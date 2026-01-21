@@ -74,3 +74,8 @@ uv.lock
 # OS
 .DS_Store
 Thumbs.db
+specs/
+.cross-critic/
+.mcp.json
+parallel_dev/
+*.plist
