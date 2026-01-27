@@ -49,6 +49,7 @@ generated_videos/
 pipeline_output/
 reference_videos/
 databases/
+!databases/migrations/
 assets/
 
 # Internal docs (not for public repo)

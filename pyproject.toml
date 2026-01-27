@@ -10,6 +10,7 @@ dependencies = [
     "typer>=0.9",
     "structlog>=23.0",
     "pyyaml>=6.0",
+    "supabase>=2.0",
 ]
 
 [project.optional-dependencies]

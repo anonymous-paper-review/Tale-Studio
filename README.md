@@ -149,6 +149,24 @@ ruff check .
 ruff format .
 ```
 
+## Video Reference DB
+
+영상 학습 및 기법 추출을 위한 통합 데이터베이스:
+
+- **저장**: YouTube/Vimeo/Local 영상의 메타데이터 및 샷별 분석
+- **연결**: Knowledge DB(YAML)의 technique과 soft reference로 연결
+- **활용**: Prompt Builder에서 기법별 시각 레퍼런스 제공
+
+### 설정
+
+```bash
+# .env에 Supabase 자격증명 추가
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5...
+```
+
+자세한 설정 및 사용법은 [Video Reference DB 가이드](docs/video_reference_db.md)를 참고하세요.
+
 ## Specs
 
 ### 핵심 설계
@@ -163,6 +181,9 @@ ruff format .
 
 ### 스타일 가이드
 - [Style Heuristics](specs/style_heuristics.md) - 비주얼 스타일 가이드
+
+### 데이터베이스
+- [Video Reference DB](docs/video_reference_db.md) - 영상 레퍼런스 DB 가이드
 
 ## Development
 

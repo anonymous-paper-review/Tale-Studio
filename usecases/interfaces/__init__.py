@@ -17,17 +17,22 @@ from usecases.interfaces.video_generator import (
     VideoRequest,
     VideoStatus,
 )
+from usecases.interfaces.knowledge_db import CinematographyKnowledgeDB, TechniqueEntry
+from usecases.interfaces.video_reference_db import VideoReferenceDB
 
 __all__ = [
     "AssetRepository",
+    "CinematographyKnowledgeDB",
     "ImageGenerator",
     "ImageRequest",
     "ImageResponse",
     "LLMGateway",
     "LLMRequest",
     "LLMResponse",
+    "TechniqueEntry",
     "VideoGenerator",
     "VideoJob",
+    "VideoReferenceDB",
     "VideoRequest",
     "VideoStatus",
 ]
