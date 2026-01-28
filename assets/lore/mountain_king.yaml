@@ -1,0 +1,123 @@
+# Mountain King - In the Hall of the Mountain King (Grieg)
+# Source: 친구 입력 (Dark Romanticism + Psychological Horror)
+
+metadata:
+  title: "In the Hall of the Mountain King"
+  composer: "Edvard Grieg"
+  source_type: "classical_music"
+  duration_seconds: 150
+  bpm_range: [60, 180]  # accelerando
+  mood_tags: ["tense", "chaotic", "epic"]
+  genre_tags: ["orchestral", "classical", "horror"]
+
+# AVA Framework - Anchor
+anchor:
+  narrative:
+    theme: "paranoia and overwhelming terror"
+    arc: "slow-build-to-chaos"
+    beats:
+      - "A human enters the forbidden realm"
+      - "The creatures notice the intruder"
+      - "Judgment and pursuit begins"
+      - "Frantic escape through darkness"
+      - "Overwhelming force consumes all"
+  emotion:
+    primary_mood: "tense"
+    tension_curve: [0.2, 0.3, 0.5, 0.7, 0.9, 1.0]
+    peaks: [0.7, 1.0]
+  structure:
+    tempo: "accelerando"  # slow → fast
+    sections:
+      - label: "intro"
+        start_time: 0
+        end_time: 30
+        energy_level: 0.2
+      - label: "build"
+        start_time: 30
+        end_time: 90
+        energy_level: 0.5
+      - label: "climax"
+        start_time: 90
+        end_time: 150
+        energy_level: 1.0
+
+# Global Style Context
+style:
+  archetype: "19th-Century Dark Romanticism meets Modern Psychological Horror"
+  visual_references:
+    - "Theodor Kittelsen (Nordic folklore)"
+    - "Hieronymus Bosch (Chaos)"
+    - "Francisco Goya (Black Paintings)"
+  texture_rendering:
+    - "Heavy oil painting texture animated"
+    - "Visible brushstrokes"
+    - "High contrast Chiaroscuro lighting (Rembrandt style)"
+    - "Flickering torchlight"
+    - "Film grain"
+    - "Dust particles suspended in air"
+    - "Volumetric fog"
+  camera_language:
+    - "Handheld anxiety"
+    - "Vertigo effects"
+    - "Claustrophobic framing"
+    - "Lens distortion (anamorphic)"
+    - "Shallow depth of field"
+  core_emotions:
+    - "Paranoia"
+    - "Claustrophobia"
+    - "Hysteria"
+    - "The Sublime Terror"
+
+# Characters
+characters:
+  - id: protagonist
+    name: "The Fool (Peer)"
+    role: "Human intruder, represents fragility"
+    description: |
+      A young 19th-century Norwegian man. Pale skin, sweat-drenched forehead,
+      terrified wide eyes (dilated pupils), wearing a worn red velvet vest
+      and white shirt stained with dirt.
+    fixed_prompt: |
+      young Norwegian man, 19th century clothing, pale sweaty skin,
+      terrified wide eyes with dilated pupils, worn red velvet vest,
+      white shirt stained with dirt, trembling
+
+  - id: antagonist_horde
+    name: "The Horde (Trolls and Gnomes)"
+    role: "Overwhelming force of nature and guilt"
+    description: |
+      Not cartoonish, but grotesque. Long noses, matted fur, glowing yellow eyes,
+      twisted limbs. Thousands of silhouettes in circular formation.
+    fixed_prompt: |
+      grotesque trolls, long crooked noses, matted dark fur, glowing yellow eyes,
+      twisted limbs, sharp teeth, nightmare creatures, nordic folklore horror
+
+  - id: location
+    name: "The Hall of the Mountain King"
+    role: "The overwhelming environment"
+    description: |
+      A colossal underground cavern. Stalactites dripping water, ancient stone throne,
+      suffocating darkness illuminated only by thousands of erratic torches.
+    fixed_prompt: |
+      massive underground cavern, stalactites dripping, ancient stone throne,
+      deep shadows, thousands of torches, smoke-filled air, oppressive darkness
+
+# Scenes
+scenes:
+  - id: scene_01
+    name: "The Judgment"
+    timestamp: "00:59-01:04"
+    duration: 5
+    shot_type: "EWS"
+    camera: "Ultra-Wide Establishing Shot, slow push-in"
+    action: |
+      The massive Hall of the Mountain King is revealed.
+      Thousands of silhouette trolls stand frozen in a circular formation.
+      In the center, the tiny figure of the Protagonist stands paralyzed.
+    lighting: |
+      Deep shadows swallow the edges. The only light comes from a massive bonfire
+      behind the stone throne, creating a terrifying backlit silhouette of the Mountain King.
+    atmosphere: "The air is thick with smoke."
+    detail: "The scale difference between the giant cavern and the human is overwhelming, emphasizing isolation."
+    mood: "Paranoia, isolation, impending doom"
+    character_ids: [protagonist, antagonist_horde, location]

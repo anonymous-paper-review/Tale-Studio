@@ -51,6 +51,7 @@ reference_videos/
 databases/
 !databases/migrations/
 assets/
+!assets/lore/
 
 # Internal docs (not for public repo)
 PROGRESS.md

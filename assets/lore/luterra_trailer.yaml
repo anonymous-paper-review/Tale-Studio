@@ -1,0 +1,160 @@
+# Luterra Trailer - Lost Ark Esther's Resolve
+# Source: 로스트아크 루테란 트레일러 (Epic Fantasy)
+
+metadata:
+  title: "루테란의 결의 (The Resolve of Luterra)"
+  source_type: "game_lore"
+  duration_seconds: 60
+  mood_tags: ["epic", "hopeful", "tense"]
+  genre_tags: ["fantasy", "action", "dramatic"]
+
+# AVA Framework - Anchor
+anchor:
+  narrative:
+    theme: "sacrifice and hope against overwhelming darkness"
+    arc: "despair-defiance-charge"
+    beats:
+      - "The world burns under demon invasion"
+      - "Kazeros and his horde darken the sky"
+      - "The Esther stand alone against extinction"
+      - "Luterra raises the Sword of the Victor"
+      - "Seven lights ignite, the charge begins"
+  emotion:
+    primary_mood: "epic"
+    tension_curve: [0.8, 0.9, 0.6, 0.7, 0.9, 1.0]
+    peaks: [0.3, 1.0]
+  structure:
+    tempo: "fast"
+    sections:
+      - label: "despair"
+        start_time: 0
+        end_time: 15
+        energy_level: 0.8
+      - label: "defiance"
+        start_time: 15
+        end_time: 40
+        energy_level: 0.7
+      - label: "charge"
+        start_time: 40
+        end_time: 60
+        energy_level: 1.0
+
+# Global Style Context
+style:
+  archetype: "Epic Fantasy Cinematic Trailer"
+  visual_references:
+    - "Lord of the Rings (scale, epic battles)"
+    - "Game of Thrones (gritty fantasy)"
+    - "Lost Ark cinematics"
+  texture_rendering:
+    - "Photorealistic"
+    - "24fps film look"
+    - "Shallow depth of field"
+    - "Dramatic lighting"
+    - "Volumetric god rays"
+  camera_language:
+    - "Epic wide shots"
+    - "Heroic low angles"
+    - "Fast cuts"
+    - "Slow-motion impacts"
+  core_emotions:
+    - "Despair"
+    - "Defiance"
+    - "Hope"
+    - "Heroism"
+
+# Characters
+characters:
+  - id: luterra
+    name: "루테란 (Luterra)"
+    role: "주인공, 에스더의 리더, 루테란 왕국의 건국왕"
+    description: |
+      기사의 나라 루테란 왕국의 왕이자 에스더들의 리더.
+      금색 정교한 갑옷에 파란 망토, 사자 문양의 어깨 장식.
+      패자의 검(금빛으로 빛나는 대검)을 들고 있다.
+      짧은 검은 머리에 회색 가닥, 풍파를 겪은 얼굴, 결연한 눈빛.
+    fixed_prompt: |
+      45-year-old male warrior king, ornate golden armor with lion motifs,
+      blue cape flowing, short black hair with grey streaks, weathered face,
+      determined eyes, holding golden legendary sword
+    emotion_arc: "고뇌 → 결의 → 희망"
+
+  - id: azena
+    name: "아제나 (Azena)"
+    role: "로헨델의 여왕, 마법사 전사"
+    description: |
+      30대 여성 전사. 진홍색과 검정색 갑옷, 날카로운 각진 디자인.
+      등에 쌍검, 긴 검은 머리가 흩날림. 창백한 피부에 전투 흉터.
+      붉게 빛나는 강렬한 눈.
+    fixed_prompt: |
+      30-year-old female warrior queen, crimson and black angular armor,
+      twin swords on back, long black hair flowing, pale skin with battle scars,
+      fierce red glowing eyes, tears in eyes
+    emotion_arc: "분노/눈물 → 갈등 → 묵묵한 동의"
+
+  - id: kadan
+    name: "카단 (Kadan)"
+    role: "가디언 슬레이어, 최강의 에스더"
+    description: |
+      고귀한 남성 팔라딘 전사. 은백색 갑옷에 성스러운 문양.
+      등에 타워 실드, 짧은 은발을 뒤로 넘김.
+      차분하고 현명한 눈에 부드러운 금빛 광채.
+    fixed_prompt: |
+      40-year-old male paladin, silver-white holy armor with sacred runes,
+      tower shield on back, short silver hair swept back, calm wise eyes
+      with soft golden glow, drawing gleaming sword
+    emotion_arc: "관조 → 이해의 끄덕임 → 지지"
+
+# Scenes (Trailer Shot List)
+scenes:
+  - id: shot_01
+    name: "Burning World"
+    duration: 2
+    shot_type: "EWS"
+    camera: "Aerial shot, slow descent"
+    action: "검은 화면. 천둥소리. 붉은 하늘이 서서히 드러난다. 아크라시아 대륙 전체가 불타고 있다."
+    mood: "Apocalyptic despair"
+
+  - id: shot_02
+    name: "Demon Horde"
+    duration: 2
+    shot_type: "EWS"
+    camera: "Low angle, looking up"
+    action: "하늘 가득 악마 군단. 수만 개의 검은 날개가 태양을 완전히 가린다."
+    mood: "Overwhelming terror"
+
+  - id: shot_05
+    name: "Esther Silhouettes"
+    duration: 1
+    shot_type: "WS"
+    camera: "Backlit, wide shot"
+    action: "역광. 언덕 위 일곱 개의 실루엣. 망토가 바람에 휘날린다."
+    mood: "Hope amidst darkness"
+    character_ids: [luterra, azena, kadan]
+
+  - id: shot_08
+    name: "Luterra's Resolve"
+    duration: 2
+    shot_type: "MS"
+    camera: "Low angle, slow push-in"
+    action: "루테란. 석양빛이 금빛 갑옷을 붉게 물들인다. 천천히 고개를 든다. 결연한 눈빛."
+    mood: "Determination"
+    character_ids: [luterra]
+
+  - id: shot_10
+    name: "Sword Raised"
+    duration: 2
+    shot_type: "MS"
+    camera: "Dynamic, golden light burst"
+    action: "루테란이 검을 하늘로 치켜든다. 검에서 황금빛 광채가 폭발한다!"
+    mood: "Epic heroism"
+    character_ids: [luterra]
+
+  - id: shot_12
+    name: "The Charge"
+    duration: 2
+    shot_type: "EWS"
+    camera: "Wide, chaotic action"
+    action: "에스더들이 악마 군단을 향해 돌격한다. 폭발. 마법. 검격. 화면 가득 카오스."
+    mood: "Epic battle climax"
+    character_ids: [luterra, azena, kadan]
