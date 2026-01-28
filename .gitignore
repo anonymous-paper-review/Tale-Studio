@@ -77,5 +77,6 @@ uv.lock
 Thumbs.db
 .cross-critic/
 .mcp.json
+.omc/
 parallel_dev/
 *.plist
