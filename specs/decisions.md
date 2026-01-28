@@ -1,8 +1,29 @@
 # Decisions
 
-> 최종 수정: 2026-01-27 23:27
+> 최종 수정: 2026-01-28 15:30
 
 ## 확정
+
+### 13. Knowledge DB Supabase 이관
+- **결정**: YAML 기반 Knowledge DB를 Supabase `knowledge_techniques` 테이블로 이관
+- **구조**:
+  - `technique_id`: 고유 ID (handheld, chiaroscuro 등)
+  - `category`: camera_language / rendering_style / shot_grammar
+  - `prompt_fragment`: 프롬프트에 삽입할 텍스트
+  - `emotional_tags`: 감정 기반 검색용 배열 (GIN 인덱스)
+  - `shot_type_affinity`: 샷 타입 매칭용 배열 (GIN 인덱스)
+- **이유**: Video Reference DB와 동일 인프라 사용, 배열 검색 성능, 향후 확장성
+- **어댑터**: `SupabaseKnowledgeDB` (YAML과 동일 인터페이스)
+- **일자**: 2026-01-28
+
+### 14. Lore 데이터 구조화
+- **결정**: `assets/lore/*.yaml`에 테스트용 입력 데이터 저장
+- **구조**: AVA Framework 기반 (anchor, style, characters, scenes)
+- **파일**:
+  - `mountain_king.yaml`: Dark Romanticism + Horror (클래식 음악)
+  - `luterra_trailer.yaml`: Epic Fantasy (게임 lore)
+- **이유**: 다양한 입력 소스 테스트, AVA Framework 범용성 검증
+- **일자**: 2026-01-28
 
 ### 12. Video Reference DB 구현
 - **결정**: Supabase 기반 영상 레퍼런스 DB, Knowledge DB(YAML)와 soft reference 연결
