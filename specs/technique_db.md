@@ -1,236 +1,353 @@
-# Technique DB 스펙
+# Technique DB 스펙 (Supabase)
 
-> 최종 수정: 2026-01-22 15:15
-> 상태: 스펙 정의 완료, 필드 설계 대기
+> 최종 수정: 2026-02-02 (Supabase 버전으로 재작성)
 
 ## 개요
 
-유튜브/영상을 분석하여 시네마틱 연출 테크닉을 DB로 축적.
+촬영 테크닉과 영상 레퍼런스를 저장하는 Supabase 기반 DB.
 L3 Prompt Builder가 샷 프롬프트 생성 시 참조.
 
 ---
 
-## 목적
+## 아키텍처
 
-1. **연출 패턴 축적**: 다양한 영상에서 검증된 연출 기법 수집
-2. **프롬프트 품질 향상**: DB 기반으로 구체적이고 일관된 프롬프트 생성
-3. **스타일 재현**: 특정 영상/감독 스타일을 재현할 수 있는 레퍼런스
-
----
-
-## 범위 (Scope)
-
-### 포함 (In Scope)
-- 카메라 워크 (pan, tilt, dolly, crane, handheld 등)
-- 샷 타입별 세부 설정 (wide, medium, close-up 등)
-- 조명/분위기 (high-key, low-key, golden hour, neon 등)
-- 시각 효과 (렌즈 플레어, 먼지 입자, 피사계 심도 등)
-- 배우/피사체 디테일 (피부 질감, 의상 질감, 헤어 등)
-- 환경 디테일 (공기 먼지, 안개, 빛줄기 등)
-
-### 제외 (Out of Scope) - L2 담당
-- 샷 순서/구성
-- 대사 유무
-- 액션 유형
-- 감정 태그
-- 전후 샷 관계
-- 장르 분류
-
----
-
-## 데이터 모델
-
-### 핵심 엔티티: `Technique`
-
-```yaml
-Technique:
-  id: string              # unique identifier
-  category: enum          # camera | lighting | atmosphere | detail
-  name: string            # 기법 이름 (예: "dolly_zoom", "rim_lighting")
-
-  # 적용 컨텍스트
-  applicable_shot_types:  # 이 기법이 적용되는 샷 타입들
-    - wide
-    - medium
-    - close_up
-  applicable_moods:       # 이 기법이 어울리는 분위기
-    - tense
-    - romantic
-    - action
-
-  # 프롬프트 요소
-  prompt_fragment: string # Veo 프롬프트에 들어갈 텍스트 조각
-  keywords: list[string]  # 검색용 키워드
-
-  # 메타데이터
-  source_video: string    # 출처 영상 (optional)
-  timestamp: string       # 영상 내 타임스탬프 (optional)
-  confidence: float       # 0.0-1.0, 수동 검증 시 1.0
-
-  # 예시
-  example_description: string  # 이 기법이 사용된 장면 설명
 ```
-
-### 카테고리별 필드
-
-#### 1. Camera (카메라)
-```yaml
-camera_technique:
-  movement: enum          # static | pan | tilt | dolly | crane | handheld | steadicam
-  speed: enum             # slow | medium | fast
-  direction: string       # left_to_right, push_in, pull_out 등
-  lens: string            # wide_angle, telephoto, macro 등
-  focus: string           # deep_focus, shallow_dof, rack_focus 등
-```
-
-#### 2. Lighting (조명)
-```yaml
-lighting_technique:
-  key_type: enum          # high_key | low_key | natural | mixed
-  direction: string       # front | side | back | top | bottom
-  color_temp: string      # warm | cool | neutral | mixed
-  special: list[string]   # rim_light, hair_light, practical_lights 등
-```
-
-#### 3. Atmosphere (분위기/환경)
-```yaml
-atmosphere_technique:
-  particles: list[string] # dust, fog, smoke, rain, snow 등
-  light_effects: list[string]  # lens_flare, god_rays, bokeh 등
-  color_grade: string     # teal_orange, desaturated, high_contrast 등
-```
-
-#### 4. Detail (피사체 디테일)
-```yaml
-detail_technique:
-  skin: string            # sweaty, pale, weathered, glowing 등
-  texture: string         # fabric_detail, metal_reflection 등
-  micro_details: list[string]  # pores, stubble, freckles 등
+┌─────────────────────────────────────────────────────────┐
+│                     Supabase                            │
+│  ┌─────────────────┐      ┌─────────────────────────┐  │
+│  │ knowledge_      │      │ videos                  │  │
+│  │ techniques      │◄─────│ shot_analysis           │  │
+│  │ (촬영 기법)     │ soft │ (영상 레퍼런스)         │  │
+│  └─────────────────┘ ref  └─────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+         │                           │
+         ▼                           ▼
+┌─────────────────┐         ┌─────────────────────────┐
+│ YAMLKnowledgeDB │         │ SupabaseVideoReferenceDB│
+│ (로컬 백업)     │         │                         │
+└─────────────────┘         └─────────────────────────┘
 ```
 
 ---
 
-## 분석 파이프라인
+## 1. Knowledge DB (knowledge_techniques)
 
-### 워크플로우 (반자동)
+촬영 테크닉 레퍼런스. L3 Prompt Builder가 mood/shot_type 기반으로 쿼리.
 
-```
-[영상 입력]
-    ↓
-[1. 프레임 추출]
-    - 씬 전환점 감지
-    - 대표 프레임 선택
-    ↓
-[2. LLM 초안 분석]
-    - Gemini Vision으로 프레임 분석
-    - 카메라/조명/분위기/디테일 추출
-    - JSON 형식 출력
-    ↓
-[3. 사람 검토/수정]
-    - 잘못된 분석 수정
-    - 누락된 기법 추가
-    - confidence 점수 부여
-    ↓
-[4. DB 저장]
-    - 검증된 데이터만 저장
-    - 중복 체크
-```
+### 테이블 스키마
 
-### 분석 프롬프트 (초안)
+```sql
+CREATE TABLE knowledge_techniques (
+  id            BIGSERIAL PRIMARY KEY,
+  technique_id  TEXT NOT NULL,           -- 'handheld', 'chiaroscuro' 등
+  name          TEXT NOT NULL,           -- 표시 이름
+  category      TEXT NOT NULL,           -- 카테고리 (아래 참조)
+  prompt_fragment TEXT NOT NULL,         -- Veo 프롬프트에 삽입할 텍스트
+  description   TEXT,                    -- 설명 (optional)
+  emotional_tags TEXT[] DEFAULT '{}',    -- 감정 기반 검색용
+  shot_type_affinity TEXT[] DEFAULT '{}',-- 샷 타입 매칭용
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
 
-```
-이 영상 프레임을 분석하여 다음 정보를 JSON으로 추출하세요:
+  UNIQUE(category, technique_id)
+);
 
-1. 카메라:
-   - 움직임 (static/pan/tilt/dolly/crane/handheld)
-   - 렌즈 특성 (wide/normal/telephoto)
-   - 포커스 (deep/shallow/rack)
-
-2. 조명:
-   - 키 조명 유형 (high-key/low-key/natural)
-   - 조명 방향
-   - 색온도
-   - 특수 조명 (림라이트, 실용조명 등)
-
-3. 분위기:
-   - 공기 중 입자 (먼지, 안개, 연기 등)
-   - 빛 효과 (렌즈플레어, 갓레이 등)
-   - 컬러 그레이딩 스타일
-
-4. 디테일:
-   - 피부/질감 묘사
-   - 주목할 만한 시각적 디테일
+-- 검색 성능을 위한 GIN 인덱스
+CREATE INDEX idx_knowledge_emotional_tags ON knowledge_techniques USING GIN (emotional_tags);
+CREATE INDEX idx_knowledge_shot_type ON knowledge_techniques USING GIN (shot_type_affinity);
+CREATE INDEX idx_knowledge_category ON knowledge_techniques (category);
 ```
 
----
+### 카테고리
 
-## 사용 시나리오
+| category | 설명 | 예시 |
+|----------|------|------|
+| `camera_language` | 카메라 워크/움직임 | handheld, vertigo, steadicam, dutch_angle |
+| `rendering_style` | 렌더링/시각 스타일 | chiaroscuro, film_grain_70s, neon_noir |
+| `shot_grammar` | 샷 문법/연출 패턴 | silhouette_reveal, push_in_realization |
 
-### L3 Prompt Builder에서 사용
+### TechniqueEntry 구조
 
 ```python
-# 샷 정보가 주어졌을 때
-shot = Shot(type="close_up", mood="tense", action="dialogue")
+@dataclass
+class TechniqueEntry:
+    id: str                         # technique_id
+    name: str                       # 표시 이름
+    prompt_fragment: str            # 프롬프트 조각
+    emotional_tags: list[str]       # ['tense', 'intimate', 'chaotic']
+    shot_type_affinity: list[str]   # ['CU', 'MS', 'WS']
+    description: str                # 설명
+```
 
-# DB에서 적합한 테크닉 조회
-techniques = db.query(
-    applicable_shot_types=["close_up"],
-    applicable_moods=["tense"]
-)
+### 쿼리 인터페이스
 
-# 프롬프트 조합
-prompt_fragments = [t.prompt_fragment for t in techniques]
-final_prompt = base_prompt + " ".join(prompt_fragments)
+```python
+class CinematographyKnowledgeDB(ABC):
+    @abstractmethod
+    def query(
+        self,
+        category: str,              # "camera_language" | "rendering_style" | "shot_grammar"
+        moods: list[str] = None,    # 감정 필터 (overlaps)
+        shot_type: str = None,      # 샷 타입 필터 (contains)
+        limit: int = 3,
+    ) -> list[TechniqueEntry]
+
+    @abstractmethod
+    def get_by_id(
+        self, category: str, technique_id: str
+    ) -> Optional[TechniqueEntry]
 ```
 
 ### 예시 데이터
 
-```json
-{
-  "id": "cam_dolly_zoom_001",
-  "category": "camera",
-  "name": "dolly_zoom",
-  "applicable_shot_types": ["medium", "close_up"],
-  "applicable_moods": ["tense", "revelation", "horror"],
-  "prompt_fragment": "dolly zoom effect, background expanding while subject stays same size",
-  "keywords": ["vertigo", "zolly", "contra-zoom"],
-  "source_video": "https://youtube.com/...",
-  "timestamp": "01:23:45",
-  "confidence": 1.0,
-  "example_description": "주인공이 충격적인 사실을 깨닫는 순간, 배경이 멀어지며 고립감 강조"
-}
+```yaml
+# camera_language
+- technique_id: handheld
+  name: Handheld Camera
+  prompt_fragment: "handheld camera with subtle organic movement"
+  emotional_tags: [tense, intimate, chaotic, documentary]
+  shot_type_affinity: [CU, MS]
+  description: 손으로 든 카메라의 미세한 흔들림
+
+# rendering_style
+- technique_id: chiaroscuro
+  name: Chiaroscuro Lighting
+  prompt_fragment: "dramatic chiaroscuro lighting with deep shadows"
+  emotional_tags: [dramatic, mysterious, noir]
+  shot_type_affinity: [CU, MS, WS]
+  description: 강한 명암 대비의 드라마틱한 조명
+
+# shot_grammar
+- technique_id: silhouette_reveal
+  name: Silhouette Reveal
+  prompt_fragment: "silhouette against bright background, slowly revealing details"
+  emotional_tags: [mysterious, dramatic, epic]
+  shot_type_affinity: [WS, EWS]
+  description: 실루엣에서 점점 디테일이 드러나는 연출
 ```
 
 ---
 
-## 저장소 구조
+## 2. Video Reference DB
+
+영상 레퍼런스와 샷 분석 저장. Knowledge DB와 soft reference로 연결.
+
+### videos 테이블
+
+```sql
+CREATE TABLE videos (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title       TEXT NOT NULL,
+  url         TEXT,                      -- 원본 URL
+  platform    TEXT DEFAULT 'youtube',    -- youtube, vimeo, local
+  genre       TEXT,                      -- drama, action, horror 등
+  tags        TEXT[] DEFAULT '{}',       -- 검색용 태그
+  status      TEXT DEFAULT 'pending',    -- pending → analyzed → reviewed → archived
+  duration_seconds INTEGER,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_videos_status ON videos (status);
+CREATE INDEX idx_videos_genre ON videos (genre);
+CREATE INDEX idx_videos_tags ON videos USING GIN (tags);
+```
+
+### shot_analysis 테이블
+
+```sql
+CREATE TABLE shot_analysis (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  video_id          UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+
+  -- 타임스탬프
+  start_time        FLOAT NOT NULL,      -- 시작 시간 (초)
+  end_time          FLOAT NOT NULL,      -- 종료 시간 (초)
+
+  -- Knowledge DB 연결 (soft reference)
+  technique_category TEXT,               -- camera_language, rendering_style, shot_grammar
+  technique_id      TEXT,                -- knowledge_techniques.technique_id
+
+  -- 분석 결과
+  shot_type         TEXT,                -- WS, MS, CU, ECU 등
+  description       TEXT,                -- 샷 설명
+  confidence        FLOAT DEFAULT 0.0,   -- 0.0~1.0
+
+  -- 검증
+  human_verified    BOOLEAN DEFAULT FALSE,
+  verified_by       TEXT,
+  verified_at       TIMESTAMPTZ,
+  human_notes       TEXT,
+
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_shot_video ON shot_analysis (video_id);
+CREATE INDEX idx_shot_technique ON shot_analysis (technique_category, technique_id);
+CREATE INDEX idx_shot_verified ON shot_analysis (human_verified);
+```
+
+### 워크플로우
 
 ```
-databases/
-├── technique_db.json       # 메인 DB
-├── categories/
-│   ├── camera.json         # 카메라 기법
-│   ├── lighting.json       # 조명 기법
-│   ├── atmosphere.json     # 분위기/환경
-│   └── detail.json         # 디테일
-└── sources/
-    └── analysis_logs/      # 분석 로그 (검토용)
+[영상 등록]
+    ↓
+status: pending
+    ↓
+[LLM 자동 분석]
+    - 프레임 추출
+    - 샷 분할
+    - 테크닉 매칭
+    ↓
+status: analyzed
+    ↓
+[사람 검토]
+    - 잘못된 분석 수정
+    - human_verified = true
+    ↓
+status: reviewed
+```
+
+### 어댑터 인터페이스
+
+```python
+class VideoReferenceDB(ABC):
+    # Video CRUD
+    def add_video(self, video: Video) -> Video
+    def get_video(self, video_id: UUID) -> Optional[Video]
+    def update_video_status(self, video_id: UUID, status: str) -> None
+    def list_videos(self, status, genre, tags, limit, offset) -> list[Video]
+
+    # ShotAnalysis CRUD
+    def add_shot_analysis(self, analysis: ShotAnalysis) -> ShotAnalysis
+    def add_shot_analyses_batch(self, analyses: list[ShotAnalysis]) -> list[ShotAnalysis]
+    def get_shots_by_video(self, video_id: UUID) -> list[ShotAnalysis]
+    def verify_shot(self, shot_id, verified_by, notes) -> ShotAnalysis
+
+    # Knowledge DB 연결
+    def find_references_by_technique(
+        self,
+        category: str,
+        technique_id: str,
+        verified_only: bool = False,
+        min_confidence: float = None,
+        limit: int = 10,
+    ) -> list[ShotAnalysis]
 ```
 
 ---
 
-## 미해결 사항
+## 3. 어댑터 구현
 
-- [ ] 영상 소스 선정 (장르/스타일)
-- [ ] 프레임 추출 도구 선정
-- [ ] LLM 분석 비용 추정
-- [ ] 검토 UI/워크플로우 설계
-- [ ] 중복 제거 로직
+### SupabaseKnowledgeDB
+
+```python
+from adapters.knowledge_db import SupabaseKnowledgeDB
+
+# 환경변수에서 생성
+db = SupabaseKnowledgeDB.from_env()
+
+# 쿼리
+techniques = db.query(
+    category="camera_language",
+    moods=["tense", "intimate"],
+    shot_type="CU",
+    limit=3
+)
+
+# 특정 ID 조회
+technique = db.get_by_id("rendering_style", "chiaroscuro")
+```
+
+### YAMLKnowledgeDB (로컬 백업)
+
+```python
+from adapters.knowledge_db import YAMLKnowledgeDB
+
+# 로컬 YAML 파일에서 로드
+db = YAMLKnowledgeDB("databases/knowledge")
+
+# 동일한 인터페이스
+techniques = db.query(category="camera_language", moods=["tense"])
+```
+
+### SupabaseVideoReferenceDB
+
+```python
+from adapters.video_reference_db import SupabaseVideoReferenceDB
+
+db = SupabaseVideoReferenceDB.from_env()
+
+# 영상 등록
+video = db.add_video(Video(title="Reference Film", url="..."))
+
+# 샷 분석 추가
+analysis = db.add_shot_analysis(ShotAnalysis(
+    video_id=video.id,
+    start_time=0.0,
+    end_time=5.0,
+    technique_category="camera_language",
+    technique_id="handheld",
+    shot_type="MS",
+    confidence=0.85
+))
+
+# 테크닉으로 레퍼런스 검색
+refs = db.find_references_by_technique(
+    category="camera_language",
+    technique_id="handheld",
+    verified_only=True
+)
+```
 
 ---
 
-## 변경 이력
+## 4. 환경 설정
+
+### 필수 환경변수
+
+```bash
+# .env
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_KEY=eyJhbGc...  # Service Role Key (백엔드용)
+SUPABASE_ANON_KEY=eyJhbGc...     # Anon Key (클라이언트용, optional)
+```
+
+### Supabase 프로젝트
+
+- **Project**: j-xcape's Project
+- **Region**: ap-southeast-1
+- **Organization**: second-brain
+
+---
+
+## 5. 로컬 YAML 구조 (백업/시딩용)
+
+```
+databases/knowledge/
+├── camera_language.yaml
+├── rendering_style.yaml
+└── shot_grammar.yaml
+```
+
+각 파일 형식:
+```yaml
+techniques:
+  - id: handheld
+    name: Handheld Camera
+    prompt_fragment: "handheld camera with subtle organic movement"
+    emotional_tags: [tense, intimate, chaotic]
+    shot_type_affinity: [CU, MS]
+    description: 손으로 든 카메라의 미세한 흔들림
+```
+
+---
+
+## 6. 마이그레이션 히스토리
 
 | 날짜 | 내용 |
 |------|------|
-| 2026-01-22 | 스펙 인터뷰 기반 초안 작성 |
+| 2026-01-22 | 초기 스펙 작성 (JSON 기반) |
+| 2026-01-27 | YAML 기반 Knowledge DB 구현 |
+| 2026-01-27 | Video Reference DB (Supabase) 추가 |
+| 2026-01-28 | Knowledge DB Supabase 이관 결정 |
+| 2026-02-02 | 스펙 문서 Supabase 버전으로 재작성 |
