@@ -46,38 +46,82 @@ Level 3: Prompt Builder
 
 ---
 
-## 디렉토리 구조 (목표)
+## 디렉토리 구조
+
+> Clean Architecture 기반 구조
 
 ```
 tale/
-├── pipeline/              # 핵심 파이프라인 코드
-│   ├── main_pipeline.py
-│   ├── video_generator.py
-│   ├── level1_scene_architect.py
-│   ├── level2_shot_template.py
-│   ├── level3_prompt_builder.py
-│   ├── asset_manager.py
-│   ├── reference_generator.py
-│   └── evaluation_manager.py
+├── domain/                # 핵심 도메인 (엔티티, 값 객체)
+│   ├── entities/
+│   │   ├── ava/           # AVA Framework 엔티티
+│   │   │   ├── anchor.py      # Anchor (NarrativeCore, EmotionalCore, StructuralCore)
+│   │   │   └── expression.py  # Expression (World, Actor, Style)
+│   │   ├── music/         # 음악 메타데이터
+│   │   ├── scene.py       # Scene 엔티티
+│   │   ├── shot.py        # Shot 엔티티
+│   │   ├── character.py   # Character 엔티티
+│   │   └── prompt.py      # Prompt 엔티티
+│   ├── value_objects/
+│   │   ├── ava/           # Mood, BridgeMode, EmotionalArc
+│   │   ├── shot_type.py
+│   │   ├── scene_type.py
+│   │   └── duration.py
+│   └── exceptions.py
+│
+├── usecases/              # 비즈니스 로직 (3-Level Pipeline)
+│   ├── scene_architect.py     # L1: 스토리 → 씬 분할
+│   ├── shot_composer.py       # L2: 씬 → 샷 시퀀스
+│   ├── prompt_builder.py      # L3: 샷 → 최종 프롬프트
+│   ├── ava/                   # AVA Framework 유스케이스
+│   │   ├── bridge_translator.py   # Anchor → Expression
+│   │   └── expression_adapter.py  # Expression → SceneArchitectInput
+│   ├── music/
+│   │   └── music_to_anchor.py     # MusicMetadata → Anchor
+│   ├── music_to_video_adapter.py  # Facade (Music → Video 전체 흐름)
+│   └── interfaces/            # 포트 (추상 인터페이스)
+│       ├── llm_gateway.py
+│       ├── video_generator.py
+│       ├── image_generator.py
+│       ├── knowledge_db.py
+│       └── asset_repository.py
+│
+├── adapters/              # 외부 시스템 어댑터
+│   ├── gateways/          # API 클라이언트
+│   │   ├── gemini_llm.py      # Google Gemini
+│   │   ├── openai_llm.py      # OpenAI GPT
+│   │   ├── veo_video.py       # Google Veo (T2V/I2V)
+│   │   └── imagen_image.py    # Google Imagen (T2I)
+│   ├── knowledge_db/      # Knowledge DB 구현체
+│   │   ├── yaml_knowledge_db.py
+│   │   └── supabase_knowledge_db.py
+│   └── repositories/      # 저장소 구현체
+│       └── file_repository.py
+│
+├── infrastructure/        # 설정, CLI
+│   ├── settings.py
+│   ├── api_key_pool.py
+│   └── cli.py
+│
+├── scripts/               # 실행 스크립트
+│   ├── run_pipeline.py
+│   ├── run_ava_pipeline.py
+│   └── seed_knowledge_db.py
+│
+├── databases/             # Knowledge DB 데이터
+│   └── knowledge/
+│       ├── camera_language.yaml
+│       ├── rendering_style.yaml
+│       └── shot_grammar.yaml
 │
 ├── assets/                # Global Assets
 │   ├── characters/
-│   ├── locations/
-│   └── props/
-│
-├── databases/             # Level 3 Prompt DB
-│   ├── cinematography_db.json
-│   ├── camera_shots.yaml
-│   └── lighting_presets.yaml
-│
-├── scenes/                # 씬별 출력물
-│   ├── scene_manifest.yaml
-│   ├── shot_sequences/
-│   └── prompts/
+│   ├── lore/              # 테스트용 입력 데이터 (AVA 기반)
+│   └── locations/
 │
 ├── generated_videos/      # 생성된 영상
-│
 ├── specs/                 # 스펙 문서
+├── tests/                 # 테스트
 ├── BUGS.md
 ├── PROGRESS.md
 └── CLAUDE.md
