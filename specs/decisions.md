@@ -1,8 +1,82 @@
 # Decisions
 
-> 최종 수정: 2026-01-28 15:30
+> 최종 수정: 2026-01-28 13:45
 
 ## 확정
+
+### 17. Veo 프롬프트 최적화 (삽질 기록)
+- **결정**: Veo 프롬프트는 **150자 이내**, 8초 영상에 맞게 **핵심 액션만** 기술
+- **배경**: 여러 번의 시행착오를 거쳐 도달한 결론
+- **삽질 과정**:
+  | 시도 | 문제 | 결과 |
+  |------|------|------|
+  | v1: 400자 상세 프롬프트 | 앞부분만 반영, 뒷부분 무시 | 정적인 장면만 생성 |
+  | v2: "POV shot moving forward" 추가 | 카메라 움직임 설명만, 피사체 정적 | 카메라만 움직임 |
+  | v3: 짧은 프롬프트 + 동시 액션 | 핵심만 150자 이내 | ✅ 성공 |
+- **핵심 교훈**:
+  1. **길이 제한**: 8초 영상 = 앞부분 100-150자만 유효
+  2. **동시 서술**: 카메라 움직임 + 피사체 움직임을 한 문장에
+  3. **정적 표현 금지**: "stand in formation" → "walk toward camera"
+  4. **구체적 동사**: "approaches" → "walk toward camera"
+- **좋은 예시**:
+  ```
+  Camera glides forward through stone arches. White-robed hooded
+  figures with masks walk toward camera in silent procession.
+  Warm golden sunlight. Cinematic.
+  ```
+- **나쁜 예시**:
+  ```
+  Slow cinematic dolly forward through a western-style stone cloister.
+  Romanesque arches create frame-within-frame composition, each arch
+  revealing the next. Warm golden afternoon sunlight streams through
+  the colonnade. Large lush green trees visible through the arches.
+  In the far distance, small white-robed hooded figures approach in
+  silent formation... (이하 무시됨)
+  ```
+- **추가 발견**:
+  - cinematography 필드는 Veo가 잘 못 읽음 (scene_context에 통합 권장)
+  - negative_prompts는 효과 불분명 (짧게 유지)
+  - style_keywords도 짧게 (2-3개 max)
+- **일자**: 2026-01-28
+
+### 18. 영상 연출 기법 선택
+- **결정**: 스토리라인 확장보다 **4샷 고급 연출**로 진행
+- **배경**: 2분 영상에 복잡한 스토리 넣기보다 연출 밀도 높이기
+- **선택한 기법**:
+  | 샷 | 기법 | 설명 |
+  |---|---|---|
+  | 1 | 돌리 인 + 프레임인프레임 | 아치 통과하며 전진, 행렬 다가옴 |
+  | 2 | 로우앵글 + 실루엣 | 바닥에서 올려다봄, 역광, 긴 그림자 |
+  | 3 | 리플렉션 + 랙포커스 | 물에 비친 가면 → 실제로 초점 이동 |
+  | 4 | 오버헤드 + 그림자 | 위에서, 큰 나무 그림자 속으로 사라짐 |
+- **비주얼 톤 변경**: 벚꽃 → 큰 나무 + 초록 + 따뜻한 빛 (봄~초여름)
+- **일자**: 2026-01-28
+
+### 15. Analyzer vs Adapter 역할 분리
+- **결정**: 분석기(Analyzer)와 어댑터(Adapter)는 분리된 레이어로 구현
+- **역할 구분**:
+  - **Analyzer**: 원본 소스 분석 → raw features 추출 (무거움, 교체 가능)
+  - **Adapter**: raw features → 통일된 형식(Anchor)으로 정규화 (가벼움)
+- **이유**:
+  - Single Responsibility Principle
+  - Analyzer는 구현체 교체 빈번 (Spotify API, librosa, Gemini Audio 등)
+  - Adapter는 순수 변환 로직, 테스트 용이
+- **현재 상태**: `MusicToAnchor`는 Adapter 역할. Analyzer는 미구현.
+- **일자**: 2026-01-28
+
+### 16. 음악 Analyzer 우선순위 결정
+- **결정**: 음악 Analyzer(AudioAnalyzer) 구현 우선순위 **낮음**
+- **배경**:
+  - 현재 `MusicMetadata.mood_tags`는 수동 입력 (자동화 아님)
+  - 진정한 "음악 → 영상" 자동화에는 AudioAnalyzer 필요
+- **유스케이스 분석**:
+  | 시나리오 | 설명 | Analyzer 필요 |
+  |----------|------|---------------|
+  | A: "이 음악 써줘" | 스토리 → 영상 → 음악 배경으로 | ❌ |
+  | B: "음악으로 스토리 만들어줘" | 음악 → 스토리 추출 → 영상 | ✅ |
+- **결론**: 시나리오 B(뮤비 특화) 외에 Analyzer 필요한 유스케이스 불분명
+- **향후 방향**: 필요 시 optional 모듈로 구현
+- **일자**: 2026-01-28
 
 ### 13. Knowledge DB Supabase 이관
 - **결정**: YAML 기반 Knowledge DB를 Supabase `knowledge_techniques` 테이블로 이관

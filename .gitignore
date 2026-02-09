@@ -48,6 +48,7 @@ htmlcov/
 generated_videos/
 pipeline_output/
 reference_videos/
+output/
 databases/
 !databases/migrations/
 assets/
@@ -58,6 +59,7 @@ PROGRESS.md
 BUGS.md
 CLAUDE.md
 .claude/
+docs/internal/
 
 # Decision/planning docs
 specs/cinematic_luterra_decision.md

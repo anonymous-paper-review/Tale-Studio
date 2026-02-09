@@ -31,6 +31,7 @@ class MusicToAnchor:
         "suspenseful": Mood.TENSE,
         "nostalgic": Mood.NOSTALGIC,
         "wistful": Mood.NOSTALGIC,
+        "bittersweet": Mood.NOSTALGIC,
         "epic": Mood.EPIC,
         "grand": Mood.EPIC,
         "heroic": Mood.EPIC,
@@ -43,6 +44,11 @@ class MusicToAnchor:
         "serene": Mood.SERENE,
         "peaceful": Mood.SERENE,
         "calm": Mood.SERENE,
+        "ethereal": Mood.SERENE,
+        "mysterious": Mood.SERENE,
+        "eerie": Mood.SERENE,
+        "dreamy": Mood.SERENE,
+        "reflective": Mood.NOSTALGIC,
     }
 
     def execute(self, music: MusicMetadata) -> Anchor:
