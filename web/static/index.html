@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camera Explorer - Tale</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0f; color: #e0e0e0; overflow: hidden; height: 100vh; }
+
+  #app { display: grid; grid-template-columns: 1fr 360px; grid-template-rows: 1fr auto; height: 100vh; gap: 1px; background: #1a1a2e; }
+
+  /* 3D Viewport */
+  #viewport { background: #0d0d15; position: relative; overflow: hidden; }
+  #viewport canvas { width: 100% !important; height: 100% !important; }
+  #viewport-label { position: absolute; top: 12px; left: 16px; font-size: 11px; color: #555; letter-spacing: 1px; text-transform: uppercase; }
+  #camera-info { position: absolute; bottom: 12px; left: 16px; font-size: 11px; color: #444; font-family: monospace; }
+
+  /* Controls Panel */
+  #controls { background: #111118; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .section-title { font-size: 11px; color: #666; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+
+  /* Prompt */
+  #prompt-input { width: 100%; height: 80px; background: #1a1a25; border: 1px solid #2a2a3a; border-radius: 8px; color: #ddd; padding: 10px; font-size: 13px; resize: none; font-family: inherit; }
+  #prompt-input:focus { outline: none; border-color: #4a6cf7; }
+
+  /* Sliders */
+  .slider-group { display: flex; flex-direction: column; gap: 6px; }
+  .slider-row { display: flex; align-items: center; gap: 8px; }
+  .slider-label { width: 70px; font-size: 12px; color: #888; flex-shrink: 0; }
+  .slider-value { width: 32px; font-size: 12px; color: #4a6cf7; text-align: right; font-family: monospace; flex-shrink: 0; }
+  input[type="range"] { flex: 1; -webkit-appearance: none; height: 4px; background: #2a2a3a; border-radius: 2px; outline: none; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #4a6cf7; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb:hover { background: #6b8cff; }
+
+  /* Preset Buttons */
+  .preset-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .preset-btn { padding: 5px 10px; font-size: 11px; background: #1a1a28; border: 1px solid #2a2a3a; border-radius: 6px; color: #aaa; cursor: pointer; transition: all 0.2s; }
+  .preset-btn:hover { border-color: #4a6cf7; color: #ddd; }
+  .preset-btn.active { background: #4a6cf722; border-color: #4a6cf7; color: #4a6cf7; }
+
+  /* Lighting Select */
+  #lighting-select { width: 100%; padding: 8px 10px; background: #1a1a25; border: 1px solid #2a2a3a; border-radius: 8px; color: #ddd; font-size: 13px; }
+
+  /* Options Row */
+  .options-row { display: flex; gap: 8px; }
+  .option-select { flex: 1; padding: 6px 8px; background: #1a1a25; border: 1px solid #2a2a3a; border-radius: 6px; color: #ddd; font-size: 12px; }
+
+  /* Generate Button */
+  #generate-btn { width: 100%; padding: 12px; background: #4a6cf7; border: none; border-radius: 8px; color: white; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  #generate-btn:hover { background: #3a5ce5; }
+  #generate-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+  /* Status */
+  #status { font-size: 12px; color: #666; text-align: center; min-height: 20px; }
+  #status.error { color: #f74a4a; }
+  #status.success { color: #4af77a; }
+
+  /* Results */
+  #results { grid-column: 1 / -1; background: #0d0d15; padding: 12px 16px; display: flex; gap: 12px; overflow-x: auto; min-height: 120px; align-items: center; border-top: 1px solid #1a1a2e; }
+  #results:empty::before { content: 'Generated videos will appear here'; color: #333; font-size: 13px; }
+  .result-card { flex-shrink: 0; width: 200px; background: #111118; border-radius: 8px; overflow: hidden; border: 1px solid #2a2a3a; }
+  .result-card video { width: 100%; height: 112px; object-fit: cover; background: #000; }
+  .result-card .result-meta { padding: 6px 8px; font-size: 10px; color: #666; }
+  .result-card .result-meta .result-preset { color: #4a6cf7; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="viewport">
+    <div id="viewport-label">3D Camera Preview</div>
+    <div id="camera-info"></div>
+  </div>
+
+  <div id="controls">
+    <div>
+      <div class="section-title">Prompt</div>
+      <textarea id="prompt-input" placeholder="Describe your scene...">A lone warrior stands on a cliff edge at sunset, wind blowing through their cape, dramatic clouds in the background</textarea>
+    </div>
+
+    <div>
+      <div class="section-title">Camera Presets</div>
+      <div class="preset-grid" id="camera-presets"></div>
+    </div>
+
+    <div>
+      <div class="section-title">Camera Axes</div>
+      <div class="slider-group" id="slider-group"></div>
+    </div>
+
+    <div>
+      <div class="section-title">Lighting</div>
+      <select id="lighting-select">
+        <option value="">None (use prompt only)</option>
+      </select>
+    </div>
+
+    <div>
+      <div class="section-title">Options</div>
+      <div class="options-row">
+        <select class="option-select" id="duration-select">
+          <option value="5">5 sec</option>
+          <option value="10">10 sec</option>
+        </select>
+        <select class="option-select" id="ratio-select">
+          <option value="16:9">16:9</option>
+          <option value="9:16">9:16</option>
+          <option value="1:1">1:1</option>
+        </select>
+        <select class="option-select" id="mode-select">
+          <option value="std">Standard</option>
+          <option value="pro">Pro</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="generate-btn">Generate Video</button>
+    <div id="status"></div>
+  </div>
+
+  <div id="results"></div>
+</div>
+
+<script>
+// ============================================================
+// State
+// ============================================================
+const AXES = [
+  { key: 'horizontal', label: 'Horizontal', default: 0 },
+  { key: 'vertical',   label: 'Vertical',   default: 0 },
+  { key: 'pan',        label: 'Pan',         default: 0 },
+  { key: 'tilt',       label: 'Tilt',        default: 0 },
+  { key: 'roll',       label: 'Roll',        default: 0 },
+  { key: 'zoom',       label: 'Zoom',        default: 0 },
+];
+
+const state = { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 };
+let cameraPresets = [];
+let lightingPresets = [];
+let activePresetId = null;
+let generating = false;
+
+// ============================================================
+// Three.js Scene
+// ============================================================
+const viewport = document.getElementById('viewport');
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0d0d15, 15, 40);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+camera.position.set(0, 2, 8);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+viewport.appendChild(renderer.domElement);
+
+// Ground
+const groundGeo = new THREE.PlaneGeometry(30, 30);
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.9 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Grid
+const grid = new THREE.GridHelper(20, 20, 0x222233, 0x181825);
+scene.add(grid);
+
+// Figure (simple humanoid silhouette)
+const figureGroup = new THREE.Group();
+
+// Body
+const bodyGeo = new THREE.CapsuleGeometry(0.3, 1.0, 8, 16);
+const bodyMat = new THREE.MeshStandardMaterial({ color: 0x334455, roughness: 0.6, metalness: 0.2 });
+const body = new THREE.Mesh(bodyGeo, bodyMat);
+body.position.y = 1.2;
+body.castShadow = true;
+figureGroup.add(body);
+
+// Head
+const headGeo = new THREE.SphereGeometry(0.22, 16, 16);
+const head = new THREE.Mesh(headGeo, bodyMat);
+head.position.y = 2.0;
+head.castShadow = true;
+figureGroup.add(head);
+
+scene.add(figureGroup);
+
+// Reference cube (small, at origin)
+const cubeGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+const cubeMat = new THREE.MeshStandardMaterial({ color: 0x4a6cf7, roughness: 0.4, metalness: 0.3, transparent: true, opacity: 0.3 });
+const cube = new THREE.Mesh(cubeGeo, cubeMat);
+cube.position.set(2, 0.25, -1);
+scene.add(cube);
+
+// Lights (default setup - will be changed by presets)
+const ambientLight = new THREE.AmbientLight(0x334455, 0.4);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+dirLight.position.set(5, 8, 5);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 1024;
+dirLight.shadow.mapSize.height = 1024;
+scene.add(dirLight);
+
+const rimLight = new THREE.PointLight(0x4a6cf7, 0.5, 15);
+rimLight.position.set(-3, 3, -3);
+scene.add(rimLight);
+
+// Camera target marker
+const targetGeo = new THREE.SphereGeometry(0.05, 8, 8);
+const targetMat = new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.5 });
+const targetMarker = new THREE.Mesh(targetGeo, targetMat);
+scene.add(targetMarker);
+
+// Lighting preset definitions for Three.js
+const LIGHTING_3D = {
+  '': { ambient: [0x334455, 0.4], dir: [0xffeedd, 1.2, [5, 8, 5]], rim: [0x4a6cf7, 0.5], bg: 0x0d0d15, exposure: 1.0 },
+  'golden_hour': { ambient: [0x553311, 0.3], dir: [0xffaa44, 2.0, [3, 2, 5]], rim: [0xff6622, 0.6], bg: 0x120a04, exposure: 1.2 },
+  'chiaroscuro': { ambient: [0x111111, 0.05], dir: [0xffffff, 2.5, [3, 6, 2]], rim: [0x000000, 0], bg: 0x050505, exposure: 0.9 },
+  'neon_noir': { ambient: [0x110022, 0.3], dir: [0xff44aa, 1.0, [2, 4, 3]], rim: [0x44aaff, 1.5], bg: 0x080010, exposure: 1.1 },
+  'moonlight_blue': { ambient: [0x112233, 0.3], dir: [0x6688cc, 1.5, [-3, 8, 2]], rim: [0x334466, 0.4], bg: 0x060810, exposure: 0.8 },
+  'silhouette_backlit': { ambient: [0x111111, 0.1], dir: [0xffddbb, 2.5, [0, 3, -5]], rim: [0xffaa66, 1.0], bg: 0x0a0808, exposure: 1.3 },
+  'candlelight_warm': { ambient: [0x221100, 0.2], dir: [0xff8833, 1.5, [1, 3, 2]], rim: [0xff6611, 0.3], bg: 0x0a0604, exposure: 0.9 },
+  'high_key_bright': { ambient: [0xcccccc, 0.8], dir: [0xffffff, 1.0, [0, 10, 5]], rim: [0xffffff, 0.3], bg: 0x181820, exposure: 1.4 },
+  'desaturated_gritty': { ambient: [0x222222, 0.4], dir: [0x999999, 1.2, [4, 6, 3]], rim: [0x444444, 0.3], bg: 0x0a0a0a, exposure: 0.7 },
+  'film_grain_70s': { ambient: [0x443322, 0.4], dir: [0xddaa77, 1.3, [4, 5, 3]], rim: [0x885533, 0.4], bg: 0x0d0a06, exposure: 1.0 },
+  'oil_painting': { ambient: [0x332211, 0.3], dir: [0xeedd99, 1.5, [5, 7, 2]], rim: [0x997744, 0.3], bg: 0x0a0806, exposure: 1.0 },
+  'ethereal_glow': { ambient: [0x223344, 0.5], dir: [0xaaddff, 1.2, [2, 8, 4]], rim: [0x88bbee, 0.6], bg: 0x0a0d12, exposure: 1.2 },
+};
+
+function applyLighting(presetId) {
+  const preset = LIGHTING_3D[presetId] || LIGHTING_3D[''];
+  ambientLight.color.setHex(preset.ambient[0]);
+  ambientLight.intensity = preset.ambient[1];
+  dirLight.color.setHex(preset.dir[0]);
+  dirLight.intensity = preset.dir[1];
+  dirLight.position.set(...preset.dir[2]);
+  rimLight.color.setHex(preset.rim[0]);
+  rimLight.intensity = preset.rim[1];
+  scene.background = new THREE.Color(preset.bg);
+  scene.fog.color.setHex(preset.bg);
+  renderer.toneMappingExposure = preset.exposure;
+}
+
+applyLighting('');
+
+// ============================================================
+// Camera Update from Sliders
+// ============================================================
+const BASE_POS = new THREE.Vector3(0, 2, 8);
+const LOOK_TARGET = new THREE.Vector3(0, 1, 0);
+
+function updateCamera() {
+  const h = state.horizontal;
+  const v = state.vertical;
+  const p = state.pan;
+  const t = state.tilt;
+  const r = state.roll;
+  const z = state.zoom;
+
+  // Position offsets
+  camera.position.x = BASE_POS.x + h * 0.5;
+  camera.position.y = BASE_POS.y + v * 0.3;
+  camera.position.z = BASE_POS.z - z * 0.5;
+
+  // Look target with pan/tilt
+  const target = new THREE.Vector3(
+    LOOK_TARGET.x + t * 0.3,
+    LOOK_TARGET.y + p * 0.2,
+    LOOK_TARGET.z
+  );
+  camera.lookAt(target);
+  targetMarker.position.copy(target);
+
+  // Apply roll
+  camera.rotateZ(r * Math.PI / 180 * 3);
+
+  // Update info
+  document.getElementById('camera-info').textContent =
+    `pos(${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}) ` +
+    `H:${h} V:${v} P:${p} T:${t} R:${r} Z:${z}`;
+}
+
+// ============================================================
+// Render Loop
+// ============================================================
+function resize() {
+  const w = viewport.clientWidth;
+  const h = viewport.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  // Subtle idle animation
+  cube.rotation.y += 0.005;
+  updateCamera();
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', resize);
+resize();
+animate();
+
+// ============================================================
+// UI: Sliders
+// ============================================================
+const sliderGroup = document.getElementById('slider-group');
+
+AXES.forEach(axis => {
+  const row = document.createElement('div');
+  row.className = 'slider-row';
+
+  const label = document.createElement('span');
+  label.className = 'slider-label';
+  label.textContent = axis.label;
+
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.min = -10;
+  slider.max = 10;
+  slider.step = 1;
+  slider.value = axis.default;
+  slider.id = `slider-${axis.key}`;
+
+  const value = document.createElement('span');
+  value.className = 'slider-value';
+  value.id = `value-${axis.key}`;
+  value.textContent = axis.default;
+
+  slider.addEventListener('input', () => {
+    const v = parseInt(slider.value);
+    state[axis.key] = v;
+    value.textContent = v;
+    activePresetId = null;
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  });
+
+  row.appendChild(label);
+  row.appendChild(slider);
+  row.appendChild(value);
+  sliderGroup.appendChild(row);
+});
+
+function setSliders(values) {
+  AXES.forEach(axis => {
+    const v = values[axis.key] ?? 0;
+    state[axis.key] = v;
+    document.getElementById(`slider-${axis.key}`).value = v;
+    document.getElementById(`value-${axis.key}`).value = v;
+    document.getElementById(`value-${axis.key}`).textContent = v;
+  });
+}
+
+// ============================================================
+// UI: Presets
+// ============================================================
+const presetsContainer = document.getElementById('camera-presets');
+
+async function loadPresets() {
+  try {
+    const resp = await fetch('/api/presets');
+    const data = await resp.json();
+    cameraPresets = data.camera || [];
+    lightingPresets = data.lighting || [];
+
+    // Camera preset buttons
+    presetsContainer.innerHTML = '';
+    cameraPresets.forEach(preset => {
+      const btn = document.createElement('button');
+      btn.className = 'preset-btn';
+      btn.textContent = preset.name;
+      btn.title = preset.description;
+      btn.addEventListener('click', () => {
+        setSliders(preset);
+        activePresetId = preset.id;
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+      presetsContainer.appendChild(btn);
+    });
+
+    // Lighting select
+    const select = document.getElementById('lighting-select');
+    lightingPresets.forEach(preset => {
+      const opt = document.createElement('option');
+      opt.value = preset.id;
+      opt.textContent = `${preset.name} — ${preset.emotional_tags.slice(0, 3).join(', ')}`;
+      select.appendChild(opt);
+    });
+  } catch (e) {
+    console.warn('Failed to load presets:', e);
+  }
+}
+
+document.getElementById('lighting-select').addEventListener('change', (e) => {
+  applyLighting(e.target.value);
+});
+
+loadPresets();
+
+// ============================================================
+// Generate
+// ============================================================
+const generateBtn = document.getElementById('generate-btn');
+const statusEl = document.getElementById('status');
+const resultsEl = document.getElementById('results');
+
+generateBtn.addEventListener('click', async () => {
+  if (generating) return;
+  const prompt = document.getElementById('prompt-input').value.trim();
+  if (!prompt) { setStatus('Enter a prompt first', 'error'); return; }
+
+  generating = true;
+  generateBtn.disabled = true;
+  generateBtn.textContent = 'Generating...';
+  setStatus('Submitting to Kling API...', '');
+
+  // Get lighting prompt fragment
+  const lightingId = document.getElementById('lighting-select').value;
+  const lightingPreset = lightingPresets.find(p => p.id === lightingId);
+  const lightingPrompt = lightingPreset ? lightingPreset.prompt_fragment : '';
+
+  try {
+    // Create task
+    const resp = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt,
+        camera: { ...state },
+        lighting_prompt: lightingPrompt,
+        duration: document.getElementById('duration-select').value,
+        aspect_ratio: document.getElementById('ratio-select').value,
+        mode: document.getElementById('mode-select').value,
+      }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.detail || 'API error');
+    }
+
+    const { task_id } = await resp.json();
+    setStatus(`Task created: ${task_id.slice(0, 12)}... Polling...`, '');
+
+    // Poll for completion
+    const result = await pollStatus(task_id);
+    if (result.status === 'succeed' && result.video_url) {
+      addResult(result.video_url, lightingId, activePresetId);
+      setStatus('Video generated!', 'success');
+    } else {
+      setStatus(`Failed: ${result.error || 'Unknown error'}`, 'error');
+    }
+  } catch (e) {
+    setStatus(`Error: ${e.message}`, 'error');
+  } finally {
+    generating = false;
+    generateBtn.disabled = false;
+    generateBtn.textContent = 'Generate Video';
+  }
+});
+
+async function pollStatus(taskId) {
+  const MAX_POLLS = 120; // 10 min at 5s intervals
+  for (let i = 0; i < MAX_POLLS; i++) {
+    await sleep(5000);
+    try {
+      const resp = await fetch(`/api/status/${taskId}`);
+      const data = await resp.json();
+      setStatus(`Status: ${data.status} (${i * 5}s)`, '');
+      if (data.status === 'succeed' || data.status === 'failed') return data;
+    } catch (e) {
+      console.warn('Poll error:', e);
+    }
+  }
+  return { status: 'failed', error: 'Timeout' };
+}
+
+function addResult(videoUrl, lightingId, presetId) {
+  const card = document.createElement('div');
+  card.className = 'result-card';
+
+  const video = document.createElement('video');
+  video.src = videoUrl;
+  video.controls = true;
+  video.muted = true;
+  video.loop = true;
+  video.autoplay = true;
+
+  const meta = document.createElement('div');
+  meta.className = 'result-meta';
+  const presetName = presetId ? (cameraPresets.find(p => p.id === presetId)?.name || 'Custom') : 'Custom';
+  const lightName = lightingId ? (lightingPresets.find(p => p.id === lightingId)?.name || '') : '';
+  meta.innerHTML = `<span class="result-preset">${presetName}</span>${lightName ? ' + ' + lightName : ''}`;
+
+  card.appendChild(video);
+  card.appendChild(meta);
+  resultsEl.prepend(card);
+}
+
+function setStatus(msg, type) {
+  statusEl.textContent = msg;
+  statusEl.className = type || '';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>

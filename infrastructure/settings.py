@@ -75,6 +75,18 @@ class Settings(BaseSettings):
         description="Google Cloud region",
     )
 
+    # Kling AI
+    kling_access_key: Optional[str] = Field(
+        default=None,
+        alias="KLING_ACCESS_KEY",
+        description="Kling AI access key for JWT auth",
+    )
+    kling_secret_key: Optional[str] = Field(
+        default=None,
+        alias="KLING_SECRET_KEY",
+        description="Kling AI secret key for JWT signing",
+    )
+
     # Output settings
     output_dir: Path = Field(
         default=Path("./generated_videos"),

@@ -1,19 +1,70 @@
 # PROGRESS.md
 
-> 최종 수정: 2026-01-28 15:30
+> 최종 수정: 2026-02-12 17:20
 
 ## 프로젝트: Tale (AI Video Generation Pipeline)
 
-### 현재 상태: Phase 5 진행 중 (Knowledge DB Supabase 이관)
+### 현재 상태: Phase 6 진행 중 (Camera Explorer Web UI)
 
 ---
 
-## Now
+## Now: Camera Explorer PoC (Phase 6)
 
-- [x] Knowledge DB Supabase 이관 완료 (2026-01-28)
-- [x] Lore 데이터 구조화 (2026-01-28)
-- [ ] 음악 → 영상 파이프라인 실제 테스트
-- [ ] 영상 레퍼런스 수집 시작
+### 목표
+동일 장면을 다양한 카메라 앵글/라이팅으로 돌려보는 인터랙티브 웹 UI
+
+### 태스크
+- [x] 영상 생성 API 기술 리서치: Kling/VEO/Grok 카메라·라이팅 제어 비교 (02-12)
+- [x] Kling API 어댑터 구현: JWT 인증 + 6축 카메라 파라미터 → `adapters/gateways/kling_video.py` (02-12)
+- [x] 카메라 프리셋 매핑: camera_language 10개 → Kling 6축 값 → `camera_presets.yaml` (02-12)
+- [x] FastAPI 백엔드: generate/status/presets 3개 API → `web/server.py` (02-12)
+- [x] Three.js 3D 프리뷰 UI: 슬라이더 6축 + 프리셋 버튼 + 라이팅 연동 → `web/static/index.html` (02-12)
+- [ ] Kling API 실제 호출 테스트: 크레딧 소모 확인 후 영상 1건 생성
+- [ ] UI 피드백 반영: 시연 후 조정 사항
+
+### 메모
+- Kling이 유일하게 수치 기반 카메라 파라미터 제공 (6축 -10~+10)
+- VEO/Grok은 프롬프트 텍스트 기반만 지원
+- 라이팅은 3개 API 모두 프롬프트 기반 (dedicated 파라미터 없음)
+- 서버 실행: `.venv/bin/python -m uvicorn web.server:app --reload --port 8000`
+
+---
+
+## Phase 6: Camera Explorer Web UI (진행 중)
+
+### 리서치 결과 (2026-02-12)
+
+**서비스별 카메라 제어 비교**
+| 서비스 | 카메라 제어 | 라이팅 제어 | API 상태 |
+|--------|-----------|-----------|---------|
+| Kling | ⭐⭐⭐⭐⭐ 6축 수치 파라미터 | ⭐⭐⭐ 프롬프트만 | 공식 API (크레딧) |
+| VEO | ⭐⭐⭐⭐ 프롬프트 (해석 정밀) | ⭐⭐⭐⭐ 프롬프트 (해석 우수) | Gemini/Vertex AI |
+| Grok | ⭐⭐⭐⭐ 프리셋+프롬프트 | ⭐⭐⭐⭐ Scene Control | 2026.01 출시 |
+
+**PoC 방향**: Kling 단독 → 수치 카메라 제어 시연에 최적
+
+### 구현 완료 (2026-02-12 17:20)
+
+**코드**
+- `adapters/gateways/kling_video.py` — Kling API 클라이언트 (JWT + 6축 카메라)
+- `web/server.py` — FastAPI 백엔드 (generate/status/presets)
+- `web/static/index.html` — Three.js 3D 프리뷰 + 슬라이더 UI
+- `databases/knowledge/camera_presets.yaml` — 10개 카메라 프리셋 6축 매핑
+
+**수정**
+- `infrastructure/settings.py` — KLING_ACCESS_KEY/SECRET_KEY 추가
+- `pyproject.toml` — fastapi, uvicorn, PyJWT 의존성
+
+**아키텍처**
+```
+Browser (Three.js 3D + Sliders)
+     │ POST /api/generate
+     ▼
+FastAPI (web/server.py)
+     │ JWT Auth
+     ▼
+Kling API (6-axis camera + prompt lighting)
+```
 
 ---
 
@@ -133,3 +184,4 @@ MusicMetadata
 | 2026-01-27 | AVA Framework 통합, Music→Video 파이프라인 |
 | 2026-01-27 | Video Reference DB 구현, Supabase 배포, 통합 테스트 통과 |
 | 2026-01-28 | Knowledge DB Supabase 이관, SupabaseKnowledgeDB 어댑터, Lore 데이터 구조화 |
+| 2026-02-12 | 영상 생성 API 기술 리서치 (Kling/VEO/Grok), Camera Explorer Web UI 구현 |
