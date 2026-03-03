@@ -54,59 +54,37 @@ tale/
 4. `specs/layers/L1~L3` — 레이어별 입출력 계약
 5. `specs/decisions.md` — 왜 이렇게 결정했는지
 
-## Quick Start (새 머신 셋업)
+## Setup (새 머신에서 시작하기)
 
-### 사전 요구
+아래 프롬프트를 터미널에서 그대로 실행하면 됩니다.
 
-- **Node.js** ≥ 20 (`node -v`)
-- **pnpm** ≥ 9 (`npm i -g pnpm` 또는 `corepack enable`)
-- **Git**
-- **Claude Code** (`npm i -g @anthropic-ai/claude-code`)
-
-### 1. 클론 & 설치
+### Step 1: 프로젝트 클론 & 의존성 설치
 
 ```bash
-git clone https://github.com/<org>/tale.git
+git clone git@github.com:anonymous-paper-review/Tale-Studio.git tale
 cd tale
-pnpm install
-```
-
-### 2. 환경변수
-
-```bash
+corepack enable && pnpm install
 cp .env.example .env
 ```
 
-`.env` 파일을 열고 아래 키를 채워 넣기:
+> API 키 없이도 Mock 모드로 UI 확인 가능. 필요 시 `.env`에 키 채워 넣기.
 
-| 키 | 용도 | 필수 |
-|----|------|------|
-| `OPENAI_API_KEY` | GPT-4o, DALL-E 3 | MVP 시 |
-| `GOOGLE_API_KEYS` | Veo (영상 생성) | MVP 시 |
-| `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | Knowledge DB | MVP 시 |
-
-> 로컬 개발(Mock 모드)에서는 API 키 없이도 UI 확인 가능
-
-### 3. 실행
+### Step 2: Claude Code 시작
 
 ```bash
-pnpm dev          # http://localhost:3000
-pnpm build        # 프로덕션 빌드
-pnpm lint         # ESLint
-```
-
-### 4. Claude Code로 개발 시작
-
-```bash
-cd tale
 claude
-
-# 추천 첫 프롬프트:
-# "CLAUDE.md 읽고 현재 프로젝트 상태 파악해줘"
-# "specs/mvp_scope.md 기준으로 다음 구현할 것 알려줘"
 ```
 
-**병렬 개발 규칙** — `CLAUDE.md`의 "병렬 개발 규칙" 섹션 참고:
-- Dev A: `feature/producer-writer-artist` 브랜치 (P1, P2, P3)
-- Dev B: `feature/director-editor` 브랜치 (P4, P5)
-- 공유 영역(`types/`, `components/layout/`, `stores/project-store.ts`) 변경 → main PR
+아래 프롬프트를 복사해서 Claude Code에 붙여넣기:
+
+```
+이 프로젝트에 새로 투입된 개발자야. 온보딩 시켜줘.
+
+1. CLAUDE.md 읽고 프로젝트 개요, 기술 스택, 파이프라인 구조 요약
+2. specs/mvp_scope.md 읽고 현재 MVP 범위와 구현 순서(P1~P5) 정리
+3. PROGRESS.md 읽고 지금까지 완료된 것 / 다음 할 일 파악
+4. pnpm build 돌려서 현재 빌드 상태 확인
+5. 위 내용 종합해서 "현재 상태 + 바로 시작할 수 있는 작업" 브리핑해줘
+
+병렬 개발 중이면 내가 어느 브랜치에서 작업해야 하는지도 알려줘.
+```
