@@ -1,6 +1,7 @@
 # AVA Framework Spec
 
 > 생성일: 2026-01-27 22:35
+> 상태: **개념 스펙** — Post-MVP 확장용. §7~§8의 Python 코드/파일구조는 Phase 0에서 삭제됨.
 
 ## 개요
 
@@ -215,7 +216,7 @@ SceneArchitectInput(
 
 ### 5.7 Story 생성 로직
 
-> 소스: `usecases/ava/expression_adapter.py:68-120`
+> ~~소스: `usecases/ava/expression_adapter.py:68-120`~~ (Phase 0에서 삭제. 개념 참조용)
 
 #### story_seed 있을 때 (가사/사용자 입력)
 
@@ -258,7 +259,7 @@ Someone pausing, looking back with longing
 
 ### 5.8 Genre 자동 매핑
 
-> 소스: `usecases/ava/expression_adapter.py:17-26`
+> ~~소스: `usecases/ava/expression_adapter.py:17-26`~~ (Phase 0에서 삭제. 개념 참조용)
 
 | atmosphere | genre |
 |------------|-------|
@@ -273,7 +274,7 @@ Someone pausing, looking back with longing
 
 ### 5.9 Pumpup Hints
 
-> 소스: `domain/entities/ava/expression.py:46-54`
+> ~~소스: `domain/entities/ava/expression.py:46-54`~~ (Phase 0에서 삭제. 개념 참조용)
 
 StoryPumpup 확장 시 사용할 수 있는 힌트 (`Expression.to_pumpup_hints()`):
 
@@ -331,72 +332,8 @@ class CinematographyKnowledgeDB(ABC):
 
 ---
 
-## 7. 사용 예시
+## 7~8. 사용 예시 + 파일 구조
 
-```python
-from domain.entities.music import MusicMetadata, MusicSection
-from usecases.music_to_video_adapter import MusicToVideoAdapter
-from adapters.knowledge_db import YAMLKnowledgeDB
-
-# 1. 음악 메타데이터 생성
-music = MusicMetadata(
-    title="Rainy Memories",
-    artist="Artist Name",
-    bpm=72,
-    mood_tags=["melancholic", "nostalgic"],
-    genre_tags=["ambient", "piano"],
-    sections=[
-        MusicSection("intro", 0, 30, 0.3),
-        MusicSection("verse", 30, 90, 0.5),
-        MusicSection("chorus", 90, 150, 0.8),
-        MusicSection("outro", 150, 180, 0.4),
-    ]
-)
-
-# 2. 파이프라인 실행
-knowledge_db = YAMLKnowledgeDB("databases/knowledge")
-adapter = MusicToVideoAdapter(knowledge_db)
-scene_input = adapter.execute(music, story_seed="A lonely figure walks through rain")
-
-# 3. 결과 → L1 파이프라인
-# scene_input.story: 확장된 스토리
-# scene_input.duration_minutes: 영상 길이
-# scene_input.visual_hints: Expression에서 추출한 힌트
-```
-
----
-
-## 8. 파일 구조
-
-```
-tale/
-├── domain/entities/ava/
-│   ├── anchor.py          # Anchor, NarrativeCore, EmotionalCore, StructuralCore
-│   └── expression.py      # Expression, WorldExpression, ActorExpression, StyleExpression
-│
-├── domain/entities/music/
-│   └── music_metadata.py  # MusicMetadata, MusicSection
-│
-├── domain/value_objects/ava/
-│   ├── mood.py            # Mood enum
-│   ├── bridge_mode.py     # BridgeMode enum
-│   └── emotional_arc.py   # EmotionalArc
-│
-├── usecases/ava/
-│   ├── bridge_translator.py   # Anchor → Expression
-│   └── expression_adapter.py  # Expression → SceneArchitectInput
-│
-├── usecases/music/
-│   └── music_to_anchor.py     # MusicMetadata → Anchor
-│
-├── usecases/
-│   └── music_to_video_adapter.py  # Facade (전체 파이프라인)
-│
-├── adapters/knowledge_db/
-│   └── yaml_knowledge_db.py   # YAML 기반 Knowledge DB 구현
-│
-└── databases/knowledge/
-    ├── camera_language.yaml
-    ├── rendering_style.yaml
-    └── shot_grammar.yaml
-```
+> **Phase 0에서 삭제됨**. 아래 Python 코드와 파일 구조는 구 코드베이스 기준.
+> Next.js 기반 재구현 시 이 섹션의 개념(변환 흐름, 데이터 모델)만 참조.
+> Knowledge DB 데이터는 `databases/knowledge/*.yaml`에 보존되어 있음.

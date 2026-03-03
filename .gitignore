@@ -1,29 +1,17 @@
-# Python
+# Node.js
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# Python (레거시 스크립트용)
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
 .venv/
 venv/
-ENV/
+*.egg-info/
 
 # Environment variables
 .env
@@ -34,8 +22,6 @@ ENV/
 .pytest_cache/
 .coverage
 htmlcov/
-.tox/
-.nox/
 
 # IDE
 .idea/
@@ -61,19 +47,9 @@ CLAUDE.md
 .claude/
 docs/internal/
 
-# Decision/planning docs
-specs/cinematic_luterra_decision.md
-specs/cinematic_luterra_v2.md
-specs/cinematic_pipeline_decisions.md
-specs/implementation_plan.md
-
 # Experimental/debug scripts
 scripts/test_*.py
 scripts/debug_*.py
-scripts/generate_shot7*.py
-
-# Lock files (optional - using uv)
-uv.lock
 
 # OS
 .DS_Store

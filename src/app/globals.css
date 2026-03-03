@@ -1,0 +1,176 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  /* Act colors (기승전결) */
+  --color-act-intro: var(--act-intro);
+  --color-act-dev: var(--act-dev);
+  --color-act-turn: var(--act-turn);
+  --color-act-conclusion: var(--act-conclusion);
+
+  /* Surface hierarchy */
+  --color-surface-primary: var(--surface-primary);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-tertiary: var(--surface-tertiary);
+  --color-surface-elevated: var(--surface-elevated);
+}
+
+/*
+ * Netflix Dark Mode — Tale Studio
+ * Dark-only app: :root light theme kept for shadcn compatibility but unused.
+ */
+:root {
+  --radius: 0.5rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  /* Background: #121212 */
+  --background: oklch(0.156 0 0);
+  /* Foreground: #FFFFFF */
+  --foreground: oklch(1 0 0);
+
+  /* Card: #1a1a1a */
+  --card: oklch(0.185 0 0);
+  --card-foreground: oklch(1 0 0);
+
+  /* Popover: #242424 */
+  --popover: oklch(0.222 0 0);
+  --popover-foreground: oklch(1 0 0);
+
+  /* Primary: #E50914 (Netflix Red) */
+  --primary: oklch(0.537 0.234 29.23);
+  --primary-foreground: oklch(1 0 0);
+
+  /* Secondary: #1a1a1a */
+  --secondary: oklch(0.185 0 0);
+  --secondary-foreground: oklch(1 0 0);
+
+  /* Muted: #2a2a2a */
+  --muted: oklch(0.243 0 0);
+  /* Muted foreground: #B3B3B3 */
+  --muted-foreground: oklch(0.762 0 0);
+
+  /* Accent: #242424 */
+  --accent: oklch(0.222 0 0);
+  --accent-foreground: oklch(1 0 0);
+
+  --destructive: oklch(0.704 0.191 22.216);
+
+  /* Border: #333333 */
+  --border: oklch(0.278 0 0);
+  --input: oklch(0.278 0 0);
+  /* Ring: #E50914 */
+  --ring: oklch(0.537 0.234 29.23);
+
+  --chart-1: oklch(0.537 0.234 29.23);
+  --chart-2: oklch(0.614 0.189 254.8);
+  --chart-3: oklch(0.779 0.175 64.1);
+  --chart-4: oklch(0.648 0.174 142.5);
+  --chart-5: oklch(0.628 0.225 26.5);
+
+  /* Sidebar: #1a1a1a */
+  --sidebar: oklch(0.185 0 0);
+  --sidebar-foreground: oklch(1 0 0);
+  --sidebar-primary: oklch(0.537 0.234 29.23);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.222 0 0);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.278 0 0);
+  --sidebar-ring: oklch(0.537 0.234 29.23);
+
+  /* Act colors (기승전결) */
+  --act-intro: oklch(0.648 0.174 142.5);       /* #4CAF50 green */
+  --act-dev: oklch(0.614 0.189 254.8);         /* #2196F3 blue */
+  --act-turn: oklch(0.779 0.175 64.1);         /* #FF9800 orange */
+  --act-conclusion: oklch(0.628 0.225 26.5);   /* #F44336 red */
+
+  /* Surface hierarchy */
+  --surface-primary: oklch(0.156 0 0);    /* #121212 */
+  --surface-secondary: oklch(0.185 0 0);  /* #1a1a1a */
+  --surface-tertiary: oklch(0.222 0 0);   /* #242424 */
+  --surface-elevated: oklch(0.243 0 0);   /* #2a2a2a */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

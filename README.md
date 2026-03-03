@@ -1,206 +1,64 @@
 # Tale Studio
 
-AI Video Generation Pipeline using T2V (Text-to-Video) and I2V (Image-to-Video) APIs.
+B2B AI 영상 제작 도구. 텍스트 → 전문 촬영 기법 적용 고품질 AI 비디오 자동 생성.
 
-## Overview
+## 기술 스택
 
-Tale Studio transforms story text into video sequences through a 3-level architecture:
+- **Frontend**: Next.js (React) + Three.js (3D 카메라 프리뷰)
+- **Backend**: Next.js API Routes
+- **DB**: Supabase (PostgreSQL)
+- **배포**: Vercel
 
-```
-Story (text) → Scene Architect → Shot Composer → Prompt Builder → Video API → MP4
-```
-
-**Target**: 2-minute video = ~15 shots = 3-5 scenes
-
-## Architecture
-
-### 3-Level Pipeline
-
-| Level | Component | Role |
-|-------|-----------|------|
-| L1 | Scene Architect | Story → Scenes, Characters, Locations |
-| L2 | Shot Composer | Scene → Shot sequences, T2V/I2V decision |
-| L3 | Prompt Builder | Shot → Final prompt with cinematography |
-
-### Clean Architecture
+## 프로젝트 구조
 
 ```
 tale/
-├── domain/           # Entities & Value Objects (no dependencies)
-├── usecases/         # Application logic & interfaces
-├── adapters/         # External API implementations
-├── infrastructure/   # Settings, CLI, utilities
-├── scripts/          # 실행 스크립트
-├── specs/            # 스펙 문서
-└── tests/            # Unit & integration tests
+├── specs/                      # 제품 스펙
+│   ├── overview.md             # 제품 + UX + 아키텍처
+│   ├── mvp_scope.md            # MVP 범위 (P3+P4) + 기술 결정
+│   ├── ux_pages.md             # UX 페이지별 정의서
+│   ├── open_questions.md       # 열린/닫힌 질문 추적
+│   ├── ava_framework.md        # AVA Framework
+│   ├── decisions.md            # 의사결정 로그
+│   ├── layers/                 # 파이프라인 레이어별 상세 스펙
+│   │   ├── L1_scene_architect.md
+│   │   ├── L2_shot_composer.md
+│   │   └── L3_prompt_builder.md
+│   ├── reference/              # UX 와이어프레임, 경쟁사 참고, 레거시 코드
+│   └── archive/                # 레거시 스펙
+│
+├── docs/                       # 비즈니스 문서
+│   ├── infrastructure.md       # 인프라/배포/비용 설계
+│   └── internal/               # 전략 논의
+│
+├── databases/                  # 데이터
+│   ├── knowledge/              # 촬영 기법 Knowledge DB (YAML)
+│   └── migrations/             # Supabase 스키마
+│
+├── assets/                     # 크리에이티브 자산
+│   ├── characters/             # 캐릭터 레퍼런스 이미지
+│   └── lore/                   # 로어/시나리오 데이터
+│
+└── .env                        # API 키 (환경변수)
 ```
 
-## API Integration
+## 핵심 파이프라인
 
-| Purpose | API | Notes |
-|---------|-----|-------|
-| Video Generation | Google Veo | T2V and I2V (~8s per shot) |
-| Image Generation | Google Imagen | Character references |
-| LLM | Gemini / OpenAI | Scene analysis, prompt generation |
-
-## Quick Start
-
-### 1. 설치
-
-```bash
-# Clone
-git clone git@github.com:jxcape/tale-studio.git
-cd tale-studio
-
-# Setup (using uv)
-uv venv
-source .venv/bin/activate
-uv pip install -e ".[dev]"
+```
+[Story] → [Pumpup] → [L1 Scene Architect] → [L2 Shot Composer] → [L3 Prompt Builder] → [Video API]
 ```
 
-### 2. 환경 설정
+## 스펙 읽는 순서
+
+1. `specs/overview.md` — 전체 그림
+2. `specs/mvp_scope.md` — MVP 범위 + 기술 결정
+3. `specs/ux_pages.md` — UX 페이지별 상세
+4. `specs/layers/L1~L3` — 레이어별 상세
+5. `specs/decisions.md` — 왜 이렇게 결정했는지
+
+## 환경 설정
 
 ```bash
 cp .env.example .env
+# .env 파일에 API 키 설정
 ```
-
-`.env` 파일 수정:
-
-```bash
-# Google API Keys (alias 포함 형식)
-# 형식: key:alias 또는 key:alias:project_id
-GOOGLE_API_KEYS=AIzaSy...:key1, AIzaSy...:key2
-
-# Google Cloud 설정
-GOOGLE_PROJECT_ID=your-project-id
-GOOGLE_LOCATION=us-central1
-
-# OpenAI (optional)
-OPENAI_API_KEY=sk-...
-```
-
-### 3. 파이프라인 실행
-
-```bash
-# L1-L2-L3 전체 파이프라인 실행
-python scripts/run_pipeline.py
-
-# 출력 위치: pipeline_output/YYYYMMDD_HHMMSS/
-```
-
-### 4. 출력 결과
-
-```
-pipeline_output/20260121_192652/
-├── l1_scenes.json      # L1 씬 분할 결과
-├── l2_shots.json       # L2 샷 시퀀스
-├── l3_prompts.json     # L3 최종 프롬프트
-└── metadata.json       # 실행 메타데이터
-```
-
-## Configuration
-
-### 환경 변수
-
-| 변수 | 설명 | 예시 |
-|------|------|------|
-| `GOOGLE_API_KEYS` | Gemini API 키 (alias 포함) | `AIzaSy...:xcape, AIzaSy...:tale` |
-| `GOOGLE_PROJECT_ID` | GCP 프로젝트 ID | `my-project` |
-| `GOOGLE_LOCATION` | GCP 리전 | `us-central1` |
-| `OPENAI_API_KEY` | OpenAI API 키 (optional) | `sk-...` |
-| `VEO_KEY_ROTATION_STRATEGY` | 키 로테이션 전략 | `round_robin` / `least_used` |
-
-### API Key Pool
-
-여러 Google API 키를 등록하면 429 에러 시 자동 failover:
-
-```python
-# 내부 동작
-key_pool = APIKeyPool(keys=[...], strategy=RotationStrategy.ROUND_ROBIN)
-# 키 1 실패 → 자동으로 키 2로 전환
-```
-
-## Key Concepts
-
-### Terminology
-
-| Term | Definition |
-|------|------------|
-| **Story** | Complete narrative (1 video project) |
-| **Scene** | Continuous sequence at same time/place |
-| **Shot** | Minimum generation unit = 1 API call = ~8s video |
-
-### Consistency Strategy
-
-- Multi-angle character references (front/side/3-quarter)
-- Fixed prompts per character injected into all shots
-- I2V for character shots, T2V for atmosphere/background
-
-## Development
-
-```bash
-# Run tests with coverage
-pytest --cov
-
-# Lint
-ruff check .
-
-# Format
-ruff format .
-```
-
-## Video Reference DB
-
-영상 학습 및 기법 추출을 위한 통합 데이터베이스:
-
-- **저장**: YouTube/Vimeo/Local 영상의 메타데이터 및 샷별 분석
-- **연결**: Knowledge DB(YAML)의 technique과 soft reference로 연결
-- **활용**: Prompt Builder에서 기법별 시각 레퍼런스 제공
-
-### 설정
-
-```bash
-# .env에 Supabase 자격증명 추가
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5...
-```
-
-자세한 설정 및 사용법은 [Video Reference DB 가이드](docs/video_reference_db.md)를 참고하세요.
-
-## Specs
-
-### 핵심 설계
-- [Architecture](specs/architecture.md) - 시스템 아키텍처
-- [MVP](specs/mvp.md) - MVP 스코프 및 결정사항
-
-### 기능 스펙
-- [Next Phase](specs/next_phase.md) - 다음 단계 로드맵
-- [Pumpup](specs/pumpup.md) - 서사 확장 기능
-- [Dialogue](specs/dialogue.md) - 대화 생성 기능
-- [Technique DB](specs/technique_db.md) - 연출 테크닉 DB
-
-### 스타일 가이드
-- [Style Heuristics](specs/style_heuristics.md) - 비주얼 스타일 가이드
-
-### 데이터베이스
-- [Video Reference DB](docs/video_reference_db.md) - 영상 레퍼런스 DB 가이드
-
-## Development
-
-```bash
-# 테스트 실행
-pytest
-
-# 커버리지 포함
-pytest --cov
-
-# 린트
-ruff check .
-
-# 포맷
-ruff format .
-```
-
-## License
-
-MIT
