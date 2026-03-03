@@ -71,7 +71,7 @@
 |------|--------|------|
 | LLM | Google Gemini API | 씬 분할, 프롬프트 생성 |
 | 영상 생성 | Google Veo API | T2V/I2V, 8초 클립 |
-| 이미지 생성 | OpenAI DALL-E 3 | 캐릭터 레퍼런스 |
+| 이미지 생성 | Gemini Imagen | 캐릭터 레퍼런스 |
 
 ### 장점
 - 초기 투자 최소 (GPU 인프라 불필요)
@@ -128,7 +128,7 @@
 | API | 영상 1건당 |
 |-----|-----------|
 | Gemini LLM (씬 분할, 프롬프트) | $0.02-0.20 |
-| DALL-E 3 (캐릭터 레퍼런스) | $0.04-0.12 |
+| Gemini Imagen (캐릭터 레퍼런스) | Google API 무료 티어 내 |
 
 #### 시나리오 A 총비용
 
@@ -165,7 +165,7 @@
 |------|-------------|--------------|---------|
 | LLM | Gemini → | Llama 3.1 70B / Qwen 2.5 72B | A100 80GB × 1 |
 | 영상 생성 | Veo → | CogVideoX-5B / Wan2.1 / HunyuanVideo | A100 80GB × 2-4 |
-| 이미지 생성 | DALL-E → | SDXL / Flux.1 | A10G × 1 |
+| 이미지 생성 | Gemini Imagen → | SDXL / Flux.1 | A10G × 1 |
 
 ### 인프라 구성
 

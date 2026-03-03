@@ -37,11 +37,14 @@ export default function VisualPage() {
     worldAssets,
     selectedCharacterId,
     generatingCharacterId,
+    generatingLocationId,
     selectedBoostPreset,
+    error,
     selectCharacter,
     lockCharacter,
     unlockCharacter,
     generateSheet,
+    generateWorldAsset,
     selectBoostPreset,
     loadMockData,
   } = useArtistStore()
@@ -201,6 +204,8 @@ export default function VisualPage() {
             <div className="space-y-6">
               {worldAssets.map((world) => {
                 const scene = getScene(world.sceneId)
+                const isGenerating =
+                  generatingLocationId === world.locationId
 
                 return (
                   <div
@@ -228,6 +233,26 @@ export default function VisualPage() {
                         imageUrl={world.establishingShot}
                       />
                     </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full"
+                      disabled={isGenerating}
+                      onClick={() => generateWorldAsset(world.locationId)}
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="size-3.5 animate-spin" />
+                          Generating…
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="size-3.5" />
+                          Generate Background
+                        </>
+                      )}
+                    </Button>
                   </div>
                 )
               })}
@@ -235,6 +260,11 @@ export default function VisualPage() {
           </ScrollArea>
         </div>
       </div>
+      {error && (
+        <div className="border-t border-destructive/30 bg-destructive/10 px-6 py-2 text-sm text-destructive">
+          {error}
+        </div>
+      )}
       <HandoffButton label="Approve & Direct" targetStage="director" />
     </>
   )

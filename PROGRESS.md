@@ -28,10 +28,13 @@
 - [x] 이미지 placeholder (Mock URL/빈 상태)
 
 ### P3-2: API 연동
-- [ ] `POST /api/generate/image` 라우트 (DALL-E 3)
-- [ ] artist-store 확장 — 이미지 URL 저장, 생성 상태, updateAsset
-- [ ] Generate Sheet → API 호출 → 이미지 표시 연동
-- [ ] 에러/로딩 상태 처리
+- [x] `POST /api/generate/image` 라우트 (Gemini Imagen)
+- [x] artist-store 확장 — 이미지 URL 저장, 생성 상태, generateWorldAsset
+- [x] Generate Sheet → API 호출 → 이미지 표시 연동
+- [x] Generate Background 버튼 + 월드 이미지 생성
+- [x] Cinematic Boost → 프롬프트 반영
+- [x] 에러/로딩 상태 처리
+- [x] 문서 업데이트 (DALL-E → Gemini Imagen)
 
 ### 다음 예정
 - P2 The Script Room (P3 인터페이스 확정 후)

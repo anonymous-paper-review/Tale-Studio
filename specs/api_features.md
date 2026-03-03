@@ -144,64 +144,40 @@
 
 ### 1.2 이미지 생성
 
-#### DALL-E 3
+#### Gemini Imagen
 
 | 항목 | 내용 |
 |------|------|
 | 용도 | 캐릭터 Consistency Sheet (3뷰), 배경 이미지, 샷 Start Frame |
-| Endpoint | `POST https://api.openai.com/v1/images/generations` |
-| 인증 | `Authorization: Bearer {API_KEY}` |
+| SDK | `@google/genai` (npm) |
+| 모델 | `gemini-2.0-flash-preview-image-generation` |
+| 인증 | `GOOGLE_API_KEYS` 환경변수 (API Key) |
 
-**Request**:
+**Request** (Node.js SDK):
+```typescript
+const response = await ai.models.generateContent({
+  model: 'gemini-2.0-flash-preview-image-generation',
+  contents: prompt,
+  config: {
+    responseModalities: ['IMAGE'],
+    imageConfig: {
+      aspectRatio: '1:1' | '16:9',
+    },
+  },
+})
+```
+
+**Response**: `response.candidates[0].content.parts[].inlineData`
 ```json
 {
-  "model": "dall-e-3",
-  "prompt": "string",
-  "n": 1,
-  "size": "1024x1024" | "1792x1024" | "1024x1792",
-  "quality": "standard" | "hd",
-  "style": "natural" | "vivid"
+  "mimeType": "image/png",
+  "data": "base64..."
 }
 ```
 
-**Response**:
-```json
-{
-  "data": [{
-    "url": "https://...",
-    "revised_prompt": "string"
-  }]
-}
-```
-
-#### Imagen (Google Vertex AI)
-
-| 항목 | 내용 |
-|------|------|
-| 용도 | DALL-E 대안. 동일 용도 |
-| Endpoint | `POST https://{location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/imagegeneration:predict` |
-| 인증 | Google Cloud credentials (JWT / 서비스 계정) |
-
-**Request**:
-```json
-{
-  "instances": [{ "prompt": "string" }],
-  "parameters": {
-    "sampleCount": 1,
-    "aspectRatio": "1:1" | "16:9" | "9:16"
-  }
-}
-```
-
-**Response**:
-```json
-{
-  "predictions": [{
-    "bytesBase64Encoded": "base64...",
-    "mimeType": "image/png"
-  }]
-}
-```
+**내부 API 라우트**: `POST /api/generate/image`
+- Request: `{ prompt: string, aspectRatio?: "1:1" | "16:9" }`
+- Response: `{ url: "data:image/png;base64,..." }`
 
 ---
 
@@ -533,7 +509,7 @@ CREATE TABLE knowledge_techniques (
 | Veo 3.1 Standard | $0.40/초 | $25.60 |
 | Veo 2.0 | $0.35/초 | $22.40 |
 | Kling v2 | ~$0.05~0.15/초 (추정) | TBD |
-| DALL-E 3 | $0.04~0.12/장 | $0.30~0.90 |
+| Gemini Imagen | $0.04~0.12/장 | $0.30~0.90 |
 | Gemini LLM | $0.02~0.20/호출 | $0.10~1.00 |
 
 ### 4.2 일일 제한
@@ -542,7 +518,7 @@ CREATE TABLE knowledge_techniques (
 |-----|----------|----------|
 | Veo | ~10 영상/키/일 | 1~2/키 |
 | Kling | ~10 영상/키/일 | JWT 30분 유효 |
-| DALL-E 3 | ~50 이미지/분/키 | - |
+| Gemini Imagen | ~50 이미지/분/키 | - |
 | Gemini | RPM 제한 (모델별) | - |
 
 ### 4.3 비즈니스 모델 시사점
@@ -563,7 +539,7 @@ POST /api/pipeline/scene-architect   ← L1 (씬 분할)
 POST /api/pipeline/shot-composer     ← L2 (샷 시퀀스)
 POST /api/pipeline/prompt-builder    ← L3 (최종 프롬프트)
 
-POST /api/generate/image            ← DALL-E / Imagen 이미지 생성
+POST /api/generate/image            ← Gemini Imagen 이미지 생성
 POST /api/generate/video            ← Kling / Veo 영상 생성
 GET  /api/generate/video/[jobId]    ← 영상 생성 상태 폴링
 
@@ -596,8 +572,8 @@ PUT  /api/project/[id]              ← 프로젝트 업데이트
 |-------|---------|--------|
 | **P1** | Gemini (Producer Agent 대화) | 사용자 메시지 입력 |
 | **P2** | Gemini (Pumpup → L1 Scene Architect) | Stage 진입 시 자동 / "Auto-Generate Scenes" 버튼 |
-| **P3** | DALL-E/Imagen (캐릭터 시트 + 배경) | Stage 진입 시 자동 (Handoff → 로딩) |
-| **P4** | Gemini (L2+L3) + DALL-E (샷 이미지) + Kling/Veo (영상) | Stage 진입 시 L2 자동 → 사용자 트리거로 영상 생성 |
+| **P3** | Gemini Imagen (캐릭터 시트 + 배경) | Stage 진입 시 자동 (Handoff → 로딩) |
+| **P4** | Gemini (L2+L3) + Gemini Imagen (샷 이미지) + Kling/Veo (영상) | Stage 진입 시 L2 자동 → 사용자 트리거로 영상 생성 |
 | **P5** | 없음 (클라이언트 사이드 편집) | - |
 
 ---

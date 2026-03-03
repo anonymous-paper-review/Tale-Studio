@@ -53,7 +53,7 @@ Story → [Pumpup] → [L1 Scene Architect] → [L2 Shot Composer] → [L3 Promp
 - **패키지 매니저**: pnpm
 - **배포**: Vercel
 - **영상 생성**: Kling (I2V, 6축 카메라) / Veo (T2V, 품질)
-- **이미지 생성**: DALL-E 3 / Imagen
+- **이미지 생성**: Gemini Imagen (gemini-2.0-flash-preview-image-generation)
 - **LLM**: Gemini
 
 ## 작업 시 주의사항

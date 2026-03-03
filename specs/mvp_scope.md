@@ -87,7 +87,7 @@ P5 Post-Production Suite ─── 편집 + Draft 렌더링
 | 3D 프리뷰 | **Three.js** | Angle Control 3D Cube + 카메라 시각화 |
 | Backend API | **Next.js API Routes** | 별도 서버 불필요 |
 | DB | **Supabase** (PostgreSQL) | Knowledge DB + Video Reference DB + 프로젝트 저장 |
-| 이미지 생성 | **DALL-E 3** / Imagen | 캐릭터/배경/샷 이미지 |
+| 이미지 생성 | **Gemini Imagen** | 캐릭터/배경/샷 이미지 |
 | 영상 생성 | **Kling** (카메라 제어) / **Veo** (품질) | 기존 검증됨 |
 | LLM | **Gemini** | Agent 대화, 프롬프트 생성, 씬 분석 |
 | 배포 | **Vercel** | Next.js 네이티브 |
