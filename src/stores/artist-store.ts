@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { SceneManifest, CharacterAsset, WorldAsset } from '@/types'
 import { buildCharacterPrompt, buildWorldPrompt } from '@/lib/prompts'
+import { useWriterStore } from '@/stores/writer-store'
 
 async function generateImage(
   prompt: string,
@@ -29,6 +30,7 @@ interface ArtistState {
   selectedBoostPreset: string | null
   error: string | null
 
+  loadData: () => void
   loadMockData: () => void
   selectCharacter: (id: string) => void
   lockCharacter: (id: string) => void
@@ -47,6 +49,43 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   generatingLocationId: null,
   selectedBoostPreset: null,
   error: null,
+
+  loadData: () => {
+    const writerManifest = useWriterStore.getState().sceneManifest
+    if (writerManifest) {
+      const characterAssets: CharacterAsset[] = writerManifest.characters.map(
+        (c) => ({
+          characterId: c.characterId,
+          name: c.name,
+          views: { front: null, side: null, back: null },
+          locked: false,
+        }),
+      )
+      const worldAssets: WorldAsset[] = writerManifest.locations.map((loc) => {
+        const scene = writerManifest.scenes.find(
+          (s) => s.location === loc.locationId,
+        )
+        return {
+          locationId: loc.locationId,
+          name: loc.name,
+          sceneId: scene?.sceneId ?? '',
+          wideShot: null,
+          establishingShot: null,
+        }
+      })
+
+      set({
+        sceneManifest: writerManifest,
+        characterAssets,
+        worldAssets,
+        selectedCharacterId: characterAssets[0]?.characterId ?? null,
+      })
+      return
+    }
+
+    // Fallback: load mock data
+    get().loadMockData()
+  },
 
   loadMockData: async () => {
     const [

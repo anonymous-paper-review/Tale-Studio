@@ -36,6 +36,36 @@
 - [x] 에러/로딩 상태 처리
 - [x] 문서 업데이트 (DALL-E → Gemini Imagen)
 
+## Phase 3: P2 The Script Room (2026-03-05~)
+
+> 브랜치: `feature/producer-writer-artist`
+> 스펙: `specs/ux_pages.md` P2 섹션 + `specs/layers/L1_scene_architect.md`
+
+### DoD
+- [ ] 스토리 입력 → Auto-Generate Scenes → Gemini LLM (Pumpup + Scene Architect) → 기승전결 4씬 카드 표시
+- [ ] 씬 카드 클릭 → Scene Detail Editor 표시 (Location, Time of Day, Key Conflict, Description)
+- [ ] Scene Detail Editor 필드 수정 → store 즉시 반영 (Auto-Save)
+- [ ] AI Writer 채팅 패널 — Gemini 대화로 씬 구성 논의
+- [ ] "Ask Concept Artist →" Handoff → artist 페이지 + sceneManifest 전달
+- [ ] 생성 중 로딩 상태, 에러 시 메시지 표시
+- [ ] 기존 P3 동작 깨지지 않을 것
+
+### P2-1: API + Store
+- [x] `POST /api/write/generate-scenes` (Pumpup + Scene Architect 체인)
+- [x] `POST /api/write/chat` (AI Writer 채팅)
+- [x] `writer-store.ts` — storyText, sceneManifest, selectedScene, generating/error 상태
+
+### P2-2: UI
+- [x] 스토리 입력 영역 + Auto-Generate Scenes 버튼
+- [x] 씬 카드 4개 (기승전결) 가로 배열 + 선택 강조
+- [x] Scene Detail Editor (Location, Time of Day, Mood, Description)
+- [x] AI Writer 채팅 패널
+- [x] Auto-Save 표시
+- [x] Handoff 버튼 → artist
+
+### P2-3: P3 연결
+- [x] artist-store → writer-store의 sceneManifest 수신 (loadData)
+- [x] project-store 기본 stage → writer로 조정
+
 ### 다음 예정
-- P2 The Script Room (P3 인터페이스 확정 후)
 - P1 The Meeting Room (P2 인터페이스 확정 후)

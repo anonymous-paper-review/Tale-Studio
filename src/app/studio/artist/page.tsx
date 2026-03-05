@@ -47,11 +47,12 @@ export default function VisualPage() {
     generateWorldAsset,
     selectBoostPreset,
     loadMockData,
+    loadData,
   } = useArtistStore()
 
   useEffect(() => {
-    loadMockData()
-  }, [loadMockData])
+    loadData()
+  }, [loadData])
 
   const getRole = (id: string) =>
     sceneManifest?.characters.find((c) => c.characterId === id)?.role ??
