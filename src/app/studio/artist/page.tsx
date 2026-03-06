@@ -14,6 +14,7 @@ import {
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { useArtistStore } from '@/stores/artist-store'
+import { useProjectStore } from '@/stores/project-store'
 import { cn } from '@/lib/utils'
 
 const ROLE_VARIANT = {
@@ -50,9 +51,11 @@ export default function VisualPage() {
     loadData,
   } = useArtistStore()
 
+  const projectId = useProjectStore((s) => s.projectId)
+
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    if (projectId) loadData()
+  }, [projectId, loadData])
 
   const getRole = (id: string) =>
     sceneManifest?.characters.find((c) => c.characterId === id)?.role ??

@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Loader2,
   Sparkles,
@@ -19,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { useWriterStore } from '@/stores/writer-store'
+import { useProjectStore } from '@/stores/project-store'
 import { cn } from '@/lib/utils'
 import type { Act } from '@/types'
 
@@ -59,6 +60,13 @@ export default function WriterPage() {
     sendChatMessage,
     clearError,
   } = useWriterStore()
+
+  const projectId = useProjectStore((s) => s.projectId)
+  const loadProject = useWriterStore((s) => s.loadProject)
+
+  useEffect(() => {
+    if (projectId) loadProject()
+  }, [projectId, loadProject])
 
   const [chatInput, setChatInput] = useState('')
   const [storyCollapsed, setStoryCollapsed] = useState(false)

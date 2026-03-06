@@ -94,7 +94,34 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         ])
 
         if (dbChars?.length) {
-          const writerManifest = useWriterStore.getState().sceneManifest
+          const manifest: SceneManifest = {
+            scenes: (scenes ?? []).map((s) => ({
+              sceneId: s.scene_id,
+              act: s.act as 'intro' | 'dev' | 'turn' | 'conclusion',
+              narrativeSummary: s.narrative_summary ?? '',
+              originalTextQuote: s.original_text_quote ?? '',
+              location: s.location ?? '',
+              timeOfDay: s.time_of_day ?? '',
+              mood: s.mood ?? '',
+              charactersPresent: s.characters_present ?? [],
+              estimatedDurationSeconds: s.estimated_duration_seconds ?? 30,
+            })),
+            characters: dbChars.map((c) => ({
+              characterId: c.character_id,
+              name: c.name,
+              role: c.role as 'protagonist' | 'antagonist' | 'supporting',
+              description: c.description ?? '',
+              fixedPrompt: c.fixed_prompt ?? '',
+              referenceImages: [],
+            })),
+            locations: (dbLocs ?? []).map((l) => ({
+              locationId: l.location_id,
+              name: l.name,
+              visualDescription: l.visual_description ?? '',
+              timeOfDay: l.time_of_day ?? '',
+              lightingDirection: l.lighting_direction ?? '',
+            })),
+          }
           const characterAssets: CharacterAsset[] = dbChars.map((c) => ({
             characterId: c.character_id,
             name: c.name,
@@ -114,7 +141,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           }))
 
           set({
-            sceneManifest: writerManifest,
+            sceneManifest: manifest,
             characterAssets,
             worldAssets,
             selectedCharacterId: characterAssets[0]?.characterId ?? null,
