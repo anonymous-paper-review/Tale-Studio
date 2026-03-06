@@ -67,5 +67,29 @@
 - [x] artist-store → writer-store의 sceneManifest 수신 (loadData)
 - [x] project-store 기본 stage → writer로 조정
 
-### 다음 예정
-- P1 The Meeting Room (P2 인터페이스 확정 후)
+## Phase 4: P1 The Meeting Room (2026-03-06~)
+
+> 브랜치: `feature/producer-writer-artist`
+> 스펙: `specs/ux_pages.md` P1 섹션
+
+### DoD
+- [x] `/studio/producer` 진입 → 2컬럼 레이아웃 (좌: Meeting Chat, 우: Project Dashboard)
+- [ ] 채팅 전송 → POST `/api/produce/chat` → Gemini 응답 + Dashboard에 추론된 settings 실시간 반영
+- [ ] 텍스트 복붙 또는 .txt 파일 업로드 → storyText로 저장
+- [ ] Dashboard 위젯: Playtime, Genre, AspectRatio, ToneStyle — "Pending..." → 값 채워짐
+- [ ] "Hand over to Writer →" 클릭 → story_text + settings DB 저장 → `/studio/writer` 이동
+- [ ] P2 진입 시 story_text 불러와짐 (기존 loadProject 활용)
+- [ ] P2(Writer), P3(Artist) 기존 동작 변경 없음
+
+### P1-1: Store + API
+- [x] `producer-store.ts` — chatMessages, storyText, projectSettings, sendChatMessage, uploadFile, saveAndHandoff
+- [x] `POST /api/produce/chat` — Gemini Producer Agent (설정 추론 + structured JSON 추출)
+
+### P1-2: UI
+- [x] `features/producer/meeting-chat.tsx` — 채팅 UI + 파일 업로드
+- [x] `features/producer/project-dashboard.tsx` — 설정 위젯 4개 + Logline
+- [x] `producer/page.tsx` — 2컬럼 조립 + Handoff 버튼
+
+### P1-3: 연결
+- [x] `project-store.ts` — 기본 stage `'writer'` → `'producer'` (DB 기본값과 일치)
+- [x] 빌드 통과

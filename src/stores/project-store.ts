@@ -20,7 +20,7 @@ function getStageIndex(id: StageId): number {
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
-  currentStage: 'writer',
+  currentStage: 'producer',
   videoGenerationStarted: false,
   workspaceId: null,
   projectId: null,
@@ -47,7 +47,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         workspaceId,
         projectId,
         initLoading: false,
-        currentStage: project.current_stage ?? 'writer',
+        currentStage: project.current_stage ?? 'producer',
       })
     } catch (err) {
       console.error('[project-store] initProject failed:', err)
