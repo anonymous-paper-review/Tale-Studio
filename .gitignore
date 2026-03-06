@@ -38,6 +38,7 @@ databases/
 !databases/migrations/
 assets/
 !assets/lore/
+!src/app/api/assets/
 
 # Legacy specs (로컬 보관, git 미추적)
 specs/archive/

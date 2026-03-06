@@ -5,10 +5,14 @@ import { STAGES } from '@/lib/constants'
 interface ProjectState {
   currentStage: StageId
   videoGenerationStarted: boolean
+  workspaceId: string | null
+  projectId: string | null
+  initLoading: boolean
 
   setStage: (stage: StageId) => void
   startVideoGeneration: () => void
   canNavigateTo: (stage: StageId) => boolean
+  initProject: () => Promise<void>
 }
 
 function getStageIndex(id: StageId): number {
@@ -18,6 +22,9 @@ function getStageIndex(id: StageId): number {
 export const useProjectStore = create<ProjectState>((set, get) => ({
   currentStage: 'writer',
   videoGenerationStarted: false,
+  workspaceId: null,
+  projectId: null,
+  initLoading: false,
 
   setStage: (stage) => set({ currentStage: stage }),
 
@@ -27,5 +34,24 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const { videoGenerationStarted, currentStage } = get()
     if (!videoGenerationStarted) return true
     return getStageIndex(stage) >= getStageIndex(currentStage)
+  },
+
+  initProject: async () => {
+    if (get().projectId) return
+    set({ initLoading: true })
+    try {
+      const res = await fetch('/api/project/init', { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to init project')
+      const { workspaceId, projectId, project } = await res.json()
+      set({
+        workspaceId,
+        projectId,
+        initLoading: false,
+        currentStage: project.current_stage ?? 'writer',
+      })
+    } catch (err) {
+      console.error('[project-store] initProject failed:', err)
+      set({ initLoading: false })
+    }
   },
 }))

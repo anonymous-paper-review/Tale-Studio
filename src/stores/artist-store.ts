@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import type { SceneManifest, CharacterAsset, WorldAsset } from '@/types'
 import { buildCharacterPrompt, buildWorldPrompt } from '@/lib/prompts'
 import { useWriterStore } from '@/stores/writer-store'
+import { useProjectStore } from '@/stores/project-store'
+import { createClient } from '@/lib/supabase/client'
 
 async function generateImage(
   prompt: string,
@@ -18,6 +20,20 @@ async function generateImage(
   }
   const { url } = await res.json()
   return url as string
+}
+
+function persistImage(
+  projectId: string,
+  type: 'character' | 'location',
+  entityId: string,
+  field: string,
+  dataUrl: string,
+) {
+  fetch('/api/assets/upload-image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, type, entityId, field, dataUrl }),
+  }).catch((err) => console.error('[artist-store] persistImage failed:', err))
 }
 
 interface ArtistState {
@@ -50,7 +66,67 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectedBoostPreset: null,
   error: null,
 
-  loadData: () => {
+  loadData: async () => {
+    const projectId = useProjectStore.getState().projectId
+
+    // Try loading from DB first
+    if (projectId) {
+      try {
+        const supabase = createClient()
+        const [
+          { data: scenes },
+          { data: dbChars },
+          { data: dbLocs },
+        ] = await Promise.all([
+          supabase
+            .from('scenes')
+            .select('*')
+            .eq('project_id', projectId)
+            .order('sort_order'),
+          supabase
+            .from('characters')
+            .select('*')
+            .eq('project_id', projectId),
+          supabase
+            .from('locations')
+            .select('*')
+            .eq('project_id', projectId),
+        ])
+
+        if (dbChars?.length) {
+          const writerManifest = useWriterStore.getState().sceneManifest
+          const characterAssets: CharacterAsset[] = dbChars.map((c) => ({
+            characterId: c.character_id,
+            name: c.name,
+            views: {
+              front: c.view_front ?? null,
+              side: c.view_side ?? null,
+              back: c.view_back ?? null,
+            },
+            locked: c.locked ?? false,
+          }))
+          const worldAssets: WorldAsset[] = (dbLocs ?? []).map((l) => ({
+            locationId: l.location_id,
+            name: l.name,
+            sceneId: l.scene_id ?? '',
+            wideShot: l.wide_shot ?? null,
+            establishingShot: l.establishing_shot ?? null,
+          }))
+
+          set({
+            sceneManifest: writerManifest,
+            characterAssets,
+            worldAssets,
+            selectedCharacterId: characterAssets[0]?.characterId ?? null,
+          })
+          return
+        }
+      } catch (err) {
+        console.error('[artist-store] DB load failed, falling back:', err)
+      }
+    }
+
+    // Fallback: load from writer store or mock data
     const writerManifest = useWriterStore.getState().sceneManifest
     if (writerManifest) {
       const characterAssets: CharacterAsset[] = writerManifest.characters.map(
@@ -146,6 +222,14 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             : a,
         ),
       }))
+
+      // Fire-and-forget: persist to Storage + DB
+      const pid = useProjectStore.getState().projectId
+      if (pid) {
+        persistImage(pid, 'character', id, 'view_front', front)
+        persistImage(pid, 'character', id, 'view_side', side)
+        persistImage(pid, 'character', id, 'view_back', back)
+      }
     } catch (err) {
       set({
         generatingCharacterId: null,
@@ -186,6 +270,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             : w,
         ),
       }))
+
+      // Fire-and-forget: persist to Storage + DB
+      const pid = useProjectStore.getState().projectId
+      if (pid) {
+        persistImage(pid, 'location', locationId, 'wide_shot', wideShot)
+        persistImage(pid, 'location', locationId, 'establishing_shot', establishingShot)
+      }
     } catch (err) {
       set({
         generatingLocationId: null,

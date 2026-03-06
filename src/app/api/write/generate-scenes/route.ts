@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import { NextResponse } from 'next/server'
 import type { SceneManifest } from '@/types'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 
 function getApiKey(): string {
   const keys = process.env.GOOGLE_API_KEYS ?? ''
@@ -82,7 +83,7 @@ Rules:
 
 export async function POST(req: Request) {
   try {
-    const { storyText } = await req.json()
+    const { storyText, projectId } = await req.json()
 
     if (!storyText || typeof storyText !== 'string') {
       return NextResponse.json(
@@ -146,6 +147,68 @@ export async function POST(req: Request) {
         { error: 'Invalid manifest: missing scenes or characters' },
         { status: 500 },
       )
+    }
+
+    // Persist to Supabase if projectId provided
+    if (projectId) {
+      await supabaseAdmin
+        .from('projects')
+        .update({
+          story_text: storyText,
+          expanded_story: expandedStory,
+          current_stage: 'writer',
+        })
+        .eq('id', projectId)
+
+      // Clear old data (re-generation replaces all)
+      await Promise.all([
+        supabaseAdmin.from('scenes').delete().eq('project_id', projectId),
+        supabaseAdmin.from('characters').delete().eq('project_id', projectId),
+        supabaseAdmin.from('locations').delete().eq('project_id', projectId),
+      ])
+
+      // Insert scenes
+      await supabaseAdmin.from('scenes').insert(
+        manifest.scenes.map((s, i) => ({
+          project_id: projectId,
+          scene_id: s.sceneId,
+          act: s.act,
+          narrative_summary: s.narrativeSummary,
+          original_text_quote: s.originalTextQuote,
+          location: s.location,
+          time_of_day: s.timeOfDay,
+          mood: s.mood,
+          characters_present: s.charactersPresent,
+          estimated_duration_seconds: s.estimatedDurationSeconds,
+          sort_order: i,
+        })),
+      )
+
+      // Insert characters
+      await supabaseAdmin.from('characters').insert(
+        manifest.characters.map((c) => ({
+          project_id: projectId,
+          character_id: c.characterId,
+          name: c.name,
+          role: c.role,
+          description: c.description,
+          fixed_prompt: c.fixedPrompt,
+        })),
+      )
+
+      // Insert locations
+      if (manifest.locations?.length) {
+        await supabaseAdmin.from('locations').insert(
+          manifest.locations.map((l) => ({
+            project_id: projectId,
+            location_id: l.locationId,
+            name: l.name,
+            visual_description: l.visualDescription,
+            time_of_day: l.timeOfDay,
+            lighting_direction: l.lightingDirection,
+          })),
+        )
+      }
     }
 
     return NextResponse.json({

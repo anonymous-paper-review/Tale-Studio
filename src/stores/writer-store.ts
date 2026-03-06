@@ -1,5 +1,7 @@
 import { create } from 'zustand'
-import type { Scene, SceneManifest } from '@/types'
+import type { Scene, SceneManifest, Character, Location } from '@/types'
+import { createClient } from '@/lib/supabase/client'
+import { useProjectStore } from '@/stores/project-store'
 
 interface ChatMessage {
   role: 'user' | 'model'
@@ -18,6 +20,7 @@ interface WriterState {
 
   setStoryText: (text: string) => void
   generateScenes: () => Promise<void>
+  loadProject: () => Promise<void>
   selectScene: (id: string) => void
   updateScene: (id: string, changes: Partial<Scene>) => void
   sendChatMessage: (message: string) => Promise<void>
@@ -43,10 +46,11 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     set({ generating: true, error: null })
 
     try {
+      const projectId = useProjectStore.getState().projectId
       const res = await fetch('/api/write/generate-scenes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storyText }),
+        body: JSON.stringify({ storyText, projectId }),
       })
 
       if (!res.ok) {
@@ -129,4 +133,78 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  loadProject: async () => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+
+    try {
+      const supabase = createClient()
+      const [
+        { data: project },
+        { data: scenes },
+        { data: characters },
+        { data: locations },
+      ] = await Promise.all([
+        supabase
+          .from('projects')
+          .select('story_text, expanded_story')
+          .eq('id', projectId)
+          .single(),
+        supabase
+          .from('scenes')
+          .select('*')
+          .eq('project_id', projectId)
+          .order('sort_order'),
+        supabase
+          .from('characters')
+          .select('*')
+          .eq('project_id', projectId),
+        supabase
+          .from('locations')
+          .select('*')
+          .eq('project_id', projectId),
+      ])
+
+      if (!scenes?.length) return
+
+      const manifest: SceneManifest = {
+        scenes: scenes.map((s) => ({
+          sceneId: s.scene_id,
+          act: s.act as Scene['act'],
+          narrativeSummary: s.narrative_summary ?? '',
+          originalTextQuote: s.original_text_quote ?? '',
+          location: s.location ?? '',
+          timeOfDay: s.time_of_day ?? '',
+          mood: s.mood ?? '',
+          charactersPresent: s.characters_present ?? [],
+          estimatedDurationSeconds: s.estimated_duration_seconds ?? 30,
+        })),
+        characters: (characters ?? []).map((c) => ({
+          characterId: c.character_id,
+          name: c.name,
+          role: c.role as Character['role'],
+          description: c.description ?? '',
+          fixedPrompt: c.fixed_prompt ?? '',
+          referenceImages: [],
+        })),
+        locations: (locations ?? []).map((l) => ({
+          locationId: l.location_id,
+          name: l.name,
+          visualDescription: l.visual_description ?? '',
+          timeOfDay: l.time_of_day ?? '',
+          lightingDirection: l.lighting_direction ?? '',
+        })),
+      }
+
+      set({
+        storyText: project?.story_text ?? '',
+        expandedStory: project?.expanded_story ?? null,
+        sceneManifest: manifest,
+        selectedSceneId: manifest.scenes[0]?.sceneId ?? null,
+      })
+    } catch (err) {
+      console.error('[writer-store] loadProject failed:', err)
+    }
+  },
 }))
