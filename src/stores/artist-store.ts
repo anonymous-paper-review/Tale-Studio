@@ -5,14 +5,17 @@ import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 
+export type ImageProvider = 'gemini' | 'tailscale'
+
 async function generateImage(
   prompt: string,
   aspectRatio: '1:1' | '16:9' = '1:1',
+  provider: ImageProvider = 'gemini',
 ): Promise<string> {
   const res = await fetch('/api/generate/image', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, aspectRatio }),
+    body: JSON.stringify({ prompt, aspectRatio, provider }),
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
@@ -22,25 +25,29 @@ async function generateImage(
   return URL.createObjectURL(blob)
 }
 
-function persistImage(
+async function persistImage(
   projectId: string,
   type: 'character' | 'location',
   entityId: string,
   field: string,
   blobUrl: string,
-) {
-  fetch(blobUrl)
-    .then((r) => r.blob())
-    .then((blob) => {
-      const form = new FormData()
-      form.append('projectId', projectId)
-      form.append('type', type)
-      form.append('entityId', entityId)
-      form.append('field', field)
-      form.append('file', blob, `${entityId}_${field}.png`)
-      return fetch('/api/assets/upload-image', { method: 'POST', body: form })
-    })
-    .catch((err) => console.error('[artist-store] persistImage failed:', err))
+): Promise<void> {
+  try {
+    const r = await fetch(blobUrl)
+    const blob = await r.blob()
+    const form = new FormData()
+    form.append('projectId', projectId)
+    form.append('type', type)
+    form.append('entityId', entityId)
+    form.append('field', field)
+    form.append('file', blob, `${entityId}_${field}.png`)
+    const res = await fetch('/api/assets/upload-image', { method: 'POST', body: form })
+    if (!res.ok) {
+      console.error(`[artist-store] persistImage HTTP ${res.status} for ${entityId}/${field}`)
+    }
+  } catch (err) {
+    console.error(`[artist-store] persistImage failed for ${entityId}/${field}:`, err)
+  }
 }
 
 interface ArtistState {
@@ -51,6 +58,7 @@ interface ArtistState {
   generatingCharacterId: string | null
   generatingLocationId: string | null
   selectedBoostPreset: string | null
+  imageProvider: ImageProvider
   error: string | null
 
   loadData: () => void
@@ -61,6 +69,7 @@ interface ArtistState {
   generateSheet: (id: string) => void
   generateWorldAsset: (locationId: string) => void
   selectBoostPreset: (preset: string) => void
+  setImageProvider: (provider: ImageProvider) => void
 }
 
 export const useArtistStore = create<ArtistState>((set, get) => ({
@@ -71,6 +80,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   generatingCharacterId: null,
   generatingLocationId: null,
   selectedBoostPreset: null,
+  imageProvider: 'gemini' as ImageProvider,
   error: null,
 
   loadData: async () => {
@@ -233,7 +243,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     })),
 
   generateSheet: async (id) => {
-    const { sceneManifest } = get()
+    const { sceneManifest, imageProvider } = get()
     const character = sceneManifest?.characters.find(
       (c) => c.characterId === id,
     )
@@ -244,7 +254,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     try {
       const [front, side, back] = await Promise.all(
         (['front', 'side', 'back'] as const).map((view) =>
-          generateImage(buildCharacterPrompt(character.fixedPrompt, view)),
+          generateImage(buildCharacterPrompt(character.fixedPrompt, view), '1:1', imageProvider),
         ),
       )
 
@@ -274,7 +284,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   },
 
   generateWorldAsset: async (locationId) => {
-    const { sceneManifest, selectedBoostPreset } = get()
+    const { sceneManifest, selectedBoostPreset, imageProvider } = get()
     const location = sceneManifest?.locations.find(
       (l) => l.locationId === locationId,
     )
@@ -292,8 +302,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       )
 
       const [wideShot, establishingShot] = await Promise.all([
-        generateImage(`${basePrompt}, wide shot, panoramic`, '16:9'),
-        generateImage(`${basePrompt}, establishing shot, aerial view`, '16:9'),
+        generateImage(`${basePrompt}, wide shot, panoramic`, '16:9', imageProvider),
+        generateImage(`${basePrompt}, establishing shot, aerial view`, '16:9', imageProvider),
       ])
 
       set((state) => ({
@@ -324,4 +334,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     set((state) => ({
       selectedBoostPreset: state.selectedBoostPreset === preset ? null : preset,
     })),
+
+  setImageProvider: (provider) => set({ imageProvider: provider }),
 }))

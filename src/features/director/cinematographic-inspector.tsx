@@ -1,5 +1,7 @@
 'use client'
 
+import { Video, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { AngleControl } from './angle-control'
@@ -10,12 +12,16 @@ interface CinematographicInspectorProps {
   shot: Shot | undefined
   onUpdateCamera: (config: Partial<CameraConfig>) => void
   onUpdateLighting: (config: Partial<LightingConfig>) => void
+  onGenerateVideo?: () => void
+  isGenerating?: boolean
 }
 
 export function CinematographicInspector({
   shot,
   onUpdateCamera,
   onUpdateLighting,
+  onGenerateVideo,
+  isGenerating,
 }: CinematographicInspectorProps) {
   if (!shot) {
     return (
@@ -60,6 +66,27 @@ export function CinematographicInspector({
             </div>
           </>
         )}
+
+        <Separator />
+
+        {/* Generate Video */}
+        <Button
+          className="w-full"
+          onClick={onGenerateVideo}
+          disabled={isGenerating}
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Generating…
+            </>
+          ) : (
+            <>
+              <Video className="mr-2 size-4" />
+              Generate Video
+            </>
+          )}
+        </Button>
       </div>
     </ScrollArea>
   )

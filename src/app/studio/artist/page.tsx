@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Lock, Unlock, Loader2, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/tooltip'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
-import { useArtistStore } from '@/stores/artist-store'
+import { useArtistStore, type ImageProvider } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { cn } from '@/lib/utils'
 
@@ -40,6 +40,7 @@ export default function VisualPage() {
     generatingCharacterId,
     generatingLocationId,
     selectedBoostPreset,
+    imageProvider,
     error,
     selectCharacter,
     lockCharacter,
@@ -47,15 +48,35 @@ export default function VisualPage() {
     generateSheet,
     generateWorldAsset,
     selectBoostPreset,
+    setImageProvider,
     loadMockData,
     loadData,
   } = useArtistStore()
 
   const projectId = useProjectStore((s) => s.projectId)
 
+  // Self-hosted server health check
+  const [selfHostedStatus, setSelfHostedStatus] = useState<'checking' | 'online' | 'offline' | 'unconfigured'>('checking')
+
   useEffect(() => {
     if (projectId) loadData()
   }, [projectId, loadData])
+
+  useEffect(() => {
+    let cancelled = false
+    const check = async () => {
+      try {
+        const res = await fetch('/api/generate/health')
+        const data = await res.json()
+        if (!cancelled) setSelfHostedStatus(data.status)
+      } catch {
+        if (!cancelled) setSelfHostedStatus('offline')
+      }
+    }
+    check()
+    const interval = setInterval(check, 30_000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [])
 
   const getRole = (id: string) =>
     sceneManifest?.characters.find((c) => c.characterId === id)?.role ??
@@ -182,8 +203,61 @@ export default function VisualPage() {
             <h2 className="text-lg font-semibold">World Model</h2>
           </div>
 
-          {/* Cinematic Boost Chips */}
+          {/* Provider Toggle + Cinematic Boost Chips */}
           <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
+            {/* Image Provider Toggle */}
+            <div className="mr-3 flex items-center gap-1 rounded-lg border border-border p-0.5">
+              <button
+                type="button"
+                onClick={() => setImageProvider('gemini')}
+                className={cn(
+                  'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                  imageProvider === 'gemini'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                Gemini
+              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selfHostedStatus === 'online') setImageProvider('tailscale')
+                    }}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                      imageProvider === 'tailscale'
+                        ? 'bg-primary text-primary-foreground'
+                        : selfHostedStatus === 'online'
+                          ? 'text-muted-foreground hover:text-foreground'
+                          : 'cursor-not-allowed text-muted-foreground/50',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'size-1.5 rounded-full',
+                        selfHostedStatus === 'online' && 'bg-green-500',
+                        selfHostedStatus === 'offline' && 'bg-red-500',
+                        selfHostedStatus === 'checking' && 'bg-yellow-500 animate-pulse',
+                        selfHostedStatus === 'unconfigured' && 'bg-gray-400',
+                      )}
+                    />
+                    Self-hosted
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {selfHostedStatus === 'online' && 'h100-image-gen connected'}
+                  {selfHostedStatus === 'offline' && 'Server offline — check h100-image-gen'}
+                  {selfHostedStatus === 'checking' && 'Checking connection…'}
+                  {selfHostedStatus === 'unconfigured' && 'TAILSCALE_IMAGE_API_URL not set'}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <Separator orientation="vertical" className="!h-5" />
+
             <span className="mr-1 text-xs font-medium text-muted-foreground">
               Cinematic Boost
             </span>

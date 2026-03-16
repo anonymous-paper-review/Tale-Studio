@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
+import { createKlingToken, cameraToText, KLING_API_BASE } from '@/lib/kling'
+import type { CameraConfig } from '@/types'
 
 export async function POST(req: Request) {
   try {
@@ -8,42 +10,66 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { shotId, cameraConfig, prompt, generationMethod } = await req.json()
+    const { shotId, prompt, camera, durationSeconds, aspectRatio } =
+      (await req.json()) as {
+        shotId: string
+        prompt: string
+        camera?: CameraConfig
+        durationSeconds?: number
+        aspectRatio?: string
+      }
 
-    if (!shotId) {
+    if (!shotId || !prompt) {
       return NextResponse.json(
-        { error: 'shotId is required' },
+        { error: 'shotId and prompt are required' },
         { status: 400 },
       )
     }
 
-    // TODO: Wire to Kling (I2V with 6-axis camera) or Veo (T2V) when API keys are available
-    // For now, return a stub response acknowledging the request
-    const hasKlingKey = !!process.env.KLING_API_KEY
-    const hasVeoKey = !!process.env.VEO_API_KEY
+    const token = createKlingToken()
 
-    if (!hasKlingKey && !hasVeoKey) {
-      return NextResponse.json({
-        shotId,
-        status: 'pending',
-        message: 'Video generation API keys not configured. Set KLING_API_KEY or VEO_API_KEY.',
-        stub: true,
-        request: {
-          generationMethod: generationMethod ?? 'T2V',
-          cameraConfig,
-          promptLength: prompt?.length ?? 0,
-        },
-      })
+    // kling-v2-master: convert 6-axis camera values to natural language in prompt
+    const cameraText = camera ? cameraToText(camera) : ''
+    const fullPrompt = cameraText
+      ? `${prompt}. ${cameraText}.`.slice(0, 500)
+      : prompt.slice(0, 500)
+
+    const body = {
+      model_name: 'kling-v2-master',
+      prompt: fullPrompt,
+      negative_prompt: 'blurry, low quality, distorted, deformed',
+      duration: String(Math.min(durationSeconds ?? 5, 10)),
+      aspect_ratio: aspectRatio ?? '16:9',
+      mode: 'std',
     }
 
-    // Future: actual API call
-    // if (generationMethod === 'I2V' && hasKlingKey) { ... }
-    // if (generationMethod === 'T2V' && hasVeoKey) { ... }
+    const res = await fetch(`${KLING_API_BASE}/videos/text2video`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}))
+      throw new Error(
+        errBody.message ?? errBody.error ?? `Kling API error: ${res.status}`,
+      )
+    }
+
+    const data = await res.json()
+    const taskId = data.data?.task_id
+
+    if (!taskId) {
+      throw new Error('No task_id returned from Kling API')
+    }
 
     return NextResponse.json({
       shotId,
-      status: 'pending',
-      message: 'Video generation queued',
+      taskId,
+      status: 'generating',
     })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'

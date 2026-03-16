@@ -16,10 +16,9 @@ interface SettingWidgetProps {
   icon: React.ReactNode
   label: string
   value: string
-  onEdit?: () => void
 }
 
-function SettingWidget({ icon, label, value, onEdit }: SettingWidgetProps) {
+function SettingWidget({ icon, label, value }: Omit<SettingWidgetProps, 'onEdit'>) {
   const isPending = !value || value === 'Pending...'
   return (
     <div className="rounded-lg border border-border p-4">
@@ -34,13 +33,11 @@ function SettingWidget({ icon, label, value, onEdit }: SettingWidgetProps) {
           </Badge>
         )}
       </div>
-      <button
-        type="button"
-        onClick={onEdit}
-        className={`text-sm font-medium ${isPending ? 'text-muted-foreground italic' : 'text-foreground'} hover:underline`}
+      <span
+        className={`text-sm font-medium ${isPending ? 'text-muted-foreground italic' : 'text-foreground'}`}
       >
         {value || 'Pending...'}
-      </button>
+      </span>
     </div>
   )
 }
