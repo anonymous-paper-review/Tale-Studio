@@ -236,6 +236,34 @@
 
 ---
 
+## 🔴 최우선: Agent SDK 전환 (2026-03-16~)
+
+> 현재 Gemini `generateContent` 직호출 6곳 → Claude Agent SDK 기반으로 전환
+
+### 대상 API 라우트
+| # | 라우트 | 현재 | 역할 |
+|---|--------|------|------|
+| 1 | `/api/produce/chat` | Gemini generateContent | P1 Producer Agent — 설정 추론 + 대화 |
+| 2 | `/api/write/generate-scenes` | Gemini generateContent | P2 Pumpup + L1 Scene Architect 체인 |
+| 3 | `/api/write/chat` | Gemini generateContent | P2 AI Writer 채팅 |
+| 4 | `/api/director/chat` | Gemini generateContent | P4 Director Kim 촬영기법 추천 |
+| 5 | `/api/director/generate-shots` | Gemini generateContent | P4 L2+L3 샷 생성 + Knowledge DB |
+| 6 | `/api/generate/image` | Gemini Imagen | P3 이미지 생성 (별도 — LLM 아님) |
+
+### 계획
+- [ ] Agent SDK 공통 헬퍼 구성 (`src/lib/agent.ts`)
+- [ ] #1 `/api/produce/chat` 전환
+- [ ] #2 `/api/write/generate-scenes` 전환
+- [ ] #3 `/api/write/chat` 전환
+- [ ] #4 `/api/director/chat` 전환
+- [ ] #5 `/api/director/generate-shots` 전환
+- [ ] #6 이미지 생성은 Imagen 유지 (Agent SDK 대상 아님)
+- [ ] 기존 동작 불변 검증 (P1→P5 E2E)
+
+### 참고
+- `#6 generate/image`는 Gemini Imagen (이미지 생성 모델)이므로 Agent SDK 전환 대상 아님
+- 프롬프트/시스템 인스트럭션은 각 라우트에 이미 정의되어 있으므로 Agent tool 정의로 매핑
+
 ## Backlog
 
 - [ ] Kling API 키 확보 + Vercel 환경변수 등록
