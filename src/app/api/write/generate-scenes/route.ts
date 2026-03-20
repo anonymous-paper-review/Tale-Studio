@@ -1,15 +1,8 @@
-import { GoogleGenAI } from '@google/genai'
 import { NextResponse } from 'next/server'
 import type { SceneManifest, Shot } from '@/types'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
-
-function getApiKey(): string {
-  const keys = process.env.GOOGLE_API_KEYS ?? ''
-  const first = keys.split(',')[0]?.split(':')[0]?.trim()
-  if (!first) throw new Error('GOOGLE_API_KEYS is not configured')
-  return first
-}
+import { claudeChat, claudeJSON } from '@/lib/claude'
 
 const PUMPUP_SYSTEM = `You are a visual story expander. Your job is to take a short story and add visual details that help cinematographers and video AI systems create stunning imagery.
 
@@ -79,8 +72,7 @@ Rules:
 - Role must be "protagonist", "antagonist", or "supporting"
 - Each scene ~30 seconds (total ~2 min video)
 - fixedPrompt: physical appearance only, no actions or emotions
-- Extract ALL characters mentioned, even briefly
-- Output valid JSON only, no markdown fences`
+- Extract ALL characters mentioned, even briefly`
 
 const SHOT_COMPOSER_SYSTEM = `You are a shot composer. Given a scene manifest and expanded story, generate 4-6 shots per scene.
 
@@ -117,8 +109,7 @@ Rules:
 - dialogueLines: include ONLY lines from the original story. Empty array if no dialogue in that shot
 - durationSeconds: 3-8 seconds per shot
 - Vary shot types for visual interest (wide establishing → medium → close-up for emotion)
-- characters: list character IDs present in this shot
-- Output valid JSON array only, no markdown fences`
+- characters: list character IDs present in this shot`
 
 export async function POST(req: Request) {
   try {
@@ -143,20 +134,9 @@ export async function POST(req: Request) {
       )
     }
 
-    const ai = new GoogleGenAI({ apiKey: getApiKey() })
-
     // Step 1: Pumpup — expand story with visual details
-    const pumpupResponse = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: storyText,
-      config: {
-        systemInstruction: PUMPUP_SYSTEM,
-        temperature: 0.7,
-      },
-    })
+    const expandedStory = await claudeChat(PUMPUP_SYSTEM, [], storyText, 0.7)
 
-    const expandedStory =
-      pumpupResponse.candidates?.[0]?.content?.parts?.[0]?.text
     if (!expandedStory) {
       return NextResponse.json(
         { error: 'Pumpup failed: no expanded story generated' },
@@ -165,27 +145,12 @@ export async function POST(req: Request) {
     }
 
     // Step 2: Scene Architect — split into 4 scenes
-    const sceneResponse = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: expandedStory,
-      config: {
-        systemInstruction: SCENE_ARCHITECT_SYSTEM,
-        temperature: 0.3,
-        responseMimeType: 'application/json',
-      },
-    })
+    const manifest = await claudeJSON<SceneManifest>(
+      SCENE_ARCHITECT_SYSTEM,
+      expandedStory,
+      0.3,
+    )
 
-    const sceneJson = sceneResponse.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!sceneJson) {
-      return NextResponse.json(
-        { error: 'Scene Architect failed: no scene manifest generated' },
-        { status: 500 },
-      )
-    }
-
-    const manifest: SceneManifest = JSON.parse(sceneJson)
-
-    // Basic validation
     if (!manifest.scenes?.length || !manifest.characters?.length) {
       return NextResponse.json(
         { error: 'Invalid manifest: missing scenes or characters' },
@@ -200,36 +165,33 @@ export async function POST(req: Request) {
       characters: manifest.characters,
     })
 
-    const shotResponse = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: shotInput,
-      config: {
-        systemInstruction: SHOT_COMPOSER_SYSTEM,
-        temperature: 0.4,
-        responseMimeType: 'application/json',
-      },
-    })
-
-    const shotJson = shotResponse.candidates?.[0]?.content?.parts?.[0]?.text
     let shots: Shot[] = []
+    try {
+      const rawShots = await claudeJSON<Record<string, unknown>[]>(
+        SHOT_COMPOSER_SYSTEM,
+        shotInput,
+        0.4,
+      )
 
-    if (shotJson) {
-      const parsed = JSON.parse(shotJson)
-      const rawShots = Array.isArray(parsed) ? parsed : parsed.shots ?? []
+      const arr = Array.isArray(rawShots) ? rawShots : (rawShots as { shots?: unknown[] }).shots ?? []
 
-      // Normalize — add default camera/lighting
-      shots = rawShots.map((s: Record<string, unknown>) => ({
-        shotId: s.shotId as string,
-        sceneId: s.sceneId as string,
-        shotType: s.shotType as string,
-        actionDescription: (s.actionDescription as string) ?? '',
-        characters: (s.characters as string[]) ?? [],
-        durationSeconds: (s.durationSeconds as number) ?? 5,
-        generationMethod: (s.generationMethod as string) ?? 'T2V',
-        dialogueLines: (s.dialogueLines as Shot['dialogueLines']) ?? [],
-        camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 },
-        lighting: { position: 'front', brightness: 50, colorTemp: 5000 },
-      }))
+      shots = arr.map((s) => {
+        const r = s as Record<string, unknown>
+        return {
+          shotId: r.shotId as string,
+          sceneId: r.sceneId as string,
+          shotType: r.shotType as Shot['shotType'],
+          actionDescription: (r.actionDescription as string) ?? '',
+          characters: (r.characters as string[]) ?? [],
+          durationSeconds: (r.durationSeconds as number) ?? 5,
+          generationMethod: (r.generationMethod as Shot['generationMethod']) ?? 'T2V',
+          dialogueLines: (r.dialogueLines as Shot['dialogueLines']) ?? [],
+          camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 },
+          lighting: { position: 'front' as const, brightness: 50, colorTemp: 5000 },
+        }
+      })
+    } catch {
+      // Shots are optional — continue without them
     }
 
     // Persist to Supabase if projectId provided
@@ -243,7 +205,6 @@ export async function POST(req: Request) {
         })
         .eq('id', projectId)
 
-      // Clear old data (re-generation replaces all)
       await Promise.all([
         supabaseAdmin.from('scenes').delete().eq('project_id', projectId),
         supabaseAdmin.from('characters').delete().eq('project_id', projectId),
@@ -251,7 +212,6 @@ export async function POST(req: Request) {
         supabaseAdmin.from('shots').delete().eq('project_id', projectId),
       ])
 
-      // Insert scenes
       await supabaseAdmin.from('scenes').insert(
         manifest.scenes.map((s, i) => ({
           project_id: projectId,
@@ -268,7 +228,6 @@ export async function POST(req: Request) {
         })),
       )
 
-      // Insert characters
       await supabaseAdmin.from('characters').insert(
         manifest.characters.map((c) => ({
           project_id: projectId,
@@ -280,7 +239,6 @@ export async function POST(req: Request) {
         })),
       )
 
-      // Insert locations
       if (manifest.locations?.length) {
         await supabaseAdmin.from('locations').insert(
           manifest.locations.map((l) => ({
@@ -294,7 +252,6 @@ export async function POST(req: Request) {
         )
       }
 
-      // Insert shots
       if (shots.length) {
         await supabaseAdmin.from('shots').insert(
           shots.map((s, i) => ({

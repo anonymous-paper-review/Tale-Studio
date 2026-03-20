@@ -295,12 +295,27 @@
 - `src/app/studio/director/page.tsx` — HandoffButton disabled + empty state + projectId dep
 - `src/app/studio/editor/page.tsx` — loadData() 사용 + empty state
 
+## Phase 9: Agent SDK 전환 + Editor 영속화 (2026-03-20)
+
+> 브랜치: main
+
+- [x] `@anthropic-ai/sdk` 설치 + `src/lib/claude.ts` 헬퍼 (`claudeChat`, `claudeJSON<T>`)
+- [x] Gemini → Claude 전환 (5개 파일, 7개 호출): produce/chat, write/generate-scenes, write/chat, director/chat, director/generate-shots
+- [x] Gemini Imagen (`/api/generate/image`) 유지 — 이미지 생성 모델, LLM 아님
+- [x] Editor clip order DB 영속화 — `/api/editor/reorder` shots.sort_order UPDATE 구현
+- [x] Editor trim DB 영속화 — shots 테이블 migration (trim_start, trim_end) + `/api/editor/trim` + store 연동
+- [x] `.txt 파일 업로드 (P1)` 구현 완료 확인
+- [x] Artist Provider UI (Gemini/Self-hosted 토글) 구현 완료 확인
+- [x] `pnpm build` 통과
+
+**내가 결정한 것:**
+- trim을 video_clips 아닌 shots 테이블에 추가 (Kling 미설정으로 video_clips 레코드 없음)
+- reorder/trim 영속화는 fire-and-forget (UX 블로킹 방지)
+
 ## Backlog
 
-- [ ] Kling API 키 확보 + Vercel 환경변수 등록
-- [ ] P5 Editor: 클립 순서 Supabase 영속화
-- [ ] P5 Editor: Trim 값 Supabase 영속화
-- [ ] 전체 파이프라인 E2E 검증 (P1→P5 Mock 없이)
+- [ ] Kling API 키 → Vercel 환경변수 `KLING_ACCESS_KEY` + `KLING_SECRET_KEY` 등록
+- [ ] 전체 파이프라인 E2E 검증 (P1→P5)
 
 ## Bugfix Log (2026-03-06)
 

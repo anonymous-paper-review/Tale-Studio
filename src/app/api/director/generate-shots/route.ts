@@ -1,15 +1,8 @@
-import { GoogleGenAI } from '@google/genai'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { queryTechniques, loadCameraPresets } from '@/lib/knowledge'
 import { SHOTS_PER_SCENE, PROMPT_MAX_LENGTH } from '@/lib/constants'
-
-function getApiKey(): string {
-  const keys = process.env.GOOGLE_API_KEYS ?? ''
-  const first = keys.split(',')[0]?.split(':')[0]?.trim()
-  if (!first) throw new Error('GOOGLE_API_KEYS is not configured')
-  return first
-}
+import { claudeJSON } from '@/lib/claude'
 
 const L2_SYSTEM = `You are a Shot Composer for an AI video production pipeline.
 
@@ -68,8 +61,6 @@ export async function POST(req: Request) {
       )
     }
 
-    const ai = new GoogleGenAI({ apiKey: getApiKey() })
-
     const sceneContext = JSON.stringify({
       sceneId: scene.sceneId,
       act: scene.act,
@@ -80,31 +71,7 @@ export async function POST(req: Request) {
       characters: scene.characters,
     })
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: [
-        {
-          role: 'user' as const,
-          parts: [{ text: `Generate shots for this scene:\n${sceneContext}` }],
-        },
-      ],
-      config: {
-        systemInstruction: L2_SYSTEM,
-        temperature: 0.6,
-      },
-    })
-
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!text) {
-      return NextResponse.json(
-        { error: 'No response generated' },
-        { status: 500 },
-      )
-    }
-
-    // Parse LLM output
-    const cleaned = text.replace(/```json?\s*/g, '').replace(/```/g, '').trim()
-    let rawShots: Array<{
+    type RawShot = {
       shotType: string
       actionDescription: string
       characters: string[]
@@ -117,16 +84,13 @@ export async function POST(req: Request) {
         delivery: string
         durationHint: number
       }>
-    }>
-
-    try {
-      rawShots = JSON.parse(cleaned)
-    } catch {
-      return NextResponse.json(
-        { error: 'Failed to parse shot sequence', raw: text },
-        { status: 500 },
-      )
     }
+
+    const rawShots = await claudeJSON<RawShot[]>(
+      L2_SYSTEM,
+      `Generate shots for this scene:\n${sceneContext}`,
+      0.6,
+    )
 
     // L3: Enrich with Knowledge DB + build prompts
     const presets = loadCameraPresets()
@@ -137,7 +101,6 @@ export async function POST(req: Request) {
       const matchedTechniques = queryTechniques(moods, raw.shotType)
       const finalPrompt = buildFinalPrompt(raw.actionDescription, matchedTechniques)
 
-      // Pick camera preset based on first matching technique or default
       const techPreset = matchedTechniques.length > 0
         ? presets.find((p) => p.id === matchedTechniques[0].id) ?? defaultPreset
         : defaultPreset

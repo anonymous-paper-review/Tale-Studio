@@ -1,13 +1,6 @@
-import { GoogleGenAI } from '@google/genai'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
-
-function getApiKey(): string {
-  const keys = process.env.GOOGLE_API_KEYS ?? ''
-  const first = keys.split(',')[0]?.split(':')[0]?.trim()
-  if (!first) throw new Error('GOOGLE_API_KEYS is not configured')
-  return first
-}
+import { claudeChat } from '@/lib/claude'
 
 const WRITER_SYSTEM = `You are a professional screenwriter and story consultant working in an AI video production pipeline.
 
@@ -47,8 +40,6 @@ export async function POST(req: Request) {
       )
     }
 
-    const ai = new GoogleGenAI({ apiKey: getApiKey() })
-
     let contextPrefix = ''
     if (sceneContext) {
       contextPrefix += `[Current Scene Manifest]\n${JSON.stringify(sceneContext, null, 2)}\n\n`
@@ -57,33 +48,12 @@ export async function POST(req: Request) {
       contextPrefix += `[Currently Selected Shot]\n${JSON.stringify(shotContext, null, 2)}\n\n`
     }
 
-    const contents = [
-      ...(history ?? []).map((msg: ChatMessage) => ({
-        role: msg.role,
-        parts: [{ text: msg.content }],
-      })),
-      {
-        role: 'user' as const,
-        parts: [{ text: `${contextPrefix}${message}` }],
-      },
-    ]
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents,
-      config: {
-        systemInstruction: WRITER_SYSTEM,
-        temperature: 0.7,
-      },
-    })
-
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!text) {
-      return NextResponse.json(
-        { error: 'No response generated' },
-        { status: 500 },
-      )
-    }
+    const text = await claudeChat(
+      WRITER_SYSTEM,
+      (history ?? []) as ChatMessage[],
+      `${contextPrefix}${message}`,
+      0.7,
+    )
 
     return NextResponse.json({ message: text })
   } catch (err) {

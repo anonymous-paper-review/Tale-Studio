@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function PATCH(req: Request) {
   try {
@@ -17,14 +18,17 @@ export async function PATCH(req: Request) {
       )
     }
 
-    // TODO: Persist to Supabase shots table (update sort_order)
-    // For MVP, reorder is client-only (Zustand state)
+    // Persist sort_order to shots table
+    await Promise.all(
+      (clipOrder as string[]).map((shotId, index) =>
+        supabaseAdmin
+          .from('shots')
+          .update({ sort_order: index })
+          .eq('shot_id', shotId),
+      ),
+    )
 
-    return NextResponse.json({
-      sceneId,
-      clipOrder,
-      message: 'Reorder saved (client-only for MVP)',
-    })
+    return NextResponse.json({ sceneId, clipOrder })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[editor/reorder]', errMsg)

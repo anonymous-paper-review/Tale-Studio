@@ -85,11 +85,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             referenceImageUrl: s.reference_image ?? null,
           }))
 
-          const videoClips: VideoClip[] = shots.map((s) => ({
-            shotId: s.shotId,
+          const videoClips: VideoClip[] = dbShots.map((s) => ({
+            shotId: s.shot_id,
             url: null,
             status: 'pending',
             thumbnailUrl: null,
+            trimStart: s.trim_start ?? undefined,
+            trimEnd: s.trim_end ?? undefined,
           }))
 
           const order = buildClipOrder(shots)
@@ -167,22 +169,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   selectClip: (shotId) => set({ selectedClipShotId: shotId }),
 
-  reorderClips: (sceneId, fromIndex, toIndex) =>
+  reorderClips: (sceneId, fromIndex, toIndex) => {
     set((state) => {
       const order = [...(state.clipOrder[sceneId] ?? [])]
       const [moved] = order.splice(fromIndex, 1)
       order.splice(toIndex, 0, moved)
-      return {
-        clipOrder: { ...state.clipOrder, [sceneId]: order },
-      }
-    }),
+      const newOrder = { ...state.clipOrder, [sceneId]: order }
 
-  setTrim: (shotId, trimStart, trimEnd) =>
+      // Persist to DB (fire-and-forget)
+      fetch('/api/editor/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sceneId, clipOrder: order }),
+      }).catch((err) => console.error('[editor-store] reorder persist failed:', err))
+
+      return { clipOrder: newOrder }
+    })
+  },
+
+  setTrim: (shotId, trimStart, trimEnd) => {
     set((state) => ({
       videoClips: state.videoClips.map((c) =>
         c.shotId === shotId ? { ...c, trimStart, trimEnd } : c,
       ),
-    })),
+    }))
+
+    // Persist to DB (fire-and-forget)
+    fetch('/api/editor/trim', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shotId, trimStart, trimEnd }),
+    }).catch((err) => console.error('[editor-store] trim persist failed:', err))
+  },
 
   deleteClip: (shotId) =>
     set((state) => {
