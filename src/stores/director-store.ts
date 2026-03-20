@@ -124,6 +124,7 @@ interface DirectorState {
   generateShotImage: (shotId: string) => Promise<void>
   generateAllShotImages: () => Promise<void>
   setImageProvider: (provider: ImageProvider) => void
+  reset: () => void
 }
 
 const POLL_INTERVAL_MS = 5_000
@@ -302,8 +303,7 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
       return
     }
 
-    // 3) Fallback: mock data
-    get().loadMockData()
+    // No data available — keep empty state (don't show fake mock data)
   },
 
   loadMockData: async () => {
@@ -434,6 +434,23 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
   },
 
   setImageProvider: (provider) => set({ imageProvider: provider }),
+
+  reset: () =>
+    set({
+      sceneManifest: null,
+      characterAssets: [],
+      worldAssets: [],
+      shots: [],
+      videoClips: [],
+      selectedSceneId: null,
+      selectedShotId: null,
+      chatMessages: [],
+      chatLoading: false,
+      generatingVideoShotId: null,
+      generatingImageShotIds: new Set<string>(),
+      imageProvider: 'gemini' as ImageProvider,
+      error: null,
+    }),
 
   generateShotImage: async (shotId: string) => {
     const { shots, sceneManifest, worldAssets, characterAssets, imageProvider } = get()

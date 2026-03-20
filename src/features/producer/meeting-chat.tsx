@@ -56,6 +56,23 @@ export function MeetingChat() {
                 you&apos;d like to create, or upload a script file to get
                 started.
               </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  'A lonely astronaut discovers a garden on Mars',
+                  'Two rival chefs compete in a midnight cook-off',
+                  'A child finds a door to another world in their closet',
+                  'A detective solves crimes using dreams',
+                ].map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                    onClick={() => setInput(example)}
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           {chatMessages.map((msg, i) => (

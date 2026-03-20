@@ -70,6 +70,7 @@ interface ArtistState {
   generateWorldAsset: (locationId: string) => void
   selectBoostPreset: (preset: string) => void
   setImageProvider: (provider: ImageProvider) => void
+  reset: () => void
 }
 
 export const useArtistStore = create<ArtistState>((set, get) => ({
@@ -203,8 +204,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       return
     }
 
-    // Fallback: load mock data
-    get().loadMockData()
+    // No data available — keep empty state (don't show fake mock data)
   },
 
   loadMockData: async () => {
@@ -336,4 +336,17 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     })),
 
   setImageProvider: (provider) => set({ imageProvider: provider }),
+
+  reset: () =>
+    set({
+      sceneManifest: null,
+      characterAssets: [],
+      worldAssets: [],
+      selectedCharacterId: null,
+      generatingCharacterId: null,
+      generatingLocationId: null,
+      selectedBoostPreset: null,
+      imageProvider: 'gemini' as ImageProvider,
+      error: null,
+    }),
 }))

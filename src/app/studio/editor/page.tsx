@@ -9,6 +9,7 @@ import { SceneTabs } from '@/features/editor/scene-tabs'
 import { ShotTimeline } from '@/features/editor/shot-timeline'
 import { EditToolbar } from '@/features/editor/edit-toolbar'
 import { useEditorStore } from '@/stores/editor-store'
+import { useProjectStore } from '@/stores/project-store'
 
 export default function PostPage() {
   const {
@@ -19,7 +20,7 @@ export default function PostPage() {
     clipOrder,
     rendering,
     error,
-    loadMockData,
+    loadData,
     selectScene,
     selectClip,
     reorderClips,
@@ -27,9 +28,11 @@ export default function PostPage() {
     renderDraft,
   } = useEditorStore()
 
+  const projectId = useProjectStore((s) => s.projectId)
+
   useEffect(() => {
-    loadMockData()
-  }, [loadMockData])
+    loadData()
+  }, [projectId, loadData])
 
   const sceneIds = [...new Set(shots.map((s) => s.sceneId))]
   const currentOrder = selectedSceneId
@@ -39,6 +42,19 @@ export default function PostPage() {
   const selectedClip = videoClips.find(
     (c) => c.shotId === selectedClipShotId,
   )
+
+  if (shots.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">Post-Production Suite</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Complete previous steps first to load video clips.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

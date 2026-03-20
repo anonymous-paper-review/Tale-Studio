@@ -14,6 +14,7 @@ import { HandoffButton } from '@/components/layout/handoff-button'
 import { CinematographicInspector } from '@/features/director/cinematographic-inspector'
 import { DirectorChat } from '@/features/director/director-chat'
 import { useDirectorStore } from '@/stores/director-store'
+import { useProjectStore } from '@/stores/project-store'
 import { type ImageProvider } from '@/stores/artist-store'
 import { cn } from '@/lib/utils'
 
@@ -47,12 +48,14 @@ export default function SetPage() {
     loadData,
   } = useDirectorStore()
 
+  const projectId = useProjectStore((s) => s.projectId)
+
   // Self-hosted health check
   const [selfHostedStatus, setSelfHostedStatus] = useState<'checking' | 'online' | 'offline' | 'unconfigured'>('checking')
 
   useEffect(() => {
     loadData()
-  }, [loadData])
+  }, [projectId, loadData])
 
   useEffect(() => {
     let cancelled = false
@@ -89,6 +92,19 @@ export default function SetPage() {
     characterIds
       .map((id) => characterAssets.find((c) => c.characterId === id))
       .filter(Boolean)
+
+  if (shots.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">The Set</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Complete previous steps first to load scenes and shots.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -381,7 +397,11 @@ export default function SetPage() {
       {/* Bottom: Director Kim Chat */}
       <DirectorChat />
 
-      <HandoffButton label="Head to Editor" targetStage="editor" />
+      <HandoffButton
+        label="Head to Editor"
+        targetStage="editor"
+        disabled={shots.length === 0}
+      />
     </>
   )
 }

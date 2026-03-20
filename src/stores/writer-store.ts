@@ -59,6 +59,7 @@ interface WriterState {
   ) => void
   sendChatMessage: (message: string) => Promise<void>
   clearError: () => void
+  reset: () => void
 }
 
 export const useWriterStore = create<WriterState>((set, get) => ({
@@ -228,6 +229,21 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  reset: () =>
+    set({
+      storyText: '',
+      expandedStory: null,
+      sceneManifest: null,
+      selectedSceneId: null,
+      shots: [],
+      selectedShotId: null,
+      generatingShots: false,
+      generating: false,
+      chatMessages: [],
+      chatLoading: false,
+      error: null,
+    }),
 
   loadProject: async () => {
     const projectId = useProjectStore.getState().projectId

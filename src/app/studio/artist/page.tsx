@@ -85,6 +85,19 @@ export default function VisualPage() {
   const getScene = (sceneId: string) =>
     sceneManifest?.scenes.find((s) => s.sceneId === sceneId)
 
+  if (characterAssets.length === 0 && worldAssets.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">The Visual Studio</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Complete the Script Room first to generate characters and locations.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
@@ -343,7 +356,11 @@ export default function VisualPage() {
           {error}
         </div>
       )}
-      <HandoffButton label="Approve & Direct" targetStage="director" />
+      <HandoffButton
+        label="Approve & Direct"
+        targetStage="director"
+        disabled={characterAssets.length === 0}
+      />
     </>
   )
 }

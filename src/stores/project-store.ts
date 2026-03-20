@@ -4,14 +4,12 @@ import { STAGES } from '@/lib/constants'
 
 interface ProjectState {
   currentStage: StageId
-  videoGenerationStarted: boolean
   workspaceId: string | null
   projectId: string | null
   projectTitle: string
   initLoading: boolean
 
   setStage: (stage: StageId) => void
-  startVideoGeneration: () => void
   canNavigateTo: (stage: StageId) => boolean
   initProject: () => Promise<void>
   createNewProject: () => Promise<void>
@@ -23,9 +21,23 @@ function getStageIndex(id: StageId): number {
   return STAGES.findIndex((s) => s.id === id)
 }
 
+function resetChildStores() {
+  // Lazy imports to avoid circular dependencies
+  const { useProducerStore } = require('@/stores/producer-store')
+  const { useWriterStore } = require('@/stores/writer-store')
+  const { useArtistStore } = require('@/stores/artist-store')
+  const { useDirectorStore } = require('@/stores/director-store')
+  const { useEditorStore } = require('@/stores/editor-store')
+
+  useProducerStore.getState().reset()
+  useWriterStore.getState().reset()
+  useArtistStore.getState().reset()
+  useDirectorStore.getState().reset()
+  useEditorStore.getState().reset()
+}
+
 export const useProjectStore = create<ProjectState>((set, get) => ({
   currentStage: 'producer',
-  videoGenerationStarted: false,
   workspaceId: null,
   projectId: null,
   projectTitle: 'Untitled',
@@ -33,12 +45,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   setStage: (stage) => set({ currentStage: stage }),
 
-  startVideoGeneration: () => set({ videoGenerationStarted: true }),
-
   canNavigateTo: (stage) => {
-    const { videoGenerationStarted, currentStage } = get()
-    if (!videoGenerationStarted) return true
-    return getStageIndex(stage) >= getStageIndex(currentStage)
+    const { currentStage } = get()
+    return getStageIndex(stage) <= getStageIndex(currentStage)
   },
 
   initProject: async () => {
@@ -62,6 +71,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   createNewProject: async () => {
+    resetChildStores()
     set({ initLoading: true })
     try {
       const res = await fetch('/api/project/new', { method: 'POST' })
@@ -73,8 +83,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         projectTitle: 'Untitled',
         initLoading: false,
         currentStage: 'producer',
-        videoGenerationStarted: false,
-      })
+        })
     } catch (err) {
       console.error('[project-store] createNewProject failed:', err)
       set({ initLoading: false })
@@ -82,11 +91,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   switchProject: (id, title) => {
+    resetChildStores()
     set({
       projectId: id,
       projectTitle: title,
       currentStage: 'producer',
-      videoGenerationStarted: false,
     })
   },
 
@@ -96,7 +105,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectId: null,
       projectTitle: 'Untitled',
       currentStage: 'producer',
-      videoGenerationStarted: false,
       initLoading: false,
     })
   },

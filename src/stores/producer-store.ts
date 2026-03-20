@@ -27,9 +27,10 @@ interface ProducerState {
   updateSettings: (partial: Partial<ProjectSettings>) => void
   sendChatMessage: (message: string) => Promise<void>
   uploadFile: (file: File) => Promise<void>
-  saveAndHandoff: () => Promise<void>
+  saveAndHandoff: () => Promise<boolean>
   loadProject: () => Promise<void>
   clearError: () => void
+  reset: () => void
 }
 
 const DEFAULT_SETTINGS: ProjectSettings = {
@@ -129,7 +130,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   saveAndHandoff: async () => {
     const { storyText, projectSettings } = get()
     const projectId = useProjectStore.getState().projectId
-    if (!projectId) return
+    if (!projectId) return false
 
     set({ syncing: true, error: null })
 
@@ -148,11 +149,13 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
       useProjectStore.getState().setStage('writer')
       set({ syncing: false })
+      return true
     } catch (err) {
       set({
         syncing: false,
         error: err instanceof Error ? err.message : 'Save failed',
       })
+      return false
     }
   },
 
@@ -183,4 +186,14 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  reset: () =>
+    set({
+      storyText: '',
+      projectSettings: { ...DEFAULT_SETTINGS },
+      chatMessages: [],
+      chatLoading: false,
+      syncing: false,
+      error: null,
+    }),
 }))

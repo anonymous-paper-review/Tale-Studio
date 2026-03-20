@@ -24,8 +24,8 @@ export default function MeetingPage() {
     projectSettings.genre || projectSettings.toneStyle || storyText.length > 0
 
   const handleHandoff = async () => {
-    await saveAndHandoff()
-    router.push('/studio/writer')
+    const ok = await saveAndHandoff()
+    if (ok) router.push('/studio/writer')
   }
 
   return (

@@ -243,7 +243,11 @@ export default function WriterPage() {
         </button>
       )}
 
-      <HandoffButton label="Ask Concept Artist" targetStage="artist" />
+      <HandoffButton
+        label="Ask Concept Artist"
+        targetStage="artist"
+        disabled={shots.length === 0}
+      />
     </>
   )
 }
