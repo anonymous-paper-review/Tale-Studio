@@ -57,7 +57,7 @@ export default function MeetingPage() {
         <Button
           onClick={handleHandoff}
           disabled={!hasMinSettings || syncing}
-          className="w-full"
+          className={`w-full ${hasMinSettings && !syncing ? 'animate-pulse bg-green-600 hover:bg-green-700' : ''}`}
           size="lg"
         >
           {syncing ? (
@@ -65,9 +65,14 @@ export default function MeetingPage() {
               <Loader2 className="size-4 animate-spin" />
               Generating Scenes…
             </>
+          ) : hasMinSettings ? (
+            <>
+              Ready! Generate Scenes & Hand over
+              <ArrowRight className="ml-2 size-4" />
+            </>
           ) : (
             <>
-              Generate Scenes & Hand over
+              Complete your story to continue
               <ArrowRight className="ml-2 size-4" />
             </>
           )}
