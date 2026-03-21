@@ -39,10 +39,17 @@ export function WriterChat({ messages, loading, onSend }: WriterChatProps) {
       <ScrollArea className="flex-1 px-4 py-3">
         <div className="space-y-3">
           {messages.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              Ask the AI Writer to help refine your scenes and shots,
-              suggest improvements, or discuss story structure.
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                AI Writer can directly edit your scenes and shots.
+              </p>
+              <div className="space-y-1 text-[11px] text-muted-foreground/70">
+                <p>Try:</p>
+                <p>&quot;이 샷을 클로즈업으로 바꿔줘&quot;</p>
+                <p>&quot;이 씬 분위기를 더 어둡게&quot;</p>
+                <p>&quot;주인공 대사 추가해줘&quot;</p>
+              </div>
+            </div>
           )}
           {messages.map((msg, i) => (
             <div

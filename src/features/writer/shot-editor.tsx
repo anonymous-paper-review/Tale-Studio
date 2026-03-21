@@ -56,12 +56,17 @@ export function ShotEditor({
     <ScrollArea className="flex-1 px-6 py-4">
       <div className="space-y-4">
         {/* Shot header */}
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold">
-            Shot {shot.shotId}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            Scene: {shot.sceneId}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold">
+              Shot {shot.shotId}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Scene: {shot.sceneId}
+            </span>
+          </div>
+          <span className="text-[10px] text-muted-foreground">
+            Edit fields below to customize this shot
           </span>
         </div>
 
@@ -133,22 +138,34 @@ export function ShotEditor({
           />
         </div>
 
-        {/* Characters */}
+        {/* Characters — toggle to add/remove */}
         <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">
-            CHARACTERS
+            CHARACTERS <span className="font-normal">(click to toggle)</span>
           </label>
           <div className="flex flex-wrap gap-1.5">
-            {shot.characters.map((charId) => (
-              <Badge key={charId} variant="secondary">
-                {getCharName(charId)}
-              </Badge>
-            ))}
-            {shot.characters.length === 0 && (
-              <span className="text-xs text-muted-foreground">
-                No characters assigned
-              </span>
-            )}
+            {manifest.characters.map((c) => {
+              const isActive = shot.characters.includes(c.characterId)
+              return (
+                <button
+                  key={c.characterId}
+                  type="button"
+                  className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                    isActive
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-background text-muted-foreground hover:border-primary/50'
+                  }`}
+                  onClick={() => {
+                    const next = isActive
+                      ? shot.characters.filter((id) => id !== c.characterId)
+                      : [...shot.characters, c.characterId]
+                    onUpdateShot(shot.shotId, { characters: next })
+                  }}
+                >
+                  {c.name}
+                </button>
+              )
+            })}
           </div>
         </div>
 

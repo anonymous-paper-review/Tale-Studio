@@ -211,15 +211,46 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         throw new Error(body.error ?? `HTTP ${res.status}`)
       }
 
-      const { message: reply } = await res.json()
+      const { message: reply, updates } = await res.json()
 
+      // Update chat messages
       set((state) => ({
         chatLoading: false,
         chatMessages: [
           ...state.chatMessages,
-          { role: 'model', content: reply },
+          { role: 'model' as const, content: reply },
         ],
       }))
+
+      // Apply structured updates from AI Writer
+      if (Array.isArray(updates)) {
+        for (const op of updates) {
+          const u = op as { type: string; sceneId?: string; shotId?: string; changes?: Record<string, unknown> }
+          if (!u.changes) continue
+
+          if (u.type === 'updateScene' && u.sceneId) {
+            set((state) => {
+              if (!state.sceneManifest) return state
+              return {
+                sceneManifest: {
+                  ...state.sceneManifest,
+                  scenes: state.sceneManifest.scenes.map((s) =>
+                    s.sceneId === u.sceneId ? { ...s, ...u.changes } : s,
+                  ),
+                },
+              }
+            })
+          }
+
+          if (u.type === 'updateShot' && u.shotId) {
+            set((state) => ({
+              shots: state.shots.map((s) =>
+                s.shotId === u.shotId ? { ...s, ...u.changes } : s,
+              ),
+            }))
+          }
+        }
+      }
     } catch (err) {
       set({
         chatLoading: false,
