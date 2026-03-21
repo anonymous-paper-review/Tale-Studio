@@ -165,49 +165,48 @@ export default function WriterPage() {
           onSelectScene={selectScene}
         />
 
-        {/* ── Bottom: Shot Grid + Editor (left) + Chat (right) ── */}
+        {/* ── Middle: Shot Grid + Editor ── */}
         <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-          {/* Left panel: Shot Grid + Shot Editor */}
-          <div className="flex flex-1 flex-col border-b border-border lg:border-b-0 lg:border-r">
-            {/* Shot Grid */}
-            <ShotGrid
-              shots={sceneShotsFiltered}
-              selectedShotId={selectedShotId}
-              manifest={sceneManifest}
-              onSelectShot={selectShot}
-            />
+          {/* Left: Shot Grid */}
+          <ShotGrid
+            shots={sceneShotsFiltered}
+            selectedShotId={selectedShotId}
+            manifest={sceneManifest}
+            onSelectShot={selectShot}
+          />
 
-            {/* Shot Detail Editor */}
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="border-b border-border px-6 py-2">
-                <span className="text-sm font-semibold">Shot Detail Editor</span>
-                {selectedShot && (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    [{selectedShot.shotId}]
-                  </span>
-                )}
-              </div>
-
-              {selectedShot ? (
-                <ShotEditor
-                  shot={selectedShot}
-                  manifest={sceneManifest}
-                  onUpdateShot={updateShot}
-                  onAddDialogue={addDialogueLine}
-                  onRemoveDialogue={removeDialogueLine}
-                  onUpdateDialogue={updateDialogueLine}
-                />
-              ) : (
-                <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                  {sceneShotsFiltered.length > 0
-                    ? 'Select a shot above'
-                    : 'Generate scenes to create shots'}
-                </div>
+          {/* Right: Shot Detail Editor */}
+          <div className="flex min-h-0 flex-1 flex-col border-t border-border lg:border-l lg:border-t-0">
+            <div className="border-b border-border px-6 py-2">
+              <span className="text-sm font-semibold">Shot Detail Editor</span>
+              {selectedShot && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  [{selectedShot.shotId}]
+                </span>
               )}
             </div>
-          </div>
 
-          {/* Right panel: AI Writer Chat */}
+            {selectedShot ? (
+              <ShotEditor
+                shot={selectedShot}
+                manifest={sceneManifest}
+                onUpdateShot={updateShot}
+                onAddDialogue={addDialogueLine}
+                onRemoveDialogue={removeDialogueLine}
+                onUpdateDialogue={updateDialogueLine}
+              />
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                {sceneShotsFiltered.length > 0
+                  ? 'Select a shot above'
+                  : 'Generate scenes to create shots'}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Bottom: AI Writer Chat (full width) ── */}
+        <div className="h-64 border-t border-border">
           <WriterChat
             messages={chatMessages}
             loading={chatLoading}

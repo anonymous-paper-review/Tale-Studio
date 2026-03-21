@@ -30,7 +30,7 @@ export function WriterChat({ messages, loading, onSend }: WriterChatProps) {
   }
 
   return (
-    <div className="flex w-full flex-col lg:w-80">
+    <div className="flex h-full w-full flex-col">
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <MessageSquare className="size-4 text-muted-foreground" />
         <span className="text-sm font-semibold">AI Writer</span>
