@@ -20,8 +20,9 @@ export default function MeetingPage() {
     if (projectId) loadProject()
   }, [projectId, loadProject])
 
+  const storyReady = useProducerStore((s) => s.storyReady)
   const hasMinSettings =
-    projectSettings.genre || projectSettings.toneStyle || storyText.length > 0
+    storyReady && (projectSettings.genre || projectSettings.toneStyle)
 
   const handleHandoff = async () => {
     const ok = await saveAndHandoff()
@@ -62,11 +63,11 @@ export default function MeetingPage() {
           {syncing ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              Saving…
+              Generating Scenes…
             </>
           ) : (
             <>
-              Hand over to Writer
+              Generate Scenes & Hand over
               <ArrowRight className="ml-2 size-4" />
             </>
           )}

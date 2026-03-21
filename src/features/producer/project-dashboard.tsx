@@ -49,7 +49,7 @@ const ASPECT_RATIO_LABELS: Record<string, string> = {
 }
 
 export function ProjectDashboard() {
-  const { projectSettings, syncing, storyText } = useProducerStore()
+  const { projectSettings, syncing, storyText, storyReady } = useProducerStore()
 
   return (
     <div className="flex w-full flex-col lg:w-80 xl:w-96">
@@ -92,9 +92,18 @@ export function ProjectDashboard() {
         />
 
         {/* Story Text Preview */}
-        <div className="rounded-lg border border-border p-4">
-          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            LOGLINE
+        <div className={`rounded-lg border p-4 ${storyReady ? 'border-green-500/50 bg-green-500/5' : 'border-border'}`}>
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">STORY</span>
+            {storyReady ? (
+              <Badge variant="outline" className="border-green-500/50 text-[10px] text-green-600">
+                Ready
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px]">
+                Need more detail
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground italic">
             {storyText

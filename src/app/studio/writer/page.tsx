@@ -56,45 +56,29 @@ export default function WriterPage() {
   )
   const selectedShot = shots.find((s) => s.shotId === selectedShotId)
 
-  // ── No scenes yet: show story input ──
+  // ── No scenes yet: scenes should have been generated during Producer handoff ──
   if (!sceneManifest) {
     return (
       <>
         <div className="flex flex-1 items-center justify-center p-8">
-          <div className="w-full max-w-2xl space-y-6">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold">The Script Room</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Paste your story below and let the AI Writer break it into
-                scenes.
-              </p>
-            </div>
-
-            <Textarea
-              placeholder="Enter your story here (min 20 characters)…"
-              className="min-h-[200px] resize-y"
-              value={storyText}
-              onChange={(e) => setStoryText(e.target.value)}
-            />
-
-            <Button
-              onClick={generateScenes}
-              disabled={generating || storyText.trim().length < 20}
-              className="w-full"
-              size="lg"
-            >
-              {generating ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Generating Scenes & Shots…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="size-4" />
-                  Auto-Generate Scenes
-                </>
-              )}
-            </Button>
+          <div className="w-full max-w-md space-y-4 text-center">
+            {generating ? (
+              <>
+                <Loader2 className="mx-auto size-8 animate-spin text-muted-foreground" />
+                <h1 className="text-xl font-bold">Generating Scenes…</h1>
+                <p className="text-sm text-muted-foreground">
+                  The AI is breaking your story into scenes and shots.
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-xl font-bold">No Scenes Yet</h1>
+                <p className="text-sm text-muted-foreground">
+                  Go back to The Meeting Room and complete your story with the Producer.
+                  Scenes will be generated automatically when you hand off.
+                </p>
+              </>
+            )}
 
             {error && (
               <button

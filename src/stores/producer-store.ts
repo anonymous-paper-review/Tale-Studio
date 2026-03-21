@@ -13,10 +13,12 @@ interface ExtractedSettings {
   genre?: string
   aspectRatio?: '16:9' | '9:16' | '1:1'
   toneStyle?: string
+  storyReady?: boolean
 }
 
 interface ProducerState {
   storyText: string
+  storyReady: boolean
   projectSettings: ProjectSettings
   chatMessages: ChatMessage[]
   chatLoading: boolean
@@ -42,6 +44,7 @@ const DEFAULT_SETTINGS: ProjectSettings = {
 
 export const useProducerStore = create<ProducerState>((set, get) => ({
   storyText: '',
+  storyReady: false,
   projectSettings: { ...DEFAULT_SETTINGS },
   chatMessages: [],
   chatLoading: false,
@@ -93,6 +96,11 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           ? extractedSettings.storyText
           : state.storyText
 
+        // Track story readiness from LLM judgment
+        const newStoryReady = extractedSettings?.storyReady === true
+          ? true
+          : state.storyReady
+
         return {
           chatLoading: false,
           chatMessages: [
@@ -101,6 +109,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           ],
           projectSettings: newSettings,
           storyText: newStoryText,
+          storyReady: newStoryReady,
         }
       })
     } catch (err) {
@@ -147,6 +156,18 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
       if (error) throw error
 
+      // Auto-generate scenes before handing off to Writer
+      const res = await fetch('/api/write/generate-scenes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storyText, projectId }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Scene generation failed')
+      }
+
       useProjectStore.getState().setStage('writer')
       set({ syncing: false })
       return true
@@ -190,6 +211,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   reset: () =>
     set({
       storyText: '',
+      storyReady: false,
       projectSettings: { ...DEFAULT_SETTINGS },
       chatMessages: [],
       chatLoading: false,
