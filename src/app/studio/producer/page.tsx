@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -24,9 +24,15 @@ export default function MeetingPage() {
   const hasMinSettings =
     storyReady && (projectSettings.genre || projectSettings.toneStyle)
 
+  // Redirect via useEffect to avoid router.push failing inside async handlers
+  const [redirectTo, setRedirectTo] = useState<string | null>(null)
+  useEffect(() => {
+    if (redirectTo) router.replace(redirectTo)
+  }, [redirectTo, router])
+
   const handleHandoff = async () => {
     const ok = await saveAndHandoff()
-    if (ok) router.push('/studio/writer')
+    if (ok) setRedirectTo('/studio/writer')
   }
 
   return (

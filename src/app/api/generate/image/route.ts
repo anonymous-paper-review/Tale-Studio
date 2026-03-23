@@ -9,6 +9,9 @@ function getApiKey(): string {
   return first
 }
 
+// Vercel serverless function timeout (seconds) — 60s for Pro, 10s for Hobby
+export const maxDuration = 120
+
 /* ── Tailscale self-hosted image gen (Qwen/FLUX etc.) ── */
 async function generateViaTailscale(
   prompt: string,
@@ -18,6 +21,9 @@ async function generateViaTailscale(
   if (!baseUrl) {
     throw new Error('TAILSCALE_IMAGE_API_URL is not configured')
   }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 120_000) // 2min for image gen
 
   const res = await fetch(`${baseUrl}/generate`, {
     method: 'POST',
@@ -30,7 +36,10 @@ async function generateViaTailscale(
       true_cfg_scale: 4.0,
       seed: -1,
     }),
+    signal: controller.signal,
   })
+
+  clearTimeout(timeout)
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')
