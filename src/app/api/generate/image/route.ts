@@ -10,7 +10,7 @@ function getApiKey(): string {
 }
 
 // Vercel serverless function timeout (seconds) — 60s for Pro, 10s for Hobby
-export const maxDuration = 300
+export const maxDuration = 600
 
 /* ── Tailscale self-hosted image gen (Qwen/FLUX etc.) ── */
 async function generateViaTailscale(
