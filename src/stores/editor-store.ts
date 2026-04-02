@@ -87,8 +87,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
           const videoClips: VideoClip[] = dbShots.map((s) => ({
             shotId: s.shot_id,
-            url: null,
-            status: 'pending',
+            url: s.video_url ?? null,
+            status: s.video_url ? 'completed' : 'pending',
             thumbnailUrl: null,
             trimStart: s.trim_start ?? undefined,
             trimEnd: s.trim_end ?? undefined,

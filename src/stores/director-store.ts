@@ -246,10 +246,10 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
             referenceImageUrl: s.reference_image ?? null,
           }))
 
-          const videoClips: VideoClip[] = shots.map((s) => ({
-            shotId: s.shotId,
-            url: null,
-            status: 'pending',
+          const videoClips: VideoClip[] = dbShots.map((s) => ({
+            shotId: s.shot_id,
+            url: s.video_url ?? null,
+            status: s.video_url ? 'completed' : 'pending',
             thumbnailUrl: null,
           }))
 

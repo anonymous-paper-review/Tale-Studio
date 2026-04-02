@@ -67,3 +67,4 @@ parallel_dev/
 .vercel
 log.sh
 run.sh
+git-push-helper.sh
