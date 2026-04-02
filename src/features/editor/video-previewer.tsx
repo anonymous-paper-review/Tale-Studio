@@ -1,8 +1,5 @@
 'use client'
 
-import { Play, Pause } from 'lucide-react'
-import { useRef, useState } from 'react'
-import { Button } from '@/components/ui/button'
 import type { Shot, VideoClip } from '@/types'
 
 interface VideoPreviewerProps {
@@ -11,19 +8,6 @@ interface VideoPreviewerProps {
 }
 
 export function VideoPreviewer({ shot, clip }: VideoPreviewerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [playing, setPlaying] = useState(false)
-
-  const togglePlay = () => {
-    if (!videoRef.current) return
-    if (playing) {
-      videoRef.current.pause()
-    } else {
-      videoRef.current.play()
-    }
-    setPlaying(!playing)
-  }
-
   if (!shot) {
     return (
       <div className="flex h-full items-center justify-center bg-black/40">
@@ -33,13 +17,12 @@ export function VideoPreviewer({ shot, clip }: VideoPreviewerProps) {
   }
 
   return (
-    <div className="relative flex h-full flex-col items-center justify-center bg-black">
+    <div className="relative flex h-full items-center justify-center bg-black">
       {clip?.url ? (
         <video
-          ref={videoRef}
           src={clip.url}
-          className="max-h-full max-w-full"
-          onEnded={() => setPlaying(false)}
+          controls
+          className="max-h-[70vh] max-w-full rounded"
         />
       ) : (
         <div className="flex flex-col items-center gap-3">
@@ -58,24 +41,6 @@ export function VideoPreviewer({ shot, clip }: VideoPreviewerProps) {
               </p>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Playback controls overlay */}
-      {clip?.url && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-          <Button
-            size="icon"
-            variant="secondary"
-            className="size-10 rounded-full"
-            onClick={togglePlay}
-          >
-            {playing ? (
-              <Pause className="size-4" />
-            ) : (
-              <Play className="size-4" />
-            )}
-          </Button>
         </div>
       )}
 

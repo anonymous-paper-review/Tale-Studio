@@ -303,41 +303,9 @@ export default function SetPage() {
                         <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
                           {shot.shotType}
                         </span>
-                        {/* Hover: regenerate */}
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            generateShotImage(shot.shotId)
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.stopPropagation()
-                              generateShotImage(shot.shotId)
-                            }
-                          }}
-                        >
-                          <ImageIcon className="size-4 text-white" />
-                        </div>
                       </>
                     ) : (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        className="flex flex-col items-center gap-1"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          generateShotImage(shot.shotId)
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.stopPropagation()
-                            generateShotImage(shot.shotId)
-                          }
-                        }}
-                      >
+                      <div className="flex flex-col items-center gap-1">
                         <ImageIcon className="size-4 text-muted-foreground" />
                         <span className="text-[10px] text-muted-foreground">
                           {shot.shotType}
@@ -360,13 +328,28 @@ export default function SetPage() {
                   </div>
 
                   <p className="truncate text-xs">{shot.actionDescription}</p>
-                  <div className="mt-1 flex gap-1">
+                  <div className="mt-1 flex items-center gap-1">
                     <Badge variant="secondary" className="text-[10px]">
                       {shot.generationMethod}
                     </Badge>
                     <Badge variant="secondary" className="text-[10px]">
                       {shot.durationSeconds}s
                     </Badge>
+                    <button
+                      className="ml-auto flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                      disabled={isGenImg}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        generateShotImage(shot.shotId)
+                      }}
+                    >
+                      {isGenImg ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <ImageIcon className="size-3" />
+                      )}
+                      {imgUrl ? 'Regen' : 'Gen'}
+                    </button>
                   </div>
                 </button>
               )
