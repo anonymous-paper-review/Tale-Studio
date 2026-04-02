@@ -52,8 +52,9 @@ export default function SetPage() {
 
   const projectId = useProjectStore((s) => s.projectId)
 
-  // Self-hosted health check
-  const [selfHostedStatus, setSelfHostedStatus] = useState<'checking' | 'online' | 'offline' | 'unconfigured'>('checking')
+  // Self-hosted health checks
+  const [imgServerStatus, setImgServerStatus] = useState<'checking' | 'online' | 'offline' | 'unconfigured'>('checking')
+  const [vidServerStatus, setVidServerStatus] = useState<'checking' | 'online' | 'offline' | 'unconfigured'>('checking')
 
   useEffect(() => {
     loadData()
@@ -63,11 +64,20 @@ export default function SetPage() {
     let cancelled = false
     const check = async () => {
       try {
-        const res = await fetch('/api/generate/health')
-        const data = await res.json()
-        if (!cancelled) setSelfHostedStatus(data.status)
+        const [imgRes, vidRes] = await Promise.all([
+          fetch('/api/generate/health'),
+          fetch('/api/generate/video-health'),
+        ])
+        const [imgData, vidData] = await Promise.all([imgRes.json(), vidRes.json()])
+        if (!cancelled) {
+          setImgServerStatus(imgData.status)
+          setVidServerStatus(vidData.status)
+        }
       } catch {
-        if (!cancelled) setSelfHostedStatus('offline')
+        if (!cancelled) {
+          setImgServerStatus('offline')
+          setVidServerStatus('offline')
+        }
       }
     }
     check()
@@ -179,8 +189,9 @@ export default function SetPage() {
               Shots <span className="font-normal">({sceneShots.length})</span>
             </h3>
             <div className="flex items-center gap-2">
-              {/* Provider toggle */}
+              {/* Image provider toggle */}
               <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5">
+                <span className="px-1 text-[10px] text-muted-foreground/60">Img:</span>
                 <button
                   type="button"
                   onClick={() => setImageProvider('gemini')}
@@ -198,13 +209,13 @@ export default function SetPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (selfHostedStatus === 'online') setImageProvider('tailscale')
+                        if (imgServerStatus === 'online') setImageProvider('tailscale')
                       }}
                       className={cn(
                         'flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors',
                         imageProvider === 'tailscale'
                           ? 'bg-primary text-primary-foreground'
-                          : selfHostedStatus === 'online'
+                          : imgServerStatus === 'online'
                             ? 'text-muted-foreground hover:text-foreground'
                             : 'cursor-not-allowed text-muted-foreground/50',
                       )}
@@ -212,20 +223,20 @@ export default function SetPage() {
                       <span
                         className={cn(
                           'size-1.5 rounded-full',
-                          selfHostedStatus === 'online' && 'bg-green-500',
-                          selfHostedStatus === 'offline' && 'bg-red-500',
-                          selfHostedStatus === 'checking' && 'bg-yellow-500 animate-pulse',
-                          selfHostedStatus === 'unconfigured' && 'bg-gray-400',
+                          imgServerStatus === 'online' && 'bg-green-500',
+                          imgServerStatus === 'offline' && 'bg-red-500',
+                          imgServerStatus === 'checking' && 'bg-yellow-500 animate-pulse',
+                          imgServerStatus === 'unconfigured' && 'bg-gray-400',
                         )}
                       />
                       Self-hosted
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {selfHostedStatus === 'online' && 'h100-image-gen connected'}
-                    {selfHostedStatus === 'offline' && 'Server offline'}
-                    {selfHostedStatus === 'checking' && 'Checking…'}
-                    {selfHostedStatus === 'unconfigured' && 'Not configured'}
+                    {imgServerStatus === 'online' && 'h100-image-gen connected'}
+                    {imgServerStatus === 'offline' && 'Image server offline'}
+                    {imgServerStatus === 'checking' && 'Checking…'}
+                    {imgServerStatus === 'unconfigured' && 'Not configured'}
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -245,18 +256,41 @@ export default function SetPage() {
                 >
                   FAL
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setVideoProvider('local')}
-                  className={cn(
-                    'rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors',
-                    videoProvider === 'local'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  Local
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (vidServerStatus === 'online') setVideoProvider('local')
+                      }}
+                      className={cn(
+                        'flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors',
+                        videoProvider === 'local'
+                          ? 'bg-primary text-primary-foreground'
+                          : vidServerStatus === 'online'
+                            ? 'text-muted-foreground hover:text-foreground'
+                            : 'cursor-not-allowed text-muted-foreground/50',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'size-1.5 rounded-full',
+                          vidServerStatus === 'online' && 'bg-green-500',
+                          vidServerStatus === 'offline' && 'bg-red-500',
+                          vidServerStatus === 'checking' && 'bg-yellow-500 animate-pulse',
+                          vidServerStatus === 'unconfigured' && 'bg-gray-400',
+                        )}
+                      />
+                      Self-hosted
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {vidServerStatus === 'online' && 'pro6000-video-gen connected'}
+                    {vidServerStatus === 'offline' && 'Video server offline'}
+                    {vidServerStatus === 'checking' && 'Checking…'}
+                    {vidServerStatus === 'unconfigured' && 'Not configured'}
+                  </TooltipContent>
+                </Tooltip>
               </div>
 
               <Button
