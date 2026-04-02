@@ -13,12 +13,14 @@ import { useArtistStore, type ImageProvider } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 
+export type VideoProvider = 'fal' | 'local'
+
 /* ── Fire-and-forget: upload shot reference image to Storage + DB ── */
 async function persistShotImage(
   projectId: string,
   shotId: string,
   blobUrl: string,
-): Promise<void> {
+): Promise<string | null> {
   try {
     const r = await fetch(blobUrl)
     const blob = await r.blob()
@@ -31,9 +33,13 @@ async function persistShotImage(
     const res = await fetch('/api/assets/upload-image', { method: 'POST', body: form })
     if (!res.ok) {
       console.error(`[director-store] persistShotImage HTTP ${res.status} for ${shotId}`)
+      return null
     }
+    const { publicUrl } = await res.json()
+    return publicUrl ?? null
   } catch (err) {
     console.error(`[director-store] persistShotImage failed for ${shotId}:`, err)
+    return null
   }
 }
 
@@ -109,6 +115,7 @@ interface DirectorState {
   generatingVideoShotId: string | null
   generatingImageShotIds: Set<string>
   imageProvider: ImageProvider
+  videoProvider: VideoProvider
   videoStorage: 'supabase' | 'local'
   error: string | null
 
@@ -125,6 +132,7 @@ interface DirectorState {
   generateShotImage: (shotId: string) => Promise<void>
   generateAllShotImages: () => Promise<void>
   setImageProvider: (provider: ImageProvider) => void
+  setVideoProvider: (provider: VideoProvider) => void
   setVideoStorage: (storage: 'supabase' | 'local') => void
   reset: () => void
 }
@@ -145,6 +153,7 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
   generatingVideoShotId: null,
   generatingImageShotIds: new Set<string>(),
   imageProvider: 'gemini' as ImageProvider,
+  videoProvider: 'fal' as VideoProvider,
   videoStorage: 'supabase' as 'supabase' | 'local',
   error: null,
 
@@ -437,6 +446,7 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
   },
 
   setImageProvider: (provider) => set({ imageProvider: provider }),
+  setVideoProvider: (provider) => set({ videoProvider: provider }),
   setVideoStorage: (storage) => set({ videoStorage: storage }),
 
   reset: () =>
@@ -453,6 +463,7 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
       generatingVideoShotId: null,
       generatingImageShotIds: new Set<string>(),
       imageProvider: 'gemini' as ImageProvider,
+      videoProvider: 'fal' as VideoProvider,
       videoStorage: 'supabase' as 'supabase' | 'local',
       error: null,
     }),
@@ -514,10 +525,17 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
         }
       })
 
-      // Fire-and-forget: persist to Storage + DB
+      // Persist to Storage + DB, then update state with permanent URL
       const projectId = useProjectStore.getState().projectId
       if (projectId) {
-        persistShotImage(projectId, shotId, blobUrl)
+        const publicUrl = await persistShotImage(projectId, shotId, blobUrl)
+        if (publicUrl) {
+          set((state) => ({
+            shots: state.shots.map((s) =>
+              s.shotId === shotId ? { ...s, referenceImageUrl: publicUrl } : s,
+            ),
+          }))
+        }
       }
     } catch (err) {
       set((state) => {
@@ -546,6 +564,8 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
     const shot = get().shots.find((s) => s.shotId === shotId)
     if (!shot) return
 
+    const { videoProvider, videoStorage } = get()
+
     set({ generatingVideoShotId: shotId, error: null })
 
     set((state) => ({
@@ -564,6 +584,9 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
           camera: shot.camera,
           durationSeconds: shot.durationSeconds,
           aspectRatio: '16:9',
+          generationMethod: shot.generationMethod,
+          provider: videoProvider,
+          referenceImageUrl: shot.referenceImageUrl,
         }),
       })
 
@@ -572,8 +595,53 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
         throw new Error(data.error || 'Video generation failed')
       }
 
-      const { taskId } = await res.json()
+      const { taskId, provider: respProvider, model, status: initStatus } = await res.json()
 
+      // Helper: persist completed video to Supabase/local storage
+      const persistVideo = async (videoUrl: string): Promise<string> => {
+        const projectId = useProjectStore.getState().projectId
+        let savedUrl = videoUrl
+        if (projectId) {
+          try {
+            const uploadRes = await fetch('/api/assets/upload-video', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ videoUrl, projectId, shotId, storage: videoStorage }),
+            })
+            if (uploadRes.ok) {
+              const { url } = await uploadRes.json()
+              savedUrl = url
+            }
+          } catch {
+            console.warn('[generateVideo] Failed to persist video, using original URL')
+          }
+        }
+        return savedUrl
+      }
+
+      // Local provider returns completed immediately
+      if (initStatus === 'completed') {
+        const pollRes = await fetch(
+          `/api/director/generate-video/${encodeURIComponent(taskId)}?provider=${respProvider}&model=${encodeURIComponent(model)}`,
+        )
+        const pollData = await pollRes.json()
+
+        if (pollData.status === 'completed') {
+          const savedUrl = await persistVideo(pollData.url)
+          set((state) => ({
+            videoClips: state.videoClips.map((c) =>
+              c.shotId === shotId
+                ? { ...c, status: 'completed', url: savedUrl }
+                : c,
+            ),
+            generatingVideoShotId: null,
+          }))
+          return
+        }
+        throw new Error(pollData.error || 'Video generation failed')
+      }
+
+      // FAL provider: poll until done
       const startTime = Date.now()
       const poll = async (): Promise<void> => {
         if (Date.now() - startTime > POLL_TIMEOUT_MS) {
@@ -581,7 +649,7 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
         }
 
         const pollRes = await fetch(
-          `/api/director/generate-video/${taskId}`,
+          `/api/director/generate-video/${encodeURIComponent(taskId)}?provider=${respProvider}&model=${encodeURIComponent(model)}`,
         )
         if (!pollRes.ok) {
           const errData = await pollRes.json()
@@ -591,34 +659,7 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
         const pollData = await pollRes.json()
 
         if (pollData.status === 'completed') {
-          const falUrl = pollData.url
-
-          // Persist video to storage (Supabase or local)
-          const projectId = useProjectStore.getState().projectId
-          const { videoStorage } = get()
-          let savedUrl = falUrl
-
-          if (projectId) {
-            try {
-              const uploadRes = await fetch('/api/assets/upload-video', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  videoUrl: falUrl,
-                  projectId,
-                  shotId,
-                  storage: videoStorage,
-                }),
-              })
-              if (uploadRes.ok) {
-                const { url } = await uploadRes.json()
-                savedUrl = url
-              }
-            } catch {
-              console.warn('[generateVideo] Failed to persist video, using FAL URL')
-            }
-          }
-
+          const savedUrl = await persistVideo(pollData.url)
           set((state) => ({
             videoClips: state.videoClips.map((c) =>
               c.shotId === shotId

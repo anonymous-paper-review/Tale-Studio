@@ -42,21 +42,21 @@ export function AngleControl({ camera, onUpdate }: AngleControlProps) {
         >
           {/* Front */}
           <div
-            className="absolute inset-0 border border-primary/40 bg-primary/10"
+            className="absolute inset-0 border border-white bg-white/10"
             style={{ transform: 'translateZ(40px)' }}
           >
-            <div className="flex h-full items-center justify-center text-[10px] text-primary/60">
+            <div className="flex h-full items-center justify-center text-[10px] text-white/60">
               F
             </div>
           </div>
           {/* Back */}
           <div
-            className="absolute inset-0 border border-primary/20 bg-primary/5"
+            className="absolute inset-0 border border-white/60 bg-white/5"
             style={{ transform: 'rotateY(180deg) translateZ(40px)' }}
           />
           {/* Left */}
           <div
-            className="absolute inset-0 border border-primary/20 bg-primary/5"
+            className="absolute inset-0 border border-white/60 bg-white/5"
             style={{
               width: '80px',
               transform: 'rotateY(-90deg) translateZ(40px)',
@@ -64,7 +64,7 @@ export function AngleControl({ camera, onUpdate }: AngleControlProps) {
           />
           {/* Right */}
           <div
-            className="absolute inset-0 border border-primary/20 bg-primary/5"
+            className="absolute inset-0 border border-white/60 bg-white/5"
             style={{
               width: '80px',
               transform: 'rotateY(90deg) translateZ(40px)',
@@ -72,7 +72,7 @@ export function AngleControl({ camera, onUpdate }: AngleControlProps) {
           />
           {/* Top */}
           <div
-            className="absolute inset-0 border border-primary/30 bg-primary/10"
+            className="absolute inset-0 border border-white/80 bg-white/10"
             style={{
               height: '80px',
               transform: 'rotateX(90deg) translateZ(40px)',
@@ -80,7 +80,7 @@ export function AngleControl({ camera, onUpdate }: AngleControlProps) {
           />
           {/* Bottom */}
           <div
-            className="absolute inset-0 border border-primary/20 bg-primary/5"
+            className="absolute inset-0 border border-white/60 bg-white/5"
             style={{
               height: '80px',
               transform: 'rotateX(-90deg) translateZ(40px)',

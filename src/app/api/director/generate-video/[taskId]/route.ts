@@ -4,10 +4,8 @@ import { fal } from '@fal-ai/client'
 
 fal.config({ credentials: () => process.env.FAL_KEY ?? '' })
 
-const FAL_MODEL = 'fal-ai/kling-video/v2.1/master/text-to-video'
-
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ taskId: string }> },
 ) {
   try {
@@ -17,8 +15,30 @@ export async function GET(
     }
 
     const { taskId } = await params
+    const { searchParams } = new URL(req.url)
+    const provider = searchParams.get('provider') ?? 'fal'
+    const model = searchParams.get('model') ?? 'fal-ai/kling-video/v2.1/master/text-to-video'
 
-    const status = await fal.queue.status(FAL_MODEL, {
+    /* ── Local provider: taskId is the output_path, video is already done ── */
+    if (provider === 'local') {
+      const baseUrl = process.env.TAILSCALE_VIDEO_API_URL
+      if (!baseUrl) {
+        return NextResponse.json(
+          { status: 'failed', error: 'TAILSCALE_VIDEO_API_URL not configured' },
+        )
+      }
+
+      // Convert server output_path to downloadable URL
+      // e.g. /data/hunyuan/outputs/api/hunyuan_xxx.mp4 → /outputs/api/hunyuan_xxx.mp4
+      const outputPath = taskId
+      const relativePath = outputPath.replace(/^\/data\/hunyuan\/outputs\//, '')
+      const videoUrl = `${baseUrl}/outputs/${relativePath}`
+
+      return NextResponse.json({ status: 'completed', url: videoUrl })
+    }
+
+    /* ── FAL provider: poll queue status ── */
+    const status = await fal.queue.status(model, {
       requestId: taskId,
       logs: false,
     })
@@ -26,7 +46,7 @@ export async function GET(
     const queueStatus = status.status as string
 
     if (queueStatus === 'COMPLETED') {
-      const result = await fal.queue.result(FAL_MODEL, {
+      const result = await fal.queue.result(model, {
         requestId: taskId,
       })
 

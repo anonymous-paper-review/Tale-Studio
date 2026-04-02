@@ -37,6 +37,7 @@ export default function SetPage() {
     generatingVideoShotId,
     generatingImageShotIds,
     imageProvider,
+    videoProvider,
     selectScene,
     selectShot,
     updateCamera,
@@ -45,6 +46,7 @@ export default function SetPage() {
     generateShotImage,
     generateAllShotImages,
     setImageProvider,
+    setVideoProvider,
     loadData,
   } = useDirectorStore()
 
@@ -226,6 +228,35 @@ export default function SetPage() {
                     {selfHostedStatus === 'unconfigured' && 'Not configured'}
                   </TooltipContent>
                 </Tooltip>
+              </div>
+
+              {/* Video provider toggle */}
+              <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5">
+                <span className="px-1 text-[10px] text-muted-foreground/60">Vid:</span>
+                <button
+                  type="button"
+                  onClick={() => setVideoProvider('fal')}
+                  className={cn(
+                    'rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors',
+                    videoProvider === 'fal'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  FAL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVideoProvider('local')}
+                  className={cn(
+                    'rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors',
+                    videoProvider === 'local'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  Local
+                </button>
               </div>
 
               <Button
