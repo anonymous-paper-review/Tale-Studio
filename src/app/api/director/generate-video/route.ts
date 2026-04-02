@@ -58,7 +58,10 @@ async function submitLocalT2V(prompt: string) {
   const res = await fetch(`${baseUrl}/hunyuan/t2v`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({
+      prompt,
+      enable_step_distill: false,
+    }),
   })
 
   if (!res.ok) {
