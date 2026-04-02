@@ -473,27 +473,6 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
     const shot = shots.find((s) => s.shotId === shotId)
     if (!shot) return
 
-    // TEMP: sh_01_02 uses a fixed reference image for demo recording
-    if (shotId === 'sh_01_02') {
-      const fixedUrl = 'https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/df4dd3a8-12b6-400c-aa10-481d77be39c6/764a1b9a-3218-4757-9088-8f3f75f79d9b/shots/sh_01_02_reference_image.png'
-      set((state) => ({
-        generatingImageShotIds: new Set(state.generatingImageShotIds).add(shotId),
-      }))
-      // Fake loading delay
-      await new Promise((r) => setTimeout(r, 1500))
-      set((state) => {
-        const next = new Set(state.generatingImageShotIds)
-        next.delete(shotId)
-        return {
-          generatingImageShotIds: next,
-          shots: state.shots.map((s) =>
-            s.shotId === shotId ? { ...s, referenceImageUrl: fixedUrl } : s,
-          ),
-        }
-      })
-      return
-    }
-
     // Build a rich prompt from shot context
     const scene = sceneManifest?.scenes.find((s) => s.sceneId === shot.sceneId)
     const world = worldAssets.find(
