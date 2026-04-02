@@ -27,9 +27,18 @@ interface KeyLightProps {
 export function KeyLight({ lighting, onUpdate }: KeyLightProps) {
   return (
     <div className="space-y-4">
-      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Key Light
-      </h4>
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Key Light
+        </h4>
+        <button
+          type="button"
+          onClick={() => onUpdate({ position: 'front', brightness: 50, colorTemp: 5000 })}
+          className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          Reset
+        </button>
+      </div>
 
       {/* Light position circle */}
       <div className="flex justify-center py-2">

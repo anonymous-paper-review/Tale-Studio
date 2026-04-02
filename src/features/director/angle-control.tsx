@@ -26,9 +26,18 @@ export function AngleControl({ camera, onUpdate }: AngleControlProps) {
 
   return (
     <div className="space-y-4">
-      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Angle Control
-      </h4>
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Angle Control
+        </h4>
+        <button
+          type="button"
+          onClick={() => onUpdate({ horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 })}
+          className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          Reset
+        </button>
+      </div>
 
       {/* CSS 3D Cube */}
       <div className="flex justify-center py-2" style={{ perspective: '300px' }}>
