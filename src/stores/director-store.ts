@@ -550,12 +550,10 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
   },
 
   generateAllShotImages: async () => {
-    const { shots, selectedSceneId } = get()
-    const sceneShots = shots.filter(
-      (s) => s.sceneId === selectedSceneId && !s.referenceImageUrl,
-    )
+    const { shots } = get()
+    const allShots = shots.filter((s) => !s.referenceImageUrl)
     // Generate sequentially to avoid rate limits
-    for (const shot of sceneShots) {
+    for (const shot of allShots) {
       await get().generateShotImage(shot.shotId)
     }
   },

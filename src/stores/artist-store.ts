@@ -31,7 +31,7 @@ async function persistImage(
   entityId: string,
   field: string,
   blobUrl: string,
-): Promise<void> {
+): Promise<string | null> {
   try {
     const r = await fetch(blobUrl)
     const blob = await r.blob()
@@ -44,9 +44,13 @@ async function persistImage(
     const res = await fetch('/api/assets/upload-image', { method: 'POST', body: form })
     if (!res.ok) {
       console.error(`[artist-store] persistImage HTTP ${res.status} for ${entityId}/${field}`)
+      return null
     }
+    const { publicUrl } = await res.json()
+    return publicUrl ?? null
   } catch (err) {
     console.error(`[artist-store] persistImage failed for ${entityId}/${field}:`, err)
+    return null
   }
 }
 
@@ -267,12 +271,28 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         ),
       }))
 
-      // Fire-and-forget: persist to Storage + DB
+      // Persist to Storage + DB, then update state with permanent URLs
       const pid = useProjectStore.getState().projectId
       if (pid) {
-        persistImage(pid, 'character', id, 'view_front', front)
-        persistImage(pid, 'character', id, 'view_side', side)
-        persistImage(pid, 'character', id, 'view_back', back)
+        const [frontUrl, sideUrl, backUrl] = await Promise.all([
+          persistImage(pid, 'character', id, 'view_front', front),
+          persistImage(pid, 'character', id, 'view_side', side),
+          persistImage(pid, 'character', id, 'view_back', back),
+        ])
+        set((state) => ({
+          characterAssets: state.characterAssets.map((a) =>
+            a.characterId === id
+              ? {
+                  ...a,
+                  views: {
+                    front: frontUrl ?? front,
+                    side: sideUrl ?? side,
+                    back: backUrl ?? back,
+                  },
+                }
+              : a,
+          ),
+        }))
       }
     } catch (err) {
       set({
@@ -315,11 +335,24 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         ),
       }))
 
-      // Fire-and-forget: persist to Storage + DB
+      // Persist to Storage + DB, then update state with permanent URLs
       const pid = useProjectStore.getState().projectId
       if (pid) {
-        persistImage(pid, 'location', locationId, 'wide_shot', wideShot)
-        persistImage(pid, 'location', locationId, 'establishing_shot', establishingShot)
+        const [wideUrl, estUrl] = await Promise.all([
+          persistImage(pid, 'location', locationId, 'wide_shot', wideShot),
+          persistImage(pid, 'location', locationId, 'establishing_shot', establishingShot),
+        ])
+        set((state) => ({
+          worldAssets: state.worldAssets.map((w) =>
+            w.locationId === locationId
+              ? {
+                  ...w,
+                  wideShot: wideUrl ?? wideShot,
+                  establishingShot: estUrl ?? establishingShot,
+                }
+              : w,
+          ),
+        }))
       }
     } catch (err) {
       set({
