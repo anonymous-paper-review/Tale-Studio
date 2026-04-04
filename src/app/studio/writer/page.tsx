@@ -178,7 +178,7 @@ export default function WriterPage() {
         {/* ── Bottom: Shot Grid + Editor (left) + Chat (right full height) ── */}
         <div className="flex flex-1 overflow-hidden">
           {/* Left: Shot Grid + Shot Editor */}
-          <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex flex-1 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {/* Shot Grid */}
             <ShotGrid
               shots={sceneShotsFiltered}
@@ -188,7 +188,7 @@ export default function WriterPage() {
             />
 
             {/* Shot Detail Editor */}
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <div className="flex min-h-0 flex-col">
               <div className="border-b border-border px-6 py-2">
                 <span className="text-sm font-semibold">Shot Detail Editor</span>
                 {selectedShot && (
