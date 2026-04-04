@@ -75,8 +75,11 @@ async function submitLocalT2V(prompt: string) {
     throw new Error(`Local T2V error (${res.status}): ${text}`)
   }
 
-  const data = await res.json() as { output_path: string }
-  return { taskId: data.output_path, provider: 'local' as const, model: 'hunyuan-t2v' }
+  const data = await res.json() as { output_url?: string; output_path?: string }
+  const outputUrl = data.output_url
+  if (!outputUrl) throw new Error('output_url missing from server response')
+  const videoUrl = new URL(outputUrl, baseUrl).toString()
+  return { taskId: videoUrl, provider: 'local' as const, model: 'hunyuan-t2v' }
 }
 
 /* ── Local (Hunyuan) I2V ── */
@@ -101,8 +104,11 @@ async function submitLocalI2V(prompt: string, imageUrl: string) {
     throw new Error(`Local I2V error (${res.status}): ${text}`)
   }
 
-  const data = await res.json() as { output_path: string }
-  return { taskId: data.output_path, provider: 'local' as const, model: 'hunyuan-i2v' }
+  const data = await res.json() as { output_url?: string; output_path?: string }
+  const outputUrl = data.output_url
+  if (!outputUrl) throw new Error('output_url missing from server response')
+  const videoUrl = new URL(outputUrl, baseUrl).toString()
+  return { taskId: videoUrl, provider: 'local' as const, model: 'hunyuan-i2v' }
 }
 
 export async function POST(req: Request) {

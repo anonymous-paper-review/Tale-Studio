@@ -19,22 +19,9 @@ export async function GET(
     const provider = searchParams.get('provider') ?? 'fal'
     const model = searchParams.get('model') ?? 'fal-ai/kling-video/v2.1/master/text-to-video'
 
-    /* ── Local provider: taskId is the output_path, video is already done ── */
+    /* ── Local provider: taskId is already the full video URL ── */
     if (provider === 'local') {
-      const baseUrl = process.env.TAILSCALE_VIDEO_API_URL
-      if (!baseUrl) {
-        return NextResponse.json(
-          { status: 'failed', error: 'TAILSCALE_VIDEO_API_URL not configured' },
-        )
-      }
-
-      // Convert server output_path to downloadable URL
-      // e.g. /data/hunyuan/outputs/api/hunyuan_xxx.mp4 → /outputs/api/hunyuan_xxx.mp4
-      const outputPath = taskId
-      const relativePath = outputPath.replace(/^\/data\/hunyuan\/outputs\//, '')
-      const videoUrl = `${baseUrl}/outputs/${relativePath}`
-
-      return NextResponse.json({ status: 'completed', url: videoUrl })
+      return NextResponse.json({ status: 'completed', url: taskId })
     }
 
     /* ── FAL provider: poll queue status ── */
