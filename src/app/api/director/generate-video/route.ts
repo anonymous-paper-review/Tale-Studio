@@ -55,6 +55,9 @@ async function submitLocalT2V(prompt: string) {
   const baseUrl = process.env.TAILSCALE_VIDEO_API_URL
   if (!baseUrl) throw new Error('TAILSCALE_VIDEO_API_URL is not configured')
 
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 290_000) // 4min 50s (under maxDuration)
+
   const res = await fetch(`${baseUrl}/hunyuan/t2v`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -62,7 +65,10 @@ async function submitLocalT2V(prompt: string) {
       prompt,
       enable_step_distill: false,
     }),
+    signal: controller.signal,
   })
+
+  clearTimeout(timeout)
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')
@@ -70,7 +76,6 @@ async function submitLocalT2V(prompt: string) {
   }
 
   const data = await res.json() as { output_path: string }
-  // Local server returns synchronously — we return the output path as taskId
   return { taskId: data.output_path, provider: 'local' as const, model: 'hunyuan-t2v' }
 }
 
@@ -79,11 +84,17 @@ async function submitLocalI2V(prompt: string, imageUrl: string) {
   const baseUrl = process.env.TAILSCALE_VIDEO_API_URL
   if (!baseUrl) throw new Error('TAILSCALE_VIDEO_API_URL is not configured')
 
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 290_000)
+
   const res = await fetch(`${baseUrl}/hunyuan/i2v`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, image_url: imageUrl }),
+    signal: controller.signal,
   })
+
+  clearTimeout(timeout)
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')
