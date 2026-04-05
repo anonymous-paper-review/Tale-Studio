@@ -132,6 +132,7 @@ interface DirectorState {
   generateVideo: (shotId: string) => Promise<void>
   generateShotImage: (shotId: string) => Promise<void>
   generateAllShotImages: () => Promise<void>
+  generateAllVideos: () => Promise<void>
   setImageProvider: (provider: ImageProvider) => void
   setVideoProvider: (provider: VideoProvider) => void
   setVideoStorage: (storage: 'supabase' | 'local') => void
@@ -553,20 +554,44 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
   generateAllShotImages: async () => {
     const { shots } = get()
     const allShots = shots.filter((s) => !s.referenceImageUrl)
-    // Generate sequentially to avoid rate limits
     for (const shot of allShots) {
       await get().generateShotImage(shot.shotId)
     }
   },
 
+  generateAllVideos: async () => {
+    const { shots, videoClips } = get()
+    const pending = shots.filter((s) => {
+      const clip = videoClips.find((c) => c.shotId === s.shotId)
+      return !clip || clip.status === 'pending' || clip.status === 'failed'
+    })
+    for (const shot of pending) {
+      await get().generateVideo(shot.shotId)
+    }
+  },
+
   toggleGenerationMethod: (shotId: string) => {
+    const shot = get().shots.find((s) => s.shotId === shotId)
+    if (!shot) return
+    const newMethod = shot.generationMethod === 'T2V' ? 'I2V' : 'T2V'
+
     set((state) => ({
       shots: state.shots.map((s) =>
-        s.shotId === shotId
-          ? { ...s, generationMethod: s.generationMethod === 'T2V' ? 'I2V' : 'T2V' }
-          : s,
+        s.shotId === shotId ? { ...s, generationMethod: newMethod } : s,
       ),
     }))
+
+    // Persist to DB
+    const projectId = useProjectStore.getState().projectId
+    if (projectId) {
+      const supabase = createClient()
+      supabase
+        .from('shots')
+        .update({ generation_method: newMethod })
+        .eq('project_id', projectId)
+        .eq('shot_id', shotId)
+        .then()
+    }
   },
 
   generateVideo: async (shotId: string) => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ImageIcon, Loader2 } from 'lucide-react'
+import { ImageIcon, Loader2, Video } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -46,6 +46,7 @@ export default function SetPage() {
     generateVideo,
     generateShotImage,
     generateAllShotImages,
+    generateAllVideos,
     setImageProvider,
     setVideoProvider,
     loadData,
@@ -309,7 +310,26 @@ export default function SetPage() {
                 ) : (
                   <>
                     <ImageIcon className="mr-1 size-3" />
-                    Generate All
+                    All Images
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                disabled={!!generatingVideoShotId}
+                onClick={() => generateAllVideos()}
+              >
+                {generatingVideoShotId ? (
+                  <>
+                    <Loader2 className="mr-1 size-3 animate-spin" />
+                    Generating…
+                  </>
+                ) : (
+                  <>
+                    <Video className="mr-1 size-3" />
+                    All Videos
                   </>
                 )}
               </Button>

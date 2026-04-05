@@ -321,38 +321,44 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         selectedBoostPreset,
       )
 
-      const [wideShot, establishingShot] = await Promise.all([
-        generateImage(`${basePrompt}, wide shot, panoramic`, '16:9', imageProvider),
-        generateImage(`${basePrompt}, establishing shot, aerial view`, '16:9', imageProvider),
-      ])
+      const pid = useProjectStore.getState().projectId
 
+      // Generate sequentially to avoid timeout
+      // 1) Wide shot
+      const wideShot = await generateImage(`${basePrompt}, wide shot, panoramic`, '16:9', imageProvider)
+      set((state) => ({
+        worldAssets: state.worldAssets.map((w) =>
+          w.locationId === locationId ? { ...w, wideShot } : w,
+        ),
+      }))
+      if (pid) {
+        const wideUrl = await persistImage(pid, 'location', locationId, 'wide_shot', wideShot)
+        if (wideUrl) {
+          set((state) => ({
+            worldAssets: state.worldAssets.map((w) =>
+              w.locationId === locationId ? { ...w, wideShot: wideUrl } : w,
+            ),
+          }))
+        }
+      }
+
+      // 2) Establishing shot
+      const establishingShot = await generateImage(`${basePrompt}, establishing shot, aerial view`, '16:9', imageProvider)
       set((state) => ({
         generatingLocationId: null,
         worldAssets: state.worldAssets.map((w) =>
-          w.locationId === locationId
-            ? { ...w, wideShot, establishingShot }
-            : w,
+          w.locationId === locationId ? { ...w, establishingShot } : w,
         ),
       }))
-
-      // Persist to Storage + DB, then update state with permanent URLs
-      const pid = useProjectStore.getState().projectId
       if (pid) {
-        const [wideUrl, estUrl] = await Promise.all([
-          persistImage(pid, 'location', locationId, 'wide_shot', wideShot),
-          persistImage(pid, 'location', locationId, 'establishing_shot', establishingShot),
-        ])
-        set((state) => ({
-          worldAssets: state.worldAssets.map((w) =>
-            w.locationId === locationId
-              ? {
-                  ...w,
-                  wideShot: wideUrl ?? wideShot,
-                  establishingShot: estUrl ?? establishingShot,
-                }
-              : w,
-          ),
-        }))
+        const estUrl = await persistImage(pid, 'location', locationId, 'establishing_shot', establishingShot)
+        if (estUrl) {
+          set((state) => ({
+            worldAssets: state.worldAssets.map((w) =>
+              w.locationId === locationId ? { ...w, establishingShot: estUrl } : w,
+            ),
+          }))
+        }
       }
     } catch (err) {
       set({
