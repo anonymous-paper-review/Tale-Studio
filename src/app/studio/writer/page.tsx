@@ -218,7 +218,7 @@ export default function WriterPage() {
           </div>
 
           {/* Right: AI Writer Chat (full height) */}
-          <div className="w-96 border-l border-border xl:w-[28rem]">
+          <div className="w-96 overflow-hidden border-l border-border xl:w-[28rem]">
             <WriterChat
               messages={chatMessages}
               loading={chatLoading}

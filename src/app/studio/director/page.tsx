@@ -42,6 +42,7 @@ export default function SetPage() {
     selectShot,
     updateCamera,
     updateLighting,
+    toggleGenerationMethod,
     generateVideo,
     generateShotImage,
     generateAllShotImages,
@@ -394,7 +395,14 @@ export default function SetPage() {
 
                   <p className="truncate text-xs">{shot.actionDescription}</p>
                   <div className="mt-1 flex items-center gap-1">
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge
+                      variant="secondary"
+                      className="cursor-pointer text-[10px] hover:bg-primary hover:text-primary-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleGenerationMethod(shot.shotId)
+                      }}
+                    >
                       {shot.generationMethod}
                     </Badge>
                     <Badge variant="secondary" className="text-[10px]">

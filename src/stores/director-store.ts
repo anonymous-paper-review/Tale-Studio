@@ -128,6 +128,7 @@ interface DirectorState {
   sendChatMessage: (message: string) => Promise<void>
   applySuggestedCamera: (config: Partial<CameraConfig>) => void
   applySuggestedLighting: (config: Partial<LightingConfig>) => void
+  toggleGenerationMethod: (shotId: string) => void
   generateVideo: (shotId: string) => Promise<void>
   generateShotImage: (shotId: string) => Promise<void>
   generateAllShotImages: () => Promise<void>
@@ -556,6 +557,16 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
     for (const shot of allShots) {
       await get().generateShotImage(shot.shotId)
     }
+  },
+
+  toggleGenerationMethod: (shotId: string) => {
+    set((state) => ({
+      shots: state.shots.map((s) =>
+        s.shotId === shotId
+          ? { ...s, generationMethod: s.generationMethod === 'T2V' ? 'I2V' : 'T2V' }
+          : s,
+      ),
+    }))
   },
 
   generateVideo: async (shotId: string) => {

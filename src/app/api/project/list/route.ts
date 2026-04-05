@@ -26,7 +26,7 @@ export async function GET() {
 
     const { data: projects } = await supabaseAdmin
       .from('projects')
-      .select('id, title, updated_at')
+      .select('id, title, current_stage, updated_at')
       .eq('workspace_id', workspace.id)
       .order('updated_at', { ascending: false })
 

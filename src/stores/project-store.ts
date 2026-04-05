@@ -13,7 +13,7 @@ interface ProjectState {
   canNavigateTo: (stage: StageId) => boolean
   initProject: () => Promise<void>
   createNewProject: () => Promise<void>
-  switchProject: (id: string, title: string) => void
+  switchProject: (id: string, title: string, stage?: StageId) => void
   resetProject: () => void
 }
 
@@ -90,12 +90,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  switchProject: (id, title) => {
+  switchProject: (id, title, stage) => {
     resetChildStores()
     set({
       projectId: id,
       projectTitle: title,
-      currentStage: 'producer',
+      currentStage: stage ?? 'producer',
     })
   },
 

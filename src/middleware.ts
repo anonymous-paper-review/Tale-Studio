@@ -36,10 +36,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Logged in but on /login → redirect to studio
+  // Logged in but on /login → redirect to home
   if (user && request.nextUrl.pathname.startsWith('/login')) {
     const url = request.nextUrl.clone()
-    url.pathname = '/studio/producer'
+    url.pathname = '/'
     return NextResponse.redirect(url)
   }
 
