@@ -5,10 +5,10 @@ import { cn } from '@/lib/utils'
 import type { Act, SceneManifest } from '@/types'
 
 const ACT_LABELS: Record<Act, string> = {
-  intro: 'INTRODUCTION',
-  dev: 'DEVELOPMENT',
-  turn: 'TURN',
-  conclusion: 'CONCLUSION',
+  intro: 'INTRODUCTION SCENE',
+  dev: 'DEVELOPMENT SCENE',
+  turn: 'TURN SCENE',
+  conclusion: 'CONCLUSION SCENE',
 }
 
 const ACT_COLORS: Record<Act, string> = {

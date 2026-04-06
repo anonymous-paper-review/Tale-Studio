@@ -12,6 +12,7 @@ import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore, type ImageProvider } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
+import { loadChatMessages, saveChatMessage } from '@/lib/chat-persistence'
 
 export type VideoProvider = 'fal' | 'local'
 
@@ -267,6 +268,7 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
           const firstSceneId = manifest.scenes[0]?.sceneId ?? null
           const firstShot = shots.find((s) => s.sceneId === firstSceneId)
 
+          const chatMessages = await loadChatMessages(projectId, 'director')
           set({
             sceneManifest: manifest,
             characterAssets,
@@ -275,6 +277,7 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
             videoClips,
             selectedSceneId: firstSceneId,
             selectedShotId: firstShot?.shotId ?? null,
+            chatMessages,
           })
           return
         }
@@ -391,6 +394,9 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
       error: null,
     })
 
+    const pid = useProjectStore.getState().projectId
+    if (pid) saveChatMessage(pid, 'director', 'user', message)
+
     try {
       const history = chatMessages.map((m) => ({
         role: m.role,
@@ -427,6 +433,8 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
         ],
         chatLoading: false,
       }))
+
+      if (pid) saveChatMessage(pid, 'director', 'model', data.reply)
     } catch (err) {
       set({
         chatLoading: false,

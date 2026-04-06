@@ -7,6 +7,7 @@ import {
   Palette,
   Clapperboard,
   Film,
+  Home,
 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
@@ -27,9 +28,29 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const canNavigateTo = useProjectStore((s) => s.canNavigateTo)
+  const projectTitle = useProjectStore((s) => s.projectTitle)
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-full w-16 flex-col items-center border-r border-border bg-card py-4">
+      {/* Home / Back button */}
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => router.push('/')}
+            className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Home className="h-5 w-5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="flex flex-col">
+          <span className="font-medium">{projectTitle || 'Untitled'}</span>
+          <span className="text-xs text-muted-foreground">Back to Projects</span>
+        </TooltipContent>
+      </Tooltip>
+
+      <div className="mb-2 h-px w-8 bg-border" />
+
+      {/* Stage navigation */}
       <div className="flex flex-1 flex-col items-center gap-2">
         {STAGES.map((stage) => {
           const Icon = STAGE_ICONS[stage.id]

@@ -119,7 +119,7 @@ export default function WriterPage() {
           <div>
             <h1 className="text-lg font-semibold">The Script Room</h1>
             <p className="text-xs text-muted-foreground">
-              Organize your plot (Ki-Seung-Jeon-Gyeol)
+              Craft the Narrative Foundation of Your Plot
             </p>
           </div>
           <div className="flex items-center gap-2">

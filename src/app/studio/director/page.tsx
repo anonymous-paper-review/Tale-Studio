@@ -295,49 +295,62 @@ export default function SetPage() {
                 </Tooltip>
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                disabled={generatingImageShotIds.size > 0}
-                onClick={() => generateAllShotImages()}
-              >
-                {generatingImageShotIds.size > 0 ? (
-                  <>
-                    <Loader2 className="mr-1 size-3 animate-spin" />
-                    {generatingImageShotIds.size} generating…
-                  </>
-                ) : (
-                  <>
-                    <ImageIcon className="mr-1 size-3" />
-                    All Images
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                disabled={!!generatingVideoShotId}
-                onClick={() => generateAllVideos()}
-              >
-                {generatingVideoShotId ? (
-                  <>
-                    <Loader2 className="mr-1 size-3 animate-spin" />
-                    Generating…
-                  </>
-                ) : (
-                  <>
-                    <Video className="mr-1 size-3" />
-                    All Videos
-                  </>
-                )}
-              </Button>
+              {(() => {
+                const missingImgs = shots.filter((s) => !s.referenceImageUrl).length
+                return (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={generatingImageShotIds.size > 0 || missingImgs === 0}
+                    onClick={() => generateAllShotImages()}
+                  >
+                    {generatingImageShotIds.size > 0 ? (
+                      <>
+                        <Loader2 className="mr-1 size-3 animate-spin" />
+                        {generatingImageShotIds.size}/{missingImgs} images…
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon className="mr-1 size-3" />
+                        {missingImgs > 0 ? `${missingImgs} Images` : 'All Done'}
+                      </>
+                    )}
+                  </Button>
+                )
+              })()}
+              {(() => {
+                const pendingVids = shots.filter((s) => {
+                  const c = videoClips.find((v) => v.shotId === s.shotId)
+                  return !c || c.status === 'pending' || c.status === 'failed'
+                }).length
+                return (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={!!generatingVideoShotId || pendingVids === 0}
+                    onClick={() => generateAllVideos()}
+                  >
+                    {generatingVideoShotId ? (
+                      <>
+                        <Loader2 className="mr-1 size-3 animate-spin" />
+                        Video…
+                      </>
+                    ) : (
+                      <>
+                        <Video className="mr-1 size-3" />
+                        {pendingVids > 0 ? `${pendingVids} Videos` : 'All Done'}
+                      </>
+                    )}
+                  </Button>
+                )
+              })()}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3 overflow-y-auto">
             {sceneShots.map((shot) => {
-              const imgUrl = shot.referenceImageUrl ?? getSceneBg(shot.sceneId)
+              const imgUrl = shot.referenceImageUrl
               const charAvatars = getShotCharAvatars(shot.characters)
               const clip = videoClips.find((c) => c.shotId === shot.shotId)
               const isGenImg = generatingImageShotIds.has(shot.shotId)

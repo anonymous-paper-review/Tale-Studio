@@ -14,6 +14,7 @@ interface ProjectState {
   initProject: () => Promise<void>
   createNewProject: () => Promise<void>
   switchProject: (id: string, title: string, stage?: StageId) => void
+  renameProject: (title: string) => Promise<void>
   resetProject: () => void
 }
 
@@ -97,6 +98,21 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectTitle: title,
       currentStage: stage ?? 'producer',
     })
+  },
+
+  renameProject: async (title: string) => {
+    const { projectId } = get()
+    if (!projectId) return
+    set({ projectTitle: title })
+    try {
+      await fetch(`/api/project/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      })
+    } catch (err) {
+      console.error('[project-store] rename failed:', err)
+    }
   },
 
   resetProject: () => {

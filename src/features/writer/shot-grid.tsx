@@ -65,7 +65,10 @@ export function ShotGrid({
             >
               <div className="mb-1.5 flex items-center justify-between">
                 <span className="text-[10px] font-bold tracking-wider text-muted-foreground">
-                  {shot.shotId.toUpperCase()}
+                  {(() => {
+                    const m = shot.shotId.match(/sh_(\d+)_(\d+)/)
+                    return m ? `Scene #${parseInt(m[1])} Shot #${parseInt(m[2])}` : shot.shotId
+                  })()}
                 </span>
                 <Badge variant="outline" className="text-[9px] px-1 py-0">
                   {shot.shotType}

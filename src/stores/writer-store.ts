@@ -9,6 +9,7 @@ import type {
 } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { useProjectStore } from '@/stores/project-store'
+import { loadChatMessages, saveChatMessage } from '@/lib/chat-persistence'
 
 interface ChatMessage {
   role: 'user' | 'model'
@@ -194,6 +195,9 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       error: null,
     })
 
+    const pid = useProjectStore.getState().projectId
+    if (pid) saveChatMessage(pid, 'writer', 'user', message)
+
     try {
       const res = await fetch('/api/write/chat', {
         method: 'POST',
@@ -221,6 +225,8 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           { role: 'model' as const, content: reply },
         ],
       }))
+
+      if (pid) saveChatMessage(pid, 'writer', 'model', reply)
 
       // Apply structured updates from AI Writer
       if (Array.isArray(updates)) {
@@ -314,11 +320,15 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           .order('sort_order'),
       ])
 
+      // Load chat messages
+      const chatMessages = await loadChatMessages(projectId, 'writer')
+
       // Always load story_text even if no scenes yet (P1 → P2 handoff)
       if (!scenes?.length) {
         set({
           storyText: project?.story_text ?? '',
           expandedStory: project?.expanded_story ?? null,
+          chatMessages,
         })
         return
       }
@@ -382,6 +392,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         selectedSceneId: firstSceneId,
         shots,
         selectedShotId: firstShot?.shotId ?? null,
+        chatMessages,
       })
     } catch (err) {
       console.error('[writer-store] loadProject failed:', err)

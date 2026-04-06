@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Plus,
   Loader2,
   Film,
+  Pencil,
   Clock,
   ArrowRight,
   Sparkles,
@@ -77,6 +78,83 @@ function formatDate(dateStr: string | null) {
   const diffDay = Math.floor(diffHr / 24)
   if (diffDay < 7) return `${diffDay}d ago`
   return d.toLocaleDateString()
+}
+
+function ProjectCard({
+  project,
+  onOpen,
+  onRenamed,
+}: {
+  project: ProjectItem
+  onOpen: (p: ProjectItem) => void
+  onRenamed: (id: string, title: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [title, setTitle] = useState(project.title || 'Untitled')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleSave = async () => {
+    setEditing(false)
+    const trimmed = title.trim() || 'Untitled'
+    setTitle(trimmed)
+    onRenamed(project.id, trimmed)
+    await fetch(`/api/project/${project.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: trimmed }),
+    })
+  }
+
+  return (
+    <div
+      onClick={() => !editing && onOpen(project)}
+      className="group flex cursor-pointer flex-col rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur-sm transition-all duration-300 hover:border-[#E50914]/50 hover:bg-white/10 hover:shadow-[0_10px_30px_rgba(229,9,20,0.1)]"
+    >
+      <div className="flex items-center justify-between">
+        {editing ? (
+          <input
+            ref={inputRef}
+            className="w-full rounded bg-white/10 px-2 py-1 text-lg font-semibold text-white outline-none focus:ring-1 focus:ring-[#E50914]"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSave()
+              if (e.key === 'Escape') { setTitle(project.title || 'Untitled'); setEditing(false) }
+            }}
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <>
+            <h3 className="text-lg font-semibold text-white transition-colors group-hover:text-[#E50914]">
+              {title}
+            </h3>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setEditing(true)
+              }}
+              className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
+            >
+              <Pencil className="size-3.5" />
+            </button>
+          </>
+        )}
+      </div>
+      <div className="mt-4 flex items-center gap-3 text-xs text-gray-400">
+        <span className="rounded-md bg-white/10 px-2.5 py-1 font-medium">
+          {STAGE_LABELS[project.current_stage ?? 'producer'] ?? 'Producer'}
+        </span>
+        {project.updated_at && (
+          <span className="flex items-center gap-1">
+            <Clock className="size-3" />
+            {formatDate(project.updated_at)}
+          </span>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export default function HomePage() {
@@ -346,27 +424,16 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {projects.map((project) => (
-                <button
+                <ProjectCard
                   key={project.id}
-                  onClick={() => handleOpen(project)}
-                  className="group flex flex-col rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur-sm transition-all duration-300 hover:border-[#E50914]/50 hover:bg-white/10 hover:shadow-[0_10px_30px_rgba(229,9,20,0.1)]"
-                >
-                  <h3 className="text-lg font-semibold text-white transition-colors group-hover:text-[#E50914]">
-                    {project.title || 'Untitled'}
-                  </h3>
-                  <div className="mt-4 flex items-center gap-3 text-xs text-gray-400">
-                    <span className="rounded-md bg-white/10 px-2.5 py-1 font-medium">
-                      {STAGE_LABELS[project.current_stage ?? 'producer'] ??
-                        'Producer'}
-                    </span>
-                    {project.updated_at && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="size-3" />
-                        {formatDate(project.updated_at)}
-                      </span>
-                    )}
-                  </div>
-                </button>
+                  project={project}
+                  onOpen={handleOpen}
+                  onRenamed={(id, title) =>
+                    setProjects((prev) =>
+                      prev.map((p) => (p.id === id ? { ...p, title } : p)),
+                    )
+                  }
+                />
               ))}
             </div>
           )}

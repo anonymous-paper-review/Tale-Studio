@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { ProjectSettings } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { useProjectStore } from '@/stores/project-store'
+import { loadChatMessages, saveChatMessage } from '@/lib/chat-persistence'
 
 interface ChatMessage {
   role: 'user' | 'model'
@@ -67,6 +68,9 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       error: null,
     })
 
+    const pid = useProjectStore.getState().projectId
+    if (pid) saveChatMessage(pid, 'producer', 'user', message)
+
     try {
       const res = await fetch('/api/produce/chat', {
         method: 'POST',
@@ -112,6 +116,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           storyReady: newStoryReady,
         }
       })
+
+      if (pid) saveChatMessage(pid, 'producer', 'model', reply)
     } catch (err) {
       set({
         chatLoading: false,
@@ -181,12 +187,14 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         .single()
 
       if (project) {
+        const messages = await loadChatMessages(projectId, 'producer')
         set({
           storyText: project.story_text ?? '',
           projectSettings: {
             ...DEFAULT_SETTINGS,
             ...(project.settings as Partial<ProjectSettings>),
           },
+          chatMessages: messages,
         })
       }
     } catch (err) {

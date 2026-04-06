@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { GripVertical, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { Shot, VideoClip } from '@/types'
@@ -33,16 +33,25 @@ export function ShotTimeline({
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDragIndex(index)
     e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(index))
   }
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
     setOverIndex(index)
   }
 
   const handleDrop = (e: React.DragEvent, toIndex: number) => {
     e.preventDefault()
-    if (dragIndex !== null && dragIndex !== toIndex) {
+    if (
+      dragIndex !== null &&
+      dragIndex !== toIndex &&
+      dragIndex >= 0 &&
+      toIndex >= 0 &&
+      dragIndex < orderedShotIds.length &&
+      toIndex < orderedShotIds.length
+    ) {
       onReorder(dragIndex, toIndex)
     }
     setDragIndex(null)
@@ -63,7 +72,7 @@ export function ShotTimeline({
 
         const isSelected = selectedShotId === shotId
         const isDragging = dragIndex === index
-        const isOver = overIndex === index
+        const isOver = overIndex === index && dragIndex !== index
 
         return (
           <div
@@ -73,16 +82,27 @@ export function ShotTimeline({
             onDragOver={(e) => handleDragOver(e, index)}
             onDrop={(e) => handleDrop(e, index)}
             onDragEnd={handleDragEnd}
+            onDragLeave={() => setOverIndex(null)}
             onClick={() => onSelect(shotId)}
             className={cn(
-              'group relative flex w-32 shrink-0 cursor-pointer flex-col rounded-lg border p-2 transition-all',
+              'group relative flex w-32 shrink-0 cursor-grab flex-col rounded-lg border p-2 transition-all active:cursor-grabbing',
               isSelected
                 ? 'border-primary bg-accent'
                 : 'border-border hover:bg-accent/50',
-              isDragging && 'opacity-40',
-              isOver && 'border-primary/60 bg-primary/5',
+              isDragging && 'scale-95 opacity-40',
+              isOver && 'border-primary border-2 bg-primary/10',
             )}
           >
+            {/* Drag handle */}
+            <div className="absolute left-0.5 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-50">
+              <GripVertical className="size-3 text-muted-foreground" />
+            </div>
+
+            {/* Drop indicator */}
+            {isOver && (
+              <div className="absolute -left-1.5 top-0 h-full w-1 rounded-full bg-primary" />
+            )}
+
             {/* Thumbnail area */}
             <div className="flex aspect-video items-center justify-center rounded bg-muted text-[10px] text-muted-foreground">
               {clip?.thumbnailUrl ? (
