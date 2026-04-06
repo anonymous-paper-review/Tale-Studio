@@ -71,7 +71,7 @@ export function MeetingChat() {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-6 py-4">
+      <ScrollArea className="min-h-0 flex-1 px-6 py-4">
         <div className="space-y-3">
           {chatMessages.length === 0 && (
             <div className="space-y-3">

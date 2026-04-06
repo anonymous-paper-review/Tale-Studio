@@ -56,7 +56,7 @@ export function WriterChat({ messages, loading, onSend }: WriterChatProps) {
         <span className="text-sm font-semibold">AI Writer</span>
       </div>
 
-      <ScrollArea className="flex-1 px-4 py-3">
+      <ScrollArea className="min-h-0 flex-1 px-4 py-3">
         <div className="space-y-3">
           {messages.length === 0 && (
             <div className="space-y-2">
