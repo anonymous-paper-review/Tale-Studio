@@ -165,6 +165,7 @@ export default function HomePage() {
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [userInfo, setUserInfo] = useState<{ name: string; avatar: string | null } | null>(null)
 
   useEffect(() => {
     fetch('/api/project/list')
@@ -172,6 +173,19 @@ export default function HomePage() {
       .then((data) => setProjects(data.projects ?? []))
       .catch(() => {})
       .finally(() => setLoading(false))
+
+    // Load user info
+    import('@/lib/supabase/client').then(({ createClient }) => {
+      const supabase = createClient()
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+          setUserInfo({
+            name: user.user_metadata?.full_name ?? user.email ?? '',
+            avatar: user.user_metadata?.avatar_url ?? null,
+          })
+        }
+      })
+    })
   }, [])
 
   const handleOpen = (project: ProjectItem) => {
@@ -223,6 +237,25 @@ export default function HomePage() {
             >
               {creating ? 'Creating...' : 'Get Started'}
             </button>
+            {userInfo && (
+              <div className="flex items-center gap-2">
+                {userInfo.avatar ? (
+                  <img
+                    src={userInfo.avatar}
+                    alt={userInfo.name}
+                    className="size-8 rounded-full border border-white/20 object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="flex size-8 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white">
+                    {userInfo.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="max-w-[120px] truncate text-xs text-gray-300">
+                  {userInfo.name}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </nav>

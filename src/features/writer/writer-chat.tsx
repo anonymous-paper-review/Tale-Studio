@@ -21,21 +21,35 @@ interface WriterChatProps {
 
 export function WriterChat({ messages, loading, onSend }: WriterChatProps) {
   const [input, setInput] = useState('')
+  const [isTyping, setIsTyping] = useState(false)
+  const [lastRenderedCount, setLastRenderedCount] = useState(0)
   const chatEndRef = useRef<HTMLDivElement>(null)
+
+  const isNewMessage =
+    messages.length > 0 &&
+    messages.length > lastRenderedCount &&
+    lastRenderedCount > 0
+
+  if (lastRenderedCount === 0 && messages.length > 0) {
+    setLastRenderedCount(messages.length)
+  }
 
   const handleSend = () => {
     if (!input.trim() || loading) return
     const msg = input
     setInput('')
+    setLastRenderedCount(messages.length + 1)
     onSend(msg)
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
+  const expression = loading ? 'thinking' : isTyping ? 'talking' : 'idle'
+
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
         <AgentFace
-          expression={loading ? 'thinking' : messages.length > 0 ? 'talking' : 'idle'}
+          expression={expression}
           color="#3B82F6"
           size={36}
         />
@@ -51,9 +65,9 @@ export function WriterChat({ messages, loading, onSend }: WriterChatProps) {
               </p>
               <div className="space-y-1 text-[11px] text-muted-foreground/70">
                 <p>Try:</p>
-                <p>&quot;이 샷을 클로즈업으로 바꿔줘&quot;</p>
-                <p>&quot;이 씬 분위기를 더 어둡게&quot;</p>
-                <p>&quot;주인공 대사 추가해줘&quot;</p>
+                <p>&quot;Change this shot to close-up&quot;</p>
+                <p>&quot;Make this scene darker&quot;</p>
+                <p>&quot;Add dialogue for the main character&quot;</p>
               </div>
             </div>
           )}
@@ -61,7 +75,8 @@ export function WriterChat({ messages, loading, onSend }: WriterChatProps) {
             const isLastModel =
               msg.role === 'model' &&
               i === messages.length - 1 &&
-              !loading
+              !loading &&
+              isNewMessage
             return (
               <div
                 key={i}
@@ -73,7 +88,12 @@ export function WriterChat({ messages, loading, onSend }: WriterChatProps) {
                 )}
               >
                 {isLastModel ? (
-                  <TypingText text={msg.content} speed={8} />
+                  <TypingText
+                    text={msg.content}
+                    speed={8}
+                    onTyping={setIsTyping}
+                    onDone={() => setLastRenderedCount(messages.length)}
+                  />
                 ) : (
                   msg.content
                 )}
@@ -90,7 +110,7 @@ export function WriterChat({ messages, loading, onSend }: WriterChatProps) {
         </div>
       </ScrollArea>
 
-      <div className="border-t border-border p-3">
+      <div className="shrink-0 border-t border-border p-3">
         <div className="flex gap-2">
           <input
             type="text"

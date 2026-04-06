@@ -18,15 +18,29 @@ export function MeetingChat() {
   } = useProducerStore()
 
   const [input, setInput] = useState('')
+  const [isTyping, setIsTyping] = useState(false)
+  const [lastRenderedCount, setLastRenderedCount] = useState(0)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Track if a new message just arrived (not loaded from DB)
+  const isNewMessage =
+    chatMessages.length > 0 &&
+    chatMessages.length > lastRenderedCount &&
+    lastRenderedCount > 0
 
   const handleSend = async () => {
     if (!input.trim() || chatLoading) return
     const msg = input
     setInput('')
+    setLastRenderedCount(chatMessages.length + 1) // user message
     await sendChatMessage(msg)
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  // On first render, mark all existing messages as "already rendered"
+  if (lastRenderedCount === 0 && chatMessages.length > 0) {
+    setLastRenderedCount(chatMessages.length)
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,16 +48,17 @@ export function MeetingChat() {
     if (!file) return
     await uploadFile(file)
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    // Reset file input
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
+
+  const expression = chatLoading ? 'thinking' : isTyping ? 'talking' : 'idle'
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-border px-6 py-3">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border px-6 py-3">
         <AgentFace
-          expression={chatLoading ? 'thinking' : chatMessages.length > 0 ? 'talking' : 'idle'}
+          expression={expression}
           color="#8B5CF6"
           size={36}
         />
@@ -88,7 +103,8 @@ export function MeetingChat() {
             const isLastModel =
               msg.role === 'model' &&
               i === chatMessages.length - 1 &&
-              !chatLoading
+              !chatLoading &&
+              isNewMessage
             return (
               <div
                 key={i}
@@ -100,7 +116,12 @@ export function MeetingChat() {
                 )}
               >
                 {isLastModel ? (
-                  <TypingText text={msg.content} speed={8} />
+                  <TypingText
+                    text={msg.content}
+                    speed={8}
+                    onTyping={setIsTyping}
+                    onDone={() => setLastRenderedCount(chatMessages.length)}
+                  />
                 ) : (
                   msg.content
                 )}
@@ -118,7 +139,7 @@ export function MeetingChat() {
       </ScrollArea>
 
       {/* Input */}
-      <div className="border-t border-border p-4">
+      <div className="shrink-0 border-t border-border p-4">
         <div className="flex gap-2">
           <input
             type="text"

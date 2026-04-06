@@ -1,20 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface TypingTextProps {
   text: string
   speed?: number
   onDone?: () => void
+  onTyping?: (isTyping: boolean) => void
 }
 
-export function TypingText({ text, speed = 8, onDone }: TypingTextProps) {
+export function TypingText({ text, speed = 8, onDone, onTyping }: TypingTextProps) {
   const [displayed, setDisplayed] = useState('')
   const [done, setDone] = useState(false)
+  const onDoneRef = useRef(onDone)
+  const onTypingRef = useRef(onTyping)
+  onDoneRef.current = onDone
+  onTypingRef.current = onTyping
 
   useEffect(() => {
     setDisplayed('')
     setDone(false)
+    onTypingRef.current?.(true)
     let i = 0
     const interval = setInterval(() => {
       i++
@@ -22,11 +28,15 @@ export function TypingText({ text, speed = 8, onDone }: TypingTextProps) {
       if (i >= text.length) {
         clearInterval(interval)
         setDone(true)
-        onDone?.()
+        onTypingRef.current?.(false)
+        onDoneRef.current?.()
       }
     }, speed)
-    return () => clearInterval(interval)
-  }, [text, speed, onDone])
+    return () => {
+      clearInterval(interval)
+      onTypingRef.current?.(false)
+    }
+  }, [text, speed])
 
   return (
     <span>

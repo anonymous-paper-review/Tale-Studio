@@ -33,7 +33,15 @@ export function ShotTimeline({
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDragIndex(index)
     e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', String(index))
+    e.dataTransfer.setData('application/x-shot-reorder', String(index))
+    // Create a transparent drag image to prevent Chrome super-drag
+    const ghost = document.createElement('div')
+    ghost.style.width = '1px'
+    ghost.style.height = '1px'
+    ghost.style.opacity = '0'
+    document.body.appendChild(ghost)
+    e.dataTransfer.setDragImage(ghost, 0, 0)
+    requestAnimationFrame(() => ghost.remove())
   }
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
@@ -104,8 +112,21 @@ export function ShotTimeline({
             )}
 
             {/* Thumbnail area */}
-            <div className="flex aspect-video items-center justify-center rounded bg-muted text-[10px] text-muted-foreground">
-              {clip?.thumbnailUrl ? (
+            <div className="flex aspect-video items-center justify-center overflow-hidden rounded bg-muted text-[10px] text-muted-foreground">
+              {clip?.url ? (
+                <video
+                  src={clip.url}
+                  className="h-full w-full rounded object-cover"
+                  muted
+                  preload="metadata"
+                />
+              ) : shot.referenceImageUrl ? (
+                <img
+                  src={shot.referenceImageUrl}
+                  alt={shot.shotType}
+                  className="h-full w-full rounded object-cover"
+                />
+              ) : clip?.thumbnailUrl ? (
                 <img
                   src={clip.thumbnailUrl}
                   alt={shot.shotType}

@@ -13,21 +13,35 @@ export function DirectorChat() {
   const { chatMessages, chatLoading, sendChatMessage } = useDirectorStore()
   const [input, setInput] = useState('')
   const [collapsed, setCollapsed] = useState(false)
+  const [isTyping, setIsTyping] = useState(false)
+  const [lastRenderedCount, setLastRenderedCount] = useState(0)
   const chatEndRef = useRef<HTMLDivElement>(null)
+
+  const isNewMessage =
+    chatMessages.length > 0 &&
+    chatMessages.length > lastRenderedCount &&
+    lastRenderedCount > 0
+
+  if (lastRenderedCount === 0 && chatMessages.length > 0) {
+    setLastRenderedCount(chatMessages.length)
+  }
 
   const handleSend = async () => {
     if (!input.trim() || chatLoading) return
     const msg = input
     setInput('')
+    setLastRenderedCount(chatMessages.length + 1)
     await sendChatMessage(msg)
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  const expression = chatLoading ? 'thinking' : isTyping ? 'talking' : 'idle'
+
   return (
     <div
       className={cn(
-        'flex flex-col border-t border-border transition-all',
-        collapsed ? 'h-10' : 'h-56',
+        'flex shrink-0 flex-col border-t border-border transition-all',
+        collapsed ? 'h-10' : 'max-h-64',
       )}
     >
       {/* Header */}
@@ -37,7 +51,7 @@ export function DirectorChat() {
       >
         <div className="flex items-center gap-2">
           <AgentFace
-            expression={chatLoading ? 'thinking' : chatMessages.length > 0 ? 'talking' : 'idle'}
+            expression={expression}
             color="#E50914"
             size={28}
           />
@@ -56,7 +70,7 @@ export function DirectorChat() {
       {!collapsed && (
         <>
           {/* Messages */}
-          <ScrollArea className="flex-1 px-4">
+          <ScrollArea className="flex-1 overflow-hidden px-4">
             <div className="space-y-2 py-2">
               {chatMessages.length === 0 && (
                 <div className="mr-8 rounded-lg bg-muted px-3 py-2 text-xs">
@@ -68,7 +82,8 @@ export function DirectorChat() {
                 const isLastModel =
                   msg.role === 'model' &&
                   i === chatMessages.length - 1 &&
-                  !chatLoading
+                  !chatLoading &&
+                  isNewMessage
                 return (
                   <div
                     key={i}
@@ -80,7 +95,12 @@ export function DirectorChat() {
                     )}
                   >
                     {isLastModel ? (
-                      <TypingText text={msg.content} speed={8} />
+                      <TypingText
+                        text={msg.content}
+                        speed={8}
+                        onTyping={setIsTyping}
+                        onDone={() => setLastRenderedCount(chatMessages.length)}
+                      />
                     ) : (
                       msg.content
                     )}
@@ -98,7 +118,7 @@ export function DirectorChat() {
           </ScrollArea>
 
           {/* Input */}
-          <div className="border-t border-border p-2">
+          <div className="shrink-0 border-t border-border p-2">
             <div className="flex gap-2">
               <input
                 type="text"
