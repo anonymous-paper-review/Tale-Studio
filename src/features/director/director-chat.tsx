@@ -4,6 +4,8 @@ import { useRef, useState } from 'react'
 import { ChevronUp, ChevronDown, Loader2, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { AgentFace } from '@/components/agent-face'
+import { TypingText } from '@/components/typing-text'
 import { useDirectorStore } from '@/stores/director-store'
 import { cn } from '@/lib/utils'
 
@@ -34,6 +36,11 @@ export function DirectorChat() {
         className="flex shrink-0 items-center justify-between px-4 py-2 hover:bg-accent/50"
       >
         <div className="flex items-center gap-2">
+          <AgentFace
+            expression={chatLoading ? 'thinking' : chatMessages.length > 0 ? 'talking' : 'idle'}
+            color="#E50914"
+            size={28}
+          />
           <span className="text-xs font-semibold">Director Kim</span>
           <span className="text-[10px] text-muted-foreground">
             Cinematography Guide
@@ -57,19 +64,29 @@ export function DirectorChat() {
                   angles, lighting, or cinematography techniques.
                 </div>
               )}
-              {chatMessages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'rounded-lg px-3 py-2 text-xs whitespace-pre-wrap',
-                    msg.role === 'user'
-                      ? 'ml-8 bg-primary/10'
-                      : 'mr-8 bg-muted',
-                  )}
-                >
-                  {msg.content}
-                </div>
-              ))}
+              {chatMessages.map((msg, i) => {
+                const isLastModel =
+                  msg.role === 'model' &&
+                  i === chatMessages.length - 1 &&
+                  !chatLoading
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      'rounded-lg px-3 py-2 text-xs whitespace-pre-wrap',
+                      msg.role === 'user'
+                        ? 'ml-8 bg-primary/10'
+                        : 'mr-8 bg-muted',
+                    )}
+                  >
+                    {isLastModel ? (
+                      <TypingText text={msg.content} speed={8} />
+                    ) : (
+                      msg.content
+                    )}
+                  </div>
+                )
+              })}
               {chatLoading && (
                 <div className="mr-8 flex items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
                   <Loader2 className="size-3 animate-spin" />

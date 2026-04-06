@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { GripVertical, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, GripVertical, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { Shot, VideoClip } from '@/types'
@@ -141,18 +141,46 @@ export function ShotTimeline({
               )}
             </div>
 
-            {/* Delete button */}
-            <Button
-              size="icon"
-              variant="ghost"
-              className="absolute -right-1 -top-1 hidden size-5 rounded-full bg-destructive/80 text-destructive-foreground hover:bg-destructive group-hover:flex"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete(shotId)
-              }}
-            >
-              <Trash2 className="size-3" />
-            </Button>
+            {/* Move & Delete buttons */}
+            <div className="absolute -top-1 right-0 hidden items-center gap-0.5 group-hover:flex">
+              {index > 0 && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-5 rounded-full bg-muted text-muted-foreground hover:bg-accent"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onReorder(index, index - 1)
+                  }}
+                >
+                  <ChevronLeft className="size-3" />
+                </Button>
+              )}
+              {index < orderedShotIds.length - 1 && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-5 rounded-full bg-muted text-muted-foreground hover:bg-accent"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onReorder(index, index + 1)
+                  }}
+                >
+                  <ChevronRight className="size-3" />
+                </Button>
+              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-5 rounded-full bg-destructive/80 text-destructive-foreground hover:bg-destructive"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete(shotId)
+                }}
+              >
+                <Trash2 className="size-3" />
+              </Button>
+            </div>
           </div>
         )
       })}

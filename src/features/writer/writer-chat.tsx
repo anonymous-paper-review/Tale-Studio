@@ -1,9 +1,11 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Loader2, MessageSquare, Send } from 'lucide-react'
+import { Loader2, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { AgentFace } from '@/components/agent-face'
+import { TypingText } from '@/components/typing-text'
 import { cn } from '@/lib/utils'
 
 interface ChatMessage {
@@ -31,8 +33,12 @@ export function WriterChat({ messages, loading, onSend }: WriterChatProps) {
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <MessageSquare className="size-4 text-muted-foreground" />
+      <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+        <AgentFace
+          expression={loading ? 'thinking' : messages.length > 0 ? 'talking' : 'idle'}
+          color="#3B82F6"
+          size={36}
+        />
         <span className="text-sm font-semibold">AI Writer</span>
       </div>
 
@@ -51,19 +57,29 @@ export function WriterChat({ messages, loading, onSend }: WriterChatProps) {
               </div>
             </div>
           )}
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={cn(
-                'rounded-lg px-3 py-2 text-sm',
-                msg.role === 'user'
-                  ? 'ml-4 bg-primary/10 text-foreground'
-                  : 'mr-4 bg-muted text-foreground',
-              )}
-            >
-              {msg.content}
-            </div>
-          ))}
+          {messages.map((msg, i) => {
+            const isLastModel =
+              msg.role === 'model' &&
+              i === messages.length - 1 &&
+              !loading
+            return (
+              <div
+                key={i}
+                className={cn(
+                  'rounded-lg px-3 py-2 text-sm',
+                  msg.role === 'user'
+                    ? 'ml-4 bg-primary/10 text-foreground'
+                    : 'mr-4 bg-muted text-foreground',
+                )}
+              >
+                {isLastModel ? (
+                  <TypingText text={msg.content} speed={8} />
+                ) : (
+                  msg.content
+                )}
+              </div>
+            )
+          })}
           {loading && (
             <div className="mr-4 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />

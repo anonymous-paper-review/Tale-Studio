@@ -4,6 +4,8 @@ import { useRef, useState } from 'react'
 import { Loader2, Send, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { AgentFace } from '@/components/agent-face'
+import { TypingText } from '@/components/typing-text'
 import { useProducerStore } from '@/stores/producer-store'
 import { cn } from '@/lib/utils'
 
@@ -39,11 +41,18 @@ export function MeetingChat() {
   return (
     <div className="flex flex-1 flex-col">
       {/* Header */}
-      <div className="border-b border-border px-6 py-3">
-        <h2 className="text-sm font-semibold">The Meeting Room</h2>
-        <p className="text-xs text-muted-foreground">
-          Chat with your Producer Agent
-        </p>
+      <div className="flex items-center gap-3 border-b border-border px-6 py-3">
+        <AgentFace
+          expression={chatLoading ? 'thinking' : chatMessages.length > 0 ? 'talking' : 'idle'}
+          color="#8B5CF6"
+          size={36}
+        />
+        <div>
+          <h2 className="text-sm font-semibold">The Meeting Room</h2>
+          <p className="text-xs text-muted-foreground">
+            Chat with your Producer Agent
+          </p>
+        </div>
       </div>
 
       {/* Messages */}
@@ -75,19 +84,29 @@ export function MeetingChat() {
               </div>
             </div>
           )}
-          {chatMessages.map((msg, i) => (
-            <div
-              key={i}
-              className={cn(
-                'rounded-lg px-4 py-3 text-sm whitespace-pre-wrap',
-                msg.role === 'user'
-                  ? 'ml-8 bg-primary/10 text-foreground'
-                  : 'mr-8 bg-muted text-foreground',
-              )}
-            >
-              {msg.content}
-            </div>
-          ))}
+          {chatMessages.map((msg, i) => {
+            const isLastModel =
+              msg.role === 'model' &&
+              i === chatMessages.length - 1 &&
+              !chatLoading
+            return (
+              <div
+                key={i}
+                className={cn(
+                  'rounded-lg px-4 py-3 text-sm whitespace-pre-wrap',
+                  msg.role === 'user'
+                    ? 'ml-8 bg-primary/10 text-foreground'
+                    : 'mr-8 bg-muted text-foreground',
+                )}
+              >
+                {isLastModel ? (
+                  <TypingText text={msg.content} speed={8} />
+                ) : (
+                  msg.content
+                )}
+              </div>
+            )
+          })}
           {chatLoading && (
             <div className="mr-8 flex items-center gap-2 rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />

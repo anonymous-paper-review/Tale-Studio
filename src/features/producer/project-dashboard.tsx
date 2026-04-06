@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import { Clock, Film, Monitor, Palette, RefreshCw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { useProducerStore } from '@/stores/producer-store'
@@ -20,8 +21,27 @@ interface SettingWidgetProps {
 
 function SettingWidget({ icon, label, value }: Omit<SettingWidgetProps, 'onEdit'>) {
   const isPending = !value || value === 'Pending...'
+  const prevValueRef = useRef(value)
+  const [highlight, setHighlight] = useState(false)
+
+  useEffect(() => {
+    if (value && value !== 'Pending...' && value !== prevValueRef.current) {
+      setHighlight(true)
+      const timer = setTimeout(() => setHighlight(false), 1500)
+      prevValueRef.current = value
+      return () => clearTimeout(timer)
+    }
+    prevValueRef.current = value
+  }, [value])
+
   return (
-    <div className="rounded-lg border border-border p-4">
+    <div
+      className={`rounded-lg border p-4 transition-all duration-500 ${
+        highlight
+          ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/20'
+          : 'border-border'
+      }`}
+    >
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           {icon}
