@@ -42,31 +42,30 @@ export function AgentFace({
     return () => clearInterval(interval)
   }, [expression])
 
-  const eyeH = blinking ? 1 : 4
-  const eyeY = blinking ? 19 : 17
+  const eyeH = blinking ? 1 : 4.5
+  const eyeY = blinking ? 20 : 18
 
   // Mouth shapes
   const getMouth = () => {
     if (expression === 'thinking') {
-      // Small 'o' shape
-      return <ellipse cx="24" cy="30" rx="2.5" ry="2" fill="#1a1a1a" />
+      return <ellipse cx="24" cy="31" rx="2.5" ry="2" fill="#555" />
     }
     if (expression === 'talking') {
       const shapes = [
-        <ellipse key="0" cx="24" cy="30" rx="4" ry="3" fill="#1a1a1a" />,
-        <ellipse key="1" cx="24" cy="30" rx="3" ry="1.5" fill="#1a1a1a" />,
-        <ellipse key="2" cx="24" cy="30" rx="5" ry="4" fill="#1a1a1a" />,
-        <ellipse key="3" cx="24" cy="30" rx="3" ry="2" fill="#1a1a1a" />,
+        <ellipse key="0" cx="24" cy="31" rx="4" ry="3.5" fill="#555" />,
+        <ellipse key="1" cx="24" cy="31" rx="3" ry="1.5" fill="#555" />,
+        <ellipse key="2" cx="24" cy="31" rx="5" ry="4" fill="#555" />,
+        <ellipse key="3" cx="24" cy="31" rx="3" ry="2" fill="#555" />,
       ]
       return shapes[mouthFrame]
     }
     // Idle: gentle smile
     return (
       <path
-        d="M19 28 Q24 33 29 28"
+        d="M19 29 Q24 34 29 29"
         fill="none"
-        stroke="#1a1a1a"
-        strokeWidth="1.5"
+        stroke="#555"
+        strokeWidth="2"
         strokeLinecap="round"
       />
     )
@@ -74,56 +73,42 @@ export function AgentFace({
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <div
-        className="relative"
-        style={{
-          width: size,
-          height: size,
-          filter: expression === 'thinking' ? 'none' : 'none',
-        }}
-      >
+      <div className="relative" style={{ width: size, height: size }}>
         <svg
           viewBox="0 0 48 48"
           width={size}
           height={size}
-          className="drop-shadow-sm"
+          className="drop-shadow-md"
         >
-          {/* Head */}
+          {/* White face circle */}
+          <circle cx="24" cy="24" r="21" fill="white" />
           <circle
             cx="24"
             cy="24"
-            r="20"
-            fill={color}
-            opacity="0.15"
-          />
-          <circle
-            cx="24"
-            cy="24"
-            r="20"
+            r="21"
             fill="none"
             stroke={color}
-            strokeWidth="2"
-            opacity="0.6"
+            strokeWidth="2.5"
           />
 
           {/* Eyes */}
-          <ellipse cx="17" cy={eyeY} rx="2.5" ry={eyeH} fill="#1a1a1a">
+          <ellipse cx="16" cy={eyeY} rx="3" ry={eyeH} fill="#333">
             {expression === 'thinking' && (
               <animateTransform
                 attributeName="transform"
                 type="translate"
-                values="0,0;-1,0;0,0;1,0;0,0"
+                values="0,0;-1.5,0;0,0;1.5,0;0,0"
                 dur="2s"
                 repeatCount="indefinite"
               />
             )}
           </ellipse>
-          <ellipse cx="31" cy={eyeY} rx="2.5" ry={eyeH} fill="#1a1a1a">
+          <ellipse cx="32" cy={eyeY} rx="3" ry={eyeH} fill="#333">
             {expression === 'thinking' && (
               <animateTransform
                 attributeName="transform"
                 type="translate"
-                values="0,0;-1,0;0,0;1,0;0,0"
+                values="0,0;-1.5,0;0,0;1.5,0;0,0"
                 dur="2s"
                 repeatCount="indefinite"
               />
@@ -133,30 +118,38 @@ export function AgentFace({
           {/* Eye highlights */}
           {!blinking && (
             <>
-              <circle cx="18" cy="16" r="1" fill="white" opacity="0.7" />
-              <circle cx="32" cy="16" r="1" fill="white" opacity="0.7" />
+              <circle cx="17.5" cy="16.5" r="1.5" fill="white" />
+              <circle cx="33.5" cy="16.5" r="1.5" fill="white" />
             </>
           )}
 
           {/* Eyebrows */}
-          <line
-            x1="13.5"
-            y1={expression === 'thinking' ? '12' : '13'}
-            x2="20.5"
-            y2={expression === 'thinking' ? '11' : '13'}
-            stroke="#1a1a1a"
-            strokeWidth="1.5"
+          <path
+            d={
+              expression === 'thinking'
+                ? 'M12 12 Q16 10 21 12'
+                : 'M12 13.5 Q16 12 21 13.5'
+            }
+            fill="none"
+            stroke="#333"
+            strokeWidth="2"
             strokeLinecap="round"
           />
-          <line
-            x1="27.5"
-            y1={expression === 'thinking' ? '11' : '13'}
-            x2="34.5"
-            y2={expression === 'thinking' ? '12' : '13'}
-            stroke="#1a1a1a"
-            strokeWidth="1.5"
+          <path
+            d={
+              expression === 'thinking'
+                ? 'M27 12 Q32 10 36 12'
+                : 'M27 13.5 Q32 12 36 13.5'
+            }
+            fill="none"
+            stroke="#333"
+            strokeWidth="2"
             strokeLinecap="round"
           />
+
+          {/* Cheeks (blush) */}
+          <circle cx="10" cy="24" r="3" fill={color} opacity="0.15" />
+          <circle cx="38" cy="24" r="3" fill={color} opacity="0.15" />
 
           {/* Mouth */}
           {getMouth()}

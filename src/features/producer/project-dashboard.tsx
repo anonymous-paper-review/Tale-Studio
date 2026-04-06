@@ -72,9 +72,9 @@ export function ProjectDashboard() {
   const { projectSettings, syncing, storyText, storyReady } = useProducerStore()
 
   return (
-    <div className="flex w-full flex-col lg:w-80 xl:w-96">
+    <div className="flex w-full flex-col overflow-hidden lg:w-80 xl:w-96">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <span className="text-sm font-semibold">Project Dashboard</span>
         {syncing && (
           <Badge variant="outline" className="gap-1 text-[10px]">
@@ -85,7 +85,7 @@ export function ProjectDashboard() {
       </div>
 
       {/* Settings Grid */}
-      <div className="flex-1 space-y-3 p-4">
+      <div className="flex-1 space-y-3 overflow-y-auto p-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <SettingWidget
           icon={<Clock className="size-3.5" />}
           label="PLAYTIME"
