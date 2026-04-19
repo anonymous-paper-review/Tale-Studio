@@ -14,6 +14,7 @@ interface ExtractedSettings {
   genre?: string
   aspectRatio?: '16:9' | '9:16' | '1:1'
   toneStyle?: string
+  dialogueLanguage?: string
   storyReady?: boolean
 }
 
@@ -41,6 +42,7 @@ const DEFAULT_SETTINGS: ProjectSettings = {
   genre: '',
   aspectRatio: '16:9',
   toneStyle: '',
+  dialogueLanguage: '',
 }
 
 export const useProducerStore = create<ProducerState>((set, get) => ({

@@ -14,6 +14,7 @@ export interface ProjectSettings {
   genre: string
   aspectRatio: '16:9' | '9:16' | '1:1'
   toneStyle: string
+  dialogueLanguage: string // BCP-47 short code: 'en', 'ko', 'ja', 'zh', ...
 }
 
 export interface Project {
