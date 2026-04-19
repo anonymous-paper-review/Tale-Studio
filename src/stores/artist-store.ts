@@ -1,11 +1,24 @@
 import { create } from 'zustand'
 import type { SceneManifest, CharacterAsset, WorldAsset } from '@/types'
+import {
+  CHARACTER_VIEW_KEYS,
+  CHARACTER_VIEW_COLUMNS,
+  type CharacterViewKey,
+} from '@/types/asset'
 import { buildCharacterPrompt, buildWorldPrompt } from '@/lib/prompts'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 
 export type ImageProvider = 'gemini' | 'tailscale'
+
+export type ArtistUpdate =
+  | {
+      type: 'regenerateCharacter'
+      characterId: string
+      views?: CharacterViewKey[]
+    }
+  | { type: 'regenerateWorldAsset'; locationId: string }
 
 async function generateImage(
   prompt: string,
@@ -59,6 +72,7 @@ interface ArtistState {
   characterAssets: CharacterAsset[]
   worldAssets: WorldAsset[]
   selectedCharacterId: string | null
+  selectedLocationId: string | null
   generatingCharacterId: string | null
   generatingLocationId: string | null
   selectedBoostPreset: string | null
@@ -68,10 +82,12 @@ interface ArtistState {
   loadData: () => void
   loadMockData: () => void
   selectCharacter: (id: string) => void
+  selectLocation: (id: string) => void
   lockCharacter: (id: string) => void
   unlockCharacter: (id: string) => void
-  generateSheet: (id: string) => void
-  generateWorldAsset: (locationId: string) => void
+  generateSheet: (id: string, views?: CharacterViewKey[]) => Promise<void>
+  generateWorldAsset: (locationId: string) => Promise<void>
+  applyUpdates: (updates: ArtistUpdate[]) => Promise<void>
   selectBoostPreset: (preset: string) => void
   setImageProvider: (provider: ImageProvider) => void
   reset: () => void
@@ -82,6 +98,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   characterAssets: [],
   worldAssets: [],
   selectedCharacterId: null,
+  selectedLocationId: null,
   generatingCharacterId: null,
   generatingLocationId: null,
   selectedBoostPreset: null,
@@ -151,6 +168,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               front: c.view_front ?? null,
               side: c.view_side ?? null,
               back: c.view_back ?? null,
+              threeQuarterLeft: c.view_three_quarter_left ?? null,
+              threeQuarterRight: c.view_three_quarter_right ?? null,
             },
             locked: c.locked ?? false,
           }))
@@ -167,6 +186,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             characterAssets,
             worldAssets,
             selectedCharacterId: characterAssets[0]?.characterId ?? null,
+            selectedLocationId: worldAssets[0]?.locationId ?? null,
           })
           return
         }
@@ -182,7 +202,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         (c) => ({
           characterId: c.characterId,
           name: c.name,
-          views: { front: null, side: null, back: null },
+          views: {
+            front: null,
+            side: null,
+            back: null,
+            threeQuarterLeft: null,
+            threeQuarterRight: null,
+          },
           locked: false,
         }),
       )
@@ -204,6 +230,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         characterAssets,
         worldAssets,
         selectedCharacterId: characterAssets[0]?.characterId ?? null,
+        selectedLocationId: worldAssets[0]?.locationId ?? null,
       })
       return
     }
@@ -227,10 +254,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       characterAssets: mockCharacterAssets,
       worldAssets: mockWorldAssets,
       selectedCharacterId: mockCharacterAssets[0]?.characterId ?? null,
+      selectedLocationId: mockWorldAssets[0]?.locationId ?? null,
     })
   },
 
   selectCharacter: (id) => set({ selectedCharacterId: id }),
+
+  selectLocation: (id) => set({ selectedLocationId: id }),
 
   lockCharacter: (id) =>
     set((state) => ({
@@ -246,50 +276,63 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       ),
     })),
 
-  generateSheet: async (id) => {
+  generateSheet: async (id, views) => {
     const { sceneManifest, imageProvider } = get()
     const character = sceneManifest?.characters.find(
       (c) => c.characterId === id,
     )
     if (!character) return
 
+    const viewList: CharacterViewKey[] =
+      views && views.length > 0 ? views : CHARACTER_VIEW_KEYS
+
     set({ generatingCharacterId: id, error: null })
 
     try {
-      const [front, side, back] = await Promise.all(
-        (['front', 'side', 'back'] as const).map((view) =>
-          generateImage(buildCharacterPrompt(character.fixedPrompt, view), '1:1', imageProvider),
+      const generated = await Promise.all(
+        viewList.map((v) =>
+          generateImage(
+            buildCharacterPrompt(character.fixedPrompt, v),
+            '1:1',
+            imageProvider,
+          ),
         ),
       )
+      const blobByView: Partial<Record<CharacterViewKey, string>> = {}
+      viewList.forEach((v, i) => {
+        blobByView[v] = generated[i]
+      })
 
       set((state) => ({
         generatingCharacterId: null,
         characterAssets: state.characterAssets.map((a) =>
           a.characterId === id
-            ? { ...a, views: { front, side, back } }
+            ? { ...a, views: { ...a.views, ...blobByView } }
             : a,
         ),
       }))
 
-      // Persist to Storage + DB, then update state with permanent URLs
       const pid = useProjectStore.getState().projectId
       if (pid) {
-        const [frontUrl, sideUrl, backUrl] = await Promise.all([
-          persistImage(pid, 'character', id, 'view_front', front),
-          persistImage(pid, 'character', id, 'view_side', side),
-          persistImage(pid, 'character', id, 'view_back', back),
-        ])
+        const persisted = await Promise.all(
+          viewList.map((v) =>
+            persistImage(
+              pid,
+              'character',
+              id,
+              CHARACTER_VIEW_COLUMNS[v],
+              blobByView[v]!,
+            ),
+          ),
+        )
+        const finalByView: Partial<Record<CharacterViewKey, string>> = {}
+        viewList.forEach((v, i) => {
+          finalByView[v] = persisted[i] ?? blobByView[v]!
+        })
         set((state) => ({
           characterAssets: state.characterAssets.map((a) =>
             a.characterId === id
-              ? {
-                  ...a,
-                  views: {
-                    front: frontUrl ?? front,
-                    side: sideUrl ?? side,
-                    back: backUrl ?? back,
-                  },
-                }
+              ? { ...a, views: { ...a.views, ...finalByView } }
               : a,
           ),
         }))
@@ -369,6 +412,16 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
   },
 
+  applyUpdates: async (updates) => {
+    for (const u of updates) {
+      if (u.type === 'regenerateCharacter') {
+        await get().generateSheet(u.characterId, u.views)
+      } else if (u.type === 'regenerateWorldAsset') {
+        await get().generateWorldAsset(u.locationId)
+      }
+    }
+  },
+
   selectBoostPreset: (preset) =>
     set((state) => ({
       selectedBoostPreset: state.selectedBoostPreset === preset ? null : preset,
@@ -382,6 +435,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       characterAssets: [],
       worldAssets: [],
       selectedCharacterId: null,
+      selectedLocationId: null,
       generatingCharacterId: null,
       generatingLocationId: null,
       selectedBoostPreset: null,

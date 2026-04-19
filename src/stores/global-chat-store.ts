@@ -3,6 +3,7 @@ import type { StageId } from '@/types'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useWriterStore } from '@/stores/writer-store'
+import { useArtistStore, type ArtistUpdate } from '@/stores/artist-store'
 import { useDirectorStore } from '@/stores/director-store'
 import { saveChatMessage } from '@/lib/chat-persistence'
 
@@ -98,6 +99,24 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         break
       }
+      case 'artist': {
+        const a = useArtistStore.getState()
+        endpoint = '/api/artist/chat'
+        body = {
+          message: trimmed,
+          history: historyPayload,
+          characterContext: a.characterAssets.map((c) => ({
+            characterId: c.characterId,
+            name: c.name,
+            locked: c.locked,
+          })),
+          locationContext: a.worldAssets.map((w) => ({
+            locationId: w.locationId,
+            name: w.name,
+          })),
+        }
+        break
+      }
       case 'director': {
         const d = useDirectorStore.getState()
         const selectedShot = d.shots.find(
@@ -178,6 +197,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       }
       if (stage === 'writer' && Array.isArray(data.updates)) {
         useWriterStore.getState().applyUpdates(data.updates)
+      }
+      if (stage === 'artist' && Array.isArray(data.updates)) {
+        useArtistStore
+          .getState()
+          .applyUpdates(data.updates as ArtistUpdate[])
       }
       if (stage === 'director') {
         if (data.suggestedCamera) {
