@@ -3,11 +3,13 @@ import type {
   Shot,
   VideoClip,
   CameraConfig,
+  CameraPreset,
   LightingConfig,
   SceneManifest,
   CharacterAsset,
   WorldAsset,
 } from '@/types'
+import { DEFAULT_CAMERA_PRESET } from '@/types'
 import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore, type ImageProvider } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -68,6 +70,10 @@ function debouncedShotSave(
           .update({
             camera_config: shot.camera,
             lighting_config: shot.lighting,
+            camera_brand: shot.cameraPreset?.brand ?? null,
+            focal_length: shot.cameraPreset?.focalLength ?? null,
+            aperture: shot.cameraPreset?.aperture ?? null,
+            white_balance: shot.cameraPreset?.whiteBalance ?? null,
           })
           .eq('project_id', projectId)
           .eq('shot_id', shotId)
@@ -115,6 +121,7 @@ interface DirectorState {
   selectScene: (id: string) => void
   selectShot: (id: string) => void
   updateCamera: (shotId: string, config: Partial<CameraConfig>) => void
+  updateCameraPreset: (shotId: string, changes: Partial<CameraPreset>) => void
   updateLighting: (shotId: string, config: Partial<LightingConfig>) => void
   applySuggestedCamera: (config: Partial<CameraConfig>) => void
   applySuggestedLighting: (config: Partial<LightingConfig>) => void
@@ -246,6 +253,16 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
             generationMethod: s.generation_method ?? 'T2V',
             dialogueLines: s.dialogue_lines ?? [],
             camera: { ...DEFAULT_CAMERA, ...(s.camera_config ?? {}) },
+            cameraPreset: {
+              brand: s.camera_brand ?? DEFAULT_CAMERA_PRESET.brand,
+              focalLength: s.focal_length ?? DEFAULT_CAMERA_PRESET.focalLength,
+              aperture:
+                s.aperture != null
+                  ? Number(s.aperture)
+                  : DEFAULT_CAMERA_PRESET.aperture,
+              whiteBalance:
+                s.white_balance ?? DEFAULT_CAMERA_PRESET.whiteBalance,
+            },
             movementPreset: s.movement_preset ?? null,
             movementIntensity: s.movement_intensity ?? 5,
             lighting: { ...DEFAULT_LIGHTING, ...(s.lighting_config ?? {}) },
@@ -368,6 +385,25 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
       shots: state.shots.map((s) =>
         s.shotId === shotId
           ? { ...s, lighting: { ...s.lighting, ...config } }
+          : s,
+      ),
+    }))
+    debouncedShotSave(shotId, () =>
+      get().shots.find((s) => s.shotId === shotId),
+    )
+  },
+
+  updateCameraPreset: (shotId, changes) => {
+    set((state) => ({
+      shots: state.shots.map((s) =>
+        s.shotId === shotId
+          ? {
+              ...s,
+              cameraPreset: {
+                ...(s.cameraPreset ?? DEFAULT_CAMERA_PRESET),
+                ...changes,
+              },
+            }
           : s,
       ),
     }))
@@ -636,6 +672,7 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
           provider: videoProvider,
           referenceImageUrl: shot.referenceImageUrl,
           movementPreset: shot.movementPreset ?? null,
+          cameraPreset: shot.cameraPreset ?? null,
         }),
       })
 

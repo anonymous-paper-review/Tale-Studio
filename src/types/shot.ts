@@ -28,6 +28,20 @@ export interface LightingConfig {
   colorTemp: number     // 2000-10000 Kelvin
 }
 
+export interface CameraPreset {
+  brand: string         // brand id: 'arri' | 'panavision' | 'red' | 'cooke' | 'zeiss'
+  focalLength: number   // mm: 24 | 35 | 50 | 85
+  aperture: number      // f-stop: 1.4 | 2 | 2.8 | 4 | 5.6 | 8
+  whiteBalance: number  // kelvin: 3200 | 5600 | 6500 or custom
+}
+
+export const DEFAULT_CAMERA_PRESET: CameraPreset = {
+  brand: 'arri',
+  focalLength: 35,
+  aperture: 2.8,
+  whiteBalance: 5600,
+}
+
 export interface Shot {
   shotId: string
   sceneId: string
@@ -38,6 +52,7 @@ export interface Shot {
   generationMethod: GenerationMethod
   dialogueLines: DialogueLine[]
   camera: CameraConfig
+  cameraPreset?: CameraPreset
   movementPreset?: string | null
   movementIntensity?: number
   lighting: LightingConfig

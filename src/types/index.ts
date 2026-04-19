@@ -7,7 +7,9 @@ export type {
   DialogueLine,
   CameraConfig,
   LightingConfig,
+  CameraPreset,
   Shot,
   VideoClip,
 } from './shot'
-export type { TechniqueCategory, KnowledgeTechnique, CameraPreset } from './knowledge'
+export { DEFAULT_CAMERA_PRESET } from './shot'
+export type { TechniqueCategory, KnowledgeTechnique } from './knowledge'

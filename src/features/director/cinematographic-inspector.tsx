@@ -5,14 +5,17 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { AngleControl } from './angle-control'
+import { CameraPresetControl } from './camera-preset-control'
 import { KeyLight } from './key-light'
 import { MovementControl } from './movement-control'
-import type { Shot, CameraConfig, LightingConfig } from '@/types'
+import { DEFAULT_CAMERA_PRESET } from '@/types'
+import type { Shot, CameraConfig, CameraPreset, LightingConfig } from '@/types'
 
 interface CinematographicInspectorProps {
   shot: Shot | undefined
   onUpdateCamera: (config: Partial<CameraConfig>) => void
   onUpdateLighting: (config: Partial<LightingConfig>) => void
+  onUpdateCameraPreset: (changes: Partial<CameraPreset>) => void
   onApplyMovement: (presetId: string | null, intensity: number) => void
   onGenerateVideo?: () => void
   isGenerating?: boolean
@@ -22,6 +25,7 @@ export function CinematographicInspector({
   shot,
   onUpdateCamera,
   onUpdateLighting,
+  onUpdateCameraPreset,
   onApplyMovement,
   onGenerateVideo,
   isGenerating,
@@ -44,6 +48,13 @@ export function CinematographicInspector({
             {shot.shotType} — {shot.generationMethod}
           </p>
         </div>
+
+        <Separator />
+
+        <CameraPresetControl
+          preset={shot.cameraPreset ?? DEFAULT_CAMERA_PRESET}
+          onUpdate={onUpdateCameraPreset}
+        />
 
         <Separator />
 

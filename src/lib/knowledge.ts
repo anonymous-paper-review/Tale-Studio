@@ -11,16 +11,24 @@ interface Technique {
   description: string
 }
 
-interface CameraPreset {
+export interface CameraBrand {
   id: string
-  name: string
-  description: string
-  horizontal: number
-  vertical: number
-  pan: number
-  tilt: number
-  roll: number
-  zoom: number
+  label: string
+  full_name: string
+  characteristics: string
+}
+
+export interface WhiteBalancePreset {
+  id: string
+  label: string
+  kelvin: number
+}
+
+export interface CameraGearPresets {
+  brands: CameraBrand[]
+  focal_lengths: number[]
+  apertures: number[]
+  white_balances: WhiteBalancePreset[]
 }
 
 export interface CameraMovement {
@@ -47,7 +55,7 @@ function loadYaml<T>(filename: string): T {
 }
 
 let techniquesCache: Technique[] | null = null
-let presetsCache: CameraPreset[] | null = null
+let cameraGearCache: CameraGearPresets | null = null
 let movementsCache: CameraMovement[] | null = null
 
 export function loadAllTechniques(): Technique[] {
@@ -69,12 +77,21 @@ export function loadAllTechniques(): Technique[] {
   return all
 }
 
-export function loadCameraPresets(): CameraPreset[] {
-  if (presetsCache) return presetsCache
+export function loadCameraGear(): CameraGearPresets {
+  if (cameraGearCache) return cameraGearCache
 
-  const data = loadYaml<{ presets: CameraPreset[] }>('camera_presets.yaml')
-  presetsCache = data.presets
-  return data.presets
+  const data = loadYaml<CameraGearPresets>('camera_presets.yaml')
+  cameraGearCache = {
+    brands: data.brands ?? [],
+    focal_lengths: data.focal_lengths ?? [24, 35, 50, 85],
+    apertures: data.apertures ?? [1.4, 2, 2.8, 4, 5.6, 8],
+    white_balances: data.white_balances ?? [],
+  }
+  return cameraGearCache
+}
+
+export function findCameraBrand(id: string): CameraBrand | undefined {
+  return loadCameraGear().brands.find((b) => b.id === id)
 }
 
 export function loadCameraMovements(): CameraMovement[] {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
-import { queryTechniques, loadCameraPresets } from '@/lib/knowledge'
+import { queryTechniques } from '@/lib/knowledge'
 import { SHOTS_PER_SCENE, PROMPT_MAX_LENGTH } from '@/lib/constants'
 import { llmJSON } from '@/lib/llm'
 
@@ -92,18 +92,12 @@ export async function POST(req: Request) {
       0.6,
     )
 
-    // L3: Enrich with Knowledge DB + build prompts
-    const presets = loadCameraPresets()
-    const defaultPreset = presets.find((p) => p.id === 'static_locked') ?? presets[0]
-
+    // L3: Enrich with Knowledge DB + build prompts.
+    // Camera axes default to static — users pick movement via Director UI (Plan 04).
     const shots = rawShots.map((raw, i) => {
       const moods = scene.mood ? [scene.mood.toLowerCase()] : []
       const matchedTechniques = queryTechniques(moods, raw.shotType)
       const finalPrompt = buildFinalPrompt(raw.actionDescription, matchedTechniques)
-
-      const techPreset = matchedTechniques.length > 0
-        ? presets.find((p) => p.id === matchedTechniques[0].id) ?? defaultPreset
-        : defaultPreset
 
       return {
         shotId: `${scene.sceneId}_sh_${String(i + 1).padStart(2, '0')}`,
@@ -115,12 +109,12 @@ export async function POST(req: Request) {
         generationMethod: raw.generationMethod ?? 'T2V',
         dialogueLines: raw.dialogueLines ?? [],
         camera: {
-          horizontal: techPreset.horizontal,
-          vertical: techPreset.vertical,
-          pan: techPreset.pan,
-          tilt: techPreset.tilt,
-          roll: techPreset.roll,
-          zoom: techPreset.zoom,
+          horizontal: 0,
+          vertical: 0,
+          pan: 0,
+          tilt: 0,
+          roll: 0,
+          zoom: 0,
         },
         lighting: {
           position: 'front' as const,
