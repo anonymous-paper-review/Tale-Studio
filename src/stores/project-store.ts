@@ -29,12 +29,14 @@ function resetChildStores() {
   const { useArtistStore } = require('@/stores/artist-store')
   const { useDirectorStore } = require('@/stores/director-store')
   const { useEditorStore } = require('@/stores/editor-store')
+  const { useGlobalChatStore } = require('@/stores/global-chat-store')
 
   useProducerStore.getState().reset()
   useWriterStore.getState().reset()
   useArtistStore.getState().reset()
   useDirectorStore.getState().reset()
   useEditorStore.getState().reset()
+  useGlobalChatStore.getState().reset()
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({

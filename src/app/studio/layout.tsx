@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useProjectStore } from '@/stores/project-store'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Samantha } from '@/components/layout/samantha'
+import { GlobalChat } from '@/components/layout/global-chat'
 import { useIdleTimeout } from '@/hooks/use-idle-timeout'
 import { STAGES } from '@/lib/constants'
 import type { StageId } from '@/types'
@@ -37,9 +38,10 @@ export default function StudioLayout({
   return (
     <>
       <Sidebar />
-      <main className="ml-16 min-h-screen">
+      <main className="ml-16 mr-80 min-h-screen">
         <div className="flex h-screen flex-col">{children}</div>
       </main>
+      <GlobalChat />
       <Samantha />
     </>
   )

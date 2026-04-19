@@ -88,6 +88,29 @@ interface ChatMessage {
   content: string
 }
 
+interface IncomingHistoryItem {
+  role: 'user' | 'model'
+  content: string
+  stage?: string
+}
+
+const STAGE_BADGE: Record<string, string> = {
+  producer: 'P1',
+  writer: 'P2',
+  artist: 'P3',
+  director: 'P4',
+  editor: 'P5',
+}
+
+function normalizeHistory(history: unknown): ChatMessage[] {
+  if (!Array.isArray(history)) return []
+  return (history as IncomingHistoryItem[]).map((m) => {
+    const badge = m.stage ? STAGE_BADGE[m.stage] : null
+    const prefix = badge ? `[${badge}] ` : ''
+    return { role: m.role, content: `${prefix}${m.content}` }
+  })
+}
+
 function parseExtractedSettings(
   text: string,
 ): { reply: string; extractedSettings: Record<string, unknown> } {
@@ -136,9 +159,16 @@ export async function POST(req: Request) {
       ? contextParts.join('\n\n') + '\n\n'
       : ''
 
+    const normalizedHistory = normalizeHistory(history)
+    const crossStageNote = normalizedHistory.some((m) =>
+      /^\[P[1-5]\]/.test(m.content),
+    )
+      ? `\n\nThe user is currently in the Producer (P1) stage. Prior messages from other stages are prefixed with [P1]/[P2]/[P3]/[P4]/[P5]. Reference them for continuity, but only emit extractedSettings valid for the Producer stage.`
+      : ''
+
     const text = await llmChat(
-      PRODUCER_SYSTEM,
-      (history ?? []) as ChatMessage[],
+      PRODUCER_SYSTEM + crossStageNote,
+      normalizedHistory,
       `${contextPrefix}${message}`,
       0.7,
     )

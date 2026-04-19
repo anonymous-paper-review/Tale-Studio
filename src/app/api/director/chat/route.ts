@@ -29,6 +29,29 @@ interface ChatMessage {
   content: string
 }
 
+interface IncomingHistoryItem {
+  role: 'user' | 'model'
+  content: string
+  stage?: string
+}
+
+const STAGE_BADGE: Record<string, string> = {
+  producer: 'P1',
+  writer: 'P2',
+  artist: 'P3',
+  director: 'P4',
+  editor: 'P5',
+}
+
+function normalizeHistory(history: unknown): ChatMessage[] {
+  if (!Array.isArray(history)) return []
+  return (history as IncomingHistoryItem[]).map((m) => {
+    const badge = m.stage ? STAGE_BADGE[m.stage] : null
+    const prefix = badge ? `[${badge}] ` : ''
+    return { role: m.role, content: `${prefix}${m.content}` }
+  })
+}
+
 function parseSuggestions(text: string): {
   reply: string
   suggestedCamera?: Record<string, number>
@@ -75,9 +98,16 @@ export async function POST(req: Request) {
       ? `[Current Shot]\n${JSON.stringify(shotContext)}\n\n`
       : ''
 
+    const normalizedHistory = normalizeHistory(history)
+    const crossStageNote = normalizedHistory.some((m) =>
+      /^\[P[1-5]\]/.test(m.content),
+    )
+      ? `\n\nThe user is currently in the Director (P4) stage. Prior messages from other stages are prefixed with [P1]/[P2]/[P3]/[P4]/[P5]. Reference them for continuity, but only emit suggestedCamera / suggestedLighting for the currently selected shot.`
+      : ''
+
     const text = await llmChat(
-      DIRECTOR_SYSTEM,
-      (history ?? []) as ChatMessage[],
+      DIRECTOR_SYSTEM + crossStageNote,
+      normalizedHistory,
       `${contextPrefix}${message}`,
       0.7,
     )

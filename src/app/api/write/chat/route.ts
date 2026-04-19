@@ -64,6 +64,29 @@ interface ChatMessage {
   content: string
 }
 
+interface IncomingHistoryItem {
+  role: 'user' | 'model'
+  content: string
+  stage?: string
+}
+
+const STAGE_BADGE: Record<string, string> = {
+  producer: 'P1',
+  writer: 'P2',
+  artist: 'P3',
+  director: 'P4',
+  editor: 'P5',
+}
+
+function normalizeHistory(history: unknown): ChatMessage[] {
+  if (!Array.isArray(history)) return []
+  return (history as IncomingHistoryItem[]).map((m) => {
+    const badge = m.stage ? STAGE_BADGE[m.stage] : null
+    const prefix = badge ? `[${badge}] ` : ''
+    return { role: m.role, content: `${prefix}${m.content}` }
+  })
+}
+
 function parseUpdates(
   text: string,
 ): { reply: string; updates: Record<string, unknown>[] } {
@@ -106,9 +129,16 @@ export async function POST(req: Request) {
       contextPrefix += `[Currently Selected Shot]\n${JSON.stringify(shotContext, null, 2)}\n\n`
     }
 
+    const normalizedHistory = normalizeHistory(history)
+    const crossStageNote = normalizedHistory.some((m) =>
+      /^\[P[1-5]\]/.test(m.content),
+    )
+      ? `\n\nThe user is currently in the Writer (P2) stage. Prior messages from other stages are prefixed with [P1]/[P2]/[P3]/[P4]/[P5]. Reference them for continuity, but only emit updates[] operations valid for the Writer stage (updateScene / updateShot).`
+      : ''
+
     const text = await llmChat(
-      WRITER_SYSTEM,
-      (history ?? []) as ChatMessage[],
+      WRITER_SYSTEM + crossStageNote,
+      normalizedHistory,
       `${contextPrefix}${message}`,
       0.7,
     )

@@ -9,12 +9,20 @@ import type {
 } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { useProjectStore } from '@/stores/project-store'
-import { loadChatMessages, saveChatMessage } from '@/lib/chat-persistence'
 
-interface ChatMessage {
-  role: 'user' | 'model'
-  content: string
+interface SceneUpdateOp {
+  type: 'updateScene'
+  sceneId: string
+  changes: Partial<Scene>
 }
+
+interface ShotUpdateOp {
+  type: 'updateShot'
+  shotId: string
+  changes: Partial<Shot>
+}
+
+type WriterUpdate = SceneUpdateOp | ShotUpdateOp | { type: string; [k: string]: unknown }
 
 const DEFAULT_CAMERA = {
   horizontal: 0,
@@ -40,8 +48,6 @@ interface WriterState {
   selectedShotId: string | null
   generatingShots: boolean
   generating: boolean
-  chatMessages: ChatMessage[]
-  chatLoading: boolean
   error: string | null
 
   setStoryText: (text: string) => void
@@ -58,7 +64,7 @@ interface WriterState {
     index: number,
     changes: Partial<DialogueLine>,
   ) => void
-  sendChatMessage: (message: string) => Promise<void>
+  applyUpdates: (updates: WriterUpdate[]) => void
   clearError: () => void
   reset: () => void
 }
@@ -72,8 +78,6 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   selectedShotId: null,
   generatingShots: false,
   generating: false,
-  chatMessages: [],
-  chatLoading: false,
   error: null,
 
   setStoryText: (text) => set({ storyText: text }),
@@ -185,83 +189,38 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       ),
     })),
 
-  sendChatMessage: async (message) => {
-    const { chatMessages, sceneManifest, shots, selectedShotId } = get()
-    const selectedShot = shots.find((s) => s.shotId === selectedShotId)
-
-    set({
-      chatMessages: [...chatMessages, { role: 'user', content: message }],
-      chatLoading: true,
-      error: null,
-    })
-
-    const pid = useProjectStore.getState().projectId
-    if (pid) saveChatMessage(pid, 'writer', 'user', message)
-
-    try {
-      const res = await fetch('/api/write/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          history: chatMessages,
-          sceneContext: sceneManifest,
-          shotContext: selectedShot ?? null,
-        }),
-      })
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error ?? `HTTP ${res.status}`)
+  applyUpdates: (updates) => {
+    if (!Array.isArray(updates)) return
+    for (const op of updates) {
+      const u = op as {
+        type: string
+        sceneId?: string
+        shotId?: string
+        changes?: Record<string, unknown>
       }
+      if (!u.changes) continue
 
-      const { message: reply, updates } = await res.json()
-
-      // Update chat messages
-      set((state) => ({
-        chatLoading: false,
-        chatMessages: [
-          ...state.chatMessages,
-          { role: 'model' as const, content: reply },
-        ],
-      }))
-
-      if (pid) saveChatMessage(pid, 'writer', 'model', reply)
-
-      // Apply structured updates from AI Writer
-      if (Array.isArray(updates)) {
-        for (const op of updates) {
-          const u = op as { type: string; sceneId?: string; shotId?: string; changes?: Record<string, unknown> }
-          if (!u.changes) continue
-
-          if (u.type === 'updateScene' && u.sceneId) {
-            set((state) => {
-              if (!state.sceneManifest) return state
-              return {
-                sceneManifest: {
-                  ...state.sceneManifest,
-                  scenes: state.sceneManifest.scenes.map((s) =>
-                    s.sceneId === u.sceneId ? { ...s, ...u.changes } : s,
-                  ),
-                },
-              }
-            })
-          }
-
-          if (u.type === 'updateShot' && u.shotId) {
-            set((state) => ({
-              shots: state.shots.map((s) =>
-                s.shotId === u.shotId ? { ...s, ...u.changes } : s,
+      if (u.type === 'updateScene' && u.sceneId) {
+        set((state) => {
+          if (!state.sceneManifest) return state
+          return {
+            sceneManifest: {
+              ...state.sceneManifest,
+              scenes: state.sceneManifest.scenes.map((s) =>
+                s.sceneId === u.sceneId ? { ...s, ...u.changes } : s,
               ),
-            }))
+            },
           }
-        }
+        })
       }
-    } catch (err) {
-      set({
-        chatLoading: false,
-        error: err instanceof Error ? err.message : 'Chat failed',
-      })
+
+      if (u.type === 'updateShot' && u.shotId) {
+        set((state) => ({
+          shots: state.shots.map((s) =>
+            s.shotId === u.shotId ? { ...s, ...u.changes } : s,
+          ),
+        }))
+      }
     }
   },
 
@@ -277,8 +236,6 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       selectedShotId: null,
       generatingShots: false,
       generating: false,
-      chatMessages: [],
-      chatLoading: false,
       error: null,
     }),
 
@@ -320,15 +277,11 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           .order('sort_order'),
       ])
 
-      // Load chat messages
-      const chatMessages = await loadChatMessages(projectId, 'writer')
-
       // Always load story_text even if no scenes yet (P1 → P2 handoff)
       if (!scenes?.length) {
         set({
           storyText: project?.story_text ?? '',
           expandedStory: project?.expanded_story ?? null,
-          chatMessages,
         })
         return
       }
@@ -392,7 +345,6 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         selectedSceneId: firstSceneId,
         shots,
         selectedShotId: firstShot?.shotId ?? null,
-        chatMessages,
       })
     } catch (err) {
       console.error('[writer-store] loadProject failed:', err)

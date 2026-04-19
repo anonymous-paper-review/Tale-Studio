@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/tooltip'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { CinematographicInspector } from '@/features/director/cinematographic-inspector'
-import { DirectorChat } from '@/features/director/director-chat'
 import { useDirectorStore } from '@/stores/director-store'
 import { useProjectStore } from '@/stores/project-store'
 import { type ImageProvider } from '@/stores/artist-store'
@@ -482,9 +481,6 @@ export default function SetPage() {
           />
         </div>
       </div>
-
-      {/* Bottom: Director Kim Chat */}
-      <DirectorChat />
 
       <HandoffButton
         label="Head to Editor"

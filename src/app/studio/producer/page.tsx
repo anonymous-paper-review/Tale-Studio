@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { MeetingChat } from '@/features/producer/meeting-chat'
 import { ProjectDashboard } from '@/features/producer/project-dashboard'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -13,7 +12,7 @@ export default function MeetingPage() {
   const router = useRouter()
   const projectId = useProjectStore((s) => s.projectId)
   const loadProject = useProducerStore((s) => s.loadProject)
-  const { saveAndHandoff, syncing, projectSettings, storyText, error, clearError } =
+  const { saveAndHandoff, syncing, projectSettings, error, clearError } =
     useProducerStore()
 
   useEffect(() => {
@@ -37,13 +36,7 @@ export default function MeetingPage() {
 
   return (
     <>
-      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-        {/* Left: Meeting Chat */}
-        <div className="flex flex-1 flex-col border-b border-border lg:border-b-0 lg:border-r">
-          <MeetingChat />
-        </div>
-
-        {/* Right: Project Dashboard */}
+      <div className="flex flex-1 overflow-hidden">
         <ProjectDashboard />
       </div>
 

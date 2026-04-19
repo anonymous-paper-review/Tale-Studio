@@ -2,12 +2,6 @@ import { create } from 'zustand'
 import type { ProjectSettings } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { useProjectStore } from '@/stores/project-store'
-import { loadChatMessages, saveChatMessage } from '@/lib/chat-persistence'
-
-interface ChatMessage {
-  role: 'user' | 'model'
-  content: string
-}
 
 interface ExtractedSettings {
   playtime?: number
@@ -15,6 +9,7 @@ interface ExtractedSettings {
   aspectRatio?: '16:9' | '9:16' | '1:1'
   toneStyle?: string
   dialogueLanguage?: string
+  storyText?: string
   storyReady?: boolean
 }
 
@@ -22,15 +17,12 @@ interface ProducerState {
   storyText: string
   storyReady: boolean
   projectSettings: ProjectSettings
-  chatMessages: ChatMessage[]
-  chatLoading: boolean
   syncing: boolean
   error: string | null
 
   setStoryText: (text: string) => void
   updateSettings: (partial: Partial<ProjectSettings>) => void
-  sendChatMessage: (message: string) => Promise<void>
-  uploadFile: (file: File) => Promise<void>
+  applyExtractedSettings: (extracted: ExtractedSettings) => void
   saveAndHandoff: () => Promise<boolean>
   loadProject: () => Promise<void>
   clearError: () => void
@@ -49,8 +41,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   storyText: '',
   storyReady: false,
   projectSettings: { ...DEFAULT_SETTINGS },
-  chatMessages: [],
-  chatLoading: false,
   syncing: false,
   error: null,
 
@@ -61,88 +51,20 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       projectSettings: { ...state.projectSettings, ...partial },
     })),
 
-  sendChatMessage: async (message) => {
-    const { chatMessages, projectSettings, storyText } = get()
-
-    set({
-      chatMessages: [...chatMessages, { role: 'user', content: message }],
-      chatLoading: true,
-      error: null,
-    })
-
-    const pid = useProjectStore.getState().projectId
-    if (pid) saveChatMessage(pid, 'producer', 'user', message)
-
-    try {
-      const res = await fetch('/api/produce/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          history: chatMessages,
-          currentSettings: projectSettings,
-          storyText,
-        }),
-      })
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error ?? `HTTP ${res.status}`)
+  applyExtractedSettings: (extracted) =>
+    set((state) => {
+      if (!extracted) return state
+      const { storyText: nextStory, storyReady: nextReady, ...settingsPatch } =
+        extracted
+      return {
+        projectSettings: {
+          ...state.projectSettings,
+          ...settingsPatch,
+        },
+        storyText: nextStory ? nextStory : state.storyText,
+        storyReady: nextReady === true ? true : state.storyReady,
       }
-
-      const { reply, extractedSettings } = await res.json()
-
-      set((state) => {
-        const newSettings = extractedSettings
-          ? { ...state.projectSettings, ...extractedSettings }
-          : state.projectSettings
-
-        // If the AI extracted story text from conversation, update it
-        const newStoryText = extractedSettings?.storyText
-          ? extractedSettings.storyText
-          : state.storyText
-
-        // Track story readiness from LLM judgment
-        const newStoryReady = extractedSettings?.storyReady === true
-          ? true
-          : state.storyReady
-
-        return {
-          chatLoading: false,
-          chatMessages: [
-            ...state.chatMessages,
-            { role: 'model', content: reply },
-          ],
-          projectSettings: newSettings,
-          storyText: newStoryText,
-          storyReady: newStoryReady,
-        }
-      })
-
-      if (pid) saveChatMessage(pid, 'producer', 'model', reply)
-    } catch (err) {
-      set({
-        chatLoading: false,
-        error: err instanceof Error ? err.message : 'Chat failed',
-      })
-    }
-  },
-
-  uploadFile: async (file) => {
-    try {
-      const text = await file.text()
-      set({ storyText: text })
-
-      // Auto-send to AI for analysis
-      await get().sendChatMessage(
-        `I've uploaded a script file. Here's the content:\n\n${text}`,
-      )
-    } catch (err) {
-      set({
-        error: err instanceof Error ? err.message : 'File upload failed',
-      })
-    }
-  },
+    }),
 
   saveAndHandoff: async () => {
     const { storyText, projectSettings } = get()
@@ -189,14 +111,12 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         .single()
 
       if (project) {
-        const messages = await loadChatMessages(projectId, 'producer')
         set({
           storyText: project.story_text ?? '',
           projectSettings: {
             ...DEFAULT_SETTINGS,
             ...(project.settings as Partial<ProjectSettings>),
           },
-          chatMessages: messages,
         })
       }
     } catch (err) {
@@ -211,8 +131,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       storyText: '',
       storyReady: false,
       projectSettings: { ...DEFAULT_SETTINGS },
-      chatMessages: [],
-      chatLoading: false,
       syncing: false,
       error: null,
     }),

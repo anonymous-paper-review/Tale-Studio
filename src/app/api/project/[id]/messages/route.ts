@@ -15,16 +15,15 @@ export async function GET(
     const { searchParams } = new URL(req.url)
     const stage = searchParams.get('stage')
 
-    if (!stage) {
-      return NextResponse.json({ error: 'stage is required' }, { status: 400 })
-    }
-
-    const { data } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('messages')
-      .select('role, content')
+      .select('stage, role, content')
       .eq('project_id', id)
-      .eq('stage', stage)
       .order('created_at')
+
+    if (stage) query = query.eq('stage', stage)
+
+    const { data } = await query
 
     return NextResponse.json({ messages: data ?? [] })
   } catch (err) {

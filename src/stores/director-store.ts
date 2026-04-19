@@ -12,7 +12,6 @@ import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore, type ImageProvider } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
-import { loadChatMessages, saveChatMessage } from '@/lib/chat-persistence'
 
 export type VideoProvider = 'fal' | 'local'
 
@@ -79,11 +78,6 @@ function debouncedShotSave(
   )
 }
 
-interface ChatMessage {
-  role: 'user' | 'model'
-  content: string
-}
-
 const DEFAULT_CAMERA = {
   horizontal: 0,
   vertical: 0,
@@ -108,10 +102,6 @@ interface DirectorState {
   selectedSceneId: string | null
   selectedShotId: string | null
 
-  // Chat
-  chatMessages: ChatMessage[]
-  chatLoading: boolean
-
   // Generation
   generatingVideoShotId: string | null
   generatingImageShotIds: Set<string>
@@ -126,7 +116,6 @@ interface DirectorState {
   selectShot: (id: string) => void
   updateCamera: (shotId: string, config: Partial<CameraConfig>) => void
   updateLighting: (shotId: string, config: Partial<LightingConfig>) => void
-  sendChatMessage: (message: string) => Promise<void>
   applySuggestedCamera: (config: Partial<CameraConfig>) => void
   applySuggestedLighting: (config: Partial<LightingConfig>) => void
   toggleGenerationMethod: (shotId: string) => void
@@ -151,8 +140,6 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
   videoClips: [],
   selectedSceneId: null,
   selectedShotId: null,
-  chatMessages: [],
-  chatLoading: false,
   generatingVideoShotId: null,
   generatingImageShotIds: new Set<string>(),
   imageProvider: 'gemini' as ImageProvider,
@@ -268,7 +255,6 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
           const firstSceneId = manifest.scenes[0]?.sceneId ?? null
           const firstShot = shots.find((s) => s.sceneId === firstSceneId)
 
-          const chatMessages = await loadChatMessages(projectId, 'director')
           set({
             sceneManifest: manifest,
             characterAssets,
@@ -277,7 +263,6 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
             videoClips,
             selectedSceneId: firstSceneId,
             selectedShotId: firstShot?.shotId ?? null,
-            chatMessages,
           })
           return
         }
@@ -384,65 +369,6 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
     )
   },
 
-  sendChatMessage: async (message: string) => {
-    const { chatMessages, selectedShotId, shots } = get()
-    const selectedShot = shots.find((s) => s.shotId === selectedShotId)
-
-    set({
-      chatMessages: [...chatMessages, { role: 'user', content: message }],
-      chatLoading: true,
-      error: null,
-    })
-
-    const pid = useProjectStore.getState().projectId
-    if (pid) saveChatMessage(pid, 'director', 'user', message)
-
-    try {
-      const history = chatMessages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }))
-
-      const shotContext = selectedShot
-        ? {
-            shotType: selectedShot.shotType,
-            actionDescription: selectedShot.actionDescription,
-            camera: selectedShot.camera,
-            lighting: selectedShot.lighting,
-            generationMethod: selectedShot.generationMethod,
-          }
-        : undefined
-
-      const res = await fetch('/api/director/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, history, shotContext }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Chat failed')
-      }
-
-      const data = await res.json()
-
-      set((state) => ({
-        chatMessages: [
-          ...state.chatMessages,
-          { role: 'model', content: data.reply },
-        ],
-        chatLoading: false,
-      }))
-
-      if (pid) saveChatMessage(pid, 'director', 'model', data.reply)
-    } catch (err) {
-      set({
-        chatLoading: false,
-        error: err instanceof Error ? err.message : 'Chat failed',
-      })
-    }
-  },
-
   applySuggestedCamera: (config) => {
     const { selectedShotId } = get()
     if (!selectedShotId) return
@@ -468,8 +394,6 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
       videoClips: [],
       selectedSceneId: null,
       selectedShotId: null,
-      chatMessages: [],
-      chatLoading: false,
       generatingVideoShotId: null,
       generatingImageShotIds: new Set<string>(),
       imageProvider: 'gemini' as ImageProvider,
