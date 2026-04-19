@@ -26,15 +26,14 @@ PRESERVE exactly:
 
 Output: The expanded story text only (1000-2500 characters). No explanations.`
 
-const SCENE_ARCHITECT_SYSTEM = `You are a scene architect. Split the story into exactly 4 scenes following the Ki-Seung-Jeon-Gyeol (기승전결) structure.
+const SCENE_ARCHITECT_SYSTEM = `You are a scene architect. Split the story into exactly 4 scenes that cover the full narrative arc.
 
 Output a JSON object matching this exact schema:
 {
   "scenes": [
     {
       "sceneId": "sc_01",
-      "act": "intro",
-      "narrativeSummary": "One sentence summary",
+      "narrativeSummary": "One sentence plot summary (what happens, not how it looks)",
       "originalTextQuote": "Direct quote from the story",
       "location": "loc_01",
       "timeOfDay": "night",
@@ -65,12 +64,13 @@ Output a JSON object matching this exact schema:
 }
 
 Rules:
-- Exactly 4 scenes with acts: "intro", "dev", "turn", "conclusion"
+- Exactly 4 scenes covering the full story
 - Scene IDs: sc_01 through sc_04
 - Character IDs: char_{lowercase_name}
 - Location IDs: loc_01 through loc_N
 - Role must be "protagonist", "antagonist", or "supporting"
 - Each scene ~30 seconds (total ~2 min video)
+- narrativeSummary MUST be a plot summary only — what happens. NO visual descriptions (no "neon alleyway flickers red", no "camera pans across"). Write it like a one-line outline: "protagonist discovers the clue and chases the broker".
 - fixedPrompt: physical appearance only, no actions or emotions
 - Extract ALL characters mentioned, even briefly
 - Output valid JSON only, no markdown fences`
@@ -220,7 +220,6 @@ export async function POST(req: Request) {
         manifest.scenes.map((s, i) => ({
           project_id: projectId,
           scene_id: s.sceneId,
-          act: s.act,
           narrative_summary: s.narrativeSummary,
           original_text_quote: s.originalTextQuote,
           location: s.location,

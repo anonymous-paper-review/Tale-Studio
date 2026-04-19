@@ -1,8 +1,5 @@
-export type Act = 'intro' | 'dev' | 'turn' | 'conclusion'
-
 export interface Scene {
   sceneId: string
-  act: Act
   narrativeSummary: string
   originalTextQuote: string
   location: string

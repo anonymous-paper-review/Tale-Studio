@@ -1,5 +1,5 @@
 export type { StageId, StageConfig, Project, ProjectSettings } from './project'
-export type { Act, Scene, Character, Location, SceneManifest } from './scene'
+export type { Scene, Character, Location, SceneManifest } from './scene'
 export type { CharacterView, CharacterAsset, WorldAsset } from './asset'
 export type {
   ShotType,

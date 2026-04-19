@@ -172,7 +172,7 @@ export function WorldPanel() {
                   <span className="font-medium">{world.name}</span>
                   {scene && (
                     <Badge variant="outline" className="text-[10px]">
-                      {scene.act.toUpperCase()} · {scene.timeOfDay}
+                      {scene.timeOfDay}
                     </Badge>
                   )}
                 </div>

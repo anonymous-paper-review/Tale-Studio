@@ -208,7 +208,6 @@ export type Database = {
       }
       scenes: {
         Row: {
-          act: string
           characters_present: string[] | null
           created_at: string | null
           estimated_duration_seconds: number | null
@@ -224,7 +223,6 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          act: string
           characters_present?: string[] | null
           created_at?: string | null
           estimated_duration_seconds?: number | null
@@ -240,7 +238,6 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          act?: string
           characters_present?: string[] | null
           created_at?: string | null
           estimated_duration_seconds?: number | null

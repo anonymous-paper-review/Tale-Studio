@@ -136,7 +136,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           const manifest: SceneManifest = {
             scenes: (scenes ?? []).map((s) => ({
               sceneId: s.scene_id,
-              act: s.act as 'intro' | 'dev' | 'turn' | 'conclusion',
               narrativeSummary: s.narrative_summary ?? '',
               originalTextQuote: s.original_text_quote ?? '',
               location: s.location ?? '',

@@ -63,7 +63,6 @@ export async function POST(req: Request) {
 
     const sceneContext = JSON.stringify({
       sceneId: scene.sceneId,
-      act: scene.act,
       narrative: scene.narrativeSummary,
       location: scene.location,
       timeOfDay: scene.timeOfDay,

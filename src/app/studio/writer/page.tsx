@@ -1,40 +1,21 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import {
-  Loader2,
-  Sparkles,
-  Save,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import { useEffect, useMemo, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { SceneCards } from '@/features/writer/scene-cards'
-import { ShotGrid } from '@/features/writer/shot-grid'
-import { ShotEditor } from '@/features/writer/shot-editor'
+import { ShotsDialog } from '@/features/writer/shots-dialog'
 
 export default function WriterPage() {
   const {
     storyText,
     sceneManifest,
-    selectedSceneId,
     shots,
-    selectedShotId,
     generating,
     error,
-    setStoryText,
     generateScenes,
-    selectScene,
-    selectShot,
-    updateShot,
-    addDialogueLine,
-    removeDialogueLine,
-    updateDialogueLine,
     clearError,
   } = useWriterStore()
 
@@ -42,6 +23,7 @@ export default function WriterPage() {
   const loadProject = useWriterStore((s) => s.loadProject)
 
   const [autoGenTriggered, setAutoGenTriggered] = useState(false)
+  const [openSceneId, setOpenSceneId] = useState<string | null>(null)
 
   useEffect(() => {
     if (projectId) loadProject()
@@ -49,20 +31,25 @@ export default function WriterPage() {
 
   // Auto-generate scenes if story exists but no scenes yet
   useEffect(() => {
-    if (storyText && storyText.length >= 20 && !sceneManifest && !generating && !autoGenTriggered) {
+    if (
+      storyText &&
+      storyText.length >= 20 &&
+      !sceneManifest &&
+      !generating &&
+      !autoGenTriggered
+    ) {
       setAutoGenTriggered(true)
       generateScenes()
     }
   }, [storyText, sceneManifest, generating, autoGenTriggered, generateScenes])
 
-  const [storyCollapsed, setStoryCollapsed] = useState(false)
+  const shotCounts = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const s of shots) m[s.sceneId] = (m[s.sceneId] ?? 0) + 1
+    return m
+  }, [shots])
 
-  const sceneShotsFiltered = shots.filter(
-    (s) => s.sceneId === selectedSceneId,
-  )
-  const selectedShot = shots.find((s) => s.shotId === selectedShotId)
-
-  // ── No scenes yet: scenes should have been generated during Producer handoff ──
+  // ── No scenes yet ──
   if (!sceneManifest) {
     return (
       <>
@@ -80,8 +67,9 @@ export default function WriterPage() {
               <>
                 <h1 className="text-xl font-bold">No Scenes Yet</h1>
                 <p className="text-sm text-muted-foreground">
-                  Go back to The Meeting Room and complete your story with the Producer.
-                  Scenes will be generated automatically when you hand off.
+                  Go back to The Meeting Room and complete your story with
+                  the Producer. Scenes will be generated automatically when
+                  you hand off.
                 </p>
               </>
             )}
@@ -106,113 +94,40 @@ export default function WriterPage() {
     )
   }
 
-  // ── Scenes generated: full layout ──
+  // ── Scene list + chat-centric layout ──
   return (
     <>
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between border-b border-border px-6 py-3">
-          <div>
-            <h1 className="text-lg font-semibold">The Script Room</h1>
-            <p className="text-xs text-muted-foreground">
-              Craft the Narrative Foundation of Your Plot
+      <div className="grid h-full grid-cols-[280px_1fr] overflow-hidden">
+        <aside className="flex min-h-0 flex-col overflow-y-auto border-r border-border">
+          <SceneCards
+            manifest={sceneManifest}
+            shotCounts={shotCounts}
+            onOpenScene={setOpenSceneId}
+            activeSceneId={openSceneId}
+          />
+        </aside>
+
+        <main className="flex min-h-0 items-center justify-center p-8">
+          <div className="max-w-sm space-y-2 text-center text-sm text-muted-foreground">
+            <h2 className="text-base font-semibold text-foreground">
+              The Script Room
+            </h2>
+            <p>
+              Click a scene on the left to edit its shots, or use the chat on
+              the right to refine anything — {'"'}add a shot to scene 2{'"'},
+              {' "'}regenerate scene 3{'"'}, and so on.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="gap-1 text-xs">
-              <Save className="size-3" />
-              Auto-Save
-            </Badge>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={generateScenes}
-              disabled={generating}
-            >
-              {generating ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="size-3.5" />
-              )}
-              Regenerate
-            </Button>
-          </div>
-        </div>
-
-        {/* ── Collapsible Story Input ── */}
-        <div className="border-b border-border">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between px-6 py-2 text-xs text-muted-foreground hover:bg-accent/50"
-            onClick={() => setStoryCollapsed(!storyCollapsed)}
-          >
-            <span>Original Story ({storyText.length} chars)</span>
-            {storyCollapsed ? (
-              <ChevronDown className="size-3.5" />
-            ) : (
-              <ChevronUp className="size-3.5" />
-            )}
-          </button>
-          {!storyCollapsed && (
-            <div className="px-6 pb-3">
-              <Textarea
-                className="min-h-[80px] resize-y text-sm"
-                value={storyText}
-                onChange={(e) => setStoryText(e.target.value)}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* ── Scene Cards ── */}
-        <SceneCards
-          manifest={sceneManifest}
-          selectedSceneId={selectedSceneId}
-          onSelectScene={selectScene}
-        />
-
-        {/* ── Bottom: Shot Grid + Shot Detail Editor (full width) ── */}
-        <div className="flex flex-1 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {/* Shot Grid */}
-          <ShotGrid
-            shots={sceneShotsFiltered}
-            selectedShotId={selectedShotId}
-            manifest={sceneManifest}
-            onSelectShot={selectShot}
-          />
-
-          {/* Shot Detail Editor */}
-          <div className="flex min-h-0 flex-col">
-            <div className="border-b border-border px-6 py-2">
-              <span className="text-sm font-semibold">Shot Detail Editor</span>
-              {selectedShot && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  [{selectedShot.shotId}]
-                </span>
-              )}
-            </div>
-
-            {selectedShot ? (
-              <ShotEditor
-                shot={selectedShot}
-                manifest={sceneManifest}
-                onUpdateShot={updateShot}
-                onAddDialogue={addDialogueLine}
-                onRemoveDialogue={removeDialogueLine}
-                onUpdateDialogue={updateDialogueLine}
-              />
-            ) : (
-              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                {sceneShotsFiltered.length > 0
-                  ? 'Select a shot above'
-                  : 'Generate scenes to create shots'}
-              </div>
-            )}
-          </div>
-        </div>
+        </main>
       </div>
 
-      {/* Error bar */}
+      <ShotsDialog
+        sceneId={openSceneId}
+        manifest={sceneManifest}
+        shots={shots}
+        onClose={() => setOpenSceneId(null)}
+      />
+
       {error && (
         <button
           type="button"
