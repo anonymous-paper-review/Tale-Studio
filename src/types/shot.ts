@@ -38,6 +38,8 @@ export interface Shot {
   generationMethod: GenerationMethod
   dialogueLines: DialogueLine[]
   camera: CameraConfig
+  movementPreset?: string | null
+  movementIntensity?: number
   lighting: LightingConfig
   referenceImageUrl?: string | null
 }

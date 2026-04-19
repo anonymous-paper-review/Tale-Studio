@@ -276,6 +276,8 @@ export type Database = {
           generation_method: string | null
           id: string
           lighting_config: Json | null
+          movement_intensity: number | null
+          movement_preset: string | null
           project_id: string
           prompt: string | null
           scene_id: string
@@ -294,6 +296,8 @@ export type Database = {
           generation_method?: string | null
           id?: string
           lighting_config?: Json | null
+          movement_intensity?: number | null
+          movement_preset?: string | null
           project_id: string
           prompt?: string | null
           scene_id: string
@@ -312,6 +316,8 @@ export type Database = {
           generation_method?: string | null
           id?: string
           lighting_config?: Json | null
+          movement_intensity?: number | null
+          movement_preset?: string | null
           project_id?: string
           prompt?: string | null
           scene_id?: string

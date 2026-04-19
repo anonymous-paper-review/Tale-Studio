@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { fal } from '@fal-ai/client'
 import { cameraToText } from '@/lib/kling'
+import { findCameraMovement } from '@/lib/knowledge'
 import type { CameraConfig } from '@/types'
 
 fal.config({ credentials: () => process.env.FAL_KEY ?? '' })
@@ -127,6 +128,7 @@ export async function POST(req: Request) {
       generationMethod = 'T2V',
       provider = 'fal',
       referenceImageUrl,
+      movementPreset,
     } = (await req.json()) as {
       shotId: string
       prompt: string
@@ -136,6 +138,7 @@ export async function POST(req: Request) {
       generationMethod?: GenerationMethod
       provider?: VideoProvider
       referenceImageUrl?: string
+      movementPreset?: string | null
     }
 
     if (!shotId || !prompt) {
@@ -154,9 +157,15 @@ export async function POST(req: Request) {
 
     // Convert 6-axis camera values to natural language in prompt
     const cameraText = camera ? cameraToText(camera) : ''
-    const fullPrompt = cameraText
-      ? `${prompt}. ${cameraText}.`.slice(0, 500)
-      : prompt.slice(0, 500)
+    // Inject named movement label for T2V only (I2V relies on cameraToText axis mapping)
+    const movementFragment =
+      generationMethod === 'T2V' && movementPreset
+        ? findCameraMovement(movementPreset)?.prompt_fragment ?? ''
+        : ''
+    const fullPrompt = [prompt, movementFragment, cameraText]
+      .filter(Boolean)
+      .join('. ')
+      .slice(0, 500)
 
     let result: { taskId: string; provider: string; model: string }
 

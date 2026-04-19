@@ -6,12 +6,14 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { AngleControl } from './angle-control'
 import { KeyLight } from './key-light'
+import { MovementControl } from './movement-control'
 import type { Shot, CameraConfig, LightingConfig } from '@/types'
 
 interface CinematographicInspectorProps {
   shot: Shot | undefined
   onUpdateCamera: (config: Partial<CameraConfig>) => void
   onUpdateLighting: (config: Partial<LightingConfig>) => void
+  onApplyMovement: (presetId: string | null, intensity: number) => void
   onGenerateVideo?: () => void
   isGenerating?: boolean
 }
@@ -20,6 +22,7 @@ export function CinematographicInspector({
   shot,
   onUpdateCamera,
   onUpdateLighting,
+  onApplyMovement,
   onGenerateVideo,
   isGenerating,
 }: CinematographicInspectorProps) {
@@ -45,6 +48,19 @@ export function CinematographicInspector({
         <Separator />
 
         <AngleControl camera={shot.camera} onUpdate={onUpdateCamera} />
+
+        <Separator />
+
+        <MovementControl
+          preset={shot.movementPreset ?? null}
+          intensity={shot.movementIntensity ?? 5}
+          onSelectPreset={(id) =>
+            onApplyMovement(id, shot.movementIntensity ?? 5)
+          }
+          onIntensityChange={(v) =>
+            onApplyMovement(shot.movementPreset ?? null, v)
+          }
+        />
 
         <Separator />
 

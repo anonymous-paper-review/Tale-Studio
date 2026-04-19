@@ -41,6 +41,7 @@ export default function SetPage() {
     selectShot,
     updateCamera,
     updateLighting,
+    applyMovementPreset,
     toggleGenerationMethod,
     generateVideo,
     generateShotImage,
@@ -473,6 +474,10 @@ export default function SetPage() {
             }
             onUpdateLighting={(config) =>
               selectedShotId && updateLighting(selectedShotId, config)
+            }
+            onApplyMovement={(presetId, intensity) =>
+              selectedShotId &&
+              applyMovementPreset(selectedShotId, presetId, intensity)
             }
             onGenerateVideo={() =>
               selectedShotId && generateVideo(selectedShotId)

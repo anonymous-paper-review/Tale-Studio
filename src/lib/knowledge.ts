@@ -23,6 +23,21 @@ interface CameraPreset {
   zoom: number
 }
 
+export interface CameraMovement {
+  id: string
+  label: string
+  description: string
+  axis: {
+    horizontal: number
+    vertical: number
+    pan: number
+    tilt: number
+    roll: number
+    zoom: number
+  }
+  prompt_fragment: string
+}
+
 const KB_DIR = path.join(process.cwd(), 'databases', 'knowledge')
 
 function loadYaml<T>(filename: string): T {
@@ -33,6 +48,7 @@ function loadYaml<T>(filename: string): T {
 
 let techniquesCache: Technique[] | null = null
 let presetsCache: CameraPreset[] | null = null
+let movementsCache: CameraMovement[] | null = null
 
 export function loadAllTechniques(): Technique[] {
   if (techniquesCache) return techniquesCache
@@ -59,6 +75,18 @@ export function loadCameraPresets(): CameraPreset[] {
   const data = loadYaml<{ presets: CameraPreset[] }>('camera_presets.yaml')
   presetsCache = data.presets
   return data.presets
+}
+
+export function loadCameraMovements(): CameraMovement[] {
+  if (movementsCache) return movementsCache
+
+  const data = loadYaml<{ movements: CameraMovement[] }>('camera_movements.yaml')
+  movementsCache = data.movements
+  return data.movements
+}
+
+export function findCameraMovement(id: string): CameraMovement | undefined {
+  return loadCameraMovements().find((m) => m.id === id)
 }
 
 export function queryTechniques(

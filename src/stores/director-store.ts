@@ -118,6 +118,11 @@ interface DirectorState {
   updateLighting: (shotId: string, config: Partial<LightingConfig>) => void
   applySuggestedCamera: (config: Partial<CameraConfig>) => void
   applySuggestedLighting: (config: Partial<LightingConfig>) => void
+  applyMovementPreset: (
+    shotId: string,
+    presetId: string | null,
+    intensity: number,
+  ) => Promise<void>
   toggleGenerationMethod: (shotId: string) => void
   generateVideo: (shotId: string) => Promise<void>
   generateShotImage: (shotId: string) => Promise<void>
@@ -241,6 +246,8 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
             generationMethod: s.generation_method ?? 'T2V',
             dialogueLines: s.dialogue_lines ?? [],
             camera: { ...DEFAULT_CAMERA, ...(s.camera_config ?? {}) },
+            movementPreset: s.movement_preset ?? null,
+            movementIntensity: s.movement_intensity ?? 5,
             lighting: { ...DEFAULT_LIGHTING, ...(s.lighting_config ?? {}) },
             referenceImageUrl: s.reference_image ?? null,
           }))
@@ -379,6 +386,81 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
     const { selectedShotId } = get()
     if (!selectedShotId) return
     get().updateLighting(selectedShotId, config)
+  },
+
+  applyMovementPreset: async (shotId, presetId, intensity) => {
+    let axisUpdate: Partial<CameraConfig> = {
+      horizontal: 0,
+      vertical: 0,
+      pan: 0,
+      tilt: 0,
+      roll: 0,
+      zoom: 0,
+    }
+
+    if (presetId) {
+      try {
+        const res = await fetch('/api/knowledge/movements')
+        const { movements } = (await res.json()) as {
+          movements: {
+            id: string
+            axis: CameraConfig
+          }[]
+        }
+        const preset = movements.find((m) => m.id === presetId)
+        if (preset) {
+          const scale = intensity / 5
+          const clamp = (v: number) =>
+            Math.max(-10, Math.min(10, Math.round(v * scale)))
+          axisUpdate = {
+            horizontal: clamp(preset.axis.horizontal),
+            vertical: clamp(preset.axis.vertical),
+            pan: clamp(preset.axis.pan),
+            tilt: clamp(preset.axis.tilt),
+            roll: clamp(preset.axis.roll),
+            zoom: clamp(preset.axis.zoom),
+          }
+        }
+      } catch (err) {
+        console.error('[director-store] movement preset fetch failed:', err)
+      }
+    }
+
+    set((state) => ({
+      shots: state.shots.map((s) =>
+        s.shotId === shotId
+          ? {
+              ...s,
+              movementPreset: presetId,
+              movementIntensity: intensity,
+              camera: { ...s.camera, ...axisUpdate },
+            }
+          : s,
+      ),
+    }))
+
+    // Persist camera_config via existing debounce path
+    debouncedShotSave(shotId, () =>
+      get().shots.find((s) => s.shotId === shotId),
+    )
+
+    // Persist preset + intensity columns
+    const projectId = useProjectStore.getState().projectId
+    if (projectId) {
+      try {
+        const supabase = createClient()
+        await supabase
+          .from('shots')
+          .update({
+            movement_preset: presetId,
+            movement_intensity: intensity,
+          })
+          .eq('project_id', projectId)
+          .eq('shot_id', shotId)
+      } catch (err) {
+        console.warn('[director-store] movement persist skipped:', err)
+      }
+    }
   },
 
   setImageProvider: (provider) => set({ imageProvider: provider }),
@@ -553,6 +635,7 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
           generationMethod: shot.generationMethod,
           provider: videoProvider,
           referenceImageUrl: shot.referenceImageUrl,
+          movementPreset: shot.movementPreset ?? null,
         }),
       })
 
