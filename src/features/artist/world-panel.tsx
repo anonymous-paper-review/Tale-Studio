@@ -144,7 +144,7 @@ export function WorldPanel() {
         ))}
       </div>
 
-      <ScrollArea className="flex-1 px-6 py-4">
+      <ScrollArea className="min-h-0 flex-1 px-6 py-4">
         <div className="space-y-6">
           {worldAssets.map((world) => {
             const scene = getScene(world.sceneId)

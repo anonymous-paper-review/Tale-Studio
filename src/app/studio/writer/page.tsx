@@ -21,6 +21,7 @@ export default function WriterPage() {
 
   const projectId = useProjectStore((s) => s.projectId)
   const loadProject = useWriterStore((s) => s.loadProject)
+  const reorderScenes = useWriterStore((s) => s.reorderScenes)
 
   const [autoGenTriggered, setAutoGenTriggered] = useState(false)
   const [openSceneId, setOpenSceneId] = useState<string | null>(null)
@@ -104,6 +105,7 @@ export default function WriterPage() {
             shotCounts={shotCounts}
             onOpenScene={setOpenSceneId}
             activeSceneId={openSceneId}
+            onReorder={reorderScenes}
           />
         </aside>
 

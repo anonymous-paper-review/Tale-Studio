@@ -75,7 +75,7 @@ export function ShotsDialog({
           )}
         </DialogHeader>
 
-        <ScrollArea className="flex-1 px-6 py-4">
+        <ScrollArea className="min-h-0 flex-1 px-6 py-4">
           {isRegenerating && (
             <div className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
               Regenerating shots…

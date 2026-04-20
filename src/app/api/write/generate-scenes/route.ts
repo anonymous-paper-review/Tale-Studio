@@ -239,6 +239,8 @@ export async function POST(req: Request) {
           role: c.role,
           description: c.description,
           fixed_prompt: c.fixedPrompt,
+          view_three_quarter_left: null,
+          view_three_quarter_right: null,
         })),
       )
 
