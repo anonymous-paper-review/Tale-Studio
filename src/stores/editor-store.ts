@@ -19,6 +19,9 @@ const DEFAULT_LIGHTING = {
   colorTemp: 5000,
 }
 
+// Per-shot debounce timers for speed persist (300ms)
+const speedPersistTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
 interface EditorState {
   shots: Shot[]
   videoClips: VideoClip[]
@@ -35,6 +38,7 @@ interface EditorState {
   selectClip: (shotId: string) => void
   reorderClips: (sceneId: string, fromIndex: number, toIndex: number) => void
   setTrim: (shotId: string, trimStart: number, trimEnd: number) => void
+  setSpeed: (shotId: string, speed: number) => void
   deleteClip: (shotId: string) => void
   renderDraft: () => Promise<void>
 }
@@ -92,6 +96,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             thumbnailUrl: null,
             trimStart: s.trim_start ?? undefined,
             trimEnd: s.trim_end ?? undefined,
+            speed: s.speed ?? 1.0,
           }))
 
           const order = buildClipOrder(shots)
@@ -200,6 +205,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ shotId, trimStart, trimEnd }),
     }).catch((err) => console.error('[editor-store] trim persist failed:', err))
+  },
+
+  setSpeed: (shotId, speed) => {
+    const clamped = Math.max(0.25, Math.min(4.0, speed))
+
+    set((state) => ({
+      videoClips: state.videoClips.map((c) =>
+        c.shotId === shotId ? { ...c, speed: clamped } : c,
+      ),
+    }))
+
+    // Debounced persist to DB (fire-and-forget)
+    const existing = speedPersistTimers.get(shotId)
+    if (existing) clearTimeout(existing)
+    const timer = setTimeout(() => {
+      speedPersistTimers.delete(shotId)
+      fetch('/api/editor/speed', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shotId, speed: clamped }),
+      }).catch((err) => console.error('[editor-store] speed persist failed:', err))
+    }, 300)
+    speedPersistTimers.set(shotId, timer)
   },
 
   deleteClip: (shotId) =>

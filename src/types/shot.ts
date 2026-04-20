@@ -66,4 +66,5 @@ export interface VideoClip {
   thumbnailUrl: string | null
   trimStart?: number  // seconds, client-only for P5 crop
   trimEnd?: number    // seconds, client-only for P5 crop
+  speed?: number      // 0.25 ~ 4.0, default 1.0
 }
