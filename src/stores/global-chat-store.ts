@@ -3,7 +3,11 @@ import type { StageId } from '@/types'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useWriterStore } from '@/stores/writer-store'
-import { useArtistStore, type ArtistUpdate } from '@/stores/artist-store'
+import {
+  useCanvasStore,
+  serializeCanvasContext,
+  type CanvasUpdate,
+} from '@/stores/canvas-store'
 import { useDirectorStore } from '@/stores/director-store'
 import { saveChatMessage } from '@/lib/chat-persistence'
 
@@ -100,20 +104,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         break
       }
       case 'artist': {
-        const a = useArtistStore.getState()
+        const canvasContext = serializeCanvasContext(
+          useCanvasStore.getState(),
+        )
         endpoint = '/api/artist/chat'
         body = {
           message: trimmed,
           history: historyPayload,
-          characterContext: a.characterAssets.map((c) => ({
-            characterId: c.characterId,
-            name: c.name,
-            locked: c.locked,
-          })),
-          locationContext: a.worldAssets.map((w) => ({
-            locationId: w.locationId,
-            name: w.name,
-          })),
+          canvasContext,
         }
         break
       }
@@ -199,9 +197,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         useWriterStore.getState().applyUpdates(data.updates)
       }
       if (stage === 'artist' && Array.isArray(data.updates)) {
-        useArtistStore
+        const result = useCanvasStore
           .getState()
-          .applyUpdates(data.updates as ArtistUpdate[])
+          .applyUpdates(data.updates as CanvasUpdate[])
+        if (result.skipped.length > 0) {
+          console.warn('[global-chat-store] artist updates skipped:', result.skipped)
+        }
       }
       if (stage === 'director') {
         if (data.suggestedCamera) {

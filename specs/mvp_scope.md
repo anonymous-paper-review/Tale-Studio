@@ -1,8 +1,8 @@
-# MVP Scope — V3
+# MVP Scope — V3.1
 
-> 최종 수정: 2026-03-03
-> 상태: P1~P5 전체 포함으로 확장
-> 이전: V2 (P3+P4+P5 Lite) → **V3 (P1~P5, P5 Lite)**
+> 최종 수정: 2026-05-17
+> 상태: P1~P5 전체 포함, P3는 L0 Concept Canvas로 재설계
+> 이전: V3 → **V3.1 (P3 노드 그래프 전환)**
 
 ---
 
@@ -14,7 +14,7 @@
 |-------|---------|----------|----------|
 | **P1** | The Meeting Room | Producer Agent 대화로 스토리/설정 수집 | - |
 | **P2** | The Script Room | Writer Agent + L1 (Pumpup → 씬 분할) | L1 |
-| **P3** | The Visual Studio | 캐릭터 Consistency Sheet + World Model | - |
+| **P3** | The Visual Studio | 노드 그래프 기반 캐릭터/월드 컨셉 정의 (L0 Concept Canvas) | L0 |
 | **P4** | The Set | Shot Node Grid + Cinematographic Inspector + 영상 생성 | L2+L3 |
 | **P5 Lite** | Post-Production Suite | 프리뷰 + 타임라인 + Crop + Draft 렌더링 | - |
 
@@ -104,7 +104,8 @@ P5 Post-Production Suite ─── 편집 + Draft 렌더링
 | Samantha | 우측 하단 플로팅 아이콘. 전역 AI 비서 |
 | Stage 전환 | Handoff 버튼 패턴. 영상생성 전까지 이전 Stage 복귀 가능 |
 
-> 공통 UI 상세 + Stage 전환 패턴: `specs/ux_pages.md`
+> 시각·인터랙션 공통 컨벤션 (헌법): `docs/design.md`
+> 페이지별 레이아웃 + Stage 전환 패턴: `specs/ux_pages.md`
 
 ---
 
@@ -114,7 +115,8 @@ P5 Post-Production Suite ─── 편집 + Draft 렌더링
 |------|------|------|
 | MVP 범위 | P1~P5 (P5 Lite) | Decision #28 |
 | 구현 순서 | P3+P4 → P5 → P2 → P1 | 핵심 가치 우선 + 점진적 파이프라인 연결 |
-| P3 범위 | 에셋 전용 (Storyboard → P4 이동) | Decision #25 |
+| P3 재설계 | L0 Concept Canvas (React Flow 노드 그래프) | Decision #29 |
+| 디자인 헌법 | `docs/design.md` 단일 진실 | Decision #30 |
 | P4 범위 | Shot Node Grid + Inspector + Director Chat 통합 | Decision #26 |
 | P5 Lite | 프리뷰 + 타임라인 + Draft 렌더링. AI 편집 제외 | Decision #27 |
 | FE 스택 | Next.js + Vercel | Decision #22 |
@@ -127,6 +129,7 @@ P5 Post-Production Suite ─── 편집 + Draft 렌더링
 
 | 날짜 | 내용 |
 |------|------|
+| 2026-05-17 | V3.1: P3 → L0 Concept Canvas (React Flow 노드 그래프) 재설계. `docs/design.md` 도입 |
 | 2026-03-03 | V3: MVP P1~P5 전체 포함. Mock 전략 → 구현 순서 기반 점진적 교체로 변경 |
 | 2026-03-03 | V2: P3+P4+P5 Lite. V2 디자인 반영 |
 | 2026-02-25 | V1: P3+P4 Only |

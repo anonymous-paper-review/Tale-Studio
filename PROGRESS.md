@@ -1,5 +1,44 @@
 # Progress
 
+> **상태 범례** (모든 작업 항목에 적용):
+> - `[ ]` 미착수
+> - `[c]` **코드 작성 완료, 브라우저/사용자 검증 대기** ← 다음 세션 진입 시 우선 처리 대상
+> - `[x]` 검증 완료 (코드 + 브라우저 확인 둘 다 ✓)
+> - `[~]` 보류 (사유 명시)
+>
+> **DoD 표기**: 각 phase의 DoD는 `코드 ✓ / 검증 ✓` 둘 다 충족해야 완료. 한쪽만 되면 "코드 ✓ / 검증 대기" 명시.
+>
+> **다음 세션 진입 시 권장 액션**:
+> 1. 이 파일에서 `grep '^- \[c\]' PROGRESS.md` 또는 아래 **검증 보드** 확인
+> 2. 미검증 항목 사용자에게 1줄 보고 ("P10-X 검증 대기 항목 N개 있음")
+> 3. 검증 진행 / 새 작업 진입 / 잡힌 버그 수정 중 선택받기
+
+---
+
+## 🔴 현재 검증 보드 (2026-05-17 갱신)
+
+L0 Concept Canvas (Phase 10) 1차 라운드 fix 다수 적용, quota 풀린 후 2차 검증 예정:
+
+| 영역 | 상태 | 결과 / 비고 |
+|------|------|------------|
+| P10-2 캔버스 + 노드 기본 | `[x]` | 더블클릭 모달 / snap 16px / 새로고침 보존 모두 OK |
+| P10-3 노드 팝업 + Mock 생성 | `[c]` | Edit / 모델 토글 / **출력 모드 색상 강조(F-1)** OK. 노드 더블클릭 = Edit 단축 추가. 20장 등록 임계값 검증 보류 (B-7) |
+| P10-4 엣지 / Branch / Cascade | `[c]` | 핀 연결 + parent 엣지 렌더링 fix(F-2/F-5) 완료, 사용자 connect/Branch 동작 확인. **F-3 적용 후 RelationModal은 references/in-world 2개만 노출**. cascade 시나리오 추가 검증 남음 |
+| P10-4 우클릭 메뉴 | `[x]` | **F-D2 결정: 우클릭 컨텍스트 메뉴 완전 제거 + BaseNode 헤더에 Copy 아이콘 추가(F-4)**. 액션은 헤더 4 아이콘(Edit/Branch/Copy/Delete) + NodePopup에 일원화 |
+| P10-5 Agentic Canvas | `[c]` | MeetingRoom → GlobalChat 통합(F-6) 완료. "Kai 만들어줘" 캐릭터 생성 동작 확인. "삭제해줘" → DeleteConfirmModal 시나리오 추가 검증 남음 |
+| P10-6 이미지 생성 wire-up | `[c]` | Claude API 전환(F-7) + **Imagen → Nano Banana(decisions.md #34) 임시 전환** 완료. quota reset 후 사용자 검증 (E-15) |
+| P10-7 부분 (Asset export, project-store sync) | `[c]` | 프로젝트 전환 시 reset 시나리오 검증 남음 (F-16) |
+
+**검증 절차 상세**: 이전 세션의 "Artist 단계 테스트 체크리스트" 메시지 참조 (시나리오 16개).
+
+**유닛 테스트**: vitest 4.1.6 도입, `tests/` 3 파일 / 32 케이스 / 136ms 통과 (2026-05-17). F-2/F-5 fix 후 branchStatus parent edge sourceHandle/targetHandle 검증 케이스 추가.
+
+**임시 조치 (검증 종료 후 원복)**:
+- `project-store.canNavigateTo()` true 고정 — 검증 종료 후 원본 로직(주석 보존) 복원
+- `/api/generate/image`가 Imagen → Nano Banana(`gemini-2.5-flash-image`) 사용 중. paid plan 결제 시 git history 참조해 Imagen 복원 (decisions.md #34)
+
+---
+
 ## Phase 0: 코드베이스 클렌징 (2026-02-25)
 
 - [x] 구 코드 전체 삭제 (adapters, domain, usecases, web, scripts, infrastructure, tests)
@@ -318,10 +357,176 @@
 - Claude SDK 활성화 보류 — Vercel에 `ANTHROPIC_API_KEY` 미설정. 현재 Gemini(`GOOGLE_API_KEYS`) 사용
 - `llm.ts` 추상화: 나중에 Agent SDK(tool-use) 전환 시 진입점 단일화
 
+## Bugfix: IME + 리다이렉트 + Tailscale (2026-03-23)
+
+- [x] 한글 IME 조합 중 Enter 시 잔여 글자 남는 버그 — `isComposing` 체크 추가 (3개 채팅 컴포넌트)
+- [x] Producer→Writer 핸드오프 리다이렉트 안 됨 — `router.push`를 `useEffect` 기반 redirect로 변경
+- [x] Tailscale self-hosted 이미지 서버 URL 변경 — Tailscale Funnel public URL로 전환
+  - 이미지: `https://h100-image-gen.tailddf36d.ts.net`
+  - 비디오: `https://pro6000-video-gen.tailddf36d.ts.net`
+- [x] Tailscale image API fetch timeout 2분 + `maxDuration = 120` 추가
+- [x] Vercel 환경변수 등록: `TAILSCALE_IMAGE_API_URL`, `TAILSCALE_VIDEO_API_URL`
+
+## Phase 10: L0 Concept Canvas — P3 노드 그래프 재설계 (2026-05-17~)
+
+> 브랜치: main
+> 스펙: `specs/layers/L0_concept_canvas.md` + `specs/data/canvas_data_model.md` + `specs/data/asset_storage.md`
+> 디자인 헌법: `docs/design.md`
+
+### 목표
+P3 The Visual Studio를 패널 UI에서 React Flow 기반 노드 그래프로 전면 재설계. Higgsfield Canvas 패턴 + ComfyUI 핀-엣지 메타포. 노드=개체 패러다임으로 차별화.
+
+### P10-1: 인프라 + 데이터 모델
+- [x] `@xyflow/react` 12.10.2 설치
+- [x] `src/stores/canvas-store.ts` — Zustand + persist, 14개 액션 + 8개 selector
+- [x] `src/stores/asset-storage-store.ts` — 등록 캐릭터/월드 저장소
+
+DoD: TypeScript clean, localStorage persist 동작 ✓ (2026-05-17)
+
+### P10-2: 캔버스 + 노드 기본 UI
+- [x] `src/features/artist/nodes/{Base,Actor,World,Status}Node.tsx` (파일 생성)
+- [x] `src/features/artist/edges/CategoryEdge.tsx` (parent 2px / in-world 1.5px / references 1.5px dashed)
+- [x] `src/app/studio/artist/page.tsx` — React Flow + 좌측 Meeting Room placeholder + Palette/Storage 탭
+- [x] 빈 캔버스 hint (텍스트 노출)
+- [c] 더블클릭 → Actor/World 선택 모달 (`zoomOnDoubleClick={false}` + target 가드, 2026-05-17 버그픽스 후 미검증)
+- [c] 핀 → 빈 공간 = Status 자동 Branch
+- [x] 기존 패널 파일 4개 삭제
+
+DoD: `/studio/artist` 접속 → 더블클릭 노드 생성, snap-to-grid 16px, 새로고침 후 노드 보존 — 코드 작성 ✓ / **브라우저 검증 대기** (2026-05-17 zoomOnDoubleClick 버그픽스)
+
+### P10-3: 노드 팝업 + 출력 모드 + Mock 생성
+- [c] 노드 Edit 버튼 → 팝업 Dialog (프롬프트, 모델, 출력 모드, 생성)
+- [c] 출력 모드 토글 시 노드 박스 동적 너비 (Single 240 / 5-View 320 / 16-Angle 400)
+- [c] 생성 버튼 → 모드별 N장 (P10-6에서 실제 API로 교체됨, mock은 fallback)
+- [c] 노드 박스 내 이미지 그리드
+- [c] 등록 버튼 (누적 ≥ 20장 시 활성) + 등록 폼
+
+DoD: 노드 클릭 → 프롬프트 입력 → 모드 변경 → 생성 → 이미지 그리드 표시 → 20장 충족 시 등록 가능 — 코드 작성 ✓ / **브라우저 검증 대기**
+
+### P10-4: 엣지 카테고리 + Branch 옵션 + 우클릭 + Cascade 확인
+- [c] 엣지 연결 시 카테고리 선택 모달 (parent/in-world/references + 자유 텍스트)
+- [c] 노드 우클릭 컨텍스트 메뉴 (편집/Branch/복제/등록/삭제)
+- [c] Branch 옵션 분기 모달 (Status / 독립 자식)
+- [c] 노드 박스 내 Branch 버튼 (헤더 호버 시 노출)
+- [c] 삭제 cascade 확인 모달 (Status 자식 있을 때)
+- [c] 등록된 노드 삭제 안내 토스트
+
+DoD: 엣지 카테고리별 시각 구분 동작, 우클릭/노드 헤더 아이콘으로 모든 액션 접근, cascade 확인 동작 — 코드 작성 ✓ / **브라우저 검증 대기**
+
+### P10-5: Agentic Canvas — 채팅으로 캔버스 조작 (Decision #31)
+- [x] P10-5a: `CanvasUpdate` union (10 액션) + `applyUpdates(updates)` 메서드 + tempId 매핑 (canvas-store)
+- [x] P10-5b: `serializeCanvasContext(state)` 헬퍼 (LLM prompt용)
+- [c] P10-5c: `/api/artist/chat` 라우트 개편 — 새 시스템 프롬프트 + CanvasUpdate JSON validator (실호출 검증 필요)
+- [c] P10-5d: `global-chat-store` artist 분기 — 캔버스 컨텍스트 + applyUpdates 적용
+- [c] P10-5e: `ArtistMeetingRoom` 좌측 도킹 컴포넌트 (같은 useGlobalChatStore)
+- [c] P10-5f: artist 페이지에서 우측 floating GlobalChat hide (조건부 early return)
+- [c] P10-5g: Warm starting 룰 기반 banner (`use-canvas-warm-starting` 훅, LLM 호출 없음)
+
+DoD (브라우저 검증 필요):
+- "Kai 캐릭터 만들어줘" → Actor 노드 생성 + label/prompt 채워짐
+- "Kai 5-View로 생성해" → setOutputMode + generate 두 액션 순차
+- "Kai 삭제해줘" → DeleteConfirmModal 열림 (즉시 삭제 안 됨)
+- 빈 캔버스 진입 → 좌측 패널에 "어떤 캐릭터부터 만들까요?" inline hint
+- Actor 1개 + 5-View 미생성 → 입력창 위 amber banner "5-View로 캐릭터 시트를…"
+
+코드 완료: 2026-05-17. 브라우저 E2E 검증은 다음 라운드.
+
+### P10-6: 이미지 생성 wire-up
+- [c] H100 self-hosted (tailscale) + Imagen (gemini) 모델 분기 — 기존 `/api/generate/image` 재사용
+- [c] 동일 시드 + 카메라 프롬프트 변주 (5-View 5장 / 16-Angle 16장, Single 1장)
+- [c] `Promise.allSettled` 부분 실패 허용 + 첫 에러 toast 표시
+- [c] 노드별 loading 상태 (`generatingNodeIds`, NodePopup + BaseNode 표시)
+- [c] World 노드는 16:9, Actor/Status는 1:1 aspect ratio 자동
+- [ ] 토큰 비용 정확화 (현재 UI는 1/5/16 표시, 실제 비용 모델별 차이 미반영)
+- [ ] 비동기 큐 / 16-Angle 동시성 제한 (현재 Promise.all 일괄)
+
+DoD: 실제 모델로 5-View 5장 생성 가능 — 코드 작성 ✓ / **브라우저 검증 대기** (2026-05-17)
+
+### P10-7: Persistence + Undo + 다음 단계 연동
+- [c] Asset Storage → P4 export 함수 (`src/features/artist/asset-export.ts`)
+- [c] project-store wire-up — 프로젝트 전환 시 canvas/asset-storage reset + setProjectId
+- [ ] Persistence key `<projectId>` 동적 isolation (현재 단일 키 + reset)
+- [ ] Undo/Redo (Cmd/Ctrl+Z) — Zustand temporal middleware 도입 필요
+- [ ] artist-store deprecate 마이그레이션 (director/global-chat 의존 정리)
+
+DoD: 프로젝트 전환 시 별도 그래프, Undo 동작, P4가 등록된 캐릭터 사용 (부분 완료 2026-05-17)
+
+### 알려진 빚 / 결정 사항
+- artist-store 유지 (director/global-chat/project-store 의존). 점진적 마이그레이션
+- MiniMap/Controls 표시 (design.md 명시 없음, 기본 추가)
+- Status 노드 색은 단일 톤 (마더 inherit 동적 계산 미구현)
+- Mock 이미지 = SVG data URL (실제 모델 wire-up은 P10-6)
+
+### P10-Followup: 1차 브라우저 검증 후속 (2026-05-17~)
+
+**우선순위 권장 순서**: 7 → 6 → 2 → 5 → 결정 → 3+4 → 1
+
+**차단성 이슈 (완료)**
+
+- [x] **F-7 채팅 모델을 Claude API로 전환** (2026-05-17) — `llm.ts`를 `claude.ts` re-export로 교체, lazy client init, 6개 라우트 전체 Claude로
+- [x] **F-6 MeetingRoom → 우측 GlobalChat 통합** (2026-05-17) — 좌측 ArtistMeetingRoom 컴포넌트 삭제, GlobalChat의 artist hide 분기 제거, warm starting tip을 GlobalChat 안으로 통합
+- [x] **F-2 핀 연결 자체가 안 되는 버그** (2026-05-17) — 원인: BaseNode Handle 4개 전부 `type="source"`. fix: `connectionMode="loose"` 추가
+- [x] **F-5 branchStatus parent 엣지 선이 안 보이는 버그** (2026-05-17) — 원인: 자동 생성 edge에 `sourceHandle`/`targetHandle` 미명시. fix: `'right'`/`'left'` 명시 + addEdge 시그니처 확장 + RelationModal에서 사용자 connect handle 보존
+
+**부수 작업 (완료)**
+
+- [x] **네비게이션 가드 임시 해제** (2026-05-17) — `project-store.canNavigateTo()` true 고정, 원본 주석 보존
+- [x] **URL ↔ currentStage 동기화 fix** (2026-05-17) — `studio/layout.tsx` useEffect에서 가드 통과 시 `setStage()` 호출
+- [x] **UI 한국어 정책 + cleanup** (2026-05-17) — `docs/design.md §3`에 "언어: 한국어 기본" 추가, GlobalChat + shots-dialog + cinematographic-inspector + video-previewer + page.tsx 풀 영어 문장 한국어로
+
+**결정 (완료)**
+
+- [x] **F-D1 엣지 카테고리 단순화** (2026-05-17, decisions.md #32) — Actor↔Actor 연결은 references만, parent는 Status Branch 자동 생성 전용
+- [x] **F-D2 우클릭 컨텍스트 메뉴 처리** (2026-05-17, decisions.md #33) — 완전 제거 + BaseNode 헤더에 Copy 아이콘 추가
+- [x] **이미지 생성 모델 임시 결정** (2026-05-17, decisions.md #34) — Imagen paid 까지 Nano Banana(`gemini-2.5-flash-image`) 사용
+
+**폴리시 (완료)**
+
+- [x] **F-1 출력 모드 토글 가시성** (2026-05-17) — NodePopup의 shadcn Tabs → button 그룹으로 교체. 모델 토글과 동일한 `border-primary bg-primary/10` 활성 시각 적용
+- [x] **F-3 엣지 카테고리 코드 적용** (2026-05-17) — RelationModal에서 parent 제거. references/in-world 2개만 사용자 노출. default = references
+- [x] **F-4 우클릭 메뉴 제거** (2026-05-17) — NodeContextMenu 파일 + canvas-store contextMenu state + page.tsx onNodeContextMenu 제거. BaseNode 헤더에 Copy 아이콘 추가
+
+**부수 작업 (이번 라운드 추가)**
+
+- [x] **노드 더블클릭 = Edit 단축** (2026-05-17) — `onNodeDoubleClick` → `openPopup`
+- [x] **이미지 생성 API 진단 강화** (2026-05-17) — 응답에 `[provider]` prefix + 콘솔 로그에 hasGoogleKey/hasTailscaleUrl 정보
+- [x] **Imagen → Nano Banana 코드 전환** (2026-05-17) — `generateImages` → `generateContent` + `responseModalities` + `inlineData` 추출
+
+**미진행 검증 (quota reset 후)**
+
+- [ ] B-7 등록 임계값 실제 충족 — 20장 충족 후 등록 폼 열리는지
+- [ ] E-15 노드별 loading 상태 (NodePopup + BaseNode)
+- [ ] F-16 프로젝트 전환 시 canvas reset / Asset Storage 보존
+- [ ] 통합 시나리오 — 더블클릭 편집 / 헤더 Copy / RelationModal 2카테고리 / cascade 모달 등 신규 변경 영역
+
+---
+
+## TODO: P4 Director — Depth Parallax 카메라 프리뷰 (미착수)
+
+> 카메라 슬라이더 조작 시 샷 이미지가 실시간으로 3D 시차 효과로 움직이는 기능
+
+### 배경
+- 현재 카메라 6축 슬라이더는 **영상 생성(Kling) 프롬프트에만** 반영됨
+- 이미지 생성에는 카메라 설정 미반영 → 슬라이더 움직여도 이미지 변화 없음
+- CSS 3D transform은 종이 돌리는 느낌이라 부적합
+
+### 계획
+- [ ] H100 서버에 **Depth Anything V2 Large** API 엔드포인트 추가 (이형석 요청)
+- [ ] 샷 이미지 생성 시 depth map 자동 생성 + 함께 저장
+- [ ] R3F Canvas + 커스텀 GLSL parallax shader 컴포넌트 (~300줄)
+- [ ] 카메라 슬라이더 6축 → shader uniform 연결 (실시간 60fps)
+- [ ] 가장자리 처리 (mirror/stretch UV)
+
+### 참고
+- 기법: Fragment shader UV offset (DepthFlow / Immersity AI와 동일 방식)
+- Depth Anything V2 Large: H100에서 ~50ms/장, 1회 생성 후 캐시
+- Three.js / R3F 이미 프로젝트 스택에 포함
+
 ## Backlog
 
 - [ ] Kling API 키 → Vercel 환경변수 `KLING_ACCESS_KEY` + `KLING_SECRET_KEY` 등록
 - [ ] 전체 파이프라인 E2E 검증 (P1→P5)
+- [ ] Tailscale 502 에러 — H100 이미지 서버 프로세스 상태 확인 (이형석)
 
 ## Bugfix Log (2026-03-06)
 

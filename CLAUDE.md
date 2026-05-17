@@ -1,124 +1,118 @@
-# Tale - AI Video Generation Pipeline
+# Tale — AI Video Generation Pipeline
 
-## 프로젝트 개요
+> 텍스트 → 전문 촬영 기법 적용 고품질 AI 비디오 자동 생성 (B2B). 차별화는 Knowledge DB 기반 cinematography RAG.
 
-B2B AI 영상 제작 도구. 텍스트 → 전문 촬영 기법 적용 고품질 AI 비디오 자동 생성.
-차별화: Knowledge DB 기반 cinematography RAG.
+## 상태
 
-## 스펙 구조
-
-```
-specs/
-├── mvp_scope.md             ← Scope SoT: MVP 범위 + 기술 스택 + 구현 순서
-├── ux_pages.md              ← UX SoT: 페이지별 레이아웃, 요소, 인터랙션
-├── api_features.md          ← API 기능 스펙 (6축 카메라, Knowledge DB 등)
-├── decisions.md             ← 의사결정 로그
-├── open_questions.md         ← 열린/닫힌 질문 추적
-└── layers/
-    ├── L1_scene_architect.md ← Pumpup + 씬 분할
-    ├── L2_shot_composer.md   ← 샷 시퀀스 + 대화
-    └── L3_prompt_builder.md  ← Knowledge DB + Camera + 프롬프트
-```
-
-> 레거시 (archive/, reference/, reference_v2/, overview.md, ava_framework.md)는 로컬에만 보관, git 미추적
-
-## 3-Level Pipeline
-
-```
-Story → [Pumpup] → [L1 Scene Architect] → [L2 Shot Composer] → [L3 Prompt Builder] → [Video API]
-```
-
-- **L1**: 스토리 → 씬 분할 + 캐릭터/로케이션
-- **L2**: 씬 → 샷 시퀀스 + 대화 + 이미지 생성
-- **L3**: 샷 → 최종 프롬프트 + Knowledge DB 기법 주입
-
-## 주요 문서
-
-| 문서 | 용도 |
-|------|------|
-| `specs/mvp_scope.md` | **Scope SoT** — MVP 범위 (P1~P5) + 기술 스택 + 구현 순서 |
-| `specs/ux_pages.md` | **UX SoT** — 레이아웃, 요소, 인터랙션, 데이터 입출력 |
-| `specs/api_features.md` | API 기능 스펙 (6축 카메라, Knowledge DB 등) |
-| `specs/decisions.md` | 의사결정 로그 |
-| `specs/open_questions.md` | 열린/닫힌 질문 추적 |
-| `specs/layers/L1~L3` | 파이프라인 레이어별 입출력 계약 |
-| `docs/infrastructure.md` | 인프라/배포/비용 설계 |
+보일러플레이트 완료, 병렬 개발 진행 (2026-03-03). 구현 순서: P3+P4 (Phase 1) → P5 → P2 → P1. 
+P3는 L0 Concept Canvas (노드 그래프)로 전면 재설계 중.
 
 ## 기술 스택
 
-- **Frontend**: Next.js 16 (App Router) + Tailwind v4 + shadcn/ui + Zustand
-- **3D**: Three.js + React Three Fiber (P4 전용, Dev B가 설치)
-- **Backend**: Next.js API Routes
-- **DB**: Supabase (PostgreSQL) — Knowledge DB + Video Reference DB
-- **패키지 매니저**: pnpm
-- **배포**: Vercel
-- **영상 생성**: Kling (I2V, 6축 카메라) / Veo (T2V, 품질)
-- **이미지 생성**: Gemini Imagen (gemini-2.0-flash-preview-image-generation)
-- **LLM**: Gemini
+- Frontend: Next.js 16 + Tailwind v4 + shadcn/ui + Zustand (`pnpm`)
+- Canvas: React Flow (xyflow) — L0 Concept Canvas
+- 3D: Three.js + React Three Fiber — P4 (`pnpm add three @types/three @react-three/fiber @react-three/drei`)
+- Backend: Next.js API Routes + Supabase (PostgreSQL)
+- AI: Gemini (LLM), Gemini Imagen + H100 self-hosted (이미지), Kling + Veo + Pro6000 self-hosted (비디오)
 
-## 작업 시 주의사항
+## 라우터
 
-- API 키는 환경변수로 관리 (하드코딩 금지)
+| 무엇 하려면 | 어디 보는가 |
+|-------------|-------------|
+| MVP 범위 / 우선순위 / 구현 순서 | `specs/mvp_scope.md` |
+| 페이지별 레이아웃·요소·인터랙션 | `specs/ux_pages.md` |
+| **시각·인터랙션 공통 컨벤션 (디자인 헌법)** | `docs/design.md` |
+| 페이지별 디자인 레퍼런스/벤치마크 | `docs/design-references.md` |
+| L0 Concept Canvas (노드 그래프, P3 재설계) | `specs/layers/L0_concept_canvas.md` |
+| L0 Canvas 데이터 모델 (TS 타입, Zustand 액션) | `specs/data/canvas_data_model.md` |
+| Asset Storage 스키마 (등록 캐릭터/월드, P4 인터페이스) | `specs/data/asset_storage.md` |
+| L1 Scene 분할 (Pumpup) | `specs/layers/L1_scene_architect.md` |
+| L2 Shot Composer | `specs/layers/L2_shot_composer.md` |
+| L3 Prompt Builder + Knowledge DB | `specs/layers/L3_prompt_builder.md` |
+| API 기능 (6축 카메라, RAG) | `specs/api_features.md` |
+| 의사결정 로그 | `specs/decisions.md` |
+| 열린/닫힌 질문 | `specs/open_questions.md` |
+| 인프라 / 배포 / 비용 | `docs/infrastructure.md` |
+| 자주 쓰는 패턴 / 보일러플레이트 인벤토리 | 본 문서 하단 도메인 특수성 |
+
+## 실행
+
+- `pnpm dev` — 개발 서버
+- `pnpm build` / `pnpm typecheck` / `pnpm lint`
+- API 키는 `.env.local`. 하드코딩 금지.
 - Knowledge DB: `databases/knowledge/*.yaml` (로컬) + Supabase (프로덕션)
 
-## 현재 상태
+---
 
-**보일러플레이트 완료 → 병렬 개발 시작** (2026-03-03)
+## 작업 진행 규약
 
-Next.js 프로젝트 초기화됨. 공유 타입, 레이아웃, Mock 데이터, Stub 페이지 완비.
-구현 순서: P3+P4 (Phase 1) → P5 → P2 → P1
+### 세션 진입 시 (반드시)
 
-## 병렬 개발 규칙
+1. `PROGRESS.md` 읽기
+2. 파일 상단 **"현재 검증 보드"** 또는 `grep '^- \[c\]' PROGRESS.md` 확인
+3. 미검증 항목 수 + 영역을 사용자에게 1줄 보고 (예: "P10-3/4/5/6 검증 대기 N개 있음")
+4. 사용자에게 선택받기: (a) 검증 진행 (b) 새 작업 진입 (c) 잡힌 버그 수정
 
-### 디렉토리 네이밍
-Agent 이름 기준: producer(P1) / writer(P2) / artist(P3) / director(P4) / editor(P5)
+### 작업 항목 상태 마커
 
-### 소유권
+```
+[ ] 미착수
+[c] 코드 작성 완료, 브라우저/사용자 검증 대기 ← AI가 코드만 작성한 상태의 기본 마커
+[x] 검증 완료 (코드 + 브라우저 확인 둘 다 ✓)
+[~] 보류 (사유 명시)
+```
+
+### DoD 작성·체크 규칙
+
+- DoD가 *동작*을 명시하면 (예: "더블클릭 → 모달 열림"), `[x]`로 마킹하려면 **반드시 브라우저에서 실제 동작 확인** 후에만.
+- 코드만 작성한 상태에서는 `[c]` + DoD 끝에 "코드 ✓ / 검증 대기" 명시.
+- 인프라성 항목 (파일 생성, 타입 정의, TS clean) 은 코드 자체로 검증되므로 `[x]` OK.
+- UI 인터랙션·API 호출·persistence는 `[c]` 거쳐 브라우저 확인 후 `[x]`.
+
+### 사고 → 교훈
+
+- **2026-05-17**: L0 Canvas P10-2~6을 "코드 작성 완료" 시점에 `[x]` 처리. 사용자가 더블클릭이 안 된다고 지적해서야 React Flow `zoomOnDoubleClick` 기본값 문제 잡힘. DoD가 "동작"인데 *동작 확인 없이* 체크한 패턴. 이후 모든 동작 DoD는 `[c]` 거쳐 `[x]`로 승격.
+
+---
+
+## 도메인 특수성
+
+### 3-Level Pipeline + L0
+
+```
+[L0 Concept Canvas] → Asset Storage
+                            ↓
+Story → [Pumpup] → [L1 Scene Architect] → [L2 Shot Composer] → [L3 Prompt Builder] → [Video API]
+```
+
+L0은 L1 이전에 캐릭터/월드를 사전 정의해 Asset Storage로 다음 단계에 공급한다. 노드=개체 패러다임 (Higgsfield 노드=모델과 다름). 상세는 L0 스펙.
+
+### 병렬 개발 소유권
 
 | Area | Dev A | Dev B |
 |------|-------|-------|
-| features/producer/, writer/, artist/ | Owner | - |
-| features/director/, editor/ | - | Owner |
-| stores/artist-store.ts | Owner | - |
-| stores/director-store.ts, editor-store.ts (신규) | - | Owner |
-| types/, components/layout/, stores/project-store.ts | **PR to main** | **PR to main** |
-| mocks/ | 추가만 | 추가만 |
+| `features/producer/`, `writer/`, `artist/` | Owner | - |
+| `features/director/`, `editor/` | - | Owner |
+| `stores/artist-store.ts` (L0 재설계 시 `canvas-store.ts`로 교체) | Owner | - |
+| `stores/director-store.ts`, `editor-store.ts` | - | Owner |
+| `types/`, `components/layout/`, `stores/project-store.ts` | PR to main | PR to main |
+| `mocks/` | 추가만 | 추가만 |
 
-### 브랜치
-- `feature/producer-writer-artist` — Dev A
-- `feature/director-editor` — Dev B
-- 공유 영역 변경 → main PR → 상대가 rebase
+- 브랜치: Dev A `feature/producer-writer-artist`, Dev B `feature/director-editor`
+- 공유 영역 변경은 main PR, 상대가 rebase
 
-### URL 라우트 → 디렉토리 매핑
+### URL → 디렉토리
+
 ```
 /studio/producer → features/producer/
 /studio/writer   → features/writer/
-/studio/artist   → features/artist/
+/studio/artist   → features/artist/   (L0 Canvas로 재설계)
 /studio/director → features/director/
 /studio/editor   → features/editor/
 ```
 
-## 보일러플레이트 인벤토리
+### 보일러플레이트 인벤토리
 
-### Stores (Zustand)
-- `director-store.ts` — loadMockData, selectScene/Shot, updateCamera/Lighting
-- `artist-store.ts` — loadMockData, selectCharacter, updateAsset
-- `project-store.ts` — 공유 프로젝트 상태
-
-### Mocks (Phase 1 데이터)
-- `shot-sequences.ts` — 24 shots (4씬 × 6샷), CameraConfig + LightingConfig 포함
-- `scene-manifest.ts` — 4 scenes (기승전결)
-- `character-assets.ts` — 3 캐릭터 (Kai, Viper, Oracle)
-- `world-assets.ts` — 4 배경
-- `video-clips.ts` — P5 프리뷰용 클립 목록
-
-### Types
-- `Shot` — shotType, camera (6축), lighting, dialogueLines
-- `CameraConfig` — { horizontal, vertical, pan, tilt, roll, zoom } (-10~+10)
-- `Scene`, `CharacterAsset`, `WorldAsset`, `VideoClip`
-
-### P4/P5 시작점
-- Stub page: `src/app/studio/set/page.tsx`, `src/app/studio/post/page.tsx`
-- Three.js 설치: `pnpm add three @types/three @react-three/fiber @react-three/drei`
-- P4 스펙: `specs/ux_pages.md` P4 섹션 (4패널: Scene Nav + Shot Grid + Inspector + Chat)
-- P5 스펙: `specs/ux_pages.md` P5 섹션 (프리뷰어 + 타임라인 + 크롭 + Draft Render)
+Stores: `director-store`, `artist-store`, `project-store`, `producer-store`, `writer-store`, `editor-store`, `global-chat-store`
+Mocks: `shot-sequences` (24 shots), `scene-manifest` (4 scenes), `character-assets` (3 캐릭터), `world-assets` (4 배경), `video-clips`
+주요 Types: `Shot`, `CameraConfig` (6축 -10~+10), `Scene`, `CharacterAsset`, `WorldAsset`, `VideoClip`

@@ -1,7 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic()
 const MODEL = 'claude-sonnet-4-6'
+
+let _client: Anthropic | null = null
+function getClient(): Anthropic {
+  if (!_client) _client = new Anthropic()
+  return _client
+}
 
 interface HistoryMessage {
   role: 'user' | 'model' | 'assistant'
@@ -27,7 +32,7 @@ export async function claudeChat(
     { role: 'user', content: userMessage },
   ]
 
-  const response = await client.messages.create({
+  const response = await getClient().messages.create({
     model: MODEL,
     max_tokens: 4096,
     system,
@@ -46,7 +51,7 @@ export async function claudeJSON<T = unknown>(
   userMessage: string,
   temperature = 0.3,
 ): Promise<T> {
-  const response = await client.messages.create({
+  const response = await getClient().messages.create({
     model: MODEL,
     max_tokens: 8192,
     system: `${system}\n\nIMPORTANT: Output ONLY valid JSON. No markdown fences, no explanation.`,

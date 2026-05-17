@@ -1,9 +1,87 @@
 # Decisions
 
-> 최종 수정: 2026-03-03
+> 최종 수정: 2026-05-17
 > 레거시 아카이브: `specs/archive/decisions_legacy_2026-03-03.md`
 
 ## 확정
+
+### 34. 이미지 생성 모델 — Nano Banana 임시 사용 (Imagen paid 까지)
+- **결정**: `/api/generate/image`에서 `imagen-4.0-generate-001`(paid-only) → **`gemini-2.5-flash-image`** (Nano Banana, free tier 500 req/day)
+- **이유**:
+  - 검증 단계에서 Imagen paid plan 결제 부담 회피
+  - Nano Banana는 free tier에서 동일 image generation 호출 가능 (Google AI Studio key)
+  - SDK 호출 방식: `generateImages` → `generateContent` + `responseModalities: ['Text', 'Image']` + `inlineData` 추출
+  - aspectRatio는 prompt 후미에 자연어 힌트로 주입 (Nano Banana가 명시적 옵션 미지원)
+- **트레이드오프**: Nano Banana는 Imagen 대비 캐릭터 일관성/품질 다소 낮음. 검증·내부 시연 단계에 충분, 외부 데모 직전에는 Imagen 복원 검토
+- **복원 트리거**: paid plan 결제 시 `route.ts`의 `generateViaGemini` 함수를 이전 `generateImages` 호출로 복원 (git history 참조)
+- **일자**: 2026-05-17
+
+### 33. F-D2 — 노드 우클릭 컨텍스트 메뉴 제거 + 헤더 아이콘 일원화
+- **결정**:
+  - 노드 우클릭 컨텍스트 메뉴(`NodeContextMenu`) 완전 제거 — 파일·store state(`contextMenu`, `openContextMenu`, `closeContextMenu`)·page.tsx의 `onNodeContextMenu` 핸들러 모두 삭제
+  - 모든 노드 액션은 **BaseNode 헤더의 4개 아이콘(Edit / Branch / Copy / Delete)** 또는 **NodePopup** 한 곳에 집중
+  - **노드 더블클릭 = Edit popup 단축** (ReactFlow `onNodeDoubleClick` → `openPopup`)
+  - 복제 액션은 헤더에 `Copy` 아이콘 신규 추가 (Status 포함 모든 노드)
+- **이유**:
+  - 사용자 의견: "Edit에서 다 되는 거 아님?" — UI 일관성을 위해 우클릭/메뉴 이중 표면 제거
+  - Edit / Branch / Delete는 이미 BaseNode 헤더에 노출됨. 우클릭 메뉴는 *복제만* 고유 → 헤더에 복제 아이콘 1개 추가로 흡수
+  - 우클릭은 브라우저 기본 메뉴를 가리지 않음 → 사용자가 우연히 우클릭해도 혼동 X
+- **영향 범위**:
+  - L0 스펙 섹션 3(액션 버튼) + 섹션 12(캔버스 인터랙션) 표 갱신 필요
+  - 데이터 모델 스펙(`canvas_data_model.md`) 섹션 4.3 핸들러 표에서 `onNodeContextMenu` 행 제거
+- **일자**: 2026-05-17
+
+### 32. F-D1 — L0 Canvas Actor↔Actor 엣지 카테고리 단순화
+- **결정**: Actor↔Actor 엣지는 `references`(점선 + 자유 텍스트 메모) 한 종류만 허용. `parent`는 Status Branch 자동 생성 전용으로 한정 — 사용자가 수동으로 Actor↔Actor parent를 그리지 않음. Actor↔World `in-world`는 그대로 유지
+- **이유**:
+  - Higgsfield 등 노드 캔버스 도구는 동종 노드 연결을 공개 사용 시나리오로 다루지 않음 (`docs/design-references.md` Higgsfield 분석 섹션 참조). 동종 자산 관계는 라이브러리/폴더가 담당
+  - parent 의미를 "기술적 상속(prompt/이미지/Status)"으로, references를 "내러티브 관계(쌍둥이/라이벌/스승-제자)"로 분리 → 사용자 메탈모델이 깨끗
+- **현재 시점 적용 상태**: 의사결정만 기록, **코드 변경(F-3)은 보류**. 다른 검증 차단 이슈 해결 후 진행
+- **참고**: `docs/design-references.md` 섹션 4 (권고 a), PROGRESS.md P10-Followup F-D1/F-3
+- **일자**: 2026-05-17
+
+### 31. L0 Meeting Room — Agentic Canvas (tool-use 패턴)
+- **결정**: L0 Meeting Room의 artist agent를 read-only 가이드에서 **캔버스를 직접 조작하는 tool-use agent**로 전환. 기존 `global-chat-store` 패턴(`ArtistUpdate[]` → `applyUpdates`)을 그대로 캔버스에 적용
+- **CanvasUpdate 액션 union** (10종):
+  - 비파괴: `addNode`, `updateNode`, `connect`, `setOutputMode`, `generate`, `branchStatus`, `duplicateNode`
+  - 파괴/등록: `requestDelete`, `requestRegister` → agent가 직접 실행하지 않고 기존 확인 UI 트리거 (DeleteConfirmModal, NodePopup 등록 폼)
+- **컨텍스트 직렬화**: 매 chat turn마다 캔버스 스냅샷(노드 목록 요약 + 엣지 + 선택 노드 풀 정보 + 누적 이미지 수)을 prompt에 자동 주입
+- **레이아웃 변경**: Meeting Room은 좌측 도킹 유지(L0 스펙 1번 그대로). 기존 우측 floating `GlobalChat`은 artist 페이지에서 hide → 좌측 도킹 컴포넌트가 같은 `useGlobalChatStore`를 소비
+- **근거**: read-only 가이드는 Higgsfield 등 경쟁 도구에 흔함. tool-use는 우리 차별화 포인트. 그래프=개체 패러다임과 결합해 "캐릭터 만들어줘" → 실제 노드 생성까지 한 흐름. 기존 5-agent 패턴 재사용으로 구현 분량 ↓
+- **destructive 안전장치**: 파괴 액션은 agent가 직접 실행 안 함. 모든 삭제·등록은 기존 user-facing 모달 거침 → undo 미구현 상태에서도 안전
+- **상세**: `specs/data/canvas_data_model.md` 섹션 6 (Agent Actions), `specs/layers/L0_concept_canvas.md` 섹션 11
+- **일자**: 2026-05-17
+
+### 30. Design Constitution (`docs/design.md`) 도입
+- **결정**: 시각·인터랙션 공통 컨벤션의 단일 진실 소스로 `docs/design.md` 채택. 페이지별 레이아웃(`specs/ux_pages.md`)과 분리
+- **원칙 5개**:
+  1. 캔버스 제일주의 (패널 보조)
+  2. `globals.css` 토큰 외 신규 색 금지
+  3. 모션은 정보 전달 (장식 아님)
+  4. 키보드 일등 시민
+  5. 한 화면 정보 위계 2단까지
+- **색 시스템**: Netflix Dark 그대로. Actor=`--chart-1`(red), World=`--chart-2`(blue), Status=마더 색 채도 50% 감소
+- **엣지 시각**: neutral gray 한 톤, 카테고리는 굵기+스타일로 구분 (색 분기 안 함)
+- **모션 4-tier**: 100 / 150 / 250 / 350ms
+- **근거**: Linear / shadcn / Geist 디자인 시스템 리서치. 소규모 팀 헌법은 *결정된 것을 명문화*가 핵심
+- **일자**: 2026-05-17
+
+### 29. P3 → L0 Concept Canvas 전면 재설계
+- **결정**: P3 (The Visual Studio)의 character-panel/world-panel/inventory-grid 패널 UI를 노드 그래프 캔버스로 완전 교체
+- **8개 하위 결정**:
+  1. React Flow (xyflow) 채택 — MVP 속도 + ComfyUI 호환 패턴
+  2. 기존 artist 패널 완전 교체 (병행 또는 모드 토글 안 함)
+  3. 3D / Multi-angle은 별도 노드 아님 — Actor/World 노드의 *출력 모드*로 흡수
+  4. Status만 별도 노드 유지 (마더 연동 변형이라는 별개 정체성)
+  5. 캐릭터 등록 조건 = "누적 이미지 ≥ 20장" (원문 "20엣지"의 의미 명확화. Higgsfield Soul ID의 20장 학습 임계점 차용)
+  6. 프롬프트만 전파, 이미지 재생성은 수동 (토큰 비용 폭발 방지)
+  7. Meeting Room = 기존 `global-chat-store`의 artist agent 재사용, 캔버스 좌측 도킹
+  8. 한 프로젝트 = 한 그래프 (MVP, YAGNI)
+- **노드 종류 (Tier 1)**: Actor / World / Status 3종. 3D·Multi-angle은 출력 모드, 캐릭터 시트는 5-View 모드, 회전 시퀀스는 16-Angle 모드
+- **레퍼런스**: Higgsfield Canvas (노드 그래프 패턴) + ComfyUI (핀-엣지 메타포). 우리는 노드=개체 패러다임 (Higgsfield는 노드=모델)으로 차별화
+- **상세 스펙**: `specs/layers/L0_concept_canvas.md`
+- **근거**: 캐릭터 일관성 + 월드-액터 관계를 그래프 구조로 표현해야 차별화 가능. 기존 패널 UI는 메탈모델 충돌
+- **일자**: 2026-05-17
 
 ### 28. MVP 범위 P1~P5 전체 포함
 - **결정**: MVP를 P3+P4+P5 Lite → **P1~P5 (P5 Lite)** 로 확장. P1/P2 Mock 대체 전략 폐기

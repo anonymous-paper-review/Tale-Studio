@@ -208,7 +208,7 @@ function ShotCard({
 
       <Textarea
         className="min-h-[54px] resize-y text-sm"
-        placeholder="Describe what happens in this shot…"
+        placeholder="이 샷에서 일어나는 일을 설명해주세요…"
         value={shot.actionDescription}
         onChange={(e) =>
           onUpdateShot(shot.shotId, { actionDescription: e.target.value })

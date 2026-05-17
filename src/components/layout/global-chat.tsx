@@ -8,6 +8,7 @@ import { AgentFace } from '@/components/agent-face'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
+import { useCanvasWarmStarting } from '@/features/artist/hooks/use-canvas-warm-starting'
 import { cn } from '@/lib/utils'
 import type { StageId } from '@/types'
 
@@ -44,16 +45,17 @@ const STAGE_FACE_COLOR: Record<StageId, string> = {
 }
 
 const STAGE_PLACEHOLDER: Record<StageId, string> = {
-  producer: 'Tell me about your story…',
-  writer: 'Ask about your scenes & shots…',
-  artist: 'Chat not available on this stage yet.',
-  director: 'Ask about cinematography…',
-  editor: 'Chat not available on this stage yet.',
+  producer: '스토리에 대해 말해주세요…',
+  writer: '씬과 샷에 대해 물어보세요…',
+  artist: '예: Kai 캐릭터 만들어줘, 갈색머리 검은코트',
+  director: '촬영 기법에 대해 물어보세요…',
+  editor: '아직 이 단계에서는 채팅을 쓸 수 없어요.',
 }
 
 const SUPPORTED_STAGES: ReadonlySet<StageId> = new Set<StageId>([
   'producer',
   'writer',
+  'artist',
   'director',
 ])
 
@@ -67,6 +69,7 @@ export function GlobalChat() {
 
   const currentStage = useProjectStore((s) => s.currentStage)
   const projectId = useProjectStore((s) => s.projectId)
+  const warmStartingTip = useCanvasWarmStarting()
 
   const [input, setInput] = useState('')
   const chatEndRef = useRef<HTMLDivElement>(null)
@@ -99,7 +102,7 @@ export function GlobalChat() {
       const text = await file.text()
       useProducerStore.getState().setStoryText(text)
       await sendMessage(
-        `I've uploaded a script file. Here's the content:\n\n${text}`,
+        `스크립트 파일을 업로드했어요. 내용은 다음과 같아요:\n\n${text}`,
       )
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -119,7 +122,7 @@ export function GlobalChat() {
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold">Chat</span>
+            <span className="text-sm font-semibold">채팅</span>
             <span
               className={cn(
                 'rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
@@ -130,7 +133,7 @@ export function GlobalChat() {
             </span>
           </div>
           <p className="truncate text-[11px] text-muted-foreground">
-            Unified across stages
+            모든 단계 통합
           </p>
         </div>
       </div>
@@ -140,8 +143,7 @@ export function GlobalChat() {
         <div className="space-y-2">
           {messages.length === 0 && (
             <div className="mr-4 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-              Start a conversation. Messages from every stage (P1–P5) appear
-              here in order.
+              대화를 시작해보세요. 모든 단계(P1–P5)의 메시지가 시간순으로 표시됩니다.
             </div>
           )}
 
@@ -173,7 +175,7 @@ export function GlobalChat() {
           {loading && (
             <div className="mr-4 flex items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />
-              Thinking…
+              생각 중…
             </div>
           )}
           <div ref={chatEndRef} />
@@ -188,6 +190,12 @@ export function GlobalChat() {
         >
           {error}
         </button>
+      )}
+
+      {currentStage === 'artist' && warmStartingTip && (
+        <div className="shrink-0 border-t border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-[11px] text-amber-700">
+          {warmStartingTip}
+        </div>
       )}
 
       {/* Input */}
@@ -226,7 +234,7 @@ export function GlobalChat() {
                 className="size-8"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={loading}
-                title="Upload script file (.txt)"
+                title="스크립트 파일 업로드 (.txt)"
               >
                 <Upload className="size-4" />
               </Button>

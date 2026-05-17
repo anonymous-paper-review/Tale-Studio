@@ -1,84 +1,15 @@
 /**
  * LLM Abstraction Layer
  *
- * 현재: Gemini 2.0 Flash (GOOGLE_API_KEYS)
- * 전환 시: 이 파일만 수정 → 모든 API 라우트 자동 전환
+ * 2026-05-17 (F-7): Gemini → Claude 전환.
+ * 6개 API 라우트(produce/chat, write/generate-scenes, write/chat,
+ * director/chat, director/generate-shots, artist/chat)가 이 파일의
+ * llmChat / llmJSON 을 사용. 모델 교체는 여기 re-export만 수정.
  *
- * Agent SDK 전환 계획:
- *   import { claudeChat, claudeJSON } from './claude'
- *   export const llmChat = claudeChat
- *   export const llmJSON = claudeJSON
+ * 환경변수: `ANTHROPIC_API_KEY` (Anthropic SDK 기본).
  *
- * Tool-use 에이전트가 필요한 경우: claude.ts에 tool loop 추가
+ * 향후 Agent SDK / tool-use 전환 시 `claude.ts` 에 tool loop 추가하거나
+ * 별도 어댑터를 만들어 여기서 re-export 한다.
  */
 
-import { GoogleGenAI } from '@google/genai'
-
-const MODEL = 'gemini-2.0-flash'
-
-function getApiKey(): string {
-  const keys = process.env.GOOGLE_API_KEYS ?? ''
-  const first = keys.split(',')[0]?.split(':')[0]?.trim()
-  if (!first) throw new Error('GOOGLE_API_KEYS is not configured')
-  return first
-}
-
-interface HistoryMessage {
-  role: 'user' | 'model' | 'assistant'
-  content: string
-}
-
-function toGeminiRole(role: string): 'user' | 'model' {
-  return role === 'user' ? 'user' : 'model'
-}
-
-/** Multi-turn chat — returns assistant text */
-export async function llmChat(
-  system: string,
-  history: HistoryMessage[],
-  userMessage: string,
-  temperature = 0.7,
-): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() })
-
-  const contents = [
-    ...history.map((m) => ({
-      role: toGeminiRole(m.role),
-      parts: [{ text: m.content }],
-    })),
-    { role: 'user' as const, parts: [{ text: userMessage }] },
-  ]
-
-  const response = await ai.models.generateContent({
-    model: MODEL,
-    contents,
-    config: { systemInstruction: system, temperature },
-  })
-
-  const text = response.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) throw new Error('No response generated')
-  return text
-}
-
-/** Single-turn JSON generation — parses and returns typed result */
-export async function llmJSON<T = unknown>(
-  system: string,
-  userMessage: string,
-  temperature = 0.3,
-): Promise<T> {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() })
-
-  const response = await ai.models.generateContent({
-    model: MODEL,
-    contents: userMessage,
-    config: {
-      systemInstruction: system,
-      temperature,
-      responseMimeType: 'application/json',
-    },
-  })
-
-  const text = response.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) throw new Error('No response generated')
-  return JSON.parse(text) as T
-}
+export { claudeChat as llmChat, claudeJSON as llmJSON } from './claude'

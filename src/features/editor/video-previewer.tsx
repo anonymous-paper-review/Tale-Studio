@@ -62,7 +62,7 @@ export function VideoPreviewer({ shot, clip }: VideoPreviewerProps) {
   if (!shot) {
     return (
       <div className="flex h-full items-center justify-center bg-black/40">
-        <p className="text-sm text-muted-foreground">Select a clip to preview</p>
+        <p className="text-sm text-muted-foreground">미리볼 클립을 선택해주세요</p>
       </div>
     )
   }

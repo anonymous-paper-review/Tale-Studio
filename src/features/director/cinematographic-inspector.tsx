@@ -33,7 +33,7 @@ export function CinematographicInspector({
   if (!shot) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-muted-foreground">Select a shot</p>
+        <p className="text-sm text-muted-foreground">샷을 선택해주세요</p>
       </div>
     )
   }
