@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useProjectStore } from '@/stores/project-store'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Samantha } from '@/components/layout/samantha'
+import { GlobalChat } from '@/components/layout/global-chat'
 import { useIdleTimeout } from '@/hooks/use-idle-timeout'
 import { STAGES } from '@/lib/constants'
 import type { StageId } from '@/types'
@@ -16,6 +17,7 @@ export default function StudioLayout({
 }) {
   const initProject = useProjectStore((s) => s.initProject)
   const canNavigateTo = useProjectStore((s) => s.canNavigateTo)
+  const setStage = useProjectStore((s) => s.setStage)
   const initLoading = useProjectStore((s) => s.initLoading)
   const pathname = usePathname()
   const router = useRouter()
@@ -25,21 +27,28 @@ export default function StudioLayout({
     initProject()
   }, [initProject])
 
-  // Redirect to producer if user navigates to a locked stage (URL direct / back button)
+  // URL ↔ currentStage 동기화 + 잠긴 stage 리다이렉트.
+  // Sidebar 클릭이나 직접 URL 진입 시에도 GlobalChat/Samantha가 올바른 stage로 동작하도록.
   useEffect(() => {
     if (initLoading) return
     const stage = STAGES.find((s) => pathname.startsWith(s.path))
-    if (stage && !canNavigateTo(stage.id as StageId)) {
+    if (!stage) return
+    if (!canNavigateTo(stage.id as StageId)) {
       router.replace('/studio/producer')
+      return
     }
-  }, [pathname, canNavigateTo, initLoading, router])
+    if (useProjectStore.getState().currentStage !== stage.id) {
+      setStage(stage.id as StageId)
+    }
+  }, [pathname, canNavigateTo, initLoading, router, setStage])
 
   return (
     <>
       <Sidebar />
-      <main className="ml-16 min-h-screen">
+      <main className="ml-16 mr-80 min-h-screen">
         <div className="flex h-screen flex-col">{children}</div>
       </main>
+      <GlobalChat />
       <Samantha />
     </>
   )

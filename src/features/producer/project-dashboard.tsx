@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Clock, Film, Monitor, Palette, RefreshCw } from 'lucide-react'
+import { Clock, Film, Languages, Monitor, Palette, RefreshCw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { useProducerStore } from '@/stores/producer-store'
 
@@ -68,6 +68,13 @@ const ASPECT_RATIO_LABELS: Record<string, string> = {
   '1:1': '1:1 Square',
 }
 
+const DIALOGUE_LANGUAGE_LABELS: Record<string, string> = {
+  en: 'English',
+  ko: '한국어',
+  ja: '日本語',
+  zh: '中文',
+}
+
 export function ProjectDashboard() {
   const { projectSettings, syncing, storyText, storyReady } = useProducerStore()
 
@@ -109,6 +116,15 @@ export function ProjectDashboard() {
           icon={<Palette className="size-3.5" />}
           label="TONE & STYLE"
           value={projectSettings.toneStyle || 'Pending...'}
+        />
+        <SettingWidget
+          icon={<Languages className="size-3.5" />}
+          label="DIALOGUE LANGUAGE"
+          value={
+            DIALOGUE_LANGUAGE_LABELS[projectSettings.dialogueLanguage] ||
+            projectSettings.dialogueLanguage ||
+            'Pending...'
+          }
         />
 
         {/* Story Text Preview */}

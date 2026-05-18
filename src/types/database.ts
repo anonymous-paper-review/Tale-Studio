@@ -208,7 +208,6 @@ export type Database = {
       }
       scenes: {
         Row: {
-          act: string
           characters_present: string[] | null
           created_at: string | null
           estimated_duration_seconds: number | null
@@ -224,7 +223,6 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          act: string
           characters_present?: string[] | null
           created_at?: string | null
           estimated_duration_seconds?: number | null
@@ -240,7 +238,6 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          act?: string
           characters_present?: string[] | null
           created_at?: string | null
           estimated_duration_seconds?: number | null
@@ -276,6 +273,8 @@ export type Database = {
           generation_method: string | null
           id: string
           lighting_config: Json | null
+          movement_intensity: number | null
+          movement_preset: string | null
           project_id: string
           prompt: string | null
           scene_id: string
@@ -294,6 +293,8 @@ export type Database = {
           generation_method?: string | null
           id?: string
           lighting_config?: Json | null
+          movement_intensity?: number | null
+          movement_preset?: string | null
           project_id: string
           prompt?: string | null
           scene_id: string
@@ -312,6 +313,8 @@ export type Database = {
           generation_method?: string | null
           id?: string
           lighting_config?: Json | null
+          movement_intensity?: number | null
+          movement_preset?: string | null
           project_id?: string
           prompt?: string | null
           scene_id?: string

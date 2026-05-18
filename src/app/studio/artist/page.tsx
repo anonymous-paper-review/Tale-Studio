@@ -1,366 +1,302 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Lock, Unlock, Loader2, Sparkles } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
+import '@xyflow/react/dist/style.css'
+
+import { useCallback, useRef, useState, type MouseEvent } from 'react'
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { HandoffButton } from '@/components/layout/handoff-button'
-import { ImagePlaceholder } from '@/features/artist/image-placeholder'
-import { useArtistStore, type ImageProvider } from '@/stores/artist-store'
-import { useProjectStore } from '@/stores/project-store'
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  Controls,
+  MiniMap,
+  ConnectionMode,
+  applyNodeChanges,
+  applyEdgeChanges,
+  useReactFlow,
+  type NodeChange,
+  type EdgeChange,
+  type Connection,
+  type OnConnectStart,
+  type OnConnectEnd,
+} from '@xyflow/react'
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const ROLE_VARIANT = {
-  protagonist: 'default',
-  antagonist: 'destructive',
-  supporting: 'secondary',
+import { useCanvasStore, type NodeKind } from '@/stores/canvas-store'
+import { ActorNode } from '@/features/artist/nodes/ActorNode'
+import { WorldNode } from '@/features/artist/nodes/WorldNode'
+import { StatusNode } from '@/features/artist/nodes/StatusNode'
+import { CategoryEdge } from '@/features/artist/edges/CategoryEdge'
+import { NodePopup } from '@/features/artist/popups/NodePopup'
+import { RelationModal } from '@/features/artist/popups/RelationModal'
+import { BranchOptionModal } from '@/features/artist/popups/BranchOptionModal'
+import { DeleteConfirmModal } from '@/features/artist/popups/DeleteConfirmModal'
+
+const nodeTypes = {
+  actor: ActorNode,
+  world: WorldNode,
+  status: StatusNode,
 } as const
 
-const BOOST_PRESETS = [
-  'Cinematic',
-  'High-Res',
-  'Film Grain',
-  'Neon Noir',
-  'Golden Hour',
-] as const
+const edgeTypes = {
+  parent: CategoryEdge,
+  'in-world': CategoryEdge,
+  references: CategoryEdge,
+} as const
 
-export default function VisualPage() {
-  const {
-    sceneManifest,
-    characterAssets,
-    worldAssets,
-    selectedCharacterId,
-    generatingCharacterId,
-    generatingLocationId,
-    selectedBoostPreset,
-    imageProvider,
-    error,
-    selectCharacter,
-    lockCharacter,
-    unlockCharacter,
-    generateSheet,
-    generateWorldAsset,
-    selectBoostPreset,
-    setImageProvider,
-    loadMockData,
-    loadData,
-  } = useArtistStore()
+const SNAP_GRID: [number, number] = [16, 16]
 
-  const projectId = useProjectStore((s) => s.projectId)
+function CanvasInner() {
+  const nodes = useCanvasStore((s) => s.nodes)
+  const edges = useCanvasStore((s) => s.edges)
+  const addNode = useCanvasStore((s) => s.addNode)
+  const deleteNode = useCanvasStore((s) => s.deleteNode)
+  const deleteEdge = useCanvasStore((s) => s.deleteEdge)
+  const setViewport = useCanvasStore((s) => s.setViewport)
+  const openPopup = useCanvasStore((s) => s.openPopup)
 
-  // Self-hosted server health check
-  const [selfHostedStatus, setSelfHostedStatus] = useState<'checking' | 'online' | 'offline' | 'unconfigured'>('checking')
+  const { screenToFlowPosition } = useReactFlow()
 
-  useEffect(() => {
-    if (projectId) loadData()
-  }, [projectId, loadData])
+  const [creatorOpen, setCreatorOpen] = useState(false)
+  const [creatorPosition, setCreatorPosition] = useState<{
+    x: number
+    y: number
+  } | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    const check = async () => {
-      try {
-        const res = await fetch('/api/generate/health')
-        const data = await res.json()
-        if (!cancelled) setSelfHostedStatus(data.status)
-      } catch {
-        if (!cancelled) setSelfHostedStatus('offline')
-      }
-    }
-    check()
-    const interval = setInterval(check, 30_000)
-    return () => { cancelled = true; clearInterval(interval) }
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      const next = applyNodeChanges(changes, nodes)
+      useCanvasStore.setState({ nodes: next as typeof nodes })
+      changes.forEach((c) => {
+        if (c.type === 'remove') deleteNode(c.id)
+      })
+    },
+    [nodes, deleteNode],
+  )
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      const next = applyEdgeChanges(changes, edges)
+      useCanvasStore.setState({ edges: next as typeof edges })
+      changes.forEach((c) => {
+        if (c.type === 'remove') deleteEdge(c.id)
+      })
+    },
+    [edges, deleteEdge],
+  )
+
+  const openRelationModal = useCanvasStore((s) => s.openRelationModal)
+  const onConnect = useCallback(
+    (params: Connection) => {
+      if (!params.source || !params.target) return
+      openRelationModal(
+        params.source,
+        params.target,
+        params.sourceHandle,
+        params.targetHandle,
+      )
+    },
+    [openRelationModal],
+  )
+
+  const dragFromRef = useRef<string | null>(null)
+
+  const onConnectStart: OnConnectStart = useCallback((_event, params) => {
+    dragFromRef.current = params.nodeId ?? null
   }, [])
 
-  const getRole = (id: string) =>
-    sceneManifest?.characters.find((c) => c.characterId === id)?.role ??
-    'supporting'
+  const onConnectEnd: OnConnectEnd = useCallback(
+    (event) => {
+      const sourceId = dragFromRef.current
+      dragFromRef.current = null
+      if (!sourceId) return
 
-  const getScene = (sceneId: string) =>
-    sceneManifest?.scenes.find((s) => s.sceneId === sceneId)
+      const target = event.target as HTMLElement | null
+      const isHandleOrNode =
+        target?.closest('.react-flow__handle') ||
+        target?.closest('.react-flow__node')
+      if (isHandleOrNode) return
 
-  if (characterAssets.length === 0 && worldAssets.length === 0) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">The Visual Studio</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Complete the Script Room first to generate characters and locations.
-          </p>
-        </div>
-      </div>
-    )
+      // Drop on empty → Branch Status node at drop position
+      const native = event as unknown as { clientX?: number; clientY?: number }
+      const position = screenToFlowPosition({
+        x: native.clientX ?? 0,
+        y: native.clientY ?? 0,
+      })
+      const newId = useCanvasStore.getState().branchStatus(sourceId)
+      if (newId) {
+        useCanvasStore.setState((s) => ({
+          nodes: s.nodes.map((n) =>
+            n.id === newId ? { ...n, position } : n,
+          ),
+        }))
+      }
+    },
+    [screenToFlowPosition],
+  )
+
+  const onPaneDoubleClick = useCallback(
+    (event: MouseEvent) => {
+      // Only fire on the pane background, not on nodes/handles/buttons
+      const target = event.target as HTMLElement | null
+      const isPane =
+        target?.classList.contains('react-flow__pane') ||
+        target?.classList.contains('react-flow__background') ||
+        target?.closest('.react-flow__pane') !== null
+      const isInsideNode = target?.closest('.react-flow__node') !== null
+      if (!isPane || isInsideNode) return
+
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      })
+      setCreatorPosition(position)
+      setCreatorOpen(true)
+    },
+    [screenToFlowPosition],
+  )
+
+  const createNode = (kind: NodeKind) => {
+    if (!creatorPosition) return
+    addNode(kind, creatorPosition)
+    setCreatorOpen(false)
+    setCreatorPosition(null)
   }
 
   return (
     <>
-      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-        {/* ===== Left: Character Consistency ===== */}
-        <div className="flex w-full flex-col border-b border-border lg:w-1/2 lg:border-b-0 lg:border-r">
-          <div className="border-b border-border px-6 py-4">
-            <h2 className="text-lg font-semibold">Character Consistency</h2>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
+        onPaneClick={() => {
+          useCanvasStore.getState().selectNode(null)
+          useCanvasStore.getState().selectEdge(null)
+        }}
+        onNodeDoubleClick={(_event, node) => {
+          openPopup(node.id)
+        }}
+        onDoubleClick={onPaneDoubleClick}
+        onMove={(_, vp) => setViewport(vp)}
+        snapToGrid
+        snapGrid={SNAP_GRID}
+        connectionMode={ConnectionMode.Loose}
+        deleteKeyCode={['Backspace', 'Delete']}
+        fitView={nodes.length > 0}
+        zoomOnDoubleClick={false}
+        proOptions={{ hideAttribution: true }}
+        className="bg-background"
+      >
+        <Background gap={16} size={1} className="opacity-30" />
+        <Controls className="!bg-card !border !border-border" />
+        <MiniMap
+          className="!bg-card !border !border-border"
+          pannable
+          zoomable
+        />
+      </ReactFlow>
+
+      {nodes.length === 0 && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="text-center text-sm text-muted-foreground">
+            캔버스를 더블클릭해서 첫 노드를 만들어 보세요.
           </div>
-
-          <ScrollArea className="flex-1 px-6 py-4">
-            <div className="space-y-4">
-              {characterAssets.map((char) => {
-                const role = getRole(char.characterId)
-                const isSelected = selectedCharacterId === char.characterId
-                const isGenerating =
-                  generatingCharacterId === char.characterId
-
-                return (
-                  <div
-                    key={char.characterId}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => selectCharacter(char.characterId)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ')
-                        selectCharacter(char.characterId)
-                    }}
-                    className={cn(
-                      'cursor-pointer rounded-xl border p-4 transition-colors',
-                      isSelected
-                        ? 'border-primary bg-accent'
-                        : 'border-border hover:bg-accent/50',
-                    )}
-                  >
-                    {/* Header: Name + Role + Lock */}
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{char.name}</span>
-                        <Badge variant={ROLE_VARIANT[role]}>{role}</Badge>
-                      </div>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              char.locked
-                                ? unlockCharacter(char.characterId)
-                                : lockCharacter(char.characterId)
-                            }}
-                          >
-                            {char.locked ? (
-                              <Lock className="size-3.5" />
-                            ) : (
-                              <Unlock className="size-3.5 text-muted-foreground" />
-                            )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {char.locked
-                            ? 'Unlock character'
-                            : 'Lock character'}
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-
-                    {/* 3-View Grid */}
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['front', 'side', 'back'] as const).map((view) => (
-                        <ImagePlaceholder
-                          key={view}
-                          label={view.charAt(0).toUpperCase() + view.slice(1)}
-                          aspectRatio="square"
-                          imageUrl={char.views[view]}
-                        />
-                      ))}
-                    </div>
-
-                    {/* Generate Sheet */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 w-full"
-                      disabled={isGenerating || char.locked}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        generateSheet(char.characterId)
-                      }}
-                    >
-                      {isGenerating ? (
-                        <>
-                          <Loader2 className="size-3.5 animate-spin" />
-                          Generating…
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="size-3.5" />
-                          Generate Sheet
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
-          </ScrollArea>
-        </div>
-
-        <Separator orientation="vertical" className="hidden lg:block" />
-
-        {/* ===== Right: World Model ===== */}
-        <div className="flex w-full flex-col lg:w-1/2">
-          <div className="border-b border-border px-6 py-4">
-            <h2 className="text-lg font-semibold">World Model</h2>
-          </div>
-
-          {/* Provider Toggle + Cinematic Boost Chips */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
-            {/* Image Provider Toggle */}
-            <div className="mr-3 flex items-center gap-1 rounded-lg border border-border p-0.5">
-              <button
-                type="button"
-                onClick={() => setImageProvider('gemini')}
-                className={cn(
-                  'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                  imageProvider === 'gemini'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                Gemini
-              </button>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (selfHostedStatus === 'online') setImageProvider('tailscale')
-                    }}
-                    className={cn(
-                      'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                      imageProvider === 'tailscale'
-                        ? 'bg-primary text-primary-foreground'
-                        : selfHostedStatus === 'online'
-                          ? 'text-muted-foreground hover:text-foreground'
-                          : 'cursor-not-allowed text-muted-foreground/50',
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'size-1.5 rounded-full',
-                        selfHostedStatus === 'online' && 'bg-green-500',
-                        selfHostedStatus === 'offline' && 'bg-red-500',
-                        selfHostedStatus === 'checking' && 'bg-yellow-500 animate-pulse',
-                        selfHostedStatus === 'unconfigured' && 'bg-gray-400',
-                      )}
-                    />
-                    Self-hosted
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {selfHostedStatus === 'online' && 'h100-image-gen connected'}
-                  {selfHostedStatus === 'offline' && 'Server offline — check h100-image-gen'}
-                  {selfHostedStatus === 'checking' && 'Checking connection…'}
-                  {selfHostedStatus === 'unconfigured' && 'TAILSCALE_IMAGE_API_URL not set'}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-
-            <Separator orientation="vertical" className="!h-5" />
-
-            <span className="mr-1 text-xs font-medium text-muted-foreground">
-              Cinematic Boost
-            </span>
-            {BOOST_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => selectBoostPreset(preset)}
-                className={cn(
-                  'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                  selectedBoostPreset === preset
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground',
-                )}
-              >
-                {preset}
-              </button>
-            ))}
-          </div>
-
-          <ScrollArea className="flex-1 px-6 py-4">
-            <div className="space-y-6">
-              {worldAssets.map((world) => {
-                const scene = getScene(world.sceneId)
-                const isGenerating =
-                  generatingLocationId === world.locationId
-
-                return (
-                  <div
-                    key={world.locationId}
-                    className="rounded-xl border border-border p-4"
-                  >
-                    <div className="mb-3 flex items-center justify-between">
-                      <span className="font-medium">{world.name}</span>
-                      {scene && (
-                        <Badge variant="outline" className="text-[10px]">
-                          {scene.act.toUpperCase()} · {scene.timeOfDay}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <ImagePlaceholder
-                        label="Wide Shot"
-                        aspectRatio="video"
-                        imageUrl={world.wideShot}
-                      />
-                      <ImagePlaceholder
-                        label="Establishing"
-                        aspectRatio="video"
-                        imageUrl={world.establishingShot}
-                      />
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 w-full"
-                      disabled={isGenerating}
-                      onClick={() => generateWorldAsset(world.locationId)}
-                    >
-                      {isGenerating ? (
-                        <>
-                          <Loader2 className="size-3.5 animate-spin" />
-                          Generating…
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="size-3.5" />
-                          Generate Background
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
-          </ScrollArea>
-        </div>
-      </div>
-      {error && (
-        <div className="border-t border-destructive/30 bg-destructive/10 px-6 py-2 text-sm text-destructive">
-          {error}
         </div>
       )}
-      <HandoffButton
-        label="Approve & Direct"
-        targetStage="director"
-        disabled={characterAssets.length === 0}
-      />
+
+      <Dialog
+        open={creatorOpen}
+        onOpenChange={(open) => {
+          setCreatorOpen(open)
+          if (!open) setCreatorPosition(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>새 노드 만들기</DialogTitle>
+            <DialogDescription>
+              어떤 종류의 노드를 만들까요?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            <button
+              onClick={() => createNode('actor')}
+              className={cn(
+                'group flex flex-col items-center gap-2 rounded-lg border border-chart-1/60 bg-card p-4 transition-colors hover:bg-accent',
+              )}
+            >
+              <span className="h-3 w-3 rounded-full bg-chart-1" />
+              <span className="text-sm font-medium">Actor</span>
+              <span className="text-xs text-muted-foreground">캐릭터</span>
+            </button>
+            <button
+              onClick={() => createNode('world')}
+              className="group flex flex-col items-center gap-2 rounded-lg border border-chart-2/60 bg-card p-4 transition-colors hover:bg-accent"
+            >
+              <span className="h-3 w-3 rounded-full bg-chart-2" />
+              <span className="text-sm font-medium">World</span>
+              <span className="text-xs text-muted-foreground">장소/환경</span>
+            </button>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setCreatorOpen(false)}
+              size="sm"
+            >
+              취소
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Popups / Modals */}
+      <NodePopup />
+      <RelationModal />
+      <BranchOptionModal />
+      <DeleteConfirmModal />
     </>
+  )
+}
+
+export default function ConceptCanvasPage() {
+  return (
+    <div className="flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 flex-col overflow-hidden">
+        <div className="relative flex-1">
+          <ReactFlowProvider>
+            <CanvasInner />
+          </ReactFlowProvider>
+        </div>
+
+        <div className="flex h-9 items-center border-t border-border px-4 text-xs text-muted-foreground">
+          <span className="opacity-50">Palette (coming soon)</span>
+        </div>
+      </div>
+
+      <aside className="flex w-9 flex-col items-center border-l border-border bg-card">
+        <span
+          className="mt-4 text-xs text-muted-foreground opacity-50 [writing-mode:vertical-rl]"
+          aria-label="Storage tab disabled"
+        >
+          Storage (coming soon)
+        </span>
+      </aside>
+    </div>
   )
 }

@@ -3,16 +3,17 @@ import type {
   Shot,
   VideoClip,
   CameraConfig,
+  CameraPreset,
   LightingConfig,
   SceneManifest,
   CharacterAsset,
   WorldAsset,
 } from '@/types'
+import { DEFAULT_CAMERA_PRESET } from '@/types'
 import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore, type ImageProvider } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
-import { loadChatMessages, saveChatMessage } from '@/lib/chat-persistence'
 
 export type VideoProvider = 'fal' | 'local'
 
@@ -69,6 +70,10 @@ function debouncedShotSave(
           .update({
             camera_config: shot.camera,
             lighting_config: shot.lighting,
+            camera_brand: shot.cameraPreset?.brand ?? null,
+            focal_length: shot.cameraPreset?.focalLength ?? null,
+            aperture: shot.cameraPreset?.aperture ?? null,
+            white_balance: shot.cameraPreset?.whiteBalance ?? null,
           })
           .eq('project_id', projectId)
           .eq('shot_id', shotId)
@@ -77,11 +82,6 @@ function debouncedShotSave(
       }
     }, 500),
   )
-}
-
-interface ChatMessage {
-  role: 'user' | 'model'
-  content: string
 }
 
 const DEFAULT_CAMERA = {
@@ -108,10 +108,6 @@ interface DirectorState {
   selectedSceneId: string | null
   selectedShotId: string | null
 
-  // Chat
-  chatMessages: ChatMessage[]
-  chatLoading: boolean
-
   // Generation
   generatingVideoShotId: string | null
   generatingImageShotIds: Set<string>
@@ -125,10 +121,15 @@ interface DirectorState {
   selectScene: (id: string) => void
   selectShot: (id: string) => void
   updateCamera: (shotId: string, config: Partial<CameraConfig>) => void
+  updateCameraPreset: (shotId: string, changes: Partial<CameraPreset>) => void
   updateLighting: (shotId: string, config: Partial<LightingConfig>) => void
-  sendChatMessage: (message: string) => Promise<void>
   applySuggestedCamera: (config: Partial<CameraConfig>) => void
   applySuggestedLighting: (config: Partial<LightingConfig>) => void
+  applyMovementPreset: (
+    shotId: string,
+    presetId: string | null,
+    intensity: number,
+  ) => Promise<void>
   toggleGenerationMethod: (shotId: string) => void
   generateVideo: (shotId: string) => Promise<void>
   generateShotImage: (shotId: string) => Promise<void>
@@ -151,8 +152,6 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
   videoClips: [],
   selectedSceneId: null,
   selectedShotId: null,
-  chatMessages: [],
-  chatLoading: false,
   generatingVideoShotId: null,
   generatingImageShotIds: new Set<string>(),
   imageProvider: 'gemini' as ImageProvider,
@@ -197,7 +196,6 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
           const manifest: SceneManifest = {
             scenes: (scenes ?? []).map((s) => ({
               sceneId: s.scene_id,
-              act: s.act as 'intro' | 'dev' | 'turn' | 'conclusion',
               narrativeSummary: s.narrative_summary ?? '',
               originalTextQuote: s.original_text_quote ?? '',
               location: s.location ?? '',
@@ -254,6 +252,18 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
             generationMethod: s.generation_method ?? 'T2V',
             dialogueLines: s.dialogue_lines ?? [],
             camera: { ...DEFAULT_CAMERA, ...(s.camera_config ?? {}) },
+            cameraPreset: {
+              brand: s.camera_brand ?? DEFAULT_CAMERA_PRESET.brand,
+              focalLength: s.focal_length ?? DEFAULT_CAMERA_PRESET.focalLength,
+              aperture:
+                s.aperture != null
+                  ? Number(s.aperture)
+                  : DEFAULT_CAMERA_PRESET.aperture,
+              whiteBalance:
+                s.white_balance ?? DEFAULT_CAMERA_PRESET.whiteBalance,
+            },
+            movementPreset: s.movement_preset ?? null,
+            movementIntensity: s.movement_intensity ?? 5,
             lighting: { ...DEFAULT_LIGHTING, ...(s.lighting_config ?? {}) },
             referenceImageUrl: s.reference_image ?? null,
           }))
@@ -268,7 +278,6 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
           const firstSceneId = manifest.scenes[0]?.sceneId ?? null
           const firstShot = shots.find((s) => s.sceneId === firstSceneId)
 
-          const chatMessages = await loadChatMessages(projectId, 'director')
           set({
             sceneManifest: manifest,
             characterAssets,
@@ -277,7 +286,6 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
             videoClips,
             selectedSceneId: firstSceneId,
             selectedShotId: firstShot?.shotId ?? null,
-            chatMessages,
           })
           return
         }
@@ -384,63 +392,23 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
     )
   },
 
-  sendChatMessage: async (message: string) => {
-    const { chatMessages, selectedShotId, shots } = get()
-    const selectedShot = shots.find((s) => s.shotId === selectedShotId)
-
-    set({
-      chatMessages: [...chatMessages, { role: 'user', content: message }],
-      chatLoading: true,
-      error: null,
-    })
-
-    const pid = useProjectStore.getState().projectId
-    if (pid) saveChatMessage(pid, 'director', 'user', message)
-
-    try {
-      const history = chatMessages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }))
-
-      const shotContext = selectedShot
-        ? {
-            shotType: selectedShot.shotType,
-            actionDescription: selectedShot.actionDescription,
-            camera: selectedShot.camera,
-            lighting: selectedShot.lighting,
-            generationMethod: selectedShot.generationMethod,
-          }
-        : undefined
-
-      const res = await fetch('/api/director/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, history, shotContext }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Chat failed')
-      }
-
-      const data = await res.json()
-
-      set((state) => ({
-        chatMessages: [
-          ...state.chatMessages,
-          { role: 'model', content: data.reply },
-        ],
-        chatLoading: false,
-      }))
-
-      if (pid) saveChatMessage(pid, 'director', 'model', data.reply)
-    } catch (err) {
-      set({
-        chatLoading: false,
-        error: err instanceof Error ? err.message : 'Chat failed',
-      })
-    }
+  updateCameraPreset: (shotId, changes) => {
+    set((state) => ({
+      shots: state.shots.map((s) =>
+        s.shotId === shotId
+          ? {
+              ...s,
+              cameraPreset: {
+                ...(s.cameraPreset ?? DEFAULT_CAMERA_PRESET),
+                ...changes,
+              },
+            }
+          : s,
+      ),
+    }))
+    debouncedShotSave(shotId, () =>
+      get().shots.find((s) => s.shotId === shotId),
+    )
   },
 
   applySuggestedCamera: (config) => {
@@ -453,6 +421,81 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
     const { selectedShotId } = get()
     if (!selectedShotId) return
     get().updateLighting(selectedShotId, config)
+  },
+
+  applyMovementPreset: async (shotId, presetId, intensity) => {
+    let axisUpdate: Partial<CameraConfig> = {
+      horizontal: 0,
+      vertical: 0,
+      pan: 0,
+      tilt: 0,
+      roll: 0,
+      zoom: 0,
+    }
+
+    if (presetId) {
+      try {
+        const res = await fetch('/api/knowledge/movements')
+        const { movements } = (await res.json()) as {
+          movements: {
+            id: string
+            axis: CameraConfig
+          }[]
+        }
+        const preset = movements.find((m) => m.id === presetId)
+        if (preset) {
+          const scale = intensity / 5
+          const clamp = (v: number) =>
+            Math.max(-10, Math.min(10, Math.round(v * scale)))
+          axisUpdate = {
+            horizontal: clamp(preset.axis.horizontal),
+            vertical: clamp(preset.axis.vertical),
+            pan: clamp(preset.axis.pan),
+            tilt: clamp(preset.axis.tilt),
+            roll: clamp(preset.axis.roll),
+            zoom: clamp(preset.axis.zoom),
+          }
+        }
+      } catch (err) {
+        console.error('[director-store] movement preset fetch failed:', err)
+      }
+    }
+
+    set((state) => ({
+      shots: state.shots.map((s) =>
+        s.shotId === shotId
+          ? {
+              ...s,
+              movementPreset: presetId,
+              movementIntensity: intensity,
+              camera: { ...s.camera, ...axisUpdate },
+            }
+          : s,
+      ),
+    }))
+
+    // Persist camera_config via existing debounce path
+    debouncedShotSave(shotId, () =>
+      get().shots.find((s) => s.shotId === shotId),
+    )
+
+    // Persist preset + intensity columns
+    const projectId = useProjectStore.getState().projectId
+    if (projectId) {
+      try {
+        const supabase = createClient()
+        await supabase
+          .from('shots')
+          .update({
+            movement_preset: presetId,
+            movement_intensity: intensity,
+          })
+          .eq('project_id', projectId)
+          .eq('shot_id', shotId)
+      } catch (err) {
+        console.warn('[director-store] movement persist skipped:', err)
+      }
+    }
   },
 
   setImageProvider: (provider) => set({ imageProvider: provider }),
@@ -468,8 +511,6 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
       videoClips: [],
       selectedSceneId: null,
       selectedShotId: null,
-      chatMessages: [],
-      chatLoading: false,
       generatingVideoShotId: null,
       generatingImageShotIds: new Set<string>(),
       imageProvider: 'gemini' as ImageProvider,
@@ -629,6 +670,8 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
           generationMethod: shot.generationMethod,
           provider: videoProvider,
           referenceImageUrl: shot.referenceImageUrl,
+          movementPreset: shot.movementPreset ?? null,
+          cameraPreset: shot.cameraPreset ?? null,
         }),
       })
 

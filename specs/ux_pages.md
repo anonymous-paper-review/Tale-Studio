@@ -205,76 +205,79 @@ writer/page.tsx (리컴포즈)
 
 ---
 
-## P3: The Visual Studio (Concept Artist)
+## P3: The Visual Studio (Concept Canvas)
 
-> 상태: **MVP 포함** — V2 기준 결정 완료
-> 참고: `specs/reference_v2/image3.png`
+> 상태: **MVP 포함** — V3.1에서 노드 그래프로 전면 재설계
+> 상세 스펙: `specs/layers/L0_concept_canvas.md`
+> 시각 컨벤션: `docs/design.md` (특히 섹션 9 Canvas Conventions)
+> 결정 근거: `specs/decisions.md` #29
 
 ### 목적
 
-시각 에셋 제작: 캐릭터 일관성 시트 + 배경(World Model).
-생성 → 리뷰 → 재생성 루프. AI가 만든 걸 큐레이션하는 방식.
+캐릭터(Actor)와 장소(World)를 노드로 정의하고 관계를 엣지로 연결해 컨셉 아트의 일관성을 그래프로 관리. 누적 이미지 ≥ 20장 충족 시 Asset Storage에 등록해 P4로 전달.
 
-### V1 → V2 변경점
+### V2 → V3.1 변경점
 
-- ~~3탭 (Char / Stage / Storyboard)~~ → **2컬럼 단일 화면**
-- ~~Storyboard 탭~~ → P4로 이동 (Shot Node Grid)
-- Asset Locking 추가
-- Cinematic Boost 필터 추가
+- ~~2컬럼 패널 (Character Consistency + World Model)~~ → **노드 그래프 캔버스 + 좌측 Meeting Room 도킹**
+- ~~Front/Side/Back 3뷰 고정~~ → **노드 출력 모드 (Single / 5-View / 16-Angle) 토글**
+- ~~Asset Locking 마우스 오버~~ → **캐릭터 등록 폼 (조건 충족 시 활성)**
+- 신규: Branch 메커니즘, Status 노드 (마더 연동 변형), Real-time Propagation, 토큰 비용 표시
 
 ### 레이아웃
 
 ```
-┌──── 사이드바 ──┬──────────────────┬──────────────────────┐
-│ [P] Producer  │ The Visual Studio│        [Approve &    │
-│ [W] Writer    │                  │         Direct →]    │
-│ [C] Concept ● │                  │                      │
-│ [D] Director  │ CHARACTER        │ WORLD MODEL          │
-│ [E] Editor    │ CONSISTENCY      │ Style: [CINEMATIC]✏️ │
-│               │                  │                      │
-│               │ [🔒 Generate     │ ┌──────────────────┐ │
-│               │      Sheet]      │ │ Wide Shot        │ │
-│               │                  │ │ (배경 이미지)      │ │
-│               │ PROTAGONIST "KAI"│ │                  │ │
-│               │ [Front][Side]    │ └──────────────────┘ │
-│               │ [Back]           │                      │
-│               │                  │ ┌──────────────────┐ │
-│               │ ANTAGONIST       │ │ Establishing     │ │
-│               │ "VIPER"          │ │ Shot             │ │
-│               │ [  ][  ][  ]     │ │ (배경 이미지)      │ │
-│               │                  │ └──────────────────┘ │
-└───────────────┴──────────────────┴──────────────────────┘
+┌─ Studio sidebar ─┬─ Meeting Room ─┬───── Canvas (React Flow) ─────┐
+│ [P] Producer    │ (좌측 도킹)     │                                │
+│ [W] Writer      │                 │   ┌──────────┐   ┌──────────┐  │
+│ [C] Concept ●   │ artist agent    │   │ Actor:   │   │ World:   │  │
+│ [D] Director    │ 가이드 + 채팅   │   │  Kai (붉)│───│ Plain(파)│  │
+│ [E] Editor      │                 │   └────┬─────┘   └──────────┘  │
+│                 │                 │        │                       │
+│                 │                 │   ┌────▼────┐                  │
+│                 │                 │   │ Status: │                  │
+│                 │                 │   │  부상   │                  │
+│                 │                 │   └─────────┘                  │
+│                 │                 ├────────────────────────────────┤
+│                 │                 │ Palette (탭, MVP Disable)      │
+└─────────────────┴─────────────────┴────────────────────────────────┘
+                                      Storage 탭 (우, MVP Disable)
 ```
 
-### 요소
+### 요소 (요약 — 상세는 L0 스펙)
 
 | 요소 | 설명 |
 |------|------|
-| **Character Consistency (좌)** | 캐릭터별 3뷰 (Front/Side/Back). "Generate Sheet" 버튼으로 자동 생성. 마우스 오버 시 Lock 아이콘 |
-| **Asset Locking** | 확정 캐릭터 Lock → 이후 모든 이미지 생성 시 해당 캐릭터 일관성 유지 |
-| **World Model (우)** | 씬별 배경 이미지. Wide Shot + Establishing Shot. "CINEMATIC BOOST" 스타일 프리셋 |
-| **Cinematic Boost** | 필터 프리셋 칩 (Cinematic, High-res 등). 배경 이미지 품질/스타일 조정 |
-| **Handoff** | "Approve & Direct →" 버튼. 에셋 확정 후 P4로 이동 |
+| **Canvas** | React Flow 무한 캔버스. 좌→우 흐름 + snap-to-grid 16px |
+| **Meeting Room (좌)** | 기존 `global-chat-store` artist agent 재사용, 좌측 도킹. Warm starting 가이드 |
+| **노드 종류** | Actor (붉은) / World (파란) / Status (마더 톤 변주). 3종만 |
+| **출력 모드** | Single 1장 / 5-View 5장 / 16-Angle 16장. 별도 노드 아님, 노드 속성 |
+| **Branch** | 박스 내 버튼 또는 핀→빈공간 클릭. Status 또는 독립 자식 생성 |
+| **엣지** | parent / in-world / references 3종. 색은 동일, 굵기·스타일로 구분 |
+| **캐릭터 등록** | 누적 이미지 ≥ 20장 시 활성. 이름/ID/배경/설명 입력 → Asset Storage |
+| **Palette (하단 탭)** | MVP Disable. Costume / Item / Environment Preset은 Future |
+| **Storage (우측 탭)** | MVP Disable. Asset 브라우저는 Future |
 
 ### API
 
 | API | 용도 |
 |-----|------|
-| DALL-E 3 / Imagen | 캐릭터 시트 생성, 배경 이미지 생성 |
+| Gemini Imagen | T2I 기본 모델 |
+| H100 self-hosted | Multi-view 일관성 (동일 시드 + 카메라 프롬프트 변주) |
 
 ### 입력
 
 | 데이터 | 소스 |
 |--------|------|
-| character_sheet | P2 출력 |
-| location_sheet | P2 출력 |
+| (현재) 비어 있음 | L0는 사용자가 캔버스에서 직접 정의 |
+| (향후) character_sheet, location_sheet | P2 출력에서 자동 노드 시드 (Phase 3+) |
 
 ### 출력 → P4
 
 | 데이터 | 내용 |
 |--------|------|
-| character_assets | 캐릭터별 3뷰 이미지 (Lock 상태 포함) |
-| world_assets | 씬별 배경 이미지 (Wide + Establishing) |
+| character_assets | 등록된 Actor의 5-View + 16-Angle + Status 변형 |
+| world_assets | 등록된 World의 Single + 5-View 이미지 |
+| graph_snapshot | 그래프 위상 (P4가 캐릭터-월드 관계 참조 시) |
 
 ---
 

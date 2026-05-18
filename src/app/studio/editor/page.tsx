@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { VideoPreviewer } from '@/features/editor/video-previewer'
 import { SceneTabs } from '@/features/editor/scene-tabs'
 import { ShotTimeline } from '@/features/editor/shot-timeline'
-import { EditToolbar } from '@/features/editor/edit-toolbar'
+import { ClipInspector } from '@/features/editor/clip-inspector'
 import { useEditorStore } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
 
@@ -26,6 +26,8 @@ export default function PostPage() {
     reorderClips,
     deleteClip,
     renderDraft,
+    setTrim,
+    setSpeed,
   } = useEditorStore()
 
   const projectId = useProjectStore((s) => s.projectId)
@@ -57,18 +59,18 @@ export default function PostPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Top: Video Previewer */}
-      <div className="flex-1">
-        <VideoPreviewer shot={selectedShot} clip={selectedClip} />
-      </div>
+    <div className="flex flex-1 overflow-hidden">
+      {/* Left: Preview + Timeline */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Top: Video Previewer */}
+        <div className="flex-1">
+          <VideoPreviewer shot={selectedShot} clip={selectedClip} />
+        </div>
 
-      <Separator />
+        <Separator />
 
-      {/* Bottom panel */}
-      <div className="flex h-48 shrink-0">
-        {/* Scene Tabs + Timeline */}
-        <div className="flex flex-1 flex-col">
+        {/* Bottom: Scene Tabs + Timeline */}
+        <div className="flex h-48 shrink-0 flex-col">
           {/* Scene tabs */}
           <div className="flex items-center justify-between border-b border-border px-4 py-2">
             <SceneTabs
@@ -109,10 +111,19 @@ export default function PostPage() {
             <p className="px-4 pb-2 text-xs text-destructive">{error}</p>
           )}
         </div>
-
-        {/* Right: Edit Toolbar */}
-        <EditToolbar />
       </div>
+
+      {/* Right: Clip Inspector */}
+      <ClipInspector
+        shot={selectedShot}
+        clip={selectedClip}
+        onTrim={(s, e) =>
+          selectedClipShotId && setTrim(selectedClipShotId, s, e)
+        }
+        onSpeed={(v) =>
+          selectedClipShotId && setSpeed(selectedClipShotId, v)
+        }
+      />
     </div>
   )
 }

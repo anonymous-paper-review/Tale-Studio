@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { fal } from '@fal-ai/client'
 import { cameraToText } from '@/lib/kling'
-import type { CameraConfig } from '@/types'
+import { findCameraMovement, findCameraBrand } from '@/lib/knowledge'
+import type { CameraConfig, CameraPreset } from '@/types'
 
 fal.config({ credentials: () => process.env.FAL_KEY ?? '' })
 
@@ -127,6 +128,8 @@ export async function POST(req: Request) {
       generationMethod = 'T2V',
       provider = 'fal',
       referenceImageUrl,
+      movementPreset,
+      cameraPreset,
     } = (await req.json()) as {
       shotId: string
       prompt: string
@@ -136,6 +139,8 @@ export async function POST(req: Request) {
       generationMethod?: GenerationMethod
       provider?: VideoProvider
       referenceImageUrl?: string
+      movementPreset?: string | null
+      cameraPreset?: CameraPreset | null
     }
 
     if (!shotId || !prompt) {
@@ -154,9 +159,22 @@ export async function POST(req: Request) {
 
     // Convert 6-axis camera values to natural language in prompt
     const cameraText = camera ? cameraToText(camera) : ''
-    const fullPrompt = cameraText
-      ? `${prompt}. ${cameraText}.`.slice(0, 500)
-      : prompt.slice(0, 500)
+    // Inject named movement label for T2V only (I2V relies on cameraToText axis mapping)
+    const movementFragment =
+      generationMethod === 'T2V' && movementPreset
+        ? findCameraMovement(movementPreset)?.prompt_fragment ?? ''
+        : ''
+    // Camera gear (brand / focal / aperture / WB) — always included if set
+    let gearFragment = ''
+    if (cameraPreset) {
+      const brandName =
+        findCameraBrand(cameraPreset.brand)?.full_name ?? cameraPreset.brand
+      gearFragment = `shot on ${brandName}, ${cameraPreset.focalLength}mm, f/${cameraPreset.aperture}, white balance ${cameraPreset.whiteBalance}K`
+    }
+    const fullPrompt = [prompt, movementFragment, gearFragment, cameraText]
+      .filter(Boolean)
+      .join('. ')
+      .slice(0, 500)
 
     let result: { taskId: string; provider: string; model: string }
 

@@ -55,29 +55,37 @@ async function generateViaTailscale(
   })
 }
 
-/* ── Gemini Imagen ── */
+/* ── Gemini 2.5 Flash Image (Nano Banana, free tier) ──
+ * Imagen 은 paid plan 전용이라 검증용으로 무료 Nano Banana 사용.
+ * paid plan 확보 후 imagen-4.0-generate-001 복원 가능.
+ */
 async function generateViaGemini(
   prompt: string,
   aspectRatio: string,
 ): Promise<Response> {
   const ai = new GoogleGenAI({ apiKey: getApiKey() })
 
-  const response = await ai.models.generateImages({
-    model: 'imagen-4.0-generate-001',
-    prompt,
+  const aspectHint =
+    aspectRatio === '16:9'
+      ? ' Compose as widescreen 16:9 aspect ratio.'
+      : ' Compose as square 1:1 aspect ratio.'
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: `${prompt}${aspectHint}`,
     config: {
-      numberOfImages: 1,
-      aspectRatio: aspectRatio as '1:1' | '16:9',
+      responseModalities: ['Text', 'Image'],
     },
   })
 
-  const img = response.generatedImages?.[0]?.image
-  if (!img?.imageBytes) {
-    throw new Error('No image generated')
+  const parts = response.candidates?.[0]?.content?.parts ?? []
+  const imagePart = parts.find((p) => p.inlineData?.data)
+  if (!imagePart?.inlineData?.data) {
+    throw new Error('Nano Banana 응답에 이미지가 없습니다')
   }
 
-  const buffer = Buffer.from(img.imageBytes, 'base64')
-  const mimeType = img.mimeType ?? 'image/png'
+  const buffer = Buffer.from(imagePart.inlineData.data, 'base64')
+  const mimeType = imagePart.inlineData.mimeType ?? 'image/png'
 
   return new Response(buffer, {
     headers: {
@@ -88,6 +96,7 @@ async function generateViaGemini(
 }
 
 export async function POST(req: Request) {
+  let providerUsed: 'tailscale' | 'gemini' = 'gemini'
   try {
     const user = await getUser()
     if (!user) {
@@ -104,14 +113,22 @@ export async function POST(req: Request) {
     }
 
     // provider: 'tailscale' | 'gemini' (default)
-    if (provider === 'tailscale') {
+    providerUsed = provider === 'tailscale' ? 'tailscale' : 'gemini'
+    if (providerUsed === 'tailscale') {
       return await generateViaTailscale(prompt, aspectRatio)
     }
-
     return await generateViaGemini(prompt, aspectRatio)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    console.error('[generate/image]', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[generate/image]', {
+      provider: providerUsed,
+      hasGoogleKey: !!process.env.GOOGLE_API_KEYS,
+      hasTailscaleUrl: !!process.env.TAILSCALE_IMAGE_API_URL,
+      message,
+    })
+    return NextResponse.json(
+      { error: `[${providerUsed}] ${message}` },
+      { status: 500 },
+    )
   }
 }

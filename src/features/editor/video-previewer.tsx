@@ -52,10 +52,17 @@ export function VideoPreviewer({ shot, clip }: VideoPreviewerProps) {
     setDuration(0)
   }, [clip?.shotId])
 
+  // Bind playbackRate to clip.speed (default 1.0)
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = clip?.speed ?? 1.0
+    }
+  }, [clip?.speed, clip?.url])
+
   if (!shot) {
     return (
       <div className="flex h-full items-center justify-center bg-black/40">
-        <p className="text-sm text-muted-foreground">Select a clip to preview</p>
+        <p className="text-sm text-muted-foreground">미리볼 클립을 선택해주세요</p>
       </div>
     )
   }

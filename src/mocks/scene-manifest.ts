@@ -4,7 +4,6 @@ export const mockSceneManifest = {
   scenes: [
     {
       sceneId: 'sc_01',
-      act: 'intro',
       narrativeSummary: 'Kai spots a suspicious data broker in the neon-lit street and decides to follow.',
       originalTextQuote: 'The rain-slicked street glowed with neon as Kai noticed the figure ducking into an alley.',
       location: 'loc_01',
@@ -15,7 +14,6 @@ export const mockSceneManifest = {
     },
     {
       sceneId: 'sc_02',
-      act: 'dev',
       narrativeSummary: 'Viper spots Kai tailing her and a chase erupts through the crowded night market.',
       originalTextQuote: 'Viper whipped around, silver hair catching the light. Their eyes met — then she ran.',
       location: 'loc_02',
@@ -26,7 +24,6 @@ export const mockSceneManifest = {
     },
     {
       sceneId: 'sc_03',
-      act: 'turn',
       narrativeSummary: 'Kai finds refuge in Mira\'s underground bunker. Mira reveals a shocking truth about Viper.',
       originalTextQuote: '"She\'s not your enemy, kid." Mira tightened a bolt on her prosthetic arm without looking up.',
       location: 'loc_03',
@@ -37,7 +34,6 @@ export const mockSceneManifest = {
     },
     {
       sceneId: 'sc_04',
-      act: 'conclusion',
       narrativeSummary: 'Kai confronts Viper on the rooftop at sunrise. They forge an uneasy alliance.',
       originalTextQuote: 'The first light of dawn painted the skyline gold as Kai extended a hand to Viper.',
       location: 'loc_04',

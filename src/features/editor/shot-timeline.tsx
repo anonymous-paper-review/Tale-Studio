@@ -161,6 +161,13 @@ export function ShotTimeline({
                 </Badge>
               )}
             </div>
+            {/* Speed label */}
+            <div className="mt-0.5 text-[10px] text-muted-foreground">
+              {(clip?.speed ?? 1.0).toFixed(
+                (clip?.speed ?? 1.0) === 1.0 ? 0 : 1,
+              )}
+              x
+            </div>
 
             {/* Move & Delete buttons */}
             <div className="absolute -top-1 right-0 hidden items-center gap-0.5 group-hover:flex">

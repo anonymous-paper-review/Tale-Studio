@@ -444,14 +444,14 @@ export default function HomePage() {
           ) : projects.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 py-20">
               <Film className="size-10 text-gray-600" />
-              <p className="mt-4 text-sm text-gray-500">No projects yet</p>
+              <p className="mt-4 text-sm text-gray-500">아직 프로젝트가 없어요</p>
               <button
                 onClick={handleNew}
                 disabled={creating}
                 className="mt-6 flex items-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white transition-all hover:border-[#E50914] hover:text-[#E50914]"
               >
                 <Plus className="size-4" />
-                Create your first project
+                첫 프로젝트 만들기
               </button>
             </div>
           ) : (

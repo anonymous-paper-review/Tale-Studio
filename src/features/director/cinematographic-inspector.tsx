@@ -5,13 +5,18 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { AngleControl } from './angle-control'
+import { CameraPresetControl } from './camera-preset-control'
 import { KeyLight } from './key-light'
-import type { Shot, CameraConfig, LightingConfig } from '@/types'
+import { MovementControl } from './movement-control'
+import { DEFAULT_CAMERA_PRESET } from '@/types'
+import type { Shot, CameraConfig, CameraPreset, LightingConfig } from '@/types'
 
 interface CinematographicInspectorProps {
   shot: Shot | undefined
   onUpdateCamera: (config: Partial<CameraConfig>) => void
   onUpdateLighting: (config: Partial<LightingConfig>) => void
+  onUpdateCameraPreset: (changes: Partial<CameraPreset>) => void
+  onApplyMovement: (presetId: string | null, intensity: number) => void
   onGenerateVideo?: () => void
   isGenerating?: boolean
 }
@@ -20,13 +25,15 @@ export function CinematographicInspector({
   shot,
   onUpdateCamera,
   onUpdateLighting,
+  onUpdateCameraPreset,
+  onApplyMovement,
   onGenerateVideo,
   isGenerating,
 }: CinematographicInspectorProps) {
   if (!shot) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-muted-foreground">Select a shot</p>
+        <p className="text-sm text-muted-foreground">샷을 선택해주세요</p>
       </div>
     )
   }
@@ -44,7 +51,27 @@ export function CinematographicInspector({
 
         <Separator />
 
+        <CameraPresetControl
+          preset={shot.cameraPreset ?? DEFAULT_CAMERA_PRESET}
+          onUpdate={onUpdateCameraPreset}
+        />
+
+        <Separator />
+
         <AngleControl camera={shot.camera} onUpdate={onUpdateCamera} />
+
+        <Separator />
+
+        <MovementControl
+          preset={shot.movementPreset ?? null}
+          intensity={shot.movementIntensity ?? 5}
+          onSelectPreset={(id) =>
+            onApplyMovement(id, shot.movementIntensity ?? 5)
+          }
+          onIntensityChange={(v) =>
+            onApplyMovement(shot.movementPreset ?? null, v)
+          }
+        />
 
         <Separator />
 

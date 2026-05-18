@@ -46,12 +46,6 @@
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
 
-  /* Act colors (기승전결) */
-  --color-act-intro: var(--act-intro);
-  --color-act-dev: var(--act-dev);
-  --color-act-turn: var(--act-turn);
-  --color-act-conclusion: var(--act-conclusion);
-
   /* Surface hierarchy */
   --color-surface-primary: var(--surface-primary);
   --color-surface-secondary: var(--surface-secondary);
@@ -152,12 +146,6 @@
   --sidebar-accent-foreground: oklch(1 0 0);
   --sidebar-border: oklch(0.278 0 0);
   --sidebar-ring: oklch(0.537 0.234 29.23);
-
-  /* Act colors (기승전결) */
-  --act-intro: oklch(0.648 0.174 142.5);       /* #4CAF50 green */
-  --act-dev: oklch(0.614 0.189 254.8);         /* #2196F3 blue */
-  --act-turn: oklch(0.779 0.175 64.1);         /* #FF9800 orange */
-  --act-conclusion: oklch(0.628 0.225 26.5);   /* #F44336 red */
 
   /* Surface hierarchy */
   --surface-primary: oklch(0.156 0 0);    /* #121212 */

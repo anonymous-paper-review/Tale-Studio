@@ -29,12 +29,18 @@ function resetChildStores() {
   const { useArtistStore } = require('@/stores/artist-store')
   const { useDirectorStore } = require('@/stores/director-store')
   const { useEditorStore } = require('@/stores/editor-store')
+  const { useGlobalChatStore } = require('@/stores/global-chat-store')
+  const { useCanvasStore } = require('@/stores/canvas-store')
+  const { useAssetStorageStore } = require('@/stores/asset-storage-store')
 
   useProducerStore.getState().reset()
   useWriterStore.getState().reset()
   useArtistStore.getState().reset()
   useDirectorStore.getState().reset()
   useEditorStore.getState().reset()
+  useGlobalChatStore.getState().reset()
+  useCanvasStore.getState().reset()
+  useAssetStorageStore.getState().reset()
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -46,9 +52,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   setStage: (stage) => set({ currentStage: stage }),
 
-  canNavigateTo: (stage) => {
-    const { currentStage } = get()
-    return getStageIndex(stage) <= getStageIndex(currentStage)
+  canNavigateTo: (_stage) => {
+    // TEMP (2026-05-17): 검증 편의 위해 가드 해제. 검증 끝나면 아래 원본 로직으로 복원.
+    // const { currentStage } = get()
+    // return getStageIndex(stage) <= getStageIndex(currentStage)
+    return true
   },
 
   initProject: async () => {
@@ -65,6 +73,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         initLoading: false,
         currentStage: project.current_stage ?? 'producer',
       })
+      const { useCanvasStore } = require('@/stores/canvas-store')
+      useCanvasStore.getState().setProjectId(projectId)
     } catch (err) {
       console.error('[project-store] initProject failed:', err)
       set({ initLoading: false })
@@ -85,6 +95,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         initLoading: false,
         currentStage: 'producer',
         })
+      const { useCanvasStore } = require('@/stores/canvas-store')
+      useCanvasStore.getState().setProjectId(projectId)
     } catch (err) {
       console.error('[project-store] createNewProject failed:', err)
       set({ initLoading: false })
@@ -98,6 +110,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectTitle: title,
       currentStage: stage ?? 'producer',
     })
+    const { useCanvasStore } = require('@/stores/canvas-store')
+    useCanvasStore.getState().setProjectId(id)
   },
 
   renameProject: async (title: string) => {

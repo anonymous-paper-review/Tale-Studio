@@ -12,18 +12,10 @@ import {
 } from '@/components/ui/tooltip'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { CinematographicInspector } from '@/features/director/cinematographic-inspector'
-import { DirectorChat } from '@/features/director/director-chat'
 import { useDirectorStore } from '@/stores/director-store'
 import { useProjectStore } from '@/stores/project-store'
 import { type ImageProvider } from '@/stores/artist-store'
 import { cn } from '@/lib/utils'
-
-const ACT_COLORS: Record<string, string> = {
-  intro: 'bg-act-intro',
-  dev: 'bg-act-dev',
-  turn: 'bg-act-turn',
-  conclusion: 'bg-act-conclusion',
-}
 
 export default function SetPage() {
   const {
@@ -42,6 +34,8 @@ export default function SetPage() {
     selectShot,
     updateCamera,
     updateLighting,
+    updateCameraPreset,
+    applyMovementPreset,
     toggleGenerationMethod,
     generateVideo,
     generateShotImage,
@@ -129,7 +123,7 @@ export default function SetPage() {
             Scenes
           </h3>
           <div className="space-y-2">
-            {scenes.map((scene) => {
+            {scenes.map((scene, sceneIdx) => {
               const shotCount = shots.filter(
                 (s) => s.sceneId === scene.sceneId,
               ).length
@@ -152,11 +146,9 @@ export default function SetPage() {
                   }`}
                 >
                   <div className="mb-1 flex items-center gap-2">
-                    <div
-                      className={`h-2 w-2 rounded-full ${ACT_COLORS[scene.act] ?? 'bg-muted'}`}
-                    />
+                    <div className="h-2 w-2 rounded-full bg-muted" />
                     <span className="font-medium">
-                      {scene.act.toUpperCase()}
+                      Scene {sceneIdx + 1}
                     </span>
                   </div>
                   <p className="truncate text-xs text-muted-foreground">
@@ -475,6 +467,13 @@ export default function SetPage() {
             onUpdateLighting={(config) =>
               selectedShotId && updateLighting(selectedShotId, config)
             }
+            onUpdateCameraPreset={(changes) =>
+              selectedShotId && updateCameraPreset(selectedShotId, changes)
+            }
+            onApplyMovement={(presetId, intensity) =>
+              selectedShotId &&
+              applyMovementPreset(selectedShotId, presetId, intensity)
+            }
             onGenerateVideo={() =>
               selectedShotId && generateVideo(selectedShotId)
             }
@@ -482,9 +481,6 @@ export default function SetPage() {
           />
         </div>
       </div>
-
-      {/* Bottom: Director Kim Chat */}
-      <DirectorChat />
 
       <HandoffButton
         label="Head to Editor"
