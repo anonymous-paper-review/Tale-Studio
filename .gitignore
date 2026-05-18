@@ -70,3 +70,7 @@ parallel_dev/
 .vercel
 *.sh
 docs/*
+
+
+# experiment
+experiment/
