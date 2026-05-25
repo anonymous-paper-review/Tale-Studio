@@ -491,66 +491,9 @@ export interface ShotSequence {
   shots: ShotSequenceItem[];
 }
 
-// =====================================================================
-// L5: Render Spec — T2I/TI2V 프롬프트 추출 + provider-agnostic 패키징
-// 현재는 추출 모드만 (extraction_only=true). 추후 provider-specific 변환/
-//   seed/cfg/asset path resolution/IP-Adapter 등 확장 예정.
-// =====================================================================
-
-export interface ImageRequest {
-  prompt: string;                     // T2I 프롬프트 (L4b.first_frame_prompt 추출)
-  base_assets: string[];              // 참조 에셋 ID (캐릭터/로케이션)
-  aspect_ratio?: string;              // L0에서 carry
-  resolution?: { width: number; height: number };
-  // === 향후 (L5 고도화) ===
-  provider?: 'qwen3' | 'imagen' | 'flux' | 'nano_banana';
-  negative_prompt?: string;
-  seed?: number;
-  cfg_scale?: number;
-  steps?: number;
-  sampler?: string;
-  reference_images?: string[];        // IP-Adapter / ControlNet 시드
-  lora_refs?: string[];
-  estimated_cost_usd?: number;
-}
-
-export interface VideoRequest {
-  motion_prompt: string;              // TI2V 모션 프롬프트 (L4c.motion_prompt 추출)
-  duration_seconds: number;
-  fps?: number;                       // L0에서 carry
-  // === 향후 (L5 고도화) ===
-  provider?: 'hunyuan' | 'kling' | 'veo' | 'sora';
-  first_frame_input?: string;         // ImageRequest의 출력 경로 (체이닝)
-  motion_strength?: number;
-  interpolation?: boolean;
-  estimated_cost_usd?: number;
-}
-
-export interface ShotRenderSpec {
-  shot_id: string;
-  duration_seconds: number;
-  image_request: ImageRequest;
-  video_request: VideoRequest;
-  // 향후: transition_handling, fallback_chain, retry_policy 등
-}
-
-export interface RenderPlan {
-  project_id: string;
-  total_shots: number;
-  total_duration_seconds: number;
-  aspect_ratio: string;
-  resolution: { width: number; height: number };
-  fps: number;
-  shots: ShotRenderSpec[];
-  extraction_only: boolean;           // 현재 추출 모드 명시. true면 provider 미결정/추가 파라미터 없음
-  // === 향후 (L5 고도화) ===
-  total_estimated_cost_usd?: number;
-  total_estimated_minutes?: number;
-  default_providers?: {
-    image: string;
-    video: string;
-  };
-}
+// L5 Render Spec 타입(`FinalPromptsOutput`/`T2IPrompt`/`TI2VPrompt`/`ShotGenerationPrompts`)은
+// 본 파일 상단(50번대 줄)에 정의됨. l5_prompts.ts 참조.
+// 향후 provider-specific 확장(seed/cfg/asset path/IP-Adapter 등)은 그 위에서.
 
 // =====================================================================
 // 통합 결과 (모든 단계 + 최종 샷 시퀀스)

@@ -2,6 +2,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { recordRawCall } from './raw_collector';
 import { repairJson } from './json_repair';
+import { withLlmRetry } from './retry';
 
 const apiKey = process.env.CLAUDE_API_KEY;
 if (!apiKey) {
@@ -38,13 +39,13 @@ export async function claudeGenerate(
   let error: string | undefined;
 
   try {
-    const response = await client.messages.create({
+    const response = await withLlmRetry(() => client.messages.create({
       model,
       max_tokens: opts.maxTokens ?? 4096,
       temperature: opts.temperature ?? 0.3,
       system: opts.system,
       messages: [{ role: 'user', content: userPrompt }],
-    });
+    }), 'claude');
 
     stopReason = response.stop_reason ?? undefined;
     const block = response.content[0];

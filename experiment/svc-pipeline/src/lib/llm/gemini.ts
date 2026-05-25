@@ -2,6 +2,7 @@
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { recordRawCall } from './raw_collector';
 import { repairJson } from './json_repair';
+import { withLlmRetry } from './retry';
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
@@ -47,7 +48,7 @@ export async function geminiGenerate(
   let finishReason: string | undefined;
   let error: string | undefined;
   try {
-    const result = await model.generateContent(userPrompt);
+    const result = await withLlmRetry(() => model.generateContent(userPrompt), 'gemini');
     finishReason = result.response.candidates?.[0]?.finishReason;
     text = result.response.text();
 
