@@ -7,7 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans:
+    var(--font-geist-sans), var(--font-pretendard), ui-sans-serif, system-ui,
+    sans-serif;
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -51,6 +53,28 @@
   --color-surface-secondary: var(--surface-secondary);
   --color-surface-tertiary: var(--surface-tertiary);
   --color-surface-elevated: var(--surface-elevated);
+
+  /* Canvas extension tokens (design.md §17.11) */
+  --color-canvas-bg: var(--canvas-bg);
+  --color-canvas-dot: var(--canvas-dot);
+  --color-node-bg-default: var(--node-bg-default);
+  --color-node-bg-selected: var(--node-bg-selected);
+  --color-node-border-default: var(--node-border-default);
+  --color-node-border-selected: var(--node-border-selected);
+  --color-edge-default: var(--edge-default);
+  --color-edge-selected: var(--edge-selected);
+
+  /* Border tiers (design.md §2.4) */
+  --color-border-strong: var(--border-strong);
+  --color-border-subtle: var(--border-subtle);
+
+  /* Semantic state colors (design.md §2.5) */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
 }
 
 /*
@@ -90,6 +114,42 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Canvas extension tokens (design.md §17.11). alias only — values follow base tokens at use site so cascade applies dark overrides automatically. */
+  --canvas-bg: var(--background);
+  --canvas-dot: var(--muted-foreground);
+  --node-bg-default: var(--card);
+  --node-bg-selected: var(--accent);
+  --node-border-default: var(--border);
+  --node-border-selected: var(--ring);
+  --edge-default: var(--border);
+  --edge-selected: var(--ring);
+
+  /* Border tiers (design.md §2.4). light: Radix gray-7 / gray-5. */
+  --border-strong: oklch(0.85 0 0);
+  --border-subtle: oklch(0.95 0 0);
+
+  /* Semantic state colors (design.md §2.5). Light variants — paired with foregrounds for icon+label compounds. */
+  --success: oklch(0.55 0.16 145);
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.7 0.18 70);
+  --warning-foreground: oklch(0.145 0 0);
+  --info: oklch(0.6 0.15 240);
+  --info-foreground: oklch(1 0 0);
+
+  /* Z-index named ladder (design.md §11.1). Referenced by @utility z-* below. */
+  --z-canvas: 0;
+  --z-canvas-edge: 1;
+  --z-canvas-node: 2;
+  --z-canvas-selected: 3;
+  --z-canvas-handle: 4;
+  --z-toolbar: 10;
+  --z-sticky: 20;
+  --z-sidebar: 30;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-toast: 70;
 }
 
 .dark {
@@ -152,6 +212,18 @@
   --surface-secondary: oklch(0.185 0 0);  /* #1a1a1a */
   --surface-tertiary: oklch(0.222 0 0);   /* #242424 */
   --surface-elevated: oklch(0.243 0 0);   /* #2a2a2a */
+
+  /* Border tiers (design.md §2.4). dark: brighter step for hovered/strong, subtle for non-interactive separator. */
+  --border-strong: oklch(0.38 0 0);  /* ~#5a5a5a */
+  --border-subtle: oklch(0.22 0 0);  /* ~#262626 */
+
+  /* Semantic state colors — dark mode (design.md §2.5). Chroma kept low to avoid Netflix-Red accent collision. */
+  --success: oklch(0.648 0.174 142.5);
+  --success-foreground: oklch(0.156 0 0);
+  --warning: oklch(0.779 0.175 64.1);
+  --warning-foreground: oklch(0.156 0 0);
+  --info: oklch(0.614 0.189 254.8);
+  --info-foreground: oklch(1 0 0);
 }
 
 @layer base {
@@ -162,3 +234,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Z-index named utilities (design.md §11.1). Use these instead of literal z-* in app code. */
+@utility z-canvas { z-index: var(--z-canvas); }
+@utility z-canvas-edge { z-index: var(--z-canvas-edge); }
+@utility z-canvas-node { z-index: var(--z-canvas-node); }
+@utility z-canvas-selected { z-index: var(--z-canvas-selected); }
+@utility z-canvas-handle { z-index: var(--z-canvas-handle); }
+@utility z-toolbar { z-index: var(--z-toolbar); }
+@utility z-sticky { z-index: var(--z-sticky); }
+@utility z-sidebar { z-index: var(--z-sidebar); }
+@utility z-overlay { z-index: var(--z-overlay); }
+@utility z-modal { z-index: var(--z-modal); }
+@utility z-popover { z-index: var(--z-popover); }
+@utility z-toast { z-index: var(--z-toast); }

@@ -5,7 +5,7 @@
 ## 상태
 
 보일러플레이트 완료, 병렬 개발 진행 (2026-03-03). 구현 순서: P3+P4 (Phase 1) → P5 → P2 → P1. 
-P3는 L0 Concept Canvas (노드 그래프)로 전면 재설계 중.
+P3는 L0 Concept Canvas (노드 그래프)로 전면 재설계 중. **P4도 Director Canvas (노드 그래프)로 재설계 시작 (2026-05-25)** — `specs/layers/director_canvas.md`.
 
 ## 기술 스택
 
@@ -15,24 +15,42 @@ P3는 L0 Concept Canvas (노드 그래프)로 전면 재설계 중.
 - Backend: Next.js API Routes + Supabase (PostgreSQL)
 - AI: Gemini (LLM), Gemini Imagen + H100 self-hosted (이미지), Kling + Veo + Pro6000 self-hosted (비디오)
 
-## 라우터
+## 디렉토리 구조
+
+| 폴더 | 성격 | harness 참조 |
+|------|------|------|
+| `specs/` | **명세 (spec) — source-of-truth, 캐넌**. constitution, changes, archive, layers, data, design system | ✓ 직접 참조 |
+| `.claude/` | Claude Code harness (rules / hooks / skills / agents / settings.json) | ✓ 자동 로드 |
+| `src/` | 코드 (Next.js app, features, stores, lib) | ✓ paths-scoped rules + subdir CLAUDE.md |
+| `databases/` | Knowledge DB YAML (로컬) + Supabase migration | ✓ supabase rule |
+| `assets/` | Lore 테스트 데이터 (`assets/lore/*.yaml`) | — |
+| `docs/` | **리서치 / 계획 / WIP 문서**. 캐넌 아님 — harness 직접 참조 안 함 | — (사용자 reference) |
+| `PROGRESS.md` | 검증 보드 + 작업 진행 로그 | ✓ SessionStart hook |
+
+## 라우터 (주제 → 파일)
 
 | 무엇 하려면 | 어디 보는가 |
 |-------------|-------------|
+| **이번 프로젝트 원칙 (Constitution)** | `specs/_constitution.md` |
+| **진행 중 변경 (in-flight specs)** | `specs/changes/` |
+| **완료된 변경 (timeline + audit)** | `specs/archive/` |
+| **새 change 작성 표준 (proposal/delta/tasks 캐넌)** | `specs/_TEMPLATE.md` |
 | MVP 범위 / 우선순위 / 구현 순서 | `specs/mvp_scope.md` |
 | 페이지별 레이아웃·요소·인터랙션 | `specs/ux_pages.md` |
-| **시각·인터랙션 공통 컨벤션 (디자인 헌법)** | `docs/design.md` |
-| 페이지별 디자인 레퍼런스/벤치마크 | `docs/design-references.md` |
+| **시각·인터랙션 공통 컨벤션 (Design system)** | `specs/design.md` |
+| **페이지별 디자인 레퍼런스/벤치마크** | `specs/design-references.md` |
+| harness 전체 설계 (왜 이렇게 했는지) | `docs/research/claude-code-harness-design-for-tale-studio.md` |
+| harness 이행 작업 (참고용, 완료) | `docs/research/harness-migration-plan.md` |
 | L0 Concept Canvas (노드 그래프, P3 재설계) | `specs/layers/L0_concept_canvas.md` |
 | L0 Canvas 데이터 모델 (TS 타입, Zustand 액션) | `specs/data/canvas_data_model.md` |
 | Asset Storage 스키마 (등록 캐릭터/월드, P4 인터페이스) | `specs/data/asset_storage.md` |
+| **Director Canvas (노드 그래프, P4 재설계)** | `specs/layers/director_canvas.md` |
 | L1 Scene 분할 (Pumpup) | `specs/layers/L1_scene_architect.md` |
 | L2 Shot Composer | `specs/layers/L2_shot_composer.md` |
 | L3 Prompt Builder + Knowledge DB | `specs/layers/L3_prompt_builder.md` |
 | API 기능 (6축 카메라, RAG) | `specs/api_features.md` |
 | 의사결정 로그 | `specs/decisions.md` |
 | 열린/닫힌 질문 | `specs/open_questions.md` |
-| 인프라 / 배포 / 비용 | `docs/infrastructure.md` |
 | 자주 쓰는 패턴 / 보일러플레이트 인벤토리 | 본 문서 하단 도메인 특수성 |
 
 ## 실행

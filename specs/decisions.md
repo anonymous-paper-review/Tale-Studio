@@ -3,7 +3,26 @@
 > 최종 수정: 2026-05-17
 > 레거시 아카이브: `specs/archive/decisions_legacy_2026-03-03.md`
 
+> **이 파일은 cross-cutting 결정의 rolling 로그입니다. Append-only.**
+>
+> 새 변경 작업은 `specs/changes/<name>/proposal.md`에 작성하고, 끝나면 `specs/archive/YYYY-MM-DD-<name>/`로 이동. archive 시 본 파일에 entry 1줄 append (entry 번호 + archive 폴더 링크).
+>
+> Entry 번호는 monotonic. **기존 번호 mid-history 편집 금지**. 변경 적은 원칙은 `specs/_constitution.md` 참조.
+
 ## 확정
+
+### 35. Pretendard Variable 한국어 폰트 도입
+- **결정**: `next/font/local`로 Pretendard Variable woff2를 로드해 한국어 fallback 확보. `--font-pretendard` CSS variable로 노출. `--font-sans` chain은 `Geist Sans → Pretendard → ui-sans-serif → system-ui → sans-serif`
+- **이유**:
+  - UI 기본 언어가 한국어 (decisions log 2026-05-17 cleanup)인데 Geist Sans는 한글 미지원 → 시스템 기본 폰트로 fallback되어 OS/브라우저별 일관성 깨짐
+  - Pretendard Variable은 weight 45~920 가변 폰트 (단일 woff2 ~2MB) — 별도 weight 파일 불필요
+  - Latin 글리프는 Geist 우선이라 영문 타이포 정체성 유지
+- **구현**:
+  - 패키지: `pretendard@1.3.9` (npm) 설치 후 `dist/web/variable/woff2/PretendardVariable.woff2`를 `src/app/fonts/`로 복사 (build-time bundle용)
+  - `src/app/layout.tsx`에 `localFont({ src: './fonts/PretendardVariable.woff2', variable: '--font-pretendard', display: 'swap', weight: '45 920' })` 추가
+  - `globals.css @theme inline`의 `--font-sans` chain에 `var(--font-pretendard)` 삽입
+- **트레이드오프**: 초기 bundle 크기 ~2MB 증가. 분할 subset (`pretendard/dist/web/variable/woff2-dynamic-subset/`) 도입은 후속 작업 (현재 단일 file로 단순화)
+- **일자**: 2026-05-28
 
 ### 34. 이미지 생성 모델 — Nano Banana 임시 사용 (Imagen paid 까지)
 - **결정**: `/api/generate/image`에서 `imagen-4.0-generate-001`(paid-only) → **`gemini-2.5-flash-image`** (Nano Banana, free tier 500 req/day)
@@ -34,10 +53,10 @@
 ### 32. F-D1 — L0 Canvas Actor↔Actor 엣지 카테고리 단순화
 - **결정**: Actor↔Actor 엣지는 `references`(점선 + 자유 텍스트 메모) 한 종류만 허용. `parent`는 Status Branch 자동 생성 전용으로 한정 — 사용자가 수동으로 Actor↔Actor parent를 그리지 않음. Actor↔World `in-world`는 그대로 유지
 - **이유**:
-  - Higgsfield 등 노드 캔버스 도구는 동종 노드 연결을 공개 사용 시나리오로 다루지 않음 (`docs/design-references.md` Higgsfield 분석 섹션 참조). 동종 자산 관계는 라이브러리/폴더가 담당
+  - Higgsfield 등 노드 캔버스 도구는 동종 노드 연결을 공개 사용 시나리오로 다루지 않음 (`specs/design-references.md` Higgsfield 분석 섹션 참조). 동종 자산 관계는 라이브러리/폴더가 담당
   - parent 의미를 "기술적 상속(prompt/이미지/Status)"으로, references를 "내러티브 관계(쌍둥이/라이벌/스승-제자)"로 분리 → 사용자 메탈모델이 깨끗
 - **현재 시점 적용 상태**: 의사결정만 기록, **코드 변경(F-3)은 보류**. 다른 검증 차단 이슈 해결 후 진행
-- **참고**: `docs/design-references.md` 섹션 4 (권고 a), PROGRESS.md P10-Followup F-D1/F-3
+- **참고**: `specs/design-references.md` 섹션 4 (권고 a), PROGRESS.md P10-Followup F-D1/F-3
 - **일자**: 2026-05-17
 
 ### 31. L0 Meeting Room — Agentic Canvas (tool-use 패턴)
@@ -52,8 +71,8 @@
 - **상세**: `specs/data/canvas_data_model.md` 섹션 6 (Agent Actions), `specs/layers/L0_concept_canvas.md` 섹션 11
 - **일자**: 2026-05-17
 
-### 30. Design Constitution (`docs/design.md`) 도입
-- **결정**: 시각·인터랙션 공통 컨벤션의 단일 진실 소스로 `docs/design.md` 채택. 페이지별 레이아웃(`specs/ux_pages.md`)과 분리
+### 30. Design Constitution (`specs/design.md`) 도입
+- **결정**: 시각·인터랙션 공통 컨벤션의 단일 진실 소스로 `specs/design.md` 채택. 페이지별 레이아웃(`specs/ux_pages.md`)과 분리
 - **원칙 5개**:
   1. 캔버스 제일주의 (패널 보조)
   2. `globals.css` 토큰 외 신규 색 금지

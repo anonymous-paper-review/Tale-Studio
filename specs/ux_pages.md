@@ -209,7 +209,7 @@ writer/page.tsx (리컴포즈)
 
 > 상태: **MVP 포함** — V3.1에서 노드 그래프로 전면 재설계
 > 상세 스펙: `specs/layers/L0_concept_canvas.md`
-> 시각 컨벤션: `docs/design.md` (특히 섹션 9 Canvas Conventions)
+> 시각 컨벤션: `specs/design.md` (특히 §17 Canvas conventions)
 > 결정 근거: `specs/decisions.md` #29
 
 ### 목적
@@ -283,21 +283,36 @@ writer/page.tsx (리컴포즈)
 
 ## P4: The Set (Director)
 
-> 상태: **MVP 포함** — V2 기준 결정 완료
-> 참고: `specs/reference_v2/image4.png`
+> 상태: **MVP 포함** — V2 기준 → **노드 그래프 재설계 진행 중 (2026-05-25~)**
+> 참고: `specs/reference_v2/image4.png` (구 V2 패널 UI)
+> **신규 SoT**: `specs/layers/director_canvas.md` — Scene → Shot → Video 노드 그래프 스펙
+> 참고 패턴: `specs/layers/L0_concept_canvas.md` (Artist 노드 그래프)
 
-### 목적
+### 재설계 개요 (2026-05-25)
+
+P4를 Artist L0 Canvas와 같은 패턴의 노드 그래프 워크스페이스로 재설계.
+
+| 차원 | 구 V2 (현행 코드) | 신규 노드 그래프 |
+|------|------------------|------------------|
+| UI 메탈모델 | 3패널 (Scene Nav + Shot Grid + Cinematographic Inspector) | 노드 캔버스 + 좌측 Meeting Room + 하단 Palette + 우측 Storage 탭 |
+| Shot 표현 | Grid 카드 | Shot 노드 (Scene 노드 자식) |
+| 영상 테이크 | 단일 video URL per Shot | Video 자식 노드 N개 (Branch로 변주) |
+| Writer 연동 | Handoff 시 1회 로드 | Scene/Shot 양방향 sync |
+| 카메라/조명 UI | Inspector 패널 | Shot/Video NodePopup 내부 |
+| 재사용 셋업 | 없음 | Camera/Light Preset Library (Palette 등록) |
+
+상세 스펙·결정사항·Open Questions는 모두 `specs/layers/director_canvas.md` 참조.
+
+### 목적 (변경 없음)
 
 스토리보드(샷 배치) + 촬영 기법 적용 + 영상 생성.
-Shot Node Grid-Mindmap이 핵심 UI. Director Chat이 AI 가이드.
+Artist가 *이미지 기반 스토리보드*라면 P4는 *영상 기반 스토리보드 + 디렉팅*(조명/앵글/카메라 무브먼트/렌즈 프리셋).
 
-### V1 → V2 변경점
+### V1 → V2 → 노드 그래프 변경 이력
 
-- ~~탭 기반 (Cinematographic / Shot Frames / Music)~~ → **3패널 통합**
-- P3 Storyboard가 **Shot Node Grid-Mindmap**으로 이동
-- ~~프리셋 드롭다운~~ → **Lens Combo + 3D Cube + Lighting Sphere**
-- Director Kim Chat 추가 (하단)
-- Shot Frames 탭 → Grid 내 직접 관리 (Frame Mode 선택)
+- V1: 탭 기반 (Cinematographic / Shot Frames / Music)
+- V2: 3패널 통합 (Scene Nav + Shot Grid-Mindmap + Cinematographic Inspector) + Director Kim Chat 하단
+- **2026-05-25**: 노드 그래프로 재설계 (Artist L0와 같은 패턴). 아래 V2 레이아웃 설명은 현행 코드 기준이며 점진적으로 노드 그래프로 마이그레이션 예정. 신규 스펙은 `director_canvas.md` 참조
 
 ### 레이아웃
 

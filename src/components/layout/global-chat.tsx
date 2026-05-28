@@ -9,6 +9,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useCanvasWarmStarting } from '@/features/artist/hooks/use-canvas-warm-starting'
+import { useDirectorCanvasWarmStarting } from '@/features/director/hooks/use-director-canvas-warm-starting'
 import { cn } from '@/lib/utils'
 import type { StageId } from '@/types'
 
@@ -69,7 +70,14 @@ export function GlobalChat() {
 
   const currentStage = useProjectStore((s) => s.currentStage)
   const projectId = useProjectStore((s) => s.projectId)
-  const warmStartingTip = useCanvasWarmStarting()
+  const artistWarmTip = useCanvasWarmStarting()
+  const directorWarmTip = useDirectorCanvasWarmStarting()
+  const warmStartingTip =
+    currentStage === 'artist'
+      ? artistWarmTip
+      : currentStage === 'director'
+        ? directorWarmTip
+        : null
 
   const [input, setInput] = useState('')
   const chatEndRef = useRef<HTMLDivElement>(null)
@@ -192,11 +200,12 @@ export function GlobalChat() {
         </button>
       )}
 
-      {currentStage === 'artist' && warmStartingTip && (
-        <div className="shrink-0 border-t border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-[11px] text-amber-700">
-          {warmStartingTip}
-        </div>
-      )}
+      {(currentStage === 'artist' || currentStage === 'director') &&
+        warmStartingTip && (
+          <div className="shrink-0 border-t border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-[11px] text-amber-700">
+            {warmStartingTip}
+          </div>
+        )}
 
       {/* Input */}
       <div className="shrink-0 border-t border-border p-3">

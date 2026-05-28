@@ -38,7 +38,7 @@ function CategoryEdgeImpl({
 
   const category = (data?.category ?? 'parent') as EdgeCategory
   const style = STYLE_BY_CATEGORY[category]
-  const stroke = selected ? 'var(--primary)' : 'var(--muted-foreground)'
+  const stroke = selected ? 'var(--edge-selected)' : 'var(--edge-default)'
 
   return (
     <BaseEdge

@@ -44,7 +44,6 @@ assets/
 !src/app/api/assets/
 
 # Legacy specs (로컬 보관, git 미추적)
-specs/archive/
 specs/reference/
 specs/reference_v2/
 specs/overview.md
@@ -53,7 +52,8 @@ specs/ava_framework.md
 # Internal docs (not for public repo)
 PROGRESS.md
 BUGS.md
-.claude/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
 docs/internal/
 
 # Experimental/debug scripts
@@ -69,6 +69,7 @@ parallel_dev/
 *.plist
 .vercel
 *.sh
+!.claude/hooks/*.sh
 docs/homepage_legacy/
 
 

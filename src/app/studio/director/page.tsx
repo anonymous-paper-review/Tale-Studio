@@ -1,492 +1,290 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ImageIcon, Loader2, Video } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
+import '@xyflow/react/dist/style.css'
+
+import { useCallback, useRef, useState, type MouseEvent } from 'react'
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  Controls,
+  MiniMap,
+  ConnectionMode,
+  applyNodeChanges,
+  applyEdgeChanges,
+  useReactFlow,
+  type NodeChange,
+  type EdgeChange,
+  type Connection,
+  type OnConnectStart,
+  type OnConnectEnd,
+  type XYPosition,
+} from '@xyflow/react'
+import { ArrowUpRight } from 'lucide-react'
+import Link from 'next/link'
+
 import { HandoffButton } from '@/components/layout/handoff-button'
-import { CinematographicInspector } from '@/features/director/cinematographic-inspector'
-import { useDirectorStore } from '@/stores/director-store'
-import { useProjectStore } from '@/stores/project-store'
-import { type ImageProvider } from '@/stores/artist-store'
 import { cn } from '@/lib/utils'
 
-export default function SetPage() {
-  const {
-    sceneManifest,
-    characterAssets,
-    worldAssets,
-    shots,
-    videoClips,
-    selectedSceneId,
-    selectedShotId,
-    generatingVideoShotId,
-    generatingImageShotIds,
-    imageProvider,
-    videoProvider,
-    selectScene,
-    selectShot,
-    updateCamera,
-    updateLighting,
-    updateCameraPreset,
-    applyMovementPreset,
-    toggleGenerationMethod,
-    generateVideo,
-    generateShotImage,
-    generateAllShotImages,
-    generateAllVideos,
-    setImageProvider,
-    setVideoProvider,
-    loadData,
-  } = useDirectorStore()
+import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
+import {
+  isShotData,
+  isSceneData,
+  SNAP_GRID,
+} from '@/types/director-canvas'
 
-  const projectId = useProjectStore((s) => s.projectId)
+import { SceneNode } from '@/features/director/canvas-nodes/SceneNode'
+import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
+import { VideoNode } from '@/features/director/canvas-nodes/VideoNode'
+import { CategoryEdge } from '@/features/director/canvas-edges/CategoryEdge'
+import { CreatorModal } from '@/features/director/canvas-popups/CreatorModal'
+import { RelationModal } from '@/features/director/canvas-popups/RelationModal'
+import { DeleteConfirmModal } from '@/features/director/canvas-popups/DeleteConfirmModal'
+import { DirectorNodePopup } from '@/features/director/canvas-popups/DirectorNodePopup'
 
-  // Self-hosted health checks
-  const [imgServerStatus, setImgServerStatus] = useState<'checking' | 'online' | 'offline' | 'unconfigured'>('checking')
-  const [vidServerStatus, setVidServerStatus] = useState<'checking' | 'online' | 'offline' | 'unconfigured'>('checking')
+const nodeTypes = {
+  scene: SceneNode,
+  shot: ShotNode,
+  video: VideoNode,
+} as const
 
-  useEffect(() => {
-    loadData()
-  }, [projectId, loadData])
+const edgeTypes = {
+  parent: CategoryEdge,
+  'relates-to': CategoryEdge,
+} as const
 
-  useEffect(() => {
-    let cancelled = false
-    const check = async () => {
-      try {
-        const [imgRes, vidRes] = await Promise.all([
-          fetch('/api/generate/health'),
-          fetch('/api/generate/video-health'),
-        ])
-        const [imgData, vidData] = await Promise.all([imgRes.json(), vidRes.json()])
-        if (!cancelled) {
-          setImgServerStatus(imgData.status)
-          setVidServerStatus(vidData.status)
-        }
-      } catch {
-        if (!cancelled) {
-          setImgServerStatus('offline')
-          setVidServerStatus('offline')
-        }
-      }
-    }
-    check()
-    const interval = setInterval(check, 30_000)
-    return () => { cancelled = true; clearInterval(interval) }
+// ────────────────────────────────────────────────────────────────────────────
+
+function CanvasInner() {
+  const nodes = useDirectorCanvasStore((s) => s.nodes)
+  const edges = useDirectorCanvasStore((s) => s.edges)
+  const deleteNode = useDirectorCanvasStore((s) => s.deleteNode)
+  const deleteEdge = useDirectorCanvasStore((s) => s.deleteEdge)
+  const setViewport = useDirectorCanvasStore((s) => s.setViewport)
+  const openPopup = useDirectorCanvasStore((s) => s.openPopup)
+  const openRelationModal = useDirectorCanvasStore((s) => s.openRelationModal)
+  const addShotNode = useDirectorCanvasStore((s) => s.addShotNode)
+  const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
+  const selectNode = useDirectorCanvasStore((s) => s.selectNode)
+  const selectEdge = useDirectorCanvasStore((s) => s.selectEdge)
+
+  const { screenToFlowPosition } = useReactFlow()
+
+  const [creatorOpen, setCreatorOpen] = useState(false)
+  const [creatorPosition, setCreatorPosition] = useState<XYPosition | null>(
+    null,
+  )
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      const next = applyNodeChanges(changes, nodes)
+      useDirectorCanvasStore.setState({ nodes: next as typeof nodes })
+      changes.forEach((c) => {
+        if (c.type === 'remove') deleteNode(c.id)
+      })
+    },
+    [nodes, deleteNode],
+  )
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      const next = applyEdgeChanges(changes, edges)
+      useDirectorCanvasStore.setState({ edges: next as typeof edges })
+      changes.forEach((c) => {
+        if (c.type === 'remove') deleteEdge(c.id)
+      })
+    },
+    [edges, deleteEdge],
+  )
+
+  const onConnect = useCallback(
+    (params: Connection) => {
+      if (!params.source || !params.target) return
+      openRelationModal(
+        params.source,
+        params.target,
+        params.sourceHandle,
+        params.targetHandle,
+      )
+    },
+    [openRelationModal],
+  )
+
+  const dragFromRef = useRef<string | null>(null)
+  const onConnectStart: OnConnectStart = useCallback((_event, params) => {
+    dragFromRef.current = params.nodeId ?? null
   }, [])
 
-  const scenes = sceneManifest?.scenes ?? []
-  const sceneShots = shots.filter((s) => s.sceneId === selectedSceneId)
-  const selectedShot = shots.find((s) => s.shotId === selectedShotId)
+  const onConnectEnd: OnConnectEnd = useCallback(
+    (event) => {
+      const sourceId = dragFromRef.current
+      dragFromRef.current = null
+      if (!sourceId) return
 
-  // Helper: find world asset image for a shot's scene
-  const getSceneBg = (sceneId: string) => {
-    const scene = scenes.find((s) => s.sceneId === sceneId)
-    if (!scene) return null
-    const world = worldAssets.find(
-      (w) => w.locationId === scene.location || w.sceneId === sceneId,
-    )
-    return world?.wideShot ?? world?.establishingShot ?? null
-  }
+      const target = event.target as HTMLElement | null
+      const isHandleOrNode =
+        target?.closest('.react-flow__handle') ||
+        target?.closest('.react-flow__node')
+      if (isHandleOrNode) return
 
-  // Helper: find character avatars for a shot
-  const getShotCharAvatars = (characterIds: string[]) =>
-    characterIds
-      .map((id) => characterAssets.find((c) => c.characterId === id))
-      .filter(Boolean)
+      // 빈 공간 drop → 부모 종류에 따라 자동 자식 생성
+      const native = event as unknown as { clientX?: number; clientY?: number }
+      const position = screenToFlowPosition({
+        x: native.clientX ?? 0,
+        y: native.clientY ?? 0,
+      })
 
-  if (shots.length === 0) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">The Set</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Complete previous steps first to load scenes and shots.
-          </p>
-        </div>
-      </div>
-    )
-  }
+      const sourceNode = useDirectorCanvasStore
+        .getState()
+        .nodes.find((n) => n.id === sourceId)
+      if (!sourceNode) return
+
+      if (isSceneData(sourceNode.data)) {
+        const newId = addShotNode(sourceId, position)
+        if (newId) selectNode(newId)
+      } else if (isShotData(sourceNode.data)) {
+        const newId = addVideoTake(sourceId, position)
+        if (newId) selectNode(newId)
+      }
+      // Video는 자식 없음 — 빈 공간 drop은 무시
+    },
+    [screenToFlowPosition, addShotNode, addVideoTake, selectNode],
+  )
+
+  const onPaneDoubleClick = useCallback(
+    (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      const isPane =
+        target?.classList.contains('react-flow__pane') ||
+        target?.classList.contains('react-flow__background') ||
+        target?.closest('.react-flow__pane') !== null
+      const isInsideNode = target?.closest('.react-flow__node') !== null
+      if (!isPane || isInsideNode) return
+
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      })
+      setCreatorPosition(position)
+      setCreatorOpen(true)
+    },
+    [screenToFlowPosition],
+  )
 
   return (
-    <>
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: Scene Navigator */}
-        <div className="flex w-48 shrink-0 flex-col border-r border-border p-4">
-          <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
-            Scenes
-          </h3>
-          <div className="space-y-2">
-            {scenes.map((scene, sceneIdx) => {
-              const shotCount = shots.filter(
-                (s) => s.sceneId === scene.sceneId,
-              ).length
-              const completedCount = videoClips.filter(
-                (c) =>
-                  shots.some(
-                    (s) =>
-                      s.sceneId === scene.sceneId && s.shotId === c.shotId,
-                  ) && c.status === 'completed',
-              ).length
+    // B-D1 fix: wrapper div에 onDoubleClick 등록해 ReactFlow 내부 처리와 독립적으로 캡처
+    <div
+      className="relative h-full w-full"
+      onDoubleClick={onPaneDoubleClick}
+    >
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
+        onPaneClick={() => {
+          selectNode(null)
+          selectEdge(null)
+        }}
+        onNodeClick={(_event, node) => selectNode(node.id)}
+        onEdgeClick={(_event, edge) => selectEdge(edge.id)}
+        onNodeDoubleClick={(_event, node) => openPopup(node.id)}
+        onMove={(_, vp) => setViewport(vp)}
+        snapToGrid
+        snapGrid={SNAP_GRID}
+        connectionMode={ConnectionMode.Loose}
+        deleteKeyCode={['Backspace', 'Delete']}
+        fitView={nodes.length > 0}
+        zoomOnDoubleClick={false}
+        proOptions={{ hideAttribution: true }}
+        className="bg-background"
+      >
+        <Background gap={16} size={1} className="opacity-30" />
+        <Controls className="!bg-card !border !border-border" />
+        <MiniMap
+          className="!bg-card !border !border-border"
+          pannable
+          zoomable
+        />
+      </ReactFlow>
 
-              return (
-                <button
-                  key={scene.sceneId}
-                  onClick={() => selectScene(scene.sceneId)}
-                  className={`w-full rounded-lg border p-3 text-left text-sm transition-colors ${
-                    selectedSceneId === scene.sceneId
-                      ? 'border-primary bg-accent'
-                      : 'border-border hover:bg-accent/50'
-                  }`}
-                >
-                  <div className="mb-1 flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-muted" />
-                    <span className="font-medium">
-                      Scene {sceneIdx + 1}
-                    </span>
-                  </div>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {scene.narrativeSummary}
-                  </p>
-                  {/* Shot progress dots */}
-                  <div className="mt-2 flex gap-1">
-                    {Array.from({ length: shotCount }, (_, i) => (
-                      <div
-                        key={i}
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          i < completedCount
-                            ? 'bg-primary'
-                            : 'bg-primary/30'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <Separator orientation="vertical" />
-
-        {/* Center: Shot Grid */}
-        <div className="flex flex-1 flex-col p-4">
-          {/* Header: title + provider toggle + generate all */}
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-muted-foreground">
-              Shots <span className="font-normal">({sceneShots.length})</span>
-            </h3>
-            <div className="flex items-center gap-2">
-              {/* Image provider toggle */}
-              <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5">
-                <span className="px-1 text-[10px] text-muted-foreground/60">Img:</span>
-                <button
-                  type="button"
-                  onClick={() => setImageProvider('gemini')}
-                  className={cn(
-                    'rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors',
-                    imageProvider === 'gemini'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  Gemini
-                </button>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (imgServerStatus === 'online') setImageProvider('tailscale')
-                      }}
-                      className={cn(
-                        'flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors',
-                        imageProvider === 'tailscale'
-                          ? 'bg-primary text-primary-foreground'
-                          : imgServerStatus === 'online'
-                            ? 'text-muted-foreground hover:text-foreground'
-                            : 'cursor-not-allowed text-muted-foreground/50',
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'size-1.5 rounded-full',
-                          imgServerStatus === 'online' && 'bg-green-500',
-                          imgServerStatus === 'offline' && 'bg-red-500',
-                          imgServerStatus === 'checking' && 'bg-yellow-500 animate-pulse',
-                          imgServerStatus === 'unconfigured' && 'bg-gray-400',
-                        )}
-                      />
-                      Self-hosted
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {imgServerStatus === 'online' && 'h100-image-gen connected'}
-                    {imgServerStatus === 'offline' && 'Image server offline'}
-                    {imgServerStatus === 'checking' && 'Checking…'}
-                    {imgServerStatus === 'unconfigured' && 'Not configured'}
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-
-              {/* Video provider toggle */}
-              <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5">
-                <span className="px-1 text-[10px] text-muted-foreground/60">Vid:</span>
-                <button
-                  type="button"
-                  onClick={() => setVideoProvider('fal')}
-                  className={cn(
-                    'rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors',
-                    videoProvider === 'fal'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  FAL
-                </button>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (vidServerStatus === 'online') setVideoProvider('local')
-                      }}
-                      className={cn(
-                        'flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors',
-                        videoProvider === 'local'
-                          ? 'bg-primary text-primary-foreground'
-                          : vidServerStatus === 'online'
-                            ? 'text-muted-foreground hover:text-foreground'
-                            : 'cursor-not-allowed text-muted-foreground/50',
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'size-1.5 rounded-full',
-                          vidServerStatus === 'online' && 'bg-green-500',
-                          vidServerStatus === 'offline' && 'bg-red-500',
-                          vidServerStatus === 'checking' && 'bg-yellow-500 animate-pulse',
-                          vidServerStatus === 'unconfigured' && 'bg-gray-400',
-                        )}
-                      />
-                      Self-hosted
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {vidServerStatus === 'online' && 'pro6000-video-gen connected'}
-                    {vidServerStatus === 'offline' && 'Video server offline'}
-                    {vidServerStatus === 'checking' && 'Checking…'}
-                    {vidServerStatus === 'unconfigured' && 'Not configured'}
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-
-              {(() => {
-                const missingImgs = shots.filter((s) => !s.referenceImageUrl).length
-                return (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    disabled={generatingImageShotIds.size > 0 || missingImgs === 0}
-                    onClick={() => generateAllShotImages()}
-                  >
-                    {generatingImageShotIds.size > 0 ? (
-                      <>
-                        <Loader2 className="mr-1 size-3 animate-spin" />
-                        {generatingImageShotIds.size}/{missingImgs} images…
-                      </>
-                    ) : (
-                      <>
-                        <ImageIcon className="mr-1 size-3" />
-                        {missingImgs > 0 ? `${missingImgs} Images` : 'All Done'}
-                      </>
-                    )}
-                  </Button>
-                )
-              })()}
-              {(() => {
-                const pendingVids = shots.filter((s) => {
-                  const c = videoClips.find((v) => v.shotId === s.shotId)
-                  return !c || c.status === 'pending' || c.status === 'failed'
-                }).length
-                return (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    disabled={!!generatingVideoShotId || pendingVids === 0}
-                    onClick={() => generateAllVideos()}
-                  >
-                    {generatingVideoShotId ? (
-                      <>
-                        <Loader2 className="mr-1 size-3 animate-spin" />
-                        Video…
-                      </>
-                    ) : (
-                      <>
-                        <Video className="mr-1 size-3" />
-                        {pendingVids > 0 ? `${pendingVids} Videos` : 'All Done'}
-                      </>
-                    )}
-                  </Button>
-                )
-              })()}
+      {nodes.length === 0 && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="text-center text-sm text-muted-foreground">
+            캔버스를 더블클릭해서 첫 Scene을 만들어 보세요.
+            <div className="mt-1 text-xs opacity-70">
+              Scene → Shot → Video 순서로 그래프가 자라요.
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3 overflow-y-auto">
-            {sceneShots.map((shot) => {
-              const imgUrl = shot.referenceImageUrl
-              const charAvatars = getShotCharAvatars(shot.characters)
-              const clip = videoClips.find((c) => c.shotId === shot.shotId)
-              const isGenImg = generatingImageShotIds.has(shot.shotId)
+        </div>
+      )}
 
-              return (
-                <button
-                  key={shot.shotId}
-                  onClick={() => selectShot(shot.shotId)}
-                  className={`rounded-lg border p-3 text-left transition-colors ${
-                    selectedShotId === shot.shotId
-                      ? 'border-primary bg-accent'
-                      : 'border-border hover:bg-accent/50'
-                  }`}
-                >
-                  {/* Character avatars */}
-                  {charAvatars.length > 0 && (
-                    <div className="mb-2 flex -space-x-1.5">
-                      {charAvatars.map((char) =>
-                        char!.views.front ? (
-                          <img
-                            key={char!.characterId}
-                            src={char!.views.front}
-                            alt={char!.name}
-                            className="h-5 w-5 rounded-full border border-background object-cover"
-                          />
-                        ) : (
-                          <div
-                            key={char!.characterId}
-                            className="flex h-5 w-5 items-center justify-center rounded-full border border-background bg-muted text-[8px] font-medium"
-                          >
-                            {char!.name[0]}
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  )}
+      <CreatorModal
+        open={creatorOpen}
+        position={creatorPosition}
+        onClose={() => {
+          setCreatorOpen(false)
+          setCreatorPosition(null)
+        }}
+      />
+      <RelationModal />
+      <DeleteConfirmModal />
+      <DirectorNodePopup />
+    </div>
+  )
+}
 
-                  {/* Shot thumbnail */}
-                  <div className="group relative mb-2 flex aspect-video items-center justify-center overflow-hidden rounded-md bg-muted">
-                    {isGenImg ? (
-                      <Loader2 className="size-5 animate-spin text-muted-foreground" />
-                    ) : imgUrl ? (
-                      <>
-                        <img
-                          src={imgUrl}
-                          alt={shot.actionDescription}
-                          className="h-full w-full object-cover"
-                        />
-                        <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                          {shot.shotType}
-                        </span>
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center gap-1">
-                        <ImageIcon className="size-4 text-muted-foreground" />
-                        <span className="text-[10px] text-muted-foreground">
-                          {shot.shotType}
-                        </span>
-                      </div>
-                    )}
+// ────────────────────────────────────────────────────────────────────────────
 
-                    {/* Video status indicator */}
-                    {clip && clip.status !== 'pending' && (
-                      <span
-                        className={`absolute right-1 top-1 h-2 w-2 rounded-full ${
-                          clip.status === 'completed'
-                            ? 'bg-green-500'
-                            : clip.status === 'generating'
-                              ? 'animate-pulse bg-yellow-500'
-                              : 'bg-red-500'
-                        }`}
-                      />
-                    )}
-                  </div>
+export default function DirectorCanvasPage() {
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left: Meeting Room placeholder (D-7에서 채움) */}
+        <aside className="flex w-9 shrink-0 flex-col items-center border-r border-border bg-card">
+          <span
+            className="mt-4 text-xs text-muted-foreground opacity-50 [writing-mode:vertical-rl]"
+            aria-label="Meeting Room placeholder"
+          >
+            Meeting Room (coming soon)
+          </span>
+        </aside>
 
-                  <p className="truncate text-xs">{shot.actionDescription}</p>
-                  <div className="mt-1 flex items-center gap-1">
-                    <Badge
-                      variant="secondary"
-                      className="cursor-pointer text-[10px] hover:bg-primary hover:text-primary-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleGenerationMethod(shot.shotId)
-                      }}
-                    >
-                      {shot.generationMethod}
-                    </Badge>
-                    <Badge variant="secondary" className="text-[10px]">
-                      {shot.durationSeconds}s
-                    </Badge>
-                    <button
-                      className="ml-auto flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
-                      disabled={isGenImg}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        generateShotImage(shot.shotId)
-                      }}
-                    >
-                      {isGenImg ? (
-                        <Loader2 className="size-3 animate-spin" />
-                      ) : (
-                        <ImageIcon className="size-3" />
-                      )}
-                      {imgUrl ? 'Regen' : 'Gen'}
-                    </button>
-                  </div>
-                </button>
-              )
-            })}
+        {/* Center: Canvas + bottom Palette placeholder */}
+        <div className="relative flex flex-1 flex-col overflow-hidden">
+          <div className="relative flex-1">
+            <ReactFlowProvider>
+              <CanvasInner />
+            </ReactFlowProvider>
+          </div>
+
+          {/* Bottom Palette placeholder (D-6에서 채움) */}
+          <div className="flex h-9 items-center justify-between border-t border-border px-4 text-xs text-muted-foreground">
+            <span className="opacity-50">Palette (coming soon)</span>
+            <Link
+              href="/studio/director/legacy"
+              className={cn(
+                'flex items-center gap-1 rounded px-2 py-0.5',
+                'opacity-50 transition-opacity hover:opacity-100',
+              )}
+              title="결정 #12: 단계적 마이그레이션 — 검증 종료 후 제거"
+            >
+              <span>Legacy view</span>
+              <ArrowUpRight className="size-3" />
+            </Link>
           </div>
         </div>
 
-        <Separator orientation="vertical" />
-
-        {/* Right: Cinematographic Inspector */}
-        <div className="w-72 shrink-0 border-l border-border">
-          <CinematographicInspector
-            shot={selectedShot}
-            onUpdateCamera={(config) =>
-              selectedShotId && updateCamera(selectedShotId, config)
-            }
-            onUpdateLighting={(config) =>
-              selectedShotId && updateLighting(selectedShotId, config)
-            }
-            onUpdateCameraPreset={(changes) =>
-              selectedShotId && updateCameraPreset(selectedShotId, changes)
-            }
-            onApplyMovement={(presetId, intensity) =>
-              selectedShotId &&
-              applyMovementPreset(selectedShotId, presetId, intensity)
-            }
-            onGenerateVideo={() =>
-              selectedShotId && generateVideo(selectedShotId)
-            }
-            isGenerating={generatingVideoShotId === selectedShotId}
-          />
-        </div>
+        {/* 결정 #12 완료: D-3 NodePopup이 카메라/조명/렌즈 편집을 흡수.
+            우측 Inspector aside 제거됨 (D-3 마일스톤, 2026-05-25) */}
       </div>
 
-      <HandoffButton
-        label="Head to Editor"
-        targetStage="editor"
-        disabled={shots.length === 0}
-      />
-    </>
+      <HandoffButton label="Head to Editor" targetStage="editor" />
+    </div>
   )
 }

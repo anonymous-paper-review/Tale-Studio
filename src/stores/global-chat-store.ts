@@ -9,6 +9,11 @@ import {
   type CanvasUpdate,
 } from '@/stores/canvas-store'
 import { useDirectorStore } from '@/stores/director-store'
+import {
+  useDirectorCanvasStore,
+  serializeDirectorCanvasContext,
+  type DirectorCanvasUpdate,
+} from '@/stores/director-canvas-store'
 import { saveChatMessage } from '@/lib/chat-persistence'
 
 export interface GlobalChatMessage {
@@ -116,24 +121,39 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         break
       }
       case 'director': {
-        const d = useDirectorStore.getState()
-        const selectedShot = d.shots.find(
-          (s) => s.shotId === d.selectedShotId,
-        )
-        const shotContext = selectedShot
-          ? {
-              shotType: selectedShot.shotType,
-              actionDescription: selectedShot.actionDescription,
-              camera: selectedShot.camera,
-              lighting: selectedShot.lighting,
-              generationMethod: selectedShot.generationMethod,
-            }
-          : undefined
-        endpoint = '/api/director/chat'
-        body = {
-          message: trimmed,
-          history: historyPayload,
-          shotContext,
+        // D-7: Director Canvas가 노드를 가지고 있으면 agentic 모드 (canvasContext 전달)
+        // 아니면 legacy director-store 모드 (shotContext 전달)
+        const canvasState = useDirectorCanvasStore.getState()
+        const hasCanvasNodes = canvasState.nodes.length > 0
+
+        if (hasCanvasNodes) {
+          const canvasContext = serializeDirectorCanvasContext(canvasState)
+          endpoint = '/api/director/chat'
+          body = {
+            message: trimmed,
+            history: historyPayload,
+            canvasContext,
+          }
+        } else {
+          const d = useDirectorStore.getState()
+          const selectedShot = d.shots.find(
+            (s) => s.shotId === d.selectedShotId,
+          )
+          const shotContext = selectedShot
+            ? {
+                shotType: selectedShot.shotType,
+                actionDescription: selectedShot.actionDescription,
+                camera: selectedShot.camera,
+                lighting: selectedShot.lighting,
+                generationMethod: selectedShot.generationMethod,
+              }
+            : undefined
+          endpoint = '/api/director/chat'
+          body = {
+            message: trimmed,
+            history: historyPayload,
+            shotContext,
+          }
         }
         break
       }
@@ -205,6 +225,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
       }
       if (stage === 'director') {
+        // Agentic 응답 — DirectorCanvasUpdate[]
+        if (Array.isArray(data.updates)) {
+          const result = useDirectorCanvasStore
+            .getState()
+            .applyUpdates(data.updates as DirectorCanvasUpdate[])
+          if (result.skipped.length > 0) {
+            console.warn(
+              '[global-chat-store] director updates skipped:',
+              result.skipped,
+            )
+          }
+        }
+        // Legacy 응답 — suggestedCamera/suggestedLighting
         if (data.suggestedCamera) {
           useDirectorStore
             .getState()

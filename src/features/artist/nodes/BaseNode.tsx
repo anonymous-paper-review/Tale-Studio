@@ -87,7 +87,7 @@ function BaseNodeImpl({ id, data, selected, theme }: Props) {
   return (
     <div
       className={cn(
-        'group relative rounded-lg bg-card transition-[border-width] duration-100',
+        'group relative rounded-lg bg-node-bg-default transition-[border-width] duration-100',
         'border',
         palette.border,
         WIDTH_BY_MODE[data.outputMode],
