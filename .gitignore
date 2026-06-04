@@ -72,5 +72,19 @@ parallel_dev/
 docs/homepage_legacy/
 
 
-# experiment
-experiment/
+# experiment 디렉토리는 원칙적으로 무시하지만 svc-pipeline은 dev 브랜치에서 트랙
+experiment/*
+!experiment/svc-pipeline
+
+# svc-pipeline 내부 — 빌드/런타임/비밀은 제외
+experiment/svc-pipeline/node_modules/
+experiment/svc-pipeline/.next/
+experiment/svc-pipeline/logs/
+experiment/svc-pipeline/.env
+experiment/svc-pipeline/.env.local
+experiment/svc-pipeline/.env.*.local
+experiment/svc-pipeline/*.tsbuildinfo
+experiment/svc-pipeline/next-env.d.ts
+
+# logs
+logs/*
