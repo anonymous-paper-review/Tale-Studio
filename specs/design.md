@@ -1,8 +1,8 @@
 ---
 name: tale-studio design system
-version: 0.2.0
-last_updated: 2026-05-28
-owner: Dev A / Dev B (공동)
+version: 0.3.0
+last_updated: 2026-06-04
+owner: shared
 canonical_implementation: src/app/globals.css
 source_of_truth: 토큰 값은 globals.css. design.md는 *역할 / 사용 룰 / 스케일 정량 명세*.
 ---
@@ -32,12 +32,11 @@ tale-studio는 **B2B AI 비디오 파이프라인 (Tale)** 의 내부 도구다.
 4. **키보드 일등 시민**
 5. **한 화면 정보 위계 2단까지**
 
-### 5 hard rules (`.claude/rules/design.md`와 동일)
+### 4 hard rules (`.claude/rules/design.md`와 동일)
 1. **Dark-first with light parity**. light-only 금지.
 2. **One accent** (Netflix Red `#E50914`, decisions #30) — CTA + active state만. 카테고리 색 분기 금지.
 3. **Geist Mono** — camera-axis values, render IDs, frame numbers.
-4. **캔버스 노드 shadow 금지**. Hairline 1px border만.
-5. **캔버스 확장 토큰** (`--canvas-*`, `--node-*`, `--edge-*`) 사용. 새 토큰 만들지 말 것.
+4. **캔버스 확장 토큰** (`--canvas-*`, `--node-*`, `--edge-*`) 사용. 새 토큰 만들지 말 것.
 
 ### "We are NOT" exclusion list
 1. **NOT Higgsfield** — glassmorphism, neon edge-glow, volumetric 3D icon, liquid-glass surface, creator-prosumer flourish 금지.
@@ -154,7 +153,25 @@ Tailwind 클래스: `bg-success`, `text-success-foreground`, `border-success` (w
 - Raw hex / RGB in `*.tsx` (globals.css 외)
 - Saturated 카테고리 배너 (n8n-style)
 - Glassmorphism `bg-white/N + backdrop-blur` (decoration용)
-- 캔버스 노드 box-shadow / glow
+
+### 2.9 Stage 색 (파이프라인 P1~P5)
+
+GlobalChat badge + AgentFace 등 **단계 식별**용. chart 토큰(엔티티 노드, §2.2)과 의미축이 다르므로 별도 토큰.
+
+| 토큰 | Dark 값 | Stage | 사용처 |
+|---|---|---|---|
+| `--stage-producer` | `oklch(0.606 0.25 292.717)` (violet) | P1 Producer | badge, agent face |
+| `--stage-writer` | `oklch(0.623 0.214 259.815)` (blue) | P2 Writer | badge, agent face |
+| `--stage-artist` | `oklch(0.769 0.188 70.08)` (amber) | P3 Artist | badge, agent face |
+| `--stage-director` | `oklch(0.645 0.246 16.439)` (rose) | P4 Director | badge, agent face |
+| `--stage-editor` | `oklch(0.696 0.17 162.48)` (emerald) | P5 Editor | badge, agent face |
+
+Tailwind 클래스: `bg-stage-{id}`, `text-stage-{id}`, `border-stage-{id}` (+ 알파 `/15` `/30`). SVG fill/stroke는 `var(--stage-{id})` 또는 `currentColor`.
+
+**룰**:
+- **director는 rose** — `--primary`(Netflix Red)와 분리해 one-accent 룰 보존. 단계 색은 *식별*용일 뿐 CTA 아님.
+- face와 badge는 **같은 stage 색** 사용 (불일치 금지).
+- 단계 색 정의/조회는 `src/lib/constants.ts` 단일 source (`STAGE_BADGE_CLASS` / `STAGE_FACE_COLOR`).
 
 ---
 
@@ -357,6 +374,8 @@ Tailwind v4 default 그대로:
 | Checkbox / Radio | size-4 (16) |
 | Switch | h-5 w-9 (20×36) |
 
+**Footer 정렬 예외**: 패널 하단 footer(`p-4 border-t`)에서 입력행을 CTA(`Button lg` = h-10)와 같은 선 높이로 맞출 때는 Input/icon-button을 **h-10 / `size="icon-lg"`** 로 override. footer 총높이 = `p-4(16)+h-10(40)+p-4(16)` = 72px. 예: GlobalChat 입력부 ↔ HandoffButton.
+
 ### 6.3 Modal sizes
 
 | Size | max-w |
@@ -474,7 +493,7 @@ inner radius ≤ outer radius. 예: 카드(`rounded-xl 12`) 안의 button (`roun
 | Dialog | `shadow-lg` |
 | Sheet | `shadow-none` (edge fixed, shadow unnecessary) |
 | Toast | `shadow-xl` |
-| **Canvas node** | **`shadow-none` 강제** — selection halo로 표현 (§17.6) |
+| **Canvas node** | `shadow-none` default — 강조는 selection halo 권장 (§17.6). shadow 사용 자유 |
 | Tooltip | `shadow-sm` |
 
 ### 9.3 Dark mode 전략
@@ -724,6 +743,43 @@ Error message (text-xs text-destructive)  ← invalid 시
 - Long form section header `sticky top-14 (header offset)`
 - 캔버스 toolbar: `absolute top-2 right-2` (sticky 아님, viewport 변형 안 됨)
 
+### 13.8 Component patterns (shadcn primitives)
+
+shadcn CLI(`npx shadcn@latest add <name>`)로 생성, `src/components/ui/`에 위치. 모든 variant×size×state를 **살아있는 토큰으로 렌더하는 카탈로그는 `/design` 쇼케이스 페이지** (`src/app/design/page.tsx`). 새 색·variant 추가 시 거기서 먼저 시각 확인.
+
+**Primitive 인벤토리** (값/스타일은 각 CVA + globals.css 참조 — 여기 복제 금지):
+
+| Primitive | 주요 variant / size | 비고 |
+|---|---|---|
+| `Button` | variant: default·destructive·outline·secondary·ghost·link / size: default(h-9)·xs·sm·lg(h-10)·icon·icon-xs·icon-sm·icon-lg | CTA=default(`--primary`). icon-lg=size-10 |
+| `Input` | size: 기본 h-9 (§6.2). footer 정렬 시 `h-10` override | `border-input` `focus-visible:ring-ring/50` |
+| `Select` | trigger size: default(h-9)·sm(h-8). raw `<select>` 대체 | Radix Select, `border-input` |
+| `Badge` | `rounded-full` pill (§7.1). stage 색은 §2.9 토큰 | |
+| `Tabs` / `Slider` / `Tooltip` / `Dialog` / `DropdownMenu` / `Popover` / `Separator` / `Textarea` / `ScrollArea` / `Sonner`(toast) | shadcn 기본 | 모두 토큰 소비 |
+
+**표준 조합 스니펫**:
+
+```tsx
+// 패널 하단 footer (CTA) — §6.2 Footer 정렬 (72px)
+<div className="border-t border-border p-4">
+  <Button size="lg" className="w-full">{label}<ArrowRight className="ml-2 h-4 w-4" /></Button>
+</div>
+
+// 입력 footer (CTA와 같은 선 높이) — §6.2 예외
+<div className="border-t border-border p-4">
+  <div className="flex gap-2">
+    <Input className="h-10" placeholder={...} />
+    <Button size="icon-lg"><Send className="size-4" /></Button>
+  </div>
+</div>
+
+// stage badge — §2.9 토큰 (face와 동일 색)
+<span className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium
+  bg-stage-writer/15 text-stage-writer border-stage-writer/30">P2 · Writer</span>
+```
+
+**룰**: `src/components/ui/*`는 CLI 관리 — 직접 편집 시 다음 `add`가 덮어쓸 수 있음. 커스텀은 `src/components/<feature>/`. raw hex/px 금지, 토큰만.
+
 ---
 
 ## 14. Iconography
@@ -894,7 +950,7 @@ Height: content-driven (auto). min-h-20 (80px) 최소.
 
 - `ring-2 ring-ring ring-offset-2 ring-offset-canvas-bg`
 - 진입 100ms ease-out
-- 노드 box-shadow 금지 (강조는 halo로만)
+- 강조는 selection halo 권장 (box-shadow 사용 자유)
 
 ### 17.7 Pan / zoom defaults
 
@@ -965,7 +1021,7 @@ export function ActorNode({ data, selected }: NodeProps<ActorNodeData>) {
         // L: 240 / 5-View: 320 / 16-Angle: 400 (§17.1)
         'w-60',  // single mode default
         'min-h-20',
-        // border, no shadow (§9.2, hard rule 4)
+        // border 기반 (§9.2). shadow는 자유
         'border border-border bg-card rounded-lg',
         // selection halo (§17.6)
         selected && 'ring-2 ring-ring ring-offset-2 ring-offset-background'
@@ -1021,7 +1077,6 @@ export function ActorNode({ data, selected }: NodeProps<ActorNodeData>) {
 ```
 
 **룰 적용 체크**:
-- ✓ shadow-none (canvas node, §9.2)
 - ✓ border-border 1px (§8)
 - ✓ rounded-lg 8px (§7.1)
 - ✓ text-sm font-medium (§4.4)
@@ -1057,7 +1112,7 @@ export function ActorNode({ data, selected }: NodeProps<ActorNodeData>) {
 ### 19.4 design.md drift 방지
 
 - **last_updated 매 PR**: 본 문서 수정 시 frontmatter 날짜 갱신
-- **owner 검증**: Dev A / Dev B 둘 다 PR 리뷰 (공유 영역)
+- **owner 검증**: 공유 영역 변경은 PR 리뷰
 - **`.claude/rules/design.md`가 enforcement**: 작업 중 inject되는 hard rules는 본 문서와 일관 유지
 - **drift 감지**: globals.css 토큰 변경 시 본 문서 §2 표 갱신 PR로 같이
 

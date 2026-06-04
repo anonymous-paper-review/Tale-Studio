@@ -2,7 +2,7 @@
 name: tale-studio design references
 version: 0.1.0
 last_updated: 2026-05-28
-owner: Dev A / Dev B
+owner: shared
 companion_to: specs/design.md
 ---
 
@@ -137,7 +137,7 @@ contributor drift 방지용 명시적 negative space. AI 에이전트가 *없어
 | Color | monochrome warm-neutral foundation + **단일 primary accent** (Netflix Red `#E50914`, decisions #30 — CTA + active state만) + status colors |
 | Typography | Geist Sans + Geist Mono (강제 mono for camera-axis, render ID, frame number, timecode). Tight letter-spacing on body (~-0.005em). Base 14px |
 | Density | chrome info-dense (Linear), media tile 주변 generous (Runway). 캔버스 표면 자체가 콘텐츠 — 주변 chrome 최소 |
-| Surfaces | flat. Hairline 1px border. **캔버스 노드 shadow 금지**. Overlay/popover/dialog에만 subtle shadow |
+| Surfaces | flat 우선. Hairline 1px border 기본 (캔버스 노드 shadow 사용 자유). Overlay/popover/dialog에만 subtle shadow |
 | Canvas tokens | shadcn 표준 외 extension namespace (`--canvas-*`, `--node-*`, `--edge-*`). 5 studio 중 2개에 load-bearing |
 | Iconography | Lucide stroke 1.5, 16/20px, no fill, 단일 weight, 단일 radius. Phosphor / Hero mix 금지 |
 | Motion | sub-200ms easing; no spring bounce; canvas pan/zoom React Flow default; "generating" state는 subtle pulse, loud spinner 금지 |
