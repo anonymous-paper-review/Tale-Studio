@@ -20,7 +20,7 @@ import {
   type OnConnectEnd,
   type XYPosition,
 } from '@xyflow/react'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, Loader2, ImageIcon } from 'lucide-react'
 import Link from 'next/link'
 
 import { HandoffButton } from '@/components/layout/handoff-button'
@@ -32,6 +32,7 @@ import {
   isSceneData,
   SNAP_GRID,
 } from '@/types/director-canvas'
+import { StoryboardGridView } from '@/features/director/canvas-views/StoryboardGridView'
 
 import { SceneNode } from '@/features/director/canvas-nodes/SceneNode'
 import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
@@ -241,7 +242,97 @@ function CanvasInner() {
 
 // ────────────────────────────────────────────────────────────────────────────
 
+function PaletteBar() {
+  const viewMode = useDirectorCanvasStore((s) => s.viewMode)
+  const setViewMode = useDirectorCanvasStore((s) => s.setViewMode)
+  const nodes = useDirectorCanvasStore((s) => s.nodes)
+  const generateAllStoryboardImages = useDirectorCanvasStore(
+    (s) => s.generateAllStoryboardImages,
+  )
+
+  const shots = nodes.filter((n) => isShotData(n.data))
+  const totalShots = shots.length
+  const completedShots = shots.filter(
+    (n) => isShotData(n.data) && n.data.storyboardImage?.status === 'completed',
+  ).length
+  const isGenerating = shots.some(
+    (n) =>
+      isShotData(n.data) && n.data.storyboardImage?.status === 'generating',
+  )
+
+  return (
+    <div className="flex h-11 items-center justify-between border-t border-border px-4">
+      <div className="flex items-center gap-4">
+        {/* Node / Storyboard 토글 */}
+        <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+          {(['node', 'storyboard'] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setViewMode(mode)}
+              className={cn(
+                'rounded px-3 py-1 text-xs font-medium transition-colors duration-100',
+                viewMode === mode
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {mode === 'node' ? 'Node' : 'Storyboard'}
+            </button>
+          ))}
+        </div>
+
+        {/* 스토리보드 일괄 생성 */}
+        <button
+          type="button"
+          onClick={() => {
+            void generateAllStoryboardImages()
+          }}
+          disabled={isGenerating || totalShots === 0}
+          aria-busy={isGenerating}
+          className={cn(
+            'flex h-8 items-center gap-2 rounded-md border border-border px-3',
+            'text-xs font-medium text-foreground',
+            'transition-colors duration-100 hover:bg-accent',
+            (isGenerating || totalShots === 0) &&
+              'cursor-not-allowed opacity-50',
+            isGenerating && 'opacity-70',
+          )}
+        >
+          {isGenerating ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <ImageIcon className="size-4" />
+          )}
+          <span>스토리보드 생성</span>
+          {totalShots > 0 && (
+            <span className="font-mono tabular-nums text-muted-foreground">
+              {completedShots}/{totalShots}
+            </span>
+          )}
+        </button>
+      </div>
+
+      <Link
+        href="/studio/director/legacy"
+        className={cn(
+          'flex items-center gap-1 rounded px-2 py-0.5 text-xs text-muted-foreground',
+          'opacity-50 transition-opacity hover:opacity-100',
+        )}
+        title="결정 #12: 단계적 마이그레이션 — 검증 종료 후 제거"
+      >
+        <span>Legacy view</span>
+        <ArrowUpRight className="size-3" />
+      </Link>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 export default function DirectorCanvasPage() {
+  const viewMode = useDirectorCanvasStore((s) => s.viewMode)
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex flex-1 overflow-hidden">
@@ -255,29 +346,22 @@ export default function DirectorCanvasPage() {
           </span>
         </aside>
 
-        {/* Center: Canvas + bottom Palette placeholder */}
+        {/* Center: Canvas (Node/Storyboard) + bottom Palette bar */}
         <div className="relative flex flex-1 flex-col overflow-hidden">
           <div className="relative flex-1">
-            <ReactFlowProvider>
-              <CanvasInner />
-            </ReactFlowProvider>
+            {viewMode === 'storyboard' ? (
+              <StoryboardGridView />
+            ) : (
+              <ReactFlowProvider>
+                <CanvasInner />
+              </ReactFlowProvider>
+            )}
           </div>
 
-          {/* Bottom Palette placeholder (D-6에서 채움) */}
-          <div className="flex h-9 items-center justify-between border-t border-border px-4 text-xs text-muted-foreground">
-            <span className="opacity-50">Palette (coming soon)</span>
-            <Link
-              href="/studio/director/legacy"
-              className={cn(
-                'flex items-center gap-1 rounded px-2 py-0.5',
-                'opacity-50 transition-opacity hover:opacity-100',
-              )}
-              title="결정 #12: 단계적 마이그레이션 — 검증 종료 후 제거"
-            >
-              <span>Legacy view</span>
-              <ArrowUpRight className="size-3" />
-            </Link>
-          </div>
+          {/* Storyboard 뷰에서도 더블클릭 편집 팝업이 동작하도록 viewMode 무관 마운트 */}
+          {viewMode === 'storyboard' && <DirectorNodePopup />}
+
+          <PaletteBar />
         </div>
 
         {/* 결정 #12 완료: D-3 NodePopup이 카메라/조명/렌즈 편집을 흡수.

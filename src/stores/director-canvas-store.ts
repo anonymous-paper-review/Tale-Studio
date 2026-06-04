@@ -29,6 +29,10 @@ import {
   type DirectorVideoStatus,
   type DirectorVideoProvider,
 } from '@/types/director-canvas'
+import {
+  useAssetStorageStore,
+  type RegisteredCharacter,
+} from '@/stores/asset-storage-store'
 
 // ============================================================================
 // Defaults
@@ -71,12 +75,14 @@ function makeShotData(label: string, parentSceneNodeId: string | null): ShotNode
     parentSceneNodeId,
     prompt: '',
     referenceImages: [],
+    storyboardImage: null,
     characterAssetIds: [],
     worldAssetIds: [],
     camera: { ...DEFAULT_CAMERA },
     lighting: { ...DEFAULT_LIGHTING },
     cameraPreset: { ...DEFAULT_CAMERA_PRESET },
     provider: DEFAULT_PROVIDER,
+    generationMethod: 'T2V',
     stale: false,
   }
 }
@@ -97,6 +103,91 @@ function makeVideoData(
     final: false,
     stale: false,
   }
+}
+
+// ============================================================================
+// ST-2: Storyboard image (I2I) helpers
+// ============================================================================
+
+/** RegisteredCharacter/World에서 대표 이미지 URL 1장 선택 (referenceImages 우선, 없으면 single view) */
+function pickAssetImageUrl(reg: RegisteredCharacter | undefined): string | null {
+  if (!reg) return null
+  if (reg.referenceImages[0]) return reg.referenceImages[0]
+  return reg.views.single[0]?.url ?? null
+}
+
+/** Shot에 연결된 actor+world asset의 대표 이미지 URL을 모은다 (I2I 입력, 결정 #36) */
+function resolveShotAssetImages(data: ShotNodeData): string[] {
+  const store = useAssetStorageStore.getState()
+  const urls: string[] = []
+  for (const id of data.characterAssetIds) {
+    const u = pickAssetImageUrl(store.getCharacter(id))
+    if (u) urls.push(u)
+  }
+  for (const id of data.worldAssetIds) {
+    const u = pickAssetImageUrl(store.getWorld(id))
+    if (u) urls.push(u)
+  }
+  return urls
+}
+
+/** 생성된 이미지 blob을 Supabase Storage에 영속화 → publicUrl (실패 시 null) */
+async function persistStoryboardImage(
+  projectId: string,
+  shotId: string,
+  blobUrl: string,
+): Promise<string | null> {
+  try {
+    const r = await fetch(blobUrl)
+    const blob = await r.blob()
+    const form = new FormData()
+    form.append('projectId', projectId)
+    form.append('type', 'shot')
+    form.append('entityId', shotId)
+    form.append('field', 'storyboard_image')
+    form.append('file', blob, `${shotId}_storyboard.png`)
+    const res = await fetch('/api/assets/upload-image', {
+      method: 'POST',
+      body: form,
+    })
+    if (!res.ok) return null
+    const { publicUrl } = await res.json()
+    return publicUrl ?? null
+  } catch {
+    return null
+  }
+}
+
+// ============================================================================
+// ST-4: Video generation (I2V/T2V) helpers
+// ============================================================================
+
+const VIDEO_POLL_INTERVAL_MS = 5_000
+const VIDEO_POLL_TIMEOUT_MS = 300_000
+
+/** 완료된 영상 URL을 Storage에 영속화 → 저장 URL (실패 시 원본 URL) */
+async function persistDirectorVideo(
+  projectId: string,
+  shotId: string,
+  videoUrl: string,
+): Promise<string> {
+  try {
+    const res = await fetch('/api/assets/upload-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoUrl, projectId, shotId }),
+    })
+    if (!res.ok) return videoUrl
+    const { url } = await res.json()
+    return url ?? videoUrl
+  } catch {
+    return videoUrl
+  }
+}
+
+/** director-canvas provider(kling/veo/local) → generate-video 라우트 provider(fal/local) 매핑 */
+function toRouteProvider(p: DirectorVideoProvider): 'fal' | 'local' {
+  return p === 'local' ? 'local' : 'fal'
 }
 
 // ============================================================================
@@ -126,6 +217,7 @@ interface DirectorCanvasState {
   selectedNodeId: string | null
   selectedEdgeId: string | null
   viewport: { x: number; y: number; zoom: number }
+  viewMode: 'node' | 'storyboard'
 
   // popup/modal
   popupNodeId: string | null
@@ -144,6 +236,7 @@ interface DirectorCanvasState {
 
   setProjectId: (projectId: string) => void
   setViewport: (vp: { x: number; y: number; zoom: number }) => void
+  setViewMode: (m: 'node' | 'storyboard') => void
 
   // node lifecycle
   addSceneNode: (position: XYPosition, label?: string) => string
@@ -181,6 +274,16 @@ interface DirectorCanvasState {
     payload?: { url?: string; thumbnailUrl?: string; error?: string },
   ) => void
   applyVideoOverride: (videoNodeId: string, override: VideoOverride) => void
+
+  // storyboard image (ST-2, I2I)
+  /** 단일 Shot의 storyboardImage를 I2I로 생성 (asset 자동 결합 + prompt) */
+  generateStoryboardImage: (shotNodeId: string) => Promise<void>
+  /** 모든 Shot의 storyboardImage 일괄 생성 (씬 순서대로). 영상 생성은 포함 안 함 (결정 #40) */
+  generateAllStoryboardImages: () => Promise<void>
+
+  // video generation (ST-4, I2V/T2V) — 항상 사용자 클릭으로만 (결정 #40)
+  /** Shot에 새 Video take 생성 + 영상 생성 API 호출(+폴링). storyboardImage 있으면 I2V. 생성된 Video 노드 id 반환 */
+  generateVideoForShot: (shotNodeId: string) => Promise<string | null>
 
   // propagation (Shot 설정 변경 → 자식 Video stale)
   propagateStaleFromShot: (shotNodeId: string) => void
@@ -406,6 +509,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       selectedNodeId: null,
       selectedEdgeId: null,
       viewport: { x: 0, y: 0, zoom: 1 },
+      viewMode: 'node',
       popupNodeId: null,
       deleteConfirmInfo: null,
       relationModal: null,
@@ -416,6 +520,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       setProjectId: (projectId) => set({ projectId }),
       setViewport: (vp) => set({ viewport: vp }),
+      setViewMode: (m) => set({ viewMode: m }),
 
       // ─── node lifecycle ────────────────────────────────────────────────
 
@@ -506,10 +611,13 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           'lighting',
           'cameraPreset',
           'provider',
+          'generationMethod',
           'referenceImages',
           'characterAssetIds',
           'worldAssetIds',
         ]
+        // 주: storyboardImage는 제외 — 생성 status 전이(generating/failed)마다 stale 전파되는
+        // 것을 피하기 위함. "새 storyboardImage → 자식 Video stale"은 ST-4에서 명시 처리.
         const isShotConfigChange =
           isShotData(prev.data) &&
           shotConfigKeys.some((k) => k in patch)
@@ -656,6 +764,179 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           }),
           lastSavedAt: Date.now(),
         }))
+      },
+
+      // ─── storyboard image (ST-2, I2I) ──────────────────────────────────
+
+      generateStoryboardImage: async (shotNodeId) => {
+        const api = get()
+        const node = api.nodes.find((n) => n.id === shotNodeId)
+        if (!node || !isShotData(node.data)) return
+        const data = node.data
+        const prevUrl = data.storyboardImage?.url ?? ''
+
+        // status → generating (storyboardImage는 shotConfigKeys 아님 → stale 전파 없음)
+        api.updateNodeData<'shot'>(shotNodeId, {
+          storyboardImage: {
+            url: prevUrl,
+            status: 'generating',
+            errorMessage: null,
+            generatedAt: data.storyboardImage?.generatedAt ?? 0,
+          },
+        })
+
+        try {
+          const referenceImageUrls = resolveShotAssetImages(data)
+          const res = await fetch('/api/generate/image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: data.prompt || data.label,
+              aspectRatio: '16:9',
+              referenceImageUrls,
+            }),
+          })
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}))
+            throw new Error(body.error ?? `HTTP ${res.status}`)
+          }
+          const blob = await res.blob()
+          const blobUrl = URL.createObjectURL(blob)
+          const publicUrl =
+            (await persistStoryboardImage(
+              get().projectId,
+              shotNodeId,
+              blobUrl,
+            )) ?? blobUrl
+
+          get().updateNodeData<'shot'>(shotNodeId, {
+            storyboardImage: {
+              url: publicUrl,
+              status: 'completed',
+              errorMessage: null,
+              generatedAt: Date.now(),
+            },
+          })
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Unknown error'
+          get().updateNodeData<'shot'>(shotNodeId, {
+            storyboardImage: {
+              url: prevUrl,
+              status: 'failed',
+              errorMessage: message,
+              generatedAt: 0,
+            },
+          })
+        }
+      },
+
+      generateAllStoryboardImages: async () => {
+        // 씬 순서대로 Shot 순회. 순차 실행 (rate limit + 비용 가시성).
+        const sceneNodes = get().nodes.filter((n) => isSceneData(n.data))
+        const orphanShots = get().nodes.filter(
+          (n) => isShotData(n.data) && !n.data.parentSceneNodeId,
+        )
+        const ordered: string[] = []
+        for (const scene of sceneNodes) {
+          for (const shot of getChildShots(get(), scene.id)) {
+            ordered.push(shot.id)
+          }
+        }
+        for (const shot of orphanShots) ordered.push(shot.id)
+
+        for (const shotId of ordered) {
+          await get().generateStoryboardImage(shotId)
+        }
+      },
+
+      // ─── video generation (ST-4) ────────────────────────────────────────
+
+      generateVideoForShot: async (shotNodeId) => {
+        const api = get()
+        const shotNode = api.nodes.find((n) => n.id === shotNodeId)
+        if (!shotNode || !isShotData(shotNode.data)) return null
+        const shot = shotNode.data
+
+        // 새 Video take 생성 (마더 설정 상속, 결정 #13)
+        const videoNodeId = api.addVideoTake(shotNodeId)
+        if (!videoNodeId) return null
+
+        const eff = getEffectiveShotConfig(get(), videoNodeId)
+        if (!eff) return null
+
+        // 레퍼런스 결정: storyboardImage(완료) 우선 → 유저 업로드 → 없으면 T2V (결정 #40)
+        const storyboardUrl =
+          shot.storyboardImage?.status === 'completed' &&
+          shot.storyboardImage.url
+            ? shot.storyboardImage.url
+            : null
+        const referenceImageUrl =
+          storyboardUrl ?? shot.referenceImages[0]?.url ?? null
+        const generationMethod: 'T2V' | 'I2V' = referenceImageUrl
+          ? 'I2V'
+          : 'T2V'
+
+        get().setVideoStatus(videoNodeId, 'generating')
+
+        try {
+          const res = await fetch('/api/director/generate-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              shotId: shotNodeId,
+              // TODO(ST-4 후속): writer 시간 축 연출 정보(움직임/카메라 동선)를 prompt에 추가 투입.
+              // 현재는 Shot prompt만 사용 (writer-store 연동은 D-4 sync 이후).
+              prompt: eff.prompt,
+              camera: eff.camera,
+              cameraPreset: eff.cameraPreset,
+              aspectRatio: '16:9',
+              generationMethod,
+              provider: toRouteProvider(eff.provider),
+              referenceImageUrl,
+            }),
+          })
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}))
+            throw new Error(body.error ?? `HTTP ${res.status}`)
+          }
+          const { taskId, provider: respProvider, model } = await res.json()
+
+          const pollUrl = `/api/director/generate-video/${encodeURIComponent(
+            taskId,
+          )}?provider=${respProvider}&model=${encodeURIComponent(model)}`
+
+          const startedAt = Date.now()
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            if (Date.now() - startedAt > VIDEO_POLL_TIMEOUT_MS) {
+              throw new Error('영상 생성 타임아웃 (5분)')
+            }
+            const pollRes = await fetch(pollUrl)
+            if (!pollRes.ok) {
+              const e = await pollRes.json().catch(() => ({}))
+              throw new Error(e.error ?? `폴링 실패 HTTP ${pollRes.status}`)
+            }
+            const poll = await pollRes.json()
+            if (poll.status === 'completed') {
+              const savedUrl = await persistDirectorVideo(
+                get().projectId,
+                shotNodeId,
+                poll.url,
+              )
+              get().setVideoStatus(videoNodeId, 'completed', { url: savedUrl })
+              break
+            }
+            if (poll.status === 'failed') {
+              throw new Error(poll.error ?? '영상 생성 실패')
+            }
+            await new Promise((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS))
+          }
+          return videoNodeId
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Unknown error'
+          get().setVideoStatus(videoNodeId, 'failed', { error: message })
+          return videoNodeId
+        }
       },
 
       // ─── propagation ───────────────────────────────────────────────────
@@ -1023,6 +1304,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         nodes: s.nodes,
         edges: s.edges,
         viewport: s.viewport,
+        viewMode: s.viewMode,
         projectId: s.projectId,
         lastSavedAt: s.lastSavedAt,
       }),

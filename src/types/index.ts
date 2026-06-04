@@ -19,6 +19,7 @@ export type {
   DirectorVideoStatus,
   DirectorVideoProvider,
   DirectorReferenceImage,
+  StoryboardImage,
   SceneNodeData,
   ShotNodeData,
   VideoNodeData,

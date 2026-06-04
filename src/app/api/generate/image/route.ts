@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
+import { falImageGenerate } from '@/lib/svc/llm/fal'
 
 function getApiKey(): string {
   const keys = process.env.GOOGLE_API_KEYS ?? ''
@@ -95,15 +96,53 @@ async function generateViaGemini(
   })
 }
 
+/* ── fal.ai (default) ──
+ * T2I: openai/gpt-image-2. I2I: referenceImageUrls 있으면 fal 래퍼가 자동으로
+ * openai/gpt-image-2/edit (image_urls 입력) 으로 라우팅한다 (src/lib/svc/llm/fal.ts).
+ * fal은 호스팅 URL을 반환하므로, 기존 호출부(blob 소비) 계약 유지를 위해 바이트로 다시 받아 반환한다.
+ */
+async function generateViaFal(
+  prompt: string,
+  aspectRatio: string,
+  referenceImageUrls?: string[],
+): Promise<Response> {
+  const { url } = await falImageGenerate({
+    prompt,
+    aspect_ratio: aspectRatio,
+    reference_image_urls: referenceImageUrls?.length
+      ? referenceImageUrls
+      : undefined,
+  })
+
+  const imgRes = await fetch(url)
+  if (!imgRes.ok) {
+    throw new Error(`fal image fetch failed (${imgRes.status})`)
+  }
+  const buffer = Buffer.from(await imgRes.arrayBuffer())
+  const contentType = imgRes.headers.get('content-type') ?? 'image/png'
+
+  return new Response(buffer, {
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': String(buffer.length),
+    },
+  })
+}
+
 export async function POST(req: Request) {
-  let providerUsed: 'tailscale' | 'gemini' = 'gemini'
+  let providerUsed: 'fal' | 'tailscale' | 'gemini' = 'fal'
   try {
     const user = await getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { prompt, aspectRatio = '1:1', provider } = await req.json()
+    const {
+      prompt,
+      aspectRatio = '1:1',
+      provider,
+      referenceImageUrls,
+    } = await req.json()
 
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json(
@@ -112,16 +151,25 @@ export async function POST(req: Request) {
       )
     }
 
-    // provider: 'tailscale' | 'gemini' (default)
-    providerUsed = provider === 'tailscale' ? 'tailscale' : 'gemini'
+    // provider: 'fal' (default, T2I+I2I) | 'tailscale' | 'gemini'
+    providerUsed =
+      provider === 'tailscale'
+        ? 'tailscale'
+        : provider === 'gemini'
+          ? 'gemini'
+          : 'fal'
     if (providerUsed === 'tailscale') {
       return await generateViaTailscale(prompt, aspectRatio)
     }
-    return await generateViaGemini(prompt, aspectRatio)
+    if (providerUsed === 'gemini') {
+      return await generateViaGemini(prompt, aspectRatio)
+    }
+    return await generateViaFal(prompt, aspectRatio, referenceImageUrls)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[generate/image]', {
       provider: providerUsed,
+      hasFalKey: !!process.env.FAL_KEY,
       hasGoogleKey: !!process.env.GOOGLE_API_KEYS,
       hasTailscaleUrl: !!process.env.TAILSCALE_IMAGE_API_URL,
       message,

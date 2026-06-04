@@ -1,5 +1,10 @@
 import type { Node, Edge } from '@xyflow/react'
-import type { CameraConfig, LightingConfig, CameraPreset } from '@/types/shot'
+import type {
+  CameraConfig,
+  LightingConfig,
+  CameraPreset,
+  GenerationMethod,
+} from '@/types/shot'
 
 // ============================================================================
 // Director Canvas Types — specs/layers/director_canvas.md §2~7
@@ -21,10 +26,23 @@ export type DirectorVideoProvider = 'kling' | 'veo' | 'local'
 
 // ─── Reference / Asset ─────────────────────────────────────────────────────
 
+/** 사용자가 직접 업로드한 보조 참고 이미지 (생성물 아님). */
 export type DirectorReferenceImage = {
   id: string
   url: string
   uploadedAt: number
+}
+
+/**
+ * I2I로 생성된 샷 대표 이미지 (샷당 1장, 내부 결정 #36/#37).
+ * 입력: 연결된 actor+world asset 이미지 자동 결합 + 샷 프롬프트.
+ * 이 이미지가 해당 샷 I2V 영상 생성의 기본 레퍼런스가 된다.
+ */
+export type StoryboardImage = {
+  url: string
+  status: DirectorVideoStatus // 'pending'|'generating'|'completed'|'failed' 재사용
+  errorMessage: string | null
+  generatedAt: number
 }
 
 // ─── Scene Node ────────────────────────────────────────────────────────────
@@ -51,7 +69,10 @@ export type ShotNodeData = {
   /** 부모 Scene Canvas 노드 ID */
   parentSceneNodeId: string | null
   prompt: string
+  /** 사용자 업로드 보조 참고 이미지 (생성물 아님 — storyboardImage와 구분, 결정 #37) */
   referenceImages: DirectorReferenceImage[]
+  /** I2I 생성 샷 대표 이미지 (샷당 1장, I2V 기본 레퍼런스). null = 미생성 */
+  storyboardImage: StoryboardImage | null
   /** Artist Asset Storage RegisteredCharacter.id 목록 (references 엣지는 논리적) */
   characterAssetIds: string[]
   /** Artist Asset Storage RegisteredWorld.id 목록 */
@@ -60,6 +81,8 @@ export type ShotNodeData = {
   lighting: LightingConfig
   cameraPreset: CameraPreset
   provider: DirectorVideoProvider
+  /** 영상 생성 방식. storyboardImage/레퍼런스 있으면 I2V, 없으면 T2V (결정 #36) */
+  generationMethod: GenerationMethod
   /** Shot 설정 변경 시 자식 Video stale 표시 (시그널, 자동 재생성 X) */
   stale: boolean
   [key: string]: unknown
