@@ -146,7 +146,7 @@ export function VideoNodePopup({ nodeId, data }: Props) {
                 className={cn(
                   'size-4',
                   data.final
-                    ? 'fill-amber-400 text-amber-400'
+                    ? 'fill-warning text-warning'
                     : 'text-muted-foreground',
                 )}
               />
@@ -186,7 +186,7 @@ export function VideoNodePopup({ nodeId, data }: Props) {
                 {overrideKeys.includes('prompt') && (
                   <Badge
                     variant="outline"
-                    className="border-amber-400/50 bg-amber-400/10 text-[9px] uppercase text-amber-500"
+                    className="border-warning/50 bg-warning/10 text-[9px] uppercase text-warning"
                   >
                     overridden
                   </Badge>

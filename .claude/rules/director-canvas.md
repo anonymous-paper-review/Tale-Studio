@@ -3,10 +3,9 @@ paths:
   - "src/features/director/**/*.{tsx,ts}"
 ---
 
-# Director Canvas (Dev B)
+# Director Canvas
 
-## Owner & Status
-- **Owner**: Dev B (브랜치 `feature/director-editor`)
+## Status
 - **Status**: Director Canvas 노드 그래프 재설계 진행 중 (2026-05-25~)
 - **Spec**: `specs/layers/director_canvas.md`
 - **진행 중 변경**: `specs/changes/redesign-director-canvas/` (proposal, tasks, deltas)
@@ -30,11 +29,11 @@ paths:
 - `hooks/` — React hooks (use-director-canvas-warm-starting 등)
 
 ## 컨벤션
-- 노드 컴포넌트는 `@/components/ui` 직접 import 금지 — 캔버스 확장 토큰만 사용
+- 노드 컴포넌트: plain shadcn primitive(`Button`/`Input`/`Badge` 등 제자리 렌더) OK. **Radix portal 위젯(`Select`/`Popover`/`Tooltip`/`Dialog`/`DropdownMenu`)은 노드 본체 금지** — RF pane 밖 portal로 pan/zoom·포인터 충돌, popup/모달에 둘 것. 색은 캔버스 확장 토큰 우선
 - Video 노드 헤더 ★ = Final 토글. Shot당 1개 강제 (내부 #11)
 - Inspector aside는 단계적 마이그레이션 (내부 #12, D-3 완료 시 제거 — 이미 진행됨)
 - 노드 위치 저장: `scenes` / `shots` / `video_clips` 테이블 `canvas_position` JSONB (내부 #15)
 
 ## 안 건드릴 곳
-- `../artist/canvas-*` — Dev A 소유. 패턴 참고는 OK, 직접 편집 금지
-- `../../stores/artist-store.ts`, `canvas-store.ts`, `asset-storage-store.ts` — Dev A 소유
+- `../artist/canvas-*` — 패턴 참고는 OK, 직접 편집 금지
+- `../../stores/artist-store.ts`, `canvas-store.ts`, `asset-storage-store.ts` — 직접 편집 금지

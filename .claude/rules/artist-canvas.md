@@ -3,10 +3,9 @@ paths:
   - "src/features/artist/**/*.{tsx,ts}"
 ---
 
-# Artist L0 Concept Canvas (Dev A)
+# Artist L0 Concept Canvas
 
-## Owner & Status
-- **Owner**: Dev A (브랜치 `feature/producer-writer-artist`)
+## Status
 - **Status**: L0 Concept Canvas 노드 그래프 재설계 진행 중 (2026-05-17~)
 - **Spec**: `specs/layers/L0_concept_canvas.md` + `specs/data/canvas_data_model.md` + `specs/data/asset_storage.md`
 - **진행 중 변경**: `specs/changes/redesign-l0-canvas/` (proposal, tasks, deltas)
@@ -39,10 +38,10 @@ paths:
 - `canvas-popups/` — NodePopup, RelationModal, DeleteConfirmModal, registration 폼
 
 ## 컨벤션
-- 노드 컴포넌트는 `@/components/ui` 직접 import 금지 — 캔버스 확장 토큰만
+- 노드 컴포넌트: plain shadcn primitive(`Button`/`Input`/`Badge` 등 제자리 렌더) OK. **Radix portal 위젯(`Select`/`Popover`/`Tooltip`/`Dialog`/`DropdownMenu`)은 노드 본체 금지** — RF pane 밖 portal로 pan/zoom·포인터 충돌, popup/모달에 둘 것. 색은 캔버스 확장 토큰 우선
 - 등록 임계값: 누적 이미지 ≥ 20장 (Higgsfield Soul ID 차용, decisions #29.5)
 - 프롬프트만 전파, 이미지 재생성은 수동 (decisions #29.6)
 
 ## 안 건드릴 곳
-- `../director/canvas-*` — Dev B 소유
-- `../../stores/director-store.ts`, `director-canvas-store.ts`, `editor-store.ts` — Dev B 소유
+- `../director/canvas-*` — 직접 편집 금지. 패턴 참고는 OK
+- `../../stores/director-store.ts`, `director-canvas-store.ts`, `editor-store.ts` — 직접 편집 금지

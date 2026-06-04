@@ -3,6 +3,7 @@
 import { memo, type ReactNode } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import { Copy, Edit, GitBranch, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
 
@@ -164,37 +165,42 @@ function BaseNodeImpl({
         <div className="flex items-center gap-0.5">
           {headerExtra}
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-            <button
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={handleEdit}
-              className="rounded p-0.5 hover:bg-accent"
               aria-label="Edit"
             >
               <Edit className="size-3" />
-            </button>
+            </Button>
             {canBranch && (
-              <button
+              <Button
+                variant="ghost"
+                size="icon-xs"
                 onClick={handleBranch}
-                className="rounded p-0.5 hover:bg-accent"
                 aria-label="Branch"
               >
                 <GitBranch className="size-3" />
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={handleDuplicate}
-              className="rounded p-0.5 hover:bg-accent"
               aria-label="Duplicate"
               disabled
             >
               <Copy className="size-3 opacity-30" />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={handleDelete}
-              className="rounded p-0.5 text-destructive hover:bg-accent"
               aria-label="Delete"
+              className="text-destructive"
             >
               <Trash2 className="size-3" />
-            </button>
+            </Button>
           </div>
         </div>
       </div>

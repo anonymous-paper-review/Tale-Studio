@@ -67,7 +67,7 @@ export function DeleteConfirmModal() {
                 key={i}
                 className={
                   line.startsWith('⚠')
-                    ? 'text-amber-500'
+                    ? 'text-warning'
                     : 'text-destructive'
                 }
               >

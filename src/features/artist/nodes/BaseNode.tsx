@@ -4,6 +4,7 @@ import { memo } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import { cn } from '@/lib/utils'
 import { Copy, Edit, GitBranch, Trash2, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   useCanvasStore,
   type NodeData,
@@ -156,36 +157,41 @@ function BaseNodeImpl({ id, data, selected, theme }: Props) {
           )}
         </span>
         <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
+          <Button
+            variant="ghost"
+            size="icon-xs"
             onClick={stopAndOpenPopup}
-            className="rounded p-0.5 hover:bg-accent"
             aria-label="Edit"
           >
             <Edit className="size-3" />
-          </button>
+          </Button>
           {data.kind !== 'status' && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={stopAndBranch}
-              className="rounded p-0.5 hover:bg-accent"
               aria-label="Branch"
             >
               <GitBranch className="size-3" />
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant="ghost"
+            size="icon-xs"
             onClick={stopAndDuplicate}
-            className="rounded p-0.5 hover:bg-accent"
             aria-label="Duplicate"
           >
             <Copy className="size-3" />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
             onClick={stopAndDelete}
-            className="rounded p-0.5 text-destructive hover:bg-accent"
             aria-label="Delete"
+            className="text-destructive"
           >
             <Trash2 className="size-3" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -224,7 +230,7 @@ function BaseNodeImpl({ id, data, selected, theme }: Props) {
         <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
           <span className="font-mono">{data.outputMode}</span>
           {isGenerating ? (
-            <span className="flex items-center gap-1 font-mono text-amber-600">
+            <span className="flex items-center gap-1 font-mono text-warning">
               <Loader2 className="size-2.5 animate-spin" />
               생성 중
             </span>
