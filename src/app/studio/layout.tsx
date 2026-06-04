@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useProjectStore } from '@/stores/project-store'
+import { useChatUiStore } from '@/stores/chat-ui-store'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Samantha } from '@/components/layout/samantha'
 import { GlobalChat } from '@/components/layout/global-chat'
@@ -21,6 +22,8 @@ export default function StudioLayout({
   const initLoading = useProjectStore((s) => s.initLoading)
   const pathname = usePathname()
   const router = useRouter()
+  const chatWidth = useChatUiStore((s) => s.chatWidth)
+  const chatCollapsed = useChatUiStore((s) => s.collapsed)
   useIdleTimeout()
 
   useEffect(() => {
@@ -45,7 +48,10 @@ export default function StudioLayout({
   return (
     <>
       <Sidebar />
-      <main className="ml-16 mr-80 min-h-screen">
+      <main
+        className="ml-16 min-h-screen transition-[margin] duration-350 ease-out"
+        style={{ marginRight: chatCollapsed ? 0 : chatWidth }}
+      >
         <div className="flex h-screen flex-col">{children}</div>
       </main>
       <GlobalChat />

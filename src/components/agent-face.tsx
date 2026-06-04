@@ -13,7 +13,7 @@ interface AgentFaceProps {
 
 export function AgentFace({
   expression = 'idle',
-  color = '#E50914',
+  color = 'var(--primary)',
   size = 48,
   name,
 }: AgentFaceProps) {
@@ -79,6 +79,7 @@ export function AgentFace({
           width={size}
           height={size}
           className="drop-shadow-md"
+          style={{ color }}
         >
           {/* White face circle */}
           <circle cx="24" cy="24" r="21" fill="white" />
@@ -87,7 +88,7 @@ export function AgentFace({
             cy="24"
             r="21"
             fill="none"
-            stroke={color}
+            stroke="currentColor"
             strokeWidth="2.5"
           />
 
@@ -148,8 +149,8 @@ export function AgentFace({
           />
 
           {/* Cheeks (blush) */}
-          <circle cx="10" cy="24" r="3" fill={color} opacity="0.15" />
-          <circle cx="38" cy="24" r="3" fill={color} opacity="0.15" />
+          <circle cx="10" cy="24" r="3" fill="currentColor" opacity="0.15" />
+          <circle cx="38" cy="24" r="3" fill="currentColor" opacity="0.15" />
 
           {/* Mouth */}
           {getMouth()}
