@@ -1,7 +1,6 @@
-# src/features/editor — Post-Production Suite (Dev B)
+# src/features/editor — Post-Production Suite
 
-## Owner & Status
-- Owner: Dev B (브랜치 `feature/director-editor`)
+## Status
 - Spec: `@../../../specs/ux_pages.md` P5 (Lite 범위)
 
 ## Stack

@@ -1,7 +1,6 @@
-# src/features/director — Director Canvas (Dev B)
+# src/features/director — Director Canvas
 
-## Owner & Status
-- Owner: Dev B (브랜치 `feature/director-editor`)
+## Status
 - Status: Director Canvas 노드 그래프 재설계 진행 중 (2026-05-25~)
 - Spec: `@../../../specs/layers/director_canvas.md`
 - 진행 중 변경: `@../../../specs/changes/redesign-director-canvas/`
@@ -33,7 +32,7 @@
 - 노드 ID는 `nanoid(10)`. URL slug 아님
 - 노드 좌표는 **16px snap**. 자유 좌표 금지 (내부 결정 #18)
 - 선택 halo: `ring-2 ring-node-selected ring-offset-2`
-- 노드 컴포넌트는 `@/components/ui` 직접 import 금지. 캔버스 확장 토큰만 사용
+- 노드 컴포넌트: plain shadcn primitive(`Button`/`Input`/`Badge`) OK. **Radix portal 위젯(`Select`/`Popover`/`Tooltip`/`Dialog`/`DropdownMenu`)은 노드 본체 금지** (RF pane 밖 portal 충돌 → popup/모달에). 색은 캔버스 확장 토큰 우선
 - React Flow `nodeTypes` / `edgeTypes`는 **module-scope 상수** (인라인 객체 매 렌더 재생성 → 성능 저하)
 - 핀 연결은 `connectionMode="loose"` (BaseNode Handle 4면 패턴)
 
@@ -47,5 +46,5 @@
 - NodePopup에서도 토글 가능
 
 ## 안 건드릴 곳
-- `../artist/canvas-*` — Dev A 소유. 패턴 참고는 OK, 직접 편집 금지
-- `../../stores/artist-store.ts`, `canvas-store.ts`, `asset-storage-store.ts` — Dev A 소유
+- `../artist/canvas-*` — 패턴 참고는 OK, 직접 편집 금지
+- `../../stores/artist-store.ts`, `canvas-store.ts`, `asset-storage-store.ts` — 직접 편집 금지

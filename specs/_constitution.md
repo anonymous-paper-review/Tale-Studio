@@ -78,13 +78,6 @@ P1 (Meeting Room) + P2 (Script Room) + P3 (Visual Studio = L0 Concept Canvas) + 
 
 주의: Kling pan/tilt 명명이 일반 시네마토그래피와 반대 (pan=pitch, tilt=yaw). Camera-axis 값은 Geist Mono로 표시.
 
-## 병렬 개발 소유권
-
-- **Dev A**: producer, writer, artist (+ `stores/artist-store.ts`, L0 재설계 시 `canvas-store.ts`로 교체)
-- **Dev B**: director, editor (+ `stores/director-store.ts`, `editor-store.ts`, `director-canvas-store.ts`)
-- **공유 영역** (`types/`, `components/layout/`, `stores/project-store.ts`, `stores/global-chat-store.ts`): main PR + 상대 rebase
-- **브랜치**: Dev A `feature/producer-writer-artist`, Dev B `feature/director-editor`
-
 ## 작업 진행 규약
 
 상태 마커 (`PROGRESS.md` 또는 `specs/changes/*/tasks.md`):

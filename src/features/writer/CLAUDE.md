@@ -1,7 +1,6 @@
-# src/features/writer — The Script Room (Dev A)
+# src/features/writer — The Script Room
 
-## Owner & Status
-- Owner: Dev A (브랜치 `feature/producer-writer-artist`)
+## Status
 - Spec: `@../../../specs/ux_pages.md` P2 + `@../../../specs/layers/L1_scene_architect.md`
 
 ## Stack

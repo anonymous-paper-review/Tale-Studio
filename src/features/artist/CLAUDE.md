@@ -1,7 +1,6 @@
-# src/features/artist — L0 Concept Canvas (Dev A)
+# src/features/artist — L0 Concept Canvas
 
-## Owner & Status
-- Owner: Dev A (브랜치 `feature/producer-writer-artist`)
+## Status
 - Status: L0 Concept Canvas 노드 그래프 재설계 진행 중 (2026-05-17~)
 - Spec: `@../../../specs/layers/L0_concept_canvas.md` + `@../../../specs/data/canvas_data_model.md` + `@../../../specs/data/asset_storage.md`
 - 진행 중 변경: `@../../../specs/changes/redesign-l0-canvas/`
@@ -32,7 +31,7 @@
 - 노드 ID는 `nanoid(10)`
 - 노드 좌표 **16px snap**
 - 선택 halo: `ring-2 ring-node-selected ring-offset-2`
-- 노드 컴포넌트는 `@/components/ui` 직접 import 금지. 캔버스 확장 토큰만
+- 노드 컴포넌트: plain shadcn primitive(`Button`/`Input`/`Badge`) OK. **Radix portal 위젯(`Select`/`Popover`/`Tooltip`/`Dialog`/`DropdownMenu`)은 노드 본체 금지** (RF pane 밖 portal 충돌 → popup/모달에). 색은 캔버스 확장 토큰 우선
 - React Flow `nodeTypes` / `edgeTypes` module-scope 상수
 - 핀 연결 `connectionMode="loose"` (F-2 fix)
 
@@ -56,5 +55,5 @@
 - 프롬프트만 전파, 이미지 재생성은 수동
 
 ## 안 건드릴 곳
-- `../director/canvas-*` — Dev B 소유
-- `../../stores/director-store.ts`, `director-canvas-store.ts`, `editor-store.ts` — Dev B 소유
+- `../director/canvas-*` — 직접 편집 금지. 패턴 참고는 OK
+- `../../stores/director-store.ts`, `director-canvas-store.ts`, `editor-store.ts` — 직접 편집 금지

@@ -9,19 +9,18 @@ paths:
 UI 작업 전 반드시 `specs/design.md`와 `specs/design-references.md`를 읽으세요
 (아직 이번 세션에 읽지 않았다면). 토큰 값의 source-of-truth는 `src/app/globals.css`.
 
-## 5 hard rules (사용자 명시 지시 없이 위반 금지)
+## 4 hard rules (사용자 명시 지시 없이 위반 금지)
 1. **Dark-first with light parity**. light-only 금지.
 2. **One accent** — CTA + active state만. 카테고리 색 분기 금지.
 3. **Geist Mono** — camera-axis 값, render IDs, frame number 표기 필수.
-4. **캔버스 노드 shadow 금지**. Hairline 1px border만.
-5. **캔버스 확장 토큰** (`--canvas-*`, `--node-*`, `--edge-*`) 사용. 새 토큰 만들지 말 것.
+4. **캔버스 확장 토큰** (`--canvas-*`, `--node-*`, `--edge-*`) 사용. 새 토큰 만들지 말 것.
 
 ## 토큰 위치
 - shadcn CSS variables → `src/app/globals.css`
 - 새 색 추가는 globals.css에만 (decisions #30 — "globals.css 토큰 외 신규 색 금지")
 
 ## "We are NOT" exclusion list
-- **NOT Higgsfield** — glassmorphism / neon glow / 캔버스 노드 shadow 금지
+- **NOT Higgsfield** — glassmorphism / neon glow 금지
 - **NOT consumer-creator** — light-mode-first / marketing gradient 금지
 - **NOT n8n-style** — saturated 카테고리 배너 금지
 - **NOT Vercel-extreme** — pure `#000` 금지 (warm near-black)

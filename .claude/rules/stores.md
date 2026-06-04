@@ -19,5 +19,5 @@ paths:
 
 ## 인벤토리
 - 공유: `project-store`, `global-chat-store`
-- Dev A: `producer-store`, `writer-store`, `artist-store` (deprecate 중), `canvas-store`, `asset-storage-store`
-- Dev B: `director-store` (deprecate 중), `director-canvas-store`, `editor-store`
+- `producer-store`, `writer-store`, `artist-store` (deprecate 중), `canvas-store`, `asset-storage-store`
+- `director-store` (deprecate 중), `director-canvas-store`, `editor-store`

@@ -1,7 +1,6 @@
-# src/features/producer — The Meeting Room (Dev A)
+# src/features/producer — The Meeting Room
 
-## Owner & Status
-- Owner: Dev A (브랜치 `feature/producer-writer-artist`)
+## Status
 - Spec: `@../../../specs/ux_pages.md` P1
 
 ## Stack

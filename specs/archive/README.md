@@ -19,7 +19,7 @@
 ## 트리거 — Option Y 이행 시점
 
 - `decisions.md` > 500줄
-- Dev A/B가 같은 entry 동시 편집으로 merge conflict 발생
+- 여러 작업자가 같은 entry 동시 편집으로 merge conflict 발생
 - 결정 cross-reference 많아져 grep으로 항해 어려움
 
 위 트리거 도달 시 별도 세션에서 `decisions.md` → `docs/adr/0001..NNNN.md` 분해 검토. `specs/changes/`, `specs/archive/` 구조 자체는 그대로 유지.

@@ -1,10 +1,10 @@
 # src/stores — Zustand stores
 
 ## 인벤토리
-- `project-store.ts` — 공유 (Dev A & B PR to main)
-- `producer-store.ts`, `writer-store.ts`, `artist-store.ts` — Dev A
-- `director-store.ts`, `editor-store.ts`, `director-canvas-store.ts` — Dev B
-- `canvas-store.ts`, `asset-storage-store.ts` — Dev A (L0 Canvas)
+- `project-store.ts` — 공유
+- `producer-store.ts`, `writer-store.ts`, `artist-store.ts`
+- `director-store.ts`, `editor-store.ts`, `director-canvas-store.ts`
+- `canvas-store.ts`, `asset-storage-store.ts` — (L0 Canvas)
 - `global-chat-store.ts` — 공유
 
 ## 컨벤션

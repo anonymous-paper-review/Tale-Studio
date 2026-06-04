@@ -2,13 +2,13 @@
 
 ## 라우트 5종
 
-| URL | Feature | Owner |
-|---|---|---|
-| `/studio/producer` | `features/producer/` (Meeting Room) | Dev A |
-| `/studio/writer`   | `features/writer/`  (Script Room) | Dev A |
-| `/studio/artist`   | `features/artist/`  (L0 Concept Canvas) | Dev A |
-| `/studio/director` | `features/director/` (Director Canvas) | Dev B |
-| `/studio/editor`   | `features/editor/`   (Post-Production Lite) | Dev B |
+| URL | Feature |
+|---|---|
+| `/studio/producer` | `features/producer/` (Meeting Room) |
+| `/studio/writer`   | `features/writer/`  (Script Room) |
+| `/studio/artist`   | `features/artist/`  (L0 Concept Canvas) |
+| `/studio/director` | `features/director/` (Director Canvas) |
+| `/studio/editor`   | `features/editor/`   (Post-Production Lite) |
 
 `layout.tsx`가 모든 5종 공통 shell.
 
@@ -73,5 +73,5 @@ canNavigateTo: (stage) => {
 
 ## 안 건드릴 곳
 
-- `src/components/layout/sidebar.tsx`, `global-chat.tsx`, `samantha.tsx` — 공유 영역, Dev A/B PR to main
-- `src/stores/project-store.ts` — 공유 컨테이너, PR to main
+- `src/components/layout/sidebar.tsx`, `global-chat.tsx`, `samantha.tsx` — 공유 컴포넌트, 변경 시 신중하게 편집
+- `src/stores/project-store.ts` — 공유 컨테이너, 변경 시 PR 필요

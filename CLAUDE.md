@@ -4,7 +4,7 @@
 
 ## 상태
 
-보일러플레이트 완료, 병렬 개발 진행 (2026-03-03). 구현 순서: P3+P4 (Phase 1) → P5 → P2 → P1. 
+보일러플레이트 완료, 구현 진행 (2026-03-03). 구현 순서: P3+P4 (Phase 1) → P5 → P2 → P1. 
 P3는 L0 Concept Canvas (노드 그래프)로 전면 재설계 중. **P4도 Director Canvas (노드 그래프)로 재설계 시작 (2026-05-25)** — `specs/layers/director_canvas.md`.
 
 ## 기술 스택
@@ -104,20 +104,6 @@ Story → [Pumpup] → [L1 Scene Architect] → [L2 Shot Composer] → [L3 Promp
 ```
 
 L0은 L1 이전에 캐릭터/월드를 사전 정의해 Asset Storage로 다음 단계에 공급한다. 노드=개체 패러다임 (Higgsfield 노드=모델과 다름). 상세는 L0 스펙.
-
-### 병렬 개발 소유권
-
-| Area | Dev A | Dev B |
-|------|-------|-------|
-| `features/producer/`, `writer/`, `artist/` | Owner | - |
-| `features/director/`, `editor/` | - | Owner |
-| `stores/artist-store.ts` (L0 재설계 시 `canvas-store.ts`로 교체) | Owner | - |
-| `stores/director-store.ts`, `editor-store.ts` | - | Owner |
-| `types/`, `components/layout/`, `stores/project-store.ts` | PR to main | PR to main |
-| `mocks/` | 추가만 | 추가만 |
-
-- 브랜치: Dev A `feature/producer-writer-artist`, Dev B `feature/director-editor`
-- 공유 영역 변경은 main PR, 상대가 rebase
 
 ### URL → 디렉토리
 

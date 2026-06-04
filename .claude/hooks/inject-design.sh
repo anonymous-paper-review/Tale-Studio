@@ -10,7 +10,7 @@ if echo "$PROMPT" | grep -iEq "$KEYWORDS"; then
 {
   "hookSpecificOutput": {
     "hookEventName": "UserPromptSubmit",
-    "additionalContext": "UI 작업 감지됨. specs/design.md를 반드시 consult하세요 (정성 reference는 specs/design-references.md). 토큰 source-of-truth: src/app/globals.css. Hard rules: dark-first with light parity; ONE accent (Netflix Red, decisions #30) for CTAs only; Geist Mono for camera-axis values; no shadows on canvas nodes; use canvas extension tokens (--canvas-*, --node-*, --edge-*); Higgsfield-style glassmorphism 금지."
+    "additionalContext": "UI 작업 감지됨. specs/design.md를 반드시 consult하세요 (정성 reference는 specs/design-references.md). 토큰 source-of-truth: src/app/globals.css. Hard rules: dark-first with light parity; ONE accent (Netflix Red, decisions #30) for CTAs only; Geist Mono for camera-axis values; use canvas extension tokens (--canvas-*, --node-*, --edge-*); Higgsfield-style glassmorphism 금지."
   }
 }
 EOF
