@@ -86,6 +86,28 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
       if (error) throw error
 
+      // svc-pipeline 백그라운드 시작 (S0~L5 텍스트 단계).
+      // 실패해도 메인 플로우는 진행 (사용자가 writer에서 수동 작성 가능).
+      try {
+        const runtimeSeconds = typeof projectSettings.playtime === 'number' && projectSettings.playtime > 0
+          ? projectSettings.playtime
+          : undefined
+        await fetch('/api/svc/start', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            projectId,
+            story: storyText,
+            runtimeSeconds,
+          }),
+        }).catch((e) => {
+          // svc 시작 실패는 무시 (UI에 표시는 status polling이 함)
+          console.warn('[producer] svc-pipeline start failed (non-blocking):', e)
+        })
+      } catch (svcErr) {
+        console.warn('[producer] svc-pipeline trigger error (non-blocking):', svcErr)
+      }
+
       useProjectStore.getState().setStage('writer')
       set({ syncing: false })
       return true

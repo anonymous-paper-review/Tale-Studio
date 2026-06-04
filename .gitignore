@@ -85,3 +85,6 @@ experiment/svc-pipeline/.env.local
 experiment/svc-pipeline/.env.*.local
 experiment/svc-pipeline/*.tsbuildinfo
 experiment/svc-pipeline/next-env.d.ts
+
+# logs
+logs/*
