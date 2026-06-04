@@ -3,7 +3,7 @@
 > PROGRESS.md Phase 10 (P10-1~7) + P10-Followup의 L0 관련 항목 mirror. 원본 PROGRESS.md는 그대로 유지.
 > 본 파일은 진행 중 변경의 audit trail이며, 검증 완료 시 PROGRESS.md와 본 파일 둘 다 `[x]` 승격.
 
-## Active (브라우저 검증 대기)
+## Archived (superseded — 카드형 Artist 롤백으로 폐기, 2026-06-04)
 
 - [c] P10-2: 더블클릭 노드 생성 — `zoomOnDoubleClick={false}` + target 가드 (2026-05-17 버그픽스 후 미검증)
 - [c] P10-2: 핀 → 빈 공간 = Status 자동 Branch
@@ -26,7 +26,7 @@
 - [c] P10-7: Asset Storage → P4 export (`src/features/artist/asset-export.ts`)
 - [c] P10-7: project-store wire-up — 전환 시 canvas/asset-storage reset + setProjectId
 
-## Active (코드 미작성, 후속)
+## Archived — 미착수 후속 (superseded)
 
 - [ ] P10-6: 토큰 비용 정확화 (모델별 비용 차이 반영)
 - [ ] P10-6: 비동기 큐 / 16-Angle 동시성 제한

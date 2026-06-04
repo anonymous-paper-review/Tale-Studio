@@ -50,6 +50,18 @@ function ShotCell({ node }: { node: DirectorNode }) {
             alt={data.label}
             className="size-full object-cover"
           />
+        ) : status === 'failed' ? (
+          // 실패 시 이미지 자리에 로그 표시 (사용자 요청)
+          <div className="flex size-full flex-col items-center justify-center gap-1 bg-destructive/10 p-2 text-center">
+            <span className="text-[11px] font-medium text-destructive">
+              생성 실패
+            </span>
+            {img?.errorMessage && (
+              <span className="line-clamp-3 break-all font-mono text-[10px] leading-tight text-destructive/80">
+                {img.errorMessage}
+              </span>
+            )}
+          </div>
         ) : (
           <div className="flex size-full items-center justify-center">
             <ImageIcon className="size-8 text-muted-foreground opacity-50" />

@@ -33,6 +33,7 @@ import {
   SNAP_GRID,
 } from '@/types/director-canvas'
 import { StoryboardGridView } from '@/features/director/canvas-views/StoryboardGridView'
+import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
 
 import { SceneNode } from '@/features/director/canvas-nodes/SceneNode'
 import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
@@ -217,9 +218,9 @@ function CanvasInner() {
       {nodes.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="text-center text-sm text-muted-foreground">
-            캔버스를 더블클릭해서 첫 Scene을 만들어 보세요.
+            Writer에서 씬을 먼저 만들면 자동으로 들어와요.
             <div className="mt-1 text-xs opacity-70">
-              Scene → Shot → Video 순서로 그래프가 자라요.
+              또는 캔버스를 더블클릭해서 직접 Scene을 만들 수 있어요.
             </div>
           </div>
         </div>
@@ -333,22 +334,18 @@ function PaletteBar() {
 export default function DirectorCanvasPage() {
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
 
+  // Writer Scene/Shot → Director 노드 자동 셋업 (프롬프트 + 에셋 바인딩, 스펙 §8)
+  useWriterDirectorSync()
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Meeting Room placeholder (D-7에서 채움) */}
-        <aside className="flex w-9 shrink-0 flex-col items-center border-r border-border bg-card">
-          <span
-            className="mt-4 text-xs text-muted-foreground opacity-50 [writing-mode:vertical-rl]"
-            aria-label="Meeting Room placeholder"
-          >
-            Meeting Room (coming soon)
-          </span>
-        </aside>
-
         {/* Center: Canvas (Node/Storyboard) + bottom Palette bar */}
         <div className="relative flex flex-1 flex-col overflow-hidden">
-          <div className="relative flex-1">
+          {/* min-h-0: flex-1이 내용 높이만큼 커져 하단 PaletteBar(토글)를
+              밀어내고 StoryboardGridView의 overflow-auto가 안 걸리던 문제 수정.
+              이걸로 storyboard 그리드 스크롤 + Node/Storyboard 토글 항상 노출. */}
+          <div className="relative min-h-0 flex-1">
             {viewMode === 'storyboard' ? (
               <StoryboardGridView />
             ) : (

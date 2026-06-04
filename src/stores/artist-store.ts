@@ -10,7 +10,7 @@ import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 
-export type ImageProvider = 'gemini' | 'tailscale'
+export type ImageProvider = 'fal' | 'gemini' | 'tailscale'
 
 export type ArtistUpdate =
   | {
@@ -20,10 +20,36 @@ export type ArtistUpdate =
     }
   | { type: 'regenerateWorldAsset'; locationId: string }
 
+// World 샷 (wide/establishing) — 캐릭터 뷰와 대칭 구조
+export type WorldShotKey = 'wideShot' | 'establishingShot'
+
+const WORLD_SHOT_SUFFIX: Record<WorldShotKey, string> = {
+  wideShot: 'wide shot, panoramic',
+  establishingShot: 'establishing shot, aerial view',
+}
+const WORLD_SHOT_COLUMN: Record<WorldShotKey, string> = {
+  wideShot: 'wide_shot',
+  establishingShot: 'establishing_shot',
+}
+export const WORLD_SHOT_LABELS: Record<WorldShotKey, string> = {
+  wideShot: 'Wide Shot',
+  establishingShot: 'Establishing',
+}
+
+function worldShotPrompt(
+  visualDescription: string,
+  timeOfDay: string,
+  mood: string,
+  boost: string | null,
+  shot: WorldShotKey,
+): string {
+  return `${buildWorldPrompt(visualDescription, timeOfDay, mood, boost)}, ${WORLD_SHOT_SUFFIX[shot]}`
+}
+
 async function generateImage(
   prompt: string,
   aspectRatio: '1:1' | '16:9' = '1:1',
-  provider: ImageProvider = 'gemini',
+  provider: ImageProvider = 'fal',
 ): Promise<string> {
   const res = await fetch('/api/generate/image', {
     method: 'POST',
@@ -85,8 +111,18 @@ interface ArtistState {
   selectLocation: (id: string) => void
   lockCharacter: (id: string) => void
   unlockCharacter: (id: string) => void
-  generateSheet: (id: string, views?: CharacterViewKey[]) => Promise<void>
+  generateSheet: (
+    id: string,
+    views?: CharacterViewKey[],
+    promptOverrides?: Partial<Record<CharacterViewKey, string>>,
+  ) => Promise<void>
   generateWorldAsset: (locationId: string) => Promise<void>
+  generateWorldShot: (
+    locationId: string,
+    shot: WorldShotKey,
+    promptOverride?: string,
+  ) => Promise<void>
+  autoGenerateBaseImages: () => Promise<void>
   applyUpdates: (updates: ArtistUpdate[]) => Promise<void>
   selectBoostPreset: (preset: string) => void
   setImageProvider: (provider: ImageProvider) => void
@@ -102,7 +138,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   generatingCharacterId: null,
   generatingLocationId: null,
   selectedBoostPreset: null,
-  imageProvider: 'gemini' as ImageProvider,
+  imageProvider: 'fal' as ImageProvider,
   error: null,
 
   loadData: async () => {
@@ -171,6 +207,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               threeQuarterRight: c.view_three_quarter_right ?? null,
             },
             locked: c.locked ?? false,
+            description: c.description ?? '',
+            fixedPrompt: c.fixed_prompt ?? '',
           }))
           const worldAssets: WorldAsset[] = (dbLocs ?? []).map((l) => ({
             locationId: l.location_id,
@@ -178,6 +216,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             sceneId: l.scene_id ?? '',
             wideShot: l.wide_shot ?? null,
             establishingShot: l.establishing_shot ?? null,
+            visualDescription: l.visual_description ?? '',
           }))
 
           set({
@@ -209,6 +248,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             threeQuarterRight: null,
           },
           locked: false,
+          description: c.description ?? '',
+          fixedPrompt: c.fixedPrompt ?? '',
         }),
       )
       const worldAssets: WorldAsset[] = writerManifest.locations.map((loc) => {
@@ -221,6 +262,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           sceneId: scene?.sceneId ?? '',
           wideShot: null,
           establishingShot: null,
+          visualDescription: loc.visualDescription ?? '',
         }
       })
 
@@ -275,7 +317,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       ),
     })),
 
-  generateSheet: async (id, views) => {
+  generateSheet: async (id, views, promptOverrides) => {
     const { sceneManifest, imageProvider } = get()
     const character = sceneManifest?.characters.find(
       (c) => c.characterId === id,
@@ -291,7 +333,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const generated = await Promise.all(
         viewList.map((v) =>
           generateImage(
-            buildCharacterPrompt(character.fixedPrompt, v),
+            // 뷰별 프롬프트 override(사용자 편집) 우선, 없으면 기본 빌드 프롬프트.
+            promptOverrides?.[v] ?? buildCharacterPrompt(character.fixedPrompt, v),
             '1:1',
             imageProvider,
           ),
@@ -411,6 +454,84 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
   },
 
+  generateWorldShot: async (locationId, shot, promptOverride) => {
+    const { sceneManifest, selectedBoostPreset, imageProvider } = get()
+    const location = sceneManifest?.locations.find(
+      (l) => l.locationId === locationId,
+    )
+    const scene = sceneManifest?.scenes.find((s) => s.location === locationId)
+    if (!location || !scene) return
+
+    set({ generatingLocationId: locationId, error: null })
+
+    try {
+      // 사용자 편집 프롬프트 우선, 없으면 기본 빌드 프롬프트.
+      const prompt =
+        promptOverride ??
+        worldShotPrompt(
+          location.visualDescription,
+          location.timeOfDay,
+          scene.mood,
+          selectedBoostPreset,
+          shot,
+        )
+      const img = await generateImage(prompt, '16:9', imageProvider)
+      set((state) => ({
+        generatingLocationId: null,
+        worldAssets: state.worldAssets.map((w) =>
+          w.locationId === locationId ? { ...w, [shot]: img } : w,
+        ),
+      }))
+
+      const pid = useProjectStore.getState().projectId
+      if (pid) {
+        const url = await persistImage(
+          pid,
+          'location',
+          locationId,
+          WORLD_SHOT_COLUMN[shot],
+          img,
+        )
+        if (url) {
+          set((state) => ({
+            worldAssets: state.worldAssets.map((w) =>
+              w.locationId === locationId ? { ...w, [shot]: url } : w,
+            ),
+          }))
+        }
+      }
+    } catch (err) {
+      set({
+        generatingLocationId: null,
+        error:
+          err instanceof Error ? err.message : 'World generation failed',
+      })
+    }
+  },
+
+  // Writer→Artist 첫 진입 시 "기본 필수" 이미지 1회 자동생성 (1회+캐시).
+  // 가드 = 이미지가 없는(null) 것만 생성 → 생성물은 DB 영속(persistImage)되므로
+  // 재진입 시 not-null이라 자동 skip(자연 캐시). decision #29.6(토큰 보호) 화해책.
+  // 토큰 절약: 캐릭터는 전체 5뷰가 아니라 대표 뷰(front) 1장만.
+  autoGenerateBaseImages: async () => {
+    const { characterAssets, worldAssets } = get()
+
+    for (const c of characterAssets) {
+      // 동시/중복 트리거 방지: 진행 중이면 skip.
+      if (get().generatingCharacterId) break
+      if (c.views.front == null) {
+        await get().generateSheet(c.characterId, ['front'])
+      }
+    }
+
+    for (const w of worldAssets) {
+      if (get().generatingLocationId) break
+      if (w.wideShot == null) {
+        await get().generateWorldAsset(w.locationId)
+      }
+    }
+  },
+
   applyUpdates: async (updates) => {
     for (const u of updates) {
       if (u.type === 'regenerateCharacter') {
@@ -438,7 +559,27 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       generatingCharacterId: null,
       generatingLocationId: null,
       selectedBoostPreset: null,
-      imageProvider: 'gemini' as ImageProvider,
+      imageProvider: 'fal' as ImageProvider,
       error: null,
     }),
 }))
+
+/** World 샷의 기본 생성 프롬프트 (dialog 표시·편집 초기값용) */
+export function worldShotDefaultPrompt(
+  locationId: string,
+  shot: WorldShotKey,
+): string {
+  const { sceneManifest, selectedBoostPreset } = useArtistStore.getState()
+  const location = sceneManifest?.locations.find(
+    (l) => l.locationId === locationId,
+  )
+  const scene = sceneManifest?.scenes.find((s) => s.location === locationId)
+  if (!location || !scene) return ''
+  return worldShotPrompt(
+    location.visualDescription,
+    location.timeOfDay,
+    scene.mood,
+    selectedBoostPreset,
+    shot,
+  )
+}

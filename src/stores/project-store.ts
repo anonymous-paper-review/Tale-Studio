@@ -30,8 +30,8 @@ function resetChildStores() {
   const { useDirectorStore } = require('@/stores/director-store')
   const { useEditorStore } = require('@/stores/editor-store')
   const { useGlobalChatStore } = require('@/stores/global-chat-store')
-  const { useCanvasStore } = require('@/stores/canvas-store')
   const { useAssetStorageStore } = require('@/stores/asset-storage-store')
+  const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
 
   useProducerStore.getState().reset()
   useWriterStore.getState().reset()
@@ -39,8 +39,9 @@ function resetChildStores() {
   useDirectorStore.getState().reset()
   useEditorStore.getState().reset()
   useGlobalChatStore.getState().reset()
-  useCanvasStore.getState().reset()
   useAssetStorageStore.getState().reset()
+  // director-canvas-store는 persist 캐시를 들고 있어 프로젝트 전환 시 명시적 reset 필요
+  useDirectorCanvasStore.getState().reset()
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -73,8 +74,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         initLoading: false,
         currentStage: project.current_stage ?? 'producer',
       })
-      const { useCanvasStore } = require('@/stores/canvas-store')
-      useCanvasStore.getState().setProjectId(projectId)
+      const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
+      useDirectorCanvasStore.getState().setProjectId(projectId)
     } catch (err) {
       console.error('[project-store] initProject failed:', err)
       set({ initLoading: false })
@@ -95,8 +96,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         initLoading: false,
         currentStage: 'producer',
         })
-      const { useCanvasStore } = require('@/stores/canvas-store')
-      useCanvasStore.getState().setProjectId(projectId)
+      const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
+      useDirectorCanvasStore.getState().setProjectId(projectId)
     } catch (err) {
       console.error('[project-store] createNewProject failed:', err)
       set({ initLoading: false })
@@ -110,8 +111,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectTitle: title,
       currentStage: stage ?? 'producer',
     })
-    const { useCanvasStore } = require('@/stores/canvas-store')
-    useCanvasStore.getState().setProjectId(id)
+    const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
+    useDirectorCanvasStore.getState().setProjectId(id)
   },
 
   renameProject: async (title: string) => {

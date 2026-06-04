@@ -1,6 +1,8 @@
 ---
 change: redesign-l0-canvas
-status: active
+status: archived
+archived: 2026-06-04
+superseded-by: rollback-artist-card
 created: 2026-05-17
 decisions: [29, 30, 31, 32, 33, 34]
 ---

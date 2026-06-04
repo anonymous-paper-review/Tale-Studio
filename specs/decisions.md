@@ -11,6 +11,12 @@
 
 ## 확정
 
+### 36. redesign-l0-canvas archived (superseded)
+- **결정**: `redesign-l0-canvas` change를 검증 완료 없이 superseded 상태로 archive. 노드 그래프 패러다임 폐기, 카드형 Artist UI (character-panel / world-panel / inventory-grid)로 롤백.
+- **사유**: 노드 그래프 접근은 구현 복잡도가 높고 브라우저 검증을 통과하지 못한 채 다수의 [c] 항목이 누적됨. 사용자 결정(2026-06-04)으로 커밋 8507796 기준 카드형 UI로 복원. asset-storage 백엔드(RegisteredCharacter/RegisteredWorld)는 카드→등록 어댑터를 통해 계속 유지.
+- **archive 경로**: `specs/archive/2026-06-04-redesign-l0-canvas/`
+- **일자**: 2026-06-04
+
 ### 35. Pretendard Variable 한국어 폰트 도입
 - **결정**: `next/font/local`로 Pretendard Variable woff2를 로드해 한국어 fallback 확보. `--font-pretendard` CSS variable로 노출. `--font-sans` chain은 `Geist Sans → Pretendard → ui-sans-serif → system-ui → sans-serif`
 - **이유**:

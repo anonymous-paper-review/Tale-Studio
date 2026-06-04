@@ -4,13 +4,13 @@
 
 ## 상태
 
-보일러플레이트 완료, 구현 진행 (2026-03-03). 구현 순서: P3+P4 (Phase 1) → P5 → P2 → P1. 
-P3는 L0 Concept Canvas (노드 그래프)로 전면 재설계 중. **P4도 Director Canvas (노드 그래프)로 재설계 시작 (2026-05-25)** — `specs/layers/director_canvas.md`.
+보일러플레이트 완료, 구현 진행 (2026-03-03). 구현 순서: P3+P4 (Phase 1) → P5 → P2 → P1.
+P3 Artist는 **카드형 UI (Tabs: Characters/World/Inventory) 유지** — 노드 그래프 버전은 2026-06-04 사용자 결정으로 폐기(`specs/archive/2026-06-04-redesign-l0-canvas/`). 카드→asset-storage 어댑터 하이브리드. **P4도 Director Canvas (노드 그래프)로 재설계 시작 (2026-05-25)** — `specs/layers/director_canvas.md`.
 
 ## 기술 스택
 
 - Frontend: Next.js 16 + Tailwind v4 + shadcn/ui + Zustand (`pnpm`)
-- Canvas: React Flow (xyflow) — L0 Concept Canvas
+- Canvas: React Flow (xyflow) — P4 Director Canvas (L0 Artist는 카드형 패널, React Flow 미사용)
 - 3D: Three.js + React Three Fiber — P4 (`pnpm add three @types/three @react-three/fiber @react-three/drei`)
 - Backend: Next.js API Routes + Supabase (PostgreSQL)
 - AI: Gemini (LLM), Gemini Imagen + H100 self-hosted (이미지), Kling + Veo + Pro6000 self-hosted (비디오)
@@ -41,8 +41,8 @@ P3는 L0 Concept Canvas (노드 그래프)로 전면 재설계 중. **P4도 Dire
 | **페이지별 디자인 레퍼런스/벤치마크** | `specs/design-references.md` |
 | harness 전체 설계 (왜 이렇게 했는지) | `docs/research/claude-code-harness-design-for-tale-studio.md` |
 | harness 이행 작업 (참고용, 완료) | `docs/research/harness-migration-plan.md` |
-| L0 Concept Canvas (노드 그래프, P3 재설계) | `specs/layers/L0_concept_canvas.md` |
-| L0 Canvas 데이터 모델 (TS 타입, Zustand 액션) | `specs/data/canvas_data_model.md` |
+| L0 Concept Canvas (카드형, P3 Artist) | `specs/layers/L0_concept_canvas.md` |
+| L0 Canvas 데이터 모델 (노드 그래프 시절, **deprecated**) | `specs/data/canvas_data_model.md` |
 | Asset Storage 스키마 (등록 캐릭터/월드, P4 인터페이스) | `specs/data/asset_storage.md` |
 | **Director Canvas (노드 그래프, P4 재설계)** | `specs/layers/director_canvas.md` |
 | L1 Scene 분할 (Pumpup) | `specs/layers/L1_scene_architect.md` |
@@ -103,14 +103,14 @@ P3는 L0 Concept Canvas (노드 그래프)로 전면 재설계 중. **P4도 Dire
 Story → [Pumpup] → [L1 Scene Architect] → [L2 Shot Composer] → [L3 Prompt Builder] → [Video API]
 ```
 
-L0은 L1 이전에 캐릭터/월드를 사전 정의해 Asset Storage로 다음 단계에 공급한다. 노드=개체 패러다임 (Higgsfield 노드=모델과 다름). 상세는 L0 스펙.
+L0은 L1 이전에 캐릭터/월드를 카드 UI로 사전 정의해 Asset Storage로 다음 단계에 공급한다. 카드→등록 어댑터를 통해 asset-storage-store에 기록. 상세는 L0 스펙.
 
 ### URL → 디렉토리
 
 ```
 /studio/producer → features/producer/
 /studio/writer   → features/writer/
-/studio/artist   → features/artist/   (L0 Canvas로 재설계)
+/studio/artist   → features/artist/   (카드형 Tabs: Characters/World/Inventory)
 /studio/director → features/director/
 /studio/editor   → features/editor/
 ```

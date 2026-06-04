@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { GeneratedImage } from '@/stores/canvas-store'
+import type { GeneratedImage, CharacterAsset, WorldAsset } from '@/types/asset'
 
 // ============================================================================
 // Types — see specs/data/asset_storage.md
@@ -134,3 +134,118 @@ export const useAssetStorageStore = create<AssetStorageState>()(
     },
   ),
 )
+
+// ============================================================================
+// Card → Asset Storage adapter (hybrid)
+//
+// The Artist UI is card-based (artist-store: CharacterAsset / WorldAsset) but
+// the Director contract reads from Asset Storage (RegisteredCharacter /
+// RegisteredWorld via getCharacter/getWorld). These helpers bridge the two so
+// assets registered from a card resolve in director-canvas-store's
+// pickAssetImageUrl / resolveShotAssetImages.
+//
+// Mapping note: we register with `id === characterId` / `id === locationId` so
+// the stable card id is the lookup key shots reference. The first non-null view
+// image is placed in BOTH `referenceImages` and `views.single` to satisfy
+// pickAssetImageUrl (referenceImages[0] → views.single[0].url fallback).
+//
+// Writer 정의(description/prompt)는 카드(CharacterAsset.description/fixedPrompt,
+// WorldAsset.visualDescription)에서 계승해 채운다.
+// Fields lost in the card→registered mapping (no card equivalent — left empty):
+//   alias, background, statusVariants, views.fiveView, views.sixteenAngle.
+// sourceCanvasNodeId no longer maps to a node (cards have none) → filled with
+// the card id for traceability, signature preserved.
+// ============================================================================
+
+function viewToGeneratedImage(
+  url: string,
+  view: GeneratedImage['view'],
+): GeneratedImage {
+  return {
+    id: `cardimg_${url.slice(-12)}_${view ?? 'single'}`,
+    url,
+    prompt: '',
+    view,
+    modelId: 'imagen',
+    createdAt: Date.now(),
+  }
+}
+
+/** CharacterAsset (front/side/back card) → RegisterCharacterInput */
+export function characterAssetToRegisterInput(
+  asset: CharacterAsset,
+  projectId: string,
+): RegisterCharacterInput {
+  const front = asset.views.front
+  const single = front ? [viewToGeneratedImage(front, 'front')] : []
+  const fiveView: GeneratedImage[] = (
+    [
+      ['front', asset.views.front],
+      ['left', asset.views.side],
+      ['back', asset.views.back],
+    ] as const
+  )
+    .filter(([, u]) => u)
+    .map(([v, u]) => viewToGeneratedImage(u as string, v))
+
+  return {
+    projectId,
+    sourceCanvasNodeId: asset.characterId, // no node in card UI; trace by card id
+    name: asset.name,
+    alias: '',
+    background: '',
+    description: asset.description ?? '',
+    prompt: asset.fixedPrompt ?? '',
+    referenceImages: front ? [front] : [],
+    views: { single, fiveView, sixteenAngle: [] },
+    statusVariants: [],
+  }
+}
+
+/** WorldAsset (wide/establishing card) → RegisterCharacterInput */
+export function worldAssetToRegisterInput(
+  asset: WorldAsset,
+  projectId: string,
+): RegisterCharacterInput {
+  const wide = asset.wideShot
+  const single = wide ? [viewToGeneratedImage(wide, undefined)] : []
+
+  return {
+    projectId,
+    sourceCanvasNodeId: asset.locationId,
+    name: asset.name,
+    alias: '',
+    background: '',
+    description: asset.visualDescription ?? '',
+    prompt: asset.visualDescription ?? '',
+    referenceImages: wide ? [wide] : [],
+    views: { single, fiveView: [], sixteenAngle: [] },
+    statusVariants: [],
+  }
+}
+
+/** Register a card character into Asset Storage (id === characterId). */
+export function registerCharacterCard(
+  asset: CharacterAsset,
+  projectId: string,
+): string {
+  return useAssetStorageStore
+    .getState()
+    .registerCharacter(
+      asset.characterId,
+      characterAssetToRegisterInput(asset, projectId),
+    )
+}
+
+/** Register a card world/location into Asset Storage (id === locationId). */
+export function registerWorldCard(
+  asset: WorldAsset,
+  projectId: string,
+): string {
+  return useAssetStorageStore
+    .getState()
+    .registerWorld(
+      asset.locationId,
+      worldAssetToRegisterInput(asset, projectId),
+    )
+}

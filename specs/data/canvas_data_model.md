@@ -1,6 +1,13 @@
 # Canvas Data Model
 
-> L0 Concept Canvas의 TypeScript 타입과 Zustand store 액션 계약. React Flow 커스텀 노드/엣지의 시그니처 단일 진실.
+> **[DEPRECATED — 2026-06-04]** 이 문서는 L0 노드 그래프 재설계(`redesign-l0-canvas`, 아카이브: `specs/archive/2026-06-04-redesign-l0-canvas/`) 시절 작성된 React Flow 기반 타입 정의입니다. 카드형 Artist UI로 롤백됨에 따라 `canvas-store.ts`가 삭제되어 이 모델은 더 이상 active code에 반영되지 않습니다. 삭제하지 않고 역사적 참고용으로 보존.
+>
+> 현행 L0 스펙: `specs/layers/L0_concept_canvas.md` — 카드형 패널 기반.
+> 현행 에셋 스토어: `specs/data/asset_storage.md` (여전히 유효).
+
+---
+
+> ~~L0 Concept Canvas의 TypeScript 타입과 Zustand store 액션 계약. React Flow 커스텀 노드/엣지의 시그니처 단일 진실.~~
 
 ## 1. 타입
 

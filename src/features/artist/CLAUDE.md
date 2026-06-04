@@ -1,59 +1,37 @@
-# src/features/artist — L0 Concept Canvas
+# src/features/artist — L0 Artist Card Studio
 
 ## Status
-- Status: L0 Concept Canvas 노드 그래프 재설계 진행 중 (2026-05-17~)
-- Spec: `@../../../specs/layers/L0_concept_canvas.md` + `@../../../specs/data/canvas_data_model.md` + `@../../../specs/data/asset_storage.md`
-- 진행 중 변경: `@../../../specs/changes/redesign-l0-canvas/`
+- Status: 카드형 패널 UI (2026-06-04 롤백 완료)
+- 이력: 노드 그래프 버전은 `specs/archive/2026-06-04-redesign-l0-canvas/`에 보존
+- Spec: `@../../../specs/layers/L0_concept_canvas.md` + `@../../../specs/data/asset_storage.md`
+- 진행 중 변경: `@../../../specs/changes/rollback-artist-card/`
 
 ## Stack
-- React Flow (xyflow) — 노드 그래프
-- Zustand — `@../../../stores/canvas-store.ts` + `@../../../stores/asset-storage-store.ts`
-- 기존 `artist-store.ts`는 점진 deprecate (director/global-chat 의존 정리 후 삭제)
-- shadcn/ui — 노드 팝업, RelationModal, DeleteConfirmModal
+- shadcn/ui Tabs — Characters / World / Inventory 탭 패널
+- Zustand — `@../../../stores/artist-store.ts` + `@../../../stores/asset-storage-store.ts`
+- `canvas-store.ts` — **삭제됨** (노드 그래프 폐기)
 
 ## 디렉토리 anatomy
-- `nodes/` — Base/Actor/World/StatusNode
-- `edges/` — CategoryEdge
-- `canvas-popups/` — NodePopup, RelationModal, DeleteConfirmModal, registration 폼
-- `asset-export.ts` — Asset Storage → P4 export
+- `character-panel.tsx` — 캐릭터 카드 목록 (이미지 생성 + Register)
+- `world-panel.tsx` — 월드 카드 목록 (이미지 생성 + Register)
+- `inventory-grid.tsx` — 등록 에셋 그리드 (읽기 전용)
+- `image-placeholder.tsx` — 이미지 없을 때 placeholder
 
 ## 자주 하는 작업
 | 무엇 | 어디 |
 |---|---|
-| 새 노드 타입 추가 | `nodes/`에 .tsx + `nodeTypes` 맵 |
-| 새 엣지 카테고리 추가 | `edges/CategoryEdge.tsx` |
-| 팝업/모달 추가 | `canvas-popups/`에 .tsx |
-| 스토어 액션 추가 | `../../../stores/canvas-store.ts` |
-| 데이터 모델 변경 | `../../../types/index.ts` + canvas_data_model.md |
-| Agent 액션 추가 | `CanvasUpdate` union + `applyUpdates` |
+| 캐릭터 카드 편집 UI 변경 | `character-panel.tsx` |
+| 월드 카드 편집 UI 변경 | `world-panel.tsx` |
+| 등록 에셋 표시 변경 | `inventory-grid.tsx` |
+| Register 어댑터 수정 | `../../../stores/asset-storage-store.ts` (registerCharacterCard / registerWorldCard) |
+| 데이터 타입 변경 | `../../../types/asset.ts` + asset_storage.md |
 
 ## 컨벤션
-- 노드 ID는 `nanoid(10)`
-- 노드 좌표 **16px snap**
-- 선택 halo: `ring-2 ring-node-selected ring-offset-2`
-- 노드 컴포넌트: plain shadcn primitive(`Button`/`Input`/`Badge`) OK. **Radix portal 위젯(`Select`/`Popover`/`Tooltip`/`Dialog`/`DropdownMenu`)은 노드 본체 금지** (RF pane 밖 portal 충돌 → popup/모달에). 색은 캔버스 확장 토큰 우선
-- React Flow `nodeTypes` / `edgeTypes` module-scope 상수
-- 핀 연결 `connectionMode="loose"` (F-2 fix)
-
-## 노드 색 (decisions #30)
-- Actor = `--chart-1` (red)
-- World = `--chart-2` (blue)
-- Status = 마더 색 채도 50% 감소
-
-## 엣지 카테고리 (decisions #32)
-- Actor↔Actor = `references`만 (점선 + 자유 텍스트)
-- Actor↔World = `in-world`
-- `parent`는 Status Branch 자동 생성 전용. 사용자 수동 그리기 금지
-
-## 노드 액션 (decisions #33)
-- 우클릭 컨텍스트 메뉴 **완전 제거**
-- BaseNode 헤더 4 아이콘 (Edit / Branch / Copy / Delete) + NodePopup
-- 노드 더블클릭 = Edit 단축
-
-## 등록 임계값 (decisions #29.5)
-- 누적 이미지 ≥ 20장 시 등록 가능 (Higgsfield Soul ID 차용)
-- 프롬프트만 전파, 이미지 재생성은 수동
+- shadcn/ui 컴포넌트 우선 (`Card`, `Button`, `Input`, `Tabs`)
+- `globals.css` 토큰 외 신규 색 금지 (specs/design.md)
+- 이미지 생성: `POST /api/generate/image` 재사용. 현재 모델 `gemini-2.5-flash-image` (decisions.md #34)
+- asset-storage-store에 기록 시 반드시 어댑터 함수 사용 (직접 `RegisteredCharacter` 조작 금지)
 
 ## 안 건드릴 곳
-- `../director/canvas-*` — 직접 편집 금지. 패턴 참고는 OK
+- `../director/` — 직접 편집 금지. 패턴 참고는 OK
 - `../../stores/director-store.ts`, `director-canvas-store.ts`, `editor-store.ts` — 직접 편집 금지

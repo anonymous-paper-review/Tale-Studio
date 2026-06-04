@@ -41,6 +41,29 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           {data.prompt}
         </p>
       )}
+      {data.storyboardImage?.status === 'completed' &&
+        data.storyboardImage.url && (
+          <div className="mt-2 aspect-video w-full overflow-hidden rounded-sm border border-border/40">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={data.storyboardImage.url}
+              alt="storyboard"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        )}
+      {data.storyboardImage?.status === 'failed' && (
+        <div className="mt-2 flex aspect-video w-full flex-col items-center justify-center gap-0.5 rounded-sm border border-destructive/50 bg-destructive/10 p-1.5 text-center">
+          <span className="text-[10px] font-medium text-destructive">
+            생성 실패
+          </span>
+          {data.storyboardImage.errorMessage && (
+            <span className="line-clamp-2 break-all font-mono text-[9px] leading-tight text-destructive/80">
+              {data.storyboardImage.errorMessage}
+            </span>
+          )}
+        </div>
+      )}
       {data.referenceImages.length > 0 && (
         <div className="mt-2 flex gap-1">
           {data.referenceImages.slice(0, 4).map((img) => (

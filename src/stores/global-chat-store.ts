@@ -3,11 +3,7 @@ import type { StageId } from '@/types'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useWriterStore } from '@/stores/writer-store'
-import {
-  useCanvasStore,
-  serializeCanvasContext,
-  type CanvasUpdate,
-} from '@/stores/canvas-store'
+import { useArtistStore } from '@/stores/artist-store'
 import { useDirectorStore } from '@/stores/director-store'
 import {
   useDirectorCanvasStore,
@@ -109,9 +105,23 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         break
       }
       case 'artist': {
-        const canvasContext = serializeCanvasContext(
-          useCanvasStore.getState(),
+        // Card UI (artist-store) — no canvas graph. Provide a lightweight asset
+        // summary in place of the former serializeCanvasContext output.
+        const a = useArtistStore.getState()
+        const charLines = a.characterAssets.map(
+          (c) =>
+            `- ${c.name} (${c.characterId})${c.locked ? ' [locked]' : ''}`,
         )
+        const worldLines = a.worldAssets.map(
+          (w) => `- ${w.name} (${w.locationId})`,
+        )
+        const canvasContext = [
+          '## Artist 에셋',
+          `### 캐릭터 (${a.characterAssets.length})`,
+          ...(charLines.length ? charLines : ['- (없음)']),
+          `### 장소 (${a.worldAssets.length})`,
+          ...(worldLines.length ? worldLines : ['- (없음)']),
+        ].join('\n')
         endpoint = '/api/artist/chat'
         body = {
           message: trimmed,
@@ -217,12 +227,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         useWriterStore.getState().applyUpdates(data.updates)
       }
       if (stage === 'artist' && Array.isArray(data.updates)) {
-        const result = useCanvasStore
-          .getState()
-          .applyUpdates(data.updates as CanvasUpdate[])
-        if (result.skipped.length > 0) {
-          console.warn('[global-chat-store] artist updates skipped:', result.skipped)
-        }
+        // TODO: card UI 롤백 — 과거 canvas-store(node graph) 전용 updates 디스패치를
+        // 비활성화. /api/artist/chat이 ArtistUpdate(regenerateCharacter /
+        // regenerateWorldAsset) 형태로 응답하도록 재정의되면 아래를 활성화:
+        //   useArtistStore.getState().applyUpdates(data.updates as ArtistUpdate[])
+        console.warn(
+          '[global-chat-store] artist updates ignored (card UI rollback):',
+          data.updates,
+        )
       }
       if (stage === 'director') {
         // Agentic 응답 — DirectorCanvasUpdate[]

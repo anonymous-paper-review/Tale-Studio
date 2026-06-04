@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Film, GitBranch, Loader2, Trash2, Upload, X } from 'lucide-react'
 import {
   Dialog,
@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
+import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import {
   newDirectorId,
   type DirectorVideoProvider,
@@ -47,6 +48,32 @@ export function ShotNodePopup({ nodeId, data }: Props) {
   const generationError = useDirectorCanvasStore(
     (s) => s.generationErrors[nodeId],
   )
+
+  // 등장 캐릭터/월드 — Artist Asset Storage의 등록 에셋 (스펙 §5.3)
+  const projectId = useDirectorCanvasStore((s) => s.projectId)
+  const characterRecords = useAssetStorageStore((s) => s.characters)
+  const worldRecords = useAssetStorageStore((s) => s.worlds)
+  const projectCharacters = useMemo(
+    () => Object.values(characterRecords).filter((c) => c.projectId === projectId),
+    [characterRecords, projectId],
+  )
+  const projectWorlds = useMemo(
+    () => Object.values(worldRecords).filter((w) => w.projectId === projectId),
+    [worldRecords, projectId],
+  )
+
+  const toggleCharacter = (id: string) => {
+    const next = data.characterAssetIds.includes(id)
+      ? data.characterAssetIds.filter((x) => x !== id)
+      : [...data.characterAssetIds, id]
+    updateNodeData<'shot'>(nodeId, { characterAssetIds: next })
+  }
+  const toggleWorld = (id: string) => {
+    const next = data.worldAssetIds.includes(id)
+      ? data.worldAssetIds.filter((x) => x !== id)
+      : [...data.worldAssetIds, id]
+    updateNodeData<'shot'>(nodeId, { worldAssetIds: next })
+  }
 
   const [label, setLabel] = useState(data.label)
   const [prompt, setPrompt] = useState(data.prompt)
@@ -165,6 +192,70 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                 />
               </label>
             </div>
+          </Field>
+
+          <Separator />
+
+          {/* 등장 캐릭터 / 월드 — Artist 등록 Asset에서 선택 (스펙 §5.3).
+              선택된 에셋의 대표 이미지가 스토리보드/영상 생성의 레퍼런스로 들어간다. */}
+          <Field
+            label={`등장 캐릭터 (${data.characterAssetIds.length}/${projectCharacters.length})`}
+          >
+            {projectCharacters.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Artist에서 캐릭터를 Register하면 여기에 나타납니다.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {projectCharacters.map((c) => {
+                  const active = data.characterAssetIds.includes(c.id)
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => toggleCharacter(c.id)}
+                      className={cn(
+                        'rounded-full border px-2.5 py-1 text-xs transition-colors',
+                        active
+                          ? 'border-primary bg-primary/10 text-foreground'
+                          : 'border-border text-muted-foreground hover:bg-accent',
+                      )}
+                    >
+                      {c.name || c.alias || c.id}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </Field>
+
+          <Field
+            label={`월드 / 장소 (${data.worldAssetIds.length}/${projectWorlds.length})`}
+          >
+            {projectWorlds.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Artist에서 장소를 Register하면 여기에 나타납니다.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {projectWorlds.map((w) => {
+                  const active = data.worldAssetIds.includes(w.id)
+                  return (
+                    <button
+                      key={w.id}
+                      onClick={() => toggleWorld(w.id)}
+                      className={cn(
+                        'rounded-full border px-2.5 py-1 text-xs transition-colors',
+                        active
+                          ? 'border-primary bg-primary/10 text-foreground'
+                          : 'border-border text-muted-foreground hover:bg-accent',
+                      )}
+                    >
+                      {w.name || w.alias || w.id}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </Field>
 
           <Separator />

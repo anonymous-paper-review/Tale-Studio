@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Loader2, Play, RefreshCw, Star, Trash2 } from 'lucide-react'
 import {
   Dialog,
@@ -48,11 +48,17 @@ export function VideoNodePopup({ nodeId, data }: Props) {
   const openDeleteConfirm = useDirectorCanvasStore(
     (s) => s.openDeleteConfirm,
   )
-  const effective = useDirectorCanvasStore((s) =>
-    getEffectiveShotConfig(s, nodeId),
+  // getEffectiveShotConfig는 매 호출마다 새 객체를 반환하므로 셀렉터에서 직접
+  // 호출하면 useSyncExternalStore가 무한 변화로 인식("getSnapshot should be
+  // cached" 에러). nodes만 구독하고 useMemo로 캐싱한다.
+  const nodes = useDirectorCanvasStore((s) => s.nodes)
+  const effective = useMemo(
+    () => getEffectiveShotConfig({ nodes }, nodeId),
+    [nodes, nodeId],
   )
-  const motherNode = useDirectorCanvasStore((s) =>
-    s.nodes.find((n) => n.id === data.parentShotNodeId),
+  const motherNode = useMemo(
+    () => nodes.find((n) => n.id === data.parentShotNodeId),
+    [nodes, data.parentShotNodeId],
   )
   const isGenerating = useDirectorCanvasStore(
     (s) => !!s.generatingNodeIds[nodeId],

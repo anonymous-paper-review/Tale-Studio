@@ -16,7 +16,6 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
-import { useCanvasWarmStarting } from '@/features/artist/hooks/use-canvas-warm-starting'
 import { useDirectorCanvasWarmStarting } from '@/features/director/hooks/use-director-canvas-warm-starting'
 import { cn } from '@/lib/utils'
 import {
@@ -38,11 +37,11 @@ export function GlobalChat() {
 
   const currentStage = useProjectStore((s) => s.currentStage)
   const projectId = useProjectStore((s) => s.projectId)
-  const artistWarmTip = useCanvasWarmStarting()
+  // Artist는 카드 UI로 롤백되어 노드 전용 warm tip 훅 제거. 정적 안내로 대체.
   const directorWarmTip = useDirectorCanvasWarmStarting()
   const warmStartingTip =
     currentStage === 'artist'
-      ? artistWarmTip
+      ? '캐릭터/장소 시트를 생성한 뒤 Register로 Director에 넘기세요.'
       : currentStage === 'director'
         ? directorWarmTip
         : null

@@ -518,7 +518,29 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       projectId: 'default',
       lastSavedAt: Date.now(),
 
-      setProjectId: (projectId) => set({ projectId }),
+      setProjectId: (projectId) => {
+        // 프로젝트 격리: projectId가 바뀌면 이전 프로젝트의 노드/엣지 캐시를 비운다.
+        // persist 키가 고정(tale-director-canvas-v1-default)이라 프로젝트 전환 시
+        // localStorage 잔존 노드가 새 프로젝트로 새지 않도록 in-memory를 리셋하고,
+        // 변경된 빈 상태가 곧바로 persist에 덮어써지게 한다.
+        if (get().projectId !== projectId) {
+          set({
+            projectId,
+            nodes: initialNodes,
+            edges: initialEdges,
+            selectedNodeId: null,
+            selectedEdgeId: null,
+            popupNodeId: null,
+            deleteConfirmInfo: null,
+            relationModal: null,
+            generatingNodeIds: {},
+            generationErrors: {},
+            lastSavedAt: Date.now(),
+          })
+        } else {
+          set({ projectId })
+        }
+      },
       setViewport: (vp) => set({ viewport: vp }),
       setViewMode: (m) => set({ viewMode: m }),
 
@@ -785,23 +807,42 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           },
         })
 
-        try {
-          const referenceImageUrls = resolveShotAssetImages(data)
-          const res = await fetch('/api/generate/image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              prompt: data.prompt || data.label,
-              aspectRatio: '16:9',
-              referenceImageUrls,
-            }),
-          })
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({}))
-            throw new Error(body.error ?? `HTTP ${res.status}`)
+        const referenceImageUrls = resolveShotAssetImages(data)
+
+        // 단일 시도 — 90s 타임아웃(fal 행 방지). 실패/타임아웃 시 throw.
+        const attempt = async (): Promise<string> => {
+          const controller = new AbortController()
+          const timer = setTimeout(() => controller.abort(), 90_000)
+          try {
+            const res = await fetch('/api/generate/image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                prompt: data.prompt || data.label,
+                aspectRatio: '16:9',
+                referenceImageUrls,
+              }),
+              signal: controller.signal,
+            })
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}))
+              throw new Error(body.error ?? `HTTP ${res.status}`)
+            }
+            const blob = await res.blob()
+            return URL.createObjectURL(blob)
+          } finally {
+            clearTimeout(timer)
           }
-          const blob = await res.blob()
-          const blobUrl = URL.createObjectURL(blob)
+        }
+
+        try {
+          // 실패 시 1회 재시도 후 최종 실패 처리.
+          let blobUrl: string
+          try {
+            blobUrl = await attempt()
+          } catch {
+            blobUrl = await attempt()
+          }
           const publicUrl =
             (await persistStoryboardImage(
               get().projectId,
@@ -818,7 +859,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             },
           })
         } catch (err) {
-          const message = err instanceof Error ? err.message : 'Unknown error'
+          const message =
+            err instanceof Error
+              ? err.name === 'AbortError'
+                ? '시간 초과 (90s)'
+                : err.message
+              : 'Unknown error'
           get().updateNodeData<'shot'>(shotNodeId, {
             storyboardImage: {
               url: prevUrl,
@@ -831,7 +877,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       generateAllStoryboardImages: async () => {
-        // 씬 순서대로 Shot 순회. 순차 실행 (rate limit + 비용 가시성).
+        // 씬 순서대로 Shot 수집 후 동시성 제한 병렬(3) — SVC 이미지 파이프라인과 동일.
+        // 순차(20장 직렬 → 수 분)에서 병렬로 단축. 각 샷은 자체 재시도/타임아웃 보유.
         const sceneNodes = get().nodes.filter((n) => isSceneData(n.data))
         const orphanShots = get().nodes.filter(
           (n) => isShotData(n.data) && !n.data.parentSceneNodeId,
@@ -844,9 +891,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         }
         for (const shot of orphanShots) ordered.push(shot.id)
 
-        for (const shotId of ordered) {
-          await get().generateStoryboardImage(shotId)
+        const CONCURRENCY = 3
+        let cursor = 0
+        const worker = async () => {
+          while (cursor < ordered.length) {
+            const i = cursor++
+            await get().generateStoryboardImage(ordered[i]!)
+          }
         }
+        await Promise.all(
+          Array.from({ length: Math.min(CONCURRENCY, ordered.length) }, worker),
+        )
       },
 
       // ─── video generation (ST-4) ────────────────────────────────────────

@@ -52,7 +52,10 @@ export default function StudioLayout({
         className="ml-16 min-h-screen transition-[margin] duration-350 ease-out"
         style={{ marginRight: chatCollapsed ? 0 : chatWidth }}
       >
-        <div className="flex h-screen flex-col">{children}</div>
+        {/* h-screen으로 높이 고정 + overflow-y-auto: 내용이 화면을 넘치면
+            세로 스크롤 자동 생성. 캔버스 페이지(director)는 flex-1로 딱 채워
+            넘치지 않으므로 스크롤 미발생 — 카드 페이지만 스크롤된다. */}
+        <div className="flex h-screen flex-col overflow-y-auto">{children}</div>
       </main>
       <GlobalChat />
       <Samantha />

@@ -1,3 +1,24 @@
+// ============================================================================
+// Generated image — produced by image-gen pipeline, stored in Asset Storage.
+// Moved here from the (removed) L0 canvas-store so asset-storage-store and the
+// Director contract no longer depend on canvas internals.
+// ============================================================================
+
+export type ImageModelId = 'imagen' | 'h100-self'
+
+export type FiveViewKey = 'front' | 'left' | 'right' | 'back' | 'detail'
+
+export type GeneratedImage = {
+  id: string
+  url: string
+  prompt: string
+  seed?: number
+  angle?: number
+  view?: FiveViewKey
+  modelId: ImageModelId
+  createdAt: number
+}
+
 export interface CharacterView {
   front: string | null
   side: string | null
@@ -42,6 +63,9 @@ export interface CharacterAsset {
   name: string
   views: CharacterView
   locked: boolean
+  /** Writer 정의 계승 — asset-storage 등록 시 description/prompt로 전파 */
+  description?: string
+  fixedPrompt?: string
 }
 
 export interface WorldAsset {
@@ -50,4 +74,6 @@ export interface WorldAsset {
   sceneId: string
   wideShot: string | null
   establishingShot: string | null
+  /** Writer 정의 계승 — asset-storage 등록 시 description/prompt로 전파 */
+  visualDescription?: string
 }

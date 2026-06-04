@@ -162,12 +162,14 @@ export default function WriterPage() {
         </aside>
 
         <main className="flex min-h-0 flex-col overflow-y-auto p-8">
-          <div className="mx-auto w-full max-w-3xl space-y-4">
-            <div className="text-center text-sm text-muted-foreground">
+          {/* 패널이 pane을 채우도록 max-w 캡 완화(max-w-3xl 섬 → max-w-6xl).
+              미디어 그리드가 폭을 활용해 info-dense. (레이아웃 제안 A) */}
+          <div className="mx-auto w-full max-w-6xl space-y-4">
+            <div className="text-sm text-muted-foreground">
               <h2 className="text-base font-semibold text-foreground">
                 The Script Room
               </h2>
-              <p className="mt-1">Click a scene on the left to edit its shots.</p>
+              <p className="mt-1">왼쪽에서 씬을 선택하면 샷을 편집할 수 있어요.</p>
             </div>
 
             <MediaGenerationPanel projectId={projectId} svcStatus={svcStatus} />

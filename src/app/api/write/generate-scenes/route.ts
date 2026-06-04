@@ -136,8 +136,35 @@ export async function POST(req: Request) {
       )
     }
 
+    // 출력 언어 결정: projectSettings.dialogueLanguage 우선, 없으면 storyText에서 한글 감지.
+    let dialogueLanguage = ''
+    if (projectId) {
+      const { data: proj } = await supabaseAdmin
+        .from('projects')
+        .select('settings')
+        .eq('id', projectId)
+        .single()
+      dialogueLanguage =
+        (proj?.settings as { dialogueLanguage?: string } | null)
+          ?.dialogueLanguage ?? ''
+    }
+    if (!dialogueLanguage) {
+      dialogueLanguage = /[가-힣]/.test(storyText) ? 'ko' : 'en'
+    }
+
+    // 사람이 읽는 텍스트는 한국어로, 단 ID/JSON 키/enum 값은 영어 ASCII 유지.
+    const langDirective =
+      dialogueLanguage === 'ko'
+        ? `\n\n[언어 규칙 — 매우 중요] 사람이 읽는 모든 텍스트 필드(narrativeSummary, name, description, fixedPrompt, visualDescription, actionDescription, mood, location name, dialogue text 등)는 반드시 자연스러운 한국어로 작성하라. 등장인물·장소의 고유명사도 한국어로 표기하라. 단, JSON 키, ID(sceneId/characterId/locationId/shotId), enum 값(role, shotType, generationMethod, timeOfDay 같은 코드값)은 영어 ASCII로 유지하라. 캐릭터/장소 ID는 이름 기반(char_{name}) 대신 char_01, loc_01 처럼 번호 기반으로 만들라.`
+        : ''
+
     // Step 1: Pumpup — expand story with visual details
-    const expandedStory = await llmChat(PUMPUP_SYSTEM, [], storyText, 0.7)
+    const expandedStory = await llmChat(
+      PUMPUP_SYSTEM + langDirective,
+      [],
+      storyText,
+      0.7,
+    )
 
     if (!expandedStory) {
       return NextResponse.json(
@@ -148,7 +175,7 @@ export async function POST(req: Request) {
 
     // Step 2: Scene Architect — split into 4 scenes
     const manifest = await llmJSON<SceneManifest>(
-      SCENE_ARCHITECT_SYSTEM,
+      SCENE_ARCHITECT_SYSTEM + langDirective,
       expandedStory,
       0.3,
     )
@@ -170,7 +197,7 @@ export async function POST(req: Request) {
     let shots: Shot[] = []
     try {
       const rawShots = await llmJSON<Record<string, unknown>[]>(
-        SHOT_COMPOSER_SYSTEM,
+        SHOT_COMPOSER_SYSTEM + langDirective,
         shotInput,
         0.4,
       )
