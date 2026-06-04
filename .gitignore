@@ -39,8 +39,10 @@ reference_videos/
 output/
 databases/
 !databases/migrations/
-assets/
-!src/app/api/assets/
+# 루트의 asset 산출물만 ignore (앞의 / 로 anchor). 경로 무관 'assets/'는
+# src/app/api/svc/{resume,generate}/assets/ 같은 소스 라우트까지 삼켰음.
+# assets/lore는 로컬 테스트 데이터 — 원격 미추적 (lore 예외 없음)
+/assets/
 
 # Legacy specs (로컬 보관, git 미추적)
 specs/reference/
