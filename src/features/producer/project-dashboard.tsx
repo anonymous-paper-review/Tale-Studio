@@ -128,11 +128,11 @@ export function ProjectDashboard() {
         />
 
         {/* Story Text Preview */}
-        <div className={`rounded-lg border p-4 ${storyReady ? 'border-green-500/50 bg-green-500/5' : 'border-border'}`}>
+        <div className={`rounded-lg border p-4 ${storyReady ? 'border-success/50 bg-success/10' : 'border-border'}`}>
           <div className="mb-2 flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">STORY</span>
             {storyReady ? (
-              <Badge variant="outline" className="border-green-500/50 text-[10px] text-green-600">
+              <Badge variant="outline" className="border-success/50 text-[10px] text-success">
                 Ready
               </Badge>
             ) : (

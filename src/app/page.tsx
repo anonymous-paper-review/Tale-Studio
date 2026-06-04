@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { useProjectStore } from '@/stores/project-store'
+import { Input } from '@/components/ui/input'
 import type { StageId } from '@/types'
 
 interface ProjectItem {
@@ -108,13 +109,13 @@ function ProjectCard({
   return (
     <div
       onClick={() => !editing && onOpen(project)}
-      className="group flex cursor-pointer flex-col rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur-sm transition-all duration-300 hover:border-[#E50914]/50 hover:bg-white/10 hover:shadow-[0_10px_30px_rgba(229,9,20,0.1)]"
+      className="group flex cursor-pointer flex-col rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:bg-white/10 hover:shadow-[0_10px_30px_rgba(229,9,20,0.1)]"
     >
       <div className="flex items-center justify-between">
         {editing ? (
-          <input
+          <Input
             ref={inputRef}
-            className="w-full rounded bg-white/10 px-2 py-1 text-lg font-semibold text-white outline-none focus:ring-1 focus:ring-[#E50914]"
+            className="h-9 text-lg font-semibold"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleSave}
@@ -127,7 +128,7 @@ function ProjectCard({
           />
         ) : (
           <>
-            <h3 className="text-lg font-semibold text-white transition-colors group-hover:text-[#E50914]">
+            <h3 className="text-lg font-semibold text-white transition-colors group-hover:text-primary">
               {title}
             </h3>
             <button
@@ -207,12 +208,12 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-black selection:bg-[#E50914] selection:text-white">
+    <div className="min-h-screen bg-white text-black selection:bg-primary selection:text-white">
       {/* ── Navbar ── */}
       <nav className="fixed top-0 z-50 w-full bg-gradient-to-b from-black/80 to-transparent px-6 py-6">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-2">
-            <Film className="size-8 text-[#E50914]" />
+            <Film className="size-8 text-primary" />
             <span className="text-2xl font-bold tracking-tight text-white">
               Tale Studio
             </span>
@@ -220,20 +221,20 @@ export default function HomePage() {
           <div className="hidden items-center gap-10 text-sm font-medium md:flex">
             <a
               href="#services"
-              className="text-gray-300 transition-colors hover:text-[#E50914]"
+              className="text-gray-300 transition-colors hover:text-primary"
             >
               Services
             </a>
             <a
               href="#projects"
-              className="text-gray-300 transition-colors hover:text-[#E50914]"
+              className="text-gray-300 transition-colors hover:text-primary"
             >
               Projects
             </a>
             <button
               onClick={handleNew}
               disabled={creating}
-              className="rounded-full bg-white px-6 py-2.5 font-semibold text-black transition-all duration-300 hover:bg-[#E50914] hover:text-white hover:shadow-lg hover:shadow-[#E50914]/20"
+              className="rounded-full bg-white px-6 py-2.5 font-semibold text-black transition-all duration-300 hover:bg-primary hover:text-white hover:shadow-lg hover:shadow-primary/20"
             >
               {creating ? 'Creating...' : 'Get Started'}
             </button>
@@ -286,8 +287,8 @@ export default function HomePage() {
           {/* Badge */}
           <div className="mb-10 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium tracking-wide text-white backdrop-blur-md">
             <span className="relative flex size-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#E50914] opacity-75" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-[#E50914]" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex size-2.5 rounded-full bg-primary" />
             </span>
             The Future of Filmmaking is Here
           </div>
@@ -296,10 +297,10 @@ export default function HomePage() {
           <h1 className="mb-8 text-6xl font-semibold leading-[1.05] tracking-tighter text-white md:text-[5.5rem] lg:text-9xl">
             Create Beyond <br className="hidden md:block" />
             <span className="relative inline-block">
-              <span className="relative z-10 bg-gradient-to-r from-[#E50914] via-red-500 to-orange-500 bg-clip-text text-transparent">
+              <span className="relative z-10 bg-gradient-to-r from-primary via-red-500 to-orange-500 bg-clip-text text-transparent">
                 Human Limits
               </span>
-              <span className="pointer-events-none absolute -inset-2 z-0 animate-pulse rounded-full bg-[#E50914]/20 opacity-50 blur-2xl" />
+              <span className="pointer-events-none absolute -inset-2 z-0 animate-pulse rounded-full bg-primary/20 opacity-50 blur-2xl" />
             </span>
           </h1>
 
@@ -313,7 +314,7 @@ export default function HomePage() {
           <div className="flex flex-col items-center justify-center gap-6 sm:flex-row">
             <button
               onClick={scrollToProjects}
-              className="group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-full bg-[#E50914] px-8 py-5 text-lg font-medium text-white transition-all duration-300 hover:bg-red-600 hover:shadow-[0_0_40px_rgba(229,9,20,0.4)] sm:w-auto"
+              className="group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-full bg-primary px-8 py-5 text-lg font-medium text-primary-foreground transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_40px_rgba(229,9,20,0.4)] sm:w-auto"
             >
               <span className="relative z-10 flex items-center gap-2">
                 View Projects
@@ -341,7 +342,7 @@ export default function HomePage() {
             Scroll to explore
           </span>
           <div className="rounded-full border border-white/10 bg-white/10 p-2 backdrop-blur-sm transition-colors group-hover:border-black/10 group-hover:bg-black/5">
-            <ChevronDown className="size-6 text-[#E50914]" />
+            <ChevronDown className="size-6 text-primary" />
           </div>
         </div>
       </section>
@@ -353,7 +354,7 @@ export default function HomePage() {
       >
         <div className="mb-24 text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-bold uppercase tracking-widest text-gray-600">
-            <Sparkles className="size-3 text-[#E50914]" />
+            <Sparkles className="size-3 text-primary" />
             Platform Capabilities
           </div>
           <h2 className="mb-8 text-5xl font-semibold tracking-tighter text-black md:text-6xl">
@@ -378,11 +379,11 @@ export default function HomePage() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
               <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent opacity-50" />
-              <div className="absolute inset-0 bg-[#E50914]/10 opacity-0 mix-blend-overlay transition-opacity duration-700 group-hover:opacity-100" />
+              <div className="absolute inset-0 bg-primary/10 opacity-0 mix-blend-overlay transition-opacity duration-700 group-hover:opacity-100" />
 
               {/* AI Active badge */}
               <div className="absolute right-6 top-6 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 opacity-0 backdrop-blur-md transition-all duration-500 group-hover:opacity-100">
-                <div className="size-2 animate-pulse rounded-full bg-[#E50914]" />
+                <div className="size-2 animate-pulse rounded-full bg-primary" />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-white">
                   AI Active
                 </span>
@@ -390,8 +391,8 @@ export default function HomePage() {
 
               {/* Content */}
               <div className="absolute inset-0 z-20 flex flex-col justify-end p-8 text-white md:p-10">
-                <div className="flex items-center gap-3 mb-4 text-[#E50914]">
-                  <div className="rounded-lg border border-[#E50914]/30 bg-[#E50914]/20 p-2 backdrop-blur-sm">
+                <div className="flex items-center gap-3 mb-4 text-primary">
+                  <div className="rounded-lg border border-primary/30 bg-primary/20 p-2 backdrop-blur-sm">
                     {service.icon}
                   </div>
                   <span className="text-xs font-bold uppercase tracking-widest">
@@ -416,7 +417,7 @@ export default function HomePage() {
           <div className="mb-12 flex items-center justify-between">
             <div>
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-widest text-gray-400">
-                <Film className="size-3 text-[#E50914]" />
+                <Film className="size-3 text-primary" />
                 Your Workspace
               </div>
               <h2 className="text-4xl font-semibold tracking-tighter text-white md:text-5xl">
@@ -426,7 +427,7 @@ export default function HomePage() {
             <button
               onClick={handleNew}
               disabled={creating}
-              className="flex items-center gap-2 rounded-full bg-[#E50914] px-6 py-3 font-semibold text-white transition-all duration-300 hover:bg-red-600 hover:shadow-[0_0_30px_rgba(229,9,20,0.3)]"
+              className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_30px_rgba(229,9,20,0.3)]"
             >
               {creating ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -448,7 +449,7 @@ export default function HomePage() {
               <button
                 onClick={handleNew}
                 disabled={creating}
-                className="mt-6 flex items-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white transition-all hover:border-[#E50914] hover:text-[#E50914]"
+                className="mt-6 flex items-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white transition-all hover:border-primary hover:text-primary"
               >
                 <Plus className="size-4" />
                 첫 프로젝트 만들기
@@ -478,7 +479,7 @@ export default function HomePage() {
         <div className="mx-auto mb-20 grid max-w-7xl grid-cols-1 gap-12 md:grid-cols-4 md:gap-8">
           <div className="col-span-1 md:col-span-2">
             <div className="mb-6 flex items-center gap-2 text-white">
-              <Film className="size-8 text-[#E50914]" />
+              <Film className="size-8 text-primary" />
               <span className="text-2xl font-medium tracking-tight">
                 Tale Studio
               </span>
@@ -495,7 +496,7 @@ export default function HomePage() {
               <li>
                 <a
                   href="#services"
-                  className="transition-colors hover:text-[#E50914]"
+                  className="transition-colors hover:text-primary"
                 >
                   AI Production
                 </a>
@@ -503,7 +504,7 @@ export default function HomePage() {
               <li>
                 <a
                   href="#services"
-                  className="transition-colors hover:text-[#E50914]"
+                  className="transition-colors hover:text-primary"
                 >
                   Cinematography
                 </a>
@@ -511,7 +512,7 @@ export default function HomePage() {
               <li>
                 <a
                   href="#services"
-                  className="transition-colors hover:text-[#E50914]"
+                  className="transition-colors hover:text-primary"
                 >
                   Video Generation
                 </a>
@@ -519,7 +520,7 @@ export default function HomePage() {
               <li>
                 <a
                   href="#services"
-                  className="transition-colors hover:text-[#E50914]"
+                  className="transition-colors hover:text-primary"
                 >
                   Security
                 </a>
@@ -533,7 +534,7 @@ export default function HomePage() {
               <li>
                 <a
                   href="#projects"
-                  className="transition-colors hover:text-[#E50914]"
+                  className="transition-colors hover:text-primary"
                 >
                   Projects
                 </a>
@@ -541,7 +542,7 @@ export default function HomePage() {
               <li>
                 <a
                   href="#"
-                  className="transition-colors hover:text-[#E50914]"
+                  className="transition-colors hover:text-primary"
                 >
                   About Us
                 </a>
@@ -549,7 +550,7 @@ export default function HomePage() {
               <li>
                 <a
                   href="#"
-                  className="transition-colors hover:text-[#E50914]"
+                  className="transition-colors hover:text-primary"
                 >
                   Careers
                 </a>
@@ -557,7 +558,7 @@ export default function HomePage() {
               <li>
                 <a
                   href="#"
-                  className="transition-colors hover:text-[#E50914]"
+                  className="transition-colors hover:text-primary"
                 >
                   Contact
                 </a>

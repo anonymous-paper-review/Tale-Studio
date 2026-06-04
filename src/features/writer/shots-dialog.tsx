@@ -11,6 +11,14 @@ import {
 } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { useWriterStore } from '@/stores/writer-store'
 import type { DialogueLine, SceneManifest, Shot, ShotType } from '@/types'
@@ -174,27 +182,29 @@ function ShotCard({
 
       <div className="mb-2 flex items-center gap-3 pr-8">
         <span className="text-xs font-semibold">Shot {index + 1}</span>
-        <select
-          className="rounded-md border border-border bg-background px-2 py-1 text-xs focus:border-primary focus:outline-none"
+        <Select
           value={shot.shotType}
-          onChange={(e) =>
-            onUpdateShot(shot.shotId, {
-              shotType: e.target.value as ShotType,
-            })
+          onValueChange={(v) =>
+            onUpdateShot(shot.shotId, { shotType: v as ShotType })
           }
         >
-          {SHOT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger size="sm" className="w-auto text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SHOT_TYPES.map((t) => (
+              <SelectItem key={t} value={t} className="text-xs">
+                {t}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <input
+          <Input
             type="number"
             min={1}
             max={30}
-            className="w-14 rounded-md border border-border bg-background px-2 py-1 text-xs focus:border-primary focus:outline-none"
+            className="h-8 w-14 text-xs"
             value={shot.durationSeconds}
             onChange={(e) =>
               onUpdateShot(shot.shotId, {
@@ -239,21 +249,27 @@ function ShotCard({
               className="rounded-md border border-border bg-background/50 p-2"
             >
               <div className="mb-1.5 flex items-center justify-between gap-2">
-                <select
-                  className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none"
+                <Select
                   value={dl.characterId}
-                  onChange={(e) =>
-                    onUpdateDialogue(shot.shotId, i, {
-                      characterId: e.target.value,
-                    })
+                  onValueChange={(v) =>
+                    onUpdateDialogue(shot.shotId, i, { characterId: v })
                   }
                 >
-                  {manifest.characters.map((c) => (
-                    <option key={c.characterId} value={c.characterId}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger size="sm" className="w-auto text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {manifest.characters.map((c) => (
+                      <SelectItem
+                        key={c.characterId}
+                        value={c.characterId}
+                        className="text-xs"
+                      >
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <button
                   type="button"
                   className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
@@ -263,9 +279,9 @@ function ShotCard({
                   <Trash2 className="size-3" />
                 </button>
               </div>
-              <input
+              <Input
                 type="text"
-                className="mb-1 w-full rounded border border-border bg-background px-2 py-1 text-xs focus:border-primary focus:outline-none"
+                className="mb-1 h-8 text-xs"
                 placeholder="Dialogue text…"
                 value={dl.text}
                 onChange={(e) =>
@@ -273,9 +289,9 @@ function ShotCard({
                 }
               />
               <div className="flex gap-1.5">
-                <input
+                <Input
                   type="text"
-                  className="flex-1 rounded border border-border bg-background px-2 py-0.5 text-[11px] focus:border-primary focus:outline-none"
+                  className="h-8 flex-1 text-xs"
                   placeholder="Emotion"
                   value={dl.emotion}
                   onChange={(e) =>
@@ -284,9 +300,9 @@ function ShotCard({
                     })
                   }
                 />
-                <input
+                <Input
                   type="text"
-                  className="flex-1 rounded border border-border bg-background px-2 py-0.5 text-[11px] focus:border-primary focus:outline-none"
+                  className="h-8 flex-1 text-xs"
                   placeholder="Delivery"
                   value={dl.delivery}
                   onChange={(e) =>

@@ -56,7 +56,7 @@ export default function MeetingPage() {
         <Button
           onClick={handleHandoff}
           disabled={!hasMinSettings || syncing}
-          className={`w-full ${hasMinSettings && !syncing ? 'animate-pulse bg-green-600 hover:bg-green-700' : ''}`}
+          className={`w-full ${hasMinSettings && !syncing ? 'animate-pulse bg-success hover:bg-success/90' : ''}`}
           size="lg"
         >
           {syncing ? (
