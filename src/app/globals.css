@@ -254,6 +254,18 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* 슈퍼 드래그(텍스트 선택 하이라이트) 비활성 — 캔버스/타임라인 드래그 시 OS 선택색 방지 */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  /* 입력/편집 가능한 요소·명시적 selectable 영역에서는 선택 허용 */
+  input,
+  textarea,
+  [contenteditable="true"],
+  [contenteditable=""],
+  .select-text {
+    user-select: text;
+    -webkit-user-select: text;
   }
 }
 

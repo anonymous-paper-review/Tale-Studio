@@ -12,6 +12,7 @@ interface BinDragArgs {
   onDrop: (info: { target: Element; clientX: number; clientY: number }) => void
   onDragStart?: () => void
   onDragEnd?: () => void
+  onDragOver?: (target: Element | null, clientX: number) => void // 매 이동마다 현재 드롭 대상
   threshold?: number
 }
 
@@ -23,6 +24,7 @@ export function startBinDrag({
   onDrop,
   onDragStart,
   onDragEnd,
+  onDragOver,
   threshold = 5,
 }: BinDragArgs): void {
   if (event.button !== 0) return
@@ -52,6 +54,8 @@ export function startBinDrag({
     if (dragging && ghost) {
       ghost.style.left = `${ev.clientX}px`
       ghost.style.top = `${ev.clientY}px`
+      const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(dropSelector) ?? null
+      onDragOver?.(over, ev.clientX)
     }
   }
 

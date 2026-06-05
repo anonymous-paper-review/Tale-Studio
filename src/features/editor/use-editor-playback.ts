@@ -55,13 +55,17 @@ export function useEditorPlayback() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // 입력 필드/셀렉트에서 조작 중이면 무시 (오디오 이름 input, 배속 select 등)
-      const tag = (e.target as HTMLElement | null)?.tagName
+      const el = e.target as HTMLElement | null
+      const tag = el?.tagName
+      // 볼륨 등 range 슬라이더는 텍스트 입력이 아님 → 단축키 허용 (단, 화살표는 네이티브 볼륨 조절에 양보)
+      const isRange = tag === 'INPUT' && (el as HTMLInputElement | null)?.type === 'range'
       const editable =
-        tag === 'INPUT' ||
+        (tag === 'INPUT' && !isRange) ||
         tag === 'TEXTAREA' ||
         tag === 'SELECT' ||
-        (e.target as HTMLElement | null)?.isContentEditable
+        el?.isContentEditable
       if (editable) return
+      if (isRange && e.key.startsWith('Arrow')) return // 슬라이더 포커스 시 화살표는 네이티브 처리
 
       const s = useEditorStore.getState()
       const meta = e.ctrlKey || e.metaKey
@@ -77,20 +81,37 @@ export function useEditorPlayback() {
         s.redo()
         return
       }
+      // 프레임/컷 이동 (요청 8): ←/→ 1프레임, Shift+←/→ 5프레임, Ctrl/⌘+←/→ 다음·이전 컷(클립 경계)
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault()
+        const dir = e.key === 'ArrowRight' ? 1 : -1
+        if (meta) {
+          const layout = selectTimelineLayout(s)
+          const bounds = [0]
+          let acc = 0
+          for (const l of layout) {
+            acc += l.durationSec
+            bounds.push(acc)
+          }
+          const cur = s.currentTime
+          let target: number
+          if (dir > 0) target = bounds.find((b) => b > cur + 1e-3) ?? bounds[bounds.length - 1] ?? cur
+          else {
+            const prevs = bounds.filter((b) => b < cur - 1e-3)
+            target = prevs.length ? prevs[prevs.length - 1] : 0
+          }
+          s.nudge(target - cur)
+        } else {
+          s.nudge((e.shiftKey ? 5 : 1) * dir * FRAME)
+        }
+        return
+      }
       if (meta) return // 다른 Ctrl 조합은 통과
 
       switch (e.key) {
         case ' ':
           e.preventDefault()
           s.togglePlay()
-          break
-        case 'ArrowRight':
-          e.preventDefault()
-          s.nudge(e.shiftKey ? 1 : FRAME)
-          break
-        case 'ArrowLeft':
-          e.preventDefault()
-          s.nudge(e.shiftKey ? -1 : -FRAME)
           break
         case 'v':
         case 'V':

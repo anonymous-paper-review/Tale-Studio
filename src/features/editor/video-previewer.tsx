@@ -14,10 +14,9 @@ function formatTime(sec: number) {
 
 /**
  * Editor 프리뷰. 두 모드:
- *   1) 타임라인 모드 (default): 전역 currentTime 아래 클립을 골라 trim/speed 반영해 일렬 재생.
- *   2) 소스 미리보기 모드 (previewSourceShotId 설정 시): Video Source 에서 클릭한 단일 클립을
- *      원본 그대로(트림/속도 무시, loop) 재생. 타임라인 클릭하면 해제되어 1)로 복귀.
- * 마스터 클럭은 use-editor-playback rAF(타임라인 모드에서만 currentTime 진행).
+ *   1) 타임라인 모드(default): currentTime 아래 클립을 trim/speed 반영해 일렬 재생.
+ *      영상이 없는 구간(영상 끝 이후 등)에선 클립을 잡지 않고 검은 화면 (요청 1).
+ *   2) 소스 미리보기 모드(previewSourceShotId): 단일 클립을 원본 그대로 loop 재생.
  */
 export function VideoPreviewer() {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -33,6 +32,7 @@ export function VideoPreviewer() {
   const isPlaying = useEditorStore((s) => s.isPlaying)
   const previewSourceShotId = useEditorStore((s) => s.previewSourceShotId)
   const masterVolume = useEditorStore((s) => s.masterVolume)
+  const hasClips = useEditorStore((s) => Object.values(s.clipOrder).some((ids) => ids.length > 0))
   const togglePlay = useEditorStore((s) => s.togglePlay)
   const seek = useEditorStore((s) => s.seek)
   const setMasterVolume = useEditorStore((s) => s.setMasterVolume)
@@ -46,7 +46,6 @@ export function VideoPreviewer() {
       const preview = st.previewSourceShotId
 
       if (preview) {
-        // 소스 미리보기 모드: 단일 클립을 원본 그대로 재생 (loop)
         if (preview !== activeIdRef.current) {
           activeIdRef.current = preview
           setActiveShotId(preview)
@@ -76,8 +75,8 @@ export function VideoPreviewer() {
       const total = layout.reduce((sum, l) => sum + l.durationSec, 0)
       const t = st.currentTime
 
-      let item = layout.find((l) => t >= l.startSec && t < l.startSec + l.durationSec)
-      if (!item && layout.length > 0 && t >= total) item = layout[layout.length - 1]
+      // 영상이 없는 구간에선 클립을 강제로 잡지 않음 → 검은 화면 (요청 1)
+      const item = layout.find((l) => t >= l.startSec && t < l.startSec + l.durationSec)
       const id = item?.shotId ?? null
       if (id !== activeIdRef.current) {
         activeIdRef.current = id
@@ -89,7 +88,7 @@ export function VideoPreviewer() {
       if (timeRef.current) timeRef.current.textContent = `${formatTime(t)} / ${formatTime(total)}`
 
       if (v && item) {
-        const clip = st.videoClips.find((c) => c.shotId === item!.shotId)
+        const clip = st.videoClips.find((c) => c.shotId === item.shotId)
         if (clip?.url) {
           v.loop = false
           const trimStart = clip.trimStart ?? 0
@@ -134,14 +133,6 @@ export function VideoPreviewer() {
   const activeShot = shots.find((s) => s.shotId === activeShotId)
   const activeClip = videoClips.find((c) => c.shotId === activeShotId)
 
-  if (!activeShot) {
-    return (
-      <div className="flex h-full items-center justify-center bg-black/40">
-        <p className="text-sm text-muted-foreground">타임라인에 클립이 없습니다</p>
-      </div>
-    )
-  }
-
   return (
     <div className="relative flex h-full flex-col items-center justify-center bg-black">
       {activeClip?.url ? (
@@ -157,23 +148,24 @@ export function VideoPreviewer() {
             if (videoRef.current) setActualDuration(videoRef.current.duration)
           }}
         />
-      ) : (
+      ) : activeShot ? (
         <div className="flex flex-col items-center gap-3">
           <div className="flex h-48 w-80 items-center justify-center rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10">
             <div className="text-center">
               <p className="text-lg font-semibold text-muted-foreground">{activeShot.shotType}</p>
-              <p className="mt-1 max-w-[260px] text-xs text-muted-foreground/70">
-                {activeShot.actionDescription}
-              </p>
+              <p className="mt-1 max-w-[260px] text-xs text-muted-foreground/70">{activeShot.actionDescription}</p>
               <p className="mt-2 text-[10px] text-muted-foreground/50">
                 {activeClip?.status === 'generating' ? 'Generating...' : 'No video generated yet'}
               </p>
             </div>
           </div>
         </div>
+      ) : (
+        // 영상 없는 구간 = 검은 화면. 타임라인이 비었을 때만 안내 문구.
+        !hasClips && <p className="text-sm text-muted-foreground">타임라인에 클립이 없습니다</p>
       )}
 
-      {/* 재생 컨트롤 */}
+      {/* 재생 컨트롤 (항상 표시 — 검은 구간에서도 스크럽 가능) */}
       <div className="absolute bottom-0 left-0 right-0 flex items-center gap-3 bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-8">
         <Button
           size="icon"
@@ -184,10 +176,7 @@ export function VideoPreviewer() {
           {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
         </Button>
 
-        <div
-          className="group relative flex h-5 flex-1 cursor-pointer items-center"
-          onClick={onProgressClick}
-        >
+        <div className="group relative flex h-5 flex-1 cursor-pointer items-center" onClick={onProgressClick}>
           <div className="h-1 w-full rounded-full bg-white/20 transition-all group-hover:h-1.5">
             <div ref={fillRef} className="h-full rounded-full bg-white" style={{ width: '0%' }} />
           </div>
@@ -197,7 +186,7 @@ export function VideoPreviewer() {
           0:00 / 0:00
         </span>
 
-        {/* 전역 재생 볼륨 (재생 전용 — draft 무관) */}
+        {/* 전역 재생 볼륨 (재생 전용) */}
         <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
@@ -220,16 +209,16 @@ export function VideoPreviewer() {
         </div>
       </div>
 
-      {/* 모드 뱃지 + 길이 뱃지 (실제 생성 영상 길이 우선 — 요청 6) */}
+      {/* 모드 뱃지 + 길이 뱃지 (활성 클립 있을 때만) */}
       <div className="absolute right-3 top-3 flex items-center gap-1.5">
         {previewSourceShotId && (
-          <span className="rounded bg-primary/80 px-2 py-0.5 text-xs font-medium text-primary-foreground">
-            소스 미리보기
+          <span className="rounded bg-primary/80 px-2 py-0.5 text-xs font-medium text-primary-foreground">소스 미리보기</span>
+        )}
+        {activeShot && (
+          <span className="rounded bg-black/60 px-2 py-0.5 text-xs text-white">
+            {(actualDuration ?? activeShot.durationSeconds).toFixed(1)}s
           </span>
         )}
-        <span className="rounded bg-black/60 px-2 py-0.5 text-xs text-white">
-          {(actualDuration ?? activeShot.durationSeconds).toFixed(1)}s
-        </span>
       </div>
     </div>
   )

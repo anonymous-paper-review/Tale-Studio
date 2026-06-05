@@ -30,6 +30,7 @@ interface VideoSourcePanelProps {
   onRemoveAudioSource: (id: string) => void
   onBinDragStart: (kind: 'video' | 'audio') => void
   onBinDragEnd: () => void
+  onSetBinDropSec: (sec: number | null) => void
 }
 
 function fmtDur(sec: number) {
@@ -58,6 +59,7 @@ export function VideoSourcePanel({
   onRemoveAudioSource,
   onBinDragStart,
   onBinDragEnd,
+  onSetBinDropSec,
 }: VideoSourcePanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -129,6 +131,8 @@ export function VideoSourcePanel({
                             onClick: () => onPreview(shot.shotId),
                             onDragStart: () => onBinDragStart('video'),
                             onDragEnd: onBinDragEnd,
+                            onDragOver: (target, clientX) =>
+                              onSetBinDropSec(target ? dropTargetSec(target, clientX) : null),
                             onDrop: ({ target, clientX }) => onAddClip(shot.shotId, dropTargetSec(target, clientX)),
                           })
                         }

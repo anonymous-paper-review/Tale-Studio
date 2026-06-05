@@ -44,6 +44,7 @@ export default function PostPage() {
     isPlaying,
     toolMode,
     binDragKind,
+    binDropSec,
     panelSizes,
     past,
     future,
@@ -70,6 +71,9 @@ export default function PostPage() {
     removeAudioTrack,
     setAudioVolume,
     setBinDragKind,
+    setBinDropSec,
+    updateVideoClip,
+    updateAudioClip,
     renderDraft,
     toggleSourcePanel,
     seek,
@@ -172,7 +176,11 @@ export default function PostPage() {
               onAddAudioSource={addAudioSource}
               onRemoveAudioSource={removeAudioSource}
               onBinDragStart={setBinDragKind}
-              onBinDragEnd={() => setBinDragKind(null)}
+              onBinDragEnd={() => {
+                setBinDragKind(null)
+                setBinDropSec(null)
+              }}
+              onSetBinDropSec={setBinDropSec}
             />
           </div>
           <ResizeHandle
@@ -195,7 +203,11 @@ export default function PostPage() {
           onAddAudioSource={addAudioSource}
           onRemoveAudioSource={removeAudioSource}
           onBinDragStart={setBinDragKind}
-          onBinDragEnd={() => setBinDragKind(null)}
+          onBinDragEnd={() => {
+            setBinDragKind(null)
+            setBinDropSec(null)
+          }}
+          onSetBinDropSec={setBinDropSec}
         />
       )}
 
@@ -302,6 +314,7 @@ export default function PostPage() {
               pxPerSec={pxPerSec}
               toolMode={toolMode}
               binDragKind={binDragKind}
+              binDropSec={binDropSec}
               audioClips={audioClips}
               audioTracks={audioTracks}
               onSeek={seek}
@@ -326,6 +339,8 @@ export default function PostPage() {
               onSetAudioVolume={setAudioVolume}
               onSplitAudio={splitAudioClipAt}
               onSelectAudio={selectAudioClip}
+              onUpdateVideoClip={updateVideoClip}
+              onUpdateAudioClip={updateAudioClip}
               onPushHistory={pushHistory}
             />
           </div>

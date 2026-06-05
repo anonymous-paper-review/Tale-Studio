@@ -28,12 +28,12 @@ const DEFAULT_LIGHTING = {
 // Per-shot debounce timers for speed persist (300ms)
 const speedPersistTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-// 오디오 클립 id 시퀀스 (Date.now/random 회피 — 모듈 카운터)
-let audioIdSeq = 1
-// cut(split)·drag-add 로 생기는 synthetic 비디오 인스턴스 id 시퀀스
-let instanceSeq = 1
-// 오디오 트랙(레인) id 시퀀스
-let audioTrackSeq = 2 // atrack_1 은 기본 트랙
+// 고유 id 생성. 모듈 카운터는 HMR/새로고침 후 리셋되어 영속화된 id 와 충돌(audio_1 중복 등)
+// → React key 중복 + 같은 id 클립 일괄 토글 버그 유발. crypto.randomUUID 로 충돌 원천 차단.
+function uid(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID().slice(0, 8)
+  return Math.random().toString(36).slice(2, 10)
+}
 
 interface EditorState {
   shots: Shot[]
@@ -70,6 +70,8 @@ interface EditorState {
 
   // bin→트랙 포인터 드래그 중 드롭존 하이라이트 ('video'|'audio'|null)
   binDragKind: 'video' | 'audio' | null
+  // bin→비디오 트랙 드래그 중 삽입 위치(초). 드롭 인디케이터용
+  binDropSec: number | null
 
   // 리사이즈 섹션 크기 (px). 영속화 대상.
   panelSizes: { sourceW: number; previewH: number }
@@ -137,6 +139,11 @@ interface EditorState {
   // 전역 볼륨 / bin 드래그 하이라이트
   setMasterVolume: (v: number) => void
   setBinDragKind: (kind: 'video' | 'audio' | null) => void
+  setBinDropSec: (sec: number | null) => void
+
+  // 드래그 중 클립 필드 라이브 갱신 (history/persist 스팸 방지 — pushHistory는 드래그 시작 1회)
+  updateVideoClip: (shotId: string, patch: Partial<VideoClip>) => void
+  updateAudioClip: (id: string, patch: Partial<AudioTrackClip>) => void
 
   // 재생 / 도구 / Undo·Redo 액션
   togglePlay: () => void
@@ -268,6 +275,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   previewSourceShotId: null,
   masterVolume: 1,
   binDragKind: null,
+  binDropSec: null,
   panelSizes: { ...DEFAULT_PANEL_SIZES },
   past: [],
   future: [],
@@ -331,7 +339,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ pxPerSec: Math.max(PX_PER_SEC_MIN, Math.min(PX_PER_SEC_MAX, px)) }),
 
   addAudioClip: (clip) => {
-    const id = `audio_${audioIdSeq++}`
+    const id = `audio_${uid()}`
     set((state) => ({
       audioClips: [
         ...state.audioClips,
@@ -401,7 +409,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const srcOff = a.sourceOffsetSec ?? 0
       const srcDur = a.sourceDurationSec ?? a.durationSec
-      const newId = `audio_${audioIdSeq++}`
+      const newId = `audio_${uid()}`
       const first: AudioTrackClip = { ...a, durationSec: localT }
       const second: AudioTrackClip = {
         ...a,
@@ -436,7 +444,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addAudioClipFromSource: (sourceId, startSec, trackId) => {
     const src = get().audioSources.find((s) => s.id === sourceId)
     if (!src) return null
-    const id = `audio_${audioIdSeq++}`
+    const id = `audio_${uid()}`
     const lane = trackId ?? get().audioTracks[0]?.id ?? 'atrack_1'
     set((state) => ({
       audioClips: [
@@ -466,7 +474,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   addAudioTrack: () =>
     set((state) => ({
-      audioTracks: [...state.audioTracks, { id: `atrack_${audioTrackSeq++}` }],
+      audioTracks: [...state.audioTracks, { id: `atrack_${uid()}` }],
       past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
       future: [],
     })),
@@ -491,6 +499,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // ── 전역 볼륨 / bin 드래그 ──
   setMasterVolume: (v) => set({ masterVolume: Math.max(0, Math.min(1, v)) }),
   setBinDragKind: (kind) => set({ binDragKind: kind }),
+  setBinDropSec: (sec) => set({ binDropSec: sec }),
+
+  updateVideoClip: (shotId, patch) =>
+    set((state) => ({
+      videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, ...patch } : c)),
+    })),
+  updateAudioClip: (id, patch) =>
+    set((state) => ({
+      audioClips: state.audioClips.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+    })),
 
   // ── 리사이즈 섹션 크기 ──
   setPanelSize: (key, value) =>
@@ -509,13 +527,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!projectId) return
     const saved = await loadEditorState(projectId)
     if (!saved) return
+
+    // 복구: 이전 버전(모듈 카운터)에서 중복된 트랙/오디오 클립 id 제거
+    const seenTracks = new Set<string>()
+    const dedupTracks: { id: string }[] = []
+    for (const t of saved.audioTracks ?? []) {
+      if (!seenTracks.has(t.id)) {
+        seenTracks.add(t.id)
+        dedupTracks.push(t)
+      }
+    }
+    if (dedupTracks.length === 0) dedupTracks.push({ id: 'atrack_1' })
+    const validTrackIds = new Set(dedupTracks.map((t) => t.id))
+    const seenClips = new Set<string>()
+    const dedupAudioClips = (saved.audioClips ?? []).map((c) => {
+      const id = seenClips.has(c.id) ? `audio_${uid()}` : c.id
+      seenClips.add(id)
+      const trackId = c.trackId && validTrackIds.has(c.trackId) ? c.trackId : dedupTracks[0].id
+      return { ...c, id, trackId }
+    })
+
     set({
       shots: saved.shots ?? [],
       clipOrder: saved.clipOrder ?? {},
       videoClips: saved.videoClips ?? [],
-      audioClips: saved.audioClips ?? [],
+      audioClips: dedupAudioClips,
       audioSources: saved.audioSources ?? [],
-      audioTracks: saved.audioTracks?.length ? saved.audioTracks : [{ id: 'atrack_1' }],
+      audioTracks: dedupTracks,
       panelSizes: saved.panelSizes ?? { ...DEFAULT_PANEL_SIZES },
       selectedClipShotId: null,
       selectedShotIds: [],
@@ -871,7 +909,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const MIN = 0.1
       if (srcSplit <= trimStart + MIN || srcSplit >= trimEnd - MIN) return state
 
-      const newId = `${shotId}__c${instanceSeq++}`
+      const newId = `${shotId}__c${uid()}`
       const newShot: Shot = { ...shot, shotId: newId }
       const baseClip: VideoClip =
         clip ?? { shotId, url: null, status: 'pending', thumbnailUrl: null }
@@ -904,7 +942,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!srcShot) return state
       const srcClip = state.videoClips.find((c) => c.shotId === sourceShotId)
 
-      const newId = `${sourceShotId}__i${instanceSeq++}`
+      const newId = `${sourceShotId}__i${uid()}`
       const newShot: Shot = { ...srcShot, shotId: newId }
       // 새 인스턴스는 소스 전체를 그대로 (trim/speed 초기화)
       const newClip: VideoClip = {

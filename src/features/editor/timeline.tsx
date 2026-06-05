@@ -19,10 +19,12 @@ import {
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
 } from '@/components/ui/context-menu'
+import { TimelineScrollbars } from '@/features/editor/timeline-scrollbars'
 
 const CLIP_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4]
+const TRIM_MIN = 0.1 // 트림 최소 길이(초)
 const SNAP_PX = 8 // 스냅 임계(px)
-const HEADER_W = 64 // 좌측 트랙 헤더 폭(px)
+const HEADER_W = 76 // 좌측 트랙 헤더 폭(px)
 
 interface TimelineLayoutItem {
   shotId: string
@@ -40,6 +42,7 @@ interface TimelineProps {
   pxPerSec: number
   toolMode: 'select' | 'cut'
   binDragKind: 'video' | 'audio' | null
+  binDropSec: number | null
   audioClips: AudioTrackClip[]
   audioTracks: { id: string }[]
   onSeek: (timeSec: number) => void
@@ -64,6 +67,8 @@ interface TimelineProps {
   onSetAudioVolume: (id: string, volume: number) => void
   onSplitAudio: (id: string, atGlobalSec: number) => void
   onSelectAudio: (id: string) => void
+  onUpdateVideoClip: (shotId: string, patch: Partial<VideoClip>) => void
+  onUpdateAudioClip: (id: string, patch: Partial<AudioTrackClip>) => void
   onPushHistory: () => void
 }
 
@@ -99,6 +104,9 @@ function AudioClipBlock({
   onSplit,
   onSelect,
   onSetVolume,
+  onUpdate,
+  onTrimPreview,
+  rowTrackId,
   onPushHistory,
 }: {
   clip: AudioTrackClip
@@ -113,10 +121,18 @@ function AudioClipBlock({
   onSplit: (atGlobalSec: number) => void
   onSelect: () => void
   onSetVolume: (v: number) => void
+  onUpdate: (patch: Partial<AudioTrackClip>) => void
+  onTrimPreview: (p: { scope: string; leftSec: number; rightSec: number; label: string; clientX: number; clientY: number } | null) => void
+  rowTrackId: string
   onPushHistory: () => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const width = Math.max(clip.durationSec * pxPerSec, 12)
+  const CLIP_H = 52
+  const HEADER_H = 14
+  const WAVE_H = CLIP_H - HEADER_H
+  const vol = Math.max(0, Math.min(1, clip.volume ?? 1))
+  const gainTop = HEADER_H + (1 - vol) * WAVE_H // 게인 라인 Y (요청 6)
 
   const slice = useMemo(() => {
     const peaks = clip.peaks
@@ -170,6 +186,75 @@ function AudioClipBlock({
     [cutMode, clientXToSec, onSplit, onSelect, onPushHistory, clip.startSec, clip.durationSec, clip.id, clip.trackId, pxPerSec, onMove, snapStart],
   )
 
+  // 게인(음량) 러버밴드 드래그 (요청 6) — 위/아래로 끌어 음량 조절
+  const handleGain = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.button !== 0) return
+      e.stopPropagation()
+      onSelect()
+      onPushHistory()
+      const startY = e.clientY
+      const o = clip.volume ?? 1
+      const move = (ev: PointerEvent) => onSetVolume(Math.max(0, Math.min(1, o - (ev.clientY - startY) / WAVE_H)))
+      const up = () => {
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', up)
+      }
+      window.addEventListener('pointermove', move)
+      window.addEventListener('pointerup', up)
+    },
+    [clip.volume, onSelect, onPushHistory, onSetVolume, WAVE_H],
+  )
+
+  // 트림 핸들 (요청): 점선 미리보기 → 드롭 시 적용. 원본 길이 초과 불가.
+  const handleTrim = useCallback(
+    (edge: 'l' | 'r') => (e: React.PointerEvent) => {
+      if (e.button !== 0) return
+      e.stopPropagation()
+      const start = clip.startSec
+      const dur = clip.durationSec
+      const end = start + dur
+      const off = clip.sourceOffsetSec ?? 0
+      const srcDur = clip.sourceDurationSec ?? dur
+      const minLeft = start - off // 원본 시작까지만 확장
+      const maxLeft = end - TRIM_MIN
+      const minRight = start + TRIM_MIN
+      const maxRight = start + (srcDur - off) // 원본 끝까지만
+      const startX = e.clientX
+      let moved = false
+      const move = (ev: PointerEvent) => {
+        if (!moved && Math.abs(ev.clientX - startX) > 2) moved = true
+        if (!moved) return
+        if (edge === 'l') {
+          const lft = Math.max(minLeft, Math.min(clientXToSec(ev.clientX), maxLeft))
+          onTrimPreview({ scope: rowTrackId, leftSec: lft, rightSec: end, label: `${(end - lft).toFixed(2)}s`, clientX: ev.clientX, clientY: ev.clientY })
+        } else {
+          const rgt = Math.max(minRight, Math.min(clientXToSec(ev.clientX), maxRight))
+          onTrimPreview({ scope: rowTrackId, leftSec: start, rightSec: rgt, label: `${(rgt - start).toFixed(2)}s`, clientX: ev.clientX, clientY: ev.clientY })
+        }
+      }
+      const up = (ev: PointerEvent) => {
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', up)
+        if (moved) {
+          onPushHistory()
+          if (edge === 'l') {
+            const lft = Math.max(minLeft, Math.min(clientXToSec(ev.clientX), maxLeft))
+            const dd = lft - start
+            onUpdate({ startSec: Math.max(0, start + dd), durationSec: dur - dd, sourceOffsetSec: Math.max(0, off + dd) })
+          } else {
+            const rgt = Math.max(minRight, Math.min(clientXToSec(ev.clientX), maxRight))
+            onUpdate({ durationSec: rgt - start })
+          }
+        }
+        onTrimPreview(null)
+      }
+      window.addEventListener('pointermove', move)
+      window.addEventListener('pointerup', up)
+    },
+    [clip.startSec, clip.durationSec, clip.sourceOffsetSec, clip.sourceDurationSec, clientXToSec, onUpdate, onPushHistory, onTrimPreview, rowTrackId],
+  )
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
@@ -190,6 +275,30 @@ function AudioClipBlock({
             </button>
           </div>
           <canvas ref={canvasRef} className="pointer-events-none h-full w-full" />
+
+          {/* 게인 라인 + % (요청 6) */}
+          <div className="pointer-events-none absolute inset-x-0 h-px bg-primary/50" style={{ top: gainTop }} />
+          <span
+            className="pointer-events-none absolute right-1 font-mono text-[8px] text-primary"
+            style={{ top: Math.max(HEADER_H, Math.min(gainTop - 8, CLIP_H - 9)) }}
+          >
+            {Math.round(vol * 100)}%
+          </span>
+          <div
+            data-no-seek
+            onPointerDown={handleGain}
+            className="absolute inset-x-1.5 h-2.5 -translate-y-1/2 cursor-ns-resize"
+            style={{ top: gainTop }}
+            title={`음량 ${Math.round(vol * 100)}% — 위/아래 드래그`}
+          />
+
+          {/* 트림 핸들 (요청): 좌=시작점, 우=끝점 + hover 라벨 */}
+          <div data-no-seek onPointerDown={handleTrim('l')} className="group/trim absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-primary/60">
+            <span className="pointer-events-none absolute -top-4 left-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">▕ 이 오디오 시작점</span>
+          </div>
+          <div data-no-seek onPointerDown={handleTrim('r')} className="group/trim absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-primary/60">
+            <span className="pointer-events-none absolute -top-4 right-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">이 오디오 끝점 ▏</span>
+          </div>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">
@@ -233,6 +342,7 @@ export function Timeline({
   pxPerSec,
   toolMode,
   binDragKind,
+  binDropSec,
   audioClips,
   audioTracks,
   onSeek,
@@ -257,6 +367,8 @@ export function Timeline({
   onSetAudioVolume,
   onSplitAudio,
   onSelectAudio,
+  onUpdateVideoClip,
+  onUpdateAudioClip,
   onPushHistory,
 }: TimelineProps) {
   const trackRef = useRef<HTMLDivElement>(null)
@@ -267,6 +379,11 @@ export function Timeline({
 
   const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
   const [reorder, setReorder] = useState<{ shotId: string; targetIndex: number } | null>(null)
+  const [cutHoverSec, setCutHoverSec] = useState<number | null>(null) // cut 모드 미리보기 위치
+  // 트림 미리보기: 드래그 중엔 실제 변경 없이 점선 박스 + 마우스 옆 시간초만 표시, 드롭 시 적용 (요청)
+  const [trimPreview, setTrimPreview] = useState<
+    { scope: 'video' | string; leftSec: number; rightSec: number; label: string; clientX: number; clientY: number } | null
+  >(null)
 
   const cutMode = toolMode === 'cut'
 
@@ -285,6 +402,12 @@ export function Timeline({
       return Math.max(0, (clientX - rect.left + el.scrollLeft) / pxPerSec)
     },
     [pxPerSec],
+  )
+
+  // cut: 플레이헤드 근처면 플레이헤드에 스냅 (요청 7)
+  const snapToPlayhead = useCallback(
+    (sec: number) => (Math.abs(sec - currentTime) * pxPerSec < SNAP_PX ? currentTime : sec),
+    [currentTime, pxPerSec],
   )
 
   // 오디오 드래그 스냅: 0 / 플레이헤드 / 비디오·오디오 클립 경계
@@ -425,7 +548,7 @@ export function Timeline({
     (e: React.PointerEvent, item: TimelineLayoutItem) => {
       if (e.button === 2) return
       e.stopPropagation()
-      if (cutMode) { onSplitVideo(item.shotId, clientXToSec(e.clientX)); return }
+      if (cutMode) { onSplitVideo(item.shotId, snapToPlayhead(clientXToSec(e.clientX))); return }
       if (e.ctrlKey || e.metaKey) { onToggleSelect(item.shotId); return }
       if (e.shiftKey) { onRangeSelect(item.shotId); return }
       onSelect(item.shotId)
@@ -445,7 +568,7 @@ export function Timeline({
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [cutMode, clientXToSec, onSplitVideo, onToggleSelect, onRangeSelect, onSelect, onSeek, computeDropIndex, onMoveClipToIndex],
+    [cutMode, clientXToSec, snapToPlayhead, onSplitVideo, onToggleSelect, onRangeSelect, onSelect, onSeek, computeDropIndex, onMoveClipToIndex],
   )
 
   const reorderX = useMemo(() => {
@@ -459,11 +582,27 @@ export function Timeline({
     return others[reorder.targetIndex].startSec * pxPerSec
   }, [reorder, layout, pxPerSec])
 
+  // Video Source 드래그 중 삽입 위치 인디케이터 (요청 4)
+  const binIndicatorX = useMemo(() => {
+    if (binDragKind !== 'video' || binDropSec == null) return null
+    if (layout.length === 0) return 0
+    let idx = layout.length
+    for (let i = 0; i < layout.length; i++) {
+      const it = layout[i]
+      if (binDropSec < it.startSec + it.durationSec / 2) { idx = i; break }
+    }
+    if (idx >= layout.length) {
+      const last = layout[layout.length - 1]
+      return (last.startSec + last.durationSec) * pxPerSec
+    }
+    return layout[idx].startSec * pxPerSec
+  }, [binDragKind, binDropSec, layout, pxPerSec])
+
   const playheadX = currentTime * pxPerSec
   const firstTrackId = audioTracks[0]?.id
 
   return (
-    <div className="flex h-full flex-col bg-card">
+    <div className="flex h-full flex-col bg-card select-none">
       {/* 상단 바 */}
       <div className="flex items-center justify-between border-b border-border px-3 py-1">
         <span className="font-mono text-xs tabular-nums text-foreground">{formatTimecode(currentTime)}</span>
@@ -497,7 +636,7 @@ export function Timeline({
               <ContextMenu key={t.id}>
                 <ContextMenuTrigger asChild>
                   <div className="flex h-16 items-center justify-center border-b border-border text-[10px] font-medium text-muted-foreground hover:bg-accent/40">
-                    A{i + 1}
+                    Audio {i + 1}
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-40">
@@ -526,16 +665,22 @@ export function Timeline({
           </div>
         </div>
 
-        {/* 트랙 컬럼 */}
+        {/* 트랙 컬럼 (래퍼 — 커스텀 스크롤바 오버레이용) */}
+        <div className="relative min-w-0 flex-1">
         <div
           ref={(el) => { trackRef.current = el; scrollRef.current = el }}
-          className="relative flex-1 overflow-auto"
+          className="absolute inset-0 overflow-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           onWheel={handleWheel}
           onScroll={(e) => {
             if (headerInnerRef.current) headerInnerRef.current.style.transform = `translateY(${-e.currentTarget.scrollTop}px)`
           }}
         >
-          <div className="relative" style={{ width: totalWidth }}>
+          <div
+            className="relative"
+            style={{ width: totalWidth }}
+            onPointerMove={cutMode ? (e) => setCutHoverSec(snapToPlayhead(clientXToSec(e.clientX))) : undefined}
+            onPointerLeave={() => setCutHoverSec(null)}
+          >
             {/* Ruler */}
             <div className="relative h-5 border-b border-border bg-muted/30" onPointerDown={handleSeekPointerDown}>
               {ticks.map((t) => (
@@ -592,11 +737,93 @@ export function Timeline({
                           {shot.shotType}
                           {clip?.speed && clip.speed !== 1 && <span className="ml-1 text-primary">{clip.speed.toFixed(2)}×</span>}
                         </span>
+                        {/* 트림 핸들 (요청): 점선 미리보기 → 드롭 시 적용. 원본 길이 초과 불가. */}
+                        <div
+                          data-no-seek
+                          onPointerDown={(e) => {
+                            if (e.button !== 0) return
+                            e.stopPropagation()
+                            const base = shot.durationSeconds
+                            const speed = clip?.speed ?? 1
+                            const t0 = clip?.trimStart ?? 0
+                            const t1 = clip?.trimEnd ?? base
+                            const startSec = item.startSec
+                            const endSec = item.startSec + item.durationSec
+                            const minLeft = startSec - t0 / speed // 원본 시작까지만 확장
+                            const maxLeft = endSec - TRIM_MIN
+                            const startX = e.clientX
+                            let moved = false
+                            const calc = (cx: number) => Math.max(minLeft, Math.min(clientXToSec(cx), maxLeft))
+                            const move = (ev: PointerEvent) => {
+                              if (!moved && Math.abs(ev.clientX - startX) > 2) moved = true
+                              if (!moved) return
+                              const lft = calc(ev.clientX)
+                              setTrimPreview({ scope: 'video', leftSec: lft, rightSec: endSec, label: `${(endSec - lft).toFixed(2)}s`, clientX: ev.clientX, clientY: ev.clientY })
+                            }
+                            const up = (ev: PointerEvent) => {
+                              window.removeEventListener('pointermove', move)
+                              window.removeEventListener('pointerup', up)
+                              if (moved) {
+                                const lft = calc(ev.clientX)
+                                onPushHistory()
+                                onUpdateVideoClip(item.shotId, { trimStart: Math.max(0, t0 + (lft - startSec) * speed), trimEnd: t1 })
+                              }
+                              setTrimPreview(null)
+                            }
+                            window.addEventListener('pointermove', move)
+                            window.addEventListener('pointerup', up)
+                          }}
+                          className="group/trim absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-primary/60"
+                        >
+                          <span className="pointer-events-none absolute -top-4 left-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">
+                            ▕ 이 클립 시작점
+                          </span>
+                        </div>
+                        <div
+                          data-no-seek
+                          onPointerDown={(e) => {
+                            if (e.button !== 0) return
+                            e.stopPropagation()
+                            const base = shot.durationSeconds
+                            const speed = clip?.speed ?? 1
+                            const t0 = clip?.trimStart ?? 0
+                            const startSec = item.startSec
+                            const minRight = startSec + TRIM_MIN
+                            const maxRight = startSec + (base - t0) / speed // 원본 끝까지만
+                            const startX = e.clientX
+                            let moved = false
+                            const calc = (cx: number) => Math.max(minRight, Math.min(clientXToSec(cx), maxRight))
+                            const move = (ev: PointerEvent) => {
+                              if (!moved && Math.abs(ev.clientX - startX) > 2) moved = true
+                              if (!moved) return
+                              const rgt = calc(ev.clientX)
+                              setTrimPreview({ scope: 'video', leftSec: startSec, rightSec: rgt, label: `${(rgt - startSec).toFixed(2)}s`, clientX: ev.clientX, clientY: ev.clientY })
+                            }
+                            const up = (ev: PointerEvent) => {
+                              window.removeEventListener('pointermove', move)
+                              window.removeEventListener('pointerup', up)
+                              if (moved) {
+                                const rgt = calc(ev.clientX)
+                                onPushHistory()
+                                onUpdateVideoClip(item.shotId, { trimStart: t0, trimEnd: t0 + (rgt - startSec) * speed })
+                              }
+                              setTrimPreview(null)
+                            }
+                            window.addEventListener('pointermove', move)
+                            window.addEventListener('pointerup', up)
+                          }}
+                          className="group/trim absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-primary/60"
+                        >
+                          <span className="pointer-events-none absolute -top-4 right-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">
+                            이 클립 끝점 ▏
+                          </span>
+                        </div>
+
                         <button
                           type="button"
                           data-no-seek
                           onPointerDown={(e) => { e.stopPropagation(); onDelete(item.shotId) }}
-                          className="absolute right-0.5 top-0.5 hidden rounded bg-destructive/80 p-0.5 text-destructive-foreground hover:bg-destructive group-hover:block"
+                          className="absolute right-0.5 top-0.5 z-20 hidden rounded bg-destructive/80 p-0.5 text-destructive-foreground hover:bg-destructive group-hover:block"
                           title="클립 숨기기"
                         >
                           <Trash2 className="size-3" />
@@ -642,6 +869,17 @@ export function Timeline({
                 />
               )}
               {reorderX != null && <div className="pointer-events-none absolute top-0 z-20 h-full w-0.5 bg-primary" style={{ left: reorderX }} />}
+              {binIndicatorX != null && (
+                <div className="pointer-events-none absolute top-0 z-20 h-full w-0.5 bg-primary" style={{ left: binIndicatorX }}>
+                  <div className="absolute -left-[3px] -top-0.5 size-1.5 rounded-full bg-primary" />
+                </div>
+              )}
+              {trimPreview?.scope === 'video' && (
+                <div
+                  className="pointer-events-none absolute top-1 z-30 h-[72px] rounded border-2 border-dashed border-muted-foreground/80 bg-foreground/10"
+                  style={{ left: trimPreview.leftSec * pxPerSec, width: Math.max(2, (trimPreview.rightSec - trimPreview.leftSec) * pxPerSec) }}
+                />
+              )}
               {layout.length === 0 && (
                 <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">
                   Video Source에서 클립을 드래그하거나 우클릭→타임라인 추가
@@ -673,12 +911,21 @@ export function Timeline({
                       onToggleMute={() => onToggleAudioMute(a.id)}
                       onRemove={() => onRemoveAudio(a.id)}
                       onMove={(startSec, trackId) => onMoveAudio(a.id, startSec, trackId)}
-                      onSplit={(atSec) => onSplitAudio(a.id, atSec)}
+                      onSplit={(atSec) => onSplitAudio(a.id, snapToPlayhead(atSec))}
                       onSelect={() => onSelectAudio(a.id)}
                       onSetVolume={(v) => onSetAudioVolume(a.id, v)}
+                      onUpdate={(patch) => onUpdateAudioClip(a.id, patch)}
+                      onTrimPreview={setTrimPreview}
+                      rowTrackId={track.id}
                       onPushHistory={onPushHistory}
                     />
                   ))}
+                  {trimPreview?.scope === track.id && (
+                    <div
+                      className="pointer-events-none absolute top-1 z-30 h-[52px] rounded border-2 border-dashed border-muted-foreground/80 bg-foreground/10"
+                      style={{ left: trimPreview.leftSec * pxPerSec, width: Math.max(2, (trimPreview.rightSec - trimPreview.leftSec) * pxPerSec) }}
+                    />
+                  )}
                 </div>
               )
             })}
@@ -689,13 +936,36 @@ export function Timeline({
               </p>
             )}
 
+            {/* Cut 미리보기 (점선) — 플레이헤드 근처면 겹침 */}
+            {cutMode && cutHoverSec != null && (
+              <div
+                className="pointer-events-none absolute top-0 z-30 h-full border-l border-dashed border-primary/70"
+                style={{ left: cutHoverSec * pxPerSec }}
+              />
+            )}
+
             {/* Playhead (전체 트랙 관통) */}
             <div className="pointer-events-none absolute top-0 z-30 h-full w-px bg-primary" style={{ left: playheadX }}>
               <div className="absolute -left-[5px] top-0 size-0 border-x-[5px] border-t-[6px] border-x-transparent border-t-primary" />
             </div>
           </div>
         </div>
+        <TimelineScrollbars
+          targetRef={scrollRef}
+          revision={`${Math.round(totalWidth)}-${audioTracks.length}-${Math.round(pxPerSec)}`}
+        />
+        </div>
       </div>
+
+      {/* 트림 시간초 (마우스 옆, 실시간) */}
+      {trimPreview && (
+        <div
+          className="pointer-events-none fixed z-50 rounded bg-foreground px-1.5 py-0.5 font-mono text-[10px] text-background shadow"
+          style={{ left: trimPreview.clientX + 14, top: trimPreview.clientY + 4 }}
+        >
+          {trimPreview.label}
+        </div>
+      )}
     </div>
   )
 }
