@@ -58,7 +58,7 @@ tale/
 │   ├── features/               # stage별 기능 (producer/writer/artist/director/editor)
 │   ├── stores/                 # Zustand (project, canvas, director-canvas, chat-ui 등)
 │   ├── types/                  # 공유 타입
-│   └── lib/                    # 유틸 + Supabase 클라이언트 + svc 파이프라인
+│   └── lib/                    # 유틸 + Supabase 클라이언트 + writer 파이프라인
 │
 ├── databases/
 │   ├── knowledge/              # 촬영 기법 Knowledge DB (YAML)

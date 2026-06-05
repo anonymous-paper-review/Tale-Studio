@@ -8,8 +8,8 @@ import { WorldPanel } from '@/features/artist/world-panel'
 import { InventoryGrid } from '@/features/artist/inventory-grid'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
-import { SvcProgress } from '@/components/layout/svc-progress'
-import { useSvcStatus } from '@/lib/writer/use-svc-status'
+import { WriterProgress } from '@/components/layout/writer-progress'
+import { useWriterStatus } from '@/lib/writer/use-writer-status'
 
 type ArtistTab = 'characters' | 'world' | 'inventory'
 
@@ -27,8 +27,8 @@ export default function VisualPage() {
   const projectId = useProjectStore((s) => s.projectId)
   const [tab, setTab] = useState<ArtistTab>('characters')
 
-  // svc-pipeline 진행상황 (producer→artist 직행 시 백그라운드 생성 진행 표시용, decisions #37)
-  const { status: svcStatus } = useSvcStatus(projectId)
+  // writer-pipeline 진행상황 (producer→artist 직행 시 백그라운드 생성 진행 표시용, decisions #37)
+  const { status: writerStatus } = useWriterStatus(projectId)
 
   // 프로젝트당 1회만 자동생성 트리거 (마운트/재진입 중복 방지)
   const autoGenTriggeredRef = useRef<string | null>(null)
@@ -61,17 +61,17 @@ export default function VisualPage() {
   if (characterAssets.length === 0 && worldAssets.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
-        {svcStatus?.pipeline_failed ? (
+        {writerStatus?.pipeline_failed ? (
           <div className="mx-auto w-full max-w-md text-center">
             <h1 className="text-xl font-bold text-destructive">
               AI 자동 생성 실패
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              {svcStatus.error ?? '백그라운드 생성에 실패했습니다. Producer로 돌아가 다시 시도하세요.'}
+              {writerStatus.error ?? '백그라운드 생성에 실패했습니다. Producer로 돌아가 다시 시도하세요.'}
             </p>
           </div>
         ) : (
-          <SvcProgress status={svcStatus} />
+          <WriterProgress status={writerStatus} />
         )}
       </div>
     )
@@ -95,7 +95,7 @@ export default function VisualPage() {
       <Tabs
         value={tab}
         onValueChange={(v) => setTab(v as ArtistTab)}
-        className="flex flex-1 flex-col overflow-hidden"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <div className="border-b border-border px-6 py-3">
           <TabsList>
@@ -107,21 +107,21 @@ export default function VisualPage() {
 
         <TabsContent
           value="characters"
-          className="flex flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
         >
           <CharacterPanel />
         </TabsContent>
 
         <TabsContent
           value="world"
-          className="flex flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
         >
           <WorldPanel />
         </TabsContent>
 
         <TabsContent
           value="inventory"
-          className="flex flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
         >
           <InventoryGrid onSelect={handleInventorySelect} />
         </TabsContent>

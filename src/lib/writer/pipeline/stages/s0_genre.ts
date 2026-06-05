@@ -1,10 +1,10 @@
 // S0: 장르/톤/감정/러닝타임 + 깊이 레벨 결정
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
-import type { S0Genre, PipelineInput, DepthLevel } from '@/lib/writer/types/pipeline';
+import type { Genre, PipelineInput, DepthLevel } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
-export async function runS0(input: PipelineInput, logger: PipelineLogger, axisConfig: LlmAxisConfig): Promise<S0Genre> {
-  await logger.markStage('S0', 'started');
+export async function runGenre(input: PipelineInput, logger: PipelineLogger, axisConfig: LlmAxisConfig): Promise<Genre> {
+  await logger.markStage('genre', 'started');
 
   const systemInstruction = `당신은 영상 제작의 S0(장르/톤) 디자이너이다.
 주어진 스토리에서 장르, 톤, 타겟 감정, 적정 러닝타임을 추출한다.
@@ -48,12 +48,12 @@ ${input.runtimeSeconds ? input.runtimeSeconds + '초' : '자동 결정'}
   "format": "horizontal_16:9" | "vertical_9:16" | "cinema_2.39:1"
 }`;
 
-  const result = await generateJson<S0Genre>(userPrompt, axisConfig, {
+  const result = await generateJson<Genre>(userPrompt, axisConfig, {
     systemInstruction,
     temperature: 0.5,
   });
 
-  await logger.saveLlmCall('S0_genre', {
+  await logger.saveLlmCall('genre', {
     prompt: userPrompt,
     response: JSON.stringify(result, null, 2),
     model: describeAxisConfig(axisConfig),
@@ -65,7 +65,7 @@ ${input.runtimeSeconds ? input.runtimeSeconds + '초' : '자동 결정'}
     result.depth_level = 'D3' as DepthLevel;
   }
 
-  await logger.saveStage('02_S0.json', result);
-  await logger.markStage('S0', 'completed', { depth_level: result.depth_level });
+  await logger.saveStage('02_genre.json', result);
+  await logger.markStage('genre', 'completed', { depth_level: result.depth_level });
   return result;
 }

@@ -98,7 +98,7 @@ async function generateViaGemini(
 
 /* ── fal.ai (default) ──
  * T2I: openai/gpt-image-2. I2I: referenceImageUrls 있으면 fal 래퍼가 자동으로
- * openai/gpt-image-2/edit (image_urls 입력) 으로 라우팅한다 (src/lib/svc/llm/fal.ts).
+ * openai/gpt-image-2/edit (image_urls 입력) 으로 라우팅한다 (src/lib/writer/llm/fal.ts).
  * fal은 호스팅 URL을 반환하므로, 기존 호출부(blob 소비) 계약 유지를 위해 바이트로 다시 받아 반환한다.
  */
 async function generateViaFal(

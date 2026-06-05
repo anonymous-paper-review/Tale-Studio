@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildAssetRegistry, normalizeShotSequenceAssetRefs } from '@/lib/writer/pipeline/util/asset_refs';
-import type { L2Design, S2Block, S3Block, ShotSequenceItem } from '@/lib/writer/types/pipeline';
+import type { ProductionDesign, Characters, Scenes, ShotSequenceItem } from '@/lib/writer/types/pipeline';
 
 const LOG = path.resolve(__dirname, '../../logs/5ba68003-3922-4d91-a87b-1b1ca7f5dd2f');
 const read = (f: string) => JSON.parse(fs.readFileSync(path.join(LOG, f), 'utf8'));
@@ -25,9 +25,9 @@ interface L4Out {
 
 describe('découpage → final_prompts emit (fixed pipeline, no L6/L7)', () => {
   it('normalizes refs (real Layer-1) and emits I2I + TI2V prompts for all 26 shots', () => {
-    const s2 = read('04_S2.json') as S2Block;
-    const l2 = read('09_L2.json') as L2Design;
-    const s3 = read('05_S3.json') as S3Block;
+    const s2 = read('04_S2.json') as Characters;
+    const l2 = read('09_L2.json') as ProductionDesign;
+    const s3 = read('05_S3.json') as Scenes;
     const L0 = read('08_L0_L1.json').L0 as { aspect_ratio: string; fps: number; resolution: { width: number; height: number } };
     const l4 = (read('_decoupage_l4.json').shots ?? []) as L4Out[];
 

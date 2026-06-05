@@ -877,7 +877,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       generateAllStoryboardImages: async () => {
-        // 씬 순서대로 Shot 수집 후 동시성 제한 병렬(3) — SVC 이미지 파이프라인과 동일.
+        // 씬 순서대로 Shot 수집 후 동시성 제한 병렬(3) — writer 이미지 파이프라인과 동일.
         // 순차(20장 직렬 → 수 분)에서 병렬로 단축. 각 샷은 자체 재시도/타임아웃 보유.
         const sceneNodes = get().nodes.filter((n) => isSceneData(n.data))
         const orphanShots = get().nodes.filter(

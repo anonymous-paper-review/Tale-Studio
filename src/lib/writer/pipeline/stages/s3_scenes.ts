@@ -1,19 +1,19 @@
 // S3: 씬 브레이크다운, 감정 비트, 정보 비대칭
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
-import type { S0Genre, S1Structure, S2Block, S3Block, PipelineInput } from '@/lib/writer/types/pipeline';
+import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
-export async function runS3(
+export async function runScenes(
   input: PipelineInput,
-  s0: S0Genre,
-  s1: S1Structure,
-  s2: S2Block,
+  genre: Genre,
+  narrativeStructure: NarrativeStructure,
+  characters: Characters,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
-): Promise<S3Block> {
-  await logger.markStage('S3', 'started');
+): Promise<Scenes> {
+  await logger.markStage('scenes', 'started');
 
-  const totalSecondsTarget = s0.runtime_seconds;
+  const totalSecondsTarget = genre.runtime_seconds;
   const sceneCountHintMap: Record<string, string> = {
     D1: '1개 씬 (한 순간, 단일 액션)',
     D2: '1~2개 씬',
@@ -23,7 +23,7 @@ export async function runS3(
     D6: '20~30개 씬',
     D7: '30개+ 씬',
   };
-  const sceneCountHint = sceneCountHintMap[s0.depth_level] ?? '5~10개 씬';
+  const sceneCountHint = sceneCountHintMap[genre.depth_level] ?? '5~10개 씬';
 
   const systemInstruction = `당신은 영상 제작의 S3(씬 브레이크다운) 디자이너이다.
 주어진 S0/S1/S2 위에서 씬 단위 분해를 한다.
@@ -57,14 +57,14 @@ scene_actions:
   const userPrompt = `[스토리]
 ${input.story}
 
-[S0]
-${JSON.stringify(s0, null, 2)}
+[genre]
+${JSON.stringify(genre, null, 2)}
 
-[S1]
-${JSON.stringify(s1, null, 2)}
+[narrativeStructure]
+${JSON.stringify(narrativeStructure, null, 2)}
 
-[S2 캐릭터 ID들]
-${s2.characters.map((c) => `${c.id} (${c.name})`).join(', ')}
+[characters ID들]
+${characters.characters.map((c) => `${c.id} (${c.name})`).join(', ')}
 
 [출력 형식 - JSON]
 {
@@ -90,19 +90,19 @@ ${s2.characters.map((c) => `${c.id} (${c.name})`).join(', ')}
   "total_estimated_seconds": number
 }`;
 
-  const result = await generateJson<S3Block>(userPrompt, axisConfig, {
+  const result = await generateJson<Scenes>(userPrompt, axisConfig, {
     systemInstruction,
     temperature: 0.7,
   });
 
-  await logger.saveLlmCall('S3_scenes', {
+  await logger.saveLlmCall('scenes', {
     prompt: userPrompt,
     response: JSON.stringify(result, null, 2),
     model: describeAxisConfig(axisConfig),
     provider: axisConfig.provider,
   });
 
-  await logger.saveStage('05_S3.json', result);
-  await logger.markStage('S3', 'completed', { scene_count: result.scenes.length });
+  await logger.saveStage('05_scenes.json', result);
+  await logger.markStage('scenes', 'completed', { scene_count: result.scenes.length });
   return result;
 }

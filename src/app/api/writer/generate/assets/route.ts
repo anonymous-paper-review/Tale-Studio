@@ -3,14 +3,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PipelineLogger } from '@/lib/writer/logger';
 import { runAssetsGenerate } from '@/lib/writer/pipeline/stages/assets_generate';
 import type {
-  L0Visual,
-  L1Style,
-  L2Design,
-  S2Block,
+  RenderFormat,
+  ArtDirection,
+  ProductionDesign,
+  Characters,
 } from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';
-export const maxDuration = 600;
+export const maxDuration = 300; // Vercel Hobby 한도. 점진적 저장 + resume으로 초과분 이어받기.
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,17 +25,17 @@ export async function POST(req: NextRequest) {
     const logger = new PipelineLogger(projectId);
     await logger.init();
 
-    const s2 = await logger.loadStage<S2Block>('04_S2.json');
-    const l0l1 = await logger.loadStage<{ L0: L0Visual; L1: L1Style }>('08_L0_L1.json');
-    const l2 = await logger.loadStage<L2Design>('09_L2.json');
-    if (!s2 || !l0l1 || !l2) {
+    const characters = await logger.loadStage<Characters>('04_characters.json');
+    const visualFormat = await logger.loadStage<{ renderFormat: RenderFormat; artDirection: ArtDirection }>('08_renderFormat_artDirection.json');
+    const productionDesign = await logger.loadStage<ProductionDesign>('09_productionDesign.json');
+    if (!characters || !visualFormat || !productionDesign) {
       return NextResponse.json(
-        { error: '04_S2.json / 08_L0_L1.json / 09_L2.json 중 하나 없음. 파이프라인 L2까지 필요.' },
+        { error: '04_characters.json / 08_renderFormat_artDirection.json / 09_productionDesign.json 중 하나 없음. 파이프라인 productionDesign까지 필요.' },
         { status: 400 },
       );
     }
 
-    const result = await runAssetsGenerate(s2, l0l1.L0, l0l1.L1, l2, logger, {
+    const result = await runAssetsGenerate(characters, visualFormat.renderFormat, visualFormat.artDirection, productionDesign, logger, {
       model,
       concurrency,
       force,
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[svc/generate/assets]', msg);
+    console.error('[writer/generate/assets]', msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

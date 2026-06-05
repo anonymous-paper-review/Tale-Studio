@@ -3,16 +3,16 @@
 // Step 2: Claude로 액션 스코프 + 일관성 검증 (실패 시 split)
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
-  CValidation2Report,
-  L0Visual,
-  L1Style,
-  L2Design,
-  L3SceneVisualPlan,
-  L4Shot,
-  S0Genre,
-  S1Structure,
-  S2Block,
-  S3Block,
+  ShotCheckReport,
+  RenderFormat,
+  ArtDirection,
+  ProductionDesign,
+  SceneCinematography,
+  ShotDesign,
+  Genre,
+  NarrativeStructure,
+  Characters,
+  Scenes,
   ShotSequence,
   ShotSequenceItem,
   ValidationIssue,
@@ -29,23 +29,23 @@ interface ClaudeC2ValidationResponse {
   semantic_issues: ValidationIssue[];
 }
 
-export async function runCApplication2(
+export async function runShotCheck(
   projectId: string,
-  s0: S0Genre,
-  s1: S1Structure,
-  s2: S2Block,
-  s3: S3Block,
-  l0: L0Visual,
-  l1: L1Style,
-  l2: L2Design,
-  l3ScenePlans: L3SceneVisualPlan[],
-  l4Shots: L4Shot[],
-  l3BudgetIssues: ValidationIssue[],
+  genre: Genre,
+  narrativeStructure: NarrativeStructure,
+  characters: Characters,
+  scenes: Scenes,
+  renderFormat: RenderFormat,
+  artDirection: ArtDirection,
+  productionDesign: ProductionDesign,
+  sceneCinematographyPlans: SceneCinematography[],
+  shotDesigns: ShotDesign[],
+  sceneBudgetIssues: ValidationIssue[],
   logger: PipelineLogger,
   vAxisConfig: LlmAxisConfig,   // V축: 샷 시퀀스 조립 (현재 Gemini)
   cAxisConfig: LlmAxisConfig,   // C축: 의미/액션 검증 (현재 Claude)
-): Promise<{ shotSequence: ShotSequence; report: CValidation2Report }> {
-  await logger.markStage('C2_application', 'started');
+): Promise<{ shotSequence: ShotSequence; report: ShotCheckReport }> {
+  await logger.markStage('shotCheck', 'started');
 
   // ===== Step 1: Gemini로 L4 → ShotSequenceItem 조립 =====
   const genSystem = `당신은 S+V 변환의 마지막 단계 디자이너이다.
@@ -73,34 +73,34 @@ continuity.carry_forward_from: 이전 샷에서 가져온 시각 요소 (의상/
 - 목록에 없는 ID를 발명하지 마라 (예: 'cliff_edge', 'demon_king_castle' 같은 임의 로케이션 ID 금지).
 - id에 버전 접미사를 붙이지 마라 ('young_hero_v1' 금지). 버전은 asset_version 필드에만 ('v1', 'v2' / 로케이션은 'a').`;
 
-  const genUser = `[S0]
-${JSON.stringify(s0)}
+  const genUser = `[genre]
+${JSON.stringify(genre)}
 
-[S1.theme]
-${s1.theme}
+[narrativeStructure.theme]
+${narrativeStructure.theme}
 
-[S2 characters]
-${JSON.stringify(s2.characters)}
+[characters]
+${JSON.stringify(characters.characters)}
 
-[S3 scenes (요약)]
-${s3.scenes
+[scenes (요약)]
+${scenes.scenes
   .map(
     (sc) =>
       `${sc.scene_id}: purpose="${sc.purpose}", emotion=${sc.emotion_beat.start}→${sc.emotion_beat.end}, dialogue="${sc.dialogue_summary}"`
   )
   .join('\n')}
 
-[L0]
-${JSON.stringify(l0)}
+[renderFormat]
+${JSON.stringify(renderFormat)}
 
-[L1]
-${JSON.stringify(l1)}
+[artDirection]
+${JSON.stringify(artDirection)}
 
-[L2.global_palette]
-${JSON.stringify(l2.global_palette)}
+[productionDesign.global_palette]
+${JSON.stringify(productionDesign.global_palette)}
 
-[L3 scene plans (요약)]
-${l3ScenePlans
+[sceneCinematography plans (요약)]
+${sceneCinematographyPlans
   .map(
     (p) =>
       `${p.scene_id}: ${p.coverage_pattern} / lens=${p.lens_vocabulary.join(',')}mm / ${p.camera_mounting}+${p.camera_energy}`
@@ -108,14 +108,14 @@ ${l3ScenePlans
   .join('\n')}
 
 [L4 shots (3분할)]
-${JSON.stringify(l4Shots)}
+${JSON.stringify(shotDesigns)}
 
 [액션 예산 사전 분석 issues]
-${JSON.stringify(l3BudgetIssues)}
+${JSON.stringify(sceneBudgetIssues)}
 
 [유효 asset ID — assets와 base_assets는 이 ID만 사용 (발명·버전접미사 금지)]
-characters: ${s2.characters.map((c) => c.id).join(', ')}
-locations: ${l2.locations.map((l) => l.id).join(', ')}
+characters: ${characters.characters.map((c) => c.id).join(', ')}
+locations: ${productionDesign.locations.map((l) => l.id).join(', ')}
 
 [출력 형식 - JSON]
 {
@@ -176,7 +176,7 @@ locations: ${l2.locations.map((l) => l.id).join(', ')}
     temperature: 0.4,
   });
 
-  await logger.saveLlmCall('C2_generate', {
+  await logger.saveLlmCall('shotCheck_generate', {
     prompt: genUser,
     response: JSON.stringify(genRaw, null, 2),
     model: describeAxisConfig(vAxisConfig),
@@ -270,7 +270,7 @@ ${JSON.stringify(genResult.shots, null, 2)}
       temperature: 0.3,
       maxTokens: 16000,
     });
-    await logger.saveLlmCall('C2_validate', {
+    await logger.saveLlmCall('shotCheck_validate', {
       prompt: valUser,
       response: JSON.stringify(valRaw, null, 2),
       model: describeAxisConfig(cAxisConfig),
@@ -284,7 +284,7 @@ ${JSON.stringify(genResult.shots, null, 2)}
     };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    await logger.saveLlmCall('C2_validate_FAILED', {
+    await logger.saveLlmCall('shotCheck_validate_FAILED', {
       prompt: valUser,
       response: `ERROR: ${msg}`,
       model: describeAxisConfig(cAxisConfig),
@@ -322,8 +322,8 @@ ${JSON.stringify(genResult.shots, null, 2)}
   // ===== Step 3.5: asset reference 정규화 (Layer 1 — 결정론적 안전망) =====
   // LLM이 발명한/버전접미사 붙은 reference를 canonical asset ID로 강제. 미해결은 drop + 이슈.
   // 모델이 무엇을 뱉든 L5/L6엔 실재하는 asset ID만 도달하게 보장한다.
-  const assetRegistry = buildAssetRegistry(s2, l2);
-  const sceneLocationById = new Map<string, string>(s3.scenes.map((sc) => [sc.scene_id, sc.location]));
+  const assetRegistry = buildAssetRegistry(characters, productionDesign);
+  const sceneLocationById = new Map<string, string>(scenes.scenes.map((sc) => [sc.scene_id, sc.location]));
   const assetNorm = normalizeShotSequenceAssetRefs(finalShots, assetRegistry, sceneLocationById);
   finalShots = assetNorm.shots;
 
@@ -333,23 +333,23 @@ ${JSON.stringify(genResult.shots, null, 2)}
     project_id: projectId,
     total_shots: finalShots.length,
     total_duration_seconds: totalDuration,
-    depth_level: s0.depth_level,
+    depth_level: genre.depth_level,
     shots: finalShots,
   };
 
-  const allIssues = [...l3BudgetIssues, ...valResult.semantic_issues, ...assetNorm.issues];
+  const allIssues = [...sceneBudgetIssues, ...valResult.semantic_issues, ...assetNorm.issues];
   const hasCritical = allIssues.some((i) => i.severity === 'CRITICAL');
 
-  const report: CValidation2Report = {
+  const report: ShotCheckReport = {
     passed: !hasCritical,
     issues: allIssues,
     shots_split_count: splitCount,
     total_action_violations_fixed: valResult.shots_to_split.length,
   };
 
-  await logger.saveStage('12_C_application_2.json', report);
-  await logger.saveStage('13_shot_sequence.json', shotSequence);
-  await logger.markStage('C2_application', 'completed', {
+  await logger.saveStage('12_shotCheck.json', report);
+  await logger.saveStage('13_shotSequence.json', shotSequence);
+  await logger.markStage('shotCheck', 'completed', {
     final_shot_count: finalShots.length,
     split_count: splitCount,
     asset_refs_dropped: assetNorm.droppedCount,

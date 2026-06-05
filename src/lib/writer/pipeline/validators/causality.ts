@@ -1,5 +1,5 @@
 // 룰 기반 인과 체인 검사
-import type { S3Block, ValidationIssue } from '@/lib/writer/types/pipeline';
+import type { Scenes, ValidationIssue } from '@/lib/writer/types/pipeline';
 
 export interface CausalityChainEntry {
   from: string;
@@ -15,16 +15,16 @@ export interface CausalityChainEntry {
  * - but: 합병증/반전 (감정 반전)
  * - and_then: 단순 시간 순서 (의미 연결 약함) ← 핍진성 위험
  */
-export function analyzeCausalityChain(s3: S3Block): {
+export function analyzeCausalityChain(scenes: Scenes): {
   chain: CausalityChainEntry[];
   issues: ValidationIssue[];
 } {
   const chain: CausalityChainEntry[] = [];
   const issues: ValidationIssue[] = [];
 
-  for (let i = 0; i < s3.scenes.length - 1; i++) {
-    const cur = s3.scenes[i];
-    const next = s3.scenes[i + 1];
+  for (let i = 0; i < scenes.scenes.length - 1; i++) {
+    const cur = scenes.scenes[i];
+    const next = scenes.scenes[i + 1];
 
     let connector: CausalityChainEntry['connector'] = 'and_then';
 

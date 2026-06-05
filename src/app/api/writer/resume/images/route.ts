@@ -1,10 +1,10 @@
-// L6 resume: 15_L6_images.json의 status='pending' 항목을 fal.queue로 회수
+// L6 resume: 15_shotImages.json의 status='pending' 항목을 fal.queue로 회수
 //   - status='pending' + request_id 있는 항목만 처리
 //   - polling 한 라운드 + 즉시 응답 (UI가 반복 호출)
 import { NextRequest, NextResponse } from 'next/server';
 import { PipelineLogger } from '@/lib/writer/logger';
 import { falImageFetch } from '@/lib/writer/llm/fal';
-import type { L6ImagesOutput, ShotImageResult } from '@/lib/writer/types/pipeline';
+import type { ShotImagesOutput, ShotImageResult } from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -28,9 +28,9 @@ export async function POST(req: NextRequest) {
     const logger = new PipelineLogger(projectId);
     await logger.init();
 
-    const file = await logger.loadStage<L6ImagesOutput>('15_L6_images.json');
+    const file = await logger.loadStage<ShotImagesOutput>('15_shotImages.json');
     if (!file) {
-      return NextResponse.json({ error: '15_L6_images.json 없음' }, { status: 400 });
+      return NextResponse.json({ error: '15_shotImages.json 없음' }, { status: 400 });
     }
 
     const shots: ShotImageResult[] = file.shots.slice();
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     );
 
     const sorted = shots.sort((a, b) => naturalCompareShotId(a.shot_id, b.shot_id));
-    const output: L6ImagesOutput = {
+    const output: ShotImagesOutput = {
       total_shots: file.total_shots,
       success_count: sorted.filter((r) => r.status === 'success').length,
       failed_count: sorted.filter((r) => r.status === 'failed').length,
@@ -74,11 +74,11 @@ export async function POST(req: NextRequest) {
       model: file.model,
       shots: sorted,
     };
-    await logger.saveStage('15_L6_images.json', output);
+    await logger.saveStage('15_shotImages.json', output);
     return NextResponse.json({ ...output, resumed, still_pending: output.pending_count });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[svc/resume/images]', msg);
+    console.error('[writer/resume/images]', msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

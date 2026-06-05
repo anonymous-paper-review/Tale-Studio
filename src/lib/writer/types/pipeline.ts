@@ -54,7 +54,7 @@ export interface ShotGenerationPrompts {
   ti2v: TI2VPrompt;
 }
 
-export interface FinalPromptsOutput {
+export interface RenderPromptsOutput {
   total_shots: number;
   shots: ShotGenerationPrompts[];
   l0_meta: {
@@ -124,7 +124,7 @@ export interface ShotImageResult {
   submitted_at?: string;     // ISO. resume timeout 판단용
 }
 
-export interface L6ImagesOutput {
+export interface ShotImagesOutput {
   total_shots: number;
   success_count: number;
   failed_count: number;
@@ -151,7 +151,7 @@ export interface ShotVideoResult {
   submitted_at?: string;
 }
 
-export interface L7VideosOutput {
+export interface ShotVideosOutput {
   total_shots: number;
   success_count: number;
   failed_count: number;
@@ -182,7 +182,7 @@ export interface PipelineInput {
 // S축 (Story Layer)
 // =====================================================================
 
-export interface S0Genre {
+export interface Genre {
   genre: string;
   subGenre?: string;
   tone: string[];
@@ -192,7 +192,7 @@ export interface S0Genre {
   format: string; // "horizontal_16:9" | "vertical_9:16" | "cinema_2.39:1"
 }
 
-export interface S1Structure {
+export interface NarrativeStructure {
   structure_type: string; // "kishōtenketsu" | "3-act" | "hero's_journey" | "non-linear" 등
   acts: Array<{
     act_id: string;
@@ -205,7 +205,7 @@ export interface S1Structure {
   turning_point_position: number; // 0~1
 }
 
-export interface S2Character {
+export interface StoryCharacter {
   id: string;
   name: string;
   age?: string;
@@ -225,20 +225,20 @@ export interface S2Character {
   };
 }
 
-export interface S2Relationship {
+export interface StoryRelationship {
   between: [string, string]; // character ids
   type: string;
   state_change?: string;
   visible_in_video: boolean;
 }
 
-export interface S2Block {
-  characters: S2Character[];
-  relationships: S2Relationship[];
+export interface Characters {
+  characters: StoryCharacter[];
+  relationships: StoryRelationship[];
   subtext_notes: string[];
 }
 
-export interface S3Scene {
+export interface StoryScene {
   scene_id: string;
   act_ref: string;
   location: string;
@@ -261,8 +261,8 @@ export interface S3Scene {
   scene_actions: string[]; // 씬에서 일어나는 주요 액션들 (분할 전)
 }
 
-export interface S3Block {
-  scenes: S3Scene[];
+export interface Scenes {
+  scenes: StoryScene[];
   total_estimated_seconds: number;
 }
 
@@ -280,7 +280,7 @@ export interface ValidationIssue {
   suggestion?: string;
 }
 
-export interface CValidation1Report {
+export interface StoryCheckReport {
   passed: boolean;
   issues: ValidationIssue[];
   causality_chain: Array<{ from: string; to: string; connector: 'therefore' | 'but' | 'and_then' }>;
@@ -290,7 +290,7 @@ export interface CValidation1Report {
   retry_count: number;
 }
 
-export interface CValidation2Report {
+export interface ShotCheckReport {
   passed: boolean;
   issues: ValidationIssue[];
   shots_split_count: number;
@@ -303,8 +303,8 @@ export interface CValidation2Report {
 
 export interface MidPreview {
   v_recommendations: {
-    L0: Partial<L0Visual>;
-    L1: Partial<L1Style>;
+    L0: Partial<RenderFormat>;
+    L1: Partial<ArtDirection>;
     L2_summary: string;
     L3_scene_strategy: string;   // 씬 단위 영상 문법 힌트 (커버리지/리듬)
     L4_shot_recipe: string;      // 샷 단위 분배 힌트 (정적/동적)
@@ -319,7 +319,7 @@ export interface MidPreview {
 // V축 (Visual Layer)
 // =====================================================================
 
-export interface L0Visual {
+export interface RenderFormat {
   medium: string;
   resolution: { width: number; height: number };
   fps: number;
@@ -327,7 +327,7 @@ export interface L0Visual {
   rendering_method: string;
 }
 
-export interface L1Style {
+export interface ArtDirection {
   art_style: string;
   shape_language: string;
   line_quality: string;
@@ -335,7 +335,7 @@ export interface L1Style {
   texture_philosophy: string;
 }
 
-export interface L2Design {
+export interface ProductionDesign {
   global_palette: {
     primary: string;
     secondary: string;
@@ -358,7 +358,7 @@ export interface L2Design {
 // 글로벌 L0~L2와 샷 L4 사이의 다리. 한 씬을 어떻게 찍을지의 영상 문법.
 // =====================================================================
 
-export interface L3SceneVisualPlan {
+export interface SceneCinematography {
   scene_id: string;
 
   // 커버리지 패턴
@@ -482,7 +482,7 @@ export interface DecoupagePlan {
 //   L4c: 동적 시각 (Video 생성 입력 — 압축)
 // =====================================================================
 
-export interface L4aShotIntent {
+export interface ShotIntent {
   shot_id: string;
   scene_id: string;
   story_beat_ref: number;            // S3.scenes[i].scene_actions의 index
@@ -494,7 +494,7 @@ export interface L4aShotIntent {
     | 'opening' | 'developing' | 'climax' | 'resolution' | 'transition';
 }
 
-export interface L4bShotStatic {
+export interface ShotStaticSpec {
   shot_id: string;
 
   // 카메라 (frame start 기준 정적)
@@ -544,7 +544,7 @@ export interface L4bShotStatic {
   first_frame_prompt: string;        // Image 생성기 입력 (200~400자 OK)
 }
 
-export interface L4cShotDynamic {
+export interface ShotDynamicSpec {
   shot_id: string;
 
   // 카메라 모션 (5~15초 동안)
@@ -584,10 +584,10 @@ export interface L4cShotDynamic {
   motion_prompt: string;             // Video 생성기 입력 (50~80자, 동사 1~2개)
 }
 
-export interface L4Shot {
-  intent: L4aShotIntent;
-  static_spec: L4bShotStatic;
-  dynamic_spec: L4cShotDynamic;
+export interface ShotDesign {
+  intent: ShotIntent;
+  static_spec: ShotStaticSpec;
+  dynamic_spec: ShotDynamicSpec;
 }
 
 // =====================================================================
@@ -667,7 +667,7 @@ export interface ShotSequence {
   shots: ShotSequenceItem[];
 }
 
-// L5 Render Spec 타입(`FinalPromptsOutput`/`T2IPrompt`/`TI2VPrompt`/`ShotGenerationPrompts`)은
+// Render Spec 타입(`RenderPromptsOutput`/`T2IPrompt`/`TI2VPrompt`/`ShotGenerationPrompts`)은
 // 본 파일 상단(50번대 줄)에 정의됨. l5_prompts.ts 참조.
 // 향후 provider-specific 확장(seed/cfg/asset path/IP-Adapter 등)은 그 위에서.
 
@@ -678,20 +678,20 @@ export interface ShotSequence {
 export interface PipelineResult {
   project_id: string;
   input: PipelineInput;
-  S0: S0Genre;
-  S1: S1Structure;
-  S2: S2Block;
-  S3: S3Block;
-  c_validation_1: CValidation1Report;
-  mid_preview: MidPreview;
-  L0: L0Visual;
-  L1: L1Style;
-  L2: L2Design;
-  L3: L3SceneVisualPlan[];   // 씬 단위 비주얼 플랜
-  L4: L4Shot[];              // 샷 단위 3분할 (intent + static + dynamic)
-  c_validation_2: CValidation2Report;
-  shot_sequence: ShotSequence;
-  final_prompts: FinalPromptsOutput;  // L5: T2I + TI2V 최종 프롬프트
+  genre: Genre;
+  narrativeStructure: NarrativeStructure;
+  characters: Characters;
+  scenes: Scenes;
+  storyCheck: StoryCheckReport;
+  midPreview: MidPreview;
+  renderFormat: RenderFormat;
+  artDirection: ArtDirection;
+  productionDesign: ProductionDesign;
+  sceneCinematography: SceneCinematography[];   // 씬 단위 비주얼 플랜
+  shotDesign: ShotDesign[];              // 샷 단위 3분할 (intent + static + dynamic)
+  shotCheck: ShotCheckReport;
+  shotSequence: ShotSequence;
+  renderPrompts: RenderPromptsOutput;  // T2I + TI2V 최종 프롬프트
   metadata: {
     started_at: string;
     completed_at: string;

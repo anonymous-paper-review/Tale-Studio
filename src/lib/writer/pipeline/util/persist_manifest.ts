@@ -1,4 +1,4 @@
-// writer(=svc) 파이프라인 결과 → DB 기록 (단일 생산자, §3 일원화)
+// writer 파이프라인 결과 → DB 기록 (단일 생산자, §3 일원화)
 //
 // 기존 generate-scenes(낡은 writer)를 대체한다. lossy 한 adapters.ts 대신, 대사를 보유한
 // shot_sequence(ShotSequenceItem.S.dialogue)를 샷 소스로 쓴다.
@@ -9,15 +9,15 @@
 //   scenes     ← S3.scenes
 //   shots      ← shot_sequence.shots (대사 포함)
 //
-// id: scene/shot 은 main 포맷(sc_01 / sh_01_01)으로 정규화, character 는 svc snake_case 유지
+// id: scene/shot 은 main 포맷(sc_01 / sh_01_01)으로 정규화, character 는 writer snake_case 유지
 //     → shots.characters 와 characters.character_id 가 동일 id 공간(referential 정합).
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { svcSceneIdToMain, svcShotIdToMain } from '@/lib/writer/adapters'
+import { writerSceneIdToMain, writerShotIdToMain } from '@/lib/writer/adapters'
 import type { ShotType } from '@/types'
 import type {
-  S2Block,
-  S3Block,
-  L2Design,
+  Characters,
+  Scenes,
+  ProductionDesign,
   ShotSequence,
 } from '@/lib/writer/types/pipeline'
 
@@ -49,9 +49,9 @@ function normRole(role: string): 'protagonist' | 'antagonist' | 'supporting' {
  */
 export async function persistManifestToDb(
   projectId: string,
-  S2: S2Block,
-  S3: S3Block,
-  L2: L2Design,
+  characters: Characters,
+  scenes: Scenes,
+  productionDesign: ProductionDesign,
   shotSequence: ShotSequence,
 ): Promise<void> {
   if (!UUID_RE.test(projectId)) return // 핸드오프 외 run — DB project 없음
@@ -65,10 +65,10 @@ export async function persistManifestToDb(
   ])
 
   // characters
-  const costumes = L2.costumes ?? {}
-  if (S2.characters.length) {
+  const costumes = productionDesign.costumes ?? {}
+  if (characters.characters.length) {
     await supabaseAdmin.from('characters').insert(
-      S2.characters.map((c) => ({
+      characters.characters.map((c) => ({
         project_id: projectId,
         character_id: c.id,
         name: c.name,
@@ -81,10 +81,10 @@ export async function persistManifestToDb(
     )
   }
 
-  // locations (svc L2.locations — name 은 id 기반, time_of_day 는 미보유)
-  if (L2.locations?.length) {
+  // locations (writer productionDesign.locations — name 은 id 기반, time_of_day 는 미보유)
+  if (productionDesign.locations?.length) {
     await supabaseAdmin.from('locations').insert(
-      L2.locations.map((loc) => ({
+      productionDesign.locations.map((loc) => ({
         project_id: projectId,
         location_id: loc.id,
         name: loc.id,
@@ -100,11 +100,11 @@ export async function persistManifestToDb(
   }
 
   // scenes
-  if (S3.scenes.length) {
+  if (scenes.scenes.length) {
     await supabaseAdmin.from('scenes').insert(
-      S3.scenes.map((sc, i) => ({
+      scenes.scenes.map((sc, i) => ({
         project_id: projectId,
-        scene_id: svcSceneIdToMain(sc.scene_id),
+        scene_id: writerSceneIdToMain(sc.scene_id),
         narrative_summary: sc.dialogue_summary ?? sc.purpose ?? '',
         original_text_quote: (sc.scene_actions ?? []).join(' '),
         location: sc.location ?? '',
@@ -127,8 +127,8 @@ export async function persistManifestToDb(
         const dialogue = it.S?.dialogue
         return {
           project_id: projectId,
-          scene_id: svcSceneIdToMain(it.S.scene_id),
-          shot_id: svcShotIdToMain(it.shot_id, it.S.scene_id),
+          scene_id: writerSceneIdToMain(it.S.scene_id),
+          shot_id: writerShotIdToMain(it.shot_id, it.S.scene_id),
           shot_type: normShotType(it.V?.camera?.type),
           action_description: it.S?.character_action ?? '',
           characters: Array.from(new Set(chars)),

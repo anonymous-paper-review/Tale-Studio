@@ -4,37 +4,37 @@
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
 import type {
-  L1Style,
-  L2Design,
-  L3SceneVisualPlan,
+  ArtDirection,
+  ProductionDesign,
+  SceneCinematography,
   MidPreview,
-  S0Genre,
-  S2Block,
-  S3Block,
+  Genre,
+  Characters,
+  Scenes,
   ValidationIssue,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
 interface L3Result {
-  scene_plans: L3SceneVisualPlan[];
+  scene_plans: SceneCinematography[];
   shot_count_total: number;
   budget_issues: ValidationIssue[];
 }
 
-export async function runL3SceneVisualPlan(
-  s0: S0Genre,
-  s2: S2Block,
-  s3: S3Block,
-  l1: L1Style,
-  l2: L2Design,
+export async function runSceneCinematography(
+  genre: Genre,
+  characters: Characters,
+  scenes: Scenes,
+  artDirection: ArtDirection,
+  productionDesign: ProductionDesign,
   midPreview: MidPreview,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
 ): Promise<L3Result> {
-  await logger.markStage('L3_scene_plan', 'started');
+  await logger.markStage('sceneCinematography', 'started');
 
   // 씬별 액션 예산 분석 (shot_count_target 산정 근거)
-  const sceneAnalyses = s3.scenes.map((scene) => ({
+  const sceneAnalyses = scenes.scenes.map((scene) => ({
     scene,
     analysis: analyzeSceneActionBudget(scene),
   }));
@@ -83,26 +83,26 @@ cut_pace ↔ rhythm_profile:
 - rapid + accelerating → 액션 클라이맥스
 - punctuated + decaying → 충격 후 여운`;
 
-  const userPrompt = `[S0]
-${JSON.stringify(s0)}
+  const userPrompt = `[genre]
+${JSON.stringify(genre)}
 
-[S2 캐릭터]
-${JSON.stringify(s2.characters.map((c) => ({ id: c.id, name: c.name, role: c.role })))}
+[characters]
+${JSON.stringify(characters.characters.map((c) => ({ id: c.id, name: c.name, role: c.role })))}
 
-[S3 씬 (요약)]
-${s3.scenes
+[scenes (요약)]
+${scenes.scenes
   .map(
     (sc) =>
       `${sc.scene_id} (${sc.estimated_seconds}s): purpose="${sc.purpose}", emotion=${sc.emotion_beat.start}→${sc.emotion_beat.end}, location=${sc.location}, 인물=[${sc.characters_in_scene.join(', ')}]`
   )
   .join('\n')}
 
-[L1 스타일]
-${JSON.stringify(l1)}
+[artDirection 스타일]
+${JSON.stringify(artDirection)}
 
-[L2 디자인 요약]
-palette=${JSON.stringify(l2.global_palette)}
-locations=${l2.locations.map((l) => l.id).join(', ')}
+[productionDesign 요약]
+palette=${JSON.stringify(productionDesign.global_palette)}
+locations=${productionDesign.locations.map((l) => l.id).join(', ')}
 
 [Mid Preview 비주얼 전략 힌트]
 ${midPreview.v_recommendations.L3_scene_strategy ?? ''}
@@ -137,12 +137,12 @@ ${sceneToShotHint}
   ]
 }`;
 
-  const llmResult = await generateJson<{ scene_plans: L3SceneVisualPlan[] }>(userPrompt, axisConfig, {
+  const llmResult = await generateJson<{ scene_plans: SceneCinematography[] }>(userPrompt, axisConfig, {
     systemInstruction,
     temperature: 0.5,
   });
 
-  await logger.saveLlmCall('L3_scene_plan', {
+  await logger.saveLlmCall('sceneCinematography', {
     prompt: userPrompt,
     response: JSON.stringify(llmResult, null, 2),
     model: describeAxisConfig(axisConfig),
@@ -154,12 +154,12 @@ ${sceneToShotHint}
     0
   );
 
-  await logger.saveStage('10_L3_scene_plans.json', {
+  await logger.saveStage('10_sceneCinematography.json', {
     scene_plans: llmResult.scene_plans,
     shot_count_total: shotCountTotal,
     budget_issues: allBudgetIssues,
   });
-  await logger.markStage('L3_scene_plan', 'completed', {
+  await logger.markStage('sceneCinematography', 'completed', {
     scene_count: llmResult.scene_plans.length,
     shot_count_total: shotCountTotal,
   });

@@ -1,8 +1,8 @@
-// L7 resume: 16_L7_videos.json의 status='pending' 항목을 fal.queue로 회수
+// L7 resume: 16_shotVideos.json의 status='pending' 항목을 fal.queue로 회수
 import { NextRequest, NextResponse } from 'next/server';
 import { PipelineLogger } from '@/lib/writer/logger';
 import { falVideoFetch } from '@/lib/writer/llm/fal';
-import type { L7VideosOutput, ShotVideoResult } from '@/lib/writer/types/pipeline';
+import type { ShotVideosOutput, ShotVideoResult } from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -26,9 +26,9 @@ export async function POST(req: NextRequest) {
     const logger = new PipelineLogger(projectId);
     await logger.init();
 
-    const file = await logger.loadStage<L7VideosOutput>('16_L7_videos.json');
+    const file = await logger.loadStage<ShotVideosOutput>('16_shotVideos.json');
     if (!file) {
-      return NextResponse.json({ error: '16_L7_videos.json 없음' }, { status: 400 });
+      return NextResponse.json({ error: '16_shotVideos.json 없음' }, { status: 400 });
     }
 
     const shots: ShotVideoResult[] = file.shots.slice();
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     );
 
     const sorted = shots.sort((a, b) => naturalCompareShotId(a.shot_id, b.shot_id));
-    const output: L7VideosOutput = {
+    const output: ShotVideosOutput = {
       total_shots: file.total_shots,
       success_count: sorted.filter((r) => r.status === 'success').length,
       failed_count: sorted.filter((r) => r.status === 'failed').length,
@@ -74,11 +74,11 @@ export async function POST(req: NextRequest) {
       model: file.model,
       shots: sorted,
     };
-    await logger.saveStage('16_L7_videos.json', output);
+    await logger.saveStage('16_shotVideos.json', output);
     return NextResponse.json({ ...output, resumed, still_pending: output.pending_count });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[svc/resume/videos]', msg);
+    console.error('[writer/resume/videos]', msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

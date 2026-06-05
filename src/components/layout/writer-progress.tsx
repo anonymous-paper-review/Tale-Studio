@@ -1,14 +1,14 @@
 'use client'
 
 import { Sparkles } from 'lucide-react'
-import type { SvcStatus } from '@/lib/writer/use-svc-status'
+import type { WriterStatus } from '@/lib/writer/use-writer-status'
 
 /**
- * svc-pipeline 백그라운드 생성 진행 표시 (writer/artist 공용).
+ * writer-pipeline 백그라운드 생성 진행 표시 (artist 공용).
  * 호출 측이 레이아웃 컨테이너를 제공하고, 이 컴포넌트는 중앙 정렬 콘텐츠만 렌더.
  * decisions #37 — writer 백그라운드化 + artist 첫 진입 progress gating.
  */
-export function SvcProgress({ status }: { status: SvcStatus | null }) {
+export function WriterProgress({ status }: { status: WriterStatus | null }) {
   return (
     <div className="mx-auto w-full max-w-md space-y-4 text-center">
       <Sparkles className="mx-auto size-8 animate-pulse text-primary" />

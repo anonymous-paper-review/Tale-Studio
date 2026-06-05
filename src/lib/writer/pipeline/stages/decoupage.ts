@@ -11,13 +11,13 @@ import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writ
 import type {
   DecoupagePlan,
   DecoupageShot,
-  L1Style,
-  L2Design,
-  L3SceneVisualPlan,
-  S0Genre,
-  S2Block,
-  S3Block,
-  S3Scene,
+  ArtDirection,
+  ProductionDesign,
+  SceneCinematography,
+  Genre,
+  Characters,
+  Scenes,
+  StoryScene,
   SceneDecoupage,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
@@ -63,20 +63,20 @@ interface SceneDecoupageResponse {
 }
 
 function buildUserPrompt(
-  scene: S3Scene,
-  plan: L3SceneVisualPlan | null,
-  s0: S0Genre,
-  s2: S2Block,
-  l2: L2Design,
+  scene: StoryScene,
+  plan: SceneCinematography | null,
+  genre: Genre,
+  characters: Characters,
+  productionDesign: ProductionDesign,
 ): string {
   const beatList = scene.scene_actions
     .map((a, i) => `  [${i}] ${a}`)
     .join('\n');
 
   const planHint = plan
-    ? `[L3 비주얼 플랜 — 참고용 힌트 (제약 아님)]
+    ? `[sceneCinematography 비주얼 플랜 — 참고용 힌트 (제약 아님)]
 coverage_pattern=${plan.coverage_pattern}, shot_count_target=${plan.shot_count_target} (힌트), rhythm_profile=${plan.rhythm_profile}, cut_pace=${plan.cut_pace}, avg_shot_seconds=${plan.avg_shot_seconds}, lens=${plan.lens_vocabulary.join('/')}mm, energy=${plan.camera_energy}`
-    : `[L3 미제공 — Compact Mode. 데쿠파주를 자체 판단으로 저작]`;
+    : `[sceneCinematography 미제공 — Compact Mode. 데쿠파주를 자체 판단으로 저작]`;
 
   return `[씬 정보]
 scene_id=${scene.scene_id}, purpose=${scene.purpose}, location=${scene.location}, time=${scene.time_of_day}
@@ -91,18 +91,18 @@ ${beatList}
 
 ${planHint}
 
-[S0 장르/톤]
-genre=${s0.genre}, tone=${s0.tone.join('/')}, targetEmotion=${s0.targetEmotion.join('/')}
+[genre 장르/톤]
+genre=${genre.genre}, tone=${genre.tone.join('/')}, targetEmotion=${genre.targetEmotion.join('/')}
 
 [등장 캐릭터]
 ${JSON.stringify(
-  s2.characters
+  characters.characters
     .filter((c) => scene.characters_in_scene.includes(c.id))
     .map((c) => ({ id: c.id, role: c.role, personality: c.personality }))
 )}
 
 [로케이션 디자인]
-${JSON.stringify(l2.locations.filter((loc) => loc.id === scene.location || scene.location.includes(loc.id)))}
+${JSON.stringify(productionDesign.locations.filter((loc) => loc.id === scene.location || scene.location.includes(loc.id)))}
 
 [출력 형식 - JSON]
 {
@@ -152,15 +152,15 @@ function coerceSceneShots(raw: unknown): SceneDecoupageResponse {
 }
 
 async function decoupageForScene(
-  scene: S3Scene,
-  plan: L3SceneVisualPlan | null,
-  s0: S0Genre,
-  s2: S2Block,
-  l2: L2Design,
+  scene: StoryScene,
+  plan: SceneCinematography | null,
+  genre: Genre,
+  characters: Characters,
+  productionDesign: ProductionDesign,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
 ): Promise<SceneDecoupage> {
-  const userPrompt = buildUserPrompt(scene, plan, s0, s2, l2);
+  const userPrompt = buildUserPrompt(scene, plan, genre, characters, productionDesign);
 
   const raw = await generateJson<unknown>(userPrompt, axisConfig, {
     systemInstruction: SYSTEM_INSTRUCTION,
@@ -204,45 +204,45 @@ async function decoupageForScene(
 }
 
 export async function runDecoupage(
-  s0: S0Genre,
-  s2: S2Block,
-  s3: S3Block,
-  _l1: L1Style,
-  l2: L2Design,
-  l3Plans: L3SceneVisualPlan[] | null,
+  genre: Genre,
+  characters: Characters,
+  scenes: Scenes,
+  _artDirection: ArtDirection,
+  productionDesign: ProductionDesign,
+  sceneCinematographyPlans: SceneCinematography[] | null,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
 ): Promise<DecoupagePlan> {
-  await logger.markStage('Decoupage', 'started', { scene_count: s3.scenes.length });
+  await logger.markStage('decoupage', 'started', { scene_count: scenes.scenes.length });
 
-  const scenes: SceneDecoupage[] = [];
-  for (const scene of s3.scenes) {
-    const plan = l3Plans?.find((p) => p.scene_id === scene.scene_id) ?? null;
-    const sceneDec = await decoupageForScene(scene, plan, s0, s2, l2, logger, axisConfig);
-    scenes.push(sceneDec);
+  const sceneDecoupages: SceneDecoupage[] = [];
+  for (const scene of scenes.scenes) {
+    const plan = sceneCinematographyPlans?.find((p) => p.scene_id === scene.scene_id) ?? null;
+    const sceneDec = await decoupageForScene(scene, plan, genre, characters, productionDesign, logger, axisConfig);
+    sceneDecoupages.push(sceneDec);
   }
 
   // 전역 shot_id 재인덱싱 (씬 경계 넘어 순번)
   let globalIdx = 0;
-  for (const sd of scenes) {
+  for (const sd of sceneDecoupages) {
     sd.shots = sd.shots.map((shot) => {
       globalIdx += 1;
       return { ...shot, shot_id: `shot_${globalIdx}` };
     });
   }
 
-  const allShots = scenes.flatMap((s) => s.shots);
+  const allShots = sceneDecoupages.flatMap((s) => s.shots);
   const plan: DecoupagePlan = {
-    scenes,
+    scenes: sceneDecoupages,
     total_shots: allShots.length,
     total_added: allShots.filter((s) => s.operation === 'added').length,
     total_merged: allShots.filter((s) => s.operation === 'merged').length,
     total_split: allShots.filter((s) => s.operation === 'split').length,
-    director_notes: scenes.map((s) => `${s.scene_id}: ${s.beat_count}beats→${s.shot_count}shots (${s.rhythm_profile})`).join(' | '),
+    director_notes: sceneDecoupages.map((s) => `${s.scene_id}: ${s.beat_count}beats→${s.shot_count}shots (${s.rhythm_profile})`).join(' | '),
   };
 
   await logger.saveStage('10b_decoupage.json', plan);
-  await logger.markStage('Decoupage', 'completed', {
+  await logger.markStage('decoupage', 'completed', {
     total_shots: plan.total_shots,
     total_added: plan.total_added,
     total_merged: plan.total_merged,
