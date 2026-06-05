@@ -7,7 +7,7 @@ paths:
 
 ## Status
 - **Status**: L0 Concept Canvas 노드 그래프 재설계 진행 중 (2026-05-17~)
-- **Spec**: `specs/layers/L0_concept_canvas.md` + `specs/data/canvas_data_model.md` + `specs/data/asset_storage.md`
+- **Spec**: 구현이 source-of-truth (`src/features/artist/`, `src/app/studio/artist/`) + `specs/data/asset_storage.md`
 - **진행 중 변경**: `specs/changes/redesign-l0-canvas/` (proposal, tasks, deltas)
 
 ## React Flow 패턴

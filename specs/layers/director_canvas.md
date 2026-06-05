@@ -14,7 +14,7 @@ Writer Scene/Shot ⇄ [Director Canvas] → Editor 타임라인
 ```
 
 **UX 매핑**: P4 The Set 전면 교체 (`specs/ux_pages.md` P4)
-**선행 스펙**: `specs/layers/L0_concept_canvas.md` (노드-엣지 패턴 공유), `specs/layers/L2_shot_composer.md`, `specs/layers/L3_prompt_builder.md`
+**선행 코드**: Artist 노드-엣지/팝업 패턴은 `src/features/artist/`, 샷·프롬프트 파이프라인은 `src/lib/writer/pipeline/` + `src/app/api/director/generate-shots/`
 **기술**: React Flow (xyflow), Zustand 그래프 스토어
 
 ---
@@ -387,7 +387,7 @@ Artist에서 아직 등록 안 된 캐릭터를 Shot에 쓰고 싶을 때:
 
 ### 12.1 패턴
 
-Artist Canvas의 Meeting Room 패턴(`docs/`/`L0_concept_canvas.md` §11) 재사용:
+Artist Canvas의 Meeting Room 패턴(`src/components/layout/global-chat.tsx` + artist agent) 재사용:
 - 같은 `global-chat-store` 인스턴스 사용
 - Director 페이지에서는 기본 agent = `director`
 - 다른 agent(producer/writer/concept-artist/editor)로 토글 가능
@@ -595,9 +595,8 @@ LLM 호출 없음.
 
 ## 20. 참조
 
-- `specs/layers/L0_concept_canvas.md` — Artist 노드 그래프 패턴 (이 스펙의 모범)
-- `specs/archive/2026-06-04-redesign-l0-canvas/canvas_data_model.md` — Artist 데이터 모델 (Director도 유사 구조)
+- `src/features/artist/` — Artist 카드/팝업 패턴 (이 스펙의 UI 모범)
 - `specs/data/asset_storage.md` — Artist 등록 자산 (Director가 참조)
-- `specs/layers/L2_shot_composer.md` / `L3_prompt_builder.md` — 영상 생성 파이프라인
+- `src/lib/writer/pipeline/` / `src/app/api/director/generate-shots/` — 샷·프롬프트·영상 생성 파이프라인 (코드)
 - `specs/design.md` — 색 토큰 / 모션 / 인터랙션 헌법
 - `specs/decisions.md` — Artist 결정 #29~34 (패턴 참고)

@@ -46,7 +46,7 @@ artist 첫 진입 시 진행 상황만 보여준 뒤(블로킹) 준비되면 카
 - 기존 artist `autoGenerateBaseImages`(Path B) → 시트+crop 파이프라인으로 대체.
 
 ## Impact
-- Affected specs: `specs/layers/L0_concept_canvas.md` (artist 뷰 모델/이미지 파이프라인)
+- Affected specs: 없음 (artist 뷰 모델/이미지 파이프라인 = 코드 source-of-truth: `src/features/artist/`, `src/types/asset.ts`)
 - Affected code: `src/app/studio/{producer,writer,artist}/page.tsx`, `src/components/layout/{sidebar,handoff-button}.tsx`, `src/features/{writer,artist}/*`, `src/lib/svc/llm/fal.ts`(crop 호출 측), 신규 `src/app/api/artist/generate-sheet/*`
 - Affected stores: `artist-store`(시트/crop 액션, 뷰 모델), `producer-store`(핸드오프+트리거), `writer-store`(트리거 이전)
 - Affected types: `CharacterAsset.views` (main/sideLeft/sideRight)

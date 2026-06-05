@@ -214,7 +214,7 @@ writer/page.tsx (리컴포즈)
 ## P3: The Visual Studio (Concept Canvas)
 
 > 상태: **MVP 포함** — V3.1에서 노드 그래프로 전면 재설계
-> 상세 스펙: `specs/layers/L0_concept_canvas.md`
+> 구현 (source-of-truth): `src/features/artist/`, `src/app/studio/artist/`
 > 시각 컨벤션: `specs/design.md` (특히 §17 Canvas conventions)
 > 결정 근거: `specs/decisions.md` #29
 
@@ -292,7 +292,7 @@ writer/page.tsx (리컴포즈)
 > 상태: **MVP 포함** — V2 기준 → **노드 그래프 재설계 진행 중 (2026-05-25~)**
 > 참고: `specs/reference_v2/image4.png` (구 V2 패널 UI)
 > **신규 SoT**: `specs/layers/director_canvas.md` — Scene → Shot → Video 노드 그래프 스펙
-> 참고 패턴: `specs/layers/L0_concept_canvas.md` (Artist 노드 그래프)
+> 참고 패턴: `src/features/artist/` (Artist 카드/팝업 UI 코드)
 
 ### 재설계 개요 (2026-05-25)
 

@@ -130,7 +130,7 @@
   8. 한 프로젝트 = 한 그래프 (MVP, YAGNI)
 - **노드 종류 (Tier 1)**: Actor / World / Status 3종. 3D·Multi-angle은 출력 모드, 캐릭터 시트는 5-View 모드, 회전 시퀀스는 16-Angle 모드
 - **레퍼런스**: Higgsfield Canvas (노드 그래프 패턴) + ComfyUI (핀-엣지 메타포). 우리는 노드=개체 패러다임 (Higgsfield는 노드=모델)으로 차별화
-- **상세 스펙**: `specs/layers/L0_concept_canvas.md`
+- **상세**: 노드 그래프는 2026-06-04 카드형으로 롤백됨(아래 #참조). 현행 구현 = `src/features/artist/`
 - **근거**: 캐릭터 일관성 + 월드-액터 관계를 그래프 구조로 표현해야 차별화 가능. 기존 패널 UI는 메탈모델 충돌
 - **일자**: 2026-05-17
 
