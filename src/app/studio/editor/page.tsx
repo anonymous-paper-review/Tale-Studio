@@ -23,6 +23,7 @@ import { useEditorPlayback } from '@/features/editor/use-editor-playback'
 import { useEditorStore, selectTimelineLayout } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
+import { decodeAudioPeaks } from '@/lib/audio-waveform'
 
 const FRAME = 1 / 24
 
@@ -144,6 +145,51 @@ export default function PostPage() {
     }
   }, [])
 
+  // 비디오 소스에 오디오가 있으면 같은 위치 오디오 트랙에 함께 삽입 (요청).
+  // 비디오 파일을 decodeAudioData 로 디코드 시도 → 성공 시 소리 있음. 실패(무음/CORS) 시 비디오만.
+  const attachVideoAudio = useCallback(async (shotId: string, atSec: number) => {
+    const st = useEditorStore.getState()
+    const src = st.videoClips.find((c) => c.shotId === shotId)
+    const shot = st.shots.find((s) => s.shotId === shotId)
+    if (!src?.url) return
+    try {
+      const { durationSec, peaks } = await decodeAudioPeaks(src.url)
+      if (!(durationSec > 0)) return
+      st.addAudioClip({
+        name: `${shot?.shotType ?? '비디오'} 오디오`,
+        url: src.url,
+        startSec: atSec,
+        durationSec,
+        peaks,
+        sourceOffsetSec: 0,
+        sourceDurationSec: durationSec,
+        trackId: st.audioTracks[0]?.id,
+      })
+    } catch {
+      // 비디오에 오디오 트랙 없음 / 디코드 불가(CORS 등) → 비디오만 삽입
+    }
+  }, [])
+
+  // 드래그-드롭: 비디오 + (있으면) 오디오 함께 삽입
+  const handleAddVideoClip = useCallback(
+    (shotId: string, atSec: number) => {
+      addClipInstanceAt(shotId, atSec)
+      void attachVideoAudio(shotId, atSec)
+    },
+    [addClipInstanceAt, attachVideoAudio],
+  )
+
+  // 우클릭 "타임라인 추가": 플레이헤드 인접 경계 + 오디오 동반
+  const handleAddVideoClipAtPlayhead = useCallback(
+    (shotId: string) => {
+      addClipAtPlayhead(shotId)
+      const st = useEditorStore.getState()
+      const item = selectTimelineLayout(st).find((l) => l.shotId === st.selectedClipShotId)
+      if (item) void attachVideoAudio(shotId, item.startSec)
+    },
+    [addClipAtPlayhead, attachVideoAudio],
+  )
+
   if (shots.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -170,8 +216,8 @@ export default function PostPage() {
               videoClips={videoClips}
               audioSources={audioSources}
               onPreview={previewSource}
-              onAddClip={addClipInstanceAt}
-              onAddClipAtPlayhead={addClipAtPlayhead}
+              onAddClip={handleAddVideoClip}
+              onAddClipAtPlayhead={handleAddVideoClipAtPlayhead}
               onAddAudioFromSource={addAudioClipFromSource}
               onAddAudioSource={addAudioSource}
               onRemoveAudioSource={removeAudioSource}
@@ -197,8 +243,8 @@ export default function PostPage() {
           videoClips={videoClips}
           audioSources={audioSources}
           onPreview={previewSource}
-          onAddClip={addClipInstanceAt}
-          onAddClipAtPlayhead={addClipAtPlayhead}
+          onAddClip={handleAddVideoClip}
+          onAddClipAtPlayhead={handleAddVideoClipAtPlayhead}
           onAddAudioFromSource={addAudioClipFromSource}
           onAddAudioSource={addAudioSource}
           onRemoveAudioSource={removeAudioSource}
