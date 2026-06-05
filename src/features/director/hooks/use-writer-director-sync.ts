@@ -30,9 +30,24 @@ export function useWriterDirectorSync() {
   const autoStoryboardTriggeredRef = useRef(false)
   // Step 2: DB hydrate 1회 가드 (projectId별). DB가 진실 — Scene/Shot seed 후 1회 적용.
   const hydratedProjectIdRef = useRef<string | null>(null)
+  // asset-storage DB hydrate 1회 가드 (projectId별). Pass 2 에셋 바인딩이 이 결과에 의존.
+  const assetHydratedProjectIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!manifest) return
+    let cancelled = false
+
+    void (async () => {
+    // ── Pass 0: asset-storage DB hydrate (projectId별 1회) ─────────────
+    // Director 직행/타브라우저/localStorage 비움에서도 캐릭터·월드 이미지가 채워지도록
+    // DB(characters/locations)에서 직접 등록. Pass 2의 characterAssetIds/worldAssetIds
+    // 바인딩이 이 등록 결과(assets.getCharacter/getWorld)에 의존하므로 먼저 await.
+    const assetProjectId = useDirectorCanvasStore.getState().projectId
+    if (assetProjectId && assetHydratedProjectIdRef.current !== assetProjectId) {
+      assetHydratedProjectIdRef.current = assetProjectId
+      await useAssetStorageStore.getState().hydrateFromDb(assetProjectId)
+    }
+    if (cancelled) return
 
     const dir = useDirectorCanvasStore.getState()
     const assets = useAssetStorageStore.getState()
@@ -138,5 +153,10 @@ export function useWriterDirectorSync() {
         ),
       )
     })()
+    })()
+
+    return () => {
+      cancelled = true
+    }
   }, [manifest, shots])
 }

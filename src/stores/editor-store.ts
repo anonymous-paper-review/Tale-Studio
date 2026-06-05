@@ -80,7 +80,6 @@ interface EditorState {
   future: EditorSnapshot[]
 
   loadData: () => void
-  loadMockData: () => void
   reset: () => void
   selectScene: (sceneId: string) => void
   selectClip: (shotId: string) => void                 // 단일 선택 (교체)
@@ -651,23 +650,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       past: [],
       future: [],
     }),
-
-  loadMockData: async () => {
-    const [{ mockShots }, { mockVideoClips }] = await Promise.all([
-      import('@/mocks/shot-sequences'),
-      import('@/mocks/video-clips'),
-    ])
-
-    const order = buildClipOrder(mockShots)
-
-    set({
-      shots: mockShots,
-      videoClips: mockVideoClips,
-      clipOrder: order,
-      selectedSceneId: mockShots[0]?.sceneId ?? null,
-      selectedClipShotId: mockShots[0]?.shotId ?? null,
-    })
-  },
 
   selectScene: (sceneId) =>
     set((state) => {

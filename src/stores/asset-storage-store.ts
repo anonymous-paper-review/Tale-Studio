@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { GeneratedImage, CharacterAsset, WorldAsset } from '@/types/asset'
+import { createClient } from '@/lib/supabase/client'
 
 // ============================================================================
 // Types — see specs/data/asset_storage.md
@@ -59,6 +60,14 @@ interface AssetStorageState {
   getWorld: (id: string) => RegisteredWorld | undefined
   listCharactersByProject: (projectId: string) => RegisteredCharacter[]
   listWorldsByProject: (projectId: string) => RegisteredWorld[]
+
+  /**
+   * DB(characters/locations)에서 직접 등록 — Artist 카드를 거치지 않은 진입(Director 직행,
+   * 타브라우저/기기, localStorage 비움)에서도 캐릭터·월드 이미지가 채워지게 한다.
+   * 카드→등록 어댑터와 동일한 매핑(id === characterId/locationId)을 DB row 소스로 재사용.
+   * 멱등 — registerCharacter/registerWorld가 key 기준 덮어쓰기라 재호출해도 안전.
+   */
+  hydrateFromDb: (projectId: string) => Promise<void>
 
   reset: () => void
 }
@@ -125,6 +134,67 @@ export const useAssetStorageStore = create<AssetStorageState>()(
 
       listWorldsByProject: (projectId) =>
         Object.values(get().worlds).filter((w) => w.projectId === projectId),
+
+      hydrateFromDb: async (projectId) => {
+        if (!projectId) return
+        try {
+          const supabase = createClient()
+          const [charsRes, locsRes] = await Promise.all([
+            supabase
+              .from('characters')
+              .select(
+                'character_id, name, view_main, view_back, view_side_left, view_side_right, locked, description, appearance',
+              )
+              .eq('project_id', projectId),
+            supabase
+              .from('locations')
+              .select(
+                'location_id, name, scene_id, wide_shot, establishing_shot, visual_description',
+              )
+              .eq('project_id', projectId),
+          ])
+          if (charsRes.error) throw charsRes.error
+          if (locsRes.error) throw locsRes.error
+
+          // DB row → CharacterAsset/WorldAsset (artist-store.loadData와 동일 매핑)
+          // → 카드 어댑터로 RegisteredCharacter/World 등록.
+          for (const c of charsRes.data ?? []) {
+            const asset: CharacterAsset = {
+              characterId: c.character_id,
+              name: c.name,
+              views: {
+                main: c.view_main ?? null,
+                back: c.view_back ?? null,
+                sideLeft: c.view_side_left ?? null,
+                sideRight: c.view_side_right ?? null,
+              },
+              locked: c.locked ?? false,
+              description: c.description ?? '',
+              fixedPrompt: c.appearance ?? '',
+            }
+            get().registerCharacter(
+              c.character_id,
+              characterAssetToRegisterInput(asset, projectId),
+            )
+          }
+          for (const l of locsRes.data ?? []) {
+            const asset: WorldAsset = {
+              locationId: l.location_id,
+              name: l.name,
+              sceneId: l.scene_id ?? '',
+              wideShot: l.wide_shot ?? null,
+              establishingShot: l.establishing_shot ?? null,
+              visualDescription: l.visual_description ?? '',
+            }
+            get().registerWorld(
+              l.location_id,
+              worldAssetToRegisterInput(asset, projectId),
+            )
+          }
+        } catch (err) {
+          console.error('[asset-storage-store] hydrateFromDb failed:', err)
+        }
+      },
 
       reset: () => set({ characters: {}, worlds: {} }),
     }),

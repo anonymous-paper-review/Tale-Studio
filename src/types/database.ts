@@ -20,14 +20,10 @@ export type Database = {
           name: string
           role: string | null
           description: string | null
-          view_front: string | null
-          view_side: string | null
           view_back: string | null
           locked: boolean | null
           created_at: string | null
           updated_at: string | null
-          view_three_quarter_left: string | null
-          view_three_quarter_right: string | null
           appearance: string | null
           costume: string[] | null
           view_main: string | null
@@ -41,14 +37,10 @@ export type Database = {
           name: string
           role?: string | null
           description?: string | null
-          view_front?: string | null
-          view_side?: string | null
           view_back?: string | null
           locked?: boolean | null
           created_at?: string | null
           updated_at?: string | null
-          view_three_quarter_left?: string | null
-          view_three_quarter_right?: string | null
           appearance?: string | null
           costume?: string[] | null
           view_main?: string | null
@@ -62,14 +54,10 @@ export type Database = {
           name?: string
           role?: string | null
           description?: string | null
-          view_front?: string | null
-          view_side?: string | null
           view_back?: string | null
           locked?: boolean | null
           created_at?: string | null
           updated_at?: string | null
-          view_three_quarter_left?: string | null
-          view_three_quarter_right?: string | null
           appearance?: string | null
           costume?: string[] | null
           view_main?: string | null
