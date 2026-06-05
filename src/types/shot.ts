@@ -79,8 +79,28 @@ export interface AudioTrackClip {
   name: string
   url: string          // 업로드된 오디오 object URL or 원격 URL
   startSec: number     // 타임라인 시작 위치 (자유 배치)
-  durationSec: number
+  durationSec: number  // 타임라인에 차지하는 길이 (cut 시 줄어듦)
   volume: number       // 0~1, default 1
   muted: boolean
-  peaks?: number[]     // 파형 렌더용 정규화 peak (0~1). 디코드 후 캐시
+  peaks?: number[]     // 파형 렌더용 정규화 peak (0~1, 원본 소스 전체 기준). 디코드 후 캐시
+  // cut(split) 지원: 한 소스 파일을 여러 조각으로 나눠도 각 조각이 원본의 어느 구간인지 추적.
+  sourceOffsetSec?: number    // 이 조각이 원본 파일의 몇 초부터 시작하는지 (default 0)
+  sourceDurationSec?: number  // 원본 파일 전체 길이 (peaks 슬라이스 매핑용. default = durationSec)
+  // 영속화: 업로드 파일 blob 의 IndexedDB 키 (새로고침 후 url 재생성). source bin 클립이면 동일 키 공유.
+  blobKey?: string
+  sourceId?: string           // 어떤 AudioSource 에서 왔는지 (bin 추적용)
+}
+
+/**
+ * 오디오/보이스 소스 보관함 항목 (Video Source 의 오디오 버전).
+ * 업로드하면 bin 에 등록되고, 타임라인 오디오 트랙으로 드래그해 여러 번 인스턴스화할 수 있다.
+ */
+export interface AudioSource {
+  id: string
+  name: string
+  url: string          // 라이브 object URL (세션마다 blob 에서 재생성)
+  durationSec: number
+  peaks?: number[]
+  blobKey?: string     // IndexedDB 키 (원본 파일 blob)
+  kind: 'voice' | 'audio'
 }

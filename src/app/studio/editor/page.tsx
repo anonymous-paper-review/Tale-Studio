@@ -14,18 +14,14 @@ import {
   Redo2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { VideoPreviewer } from '@/features/editor/video-previewer'
 import { Timeline } from '@/features/editor/timeline'
 import { VideoSourcePanel } from '@/features/editor/video-source-panel'
 import { AudioMeter } from '@/features/editor/audio-meter'
+import { ResizeHandle } from '@/features/editor/resize-handle'
 import { useEditorPlayback } from '@/features/editor/use-editor-playback'
-import {
-  useEditorStore,
-  selectTimelineLayout,
-} from '@/stores/editor-store'
+import { useEditorStore, selectTimelineLayout } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
-import { cn } from '@/lib/utils'
 
 const FRAME = 1 / 24
 
@@ -34,27 +30,50 @@ export default function PostPage() {
     shots,
     videoClips,
     clipOrder,
-    selectedClipShotId,
+    selectedShotIds,
+    selectedAudioId,
     rendering,
     error,
     sourcePanelOpen,
     currentTime,
     pxPerSec,
     audioClips,
+    audioSources,
     isPlaying,
     toolMode,
+    binDragKind,
+    panelSizes,
     past,
     future,
     loadData,
+    loadPersisted,
     selectClip,
+    toggleClipSelection,
+    selectClipRange,
+    setClipSelection,
+    clearClipSelection,
+    selectAudioClip,
     deleteClip,
+    deleteSelectedClips,
+    moveClipToIndex,
+    setSpeed,
+    splitVideoClipAt,
+    addClipInstanceAt,
+    previewSource,
+    addAudioSource,
+    removeAudioSource,
+    addAudioClipFromSource,
+    setBinDragKind,
     renderDraft,
     toggleSourcePanel,
     seek,
     setPxPerSec,
-    addAudioClip,
+    setPanelSize,
     toggleAudioMute,
     removeAudioClip,
+    moveAudioClip,
+    splitAudioClipAt,
+    pushHistory,
     togglePlay,
     nudge,
     setToolMode,
@@ -62,10 +81,9 @@ export default function PostPage() {
     redo,
   } = useEditorStore()
 
-  // 재생 엔진 + 전역 단축키 (Space/←→/Ctrl+Z·Y/V·C)
+  // 재생 엔진 + 전역 단축키 (Space/←→/Ctrl+Z·Y/V·C/Del)
   useEditorPlayback()
 
-  // 파생 배열은 useMemo로 (selector가 매번 새 배열을 만들면 무한루프 경고)
   const timelineLayout = useMemo(
     () => selectTimelineLayout({ shots, videoClips, clipOrder }),
     [shots, videoClips, clipOrder],
@@ -73,13 +91,17 @@ export default function PostPage() {
 
   const projectId = useProjectStore((s) => s.projectId)
 
+  // loadData(원본) → loadPersisted(저장된 편집 덮어쓰기)
   useEffect(() => {
-    loadData()
-  }, [projectId, loadData])
-
-  const selectedShot = shots.find((s) => s.shotId === selectedClipShotId)
-  const selectedClip = videoClips.find((c) => c.shotId === selectedClipShotId)
-  const playbackSpeed = selectedClip?.speed ?? 1.0
+    let cancelled = false
+    ;(async () => {
+      await loadData()
+      if (!cancelled) await loadPersisted()
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [projectId, loadData, loadPersisted])
 
   if (shots.length === 0) {
     return (
@@ -96,30 +118,63 @@ export default function PostPage() {
 
   return (
     <div className="flex flex-1 overflow-hidden">
-      {/* Far left: Video Source 패널 (토글로 접기) */}
-      <VideoSourcePanel
-        open={sourcePanelOpen}
-        onToggle={toggleSourcePanel}
-        shots={shots}
-        videoClips={videoClips}
-        selectedShotId={selectedClipShotId}
-        onSelect={selectClip}
-      />
-
-      {/* Center: Preview + Toolbar + Timeline */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top: Video Previewer + VU 미터 */}
-        <div className="flex flex-1 overflow-hidden">
-          <div className="min-w-0 flex-1">
-            <VideoPreviewer shot={selectedShot} clip={selectedClip} />
+      {/* Far left: 소스 보관함 (Video/Voice). 열렸을 때만 너비 조절 가능 */}
+      {sourcePanelOpen ? (
+        <>
+          <div style={{ width: panelSizes.sourceW }} className="h-full shrink-0">
+            <VideoSourcePanel
+              open
+              onToggle={toggleSourcePanel}
+              shots={shots}
+              videoClips={videoClips}
+              audioSources={audioSources}
+              onPreview={previewSource}
+              onAddClip={addClipInstanceAt}
+              onAddAudioFromSource={addAudioClipFromSource}
+              onAddAudioSource={addAudioSource}
+              onRemoveAudioSource={removeAudioSource}
+              onBinDragStart={setBinDragKind}
+              onBinDragEnd={() => setBinDragKind(null)}
+            />
           </div>
-          <AudioMeter audioClips={audioClips} />
+          <ResizeHandle
+            axis="x"
+            getValue={() => panelSizes.sourceW}
+            onChange={(v) => setPanelSize('sourceW', v)}
+          />
+        </>
+      ) : (
+        <VideoSourcePanel
+          open={false}
+          onToggle={toggleSourcePanel}
+          shots={shots}
+          videoClips={videoClips}
+          audioSources={audioSources}
+          onPreview={previewSource}
+          onAddClip={addClipInstanceAt}
+          onAddAudioFromSource={addAudioClipFromSource}
+          onAddAudioSource={addAudioSource}
+          onRemoveAudioSource={removeAudioSource}
+          onBinDragStart={setBinDragKind}
+          onBinDragEnd={() => setBinDragKind(null)}
+        />
+      )}
+
+      {/* Center: Preview ─ (resize) ─ Toolbar ─ Timeline(+VU) */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Preview — 높이 조절 대상 */}
+        <div style={{ height: panelSizes.previewH }} className="shrink-0 overflow-hidden">
+          <VideoPreviewer />
         </div>
 
-        <Separator />
+        <ResizeHandle
+          axis="y"
+          getValue={() => panelSizes.previewH}
+          onChange={(v) => setPanelSize('previewH', v)}
+        />
 
-        {/* 재생 컨트롤바 + 도구 + 상태바 */}
-        <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
+        {/* 재생 컨트롤바 + 도구 */}
+        <div className="flex items-center gap-2 border-y border-border px-3 py-1.5">
           {/* 도구 모드 (V/C) */}
           <div className="flex items-center gap-0.5 rounded border border-border p-0.5">
             <Button
@@ -165,15 +220,8 @@ export default function PostPage() {
             </Button>
           </div>
 
-          {/* 상태바: 재생 속도 (ClipInspector에서 이동) */}
-          <span
-            className={cn(
-              'rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tabular-nums',
-              playbackSpeed !== 1.0 ? 'text-primary' : 'text-muted-foreground',
-            )}
-            title="현재 클립 재생 속도"
-          >
-            {playbackSpeed.toFixed(2)}×
+          <span className="text-[10px] text-muted-foreground">
+            클립 우클릭 → 속도·분할·삭제
           </span>
 
           <div className="ml-auto">
@@ -184,29 +232,46 @@ export default function PostPage() {
           </div>
         </div>
 
-        {/* 통합 타임라인 */}
-        <div className="flex h-56 shrink-0 flex-col">
-          <div className="min-h-0 flex-1">
+        {/* 통합 타임라인 + VU 미터 (우측) */}
+        <div className="flex min-h-0 flex-1">
+          <div className="min-w-0 flex-1">
             <Timeline
               layout={timelineLayout}
               shots={shots}
               videoClips={videoClips}
-              selectedShotId={selectedClipShotId}
+              selectedShotIds={selectedShotIds}
+              selectedAudioId={selectedAudioId}
               currentTime={currentTime}
               pxPerSec={pxPerSec}
+              toolMode={toolMode}
+              binDragKind={binDragKind}
               audioClips={audioClips}
               onSeek={seek}
               onSelect={selectClip}
+              onToggleSelect={toggleClipSelection}
+              onRangeSelect={selectClipRange}
+              onSetSelection={setClipSelection}
+              onClearSelection={clearClipSelection}
               onDelete={deleteClip}
+              onDeleteSelected={deleteSelectedClips}
+              onMoveClipToIndex={moveClipToIndex}
               onZoom={setPxPerSec}
-              onAddAudio={addAudioClip}
+              onSplitVideo={splitVideoClipAt}
+              onSetSpeed={setSpeed}
+              onAddAudioSource={addAudioSource}
+              onAddAudioFromSource={addAudioClipFromSource}
               onToggleAudioMute={toggleAudioMute}
               onRemoveAudio={removeAudioClip}
+              onMoveAudio={moveAudioClip}
+              onSplitAudio={splitAudioClipAt}
+              onSelectAudio={selectAudioClip}
+              onPushHistory={pushHistory}
             />
           </div>
-
-          {error && <p className="px-4 pb-1 text-xs text-destructive">{error}</p>}
+          <AudioMeter audioClips={audioClips} />
         </div>
+
+        {error && <p className="shrink-0 px-4 py-1 text-xs text-destructive">{error}</p>}
       </div>
     </div>
   )
