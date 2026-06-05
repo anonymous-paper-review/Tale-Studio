@@ -103,6 +103,25 @@ export async function GET(
       ? 100
       : Math.min(100, Math.round((completedStages / totalWriterStages) * 100));
 
+    // ── 구간 시간측정 (ms) ──────────────────────────────────────────────
+    // PIPELINE/started 를 t0 로 잡고 주요 마일스톤까지의 경과를 계산.
+    //   assets_ready_ms = artist 가 언블록되어 이미지 생성을 시작할 수 있는 시점 (Tier 1 persist 완료).
+    //   shots_ready_ms  = director 콘티가 채워지는 시점 (Tier 2 persist 완료).
+    //   total_ms        = 전체 텍스트 파이프라인 완료.
+    const tsOf = (stage: string, status: ProgressEntry['status']): number | null => {
+      const e = timeline.find((x) => x.stage === stage && x.status === status);
+      return e ? Date.parse(e.timestamp) : null;
+    };
+    const startedMs = tsOf('PIPELINE', 'started');
+    const since = (ms: number | null) =>
+      startedMs != null && ms != null ? ms - startedMs : null;
+    const timings = {
+      pipeline_started_at: startedMs != null ? new Date(startedMs).toISOString() : null,
+      assets_ready_ms: since(tsOf('persistAssets', 'completed')),
+      shots_ready_ms: since(tsOf('persistShots', 'completed')),
+      total_ms: since(tsOf('PIPELINE', 'completed')),
+    };
+
     return NextResponse.json({
       projectId,
       started: true,
@@ -116,6 +135,7 @@ export async function GET(
         ? (failed.extra as { error?: string } | undefined)?.error ??
           `failed at ${failed.stage}`
         : null,
+      timings,
       available,
       timeline,
     });

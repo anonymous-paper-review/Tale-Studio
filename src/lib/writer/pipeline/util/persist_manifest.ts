@@ -43,43 +43,33 @@ function normRole(role: string): 'protagonist' | 'antagonist' | 'supporting' {
 }
 
 /**
- * writer 파이프라인의 텍스트 결과(S2/S3/L2 + shot_sequence)를 DB에 기록.
- * 기존 행은 project_id 기준 삭제 후 재삽입(idempotent). projectId 는 DB UUID 여야 함.
- * 호출자는 non-blocking 으로 감싼다.
+ * Tier 1 (이미지에 필수): characters + locations + scenes 를 DB 기록.
+ *   writer 파이프라인 stage 09(productionDesign) 직후 호출 → artist 가 ~절반 시점에 언블록되어
+ *   캐릭터/월드 레퍼런스 이미지 생성을 일찍 시작할 수 있다 (shots/director 단계 10~14를 안 기다림).
+ *   scenes 도 여기 포함 — world(로케이션) 이미지 생성이 scene.mood 에 의존하므로
+ *   scenes 가 없으면 generateWorldAsset 이 조용히 스킵된다. scenes 는 stage 05 에서 이미 준비됨.
+ *   기존 행은 project_id 기준 삭제 후 재삽입(idempotent). projectId 는 DB UUID 여야 함.
+ *   호출자는 non-blocking 으로 감싼다.
  */
-export async function persistManifestToDb(
+export async function persistAssetsToDb(
   projectId: string,
   characters: Characters,
   scenes: Scenes,
   productionDesign: ProductionDesign,
-  shotSequence: ShotSequence,
 ): Promise<void> {
   if (!UUID_RE.test(projectId)) return // 핸드오프 외 run — DB project 없음
 
-  // 기존 데이터 정리 (shots → scenes/characters/locations 순서 무관, 모두 project_id scope)
+  // 자신이 채우는 테이블만 정리 (characters/locations/scenes). shots 는 Tier 2 가 관리.
   await Promise.all([
-    supabaseAdmin.from('shots').delete().eq('project_id', projectId),
-    supabaseAdmin.from('scenes').delete().eq('project_id', projectId),
     supabaseAdmin.from('characters').delete().eq('project_id', projectId),
     supabaseAdmin.from('locations').delete().eq('project_id', projectId),
+    supabaseAdmin.from('scenes').delete().eq('project_id', projectId),
   ])
 
-  // characters
-  const costumes = productionDesign.costumes ?? {}
-  if (characters.characters.length) {
-    await supabaseAdmin.from('characters').insert(
-      characters.characters.map((c) => ({
-        project_id: projectId,
-        character_id: c.id,
-        name: c.name,
-        role: normRole(c.role),
-        appearance: c.appearance_description ?? '',
-        // 레거시 description 도 채워 기존 소비측(c.description) 무변경 유지. fixed_prompt 는 제거(드롭).
-        description: c.appearance_description ?? '',
-        costume: costumes[c.id] ?? null,
-      })),
-    )
-  }
+  // ⚠️ insert 순서 주의: artist 의 loadData 는 `dbChars?.length` 만 보고 hydrate 한다.
+  //   characters 가 먼저 들어가면 locations/scenes 가 아직 없는 찰나에 폴링이 끼어 world 가
+  //   누락될 수 있다. 그래서 locations → scenes 를 먼저 넣고 characters 를 마지막에 넣어,
+  //   characters 가 보이는 순간 나머지가 보장되도록 한다.
 
   // locations (writer productionDesign.locations — name 은 id 기반, time_of_day 는 미보유)
   if (productionDesign.locations?.length) {
@@ -99,7 +89,7 @@ export async function persistManifestToDb(
     )
   }
 
-  // scenes
+  // scenes (world 이미지 생성이 scene.mood 에 의존 → Tier 1 에 포함)
   if (scenes.scenes.length) {
     await supabaseAdmin.from('scenes').insert(
       scenes.scenes.map((sc, i) => ({
@@ -116,6 +106,39 @@ export async function persistManifestToDb(
       })),
     )
   }
+
+  // characters (마지막 — loadData 게이트 `dbChars?.length` 를 만족시키는 신호)
+  const costumes = productionDesign.costumes ?? {}
+  if (characters.characters.length) {
+    await supabaseAdmin.from('characters').insert(
+      characters.characters.map((c) => ({
+        project_id: projectId,
+        character_id: c.id,
+        name: c.name,
+        role: normRole(c.role),
+        appearance: c.appearance_description ?? '',
+        // 레거시 description 도 채워 기존 소비측(c.description) 무변경 유지. fixed_prompt 는 제거(드롭).
+        description: c.appearance_description ?? '',
+        costume: costumes[c.id] ?? null,
+      })),
+    )
+  }
+}
+
+/**
+ * Tier 2 (스토리보드/director): shots 만 DB 기록.
+ *   writer 파이프라인 마지막(stage 14 renderPrompts 직후) 호출 → director 가 콘티 노드를 채운다.
+ *   characters/locations/scenes 는 Tier 1 이 이미 기록했으므로 건드리지 않는다(artist 편집 보존).
+ *   기존 shots 행은 project_id 기준 삭제 후 재삽입(idempotent). 호출자는 non-blocking.
+ */
+export async function persistShotsToDb(
+  projectId: string,
+  shotSequence: ShotSequence,
+): Promise<void> {
+  if (!UUID_RE.test(projectId)) return // 핸드오프 외 run — DB project 없음
+
+  // 자신이 채우는 테이블만 정리 (shots). characters/locations/scenes 는 Tier 1 소관.
+  await supabaseAdmin.from('shots').delete().eq('project_id', projectId)
 
   // shots (shot_sequence — 대사 보유)
   if (shotSequence.shots.length) {
@@ -144,4 +167,19 @@ export async function persistManifestToDb(
       }),
     )
   }
+}
+
+/**
+ * 호환용 래퍼: 두 tier 를 순차 기록. 점진적 언블록이 필요 없는 호출자용.
+ * (핸드오프 파이프라인은 persistAssetsToDb / persistShotsToDb 를 시점 분리해 직접 호출한다.)
+ */
+export async function persistManifestToDb(
+  projectId: string,
+  characters: Characters,
+  scenes: Scenes,
+  productionDesign: ProductionDesign,
+  shotSequence: ShotSequence,
+): Promise<void> {
+  await persistAssetsToDb(projectId, characters, scenes, productionDesign)
+  await persistShotsToDb(projectId, shotSequence)
 }

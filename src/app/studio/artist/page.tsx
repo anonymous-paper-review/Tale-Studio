@@ -32,6 +32,8 @@ export default function VisualPage() {
 
   // 프로젝트당 1회만 자동생성 트리거 (마운트/재진입 중복 방지)
   const autoGenTriggeredRef = useRef<string | null>(null)
+  // 시간측정 로그 1회 가드 (프로젝트당)
+  const timingLoggedRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (projectId) loadData()
@@ -55,6 +57,26 @@ export default function VisualPage() {
     autoGenTriggeredRef.current = projectId
     void autoGenerateBaseImages()
   }, [projectId, characterAssets.length, worldAssets.length, autoGenerateBaseImages])
+
+  // 시간측정: artist 데이터가 처음 들어온(=이미지 생성 가능) 순간 1회 로깅.
+  //   end_to_end_ms = 핸드오프 클릭(producer) → 지금 (sessionStorage 기준 wall-clock)
+  //   서버 timings 도 함께 출력 (pipeline 내부 구간).
+  useEffect(() => {
+    if (!projectId) return
+    if (characterAssets.length === 0 && worldAssets.length === 0) return
+    if (timingLoggedRef.current === projectId) return
+    timingLoggedRef.current = projectId
+    let endToEndMs: number | null = null
+    try {
+      const t0 = sessionStorage.getItem(`handoffStartedAt:${projectId}`)
+      if (t0) endToEndMs = Date.now() - Number(t0)
+    } catch {}
+    console.log('[handoff timing] artist 이미지 생성 가능', {
+      end_to_end_ms: endToEndMs,
+      end_to_end_s: endToEndMs != null ? +(endToEndMs / 1000).toFixed(1) : null,
+      server: writerStatus?.timings ?? null,
+    })
+  }, [projectId, characterAssets.length, worldAssets.length, writerStatus])
 
   // 데이터 미준비 = 백그라운드 생성 진행 중 → progress bar 블로킹 (decisions #37).
   // writer 스테이지가 숨겨졌으므로 "Complete the Script Room first" 안내는 더 이상 유효치 않음.

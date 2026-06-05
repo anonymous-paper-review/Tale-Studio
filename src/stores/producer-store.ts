@@ -73,6 +73,13 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
     set({ syncing: true, error: null })
 
+    // 시간측정: 핸드오프 클릭 시각을 기록 → artist 가 "이미지 생성 가능"까지의 end-to-end 를 계산.
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(`handoffStartedAt:${projectId}`, String(Date.now()))
+      } catch {}
+    }
+
     try {
       const supabase = createClient()
       const { error } = await supabase

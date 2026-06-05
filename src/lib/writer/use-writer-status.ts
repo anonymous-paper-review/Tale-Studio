@@ -13,6 +13,12 @@ export interface WriterStatus {
   current_status: string | null
   last_timestamp: string | null
   error: string | null
+  timings?: {
+    pipeline_started_at: string | null
+    assets_ready_ms: number | null   // artist 언블록(이미지 생성 시작 가능) 지연
+    shots_ready_ms: number | null    // director 콘티 준비 지연
+    total_ms: number | null          // 전체 텍스트 파이프라인 완료
+  }
   available: Record<string, boolean>
 }
 

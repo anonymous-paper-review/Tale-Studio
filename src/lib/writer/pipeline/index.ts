@@ -17,7 +17,7 @@ import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/l5_prompts';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_l3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
-import { persistManifestToDb } from '@/lib/writer/pipeline/util/persist_manifest';
+import { persistAssetsToDb, persistShotsToDb } from '@/lib/writer/pipeline/util/persist_manifest';
 import { isCompactDepth } from '@/lib/writer/types/pipeline';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
 import { resetGeminiCallCount, getGeminiCallCount } from '@/lib/writer/llm/gemini';
@@ -246,6 +246,17 @@ async function _runPipelineInner(
     console.warn('[assets] background generation failed (pipeline continues):', e);
   });
 
+  // ★ Tier 1 persist (이미지에 필수): characters/locations/scenes 를 여기서 미리 DB 기록 →
+  //   artist 가 shots/director 단계(10~14)를 안 기다리고 ~절반 시점에 언블록되어 이미지 생성 시작.
+  //   scenes 포함 — world 이미지 생성이 scene.mood 의존(없으면 generateWorldAsset 스킵). stage 05 에서 준비됨.
+  //   완료 마커(persistAssets)는 _progress.jsonl 에 timestamp 로 남아 artist-언블록 지연 측정에 쓰임.
+  //   non-blocking — 실패해도 파이프라인 계속(끝의 persistShots 와 무관).
+  persistAssetsToDb(projectId, characters, scenes, productionDesign)
+    .then(() => logger.markStage('persistAssets', 'completed'))
+    .catch((e) => {
+      console.warn('[writer] Tier1 assets persist failed (pipeline continues):', e);
+    });
+
   // sceneCinematography (씬 비주얼 플랜) — Compact Mode (D1~D3)에선 스킵
   const compact = isCompactDepth(genre.depth_level);
   let sceneCinematography: SceneCinematography[] = [];
@@ -355,11 +366,14 @@ async function _runPipelineInner(
     logger,
   )).value;
 
-  // 텍스트 결과(캐릭터/씬/로케이션/샷)를 DB에 기록 — writer 단일 생산자(§3 일원화).
+  // ★ Tier 2 persist (스토리보드/director): shots 를 마지막에 DB 기록.
+  //   characters/locations/scenes 는 Tier 1(stage 09)이 이미 기록 — 여기선 건드리지 않음(artist 편집 보존).
   //   shotSequence 는 샷별 대사를 보유. non-blocking — 실패해도 파이프라인 계속.
-  persistManifestToDb(projectId, characters, scenes, productionDesign, shotSequence).catch((e) => {
-    console.warn('[writer] manifest persist failed (pipeline continues):', e);
-  });
+  persistShotsToDb(projectId, shotSequence)
+    .then(() => logger.markStage('persistShots', 'completed'))
+    .catch((e) => {
+      console.warn('[writer] Tier2 shots persist failed (pipeline continues):', e);
+    });
 
   const completedAt = new Date().toISOString();
   const totalDurationMs = Date.now() - startedMs;
