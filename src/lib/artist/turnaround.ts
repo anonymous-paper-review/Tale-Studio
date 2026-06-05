@@ -1,117 +1,95 @@
-// 캐릭터 턴어라운드 시트 — 프롬프트 빌더 + crop 유틸 (순수 함수).
+// 캐릭터 뷰 프롬프트 빌더 (순수 함수).
 //
-// decisions #37: A-style 구조화 프롬프트로 1×4 가로 스트립(front|side-L|side-R|back)을
-// 한 장 생성한 뒤, 균등 4등분 고정좌표로 crop 해 개별 뷰에 분배한다.
+// 전략 (crop 폐기, 2026-06-05 / front 통합, 2026-06-05): 1×4 스트립 생성·sharp 4등분을 폐기하고,
+//   - main = 풀바디·정면·중립배경 대표 포트레이트 1장 (T2I). 핸드오프 파이프라인의
+//     runAssetsGenerate 가 progress bar 뒤에서 미리 생성해 characters.view_main 에 저장.
+//     이 정면 대표 이미지가 곧 "front" 역할을 겸한다 (별도 front 뷰 폐기).
+//   - back/sideLeft/sideRight = main 을 reference 로 한 image-to-image(edit 모델) 재생성.
+//     각 방향을 개별 호출로 생성해 crop 오정합 문제를 제거하고 일관성을 높인다.
 //
-// ⚠️ source-agnostic: 프롬프트 입력 토큰을 "인자로" 받는다. 토큰이 writer 로그에서 오든
-//    DB(unify-svc-writer-pipeline 이후)에서 오든 호출자가 채우면 된다 → 데이터 출처와 무관.
-import sharp from 'sharp'
+// ⚠️ source-agnostic: 프롬프트 입력 토큰을 "인자로" 받는다. 토큰이 writer 로그/DB 어디서 오든
+//    호출자가 채우면 된다 → 데이터 출처와 무관.
 
-/** 시트의 셀 순서 (좌→우). crop 인덱스와 1:1 대응. */
-export const TURNAROUND_VIEW_ORDER = [
-  'front',
-  'sideLeft',
-  'sideRight',
-  'back',
-] as const
+/** main(정면) 을 제외한 방향 뷰 (개별 i2i 생성 대상) */
+export const CHARACTER_DIRECTIONAL_VIEWS = ['back', 'sideLeft', 'sideRight'] as const
 
-export type TurnaroundView = (typeof TURNAROUND_VIEW_ORDER)[number]
+export type DirectionalView = (typeof CHARACTER_DIRECTIONAL_VIEWS)[number]
 
-/** 각 셀의 각도 지시문 (프롬프트 + 사람이 읽는 라벨) */
-export const TURNAROUND_VIEW_SPEC: Record<
-  TurnaroundView,
-  { label: string; angle: string }
-> = {
-  front: { label: 'Front', angle: 'front view facing camera' },
-  sideLeft: { label: 'Side (L)', angle: 'left side profile, 90 degrees' },
-  sideRight: { label: 'Side (R)', angle: 'right side profile, 90 degrees' },
-  back: { label: 'Back', angle: 'back view from behind' },
+/** 각 방향 뷰의 각도 지시문 */
+const VIEW_ANGLE: Record<DirectionalView, string> = {
+  back: 'back view, the character seen from directly behind',
+  sideLeft: 'left-side profile view, the character facing left at 90 degrees',
+  sideRight: 'right-side profile view, the character facing right at 90 degrees',
 }
 
-export interface TurnaroundPromptInput {
+export interface CharacterPromptInput {
   /** 캐릭터 이름 */
   name: string
-  /** 외형 묘사 (writer appearance_description 또는 DB fixed_prompt) */
+  /** 외형 묘사 (DB characters.appearance) */
   appearance: string
   age?: string
   role?: string
   costumes?: string[]
-  /** writer L1 — 폴백(fixed_prompt) 시엔 없을 수 있음 */
+  /** 디자인 토큰 (projects.design_tokens.l1) */
   artStyle?: string
   shapeLanguage?: string
-  /** writer L2 global_palette 색상들 */
+  /** 글로벌 팔레트 색상들 */
   palette?: string[]
 }
 
-/**
- * 1×4 가로 스트립 턴어라운드 시트 프롬프트 조립.
- * 셀 순서(좌→우)는 TURNAROUND_VIEW_ORDER 와 일치 — crop 좌표와 맞추기 위해 프롬프트에서
- * "4 equal panels, evenly spaced" 를 강하게 지시한다.
- */
-export function buildTurnaroundSheetPrompt(input: TurnaroundPromptInput): string {
+function styleTokens(input: CharacterPromptInput): string[] {
   const palette = input.palette?.filter(Boolean).join(', ')
+  return [
+    input.artStyle ? `art style: ${input.artStyle}` : '',
+    input.shapeLanguage ? `shape language: ${input.shapeLanguage}` : '',
+    palette ? `palette: ${palette}` : '',
+  ].filter(Boolean)
+}
+
+function describe(input: CharacterPromptInput): string[] {
   const costumes = input.costumes?.length
     ? `wearing ${input.costumes.join(', ')}`
     : ''
-
-  const panelOrder = TURNAROUND_VIEW_ORDER.map(
-    (v, i) => `(${i + 1}) ${TURNAROUND_VIEW_SPEC[v].angle}`,
-  ).join(', ')
-
   return [
-    `Character turnaround model sheet of ${input.name}`,
     input.age ? `age ${input.age}` : '',
     input.role,
     input.appearance,
     costumes,
-    input.artStyle ? `art style: ${input.artStyle}` : '',
-    input.shapeLanguage ? `shape language: ${input.shapeLanguage}` : '',
-    palette ? `palette: ${palette}` : '',
-    // 레이아웃 지시 — crop 정합을 위해 균등 4패널을 강제
-    `Exactly 4 full-body views of the SAME character in one horizontal row, evenly spaced across 4 equal-width panels, left to right: ${panelOrder}`,
-    `identical character, identical outfit and proportions in every panel`,
-    `neutral grey background, even studio lighting, thin vertical gridlines separating the 4 panels, no text, no logo`,
-  ]
-    .filter(Boolean)
-    .join('. ')
-    .slice(0, 1000)
-}
-
-export interface TurnaroundCrops {
-  front: Buffer
-  sideLeft: Buffer
-  sideRight: Buffer
-  back: Buffer
+  ].filter((x): x is string => !!x)
 }
 
 /**
- * 1×4 스트립 이미지를 균등 4등분(고정좌표)으로 crop.
- * 마지막 셀은 반올림 잔차를 흡수하도록 남은 폭 전체를 사용.
- * ⚠️ 모델이 패널을 정확히 4등분에 안 맞추면 일부 잘릴 수 있음 (MVP 한계, decisions #37).
+ * main(대표 포트레이트) 프롬프트 — 풀바디·정면·중립배경·단일 캐릭터.
+ * reference 없이 깨끗하게 생성하는 T2I 용. (핸드오프 runAssetsGenerate 의 캐릭터 프롬프트와 동일 의도)
  */
-export async function cropTurnaroundStrip(
-  strip: Buffer,
-): Promise<TurnaroundCrops> {
-  const meta = await sharp(strip).metadata()
-  const w = meta.width
-  const h = meta.height
-  if (!w || !h) throw new Error('cropTurnaroundStrip: 이미지 크기를 읽지 못함')
+export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
+  return [
+    `Character reference portrait of ${input.name}`,
+    ...describe(input),
+    ...styleTokens(input),
+    'full body, single character, front view, neutral grey background, even studio lighting, clean composition, no text, no logo',
+  ]
+    .filter(Boolean)
+    .join('. ')
+    .slice(0, 900)
+}
 
-  const cellW = Math.floor(w / 4)
-  const extractCell = (index: number): Promise<Buffer> => {
-    const left = index * cellW
-    const width = index === 3 ? w - left : cellW // 마지막 셀은 잔차 흡수
-    return sharp(strip)
-      .extract({ left, top: 0, width, height: h })
-      .png()
-      .toBuffer()
-  }
-
-  const [front, sideLeft, sideRight, back] = await Promise.all([
-    extractCell(0),
-    extractCell(1),
-    extractCell(2),
-    extractCell(3),
-  ])
-  return { front, sideLeft, sideRight, back }
+/**
+ * 방향 뷰 프롬프트 — main 이미지를 reference 로 넘긴 image-to-image(edit) 용.
+ * "동일 캐릭터/의상을 이 각도에서" 를 강하게 지시해 일관성을 유지한다.
+ */
+export function buildCharacterViewPrompt(
+  input: CharacterPromptInput,
+  view: DirectionalView,
+): string {
+  return [
+    `The same character as the reference image, ${input.name}`,
+    VIEW_ANGLE[view],
+    ...describe(input),
+    ...styleTokens(input),
+    'identical character, identical outfit and proportions to the reference, full body, single character, neutral grey background, even studio lighting, no text, no logo',
+  ]
+    .filter(Boolean)
+    .join('. ')
+    .slice(0, 900)
 }

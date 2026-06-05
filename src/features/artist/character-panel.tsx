@@ -33,11 +33,11 @@ export function CharacterPanel() {
     sceneManifest,
     characterAssets,
     selectedCharacterId,
-    generatingCharacterId,
+    generatingViews,
     selectCharacter,
     lockCharacter,
     unlockCharacter,
-    generateSheet,
+    generateCharacterAllViews,
   } = useArtistStore()
 
   const projectId = useProjectStore((s) => s.projectId)
@@ -58,7 +58,11 @@ export function CharacterPanel() {
         {characterAssets.map((char) => {
           const role = getRole(char.characterId)
           const isSelected = selectedCharacterId === char.characterId
-          const isGenerating = generatingCharacterId === char.characterId
+          const isGenerating = generatingViews.some((k) =>
+            k.startsWith(`${char.characterId}:`),
+          )
+          const isViewGenerating = (v: CharacterViewKey) =>
+            generatingViews.includes(`${char.characterId}:${v}`)
           const isRegistered = registeredIds.has(char.characterId)
           const hasImage = CHARACTER_VIEW_KEYS.some((v) => char.views[v])
 
@@ -113,25 +117,10 @@ export function CharacterPanel() {
                 </Tooltip>
               </div>
 
-              {/* 턴어라운드 시트(main) wide 프리뷰 + 4 crop 뷰 (decisions #37).
-                  셀 클릭 → 상세/시트 재생성 Dialog. */}
-              <button
-                type="button"
-                title="Main 턴어라운드 시트 — 클릭해서 크게 보기 / 재생성"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setViewDialog({ charId: char.characterId, view: 'main' })
-                }}
-                className="mx-auto mb-2 block w-full max-w-[220px] rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <ImagePlaceholder
-                  label={CHARACTER_VIEW_LABELS.main}
-                  aspectRatio="video"
-                  imageUrl={char.views.main ?? null}
-                />
-              </button>
+              {/* main(정면 대표) + 3방향 뷰를 동일 크기로 병렬 표시 (front 통합·hero 폐기, 2026-06-05).
+                  셀 클릭 → 상세/재생성 Dialog. */}
               <div className="grid grid-cols-4 gap-2">
-                {(['front', 'back', 'sideLeft', 'sideRight'] as const).map(
+                {(['main', 'back', 'sideLeft', 'sideRight'] as const).map(
                   (view) => (
                     <button
                       key={view}
@@ -147,6 +136,7 @@ export function CharacterPanel() {
                         label={CHARACTER_VIEW_LABELS[view]}
                         aspectRatio="square"
                         imageUrl={char.views[view] ?? null}
+                        generating={isViewGenerating(view)}
                       />
                     </button>
                   ),
@@ -162,7 +152,7 @@ export function CharacterPanel() {
                   disabled={isGenerating || char.locked}
                   onClick={(e) => {
                     e.stopPropagation()
-                    generateSheet(char.characterId)
+                    generateCharacterAllViews(char.characterId)
                   }}
                 >
                   {isGenerating ? (

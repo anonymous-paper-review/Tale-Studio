@@ -17,7 +17,7 @@ import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/l5_prompts';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_l3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
-import { persistAssetsToDb, persistShotsToDb } from '@/lib/writer/pipeline/util/persist_manifest';
+import { persistAssetsToDb, persistAssetImagesToDb, persistShotsToDb } from '@/lib/writer/pipeline/util/persist_manifest';
 import { isCompactDepth } from '@/lib/writer/types/pipeline';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
 import { resetGeminiCallCount, getGeminiCallCount } from '@/lib/writer/llm/gemini';
@@ -242,8 +242,10 @@ async function _runPipelineInner(
 
   // productionDesign 직후 → 캐릭터/로케이션 reference 에셋 생성 (shotImages에서 I2I용으로 사용)
   // 실패해도 파이프라인은 계속 진행 (shotImages는 에셋 없으면 순수 T2I로 자동 fallback).
-  runAssetsGenerate(characters, renderFormat, artDirection, productionDesign, logger, { concurrency: 4 }).catch((e) => {
+  // 결과 manifest 는 아래에서 view_main/wide_shot 으로 DB 에 연결한다 (artist 진입 시 i2i base).
+  const assetsManifestPromise = runAssetsGenerate(characters, renderFormat, artDirection, productionDesign, logger, { concurrency: 4 }).catch((e) => {
     console.warn('[assets] background generation failed (pipeline continues):', e);
+    return null;
   });
 
   // ★ Tier 1 persist (이미지에 필수): characters/locations/scenes 를 여기서 미리 DB 기록 →
@@ -251,10 +253,23 @@ async function _runPipelineInner(
   //   scenes 포함 — world 이미지 생성이 scene.mood 의존(없으면 generateWorldAsset 스킵). stage 05 에서 준비됨.
   //   완료 마커(persistAssets)는 _progress.jsonl 에 timestamp 로 남아 artist-언블록 지연 측정에 쓰임.
   //   non-blocking — 실패해도 파이프라인 계속(끝의 persistShots 와 무관).
-  persistAssetsToDb(projectId, characters, scenes, productionDesign)
+  const persistAssetsPromise = persistAssetsToDb(projectId, characters, scenes, productionDesign)
     .then(() => logger.markStage('persistAssets', 'completed'))
     .catch((e) => {
       console.warn('[writer] Tier1 assets persist failed (pipeline continues):', e);
+    });
+
+  // ★ main(view_main)/wide_shot 연결: reference 이미지 생성 + 행 insert 가 모두 끝난 뒤,
+  //   생성된 이미지를 storage 로 복사해 characters.view_main / locations.wide_shot 에 기록.
+  //   progress bar 뒤에서 main 을 미리 채워 artist 진입 즉시 4방향 i2i 가 가능해진다.
+  //   non-blocking — 실패해도 파이프라인/이미지 흐름 무관 (artist 가 client-side 로 보강).
+  Promise.all([assetsManifestPromise, persistAssetsPromise])
+    .then(([manifest]) => {
+      if (manifest) return persistAssetImagesToDb(projectId, manifest);
+    })
+    .then(() => logger.markStage('persistAssetImages', 'completed'))
+    .catch((e) => {
+      console.warn('[writer] view_main/wide_shot persist failed (pipeline continues):', e);
     });
 
   // sceneCinematography (씬 비주얼 플랜) — Compact Mode (D1~D3)에선 스킵

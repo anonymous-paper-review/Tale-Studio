@@ -192,13 +192,16 @@ export default function HomePage() {
   const handleOpen = (project: ProjectItem) => {
     const stage = project.current_stage ?? 'producer'
     switchProject(project.id, project.title, stage as StageId)
-    router.push(`/studio/${stage}`)
+    router.push(`/studio/${stage}?projectId=${project.id}`)
   }
 
   const handleNew = async () => {
     setCreating(true)
     await createNewProject()
-    router.push('/studio/producer')
+    const newId = useProjectStore.getState().projectId
+    router.push(
+      newId ? `/studio/producer?projectId=${newId}` : '/studio/producer',
+    )
   }
 
   const scrollToProjects = () => {

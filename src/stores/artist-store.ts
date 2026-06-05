@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { SceneManifest, CharacterAsset, WorldAsset } from '@/types'
 import { type CharacterViewKey } from '@/types/asset'
+import { CHARACTER_DIRECTIONAL_VIEWS } from '@/lib/artist/turnaround'
 import { buildWorldPrompt } from '@/lib/prompts'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -89,14 +90,34 @@ async function persistImage(
   }
 }
 
+/** 작업 배열을 동시 N개 제한으로 실행 (캐릭터/월드 병렬 생성용, decision: concurrency 4) */
+async function runPool(
+  tasks: Array<() => Promise<void>>,
+  concurrency: number,
+): Promise<void> {
+  let cursor = 0
+  const workers = Array.from(
+    { length: Math.min(concurrency, tasks.length) },
+    async () => {
+      while (cursor < tasks.length) {
+        const task = tasks[cursor++]
+        await task()
+      }
+    },
+  )
+  await Promise.all(workers)
+}
+
 interface ArtistState {
   sceneManifest: SceneManifest | null
   characterAssets: CharacterAsset[]
   worldAssets: WorldAsset[]
   selectedCharacterId: string | null
   selectedLocationId: string | null
-  generatingCharacterId: string | null
-  generatingLocationId: string | null
+  /** 생성 중인 캐릭터 뷰 키들 — `${characterId}:${view}` (병렬 생성 추적) */
+  generatingViews: string[]
+  /** 생성 중인 로케이션 id 들 (병렬 생성 추적) */
+  generatingLocations: string[]
   selectedBoostPreset: string | null
   imageProvider: ImageProvider
   error: string | null
@@ -107,7 +128,13 @@ interface ArtistState {
   selectLocation: (id: string) => void
   lockCharacter: (id: string) => void
   unlockCharacter: (id: string) => void
-  generateSheet: (id: string) => Promise<void>
+  /** 단일 뷰 생성 (main=T2I, 방향=main 기반 i2i). 서버가 view 컬럼만 갱신. */
+  generateCharacterView: (
+    characterId: string,
+    view: CharacterViewKey,
+  ) => Promise<void>
+  /** main → 4방향(i2i)을 순서대로 생성 (방향은 concurrency 4 풀). 카드 "Generate All Views"용. */
+  generateCharacterAllViews: (characterId: string) => Promise<void>
   generateWorldAsset: (locationId: string) => Promise<void>
   generateWorldShot: (
     locationId: string,
@@ -127,8 +154,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   worldAssets: [],
   selectedCharacterId: null,
   selectedLocationId: null,
-  generatingCharacterId: null,
-  generatingLocationId: null,
+  generatingViews: [],
+  generatingLocations: [],
   selectedBoostPreset: null,
   imageProvider: 'fal' as ImageProvider,
   error: null,
@@ -193,7 +220,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             name: c.name,
             views: {
               main: c.view_main ?? null,
-              front: c.view_front ?? null,
               back: c.view_back ?? null,
               sideLeft: c.view_side_left ?? null,
               sideRight: c.view_side_right ?? null,
@@ -234,7 +260,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           name: c.name,
           views: {
             main: null,
-            front: null,
             back: null,
             sideLeft: null,
             sideRight: null,
@@ -309,48 +334,54 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       ),
     })),
 
-  // 턴어라운드 시트 생성 (decisions #37). 시트 1장 생성→서버 crop→DB 저장을 엔드포인트가 수행.
-  generateSheet: async (id) => {
+  // 단일 뷰 생성 (crop 폐기, 2026-06-05). main=T2I, 방향=main 기반 i2i. 서버가 해당 뷰 컬럼만 갱신.
+  generateCharacterView: async (characterId, view) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
+    const key = `${characterId}:${view}`
+    if (get().generatingViews.includes(key)) return
 
-    set({ generatingCharacterId: id, error: null })
+    set((state) => ({ generatingViews: [...state.generatingViews, key], error: null }))
     try {
       const res = await fetch('/api/artist/generate-sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, characterId: id }),
+        body: JSON.stringify({ projectId, characterId, view }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error ?? `HTTP ${res.status}`)
       }
-      const { views } = (await res.json()) as { views: Record<string, string> }
-
+      const { url } = (await res.json()) as { url: string }
       set((state) => ({
-        generatingCharacterId: null,
         characterAssets: state.characterAssets.map((a) =>
-          a.characterId === id
-            ? {
-                ...a,
-                views: {
-                  main: views.view_main ?? a.views.main,
-                  front: views.view_front ?? a.views.front,
-                  back: views.view_back ?? a.views.back,
-                  sideLeft: views.view_side_left ?? a.views.sideLeft,
-                  sideRight: views.view_side_right ?? a.views.sideRight,
-                },
-              }
+          a.characterId === characterId
+            ? { ...a, views: { ...a.views, [view]: url } }
             : a,
         ),
       }))
     } catch (err) {
       set({
-        generatingCharacterId: null,
         error:
-          err instanceof Error ? err.message : 'Character sheet generation failed',
+          err instanceof Error ? err.message : 'Character view generation failed',
       })
+    } finally {
+      set((state) => ({
+        generatingViews: state.generatingViews.filter((k) => k !== key),
+      }))
     }
+  },
+
+  // main → 4방향 순서 생성. 방향 i2i 는 main 이 DB 에 있어야 하므로 main 을 먼저 await 한 뒤
+  // 4방향을 concurrency 4 풀로 병렬 생성. 카드 "Generate All Views" / 시트 재생성용.
+  generateCharacterAllViews: async (characterId) => {
+    await get().generateCharacterView(characterId, 'main')
+    await runPool(
+      CHARACTER_DIRECTIONAL_VIEWS.map(
+        (v) => () => get().generateCharacterView(characterId, v),
+      ),
+      4,
+    )
   },
 
   generateWorldAsset: async (locationId) => {
@@ -360,8 +391,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     )
     const scene = sceneManifest?.scenes.find((s) => s.location === locationId)
     if (!location || !scene) return
+    if (get().generatingLocations.includes(locationId)) return
 
-    set({ generatingLocationId: locationId, error: null })
+    set((state) => ({
+      generatingLocations: [...state.generatingLocations, locationId],
+      error: null,
+    }))
 
     try {
       const basePrompt = buildWorldPrompt(
@@ -395,7 +430,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       // 2) Establishing shot
       const establishingShot = await generateImage(`${basePrompt}, establishing shot, aerial view`, '16:9', imageProvider)
       set((state) => ({
-        generatingLocationId: null,
         worldAssets: state.worldAssets.map((w) =>
           w.locationId === locationId ? { ...w, establishingShot } : w,
         ),
@@ -412,10 +446,15 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       }
     } catch (err) {
       set({
-        generatingLocationId: null,
         error:
           err instanceof Error ? err.message : 'World generation failed',
       })
+    } finally {
+      set((state) => ({
+        generatingLocations: state.generatingLocations.filter(
+          (id) => id !== locationId,
+        ),
+      }))
     }
   },
 
@@ -427,7 +466,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const scene = sceneManifest?.scenes.find((s) => s.location === locationId)
     if (!location || !scene) return
 
-    set({ generatingLocationId: locationId, error: null })
+    // location 단위 가드를 두지 않음 — 같은 로케이션의 wide/establishing 을 병렬 생성할 수 있어야 함.
+    set((state) => ({
+      generatingLocations: [...state.generatingLocations, locationId],
+      error: null,
+    }))
 
     try {
       // 사용자 편집 프롬프트 우선, 없으면 기본 빌드 프롬프트.
@@ -442,7 +485,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         )
       const img = await generateImage(prompt, '16:9', imageProvider)
       set((state) => ({
-        generatingLocationId: null,
         worldAssets: state.worldAssets.map((w) =>
           w.locationId === locationId ? { ...w, [shot]: img } : w,
         ),
@@ -467,40 +509,67 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       }
     } catch (err) {
       set({
-        generatingLocationId: null,
         error:
           err instanceof Error ? err.message : 'World generation failed',
+      })
+    } finally {
+      // 같은 locationId 가 중복될 수 있으므로 한 건만 제거.
+      set((state) => {
+        const idx = state.generatingLocations.indexOf(locationId)
+        if (idx === -1) return {}
+        const next = state.generatingLocations.slice()
+        next.splice(idx, 1)
+        return { generatingLocations: next }
       })
     }
   },
 
-  // Writer→Artist 첫 진입 시 "기본 필수" 이미지 1회 자동생성 (1회+캐시).
-  // 가드 = 이미지가 없는(null) 것만 생성 → 생성물은 DB 영속(persistImage)되므로
-  // 재진입 시 not-null이라 자동 skip(자연 캐시). decision #29.6(토큰 보호) 화해책.
-  // 토큰 절약: 캐릭터는 전체 5뷰가 아니라 대표 뷰(front) 1장만.
+  // Writer→Artist 진입 시 비어있는 이미지 자동생성 (crop 폐기 후 재설계, 2026-06-05).
+  //   main(정면 대표) 은 핸드오프 파이프라인(runAssetsGenerate→view_main)이 progress bar 뒤에서 미리 채움 →
+  //   여기선 비어있는 방향 뷰(back/left/right) i2i 와 월드 샷만 보강한다.
+  //   캐릭터 뷰·월드 샷을 한 풀에서 동시 4개 제한으로 병렬 처리 (캐릭터별·월드별 병렬).
+  //   생성물은 DB 영속 → 재진입 시 not-null 이라 자동 skip(자연 캐시).
   autoGenerateBaseImages: async () => {
     const { characterAssets, worldAssets } = get()
+    const tasks: Array<() => Promise<void>> = []
 
     for (const c of characterAssets) {
-      // 동시/중복 트리거 방지: 진행 중이면 skip.
-      if (get().generatingCharacterId) break
       if (c.views.main == null) {
-        await get().generateSheet(c.characterId)
+        // main 미준비(파이프라인 생성 실패 등) → main 부터 만들고 4방향까지 한 체인으로.
+        tasks.push(() => get().generateCharacterAllViews(c.characterId))
+      } else {
+        // main 준비됨 → 비어있는 방향 뷰만 i2i 로 생성.
+        for (const v of CHARACTER_DIRECTIONAL_VIEWS) {
+          if (c.views[v] == null) {
+            tasks.push(() => get().generateCharacterView(c.characterId, v))
+          }
+        }
       }
     }
 
     for (const w of worldAssets) {
-      if (get().generatingLocationId) break
       if (w.wideShot == null) {
-        await get().generateWorldAsset(w.locationId)
+        tasks.push(() => get().generateWorldShot(w.locationId, 'wideShot'))
+      }
+      if (w.establishingShot == null) {
+        tasks.push(() => get().generateWorldShot(w.locationId, 'establishingShot'))
       }
     }
+
+    await runPool(tasks, 4)
   },
 
   applyUpdates: async (updates) => {
     for (const u of updates) {
       if (u.type === 'regenerateCharacter') {
-        await get().generateSheet(u.characterId)
+        if (u.views?.length) {
+          await runPool(
+            u.views.map((v) => () => get().generateCharacterView(u.characterId, v)),
+            4,
+          )
+        } else {
+          await get().generateCharacterAllViews(u.characterId)
+        }
       } else if (u.type === 'regenerateWorldAsset') {
         await get().generateWorldAsset(u.locationId)
       }
@@ -521,8 +590,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       worldAssets: [],
       selectedCharacterId: null,
       selectedLocationId: null,
-      generatingCharacterId: null,
-      generatingLocationId: null,
+      generatingViews: [],
+      generatingLocations: [],
       selectedBoostPreset: null,
       imageProvider: 'fal' as ImageProvider,
       error: null,

@@ -176,11 +176,13 @@ export function characterAssetToRegisterInput(
   asset: CharacterAsset,
   projectId: string,
 ): RegisterCharacterInput {
-  const front = asset.views.front
-  const single = front ? [viewToGeneratedImage(front, 'front')] : []
+  // main(정면 대표)이 front 역할을 겸한다 (별도 front 뷰 폐기, 2026-06-05).
+  // 다운스트림 GeneratedImage.view='front' 계약은 유지하고 소스만 main 으로.
+  const main = asset.views.main
+  const single = main ? [viewToGeneratedImage(main, 'front')] : []
   const fiveView: GeneratedImage[] = (
     [
-      ['front', asset.views.front],
+      ['front', asset.views.main],
       ['left', asset.views.sideLeft],
       ['right', asset.views.sideRight],
       ['back', asset.views.back],
@@ -197,7 +199,7 @@ export function characterAssetToRegisterInput(
     background: '',
     description: asset.description ?? '',
     prompt: asset.fixedPrompt ?? '',
-    referenceImages: front ? [front] : [],
+    referenceImages: main ? [main] : [],
     views: { single, fiveView, sixteenAngle: [] },
     statusVariants: [],
   }

@@ -19,25 +19,20 @@ export type GeneratedImage = {
   createdAt: number
 }
 
-// 턴어라운드 시트 뷰 모델 (decisions #37). main=전체 시트(1×4 스트립), 나머지=crop.
+// 캐릭터 뷰 모델 (crop 폐기, 2026-06-05 / front 통합, 2026-06-05). main=정면 풀바디 대표
+// 포트레이트(T2I, 핸드오프에서 미리 생성) — 이전의 별도 front 뷰를 흡수했다.
+// back/sideLeft/sideRight=main 을 reference 로 한 개별 i2i 생성.
 export interface CharacterView {
   main: string | null
-  front: string | null
   back: string | null
   sideLeft: string | null
   sideRight: string | null
 }
 
-export type CharacterViewKey =
-  | 'main'
-  | 'front'
-  | 'back'
-  | 'sideLeft'
-  | 'sideRight'
+export type CharacterViewKey = 'main' | 'back' | 'sideLeft' | 'sideRight'
 
 export const CHARACTER_VIEW_KEYS: CharacterViewKey[] = [
   'main',
-  'front',
   'back',
   'sideLeft',
   'sideRight',
@@ -45,7 +40,6 @@ export const CHARACTER_VIEW_KEYS: CharacterViewKey[] = [
 
 export const CHARACTER_VIEW_COLUMNS: Record<CharacterViewKey, string> = {
   main: 'view_main',
-  front: 'view_front',
   back: 'view_back',
   sideLeft: 'view_side_left',
   sideRight: 'view_side_right',
@@ -53,7 +47,6 @@ export const CHARACTER_VIEW_COLUMNS: Record<CharacterViewKey, string> = {
 
 export const CHARACTER_VIEW_LABELS: Record<CharacterViewKey, string> = {
   main: 'Main',
-  front: 'Front',
   back: 'Back',
   sideLeft: 'Side (L)',
   sideRight: 'Side (R)',

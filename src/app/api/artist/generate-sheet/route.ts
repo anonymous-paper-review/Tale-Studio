@@ -1,16 +1,25 @@
-// 캐릭터 턴어라운드 시트 생성 — decisions #37 / writer-background-artist-progress §5
+// 캐릭터 단일 뷰 생성 (crop 폐기 / front 통합, 2026-06-05)
 //
-// DB 디자인 토큰(characters.appearance/costume + projects.design_tokens)으로 A-style 프롬프트를
-// 조립 → fal openai/gpt-image-2 로 1×4 가로 스트립 1장 생성 → sharp 로 4등분 crop →
-// main + 4뷰(front/side-left/side-right/back)를 storage 업로드 + characters.view_* 기록.
+// main = 정면 풀바디 대표 포트레이트(T2I, 이전 front 역할 겸함). back/sideLeft/sideRight = main 을
+// reference 로 한 image-to-image(openai/gpt-image-2/edit). 한 번에 한 뷰만 생성한다 — 호출자(artist-store)가
+// concurrency 를 제어하며 캐릭터/뷰 단위로 병렬 호출한다.
+//
+// DB 디자인 토큰(characters.appearance/costume + projects.design_tokens)으로 프롬프트 조립.
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
 import { falImageGenerate } from '@/lib/writer/llm/fal'
 import {
-  buildTurnaroundSheetPrompt,
-  cropTurnaroundStrip,
+  buildCharacterMainPrompt,
+  buildCharacterViewPrompt,
+  type CharacterPromptInput,
+  type DirectionalView,
 } from '@/lib/artist/turnaround'
+import {
+  CHARACTER_VIEW_COLUMNS,
+  CHARACTER_VIEW_KEYS,
+  type CharacterViewKey,
+} from '@/types/asset'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -26,18 +35,22 @@ export async function POST(req: Request) {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { projectId, characterId } = (await req.json()) as {
+    const { projectId, characterId, view } = (await req.json()) as {
       projectId?: string
       characterId?: string
+      view?: CharacterViewKey
     }
-    if (!projectId || !characterId) {
+    if (!projectId || !characterId || !view) {
       return NextResponse.json(
-        { error: 'projectId, characterId required' },
+        { error: 'projectId, characterId, view required' },
         { status: 400 },
       )
     }
+    if (!CHARACTER_VIEW_KEYS.includes(view)) {
+      return NextResponse.json({ error: `invalid view: ${view}` }, { status: 400 })
+    }
 
-    // 1. 프로젝트(workspace + 디자인 토큰) + 캐릭터 로드
+    // 1. 프로젝트(workspace + 디자인 토큰) + 캐릭터 로드 (view_main = i2i reference)
     const [{ data: project }, { data: character }] = await Promise.all([
       supabaseAdmin
         .from('projects')
@@ -46,7 +59,7 @@ export async function POST(req: Request) {
         .single(),
       supabaseAdmin
         .from('characters')
-        .select('character_id, name, role, appearance, costume')
+        .select('character_id, name, role, appearance, costume, view_main')
         .eq('project_id', projectId)
         .eq('character_id', characterId)
         .single(),
@@ -58,9 +71,7 @@ export async function POST(req: Request) {
     const palette = [dt.palette?.primary, dt.palette?.secondary, dt.palette?.accent].filter(
       (x): x is string => !!x,
     )
-
-    // 2. A-style 프롬프트 조립 (source-agnostic 빌더에 DB 토큰 주입)
-    const prompt = buildTurnaroundSheetPrompt({
+    const input: CharacterPromptInput = {
       name: character.name,
       appearance: character.appearance ?? character.name,
       role: character.role ?? undefined,
@@ -68,54 +79,55 @@ export async function POST(req: Request) {
       artStyle: dt.l1?.art_style,
       shapeLanguage: dt.l1?.shape_language,
       palette,
-    })
+    }
 
-    // 3. fal 생성 — 1×4 가로 스트립 (openai/gpt-image-2, 가로 비율)
-    const { url } = await falImageGenerate({
-      model: 'openai/gpt-image-2',
-      prompt,
-      aspect_ratio: '16:9',
-    })
+    // 2. 프롬프트 + 모델 결정
+    //    main → 깨끗한 T2I. 방향 뷰 → view_main 을 reference 로 한 i2i(edit). main 없으면 T2I fallback.
+    const refMain = character.view_main as string | null
+    let url: string
+    if (view === 'main') {
+      const out = await falImageGenerate({
+        model: 'openai/gpt-image-2',
+        prompt: buildCharacterMainPrompt(input),
+        aspect_ratio: '1:1',
+      })
+      url = out.url
+    } else {
+      const prompt = buildCharacterViewPrompt(input, view as DirectionalView)
+      const out = await falImageGenerate(
+        refMain
+          ? {
+              model: 'openai/gpt-image-2/edit',
+              prompt,
+              reference_image_urls: [refMain],
+            } // aspect_ratio 생략 → edit 모델이 reference 비율을 따름
+          : { model: 'openai/gpt-image-2', prompt, aspect_ratio: '1:1' },
+      )
+      url = out.url
+    }
 
-    // 4. 생성 이미지 바이트 회수 → 4등분 crop
+    // 3. 생성 이미지 바이트 회수 → storage 업로드 (upload-image 와 동일 경로 규칙)
     const imgRes = await fetch(url)
     if (!imgRes.ok) throw new Error(`fal image fetch failed: ${imgRes.status}`)
-    const strip = Buffer.from(await imgRes.arrayBuffer())
-    const crops = await cropTurnaroundStrip(strip)
+    const buf = Buffer.from(await imgRes.arrayBuffer())
 
-    // 5. main(전체 시트) + 4 crop 을 storage 업로드 (upload-image 와 동일 경로 규칙)
-    const buffers: Record<string, Buffer> = {
-      view_main: strip,
-      view_front: crops.front,
-      view_side_left: crops.sideLeft,
-      view_side_right: crops.sideRight,
-      view_back: crops.back,
-    }
-    const urls: Record<string, string> = {}
-    for (const [field, buf] of Object.entries(buffers)) {
-      const path = `${project.workspace_id}/${projectId}/characters/${characterId}_${field}.png`
-      const { error: upErr } = await supabaseAdmin.storage
-        .from('media')
-        .upload(path, buf, { contentType: 'image/png', upsert: true })
-      if (upErr) throw upErr
-      urls[field] = supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl
-    }
+    const column = CHARACTER_VIEW_COLUMNS[view]
+    const path = `${project.workspace_id}/${projectId}/characters/${characterId}_${column}.png`
+    const { error: upErr } = await supabaseAdmin.storage
+      .from('media')
+      .upload(path, buf, { contentType: 'image/png', upsert: true })
+    if (upErr) throw upErr
+    const publicUrl = supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl
 
-    // 6. DB 기록
+    // 4. DB 기록 (해당 뷰 컬럼만)
     const { error: updErr } = await supabaseAdmin
       .from('characters')
-      .update({
-        view_main: urls.view_main,
-        view_front: urls.view_front,
-        view_side_left: urls.view_side_left,
-        view_side_right: urls.view_side_right,
-        view_back: urls.view_back,
-      })
+      .update({ [column]: publicUrl })
       .eq('project_id', projectId)
       .eq('character_id', characterId)
     if (updErr) throw updErr
 
-    return NextResponse.json({ ok: true, views: urls })
+    return NextResponse.json({ ok: true, view, url: publicUrl })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[artist/generate-sheet]', msg)

@@ -9,7 +9,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { AgentFace } from '@/components/agent-face'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -226,11 +226,13 @@ export function GlobalChat() {
             </div>
           )}
 
-        {/* Input footer — 하단 핸드오프 버튼과 같은 선 높이 (p-4 + h-10 = 72px, §6.2) */}
+        {/* Input footer — Textarea가 입력 길이에 따라 자동 확장 (한 줄 min-h-9 → 최대 max-h-40).
+            Enter 전송 / Shift+Enter 개행. 버튼은 items-end로 입력창 하단에 정렬. */}
         <div className="shrink-0 border-t border-border p-4">
-          <div className="flex gap-2">
-            <Input
-              className="h-10 flex-1"
+          <div className="flex items-end gap-2">
+            <Textarea
+              rows={1}
+              className="max-h-40 min-h-9 flex-1 resize-none py-2"
               placeholder={STAGE_PLACEHOLDER[currentStage]}
               value={input}
               onChange={(e) => setInput(e.target.value)}

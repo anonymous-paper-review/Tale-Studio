@@ -34,8 +34,8 @@ export function WorldViewDialog({ locationId, shot, onClose }: Props) {
     s.worldAssets.find((w) => w.locationId === locationId),
   )
   const generateWorldShot = useArtistStore((s) => s.generateWorldShot)
-  const isGenerating = useArtistStore(
-    (s) => s.generatingLocationId === locationId,
+  const isGenerating = useArtistStore((s) =>
+    locationId ? s.generatingLocations.includes(locationId) : false,
   )
 
   const defaultPrompt =

@@ -19,6 +19,7 @@ import type {
   Scenes,
   ProductionDesign,
   ShotSequence,
+  AssetsManifest,
 } from '@/lib/writer/types/pipeline'
 
 const UUID_RE =
@@ -123,6 +124,70 @@ export async function persistAssetsToDb(
       })),
     )
   }
+}
+
+/**
+ * 핸드오프 중 생성된 캐릭터/로케이션 reference 이미지를 DB 이미지 컬럼에 연결한다 (2026-06-05).
+ *   runAssetsGenerate 가 progress bar 뒤에서 만든 이미지를:
+ *     - 캐릭터 → characters.view_main (artist 진입 시 4방향 i2i 의 base)
+ *     - 로케이션 → locations.wide_shot (월드 대표 샷)
+ *   fal 호스팅 URL 은 만료될 수 있으므로 media storage 로 복사 후 public URL 을 기록한다.
+ *   ⚠️ persistAssetsToDb(행 insert) 가 끝난 뒤 호출해야 한다 (UPDATE 대상 행이 있어야 함).
+ *   호출자는 non-blocking 으로 감싼다. UUID 가 아니면(핸드오프 외 run) skip.
+ */
+export async function persistAssetImagesToDb(
+  projectId: string,
+  manifest: AssetsManifest,
+): Promise<void> {
+  if (!UUID_RE.test(projectId)) return
+
+  const { data: project } = await supabaseAdmin
+    .from('projects')
+    .select('workspace_id')
+    .eq('id', projectId)
+    .single()
+  const workspaceId = project?.workspace_id
+  if (!workspaceId) return
+
+  const copyToColumn = async (
+    table: 'characters' | 'locations',
+    idColumn: 'character_id' | 'location_id',
+    field: string,
+    id: string,
+    falUrl: string,
+  ): Promise<void> => {
+    try {
+      const res = await fetch(falUrl)
+      if (!res.ok) throw new Error(`fetch ${res.status}`)
+      const buf = Buffer.from(await res.arrayBuffer())
+      const path = `${workspaceId}/${projectId}/${table}/${id}_${field}.png`
+      const { error: upErr } = await supabaseAdmin.storage
+        .from('media')
+        .upload(path, buf, { contentType: 'image/png', upsert: true })
+      if (upErr) throw upErr
+      const publicUrl = supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl
+      await supabaseAdmin
+        .from(table)
+        .update({ [field]: publicUrl })
+        .eq('project_id', projectId)
+        .eq(idColumn, id)
+    } catch (e) {
+      console.warn(`[assets] persist ${table}/${id}/${field} failed:`, e instanceof Error ? e.message : e)
+    }
+  }
+
+  const jobs: Promise<void>[] = []
+  for (const c of manifest.characters) {
+    if (c.status === 'success' && c.image_url) {
+      jobs.push(copyToColumn('characters', 'character_id', 'view_main', c.id, c.image_url))
+    }
+  }
+  for (const l of manifest.locations) {
+    if (l.status === 'success' && l.image_url) {
+      jobs.push(copyToColumn('locations', 'location_id', 'wide_shot', l.id, l.image_url))
+    }
+  }
+  await Promise.all(jobs)
 }
 
 /**

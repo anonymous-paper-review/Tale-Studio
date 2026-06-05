@@ -31,7 +31,7 @@ export function WorldPanel() {
     sceneManifest,
     worldAssets,
     selectedLocationId,
-    generatingLocationId,
+    generatingLocations,
     selectedBoostPreset,
     imageProvider,
     selectLocation,
@@ -170,7 +170,7 @@ export function WorldPanel() {
         <div className="space-y-6">
           {worldAssets.map((world) => {
             const scene = getScene(world.sceneId)
-            const isGenerating = generatingLocationId === world.locationId
+            const isGenerating = generatingLocations.includes(world.locationId)
             const isSelected = selectedLocationId === world.locationId
             const isRegistered = registeredIds.has(world.locationId)
             const hasImage = Boolean(world.wideShot || world.establishingShot)
@@ -219,6 +219,7 @@ export function WorldPanel() {
                       label="Wide Shot"
                       aspectRatio="video"
                       imageUrl={world.wideShot}
+                      generating={isGenerating && !world.wideShot}
                     />
                   </button>
                   <button
@@ -237,6 +238,7 @@ export function WorldPanel() {
                       label="Establishing"
                       aspectRatio="video"
                       imageUrl={world.establishingShot}
+                      generating={isGenerating && !world.establishingShot}
                     />
                   </button>
                 </div>

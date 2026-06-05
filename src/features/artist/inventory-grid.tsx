@@ -33,7 +33,7 @@ export function InventoryGrid({ onSelect }: InventoryGridProps) {
                 <ImagePlaceholder
                   label={c.name}
                   aspectRatio="square"
-                  imageUrl={c.views.front}
+                  imageUrl={c.views.main}
                 />
                 <div className="mt-2 flex items-center justify-between gap-1">
                   <span className="truncate text-xs font-medium">

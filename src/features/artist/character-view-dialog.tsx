@@ -19,21 +19,25 @@ type Props = {
 }
 
 /**
- * 캐릭터 뷰 상세 — 선택 뷰 이미지 프리뷰 + 턴어라운드 시트 재생성 (decisions #37).
- * 각 뷰는 시트 1장에서 crop된 것이므로 개별 뷰 재생성이 아니라 시트 전체를 재생성한다.
+ * 캐릭터 뷰 상세 — 선택 뷰 프리뷰 + 단일 뷰 재생성 (crop 폐기, 2026-06-05).
+ * main = 대표 포트레이트(T2I), 방향 뷰 = main 을 reference 로 한 i2i. 각 뷰를 개별 재생성한다.
  */
 export function CharacterViewDialog({ charId, view, onClose }: Props) {
   const char = useArtistStore((s) =>
     s.characterAssets.find((c) => c.characterId === charId),
   )
-  const generateSheet = useArtistStore((s) => s.generateSheet)
-  const isGenerating = useArtistStore((s) => s.generatingCharacterId === charId)
+  const generateCharacterView = useArtistStore((s) => s.generateCharacterView)
+  const isGenerating = useArtistStore((s) =>
+    view ? s.generatingViews.includes(`${charId}:${view}`) : false,
+  )
 
   const open = !!charId && !!view
   if (!open || !char || !view) return null
 
   const imageUrl = char.views[view] ?? null
   const label = CHARACTER_VIEW_LABELS[view]
+  const isDirectional = view !== 'main'
+  const needsMain = isDirectional && !char.views.main
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -50,18 +54,22 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
               label={label}
               aspectRatio="square"
               imageUrl={imageUrl}
+              generating={isGenerating}
             />
           </div>
 
           <p className="text-xs text-muted-foreground">
-            각 뷰는 턴어라운드 시트 1장에서 잘라낸 것입니다. 다시 만들려면 시트
-            전체를 재생성하세요.
+            {view === 'main'
+              ? 'Main 은 대표 포트레이트입니다. 재생성하면 새 이미지를 만듭니다.'
+              : needsMain
+                ? '방향 뷰는 Main 을 기준으로 생성됩니다. 먼저 Main 을 생성하세요.'
+                : '이 뷰는 Main 이미지를 기준으로 재생성됩니다.'}
           </p>
 
           <Button
             className="w-full"
-            disabled={isGenerating || char.locked}
-            onClick={() => generateSheet(char.characterId)}
+            disabled={isGenerating || char.locked || needsMain}
+            onClick={() => generateCharacterView(char.characterId, view)}
           >
             {isGenerating ? (
               <>
@@ -71,7 +79,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
             ) : (
               <>
                 <Sparkles className="size-4" />
-                {char.views.main ? '시트 재생성' : '시트 생성'}
+                {imageUrl ? `${label} 재생성` : `${label} 생성`}
               </>
             )}
           </Button>

@@ -74,14 +74,17 @@ export function UserMenu() {
   const handleNewProject = async () => {
     await createNewProject()
     setOpen(false)
-    router.push('/studio/producer')
+    // createNewProject가 set한 새 projectId를 URL 쿼리에 직접 실어 push.
+    // (쿼리 없이 push하면 layout의 replaceState 보정이 push에 덮여 URL이 안 바뀜)
+    const newId = useProjectStore.getState().projectId
+    router.push(newId ? `/studio/producer?projectId=${newId}` : '/studio/producer')
   }
 
   const handleSwitch = (p: ProjectItem) => {
     if (p.id === projectId) return
     switchProject(p.id, p.title)
     setOpen(false)
-    router.push('/studio/producer')
+    router.push(`/studio/producer?projectId=${p.id}`)
   }
 
   const handleRename = async (p: ProjectItem) => {
@@ -114,7 +117,8 @@ export function UserMenu() {
       } else {
         await createNewProject()
       }
-      router.push('/studio/producer')
+      const nextId = useProjectStore.getState().projectId
+      router.push(nextId ? `/studio/producer?projectId=${nextId}` : '/studio/producer')
     }
   }
 
