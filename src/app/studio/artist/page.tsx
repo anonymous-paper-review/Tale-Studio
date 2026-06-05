@@ -17,8 +17,6 @@ export default function VisualPage() {
   const {
     characterAssets,
     error,
-    selectCharacter,
-    selectLocation,
     loadData,
     autoGenerateBaseImages,
   } = useArtistStore()
@@ -132,19 +130,6 @@ export default function VisualPage() {
     )
   }
 
-  const handleInventorySelect = (
-    kind: 'character' | 'location',
-    id: string,
-  ) => {
-    if (kind === 'character') {
-      selectCharacter(id)
-      setTab('characters')
-    } else {
-      selectLocation(id)
-      setTab('world')
-    }
-  }
-
   return (
     <>
       <Tabs
@@ -178,7 +163,7 @@ export default function VisualPage() {
           value="inventory"
           className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
         >
-          <InventoryGrid onSelect={handleInventorySelect} />
+          <InventoryGrid />
         </TabsContent>
       </Tabs>
 

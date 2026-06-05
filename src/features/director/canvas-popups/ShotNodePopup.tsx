@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Bookmark, Film, GitBranch, Loader2, Trash2, Upload, X } from 'lucide-react'
+import { Bookmark, Film, GitBranch, Images, Loader2, Trash2, Upload, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -20,10 +20,12 @@ import {
   type DirectorVideoProvider,
   type ShotNodeData,
 } from '@/types/director-canvas'
+import type { InventoryItem } from '@/types/inventory'
 
 import { AngleControl } from '@/features/director/angle-control'
 import { KeyLight } from '@/features/director/key-light'
 import { CameraPresetControl } from '@/features/director/camera-preset-control'
+import { InventoryPickerDialog } from '@/features/director/canvas-popups/inventory-picker-dialog'
 
 type Props = {
   nodeId: string
@@ -50,6 +52,8 @@ export function ShotNodePopup({ nodeId, data }: Props) {
   const generationError = useDirectorCanvasStore(
     (s) => s.generationErrors[nodeId],
   )
+
+  const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false)
 
   // 등장 캐릭터/월드 — Artist Asset Storage의 등록 에셋 (스펙 §5.3)
   const projectId = useDirectorCanvasStore((s) => s.projectId)
@@ -144,6 +148,15 @@ export function ShotNodePopup({ nodeId, data }: Props) {
     reader.readAsDataURL(file)
   }
 
+  const handlePickInventoryItem = (item: InventoryItem) => {
+    updateNodeData<'shot'>(nodeId, {
+      referenceImages: [
+        ...data.referenceImages,
+        { id: newDirectorId('dr'), url: item.imageUrl, uploadedAt: Date.now() },
+      ],
+    })
+  }
+
   const handleRemoveRef = (id: string) => {
     updateNodeData<'shot'>(nodeId, {
       referenceImages: data.referenceImages.filter((r) => r.id !== id),
@@ -217,6 +230,14 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                   }}
                 />
               </label>
+              <button
+                type="button"
+                onClick={() => setInventoryPickerOpen(true)}
+                className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-md border border-dashed border-border text-muted-foreground hover:bg-accent"
+                title="인벤토리에서 선택"
+              >
+                <Images className="size-4" />
+              </button>
             </div>
           </Field>
 
@@ -402,6 +423,12 @@ export function ShotNodePopup({ nodeId, data }: Props) {
           </Button>
         </div>
       </DialogContent>
+
+      <InventoryPickerDialog
+        open={inventoryPickerOpen}
+        onOpenChange={setInventoryPickerOpen}
+        onPick={handlePickInventoryItem}
+      />
     </Dialog>
   )
 }

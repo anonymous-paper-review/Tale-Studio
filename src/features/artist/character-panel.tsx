@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Lock, Unlock, Loader2, Sparkles, Check, Share2 } from 'lucide-react'
+import { Lock, Unlock, Loader2, Sparkles, Check, Share2, BookmarkCheck, BookmarkPlus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -15,6 +15,7 @@ import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
+import { useInventoryStore } from '@/stores/inventory-store'
 import {
   CHARACTER_VIEW_KEYS,
   CHARACTER_VIEW_LABELS,
@@ -41,7 +42,10 @@ export function CharacterPanel() {
   } = useArtistStore()
 
   const projectId = useProjectStore((s) => s.projectId)
+  const workspaceId = useProjectStore((s) => s.workspaceId)
+  const saveFromAsset = useInventoryStore((s) => s.saveFromAsset)
   const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set())
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [viewDialog, setViewDialog] = useState<{
     charId: string
     view: CharacterViewKey
@@ -64,7 +68,9 @@ export function CharacterPanel() {
           const isViewGenerating = (v: CharacterViewKey) =>
             generatingViews.includes(`${char.characterId}:${v}`)
           const isRegistered = registeredIds.has(char.characterId)
+          const isSaved = savedIds.has(char.characterId)
           const hasImage = CHARACTER_VIEW_KEYS.some((v) => char.views[v])
+          const hasMainImage = Boolean(char.views.main)
 
           return (
             <div
@@ -197,6 +203,51 @@ export function CharacterPanel() {
                   </TooltipTrigger>
                   <TooltipContent>
                     Register to Asset Storage for the Director stage
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={isSaved ? 'secondary' : 'outline'}
+                      size="sm"
+                      disabled={!hasMainImage || !workspaceId}
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        const item = await saveFromAsset({
+                          workspaceId: workspaceId!,
+                          kind: 'character',
+                          name: char.name,
+                          sourceImageUrl: char.views.main!,
+                          sourceProjectId: projectId ?? undefined,
+                          sourceCharacterId: char.characterId,
+                        })
+                        if (item) {
+                          setSavedIds((prev) =>
+                            new Set(prev).add(char.characterId),
+                          )
+                        }
+                      }}
+                    >
+                      {isSaved ? (
+                        <>
+                          <BookmarkCheck className="size-3.5" />
+                          저장됨
+                        </>
+                      ) : (
+                        <>
+                          <BookmarkPlus className="size-3.5" />
+                          인벤토리에 저장
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {workspaceId
+                      ? hasMainImage
+                        ? '워크스페이스 인벤토리에 저장'
+                        : 'main 이미지가 있어야 저장할 수 있습니다'
+                      : '프로젝트 로드 후 사용 가능합니다'}
                   </TooltipContent>
                 </Tooltip>
               </div>

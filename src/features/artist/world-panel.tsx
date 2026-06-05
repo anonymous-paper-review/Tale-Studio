@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, Sparkles, Check, Share2 } from 'lucide-react'
+import { Loader2, Sparkles, Check, Share2, BookmarkCheck, BookmarkPlus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -16,6 +16,7 @@ import { WorldViewDialog } from '@/features/artist/world-view-dialog'
 import { useArtistStore, type WorldShotKey } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { registerWorldCard } from '@/stores/asset-storage-store'
+import { useInventoryStore } from '@/stores/inventory-store'
 import { cn } from '@/lib/utils'
 
 const BOOST_PRESETS = [
@@ -41,7 +42,10 @@ export function WorldPanel() {
   } = useArtistStore()
 
   const projectId = useProjectStore((s) => s.projectId)
+  const workspaceId = useProjectStore((s) => s.workspaceId)
+  const saveFromAsset = useInventoryStore((s) => s.saveFromAsset)
   const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set())
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [viewDialog, setViewDialog] = useState<{
     locationId: string
     shot: WorldShotKey
@@ -173,7 +177,9 @@ export function WorldPanel() {
             const isGenerating = generatingLocations.includes(world.locationId)
             const isSelected = selectedLocationId === world.locationId
             const isRegistered = registeredIds.has(world.locationId)
+            const isSaved = savedIds.has(world.locationId)
             const hasImage = Boolean(world.wideShot || world.establishingShot)
+            const representativeImage = world.wideShot ?? world.establishingShot ?? null
 
             return (
               <div
@@ -296,6 +302,50 @@ export function WorldPanel() {
                     </TooltipTrigger>
                     <TooltipContent>
                       Register to Asset Storage for the Director stage
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={isSaved ? 'secondary' : 'outline'}
+                        size="sm"
+                        disabled={!representativeImage || !workspaceId}
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          const item = await saveFromAsset({
+                            workspaceId: workspaceId!,
+                            kind: 'world',
+                            name: world.name,
+                            sourceImageUrl: representativeImage!,
+                            sourceProjectId: projectId ?? undefined,
+                          })
+                          if (item) {
+                            setSavedIds((prev) =>
+                              new Set(prev).add(world.locationId),
+                            )
+                          }
+                        }}
+                      >
+                        {isSaved ? (
+                          <>
+                            <BookmarkCheck className="size-3.5" />
+                            저장됨
+                          </>
+                        ) : (
+                          <>
+                            <BookmarkPlus className="size-3.5" />
+                            인벤토리에 저장
+                          </>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {workspaceId
+                        ? representativeImage
+                          ? '워크스페이스 인벤토리에 저장'
+                          : '이미지가 있어야 저장할 수 있습니다'
+                        : '프로젝트 로드 후 사용 가능합니다'}
                     </TooltipContent>
                   </Tooltip>
                 </div>

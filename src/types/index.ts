@@ -43,3 +43,4 @@ export {
   isShotData,
   isVideoData,
 } from './director-canvas'
+export type { InventoryItem, InventoryKind, SaveFromAssetInput } from './inventory'

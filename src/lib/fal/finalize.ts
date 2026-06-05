@@ -43,7 +43,7 @@ export async function finalizeCharacterViewJob(
 }
 
 /** 공통: 원격 이미지 바이트 회수 → media 스토리지 업로드 → publicUrl. */
-async function uploadImageFromUrl(
+export async function uploadImageFromUrl(
   remoteUrl: string,
   path: string,
 ): Promise<string> {
