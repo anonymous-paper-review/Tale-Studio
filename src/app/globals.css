@@ -282,3 +282,48 @@
 @utility z-modal { z-index: var(--z-modal); }
 @utility z-popover { z-index: var(--z-popover); }
 @utility z-toast { z-index: var(--z-toast); }
+
+/* ── Generation "border beam" ────────────────────────────────────────────
+   카드·노드가 이미지/비디오를 생성하는 동안 테두리를 도는 accent 빛 (loud spinner 대체).
+   generation-in-progress 는 accent 색 허용 영역 (design-references §2.6 L92, decisions #30).
+   conic-gradient 를 1.5px ring 으로 mask 해 회전 → "이 카드 작업 중" 신호. */
+@property --beam-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes beam-spin {
+  to {
+    --beam-angle: 360deg;
+  }
+}
+
+.tale-beam {
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--beam-angle),
+    transparent 0deg,
+    var(--primary) 55deg,
+    transparent 135deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: beam-spin 1.8s linear infinite;
+}
+
+/* 모션 최소화 선호 시 회전 대신 정적 accent ring */
+@media (prefers-reduced-motion: reduce) {
+  .tale-beam {
+    animation: none;
+    background: var(--primary);
+    opacity: 0.55;
+  }
+}

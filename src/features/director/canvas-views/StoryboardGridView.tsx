@@ -1,8 +1,9 @@
 'use client'
 
-import { ImageIcon, Loader2, MapPin, Clock } from 'lucide-react'
+import { ImageIcon, MapPin, Clock } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import {
   getChildShots,
   useDirectorCanvasStore,
@@ -44,8 +45,7 @@ function ShotCell({ node }: { node: DirectorNode }) {
     >
       <div className="relative aspect-video bg-muted">
         {hasImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <GeneratedImage
             src={img!.url}
             alt={data.label}
             className="size-full object-cover"
@@ -68,17 +68,15 @@ function ShotCell({ node }: { node: DirectorNode }) {
           </div>
         )}
 
-        {/* 우하단 액션 버튼 */}
+        {/* 생성 중 — border beam + 경과시간 오버레이 */}
+        <GeneratingOverlay
+          active={status === 'generating'}
+          label="이미지 생성 중"
+        />
+
+        {/* 우하단 액션 버튼 (생성 중엔 숨김) */}
         <div className="absolute bottom-2 right-2">
-          {status === 'generating' ? (
-            <span
-              className="flex size-8 items-center justify-center rounded-md border border-border bg-card opacity-70"
-              aria-label="이미지 생성 중"
-              aria-busy="true"
-            >
-              <Loader2 className="size-4 animate-spin text-muted-foreground" />
-            </span>
-          ) : hasImage ? (
+          {status === 'generating' ? null : hasImage ? (
             <button
               type="button"
               aria-label="영상 생성"

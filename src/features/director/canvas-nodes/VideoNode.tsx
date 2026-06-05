@@ -2,8 +2,9 @@
 
 import { memo } from 'react'
 import type { NodeProps } from '@xyflow/react'
-import { Loader2, Play, Star } from 'lucide-react'
+import { Play, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import { BaseNode } from './BaseNode'
 import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
 import { isVideoData, type DirectorNode } from '@/types/director-canvas'
@@ -51,17 +52,14 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       }
     >
       {/* 썸네일 / 상태 */}
-      <div className="mt-1 flex h-24 w-full items-center justify-center overflow-hidden rounded-sm border border-border/40 bg-muted/40">
-        {data.status === 'generating' ? (
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        ) : data.status === 'failed' ? (
+      <div className="relative mt-1 flex h-24 w-full items-center justify-center overflow-hidden rounded-sm border border-border/40 bg-muted/40">
+        {data.status === 'failed' ? (
           <span className="px-2 text-center text-[10px] text-destructive">
             {data.errorMessage ?? '실패'}
           </span>
         ) : data.thumbnailUrl ? (
           <div className="relative h-full w-full">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <GeneratedImage
               src={data.thumbnailUrl}
               alt={data.label}
               className="h-full w-full object-cover"
@@ -75,6 +73,11 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         ) : (
           <span className="text-[10px] text-muted-foreground">대기 중</span>
         )}
+
+        <GeneratingOverlay
+          active={data.status === 'generating'}
+          label="영상 생성 중"
+        />
       </div>
 
       {/* override indicator */}
