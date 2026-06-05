@@ -1,24 +1,34 @@
 # Pipeline 모식도: svc-pipeline + dual-axis 통합 시각화
 
-> 작성일: 2026-04-20 (개정: 2026-04-20 V축 재설계 + Compact Mode + D 레벨 7단계 반영, svc-pipeline만)
-> 대상: 현재 구현된 두 실험 파이프라인의 구조/상태/차이
-> 근거 코드: `experiment/svc-pipeline/`, `experiment/dual-axis/`
+> 작성일: 2026-04-20 / **전면 개정: 2026-06-05 — PART 1을 현재 프로덕션 코드(`src/lib/svc/pipeline/`) 기준으로 재작성**
+> 대상: 현재 구현된 파이프라인의 구조/상태/피드백 경로
+> 근거 코드: **`src/lib/svc/pipeline/`** (프로덕션), `experiment/dual-axis/` (PART 2, 코드 유실)
 >
-> ⚠️ **PART 1 (svc-pipeline)은 최신 구조 반영 완료. PART 2 (dual-axis)는 옛 구조 (마이그레이션 대기)**
+> ⚠️ **PART 1 = 현재 코드(`src/lib/svc/pipeline/`) 최신 반영.** 옛 `experiment/svc-pipeline/`는 폐기됨.
+> ⚠️ **PART 2 (dual-axis) = 옛 구조 기록 보존용. 해당 코드는 유실됨 (재구현 시 참고용 도식).**
+> 📎 stage별 입출력 필드 단위 상세는 `dev/PIPELINE_IO_MAP.md` 참조 (이 문서는 실행 흐름, IO_MAP은 필드 손실 추적).
 
 ---
 
 ## 0. 이 문서의 목적
 
-기존 `dev/writer_advencement/` 아래의 모식도는 **이론 레이어(L0-L1, L1-L2-L3, S2-S3)** 용이었다. 실제 구현체의 **실행 흐름, 상태 전이, 피드백 경로**를 담은 도식은 없었다. 이 문서는 세 가지를 제공:
+실제 구현체의 **실행 흐름, 상태 전이, 피드백 경로**를 담은 도식. 세 가지 제공:
 
-1. **svc-pipeline** — 자동 원샷 오케스트레이터의 내부 플로우
-2. **dual-axis** — 세션 기반 상태 머신 + Lock Policy + 4개 피드백
-3. **두 구현체 비교** — 같은 S/V 이론에서 파생된 두 UX
+1. **svc-pipeline** (`src/lib/svc/pipeline/`) — 자동 원샷 오케스트레이터. 현재 프로덕션.
+2. **dual-axis** — 세션 기반 상태 머신 (코드 유실, 도식만 보존)
+3. **두 구현체 비교**
+
+### 변경 이력 (2026-06-05 재작성에서 반영)
+- 코드 위치 이동: `experiment/svc-pipeline/` → `src/lib/svc/pipeline/`
+- **신규 stage**: Assets(L2 직후 병렬), **Découpage**(감독 beat→shot 분해), L4 데쿠파주 구동 모드, **L6 images / L7 videos**(fal.ai 생성)
+- **C2에 Layer1 asset-ref 정규화** 추가 (canonical 강제)
+- **Skip 모드**: `c_validation_1` + `mid_preview` 통째 skip이 **default** (피드백 미반영 → 비용 절감)
+- **Compact Mode 변경**: `COMPACT_DEPTH_LEVELS = []` → **모든 depth가 L3 거침** (D1~D3도 풀 파이프라인)
+- 4-provider dispatch: gemini / claude / openai / local
 
 ---
 
-# PART 1: svc-pipeline 전체 플로우
+# PART 1: svc-pipeline 전체 플로우 (현재 코드)
 
 ## 1.1 최상위 아키텍처
 
@@ -68,154 +78,128 @@
                   NextResponse.json(result)
 ```
 
-## 1.2 내부 파이프라인 시퀀스
+## 1.2 내부 파이프라인 시퀀스 (현재 코드)
 
 ```
-_runPipelineInner() 내부:
+_runPipelineInner(input) 내부:   models = {S, V, C} (4-provider), skip = resolveSkip(input)
 
-  INPUT(story, runtimeSeconds?, presetId?)
+  INPUT(story, runtimeSeconds?, models?, skip?)
       │
       ▼
  ┌─────────────┐
- │  S축 (Story) │
+ │  S축 (Story) │  model = models.S (default gemini)
  └─────────────┘
+      ├──► S0  runS0(input)                      ──► 02_S0.json  (장르/톤/depth_level D1~D7)
+      ├──► S1  runS1(input,S0)                   ──► 03_S1.json  (구조/POV/CDQ)
+      ├──► S2  runS2(input,S0,S1)                ──► 04_S2.json  ★canonical character id
+      └──► S3  runS3(input,S0,S1,S2)             ──► 05_S3.json  ★canonical location, scene_actions(비트)
       │
-      ├──► S0 ── runS0(input, logger) ─────────── Gemini ──► S0 JSON
-      │         (장르/톤/타겟/포맷/depth_level D1~D7 결정)   (+ flush 'S0')
-      │
-      ├──► S1 ── runS1(input, S0, logger) ─────── Gemini ──► S1 JSON
-      │         (기승전결/CDQ — depth_level별 강도 차등)     (+ flush 'S1')
-      │
-      ├──► S2 ── runS2(input, S0, S1, logger) ─── Gemini ──► S2 JSON
-      │         (캐릭터 카드 — depth별 1명~앙상블)            (+ flush 'S2')
-      │
-      └──► S3 ── runS3(input, S0, S1, S2, logger) Gemini ──► S3 JSON
-                (씬 리스트 — depth별 1~30+씬)                 (+ flush 'S3')
+      ▼   skip = resolveSkip(input)   ← default 둘 다 skip
+ ┌─────────────────────────┐
+ │  C 검증 ① (skip default) │
+ └─────────────────────────┘
+      └──► skip.validation1 ? emptyC1Report()  ← ★ default. LLM 호출 0, markStage skipped
+                             : runCValidation1(S0..S3) [Claude] ──► 06_C_validation_1.json
       │
       ▼
  ┌─────────────────────────┐
- │  C축 검증 ①              │
+ │  Mid Preview (skip def.) │
  └─────────────────────────┘
-      │
-      └──► c_validation_1 ── Claude ──► validation report
-                                        (+ flush 'C1_validation')
-      │
-      ▼
- ┌─────────────────────────┐
- │  Mid Preview             │
- └─────────────────────────┘
-      │
-      └──► mid_preview ── Gemini ──► v_recommendations {L0, L1,
-                                     L2_summary, L3_scene_strategy,
-                                     L4_shot_recipe}
-                                     (+ flush 'mid_preview')
+      └──► skip.midPreview ? emptyMidPreview()  ← ★ default. 빈 추천 → L0L1/L2/L3 자체 결정
+                           : runMidPreview(S0..S3, c1) [V] ──► 07_mid_preview.json
       │
       ▼
  ┌─────────────┐
- │  V축 (Visual)│
+ │  V축 (Visual)│  model = models.V
  └─────────────┘
+      ├──► L0+L1  runL0L1(S0, mid_preview)       ──► 08_L0_L1.json  ★aspect/fps/resolution
+      │           (매체/렌더 + 시각 스타일)
       │
-      ├──► L0+L1 ── runL0L1(S0, mid_preview, logger) ── Gemini ──► L0, L1
-      │         (매체/렌더 + 시각 스타일)                          (+ flush 'L0_L1')
+      ├──► L2     runL2(S2,S3,L1, mid_preview)   ──► 09_L2.json     ★location 디자인/의상/팔레트
       │
-      ├──► L2  ── runL2(S2, S3, L1, mid_preview, logger) Gemini ──► L2
-      │         (로케이션/의상/컬러팔레트/VFX 글로벌)                (+ flush 'L2')
+      ├──► ◇ Assets (L2 직후, 비동기 fire-and-forget — await 안 함)
+      │       runAssetsGenerate(S2,L0,L1,L2) [fal.ai T2I] ──► 14b_assets.json
+      │       캐릭터/로케이션 reference 이미지. L6에서 I2I용. 실패해도 파이프라인 계속.
+      │       ⚠ L6보다 늦으면 순수 T2I로 강등 (IO_MAP 손실지점 ④)
       │
-      ├──► [Compact 분기]  isCompactDepth(S0.depth_level)?
-      │         ├─ YES (D1~D3) → L3 스킵, action_budget만 계산
-      │         └─ NO  (D4~D7) → runL3SceneVisualPlan ─ Gemini ──► L3
-      │                          (씬마다 coverage_pattern/         (+ flush 'L3_scene_plan')
-      │                           lens_vocab/lighting_arc 등
-      │                           씬 디시플린 결정)
+      ├──► L3     [Compact 분기] isCompactDepth(depth) — 현재 COMPACT_DEPTH_LEVELS=[] → 항상 false
+      │           → runL3SceneVisualPlan(S0,S2,S3,L1,L2) [V] ──► 10_L3_scene_plans.json
+      │           (씬마다 coverage_pattern/lens/lighting_arc/rhythm 디시플린)
+      │           ※ compact 경로(스킵+inferL3)는 코드에 남아있으나 현재 비활성
       │
-      ├──► L4 ── runL4Shots(S0, S2, S3, L1, L2, L3|null, logger)
-      │         씬별 호출. 각 샷이 3분할:                          Gemini × N(씬)
-      │         ┌─ L4a Intent: story_beat_ref 1:1, dramatic_purpose,
-      │         │              duration_seconds, audience_focus
-      │         ├─ L4b Static: lens_mm, framing, lighting,
-      │         │              character_blocking, prop_placement,
-      │         │              first_frame_prompt (200~400자 → Image)
-      │         └─ L4c Dynamic: camera_motion, character_motion,
-      │                        gaze_arc, transition,
-      │                        motion_prompt (50~80자 → Video)
-      │         (Compact일 땐 자체 디시플린 결정 모드)              (+ flush 'L4_shots')
+      ├──► ★ Découpage  runDecoupage(S0,S2,S3,L1,L2, L3) [V]  ──► 10b_decoupage.json
+      │           감독 페르소나. beat→shot 분해 (4연산 derived/added/merged/split).
+      │           샷 개수/리듬(rhythm_role)/카메라의도/쇼트사이즈 저작. 시간=validator.
       │
-      └──► [Compact 사후처리]
-                Compact였으면 inferL3FromL4Shots(L4, S3) 호출
-                → L3 (씬 플랜) 역추론, 다운스트림 호환용
-                → save '10_L3_scene_plans_inferred.json'
+      ├──► L4     runL4Shots(S0,S2,S3,L1,L2, L3, decoupage) [V]  ──► 11_L4_shots.json
+      │           씬별 호출. 데쿠파주 구동 모드: 데쿠파주가 정한 샷에 3분할 spec만 채움
+      │           ┌─ Intent  : dramatic_purpose, duration, audience_focus (연출의도 — 직접 생성 stage로 안 감)
+      │           ├─ Static  : lens/framing/lighting/blocking, first_frame_prompt(200~400자) ──► L5→L6 이미지
+      │           └─ Dynamic : camera_motion, character_motion, motion_prompt(50~80자) ──► L5→L7 영상
       │
       ▼
  ┌─────────────────────────┐
- │  C축 적용 ②              │
+ │  C 적용 ② (조립+검증+정규화)│  V(조립) + C(검증)
  └─────────────────────────┘
-      │
-      └──► c_application_2 ── Gemini + Claude ──► shotSequence + report
-                                                 (+ flush 'C2_application')
-            Step 1: Gemini → L4 (3분할) → ShotSequenceItem 조립 + S/C/V 메타
-            Step 2: Claude → 액션 스코프/연속성 검증 + 자동 split
-            Step 3: shot_id 재정렬 + causal_link 갱신
+      └──► runCApplication2(...,L3,L4) ──► 12_C_application_2.json + 13_shot_sequence.json
+            Step1: [V/Gemini] L4(3분할) → ShotSequenceItem 조립 + S/C/V 메타
+            Step2: [C/Claude] 액션 스코프/연속성 검증 + 자동 split
+            Step3: shot_id 재정렬 + causal_link 갱신
+            Step3.5: ★ Layer1 asset-ref 정규화 (canonical 강제, scene.location fallback, 미해결 drop)
       │
       ▼
  ┌─────────────────────────────────────┐
- │  L5 Render Spec (T2I/TI2V 프롬프트)   │
+ │  L5 Render Spec (T2I/TI2V 프롬프트)   │  추출 우선, 누락 시 V LLM fallback
  └─────────────────────────────────────┘
+      └──► runL5Prompts(shotSequence, L0, S2, L2) ──► 14_final_prompts.json
+            샷마다 { t2i:{prompt, aspect_ratio, resolution, reference_assets},
+                    ti2v:{motion_prompt, duration_seconds, fps, camera_movement} }
       │
-      └──► l5_prompts ── (대부분 추출, 누락 시 LLM fallback) ──► FinalPromptsOutput
-            샷마다 ShotGenerationPrompts {
-              t2i: { prompt, aspect_ratio, resolution, reference_assets }
-              ti2v: { motion_prompt, duration_seconds, fps, camera_movement }
-            }
-            extraction_summary: { t2i_extracted, t2i_llm_generated, ... }
-            (+ flush 'L5_prompts')
-            ※ 현재는 추출 모드 (Phase 1). Provider-aware 확장은 향후.
-      │
-      ▼
-  OUTPUT {
-    project_id, input,
-    S0, S1, S2, S3,
-    c_validation_1, mid_preview,
-    L0, L1, L2,
-    L3,    ← 씬 비주얼 플랜 (실제 호출 or inferred)
-    L4,    ← 샷 3분할 (intent + static + dynamic)
-    c_validation_2,
-    shot_sequence,    ← C2가 조립한 최종 ShotSequenceItem[]
-    final_prompts,    ← L5 추출 결과 (T2I/TI2V 프롬프트)
-    metadata { started_at, completed_at, total_duration_ms,
-               llm_calls: {gemini, claude} }
+      ▼   (여기까지 runPipeline 반환. L6/L7은 별도 API로 트리거)
+  OUTPUT PipelineResult {
+    project_id, input, S0~S3, c_validation_1, mid_preview, L0, L1, L2,
+    L3, L4, c_validation_2, shot_sequence, final_prompts,
+    metadata { ..., llm_calls: {gemini, claude, openai, local} }
   }
       │
+      ▼  ───── 생성 단계 (fal.ai, 별도 호출 — /api/svc/generate|resume) ─────
+ ┌─────────────┐   runL6Images(final_prompts, +14b_assets 룩업)  ──► 15_L6_images.json
+ │  L6 Images   │   asset 있으면 openai/gpt-image-2/edit (I2I) + reference_image_urls
+ └─────────────┘   없으면 순수 T2I. submit→poll→progressive save.
+      │
       ▼
-  logger.saveIntegrated(result)
-  logger.markStage('PIPELINE', 'completed', ...)
+ ┌─────────────┐   runL7Videos(final_prompts.ti2v, +15_L6 첫프레임)  ──► 16_L7_videos.json
+ │  L7 Videos   │   reference-to-video (예: seedance/happy-horse). 첫프레임+motion_prompt.
+ └─────────────┘   L6 success 아니면 해당 샷 skipped.
 ```
 
-## 1.3 LLM 호출 모델 분담
+## 1.3 LLM 호출 모델 분담 (4-provider dispatch)
+
+모델은 S/V/C 축별로 지정 (`dispatch.ts`, DEFAULT_MODELS). provider ∈ {gemini, claude, openai, local}.
 
 ```
+DEFAULT_MODELS:
+  S축 = gemini/gemini-3-flash-preview   (S0~S3)
+  V축 = gemini/gemini-3-flash-preview   (MidPreview, L0L1, L2, L3, Decoupage, L4, C2조립, L5fallback)
+  C축 = claude/claude-sonnet-4-6        (C1 검증, C2 검증)
+
 ┌──────────────────────┬──────────────────────────────────┐
-│   GEMINI             │          CLAUDE                  │
-│ (gemini-3-flash-     │        (claude-sonnet-4-6)       │
-│  preview)            │                                  │
+│  V축 (생성)           │   C축 (검증)                      │
 ├──────────────────────┼──────────────────────────────────┤
-│ 생성(Generation)      │          검증(Validation)         │
-├──────────────────────┼──────────────────────────────────┤
-│ S0 genre              │ C1 validation (S0-S3 일관성)     │
-│ S1 structure          │ C2 validation step (액션 스코프) │
-│ S2 characters         │                                  │
-│ S3 scenes             │                                  │
-│ Mid Preview           │                                  │
-│ L0+L1 visual          │                                  │
-│ L2 design             │                                  │
-│ L3 scene_plan (1회)   │                                  │
+│ L0+L1, L2             │ C1 validation  ← skip default     │
+│ L3 scene_plan         │ C2 validation step (액션 스코프)  │
+│ Découpage  ★          │                                  │
 │ L4 shots (씬당 1회)   │                                  │
 │ C2 generate step      │                                  │
+│ L5 fallback (누락 시) │                                  │
+│ MidPreview ← skip def.│                                  │
 └──────────────────────┴──────────────────────────────────┘
+이미지/영상: fal.ai (openai/gpt-image-2[/edit], reference-to-video) — LLM 카운트 별개.
 
-→ Gemini = 창작(다양성, 속도)
-→ Claude = 검증(엄격성, 구조 준수)
-→ 호출 횟수 (D4 일반 모드 기준, 씬 N개): 9 + N (L4 분산) = 통상 14~19회
-→ Compact (D1~D3): L3 1회 절감 → 8 + N
+→ 호출 횟수 (씬 N개, skip default 적용):
+   S0~S3(4) + L0L1(1) + L2(1) + L3(1) + Découpage(N) + L4(N) + C2(2) + L5(0~M)
+   = 9 + 2N + (L5 fallback)
+   C1·MidPreview skip으로 2회 절감 (default). 끄면 +2.
 ```
 
 ## 1.4 로깅/에러 경계
@@ -254,20 +238,21 @@ logs/<YYYY-MM-DD_HH-MM-SS>_<project_id>/
 ├── 03_S1.json
 ├── 04_S2.json
 ├── 05_S3.json
-├── 06_C_validation_1.json
-├── 07_mid_preview.json
+├── 06_C_validation_1.json                  ← skip default 시 미생성
+├── 07_mid_preview.json                     ← skip default 시 미생성
 ├── 08_L0_L1.json
 ├── 09_L2.json
 │
-├── 10_L3_scene_plans.json                  ← (일반 모드) 씬 비주얼 플랜
-│   OR
-├── 10_L3_scene_plans_inferred.json         ← (Compact 모드) L4 후 역추론
-│   (note: "inferred from L4 (Compact Mode skipped L3 generation)")
+├── 10_L3_scene_plans.json                  ← 씬 비주얼 플랜 (현재 모든 depth)
+├── 10b_decoupage.json                      ← ★ 감독 데쿠파주 (beat→shot, 4연산)
 │
-├── 11_L4_shots.json                        ← 샷 3분할 (compact_mode 필드 포함)
-├── 12_C_application_2.json                 ← C2 validation report
-├── 13_shot_sequence.json                   ← 최종 ShotSequenceItem[]
-├── 14_final_prompts.json                   ← L5 추출: T2I/TI2V 프롬프트 정리
+├── 11_L4_shots.json                        ← 샷 3분할 (데쿠파주 구동)
+├── 12_C_application_2.json                 ← C2 report (+ asset-ref 정규화 결과)
+├── 13_shot_sequence.json                   ← 최종 ShotSequenceItem[] (canonical asset)
+├── 14_final_prompts.json                   ← L5 추출: T2I/TI2V 프롬프트
+├── 14b_assets.json                         ← ★ 캐릭터/로케이션 reference 이미지 (fal.ai)
+├── 15_L6_images.json                       ← ★ 샷별 첫 프레임 이미지 (T2I/I2I)
+├── 16_L7_videos.json                       ← ★ 샷별 영상 클립 (reference-to-video)
 ├── INTEGRATED.json                         ← 전체 result
 ├── STORY.md                                ← (수동 생성) 읽기 편한 서사
 │
@@ -293,7 +278,46 @@ logs/<YYYY-MM-DD_HH-MM-SS>_<project_id>/
 
 ⚠️ 옛 로그 (`09_l3_shots.json`, `10_c_validation_2.json`, `11_integrated.json`, `12_shot_sequence.json`)는 옛 구조 결과. 새로 실행 시 위 구조로 생성.
 
-## 1.6 Compact Mode 흐름 (D1~D3 전용)
+## 1.5b Skip 모드 (현재 default) ★
+
+피드백이 다운스트림에 실질 반영되지 않는 stage를 건너뛰어 LLM 호출/시간 절약.
+`PipelineInput.skip = { validation1?, midPreview? }`, 미지정 시 **default = 둘 다 skip(true)**.
+
+```
+resolveSkip(input):
+  validation1 = input.skip?.validation1 ?? true   ← default skip
+  midPreview  = input.skip?.midPreview  ?? true   ← default skip
+
+C 검증 ①:  skip.validation1 ? emptyC1Report()    : runCValidation1()  [Claude]
+Mid Preview: skip.midPreview ? emptyMidPreview()  : runMidPreview()    [V]
+
+emptyMidPreview() = { v_recommendations:{L0:{},L1:{},L2_summary:'',
+                       L3_scene_strategy:'',L4_shot_recipe:''},
+                      color_script:[], emotional_arc:'', difficulty:'medium', warnings:[] }
+  → L0L1/L2/L3이 빈 추천을 받아 S·L 기반으로 자체 결정 (안전 fallback)
+
+emptyC1Report() = { passed:true, issues:[], causality_chain:[], cdq_present:false,
+                    cdq_clarity_score:0, cliche_count:0, retry_count:0 }
+```
+
+**근거**: c_validation_1은 검증 리포트만 만들고 S를 수정하지 않음 (피드백 루프 없음).
+mid_preview의 v_recommendations도 L0L1/L2/L3이 약하게만 참조 → skip해도 품질 영향 미미, 비용↓.
+켜려면 `input.skip = { validation1:false, midPreview:false }`.
+
+## 1.6 Compact Mode (현재 비활성) ⚠️
+
+```
+COMPACT_DEPTH_LEVELS = []   ← 2026 변경. isCompactDepth()는 항상 false.
+→ 모든 depth(D1~D7)가 L3 씬 비주얼 플랜을 거침 (짧은 영상도 풀 파이프라인).
+→ 이유: D1~D3가 L3를 스킵하고 L4 즉흥 판단하던 게 연출 규율을 약화시켰음.
+
+코드에는 compact 분기(L3 스킵 + inferL3FromL4Shots 역추론)가 남아있으나 현재 진입 안 함.
+재활성화하려면 types/pipeline.ts의 COMPACT_DEPTH_LEVELS 배열에 레벨 추가.
+```
+
+<details><summary>구 Compact Mode 흐름 (참고용, 현재 비활성)</summary>
+
+## (구) Compact Mode 흐름 (D1~D3 전용)
 
 ```
 S0.depth_level ∈ {D1, D2, D3}  →  isCompactDepth() = true
@@ -339,28 +363,31 @@ S0.depth_level ∈ {D1, D2, D3}  →  isCompactDepth() = true
    C2 application (compact 여부 무관, L3는 항상 채워짐)
 ```
 
-**효과**:
-- D1 (15초 영상): LLM 호출 ~7회 → ~6회
-- D3 (5분 영상): L3 LLM 호출 1회 절감, L4 자유도 ↑
-- 다운스트림(C2/UI/분석) **변경 없음** (L3 필드는 inferred로 채워짐)
+**(구) 효과** (당시 Compact 활성 기준):
+- D1 (15초 영상): LLM 호출 ~7회 → ~6회 / D3: L3 1회 절감
+- 다운스트림(C2/UI)은 L3 필드를 inferred로 받음
 
-## 1.7 Depth Level → 활성 stage 매핑
+</details>
+
+## 1.7 Depth Level → 활성 stage 매핑 (현재)
 
 ```
-┌────┬──────────────┬───────┬────────┬────────────────────┐
-│ D  │ 시간         │ 샷 수  │ 모드   │ L3 단계            │
-├────┼──────────────┼───────┼────────┼────────────────────┤
-│ D1 │ 5~15초       │ 1~2   │Compact│ 스킵 → inferred    │
-│ D2 │ 15~60초      │ 3~10  │Compact│ 스킵 → inferred    │
-│ D3 │ 1~5분        │ 6~30  │Compact│ 스킵 → inferred    │
-│ D4 │ 5~10분       │30~60  │ 일반  │ LLM 호출           │
-│ D5 │ 10~20분      │60~120 │ 일반  │ LLM 호출           │
-│ D6 │ 20~30분      │120~180│ 일반  │ LLM 호출           │
-│ D7 │ 30분+        │ 180+  │ 일반  │ LLM 호출           │
-└────┴──────────────┴───────┴────────┴────────────────────┘
+┌────┬──────────────┬───────┬──────────┬────────────────────┐
+│ D  │ 시간         │ 샷 수  │ 모드     │ L3 단계            │
+├────┼──────────────┼───────┼──────────┼────────────────────┤
+│ D1 │ 5~15초       │ 1~2   │ 풀(Full) │ LLM 호출           │
+│ D2 │ 15~60초      │ 3~10  │ 풀(Full) │ LLM 호출           │
+│ D3 │ 1~5분        │ 6~30  │ 풀(Full) │ LLM 호출           │
+│ D4 │ 5~10분       │30~60  │ 풀(Full) │ LLM 호출           │
+│ D5 │ 10~20분      │60~120 │ 풀(Full) │ LLM 호출           │
+│ D6 │ 20~30분      │120~180│ 풀(Full) │ LLM 호출           │
+│ D7 │ 30분+        │ 180+  │ 풀(Full) │ LLM 호출           │
+└────┴──────────────┴───────┴──────────┴────────────────────┘
 
-S1/S2/S3 프롬프트도 depth_level별로 구조 복잡도/캐릭터 수/씬 수 가이드 차등화.
-L4는 두 모드 모두 씬별 호출 (분리 호출이 디시플린 명확화에 유리).
+★ 현재 COMPACT_DEPTH_LEVELS=[] → 모든 depth가 L3 + Découpage + L4를 거침 (풀 파이프라인).
+   짧은 영상(D1~D3)도 씬 비주얼 플랜·데쿠파주를 받아 연출 규율 확보.
+S1/S2/S3/Découpage 프롬프트는 depth_level별 구조 복잡도/캐릭터 수/씬 수 가이드 차등화.
+L4는 항상 씬별 호출. 비용 절감은 Compact 대신 Skip 모드(C1·MidPreview)로.
 ```
 
 ## 1.8 Resume 동작 (중단 지점부터 재개)
@@ -954,24 +981,28 @@ J5. "Can't go up" 원칙:
 ## 부록 A: 참조 파일
 
 ### svc-pipeline
-- `experiment/svc-pipeline/src/app/api/pipeline/route.ts` — HTTP 엔트리 (신규 실행)
-- `experiment/svc-pipeline/src/app/api/pipeline/resume/route.ts` — Resume 엔트리
-- `experiment/svc-pipeline/src/app/api/projects/route.ts` — 프로젝트 목록 + resumable 플래그
-- `experiment/svc-pipeline/src/app/api/logs/[projectId]/route.ts` — 로그 파일 조회
-- `experiment/svc-pipeline/src/lib/pipeline/index.ts` — 오케스트레이터 (loadOrRun 헬퍼)
-- `experiment/svc-pipeline/src/lib/pipeline/stages/*.ts` — 12개 stage:
+> ⚠️ 경로 갱신 (2026-06-05): 모든 svc-pipeline 코드는 `src/lib/svc/` 아래로 이동.
+
+- `src/app/api/svc/start/route.ts` — 파이프라인 시작 엔트리
+- `src/app/api/svc/resume/{assets,images,videos}/route.ts` — L6/L7/assets 재시도
+- `src/app/api/svc/generate/{assets,images,videos}/route.ts` — L6/L7/assets 생성
+- `src/app/api/svc/status/[projectId]/route.ts` — 진행상황 폴링
+- `src/app/api/svc/logs/[projectId]/route.ts` — 로그 파일 조회
+- `src/lib/svc/pipeline/index.ts` — 오케스트레이터 (loadOrRun + resolveSkip + empty fallback)
+- `src/lib/svc/pipeline/stages/*.ts` — stage:
   - s0_genre, s1_structure, s2_characters, s3_scenes
-  - c_validation_1, mid_preview
-  - l0_l1_visual, l2_design
-  - **l3_scene_plan** (신규, D4+), **l4_shots** (신규, 항상)
-  - c_application_2
-  - **l5_prompts** (신규, T2I/TI2V 추출 + LLM fallback) ⭐
-- `experiment/svc-pipeline/src/lib/pipeline/util/infer_l3.ts` — Compact 사후 L3 역추론
-- `experiment/svc-pipeline/src/lib/llm/gemini.ts` (`gemini-3-flash-preview`)
-- `experiment/svc-pipeline/src/lib/llm/claude.ts` (`claude-sonnet-4-6`)
-- `experiment/svc-pipeline/src/lib/llm/raw_collector.ts`, `json_repair.ts`, `retry.ts`
-- `experiment/svc-pipeline/src/lib/types/pipeline.ts` — DepthLevel D1~D7, L3SceneVisualPlan, L4Shot, isCompactDepth
-- `experiment/svc-pipeline/src/lib/logger.ts` — PipelineLogger (loadStage 포함)
+  - c_validation_1 (skip default), mid_preview (skip default)
+  - l0_l1_visual, l2_design, **assets_generate** (L2 직후 병렬, fal.ai)
+  - l3_scene_plan, **decoupage** ⭐ (감독 beat→shot), l4_shots (데쿠파주 구동)
+  - c_application_2 (조립 + Layer1 asset-ref 정규화 + split)
+  - **l5_prompts** (T2I/TI2V 추출 + LLM fallback), **l6_images** ⭐, **l7_videos** ⭐ (fal.ai 생성)
+- `src/lib/svc/pipeline/util/infer_l3.ts` — (구) Compact 사후 L3 역추론 (현재 비활성)
+- `src/lib/svc/pipeline/util/asset_refs.ts` — ⭐ Layer1 canonical asset-ref 정규화
+- `src/lib/svc/llm/dispatch.ts` — 4-provider dispatcher (S/V/C 축별 모델)
+- `src/lib/svc/llm/{gemini,claude,openai,local,fal}.ts` — provider 구현
+- `src/lib/svc/llm/raw_collector.ts`, `json_repair.ts`, `retry.ts`
+- `src/lib/svc/types/pipeline.ts` — DepthLevel D1~D7, DecoupagePlan, L4Shot, AudioTrackClip, PipelineInput.skip, COMPACT_DEPTH_LEVELS=[]
+- `src/lib/svc/logger/index.ts` — PipelineLogger (loadStage 포함)
 
 ### dual-axis
 - `experiment/dual-axis/src/app/api/session/new/route.ts` — 세션 생성

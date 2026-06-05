@@ -76,6 +76,7 @@ export function VideoPreviewer({ shot, clip }: VideoPreviewerProps) {
           <video
             ref={videoRef}
             src={clip.url}
+            muted
             className="max-h-[65vh] max-w-full rounded"
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={() => {

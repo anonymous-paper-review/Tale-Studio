@@ -10,6 +10,7 @@ export type {
   CameraPreset,
   Shot,
   VideoClip,
+  AudioTrackClip,
 } from './shot'
 export { DEFAULT_CAMERA_PRESET } from './shot'
 export type { TechniqueCategory, KnowledgeTechnique } from './knowledge'

@@ -43,6 +43,38 @@ import type {
   FinalPromptsOutput,
 } from '@/lib/svc/types/pipeline';
 
+// Skip 모드 default = true (피드백 미반영 stage 건너뜀, 비용 절감)
+function resolveSkip(input: PipelineInput): { validation1: boolean; midPreview: boolean } {
+  return {
+    validation1: input.skip?.validation1 ?? true,
+    midPreview: input.skip?.midPreview ?? true,
+  };
+}
+
+// c_validation_1 skip 시 다운스트림에 줄 빈 리포트
+function emptyC1Report(): CValidation1Report {
+  return {
+    passed: true,
+    issues: [],
+    causality_chain: [],
+    cdq_present: false,
+    cdq_clarity_score: 0,
+    cliche_count: 0,
+    retry_count: 0,
+  };
+}
+
+// mid_preview skip 시 빈 추천 (L0L1/L2/L3이 S·L 기반 자체 결정)
+function emptyMidPreview(): MidPreview {
+  return {
+    v_recommendations: { L0: {}, L1: {}, L2_summary: '', L3_scene_strategy: '', L4_shot_recipe: '' },
+    color_script: [],
+    emotional_arc_visualization: '',
+    production_difficulty: 'medium',
+    warnings: [],
+  };
+}
+
 function resolveModels(input: PipelineInput): PipelineModelsConfig {
   const fallback = DEFAULT_MODELS;
   const m = input.models ?? {};
@@ -154,23 +186,35 @@ async function _runPipelineInner(
   const S2 = (await loadOrRun<S2Block>(resume, '04_S2.json', () => runS2(input, S0, S1, logger, models.S), 'S2', logger)).value;
   const S3 = (await loadOrRun<S3Block>(resume, '05_S3.json', () => runS3(input, S0, S1, S2, logger, models.S), 'S3', logger)).value;
 
-  // ===== C 적용 ① =====
-  const c_validation_1 = (await loadOrRun<CValidation1Report>(
-    resume,
-    '06_C_validation_1.json',
-    () => runCValidation1(S0, S1, S2, S3, logger, models.C),
-    'C1_validation',
-    logger,
-  )).value;
+  const skip = resolveSkip(input);
 
-  // ===== Mid Preview (V축 — 시각 제안 생성) =====
-  const mid_preview = (await loadOrRun<MidPreview>(
-    resume,
-    '07_mid_preview.json',
-    () => runMidPreview(S0, S1, S2, S3, c_validation_1, logger, models.V),
-    'mid_preview',
-    logger,
-  )).value;
+  // ===== C 적용 ① (skip 시 빈 리포트) =====
+  const c_validation_1 = skip.validation1
+    ? (await (async () => {
+        await logger.markStage('C1_validation', 'completed', { skipped: true });
+        return emptyC1Report();
+      })())
+    : (await loadOrRun<CValidation1Report>(
+        resume,
+        '06_C_validation_1.json',
+        () => runCValidation1(S0, S1, S2, S3, logger, models.C),
+        'C1_validation',
+        logger,
+      )).value;
+
+  // ===== Mid Preview (V축 — 시각 제안 생성. skip 시 빈 추천) =====
+  const mid_preview = skip.midPreview
+    ? (await (async () => {
+        await logger.markStage('mid_preview', 'completed', { skipped: true });
+        return emptyMidPreview();
+      })())
+    : (await loadOrRun<MidPreview>(
+        resume,
+        '07_mid_preview.json',
+        () => runMidPreview(S0, S1, S2, S3, c_validation_1, logger, models.V),
+        'mid_preview',
+        logger,
+      )).value;
 
   // ===== V축 =====
   // L0_L1은 { L0, L1 } 합쳐서 저장

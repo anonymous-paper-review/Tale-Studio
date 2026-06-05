@@ -166,6 +166,16 @@ export interface PipelineInput {
   presetId?: string;      // 선택적 장르 프리셋
   runtimeSeconds?: number; // 사용자 명시 러닝타임 (없으면 자동 결정)
   models?: PipelineModelsInput; // S/V/C 축별 모델 선택 (선택)
+  /**
+   * Stage skip 플래그. 피드백이 다운스트림에 실질 반영되지 않는 stage를
+   * 건너뛰어 LLM 호출/시간을 절약한다. 미지정 시 default = skip(true).
+   *   - validation1: c_validation_1 (C 검증 ①) 통째 skip
+   *   - midPreview:  mid_preview 통째 skip (빈 추천으로 L0L1/L2/L3 자체 결정)
+   */
+  skip?: {
+    validation1?: boolean;
+    midPreview?: boolean;
+  };
 }
 
 // =====================================================================
