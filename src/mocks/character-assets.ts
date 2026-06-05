@@ -4,19 +4,19 @@ export const mockCharacterAssets: CharacterAsset[] = [
   {
     characterId: 'char_kai',
     name: 'Kai',
-    views: { front: null, side: null, back: null },
+    views: { main: null, front: null, back: null, sideLeft: null, sideRight: null },
     locked: false,
   },
   {
     characterId: 'char_viper',
     name: 'Viper',
-    views: { front: null, side: null, back: null },
+    views: { main: null, front: null, back: null, sideLeft: null, sideRight: null },
     locked: false,
   },
   {
     characterId: 'char_mira',
     name: 'Mira',
-    views: { front: null, side: null, back: null },
+    views: { main: null, front: null, back: null, sideLeft: null, sideRight: null },
     locked: false,
   },
 ]

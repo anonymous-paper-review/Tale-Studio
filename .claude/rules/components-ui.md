@@ -19,3 +19,12 @@ paths:
 - shadcn primitive: `src/components/ui/`
 - 레이아웃 (전역 사이드바, AppShell, GlobalChat 등): `src/components/layout/`
 - 기능별 컴포넌트는 `src/features/<feature>/`로
+
+## 레이아웃 / 스크롤 (flexbox 함정)
+- **스크롤 컨테이너(`ScrollArea`/`overflow-y-auto`)와 그 flex 조상에는 반드시 `min-h-0`.**
+  flex item은 기본 `min-height:auto`라 콘텐츠보다 작게 안 줄어든다 → 콘텐츠가 길어지면
+  스크롤 영역이 갇히지 않고 늘어나 **스크롤바가 안 생기고 레이아웃이 넘친다.**
+  콘텐츠가 짧을 땐 우연히 동작하므로 잠복하다, 큰 이미지/긴 목록에서 터진다.
+- 패턴: `<Tabs/부모 className="flex min-h-0 flex-1 flex-col overflow-hidden">` →
+  `<TabsContent className="flex min-h-0 flex-1 ...">` → `<ScrollArea className="min-h-0 flex-1 ...">`.
+- 카드 안의 이미지 프리뷰는 폭을 캡(`max-w-[…]`)해 카드가 거대해지지 않게 한다 (full-width `aspect-video`는 카드폭이 크면 과대).

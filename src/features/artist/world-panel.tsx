@@ -74,7 +74,7 @@ export function WorldPanel() {
     sceneManifest?.scenes.find((s) => s.sceneId === sceneId)
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Provider Toggle + Cinematic Boost Chips */}
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
         {/* Image Provider Toggle */}
@@ -166,7 +166,7 @@ export function WorldPanel() {
         ))}
       </div>
 
-      <ScrollArea className="flex-1 px-6 py-4">
+      <ScrollArea className="min-h-0 flex-1 px-6 py-4">
         <div className="space-y-6">
           {worldAssets.map((world) => {
             const scene = getScene(world.sceneId)

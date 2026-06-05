@@ -53,7 +53,7 @@ export function CharacterPanel() {
 
   return (
     <>
-      <ScrollArea className="flex-1 px-6 py-4">
+      <ScrollArea className="min-h-0 flex-1 px-6 py-4">
       <div className="space-y-4">
         {characterAssets.map((char) => {
           const role = getRole(char.characterId)
@@ -113,26 +113,44 @@ export function CharacterPanel() {
                 </Tooltip>
               </div>
 
-              {/* 5-View Grid — 셀 클릭 시 프롬프트 확인/수정 + 재생성 Dialog */}
-              <div className="grid grid-cols-5 gap-2">
-                {CHARACTER_VIEW_KEYS.map((view) => (
-                  <button
-                    key={view}
-                    type="button"
-                    title={`${CHARACTER_VIEW_LABELS[view]} — 클릭해서 프롬프트 보기/재생성`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setViewDialog({ charId: char.characterId, view })
-                    }}
-                    className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <ImagePlaceholder
-                      label={CHARACTER_VIEW_LABELS[view]}
-                      aspectRatio="square"
-                      imageUrl={char.views[view] ?? null}
-                    />
-                  </button>
-                ))}
+              {/* 턴어라운드 시트(main) wide 프리뷰 + 4 crop 뷰 (decisions #37).
+                  셀 클릭 → 상세/시트 재생성 Dialog. */}
+              <button
+                type="button"
+                title="Main 턴어라운드 시트 — 클릭해서 크게 보기 / 재생성"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setViewDialog({ charId: char.characterId, view: 'main' })
+                }}
+                className="mx-auto mb-2 block w-full max-w-[220px] rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <ImagePlaceholder
+                  label={CHARACTER_VIEW_LABELS.main}
+                  aspectRatio="video"
+                  imageUrl={char.views.main ?? null}
+                />
+              </button>
+              <div className="grid grid-cols-4 gap-2">
+                {(['front', 'back', 'sideLeft', 'sideRight'] as const).map(
+                  (view) => (
+                    <button
+                      key={view}
+                      type="button"
+                      title={`${CHARACTER_VIEW_LABELS[view]} — 클릭해서 보기 / 재생성`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setViewDialog({ charId: char.characterId, view })
+                      }}
+                      className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <ImagePlaceholder
+                        label={CHARACTER_VIEW_LABELS[view]}
+                        aspectRatio="square"
+                        imageUrl={char.views[view] ?? null}
+                      />
+                    </button>
+                  ),
+                )}
               </div>
 
               {/* Actions */}

@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
 import {
   Dialog,
@@ -9,10 +8,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { useArtistStore } from '@/stores/artist-store'
-import { buildCharacterPrompt } from '@/lib/prompts'
 import { CHARACTER_VIEW_LABELS, type CharacterViewKey } from '@/types/asset'
 
 type Props = {
@@ -22,9 +19,8 @@ type Props = {
 }
 
 /**
- * 캐릭터 단일 뷰(front/side/back/3Q) 상세 + 재생성 Dialog.
- * 이미지(또는 placeholder) + 사용 프롬프트(수정 가능) + 생성 버튼.
- * 프롬프트를 수정하면 generateSheet의 promptOverride로 전달돼 그대로 생성.
+ * 캐릭터 뷰 상세 — 선택 뷰 이미지 프리뷰 + 턴어라운드 시트 재생성 (decisions #37).
+ * 각 뷰는 시트 1장에서 crop된 것이므로 개별 뷰 재생성이 아니라 시트 전체를 재생성한다.
  */
 export function CharacterViewDialog({ charId, view, onClose }: Props) {
   const char = useArtistStore((s) =>
@@ -33,20 +29,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
   const generateSheet = useArtistStore((s) => s.generateSheet)
   const isGenerating = useArtistStore((s) => s.generatingCharacterId === charId)
 
-  const defaultPrompt =
-    char?.fixedPrompt && view ? buildCharacterPrompt(char.fixedPrompt, view) : ''
-
-  const [prompt, setPrompt] = useState(defaultPrompt)
-  // char/view 변경 시 prompt 리셋 (effect 없이 render 중)
-  const key = `${charId}:${view}`
-  const [prevKey, setPrevKey] = useState(key)
-  if (key !== prevKey) {
-    setPrevKey(key)
-    setPrompt(defaultPrompt)
-  }
-
   const open = !!charId && !!view
-  // 닫힘이거나 데이터 없으면 렌더 안 함
   if (!open || !char || !view) return null
 
   const imageUrl = char.views[view] ?? null
@@ -62,8 +45,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
         </DialogHeader>
 
         <div className="space-y-3">
-          {/* 이미지 / placeholder */}
-          <div className="mx-auto w-full max-w-xs">
+          <div className="mx-auto w-full max-w-sm">
             <ImagePlaceholder
               label={label}
               aspectRatio="square"
@@ -71,26 +53,15 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
             />
           </div>
 
-          {/* 사용 프롬프트 (수정 가능) */}
-          <div>
-            <label className="mb-1.5 block text-xs text-muted-foreground">
-              프롬프트 (수정 후 생성)
-            </label>
-            <Textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={4}
-              placeholder="이 뷰 이미지를 만들 프롬프트"
-            />
-          </div>
+          <p className="text-xs text-muted-foreground">
+            각 뷰는 턴어라운드 시트 1장에서 잘라낸 것입니다. 다시 만들려면 시트
+            전체를 재생성하세요.
+          </p>
 
-          {/* 생성 버튼 */}
           <Button
             className="w-full"
-            disabled={isGenerating || char.locked || !prompt.trim()}
-            onClick={() =>
-              generateSheet(char.characterId, [view], { [view]: prompt })
-            }
+            disabled={isGenerating || char.locked}
+            onClick={() => generateSheet(char.characterId)}
           >
             {isGenerating ? (
               <>
@@ -100,7 +71,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
             ) : (
               <>
                 <Sparkles className="size-4" />
-                {imageUrl ? '재생성' : '생성'}
+                {char.views.main ? '시트 재생성' : '시트 생성'}
               </>
             )}
           </Button>

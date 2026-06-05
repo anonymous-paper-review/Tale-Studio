@@ -19,43 +19,44 @@ export type GeneratedImage = {
   createdAt: number
 }
 
+// 턴어라운드 시트 뷰 모델 (decisions #37). main=전체 시트(1×4 스트립), 나머지=crop.
 export interface CharacterView {
+  main: string | null
   front: string | null
-  side: string | null
   back: string | null
-  threeQuarterLeft?: string | null
-  threeQuarterRight?: string | null
+  sideLeft: string | null
+  sideRight: string | null
 }
 
 export type CharacterViewKey =
+  | 'main'
   | 'front'
-  | 'side'
   | 'back'
-  | 'threeQuarterLeft'
-  | 'threeQuarterRight'
+  | 'sideLeft'
+  | 'sideRight'
 
 export const CHARACTER_VIEW_KEYS: CharacterViewKey[] = [
+  'main',
   'front',
-  'side',
   'back',
-  'threeQuarterLeft',
-  'threeQuarterRight',
+  'sideLeft',
+  'sideRight',
 ]
 
 export const CHARACTER_VIEW_COLUMNS: Record<CharacterViewKey, string> = {
+  main: 'view_main',
   front: 'view_front',
-  side: 'view_side',
   back: 'view_back',
-  threeQuarterLeft: 'view_three_quarter_left',
-  threeQuarterRight: 'view_three_quarter_right',
+  sideLeft: 'view_side_left',
+  sideRight: 'view_side_right',
 }
 
 export const CHARACTER_VIEW_LABELS: Record<CharacterViewKey, string> = {
+  main: 'Main',
   front: 'Front',
-  side: 'Side',
   back: 'Back',
-  threeQuarterLeft: '3Q Left',
-  threeQuarterRight: '3Q Right',
+  sideLeft: 'Side (L)',
+  sideRight: 'Side (R)',
 }
 
 export interface CharacterAsset {
