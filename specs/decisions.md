@@ -1,6 +1,6 @@
 # Decisions
 
-> 최종 수정: 2026-05-17
+> 최종 수정: 2026-06-05
 > 레거시 아카이브: `specs/archive/decisions_legacy_2026-03-03.md`
 
 > **이 파일은 cross-cutting 결정의 rolling 로그입니다. Append-only.**
@@ -10,6 +10,32 @@
 > Entry 번호는 monotonic. **기존 번호 mid-history 편집 금지**. 변경 적은 원칙은 `specs/_constitution.md` 참조.
 
 ## 확정
+
+### 39. rollback-artist-card archived
+- **결정**: 카드형 Artist UI 롤백(`rollback-artist-card`)을 archive. 카드 UI(character/world/inventory 패널)는 현재 shipped 현실이고 방향 정착됨(#36 노드그래프 폐기의 후속). 개별 인터랙션 `[c]` 검증은 잔존하나 방향·구조 확정으로 changes 정리 차원 archive.
+- **archive 경로**: `specs/archive/2026-06-05-rollback-artist-card/`
+- **일자**: 2026-06-05
+
+### 38. SVC 파이프라인 = 단일 writer 엔진으로 일원화, fixed_prompt 폐기, writer UI 제거
+- **결정**: producer 핸드오프에서 병렬로 돌던 두 파이프라인(옛 `generate-scenes` writer + `svc`)을 **svc 하나로 일원화**. svc가 상위집합(검증·비주얼스타일·3분할샷)이므로 svc를 남기고 **`svc`→`writer`로 리네임**, 옛 generate-scenes/writer-chat/writer-UI 제거.
+- **캐릭터 프롬프트 단일화**: 옛 writer의 `fixed_prompt` vs svc `appearance` 2개를 **`appearance` 하나로** 통합. `characters.fixed_prompt` DROP(`009`). 소비측(`buildCharacterPrompt`)은 appearance 사용. → #37의 "svc 토큰 미완 시 fixed_prompt 폴백"을 대체(이제 svc가 DB로 직접 공급).
+- **writer = 백엔드 전용**: `studio/writer` 페이지·`features/writer` 제거, nav producer→artist 직행. svc 파이프라인이 `/api/writer/start`(핸드오프)에서 백그라운드 실행되어 DB(characters/scenes/locations/shots, 샷별 대사 포함)를 채움(`persist_manifest`). `writer-store`는 artist/director가 소비하는 **공유 데이터 허브로 유지**.
+- **DB 정합 선행**: 코드가 라이브에 없는 컬럼에 write(Director/Editor 조용히 실패)임을 실증 → `007`(shots 기어/무브먼트/speed/storyboard_image), `008`(design_tokens + appearance/costume + location 토큰) 적용. `database.ts` 라이브 기준 재생성. 적용은 supabase CLI 히스토리 불일치로 pg 직접.
+- **트레이드오프**: svc는 16단계라 핸드오프 지연 ↑. `adapters.ts`가 대사 손실(L4 연결)이라 `shot_sequence` 기반 persist 신작성. `description`/`visual_description` 등 레거시 컬럼은 가동 우선으로 중복 잔존(후속 정리). svc 풀 런 런타임 검증 미수행(합성 테스트만).
+- **상세**: `docs/research/svc-writer-unification-2026-06-05.md`, `specs/changes/unify-svc-writer-pipeline/`
+- **일자**: 2026-06-05
+
+### 37. Artist 캐릭터 이미지 — 턴어라운드 시트 + crop 파이프라인 채택
+- **결정**: artist 캐릭터 이미지 생성을 뷰별 개별 호출(Path B `autoGenerateBaseImages`)에서 **"턴어라운드 시트 1장 생성 → 서버 crop → 뷰 분배"** 방식으로 전환. A 방식(svc 구조화 프롬프트: S2.appearance + L1.art_style/shape_language + L2.palette) 기반.
+- **시트 구성**: **1×4 가로 스트립** (front | side-left | side-right | back, 균등 4등분). 모델 = fal `openai/gpt-image-2`.
+- **crop**: `sharp`로 서버사이드 4등분 고정좌표 crop (MVP). 모델이 그리드를 완벽히 안 맞추면 일부 잘림 — 수동조정/피사체감지 crop은 후속 승급 여지.
+- **뷰 모델 변경**: `CharacterAsset.views` `{front, side, back, threeQuarterLeft, threeQuarterRight}` → **`{main, front, back, sideLeft, sideRight}`**. main=전체 시트. DB 컬럼 `view_main`/`view_side_left`/`view_side_right` 신설, `view_side`·`view_three_quarter_*` deprecate.
+- **이유**:
+  - 한 번의 생성으로 다각도 일관성 확보 + 호출 수 절감. 시트가 동일 캐릭터를 한 캔버스에 그리므로 뷰 간 외형 드리프트 ↓
+  - svc 14b_assets(Path A)는 디버그 패널에서만 소비되어 artist 카드와 무관했고, 디버그 패널 제거로 고아화 → A의 *프롬프트 자산*만 artist로 이관
+- **트레이드오프**: 고정좌표 crop은 모델 레이아웃 정합에 의존 (MVP 한계). svc 디자인 토큰(04_S2/08_L0_L1/09_L2) 접근 필요 — 미완료 시 `fixedPrompt` 폴백.
+- **상세/태스크**: `specs/changes/writer-background-artist-progress/` (decisions [25,29] 연계)
+- **일자**: 2026-06-05
 
 ### 36. redesign-l0-canvas archived (superseded)
 - **결정**: `redesign-l0-canvas` change를 검증 완료 없이 superseded 상태로 archive. 노드 그래프 패러다임 폐기, 카드형 Artist UI (character-panel / world-panel / inventory-grid)로 롤백.
@@ -74,7 +100,7 @@
 - **레이아웃 변경**: Meeting Room은 좌측 도킹 유지(L0 스펙 1번 그대로). 기존 우측 floating `GlobalChat`은 artist 페이지에서 hide → 좌측 도킹 컴포넌트가 같은 `useGlobalChatStore`를 소비
 - **근거**: read-only 가이드는 Higgsfield 등 경쟁 도구에 흔함. tool-use는 우리 차별화 포인트. 그래프=개체 패러다임과 결합해 "캐릭터 만들어줘" → 실제 노드 생성까지 한 흐름. 기존 5-agent 패턴 재사용으로 구현 분량 ↓
 - **destructive 안전장치**: 파괴 액션은 agent가 직접 실행 안 함. 모든 삭제·등록은 기존 user-facing 모달 거침 → undo 미구현 상태에서도 안전
-- **상세**: `specs/data/canvas_data_model.md` 섹션 6 (Agent Actions), `specs/layers/L0_concept_canvas.md` 섹션 11
+- **상세**: `specs/archive/2026-06-04-redesign-l0-canvas/canvas_data_model.md` 섹션 6 (Agent Actions), `specs/layers/L0_concept_canvas.md` 섹션 11
 - **일자**: 2026-05-17
 
 ### 30. Design Constitution (`specs/design.md`) 도입

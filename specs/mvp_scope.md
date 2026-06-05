@@ -13,8 +13,8 @@
 | Stage | V2 이름 | 핵심 역할 | Pipeline |
 |-------|---------|----------|----------|
 | **P1** | The Meeting Room | Producer Agent 대화로 스토리/설정 수집 | - |
-| **P2** | The Script Room | Writer Agent + L1 (Pumpup → 씬 분할) | L1 |
-| **P3** | The Visual Studio | 노드 그래프 기반 캐릭터/월드 컨셉 정의 (L0 Concept Canvas) | L0 |
+| ~~**P2**~~ | ~~The Script Room~~ | **제거 — writer는 UI 없는 백엔드 엔진**(옛 svc). 핸드오프에서 백그라운드 실행 → DB. producer→artist 직행 (decision #38) | L1 |
+| **P3** | The Visual Studio | 카드형 캐릭터/월드 컨셉 정의 (L0 Concept Canvas) | L0 |
 | **P4** | The Set | Shot Node Grid + Cinematographic Inspector + 영상 생성 | L2+L3 |
 | **P5 Lite** | Post-Production Suite | 프리뷰 + 타임라인 + Crop + Draft 렌더링 | - |
 

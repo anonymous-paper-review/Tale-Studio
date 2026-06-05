@@ -25,7 +25,7 @@
 | Stage | V2 이름 | Agent | Pipeline | MVP |
 |-------|---------|-------|----------|-----|
 | P1 | The Meeting Room | Producer | - | **포함** |
-| P2 | The Script Room | Writer | L1 | **포함** |
+| ~~P2~~ | ~~The Script Room~~ | Writer | L1 | **제거 — 백엔드 전용** (decision #38) |
 | P3 | The Visual Studio | Concept Artist | - | **포함** |
 | P4 | The Set | Director | L2+L3 | **포함** |
 | P5 | Post-Production Suite | Editor | - | **포함 (Lite)** |
@@ -110,10 +110,16 @@ P1 "Hand over to Writer →"
 
 ---
 
-## P2: The Script Room (Writer)
+## P2: The Script Room (Writer) — ⚠️ 제거됨 (백엔드 전용)
 
-> 상태: **MVP 포함** — V3 레이아웃 확정 (씬+샷 편집)
-> 참고: `specs/reference_v2/image2.png`
+> ## ⚠️ 현행 (2026-06-05, decision #38)
+> **이 페이지는 제거됐습니다.** writer는 **UI 없는 백엔드 전용 스테이지** — producer 핸드오프(`/api/writer/start`)에서
+> writer 엔진이 백그라운드 실행되어 DB(scenes/characters/shots)를 채우고, 사용자는 producer → **artist**로 직행한다.
+> 아래 본문(Shot Grid / AI Writer Chat / `features/writer/*` / 사이드바 Writer 아이콘 / "Hand over to Writer")은
+> 모두 **폐기된 옛 UI** — historical 참고용. 현행 흐름은 `decision #38`, `docs/research/svc-writer-unification-2026-06-05.md`.
+
+> 상태: ~~MVP 포함~~ → **제거 (백엔드 전용)**
+> 참고: `specs/reference_v2/image2.png` (옛 디자인)
 
 ### 목적
 

@@ -596,7 +596,7 @@ LLM 호출 없음.
 ## 20. 참조
 
 - `specs/layers/L0_concept_canvas.md` — Artist 노드 그래프 패턴 (이 스펙의 모범)
-- `specs/data/canvas_data_model.md` — Artist 데이터 모델 (Director도 유사 구조)
+- `specs/archive/2026-06-04-redesign-l0-canvas/canvas_data_model.md` — Artist 데이터 모델 (Director도 유사 구조)
 - `specs/data/asset_storage.md` — Artist 등록 자산 (Director가 참조)
 - `specs/layers/L2_shot_composer.md` / `L3_prompt_builder.md` — 영상 생성 파이프라인
 - `specs/design.md` — 색 토큰 / 모션 / 인터랙션 헌법
