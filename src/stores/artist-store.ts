@@ -6,6 +6,7 @@ import { buildWorldPrompt } from '@/lib/prompts'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
+import { pollGenerationJob } from '@/lib/generation-jobs-client'
 
 export type ImageProvider = 'fal' | 'gemini' | 'tailscale'
 
@@ -90,6 +91,40 @@ async function persistImage(
   }
 }
 
+/**
+ * 월드 샷 1장 생성 + 영속화 → 최종 URL.
+ *   fal + projectId → webhook job 경로 (서버사이드 storage+DB, 탭 닫혀도 보존).
+ *   그 외(gemini/tailscale 또는 projectId 없음) → 기존 동기 blob + 클라 persist.
+ */
+async function generateAndPersistWorldShot(
+  projectId: string | null,
+  locationId: string,
+  column: 'wide_shot' | 'establishing_shot',
+  prompt: string,
+  provider: ImageProvider,
+): Promise<string> {
+  if (provider === 'fal' && projectId) {
+    const res = await fetch('/api/artist/generate-world', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, locationId, column, prompt, aspectRatio: '16:9' }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    const { jobId } = (await res.json()) as { jobId: string }
+    return await pollGenerationJob(jobId)
+  }
+  // 비-fal provider 또는 projectId 없음 → 동기 경로
+  const blobUrl = await generateImage(prompt, '16:9', provider)
+  if (projectId) {
+    const persisted = await persistImage(projectId, 'location', locationId, column, blobUrl)
+    return persisted ?? blobUrl
+  }
+  return blobUrl
+}
+
 /** 작업 배열을 동시 N개 제한으로 실행 (캐릭터/월드 병렬 생성용, decision: concurrency 4) */
 async function runPool(
   tasks: Array<() => Promise<void>>,
@@ -123,7 +158,6 @@ interface ArtistState {
   error: string | null
 
   loadData: () => void
-  loadMockData: () => void
   selectCharacter: (id: string) => void
   selectLocation: (id: string) => void
   lockCharacter: (id: string) => void
@@ -296,26 +330,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     // No data available — keep empty state (don't show fake mock data)
   },
 
-  loadMockData: async () => {
-    const [
-      { mockSceneManifest },
-      { mockCharacterAssets },
-      { mockWorldAssets },
-    ] = await Promise.all([
-      import('@/mocks/scene-manifest'),
-      import('@/mocks/character-assets'),
-      import('@/mocks/world-assets'),
-    ])
-
-    set({
-      sceneManifest: mockSceneManifest,
-      characterAssets: mockCharacterAssets,
-      worldAssets: mockWorldAssets,
-      selectedCharacterId: mockCharacterAssets[0]?.characterId ?? null,
-      selectedLocationId: mockWorldAssets[0]?.locationId ?? null,
-    })
-  },
-
   selectCharacter: (id) => set({ selectedCharacterId: id }),
 
   selectLocation: (id) => set({ selectedLocationId: id }),
@@ -352,7 +366,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error ?? `HTTP ${res.status}`)
       }
-      const { url } = (await res.json()) as { url: string }
+      // 비동기: 라우트는 jobId만 반환 — 완료까지 polling (webhook이 서버사이드로 storage+DB 갱신).
+      const { jobId } = (await res.json()) as { jobId: string }
+      const url = await pollGenerationJob(jobId)
       set((state) => ({
         characterAssets: state.characterAssets.map((a) =>
           a.characterId === characterId
@@ -408,42 +424,27 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
       const pid = useProjectStore.getState().projectId
 
-      // Generate sequentially to avoid timeout
+      // Generate sequentially to avoid timeout. fal이면 webhook job 경로, 아니면 동기.
+      // suffix는 WORLD_SHOT_SUFFIX 단일 출처 사용 (generateWorldShot과 동일 문구).
       // 1) Wide shot
-      const wideShot = await generateImage(`${basePrompt}, wide shot, panoramic`, '16:9', imageProvider)
+      const wideShot = await generateAndPersistWorldShot(
+        pid, locationId, 'wide_shot', `${basePrompt}, ${WORLD_SHOT_SUFFIX.wideShot}`, imageProvider,
+      )
       set((state) => ({
         worldAssets: state.worldAssets.map((w) =>
           w.locationId === locationId ? { ...w, wideShot } : w,
         ),
       }))
-      if (pid) {
-        const wideUrl = await persistImage(pid, 'location', locationId, 'wide_shot', wideShot)
-        if (wideUrl) {
-          set((state) => ({
-            worldAssets: state.worldAssets.map((w) =>
-              w.locationId === locationId ? { ...w, wideShot: wideUrl } : w,
-            ),
-          }))
-        }
-      }
 
       // 2) Establishing shot
-      const establishingShot = await generateImage(`${basePrompt}, establishing shot, aerial view`, '16:9', imageProvider)
+      const establishingShot = await generateAndPersistWorldShot(
+        pid, locationId, 'establishing_shot', `${basePrompt}, ${WORLD_SHOT_SUFFIX.establishingShot}`, imageProvider,
+      )
       set((state) => ({
         worldAssets: state.worldAssets.map((w) =>
           w.locationId === locationId ? { ...w, establishingShot } : w,
         ),
       }))
-      if (pid) {
-        const estUrl = await persistImage(pid, 'location', locationId, 'establishing_shot', establishingShot)
-        if (estUrl) {
-          set((state) => ({
-            worldAssets: state.worldAssets.map((w) =>
-              w.locationId === locationId ? { ...w, establishingShot: estUrl } : w,
-            ),
-          }))
-        }
-      }
     } catch (err) {
       set({
         error:
@@ -483,30 +484,19 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           selectedBoostPreset,
           shot,
         )
-      const img = await generateImage(prompt, '16:9', imageProvider)
+      const pid = useProjectStore.getState().projectId
+      const url = await generateAndPersistWorldShot(
+        pid,
+        locationId,
+        WORLD_SHOT_COLUMN[shot] as 'wide_shot' | 'establishing_shot',
+        prompt,
+        imageProvider,
+      )
       set((state) => ({
         worldAssets: state.worldAssets.map((w) =>
-          w.locationId === locationId ? { ...w, [shot]: img } : w,
+          w.locationId === locationId ? { ...w, [shot]: url } : w,
         ),
       }))
-
-      const pid = useProjectStore.getState().projectId
-      if (pid) {
-        const url = await persistImage(
-          pid,
-          'location',
-          locationId,
-          WORLD_SHOT_COLUMN[shot],
-          img,
-        )
-        if (url) {
-          set((state) => ({
-            worldAssets: state.worldAssets.map((w) =>
-              w.locationId === locationId ? { ...w, [shot]: url } : w,
-            ),
-          }))
-        }
-      }
     } catch (err) {
       set({
         error:

@@ -8,7 +8,9 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
-import { falImageGenerate } from '@/lib/writer/llm/fal'
+import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
+import { createGenerationJob } from '@/lib/generation-jobs'
+import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import {
   buildCharacterMainPrompt,
   buildCharacterViewPrompt,
@@ -22,7 +24,8 @@ import {
 } from '@/types/asset'
 
 export const runtime = 'nodejs'
-export const maxDuration = 300
+// submit만 하고 끝 — 실제 생성은 fal 큐에서 진행, 완료는 webhook(/poll reconcile)이 처리.
+export const maxDuration = 60
 
 // projects.design_tokens JSONB shape (008_svc_design_tokens.sql 주석 기준, 부분)
 interface DesignTokens {
@@ -84,50 +87,46 @@ export async function POST(req: Request) {
     // 2. 프롬프트 + 모델 결정
     //    main → 깨끗한 T2I. 방향 뷰 → view_main 을 reference 로 한 i2i(edit). main 없으면 T2I fallback.
     const refMain = character.view_main as string | null
-    let url: string
+    const webhookUrl = resolveWebhookUrl()
+    let submitOpts: FalImageOptions
     if (view === 'main') {
-      const out = await falImageGenerate({
+      submitOpts = {
         model: 'openai/gpt-image-2',
         prompt: buildCharacterMainPrompt(input),
         aspect_ratio: '1:1',
-      })
-      url = out.url
+        webhookUrl,
+      }
     } else {
       const prompt = buildCharacterViewPrompt(input, view as DirectionalView)
-      const out = await falImageGenerate(
-        refMain
-          ? {
-              model: 'openai/gpt-image-2/edit',
-              prompt,
-              reference_image_urls: [refMain],
-            } // aspect_ratio 생략 → edit 모델이 reference 비율을 따름
-          : { model: 'openai/gpt-image-2', prompt, aspect_ratio: '1:1' },
-      )
-      url = out.url
+      submitOpts = refMain
+        ? {
+            model: 'openai/gpt-image-2/edit',
+            prompt,
+            reference_image_urls: [refMain],
+            webhookUrl,
+          } // aspect_ratio 생략 → edit 모델이 reference 비율을 따름
+        : { model: 'openai/gpt-image-2', prompt, aspect_ratio: '1:1', webhookUrl }
     }
 
-    // 3. 생성 이미지 바이트 회수 → storage 업로드 (upload-image 와 동일 경로 규칙)
-    const imgRes = await fetch(url)
-    if (!imgRes.ok) throw new Error(`fal image fetch failed: ${imgRes.status}`)
-    const buf = Buffer.from(await imgRes.arrayBuffer())
+    // 3. fal 큐에 submit (비동기). 완료는 webhook(/poll reconcile)이 storage 업로드 + DB 갱신.
+    const { request_id, model } = await falImageSubmit(submitOpts)
 
+    // 4. generation_jobs 행 생성 — 완료 시 무엇을 갱신할지(target) 기록.
     const column = CHARACTER_VIEW_COLUMNS[view]
-    const path = `${project.workspace_id}/${projectId}/characters/${characterId}_${column}.png`
-    const { error: upErr } = await supabaseAdmin.storage
-      .from('media')
-      .upload(path, buf, { contentType: 'image/png', upsert: true })
-    if (upErr) throw upErr
-    const publicUrl = supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl
+    const job = await createGenerationJob({
+      projectId,
+      requestId: request_id,
+      model,
+      kind: 'character_view',
+      target: {
+        workspaceId: project.workspace_id,
+        characterId,
+        view,
+        column,
+      },
+    })
 
-    // 4. DB 기록 (해당 뷰 컬럼만)
-    const { error: updErr } = await supabaseAdmin
-      .from('characters')
-      .update({ [column]: publicUrl })
-      .eq('project_id', projectId)
-      .eq('character_id', characterId)
-    if (updErr) throw updErr
-
-    return NextResponse.json({ ok: true, view, url: publicUrl })
+    return NextResponse.json({ ok: true, jobId: job.id, status: 'queued', view })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[artist/generate-sheet]', msg)

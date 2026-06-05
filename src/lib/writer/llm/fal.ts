@@ -59,6 +59,7 @@ export interface FalImageOptions {
   aspect_ratio?: string;
   reference_image_urls?: string[];
   negative_prompt?: string;
+  webhookUrl?: string;        // 설정 시 fal 큐가 완료를 이 URL로 POST (비동기 webhook 전환)
 }
 
 export interface FalImageResult {
@@ -148,7 +149,8 @@ export async function falImageSubmit(
   const model = resolveImageModel(opts);
   const input = buildFalImageInput(opts, model);
   const { request_id } = await withLlmRetry(
-    () => fal.queue.submit(model, { input }),
+    () =>
+      fal.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
     'fal-image-submit',
   );
   return { request_id, model };
@@ -220,6 +222,7 @@ export interface FalVideoOptions {
   duration?: number;
   aspect_ratio?: string;
   negative_prompt?: string;
+  webhookUrl?: string;        // 설정 시 fal 큐가 완료를 이 URL로 POST (비동기 webhook 전환)
 }
 
 export interface FalVideoResult {
@@ -298,7 +301,8 @@ export async function falVideoSubmit(
   const model = opts.model ?? DEFAULT_VIDEO_MODEL;
   const input = buildFalVideoInput(opts, model);
   const { request_id } = await withLlmRetry(
-    () => fal.queue.submit(model, { input }),
+    () =>
+      fal.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
     'fal-video-submit',
   );
   return { request_id, model };
