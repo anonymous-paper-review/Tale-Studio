@@ -19,8 +19,10 @@ export function useEditorPlayback() {
   // ── 재생 루프 ──
   useEffect(() => {
     const tick = (ts: number) => {
-      const { isPlaying, currentTime, seek, setPlaying } = useEditorStore.getState()
-      if (!isPlaying) {
+      const st = useEditorStore.getState()
+      const { isPlaying, currentTime, seek, setPlaying } = st
+      // 소스 미리보기 중에는 타임라인 시계를 멈춤 (프리뷰어가 단일 클립을 직접 재생)
+      if (!isPlaying || st.previewSourceShotId) {
         lastTsRef.current = null
         rafRef.current = requestAnimationFrame(tick)
         return
@@ -49,9 +51,13 @@ export function useEditorPlayback() {
   // ── 전역 단축키 ──
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // 입력 필드에서 타이핑 중이면 무시 (오디오 이름 등 input/textarea)
+      // 입력 필드/셀렉트에서 조작 중이면 무시 (오디오 이름 input, 배속 select 등)
       const tag = (e.target as HTMLElement | null)?.tagName
-      const editable = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable
+      const editable =
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        (e.target as HTMLElement | null)?.isContentEditable
       if (editable) return
 
       const s = useEditorStore.getState()
@@ -90,6 +96,17 @@ export function useEditorPlayback() {
         case 'c':
         case 'C':
           s.setToolMode('cut')
+          break
+        case 'Delete':
+        case 'Backspace':
+          // 선택된 타임라인 항목 제거 (오디오 우선, 없으면 선택된 비디오 클립 일괄)
+          if (s.selectedAudioId) {
+            e.preventDefault()
+            s.removeAudioClip(s.selectedAudioId)
+          } else if (s.selectedShotIds.length > 0) {
+            e.preventDefault()
+            s.deleteSelectedClips()
+          }
           break
         default:
           break

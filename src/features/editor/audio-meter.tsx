@@ -81,15 +81,27 @@ export function AudioMeter({ audioClips }: { audioClips: AudioTrackClip[] }) {
   useEffect(() => {
     const unsub = useEditorStore.subscribe((state) => {
       const map = elsRef.current
+      // 소스 미리보기 모드에서는 타임라인 오디오를 모두 정지 (프리뷰어가 단일 클립만 재생)
+      if (state.previewSourceShotId) {
+        for (const { el } of map.values()) if (!el.paused) el.pause()
+        return
+      }
+      // 재생 시작 시 AudioContext 깨우기 (브라우저 autoplay 정책상 gesture 전 suspended)
+      if (state.isPlaying && ctxRef.current?.state === 'suspended') {
+        void ctxRef.current.resume()
+      }
       for (const clip of audioClips) {
         const entry = map.get(clip.id)
         if (!entry) continue
         const local = state.currentTime - clip.startSec
         const inRange = local >= 0 && local < clip.durationSec
-        entry.el.volume = clip.muted ? 0 : clip.volume
+        // cut 된 조각은 원본의 sourceOffsetSec 부터 재생 (조각마다 다른 구간)
+        const srcTime = local + (clip.sourceOffsetSec ?? 0)
+        // 전역 재생 볼륨(masterVolume) 곱 — 재생 전용, draft 와 무관
+        entry.el.volume = clip.muted ? 0 : clip.volume * state.masterVolume
 
         if (state.isPlaying && inRange) {
-          if (Math.abs(entry.el.currentTime - local) > 0.3) entry.el.currentTime = local
+          if (Math.abs(entry.el.currentTime - srcTime) > 0.3) entry.el.currentTime = srcTime
           if (entry.el.paused) void entry.el.play().catch(() => {})
         } else {
           if (!entry.el.paused) entry.el.pause()

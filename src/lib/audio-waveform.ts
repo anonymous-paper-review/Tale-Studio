@@ -1,6 +1,9 @@
 // 오디오 파일 → 파형 peak 배열 디코드 (Web Audio API).
 //   브라우저 전용 (AudioContext). 업로드된 오디오의 진폭을 buckets개로 다운샘플.
 
+import type { AudioSource } from '@/types'
+import { putAudioBlob } from '@/lib/editor-persistence'
+
 export interface DecodedAudio {
   durationSec: number
   peaks: number[]   // 0~1 정규화된 진폭, 길이 = buckets
@@ -44,6 +47,31 @@ export async function decodeAudioPeaks(src: string, buckets = 1000): Promise<Dec
     return { durationSec: audioBuf.duration, peaks: norm }
   } finally {
     void ctx.close()
+  }
+}
+
+/**
+ * 업로드 오디오 파일 → AudioSource (보관함 항목).
+ *   - 원본 blob을 IndexedDB에 저장(blobKey)해 새로고침 후에도 복원 가능하게 함
+ *   - 파형 peak + 길이 디코드
+ * @param kind 'voice'(내레이션/대사) 또는 'audio'(음악/효과음)
+ */
+export async function ingestAudioFile(file: File, kind: 'voice' | 'audio'): Promise<AudioSource> {
+  const blobKey =
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `blob_${Math.round(performance.now())}_${Math.floor(Math.random() * 1e9)}`
+  await putAudioBlob(blobKey, file)
+  const url = URL.createObjectURL(file)
+  const { durationSec, peaks } = await decodeAudioPeaks(url)
+  return {
+    id: `asrc_${blobKey.slice(0, 8)}`,
+    name: file.name,
+    url,
+    durationSec,
+    peaks,
+    blobKey,
+    kind,
   }
 }
 
