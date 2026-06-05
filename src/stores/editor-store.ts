@@ -32,6 +32,8 @@ const speedPersistTimers = new Map<string, ReturnType<typeof setTimeout>>()
 let audioIdSeq = 1
 // cut(split)·drag-add 로 생기는 synthetic 비디오 인스턴스 id 시퀀스
 let instanceSeq = 1
+// 오디오 트랙(레인) id 시퀀스
+let audioTrackSeq = 2 // atrack_1 은 기본 트랙
 
 interface EditorState {
   shots: Shot[]
@@ -57,6 +59,8 @@ interface EditorState {
   audioClips: AudioTrackClip[]
   // 오디오/보이스 소스 보관함 (bin) — 드래그해 오디오 트랙에 인스턴스화
   audioSources: AudioSource[]
+  // 오디오 트랙(레인) 목록 — 멀티 트랙 (프리미어식). 기본 1개
+  audioTracks: { id: string }[]
 
   // 소스 클립 단독 미리보기 (Video Source 클릭 시). null이면 타임라인(플레이헤드) 모드.
   previewSourceShotId: string | null
@@ -90,6 +94,7 @@ interface EditorState {
   deleteClip: (shotId: string) => void
   deleteSelectedClips: () => void                       // 선택된 클립 일괄 삭제
   moveClipToIndex: (shotId: string, targetIndex: number) => void  // 드래그 순서변경
+  addClipAtPlayhead: (sourceShotId: string) => void     // 소스→플레이헤드 인접 경계에 추가+포커스
   // cut(자르기) — 비디오 클립을 전역 시간 atSec 지점에서 둘로 분할
   splitVideoClipAt: (shotId: string, atGlobalSec: number) => void
   // Video Source → 타임라인 드래그-투-애드 (atSec 위치에 새 인스턴스 삽입)
@@ -105,7 +110,7 @@ interface EditorState {
 
   // 오디오 트랙 액션
   addAudioClip: (clip: Omit<AudioTrackClip, 'id' | 'volume' | 'muted'>) => string
-  moveAudioClip: (id: string, startSec: number) => void
+  moveAudioClip: (id: string, startSec: number, trackId?: string) => void
   setAudioVolume: (id: string, volume: number) => void
   toggleAudioMute: (id: string) => void
   setAudioPeaks: (id: string, peaks: number[]) => void
@@ -115,7 +120,11 @@ interface EditorState {
   // 오디오/보이스 소스 보관함 (bin)
   addAudioSource: (source: AudioSource) => void
   removeAudioSource: (id: string) => void
-  addAudioClipFromSource: (sourceId: string, startSec: number) => string | null
+  addAudioClipFromSource: (sourceId: string, startSec: number, trackId?: string) => string | null
+
+  // 오디오 멀티 트랙
+  addAudioTrack: () => void
+  removeAudioTrack: (trackId: string) => void
 
   // 소스 단독 미리보기 (Video Source 클릭)
   previewSource: (shotId: string) => void
@@ -147,6 +156,7 @@ interface EditorSnapshot {
   videoClips: VideoClip[]
   audioClips: AudioTrackClip[]
   audioSources: AudioSource[]
+  audioTracks: { id: string }[]
 }
 
 // 리사이즈 섹션 기본 크기 (px)
@@ -221,6 +231,7 @@ function snapshotOf(state: EditorState): EditorSnapshot {
     videoClips: structuredClone(state.videoClips),
     audioClips: structuredClone(state.audioClips),
     audioSources: structuredClone(state.audioSources),
+    audioTracks: structuredClone(state.audioTracks),
   }
 }
 
@@ -253,6 +264,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   toolMode: 'select',
   audioClips: [],
   audioSources: [],
+  audioTracks: [{ id: 'atrack_1' }],
   previewSourceShotId: null,
   masterVolume: 1,
   binDragKind: null,
@@ -303,10 +315,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   seek: (timeSec) =>
     set((state) => {
-      const layout = selectTimelineLayout(state)
-      const total = layout.reduce((sum, l) => sum + l.durationSec, 0)
-      const t = Math.max(0, Math.min(timeSec, total))
+      // 상한 클램프 제거 — 영상 끝을 넘어 오디오 편집 영역까지 플레이헤드 이동 허용 (요청 5)
+      const t = Math.max(0, timeSec)
       // playhead 아래 클립을 자동 선택 (프리뷰 동기화)
+      const layout = selectTimelineLayout(state)
       const hit = layout.find((l) => t >= l.startSec && t < l.startSec + l.durationSec)
       return {
         currentTime: t,
@@ -339,10 +351,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return id
   },
 
-  moveAudioClip: (id, startSec) =>
+  moveAudioClip: (id, startSec, trackId) =>
     set((state) => ({
       audioClips: state.audioClips.map((a) =>
-        a.id === id ? { ...a, startSec: Math.max(0, startSec) } : a,
+        a.id === id
+          ? { ...a, startSec: Math.max(0, startSec), ...(trackId ? { trackId } : {}) }
+          : a,
       ),
     })),
 
@@ -419,10 +433,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
-  addAudioClipFromSource: (sourceId, startSec) => {
+  addAudioClipFromSource: (sourceId, startSec, trackId) => {
     const src = get().audioSources.find((s) => s.id === sourceId)
     if (!src) return null
     const id = `audio_${audioIdSeq++}`
+    const lane = trackId ?? get().audioTracks[0]?.id ?? 'atrack_1'
     set((state) => ({
       audioClips: [
         ...state.audioClips,
@@ -439,6 +454,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           sourceDurationSec: src.durationSec,
           blobKey: src.blobKey,
           sourceId: src.id,
+          trackId: lane,
         },
       ],
       selectedAudioId: id,
@@ -447,6 +463,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }))
     return id
   },
+
+  addAudioTrack: () =>
+    set((state) => ({
+      audioTracks: [...state.audioTracks, { id: `atrack_${audioTrackSeq++}` }],
+      past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+      future: [],
+    })),
+
+  removeAudioTrack: (trackId) =>
+    set((state) => {
+      if (state.audioTracks.length <= 1) return state // 최소 1개 트랙 유지
+      const firstId = state.audioTracks[0]?.id
+      return {
+        audioTracks: state.audioTracks.filter((t) => t.id !== trackId),
+        // 해당 레인의 클립 제거 (trackId 없으면 첫 트랙 소속으로 간주)
+        audioClips: state.audioClips.filter((c) => (c.trackId ?? firstId) !== trackId),
+        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [],
+      }
+    }),
 
   // ── 소스 단독 미리보기 (Video Source 클릭) ──
   previewSource: (shotId) => set({ previewSourceShotId: shotId, isPlaying: true }),
@@ -479,8 +515,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       videoClips: saved.videoClips ?? [],
       audioClips: saved.audioClips ?? [],
       audioSources: saved.audioSources ?? [],
+      audioTracks: saved.audioTracks?.length ? saved.audioTracks : [{ id: 'atrack_1' }],
       panelSizes: saved.panelSizes ?? { ...DEFAULT_PANEL_SIZES },
       selectedClipShotId: null,
+      selectedShotIds: [],
       selectedAudioId: null,
       previewSourceShotId: null,
       currentTime: 0,
@@ -581,6 +619,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       toolMode: 'select',
       audioClips: [],
       audioSources: [],
+      audioTracks: [{ id: 'atrack_1' }],
       previewSourceShotId: null,
       masterVolume: 1,
       binDragKind: null,
@@ -730,6 +769,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     speedPersistTimers.set(shotId, timer)
   },
 
+  // soft-delete: 타임라인(clipOrder)에서만 제거하고 videoClips 데이터는 보존.
+  // → 같은 소스를 다시 드래그하면 url 이 살아있어 정상 추가됨 (요청 6a).
   deleteClip: (shotId) =>
     set((state) => {
       const newOrder: Record<string, string[]> = {}
@@ -738,7 +779,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       return {
         clipOrder: newOrder,
-        videoClips: state.videoClips.filter((c) => c.shotId !== shotId),
         selectedShotIds: state.selectedShotIds.filter((id) => id !== shotId),
         selectedClipShotId:
           state.selectedClipShotId === shotId ? null : state.selectedClipShotId,
@@ -757,7 +797,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       return {
         clipOrder: newOrder,
-        videoClips: state.videoClips.filter((c) => !ids.has(c.shotId)),
         selectedShotIds: [],
         selectedClipShotId: null,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
@@ -909,17 +948,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         videoClips: [...state.videoClips, newClip],
         clipOrder: { ...state.clipOrder, [sceneId]: sceneOrder },
         selectedClipShotId: newId,
+        selectedShotIds: [newId],
         selectedAudioId: null,
+        previewSourceShotId: null,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
       }
     }),
 
+  // 소스 → 현재 플레이헤드에 가장 가까운 클립 경계에 추가 + 포커스 (요청 4)
+  addClipAtPlayhead: (sourceShotId) => {
+    const state = get()
+    const layout = selectTimelineLayout(state)
+    const boundaries = [0]
+    for (const it of layout) boundaries.push(it.startSec + it.durationSec)
+    const t = state.currentTime
+    let nearest = 0
+    let best = Infinity
+    for (const b of boundaries) {
+      const d = Math.abs(b - t)
+      if (d < best) {
+        best = d
+        nearest = b
+      }
+    }
+    get().addClipInstanceAt(sourceShotId, nearest)
+  },
+
   renderDraft: async () => {
     set({ rendering: true, error: null })
 
     try {
-      const { clipOrder, selectedSceneId } = get()
+      const { clipOrder, selectedSceneId, videoClips, audioClips, audioTracks } = get()
 
       const res = await fetch('/api/editor/render-draft', {
         method: 'POST',
@@ -927,6 +987,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         body: JSON.stringify({
           clipOrder,
           sceneId: selectedSceneId,
+          // draft 에 트림/속도/오디오 음량 반영되도록 편집 데이터 동봉 (요청 1: 음량 draft 반영)
+          videoClips,
+          audioClips,
+          audioTracks,
         }),
       })
 
@@ -979,6 +1043,7 @@ if (typeof window !== 'undefined') {
     videoClips: s.videoClips,
     audioClips: s.audioClips,
     audioSources: s.audioSources,
+    audioTracks: s.audioTracks,
     panelSizes: s.panelSizes,
   })
   let prev = pick(useEditorStore.getState())
@@ -991,6 +1056,7 @@ if (typeof window !== 'undefined') {
       cur.videoClips === prev.videoClips &&
       cur.audioClips === prev.audioClips &&
       cur.audioSources === prev.audioSources &&
+      cur.audioTracks === prev.audioTracks &&
       cur.panelSizes === prev.panelSizes
     ) {
       return // 편집 상태 변화 없음 (재생/선택 등) → 저장 안 함

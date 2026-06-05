@@ -89,6 +89,7 @@ export interface AudioTrackClip {
   // 영속화: 업로드 파일 blob 의 IndexedDB 키 (새로고침 후 url 재생성). source bin 클립이면 동일 키 공유.
   blobKey?: string
   sourceId?: string           // 어떤 AudioSource 에서 왔는지 (bin 추적용)
+  trackId?: string            // 어느 오디오 레인(트랙)에 속하는지 (멀티 트랙). 없으면 첫 트랙
 }
 
 /**

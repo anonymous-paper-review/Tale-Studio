@@ -31,8 +31,11 @@ export function useEditorPlayback() {
       const dt = (ts - lastTsRef.current) / 1000
       lastTsRef.current = ts
 
-      const layout = selectTimelineLayout(useEditorStore.getState())
-      const total = layout.reduce((sum, l) => sum + l.durationSec, 0)
+      const layout = selectTimelineLayout(st)
+      const videoTotal = layout.reduce((sum, l) => sum + l.durationSec, 0)
+      // 오디오가 영상보다 길면 그 끝까지 재생 (영상 끝에서 멈추지 않음 — 요청 5)
+      const audioEnd = st.audioClips.reduce((m, a) => Math.max(m, a.startSec + a.durationSec), 0)
+      const total = Math.max(videoTotal, audioEnd)
       const next = currentTime + dt
       if (next >= total) {
         seek(total)

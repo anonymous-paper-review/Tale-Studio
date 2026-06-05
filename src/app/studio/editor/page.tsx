@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   Loader2,
   Download,
@@ -22,6 +22,7 @@ import { ResizeHandle } from '@/features/editor/resize-handle'
 import { useEditorPlayback } from '@/features/editor/use-editor-playback'
 import { useEditorStore, selectTimelineLayout } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useChatUiStore } from '@/stores/chat-ui-store'
 
 const FRAME = 1 / 24
 
@@ -39,6 +40,7 @@ export default function PostPage() {
     pxPerSec,
     audioClips,
     audioSources,
+    audioTracks,
     isPlaying,
     toolMode,
     binDragKind,
@@ -56,6 +58,7 @@ export default function PostPage() {
     deleteClip,
     deleteSelectedClips,
     moveClipToIndex,
+    addClipAtPlayhead,
     setSpeed,
     splitVideoClipAt,
     addClipInstanceAt,
@@ -63,6 +66,9 @@ export default function PostPage() {
     addAudioSource,
     removeAudioSource,
     addAudioClipFromSource,
+    addAudioTrack,
+    removeAudioTrack,
+    setAudioVolume,
     setBinDragKind,
     renderDraft,
     toggleSourcePanel,
@@ -103,6 +109,37 @@ export default function PostPage() {
     }
   }, [projectId, loadData, loadPersisted])
 
+  // Editor 진입 시 채팅 기본 접힘 (요청 6b). 떠날 때 이전 상태 복원
+  useEffect(() => {
+    const prev = useChatUiStore.getState().collapsed
+    useChatUiStore.setState({ collapsed: true })
+    return () => {
+      useChatUiStore.setState({ collapsed: prev })
+    }
+  }, [])
+
+  // 프레임 이동 버튼 꾹 누르기 → 연속 반복 (요청 2)
+  const holdRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const startFrameHold = useCallback(
+    (delta: number) => {
+      nudge(delta)
+      if (holdRef.current) clearInterval(holdRef.current)
+      holdRef.current = setInterval(() => nudge(delta), 70)
+    },
+    [nudge],
+  )
+  const stopFrameHold = useCallback(() => {
+    if (holdRef.current) {
+      clearInterval(holdRef.current)
+      holdRef.current = null
+    }
+  }, [])
+  useEffect(() => {
+    return () => {
+      if (holdRef.current) clearInterval(holdRef.current)
+    }
+  }, [])
+
   if (shots.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -130,6 +167,7 @@ export default function PostPage() {
               audioSources={audioSources}
               onPreview={previewSource}
               onAddClip={addClipInstanceAt}
+              onAddClipAtPlayhead={addClipAtPlayhead}
               onAddAudioFromSource={addAudioClipFromSource}
               onAddAudioSource={addAudioSource}
               onRemoveAudioSource={removeAudioSource}
@@ -152,6 +190,7 @@ export default function PostPage() {
           audioSources={audioSources}
           onPreview={previewSource}
           onAddClip={addClipInstanceAt}
+          onAddClipAtPlayhead={addClipAtPlayhead}
           onAddAudioFromSource={addAudioClipFromSource}
           onAddAudioSource={addAudioSource}
           onRemoveAudioSource={removeAudioSource}
@@ -197,15 +236,33 @@ export default function PostPage() {
             </Button>
           </div>
 
-          {/* 재생 컨트롤 */}
+          {/* 재생 컨트롤 (프레임 버튼은 꾹 누르면 연속) */}
           <div className="flex items-center gap-0.5">
-            <Button size="icon" variant="ghost" className="size-7" onClick={() => nudge(-FRAME)} title="이전 프레임 (←)">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7"
+              onPointerDown={() => startFrameHold(-FRAME)}
+              onPointerUp={stopFrameHold}
+              onPointerLeave={stopFrameHold}
+              onPointerCancel={stopFrameHold}
+              title="이전 프레임 (←) · 꾹 누르면 연속"
+            >
               <ChevronLeft className="size-4" />
             </Button>
             <Button size="icon" variant="ghost" className="size-7" onClick={togglePlay} title="재생/정지 (Space)">
               {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
             </Button>
-            <Button size="icon" variant="ghost" className="size-7" onClick={() => nudge(FRAME)} title="다음 프레임 (→)">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7"
+              onPointerDown={() => startFrameHold(FRAME)}
+              onPointerUp={stopFrameHold}
+              onPointerLeave={stopFrameHold}
+              onPointerCancel={stopFrameHold}
+              title="다음 프레임 (→) · 꾹 누르면 연속"
+            >
               <ChevronRight className="size-4" />
             </Button>
           </div>
@@ -246,6 +303,7 @@ export default function PostPage() {
               toolMode={toolMode}
               binDragKind={binDragKind}
               audioClips={audioClips}
+              audioTracks={audioTracks}
               onSeek={seek}
               onSelect={selectClip}
               onToggleSelect={toggleClipSelection}
@@ -260,9 +318,12 @@ export default function PostPage() {
               onSetSpeed={setSpeed}
               onAddAudioSource={addAudioSource}
               onAddAudioFromSource={addAudioClipFromSource}
+              onAddAudioTrack={addAudioTrack}
+              onRemoveAudioTrack={removeAudioTrack}
               onToggleAudioMute={toggleAudioMute}
               onRemoveAudio={removeAudioClip}
               onMoveAudio={moveAudioClip}
+              onSetAudioVolume={setAudioVolume}
               onSplitAudio={splitAudioClipAt}
               onSelectAudio={selectAudioClip}
               onPushHistory={pushHistory}

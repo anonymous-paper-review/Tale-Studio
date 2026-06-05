@@ -7,6 +7,7 @@ export interface PersistedEditor {
   videoClips: VideoClip[]
   audioClips: AudioTrackClip[]
   audioSources: AudioSource[]
+  audioTracks?: { id: string }[]
   panelSizes: { sourceW: number; previewH: number }
 }
 
