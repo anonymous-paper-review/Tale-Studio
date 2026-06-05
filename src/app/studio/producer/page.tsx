@@ -30,8 +30,10 @@ export default function MeetingPage() {
   }, [redirectTo, router])
 
   const handleHandoff = async () => {
+    // writer는 백그라운드 전용 스테이지 → artist로 직행 (decisions #37).
+    // 씬/샷/연출 생성은 saveAndHandoff가 백그라운드로 발사한다.
     const ok = await saveAndHandoff()
-    if (ok) setRedirectTo('/studio/writer')
+    if (ok) setRedirectTo('/studio/artist')
   }
 
   return (
@@ -66,7 +68,7 @@ export default function MeetingPage() {
             </>
           ) : hasMinSettings ? (
             <>
-              Ready! Hand over to Script Room
+              Ready! Hand over to Concept Artist
               <ArrowRight className="ml-2 size-4" />
             </>
           ) : (

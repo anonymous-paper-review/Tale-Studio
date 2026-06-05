@@ -185,7 +185,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               name: c.name,
               role: c.role as 'protagonist' | 'antagonist' | 'supporting',
               description: c.description ?? '',
-              fixedPrompt: c.fixed_prompt ?? '',
+              fixedPrompt: c.appearance ?? '',
               referenceImages: [],
             })),
             locations: (dbLocs ?? []).map((l) => ({
@@ -208,7 +208,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             },
             locked: c.locked ?? false,
             description: c.description ?? '',
-            fixedPrompt: c.fixed_prompt ?? '',
+            fixedPrompt: c.appearance ?? '',
           }))
           const worldAssets: WorldAsset[] = (dbLocs ?? []).map((l) => ({
             locationId: l.location_id,

@@ -9,7 +9,7 @@
 | MVP 저장소 | Zustand store + localStorage persist |
 | 미래 저장소 | Supabase (이미지는 별도 스토리지 결정 후 마이그레이션) |
 
-상위 의존: `specs/data/canvas_data_model.md`의 `NodeData`, `GeneratedImage`, `Registration`.
+상위 의존: `specs/archive/2026-06-04-redesign-l0-canvas/canvas_data_model.md`의 `NodeData`, `GeneratedImage`, `Registration`.
 
 ---
 

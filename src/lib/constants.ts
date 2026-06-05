@@ -6,15 +6,8 @@ export const STAGES = [
     name: 'The Meeting Room',
     agent: 'Producer',
     path: '/studio/producer',
-    handoffLabel: 'Hand over to Writer',
-    nextStage: 'writer',
-  },
-  {
-    id: 'writer',
-    name: 'The Script Room',
-    agent: 'Writer',
-    path: '/studio/writer',
-    handoffLabel: 'Ask Concept Artist',
+    // writer는 백엔드 전용 스테이지(UI 없음) — 핸드오프는 artist로 직행 (decisions #37, §3 일원화)
+    handoffLabel: 'Hand over to Concept Artist',
     nextStage: 'artist',
   },
   {

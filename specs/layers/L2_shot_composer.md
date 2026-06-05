@@ -2,6 +2,12 @@
 
 > 씬 → 샷 시퀀스 + 대화 생성
 
+> ## ⚠️ 현행 (2026-06-05, decision #38) — 이 레이어는 **writer 엔진**이 구현
+> - **메커니즘 변경**: 옛 `Shot Composer`(`generate-scenes`의 L2-Lite)는 **폐기**. 지금은 **writer 엔진**(옛 svc)의 `decoupage → L4(shotDesign) → shot_sequence` 스테이지가 수행 → `src/lib/writer/pipeline/stages/{decoupage,l4_shots,c_application_2}.ts`. DB 기록은 `persist_manifest.ts`(샷별 대사는 `shot_sequence` 출처).
+> - **산출물 계약(source-of-truth = 코드 + `.claude/cache/db`)**: `shots` 테이블(+`dialogue_lines`). 스키마는 캐시 참조.
+> - **용어 주의**: "L2"는 *앱 파이프라인 라벨*. writer 엔진의 `L2Design`(productionDesign 예정, 팔레트/의상)과는 **다른 것** — 헷갈리지 말 것.
+> - 아래 본문은 **원 설계 의도(historical)** 참고용.
+
 ## 역할
 
 L1이 생성한 씬을 샷 시퀀스로 분해하고, 대화 씬에서는 대사를 생성한다.

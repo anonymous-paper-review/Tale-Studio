@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
@@ -16,49 +14,58 @@ export type Database = {
     Tables: {
       characters: {
         Row: {
-          character_id: string
-          created_at: string | null
-          description: string | null
-          fixed_prompt: string | null
           id: string
-          locked: boolean | null
-          name: string
           project_id: string
+          character_id: string
+          name: string
           role: string | null
-          updated_at: string | null
-          view_back: string | null
+          description: string | null
           view_front: string | null
           view_side: string | null
+          view_back: string | null
+          locked: boolean | null
+          created_at: string | null
+          updated_at: string | null
+          view_three_quarter_left: string | null
+          view_three_quarter_right: string | null
+          appearance: string | null
+          costume: string[] | null
         }
         Insert: {
-          character_id: string
-          created_at?: string | null
-          description?: string | null
-          fixed_prompt?: string | null
           id?: string
-          locked?: boolean | null
-          name: string
           project_id: string
+          character_id: string
+          name: string
           role?: string | null
-          updated_at?: string | null
-          view_back?: string | null
+          description?: string | null
           view_front?: string | null
           view_side?: string | null
+          view_back?: string | null
+          locked?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+          view_three_quarter_left?: string | null
+          view_three_quarter_right?: string | null
+          appearance?: string | null
+          costume?: string[] | null
         }
         Update: {
-          character_id?: string
-          created_at?: string | null
-          description?: string | null
-          fixed_prompt?: string | null
           id?: string
-          locked?: boolean | null
-          name?: string
           project_id?: string
+          character_id?: string
+          name?: string
           role?: string | null
-          updated_at?: string | null
-          view_back?: string | null
+          description?: string | null
           view_front?: string | null
           view_side?: string | null
+          view_back?: string | null
+          locked?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+          view_three_quarter_left?: string | null
+          view_three_quarter_right?: string | null
+          appearance?: string | null
+          costume?: string[] | null
         }
         Relationships: [
           {
@@ -72,85 +79,95 @@ export type Database = {
       }
       knowledge_techniques: {
         Row: {
-          category: string
-          created_at: string | null
-          description: string | null
-          emotional_tags: string[]
           id: number
-          name: string
-          prompt_fragment: string
-          shot_type_affinity: string[]
           technique_id: string
+          name: string
+          category: string
+          prompt_fragment: string
+          emotional_tags: string[]
+          shot_type_affinity: string[]
+          description: string | null
+          created_at: string | null
           updated_at: string | null
         }
         Insert: {
-          category: string
-          created_at?: string | null
-          description?: string | null
-          emotional_tags?: string[]
           id?: number
-          name: string
-          prompt_fragment: string
-          shot_type_affinity?: string[]
           technique_id: string
+          name: string
+          category: string
+          prompt_fragment: string
+          emotional_tags?: string[]
+          shot_type_affinity?: string[]
+          description?: string | null
+          created_at?: string | null
           updated_at?: string | null
         }
         Update: {
-          category?: string
-          created_at?: string | null
-          description?: string | null
-          emotional_tags?: string[]
           id?: number
-          name?: string
-          prompt_fragment?: string
-          shot_type_affinity?: string[]
           technique_id?: string
+          name?: string
+          category?: string
+          prompt_fragment?: string
+          emotional_tags?: string[]
+          shot_type_affinity?: string[]
+          description?: string | null
+          created_at?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+        ]
       }
       locations: {
         Row: {
-          created_at: string | null
-          establishing_shot: string | null
           id: string
-          lighting_direction: string | null
-          location_id: string
-          name: string
           project_id: string
+          location_id: string
           scene_id: string | null
-          time_of_day: string | null
-          updated_at: string | null
+          name: string
           visual_description: string | null
+          time_of_day: string | null
+          lighting_direction: string | null
           wide_shot: string | null
+          establishing_shot: string | null
+          created_at: string | null
+          updated_at: string | null
+          style_description: string | null
+          lighting_sources: string[] | null
+          props: string[] | null
         }
         Insert: {
-          created_at?: string | null
-          establishing_shot?: string | null
           id?: string
-          lighting_direction?: string | null
-          location_id: string
-          name: string
           project_id: string
+          location_id: string
           scene_id?: string | null
-          time_of_day?: string | null
-          updated_at?: string | null
+          name: string
           visual_description?: string | null
+          time_of_day?: string | null
+          lighting_direction?: string | null
           wide_shot?: string | null
+          establishing_shot?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          style_description?: string | null
+          lighting_sources?: string[] | null
+          props?: string[] | null
         }
         Update: {
-          created_at?: string | null
-          establishing_shot?: string | null
           id?: string
-          lighting_direction?: string | null
-          location_id?: string
-          name?: string
           project_id?: string
+          location_id?: string
           scene_id?: string | null
-          time_of_day?: string | null
-          updated_at?: string | null
+          name?: string
           visual_description?: string | null
+          time_of_day?: string | null
+          lighting_direction?: string | null
           wide_shot?: string | null
+          establishing_shot?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          style_description?: string | null
+          lighting_sources?: string[] | null
+          props?: string[] | null
         }
         Relationships: [
           {
@@ -162,39 +179,77 @@ export type Database = {
           },
         ]
       }
-      projects: {
+      messages: {
         Row: {
-          created_at: string | null
-          current_stage: string | null
-          expanded_story: string | null
           id: string
-          settings: Json | null
-          story_text: string | null
-          title: string
-          updated_at: string | null
-          workspace_id: string
+          project_id: string
+          stage: string
+          role: string
+          content: string
+          created_at: string | null
         }
         Insert: {
-          created_at?: string | null
-          current_stage?: string | null
-          expanded_story?: string | null
           id?: string
-          settings?: Json | null
-          story_text?: string | null
-          title?: string
-          updated_at?: string | null
-          workspace_id: string
+          project_id: string
+          stage: string
+          role: string
+          content: string
+          created_at?: string | null
         }
         Update: {
-          created_at?: string | null
-          current_stage?: string | null
-          expanded_story?: string | null
           id?: string
-          settings?: Json | null
-          story_text?: string | null
+          project_id?: string
+          stage?: string
+          role?: string
+          content?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          id: string
+          workspace_id: string
+          title: string
+          story_text: string | null
+          expanded_story: string | null
+          settings: Json | null
+          current_stage: string | null
+          created_at: string | null
+          updated_at: string | null
+          design_tokens: Json | null
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
           title?: string
+          story_text?: string | null
+          expanded_story?: string | null
+          settings?: Json | null
+          current_stage?: string | null
+          created_at?: string | null
           updated_at?: string | null
+          design_tokens?: Json | null
+        }
+        Update: {
+          id?: string
           workspace_id?: string
+          title?: string
+          story_text?: string | null
+          expanded_story?: string | null
+          settings?: Json | null
+          current_stage?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          design_tokens?: Json | null
         }
         Relationships: [
           {
@@ -208,48 +263,48 @@ export type Database = {
       }
       scenes: {
         Row: {
-          characters_present: string[] | null
-          created_at: string | null
-          estimated_duration_seconds: number | null
           id: string
-          location: string | null
-          mood: string | null
-          narrative_summary: string | null
-          original_text_quote: string | null
           project_id: string
           scene_id: string
-          sort_order: number | null
+          narrative_summary: string | null
+          original_text_quote: string | null
+          location: string | null
           time_of_day: string | null
+          mood: string | null
+          characters_present: string[] | null
+          estimated_duration_seconds: number | null
+          sort_order: number | null
+          created_at: string | null
           updated_at: string | null
         }
         Insert: {
-          characters_present?: string[] | null
-          created_at?: string | null
-          estimated_duration_seconds?: number | null
           id?: string
-          location?: string | null
-          mood?: string | null
-          narrative_summary?: string | null
-          original_text_quote?: string | null
           project_id: string
           scene_id: string
-          sort_order?: number | null
+          narrative_summary?: string | null
+          original_text_quote?: string | null
+          location?: string | null
           time_of_day?: string | null
+          mood?: string | null
+          characters_present?: string[] | null
+          estimated_duration_seconds?: number | null
+          sort_order?: number | null
+          created_at?: string | null
           updated_at?: string | null
         }
         Update: {
-          characters_present?: string[] | null
-          created_at?: string | null
-          estimated_duration_seconds?: number | null
           id?: string
-          location?: string | null
-          mood?: string | null
-          narrative_summary?: string | null
-          original_text_quote?: string | null
           project_id?: string
           scene_id?: string
-          sort_order?: number | null
+          narrative_summary?: string | null
+          original_text_quote?: string | null
+          location?: string | null
           time_of_day?: string | null
+          mood?: string | null
+          characters_present?: string[] | null
+          estimated_duration_seconds?: number | null
+          sort_order?: number | null
+          created_at?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -264,64 +319,94 @@ export type Database = {
       }
       shots: {
         Row: {
+          id: string
+          project_id: string
+          scene_id: string
+          shot_id: string
+          shot_type: string
           action_description: string | null
-          camera_config: Json | null
           characters: string[] | null
-          created_at: string | null
-          dialogue_lines: Json | null
           duration_seconds: number | null
           generation_method: string | null
-          id: string
+          dialogue_lines: Json | null
+          camera_config: Json | null
           lighting_config: Json | null
-          movement_intensity: number | null
-          movement_preset: string | null
-          project_id: string
           prompt: string | null
-          scene_id: string
-          shot_id: string
-          shot_type: string
           sort_order: number | null
+          created_at: string | null
           updated_at: string | null
+          trim_start: number | null
+          trim_end: number | null
+          video_url: string | null
+          reference_image: string | null
+          camera_brand: string | null
+          focal_length: number | null
+          aperture: number | null
+          white_balance: number | null
+          movement_preset: string | null
+          movement_intensity: number | null
+          speed: number | null
+          storyboard_image: Json | null
         }
         Insert: {
-          action_description?: string | null
-          camera_config?: Json | null
-          characters?: string[] | null
-          created_at?: string | null
-          dialogue_lines?: Json | null
-          duration_seconds?: number | null
-          generation_method?: string | null
           id?: string
-          lighting_config?: Json | null
-          movement_intensity?: number | null
-          movement_preset?: string | null
           project_id: string
-          prompt?: string | null
           scene_id: string
           shot_id: string
           shot_type: string
-          sort_order?: number | null
-          updated_at?: string | null
-        }
-        Update: {
           action_description?: string | null
-          camera_config?: Json | null
           characters?: string[] | null
-          created_at?: string | null
-          dialogue_lines?: Json | null
           duration_seconds?: number | null
           generation_method?: string | null
-          id?: string
+          dialogue_lines?: Json | null
+          camera_config?: Json | null
           lighting_config?: Json | null
-          movement_intensity?: number | null
-          movement_preset?: string | null
-          project_id?: string
           prompt?: string | null
+          sort_order?: number | null
+          created_at?: string | null
+          updated_at?: string | null
+          trim_start?: number | null
+          trim_end?: number | null
+          video_url?: string | null
+          reference_image?: string | null
+          camera_brand?: string | null
+          focal_length?: number | null
+          aperture?: number | null
+          white_balance?: number | null
+          movement_preset?: string | null
+          movement_intensity?: number | null
+          speed?: number | null
+          storyboard_image?: Json | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
           scene_id?: string
           shot_id?: string
           shot_type?: string
+          action_description?: string | null
+          characters?: string[] | null
+          duration_seconds?: number | null
+          generation_method?: string | null
+          dialogue_lines?: Json | null
+          camera_config?: Json | null
+          lighting_config?: Json | null
+          prompt?: string | null
           sort_order?: number | null
+          created_at?: string | null
           updated_at?: string | null
+          trim_start?: number | null
+          trim_end?: number | null
+          video_url?: string | null
+          reference_image?: string | null
+          camera_brand?: string | null
+          focal_length?: number | null
+          aperture?: number | null
+          white_balance?: number | null
+          movement_preset?: string | null
+          movement_intensity?: number | null
+          speed?: number | null
+          storyboard_image?: Json | null
         }
         Relationships: [
           {
@@ -335,43 +420,43 @@ export type Database = {
       }
       video_clips: {
         Row: {
-          created_at: string | null
-          duration: number | null
           id: string
           project_id: string
           shot_id: string
-          status: string | null
           storage_path: string | null
+          url: string | null
           thumbnail_path: string | null
           thumbnail_url: string | null
+          status: string | null
+          duration: number | null
+          created_at: string | null
           updated_at: string | null
-          url: string | null
         }
         Insert: {
-          created_at?: string | null
-          duration?: number | null
           id?: string
           project_id: string
           shot_id: string
-          status?: string | null
           storage_path?: string | null
+          url?: string | null
           thumbnail_path?: string | null
           thumbnail_url?: string | null
+          status?: string | null
+          duration?: number | null
+          created_at?: string | null
           updated_at?: string | null
-          url?: string | null
         }
         Update: {
-          created_at?: string | null
-          duration?: number | null
           id?: string
           project_id?: string
           shot_id?: string
-          status?: string | null
           storage_path?: string | null
+          url?: string | null
           thumbnail_path?: string | null
           thumbnail_url?: string | null
+          status?: string | null
+          duration?: number | null
+          created_at?: string | null
           updated_at?: string | null
-          url?: string | null
         }
         Relationships: [
           {
@@ -385,27 +470,31 @@ export type Database = {
       }
       workspaces: {
         Row: {
-          created_at: string | null
           id: string
           name: string
           slug: string
+          created_at: string | null
           updated_at: string | null
+          owner_id: string | null
         }
         Insert: {
-          created_at?: string | null
           id?: string
           name: string
           slug: string
+          created_at?: string | null
           updated_at?: string | null
+          owner_id?: string | null
         }
         Update: {
-          created_at?: string | null
           id?: string
           name?: string
           slug?: string
+          created_at?: string | null
           updated_at?: string | null
+          owner_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+        ]
       }
     }
     Views: {

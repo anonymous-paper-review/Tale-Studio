@@ -8,6 +8,8 @@ import { WorldPanel } from '@/features/artist/world-panel'
 import { InventoryGrid } from '@/features/artist/inventory-grid'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
+import { SvcProgress } from '@/components/layout/svc-progress'
+import { useSvcStatus } from '@/lib/writer/use-svc-status'
 
 type ArtistTab = 'characters' | 'world' | 'inventory'
 
@@ -25,12 +27,24 @@ export default function VisualPage() {
   const projectId = useProjectStore((s) => s.projectId)
   const [tab, setTab] = useState<ArtistTab>('characters')
 
+  // svc-pipeline 진행상황 (producer→artist 직행 시 백그라운드 생성 진행 표시용, decisions #37)
+  const { status: svcStatus } = useSvcStatus(projectId)
+
   // 프로젝트당 1회만 자동생성 트리거 (마운트/재진입 중복 방지)
   const autoGenTriggeredRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (projectId) loadData()
   }, [projectId, loadData])
+
+  // 백그라운드 generate-scenes가 DB(scenes/characters/locations)를 채울 때까지 폴링 재로드.
+  // loadData는 idempotent — 데이터가 들어오면 빈 화면(progress)에서 카드 UI로 자동 전환.
+  const hasArtistData = characterAssets.length > 0 || worldAssets.length > 0
+  useEffect(() => {
+    if (!projectId || hasArtistData) return
+    const id = setInterval(() => loadData(), 3000)
+    return () => clearInterval(id)
+  }, [projectId, hasArtistData, loadData])
 
   // Writer→Artist 첫 진입 시 기본 필수 이미지 자동생성 (1회+캐시).
   // 데이터가 채워진 뒤, 이미 없는(null) 이미지만 내부에서 생성하므로 안전.
@@ -42,16 +56,23 @@ export default function VisualPage() {
     void autoGenerateBaseImages()
   }, [projectId, characterAssets.length, worldAssets.length, autoGenerateBaseImages])
 
+  // 데이터 미준비 = 백그라운드 생성 진행 중 → progress bar 블로킹 (decisions #37).
+  // writer 스테이지가 숨겨졌으므로 "Complete the Script Room first" 안내는 더 이상 유효치 않음.
   if (characterAssets.length === 0 && worldAssets.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">The Visual Studio</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Complete the Script Room first to generate characters and
-            locations.
-          </p>
-        </div>
+      <div className="flex flex-1 items-center justify-center p-8">
+        {svcStatus?.pipeline_failed ? (
+          <div className="mx-auto w-full max-w-md text-center">
+            <h1 className="text-xl font-bold text-destructive">
+              AI 자동 생성 실패
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {svcStatus.error ?? '백그라운드 생성에 실패했습니다. Producer로 돌아가 다시 시도하세요.'}
+            </p>
+          </div>
+        ) : (
+          <SvcProgress status={svcStatus} />
+        )}
       </div>
     )
   }

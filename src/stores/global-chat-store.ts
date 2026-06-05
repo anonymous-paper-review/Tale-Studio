@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import type { StageId } from '@/types'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
-import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useDirectorStore } from '@/stores/director-store'
 import {
@@ -88,19 +87,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           history: historyPayload,
           currentSettings: p.projectSettings,
           storyText: p.storyText,
-        }
-        break
-      }
-      case 'writer': {
-        const w = useWriterStore.getState()
-        const selectedShot =
-          w.shots.find((s) => s.shotId === w.selectedShotId) ?? null
-        endpoint = '/api/write/chat'
-        body = {
-          message: trimmed,
-          history: historyPayload,
-          sceneContext: w.sceneManifest,
-          shotContext: selectedShot,
         }
         break
       }
@@ -222,9 +208,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         useProducerStore
           .getState()
           .applyExtractedSettings(data.extractedSettings)
-      }
-      if (stage === 'writer' && Array.isArray(data.updates)) {
-        useWriterStore.getState().applyUpdates(data.updates)
       }
       if (stage === 'artist' && Array.isArray(data.updates)) {
         // TODO: card UI 롤백 — 과거 canvas-store(node graph) 전용 updates 디스패치를

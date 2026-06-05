@@ -2,6 +2,13 @@
 
 > Pumpup (전처리) + Scene 분할
 
+> ## ⚠️ 현행 (2026-06-05, decision #38) — 이 레이어는 **writer 엔진**이 구현
+> - **메커니즘 변경**: 옛 `Pumpup → Scene Architect`(`generate-scenes`)는 **폐기**. 지금은 **writer 파이프라인 엔진**(옛 svc)이 수행 → `src/lib/writer/pipeline/stages/{s1_structure,s2_characters,s3_scenes}.ts`. DB 기록은 `persist_manifest.ts`.
+> - **산출물 계약(현행 source-of-truth = 코드 + `.claude/cache/db`)**: `scenes` / `characters` / `locations` 테이블. 스키마는 캐시 참조.
+> - **stale 정정**: 아래 본문 `character_sheet`의 **"Fixed Prompt"** → 현재 `characters.appearance` (컬럼 `fixed_prompt`는 009로 **DROP**). `scene_manifest`의 **"Act 배분(기승전결)"** → `scenes.act` 컬럼 **드롭됨(004)**.
+> - **용어 주의**: 여기 "L1"은 *앱 파이프라인 레이어 라벨*(제품 단계)이고, writer 엔진 내부 스테이지(`S0~L7`)와는 **다른 축**. (글로서리: `CLAUDE.md` 라우터)
+> - 아래 본문은 **원 설계 의도(historical)** — *계약/원칙*(보존 규칙 등)은 유효, *메커니즘 서술*(Pumpup 단계)은 옛 writer 기준 참고용.
+
 ## 역할
 
 스토리 텍스트를 받아 시각화 정보를 보강(Pumpup)한 뒤, 씬 단위로 분할하고 캐릭터/로케이션을 정의한다.

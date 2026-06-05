@@ -209,7 +209,7 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
               name: c.name,
               role: c.role as 'protagonist' | 'antagonist' | 'supporting',
               description: c.description ?? '',
-              fixedPrompt: c.fixed_prompt ?? '',
+              fixedPrompt: c.appearance ?? '',
               referenceImages: [],
             })),
             locations: (dbLocs ?? []).map((l) => ({

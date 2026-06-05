@@ -1,0 +1,3 @@
+# DB schema cache holds live row data + project URL — local only.
+# The generator (_refresh.py) stays tracked so anyone can regenerate.
+db/*.md

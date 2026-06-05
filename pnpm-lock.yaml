@@ -65,6 +65,9 @@ importers:
       react-dom:
         specifier: 19.2.3
         version: 19.2.3(react@19.2.3)
+      sharp:
+        specifier: ^0.34.5
+        version: 0.34.5
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -102,9 +105,15 @@ importers:
       eslint-config-next:
         specifier: 16.1.6
         version: 16.1.6(@typescript-eslint/parser@8.56.1(eslint@9.39.3(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.3(jiti@2.6.1))(typescript@5.9.3)
+      pg:
+        specifier: ^8.21.0
+        version: 8.21.0
       shadcn:
         specifier: ^3.8.5
         version: 3.8.5(@types/node@20.19.35)(typescript@5.9.3)
+      supabase:
+        specifier: ^2.104.0
+        version: 2.104.0
       tailwindcss:
         specifier: ^4
         version: 4.2.1
@@ -288,9 +297,6 @@ packages:
 
   '@emnapi/runtime@1.10.0':
     resolution: {integrity: sha512-ewvYlk86xUoGI0zQRNq/mC+16R1QeDlKQy21Ki3oSYXNgLb45GV1P6A0M+/s6nyCuNDqe5VpaY84BzXGwVbwFA==}
-
-  '@emnapi/runtime@1.8.1':
-    resolution: {integrity: sha512-mehfKSMWjjNol8659Z8KxEMrdSJDDot5SXMq00dM8BN4o+CLNXQ0xH2V7EchNHV4RmbZLmmPdEaXZc5H2FXmDg==}
 
   '@emnapi/wasi-threads@1.1.0':
     resolution: {integrity: sha512-WI0DdZ8xFSbgMjR1sFsKABJ/C5OnRrjT06JXbZKexJGrDuPTzZdDYfFlsgcCXCyf+suG5QU2e/y1Wo2V/OapLQ==}
@@ -1561,6 +1567,50 @@ packages:
   '@supabase/auth-js@2.98.0':
     resolution: {integrity: sha512-GBH361T0peHU91AQNzOlIrjUZw9TZbB9YDRiyFgk/3Kvr3/Z1NWUZ2athWTfHhwNNi8IrW00foyFxQD9IO/Trg==}
     engines: {node: '>=20.0.0'}
+
+  '@supabase/cli-darwin-arm64@2.104.0':
+    resolution: {integrity: sha512-cFCNtrdfDvaNFR28PEsokuZfxCFSfDJOrzKZOEAR7WbygNRRABd4ufw6GWGHm+djshM5nDkv72et+isTFK63kw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@supabase/cli-darwin-x64@2.104.0':
+    resolution: {integrity: sha512-jX4vUCfMxUb/juhEqlAY6kKueHlXaoK2SbuRxaIWaYVhtxX0HVyC6Jg4dxyIoGCj9QdKpTkDkZYBBHbSy39QIA==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@supabase/cli-linux-arm64-musl@2.104.0':
+    resolution: {integrity: sha512-ELG6O67UHn+9+nADtvFUyHWs78A5cPEWlEA5tBgknTsMp4dKLaqbdY6W7W9Ej+jNRKzXP5/z+7gXWknOCpqiZg==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@supabase/cli-linux-arm64@2.104.0':
+    resolution: {integrity: sha512-3t4DMk6rCb/6Ujk6M4z41Et3ar/gQCqprsJ7rXYdTF98eTCmbk1wr6qz3CoA0A4/CoZfyw4iF9vY5iRdVbDiNw==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@supabase/cli-linux-x64-musl@2.104.0':
+    resolution: {integrity: sha512-a6qt47EtNmWAc+Nmjt6slXvJfMCTTxl7Zio47Baj8M57UHKkF6hDQhkhlrJyj7ZI/1uKeEEAuzI+GP9q1Gq9CQ==}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@supabase/cli-linux-x64@2.104.0':
+    resolution: {integrity: sha512-2ZmgMv/ViJY3TYEna0Ed0YNcFvBLYT+4k9RCRcly1HMuMebZ85D06s6km5YHQdo/3L/BoSYHh5kuN5xI6P94lw==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@supabase/cli-windows-arm64@2.104.0':
+    resolution: {integrity: sha512-v+lBzh7C3PiKKdsgymdmCu5JhSBqpn+lx+c4/btpmg8ytJYVxzJ35YzsKXgPT8syfuJd/5pnowOqR5vltmCOmQ==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@supabase/cli-windows-x64@2.104.0':
+    resolution: {integrity: sha512-8jXnURCDTenYo+7bwja3RrLCuYRcQp7pbwbrzRhHsjkwtljK4d5Q/UDENYvgjBHe8q50olla+sbZYyjYvOaK2g==}
+    cpu: [x64]
+    os: [win32]
 
   '@supabase/functions-js@2.98.0':
     resolution: {integrity: sha512-N/xEyiNU5Org+d+PNCpv+TWniAXRzxIURxDYsS/m2I/sfAB/HcM9aM2Dmf5edj5oWb9GxID1OBaZ8NMmPXL+Lg==}
@@ -3729,6 +3779,40 @@ packages:
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
+  pg-cloudflare@1.4.0:
+    resolution: {integrity: sha512-Vo7z/6rrQYxpNRylp4Tlob2elzbh+N/MOQbxFVWCxS7oEx6jF53GTJFxK2WWpKuBRkmiin4Mt+xofFDjx09R0A==}
+
+  pg-connection-string@2.13.0:
+    resolution: {integrity: sha512-EMnU9E2fSULdsbErBbMaXJvFeD9B4+nPcM3f+4lsiCR0BHLPrLVjv3DbyM2hgQQviKJaTWIRRTjKjWlHg3p2ig==}
+
+  pg-int8@1.0.1:
+    resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}
+    engines: {node: '>=4.0.0'}
+
+  pg-pool@3.14.0:
+    resolution: {integrity: sha512-gKtPkFdQPU3DksooVLi9LsjZxrsBUZIpa+7aVx+LV5pNh0KzP4Zleud2po+ConrxbuXGBJ6Hfer6hdgpIBpBaw==}
+    peerDependencies:
+      pg: '>=8.0'
+
+  pg-protocol@1.14.0:
+    resolution: {integrity: sha512-n5taZ1kO3s9ngDTVxsEznOqCyToTgz0FLuPq0B33COy5pPpuWJpY3/2oRBVETuOgzdqRXfWpM9HIhp2LBBT1BA==}
+
+  pg-types@2.2.0:
+    resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
+    engines: {node: '>=4'}
+
+  pg@8.21.0:
+    resolution: {integrity: sha512-AUP1EYJuHraQGsVoCQVIcM7TEJVGtDzxWtGFZd8rds9d+CCXlU5Js1rYgfLNvxy9iJrpHjGrRjoi/3BT9fRyiA==}
+    engines: {node: '>= 16.0.0'}
+    peerDependencies:
+      pg-native: '>=3.0.1'
+    peerDependenciesMeta:
+      pg-native:
+        optional: true
+
+  pgpass@1.0.5:
+    resolution: {integrity: sha512-FdW9r/jQZhSeohs1Z3sI1yxFQNFvMcnmfuj4WBMUTxOrAyLMaTcE1aAMBiTlbMNaXvBCQuVi0R7hd8udDSP7ug==}
+
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -3767,6 +3851,22 @@ packages:
   postcss@8.5.8:
     resolution: {integrity: sha512-OW/rX8O/jXnm82Ey1k44pObPtdblfiuWnrd8X7GJ7emImCOstunGbXUpp7HdBrFQX6rJzn3sPT397Wp5aCwCHg==}
     engines: {node: ^10 || ^12 || >=14}
+
+  postgres-array@2.0.0:
+    resolution: {integrity: sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA==}
+    engines: {node: '>=4'}
+
+  postgres-bytea@1.0.1:
+    resolution: {integrity: sha512-5+5HqXnsZPE65IJZSMkZtURARZelel2oXUEO8rH83VS/hxH5vv1uHquPg5wZs8yMAfdv971IU+kcPUczi7NVBQ==}
+    engines: {node: '>=0.10.0'}
+
+  postgres-date@1.0.7:
+    resolution: {integrity: sha512-suDmjLVQg78nMK2UZ454hAG+OAW+HQPZ6n++TNDUX+L0+uUlLywnoxJKDou51Zm+zTCjrCl0Nq6J9C5hP9vK/Q==}
+    engines: {node: '>=0.10.0'}
+
+  postgres-interval@1.2.0:
+    resolution: {integrity: sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==}
+    engines: {node: '>=0.10.0'}
 
   powershell-utils@0.1.0:
     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
@@ -4071,6 +4171,10 @@ packages:
     resolution: {integrity: sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==}
     engines: {node: '>=0.10.0'}
 
+  split2@4.2.0:
+    resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
+    engines: {node: '>= 10.x'}
+
   stable-hash@0.0.5:
     resolution: {integrity: sha512-+L3ccpzibovGXFK+Ap/f8LOS0ahMrHTf3xu7mMLSpEGU0EO9ucaysSylKo9eRDFNhWve/y275iPmIZ4z39a9iA==}
 
@@ -4173,6 +4277,10 @@ packages:
         optional: true
       babel-plugin-macros:
         optional: true
+
+  supabase@2.104.0:
+    resolution: {integrity: sha512-RAX5ZQSX3BkdBEbG737idbVaVxbRxfsGsRQ7GPzM9F/xQbt9xF3Kf0x7x87mcBv9Vwog8eg/REjGWZxiWOHnXw==}
+    hasBin: true
 
   supports-color@7.2.0:
     resolution: {integrity: sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==}
@@ -4526,6 +4634,10 @@ packages:
     resolution: {integrity: sha512-g/eziiSUNBSsdDJtCLB8bdYEUMj4jR7AGeUo96p/3dTafgjHhpF4RiCFPiRILwjQoDXx5MqkBr4fwWtR3Ky4Wg==}
     engines: {node: '>=20'}
 
+  xtend@4.0.2:
+    resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
+    engines: {node: '>=0.4'}
+
   y18n@5.0.8:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
     engines: {node: '>=10'}
@@ -4841,11 +4953,6 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@emnapi/runtime@1.8.1':
-    dependencies:
-      tslib: 2.8.1
-    optional: true
-
   '@emnapi/wasi-threads@1.1.0':
     dependencies:
       tslib: 2.8.1
@@ -4955,8 +5062,7 @@ snapshots:
 
   '@humanwhocodes/retry@0.4.3': {}
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.34.5':
     optionalDependencies:
@@ -5040,7 +5146,7 @@ snapshots:
 
   '@img/sharp-wasm32@0.34.5':
     dependencies:
-      '@emnapi/runtime': 1.8.1
+      '@emnapi/runtime': 1.10.0
     optional: true
 
   '@img/sharp-win32-arm64@0.34.5':
@@ -5144,7 +5250,7 @@ snapshots:
   '@napi-rs/wasm-runtime@0.2.12':
     dependencies:
       '@emnapi/core': 1.8.1
-      '@emnapi/runtime': 1.8.1
+      '@emnapi/runtime': 1.10.0
       '@tybys/wasm-util': 0.10.1
     optional: true
 
@@ -6053,6 +6159,30 @@ snapshots:
   '@supabase/auth-js@2.98.0':
     dependencies:
       tslib: 2.8.1
+
+  '@supabase/cli-darwin-arm64@2.104.0':
+    optional: true
+
+  '@supabase/cli-darwin-x64@2.104.0':
+    optional: true
+
+  '@supabase/cli-linux-arm64-musl@2.104.0':
+    optional: true
+
+  '@supabase/cli-linux-arm64@2.104.0':
+    optional: true
+
+  '@supabase/cli-linux-x64-musl@2.104.0':
+    optional: true
+
+  '@supabase/cli-linux-x64@2.104.0':
+    optional: true
+
+  '@supabase/cli-windows-arm64@2.104.0':
+    optional: true
+
+  '@supabase/cli-windows-x64@2.104.0':
+    optional: true
 
   '@supabase/functions-js@2.98.0':
     dependencies:
@@ -8326,6 +8456,41 @@ snapshots:
 
   pathe@2.0.3: {}
 
+  pg-cloudflare@1.4.0:
+    optional: true
+
+  pg-connection-string@2.13.0: {}
+
+  pg-int8@1.0.1: {}
+
+  pg-pool@3.14.0(pg@8.21.0):
+    dependencies:
+      pg: 8.21.0
+
+  pg-protocol@1.14.0: {}
+
+  pg-types@2.2.0:
+    dependencies:
+      pg-int8: 1.0.1
+      postgres-array: 2.0.0
+      postgres-bytea: 1.0.1
+      postgres-date: 1.0.7
+      postgres-interval: 1.2.0
+
+  pg@8.21.0:
+    dependencies:
+      pg-connection-string: 2.13.0
+      pg-pool: 3.14.0(pg@8.21.0)
+      pg-protocol: 1.14.0
+      pg-types: 2.2.0
+      pgpass: 1.0.5
+    optionalDependencies:
+      pg-cloudflare: 1.4.0
+
+  pgpass@1.0.5:
+    dependencies:
+      split2: 4.2.0
+
   picocolors@1.1.1: {}
 
   picomatch@2.3.1: {}
@@ -8360,6 +8525,16 @@ snapshots:
       nanoid: 3.3.11
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  postgres-array@2.0.0: {}
+
+  postgres-bytea@1.0.1: {}
+
+  postgres-date@1.0.7: {}
+
+  postgres-interval@1.2.0:
+    dependencies:
+      xtend: 4.0.2
 
   powershell-utils@0.1.0: {}
 
@@ -8791,7 +8966,6 @@ snapshots:
       '@img/sharp-win32-arm64': 0.34.5
       '@img/sharp-win32-ia32': 0.34.5
       '@img/sharp-win32-x64': 0.34.5
-    optional: true
 
   shebang-command@2.0.0:
     dependencies:
@@ -8843,6 +9017,8 @@ snapshots:
   source-map-js@1.2.1: {}
 
   source-map@0.6.1: {}
+
+  split2@4.2.0: {}
 
   stable-hash@0.0.5: {}
 
@@ -8961,6 +9137,17 @@ snapshots:
       react: 19.2.3
     optionalDependencies:
       '@babel/core': 7.29.0
+
+  supabase@2.104.0:
+    optionalDependencies:
+      '@supabase/cli-darwin-arm64': 2.104.0
+      '@supabase/cli-darwin-x64': 2.104.0
+      '@supabase/cli-linux-arm64': 2.104.0
+      '@supabase/cli-linux-arm64-musl': 2.104.0
+      '@supabase/cli-linux-x64': 2.104.0
+      '@supabase/cli-linux-x64-musl': 2.104.0
+      '@supabase/cli-windows-arm64': 2.104.0
+      '@supabase/cli-windows-x64': 2.104.0
 
   supports-color@7.2.0:
     dependencies:
@@ -9297,6 +9484,8 @@ snapshots:
     dependencies:
       is-wsl: 3.1.1
       powershell-utils: 0.1.0
+
+  xtend@4.0.2: {}
 
   y18n@5.0.8: {}
 

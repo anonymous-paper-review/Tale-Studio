@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { logTiming } from './timing'
 
 const MODEL = 'claude-sonnet-4-6'
 
@@ -23,6 +24,7 @@ export async function claudeChat(
   history: HistoryMessage[],
   userMessage: string,
   temperature = 0.7,
+  label = 'chat',
 ): Promise<string> {
   const messages: Anthropic.MessageParam[] = [
     ...history.map((m) => ({
@@ -32,6 +34,7 @@ export async function claudeChat(
     { role: 'user', content: userMessage },
   ]
 
+  const t0 = performance.now()
   const response = await getClient().messages.create({
     model: MODEL,
     max_tokens: 4096,
@@ -39,6 +42,11 @@ export async function claudeChat(
     messages,
     temperature,
   })
+  const u = response.usage
+  logTiming(
+    'llm',
+    `${label} model=${MODEL} in=${u.input_tokens} out=${u.output_tokens} ${(performance.now() - t0).toFixed(0)}ms`,
+  )
 
   const block = response.content[0]
   if (block.type !== 'text') throw new Error('Unexpected response type')
@@ -50,7 +58,9 @@ export async function claudeJSON<T = unknown>(
   system: string,
   userMessage: string,
   temperature = 0.3,
+  label = 'json',
 ): Promise<T> {
+  const t0 = performance.now()
   const response = await getClient().messages.create({
     model: MODEL,
     max_tokens: 8192,
@@ -58,6 +68,11 @@ export async function claudeJSON<T = unknown>(
     messages: [{ role: 'user', content: userMessage }],
     temperature,
   })
+  const u = response.usage
+  logTiming(
+    'llm',
+    `${label} model=${MODEL} in=${u.input_tokens} out=${u.output_tokens} ${(performance.now() - t0).toFixed(0)}ms`,
+  )
 
   const block = response.content[0]
   if (block.type !== 'text') throw new Error('Unexpected response type')

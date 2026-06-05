@@ -50,7 +50,7 @@ export function Sidebar() {
 
       <div className="mb-2 h-px w-8 bg-border" />
 
-      {/* Stage navigation */}
+      {/* Stage navigation — writer는 백엔드 전용 스테이지(UI 제거, §3 일원화)라 STAGES에서 빠짐 */}
       <div className="flex flex-1 flex-col items-center gap-2">
         {STAGES.map((stage) => {
           const Icon = STAGE_ICONS[stage.id]

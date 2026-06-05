@@ -62,9 +62,21 @@ export async function POST(req: Request) {
     }
     const target = tableMap[type]
     if (target) {
+      // storyboard_image 는 JSONB StoryboardImage 객체 (src/types/director-canvas.ts).
+      // ShotNode/StoryboardGridView 가 .url/.status/.errorMessage 로 소비하므로 객체로 저장한다.
+      // 나머지 이미지 필드(reference_image, view_*, wide_shot 등)는 TEXT(public URL) 그대로.
+      const value =
+        field === 'storyboard_image'
+          ? {
+              url: publicUrl,
+              status: 'completed',
+              errorMessage: null,
+              generatedAt: Date.now(),
+            }
+          : publicUrl
       await supabaseAdmin
         .from(target.table)
-        .update({ [field]: publicUrl })
+        .update({ [field]: value })
         .eq('project_id', projectId)
         .eq(target.idCol, entityId)
     }

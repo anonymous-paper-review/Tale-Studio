@@ -81,3 +81,6 @@ experiment/
 logs/*
 # Windows ADS metadata
 *:Zone.Identifier
+
+# 로컬 작업 메모
+memo.md
