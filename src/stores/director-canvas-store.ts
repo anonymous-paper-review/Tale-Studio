@@ -34,6 +34,7 @@ import {
   type RegisteredCharacter,
 } from '@/stores/asset-storage-store'
 import { createClient } from '@/lib/supabase/client'
+import { pollGenerationJob } from '@/lib/generation-jobs-client'
 
 // ============================================================================
 // Defaults
@@ -1227,6 +1228,52 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
         const referenceImageUrls = resolveShotAssetImages(data)
 
+        // DB 샷(writerShotId=shots.shot_id 있음) → webhook job 경로.
+        // 서버가 fal submit + storage 업로드 + shots.storyboard_image 갱신을 처리(탭 닫혀도 보존).
+        const writerShotId = data.writerShotId
+        const projectId = get().projectId
+        if (writerShotId && projectId) {
+          try {
+            const res = await fetch('/api/director/generate-storyboard', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                projectId,
+                writerShotId,
+                prompt: data.prompt || data.label,
+                referenceImageUrls,
+                aspectRatio: '16:9',
+              }),
+            })
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}))
+              throw new Error(body.error ?? `HTTP ${res.status}`)
+            }
+            const { jobId } = (await res.json()) as { jobId: string }
+            const url = await pollGenerationJob(jobId)
+            get().updateNodeData<'shot'>(shotNodeId, {
+              storyboardImage: {
+                url,
+                status: 'completed',
+                errorMessage: null,
+                generatedAt: Date.now(),
+              },
+            })
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error'
+            get().updateNodeData<'shot'>(shotNodeId, {
+              storyboardImage: {
+                url: prevUrl,
+                status: 'failed',
+                errorMessage: message,
+                generatedAt: 0,
+              },
+            })
+          }
+          return
+        }
+
+        // 수동 노드(writerShotId 없음) → 기존 동기 경로 (canvas-local, DB 미반영).
         // 단일 시도 — 90s 타임아웃(fal 행 방지). 실패/타임아웃 시 throw.
         const attempt = async (): Promise<string> => {
           const controller = new AbortController()
@@ -1372,6 +1419,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               shotId: shotNodeId,
+              // webhook 서버사이드 영속(shots.video_url)을 위해 projectId + DB shot_id 전달.
+              // writerShotId 없으면(수동 노드) job 추적 없이 client polling만으로 동작.
+              projectId: get().projectId,
+              writerShotId: shot.writerShotId,
               // TODO(ST-4 후속): writer 시간 축 연출 정보(움직임/카메라 동선)를 prompt에 추가 투입.
               // 현재는 Shot prompt만 사용 (writer-store 연동은 D-4 sync 이후).
               prompt: eff.prompt,

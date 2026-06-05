@@ -3,6 +3,8 @@ import { getUser } from '@/lib/supabase/auth'
 import { fal } from '@fal-ai/client'
 import { cameraToText } from '@/lib/kling'
 import { findCameraMovement, findCameraBrand } from '@/lib/knowledge'
+import { createGenerationJob } from '@/lib/generation-jobs'
+import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import type { CameraConfig, CameraPreset } from '@/types'
 
 fal.config({ credentials: () => process.env.FAL_KEY ?? '' })
@@ -20,15 +22,18 @@ async function submitFalT2V(
   prompt: string,
   durationSeconds: number,
   aspectRatio: string,
+  webhookUrl?: string,
 ) {
-  const { request_id } = await fal.queue.submit(FAL_T2V_MODEL, {
-    input: {
-      prompt,
-      negative_prompt: 'blurry, low quality, distorted, deformed',
-      duration: durationSeconds >= 10 ? ('10' as const) : ('5' as const),
-      aspect_ratio: (aspectRatio ?? '16:9') as '16:9',
-    },
-  })
+  const input = {
+    prompt,
+    negative_prompt: 'blurry, low quality, distorted, deformed',
+    duration: durationSeconds >= 10 ? ('10' as const) : ('5' as const),
+    aspect_ratio: (aspectRatio ?? '16:9') as '16:9',
+  }
+  const { request_id } = await fal.queue.submit(
+    FAL_T2V_MODEL,
+    webhookUrl ? { input, webhookUrl } : { input },
+  )
   return { taskId: request_id, provider: 'fal' as const, model: FAL_T2V_MODEL }
 }
 
@@ -38,16 +43,19 @@ async function submitFalI2V(
   imageUrl: string,
   durationSeconds: number,
   aspectRatio: string,
+  webhookUrl?: string,
 ) {
-  const { request_id } = await fal.queue.submit(FAL_I2V_MODEL, {
-    input: {
-      prompt,
-      image_url: imageUrl,
-      negative_prompt: 'blurry, low quality, distorted, deformed',
-      duration: durationSeconds >= 10 ? ('10' as const) : ('5' as const),
-      aspect_ratio: (aspectRatio ?? '16:9') as '16:9',
-    },
-  })
+  const input = {
+    prompt,
+    image_url: imageUrl,
+    negative_prompt: 'blurry, low quality, distorted, deformed',
+    duration: durationSeconds >= 10 ? ('10' as const) : ('5' as const),
+    aspect_ratio: (aspectRatio ?? '16:9') as '16:9',
+  }
+  const { request_id } = await fal.queue.submit(
+    FAL_I2V_MODEL,
+    webhookUrl ? { input, webhookUrl } : { input },
+  )
   return { taskId: request_id, provider: 'fal' as const, model: FAL_I2V_MODEL }
 }
 
@@ -121,6 +129,8 @@ export async function POST(req: Request) {
 
     const {
       shotId,
+      projectId,
+      writerShotId,
       prompt,
       camera,
       durationSeconds,
@@ -132,6 +142,8 @@ export async function POST(req: Request) {
       cameraPreset,
     } = (await req.json()) as {
       shotId: string
+      projectId?: string
+      writerShotId?: string | null
       prompt: string
       camera?: CameraConfig
       durationSeconds?: number
@@ -184,10 +196,29 @@ export async function POST(req: Request) {
           ? await submitLocalI2V(fullPrompt, referenceImageUrl!)
           : await submitLocalT2V(fullPrompt)
     } else {
+      // webhook 전환: fal 큐에 webhookUrl 전달 → 완료 시 /api/fal/webhook가 서버사이드로 결과 영속.
+      // 기존 client polling(generate-video/[taskId])은 fallback으로 유지된다.
+      const webhookUrl = resolveWebhookUrl()
       result =
         generationMethod === 'I2V'
-          ? await submitFalI2V(fullPrompt, referenceImageUrl!, durationSeconds ?? 5, aspectRatio ?? '16:9')
-          : await submitFalT2V(fullPrompt, durationSeconds ?? 5, aspectRatio ?? '16:9')
+          ? await submitFalI2V(fullPrompt, referenceImageUrl!, durationSeconds ?? 5, aspectRatio ?? '16:9', webhookUrl)
+          : await submitFalT2V(fullPrompt, durationSeconds ?? 5, aspectRatio ?? '16:9', webhookUrl)
+
+      // generation_jobs 행 — webhook이 shots.video_url을 갱신하려면 projectId+writerShotId 필요.
+      // 둘 다 있을 때만 추적(수동 노드 등 writerShotId 없는 경우는 client polling만으로 처리).
+      if (projectId && writerShotId) {
+        try {
+          await createGenerationJob({
+            projectId,
+            requestId: result.taskId,
+            model: result.model,
+            kind: 'shot_video',
+            target: { shotId, writerShotId },
+          })
+        } catch (e) {
+          console.error('[director/generate-video] job create failed:', e instanceof Error ? e.message : e)
+        }
+      }
     }
 
     return NextResponse.json({
