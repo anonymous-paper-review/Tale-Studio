@@ -2,8 +2,10 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
+    const requestedId = new URL(req.url).searchParams.get('projectId')
+
     // 1. Get authenticated user
     const supabase = await createClient()
     const {
@@ -46,7 +48,26 @@ export async function POST() {
       workspaceId = created.id
     }
 
-    // 3. Find latest project in workspace, or create one
+    // 3a. URL ?projectId 힌트가 있으면 워크스페이스 범위로 그 프로젝트 복원
+    if (requestedId) {
+      const { data: requested } = await supabaseAdmin
+        .from('projects')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .eq('id', requestedId)
+        .maybeSingle()
+
+      if (requested) {
+        return NextResponse.json({
+          workspaceId,
+          projectId: requested.id,
+          project: requested,
+        })
+      }
+      // 없거나 권한 밖이면 아래 최신 fallback
+    }
+
+    // 3b. Find latest project in workspace, or create one
     const { data: existing } = await supabaseAdmin
       .from('projects')
       .select('*')
