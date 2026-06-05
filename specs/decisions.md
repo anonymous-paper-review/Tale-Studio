@@ -2,18 +2,57 @@
 
 > 최종 수정: 2026-06-05
 > 레거시 아카이브: `specs/archive/decisions_legacy_2026-03-03.md`
+> superseded/archive-event 결정: `specs/decisions-archive.md` (아래 인덱스 참조)
 
 > **이 파일은 cross-cutting 결정의 rolling 로그입니다. Append-only.**
 >
 > 새 변경 작업은 `specs/changes/<name>/proposal.md`에 작성하고, 끝나면 `specs/archive/YYYY-MM-DD-<name>/`로 이동. archive 시 본 파일에 entry 1줄 append (entry 번호 + archive 폴더 링크).
 >
 > Entry 번호는 monotonic. **기존 번호 mid-history 편집 금지**. 변경 적은 원칙은 `specs/_constitution.md` 참조.
+>
+> **본문 = 현재 유효한(Active) 결정만.** 이후 결정에 번복(superseded)되었거나 archive 사실만 기록하는
+> entry는 `specs/decisions-archive.md`로 분리하고, 아래 **아카이브 인덱스**에 한 줄로 남긴다(2026-06-05 정책).
 
 ## 확정
 
-### 39. rollback-artist-card archived
-- **결정**: 카드형 Artist UI 롤백(`rollback-artist-card`)을 archive. 카드 UI(character/world/inventory 패널)는 현재 shipped 현실이고 방향 정착됨(#36 노드그래프 폐기의 후속). 개별 인터랙션 `[c]` 검증은 잔존하나 방향·구조 확정으로 changes 정리 차원 archive.
-- **archive 경로**: `specs/archive/2026-06-05-rollback-artist-card/`
+### 48. Director 데이터 DB 일원화 — #43 번복(005 적용), director-store 제거
+- **결정**: Director를 **DB 단일 진실 + canvas-store 단일 스토어**로 일원화(`unify-director-store-db`). #43("005 불필요, canvas_position=localStorage")을 **번복** — 노선을 localStorage→DB로 전환.
+- **Step 0**: canvas-store `updateNodeData`가 Shot camera/lighting/cameraPreset/prompt를 DB `shots`로 write-through(debounce). 마이그레이션 0(컬럼 기존). → 캔버스 편집 drift 해소.
+- **Step 1**: `director-store.ts`(780줄) 삭제. `editor-store` fallback→DB 경로만, `global-chat-store` director 분기→항상 canvas, `project-store.resetChildStores`에서 제거. 내부 #14 종결.
+- **Step 2**: 마이그레이션 **005 라이브 적용 완료**(2026-06-05, scenes/shots/video_clips `canvas_position` + video_clips `is_final/take_label/override`, `_apply_migration.mjs`+`NOTIFY pgrst`+`_refresh.py`, drift 0). 그래프 구조 hydrate/write-back은 진행 중.
+- **유지**: 양방향 라이브 sync는 여전히 범위 밖(#44) — 단방향 write-through + 1회 hydrate만.
+- **상세**: `specs/changes/unify-director-store-db/`
+- **일자**: 2026-06-05
+
+### 47. presets 라우트 IDOR 해결 + D-8 안전분 정리 (director-store 제거는 별도 change로 보류)
+- **보안**: `/api/director/presets` GET/POST/DELETE에 `isProjectOwned(projectId, user.id)` 가드 추가 — `workspaces.owner_id`→`projects.workspace_id` 소유권 검증(project/init과 동일), 미소유 403. DELETE는 preset→project_id 역추적 후 검증.
+- **D-8 정리 완료(안전분)**: `movement-control.tsx`(고아) / `legacy/page.tsx`(+PaletteBar Legacy 링크) / `cinematographic-inspector.tsx`(legacy 전용) 삭제. tsc/eslint clean.
+- **director-store 제거 보류**: 780줄 store가 legacy 아니라 **load-bearing** — `editor-store`(핸드오프) + `global-chat-store`(legacy director chat 분기)가 의존. 무리한 제거는 가동 기능 파손 위험 → **별도 change**로 분리(내부 #14는 그때 종결). angle-control/key-light/camera-preset-control은 새 NodePopup 재사용이라 **유지**(task 원문 삭제 목록은 부정확).
+- **일자**: 2026-06-05
+
+### 46. D-6 Camera/Light Preset 라이브러리 = DB 백엔드 (camera_light_presets)
+- **결정**: Director Canvas 프리셋 라이브러리를 **DB 테이블** `camera_light_presets`(project_id 1:N, camera/lighting/camera_preset JSONB)로 영속. localStorage 아님 — 프로젝트 단위 영속 + 기기 간 공유. 마이그레이션 `011_camera_light_presets.sql`.
+- **적용 규칙**: 프리셋 적용 = camera/lighting/cameraPreset **전체 덮어쓰기**, prompt/참고이미지는 유지 (내부 #16).
+- **DB 적용**: 011 라이브 적용 완료(2026-06-05) — `_apply_migration.mjs` + `NOTIFY pgrst reload schema` → PostgREST 200, `_refresh.py` 캐시 반영.
+- **일자**: 2026-06-05
+
+### 45. redesign-director-canvas — 단방향 seed(writer→director 1회 로드) 채택
+- **결정**: #44에서 양방향 sync를 폐기하되, **단방향 seed**는 채택. Director 진입 시 writer 산출 scenes/shots를 캔버스 노드로 **1회 로드**(멱등 — 기존 노드/seed 플래그 있으면 skip). seed 이후엔 사용자 편집 + localStorage persist가 진실, writer 변경은 재반영 안 함.
+- **사유**: 양방향(무한루프 가드) 비용 없이 "캔버스가 빈 채로 시작" 여파(#44)만 해소.
+- **남은 실작업 = D-4S(seed) + D-5(NodePopup 영상생성 wire-up) + D-6(Preset 라이브러리)**.
+- **일자**: 2026-06-05
+
+### 44. redesign-director-canvas 스코프 축소 — D-4(양방향 sync)·Editor 핸드오프 폐기
+- **결정**: `redesign-director-canvas`에서 **D-4 Writer↔Director 양방향 sync**와 **D-8의 Editor 핸드오프(Final Video export)**를 **지금 안 함(드롭)**. 양방향 sync는 무한 루프 가드 비용이 크고 현 우선순위 아님, editor 연동도 현재 작업 아님.
+- **여파**: writer 파이프라인이 채운 shots가 Director 캔버스에 **자동 표출되지 않음**(수동 노드 생성 + localStorage persist만). 필요 시 별도 change로 "단방향 seed(writer→director 1회 로드)"부터 재검토.
+- **남은 실작업**: **D-5**(NodePopup 영상생성 wire-up — store/그리드뷰는 director-storyboard에서 이미 구현, NodePopup 버튼만 연결) + **D-6**(Camera/Light Preset 라이브러리 — 신규 store + `camera_light_presets` 테이블 + Palette UI). D-8 레거시 정리(구 Inspector/director-store/구 컴포넌트 삭제)는 선택(tech-debt).
+- **일자**: 2026-06-05
+
+### 43. 마이그레이션 005(director_canvas_layout) 불필요 확정 — canvas_position은 localStorage 유지
+> ⚠️ **#48에 의해 번복(superseded)** — DB 일원화 노선 전환으로 005 적용함(2026-06-05).
+- **결정**: `005_director_canvas_layout.sql`(scenes/shots/video_clips `canvas_position` + video_clips `is_final/take_label/override`)를 **라이브에 적용하지 않는다**. director-canvas 노드 위치는 현 코드가 DB가 아니라 Zustand persist(localStorage, key `tale-director-canvas-v1-*`)에 저장한다(`grep canvas_position src/` = 0건, `007` 마이그레이션 주석도 명시).
+- **근거**: 2026-06-05 `_refresh.py` 라이브 introspection — 006/007/008/009/010은 적용됨, **005만 미적용**. 미적용이 현재 동작을 깨지 않음(코드가 그 컬럼을 안 씀).
+- **영향**: `redesign-director-canvas` D-1의 "005 적용" task는 `[~] 불필요`로 정정. 향후 D-4(Writer↔Director sync)를 DB 영속으로 구현하면 005가 다시 필요해질 수 있음 — 그때 재검토.
 - **일자**: 2026-06-05
 
 ### 38. SVC 파이프라인 = 단일 writer 엔진으로 일원화, fixed_prompt 폐기, writer UI 제거
@@ -22,7 +61,7 @@
 - **writer = 백엔드 전용**: `studio/writer` 페이지·`features/writer` 제거, nav producer→artist 직행. svc 파이프라인이 `/api/writer/start`(핸드오프)에서 백그라운드 실행되어 DB(characters/scenes/locations/shots, 샷별 대사 포함)를 채움(`persist_manifest`). `writer-store`는 artist/director가 소비하는 **공유 데이터 허브로 유지**.
 - **DB 정합 선행**: 코드가 라이브에 없는 컬럼에 write(Director/Editor 조용히 실패)임을 실증 → `007`(shots 기어/무브먼트/speed/storyboard_image), `008`(design_tokens + appearance/costume + location 토큰) 적용. `database.ts` 라이브 기준 재생성. 적용은 supabase CLI 히스토리 불일치로 pg 직접.
 - **트레이드오프**: svc는 16단계라 핸드오프 지연 ↑. `adapters.ts`가 대사 손실(L4 연결)이라 `shot_sequence` 기반 persist 신작성. `description`/`visual_description` 등 레거시 컬럼은 가동 우선으로 중복 잔존(후속 정리). svc 풀 런 런타임 검증 미수행(합성 테스트만).
-- **상세**: `specs/changes/unify-svc-writer-pipeline/`
+- **상세**: `specs/archive/2026-06-05-unify-svc-writer-pipeline/`
 - **일자**: 2026-06-05
 
 ### 37. Artist 캐릭터 이미지 — 턴어라운드 시트 + crop 파이프라인 채택
@@ -36,12 +75,6 @@
 - **트레이드오프**: 고정좌표 crop은 모델 레이아웃 정합에 의존 (MVP 한계). svc 디자인 토큰(04_S2/08_L0_L1/09_L2) 접근 필요 — 미완료 시 `fixedPrompt` 폴백.
 - **상세/태스크**: `specs/changes/writer-background-artist-progress/` (decisions [25,29] 연계)
 - **일자**: 2026-06-05
-
-### 36. redesign-l0-canvas archived (superseded)
-- **결정**: `redesign-l0-canvas` change를 검증 완료 없이 superseded 상태로 archive. 노드 그래프 패러다임 폐기, 카드형 Artist UI (character-panel / world-panel / inventory-grid)로 롤백.
-- **사유**: 노드 그래프 접근은 구현 복잡도가 높고 브라우저 검증을 통과하지 못한 채 다수의 [c] 항목이 누적됨. 사용자 결정(2026-06-04)으로 커밋 8507796 기준 카드형 UI로 복원. asset-storage 백엔드(RegisteredCharacter/RegisteredWorld)는 카드→등록 어댑터를 통해 계속 유지.
-- **archive 경로**: `specs/archive/2026-06-04-redesign-l0-canvas/`
-- **일자**: 2026-06-04
 
 ### 35. Pretendard Variable 한국어 폰트 도입
 - **결정**: `next/font/local`로 Pretendard Variable woff2를 로드해 한국어 fallback 확보. `--font-pretendard` CSS variable로 노출. `--font-sans` chain은 `Geist Sans → Pretendard → ui-sans-serif → system-ui → sans-serif`
@@ -67,42 +100,6 @@
 - **복원 트리거**: paid plan 결제 시 `route.ts`의 `generateViaGemini` 함수를 이전 `generateImages` 호출로 복원 (git history 참조)
 - **일자**: 2026-05-17
 
-### 33. F-D2 — 노드 우클릭 컨텍스트 메뉴 제거 + 헤더 아이콘 일원화
-- **결정**:
-  - 노드 우클릭 컨텍스트 메뉴(`NodeContextMenu`) 완전 제거 — 파일·store state(`contextMenu`, `openContextMenu`, `closeContextMenu`)·page.tsx의 `onNodeContextMenu` 핸들러 모두 삭제
-  - 모든 노드 액션은 **BaseNode 헤더의 4개 아이콘(Edit / Branch / Copy / Delete)** 또는 **NodePopup** 한 곳에 집중
-  - **노드 더블클릭 = Edit popup 단축** (ReactFlow `onNodeDoubleClick` → `openPopup`)
-  - 복제 액션은 헤더에 `Copy` 아이콘 신규 추가 (Status 포함 모든 노드)
-- **이유**:
-  - 사용자 의견: "Edit에서 다 되는 거 아님?" — UI 일관성을 위해 우클릭/메뉴 이중 표면 제거
-  - Edit / Branch / Delete는 이미 BaseNode 헤더에 노출됨. 우클릭 메뉴는 *복제만* 고유 → 헤더에 복제 아이콘 1개 추가로 흡수
-  - 우클릭은 브라우저 기본 메뉴를 가리지 않음 → 사용자가 우연히 우클릭해도 혼동 X
-- **영향 범위**:
-  - L0 스펙 섹션 3(액션 버튼) + 섹션 12(캔버스 인터랙션) 표 갱신 필요
-  - 데이터 모델 스펙(`canvas_data_model.md`) 섹션 4.3 핸들러 표에서 `onNodeContextMenu` 행 제거
-- **일자**: 2026-05-17
-
-### 32. F-D1 — L0 Canvas Actor↔Actor 엣지 카테고리 단순화
-- **결정**: Actor↔Actor 엣지는 `references`(점선 + 자유 텍스트 메모) 한 종류만 허용. `parent`는 Status Branch 자동 생성 전용으로 한정 — 사용자가 수동으로 Actor↔Actor parent를 그리지 않음. Actor↔World `in-world`는 그대로 유지
-- **이유**:
-  - Higgsfield 등 노드 캔버스 도구는 동종 노드 연결을 공개 사용 시나리오로 다루지 않음 (`specs/design-references.md` Higgsfield 분석 섹션 참조). 동종 자산 관계는 라이브러리/폴더가 담당
-  - parent 의미를 "기술적 상속(prompt/이미지/Status)"으로, references를 "내러티브 관계(쌍둥이/라이벌/스승-제자)"로 분리 → 사용자 메탈모델이 깨끗
-- **현재 시점 적용 상태**: 의사결정만 기록, **코드 변경(F-3)은 보류**. 다른 검증 차단 이슈 해결 후 진행
-- **참고**: `specs/design-references.md` 섹션 4 (권고 a), PROGRESS.md P10-Followup F-D1/F-3
-- **일자**: 2026-05-17
-
-### 31. L0 Meeting Room — Agentic Canvas (tool-use 패턴)
-- **결정**: L0 Meeting Room의 artist agent를 read-only 가이드에서 **캔버스를 직접 조작하는 tool-use agent**로 전환. 기존 `global-chat-store` 패턴(`ArtistUpdate[]` → `applyUpdates`)을 그대로 캔버스에 적용
-- **CanvasUpdate 액션 union** (10종):
-  - 비파괴: `addNode`, `updateNode`, `connect`, `setOutputMode`, `generate`, `branchStatus`, `duplicateNode`
-  - 파괴/등록: `requestDelete`, `requestRegister` → agent가 직접 실행하지 않고 기존 확인 UI 트리거 (DeleteConfirmModal, NodePopup 등록 폼)
-- **컨텍스트 직렬화**: 매 chat turn마다 캔버스 스냅샷(노드 목록 요약 + 엣지 + 선택 노드 풀 정보 + 누적 이미지 수)을 prompt에 자동 주입
-- **레이아웃 변경**: Meeting Room은 좌측 도킹 유지(L0 스펙 1번 그대로). 기존 우측 floating `GlobalChat`은 artist 페이지에서 hide → 좌측 도킹 컴포넌트가 같은 `useGlobalChatStore`를 소비
-- **근거**: read-only 가이드는 Higgsfield 등 경쟁 도구에 흔함. tool-use는 우리 차별화 포인트. 그래프=개체 패러다임과 결합해 "캐릭터 만들어줘" → 실제 노드 생성까지 한 흐름. 기존 5-agent 패턴 재사용으로 구현 분량 ↓
-- **destructive 안전장치**: 파괴 액션은 agent가 직접 실행 안 함. 모든 삭제·등록은 기존 user-facing 모달 거침 → undo 미구현 상태에서도 안전
-- **상세**: `specs/archive/2026-06-04-redesign-l0-canvas/canvas_data_model.md` 섹션 6 (Agent Actions), `specs/layers/L0_concept_canvas.md` 섹션 11
-- **일자**: 2026-05-17
-
 ### 30. Design Constitution (`specs/design.md`) 도입
 - **결정**: 시각·인터랙션 공통 컨벤션의 단일 진실 소스로 `specs/design.md` 채택. 페이지별 레이아웃(`specs/ux_pages.md`)과 분리
 - **원칙 5개**:
@@ -115,23 +112,6 @@
 - **엣지 시각**: neutral gray 한 톤, 카테고리는 굵기+스타일로 구분 (색 분기 안 함)
 - **모션 4-tier**: 100 / 150 / 250 / 350ms
 - **근거**: Linear / shadcn / Geist 디자인 시스템 리서치. 소규모 팀 헌법은 *결정된 것을 명문화*가 핵심
-- **일자**: 2026-05-17
-
-### 29. P3 → L0 Concept Canvas 전면 재설계
-- **결정**: P3 (The Visual Studio)의 character-panel/world-panel/inventory-grid 패널 UI를 노드 그래프 캔버스로 완전 교체
-- **8개 하위 결정**:
-  1. React Flow (xyflow) 채택 — MVP 속도 + ComfyUI 호환 패턴
-  2. 기존 artist 패널 완전 교체 (병행 또는 모드 토글 안 함)
-  3. 3D / Multi-angle은 별도 노드 아님 — Actor/World 노드의 *출력 모드*로 흡수
-  4. Status만 별도 노드 유지 (마더 연동 변형이라는 별개 정체성)
-  5. 캐릭터 등록 조건 = "누적 이미지 ≥ 20장" (원문 "20엣지"의 의미 명확화. Higgsfield Soul ID의 20장 학습 임계점 차용)
-  6. 프롬프트만 전파, 이미지 재생성은 수동 (토큰 비용 폭발 방지)
-  7. Meeting Room = 기존 `global-chat-store`의 artist agent 재사용, 캔버스 좌측 도킹
-  8. 한 프로젝트 = 한 그래프 (MVP, YAGNI)
-- **노드 종류 (Tier 1)**: Actor / World / Status 3종. 3D·Multi-angle은 출력 모드, 캐릭터 시트는 5-View 모드, 회전 시퀀스는 16-Angle 모드
-- **레퍼런스**: Higgsfield Canvas (노드 그래프 패턴) + ComfyUI (핀-엣지 메타포). 우리는 노드=개체 패러다임 (Higgsfield는 노드=모델)으로 차별화
-- **상세**: 노드 그래프는 2026-06-04 카드형으로 롤백됨(아래 #참조). 현행 구현 = `src/features/artist/`
-- **근거**: 캐릭터 일관성 + 월드-액터 관계를 그래프 구조로 표현해야 차별화 가능. 기존 패널 UI는 메탈모델 충돌
 - **일자**: 2026-05-17
 
 ### 28. MVP 범위 P1~P5 전체 포함
@@ -158,30 +138,8 @@
 - **V2 P4**: 3패널 통합. Shot Frames 탭 제거 → Grid 내 Frame Mode로 대체
 - **추가 요소**: Director Kim Chat (AI 촬영 가이드, Inspector 실시간 연동), Lens Combo 캐러셀, Lighting Sphere UI
 - **근거**: V2 디자인 (reference_v2/image4.png). 스토리보드와 촬영 설정을 한 화면에서 작업
+- **후속**: P4 자체는 Phase 11 Director Canvas(노드 그래프)로 재설계 진행 중 — `specs/layers/director_canvas.md`
 - **일자**: 2026-03-03
-
-### 25. P3 에셋 전용 범위 축소
-- **결정**: P3를 에셋 전용으로 축소. Storyboard 탭 제거 → P4로 이동
-- **V1 P3**: 3탭 (Char / Stage / Storyboard)
-- **V2 P3**: 2컬럼 단일 화면 (Character Consistency + World Model)
-- **추가 요소**: Asset Locking (캐릭터 일관성 고정), Cinematic Boost 필터
-- **근거**: V2 디자인 (reference_v2/image3.png). 에셋과 스토리보드 관심사 분리
-- **일자**: 2026-03-03
-
-### 24. V2 MVP 범위 재정의 및 디자인 시스템
-- **결정**: MVP를 P3+P4 → **P3+P4+P5(Lite)**로 확장. V2 글로벌 디자인 시스템 적용
-- **디자인 시스템**: Netflix Dark (#121212) + Accent (#E50914/#7A285E) + 5 Agent 사이드바 + Samantha 플로팅 + Handoff 버튼 패턴
-- **Stage 이름**: The Meeting Room / The Script Room / The Visual Studio / The Set / Post-Production Suite
-- **네비게이션**: 영상생성 전까지 이전 Stage 자유 복귀 가능
-- **근거**: reference_v2 전체 (docs.md + image1~5), open_questions.md 닫힌 질문 23개 반영
-- **일자**: 2026-03-03
-
-### 23. 코드베이스 리셋 및 MVP 스코프
-- **결정**: 구 코드 전체 삭제, P3+P4만 MVP로 개발 → **V2에서 P3+P4+P5 Lite로 확장 (#24)**
-- **이유**: 코드베이스 거의 재작성 필요. P1/P2 미정사항 과다, P3/P4가 핵심 가치
-- **MVP 포함**: ~~P3 Pre-viz (Char/Stage/Storyboard) + P4 Director (Cinematographic/Shot Frames)~~ → #24로 대체
-- **MVP 제외**: P1 Ground, P2 Story Writer, P4 Music, ~~P5 Editor~~ → P5 Lite 포함 (#27)
-- **일자**: 2026-02-25 (V2 수정: 2026-03-03)
 
 ### 22. 프론트엔드 스택
 - **결정**: Next.js + Vercel
@@ -293,6 +251,27 @@
 
 ---
 
+## 아카이브된 결정 (인덱스 → `specs/decisions-archive.md`)
+
+> 이후 결정에 번복(superseded)됐거나 archive 사실만 기록하는 entry. 상세는 archive 파일 참조.
+
+- **#50** unify-director-store-db archived (검증 waive) — 2026-06-05
+- **#49** redesign-director-canvas archived (검증 waive) — 2026-06-05
+- **#42** director-storyboard archived (검증 waive) — 2026-06-05
+- **#41** writer-background-artist-progress archived (검증 waive) — 2026-06-05
+- **#40** unify-svc-writer-pipeline archived (런타임 검증 waive) — 2026-06-05
+- **#39** rollback-artist-card archived — 2026-06-05
+- **#36** redesign-l0-canvas archived (superseded, 카드형 롤백) — 2026-06-04
+- **#33** F-D2 노드 우클릭 메뉴 제거 (artist L0, superseded by #36) — 2026-05-17
+- **#32** F-D1 Actor↔Actor 엣지 단순화 (artist L0, superseded by #36) — 2026-05-17
+- **#31** L0 Meeting Room Agentic Canvas (artist L0, superseded by #36) — 2026-05-17
+- **#29** P3→L0 Concept Canvas 전면 재설계 (superseded by #36 카드형 롤백) — 2026-05-17
+- **#25** P3 에셋 전용 범위 축소 (superseded by #29→#36) — 2026-03-03
+- **#24** V2 MVP 범위 재정의 (superseded by #28) — 2026-03-03
+- **#23** 코드베이스 리셋 및 MVP 스코프 (superseded by #24→#28) — 2026-02-25
+
+---
+
 ## 번복됨
 
-(없음)
+(없음 — superseded 결정은 위 아카이브 인덱스 + `specs/decisions-archive.md` 참조)

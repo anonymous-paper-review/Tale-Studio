@@ -33,6 +33,7 @@ import {
   useAssetStorageStore,
   type RegisteredCharacter,
 } from '@/stores/asset-storage-store'
+import { createClient } from '@/lib/supabase/client'
 
 // ============================================================================
 // Defaults
@@ -95,6 +96,7 @@ function makeVideoData(
     kind: 'video',
     label: `take_v${takeIndex}`,
     parentShotNodeId,
+    videoClipId: null,
     override: {},
     videoUrl: null,
     thumbnailUrl: null,
@@ -191,6 +193,129 @@ function toRouteProvider(p: DirectorVideoProvider): 'fal' | 'local' {
 }
 
 // ============================================================================
+// Step 0 (unify-director-store-db): Shot 편집 → DB shots write-through
+// 캐넌 일원화 — 캔버스 샷 편집을 DB로 debounce 저장(옛 director-store 패턴 이식).
+// 키 = writerShotId(=shots.shot_id). 컬럼은 007로 이미 존재.
+// ============================================================================
+
+const pendingShotDbSaves = new Map<string, ReturnType<typeof setTimeout>>()
+
+function debouncedShotSaveToDb(
+  projectId: string,
+  writerShotId: string,
+  getData: () => ShotNodeData | undefined,
+) {
+  const existing = pendingShotDbSaves.get(writerShotId)
+  if (existing) clearTimeout(existing)
+  pendingShotDbSaves.set(
+    writerShotId,
+    setTimeout(async () => {
+      pendingShotDbSaves.delete(writerShotId)
+      const data = getData()
+      if (!projectId || !data) return
+      try {
+        const supabase = createClient()
+        await supabase
+          .from('shots')
+          .update({
+            camera_config: data.camera,
+            lighting_config: data.lighting,
+            camera_brand: data.cameraPreset?.brand ?? null,
+            focal_length: data.cameraPreset?.focalLength ?? null,
+            aperture: data.cameraPreset?.aperture ?? null,
+            white_balance: data.cameraPreset?.whiteBalance ?? null,
+            prompt: data.prompt,
+          })
+          .eq('project_id', projectId)
+          .eq('shot_id', writerShotId)
+      } catch (err) {
+        console.error('[director-canvas-store] shot DB save failed:', err)
+      }
+    }, 500),
+  )
+}
+
+// ============================================================================
+// Step 2 (unify-director-store-db): 캔버스 그래프 구조를 DB로 일원화.
+// canvas_position / video_clips 행을 DB에 write-through + 진입 시 hydrate.
+// localStorage persist는 이제 오프라인 캐시 — 진입 시 hydrateFromDb가 DB 진실로 덮어쓴다.
+// 모든 DB write는 fire-and-forget + try/catch + console.error (UI로 throw 금지).
+// ============================================================================
+
+const pendingPositionSaves = new Map<string, ReturnType<typeof setTimeout>>()
+
+/** 노드 종류별로 canvas_position을 올바른 테이블에 debounce write. key id null이면 skip. */
+function debouncedPositionSaveToDb(
+  nodeId: string,
+  getState: () => DirectorCanvasState,
+) {
+  const existing = pendingPositionSaves.get(nodeId)
+  if (existing) clearTimeout(existing)
+  pendingPositionSaves.set(
+    nodeId,
+    setTimeout(async () => {
+      pendingPositionSaves.delete(nodeId)
+      const state = getState()
+      const projectId = state.projectId
+      const node = state.nodes.find((n) => n.id === nodeId)
+      if (!projectId || !node) return
+      const pos = { x: node.position.x, y: node.position.y }
+      try {
+        const supabase = createClient()
+        if (isSceneData(node.data)) {
+          if (!node.data.writerSceneId) return
+          await supabase
+            .from('scenes')
+            .update({ canvas_position: pos })
+            .eq('project_id', projectId)
+            .eq('scene_id', node.data.writerSceneId)
+        } else if (isShotData(node.data)) {
+          if (!node.data.writerShotId) return
+          await supabase
+            .from('shots')
+            .update({ canvas_position: pos })
+            .eq('project_id', projectId)
+            .eq('shot_id', node.data.writerShotId)
+        } else if (isVideoData(node.data)) {
+          if (!node.data.videoClipId) return
+          await supabase
+            .from('video_clips')
+            .update({ canvas_position: pos })
+            .eq('id', node.data.videoClipId)
+        }
+      } catch (err) {
+        console.error('[director-canvas-store] position DB save failed:', err)
+      }
+    }, 500),
+  )
+}
+
+const pendingVideoClipSaves = new Map<string, ReturnType<typeof setTimeout>>()
+
+/** video_clips 행 1개를 debounce update (override 등). videoClipId 기준. */
+function debouncedVideoClipSaveToDb(
+  videoClipId: string,
+  getPatch: () => Record<string, unknown> | undefined,
+) {
+  const existing = pendingVideoClipSaves.get(videoClipId)
+  if (existing) clearTimeout(existing)
+  pendingVideoClipSaves.set(
+    videoClipId,
+    setTimeout(async () => {
+      pendingVideoClipSaves.delete(videoClipId)
+      const patch = getPatch()
+      if (!patch) return
+      try {
+        const supabase = createClient()
+        await supabase.from('video_clips').update(patch).eq('id', videoClipId)
+      } catch (err) {
+        console.error('[director-canvas-store] video_clip DB save failed:', err)
+      }
+    }, 500),
+  )
+}
+
+// ============================================================================
 // Store types
 // ============================================================================
 
@@ -238,6 +363,12 @@ interface DirectorCanvasState {
   setViewport: (vp: { x: number; y: number; zoom: number }) => void
   setViewMode: (m: 'node' | 'storyboard') => void
 
+  // Step 2 (unify-director-store-db): DB 일원화
+  /** 노드 이동 후 canvas_position을 해당 테이블에 debounce write (drag end에서 호출) */
+  persistNodePosition: (nodeId: string) => void
+  /** 진입 시 DB → 캔버스 hydrate. canvas_position 적용 + 누락 Video 노드 생성 (DB가 진실) */
+  hydrateFromDb: (projectId: string) => Promise<void>
+
   // node lifecycle
   addSceneNode: (position: XYPosition, label?: string) => string
   addShotNode: (
@@ -284,6 +415,8 @@ interface DirectorCanvasState {
   // video generation (ST-4, I2V/T2V) — 항상 사용자 클릭으로만 (결정 #40)
   /** Shot에 새 Video take 생성 + 영상 생성 API 호출(+폴링). storyboardImage 있으면 I2V. 생성된 Video 노드 id 반환 */
   generateVideoForShot: (shotNodeId: string) => Promise<string | null>
+  /** 기존 Video 노드 1개를 effective 설정으로 (재)생성 (D-5). 마더 Shot storyboardImage 있으면 I2V */
+  regenerateVideo: (videoNodeId: string) => Promise<void>
 
   // propagation (Shot 설정 변경 → 자식 Video stale)
   propagateStaleFromShot: (shotNodeId: string) => void
@@ -544,6 +677,115 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       setViewport: (vp) => set({ viewport: vp }),
       setViewMode: (m) => set({ viewMode: m }),
 
+      // ─── Step 2: DB 일원화 (position write-back + hydrate) ──────────────
+
+      persistNodePosition: (nodeId) => {
+        debouncedPositionSaveToDb(nodeId, get)
+      },
+
+      hydrateFromDb: async (projectId) => {
+        if (!projectId) return
+        try {
+          const supabase = createClient()
+          const [scenesRes, shotsRes, clipsRes] = await Promise.all([
+            supabase
+              .from('scenes')
+              .select('scene_id, canvas_position')
+              .eq('project_id', projectId),
+            supabase
+              .from('shots')
+              .select('shot_id, canvas_position')
+              .eq('project_id', projectId),
+            supabase.from('video_clips').select('*').eq('project_id', projectId),
+          ])
+          if (scenesRes.error) throw scenesRes.error
+          if (shotsRes.error) throw shotsRes.error
+          if (clipsRes.error) throw clipsRes.error
+
+          const scenePosBySceneId = new Map<string, { x: number; y: number }>()
+          for (const r of scenesRes.data ?? []) {
+            const p = r.canvas_position as { x: number; y: number } | null
+            if (p && r.scene_id) scenePosBySceneId.set(r.scene_id, p)
+          }
+          const shotPosByShotId = new Map<string, { x: number; y: number }>()
+          for (const r of shotsRes.data ?? []) {
+            const p = r.canvas_position as { x: number; y: number } | null
+            if (p && r.shot_id) shotPosByShotId.set(r.shot_id, p)
+          }
+
+          // 1) 기존 Scene/Shot 노드에 canvas_position 덮어쓰기 (DB 우선)
+          set((s) => ({
+            nodes: s.nodes.map((n) => {
+              if (isSceneData(n.data) && n.data.writerSceneId) {
+                const p = scenePosBySceneId.get(n.data.writerSceneId)
+                if (p) return { ...n, position: { x: p.x, y: p.y } }
+              } else if (isShotData(n.data) && n.data.writerShotId) {
+                const p = shotPosByShotId.get(n.data.writerShotId)
+                if (p) return { ...n, position: { x: p.x, y: p.y } }
+              }
+              return n
+            }),
+            lastSavedAt: Date.now(),
+          }))
+
+          // 2) video_clips 행 → 누락 Video 노드 생성 (parent Shot은 1)에서 위치 확정됨)
+          for (const row of clipsRes.data ?? []) {
+            const clipId = row.id as string
+            if (!clipId) continue
+            const state = get()
+            // 이미 이 videoClipId를 가진 노드가 있으면 skip
+            const exists = state.nodes.some(
+              (n) => isVideoData(n.data) && n.data.videoClipId === clipId,
+            )
+            if (exists) continue
+            // 부모 Shot 노드 매칭 (shot_id == writerShotId)
+            const parentShot = state.nodes.find(
+              (n) => isShotData(n.data) && n.data.writerShotId === row.shot_id,
+            )
+            if (!parentShot) continue // 부모 없으면 생성 안 함
+
+            const takeIndex = nextTakeIndex(state, parentShot.id)
+            const dbPos = row.canvas_position as { x: number; y: number } | null
+            const position: XYPosition = dbPos
+              ? { x: dbPos.x, y: dbPos.y }
+              : nextVideoPosition(state, parentShot.id)
+
+            const id = newDirectorId('dn')
+            const data = makeVideoData(parentShot.id, takeIndex)
+            data.videoClipId = clipId
+            data.label = (row.take_label as string) ?? data.label
+            data.override = (row.override as VideoOverride) ?? {}
+            data.final = (row.is_final as boolean) ?? false
+            data.videoUrl = (row.url as string) ?? null
+            data.thumbnailUrl = (row.thumbnail_url as string) ?? null
+            data.status = ((row.status as DirectorVideoStatus) ??
+              'pending') as DirectorVideoStatus
+            const videoNode: DirectorNode = {
+              id,
+              type: 'video',
+              position,
+              data,
+            }
+            const parentEdge: DirectorEdge = {
+              id: newDirectorId('de'),
+              source: parentShot.id,
+              target: id,
+              sourceHandle: 'right',
+              targetHandle: 'left',
+              type: 'parent',
+              data: { category: 'parent', relationText: '' },
+            }
+            set((s) => ({
+              nodes: [...s.nodes, videoNode],
+              edges: [...s.edges, parentEdge],
+              lastSavedAt: Date.now(),
+            }))
+          }
+        } catch (err) {
+          console.error('[director-canvas-store] hydrateFromDb failed:', err)
+        }
+      },
+
       // ─── node lifecycle ────────────────────────────────────────────────
 
       addSceneNode: (position, label) => {
@@ -593,17 +835,15 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         if (!mother || !isShotData(mother.data)) return null
 
         const takeIndex = nextTakeIndex(state, parentShotNodeId)
-        const siblings = getChildVideos(state, parentShotNodeId)
-        const defaultPos: XYPosition = position ?? {
-          x: mother.position.x + VIDEO_OFFSET_X,
-          y: mother.position.y + siblings.length * VIDEO_OFFSET_Y,
-        }
+        const defaultPos: XYPosition =
+          position ?? nextVideoPosition(state, parentShotNodeId)
         const id = newDirectorId('dn')
+        const videoData = makeVideoData(parentShotNodeId, takeIndex)
         const videoNode: DirectorNode = {
           id,
           type: 'video',
           position: defaultPos,
-          data: makeVideoData(parentShotNodeId, takeIndex),
+          data: videoData,
         }
         const parentEdge: DirectorEdge = {
           id: newDirectorId('de'),
@@ -619,6 +859,42 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           edges: [...s.edges, parentEdge],
           lastSavedAt: Date.now(),
         }))
+
+        // Step 2: video_clips 행 INSERT (fire-and-forget). 마더 Shot에 writerShotId
+        // 있을 때만 — 수동 노드(shots 행 없음)는 local-only로 두고 videoClipId=null 유지.
+        const parentWriterShotId = isShotData(mother.data)
+          ? mother.data.writerShotId
+          : null
+        const projectId = state.projectId
+        if (parentWriterShotId && projectId) {
+          void (async () => {
+            try {
+              const supabase = createClient()
+              const { data: inserted, error } = await supabase
+                .from('video_clips')
+                .insert({
+                  project_id: projectId,
+                  shot_id: parentWriterShotId,
+                  take_label: videoData.label,
+                  is_final: false,
+                  canvas_position: { x: defaultPos.x, y: defaultPos.y },
+                  status: 'pending',
+                })
+                .select('id')
+                .single()
+              if (error) throw error
+              const clipId = inserted?.id as string | undefined
+              if (clipId) {
+                get().updateNodeData<'video'>(id, { videoClipId: clipId })
+              }
+            } catch (err) {
+              console.error(
+                '[director-canvas-store] video_clip INSERT failed:',
+                err,
+              )
+            }
+          })()
+        }
         return id
       },
 
@@ -659,10 +935,42 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         if (isShotConfigChange) {
           get().propagateStaleFromShot(id)
         }
+
+        // Step 0 (unify-director-store-db): camera/lighting/cameraPreset/prompt 변경을
+        // DB shots로 write-through (캐넌 일원화). writerShotId 있는 노드만 — 수동생성 노드는 Step 2까지 skip.
+        const dbCols: (keyof ShotNodeData)[] = [
+          'camera',
+          'lighting',
+          'cameraPreset',
+          'prompt',
+        ]
+        if (isShotData(prev.data) && dbCols.some((k) => k in patch)) {
+          const node = get().nodes.find((n) => n.id === id)
+          if (node && isShotData(node.data) && node.data.writerShotId) {
+            const writerShotId = node.data.writerShotId
+            debouncedShotSaveToDb(get().projectId, writerShotId, () => {
+              const n = get().nodes.find((x) => x.id === id)
+              return n && isShotData(n.data) ? n.data : undefined
+            })
+          }
+        }
       },
 
       deleteNode: (id) => {
         const ids = collectCascadeIds(get().nodes, id)
+
+        // Step 2: cascade에 포함된 Video 노드의 videoClipId를 제거 전에 수집 → DB DELETE
+        const clipIdsToDelete: string[] = []
+        for (const n of get().nodes) {
+          if (
+            ids.has(n.id) &&
+            isVideoData(n.data) &&
+            n.data.videoClipId
+          ) {
+            clipIdsToDelete.push(n.data.videoClipId)
+          }
+        }
+
         set((s) => ({
           nodes: s.nodes.filter((n) => !ids.has(n.id)),
           edges: s.edges.filter(
@@ -674,6 +982,24 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               : s.selectedNodeId,
           lastSavedAt: Date.now(),
         }))
+
+        // Step 2: video_clips 행 DELETE (fire-and-forget)
+        if (clipIdsToDelete.length > 0) {
+          void (async () => {
+            try {
+              const supabase = createClient()
+              await supabase
+                .from('video_clips')
+                .delete()
+                .in('id', clipIdsToDelete)
+            } catch (err) {
+              console.error(
+                '[director-canvas-store] video_clip DELETE failed:',
+                err,
+              )
+            }
+          })()
+        }
       },
 
       // ─── edge lifecycle ────────────────────────────────────────────────
@@ -728,6 +1054,22 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         if (!video || !isVideoData(video.data)) return
         const shotId = video.data.parentShotNodeId
 
+        // Step 2: DB로 flip할 형제 clip id 수집 (final=true일 때 기존 final 해제)
+        const demotedClipIds: string[] = []
+        if (final) {
+          for (const n of get().nodes) {
+            if (
+              n.id !== videoNodeId &&
+              isVideoData(n.data) &&
+              n.data.parentShotNodeId === shotId &&
+              n.data.final &&
+              n.data.videoClipId
+            ) {
+              demotedClipIds.push(n.data.videoClipId)
+            }
+          }
+        }
+
         set((s) => ({
           nodes: s.nodes.map((n) => {
             if (n.id === videoNodeId && isVideoData(n.data)) {
@@ -746,6 +1088,43 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           }),
           lastSavedAt: Date.now(),
         }))
+
+        // Step 2: is_final → video_clips 행 write (fire-and-forget)
+        const clipId = isVideoData(video.data) ? video.data.videoClipId : null
+        if (clipId || demotedClipIds.length > 0) {
+          void (async () => {
+            try {
+              const supabase = createClient()
+              const ops: Promise<unknown>[] = []
+              if (clipId) {
+                ops.push(
+                  Promise.resolve(
+                    supabase
+                      .from('video_clips')
+                      .update({ is_final: final })
+                      .eq('id', clipId),
+                  ),
+                )
+              }
+              for (const demoted of demotedClipIds) {
+                ops.push(
+                  Promise.resolve(
+                    supabase
+                      .from('video_clips')
+                      .update({ is_final: false })
+                      .eq('id', demoted),
+                  ),
+                )
+              }
+              await Promise.all(ops)
+            } catch (err) {
+              console.error(
+                '[director-canvas-store] setVideoFinal DB write failed:',
+                err,
+              )
+            }
+          })()
+        }
       },
 
       setVideoStatus: (videoNodeId, status, payload) => {
@@ -773,6 +1152,33 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           })(),
           lastSavedAt: Date.now(),
         }))
+
+        // Step 2: completed 시 url/status를 video_clips 행에 반영 (videoClipId 있을 때만).
+        // 파일 영속은 이미 /api/assets/upload-video가 처리 — 여기선 row에 url+status만 반영.
+        if (status === 'completed') {
+          const node = get().nodes.find((n) => n.id === videoNodeId)
+          if (node && isVideoData(node.data) && node.data.videoClipId) {
+            const clipId = node.data.videoClipId
+            const url = node.data.videoUrl
+            void (async () => {
+              try {
+                const supabase = createClient()
+                await supabase
+                  .from('video_clips')
+                  .update({
+                    status: 'completed',
+                    ...(url ? { url } : {}),
+                  })
+                  .eq('id', clipId)
+              } catch (err) {
+                console.error(
+                  '[director-canvas-store] setVideoStatus DB write failed:',
+                  err,
+                )
+              }
+            })()
+          }
+        }
       },
 
       applyVideoOverride: (videoNodeId, override) => {
@@ -786,6 +1192,18 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           }),
           lastSavedAt: Date.now(),
         }))
+
+        // Step 2: override → video_clips 행 debounce write (videoClipId 있을 때만)
+        const node = get().nodes.find((n) => n.id === videoNodeId)
+        if (node && isVideoData(node.data) && node.data.videoClipId) {
+          const clipId = node.data.videoClipId
+          debouncedVideoClipSaveToDb(clipId, () => {
+            const n = get().nodes.find((x) => x.id === videoNodeId)
+            return n && isVideoData(n.data)
+              ? { override: n.data.override }
+              : undefined
+          })
+        }
       },
 
       // ─── storyboard image (ST-2, I2I) ──────────────────────────────────
@@ -910,16 +1328,31 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const api = get()
         const shotNode = api.nodes.find((n) => n.id === shotNodeId)
         if (!shotNode || !isShotData(shotNode.data)) return null
-        const shot = shotNode.data
 
-        // 새 Video take 생성 (마더 설정 상속, 결정 #13)
+        // 새 Video take 생성 (마더 설정 상속, 결정 #13) → 그 노드를 생성
         const videoNodeId = api.addVideoTake(shotNodeId)
         if (!videoNodeId) return null
 
-        const eff = getEffectiveShotConfig(get(), videoNodeId)
-        if (!eff) return null
+        await get().regenerateVideo(videoNodeId)
+        return videoNodeId
+      },
 
-        // 레퍼런스 결정: storyboardImage(완료) 우선 → 유저 업로드 → 없으면 T2V (결정 #40)
+      regenerateVideo: async (videoNodeId) => {
+        const api = get()
+        const videoNode = api.nodes.find((n) => n.id === videoNodeId)
+        if (!videoNode || !isVideoData(videoNode.data)) return
+        const shotNode = api.nodes.find(
+          (n) => n.id === (videoNode.data as VideoNodeData).parentShotNodeId,
+        )
+        if (!shotNode || !isShotData(shotNode.data)) return
+        const shot = shotNode.data
+        const shotNodeId = shotNode.id
+
+        // effective 설정 = 마더 Shot 상속 + 이 Video의 override
+        const eff = getEffectiveShotConfig(get(), videoNodeId)
+        if (!eff) return
+
+        // 레퍼런스 결정: 마더 storyboardImage(완료) 우선 → 유저 업로드 → 없으면 T2V (결정 #40)
         const storyboardUrl =
           shot.storyboardImage?.status === 'completed' &&
           shot.storyboardImage.url
@@ -961,7 +1394,6 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           )}?provider=${respProvider}&model=${encodeURIComponent(model)}`
 
           const startedAt = Date.now()
-          // eslint-disable-next-line no-constant-condition
           while (true) {
             if (Date.now() - startedAt > VIDEO_POLL_TIMEOUT_MS) {
               throw new Error('영상 생성 타임아웃 (5분)')
@@ -986,11 +1418,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             }
             await new Promise((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS))
           }
-          return videoNodeId
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Unknown error'
           get().setVideoStatus(videoNodeId, 'failed', { error: message })
-          return videoNodeId
         }
       },
 
@@ -1353,6 +1783,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         }),
     }),
     {
+      // Step 2 (unify-director-store-db): localStorage persist는 이제 오프라인 캐시.
+      // 진입 시 hydrateFromDb(projectId)가 DB(canvas_position/video_clips)를 진실로
+      // 적용해 캐시를 reconcile한다. 충돌 시 DB가 캐넌.
       name: 'tale-director-canvas-v1-default',
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
@@ -1385,6 +1818,23 @@ export function nextShotPosition(
   return {
     x: parent.position.x + SHOT_OFFSET_X,
     y: parent.position.y + siblings.length * SHOT_OFFSET_Y,
+  }
+}
+
+/**
+ * 부모 Shot의 우측에 새 Video take 노드 위치 자동 계산 (addVideoTake와 동일 규칙).
+ * 형제 Video 아래로 stacking.
+ */
+export function nextVideoPosition(
+  state: Pick<DirectorCanvasState, 'nodes'>,
+  parentShotNodeId: string,
+): XYPosition {
+  const parent = state.nodes.find((n) => n.id === parentShotNodeId)
+  if (!parent) return { x: 80, y: 80 }
+  const siblings = getChildVideos(state, parentShotNodeId)
+  return {
+    x: parent.position.x + VIDEO_OFFSET_X,
+    y: parent.position.y + siblings.length * VIDEO_OFFSET_Y,
   }
 }
 

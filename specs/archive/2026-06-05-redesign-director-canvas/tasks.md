@@ -6,7 +6,9 @@
 ## Active (브라우저 검증 대기)
 
 ### D-1: 인프라 + 데이터 모델 (2026-05-25 코드 완료)
-- [c] DB 마이그레이션 `005_director_canvas_layout.sql` — scenes/shots/video_clips에 `canvas_position` JSONB + `is_final`, `take_label`, `override` 컬럼 + 부분 인덱스
+- [~] DB 마이그레이션 `005_director_canvas_layout.sql` — **불필요 확정 (decision #43, 2026-06-05)**. 노드 위치는
+      DB가 아니라 Zustand persist(localStorage)에 저장 (`grep canvas_position src/` = 0건). 라이브 미적용 유지.
+      향후 D-4를 DB 영속으로 구현하면 재검토.
 - [c] `src/types/director-canvas.ts` — `DirectorNodeKind`, Scene/Shot/Video NodeData, VideoOverride, 엣지 타입, ID 헬퍼, 레이아웃 상수, type guards
 - [c] `src/types/index.ts` — re-export 추가
 - [c] `src/stores/director-canvas-store.ts` — Zustand persist (key `tale-director-canvas-v1-default`). addSceneNode/addShotNode/addVideoTake/updateNodeData/deleteNode/setVideoFinal(Shot당 1개 강제)/setVideoStatus/applyVideoOverride/propagateStaleFromShot/cascade 삭제 confirm/relation modal + selectors (getChildShots / getChildVideos / getFinalVideo / getEffectiveShotConfig / nextShotPosition / nextScenePosition)
@@ -44,35 +46,53 @@
 - [c] `use-director-canvas-warm-starting.ts` 훅 — Scene 0 / Shot 0 / Video 0 / Final 누락 / 같은 Shot Video ≥3 5단계 룰
 - [c] GlobalChat에서 artistWarmTip / directorWarmTip 둘 다 wire-up
 
+## Dropped (decision #44, 2026-06-05 — 사용자 스코프 결정)
+
+### D-4: Writer ↔ Director **양방향** Sync — **폐기 (지금 안 함)**
+- [~] Cross-store subscribe / Director→Writer 역반영 / last-write-wins 충돌해소 일체 **드롭**.
+      양방향 라이브 sync 미구현. 대신 아래 D-4S 단방향 seed만 채택(decision #44/#45).
+
+### D-8(일부): Editor 핸드오프 — **폐기 (지금 안 함)**
+- [~] "Head to Editor →" Final Video export / Final 누락 토스트 **드롭**. editor 연동은 지금 작업 아님.
+
 ## Active (미착수)
 
-### D-4: Writer ↔ Director 양방향 Sync
-- [ ] Cross-store subscribe — `writer-store` ↔ `director-canvas-store`
-- [ ] Writer Scene/Shot 추가 → Director 노드 자동 생성 (자동 배치 내부 #18)
-- [ ] Director Shot 추가/수정/삭제 → Writer `shots[]` / `sceneManifest` 갱신
-- [ ] 충돌 last-write-wins, Auto-Save 디바운스 유지
-- [ ] cascade 삭제 모달 (Scene → Shot N개, Shot → Video N개)
+### D-4S: Writer → Director 단방향 Seed (1회 로드, decision #45)
+> ✅ **이미 구현돼 있었음** — `src/features/director/hooks/use-writer-director-sync.ts`(page.tsx:338 wire).
+>   단방향 create-only, writerSceneId/writerShotId로 멱등, `nextScenePosition`/`nextShotPosition` 사용,
+>   프롬프트+에셋 바인딩 + 스토리보드 자동생성(병렬3,1회)까지. **코드 ✓ / 브라우저 검증만 남음.**
+- [c] Writer scenes/shots → 캔버스 노드 1회 seed (멱등) — 코드 ✓ / 검증 대기
 
-### D-5: 영상 생성 wire-up (Shot → Video)
-- [ ] Shot NodePopup `생성` → `addVideoTake()` + `/api/director/generate-video` 호출
-- [ ] 새 Video 노드 마더 설정 상속 (내부 #13)
-- [ ] `generatingNodeIds` 상태 spinner
-- [ ] `video_clips` row 생성 + `shot_id` FK
-- [ ] 재생성 시 기존 Video url 덮어쓰기, stale 해제
+### D-5: 영상 생성 wire-up — NodePopup 경로 (2026-06-05 코드 완료)
+> store `generateVideoForShot` + 그리드뷰 ▶▶(StoryboardGridView)는 director-storyboard에서 이미 구현.
+- [c] store: `regenerateVideo(videoNodeId)` 액션 추출(기존 Video 노드 effective 설정으로 재생성),
+      `generateVideoForShot`는 addVideoTake+regenerateVideo로 리팩터 — tsc clean / 검증 대기
+- [c] `ShotNodePopup` "새 Video 테이크 생성" → addVideoTake + openPopup + `regenerateVideo`(실제 생성).
+      "Branch (빈 테이크)"는 빈 노드 유지 — 코드 ✓ / 검증 대기
+- [c] `VideoNodePopup` "재생성" placeholder 제거 → `regenerateVideo(nodeId)` 실호출,
+      `generatingNodeIds` spinner(setVideoStatus가 관리) — 코드 ✓ / 검증 대기
 
-### D-6: Camera/Light Preset Library (Palette)
-- [ ] `src/stores/preset-storage-store.ts` 신규
-- [ ] DB 마이그레이션 — `camera_light_presets` (projectId, name, camera/lighting/cameraPreset JSONB)
-- [ ] Palette 하단 탭 UI — 프리셋 카드 리스트
-- [ ] Shot/Video NodePopup "이 셋업 프리셋으로 저장" 버튼
-- [ ] 프리셋 카드 드래그 → 노드 drop → 전체 덮어쓰기 (내부 #16), prompt 유지
+### D-6: Camera/Light Preset Library (Palette) — DB 백엔드 (decision #46, 2026-06-05 코드 완료)
+- [c] `src/stores/preset-storage-store.ts` 신규 — DB 백엔드(persist 미사용), load/save/delete. tsc/eslint clean
+- [c] API `src/app/api/director/presets/route.ts` — GET(projectId)/POST/DELETE, getUser+supabaseAdmin, camera_preset↔cameraPreset 매핑
+- [x] DB 마이그레이션 `011_camera_light_presets.sql` — **라이브 적용 완료** (2026-06-05).
+      `_apply_migration.mjs` 적용 + `NOTIFY pgrst reload schema` → PostgREST 200 확인 + `_refresh.py` 캐시 반영(camera_light_presets 0 rows)
+- [c] Palette 프리셋 카드 스트립(`page.tsx` PaletteBar) — projectId effect 로드, 카드 + × 삭제 — 코드 ✓ / 검증 대기
+- [c] Shot/Video NodePopup "이 셋업 프리셋으로 저장" 버튼(`window.prompt` 이름) — 코드 ✓ / 검증 대기
+- [c] 프리셋 카드 드래그 → 노드 drop(`BaseNode`) → camera/lighting/cameraPreset 전체 덮어쓰기, prompt 유지
+      (Shot=updateNodeData[자동 stale 전파], Video=applyVideoOverride) — 코드 ✓ / 검증 대기
+- [x] **보안 IDOR 해결** (2026-06-05) — presets 라우트 GET/POST/DELETE에 `isProjectOwned(projectId, user.id)`
+      가드 추가(`workspaces.owner_id` → `projects.workspace_id` 패턴, project/init과 동일). 미소유 시 403. tsc/eslint clean.
 
-### D-8: Editor 핸드오프 + Inspector 정리
-- [ ] "Head to Editor →" → 각 Shot의 ★ Final Video를 editor-store clips에 export
-- [ ] Final 누락 Shot 경고 토스트 (마지막 Video fallback)
-- [ ] 기존 Inspector 패널 제거 (내부 #12 단계 마이그레이션 완료)
-- [ ] 기존 `director-store.ts` 의존(Director Chat 등) 정리 → `director-canvas-store.ts`로 통합 (내부 #14)
-- [ ] 구 `/studio/director` 컴포넌트 (angle-control, key-light, cinematographic-inspector, etc.) 삭제
+### D-8(잔여): 레거시 정리 (2026-06-05 — 안전분 완료, decision #47)
+> editor export는 드롭(#44). Inspector aside는 D-3에서 이미 제거됨(#12).
+- [x] `movement-control.tsx` 삭제 — 고아(grep 0건)
+- [x] `legacy/page.tsx` 삭제 + PaletteBar "Legacy view" 링크/`next/link`·`ArrowUpRight` import 제거 + 빈 legacy 디렉토리 제거
+- [x] `cinematographic-inspector.tsx` 삭제 — legacy 페이지 전용이었음
+- [~] **`director-store.ts` 제거는 보류** — task 원문은 "구 컴포넌트 삭제(angle-control/key-light/camera-preset-control 등)"였으나
+      angle-control/key-light/camera-preset-control은 **새 NodePopup이 재사용 중**이라 삭제 불가(유지).
+      director-store(780줄)는 **legacy가 아니라 load-bearing**: `editor-store`(핸드오프 read) + `global-chat-store`
+      (legacy director chat 분기)가 의존. 제거하려면 그 두 store 마이그레이션 필요 → **별도 change**로 분리(decision #47).
 
 ## Done (검증 완료 — 이 change 내)
 

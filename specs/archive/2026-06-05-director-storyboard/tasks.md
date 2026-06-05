@@ -13,8 +13,9 @@
 - [x] `director-canvas-store.ts` `makeShotData` 기본값: `storyboardImage: null`, `generationMethod: 'T2V'`
 - [x] persist — `nodes` 배열 전체를 partialize하므로 새 필드 자동 영속화. **필드별 화이트리스트 없음 → 별도 작업 불필요**
 - [x] `shotConfigKeys`(stale 트리거)에 `generationMethod`/`storyboardImage` 추가 — 변경 시 자식 Video stale
-- [c] DB 마이그레이션 `006_shot_storyboard_image.sql` 작성 (`shots.storyboard_image` JSONB +
-      `shots.generation_method` TEXT NOT NULL DEFAULT 'T2V'). 파일 ✓ / **Supabase 실제 apply 검증 대기**
+- [x] DB 마이그레이션 `006_shot_storyboard_image.sql` 작성 (`shots.storyboard_image` JSONB +
+      `shots.generation_method` TEXT NOT NULL DEFAULT 'T2V'). 파일 ✓ / **라이브 적용 확인됨**
+      (2026-06-05 `_refresh.py` introspection: `shots.storyboard_image` jsonb + `generation_method` 존재)
 
 ### ST-2: I2I 스토리보드 이미지 생성 (2026-06-04 코드 완료)
 - [c] asset 이미지 해석 헬퍼 `resolveShotAssetImages(data)` — `characterAssetIds`+`worldAssetIds`를

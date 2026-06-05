@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource } from '@/types'
 import { useProjectStore } from '@/stores/project-store'
-import { useDirectorStore } from '@/stores/director-store'
 import { createClient } from '@/lib/supabase/client'
 import {
   saveEditorState,
@@ -621,21 +620,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
     }
 
-    // 2) Try upstream director store
-    const directorState = useDirectorStore.getState()
-    if (directorState.shots.length > 0) {
-      const order = buildClipOrder(directorState.shots)
-      const firstSceneId = directorState.shots[0]?.sceneId ?? null
-
-      set({
-        shots: directorState.shots,
-        videoClips: directorState.videoClips,
-        clipOrder: order,
-        selectedSceneId: firstSceneId,
-        selectedClipShotId: order[firstSceneId!]?.[0] ?? null,
-      })
-      return
-    }
+    // 2) DB가 단일 진실 (unify-director-store-db Step 1) — 옛 director-store fallback 제거.
+    //    Director 캔버스 편집은 Step 0 write-through로 DB shots에 반영되므로 위 (1) 경로가 캐넌.
 
     // No data available — keep empty state (don't show fake mock data)
   },

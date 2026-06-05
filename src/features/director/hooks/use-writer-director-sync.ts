@@ -28,6 +28,8 @@ export function useWriterDirectorSync() {
 
   // 스토리보드 자동생성 마운트당 1회 가드 (재진입 중복 방지).
   const autoStoryboardTriggeredRef = useRef(false)
+  // Step 2: DB hydrate 1회 가드 (projectId별). DB가 진실 — Scene/Shot seed 후 1회 적용.
+  const hydratedProjectIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!manifest) return
@@ -91,6 +93,15 @@ export function useWriterDirectorSync() {
       }
       if (shot.cameraPreset) patch.cameraPreset = shot.cameraPreset
       dir.updateNodeData<'shot'>(id, patch)
+    }
+
+    // ── Pass 2.5: DB → 캔버스 hydrate (DB가 진실, projectId별 1회) ──────
+    // Scene/Shot seed 후 실행 — 부모 노드가 존재해야 Video 노드를 매달 수 있음.
+    // canvas_position을 기존 노드에 적용 + 누락된 video_clips 행을 Video 노드로 생성.
+    const projectId = useDirectorCanvasStore.getState().projectId
+    if (projectId && hydratedProjectIdRef.current !== projectId) {
+      hydratedProjectIdRef.current = projectId
+      void useDirectorCanvasStore.getState().hydrateFromDb(projectId)
     }
 
     // ── Pass 3: 스토리보드 이미지 자동생성 (병렬3 + 1회 + null만 = 캐시) ──

@@ -104,6 +104,8 @@ export type VideoNodeData = {
   label: string
   /** 마더 Shot Canvas 노드 ID (반드시 존재) */
   parentShotNodeId: string
+  /** 연결된 `video_clips.id` (uuid). null = 아직 DB에 영속 안 됨 (수동 노드 등) */
+  videoClipId: string | null
   /** 마더 대비 변경된 필드 (없으면 마더 값 그대로 사용) */
   override: VideoOverride
   /** 생성 결과 */

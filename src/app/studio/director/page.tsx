@@ -2,7 +2,7 @@
 
 import '@xyflow/react/dist/style.css'
 
-import { useCallback, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -20,13 +20,16 @@ import {
   type OnConnectEnd,
   type XYPosition,
 } from '@xyflow/react'
-import { ArrowUpRight, Loader2, ImageIcon } from 'lucide-react'
-import Link from 'next/link'
+import { Loader2, ImageIcon, X } from 'lucide-react'
 
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { cn } from '@/lib/utils'
 
 import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
+import {
+  usePresetStorageStore,
+  type CameraLightPreset,
+} from '@/stores/preset-storage-store'
 import {
   isShotData,
   isSceneData,
@@ -69,6 +72,9 @@ function CanvasInner() {
   const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
   const selectEdge = useDirectorCanvasStore((s) => s.selectEdge)
+  const persistNodePosition = useDirectorCanvasStore(
+    (s) => s.persistNodePosition,
+  )
 
   const { screenToFlowPosition } = useReactFlow()
 
@@ -83,9 +89,13 @@ function CanvasInner() {
       useDirectorCanvasStore.setState({ nodes: next as typeof nodes })
       changes.forEach((c) => {
         if (c.type === 'remove') deleteNode(c.id)
+        // Step 2: drag end 시점에만 canvas_position을 DB로 write-back (매 프레임 X)
+        else if (c.type === 'position' && c.dragging === false) {
+          persistNodePosition(c.id)
+        }
       })
     },
-    [nodes, deleteNode],
+    [nodes, deleteNode, persistNodePosition],
   )
 
   const onEdgesChange = useCallback(
@@ -243,6 +253,65 @@ function CanvasInner() {
 
 // ────────────────────────────────────────────────────────────────────────────
 
+const PRESET_DND_TYPE = 'application/preset-id'
+
+function PresetCard({ preset }: { preset: CameraLightPreset }) {
+  const deletePreset = usePresetStorageStore((s) => s.deletePreset)
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData(PRESET_DND_TYPE, preset.id)
+    e.dataTransfer.effectAllowed = 'copy'
+  }
+
+  return (
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      title="노드 위로 드래그해 카메라/조명/렌즈 셋업 적용"
+      className={cn(
+        'group flex h-7 shrink-0 cursor-grab items-center gap-1 rounded-md border border-border px-2',
+        'bg-card text-xs text-foreground active:cursor-grabbing',
+        'transition-colors duration-100 hover:bg-accent',
+      )}
+    >
+      <span className="max-w-[10rem] truncate">{preset.name}</span>
+      <button
+        type="button"
+        onClick={() => void deletePreset(preset.id)}
+        aria-label="프리셋 삭제"
+        className="rounded-sm p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+      >
+        <X className="size-3" />
+      </button>
+    </div>
+  )
+}
+
+function PresetStrip() {
+  const projectId = useDirectorCanvasStore((s) => s.projectId)
+  const presets = usePresetStorageStore((s) => s.presets)
+  const loadPresets = usePresetStorageStore((s) => s.loadPresets)
+
+  useEffect(() => {
+    if (projectId) void loadPresets(projectId)
+  }, [projectId, loadPresets])
+
+  if (presets.length === 0) return null
+
+  return (
+    <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
+      <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+        프리셋
+      </span>
+      {presets.map((p) => (
+        <PresetCard key={p.id} preset={p} />
+      ))}
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 function PaletteBar() {
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
   const setViewMode = useDirectorCanvasStore((s) => s.setViewMode)
@@ -312,19 +381,9 @@ function PaletteBar() {
             </span>
           )}
         </button>
-      </div>
 
-      <Link
-        href="/studio/director/legacy"
-        className={cn(
-          'flex items-center gap-1 rounded px-2 py-0.5 text-xs text-muted-foreground',
-          'opacity-50 transition-opacity hover:opacity-100',
-        )}
-        title="결정 #12: 단계적 마이그레이션 — 검증 종료 후 제거"
-      >
-        <span>Legacy view</span>
-        <ArrowUpRight className="size-3" />
-      </Link>
+        <PresetStrip />
+      </div>
     </div>
   )
 }

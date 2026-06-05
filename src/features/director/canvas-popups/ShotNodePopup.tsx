@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Film, GitBranch, Loader2, Trash2, Upload, X } from 'lucide-react'
+import { Bookmark, Film, GitBranch, Loader2, Trash2, Upload, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
+import { usePresetStorageStore } from '@/stores/preset-storage-store'
 import {
   newDirectorId,
   type DirectorVideoProvider,
@@ -39,6 +40,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
   const closePopup = useDirectorCanvasStore((s) => s.closePopup)
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
   const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
+  const regenerateVideo = useDirectorCanvasStore((s) => s.regenerateVideo)
   const openDeleteConfirm = useDirectorCanvasStore(
     (s) => s.openDeleteConfirm,
   )
@@ -90,6 +92,17 @@ export function ShotNodePopup({ nodeId, data }: Props) {
     updateNodeData<'shot'>(nodeId, { label, prompt })
   }
 
+  // 새 Video 테이크 생성 + 실제 영상 생성 (D-5). storyboardImage 있으면 I2V.
+  const handleGenerateTake = () => {
+    commit()
+    const newId = addVideoTake(nodeId)
+    if (!newId) return
+    // 새 Video 노드로 popup 전환 → 생성 진행/스피너는 VideoNodePopup에서 표시
+    useDirectorCanvasStore.getState().openPopup(newId)
+    void regenerateVideo(newId)
+  }
+
+  // Branch = 빈 Video 노드만 생성 (생성은 별도, 결정 #13)
   const handleAddTake = () => {
     commit()
     const newId = addVideoTake(nodeId)
@@ -102,6 +115,19 @@ export function ShotNodePopup({ nodeId, data }: Props) {
   const handleDelete = () => {
     closePopup()
     openDeleteConfirm(nodeId)
+  }
+
+  // 현재 카메라/조명/렌즈 셋업을 프리셋으로 저장 (D-6, 결정 #46)
+  const handleSavePreset = () => {
+    const name = window.prompt('프리셋 이름')?.trim()
+    if (!name) return
+    void usePresetStorageStore.getState().savePreset({
+      projectId,
+      name,
+      camera: data.camera,
+      lighting: data.lighting,
+      cameraPreset: data.cameraPreset,
+    })
   }
 
   const handleAddReferenceImage = (file: File) => {
@@ -328,7 +354,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
-            onClick={handleAddTake}
+            onClick={handleGenerateTake}
             className="gap-1.5"
             disabled={isGenerating}
           >
@@ -353,6 +379,16 @@ export function ShotNodePopup({ nodeId, data }: Props) {
           >
             <GitBranch className="size-3.5" />
             Branch (빈 테이크)
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSavePreset}
+            className="gap-1.5"
+            title="현재 카메라/조명/렌즈 셋업을 프리셋으로 저장"
+          >
+            <Bookmark className="size-3.5" />
+            이 셋업 프리셋으로 저장
           </Button>
           <div className="ml-auto" />
           <Button

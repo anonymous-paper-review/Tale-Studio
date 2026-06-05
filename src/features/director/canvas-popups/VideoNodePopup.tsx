@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Loader2, Play, RefreshCw, Star, Trash2 } from 'lucide-react'
+import { Bookmark, Loader2, Play, RefreshCw, Star, Trash2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,7 @@ import {
   getEffectiveShotConfig,
   useDirectorCanvasStore,
 } from '@/stores/director-canvas-store'
+import { usePresetStorageStore } from '@/stores/preset-storage-store'
 import {
   isShotData,
   type VideoNodeData,
@@ -63,6 +64,7 @@ export function VideoNodePopup({ nodeId, data }: Props) {
   const isGenerating = useDirectorCanvasStore(
     (s) => !!s.generatingNodeIds[nodeId],
   )
+  const projectId = useDirectorCanvasStore((s) => s.projectId)
 
   const [label, setLabel] = useState(data.label)
   const [overridePrompt, setOverridePrompt] = useState(
@@ -103,20 +105,26 @@ export function VideoNodePopup({ nodeId, data }: Props) {
   }
 
   const handleRegenerate = () => {
-    // D-5에서 실제 영상 생성 API wire-up. 지금은 placeholder.
-    useDirectorCanvasStore
-      .getState()
-      .setVideoStatus(nodeId, 'generating')
-    setTimeout(() => {
-      useDirectorCanvasStore.getState().setVideoStatus(nodeId, 'completed', {
-        url: data.videoUrl ?? '',
-      })
-    }, 1200)
+    // D-5: effective 설정으로 이 Video 노드를 실제 (재)생성. 마더 storyboardImage 있으면 I2V.
+    void useDirectorCanvasStore.getState().regenerateVideo(nodeId)
   }
 
   const handleDelete = () => {
     closePopup()
     openDeleteConfirm(nodeId)
+  }
+
+  // effective(상속+override) 셋업을 프리셋으로 저장 (D-6, 결정 #46)
+  const handleSavePreset = () => {
+    const name = window.prompt('프리셋 이름')?.trim()
+    if (!name) return
+    void usePresetStorageStore.getState().savePreset({
+      projectId,
+      name,
+      camera: effective.camera,
+      lighting: effective.lighting,
+      cameraPreset: effective.cameraPreset,
+    })
   }
 
   return (
@@ -284,9 +292,19 @@ export function VideoNodePopup({ nodeId, data }: Props) {
             ) : (
               <>
                 <RefreshCw className="size-3.5" />
-                재생성 (placeholder — D-5에서 wire-up)
+                {data.videoUrl ? '재생성' : '생성'}
               </>
             )}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSavePreset}
+            className="gap-1.5"
+            title="현재 카메라/조명/렌즈 셋업을 프리셋으로 저장"
+          >
+            <Bookmark className="size-3.5" />
+            이 셋업 프리셋으로 저장
           </Button>
           <div className="ml-auto" />
           <Button

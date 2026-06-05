@@ -6,6 +6,10 @@ import { Copy, Edit, GitBranch, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
+import { usePresetStorageStore } from '@/stores/preset-storage-store'
+import { isShotData, isVideoData } from '@/types/director-canvas'
+
+const PRESET_DND_TYPE = 'application/preset-id'
 
 type Theme = 'scene' | 'shot' | 'video'
 
@@ -96,6 +100,36 @@ function BaseNodeImpl({
     openDeleteConfirm(id)
   }
 
+  // 프리셋 카드 drop → camera/lighting/cameraPreset 전체 덮어쓰기 (prompt/참고이미지 유지, 내부 #16)
+  const handleDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes(PRESET_DND_TYPE)) {
+      e.preventDefault()
+    }
+  }
+  const handleDrop = (e: React.DragEvent) => {
+    const presetId = e.dataTransfer.getData(PRESET_DND_TYPE)
+    if (!presetId) return
+    e.preventDefault()
+    e.stopPropagation()
+    const preset = usePresetStorageStore
+      .getState()
+      .presets.find((p) => p.id === presetId)
+    if (!preset) return
+    const node = useDirectorCanvasStore.getState().nodes.find((n) => n.id === id)
+    if (!node) return
+    const patch = {
+      camera: preset.camera,
+      lighting: preset.lighting,
+      cameraPreset: preset.cameraPreset,
+    }
+    // updateNodeData가 Shot config 변경 시 자식 Video stale 전파를 자체 수행 (store §updateNodeData)
+    if (isShotData(node.data)) {
+      useDirectorCanvasStore.getState().updateNodeData<'shot'>(id, patch)
+    } else if (isVideoData(node.data)) {
+      useDirectorCanvasStore.getState().applyVideoOverride(id, patch)
+    }
+  }
+
   return (
     <div
       className={cn(
@@ -108,6 +142,8 @@ function BaseNodeImpl({
         strongStale && 'border-2 border-destructive',
       )}
       style={width ? { width: `${width}px` } : undefined}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       {stale && (
         <div

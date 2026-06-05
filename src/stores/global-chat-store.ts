@@ -3,7 +3,6 @@ import type { StageId } from '@/types'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useArtistStore } from '@/stores/artist-store'
-import { useDirectorStore } from '@/stores/director-store'
 import {
   useDirectorCanvasStore,
   serializeDirectorCanvasContext,
@@ -117,39 +116,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         break
       }
       case 'director': {
-        // D-7: Director Canvas가 노드를 가지고 있으면 agentic 모드 (canvasContext 전달)
-        // 아니면 legacy director-store 모드 (shotContext 전달)
+        // Director Canvas agentic 모드 — 항상 canvasContext 전달.
+        // (unify-director-store-db Step 1: 옛 director-store legacy 분기 제거, canvas가 단일 진실)
         const canvasState = useDirectorCanvasStore.getState()
-        const hasCanvasNodes = canvasState.nodes.length > 0
-
-        if (hasCanvasNodes) {
-          const canvasContext = serializeDirectorCanvasContext(canvasState)
-          endpoint = '/api/director/chat'
-          body = {
-            message: trimmed,
-            history: historyPayload,
-            canvasContext,
-          }
-        } else {
-          const d = useDirectorStore.getState()
-          const selectedShot = d.shots.find(
-            (s) => s.shotId === d.selectedShotId,
-          )
-          const shotContext = selectedShot
-            ? {
-                shotType: selectedShot.shotType,
-                actionDescription: selectedShot.actionDescription,
-                camera: selectedShot.camera,
-                lighting: selectedShot.lighting,
-                generationMethod: selectedShot.generationMethod,
-              }
-            : undefined
-          endpoint = '/api/director/chat'
-          body = {
-            message: trimmed,
-            history: historyPayload,
-            shotContext,
-          }
+        const canvasContext = serializeDirectorCanvasContext(canvasState)
+        endpoint = '/api/director/chat'
+        body = {
+          message: trimmed,
+          history: historyPayload,
+          canvasContext,
         }
         break
       }
@@ -231,17 +206,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               result.skipped,
             )
           }
-        }
-        // Legacy 응답 — suggestedCamera/suggestedLighting
-        if (data.suggestedCamera) {
-          useDirectorStore
-            .getState()
-            .applySuggestedCamera(data.suggestedCamera)
-        }
-        if (data.suggestedLighting) {
-          useDirectorStore
-            .getState()
-            .applySuggestedLighting(data.suggestedLighting)
         }
       }
     } catch (err) {
