@@ -1,19 +1,19 @@
 // S2: 캐릭터, 관계, 서브텍스트
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
-import type { S0Genre, S1Structure, S2Block, PipelineInput } from '@/lib/writer/types/pipeline';
+import type { Genre, NarrativeStructure, Characters, PipelineInput } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
-export async function runS2(
+export async function runCharacters(
   input: PipelineInput,
-  s0: S0Genre,
-  s1: S1Structure,
+  genre: Genre,
+  narrativeStructure: NarrativeStructure,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig
-): Promise<S2Block> {
-  await logger.markStage('S2', 'started');
+): Promise<Characters> {
+  await logger.markStage('characters', 'started');
 
   const systemInstruction = `당신은 영상 제작의 S2(캐릭터/관계) 디자이너이다.
-주어진 스토리, S0, S1을 바탕으로 캐릭터들의 정의, 관계, 서브텍스트를 결정한다.
+주어진 스토리, genre, narrativeStructure를 바탕으로 캐릭터들의 정의, 관계, 서브텍스트를 결정한다.
 
 캐릭터 아크 유형:
 - positive_change: 결함 → 성장 → 강함
@@ -29,7 +29,7 @@ export async function runS2(
 - need: 내적 필요 (무의식적)
 - wound: 과거 상처 (선택)
 
-깊이 레벨 ${s0.depth_level} 가이드:
+깊이 레벨 ${genre.depth_level} 가이드:
 - D1: 1명 (or 0명, 사물/풍경 중심도 OK). arc/want/need/wound 생략 가능
 - D2: 1~2명. arc 단순 (전→후 1줄). want만 명시
 - D3: 1~2명 (주인공 중심)
@@ -42,11 +42,11 @@ export async function runS2(
   const userPrompt = `[스토리]
 ${input.story}
 
-[S0]
-${JSON.stringify(s0, null, 2)}
+[genre]
+${JSON.stringify(genre, null, 2)}
 
-[S1]
-${JSON.stringify(s1, null, 2)}
+[narrativeStructure]
+${JSON.stringify(narrativeStructure, null, 2)}
 
 [출력 형식 - JSON]
 {
@@ -82,19 +82,19 @@ ${JSON.stringify(s1, null, 2)}
   "subtext_notes": ["string", ...]
 }`;
 
-  const result = await generateJson<S2Block>(userPrompt, axisConfig, {
+  const result = await generateJson<Characters>(userPrompt, axisConfig, {
     systemInstruction,
     temperature: 0.7,
   });
 
-  await logger.saveLlmCall('S2_characters', {
+  await logger.saveLlmCall('characters', {
     prompt: userPrompt,
     response: JSON.stringify(result, null, 2),
     model: describeAxisConfig(axisConfig),
     provider: axisConfig.provider,
   });
 
-  await logger.saveStage('04_S2.json', result);
-  await logger.markStage('S2', 'completed', { character_count: result.characters.length });
+  await logger.saveStage('04_characters.json', result);
+  await logger.markStage('characters', 'completed', { character_count: result.characters.length });
   return result;
 }

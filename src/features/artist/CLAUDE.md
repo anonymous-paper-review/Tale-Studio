@@ -3,7 +3,7 @@
 ## Status
 - Status: 카드형 패널 UI (2026-06-04 롤백 완료)
 - 이력: 노드 그래프 버전은 `specs/archive/2026-06-04-redesign-l0-canvas/`에 보존
-- Spec: `@../../../specs/layers/L0_concept_canvas.md` + `@../../../specs/data/asset_storage.md`
+- Spec: 구현이 source-of-truth (`character-panel.tsx`/`world-panel.tsx`/`inventory-grid.tsx`) + `@../../../specs/data/asset_storage.md`
 - 진행 중 변경: `@../../../specs/changes/rollback-artist-card/`
 
 ## Stack

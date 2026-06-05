@@ -1,11 +1,7 @@
 import { create } from 'zustand'
 import type { SceneManifest, CharacterAsset, WorldAsset } from '@/types'
-import {
-  CHARACTER_VIEW_KEYS,
-  CHARACTER_VIEW_COLUMNS,
-  type CharacterViewKey,
-} from '@/types/asset'
-import { buildCharacterPrompt, buildWorldPrompt } from '@/lib/prompts'
+import { type CharacterViewKey } from '@/types/asset'
+import { buildWorldPrompt } from '@/lib/prompts'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
@@ -111,11 +107,7 @@ interface ArtistState {
   selectLocation: (id: string) => void
   lockCharacter: (id: string) => void
   unlockCharacter: (id: string) => void
-  generateSheet: (
-    id: string,
-    views?: CharacterViewKey[],
-    promptOverrides?: Partial<Record<CharacterViewKey, string>>,
-  ) => Promise<void>
+  generateSheet: (id: string) => Promise<void>
   generateWorldAsset: (locationId: string) => Promise<void>
   generateWorldShot: (
     locationId: string,
@@ -200,11 +192,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             characterId: c.character_id,
             name: c.name,
             views: {
+              main: c.view_main ?? null,
               front: c.view_front ?? null,
-              side: c.view_side ?? null,
               back: c.view_back ?? null,
-              threeQuarterLeft: c.view_three_quarter_left ?? null,
-              threeQuarterRight: c.view_three_quarter_right ?? null,
+              sideLeft: c.view_side_left ?? null,
+              sideRight: c.view_side_right ?? null,
             },
             locked: c.locked ?? false,
             description: c.description ?? '',
@@ -241,11 +233,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           characterId: c.characterId,
           name: c.name,
           views: {
+            main: null,
             front: null,
-            side: null,
             back: null,
-            threeQuarterLeft: null,
-            threeQuarterRight: null,
+            sideLeft: null,
+            sideRight: null,
           },
           locked: false,
           description: c.description ?? '',
@@ -317,73 +309,46 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       ),
     })),
 
-  generateSheet: async (id, views, promptOverrides) => {
-    const { sceneManifest, imageProvider } = get()
-    const character = sceneManifest?.characters.find(
-      (c) => c.characterId === id,
-    )
-    if (!character) return
-
-    const viewList: CharacterViewKey[] =
-      views && views.length > 0 ? views : CHARACTER_VIEW_KEYS
+  // 턴어라운드 시트 생성 (decisions #37). 시트 1장 생성→서버 crop→DB 저장을 엔드포인트가 수행.
+  generateSheet: async (id) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
 
     set({ generatingCharacterId: id, error: null })
-
     try {
-      const generated = await Promise.all(
-        viewList.map((v) =>
-          generateImage(
-            // 뷰별 프롬프트 override(사용자 편집) 우선, 없으면 기본 빌드 프롬프트.
-            promptOverrides?.[v] ?? buildCharacterPrompt(character.fixedPrompt, v),
-            '1:1',
-            imageProvider,
-          ),
-        ),
-      )
-      const blobByView: Partial<Record<CharacterViewKey, string>> = {}
-      viewList.forEach((v, i) => {
-        blobByView[v] = generated[i]
+      const res = await fetch('/api/artist/generate-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, characterId: id }),
       })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `HTTP ${res.status}`)
+      }
+      const { views } = (await res.json()) as { views: Record<string, string> }
 
       set((state) => ({
         generatingCharacterId: null,
         characterAssets: state.characterAssets.map((a) =>
           a.characterId === id
-            ? { ...a, views: { ...a.views, ...blobByView } }
+            ? {
+                ...a,
+                views: {
+                  main: views.view_main ?? a.views.main,
+                  front: views.view_front ?? a.views.front,
+                  back: views.view_back ?? a.views.back,
+                  sideLeft: views.view_side_left ?? a.views.sideLeft,
+                  sideRight: views.view_side_right ?? a.views.sideRight,
+                },
+              }
             : a,
         ),
       }))
-
-      const pid = useProjectStore.getState().projectId
-      if (pid) {
-        const persisted = await Promise.all(
-          viewList.map((v) =>
-            persistImage(
-              pid,
-              'character',
-              id,
-              CHARACTER_VIEW_COLUMNS[v],
-              blobByView[v]!,
-            ),
-          ),
-        )
-        const finalByView: Partial<Record<CharacterViewKey, string>> = {}
-        viewList.forEach((v, i) => {
-          finalByView[v] = persisted[i] ?? blobByView[v]!
-        })
-        set((state) => ({
-          characterAssets: state.characterAssets.map((a) =>
-            a.characterId === id
-              ? { ...a, views: { ...a.views, ...finalByView } }
-              : a,
-          ),
-        }))
-      }
     } catch (err) {
       set({
         generatingCharacterId: null,
         error:
-          err instanceof Error ? err.message : 'Character generation failed',
+          err instanceof Error ? err.message : 'Character sheet generation failed',
       })
     }
   },
@@ -519,8 +484,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     for (const c of characterAssets) {
       // 동시/중복 트리거 방지: 진행 중이면 skip.
       if (get().generatingCharacterId) break
-      if (c.views.front == null) {
-        await get().generateSheet(c.characterId, ['front'])
+      if (c.views.main == null) {
+        await get().generateSheet(c.characterId)
       }
     }
 
@@ -535,7 +500,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   applyUpdates: async (updates) => {
     for (const u of updates) {
       if (u.type === 'regenerateCharacter') {
-        await get().generateSheet(u.characterId, u.views)
+        await get().generateSheet(u.characterId)
       } else if (u.type === 'regenerateWorldAsset') {
         await get().generateWorldAsset(u.locationId)
       }

@@ -30,6 +30,9 @@ export type Database = {
           view_three_quarter_right: string | null
           appearance: string | null
           costume: string[] | null
+          view_main: string | null
+          view_side_left: string | null
+          view_side_right: string | null
         }
         Insert: {
           id?: string
@@ -48,6 +51,9 @@ export type Database = {
           view_three_quarter_right?: string | null
           appearance?: string | null
           costume?: string[] | null
+          view_main?: string | null
+          view_side_left?: string | null
+          view_side_right?: string | null
         }
         Update: {
           id?: string
@@ -66,6 +72,9 @@ export type Database = {
           view_three_quarter_right?: string | null
           appearance?: string | null
           costume?: string[] | null
+          view_main?: string | null
+          view_side_left?: string | null
+          view_side_right?: string | null
         }
         Relationships: [
           {
@@ -75,6 +84,57 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      editor_states: {
+        Row: {
+          project_id: string
+          state: Json
+          updated_at: string
+        }
+        Insert: {
+          project_id: string
+          state: Json
+          updated_at?: string
+        }
+        Update: {
+          project_id?: string
+          state?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editor_states_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback: {
+        Row: {
+          id: string
+          message: string
+          user_email: string | null
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          message: string
+          user_email?: string | null
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          message?: string
+          user_email?: string | null
+          status?: string
+          created_at?: string
+        }
+        Relationships: [
         ]
       }
       knowledge_techniques: {

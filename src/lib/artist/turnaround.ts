@@ -3,7 +3,7 @@
 // decisions #37: A-style 구조화 프롬프트로 1×4 가로 스트립(front|side-L|side-R|back)을
 // 한 장 생성한 뒤, 균등 4등분 고정좌표로 crop 해 개별 뷰에 분배한다.
 //
-// ⚠️ source-agnostic: 프롬프트 입력 토큰을 "인자로" 받는다. 토큰이 svc 로그에서 오든
+// ⚠️ source-agnostic: 프롬프트 입력 토큰을 "인자로" 받는다. 토큰이 writer 로그에서 오든
 //    DB(unify-svc-writer-pipeline 이후)에서 오든 호출자가 채우면 된다 → 데이터 출처와 무관.
 import sharp from 'sharp'
 
@@ -31,15 +31,15 @@ export const TURNAROUND_VIEW_SPEC: Record<
 export interface TurnaroundPromptInput {
   /** 캐릭터 이름 */
   name: string
-  /** 외형 묘사 (svc appearance_description 또는 DB fixed_prompt) */
+  /** 외형 묘사 (writer appearance_description 또는 DB fixed_prompt) */
   appearance: string
   age?: string
   role?: string
   costumes?: string[]
-  /** svc L1 — 폴백(fixed_prompt) 시엔 없을 수 있음 */
+  /** writer L1 — 폴백(fixed_prompt) 시엔 없을 수 있음 */
   artStyle?: string
   shapeLanguage?: string
-  /** svc L2 global_palette 색상들 */
+  /** writer L2 global_palette 색상들 */
   palette?: string[]
 }
 

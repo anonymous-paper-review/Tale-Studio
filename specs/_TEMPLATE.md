@@ -27,9 +27,9 @@ decisions: [N, N, N]                    # decisions.md entry 번호 (관련된 �
 - <변경 3>
 
 ## Impact
-- Affected specs: <layers/L0_concept_canvas.md 같은 path 나열>
+- Affected specs: <layers/director_canvas.md 같은 path 나열 (없으면 "없음 — 코드 source-of-truth")>
 - Affected code: <src/features/artist/ 같은 영역 나열>
-- Affected stores: <stores/canvas-store.ts 같은 path>
+- Affected stores: <stores/artist-store.ts 같은 path>
 - Affected decisions: <#N, #N>
 ```
 

@@ -142,7 +142,7 @@
 | Q-SYS-1 | 프로젝트 저장/불러오기 방식은? | 자동저장? 수동? Supabase에 저장? 로컬? |
 | Q-SYS-2 | 에러 핸들링 (API 실패, 타임아웃) | 재시도? 사용자 알림? fallback? |
 | Q-SYS-6 | 백엔드 API 엔드포인트 목록 | 기술 스택은 확정 (Next.js API Routes). 엔드포인트 상세는 P3/P4 구현 시 정의 |
-| Q-L2-1 | 대사(Dialogue) 용도: 프롬프트/TTS/자막/하이브리드? | 영상 API 립싱크 품질 테스트 후 결정. `specs/layers/L2_shot_composer.md` 참조 |
+| Q-L2-1 | 대사(Dialogue) 용도: 프롬프트/TTS/자막/하이브리드? | 영상 API 립싱크 품질 테스트 후 결정. (대사 *자동생성*은 폐기 — `shots.dialogue_lines`는 원작 대사 수동 입력용) |
 
 ---
 

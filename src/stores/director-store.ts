@@ -226,9 +226,11 @@ export const useDirectorStore = create<DirectorState>((set, get) => ({
               characterId: c.character_id,
               name: c.name,
               views: {
+                main: c.view_main ?? null,
                 front: c.view_front ?? null,
-                side: c.view_side ?? null,
                 back: c.view_back ?? null,
+                sideLeft: c.view_side_left ?? null,
+                sideRight: c.view_side_right ?? null,
               },
               locked: c.locked ?? false,
             }),

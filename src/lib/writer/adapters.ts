@@ -1,9 +1,9 @@
-// svc-pipeline 출력을 기존 main app 데이터 모델로 변환
-//   - S2 → Character[]
-//   - S3 → Scene[] + SceneManifest
-//   - L4 → Shot[]
-//   - L5 → Shot.referenceImageUrl 등
-//   - L6/L7 → Shot.referenceImageUrl / VideoClip[]
+// writer-pipeline 출력을 기존 main app 데이터 모델로 변환
+//   - characters → Character[]
+//   - scenes → Scene[] + SceneManifest
+//   - shotDesign → Shot[]
+//   - renderPrompts → Shot.referenceImageUrl 등
+//   - shotImages/shotVideos → Shot.referenceImageUrl / VideoClip[]
 import type {
   Scene,
   Character,
@@ -17,40 +17,39 @@ import type {
   GenerationMethod,
 } from '@/types';
 import type {
-  S2Block,
-  S3Block,
-  S3Scene,
-  L2Design,
-  L4Shot,
-  FinalPromptsOutput,
-  L6ImagesOutput,
-  L7VideosOutput,
+  Characters,
+  Scenes,
+  ProductionDesign,
+  ShotDesign,
+  RenderPromptsOutput,
+  ShotImagesOutput,
+  ShotVideosOutput,
 } from '@/lib/writer/types/pipeline';
 
-// svc scene_id (scene_1) → main sc_01
-export function svcSceneIdToMain(svcId: string): string {
-  const m = /scene[_-]?(\d+)/i.exec(svcId);
+// writer scene_id (scene_1) → main sc_01
+export function writerSceneIdToMain(rawId: string): string {
+  const m = /scene[_-]?(\d+)/i.exec(rawId);
   if (m) {
     return `sc_${m[1].padStart(2, '0')}`;
   }
-  return svcId;
+  return rawId;
 }
 
-// svc shot_id (shot_scene_1_001 or shot_s01_001) → main sh_01_01
-export function svcShotIdToMain(svcShotId: string, sceneId: string): string {
-  const sceneMain = svcSceneIdToMain(sceneId);
+// writer shot_id (shot_scene_1_001 or shot_s01_001) → main sh_01_01
+export function writerShotIdToMain(rawShotId: string, sceneId: string): string {
+  const sceneMain = writerSceneIdToMain(sceneId);
   const sceneNum = sceneMain.replace('sc_', '');
-  const m = /[_-](\d{2,3})$/.exec(svcShotId);
+  const m = /[_-](\d{2,3})$/.exec(rawShotId);
   if (m) {
     const n = parseInt(m[1], 10);
     return `sh_${sceneNum}_${String(n).padStart(2, '0')}`;
   }
-  return svcShotId;
+  return rawShotId;
 }
 
-// svc S2.characters → main Character[]
-export function adaptCharacters(s2: S2Block): Character[] {
-  return s2.characters.map((c) => ({
+// writer characters.characters → main Character[]
+export function adaptCharacters(characters: Characters): Character[] {
+  return characters.characters.map((c) => ({
     characterId: c.id,
     name: c.name,
     role: ['protagonist', 'antagonist', 'supporting'].includes(c.role)
@@ -62,10 +61,10 @@ export function adaptCharacters(s2: S2Block): Character[] {
   }));
 }
 
-// svc L2.locations → main Location[]
-export function adaptLocations(l2?: L2Design): Location[] {
-  if (!l2?.locations) return [];
-  return l2.locations.map((loc) => ({
+// writer productionDesign.locations → main Location[]
+export function adaptLocations(productionDesign?: ProductionDesign): Location[] {
+  if (!productionDesign?.locations) return [];
+  return productionDesign.locations.map((loc) => ({
     locationId: loc.id,
     name: loc.id,
     visualDescription: loc.style_description ?? '',
@@ -74,10 +73,10 @@ export function adaptLocations(l2?: L2Design): Location[] {
   }));
 }
 
-// svc S3.scenes → main Scene[]
-export function adaptScenes(s3: S3Block): Scene[] {
-  return s3.scenes.map((sc) => ({
-    sceneId: svcSceneIdToMain(sc.scene_id),
+// writer scenes.scenes → main Scene[]
+export function adaptScenes(scenes: Scenes): Scene[] {
+  return scenes.scenes.map((sc) => ({
+    sceneId: writerSceneIdToMain(sc.scene_id),
     narrativeSummary: sc.dialogue_summary ?? sc.purpose ?? '',
     originalTextQuote: sc.scene_actions?.join(' ') ?? '',
     location: sc.location ?? '',
@@ -89,15 +88,15 @@ export function adaptScenes(s3: S3Block): Scene[] {
 }
 
 // 통합 SceneManifest
-export function adaptSceneManifest(s2: S2Block, s3: S3Block, l2?: L2Design): SceneManifest {
+export function adaptSceneManifest(characters: Characters, scenes: Scenes, productionDesign?: ProductionDesign): SceneManifest {
   return {
-    scenes: adaptScenes(s3),
-    characters: adaptCharacters(s2),
-    locations: adaptLocations(l2),
+    scenes: adaptScenes(scenes),
+    characters: adaptCharacters(characters),
+    locations: adaptLocations(productionDesign),
   };
 }
 
-// L4 shot type 정규화 (svc는 다양한 형태로 옴)
+// L4 shot type 정규화 (writer는 다양한 형태로 옴)
 function normalizeShotType(input: unknown): ShotType {
   const s = String(input ?? '').toUpperCase();
   const candidates: ShotType[] = ['ECU', 'CU', 'MCU', 'MS', 'MFS', 'FS', 'WS', 'EWS', 'OTS', 'POV', 'TRACK', '2S'];
@@ -116,9 +115,9 @@ const DEFAULT_LIGHTING: LightingConfig = {
   position: 'front', brightness: 50, colorTemp: 5000,
 };
 
-// svc L4 + L5 → main Shot[] (다양한 svc 샷 스키마 수용)
-export function adaptShots(l4Shots: L4Shot[], finalPrompts?: FinalPromptsOutput): Shot[] {
-  return l4Shots.map((sh, idx) => {
+// writer shotDesign + renderPrompts → main Shot[] (다양한 writer 샷 스키마 수용)
+export function adaptShots(shotDesigns: ShotDesign[], renderPrompts?: RenderPromptsOutput): Shot[] {
+  return shotDesigns.map((sh, idx) => {
     const s = sh as unknown as Record<string, unknown>;
     const sceneIdRaw = String(
       s.scene_id ?? (s.intent as { scene_id?: string } | undefined)?.scene_id ?? `scene_${idx + 1}`,
@@ -126,8 +125,8 @@ export function adaptShots(l4Shots: L4Shot[], finalPrompts?: FinalPromptsOutput)
     const shotIdRaw = String(
       s.shot_id ?? (s.intent as { shot_id?: string } | undefined)?.shot_id ?? `shot_${idx + 1}`,
     );
-    const sceneId = svcSceneIdToMain(sceneIdRaw);
-    const shotId = svcShotIdToMain(shotIdRaw, sceneIdRaw);
+    const sceneId = writerSceneIdToMain(sceneIdRaw);
+    const shotId = writerShotIdToMain(shotIdRaw, sceneIdRaw);
 
     const intent = s.intent as Record<string, unknown> | undefined;
     const staticSpec = s.static_spec as Record<string, unknown> | undefined;
@@ -170,8 +169,8 @@ export function adaptShots(l4Shots: L4Shot[], finalPrompts?: FinalPromptsOutput)
       (intent?.dramatic_purpose as string | undefined) ??
       String(s.primary_action ?? '');
 
-    // L5 final_prompts 매칭해서 첫 프레임 프롬프트 참조
-    const fp = finalPrompts?.shots.find((p) => p.shot_id === shotIdRaw);
+    // renderPrompts 매칭해서 첫 프레임 프롬프트 참조
+    const fp = renderPrompts?.shots.find((p) => p.shot_id === shotIdRaw);
 
     return {
       shotId,
@@ -189,22 +188,22 @@ export function adaptShots(l4Shots: L4Shot[], finalPrompts?: FinalPromptsOutput)
   });
 }
 
-// L6 결과 → Shot.referenceImageUrl 매핑 (URL)
-export function imagesByMainShotId(l6: L6ImagesOutput): Record<string, string> {
+// shotImages 결과 → Shot.referenceImageUrl 매핑 (URL)
+export function imagesByMainShotId(shotImages: ShotImagesOutput): Record<string, string> {
   const map: Record<string, string> = {};
-  for (const img of l6.shots) {
+  for (const img of shotImages.shots) {
     if (img.status === 'success' && img.image_url) {
-      const mainId = svcShotIdToMain(img.shot_id, img.scene_id);
+      const mainId = writerShotIdToMain(img.shot_id, img.scene_id);
       map[mainId] = img.image_url;
     }
   }
   return map;
 }
 
-// L7 결과 → VideoClip[]
-export function adaptVideoClips(l7: L7VideosOutput): VideoClip[] {
-  return l7.shots.map((v) => ({
-    shotId: svcShotIdToMain(v.shot_id, v.scene_id),
+// shotVideos 결과 → VideoClip[]
+export function adaptVideoClips(shotVideos: ShotVideosOutput): VideoClip[] {
+  return shotVideos.shots.map((v) => ({
+    shotId: writerShotIdToMain(v.shot_id, v.scene_id),
     url: v.status === 'success' ? v.video_url : null,
     status: v.status === 'success' ? 'completed' : v.status === 'failed' ? 'failed' : 'pending',
     thumbnailUrl: v.first_frame_url || null,

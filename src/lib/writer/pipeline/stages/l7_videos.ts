@@ -7,9 +7,9 @@
 //   3. 끝까지 안 끝난 것은 'pending'으로 남기고 reply. resume endpoint가 회수.
 import { falVideoSubmit, falVideoFetch } from '@/lib/writer/llm/fal';
 import type {
-  FinalPromptsOutput,
-  L6ImagesOutput,
-  L7VideosOutput,
+  RenderPromptsOutput,
+  ShotImagesOutput,
+  ShotVideosOutput,
   ShotVideoResult,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
@@ -38,22 +38,22 @@ export interface L7Options {
   pollIntervalMs?: number;
 }
 
-export async function runL7Videos(
-  finalPrompts: FinalPromptsOutput,
-  images: L6ImagesOutput,
+export async function runShotVideos(
+  finalPrompts: RenderPromptsOutput,
+  images: ShotImagesOutput,
   logger: PipelineLogger,
   opts: L7Options = {},
-): Promise<L7VideosOutput> {
+): Promise<ShotVideosOutput> {
   const modelLabel = opts.model ?? 'alibaba/happy-horse/reference-to-video';
 
-  const cachedFile = !opts.force ? await logger.loadStage<L7VideosOutput>('16_L7_videos.json') : null;
+  const cachedFile = !opts.force ? await logger.loadStage<ShotVideosOutput>('16_shotVideos.json') : null;
   const cachedSuccess = new Map<string, ShotVideoResult>(
     (cachedFile?.shots ?? [])
       .filter((s) => s.status === 'success' && s.video_url)
       .map((s) => [s.shot_id, s]),
   );
 
-  await logger.markStage('L7_videos', 'started', {
+  await logger.markStage('shotVideos', 'started', {
     total: finalPrompts.shots.length,
     model: modelLabel,
     cached_skipped: cachedSuccess.size,
@@ -72,7 +72,7 @@ export async function runL7Videos(
   }
 
   let writeLock: Promise<void> = Promise.resolve();
-  const buildOutput = (): L7VideosOutput => {
+  const buildOutput = (): ShotVideosOutput => {
     const arr = [...resultByShot.values()].sort((a, b) => naturalCompareShotId(a.shot_id, b.shot_id));
     return {
       total_shots: totalShots,
@@ -86,7 +86,7 @@ export async function runL7Videos(
   };
   const saveProgress = (): Promise<void> => {
     writeLock = writeLock
-      .then(() => logger.saveStage('16_L7_videos.json', buildOutput()))
+      .then(() => logger.saveStage('16_shotVideos.json', buildOutput()))
       .then(() => undefined)
       .catch((e) => {
         console.warn('[L7] progress save failed:', e);
@@ -197,7 +197,7 @@ export async function runL7Videos(
 
   const output = buildOutput();
   await saveProgress();
-  await logger.markStage('L7_videos', 'completed', {
+  await logger.markStage('shotVideos', 'completed', {
     success: output.success_count,
     failed: output.failed_count,
     skipped: output.skipped_count,

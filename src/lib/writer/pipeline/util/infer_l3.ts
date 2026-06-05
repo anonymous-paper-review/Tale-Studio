@@ -1,15 +1,15 @@
-// Compact Mode 사후 처리: L4 결과로부터 L3 (씬 비주얼 플랜) 역추론.
-// 호출은 안 했지만 PipelineResult.L3 필드를 채우기 위함 (다운스트림 호환).
-import type { L3SceneVisualPlan, L4Shot, S3Block, S3Scene } from '@/lib/writer/types/pipeline';
+// Compact Mode 사후 처리: shotDesign 결과로부터 sceneCinematography (씬 비주얼 플랜) 역추론.
+// 호출은 안 했지만 PipelineResult.sceneCinematography 필드를 채우기 위함 (다운스트림 호환).
+import type { SceneCinematography, ShotDesign, Scenes, StoryScene } from '@/lib/writer/types/pipeline';
 
-export function inferL3FromL4Shots(
-  l4Shots: L4Shot[],
-  s3: S3Block
-): L3SceneVisualPlan[] {
-  return s3.scenes.map((scene) => inferOneScenePlan(scene, l4Shots));
+export function inferSceneCinematographyFromShots(
+  shotDesigns: ShotDesign[],
+  scenes: Scenes
+): SceneCinematography[] {
+  return scenes.scenes.map((scene) => inferOneScenePlan(scene, shotDesigns));
 }
 
-function inferOneScenePlan(scene: S3Scene, allShots: L4Shot[]): L3SceneVisualPlan {
+function inferOneScenePlan(scene: StoryScene, allShots: ShotDesign[]): SceneCinematography {
   const shotsInScene = allShots.filter((s) => s.intent.scene_id === scene.scene_id);
 
   if (shotsInScene.length === 0) {
@@ -27,12 +27,12 @@ function inferOneScenePlan(scene: S3Scene, allShots: L4Shot[]): L3SceneVisualPla
     ['dolly_in', 'dolly_out', 'tracking', 'crane', 'pan', 'tilt'].includes(t)
   ).length / motionTypes.length;
 
-  let camera_mounting: L3SceneVisualPlan['camera_mounting'] = 'tripod';
+  let camera_mounting: SceneCinematography['camera_mounting'] = 'tripod';
   if (handheldRatio > 0.5) camera_mounting = 'handheld';
   else if (kineticRatio > 0.5) camera_mounting = 'gimbal';
   else if (handheldRatio + kineticRatio > 0.4) camera_mounting = 'mixed';
 
-  let camera_energy: L3SceneVisualPlan['camera_energy'] = 'static';
+  let camera_energy: SceneCinematography['camera_energy'] = 'static';
   if (kineticRatio > 0.3) camera_energy = 'kinetic';
   else if (staticRatio < 0.7) camera_energy = 'breathing';
 
@@ -49,14 +49,14 @@ function inferOneScenePlan(scene: S3Scene, allShots: L4Shot[]): L3SceneVisualPla
   // cut pace
   const durations = shotsInScene.map((s) => s.intent.duration_seconds).filter(Number.isFinite);
   const avg_shot_seconds = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 8;
-  const cut_pace: L3SceneVisualPlan['cut_pace'] =
+  const cut_pace: SceneCinematography['cut_pace'] =
     avg_shot_seconds < 5 ? 'rapid' : avg_shot_seconds > 10 ? 'long_takes' : 'medium';
 
   // coverage pattern (shot_type 분포로 추론)
   const shotTypes = shotsInScene.map((s) => s.static_spec.shot_type ?? 'MS');
   const inserts = shotTypes.filter((t) => t === 'INSERT' || t === 'ECU').length;
   const twoshots = shotTypes.filter((t) => t === '2S' || t === 'OTS').length;
-  let coverage_pattern: L3SceneVisualPlan['coverage_pattern'] = 'master_inserts';
+  let coverage_pattern: SceneCinematography['coverage_pattern'] = 'master_inserts';
   if (shotsInScene.length === 1) coverage_pattern = 'single_take';
   else if (twoshots >= shotsInScene.length * 0.5) coverage_pattern = 'shot_reverse';
   else if (camera_mounting === 'handheld' && cut_pace !== 'rapid') coverage_pattern = 'handheld_continuous';
@@ -100,7 +100,7 @@ function inferOneScenePlan(scene: S3Scene, allShots: L4Shot[]): L3SceneVisualPla
   };
 }
 
-function makeEmptyPlan(scene_id: string): L3SceneVisualPlan {
+function makeEmptyPlan(scene_id: string): SceneCinematography {
   return {
     scene_id,
     coverage_pattern: 'single_take',

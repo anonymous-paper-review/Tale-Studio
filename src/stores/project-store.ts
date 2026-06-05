@@ -11,7 +11,7 @@ interface ProjectState {
 
   setStage: (stage: StageId) => void
   canNavigateTo: (stage: StageId) => boolean
-  initProject: () => Promise<void>
+  initProject: (projectId?: string) => Promise<void>
   createNewProject: () => Promise<void>
   switchProject: (id: string, title: string, stage?: StageId) => void
   renameProject: (title: string) => Promise<void>
@@ -60,11 +60,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     return true
   },
 
-  initProject: async () => {
+  initProject: async (restoreId?: string) => {
     if (get().projectId) return
     set({ initLoading: true })
     try {
-      const res = await fetch('/api/project/init', { method: 'POST' })
+      // restoreId 힌트(URL ?projectId)가 있으면 그 프로젝트를 복원, 없으면 최신 fallback
+      const url = restoreId
+        ? `/api/project/init?projectId=${encodeURIComponent(restoreId)}`
+        : '/api/project/init'
+      const res = await fetch(url, { method: 'POST' })
       if (!res.ok) throw new Error('Failed to init project')
       const { workspaceId, projectId, project } = await res.json()
       set({

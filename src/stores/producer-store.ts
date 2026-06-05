@@ -87,7 +87,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
       if (error) throw error
 
-      // writer(=svc) 파이프라인 백그라운드 시작 — 단일 생산자(§3 일원화). S0~L5 텍스트 단계가
+      // writer 파이프라인 백그라운드 시작 — 단일 생산자(§3 일원화). S0~L5 텍스트 단계가
       //   DB scenes/characters/locations/shots 를 채워 artist/director 가 읽는다(persist_manifest).
       //   옛 generate-scenes 는 제거됨. 2분 가량 걸리므로 await 하지 않음(fire-and-forget).
       try {
@@ -103,11 +103,11 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             runtimeSeconds,
           }),
         }).catch((e) => {
-          // svc 시작 실패는 무시 (UI에 표시는 status polling이 함)
-          console.warn('[producer] svc-pipeline start failed (non-blocking):', e)
+          // writer 시작 실패는 무시 (UI에 표시는 status polling이 함)
+          console.warn('[producer] writer-pipeline start failed (non-blocking):', e)
         })
-      } catch (svcErr) {
-        console.warn('[producer] svc-pipeline trigger error (non-blocking):', svcErr)
+      } catch (writerErr) {
+        console.warn('[producer] writer-pipeline trigger error (non-blocking):', writerErr)
       }
 
       useProjectStore.getState().setStage('artist')

@@ -14,7 +14,7 @@ export function InventoryGrid({ onSelect }: InventoryGridProps) {
   const { characterAssets, worldAssets } = useArtistStore()
 
   return (
-    <ScrollArea className="flex-1 px-6 py-4">
+    <ScrollArea className="min-h-0 flex-1 px-6 py-4">
       <section>
         <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
           CHARACTERS ({characterAssets.length})

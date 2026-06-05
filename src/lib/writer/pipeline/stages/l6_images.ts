@@ -8,8 +8,8 @@
 import { falImageSubmit, falImageFetch } from '@/lib/writer/llm/fal';
 import type {
   AssetsManifest,
-  FinalPromptsOutput,
-  L6ImagesOutput,
+  RenderPromptsOutput,
+  ShotImagesOutput,
   ShotImageResult,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
@@ -38,11 +38,11 @@ export interface L6Options {
   pollIntervalMs?: number;
 }
 
-export async function runL6Images(
-  finalPrompts: FinalPromptsOutput,
+export async function runShotImages(
+  finalPrompts: RenderPromptsOutput,
   logger: PipelineLogger,
   opts: L6Options = {},
-): Promise<L6ImagesOutput> {
+): Promise<ShotImagesOutput> {
   // 에셋 매니페스트 로드 → reference 이미지 URL 룩업 테이블
   //   asset 있으면 자동으로 edit 모델 (openai/gpt-image-2/edit)로 라우팅 (I2I)
   //   asset 없으면 순수 T2I (openai/gpt-image-2)
@@ -54,14 +54,14 @@ export async function runL6Images(
   const hasAnyAssets = assetUrlById.size > 0;
   const modelLabel = opts.model ?? (hasAnyAssets ? 'openai/gpt-image-2/edit' : 'openai/gpt-image-2');
 
-  const cachedFile = !opts.force ? await logger.loadStage<L6ImagesOutput>('15_L6_images.json') : null;
+  const cachedFile = !opts.force ? await logger.loadStage<ShotImagesOutput>('15_shotImages.json') : null;
   const cachedSuccess = new Map<string, ShotImageResult>(
     (cachedFile?.shots ?? [])
       .filter((s) => s.status === 'success' && s.image_url)
       .map((s) => [s.shot_id, s]),
   );
 
-  await logger.markStage('L6_images', 'started', {
+  await logger.markStage('shotImages', 'started', {
     total: finalPrompts.shots.length,
     model: modelLabel,
     asset_count: assetUrlById.size,
@@ -80,7 +80,7 @@ export async function runL6Images(
   }
 
   let writeLock: Promise<void> = Promise.resolve();
-  const buildOutput = (): L6ImagesOutput => {
+  const buildOutput = (): ShotImagesOutput => {
     const arr = [...resultByShot.values()].sort((a, b) => naturalCompareShotId(a.shot_id, b.shot_id));
     return {
       total_shots: totalShots,
@@ -93,7 +93,7 @@ export async function runL6Images(
   };
   const saveProgress = (): Promise<void> => {
     writeLock = writeLock
-      .then(() => logger.saveStage('15_L6_images.json', buildOutput()))
+      .then(() => logger.saveStage('15_shotImages.json', buildOutput()))
       .then(() => undefined)
       .catch((e) => {
         console.warn('[L6] progress save failed:', e);
@@ -189,7 +189,7 @@ export async function runL6Images(
 
   const output = buildOutput();
   await saveProgress();
-  await logger.markStage('L6_images', 'completed', {
+  await logger.markStage('shotImages', 'completed', {
     success: output.success_count,
     failed: output.failed_count,
     pending: output.pending_count ?? 0,

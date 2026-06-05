@@ -1,7 +1,7 @@
 # redesign-director-canvas — Tasks
 
 > PROGRESS.md Phase 11 (D-1~D-8) mirror. 원본 PROGRESS.md는 그대로 유지.
-> Spec: `specs/layers/director_canvas.md` (결정 #1~#18 완료). Artist L0 Canvas (`L0_concept_canvas.md`)와 동일 패턴.
+> Spec: `specs/layers/director_canvas.md` (결정 #1~#18 완료). Artist 카드/팝업 패턴(`src/features/artist/`) 참고.
 
 ## Active (브라우저 검증 대기)
 

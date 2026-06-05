@@ -9,10 +9,10 @@ import { falImageSubmit, falImageFetch } from '@/lib/writer/llm/fal';
 import type {
   AssetItem,
   AssetsManifest,
-  L0Visual,
-  L1Style,
-  L2Design,
-  S2Block,
+  RenderFormat,
+  ArtDirection,
+  ProductionDesign,
+  Characters,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
@@ -28,12 +28,12 @@ export interface AssetsOptions {
 
 // 캐릭터 시트 프롬프트: 일관성을 위해 중립 배경 + 풀바디 + 단일 캐릭터
 function buildCharacterPrompt(
-  char: S2Block['characters'][number],
+  char: Characters['characters'][number],
   costumes: string[],
-  l1: L1Style,
-  l2: L2Design,
+  artDirection: ArtDirection,
+  productionDesign: ProductionDesign,
 ): string {
-  const palette = [l2.global_palette.primary, l2.global_palette.secondary, l2.global_palette.accent]
+  const palette = [productionDesign.global_palette.primary, productionDesign.global_palette.secondary, productionDesign.global_palette.accent]
     .filter(Boolean)
     .join(', ');
   const costumeText = costumes?.length ? `wearing ${costumes.join(', ')}` : '';
@@ -43,8 +43,8 @@ function buildCharacterPrompt(
     char.role,
     char.appearance_description,
     costumeText,
-    `art style: ${l1.art_style}`,
-    `shape language: ${l1.shape_language}`,
+    `art style: ${artDirection.art_style}`,
+    `shape language: ${artDirection.shape_language}`,
     `palette: ${palette}`,
     `full body, neutral grey background, single character, front view, T-pose, clean lighting, no text, no logo`,
   ]
@@ -54,11 +54,11 @@ function buildCharacterPrompt(
 }
 
 function buildLocationPrompt(
-  loc: L2Design['locations'][number],
-  l1: L1Style,
-  l2: L2Design,
+  loc: ProductionDesign['locations'][number],
+  artDirection: ArtDirection,
+  productionDesign: ProductionDesign,
 ): string {
-  const palette = [l2.global_palette.primary, l2.global_palette.secondary, l2.global_palette.accent]
+  const palette = [productionDesign.global_palette.primary, productionDesign.global_palette.secondary, productionDesign.global_palette.accent]
     .filter(Boolean)
     .join(', ');
   const lights = loc.lighting_sources?.length ? `lighting: ${loc.lighting_sources.join(', ')}` : '';
@@ -68,7 +68,7 @@ function buildLocationPrompt(
     loc.style_description,
     lights,
     props,
-    `art style: ${l1.art_style}`,
+    `art style: ${artDirection.art_style}`,
     `palette: ${palette}`,
     `wide establishing shot, no characters, environment only, clean composition, no text, no logo`,
   ]
@@ -78,15 +78,15 @@ function buildLocationPrompt(
 }
 
 export async function runAssetsGenerate(
-  s2: S2Block,
-  l0: L0Visual,
-  l1: L1Style,
-  l2: L2Design,
+  characters: Characters,
+  renderFormat: RenderFormat,
+  artDirection: ArtDirection,
+  productionDesign: ProductionDesign,
   logger: PipelineLogger,
   opts: AssetsOptions = {},
 ): Promise<AssetsManifest> {
   const modelLabel = opts.model ?? 'openai/gpt-image-2'; // 순수 T2I (reference 없이)
-  const aspectRatio = l0.aspect_ratio;
+  const aspectRatio = renderFormat.aspect_ratio;
 
   const cachedFile = !opts.force ? await logger.loadStage<AssetsManifest>('14b_assets.json') : null;
   const cachedSuccessById = new Map<string, AssetItem>();
@@ -95,8 +95,8 @@ export async function runAssetsGenerate(
   }
 
   await logger.markStage('assets_generate', 'started', {
-    characters: s2.characters.length,
-    locations: l2.locations.length,
+    characters: characters.characters.length,
+    locations: productionDesign.locations.length,
     cached_skipped: cachedSuccessById.size,
     model: modelLabel,
     force: !!opts.force,
@@ -114,21 +114,21 @@ export async function runAssetsGenerate(
     prompt: string;
   };
   const allTasks: Task[] = [];
-  for (const c of s2.characters) {
-    const costumes = l2.costumes?.[c.id] ?? [];
+  for (const c of characters.characters) {
+    const costumes = productionDesign.costumes?.[c.id] ?? [];
     allTasks.push({
       id: c.id,
       kind: 'character',
       name: c.name,
-      prompt: buildCharacterPrompt(c, costumes, l1, l2),
+      prompt: buildCharacterPrompt(c, costumes, artDirection, productionDesign),
     });
   }
-  for (const loc of l2.locations) {
+  for (const loc of productionDesign.locations) {
     allTasks.push({
       id: loc.id,
       kind: 'location',
       name: loc.id,
-      prompt: buildLocationPrompt(loc, l1, l2),
+      prompt: buildLocationPrompt(loc, artDirection, productionDesign),
     });
   }
 

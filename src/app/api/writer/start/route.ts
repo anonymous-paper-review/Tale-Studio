@@ -1,4 +1,4 @@
-// svc-pipeline 시작 (비동기, fire-and-forget)
+// writer-pipeline 시작 (비동기, fire-and-forget)
 //   Producer "Complete your story" 버튼에서 호출.
 //   S0~L5 (텍스트/프롬프트 단계)까지만 자동. 이미지/영상은 별도 트리거.
 import { NextRequest, NextResponse } from 'next/server';
@@ -43,16 +43,16 @@ export async function POST(req: NextRequest) {
     // Fire-and-forget. Local/self-hosted 환경 기준 (Vercel serverless 제약 있음).
     runPipeline(input, { projectId, resume: false })
       .then(() => {
-        console.log(`[svc/start] ${projectId} completed`);
+        console.log(`[writer/start] ${projectId} completed`);
       })
       .catch((err) => {
-        console.error(`[svc/start] ${projectId} failed:`, err);
+        console.error(`[writer/start] ${projectId} failed:`, err);
       });
 
     return NextResponse.json({ projectId, status: 'started' });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[svc/start]', msg);
+    console.error('[writer/start]', msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

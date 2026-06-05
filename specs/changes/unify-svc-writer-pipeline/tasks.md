@@ -52,5 +52,5 @@
 
 ## Done
 - §2-1(007/008 적용), §2-2(persist_design_tokens), §3-1/3-2/3-4, §4-1/4-2: 2026-06-05.
-  상세: `docs/research/svc-writer-unification-2026-06-05.md`, decision #38.
+  상세: decision #38.
 - (없음)

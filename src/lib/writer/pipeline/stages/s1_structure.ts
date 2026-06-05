@@ -1,13 +1,13 @@
 // S1: 내러티브 구조, POV, 주제, CDQ
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
-import type { S0Genre, S1Structure, PipelineInput } from '@/lib/writer/types/pipeline';
+import type { Genre, NarrativeStructure, PipelineInput } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
-export async function runS1(input: PipelineInput, s0: S0Genre, logger: PipelineLogger, axisConfig: LlmAxisConfig): Promise<S1Structure> {
-  await logger.markStage('S1', 'started');
+export async function runNarrativeStructure(input: PipelineInput, genre: Genre, logger: PipelineLogger, axisConfig: LlmAxisConfig): Promise<NarrativeStructure> {
+  await logger.markStage('narrativeStructure', 'started');
 
   const systemInstruction = `당신은 영상 제작의 S1(내러티브 구조) 디자이너이다.
-주어진 스토리와 S0를 바탕으로 구조 유형, POV, 주제, 중심 극적 질문(CDQ)을 결정한다.
+주어진 스토리와 genre를 바탕으로 구조 유형, POV, 주제, 중심 극적 질문(CDQ)을 결정한다.
 
 구조 유형 가이드:
 - 3-act: 가장 일반적, 명확한 갈등-해소
@@ -21,7 +21,7 @@ CDQ (Central Dramatic Question):
 - 1막 끝에 제기되고 클라이맥스에서 답해짐
 - 5가지 속성 충족: 명확성, 개인적 stakes, 불확실성, 보편성, 긴급성
 
-깊이 레벨 ${s0.depth_level} 권장:
+깊이 레벨 ${genre.depth_level} 권장:
 - D1: 구조 없음 — 한 순간/한 비트. CDQ 생략 가능, theme 한 단어
 - D2: 미니 구조 — setup → action → result 1줄씩. CDQ 약식
 - D3: 단순 구조 (3-act 또는 기승전결, 서브플롯 0)
@@ -34,8 +34,8 @@ CDQ (Central Dramatic Question):
   const userPrompt = `[스토리]
 ${input.story}
 
-[S0]
-${JSON.stringify(s0, null, 2)}
+[genre]
+${JSON.stringify(genre, null, 2)}
 
 [출력 형식 - JSON]
 {
@@ -51,19 +51,19 @@ ${JSON.stringify(s0, null, 2)}
 
 acts의 proportion 합은 1.0이어야 함.`;
 
-  const result = await generateJson<S1Structure>(userPrompt, axisConfig, {
+  const result = await generateJson<NarrativeStructure>(userPrompt, axisConfig, {
     systemInstruction,
     temperature: 0.6,
   });
 
-  await logger.saveLlmCall('S1_structure', {
+  await logger.saveLlmCall('narrativeStructure', {
     prompt: userPrompt,
     response: JSON.stringify(result, null, 2),
     model: describeAxisConfig(axisConfig),
     provider: axisConfig.provider,
   });
 
-  await logger.saveStage('03_S1.json', result);
-  await logger.markStage('S1', 'completed');
+  await logger.saveStage('03_narrativeStructure.json', result);
+  await logger.markStage('narrativeStructure', 'completed');
   return result;
 }

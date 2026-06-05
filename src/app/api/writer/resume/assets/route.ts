@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ...output, resumed, still_pending: output.pending_count });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[svc/resume/assets]', msg);
+    console.error('[writer/resume/assets]', msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

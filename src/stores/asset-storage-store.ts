@@ -181,7 +181,8 @@ export function characterAssetToRegisterInput(
   const fiveView: GeneratedImage[] = (
     [
       ['front', asset.views.front],
-      ['left', asset.views.side],
+      ['left', asset.views.sideLeft],
+      ['right', asset.views.sideRight],
       ['back', asset.views.back],
     ] as const
   )

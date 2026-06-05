@@ -1,9 +1,9 @@
-// svc-pipeline 진행상황 폴링 훅
+// writer-pipeline 진행상황 폴링 훅
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
 
-export interface SvcStatus {
+export interface WriterStatus {
   projectId: string
   started: boolean
   pipeline_completed: boolean
@@ -21,14 +21,14 @@ interface Options {
   stopWhenCompleted?: boolean  // 완료 시 폴링 중단 (기본 true)
 }
 
-export function useSvcStatus(
+export function useWriterStatus(
   projectId: string | null | undefined,
   opts: Options = {},
-): { status: SvcStatus | null; loading: boolean; error: string | null } {
+): { status: WriterStatus | null; loading: boolean; error: string | null } {
   const interval = opts.intervalMs ?? 3000
   const stopWhenCompleted = opts.stopWhenCompleted ?? true
 
-  const [status, setStatus] = useState<SvcStatus | null>(null)
+  const [status, setStatus] = useState<WriterStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -48,7 +48,7 @@ export function useSvcStatus(
           const j = await r.json().catch(() => ({}))
           setError(j.error ?? `status ${r.status}`)
         } else {
-          const j = (await r.json()) as SvcStatus
+          const j = (await r.json()) as WriterStatus
           setStatus(j)
           setError(null)
           done = !!(j.pipeline_completed || j.pipeline_failed)

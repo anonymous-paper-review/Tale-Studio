@@ -16,7 +16,7 @@ P4 Director는 V2 디자인에서 Scene Navigator + Shot Node Grid-Mindmap + Cin
 
 ## What Changes
 
-- React Flow (xyflow) 기반 노드 그래프 — Artist L0 Canvas (`L0_concept_canvas.md`)와 동일 패턴
+- React Flow (xyflow) 기반 노드 그래프 — Artist 카드/팝업 패턴(`src/features/artist/`) 참고
 - **3종 노드**: Scene / Shot / Video (decisions #10 — Scene=chart-3, Shot=chart-4, Video=chart-5)
 - **Final 마킹**: Shot당 ★ 1개 강제. Video 헤더에 별 아이콘 primary + NodePopup 토글 (내부 #11)
 - **Inspector → NodePopup 흡수**: 단계적 마이그레이션. D-3 완료 시 우측 Inspector aside 제거 (내부 #12)

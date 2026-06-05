@@ -5,11 +5,11 @@
 //   - 다양한 샷 스키마(rich-A / declared-B / L4 3분할 등) 모두 수용
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
-  FinalPromptsOutput,
+  RenderPromptsOutput,
   ShotGenerationPrompts,
-  L0Visual,
-  L2Design,
-  S2Block,
+  RenderFormat,
+  ProductionDesign,
+  Characters,
   ShotSequence,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
@@ -28,15 +28,15 @@ type AnyShot = Record<string, unknown> & {
   intent?: Record<string, unknown>;
 };
 
-export async function runL5Prompts(
+export async function runRenderPrompts(
   shotSequence: ShotSequence,
-  l0: L0Visual,
-  s2: S2Block,
-  l2: L2Design,
+  renderFormat: RenderFormat,
+  characters: Characters,
+  productionDesign: ProductionDesign,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
-): Promise<FinalPromptsOutput> {
-  await logger.markStage('L5_prompts', 'started', { total_shots: shotSequence.shots.length });
+): Promise<RenderPromptsOutput> {
+  await logger.markStage('renderPrompts', 'started', { total_shots: shotSequence.shots.length });
 
   const shots: ShotGenerationPrompts[] = [];
   let t2iFallbacks = 0;
@@ -51,7 +51,7 @@ export async function runL5Prompts(
     let t2iText = extractT2IPrompt(rawShot);
     if (!t2iText) {
       t2iFallbacks++;
-      t2iText = await llmGenerateT2I(rawShot, axisConfig, l2, logger);
+      t2iText = await llmGenerateT2I(rawShot, axisConfig, productionDesign, logger);
     }
 
     // TI2V 추출 시도
@@ -67,27 +67,27 @@ export async function runL5Prompts(
       duration_seconds: duration,
       t2i: {
         prompt: t2iText.trim(),
-        aspect_ratio: l0.aspect_ratio,
-        width: l0.resolution?.width,
-        height: l0.resolution?.height,
+        aspect_ratio: renderFormat.aspect_ratio,
+        width: renderFormat.resolution?.width,
+        height: renderFormat.resolution?.height,
         reference_assets: extractReferences(rawShot),
       },
       ti2v: {
         motion_prompt: ti2vText.trim(),
         duration_seconds: duration,
-        fps: l0.fps,
+        fps: renderFormat.fps,
         camera_movement: extractCameraMovement(rawShot),
       },
     });
   }
 
-  const output: FinalPromptsOutput = {
+  const output: RenderPromptsOutput = {
     total_shots: shots.length,
     shots,
     l0_meta: {
-      aspect_ratio: l0.aspect_ratio,
-      fps: l0.fps,
-      resolution: l0.resolution,
+      aspect_ratio: renderFormat.aspect_ratio,
+      fps: renderFormat.fps,
+      resolution: renderFormat.resolution,
     },
     extraction_summary: {
       t2i_extracted: shots.length - t2iFallbacks,
@@ -98,8 +98,8 @@ export async function runL5Prompts(
     },
   };
 
-  await logger.saveStage('14_final_prompts.json', output);
-  await logger.markStage('L5_prompts', 'completed', {
+  await logger.saveStage('14_renderPrompts.json', output);
+  await logger.markStage('renderPrompts', 'completed', {
     total: shots.length,
     t2i_fallback: t2iFallbacks,
     ti2v_fallback: ti2vFallbacks,
@@ -202,7 +202,7 @@ function extractCameraMovement(shot: AnyShot): string | undefined {
 async function llmGenerateT2I(
   shot: AnyShot,
   axisConfig: LlmAxisConfig,
-  l2: L2Design,
+  productionDesign: ProductionDesign,
   logger: PipelineLogger,
 ): Promise<string> {
   const system = `당신은 T2I (Text-to-Image) 프롬프트 디자이너이다.
@@ -218,8 +218,8 @@ async function llmGenerateT2I(
   const user = `[샷 정보 — 부분 누락 가능]
 ${JSON.stringify(shot, null, 2)}
 
-[L2 글로벌 디자인 — 팔레트/조명/로케이션 참조]
-${JSON.stringify({ global_palette: l2.global_palette, color_meaning: l2.color_meaning }, null, 2)}
+[productionDesign 글로벌 디자인 — 팔레트/조명/로케이션 참조]
+${JSON.stringify({ global_palette: productionDesign.global_palette, color_meaning: productionDesign.color_meaning }, null, 2)}
 
 [출력 - JSON]
 { "prompt": "정적 첫 프레임 묘사 (한글, 200~400자)" }`;

@@ -20,7 +20,7 @@ export class PipelineLogger {
     await fs.mkdir(this.llmDir, { recursive: true });
   }
 
-  // 단계 결과 저장 (예: 02_S0.json)
+  // 단계 결과 저장 (예: 02_genre.json)
   async saveStage(filename: string, data: unknown) {
     const filepath = path.join(this.projectDir, filename);
     await fs.writeFile(filepath, JSON.stringify(data, null, 2), 'utf8');

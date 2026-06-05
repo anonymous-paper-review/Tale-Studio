@@ -3,11 +3,11 @@
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { analyzeCausalityChain } from '@/lib/writer/pipeline/validators/causality';
 import type {
-  CValidation1Report,
-  S0Genre,
-  S1Structure,
-  S2Block,
-  S3Block,
+  StoryCheckReport,
+  Genre,
+  NarrativeStructure,
+  Characters,
+  Scenes,
   ValidationIssue,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
@@ -19,19 +19,19 @@ interface LlmValidationResponse {
   llm_issues: ValidationIssue[];
 }
 
-export async function runCValidation1(
-  s0: S0Genre,
-  s1: S1Structure,
-  s2: S2Block,
-  s3: S3Block,
+export async function runStoryCheck(
+  genre: Genre,
+  narrativeStructure: NarrativeStructure,
+  characters: Characters,
+  scenes: Scenes,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
   retryCount = 0,
-): Promise<CValidation1Report> {
-  await logger.markStage('C1_validation', 'started', { retry: retryCount });
+): Promise<StoryCheckReport> {
+  await logger.markStage('storyCheck', 'started', { retry: retryCount });
 
   // ===== 룰 기반 검증 =====
-  const causality = analyzeCausalityChain(s3);
+  const causality = analyzeCausalityChain(scenes);
   const ruleIssues: ValidationIssue[] = [...causality.issues];
 
   // ===== LLM 기반 검증 (Claude) =====
@@ -61,17 +61,17 @@ CRITICAL: 핍진성 붕괴 (캐릭터 행동 불일치, 데우스 엑스 마키�
 WARNING: CDQ 약함, 인과 약함, 명백한 클리셰
 INFO: 미세 개선 제안`;
 
-  const user = `[S0]
-${JSON.stringify(s0)}
+  const user = `[genre]
+${JSON.stringify(genre)}
 
-[S1]
-${JSON.stringify(s1)}
+[narrativeStructure]
+${JSON.stringify(narrativeStructure)}
 
-[S2]
-${JSON.stringify(s2)}
+[characters]
+${JSON.stringify(characters)}
 
-[S3]
-${JSON.stringify(s3)}
+[scenes]
+${JSON.stringify(scenes)}
 
 [출력 형식 - JSON]
 {
@@ -94,7 +94,7 @@ ${JSON.stringify(s3)}
     temperature: 0.3,
   });
 
-  await logger.saveLlmCall('C1_validation', {
+  await logger.saveLlmCall('storyCheck', {
     prompt: user,
     response: JSON.stringify(llmResult, null, 2),
     model: describeAxisConfig(axisConfig),
@@ -104,7 +104,7 @@ ${JSON.stringify(s3)}
   const allIssues = [...ruleIssues, ...llmResult.llm_issues];
   const hasCritical = allIssues.some((i) => i.severity === 'CRITICAL');
 
-  const report: CValidation1Report = {
+  const report: StoryCheckReport = {
     passed: !hasCritical,
     issues: allIssues,
     causality_chain: causality.chain,
@@ -114,8 +114,8 @@ ${JSON.stringify(s3)}
     retry_count: retryCount,
   };
 
-  await logger.saveStage('06_C_validation_1.json', report);
-  await logger.markStage('C1_validation', 'completed', {
+  await logger.saveStage('06_storyCheck.json', report);
+  await logger.markStage('storyCheck', 'completed', {
     passed: report.passed,
     issue_count: report.issues.length,
   });

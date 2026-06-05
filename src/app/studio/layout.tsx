@@ -20,15 +20,33 @@ export default function StudioLayout({
   const canNavigateTo = useProjectStore((s) => s.canNavigateTo)
   const setStage = useProjectStore((s) => s.setStage)
   const initLoading = useProjectStore((s) => s.initLoading)
+  const projectId = useProjectStore((s) => s.projectId)
   const pathname = usePathname()
   const router = useRouter()
   const chatWidth = useChatUiStore((s) => s.chatWidth)
   const chatCollapsed = useChatUiStore((s) => s.collapsed)
   useIdleTimeout()
 
+  // mount: URL ?projectId 힌트로 프로젝트 복원 (없으면 store가 최신 fallback).
+  // 새로고침해도 보던 프로젝트가 유지되도록 하는 진입점.
   useEffect(() => {
-    initProject()
+    const hint =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('projectId')
+        : null
+    initProject(hint ?? undefined)
   }, [initProject])
+
+  // store.projectId ↔ URL ?projectId 동기화. 프로젝트 전환·stage 이동으로
+  // 쿼리가 빠지면 history.replaceState로 다시 채워 새로고침 복원을 보장.
+  // (router 네비게이션을 트리거하지 않도록 replaceState 사용 — stage-sync effect와 무충돌)
+  useEffect(() => {
+    if (!projectId || typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('projectId') === projectId) return
+    params.set('projectId', projectId)
+    window.history.replaceState(null, '', `${pathname}?${params.toString()}`)
+  }, [projectId, pathname])
 
   // URL ↔ currentStage 동기화 + 잠긴 stage 리다이렉트.
   // Sidebar 클릭이나 직접 URL 진입 시에도 GlobalChat/Samantha가 올바른 stage로 동작하도록.

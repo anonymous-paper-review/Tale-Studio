@@ -35,7 +35,7 @@ decisions: []
 - Affected code: `src/app/api/write/generate-scenes`, `src/app/api/svc/*`, `src/lib/svc/pipeline/*`, producer-store(핸드오프 트리거)
 - Affected stores: `producer-store`(트리거), `writer-store`/`artist-store`/`director-store`(소비)
 - Affected DB: 디자인 토큰 컬럼/테이블 신설 (characters/projects 또는 신규 테이블)
-- Affected specs: `specs/layers/L1_scene_architect.md`, `specs/layers/L2_shot_composer.md` (파이프라인 정의)
+- Affected specs: 없음 (L1/L2 파이프라인 정의 = 코드 source-of-truth: `src/lib/writer/pipeline/`)
 
 ## 의존/순서 (중요)
 - **`writer-background-artist-progress` §5(턴어라운드 시트 프롬프트 입력 출처)와 결합됨.**

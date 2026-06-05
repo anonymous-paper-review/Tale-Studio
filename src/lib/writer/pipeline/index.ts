@@ -1,21 +1,21 @@
 // 파이프라인 오케스트레이터: 스토리 → 샷 시퀀스 JSON
 // resumeProjectId 전달 시 기존 stage 결과 로드해 중단 지점부터 재개
 import { PipelineLogger, makeProjectId } from '@/lib/writer/logger';
-import { runS0 } from '@/lib/writer/pipeline/stages/s0_genre';
-import { runS1 } from '@/lib/writer/pipeline/stages/s1_structure';
-import { runS2 } from '@/lib/writer/pipeline/stages/s2_characters';
-import { runS3 } from '@/lib/writer/pipeline/stages/s3_scenes';
-import { runCValidation1 } from '@/lib/writer/pipeline/stages/c_validation_1';
+import { runGenre } from '@/lib/writer/pipeline/stages/s0_genre';
+import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure';
+import { runCharacters } from '@/lib/writer/pipeline/stages/s2_characters';
+import { runScenes } from '@/lib/writer/pipeline/stages/s3_scenes';
+import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
 import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview';
-import { runL0L1 } from '@/lib/writer/pipeline/stages/l0_l1_visual';
-import { runL2 } from '@/lib/writer/pipeline/stages/l2_design';
+import { runRenderFormatArtDirection } from '@/lib/writer/pipeline/stages/l0_l1_visual';
+import { runProductionDesign } from '@/lib/writer/pipeline/stages/l2_design';
 import { runAssetsGenerate } from '@/lib/writer/pipeline/stages/assets_generate';
-import { runL3SceneVisualPlan } from '@/lib/writer/pipeline/stages/l3_scene_plan';
+import { runSceneCinematography } from '@/lib/writer/pipeline/stages/l3_scene_plan';
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
-import { runL4Shots } from '@/lib/writer/pipeline/stages/l4_shots';
-import { runCApplication2 } from '@/lib/writer/pipeline/stages/c_application_2';
-import { runL5Prompts } from '@/lib/writer/pipeline/stages/l5_prompts';
-import { inferL3FromL4Shots } from '@/lib/writer/pipeline/util/infer_l3';
+import { runShotDesign } from '@/lib/writer/pipeline/stages/l4_shots';
+import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
+import { runRenderPrompts } from '@/lib/writer/pipeline/stages/l5_prompts';
+import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_l3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
 import { persistManifestToDb } from '@/lib/writer/pipeline/util/persist_manifest';
 import { isCompactDepth } from '@/lib/writer/types/pipeline';
@@ -29,20 +29,20 @@ import { DEFAULT_MODELS, type PipelineModelsConfig, type LlmAxisConfig } from '@
 import type {
   PipelineInput,
   PipelineResult,
-  L3SceneVisualPlan,
+  SceneCinematography,
   ValidationIssue,
-  S0Genre,
-  S1Structure,
-  S2Block,
-  S3Block,
-  CValidation1Report,
+  Genre,
+  NarrativeStructure,
+  Characters,
+  Scenes,
+  StoryCheckReport,
   MidPreview,
-  L0Visual,
-  L1Style,
-  L2Design,
-  L4Shot,
+  RenderFormat,
+  ArtDirection,
+  ProductionDesign,
+  ShotDesign,
   DecoupagePlan,
-  FinalPromptsOutput,
+  RenderPromptsOutput,
 } from '@/lib/writer/types/pipeline';
 
 // Skip 모드 default = true (피드백 미반영 stage 건너뜀, 비용 절감)
@@ -54,7 +54,7 @@ function resolveSkip(input: PipelineInput): { validation1: boolean; midPreview: 
 }
 
 // c_validation_1 skip 시 다운스트림에 줄 빈 리포트
-function emptyC1Report(): CValidation1Report {
+function emptyC1Report(): StoryCheckReport {
   return {
     passed: true,
     issues: [],
@@ -182,182 +182,182 @@ async function _runPipelineInner(
   models: PipelineModelsConfig,
 ): Promise<PipelineResult> {
 
-  // ===== S축 =====
-  const S0 = (await loadOrRun<S0Genre>(resume, '02_S0.json', () => runS0(input, logger, models.S), 'S0', logger)).value;
-  const S1 = (await loadOrRun<S1Structure>(resume, '03_S1.json', () => runS1(input, S0, logger, models.S), 'S1', logger)).value;
-  const S2 = (await loadOrRun<S2Block>(resume, '04_S2.json', () => runS2(input, S0, S1, logger, models.S), 'S2', logger)).value;
-  const S3 = (await loadOrRun<S3Block>(resume, '05_S3.json', () => runS3(input, S0, S1, S2, logger, models.S), 'S3', logger)).value;
+  // ===== Story 축 =====
+  const genre = (await loadOrRun<Genre>(resume, '02_genre.json', () => runGenre(input, logger, models.S), 'genre', logger)).value;
+  const narrativeStructure = (await loadOrRun<NarrativeStructure>(resume, '03_narrativeStructure.json', () => runNarrativeStructure(input, genre, logger, models.S), 'narrativeStructure', logger)).value;
+  const characters = (await loadOrRun<Characters>(resume, '04_characters.json', () => runCharacters(input, genre, narrativeStructure, logger, models.S), 'characters', logger)).value;
+  const scenes = (await loadOrRun<Scenes>(resume, '05_scenes.json', () => runScenes(input, genre, narrativeStructure, characters, logger, models.S), 'scenes', logger)).value;
 
   const skip = resolveSkip(input);
 
-  // ===== C 적용 ① (skip 시 빈 리포트) =====
-  const c_validation_1 = skip.validation1
+  // ===== storyCheck (skip 시 빈 리포트) =====
+  const storyCheck = skip.validation1
     ? (await (async () => {
-        await logger.markStage('C1_validation', 'completed', { skipped: true });
+        await logger.markStage('storyCheck', 'completed', { skipped: true });
         return emptyC1Report();
       })())
-    : (await loadOrRun<CValidation1Report>(
+    : (await loadOrRun<StoryCheckReport>(
         resume,
-        '06_C_validation_1.json',
-        () => runCValidation1(S0, S1, S2, S3, logger, models.C),
-        'C1_validation',
+        '06_storyCheck.json',
+        () => runStoryCheck(genre, narrativeStructure, characters, scenes, logger, models.C),
+        'storyCheck',
         logger,
       )).value;
 
-  // ===== Mid Preview (V축 — 시각 제안 생성. skip 시 빈 추천) =====
-  const mid_preview = skip.midPreview
+  // ===== Mid Preview (Visual 축 — 시각 제안 생성. skip 시 빈 추천) =====
+  const midPreview = skip.midPreview
     ? (await (async () => {
-        await logger.markStage('mid_preview', 'completed', { skipped: true });
+        await logger.markStage('midPreview', 'completed', { skipped: true });
         return emptyMidPreview();
       })())
     : (await loadOrRun<MidPreview>(
         resume,
-        '07_mid_preview.json',
-        () => runMidPreview(S0, S1, S2, S3, c_validation_1, logger, models.V),
-        'mid_preview',
+        '07_midPreview.json',
+        () => runMidPreview(genre, narrativeStructure, characters, scenes, storyCheck, logger, models.V),
+        'midPreview',
         logger,
       )).value;
 
-  // ===== V축 =====
-  // L0_L1은 { L0, L1 } 합쳐서 저장
-  const l01Pair = await loadOrRun<{ L0: L0Visual; L1: L1Style }>(
+  // ===== Visual 축 =====
+  // renderFormat + artDirection 은 { renderFormat, artDirection } 합본으로 저장
+  const visualFormatPair = await loadOrRun<{ renderFormat: RenderFormat; artDirection: ArtDirection }>(
     resume,
-    '08_L0_L1.json',
+    '08_renderFormat_artDirection.json',
     async () => {
-      const r = await runL0L1(S0, mid_preview, logger, models.V);
-      return { L0: r.L0, L1: r.L1 };
+      const r = await runRenderFormatArtDirection(genre, midPreview, logger, models.V);
+      return { renderFormat: r.renderFormat, artDirection: r.artDirection };
     },
-    'L0_L1',
+    'renderFormat_artDirection',
     logger,
   );
-  const { L0, L1 } = l01Pair.value;
+  const { renderFormat, artDirection } = visualFormatPair.value;
 
-  const L2 = (await loadOrRun<L2Design>(resume, '09_L2.json', () => runL2(S2, S3, L1, mid_preview, logger, models.V), 'L2', logger)).value;
+  const productionDesign = (await loadOrRun<ProductionDesign>(resume, '09_productionDesign.json', () => runProductionDesign(characters, scenes, artDirection, midPreview, logger, models.V), 'productionDesign', logger)).value;
 
-  // L2 직후 → 전역 디자인 토큰을 projects.design_tokens 에 기록 (§2-2, DB化).
+  // productionDesign 직후 → 전역 디자인 토큰을 projects.design_tokens 에 기록 (§2-2, DB化).
   //   소비(artist 턴어라운드 등)는 DB에서 읽는다. non-blocking — 실패해도 파이프라인 계속.
-  persistDesignTokens(projectId, L0, L1, L2).catch((e) => {
-    console.warn('[svc] design_tokens persist failed (pipeline continues):', e);
+  persistDesignTokens(projectId, renderFormat, artDirection, productionDesign).catch((e) => {
+    console.warn('[writer] design_tokens persist failed (pipeline continues):', e);
   });
 
-  // L2 직후 → 캐릭터/로케이션 reference 에셋 생성 (L6에서 I2I용으로 사용)
-  // 실패해도 파이프라인은 계속 진행 (L6는 에셋 없으면 순수 T2I로 자동 fallback).
-  runAssetsGenerate(S2, L0, L1, L2, logger, { concurrency: 4 }).catch((e) => {
+  // productionDesign 직후 → 캐릭터/로케이션 reference 에셋 생성 (shotImages에서 I2I용으로 사용)
+  // 실패해도 파이프라인은 계속 진행 (shotImages는 에셋 없으면 순수 T2I로 자동 fallback).
+  runAssetsGenerate(characters, renderFormat, artDirection, productionDesign, logger, { concurrency: 4 }).catch((e) => {
     console.warn('[assets] background generation failed (pipeline continues):', e);
   });
 
-  // L3 (씬 비주얼 플랜) — Compact Mode (D1~D3)에선 스킵
-  const compact = isCompactDepth(S0.depth_level);
-  let L3: L3SceneVisualPlan[] = [];
-  let l3BudgetIssues: ValidationIssue[] = [];
+  // sceneCinematography (씬 비주얼 플랜) — Compact Mode (D1~D3)에선 스킵
+  const compact = isCompactDepth(genre.depth_level);
+  let sceneCinematography: SceneCinematography[] = [];
+  let sceneBudgetIssues: ValidationIssue[] = [];
 
-  // L3 resume: compact면 별도 파일(_inferred), 아니면 정상 파일
-  type L3SavedShape = { scene_plans: L3SceneVisualPlan[]; budget_issues?: ValidationIssue[] };
-  const l3FileNormal = '10_L3_scene_plans.json';
-  const l3FileInferred = '10_L3_scene_plans_inferred.json';
+  // sceneCinematography resume: compact면 별도 파일(_inferred), 아니면 정상 파일
+  type SceneCinematographySavedShape = { scene_plans: SceneCinematography[]; budget_issues?: ValidationIssue[] };
+  const sceneCinematographyFileNormal = '10_sceneCinematography.json';
+  const sceneCinematographyFileInferred = '10_sceneCinematography_inferred.json';
 
-  let l3PlanLoaded = false;
+  let sceneCinematographyLoaded = false;
   if (resume) {
-    const normal = await logger.loadStage<L3SavedShape>(l3FileNormal);
+    const normal = await logger.loadStage<SceneCinematographySavedShape>(sceneCinematographyFileNormal);
     if (normal) {
-      L3 = normal.scene_plans;
-      l3BudgetIssues = normal.budget_issues ?? S3.scenes.flatMap((sc) => analyzeSceneActionBudget(sc).issues);
-      l3PlanLoaded = true;
-      await logger.markStage('L3_scene_plan', 'completed', { resumed: true, source: l3FileNormal });
+      sceneCinematography = normal.scene_plans;
+      sceneBudgetIssues = normal.budget_issues ?? scenes.scenes.flatMap((sc) => analyzeSceneActionBudget(sc).issues);
+      sceneCinematographyLoaded = true;
+      await logger.markStage('sceneCinematography', 'completed', { resumed: true, source: sceneCinematographyFileNormal });
     } else if (compact) {
-      const inferred = await logger.loadStage<L3SavedShape>(l3FileInferred);
+      const inferred = await logger.loadStage<SceneCinematographySavedShape>(sceneCinematographyFileInferred);
       if (inferred) {
-        L3 = inferred.scene_plans;
-        l3BudgetIssues = inferred.budget_issues ?? S3.scenes.flatMap((sc) => analyzeSceneActionBudget(sc).issues);
-        l3PlanLoaded = true;
-        await logger.markStage('L3_scene_plan', 'completed', { resumed: true, source: l3FileInferred });
+        sceneCinematography = inferred.scene_plans;
+        sceneBudgetIssues = inferred.budget_issues ?? scenes.scenes.flatMap((sc) => analyzeSceneActionBudget(sc).issues);
+        sceneCinematographyLoaded = true;
+        await logger.markStage('sceneCinematography', 'completed', { resumed: true, source: sceneCinematographyFileInferred });
       }
     }
   }
 
-  if (!l3PlanLoaded) {
+  if (!sceneCinematographyLoaded) {
     if (compact) {
-      await logger.markStage('L3_scene_plan', 'completed', { skipped: true, reason: `Compact Mode (${S0.depth_level})` });
-      l3BudgetIssues = S3.scenes.flatMap((sc) => analyzeSceneActionBudget(sc).issues);
+      await logger.markStage('sceneCinematography', 'completed', { skipped: true, reason: `Compact Mode (${genre.depth_level})` });
+      sceneBudgetIssues = scenes.scenes.flatMap((sc) => analyzeSceneActionBudget(sc).issues);
     } else {
-      const planResult = await runL3SceneVisualPlan(S0, S2, S3, L1, L2, mid_preview, logger, models.V);
-      await logger.flushRawLlm('L3_scene_plan');
-      L3 = planResult.scene_plans;
-      l3BudgetIssues = planResult.budget_issues;
+      const planResult = await runSceneCinematography(genre, characters, scenes, artDirection, productionDesign, midPreview, logger, models.V);
+      await logger.flushRawLlm('sceneCinematography');
+      sceneCinematography = planResult.scene_plans;
+      sceneBudgetIssues = planResult.budget_issues;
     }
   }
 
-  // Découpage: 감독의 beat→shot 분해 (L4 입력). Compact mode에선 L3 plans 미제공(자체 판단).
+  // Découpage: 감독의 beat→shot 분해 (shotDesign 입력). Compact mode에선 sceneCinematography plans 미제공(자체 판단).
   // 시간 제약은 driver가 아니라 validator — 감독이 샷 수/경계를 저작한다 (linear_pipeline Turn 7).
   const decoupage = (await loadOrRun<DecoupagePlan>(
     resume,
     '10b_decoupage.json',
-    () => runDecoupage(S0, S2, S3, L1, L2, compact ? null : L3, logger, models.V),
-    'Decoupage',
+    () => runDecoupage(genre, characters, scenes, artDirection, productionDesign, compact ? null : sceneCinematography, logger, models.V),
+    'decoupage',
     logger,
   )).value;
 
-  // L4: 샷 단위 3분할 (intent + static + dynamic). 데쿠파주가 정한 샷에 spec을 붙인다.
-  const l4Result = await loadOrRun<{ shots: L4Shot[]; compact_mode: boolean }>(
+  // shotDesign: 샷 단위 3분할 (intent + static + dynamic). 데쿠파주가 정한 샷에 spec을 붙인다.
+  const shotDesignResult = await loadOrRun<{ shots: ShotDesign[]; compact_mode: boolean }>(
     resume,
-    '11_L4_shots.json',
+    '11_shotDesign.json',
     async () => {
-      const shots = await runL4Shots(S0, S2, S3, L1, L2, compact ? null : L3, decoupage, logger, models.V);
+      const shots = await runShotDesign(genre, characters, scenes, artDirection, productionDesign, compact ? null : sceneCinematography, decoupage, logger, models.V);
       return { shots, compact_mode: compact };
     },
-    'L4_shots',
+    'shotDesign',
     logger,
   );
-  const L4 = l4Result.value.shots;
+  const shotDesign = shotDesignResult.value.shots;
 
-  // Compact mode 사후처리: L4에서 L3 역추론 (다운스트림 호환)
-  // resume에서 inferred 못 찾았고 + 방금 L4 새로 만든 경우만 수행 (이미 inferred 있으면 위에서 로드됨)
-  if (compact && !l3PlanLoaded) {
-    L3 = inferL3FromL4Shots(L4, S3);
-    await logger.saveStage(l3FileInferred, {
-      scene_plans: L3,
-      note: 'inferred from L4 (Compact Mode skipped L3 generation)',
+  // Compact mode 사후처리: shotDesign에서 sceneCinematography 역추론 (다운스트림 호환)
+  // resume에서 inferred 못 찾았고 + 방금 shotDesign 새로 만든 경우만 수행 (이미 inferred 있으면 위에서 로드됨)
+  if (compact && !sceneCinematographyLoaded) {
+    sceneCinematography = inferSceneCinematographyFromShots(shotDesign, scenes);
+    await logger.saveStage(sceneCinematographyFileInferred, {
+      scene_plans: sceneCinematography,
+      note: 'inferred from shotDesign (Compact Mode skipped sceneCinematography generation)',
     });
   }
 
-  // ===== C 적용 ② =====
-  // C2는 두 파일(12_C_application_2.json + 13_shot_sequence.json) 함께 저장됨
-  type C2Shape = {
-    shotSequence: PipelineResult['shot_sequence'];
-    report: PipelineResult['c_validation_2'];
+  // ===== shotCheck =====
+  // shotCheck는 두 파일(12_shotCheck.json + 13_shotSequence.json) 함께 저장됨
+  type ShotCheckShape = {
+    shotSequence: PipelineResult['shotSequence'];
+    report: PipelineResult['shotCheck'];
   };
-  let c2: C2Shape;
+  let shotCheckResult: ShotCheckShape;
   if (resume) {
-    const cachedSeq = await logger.loadStage<PipelineResult['shot_sequence']>('13_shot_sequence.json');
-    const cachedReport = await logger.loadStage<PipelineResult['c_validation_2']>('12_C_application_2.json');
+    const cachedSeq = await logger.loadStage<PipelineResult['shotSequence']>('13_shotSequence.json');
+    const cachedReport = await logger.loadStage<PipelineResult['shotCheck']>('12_shotCheck.json');
     if (cachedSeq && cachedReport) {
-      c2 = { shotSequence: cachedSeq, report: cachedReport };
-      await logger.markStage('C2_application', 'completed', { resumed: true });
+      shotCheckResult = { shotSequence: cachedSeq, report: cachedReport };
+      await logger.markStage('shotCheck', 'completed', { resumed: true });
     } else {
-      c2 = await runCApplication2(projectId, S0, S1, S2, S3, L0, L1, L2, L3, L4, l3BudgetIssues, logger, models.V, models.C);
-      await logger.flushRawLlm('C2_application');
+      shotCheckResult = await runShotCheck(projectId, genre, narrativeStructure, characters, scenes, renderFormat, artDirection, productionDesign, sceneCinematography, shotDesign, sceneBudgetIssues, logger, models.V, models.C);
+      await logger.flushRawLlm('shotCheck');
     }
   } else {
-    c2 = await runCApplication2(projectId, S0, S1, S2, S3, L0, L1, L2, L3, L4, l3BudgetIssues, logger, models.V, models.C);
-    await logger.flushRawLlm('C2_application');
+    shotCheckResult = await runShotCheck(projectId, genre, narrativeStructure, characters, scenes, renderFormat, artDirection, productionDesign, sceneCinematography, shotDesign, sceneBudgetIssues, logger, models.V, models.C);
+    await logger.flushRawLlm('shotCheck');
   }
 
-  const { shotSequence, report: c_validation_2 } = c2;
+  const { shotSequence, report: shotCheck } = shotCheckResult;
 
-  // ===== L5: T2I + TI2V 최종 프롬프트 정리 =====
+  // ===== renderPrompts: T2I + TI2V 최종 프롬프트 정리 =====
   // 기존 샷의 first_frame_generation/video_generation을 추출.
-  // 없는 경우만 LLM(V 축)로 보충 생성.
-  const final_prompts = (await loadOrRun<FinalPromptsOutput>(
+  // 없는 경우만 LLM(Visual 축)로 보충 생성.
+  const renderPrompts = (await loadOrRun<RenderPromptsOutput>(
     resume,
-    '14_final_prompts.json',
-    () => runL5Prompts(shotSequence, L0, S2, L2, logger, models.V),
-    'L5_prompts',
+    '14_renderPrompts.json',
+    () => runRenderPrompts(shotSequence, renderFormat, characters, productionDesign, logger, models.V),
+    'renderPrompts',
     logger,
   )).value;
 
   // 텍스트 결과(캐릭터/씬/로케이션/샷)를 DB에 기록 — writer 단일 생산자(§3 일원화).
-  //   shot_sequence 는 샷별 대사를 보유. non-blocking — 실패해도 파이프라인 계속.
-  persistManifestToDb(projectId, S2, S3, L2, shotSequence).catch((e) => {
+  //   shotSequence 는 샷별 대사를 보유. non-blocking — 실패해도 파이프라인 계속.
+  persistManifestToDb(projectId, characters, scenes, productionDesign, shotSequence).catch((e) => {
     console.warn('[writer] manifest persist failed (pipeline continues):', e);
   });
 
@@ -367,20 +367,20 @@ async function _runPipelineInner(
   const result: PipelineResult = {
     project_id: projectId,
     input,
-    S0,
-    S1,
-    S2,
-    S3,
-    c_validation_1,
-    mid_preview,
-    L0,
-    L1,
-    L2,
-    L3,
-    L4,
-    c_validation_2,
-    shot_sequence: shotSequence,
-    final_prompts,
+    genre,
+    narrativeStructure,
+    characters,
+    scenes,
+    storyCheck,
+    midPreview,
+    renderFormat,
+    artDirection,
+    productionDesign,
+    sceneCinematography,
+    shotDesign,
+    shotCheck,
+    shotSequence,
+    renderPrompts,
     metadata: {
       started_at: startedAt,
       completed_at: completedAt,
