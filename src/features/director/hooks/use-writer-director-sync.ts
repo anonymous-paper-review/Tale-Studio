@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useWriterStore } from '@/stores/writer-store'
+import { useProjectStore } from '@/stores/project-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import {
   useDirectorCanvasStore,
@@ -32,9 +33,22 @@ export function useWriterDirectorSync() {
   const hydratedProjectIdRef = useRef<string | null>(null)
   // asset-storage DB hydrate 1회 가드 (projectId별). Pass 2 에셋 바인딩이 이 결과에 의존.
   const assetHydratedProjectIdRef = useRef<string | null>(null)
+  // writer-store DB 로드 1회 가드 (projectId별). director 직행/새로고침 대응.
+  const writerLoadedProjectIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!manifest) return
+    // Writer 데이터(sceneManifest/shots)는 writer-store.loadProject()로만 채워지는데,
+    // 이 메서드는 director 직행/새로고침 경로에서 호출되지 않는다. manifest가 비어있고
+    // projectId가 있으면 여기서 1회 로드한다 — sceneManifest가 채워지면 selector 변경으로
+    // 이 effect가 재실행되어 아래 Pass들이 진행된다.
+    if (!manifest) {
+      const pid = useProjectStore.getState().projectId
+      if (pid && writerLoadedProjectIdRef.current !== pid) {
+        writerLoadedProjectIdRef.current = pid
+        void useWriterStore.getState().loadProject()
+      }
+      return
+    }
     let cancelled = false
 
     void (async () => {
