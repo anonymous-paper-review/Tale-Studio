@@ -22,7 +22,7 @@
 - **writer = 백엔드 전용**: `studio/writer` 페이지·`features/writer` 제거, nav producer→artist 직행. svc 파이프라인이 `/api/writer/start`(핸드오프)에서 백그라운드 실행되어 DB(characters/scenes/locations/shots, 샷별 대사 포함)를 채움(`persist_manifest`). `writer-store`는 artist/director가 소비하는 **공유 데이터 허브로 유지**.
 - **DB 정합 선행**: 코드가 라이브에 없는 컬럼에 write(Director/Editor 조용히 실패)임을 실증 → `007`(shots 기어/무브먼트/speed/storyboard_image), `008`(design_tokens + appearance/costume + location 토큰) 적용. `database.ts` 라이브 기준 재생성. 적용은 supabase CLI 히스토리 불일치로 pg 직접.
 - **트레이드오프**: svc는 16단계라 핸드오프 지연 ↑. `adapters.ts`가 대사 손실(L4 연결)이라 `shot_sequence` 기반 persist 신작성. `description`/`visual_description` 등 레거시 컬럼은 가동 우선으로 중복 잔존(후속 정리). svc 풀 런 런타임 검증 미수행(합성 테스트만).
-- **상세**: `docs/research/svc-writer-unification-2026-06-05.md`, `specs/changes/unify-svc-writer-pipeline/`
+- **상세**: `specs/changes/unify-svc-writer-pipeline/`
 - **일자**: 2026-06-05
 
 ### 37. Artist 캐릭터 이미지 — 턴어라운드 시트 + crop 파이프라인 채택

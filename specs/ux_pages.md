@@ -116,7 +116,7 @@ P1 "Hand over to Writer →"
 > **이 페이지는 제거됐습니다.** writer는 **UI 없는 백엔드 전용 스테이지** — producer 핸드오프(`/api/writer/start`)에서
 > writer 엔진이 백그라운드 실행되어 DB(scenes/characters/shots)를 채우고, 사용자는 producer → **artist**로 직행한다.
 > 아래 본문(Shot Grid / AI Writer Chat / `features/writer/*` / 사이드바 Writer 아이콘 / "Hand over to Writer")은
-> 모두 **폐기된 옛 UI** — historical 참고용. 현행 흐름은 `decision #38`, `docs/research/svc-writer-unification-2026-06-05.md`.
+> 모두 **폐기된 옛 UI** — historical 참고용. 현행 흐름은 `decision #38`, `specs/changes/unify-svc-writer-pipeline/`.
 
 > 상태: ~~MVP 포함~~ → **제거 (백엔드 전용)**
 > 참고: `specs/reference_v2/image2.png` (옛 디자인)

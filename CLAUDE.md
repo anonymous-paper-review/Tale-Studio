@@ -119,7 +119,7 @@ L0은 캐릭터/월드를 카드 UI로 사전 정의해 Asset Storage로 공급.
 > ### ⚠️ 용어 글로서리 (혼동 주의)
 > **두 개의 "레이어" 어휘가 따로 있음**:
 > - **앱 파이프라인 라벨** `L0~L3` (= 제품 단계, *specs/layers/ 의 개념*): L0 Artist / L1 씬·캐릭터 / L2 샷 / L3 프롬프트. **코드엔 식별자로 없음** — 코드의 단계는 `StageId`(producer/artist/director/editor) + writer 엔진.
-> - **writer 엔진 내부 스테이지** `S0~S3 / L0~L7` (*src/lib/writer 코드의 실구조*, 옛 svc 16단계): `S2`=캐릭터, `L1Style`=아트스타일, `L4`=샷 등. 앱 라벨과 **번호가 겹쳐도 다른 축**. (리네임 계획: `docs/research/writer-engine-stage-naming.md`)
+> - **writer 엔진 내부 스테이지** (*src/lib/writer 코드의 실구조*, 옛 svc 파이프라인): film-craft 도메인 이름 — `genre`/`narrativeStructure`/`characters`/`scenes`(Story), `renderFormat`/`artDirection`/`productionDesign`/`sceneCinematography`(Visual), `decoupage`/`shotDesign`/`shotSequence`/`renderPrompts`/`shotImages`/`shotVideos`. 로그 파일만 순번 prefix(`02_genre.json`…). 앱 라벨 `L0~L3`과 **다른 축** (옛 `S/L+숫자` prefix는 2026-06-05 리네임으로 폐기).
 >
 > **source-of-truth 원칙**: *현재 구현/스키마*(WHAT IS) = **코드 + `.claude/cache/db`**. *의도/이유*(WHY) = **specs**. layer 스펙의 메커니즘 서술이 코드와 다르면 코드가 진실.
 
