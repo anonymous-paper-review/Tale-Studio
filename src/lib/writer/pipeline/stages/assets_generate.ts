@@ -5,7 +5,7 @@
 // 전략: L6/L7 동일 — submit/poll + progressive save.
 //   - 순수 T2I (openai/gpt-image-2). reference 없이 깨끗하게 생성.
 //   - 이 결과가 L6에서 reference_image_urls로 주입됨 (I2I).
-import { falImageSubmit, falImageFetch } from '@/lib/svc/llm/fal';
+import { falImageSubmit, falImageFetch } from '@/lib/writer/llm/fal';
 import type {
   AssetItem,
   AssetsManifest,
@@ -13,8 +13,8 @@ import type {
   L1Style,
   L2Design,
   S2Block,
-} from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+} from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 

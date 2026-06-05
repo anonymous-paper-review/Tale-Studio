@@ -1,6 +1,6 @@
 // 액션 복잡도 예산 검사 + 자동 분할
 // 1샷 = 5초, 1 주요 액션 + 0~1 보조 액션 + 0~1 환경 변화 + 0~1 카메라 무브
-import type { S3Scene, ValidationIssue } from '@/lib/svc/types/pipeline';
+import type { S3Scene, ValidationIssue } from '@/lib/writer/types/pipeline';
 
 const SHOT_DURATION = 5;
 

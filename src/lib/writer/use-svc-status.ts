@@ -43,7 +43,7 @@ export function useSvcStatus(
       setLoading(true)
       let done = false
       try {
-        const r = await fetch(`/api/svc/status/${projectId}`)
+        const r = await fetch(`/api/writer/status/${projectId}`)
         if (!r.ok) {
           const j = await r.json().catch(() => ({}))
           setError(j.error ?? `status ${r.status}`)

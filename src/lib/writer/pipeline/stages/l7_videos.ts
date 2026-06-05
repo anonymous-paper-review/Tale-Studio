@@ -5,14 +5,14 @@
 //   1. 모든 샷을 fal queue에 submit (몇 초). request_id를 progressive save (status='pending').
 //   2. polling 윈도우 안에 끝난 것만 success/failed로 승격.
 //   3. 끝까지 안 끝난 것은 'pending'으로 남기고 reply. resume endpoint가 회수.
-import { falVideoSubmit, falVideoFetch } from '@/lib/svc/llm/fal';
+import { falVideoSubmit, falVideoFetch } from '@/lib/writer/llm/fal';
 import type {
   FinalPromptsOutput,
   L6ImagesOutput,
   L7VideosOutput,
   ShotVideoResult,
-} from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+} from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 function naturalCompareShotId(a: string, b: string): number {
   const ax = (a.match(/\d+/g) ?? []).map(Number);

@@ -1,6 +1,6 @@
 // Compact Mode 사후 처리: L4 결과로부터 L3 (씬 비주얼 플랜) 역추론.
 // 호출은 안 했지만 PipelineResult.L3 필드를 채우기 위함 (다운스트림 호환).
-import type { L3SceneVisualPlan, L4Shot, S3Block, S3Scene } from '@/lib/svc/types/pipeline';
+import type { L3SceneVisualPlan, L4Shot, S3Block, S3Scene } from '@/lib/writer/types/pipeline';
 
 export function inferL3FromL4Shots(
   l4Shots: L4Shot[],

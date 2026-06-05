@@ -10,17 +10,6 @@ import type {
 import { createClient } from '@/lib/supabase/client'
 import { useProjectStore } from '@/stores/project-store'
 
-type WriterUpdate =
-  | { type: 'updateScene'; sceneId: string; changes: Partial<Scene> }
-  | { type: 'updateShot'; shotId: string; changes: Partial<Shot> }
-  | { type: 'addShot'; sceneId: string }
-  | { type: 'deleteShot'; shotId: string }
-  | { type: 'addScene' }
-  | { type: 'deleteScene'; sceneId: string }
-  | { type: 'reorderScenes'; orderedIds: string[] }
-  | { type: 'regenerateScene'; sceneId: string }
-  | { type: 'regenerateAllShots' }
-  | { type: string; [k: string]: unknown }
 
 const DEFAULT_CAMERA = {
   horizontal: 0,
@@ -75,7 +64,6 @@ interface WriterState {
   error: string | null
 
   setStoryText: (text: string) => void
-  generateScenes: () => Promise<void>
   loadProject: () => Promise<void>
   selectScene: (id: string) => void
   updateScene: (id: string, changes: Partial<Scene>) => void
@@ -87,7 +75,6 @@ interface WriterState {
   deleteScene: (sceneId: string) => Promise<void>
   reorderScenes: (orderedIds: string[]) => Promise<void>
   regenerateScene: (sceneId: string) => Promise<void>
-  regenerateAllShots: () => Promise<void>
   addDialogueLine: (shotId: string, line: DialogueLine) => void
   removeDialogueLine: (shotId: string, index: number) => void
   updateDialogueLine: (
@@ -95,7 +82,6 @@ interface WriterState {
     index: number,
     changes: Partial<DialogueLine>,
   ) => void
-  applyUpdates: (updates: WriterUpdate[]) => Promise<void>
   clearError: () => void
   reset: () => void
 }
@@ -113,47 +99,6 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   error: null,
 
   setStoryText: (text) => set({ storyText: text }),
-
-  generateScenes: async () => {
-    const { storyText } = get()
-    if (!storyText.trim()) return
-
-    set({ generating: true, error: null })
-
-    try {
-      const projectId = useProjectStore.getState().projectId
-      const res = await fetch('/api/write/generate-scenes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storyText, projectId }),
-      })
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error ?? `HTTP ${res.status}`)
-      }
-
-      const { manifest, expandedStory, shots } = await res.json()
-      const firstSceneId = manifest.scenes[0]?.sceneId ?? null
-      const firstShot =
-        shots?.find((s: Shot) => s.sceneId === firstSceneId) ?? null
-
-      set({
-        generating: false,
-        sceneManifest: manifest,
-        expandedStory,
-        selectedSceneId: firstSceneId,
-        shots: shots ?? [],
-        selectedShotId: firstShot?.shotId ?? null,
-      })
-    } catch (err) {
-      set({
-        generating: false,
-        error:
-          err instanceof Error ? err.message : 'Scene generation failed',
-      })
-    }
-  },
 
   selectScene: (id) => {
     const { shots } = get()
@@ -540,10 +485,6 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     }
   },
 
-  regenerateAllShots: async () => {
-    await get().generateScenes()
-  },
-
   addDialogueLine: (shotId, line) => {
     const shot = get().shots.find((s) => s.shotId === shotId)
     if (!shot) return
@@ -568,54 +509,6 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         i === index ? { ...dl, ...changes } : dl,
       ),
     })
-  },
-
-  applyUpdates: async (updates) => {
-    if (!Array.isArray(updates)) return
-    for (const op of updates) {
-      const u = op as {
-        type: string
-        sceneId?: string
-        shotId?: string
-        orderedIds?: string[]
-        changes?: Partial<Scene> & Partial<Shot>
-      }
-      switch (u.type) {
-        case 'updateScene':
-          if (u.sceneId && u.changes) {
-            get().updateScene(u.sceneId, u.changes as Partial<Scene>)
-          }
-          break
-        case 'updateShot':
-          if (u.shotId && u.changes) {
-            get().updateShot(u.shotId, u.changes as Partial<Shot>)
-          }
-          break
-        case 'addShot':
-          if (u.sceneId) await get().addShot(u.sceneId)
-          break
-        case 'deleteShot':
-          if (u.shotId) await get().deleteShot(u.shotId)
-          break
-        case 'addScene':
-          await get().addScene()
-          break
-        case 'deleteScene':
-          if (u.sceneId) await get().deleteScene(u.sceneId)
-          break
-        case 'reorderScenes':
-          if (Array.isArray(u.orderedIds)) {
-            await get().reorderScenes(u.orderedIds)
-          }
-          break
-        case 'regenerateScene':
-          if (u.sceneId) await get().regenerateScene(u.sceneId)
-          break
-        case 'regenerateAllShots':
-          await get().regenerateAllShots()
-          break
-      }
-    }
   },
 
   clearError: () => set({ error: null }),
@@ -697,7 +590,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           name: c.name,
           role: c.role as Character['role'],
           description: c.description ?? '',
-          fixedPrompt: c.fixed_prompt ?? '',
+          fixedPrompt: c.appearance ?? '',
           referenceImages: [],
         })),
         locations: (locations ?? []).map((l) => ({

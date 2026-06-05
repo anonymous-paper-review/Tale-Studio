@@ -2,7 +2,9 @@
 
 ## 인벤토리
 - `project-store.ts` — 공유
-- `producer-store.ts`, `writer-store.ts`, `artist-store.ts`
+- `producer-store.ts`, `artist-store.ts`
+- `writer-store.ts` — **데이터 허브로 유지** (decision #38). writer UI 제거 후 생성 액션(generateScenes/
+  regenerateAllShots/applyUpdates) 삭제. `sceneManifest`/`shots`를 DB에서 로드해 artist/director가 소비.
 - `director-store.ts`, `editor-store.ts`, `director-canvas-store.ts`
 - `asset-storage-store.ts` — L0 Artist 등록 에셋 저장소 (유지)
 - `global-chat-store.ts` — 공유

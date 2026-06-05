@@ -1,5 +1,5 @@
 // Mid Preview: S↔V 양방향 협상 유일 지점. AI가 V 전체를 한 번에 제안.
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
   MidPreview,
   S0Genre,
@@ -7,8 +7,8 @@ import type {
   S2Block,
   S3Block,
   CValidation1Report,
-} from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+} from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 export async function runMidPreview(
   s0: S0Genre,

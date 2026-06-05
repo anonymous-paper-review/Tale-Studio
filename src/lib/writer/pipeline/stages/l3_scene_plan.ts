@@ -1,8 +1,8 @@
 // L3: 씬 단위 비주얼 플랜
 // 글로벌 L0~L2와 샷 단위 L4 사이의 다리.
 // 한 씬을 어떻게 찍을지 — 커버리지/렌즈/카메라/조명 디시플린 설정.
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
-import { analyzeSceneActionBudget } from '@/lib/svc/pipeline/validators/action_budget';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
 import type {
   L1Style,
   L2Design,
@@ -12,8 +12,8 @@ import type {
   S2Block,
   S3Block,
   ValidationIssue,
-} from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+} from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 interface L3Result {
   scene_plans: L3SceneVisualPlan[];

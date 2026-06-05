@@ -3,7 +3,7 @@
 //   - 기존 샷의 video_generation.motion_prompt → TI2V 프롬프트로 추출
 //   - 둘 중 하나라도 없으면 LLM 호출로 생성 (fallback)
 //   - 다양한 샷 스키마(rich-A / declared-B / L4 3분할 등) 모두 수용
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
   FinalPromptsOutput,
   ShotGenerationPrompts,
@@ -11,8 +11,8 @@ import type {
   L2Design,
   S2Block,
   ShotSequence,
-} from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+} from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 type AnyShot = Record<string, unknown> & {
   shot_id: string;

@@ -5,7 +5,7 @@
 //
 // 입력: L3 SceneVisualPlan으로 씬 디시플린이 잡혀 있어, 자유도가 제한됨.
 //        각 샷은 L3 vocabulary 안에서만 결정.
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
   DecoupagePlan,
   DecoupageShot,
@@ -20,8 +20,8 @@ import type {
   S2Block,
   S3Block,
   S3Scene,
-} from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+} from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 export async function runL4Shots(
   s0: S0Genre,

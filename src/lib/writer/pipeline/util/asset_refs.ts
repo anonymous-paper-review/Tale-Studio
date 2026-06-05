@@ -5,7 +5,7 @@
 //     - 캐릭터: S2.characters[].id
 //     - 로케이션: L2.locations[].id (= scene.location)
 //   이 util은 LLM 신뢰 없이 코드로 모든 참조를 canonical로 해소(resolve)하거나 drop한다.
-import type { L2Design, S2Block, ShotSequenceItem, ValidationIssue } from '@/lib/svc/types/pipeline';
+import type { L2Design, S2Block, ShotSequenceItem, ValidationIssue } from '@/lib/writer/types/pipeline';
 
 export interface AssetRegistry {
   characterIds: Set<string>;

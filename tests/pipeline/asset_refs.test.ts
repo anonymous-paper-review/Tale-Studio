@@ -5,8 +5,8 @@ import {
   buildAssetRegistry,
   resolveAssetRef,
   normalizeShotSequenceAssetRefs,
-} from '@/lib/svc/pipeline/util/asset_refs';
-import type { L2Design, S2Block, S3Block, ShotSequence } from '@/lib/svc/types/pipeline';
+} from '@/lib/writer/pipeline/util/asset_refs';
+import type { L2Design, S2Block, S3Block, ShotSequence } from '@/lib/writer/types/pipeline';
 
 // 실제 파이프라인 로그(깨진 reference 포함)로 결정론적 정규화기를 검증.
 const LOG = path.resolve(__dirname, '../../logs/5ba68003-3922-4d91-a87b-1b1ca7f5dd2f');

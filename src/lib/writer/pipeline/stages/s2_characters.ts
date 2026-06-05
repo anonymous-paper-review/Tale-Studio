@@ -1,7 +1,7 @@
 // S2: 캐릭터, 관계, 서브텍스트
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
-import type { S0Genre, S1Structure, S2Block, PipelineInput } from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import type { S0Genre, S1Structure, S2Block, PipelineInput } from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 export async function runS2(
   input: PipelineInput,

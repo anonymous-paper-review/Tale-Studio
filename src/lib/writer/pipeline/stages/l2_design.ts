@@ -1,13 +1,13 @@
 // L2: 프로덕션 디자인 (팔레트, 컬러 의미, 로케이션, 의상, VFX)
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
   L2Design,
   S2Block,
   S3Block,
   L1Style,
   MidPreview,
-} from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+} from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 export async function runL2(
   s2: S2Block,

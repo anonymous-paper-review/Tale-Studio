@@ -1,8 +1,8 @@
 // L7: TI2V 영상 생성 (fal.ai Seedance)
 import { NextRequest, NextResponse } from 'next/server';
-import { PipelineLogger } from '@/lib/svc/logger';
-import { runL7Videos } from '@/lib/svc/pipeline/stages/l7_videos';
-import type { FinalPromptsOutput, L6ImagesOutput } from '@/lib/svc/types/pipeline';
+import { PipelineLogger } from '@/lib/writer/logger';
+import { runL7Videos } from '@/lib/writer/pipeline/stages/l7_videos';
+import type { FinalPromptsOutput, L6ImagesOutput } from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';
 export const maxDuration = 1800;  // 30분. 점진적 저장으로 도중 끊겨도 부분 결과 보존.

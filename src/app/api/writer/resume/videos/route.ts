@@ -1,8 +1,8 @@
 // L7 resume: 16_L7_videos.json의 status='pending' 항목을 fal.queue로 회수
 import { NextRequest, NextResponse } from 'next/server';
-import { PipelineLogger } from '@/lib/svc/logger';
-import { falVideoFetch } from '@/lib/svc/llm/fal';
-import type { L7VideosOutput, ShotVideoResult } from '@/lib/svc/types/pipeline';
+import { PipelineLogger } from '@/lib/writer/logger';
+import { falVideoFetch } from '@/lib/writer/llm/fal';
+import type { L7VideosOutput, ShotVideoResult } from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;

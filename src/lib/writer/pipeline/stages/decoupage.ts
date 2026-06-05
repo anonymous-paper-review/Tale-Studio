@@ -7,7 +7,7 @@
 //   - 시간 제약은 validator (각 샷 5~15초). action_budget이 후단에서 검증.
 //
 // 출력 DecoupagePlan은 L4 입력으로 사용됨 (L4가 각 샷에 3분할 spec을 붙임).
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
   DecoupagePlan,
   DecoupageShot,
@@ -19,8 +19,8 @@ import type {
   S3Block,
   S3Scene,
   SceneDecoupage,
-} from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+} from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 const SYSTEM_INSTRUCTION = `당신은 영화 감독이다. 한 씬의 내러티브 비트(scene_actions)를 받아 *데쿠파주(découpage)* — 샷 분해 — 를 저작한다.
 

@@ -1,7 +1,7 @@
 // C 적용 ②: L4 (3분할) → ShotSequenceItem composing + 의미 검증
 // Step 1: Gemini로 L4a/b/c → ShotSequenceItem 조립 (S/C/V 메타 추가)
 // Step 2: Claude로 액션 스코프 + 일관성 검증 (실패 시 split)
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
   CValidation2Report,
   L0Visual,
@@ -16,9 +16,9 @@ import type {
   ShotSequence,
   ShotSequenceItem,
   ValidationIssue,
-} from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
-import { buildAssetRegistry, normalizeShotSequenceAssetRefs } from '@/lib/svc/pipeline/util/asset_refs';
+} from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
+import { buildAssetRegistry, normalizeShotSequenceAssetRefs } from '@/lib/writer/pipeline/util/asset_refs';
 
 interface ShotSequenceGenResponse {
   shots: ShotSequenceItem[];

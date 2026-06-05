@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
-import { falImageGenerate } from '@/lib/svc/llm/fal'
+import { falImageGenerate } from '@/lib/writer/llm/fal'
 
 function getApiKey(): string {
   const keys = process.env.GOOGLE_API_KEYS ?? ''

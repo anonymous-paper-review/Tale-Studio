@@ -1,7 +1,7 @@
 // L0 + L1: Mid Preview 제안을 정식 V축 데이터로 확정
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
-import type { L0Visual, L1Style, MidPreview, S0Genre } from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import type { L0Visual, L1Style, MidPreview, S0Genre } from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 interface L0L1Result {
   L0: L0Visual;

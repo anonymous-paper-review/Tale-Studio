@@ -25,7 +25,7 @@ import type {
   FinalPromptsOutput,
   L6ImagesOutput,
   L7VideosOutput,
-} from '@/lib/svc/types/pipeline';
+} from '@/lib/writer/types/pipeline';
 
 // svc scene_id (scene_1) → main sc_01
 export function svcSceneIdToMain(svcId: string): string {

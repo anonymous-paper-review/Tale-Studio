@@ -1,7 +1,7 @@
 // S1: 내러티브 구조, POV, 주제, CDQ
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
-import type { S0Genre, S1Structure, PipelineInput } from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import type { S0Genre, S1Structure, PipelineInput } from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 export async function runS1(input: PipelineInput, s0: S0Genre, logger: PipelineLogger, axisConfig: LlmAxisConfig): Promise<S1Structure> {
   await logger.markStage('S1', 'started');

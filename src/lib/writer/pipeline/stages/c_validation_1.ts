@@ -1,7 +1,7 @@
 // C 적용 ①: S 완료 후 서사 검증
 // 룰 기반 (인과 체인) + LLM 기반 (CDQ, 핍진성, 클리셰) 하이브리드
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
-import { analyzeCausalityChain } from '@/lib/svc/pipeline/validators/causality';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import { analyzeCausalityChain } from '@/lib/writer/pipeline/validators/causality';
 import type {
   CValidation1Report,
   S0Genre,
@@ -9,8 +9,8 @@ import type {
   S2Block,
   S3Block,
   ValidationIssue,
-} from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+} from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 interface LlmValidationResponse {
   cdq_present: boolean;

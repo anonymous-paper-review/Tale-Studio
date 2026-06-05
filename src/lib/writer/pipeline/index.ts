@@ -1,29 +1,31 @@
 // 파이프라인 오케스트레이터: 스토리 → 샷 시퀀스 JSON
 // resumeProjectId 전달 시 기존 stage 결과 로드해 중단 지점부터 재개
-import { PipelineLogger, makeProjectId } from '@/lib/svc/logger';
-import { runS0 } from '@/lib/svc/pipeline/stages/s0_genre';
-import { runS1 } from '@/lib/svc/pipeline/stages/s1_structure';
-import { runS2 } from '@/lib/svc/pipeline/stages/s2_characters';
-import { runS3 } from '@/lib/svc/pipeline/stages/s3_scenes';
-import { runCValidation1 } from '@/lib/svc/pipeline/stages/c_validation_1';
-import { runMidPreview } from '@/lib/svc/pipeline/stages/mid_preview';
-import { runL0L1 } from '@/lib/svc/pipeline/stages/l0_l1_visual';
-import { runL2 } from '@/lib/svc/pipeline/stages/l2_design';
-import { runAssetsGenerate } from '@/lib/svc/pipeline/stages/assets_generate';
-import { runL3SceneVisualPlan } from '@/lib/svc/pipeline/stages/l3_scene_plan';
-import { runDecoupage } from '@/lib/svc/pipeline/stages/decoupage';
-import { runL4Shots } from '@/lib/svc/pipeline/stages/l4_shots';
-import { runCApplication2 } from '@/lib/svc/pipeline/stages/c_application_2';
-import { runL5Prompts } from '@/lib/svc/pipeline/stages/l5_prompts';
-import { inferL3FromL4Shots } from '@/lib/svc/pipeline/util/infer_l3';
-import { isCompactDepth } from '@/lib/svc/types/pipeline';
-import { analyzeSceneActionBudget } from '@/lib/svc/pipeline/validators/action_budget';
-import { resetGeminiCallCount, getGeminiCallCount } from '@/lib/svc/llm/gemini';
-import { resetClaudeCallCount, getClaudeCallCount } from '@/lib/svc/llm/claude';
-import { resetOpenAICallCount, getOpenAICallCount } from '@/lib/svc/llm/openai';
-import { resetLocalCallCount, getLocalCallCount } from '@/lib/svc/llm/local';
-import { resetRawSeq } from '@/lib/svc/llm/raw_collector';
-import { DEFAULT_MODELS, type PipelineModelsConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
+import { PipelineLogger, makeProjectId } from '@/lib/writer/logger';
+import { runS0 } from '@/lib/writer/pipeline/stages/s0_genre';
+import { runS1 } from '@/lib/writer/pipeline/stages/s1_structure';
+import { runS2 } from '@/lib/writer/pipeline/stages/s2_characters';
+import { runS3 } from '@/lib/writer/pipeline/stages/s3_scenes';
+import { runCValidation1 } from '@/lib/writer/pipeline/stages/c_validation_1';
+import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview';
+import { runL0L1 } from '@/lib/writer/pipeline/stages/l0_l1_visual';
+import { runL2 } from '@/lib/writer/pipeline/stages/l2_design';
+import { runAssetsGenerate } from '@/lib/writer/pipeline/stages/assets_generate';
+import { runL3SceneVisualPlan } from '@/lib/writer/pipeline/stages/l3_scene_plan';
+import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
+import { runL4Shots } from '@/lib/writer/pipeline/stages/l4_shots';
+import { runCApplication2 } from '@/lib/writer/pipeline/stages/c_application_2';
+import { runL5Prompts } from '@/lib/writer/pipeline/stages/l5_prompts';
+import { inferL3FromL4Shots } from '@/lib/writer/pipeline/util/infer_l3';
+import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
+import { persistManifestToDb } from '@/lib/writer/pipeline/util/persist_manifest';
+import { isCompactDepth } from '@/lib/writer/types/pipeline';
+import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
+import { resetGeminiCallCount, getGeminiCallCount } from '@/lib/writer/llm/gemini';
+import { resetClaudeCallCount, getClaudeCallCount } from '@/lib/writer/llm/claude';
+import { resetOpenAICallCount, getOpenAICallCount } from '@/lib/writer/llm/openai';
+import { resetLocalCallCount, getLocalCallCount } from '@/lib/writer/llm/local';
+import { resetRawSeq } from '@/lib/writer/llm/raw_collector';
+import { DEFAULT_MODELS, type PipelineModelsConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
   PipelineInput,
   PipelineResult,
@@ -41,7 +43,7 @@ import type {
   L4Shot,
   DecoupagePlan,
   FinalPromptsOutput,
-} from '@/lib/svc/types/pipeline';
+} from '@/lib/writer/types/pipeline';
 
 // Skip 모드 default = true (피드백 미반영 stage 건너뜀, 비용 절감)
 function resolveSkip(input: PipelineInput): { validation1: boolean; midPreview: boolean } {
@@ -232,6 +234,12 @@ async function _runPipelineInner(
 
   const L2 = (await loadOrRun<L2Design>(resume, '09_L2.json', () => runL2(S2, S3, L1, mid_preview, logger, models.V), 'L2', logger)).value;
 
+  // L2 직후 → 전역 디자인 토큰을 projects.design_tokens 에 기록 (§2-2, DB化).
+  //   소비(artist 턴어라운드 등)는 DB에서 읽는다. non-blocking — 실패해도 파이프라인 계속.
+  persistDesignTokens(projectId, L0, L1, L2).catch((e) => {
+    console.warn('[svc] design_tokens persist failed (pipeline continues):', e);
+  });
+
   // L2 직후 → 캐릭터/로케이션 reference 에셋 생성 (L6에서 I2I용으로 사용)
   // 실패해도 파이프라인은 계속 진행 (L6는 에셋 없으면 순수 T2I로 자동 fallback).
   runAssetsGenerate(S2, L0, L1, L2, logger, { concurrency: 4 }).catch((e) => {
@@ -346,6 +354,12 @@ async function _runPipelineInner(
     'L5_prompts',
     logger,
   )).value;
+
+  // 텍스트 결과(캐릭터/씬/로케이션/샷)를 DB에 기록 — writer 단일 생산자(§3 일원화).
+  //   shot_sequence 는 샷별 대사를 보유. non-blocking — 실패해도 파이프라인 계속.
+  persistManifestToDb(projectId, S2, S3, L2, shotSequence).catch((e) => {
+    console.warn('[writer] manifest persist failed (pipeline continues):', e);
+  });
 
   const completedAt = new Date().toISOString();
   const totalDurationMs = Date.now() - startedMs;

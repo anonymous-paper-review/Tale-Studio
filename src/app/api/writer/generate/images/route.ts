@@ -1,8 +1,8 @@
 // L6: T2I 이미지 생성 (fal.ai openai/gpt-image-2)
 import { NextRequest, NextResponse } from 'next/server';
-import { PipelineLogger } from '@/lib/svc/logger';
-import { runL6Images } from '@/lib/svc/pipeline/stages/l6_images';
-import type { FinalPromptsOutput } from '@/lib/svc/types/pipeline';
+import { PipelineLogger } from '@/lib/writer/logger';
+import { runL6Images } from '@/lib/writer/pipeline/stages/l6_images';
+import type { FinalPromptsOutput } from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';
 export const maxDuration = 1800;  // 30분 (Vercel Pro 한도). 점진적 저장으로 도중 끊겨도 부분 결과 보존.

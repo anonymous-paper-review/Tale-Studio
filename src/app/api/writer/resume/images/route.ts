@@ -2,9 +2,9 @@
 //   - status='pending' + request_id 있는 항목만 처리
 //   - polling 한 라운드 + 즉시 응답 (UI가 반복 호출)
 import { NextRequest, NextResponse } from 'next/server';
-import { PipelineLogger } from '@/lib/svc/logger';
-import { falImageFetch } from '@/lib/svc/llm/fal';
-import type { L6ImagesOutput, ShotImageResult } from '@/lib/svc/types/pipeline';
+import { PipelineLogger } from '@/lib/writer/logger';
+import { falImageFetch } from '@/lib/writer/llm/fal';
+import type { L6ImagesOutput, ShotImageResult } from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;

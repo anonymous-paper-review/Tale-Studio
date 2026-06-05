@@ -1,6 +1,6 @@
 // 프로젝트 로그 파일 조회
-//   GET /api/svc/logs/:projectId           → 파일 목록
-//   GET /api/svc/logs/:projectId?file=X    → 파일 내용 (.json → {data}, else {text})
+//   GET /api/writer/logs/:projectId           → 파일 목록
+//   GET /api/writer/logs/:projectId?file=X    → 파일 내용 (.json → {data}, else {text})
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'node:fs/promises';
 import path from 'node:path';

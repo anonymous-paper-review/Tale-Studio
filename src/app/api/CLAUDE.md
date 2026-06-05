@@ -8,7 +8,8 @@ src/app/api/
 ├── artist/        — Artist 관련 endpoints (L0 Canvas chat 등)
 ├── director/      — Director Canvas 관련 (chat, generate-video 예정)
 ├── editor/        — Editor 관련
-├── write/         — Writer 관련 (story → scene)
+├── writer/        — Writer 파이프라인 엔진 (svc→writer 리네임, decision #38). start/status/resume/generate.
+│                    핸드오프(/api/writer/start)에서 백그라운드 실행 → DB 채움. 옛 `write/`(generate-scenes/chat) 폐기.
 ├── produce/       — Producer 관련
 ├── generate/      — AI 생성 (Gemini, Imagen, Kling, Veo)
 ├── knowledge/     — Knowledge DB RAG

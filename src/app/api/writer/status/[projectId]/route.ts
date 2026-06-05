@@ -81,19 +81,27 @@ export async function GET(
     // 마지막 stage / 에러 추출
     const lastEntry = timeline[timeline.length - 1] ?? null;
     const failed = timeline.find((e) => e.status === 'failed') ?? null;
-    const pipelineCompleted = timeline.some(
-      (e) => e.stage === 'PIPELINE' && e.status === 'completed',
-    );
     const pipelineFailed = timeline.some(
       (e) => e.stage === 'PIPELINE' && e.status === 'failed',
     );
 
-    // 진행률 (S0~L5 = 14단계 기준, L6/L7은 별도)
-    const totalSvcStages = 12; // S0,S1,S2,S3,C1,MidPrev,L0_L1,L2,L3,L4,C2(2개로 가산 X),L5
-    const completedStages = Object.keys(available).filter(
-      (s) => !['L6/images', 'L7/videos', 'assets'].includes(s),
-    ).length;
-    const progressPercent = Math.min(100, Math.round((completedStages / totalSvcStages) * 100));
+    // 진행률: 텍스트 자동 파이프라인(S0~L5) 산출물 기준. L6/L7/assets는 별도 트리거라 제외.
+    // 분모는 STAGE_FILES 실제 개수로 계산 (하드코딩 12 → 라벨 추가/삭제에 자동 추종).
+    const EXCLUDED_STAGES = new Set(['L6/images', 'L7/videos', 'assets']);
+    const countableStages = STAGE_FILES.filter((s) => !EXCLUDED_STAGES.has(s.stage));
+    const totalSvcStages = countableStages.length;
+    const completedStages = countableStages.filter((s) => available[s.stage]).length;
+
+    // 완료 판정: PIPELINE/completed 마커 OR 최종 산출물(L5/final_prompts) 존재.
+    // 디버그/부분 실행이 마커를 안 남겨도 L5가 나왔으면 자동 파이프라인은 끝난 것 →
+    // 폴링 무한 반복 + 스피너 83% 정체 해소.
+    const pipelineCompleted =
+      timeline.some((e) => e.stage === 'PIPELINE' && e.status === 'completed') ||
+      available['L5/final_prompts'] === true;
+
+    const progressPercent = pipelineCompleted
+      ? 100
+      : Math.min(100, Math.round((completedStages / totalSvcStages) * 100));
 
     return NextResponse.json({
       projectId,

@@ -1,7 +1,7 @@
 // S3: 씬 브레이크다운, 감정 비트, 정보 비대칭
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
-import type { S0Genre, S1Structure, S2Block, S3Block, PipelineInput } from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import type { S0Genre, S1Structure, S2Block, S3Block, PipelineInput } from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 export async function runS3(
   input: PipelineInput,

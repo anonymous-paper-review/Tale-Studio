@@ -1,13 +1,13 @@
 // Assets stage 수동 트리거: L2까지 완료된 프로젝트에 캐릭터/로케이션 reference 이미지 생성
 import { NextRequest, NextResponse } from 'next/server';
-import { PipelineLogger } from '@/lib/svc/logger';
-import { runAssetsGenerate } from '@/lib/svc/pipeline/stages/assets_generate';
+import { PipelineLogger } from '@/lib/writer/logger';
+import { runAssetsGenerate } from '@/lib/writer/pipeline/stages/assets_generate';
 import type {
   L0Visual,
   L1Style,
   L2Design,
   S2Block,
-} from '@/lib/svc/types/pipeline';
+} from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';
 export const maxDuration = 600;

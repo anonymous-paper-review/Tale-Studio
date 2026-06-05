@@ -2,9 +2,9 @@
 //   Producer "Complete your story" 버튼에서 호출.
 //   S0~L5 (텍스트/프롬프트 단계)까지만 자동. 이미지/영상은 별도 트리거.
 import { NextRequest, NextResponse } from 'next/server';
-import { runPipeline } from '@/lib/svc/pipeline';
-import { PipelineLogger } from '@/lib/svc/logger';
-import type { PipelineInput } from '@/lib/svc/types/pipeline';
+import { runPipeline } from '@/lib/writer/pipeline';
+import { PipelineLogger } from '@/lib/writer/logger';
+import type { PipelineInput } from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';
 // 백그라운드 실행이라 짧게 설정 (시작만 응답). Vercel 외 환경에서는 무의미.
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     const existing = await logger.loadStage<unknown>('00_input.json');
     if (existing) {
       return NextResponse.json(
-        { error: 'pipeline already started for this project. Use /api/svc/status or /api/svc/resume.', projectId },
+        { error: 'pipeline already started for this project. Use /api/writer/status or /api/writer/resume.', projectId },
         { status: 409 },
       );
     }

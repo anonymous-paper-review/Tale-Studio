@@ -1,7 +1,7 @@
 // S0: 장르/톤/감정/러닝타임 + 깊이 레벨 결정
-import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/svc/llm/dispatch';
-import type { S0Genre, PipelineInput, DepthLevel } from '@/lib/svc/types/pipeline';
-import type { PipelineLogger } from '@/lib/svc/logger';
+import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import type { S0Genre, PipelineInput, DepthLevel } from '@/lib/writer/types/pipeline';
+import type { PipelineLogger } from '@/lib/writer/logger';
 
 export async function runS0(input: PipelineInput, logger: PipelineLogger, axisConfig: LlmAxisConfig): Promise<S0Genre> {
   await logger.markStage('S0', 'started');

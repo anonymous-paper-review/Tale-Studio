@@ -1,5 +1,5 @@
 // 룰 기반 인과 체인 검사
-import type { S3Block, ValidationIssue } from '@/lib/svc/types/pipeline';
+import type { S3Block, ValidationIssue } from '@/lib/writer/types/pipeline';
 
 export interface CausalityChainEntry {
   from: string;

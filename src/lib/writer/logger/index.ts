@@ -1,7 +1,7 @@
 // 단계별 로그 저장 유틸 (서버 사이드 전용)
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { flushRawCalls, type RawLlmCall, type LlmProvider } from '@/lib/svc/llm/raw_collector';
+import { flushRawCalls, type RawLlmCall, type LlmProvider } from '@/lib/writer/llm/raw_collector';
 
 const LOGS_ROOT = path.resolve(process.cwd(), 'logs');
 
