@@ -28,6 +28,8 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const canNavigateTo = useProjectStore((s) => s.canNavigateTo)
+  // reachedStage 구독 — 단계가 열리면(잠금 해제) sidebar가 리렌더되도록 (canNavigateTo는 함수 참조라 단독으론 반응 안 함)
+  useProjectStore((s) => s.reachedStage)
   const projectTitle = useProjectStore((s) => s.projectTitle)
 
   return (

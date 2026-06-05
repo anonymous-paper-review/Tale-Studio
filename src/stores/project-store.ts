@@ -4,6 +4,8 @@ import { STAGES } from '@/lib/constants'
 
 interface ProjectState {
   currentStage: StageId
+  /** 지금까지 도달한 최고 단계(순차 잠금 게이트 기준). 단조 증가 — 뒤로 가도 안 줄어든다. */
+  reachedStage: StageId
   workspaceId: string | null
   projectId: string | null
   projectTitle: string
@@ -20,6 +22,11 @@ interface ProjectState {
 
 function getStageIndex(id: StageId): number {
   return STAGES.findIndex((s) => s.id === id)
+}
+
+/** 두 단계 중 더 진행된 쪽을 반환 (reachedStage 단조 증가용). */
+function furtherStage(a: StageId, b: StageId): StageId {
+  return getStageIndex(a) >= getStageIndex(b) ? a : b
 }
 
 function resetChildStores() {
@@ -44,18 +51,25 @@ function resetChildStores() {
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
   currentStage: 'producer',
+  reachedStage: 'producer',
   workspaceId: null,
   projectId: null,
   projectTitle: 'Untitled',
   initLoading: false,
 
-  setStage: (stage) => set({ currentStage: stage }),
+  // currentStage는 "지금 보는 단계", reachedStage는 "지금까지 연 최고 단계".
+  // 뒤로 가도(currentStage 후퇴) 이미 연 단계가 잠기지 않도록 reachedStage는 단조 증가.
+  setStage: (stage) =>
+    set((s) => ({
+      currentStage: stage,
+      reachedStage: furtherStage(s.reachedStage, stage),
+    })),
 
-  canNavigateTo: (_stage) => {
-    // TEMP (2026-05-17): 검증 편의 위해 가드 해제. 검증 끝나면 아래 원본 로직으로 복원.
-    // const { currentStage } = get()
-    // return getStageIndex(stage) <= getStageIndex(currentStage)
-    return true
+  canNavigateTo: (stage) => {
+    // 순차 잠금: producer→artist→director→editor 순으로 하나씩 열린다.
+    // 도달한 최고 단계(reachedStage)까지만 진입 허용 — 다음 단계는 handoff로 열린다
+    // (producer CTA / artist·director의 HandoffButton이 setStage로 reachedStage를 전진).
+    return getStageIndex(stage) <= getStageIndex(get().reachedStage)
   },
 
   initProject: async (restoreId?: string) => {
@@ -75,6 +89,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         projectTitle: project.title ?? 'Untitled',
         initLoading: false,
         currentStage: project.current_stage ?? 'producer',
+        // DB current_stage = 지금까지 진행한 최고 단계 → 새로고침/복원 시 그만큼 열어둔다
+        reachedStage: project.current_stage ?? 'producer',
       })
       const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
       useDirectorCanvasStore.getState().setProjectId(projectId)
@@ -97,6 +113,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         projectTitle: 'Untitled',
         initLoading: false,
         currentStage: 'producer',
+        reachedStage: 'producer',
         })
       const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
       useDirectorCanvasStore.getState().setProjectId(projectId)
@@ -112,6 +129,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectId: id,
       projectTitle: title,
       currentStage: stage ?? 'producer',
+      reachedStage: stage ?? 'producer',
     })
     const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
     useDirectorCanvasStore.getState().setProjectId(id)
@@ -138,6 +156,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectId: null,
       projectTitle: 'Untitled',
       currentStage: 'producer',
+      reachedStage: 'producer',
       initLoading: false,
     })
   },
