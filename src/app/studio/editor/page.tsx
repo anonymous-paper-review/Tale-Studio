@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useCallback, useState } from 'react'
 import {
   Loader2,
   Download,
+  FileArchive,
   Play,
   Pause,
   ChevronLeft,
@@ -24,6 +25,8 @@ import { useEditorStore, selectTimelineLayout } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { decodeAudioPeaks } from '@/lib/audio-waveform'
+import { downloadShotsZip } from '@/lib/editor-zip-export'
+import { toast } from 'sonner'
 
 const FRAME = 1 / 24
 
@@ -101,6 +104,7 @@ export default function PostPage() {
   )
 
   const projectId = useProjectStore((s) => s.projectId)
+  const [exportingZip, setExportingZip] = useState(false)
 
   // loadData(원본) → loadPersisted(저장된 편집 덮어쓰기)
   useEffect(() => {
@@ -339,7 +343,45 @@ export default function PostPage() {
             클립 우클릭 → 속도·분할·삭제
           </span>
 
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {/* 샷 영상 일괄 ZIP 다운로드 (타임라인 순서대로 NN_shotId.mp4) */}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={exportingZip}
+              className="gap-1.5"
+              onClick={async () => {
+                setExportingZip(true)
+                try {
+                  const r = await downloadShotsZip({
+                    shots,
+                    videoClips,
+                    clipOrder,
+                    fileBaseName: 'draft_shots',
+                  })
+                  if (r.total === 0) {
+                    toast.info('다운로드할 샷 영상이 없습니다. (먼저 영상을 생성하세요)')
+                  } else if (r.failed > 0) {
+                    toast.warning(
+                      `${r.downloaded}/${r.total}개 ZIP 완료 — ${r.failed}개 실패(zip 안 _failed.txt 참고).`,
+                    )
+                  } else {
+                    toast.success(`샷 ${r.downloaded}개를 순서대로 ZIP 다운로드했습니다.`)
+                  }
+                } catch (e) {
+                  toast.error('ZIP 생성 실패: ' + (e instanceof Error ? e.message : ''))
+                } finally {
+                  setExportingZip(false)
+                }
+              }}
+            >
+              {exportingZip ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <FileArchive className="size-3" />
+              )}
+              {exportingZip ? '압축 중…' : '샷 ZIP'}
+            </Button>
             <Button size="sm" variant="outline" onClick={renderDraft} disabled={rendering} className="gap-1.5">
               {rendering ? <Loader2 className="size-3 animate-spin" /> : <Download className="size-3" />}
               {rendering ? 'Rendering…' : 'Draft Render'}
