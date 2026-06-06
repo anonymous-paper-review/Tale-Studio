@@ -1,44 +1,38 @@
+// Artist 카드 스튜디오 채팅 에이전트 (카드 모델, 2026-06-06 재작성)
+//
+// 옛 L0 노드그래프(Actor/World/Status) 프롬프트를 폐기하고, 현재의 카드형 Artist
+// (Characters / World 탭)에 맞춘 카드 액션 모델로 재정의했다. 채팅으로 새 캐릭터를
+// 만들거나(createCharacter) 기존 에셋 이미지를 재생성(regenerateCharacter /
+// regenerateWorldAsset)할 수 있다. 실제 mutation 은 클라이언트(global-chat-store →
+// artist-store.applyUpdates)가 수행하고, 이 라우트는 검증된 updates[] 만 반환한다.
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { llmChat } from '@/lib/llm'
 
-const ARTIST_SYSTEM = `You are the Concept Artist agent operating an L0 Concept Canvas — a node graph where users build characters (Actor nodes) and environments (World nodes) and their variants (Status nodes).
+const ARTIST_SYSTEM = `You are the Concept Artist agent for the Tale L0 Artist studio — a CARD-based studio (no node graph). Users define Characters and World locations as cards. Each character card holds 4 turnaround views (main / back / side-left / side-right) produced by the image pipeline; each world card holds a wide shot + establishing shot.
 
 <role>
-You can both discuss ideas AND directly mutate the canvas by emitting an updates[] block.
-When the user asks to create, modify, generate, or relate nodes, plan a sequence of actions and emit them.
+You can both discuss concept/art-direction AND directly mutate the studio by emitting an updates[] block.
+When the user wants to CREATE a new character, or REGENERATE a character's images or a world's background, plan the actions and emit them.
 </role>
 
-<canvas_model>
-- Node kinds: 'actor' (붉은 박스, 캐릭터), 'world' (파란 박스, 장소/환경), 'status' (마더의 연동 변형)
-- Output modes: 'single' (1장, 1 credit), 'five-view' (5장 front/left/right/back/detail, 5 credits), 'sixteen-angle' (16장 22.5° 간격, 16 credits)
-- Edge categories: 'parent' (상속), 'in-world' (월드 안에 개체 배치), 'references' (시각적 참고)
-- Status 노드는 마더 prompt를 자동 결합 (effective prompt = mother prompt + "[변형] " + 자체 prompt)
-- 캐릭터 등록 임계: 한 노드 서브트리 누적 이미지 ≥ 20장
-</canvas_model>
+<context>
+A summary of the current assets (existing characters/worlds with their ids) is provided before the user's message. When referencing an EXISTING asset, use its exact id from that summary. For a NEW character you don't need an id — the studio assigns one.
+</context>
 
 <actions>
-Each update follows one of these shapes. Use the exact id from the canvas context. For new nodes you create in the same batch, assign a tempId and reference it in subsequent actions.
-
-Non-destructive (direct execution):
-1. {"type":"addNode","kind":"actor"|"world","label":"...","prompt":"...","tempId":"T1"}
-2. {"type":"updateNode","id":"<nodeId|tempId>","patch":{"label":"...","prompt":"...","modelId":"imagen"|"h100-self","outputMode":"single"|"five-view"|"sixteen-angle"}}
-3. {"type":"connect","sourceId":"<id>","targetId":"<id>","category":"parent"|"in-world"|"references","relationText":"..."}
-4. {"type":"setOutputMode","id":"<id>","mode":"single"|"five-view"|"sixteen-angle"}
-5. {"type":"generate","id":"<id>"}
-6. {"type":"branchStatus","motherId":"<actorOrWorldId>","label":"...","prompt":"...","tempId":"T2"}
-7. {"type":"duplicateNode","id":"<id>","tempId":"T3"}
-8. {"type":"selectNode","id":"<id>"}
-
-Destructive — opens a confirmation modal (NOT immediate):
-9. {"type":"requestDelete","id":"<id>","reason":"..."}
-10. {"type":"requestRegister","id":"<id>","suggestedName":"...","suggestedAlias":"...","suggestedBackground":"...","suggestedDescription":"..."}
+1. {"type":"createCharacter","name":"...","role":"protagonist"|"antagonist"|"supporting","description":"성격·서사적 배경","appearance":"외형 prose (이미지 생성 프롬프트로 사용)"}
+   - role / description / appearance 는 선택. 사용자가 새 캐릭터를 원할 때 사용.
+2. {"type":"regenerateCharacter","characterId":"<id>","views":["main","back","sideLeft","sideRight"]}
+   - views 선택 (생략 = 4뷰 전체 재생성). context 의 정확한 id 사용.
+3. {"type":"regenerateWorldAsset","locationId":"<id>"}
+   - context 의 정확한 id 사용.
 </actions>
 
 <format>
-Emit updates ONLY when the user clearly intends a canvas mutation. For pure discussion, omit the JSON block.
-Keep the reply text concise (1-3 sentences), Korean if user wrote Korean.
-The JSON block (if any) must be the LAST element in the response.
+Emit updates ONLY when the user clearly intends a mutation. For pure discussion/questions, omit the JSON block entirely.
+Keep the reply text concise (1-3 sentences), Korean if the user wrote Korean.
+The JSON block (if any) MUST be the LAST element in the response.
 
 \`\`\`json
 {"updates":[ ... ]}
@@ -47,54 +41,30 @@ The JSON block (if any) must be the LAST element in the response.
 
 <examples>
 <example>
-<user>Kai라는 캐릭터 만들어줘. 갈색 머리에 검은 코트.</user>
-<assistant>Kai 노드를 만들고 외모를 입력했습니다.
+<user>Kai라는 캐릭터 만들어줘. 갈색 머리에 검은 롱코트, 주인공이야.</user>
+<assistant>Kai를 주인공 캐릭터로 추가했습니다. 카드에서 “Generate All Views”로 이미지를 만들 수 있어요.
 
 \`\`\`json
 {"updates":[
-  {"type":"addNode","kind":"actor","label":"Kai","prompt":"갈색 머리, 검은 롱코트, 어두운 분위기","tempId":"T1"}
+  {"type":"createCharacter","name":"Kai","role":"protagonist","description":"주인공","appearance":"갈색 머리, 검은 롱코트, 날카로운 눈매"}
 ]}
 \`\`\`</assistant>
 </example>
 
 <example>
-<user>방금 만든 Kai 5-view로 생성해줘</user>
-<assistant>Kai의 5-View 시트 5장 생성합니다.
+<user>char_woman 옆모습 다시 뽑아줘</user>
+<assistant>char_woman의 좌/우 측면 뷰를 재생성합니다.
 
 \`\`\`json
 {"updates":[
-  {"type":"setOutputMode","id":"n_abc","mode":"five-view"},
-  {"type":"generate","id":"n_abc"}
+  {"type":"regenerateCharacter","characterId":"char_woman","views":["sideLeft","sideRight"]}
 ]}
 \`\`\`</assistant>
 </example>
 
 <example>
-<user>Kai에 부상 상태 Status 추가, 왼쪽 눈에 흉터</user>
-<assistant>Kai의 Status 자식을 만들었습니다.
-
-\`\`\`json
-{"updates":[
-  {"type":"branchStatus","motherId":"n_abc","label":"Kai — injured","prompt":"왼쪽 눈에 흉터, 피로 얼룩진 코트"}
-]}
-\`\`\`</assistant>
-</example>
-
-<example>
-<user>사막 월드 만들어서 Kai를 거기 배치</user>
-<assistant>사막 World 노드와 Kai를 연결합니다.
-
-\`\`\`json
-{"updates":[
-  {"type":"addNode","kind":"world","label":"사막","prompt":"황량한 모래 언덕, 강한 햇빛","tempId":"W1"},
-  {"type":"connect","sourceId":"n_abc","targetId":"W1","category":"in-world","relationText":"사막에 거주"}
-]}
-\`\`\`</assistant>
-</example>
-
-<example>
-<user>등록 가능한 상태야?</user>
-<assistant>현재 누적 12장, 등록까지 8장 더 필요합니다. 5-View나 16-Angle 모드로 더 생성해보세요.</assistant>
+<user>이 스토리에 어울리는 조연 한 명 추천해줄래?</user>
+<assistant>주인공과 대비되는 냉정한 정보원 캐릭터를 제안합니다. 이름만 정해주시면 카드로 만들어 드릴게요.</assistant>
 </example>
 </examples>`
 
@@ -126,39 +96,17 @@ function normalizeHistory(history: unknown): ChatMessage[] {
   })
 }
 
-// Valid enums for shallow validation
-const VALID_KINDS = new Set(['actor', 'world'])
-const VALID_MODES = new Set(['single', 'five-view', 'sixteen-angle'])
-const VALID_MODELS = new Set(['imagen', 'h100-self'])
-const VALID_CATEGORIES = new Set(['parent', 'in-world', 'references'])
+// ── 카드 모델 update 검증 (artist-store ArtistUpdate 와 1:1) ────────────────
+const VALID_ROLES = new Set(['protagonist', 'antagonist', 'supporting'])
+const VALID_VIEWS = new Set(['main', 'back', 'sideLeft', 'sideRight'])
 const VALID_TYPES = new Set([
-  'addNode',
-  'updateNode',
-  'connect',
-  'setOutputMode',
-  'generate',
-  'branchStatus',
-  'duplicateNode',
-  'requestDelete',
-  'requestRegister',
-  'selectNode',
+  'createCharacter',
+  'regenerateCharacter',
+  'regenerateWorldAsset',
 ])
 
 function asString(x: unknown): string | undefined {
   return typeof x === 'string' ? x : undefined
-}
-
-function validatePatch(p: unknown): Record<string, unknown> | null {
-  if (!p || typeof p !== 'object') return null
-  const out: Record<string, unknown> = {}
-  const rec = p as Record<string, unknown>
-  if (typeof rec.label === 'string') out.label = rec.label
-  if (typeof rec.prompt === 'string') out.prompt = rec.prompt
-  if (typeof rec.modelId === 'string' && VALID_MODELS.has(rec.modelId))
-    out.modelId = rec.modelId
-  if (typeof rec.outputMode === 'string' && VALID_MODES.has(rec.outputMode))
-    out.outputMode = rec.outputMode
-  return Object.keys(out).length > 0 ? out : null
 }
 
 function validateUpdates(raw: unknown[]): unknown[] {
@@ -169,100 +117,45 @@ function validateUpdates(raw: unknown[]): unknown[] {
     if (typeof rec.type !== 'string' || !VALID_TYPES.has(rec.type)) continue
 
     switch (rec.type) {
-      case 'addNode':
-        if (typeof rec.kind === 'string' && VALID_KINDS.has(rec.kind)) {
+      case 'createCharacter': {
+        const name = asString(rec.name)?.trim()
+        if (name) {
           out.push({
-            type: 'addNode',
-            kind: rec.kind,
-            ...(asString(rec.label) ? { label: rec.label } : {}),
-            ...(asString(rec.prompt) ? { prompt: rec.prompt } : {}),
-            ...(asString(rec.tempId) ? { tempId: rec.tempId } : {}),
-          })
-        }
-        break
-      case 'updateNode':
-        if (asString(rec.id)) {
-          const patch = validatePatch(rec.patch)
-          if (patch) out.push({ type: 'updateNode', id: rec.id, patch })
-        }
-        break
-      case 'connect':
-        if (
-          asString(rec.sourceId) &&
-          asString(rec.targetId) &&
-          typeof rec.category === 'string' &&
-          VALID_CATEGORIES.has(rec.category)
-        ) {
-          out.push({
-            type: 'connect',
-            sourceId: rec.sourceId,
-            targetId: rec.targetId,
-            category: rec.category,
-            ...(asString(rec.relationText)
-              ? { relationText: rec.relationText }
+            type: 'createCharacter',
+            name,
+            ...(typeof rec.role === 'string' && VALID_ROLES.has(rec.role)
+              ? { role: rec.role }
+              : {}),
+            ...(asString(rec.description)
+              ? { description: rec.description }
+              : {}),
+            ...(asString(rec.appearance)
+              ? { appearance: rec.appearance }
               : {}),
           })
         }
         break
-      case 'setOutputMode':
-        if (
-          asString(rec.id) &&
-          typeof rec.mode === 'string' &&
-          VALID_MODES.has(rec.mode)
-        ) {
-          out.push({ type: 'setOutputMode', id: rec.id, mode: rec.mode })
-        }
-        break
-      case 'generate':
-      case 'selectNode':
-      case 'requestDelete':
-        if (asString(rec.id)) {
+      }
+      case 'regenerateCharacter':
+        if (asString(rec.characterId)) {
+          const views = Array.isArray(rec.views)
+            ? rec.views.filter(
+                (v): v is string =>
+                  typeof v === 'string' && VALID_VIEWS.has(v),
+              )
+            : []
           out.push({
-            type: rec.type,
-            id: rec.id,
-            ...(rec.type === 'requestDelete' && asString(rec.reason)
-              ? { reason: rec.reason }
-              : {}),
+            type: 'regenerateCharacter',
+            characterId: rec.characterId,
+            ...(views.length ? { views } : {}),
           })
         }
         break
-      case 'branchStatus':
-        if (asString(rec.motherId)) {
+      case 'regenerateWorldAsset':
+        if (asString(rec.locationId)) {
           out.push({
-            type: 'branchStatus',
-            motherId: rec.motherId,
-            ...(asString(rec.label) ? { label: rec.label } : {}),
-            ...(asString(rec.prompt) ? { prompt: rec.prompt } : {}),
-            ...(asString(rec.tempId) ? { tempId: rec.tempId } : {}),
-          })
-        }
-        break
-      case 'duplicateNode':
-        if (asString(rec.id)) {
-          out.push({
-            type: 'duplicateNode',
-            id: rec.id,
-            ...(asString(rec.tempId) ? { tempId: rec.tempId } : {}),
-          })
-        }
-        break
-      case 'requestRegister':
-        if (asString(rec.id)) {
-          out.push({
-            type: 'requestRegister',
-            id: rec.id,
-            ...(asString(rec.suggestedName)
-              ? { suggestedName: rec.suggestedName }
-              : {}),
-            ...(asString(rec.suggestedAlias)
-              ? { suggestedAlias: rec.suggestedAlias }
-              : {}),
-            ...(asString(rec.suggestedBackground)
-              ? { suggestedBackground: rec.suggestedBackground }
-              : {}),
-            ...(asString(rec.suggestedDescription)
-              ? { suggestedDescription: rec.suggestedDescription }
-              : {}),
+            type: 'regenerateWorldAsset',
+            locationId: rec.locationId,
           })
         }
         break

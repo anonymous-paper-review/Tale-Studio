@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { StageId } from '@/types'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
-import { useArtistStore } from '@/stores/artist-store'
+import { useArtistStore, type ArtistUpdate } from '@/stores/artist-store'
 import {
   useDirectorCanvasStore,
   serializeDirectorCanvasContext,
@@ -185,14 +185,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           .applyExtractedSettings(data.extractedSettings)
       }
       if (stage === 'artist' && Array.isArray(data.updates)) {
-        // TODO: card UI 롤백 — 과거 canvas-store(node graph) 전용 updates 디스패치를
-        // 비활성화. /api/artist/chat이 ArtistUpdate(regenerateCharacter /
-        // regenerateWorldAsset) 형태로 응답하도록 재정의되면 아래를 활성화:
-        //   useArtistStore.getState().applyUpdates(data.updates as ArtistUpdate[])
-        console.warn(
-          '[global-chat-store] artist updates ignored (card UI rollback):',
-          data.updates,
-        )
+        // 카드 모델 ArtistUpdate (createCharacter / regenerateCharacter /
+        // regenerateWorldAsset) — artist/chat 카드모델 재작성(2026-06-06)으로 활성화.
+        void useArtistStore
+          .getState()
+          .applyUpdates(data.updates as ArtistUpdate[])
       }
       if (stage === 'director') {
         // Agentic 응답 — DirectorCanvasUpdate[]

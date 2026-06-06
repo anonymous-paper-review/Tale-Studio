@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/tooltip'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
+import { AddCharacterDialog } from '@/features/artist/add-character-dialog'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
@@ -55,6 +56,11 @@ export function CharacterPanel() {
     sceneManifest?.characters.find((c) => c.characterId === id)?.role ??
     'supporting'
 
+  // 캐릭터가 등장하는 씬들 — writer 가 만든 narrativeSummary(배경/스토리) 를 hover 에 노출
+  const getBackgroundScenes = (id: string) =>
+    sceneManifest?.scenes.filter((s) => s.charactersPresent?.includes(id)) ??
+    []
+
   return (
     <>
       <ScrollArea className="min-h-0 flex-1 px-6 py-4">
@@ -71,6 +77,7 @@ export function CharacterPanel() {
           const isSaved = savedIds.has(char.characterId)
           const hasImage = CHARACTER_VIEW_KEYS.some((v) => char.views[v])
           const hasMainImage = Boolean(char.views.main)
+          const bgScenes = getBackgroundScenes(char.characterId)
 
           return (
             <div
@@ -124,30 +131,85 @@ export function CharacterPanel() {
               </div>
 
               {/* main(정면 대표) + 3방향 뷰를 동일 크기로 병렬 표시 (front 통합·hero 폐기, 2026-06-05).
-                  셀 클릭 → 상세/재생성 Dialog. */}
-              <div className="grid grid-cols-4 gap-2">
-                {(['main', 'back', 'sideLeft', 'sideRight'] as const).map(
-                  (view) => (
-                    <button
-                      key={view}
-                      type="button"
-                      title={`${CHARACTER_VIEW_LABELS[view]} — 클릭해서 보기 / 재생성`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setViewDialog({ charId: char.characterId, view })
-                      }}
-                      className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <ImagePlaceholder
-                        label={CHARACTER_VIEW_LABELS[view]}
-                        aspectRatio="square"
-                        imageUrl={char.views[view] ?? null}
-                        generating={isViewGenerating(view)}
-                      />
-                    </button>
-                  ),
-                )}
-              </div>
+                  셀 클릭 → 상세/재생성 Dialog. 그리드 hover → 캐릭터 설정 + 등장 씬(배경) Tooltip. */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(['main', 'back', 'sideLeft', 'sideRight'] as const).map(
+                      (view) => (
+                        <button
+                          key={view}
+                          type="button"
+                          title={`${CHARACTER_VIEW_LABELS[view]} — 클릭해서 보기 / 재생성`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setViewDialog({ charId: char.characterId, view })
+                          }}
+                          className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <ImagePlaceholder
+                            label={CHARACTER_VIEW_LABELS[view]}
+                            aspectRatio="square"
+                            imageUrl={char.views[view] ?? null}
+                            generating={isViewGenerating(view)}
+                          />
+                        </button>
+                      ),
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  align="start"
+                  className="max-w-[260px] space-y-1.5 whitespace-normal text-left"
+                >
+                  <p className="font-medium">
+                    {char.name}
+                    <span className="font-normal text-background/60">
+                      {' · '}
+                      {role}
+                    </span>
+                  </p>
+                  {char.description ? (
+                    <p className="leading-snug text-background/80">
+                      {char.description}
+                    </p>
+                  ) : null}
+                  {char.fixedPrompt ? (
+                    <p className="leading-snug text-background/70">
+                      <span className="text-background/50">외형 · </span>
+                      {char.fixedPrompt}
+                    </p>
+                  ) : null}
+                  {bgScenes.length > 0 ? (
+                    <div className="space-y-0.5 border-t border-background/20 pt-1.5">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-background/50">
+                        등장 씬 · 배경
+                      </p>
+                      {bgScenes.slice(0, 3).map((s) => (
+                        <p
+                          key={s.sceneId}
+                          className="leading-snug text-background/80"
+                        >
+                          • {s.narrativeSummary}
+                        </p>
+                      ))}
+                      {bgScenes.length > 3 ? (
+                        <p className="text-background/50">
+                          +{bgScenes.length - 3}개 씬 더
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {!char.description &&
+                  !char.fixedPrompt &&
+                  bgScenes.length === 0 ? (
+                    <p className="text-background/60">
+                      아직 설정 정보가 없습니다.
+                    </p>
+                  ) : null}
+                </TooltipContent>
+              </Tooltip>
 
               {/* Actions */}
               <div className="mt-3 flex gap-2">
@@ -254,6 +316,9 @@ export function CharacterPanel() {
             </div>
           )
         })}
+
+        {/* 새 캐릭터 추가 — 카드 목록 하단 (+) 버튼 (채팅으로도 생성 가능) */}
+        <AddCharacterDialog />
       </div>
       </ScrollArea>
 

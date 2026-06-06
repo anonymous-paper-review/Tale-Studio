@@ -10,6 +10,18 @@ import { pollGenerationJob } from '@/lib/generation-jobs-client'
 
 export type ImageProvider = 'fal' | 'gemini' | 'tailscale'
 
+export type CharacterRole = 'protagonist' | 'antagonist' | 'supporting'
+
+/** 새 캐릭터 생성 입력 (+버튼 Dialog / 채팅 createCharacter 공용) */
+export interface NewCharacterInput {
+  name: string
+  role?: CharacterRole
+  /** 설정/배경 메모 — 카드 hover + asset-storage description 으로 전파 */
+  description?: string
+  /** 외형 prose — 이미지 생성 프롬프트(fixedPrompt/appearance)로 사용 */
+  appearance?: string
+}
+
 export type ArtistUpdate =
   | {
       type: 'regenerateCharacter'
@@ -17,6 +29,7 @@ export type ArtistUpdate =
       views?: CharacterViewKey[]
     }
   | { type: 'regenerateWorldAsset'; locationId: string }
+  | ({ type: 'createCharacter' } & NewCharacterInput)
 
 // World 샷 (wide/establishing) — 캐릭터 뷰와 대칭 구조
 export type WorldShotKey = 'wideShot' | 'establishingShot'
@@ -125,6 +138,17 @@ async function generateAndPersistWorldShot(
   return blobUrl
 }
 
+/** 새 캐릭터의 character_id 생성 — 이름 슬러그 + 짧은 난수 (프로젝트 내 충돌 회피) */
+function makeCharacterId(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 24)
+  const rand = Math.random().toString(36).slice(2, 7)
+  return `char_${slug || 'new'}_${rand}`
+}
+
 /** 작업 배열을 동시 N개 제한으로 실행 (캐릭터/월드 병렬 생성용, decision: concurrency 4) */
 async function runPool(
   tasks: Array<() => Promise<void>>,
@@ -158,6 +182,8 @@ interface ArtistState {
   error: string | null
 
   loadData: () => void
+  /** 새 캐릭터 카드를 추가 (낙관적 로컬 + projectId 있으면 DB persist). 새 characterId 반환. */
+  addCharacter: (input: NewCharacterInput) => Promise<string>
   selectCharacter: (id: string) => void
   selectLocation: (id: string) => void
   lockCharacter: (id: string) => void
@@ -328,6 +354,81 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
 
     // No data available — keep empty state (don't show fake mock data)
+  },
+
+  // 새 캐릭터 카드 추가. UI(+버튼)·채팅(createCharacter) 공용 단일 경로.
+  //   1) 낙관적으로 store(characterAssets + sceneManifest.characters)에 즉시 반영 → 카드 "뿅" 등장
+  //   2) projectId 있으면 /api/artist/character 로 DB 영속 (실패해도 로컬 카드는 유지, error 표기)
+  // 이미지(views)는 비워둠 — 사용자가 "Generate All Views" 로 생성하거나 autoGenerate가 보강.
+  addCharacter: async (input) => {
+    const name = input.name.trim()
+    if (!name) return ''
+    const role: CharacterRole = input.role ?? 'supporting'
+    const description = input.description?.trim() ?? ''
+    const appearance = input.appearance?.trim() ?? ''
+    const characterId = makeCharacterId(name)
+
+    const asset: CharacterAsset = {
+      characterId,
+      name,
+      views: { main: null, back: null, sideLeft: null, sideRight: null },
+      locked: false,
+      description,
+      fixedPrompt: appearance,
+    }
+
+    set((state) => ({
+      characterAssets: [...state.characterAssets, asset],
+      sceneManifest: state.sceneManifest
+        ? {
+            ...state.sceneManifest,
+            characters: [
+              ...state.sceneManifest.characters,
+              {
+                characterId,
+                name,
+                role,
+                description,
+                fixedPrompt: appearance,
+                referenceImages: [],
+              },
+            ],
+          }
+        : state.sceneManifest,
+      selectedCharacterId: characterId,
+      error: null,
+    }))
+
+    const projectId = useProjectStore.getState().projectId
+    if (projectId) {
+      try {
+        const res = await fetch('/api/artist/character', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId,
+            characterId,
+            name,
+            role,
+            description,
+            appearance,
+          }),
+        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body.error ?? `HTTP ${res.status}`)
+        }
+      } catch (err) {
+        set({
+          error:
+            err instanceof Error
+              ? `캐릭터 저장 실패 (카드는 유지됨): ${err.message}`
+              : 'Character save failed',
+        })
+      }
+    }
+
+    return characterId
   },
 
   selectCharacter: (id) => set({ selectedCharacterId: id }),
@@ -551,7 +652,14 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
   applyUpdates: async (updates) => {
     for (const u of updates) {
-      if (u.type === 'regenerateCharacter') {
+      if (u.type === 'createCharacter') {
+        await get().addCharacter({
+          name: u.name,
+          role: u.role,
+          description: u.description,
+          appearance: u.appearance,
+        })
+      } else if (u.type === 'regenerateCharacter') {
         if (u.views?.length) {
           await runPool(
             u.views.map((v) => () => get().generateCharacterView(u.characterId, v)),

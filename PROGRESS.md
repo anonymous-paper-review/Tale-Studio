@@ -66,6 +66,16 @@
 - [c] `characterAssetIds` / `worldAssetIds` 필드 채우기 — 코드 ✓ / 검증 대기
 - [c] `resolveShotAssetImages` 스토리보드 생성 레퍼런스 — 코드 ✓ / 검증 대기
 
+### 캐릭터 생성 + hover 정보 (2026-06-06, 코드 ✓ / 브라우저 검증 대기)
+
+> 사용자 요청 3태스크 (Register 의미 설명 + 신규 캐릭터 생성 UI + 카드 hover 정보). tsc/lint clean.
+
+- [c] `artist-store.addCharacter` 액션 + `createCharacter` ArtistUpdate + `applyUpdates` 분기 — 코드 ✓ / 검증 대기
+- [c] `POST /api/artist/character` — characters 테이블 insert (supabaseAdmin) — 코드 ✓ / 검증 대기
+- [c] `add-character-dialog.tsx` + 카드 하단 (+) 버튼 → 이름/role/설명/외형 Dialog → 카드 등장 — 코드 ✓ / 브라우저 검증 대기
+- [c] 캐릭터 카드 이미지 hover → role/description/외형 + writer 등장 씬(narrativeSummary 배경) Tooltip — 코드 ✓ / 검증 대기
+- [c] `/api/artist/chat` 카드모델 재작성(createCharacter/regenerateCharacter/regenerateWorldAsset) + `global-chat-store` artist applyUpdates 활성화 → 채팅으로 캐릭터 생성 — 코드 ✓ / 브라우저 검증 대기
+
 ---
 
 ## Phase 11: P4 Director Canvas — 노드 그래프 재설계 (2026-05-25~)
