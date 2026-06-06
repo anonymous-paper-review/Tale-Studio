@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
+import { useState, useRef, useEffect } from 'react'
 import {
   Users,
   PenTool,
@@ -8,8 +9,14 @@ import {
   Clapperboard,
   Film,
   Home,
+  Pencil,
 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@/components/ui/hover-card'
 import { cn } from '@/lib/utils'
 import { STAGES } from '@/lib/constants'
 import { UserMenu } from '@/components/layout/user-menu'
@@ -31,24 +38,97 @@ export function Sidebar() {
   // reachedStage 구독 — 단계가 열리면(잠금 해제) sidebar가 리렌더되도록 (canNavigateTo는 함수 참조라 단독으론 반응 안 함)
   useProjectStore((s) => s.reachedStage)
   const projectTitle = useProjectStore((s) => s.projectTitle)
+  const renameProject = useProjectStore((s) => s.renameProject)
+
+  // Home HoverCard: 프로젝트명 인라인 편집. 편집 중에는 hover가 벗어나도 카드 유지(controlled open).
+  const [homeOpen, setHomeOpen] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState(projectTitle)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  // 편집 진입 시점에 draft를 현재 이름으로 시드(아래 연필 onClick) — effect 내 setState 회피.
+  useEffect(() => {
+    if (editingName) {
+      nameInputRef.current?.focus()
+      nameInputRef.current?.select()
+    }
+  }, [editingName])
+
+  const commitName = () => {
+    const t = nameDraft.trim()
+    if (t && t !== projectTitle) void renameProject(t)
+    setEditingName(false)
+  }
+  const cancelName = () => {
+    setNameDraft(projectTitle)
+    setEditingName(false)
+  }
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-full w-16 flex-col items-center border-r border-border bg-card py-4">
-      {/* Home / Back button */}
-      <Tooltip delayDuration={0}>
-        <TooltipTrigger asChild>
+      {/* Home / Back button — hover 시 프로젝트명 표시 + 연필로 인라인 이름변경(HoverCard).
+          편집 중엔 controlled open으로 카드 유지(Tooltip과 달리 상호작용 가능). */}
+      <HoverCard
+        open={homeOpen || editingName}
+        onOpenChange={setHomeOpen}
+        openDelay={0}
+        closeDelay={120}
+      >
+        <HoverCardTrigger asChild>
           <button
             onClick={() => router.push('/')}
             className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <Home className="h-5 w-5" />
           </button>
-        </TooltipTrigger>
-        <TooltipContent side="right" className="flex flex-col">
-          <span className="font-medium">{projectTitle || 'Untitled'}</span>
-          <span className="text-xs text-muted-foreground">Back to Projects</span>
-        </TooltipContent>
-      </Tooltip>
+        </HoverCardTrigger>
+        <HoverCardContent
+          side="right"
+          align="start"
+          className="flex w-56 flex-col gap-1.5"
+        >
+          {editingName ? (
+            <input
+              ref={nameInputRef}
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  commitName()
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  cancelName()
+                }
+              }}
+              onBlur={commitName}
+              placeholder="프로젝트 이름"
+              className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm font-medium outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
+            />
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate font-medium">
+                {projectTitle || 'Untitled'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setNameDraft(projectTitle)
+                  setEditingName(true)
+                }}
+                title="이름 변경"
+                aria-label="프로젝트 이름 변경"
+                className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+          <span className="text-xs text-muted-foreground">
+            {editingName ? 'Enter 저장 · Esc 취소' : 'Back to Projects'}
+          </span>
+        </HoverCardContent>
+      </HoverCard>
 
       <div className="mb-2 h-px w-8 bg-border" />
 
