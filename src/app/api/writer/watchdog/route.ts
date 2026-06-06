@@ -9,7 +9,9 @@ import { triggerWriterStep } from '@/lib/writer/pipeline/steps';
 export const runtime = 'nodejs';
 
 // 이 시간보다 오래 갱신 없는 running run = 멈춘 것으로 간주.
-const STALE_MS = 90_000;
+//   fan-out 단계가 100s+ 걸릴 수 있어 진행 중 단계를 오판하지 않도록 넉넉히 잡는다.
+//   (근본 해결은 fan-out per-item 체크포인트 = Phase 2.)
+const STALE_MS = 180_000;
 
 export async function GET(req: NextRequest) {
   try {

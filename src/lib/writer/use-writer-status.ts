@@ -48,7 +48,10 @@ export function useWriterStatus(
 
     // 멈춘 run 자가복구: started && 미완료/미실패인데 last_timestamp 가 ~90s 이상 오래되면
     //   /api/writer/step 을 POST 해 끊긴 서버리스 체인을 재개한다 (fire-and-forget, cron 비의존).
-    const STALE_MS = 90_000
+    // fan-out 단계(shotCheck/renderPrompts)는 샷 수에 비례해 100s+ 걸릴 수 있으므로
+    //   stale 임계를 그보다 넉넉히 잡아 진행 중 단계를 "멈춤"으로 오판하지 않게 한다.
+    //   (근본 해결은 fan-out 단계의 per-item 체크포인트 = Phase 2.)
+    const STALE_MS = 180_000
     const KEEPALIVE_THROTTLE_MS = 60_000
     const maybeKeepalive = (s: WriterStatus) => {
       if (!s.started || s.pipeline_completed || s.pipeline_failed) return
