@@ -38,11 +38,32 @@ export function useWriterStatus(
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // keepalive: 멈춘 체인을 ~60s 에 한 번만 재트리거 (스팸 방지)
+  const lastKeepaliveRef = useRef(0)
 
   useEffect(() => {
     if (!projectId) return
 
     let cancelled = false
+
+    // 멈춘 run 자가복구: started && 미완료/미실패인데 last_timestamp 가 ~90s 이상 오래되면
+    //   /api/writer/step 을 POST 해 끊긴 서버리스 체인을 재개한다 (fire-and-forget, cron 비의존).
+    const STALE_MS = 90_000
+    const KEEPALIVE_THROTTLE_MS = 60_000
+    const maybeKeepalive = (s: WriterStatus) => {
+      if (!s.started || s.pipeline_completed || s.pipeline_failed) return
+      if (!s.last_timestamp) return
+      const age = Date.now() - Date.parse(s.last_timestamp)
+      if (Number.isNaN(age) || age < STALE_MS) return
+      const now = Date.now()
+      if (now - lastKeepaliveRef.current < KEEPALIVE_THROTTLE_MS) return
+      lastKeepaliveRef.current = now
+      fetch('/api/writer/step', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      }).catch(() => {})
+    }
 
     const tick = async () => {
       if (cancelled) return
@@ -58,6 +79,7 @@ export function useWriterStatus(
           setStatus(j)
           setError(null)
           done = !!(j.pipeline_completed || j.pipeline_failed)
+          maybeKeepalive(j)
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))

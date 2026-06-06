@@ -1,14 +1,16 @@
-// writer-pipeline 시작 (비동기, fire-and-forget)
+// writer-pipeline 시작 (서버리스 웹훅 체이닝).
 //   Producer "Complete your story" 버튼에서 호출.
-//   S0~L5 (텍스트/프롬프트 단계)까지만 자동. 이미지/영상은 별도 트리거.
-import { NextRequest, NextResponse } from 'next/server';
-import { runPipeline } from '@/lib/writer/pipeline';
-import { PipelineLogger } from '@/lib/writer/logger';
+//   writer_runs 행을 만들고 첫 step(/api/writer/step)을 after()로 트리거한다.
+//   이후 각 step 이 한 stage 실행 → state 체크포인트 → 다음 step self-trigger (자가 체이닝).
+//   genre~renderPrompts (텍스트/프롬프트 단계)까지만 자동. 이미지/영상은 별도 트리거.
+import { NextRequest, NextResponse, after } from 'next/server';
+import { createRun, getActiveRun } from '@/lib/writer/run-store';
+import { WRITER_TOTAL_UNITS, triggerWriterStep } from '@/lib/writer/pipeline/steps';
 import type { PipelineInput } from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';
-// 백그라운드 실행이라 짧게 설정 (시작만 응답). Vercel 외 환경에서는 무의미.
-export const maxDuration = 30;
+// 시작만 응답하고 첫 step 은 after()로 트리거. 짧게.
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,29 +29,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'story required' }, { status: 400 });
     }
 
-    // 이미 실행 중이거나 완료된 프로젝트면 거부
-    const logger = new PipelineLogger(projectId);
-    await logger.init();
-    const existing = await logger.loadStage<unknown>('00_input.json');
-    if (existing) {
-      return NextResponse.json(
-        { error: 'pipeline already started for this project. Use /api/writer/status or /api/writer/resume.', projectId },
-        { status: 409 },
-      );
+    // 이미 실행 중이면 거부 (중복 시작 방지).
+    const existing = await getActiveRun(projectId);
+    if (existing && existing.status === 'running') {
+      return NextResponse.json({ error: 'already running', projectId }, { status: 409 });
     }
 
     const input: PipelineInput = { story, runtimeSeconds, models };
+    const run = await createRun(projectId, input, WRITER_TOTAL_UNITS);
 
-    // Fire-and-forget. Local/self-hosted 환경 기준 (Vercel serverless 제약 있음).
-    runPipeline(input, { projectId, resume: false })
-      .then(() => {
-        console.log(`[writer/start] ${projectId} completed`);
-      })
-      .catch((err) => {
-        console.error(`[writer/start] ${projectId} failed:`, err);
-      });
+    // 첫 step 트리거 (응답 후 별도 서버리스 인스턴스에서 실행).
+    after(async () => {
+      await triggerWriterStep(req.nextUrl.origin, projectId);
+    });
 
-    return NextResponse.json({ projectId, status: 'started' });
+    return NextResponse.json({ projectId, runId: run.id, status: 'started' });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[writer/start]', msg);

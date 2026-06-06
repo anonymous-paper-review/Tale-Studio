@@ -46,7 +46,8 @@ import type {
 } from '@/lib/writer/types/pipeline';
 
 // Skip 모드 default = true (피드백 미반영 stage 건너뜀, 비용 절감)
-function resolveSkip(input: PipelineInput): { validation1: boolean; midPreview: boolean } {
+// export: stepwise 엔진(pipeline/steps.ts)이 동일 로직 재사용.
+export function resolveSkip(input: PipelineInput): { validation1: boolean; midPreview: boolean } {
   return {
     validation1: input.skip?.validation1 ?? true,
     midPreview: input.skip?.midPreview ?? true,
@@ -54,7 +55,7 @@ function resolveSkip(input: PipelineInput): { validation1: boolean; midPreview: 
 }
 
 // c_validation_1 skip 시 다운스트림에 줄 빈 리포트
-function emptyC1Report(): StoryCheckReport {
+export function emptyC1Report(): StoryCheckReport {
   return {
     passed: true,
     issues: [],
@@ -67,7 +68,7 @@ function emptyC1Report(): StoryCheckReport {
 }
 
 // mid_preview skip 시 빈 추천 (L0L1/L2/L3이 S·L 기반 자체 결정)
-function emptyMidPreview(): MidPreview {
+export function emptyMidPreview(): MidPreview {
   return {
     v_recommendations: { L0: {}, L1: {}, L2_summary: '', L3_scene_strategy: '', L4_shot_recipe: '' },
     color_script: [],
@@ -77,7 +78,7 @@ function emptyMidPreview(): MidPreview {
   };
 }
 
-function resolveModels(input: PipelineInput): PipelineModelsConfig {
+export function resolveModels(input: PipelineInput): PipelineModelsConfig {
   const fallback = DEFAULT_MODELS;
   const m = input.models ?? {};
   const fill = (cfg: { provider?: string; model?: string; baseUrl?: string } | undefined, def: LlmAxisConfig): LlmAxisConfig => {

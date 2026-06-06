@@ -1,9 +1,24 @@
 // 단계별 로그 저장 유틸 (서버 사이드 전용)
+//
+// ⚠️ 모든 파일시스템 쓰기는 best-effort (절대 throw 안 함).
+//   Vercel 서버리스는 /var/task 가 읽기전용이라 mkdir/writeFile 이 ENOENT/EROFS 로 실패한다.
+//   로컬/self-host 는 정상적으로 파일을 쓰고, Vercel 은 조용히 no-op 한다.
+//   이로써 (1) 로컬 runPipeline 이 그대로 동작하고 (2) serverless step 경로에서 stage runner
+//   내부의 logger 호출(markStage 등)이 파이프라인을 죽이지 않는다.
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { flushRawCalls, type RawLlmCall, type LlmProvider } from '@/lib/writer/llm/raw_collector';
+import { flushRawCalls, type LlmProvider } from '@/lib/writer/llm/raw_collector';
 
 const LOGS_ROOT = path.resolve(process.cwd(), 'logs');
+
+// 읽기전용 FS 경고를 한 번만 출력 (로그 스팸 방지).
+let warnedReadOnlyFs = false;
+function warnFsOnce(op: string, e: unknown) {
+  if (warnedReadOnlyFs) return;
+  warnedReadOnlyFs = true;
+  const msg = e instanceof Error ? e.message : String(e);
+  console.warn(`[writer/logger] filesystem write disabled (${op}): ${msg}. Progress is tracked in writer_runs (DB).`);
+}
 
 export class PipelineLogger {
   private projectDir: string;
@@ -17,13 +32,21 @@ export class PipelineLogger {
   }
 
   async init() {
-    await fs.mkdir(this.llmDir, { recursive: true });
+    try {
+      await fs.mkdir(this.llmDir, { recursive: true });
+    } catch (e) {
+      warnFsOnce('init', e);
+    }
   }
 
   // 단계 결과 저장 (예: 02_genre.json)
   async saveStage(filename: string, data: unknown) {
     const filepath = path.join(this.projectDir, filename);
-    await fs.writeFile(filepath, JSON.stringify(data, null, 2), 'utf8');
+    try {
+      await fs.writeFile(filepath, JSON.stringify(data, null, 2), 'utf8');
+    } catch (e) {
+      warnFsOnce('saveStage', e);
+    }
     return filepath;
   }
 
@@ -41,7 +64,11 @@ export class PipelineLogger {
   // 입력 텍스트 저장 (예: 00_input_story.md)
   async saveText(filename: string, text: string) {
     const filepath = path.join(this.projectDir, filename);
-    await fs.writeFile(filepath, text, 'utf8');
+    try {
+      await fs.writeFile(filepath, text, 'utf8');
+    } catch (e) {
+      warnFsOnce('saveText', e);
+    }
     return filepath;
   }
 
@@ -53,14 +80,22 @@ export class PipelineLogger {
     const safeLabel = label.replace(/[^a-z0-9_-]/gi, '_');
     const filename = `${padded}_${safeLabel}.json`;
     const filepath = path.join(this.llmDir, filename);
-    await fs.writeFile(filepath, JSON.stringify(payload, null, 2), 'utf8');
+    try {
+      await fs.writeFile(filepath, JSON.stringify(payload, null, 2), 'utf8');
+    } catch (e) {
+      warnFsOnce('saveLlmCall', e);
+    }
     return filepath;
   }
 
   // 통합 결과 저장 (마스터 JSON)
   async saveIntegrated(data: unknown) {
     const filepath = path.join(this.projectDir, 'INTEGRATED.json');
-    await fs.writeFile(filepath, JSON.stringify(data, null, 2), 'utf8');
+    try {
+      await fs.writeFile(filepath, JSON.stringify(data, null, 2), 'utf8');
+    } catch (e) {
+      warnFsOnce('saveIntegrated', e);
+    }
     return filepath;
   }
 
@@ -68,7 +103,11 @@ export class PipelineLogger {
   async markStage(stageName: string, status: 'started' | 'completed' | 'failed', extra?: unknown) {
     const filepath = path.join(this.projectDir, '_progress.jsonl');
     const entry = JSON.stringify({ stage: stageName, status, timestamp: new Date().toISOString(), extra }) + '\n';
-    await fs.appendFile(filepath, entry, 'utf8');
+    try {
+      await fs.appendFile(filepath, entry, 'utf8');
+    } catch (e) {
+      warnFsOnce('markStage', e);
+    }
   }
 
   // LLM raw collector에서 미저장 호출을 꺼내 stageLabel과 함께 파일로 저장
@@ -80,11 +119,15 @@ export class PipelineLogger {
     for (const c of calls) {
       const padded = String(c.seq).padStart(3, '0');
       const filename = `${padded}_${safe}_${c.provider}.json`;
-      await fs.writeFile(
-        path.join(this.llmDir, filename),
-        JSON.stringify(c, null, 2),
-        'utf8'
-      );
+      try {
+        await fs.writeFile(
+          path.join(this.llmDir, filename),
+          JSON.stringify(c, null, 2),
+          'utf8'
+        );
+      } catch (e) {
+        warnFsOnce('flushRawLlm', e);
+      }
     }
     return calls.length;
   }
