@@ -106,17 +106,54 @@ export default function PostPage() {
   const projectId = useProjectStore((s) => s.projectId)
   const [exportingZip, setExportingZip] = useState(false)
 
-  // loadData(원본) → loadPersisted(저장된 편집 덮어쓰기)
+  // 비디오 소스에 오디오가 있으면 같은 위치 오디오 트랙에 함께 삽입.
+  // 비디오 파일을 decodeAudioData 로 디코드 시도 → 성공 시 소리 있음. 실패(무음/CORS) 시 비디오만.
+  const attachVideoAudio = useCallback(async (shotId: string, atSec: number) => {
+    const st = useEditorStore.getState()
+    const src = st.videoClips.find((c) => c.shotId === shotId)
+    const shot = st.shots.find((s) => s.shotId === shotId)
+    if (!src?.url) return
+    try {
+      const { durationSec, peaks } = await decodeAudioPeaks(src.url)
+      if (!(durationSec > 0)) return
+      st.addAudioClip({
+        name: `${shot?.shotType ?? '비디오'} 오디오`,
+        url: src.url,
+        startSec: atSec,
+        durationSec,
+        peaks,
+        sourceOffsetSec: 0,
+        sourceDurationSec: durationSec,
+        trackId: st.audioTracks[0]?.id,
+      })
+    } catch {
+      // 비디오에 오디오 트랙 없음 / 디코드 불가(CORS 등) → 비디오만 삽입
+    }
+  }, [])
+
+  // loadData(원본) → loadPersisted(저장된 편집 덮어쓰기) → 첫 진입 시 샷 오디오 자동 부착.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       await loadData()
-      if (!cancelled) await loadPersisted()
+      if (cancelled) return
+      await loadPersisted()
+      if (cancelled) return
+      // Director→Editor 첫 진입: 저장된 오디오가 없으면 각 샷 영상의 오디오를
+      //   같은 위치 오디오 트랙에 부착(드래그앤드롭과 동일). 무음/CORS면 자동 skip.
+      //   (영상 클립은 음소거 재생 + 오디오는 별도 트랙 구조라, 이게 없으면 무음)
+      const st = useEditorStore.getState()
+      if (st.audioClips.length === 0) {
+        for (const item of selectTimelineLayout(st)) {
+          if (cancelled) return
+          await attachVideoAudio(item.shotId, item.startSec)
+        }
+      }
     })()
     return () => {
       cancelled = true
     }
-  }, [projectId, loadData, loadPersisted])
+  }, [projectId, loadData, loadPersisted, attachVideoAudio])
 
   // Editor 진입 시 채팅 기본 접힘 (요청 6b). 떠날 때 이전 상태 복원
   useEffect(() => {
@@ -146,31 +183,6 @@ export default function PostPage() {
   useEffect(() => {
     return () => {
       if (holdRef.current) clearInterval(holdRef.current)
-    }
-  }, [])
-
-  // 비디오 소스에 오디오가 있으면 같은 위치 오디오 트랙에 함께 삽입 (요청).
-  // 비디오 파일을 decodeAudioData 로 디코드 시도 → 성공 시 소리 있음. 실패(무음/CORS) 시 비디오만.
-  const attachVideoAudio = useCallback(async (shotId: string, atSec: number) => {
-    const st = useEditorStore.getState()
-    const src = st.videoClips.find((c) => c.shotId === shotId)
-    const shot = st.shots.find((s) => s.shotId === shotId)
-    if (!src?.url) return
-    try {
-      const { durationSec, peaks } = await decodeAudioPeaks(src.url)
-      if (!(durationSec > 0)) return
-      st.addAudioClip({
-        name: `${shot?.shotType ?? '비디오'} 오디오`,
-        url: src.url,
-        startSec: atSec,
-        durationSec,
-        peaks,
-        sourceOffsetSec: 0,
-        sourceDurationSec: durationSec,
-        trackId: st.audioTracks[0]?.id,
-      })
-    } catch {
-      // 비디오에 오디오 트랙 없음 / 디코드 불가(CORS 등) → 비디오만 삽입
     }
   }, [])
 
