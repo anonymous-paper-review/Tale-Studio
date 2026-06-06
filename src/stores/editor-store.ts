@@ -545,15 +545,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return { ...c, id, trackId }
     })
 
+    // shots/videoClips는 DB 캐넌(loadData가 직전에 채움)이 진실 — 저장본(editor_states)으로
+    //   덮어쓰지 않는다. 과거 빈/stale 저장본(shots=[])이 loadData가 채운 shots를 비워
+    //   "Complete previous steps first" 빈 화면에 갇히던 버그 방지. trim/speed/순서는 DB write-through
+    //   (editor/trim·speed·reorder)로 이미 shots에 반영됨. clipOrder는 유효 저장본만 복원.
+    const cur = get()
     set({
-      shots: saved.shots ?? [],
-      clipOrder: saved.clipOrder ?? {},
-      videoClips: saved.videoClips ?? [],
+      shots: cur.shots.length ? cur.shots : (saved.shots ?? []),
+      videoClips: cur.videoClips.length ? cur.videoClips : (saved.videoClips ?? []),
+      clipOrder:
+        saved.clipOrder && Object.keys(saved.clipOrder).length
+          ? saved.clipOrder
+          : cur.clipOrder,
       audioClips: dedupAudioClips,
       audioSources: saved.audioSources ?? [],
       audioTracks: dedupTracks,
       panelSizes: saved.panelSizes ?? { ...DEFAULT_PANEL_SIZES },
-      selectedClipShotId: null,
+      selectedClipShotId: cur.selectedClipShotId,
       selectedShotIds: [],
       selectedAudioId: null,
       previewSourceShotId: null,
