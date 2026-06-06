@@ -5,6 +5,7 @@ import type {
   CameraPreset,
   GenerationMethod,
 } from '@/types/shot'
+import type { VideoModelKey } from '@/lib/video-models'
 
 // ============================================================================
 // Director Canvas Types — specs/layers/director_canvas.md §2~7
@@ -22,7 +23,8 @@ export type DirectorVideoStatus =
   | 'completed'
   | 'failed'
 
-export type DirectorVideoProvider = 'kling' | 'veo' | 'local'
+/** 영상 생성 모델 키. video-models 레지스트리의 VideoModelKey 별칭 (#5). */
+export type DirectorVideoProvider = VideoModelKey
 
 // ─── Reference / Asset ─────────────────────────────────────────────────────
 
@@ -81,6 +83,8 @@ export type ShotNodeData = {
   lighting: LightingConfig
   cameraPreset: CameraPreset
   provider: DirectorVideoProvider
+  /** Writer가 설계한 샷 길이(초). flexible 모델 duration + Veo 트림 기준 (#4) */
+  durationSeconds: number
   /** 영상 생성 방식. storyboardImage/레퍼런스 있으면 I2V, 없으면 T2V (결정 #36) */
   generationMethod: GenerationMethod
   /** Shot 설정 변경 시 자식 Video stale 표시 (시그널, 자동 재생성 X) */

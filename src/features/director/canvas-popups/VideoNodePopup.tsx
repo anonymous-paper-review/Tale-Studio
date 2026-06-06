@@ -21,8 +21,8 @@ import { usePresetStorageStore } from '@/stores/preset-storage-store'
 import {
   isShotData,
   type VideoNodeData,
-  type DirectorVideoProvider,
 } from '@/types/director-canvas'
+import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
 
 import { AngleControl } from '@/features/director/angle-control'
 import { KeyLight } from '@/features/director/key-light'
@@ -33,11 +33,13 @@ type Props = {
   data: VideoNodeData
 }
 
-const PROVIDER_LABEL: Record<DirectorVideoProvider, string> = {
-  kling: 'Kling',
-  veo: 'Veo',
-  local: 'Self-hosted',
-}
+const MODEL_ORDER: VideoModelKey[] = [
+  'happy-horse',
+  'seedance',
+  'kling-o3',
+  'veo',
+  'local',
+]
 
 export function VideoNodePopup({ nodeId, data }: Props) {
   const closePopup = useDirectorCanvasStore((s) => s.closePopup)
@@ -256,19 +258,19 @@ export function VideoNodePopup({ nodeId, data }: Props) {
           <Separator />
 
           <Field label="Provider">
-            <div className="flex gap-2">
-              {(['kling', 'veo', 'local'] as const).map((p) => (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {MODEL_ORDER.map((p) => (
                 <button
                   key={p}
                   onClick={() => applyVideoOverride(nodeId, { provider: p })}
                   className={cn(
-                    'flex-1 rounded-md border px-3 py-1.5 text-xs transition-colors',
+                    'rounded-md border px-3 py-1.5 text-xs transition-colors',
                     effective.provider === p
                       ? 'border-primary bg-primary/10'
                       : 'border-border hover:bg-accent',
                   )}
                 >
-                  {PROVIDER_LABEL[p]}
+                  {VIDEO_MODELS[p].label}
                 </button>
               ))}
             </div>

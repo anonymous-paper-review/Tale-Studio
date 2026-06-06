@@ -5,20 +5,26 @@ import { cameraToText } from '@/lib/kling'
 import { findCameraMovement, findCameraBrand } from '@/lib/knowledge'
 import { createGenerationJob } from '@/lib/generation-jobs'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
+import {
+  VIDEO_MODELS,
+  clampDuration,
+  normalizeProvider,
+  type VideoModelKey,
+} from '@/lib/video-models'
 import type { CameraConfig, CameraPreset } from '@/types'
 
 fal.config({ credentials: () => process.env.FAL_KEY ?? '' })
 
-const FAL_T2V_MODEL = 'fal-ai/kling-video/v2.1/master/text-to-video'
-const FAL_I2V_MODEL = 'fal-ai/kling-video/v2.6/pro/image-to-video'
+// reference-to-video는 레퍼런스 이미지가 필수. 레퍼런스 없는 T2V는 이 Kling 엔드포인트로 폴백.
+const FAL_T2V_FALLBACK_MODEL = 'fal-ai/kling-video/v2.1/master/text-to-video'
 
 export const maxDuration = 300
 
 type VideoProvider = 'fal' | 'local'
 type GenerationMethod = 'T2V' | 'I2V'
 
-/* ── FAL.ai T2V ── */
-async function submitFalT2V(
+/* ── FAL.ai T2V fallback (레퍼런스 이미지 없음) ── */
+async function submitFalT2VFallback(
   prompt: string,
   durationSeconds: number,
   aspectRatio: string,
@@ -31,32 +37,61 @@ async function submitFalT2V(
     aspect_ratio: (aspectRatio ?? '16:9') as '16:9',
   }
   const { request_id } = await fal.queue.submit(
-    FAL_T2V_MODEL,
+    FAL_T2V_FALLBACK_MODEL,
     webhookUrl ? { input, webhookUrl } : { input },
   )
-  return { taskId: request_id, provider: 'fal' as const, model: FAL_T2V_MODEL }
+  return {
+    taskId: request_id,
+    provider: 'fal' as const,
+    model: FAL_T2V_FALLBACK_MODEL,
+  }
 }
 
-/* ── FAL.ai I2V ── */
-async function submitFalI2V(
+/* ── FAL.ai reference-to-video (레지스트리 기반, #5) ── */
+async function submitFalReferenceToVideo(
+  modelKey: VideoModelKey,
   prompt: string,
   imageUrl: string,
   durationSeconds: number,
   aspectRatio: string,
   webhookUrl?: string,
 ) {
-  const input = {
+  const spec = VIDEO_MODELS[modelKey]
+  // string 타입 엔드포인트 → InputType이 Record<string, any>로 풀려 유연 구성 가능.
+  const endpoint: string = spec.endpoint
+  const input: Record<string, unknown> = {
     prompt,
-    image_url: imageUrl,
     negative_prompt: 'blurry, low quality, distorted, deformed',
-    duration: durationSeconds >= 10 ? ('10' as const) : ('5' as const),
-    aspect_ratio: (aspectRatio ?? '16:9') as '16:9',
+    [spec.refParam]: [imageUrl],
   }
+
+  // duration: flexible=정수(clamp), fixed(veo)='8s'
+  if (spec.duration.mode === 'fixed') {
+    input.duration = spec.duration.value
+  } else {
+    input.duration = clampDuration(spec, durationSeconds)
+  }
+
+  // audio: 토글 있는 모델만, 기본 OFF
+  if (spec.audioParam) {
+    input[spec.audioParam] = spec.audioDefault
+  }
+
+  // resolution: 노출하는 모델만 기본 해상도
+  if (spec.resolutions.length > 0) {
+    input.resolution = spec.defaultResolution
+  }
+
+  // aspect_ratio: kling-o3는 미노출(확실치 않아 omit), 그 외 전달
+  if (modelKey !== 'kling-o3') {
+    input.aspect_ratio = aspectRatio ?? '16:9'
+  }
+
   const { request_id } = await fal.queue.submit(
-    FAL_I2V_MODEL,
+    endpoint,
     webhookUrl ? { input, webhookUrl } : { input },
   )
-  return { taskId: request_id, provider: 'fal' as const, model: FAL_I2V_MODEL }
+  return { taskId: request_id, provider: 'fal' as const, model: endpoint }
 }
 
 /* ── Local (Hunyuan) T2V ── */
@@ -136,7 +171,8 @@ export async function POST(req: Request) {
       durationSeconds,
       aspectRatio,
       generationMethod = 'T2V',
-      provider = 'fal',
+      provider,
+      model,
       referenceImageUrl,
       movementPreset,
       cameraPreset,
@@ -150,6 +186,7 @@ export async function POST(req: Request) {
       aspectRatio?: string
       generationMethod?: GenerationMethod
       provider?: VideoProvider
+      model?: string
       referenceImageUrl?: string
       movementPreset?: string | null
       cameraPreset?: CameraPreset | null
@@ -183,14 +220,33 @@ export async function POST(req: Request) {
         findCameraBrand(cameraPreset.brand)?.full_name ?? cameraPreset.brand
       gearFragment = `shot on ${brandName}, ${cameraPreset.focalLength}mm, f/${cameraPreset.aperture}, white balance ${cameraPreset.whiteBalance}K`
     }
-    const fullPrompt = [prompt, movementFragment, gearFragment, cameraText]
+    const baseFullPrompt = [prompt, movementFragment, gearFragment, cameraText]
       .filter(Boolean)
       .join('. ')
       .slice(0, 500)
 
+    // 모델 결정 (#5): model 우선 → legacy provider('local'→local, 그 외 fal 기본 모델).
+    // model 없고 provider==='local'이면 local 경로.
+    const modelKey: VideoModelKey =
+      model != null
+        ? normalizeProvider(model)
+        : provider === 'local'
+          ? 'local'
+          : normalizeProvider('')
+    const isLocal = modelKey === 'local'
+    const dur = durationSeconds ?? 5
+
+    // Veo 2안 (#4): API가 8초 고정 → 설계 길이만큼만 액션, 이후 black screen 지시를 prompt에 덧붙임.
+    // 에디터가 durationSeconds로 트림하므로 N초 뒤 검은 화면은 컷되어 보이지 않는다.
+    let fullPrompt = baseFullPrompt
+    if (modelKey === 'veo' && dur < 8) {
+      const blackInstruction = ` Show the described action only for the first ${dur} seconds; after ${dur}s the frame must be a completely black screen — no subject, no motion — until the video ends.`
+      fullPrompt = (baseFullPrompt + blackInstruction).slice(0, 800)
+    }
+
     let result: { taskId: string; provider: string; model: string }
 
-    if (provider === 'local') {
+    if (isLocal) {
       result =
         generationMethod === 'I2V'
           ? await submitLocalI2V(fullPrompt, referenceImageUrl!)
@@ -199,10 +255,22 @@ export async function POST(req: Request) {
       // webhook 전환: fal 큐에 webhookUrl 전달 → 완료 시 /api/fal/webhook가 서버사이드로 결과 영속.
       // 기존 client polling(generate-video/[taskId])은 fallback으로 유지된다.
       const webhookUrl = resolveWebhookUrl()
-      result =
-        generationMethod === 'I2V'
-          ? await submitFalI2V(fullPrompt, referenceImageUrl!, durationSeconds ?? 5, aspectRatio ?? '16:9', webhookUrl)
-          : await submitFalT2V(fullPrompt, durationSeconds ?? 5, aspectRatio ?? '16:9', webhookUrl)
+      // reference-to-video는 이미지 필수 — 레퍼런스 있으면 레지스트리 모델, 없으면 Kling T2V 폴백.
+      result = referenceImageUrl
+        ? await submitFalReferenceToVideo(
+            modelKey,
+            fullPrompt,
+            referenceImageUrl,
+            dur,
+            aspectRatio ?? '16:9',
+            webhookUrl,
+          )
+        : await submitFalT2VFallback(
+            fullPrompt,
+            dur,
+            aspectRatio ?? '16:9',
+            webhookUrl,
+          )
 
       // generation_jobs 행 — webhook이 shots.video_url을 갱신하려면 projectId+writerShotId 필요.
       // 둘 다 있을 때만 추적(수동 노드 등 writerShotId 없는 경우는 client polling만으로 처리).

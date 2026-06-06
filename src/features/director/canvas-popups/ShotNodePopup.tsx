@@ -17,9 +17,9 @@ import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { usePresetStorageStore } from '@/stores/preset-storage-store'
 import {
   newDirectorId,
-  type DirectorVideoProvider,
   type ShotNodeData,
 } from '@/types/director-canvas'
+import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
 import type { InventoryItem } from '@/types/inventory'
 
 import { AngleControl } from '@/features/director/angle-control'
@@ -32,11 +32,13 @@ type Props = {
   data: ShotNodeData
 }
 
-const PROVIDER_LABEL: Record<DirectorVideoProvider, string> = {
-  kling: 'Kling (API)',
-  veo: 'Veo (API)',
-  local: 'Self-hosted',
-}
+const MODEL_ORDER: VideoModelKey[] = [
+  'happy-horse',
+  'seedance',
+  'kling-o3',
+  'veo',
+  'local',
+]
 
 export function ShotNodePopup({ nodeId, data }: Props) {
   const closePopup = useDirectorCanvasStore((s) => s.closePopup)
@@ -343,23 +345,38 @@ export function ShotNodePopup({ nodeId, data }: Props) {
 
           <Separator />
 
-          {/* Provider */}
+          {/* Provider (영상 생성 모델 — video-models 레지스트리) */}
           <Field label="영상 생성 모델">
-            <div className="flex gap-2">
-              {(['kling', 'veo', 'local'] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => updateNodeData<'shot'>(nodeId, { provider: p })}
-                  className={cn(
-                    'flex-1 rounded-md border px-3 py-1.5 text-xs transition-colors',
-                    data.provider === p
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:bg-accent',
-                  )}
-                >
-                  {PROVIDER_LABEL[p]}
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {MODEL_ORDER.map((p) => {
+                const spec = VIDEO_MODELS[p]
+                const durHint =
+                  spec.duration.mode === 'fixed'
+                    ? '8s 고정'
+                    : `${spec.duration.min}–${spec.duration.max}s`
+                return (
+                  <button
+                    key={p}
+                    onClick={() =>
+                      updateNodeData<'shot'>(nodeId, { provider: p })
+                    }
+                    className={cn(
+                      'rounded-md border px-3 py-1.5 text-left text-xs transition-colors',
+                      data.provider === p
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:bg-accent',
+                    )}
+                  >
+                    <span className="block font-medium">{spec.label}</span>
+                    <span className="block font-mono text-[10px] text-muted-foreground">
+                      {durHint}
+                      {spec.pricePerSecNoAudio > 0
+                        ? ` · $${spec.pricePerSecNoAudio}/s`
+                        : ''}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </Field>
         </div>

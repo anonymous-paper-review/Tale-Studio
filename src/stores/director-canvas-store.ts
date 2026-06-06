@@ -35,6 +35,7 @@ import {
 } from '@/stores/asset-storage-store'
 import { createClient } from '@/lib/supabase/client'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
+import { DEFAULT_VIDEO_MODEL, normalizeProvider } from '@/lib/video-models'
 
 // ============================================================================
 // Defaults
@@ -55,7 +56,7 @@ const DEFAULT_LIGHTING: LightingConfig = {
   colorTemp: 5600,
 }
 
-const DEFAULT_PROVIDER: DirectorVideoProvider = 'kling'
+const DEFAULT_PROVIDER: DirectorVideoProvider = DEFAULT_VIDEO_MODEL
 
 function makeSceneData(label: string): SceneNodeData {
   return {
@@ -84,6 +85,7 @@ function makeShotData(label: string, parentSceneNodeId: string | null): ShotNode
     lighting: { ...DEFAULT_LIGHTING },
     cameraPreset: { ...DEFAULT_CAMERA_PRESET },
     provider: DEFAULT_PROVIDER,
+    durationSeconds: 5,
     generationMethod: 'T2V',
     stale: false,
   }
@@ -367,6 +369,8 @@ interface DirectorCanvasState {
   // Step 2 (unify-director-store-db): DB 일원화
   /** 노드 이동 후 canvas_position을 해당 테이블에 debounce write (drag end에서 호출) */
   persistNodePosition: (nodeId: string) => void
+  /** [디버그] 전체 노드를 scene 가로 / shot 세로 / video 우측 그리드로 재배치 (+ DB 영속) */
+  relayoutCanvas: () => void
   /** 진입 시 DB → 캔버스 hydrate. canvas_position 적용 + 누락 Video 노드 생성 (DB가 진실) */
   hydrateFromDb: (projectId: string) => Promise<void>
 
@@ -684,6 +688,46 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         debouncedPositionSaveToDb(nodeId, get)
       },
 
+      // [디버그] 겹친 노드 정리용 — #1 시딩과 동일 규칙으로 전체 재배치.
+      //   scene 가로(그룹 폭만큼) / 그 우측에 shot 세로 stack / shot 우측에 video 세로 stack.
+      //   in-memory 즉시 적용 + nodeId별 persist로 DB(canvas_position)까지 반영(재진입 유지).
+      relayoutCanvas: () => {
+        const GROUP_WIDTH = SHOT_OFFSET_X + VIDEO_OFFSET_X + 400
+        const state = get()
+        const scenes = state.nodes
+          .filter((n) => isSceneData(n.data))
+          .sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x)
+        const posById = new Map<string, XYPosition>()
+        scenes.forEach((scene, i) => {
+          const sx = 80 + i * GROUP_WIDTH
+          const sy = 80
+          posById.set(scene.id, { x: sx, y: sy })
+          getChildShots(state, scene.id)
+            .sort((a, b) => a.position.y - b.position.y)
+            .forEach((shot, j) => {
+              const shx = sx + SHOT_OFFSET_X
+              const shy = sy + j * SHOT_OFFSET_Y
+              posById.set(shot.id, { x: shx, y: shy })
+              getChildVideos(state, shot.id)
+                .sort((a, b) => a.position.y - b.position.y)
+                .forEach((vid, k) => {
+                  posById.set(vid.id, {
+                    x: shx + VIDEO_OFFSET_X,
+                    y: shy + k * VIDEO_OFFSET_Y,
+                  })
+                })
+            })
+        })
+        set((s) => ({
+          nodes: s.nodes.map((n) => {
+            const p = posById.get(n.id)
+            return p ? { ...n, position: p } : n
+          }),
+          lastSavedAt: Date.now(),
+        }))
+        for (const id of posById.keys()) get().persistNodePosition(id)
+      },
+
       hydrateFromDb: async (projectId) => {
         if (!projectId) return
         try {
@@ -695,7 +739,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               .eq('project_id', projectId),
             supabase
               .from('shots')
-              .select('shot_id, canvas_position')
+              .select('shot_id, canvas_position, storyboard_image')
               .eq('project_id', projectId),
             supabase.from('video_clips').select('*').eq('project_id', projectId),
           ])
@@ -713,6 +757,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             const p = r.canvas_position as { x: number; y: number } | null
             if (p && r.shot_id) shotPosByShotId.set(r.shot_id, p)
           }
+          // #3: DB(shots.storyboard_image)가 진실 — 재진입 시 stale(실패/구버전) 상태를 DB로 덮어쓴다.
+          const storyboardByShotId = new Map<string, ShotNodeData['storyboardImage']>()
+          for (const r of shotsRes.data ?? []) {
+            const sb = r.storyboard_image as ShotNodeData['storyboardImage'] | null
+            if (sb && r.shot_id) storyboardByShotId.set(r.shot_id, sb)
+          }
 
           // 1) 기존 Scene/Shot 노드에 canvas_position 덮어쓰기 (DB 우선)
           set((s) => ({
@@ -722,7 +772,14 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 if (p) return { ...n, position: { x: p.x, y: p.y } }
               } else if (isShotData(n.data) && n.data.writerShotId) {
                 const p = shotPosByShotId.get(n.data.writerShotId)
-                if (p) return { ...n, position: { x: p.x, y: p.y } }
+                const sb = storyboardByShotId.get(n.data.writerShotId)
+                if (p || sb) {
+                  return {
+                    ...n,
+                    position: p ? { x: p.x, y: p.y } : n.position,
+                    data: sb ? { ...n.data, storyboardImage: sb } : n.data,
+                  }
+                }
               }
               return n
             }),
@@ -1348,13 +1405,16 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const orphanShots = get().nodes.filter(
           (n) => isShotData(n.data) && !n.data.parentSceneNodeId,
         )
+        // #2: 이미 완료된 샷은 건너뛴다 (일괄 버튼은 미생성분만 생성; 재생성은 개별 팝업).
+        const isPending = (n: DirectorNode) =>
+          isShotData(n.data) && n.data.storyboardImage?.status !== 'completed'
         const ordered: string[] = []
         for (const scene of sceneNodes) {
           for (const shot of getChildShots(get(), scene.id)) {
-            ordered.push(shot.id)
+            if (isPending(shot)) ordered.push(shot.id)
           }
         }
-        for (const shot of orphanShots) ordered.push(shot.id)
+        for (const shot of orphanShots) if (isPending(shot)) ordered.push(shot.id)
 
         const CONCURRENCY = 3
         let cursor = 0
@@ -1430,7 +1490,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               cameraPreset: eff.cameraPreset,
               aspectRatio: '16:9',
               generationMethod,
+              // #5: 모델 레지스트리 키 전달 (legacy 'kling'→'kling-o3' 정규화).
+              // provider는 라우트 back-compat 위해 병행 전송 (fal/local 매핑).
+              model: normalizeProvider(eff.provider),
               provider: toRouteProvider(eff.provider),
+              // #4: flexible 모델 duration + Veo 트림 기준이 되는 설계 샷 길이
+              durationSeconds: shot.durationSeconds ?? 5,
               referenceImageUrl,
             }),
           })
@@ -1897,8 +1962,10 @@ export function nextScenePosition(
 ): XYPosition {
   const scenes = state.nodes.filter((n) => n.data.kind === 'scene')
   if (scenes.length === 0) return { x: 80, y: 80 }
-  const maxY = Math.max(...scenes.map((n) => n.position.y))
-  return { x: 80, y: maxY + 240 }
+  // Scene을 가로로 배치 — 각 그룹(scene + 우측 shot 컬럼 + video 공간)이 겹치지 않게
+  // 그룹 폭(scene→shot + shot→video + video 노드/여백)만큼 우측으로. (#1 레이아웃)
+  const maxX = Math.max(...scenes.map((n) => n.position.x))
+  return { x: maxX + SHOT_OFFSET_X + VIDEO_OFFSET_X + 400, y: 80 }
 }
 
 // ============================================================================

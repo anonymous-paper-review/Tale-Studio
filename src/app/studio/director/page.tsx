@@ -20,7 +20,9 @@ import {
   type OnConnectEnd,
   type XYPosition,
 } from '@xyflow/react'
-import { Loader2, ImageIcon, X } from 'lucide-react'
+import { Loader2, ImageIcon, X, LayoutGrid } from 'lucide-react'
+
+import { toast } from 'sonner'
 
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { cn } from '@/lib/utils'
@@ -319,6 +321,7 @@ function PaletteBar() {
   const generateAllStoryboardImages = useDirectorCanvasStore(
     (s) => s.generateAllStoryboardImages,
   )
+  const relayoutCanvas = useDirectorCanvasStore((s) => s.relayoutCanvas)
 
   const shots = nodes.filter((n) => isShotData(n.data))
   const totalShots = shots.length
@@ -356,6 +359,19 @@ function PaletteBar() {
         <button
           type="button"
           onClick={() => {
+            // #2: 이미 모두 생성됐으면 재생성 대신 알림.
+            const shots = nodes.filter((n) => isShotData(n.data))
+            const pending = shots.filter(
+              (n) =>
+                isShotData(n.data) &&
+                n.data.storyboardImage?.status !== 'completed',
+            )
+            if (shots.length > 0 && pending.length === 0) {
+              toast.info('이미 모든 스토리보드가 생성되어 있습니다.', {
+                description: '개별 재생성은 샷을 더블클릭해서 진행하세요.',
+              })
+              return
+            }
             void generateAllStoryboardImages()
           }}
           disabled={isGenerating || totalShots === 0}
@@ -384,6 +400,19 @@ function PaletteBar() {
 
         <PresetStrip />
       </div>
+
+      {/* [디버그] 노드 재배치 — 겹친 scene/shot을 그리드로 정리 */}
+      <button
+        type="button"
+        onClick={() => relayoutCanvas()}
+        title="[디버그] 노드를 scene 가로 / shot 세로 / video 우측 그리드로 재배치 (DB 반영)"
+        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-dashed border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground"
+      >
+        <LayoutGrid className="size-4" />
+        <span>
+          재배치 <span className="opacity-60">(debug)</span>
+        </span>
+      </button>
     </div>
   )
 }

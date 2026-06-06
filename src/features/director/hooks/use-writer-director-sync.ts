@@ -119,6 +119,8 @@ export function useWriterDirectorSync() {
         worldAssetIds,
         camera: shot.camera,
         lighting: shot.lighting,
+        // #4: Writer가 설계한 샷 길이를 노드로 전달 (영상 duration + Veo 트림의 근원)
+        durationSeconds: shot.durationSeconds ?? 5,
       }
       if (shot.cameraPreset) patch.cameraPreset = shot.cameraPreset
       dir.updateNodeData<'shot'>(id, patch)
