@@ -79,6 +79,55 @@ export function CharacterPanel() {
           const hasMainImage = Boolean(char.views.main)
           const bgScenes = getBackgroundScenes(char.characterId)
 
+          // hover 정보 본문 — 4개 뷰 이미지의 개별 Tooltip 에 공유(같은 캐릭터 정보).
+          const charTooltipBody = (
+            <>
+              <p className="font-medium">
+                {char.name}
+                <span className="font-normal text-background/60">
+                  {' · '}
+                  {role}
+                </span>
+              </p>
+              {char.description ? (
+                <p className="leading-snug text-background/80">
+                  {char.description}
+                </p>
+              ) : null}
+              {char.fixedPrompt ? (
+                <p className="leading-snug text-background/70">
+                  <span className="text-background/50">외형 · </span>
+                  {char.fixedPrompt}
+                </p>
+              ) : null}
+              {bgScenes.length > 0 ? (
+                <div className="space-y-0.5 border-t border-background/20 pt-1.5">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-background/50">
+                    등장 씬 · 배경
+                  </p>
+                  {bgScenes.slice(0, 3).map((s) => (
+                    <p
+                      key={s.sceneId}
+                      className="leading-snug text-background/80"
+                    >
+                      • {s.narrativeSummary}
+                    </p>
+                  ))}
+                  {bgScenes.length > 3 ? (
+                    <p className="text-background/50">
+                      +{bgScenes.length - 3}개 씬 더
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              {!char.description &&
+              !char.fixedPrompt &&
+              bgScenes.length === 0 ? (
+                <p className="text-background/60">아직 설정 정보가 없습니다.</p>
+              ) : null}
+            </>
+          )
+
           return (
             <div
               key={char.characterId}
@@ -131,16 +180,17 @@ export function CharacterPanel() {
               </div>
 
               {/* main(정면 대표) + 3방향 뷰를 동일 크기로 병렬 표시 (front 통합·hero 폐기, 2026-06-05).
-                  셀 클릭 → 상세/재생성 Dialog. 그리드 hover → 캐릭터 설정 + 등장 씬(배경) Tooltip. */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="grid grid-cols-4 gap-2">
-                    {(['main', 'back', 'sideLeft', 'sideRight'] as const).map(
-                      (view) => (
+                  셀 클릭 → 상세/재생성 Dialog. 각 이미지에 개별 Tooltip 부착 → 호버한 "그 이미지"의
+                  좌/우(side="right" + avoidCollisions 기본)로 떠서 화면 밖으로 나가면 자동으로 반대편(left)으로
+                  뒤집힘. collisionPadding 으로 뷰포트 가장자리 여백 확보 (이전: 그리드 전체를 한 트리거로 잡아
+                  맨 왼/오른쪽에만 떠서 화면 밖 이탈). */}
+              <div className="grid grid-cols-4 gap-2">
+                {(['main', 'back', 'sideLeft', 'sideRight'] as const).map(
+                  (view) => (
+                    <Tooltip key={view}>
+                      <TooltipTrigger asChild>
                         <button
-                          key={view}
                           type="button"
-                          title={`${CHARACTER_VIEW_LABELS[view]} — 클릭해서 보기 / 재생성`}
                           onClick={(e) => {
                             e.stopPropagation()
                             setViewDialog({ charId: char.characterId, view })
@@ -154,62 +204,20 @@ export function CharacterPanel() {
                             generating={isViewGenerating(view)}
                           />
                         </button>
-                      ),
-                    )}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent
-                  side="right"
-                  align="start"
-                  className="max-w-[260px] space-y-1.5 whitespace-normal text-left"
-                >
-                  <p className="font-medium">
-                    {char.name}
-                    <span className="font-normal text-background/60">
-                      {' · '}
-                      {role}
-                    </span>
-                  </p>
-                  {char.description ? (
-                    <p className="leading-snug text-background/80">
-                      {char.description}
-                    </p>
-                  ) : null}
-                  {char.fixedPrompt ? (
-                    <p className="leading-snug text-background/70">
-                      <span className="text-background/50">외형 · </span>
-                      {char.fixedPrompt}
-                    </p>
-                  ) : null}
-                  {bgScenes.length > 0 ? (
-                    <div className="space-y-0.5 border-t border-background/20 pt-1.5">
-                      <p className="text-[10px] font-medium uppercase tracking-wide text-background/50">
-                        등장 씬 · 배경
-                      </p>
-                      {bgScenes.slice(0, 3).map((s) => (
-                        <p
-                          key={s.sceneId}
-                          className="leading-snug text-background/80"
-                        >
-                          • {s.narrativeSummary}
-                        </p>
-                      ))}
-                      {bgScenes.length > 3 ? (
-                        <p className="text-background/50">
-                          +{bgScenes.length - 3}개 씬 더
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {!char.description &&
-                  !char.fixedPrompt &&
-                  bgScenes.length === 0 ? (
-                    <p className="text-background/60">
-                      아직 설정 정보가 없습니다.
-                    </p>
-                  ) : null}
-                </TooltipContent>
-              </Tooltip>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="right"
+                        align="center"
+                        sideOffset={8}
+                        collisionPadding={12}
+                        className="max-w-[260px] space-y-1.5 whitespace-normal text-left"
+                      >
+                        {charTooltipBody}
+                      </TooltipContent>
+                    </Tooltip>
+                  ),
+                )}
+              </div>
 
               {/* Actions */}
               <div className="mt-3 flex gap-2">

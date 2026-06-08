@@ -97,8 +97,12 @@ export function AudioMeter({ audioClips }: { audioClips: AudioTrackClip[] }) {
         const inRange = local >= 0 && local < clip.durationSec
         // cut 된 조각은 원본의 sourceOffsetSec 부터 재생 (조각마다 다른 구간)
         const srcTime = local + (clip.sourceOffsetSec ?? 0)
-        // 전역 재생 볼륨(masterVolume) 곱 — 재생 전용, draft 와 무관
-        entry.el.volume = clip.muted ? 0 : clip.volume * state.masterVolume
+        // 전역 재생 볼륨(masterVolume) 곱 — 재생 전용, draft 와 무관.
+        // 클립 음소거 OR 트랙 전체 음소거면 볼륨 0.
+        const tFirst = state.audioTracks[0]?.id
+        const trackMuted =
+          state.audioTracks.find((t) => t.id === (clip.trackId ?? tFirst))?.muted ?? false
+        entry.el.volume = clip.muted || trackMuted ? 0 : clip.volume * state.masterVolume
 
         if (state.isPlaying && inRange) {
           if (Math.abs(entry.el.currentTime - srcTime) > 0.3) entry.el.currentTime = srcTime

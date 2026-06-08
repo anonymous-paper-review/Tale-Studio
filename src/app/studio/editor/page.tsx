@@ -36,7 +36,7 @@ export default function PostPage() {
     videoClips,
     clipOrder,
     selectedShotIds,
-    selectedAudioId,
+    selectedAudioIds,
     rendering,
     error,
     sourcePanelOpen,
@@ -60,6 +60,10 @@ export default function PostPage() {
     setClipSelection,
     clearClipSelection,
     selectAudioClip,
+    toggleAudioSelection,
+    selectAudioRange,
+    setAudioSelection,
+    clearAudioSelection,
     deleteClip,
     deleteSelectedClips,
     moveClipToIndex,
@@ -84,6 +88,7 @@ export default function PostPage() {
     setPxPerSec,
     setPanelSize,
     toggleAudioMute,
+    toggleAudioTrackMute,
     removeAudioClip,
     moveAudioClip,
     splitAudioClipAt,
@@ -441,7 +446,7 @@ export default function PostPage() {
               shots={shots}
               videoClips={videoClips}
               selectedShotIds={selectedShotIds}
-              selectedAudioId={selectedAudioId}
+              selectedAudioIds={selectedAudioIds}
               currentTime={currentTime}
               pxPerSec={pxPerSec}
               toolMode={toolMode}
@@ -465,12 +470,17 @@ export default function PostPage() {
               onAddAudioFromSource={addAudioClipFromSource}
               onAddAudioTrack={addAudioTrack}
               onRemoveAudioTrack={removeAudioTrack}
+              onToggleAudioTrackMute={toggleAudioTrackMute}
               onToggleAudioMute={toggleAudioMute}
               onRemoveAudio={removeAudioClip}
               onMoveAudio={moveAudioClip}
               onSetAudioVolume={setAudioVolume}
               onSplitAudio={splitAudioClipAt}
               onSelectAudio={selectAudioClip}
+              onToggleAudioSelect={toggleAudioSelection}
+              onRangeAudioSelect={selectAudioRange}
+              onSetAudioSelection={setAudioSelection}
+              onClearAudioSelection={clearAudioSelection}
               onUpdateVideoClip={updateVideoClip}
               onUpdateAudioClip={updateAudioClip}
               onPushHistory={pushHistory}

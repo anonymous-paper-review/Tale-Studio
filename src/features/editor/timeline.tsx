@@ -25,6 +25,12 @@ const CLIP_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4]
 const TRIM_MIN = 0.1 // 트림 최소 길이(초)
 const SNAP_PX = 8 // 스냅 임계(px)
 const HEADER_W = 76 // 좌측 트랙 헤더 폭(px)
+// 트랙 레이아웃 높이(px) — 오디오 마퀴(드래그 선택)의 콘텐츠 좌표 계산용. 렌더 높이와 일치해야 함.
+const RULER_H = 20 // h-5 눈금자
+const VIDEO_H = 96 // h-24 비디오 트랙
+const AUDIO_LANE_H = 64 // h-16 오디오 레인
+const AUDIO_CLIP_TOP = 4 // 레인 내 클립 top-1
+const AUDIO_CLIP_H = 52 // 클립 h-[52px]
 
 interface TimelineLayoutItem {
   shotId: string
@@ -37,14 +43,14 @@ interface TimelineProps {
   shots: Shot[]
   videoClips: VideoClip[]
   selectedShotIds: string[]
-  selectedAudioId: string | null
+  selectedAudioIds: string[]
   currentTime: number
   pxPerSec: number
   toolMode: 'select' | 'cut'
   binDragKind: 'video' | 'audio' | null
   binDropSec: number | null
   audioClips: AudioTrackClip[]
-  audioTracks: { id: string }[]
+  audioTracks: { id: string; muted?: boolean }[]
   onSeek: (timeSec: number) => void
   onSelect: (shotId: string) => void
   onToggleSelect: (shotId: string) => void
@@ -61,12 +67,17 @@ interface TimelineProps {
   onAddAudioFromSource: (sourceId: string, atGlobalSec: number, trackId?: string) => void
   onAddAudioTrack: () => void
   onRemoveAudioTrack: (trackId: string) => void
+  onToggleAudioTrackMute: (trackId: string) => void
   onToggleAudioMute: (id: string) => void
   onRemoveAudio: (id: string) => void
   onMoveAudio: (id: string, startSec: number, trackId?: string) => void
   onSetAudioVolume: (id: string, volume: number) => void
   onSplitAudio: (id: string, atGlobalSec: number) => void
   onSelectAudio: (id: string) => void
+  onToggleAudioSelect: (id: string) => void
+  onRangeAudioSelect: (id: string) => void
+  onSetAudioSelection: (ids: string[]) => void
+  onClearAudioSelection: () => void
   onUpdateVideoClip: (shotId: string, patch: Partial<VideoClip>) => void
   onUpdateAudioClip: (id: string, patch: Partial<AudioTrackClip>) => void
   onPushHistory: () => void
@@ -103,6 +114,8 @@ function AudioClipBlock({
   onMove,
   onSplit,
   onSelect,
+  onToggleSelect,
+  onRangeSelect,
   onSetVolume,
   onUpdate,
   onTrimPreview,
@@ -120,6 +133,8 @@ function AudioClipBlock({
   onMove: (startSec: number, trackId: string | undefined) => void
   onSplit: (atGlobalSec: number) => void
   onSelect: () => void
+  onToggleSelect: () => void
+  onRangeSelect: () => void
   onSetVolume: (v: number) => void
   onUpdate: (patch: Partial<AudioTrackClip>) => void
   onTrimPreview: (p: { scope: string; leftSec: number; rightSec: number; label: string; clientX: number; clientY: number } | null) => void
@@ -162,6 +177,15 @@ function AudioClipBlock({
         onSplit(clientXToSec(e.clientX))
         return
       }
+      // 다중 선택: Ctrl/⌘=토글, Shift=순차 (선택만 하고 드래그 이동은 하지 않음 — 비디오와 동일)
+      if (e.ctrlKey || e.metaKey) {
+        onToggleSelect()
+        return
+      }
+      if (e.shiftKey) {
+        onRangeSelect()
+        return
+      }
       onSelect()
       onPushHistory()
       const blockEl = e.currentTarget as HTMLElement
@@ -183,7 +207,7 @@ function AudioClipBlock({
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [cutMode, clientXToSec, onSplit, onSelect, onPushHistory, clip.startSec, clip.durationSec, clip.id, clip.trackId, pxPerSec, onMove, snapStart],
+    [cutMode, clientXToSec, onSplit, onSelect, onToggleSelect, onRangeSelect, onPushHistory, clip.startSec, clip.durationSec, clip.id, clip.trackId, pxPerSec, onMove, snapStart],
   )
 
   // 게인(음량) 러버밴드 드래그 (요청 6) — 위/아래로 끌어 음량 조절
@@ -337,7 +361,7 @@ export function Timeline({
   shots,
   videoClips,
   selectedShotIds,
-  selectedAudioId,
+  selectedAudioIds,
   currentTime,
   pxPerSec,
   toolMode,
@@ -361,12 +385,17 @@ export function Timeline({
   onAddAudioFromSource,
   onAddAudioTrack,
   onRemoveAudioTrack,
+  onToggleAudioTrackMute,
   onToggleAudioMute,
   onRemoveAudio,
   onMoveAudio,
   onSetAudioVolume,
   onSplitAudio,
   onSelectAudio,
+  onToggleAudioSelect,
+  onRangeAudioSelect,
+  onSetAudioSelection,
+  onClearAudioSelection,
   onUpdateVideoClip,
   onUpdateAudioClip,
   onPushHistory,
@@ -378,6 +407,8 @@ export function Timeline({
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
+  // 오디오 마퀴 — 콘텐츠 좌표(눈금자 좌상단 기준). 여러 레인을 가로지르는 드래그 선택.
+  const [audioMarquee, setAudioMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
   const [reorder, setReorder] = useState<{ shotId: string; targetIndex: number } | null>(null)
   const [cutHoverSec, setCutHoverSec] = useState<number | null>(null) // cut 모드 미리보기 위치
   // 트림 미리보기: 드래그 중엔 실제 변경 없이 점선 박스 + 마우스 옆 시간초만 표시, 드롭 시 적용 (요청)
@@ -544,6 +575,60 @@ export function Timeline({
     [cutMode, clientXToSec, onSeek, onSetSelection, onClearSelection, layout],
   )
 
+  // Audio 레인 빈 영역: 마퀴 드래그(여러 레인 가로지르며 다중 선택) 또는 클릭-seek.
+  // 콘텐츠 좌표(스크롤 보정)로 마퀴 사각형 ↔ 각 오디오 클립 사각형(시간 X · 레인 Y)을 교차 판정.
+  const handleAudioLanePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.button === 2) return
+      if ((e.target as HTMLElement).closest('[data-no-seek]')) return
+      if (cutMode) { onSeek(clientXToSec(e.clientX)); return }
+      const el = trackRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const toContent = (cx: number, cy: number) => ({
+        x: cx - rect.left + el.scrollLeft,
+        y: cy - rect.top + el.scrollTop,
+      })
+      const start = toContent(e.clientX, e.clientY)
+      const startClientX = e.clientX
+      const firstId = audioTracks[0]?.id
+      let moved = false
+      const computeSel = (cur: { x: number; y: number }) => {
+        const x1 = Math.min(start.x, cur.x)
+        const x2 = Math.max(start.x, cur.x)
+        const y1 = Math.min(start.y, cur.y)
+        const y2 = Math.max(start.y, cur.y)
+        const ids = audioClips
+          .filter((a) => {
+            const ti = audioTracks.findIndex((t) => t.id === (a.trackId ?? firstId))
+            if (ti < 0) return false
+            const cx = a.startSec * pxPerSec
+            const cw = Math.max(a.durationSec * pxPerSec, 12)
+            const laneTop = RULER_H + VIDEO_H + ti * AUDIO_LANE_H + AUDIO_CLIP_TOP
+            return cx < x2 && cx + cw > x1 && laneTop < y2 && laneTop + AUDIO_CLIP_H > y1
+          })
+          .map((a) => a.id)
+        onSetAudioSelection(ids)
+      }
+      const move = (ev: PointerEvent) => {
+        const cur = toContent(ev.clientX, ev.clientY)
+        if (!moved && Math.hypot(cur.x - start.x, cur.y - start.y) > 4) moved = true
+        if (!moved) return
+        setAudioMarquee({ x1: start.x, y1: start.y, x2: cur.x, y2: cur.y })
+        computeSel(cur)
+      }
+      const up = () => {
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', up)
+        setAudioMarquee(null)
+        if (!moved) { onClearAudioSelection(); onSeek(clientXToSec(startClientX)) }
+      }
+      window.addEventListener('pointermove', move)
+      window.addEventListener('pointerup', up)
+    },
+    [cutMode, clientXToSec, onSeek, onSetAudioSelection, onClearAudioSelection, audioClips, audioTracks, pxPerSec],
+  )
+
   const handleClipPointerDown = useCallback(
     (e: React.PointerEvent, item: TimelineLayoutItem) => {
       if (e.button === 2) return
@@ -610,6 +695,9 @@ export function Timeline({
           {selectedShotIds.length > 1 && (
             <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">{selectedShotIds.length}개 선택</span>
           )}
+          {selectedAudioIds.length > 1 && (
+            <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">오디오 {selectedAudioIds.length}개 선택</span>
+          )}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -635,11 +723,38 @@ export function Timeline({
             {audioTracks.map((t, i) => (
               <ContextMenu key={t.id}>
                 <ContextMenuTrigger asChild>
-                  <div className="flex h-16 items-center justify-center border-b border-border text-[10px] font-medium text-muted-foreground hover:bg-accent/40">
-                    Audio {i + 1}
+                  <div
+                    className={cn(
+                      'flex h-16 items-center justify-center gap-1 border-b border-border text-[10px] font-medium text-muted-foreground hover:bg-accent/40',
+                      t.muted && 'opacity-60',
+                    )}
+                  >
+                    <span>Audio {i + 1}</span>
+                    {/* 트랙 전체 음소거 토글 */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onToggleAudioTrackMute(t.id)
+                      }}
+                      title={t.muted ? '트랙 음소거 해제' : '트랙 전체 음소거'}
+                      aria-label={t.muted ? '트랙 음소거 해제' : '트랙 전체 음소거'}
+                      className="rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      {t.muted ? (
+                        <VolumeX className="size-3 text-muted-foreground" />
+                      ) : (
+                        <Volume2 className="size-3 text-primary" />
+                      )}
+                    </button>
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-40">
+                  <ContextMenuItem className="text-xs" onSelect={() => onToggleAudioTrackMute(t.id)}>
+                    {t.muted ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
+                    {t.muted ? '트랙 음소거 해제' : '트랙 전체 음소거'}
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
                   <ContextMenuItem className="text-xs" onSelect={() => onAddAudioTrack()}>
                     <Plus className="size-3.5" /> 오디오 트랙 추가
                   </ContextMenuItem>
@@ -896,15 +1011,15 @@ export function Timeline({
                   data-drop="audio-track"
                   data-track-id={track.id}
                   data-pps={pxPerSec}
-                  className={cn('relative h-16 border-b border-border bg-muted/10 transition-colors', binDragKind === 'audio' && 'bg-primary/10 ring-1 ring-inset ring-primary/40')}
-                  onPointerDown={handleSeekPointerDown}
+                  className={cn('relative h-16 border-b border-border bg-muted/10 transition-colors', binDragKind === 'audio' && 'bg-primary/10 ring-1 ring-inset ring-primary/40', track.muted && 'opacity-50')}
+                  onPointerDown={handleAudioLanePointerDown}
                 >
                   {clipsOnTrack.map((a) => (
                     <AudioClipBlock
                       key={a.id}
                       clip={a}
                       pxPerSec={pxPerSec}
-                      selected={selectedAudioId === a.id}
+                      selected={selectedAudioIds.includes(a.id)}
                       cutMode={cutMode}
                       clientXToSec={clientXToSec}
                       snapStart={snapStart}
@@ -913,6 +1028,8 @@ export function Timeline({
                       onMove={(startSec, trackId) => onMoveAudio(a.id, startSec, trackId)}
                       onSplit={(atSec) => onSplitAudio(a.id, snapToPlayhead(atSec))}
                       onSelect={() => onSelectAudio(a.id)}
+                      onToggleSelect={() => onToggleAudioSelect(a.id)}
+                      onRangeSelect={() => onRangeAudioSelect(a.id)}
                       onSetVolume={(v) => onSetAudioVolume(a.id, v)}
                       onUpdate={(patch) => onUpdateAudioClip(a.id, patch)}
                       onTrimPreview={setTrimPreview}
@@ -941,6 +1058,19 @@ export function Timeline({
               <div
                 className="pointer-events-none absolute top-0 z-30 h-full border-l border-dashed border-primary/70"
                 style={{ left: cutHoverSec * pxPerSec }}
+              />
+            )}
+
+            {/* Audio 마퀴 선택 박스 (콘텐츠 좌표 — 여러 레인 가로지름) */}
+            {audioMarquee && (
+              <div
+                className="pointer-events-none absolute z-30 rounded-sm border border-primary bg-primary/15"
+                style={{
+                  left: Math.min(audioMarquee.x1, audioMarquee.x2),
+                  top: Math.min(audioMarquee.y1, audioMarquee.y2),
+                  width: Math.abs(audioMarquee.x2 - audioMarquee.x1),
+                  height: Math.abs(audioMarquee.y2 - audioMarquee.y1),
+                }}
               />
             )}
 

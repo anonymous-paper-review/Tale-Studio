@@ -124,9 +124,9 @@ export function useEditorPlayback() {
         case 'Delete':
         case 'Backspace':
           // 선택된 타임라인 항목 제거 (오디오 우선, 없으면 선택된 비디오 클립 일괄)
-          if (s.selectedAudioId) {
+          if (s.selectedAudioIds.length > 0) {
             e.preventDefault()
-            s.removeAudioClip(s.selectedAudioId)
+            s.deleteSelectedAudio()
           } else if (s.selectedShotIds.length > 0) {
             e.preventDefault()
             s.deleteSelectedClips()

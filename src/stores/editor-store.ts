@@ -40,7 +40,8 @@ interface EditorState {
   selectedSceneId: string | null
   selectedClipShotId: string | null   // 다중 선택의 앵커/대표 (range 기준)
   selectedShotIds: string[]           // 다중 선택된 비디오 클립
-  selectedAudioId: string | null      // 선택된 오디오 클립 (Del 대상 구분)
+  selectedAudioId: string | null      // 다중 선택의 앵커/대표 (range 기준, Del 대상 구분)
+  selectedAudioIds: string[]          // 다중 선택된 오디오 클립 (marquee/Ctrl/Shift)
   clipOrder: Record<string, string[]> // sceneId → shotId[]
   rendering: boolean
   error: string | null
@@ -58,8 +59,8 @@ interface EditorState {
   audioClips: AudioTrackClip[]
   // 오디오/보이스 소스 보관함 (bin) — 드래그해 오디오 트랙에 인스턴스화
   audioSources: AudioSource[]
-  // 오디오 트랙(레인) 목록 — 멀티 트랙 (프리미어식). 기본 1개
-  audioTracks: { id: string }[]
+  // 오디오 트랙(레인) 목록 — 멀티 트랙 (프리미어식). 기본 1개. muted=트랙 전체 음소거
+  audioTracks: { id: string; muted?: boolean }[]
 
   // 소스 클립 단독 미리보기 (Video Source 클릭 시). null이면 타임라인(플레이헤드) 모드.
   previewSourceShotId: string | null
@@ -87,7 +88,12 @@ interface EditorState {
   selectClipRange: (shotId: string) => void            // shift+click (앵커~대상)
   setClipSelection: (ids: string[]) => void            // 마퀴 드래그 선택
   clearClipSelection: () => void
-  selectAudioClip: (id: string) => void
+  selectAudioClip: (id: string) => void                // 단일 선택 (교체)
+  toggleAudioSelection: (id: string) => void           // ctrl+click 토글 다중
+  selectAudioRange: (id: string) => void               // shift+click 순차(앵커~대상)
+  setAudioSelection: (ids: string[]) => void           // 마퀴 드래그 선택
+  clearAudioSelection: () => void
+  deleteSelectedAudio: () => void                       // 선택된 오디오 일괄 삭제
   reorderClips: (sceneId: string, fromIndex: number, toIndex: number) => void
   setTrim: (shotId: string, trimStart: number, trimEnd: number) => void
   setSpeed: (shotId: string, speed: number) => void
@@ -125,6 +131,7 @@ interface EditorState {
   // 오디오 멀티 트랙
   addAudioTrack: () => void
   removeAudioTrack: (trackId: string) => void
+  toggleAudioTrackMute: (trackId: string) => void   // 트랙 전체 음소거 토글
 
   // 소스 단독 미리보기 (Video Source 클릭)
   previewSource: (shotId: string) => void
@@ -161,7 +168,7 @@ interface EditorSnapshot {
   videoClips: VideoClip[]
   audioClips: AudioTrackClip[]
   audioSources: AudioSource[]
-  audioTracks: { id: string }[]
+  audioTracks: { id: string; muted?: boolean }[]
 }
 
 // 리사이즈 섹션 기본 크기 (px)
@@ -252,6 +259,22 @@ function globalOrder(
   return out
 }
 
+// 오디오 클립의 "순차" 순서 — 트랙 순서 → 트랙 내 시작초. shift+click range 기준.
+function globalAudioOrder(
+  state: Pick<EditorState, 'audioClips' | 'audioTracks'>,
+): string[] {
+  const trackIndex = new Map(state.audioTracks.map((t, i) => [t.id, i]))
+  const first = state.audioTracks[0]?.id ?? ''
+  return [...state.audioClips]
+    .sort((a, b) => {
+      const ta = trackIndex.get(a.trackId ?? first) ?? 0
+      const tb = trackIndex.get(b.trackId ?? first) ?? 0
+      if (ta !== tb) return ta - tb
+      return a.startSec - b.startSec
+    })
+    .map((a) => a.id)
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   shots: [],
   videoClips: [],
@@ -259,6 +282,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedClipShotId: null,
   selectedShotIds: [],
   selectedAudioId: null,
+  selectedAudioIds: [],
   clipOrder: {},
   rendering: false,
   error: null,
@@ -351,6 +375,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         },
       ],
       selectedAudioId: id,
+      selectedAudioIds: [id],
       past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
       future: [],
     }))
@@ -391,6 +416,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => ({
       audioClips: state.audioClips.filter((a) => a.id !== id),
       selectedAudioId: state.selectedAudioId === id ? null : state.selectedAudioId,
+      selectedAudioIds: state.selectedAudioIds.filter((x) => x !== id),
       past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
       future: [],
     })),
@@ -420,6 +446,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         audioClips: state.audioClips.flatMap((x) => (x.id === id ? [first, second] : [x])),
         selectedAudioId: newId,
+        selectedAudioIds: [newId],
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
       }
@@ -464,6 +491,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         },
       ],
       selectedAudioId: id,
+      selectedAudioIds: [id],
       past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
       future: [],
     }))
@@ -489,6 +517,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         future: [],
       }
     }),
+
+  // 트랙 전체 음소거 토글 — 재생 시 audio-meter 가 clip.muted || track.muted 로 볼륨 0 처리.
+  toggleAudioTrackMute: (trackId) =>
+    set((state) => ({
+      audioTracks: state.audioTracks.map((t) =>
+        t.id === trackId ? { ...t, muted: !t.muted } : t,
+      ),
+    })),
 
   // ── 소스 단독 미리보기 (Video Source 클릭) ──
   previewSource: (shotId) => set({ previewSourceShotId: shotId, isPlaying: true }),
@@ -564,6 +600,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedClipShotId: cur.selectedClipShotId,
       selectedShotIds: [],
       selectedAudioId: null,
+      selectedAudioIds: [],
       previewSourceShotId: null,
       currentTime: 0,
       isPlaying: false,
@@ -641,6 +678,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedClipShotId: null,
       selectedShotIds: [],
       selectedAudioId: null,
+      selectedAudioIds: [],
       clipOrder: {},
       rendering: false,
       error: null,
@@ -674,6 +712,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedClipShotId: shotId,
       selectedShotIds: [shotId],
       selectedAudioId: null,
+      selectedAudioIds: [],
       previewSourceShotId: null,
     }),
 
@@ -688,6 +727,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedShotIds: ids,
         selectedClipShotId: has ? (ids[ids.length - 1] ?? null) : shotId,
         selectedAudioId: null,
+        selectedAudioIds: [],
         previewSourceShotId: null,
       }
     }),
@@ -700,13 +740,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const ai = order.indexOf(anchor)
       const bi = order.indexOf(shotId)
       if (ai < 0 || bi < 0) {
-        return { selectedShotIds: [shotId], selectedClipShotId: shotId, selectedAudioId: null }
+        return { selectedShotIds: [shotId], selectedClipShotId: shotId, selectedAudioId: null, selectedAudioIds: [] }
       }
       const [lo, hi] = ai <= bi ? [ai, bi] : [bi, ai]
       return {
         selectedShotIds: order.slice(lo, hi + 1),
         selectedClipShotId: shotId,
         selectedAudioId: null,
+        selectedAudioIds: [],
         previewSourceShotId: null,
       }
     }),
@@ -717,9 +758,77 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   clearClipSelection: () => set({ selectedShotIds: [], selectedClipShotId: null }),
 
-  // 오디오 클립 선택 — Del 대상이 오디오로 전환 (비디오 선택 해제)
+  // 오디오 클립 단일 선택 (교체) — Del 대상이 오디오로 전환 (비디오 선택 해제)
   selectAudioClip: (id) =>
-    set({ selectedAudioId: id, selectedShotIds: [], selectedClipShotId: null }),
+    set({
+      selectedAudioId: id,
+      selectedAudioIds: [id],
+      selectedShotIds: [],
+      selectedClipShotId: null,
+    }),
+
+  // ctrl+click — 토글 다중 선택
+  toggleAudioSelection: (id) =>
+    set((state) => {
+      const has = state.selectedAudioIds.includes(id)
+      const ids = has
+        ? state.selectedAudioIds.filter((i) => i !== id)
+        : [...state.selectedAudioIds, id]
+      return {
+        selectedAudioIds: ids,
+        selectedAudioId: has ? (ids[ids.length - 1] ?? null) : id,
+        selectedShotIds: [],
+        selectedClipShotId: null,
+      }
+    }),
+
+  // shift+click — 앵커(selectedAudioId)부터 대상까지 순차 (트랙→시작초 순서 기준)
+  selectAudioRange: (id) =>
+    set((state) => {
+      const order = globalAudioOrder(state)
+      const anchor = state.selectedAudioId ?? id
+      const ai = order.indexOf(anchor)
+      const bi = order.indexOf(id)
+      if (ai < 0 || bi < 0) {
+        return {
+          selectedAudioIds: [id],
+          selectedAudioId: id,
+          selectedShotIds: [],
+          selectedClipShotId: null,
+        }
+      }
+      const [lo, hi] = ai <= bi ? [ai, bi] : [bi, ai]
+      return {
+        selectedAudioIds: order.slice(lo, hi + 1),
+        selectedAudioId: id,
+        selectedShotIds: [],
+        selectedClipShotId: null,
+      }
+    }),
+
+  // 마퀴 드래그 선택
+  setAudioSelection: (ids) =>
+    set({
+      selectedAudioIds: ids,
+      selectedAudioId: ids[ids.length - 1] ?? null,
+      selectedShotIds: [],
+      selectedClipShotId: null,
+    }),
+
+  clearAudioSelection: () => set({ selectedAudioIds: [], selectedAudioId: null }),
+
+  deleteSelectedAudio: () =>
+    set((state) => {
+      if (state.selectedAudioIds.length === 0) return state
+      const ids = new Set(state.selectedAudioIds)
+      return {
+        audioClips: state.audioClips.filter((a) => !ids.has(a.id)),
+        selectedAudioIds: [],
+        selectedAudioId: null,
+        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [],
+      }
+    }),
 
   reorderClips: (sceneId, fromIndex, toIndex) => {
     set((state) => {
@@ -906,6 +1015,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         clipOrder: { ...state.clipOrder, [shot.sceneId]: order },
         selectedClipShotId: shotId,
         selectedAudioId: null,
+        selectedAudioIds: [],
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
       }
@@ -964,6 +1074,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedClipShotId: newId,
         selectedShotIds: [newId],
         selectedAudioId: null,
+        selectedAudioIds: [],
         previewSourceShotId: null,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
