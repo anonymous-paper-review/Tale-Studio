@@ -32,6 +32,7 @@ import {
   saveRunState,
   markCompleted,
   markFailed,
+  advanceProjectStageAfterWriter,
   type WriterRunStateBase,
 } from '@/lib/writer/run-store';
 import type {
@@ -401,6 +402,7 @@ export async function runWriterSteps(
     // 남은 단계 없음 → 완료.
     if (!step) {
       await markCompleted(run.id);
+      await advanceProjectStageAfterWriter(projectId);
       return { done: true };
     }
 
@@ -449,5 +451,6 @@ export async function runWriterSteps(
   const remaining = WRITER_STEPS.find((st) => !st.has(state));
   if (remaining) return { paused: true };
   await markCompleted(run.id);
+  await advanceProjectStageAfterWriter(projectId);
   return { done: true };
 }

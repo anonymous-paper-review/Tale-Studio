@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Loader2 } from 'lucide-react'
+import { ArrowRight, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ProjectDashboard } from '@/features/producer/project-dashboard'
 import { useProducerStore } from '@/stores/producer-store'
@@ -23,6 +23,9 @@ export default function MeetingPage() {
   const hasMinSettings =
     storyReady && (projectSettings.genre || projectSettings.toneStyle)
 
+  // writer 산출물 게이트백 — 씬/샷이 없어 producer 로 되돌려진 프로젝트면 재실행 배너 노출.
+  const writerNeedsRerun = useProjectStore((s) => s.writerNeedsRerun)
+
   // Redirect via useEffect to avoid router.push failing inside async handlers
   const [redirectTo, setRedirectTo] = useState<string | null>(null)
   useEffect(() => {
@@ -38,6 +41,35 @@ export default function MeetingPage() {
 
   return (
     <>
+      {/* writer 미완료 게이트백 배너 — 씬/샷이 없어 Director/Editor 가 빈 화면이던 프로젝트.
+          스토리/설정은 그대로 두고 'Writer 다시 실행'으로 재생성한다(persist 는 멱등 — 중복 안 생김). */}
+      {writerNeedsRerun && (
+        <div className="flex items-center gap-3 border-b border-warning/30 bg-warning/10 px-6 py-3 text-sm">
+          <AlertTriangle className="size-4 shrink-0 text-warning" />
+          <div className="flex-1">
+            <p className="font-medium text-foreground">
+              이전 Writer 실행이 완료되지 않았어요 (씬/샷 없음)
+            </p>
+            <p className="text-xs text-muted-foreground">
+              스토리·설정을 확인하고 다시 실행하면 씬·샷이 생성돼 Director/Editor 가 채워집니다.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleHandoff}
+            disabled={syncing}
+            className="shrink-0 gap-1.5"
+          >
+            {syncing ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="size-3.5" />
+            )}
+            Writer 다시 실행
+          </Button>
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         <ProjectDashboard />
       </div>

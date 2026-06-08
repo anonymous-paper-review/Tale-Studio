@@ -134,6 +134,28 @@ export async function markFailed(id: string, errorMessage: string): Promise<void
 }
 
 /**
+ * writer 파이프라인이 실제로 완료됐을 때만 projects.current_stage 를 producer→artist 로 전진.
+ *   - 핸드오프(saveAndHandoff)는 더 이상 current_stage 를 낙관적으로 올리지 않는다(거짓 진행 방지).
+ *   - 이미 artist 이상으로 진행된 프로젝트는 건드리지 않는다(`.eq('current_stage','producer')` 가드 → 다운그레이드 없음).
+ *   - 실패(markFailed)는 호출하지 않으므로, writer 가 죽으면 DB 는 producer 로 남아 게이트가 producer 로 돌린다.
+ * best-effort — 실패해도 throw 하지 않는다(파이프라인 완료 자체를 막지 않음).
+ */
+export async function advanceProjectStageAfterWriter(projectId: string): Promise<void> {
+  try {
+    const { error } = await supabaseAdmin
+      .from('projects')
+      .update({ current_stage: 'artist' })
+      .eq('id', projectId)
+      .eq('current_stage', 'producer');
+    if (error) {
+      console.error('[run-store] advanceProjectStageAfterWriter failed:', error.message);
+    }
+  } catch (e) {
+    console.error('[run-store] advanceProjectStageAfterWriter error:', e);
+  }
+}
+
+/**
  * 진행률 폴링용 경량 조회 — 무거운 state 블롭은 SELECT 하지 않는다.
  * 프로젝트의 최신 run 행. 없으면 null.
  */

@@ -196,6 +196,72 @@ function toRouteProvider(p: DirectorVideoProvider): 'fal' | 'local' {
 }
 
 // ============================================================================
+// Thumbnail capture (Node 탭 영상 카드용)
+// 서버 ffmpeg 불가(Vercel Hobby) → 클라이언트에서 <video>+<canvas>로 첫 프레임 캡처.
+// CORS 차단 시 canvas 가 taint 되어 toBlob 이 throw → null 반환(graceful, 영상 재생엔 무영향).
+// 영상 URL 은 우리 Storage(persistDirectorVideo)라 보통 same-CORS 라 캡처 가능.
+// ============================================================================
+
+/** 같은 노드 썸네일 중복 캡처 방지 (in-flight 가드). */
+const thumbnailInFlight = new Set<string>()
+
+/** 영상 URL 첫 프레임을 JPEG Blob 으로 캡처. 실패(CORS/네트워크/디코드/타임아웃) 시 null. */
+async function captureVideoThumbnail(videoUrl: string): Promise<Blob | null> {
+  if (typeof document === 'undefined') return null
+  return new Promise<Blob | null>((resolve) => {
+    const video = document.createElement('video')
+    video.crossOrigin = 'anonymous'
+    video.muted = true
+    video.preload = 'metadata'
+    video.playsInline = true
+
+    let settled = false
+    const finish = (blob: Blob | null) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      video.removeAttribute('src')
+      try {
+        video.load()
+      } catch {
+        /* noop */
+      }
+      resolve(blob)
+    }
+    const timer = setTimeout(() => finish(null), 15_000)
+
+    const grab = () => {
+      try {
+        const w = video.videoWidth
+        const h = video.videoHeight
+        if (!w || !h) return finish(null)
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return finish(null)
+        ctx.drawImage(video, 0, 0, w, h)
+        canvas.toBlob((blob) => finish(blob), 'image/jpeg', 0.82)
+      } catch {
+        finish(null)
+      }
+    }
+
+    video.onloadeddata = () => {
+      // 일부 코덱은 currentTime=0 프레임이 비어있어 살짝 seek 후 캡처.
+      try {
+        video.currentTime = Math.min(0.1, (video.duration || 1) / 2)
+      } catch {
+        grab()
+      }
+    }
+    video.onseeked = grab
+    video.onerror = () => finish(null)
+    video.src = videoUrl
+  })
+}
+
+// ============================================================================
 // Step 0 (unify-director-store-db): Shot 편집 → DB shots write-through
 // 캐넌 일원화 — 캔버스 샷 편집을 DB로 debounce 저장(옛 director-store 패턴 이식).
 // 키 = writerShotId(=shots.shot_id). 컬럼은 007로 이미 존재.
@@ -356,6 +422,9 @@ interface DirectorCanvasState {
   generatingNodeIds: Record<string, boolean>
   generationErrors: Record<string, string>
 
+  // playback — 한 번에 1개 Video 노드만 재생 (single-play). 비영속(UI ephemeral).
+  playingNodeId: string | null
+
   // persistence meta
   projectId: string
   lastSavedAt: number
@@ -422,6 +491,12 @@ interface DirectorCanvasState {
   generateVideoForShot: (shotNodeId: string) => Promise<string | null>
   /** 기존 Video 노드 1개를 effective 설정으로 (재)생성 (D-5). 마더 Shot storyboardImage 있으면 I2V */
   regenerateVideo: (videoNodeId: string) => Promise<void>
+
+  // playback + thumbnail (ST-4 후속 — Node 탭 영상 재생)
+  /** single-play 토글 — 이 노드만 재생, 나머지 Video 는 자동 정지. id=null 이면 전부 정지 */
+  setPlayingNode: (id: string | null) => void
+  /** Video 노드에 썸네일이 없으면 영상 첫 프레임을 캡처 → Storage 업로드 → thumbnail_url 영속 */
+  ensureVideoThumbnail: (videoNodeId: string) => Promise<void>
 
   // propagation (Shot 설정 변경 → 자식 Video stale)
   propagateStaleFromShot: (shotNodeId: string) => void
@@ -653,6 +728,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       relationModal: null,
       generatingNodeIds: {},
       generationErrors: {},
+      playingNodeId: null,
       projectId: 'default',
       lastSavedAt: Date.now(),
 
@@ -673,6 +749,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             relationModal: null,
             generatingNodeIds: {},
             generationErrors: {},
+            playingNodeId: null,
             lastSavedAt: Date.now(),
           })
         } else {
@@ -1214,6 +1291,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         // Step 2: completed 시 url/status를 video_clips 행에 반영 (videoClipId 있을 때만).
         // 파일 영속은 이미 /api/assets/upload-video가 처리 — 여기선 row에 url+status만 반영.
         if (status === 'completed') {
+          // 완료 즉시 썸네일 생성(첫 프레임 캡처 → Storage 업로드). 수동 노드 포함.
+          void get().ensureVideoThumbnail(videoNodeId)
           const node = get().nodes.find((n) => n.id === videoNodeId)
           if (node && isVideoData(node.data) && node.data.videoClipId) {
             const clipId = node.data.videoClipId
@@ -1537,6 +1616,62 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Unknown error'
           get().setVideoStatus(videoNodeId, 'failed', { error: message })
+        }
+      },
+
+      // ─── playback + thumbnail ──────────────────────────────────────────
+
+      setPlayingNode: (id) => set({ playingNodeId: id }),
+
+      ensureVideoThumbnail: async (videoNodeId) => {
+        const node = get().nodes.find((n) => n.id === videoNodeId)
+        if (!node || !isVideoData(node.data)) return
+        const data = node.data
+        // 이미 썸네일 있거나, 영상 없거나, 캡처 진행 중이면 skip.
+        if (!data.videoUrl || data.thumbnailUrl) return
+        if (thumbnailInFlight.has(videoNodeId)) return
+        thumbnailInFlight.add(videoNodeId)
+        try {
+          const blob = await captureVideoThumbnail(data.videoUrl)
+          if (!blob) return
+
+          const projectId = get().projectId
+          const clipId = data.videoClipId
+          // DB 샷(video_clips 행 존재) → Storage 업로드 + thumbnail_url/path 영속(속도·전송 안정).
+          if (clipId && projectId && projectId !== 'default') {
+            try {
+              const form = new FormData()
+              form.append('projectId', projectId)
+              form.append('type', 'video')
+              form.append('entityId', clipId)
+              form.append('field', 'thumbnail')
+              form.append('file', blob, `${clipId}_thumbnail.jpg`)
+              const res = await fetch('/api/assets/upload-image', {
+                method: 'POST',
+                body: form,
+              })
+              if (res.ok) {
+                const { publicUrl } = await res.json()
+                if (publicUrl) {
+                  get().updateNodeData<'video'>(videoNodeId, {
+                    thumbnailUrl: publicUrl,
+                  })
+                  return
+                }
+              }
+            } catch (err) {
+              console.error(
+                '[director-canvas-store] thumbnail upload failed:',
+                err,
+              )
+            }
+          }
+          // 수동 노드(clip 없음) 또는 업로드 실패 → 로컬 objectURL 폴백(세션 한정).
+          get().updateNodeData<'video'>(videoNodeId, {
+            thumbnailUrl: URL.createObjectURL(blob),
+          })
+        } finally {
+          thumbnailInFlight.delete(videoNodeId)
         }
       },
 
@@ -1895,6 +2030,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           relationModal: null,
           generatingNodeIds: {},
           generationErrors: {},
+          playingNodeId: null,
           lastSavedAt: Date.now(),
         }),
     }),

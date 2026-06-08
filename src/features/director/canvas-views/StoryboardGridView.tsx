@@ -3,6 +3,7 @@
 import { ImageIcon, MapPin, Clock } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import {
   getChildShots,
@@ -188,7 +189,9 @@ export function StoryboardGridView() {
   }
 
   return (
-    <div className="size-full overflow-auto bg-background">
+    // Artist/Editor와 동일한 디자인 룰 — shadcn ScrollArea(스타일된 스크롤바).
+    // 기존 raw overflow-auto(네이티브 스크롤바)를 교체. 부모 `min-h-0 flex-1`가 높이를 가둔다.
+    <ScrollArea className="size-full bg-background">
       <div className="flex flex-col gap-6 p-6">
         {groups.map((group) => (
           <section key={group.key} className="flex flex-col gap-4">
@@ -226,6 +229,6 @@ export function StoryboardGridView() {
           </section>
         ))}
       </div>
-    </div>
+    </ScrollArea>
   )
 }

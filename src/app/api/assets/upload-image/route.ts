@@ -55,30 +55,40 @@ export async function POST(req: Request) {
     } = supabaseAdmin.storage.from('media').getPublicUrl(path)
 
     // 5. Update DB row
-    const tableMap: Record<string, { table: string; idCol: string }> = {
-      character: { table: 'characters', idCol: 'character_id' },
-      location: { table: 'locations', idCol: 'location_id' },
-      shot: { table: 'shots', idCol: 'shot_id' },
-    }
-    const target = tableMap[type]
-    if (target) {
-      // storyboard_image 는 JSONB StoryboardImage 객체 (src/types/director-canvas.ts).
-      // ShotNode/StoryboardGridView 가 .url/.status/.errorMessage 로 소비하므로 객체로 저장한다.
-      // 나머지 이미지 필드(reference_image, view_*, wide_shot 등)는 TEXT(public URL) 그대로.
-      const value =
-        field === 'storyboard_image'
-          ? {
-              url: publicUrl,
-              status: 'completed',
-              errorMessage: null,
-              generatedAt: Date.now(),
-            }
-          : publicUrl
+    if (type === 'video') {
+      // video_clips 는 id(uuid) 기준 — 영상 썸네일을 thumbnail_url + thumbnail_path 로 영속.
+      // (Node 탭 영상 카드가 thumbnail_url 을 우선 렌더 → 속도·전송 안정.)
       await supabaseAdmin
-        .from(target.table)
-        .update({ [field]: value })
+        .from('video_clips')
+        .update({ thumbnail_url: publicUrl, thumbnail_path: path })
+        .eq('id', entityId)
         .eq('project_id', projectId)
-        .eq(target.idCol, entityId)
+    } else {
+      const tableMap: Record<string, { table: string; idCol: string }> = {
+        character: { table: 'characters', idCol: 'character_id' },
+        location: { table: 'locations', idCol: 'location_id' },
+        shot: { table: 'shots', idCol: 'shot_id' },
+      }
+      const target = tableMap[type]
+      if (target) {
+        // storyboard_image 는 JSONB StoryboardImage 객체 (src/types/director-canvas.ts).
+        // ShotNode/StoryboardGridView 가 .url/.status/.errorMessage 로 소비하므로 객체로 저장한다.
+        // 나머지 이미지 필드(reference_image, view_*, wide_shot 등)는 TEXT(public URL) 그대로.
+        const value =
+          field === 'storyboard_image'
+            ? {
+                url: publicUrl,
+                status: 'completed',
+                errorMessage: null,
+                generatedAt: Date.now(),
+              }
+            : publicUrl
+        await supabaseAdmin
+          .from(target.table)
+          .update({ [field]: value })
+          .eq('project_id', projectId)
+          .eq(target.idCol, entityId)
+      }
     }
 
     return NextResponse.json({ publicUrl })

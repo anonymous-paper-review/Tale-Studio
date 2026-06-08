@@ -21,6 +21,7 @@ export default function StudioLayout({
   const setStage = useProjectStore((s) => s.setStage)
   const initLoading = useProjectStore((s) => s.initLoading)
   const projectId = useProjectStore((s) => s.projectId)
+  const verifyWriterGate = useProjectStore((s) => s.verifyWriterGate)
   const pathname = usePathname()
   const router = useRouter()
   const chatWidth = useChatUiStore((s) => s.chatWidth)
@@ -36,6 +37,14 @@ export default function StudioLayout({
         : null
     initProject(hint ?? undefined)
   }, [initProject])
+
+  // writer 산출물 게이트: projectId 확정 시 1회 검증 → 씬 없으면 producer 로 게이트백.
+  //   양쪽 진입 경로를 모두 커버 — 새로고침(initProject 가 projectId 세팅) /
+  //   홈 클릭(switchProject 가 projectId 세팅). initProject 의 early-return 과 무관하게 동작.
+  useEffect(() => {
+    if (!projectId) return
+    void verifyWriterGate(projectId)
+  }, [projectId, verifyWriterGate])
 
   // store.projectId ↔ URL ?projectId 동기화. 프로젝트 전환·stage 이동으로
   // 쿼리가 빠지면 history.replaceState로 다시 채워 새로고침 복원을 보장.

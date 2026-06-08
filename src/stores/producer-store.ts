@@ -87,7 +87,10 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         .update({
           story_text: storyText,
           settings: projectSettings,
-          // writer는 백그라운드 전용 스테이지 → 사용자는 artist로 직행 (decisions #37)
+          // writer는 백그라운드 전용 스테이지 → 사용자는 artist로 직행 (decisions #37).
+          //   current_stage 는 낙관적으로 artist 로 올리되(진행 중 새로고침해도 artist 유지),
+          //   진입 게이트(verifyWriterGate)가 "씬 없음 + run 없음/실패"면 producer 로 되돌려
+          //   빈 Director/Editor 진입을 막는다(자가 교정). → 거짓 진행 버그 해소.
           current_stage: 'artist',
         })
         .eq('id', projectId)
@@ -144,6 +147,9 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       if (project) {
         set({
           storyText: project.story_text ?? '',
+          // 이미 저장된 스토리가 있으면 "준비됨"으로 본다 — 핸드오프/재실행 버튼이
+          //   storyReady 게이트에 막혀 비활성화되지 않도록 (writer 재실행 가능하게).
+          storyReady: !!(project.story_text && project.story_text.trim().length > 0),
           projectSettings: {
             ...DEFAULT_SETTINGS,
             ...(project.settings as Partial<ProjectSettings>),

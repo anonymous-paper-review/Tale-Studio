@@ -120,7 +120,9 @@ export default function PostPage() {
         name: `${shot?.shotType ?? '비디오'} 오디오`,
         url: src.url,
         startSec: atSec,
-        durationSec,
+        // 표시 길이는 영상 슬롯(shot.durationSeconds)에 맞춰 옆 클립과 안 겹치게.
+        // 실제 오디오 길이는 sourceDurationSec(트림 한계)로 보존.
+        durationSec: shot?.durationSeconds ?? durationSec,
         peaks,
         sourceOffsetSec: 0,
         sourceDurationSec: durationSec,
@@ -139,21 +141,51 @@ export default function PostPage() {
       if (cancelled) return
       await loadPersisted()
       if (cancelled) return
-      // Director→Editor 첫 진입: 저장된 오디오가 없으면 각 샷 영상의 오디오를
-      //   같은 위치 오디오 트랙에 부착(드래그앤드롭과 동일). 무음/CORS면 자동 skip.
-      //   (영상 클립은 음소거 재생 + 오디오는 별도 트랙 구조라, 이게 없으면 무음)
+      // Director→Editor 첫 진입: 저장된 오디오가 없으면 각 샷 오디오를 영상 카드처럼
+      //   '즉시' 한 번에 트랙에 올린다(빈 파형) → 파형/실제 길이는 백그라운드 병렬 디코드로 채움.
+      //   (영상은 음소거 재생 + 오디오는 별도 트랙 구조. 소리는 <audio>로 나므로 디코드 전에도 재생됨)
       const st = useEditorStore.getState()
       if (st.audioClips.length === 0) {
-        for (const item of selectTimelineLayout(st)) {
-          if (cancelled) return
-          await attachVideoAudio(item.shotId, item.startSec)
+        const items = selectTimelineLayout(st)
+        const trackId = st.audioTracks[0]?.id
+        // 1) 즉시 생성 (순차 디코드 대기 없이 바로 표시)
+        const created: { id: string; url: string }[] = []
+        for (const item of items) {
+          const src = st.videoClips.find((c) => c.shotId === item.shotId)
+          if (!src?.url) continue
+          const shot = st.shots.find((s) => s.shotId === item.shotId)
+          const id = st.addAudioClip({
+            name: `${shot?.shotType ?? '비디오'} 오디오`,
+            url: src.url,
+            startSec: item.startSec,
+            durationSec: item.durationSec,
+            peaks: [],
+            sourceOffsetSec: 0,
+            sourceDurationSec: item.durationSec,
+            trackId,
+          })
+          created.push({ id, url: src.url })
         }
+        // 2) 백그라운드 병렬 디코드 → 파형/실제 길이 채움. 무음/CORS면 파형만 생략(소리는 재생).
+        void Promise.all(
+          created.map(async ({ id, url }) => {
+            try {
+              const { durationSec, peaks } = await decodeAudioPeaks(url)
+              if (cancelled || !(durationSec > 0)) return
+              useEditorStore
+                .getState()
+                .updateAudioClip(id, { peaks, sourceDurationSec: durationSec })
+            } catch {
+              /* 무음/CORS → 파형 생략 */
+            }
+          }),
+        )
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [projectId, loadData, loadPersisted, attachVideoAudio])
+  }, [projectId, loadData, loadPersisted])
 
   // Editor 진입 시 채팅 기본 접힘 (요청 6b). 떠날 때 이전 상태 복원
   useEffect(() => {

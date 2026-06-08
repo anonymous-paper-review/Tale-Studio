@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { StageId } from '@/types'
 import { STAGES } from '@/lib/constants'
+import { createClient } from '@/lib/supabase/client'
 
 interface ProjectState {
   currentStage: StageId
@@ -11,12 +12,22 @@ interface ProjectState {
   projectTitle: string
   initLoading: boolean
 
+  // ── writer 산출물 게이트 (씬/샷 존재 여부 = "writer 완료"의 진실) ──
+  /** 이 프로젝트에 씬이 존재 = writer 텍스트 파이프라인이 산출물을 남김 */
+  writerComplete: boolean
+  /** writer run 이 현재 진행 중 (진행 중이면 게이트백하지 않음 — artist 에서 진행률을 본다) */
+  writerActive: boolean
+  /** writer 산출물 없음 + 진행 중도 아님 + DB 단계가 producer 보다 앞 → producer 재실행 필요 */
+  writerNeedsRerun: boolean
+
   setStage: (stage: StageId) => void
   canNavigateTo: (stage: StageId) => boolean
   initProject: (projectId?: string) => Promise<void>
   createNewProject: () => Promise<void>
   switchProject: (id: string, title: string, stage?: StageId) => void
   renameProject: (title: string) => Promise<void>
+  /** 진입 시 writer 산출물(씬) 검증 → 없으면 producer 로 게이트백 + writerNeedsRerun 표시 */
+  verifyWriterGate: (projectId: string) => Promise<void>
   resetProject: () => void
 }
 
@@ -56,6 +67,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   projectId: null,
   projectTitle: 'Untitled',
   initLoading: false,
+  // 기본 true — 게이트 검증(verifyWriterGate) 전에는 잠그지 않는다(플래시 방지).
+  writerComplete: true,
+  writerActive: false,
+  writerNeedsRerun: false,
 
   // currentStage는 "지금 보는 단계", reachedStage는 "지금까지 연 최고 단계".
   // 뒤로 가도(currentStage 후퇴) 이미 연 단계가 잠기지 않도록 reachedStage는 단조 증가.
@@ -114,6 +129,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         initLoading: false,
         currentStage: 'producer',
         reachedStage: 'producer',
+        writerComplete: true,
+        writerActive: false,
+        writerNeedsRerun: false,
         })
       const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
       useDirectorCanvasStore.getState().setProjectId(projectId)
@@ -130,6 +148,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectTitle: title,
       currentStage: stage ?? 'producer',
       reachedStage: stage ?? 'producer',
+      // 새 프로젝트 진입 — 게이트 플래그 초기화 (verifyWriterGate 가 곧 재계산).
+      writerComplete: true,
+      writerActive: false,
+      writerNeedsRerun: false,
     })
     const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
     useDirectorCanvasStore.getState().setProjectId(id)
@@ -150,6 +172,55 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
+  // 진입 시 writer 산출물 게이트 검증.
+  //   - 씬이 있으면 → writer 완료. 잠그지 않는다(현 단계 그대로).
+  //   - 씬이 없고 writer run 도 진행 중이 아니고 DB 단계가 producer 보다 앞이면
+  //     → "깨진 진행"(옛 깨진 writer / 중단). producer 로 게이트백 + 재실행 플래그.
+  //   - 씬 없지만 run 이 진행 중이면 → 잠그지 않는다(artist 에서 진행률 관찰).
+  //   양쪽 진입 경로(새로고침=initProject, 홈 클릭=switchProject) 모두 projectId 가
+  //   세팅된 뒤 StudioLayout 이 1회 호출한다.
+  verifyWriterGate: async (projectId) => {
+    if (!projectId) return
+    const origStage = get().currentStage
+    try {
+      const supabase = createClient()
+      const { data: scenes } = await supabase
+        .from('scenes')
+        .select('scene_id')
+        .eq('project_id', projectId)
+        .limit(1)
+      const hasScenes = !!(scenes && scenes.length > 0)
+
+      // writer_runs 는 RLS(service-role only)라 클라이언트가 못 읽음 → 서버 status 라우트 사용.
+      let writerActive = false
+      let writerFailed = false
+      try {
+        const r = await fetch(`/api/writer/status/${projectId}`)
+        if (r.ok) {
+          const s = await r.json()
+          writerActive = !!(s?.started && !s?.pipeline_completed && !s?.pipeline_failed)
+          writerFailed = !!s?.pipeline_failed
+        }
+      } catch {
+        // status 조회 실패 → writerActive=false (씬 없으면 안전하게 게이트백)
+      }
+
+      const incomplete = !hasScenes && !writerActive
+      // producer 보다 앞 단계인데 비어있거나(레거시/중단), 마지막 run 이 실패면 재실행 안내.
+      const needsRerun = incomplete && (origStage !== 'producer' || writerFailed)
+
+      set({ writerComplete: hasScenes, writerActive, writerNeedsRerun: needsRerun })
+
+      if (needsRerun) {
+        // 단조 증가 reachedStage 를 의도적으로 producer 로 강제 하향 (setStage 우회).
+        //   StudioLayout 의 canNavigateTo 가드가 잠긴 단계 URL 을 producer 로 리다이렉트한다.
+        set({ currentStage: 'producer', reachedStage: 'producer' })
+      }
+    } catch (err) {
+      console.error('[project-store] verifyWriterGate failed:', err)
+    }
+  },
+
   resetProject: () => {
     set({
       workspaceId: null,
@@ -158,6 +229,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       currentStage: 'producer',
       reachedStage: 'producer',
       initLoading: false,
+      writerComplete: true,
+      writerActive: false,
+      writerNeedsRerun: false,
     })
   },
 }))
