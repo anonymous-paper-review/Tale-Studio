@@ -1,8 +1,11 @@
 # API & Feature Spec — V1
 
+> ⚠️ **구식 (2026-03-03 이후 미갱신, 2026-06-10 표기)**: 본 문서의 외부 API 연동(Kling/Veo/Imagen self-hosted)은 **미구현 계획**이며 실제 구현은 fal.ai API only.
+> **현재 구현의 진실**: 루트 `CLAUDE.md` §기술 스택 + `src/lib/writer/llm/` (fal.ts, dispatch.ts). 본 문서는 **6축 카메라 의미론·RAG 기능 의도** 참고용으로만 유지.
+>
 > 최종 수정: 2026-03-03
 > 역할: 외부 API 연동 + LLM 파이프라인 + Knowledge DB 기능 스펙
-> 관련: `mvp_scope.md` (범위), `ux_pages.md` (UI), `layers/L1~L3` (파이프라인 상세)
+> 관련: `mvp_scope.md` (범위), `ux_pages.md` (UI), `layers/README.md` (파이프라인 — L1/L2는 writer 엔진으로 통합)
 
 ---
 

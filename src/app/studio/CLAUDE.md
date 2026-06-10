@@ -22,7 +22,7 @@
 <main className="ml-16 mr-80 min-h-screen">  // 좌 sidebar / 우 GlobalChat 여백
   <div className="flex h-screen flex-col">{children}</div>
 </main>
-<GlobalChat />              // w-80 fixed right (artist 페이지에서 hide — Meeting Room 좌측 도킹으로 흡수)
+<GlobalChat />              // w-80 fixed right (전 stage 공통 렌더 — layout.tsx:87, 조건부 hide 없음)
 <Samantha />                // floating CTA
 ```
 

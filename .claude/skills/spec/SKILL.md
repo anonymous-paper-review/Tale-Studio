@@ -171,7 +171,14 @@ PROGRESS.md mirror gap
      - 있으면 사용자에게 확인 ("X개 미완료. 정말 archive할까요?")
    - source-of-truth spec 본문 final state 반영 여부 사용자 확인 (이건 자동 검증 불가, 사용자 명시 답변)
 
-2. **decisions.md entry 미리보기** (사용자 컨펌 후 commit)
+2. **하네스 정합 체크** (specs만 게이트하면 rules/CLAUDE.md가 썩는다 — 2026-06 artist rule 사고 재발 방지)
+   - proposal.md `Affected code`의 디렉토리들에 대해:
+     - 그 paths에 걸리는 `.claude/rules/*.md` (frontmatter `paths:` grep으로 식별)
+     - 해당 디렉토리(및 상위)의 `CLAUDE.md`
+   - 위 파일들이 **변경 후 상태와 정합하는지 읽고 확인**. 폐기된 패턴/파일/모델명 언급 발견 시 archive 전에 수정 (또는 사용자에게 보고 후 함께 수정).
+   - 아키텍처가 뒤집힌 change(롤백/재설계)면 rule **재작성**까지 이 단계에서.
+
+3. **decisions.md entry 미리보기** (사용자 컨펌 후 commit)
    ```markdown
    ### <next-N>. <name> archived
    - **결정**: <name> 검증 완료, specs/archive/<date>-<name>/ 로 이동
@@ -180,12 +187,12 @@ PROGRESS.md mirror gap
    ```
    사용자가 entry 내용 조정 가능 — 단순 "archived" 이상의 결정/회고가 있으면 그것 반영.
 
-3. **실행**
+4. **실행**
    - `git mv specs/changes/<name>/ specs/archive/<YYYY-MM-DD>-<name>/`
    - `specs/decisions.md` 가장 위 `## 확정` 아래 새 entry insert
    - tasks.md `## Active` 헤더를 `## Archived` 로 갱신 (timeline 가독성)
 
-4. **출력**
+5. **출력**
    - 새 archive 경로 + decisions.md 갱신 위치
    - "git status 확인 후 commit하세요" 안내
 

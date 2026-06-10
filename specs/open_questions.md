@@ -1,6 +1,6 @@
 # Questions Tracker
 
-> 최종 수정: 2026-03-03
+> 최종 수정: 2026-06-10
 > 열린 질문 + 닫힌 질문 통합 관리
 
 ---
@@ -62,12 +62,12 @@
 
 ### 열린 질문
 
-| ID | 질문 | 맥락 |
-|----|------|------|
-| Q-P2-1 | AI 작가의 시스템 프롬프트/역할 정의는? | 어떤 톤으로 가이드하는가? 자유도는? 채팅 패널 존재 확인됨, 역할 상세 미정 |
-| Q-P2-3 | 출연진 추출은 자동인가 수동인가? | L1이 씬 분할 시 캐릭터 추출하지만, 수동 추가 허용 여부 미정 |
+(없음 — 2026-06-10 정리)
 
-> P2 열린 질문 2개 남음. 구현 시 결정 필요.
+| ID | 질문 | 결정 (사후) | 근거 |
+|----|------|------|------|
+| Q-P2-1 | AI 작가의 시스템 프롬프트/역할 정의는? | **사실상 닫힘** — writer가 UI 없는 백엔드 스테이지로 일원화되어 "AI 작가 채팅" 자체가 폐기. 역할 정의는 writer 파이프라인 스테이지 프롬프트(`src/lib/writer/pipeline/stages/`)가 대체 | decisions #38 (2026-06-05) |
+| Q-P2-3 | 출연진 추출은 자동인가 수동인가? | **사실상 닫힘** — writer 엔진이 자동 추출해 DB(characters)를 채움. 수동 추가는 artist 카드 UI(add-character-dialog)에서 가능 | decisions #38 + `src/features/artist/` |
 
 ---
 
@@ -139,10 +139,15 @@
 
 | ID | 질문 | 맥락 |
 |----|------|------|
-| Q-SYS-1 | 프로젝트 저장/불러오기 방식은? | 자동저장? 수동? Supabase에 저장? 로컬? |
-| Q-SYS-2 | 에러 핸들링 (API 실패, 타임아웃) | 재시도? 사용자 알림? fallback? |
-| Q-SYS-6 | 백엔드 API 엔드포인트 목록 | 기술 스택은 확정 (Next.js API Routes). 엔드포인트 상세는 P3/P4 구현 시 정의 |
+| Q-SYS-2 | 에러 핸들링 (API 실패, 타임아웃) | **부분 닫힘 (2026-06-10)**: LLM transient 재시도(`src/lib/writer/llm/retry.ts`, 지수 백오프 4회) + 쿼터 fail-open(`src/lib/generation-quota.ts`) + 잡 failed 상태(`src/lib/generation-jobs.ts`) 구현. **열림**: 사용자-facing 에러 알림/복구 UX 정책 |
 | Q-L2-1 | 대사(Dialogue) 용도: 프롬프트/TTS/자막/하이브리드? | 영상 API 립싱크 품질 테스트 후 결정. (대사 *자동생성*은 폐기 — `shots.dialogue_lines`는 원작 대사 수동 입력용) |
+
+#### 사후 닫힘 (2026-06-10 정리)
+
+| ID | 질문 | 결정 (사후) | 근거 |
+|----|------|------|------|
+| Q-SYS-1 | 프로젝트 저장/불러오기 방식은? | **닫힘** — Supabase 영속 (projects/characters/scenes/shots 등 라이브 스키마). writer 파이프라인이 DB 기록 | `.claude/cache/db/README.md` + `src/app/api/project/` |
+| Q-SYS-6 | 백엔드 API 엔드포인트 목록 | **닫힘** — `src/app/api/` 실재 (artist/director/editor/writer/produce/generate 등). 코드가 진실 | `src/app/api/` |
 
 ---
 
@@ -152,12 +157,12 @@
 |------|------|------|------|
 | **제품 방향** | 0 | **1** | Q-DIR-1 닫힘 |
 | P1 Ground | 0 | **6** | V2 기준 전부 닫힘. MVP 포함 |
-| P2 Story Writer | **2** | **4** | Q-P2-1(AI역할), Q-P2-3(출연진) 미정. MVP 포함 |
+| P2 Story Writer | 0 | **6** | Q-P2-1/Q-P2-3 사후 닫힘 (decisions #38 writer 백엔드화) |
 | P3 Concept Artist | 0 | **4** | V2 구조 변경 반영. 에셋 전용 |
 | P4 Director | 0 | **4** | V2 구조 변경 반영. Storyboard 통합 |
 | P5 Editor | 0 | **1** | V2 디자인 확정. MVP Lite 포함 |
-| 시스템 전반 | **4** | 3 | Q-L2-1(대사용도) 추가. SYS-1,2,6 미정 |
-| **합계** | **6** | **23** | MVP = P1~P5 (Decision #28) |
+| 시스템 전반 | **2** | 5 | Q-SYS-1/6 사후 닫힘. Q-SYS-2 부분 닫힘(알림 UX), Q-L2-1 열림 |
+| **합계** | **2** | **27** | MVP = P1~P5 (Decision #28) |
 
 ---
 
@@ -165,6 +170,7 @@
 
 | 날짜 | 내용 |
 |------|------|
+| 2026-06-10 | 사후 정리: Q-P2-1/Q-P2-3(writer 백엔드화, #38), Q-SYS-1(Supabase 영속), Q-SYS-6(api/ 실재) 닫힘. Q-SYS-2 부분 닫힘(retry/quota 구현, 알림 UX 열림). 열린 6→2 |
 | 2026-03-03 | V3: P1~P5 전체 MVP 포함 반영. Q-L2-1(대사용도) 추가. Q-P4-1 근거 수정. 열린 5→6 |
 | 2026-03-03 | V2 (reference_v2) 반영. P1 전부 닫힘, P2 3개 닫힘, P3/P4 구조 변경 (Storyboard→P4 이동), P5 디자인 확정. 열린 질문 13→5 |
 | 2026-02-26 | Q-DIR-1 닫힘 (둘 다, 같은 파이프라인). Q-P1-6 닫힘 (채팅+파일). 팀 논의 반영 |

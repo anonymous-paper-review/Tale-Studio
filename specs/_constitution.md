@@ -13,25 +13,29 @@
 ## Architecture: 3-Level Pipeline + L0
 
 ```
-[L0 Concept Canvas] → Asset Storage
-                            ↓
-Story → [Pumpup] → [L1 Scene Architect] → [L2 Shot Composer] → [L3 Prompt Builder] → [Video API]
+[L0 Artist 카드형 패널] → Asset Storage
+                              ↓
+Story → [writer 엔진] → DB(scenes/characters/locations/shots) → [L3 Prompt Builder] → [Video API]
+        (옛 L1 Scene Architect + L2 Shot Composer를 통합 수행)
 ```
 
-- **L0** (decisions #29): L1 이전에 캐릭터·월드·Status를 사전 정의. 노드 그래프 패러다임.
-- **L1** (decisions #1): 스토리 요소 (대사, 액션, 감정) 분할. Pumpup으로 시각 정보 확장.
-- **L2** (decisions #1): 샷 단위로 분해.
+- **L0** (decisions #29): L1 이전에 캐릭터·월드를 사전 정의. ~~노드 그래프 패러다임~~ → **카드형 UI로 롤백** (2026-06-04, `specs/archive/2026-06-04-redesign-l0-canvas/`).
+- **L1+L2** (decisions #1 → #38로 통합): 씬/캐릭터 분할 + 샷 분해는 **writer 엔진**(`src/lib/writer/`)이 백그라운드 수행. 옛 Pumpup/Scene Architect/Shot Composer 명칭 폐기.
 - **L3** (decisions #1): Knowledge DB의 cinematography 테크닉으로 프롬프트 강화.
 
-## 노드 = 개체 패러다임 (decisions #29)
+## 노드 = 개체 패러다임 (decisions #29) — 현재 Director Canvas 전용
 
-- Higgsfield 노드 = 모델. **우리 노드 = 엔티티** (Character / World / Status / Scene / Shot / Video).
+> 2026-06-10 사실 업데이트: artist(L0)는 카드형 롤백으로 노드 패러다임에서 제외. 아래 원칙은 **P4 Director Canvas**에만 적용.
+
+- Higgsfield 노드 = 모델. **우리 노드 = 엔티티** (Scene / Shot / Video — 옛 Character/World/Status 노드는 폐기).
 - 노드 시각화는 *모델 흐름*이 아니라 *콘텐츠 자산 관계*를 표현.
 - 동종 노드 연결은 `references` (자유 텍스트 메모) — `parent`는 Status Branch 자동 생성 전용 (decisions #32).
 
 ## Agentic Canvas (decisions #31)
 
-- artist (L0) + director 캔버스 모두 **채팅 agent가 노드를 직접 조작**. `CanvasUpdate` / `DirectorCanvasUpdate` action union.
+> 2026-06-10 사실 업데이트: artist는 카드형 롤백으로 캔버스 조작 대상에서 제외 — 현재는 director 캔버스만 해당.
+
+- director 캔버스는 **채팅 agent가 노드를 직접 조작**. `DirectorCanvasUpdate` action union (옛 artist `CanvasUpdate`는 폐기).
 - 매 채팅 turn마다 캔버스 스냅샷 (노드 목록 + 엣지 + 선택 노드 풀 정보)을 prompt에 자동 주입.
 - **파괴/등록 액션은 agent 직접 실행 금지** — `requestDelete`, `requestRegister`는 user-facing 모달 (DeleteConfirmModal, 등록 폼) 트리거만. undo 미구현 상태 안전장치.
 - read-only 가이드 (Higgsfield 등 흔함) → tool-use agent는 tale-studio 차별화.
@@ -57,15 +61,17 @@ Story → [Pumpup] → [L1 Scene Architect] → [L2 Shot Composer] → [L3 Promp
 
 P1 (Meeting Room) + P2 (Script Room) + P3 (Visual Studio = L0 Concept Canvas) + P4 (Director = Director Canvas) + P5 Lite (Editor) 전체 포함. DataProvider Mock 패턴 폐기.
 
-## 기술 스택 (decisions #22, 변경 적음)
+## 기술 스택 (decisions #22, 변경 적음 — 2026-06-10 사실 업데이트)
 
 - **Frontend**: Next.js 16 + Tailwind v4 + shadcn/ui + Zustand (pnpm)
-- **Canvas**: React Flow (xyflow)
-- **3D**: Three.js + React Three Fiber (P4 일부)
+- **Canvas**: React Flow (xyflow) — P4 Director Canvas만 (L0 Artist는 카드형, 미사용)
+- **3D**: Three.js + React Three Fiber (P4 일부 — **아직 미설치**, 도입 시 추가)
 - **Backend**: Next.js API Routes + Supabase (PostgreSQL)
-- **AI**: Gemini LLM, Imagen + H100 self-hosted (이미지), Kling + Veo + Pro6000 self-hosted (비디오)
+- **AI** (실제 구현 — 상세는 루트 `CLAUDE.md` §기술 스택):
+  - 채팅 LLM = Claude `claude-sonnet-4-6` / writer 파이프라인 = Gemini+Claude multi-provider dispatch
+  - 이미지·비디오 = **fal.ai API only** (옛 "Imagen+H100 self-hosted, Kling+Veo+Pro6000 self-hosted" 계획은 미구현 — decisions #37, #38 이후 fal 일원화)
 
-## Kling 6축 카메라 (decisions #20)
+## 6축 카메라 (decisions #20 — 명명 기원은 Kling, 현재 모델 비종속 제품 개념)
 
 | 축 | 범위 | 동작 |
 |----|------|------|
@@ -77,6 +83,7 @@ P1 (Meeting Room) + P2 (Script Room) + P3 (Visual Studio = L0 Concept Canvas) + 
 | zoom | -10~+10 | 화각 좁(-)/넓(+) |
 
 주의: Kling pan/tilt 명명이 일반 시네마토그래피와 반대 (pan=pitch, tilt=yaw). Camera-axis 값은 Geist Mono로 표시.
+2026-06-10 참고: 현재 비디오 생성은 fal.ai 모델 사용 (Kling API 미연동). 6축은 `CameraConfig` 타입 + 프롬프트 빌더의 제품 개념으로 유지.
 
 ## 작업 진행 규약
 

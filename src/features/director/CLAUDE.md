@@ -1,22 +1,24 @@
 # src/features/director — Director Canvas
 
+> 제약(React Flow 패턴 / portal 금지 / snap / 노드 색)은 `.claude/rules/director-canvas.md` — 여기는 anatomy·작업 가이드만.
+
 ## Status
-- Status: Director Canvas 노드 그래프 재설계 진행 중 (2026-05-25~)
-- Spec: `@../../../specs/layers/director_canvas.md`
-- 진행 중 변경: `@../../../specs/changes/redesign-director-canvas/`
+- 재설계 완료·archive (`@../../../specs/archive/2026-06-05-redesign-director-canvas/`). Spec: `@../../../specs/layers/director_canvas.md`
+- 구 Director 패널(`legacy/`)과 `director-store`는 **제거 완료**
 
 ## Stack
 - React Flow (xyflow) — 노드 그래프
-- Three.js + React Three Fiber — 3D viewport (일부 노드, depth parallax 후속)
+- Three.js + React Three Fiber — 3D viewport 예정 (**미설치** — 도입 시 추가)
 - Zustand — `@../../../stores/director-canvas-store.ts`
-- shadcn/ui — 인스펙터/모달 (Sheet, Dialog), context menu (DropdownMenu)
+- shadcn/ui — 인스펙터/모달 (popup/모달에서만 portal 위젯)
 
-## 디렉토리 anatomy
+## 디렉토리 anatomy (2026-06-10 동기화)
 - `canvas-nodes/` — 1 file = 1 node type (Base/Scene/Shot/Video)
-- `canvas-edges/` — 1 file = 1 edge type (CategoryEdge)
+- `canvas-edges/` — CategoryEdge (`parent` / `relates-to` — `DirectorEdgeCategory`)
 - `canvas-popups/` — CreatorModal, RelationModal, DeleteConfirmModal, DirectorNodePopup + Scene/Shot/VideoNodePopup
+- `canvas-views/` — 캔버스 뷰
 - `hooks/` — use-director-canvas-warm-starting 등
-- `legacy/` — 구 Director 패널 (D-8까지 유지, 검증 끝나면 삭제)
+- 루트: `angle-control.tsx`, `camera-preset-control.tsx`, `key-light.tsx` — 카메라/조명 컨트롤
 
 ## 자주 하는 작업
 | 무엇 | 어디 |
@@ -28,23 +30,9 @@
 | 데이터 모델 변경 | `../../../types/director-canvas.ts` + 스펙 업데이트 |
 | Agent 액션 추가 | `DirectorCanvasUpdate` union + `applyUpdates` |
 
-## 컨벤션
-- 노드 ID는 `nanoid(10)`. URL slug 아님
-- 노드 좌표는 **16px snap**. 자유 좌표 금지 (내부 결정 #18)
-- 선택 halo: `ring-2 ring-node-selected ring-offset-2`
-- 노드 컴포넌트: plain shadcn primitive(`Button`/`Input`/`Badge`) OK. **Radix portal 위젯(`Select`/`Popover`/`Tooltip`/`Dialog`/`DropdownMenu`)은 노드 본체 금지** (RF pane 밖 portal 충돌 → popup/모달에). 색은 캔버스 확장 토큰 우선
-- React Flow `nodeTypes` / `edgeTypes`는 **module-scope 상수** (인라인 객체 매 렌더 재생성 → 성능 저하)
-- 핀 연결은 `connectionMode="loose"` (BaseNode Handle 4면 패턴)
-
-## 노드 색 (내부 #10)
-- Scene = `--chart-3`
-- Shot = `--chart-4`
-- Video = `--chart-5`
-
 ## Final 마킹 (내부 #11)
-- Video 헤더 ★ = Final 토글. Shot당 1개 강제
-- NodePopup에서도 토글 가능
+- Video 헤더 ★ = Final 토글. Shot당 1개 강제. NodePopup에서도 토글 가능
 
 ## 안 건드릴 곳
-- `../artist/canvas-*` — 패턴 참고는 OK, 직접 편집 금지
-- `../../stores/artist-store.ts`, `canvas-store.ts`, `asset-storage-store.ts` — 직접 편집 금지
+- `../artist/` — 직접 편집 금지
+- `../../stores/artist-store.ts`, `asset-storage-store.ts` — 직접 편집 금지
