@@ -21,16 +21,15 @@
 
 ---
 
-## 🔴 현재 검증 보드 (2026-06-04 갱신)
+## 현재 검증 보드 — 비어 있음 (2026-06-10 일괄 waive)
 
-> **Director Canvas (Phase 11)**: D-1 / D-2 / D-3 / D-7 + B-D1 + ShotNode 에셋 선택 코드 완료, 브라우저 검증 대기 — 상세는 본 파일의 **Phase 11 검증 보드** 참조.
+> **2026-06-10 사용자 결정**: 누적 `[c]` 43건 + changes 21건을 **검증 waive로 일괄 `[x]` 승격**.
+> 사유: writer 영역이 외부 협업자에 의해 재작업 예정 — 현 시점 브라우저 검증은 재작업 후 무효화되므로 생략.
+> 재작업 머지 후 회귀 확인이 필요하면 그때 신규 검증 항목으로 등록할 것 (**waive ≠ 브라우저 동작 보증**).
 
-> **Artist 카드 롤백 (Phase 12)**: 카드형 UI 복원 코드 완료, 브라우저 검증 대기 — 상세는 Phase 12 참조.
-
-> **진행 중 changes/**: 없음 (전부 archive). 코드 완료·**브라우저 검증 대기** 상태가 다수 — 아래 검증 보드/archive 참조.
+> **진행 중 changes/**: `chat-proactive-copilot`, `workspace-inventory` — 둘 다 코드 완료·검증 waive (archive 의식만 남음).
 > 2026-06-05 archive: `unify-svc-writer-pipeline` / `writer-background-artist-progress` / `director-storyboard` /
 >   `rollback-artist-card` / `redesign-director-canvas` / `unify-director-store-db` (검증 waive, decisions #39~#42, #49~#50).
-> ⚠️ 다음 진입 시 권장: Director 일원화(unify-director-store-db) end-to-end 브라우저 검증 — 편집→DB 반영, localStorage 비우고 복원.
 
 **임시 조치 (여전히 유효)**:
 - `project-store.canNavigateTo()` true 고정 — 원복 시점 미정
@@ -53,28 +52,28 @@
 - [x] `src/types/asset.ts` — `GeneratedImage` 타입 이동 (2026-06-04)
 - [x] `tsc --noEmit` exit 0 (2026-06-04)
 
-### Artist UI (코드 ✓ / 브라우저 검증 대기)
+### Artist UI (코드 ✓ / 검증 waive 2026-06-10)
 
-- [c] `src/app/studio/artist/page.tsx` — Tabs(Characters/World/Inventory) 카드형 복원 — 코드 ✓ / 검증 대기
-- [c] `character-panel.tsx` / `world-panel.tsx` / `inventory-grid.tsx` / `image-placeholder.tsx` 복원 — 코드 ✓ / 검증 대기
-- [c] Register 버튼 → asset-storage-store 기록 동작 — 코드 ✓ / 브라우저 검증 대기
-- [c] `global-chat-store` artist 분기 canvas-store 의존 제거 + 정적 warm tip — 코드 ✓ / 검증 대기
+- [x] `src/app/studio/artist/page.tsx` — Tabs(Characters/World/Inventory) 카드형 복원 — 코드 ✓ / 검증 waive 2026-06-10
+- [x] `character-panel.tsx` / `world-panel.tsx` / `inventory-grid.tsx` / `image-placeholder.tsx` 복원 — 코드 ✓ / 검증 waive 2026-06-10
+- [x] Register 버튼 → asset-storage-store 기록 동작 — 코드 ✓ / 검증 waive 2026-06-10
+- [x] `global-chat-store` artist 분기 canvas-store 의존 제거 + 정적 warm tip — 코드 ✓ / 검증 waive 2026-06-10
 
-### Director ShotNode 에셋 선택 (코드 ✓ / 브라우저 검증 대기)
+### Director ShotNode 에셋 선택 (코드 ✓ / 검증 waive 2026-06-10)
 
-- [c] ShotNodePopup 등장 캐릭터/월드 드롭다운/칩 UI (director_canvas.md §5.3) — 코드 ✓ / 검증 대기
-- [c] `characterAssetIds` / `worldAssetIds` 필드 채우기 — 코드 ✓ / 검증 대기
-- [c] `resolveShotAssetImages` 스토리보드 생성 레퍼런스 — 코드 ✓ / 검증 대기
+- [x] ShotNodePopup 등장 캐릭터/월드 드롭다운/칩 UI (director_canvas.md §5.3) — 코드 ✓ / 검증 waive 2026-06-10
+- [x] `characterAssetIds` / `worldAssetIds` 필드 채우기 — 코드 ✓ / 검증 waive 2026-06-10
+- [x] `resolveShotAssetImages` 스토리보드 생성 레퍼런스 — 코드 ✓ / 검증 waive 2026-06-10
 
-### 캐릭터 생성 + hover 정보 (2026-06-06, 코드 ✓ / 브라우저 검증 대기)
+### 캐릭터 생성 + hover 정보 (2026-06-06, 코드 ✓ / 검증 waive 2026-06-10)
 
 > 사용자 요청 3태스크 (Register 의미 설명 + 신규 캐릭터 생성 UI + 카드 hover 정보). tsc/lint clean.
 
-- [c] `artist-store.addCharacter` 액션 + `createCharacter` ArtistUpdate + `applyUpdates` 분기 — 코드 ✓ / 검증 대기
-- [c] `POST /api/artist/character` — characters 테이블 insert (supabaseAdmin) — 코드 ✓ / 검증 대기
-- [c] `add-character-dialog.tsx` + 카드 하단 (+) 버튼 → 이름/role/설명/외형 Dialog → 카드 등장 — 코드 ✓ / 브라우저 검증 대기
-- [c] 캐릭터 카드 이미지 hover → role/description/외형 + writer 등장 씬(narrativeSummary 배경) Tooltip — 코드 ✓ / 검증 대기
-- [c] `/api/artist/chat` 카드모델 재작성(createCharacter/regenerateCharacter/regenerateWorldAsset) + `global-chat-store` artist applyUpdates 활성화 → 채팅으로 캐릭터 생성 — 코드 ✓ / 브라우저 검증 대기
+- [x] `artist-store.addCharacter` 액션 + `createCharacter` ArtistUpdate + `applyUpdates` 분기 — 코드 ✓ / 검증 waive 2026-06-10
+- [x] `POST /api/artist/character` — characters 테이블 insert (supabaseAdmin) — 코드 ✓ / 검증 waive 2026-06-10
+- [x] `add-character-dialog.tsx` + 카드 하단 (+) 버튼 → 이름/role/설명/외형 Dialog → 카드 등장 — 코드 ✓ / 검증 waive 2026-06-10
+- [x] 캐릭터 카드 이미지 hover → role/description/외형 + writer 등장 씬(narrativeSummary 배경) Tooltip — 코드 ✓ / 검증 waive 2026-06-10
+- [x] `/api/artist/chat` 카드모델 재작성(createCharacter/regenerateCharacter/regenerateWorldAsset) + `global-chat-store` artist applyUpdates 활성화 → 채팅으로 캐릭터 생성 — 코드 ✓ / 검증 waive 2026-06-10
 
 ---
 
@@ -84,11 +83,11 @@
 
 | 항목 | 상태 | 비고 |
 |------|------|------|
-| D-1 인프라/타입/스토어/노드/엣지 | `[c]` | typecheck/lint clean (2026-05-25) |
-| D-2 캔버스 페이지 + 모달들 + Inspector(임시) | `[c]` | next dev 부팅 OK (`Ready in 2.1s`) |
-| **B-D1 빈 캔버스 더블클릭 → CreatorModal 안 뜨는 버그** | `[c]` | 사용자 보고(2026-05-25). CanvasInner fragment → wrapper div + onDoubleClick을 wrapper에 직접 등록(ReactFlow 내부 처리와 독립적 캡처). typecheck clean. **브라우저 검증 대기** |
-| D-3 NodePopup 3종 (Scene/Shot/Video) | `[c]` | 2026-05-25. Inspector aside 제거(결정 #12 완료). 브라우저 검증 대기 |
-| D-7 Agentic Director Canvas (채팅으로 노드 조작) | `[c]` | 2026-05-25. global-chat-store director 분기, /api/director/chat 개편, warm starting 훅. 브라우저 검증 대기 |
+| D-1 인프라/타입/스토어/노드/엣지 | `[x]` (waive 06-10) | typecheck/lint clean (2026-05-25) |
+| D-2 캔버스 페이지 + 모달들 + Inspector(임시) | `[x]` (waive 06-10) | next dev 부팅 OK (`Ready in 2.1s`) |
+| **B-D1 빈 캔버스 더블클릭 → CreatorModal 안 뜨는 버그** | `[x]` (waive 06-10) | 사용자 보고(2026-05-25). CanvasInner fragment → wrapper div + onDoubleClick을 wrapper에 직접 등록(ReactFlow 내부 처리와 독립적 캡처). typecheck clean. 검증 waive 06-10 |
+| D-3 NodePopup 3종 (Scene/Shot/Video) | `[x]` (waive 06-10) | 2026-05-25. Inspector aside 제거(결정 #12 완료). 검증 waive 06-10 |
+| D-7 Agentic Director Canvas (채팅으로 노드 조작) | `[x]` (waive 06-10) | 2026-05-25. global-chat-store director 분기, /api/director/chat 개편, warm starting 훅. 검증 waive 06-10 |
 | 환경 셋업: `.env.local` 복사 + `pnpm-workspace.yaml` allowBuilds true | `[x]` | 2026-05-25, `pnpm dev` 정상 부팅 |
 
 다음 작업 진입 권장 순서:
@@ -118,12 +117,12 @@
 
 ### Phase D-1: 인프라 + 데이터 모델 (2026-05-25 완료)
 
-- [c] DB 마이그레이션 `005_director_canvas_layout.sql` — scenes/shots/video_clips에 `canvas_position` JSONB + `is_final`, `take_label`, `override` 컬럼 + 부분 인덱스 (※ decisions #43: 005는 라이브 미적용·불필요로 정정. canvas_position은 localStorage 유지)
-- [c] `src/types/director-canvas.ts` — `DirectorNodeKind`/`SceneNodeData`/`ShotNodeData`/`VideoNodeData`/`VideoOverride`/엣지 타입 + ID 헬퍼 + 레이아웃 상수 + type guards
-- [c] `src/types/index.ts` — re-export 추가
-- [c] `src/stores/director-canvas-store.ts` — Zustand persist (key `tale-director-canvas-v1-default`). addSceneNode/addShotNode/addVideoTake/updateNodeData/deleteNode/setVideoFinal(Shot당 1개 강제)/setVideoStatus/applyVideoOverride/propagateStaleFromShot/cascade 삭제 confirm/relation modal/selectors(getChildShots, getChildVideos, getFinalVideo, getEffectiveShotConfig, nextShotPosition, nextScenePosition)
-- [c] `src/features/director/canvas-nodes/{Base,Scene,Shot,Video}Node.tsx` — chart-3/4/5 매핑, Handle 4면, 헤더 액션(Edit/Branch/Copy 비활성/Delete), Video는 ★ Final 토글 헤더에 prim, override indicator 표시
-- [c] `src/features/director/canvas-edges/CategoryEdge.tsx` — parent 2px / relates-to 1.5px, selected 시 primary 색
+- [x] DB 마이그레이션 `005_director_canvas_layout.sql` — scenes/shots/video_clips에 `canvas_position` JSONB + `is_final`, `take_label`, `override` 컬럼 + 부분 인덱스 (※ decisions #43: 005는 라이브 미적용·불필요로 정정. canvas_position은 localStorage 유지) — 검증 waive 2026-06-10
+- [x] `src/types/director-canvas.ts` — `DirectorNodeKind`/`SceneNodeData`/`ShotNodeData`/`VideoNodeData`/`VideoOverride`/엣지 타입 + ID 헬퍼 + 레이아웃 상수 + type guards — 검증 waive 2026-06-10
+- [x] `src/types/index.ts` — re-export 추가 — 검증 waive 2026-06-10
+- [x] `src/stores/director-canvas-store.ts` — Zustand persist (key `tale-director-canvas-v1-default`). addSceneNode/addShotNode/addVideoTake/updateNodeData/deleteNode/setVideoFinal(Shot당 1개 강제)/setVideoStatus/applyVideoOverride/propagateStaleFromShot/cascade 삭제 confirm/relation modal/selectors(getChildShots, getChildVideos, getFinalVideo, getEffectiveShotConfig, nextShotPosition, nextScenePosition) — 검증 waive 2026-06-10
+- [x] `src/features/director/canvas-nodes/{Base,Scene,Shot,Video}Node.tsx` — chart-3/4/5 매핑, Handle 4면, 헤더 액션(Edit/Branch/Copy 비활성/Delete), Video는 ★ Final 토글 헤더에 prim, override indicator 표시 — 검증 waive 2026-06-10
+- [x] `src/features/director/canvas-edges/CategoryEdge.tsx` — parent 2px / relates-to 1.5px, selected 시 primary 색 — 검증 waive 2026-06-10
 
 DoD:
 - [x] `npx tsc --noEmit` clean (2026-05-25)
@@ -133,38 +132,38 @@ DoD:
 
 ### Phase D-2: 캔버스 + 노드 기본 UI (2026-05-25 코드 완료)
 
-- [c] `src/app/studio/director/page.tsx` 재작성 — 좌 Meeting Room 세로 strip placeholder + 중 ReactFlow + 우 Inspector(단계적, 결정 #12) + 하 Palette placeholder + Legacy view 링크
-- [c] 기존 director/page.tsx → `legacy/page.tsx`로 이동 (검증 끝나면 삭제)
-- [c] `CreatorModal` (`canvas-popups/CreatorModal.tsx`) — Scene/Shot 선택. Scene 0개면 Scene 강제, 기존 있으면 Shot 가능 + 부모 Scene 셀렉터
-- [c] `RelationModal` (`canvas-popups/RelationModal.tsx`) — relates-to 카테고리 + 자유 텍스트
-- [c] `DeleteConfirmModal` (`canvas-popups/DeleteConfirmModal.tsx`) — cascade 정보 + Final 영향 경고
-- [c] SceneNode Branch wire-up — `nextShotPosition`으로 형제 Shot 자동 stacking
-- [c] 핀 connectionMode='loose' + 더블클릭 노드 생성 + Snap 16px + persist (zustand) — 이전 D-1 산출물 그대로 활용
-- [c] 빈 캔버스 hint ("캔버스를 더블클릭해서 첫 Scene을 만들어 보세요")
-- [c] 우측 Inspector: 선택된 Shot 노드의 camera/lighting/cameraPreset을 기존 AngleControl/KeyLight/CameraPresetControl 컴포넌트로 편집 (단계적 마이그레이션, 결정 #12)
-- [c] 핀 → 빈 공간 release: Scene→Shot, Shot→Video 자동 자식 생성 (Video는 leaf라 무시)
-- [c] HandoffButton (Head to Editor) 그대로 유지
+- [x] `src/app/studio/director/page.tsx` 재작성 — 좌 Meeting Room 세로 strip placeholder + 중 ReactFlow + 우 Inspector(단계적, 결정 #12) + 하 Palette placeholder + Legacy view 링크 — 검증 waive 2026-06-10
+- [x] 기존 director/page.tsx → `legacy/page.tsx`로 이동 (검증 끝나면 삭제) — 검증 waive 2026-06-10
+- [x] `CreatorModal` (`canvas-popups/CreatorModal.tsx`) — Scene/Shot 선택. Scene 0개면 Scene 강제, 기존 있으면 Shot 가능 + 부모 Scene 셀렉터 — 검증 waive 2026-06-10
+- [x] `RelationModal` (`canvas-popups/RelationModal.tsx`) — relates-to 카테고리 + 자유 텍스트 — 검증 waive 2026-06-10
+- [x] `DeleteConfirmModal` (`canvas-popups/DeleteConfirmModal.tsx`) — cascade 정보 + Final 영향 경고 — 검증 waive 2026-06-10
+- [x] SceneNode Branch wire-up — `nextShotPosition`으로 형제 Shot 자동 stacking — 검증 waive 2026-06-10
+- [x] 핀 connectionMode='loose' + 더블클릭 노드 생성 + Snap 16px + persist (zustand) — 이전 D-1 산출물 그대로 활용 — 검증 waive 2026-06-10
+- [x] 빈 캔버스 hint ("캔버스를 더블클릭해서 첫 Scene을 만들어 보세요") — 검증 waive 2026-06-10
+- [x] 우측 Inspector: 선택된 Shot 노드의 camera/lighting/cameraPreset을 기존 AngleControl/KeyLight/CameraPresetControl 컴포넌트로 편집 (단계적 마이그레이션, 결정 #12) — 검증 waive 2026-06-10
+- [x] 핀 → 빈 공간 release: Scene→Shot, Shot→Video 자동 자식 생성 (Video는 leaf라 무시) — 검증 waive 2026-06-10
+- [x] HandoffButton (Head to Editor) 그대로 유지 — 검증 waive 2026-06-10
 
 DoD:
 - [x] `npx tsc --noEmit` clean
 - [x] ESLint clean (D-2 신규 파일)
 - [x] `next dev` 부팅 성공 (`✓ Ready in 2.1s`)
-- [ ] 브라우저 검증 시나리오: 더블클릭 Scene 생성 / Scene Branch→Shot 자동 / Shot Branch→Video 자동 / 핀-핀 연결→RelationModal / 노드 선택→Inspector 슬라이더 / Delete→cascade 모달 / 새로고침 보존
+- [~] 브라우저 검증 시나리오 — waive (2026-06-10 사용자 결정)
 
 ### Phase D-3: NodePopup (Scene / Shot / Video) (2026-05-25 코드 완료)
 
-- [c] `DirectorNodePopup` 라우터 — popupNodeId 기반 분기
-- [c] `SceneNodePopup` — Location / TimeOfDay / Mood / Description + 자식 Shot 추가 버튼
-- [c] `ShotNodePopup` — prompt / 참고 이미지 업로드 + 제거 / 카메라 6축 (AngleControl) / 조명 (KeyLight) / 카메라 프리셋 (CameraPresetControl) / Provider 선택 / Branch=새 Video / 삭제
-- [c] `VideoNodePopup` — 마더 prefilled + override indicator / Final 토글 (헤더 ★) / 재생성 placeholder (D-5 wire-up) / 카메라·조명·렌즈 override 편집
-- [c] Video 헤더 ★ 아이콘 = Final 토글 (Shot당 1개 강제 enforce) — D-1에서 이미 완료
-- [c] director/page.tsx에 `<DirectorNodePopup />` 마운트
-- [c] 결정 #12 완료: 우측 Inspector aside 제거 (NodePopup이 흡수)
+- [x] `DirectorNodePopup` 라우터 — popupNodeId 기반 분기 — 검증 waive 2026-06-10
+- [x] `SceneNodePopup` — Location / TimeOfDay / Mood / Description + 자식 Shot 추가 버튼 — 검증 waive 2026-06-10
+- [x] `ShotNodePopup` — prompt / 참고 이미지 업로드 + 제거 / 카메라 6축 (AngleControl) / 조명 (KeyLight) / 카메라 프리셋 (CameraPresetControl) / Provider 선택 / Branch=새 Video / 삭제 — 검증 waive 2026-06-10
+- [x] `VideoNodePopup` — 마더 prefilled + override indicator / Final 토글 (헤더 ★) / 재생성 placeholder (D-5 wire-up) / 카메라·조명·렌즈 override 편집 — 검증 waive 2026-06-10
+- [x] Video 헤더 ★ 아이콘 = Final 토글 (Shot당 1개 강제 enforce) — D-1에서 이미 완료 — 검증 waive 2026-06-10
+- [x] director/page.tsx에 `<DirectorNodePopup />` 마운트 — 검증 waive 2026-06-10
+- [x] 결정 #12 완료: 우측 Inspector aside 제거 (NodePopup이 흡수) — 검증 waive 2026-06-10
 
 DoD:
 - [x] `npx tsc --noEmit` clean
 - [x] ESLint clean (D-3 신규 파일)
-- [ ] 브라우저 검증: 노드 더블클릭 → 팝업 → 카메라/조명/렌즈 슬라이더 → 자동 저장 / Final 토글 ★ Shot당 1개 / VideoNodePopup override indicator
+- [~] 브라우저 검증 — waive (2026-06-10 사용자 결정)
 
 ### Phase D-4: Writer ↔ Director 양방향 Sync
 
@@ -198,23 +197,18 @@ DoD: 셋업 저장 → 다른 Shot에 드래그 → 적용 확인
 
 ### Phase D-7: Meeting Room — Agentic Director Canvas (2026-05-25 코드 완료)
 
-- [c] `DirectorCanvasUpdate` union (13 액션: addScene/addShot/updateScene/updateShot/addVideoTake/setCamera/setLighting/setCameraPreset/generateVideo/connect/requestDelete/selectNode) + `applyUpdates()` + tempId 매핑
-- [c] `serializeDirectorCanvasContext(state)` 헬퍼 — Scene→Shot→Video 트리 + 통계 + 선택 노드 풀 정보
-- [c] `/api/director/chat` 개편 — Legacy/Canvas 분기 (canvasContext 유무로). DIRECTOR_CANVAS_SYSTEM 프롬프트 + validateCanvasUpdates 검증
-- [c] `global-chat-store` director 분기 — canvas nodes 있으면 canvasContext 전달, applyUpdates 적용. Legacy 응답(suggestedCamera 등)도 backward compat 유지
-- [c] 우측 floating GlobalChat 그대로 사용 (Artist와 동일 패턴, 별도 좌측 도킹 컴포넌트 미생성 — Artist도 같음)
-- [c] `use-director-canvas-warm-starting.ts` 훅 — Scene 0 / Shot 0 / Video 0 / Final 누락 / 같은 Shot Video ≥3 5단계 룰
-- [c] GlobalChat에서 artistWarmTip / directorWarmTip 둘 다 wire-up
+- [x] `DirectorCanvasUpdate` union (13 액션: addScene/addShot/updateScene/updateShot/addVideoTake/setCamera/setLighting/setCameraPreset/generateVideo/connect/requestDelete/selectNode) + `applyUpdates()` + tempId 매핑 — 검증 waive 2026-06-10
+- [x] `serializeDirectorCanvasContext(state)` 헬퍼 — Scene→Shot→Video 트리 + 통계 + 선택 노드 풀 정보 — 검증 waive 2026-06-10
+- [x] `/api/director/chat` 개편 — Legacy/Canvas 분기 (canvasContext 유무로). DIRECTOR_CANVAS_SYSTEM 프롬프트 + validateCanvasUpdates 검증 — 검증 waive 2026-06-10
+- [x] `global-chat-store` director 분기 — canvas nodes 있으면 canvasContext 전달, applyUpdates 적용. Legacy 응답(suggestedCamera 등)도 backward compat 유지 — 검증 waive 2026-06-10
+- [x] 우측 floating GlobalChat 그대로 사용 (Artist와 동일 패턴, 별도 좌측 도킹 컴포넌트 미생성 — Artist도 같음) — 검증 waive 2026-06-10
+- [x] `use-director-canvas-warm-starting.ts` 훅 — Scene 0 / Shot 0 / Video 0 / Final 누락 / 같은 Shot Video ≥3 5단계 룰 — 검증 waive 2026-06-10
+- [x] GlobalChat에서 artistWarmTip / directorWarmTip 둘 다 wire-up — 검증 waive 2026-06-10
 
 DoD:
 - [x] `npx tsc --noEmit` clean
 - [x] ESLint clean
-- [ ] 브라우저 검증 시나리오:
-  - "오프닝 씬 만들어줘, 다리 위에서 황혼" → addScene 액션
-  - "방금 씬에 클로즈업 샷 추가" → addShot + camera/preset 설정
-  - "이 샷 따뜻한 조명 변주 만들어줘" → addVideoTake with lighting override
-  - "이 영상 삭제해줘" → requestDelete → DeleteConfirmModal 열림
-  - 캔버스 비었을 때 채팅: legacy 모드 (suggestedCamera) fallback
+- [~] 브라우저 검증 시나리오 — waive (2026-06-10 사용자 결정)
 
 ### Phase D-8: Editor 핸드오프 + Inspector 정리
 

@@ -1,10 +1,10 @@
 # workspace-inventory — Tasks
 
-## Active (브라우저 검증 대기)
+## Active (검증 waive 2026-06-10)
 
-- [c] T10 Artist 패널 "인벤토리에 저장" 버튼 (`character-panel.tsx`, `world-panel.tsx`) — 코드 ✓ / 브라우저 검증 대기
-- [c] T11 `inventory-grid.tsx` 재작성 + `src/app/studio/artist/page.tsx` onSelect 정리 — 코드 ✓ / 브라우저 검증 대기
-- [c] T12 Director 인벤토리 picker (`ShotNodePopup.tsx` + 신규 `inventory-picker-dialog.tsx`) — 코드 ✓ / 브라우저 검증 대기 (nested Dialog focus-trap 포함)
+- [x] T10 Artist 패널 "인벤토리에 저장" 버튼 (`character-panel.tsx`, `world-panel.tsx`) — 코드 ✓ / 검증 waive 2026-06-10
+- [x] T11 `inventory-grid.tsx` 재작성 + `src/app/studio/artist/page.tsx` onSelect 정리 — 코드 ✓ / 검증 waive 2026-06-10
+- [x] T12 Director 인벤토리 picker (`ShotNodePopup.tsx` + 신규 `inventory-picker-dialog.tsx`) — 코드 ✓ / 검증 waive 2026-06-10 (nested Dialog focus-trap 포함)
 
 ## Done (코드 검증 완료)
 
@@ -40,20 +40,20 @@
 ### T10 "인벤토리에 저장" 버튼
 - 대표 이미지 있을 때만 활성, 없으면 disabled
 - 클릭 → `saveFromAsset` 호출 → 성공 후 "저장됨"(BookmarkCheck) 토글
-- [c] 코드 작성 완료 / 브라우저: 저장 후 토글 확인 → [x]
+- [x] 코드 작성 완료 / 브라우저: 저장 후 토글 확인 → [x] — 검증 waive 2026-06-10
 
 ### T11 inventory-grid 재작성
 - mount 시 `load(workspaceId)` 호출, workspace inventory_items 표시
 - kind별 섹션 + 아이템 썸네일/name/kind badge + hover 삭제(Trash2, optimistic)
 - 파일 업로드 `<label>`+hidden file input
 - 빈 상태 안내 + CTA
-- [c] 코드 작성 완료 / 브라우저: 탭 그리드 표시 + **프로젝트 A 저장 아이템이 프로젝트 B에서도 보임**(cross-project 핵심) + 업로드 + 삭제 확인 → [x]
+- [x] 코드 작성 완료 / 브라우저: 탭 그리드 표시 + **프로젝트 A 저장 아이템이 프로젝트 B에서도 보임**(cross-project 핵심) + 업로드 + 삭제 확인 → [x] — 검증 waive 2026-06-10
 
 ### T12 Director picker
 - ShotNodePopup reference 영역에 "인벤토리에서 선택" 버튼 추가
 - picker Dialog에서 아이템 선택 → `referenceImages`에 publicUrl로 추가
 - nested Dialog focus-trap 정상 동작 확인
-- [c] 코드 작성 완료 / 브라우저: picker→선택→referenceImages 반영 + focus-trap 확인 → [x]
+- [x] 코드 작성 완료 / 브라우저: picker→선택→referenceImages 반영 + focus-trap 확인 → [x] — 검증 waive 2026-06-10
 
 ### T13 검증
 - `npx tsc --noEmit` 0 errors
