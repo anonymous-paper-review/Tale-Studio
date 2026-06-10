@@ -86,9 +86,10 @@ export const STAGE_PLACEHOLDER: Record<StageId, string> = {
   editor: '아직 이 단계에서는 채팅을 쓸 수 없어요.',
 }
 
+// writer는 백엔드 전용 스테이지(UI 없음, /api/writer/chat 없음 — decision #38)라 채팅 미지원.
+//   (chat-proactive-copilot Phase 5: 'writer' 제거 — global-chat-store switch에 case 없어 에러였음)
 export const CHAT_SUPPORTED_STAGES: ReadonlySet<StageId> = new Set<StageId>([
   'producer',
-  'writer',
   'artist',
   'director',
 ])

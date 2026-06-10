@@ -9,6 +9,7 @@ import {
   type DirectorCanvasUpdate,
 } from '@/stores/director-canvas-store'
 import { saveChatMessage } from '@/lib/chat-persistence'
+import { STAGE_LABEL } from '@/lib/constants'
 
 export interface GlobalChatMessage {
   id: string
@@ -17,13 +18,37 @@ export interface GlobalChatMessage {
   content: string
 }
 
+/**
+ * 프로액티브 코파일럿 — 시스템이 먼저 거는 제안 (chat-proactive-copilot Phase 1).
+ *   유저 입력 없이 채팅 패널에 actionable 버블로 표시된다. 한 번에 하나만 떠 있고,
+ *   채팅 history 에는 영속화하지 않는다(ephemeral). `action`이 있으면 승인 버튼,
+ *   항상 "나중에"(dismiss) 가능. 비용 지출은 일으키지 않는 '다음 단계' 넛지(자동생성은 별도 진행).
+ *   dismiss/승인한 제안 id 는 `dismissedSuggestionIds` 에 기록 → 같은 세션 내 재진입(탭 이동 후
+ *   복귀)에선 다시 묻지 않는다. store 는 persist 미적용이라 전체 새로고침 시엔 초기화되어 다시 뜰 수 있다.
+ */
+export interface ChatSuggestion {
+  id: string
+  stage: StageId
+  content: string
+  action: { kind: 'navigate'; targetStage: StageId; label: string } | null
+}
+
 interface GlobalChatState {
   messages: GlobalChatMessage[]
   loading: boolean
   error: string | null
+  suggestion: ChatSuggestion | null
+  dismissedSuggestionIds: string[]
+  /** 크로스스테이지 완료 알림 배지 카운트 (chat-proactive-copilot Phase 2). 사이드바가 읽는다. */
+  stageBadges: Partial<Record<StageId, number>>
 
   loadMessages: (projectId: string) => Promise<void>
   sendMessage: (content: string) => Promise<void>
+  offerSuggestion: (suggestion: ChatSuggestion) => void
+  dismissSuggestion: () => void
+  /** 백그라운드 생성 완료 통지 — 다른 stage에 있을 때만 배지 bump + 스로틀된 채팅 메시지. */
+  notifyCompletion: (stage: StageId, label: string) => void
+  clearStageBadge: (stage: StageId) => void
   clearError: () => void
   reset: () => void
 }
@@ -32,10 +57,18 @@ function makeId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+// 완료 알림 채팅 메시지 스로틀 — stage별 마지막 메시지 시각. 배치 생성(이미지 12장)에서
+//   매 완료마다 메시지가 쌓이지 않도록 stage당 10초에 1개로 제한(배지 카운트는 매번 bump).
+const NOTIFY_THROTTLE_MS = 10_000
+const lastNotifyAt: Partial<Record<StageId, number>> = {}
+
 export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   messages: [],
   loading: false,
   error: null,
+  suggestion: null,
+  dismissedSuggestionIds: [],
+  stageBadges: {},
 
   loadMessages: async (projectId) => {
     try {
@@ -213,7 +246,73 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
   },
 
+  // 프로액티브 제안 띄우기 — 한 번에 하나만(이미 떠 있으면 무시), 이미 dismiss/승인한 id 도 무시.
+  offerSuggestion: (suggestion) => {
+    const { suggestion: current, dismissedSuggestionIds } = get()
+    if (current) return
+    if (dismissedSuggestionIds.includes(suggestion.id)) return
+    set({ suggestion })
+  },
+
+  // dismiss(또는 승인) — 제안을 내리고 id 를 기록해 같은 세션 재진입 시 재발사 막는다.
+  dismissSuggestion: () =>
+    set((state) => ({
+      suggestion: null,
+      dismissedSuggestionIds: state.suggestion
+        ? [...state.dismissedSuggestionIds, state.suggestion.id]
+        : state.dismissedSuggestionIds,
+    })),
+
+  // 백그라운드 생성 완료 통지 (Phase 2). 유저가 *다른* stage에 있을 때만 알린다(보고 있으면 불필요).
+  //   배지는 매번 bump(가벼운 카운트), 채팅 메시지는 stage당 10초 스로틀(배치 스팸 방지).
+  notifyCompletion: (stage, label) => {
+    const currentStage = useProjectStore.getState().currentStage
+    if (currentStage === stage) return // 이미 해당 stage를 보고 있음 → 알림 불필요
+
+    set((state) => ({
+      stageBadges: {
+        ...state.stageBadges,
+        [stage]: (state.stageBadges[stage] ?? 0) + 1,
+      },
+    }))
+
+    const now = Date.now()
+    if (now - (lastNotifyAt[stage] ?? 0) < NOTIFY_THROTTLE_MS) return
+    lastNotifyAt[stage] = now
+
+    const projectId = useProjectStore.getState().projectId
+    const content = `✓ ${label} 생성이 완료됐어요. ${STAGE_LABEL[stage]} 탭에서 확인하세요.`
+    set((state) => ({
+      messages: [
+        ...state.messages,
+        { id: makeId(), stage, role: 'model', content },
+      ],
+    }))
+    if (projectId) saveChatMessage(projectId, stage, 'model', content)
+  },
+
+  // stage 진입 시 배지 클리어 (studio layout에서 호출).
+  clearStageBadge: (stage) =>
+    set((state) => {
+      if (!state.stageBadges[stage]) return state
+      const next = { ...state.stageBadges }
+      delete next[stage]
+      return { stageBadges: next }
+    }),
+
   clearError: () => set({ error: null }),
 
-  reset: () => set({ messages: [], loading: false, error: null }),
+  reset: () => {
+    // 프로젝트 전환 시 모듈 전역 스로틀 클럭도 비운다 — 새 프로젝트 첫 완료 알림이 이전
+    //   프로젝트 타임스탬프에 막혀 누락되지 않도록(code-review MEDIUM).
+    for (const k of Object.keys(lastNotifyAt)) delete lastNotifyAt[k as StageId]
+    set({
+      messages: [],
+      loading: false,
+      error: null,
+      suggestion: null,
+      dismissedSuggestionIds: [],
+      stageBadges: {},
+    })
+  },
 }))

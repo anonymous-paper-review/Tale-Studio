@@ -7,6 +7,7 @@ import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
+import { notifyGenerationComplete } from '@/lib/generation-notify'
 
 export type ImageProvider = 'fal' | 'gemini' | 'tailscale'
 
@@ -138,6 +139,38 @@ async function generateAndPersistWorldShot(
   return blobUrl
 }
 
+// autogen 상세 로그 토글. 기본 off — 실패(✗)·시작/요약만 콘솔에 남기고, 단계별 진행 로그는 숨긴다.
+//   디버깅 필요 시 true 로.
+const AUTOGEN_DEBUG = false
+const alog = (...args: unknown[]) => {
+  if (AUTOGEN_DEBUG) console.log(...args)
+}
+
+/**
+ * 서버 핸드오프(assetImages step)가 미리 submit 한 로케이션 wide_shot 이 webhook 으로 DB 에 채워지길
+ * 잠깐 기다린다 (중복 client 생성 방지). 채워지면 URL 반환, timeout 이면 null → 호출자가 client fallback.
+ *   진입 시점엔 보통 이미 채워져 있어(server 와 캐릭터 main 이 같은 step8 에서 병렬 submit) 첫 조회에 바로 반환.
+ */
+async function waitForWorldWideShot(
+  projectId: string,
+  locationId: string,
+  { timeoutMs = 30_000, intervalMs = 3_000 }: { timeoutMs?: number; intervalMs?: number } = {},
+): Promise<string | null> {
+  const supabase = createClient()
+  const started = Date.now()
+  for (;;) {
+    const { data } = await supabase
+      .from('locations')
+      .select('wide_shot')
+      .eq('project_id', projectId)
+      .eq('location_id', locationId)
+      .maybeSingle()
+    if (data?.wide_shot) return data.wide_shot as string
+    if (Date.now() - started > timeoutMs) return null
+    await new Promise((r) => setTimeout(r, intervalMs))
+  }
+}
+
 /** 새 캐릭터의 character_id 생성 — 이름 슬러그 + 짧은 난수 (프로젝트 내 충돌 회피) */
 function makeCharacterId(name: string): string {
   const slug = name
@@ -147,6 +180,25 @@ function makeCharacterId(name: string): string {
     .slice(0, 24)
   const rand = Math.random().toString(36).slice(2, 7)
   return `char_${slug || 'new'}_${rand}`
+}
+
+// generatingStartedAt 맵 헬퍼 — 생성 시작 시각을 store 에 들고 있어 GeneratingOverlay 가 mount 가
+//   아니라 이 시각 기준으로 경과를 센다(탭 전환=remount 에도 타이머 안 리셋). 시작시각은 호출자가 넘긴다.
+function withStartedAt(
+  map: Record<string, number>,
+  key: string,
+  now: number,
+): Record<string, number> {
+  return map[key] != null ? map : { ...map, [key]: now } // 이미 있으면 유지(최초 시작 시각)
+}
+function withoutStartedAt(
+  map: Record<string, number>,
+  key: string,
+): Record<string, number> {
+  if (map[key] == null) return map
+  const next = { ...map }
+  delete next[key]
+  return next
 }
 
 /** 작업 배열을 동시 N개 제한으로 실행 (캐릭터/월드 병렬 생성용, decision: concurrency 4) */
@@ -177,9 +229,16 @@ interface ArtistState {
   generatingViews: string[]
   /** 생성 중인 로케이션 id 들 (병렬 생성 추적) */
   generatingLocations: string[]
+  /** 생성 시작 시각 (key=`${characterId}:${view}` 또는 locationId → epoch ms).
+   *  GeneratingOverlay 가 이 시각 기준으로 경과를 세 탭 전환(remount)에도 타이머가 안 리셋된다. */
+  generatingStartedAt: Record<string, number>
   selectedBoostPreset: string | null
   imageProvider: ImageProvider
   error: string | null
+  /** 진입 게이트 영속 — 한 번 ready(진입 허용)에 도달한 projectId 는 탭 전환(route remount)에도
+   *  다시 progress 게이트에 걸리지 않는다. page-local useState/타이머가 remount 로 리셋돼
+   *  생성 도중 탭 전환 시 프로그레스 바가 재등장하던 버그 방지. reset()(프로젝트 전환)에만 비워진다. */
+  enteredProjects: Record<string, boolean>
 
   loadData: () => void
   /** 새 캐릭터 카드를 추가 (낙관적 로컬 + projectId 있으면 DB persist). 새 characterId 반환. */
@@ -205,6 +264,8 @@ interface ArtistState {
   applyUpdates: (updates: ArtistUpdate[]) => Promise<void>
   selectBoostPreset: (preset: string) => void
   setImageProvider: (provider: ImageProvider) => void
+  /** 진입 허용된 projectId 기록 (멱등). 페이지가 ready 도달 시 1회 호출. */
+  markEntered: (projectId: string) => void
   reset: () => void
 }
 
@@ -216,9 +277,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectedLocationId: null,
   generatingViews: [],
   generatingLocations: [],
+  generatingStartedAt: {},
   selectedBoostPreset: null,
   imageProvider: 'fal' as ImageProvider,
   error: null,
+  enteredProjects: {},
 
   loadData: async () => {
     const projectId = useProjectStore.getState().projectId
@@ -456,7 +519,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const key = `${characterId}:${view}`
     if (get().generatingViews.includes(key)) return
 
-    set((state) => ({ generatingViews: [...state.generatingViews, key], error: null }))
+    set((state) => ({
+      generatingViews: [...state.generatingViews, key],
+      generatingStartedAt: withStartedAt(state.generatingStartedAt, key, Date.now()),
+      error: null,
+    }))
+    const t0 = Date.now()
+    alog(`[autogen] char ${key} → submitting…`)
     try {
       const res = await fetch('/api/artist/generate-sheet', {
         method: 'POST',
@@ -469,7 +538,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       }
       // 비동기: 라우트는 jobId만 반환 — 완료까지 polling (webhook이 서버사이드로 storage+DB 갱신).
       const { jobId } = (await res.json()) as { jobId: string }
+      alog(`[autogen] char ${key} job ${jobId} queued, polling…`)
       const url = await pollGenerationJob(jobId)
+      alog(`[autogen] char ${key} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
       set((state) => ({
         characterAssets: state.characterAssets.map((a) =>
           a.characterId === characterId
@@ -477,7 +548,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             : a,
         ),
       }))
+      notifyGenerationComplete('artist', '캐릭터 이미지') // 다른 stage에 있을 때만 알림(store가 판단)
     } catch (err) {
+      console.warn(
+        `[autogen] char ${key} ✗ failed in ${((Date.now() - t0) / 1000).toFixed(1)}s:`,
+        err instanceof Error ? err.message : err,
+      )
       set({
         error:
           err instanceof Error ? err.message : 'Character view generation failed',
@@ -485,6 +561,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     } finally {
       set((state) => ({
         generatingViews: state.generatingViews.filter((k) => k !== key),
+        generatingStartedAt: withoutStartedAt(state.generatingStartedAt, key),
       }))
     }
   },
@@ -512,6 +589,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
     set((state) => ({
       generatingLocations: [...state.generatingLocations, locationId],
+      generatingStartedAt: withStartedAt(state.generatingStartedAt, locationId, Date.now()),
       error: null,
     }))
 
@@ -546,6 +624,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           w.locationId === locationId ? { ...w, establishingShot } : w,
         ),
       }))
+      notifyGenerationComplete('artist', '배경 이미지') // 다른 stage에 있을 때만 알림(store가 판단)
     } catch (err) {
       set({
         error:
@@ -556,6 +635,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         generatingLocations: state.generatingLocations.filter(
           (id) => id !== locationId,
         ),
+        generatingStartedAt: withoutStartedAt(state.generatingStartedAt, locationId),
       }))
     }
   },
@@ -566,14 +646,26 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       (l) => l.locationId === locationId,
     )
     const scene = sceneManifest?.scenes.find((s) => s.location === locationId)
-    if (!location || !scene) return
+    if (!location || !scene) {
+      // ⚠️ silent-skip 지점: location/scene 매칭 실패면 월드가 *조용히* 생성 안 됨(스피너도 안 뜸).
+      //   주로 scenes.location(=writer scene.location) ↔ locations.location_id 식별자 불일치가 원인.
+      console.warn(
+        `[autogen] world ${locationId}:${shot} SKIPPED — ${
+          !location ? 'no matching location' : 'no matching scene (scene.location !== locationId)'
+        } in sceneManifest`,
+      )
+      return
+    }
 
     // location 단위 가드를 두지 않음 — 같은 로케이션의 wide/establishing 을 병렬 생성할 수 있어야 함.
     set((state) => ({
       generatingLocations: [...state.generatingLocations, locationId],
+      generatingStartedAt: withStartedAt(state.generatingStartedAt, locationId, Date.now()),
       error: null,
     }))
 
+    const t0 = Date.now()
+    alog(`[autogen] world ${locationId}:${shot} → submitting…`)
     try {
       // 사용자 편집 프롬프트 우선, 없으면 기본 빌드 프롬프트.
       const prompt =
@@ -593,61 +685,135 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         prompt,
         imageProvider,
       )
+      alog(`[autogen] world ${locationId}:${shot} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
       set((state) => ({
         worldAssets: state.worldAssets.map((w) =>
           w.locationId === locationId ? { ...w, [shot]: url } : w,
         ),
       }))
+      notifyGenerationComplete('artist', '배경 이미지') // 다른 stage에 있을 때만 알림(store가 판단)
     } catch (err) {
+      console.warn(
+        `[autogen] world ${locationId}:${shot} ✗ failed in ${((Date.now() - t0) / 1000).toFixed(1)}s:`,
+        err instanceof Error ? err.message : err,
+      )
       set({
         error:
           err instanceof Error ? err.message : 'World generation failed',
       })
     } finally {
-      // 같은 locationId 가 중복될 수 있으므로 한 건만 제거.
+      // 같은 locationId 가 중복될 수 있으므로 한 건만 제거. startedAt 은 마지막 작업이 끝날 때만 정리.
       set((state) => {
         const idx = state.generatingLocations.indexOf(locationId)
         if (idx === -1) return {}
         const next = state.generatingLocations.slice()
         next.splice(idx, 1)
-        return { generatingLocations: next }
+        const generatingStartedAt = next.includes(locationId)
+          ? state.generatingStartedAt
+          : withoutStartedAt(state.generatingStartedAt, locationId)
+        return { generatingLocations: next, generatingStartedAt }
       })
     }
   },
 
-  // Writer→Artist 진입 시 비어있는 이미지 자동생성 (crop 폐기 후 재설계, 2026-06-05).
-  //   main(정면 대표) 은 핸드오프 파이프라인(runAssetsGenerate→view_main)이 progress bar 뒤에서 미리 채움 →
-  //   여기선 비어있는 방향 뷰(back/left/right) i2i 와 월드 샷만 보강한다.
-  //   캐릭터 뷰·월드 샷을 한 풀에서 동시 4개 제한으로 병렬 처리 (캐릭터별·월드별 병렬).
+  // Writer→Artist 진입 시 비어있는 이미지 자동생성 (crop 폐기 후 재설계, 2026-06-05 / main 우선 2단계 2026-06-07).
+  //   대표 이미지(캐릭터 view_main, 로케이션 wide_shot)는 핸드오프 'assetImages' step 이 미리 채울 수 있으나,
+  //   실패/미도착이면 여기서 보강한다.
+  //   ★ 큐는 "메인 우선": Phase 1 에서 비어있는 캐릭터 main 을 전부 먼저 생성(가장 먼저 보여야 할 대표),
+  //     Phase 2 에서 방향뷰(main 기반 i2i)+월드를 생성한다. fal 은 동시성 초과분을 '거부'가 아니라 큐
+  //     대기시키므로(IN_QUEUE 무제한) 제출 순서가 곧 디스패치 순서 → main 이 먼저 뜬다. 또 dir i2i 가
+  //     main 이 DB 에 들어간 뒤 실행돼 reference 정합성도 보장된다.
   //   생성물은 DB 영속 → 재진입 시 not-null 이라 자동 skip(자연 캐시).
   autoGenerateBaseImages: async () => {
     const { characterAssets, worldAssets } = get()
-    const tasks: Array<() => Promise<void>> = []
+    const projectId = useProjectStore.getState().projectId
+    // 동시 in-flight 상한 (fal 한도가 아니라 클라 폴링/부하 상한 — fal 은 초과분을 큐 대기시킴).
+    const CONCURRENCY = 4
 
+    // ── Phase 1: 캐릭터 대표(main) — 가장 먼저 보여야 할 이미지부터 ──
+    const mainTasks: Array<() => Promise<void>> = []
+    const queuedMain: string[] = []
     for (const c of characterAssets) {
       if (c.views.main == null) {
-        // main 미준비(파이프라인 생성 실패 등) → main 부터 만들고 4방향까지 한 체인으로.
-        tasks.push(() => get().generateCharacterAllViews(c.characterId))
-      } else {
-        // main 준비됨 → 비어있는 방향 뷰만 i2i 로 생성.
-        for (const v of CHARACTER_DIRECTIONAL_VIEWS) {
-          if (c.views[v] == null) {
-            tasks.push(() => get().generateCharacterView(c.characterId, v))
-          }
+        queuedMain.push(`char ${c.characterId}:main`)
+        mainTasks.push(() => get().generateCharacterView(c.characterId, 'main'))
+      }
+    }
+
+    // ── Phase 2: 방향뷰(main reference i2i) + 월드 ──
+    const restTasks: Array<() => Promise<void>> = []
+    const queuedRest: string[] = []
+    const skipped: string[] = []
+    for (const c of characterAssets) {
+      if (c.views.main != null) skipped.push(`char ${c.characterId}:main`)
+      for (const v of CHARACTER_DIRECTIONAL_VIEWS) {
+        if (c.views[v] == null) {
+          queuedRest.push(`char ${c.characterId}:${v}`)
+          restTasks.push(() => get().generateCharacterView(c.characterId, v))
+        } else {
+          skipped.push(`char ${c.characterId}:${v}`)
         }
       }
     }
-
     for (const w of worldAssets) {
       if (w.wideShot == null) {
-        tasks.push(() => get().generateWorldShot(w.locationId, 'wideShot'))
+        // (b) 중복 제거: 서버 assetImages step 이 이미 wide 를 submit 했으면 webhook 으로 채워진다 →
+        //   잠깐 기다렸다 채워지면 client skip, timeout 이면 client fallback 생성.
+        const locId = w.locationId
+        queuedRest.push(`world ${locId}:wideShot (await server pre-gen → fallback)`)
+        restTasks.push(async () => {
+          if (!projectId) {
+            await get().generateWorldShot(locId, 'wideShot')
+            return
+          }
+          set((s) => ({
+            generatingLocations: [...s.generatingLocations, locId],
+            generatingStartedAt: withStartedAt(s.generatingStartedAt, locId, Date.now()),
+          }))
+          const url = await waitForWorldWideShot(projectId, locId).catch(() => null)
+          set((s) => {
+            const idx = s.generatingLocations.indexOf(locId)
+            if (idx === -1) return {}
+            const next = s.generatingLocations.slice()
+            next.splice(idx, 1)
+            const generatingStartedAt = next.includes(locId)
+              ? s.generatingStartedAt
+              : withoutStartedAt(s.generatingStartedAt, locId)
+            return { generatingLocations: next, generatingStartedAt }
+          })
+          if (url) {
+            alog(`[autogen] world ${locId}:wideShot ✓ server pre-gen 채움 (client skip)`)
+            set((s) => ({
+              worldAssets: s.worldAssets.map((x) =>
+                x.locationId === locId ? { ...x, wideShot: url } : x,
+              ),
+            }))
+            return
+          }
+          alog(`[autogen] world ${locId}:wideShot — server pre-gen 미도착, client fallback`)
+          await get().generateWorldShot(locId, 'wideShot')
+        })
+      } else {
+        skipped.push(`world ${w.locationId}:wideShot`)
       }
       if (w.establishingShot == null) {
-        tasks.push(() => get().generateWorldShot(w.locationId, 'establishingShot'))
+        queuedRest.push(`world ${w.locationId}:establishingShot`)
+        restTasks.push(() => get().generateWorldShot(w.locationId, 'establishingShot'))
+      } else {
+        skipped.push(`world ${w.locationId}:establishingShot`)
       }
     }
 
-    await runPool(tasks, 4)
+    console.log(
+      `[autogen] start — main:${mainTasks.length} 먼저 → rest:${restTasks.length} @ concurrency ${CONCURRENCY}`,
+      { mainFirst: queuedMain, then: queuedRest, skipped },
+    )
+    const t0 = Date.now()
+    await runPool(mainTasks, CONCURRENCY) // Phase 1: 대표(main) 먼저 완료
+    await runPool(restTasks, CONCURRENCY) // Phase 2: 방향뷰 + 월드
+    console.log(
+      `[autogen] all done in ${((Date.now() - t0) / 1000).toFixed(1)}s (main ${mainTasks.length} + rest ${restTasks.length})`,
+    )
   },
 
   applyUpdates: async (updates) => {
@@ -681,6 +847,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
   setImageProvider: (provider) => set({ imageProvider: provider }),
 
+  markEntered: (projectId) =>
+    set((state) =>
+      state.enteredProjects[projectId]
+        ? state
+        : { enteredProjects: { ...state.enteredProjects, [projectId]: true } },
+    ),
+
   reset: () =>
     set({
       sceneManifest: null,
@@ -690,9 +863,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       selectedLocationId: null,
       generatingViews: [],
       generatingLocations: [],
+      generatingStartedAt: {},
       selectedBoostPreset: null,
       imageProvider: 'fal' as ImageProvider,
       error: null,
+      enteredProjects: {},
     }),
 }))
 

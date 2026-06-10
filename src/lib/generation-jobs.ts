@@ -117,6 +117,38 @@ export async function failGenerationJob(
     .eq('status', 'queued')
 }
 
+/**
+ * 유저가 현재 in-flight(queued)로 보유한 생성 작업 수 (chat-proactive-copilot Phase 3 — 멀티유저 쿼터).
+ *   generation_jobs 에 user_id 컬럼이 없어 workspace→project 2-hop 으로 유저 소유 project 를 모은 뒤 집계.
+ *   단일 FAL_KEY 동시 풀(기본 10)을 한 유저가 독점하지 못하게 앱 레이어에서 공정 분배하는 가드의 기반.
+ *   참고: fal 은 동시 한도 초과분을 '거부'가 아니라 큐 대기시키므로 이 쿼터는 'UX 보호'(대기 폭주 방지)용.
+ */
+export async function countQueuedJobsByUser(userId: string): Promise<number> {
+  // 1) 유저 소유 workspace
+  const { data: workspaces } = await supabaseAdmin
+    .from('workspaces')
+    .select('id')
+    .eq('owner_id', userId)
+  const workspaceIds = (workspaces ?? []).map((w) => w.id as string)
+  if (workspaceIds.length === 0) return 0
+
+  // 2) 그 workspace 들의 project
+  const { data: projects } = await supabaseAdmin
+    .from('projects')
+    .select('id')
+    .in('workspace_id', workspaceIds)
+  const projectIds = (projects ?? []).map((p) => p.id as string)
+  if (projectIds.length === 0) return 0
+
+  // 3) queued 작업 수
+  const { count } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id', { count: 'exact', head: true })
+    .in('project_id', projectIds)
+    .eq('status', 'queued')
+  return count ?? 0
+}
+
 /** project → workspace.owner_id == userId 소유권 확인 (인증 polling 라우트에서 사용). */
 export async function userOwnsProject(
   projectId: string,

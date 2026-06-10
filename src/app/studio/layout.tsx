@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Samantha } from '@/components/layout/samantha'
 import { GlobalChat } from '@/components/layout/global-chat'
@@ -70,6 +71,8 @@ export default function StudioLayout({
     if (useProjectStore.getState().currentStage !== stage.id) {
       setStage(stage.id as StageId)
     }
+    // 진입한 stage의 완료 알림 배지 클리어 (chat-proactive-copilot Phase 2)
+    useGlobalChatStore.getState().clearStageBadge(stage.id as StageId)
   }, [pathname, canNavigateTo, initLoading, router, setStage])
 
   return (

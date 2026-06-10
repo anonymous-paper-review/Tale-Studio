@@ -15,6 +15,7 @@ export function GeneratingOverlay({
   active,
   label = '생성 중',
   showElapsed = true,
+  startedAt,
   className,
 }: {
   active: boolean
@@ -22,14 +23,17 @@ export function GeneratingOverlay({
   label?: string
   /** 경과시간 카운터 표시 여부 */
   showElapsed?: boolean
+  /** 생성 시작 시각(epoch ms). 주면 이 시점부터 경과를 센다 → 탭 전환(remount)에도 타이머 안 리셋.
+   *  없으면(undefined) 기존처럼 mount 시점부터 센다. */
+  startedAt?: number
   className?: string
 }) {
-  // 타이머는 active 일 때만 마운트 → 마운트/언마운트로 경과시간 자동 리셋
   if (!active) return null
   return (
     <ActiveOverlay
       label={label}
       showElapsed={showElapsed}
+      startedAt={startedAt}
       className={className}
     />
   )
@@ -38,13 +42,15 @@ export function GeneratingOverlay({
 function ActiveOverlay({
   label,
   showElapsed,
+  startedAt,
   className,
 }: {
   label: string
   showElapsed: boolean
+  startedAt?: number
   className?: string
 }) {
-  const elapsed = useElapsedSeconds()
+  const elapsed = useElapsedSeconds(startedAt)
 
   return (
     <div
@@ -106,18 +112,18 @@ export function GeneratedImage({
   )
 }
 
-/** 마운트 시점부터 흐른 초. Date.now()/setState 모두 effect/콜백 안에서만 호출. */
-function useElapsedSeconds(): number {
+/** 흐른 초. startedAt 을 주면 그 시점부터(탭 전환 remount 에도 유지), 없으면 mount 시점부터.
+ *  Date.now()/setState 모두 effect 안에서만 호출. */
+function useElapsedSeconds(startedAt?: number): number {
   const [sec, setSec] = useState(0)
 
   useEffect(() => {
-    const start = Date.now()
-    const t = setInterval(
-      () => setSec(Math.floor((Date.now() - start) / 1000)),
-      1000,
-    )
+    const base = startedAt ?? Date.now()
+    const tick = () => setSec(Math.max(0, Math.floor((Date.now() - base) / 1000)))
+    tick() // 즉시 1회 — remount 직후에도 올바른 경과로 복원(0 으로 깜빡이지 않게)
+    const t = setInterval(tick, 1000)
     return () => clearInterval(t)
-  }, [])
+  }, [startedAt])
 
   return sec
 }

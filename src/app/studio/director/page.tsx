@@ -28,6 +28,8 @@ import { HandoffButton } from '@/components/layout/handoff-button'
 import { cn } from '@/lib/utils'
 
 import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { getDirectorGaps, summarizeGaps } from '@/lib/completeness'
 import {
   usePresetStorageStore,
   type CameraLightPreset,
@@ -77,6 +79,28 @@ function CanvasInner() {
   const persistNodePosition = useDirectorCanvasStore(
     (s) => s.persistNodePosition,
   )
+  const directorProjectId = useDirectorCanvasStore((s) => s.projectId)
+  const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
+
+  // 누락 감지 넛지 (chat-proactive-copilot Phase 4): 캔버스가 안정되면(2s) 채워두면 좋을
+  //   항목(샷의 캐릭터·배경 참조 누락 / 스토리보드 미생성)을 1회 informational 제안. 생성 트리거 X.
+  const gapNudgeRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!directorProjectId || nodes.length === 0) return
+    if (gapNudgeRef.current === directorProjectId) return
+    const gaps = getDirectorGaps(nodes)
+    if (gaps.length === 0) return
+    const t = setTimeout(() => {
+      gapNudgeRef.current = directorProjectId
+      offerSuggestion({
+        id: `director-gaps-${directorProjectId}`,
+        stage: 'director',
+        content: `채워두면 좋을 항목이 ${gaps.length}건 있어요:\n${summarizeGaps(gaps)}`,
+        action: null,
+      })
+    }, 2000)
+    return () => clearTimeout(t)
+  }, [directorProjectId, nodes, offerSuggestion])
 
   const { screenToFlowPosition } = useReactFlow()
 

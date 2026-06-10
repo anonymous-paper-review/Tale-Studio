@@ -33,6 +33,7 @@ export function WorldPanel() {
     worldAssets,
     selectedLocationId,
     generatingLocations,
+    generatingStartedAt,
     selectedBoostPreset,
     imageProvider,
     selectLocation,
@@ -226,6 +227,7 @@ export function WorldPanel() {
                       aspectRatio="video"
                       imageUrl={world.wideShot}
                       generating={isGenerating && !world.wideShot}
+                      generatingStartedAt={generatingStartedAt[world.locationId]}
                     />
                   </button>
                   <button
@@ -245,6 +247,7 @@ export function WorldPanel() {
                       aspectRatio="video"
                       imageUrl={world.establishingShot}
                       generating={isGenerating && !world.establishingShot}
+                      generatingStartedAt={generatingStartedAt[world.locationId]}
                     />
                   </button>
                 </div>

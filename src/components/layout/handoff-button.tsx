@@ -4,8 +4,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { STAGES } from '@/lib/constants'
-import { useProjectStore } from '@/stores/project-store'
-import { createClient } from '@/lib/supabase/client'
+import { handoffToStage } from '@/lib/stage-nav'
 import type { StageId } from '@/types'
 
 interface HandoffButtonProps {
@@ -17,25 +16,12 @@ interface HandoffButtonProps {
 export function HandoffButton({ label, targetStage, disabled }: HandoffButtonProps) {
   const router = useRouter()
   const target = STAGES.find((s) => s.id === targetStage)
-  const { projectId, setStage, canNavigateTo } = useProjectStore()
 
   if (!target) return null
 
   const handleClick = async () => {
-    // Update current_stage in DB so navigation guard unlocks the target
-    if (projectId && !canNavigateTo(targetStage)) {
-      try {
-        const supabase = createClient()
-        await supabase
-          .from('projects')
-          .update({ current_stage: targetStage })
-          .eq('id', projectId)
-      } catch {
-        // non-blocking — worst case sidebar stays locked until reload
-      }
-    }
-    setStage(targetStage)
-    router.push(target.path)
+    const path = await handoffToStage(targetStage)
+    if (path) router.push(path)
   }
 
   return (

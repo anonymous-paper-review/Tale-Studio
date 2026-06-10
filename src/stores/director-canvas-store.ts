@@ -35,6 +35,7 @@ import {
 } from '@/stores/asset-storage-store'
 import { createClient } from '@/lib/supabase/client'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
+import { notifyGenerationComplete } from '@/lib/generation-notify'
 import { DEFAULT_VIDEO_MODEL, normalizeProvider } from '@/lib/video-models'
 
 // ============================================================================
@@ -1395,6 +1396,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 generatedAt: Date.now(),
               },
             })
+            notifyGenerationComplete('director', '스토리보드') // 다른 stage에 있을 때만 알림
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error'
             get().updateNodeData<'shot'>(shotNodeId, {
@@ -1606,6 +1608,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 poll.url,
               )
               get().setVideoStatus(videoNodeId, 'completed', { url: savedUrl })
+              notifyGenerationComplete('director', '영상') // 다른 stage에 있을 때만 알림
               break
             }
             if (poll.status === 'failed') {

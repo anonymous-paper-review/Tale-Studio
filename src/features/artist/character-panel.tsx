@@ -36,6 +36,7 @@ export function CharacterPanel() {
     characterAssets,
     selectedCharacterId,
     generatingViews,
+    generatingStartedAt,
     selectCharacter,
     lockCharacter,
     unlockCharacter,
@@ -202,6 +203,9 @@ export function CharacterPanel() {
                             aspectRatio="square"
                             imageUrl={char.views[view] ?? null}
                             generating={isViewGenerating(view)}
+                            generatingStartedAt={
+                              generatingStartedAt[`${char.characterId}:${view}`]
+                            }
                           />
                         </button>
                       </TooltipTrigger>

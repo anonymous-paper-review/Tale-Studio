@@ -51,6 +51,29 @@ export interface FalFetchFailed {
 export type FalImageFetchResult = FalFetchPending | FalImageFetchSuccess | FalFetchFailed;
 export type FalVideoFetchResult = FalFetchPending | FalVideoFetchSuccess | FalFetchFailed;
 
+/**
+ * fal 클라이언트 에러에서 진단 가능한 상세(status + 본문)를 뽑는다.
+ *   "Forbidden"(HTTP status text)만으론 원인(잔액/모델권한/OpenAI org 인증/레이트리밋)을 구분 못 하므로,
+ *   @fal-ai/client 가 던지는 에러의 status·body(detail) 를 평탄화해 메시지로 만든다.
+ */
+function falErrorDetail(e: unknown): string {
+  if (!e || typeof e !== 'object') return String(e);
+  const err = e as { status?: number; message?: string; body?: unknown };
+  const parts: string[] = [];
+  if (err.status != null) parts.push(`status=${err.status}`);
+  if (err.message) parts.push(err.message);
+  if (err.body != null) {
+    try {
+      const bodyStr =
+        typeof err.body === 'string' ? err.body : JSON.stringify(err.body);
+      if (bodyStr && bodyStr !== '{}') parts.push(`body=${bodyStr.slice(0, 600)}`);
+    } catch {
+      /* body 직렬화 실패는 무시 */
+    }
+  }
+  return parts.length ? parts.join(' | ') : String(e);
+}
+
 // ===== T2I =====
 
 export interface FalImageOptions {
@@ -148,12 +171,19 @@ export async function falImageSubmit(
   if (!apiKey) throw new Error('FAL_KEY not set');
   const model = resolveImageModel(opts);
   const input = buildFalImageInput(opts, model);
-  const { request_id } = await withLlmRetry(
-    () =>
-      fal.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
-    'fal-image-submit',
-  );
-  return { request_id, model };
+  try {
+    const { request_id } = await withLlmRetry(
+      () =>
+        fal.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
+      'fal-image-submit',
+    );
+    return { request_id, model };
+  } catch (e) {
+    // fal 실패 상세를 표면화 — 라우트(500 body.error)→client(✗ failed)까지 진짜 이유가 전파된다.
+    const detail = falErrorDetail(e);
+    console.error(`[fal-image-submit] model=${model} failed: ${detail}`);
+    throw new Error(`fal submit (${model}): ${detail}`);
+  }
 }
 
 /** fetch — fal queue status + result. 완료 시 url 포함, 미완료 시 pending */

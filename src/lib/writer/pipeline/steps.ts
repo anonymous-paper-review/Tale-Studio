@@ -24,6 +24,7 @@ import { runRenderPrompts } from '@/lib/writer/pipeline/stages/l5_prompts';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_l3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
 import { persistAssetsToDb, persistShotsToDb } from '@/lib/writer/pipeline/util/persist_manifest';
+import { submitHandoffAssetImages } from '@/lib/writer/pipeline/util/submit_asset_images';
 import { isCompactDepth } from '@/lib/writer/types/pipeline';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
 import { resolveModels, resolveSkip, emptyC1Report, emptyMidPreview } from '@/lib/writer/pipeline';
@@ -85,6 +86,10 @@ export interface WriterRunState extends WriterRunStateBase {
 
   // Compact Mode (genre.depth_level 기반). sceneCinematography step 에서 확정.
   compact?: boolean;
+
+  // 캐릭터 대표 이미지(view_main)를 fal 큐에 submit 했는가 (assetImages step). 산출물은 webhook 이
+  //   DB(characters.view_main)에 채우므로 state 엔 남지 않는다 → 이 플래그로 "제출됨"을 판정.
+  assetImagesSubmitted?: boolean;
 
   // 재시도/타임아웃 가드 (중도 kill 시 attempt 증가분이 남는다)
   _attempt?: { stage: string; count: number };
@@ -213,10 +218,29 @@ export const WRITER_STEPS: WriterStep[] = [
       await persistDesignTokens(projectId, s.renderFormat!, s.artDirection!, productionDesign).catch(() => {});
       await persistAssetsToDb(projectId, s.characters!, s.scenes!, productionDesign).catch(() => {});
 
-      // ⚠️ runAssetsGenerate / persistAssetImagesToDb 는 의도적으로 스킵한다.
-      //   무거운 reference-image 생성은 별도 이미지 phase 의 책임이고(artist 가 client-side 로
-      //   view 이미지를 생성), 텍스트 파이프라인의 시간 예산을 잡아먹지 않아야 한다.
+      // 캐릭터 대표 이미지(view_main)는 다음 'assetImages' step 에서 webhook 기반으로 미리 생성한다
+      //   (텍스트 샷 단계와 병렬). 무거운 in-process 폴링(runAssetsGenerate)은 여기서 하지 않는다 —
+      //   step 시간예산을 지키고, 완료는 fal webhook 이 비동기로 DB 에 채운다.
       return { productionDesign };
+    },
+  },
+  {
+    key: 'assetImages',
+    // submit-only 라 산출물이 state 에 없다 → 제출 여부 플래그로 has 판정 (재진입 시 중복 submit 방지).
+    has: (s) => s.assetImagesSubmitted === true,
+    run: async (s, { projectId }) => {
+      // 캐릭터 대표(view_main) + 로케이션 대표(wide_shot)를 fal 큐에 미리 던진다. webhook 이 완료를
+      //   DB 에 채우고, 생성은 이후 텍스트 step(sceneCinematography~renderPrompts)과 병렬로 진행된다.
+      //   submit 실패는 비치명적 — artist client(autoGenerateBaseImages)가 방향뷰·establishing 과
+      //   함께 보강한다.
+      await submitHandoffAssetImages(
+        projectId,
+        s.characters!,
+        s.artDirection!,
+        s.productionDesign!,
+        s.renderFormat!,
+      ).catch(() => {});
+      return { assetImagesSubmitted: true };
     },
   },
   {

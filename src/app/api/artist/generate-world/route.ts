@@ -8,6 +8,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { createGenerationJob } from '@/lib/generation-jobs'
+import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 
 export const runtime = 'nodejs'
@@ -19,6 +20,10 @@ export async function POST(req: Request) {
   try {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // 멀티유저 쿼터 (Phase 3): 유저 in-flight 작업이 상한이면 429.
+    const quota = await checkUserQuota(user.id)
+    if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
 
     const { projectId, locationId, column, prompt, aspectRatio } =
       (await req.json()) as {

@@ -140,11 +140,11 @@ claude
    ngrok config add-authtoken <your-ngrok-authtoken>
    ```
 2. **고정(static) 도메인 확보** — ngrok 대시보드 → *Domains* 에서 무료 static 도메인 1개 예약
-   (예: `your-name.ngrok-free.dev`). 매번 주소가 바뀌면 아래 env와 안 맞으므로 **고정 도메인 필수**.
+   (예: `cartwheel-construct-tinker.ngrok-free.dev`). 매번 주소가 바뀌면 아래 env와 안 맞으므로 **고정 도메인 필수**.
 3. **`.env.local`에 앱 public URL 지정** — webhook 콜백 주소의 base가 된다.
    ```bash
    # 셋 중 하나 (우선순위: WEBHOOK_BASE_URL > NEXT_PUBLIC_APP_URL > VERCEL_URL)
-   NEXT_PUBLIC_APP_URL=https://your-name.ngrok-free.dev
+   NEXT_PUBLIC_APP_URL=https://cartwheel-construct-tinker.ngrok-free.dev
    ```
    서버는 여기에 `/api/fal/webhook`을 붙여 fal에 전달한다.
 
@@ -155,7 +155,7 @@ claude
 pnpm dev                                   # http://localhost:3000
 
 # 터미널 2 — ngrok (고정 도메인을 반드시 --url 로 지정)
-ngrok http 3000 --url=https://your-name.ngrok-free.dev
+ngrok http 3000 --url=https://cartwheel-construct-tinker.ngrok-free.dev
 ```
 
 - `--url` 없이 `ngrok http 3000` 만 하면 **랜덤 주소**(`*.ngrok-free.app`)가 떠서 `.env.local`의

@@ -2,7 +2,7 @@
 //
 // 전략 (crop 폐기, 2026-06-05 / front 통합, 2026-06-05): 1×4 스트립 생성·sharp 4등분을 폐기하고,
 //   - main = 풀바디·정면·중립배경 대표 포트레이트 1장 (T2I). 핸드오프 파이프라인의
-//     runAssetsGenerate 가 progress bar 뒤에서 미리 생성해 characters.view_main 에 저장.
+//     'assetImages' step 이 fal webhook 으로 미리 생성해 characters.view_main 에 저장.
 //     이 정면 대표 이미지가 곧 "front" 역할을 겸한다 (별도 front 뷰 폐기).
 //   - back/sideLeft/sideRight = main 을 reference 로 한 image-to-image(edit 모델) 재생성.
 //     각 방향을 개별 호출로 생성해 crop 오정합 문제를 제거하고 일관성을 높인다.

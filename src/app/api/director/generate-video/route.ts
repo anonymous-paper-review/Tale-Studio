@@ -4,6 +4,7 @@ import { fal } from '@fal-ai/client'
 import { cameraToText } from '@/lib/kling'
 import { findCameraMovement, findCameraBrand } from '@/lib/knowledge'
 import { createGenerationJob } from '@/lib/generation-jobs'
+import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import {
   VIDEO_MODELS,
@@ -161,6 +162,10 @@ export async function POST(req: Request) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // 멀티유저 쿼터 (Phase 3): 유저 in-flight 작업이 상한이면 429.
+    const quota = await checkUserQuota(user.id)
+    if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
 
     const {
       shotId,

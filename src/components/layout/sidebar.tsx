@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { STAGES } from '@/lib/constants'
 import { UserMenu } from '@/components/layout/user-menu'
 import { useProjectStore } from '@/stores/project-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import type { StageId } from '@/types'
 
 const STAGE_ICONS: Record<StageId, React.ElementType> = {
@@ -37,6 +38,8 @@ export function Sidebar() {
   const canNavigateTo = useProjectStore((s) => s.canNavigateTo)
   // reachedStage 구독 — 단계가 열리면(잠금 해제) sidebar가 리렌더되도록 (canNavigateTo는 함수 참조라 단독으론 반응 안 함)
   useProjectStore((s) => s.reachedStage)
+  // 크로스스테이지 완료 알림 배지 (chat-proactive-copilot Phase 2)
+  const stageBadges = useGlobalChatStore((s) => s.stageBadges)
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const renameProject = useProjectStore((s) => s.renameProject)
 
@@ -138,6 +141,8 @@ export function Sidebar() {
           const Icon = STAGE_ICONS[stage.id]
           const isActive = pathname.startsWith(stage.path)
           const isLocked = !canNavigateTo(stage.id)
+          // 다른 stage 작업 완료 배지 — 활성/잠금 stage엔 표시 안 함(활성은 진입 시 클리어됨)
+          const badge = !isActive && !isLocked ? (stageBadges[stage.id] ?? 0) : 0
 
           return (
             <Tooltip key={stage.id} delayDuration={0}>
@@ -146,7 +151,7 @@ export function Sidebar() {
                   onClick={() => !isLocked && router.push(stage.path)}
                   disabled={isLocked}
                   className={cn(
-                    'flex h-12 w-12 items-center justify-center rounded-lg transition-colors',
+                    'relative flex h-12 w-12 items-center justify-center rounded-lg transition-colors',
                     isLocked && 'cursor-not-allowed opacity-30',
                     isActive && !isLocked
                       ? 'border-l-2 border-primary bg-accent text-primary'
@@ -154,6 +159,11 @@ export function Sidebar() {
                   )}
                 >
                   <Icon className="h-5 w-5" />
+                  {badge > 0 && (
+                    <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-primary-foreground">
+                      {badge > 9 ? '9+' : badge}
+                    </span>
+                  )}
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right" className="flex flex-col">

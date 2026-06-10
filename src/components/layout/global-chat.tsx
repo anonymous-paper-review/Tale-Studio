@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   ChevronsLeft,
   ChevronsRight,
@@ -17,6 +18,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useDirectorCanvasWarmStarting } from '@/features/director/hooks/use-director-canvas-warm-starting'
+import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
 import {
   STAGE_BADGE,
@@ -34,7 +36,10 @@ export function GlobalChat() {
   const sendMessage = useGlobalChatStore((s) => s.sendMessage)
   const clearError = useGlobalChatStore((s) => s.clearError)
   const loadMessages = useGlobalChatStore((s) => s.loadMessages)
+  const suggestion = useGlobalChatStore((s) => s.suggestion)
+  const dismissSuggestion = useGlobalChatStore((s) => s.dismissSuggestion)
 
+  const router = useRouter()
   const currentStage = useProjectStore((s) => s.currentStage)
   const projectId = useProjectStore((s) => s.projectId)
   // Artist는 카드 UI로 롤백되어 노드 전용 warm tip 훅 제거. 정적 안내로 대체.
@@ -73,6 +78,18 @@ export function GlobalChat() {
     const msg = input
     setInput('')
     await sendMessage(msg)
+  }
+
+  // 프로액티브 제안 승인 — 현재 Phase 1은 'navigate' 액션만 (handoffToStage 공통 헬퍼 재사용).
+  const handleSuggestionAction = async () => {
+    const action = suggestion?.action
+    if (!action) {
+      dismissSuggestion()
+      return
+    }
+    const path = await handoffToStage(action.targetStage)
+    dismissSuggestion()
+    if (path) router.push(path)
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,6 +220,33 @@ export function GlobalChat() {
               <div className="mr-4 flex items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
                 <Loader2 className="size-3 animate-spin" />
                 생각 중…
+              </div>
+            )}
+
+            {/* 프로액티브 제안 (chat-proactive-copilot Phase 1) — 시스템이 먼저 거는 actionable 넛지 */}
+            {suggestion && suggestion.stage === currentStage && (
+              <div className="mr-4 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-foreground">
+                <div className="flex items-start gap-1.5">
+                  <span
+                    className={cn(
+                      'mt-px inline-flex items-center rounded-full border px-1.5 py-0 align-middle text-[9px] font-medium',
+                      STAGE_BADGE_CLASS[suggestion.stage],
+                    )}
+                  >
+                    {STAGE_BADGE[suggestion.stage]}
+                  </span>
+                  <span className="whitespace-pre-wrap">{suggestion.content}</span>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  {suggestion.action && (
+                    <Button size="sm" onClick={handleSuggestionAction}>
+                      {suggestion.action.label}
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={dismissSuggestion}>
+                    나중에
+                  </Button>
+                </div>
               </div>
             )}
             <div ref={chatEndRef} />
