@@ -1,0 +1,212 @@
+# Writer 파이프라인 명세 (기계 판독용)
+# source-of-truth: src/lib/writer/ 코드. 짝 문서: writer-pipeline-structure.md
+# 생성: 2026-06-08
+meta:
+  name: writer-pipeline
+  purpose: "스토리 자유 텍스트 → 장르/구조/캐릭터/씬 → 비주얼 디렉션 → 데쿠파주/샷 → T2I·TI2V 프롬프트"
+  ui: none            # 백엔드 전용 (decision #38). producer 핸드오프에서 백그라운드 실행.
+  entrypoint: "POST /api/writer/start"
+  total_text_steps: 14
+
+# ---------------------------------------------------------------------------
+# 두 실행 경로 (동일 데이터 흐름)
+# ---------------------------------------------------------------------------
+execution_paths:
+  local_batch:
+    code: src/lib/writer/pipeline/index.ts
+    fn: runPipeline / _runPipelineInner
+    carrier: file-cache          # 02_genre.json 등
+    resume: "resume=true → stage 파일 로드"
+    async: fire-and-forget (.catch non-blocking)
+  serverless_stepwise:
+    code: src/lib/writer/pipeline/steps.ts
+    fn: runWriterSteps / WRITER_STEPS
+    carrier: "writer_runs.state (jsonb) 체크포인트"
+    resume: "step 마다 state 저장, has()로 완료 판정"
+    step_budget_ms: 240000       # STEP_BUDGET_MS (maxDuration 300 안 마진)
+    chaining: "/api/writer/step self-trigger via after()"
+    async: "await + catch (서버리스 동결 회피)"
+
+# ---------------------------------------------------------------------------
+# 서버리스 체이닝 / 복구
+# ---------------------------------------------------------------------------
+orchestration:
+  flow:
+    - "POST /api/writer/start → createRun(writer_runs, status=running) → after() trigger step"
+    - "POST /api/writer/step → runWriterSteps(deadline) → done|paused|failed"
+    - "paused → after() self-trigger 다음 step → 반복 → markCompleted"
+  recovery:
+    retry_guard: "동일 stage MAX_STAGE_ATTEMPTS=3회 진입 시 markFailed"
+    watchdog:
+      route: "GET /api/writer/watchdog"   # Vercel Cron
+      stale_ms: 180000                     # updated_at 초과 running run 재트리거
+    client_keepalive: "실시간 복구 담당 (cron 주기 느림 보완)"
+
+# ---------------------------------------------------------------------------
+# LLM 축 (dispatch.ts DEFAULT_MODELS, input.models로 override)
+# ---------------------------------------------------------------------------
+llm_axes:
+  S: { name: Story,  provider: gemini, model: gemini-3-flash-preview }
+  V: { name: Visual, provider: gemini, model: gemini-3-flash-preview }
+  C: { name: Check,  provider: claude, model: claude-sonnet-4-6 }
+  providers: [gemini, claude, openai, local]
+
+# ---------------------------------------------------------------------------
+# 단계 (순서 = index.ts _runPipelineInner == steps.ts WRITER_STEPS)
+# axis: 사용 LLM 축 / file: 로그 stage 파일 / output: 산출 타입
+# ---------------------------------------------------------------------------
+stages:
+  - n: 1
+    key: genre
+    runner: runGenre
+    axis: S
+    file: 02_genre.json
+    output: Genre
+  - n: 2
+    key: narrativeStructure
+    runner: runNarrativeStructure
+    axis: S
+    file: 03_narrativeStructure.json
+    output: NarrativeStructure
+  - n: 3
+    key: characters
+    runner: runCharacters
+    axis: S
+    file: 04_characters.json
+    output: Characters
+  - n: 4
+    key: scenes
+    runner: runScenes
+    axis: S
+    file: 05_scenes.json
+    output: Scenes
+  - n: 5
+    key: storyCheck
+    runner: runStoryCheck
+    axis: C
+    file: 06_storyCheck.json
+    output: StoryCheckReport
+    skip_default: true            # resolveSkip.validation1 → emptyC1Report()
+  - n: 6
+    key: midPreview
+    runner: runMidPreview
+    axis: V
+    file: 07_midPreview.json
+    output: MidPreview
+    skip_default: true            # resolveSkip.midPreview → emptyMidPreview()
+  - n: 7
+    key: visualFormat
+    runner: runRenderFormatArtDirection
+    axis: V
+    file: 08_renderFormat_artDirection.json
+    output: [RenderFormat, ArtDirection]   # 합본 저장
+  - n: 8
+    key: productionDesign
+    runner: runProductionDesign
+    axis: V
+    file: 09_productionDesign.json
+    output: ProductionDesign
+    post_persist: [tier1_assets, design_tokens]
+  - n: 9
+    key: assetImages
+    runner: submitHandoffAssetImages   # stepwise: submit-only; local: runAssetsGenerate 인라인
+    axis: null
+    output: null                       # state엔 assetImagesSubmitted 플래그만
+    note: "캐릭터 view_main + 로케이션 wide_shot fal 큐 제출, webhook이 DB 채움 (i2i base)"
+  - n: 10
+    key: sceneCinematography
+    runner: runSceneCinematography
+    axis: V
+    file: 10_sceneCinematography.json   # compact면 10_sceneCinematography_inferred.json
+    output: SceneCinematography[]
+    compact_behavior: "skip 후 shotDesign에서 inferSceneCinematographyFromShots 역추론"
+  - n: 11
+    key: decoupage
+    runner: runDecoupage
+    axis: V
+    file: 10b_decoupage.json
+    output: DecoupagePlan
+  - n: 12
+    key: shotDesign
+    runner: runShotDesign
+    axis: V
+    file: 11_shotDesign.json
+    output: ShotDesign[]                # intent + static_spec + dynamic_spec
+  - n: 13
+    key: shotCheck
+    runner: runShotCheck
+    axis: [V, C]
+    file: [12_shotCheck.json, 13_shotSequence.json]
+    output: [ShotSequence, ShotCheckReport]
+    note: "action_budget 검증 + 샷 split"
+  - n: 14
+    key: renderPrompts
+    runner: runRenderPrompts
+    axis: V
+    file: 14_renderPrompts.json
+    output: RenderPromptsOutput          # T2I + TI2V 최종 프롬프트
+    post_persist: [tier2_shots]
+
+# ---------------------------------------------------------------------------
+# DB persist 타이밍 (모두 non-blocking — 실패해도 파이프라인 계속)
+# ---------------------------------------------------------------------------
+persist:
+  tier1_assets:
+    when: "stage 8 (productionDesign) 직후"
+    fn: persistAssetsToDb
+    targets: [characters, locations, scenes]
+    why: "artist가 ~절반 시점에 언블록되어 이미지 생성 시작"
+  design_tokens:
+    when: "stage 8 직후"
+    fn: persistDesignTokens
+    targets: [projects.design_tokens]
+  asset_images:
+    when: "stage 9 (assetImages)"
+    fn: "fal webhook (stepwise) / persistAssetImagesToDb (local)"
+    targets: [characters.view_main, locations.wide_shot]
+  tier2_shots:
+    when: "stage 14 (renderPrompts) 직후"
+    fn: persistShotsToDb
+    targets: [shots]
+    note: "Tier1 행은 건드리지 않음 (artist 편집 보존)"
+
+# ---------------------------------------------------------------------------
+# Compact Mode
+# ---------------------------------------------------------------------------
+compact_mode:
+  trigger: "genre.depth_level ∈ COMPACT_DEPTH_LEVELS"
+  current_levels: []                    # 비어있음 → 모든 depth가 풀 L3 거침
+  rationale: "씬 단위 연출 규율 강화 (types/pipeline.ts:6)"
+  if_active: "L3 skip → shotDesign 후 역추론"
+
+# ---------------------------------------------------------------------------
+# 이미지 / 영상 생성 (별도 트리거 — 자동 체인 아님)
+# 모두 maxDuration=300, 점진 저장 + resume
+# ---------------------------------------------------------------------------
+media_generation:
+  - route: "POST /api/writer/generate/assets"
+    stage: runAssetsGenerate
+    inputs: [04_characters.json, 08_renderFormat_artDirection.json, 09_productionDesign.json]
+    output: reference 이미지 manifest
+  - route: "POST /api/writer/generate/images"
+    stage: runShotImages          # l6
+    inputs: [14_renderPrompts.json]
+    output: 15_shotImages.json     # T2I 첫 프레임
+  - route: "POST /api/writer/generate/videos"
+    stage: runShotVideos          # l7
+    inputs: [14_renderPrompts.json, 15_shotImages.json]
+    output: 영상 클립 (TI2V)
+  resume_routes:
+    - "POST /api/writer/resume/assets"
+    - "POST /api/writer/resume/images"
+    - "POST /api/writer/resume/videos"
+
+# ---------------------------------------------------------------------------
+# 관측
+# ---------------------------------------------------------------------------
+observability:
+  status: "GET /api/writer/status/[projectId]"
+  logs: "GET /api/writer/logs/[projectId]"
+  logger: "PipelineLogger — NN_<name>.json + _progress.jsonl(markStage) + raw LLM 로그"
+  llm_calls: "metadata.llm_calls (provider별 집계)"
+</content>
