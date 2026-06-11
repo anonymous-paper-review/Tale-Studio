@@ -15,6 +15,12 @@
 
 ## 확정
 
+### 55. chat-aware-regeneration archived
+- **결정**: artist 이미지 재생성의 워크스페이스 인식(workspace awareness) 구현 완료. `generation_jobs`를 활동 로그로 삼아 actor(ui/chat/writer) 귀속(015), 채팅 컨텍스트 빌더(`src/lib/artist/chat-context.ts`)가 매 턴 최근 잡을 **pull**해 주입 — 이벤트 push 없음(Cursor 패턴). 단일 명령·다중 진입점(generate-sheet/generate-world 라우트를 UI·채팅 공용, 별도 regenerate 라우트 미생성). `specs/archive/2026-06-12-chat-aware-regeneration/`로 이동.
+- **검증**: 2026-06-12 사용자 라이브 — ①UI 재생성 actor='ui'(malenia/sideLeft) ②"방금 뭐 했어?"에 UI발 재생성 인지 답변(활동 로그 pull) ③채팅 재생성 actor='chat'(malenia/sideRight) DB row 확인. ④비용 가드 = ②/③ 사이 자율 잡 미생성으로 증명.
+- **계승/제외**: #51 비용 가드(명시 요청에만 재생성), #38 writer actor, #37 턴어라운드 재생성 대상 계승. 제외: asset_versions 버전 히스토리, push형 채팅 알림(#51 Phase 2), director/editor actor 귀속(default 'ui').
+- **일자**: 2026-06-12
+
 ### 54. generation-jobs-multiuser-guard archived
 - **결정**: Async MVP→Multi-user 전환 안전장치 구현 완료. `generation_jobs`에 runtime metadata(`actor`/`user_id`/`workspace_id`/`provider`/`input_snapshot`/`submitted_at`/`completed_at`/`attempts`/`last_error`) 추가(015·016 라이브 적용 + 기존 240 row 백필), 보수적 한도(유저 queued cap 8, artist/director/writer submit concurrency 2) 적용. `specs/archive/2026-06-12-generation-jobs-multiuser-guard/`로 이동.
 - **검증**: 2026-06-12 00:55 KST 사용자 Artist 재생성 라이브 row로 전 필드 정상 기록 확인(actor=ui/writer 구분, input_snapshot 풍부 — 백필 미터치 필드라 앱 write 입증). DB 캐시·`src/types/database.ts` 재생성, tsc clean.

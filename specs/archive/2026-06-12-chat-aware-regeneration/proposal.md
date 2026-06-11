@@ -55,9 +55,9 @@ artist 탭에서 이미지 재생성의 진입점이 둘로 갈라진다: 글로
 ## Impact
 
 - Affected specs: `specs/data/asset_storage.md` (재생성 명령 인터페이스 추가 여부 확인)
-- Affected code: `src/lib/` (공유 명령 + 컨텍스트 빌더 신규), `src/app/api/artist/chat/`,
-  `src/app/api/artist/regenerate/` (신규), `src/features/artist/` (view dialogs),
-  `databases/` migration
+- Affected code: `src/lib/` (컨텍스트 빌더 `artist/chat-context.ts` 신규 + `generation-jobs.ts` actor),
+  `src/app/api/artist/chat/`, `src/features/artist/` (view dialogs), `databases/` migration
+  (~~`src/app/api/artist/regenerate/` 신규~~ — 미생성: 기존 generate-sheet/generate-world 라우트가 그 역할, 2026-06-11 정정)
 - Affected stores: `artist-store` (재생성 액션 + 진행 상태)
 - Affected DB: `generation_jobs.actor` 컬럼 추가
 - Affected decisions: #51 (비용 가드 계승), #38 (writer actor 구분), #37 (재생성 대상 =

@@ -7,7 +7,7 @@
 | 모듈 | 용도 |
 |---|---|
 | `writer/` | **writer 엔진** (스토리→씬/샷/프롬프트/이미지/비디오 파이프라인) — `writer/CLAUDE.md` 참조 |
-| `generation-jobs.ts` | 비동기 생성 잡 라이프사이클 (queued→completed/failed, CAS 전이, target JSONB) |
+| `generation-jobs.ts` | 비동기 생성 잡 라이프사이클 (queued→completed/failed, CAS 전이, target JSONB, actor 귀속 = 활동 로그) |
 | `generation-jobs-client.ts` | 잡 폴링 클라이언트 헬퍼 |
 | `generation-quota.ts` | 유저별 동시 생성 쿼터 가드 (fail-open, 429 `quota_exceeded`) |
 | `generation-notify.ts` | 크로스스테이지 생성 완료 알림 (lib→store `getState()` 패턴 — store간 직접 import 금지 우회) |
@@ -24,7 +24,7 @@
 |---|---|
 | `stage-nav.ts` | 스테이지 핸드오프 공통 로직 (lib→store 패턴의 기준 예시) |
 | `completeness.ts` | Artist/Director 산출물 누락 감지 (chat-proactive-copilot) |
-| `artist/` | artist 도메인 헬퍼 (turnaround 등) |
+| `artist/` | artist 도메인 헬퍼 (turnaround, chat-context = 채팅 워크스페이스 인식 활동 로그 빌더) |
 | `chat-persistence.ts` / `editor-persistence.ts` | 채팅/에디터 영속화 |
 | `editor-zip-export.ts` | 샷 ZIP 일괄 다운로드 |
 | `audio-waveform.ts` / `timing.ts` / `pointer-drag.ts` | 에디터/캔버스 UI 유틸 |

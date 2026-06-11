@@ -9,36 +9,36 @@
 > 재생성 버튼·진행 표시도 기구현. → 실작업은 **actor 귀속 + 활동 로그 컨텍스트 주입**으로 축소.
 > Anthropic tool use 루프 전환은 불필요로 결정 (updates[] 패턴 유지).
 
-## Active
+## Archived (2026-06-12)
 
 ### Section 1: DB — generation_jobs.actor
 - [x] migration 작성: `015_generation_jobs_actor.sql` — `actor text NOT NULL DEFAULT 'ui'` (2026-06-11)
-- [ ] **라이브 DB 적용** — Supabase 대시보드 SQL 에디터에서 015 + 016 실행 (사용자) → `.claude/cache/db/_refresh.py` 재생성
-- [c] 잡 생성 경로 actor 전달 — generate-sheet/generate-world 라우트(`'chat'` 외 전부 `'ui'`), writer `submit_asset_images`(`'writer'`) — 코드 ✓ / 검증 대기
+- [x] **라이브 DB 적용** — Supabase에서 015 + 016 실행 + `_refresh.py` 재생성 (9개 컬럼 반영, actor 실값 확인) (2026-06-12)
+- [x] 잡 생성 경로 actor 전달 — generate-sheet/generate-world 라우트(`'chat'` 외 전부 `'ui'`), writer `submit_asset_images`(`'writer'`) — ①(ui)·③(chat) 잡 기록으로 동작 확인 (2026-06-12)
 
 ### Section 2: 공유 명령 + actor 스레딩
 - [x] (발견) 공유 명령은 기존 라우트가 이미 수행 — 별도 lib 추출 불필요 확인 (2026-06-11)
-- [c] `generation-jobs.ts` — `GenerationJobActor` 타입 + create input + `listRecentGenerationJobs()` — 코드 ✓ / 검증 대기
-- [c] artist-store — `generateCharacterView/AllViews/WorldAsset/WorldShot`에 actor 파라미터(default 'ui'), `applyUpdates`→`'chat'` — 코드 ✓ / 검증 대기
+- [x] `generation-jobs.ts` — `GenerationJobActor` 타입 + create input + `listRecentGenerationJobs()` — 잡 기록·활동로그로 동작 확인 (2026-06-12)
+- [x] artist-store — `generateCharacterView/AllViews/WorldAsset/WorldShot`에 actor 파라미터(default 'ui'), `applyUpdates`→`'chat'` — ①③ 동작 확인 (2026-06-12)
 
 ### Section 3: 채팅 컨텍스트 빌더 (workspace awareness, pull)
-- [c] `src/lib/artist/chat-context.ts` — `buildArtistActivityContext()`: 최근 잡 12개 → "N분 전 [ui|chat|writer] <대상> — 진행 중|완료|실패" 직렬화 — 코드 ✓ / 검증 대기
-- [c] 스냅샷 보강 — global-chat-store 에셋 요약에 views/shots 보유 현황 포함 — 코드 ✓ / 검증 대기
-- [c] artist chat 라우트 — `projectId` 수용 + `userOwnsProject` 체크 + 활동 로그 주입 (실패는 비치명) — 코드 ✓ / 검증 대기
+- [x] `src/lib/artist/chat-context.ts` — `buildArtistActivityContext()`: 최근 잡 12개 → "N분 전 [ui|chat|writer] <대상> — 진행 중|완료|실패" 직렬화 — ②("방금 뭐 했어?") 답변으로 동작 확인 (2026-06-12)
+- [x] 스냅샷 보강 — global-chat-store 에셋 요약에 views/shots 보유 현황 포함 — 코드 ✓ (2026-06-12)
+- [x] artist chat 라우트 — `projectId` 수용 + `userOwnsProject` 체크 + 활동 로그 주입 (실패는 비치명) — ② 동작 확인 (2026-06-12)
 
 ### Section 4: 채팅 동작 규약
 - [x] (발견) 채팅 재생성 경로 기존재 — updates[] 패턴 유지, tool use 루프 전환 안 함 (2026-06-11)
-- [c] 시스템 프롬프트 — `<context>` 활동 로그 해석 가이드([ui]/[chat]/[writer], 진행 중 잡 중복 재생성 금지) + `<cost-guard>` (명시 요청에만 재생성, #51 계승) — 코드 ✓ / 검증 대기
+- [x] 시스템 프롬프트 — `<context>` 활동 로그 해석 가이드([ui]/[chat]/[writer], 진행 중 잡 중복 재생성 금지) + `<cost-guard>` (명시 요청에만 재생성, #51 계승) — ②④ 동작 확인 (2026-06-12)
 - [x] 행위 기록 messages 미저장 확인 — reply 텍스트만 저장 (`parseUpdates`가 JSON 블록 제거, 기존 동작 그대로) (2026-06-11)
 
 ### Section 5: UI — 재생성 버튼 + 진행 표시
 - [x] (발견) 기구현 — `character-view-dialog`(뷰별 재생성)·`world-view-dialog`(프롬프트 편집+재생성)·`generatingViews/generatingLocations` 진행 표시. 신규 작업 없음. `/api/artist/regenerate` 별도 라우트 불필요 (기존 generate 라우트가 그 역할) (2026-06-11)
 
 ### 검증 (proposal Verification gate 시나리오)
-- [ ] ①라이브 DB에 015 적용 후: UI 재생성 → 잡 actor='ui' 기록 + 카드 진행 표시 + 완료 반영
-- [ ] ②UI 재생성 직후 채팅 "방금 뭐 했어?" → UI발 재생성 인지 답변
-- [ ] ③채팅 재생성 요청 → 잡 actor='chat' + 카드 동일 진행 표시
-- [ ] ④명시 요청 없이 채팅 자율 재생성 없음 (비용 가드)
+- [x] ①UI 재생성 → 잡 actor='ui' 기록 + 카드 진행 표시 + 완료 반영 — malenia/sideLeft, DB 확인 (2026-06-12)
+- [x] ②UI 재생성 직후 채팅 "방금 뭐 했어?" → UI발 재생성 인지 답변 (활동 로그 pull, 진행 중 잡 인지) (2026-06-12)
+- [x] ③채팅 재생성 요청 → 잡 actor='chat' + 카드 동일 진행 표시 — malenia/sideRight, DB 확인 (2026-06-12)
+- [x] ④명시 요청 없이 채팅 자율 재생성 없음 (비용 가드) — ②("방금 뭐 했어?")와 ③ 사이 새 chat 잡 미생성으로 증명 (사용자 승인 archive, 2026-06-12)
 
 ## Blocked
 - (없음)

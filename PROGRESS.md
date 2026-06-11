@@ -15,10 +15,11 @@
 
 | Change | 상태 | 상세 (정본) |
 |---|---|---|
-| `chat-aware-regeneration` | `[c]` **7건** + 브라우저 시나리오 4건 | `specs/changes/chat-aware-regeneration/tasks.md` |
 | `chat-context-management` | `[ ]` **12건** (Phase 1+2) | `specs/changes/chat-context-management/tasks.md` |
 | `producer-story-gate` | `[ ]` **23건** (6섹션) | `specs/changes/producer-story-gate/tasks.md` |
 
+> ✅ **2026-06-12 archived**: `chat-aware-regeneration` (decision #55). 재생성 actor 귀속(015) + 채팅 워크스페이스
+> 인식(pull) 라이브 검증 완료(①ui ②인지 ③chat ④가드) → `specs/archive/2026-06-12-chat-aware-regeneration/`.
 > ✅ **2026-06-12 archived**: `generation-jobs-multiuser-guard` (decision #54). `015`+`016` 라이브 적용·검증 완료 →
 > `specs/archive/2026-06-12-generation-jobs-multiuser-guard/`. 이제 생성 잡 insert가 runtime metadata 컬럼을 정상 기록.
 
