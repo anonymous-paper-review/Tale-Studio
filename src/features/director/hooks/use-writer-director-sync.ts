@@ -29,8 +29,10 @@ export function useWriterDirectorSync() {
 
   // 스토리보드 자동생성 마운트당 1회 가드 (재진입 중복 방지).
   const autoStoryboardTriggeredRef = useRef(false)
-  // Step 2: DB hydrate 1회 가드 (projectId별). DB가 진실 — Scene/Shot seed 후 1회 적용.
-  const hydratedProjectIdRef = useRef<string | null>(null)
+  // Step 2: DB hydrate 가드 (projectId별 1회 호출) — promise를 보관해 매 실행이 완료를 기다린다.
+  // Pass 3의 storyboardImage null 판정이 DB 복원 전 상태를 읽으면 완료된 샷을 전부
+  // 재생성하므로 (재생성 폭주 버그), 호출 여부가 아니라 완료 여부가 동기화 기준이어야 한다.
+  const hydratePromiseRef = useRef<{ projectId: string; promise: Promise<void> } | null>(null)
   // asset-storage DB hydrate 1회 가드 (projectId별). Pass 2 에셋 바인딩이 이 결과에 의존.
   const assetHydratedProjectIdRef = useRef<string | null>(null)
   // writer-store DB 로드 1회 가드 (projectId별). director 직행/새로고침 대응.
@@ -129,14 +131,24 @@ export function useWriterDirectorSync() {
     // ── Pass 2.5: DB → 캔버스 hydrate (DB가 진실, projectId별 1회) ──────
     // Scene/Shot seed 후 실행 — 부모 노드가 존재해야 Video 노드를 매달 수 있음.
     // canvas_position을 기존 노드에 적용 + 누락된 video_clips 행을 Video 노드로 생성.
+    // 반드시 완료까지 await — Pass 3이 hydrate 전 상태(storyboardImage=null)를 보고
+    // 완료된 샷 전체를 재생성하던 레이스의 본질 수정. effect가 재실행돼도 같은
+    // promise를 기다리므로 "호출 1회 + 진행 중 통과" 구멍이 없다.
     const projectId = useDirectorCanvasStore.getState().projectId
-    if (projectId && hydratedProjectIdRef.current !== projectId) {
-      hydratedProjectIdRef.current = projectId
-      void useDirectorCanvasStore.getState().hydrateFromDb(projectId)
+    if (projectId) {
+      if (hydratePromiseRef.current?.projectId !== projectId) {
+        hydratePromiseRef.current = {
+          projectId,
+          promise: useDirectorCanvasStore.getState().hydrateFromDb(projectId),
+        }
+      }
+      await hydratePromiseRef.current.promise
+      if (cancelled) return
     }
 
     // ── Pass 3: 스토리보드 이미지 자동생성 (병렬3 + 1회 + null만 = 캐시) ──
-    // 마운트당 1회. storyboardImage가 null인 shot만 생성(영속되므로 재진입 skip).
+    // 마운트당 1회. storyboardImage가 null인 shot만 생성 — Pass 2.5에서 DB hydrate를
+    // 기다린 후이므로 DB에 완료본이 있는 샷은 여기서 null이 아니다 (재진입 skip).
     // 각 generateStoryboardImage는 90s 타임아웃 + 1회 재시도 + 실패로그 보유.
     if (autoStoryboardTriggeredRef.current) return
     const after = useDirectorCanvasStore.getState()
