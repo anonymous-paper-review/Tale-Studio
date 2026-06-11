@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       }
       const target = tableMap[type]
       if (target) {
-        // storyboard_image 는 JSONB StoryboardImage 객체 (src/types/director-canvas.ts).
+        // storyboard_image 는 JSONB StoryboardImage 객체 (src/types/director.ts).
         // ShotNode/StoryboardGridView 가 .url/.status/.errorMessage 로 소비하므로 객체로 저장한다.
         // 나머지 이미지 필드(reference_image, view_*, wide_shot 등)는 TEXT(public URL) 그대로.
         const value =

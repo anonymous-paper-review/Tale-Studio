@@ -5,15 +5,13 @@
 | URL | Feature |
 |---|---|
 | `/studio/producer` | `features/producer/` (Meeting Room) |
-| `/studio/artist`   | `features/artist/`  (L0 Concept Canvas) |
+| `/studio/artist`   | `features/artist/`  (L0 Artist Card Studio — 카드형 Tabs) |
 | `/studio/director` | `features/director/` (Director Canvas) |
 | `/studio/editor`   | `features/editor/`   (Post-Production Lite) |
 
 `layout.tsx`가 모든 공통 shell.
 
-> **writer는 UI 없는 백엔드 전용 스테이지** (§3 일원화, 2026-06-05). `lib/writer` 파이프라인이
-> producer 핸드오프(`/api/writer/start`)에서 백그라운드 실행되어 DB(characters/scenes/locations/shots)를
-> 채운다. 옛 `/studio/writer` 페이지·`features/writer`는 제거됨. producer → **artist** 직행.
+> writer는 UI 없는 백엔드 스테이지 — 상세는 루트 `CLAUDE.md` §URL→디렉토리 (중복 서술 금지).
 
 ## Studio shell layout
 
@@ -22,7 +20,7 @@
 <main className="ml-16 mr-80 min-h-screen">  // 좌 sidebar / 우 GlobalChat 여백
   <div className="flex h-screen flex-col">{children}</div>
 </main>
-<GlobalChat />              // w-80 fixed right (전 stage 공통 렌더 — layout.tsx:87, 조건부 hide 없음)
+<GlobalChat />              // w-80 fixed right (전 stage 공통 렌더, 조건부 hide 없음)
 <Samantha />                // floating CTA
 ```
 
@@ -31,41 +29,17 @@
 
 ## canNavigateTo 가드 (project-store)
 
-`StudioLayout`의 useEffect가 URL ↔ `currentStage` 동기화 + 잠긴 stage 리다이렉트 수행:
+계약만 (구현은 `src/stores/project-store.ts`가 진실 — 코드 블록 복제 금지):
 
-```tsx
-useEffect(() => {
-  if (initLoading) return
-  const stage = STAGES.find((s) => pathname.startsWith(s.path))
-  if (!stage) return
-  if (!canNavigateTo(stage.id as StageId)) {
-    router.replace('/studio/producer')
-    return
-  }
-  if (useProjectStore.getState().currentStage !== stage.id) {
-    setStage(stage.id as StageId)
-  }
-}, [pathname, canNavigateTo, initLoading, router, setStage])
-```
-
-### TEMP 가드 해제 (2026-05-17~)
-
-`canNavigateTo`는 **현재 항상 `true`** (검증 편의). 원본 로직은:
-
-```ts
-canNavigateTo: (stage) => {
-  const { currentStage } = get()
-  return getStageIndex(stage) <= getStageIndex(currentStage)
-}
-```
-
-검증 완료 시 (Phase 11 검증 보드 OK) 원본 복원. 그 전까지 모든 stage 자유 진입 허용.
+- `StudioLayout`의 useEffect가 URL ↔ `currentStage` 동기화 + 잠긴 stage는 producer로 리다이렉트.
+- **순차 잠금 현행**: 도달한 최고 단계(`reachedStage`)까지만 진입 허용. 다음 단계는 handoff가
+  `setStage`로 `reachedStage`를 전진시켜 연다. (옛 "항상 true" TEMP 해제는 원복 완료 — 2026-06)
 
 ## Stage 전환 패턴
 
 - Sidebar 클릭 → URL push (`/studio/<stage>`) → useEffect가 `setStage` 호출
 - Stage handoff (producer → artist): producer CTA → `setStage('artist')` + `/api/writer/start` 백그라운드 발사 (writer UI 없음)
-- **Stage 별 store는 자기 영역만** — cross-store import 금지 (project-store 외, decisions/stores 룰)
+- **Stage 별 store는 자기 영역만** — cross-store import 금지 (architecture rule §4)
 
 ## 새 Stage 페이지 작업 시
 

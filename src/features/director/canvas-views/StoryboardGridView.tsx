@@ -8,13 +8,13 @@ import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame
 import {
   getChildShots,
   useDirectorCanvasStore,
-} from '@/stores/director-canvas-store'
+} from '@/stores/director-store'
 import {
   isSceneData,
   isShotData,
   type DirectorNode,
   type ShotNodeData,
-} from '@/types/director-canvas'
+} from '@/types/director'
 
 type SceneGroup = {
   key: string

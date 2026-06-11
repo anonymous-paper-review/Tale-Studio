@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
+import { useDirectorCanvasStore } from '@/stores/director-store'
 
 /**
  * Director Canvas의 RelationModal — 사용자가 핀-핀 연결할 때 호출.

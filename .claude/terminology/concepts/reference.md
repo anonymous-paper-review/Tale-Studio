@@ -32,9 +32,9 @@
 |---|---|---|---|
 | `Character` (`scene.ts`) | `referenceImages` | `string[]` | URL 문자열 배열 |
 | `Shot` (`shot.ts`) | `referenceImageUrl` | `string \| null` | **단수, 1장만** |
-| `ShotNodeData` (`director-canvas.ts`) | `referenceImages` | `DirectorReferenceImage[]` | **객체 배열** (사용자 업로드) |
+| `ShotNodeData` (`director.ts`) | `referenceImages` | `DirectorReferenceImage[]` | **객체 배열** (사용자 업로드) |
 
-**`DirectorReferenceImage`** (`director-canvas.ts`):
+**`DirectorReferenceImage`** (`director.ts`):
 ```
 { id: string; url: string; uploadedAt: number }
 ```

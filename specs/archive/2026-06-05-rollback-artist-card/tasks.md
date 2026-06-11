@@ -36,7 +36,7 @@
 
 ### Director ShotNode 에셋 선택 (코드 ✓ / 브라우저 검증 대기)
 
-- [c] ShotNodePopup — 등장 캐릭터/월드 선택 드롭다운/칩 UI (specs/layers/director_canvas.md §5.3) — 코드 ✓ / 검증 대기
+- [c] ShotNodePopup — 등장 캐릭터/월드 선택 드롭다운/칩 UI (specs/layers/director.md §5.3) — 코드 ✓ / 검증 대기
 - [c] `characterAssetIds` / `worldAssetIds` 필드 채우기 — 코드 ✓ / 검증 대기
 - [c] `resolveShotAssetImages` — 스토리보드 생성 레퍼런스로 사용 — 코드 ✓ / 검증 대기
 

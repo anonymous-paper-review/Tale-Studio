@@ -16,8 +16,8 @@ import {
   getChildShots,
   nextShotPosition,
   useDirectorCanvasStore,
-} from '@/stores/director-canvas-store'
-import type { SceneNodeData } from '@/types/director-canvas'
+} from '@/stores/director-store'
+import type { SceneNodeData } from '@/types/director'
 
 type Props = {
   nodeId: string

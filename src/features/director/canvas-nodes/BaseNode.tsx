@@ -5,9 +5,9 @@ import { Handle, Position } from '@xyflow/react'
 import { Copy, Edit, GitBranch, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
+import { useDirectorCanvasStore } from '@/stores/director-store'
 import { usePresetStorageStore } from '@/stores/preset-storage-store'
-import { isShotData, isVideoData } from '@/types/director-canvas'
+import { isShotData, isVideoData } from '@/types/director'
 
 const PRESET_DND_TYPE = 'application/preset-id'
 

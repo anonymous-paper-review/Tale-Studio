@@ -37,7 +37,7 @@
 **`LightingConfig`**: `position('left'|'top'|'right'|'front')`, `brightness(0-100)`, `colorTemp(2000-10000K)`
 **`CameraPreset`**: `brand`, `focalLength(mm)`, `aperture(f-stop)`, `whiteBalance(Kelvin)`
 
-### 2. Director 캔버스 노드 — `ShotNodeData` (`src/types/director-canvas.ts`)
+### 2. Director 캔버스 노드 — `ShotNodeData` (`src/types/director.ts`)
 `kind: 'shot'`.
 
 | 필드 | 타입 | 의미 |
@@ -54,7 +54,7 @@
 | `provider` | `DirectorVideoProvider` | `'kling'｜'veo'｜'local'` |
 | `stale` | `boolean` | 상위 변경으로 재생성 필요 표시 |
 
-**`StoryboardImage`** (`director-canvas.ts`, 결정 #36/#37):
+**`StoryboardImage`** (`director.ts`, 결정 #36/#37):
 ```ts
 { url: string; status: DirectorVideoStatus; errorMessage: string | null; generatedAt: number }
 ```

@@ -22,8 +22,8 @@
 | 씬 | Scene | `Scene` | `SceneNodeData` | `scenes` | [[scene]] |
 | 샷 | Shot | `Shot` | `ShotNodeData` | `shots` | [[shot]] |
 | 영상 클립 | Video Clip | `VideoClip` | `VideoNodeData` | `video_clips` | [[video]] |
-| 캐릭터 | Character / Actor | `Character` / `CharacterAsset` | `'actor'` 노드 | `characters` | [[asset]] |
-| 장소/월드 | Location / World | `Location` / `WorldAsset` | `'world'` 노드 | `locations` | [[asset]] |
+| 캐릭터 | Character / Actor | `Character` / `CharacterAsset` | — | `characters` | [[asset]] |
+| 장소/월드 | Location / World | `Location` / `WorldAsset` | — | `locations` | [[asset]] |
 | 매니페스트 | Manifest | `SceneManifest` | — | — | [[scene]] |
 | 기법 | Technique | `KnowledgeTechnique` | — | `knowledge_techniques` | — |
 
@@ -38,7 +38,7 @@
 | 생성된 이미지 | `generatedImages` | `[]` | [[image]] |
 | 누적 이미지 | `countImagesInSubtree()` | fn | [[image]] |
 | 씬이미지(개념) | `WorldAsset.wideShot/establishingShot` | `string\|null` | [[image]] |
-| 캐릭터 뷰 | `CharacterView` (5뷰) | front/side/back/threeQuarterLeft/threeQuarterRight | [[asset]] |
+| 캐릭터 뷰 | `CharacterViewKey` (4뷰) | main/back/sideLeft/sideRight | [[asset]] |
 | 썸네일 | `thumbnailUrl` | `string\|null` | [[video]] |
 
 ## 샷 세부 (`src/types/shot.ts`)
@@ -51,13 +51,13 @@
 | 카메라 프리셋 | `CameraPreset` | brand/focalLength/aperture/whiteBalance |
 | 대사 | `DialogueLine` | characterId/text/emotion/delivery/durationHint |
 
-## 캔버스 (`src/types/director-canvas.ts`)
+## 캔버스 (`src/types/director.ts`)
 | 한국어 | 코드 | 값 |
 |---|---|---|
 | 노드 종류 | `DirectorNodeKind` | scene / shot / video |
 | 엣지 종류 | `DirectorEdgeCategory` | parent / relates-to |
 | 영상 상태 | `DirectorVideoStatus` | pending/generating/completed/failed |
-| 영상 제공자 | `DirectorVideoProvider` | kling / veo / local |
+| 영상 제공자 | `DirectorVideoProvider` (`VideoModelKey` 별칭) | 'happy-horse' / 'seedance' / 'kling-o3' / 'veo' / 'local' |
 | 부모 씬 노드 | `parentSceneNodeId` | — |
 | 부모 샷 노드 | `parentShotNodeId` | — |
 | 원본 씬 링크 | `writerSceneId` | nullable |
@@ -67,16 +67,6 @@
 | 테이크 | `take_label` (DB) | 예: take_v1 |
 | 오버라이드 | `VideoOverride` | prompt?/camera?/lighting?/cameraPreset?/provider? |
 
-## Artist 캔버스/UI
-| 한국어 (UI) | 코드 | 값 |
-|---|---|---|
-| 출력 모드 | `outputMode` | single / five-view / sixteen-angle |
-| 생성 모델 | `modelId` | imagen / h100-self |
-| 등록 | `registerCharacter()` | — |
-| 등록 임계값 | `REGISTRATION_IMAGE_THRESHOLD` | — |
-| 관계 정의 (메모) | `relationText` | — |
-| 상속 | `'parent'` 엣지 | — |
-| 배치 | `'in-world'` 엣지 | — |
-| 관계(내러티브) | `'references'` 엣지 | — |
+> 노드그래프 기반 L0 Artist 캔버스 어휘(outputMode/REGISTRATION_IMAGE_THRESHOLD/relationText/엣지 kind 등)는 2026-06-04 폐기됨. 필요 시 `specs/archive/2026-06-04-redesign-l0-canvas/` 참조.
 
 > 여기에 없는 충돌/주의 항목은 [[conflicts]] 참고.

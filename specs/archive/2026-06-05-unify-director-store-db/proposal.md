@@ -13,22 +13,22 @@ decisions: [14, 15, 43, 47]
 
 - **DB** (`shots`/`scenes`/`video_clips`) — writer 파이프라인이 채우는 캐넌. 옛 `director-store`가
   카메라/조명 편집을 여기에 debounce 저장. editor 등 다른 스테이지가 읽음.
-- **localStorage** (`director-canvas-store`, key `tale-director-canvas-v1-default`) — 새 노드 그래프
+- **localStorage** (`director-store`, key `tale-director-v1-default`) — 새 노드 그래프
   전체(노드 위치/테이크/override/엣지/카메라/조명)를 통째 저장. **DB에 안 씀.**
 
 문제:
 1. **Drift** — 새 Director 캔버스에서 카메라/조명/브랜치를 편집해도 DB `shots`엔 안 들어감 →
    editor 등이 읽는 캐넌과 어긋남. seed는 1회뿐이라 시간이 갈수록 벌어짐.
-2. **스토어 2개** — `director-store`(옛, 780줄)와 `director-canvas-store`(새)가 공존. 옛것은
+2. **스토어 2개** — `director-store`(옛, 780줄)와 `director-store`(새)가 공존. 옛것은
    `editor-store`(핸드오프 fallback) + `global-chat-store`(legacy 채팅 분기)가 의존해 못 지움(#47).
 3. **B2B 제품인데 화면 데이터가 브라우저 로컬** — 기기/사용자 간 공유·서버 영속 불가.
 
 ## What Changes (방향)
 
-**끝그림: DB = 단일 진실. `director-canvas-store`가 유일한 Director 스토어. localStorage는 캐시로 강등.**
+**끝그림: DB = 단일 진실. `director-store`가 유일한 Director 스토어. localStorage는 캐시로 강등.**
 
 ### Step 0 — canvas-store 샷 편집 write-through (마이그레이션 0, 즉효)
-- `director-canvas-store.updateNodeData`가 Shot의 camera/lighting/cameraPreset/prompt를 바꾸면
+- `director-store.updateNodeData`가 Shot의 camera/lighting/cameraPreset/prompt를 바꾸면
   → `shots` 테이블에 debounce 저장(옛 `director-store.debouncedShotSave` 패턴 재사용).
 - 키 = 노드의 `writerShotId`(=`shots.shot_id`). writerShotId 없는(캔버스 수동생성) 노드는 Step 2까지 skip.
 - 컬럼 이미 존재(007 적용: camera_config/lighting_config/camera_brand/focal_length/aperture/white_balance, prompt).
@@ -45,10 +45,10 @@ decisions: [14, 15, 43, 47]
 - write-back: 노드 위치/테이크 추가/override/final → DB. localStorage는 **순수 캐시**(없어도 DB 복원).
 
 ## Impact
-- Affected code: `src/stores/director-canvas-store.ts`(hydrate+write-through), `src/stores/editor-store.ts`,
+- Affected code: `src/stores/director-store.ts`(hydrate+write-through), `src/stores/editor-store.ts`,
   `src/stores/global-chat-store.ts`, `src/features/director/hooks/use-writer-director-sync.ts`(hydrate 확장),
   `src/app/api/director/*`(필요 시 video_clips persist 라우트)
-- Affected stores: `director-canvas-store`(메인), `director-store`(삭제), `editor-store`/`global-chat-store`(의존 이전)
+- Affected stores: `director-store`(메인), `director-store`(삭제), `editor-store`/`global-chat-store`(의존 이전)
 - Affected DB: 005 적용 (canvas_position 등). shots는 컬럼 기존.
 - Affected decisions: #14(종결), #15(실현), **#43 번복**, #47(연속)
 

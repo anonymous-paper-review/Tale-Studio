@@ -8,11 +8,11 @@ import {
   useDirectorCanvasStore,
   nextScenePosition,
   nextShotPosition,
-} from '@/stores/director-canvas-store'
-import { isShotData } from '@/types/director-canvas'
+} from '@/stores/director-store'
+import { isShotData } from '@/types/director'
 
 /**
- * Writer → Director 초기 셋업 (스펙 director_canvas.md §8).
+ * Writer → Director 초기 셋업 (스펙 director.md §8).
  *
  * Director 진입 시 Writer가 정의한 Scene/Shot 구조를 노드로 자동 생성하고,
  * 각 Shot의 프롬프트(actionDescription)와 등장 캐릭터/월드 에셋을 seed한다.
@@ -146,7 +146,7 @@ export function useWriterDirectorSync() {
       if (cancelled) return
     }
 
-    // ── Pass 3: 스토리보드 이미지 자동생성 (병렬3 + 1회 + null만 = 캐시) ──
+    // ── Pass 3: 스토리보드 이미지 자동생성 (병렬2 + 1회 + null만 = 캐시) ──
     // 마운트당 1회. storyboardImage가 null인 shot만 생성 — Pass 2.5에서 DB hydrate를
     // 기다린 후이므로 DB에 완료본이 있는 샷은 여기서 null이 아니다 (재진입 skip).
     // 각 generateStoryboardImage는 90s 타임아웃 + 1회 재시도 + 실패로그 보유.
@@ -164,7 +164,7 @@ export function useWriterDirectorSync() {
 
     autoStoryboardTriggeredRef.current = true
     void (async () => {
-      const CONCURRENCY = 3
+      const CONCURRENCY = 2
       let cursor = 0
       const worker = async () => {
         while (cursor < pendingShotIds.length) {

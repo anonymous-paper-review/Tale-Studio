@@ -5,9 +5,10 @@
 // 진짜 fair-queue(유저 라운드로빈 디스패치)는 후속 — 지금은 관대한 상한 + 친절한 429.
 import { countQueuedJobsByUser } from '@/lib/generation-jobs'
 
-// 유저 1명이 동시에 큐에 올릴 수 있는 최대 생성 작업 수. 캐릭터 1명(4뷰)+배경 몇 개를
-// 한꺼번에 돌려도 막히지 않게 관대하게 잡는다. 멀티유저 부하 패턴 관측 후 조정.
-export const MAX_QUEUED_JOBS_PER_USER = 30
+// 유저 1명이 동시에 큐에 올릴 수 있는 최대 생성 작업 수.
+// fal 계정 동시 실행 한도(현재 20)를 여러 유저가 공유하므로 유저 테스트 전에는 보수적으로 둔다.
+// 전역 dispatcher 도입 전까지의 UX 보호 가드이며, billing/plan별 quota는 후속 영역.
+export const MAX_QUEUED_JOBS_PER_USER = 8
 
 export interface QuotaCheck {
   ok: boolean

@@ -1,6 +1,6 @@
 # src/lib — 공유 라이브러리 맵
 
-> 모듈 단위 포인터만. 구현 디테일은 코드가 진실. 비동기 생성 규칙은 `.claude/rules/async-generation.md`.
+> 모듈 단위 포인터만. 구현 디테일은 코드가 진실. route/store 구조는 `src/app/api/**/route.ts`와 `src/stores/*.ts`를 직접 읽는다.
 
 ## AI · 생성 인프라
 
@@ -34,5 +34,5 @@
 
 ## 컨벤션
 
-- **lib→store는 허용** (`getState()`), store→store 직접 import 금지 (stores rule).
+- **lib→store는 허용** (`getState()`), store→store 직접 import 금지.
 - 새 모듈 추가 시 이 표에 한 줄 추가 (용도 1줄만 — 디테일 금지, 코드가 진실).

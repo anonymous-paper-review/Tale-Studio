@@ -75,6 +75,12 @@ export async function submitHandoffAssetImages(
   ])
   const workspaceId = project?.workspace_id as string | undefined
   if (!workspaceId) return { characters: 0, locations: 0, skipped: 0 }
+  const { data: workspace } = await supabaseAdmin
+    .from('workspaces')
+    .select('owner_id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  const ownerId = (workspace?.owner_id as string | undefined) ?? null
 
   const charFilled = new Set(
     (dbChars ?? []).filter((r) => r.view_main != null).map((r) => r.character_id as string),
@@ -112,9 +118,10 @@ export async function submitHandoffAssetImages(
       palette,
     }
     try {
+      const prompt = buildCharacterMainPrompt(input)
       const { request_id, model } = await falImageSubmit({
         model: 'openai/gpt-image-2',
-        prompt: buildCharacterMainPrompt(input),
+        prompt,
         aspect_ratio: '1:1',
         webhookUrl,
       })
@@ -123,6 +130,15 @@ export async function submitHandoffAssetImages(
         requestId: request_id,
         model,
         kind: 'character_view',
+        actor: 'writer',
+        userId: ownerId,
+        workspaceId,
+        provider: 'fal',
+        inputSnapshot: {
+          model: 'openai/gpt-image-2',
+          prompt,
+          aspect_ratio: '1:1',
+        },
         target: { workspaceId, characterId: c.id, view: 'main', column: CHARACTER_VIEW_COLUMNS.main },
       })
       charCount++
@@ -139,8 +155,9 @@ export async function submitHandoffAssetImages(
       continue
     }
     try {
+      const prompt = buildLocationWidePrompt(loc, artDirection.art_style, palette)
       const { request_id, model } = await falImageSubmit({
-        prompt: buildLocationWidePrompt(loc, artDirection.art_style, palette),
+        prompt,
         aspect_ratio: aspect,
         webhookUrl,
       })
@@ -149,6 +166,14 @@ export async function submitHandoffAssetImages(
         requestId: request_id,
         model,
         kind: 'world_shot',
+        actor: 'writer',
+        userId: ownerId,
+        workspaceId,
+        provider: 'fal',
+        inputSnapshot: {
+          prompt,
+          aspect_ratio: aspect,
+        },
         target: { workspaceId, locationId: loc.id, column: 'wide_shot' },
       })
       locCount++

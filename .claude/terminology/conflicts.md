@@ -14,7 +14,7 @@
 | 위치 | 타입 |
 |---|---|
 | `Character` (`scene.ts`) | `string[]` |
-| `ShotNodeData` (`director-canvas.ts`) | `DirectorReferenceImage[]` (`{id,url,uploadedAt}`) |
+| `ShotNodeData` (`director.ts`) | `DirectorReferenceImage[]` (`{id,url,uploadedAt}`) |
 
 동일 이름이 한쪽은 URL 문자열 배열, 한쪽은 객체 배열. 자동완성·복붙 시 혼동 위험.
 관련: [[reference]] · 통일 후보: 객체 배열로 통일하거나 이름 분리.
@@ -27,34 +27,30 @@
 
 같은 "샷의 참고 이미지"인데 단/복수 + 이름이 다름. 관련: [[shot]] [[reference]].
 
-## 🔴 3. 캐릭터 뷰 — TS 5개 vs DB 3개
-| 레이어 | 뷰 |
-|---|---|
-| `CharacterView` (`asset.ts`) | front, side, back, **threeQuarterLeft, threeQuarterRight** |
-| `characters` 테이블 (DB) | view_front, view_side, view_back |
+## ~~🔴 3. 캐릭터 뷰 — TS 5개 vs DB 3개~~ ✅ 해소됨 (2026-06-05 뷰 모델 개편)
 
-`threeQuarterLeft/Right`는 DB에 컬럼이 없어 **영속화되지 않음**. 새로고침 시 유실 가능.
-관련: [[asset]].
+TS `CharacterViewKey = 'main'|'back'|'sideLeft'|'sideRight'` (4뷰, front→main 통합, threeQuarter 폐기).
+DB `characters` 테이블도 view_main/view_back/view_side_left/view_side_right 4컬럼으로 정합.
+유실 위험 해소됨. 관련: [[asset]].
 
-## 🟡 4. 캐릭터 = Character = CharacterAsset = `'actor'`
+## 🟡 4. 캐릭터 = Character = CharacterAsset
 | 단계 | 이름 |
 |---|---|
 | Writer (`scene.ts`) | `Character` |
 | Artist 에셋 (`asset.ts`) | `CharacterAsset` |
-| Artist 캔버스 노드 kind | `'actor'` |
+| DB | `characters` 테이블 |
 
-캔버스에서만 "actor"로 바뀜. "actor"와 "character"를 같은 것으로 인지해야 함. 관련: [[asset]].
+Artist 캔버스는 2026-06-04 폐기(카드형 UI로 대체). `'actor'` 노드 kind는 구식 어휘. 관련: [[asset]].
 
-## 🟡 5. 장소 = Location = WorldAsset = `'world'`
+## 🟡 5. 장소 = Location = WorldAsset
 | 단계 | 이름 |
 |---|---|
 | Writer (`scene.ts`) | `Location` (`locationId`) |
 | Artist 에셋 (`asset.ts`) | `WorldAsset` (`locationId` 유지) |
-| Artist 캔버스 노드 kind | `'world'` |
 | DB | `locations` 테이블 |
 
-"Location"이 에셋/캔버스에선 "World/world"로 명칭이 완전히 바뀜(식별자는 `locationId` 유지).
-가장 헷갈리는 매핑 중 하나. 관련: [[asset]].
+"Location"이 에셋에선 "World"로 명칭이 완전히 바뀜(식별자는 `locationId` 유지).
+가장 헷갈리는 매핑 중 하나. Artist 캔버스 `'world'` 노드 kind는 2026-06-04 폐기로 구식. 관련: [[asset]].
 
 ## 🟡 6. "씬이미지" / "샷이미지" — 용어 정리됨 (일부 해소)
 - **샷이미지 = `storyboardImage` (정식 타입 `StoryboardImage`)** ✅ 해소됨 (결정 #36/#37, 마이그레이션 006).
@@ -88,5 +84,7 @@ DB `shots`에선 `camera_brand`, `focal_length`, `aperture`, `white_balance` 컬
 
 ## 요약 우선순위 (혼동 빈도 기준)
 1. 레퍼런스 이미지 3종 분산 (#1, #2) — 가장 자주 헷갈림
-2. 캐릭터/장소의 3중 명칭 (#4, #5)
-3. 캐릭터 뷰 TS/DB 개수 불일치 (#3) — 데이터 유실 가능성
+2. 캐릭터/장소의 이중 명칭 (#4, #5)
+3. ~~캐릭터 뷰 TS/DB 개수 불일치 (#3)~~ → 2026-06-05 해소됨
+
+> 현재 미해소 충돌: #1 #2 #4 #5 #6 #7 #8 #9 #10 (총 9건)

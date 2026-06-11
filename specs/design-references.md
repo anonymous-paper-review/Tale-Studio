@@ -56,11 +56,11 @@ companion_to: specs/design.md
 
 | 차용 | 거부 |
 |---|---|
-| ✓ Node-graph 패러다임 친숙성 — AI video tooling에 node graph 존재 재교육 불필요. **명시적 inversion**: 그들의 node = 모델, 우리 node = 엔티티 | ✗ **Glassmorphism / neon glow / liquid-glass 3D icons** — prosumer-AI-creator 미감. B2B agency엔 "quiet info-dense"가 신뢰 |
+| ✓ Node-graph 패러다임 친숙성 — AI video tooling에 node graph 존재 재교육 불필요. **Director Canvas 한정**: 그들의 node = 모델, 우리 node = 엔티티 (Artist는 카드형 패널로 롤백 2026-06-04 — 해당 없음) | ✗ **Glassmorphism / neon glow / liquid-glass 3D icons** — prosumer-AI-creator 미감. B2B agency엔 "quiet info-dense"가 신뢰 |
 | ✓ Generation-as-credit 시각 피드백 — finance owner 가시성 | ✗ In-product marketing-tier hero canvas — 매일 쓰기엔 시끄러움 |
 |  | ✗ Glass blur는 50+ 노드에서 스캔 어려움 (성능 + 인지 부담) |
 
-**왜 차용 안 하는가**: glassmorphism은 *contributor drift* 위험. .claude/rules/design.md에 명시적 금지 ("NOT Higgsfield") — Layer A hard rule 5번.
+**왜 차용 안 하는가**: glassmorphism은 *contributor drift* 위험. design.md에 명시적 금지 ("NOT Higgsfield").
 
 **출처**: [higgsfield.ai/canvas-intro](https://higgsfield.ai/canvas-intro)
 
@@ -106,7 +106,7 @@ companion_to: specs/design.md
 
 | 차용 | 거부 |
 |---|---|
-| ✓ **3-패널 캔버스 레이아웃** — palette 좌 / canvas 중 / inspector 우. Artist (L0) + Director **정확한 스켈레톤** | ✗ 커뮤니티-flavored 시각 거침 (불균일 아이콘, 혼합 radius, chaotic 팔레트). 우리는 paid-B2B |
+| ✓ **3-패널 캔버스 레이아웃** — palette 좌 / canvas 중 / inspector 우. **Director Canvas 정확한 스켈레톤** (Artist는 카드형 패널로 롤백 2026-06-04 — 해당 없음) | ✗ 커뮤니티-flavored 시각 거침 (불균일 아이콘, 혼합 radius, chaotic 팔레트). 우리는 paid-B2B |
 | ✓ **Dotted grid 배경** — "이건 편집 가능 캔버스"로 즉시 readable. dot 색 `--muted-foreground` at opacity-20 | ✗ 밝은 pink/orange 노드 accent — 너무 playful |
 | ✓ **Progressive disclosure** — 노드 클릭 → inspector slide-in. modal hell 회피 | ✗ Loud 카테고리 팔레트 — chart-1/2/3/4/5 채도 낮춰 사용 |
 | ✓ Categorical color coding 컨셉 — Asset / Scene / Shot / Video. n8n보다 saturation 훨씬 낮춤 ("tinted outline"이지 "filled banner" 아님) | |
@@ -119,13 +119,7 @@ companion_to: specs/design.md
 
 ## 3. "We are NOT" 리스트
 
-contributor drift 방지용 명시적 negative space. AI 에이전트가 *없어야 할 것* 발명 방지.
-
-1. **NOT Higgsfield** — glassmorphism, neon edge-glow, volumetric 3D icon, liquid-glass surface, creator-prosumer flourish 금지.
-2. **NOT 커뮤니티-flavored 오픈소스 도구** — 불균일 아이콘, 혼합 radius 카드, saturated 카테고리 배너 색 금지 (n8n).
-3. **NOT consumer creative app** — light-mode-first 금지, playful 일러스트 금지, in-product marketing-hero gradient 금지.
-4. **NOT marketing-tier 대시보드** — featured 캐러셀, large hero 모듈 in-studios 금지 (Producer 랜딩에만 max).
-5. **NOT pure-black Vercel-extreme** — pure `#000` 옆 skin-tone 비디오 프레임은 banding. 우리는 Netflix Dark grayscale (`#121212` warm-feel without warm chroma).
+> **정본: `specs/design.md` §1** (Overview의 "We are NOT" exclusion list). 여기는 포인터만 유지 — 중복 유지 시 drift 위험.
 
 ---
 
@@ -150,8 +144,7 @@ contributor drift 방지용 명시적 negative space. AI 에이전트가 *없어
 |---|---|---|
 | Landing (`/`) | Linear marketing + Vercel-extreme reduction | hero 1개, color 절제 |
 | Producer (`/studio/producer`) | Runway "tools row above projects row" | chat-driven, 단일 flow |
-| Writer (`/studio/writer`) | Linear issue editor + Frame.io comment 패턴 (rejected reference but pattern useful) | scene card grid + detail editor |
-| Artist (`/studio/artist`) — L0 Canvas | **n8n 3-패널 + Higgsfield 인버전 + Runway media-tile** | 주 캔버스 |
+| Artist (`/studio/artist`) | 카드형 패널 (노드그래프 레퍼런스 폐기 2026-06-04) | 카드형 Tabs: Characters / World / Inventory |
 | Director (`/studio/director`) — Director Canvas | **n8n 3-패널 + Linear inspector typography** | 주 캔버스 + NodePopup |
 | Editor (`/studio/editor`) | Runway timeline + Vercel monochrome | media-first |
 

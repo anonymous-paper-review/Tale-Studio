@@ -36,7 +36,7 @@ Director Canvas(P4)는 `characterAssetIds` / `worldAssetIds` 필드와 `resolveS
 - Affected code: `src/features/artist/`, `src/app/studio/artist/page.tsx`, `src/stores/canvas-store.ts` (삭제), `src/stores/asset-storage-store.ts` (유지+어댑터), `src/types/asset.ts`
 - Affected stores: `artist-store` (재활성), `canvas-store` (삭제), `asset-storage-store` (유지)
 - Affected decisions: #36 (archive 결정)
-- Director 무손상: `director-canvas-store`의 `characterAssetIds` / `worldAssetIds` / `resolveShotAssetImages` 그대로 동작
+- Director 무손상: `director-store`의 `characterAssetIds` / `worldAssetIds` / `resolveShotAssetImages` 그대로 동작
 
 ## Verification gate (archive 조건)
 

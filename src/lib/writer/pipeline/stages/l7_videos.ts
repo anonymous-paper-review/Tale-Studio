@@ -61,7 +61,7 @@ export async function runShotVideos(
   });
 
   const imageByShot = new Map(images.shots.map((i) => [i.shot_id, i]));
-  const concurrency = opts.concurrency ?? 4;
+  const concurrency = Math.max(1, Math.min(opts.concurrency ?? 2, 2));
   const pollWindowMs = opts.pollWindowMs ?? 240_000;
   const pollIntervalMs = opts.pollIntervalMs ?? 15_000;
   const totalShots = finalPrompts.shots.length;

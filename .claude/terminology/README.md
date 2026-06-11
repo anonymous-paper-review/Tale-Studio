@@ -1,24 +1,29 @@
 # Tale Studio 용어 위키 (Terminology Wiki)
 
-> 이 위키는 `tale-sutio` 코드베이스에 흩어진 도메인 용어를 한곳에 모아 정리한 문서입니다.
+> 이 위키는 `tale-studio` 코드베이스에 흩어진 도메인 용어를 한곳에 모아 정리한 문서입니다.
 > **권위 있는 소스(authoritative source)** 는 `src/types/*.ts`와 `databases/migrations/*.sql`이며,
 > 이 문서는 그것을 사람이 읽기 쉽게 매핑·정리한 것입니다. 코드와 문서가 다르면 코드가 맞습니다.
 
-마지막 갱신: 2026-06-04 (코드 기반 자동 추출)
+마지막 갱신: 2026-06-11 (용어 부패 수정 — 뷰 모델 개편·Artist 캔버스 폐기·VideoModelKey 반영)
 
 ---
 
 ## 0. 프로젝트 한 줄 요약
 
 Tale Studio는 **텍스트 스토리 → 영상**으로 변환하는 AI 영상 제작 파이프라인입니다.
-5개 제작 단계(Stage)를 거칩니다:
+4개 UI 단계(Stage)를 거치며, writer는 UI 없는 백엔드 엔진입니다:
 
 ```
-Producer → Writer → Artist → Director → Editor
-(설정)     (씬/샷)   (에셋)    (캔버스/영상)  (편집)
+Producer → Artist → Director → Editor
+(설정)      (에셋)   (캔버스/영상) (편집)
+   ↓ (핸드오프)
+ writer 엔진 (백그라운드)
+ (씬/샷/프롬프트 생성 — /api/writer/start)
 ```
 
 `StageId = 'producer' | 'writer' | 'artist' | 'director' | 'editor'` (`src/types/project.ts`)
+
+> writer StageId는 코드에 존재하나 UI 스테이지는 없음. producer 핸드오프 시 백그라운드 실행 후 artist로 직행 (decision #38).
 
 ---
 
@@ -49,8 +54,8 @@ Producer → Writer → Artist → Director → Editor
 | 씬 | `Scene` (`scene.ts`) | `SceneNodeData` (kind `'scene'`) | `scenes` | "씬", "Scene 라벨" |
 | 샷 | `Shot` (`shot.ts`) | `ShotNodeData` (kind `'shot'`) | `shots` | "샷", "Shot 라벨" |
 | 영상 | `VideoClip` (`shot.ts`) | `VideoNodeData` (kind `'video'`) | `video_clips` | (영상 노드) |
-| 캐릭터 | `Character` (`scene.ts`) / `CharacterAsset` (`asset.ts`) | actor 노드 | `characters` | "캐릭터", "에셋", "actor" |
-| 장소/월드 | `Location` (`scene.ts`) / `WorldAsset` (`asset.ts`) | world 노드 | `locations` | "Location (장소)", "world" |
+| 캐릭터 | `Character` (`scene.ts`) / `CharacterAsset` (`asset.ts`) | — (Artist 캔버스 폐기) | `characters` | "캐릭터", "에셋" |
+| 장소/월드 | `Location` (`scene.ts`) / `WorldAsset` (`asset.ts`) | — (Artist 캔버스 폐기) | `locations` | "Location (장소)", "world" |
 
 > ⚠️ 한 개념에 3~4개 이름이 붙는 게 정상입니다(레이어가 다름). 문제는 [[conflicts]]에 정리된 **같은 이름 다른 뜻** 케이스입니다.
 

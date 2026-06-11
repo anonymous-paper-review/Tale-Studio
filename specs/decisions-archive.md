@@ -17,14 +17,14 @@
 - **archive 경로**: `specs/archive/2026-06-05-unify-director-store-db/`
 - **일자**: 2026-06-05
 
-### 49. redesign-director-canvas archived (브라우저 검증 waive)
-- **결정**: `redesign-director-canvas`(P4 Director 노드 그래프 재설계)를 archive. D-1~D-3·D-7 코드 완료, D-4S(seed, 기구현), D-5(영상생성 wire-up), D-6(Preset 라이브러리 DB), D-8 안전분 정리 완료. D-4(양방향 sync)·Editor 핸드오프는 폐기(#44), director-store 제거는 `unify-director-store-db`로 분리 수행. **브라우저 검증 미수행** — 사용자 결정으로 waive(#36/#39/#40~42 선례). 005는 #48에서 적용됨(#43 번복).
-- **archive 경로**: `specs/archive/2026-06-05-redesign-director-canvas/`
+### 49. redesign-director archived (브라우저 검증 waive)
+- **결정**: `redesign-director`(P4 Director 노드 그래프 재설계)를 archive. D-1~D-3·D-7 코드 완료, D-4S(seed, 기구현), D-5(영상생성 wire-up), D-6(Preset 라이브러리 DB), D-8 안전분 정리 완료. D-4(양방향 sync)·Editor 핸드오프는 폐기(#44), director-store 제거는 `unify-director-store-db`로 분리 수행. **브라우저 검증 미수행** — 사용자 결정으로 waive(#36/#39/#40~42 선례). 005는 #48에서 적용됨(#43 번복).
+- **archive 경로**: `specs/archive/2026-06-05-redesign-director/`
 - **일자**: 2026-06-05
 
 ### 42. director-storyboard archived (브라우저 검증 waive)
 - **결정**: `director-storyboard`(I2I 샷 스토리보드 생성 + 그리드뷰 + I2V wire-up)를 archive. ST-1~ST-4 코드 완료, `006` 마이그레이션 라이브 적용 확인됨(introspection). 단 **스토리보드 일괄생성/그리드뷰 토글/I2V 실호출 브라우저 검증은 미수행** — 사용자 결정으로 검증 게이트 waive 후 정리 차원 archive(#36/#39 선례와 동일). ST-4 Writer 시간축 연출 투입은 `[~]` 보류(D-4 sync 선행).
-- **spec 반영**: `director_canvas.md`(그리드뷰 섹션)는 `redesign-director-canvas`와 공유하는 active 문서라 그쪽 완료 시 함께 정리. source-of-truth = 코드.
+- **spec 반영**: `director.md`(그리드뷰 섹션)는 `redesign-director`와 공유하는 active 문서라 그쪽 완료 시 함께 정리. source-of-truth = 코드.
 - **archive 경로**: `specs/archive/2026-06-05-director-storyboard/`
 - **일자**: 2026-06-05
 

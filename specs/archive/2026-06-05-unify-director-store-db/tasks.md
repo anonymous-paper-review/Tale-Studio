@@ -3,7 +3,7 @@
 > PROGRESS.md mirror. 마커: `[ ]` 미착수 · `[c]` 코드완료/검증대기 · `[x]` 검증완료 · `[~]` 보류
 
 ## Step 0: canvas-store 샷 편집 → DB write-through (마이그레이션 0)
-- [x] 0-1. `director-canvas-store`에 `debouncedShotSaveToDb` 이식 — `@/lib/supabase/client`,
+- [x] 0-1. `director-store`에 `debouncedShotSaveToDb` 이식 — `@/lib/supabase/client`,
         키 (project_id, shot_id=writerShotId), 컬럼 camera_config/lighting_config/camera_brand/focal_length/aperture/white_balance/prompt
 - [x] 0-2. `updateNodeData`에서 camera/lighting/cameraPreset/prompt 변경 + `writerShotId` 존재 시 debounce 저장 트리거
 - [x] 0-3. tsc/eslint clean (2026-06-05)

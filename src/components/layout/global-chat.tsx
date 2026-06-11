@@ -17,7 +17,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
-import { useDirectorCanvasWarmStarting } from '@/features/director/hooks/use-director-canvas-warm-starting'
+import { useDirectorCanvasWarmStarting } from '@/features/director/hooks/use-director-warm-starting'
 import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
 import {

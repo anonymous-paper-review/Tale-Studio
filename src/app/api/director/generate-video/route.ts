@@ -286,6 +286,22 @@ export async function POST(req: Request) {
             requestId: result.taskId,
             model: result.model,
             kind: 'shot_video',
+            userId: user.id,
+            provider: result.provider,
+            inputSnapshot: {
+              prompt,
+              full_prompt: fullPrompt,
+              camera,
+              duration_seconds: dur,
+              aspect_ratio: aspectRatio ?? '16:9',
+              generation_method: generationMethod,
+              provider,
+              model,
+              resolved_model_key: modelKey,
+              reference_image_url: referenceImageUrl,
+              movement_preset: movementPreset,
+              camera_preset: cameraPreset,
+            },
             target: { shotId, writerShotId },
           })
         } catch (e) {

@@ -6,7 +6,7 @@
 
 1. `specs/changes/<name>/tasks.md`의 모든 `[ ]`가 `[x]` 됨
 2. 사용자 검증 통과 (브라우저, e2e, 또는 합의된 검증 절차)
-3. 변경된 source-of-truth spec (`specs/layers/L0_concept_canvas.md`, `specs/layers/director_canvas.md` 등) 본문 실제 업데이트 완료
+3. 변경된 source-of-truth spec (`specs/layers/L0_concept_canvas.md`, `specs/layers/director.md` 등) 본문 실제 업데이트 완료
 4. `mv specs/changes/<name> specs/archive/YYYY-MM-DD-<name>/`
 5. `specs/decisions.md`에 archive 사실 1줄 append (entry 번호 + archive 폴더 링크)
 

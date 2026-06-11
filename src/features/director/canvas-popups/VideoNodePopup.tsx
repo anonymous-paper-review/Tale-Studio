@@ -16,12 +16,12 @@ import { cn } from '@/lib/utils'
 import {
   getEffectiveShotConfig,
   useDirectorCanvasStore,
-} from '@/stores/director-canvas-store'
+} from '@/stores/director-store'
 import { usePresetStorageStore } from '@/stores/preset-storage-store'
 import {
   isShotData,
   type VideoNodeData,
-} from '@/types/director-canvas'
+} from '@/types/director'
 import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
 
 import { AngleControl } from '@/features/director/angle-control'

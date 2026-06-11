@@ -59,7 +59,8 @@ Story → [writer 엔진] → DB(scenes/characters/locations/shots) → [L3 Prom
 
 ## MVP 범위 (decisions #28)
 
-P1 (Meeting Room) + P2 (Script Room) + P3 (Visual Studio = L0 Concept Canvas) + P4 (Director = Director Canvas) + P5 Lite (Editor) 전체 포함. DataProvider Mock 패턴 폐기.
+P1 (Meeting Room) + P3 (Artist — 카드형) + P4 (Director Canvas) + P5 Lite (Editor) 전체 포함.
+옛 P2 (Script Room) UI는 **writer 엔진(백그라운드)으로 흡수** (decisions #38) — 범위에는 포함되나 화면은 없음. DataProvider Mock 패턴 폐기.
 
 ## 기술 스택 (decisions #22, 변경 적음 — 2026-06-10 사실 업데이트)
 
@@ -67,9 +68,8 @@ P1 (Meeting Room) + P2 (Script Room) + P3 (Visual Studio = L0 Concept Canvas) + 
 - **Canvas**: React Flow (xyflow) — P4 Director Canvas만 (L0 Artist는 카드형, 미사용)
 - **3D**: Three.js + React Three Fiber (P4 일부 — **아직 미설치**, 도입 시 추가)
 - **Backend**: Next.js API Routes + Supabase (PostgreSQL)
-- **AI** (실제 구현 — 상세는 루트 `CLAUDE.md` §기술 스택):
-  - 채팅 LLM = Claude `claude-sonnet-4-6` / writer 파이프라인 = Gemini+Claude multi-provider dispatch
-  - 이미지·비디오 = **fal.ai API only** (옛 "Imagen+H100 self-hosted, Kling+Veo+Pro6000 self-hosted" 계획은 미구현 — decisions #37, #38 이후 fal 일원화)
+- **AI**: 프로바이더·모델 ID는 **루트 `CLAUDE.md` §기술 스택 한 곳만** (본 문서 복제 금지 — 하네스 유지 규약).
+  요지: LLM은 멀티 프로바이더 dispatch, 이미지·비디오 프로덕션 경로는 fal (self-hosted 계획 미구현, 개발용 토글 별도).
 
 ## 6축 카메라 (decisions #20 — 명명 기원은 Kling, 현재 모델 비종속 제품 개념)
 

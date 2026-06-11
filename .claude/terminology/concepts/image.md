@@ -29,7 +29,7 @@
 이 이미지가 그 샷의 **I2V 영상 생성 기본 레퍼런스**가 됩니다 (결정 #36/#37). → 상세 [[shot]].
 
 ```ts
-// director-canvas.ts
+// director.ts
 export type StoryboardImage = {
   url: string
   status: DirectorVideoStatus   // 'pending'|'generating'|'completed'|'failed'

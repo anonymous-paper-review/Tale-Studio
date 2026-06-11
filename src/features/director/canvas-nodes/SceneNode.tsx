@@ -7,8 +7,8 @@ import {
   getChildShots,
   nextShotPosition,
   useDirectorCanvasStore,
-} from '@/stores/director-canvas-store'
-import { isSceneData, type DirectorNode } from '@/types/director-canvas'
+} from '@/stores/director-store'
+import { isSceneData, type DirectorNode } from '@/types/director'
 
 function SceneNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const childCount = useDirectorCanvasStore(

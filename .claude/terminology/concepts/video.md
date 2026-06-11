@@ -21,7 +21,7 @@
 | `trimStart` / `trimEnd` | `number` | Editor 트림 구간(초) |
 | `speed` | `number` | 0.25~4.0 배속 |
 
-### 2. Director 캔버스 노드 — `VideoNodeData` (`src/types/director-canvas.ts`)
+### 2. Director 캔버스 노드 — `VideoNodeData` (`src/types/director.ts`)
 `kind: 'video'`.
 
 | 필드 | 타입 | 의미 |

@@ -32,6 +32,13 @@ export type ArtistUpdate =
   | { type: 'regenerateWorldAsset'; locationId: string }
   | ({ type: 'createCharacter' } & NewCharacterInput)
 
+/** 생성 트리거 주체 (generation_jobs.actor 귀속) — 채팅 applyUpdates 경로만 'chat', 나머지는 'ui'. */
+export type GenerationActor = 'ui' | 'chat'
+
+// fal 계정 concurrent limit을 여러 유저가 공유하므로, dispatcher 전 단계에서는 화면별 submit 풀을
+// 보수적으로 유지한다. 계정 전역 공정성은 generation_jobs dispatcher 도입 시 중앙화한다.
+const ARTIST_GENERATION_CONCURRENCY = 2
+
 // World 샷 (wide/establishing) — 캐릭터 뷰와 대칭 구조
 export type WorldShotKey = 'wideShot' | 'establishingShot'
 
@@ -116,12 +123,13 @@ async function generateAndPersistWorldShot(
   column: 'wide_shot' | 'establishing_shot',
   prompt: string,
   provider: ImageProvider,
+  actor: GenerationActor = 'ui',
 ): Promise<string> {
   if (provider === 'fal' && projectId) {
     const res = await fetch('/api/artist/generate-world', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, locationId, column, prompt, aspectRatio: '16:9' }),
+      body: JSON.stringify({ projectId, locationId, column, prompt, aspectRatio: '16:9', actor }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
@@ -201,7 +209,7 @@ function withoutStartedAt(
   return next
 }
 
-/** 작업 배열을 동시 N개 제한으로 실행 (캐릭터/월드 병렬 생성용, decision: concurrency 4) */
+/** 작업 배열을 동시 N개 제한으로 실행 (캐릭터/월드 병렬 생성용). */
 async function runPool(
   tasks: Array<() => Promise<void>>,
   concurrency: number,
@@ -251,14 +259,22 @@ interface ArtistState {
   generateCharacterView: (
     characterId: string,
     view: CharacterViewKey,
+    actor?: GenerationActor,
   ) => Promise<void>
-  /** main → 4방향(i2i)을 순서대로 생성 (방향은 concurrency 4 풀). 카드 "Generate All Views"용. */
-  generateCharacterAllViews: (characterId: string) => Promise<void>
-  generateWorldAsset: (locationId: string) => Promise<void>
+  /** main → 4방향(i2i)을 순서대로 생성. 카드 "Generate All Views"용. */
+  generateCharacterAllViews: (
+    characterId: string,
+    actor?: GenerationActor,
+  ) => Promise<void>
+  generateWorldAsset: (
+    locationId: string,
+    actor?: GenerationActor,
+  ) => Promise<void>
   generateWorldShot: (
     locationId: string,
     shot: WorldShotKey,
     promptOverride?: string,
+    actor?: GenerationActor,
   ) => Promise<void>
   autoGenerateBaseImages: () => Promise<void>
   applyUpdates: (updates: ArtistUpdate[]) => Promise<void>
@@ -513,7 +529,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     })),
 
   // 단일 뷰 생성 (crop 폐기, 2026-06-05). main=T2I, 방향=main 기반 i2i. 서버가 해당 뷰 컬럼만 갱신.
-  generateCharacterView: async (characterId, view) => {
+  generateCharacterView: async (characterId, view, actor = 'ui') => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
     const key = `${characterId}:${view}`
@@ -530,7 +546,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const res = await fetch('/api/artist/generate-sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, characterId, view }),
+        body: JSON.stringify({ projectId, characterId, view, actor }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -567,18 +583,18 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   },
 
   // main → 4방향 순서 생성. 방향 i2i 는 main 이 DB 에 있어야 하므로 main 을 먼저 await 한 뒤
-  // 4방향을 concurrency 4 풀로 병렬 생성. 카드 "Generate All Views" / 시트 재생성용.
-  generateCharacterAllViews: async (characterId) => {
-    await get().generateCharacterView(characterId, 'main')
+  // 4방향을 제한된 풀로 병렬 생성. 카드 "Generate All Views" / 시트 재생성용.
+  generateCharacterAllViews: async (characterId, actor = 'ui') => {
+    await get().generateCharacterView(characterId, 'main', actor)
     await runPool(
       CHARACTER_DIRECTIONAL_VIEWS.map(
-        (v) => () => get().generateCharacterView(characterId, v),
+        (v) => () => get().generateCharacterView(characterId, v, actor),
       ),
-      4,
+      ARTIST_GENERATION_CONCURRENCY,
     )
   },
 
-  generateWorldAsset: async (locationId) => {
+  generateWorldAsset: async (locationId, actor = 'ui') => {
     const { sceneManifest, selectedBoostPreset, imageProvider } = get()
     const location = sceneManifest?.locations.find(
       (l) => l.locationId === locationId,
@@ -607,7 +623,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       // suffix는 WORLD_SHOT_SUFFIX 단일 출처 사용 (generateWorldShot과 동일 문구).
       // 1) Wide shot
       const wideShot = await generateAndPersistWorldShot(
-        pid, locationId, 'wide_shot', `${basePrompt}, ${WORLD_SHOT_SUFFIX.wideShot}`, imageProvider,
+        pid, locationId, 'wide_shot', `${basePrompt}, ${WORLD_SHOT_SUFFIX.wideShot}`, imageProvider, actor,
       )
       set((state) => ({
         worldAssets: state.worldAssets.map((w) =>
@@ -617,7 +633,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
       // 2) Establishing shot
       const establishingShot = await generateAndPersistWorldShot(
-        pid, locationId, 'establishing_shot', `${basePrompt}, ${WORLD_SHOT_SUFFIX.establishingShot}`, imageProvider,
+        pid, locationId, 'establishing_shot', `${basePrompt}, ${WORLD_SHOT_SUFFIX.establishingShot}`, imageProvider, actor,
       )
       set((state) => ({
         worldAssets: state.worldAssets.map((w) =>
@@ -640,7 +656,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
   },
 
-  generateWorldShot: async (locationId, shot, promptOverride) => {
+  generateWorldShot: async (locationId, shot, promptOverride, actor = 'ui') => {
     const { sceneManifest, selectedBoostPreset, imageProvider } = get()
     const location = sceneManifest?.locations.find(
       (l) => l.locationId === locationId,
@@ -684,6 +700,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         WORLD_SHOT_COLUMN[shot] as 'wide_shot' | 'establishing_shot',
         prompt,
         imageProvider,
+        actor,
       )
       alog(`[autogen] world ${locationId}:${shot} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
       set((state) => ({
@@ -728,7 +745,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const { characterAssets, worldAssets } = get()
     const projectId = useProjectStore.getState().projectId
     // 동시 in-flight 상한 (fal 한도가 아니라 클라 폴링/부하 상한 — fal 은 초과분을 큐 대기시킴).
-    const CONCURRENCY = 4
+    const CONCURRENCY = ARTIST_GENERATION_CONCURRENCY
 
     // ── Phase 1: 캐릭터 대표(main) — 가장 먼저 보여야 할 이미지부터 ──
     const mainTasks: Array<() => Promise<void>> = []
@@ -826,16 +843,17 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           appearance: u.appearance,
         })
       } else if (u.type === 'regenerateCharacter') {
+        // 채팅발 재생성 — generation_jobs.actor='chat' 귀속 (chat-aware-regeneration).
         if (u.views?.length) {
           await runPool(
-            u.views.map((v) => () => get().generateCharacterView(u.characterId, v)),
-            4,
+            u.views.map((v) => () => get().generateCharacterView(u.characterId, v, 'chat')),
+            ARTIST_GENERATION_CONCURRENCY,
           )
         } else {
-          await get().generateCharacterAllViews(u.characterId)
+          await get().generateCharacterAllViews(u.characterId, 'chat')
         }
       } else if (u.type === 'regenerateWorldAsset') {
-        await get().generateWorldAsset(u.locationId)
+        await get().generateWorldAsset(u.locationId, 'chat')
       }
     }
   },

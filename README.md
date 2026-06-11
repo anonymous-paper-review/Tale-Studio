@@ -30,7 +30,7 @@ B2B AI 영상 제작 도구. 텍스트 → 전문 촬영 기법(cinematography) 
 - **룰/명세**: `specs/design.md` (정량) + `specs/design-references.md` (정성 reference)
 - **primitive**: `src/components/ui/` (shadcn — Button/Input/Select/Badge/Dialog 등)
 - **라이브 카탈로그**: `/design` — 전 색 토큰 swatch + primitive variant/state 쇼케이스
-- harness 룰: `.claude/rules/design.md`, 스킬 `design-system`
+- 디자인 SoT: `specs/design.md`, `specs/design-references.md`, `src/app/globals.css`
 
 ## 프로젝트 구조
 
@@ -56,7 +56,7 @@ tale/
 │   ├── components/ui/          # shadcn primitive
 │   ├── components/layout/      # 전역 레이아웃 (Sidebar, GlobalChat 등)
 │   ├── features/               # stage별 기능 (producer/writer/artist/director/editor)
-│   ├── stores/                 # Zustand (project, canvas, director-canvas, chat-ui 등)
+│   ├── stores/                 # Zustand (project, canvas, director, chat-ui 등)
 │   ├── types/                  # 공유 타입
 │   └── lib/                    # 유틸 + Supabase 클라이언트 + writer 파이프라인
 │
@@ -64,7 +64,7 @@ tale/
 │   ├── knowledge/              # 촬영 기법 Knowledge DB (YAML)
 │   └── migrations/             # Supabase 스키마
 │
-└── .claude/                    # Claude Code harness (rules / hooks / skills / agents)
+└── .claude/                    # Claude Code harness (rules / hooks / skills / agents / generated cache)
 ```
 
 ## 핵심 파이프라인

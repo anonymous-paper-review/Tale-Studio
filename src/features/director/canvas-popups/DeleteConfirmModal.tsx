@@ -9,7 +9,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
+import { useDirectorCanvasStore } from '@/stores/director-store'
 
 export function DeleteConfirmModal() {
   const info = useDirectorCanvasStore((s) => s.deleteConfirmInfo)

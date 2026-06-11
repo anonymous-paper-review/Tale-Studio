@@ -16,8 +16,8 @@ import { cn } from '@/lib/utils'
 import {
   useDirectorCanvasStore,
   nextShotPosition,
-} from '@/stores/director-canvas-store'
-import { isSceneData } from '@/types/director-canvas'
+} from '@/stores/director-store'
+import { isSceneData } from '@/types/director'
 
 type Props = {
   open: boolean

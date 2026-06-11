@@ -30,7 +30,7 @@ export type {
   DirectorEdgeData,
   DirectorNode,
   DirectorEdge,
-} from './director-canvas'
+} from './director'
 export {
   newDirectorId,
   SCENE_OFFSET_X,
@@ -42,5 +42,5 @@ export {
   isSceneData,
   isShotData,
   isVideoData,
-} from './director-canvas'
+} from './director'
 export type { InventoryItem, InventoryKind, SaveFromAssetInput } from './inventory'

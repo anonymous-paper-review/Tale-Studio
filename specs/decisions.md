@@ -1,6 +1,6 @@
 # Decisions
 
-> 최종 수정: 2026-06-05
+> 최종 수정: 2026-06-11
 > 레거시 아카이브: `specs/archive/decisions_legacy_2026-03-03.md`
 > superseded/archive-event 결정: `specs/decisions-archive.md` (아래 인덱스 참조)
 
@@ -14,6 +14,31 @@
 > entry는 `specs/decisions-archive.md`로 분리하고, 아래 **아카이브 인덱스**에 한 줄로 남긴다(2026-06-05 정책).
 
 ## 확정
+
+### 54. generation-jobs-multiuser-guard archived
+- **결정**: Async MVP→Multi-user 전환 안전장치 구현 완료. `generation_jobs`에 runtime metadata(`actor`/`user_id`/`workspace_id`/`provider`/`input_snapshot`/`submitted_at`/`completed_at`/`attempts`/`last_error`) 추가(015·016 라이브 적용 + 기존 240 row 백필), 보수적 한도(유저 queued cap 8, artist/director/writer submit concurrency 2) 적용. `specs/archive/2026-06-12-generation-jobs-multiuser-guard/`로 이동.
+- **검증**: 2026-06-12 00:55 KST 사용자 Artist 재생성 라이브 row로 전 필드 정상 기록 확인(actor=ui/writer 구분, input_snapshot 풍부 — 백필 미터치 필드라 앱 write 입증). DB 캐시·`src/types/database.ts` 재생성, tsc clean.
+- **유지(non-goal)**: full dispatcher/fair queue/worker pool, billing, `pending_submit` 상태 도입은 후속. dispatcher 트리거 조건은 archived proposal에 보존.
+- **일자**: 2026-06-12
+
+### 53. writer = UI 스테이지로 부활 + 스토리보드 도입 (#38 "writer UI 제거" 부분 번복) — forward
+- **결정(방향)**: writer를 **백엔드 전용 → UI 스테이지로 복원**. producer 스토리 게이트 통과 후 writer·artist가 **함께 열려 상호 편집**(artist 첫 생성은 producer 기반). writer 산출 = **스토리보드(목각인형 + 6축 연출 annotation, artist 디테일 이미지 없음)**.
+- **스토리보드 3단 점진**: ① writer 스토리보드(목각+연출) → ② director storyboard 샷 이미지(artist 디테일 기반) → ③ 영상 storyboard(②+영상 프롬프트). UI는 아직 명세화 전.
+- **#38 관계**: #38의 **writer UI 제거·producer→artist 직행**만 번복. 엔진 일원화(svc→writer)·`characters.fixed_prompt` drop·`appearance` 단일화는 **유지**(#38 잔존).
+- **범위**: 본 결정은 *방향*만 확정 — writer UI/스토리보드 **기능 명세·코드는 미작성/미구현**(현 코드의 writer는 여전히 백엔드 엔진). producer 선행 개선은 `specs/changes/producer-story-gate/`(미구현).
+- **정합**: editor 오디오 트랙은 코드에 이미 구현 → mvp_scope에서 MVP 포함으로 정정(V3.4).
+- **상세**: `specs/mvp_scope.md` V3.4
+- **일자**: 2026-06-12
+
+### 52. workspace-inventory archived
+- **결정**: `inventory_items` 테이블 + API 4종(list/save-from-asset/upload/delete) + `inventory-store` + Artist "인벤토리에 저장" 버튼 + Director ShotNodePopup 인벤토리 picker 구현 완료. `specs/archive/2026-06-11-workspace-inventory/`로 이동
+- **참고**: 잔여 [ ] 3건(rate limiting, load race guard, instantiate)은 범위 외 후속
+- **일자**: 2026-06-11
+
+### 51. chat-proactive-copilot archived
+- **결정**: Phase 1 프로액티브 '다음 단계' 넛지 + 쿼터 가드 + 크로스스테이지 알림 + completeness 감지 + 핸드오프 구현 완료. 브라우저 검증은 2026-06-10 사용자 결정으로 waive. `specs/archive/2026-06-11-chat-proactive-copilot/`로 이동
+- **참고**: 후속 [~] 6건(fair-queue, 갭 채우기 action, parity 갭 등)은 archive된 tasks.md에 보존
+- **일자**: 2026-06-11
 
 ### 48. Director 데이터 DB 일원화 — #43 번복(005 적용), director-store 제거
 - **결정**: Director를 **DB 단일 진실 + canvas-store 단일 스토어**로 일원화(`unify-director-store-db`). #43("005 불필요, canvas_position=localStorage")을 **번복** — 노선을 localStorage→DB로 전환.
@@ -36,23 +61,23 @@
 - **DB 적용**: 011 라이브 적용 완료(2026-06-05) — `_apply_migration.mjs` + `NOTIFY pgrst reload schema` → PostgREST 200, `_refresh.py` 캐시 반영.
 - **일자**: 2026-06-05
 
-### 45. redesign-director-canvas — 단방향 seed(writer→director 1회 로드) 채택
+### 45. redesign-director — 단방향 seed(writer→director 1회 로드) 채택
 - **결정**: #44에서 양방향 sync를 폐기하되, **단방향 seed**는 채택. Director 진입 시 writer 산출 scenes/shots를 캔버스 노드로 **1회 로드**(멱등 — 기존 노드/seed 플래그 있으면 skip). seed 이후엔 사용자 편집 + localStorage persist가 진실, writer 변경은 재반영 안 함.
 - **사유**: 양방향(무한루프 가드) 비용 없이 "캔버스가 빈 채로 시작" 여파(#44)만 해소.
 - **남은 실작업 = D-4S(seed) + D-5(NodePopup 영상생성 wire-up) + D-6(Preset 라이브러리)**.
 - **일자**: 2026-06-05
 
-### 44. redesign-director-canvas 스코프 축소 — D-4(양방향 sync)·Editor 핸드오프 폐기
-- **결정**: `redesign-director-canvas`에서 **D-4 Writer↔Director 양방향 sync**와 **D-8의 Editor 핸드오프(Final Video export)**를 **지금 안 함(드롭)**. 양방향 sync는 무한 루프 가드 비용이 크고 현 우선순위 아님, editor 연동도 현재 작업 아님.
+### 44. redesign-director 스코프 축소 — D-4(양방향 sync)·Editor 핸드오프 폐기
+- **결정**: `redesign-director`에서 **D-4 Writer↔Director 양방향 sync**와 **D-8의 Editor 핸드오프(Final Video export)**를 **지금 안 함(드롭)**. 양방향 sync는 무한 루프 가드 비용이 크고 현 우선순위 아님, editor 연동도 현재 작업 아님.
 - **여파**: writer 파이프라인이 채운 shots가 Director 캔버스에 **자동 표출되지 않음**(수동 노드 생성 + localStorage persist만). 필요 시 별도 change로 "단방향 seed(writer→director 1회 로드)"부터 재검토.
 - **남은 실작업**: **D-5**(NodePopup 영상생성 wire-up — store/그리드뷰는 director-storyboard에서 이미 구현, NodePopup 버튼만 연결) + **D-6**(Camera/Light Preset 라이브러리 — 신규 store + `camera_light_presets` 테이블 + Palette UI). D-8 레거시 정리(구 Inspector/director-store/구 컴포넌트 삭제)는 선택(tech-debt).
 - **일자**: 2026-06-05
 
-### 43. 마이그레이션 005(director_canvas_layout) 불필요 확정 — canvas_position은 localStorage 유지
+### 43. 마이그레이션 005(director_layout) 불필요 확정 — canvas_position은 localStorage 유지
 > ⚠️ **#48에 의해 번복(superseded)** — DB 일원화 노선 전환으로 005 적용함(2026-06-05).
-- **결정**: `005_director_canvas_layout.sql`(scenes/shots/video_clips `canvas_position` + video_clips `is_final/take_label/override`)를 **라이브에 적용하지 않는다**. director-canvas 노드 위치는 현 코드가 DB가 아니라 Zustand persist(localStorage, key `tale-director-canvas-v1-*`)에 저장한다(`grep canvas_position src/` = 0건, `007` 마이그레이션 주석도 명시).
+- **결정**: `005_director_layout.sql`(scenes/shots/video_clips `canvas_position` + video_clips `is_final/take_label/override`)를 **라이브에 적용하지 않는다**. director 노드 위치는 현 코드가 DB가 아니라 Zustand persist(localStorage, key `tale-director-v1-*`)에 저장한다(`grep canvas_position src/` = 0건, `007` 마이그레이션 주석도 명시).
 - **근거**: 2026-06-05 `_refresh.py` 라이브 introspection — 006/007/008/009/010은 적용됨, **005만 미적용**. 미적용이 현재 동작을 깨지 않음(코드가 그 컬럼을 안 씀).
-- **영향**: `redesign-director-canvas` D-1의 "005 적용" task는 `[~] 불필요`로 정정. 향후 D-4(Writer↔Director sync)를 DB 영속으로 구현하면 005가 다시 필요해질 수 있음 — 그때 재검토.
+- **영향**: `redesign-director` D-1의 "005 적용" task는 `[~] 불필요`로 정정. 향후 D-4(Writer↔Director sync)를 DB 영속으로 구현하면 005가 다시 필요해질 수 있음 — 그때 재검토.
 - **일자**: 2026-06-05
 
 ### 38. SVC 파이프라인 = 단일 writer 엔진으로 일원화, fixed_prompt 폐기, writer UI 제거
@@ -138,7 +163,7 @@
 - **V2 P4**: 3패널 통합. Shot Frames 탭 제거 → Grid 내 Frame Mode로 대체
 - **추가 요소**: Director Kim Chat (AI 촬영 가이드, Inspector 실시간 연동), Lens Combo 캐러셀, Lighting Sphere UI
 - **근거**: V2 디자인 (reference_v2/image4.png). 스토리보드와 촬영 설정을 한 화면에서 작업
-- **후속**: P4 자체는 Phase 11 Director Canvas(노드 그래프)로 재설계 진행 중 — `specs/layers/director_canvas.md`
+- **후속**: P4 자체는 Phase 11 Director Canvas(노드 그래프)로 재설계 진행 중 — `specs/layers/director.md`
 - **일자**: 2026-03-03
 
 ### 22. 프론트엔드 스택
@@ -256,7 +281,7 @@
 > 이후 결정에 번복(superseded)됐거나 archive 사실만 기록하는 entry. 상세는 archive 파일 참조.
 
 - **#50** unify-director-store-db archived (검증 waive) — 2026-06-05
-- **#49** redesign-director-canvas archived (검증 waive) — 2026-06-05
+- **#49** redesign-director archived (검증 waive) — 2026-06-05
 - **#42** director-storyboard archived (검증 waive) — 2026-06-05
 - **#41** writer-background-artist-progress archived (검증 waive) — 2026-06-05
 - **#40** unify-svc-writer-pipeline archived (런타임 검증 waive) — 2026-06-05

@@ -14,9 +14,9 @@
 ## 자주 하는 작업
 | 무엇 | 어디 |
 |---|---|
-| 클립 import (Director 핸드오프) | editor-store `setClips` |
+| 클립 import (Director 핸드오프) | editor-store `loadData` / `loadPersisted` |
 | 타임라인 편집 | timeline 컴포넌트 + store action |
-| 렌더링 큐 | `../../../app/api/...` (TBD) |
+| 렌더링 큐 | `../../../app/api/editor/render-draft/route.ts` |
 
-## D-8 핸드오프
-Director Canvas D-8에서 각 Shot의 ★ Final Video를 editor-store clips에 export 예정. Final 누락 Shot은 마지막 Video fallback + 경고 토스트.
+## Director → Editor 핸드오프
+Director HandoffButton → editor가 `shots.video_url`을 소비. Final 마킹된 Shot의 video_url을 editor-store가 `loadData`로 로드, 편집 가능 상태로 전환.

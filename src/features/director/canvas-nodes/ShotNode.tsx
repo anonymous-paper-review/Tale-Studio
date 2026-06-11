@@ -7,8 +7,8 @@ import { BaseNode } from './BaseNode'
 import {
   getChildVideos,
   useDirectorCanvasStore,
-} from '@/stores/director-canvas-store'
-import { isShotData, type DirectorNode } from '@/types/director-canvas'
+} from '@/stores/director-store'
+import { isShotData, type DirectorNode } from '@/types/director'
 
 function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const takeCount = useDirectorCanvasStore(

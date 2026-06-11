@@ -100,7 +100,7 @@ export async function runAssetsGenerate(
     force: !!opts.force,
   });
 
-  const concurrency = opts.concurrency ?? 4;
+  const concurrency = Math.max(1, Math.min(opts.concurrency ?? 2, 2));
   const pollWindowMs = opts.pollWindowMs ?? 90_000;
   const pollIntervalMs = opts.pollIntervalMs ?? 8_000;
 

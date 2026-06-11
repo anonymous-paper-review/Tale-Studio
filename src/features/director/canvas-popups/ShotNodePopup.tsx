@@ -12,13 +12,13 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
-import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
+import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { usePresetStorageStore } from '@/stores/preset-storage-store'
 import {
   newDirectorId,
   type ShotNodeData,
-} from '@/types/director-canvas'
+} from '@/types/director'
 import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
 import type { InventoryItem } from '@/types/inventory'
 

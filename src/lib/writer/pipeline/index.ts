@@ -244,7 +244,7 @@ async function _runPipelineInner(
   // productionDesign 직후 → 캐릭터/로케이션 reference 에셋 생성 (shotImages에서 I2I용으로 사용)
   // 실패해도 파이프라인은 계속 진행 (shotImages는 에셋 없으면 순수 T2I로 자동 fallback).
   // 결과 manifest 는 아래에서 view_main/wide_shot 으로 DB 에 연결한다 (artist 진입 시 i2i base).
-  const assetsManifestPromise = runAssetsGenerate(characters, renderFormat, artDirection, productionDesign, logger, { concurrency: 4 }).catch((e) => {
+  const assetsManifestPromise = runAssetsGenerate(characters, renderFormat, artDirection, productionDesign, logger, { concurrency: 2 }).catch((e) => {
     console.warn('[assets] background generation failed (pipeline continues):', e);
     return null;
   });

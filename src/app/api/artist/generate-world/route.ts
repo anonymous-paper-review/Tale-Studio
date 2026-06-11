@@ -7,7 +7,10 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
-import { createGenerationJob } from '@/lib/generation-jobs'
+import {
+  createGenerationJob,
+  type GenerationJobActor,
+} from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 
@@ -25,14 +28,17 @@ export async function POST(req: Request) {
     const quota = await checkUserQuota(user.id)
     if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
 
-    const { projectId, locationId, column, prompt, aspectRatio } =
+    const { projectId, locationId, column, prompt, aspectRatio, actor } =
       (await req.json()) as {
         projectId?: string
         locationId?: string
         column?: string
         prompt?: string
         aspectRatio?: string
+        actor?: string
       }
+    // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
+    const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
 
     if (!projectId || !locationId || !column || !prompt) {
       return NextResponse.json(
@@ -62,6 +68,14 @@ export async function POST(req: Request) {
       requestId: request_id,
       model,
       kind: 'world_shot',
+      actor: jobActor,
+      userId: user.id,
+      workspaceId: project.workspace_id,
+      provider: 'fal',
+      inputSnapshot: {
+        prompt,
+        aspect_ratio: aspectRatio ?? '16:9',
+      },
       target: { workspaceId: project.workspace_id, locationId, column },
     })
 

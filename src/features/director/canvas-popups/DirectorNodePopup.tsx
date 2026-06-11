@@ -1,11 +1,11 @@
 'use client'
 
-import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
+import { useDirectorCanvasStore } from '@/stores/director-store'
 import {
   isSceneData,
   isShotData,
   isVideoData,
-} from '@/types/director-canvas'
+} from '@/types/director'
 import { SceneNodePopup } from './SceneNodePopup'
 import { ShotNodePopup } from './ShotNodePopup'
 import { VideoNodePopup } from './VideoNodePopup'

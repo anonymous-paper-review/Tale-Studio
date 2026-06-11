@@ -13,6 +13,6 @@
 - forwardRef 의존 패턴 작성 금지 (shadcn 최신 컴포넌트 미사용)
 
 ## 디자인 토큰
-- `src/app/globals.css` 참조. 자세한 룰은 `specs/design.md` + `.claude/rules/design.md`
+- `src/app/globals.css` 참조. 자세한 룰은 `specs/design.md`
 - 새 토큰은 globals.css에만 (decisions #30)
-- 캔버스 확장 토큰 (`--canvas-*`, `--node-*`, `--edge-*`)은 여기서 import 금지 — 캔버스 노드(`src/features/*/canvas-nodes/`, `src/features/artist/nodes/`)에서만
+- 캔버스 확장 토큰 (`--canvas-*`, `--node-*`, `--edge-*`)은 여기서 import 금지 — Director Canvas (`src/features/director/canvas-nodes/`, `src/features/director/canvas-edges/` 등)에서만

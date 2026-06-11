@@ -12,6 +12,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      camera_light_presets: {
+        Row: {
+          id: string
+          project_id: string
+          name: string
+          camera: Json
+          lighting: Json
+          camera_preset: Json
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          name: string
+          camera: Json
+          lighting: Json
+          camera_preset: Json
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          name?: string
+          camera?: Json
+          lighting?: Json
+          camera_preset?: Json
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camera_light_presets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       characters: {
         Row: {
           id: string
@@ -123,6 +164,90 @@ export type Database = {
           created_at?: string
         }
         Relationships: [
+        ]
+      }
+      generation_jobs: {
+        Row: {
+          id: string
+          project_id: string
+          request_id: string
+          model: string
+          kind: string
+          status: string
+          target: Json
+          result_url: string | null
+          error: string | null
+          created_at: string
+          updated_at: string
+          actor: string
+          user_id: string | null
+          workspace_id: string | null
+          provider: string
+          input_snapshot: Json
+          submitted_at: string | null
+          completed_at: string | null
+          attempts: number
+          last_error: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          request_id: string
+          model: string
+          kind: string
+          status?: string
+          target?: Json
+          result_url?: string | null
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+          actor?: string
+          user_id?: string | null
+          workspace_id?: string | null
+          provider?: string
+          input_snapshot?: Json
+          submitted_at?: string | null
+          completed_at?: string | null
+          attempts?: number
+          last_error?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          request_id?: string
+          model?: string
+          kind?: string
+          status?: string
+          target?: Json
+          result_url?: string | null
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+          actor?: string
+          user_id?: string | null
+          workspace_id?: string | null
+          provider?: string
+          input_snapshot?: Json
+          submitted_at?: string | null
+          completed_at?: string | null
+          attempts?: number
+          last_error?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generation_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generation_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
         ]
       }
       knowledge_techniques: {
@@ -324,6 +449,7 @@ export type Database = {
           sort_order: number | null
           created_at: string | null
           updated_at: string | null
+          canvas_position: Json | null
         }
         Insert: {
           id?: string
@@ -339,6 +465,7 @@ export type Database = {
           sort_order?: number | null
           created_at?: string | null
           updated_at?: string | null
+          canvas_position?: Json | null
         }
         Update: {
           id?: string
@@ -354,6 +481,7 @@ export type Database = {
           sort_order?: number | null
           created_at?: string | null
           updated_at?: string | null
+          canvas_position?: Json | null
         }
         Relationships: [
           {
@@ -395,6 +523,7 @@ export type Database = {
           movement_intensity: number | null
           speed: number | null
           storyboard_image: Json | null
+          canvas_position: Json | null
         }
         Insert: {
           id?: string
@@ -425,6 +554,7 @@ export type Database = {
           movement_intensity?: number | null
           speed?: number | null
           storyboard_image?: Json | null
+          canvas_position?: Json | null
         }
         Update: {
           id?: string
@@ -455,6 +585,7 @@ export type Database = {
           movement_intensity?: number | null
           speed?: number | null
           storyboard_image?: Json | null
+          canvas_position?: Json | null
         }
         Relationships: [
           {
@@ -479,6 +610,10 @@ export type Database = {
           duration: number | null
           created_at: string | null
           updated_at: string | null
+          canvas_position: Json | null
+          is_final: boolean
+          take_label: string | null
+          override: Json | null
         }
         Insert: {
           id?: string
@@ -492,6 +627,10 @@ export type Database = {
           duration?: number | null
           created_at?: string | null
           updated_at?: string | null
+          canvas_position?: Json | null
+          is_final?: boolean
+          take_label?: string | null
+          override?: Json | null
         }
         Update: {
           id?: string
@@ -505,6 +644,10 @@ export type Database = {
           duration?: number | null
           created_at?: string | null
           updated_at?: string | null
+          canvas_position?: Json | null
+          is_final?: boolean
+          take_label?: string | null
+          override?: Json | null
         }
         Relationships: [
           {
@@ -542,6 +685,53 @@ export type Database = {
           owner_id?: string | null
         }
         Relationships: [
+        ]
+      }
+      writer_runs: {
+        Row: {
+          id: string
+          project_id: string
+          status: string
+          current_stage: string | null
+          completed_units: number
+          total_units: number
+          state: Json
+          error: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          status?: string
+          current_stage?: string | null
+          completed_units?: number
+          total_units?: number
+          state?: Json
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          status?: string
+          current_stage?: string | null
+          completed_units?: number
+          total_units?: number
+          state?: Json
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "writer_runs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }

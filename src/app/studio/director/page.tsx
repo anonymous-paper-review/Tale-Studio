@@ -27,7 +27,7 @@ import { toast } from 'sonner'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { cn } from '@/lib/utils'
 
-import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
+import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { getDirectorGaps, summarizeGaps } from '@/lib/completeness'
 import {
@@ -38,7 +38,7 @@ import {
   isShotData,
   isSceneData,
   SNAP_GRID,
-} from '@/types/director-canvas'
+} from '@/types/director'
 import { StoryboardGridView } from '@/features/director/canvas-views/StoryboardGridView'
 import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
 

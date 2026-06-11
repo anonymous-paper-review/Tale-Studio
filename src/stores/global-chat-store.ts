@@ -7,7 +7,7 @@ import {
   useDirectorCanvasStore,
   serializeDirectorCanvasContext,
   type DirectorCanvasUpdate,
-} from '@/stores/director-canvas-store'
+} from '@/stores/director-store'
 import { saveChatMessage } from '@/lib/chat-persistence'
 import { STAGE_LABEL } from '@/lib/constants'
 
@@ -126,13 +126,22 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         // Card UI (artist-store) — no canvas graph. Provide a lightweight asset
         // summary in place of the former serializeCanvasContext output.
         const a = useArtistStore.getState()
-        const charLines = a.characterAssets.map(
-          (c) =>
-            `- ${c.name} (${c.characterId})${c.locked ? ' [locked]' : ''}`,
-        )
-        const worldLines = a.worldAssets.map(
-          (w) => `- ${w.name} (${w.locationId})`,
-        )
+        // 스냅샷에 이미지 보유 현황 포함 — 채팅이 "어떤 뷰가 비어있는지" 즉답 가능 (chat-aware-regeneration)
+        const charLines = a.characterAssets.map((c) => {
+          const filled = (['main', 'back', 'sideLeft', 'sideRight'] as const)
+            .filter((v) => c.views[v])
+            .join(', ')
+          return `- ${c.name} (${c.characterId})${c.locked ? ' [locked]' : ''} — views: ${filled || '(없음)'}`
+        })
+        const worldLines = a.worldAssets.map((w) => {
+          const shots = [
+            w.wideShot ? 'wide' : null,
+            w.establishingShot ? 'establishing' : null,
+          ]
+            .filter(Boolean)
+            .join(', ')
+          return `- ${w.name} (${w.locationId}) — shots: ${shots || '(없음)'}`
+        })
         const canvasContext = [
           '## Artist 에셋',
           `### 캐릭터 (${a.characterAssets.length})`,
@@ -145,6 +154,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           message: trimmed,
           history: historyPayload,
           canvasContext,
+          // 서버가 generation_jobs 활동 로그(작업공간 인식)를 주입할 수 있게 전달 (chat-aware-regeneration)
+          projectId,
         }
         break
       }

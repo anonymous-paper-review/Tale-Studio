@@ -66,7 +66,7 @@ ls specs/               # decisions.md, open_questions.md, mvp_scope.md, ux_page
 
 ```bash
 mkdir -p specs/changes/redesign-l0-canvas/deltas
-mkdir -p specs/changes/redesign-director-canvas/deltas
+mkdir -p specs/changes/redesign-director/deltas
 ```
 
 ### 1.3a — `specs/changes/redesign-l0-canvas/proposal.md`
@@ -120,19 +120,19 @@ mkdir -p specs/changes/redesign-director-canvas/deltas
 (TBD)
 ```
 
-### 1.3d — `specs/changes/redesign-director-canvas/proposal.md`
+### 1.3d — `specs/changes/redesign-director/proposal.md`
 
-동일 패턴. `specs/layers/director_canvas.md` 본문에서 추출.
+동일 패턴. `specs/layers/director.md` 본문에서 추출.
 
 **채워야 할 placeholder**:
 - `created: 2026-05-25` (메인 CLAUDE.md에 명시되어 있음)
 - `decisions:` — decisions.md grep해서 Director 관련 entry 번호
 
-### 1.3e — `specs/changes/redesign-director-canvas/tasks.md`
+### 1.3e — `specs/changes/redesign-director/tasks.md`
 
 PROGRESS.md에서 Director 관련 항목 mirror.
 
-### 1.3f — `specs/changes/redesign-director-canvas/deltas/director_canvas.md`
+### 1.3f — `specs/changes/redesign-director/deltas/director.md`
 
 placeholder.
 
@@ -179,7 +179,7 @@ cat specs/_TEMPLATE.md | head -20
 - `specs/_constitution.md` 존재 (200줄 미만)
 - `specs/_TEMPLATE.md` 존재
 - `specs/changes/redesign-l0-canvas/` 존재 (proposal.md, tasks.md, deltas/)
-- `specs/changes/redesign-director-canvas/` 존재 (proposal.md, tasks.md, deltas/)
+- `specs/changes/redesign-director/` 존재 (proposal.md, tasks.md, deltas/)
 - `specs/archive/README.md` 존재
 - `specs/decisions.md` 헤더 추가됨, 본문 그대로
 
@@ -381,7 +381,7 @@ paths:
 - store 간 import 금지 (project-store는 예외 — 공유 컨테이너)
 - canvas-store는 React Flow 인스턴스 *참조* 보관 금지 (직렬화 불가)
 
-### 2.3d — `director-canvas.md`
+### 2.3d — `director.md`
 
 ```yaml
 ---
@@ -410,7 +410,7 @@ paths:
 본문 룰:
 - Owner: Dev A
 - L0 Concept Canvas 재설계 진행 중 (`specs/changes/redesign-l0-canvas/`)
-- 나머지 규칙은 director-canvas.md와 동일 (캔버스 공통)
+- 나머지 규칙은 director.md와 동일 (캔버스 공통)
 
 ### 2.3f — `supabase.md`
 
@@ -608,7 +608,7 @@ src/app/globals.css 참조. 자세한 룰은 docs/design.md.
 ## 인벤토리
 - `project-store.ts` — 공유 (Dev A & B PR to main)
 - `producer-store.ts`, `writer-store.ts`, `artist-store.ts` — Dev A
-- `director-store.ts`, `editor-store.ts`, `director-canvas-store.ts` — Dev B
+- `director-store.ts`, `editor-store.ts`, `director-store.ts` — Dev B
 - `global-chat-store.ts` — 공유
 
 ## 컨벤션
@@ -672,7 +672,7 @@ ls src/stores/CLAUDE.md  # 선택
 > 기존 [c] 항목은 점진 마이그레이션. PROGRESS.md 통째 이전은 별도 세션.
 >
 > 다음 세션 진입 시: (a) [c] 검증 (b) 신규 작업 (c) 잡힌 버그 중 선택.
-> 진행 중 changes/: redesign-l0-canvas, redesign-director-canvas (specs/changes/ 참조)
+> 진행 중 changes/: redesign-l0-canvas, redesign-director (specs/changes/ 참조)
 
 (기존 헤더 그대로 유지)
 ```
@@ -743,7 +743,7 @@ git commit 여부는 사용자에게 묻고, 동의 시 `git add` + `git commit`
 
 3. **`specs/changes/*/tasks.md`에 PROGRESS.md에서 mirror 할 항목**:
    - PROGRESS.md 692줄 중 어느 [c]/[~] 항목을 changes/ 로 mirror 할지.
-   - **권장 기본값**: P10-X (L0 관련), 그리고 director-canvas 관련 항목만 mirror. 나머지는 그대로 PROGRESS.md에 둠.
+   - **권장 기본값**: P10-X (L0 관련), 그리고 director 관련 항목만 mirror. 나머지는 그대로 PROGRESS.md에 둠.
    - **물을 것**: "PROGRESS.md에서 어떤 [c] 항목을 changes/로 mirror할까요? 기본은 L0/director 관련만."
 
 4. **commit 시점**:
@@ -764,7 +764,7 @@ git commit 여부는 사용자에게 묻고, 동의 시 `git add` + `git commit`
 ```bash
 # Phase 1 완료 여부
 ls specs/_constitution.md specs/_TEMPLATE.md specs/archive/README.md 2>/dev/null
-ls specs/changes/redesign-l0-canvas/ specs/changes/redesign-director-canvas/ 2>/dev/null
+ls specs/changes/redesign-l0-canvas/ specs/changes/redesign-director/ 2>/dev/null
 
 # Phase 2 완료 여부
 ls .claude/settings.json .claude/hooks/ .claude/rules/ .claude/skills/ .claude/agents/ 2>/dev/null

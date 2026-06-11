@@ -9,7 +9,10 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
 import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
-import { createGenerationJob } from '@/lib/generation-jobs'
+import {
+  createGenerationJob,
+  type GenerationJobActor,
+} from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import {
@@ -43,11 +46,14 @@ export async function POST(req: Request) {
     const quota = await checkUserQuota(user.id)
     if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
 
-    const { projectId, characterId, view } = (await req.json()) as {
+    const { projectId, characterId, view, actor } = (await req.json()) as {
       projectId?: string
       characterId?: string
       view?: CharacterViewKey
+      actor?: string
     }
+    // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
+    const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
     if (!projectId || !characterId || !view) {
       return NextResponse.json(
         { error: 'projectId, characterId, view required' },
@@ -115,6 +121,8 @@ export async function POST(req: Request) {
 
     // 3. fal 큐에 submit (비동기). 완료는 webhook(/poll reconcile)이 storage 업로드 + DB 갱신.
     const { request_id, model } = await falImageSubmit(submitOpts)
+    const inputSnapshot = { ...submitOpts }
+    delete inputSnapshot.webhookUrl
 
     // 4. generation_jobs 행 생성 — 완료 시 무엇을 갱신할지(target) 기록.
     const column = CHARACTER_VIEW_COLUMNS[view]
@@ -123,6 +131,11 @@ export async function POST(req: Request) {
       requestId: request_id,
       model,
       kind: 'character_view',
+      actor: jobActor,
+      userId: user.id,
+      workspaceId: project.workspace_id,
+      provider: 'fal',
+      inputSnapshot,
       target: {
         workspaceId: project.workspace_id,
         characterId,

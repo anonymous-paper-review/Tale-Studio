@@ -3,6 +3,7 @@
 // 모든 접근은 service-role(supabaseAdmin)로만 — RLS ON + policy 없음이라 클라이언트 직접 접근 불가.
 // 프론트는 GET /api/generation-jobs/[id] (소유권 체크) 경유로만 상태를 읽는다.
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import type { Json } from '@/types/database'
 
 export type GenerationJobKind =
   | 'character_view'
@@ -10,6 +11,8 @@ export type GenerationJobKind =
   | 'shot_storyboard'
   | 'shot_video'
 export type GenerationJobStatus = 'queued' | 'completed' | 'failed'
+/** 잡 트리거 주체 — ui(직접 조작) | chat(글로벌 채팅 updates) | writer(핸드오프 파이프라인) */
+export type GenerationJobActor = 'ui' | 'chat' | 'writer'
 
 export interface GenerationJobTarget {
   workspaceId?: string
@@ -31,13 +34,63 @@ export interface GenerationJob {
   model: string
   kind: GenerationJobKind
   status: GenerationJobStatus
+  /** 읽기 경로(웹훅/폴링)는 actor 를 select 하지 않으므로 optional — 생성/활동 로그 경로만 채워진다. */
+  actor?: GenerationJobActor
+  user_id?: string | null
+  workspace_id?: string | null
+  provider?: string
+  input_snapshot?: Json
   target: GenerationJobTarget
   result_url: string | null
   error: string | null
+  submitted_at?: string | null
+  completed_at?: string | null
+  attempts?: number
+  last_error?: string | null
 }
 
+// ⚠️ actor/runtime metadata 는 의도적으로 제외 — 015/016 마이그레이션 적용 전 라이브 DB에서도
+//   완료(웹훅)·폴링 read 경로가 깨지지 않게 한다. 필요한 곳(create/활동 로그/quota)만 명시 사용.
 const COLUMNS =
   'id, project_id, request_id, model, kind, status, target, result_url, error'
+
+function toJsonSnapshot(value: unknown): Json {
+  try {
+    const serialized = JSON.stringify(value ?? {})
+    return JSON.parse(serialized ?? '{}') as Json
+  } catch {
+    return {}
+  }
+}
+
+async function resolveJobOwnership(input: {
+  projectId: string
+  workspaceId?: string | null
+  userId?: string | null
+}): Promise<{ workspaceId: string | null; userId: string | null }> {
+  let workspaceId = input.workspaceId ?? null
+  let userId = input.userId ?? null
+
+  if (!workspaceId) {
+    const { data: project } = await supabaseAdmin
+      .from('projects')
+      .select('workspace_id')
+      .eq('id', input.projectId)
+      .maybeSingle()
+    workspaceId = (project?.workspace_id as string | undefined) ?? null
+  }
+
+  if (workspaceId && !userId) {
+    const { data: workspace } = await supabaseAdmin
+      .from('workspaces')
+      .select('owner_id')
+      .eq('id', workspaceId)
+      .maybeSingle()
+    userId = (workspace?.owner_id as string | undefined) ?? null
+  }
+
+  return { workspaceId, userId }
+}
 
 export async function createGenerationJob(input: {
   projectId: string
@@ -45,7 +98,23 @@ export async function createGenerationJob(input: {
   model: string
   kind: GenerationJobKind
   target: GenerationJobTarget
+  /** 생략 시 'ui' (DB default와 동일) */
+  actor?: GenerationJobActor
+  /** 멀티유저 quota/fairness 집계 기준. 생략 시 workspace owner를 best-effort로 해석. */
+  userId?: string | null
+  /** workspace quota/운영 조회 기준. 생략 시 project에서 best-effort로 해석. */
+  workspaceId?: string | null
+  /** 현재는 fal이 기본. 향후 provider 다변화 대비. */
+  provider?: string
+  /** provider submit 입력 스냅샷. webhook URL/secret 같은 runtime 값은 호출자가 제외한다. */
+  inputSnapshot?: unknown
 }): Promise<GenerationJob> {
+  const ownership = await resolveJobOwnership({
+    projectId: input.projectId,
+    workspaceId: input.workspaceId ?? input.target.workspaceId,
+    userId: input.userId,
+  })
+  const now = new Date().toISOString()
   const { data, error } = await supabaseAdmin
     .from('generation_jobs')
     .insert({
@@ -54,12 +123,44 @@ export async function createGenerationJob(input: {
       model: input.model,
       kind: input.kind,
       target: input.target,
+      actor: input.actor ?? 'ui',
+      user_id: ownership.userId,
+      workspace_id: ownership.workspaceId,
+      provider: input.provider ?? 'fal',
+      input_snapshot: toJsonSnapshot(input.inputSnapshot),
+      submitted_at: now,
+      attempts: 1,
       status: 'queued',
     })
-    .select(COLUMNS)
+    .select(`${COLUMNS}, actor`)
     .single()
   if (error) throw error
   return data as GenerationJob
+}
+
+/**
+ * 활동 로그 조회 — 프로젝트의 최근 24시간 잡 N개 (chat-aware-regeneration: 채팅 컨텍스트 빌더용).
+ * 24h 창: 오래된 실패 잡이 매 턴 컨텍스트에 반복 주입되는 노이즈 방지.
+ */
+export async function listRecentGenerationJobs(
+  projectId: string,
+  limit = 12,
+): Promise<Array<GenerationJob & { created_at: string }>> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select(`${COLUMNS}, actor, created_at`)
+    .eq('project_id', projectId)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) {
+    // 활동 로그는 부가 기능 — 실패해도 채팅은 계속. 단, 조용히 죽으면 진단 불가라 반드시 로그.
+    //   (015 미적용으로 actor 컬럼이 없으면 여기로 떨어진다.)
+    console.warn('[generation-jobs] listRecentGenerationJobs failed:', error.message)
+    return []
+  }
+  return (data ?? []) as Array<GenerationJob & { created_at: string }>
 }
 
 export async function getGenerationJobById(
@@ -95,6 +196,7 @@ export async function completeGenerationJob(
       status: 'completed',
       result_url: resultUrl,
       error: null,
+      completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
@@ -105,12 +207,14 @@ export async function failGenerationJob(
   id: string,
   message: string,
 ): Promise<void> {
+  const errorMessage = message.slice(0, 1000)
   // CAS: queued일 때만 실패로 전이 — 이미 완료된 작업을 늦은 ERROR webhook이 덮어쓰지 못하게.
   await supabaseAdmin
     .from('generation_jobs')
     .update({
       status: 'failed',
-      error: message.slice(0, 1000),
+      error: errorMessage,
+      last_error: errorMessage,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
@@ -119,11 +223,19 @@ export async function failGenerationJob(
 
 /**
  * 유저가 현재 in-flight(queued)로 보유한 생성 작업 수 (chat-proactive-copilot Phase 3 — 멀티유저 쿼터).
- *   generation_jobs 에 user_id 컬럼이 없어 workspace→project 2-hop 으로 유저 소유 project 를 모은 뒤 집계.
- *   단일 FAL_KEY 동시 풀(기본 10)을 한 유저가 독점하지 못하게 앱 레이어에서 공정 분배하는 가드의 기반.
+ *   016 이후에는 generation_jobs.user_id 로 직접 집계한다.
+ *   016 미적용/오류 시 workspace→project 2-hop 으로 fallback 한다.
+ *   단일 FAL_KEY 동시 풀(현재 대시보드 기준 20)을 한 유저가 독점하지 못하게 앱 레이어에서 공정 분배하는 가드의 기반.
  *   참고: fal 은 동시 한도 초과분을 '거부'가 아니라 큐 대기시키므로 이 쿼터는 'UX 보호'(대기 폭주 방지)용.
  */
 export async function countQueuedJobsByUser(userId: string): Promise<number> {
+  const direct = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('status', 'queued')
+  if (!direct.error) return direct.count ?? 0
+
   // 1) 유저 소유 workspace
   const { data: workspaces } = await supabaseAdmin
     .from('workspaces')

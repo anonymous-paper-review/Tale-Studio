@@ -3,6 +3,8 @@ import type { StageId } from '@/types'
 import { STAGES } from '@/lib/constants'
 import { createClient } from '@/lib/supabase/client'
 
+/* eslint-disable @typescript-eslint/no-require-imports -- Lazy store imports avoid circular Zustand dependencies. */
+
 interface ProjectState {
   currentStage: StageId
   /** 지금까지 도달한 최고 단계(순차 잠금 게이트 기준). 단조 증가 — 뒤로 가도 안 줄어든다. */
@@ -48,7 +50,7 @@ function resetChildStores() {
   const { useEditorStore } = require('@/stores/editor-store')
   const { useGlobalChatStore } = require('@/stores/global-chat-store')
   const { useAssetStorageStore } = require('@/stores/asset-storage-store')
-  const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
+  const { useDirectorCanvasStore } = require('@/stores/director-store')
 
   useProducerStore.getState().reset()
   useWriterStore.getState().reset()
@@ -56,7 +58,7 @@ function resetChildStores() {
   useEditorStore.getState().reset()
   useGlobalChatStore.getState().reset()
   useAssetStorageStore.getState().reset()
-  // director-canvas-store는 persist 캐시를 들고 있어 프로젝트 전환 시 명시적 reset 필요
+  // director-store는 persist 캐시를 들고 있어 프로젝트 전환 시 명시적 reset 필요
   useDirectorCanvasStore.getState().reset()
 }
 
@@ -107,7 +109,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         // DB current_stage = 지금까지 진행한 최고 단계 → 새로고침/복원 시 그만큼 열어둔다
         reachedStage: project.current_stage ?? 'producer',
       })
-      const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
+      const { useDirectorCanvasStore } = require('@/stores/director-store')
       useDirectorCanvasStore.getState().setProjectId(projectId)
     } catch (err) {
       console.error('[project-store] initProject failed:', err)
@@ -133,7 +135,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         writerActive: false,
         writerNeedsRerun: false,
         })
-      const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
+      const { useDirectorCanvasStore } = require('@/stores/director-store')
       useDirectorCanvasStore.getState().setProjectId(projectId)
     } catch (err) {
       console.error('[project-store] createNewProject failed:', err)
@@ -153,7 +155,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       writerActive: false,
       writerNeedsRerun: false,
     })
-    const { useDirectorCanvasStore } = require('@/stores/director-canvas-store')
+    const { useDirectorCanvasStore } = require('@/stores/director-store')
     useDirectorCanvasStore.getState().setProjectId(id)
   },
 

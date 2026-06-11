@@ -5,7 +5,7 @@ import { BaseEdge, getBezierPath, type EdgeProps } from '@xyflow/react'
 import type {
   DirectorEdge,
   DirectorEdgeCategory,
-} from '@/types/director-canvas'
+} from '@/types/director'
 
 const STYLE_BY_CATEGORY: Record<
   DirectorEdgeCategory,

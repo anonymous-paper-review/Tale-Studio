@@ -1,8 +1,8 @@
 /**
  * 서버 라우트/LLM 단계별 소요시간 로깅 (dev 터미널 출력).
  *
- * api-routes 룰상 console 사용은 지양하나, "어디서 오래 걸리는지" 관측 목적에
- * 한해 사용자 승인하에 도입. 프로덕션에서는 LOG_TIMING=1 일 때만 출력.
+ * "어디서 오래 걸리는지" 관측 목적의 진단 로그.
+ * 프로덕션에서는 LOG_TIMING=1 일 때만 출력.
  *
  * 사용 예:
  *   const t = startTimer('generate-scenes')

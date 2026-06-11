@@ -30,7 +30,7 @@
 
 `Scene`들은 `SceneManifest { scenes, characters, locations }` 컨테이너에 담깁니다.
 
-### 2. Director 캔버스 노드 — `SceneNodeData` (`src/types/director-canvas.ts`)
+### 2. Director 캔버스 노드 — `SceneNodeData` (`src/types/director.ts`)
 캔버스에 배치되는 씬 노드. `kind: 'scene'`.
 
 | 필드 | 타입 | 의미 |

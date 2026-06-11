@@ -6,8 +6,8 @@ import { Play, Square, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import { BaseNode } from './BaseNode'
-import { useDirectorCanvasStore } from '@/stores/director-canvas-store'
-import { isVideoData, type DirectorNode } from '@/types/director-canvas'
+import { useDirectorCanvasStore } from '@/stores/director-store'
+import { isVideoData, type DirectorNode } from '@/types/director'
 import { cn } from '@/lib/utils'
 
 function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {

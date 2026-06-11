@@ -5,7 +5,7 @@
 
 ## Stack
 - Zustand — `@../../../stores/producer-store.ts`
-- AI — Producer Agent 대화 수집 (Gemini LLM)
+- AI — Producer Agent 대화 수집 (채팅 LLM: 루트 CLAUDE.md §기술 스택 참조, `src/lib/llm`→`src/lib/claude.ts`)
 - shadcn/ui — 대화 UI, summary 카드
 
 ## 자주 하는 작업

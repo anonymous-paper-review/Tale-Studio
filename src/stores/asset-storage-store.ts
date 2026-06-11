@@ -211,7 +211,7 @@ export const useAssetStorageStore = create<AssetStorageState>()(
 // The Artist UI is card-based (artist-store: CharacterAsset / WorldAsset) but
 // the Director contract reads from Asset Storage (RegisteredCharacter /
 // RegisteredWorld via getCharacter/getWorld). These helpers bridge the two so
-// assets registered from a card resolve in director-canvas-store's
+// assets registered from a card resolve in director-store's
 // pickAssetImageUrl / resolveShotAssetImages.
 //
 // Mapping note: we register with `id === characterId` / `id === locationId` so

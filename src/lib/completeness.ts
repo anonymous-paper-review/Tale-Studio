@@ -3,8 +3,8 @@
 // 순수 함수만 — store/네트워크 의존 없음. 채팅 프로액티브 넛지가 "뭐가 비었는지"를
 // 사람이 읽을 수 있는 문장으로 만들 때 쓴다. 생성을 트리거하지 않는다(비용 무발생).
 import type { CharacterAsset, WorldAsset } from '@/types'
-import type { DirectorNode } from '@/types/director-canvas'
-import { isShotData } from '@/types/director-canvas'
+import type { DirectorNode } from '@/types/director'
+import { isShotData } from '@/types/director'
 import { CHARACTER_DIRECTIONAL_VIEWS } from '@/lib/artist/turnaround'
 
 export interface CompletenessGap {

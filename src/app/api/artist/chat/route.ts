@@ -8,6 +8,8 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { llmChat } from '@/lib/llm'
+import { userOwnsProject } from '@/lib/generation-jobs'
+import { buildArtistActivityContext } from '@/lib/artist/chat-context'
 
 const ARTIST_SYSTEM = `You are the Concept Artist agent for the Tale L0 Artist studio — a CARD-based studio (no node graph). Users define Characters and World locations as cards. Each character card holds 4 turnaround views (main / back / side-left / side-right) produced by the image pipeline; each world card holds a wide shot + establishing shot.
 
@@ -18,7 +20,13 @@ When the user wants to CREATE a new character, or REGENERATE a character's image
 
 <context>
 A summary of the current assets (existing characters/worlds with their ids) is provided before the user's message. When referencing an EXISTING asset, use its exact id from that summary. For a NEW character you don't need an id — the studio assigns one.
+
+A "## 최근 생성 활동" section may also be provided — the recent image generation activity log, regardless of where it was triggered: [ui] = the user clicked regenerate directly in the studio UI, [chat] = via this chat, [writer] = the automatic handoff pipeline. Use it to answer questions like "방금 뭐 했지?" or "재생성 끝났어?". Treat "진행 중" as in-progress: do NOT re-emit a regenerate action for an asset that already has an in-progress job (it would double-bill).
 </context>
+
+<cost-guard>
+Every image generation call is billed. Emit regenerate actions ONLY when the user explicitly asks for (re)generation in their current message. Never regenerate on your own initiative, never retry a failed job without being asked.
+</cost-guard>
 
 <actions>
 1. {"type":"createCharacter","name":"...","role":"protagonist"|"antagonist"|"supporting","description":"성격·서사적 배경","appearance":"외형 prose (이미지 생성 프롬프트로 사용)"}
@@ -185,7 +193,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { message, history, canvasContext } = await req.json()
+    const { message, history, canvasContext, projectId } = await req.json()
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -194,10 +202,32 @@ export async function POST(req: Request) {
       )
     }
 
-    const contextPrefix =
+    // 작업공간 인식(pull) — 응답 시점에 generation_jobs 활동 로그를 읽어 주입.
+    //   UI/writer 가 트리거한 재생성도 채팅이 다음 턴에 인지한다 (chat-aware-regeneration).
+    //   소유권 미확인 projectId 는 무시 (타 프로젝트 활동 로그 누설 방지). 실패는 비치명 — 채팅은 계속.
+    let activityContext = ''
+    if (typeof projectId === 'string' && projectId) {
+      try {
+        if (await userOwnsProject(projectId, user.id)) {
+          activityContext = await buildArtistActivityContext(projectId)
+        }
+      } catch (err) {
+        console.warn(
+          '[artist/chat] activity context skipped:',
+          err instanceof Error ? err.message : err,
+        )
+      }
+    }
+
+    const contextBlocks = [
       typeof canvasContext === 'string' && canvasContext.trim()
-        ? `${canvasContext}\n\n---\n\n`
-        : ''
+        ? canvasContext.trim()
+        : '',
+      activityContext,
+    ].filter(Boolean)
+    const contextPrefix = contextBlocks.length
+      ? `${contextBlocks.join('\n\n')}\n\n---\n\n`
+      : ''
 
     const normalizedHistory = normalizeHistory(history)
 
