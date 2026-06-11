@@ -49,8 +49,7 @@ function buildCharacterPrompt(
     `full body, neutral grey background, single character, front view, T-pose, clean lighting, no text, no logo`,
   ]
     .filter(Boolean)
-    .join('. ')
-    .slice(0, 800);
+    .join('. ');
 }
 
 function buildLocationPrompt(
@@ -73,8 +72,7 @@ function buildLocationPrompt(
     `wide establishing shot, no characters, environment only, clean composition, no text, no logo`,
   ]
     .filter(Boolean)
-    .join('. ')
-    .slice(0, 800);
+    .join('. ');
 }
 
 export async function runAssetsGenerate(
