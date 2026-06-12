@@ -11,11 +11,12 @@ import type { VideoModelKey } from '@/lib/video-models'
 // Director Canvas Types — specs/layers/director.md §2~7
 // ============================================================================
 
-export type DirectorNodeKind = 'scene' | 'shot' | 'video'
+export type DirectorNodeKind = 'scene' | 'shot' | 'video' | 'asset'
 
 export type DirectorEdgeCategory =
   | 'parent' // Scene→Shot, Shot→Video (계층)
   | 'relates-to' // 사용자 정의 내러티브 관계
+  | 'references' // Asset→Shot (Artist 에셋을 참조하는 샷, 파생 — DB 미영속)
 
 export type DirectorVideoStatus =
   | 'pending'
@@ -124,9 +125,33 @@ export type VideoNodeData = {
   [key: string]: unknown
 }
 
+// ─── Asset Node (파생 — Artist Asset Storage 시각화) ─────────────────────────
+
+/**
+ * Artist에서 생성된 캐릭터/월드 에셋을 Director 캔버스에 표시하는 read-only 노드.
+ * DB에 영속하지 않는 파생 노드 — asset-storage(characters/locations)가 진실이고,
+ * 매 진입 시 sync가 재생성한다(persist partialize에서 제외). Director에서 편집 불가(locked).
+ * 같은 에셋이 여러 씬에 등장하면 씬별 인스턴스로 표시된다(scene 우측 컬럼).
+ */
+export type AssetNodeData = {
+  kind: 'asset'
+  label: string
+  assetKind: 'character' | 'world'
+  /** asset-storage RegisteredCharacter/World.id (= DB character_id / location_id) */
+  assetId: string
+  imageUrl: string | null
+  /** 항상 true — Artist가 진실, Director는 표시만 */
+  locked: true
+  [key: string]: unknown
+}
+
 // ─── Discriminated union ───────────────────────────────────────────────────
 
-export type DirectorNodeData = SceneNodeData | ShotNodeData | VideoNodeData
+export type DirectorNodeData =
+  | SceneNodeData
+  | ShotNodeData
+  | VideoNodeData
+  | AssetNodeData
 
 export type DirectorEdgeData = {
   category: DirectorEdgeCategory
@@ -158,6 +183,16 @@ export const VIDEO_OFFSET_Y = 180
 /** snap-to-grid */
 export const SNAP_GRID: [number, number] = [16, 16]
 
+// ─── Asset 컬럼 레이아웃 (Scene 우측: character 위 → world 아래) ─────────────
+/** Scene 노드 좌측 기준 asset 컬럼 X 오프셋 */
+export const ASSET_OFFSET_X = 300
+/** asset 노드 폭 */
+export const ASSET_NODE_WIDTH = 200
+/** asset 형제 간 세로 간격 */
+export const ASSET_OFFSET_Y = 132
+/** asset 컬럼이 있는 씬의 shot 최소 X (Scene 좌측 기준) — asset 우측으로 shot 밀기 */
+export const SHOT_MIN_X_WITH_ASSETS = ASSET_OFFSET_X + ASSET_NODE_WIDTH + 60
+
 // ─── Type guards ───────────────────────────────────────────────────────────
 
 export function isSceneData(d: DirectorNodeData): d is SceneNodeData {
@@ -168,4 +203,7 @@ export function isShotData(d: DirectorNodeData): d is ShotNodeData {
 }
 export function isVideoData(d: DirectorNodeData): d is VideoNodeData {
   return d.kind === 'video'
+}
+export function isAssetData(d: DirectorNodeData): d is AssetNodeData {
+  return d.kind === 'asset'
 }

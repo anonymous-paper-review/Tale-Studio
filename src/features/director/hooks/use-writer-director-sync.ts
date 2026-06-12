@@ -146,6 +146,13 @@ export function useWriterDirectorSync() {
       if (cancelled) return
     }
 
+    // ── Pass 2.6: Artist 에셋 노드 재생성 (파생, 멱등) ──────────────────
+    // hydrate로 shot 위치가 확정된 뒤 실행 — Scene 우측에 character/world 에셋을
+    // 세로 컬럼으로 표시하고 참조 shot에 references 엣지를 잇는다. asset-storage가
+    // 진실(Pass 0에서 hydrate 완료)이므로 매번 재생성해도 멱등. DB 미영속(persist 제외).
+    useDirectorCanvasStore.getState().rebuildAssetNodes()
+    if (cancelled) return
+
     // ── Pass 3: 스토리보드 이미지 자동생성 (병렬2 + 1회 + null만 = 캐시) ──
     // 마운트당 1회. storyboardImage가 null인 shot만 생성 — Pass 2.5에서 DB hydrate를
     // 기다린 후이므로 DB에 완료본이 있는 샷은 여기서 null이 아니다 (재진입 skip).

@@ -44,5 +44,6 @@ export {
   isSceneData,
   isShotData,
   isVideoData,
+  isAssetData,
 } from './director'
 export type { InventoryItem, InventoryKind, SaveFromAssetInput } from './inventory'

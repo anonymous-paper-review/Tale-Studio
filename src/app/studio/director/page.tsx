@@ -45,6 +45,7 @@ import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-dire
 import { SceneNode } from '@/features/director/canvas-nodes/SceneNode'
 import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
 import { VideoNode } from '@/features/director/canvas-nodes/VideoNode'
+import { AssetNode } from '@/features/director/canvas-nodes/AssetNode'
 import { CategoryEdge } from '@/features/director/canvas-edges/CategoryEdge'
 import { CreatorModal } from '@/features/director/canvas-popups/CreatorModal'
 import { RelationModal } from '@/features/director/canvas-popups/RelationModal'
@@ -55,11 +56,13 @@ const nodeTypes = {
   scene: SceneNode,
   shot: ShotNode,
   video: VideoNode,
+  asset: AssetNode,
 } as const
 
 const edgeTypes = {
   parent: CategoryEdge,
   'relates-to': CategoryEdge,
+  references: CategoryEdge,
 } as const
 
 // ────────────────────────────────────────────────────────────────────────────

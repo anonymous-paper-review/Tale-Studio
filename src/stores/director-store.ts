@@ -13,9 +13,13 @@ import {
   SHOT_OFFSET_Y,
   VIDEO_OFFSET_X,
   VIDEO_OFFSET_Y,
+  ASSET_OFFSET_X,
+  ASSET_OFFSET_Y,
+  SHOT_MIN_X_WITH_ASSETS,
   isShotData,
   isSceneData,
   isVideoData,
+  isAssetData,
   type DirectorNode,
   type DirectorEdge,
   type DirectorNodeData,
@@ -470,6 +474,12 @@ interface DirectorCanvasState {
   ) => string | null
   updateEdge: (id: string, patch: Partial<DirectorEdgeData>) => void
   deleteEdge: (id: string) => void
+  /**
+   * Artist 에셋(asset-storage) → 씬별 asset 노드 + shot 참조 엣지를 재생성한다 (멱등, 파생).
+   * 각 Scene 우측에 character(위)→world(아래) 세로 컬럼을 만들고, 그 에셋을 참조하는
+   * shot에 references 엣지를 잇는다. asset과 겹치는 shot은 우측으로 밀어 정렬.
+   */
+  rebuildAssetNodes: () => void
 
   // video specific
   /** Shot당 1개 강제 enforce (결정 #11) */
@@ -1173,6 +1183,100 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           ),
           lastSavedAt: Date.now(),
         }))
+      },
+
+      rebuildAssetNodes: () => {
+        const assetStore = useAssetStorageStore.getState()
+        set((s) => {
+          // 1) 기존 파생물(asset 노드 + references 엣지) 제거 — 멱등 재생성
+          let nodes = s.nodes.filter((n) => !isAssetData(n.data))
+          const edges = s.edges.filter((e) => e.data?.category !== 'references')
+
+          const sceneNodes = nodes.filter((n) => isSceneData(n.data))
+          for (const scene of sceneNodes) {
+            const childShots = nodes.filter(
+              (n) =>
+                isShotData(n.data) && n.data.parentSceneNodeId === scene.id,
+            )
+            if (childShots.length === 0) continue
+
+            // 2) 이 씬 shot들이 참조하는 character/world 에셋 수집 (등록된 것만, 순서 보존 dedup)
+            const charIds: string[] = []
+            const worldIds: string[] = []
+            for (const sn of childShots) {
+              const sd = sn.data as ShotNodeData
+              for (const cid of sd.characterAssetIds)
+                if (!charIds.includes(cid) && assetStore.getCharacter(cid))
+                  charIds.push(cid)
+              for (const wid of sd.worldAssetIds)
+                if (!worldIds.includes(wid) && assetStore.getWorld(wid))
+                  worldIds.push(wid)
+            }
+            if (charIds.length === 0 && worldIds.length === 0) continue
+
+            // 3) asset 노드 생성 — Scene 우측 컬럼, character(위) → world(아래)
+            const baseX = scene.position.x + ASSET_OFFSET_X
+            let y = scene.position.y
+            const assetNodeIdByAssetId = new Map<string, string>()
+            const make = (assetId: string, kind: 'character' | 'world') => {
+              const reg =
+                kind === 'character'
+                  ? assetStore.getCharacter(assetId)
+                  : assetStore.getWorld(assetId)
+              const id = `dn_asset_${scene.id}_${kind}_${assetId}`
+              nodes.push({
+                id,
+                type: 'asset',
+                position: { x: baseX, y },
+                draggable: false,
+                selectable: false,
+                data: {
+                  kind: 'asset',
+                  assetKind: kind,
+                  assetId,
+                  label: reg?.name ?? assetId,
+                  imageUrl: pickAssetImageUrl(reg),
+                  locked: true,
+                },
+              })
+              assetNodeIdByAssetId.set(assetId, id)
+              y += ASSET_OFFSET_Y
+            }
+            for (const cid of charIds) make(cid, 'character')
+            for (const wid of worldIds) make(wid, 'world')
+
+            // 4) asset 컬럼과 겹치는 shot은 우측으로 밀어 정렬 (자동 초기배치만 — 사용자가
+            //    이미 우측으로 옮긴 shot은 건드리지 않음)
+            const shotMinX = scene.position.x + SHOT_MIN_X_WITH_ASSETS
+            nodes = nodes.map((n) =>
+              isShotData(n.data) &&
+              n.data.parentSceneNodeId === scene.id &&
+              n.position.x < shotMinX
+                ? { ...n, position: { x: shotMinX, y: n.position.y } }
+                : n,
+            )
+
+            // 5) shot → 참조 asset references 엣지 (asset 우측 포트 → shot 좌측 포트)
+            for (const sn of childShots) {
+              const sd = sn.data as ShotNodeData
+              for (const aid of [...sd.characterAssetIds, ...sd.worldAssetIds]) {
+                const assetNodeId = assetNodeIdByAssetId.get(aid)
+                if (!assetNodeId) continue
+                edges.push({
+                  id: `de_ref_${assetNodeId}_${sn.id}`,
+                  source: assetNodeId,
+                  target: sn.id,
+                  sourceHandle: 'right',
+                  targetHandle: 'left',
+                  type: 'references',
+                  data: { category: 'references', relationText: '' },
+                })
+              }
+            }
+          }
+
+          return { nodes, edges, lastSavedAt: Date.now() }
+        })
       },
 
       deleteEdge: (id) => {
@@ -2044,8 +2148,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       name: 'tale-director-v1-default',
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
-        nodes: s.nodes,
-        edges: s.edges,
+        // asset 노드/references 엣지는 파생물(asset-storage가 진실) — persist 제외.
+        // 매 진입 시 sync가 rebuildAssetNodes로 재생성하므로 캐시에 남기면 stale 위험.
+        nodes: s.nodes.filter((n) => n.data.kind !== 'asset'),
+        edges: s.edges.filter((e) => e.data?.category !== 'references'),
         viewport: s.viewport,
         viewMode: s.viewMode,
         projectId: s.projectId,
