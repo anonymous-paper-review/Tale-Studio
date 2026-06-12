@@ -15,9 +15,10 @@
 
 | Change | 상태 | 상세 (정본) |
 |---|---|---|
-| `chat-context-management` | Phase 1·2 코드 ✓ (캐싱+윈도잉+compaction@600K 보험, tsc clean, 검증 waived) · carry-off `[~]`defer | `specs/changes/chat-context-management/tasks.md` |
 | `producer-story-gate` | `[ ]` **23건** (6섹션) | `specs/changes/producer-story-gate/tasks.md` |
 
+> ✅ **2026-06-12 archived**: `chat-context-management` (decision #56). 캐싱 + 토큰예산 윈도잉 + compaction@600K 보험,
+> 마이그레이션 0 (산출물 외부화로 "compaction 주 메커니즘" 전제 번복) → `specs/archive/2026-06-12-chat-context-management/`.
 > ✅ **2026-06-12 archived**: `chat-aware-regeneration` (decision #55). 재생성 actor 귀속(015) + 채팅 워크스페이스
 > 인식(pull) 라이브 검증 완료(①ui ②인지 ③chat ④가드) → `specs/archive/2026-06-12-chat-aware-regeneration/`.
 > ✅ **2026-06-12 archived**: `generation-jobs-multiuser-guard` (decision #54). `015`+`016` 라이브 적용·검증 완료 →

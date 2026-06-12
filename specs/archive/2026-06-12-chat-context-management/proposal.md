@@ -1,6 +1,6 @@
 ---
 change: chat-context-management
-status: active
+status: archived
 created: 2026-06-11
 decisions: [51]
 ---

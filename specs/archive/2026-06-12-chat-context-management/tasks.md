@@ -3,9 +3,9 @@
 > 작업 체크리스트의 **정본** (단일 장부, 2026-06-11). PROGRESS.md 검증 보드에는
 > 이 change의 "건수 + 본 파일 포인터" 한 줄만 추가한다 — 항목 복제 금지.
 
-## Active
+## Archived
 
-(없음 — Phase 1·2 코드 완료, 브라우저/로그 검증은 사용자 waive 2026-06-12. Done 참조.)
+(2026-06-12 archived → decision #56. Phase 1·2 코드 완료, 브라우저/로그 검증 사용자 waive. Done 참조.)
 
 ## Blocked
 - (없음)

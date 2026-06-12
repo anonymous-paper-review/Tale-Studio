@@ -15,6 +15,12 @@
 
 ## 확정
 
+### 56. chat-context-management archived
+- **결정**: 전역 채팅 컨텍스트 관리 구현 완료. **prompt caching(top-level `cache_control`) + 토큰예산 윈도잉(메시지 40개 + char 48K 이중 상한) + 서버사이드 compaction 안전망(@600K)**. proposal의 "compaction을 주 메커니즘 + 블록 영속화 마이그레이션" 전제는 **번복** — 스테이지 산출물은 이미 DB pull로 외부화돼 transcript 미누적(Anthropic/Manus just-in-time)이라, 윈도잉이 입력을 compaction 트리거(600K) 한참 아래로 캡한다. 채택: 외부화(기존) + 윈도잉 + compaction 보험, **마이그레이션 0**. `specs/archive/2026-06-12-chat-context-management/`로 이동.
+- **검증**: tsc·eslint clean. 브라우저/로그(cache_read>0, compaction 트리거) 검증은 사용자 waive(2026-06-12) — 규모상 compaction은 평소 발효 경로 없음(순수 보험).
+- **계승/제외**: #51 chat-proactive-copilot 전역 채팅 구조 계승. 제외(defer): compaction 블록 DB 영속화 + `loadMessages` carry-over(`[~]`) — 윈도우를 풀어 대화를 키우는 설계(Phase 3 tool-calling 외부화)로 갈 때만 재평가.
+- **일자**: 2026-06-12
+
 ### 55. chat-aware-regeneration archived
 - **결정**: artist 이미지 재생성의 워크스페이스 인식(workspace awareness) 구현 완료. `generation_jobs`를 활동 로그로 삼아 actor(ui/chat/writer) 귀속(015), 채팅 컨텍스트 빌더(`src/lib/artist/chat-context.ts`)가 매 턴 최근 잡을 **pull**해 주입 — 이벤트 push 없음(Cursor 패턴). 단일 명령·다중 진입점(generate-sheet/generate-world 라우트를 UI·채팅 공용, 별도 regenerate 라우트 미생성). `specs/archive/2026-06-12-chat-aware-regeneration/`로 이동.
 - **검증**: 2026-06-12 사용자 라이브 — ①UI 재생성 actor='ui'(malenia/sideLeft) ②"방금 뭐 했어?"에 UI발 재생성 인지 답변(활동 로그 pull) ③채팅 재생성 actor='chat'(malenia/sideRight) DB row 확인. ④비용 가드 = ②/③ 사이 자율 잡 미생성으로 증명.
