@@ -15,7 +15,6 @@ import {
   VIDEO_OFFSET_Y,
   ASSET_OFFSET_X,
   ASSET_OFFSET_Y,
-  SHOT_MIN_X_WITH_ASSETS,
   isShotData,
   isSceneData,
   isVideoData,
@@ -1189,7 +1188,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const assetStore = useAssetStorageStore.getState()
         set((s) => {
           // 1) 기존 파생물(asset 노드 + references 엣지) 제거 — 멱등 재생성
-          let nodes = s.nodes.filter((n) => !isAssetData(n.data))
+          const nodes = s.nodes.filter((n) => !isAssetData(n.data))
           const edges = s.edges.filter((e) => e.data?.category !== 'references')
 
           const sceneNodes = nodes.filter((n) => isSceneData(n.data))
@@ -1214,8 +1213,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             }
             if (charIds.length === 0 && worldIds.length === 0) continue
 
-            // 3) asset 노드 생성 — Scene 우측 컬럼, character(위) → world(아래)
-            const baseX = scene.position.x + ASSET_OFFSET_X
+            // 3) asset 노드 생성 — Scene 좌측 컬럼, character(위) → world(아래)
+            const baseX = scene.position.x - ASSET_OFFSET_X
             let y = scene.position.y
             const assetNodeIdByAssetId = new Map<string, string>()
             const make = (assetId: string, kind: 'character' | 'world') => {
@@ -1245,18 +1244,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             for (const cid of charIds) make(cid, 'character')
             for (const wid of worldIds) make(wid, 'world')
 
-            // 4) asset 컬럼과 겹치는 shot은 우측으로 밀어 정렬 (자동 초기배치만 — 사용자가
-            //    이미 우측으로 옮긴 shot은 건드리지 않음)
-            const shotMinX = scene.position.x + SHOT_MIN_X_WITH_ASSETS
-            nodes = nodes.map((n) =>
-              isShotData(n.data) &&
-              n.data.parentSceneNodeId === scene.id &&
-              n.position.x < shotMinX
-                ? { ...n, position: { x: shotMinX, y: n.position.y } }
-                : n,
-            )
-
-            // 5) shot → 참조 asset references 엣지 (asset 우측 포트 → shot 좌측 포트)
+            // 4) shot → 참조 asset references 엣지 (asset 우측 포트 → shot 좌측 포트)
+            //    asset이 Scene 좌측에 있으므로 shot 위치는 건드리지 않는다(기존 흐름 보존).
             for (const sn of childShots) {
               const sd = sn.data as ShotNodeData
               for (const aid of [...sd.characterAssetIds, ...sd.worldAssetIds]) {

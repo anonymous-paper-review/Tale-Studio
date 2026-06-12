@@ -183,15 +183,13 @@ export const VIDEO_OFFSET_Y = 180
 /** snap-to-grid */
 export const SNAP_GRID: [number, number] = [16, 16]
 
-// ─── Asset 컬럼 레이아웃 (Scene 우측: character 위 → world 아래) ─────────────
-/** Scene 노드 좌측 기준 asset 컬럼 X 오프셋 */
+// ─── Asset 컬럼 레이아웃 (Scene 좌측: character 위 → world 아래) ─────────────
+/** asset 컬럼이 Scene 좌측으로 떨어진 거리 (asset.x = scene.x - 이 값) */
 export const ASSET_OFFSET_X = 300
 /** asset 노드 폭 */
 export const ASSET_NODE_WIDTH = 200
 /** asset 형제 간 세로 간격 */
 export const ASSET_OFFSET_Y = 132
-/** asset 컬럼이 있는 씬의 shot 최소 X (Scene 좌측 기준) — asset 우측으로 shot 밀기 */
-export const SHOT_MIN_X_WITH_ASSETS = ASSET_OFFSET_X + ASSET_NODE_WIDTH + 60
 
 // ─── Type guards ───────────────────────────────────────────────────────────
 
