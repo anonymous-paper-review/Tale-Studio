@@ -12,7 +12,49 @@ import { falImageSubmit, ROUGH_STORYBOARD_IMAGE_MODEL } from '@/lib/writer/llm/f
 import { createGenerationJob } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
-import { buildRoughStoryboardPrompt } from '@/lib/writer/rough-storyboard'
+import {
+  buildRoughStoryboardPrompt,
+  type RoughStoryboardSpec,
+} from '@/lib/writer/rough-storyboard'
+import { writerShotIdToMain } from '@/lib/writer/adapters'
+import type { ShotDesign } from '@/lib/writer/types/pipeline'
+
+/**
+ * L4(shotDesign) 원본을 writer_runs.state 에서 회수해 main shot_id 로 색인.
+ *   persist 가 V축 facet 을 평탄화하며 버리므로(증발), 러프보드는 state 의 원본 스펙을 직접 쓴다.
+ *   run 이 없거나 구버전이면 빈 맵 — 호출부가 DB fallback 으로 처리. best-effort (throw 금지).
+ */
+async function loadShotDesignByMainId(
+  projectId: string,
+): Promise<Map<string, RoughStoryboardSpec>> {
+  const byId = new Map<string, RoughStoryboardSpec>()
+  try {
+    const { data: runs } = await supabaseAdmin
+      .from('writer_runs')
+      .select('status, shotDesign:state->shotDesign')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    const rows = (runs ?? []) as Array<{ status: string; shotDesign: unknown }>
+    const row =
+      rows.find((r) => r.status === 'completed' && Array.isArray(r.shotDesign)) ??
+      rows.find((r) => Array.isArray(r.shotDesign))
+    if (!row) return byId
+    for (const d of row.shotDesign as ShotDesign[]) {
+      const writerShotId = d?.static_spec?.shot_id ?? d?.intent?.shot_id
+      const writerSceneId = d?.intent?.scene_id
+      if (!writerShotId || !writerSceneId) continue
+      byId.set(writerShotIdToMain(writerShotId, writerSceneId), {
+        staticSpec: d.static_spec,
+        intent: d.intent,
+        dynamicSpec: d.dynamic_spec,
+      })
+    }
+  } catch (e) {
+    console.error('[writer/rough-storyboard] shotDesign state load failed:', e)
+  }
+  return byId
+}
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -56,7 +98,7 @@ export async function POST(req: Request) {
         { status: 404 },
       )
 
-    const [{ data: shots }, { data: scenes }, { data: chars }, { data: queuedJobs }] =
+    const [{ data: shots }, { data: scenes }, { data: chars }, { data: queuedJobs }, specByShotId] =
       await Promise.all([
         supabaseAdmin
           .from('shots')
@@ -79,6 +121,7 @@ export async function POST(req: Request) {
           .eq('project_id', projectId)
           .eq('kind', 'shot_rough_storyboard')
           .eq('status', 'queued'),
+        loadShotDesignByMainId(projectId),
       ])
 
     const sceneById = new Map((scenes ?? []).map((s) => [s.scene_id as string, s]))
@@ -95,7 +138,11 @@ export async function POST(req: Request) {
       ? (shots ?? []).filter((s) => shotIds.includes(s.shot_id as string))
       : (shots ?? [])
 
-    const submitted: Array<{ shotId: string; jobId: string }> = []
+    const submitted: Array<{
+      shotId: string
+      jobId: string
+      promptSource: 'shotDesign' | 'db_fallback'
+    }> = []
     const skipped: Array<{ shotId: string; reason: 'exists' | 'in_flight' }> = []
 
     for (const s of wanted) {
@@ -112,12 +159,14 @@ export async function POST(req: Request) {
       const scene = sceneById.get(s.scene_id as string)
       const camera = (s.camera_config ?? {}) as { pan?: number }
       const lighting = (s.lighting_config ?? {}) as { position?: string }
+      const spec = specByShotId.get(shotId) ?? null
       const prompt = buildRoughStoryboardPrompt({
         shotType: (s.shot_type as string) ?? 'MS',
         actionDescription: (s.action_description as string) ?? '',
         characterNames: ((s.characters as string[]) ?? []).map(
           (id) => nameById.get(id) ?? id,
         ),
+        characterNameById: nameById,
         location: scene?.location as string | undefined,
         timeOfDay: scene?.time_of_day as string | undefined,
         mood: scene?.mood as string | undefined,
@@ -126,6 +175,7 @@ export async function POST(req: Request) {
         aperture: (s.aperture as number | null) ?? null,
         lightPosition: lighting.position ?? null,
         aspectRatio: '16:9',
+        spec,
       })
 
       const { request_id, model } = await falImageSubmit({
@@ -142,7 +192,11 @@ export async function POST(req: Request) {
         kind: 'shot_rough_storyboard',
         target: { workspaceId: project.workspace_id, writerShotId: shotId },
       })
-      submitted.push({ shotId, jobId: job.id })
+      submitted.push({
+        shotId,
+        jobId: job.id,
+        promptSource: spec ? 'shotDesign' : 'db_fallback',
+      })
     }
 
     return NextResponse.json({ ok: true, data: { submitted, skipped } })
