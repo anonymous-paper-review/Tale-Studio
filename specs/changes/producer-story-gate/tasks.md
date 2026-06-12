@@ -59,9 +59,17 @@
 - [c] **후보 히스토리 UI** (#57) — 재생성=후보 추가(`finalize`가 character_image_candidates에 insert, 선택본 자동 교체 없음 — 단 새 생성은 새 선택본). view-dialog 썸네일 스트립 + 클릭 선택 교체(`/api/artist/select-candidate` route + `selectCandidate` 액션). 보관=선택본 보존 + 미선택 최근 5장(`finalize` 정리). tsc clean. **브라우저 검증 대기**.
 - [c] **webhook 착지 검증** (#57) — `generate-sheet`가 submit 시 외모 지문을 `input_snapshot.source_hash`에 동봉 → `finalize`가 그 지문으로 후보 기록(외모가 생성 중 바뀌어도 폐기 안 하고 착지). 현재 행과의 불일치는 **stale 순수 함수가 자동 표시**(별도 비교 코드 불필요 — submit지문 vs 현재외모지문). tsc clean. **브라우저 검증 대기**: 생성 중 외모 수정 → 늦은 착지에 즉시 배지.
 - [c] entity_type='object' 카드 — artist 전역 entity_type 분기 추가(기존 0건): CharacterAsset.entityType + artist-store hydrate/addCharacter + `/api/artist/character` insert. object는 **단일 main 이미지**(방향뷰 미생성 — `generateCharacterAllViews`·`autoGenerateBaseImages` Phase2 skip), character-panel 단일 셀 + "사물" 배지, add-dialog 인물/사물 토글(object는 role 숨김·supporting 고정), view-dialog 방향뷰 미적용. tsc clean. **브라우저 검증 대기**(Section 6 반지).
-- [ ] writer 완료 전 카드 노출 동작 점검 — enteredProjects 진입 게이트·완료 알림 상호작용
+- [x] writer 완료 전 카드 노출 동작 점검 — **회귀 발견+수정 (2026-06-13)**: A3로 writer가 view_main 사전생성을 멈추자 `mainReady`(모든 main!=null)가 영영 거짓 → 진입이 `pipelineDone+90s` 타이머에만 의존(핸드오프마다 빈 화면 90s 대기) = 데드락성 회귀. `artist/page.tsx` `ready`에 `pipeline_completed` 추가로 수정 — 데이터 준비 시점 진입 + 진입 직후 autoGenerateBaseImages가 빈 이미지 생성. tsc+production build clean (인프라성 진입 로직 — 코드 검증).
 
 ### Section 6: 검증 (브라우저)
+
+> **검증 범위 결정 (2026-06-13, 사용자 (A) 선택)**: 비용 없는 **코드/빌드/유닛 레벨 검증**까지 수행하고,
+> fal 실생성이 필요한 **생성 의존 동작 플로우는 수동 확인 권장**으로 남기고 archive.
+> - ✅ 수행: tsc 0 / `pnpm build` 0(전 라우트 + `/studio/artist`·`/api/artist/select-candidate` SSR-safe) /
+>   provenance 9 유닛 테스트 / Lock grep 0건 / **A3 진입게이트 회귀 발견+수정**(Section 5).
+> - ⏳ 수동 확인 권장(미실행 — fal/LLM 비용): 핸드오프→파이프라인 완주 / 진입 자동생성 실제 이미지 /
+>   stale 배지 실편집 후 / 후보 썸네일 교체 / object(반지) ref 주입 / additive 재실행.
+>   (아래 [ ] 항목들이 그것 — 코드는 [c]로 준비됨, 실동작은 사람이 한 번 확인 권장.)
 
 - [x] D3 프로젝트 — 게이트 차단→충족→핸드오프, writer 로그에 s0/s2 LLM 호출 없음 ✓ (2026-06-12 Playwright E2E, 프로젝트 a2fac5bf… / `logs/<pid>/debug/llm_calls`가 `001_narrativeStructure`부터)
 - [ ] D1 프로젝트 — 캐릭터 0명 핸드오프 통과 (게이트 통과·버튼 활성까지는 ✓ 2026-06-12 — 30s=D2 캐스트 0명. 핸드오프 실행·파이프라인 완주는 미실행)

@@ -136,6 +136,11 @@ producer는 현재 5필드(`playtime/genre/aspectRatio/toneStyle/dialogueLanguag
 
 ## Verification gate (archive 조건)
 
+> **검증 범위 완화 결정 (2026-06-13, 사용자 (A) 선택)**: 아래 게이트 중 **코드/빌드/유닛 레벨**(tsc·
+> `pnpm build`·provenance 유닛·Lock grep·진입게이트 회귀 수정)까지 충족하고 archive. fal 실생성이
+> 필요한 **생성 의존 브라우저 항목**(자동생성 실이미지·stale 실편집·후보 교체·object ref·additive 재실행)은
+> **수동 확인 권장**으로 남긴다(코드는 [c] 준비 완료, 비용/시간 사유로 자동 검증 생략). 상세 tasks.md §Section 6.
+
 - tasks.md의 모든 [c] → [x]
 - 브라우저: D3 프로젝트 — 게이트 미충족 시 핸드오프 차단+사유 표시 → 충족 후 핸드오프 → writer 로그에 genre/characters LLM 호출 **없음**(s1부터 시작) 확인
 - 브라우저: D1(5~15초) 프로젝트 — 캐릭터 0명으로 핸드오프 통과
