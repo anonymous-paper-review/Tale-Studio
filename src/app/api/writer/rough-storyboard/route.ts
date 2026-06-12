@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
-import { falImageSubmit } from '@/lib/writer/llm/fal'
+import { falImageSubmit, ROUGH_STORYBOARD_IMAGE_MODEL } from '@/lib/writer/llm/fal'
 import { createGenerationJob } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
@@ -129,6 +129,8 @@ export async function POST(req: Request) {
       })
 
       const { request_id, model } = await falImageSubmit({
+        // previz 스케치 — 비용/속도 우선 경량 모델 (모델 ID 의 진실은 fal.ts)
+        model: ROUGH_STORYBOARD_IMAGE_MODEL,
         prompt,
         aspect_ratio: '16:9',
         webhookUrl: resolveWebhookUrl(),
