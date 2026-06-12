@@ -68,7 +68,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
 
           <Button
             className="w-full"
-            disabled={isGenerating || char.locked || needsMain}
+            disabled={isGenerating || needsMain}
             onClick={() => generateCharacterView(char.characterId, view)}
           >
             {isGenerating ? (
@@ -83,11 +83,6 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
               </>
             )}
           </Button>
-          {char.locked && (
-            <p className="text-center text-xs text-muted-foreground">
-              잠금 상태 — 생성하려면 카드의 잠금을 해제하세요.
-            </p>
-          )}
         </div>
       </DialogContent>
     </Dialog>

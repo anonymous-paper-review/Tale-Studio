@@ -49,7 +49,6 @@ export async function POST(req: Request) {
         role: safeRole,
         description: description?.trim() || null,
         appearance: appearance?.trim() || null,
-        locked: false,
       })
       .select('character_id')
       .single()

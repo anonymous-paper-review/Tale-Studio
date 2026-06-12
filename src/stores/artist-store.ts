@@ -253,8 +253,6 @@ interface ArtistState {
   addCharacter: (input: NewCharacterInput) => Promise<string>
   selectCharacter: (id: string) => void
   selectLocation: (id: string) => void
-  lockCharacter: (id: string) => void
-  unlockCharacter: (id: string) => void
   /** 단일 뷰 생성 (main=T2I, 방향=main 기반 i2i). 서버가 view 컬럼만 갱신. */
   generateCharacterView: (
     characterId: string,
@@ -363,7 +361,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               sideLeft: c.view_side_left ?? null,
               sideRight: c.view_side_right ?? null,
             },
-            locked: c.locked ?? false,
             description: c.description ?? '',
             fixedPrompt: c.appearance ?? '',
           }))
@@ -403,7 +400,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             sideLeft: null,
             sideRight: null,
           },
-          locked: false,
           description: c.description ?? '',
           fixedPrompt: c.fixedPrompt ?? '',
         }),
@@ -451,7 +447,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       characterId,
       name,
       views: { main: null, back: null, sideLeft: null, sideRight: null },
-      locked: false,
       description,
       fixedPrompt: appearance,
     }
@@ -513,20 +508,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectCharacter: (id) => set({ selectedCharacterId: id }),
 
   selectLocation: (id) => set({ selectedLocationId: id }),
-
-  lockCharacter: (id) =>
-    set((state) => ({
-      characterAssets: state.characterAssets.map((a) =>
-        a.characterId === id ? { ...a, locked: true } : a,
-      ),
-    })),
-
-  unlockCharacter: (id) =>
-    set((state) => ({
-      characterAssets: state.characterAssets.map((a) =>
-        a.characterId === id ? { ...a, locked: false } : a,
-      ),
-    })),
 
   // 단일 뷰 생성 (crop 폐기, 2026-06-05). main=T2I, 방향=main 기반 i2i. 서버가 해당 뷰 컬럼만 갱신.
   generateCharacterView: async (characterId, view, actor = 'ui') => {

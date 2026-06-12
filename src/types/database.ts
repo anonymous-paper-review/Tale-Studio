@@ -62,7 +62,6 @@ export type Database = {
           role: string | null
           description: string | null
           view_back: string | null
-          locked: boolean | null
           created_at: string | null
           updated_at: string | null
           appearance: string | null
@@ -79,7 +78,6 @@ export type Database = {
           role?: string | null
           description?: string | null
           view_back?: string | null
-          locked?: boolean | null
           created_at?: string | null
           updated_at?: string | null
           appearance?: string | null
@@ -96,7 +94,6 @@ export type Database = {
           role?: string | null
           description?: string | null
           view_back?: string | null
-          locked?: boolean | null
           created_at?: string | null
           updated_at?: string | null
           appearance?: string | null

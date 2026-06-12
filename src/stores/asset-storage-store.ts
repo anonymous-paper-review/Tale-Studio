@@ -143,7 +143,7 @@ export const useAssetStorageStore = create<AssetStorageState>()(
             supabase
               .from('characters')
               .select(
-                'character_id, name, view_main, view_back, view_side_left, view_side_right, locked, description, appearance',
+                'character_id, name, view_main, view_back, view_side_left, view_side_right, description, appearance',
               )
               .eq('project_id', projectId),
             supabase
@@ -168,7 +168,6 @@ export const useAssetStorageStore = create<AssetStorageState>()(
                 sideLeft: c.view_side_left ?? null,
                 sideRight: c.view_side_right ?? null,
               },
-              locked: c.locked ?? false,
               description: c.description ?? '',
               fixedPrompt: c.appearance ?? '',
             }

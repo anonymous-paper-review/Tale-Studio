@@ -149,7 +149,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const filled = (['main', 'back', 'sideLeft', 'sideRight'] as const)
             .filter((v) => c.views[v])
             .join(', ')
-          return `- ${c.name} (${c.characterId})${c.locked ? ' [locked]' : ''} — views: ${filled || '(없음)'}`
+          return `- ${c.name} (${c.characterId}) — views: ${filled || '(없음)'}`
         })
         const worldLines = a.worldAssets.map((w) => {
           const shots = [

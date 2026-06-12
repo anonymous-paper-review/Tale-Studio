@@ -56,7 +56,6 @@ export interface CharacterAsset {
   characterId: string
   name: string
   views: CharacterView
-  locked: boolean
   /** Writer 정의 계승 — asset-storage 등록 시 description/prompt로 전파 */
   description?: string
   fixedPrompt?: string

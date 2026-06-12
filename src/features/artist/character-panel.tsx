@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Lock, Unlock, Loader2, Sparkles, Check, Share2, BookmarkCheck, BookmarkPlus } from 'lucide-react'
+import { Loader2, Sparkles, Check, Share2, BookmarkCheck, BookmarkPlus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -38,8 +38,6 @@ export function CharacterPanel() {
     generatingViews,
     generatingStartedAt,
     selectCharacter,
-    lockCharacter,
-    unlockCharacter,
     generateCharacterAllViews,
   } = useArtistStore()
 
@@ -146,38 +144,10 @@ export function CharacterPanel() {
                   : 'border-border hover:bg-accent/50',
               )}
             >
-              {/* Header: Name + Role + Lock */}
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{char.name}</span>
-                  <Badge variant={ROLE_VARIANT[role]}>{role}</Badge>
-                </div>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (char.locked) {
-                          unlockCharacter(char.characterId)
-                        } else {
-                          lockCharacter(char.characterId)
-                        }
-                      }}
-                    >
-                      {char.locked ? (
-                        <Lock className="size-3.5" />
-                      ) : (
-                        <Unlock className="size-3.5 text-muted-foreground" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {char.locked ? 'Unlock character' : 'Lock character'}
-                  </TooltipContent>
-                </Tooltip>
+              {/* Header: Name + Role */}
+              <div className="mb-3 flex items-center gap-2">
+                <span className="font-medium">{char.name}</span>
+                <Badge variant={ROLE_VARIANT[role]}>{role}</Badge>
               </div>
 
               {/* main(정면 대표) + 3방향 뷰를 동일 크기로 병렬 표시 (front 통합·hero 폐기, 2026-06-05).
@@ -229,7 +199,7 @@ export function CharacterPanel() {
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  disabled={isGenerating || char.locked}
+                  disabled={isGenerating}
                   onClick={(e) => {
                     e.stopPropagation()
                     generateCharacterAllViews(char.characterId)
