@@ -15,7 +15,7 @@
 
 | Change | 상태 | 상세 (정본) |
 |---|---|---|
-| `chat-context-management` | `[ ]` **12건** (Phase 1+2) | `specs/changes/chat-context-management/tasks.md` |
+| `chat-context-management` | Phase 1·2 코드 ✓ (캐싱+윈도잉+compaction@600K 보험, tsc clean, 검증 waived) · carry-off `[~]`defer | `specs/changes/chat-context-management/tasks.md` |
 | `producer-story-gate` | `[ ]` **23건** (6섹션) | `specs/changes/producer-story-gate/tasks.md` |
 
 > ✅ **2026-06-12 archived**: `chat-aware-regeneration` (decision #55). 재생성 actor 귀속(015) + 채팅 워크스페이스

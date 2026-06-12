@@ -11,7 +11,7 @@
 | `generation-jobs-client.ts` | 잡 폴링 클라이언트 헬퍼 |
 | `generation-quota.ts` | 유저별 동시 생성 쿼터 가드 (fail-open, 429 `quota_exceeded`) |
 | `generation-notify.ts` | 크로스스테이지 생성 완료 알림 (lib→store `getState()` 패턴 — store간 직접 import 금지 우회) |
-| `claude.ts` / `llm.ts` | 채팅 LLM (claudeChat / claudeJSON — fence 자동 제거) |
+| `claude.ts` / `llm.ts` | 채팅 LLM (claudeChat / claudeJSON — fence 자동 제거). claudeChat은 멀티턴 프롬프트 캐싱(top-level `cache_control`) + 서버사이드 compaction 안전망(`beta.messages.create`, `compact_20260112`, 트리거 `CHAT_COMPACTION_TRIGGER_TOKENS`) 적용 — chat-context-management |
 | `fal/` | fal 관련 헬퍼 (writer/llm/fal.ts와 구분) |
 | `kling.ts` | 6축 카메라 의미론 (옛 Kling 기원 — 현재 모델 비종속 제품 개념) |
 | `video-models.ts` | 비디오 모델 registry (endpoint/duration spec) |

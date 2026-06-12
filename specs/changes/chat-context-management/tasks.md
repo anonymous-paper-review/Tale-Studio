@@ -5,29 +5,35 @@
 
 ## Active
 
-### Phase 1: prompt caching + 전송 윈도잉
-
-- [ ] `claude.ts` claudeChat에 top-level `cache_control: {type: "ephemeral"}` 적용 + logTiming에 cache_read/cache_creation 토큰 기록
-- [ ] 3개 chat 라우트 캐시 prefix 점검 — volatile 컨텍스트(canvasContext/currentSettings/에셋 요약)를 시스템 프롬프트가 아닌 history 뒤(마지막 user 턴)에 배치
-- [ ] `global-chat-store.sendMessage` historyPayload 윈도잉 — 최근 N개만 전송 (N=`constants.ts`, 초기 40)
-- [ ] `/api/project/[id]/messages` GET 로드 limit (최근 200, created_at 정렬 유지)
-
-### Phase 2: 서버사이드 compaction
-
-- [ ] `claudeChat` → `client.beta.messages.create` + `compact-2026-01-12` 헤더 + `context_management.edits: [compact_20260112]` 확장
-- [ ] 응답 `content` 블록 단위 보존 — 텍스트 평탄화 제거, compaction 블록이 메시지 체인에 유지되도록
-- [ ] 채팅 메시지 테이블 content 저장 형식 확장 (compaction 블록 영속화) — `.claude/cache/db` 스키마 확인 후 마이그레이션 작성
-- [ ] `loadMessages` → historyPayload 경로가 DB에서 compaction 블록을 복원해 재전송하도록 수정
-- [ ] Phase 1 윈도우 한도 상향 (compaction 주 메커니즘 / 윈도잉 안전 캡 관계 정리)
-
-### 검증
-
-- [ ] 브라우저: 멀티스테이지 장기 대화 — 채팅 정상 + 체감 맥락 단절 없음
-- [ ] 로그: 2번째 턴부터 `cache_read_input_tokens > 0`
-- [ ] 브라우저: compaction 트리거 시뮬레이션 — 정상 응답 + 새로고침 후 복원
+(없음 — Phase 1·2 코드 완료, 브라우저/로그 검증은 사용자 waive 2026-06-12. Done 참조.)
 
 ## Blocked
 - (없음)
 
 ## Done
-- (없음)
+
+### Phase 1: prompt caching + 전송 윈도잉 (코드 ✓ · 검증 waived 2026-06-12)
+
+- [x] `claude.ts` claudeChat top-level `cache_control` + logTiming cache_read/creation 기록 — tsc clean
+- [x] 3개 chat 라우트 캐시 prefix 점검 — volatile 컨텍스트(storyText/settings/canvas/activity)가 이미 마지막 user 턴에 prepend됨 확인(추가 이동 불필요)
+- [x] `global-chat-store.sendMessage` 전송 윈도잉 — 메시지 개수(`CHAT_HISTORY_WINDOW=40`) + char 예산(`CHAT_HISTORY_CHAR_BUDGET=48_000`) 이중 상한, 최소 1개 보장
+- [x] `/api/project/[id]/messages` GET 로드 limit (`CHAT_MESSAGES_LOAD_LIMIT=200`)
+
+### Phase 2: 서버사이드 compaction = 안전망 (코드 ✓ · 검증 waived 2026-06-12)
+
+- [x] `claudeChat` → `beta.messages.create` + `compact-2026-01-12` 헤더 + `context_management.edits:[compact_20260112]`, 트리거 `CHAT_COMPACTION_TRIGGER_TOKENS=600_000` — SDK 0.80.0 타입으로 shape 검증, tsc clean
+- [x] 응답 content에서 text 블록 탐색 — compaction 블록이 끼어도 `content[0]` 가정 안 깨지게
+- [x] 윈도우 char 예산 도입 — 옛 "Phase 1 윈도우 한도 상향" 항목 대체(상향이 아니라 토큰예산 근사로 정밀화)
+
+## Deferred
+
+- [~] compaction 블록 DB 영속화 + `loadMessages` 복원 (turn 간 carry-over) — **defer**.
+  사유: 스테이지 산출물이 이미 DB에서 매 요청 fresh pull(producer storyText/settings, artist canvas/activity, director canvas)되어 transcript에 누적되지 않음(Anthropic/Manus just-in-time 패턴). 윈도잉으로 입력이 600K에 닿지 않아 carry-over가 발효될 경로 자체가 없음 → 블록 영속화·DB JSONB 마이그레이션 불필요. 추후 윈도우를 풀어 대화를 키우는 설계(proposal Phase 3 tool-calling 외부화)로 갈 때만 재평가.
+
+## 결정 (2026-06-12)
+
+proposal의 "Phase 2 = compaction을 **주 메커니즘**으로 + 블록 영속화 마이그레이션" 전제를 **번복**.
+멀티스테이지 + 산출물 외부화 구조에서 compaction은 주 메커니즘이 될 수 없음(윈도잉이 입력을 트리거
+한참 아래로 캡). 채택안: **외부화(이미 충족) + 토큰예산 윈도잉 + compaction@600K 보험** — 마이그레이션 0.
+레퍼런스: Anthropic "Effective Context Engineering"(just-in-time/외부 노트), Manus context-engineering
+(recoverable compression·KV-cache), Anthropic Compaction docs(기본 150K·최소 50K·per-request 설정).

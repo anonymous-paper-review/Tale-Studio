@@ -9,7 +9,11 @@ import {
   type DirectorCanvasUpdate,
 } from '@/stores/director-store'
 import { saveChatMessage } from '@/lib/chat-persistence'
-import { STAGE_LABEL } from '@/lib/constants'
+import {
+  STAGE_LABEL,
+  CHAT_HISTORY_WINDOW,
+  CHAT_HISTORY_CHAR_BUDGET,
+} from '@/lib/constants'
 
 export interface GlobalChatMessage {
   id: string
@@ -101,7 +105,21 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const projectId = useProjectStore.getState().projectId
     const history = get().messages
 
-    const historyPayload = history.map((m) => ({
+    // 전송 윈도잉 (chat-context-management) — 최근 메시지만 LLM에 보낸다. 메시지 개수(WINDOW)와
+    //   글자 예산(CHAR_BUDGET) 두 상한을 함께 적용: 긴 단일 메시지가 입력을 부풀리는 것까지 막는다.
+    //   전체 히스토리 재전송으로 인한 입력 토큰/비용/벽돌(컨텍스트 한도) 시나리오 방지. prompt
+    //   caching이 안정 prefix를 캐싱하므로 윈도우는 안전 캡. 화면 표시는 전체 유지. (compaction은
+    //   이보다 훨씬 큰 600K에서만 작동하는 별도 안전망 — claude.ts.) 최소 1개는 항상 포함.
+    const recent = history.slice(-CHAT_HISTORY_WINDOW)
+    let charBudget = CHAT_HISTORY_CHAR_BUDGET
+    const windowed: typeof recent = []
+    for (let i = recent.length - 1; i >= 0; i--) {
+      const m = recent[i]
+      if (charBudget < m.content.length && windowed.length > 0) break
+      charBudget -= m.content.length
+      windowed.unshift(m)
+    }
+    const historyPayload = windowed.map((m) => ({
       stage: m.stage,
       role: m.role,
       content: m.content,

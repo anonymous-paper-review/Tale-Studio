@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
+import { CHAT_MESSAGES_LOAD_LIMIT } from '@/lib/constants'
 
 // GET: Load messages for a project + stage
 export async function GET(
@@ -15,17 +16,22 @@ export async function GET(
     const { searchParams } = new URL(req.url)
     const stage = searchParams.get('stage')
 
+    // 로드 limit (chat-context-management Phase 1) — 무한 성장 로그를 통째로 읽지 않도록
+    //   최근 N개만 가져온다. desc + limit으로 최근 N개를 뽑고 reverse해 시간순(오래된→최신) 복원.
     let query = supabaseAdmin
       .from('messages')
       .select('stage, role, content')
       .eq('project_id', id)
-      .order('created_at')
+      .order('created_at', { ascending: false })
+      .limit(CHAT_MESSAGES_LOAD_LIMIT)
 
     if (stage) query = query.eq('stage', stage)
 
     const { data } = await query
 
-    return NextResponse.json({ messages: data ?? [] })
+    const messages = (data ?? []).reverse()
+
+    return NextResponse.json({ messages })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })

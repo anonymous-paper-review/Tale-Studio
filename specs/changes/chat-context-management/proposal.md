@@ -20,6 +20,8 @@ decisions: [51]
 - `/api/project/[id]/messages` GET: 로드 limit (최근 200, `created_at` 정렬 유지).
 
 ### Phase 2 — 자동 압축: 서버사이드 compaction (beta)
+
+> **결정 (2026-06-12, 구현 시 번복)**: 아래 "compaction을 주 메커니즘 + 블록 영속화 마이그레이션" 전제를 폐기했다. 멀티스테이지+산출물 외부화 구조에선 윈도잉이 입력을 트리거(600K) 한참 아래로 캡해 compaction이 주 메커니즘이 될 수 없음. 실제 구현 = **compaction@600K 보험(마이그레이션 0) + 토큰예산 윈도잉**, 블록 영속화/loadMessages 복원은 defer. 상세·근거 → `tasks.md` ## 결정.
 - `claudeChat`을 `client.beta.messages.create` + `compact-2026-01-12` beta 헤더 + `context_management: {edits: [{type: "compact_20260112"}]}`로 확장 — 한도 근접 시 API가 이전 히스토리를 요약 블록으로 자동 압축 (Sonnet 4.6 지원).
 - **compaction 블록 보존이 정합 조건**: 응답 `content`를 텍스트로 납작하게 만들지 말고 블록 단위로 메시지 체인에 유지·재전송. 우리 앱은 히스토리를 DB에서 재구성하므로 compaction 블록의 **DB 영속화**가 필요 — 채팅 메시지 테이블 content 저장 형식 확장 (마이그레이션 1건 예상, 스키마는 `.claude/cache/db` 확인 후).
 - Phase 1 윈도잉과의 관계: compaction 도입 후 윈도우 한도를 상향 — compaction이 주 메커니즘, 윈도잉은 안전 캡.
