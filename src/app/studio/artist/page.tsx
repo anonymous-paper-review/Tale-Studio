@@ -52,7 +52,11 @@ export default function VisualPage() {
   const mainReady =
     charsLoaded && characterAssets.every((c) => c.views.main != null)
   const enterFallback = fallbackProject === projectId
-  const ready = mainReady || enterFallback
+  // 결정 8(producer-story-gate): writer 가 view_main 을 더 이상 채우지 않으므로 mainReady 가
+  //   영영 거짓일 수 있다 → 파이프라인이 데이터(캐릭터 seed + 씬/로케이션)를 다 채운 시점
+  //   (pipeline_completed)에 진입하고, 빈 이미지는 진입 직후 autoGenerateBaseImages 가 생성한다.
+  //   (A3 로 인한 "핸드오프 후 90s 빈 화면 대기" 회귀 수정.)
+  const ready = mainReady || !!writerStatus?.pipeline_completed || enterFallback
 
   // 진입 게이트 영속화: 한 번 진입(ready)한 projectId 는 탭 전환(route remount)으로
   //   fallbackProject(useState)/타이머가 리셋돼도 다시 progress 게이트에 걸리지 않는다.
