@@ -24,11 +24,17 @@
 - [x] producer UI — 설정 인라인 편집(`project-dashboard.tsx` 전체 위젯 + `tag-input.tsx`) + 인물/사물 카드(`cast-panel.tsx` + `cast-edit-dialog.tsx`) + 미충족 사유(`gate-status.tsx`) + 핸드오프 게이팅(`evaluateProducerGate`, 하드만 차단). TS/eslint clean. 브라우저 ✓ (인라인 subGenre/playtime 편집이 핸드오프 seed까지 반영 / person 다이얼로그 D3 필드·object 다이얼로그 person 필드 미노출 확인)
 - [x] produce/chat 추출 스키마 확장 — 신규 settings 필드(format/tone[]/subGenre/targetEmotion[]) + characters[] 후보 제안 + soft 게이트 빈칸 시 채팅 넛지. 브라우저 ✓ (1턴에 설정+캐스트 3건+storyReady 추출, tone/감정 빈칸 넛지 노출)
 
-### Section 2.5: 관계(relationships) 편집 (분리)
+### Section 2.5: 관계(relationships) 편집 (분리) — **보류 (2026-06-13, 결정 9)**
 
-- [ ] producer-store 관계 상태 — `relationships: CastRelationship[]` + add/update/remove + DB 하이드레이트(`character_relationships` pull)
-- [ ] 관계 편집 UI — D4+ soft 권장. 인물 쌍 + 관계 유형 + (선택) state_change/visible_in_video. cast-panel 내 섹션 또는 별도 다이얼로그
-- [ ] 핸드오프 시 `character_relationships` upsert (Section 3 핸드오프 계약에 합류) + 인물 삭제 시 관계 정리(복합 FK cascade 확인)
+> 전용 편집 UI **보류**. 사유: ① 관계는 스토리 텍스트에서 *파생 가능*한 값(제1원칙: 파생값은 따로 저장 안 함) —
+> producer 스토리 칸이 이미 관계를 담고 writer가 줄거리+캐스트 카드로 추론(현 동작과 동일, 기능 공백 없음).
+> ② soft 권장 + 최고 무게 = 비용 대비 가치 최저. ③ 저장 테이블(018 `character_relationships`)은
+> **미래용 보존** — "구조적 관계 메타(변화/가시성)가 정말 필요" 판명 시 UI만 얹으면 됨. 상세 proposal 결정 9.
+> 핸드오프는 `relationships: []`(빈 배열)로 나가며 `castContractToCharacters`가 안전 처리(현 상태).
+
+- [~] producer-store 관계 상태 — **보류** (스토리 텍스트로 대체)
+- [~] 관계 편집 UI — **보류** (제일 무거운 soft 항목, 파생값)
+- [~] 핸드오프 시 `character_relationships` upsert — **보류** (테이블은 미래용 보존, 현재 빈 배열 핸드오프)
 
 ### Section 3: 핸드오프 계약
 
