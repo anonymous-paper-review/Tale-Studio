@@ -16,6 +16,7 @@ import {
   finalizeCharacterViewJob,
   finalizeWorldShotJob,
   finalizeShotStoryboardJob,
+  finalizeShotRoughStoryboardJob,
   finalizeShotVideoJob,
 } from '@/lib/fal/finalize'
 
@@ -36,12 +37,14 @@ async function reconcile(job: GenerationJob): Promise<GenerationJob> {
         return { ...job, status: 'failed', error: r.error }
       }
     } else {
-      // 이미지 계열 (character_view / world_shot / shot_storyboard)
+      // 이미지 계열 (character_view / world_shot / shot_storyboard / shot_rough_storyboard)
       const r = await falImageFetch(job.model, job.request_id)
       if (r.status === 'COMPLETED') {
         let url: string
         if (job.kind === 'character_view') url = await finalizeCharacterViewJob(job, r.url)
         else if (job.kind === 'world_shot') url = await finalizeWorldShotJob(job, r.url)
+        else if (job.kind === 'shot_rough_storyboard')
+          url = await finalizeShotRoughStoryboardJob(job, r.url)
         else url = await finalizeShotStoryboardJob(job, r.url)
         return { ...job, status: 'completed', result_url: url }
       }

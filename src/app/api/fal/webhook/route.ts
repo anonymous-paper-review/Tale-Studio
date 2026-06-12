@@ -18,6 +18,7 @@ import {
   finalizeCharacterViewJob,
   finalizeWorldShotJob,
   finalizeShotStoryboardJob,
+  finalizeShotRoughStoryboardJob,
   finalizeShotVideoJob,
 } from '@/lib/fal/finalize'
 
@@ -86,12 +87,14 @@ export async function POST(req: Request) {
       if (!url) throw new Error('no video url in webhook payload')
       await finalizeShotVideoJob(job, url)
     } else {
-      // 이미지 계열 (character_view / world_shot / shot_storyboard)
+      // 이미지 계열 (character_view / world_shot / shot_storyboard / shot_rough_storyboard)
       const url = extractImageUrl(body.payload)
       if (!url) throw new Error('no image url in webhook payload')
       if (job.kind === 'character_view') await finalizeCharacterViewJob(job, url)
       else if (job.kind === 'world_shot') await finalizeWorldShotJob(job, url)
       else if (job.kind === 'shot_storyboard') await finalizeShotStoryboardJob(job, url)
+      else if (job.kind === 'shot_rough_storyboard')
+        await finalizeShotRoughStoryboardJob(job, url)
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

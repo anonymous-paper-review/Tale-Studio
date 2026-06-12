@@ -111,6 +111,37 @@ export async function finalizeShotStoryboardJob(
   return publicUrl
 }
 
+/** 러프 스토리보드 패널(writer 탭, mannequin previz) 영속화 → shots.rough_storyboard(JSONB) 갱신. */
+export async function finalizeShotRoughStoryboardJob(
+  job: GenerationJob,
+  falImageUrl: string,
+): Promise<string> {
+  const { workspaceId, writerShotId } = job.target
+  if (!workspaceId || !writerShotId) {
+    throw new Error('shot_rough_storyboard job target missing workspaceId/writerShotId')
+  }
+  const path = `${workspaceId}/${job.project_id}/shots/${writerShotId}_rough_storyboard.png`
+  const publicUrl = await uploadImageFromUrl(falImageUrl, path)
+
+  // RoughStoryboardImage shape (src/types/shot.ts — writer 러프 보드가 소비).
+  const { error } = await supabaseAdmin
+    .from('shots')
+    .update({
+      rough_storyboard: {
+        url: publicUrl,
+        status: 'completed',
+        errorMessage: null,
+        generatedAt: Date.now(),
+      },
+    })
+    .eq('project_id', job.project_id)
+    .eq('shot_id', writerShotId)
+  if (error) throw error
+
+  await completeGenerationJob(job.id, publicUrl)
+  return publicUrl
+}
+
 /** 샷 영상 URL 영속화. writerShotId 있으면 shots.video_url 갱신. */
 export async function finalizeShotVideoJob(
   job: GenerationJob,

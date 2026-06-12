@@ -134,9 +134,10 @@ export async function markFailed(id: string, errorMessage: string): Promise<void
 }
 
 /**
- * writer 파이프라인이 실제로 완료됐을 때만 projects.current_stage 를 producer→artist 로 전진.
- *   - 핸드오프(saveAndHandoff)는 더 이상 current_stage 를 낙관적으로 올리지 않는다(거짓 진행 방지).
- *   - 이미 artist 이상으로 진행된 프로젝트는 건드리지 않는다(`.eq('current_stage','producer')` 가드 → 다운그레이드 없음).
+ * writer 파이프라인이 실제로 완료됐을 때만 projects.current_stage 를 producer→writer 로 전진.
+ *   - 정상 경로는 핸드오프(saveAndHandoff)가 이미 낙관적으로 writer 로 올린다 — 여기는
+ *     게이트백으로 producer 에 묶였던 프로젝트의 재실행 완료를 풀어주는 보강 경로.
+ *   - 이미 writer 이상으로 진행된 프로젝트는 건드리지 않는다(`.eq('current_stage','producer')` 가드 → 다운그레이드 없음).
  *   - 실패(markFailed)는 호출하지 않으므로, writer 가 죽으면 DB 는 producer 로 남아 게이트가 producer 로 돌린다.
  * best-effort — 실패해도 throw 하지 않는다(파이프라인 완료 자체를 막지 않음).
  */
@@ -144,7 +145,7 @@ export async function advanceProjectStageAfterWriter(projectId: string): Promise
   try {
     const { error } = await supabaseAdmin
       .from('projects')
-      .update({ current_stage: 'artist' })
+      .update({ current_stage: 'writer' })
       .eq('id', projectId)
       .eq('current_stage', 'producer');
     if (error) {

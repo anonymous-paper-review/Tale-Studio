@@ -143,14 +143,16 @@ L0은 캐릭터/월드를 카드 UI로 사전 정의해 Asset Storage로 공급.
 
 ```
 /studio/producer → features/producer/
+/studio/writer   → features/writer/   (러프 스토리보드 — pre-concept previz)
 /studio/artist   → features/artist/   (카드형 Tabs: Characters/World/Inventory)
 /studio/director → features/director/
 /studio/editor   → features/editor/
 ```
 
-> **writer는 UI 없는 백엔드 전용 스테이지** (decision #38, 2026-06-05). `src/lib/writer/` 파이프라인이
-> producer 핸드오프(`/api/writer/start`)에서 백그라운드 실행되어 DB(characters/scenes/locations/shots)를
-> 채운다. producer → **artist** 직행. 옛 `generate-scenes` writer·`/studio/writer` UI는 폐기.
+> **writer 파이프라인은 백엔드 실행, 탭은 러프 스토리보드 검토 단계로 부활** (2026-06-12).
+> `src/lib/writer/` 파이프라인이 producer 핸드오프(`/api/writer/start`)에서 백그라운드 실행되어
+> DB(characters/scenes/locations/shots)를 채우고, `/studio/writer` 탭은 완료 후 샷별 러프 패널
+> (목각 인형 previz, `shots.rough_storyboard`)과 스토리 텍스트를 검토한다. producer → **writer** → artist.
 > 캐릭터 프롬프트는 `characters.appearance` 단일 (옛 `fixed_prompt` drop).
 
 ### 인벤토리 (목록 복제 금지 — 코드가 진실)

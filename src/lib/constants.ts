@@ -6,7 +6,16 @@ export const STAGES = [
     name: 'The Meeting Room',
     agent: 'Producer',
     path: '/studio/producer',
-    // writer는 백엔드 전용 스테이지(UI 없음) — 핸드오프는 artist로 직행 (decisions #37, §3 일원화)
+    handoffLabel: 'Hand over to Writer',
+    nextStage: 'writer',
+  },
+  {
+    // writer 탭 부활 (2026-06-12): 파이프라인 실행은 여전히 백엔드(producer 핸드오프가 발사).
+    // 이 탭은 파이프라인 완료 후 러프 스토리보드(목각 인형 previz + 스토리 텍스트) 검토 단계.
+    id: 'writer',
+    name: "The Writers' Room",
+    agent: 'Writer',
+    path: '/studio/writer',
     handoffLabel: 'Hand over to Concept Artist',
     nextStage: 'artist',
   },
@@ -80,14 +89,14 @@ export const STAGE_FACE_COLOR: Record<StageId, string> = {
 
 export const STAGE_PLACEHOLDER: Record<StageId, string> = {
   producer: '스토리에 대해 말해주세요…',
-  writer: '씬과 샷에 대해 물어보세요…',
+  writer: '아직 이 단계에서는 채팅을 쓸 수 없어요.',
   artist: '예: Kai 캐릭터 만들어줘, 갈색머리 검은코트',
   director: '촬영 기법에 대해 물어보세요…',
   editor: '아직 이 단계에서는 채팅을 쓸 수 없어요.',
 }
 
-// writer는 백엔드 전용 스테이지(UI 없음, /api/writer/chat 없음 — decision #38)라 채팅 미지원.
-//   (chat-proactive-copilot Phase 5: 'writer' 제거 — global-chat-store switch에 case 없어 에러였음)
+// writer 탭은 부활했지만(러프 스토리보드 검토) /api/writer/chat 이 없어 채팅은 여전히 미지원.
+//   (global-chat-store switch 에 'writer' case 없음 — 지원하려면 라우트+case 둘 다 추가)
 export const CHAT_SUPPORTED_STAGES: ReadonlySet<StageId> = new Set<StageId>([
   'producer',
   'artist',

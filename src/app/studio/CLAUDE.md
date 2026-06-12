@@ -1,19 +1,21 @@
 # src/app/studio — Stage 라우트 공통 룰
 
-## 라우트 4종
+## 라우트 5종
 
 | URL | Feature |
 |---|---|
 | `/studio/producer` | `features/producer/` (Meeting Room) |
+| `/studio/writer`   | `features/writer/`   (러프 스토리보드 — Writers' Room) |
 | `/studio/artist`   | `features/artist/`  (L0 Concept Canvas) |
 | `/studio/director` | `features/director/` (Director Canvas) |
 | `/studio/editor`   | `features/editor/`   (Post-Production Lite) |
 
 `layout.tsx`가 모든 공통 shell.
 
-> **writer는 UI 없는 백엔드 전용 스테이지** (§3 일원화, 2026-06-05). `lib/writer` 파이프라인이
-> producer 핸드오프(`/api/writer/start`)에서 백그라운드 실행되어 DB(characters/scenes/locations/shots)를
-> 채운다. 옛 `/studio/writer` 페이지·`features/writer`는 제거됨. producer → **artist** 직행.
+> **writer 탭 부활 (2026-06-12)**: 파이프라인은 여전히 `lib/writer` 백엔드가 producer 핸드오프
+> (`/api/writer/start`)에서 백그라운드 실행해 DB(characters/scenes/locations/shots)를 채우고,
+> 탭은 완료 후 러프 스토리보드(`shots.rough_storyboard`, 목각 인형 previz) 검토 단계.
+> producer → **writer** → artist.
 
 ## Studio shell layout
 
@@ -64,7 +66,7 @@ canNavigateTo: (stage) => {
 ## Stage 전환 패턴
 
 - Sidebar 클릭 → URL push (`/studio/<stage>`) → useEffect가 `setStage` 호출
-- Stage handoff (producer → artist): producer CTA → `setStage('artist')` + `/api/writer/start` 백그라운드 발사 (writer UI 없음)
+- Stage handoff (producer → writer): producer CTA → `setStage('writer')` + `/api/writer/start` 백그라운드 발사 → writer 탭이 진행/러프 보드 표시
 - **Stage 별 store는 자기 영역만** — cross-store import 금지 (project-store 외, decisions/stores 룰)
 
 ## 새 Stage 페이지 작업 시

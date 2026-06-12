@@ -42,6 +42,18 @@ export const DEFAULT_CAMERA_PRESET: CameraPreset = {
   whiteBalance: 5600,
 }
 
+/**
+ * 러프 스토리보드 패널 (writer 탭, pre-concept previz).
+ * 컨셉 아트 이전에 목각 인형/스틱 피겨로 연출(구도·포즈·배치)만 확인하는 패널.
+ * DB shots.rough_storyboard JSONB — Director의 storyboard_image와 동일 shape, 다른 용도.
+ */
+export interface RoughStoryboardImage {
+  url: string
+  status: 'pending' | 'generating' | 'completed' | 'failed'
+  errorMessage: string | null
+  generatedAt: number
+}
+
 export interface Shot {
   shotId: string
   sceneId: string
@@ -57,6 +69,7 @@ export interface Shot {
   movementIntensity?: number
   lighting: LightingConfig
   referenceImageUrl?: string | null
+  roughStoryboard?: RoughStoryboardImage | null
 }
 
 export interface VideoClip {
