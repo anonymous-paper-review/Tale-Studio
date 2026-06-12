@@ -98,8 +98,14 @@ export async function POST(req: Request) {
         { status: 404 },
       )
 
-    const [{ data: shots }, { data: scenes }, { data: chars }, { data: queuedJobs }, specByShotId] =
-      await Promise.all([
+    const [
+      { data: shots },
+      { data: scenes },
+      { data: chars },
+      { data: queuedJobs },
+      { data: failedJobs },
+      specByShotId,
+    ] = await Promise.all([
         supabaseAdmin
           .from('shots')
           .select(
@@ -121,6 +127,14 @@ export async function POST(req: Request) {
           .eq('project_id', projectId)
           .eq('kind', 'shot_rough_storyboard')
           .eq('status', 'queued'),
+        // 직전 실패 이력 → safe mode 파생 (fal 입력 모더레이션 우회 재시도).
+        // 별도 상태 저장 없음 — 실패 잡의 존재가 진실 (architecture §0).
+        supabaseAdmin
+          .from('generation_jobs')
+          .select('target')
+          .eq('project_id', projectId)
+          .eq('kind', 'shot_rough_storyboard')
+          .eq('status', 'failed'),
         loadShotDesignByMainId(projectId),
       ])
 
@@ -133,6 +147,11 @@ export async function POST(req: Request) {
         .map((j) => (j.target as { writerShotId?: string })?.writerShotId)
         .filter(Boolean),
     )
+    const previouslyFailed = new Set(
+      (failedJobs ?? [])
+        .map((j) => (j.target as { writerShotId?: string })?.writerShotId)
+        .filter(Boolean),
+    )
 
     const wanted = shotIds?.length
       ? (shots ?? []).filter((s) => shotIds.includes(s.shot_id as string))
@@ -142,6 +161,7 @@ export async function POST(req: Request) {
       shotId: string
       jobId: string
       promptSource: 'shotDesign' | 'db_fallback'
+      safeMode: boolean
     }> = []
     const skipped: Array<{ shotId: string; reason: 'exists' | 'in_flight' }> = []
 
@@ -160,6 +180,7 @@ export async function POST(req: Request) {
       const camera = (s.camera_config ?? {}) as { pan?: number }
       const lighting = (s.lighting_config ?? {}) as { position?: string }
       const spec = specByShotId.get(shotId) ?? null
+      const safeMode = previouslyFailed.has(shotId)
       const prompt = buildRoughStoryboardPrompt({
         shotType: (s.shot_type as string) ?? 'MS',
         actionDescription: (s.action_description as string) ?? '',
@@ -176,6 +197,7 @@ export async function POST(req: Request) {
         lightPosition: lighting.position ?? null,
         aspectRatio: '16:9',
         spec,
+        safeMode,
       })
 
       const { request_id, model } = await falImageSubmit({
@@ -196,6 +218,7 @@ export async function POST(req: Request) {
         shotId,
         jobId: job.id,
         promptSource: spec ? 'shotDesign' : 'db_fallback',
+        safeMode,
       })
     }
 

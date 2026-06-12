@@ -103,6 +103,13 @@ export interface RoughStoryboardPromptInput {
   aspectRatio?: string
   /** L4(shotDesign) 원본 — 있으면 rich 경로, 없으면 DB fallback */
   spec?: RoughStoryboardSpec | null
+  /**
+   * 콘텐츠 체커 우회 모드 — fal 입력 모더레이션(content_policy_violation, 토글 불가)에
+   * 걸린 샷의 재시도용. 서사 동사·감정어(액션문/무드/모션/구도 레이어)를 빼고
+   * 기계적 스테이징(샷 사이즈·blocking·포즈·소품·focal point)만 남긴다.
+   * 직전 잡이 실패한 샷에만 라우트가 자동 적용 — 1차 시도는 항상 원문.
+   */
+  safeMode?: boolean
 }
 
 const PANEL_HEADER = `Create a single rough storyboard panel for film previsualization, drawn FROM THE CAMERA'S POINT OF VIEW — what the lens sees on screen. This is NOT an overhead map.`
@@ -128,7 +135,8 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
   const dof = s.depth_of_field ?? 'deep'
   const rule = FRAMING_RULE_WORDS[s.framing?.rule ?? ''] ?? 'the rule of thirds'
 
-  const layers = s.framing?.layers ?? {}
+  // safe mode: 서사 동사·감정어가 실리는 구도 레이어/액션문/모션을 제외 (모더레이션 우회)
+  const layers = input.safeMode ? {} : (s.framing?.layers ?? {})
   const layerLines = [
     layers.foreground ? `- Foreground: ${layers.foreground}.` : null,
     layers.midground ? `- Midground: ${layers.midground}.` : null,
@@ -145,7 +153,7 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
   )
 
   // 동적 스펙은 "어느 순간을 얼릴지" 가이드로만 — 패널은 정지화.
-  const motion = spec.dynamicSpec
+  const motion = input.safeMode ? undefined : spec.dynamicSpec
   const motionNote = motion
     ? `Freeze the most readable instant of: ${
         (motion.character_motion ?? [])
@@ -168,11 +176,13 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
     layerLines.length ? `Composition (camera POV, three depth layers):` : null,
     ...layerLines,
     ``,
-    `Action this panel captures: ${input.actionDescription}${
-      spec.intent?.dramatic_purpose && spec.intent.dramatic_purpose !== input.actionDescription
-        ? ` (dramatic purpose: ${spec.intent.dramatic_purpose})`
-        : ''
-    }`,
+    input.safeMode
+      ? `Neutral staging panel — place the figures exactly as specified below; no dramatic action.`
+      : `Action this panel captures: ${input.actionDescription}${
+          spec.intent?.dramatic_purpose && spec.intent.dramatic_purpose !== input.actionDescription
+            ? ` (dramatic purpose: ${spec.intent.dramatic_purpose})`
+            : ''
+        }`,
     motionNote,
     ``,
     `${MANNEQUIN_RULE}${blocking.length ? ` ${blocking.join(' ')}` : ''} Represent any held prop or key object as a simple line or geometric shape${
@@ -196,7 +206,11 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
 
   const setting = [input.location, input.timeOfDay].filter(Boolean).join(', ')
   const figures = input.characterNames.length
-    ? `${input.characterNames.length} figure(s): ${input.characterNames.join(', ')} — place and pose them according to the action above.`
+    ? `${input.characterNames.length} figure(s): ${input.characterNames.join(', ')} — ${
+        input.safeMode
+          ? 'neutral standing poses, composed naturally in the frame.'
+          : 'place and pose them according to the action above.'
+      }`
     : 'No characters — environment only.'
   const focal = input.characterNames[0]
     ? `${input.characterNames[0]} and the main action`
@@ -211,8 +225,12 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
     ``,
     `Frame: one ${aspect} storyboard panel with a thin rectangular border. This is a ${size} from ${angle}, ${lens}mm-lens feel, ${focus} focus. Compose using the rule of thirds.`,
     ``,
-    `Action in frame (midground focus): ${input.actionDescription}`,
-    setting ? `Setting (background): ${setting}.${input.mood ? ` Mood: ${input.mood}.` : ''}` : '',
+    input.safeMode
+      ? `Neutral staging panel — no dramatic action.`
+      : `Action in frame (midground focus): ${input.actionDescription}`,
+    setting
+      ? `Setting (background): ${setting}.${!input.safeMode && input.mood ? ` Mood: ${input.mood}.` : ''}`
+      : '',
     ``,
     `${MANNEQUIN_RULE} ${figures} Represent any held prop or key object as a simple line or geometric shape.`,
     ``,
