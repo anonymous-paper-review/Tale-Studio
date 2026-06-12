@@ -89,27 +89,47 @@ export function useWriterDirectorSync() {
     }
 
     // ── Pass 2: Shot 노드 (프롬프트 + 에셋 바인딩) ──────────────────────
+    // 등장 캐릭터: Shot.characters 우선, 없으면 Scene.charactersPresent.
+    // 등록(asset-storage, Pass 0 hydrate)된 것만 바인딩 — 어댑터가 id === characterId/locationId로 등록.
+    const resolveAssetIds = (shot: (typeof shots)[number]) => {
+      const scene = manifest.scenes.find((s) => s.sceneId === shot.sceneId)
+      const sourceCharIds =
+        shot.characters?.length ? shot.characters : scene?.charactersPresent ?? []
+      return {
+        characterAssetIds: sourceCharIds.filter((cid) => assets.getCharacter(cid)),
+        worldAssetIds:
+          scene?.location && assets.getWorld(scene.location) ? [scene.location] : [],
+      }
+    }
+
     for (const shot of shots) {
       const cur = useDirectorCanvasStore.getState()
-      const already = cur.nodes.some(
-        (n) => n.data.kind === 'shot' && n.data.writerShotId === shot.shotId,
+      const existing = cur.nodes.find(
+        (n) => isShotData(n.data) && n.data.writerShotId === shot.shotId,
       )
-      if (already) continue
+      if (existing) {
+        // 이미 있는 shot은 사용자 편집(prompt/카메라 등)을 보존하되, 파생 필드인
+        // 에셋 바인딩만 재계산해 갱신한다. persist 캐시에 빈 바인딩으로 굳은 노드가
+        // asset-storage hydrate 후에도 안 채워지던 문제 수정 — 값이 바뀔 때만 set(stale 최소).
+        if (isShotData(existing.data)) {
+          const { characterAssetIds, worldAssetIds } = resolveAssetIds(shot)
+          const d = existing.data
+          const changed =
+            characterAssetIds.join(',') !== d.characterAssetIds.join(',') ||
+            worldAssetIds.join(',') !== d.worldAssetIds.join(',')
+          if (changed) {
+            dir.updateNodeData<'shot'>(existing.id, { characterAssetIds, worldAssetIds })
+          }
+        }
+        continue
+      }
 
       const parent = cur.nodes.find(
         (n) => n.data.kind === 'scene' && n.data.writerSceneId === shot.sceneId,
       )
       if (!parent) continue // 부모 Scene이 아직 없으면 skip (다음 진입에 재시도)
 
-      const scene = manifest.scenes.find((s) => s.sceneId === shot.sceneId)
-
-      // 등장 캐릭터: Shot.characters 우선, 없으면 Scene.charactersPresent.
-      // 등록(asset-storage)된 것만 바인딩 — 어댑터가 id === characterId/locationId로 등록함.
-      const sourceCharIds =
-        shot.characters?.length ? shot.characters : scene?.charactersPresent ?? []
-      const characterAssetIds = sourceCharIds.filter((cid) => assets.getCharacter(cid))
-      const worldAssetIds =
-        scene?.location && assets.getWorld(scene.location) ? [scene.location] : []
+      const { characterAssetIds, worldAssetIds } = resolveAssetIds(shot)
 
       const pos = nextShotPosition(cur, parent.id)
       const id = dir.addShotNode(parent.id, pos, shot.shotId)
