@@ -42,12 +42,12 @@
 - [c] s3_scenes 오픈 캐스트 계약 — `runScenes` 프롬프트에 [기존 캐스트] slug+role+외형 주입 + 오픈캐스트 규칙(기존 slug 그대로/필요시만 신규/억지등장 금지) + 출력에 `new_characters[]` 추가. `mergeOpenCast`(s3_scenes.ts export)가 충돌·빈 id 거르고 StoryCharacter 기본값으로 머지 → steps.ts scenes step·index.ts 양 경로에서 호출 → persistAssetsToDb가 새 slug만 origin='writer' insert. tsc clean. **브라우저 검증 대기**(Section 6 additive 재실행 — new_characters 노출)
 - [c] **additive 재실행** — `persistAssetsToDb` characters: delete 제거 → 기존 행 보존, 새 slug만 origin='writer' insert, 기존 행은 빈 보강 필드(appearance/costume)만 채움. (Section 3과 함께 선반영 — 핸드오프 캐스트 클로버 방지) 브라우저 검증 대기. *부분 증거(2026-06-12): 첫 run의 persist(productionDesign 시점) 후에도 producer 캐스트 3행 그대로(origin/정의 칸 미변경, 중복 insert 없음). 재실행 보존 시나리오는 Section 6에서.*
 - [c] persistAssetsToDb — characters insert → 신규 insert + 빈 보강 필드 채우기만 (기존 정의 칸·이미지 칸 미변경). ↑와 동일 작업
-- [ ] **이미지 생성 스텝 writer에서 제거** — view_main/wide_shot 레퍼런스 생성을 artist 초기 생성으로 이전. **의도적 후행(2026-06-12)**: artist가 이미지 생성을 인수하는 **Section 5**가 먼저 들어와야 한다 — 지금 writer에서 제거하면 이미지 생성 주체가 사라진다(공백). Section 5(artist 일원화)와 한 묶음으로 진행. 현재 writer는 `assetImages` step(steps.ts) + `assets_generate`/`submitHandoffAssetImages`로 이미지 submit 유지 중.
+- [ ] **이미지 생성 스텝 writer에서 제거** — view_main/wide_shot 레퍼런스 생성을 artist 초기 생성(**진입 시 자동 1회**, 결정 8)으로 이전. **의도적 후행(2026-06-12)**: artist가 이미지 생성을 인수하는 **Section 5**가 먼저 들어와야 한다 — 지금 writer에서 제거하면 이미지 생성 주체가 사라진다(공백). Section 5(artist 진입 자동 생성)와 한 묶음으로 진행. 현재 writer는 `assetImages` step(steps.ts) + `assets_generate`/`submitHandoffAssetImages`로 이미지 submit 유지 중.
 - [c] renderPrompts(l5) — object asset ref 주입 **코드 경로 확인 완료**: object는 `castContractToCharacters`로 state.characters에 들어가고(entity_type drop, id/name/appearance 보존) `buildAssetRegistry`의 characterIds에 포함 → l5 `reference_assets`가 person과 **동일 resolveAssetRef 경로**로 해소. 별도 코드 불필요. 런타임 주입 증명은 Section 6 object(반지) 브라우저 테스트
 
 ### Section 5: Artist — 이미지 생성 일원화 + object 카드
 
-- [ ] **이미지 초기 생성 artist로 이전** — entity_type 분기(person 턴어라운드 #37 / object 단일 이미지) artist에서 수행
+- [ ] **이미지 초기 생성 artist로 이전 — 진입 시 자동 1회(결정 8)** — 빈칸(누락) 이미지를 artist 진입 시 **자동 생성**(입력=producer 확정 appearance), 재생성은 명시적 클릭만. entity_type 분기(person 턴어라운드 #37 / object 단일 이미지) artist에서 수행. **자동 가드 필수**: 멱등(이미 있으면 skip) + 진입/세션당 1회(`autoTriggeredRef` 패턴) + 실패 배지 — person 4뷰는 1회에 비싼 이미지 4장이라 가드 누락 시 과금 폭주. 패턴 레퍼런스 = `rough-storyboard-view.tsx`(writer 탭 진입 자동 생성)
 - [ ] **Lock UI/컬럼 제거** — character-panel/character-view-dialog Lock 토글 + 스토어 locked 필드 정리
 - [ ] **stale 배지** (#57) — 상류(외모 등 이미지 입력) 변경 시 파생 이미지 낡음 표시. 자동 무효화·자동 재생성 금지(배지=정보, 행동=명시적)
 - [ ] **후보 히스토리 UI** (#57) — 재생성=후보 추가(선택 자동 교체 없음), 선택본 교체 UI, 보관 정책(선택본 보존 + 미선택 최근 N장) 적용

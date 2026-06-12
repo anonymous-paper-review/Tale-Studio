@@ -89,3 +89,5 @@ docs/algorithm-experience-html-assets/*
 docs/*.html
 
 *.gitignore
+# skill/harness 상태 (deep-interview 등) — .omc 와 동일 성격
+.gjc/
