@@ -192,11 +192,12 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         .update({
           story_text: storyText,
           settings: projectSettings,
-          // writer는 백그라운드 전용 스테이지 → 사용자는 artist로 직행 (decisions #37).
-          //   current_stage 는 낙관적으로 artist 로 올리되(진행 중 새로고침해도 artist 유지),
+          // 핸드오프 → writer 탭(러프 스토리보드, 2026-06-12 부활). 파이프라인은 아래에서
+          //   백그라운드 발사되고, 사용자는 writer 탭에서 진행/결과(러프 보드)를 본다.
+          //   current_stage 는 낙관적으로 writer 로 올리되(진행 중 새로고침에도 유지),
           //   진입 게이트(verifyWriterGate)가 "씬 없음 + run 없음/실패"면 producer 로 되돌려
-          //   빈 Director/Editor 진입을 막는다(자가 교정). → 거짓 진행 버그 해소.
-          current_stage: 'artist',
+          //   빈 화면 진입을 막는다(자가 교정).
+          current_stage: 'writer',
         })
         .eq('id', projectId)
 
@@ -253,7 +254,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         console.warn('[producer] writer-pipeline trigger error (non-blocking):', writerErr)
       }
 
-      useProjectStore.getState().setStage('artist')
+      useProjectStore.getState().setStage('writer')
       set({ syncing: false })
       return true
     } catch (err) {

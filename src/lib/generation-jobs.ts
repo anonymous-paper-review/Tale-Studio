@@ -9,6 +9,7 @@ export type GenerationJobKind =
   | 'character_view'
   | 'world_shot'
   | 'shot_storyboard'
+  | 'shot_rough_storyboard'
   | 'shot_video'
 export type GenerationJobStatus = 'queued' | 'completed' | 'failed'
 /** 잡 트리거 주체 — ui(직접 조작) | chat(글로벌 채팅 updates) | writer(핸드오프 파이프라인) */
@@ -23,6 +24,7 @@ export interface GenerationJobTarget {
   // world_shot: locations[column] 갱신
   locationId?: string
   // shot_video: shots.video_url / shot_storyboard: shots.storyboard_image (JSONB)
+  // shot_rough_storyboard: shots.rough_storyboard (JSONB)
   shotId?: string
   writerShotId?: string
 }

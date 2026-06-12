@@ -1,7 +1,9 @@
 # src/lib/writer — writer 엔진 (백엔드 전용 스테이지)
 
-> UI 없음 (decision #38). producer 핸드오프(`/api/writer/start`)에서 백그라운드 실행되어
-> DB(characters/scenes/locations/shots)를 채운다. 현재 stage/adapter 구조와 비동기/재시도/체이닝 동작은 코드가 진실이다.
+> 파이프라인은 백엔드 실행 (decision #38) — 단, `/studio/writer` 탭이 러프 스토리보드 검토 UI로
+> 부활 (2026-06-12, `rough-storyboard.ts` + `/api/writer/rough-storyboard`).
+> producer 핸드오프(`/api/writer/start`)에서 백그라운드 실행되어
+> DB(characters/scenes/locations/shots)를 채운다. 비동기/재시도/체이닝 규칙은 `.claude/rules/async-generation.md`.
 
 ## 실행 모드 2개 (혼동 주의)
 

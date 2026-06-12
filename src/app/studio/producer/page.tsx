@@ -38,10 +38,10 @@ export default function MeetingPage() {
   }, [redirectTo, router])
 
   const handleHandoff = async () => {
-    // writer는 백그라운드 전용 스테이지 → artist로 직행 (decisions #37).
-    // 씬/샷/연출 생성은 saveAndHandoff가 백그라운드로 발사한다.
+    // 씬/샷/연출 생성(writer 파이프라인)은 saveAndHandoff가 백그라운드로 발사하고,
+    // 사용자는 writer 탭에서 진행 상황과 러프 스토리보드를 본다 (2026-06-12 탭 부활).
     const ok = await saveAndHandoff()
-    if (ok) setRedirectTo('/studio/artist')
+    if (ok) setRedirectTo('/studio/writer')
   }
 
   return (
@@ -107,7 +107,7 @@ export default function MeetingPage() {
             </>
           ) : canHandoff ? (
             <>
-              Artist로 핸드오프
+              Writer로 핸드오프
               <ArrowRight className="ml-2 size-4" />
             </>
           ) : (

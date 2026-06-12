@@ -6,6 +6,7 @@ import type {
   Location,
   Shot,
   DialogueLine,
+  RoughStoryboardImage,
 } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { useProjectStore } from '@/stores/project-store'
@@ -619,6 +620,8 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           ...DEFAULT_LIGHTING,
           ...(s.lighting_config as Partial<Shot['lighting']> ?? {}),
         },
+        // 러프 스토리보드 패널 (writer 탭). 마이그레이션 016 이전 DB 에선 undefined → null.
+        roughStoryboard: (s.rough_storyboard as RoughStoryboardImage | null) ?? null,
       }))
 
       const firstSceneId = manifest.scenes[0]?.sceneId ?? null

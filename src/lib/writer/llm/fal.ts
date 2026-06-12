@@ -95,6 +95,14 @@ export interface FalImageResult {
 const DEFAULT_IMAGE_MODEL = 'openai/gpt-image-2';
 // reference 있을 때 자동 사용할 edit 모델 (image_urls 입력)
 const DEFAULT_EDIT_IMAGE_MODEL = 'openai/gpt-image-2/edit';
+// 러프 스토리보드(previz 스케치) 전용 — 비용/속도 우선 경량 모델 (2026-06-12 사용자 결정).
+//   흑백 연필 스케치 + 목각 인형 수준이라 소형 모델로 충분. LoRA 미지정 시 base 로 동작.
+export const ROUGH_STORYBOARD_IMAGE_MODEL = 'fal-ai/flux-2/klein/4b/lora';
+
+// flux 계열 입력 스키마 모델인지 (aspect_ratio 대신 image_size preset 사용)
+function isFluxFamilyModel(model: string): boolean {
+  return /\bflux\b|\/flux/.test(model);
+}
 
 // reference_image_urls 필요한 edit 류 모델인지
 function isImageEditModel(model: string): boolean {
@@ -147,6 +155,11 @@ function buildFalImageInput(opts: FalImageOptions, model: string): Record<string
     // edit 모델: image_urls 필수 + image_size preset
     input.image_urls = opts.reference_image_urls ?? [];
     input.image_size = arToImageSize(opts.aspect_ratio);
+  } else if (isFluxFamilyModel(model)) {
+    // flux 계열: aspect_ratio 파라미터가 없고 image_size preset 사용 ('auto' 미지원 → 16:9 fallback)
+    const size = arToImageSize(opts.aspect_ratio);
+    input.image_size = size === 'auto' ? 'landscape_16_9' : size;
+    if (opts.reference_image_urls?.length) input.image_urls = opts.reference_image_urls;
   } else {
     // 순수 T2I: aspect_ratio. reference 있어도 모델이 받으면 함께 보냄
     if (opts.aspect_ratio) input.aspect_ratio = opts.aspect_ratio;

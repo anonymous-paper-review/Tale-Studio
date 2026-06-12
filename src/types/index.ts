@@ -10,6 +10,7 @@ export type {
   LightingConfig,
   CameraPreset,
   Shot,
+  RoughStoryboardImage,
   VideoClip,
   AudioTrackClip,
   AudioSource,
