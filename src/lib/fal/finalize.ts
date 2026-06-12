@@ -8,13 +8,14 @@
 //         가드(호출부)로 1차 차단하고, storage upsert/컬럼 update는 동일 결과라 재실행돼도 무해.
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { completeGenerationJob, type GenerationJob } from '@/lib/generation-jobs'
+import { CANDIDATE_RETENTION, type CandidateView } from '@/lib/image-provenance'
 
 /** 캐릭터 뷰 이미지 영속화 → 저장된 publicUrl 반환. */
 export async function finalizeCharacterViewJob(
   job: GenerationJob,
   falImageUrl: string,
 ): Promise<string> {
-  const { workspaceId, characterId, column } = job.target
+  const { workspaceId, characterId, column, view } = job.target
   if (!workspaceId || !characterId || !column) {
     throw new Error('character_view job target missing workspaceId/characterId/column')
   }
@@ -31,6 +32,7 @@ export async function finalizeCharacterViewJob(
   const publicUrl = supabaseAdmin.storage.from('media').getPublicUrl(path).data
     .publicUrl
 
+  // 선택본 URL 은 기존대로 characters.view_* 에 미러(read 경로 무변경).
   const { error: updErr } = await supabaseAdmin
     .from('characters')
     .update({ [column]: publicUrl })
@@ -38,8 +40,76 @@ export async function finalizeCharacterViewJob(
     .eq('character_id', characterId)
   if (updErr) throw updErr
 
+  // provenance(#57): 그 위에 character_image_candidates 행을 얹는다 — best-effort.
+  //   지문이 어긋나 착지해도(생성 중 외모 변경) 폐기하지 않고 그대로 선택본으로 기록 →
+  //   stale 판정(순수 함수)이 알아서 낡음으로 표시한다(architecture §5 — 착지 + 배지).
+  await recordCharacterImageCandidate(job, characterId, view, publicUrl).catch((e) => {
+    console.warn('[finalize] candidate record failed (image landed):', e instanceof Error ? e.message : e)
+  })
+
   await completeGenerationJob(job.id, publicUrl)
   return publicUrl
+}
+
+/**
+ * 착지한 이미지를 character_image_candidates 의 새 "선택본"으로 기록한다(#57).
+ *   1) 슬롯의 기존 선택본 해제(partial-unique: 슬롯당 is_selected 1개) → 2) 새 후보 insert(is_selected=true)
+ *   → 3) 보관 정리(미선택 최근 N장만, 선택본 보존). source_hash 는 submit 시점 input_snapshot 에서.
+ *   view 가 없는(레거시) job 은 skip — 기존 view_* 미러만으로 동작.
+ */
+async function recordCharacterImageCandidate(
+  job: GenerationJob,
+  characterId: string,
+  viewKey: string | undefined,
+  url: string,
+): Promise<void> {
+  // job.target.view = CharacterViewKey('main'|'back'|'sideLeft'|'sideRight'). object 단일 이미지는 'main'.
+  const map: Record<string, CandidateView> = {
+    main: 'main',
+    back: 'back',
+    sideLeft: 'side_left',
+    sideRight: 'side_right',
+  }
+  const view = viewKey ? map[viewKey] : undefined
+  if (!view) return
+
+  const sourceHash =
+    (job.input_snapshot as { source_hash?: string } | null | undefined)?.source_hash ?? null
+
+  // 1) 기존 선택본 해제.
+  await supabaseAdmin
+    .from('character_image_candidates')
+    .update({ is_selected: false })
+    .eq('project_id', job.project_id)
+    .eq('character_id', characterId)
+    .eq('view', view)
+    .eq('is_selected', true)
+
+  // 2) 새 후보 = 선택본.
+  const { error: insErr } = await supabaseAdmin.from('character_image_candidates').insert({
+    project_id: job.project_id,
+    character_id: characterId,
+    view,
+    url,
+    source_hash: sourceHash,
+    job_id: job.id,
+    is_selected: true,
+  })
+  if (insErr) throw insErr
+
+  // 3) 보관 정리: 미선택 후보를 최근 N장만 남기고 삭제(선택본은 항상 보존).
+  const { data: unselected } = await supabaseAdmin
+    .from('character_image_candidates')
+    .select('id')
+    .eq('project_id', job.project_id)
+    .eq('character_id', characterId)
+    .eq('view', view)
+    .eq('is_selected', false)
+    .order('generated_at', { ascending: false })
+  const stale = (unselected ?? []).slice(CANDIDATE_RETENTION).map((r) => r.id as string)
+  if (stale.length) {
+    await supabaseAdmin.from('character_image_candidates').delete().in('id', stale)
+  }
 }
 
 /** 공통: 원격 이미지 바이트 회수 → media 스토리지 업로드 → publicUrl. */

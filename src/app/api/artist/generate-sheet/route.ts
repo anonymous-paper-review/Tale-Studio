@@ -26,6 +26,7 @@ import {
   CHARACTER_VIEW_KEYS,
   type CharacterViewKey,
 } from '@/types/asset'
+import { computeImageSourceHash } from '@/lib/image-provenance'
 
 export const runtime = 'nodejs'
 // submit만 하고 끝 — 실제 생성은 fal 큐에서 진행, 완료는 webhook(/poll reconcile)이 처리.
@@ -121,7 +122,12 @@ export async function POST(req: Request) {
 
     // 3. fal 큐에 submit (비동기). 완료는 webhook(/poll reconcile)이 storage 업로드 + DB 갱신.
     const { request_id, model } = await falImageSubmit(submitOpts)
-    const inputSnapshot = { ...submitOpts }
+    // provenance(#57): 생성 입력(외모) 지문을 submit 시점에 함께 계산해 input_snapshot 에 동봉.
+    //   착지 시 finalize 가 이 지문으로 character_image_candidates 행을 남긴다(분리 금지 — architecture §5).
+    const inputSnapshot: Record<string, unknown> = {
+      ...submitOpts,
+      source_hash: computeImageSourceHash(character.appearance),
+    }
     delete inputSnapshot.webhookUrl
 
     // 4. generation_jobs 행 생성 — 완료 시 무엇을 갱신할지(target) 기록.
