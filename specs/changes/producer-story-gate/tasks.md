@@ -47,11 +47,11 @@
 
 ### Section 5: Artist — 이미지 생성 일원화 + object 카드
 
-- [ ] **이미지 초기 생성 artist로 이전 — 진입 시 자동 1회(결정 8)** — 빈칸(누락) 이미지를 artist 진입 시 **자동 생성**(입력=producer 확정 appearance), 재생성은 명시적 클릭만. entity_type 분기(person 턴어라운드 #37 / object 단일 이미지) artist에서 수행. **자동 가드 필수**: 멱등(이미 있으면 skip) + 진입/세션당 1회(`autoTriggeredRef` 패턴) + 실패 배지 — person 4뷰는 1회에 비싼 이미지 4장이라 가드 누락 시 과금 폭주. 패턴 레퍼런스 = `rough-storyboard-view.tsx`(writer 탭 진입 자동 생성)
+- [c] **이미지 초기 생성 artist로 이전 — 진입 시 자동 1회(결정 8)** — **기존 구현 확인**: `autoGenerateBaseImages`(artist-store) + `artist/page.tsx:96-101`(`autoGenTriggeredRef` 진입당 1회, 멱등 — 빈칸만 채움)이 이미 존재. writer 쪽 자동 생성은 A3에서 제거(결정 8). object는 main만(Phase2 directional skip — A4). 입력=producer 확정 appearance. **브라우저 검증 대기**(Section 6): 핸드오프 후 빈칸 진입 자동생성 + 재진입 멱등 skip.
 - [c] **Lock UI/컬럼 제거** (결정 4) — `locked` 전면 제거(라이브 컬럼은 017에서 이미 드롭): character-panel Lock 토글 UI + character-view-dialog disabled/안내 + artist-store `lockCharacter`/`unlockCharacter` 액션·매핑 + asset-storage-store/global-chat-store 참조 + types/asset.ts·database.ts 필드 + `/api/artist/character` insert(없는 컬럼 insert 잠재버그도 수정). grep 0건, tsc clean. **브라우저 검증 대기**: artist 카드에 Lock 토글 미노출 + 재생성 항상 가능(Section 6 일부).
-- [ ] **stale 배지** (#57) — 상류(외모 등 이미지 입력) 변경 시 파생 이미지 낡음 표시. 자동 무효화·자동 재생성 금지(배지=정보, 행동=명시적)
-- [ ] **후보 히스토리 UI** (#57) — 재생성=후보 추가(선택 자동 교체 없음), 선택본 교체 UI, 보관 정책(선택본 보존 + 미선택 최근 N장) 적용
-- [ ] **webhook 착지 검증** (#57) — submit 시 `input_snapshot.source_hash` 동봉 → 착지 시 현재 행과 비교, 불일치면 착지+즉시 stale 배지(폐기 안 함)
+- [c] **stale 배지** (#57) — 입력 경계=**appearance만**(결정). `lib/image-provenance.ts`(`computeImageSourceHash`/`isImageStale`, FNV-1a, isomorphic, 9 테스트) → character-panel 각 셀 + character-view-dialog 상단 배지. 자동 무효화·자동 재생성 없음(정보 표시만). tsc clean. **브라우저 검증 대기**(Section 6).
+- [c] **후보 히스토리 UI** (#57) — 재생성=후보 추가(`finalize`가 character_image_candidates에 insert, 선택본 자동 교체 없음 — 단 새 생성은 새 선택본). view-dialog 썸네일 스트립 + 클릭 선택 교체(`/api/artist/select-candidate` route + `selectCandidate` 액션). 보관=선택본 보존 + 미선택 최근 5장(`finalize` 정리). tsc clean. **브라우저 검증 대기**.
+- [c] **webhook 착지 검증** (#57) — `generate-sheet`가 submit 시 외모 지문을 `input_snapshot.source_hash`에 동봉 → `finalize`가 그 지문으로 후보 기록(외모가 생성 중 바뀌어도 폐기 안 하고 착지). 현재 행과의 불일치는 **stale 순수 함수가 자동 표시**(별도 비교 코드 불필요 — submit지문 vs 현재외모지문). tsc clean. **브라우저 검증 대기**: 생성 중 외모 수정 → 늦은 착지에 즉시 배지.
 - [c] entity_type='object' 카드 — artist 전역 entity_type 분기 추가(기존 0건): CharacterAsset.entityType + artist-store hydrate/addCharacter + `/api/artist/character` insert. object는 **단일 main 이미지**(방향뷰 미생성 — `generateCharacterAllViews`·`autoGenerateBaseImages` Phase2 skip), character-panel 단일 셀 + "사물" 배지, add-dialog 인물/사물 토글(object는 role 숨김·supporting 고정), view-dialog 방향뷰 미적용. tsc clean. **브라우저 검증 대기**(Section 6 반지).
 - [ ] writer 완료 전 카드 노출 동작 점검 — enteredProjects 진입 게이트·완료 알림 상호작용
 

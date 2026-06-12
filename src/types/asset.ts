@@ -52,6 +52,8 @@ export const CHARACTER_VIEW_LABELS: Record<CharacterViewKey, string> = {
   sideRight: 'Side (R)',
 }
 
+import type { CandidateImage } from '@/lib/image-provenance'
+
 export interface CharacterAsset {
   characterId: string
   name: string
@@ -60,6 +62,8 @@ export interface CharacterAsset {
   /** Writer 정의 계승 — asset-storage 등록 시 description/prompt로 전파 */
   description?: string
   fixedPrompt?: string
+  /** 뷰별 후보 히스토리 (character_image_candidates). 없으면 빈 객체. */
+  viewCandidates: Partial<Record<CharacterViewKey, CandidateImage[]>>
 }
 
 export interface WorldAsset {

@@ -22,6 +22,7 @@ import {
   CHARACTER_VIEW_LABELS,
   type CharacterViewKey,
 } from '@/types/asset'
+import { isImageStale } from '@/lib/image-provenance'
 import { cn } from '@/lib/utils'
 
 const ROLE_VARIANT = {
@@ -78,6 +79,13 @@ export function CharacterPanel() {
           const hasImage = isObject ? Boolean(char.views.main) : CHARACTER_VIEW_KEYS.some((v) => char.views[v])
           const hasMainImage = Boolean(char.views.main)
           const bgScenes = getBackgroundScenes(char.characterId)
+
+          // stale 판정: 해당 view의 선택된 후보 sourceHash 기준 (정보 표시만 — 자동 재생성 금지)
+          const isViewStale = (v: CharacterViewKey): boolean => {
+            const selected = (char.viewCandidates[v] ?? []).find((c) => c.isSelected)
+            if (!selected) return false
+            return isImageStale(char.fixedPrompt, selected.sourceHash)
+          }
 
           // hover 정보 본문 — 4개 뷰 이미지의 개별 Tooltip 에 공유(같은 캐릭터 정보).
           const charTooltipBody = (
@@ -165,7 +173,7 @@ export function CharacterPanel() {
                         e.stopPropagation()
                         setViewDialog({ charId: char.characterId, view: 'main' })
                       }}
-                      className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <ImagePlaceholder
                         label={CHARACTER_VIEW_LABELS['main']}
@@ -176,6 +184,14 @@ export function CharacterPanel() {
                           generatingStartedAt[`${char.characterId}:main`]
                         }
                       />
+                      {isViewStale('main') && (
+                        <Badge
+                          variant="destructive"
+                          className="absolute right-1 top-1 px-1 py-0 text-[10px] leading-tight"
+                        >
+                          낡음
+                        </Badge>
+                      )}
                     </button>
                   </TooltipTrigger>
                   <TooltipContent
@@ -205,7 +221,7 @@ export function CharacterPanel() {
                               e.stopPropagation()
                               setViewDialog({ charId: char.characterId, view })
                             }}
-                            className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
                             <ImagePlaceholder
                               label={CHARACTER_VIEW_LABELS[view]}
@@ -216,6 +232,14 @@ export function CharacterPanel() {
                                 generatingStartedAt[`${char.characterId}:${view}`]
                               }
                             />
+                            {isViewStale(view) && (
+                              <Badge
+                                variant="destructive"
+                                className="absolute right-1 top-1 px-1 py-0 text-[10px] leading-tight"
+                              >
+                                낡음
+                              </Badge>
+                            )}
                           </button>
                         </TooltipTrigger>
                         <TooltipContent

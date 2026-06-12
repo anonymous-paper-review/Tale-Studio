@@ -171,6 +171,7 @@ export const useAssetStorageStore = create<AssetStorageState>()(
               entityType: c.entity_type === 'object' ? 'object' : 'person',
               description: c.description ?? '',
               fixedPrompt: c.appearance ?? '',
+              viewCandidates: {},
             }
             get().registerCharacter(
               c.character_id,

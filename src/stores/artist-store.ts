@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { SceneManifest, CharacterAsset, WorldAsset } from '@/types'
 import { type CharacterViewKey } from '@/types/asset'
 import { CHARACTER_DIRECTIONAL_VIEWS } from '@/lib/artist/turnaround'
+import { candidateViewToViewKey, type CandidateImage } from '@/lib/image-provenance'
 import { buildWorldPrompt } from '@/lib/prompts'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -281,6 +282,8 @@ interface ArtistState {
   setImageProvider: (provider: ImageProvider) => void
   /** 진입 허용된 projectId 기록 (멱등). 페이지가 ready 도달 시 1회 호출. */
   markEntered: (projectId: string) => void
+  /** 후보 이미지를 선택본으로 교체. 서버에 persist 후 로컬 상태 즉시 반영. */
+  selectCandidate: (characterId: string, viewKey: CharacterViewKey, candidateId: string) => Promise<void>
   reset: () => void
 }
 
@@ -309,6 +312,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           { data: scenes },
           { data: dbChars },
           { data: dbLocs },
+          { data: dbCandidates },
         ] = await Promise.all([
           supabase
             .from('scenes')
@@ -323,7 +327,34 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .from('locations')
             .select('*')
             .eq('project_id', projectId),
+          supabase
+            .from('character_image_candidates')
+            .select('id, character_id, view, url, source_hash, is_selected, generated_at')
+            .eq('project_id', projectId),
         ])
+
+        // 후보 히스토리: character_id + viewKey 로 그룹핑, generated_at desc 정렬
+        const candidatesByCharView: Record<string, Record<string, CandidateImage[]>> = {}
+        for (const row of dbCandidates ?? []) {
+          const viewKey = candidateViewToViewKey(row.view)
+          const charMap = candidatesByCharView[row.character_id] ?? {}
+          const list = charMap[viewKey] ?? []
+          list.push({
+            id: row.id,
+            url: row.url,
+            sourceHash: row.source_hash ?? null,
+            isSelected: row.is_selected ?? false,
+            generatedAt: row.generated_at,
+          })
+          charMap[viewKey] = list
+          candidatesByCharView[row.character_id] = charMap
+        }
+        // generated_at desc 정렬
+        for (const charMap of Object.values(candidatesByCharView)) {
+          for (const key of Object.keys(charMap)) {
+            charMap[key].sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
+          }
+        }
 
         if (dbChars?.length) {
           const manifest: SceneManifest = {
@@ -365,6 +396,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             entityType: c.entity_type === 'object' ? 'object' : 'person',
             description: c.description ?? '',
             fixedPrompt: c.appearance ?? '',
+            viewCandidates: candidatesByCharView[c.character_id] ?? {},
           }))
           const worldAssets: WorldAsset[] = (dbLocs ?? []).map((l) => ({
             locationId: l.location_id,
@@ -405,6 +437,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           entityType: 'person' as const,
           description: c.description ?? '',
           fixedPrompt: c.fixedPrompt ?? '',
+          viewCandidates: {},
         }),
       )
       const worldAssets: WorldAsset[] = writerManifest.locations.map((loc) => {
@@ -454,6 +487,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       entityType,
       description,
       fixedPrompt: appearance,
+      viewCandidates: {},
     }
 
     set((state) => ({
@@ -851,6 +885,37 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         await get().generateWorldAsset(u.locationId, 'chat')
       }
     }
+  },
+
+  selectCandidate: async (characterId, viewKey, candidateId) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    const res = await fetch('/api/artist/select-candidate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, characterId, view: viewKey, candidateId }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      set({ error: body.error ?? `선택 교체 실패 HTTP ${res.status}` })
+      return
+    }
+    const { url } = (await res.json()) as { url: string }
+    set((state) => ({
+      characterAssets: state.characterAssets.map((a) => {
+        if (a.characterId !== characterId) return a
+        const prevCandidates = a.viewCandidates[viewKey] ?? []
+        const nextCandidates = prevCandidates.map((c) => ({
+          ...c,
+          isSelected: c.id === candidateId,
+        }))
+        return {
+          ...a,
+          views: { ...a.views, [viewKey]: url },
+          viewCandidates: { ...a.viewCandidates, [viewKey]: nextCandidates },
+        }
+      }),
+    }))
   },
 
   selectBoostPreset: (preset) =>

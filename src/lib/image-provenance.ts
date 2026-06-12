@@ -9,6 +9,15 @@
 //   지문은 정합성 신호일 뿐 보안 용도가 아니다.
 import type { CharacterViewKey } from '@/types/asset'
 
+/** character_image_candidates 행 하나 (클라 표현). */
+export interface CandidateImage {
+  id: string
+  url: string
+  sourceHash: string | null
+  isSelected: boolean
+  generatedAt: string
+}
+
 // 후보 보관 정책: 선택본은 항상 보존 + 미선택 후보는 슬롯당 최근 N장 (기간 기준 금지 — 결정 6).
 export const CANDIDATE_RETENTION = 5
 
@@ -25,6 +34,20 @@ export function viewKeyToCandidateView(view: CharacterViewKey): CandidateView {
       return 'side_left'
     case 'sideRight':
       return 'side_right'
+  }
+}
+
+/** CandidateView(snake_case DB 값) → CharacterViewKey(camelCase 클라/store 값) 역방향 매핑 */
+export function candidateViewToViewKey(v: CandidateView): CharacterViewKey {
+  switch (v) {
+    case 'main':
+      return 'main'
+    case 'back':
+      return 'back'
+    case 'side_left':
+      return 'sideLeft'
+    case 'side_right':
+      return 'sideRight'
   }
 }
 
