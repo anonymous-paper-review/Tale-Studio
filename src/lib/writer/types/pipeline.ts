@@ -166,6 +166,11 @@ export interface PipelineInput {
   presetId?: string;      // 선택적 장르 프리셋
   runtimeSeconds?: number; // 사용자 명시 러닝타임 (없으면 자동 결정)
   models?: PipelineModelsInput; // S/V/C 축별 모델 선택 (선택)
+  // producer-story-gate §3: producer가 확정한 장르(완성형)·캐스트 seed.
+  //   있으면 createRun이 state.genre/state.characters를 seed → s0(genre)/s2(characters) step이
+  //   has 체크(`!== undefined`)로 자연 생략된다. writer는 s1(structure)부터 수행.
+  genre?: Genre;
+  cast?: CastContract;
   /**
    * Stage skip 플래그. 피드백이 다운스트림에 실질 반영되지 않는 stage를
    * 건너뛰어 LLM 호출/시간을 절약한다. 미지정 시 default = skip(true).
@@ -236,6 +241,24 @@ export interface Characters {
   characters: StoryCharacter[];
   relationships: StoryRelationship[];
   subtext_notes: string[];
+}
+
+// producer → writer 핸드오프 계약 (producer-story-gate §3). characters 테이블 컬럼과 1:1.
+//   slug(character_id) 생성은 producer가 소유. writer는 이를 seed로 받아 재료로만 읽는다.
+export interface CastContractCharacter {
+  character_id: string; // producer가 확정한 slug
+  name: string;
+  entity_type: 'person' | 'object';
+  role?: string;
+  appearance: string;
+  voice?: string;
+  arc?: { start_state: string; end_state: string; arc_type: string };
+  motivation?: { want: string; need?: string; wound?: string };
+}
+export interface CastContract {
+  characters: CastContractCharacter[];
+  relationships?: StoryRelationship[];
+  subtext_notes?: string[];
 }
 
 export interface StoryScene {

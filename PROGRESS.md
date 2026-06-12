@@ -15,7 +15,7 @@
 
 | Change | 상태 | 상세 (정본) |
 |---|---|---|
-| `producer-story-gate` | `[ ]` **23건** (6섹션) | `specs/changes/producer-story-gate/tasks.md` |
+| `producer-story-gate` | **S1✓ · S2·S3 코드완료**(브라우저 검증 대기, S4 persist 선반영) — `[x]`4 `[c]`10 `[ ]`11 (총 25) | `specs/changes/producer-story-gate/tasks.md` |
 
 > ✅ **2026-06-12 archived**: `chat-context-management` (decision #56). 캐싱 + 토큰예산 윈도잉 + compaction@600K 보험,
 > 마이그레이션 0 (산출물 외부화로 "compaction 주 메커니즘" 전제 번복) → `specs/archive/2026-06-12-chat-context-management/`.

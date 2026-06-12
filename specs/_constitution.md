@@ -40,6 +40,22 @@ Story → [writer 엔진] → DB(scenes/characters/locations/shots) → [L3 Prom
 - **파괴/등록 액션은 agent 직접 실행 금지** — `requestDelete`, `requestRegister`는 user-facing 모달 (DeleteConfirmModal, 등록 폼) 트리거만. undo 미구현 상태 안전장치.
 - read-only 가이드 (Higgsfield 등 흔함) → tool-use agent는 tale-studio 차별화.
 
+## 데이터 정합: 원천/파생 (decisions #57)
+
+같은 데이터가 여러 스테이지에서 읽히고 고쳐질 때의 원칙. 데이터는 **원천**(사람이 직접 정한 값)과
+**파생**(원천을 읽어 생성된 결과물)으로 나뉘며, 파생물에는 sync가 아니라 **provenance(입력 지문)**를 설계한다.
+
+1. **빌드는 독립** — 각 스테이지의 생성물은 다른 스테이지의 생성물을 고치지 않는다.
+2. **원천은 공동 편집** — 자율 실행(파이프라인)은 빈칸만 채운다. 차 있는 칸의 덮어쓰기는 사람의 명시적 행동만.
+3. **합류는 하류** — 스테이지 간 영향은 옆(통지/sync)이 아니라 아래로만: 확정·선택된 산출물이 하류 빌드의 재료가 된다.
+4. **일관성은 순간이 아니라 수습 가능성** — 전역 불일치 상태는 정상. 파생물이 입력 지문을 알고, 낡음(stale)이
+   사용자에게 보이고, 명시적 재생성으로 수렴 가능하면 된다. **상류 변경 시 하류 자동 무효화·자동 재생성 금지**
+   (stale은 정보, 행동은 사람).
+5. **통합 경험은 에이전트** — 스테이지 연결은 데이터 계층의 자동 연쇄가 아니라, 에이전트(글로벌 채팅)가
+   낡음을 읽고 재생성을 *제안*하는 것.
+
+판별 규칙(질문 형태)은 `.claude/rules/architecture.md` §5, 게이트 질문은 `specs/_DECISION_TEMPLATE.md` §Data/State Ownership.
+
 ## 디자인 헌법 (decisions #30)
 
 5개 원칙:

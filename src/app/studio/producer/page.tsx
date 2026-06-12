@@ -5,8 +5,11 @@ import { useRouter } from 'next/navigation'
 import { ArrowRight, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ProjectDashboard } from '@/features/producer/project-dashboard'
+import { CastPanel } from '@/features/producer/cast-panel'
+import { GateStatus } from '@/features/producer/gate-status'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
+import { evaluateProducerGate } from '@/lib/producer-gate'
 
 export default function MeetingPage() {
   const router = useRouter()
@@ -20,8 +23,10 @@ export default function MeetingPage() {
   }, [projectId, loadProject])
 
   const storyReady = useProducerStore((s) => s.storyReady)
-  const hasMinSettings =
-    storyReady && (projectSettings.genre || projectSettings.toneStyle)
+  const cast = useProducerStore((s) => s.cast)
+  // 핸드오프 가부는 결정적 게이트가 판정 (architecture §3 — 채팅은 제안일 뿐).
+  const gate = evaluateProducerGate({ settings: projectSettings, storyReady, cast })
+  const canHandoff = gate.canHandoff
 
   // writer 산출물 게이트백 — 씬/샷이 없어 producer 로 되돌려진 프로젝트면 재실행 배너 노출.
   const writerNeedsRerun = useProjectStore((s) => s.writerNeedsRerun)
@@ -72,6 +77,7 @@ export default function MeetingPage() {
 
       <div className="flex flex-1 overflow-hidden">
         <ProjectDashboard />
+        <CastPanel />
       </div>
 
       {/* Error bar */}
@@ -85,27 +91,28 @@ export default function MeetingPage() {
         </button>
       )}
 
-      {/* Handoff */}
-      <div className="border-t border-border p-4">
+      {/* Handoff — 게이트 사유 + 버튼 (하드 게이트만 차단, soft는 경고) */}
+      <div className="space-y-3 border-t border-border p-4">
+        <GateStatus gate={gate} />
         <Button
           onClick={handleHandoff}
-          disabled={!hasMinSettings || syncing}
-          className={`w-full ${hasMinSettings && !syncing ? 'animate-pulse bg-success hover:bg-success/90' : ''}`}
+          disabled={!canHandoff || syncing}
+          className={`w-full ${canHandoff && !syncing ? 'animate-pulse bg-success hover:bg-success/90' : ''}`}
           size="lg"
         >
           {syncing ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              Saving…
+              저장 중…
             </>
-          ) : hasMinSettings ? (
+          ) : canHandoff ? (
             <>
-              Ready! Hand over to Concept Artist
+              Artist로 핸드오프
               <ArrowRight className="ml-2 size-4" />
             </>
           ) : (
             <>
-              Complete your story to continue
+              게이트를 충족해 주세요
               <ArrowRight className="ml-2 size-4" />
             </>
           )}

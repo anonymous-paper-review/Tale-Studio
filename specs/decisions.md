@@ -1,6 +1,6 @@
 # Decisions
 
-> 최종 수정: 2026-06-11
+> 최종 수정: 2026-06-12
 > 레거시 아카이브: `specs/archive/decisions_legacy_2026-03-03.md`
 > superseded/archive-event 결정: `specs/decisions-archive.md` (아래 인덱스 참조)
 
@@ -14,6 +14,13 @@
 > entry는 `specs/decisions-archive.md`로 분리하고, 아래 **아카이브 인덱스**에 한 줄로 남긴다(2026-06-05 정책).
 
 ## 확정
+
+### 57. 데이터 정합 원칙 — 원천/파생(provenance) 모델 채택 (cross-cutting)
+- **결정**: 다단계(stage) 공유 데이터의 정합성 원칙 확정. 데이터는 **원천**(사람이 직접 정한 값)과 **파생**(원천을 읽어 생성된 결과물)으로 나뉘며, 파생물에는 sync가 아니라 **provenance(입력 지문)**를 설계한다. 5원칙: ① **빌드는 독립** ② **원천은 공동 편집**(자율 실행=빈칸만, 덮어쓰기=사람의 명시적 행동만) ③ **합류는 하류**(스테이지 간 영향은 통지/sync가 아니라 하류 빌드의 재료로만 — writer·artist는 형제, 합류는 director) ④ **일관성 = 순간이 아니라 수습 가능성**(전역 불일치는 정상 — 파생물이 입력 지문 보유 + 낡음(stale) 표시 + 명시적 재생성으로 수렴) ⑤ **통합 경험은 에이전트**(낡음을 읽고 재생성을 *제안* — 데이터 자동 연쇄 금지).
+- **적용**: stale = 표시(정보)만, 자동 무효화/자동 재생성 금지(사람 선별 보호 + 과금). "초기생성 vs 재생성" 구분 폐기 → "빈칸 채우기(자율 가능) vs 차 있는 것 교체(사람만)". 보존 판별 = "갈아엎으면 잃는 게 있는가(사람이 선별·편집했는가)" — 비용이 아니라 복원 불가능성+선별 투자 기준. producer-story-gate의 데이터 모델 OQ 1~4를 이 원칙으로 전부 해소(상세·구현은 해당 proposal §Decisions 5~7). 이미지 후보 히스토리(#55에서 defer했던 버전 히스토리)를 동 change 범위로 승급.
+- **주의(forward)**: "장면 = 매 실행 통째 재생성" 티어 배치는 *장면에 사람 손이 안 탄* 현 구조에서만 참 — **#53 writer UI 부활로 사용자가 장면/스토리보드를 직접 편집하게 되면 장면 단위 보존 표식 재논의 필요**.
+- **하네스/원칙 격상**: `.claude/rules/architecture.md` §5(판별 규칙) + `specs/_constitution.md` §데이터 정합(5원칙 서술) + `specs/_DECISION_TEMPLATE.md` §Data/State Ownership(게이트 질문) 반영.
+- **일자**: 2026-06-12
 
 ### 56. chat-context-management archived
 - **결정**: 전역 채팅 컨텍스트 관리 구현 완료. **prompt caching(top-level `cache_control`) + 토큰예산 윈도잉(메시지 40개 + char 48K 이중 상한) + 서버사이드 compaction 안전망(@600K)**. proposal의 "compaction을 주 메커니즘 + 블록 영속화 마이그레이션" 전제는 **번복** — 스테이지 산출물은 이미 DB pull로 외부화돼 transcript 미누적(Anthropic/Manus just-in-time)이라, 윈도잉이 입력을 compaction 트리거(600K) 한참 아래로 캡한다. 채택: 외부화(기존) + 윈도잉 + compaction 보험, **마이그레이션 0**. `specs/archive/2026-06-12-chat-context-management/`로 이동.

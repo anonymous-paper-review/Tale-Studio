@@ -7,6 +7,7 @@
 // 접근은 전부 supabaseAdmin (service_role). writer_runs 는 RLS ENABLE + policy 없음 = 서버 전용.
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import type { PipelineInput } from '@/lib/writer/types/pipeline';
+import { castContractToCharacters } from '@/lib/writer/cast-contract';
 
 export type WriterRunStatus = 'running' | 'completed' | 'failed';
 
@@ -54,6 +55,9 @@ export async function createRun(
   totalUnits: number,
 ): Promise<{ id: string; state: WriterRunStateBase }> {
   const state: WriterRunStateBase = { input };
+  // producer-story-gate §3: producer 확정값 seed → s0(genre)/s2(characters) step 이 자연 생략.
+  if (input.genre) state.genre = input.genre;
+  if (input.cast) state.characters = castContractToCharacters(input.cast);
   const { data, error } = await supabaseAdmin
     .from('writer_runs')
     .insert({

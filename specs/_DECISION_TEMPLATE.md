@@ -96,6 +96,16 @@ Selected stage (관측된 근거 필수 — 성숙도는 야심이 아니라 관
 |---|---|---|---|
 | <state name> | <table/file/store> | <who can mutate> | <who consumes> |
 
+원천/파생 판별 (decisions #57, 규칙 상세 `.claude/rules/architecture.md` §5) — 상태마다 답한다:
+
+| Question | Answer |
+|---|---|
+| 이 상태는 **원천**(사람이 직접 정함)인가 **파생**(무언가를 읽어 생성됨)인가? | <source/derived + 무엇으로부터> |
+| 파생이면: 입력 지문(provenance)은 어디에 기록되고, 낡음(stale)은 사용자에게 어떻게 보이는가? | <yes/no + 위치> |
+| 파생이면: 상류 변경 시 자동 무효화/자동 재생성을 하고 있지 않은가? (금지 — stale은 표시만) | <yes/no> |
+| Writers에 자율 실행(빈칸만 채움)과 사용자 주도(덮어쓰기 가능)가 섞여 있다면, 쓰기 모드가 구분되는가? | <yes/no + 근거> |
+| 갈아엎으면 잃는 게 있는가(사람이 그 결과물을 선별·편집했는가)? 없으면 통째 재생성으로 충분하지 않은가? | <yes/no + 근거> |
+
 ### Non-goals
 
 이번 결정에서 하지 않는 것을 명시한다.

@@ -60,9 +60,9 @@ export async function persistAssetsToDb(
 ): Promise<void> {
   if (!UUID_RE.test(projectId)) return // 핸드오프 외 run — DB project 없음
 
-  // 자신이 채우는 테이블만 정리 (characters/locations/scenes). shots 는 Tier 2 가 관리.
+  // locations/scenes 는 writer 출력 → 매 실행 재생성(delete-then-insert).
+  //   characters 는 입력(producer-story-gate §4) → 삭제하지 않고 additive 로만 보강(아래).
   await Promise.all([
-    supabaseAdmin.from('characters').delete().eq('project_id', projectId),
     supabaseAdmin.from('locations').delete().eq('project_id', projectId),
     supabaseAdmin.from('scenes').delete().eq('project_id', projectId),
   ])
@@ -108,21 +108,55 @@ export async function persistAssetsToDb(
     )
   }
 
-  // characters (마지막 — loadData 게이트 `dbChars?.length` 를 만족시키는 신호)
+  // characters: additive (producer-story-gate §4 — 인물=입력). 기존 행(producer·writer-origin)은
+  //   보존하고, 새 slug 만 origin='writer' 로 insert + 기존 행은 비어 있는 보강 필드만 채운다.
+  //   producer 가 확정한 정체성(name/role/voice/arc/motivation/이미지)은 절대 덮어쓰지 않는다.
   const costumes = productionDesign.costumes ?? {}
   if (characters.characters.length) {
-    await supabaseAdmin.from('characters').insert(
-      characters.characters.map((c) => ({
-        project_id: projectId,
-        character_id: c.id,
-        name: c.name,
-        role: normRole(c.role),
-        appearance: c.appearance_description ?? '',
-        // 레거시 description 도 채워 기존 소비측(c.description) 무변경 유지. fixed_prompt 는 제거(드롭).
-        description: c.appearance_description ?? '',
-        costume: costumes[c.id] ?? null,
-      })),
+    const { data: existingRows } = await supabaseAdmin
+      .from('characters')
+      .select('character_id, appearance, costume')
+      .eq('project_id', projectId)
+    const existing = new Map(
+      (existingRows ?? []).map((r) => [r.character_id as string, r]),
     )
+
+    const toInsert: Record<string, unknown>[] = []
+    for (const c of characters.characters) {
+      const prev = existing.get(c.id)
+      if (!prev) {
+        // 새 인물 (writer 가 전개상 추가) — 최소 필드 insert.
+        toInsert.push({
+          project_id: projectId,
+          character_id: c.id,
+          name: c.name,
+          role: normRole(c.role),
+          entity_type: 'person',
+          appearance: c.appearance_description ?? '',
+          description: c.appearance_description ?? '',
+          costume: costumes[c.id] ?? null,
+          origin: 'writer',
+        })
+        continue
+      }
+      // 기존 행: 빈 보강 필드만 채움 (덮어쓰기 금지).
+      const patch: Record<string, unknown> = {}
+      if (!prev.appearance && c.appearance_description) {
+        patch.appearance = c.appearance_description
+        patch.description = c.appearance_description
+      }
+      if (prev.costume == null && costumes[c.id]) patch.costume = costumes[c.id]
+      if (Object.keys(patch).length) {
+        await supabaseAdmin
+          .from('characters')
+          .update(patch)
+          .eq('project_id', projectId)
+          .eq('character_id', c.id)
+      }
+    }
+    if (toInsert.length) {
+      await supabaseAdmin.from('characters').insert(toInsert)
+    }
   }
 }
 
