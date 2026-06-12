@@ -26,14 +26,14 @@ step 키는 film-craft 명, **파일명은 옛 순번 prefix 유지** (리네임
 - **검증 (C, Claude)**: `c_validation_1`(storyCheck) / `c_application_2` — skip 플래그로 생략 가능 (비용 절감)
 - **Visual축 (V, Gemini)**: `mid_preview` → `l0_l1_visual`(renderFormat/artDirection) → `l2_design`(productionDesign) → `l3_scene_plan`(sceneCinematography — Compact Mode 시 생략)
 - **샷/렌더**: `decoupage` → `l4_shots`(shotDesign/shotSequence) → `l5_prompts`(renderPrompts) → `l6_images` → `l7_videos`
-- **에셋**: `assets_generate` — 캐릭터/로케이션 이미지 fal submit (완료는 webhook이 DB 기록, state엔 submitted 플래그만)
+- **에셋 이미지**: ~~`assetImages` step~~ **제거됨** (producer-story-gate 결정 8) — 캐릭터/로케이션 이미지 초기 생성은 **artist 전담**(artist 진입 시 `autoGenerateBaseImages` 자동 1회·멱등). writer 파이프라인은 행(characters/locations/scenes)만 채운다. `assets_generate.ts` 자체는 잔존(수동 라우트 `/api/writer/generate/assets`용)이나 파이프라인에선 미호출.
 
 ## 하위 모듈
 
 | 폴더 | 내용 |
 |---|---|
 | `llm/` | `dispatch.ts` (S/V/C 축별 프로바이더 라우팅), `fal.ts` (이미지/비디오 submit/fetch), `retry.ts` (`withLlmRetry`), `json_repair.ts`, `raw_collector.ts`, 프로바이더별 어댑터 (claude/gemini/openai/local) |
-| `pipeline/util/` | `persist_manifest.ts` (DB 기록), `persist_design_tokens.ts`, `submit_asset_images.ts`, `asset_refs.ts`, `infer_l3.ts` |
+| `pipeline/util/` | `persist_manifest.ts` (DB 행 기록 — 이미지 컬럼은 안 건드림), `persist_design_tokens.ts`, `asset_refs.ts`, `infer_l3.ts` |
 | `pipeline/validators/` | stage 산출물 검증 |
 | `types/` | `pipeline.ts` — stage 입출력 타입 |
 | `logger/` | 프로젝트별 실행 로그 (raw LLM 호출 포함, 순번 prefix JSON) |
