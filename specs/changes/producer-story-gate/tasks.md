@@ -13,7 +13,7 @@
 - [x] `depthLevelFromRuntime(seconds)` 순수 함수 — `src/lib/depth.ts` (s0 매핑표 코드화) + `tests/depth.test.ts` 통과. 소비처(게이트/Compact/genre seed) 연결은 Section 2~3에서.
 - [x] characters 마이그레이션 — `017` 적용·검증: entity_type/origin/voice/arc/motivation 추가 + `locked` 제거 + UNIQUE(project_id, character_id) ✓ (캐시 refresh ✓)
 - [x] `character_relationships` / `subtext_notes` 신규 테이블 — `018` 적용·검증 (복합 FK cascade, 캐시에 노출) ✓
-- [c] 이미지 provenance + 후보 히스토리 — `019_character_image_provenance.sql` 작성 완료. **PROVISIONAL — 미적용, Section 5 진입 직전 적용 권장**
+- [x] 이미지 provenance + 후보 히스토리 — `019_character_image_provenance.sql` **적용·검증 완료** (2026-06-12, Section 5 진입 시점): `character_image_candidates` 테이블 10컬럼 생성 + 기존 view_* URL 78행 backfill(전부 is_selected) + 캐시 refresh ✓. 슬롯당 선택본 1개 partial-unique 인덱스 적용
 
 ### Section 2: Producer 게이트 (UI + 추출) — 캐스트 카드까지
 
