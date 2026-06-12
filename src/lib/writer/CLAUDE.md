@@ -4,6 +4,10 @@
 > 부활 (2026-06-12, `rough-storyboard.ts` + `/api/writer/rough-storyboard`).
 > producer 핸드오프(`/api/writer/start`)에서 백그라운드 실행되어
 > DB(characters/scenes/locations/shots)를 채운다. 비동기/재시도/체이닝 규칙은 `.claude/rules/async-generation.md`.
+>
+> **역할 분담 (producer-story-gate, 2026-06-12)**: 옛 `s0`(장르축)·`s2`(캐릭터 정의)는
+> **producer가 게이트로 확정**해 seed로 넘기므로 writer에서 **생략**된다(`has` 체크).
+> 분담 = **producer(스토리 정체성: 장르축+캐스트) → writer(전개: s1 구조·s3 씬 + 연출: l0~l5) → 러프 보드**.
 
 ## 실행 모드 2개 (혼동 주의)
 
@@ -16,7 +20,7 @@
 
 step 키는 film-craft 명, **파일명은 옛 순번 prefix 유지** (리네임 미적용 — 키↔파일 매핑 주의):
 
-- **Story축 (S, Gemini)**: `s0_genre`(genre) → `s1_structure`(narrativeStructure) → `s2_characters`(characters) → `s3_scenes`(scenes)
+- **Story축 (S, Gemini)**: `s0_genre`(genre)·`s2_characters`(characters)는 **producer seed 시 생략**(producer-story-gate §3 — `has` 체크. Section 4에서 파일 삭제 예정) → `s1_structure`(narrativeStructure) → `s3_scenes`(scenes — 오픈 캐스트 프롬프트 계약은 Section 4 예정)
 - **검증 (C, Claude)**: `c_validation_1`(storyCheck) / `c_application_2` — skip 플래그로 생략 가능 (비용 절감)
 - **Visual축 (V, Gemini)**: `mid_preview` → `l0_l1_visual`(renderFormat/artDirection) → `l2_design`(productionDesign) → `l3_scene_plan`(sceneCinematography — Compact Mode 시 생략)
 - **샷/렌더**: `decoupage` → `l4_shots`(shotDesign/shotSequence) → `l5_prompts`(renderPrompts) → `l6_images` → `l7_videos`
@@ -37,5 +41,6 @@ step 키는 film-craft 명, **파일명은 옛 순번 prefix 유지** (리네임
 
 - step 산출물은 **state 또는 DB에만** — 서버리스 인스턴스 로컬에 남기지 않는다.
 - 새 stage 추가 시: steps.ts step 정의(`key`/`has`/runner) + index.ts 로컬 경로 + validators 동시 갱신.
+- **characters = 입력**(producer-story-gate §4): 재실행해도 기존 행 보존(additive) — 새 slug만 `origin='writer'` insert + 빈 보강 필드만 채움. scenes/locations = 출력(매 실행 재생성). 이미지는 writer 손 밖(artist 전담, forward).
 - Compact Mode (genre.depth_level 기반)가 후행 stage를 생략할 수 있음 — `has` 체크가 빈 산출물(`[]`)도 통과시키는지 확인.
 - 모델 ID는 dispatch.ts/fal.ts에서만 — stage 코드에 하드코딩 금지.

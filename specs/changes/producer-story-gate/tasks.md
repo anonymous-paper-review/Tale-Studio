@@ -63,7 +63,7 @@
 - [ ] object(반지) — 등록→artist 단일 이미지→등장 샷 renderPrompts ref 주입
 - [ ] additive 재실행 — 인물·이미지 확정 후 줄거리만 수정·재실행 → 기존 인물 정의·이미지 보존 + 장면만 갱신 + new_characters 노출
 - [ ] stale 배지 + 히스토리 — 이미지 생성 후 외모 수정 → 배지(자동 재생성 없음) / 생성 중 수정 → 늦은 착지에 즉시 배지 / 재생성 → 후보 추가·선택본 유지
-- [ ] `src/lib/writer/CLAUDE.md` 스테이지 맵 갱신 (s0/s2 제거 + 이미지 생성 artist 이전 — 하네스 정합)
+- [c] 하네스 정합 1차 — `CLAUDE.md`(루트)·`src/app/studio/CLAUDE.md`·`src/lib/writer/CLAUDE.md`에 producer-story-gate 분담(정체성=producer / 전개+연출=writer) + s0/s2 seed-생략 반영(writer-탭 부활과 공존 머지). **남은 것**: Section 4에서 s0/s2 실제 삭제 후 "생략 예정"→"삭제됨" 확정 + 이미지 생성 artist 이전 반영
 
 ## Blocked
 - (없음)

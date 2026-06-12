@@ -16,6 +16,9 @@
 > (`/api/writer/start`)에서 백그라운드 실행해 DB(characters/scenes/locations/shots)를 채우고,
 > 탭은 완료 후 러프 스토리보드(`shots.rough_storyboard`, 목각 인형 previz) 검토 단계.
 > producer → **writer** → artist.
+>
+> **producer-story-gate (2026-06-12)**: producer가 **장르축(s0)+캐스트(s2)를 게이트로 확정**해
+> seed로 넘기므로 writer는 s0/s2를 생략한다. 분담 = producer(정체성) → writer(전개+연출).
 
 ## Studio shell layout
 
@@ -66,7 +69,7 @@ canNavigateTo: (stage) => {
 ## Stage 전환 패턴
 
 - Sidebar 클릭 → URL push (`/studio/<stage>`) → useEffect가 `setStage` 호출
-- Stage handoff (producer → writer): producer CTA → `setStage('writer')` + `/api/writer/start` 백그라운드 발사 → writer 탭이 진행/러프 보드 표시
+- Stage handoff (producer → writer): producer CTA → `setStage('writer')` + `/api/writer/start` 백그라운드 발사 → writer 탭이 진행/러프 보드 표시. 핸드오프 body에 **genre 완성형 + cast 계약** 동봉(producer-story-gate), 하드 게이트 미충족 시 차단
 - **Stage 별 store는 자기 영역만** — cross-store import 금지 (project-store 외, decisions/stores 룰)
 
 ## 새 Stage 페이지 작업 시
