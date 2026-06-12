@@ -284,9 +284,21 @@ export interface StoryScene {
   scene_actions: string[]; // 씬에서 일어나는 주요 액션들 (분할 전)
 }
 
+// 오픈 캐스트 (producer-story-gate §4): s3_scenes 가 전개상 새 인물이 필요할 때만 분리 반환.
+//   파이프라인이 state.characters 에 머지(origin='writer')하고 persistAssetsToDb 가 새 slug 만 insert.
+//   최소 필드 — 나머지는 mergeOpenCast 가 StoryCharacter 기본값으로 채운다.
+export interface NewCharacter {
+  id: string; // 새 slug (snake_case, 기존 캐스트와 중복 금지)
+  name: string;
+  role?: string; // "protagonist" | "antagonist" | "supporting"
+  appearance_description?: string;
+}
+
 export interface Scenes {
   scenes: StoryScene[];
   total_estimated_seconds: number;
+  // 전개상 추가된 새 인물 (기존 캐스트로 충분하면 [] 또는 미반환). §4 오픈 캐스트.
+  new_characters?: NewCharacter[];
 }
 
 // =====================================================================

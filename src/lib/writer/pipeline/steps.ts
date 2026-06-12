@@ -8,10 +8,8 @@
 //
 // runPipeline(로컬, 파일 캐시 resume)과 별개 경로 — 그쪽 로직은 건드리지 않는다.
 import { PipelineLogger } from '@/lib/writer/logger';
-import { runGenre } from '@/lib/writer/pipeline/stages/s0_genre';
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure';
-import { runCharacters } from '@/lib/writer/pipeline/stages/s2_characters';
-import { runScenes } from '@/lib/writer/pipeline/stages/s3_scenes';
+import { runScenes, mergeOpenCast } from '@/lib/writer/pipeline/stages/s3_scenes';
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
 import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview';
 import { runRenderFormatArtDirection } from '@/lib/writer/pipeline/stages/l0_l1_visual';
@@ -111,17 +109,10 @@ interface WriterStep {
 //   has  = 해당 산출물이 state 에 이미 있는가
 //   run  = state 입력으로 한 stage 실행 → patch 반환
 // =====================================================================
+// producer-story-gate §4: s0(genre)·s2(characters) 스테이지 삭제. producer 게이트가 확정해
+//   createRun 이 state.genre/state.characters 로 seed 하므로 writer 는 s1(structure)부터 수행한다.
+//   (genre seed 가 없으면 narrativeStructure 의 s.genre! 에서 명시적으로 실패 — 핸드오프는 항상 seed.)
 export const WRITER_STEPS: WriterStep[] = [
-  {
-    key: 'genre',
-    has: (s) => s.genre !== undefined,
-    run: async (s, { logger }) => {
-      const models = resolveModels(s.input);
-      const genre = await runGenre(s.input, logger, models.S);
-      await logger.flushRawLlm('genre');
-      return { genre };
-    },
-  },
   {
     key: 'narrativeStructure',
     has: (s) => s.narrativeStructure !== undefined,
@@ -133,23 +124,16 @@ export const WRITER_STEPS: WriterStep[] = [
     },
   },
   {
-    key: 'characters',
-    has: (s) => s.characters !== undefined,
-    run: async (s, { logger }) => {
-      const models = resolveModels(s.input);
-      const characters = await runCharacters(s.input, s.genre!, s.narrativeStructure!, logger, models.S);
-      await logger.flushRawLlm('characters');
-      return { characters };
-    },
-  },
-  {
     key: 'scenes',
     has: (s) => s.scenes !== undefined,
     run: async (s, { logger }) => {
       const models = resolveModels(s.input);
       const scenes = await runScenes(s.input, s.genre!, s.narrativeStructure!, s.characters!, logger, models.S);
       await logger.flushRawLlm('scenes');
-      return { scenes };
+      // 오픈 캐스트(§4): 전개상 추가된 new_characters 를 state.characters 에 머지 →
+      //   하류 stage 가 새 인물을 재료로 보고, persistAssetsToDb 가 origin='writer' 로 insert.
+      const characters = mergeOpenCast(s.characters!, scenes);
+      return characters === s.characters ? { scenes } : { scenes, characters };
     },
   },
   {

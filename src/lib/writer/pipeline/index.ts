@@ -1,10 +1,9 @@
 // 파이프라인 오케스트레이터: 스토리 → 샷 시퀀스 JSON
 // resumeProjectId 전달 시 기존 stage 결과 로드해 중단 지점부터 재개
 import { PipelineLogger, makeProjectId } from '@/lib/writer/logger';
-import { runGenre } from '@/lib/writer/pipeline/stages/s0_genre';
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure';
-import { runCharacters } from '@/lib/writer/pipeline/stages/s2_characters';
-import { runScenes } from '@/lib/writer/pipeline/stages/s3_scenes';
+import { runScenes, mergeOpenCast } from '@/lib/writer/pipeline/stages/s3_scenes';
+import { castContractToCharacters } from '@/lib/writer/cast-contract';
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
 import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview';
 import { runRenderFormatArtDirection } from '@/lib/writer/pipeline/stages/l0_l1_visual';
@@ -184,10 +183,22 @@ async function _runPipelineInner(
 ): Promise<PipelineResult> {
 
   // ===== Story 축 =====
-  const genre = (await loadOrRun<Genre>(resume, '02_genre.json', () => runGenre(input, logger, models.S), 'genre', logger)).value;
+  // producer-story-gate §4: s0(genre)·s2(characters)는 producer 게이트가 확정한 seed(input.genre/cast)로
+  //   대체된다 — writer 는 더 이상 LLM 으로 장르/캐스트를 만들지 않는다. 로컬 runPipeline 도 seed 를 받는다.
+  if (!input.genre) {
+    throw new Error('runPipeline: input.genre seed required (producer-story-gate: s0_genre removed)');
+  }
+  const genre: Genre = input.genre;
+  await logger.markStage('genre', 'completed', { seeded: true });
+  let characters: Characters = input.cast
+    ? castContractToCharacters(input.cast)
+    : { characters: [], relationships: [], subtext_notes: [] };
+  await logger.markStage('characters', 'completed', { seeded: true, count: characters.characters.length });
+
   const narrativeStructure = (await loadOrRun<NarrativeStructure>(resume, '03_narrativeStructure.json', () => runNarrativeStructure(input, genre, logger, models.S), 'narrativeStructure', logger)).value;
-  const characters = (await loadOrRun<Characters>(resume, '04_characters.json', () => runCharacters(input, genre, narrativeStructure, logger, models.S), 'characters', logger)).value;
   const scenes = (await loadOrRun<Scenes>(resume, '05_scenes.json', () => runScenes(input, genre, narrativeStructure, characters, logger, models.S), 'scenes', logger)).value;
+  // 오픈 캐스트(§4): 전개상 추가된 new_characters 를 머지 → 하류 stage 와 persistAssetsToDb(origin='writer' insert)가 본다.
+  characters = mergeOpenCast(characters, scenes);
 
   const skip = resolveSkip(input);
 
