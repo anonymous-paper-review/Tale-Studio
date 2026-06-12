@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useArtistStore, type CharacterRole } from '@/stores/artist-store'
+import { cn } from '@/lib/utils'
 
 const ROLE_OPTIONS: { value: CharacterRole; label: string }[] = [
   { value: 'protagonist', label: 'Protagonist (주인공)' },
@@ -58,6 +59,7 @@ export function AddCharacterDialog() {
   const addCharacter = useArtistStore((s) => s.addCharacter)
 
   const [open, setOpen] = useState(false)
+  const [entityType, setEntityType] = useState<'person' | 'object'>('person')
   const [name, setName] = useState('')
   const [role, setRole] = useState<CharacterRole>('supporting')
   const [description, setDescription] = useState('')
@@ -65,6 +67,7 @@ export function AddCharacterDialog() {
   const [submitting, setSubmitting] = useState(false)
 
   const reset = () => {
+    setEntityType('person')
     setName('')
     setRole('supporting')
     setDescription('')
@@ -76,7 +79,13 @@ export function AddCharacterDialog() {
   const handleSubmit = async () => {
     if (!canSubmit) return
     setSubmitting(true)
-    await addCharacter({ name, role, description, appearance })
+    await addCharacter({
+      name,
+      role: entityType === 'object' ? 'supporting' : role,
+      entityType,
+      description,
+      appearance,
+    })
     setSubmitting(false)
     reset()
     setOpen(false)
@@ -104,16 +113,37 @@ export function AddCharacterDialog() {
           <DialogTitle>새 캐릭터 추가</DialogTitle>
           <DialogDescription>
             이름과 설정을 입력하면 카드가 생성됩니다. 이미지는 카드의
-            “Generate All Views”로 만드세요.
+            &quot;Generate All Views&quot;로 만드세요.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-1">
+          {/* 인물/사물 토글 */}
+          <Field label="유형">
+            <div className="flex gap-2">
+              {(['person', 'object'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setEntityType(t)}
+                  className={cn(
+                    'flex-1 rounded-md border px-3 py-1.5 text-sm transition-colors',
+                    entityType === t
+                      ? 'border-primary bg-accent text-foreground'
+                      : 'border-border text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {t === 'person' ? '인물' : '사물'}
+                </button>
+              ))}
+            </div>
+          </Field>
+
           <Field label="이름">
             <Input
               autoFocus
               value={name}
-              placeholder="예: Kai"
+              placeholder={entityType === 'object' ? '예: 마법 검' : '예: Kai'}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSubmit()
@@ -121,28 +151,35 @@ export function AddCharacterDialog() {
             />
           </Field>
 
-          <Field label="역할">
-            <Select
-              value={role}
-              onValueChange={(v) => setRole(v as CharacterRole)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ROLE_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          {/* object 는 role 필드 숨김 */}
+          {entityType === 'person' && (
+            <Field label="역할">
+              <Select
+                value={role}
+                onValueChange={(v) => setRole(v as CharacterRole)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
 
           <Field label="설정 / 배경" hint="카드 hover 정보에 표시됩니다.">
             <Textarea
               value={description}
-              placeholder="캐릭터의 성격·역할·서사적 배경"
+              placeholder={
+                entityType === 'object'
+                  ? '사물의 특성·용도·서사적 의미'
+                  : '캐릭터의 성격·역할·서사적 배경'
+              }
               rows={2}
               onChange={(e) => setDescription(e.target.value)}
             />
@@ -154,7 +191,11 @@ export function AddCharacterDialog() {
           >
             <Textarea
               value={appearance}
-              placeholder="예: 갈색 머리, 검은 롱코트, 날카로운 눈매"
+              placeholder={
+                entityType === 'object'
+                  ? '예: 고대 룬 문자가 새겨진 은빛 검, 빛나는 칼날'
+                  : '예: 갈색 머리, 검은 롱코트, 날카로운 눈매'
+              }
               rows={2}
               onChange={(e) => setAppearance(e.target.value)}
             />

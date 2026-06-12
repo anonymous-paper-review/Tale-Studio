@@ -17,6 +17,7 @@ export type CharacterRole = 'protagonist' | 'antagonist' | 'supporting'
 export interface NewCharacterInput {
   name: string
   role?: CharacterRole
+  entityType?: 'person' | 'object'
   /** 설정/배경 메모 — 카드 hover + asset-storage description 으로 전파 */
   description?: string
   /** 외형 prose — 이미지 생성 프롬프트(fixedPrompt/appearance)로 사용 */
@@ -361,6 +362,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               sideLeft: c.view_side_left ?? null,
               sideRight: c.view_side_right ?? null,
             },
+            entityType: c.entity_type === 'object' ? 'object' : 'person',
             description: c.description ?? '',
             fixedPrompt: c.appearance ?? '',
           }))
@@ -400,6 +402,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             sideLeft: null,
             sideRight: null,
           },
+          entityType: 'person' as const,
           description: c.description ?? '',
           fixedPrompt: c.fixedPrompt ?? '',
         }),
@@ -439,6 +442,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const name = input.name.trim()
     if (!name) return ''
     const role: CharacterRole = input.role ?? 'supporting'
+    const entityType: 'person' | 'object' = input.entityType === 'object' ? 'object' : 'person'
     const description = input.description?.trim() ?? ''
     const appearance = input.appearance?.trim() ?? ''
     const characterId = makeCharacterId(name)
@@ -447,6 +451,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       characterId,
       name,
       views: { main: null, back: null, sideLeft: null, sideRight: null },
+      entityType,
       description,
       fixedPrompt: appearance,
     }
@@ -484,6 +489,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             characterId,
             name,
             role,
+            entity_type: entityType,
             description,
             appearance,
           }),
@@ -565,8 +571,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
   // main → 4방향 순서 생성. 방향 i2i 는 main 이 DB 에 있어야 하므로 main 을 먼저 await 한 뒤
   // 4방향을 제한된 풀로 병렬 생성. 카드 "Generate All Views" / 시트 재생성용.
+  // object 캐릭터는 main 만 생성 — 방향뷰 불필요.
   generateCharacterAllViews: async (characterId, actor = 'ui') => {
     await get().generateCharacterView(characterId, 'main', actor)
+    const char = get().characterAssets.find((c) => c.characterId === characterId)
+    if (char?.entityType === 'object') return
     await runPool(
       CHARACTER_DIRECTIONAL_VIEWS.map(
         (v) => () => get().generateCharacterView(characterId, v, actor),
@@ -744,6 +753,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const skipped: string[] = []
     for (const c of characterAssets) {
       if (c.views.main != null) skipped.push(`char ${c.characterId}:main`)
+      // object 캐릭터는 방향뷰 불필요 — Phase 2 directional 루프 skip
+      if (c.entityType === 'object') {
+        skipped.push(`char ${c.characterId}:directional (object — skip)`)
+        continue
+      }
       for (const v of CHARACTER_DIRECTIONAL_VIEWS) {
         if (c.views[v] == null) {
           queuedRest.push(`char ${c.characterId}:${v}`)

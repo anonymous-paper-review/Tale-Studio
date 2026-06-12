@@ -36,7 +36,9 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
 
   const imageUrl = char.views[view] ?? null
   const label = CHARACTER_VIEW_LABELS[view]
-  const isDirectional = view !== 'main'
+  const isObject = char.entityType === 'object'
+  // object 캐릭터는 방향뷰 개념 없음 — isDirectional/needsMain 로직 미적용
+  const isDirectional = !isObject && view !== 'main'
   const needsMain = isDirectional && !char.views.main
 
   return (
@@ -59,11 +61,15 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            {view === 'main'
-              ? 'Main 은 대표 포트레이트입니다. 재생성하면 새 이미지를 만듭니다.'
-              : needsMain
-                ? '방향 뷰는 Main 을 기준으로 생성됩니다. 먼저 Main 을 생성하세요.'
-                : '이 뷰는 Main 이미지를 기준으로 재생성됩니다.'}
+            {isObject
+              ? imageUrl
+                ? '재생성하면 새 이미지를 만듭니다.'
+                : '이미지를 생성합니다.'
+              : view === 'main'
+                ? 'Main 은 대표 포트레이트입니다. 재생성하면 새 이미지를 만듭니다.'
+                : needsMain
+                  ? '방향 뷰는 Main 을 기준으로 생성됩니다. 먼저 Main 을 생성하세요.'
+                  : '이 뷰는 Main 이미지를 기준으로 재생성됩니다.'}
           </p>
 
           <Button

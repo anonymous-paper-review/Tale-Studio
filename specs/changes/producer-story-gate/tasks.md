@@ -52,7 +52,7 @@
 - [ ] **stale 배지** (#57) — 상류(외모 등 이미지 입력) 변경 시 파생 이미지 낡음 표시. 자동 무효화·자동 재생성 금지(배지=정보, 행동=명시적)
 - [ ] **후보 히스토리 UI** (#57) — 재생성=후보 추가(선택 자동 교체 없음), 선택본 교체 UI, 보관 정책(선택본 보존 + 미선택 최근 N장) 적용
 - [ ] **webhook 착지 검증** (#57) — submit 시 `input_snapshot.source_hash` 동봉 → 착지 시 현재 행과 비교, 불일치면 착지+즉시 stale 배지(폐기 안 함)
-- [ ] entity_type='object' 카드 — 턴어라운드 UI 미노출, 단일 이미지 생성/교체 + 탭 내 구분 표시
+- [c] entity_type='object' 카드 — artist 전역 entity_type 분기 추가(기존 0건): CharacterAsset.entityType + artist-store hydrate/addCharacter + `/api/artist/character` insert. object는 **단일 main 이미지**(방향뷰 미생성 — `generateCharacterAllViews`·`autoGenerateBaseImages` Phase2 skip), character-panel 단일 셀 + "사물" 배지, add-dialog 인물/사물 토글(object는 role 숨김·supporting 고정), view-dialog 방향뷰 미적용. tsc clean. **브라우저 검증 대기**(Section 6 반지).
 - [ ] writer 완료 전 카드 노출 동작 점검 — enteredProjects 진입 게이트·완료 알림 상호작용
 
 ### Section 6: 검증 (브라우저)

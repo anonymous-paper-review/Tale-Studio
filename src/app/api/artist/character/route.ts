@@ -7,6 +7,7 @@ import { getUser } from '@/lib/supabase/auth'
 export const runtime = 'nodejs'
 
 const VALID_ROLES = new Set(['protagonist', 'antagonist', 'supporting'])
+const VALID_ENTITY_TYPES = new Set(['person', 'object'])
 
 export async function POST(req: Request) {
   try {
@@ -20,6 +21,7 @@ export async function POST(req: Request) {
       characterId,
       name,
       role,
+      entity_type,
       description,
       appearance,
     } = (await req.json()) as {
@@ -27,6 +29,7 @@ export async function POST(req: Request) {
       characterId?: string
       name?: string
       role?: string
+      entity_type?: string
       description?: string
       appearance?: string
     }
@@ -39,6 +42,8 @@ export async function POST(req: Request) {
     }
 
     const safeRole = role && VALID_ROLES.has(role) ? role : 'supporting'
+    const safeEntityType =
+      entity_type && VALID_ENTITY_TYPES.has(entity_type) ? entity_type : 'person'
 
     const { data, error } = await supabaseAdmin
       .from('characters')
@@ -47,6 +52,7 @@ export async function POST(req: Request) {
         character_id: characterId,
         name: name.trim(),
         role: safeRole,
+        entity_type: safeEntityType,
         description: description?.trim() || null,
         appearance: appearance?.trim() || null,
       })

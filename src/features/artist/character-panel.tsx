@@ -74,7 +74,8 @@ export function CharacterPanel() {
             generatingViews.includes(`${char.characterId}:${v}`)
           const isRegistered = registeredIds.has(char.characterId)
           const isSaved = savedIds.has(char.characterId)
-          const hasImage = CHARACTER_VIEW_KEYS.some((v) => char.views[v])
+          const isObject = char.entityType === 'object'
+          const hasImage = isObject ? Boolean(char.views.main) : CHARACTER_VIEW_KEYS.some((v) => char.views[v])
           const hasMainImage = Boolean(char.views.main)
           const bgScenes = getBackgroundScenes(char.characterId)
 
@@ -144,54 +145,93 @@ export function CharacterPanel() {
                   : 'border-border hover:bg-accent/50',
               )}
             >
-              {/* Header: Name + Role */}
+              {/* Header: Name + Role + entity 배지 */}
               <div className="mb-3 flex items-center gap-2">
                 <span className="font-medium">{char.name}</span>
-                <Badge variant={ROLE_VARIANT[role]}>{role}</Badge>
-              </div>
-
-              {/* main(정면 대표) + 3방향 뷰를 동일 크기로 병렬 표시 (front 통합·hero 폐기, 2026-06-05).
-                  셀 클릭 → 상세/재생성 Dialog. 각 이미지에 개별 Tooltip 부착 → 호버한 "그 이미지"의
-                  좌/우(side="right" + avoidCollisions 기본)로 떠서 화면 밖으로 나가면 자동으로 반대편(left)으로
-                  뒤집힘. collisionPadding 으로 뷰포트 가장자리 여백 확보 (이전: 그리드 전체를 한 트리거로 잡아
-                  맨 왼/오른쪽에만 떠서 화면 밖 이탈). */}
-              <div className="grid grid-cols-4 gap-2">
-                {(['main', 'back', 'sideLeft', 'sideRight'] as const).map(
-                  (view) => (
-                    <Tooltip key={view}>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setViewDialog({ charId: char.characterId, view })
-                          }}
-                          className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          <ImagePlaceholder
-                            label={CHARACTER_VIEW_LABELS[view]}
-                            aspectRatio="square"
-                            imageUrl={char.views[view] ?? null}
-                            generating={isViewGenerating(view)}
-                            generatingStartedAt={
-                              generatingStartedAt[`${char.characterId}:${view}`]
-                            }
-                          />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="right"
-                        align="center"
-                        sideOffset={8}
-                        collisionPadding={12}
-                        className="max-w-[260px] space-y-1.5 whitespace-normal text-left"
-                      >
-                        {charTooltipBody}
-                      </TooltipContent>
-                    </Tooltip>
-                  ),
+                {isObject ? (
+                  <Badge variant="secondary">사물</Badge>
+                ) : (
+                  <Badge variant={ROLE_VARIANT[role]}>{role}</Badge>
                 )}
               </div>
+
+              {/* object: 단일 main 이미지 셀 / person: 기존 4뷰 그리드 */}
+              {isObject ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setViewDialog({ charId: char.characterId, view: 'main' })
+                      }}
+                      className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <ImagePlaceholder
+                        label={CHARACTER_VIEW_LABELS['main']}
+                        aspectRatio="square"
+                        imageUrl={char.views.main ?? null}
+                        generating={isViewGenerating('main')}
+                        generatingStartedAt={
+                          generatingStartedAt[`${char.characterId}:main`]
+                        }
+                      />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="right"
+                    align="center"
+                    sideOffset={8}
+                    collisionPadding={12}
+                    className="max-w-[260px] space-y-1.5 whitespace-normal text-left"
+                  >
+                    {charTooltipBody}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                /* main(정면 대표) + 3방향 뷰를 동일 크기로 병렬 표시 (front 통합·hero 폐기, 2026-06-05).
+                   셀 클릭 → 상세/재생성 Dialog. 각 이미지에 개별 Tooltip 부착 → 호버한 "그 이미지"의
+                   좌/우(side="right" + avoidCollisions 기본)로 떠서 화면 밖으로 나가면 자동으로 반대편(left)으로
+                   뒤집힘. collisionPadding 으로 뷰포트 가장자리 여백 확보 (이전: 그리드 전체를 한 트리거로 잡아
+                   맨 왼/오른쪽에만 떠서 화면 밖 이탈). */
+                <div className="grid grid-cols-4 gap-2">
+                  {(['main', 'back', 'sideLeft', 'sideRight'] as const).map(
+                    (view) => (
+                      <Tooltip key={view}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setViewDialog({ charId: char.characterId, view })
+                            }}
+                            className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <ImagePlaceholder
+                              label={CHARACTER_VIEW_LABELS[view]}
+                              aspectRatio="square"
+                              imageUrl={char.views[view] ?? null}
+                              generating={isViewGenerating(view)}
+                              generatingStartedAt={
+                                generatingStartedAt[`${char.characterId}:${view}`]
+                              }
+                            />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="right"
+                          align="center"
+                          sideOffset={8}
+                          collisionPadding={12}
+                          className="max-w-[260px] space-y-1.5 whitespace-normal text-left"
+                        >
+                          {charTooltipBody}
+                        </TooltipContent>
+                      </Tooltip>
+                    ),
+                  )}
+                </div>
+              )}
 
               {/* Actions */}
               <div className="mt-3 flex gap-2">
@@ -213,7 +253,7 @@ export function CharacterPanel() {
                   ) : (
                     <>
                       <Sparkles className="size-3.5" />
-                      Generate All Views
+                      {isObject ? '이미지 생성' : 'Generate All Views'}
                     </>
                   )}
                 </Button>

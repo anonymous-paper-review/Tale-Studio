@@ -56,6 +56,7 @@ export interface CharacterAsset {
   characterId: string
   name: string
   views: CharacterView
+  entityType: 'person' | 'object'
   /** Writer 정의 계승 — asset-storage 등록 시 description/prompt로 전파 */
   description?: string
   fixedPrompt?: string
