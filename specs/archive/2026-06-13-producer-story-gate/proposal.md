@@ -1,8 +1,9 @@
 ---
 change: producer-story-gate
-status: active
+status: archived
 created: 2026-06-11
-decisions: [37, 38, 57]
+archived: 2026-06-13
+decisions: [37, 38, 57, 58]
 ---
 
 # Producer Story Gate — S0/S2 스토리 기반 요소의 producer 승격

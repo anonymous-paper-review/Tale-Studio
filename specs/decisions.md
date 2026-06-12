@@ -15,6 +15,13 @@
 
 ## 확정
 
+### 58. producer-story-gate archived
+- **결정**: producer-story-gate 구현 완료 — s0(장르축)·s2(캐릭터 정의)를 producer 게이트로 승격, writer는 s1부터 + 오픈 캐스트(`new_characters[]`/`mergeOpenCast`), 이미지 생성 artist 일원화(진입 시 자동 1회·결정 8), 파생 이미지 provenance + stale 배지 + 후보 히스토리(#57), Lock 플래그 전면 폐기(결정 4). `specs/archive/2026-06-13-producer-story-gate/`로 이동.
+- **검증**: 코드/빌드/유닛(provenance 9 테스트) + **A3 진입게이트 회귀 발견·수정**(writer view_main 사전생성 제거로 mainReady 데드락 → `pipeline_completed` 진입). 생성 의존 브라우저 플로우(자동생성 실이미지·stale 실편집·후보 교체·object ref·additive 재실행)는 **수동 확인 권장**으로 남김(사용자 (A) 결정, 2026-06-13).
+- **관계 편집(Section 2.5)**: 결정 9로 **보류** — 관계는 스토리 텍스트에서 파생, producer 전용 UI 미구현. 저장 테이블(018 `character_relationships`)은 미래용 보존, 핸드오프는 빈 배열.
+- **신설 결정**: 본 change 진행 중 #57(provenance, cross-cutting) + 내부 결정 1~9(proposal §Decisions). 결정 8(이미지 초기생성 자동/재생성 수동)은 architecture §5의 "과금 파생물 사람 방아쇠" 예외를 폐기.
+- **일자**: 2026-06-13
+
 ### 57. 데이터 정합 원칙 — 원천/파생(provenance) 모델 채택 (cross-cutting)
 - **결정**: 다단계(stage) 공유 데이터의 정합성 원칙 확정. 데이터는 **원천**(사람이 직접 정한 값)과 **파생**(원천을 읽어 생성된 결과물)으로 나뉘며, 파생물에는 sync가 아니라 **provenance(입력 지문)**를 설계한다. 5원칙: ① **빌드는 독립** ② **원천은 공동 편집**(자율 실행=빈칸만, 덮어쓰기=사람의 명시적 행동만) ③ **합류는 하류**(스테이지 간 영향은 통지/sync가 아니라 하류 빌드의 재료로만 — writer·artist는 형제, 합류는 director) ④ **일관성 = 순간이 아니라 수습 가능성**(전역 불일치는 정상 — 파생물이 입력 지문 보유 + 낡음(stale) 표시 + 명시적 재생성으로 수렴) ⑤ **통합 경험은 에이전트**(낡음을 읽고 재생성을 *제안* — 데이터 자동 연쇄 금지).
 - **적용**: stale = 표시(정보)만, 자동 무효화/자동 재생성 금지(사람 선별 보호 + 과금). "초기생성 vs 재생성" 구분 폐기 → "빈칸 채우기(자율 가능) vs 차 있는 것 교체(사람만)". 보존 판별 = "갈아엎으면 잃는 게 있는가(사람이 선별·편집했는가)" — 비용이 아니라 복원 불가능성+선별 투자 기준. producer-story-gate의 데이터 모델 OQ 1~4를 이 원칙으로 전부 해소(상세·구현은 해당 proposal §Decisions 5~7). 이미지 후보 히스토리(#55에서 defer했던 버전 히스토리)를 동 change 범위로 승급.

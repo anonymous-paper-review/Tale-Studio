@@ -15,8 +15,12 @@
 
 | Change | 상태 | 상세 (정본) |
 |---|---|---|
-| `producer-story-gate` | **S1✓ · S2·S3 코드완료**(브라우저 검증 대기, S4 persist 선반영) — `[x]`4 `[c]`10 `[ ]`11 (총 25) | `specs/changes/producer-story-gate/tasks.md` |
+| (active 없음) | — | — |
 
+> ✅ **2026-06-13 archived**: `producer-story-gate` (decision #58). s0/s2 producer 승격 + 오픈캐스트 +
+> 이미지 artist 일원화(자동 초기생성·결정8) + provenance/stale/후보 히스토리(#57) + Lock 폐기. 코드/빌드/유닛
+> 검증 + A3 진입게이트 회귀 수정 완료, 생성 의존 브라우저 플로우는 수동 확인 권장((A)). 관계 편집은 보류(#9).
+> → `specs/archive/2026-06-13-producer-story-gate/`.
 > ✅ **2026-06-12 archived**: `chat-context-management` (decision #56). 캐싱 + 토큰예산 윈도잉 + compaction@600K 보험,
 > 마이그레이션 0 (산출물 외부화로 "compaction 주 메커니즘" 전제 번복) → `specs/archive/2026-06-12-chat-context-management/`.
 > ✅ **2026-06-12 archived**: `chat-aware-regeneration` (decision #55). 재생성 actor 귀속(015) + 채팅 워크스페이스
