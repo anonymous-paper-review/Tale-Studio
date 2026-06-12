@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { sanitizeNextPath } from '@/lib/session-restore'
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -29,18 +30,23 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Not logged in → redirect to /login
+  // Not logged in → redirect to /login (?next= 로 원래 위치 보존 — 세션 만료 후
+  // 재로그인 시 보던 스테이지/프로젝트(?projectId 쿼리 포함)로 복귀)
   if (!user && !request.nextUrl.pathname.startsWith('/login')) {
     const url = request.nextUrl.clone()
+    const next = sanitizeNextPath(
+      request.nextUrl.pathname + request.nextUrl.search,
+    )
     url.pathname = '/login'
+    url.search = ''
+    if (next && next !== '/') url.searchParams.set('next', next)
     return NextResponse.redirect(url)
   }
 
-  // Logged in but on /login → redirect to home
+  // Logged in but on /login → next 가 있으면 그곳으로(검증 통과분만), 없으면 home
   if (user && request.nextUrl.pathname.startsWith('/login')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/'
-    return NextResponse.redirect(url)
+    const next = sanitizeNextPath(request.nextUrl.searchParams.get('next'))
+    return NextResponse.redirect(new URL(next ?? '/', request.url))
   }
 
   return supabaseResponse

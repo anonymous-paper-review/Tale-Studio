@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { clearLastProjectId } from '@/lib/session-restore'
 import { useProjectStore } from '@/stores/project-store'
 
 interface ProjectItem {
@@ -67,6 +68,9 @@ export function UserMenu() {
   }, [])
 
   const handleLogout = async () => {
+    // 공용 브라우저에서 다음 계정에게 마지막 프로젝트 힌트가 안 새도록 제거.
+    // (서버가 워크스페이스 범위로 거르긴 하지만 명시적 의도 표시로 클라에서도 정리)
+    clearLastProjectId()
     await supabase.auth.signOut()
     router.push('/login')
   }

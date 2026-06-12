@@ -1,9 +1,19 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
+import { sanitizeNextPath, NEXT_PATH_COOKIE } from '@/lib/session-restore'
 
 export default function LoginPage() {
   const handleGoogleLogin = async () => {
+    // 세션 만료 복귀: middleware 가 실어준 ?next 를 OAuth 왕복 동안 단명 쿠키로 운반.
+    // (Supabase redirectTo 허용목록 매칭에 쿼리를 안 끼우려고 쿠키 사용 —
+    //  /auth/callback 이 읽고 지운다. 검증된 상대경로만 저장: open redirect 차단)
+    const next = sanitizeNextPath(
+      new URLSearchParams(window.location.search).get('next'),
+    )
+    if (next) {
+      document.cookie = `${NEXT_PATH_COOKIE}=${encodeURIComponent(next)}; path=/; max-age=600; samesite=lax`
+    }
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: 'google',

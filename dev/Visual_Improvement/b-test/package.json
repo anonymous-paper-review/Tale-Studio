@@ -1,0 +1,11 @@
+{
+  "name": "visual-improvement-b-test",
+  "private": true,
+  "type": "module",
+  "description": "B안(motion_units 1급 구조) 독립 테스트 하네스 — 앱 빌드와 무관 (루트 tsconfig/eslint에서 dev/ 제외)",
+  "scripts": {
+    "prepare-inputs": "node --experimental-strip-types src/run.ts prepare",
+    "evaluate": "node --experimental-strip-types src/run.ts evaluate",
+    "typecheck": "../../../node_modules/.bin/tsc -p ."
+  }
+}

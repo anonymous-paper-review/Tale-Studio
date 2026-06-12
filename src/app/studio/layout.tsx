@@ -9,6 +9,7 @@ import { Sidebar } from '@/components/layout/sidebar'
 import { Samantha } from '@/components/layout/samantha'
 import { GlobalChat } from '@/components/layout/global-chat'
 import { useIdleTimeout } from '@/hooks/use-idle-timeout'
+import { readLastProjectId, writeLastProjectId } from '@/lib/session-restore'
 import { STAGES } from '@/lib/constants'
 import type { StageId } from '@/types'
 
@@ -29,14 +30,15 @@ export default function StudioLayout({
   const chatCollapsed = useChatUiStore((s) => s.collapsed)
   useIdleTimeout()
 
-  // mount: URL ?projectId 힌트로 프로젝트 복원 (없으면 store가 최신 fallback).
-  // 새로고침해도 보던 프로젝트가 유지되도록 하는 진입점.
+  // mount: URL ?projectId 힌트로 프로젝트 복원 → 없으면 localStorage 마지막 본 프로젝트
+  // → 그것도 없으면 store가 최신 fallback. 어느 경로든 서버(/api/project/init)가
+  // 본인 워크스페이스 범위로만 조회하므로 미소유 id 는 자동으로 최신 fallback 된다.
   useEffect(() => {
     const hint =
       typeof window !== 'undefined'
         ? new URLSearchParams(window.location.search).get('projectId')
         : null
-    initProject(hint ?? undefined)
+    initProject(hint ?? readLastProjectId() ?? undefined)
   }, [initProject])
 
   // writer 산출물 게이트: projectId 확정 시 1회 검증 → 씬 없으면 producer 로 게이트백.
@@ -52,6 +54,8 @@ export default function StudioLayout({
   // (router 네비게이션을 트리거하지 않도록 replaceState 사용 — stage-sync effect와 무충돌)
   useEffect(() => {
     if (!projectId || typeof window === 'undefined') return
+    // 마지막 본 프로젝트 기록 — 쿼리 없는 재진입(북마크/홈) 시 복원 힌트
+    writeLastProjectId(projectId)
     const params = new URLSearchParams(window.location.search)
     if (params.get('projectId') === projectId) return
     params.set('projectId', projectId)

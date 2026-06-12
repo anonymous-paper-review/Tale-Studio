@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // dev/: 독립 실험 하네스 (자체 tsconfig, node strip-types 실행 — 앱 빌드와 무관)
+    "dev/**",
   ]),
 ]);
 
