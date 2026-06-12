@@ -15,6 +15,7 @@ import {
   VIDEO_OFFSET_Y,
   ASSET_OFFSET_X,
   ASSET_OFFSET_Y,
+  ASSET_NODE_WIDTH,
   isShotData,
   isSceneData,
   isVideoData,
@@ -429,6 +430,9 @@ interface DirectorCanvasState {
   // playback — 한 번에 1개 Video 노드만 재생 (single-play). 비영속(UI ephemeral).
   playingNodeId: string | null
 
+  // 미사용 에셋(어떤 shot도 참조 안 함) 좌상단 표시 토글. 비영속(UI ephemeral).
+  showUnusedAssets: boolean
+
   // persistence meta
   projectId: string
   lastSavedAt: number
@@ -479,6 +483,8 @@ interface DirectorCanvasState {
    * shot에 references 엣지를 잇는다. asset과 겹치는 shot은 우측으로 밀어 정렬.
    */
   rebuildAssetNodes: () => void
+  /** 미사용 에셋 표시 토글 — 켜면 좌상단에 참조되지 않은 character/world 노드를 추가 */
+  toggleUnusedAssets: () => void
 
   // video specific
   /** Shot당 1개 강제 enforce (결정 #11) */
@@ -739,6 +745,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       generatingNodeIds: {},
       generationErrors: {},
       playingNodeId: null,
+      showUnusedAssets: false,
       projectId: 'default',
       lastSavedAt: Date.now(),
 
@@ -760,6 +767,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             generatingNodeIds: {},
             generationErrors: {},
             playingNodeId: null,
+            showUnusedAssets: false,
             lastSavedAt: Date.now(),
           })
         } else {
@@ -775,18 +783,22 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         debouncedPositionSaveToDb(nodeId, get)
       },
 
-      // [디버그] 겹친 노드 정리용 — #1 시딩과 동일 규칙으로 전체 재배치.
-      //   scene 가로(그룹 폭만큼) / 그 우측에 shot 세로 stack / shot 우측에 video 세로 stack.
-      //   in-memory 즉시 적용 + nodeId별 persist로 DB(canvas_position)까지 반영(재진입 유지).
+      // 자동 정렬 — 겹친 노드를 다이어그램 레이아웃으로 재배치.
+      //   [Asset 컬럼(좌)] - Scene - Shot 세로 - Video 세로, 각 scene 그룹은 좌우로 분리.
+      //   그룹 폭에 asset 컬럼(좌)·video(우) 공간을 포함해 asset이 옆 그룹과 안 겹치게 한다.
+      //   in-memory 즉시 적용 + nodeId별 persist로 DB(canvas_position) 반영(재진입 유지).
+      //   asset 노드는 scene 좌측 파생이므로 재배치 후 rebuildAssetNodes로 갱신.
       relayoutCanvas: () => {
-        const GROUP_WIDTH = SHOT_OFFSET_X + VIDEO_OFFSET_X + 400
+        // 그룹 폭 = asset 컬럼(좌) + scene→shot + shot→video + video 노드/여백
+        const GROUP_WIDTH = ASSET_OFFSET_X + SHOT_OFFSET_X + VIDEO_OFFSET_X + 400
         const state = get()
         const scenes = state.nodes
           .filter((n) => isSceneData(n.data))
           .sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x)
         const posById = new Map<string, XYPosition>()
         scenes.forEach((scene, i) => {
-          const sx = 80 + i * GROUP_WIDTH
+          // 첫 그룹부터 asset 컬럼 공간을 확보(scene을 asset 폭만큼 우측에서 시작)
+          const sx = 80 + ASSET_OFFSET_X + i * GROUP_WIDTH
           const sy = 80
           posById.set(scene.id, { x: sx, y: sy })
           getChildShots(state, scene.id)
@@ -813,6 +825,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           lastSavedAt: Date.now(),
         }))
         for (const id of posById.keys()) get().persistNodePosition(id)
+        // asset 컬럼을 새 scene 위치 기준으로 재배치
+        get().rebuildAssetNodes()
       },
 
       hydrateFromDb: async (projectId) => {
@@ -1262,6 +1276,55 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 })
               }
             }
+          }
+
+          // 미사용 에셋(어떤 shot도 참조 안 함) — 토글 시 좌상단에 가로로 표시 (표시만, 엣지 없음).
+          if (s.showUnusedAssets) {
+            const usedChar = new Set<string>()
+            const usedWorld = new Set<string>()
+            for (const n of nodes) {
+              if (!isShotData(n.data)) continue
+              n.data.characterAssetIds.forEach((id) => usedChar.add(id))
+              n.data.worldAssetIds.forEach((id) => usedWorld.add(id))
+            }
+            const unusedChars = Object.keys(assetStore.characters).filter(
+              (id) => !usedChar.has(id),
+            )
+            const unusedWorlds = Object.keys(assetStore.worlds).filter(
+              (id) => !usedWorld.has(id),
+            )
+            // 좌상단 — 모든 scene 위쪽 레인에 가로 배치
+            const sceneNodes = nodes.filter((n) => isSceneData(n.data))
+            const topY =
+              (sceneNodes.length
+                ? Math.min(...sceneNodes.map((n) => n.position.y))
+                : 80) - ASSET_OFFSET_Y - 200
+            let ux = 80
+            const pushUnused = (assetId: string, kind: 'character' | 'world') => {
+              const reg =
+                kind === 'character'
+                  ? assetStore.getCharacter(assetId)
+                  : assetStore.getWorld(assetId)
+              nodes.push({
+                id: `dn_asset_unused_${kind}_${assetId}`,
+                type: 'asset',
+                position: { x: ux, y: topY },
+                draggable: false,
+                selectable: false,
+                data: {
+                  kind: 'asset',
+                  assetKind: kind,
+                  assetId,
+                  label: reg?.name ?? assetId,
+                  imageUrl: pickAssetImageUrl(reg),
+                  locked: true,
+                  unused: true,
+                },
+              })
+              ux += ASSET_NODE_WIDTH + 40
+            }
+            for (const id of unusedChars) pushUnused(id, 'character')
+            for (const id of unusedWorlds) pushUnused(id, 'world')
           }
 
           return { nodes, edges, lastSavedAt: Date.now() }
@@ -1719,6 +1782,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       setPlayingNode: (id) => set({ playingNodeId: id }),
 
+      toggleUnusedAssets: () => {
+        set((s) => ({ showUnusedAssets: !s.showUnusedAssets }))
+        get().rebuildAssetNodes()
+      },
+
       ensureVideoThumbnail: async (videoNodeId) => {
         const node = get().nodes.find((n) => n.id === videoNodeId)
         if (!node || !isVideoData(node.data)) return
@@ -2127,6 +2195,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           generatingNodeIds: {},
           generationErrors: {},
           playingNodeId: null,
+          showUnusedAssets: false,
           lastSavedAt: Date.now(),
         }),
     }),

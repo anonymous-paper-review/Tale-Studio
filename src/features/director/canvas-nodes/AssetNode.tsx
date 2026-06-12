@@ -27,6 +27,7 @@ function AssetNodeImpl({ data }: NodeProps<DirectorNode>) {
       className={cn(
         'group relative w-[200px] overflow-hidden rounded-lg border bg-node-bg-default',
         style.border,
+        data.unused && 'border-dashed opacity-60',
       )}
     >
       {/* 샷으로 향하는 출력 포트만 (우측). asset은 입력을 안 받음 */}
@@ -41,6 +42,7 @@ function AssetNodeImpl({ data }: NodeProps<DirectorNode>) {
         <span className="flex items-center gap-1.5 font-medium uppercase tracking-wide text-muted-foreground">
           <span className={cn('h-1.5 w-1.5 rounded-full', style.dot)} />
           {style.label}
+          {data.unused && <span className="normal-case text-muted-foreground/70">· 미사용</span>}
         </span>
         <Lock className="size-3 text-muted-foreground" aria-label="locked" />
       </div>

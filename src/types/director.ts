@@ -142,6 +142,8 @@ export type AssetNodeData = {
   imageUrl: string | null
   /** 항상 true — Artist가 진실, Director는 표시만 */
   locked: true
+  /** 어떤 shot도 참조하지 않는 미사용 에셋 (불러오기 토글로 좌상단에 표시) */
+  unused?: boolean
   [key: string]: unknown
 }
 
@@ -176,8 +178,8 @@ export const SCENE_OFFSET_X = 360
 export const SHOT_OFFSET_X = 360
 /** Shot 형제 간 세로 간격 */
 export const SHOT_OFFSET_Y = 200
-/** Video 노드 폭 + gap (Shot 우측 stacking) */
-export const VIDEO_OFFSET_X = 280
+/** Video 노드 폭 + gap (Shot 우측 stacking). Scene→Shot(360)과 동일 간격으로 여유 확보 */
+export const VIDEO_OFFSET_X = 360
 /** Video 형제 간 세로 간격 */
 export const VIDEO_OFFSET_Y = 180
 /** snap-to-grid */

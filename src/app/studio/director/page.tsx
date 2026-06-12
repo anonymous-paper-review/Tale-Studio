@@ -20,7 +20,7 @@ import {
   type OnConnectEnd,
   type XYPosition,
 } from '@xyflow/react'
-import { Loader2, ImageIcon, X, LayoutGrid } from 'lucide-react'
+import { Loader2, ImageIcon, X, LayoutGrid, Boxes } from 'lucide-react'
 
 import { toast } from 'sonner'
 
@@ -349,6 +349,8 @@ function PaletteBar() {
     (s) => s.generateAllStoryboardImages,
   )
   const relayoutCanvas = useDirectorCanvasStore((s) => s.relayoutCanvas)
+  const showUnusedAssets = useDirectorCanvasStore((s) => s.showUnusedAssets)
+  const toggleUnusedAssets = useDirectorCanvasStore((s) => s.toggleUnusedAssets)
 
   const shots = nodes.filter((n) => isShotData(n.data))
   const totalShots = shots.length
@@ -428,17 +430,31 @@ function PaletteBar() {
         <PresetStrip />
       </div>
 
-      {/* [디버그] 노드 재배치 — 겹친 scene/shot을 그리드로 정리 */}
+      {/* 미사용 에셋 불러오기 — 어떤 shot도 참조 안 하는 character/world를 좌상단에 표시 (표시만) */}
+      <button
+        type="button"
+        onClick={() => toggleUnusedAssets()}
+        title="어떤 샷도 참조하지 않는 에셋을 캔버스 좌상단에 표시"
+        className={cn(
+          'flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-3 text-xs transition-colors duration-100',
+          showUnusedAssets
+            ? 'border-primary bg-primary/10 text-foreground'
+            : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
+        )}
+      >
+        <Boxes className="size-4" />
+        <span>{showUnusedAssets ? '미사용 에셋 숨기기' : '미사용 에셋 불러오기'}</span>
+      </button>
+
+      {/* 노드 자동 정렬 — asset·scene·shot·video를 다이어그램 레이아웃으로 재배치 (DB 반영) */}
       <button
         type="button"
         onClick={() => relayoutCanvas()}
-        title="[디버그] 노드를 scene 가로 / shot 세로 / video 우측 그리드로 재배치 (DB 반영)"
-        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-dashed border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground"
+        title="에셋·씬·샷·영상을 좌→우 레이아웃으로 정렬하고 간격을 확보 (DB 저장)"
+        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground"
       >
         <LayoutGrid className="size-4" />
-        <span>
-          재배치 <span className="opacity-60">(debug)</span>
-        </span>
+        <span>자동 정렬</span>
       </button>
     </div>
   )
