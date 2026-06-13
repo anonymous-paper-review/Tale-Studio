@@ -15,7 +15,6 @@ import {
   VIDEO_OFFSET_Y,
   ASSET_OFFSET_X,
   ASSET_OFFSET_Y,
-  ASSET_NODE_WIDTH,
   isShotData,
   isSceneData,
   isVideoData,
@@ -1228,6 +1227,19 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           const nodes = s.nodes.filter((n) => !isAssetData(n.data))
           const edges = s.edges.filter((e) => e.data?.category !== 'references')
 
+          // 토글 ON: 이 프로젝트에 등록된 전체 에셋(미사용 후보). 씬별로 안 쓰는 것도 표시한다.
+          //   asset-storage는 localStorage 영속이라 타 프로젝트 잔재 혼입 방지 위해 projectId 필터.
+          const allCharIds = s.showUnusedAssets
+            ? Object.keys(assetStore.characters).filter(
+                (id) => assetStore.characters[id]?.projectId === s.projectId,
+              )
+            : []
+          const allWorldIds = s.showUnusedAssets
+            ? Object.keys(assetStore.worlds).filter(
+                (id) => assetStore.worlds[id]?.projectId === s.projectId,
+              )
+            : []
+
           const sceneNodes = nodes.filter((n) => isSceneData(n.data))
           for (const scene of sceneNodes) {
             const childShots = nodes.filter(
@@ -1248,13 +1260,29 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 if (!worldIds.includes(wid) && assetStore.getWorld(wid))
                   worldIds.push(wid)
             }
-            if (charIds.length === 0 && worldIds.length === 0) continue
+            // 2.5) 토글 ON: 이 씬이 안 쓰는 등록 에셋 = per-scene 미사용. 엣지 없이 표시만.
+            const unusedCharIds = allCharIds.filter((id) => !charIds.includes(id))
+            const unusedWorldIds = allWorldIds.filter(
+              (id) => !worldIds.includes(id),
+            )
 
-            // 3) asset 노드 생성 — Scene 좌측 컬럼, character(위) → world(아래)
+            if (
+              charIds.length === 0 &&
+              worldIds.length === 0 &&
+              unusedCharIds.length === 0 &&
+              unusedWorldIds.length === 0
+            )
+              continue
+
+            // 3) asset 노드 생성 — Scene 좌측 컬럼, character(위)→world(아래), 사용→미사용 순.
             const baseX = scene.position.x - ASSET_OFFSET_X
             let y = scene.position.y
             const assetNodeIdByAssetId = new Map<string, string>()
-            const make = (assetId: string, kind: 'character' | 'world') => {
+            const make = (
+              assetId: string,
+              kind: 'character' | 'world',
+              unused: boolean,
+            ) => {
               const reg =
                 kind === 'character'
                   ? assetStore.getCharacter(assetId)
@@ -1273,13 +1301,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   label: reg?.name ?? assetId,
                   imageUrl: pickAssetImageUrl(reg),
                   locked: true,
+                  ...(unused ? { unused: true } : {}),
                 },
               })
-              assetNodeIdByAssetId.set(assetId, id)
+              // 미사용 노드는 ref 엣지를 안 만드므로 매핑에서 제외(사용분만 등록).
+              if (!unused) assetNodeIdByAssetId.set(assetId, id)
               y += ASSET_OFFSET_Y
             }
-            for (const cid of charIds) make(cid, 'character')
-            for (const wid of worldIds) make(wid, 'world')
+            for (const cid of charIds) make(cid, 'character', false)
+            for (const cid of unusedCharIds) make(cid, 'character', true)
+            for (const wid of worldIds) make(wid, 'world', false)
+            for (const wid of unusedWorldIds) make(wid, 'world', true)
 
             // 4) shot → 참조 asset references 엣지 (asset 우측 포트 → shot 좌측 포트)
             //    asset이 Scene 좌측에 있으므로 shot 위치는 건드리지 않는다(기존 흐름 보존).
@@ -1299,55 +1331,6 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 })
               }
             }
-          }
-
-          // 미사용 에셋(어떤 shot도 참조 안 함) — 토글 시 좌상단에 가로로 표시 (표시만, 엣지 없음).
-          if (s.showUnusedAssets) {
-            const usedChar = new Set<string>()
-            const usedWorld = new Set<string>()
-            for (const n of nodes) {
-              if (!isShotData(n.data)) continue
-              n.data.characterAssetIds.forEach((id) => usedChar.add(id))
-              n.data.worldAssetIds.forEach((id) => usedWorld.add(id))
-            }
-            const unusedChars = Object.keys(assetStore.characters).filter(
-              (id) => !usedChar.has(id),
-            )
-            const unusedWorlds = Object.keys(assetStore.worlds).filter(
-              (id) => !usedWorld.has(id),
-            )
-            // 좌상단 — 모든 scene 위쪽 레인에 가로 배치
-            const sceneNodes = nodes.filter((n) => isSceneData(n.data))
-            const topY =
-              (sceneNodes.length
-                ? Math.min(...sceneNodes.map((n) => n.position.y))
-                : 80) - ASSET_OFFSET_Y - 200
-            let ux = 80
-            const pushUnused = (assetId: string, kind: 'character' | 'world') => {
-              const reg =
-                kind === 'character'
-                  ? assetStore.getCharacter(assetId)
-                  : assetStore.getWorld(assetId)
-              nodes.push({
-                id: `dn_asset_unused_${kind}_${assetId}`,
-                type: 'asset',
-                position: { x: ux, y: topY },
-                draggable: false,
-                selectable: false,
-                data: {
-                  kind: 'asset',
-                  assetKind: kind,
-                  assetId,
-                  label: reg?.name ?? assetId,
-                  imageUrl: pickAssetImageUrl(reg),
-                  locked: true,
-                  unused: true,
-                },
-              })
-              ux += ASSET_NODE_WIDTH + 40
-            }
-            for (const id of unusedChars) pushUnused(id, 'character')
-            for (const id of unusedWorlds) pushUnused(id, 'world')
           }
 
           return { nodes, edges, lastSavedAt: Date.now() }

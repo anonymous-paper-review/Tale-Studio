@@ -67,6 +67,7 @@ function MiniMapPanel() {
   const [visible, setVisible] = useState(true)
   const [locked, setLocked] = useState(false)
   const [pos, setPos] = useState({ right: 16, bottom: 16 })
+  const [size, setSize] = useState({ w: 200, h: 150 })
   const dragRef = useRef<{
     sx: number
     sy: number
@@ -96,6 +97,35 @@ function MiniMapPanel() {
     window.addEventListener('pointerup', up)
   }
 
+  // 크기 조절 — 패널 앵커가 우하단이라 좌상단 코너를 끌면 좌·상으로 커진다.
+  const resizeRef = useRef<{
+    sx: number
+    sy: number
+    sw: number
+    sh: number
+  } | null>(null)
+
+  const onResizePointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    resizeRef.current = { sx: e.clientX, sy: e.clientY, sw: size.w, sh: size.h }
+    const move = (ev: PointerEvent) => {
+      const d = resizeRef.current
+      if (!d) return
+      setSize({
+        w: Math.min(560, Math.max(140, d.sw - (ev.clientX - d.sx))),
+        h: Math.min(420, Math.max(100, d.sh - (ev.clientY - d.sy))),
+      })
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      resizeRef.current = null
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
   if (!visible) {
     return (
       <button
@@ -114,6 +144,13 @@ function MiniMapPanel() {
       className="absolute z-10 overflow-hidden rounded-lg border border-border bg-card/50"
       style={{ right: pos.right, bottom: pos.bottom }}
     >
+      {/* 크기 조절 핸들 — 좌상단 코너(앵커가 우하단). 드래그로 미니맵 크기 조절 */}
+      <div
+        onPointerDown={onResizePointerDown}
+        title="크기 조절 (드래그)"
+        className="absolute left-0 top-0 z-30 size-3.5 cursor-nwse-resize rounded-tl-lg transition-colors hover:bg-primary/30"
+        style={{ touchAction: 'none' }}
+      />
       <div
         onPointerDown={onHeaderPointerDown}
         className={cn(
@@ -141,7 +178,13 @@ function MiniMapPanel() {
           </button>
         </div>
       </div>
-      <MiniMap className="!static !m-0 !bg-transparent" pannable zoomable />
+      <div style={{ width: size.w, height: size.h }}>
+        <MiniMap
+          className="!static !m-0 !h-full !w-full !bg-transparent"
+          pannable
+          zoomable
+        />
+      </div>
     </div>
   )
 }
@@ -543,11 +586,11 @@ function PaletteBar() {
         <PresetStrip />
       </div>
 
-      {/* 미사용 에셋 불러오기 — 어떤 shot도 참조 안 하는 character/world를 좌상단에 표시 (표시만) */}
+      {/* 미사용 에셋 불러오기 — 씬마다 그 씬이 참조 안 하는 등록 에셋도 좌측 컬럼에 표시(표시만) */}
       <button
         type="button"
         onClick={() => toggleUnusedAssets()}
-        title="어떤 샷도 참조하지 않는 에셋을 캔버스 좌상단에 표시"
+        title="씬마다 해당 씬이 참조하지 않는 등록 에셋도 좌측 에셋 컬럼에 표시"
         className={cn(
           'flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-3 text-xs transition-colors duration-100',
           showUnusedAssets
