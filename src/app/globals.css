@@ -327,3 +327,25 @@
     opacity: 0.55;
   }
 }
+
+/* ── React Flow — Director 캔버스 컨트롤/미니맵 (design.md: card alpha 0.5, foreground 아이콘) ──
+   xyflow 기본 컨트롤은 흰 배경 + 검은 아이콘이라 dark 테마에서 대비가 낮다.
+   반투명(alpha 0.5) card 표면 + foreground 아이콘 + accent hover 로 가시성 개선. */
+.react-flow__controls {
+  box-shadow: none;
+}
+.react-flow__controls-button {
+  background-color: color-mix(in oklab, var(--card) 50%, transparent);
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+  width: 28px;
+  height: 28px;
+}
+.react-flow__controls-button:hover {
+  background-color: var(--accent);
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
+  max-width: 14px;
+  max-height: 14px;
+}

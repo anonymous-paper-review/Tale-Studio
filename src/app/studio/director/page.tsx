@@ -10,6 +10,7 @@ import {
   Controls,
   MiniMap,
   ConnectionMode,
+  PanOnScrollMode,
   applyNodeChanges,
   applyEdgeChanges,
   useReactFlow,
@@ -20,7 +21,7 @@ import {
   type OnConnectEnd,
   type XYPosition,
 } from '@xyflow/react'
-import { Loader2, ImageIcon, X, LayoutGrid, Boxes } from 'lucide-react'
+import { Loader2, ImageIcon, X, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock } from 'lucide-react'
 
 import { toast } from 'sonner'
 
@@ -59,6 +60,92 @@ const nodeTypes = {
   asset: AssetNode,
 } as const
 
+// ────────────────────────────────────────────────────────────────────────────
+// MiniMap 상태창 — 숨기기/켜기 토글 + 드래그 이동 + 잠금(위치 고정).
+//   ReactFlow 자식이라 MiniMap이 viewport context를 받는다. 위치는 우/하단 offset(px).
+function MiniMapPanel() {
+  const [visible, setVisible] = useState(true)
+  const [locked, setLocked] = useState(false)
+  const [pos, setPos] = useState({ right: 16, bottom: 16 })
+  const dragRef = useRef<{
+    sx: number
+    sy: number
+    br: number
+    bo: number
+  } | null>(null)
+
+  const onHeaderPointerDown = (e: React.PointerEvent) => {
+    if (locked) return
+    e.stopPropagation()
+    dragRef.current = { sx: e.clientX, sy: e.clientY, br: pos.right, bo: pos.bottom }
+    const move = (ev: PointerEvent) => {
+      const d = dragRef.current
+      if (!d) return
+      // 우/하단 기준이라 마우스 이동의 반대 방향으로 offset 증가
+      setPos({
+        right: Math.max(0, d.br - (ev.clientX - d.sx)),
+        bottom: Math.max(0, d.bo - (ev.clientY - d.sy)),
+      })
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      dragRef.current = null
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
+  if (!visible) {
+    return (
+      <button
+        type="button"
+        onClick={() => setVisible(true)}
+        className="absolute bottom-4 right-4 z-10 flex h-8 items-center gap-1.5 rounded-md border border-border bg-card/50 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <MapIcon className="size-3.5" />
+        미니맵
+      </button>
+    )
+  }
+
+  return (
+    <div
+      className="absolute z-10 overflow-hidden rounded-lg border border-border bg-card/50"
+      style={{ right: pos.right, bottom: pos.bottom }}
+    >
+      <div
+        onPointerDown={onHeaderPointerDown}
+        className={cn(
+          'flex h-6 items-center justify-between border-b border-border/60 px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground',
+          locked ? 'cursor-default' : 'cursor-grab active:cursor-grabbing',
+        )}
+      >
+        <span>미니맵</span>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setLocked((v) => !v)}
+            title={locked ? '위치 잠금 해제' : '위치 잠금'}
+            className="rounded p-0.5 hover:bg-accent hover:text-foreground"
+          >
+            {locked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisible(false)}
+            title="미니맵 숨기기"
+            className="rounded p-0.5 hover:bg-accent hover:text-foreground"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      </div>
+      <MiniMap className="!static !m-0 !bg-transparent" pannable zoomable />
+    </div>
+  )
+}
+
 const edgeTypes = {
   parent: CategoryEdge,
   'relates-to': CategoryEdge,
@@ -82,8 +169,31 @@ function CanvasInner() {
   const persistNodePosition = useDirectorCanvasStore(
     (s) => s.persistNodePosition,
   )
+  const commitHistory = useDirectorCanvasStore((s) => s.commitHistory)
+  const undo = useDirectorCanvasStore((s) => s.undo)
+  const redo = useDirectorCanvasStore((s) => s.redo)
   const directorProjectId = useDirectorCanvasStore((s) => s.projectId)
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
+
+  // undo/redo 키보드 — Ctrl/Cmd+Z = undo, Ctrl/Cmd+Y 또는 Ctrl/Cmd+Shift+Z = redo.
+  //   입력 필드(input/textarea)에서는 브라우저 텍스트 편집 undo를 우선해 무시.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      const tag = (e.target as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      const k = e.key.toLowerCase()
+      if (k === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        undo()
+      } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
+        e.preventDefault()
+        redo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undo, redo])
 
   // 누락 감지 넛지 (chat-proactive-copilot Phase 4): 캔버스가 안정되면(2s) 채워두면 좋을
   //   항목(샷의 캐릭터·배경 참조 누락 / 스토리보드 미생성)을 1회 informational 제안. 생성 트리거 X.
@@ -235,6 +345,7 @@ function CanvasInner() {
         onNodeClick={(_event, node) => selectNode(node.id)}
         onEdgeClick={(_event, edge) => selectEdge(edge.id)}
         onNodeDoubleClick={(_event, node) => openPopup(node.id)}
+        onNodeDragStart={() => commitHistory()}
         onMove={(_, vp) => setViewport(vp)}
         snapToGrid
         snapGrid={SNAP_GRID}
@@ -242,16 +353,18 @@ function CanvasInner() {
         deleteKeyCode={['Backspace', 'Delete']}
         fitView={nodes.length > 0}
         zoomOnDoubleClick={false}
+        // 스크롤 = 상하/좌우 화면 이동(패닝), Ctrl+스크롤 = 확대/축소.
+        //   panOnScroll 모드에서 xyflow는 ctrl/meta 누른 스크롤을 줌으로 처리한다.
+        panOnScroll
+        panOnScrollMode={PanOnScrollMode.Free}
+        zoomOnScroll={false}
+        zoomActivationKeyCode="Control"
         proOptions={{ hideAttribution: true }}
         className="bg-background"
       >
         <Background gap={16} size={1} className="opacity-30" />
-        <Controls className="!bg-card !border !border-border" />
-        <MiniMap
-          className="!bg-card !border !border-border"
-          pannable
-          zoomable
-        />
+        <Controls className="!border !border-border" />
+        <MiniMapPanel />
       </ReactFlow>
 
       {nodes.length === 0 && (

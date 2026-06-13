@@ -433,6 +433,12 @@ interface DirectorCanvasState {
   // 미사용 에셋(어떤 shot도 참조 안 함) 좌상단 표시 토글. 비영속(UI ephemeral).
   showUnusedAssets: boolean
 
+  // undo/redo 히스토리 (런타임, 비영속). asset/references 파생은 스냅샷에서 제외 —
+  // 복원 후 rebuildAssetNodes가 재생성. sync 셋업 중에는 _historySuppressed로 기록 차단.
+  historyPast: { nodes: DirectorNode[]; edges: DirectorEdge[] }[]
+  historyFuture: { nodes: DirectorNode[]; edges: DirectorEdge[] }[]
+  _historySuppressed: boolean
+
   // persistence meta
   projectId: string
   lastSavedAt: number
@@ -485,6 +491,10 @@ interface DirectorCanvasState {
   rebuildAssetNodes: () => void
   /** 미사용 에셋 표시 토글 — 켜면 좌상단에 참조되지 않은 character/world 노드를 추가 */
   toggleUnusedAssets: () => void
+  /** 현재 노드/엣지 스냅샷을 히스토리에 기록 (변경 직전 호출, suppress 중엔 무시) */
+  commitHistory: () => void
+  undo: () => void
+  redo: () => void
 
   // video specific
   /** Shot당 1개 강제 enforce (결정 #11) */
@@ -746,6 +756,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       generationErrors: {},
       playingNodeId: null,
       showUnusedAssets: false,
+      historyPast: [],
+      historyFuture: [],
+      _historySuppressed: false,
       projectId: 'default',
       lastSavedAt: Date.now(),
 
@@ -768,6 +781,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             generationErrors: {},
             playingNodeId: null,
             showUnusedAssets: false,
+            historyPast: [],
+            historyFuture: [],
             lastSavedAt: Date.now(),
           })
         } else {
@@ -789,6 +804,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       //   in-memory 즉시 적용 + nodeId별 persist로 DB(canvas_position) 반영(재진입 유지).
       //   asset 노드는 scene 좌측 파생이므로 재배치 후 rebuildAssetNodes로 갱신.
       relayoutCanvas: () => {
+        get().commitHistory()
         // 그룹 폭 = asset 컬럼(좌) + scene→shot + shot→video + video 노드/여백
         const GROUP_WIDTH = ASSET_OFFSET_X + SHOT_OFFSET_X + VIDEO_OFFSET_X + 400
         const state = get()
@@ -948,6 +964,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       // ─── node lifecycle ────────────────────────────────────────────────
 
       addSceneNode: (position, label) => {
+        get().commitHistory()
         const id = newDirectorId('dn')
         const node: DirectorNode = {
           id,
@@ -960,6 +977,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       addShotNode: (parentSceneNodeId, position, label) => {
+        get().commitHistory()
         const id = newDirectorId('dn')
         const node: DirectorNode = {
           id,
@@ -992,6 +1010,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const state = get()
         const mother = state.nodes.find((n) => n.id === parentShotNodeId)
         if (!mother || !isShotData(mother.data)) return null
+        get().commitHistory()
 
         const takeIndex = nextTakeIndex(state, parentShotNodeId)
         const defaultPos: XYPosition =
@@ -1060,6 +1079,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       updateNodeData: (id, patch) => {
         const prev = get().nodes.find((n) => n.id === id)
         if (!prev) return
+        // 노드 데이터 수정은 undo 대상에서 제외 — generateStoryboardImage 등 생성 결과도
+        // 이 경로로 들어와 history를 오염시키기 때문. undo는 드래그/추가/삭제/연결/정렬만.
 
         // Shot 설정 변경 시 prompt/camera/lighting/cameraPreset/provider 변경이면 자식 Video stale
         const shotConfigKeys: (keyof ShotNodeData)[] = [
@@ -1116,6 +1137,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       deleteNode: (id) => {
+        get().commitHistory()
         const ids = collectCascadeIds(get().nodes, id)
 
         // Step 2: cascade에 포함된 Video 노드의 videoClipId를 제거 전에 수집 → DB DELETE
@@ -1165,6 +1187,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       addEdge: (source, target, data, sourceHandle, targetHandle) => {
         if (source === target) return null
+        get().commitHistory()
         const exists = get().edges.find(
           (e) => e.source === source && e.target === target,
         )
@@ -1787,6 +1810,53 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         get().rebuildAssetNodes()
       },
 
+      // ─── undo/redo ─────────────────────────────────────────────────────
+      // 스냅샷은 asset/references 파생 제외 — 복원 후 rebuildAssetNodes가 재생성.
+      commitHistory: () => {
+        if (get()._historySuppressed) return
+        const s = get()
+        const snap = {
+          nodes: s.nodes.filter((n) => !isAssetData(n.data)),
+          edges: s.edges.filter((e) => e.data?.category !== 'references'),
+        }
+        // past 최대 50개 유지, 새 변경이 생기면 redo 가지(future)는 버린다
+        set({ historyPast: [...s.historyPast.slice(-49), snap], historyFuture: [] })
+      },
+      undo: () => {
+        const s = get()
+        if (!s.historyPast.length) return
+        const prev = s.historyPast[s.historyPast.length - 1]!
+        const cur = {
+          nodes: s.nodes.filter((n) => !isAssetData(n.data)),
+          edges: s.edges.filter((e) => e.data?.category !== 'references'),
+        }
+        set({
+          nodes: prev.nodes,
+          edges: prev.edges,
+          historyPast: s.historyPast.slice(0, -1),
+          historyFuture: [...s.historyFuture, cur],
+          lastSavedAt: Date.now(),
+        })
+        get().rebuildAssetNodes()
+      },
+      redo: () => {
+        const s = get()
+        if (!s.historyFuture.length) return
+        const next = s.historyFuture[s.historyFuture.length - 1]!
+        const cur = {
+          nodes: s.nodes.filter((n) => !isAssetData(n.data)),
+          edges: s.edges.filter((e) => e.data?.category !== 'references'),
+        }
+        set({
+          nodes: next.nodes,
+          edges: next.edges,
+          historyPast: [...s.historyPast, cur],
+          historyFuture: s.historyFuture.slice(0, -1),
+          lastSavedAt: Date.now(),
+        })
+        get().rebuildAssetNodes()
+      },
+
       ensureVideoThumbnail: async (videoNodeId) => {
         const node = get().nodes.find((n) => n.id === videoNodeId)
         if (!node || !isVideoData(node.data)) return
@@ -2196,6 +2266,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           generationErrors: {},
           playingNodeId: null,
           showUnusedAssets: false,
+          historyPast: [],
+          historyFuture: [],
           lastSavedAt: Date.now(),
         }),
     }),

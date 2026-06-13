@@ -53,6 +53,8 @@ export function useWriterDirectorSync() {
     }
     let cancelled = false
 
+    // sync 셋업(addSceneNode/addShotNode 등)은 undo 히스토리에서 제외 (시스템 변경).
+    useDirectorCanvasStore.setState({ _historySuppressed: true })
     void (async () => {
     // ── Pass 0: asset-storage DB hydrate (projectId별 1회) ─────────────
     // Director 직행/타브라우저/localStorage 비움에서도 캐릭터·월드 이미지가 채워지도록
@@ -208,7 +210,9 @@ export function useWriterDirectorSync() {
         ),
       )
     })()
-    })()
+    })().finally(() => {
+      useDirectorCanvasStore.setState({ _historySuppressed: false })
+    })
 
     return () => {
       cancelled = true
