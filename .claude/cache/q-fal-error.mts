@@ -13,17 +13,29 @@ const jobs = await q(`generation_jobs?project_id=eq.${pid}&kind=eq.shot_rough_st
 const { request_id, model } = jobs[0]
 console.log('request:', request_id, '| model:', model)
 
+type FalQueueError = {
+  status?: unknown
+  body?: unknown
+  message?: unknown
+}
+
+function queueError(e: unknown): FalQueueError {
+  return e as FalQueueError
+}
+
 try {
   const st = await fal.queue.status(model, { requestId: request_id, logs: true })
   console.log('status:', JSON.stringify(st, null, 1).slice(0, 800))
-} catch (e: any) {
-  console.log('status err:', e?.status, JSON.stringify(e?.body ?? e?.message).slice(0, 600))
+} catch (e: unknown) {
+  const err = queueError(e)
+  console.log('status err:', err.status, JSON.stringify(err.body ?? err.message).slice(0, 600))
 }
 try {
   const r = await fal.queue.result(model, { requestId: request_id })
   console.log('result:', JSON.stringify(r.data).slice(0, 300))
-} catch (e: any) {
-  console.log('result err:', e?.status, JSON.stringify(e?.body ?? e?.message).slice(0, 800))
+} catch (e: unknown) {
+  const err = queueError(e)
+  console.log('result err:', err.status, JSON.stringify(err.body ?? err.message).slice(0, 800))
 }
 
 // 해당 샷의 프롬프트 재료도 같이

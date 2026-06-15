@@ -4,9 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ProjectDashboard } from '@/features/producer/project-dashboard'
-import { CastPanel } from '@/features/producer/cast-panel'
-import { GateStatus } from '@/features/producer/gate-status'
+import { ProducerReadinessBoard } from '@/features/producer/readiness-board'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -105,10 +103,7 @@ export default function MeetingPage() {
         </div>
       )}
 
-      <div className="flex flex-1 overflow-hidden">
-        <ProjectDashboard />
-        <CastPanel />
-      </div>
+      <ProducerReadinessBoard gate={gate} />
 
       {/* Error bar */}
       {error && (
@@ -121,9 +116,8 @@ export default function MeetingPage() {
         </button>
       )}
 
-      {/* Handoff — 게이트 사유 + 버튼 (하드 게이트만 차단, soft는 경고) */}
+      {/* Handoff — 하드 게이트만 차단, 상세 사유는 readiness board inline 표시 */}
       <div className="space-y-3 border-t border-border p-4">
-        <GateStatus gate={gate} />
         <Button
           onClick={handleHandoff}
           disabled={!canHandoff || syncing}
@@ -142,7 +136,7 @@ export default function MeetingPage() {
             </>
           ) : (
             <>
-              게이트를 충족해 주세요
+              남은 {gate.hardMissing.length}개를 채워 주세요
               <ArrowRight className="ml-2 size-4" />
             </>
           )}

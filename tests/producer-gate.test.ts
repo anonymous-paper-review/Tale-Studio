@@ -38,15 +38,16 @@ describe('evaluateProducerGate — gate A (story foundation)', () => {
     expect(r.hardMissing.map((i) => i.field)).toContain('storyText')
   })
 
-  it('reports empty tone/targetEmotion as SOFT only (not blocking)', () => {
+  it('reports empty tone/subGenre as SOFT only (not blocking)', () => {
     const r = evaluateProducerGate({
-      settings: { ...baseSettings, tone: [], targetEmotion: [], subGenre: '' },
+      settings: { ...baseSettings, tone: [], subGenre: '' },
       storyReady: true,
       cast: [fullPerson()],
     })
     expect(r.canHandoff).toBe(true)
     const softFields = r.softMissing.map((i) => i.field)
-    expect(softFields).toEqual(expect.arrayContaining(['tone', 'targetEmotion', 'subGenre']))
+    expect(softFields).toEqual(expect.arrayContaining(['tone', 'subGenre']))
+    expect(softFields).not.toContain('targetEmotion')
   })
 })
 

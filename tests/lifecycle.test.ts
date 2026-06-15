@@ -30,7 +30,6 @@ const producerSource = {
       entityType: 'person',
       role: 'protagonist',
       appearance: '검은 후디',
-      voice: '낮고 빠름',
       arc: { start_state: '도주', end_state: '대면', arc_type: '용기' },
       motivation: { want: '살아남기' },
     },

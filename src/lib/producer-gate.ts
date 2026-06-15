@@ -114,13 +114,11 @@ export function evaluateProducerGate({ settings, storyReady, cast }: GateInput):
   if (!storyReady)
     hardMissing.push({ field: 'storyText', label: '스토리가 아직 준비되지 않음' })
 
-  // soft: subGenre / tone[] / targetEmotion[]
+  // soft: subGenre / tone[]
   if (!isFilled(settings.subGenre))
     softMissing.push({ field: 'subGenre', label: '세부 장르(subGenre)', detail: '비우면 writer에 빈 채로 전달' })
   if (!isFilled(settings.tone))
     softMissing.push({ field: 'tone', label: '톤(tone)', detail: '채우면 각본 퀄이 올라가요' })
-  if (!isFilled(settings.targetEmotion))
-    softMissing.push({ field: 'targetEmotion', label: '목표 감정(targetEmotion)', detail: '채우면 각본 퀄이 올라가요' })
 
   // ── 게이트 B: Cast (depth 연동) ─────────────────────────────
   const depth = depthLevelFromRuntime(

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 
 /**
- * 문자열 배열(tone[] / targetEmotion[]) 칩 편집기.
+ * 문자열 배열(tone[]) 칩 편집기.
  * Enter 또는 blur 로 추가, 칩의 X 로 제거. 중복(대소문자 무시)은 무시.
  * design.md §2.5 — 칩은 Badge(secondary), 색만으로 상태 전달 안 함.
  */

@@ -57,23 +57,27 @@ Stage 식별자 및 handoff 레이블: `src/lib/constants.ts`.
 
 ### 목적
 
-프로젝트 시작점. Producer Agent와 대화하며 스토리/컨셉/설정 수집.
-"미팅하듯이" 자연스럽게 정보를 채우는 대화 중심 설계.
-Producer 입력이 writer 엔진(`/api/writer/start`) 호출의 seed가 된다.
+프로젝트 시작점. Producer Agent와 대화하며 스토리/컨셉/설정을 수집하고,
+main의 **Handoff readiness board**에서 writer로 넘길 계약의 준비 상태를 확인한다.
+오른쪽 `GlobalChat`은 전 stage 공통 고정 rail이고, Producer main은 하나의 board surface로 구성된다.
 
 ### 입력
 
 | 데이터 | 방식 |
 |--------|------|
-| story_text | 대화로 입력 또는 파일 업로드 (시나리오 복붙) |
-| project_settings | AI가 스토리에서 추론 → 사용자 확인 (장르, 비율, 길이) |
+| story_text | GlobalChat 대화 또는 파일 업로드로 입력. 준비 여부는 board에서 read-back |
+| project_settings | AI가 스토리에서 추론 → board에서 사용자 확인/수정 (러닝타임, 장르, 포맷, 톤, 언어) |
+| cast | AI가 인물/사물을 추출 → board 카드에서 quick edit 또는 chat draft assist로 보강 |
+| targetEmotion | **Producer 입력 없음** — writer 파생/후속 영역 |
+| character voice | **제거됨** — editor audio `kind='voice'`와 별개 |
 
 ### 출력 (→ writer engine)
 
 | 데이터 | 내용 |
 |--------|------|
 | story_text | 사용자 입력 스토리 |
-| project_settings | playtime, genre, aspectRatio, toneStyle |
+| project_settings / genre | playtime, genre, subGenre, format, tone, dialogueLanguage, `targetEmotion: []` compatibility payload |
+| castContract | name, entity_type, role, appearance, arc, motivation (voice 없음) |
 
 ---
 
