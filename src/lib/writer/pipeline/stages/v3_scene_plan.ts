@@ -1,8 +1,12 @@
-// L3: 씬 단위 비주얼 플랜
-// 글로벌 L0~L2와 샷 단위 L4 사이의 다리.
+// V3: 씬 단위 비주얼 플랜
+// 글로벌 V0~V2와 샷 단위 V4 사이의 다리.
 // 한 씬을 어떻게 찍을지 — 커버리지/렌즈/카메라/조명 디시플린 설정.
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
+import {
+  validateSceneCinematography,
+  buildCorrectionNote,
+} from '@/lib/writer/pipeline/validators/scene_cinematography';
 import type {
   ArtDirection,
   ProductionDesign,
@@ -47,9 +51,9 @@ export async function runSceneCinematography(
     )
     .join('\n');
 
-  const systemInstruction = `당신은 V축 L3(씬 비주얼 플랜) 설계자이다.
+  const systemInstruction = `당신은 V축 V3(씬 비주얼 플랜) 설계자이다.
 S3 씬마다 "이 씬을 어떻게 찍을 것인가"의 영상 문법을 결정한다.
-글로벌 L0~L2는 이미 정해졌고, 샷 단위 L4는 다음 단계. L3는 그 사이를 메우는 씬 디시플린.
+글로벌 V0~V2는 이미 정해졌고, 샷 단위 V4는 다음 단계. V3는 그 사이를 메우는 씬 디시플린.
 
 핵심 원칙:
 - 씬 단위 일관성: 한 씬 내 lens / mount / energy는 일관되어야 함
@@ -149,24 +153,59 @@ ${sceneToShotHint}
     provider: axisConfig.provider,
   });
 
-  const shotCountTotal = llmResult.scene_plans.reduce(
+  // rule-base 자기 검증 (V3 내용을 V3에서 확인) — enum/수치/상류(V2 팔레트·씬 등장인물) 정합.
+  //   CRITICAL 위반 시 위반 목록을 첨부해 1회 교정 재생성하고, CRITICAL 이 더 적은 쪽을 채택한다.
+  let scenePlans = llmResult.scene_plans;
+  let validation = validateSceneCinematography(scenePlans, scenes, productionDesign);
+  const criticalCount = (v: typeof validation) =>
+    v.issues.filter((i) => i.severity === 'CRITICAL').length;
+
+  if (!validation.valid) {
+    const repairPrompt = `${userPrompt}
+
+[규칙 위반 — 아래 항목을 반드시 고쳐 동일 JSON 형식으로 다시 출력]
+${buildCorrectionNote(validation.issues)}`;
+    const repaired = await generateJson<{ scene_plans: SceneCinematography[] }>(repairPrompt, axisConfig, {
+      systemInstruction,
+      temperature: 0.4,
+    });
+    await logger.saveLlmCall('sceneCinematography_repair', {
+      prompt: repairPrompt,
+      response: JSON.stringify(repaired, null, 2),
+      model: describeAxisConfig(axisConfig),
+      provider: axisConfig.provider,
+    });
+    const repairedValidation = validateSceneCinematography(repaired.scene_plans, scenes, productionDesign);
+    if (criticalCount(repairedValidation) <= criticalCount(validation)) {
+      scenePlans = repaired.scene_plans;
+      validation = repairedValidation;
+    }
+  }
+
+  const shotCountTotal = scenePlans.reduce(
     (sum, p) => sum + (p.shot_count_target ?? 0),
     0
   );
 
+  // action_budget 이슈 + 자기 검증 이슈 합본 영속(둘 다 ValidationIssue).
+  const allIssues = [...allBudgetIssues, ...validation.issues];
+
   await logger.saveStage('10_sceneCinematography.json', {
-    scene_plans: llmResult.scene_plans,
+    scene_plans: scenePlans,
     shot_count_total: shotCountTotal,
-    budget_issues: allBudgetIssues,
+    budget_issues: allIssues,
+    validation_passed: validation.valid,
   });
   await logger.markStage('sceneCinematography', 'completed', {
-    scene_count: llmResult.scene_plans.length,
+    scene_count: scenePlans.length,
     shot_count_total: shotCountTotal,
+    validation_passed: validation.valid,
+    cinematography_issues: validation.issues.length,
   });
 
   return {
-    scene_plans: llmResult.scene_plans,
+    scene_plans: scenePlans,
     shot_count_total: shotCountTotal,
-    budget_issues: allBudgetIssues,
+    budget_issues: allIssues,
   };
 }

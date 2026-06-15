@@ -3,9 +3,9 @@
 
 export type DepthLevel = 'D1' | 'D2' | 'D3' | 'D4' | 'D5' | 'D6' | 'D7';
 
-// Compact Mode 트리거: 어떤 depth도 L3를 스킵하지 않음 — 짧은 영상(D1~D3)도 풀 파이프라인.
-//   (이전엔 D1~D3가 L3를 스킵하고 L4가 디시플린을 자체 판단 → 씬 단위 연출 규율이 약했음.
-//    연출 품질을 위해 모든 depth가 L3 씬 비주얼 플랜을 거치도록 변경.)
+// Compact Mode 트리거: 어떤 depth도 V3를 스킵하지 않음 — 짧은 영상(D1~D3)도 풀 파이프라인.
+//   (이전엔 D1~D3가 V3를 스킵하고 V4가 디시플린을 자체 판단 → 씬 단위 연출 규율이 약했음.
+//    연출 품질을 위해 모든 depth가 V3 씬 비주얼 플랜을 거치도록 변경.)
 //   재활성화하려면 해당 레벨을 배열에 다시 추가하면 됨.
 export const COMPACT_DEPTH_LEVELS: readonly DepthLevel[] = [];
 export function isCompactDepth(d: DepthLevel): boolean {
@@ -26,13 +26,13 @@ export interface PipelineModelsInput {
 }
 
 // =====================================================================
-// L5: T2I / TI2V 최종 프롬프트 (마지막 stage 출력)
+// V5: T2I / TI2V 최종 프롬프트 (마지막 stage 출력)
 // =====================================================================
 
 export interface T2IPrompt {
   prompt: string;                  // 첫 프레임 생성용 (200~400자)
   negative_prompt?: string;
-  aspect_ratio: string;            // L0.aspect_ratio
+  aspect_ratio: string;            // V0.aspect_ratio
   width?: number;
   height?: number;
   reference_assets: string[];      // 캐릭터/로케이션 ID (IP-Adapter 등)
@@ -72,15 +72,15 @@ export interface RenderPromptsOutput {
 }
 
 // =====================================================================
-// Assets: 캐릭터/로케이션 reference 이미지 (L2 직후 생성, L6 input)
-//   - L0의 reference_assets ID와 1:1 매칭되는 실제 이미지 URL
-//   - L6 T2I는 이걸 reference_image_urls로 fal에 전달 (I2I)
+// Assets: 캐릭터/로케이션 reference 이미지 (V2 직후 생성, V6 input)
+//   - V0의 reference_assets ID와 1:1 매칭되는 실제 이미지 URL
+//   - V6 T2I는 이걸 reference_image_urls로 fal에 전달 (I2I)
 // =====================================================================
 
 export type AssetKind = 'character' | 'location';
 
 export interface AssetItem {
-  id: string;                // S2 character.id 또는 L2 location.id
+  id: string;                // S2 character.id 또는 V2 location.id
   kind: AssetKind;
   name: string;
   prompt_used: string;
@@ -100,13 +100,13 @@ export interface AssetsManifest {
   failed_count: number;
   pending_count?: number;
   model: string;
-  aspect_ratio: string;            // L0.aspect_ratio (reference 일관성 위해 동일)
+  aspect_ratio: string;            // V0.aspect_ratio (reference 일관성 위해 동일)
   characters: AssetItem[];
   locations: AssetItem[];
 }
 
 // =====================================================================
-// L6: 첫 프레임 이미지 (fal.ai T2I 결과)
+// V6: 첫 프레임 이미지 (fal.ai T2I 결과)
 // =====================================================================
 
 export interface ShotImageResult {
@@ -134,7 +134,7 @@ export interface ShotImagesOutput {
 }
 
 // =====================================================================
-// L7: 영상 클립 (fal.ai TI2V 결과)
+// V7: 영상 클립 (fal.ai TI2V 결과)
 // =====================================================================
 
 export interface ShotVideoResult {
@@ -175,7 +175,7 @@ export interface PipelineInput {
    * Stage skip 플래그. 피드백이 다운스트림에 실질 반영되지 않는 stage를
    * 건너뛰어 LLM 호출/시간을 절약한다. 미지정 시 default = skip(true).
    *   - validation1: c_validation_1 (C 검증 ①) 통째 skip
-   *   - midPreview:  mid_preview 통째 skip (빈 추천으로 L0L1/L2/L3 자체 결정)
+   *   - midPreview:  mid_preview 통째 skip (빈 추천으로 V0V1/V2/V3 자체 결정)
    */
   skip?: {
     validation1?: boolean;
@@ -308,7 +308,7 @@ export interface Scenes {
 export type ValidationSeverity = 'CRITICAL' | 'WARNING' | 'INFO';
 
 export interface ValidationIssue {
-  category: 'causality' | 'cdq' | 'verisimilitude' | 'cliche' | 'action_budget' | 'continuity' | 'theme';
+  category: 'causality' | 'cdq' | 'verisimilitude' | 'cliche' | 'action_budget' | 'continuity' | 'theme' | 'cinematography';
   severity: ValidationSeverity;
   location: string; // "S3.scene_2" or "shot_5" etc
   message: string;
@@ -389,8 +389,8 @@ export interface ProductionDesign {
 }
 
 // =====================================================================
-// L3: 씬 단위 비주얼 플랜 (Scene-level visual discipline)
-// 글로벌 L0~L2와 샷 L4 사이의 다리. 한 씬을 어떻게 찍을지의 영상 문법.
+// V3: 씬 단위 비주얼 플랜 (Scene-level visual discipline)
+// 글로벌 V0~V2와 샷 V4 사이의 다리. 한 씬을 어떻게 찍을지의 영상 문법.
 // =====================================================================
 
 export interface SceneCinematography {
@@ -418,7 +418,7 @@ export interface SceneCinematography {
     dominant_ratio: string;   // "4:1" 등
     quality: 'hard' | 'soft' | 'diffused';
   };
-  palette_emphasis: string[];  // L2.global_palette 중 강조할 색
+  palette_emphasis: string[];  // V2.global_palette 중 강조할 색
 
   // 공간 / POV
   dominant_pov: string;        // character_id | "omniscient"
@@ -444,7 +444,7 @@ export interface SceneCinematography {
 //     - 샷 = "어떻게 찍는가" (카메라 단위)
 //     - 둘의 매핑(N:M)이 감독의 1차 craft = découpage
 //   시간 제약은 driver가 아니라 validator: 감독이 샷 수를 저작, action_budget이 검증.
-//   L3/L4 사이에 위치. L4는 이 데쿠파주를 받아 각 샷을 3분할로 살만 붙인다.
+//   V3/V4 사이에 위치. V4는 이 데쿠파주를 받아 각 샷을 3분할로 살만 붙인다.
 // =====================================================================
 
 export type ShotOperation =
@@ -511,10 +511,10 @@ export interface DecoupagePlan {
 }
 
 // =====================================================================
-// L4: 샷 단위 3분할 (T2I2V 파이프라인 대응)
-//   L4a: 연출 의도 (story beat 1:1 매핑)
-//   L4b: 정적 시각 (Image 생성 입력 — 풍부)
-//   L4c: 동적 시각 (Video 생성 입력 — 압축)
+// V4: 샷 단위 3분할 (T2I2V 파이프라인 대응)
+//   V4a: 연출 의도 (story beat 1:1 매핑)
+//   V4b: 정적 시각 (Image 생성 입력 — 풍부)
+//   V4c: 동적 시각 (Video 생성 입력 — 압축)
 // =====================================================================
 
 export interface ShotIntent {
@@ -533,7 +533,7 @@ export interface ShotStaticSpec {
   shot_id: string;
 
   // 카메라 (frame start 기준 정적)
-  lens_mm: number;                   // L3.lens_vocabulary에서 선택
+  lens_mm: number;                   // V3.lens_vocabulary에서 선택
   shot_type: string;                 // EWS, WS, MS, MCU, CU, ECU, OTS, 2S, INSERT, POV
   camera_angle: string;              // eye_level, low, high, dutch, overhead 등
   focal_distance_m?: number;
@@ -571,7 +571,7 @@ export interface ShotStaticSpec {
   }>;
 
   // 색/질감 emphasis
-  palette_emphasis: string[];        // L3.palette_emphasis 중 이 샷 강조 색
+  palette_emphasis: string[];        // V3.palette_emphasis 중 이 샷 강조 색
   texture_notes: string;
   color_grading_intent: string;
 

@@ -157,7 +157,7 @@ L0은 캐릭터/월드를 카드 UI로 사전 정의해 Asset Storage로 공급.
 > **producer-story-gate (2026-06-12)**: 옛 writer `s0`(장르축)·`s2`(캐릭터 정의)를 **producer로 승격**.
 > producer가 장르축+캐스트를 게이트로 확정 → 핸드오프 시 `characters` upsert(`origin='producer'`) +
 > genre/cast **seed** → writer는 s0/s2 **생략**하고 s1(구조)부터 수행. 역할 분담 =
-> **producer(스토리 정체성) → writer(전개 s1·s3 + 연출 l0~l5) → 러프 보드**.
+> **producer(스토리 정체성) → writer(전개 s1·s3 + 연출 v0~v5) → 러프 보드**.
 > characters는 producer가 정의하면 **입력**(재실행해도 보존, additive) — writer는 새 인물만 추가.
 > 캐릭터 칸: `appearance` 단일(옛 `fixed_prompt` drop) + `entity_type`(person/object)·`origin`·
 > `voice`·`arc`·`motivation` (producer-story-gate, `locked` 제거). 관계 = `character_relationships` 테이블.

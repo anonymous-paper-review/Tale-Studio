@@ -1,7 +1,7 @@
-// L7: TI2V 영상 생성 (fal.ai Seedance)
+// V7: TI2V 영상 생성 (fal.ai Seedance)
 import { NextRequest, NextResponse } from 'next/server';
 import { PipelineLogger } from '@/lib/writer/logger';
-import { runShotVideos } from '@/lib/writer/pipeline/stages/l7_videos';
+import { runShotVideos } from '@/lib/writer/pipeline/stages/v7_videos';
 import type { RenderPromptsOutput, ShotImagesOutput } from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';

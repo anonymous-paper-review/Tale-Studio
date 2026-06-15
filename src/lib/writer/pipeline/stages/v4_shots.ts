@@ -1,10 +1,10 @@
-// L4: 샷 단위 3분할
-//   L4a: 연출 의도 (story beat 1:1)
-//   L4b: 정적 시각 (Image 생성기 입력 — 풍부)
-//   L4c: 동적 시각 (Video 생성기 입력 — 압축)
+// V4: 샷 단위 3분할
+//   V4a: 연출 의도 (story beat 1:1)
+//   V4b: 정적 시각 (Image 생성기 입력 — 풍부)
+//   V4c: 동적 시각 (Video 생성기 입력 — 압축)
 //
-// 입력: L3 SceneVisualPlan으로 씬 디시플린이 잡혀 있어, 자유도가 제한됨.
-//        각 샷은 L3 vocabulary 안에서만 결정.
+// 입력: V3 SceneVisualPlan으로 씬 디시플린이 잡혀 있어, 자유도가 제한됨.
+//        각 샷은 V3 vocabulary 안에서만 결정.
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
   DecoupagePlan,
@@ -30,14 +30,14 @@ export async function runShotDesign(
   artDirection: ArtDirection,
   productionDesign: ProductionDesign,
   sceneCinematographyPlans: SceneCinematography[] | null,  // null이면 Compact Mode
-  decoupage: DecoupagePlan | null,          // 감독 데쿠파주. null이면 L4가 자체적으로 샷 수 결정 (legacy)
+  decoupage: DecoupagePlan | null,          // 감독 데쿠파주. null이면 V4가 자체적으로 샷 수 결정 (legacy)
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
 ): Promise<ShotDesign[]> {
   const compactMode = sceneCinematographyPlans === null;
   await logger.markStage('shotDesign', 'started', { compact_mode: compactMode, decoupage_driven: decoupage !== null });
 
-  // 씬별로 L4 생성 (씬 디시플린 명확하게 적용하기 위해 분리 호출)
+  // 씬별로 V4 생성 (씬 디시플린 명확하게 적용하기 위해 분리 호출)
   const allShots: ShotDesign[] = [];
   for (const scene of scenes.scenes) {
     const plan = compactMode ? null : sceneCinematographyPlans!.find((p) => p.scene_id === scene.scene_id) ?? null;
@@ -70,27 +70,27 @@ async function generateL4ForScene(
   const compactMode = plan === null;
   const decoupageDriven = sceneDec !== null && sceneDec.length > 0;
   const disciplineSection = compactMode
-    ? `[Compact Mode — L3 미제공]
+    ? `[Compact Mode — V3 미제공]
 짧은 영상(D1~D3)이라 씬 비주얼 플랜 단계가 생략됨.
-디시플린을 L4 자체에서 결정한다:
+디시플린을 V4 자체에서 결정한다:
 - lens_mm: 50mm 기본, 필요 시 35/85 변주 (씬 내 1~2종으로 제한)
 - camera_motion.type: 짧은 영상은 단순/안정 우선 (static or handheld_drift 위주)
 - color_temp_kelvin: 씬 시간대/무드에 맞춰 일관 유지
 - key_fill_ratio: 4:1 기본 (드라마틱) 또는 2:1 (자연)
 - 샷 개수: 액션 예산에 따라 자동
 - 시선/180°축: 대화 씬이면 자체적으로 일관 유지`
-    : `[일반 모드 — L3 디시플린 준수]
-- lens_mm은 반드시 L3.lens_vocabulary 안에서 선택
-- camera_motion.type은 L3.camera_mounting + camera_energy에 부합
+    : `[일반 모드 — V3 디시플린 준수]
+- lens_mm은 반드시 V3.lens_vocabulary 안에서 선택
+- camera_motion.type은 V3.camera_mounting + camera_energy에 부합
   · tripod + static → 'static'만
   · handheld + breathing → 'static' or 'handheld_drift'만
   · gimbal + kinetic → 'tracking', 'dolly_in/out' 허용
-- color_temp_kelvin은 L3.lighting_arc.start_K~end_K 사이에서 진행
-- key_fill_ratio는 L3.lighting_arc.dominant_ratio 기준
-- 샷 개수는 L3.shot_count_target ±1
-- 시선/180°축은 L3.spatial_axis_180 준수`;
+- color_temp_kelvin은 V3.lighting_arc.start_K~end_K 사이에서 진행
+- key_fill_ratio는 V3.lighting_arc.dominant_ratio 기준
+- 샷 개수는 V3.shot_count_target ±1
+- 시선/180°축은 V3.spatial_axis_180 준수`;
 
-  const systemInstruction = `당신은 V축 L4(샷 실행) 디자이너이다.${decoupageDriven ? `
+  const systemInstruction = `당신은 V축 V4(샷 실행) 디자이너이다.${decoupageDriven ? `
 
 [데쿠파주 확정 모드]
 감독이 이미 샷 분해(데쿠파주)를 확정했다. 아래 [감독 데쿠파주] 목록의 각 샷에 3분할 spec(intent/static/dynamic)을 붙이는 것이 너의 일이다.
@@ -102,23 +102,23 @@ async function generateL4ForScene(
 - intent.shot_id는 데쿠파주 shot_id를 그대로 유지한다.` : ''}
 한 씬 안의 모든 샷을 생성한다.
 
-L4는 3분할:
-  L4a (Intent): 연출 의도. story_beat_ref로 scene_actions에 1:1 매핑.
-  L4b (Static): Image 생성기 입력. 첫 프레임의 모든 정적 요소.
-  L4c (Dynamic): Video 생성기 입력. 5~15초의 동적 변화. 압축 필수.
+V4는 3분할:
+  V4a (Intent): 연출 의도. story_beat_ref로 scene_actions에 1:1 매핑.
+  V4b (Static): Image 생성기 입력. 첫 프레임의 모든 정적 요소.
+  V4c (Dynamic): Video 생성기 입력. 5~15초의 동적 변화. 압축 필수.
 
 ${disciplineSection}
 
 샷 분배 원칙:
-- 1 샷 = 5~15초${compactMode ? '' : ' (L3.avg_shot_seconds 기준 ±2)'}
+- 1 샷 = 5~15초${compactMode ? '' : ' (V3.avg_shot_seconds 기준 ±2)'}
 - duration은 story_beat의 무게에 따라 가변 (긴 침묵 = 길게, 빠른 액션 = 짧게)
 
-L4c (Dynamic) 작성 규칙 (가장 중요):
+V4c (Dynamic) 작성 규칙 (가장 중요):
 - character_motion.verb: 동사 1~2개 이내, 순차 표현 금지
 - 카메라 큰 무브 + 캐릭터 큰 액션 + 환경 변화 동시 금지
 - motion_prompt (최종 출력): 50~80자, 동사 1~2개
 
-L4b (Static) 작성 규칙:
+V4b (Static) 작성 규칙:
 - first_frame_prompt: 200~400자 OK. 정적 묘사 풍부하게
 - 캐릭터 의상/포즈/시선, 소품 배치, 조명 방향, 색감 모두 명시
 

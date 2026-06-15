@@ -1,7 +1,7 @@
-// L6: T2I 이미지 생성 (fal.ai openai/gpt-image-2)
+// V6: T2I 이미지 생성 (fal.ai openai/gpt-image-2)
 import { NextRequest, NextResponse } from 'next/server';
 import { PipelineLogger } from '@/lib/writer/logger';
-import { runShotImages } from '@/lib/writer/pipeline/stages/l6_images';
+import { runShotImages } from '@/lib/writer/pipeline/stages/v6_images';
 import type { RenderPromptsOutput } from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';

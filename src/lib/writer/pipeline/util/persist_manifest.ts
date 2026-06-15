@@ -4,8 +4,8 @@
 // shot_sequence(ShotSequenceItem.S.dialogue)를 샷 소스로 쓴다.
 //
 // 매핑:
-//   characters ← S2.characters (appearance = appearance_description, costume = L2.costumes[id])
-//   locations  ← L2.locations
+//   characters ← S2.characters (appearance = appearance_description, costume = V2.costumes[id])
+//   locations  ← V2.locations
 //   scenes     ← S3.scenes
 //   shots      ← shot_sequence.shots (대사 포함)
 //

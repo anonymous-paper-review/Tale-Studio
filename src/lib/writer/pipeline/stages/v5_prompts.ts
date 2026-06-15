@@ -1,8 +1,8 @@
-// L5: T2I + TI2V 최종 프롬프트 정리
+// V5: T2I + TI2V 최종 프롬프트 정리
 //   - 기존 샷의 first_frame_generation.composition_prompt → T2I 프롬프트로 추출
 //   - 기존 샷의 video_generation.motion_prompt → TI2V 프롬프트로 추출
 //   - 둘 중 하나라도 없으면 LLM 호출로 생성 (fallback)
-//   - 다양한 샷 스키마(rich-A / declared-B / L4 3분할 등) 모두 수용
+//   - 다양한 샷 스키마(rich-A / declared-B / V4 3분할 등) 모두 수용
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
   RenderPromptsOutput,
@@ -112,7 +112,7 @@ export async function runRenderPrompts(
 function extractT2IPrompt(shot: AnyShot): string | null {
   // 우선순위:
   // ① shot.first_frame_generation.composition_prompt (C2 출력)
-  // ② shot.static_spec.first_frame_prompt (L4b 출력 — rich-A)
+  // ② shot.static_spec.first_frame_prompt (V4b 출력 — rich-A)
   // ③ shot.S.subject + shot.S.background 조합 (rich-A fallback)
   const a = shot.first_frame_generation?.composition_prompt;
   if (typeof a === 'string' && a.trim().length > 20) return a;
@@ -132,7 +132,7 @@ function extractT2IPrompt(shot: AnyShot): string | null {
 function extractTI2VPrompt(shot: AnyShot): string | null {
   // 우선순위:
   // ① shot.video_generation.motion_prompt (C2 출력)
-  // ② shot.dynamic_spec.motion_prompt (L4c 출력 — rich-A)
+  // ② shot.dynamic_spec.motion_prompt (V4c 출력 — rich-A)
   const a = shot.video_generation?.motion_prompt;
   if (typeof a === 'string' && a.trim().length > 5) return a;
 
@@ -212,7 +212,7 @@ async function llmGenerateT2I(
 - 200~400자
 - 정적 묘사만 (움직임/순차 표현 금지 — 첫 프레임은 멈춘 한 컷)
 - 구체적 디테일: 인물 의상/포즈/표정, 배경 요소, 조명 방향, 색감, 카메라(렌즈/앵글)
-- L2 global_palette를 우선 반영
+- V2 global_palette를 우선 반영
 `;
 
   const user = `[샷 정보 — 부분 누락 가능]

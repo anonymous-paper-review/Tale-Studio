@@ -6,14 +6,14 @@ import { runScenes, mergeOpenCast } from '@/lib/writer/pipeline/stages/s3_scenes
 import { castContractToCharacters } from '@/lib/writer/cast-contract';
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
 import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview';
-import { runRenderFormatArtDirection } from '@/lib/writer/pipeline/stages/l0_l1_visual';
-import { runProductionDesign } from '@/lib/writer/pipeline/stages/l2_design';
-import { runSceneCinematography } from '@/lib/writer/pipeline/stages/l3_scene_plan';
+import { runRenderFormatArtDirection } from '@/lib/writer/pipeline/stages/v0_v1_visual';
+import { runProductionDesign } from '@/lib/writer/pipeline/stages/v2_design';
+import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan';
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
-import { runShotDesign } from '@/lib/writer/pipeline/stages/l4_shots';
+import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
 import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
-import { runRenderPrompts } from '@/lib/writer/pipeline/stages/l5_prompts';
-import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_l3';
+import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
+import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
 import { persistAssetsToDb, persistShotsToDb } from '@/lib/writer/pipeline/util/persist_manifest';
 import { isCompactDepth } from '@/lib/writer/types/pipeline';
@@ -65,7 +65,7 @@ export function emptyC1Report(): StoryCheckReport {
   };
 }
 
-// mid_preview skip 시 빈 추천 (L0L1/L2/L3이 S·L 기반 자체 결정)
+// mid_preview skip 시 빈 추천 (V0V1/V2/V3이 S·L 기반 자체 결정)
 export function emptyMidPreview(): MidPreview {
   return {
     v_recommendations: { L0: {}, L1: {}, L2_summary: '', L3_scene_strategy: '', L4_shot_recipe: '' },

@@ -9,7 +9,7 @@
 > **삭제됨** (Section 4 완료). producer가 게이트로 확정한 값을 `createRun`이 `state.genre`/
 > `state.characters`로 **seed**하므로 writer는 s1(structure)부터 수행한다. genre seed가 없으면
 > `narrativeStructure`의 `s.genre!`에서 실패 — 핸드오프는 항상 seed.
-> 분담 = **producer(스토리 정체성: 장르축+캐스트) → writer(전개: s1 구조·s3 씬 + 연출: l0~l5) → 러프 보드**.
+> 분담 = **producer(스토리 정체성: 장르축+캐스트) → writer(전개: s1 구조·s3 씬 + 연출: v0~v5) → 러프 보드**.
 
 ## 실행 모드 2개 (혼동 주의)
 
@@ -20,12 +20,12 @@
 
 ## 스테이지 (pipeline/stages/)
 
-step 키는 film-craft 명, **파일명은 옛 순번 prefix 유지** (리네임 미적용 — 키↔파일 매핑 주의):
+step 키는 film-craft 명, **파일명 prefix는 v0~v7** (2026-06-13 l→v 리네임; `v0_v1_visual`은 V0+V1 동시 산출, `c_*`/`s_*`는 C/S축):
 
 - **Story축 (S, Gemini)**: ~~`s0_genre`·`s2_characters`~~ **삭제됨** (producer seed로 대체, §3) → `s1_structure`(narrativeStructure) → `s3_scenes`(scenes — **오픈 캐스트 계약**: 기존 cast slug 주입 + `new_characters[]` 분리 반환 → `mergeOpenCast`가 state.characters에 머지 → persistAssetsToDb가 origin='writer' insert)
 - **검증 (C, Claude)**: `c_validation_1`(storyCheck) / `c_application_2` — skip 플래그로 생략 가능 (비용 절감)
-- **Visual축 (V, Gemini)**: `mid_preview` → `l0_l1_visual`(renderFormat/artDirection) → `l2_design`(productionDesign) → `l3_scene_plan`(sceneCinematography — Compact Mode 시 생략)
-- **샷/렌더**: `decoupage` → `l4_shots`(shotDesign/shotSequence) → `l5_prompts`(renderPrompts) → `l6_images` → `l7_videos`
+- **Visual축 (V, Gemini)**: `mid_preview` → `v0_v1_visual`(renderFormat/artDirection) → `v2_design`(productionDesign) → `v3_scene_plan`(sceneCinematography — rule-base 자기검증 `validators/scene_cinematography.ts`+1회 교정 / Compact Mode 시 생략)
+- **샷/렌더**: `decoupage` → `v4_shots`(shotDesign/shotSequence) → `v5_prompts`(renderPrompts) → `v6_images` → `v7_videos`
 - **에셋 이미지**: ~~`assetImages` step~~ **제거됨** (producer-story-gate 결정 8) — 캐릭터/로케이션 이미지 초기 생성은 **artist 전담**(artist 진입 시 `autoGenerateBaseImages` 자동 1회·멱등). writer 파이프라인은 행(characters/locations/scenes)만 채운다. `assets_generate.ts` 자체는 잔존(수동 라우트 `/api/writer/generate/assets`용)이나 파이프라인에선 미호출.
 
 ## 하위 모듈
@@ -33,11 +33,12 @@ step 키는 film-craft 명, **파일명은 옛 순번 prefix 유지** (리네임
 | 폴더 | 내용 |
 |---|---|
 | `llm/` | `dispatch.ts` (S/V/C 축별 프로바이더 라우팅), `fal.ts` (이미지/비디오 submit/fetch), `retry.ts` (`withLlmRetry`), `json_repair.ts`, `raw_collector.ts`, 프로바이더별 어댑터 (claude/gemini/openai/local) |
-| `pipeline/util/` | `persist_manifest.ts` (DB 행 기록 — 이미지 컬럼은 안 건드림), `persist_design_tokens.ts`, `asset_refs.ts`, `infer_l3.ts` |
+| `pipeline/util/` | `persist_manifest.ts` (DB 행 기록 — 이미지 컬럼은 안 건드림), `persist_design_tokens.ts`, `asset_refs.ts`, `infer_v3.ts` |
 | `pipeline/validators/` | stage 산출물 검증 |
 | `types/` | `pipeline.ts` — stage 입출력 타입 |
 | `logger/` | 프로젝트별 실행 로그 (raw LLM 호출 포함, 순번 prefix JSON) |
 | `adapters.ts` / `run-store.ts` / `use-writer-status.ts` | 외부 연결: DB run 상태(`running/completed/failed`), 클라 상태 훅 |
+| `shot-config-from-design.ts` | shotDesign(V4) → 6축 `camera_config`/`lighting_config` 근사 매핑. Director 진입 시 `writer_runs.state->shotDesign`에서 복원해 "DB가 DEFAULT일 때만" 자동 채움(`/api/writer/shot-configs` + `use-writer-director-sync`) |
 
 ## 규칙
 

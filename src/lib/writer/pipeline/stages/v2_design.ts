@@ -1,4 +1,4 @@
-// L2: 프로덕션 디자인 (팔레트, 컬러 의미, 로케이션, 의상, VFX)
+// V2: 프로덕션 디자인 (팔레트, 컬러 의미, 로케이션, 의상, VFX)
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
   ProductionDesign,
@@ -22,7 +22,7 @@ export async function runProductionDesign(
   // scenes에서 unique 로케이션 추출
   const uniqueLocations = Array.from(new Set(scenes.scenes.map((s) => s.location)));
 
-  const systemInstruction = `당신은 V축 L2(프로덕션 디자인) 디자이너이다.
+  const systemInstruction = `당신은 V축 V2(프로덕션 디자인) 디자이너이다.
 characters, scenes, artDirection, Mid Preview의 컬러 스크립트를 바탕으로:
 
 1. 글로벌 컬러 팔레트 (primary, secondary, accent, forbidden)

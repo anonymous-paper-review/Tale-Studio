@@ -10,6 +10,11 @@ import {
   nextShotPosition,
 } from '@/stores/director-store'
 import { isShotData } from '@/types/director'
+import {
+  isDefaultCamera,
+  isDefaultLighting,
+} from '@/lib/writer/shot-config-from-design'
+import type { CameraConfig, LightingConfig } from '@/types/shot'
 
 /**
  * Writer → Director 초기 셋업 (스펙 director.md §8).
@@ -37,6 +42,11 @@ export function useWriterDirectorSync() {
   const assetHydratedProjectIdRef = useRef<string | null>(null)
   // writer-store DB 로드 1회 가드 (projectId별). director 직행/새로고침 대응.
   const writerLoadedProjectIdRef = useRef<string | null>(null)
+  // shotDesign 파생 camera/lighting 1회 가드 (projectId별). Option B: Director 진입 시 자동 채움.
+  const shotConfigsRef = useRef<{
+    projectId: string
+    configs: Record<string, { camera_config: CameraConfig; lighting_config: LightingConfig }>
+  } | null>(null)
 
   useEffect(() => {
     // Writer 데이터(sceneManifest/shots)는 writer-store.loadProject()로만 채워지는데,
@@ -66,6 +76,26 @@ export function useWriterDirectorSync() {
       await useAssetStorageStore.getState().hydrateFromDb(assetProjectId)
     }
     if (cancelled) return
+
+    // ── Pass 0.5: shotDesign 파생 camera/lighting (projectId별 1회, Option B) ──
+    // persist 가 camera/lighting 을 DEFAULT 로 평탄화하므로, Director 진입 시 writer_runs.state
+    // ->shotDesign 에서 6축 config 를 복원해 둔다. 적용은 Pass 2에서 "DB가 DEFAULT일 때만".
+    const cfgProjectId = useDirectorCanvasStore.getState().projectId
+    if (cfgProjectId && shotConfigsRef.current?.projectId !== cfgProjectId) {
+      try {
+        const res = await fetch('/api/writer/shot-configs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: cfgProjectId }),
+        })
+        const json = res.ok ? await res.json() : null
+        shotConfigsRef.current = { projectId: cfgProjectId, configs: json?.configs ?? {} }
+      } catch {
+        shotConfigsRef.current = { projectId: cfgProjectId, configs: {} }
+      }
+    }
+    if (cancelled) return
+    const shotConfigs = shotConfigsRef.current?.configs ?? {}
 
     const dir = useDirectorCanvasStore.getState()
     const assets = useAssetStorageStore.getState()
@@ -116,12 +146,23 @@ export function useWriterDirectorSync() {
         if (isShotData(existing.data)) {
           const { characterAssetIds, worldAssetIds } = resolveAssetIds(shot)
           const d = existing.data
-          const changed =
+          const patch: Record<string, unknown> = {}
+          if (
             characterAssetIds.join(',') !== d.characterAssetIds.join(',') ||
             worldAssetIds.join(',') !== d.worldAssetIds.join(',')
-          if (changed) {
-            dir.updateNodeData<'shot'>(existing.id, { characterAssetIds, worldAssetIds })
+          ) {
+            patch.characterAssetIds = characterAssetIds
+            patch.worldAssetIds = worldAssetIds
           }
+          // camera/lighting 빈칸(DEFAULT) 자동 채움 — shotDesign 파생값. 사용자 편집(non-default) 보존.
+          const derived = shotConfigs[shot.shotId]
+          if (derived) {
+            if (isDefaultCamera(d.camera) && !isDefaultCamera(derived.camera_config))
+              patch.camera = derived.camera_config
+            if (isDefaultLighting(d.lighting) && !isDefaultLighting(derived.lighting_config))
+              patch.lighting = derived.lighting_config
+          }
+          if (Object.keys(patch).length) dir.updateNodeData<'shot'>(existing.id, patch)
         }
         continue
       }
@@ -141,8 +182,14 @@ export function useWriterDirectorSync() {
         prompt: shot.actionDescription ?? '',
         characterAssetIds,
         worldAssetIds,
-        camera: shot.camera,
-        lighting: shot.lighting,
+        camera:
+          shotConfigs[shot.shotId] && isDefaultCamera(shot.camera)
+            ? shotConfigs[shot.shotId]!.camera_config
+            : shot.camera,
+        lighting:
+          shotConfigs[shot.shotId] && isDefaultLighting(shot.lighting)
+            ? shotConfigs[shot.shotId]!.lighting_config
+            : shot.lighting,
         // #4: Writer가 설계한 샷 길이를 노드로 전달 (영상 duration + Veo 트림의 근원)
         durationSeconds: shot.durationSeconds ?? 5,
       }

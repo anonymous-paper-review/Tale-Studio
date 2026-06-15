@@ -6,7 +6,7 @@
 //   - 리듬 저작 (establish→develop→punctuate→breath) = "뇌 아픈 영상" 해독제
 //   - 시간 제약은 validator (각 샷 5~15초). action_budget이 후단에서 검증.
 //
-// 출력 DecoupagePlan은 L4 입력으로 사용됨 (L4가 각 샷에 3분할 spec을 붙임).
+// 출력 DecoupagePlan은 V4 입력으로 사용됨 (V4가 각 샷에 3분할 spec을 붙임).
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
   DecoupagePlan,
@@ -164,7 +164,7 @@ async function decoupageForScene(
 
   const raw = await generateJson<unknown>(userPrompt, axisConfig, {
     systemInstruction: SYSTEM_INSTRUCTION,
-    temperature: 0.7, // 연출 창의성 (L4보다 약간 높게)
+    temperature: 0.7, // 연출 창의성 (V4보다 약간 높게)
   });
 
   await logger.saveLlmCall(`decoupage_${scene.scene_id}`, {
