@@ -11,6 +11,11 @@ import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { WriterProgress } from '@/components/layout/writer-progress'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
+import {
+  evaluateArtistGate,
+  evaluateDirectorGate,
+  type WriterGateStatus,
+} from '@/lib/lifecycle'
 
 type ArtistTab = 'characters' | 'world' | 'inventory'
 
@@ -30,6 +35,7 @@ export default function VisualPage() {
 
   // writer-pipeline 진행상황 (producer→artist 직행 시 백그라운드 생성 진행 표시용, decisions #37)
   const { status: writerStatus } = useWriterStatus(projectId)
+  const setLifecycleStatus = useProjectStore((s) => s.setLifecycleStatus)
 
   // 프로젝트당 1회만 자동생성 트리거 (마운트/재진입 중복 방지)
   const autoGenTriggeredRef = useRef<string | null>(null)
@@ -52,11 +58,43 @@ export default function VisualPage() {
   const mainReady =
     charsLoaded && characterAssets.every((c) => c.views.main != null)
   const enterFallback = fallbackProject === projectId
-  // 결정 8(producer-story-gate): writer 가 view_main 을 더 이상 채우지 않으므로 mainReady 가
-  //   영영 거짓일 수 있다 → 파이프라인이 데이터(캐릭터 seed + 씬/로케이션)를 다 채운 시점
-  //   (pipeline_completed)에 진입하고, 빈 이미지는 진입 직후 autoGenerateBaseImages 가 생성한다.
-  //   (A3 로 인한 "핸드오프 후 90s 빈 화면 대기" 회귀 수정.)
-  const ready = mainReady || !!writerStatus?.pipeline_completed || enterFallback
+  const writerGateStatus: WriterGateStatus = writerStatus?.pipeline_completed
+    ? { state: 'ready' }
+    : writerStatus?.pipeline_failed
+      ? {
+          state: 'failed',
+          blockers: [{ field: 'writer:failed', label: writerStatus.error ?? 'Writer 실행 실패' }],
+        }
+      : writerStatus?.started
+        ? {
+            state: 'active',
+            blockers: [{ field: 'writer:active', label: 'Writer가 아직 실행 중입니다.' }],
+          }
+        : {
+            state: 'unknown',
+            blockers: [{ field: 'writer:status', label: 'Writer 상태를 아직 확인할 수 없음' }],
+          }
+
+  const artistGate = evaluateArtistGate({
+    characters: characterAssets.map((c) => ({
+      characterId: c.characterId,
+      name: c.name,
+      entityType: c.entityType,
+      appearance: c.fixedPrompt,
+      mainImageUrl: c.views.main,
+    })),
+    worlds: worldAssets.map((w) => ({
+      locationId: w.locationId,
+      name: w.name,
+      wideShot: w.wideShot,
+      establishingShot: w.establishingShot,
+    })),
+  })
+  const directorGate = evaluateDirectorGate({ writer: writerGateStatus, artist: artistGate })
+  const writerReady = writerGateStatus.state === 'ready'
+
+  // Producer handoff 직후 characters가 먼저 들어오면 Writer가 계속 도는 동안에도 Artist 작업을 시작한다.
+  const ready = charsLoaded || !!writerStatus?.pipeline_completed || enterFallback
 
   // 진입 게이트 영속화: 한 번 진입(ready)한 projectId 는 탭 전환(route remount)으로
   //   fallbackProject(useState)/타이머가 리셋돼도 다시 progress 게이트에 걸리지 않는다.
@@ -129,15 +167,24 @@ export default function VisualPage() {
     )
   }, [projectId, ready, mainReady, writerStatus])
 
+  useEffect(() => {
+    setLifecycleStatus({
+      producerSourceHash: null,
+      writer: writerGateStatus,
+      artist: artistGate,
+      director: directorGate,
+    })
+  }, [setLifecycleStatus, writerGateStatus, artistGate, directorGate])
+
   // 프로액티브 넛지 (chat-proactive-copilot Phase 1): 자동생성이 모두 끝나고(생성 중 0 + main 준비)
   //   1.5s 안정되면 채팅에 "Director로 넘어갈까요?" 다음-단계 제안을 1회 띄운다.
   //   debounce 로 생성 시작 전 조기발사 + 생성 중 깜빡임을 방지. 비용 지출 없는 넛지(자동생성은 별도 진행).
   const generatingCount = generatingViews.length + generatingLocations.length
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   useEffect(() => {
-    if (!projectId || !ready) return
+    if (!projectId || !ready || !writerReady || !artistGate.ready) return
     if (nudgeOfferedRef.current === projectId) return
-    if (characterAssets.length === 0 || !mainReady || generatingCount > 0) return
+    if (characterAssets.length === 0 || generatingCount > 0) return
     const t = setTimeout(() => {
       nudgeOfferedRef.current = projectId
       // 월드 유무에 따라 주어+조사를 자연스럽게 (명+이 / 개+가).
@@ -161,6 +208,8 @@ export default function VisualPage() {
     characterAssets.length,
     worldAssets.length,
     offerSuggestion,
+    writerReady,
+    artistGate.ready,
   ])
 
   // 진입 전 = 백그라운드 생성/ main 준비 진행 중 → progress bar 블로킹.
@@ -233,10 +282,32 @@ export default function VisualPage() {
           {error}
         </div>
       )}
+      <div className="border-t border-border bg-card px-6 py-3 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={writerReady ? 'text-success' : 'text-warning'}>
+            Writer: {writerReady ? 'ready' : writerGateStatus.state}
+          </span>
+          <span className={artistGate.ready ? 'text-success' : 'text-warning'}>
+            Artist: {artistGate.requiredCharacterIds.length - artistGate.blockers.length}/{artistGate.requiredCharacterIds.length} required ready
+          </span>
+        </div>
+        {directorGate.blockers.length > 0 && (
+          <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
+            {directorGate.blockers.slice(0, 4).map((issue) => (
+              <li key={issue.field}>{issue.label}</li>
+            ))}
+          </ul>
+        )}
+        {artistGate.warnings.length > 0 && (
+          <p className="mt-2 text-muted-foreground">
+            경고 {artistGate.warnings.length}개: object/world 이미지는 MVP 기본 경로에서 보조 자료입니다.
+          </p>
+        )}
+      </div>
       <HandoffButton
         label="Approve & Direct"
         targetStage="director"
-        disabled={characterAssets.length === 0}
+        disabled={!directorGate.ready}
       />
     </>
   )

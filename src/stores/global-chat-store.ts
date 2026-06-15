@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import type { StageId } from '@/types'
+import type { PendingProposal } from '@/lib/pending-proposal'
+import { createPendingProposal, isApprovalUtterance } from '@/lib/pending-proposal'
 import { useProjectStore } from '@/stores/project-store'
-import { useProducerStore } from '@/stores/producer-store'
+import { useProducerStore, type ExtractedSettings } from '@/stores/producer-store'
 import { useArtistStore, type ArtistUpdate } from '@/stores/artist-store'
 import {
   useDirectorCanvasStore,
@@ -43,6 +45,7 @@ interface GlobalChatState {
   error: string | null
   suggestion: ChatSuggestion | null
   dismissedSuggestionIds: string[]
+  pendingProposal: PendingProposal | null
   /** 크로스스테이지 완료 알림 배지 카운트 (chat-proactive-copilot Phase 2). 사이드바가 읽는다. */
   stageBadges: Partial<Record<StageId, number>>
 
@@ -50,6 +53,9 @@ interface GlobalChatState {
   sendMessage: (content: string) => Promise<void>
   offerSuggestion: (suggestion: ChatSuggestion) => void
   dismissSuggestion: () => void
+  offerPendingProposal: (proposal: PendingProposal) => boolean
+  dismissPendingProposal: (id?: string) => void
+  approvePendingProposal: (id?: string) => Promise<boolean>
   /** 백그라운드 생성 완료 통지 — 다른 stage에 있을 때만 배지 bump + 스로틀된 채팅 메시지. */
   notifyCompletion: (stage: StageId, label: string) => void
   clearStageBadge: (stage: StageId) => void
@@ -72,6 +78,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   error: null,
   suggestion: null,
   dismissedSuggestionIds: [],
+  pendingProposal: null,
   stageBadges: {},
 
   loadMessages: async (projectId) => {
@@ -104,6 +111,36 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const stage = useProjectStore.getState().currentStage
     const projectId = useProjectStore.getState().projectId
     const history = get().messages
+
+    const pendingProposal = get().pendingProposal
+    if (pendingProposal && pendingProposal.stage === stage && isApprovalUtterance(trimmed)) {
+      const userMsg: GlobalChatMessage = {
+        id: makeId(),
+        stage,
+        role: 'user',
+        content: trimmed,
+      }
+      set((state) => ({
+        messages: [...state.messages, userMsg],
+        loading: true,
+        error: null,
+      }))
+      if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+
+      const approved = await get().approvePendingProposal(pendingProposal.id)
+      const content = approved
+        ? `승인했어요: ${pendingProposal.action}`
+        : '제안을 승인하지 못했어요. 잠시 후 다시 시도해 주세요.'
+      set((state) => ({
+        loading: false,
+        messages: [
+          ...state.messages,
+          { id: makeId(), stage, role: 'model', content },
+        ],
+      }))
+      if (projectId) saveChatMessage(projectId, stage, 'model', content)
+      return
+    }
 
     // 전송 윈도잉 (chat-context-management) — 최근 메시지만 LLM에 보낸다. 메시지 개수(WINDOW)와
     //   글자 예산(CHAR_BUDGET) 두 상한을 함께 적용: 긴 단일 메시지가 입력을 부풀리는 것까지 막는다.
@@ -247,11 +284,56 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           .applyExtractedSettings(data.extractedSettings)
       }
       if (stage === 'artist' && Array.isArray(data.updates)) {
-        // 카드 모델 ArtistUpdate (createCharacter / regenerateCharacter /
-        // regenerateWorldAsset) — artist/chat 카드모델 재작성(2026-06-06)으로 활성화.
-        void useArtistStore
-          .getState()
-          .applyUpdates(data.updates as ArtistUpdate[])
+        const updates = data.updates as ArtistUpdate[]
+        const costUpdate = updates.find((u) =>
+          u.type === 'regenerateCharacter' || u.type === 'regenerateWorldAsset'
+        )
+        const immediateUpdates = updates.filter((u) => u.type === 'createCharacter')
+
+        if (costUpdate) {
+          const proposal = costUpdate.type === 'regenerateCharacter'
+            ? createPendingProposal({
+                stage: 'artist',
+                kind: costUpdate.views?.length === 1
+                  ? 'artistRegenerateCharacterView'
+                  : costUpdate.views && costUpdate.views.length > 1
+                    ? 'artistRegenerateCharacterViews'
+                    : 'artistRegenerateCharacterAllViews',
+                target: costUpdate.characterId,
+                action: costUpdate.views?.length
+                  ? `캐릭터 뷰 재생성: ${costUpdate.views.join(', ')}`
+                  : '캐릭터 전체 뷰 재생성',
+                impact: [
+                  '이미지 생성 비용이 발생합니다.',
+                  '기존 선택 이미지는 새 생성이 끝날 때까지 유지됩니다.',
+                  '승인 전에는 재생성이 시작되지 않습니다.',
+                ],
+                payload: {
+                  characterId: costUpdate.characterId,
+                  view: costUpdate.views?.[0],
+                  views: costUpdate.views,
+                },
+              })
+            : createPendingProposal({
+                stage: 'artist',
+                kind: 'artistRegenerateWorldAsset',
+                target: costUpdate.locationId,
+                action: '월드/배경 이미지 재생성',
+                impact: [
+                  '이미지 생성 비용이 발생합니다.',
+                  'World 이미지는 MVP Director gate의 기본 hard blocker가 아닙니다.',
+                  '승인 전에는 재생성이 시작되지 않습니다.',
+                ],
+                payload: { locationId: costUpdate.locationId },
+              })
+
+          const accepted = get().offerPendingProposal(proposal)
+          if (!accepted) set({ error: '이미 대기 중인 제안이 있어 새 Artist 생성 제안을 보류했어요.' })
+        }
+
+        if (immediateUpdates.length > 0) {
+          void useArtistStore.getState().applyUpdates(immediateUpdates)
+        }
       }
       if (stage === 'director') {
         // Agentic 응답 — DirectorCanvasUpdate[]
@@ -291,6 +373,74 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         ? [...state.dismissedSuggestionIds, state.suggestion.id]
         : state.dismissedSuggestionIds,
     })),
+
+  offerPendingProposal: (proposal) => {
+    const current = get().pendingProposal
+    if (current && current.id !== proposal.id) return false
+    set({ pendingProposal: proposal })
+    return true
+  },
+
+  dismissPendingProposal: (id) =>
+    set((state) => {
+      if (id && state.pendingProposal?.id !== id) return state
+      return { pendingProposal: null }
+    }),
+
+  approvePendingProposal: async (id) => {
+    const proposal = get().pendingProposal
+    if (!proposal) return false
+    if (id && proposal.id !== id) return false
+
+    try {
+      if (proposal.kind === 'producerSourcePatch') {
+        useProducerStore
+          .getState()
+          .applyProducerSourcePatch(proposal.payload.patch as ExtractedSettings)
+      } else if (proposal.kind === 'producerWriterRerunRequest') {
+        const ok = await useProducerStore.getState().saveAndHandoff()
+        if (!ok) return false
+      } else if (proposal.kind === 'artistRegenerateCharacterView') {
+        const characterId = proposal.payload.characterId
+        const view = proposal.payload.view
+        if (typeof characterId !== 'string') throw new Error('characterId missing')
+        if (!['main', 'back', 'sideLeft', 'sideRight'].includes(String(view))) {
+          throw new Error('view missing')
+        }
+        await useArtistStore
+          .getState()
+          .generateCharacterView(characterId, view as 'main' | 'back' | 'sideLeft' | 'sideRight', 'chat')
+      } else if (proposal.kind === 'artistRegenerateCharacterViews') {
+        const characterId = proposal.payload.characterId
+        const views = proposal.payload.views
+        if (typeof characterId !== 'string') throw new Error('characterId missing')
+        if (!Array.isArray(views)) throw new Error('views missing')
+        for (const view of views) {
+          if (!['main', 'back', 'sideLeft', 'sideRight'].includes(String(view))) {
+            throw new Error('view missing')
+          }
+        }
+        for (const view of views) {
+          await useArtistStore
+            .getState()
+            .generateCharacterView(characterId, view as 'main' | 'back' | 'sideLeft' | 'sideRight', 'chat')
+        }
+      } else if (proposal.kind === 'artistRegenerateCharacterAllViews') {
+        const characterId = proposal.payload.characterId
+        if (typeof characterId !== 'string') throw new Error('characterId missing')
+        await useArtistStore.getState().generateCharacterAllViews(characterId, 'chat')
+      } else if (proposal.kind === 'artistRegenerateWorldAsset') {
+        const locationId = proposal.payload.locationId
+        if (typeof locationId !== 'string') throw new Error('locationId missing')
+        await useArtistStore.getState().generateWorldAsset(locationId, 'chat')
+      }
+      set({ pendingProposal: null })
+      return true
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : '제안 실행 실패' })
+      return false
+    }
+  },
 
   // 백그라운드 생성 완료 통지 (Phase 2). 유저가 *다른* stage에 있을 때만 알린다(보고 있으면 불필요).
   //   배지는 매번 bump(가벼운 카운트), 채팅 메시지는 stage당 10초 스로틀(배치 스팸 방지).
@@ -340,6 +490,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       loading: false,
       error: null,
       suggestion: null,
+      pendingProposal: null,
       dismissedSuggestionIds: [],
       stageBadges: {},
     })

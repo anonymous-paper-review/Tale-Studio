@@ -9,7 +9,9 @@ import { CastPanel } from '@/features/producer/cast-panel'
 import { GateStatus } from '@/features/producer/gate-status'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { evaluateProducerGate } from '@/lib/producer-gate'
+import { createPendingProposal } from '@/lib/pending-proposal'
 
 export default function MeetingPage() {
   const router = useRouter()
@@ -30,6 +32,9 @@ export default function MeetingPage() {
 
   // writer 산출물 게이트백 — 씬/샷이 없어 producer 로 되돌려진 프로젝트면 재실행 배너 노출.
   const writerNeedsRerun = useProjectStore((s) => s.writerNeedsRerun)
+  const reachedStage = useProjectStore((s) => s.reachedStage)
+  const offerPendingProposal = useGlobalChatStore((s) => s.offerPendingProposal)
+  const afterHandoff = reachedStage !== 'producer'
 
   // Redirect via useEffect to avoid router.push failing inside async handlers
   const [redirectTo, setRedirectTo] = useState<string | null>(null)
@@ -44,8 +49,33 @@ export default function MeetingPage() {
     if (ok) setRedirectTo('/studio/writer')
   }
 
+  const handleWriterRerunProposal = () => {
+    const accepted = offerPendingProposal(
+      createPendingProposal({
+        stage: 'producer',
+        kind: 'producerWriterRerunRequest',
+        target: 'Writer rerun',
+        action: '현재 Producer source로 Writer를 다시 실행',
+        impact: [
+          'Writer 구현은 외부 계약을 호출합니다.',
+          'Writer 쪽 same-shot 보존이 보장되지 않았다면 downstream 산출물이 orphan/stale 될 수 있어요.',
+          '승인 전에는 아무 실행도 시작하지 않습니다.',
+        ],
+        payload: {},
+      }),
+    )
+    if (!accepted) {
+      clearError()
+    }
+  }
+
   return (
     <>
+      {afterHandoff && (
+        <div className="border-b border-warning/30 bg-warning/10 px-6 py-2 text-xs text-warning">
+          Producer source를 수정하면 기존 Writer/Artist 산출물이 낡을 수 있어요. 수동 수정은 보존되며, 재실행/재생성은 제안 승인 후에만 진행합니다.
+        </div>
+      )}
       {/* writer 미완료 게이트백 배너 — 씬/샷이 없어 Director/Editor 가 빈 화면이던 프로젝트.
           스토리/설정은 그대로 두고 'Writer 다시 실행'으로 재생성한다(persist 는 멱등 — 중복 안 생김). */}
       {writerNeedsRerun && (
@@ -61,7 +91,7 @@ export default function MeetingPage() {
           </div>
           <Button
             size="sm"
-            onClick={handleHandoff}
+            onClick={handleWriterRerunProposal}
             disabled={syncing}
             className="shrink-0 gap-1.5"
           >
@@ -70,7 +100,7 @@ export default function MeetingPage() {
             ) : (
               <RefreshCw className="size-3.5" />
             )}
-            Writer 다시 실행
+            Writer 다시 실행 제안
           </Button>
         </div>
       )}
@@ -107,7 +137,7 @@ export default function MeetingPage() {
             </>
           ) : canHandoff ? (
             <>
-              Writer로 핸드오프
+              Writer로 핸드오프 · Artist도 열기
               <ArrowRight className="ml-2 size-4" />
             </>
           ) : (

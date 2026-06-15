@@ -45,6 +45,7 @@ export function CharacterPanel() {
   const projectId = useProjectStore((s) => s.projectId)
   const workspaceId = useProjectStore((s) => s.workspaceId)
   const saveFromAsset = useInventoryStore((s) => s.saveFromAsset)
+  const requiredCharacterIds = useProjectStore((s) => s.lifecycleStatus.artist?.requiredCharacterIds ?? [])
   const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set())
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [viewDialog, setViewDialog] = useState<{
@@ -78,6 +79,7 @@ export function CharacterPanel() {
           const isObject = char.entityType === 'object'
           const hasImage = isObject ? Boolean(char.views.main) : CHARACTER_VIEW_KEYS.some((v) => char.views[v])
           const hasMainImage = Boolean(char.views.main)
+          const isRequired = requiredCharacterIds.includes(char.characterId)
           const bgScenes = getBackgroundScenes(char.characterId)
 
           // stale 판정: 해당 view의 선택된 후보 sourceHash 기준 (정보 표시만 — 자동 재생성 금지)
@@ -160,6 +162,11 @@ export function CharacterPanel() {
                   <Badge variant="secondary">사물</Badge>
                 ) : (
                   <Badge variant={ROLE_VARIANT[role]}>{role}</Badge>
+                )}
+                {isRequired && (
+                  <Badge variant={hasMainImage ? 'outline' : 'destructive'} className="text-[10px]">
+                    필수
+                  </Badge>
                 )}
               </div>
 

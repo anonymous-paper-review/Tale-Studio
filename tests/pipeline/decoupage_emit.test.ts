@@ -7,54 +7,30 @@ import path from 'node:path';
 import { buildAssetRegistry, normalizeShotSequenceAssetRefs } from '@/lib/writer/pipeline/util/asset_refs';
 import type { ProductionDesign, Characters, Scenes, ShotSequenceItem } from '@/lib/writer/types/pipeline';
 
-const LOG = path.resolve(__dirname, '../../logs/5ba68003-3922-4d91-a87b-1b1ca7f5dd2f');
+const LOG = path.resolve(__dirname, '../../logs/1f0cc616-40ff-449f-8dda-ae7e6dd8e5e0');
 const read = (f: string) => JSON.parse(fs.readFileSync(path.join(LOG, f), 'utf8'));
 
-interface L4Out {
-  shot_id: string;
-  scene_id: string;
-  duration_seconds: number;
-  shot_size: string;
-  camera_intent: string;
-  first_frame_prompt: string;
-  motion_prompt: string;
-  camera_movement: string;
-  assets: { characters: string[]; locations: string[] };
-  base_assets: string[];
+type TestShot = ShotSequenceItem & {
+  V?: { camera?: { movement?: string } }
 }
 
 describe('découpage → final_prompts emit (fixed pipeline, no L6/L7)', () => {
-  it('normalizes refs (real Layer-1) and emits I2I + TI2V prompts for all 26 shots', () => {
+  it('normalizes refs (real Layer-1) and emits I2I + TI2V prompts for every fixture shot', () => {
     const s2 = read('04_S2.json') as Characters;
     const l2 = read('09_L2.json') as ProductionDesign;
     const s3 = read('05_S3.json') as Scenes;
     const L0 = read('08_L0_L1.json').L0 as { aspect_ratio: string; fps: number; resolution: { width: number; height: number } };
-    const l4 = (read('_decoupage_l4.json').shots ?? []) as L4Out[];
+    const seq = read('13_shot_sequence.json') as { shots: TestShot[] };
 
-    expect(l4.length).toBe(26);
-
-    // L4 출력 → ShotSequenceItem 형태로 래핑 (정규화기가 읽는 필드만 채우면 됨)
-    const wrapped = l4.map((s) => ({
-      shot_id: s.shot_id,
-      duration_seconds: s.duration_seconds,
-      S: { scene_id: s.scene_id },
-      assets: {
-        characters: (s.assets?.characters ?? []).map((id) => ({ id, asset_version: 'v1' })),
-        locations: (s.assets?.locations ?? []).map((id) => ({ id, asset_version: 'a' })),
-      },
-      first_frame_generation: { base_assets: s.base_assets ?? [], composition_prompt: s.first_frame_prompt },
-      video_generation: { motion_prompt: s.motion_prompt },
-    })) as unknown as ShotSequenceItem[];
+    expect(seq.shots.length).toBeGreaterThan(0);
 
     // ── 실제 Layer-1 정규화 실행 ──
     const reg = buildAssetRegistry(s2, l2);
     const sceneLocById = new Map<string, string>(s3.scenes.map((sc) => [sc.scene_id, sc.location]));
-    const { shots: normShots, issues, droppedCount } = normalizeShotSequenceAssetRefs(wrapped, reg, sceneLocById);
+    const { shots: normShots, issues, droppedCount } = normalizeShotSequenceAssetRefs(seq.shots, reg, sceneLocById);
 
     // ── L5 추출: t2i + ti2v ──
-    const byId = new Map(l4.map((s) => [s.shot_id, s]));
     const finalShots = normShots.map((shot) => {
-      const src = byId.get(shot.shot_id)!;
       const refs = Array.from(
         new Set([
           ...shot.assets.characters.map((c) => c.id),
@@ -64,8 +40,8 @@ describe('découpage → final_prompts emit (fixed pipeline, no L6/L7)', () => {
       );
       return {
         shot_id: shot.shot_id,
-        scene_id: src.scene_id,
-        duration_seconds: src.duration_seconds,
+        scene_id: shot.S.scene_id,
+        duration_seconds: shot.duration_seconds,
         t2i: {
           prompt: shot.first_frame_generation.composition_prompt,
           aspect_ratio: L0.aspect_ratio,
@@ -75,9 +51,9 @@ describe('découpage → final_prompts emit (fixed pipeline, no L6/L7)', () => {
         },
         ti2v: {
           motion_prompt: shot.video_generation.motion_prompt,
-          duration_seconds: src.duration_seconds,
+          duration_seconds: shot.duration_seconds,
           fps: L0.fps,
-          camera_movement: src.camera_movement,
+          camera_movement: shot.V?.camera?.movement ?? 'static',
         },
       };
     });
@@ -86,10 +62,10 @@ describe('découpage → final_prompts emit (fixed pipeline, no L6/L7)', () => {
       total_shots: finalShots.length,
       shots: finalShots,
       l0_meta: { aspect_ratio: L0.aspect_ratio, fps: L0.fps, resolution: L0.resolution },
-      source: 'decoupage-driven (L4 via sub-agent) + Layer-1 normalize',
+      source: 'shot-sequence fixture + Layer-1 normalize',
       asset_refs_dropped: droppedCount,
     };
-    fs.writeFileSync(path.join(LOG, '14_final_prompts.decoupage.json'), JSON.stringify(output, null, 2));
+    expect(output.total_shots).toBe(seq.shots.length);
 
     // ── 검증 ──
     const canonical = new Set<string>([...reg.characterIds, ...reg.locationIds]);

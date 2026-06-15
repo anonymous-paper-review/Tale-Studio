@@ -38,6 +38,9 @@ export function GlobalChat() {
   const loadMessages = useGlobalChatStore((s) => s.loadMessages)
   const suggestion = useGlobalChatStore((s) => s.suggestion)
   const dismissSuggestion = useGlobalChatStore((s) => s.dismissSuggestion)
+  const pendingProposal = useGlobalChatStore((s) => s.pendingProposal)
+  const approvePendingProposal = useGlobalChatStore((s) => s.approvePendingProposal)
+  const dismissPendingProposal = useGlobalChatStore((s) => s.dismissPendingProposal)
 
   const router = useRouter()
   const currentStage = useProjectStore((s) => s.currentStage)
@@ -90,6 +93,11 @@ export function GlobalChat() {
     const path = await handoffToStage(action.targetStage)
     dismissSuggestion()
     if (path) router.push(path)
+  }
+
+  const handlePendingProposalApprove = async () => {
+    if (!pendingProposal) return
+    await approvePendingProposal(pendingProposal.id)
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -244,6 +252,44 @@ export function GlobalChat() {
                     </Button>
                   )}
                   <Button size="sm" variant="ghost" onClick={dismissSuggestion}>
+                    나중에
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {pendingProposal && pendingProposal.stage === currentStage && (
+              <div className="mr-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground">
+                <div className="flex items-start gap-1.5">
+                  <span
+                    className={cn(
+                      'mt-px inline-flex items-center rounded-full border px-1.5 py-0 align-middle text-[9px] font-medium',
+                      STAGE_BADGE_CLASS[pendingProposal.stage],
+                    )}
+                  >
+                    제안
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{pendingProposal.target}</p>
+                    <p className="mt-0.5 text-muted-foreground">{pendingProposal.action}</p>
+                    {pendingProposal.impact.length > 0 && (
+                      <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
+                        {pendingProposal.impact.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <Button size="sm" onClick={handlePendingProposalApprove}>
+                    승인
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => dismissPendingProposal(pendingProposal.id)}
+                  >
                     나중에
                   </Button>
                 </div>

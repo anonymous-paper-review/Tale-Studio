@@ -2,8 +2,11 @@ import { create } from 'zustand'
 import type { ProjectSettings, ProjectFormat } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { useProjectStore } from '@/stores/project-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { depthLevelFromRuntime } from '@/lib/depth'
 import { assignCastSlugs } from '@/lib/cast-slug'
+import { computeProducerSourceHash } from '@/lib/lifecycle'
+import { createPendingProposal } from '@/lib/pending-proposal'
 import type {
   CastMember,
   CastArc,
@@ -22,7 +25,7 @@ export interface ExtractedCastMember {
   motivation?: Partial<CastMotivation>
 }
 
-interface ExtractedSettings {
+export interface ExtractedSettings {
   playtime?: number
   genre?: string
   subGenre?: string
@@ -94,6 +97,7 @@ interface ProducerState {
   setStoryText: (text: string) => void
   updateSettings: (partial: Partial<ProjectSettings>) => void
   applyExtractedSettings: (extracted: ExtractedSettings) => void
+  applyProducerSourcePatch: (patch: ExtractedSettings) => void
   addCastMember: (entityType: EntityType) => string
   updateCastMember: (localId: string, patch: Partial<CastMember>) => void
   removeCastMember: (localId: string) => void
@@ -112,6 +116,57 @@ const DEFAULT_SETTINGS: ProjectSettings = {
   dialogueLanguage: '',
 }
 
+const SOURCE_SETTING_KEYS = [
+  'playtime',
+  'genre',
+  'subGenre',
+  'format',
+  'tone',
+  'targetEmotion',
+  'dialogueLanguage',
+] as const
+
+function isMeaningfulExtractedValue(value: unknown): boolean {
+  if (typeof value === 'string') return value.trim().length > 0
+  if (typeof value === 'number') return value > 0
+  if (Array.isArray(value)) return value.length > 0
+  return value != null
+}
+
+function normalizedComparable(value: unknown): string {
+  if (typeof value === 'string') return value.trim()
+  if (Array.isArray(value)) return JSON.stringify([...value].sort())
+  return JSON.stringify(value ?? null)
+}
+
+function extractedOverwritesExisting(
+  state: Pick<ProducerState, 'storyText' | 'projectSettings'>,
+  extracted: ExtractedSettings,
+): string[] {
+  const overwritten: string[] = []
+  if (
+    isMeaningfulExtractedValue(extracted.storyText) &&
+    state.storyText.trim().length > 0 &&
+    normalizedComparable(extracted.storyText) !== normalizedComparable(state.storyText)
+  ) {
+    overwritten.push('storyText')
+  }
+
+  for (const key of SOURCE_SETTING_KEYS) {
+    const next = extracted[key]
+    const current = state.projectSettings[key]
+    if (
+      isMeaningfulExtractedValue(next) &&
+      isMeaningfulExtractedValue(current) &&
+      normalizedComparable(next) !== normalizedComparable(current)
+    ) {
+      overwritten.push(key)
+    }
+  }
+
+  return overwritten
+}
+
 export const useProducerStore = create<ProducerState>((set, get) => ({
   storyText: '',
   storyReady: false,
@@ -127,15 +182,43 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       projectSettings: { ...state.projectSettings, ...partial },
     })),
 
-  applyExtractedSettings: (extracted) =>
+  applyExtractedSettings: (extracted) => {
+    if (!extracted) return
+    const project = useProjectStore.getState()
+    const current = get()
+    const afterHandoff = project.reachedStage !== 'producer'
+    const overwritten = extractedOverwritesExisting(current, extracted)
+
+    if (afterHandoff && overwritten.length > 0) {
+      const accepted = useGlobalChatStore.getState().offerPendingProposal(
+        createPendingProposal({
+          stage: 'producer',
+          kind: 'producerSourcePatch',
+          target: 'Producer source',
+          action: '채팅이 제안한 story/settings 변경 적용',
+          impact: [
+            `덮어쓰기 필드: ${overwritten.join(', ')}`,
+            '기존 Writer/Artist 산출물이 낡을 수 있어요.',
+            '승인 전에는 현재 Producer 값이 유지됩니다.',
+          ],
+          payload: { patch: extracted },
+        }),
+      )
+      if (!accepted) set({ error: '이미 대기 중인 제안이 있어 새 Producer 변경 제안을 보류했어요.' })
+      return
+    }
+
+    get().applyProducerSourcePatch(extracted)
+  },
+
+  applyProducerSourcePatch: (patch) =>
     set((state) => {
-      if (!extracted) return state
       const {
         storyText: nextStory,
         storyReady: nextReady,
         characters: extractedCast,
         ...settingsPatch
-      } = extracted
+      } = patch
       return {
         projectSettings: {
           ...state.projectSettings,
@@ -186,18 +269,21 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     }
 
     try {
+      const producerSourceHash = computeProducerSourceHash({
+        storyText,
+        settings: projectSettings,
+        cast,
+      })
       const supabase = createClient()
       const { error } = await supabase
         .from('projects')
         .update({
           story_text: storyText,
           settings: projectSettings,
-          // 핸드오프 → writer 탭(러프 스토리보드, 2026-06-12 부활). 파이프라인은 아래에서
-          //   백그라운드 발사되고, 사용자는 writer 탭에서 진행/결과(러프 보드)를 본다.
-          //   current_stage 는 낙관적으로 writer 로 올리되(진행 중 새로고침에도 유지),
-          //   진입 게이트(verifyWriterGate)가 "씬 없음 + run 없음/실패"면 producer 로 되돌려
-          //   빈 화면 진입을 막는다(자가 교정).
-          current_stage: 'writer',
+          // current_stage 는 MVP에서 "최고로 열린 단계"로 재사용한다.
+          // Producer gate 통과 후 Writer를 보여주되 Artist도 병렬 작업 가능해야 하므로
+          // DB unlock은 artist까지 올리고, 클라이언트 currentStage만 writer로 둔다.
+          current_stage: 'artist',
         })
         .eq('id', projectId)
 
@@ -245,6 +331,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             runtimeSeconds,
             genre,
             cast: castContract,
+            producerSourceHash,
           }),
         }).catch((e) => {
           // writer 시작 실패는 무시 (UI에 표시는 status polling이 함)
@@ -254,6 +341,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         console.warn('[producer] writer-pipeline trigger error (non-blocking):', writerErr)
       }
 
+      useProjectStore.getState().unlockThrough('artist')
       useProjectStore.getState().setStage('writer')
       set({ syncing: false })
       return true

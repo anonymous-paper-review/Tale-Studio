@@ -9,6 +9,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { notifyGenerationComplete } from '@/lib/generation-notify'
+import { registerCharacterCard } from '@/stores/asset-storage-store'
 
 export type ImageProvider = 'fal' | 'gemini' | 'tailscale'
 
@@ -585,6 +586,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             : a,
         ),
       }))
+      const asset = get().characterAssets.find((a) => a.characterId === characterId)
+      if (asset) registerCharacterCard(asset, projectId)
       notifyGenerationComplete('artist', '캐릭터 이미지') // 다른 stage에 있을 때만 알림(store가 판단)
     } catch (err) {
       console.warn(
@@ -916,6 +919,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         }
       }),
     }))
+    const asset = get().characterAssets.find((a) => a.characterId === characterId)
+    if (asset) registerCharacterCard(asset, projectId)
   },
 
   selectBoostPreset: (preset) =>

@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import type { StageId } from '@/types'
 import { STAGES } from '@/lib/constants'
+import type { LifecycleStatus } from '@/lib/lifecycle'
+import { EMPTY_LIFECYCLE_STATUS } from '@/lib/lifecycle'
 import { createClient } from '@/lib/supabase/client'
 
 /* eslint-disable @typescript-eslint/no-require-imports -- Lazy store imports avoid circular Zustand dependencies. */
@@ -21,8 +23,12 @@ interface ProjectState {
   writerActive: boolean
   /** writer 산출물 없음 + 진행 중도 아님 + DB 단계가 producer 보다 앞 → producer 재실행 필요 */
   writerNeedsRerun: boolean
+  /** Producer/Artist lifecycle gate 상태. Writer 계약이 없으면 unknown으로 둔다. */
+  lifecycleStatus: LifecycleStatus
 
   setStage: (stage: StageId) => void
+  /** reachedStage만 전진시켜 현재 보고 있는 stage는 바꾸지 않는다. */
+  unlockThrough: (stage: StageId) => void
   canNavigateTo: (stage: StageId) => boolean
   initProject: (projectId?: string) => Promise<void>
   createNewProject: () => Promise<void>
@@ -30,6 +36,8 @@ interface ProjectState {
   renameProject: (title: string) => Promise<void>
   /** 진입 시 writer 산출물(씬) 검증 → 없으면 producer 로 게이트백 + writerNeedsRerun 표시 */
   verifyWriterGate: (projectId: string) => Promise<void>
+  setLifecycleStatus: (status: LifecycleStatus) => void
+  clearLifecycleStatus: () => void
   resetProject: () => void
 }
 
@@ -73,6 +81,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   writerComplete: true,
   writerActive: false,
   writerNeedsRerun: false,
+  lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
 
   // currentStage는 "지금 보는 단계", reachedStage는 "지금까지 연 최고 단계".
   // 뒤로 가도(currentStage 후퇴) 이미 연 단계가 잠기지 않도록 reachedStage는 단조 증가.
@@ -82,12 +91,20 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       reachedStage: furtherStage(s.reachedStage, stage),
     })),
 
+  unlockThrough: (stage) =>
+    set((s) => ({
+      reachedStage: furtherStage(s.reachedStage, stage),
+    })),
+
   canNavigateTo: (stage) => {
     // 순차 잠금: producer→artist→director→editor 순으로 하나씩 열린다.
     // 도달한 최고 단계(reachedStage)까지만 진입 허용 — 다음 단계는 handoff로 열린다
     // (producer CTA / artist·director의 HandoffButton이 setStage로 reachedStage를 전진).
     return getStageIndex(stage) <= getStageIndex(get().reachedStage)
   },
+
+  setLifecycleStatus: (status) => set({ lifecycleStatus: status }),
+  clearLifecycleStatus: () => set({ lifecycleStatus: EMPTY_LIFECYCLE_STATUS }),
 
   initProject: async (restoreId?: string) => {
     if (get().projectId) return
@@ -108,6 +125,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         currentStage: project.current_stage ?? 'producer',
         // DB current_stage = 지금까지 진행한 최고 단계 → 새로고침/복원 시 그만큼 열어둔다
         reachedStage: project.current_stage ?? 'producer',
+        lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
       })
       const { useDirectorCanvasStore } = require('@/stores/director-store')
       useDirectorCanvasStore.getState().setProjectId(projectId)
@@ -134,6 +152,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         writerComplete: true,
         writerActive: false,
         writerNeedsRerun: false,
+        lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
         })
       const { useDirectorCanvasStore } = require('@/stores/director-store')
       useDirectorCanvasStore.getState().setProjectId(projectId)
@@ -154,6 +173,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       writerComplete: true,
       writerActive: false,
       writerNeedsRerun: false,
+      lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
     })
     const { useDirectorCanvasStore } = require('@/stores/director-store')
     useDirectorCanvasStore.getState().setProjectId(id)
@@ -234,6 +254,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       writerComplete: true,
       writerActive: false,
       writerNeedsRerun: false,
+      lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
     })
   },
 }))
