@@ -94,8 +94,6 @@ function inferOneScenePlan(scene: StoryScene, allShots: ShotDesign[]): SceneCine
     rhythm_profile: cut_pace === 'rapid' ? 'accelerating' : 'sustained',
     cut_pace,
     avg_shot_seconds: Math.round(avg_shot_seconds * 10) / 10,
-    silence_intentional: shotsInScene.every((s) => !s.dynamic_spec.character_motion?.length),
-    sound_motif_hints: [],
     visual_intent: '(inferred from Compact Mode L4 output)',
   };
 }
@@ -114,8 +112,6 @@ function makeEmptyPlan(scene_id: string): SceneCinematography {
     rhythm_profile: 'sustained',
     cut_pace: 'medium',
     avg_shot_seconds: 0,
-    silence_intentional: false,
-    sound_motif_hints: [],
     visual_intent: '(no shots — empty inferred plan)',
   };
 }

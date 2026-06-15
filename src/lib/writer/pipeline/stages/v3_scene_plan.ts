@@ -8,8 +8,8 @@ import {
   buildCorrectionNote,
 } from '@/lib/writer/pipeline/validators/scene_cinematography';
 import type {
-  ArtDirection,
-  ProductionDesign,
+  VisualIdentity,
+  WorldVisual,
   SceneCinematography,
   MidPreview,
   Genre,
@@ -29,8 +29,8 @@ export async function runSceneCinematography(
   genre: Genre,
   characters: Characters,
   scenes: Scenes,
-  artDirection: ArtDirection,
-  productionDesign: ProductionDesign,
+  visualIdentity: VisualIdentity,
+  worldVisual: WorldVisual,
   midPreview: MidPreview,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
@@ -101,15 +101,15 @@ ${scenes.scenes
   )
   .join('\n')}
 
-[artDirection 스타일]
-${JSON.stringify(artDirection)}
+[비주얼 스타일 (v0 VisualIdentity — 전역 고정)]
+${JSON.stringify(visualIdentity.style)}
 
-[productionDesign 요약]
-palette=${JSON.stringify(productionDesign.global_palette)}
-locations=${productionDesign.locations.map((l) => l.id).join(', ')}
+[월드 비주얼 요약 (v2 WorldVisual)]
+palette=${JSON.stringify(worldVisual.global_palette)}
+locations=${worldVisual.locations.map((l) => l.id).join(', ')}
 
-[Mid Preview 비주얼 전략 힌트]
-${midPreview.v_recommendations.L3_scene_strategy ?? ''}
+[Mid Preview 거친 seed (v3 씬 전략)]
+${midPreview.v_recommendations.v3 ?? ''}
 
 [액션 예산 분석]
 ${sceneToShotHint}
@@ -134,8 +134,6 @@ ${sceneToShotHint}
       "rhythm_profile": "sustained",
       "cut_pace": "medium",
       "avg_shot_seconds": 8,
-      "silence_intentional": false,
-      "sound_motif_hints": ["..."],
       "visual_intent": "한 줄로: 왜 이 씬을 이 패턴으로 찍는가"
     }
   ]
@@ -156,7 +154,7 @@ ${sceneToShotHint}
   // rule-base 자기 검증 (V3 내용을 V3에서 확인) — enum/수치/상류(V2 팔레트·씬 등장인물) 정합.
   //   CRITICAL 위반 시 위반 목록을 첨부해 1회 교정 재생성하고, CRITICAL 이 더 적은 쪽을 채택한다.
   let scenePlans = llmResult.scene_plans;
-  let validation = validateSceneCinematography(scenePlans, scenes, productionDesign);
+  let validation = validateSceneCinematography(scenePlans, scenes, worldVisual);
   const criticalCount = (v: typeof validation) =>
     v.issues.filter((i) => i.severity === 'CRITICAL').length;
 
@@ -175,7 +173,7 @@ ${buildCorrectionNote(validation.issues)}`;
       model: describeAxisConfig(axisConfig),
       provider: axisConfig.provider,
     });
-    const repairedValidation = validateSceneCinematography(repaired.scene_plans, scenes, productionDesign);
+    const repairedValidation = validateSceneCinematography(repaired.scene_plans, scenes, worldVisual);
     if (criticalCount(repairedValidation) <= criticalCount(validation)) {
       scenePlans = repaired.scene_plans;
       validation = repairedValidation;

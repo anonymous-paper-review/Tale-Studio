@@ -12,7 +12,6 @@ export interface ProducerSourceCastMember {
   entity_type?: LifecycleEntityType | string | null
   role?: string | null
   appearance?: string | null
-  voice?: string | null
   arc?: {
     start_state?: string | null
     end_state?: string | null
@@ -183,7 +182,6 @@ function normalizeCastMember(cast: ProducerSourceCastMember) {
     entityType: normalizeEntityType(cast.entityType ?? cast.entity_type),
     role: normalizeText(cast.role),
     appearance: normalizeText(cast.appearance),
-    voice: normalizeText(cast.voice),
     arc: {
       start_state: normalizeText(cast.arc?.start_state),
       end_state: normalizeText(cast.arc?.end_state),

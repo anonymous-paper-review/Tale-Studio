@@ -24,8 +24,12 @@ export async function runMidPreview(
   const systemInstruction = `당신은 S↔V 변환의 첫 협상자이다.
 S0~S3와 검증 결과를 보고 V축 전체 방향을 한 번에 제안한다.
 
-V0: 매체, 해상도, fps, 비율, 렌더 방식
-V1: 스타일, 쉐이프, 라인, 캐릭터 코어, 텍스처
+각 v_n 층에 줄 "거친 seed"를 한 번에 제안한다 (각 층이 이걸 직접 참고해 정밀화한다):
+v0(비주얼 아이덴티티): 매체/해상도/fps/비율/렌더 + 스타일/쉐이프/라인/캐릭터코어/텍스처 (format+style 합본)
+v1(막별 비주얼 아크): 막 진행에 따른 팔레트/조명/에너지 변화의 거친 힌트
+v2(글로벌 디자인): 팔레트/로케이션/의상 방향
+v3(씬 전략): 커버리지/리듬 패턴 힌트
+v4(샷 레시피): 정적/동적 강조 힌트
 
 컬러 스크립트: 씬별 dominant 색상과 mood 매핑
 감정 곡선: 텍스트로 표현 (예: "긴장↗ → 발견↘ → 추격↗↗ → 반전↓ → 해소→")
@@ -56,11 +60,14 @@ ${JSON.stringify(validation, null, 2)}
 [출력 형식 - JSON]
 {
   "v_recommendations": {
-    "L0": {"medium": "...", "resolution": {"width": ..., "height": ...}, "fps": ..., "aspect_ratio": "...", "rendering_method": "..."},
-    "L1": {"art_style": "...", "shape_language": "...", "line_quality": "...", "character_proportion": "...", "texture_philosophy": "..."},
-    "L2_summary": "string (2~3 문장: 글로벌 디자인 방향)",
-    "L3_scene_strategy": "string (1~2 문장: 씬 단위 영상 문법 힌트 — 어떤 커버리지/리듬 패턴이 이 스토리에 맞는가)",
-    "L4_shot_recipe": "string (1~2 문장: 샷 단위 분배 힌트 — 정적/동적 강조 방향)"
+    "v0": {
+      "format": {"medium": "...", "resolution": {"width": ..., "height": ...}, "fps": ..., "aspect_ratio": "...", "rendering_method": "..."},
+      "style": {"art_style": "...", "shape_language": "...", "line_quality": "...", "character_proportion": "...", "texture_philosophy": "..."}
+    },
+    "v1": "string (1~2 문장: 막별 비주얼 아크 거친 힌트 — 막 진행에 따른 팔레트/조명/에너지 변화)",
+    "v2": "string (2~3 문장: 글로벌 디자인 방향)",
+    "v3": "string (1~2 문장: 씬 전략 — 커버리지/리듬 패턴)",
+    "v4": "string (1~2 문장: 샷 레시피 — 정적/동적 강조)"
   },
   "color_script": [
     {"scene_id": "scene_1", "dominant": "color_name", "mood": "string"}

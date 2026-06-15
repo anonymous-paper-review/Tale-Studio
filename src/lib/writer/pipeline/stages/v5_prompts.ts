@@ -7,9 +7,8 @@ import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writ
 import type {
   RenderPromptsOutput,
   ShotGenerationPrompts,
-  RenderFormat,
-  ProductionDesign,
-  Characters,
+  VisualIdentity,
+  WorldVisual,
   ShotSequence,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
@@ -30,13 +29,15 @@ type AnyShot = Record<string, unknown> & {
 
 export async function runRenderPrompts(
   shotSequence: ShotSequence,
-  renderFormat: RenderFormat,
-  characters: Characters,
-  productionDesign: ProductionDesign,
+  visualIdentity: VisualIdentity,
+  worldVisual: WorldVisual,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
 ): Promise<RenderPromptsOutput> {
   await logger.markStage('renderPrompts', 'started', { total_shots: shotSequence.shots.length });
+
+  // v0 VisualIdentity.format = 옛 RenderFormat (매체/해상도/fps/비율). 본문은 도메인명 유지.
+  const renderFormat = visualIdentity.format;
 
   const shots: ShotGenerationPrompts[] = [];
   let t2iFallbacks = 0;
@@ -51,7 +52,7 @@ export async function runRenderPrompts(
     let t2iText = extractT2IPrompt(rawShot);
     if (!t2iText) {
       t2iFallbacks++;
-      t2iText = await llmGenerateT2I(rawShot, axisConfig, productionDesign, logger);
+      t2iText = await llmGenerateT2I(rawShot, axisConfig, worldVisual, logger);
     }
 
     // TI2V 추출 시도
@@ -202,7 +203,7 @@ function extractCameraMovement(shot: AnyShot): string | undefined {
 async function llmGenerateT2I(
   shot: AnyShot,
   axisConfig: LlmAxisConfig,
-  productionDesign: ProductionDesign,
+  worldVisual: WorldVisual,
   logger: PipelineLogger,
 ): Promise<string> {
   const system = `당신은 T2I (Text-to-Image) 프롬프트 디자이너이다.
@@ -218,8 +219,8 @@ async function llmGenerateT2I(
   const user = `[샷 정보 — 부분 누락 가능]
 ${JSON.stringify(shot, null, 2)}
 
-[productionDesign 글로벌 디자인 — 팔레트/조명/로케이션 참조]
-${JSON.stringify({ global_palette: productionDesign.global_palette, color_meaning: productionDesign.color_meaning }, null, 2)}
+[worldVisual 글로벌 디자인 — 팔레트/조명/로케이션 참조]
+${JSON.stringify({ global_palette: worldVisual.global_palette, color_meaning: worldVisual.color_meaning }, null, 2)}
 
 [출력 - JSON]
 { "prompt": "정적 첫 프레임 묘사 (한글, 200~400자)" }`;

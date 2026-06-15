@@ -20,7 +20,6 @@ export interface ExtractedCastMember {
   entityType?: EntityType
   appearance?: string
   role?: string
-  voice?: string
   arc?: Partial<CastArc>
   motivation?: Partial<CastMotivation>
 }
@@ -60,7 +59,6 @@ function mergeExtractedCast(
     const match = next.find((m) => m.name.trim().toLowerCase() === name.toLowerCase())
     if (match) {
       if (!match.appearance && e.appearance) match.appearance = e.appearance
-      if (!match.voice && e.voice) match.voice = e.voice
       if (!match.role && e.role) match.role = e.role
       if (!match.arc && e.arc && (e.arc.start_state || e.arc.end_state || e.arc.arc_type))
         match.arc = { start_state: '', end_state: '', arc_type: '', ...e.arc }
@@ -73,7 +71,6 @@ function mergeExtractedCast(
         entityType: e.entityType === 'object' ? 'object' : 'person',
         appearance: e.appearance ?? '',
         role: e.role,
-        voice: e.voice,
         arc:
           e.arc && (e.arc.start_state || e.arc.end_state || e.arc.arc_type)
             ? { start_state: '', end_state: '', arc_type: '', ...e.arc }
@@ -307,7 +304,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             entity_type: m.entityType,
             role: m.role,
             appearance: m.appearance,
-            voice: m.voice,
             arc: m.arc,
             motivation: m.motivation,
           })),
@@ -370,7 +366,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       //   재진입 시 기존(producer·writer-origin 무관) 행을 카드로 복원.
       const { data: chars } = await supabase
         .from('characters')
-        .select('id, character_id, name, role, entity_type, appearance, voice, arc, motivation, origin')
+        .select('id, character_id, name, role, entity_type, appearance, arc, motivation, origin')
         .eq('project_id', projectId)
 
       if (project) {
@@ -390,7 +386,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             entityType: c.entity_type === 'object' ? 'object' : 'person',
             appearance: (c.appearance as string) ?? '',
             role: (c.role as string) ?? undefined,
-            voice: (c.voice as string) ?? undefined,
             arc: (c.arc as CastArc) ?? undefined,
             motivation: (c.motivation as CastMotivation) ?? undefined,
             origin: c.origin === 'writer' ? 'writer' : 'producer',

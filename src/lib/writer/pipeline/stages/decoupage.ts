@@ -11,8 +11,7 @@ import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writ
 import type {
   DecoupagePlan,
   DecoupageShot,
-  ArtDirection,
-  ProductionDesign,
+  WorldVisual,
   SceneCinematography,
   Genre,
   Characters,
@@ -67,7 +66,7 @@ function buildUserPrompt(
   plan: SceneCinematography | null,
   genre: Genre,
   characters: Characters,
-  productionDesign: ProductionDesign,
+  worldVisual: WorldVisual,
 ): string {
   const beatList = scene.scene_actions
     .map((a, i) => `  [${i}] ${a}`)
@@ -102,7 +101,7 @@ ${JSON.stringify(
 )}
 
 [로케이션 디자인]
-${JSON.stringify(productionDesign.locations.filter((loc) => loc.id === scene.location || scene.location.includes(loc.id)))}
+${JSON.stringify(worldVisual.locations.filter((loc) => loc.id === scene.location || scene.location.includes(loc.id)))}
 
 [출력 형식 - JSON]
 {
@@ -156,11 +155,11 @@ async function decoupageForScene(
   plan: SceneCinematography | null,
   genre: Genre,
   characters: Characters,
-  productionDesign: ProductionDesign,
+  worldVisual: WorldVisual,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
 ): Promise<SceneDecoupage> {
-  const userPrompt = buildUserPrompt(scene, plan, genre, characters, productionDesign);
+  const userPrompt = buildUserPrompt(scene, plan, genre, characters, worldVisual);
 
   const raw = await generateJson<unknown>(userPrompt, axisConfig, {
     systemInstruction: SYSTEM_INSTRUCTION,
@@ -207,8 +206,7 @@ export async function runDecoupage(
   genre: Genre,
   characters: Characters,
   scenes: Scenes,
-  _artDirection: ArtDirection,
-  productionDesign: ProductionDesign,
+  worldVisual: WorldVisual,
   sceneCinematographyPlans: SceneCinematography[] | null,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
@@ -218,7 +216,7 @@ export async function runDecoupage(
   const sceneDecoupages: SceneDecoupage[] = [];
   for (const scene of scenes.scenes) {
     const plan = sceneCinematographyPlans?.find((p) => p.scene_id === scene.scene_id) ?? null;
-    const sceneDec = await decoupageForScene(scene, plan, genre, characters, productionDesign, logger, axisConfig);
+    const sceneDec = await decoupageForScene(scene, plan, genre, characters, worldVisual, logger, axisConfig);
     sceneDecoupages.push(sceneDec);
   }
 

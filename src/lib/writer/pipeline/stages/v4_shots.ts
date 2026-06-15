@@ -9,13 +9,11 @@ import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writ
 import type {
   DecoupagePlan,
   DecoupageShot,
-  ArtDirection,
-  ProductionDesign,
+  VisualIdentity,
+  WorldVisual,
+  CharacterVisual,
   SceneCinematography,
   ShotDesign,
-  ShotIntent,
-  ShotStaticSpec,
-  ShotDynamicSpec,
   Genre,
   Characters,
   Scenes,
@@ -27,10 +25,12 @@ export async function runShotDesign(
   genre: Genre,
   characters: Characters,
   scenes: Scenes,
-  artDirection: ArtDirection,
-  productionDesign: ProductionDesign,
+  visualIdentity: VisualIdentity,
+  worldVisual: WorldVisual,
+  characterVisual: CharacterVisual,
   sceneCinematographyPlans: SceneCinematography[] | null,  // null이면 Compact Mode
   decoupage: DecoupagePlan | null,          // 감독 데쿠파주. null이면 V4가 자체적으로 샷 수 결정 (legacy)
+  seedV4: string,                           // bridge 거친 seed.v4 (샷 레시피 — 전역 참고 힌트)
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
 ): Promise<ShotDesign[]> {
@@ -46,7 +46,7 @@ export async function runShotDesign(
       continue;
     }
     const sceneDec = decoupage?.scenes.find((d) => d.scene_id === scene.scene_id)?.shots ?? null;
-    const sceneShots = await generateL4ForScene(scene, plan, sceneDec, genre, characters, artDirection, productionDesign, logger, axisConfig);
+    const sceneShots = await generateL4ForScene(scene, plan, sceneDec, genre, characters, visualIdentity, worldVisual, characterVisual, seedV4, logger, axisConfig);
     allShots.push(...sceneShots);
   }
 
@@ -62,8 +62,10 @@ async function generateL4ForScene(
   sceneDec: DecoupageShot[] | null,  // 감독 데쿠파주 샷 목록. null이면 자체 결정 (legacy)
   genre: Genre,
   characters: Characters,
-  artDirection: ArtDirection,
-  productionDesign: ProductionDesign,
+  visualIdentity: VisualIdentity,
+  worldVisual: WorldVisual,
+  characterVisual: CharacterVisual,
+  seedV4: string,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
 ): Promise<ShotDesign[]> {
@@ -132,6 +134,9 @@ ${compactMode
     ? '[sceneCinematography 미제공 — Compact Mode. shotDesign이 자체적으로 디시플린 결정]'
     : `[이 씬의 sceneCinematography 비주얼 플랜 — 반드시 준수]\n${JSON.stringify(plan, null, 2)}`}
 
+[bridge 거친 seed (v4 샷 레시피 — 전역 참고 힌트, 제약 아님)]
+${seedV4 || '(없음)'}
+
 [genre (장르/톤)]
 ${JSON.stringify(genre)}
 
@@ -140,17 +145,19 @@ ${JSON.stringify(
   characters.characters.filter((c) => scene.characters_in_scene.includes(c.id))
 )}
 
-[artDirection (시각 스타일)]
-${JSON.stringify(artDirection)}
+[비주얼 스타일 (v0 VisualIdentity — 전역 고정)]
+${JSON.stringify(visualIdentity.style)}
 
-[productionDesign (글로벌 디자인)]
-palette=${JSON.stringify(productionDesign.global_palette)}
-locations=${JSON.stringify(productionDesign.locations.filter((loc) => loc.id === scene.location || scene.location.includes(loc.id)))}
+[월드 디자인 (v2 WorldVisual)]
+palette=${JSON.stringify(worldVisual.global_palette)}
+locations=${JSON.stringify(worldVisual.locations.filter((loc) => loc.id === scene.location || scene.location.includes(loc.id)))}
+
+[인물 의상 (v2 CharacterVisual)]
 costumes=${JSON.stringify(
     Object.fromEntries(
-      scene.characters_in_scene
-        .map((cid) => [cid, productionDesign.costumes[cid]])
-        .filter(([, v]) => v !== undefined)
+      characterVisual.characters
+        .filter((cv) => scene.characters_in_scene.includes(cv.character_id) && cv.costume?.length)
+        .map((cv) => [cv.character_id, cv.costume])
     )
   )}
 

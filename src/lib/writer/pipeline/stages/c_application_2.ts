@@ -4,9 +4,8 @@
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {
   ShotCheckReport,
-  RenderFormat,
-  ArtDirection,
-  ProductionDesign,
+  VisualIdentity,
+  WorldVisual,
   SceneCinematography,
   ShotDesign,
   Genre,
@@ -35,9 +34,8 @@ export async function runShotCheck(
   narrativeStructure: NarrativeStructure,
   characters: Characters,
   scenes: Scenes,
-  renderFormat: RenderFormat,
-  artDirection: ArtDirection,
-  productionDesign: ProductionDesign,
+  visualIdentity: VisualIdentity,
+  worldVisual: WorldVisual,
   sceneCinematographyPlans: SceneCinematography[],
   shotDesigns: ShotDesign[],
   sceneBudgetIssues: ValidationIssue[],
@@ -90,14 +88,14 @@ ${scenes.scenes
   )
   .join('\n')}
 
-[renderFormat]
-${JSON.stringify(renderFormat)}
+[renderFormat (v0 VisualIdentity.format)]
+${JSON.stringify(visualIdentity.format)}
 
-[artDirection]
-${JSON.stringify(artDirection)}
+[artDirection (v0 VisualIdentity.style)]
+${JSON.stringify(visualIdentity.style)}
 
-[productionDesign.global_palette]
-${JSON.stringify(productionDesign.global_palette)}
+[worldVisual.global_palette (v2)]
+${JSON.stringify(worldVisual.global_palette)}
 
 [sceneCinematography plans (요약)]
 ${sceneCinematographyPlans
@@ -115,7 +113,7 @@ ${JSON.stringify(sceneBudgetIssues)}
 
 [유효 asset ID — assets와 base_assets는 이 ID만 사용 (발명·버전접미사 금지)]
 characters: ${characters.characters.map((c) => c.id).join(', ')}
-locations: ${productionDesign.locations.map((l) => l.id).join(', ')}
+locations: ${worldVisual.locations.map((l) => l.id).join(', ')}
 
 [출력 형식 - JSON]
 {
@@ -322,7 +320,7 @@ ${JSON.stringify(genResult.shots, null, 2)}
   // ===== Step 3.5: asset reference 정규화 (Layer 1 — 결정론적 안전망) =====
   // LLM이 발명한/버전접미사 붙은 reference를 canonical asset ID로 강제. 미해결은 drop + 이슈.
   // 모델이 무엇을 뱉든 L5/L6엔 실재하는 asset ID만 도달하게 보장한다.
-  const assetRegistry = buildAssetRegistry(characters, productionDesign);
+  const assetRegistry = buildAssetRegistry(characters, worldVisual);
   const sceneLocationById = new Map<string, string>(scenes.scenes.map((sc) => [sc.scene_id, sc.location]));
   const assetNorm = normalizeShotSequenceAssetRefs(finalShots, assetRegistry, sceneLocationById);
   finalShots = assetNorm.shots;

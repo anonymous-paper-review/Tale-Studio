@@ -60,7 +60,7 @@ function describe(input: CharacterPromptInput): string[] {
 
 /**
  * main(대표 포트레이트) 프롬프트 — 풀바디·정면·중립배경·단일 캐릭터.
- * reference 없이 깨끗하게 생성하는 T2I 용. (핸드오프 runAssetsGenerate 의 캐릭터 프롬프트와 동일 의도)
+ * reference 없이 깨끗하게 생성하는 T2I 용.
  */
 export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
   return [

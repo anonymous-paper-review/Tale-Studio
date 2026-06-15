@@ -9,11 +9,12 @@
 // runPipeline(로컬, 파일 캐시 resume)과 별개 경로 — 그쪽 로직은 건드리지 않는다.
 import { PipelineLogger } from '@/lib/writer/logger';
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure';
-import { runScenes, mergeOpenCast } from '@/lib/writer/pipeline/stages/s3_scenes';
+import { runScenes, mergeOpenCast, mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
 import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview';
-import { runRenderFormatArtDirection } from '@/lib/writer/pipeline/stages/v0_v1_visual';
-import { runProductionDesign } from '@/lib/writer/pipeline/stages/v2_design';
+import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_v1_visual';
+import { runActVisualArc } from '@/lib/writer/pipeline/stages/v1_act_arc';
+import { runV2Design } from '@/lib/writer/pipeline/stages/v2_design';
 import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan';
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
@@ -40,12 +41,17 @@ import type {
   Genre,
   NarrativeStructure,
   Characters,
+  BackgroundContract,
   Scenes,
   StoryCheckReport,
   MidPreview,
   RenderFormat,
   ArtDirection,
+  ActVisualArc,
+  VisualIdentity,
   ProductionDesign,
+  CharacterVisual,
+  WorldVisual,
   ShotDesign,
   DecoupagePlan,
   ShotSequence,
@@ -63,14 +69,19 @@ export interface WriterRunState extends WriterRunStateBase {
   genre?: Genre;
   narrativeStructure?: NarrativeStructure;
   characters?: Characters;
+  world?: BackgroundContract;        // s2 월드/세팅 seed (producer background) — V축 재설계
   scenes?: Scenes;
   storyCheck?: StoryCheckReport;
   midPreview?: MidPreview;
 
   // Visual 축
-  renderFormat?: RenderFormat;
-  artDirection?: ArtDirection;
-  productionDesign?: ProductionDesign;
+  renderFormat?: RenderFormat;       // 레거시 — v2~v5 소비자가 아직 읽음 (마이그레이션 후 제거)
+  artDirection?: ArtDirection;       // 레거시
+  visualIdentity?: VisualIdentity;   // v0 번들 (format+style) — V축 재설계
+  actVisualArc?: ActVisualArc;       // v1 (막별 비주얼 아크) — V축 재설계
+  productionDesign?: ProductionDesign;  // 레거시 — 하류 마이그레이션 후 제거
+  characterVisual?: CharacterVisual;    // v2 분화 (인물 비주얼) — V축 재설계
+  worldVisual?: WorldVisual;            // v2 분화 (월드 비주얼) — V축 재설계
   sceneCinematography?: SceneCinematography[];
   sceneBudgetIssues?: ValidationIssue[];
 
@@ -125,10 +136,14 @@ export const WRITER_STEPS: WriterStep[] = [
       const models = resolveModels(s.input);
       const scenes = await runScenes(s.input, s.genre!, s.narrativeStructure!, s.characters!, logger, models.S);
       await logger.flushRawLlm('scenes');
-      // 오픈 캐스트(§4): 전개상 추가된 new_characters 를 state.characters 에 머지 →
-      //   하류 stage 가 새 인물을 재료로 보고, persistAssetsToDb 가 origin='writer' 로 insert.
+      // 오픈 캐스트(§4 + V축 재설계): 전개상 필요한 인물/월드를 producer 베이스라인에 append.
+      //   producer 전달값(원천)은 불변 — mergeOpen* 가 append-only(아키텍처 §5#2).
       const characters = mergeOpenCast(s.characters!, scenes);
-      return characters === s.characters ? { scenes } : { scenes, characters };
+      const world = mergeOpenWorld(s.world, scenes);
+      const patch: Partial<WriterRunState> = { scenes };
+      if (characters !== s.characters) patch.characters = characters;
+      if (world !== s.world) patch.world = world;
+      return patch;
     },
   },
   {
@@ -169,38 +184,58 @@ export const WRITER_STEPS: WriterStep[] = [
   },
   {
     key: 'visualFormat',
-    has: (s) => s.renderFormat !== undefined && s.artDirection !== undefined,
+    has: (s) => s.visualIdentity !== undefined,
     run: async (s, { logger }) => {
       const models = resolveModels(s.input);
-      const r = await runRenderFormatArtDirection(s.genre!, s.midPreview!, logger, models.V);
-      await logger.flushRawLlm('renderFormat_artDirection');
-      return { renderFormat: r.renderFormat, artDirection: r.artDirection };
+      const visualIdentity = await runVisualIdentity(s.genre!, s.midPreview!, logger, models.V);
+      await logger.flushRawLlm('visualIdentity');
+      return { visualIdentity };
     },
   },
   {
-    key: 'productionDesign',
-    has: (s) => s.productionDesign !== undefined,
-    run: async (s, { logger, projectId }) => {
+    // v1 ↔ s1: 막별 비주얼 아크. 같은-계층 [s1 narrativeStructure] + 직전 v0(renderFormat/artDirection).
+    //   (V축 재설계 — additive 도입. 현재 하류 미소비, 후속 푸시에서 v2/v3가 consume.)
+    key: 'actVisualArc',
+    has: (s) => s.actVisualArc !== undefined,
+    run: async (s, { logger }) => {
       const models = resolveModels(s.input);
-      const productionDesign = await runProductionDesign(
-        s.characters!,
-        s.scenes!,
-        s.artDirection!,
-        s.midPreview!,
+      const actVisualArc = await runActVisualArc(
+        s.narrativeStructure!,
+        s.visualIdentity!, // v0 번들 (format+style) — coarse-to-fine 직전 단계
+        s.midPreview!.v_recommendations.v1, // bridge 거친 seed(v1) 직접 참조 (거미줄)
         logger,
         models.V,
       );
-      await logger.flushRawLlm('productionDesign');
+      await logger.flushRawLlm('actVisualArc');
+      return { actVisualArc };
+    },
+  },
+  {
+    // v2 ↔ s2: 비주얼 디자인 (인물/월드). native 생성 — [v0 스타일]+[v1 아크]+[s2 chars/world]+[seed.v2].
+    //   옛 productionDesign+derive shim 대체 (V축 재설계). char/world visual 을 직접 산출.
+    key: 'v2Design',
+    has: (s) => s.characterVisual !== undefined && s.worldVisual !== undefined,
+    run: async (s, { logger, projectId }) => {
+      const models = resolveModels(s.input);
+      const { characterVisual, worldVisual } = await runV2Design(
+        s.visualIdentity!,                    // v0 전역 스타일 루트
+        s.actVisualArc!,                      // v1 막별 아크 (v-체인 상속)
+        s.characters!,                        // s2 인물
+        s.world,                              // s2 월드 (producer + 오픈캐스트)
+        s.midPreview!.v_recommendations.v2,   // bridge 거친 seed.v2
+        logger,
+        models.V,
+      );
+      await logger.flushRawLlm('v2Design');
 
-      // productionDesign 직후 → 전역 디자인 토큰 + Tier 1 에셋(characters/locations/scenes)을 DB 기록.
+      // v2 직후 → 전역 디자인 토큰 + Tier 1 에셋(characters/locations/scenes)을 DB 기록.
       //   serverless 에선 함수가 응답 후 동결되므로 fire-and-forget 불가 → await + catch 로 흡수.
-      await persistDesignTokens(projectId, s.renderFormat!, s.artDirection!, productionDesign).catch(() => {});
-      await persistAssetsToDb(projectId, s.characters!, s.scenes!, productionDesign).catch(() => {});
+      await persistDesignTokens(projectId, s.visualIdentity!, worldVisual).catch(() => {});
+      await persistAssetsToDb(projectId, s.characters!, s.scenes!, worldVisual, characterVisual).catch(() => {});
 
-      // ⚠️ 이미지 생성(캐릭터 view_main / 로케이션 wide_shot)은 writer 에서 하지 않는다
-      //   (producer-story-gate 결정 8). 이미지는 artist 전담 — artist 진입 시 autoGenerateBaseImages 가
-      //   빈칸을 자동 1회 생성(멱등). writer 는 텍스트(행/씬/샷)만 채운다.
-      return { productionDesign };
+      // ⚠️ 이미지 생성은 writer 에서 하지 않는다 (producer-story-gate 결정 8) — artist 전담
+      //   (artist 진입 시 autoGenerateBaseImages 멱등 1회). writer 는 텍스트(행/씬/샷)만 채운다.
+      return { characterVisual, worldVisual };
     },
   },
   {
@@ -228,8 +263,8 @@ export const WRITER_STEPS: WriterStep[] = [
         genre,
         s.characters!,
         scenes,
-        s.artDirection!,
-        s.productionDesign!,
+        s.visualIdentity!, // v0 (전역 스타일) — 직전 v 체인의 루트 상수
+        s.worldVisual!,    // v2 (월드 디자인: 팔레트/로케이션)
         s.midPreview!,
         logger,
         models.V,
@@ -252,8 +287,7 @@ export const WRITER_STEPS: WriterStep[] = [
         s.genre!,
         s.characters!,
         s.scenes!,
-        s.artDirection!,
-        s.productionDesign!,
+        s.worldVisual!, // v2 (로케이션 디자인). artDirection 은 decoupage 미사용 → 드롭
         compact ? null : s.sceneCinematography!,
         logger,
         models.V,
@@ -272,10 +306,12 @@ export const WRITER_STEPS: WriterStep[] = [
         s.genre!,
         s.characters!,
         s.scenes!,
-        s.artDirection!,
-        s.productionDesign!,
+        s.visualIdentity!,   // v0 (전역 스타일)
+        s.worldVisual!,      // v2 (팔레트/로케이션)
+        s.characterVisual!,  // v2 (인물 의상) — character_blocking 생성용
         compact ? null : s.sceneCinematography!,
         s.decoupage!,
+        s.midPreview!.v_recommendations.v4, // bridge 거친 seed.v4 (샷 레시피)
         logger,
         models.V,
       );
@@ -300,9 +336,8 @@ export const WRITER_STEPS: WriterStep[] = [
         s.narrativeStructure!,
         s.characters!,
         s.scenes!,
-        s.renderFormat!,
-        s.artDirection!,
-        s.productionDesign!,
+        s.visualIdentity!, // v0 (format+style) — 옛 renderFormat+artDirection
+        s.worldVisual!,    // v2 (palette/locations) — 옛 productionDesign
         s.sceneCinematography!,
         s.shotDesign!,
         s.sceneBudgetIssues ?? [],
@@ -321,9 +356,8 @@ export const WRITER_STEPS: WriterStep[] = [
       const models = resolveModels(s.input);
       const renderPrompts = await runRenderPrompts(
         s.shotSequence!,
-        s.renderFormat!,
-        s.characters!,
-        s.productionDesign!,
+        s.visualIdentity!, // v0 (format) — 옛 renderFormat
+        s.worldVisual!,    // v2 (palette/color_meaning) — 옛 productionDesign
         logger,
         models.V,
       );

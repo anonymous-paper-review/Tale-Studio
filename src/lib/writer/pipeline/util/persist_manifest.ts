@@ -4,8 +4,8 @@
 // shot_sequence(ShotSequenceItem.S.dialogue)를 샷 소스로 쓴다.
 //
 // 매핑:
-//   characters ← S2.characters (appearance = appearance_description, costume = V2.costumes[id])
-//   locations  ← V2.locations
+//   characters ← S2.characters (appearance = appearance_description, costume = v2 CharacterVisual[id].costume)
+//   locations  ← v2 WorldVisual.locations
 //   scenes     ← S3.scenes
 //   shots      ← shot_sequence.shots (대사 포함)
 //
@@ -17,7 +17,8 @@ import type { ShotType } from '@/types'
 import type {
   Characters,
   Scenes,
-  ProductionDesign,
+  WorldVisual,
+  CharacterVisual,
   ShotSequence,
 } from '@/lib/writer/types/pipeline'
 
@@ -55,7 +56,8 @@ export async function persistAssetsToDb(
   projectId: string,
   characters: Characters,
   scenes: Scenes,
-  productionDesign: ProductionDesign,
+  worldVisual: WorldVisual,
+  characterVisual: CharacterVisual,
 ): Promise<void> {
   if (!UUID_RE.test(projectId)) return // 핸드오프 외 run — DB project 없음
 
@@ -71,10 +73,10 @@ export async function persistAssetsToDb(
   //   누락될 수 있다. 그래서 locations → scenes 를 먼저 넣고 characters 를 마지막에 넣어,
   //   characters 가 보이는 순간 나머지가 보장되도록 한다.
 
-  // locations (writer productionDesign.locations — name 은 id 기반, time_of_day 는 미보유)
-  if (productionDesign.locations?.length) {
+  // locations (writer worldVisual.locations — name 은 id 기반, time_of_day 는 미보유)
+  if (worldVisual.locations?.length) {
     await supabaseAdmin.from('locations').insert(
-      productionDesign.locations.map((loc) => ({
+      worldVisual.locations.map((loc) => ({
         project_id: projectId,
         location_id: loc.id,
         name: loc.id,
@@ -109,8 +111,13 @@ export async function persistAssetsToDb(
 
   // characters: additive (producer-story-gate §4 — 인물=입력). 기존 행(producer·writer-origin)은
   //   보존하고, 새 slug 만 origin='writer' 로 insert + 기존 행은 비어 있는 보강 필드만 채운다.
-  //   producer 가 확정한 정체성(name/role/voice/arc/motivation/이미지)은 절대 덮어쓰지 않는다.
-  const costumes = productionDesign.costumes ?? {}
+  //   producer 가 확정한 정체성(name/role/arc/motivation/이미지)은 절대 덮어쓰지 않는다.
+  // v2 CharacterVisual[].costume → { character_id: costume[] } (빈 의상 제외 — 옛 productionDesign.costumes 누락과 동일 취급)
+  const costumes: Record<string, string[]> = Object.fromEntries(
+    characterVisual.characters
+      .filter((cv) => cv.costume?.length)
+      .map((cv) => [cv.character_id, cv.costume]),
+  )
   if (characters.characters.length) {
     const { data: existingRows } = await supabaseAdmin
       .from('characters')
@@ -211,9 +218,10 @@ export async function persistManifestToDb(
   projectId: string,
   characters: Characters,
   scenes: Scenes,
-  productionDesign: ProductionDesign,
+  worldVisual: WorldVisual,
+  characterVisual: CharacterVisual,
   shotSequence: ShotSequence,
 ): Promise<void> {
-  await persistAssetsToDb(projectId, characters, scenes, productionDesign)
+  await persistAssetsToDb(projectId, characters, scenes, worldVisual, characterVisual)
   await persistShotsToDb(projectId, shotSequence)
 }

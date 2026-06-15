@@ -56,7 +56,7 @@ export function adaptCharacters(characters: Characters): Character[] {
       ? (c.role as 'protagonist' | 'antagonist' | 'supporting')
       : 'supporting',
     description: c.appearance_description ?? '',
-    fixedPrompt: `${c.name} (${c.role}): ${c.appearance_description ?? ''}. 성격: ${(c.personality ?? []).join(', ')}. ${c.voice ? `목소리: ${c.voice}.` : ''}`,
+    fixedPrompt: `${c.name} (${c.role}): ${c.appearance_description ?? ''}. 성격: ${(c.personality ?? []).join(', ')}.`,
     referenceImages: [],
   }));
 }

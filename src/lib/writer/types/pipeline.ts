@@ -171,6 +171,8 @@ export interface PipelineInput {
   //   has 체크(`!== undefined`)로 자연 생략된다. writer는 s1(structure)부터 수행.
   genre?: Genre;
   cast?: CastContract;
+  // V축 재설계(2026-06-13): 월드/세팅 seed (s2 = characters + 월드). createRun이 state.world로 seed.
+  background?: BackgroundContract;
   /**
    * Stage skip 플래그. 피드백이 다운스트림에 실질 반영되지 않는 stage를
    * 건너뛰어 LLM 호출/시간을 절약한다. 미지정 시 default = skip(true).
@@ -221,7 +223,6 @@ export interface StoryCharacter {
     end_state: string;
     arc_type: string; // "positive_change" | "negative_change" | "fall" | "redemption" 등
   };
-  voice: string;
   appearance_description: string;
   motivation: {
     want: string;
@@ -251,7 +252,6 @@ export interface CastContractCharacter {
   entity_type: 'person' | 'object';
   role?: string;
   appearance: string;
-  voice?: string;
   arc?: { start_state: string; end_state: string; arc_type: string };
   motivation?: { want: string; need?: string; wound?: string };
 }
@@ -337,12 +337,14 @@ export interface ShotCheckReport {
 // =====================================================================
 
 export interface MidPreview {
+  // 거친 seed (거미줄 fan-out, V축 재설계): 각 v_n 스테이지가 자기 키를 직접 참조.
+  //   bridge skip 시 전부 빈값 → 각 층은 s_n + 직전 v 로 자체 결정.
   v_recommendations: {
-    L0: Partial<RenderFormat>;
-    L1: Partial<ArtDirection>;
-    L2_summary: string;
-    L3_scene_strategy: string;   // 씬 단위 영상 문법 힌트 (커버리지/리듬)
-    L4_shot_recipe: string;      // 샷 단위 분배 힌트 (정적/동적)
+    v0: { format: Partial<RenderFormat>; style: Partial<ArtDirection> }; // 옛 L0+L1 → 새 v0(VisualIdentity)
+    v1: string;   // 막별 비주얼 아크 거친 힌트 (신규)
+    v2: string;   // 글로벌 디자인 방향 (옛 L2_summary)
+    v3: string;   // 씬 전략 (옛 L3_scene_strategy)
+    v4: string;   // 샷 레시피 (옛 L4_shot_recipe)
   };
   color_script: Array<{ scene_id: string; dominant: string; mood: string }>;
   emotional_arc_visualization: string;
@@ -389,6 +391,56 @@ export interface ProductionDesign {
 }
 
 // =====================================================================
+// V축 연결 재설계 (2026-06-13) — coarse-to-fine + 같은-계층(s_n↔v_n) 참조.
+//   v0↔s0 VisualIdentity / v1↔s1 ActVisualArc / v2↔s2 CharacterVisual+WorldVisual / v3↔s3 SceneCinematography.
+//   각 v_n = [자기 s_n] + [직전 v_{n-1}]만 직접 참조. 계획: dev/VISUAL_AXIS_REDESIGN_PLAN.md
+//   (아래 타입은 additive 도입 — 스테이지 전환은 후속 푸시에서. 그전까지 구 RenderFormat/ArtDirection/ProductionDesign 병용.)
+// =====================================================================
+
+// producer seed: 월드/세팅 (s2 = characters + 월드). ≤10min 전제 — 스토리 필요 배경만.
+export interface BackgroundContract {
+  locations: Array<{ id: string; name: string; description: string }>;
+  setting?: string; // 세계관/시대/분위기 한 줄 (선택)
+}
+
+// v0 ↔ s0(genre): 비주얼 아이덴티티 = 포맷 + 글로벌 스타일 (구 RenderFormat+ArtDirection 병합).
+//   format/style 을 별 sub-블록으로 둬 기술 스펙 vs 미학 혼선을 막는다(audit 지적).
+export interface VisualIdentity {
+  format: RenderFormat; // 매체/해상도/fps/비율/렌더
+  style: ArtDirection;  // art_style/shape/line/proportion/texture (전역 고정)
+}
+
+// v1 ↔ s1(narrativeStructure): 막별 비주얼 아크 — 막/전환점 따라 비주얼이 어떻게 진화하는가.
+export interface ActVisualArc {
+  acts: Array<{
+    act_id: string;        // NarrativeStructure.acts[].act_id 참조
+    palette_shift: string; // 이 막의 색 방향
+    lighting_mood: string; // 조명/톤
+    energy: 'low' | 'rising' | 'high' | 'falling';
+    visual_note: string;   // 한 줄 의도
+  }>;
+  global_arc_intent: string;
+}
+
+// v2 ↔ s2(characters): 인물 비주얼.
+export interface CharacterVisual {
+  characters: Array<{
+    character_id: string;
+    appearance: string; // 시각 외형(구체)
+    costume: string[];
+    palette: string[];  // 인물 강조색
+  }>;
+}
+
+// v2 ↔ s2(world/background): 월드 비주얼 (구 ProductionDesign 의 비-의상부).
+export interface WorldVisual {
+  global_palette: { primary: string; secondary: string; accent: string; forbidden: string[] };
+  color_meaning: Record<string, string>; // color → meaning
+  locations: Array<{ id: string; style_description: string; lighting_sources: string[]; props: string[] }>;
+  vfx_approach: string;
+}
+
+// =====================================================================
 // V3: 씬 단위 비주얼 플랜 (Scene-level visual discipline)
 // 글로벌 V0~V2와 샷 V4 사이의 다리. 한 씬을 어떻게 찍을지의 영상 문법.
 // =====================================================================
@@ -428,10 +480,6 @@ export interface SceneCinematography {
   rhythm_profile: 'accelerating' | 'sustained' | 'decaying' | 'punctuated';
   cut_pace: 'long_takes' | 'medium' | 'rapid';
   avg_shot_seconds: number;
-
-  // 분위기
-  silence_intentional: boolean;
-  sound_motif_hints: string[];
 
   // 설계 근거 (1줄)
   visual_intent: string;

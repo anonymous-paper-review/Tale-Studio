@@ -7,7 +7,7 @@ import { castContractToCharacters } from '@/lib/writer/cast-contract';
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
 import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview';
 import { runRenderFormatArtDirection } from '@/lib/writer/pipeline/stages/v0_v1_visual';
-import { runProductionDesign } from '@/lib/writer/pipeline/stages/v2_design';
+import { runProductionDesign, deriveWorldVisual, deriveCharacterVisual } from '@/lib/writer/pipeline/stages/v2_design';
 import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan';
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
@@ -38,6 +38,7 @@ import type {
   RenderFormat,
   ArtDirection,
   ProductionDesign,
+  VisualIdentity,
   ShotDesign,
   DecoupagePlan,
   RenderPromptsOutput,
@@ -68,7 +69,7 @@ export function emptyC1Report(): StoryCheckReport {
 // mid_preview skip 시 빈 추천 (V0V1/V2/V3이 S·L 기반 자체 결정)
 export function emptyMidPreview(): MidPreview {
   return {
-    v_recommendations: { L0: {}, L1: {}, L2_summary: '', L3_scene_strategy: '', L4_shot_recipe: '' },
+    v_recommendations: { v0: { format: {}, style: {} }, v1: '', v2: '', v3: '', v4: '' },
     color_script: [],
     emotional_arc_visualization: '',
     production_difficulty: 'medium',
@@ -245,9 +246,16 @@ async function _runPipelineInner(
 
   const productionDesign = (await loadOrRun<ProductionDesign>(resume, '09_productionDesign.json', () => runProductionDesign(characters, scenes, artDirection, midPreview, logger, models.V), 'productionDesign', logger)).value;
 
+  // V축 재설계: v3~v5 소비자가 읽는 새 비주얼 타입(v0 visualIdentity / v2 worldVisual).
+  //   로컬 경로는 v1(actVisualArc)/native-v2 parity 미적용 — 보유한 renderFormat/artDirection/
+  //   productionDesign 으로 구성한다(push 시 서버리스 경로와 정합).
+  const visualIdentity: VisualIdentity = { format: renderFormat, style: artDirection };
+  const worldVisual = deriveWorldVisual(productionDesign, input.background);
+  const characterVisual = deriveCharacterVisual(characters, productionDesign);
+
   // productionDesign 직후 → 전역 디자인 토큰을 projects.design_tokens 에 기록 (§2-2, DB化).
   //   소비(artist 턴어라운드 등)는 DB에서 읽는다. non-blocking — 실패해도 파이프라인 계속.
-  persistDesignTokens(projectId, renderFormat, artDirection, productionDesign).catch((e) => {
+  persistDesignTokens(projectId, visualIdentity, worldVisual).catch((e) => {
     console.warn('[writer] design_tokens persist failed (pipeline continues):', e);
   });
 
@@ -256,7 +264,7 @@ async function _runPipelineInner(
   //   ⚠️ 이미지(view_main/wide_shot)는 writer 가 만들지 않는다 (producer-story-gate 결정 8):
   //   캐릭터/로케이션 이미지는 artist 전담 — artist 진입 시 autoGenerateBaseImages 가 빈칸을 자동 생성.
   //   non-blocking — 실패해도 파이프라인 계속(끝의 persistShots 와 무관).
-  persistAssetsToDb(projectId, characters, scenes, productionDesign)
+  persistAssetsToDb(projectId, characters, scenes, worldVisual, characterVisual)
     .then(() => logger.markStage('persistAssets', 'completed'))
     .catch((e) => {
       console.warn('[writer] Tier1 assets persist failed (pipeline continues):', e);
@@ -296,7 +304,7 @@ async function _runPipelineInner(
       await logger.markStage('sceneCinematography', 'completed', { skipped: true, reason: `Compact Mode (${genre.depth_level})` });
       sceneBudgetIssues = scenes.scenes.flatMap((sc) => analyzeSceneActionBudget(sc).issues);
     } else {
-      const planResult = await runSceneCinematography(genre, characters, scenes, artDirection, productionDesign, midPreview, logger, models.V);
+      const planResult = await runSceneCinematography(genre, characters, scenes, visualIdentity, worldVisual, midPreview, logger, models.V);
       await logger.flushRawLlm('sceneCinematography');
       sceneCinematography = planResult.scene_plans;
       sceneBudgetIssues = planResult.budget_issues;
@@ -308,7 +316,7 @@ async function _runPipelineInner(
   const decoupage = (await loadOrRun<DecoupagePlan>(
     resume,
     '10b_decoupage.json',
-    () => runDecoupage(genre, characters, scenes, artDirection, productionDesign, compact ? null : sceneCinematography, logger, models.V),
+    () => runDecoupage(genre, characters, scenes, worldVisual, compact ? null : sceneCinematography, logger, models.V),
     'decoupage',
     logger,
   )).value;
@@ -318,7 +326,7 @@ async function _runPipelineInner(
     resume,
     '11_shotDesign.json',
     async () => {
-      const shots = await runShotDesign(genre, characters, scenes, artDirection, productionDesign, compact ? null : sceneCinematography, decoupage, logger, models.V);
+      const shots = await runShotDesign(genre, characters, scenes, visualIdentity, worldVisual, characterVisual, compact ? null : sceneCinematography, decoupage, midPreview.v_recommendations.v4, logger, models.V);
       return { shots, compact_mode: compact };
     },
     'shotDesign',
@@ -350,11 +358,11 @@ async function _runPipelineInner(
       shotCheckResult = { shotSequence: cachedSeq, report: cachedReport };
       await logger.markStage('shotCheck', 'completed', { resumed: true });
     } else {
-      shotCheckResult = await runShotCheck(projectId, genre, narrativeStructure, characters, scenes, renderFormat, artDirection, productionDesign, sceneCinematography, shotDesign, sceneBudgetIssues, logger, models.V, models.C);
+      shotCheckResult = await runShotCheck(projectId, genre, narrativeStructure, characters, scenes, visualIdentity, worldVisual, sceneCinematography, shotDesign, sceneBudgetIssues, logger, models.V, models.C);
       await logger.flushRawLlm('shotCheck');
     }
   } else {
-    shotCheckResult = await runShotCheck(projectId, genre, narrativeStructure, characters, scenes, renderFormat, artDirection, productionDesign, sceneCinematography, shotDesign, sceneBudgetIssues, logger, models.V, models.C);
+    shotCheckResult = await runShotCheck(projectId, genre, narrativeStructure, characters, scenes, visualIdentity, worldVisual, sceneCinematography, shotDesign, sceneBudgetIssues, logger, models.V, models.C);
     await logger.flushRawLlm('shotCheck');
   }
 
@@ -366,7 +374,7 @@ async function _runPipelineInner(
   const renderPrompts = (await loadOrRun<RenderPromptsOutput>(
     resume,
     '14_renderPrompts.json',
-    () => runRenderPrompts(shotSequence, renderFormat, characters, productionDesign, logger, models.V),
+    () => runRenderPrompts(shotSequence, visualIdentity, worldVisual, logger, models.V),
     'renderPrompts',
     logger,
   )).value;

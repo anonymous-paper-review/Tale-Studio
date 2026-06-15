@@ -28,7 +28,6 @@ export interface CastMember {
   entityType: EntityType
   appearance: string
   role?: string
-  voice?: string
   arc?: CastArc
   motivation?: CastMotivation
   origin?: 'producer' | 'writer'
@@ -81,10 +80,8 @@ function evaluatePersonFields(
   if (!isFilled(person.appearance))
     issues.push({ field: `cast:${person.localId}:appearance`, label: `${who}: 외모(appearance) 필요` })
 
-  // D3+ : voice / arc / motivation.want 추가 필수.
+  // D3+ : arc / motivation.want 추가 필수.
   if (depthAtLeast(depth, 'D3')) {
-    if (!isFilled(person.voice))
-      issues.push({ field: `cast:${person.localId}:voice`, label: `${who}: 보이스(voice) 필요`, detail: 'D3+ 필수' })
     if (!arcComplete(person.arc))
       issues.push({ field: `cast:${person.localId}:arc`, label: `${who}: 아크(시작/끝/유형) 필요`, detail: 'D3+ 필수' })
     if (!isFilled(person.motivation?.want))

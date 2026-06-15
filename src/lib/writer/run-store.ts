@@ -58,6 +58,8 @@ export async function createRun(
   // producer-story-gate §3: producer 확정값 seed → s0(genre)/s2(characters) step 이 자연 생략.
   if (input.genre) state.genre = input.genre;
   if (input.cast) state.characters = castContractToCharacters(input.cast);
+  // V축 재설계: 월드/세팅 seed (s2 = characters + 월드). producer 가 background 로 전달 (유저 입력, 원천).
+  if (input.background) state.world = input.background;
   const { data, error } = await supabaseAdmin
     .from('writer_runs')
     .insert({

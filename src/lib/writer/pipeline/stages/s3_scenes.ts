@@ -1,6 +1,6 @@
 // S3: 씬 브레이크다운, 감정 비트, 정보 비대칭
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
-import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, StoryCharacter } from '@/lib/writer/types/pipeline';
+import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, StoryCharacter, BackgroundContract } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
 // 오픈 캐스트 머지 (producer-story-gate §4): s3 가 반환한 new_characters 중 기존 slug 와 겹치지 않는
@@ -20,13 +20,38 @@ export function mergeOpenCast(prev: Characters, scenes: Scenes): Characters {
       role: n.role ?? 'supporting',
       personality: [],
       arc: { start_state: '', end_state: '', arc_type: '' },
-      voice: '',
       appearance_description: n.appearance_description ?? '',
       motivation: { want: '', need: '' },
     });
   }
   if (!fresh.length) return prev;
   return { ...prev, characters: [...prev.characters, ...fresh] };
+}
+
+// 월드 오픈캐스트 (characters 대칭, V축 재설계): s3 씬이 참조하는 로케이션(`scene.location` 문자열) 중
+//   producer world(s2.world seed)에 없는 것만 append 한다 — 씬 전개상 필요한 배경.
+//   ⚠️ producer 전달값(원천)은 수정·삭제하지 않는다: append-only 시멘틱으로 보장(보호 플래그 불필요, 아키텍처 §5#2).
+//   seed 가 없으면(coworker background 전) 빈 world 에 씬 로케이션을 채운다(별도 fallback 불필요).
+//   writer-added 의 origin 표기는 persist 단계에서(characters.origin='writer' 와 동일 — 후속 증분).
+export function mergeOpenWorld(prev: BackgroundContract | undefined, scenes: Scenes): BackgroundContract {
+  const base: BackgroundContract = prev ?? { locations: [] };
+  const known = new Set<string>();
+  for (const l of base.locations) {
+    known.add(l.id.toLowerCase().trim());
+    known.add(l.name.toLowerCase().trim());
+  }
+  const fresh: BackgroundContract['locations'] = [];
+  const seen = new Set<string>();
+  for (const sc of scenes.scenes) {
+    const loc = (sc.location ?? '').trim();
+    if (!loc) continue;
+    const key = loc.toLowerCase();
+    if (known.has(key) || seen.has(key)) continue; // producer/이미추가분에 있음 → skip(불변)
+    seen.add(key);
+    fresh.push({ id: loc, name: loc, description: '' }); // writer-added, 최소 필드
+  }
+  if (!fresh.length) return base;
+  return { ...base, locations: [...base.locations, ...fresh] };
 }
 
 export async function runScenes(

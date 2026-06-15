@@ -1,10 +1,10 @@
-// L3(sceneCinematography) 산출물 rule-base 자기 검증.
+// V3(sceneCinematography) 산출물 rule-base 자기 검증.
 //   LLM 출력을 결정론적 규칙으로 확인한다 — enum 유효성·수치 범위·상류 정합
-//   (L2 global_palette, S3 씬 등장인물). l3_scene_plan 이 생성 직후 호출해 CRITICAL
+//   (v2 WorldVisual global_palette, S3 씬 등장인물). v3_scene_plan 이 생성 직후 호출해 CRITICAL
 //   위반 시 1회 교정 재생성하고, 모든 이슈를 budget_issues 로 영속한다.
 import type {
   SceneCinematography,
-  ProductionDesign,
+  WorldVisual,
   Scenes,
   ValidationIssue,
 } from '@/lib/writer/types/pipeline';
@@ -28,19 +28,19 @@ export interface SceneCinematographyValidation {
 }
 
 /**
- * scene_plans 를 규칙으로 검증. 상류(scenes, productionDesign)와의 정합도 확인.
+ * scene_plans 를 규칙으로 검증. 상류(scenes, worldVisual)와의 정합도 확인.
  */
 export function validateSceneCinematography(
   scenePlans: SceneCinematography[],
   scenes: Scenes,
-  productionDesign: ProductionDesign,
+  worldVisual: WorldVisual,
 ): SceneCinematographyValidation {
   const issues: ValidationIssue[] = [];
   const sceneById = new Map(scenes.scenes.map((s) => [s.scene_id, s]));
   const planSceneIds = new Set<string>();
 
-  // L2 global_palette 색 집합 — palette_emphasis 정합 검사용
-  const gp = productionDesign.global_palette;
+  // v2 WorldVisual global_palette 색 집합 — palette_emphasis 정합 검사용
+  const gp = worldVisual.global_palette;
   const paletteColors = new Set<string>(
     [gp?.primary, gp?.secondary, gp?.accent]
       .filter((c): c is string => typeof c === 'string' && c.length > 0)
@@ -88,11 +88,11 @@ export function validateSceneCinematography(
         if (!(k >= KELVIN_MIN && k <= KELVIN_MAX)) warn(id, `lighting_arc.${label}=${k}K 비현실적(${KELVIN_MIN}~${KELVIN_MAX})`, '현실적 색온도');
     }
 
-    // 3) 상류 정합: palette_emphasis ⊆ L2 global_palette
+    // 3) 상류 정합: palette_emphasis ⊆ v2 global_palette
     if (paletteColors.size && plan.palette_emphasis?.length) {
       for (const c of plan.palette_emphasis)
         if (!paletteColors.has(String(c).toLowerCase()))
-          warn(id, `palette_emphasis "${c}" 가 L2 global_palette 밖`, 'productionDesign.global_palette 색만 강조');
+          warn(id, `palette_emphasis "${c}" 가 v2 global_palette 밖`, 'worldVisual.global_palette 색만 강조');
     }
 
     // 4) 상류 정합: dominant_pov / spatial_axis_180 가 씬 등장인물인가

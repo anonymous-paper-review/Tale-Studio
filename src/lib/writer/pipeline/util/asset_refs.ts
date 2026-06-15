@@ -3,19 +3,19 @@
 //     (예: 로케이션 ID를 'cliff_edge'로 지어내거나, 'young_hero_v1'처럼 id에 버전 접미사를 붙임).
 //   canonical asset ID는 두 곳에서만 나옴:
 //     - 캐릭터: S2.characters[].id
-//     - 로케이션: L2.locations[].id (= scene.location)
+//     - 로케이션: v2 WorldVisual.locations[].id (= scene.location)
 //   이 util은 LLM 신뢰 없이 코드로 모든 참조를 canonical로 해소(resolve)하거나 drop한다.
-import type { ProductionDesign, Characters, ShotSequenceItem, ValidationIssue } from '@/lib/writer/types/pipeline';
+import type { WorldVisual, Characters, ShotSequenceItem, ValidationIssue } from '@/lib/writer/types/pipeline';
 
 export interface AssetRegistry {
   characterIds: Set<string>;
   locationIds: string[];   // 순서 유지 (이름 부분매칭에 사용)
 }
 
-export function buildAssetRegistry(characters: Characters, productionDesign: ProductionDesign): AssetRegistry {
+export function buildAssetRegistry(characters: Characters, worldVisual: WorldVisual): AssetRegistry {
   return {
     characterIds: new Set(characters.characters.map((c) => c.id)),
-    locationIds: productionDesign.locations.map((l) => l.id),
+    locationIds: worldVisual.locations.map((l) => l.id),
   };
 }
 

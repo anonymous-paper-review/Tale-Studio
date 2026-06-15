@@ -18,10 +18,10 @@ Settings to extract:
 - Dialogue Language (BCP-47 2-letter code: 'en', 'ko', 'ja', 'zh', ... — infer from the language the user writes in, unless explicitly stated otherwise)
 
 Cast to extract (characters[] — the people/objects the story is about):
-- Each entry: { name, entityType, appearance, role?, voice?, arc?, motivation? }
+- Each entry: { name, entityType, appearance, role?, arc?, motivation? }
 - entityType: "person" for characters, "object" for key props (a ring, a letter, a weapon).
-- person: appearance is required-quality (clothing, age, features). For ≥1min videos also try to capture voice, arc {start_state, end_state, arc_type}, motivation {want, need?}.
-- object: ONLY name + appearance. Never give an object arc/voice/motivation.
+- person: appearance is required-quality (clothing, age, features). For ≥1min videos also try to capture arc {start_state, end_state, arc_type}, motivation {want, need?}.
+- object: ONLY name + appearance. Never give an object arc/motivation.
 - These are CANDIDATES the user confirms/edits as cards — extract from what they describe, don't fabricate a full cast from a one-line premise.
 
 Story readiness — the writer then builds structure & scenes from your confirmed genre + cast.

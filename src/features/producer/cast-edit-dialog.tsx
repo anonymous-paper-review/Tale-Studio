@@ -54,7 +54,7 @@ function Field({
 
 /**
  * 캐스트 멤버(person/object) 상세 편집 Dialog.
- * person: name/role/appearance + (D3+) voice/arc/motivation.
+ * person: name/role/appearance + (D3+) arc/motivation.
  * object: name/appearance 만 (인물 전용 필드 미노출 — entity_type 분기).
  * 저장은 onSave(patch), 삭제는 onDelete. depth 로 필수 표식만 바꾼다(차단은 게이트가).
  */
@@ -161,14 +161,6 @@ export function CastEditDialog({
 
           {deepPerson ? (
             <>
-              <Field label="보이스 (voice)" required hint="1분 이상 영상 필수">
-                <Input
-                  value={draft.voice ?? ''}
-                  placeholder="예: 낮고 단호한, 말수 적은"
-                  onChange={(e) => patch({ voice: e.target.value })}
-                />
-              </Field>
-
               <Field label="아크 (arc)" required hint="1분 이상 영상 필수 — 시작/끝/유형">
                 <div className="grid grid-cols-3 gap-2">
                   <Input
