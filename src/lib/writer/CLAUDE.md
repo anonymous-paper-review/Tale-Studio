@@ -20,11 +20,11 @@
 
 ## 스테이지 (pipeline/stages/)
 
-step 키는 film-craft 명, **파일명 prefix는 v0~v7** (2026-06-13 l→v 리네임; `v0_v1_visual`은 V0+V1 동시 산출, `c_*`/`s_*`는 C/S축):
+step 키는 film-craft 명, **파일명 prefix는 v0~v7** (2026-06-13 l→v 리네임; `v0_visual`=v0(VisualIdentity)·`v1_act_arc`=v1(ActVisualArc), `c_*`/`s_*`는 C/S축):
 
 - **Story축 (S, Gemini)**: ~~`s0_genre`·`s2_characters`~~ **삭제됨** (producer seed로 대체, §3) → `s1_structure`(narrativeStructure) → `s3_scenes`(scenes — **오픈 캐스트 계약**: 기존 cast slug 주입 + `new_characters[]` 분리 반환 → `mergeOpenCast`가 state.characters에 머지 → persistAssetsToDb가 origin='writer' insert)
 - **검증 (C, Claude)**: `c_validation_1`(storyCheck) / `c_application_2` — skip 플래그로 생략 가능 (비용 절감)
-- **Visual축 (V, Gemini)**: `mid_preview` → `v0_v1_visual`(renderFormat/artDirection) → `v2_design`(productionDesign) → `v3_scene_plan`(sceneCinematography — rule-base 자기검증 `validators/scene_cinematography.ts`+1회 교정 / Compact Mode 시 생략)
+- **Visual축 (V, Gemini)**: `mid_preview` → `v0_visual`(visualIdentity) → `v1_act_arc`(actVisualArc) → `v2_design`(characterVisual+worldVisual, native) → `v3_scene_plan`(sceneCinematography — rule-base 자기검증 `validators/scene_cinematography.ts`+1회 교정 / Compact Mode 시 생략)
 - **샷/렌더**: `decoupage` → `v4_shots`(shotDesign/shotSequence) → `v5_prompts`(renderPrompts) → `v6_images` → `v7_videos`
 - **에셋 이미지**: ~~`assetImages` step~~ **제거됨** (producer-story-gate 결정 8) — 캐릭터/로케이션 이미지 초기 생성은 **artist 전담**(artist 진입 시 `autoGenerateBaseImages` 자동 1회·멱등). writer 파이프라인은 행(characters/locations/scenes)만 채운다. (옛 `assets_generate.ts` + 수동 라우트 `/api/writer/generate/assets`는 superseded → **제거됨**, 2026-06 V축 재설계 정리.)
 

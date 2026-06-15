@@ -7,8 +7,6 @@
 import type {
   Scene,
   Character,
-  Location,
-  SceneManifest,
   Shot,
   VideoClip,
   ShotType,
@@ -19,7 +17,6 @@ import type {
 import type {
   Characters,
   Scenes,
-  ProductionDesign,
   ShotDesign,
   RenderPromptsOutput,
   ShotImagesOutput,
@@ -61,18 +58,6 @@ export function adaptCharacters(characters: Characters): Character[] {
   }));
 }
 
-// writer productionDesign.locations → main Location[]
-export function adaptLocations(productionDesign?: ProductionDesign): Location[] {
-  if (!productionDesign?.locations) return [];
-  return productionDesign.locations.map((loc) => ({
-    locationId: loc.id,
-    name: loc.id,
-    visualDescription: loc.style_description ?? '',
-    timeOfDay: '',
-    lightingDirection: (loc.lighting_sources ?? []).join(', '),
-  }));
-}
-
 // writer scenes.scenes → main Scene[]
 export function adaptScenes(scenes: Scenes): Scene[] {
   return scenes.scenes.map((sc) => ({
@@ -85,15 +70,6 @@ export function adaptScenes(scenes: Scenes): Scene[] {
     charactersPresent: sc.characters_in_scene ?? [],
     estimatedDurationSeconds: sc.estimated_seconds ?? 0,
   }));
-}
-
-// 통합 SceneManifest
-export function adaptSceneManifest(characters: Characters, scenes: Scenes, productionDesign?: ProductionDesign): SceneManifest {
-  return {
-    scenes: adaptScenes(scenes),
-    characters: adaptCharacters(characters),
-    locations: adaptLocations(productionDesign),
-  };
 }
 
 // L4 shot type 정규화 (writer는 다양한 형태로 옴)

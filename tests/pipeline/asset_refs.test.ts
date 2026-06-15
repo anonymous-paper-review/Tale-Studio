@@ -6,7 +6,7 @@ import {
   resolveAssetRef,
   normalizeShotSequenceAssetRefs,
 } from '@/lib/writer/pipeline/util/asset_refs';
-import type { ProductionDesign, Characters, Scenes, ShotSequence } from '@/lib/writer/types/pipeline';
+import type { WorldVisual, Characters, Scenes, ShotSequence } from '@/lib/writer/types/pipeline';
 
 // 실제 파이프라인 로그(깨진 reference 포함)로 결정론적 정규화기를 검증.
 const LOG = path.resolve(__dirname, '../../logs/1f0cc616-40ff-449f-8dda-ae7e6dd8e5e0');
@@ -14,7 +14,7 @@ const read = (f: string) => JSON.parse(fs.readFileSync(path.join(LOG, f), 'utf8'
 
 describe('asset_refs normalization (real logged data)', () => {
   const s2 = read('04_S2.json') as Characters;
-  const l2 = read('09_L2.json') as ProductionDesign;
+  const l2 = read('09_L2.json') as WorldVisual;
   const s3 = read('05_S3.json') as Scenes;
   const reg = buildAssetRegistry(s2, l2);
 

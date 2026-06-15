@@ -12,7 +12,7 @@ import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure
 import { runScenes, mergeOpenCast, mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
 import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview';
-import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_v1_visual';
+import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual';
 import { runActVisualArc } from '@/lib/writer/pipeline/stages/v1_act_arc';
 import { runV2Design } from '@/lib/writer/pipeline/stages/v2_design';
 import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan';
@@ -45,11 +45,8 @@ import type {
   Scenes,
   StoryCheckReport,
   MidPreview,
-  RenderFormat,
-  ArtDirection,
   ActVisualArc,
   VisualIdentity,
-  ProductionDesign,
   CharacterVisual,
   WorldVisual,
   ShotDesign,
@@ -75,13 +72,10 @@ export interface WriterRunState extends WriterRunStateBase {
   midPreview?: MidPreview;
 
   // Visual 축
-  renderFormat?: RenderFormat;       // 레거시 — v2~v5 소비자가 아직 읽음 (마이그레이션 후 제거)
-  artDirection?: ArtDirection;       // 레거시
-  visualIdentity?: VisualIdentity;   // v0 번들 (format+style) — V축 재설계
-  actVisualArc?: ActVisualArc;       // v1 (막별 비주얼 아크) — V축 재설계
-  productionDesign?: ProductionDesign;  // 레거시 — 하류 마이그레이션 후 제거
-  characterVisual?: CharacterVisual;    // v2 분화 (인물 비주얼) — V축 재설계
-  worldVisual?: WorldVisual;            // v2 분화 (월드 비주얼) — V축 재설계
+  visualIdentity?: VisualIdentity;   // v0 (format+style)
+  actVisualArc?: ActVisualArc;       // v1 (막별 비주얼 아크)
+  characterVisual?: CharacterVisual; // v2 (인물 비주얼)
+  worldVisual?: WorldVisual;         // v2 (월드 비주얼)
   sceneCinematography?: SceneCinematography[];
   sceneBudgetIssues?: ValidationIssue[];
 

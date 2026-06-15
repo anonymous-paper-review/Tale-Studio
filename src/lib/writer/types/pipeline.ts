@@ -372,29 +372,11 @@ export interface ArtDirection {
   texture_philosophy: string;
 }
 
-export interface ProductionDesign {
-  global_palette: {
-    primary: string;
-    secondary: string;
-    accent: string;
-    forbidden: string[];
-  };
-  color_meaning: Record<string, string>; // color → meaning
-  locations: Array<{
-    id: string;
-    style_description: string;
-    lighting_sources: string[];
-    props: string[];
-  }>;
-  costumes: Record<string, string[]>; // character_id → costume items
-  vfx_approach: string;
-}
-
 // =====================================================================
 // V축 연결 재설계 (2026-06-13) — coarse-to-fine + 같은-계층(s_n↔v_n) 참조.
 //   v0↔s0 VisualIdentity / v1↔s1 ActVisualArc / v2↔s2 CharacterVisual+WorldVisual / v3↔s3 SceneCinematography.
 //   각 v_n = [자기 s_n] + [직전 v_{n-1}]만 직접 참조. 계획: dev/VISUAL_AXIS_REDESIGN_PLAN.md
-//   (아래 타입은 additive 도입 — 스테이지 전환은 후속 푸시에서. 그전까지 구 RenderFormat/ArtDirection/ProductionDesign 병용.)
+//   (2026-06: 전 스테이지 native 전환 완료 — 구 ProductionDesign 제거. RenderFormat/ArtDirection 은 VisualIdentity.format/style 로 잔존.)
 // =====================================================================
 
 // producer seed: 월드/세팅 (s2 = characters + 월드). ≤10min 전제 — 스토리 필요 배경만.
@@ -432,7 +414,7 @@ export interface CharacterVisual {
   }>;
 }
 
-// v2 ↔ s2(world/background): 월드 비주얼 (구 ProductionDesign 의 비-의상부).
+// v2 ↔ s2(world/background): 월드 비주얼 (글로벌 팔레트·컬러 의미·로케이션·VFX).
 export interface WorldVisual {
   global_palette: { primary: string; secondary: string; accent: string; forbidden: string[] };
   color_meaning: Record<string, string>; // color → meaning
@@ -767,9 +749,10 @@ export interface PipelineResult {
   scenes: Scenes;
   storyCheck: StoryCheckReport;
   midPreview: MidPreview;
-  renderFormat: RenderFormat;
-  artDirection: ArtDirection;
-  productionDesign: ProductionDesign;
+  visualIdentity: VisualIdentity;        // v0 (format+style)
+  actVisualArc: ActVisualArc;            // v1 (막별 비주얼 아크)
+  characterVisual: CharacterVisual;      // v2 (인물 비주얼)
+  worldVisual: WorldVisual;              // v2 (월드 비주얼)
   sceneCinematography: SceneCinematography[];   // 씬 단위 비주얼 플랜
   shotDesign: ShotDesign[];              // 샷 단위 3분할 (intent + static + dynamic)
   shotCheck: ShotCheckReport;

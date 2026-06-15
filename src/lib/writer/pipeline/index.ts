@@ -2,12 +2,13 @@
 // resumeProjectId 전달 시 기존 stage 결과 로드해 중단 지점부터 재개
 import { PipelineLogger, makeProjectId } from '@/lib/writer/logger';
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure';
-import { runScenes, mergeOpenCast } from '@/lib/writer/pipeline/stages/s3_scenes';
+import { runScenes, mergeOpenCast, mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
 import { castContractToCharacters } from '@/lib/writer/cast-contract';
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
 import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview';
-import { runRenderFormatArtDirection } from '@/lib/writer/pipeline/stages/v0_v1_visual';
-import { runProductionDesign, deriveWorldVisual, deriveCharacterVisual } from '@/lib/writer/pipeline/stages/v2_design';
+import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual';
+import { runActVisualArc } from '@/lib/writer/pipeline/stages/v1_act_arc';
+import { runV2Design } from '@/lib/writer/pipeline/stages/v2_design';
 import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan';
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
@@ -35,10 +36,10 @@ import type {
   Scenes,
   StoryCheckReport,
   MidPreview,
-  RenderFormat,
-  ArtDirection,
-  ProductionDesign,
   VisualIdentity,
+  ActVisualArc,
+  CharacterVisual,
+  WorldVisual,
   ShotDesign,
   DecoupagePlan,
   RenderPromptsOutput,
@@ -230,30 +231,38 @@ async function _runPipelineInner(
         logger,
       )).value;
 
-  // ===== Visual 축 =====
-  // renderFormat + artDirection 은 { renderFormat, artDirection } 합본으로 저장
-  const visualFormatPair = await loadOrRun<{ renderFormat: RenderFormat; artDirection: ArtDirection }>(
+  // ===== Visual 축 (native — steps.ts 서버리스 경로와 동일) =====
+  // v0: VisualIdentity 직접 생성 (genre + bridge seed.v0)
+  const visualIdentity = (await loadOrRun<VisualIdentity>(
     resume,
-    '08_renderFormat_artDirection.json',
-    async () => {
-      const r = await runRenderFormatArtDirection(genre, midPreview, logger, models.V);
-      return { renderFormat: r.renderFormat, artDirection: r.artDirection };
-    },
-    'renderFormat_artDirection',
+    '08_visualIdentity.json',
+    () => runVisualIdentity(genre, midPreview, logger, models.V),
+    'visualIdentity',
     logger,
-  );
-  const { renderFormat, artDirection } = visualFormatPair.value;
+  )).value;
 
-  const productionDesign = (await loadOrRun<ProductionDesign>(resume, '09_productionDesign.json', () => runProductionDesign(characters, scenes, artDirection, midPreview, logger, models.V), 'productionDesign', logger)).value;
+  // v1: 막별 비주얼 아크 (s1 + v0 + bridge seed.v1)
+  const actVisualArc = (await loadOrRun<ActVisualArc>(
+    resume,
+    '08b_actVisualArc.json',
+    () => runActVisualArc(narrativeStructure, visualIdentity, midPreview.v_recommendations.v1, logger, models.V),
+    'actVisualArc',
+    logger,
+  )).value;
 
-  // V축 재설계: v3~v5 소비자가 읽는 새 비주얼 타입(v0 visualIdentity / v2 worldVisual).
-  //   로컬 경로는 v1(actVisualArc)/native-v2 parity 미적용 — 보유한 renderFormat/artDirection/
-  //   productionDesign 으로 구성한다(push 시 서버리스 경로와 정합).
-  const visualIdentity: VisualIdentity = { format: renderFormat, style: artDirection };
-  const worldVisual = deriveWorldVisual(productionDesign, input.background);
-  const characterVisual = deriveCharacterVisual(characters, productionDesign);
+  // s2 월드: producer background seed + 오픈캐스트(씬 로케이션 append-only). v2 입력.
+  const world = mergeOpenWorld(input.background, scenes);
 
-  // productionDesign 직후 → 전역 디자인 토큰을 projects.design_tokens 에 기록 (§2-2, DB化).
+  // v2: 인물/월드 비주얼 직접 생성 (v0 + v1 + s2 chars/world + bridge seed.v2). 옛 productionDesign+derive 대체.
+  const { characterVisual, worldVisual } = (await loadOrRun<{ characterVisual: CharacterVisual; worldVisual: WorldVisual }>(
+    resume,
+    '09_v2Design.json',
+    () => runV2Design(visualIdentity, actVisualArc, characters, world, midPreview.v_recommendations.v2, logger, models.V),
+    'v2Design',
+    logger,
+  )).value;
+
+  // v2 직후 → 전역 디자인 토큰을 projects.design_tokens 에 기록 (§2-2, DB化).
   //   소비(artist 턴어라운드 등)는 DB에서 읽는다. non-blocking — 실패해도 파이프라인 계속.
   persistDesignTokens(projectId, visualIdentity, worldVisual).catch((e) => {
     console.warn('[writer] design_tokens persist failed (pipeline continues):', e);
@@ -400,9 +409,10 @@ async function _runPipelineInner(
     scenes,
     storyCheck,
     midPreview,
-    renderFormat,
-    artDirection,
-    productionDesign,
+    visualIdentity,
+    actVisualArc,
+    characterVisual,
+    worldVisual,
     sceneCinematography,
     shotDesign,
     shotCheck,
