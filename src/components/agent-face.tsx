@@ -32,10 +32,7 @@ export function AgentFace({
 
   // Mouth animation when talking
   useEffect(() => {
-    if (expression !== 'talking') {
-      setMouthFrame(0)
-      return
-    }
+    if (expression !== 'talking') return
     const interval = setInterval(() => {
       setMouthFrame((f) => (f + 1) % 4)
     }, 120)
@@ -57,7 +54,7 @@ export function AgentFace({
         <ellipse key="2" cx="24" cy="31" rx="5" ry="4" fill="#555" />,
         <ellipse key="3" cx="24" cy="31" rx="3" ry="2" fill="#555" />,
       ]
-      return shapes[mouthFrame]
+      return shapes[expression === 'talking' ? mouthFrame : 0]
     }
     // Idle: gentle smile
     return (

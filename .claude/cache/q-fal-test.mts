@@ -14,13 +14,33 @@ Action in frame (midground focus): Close-up on the Elder's face, his eyes wide w
 Figures: draw every character as a featureless wooden mannequin / rough stick figure — no face, no identity. Style: loose, rough, monochrome pencil-sketch storyboard.`
 const SOFT = ORIG.replace('his eyes wide with horror as he witnesses the dragon\'s attack', 'looking up startled at a dragon flying overhead')
 
+type FalImageResult = {
+  images?: Array<{ url?: string }>
+}
+
+type FalSubscribeError = {
+  status?: unknown
+  body?: { detail?: unknown }
+  message?: unknown
+}
+
+function imageData(data: unknown): FalImageResult {
+  return data as FalImageResult
+}
+
+function subscribeError(e: unknown): FalSubscribeError {
+  return e as FalSubscribeError
+}
+
 async function tryOne(label: string, prompt: string, extra: Record<string, unknown> = {}) {
   try {
     const r = await fal.subscribe(MODEL, { input: { prompt, image_size: 'landscape_16_9', ...extra }, logs: false })
-    console.log(label, '→ ✅ 통과 (url:', (r.data as any)?.images?.[0]?.url?.slice(0, 50), ')')
-  } catch (e: any) {
-    const detail = JSON.stringify(e?.body?.detail ?? e?.message ?? e).slice(0, 200)
-    console.log(label, '→ ❌', e?.status, detail)
+    const data = imageData(r.data)
+    console.log(label, '→ ✅ 통과 (url:', data.images?.[0]?.url?.slice(0, 50), ')')
+  } catch (e: unknown) {
+    const err = subscribeError(e)
+    const detail = JSON.stringify(err.body?.detail ?? err.message ?? err).slice(0, 200)
+    console.log(label, '→ ❌', err.status, detail)
   }
 }
 await tryOne('A. 원본 + enable_safety_checker:false', ORIG, { enable_safety_checker: false })

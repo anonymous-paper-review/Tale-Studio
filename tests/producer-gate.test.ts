@@ -16,7 +16,6 @@ const fullPerson = (over: Partial<CastMember> = {}): CastMember => ({
   name: '지아',
   entityType: 'person',
   appearance: '20대 여성, 검은 후디',
-  voice: '낮고 단호한',
   arc: { start_state: '도주', end_state: '대면', arc_type: '용기' },
   motivation: { want: '추격자 따돌리기' },
   ...over,
@@ -39,15 +38,16 @@ describe('evaluateProducerGate — gate A (story foundation)', () => {
     expect(r.hardMissing.map((i) => i.field)).toContain('storyText')
   })
 
-  it('reports empty tone/targetEmotion as SOFT only (not blocking)', () => {
+  it('reports empty tone/subGenre as SOFT only (not blocking)', () => {
     const r = evaluateProducerGate({
-      settings: { ...baseSettings, tone: [], targetEmotion: [], subGenre: '' },
+      settings: { ...baseSettings, tone: [], subGenre: '' },
       storyReady: true,
       cast: [fullPerson()],
     })
     expect(r.canHandoff).toBe(true)
     const softFields = r.softMissing.map((i) => i.field)
-    expect(softFields).toEqual(expect.arrayContaining(['tone', 'targetEmotion', 'subGenre']))
+    expect(softFields).toEqual(expect.arrayContaining(['tone', 'subGenre']))
+    expect(softFields).not.toContain('targetEmotion')
   })
 })
 
@@ -67,15 +67,14 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
     expect(r.hardMissing.map((i) => i.field)).toContain('cast:minPerson')
   })
 
-  it('D3 person missing voice/arc/want is blocked', () => {
+  it('D3 person missing arc/want is blocked', () => {
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
-      cast: [fullPerson({ voice: '', arc: undefined, motivation: undefined })],
+      cast: [fullPerson({ arc: undefined, motivation: undefined })],
     })
     expect(r.canHandoff).toBe(false)
     const fields = r.hardMissing.map((i) => i.field)
-    expect(fields).toContain('cast:p1:voice')
     expect(fields).toContain('cast:p1:arc')
     expect(fields).toContain('cast:p1:want')
   })

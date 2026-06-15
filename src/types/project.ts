@@ -22,9 +22,10 @@ export interface ProjectSettings {
   genre: string
   subGenre?: string
   format: ProjectFormat
-  // 톤·목표감정은 본질적으로 다중값(어두움+긴장+쓸쓸함) → 태그 배열. 비면 writer에 빈 채로 전달(drop 원칙).
+  // 목표감정은 writer 파생값이다. Producer는 수집/저장하지 않지만,
+  // legacy settings / writer consumers 호환을 위해 optional 필드만 남긴다.
   tone: string[]
-  targetEmotion: string[]
+  targetEmotion?: string[]
   dialogueLanguage: string // BCP-47 short code: 'en', 'ko', 'ja', 'zh', ...
 }
 

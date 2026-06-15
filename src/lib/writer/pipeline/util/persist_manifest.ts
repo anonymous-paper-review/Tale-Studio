@@ -109,7 +109,7 @@ export async function persistAssetsToDb(
 
   // characters: additive (producer-story-gate §4 — 인물=입력). 기존 행(producer·writer-origin)은
   //   보존하고, 새 slug 만 origin='writer' 로 insert + 기존 행은 비어 있는 보강 필드만 채운다.
-  //   producer 가 확정한 정체성(name/role/voice/arc/motivation/이미지)은 절대 덮어쓰지 않는다.
+  //   producer 가 확정한 정체성(name/role/arc/motivation/이미지)은 절대 덮어쓰지 않는다.
   const costumes = productionDesign.costumes ?? {}
   if (characters.characters.length) {
     const { data: existingRows } = await supabaseAdmin

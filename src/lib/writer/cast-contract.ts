@@ -16,7 +16,6 @@ export function castContractToCharacters(cast: CastContract): Characters {
         role: c.role ?? 'supporting',
         personality: [],
         arc: c.arc ?? { start_state: '', end_state: '', arc_type: '' },
-        voice: c.voice ?? '',
         appearance_description: c.appearance,
         motivation: {
           want: c.motivation?.want ?? '',

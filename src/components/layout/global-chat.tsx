@@ -59,11 +59,14 @@ export function GlobalChat() {
   const collapsed = useChatUiStore((s) => s.collapsed)
   const setChatWidth = useChatUiStore((s) => s.setChatWidth)
   const toggleCollapsed = useChatUiStore((s) => s.toggleCollapsed)
+  const draftPrompt = useChatUiStore((s) => s.draftPrompt)
+  const consumeDraftPrompt = useChatUiStore((s) => s.consumeDraftPrompt)
   const [dragging, setDragging] = useState(false)
 
   const [input, setInput] = useState('')
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (projectId) loadMessages(projectId)
@@ -72,6 +75,18 @@ export function GlobalChat() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length, loading])
+
+  useEffect(() => {
+    if (!draftPrompt) return
+    // No-clobber default: preserve in-progress user typing and consume the draft once.
+    if (input.trim().length > 0) {
+      consumeDraftPrompt(draftPrompt.id)
+      return
+    }
+    setInput(draftPrompt.text)
+    consumeDraftPrompt(draftPrompt.id)
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }, [consumeDraftPrompt, draftPrompt, input])
 
   const stageSupported = CHAT_SUPPORTED_STAGES.has(currentStage)
   const inputDisabled = !stageSupported || loading
@@ -321,6 +336,7 @@ export function GlobalChat() {
         <div className="shrink-0 border-t border-border p-4">
           <div className="flex items-end gap-2">
             <Textarea
+              ref={textareaRef}
               rows={1}
               className="max-h-40 min-h-9 flex-1 resize-none py-2"
               placeholder={STAGE_PLACEHOLDER[currentStage]}

@@ -20,7 +20,6 @@ export function mergeOpenCast(prev: Characters, scenes: Scenes): Characters {
       role: n.role ?? 'supporting',
       personality: [],
       arc: { start_state: '', end_state: '', arc_type: '' },
-      voice: '',
       appearance_description: n.appearance_description ?? '',
       motivation: { want: '', need: '' },
     });

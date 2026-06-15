@@ -221,7 +221,6 @@ export interface StoryCharacter {
     end_state: string;
     arc_type: string; // "positive_change" | "negative_change" | "fall" | "redemption" 등
   };
-  voice: string;
   appearance_description: string;
   motivation: {
     want: string;
@@ -251,7 +250,6 @@ export interface CastContractCharacter {
   entity_type: 'person' | 'object';
   role?: string;
   appearance: string;
-  voice?: string;
   arc?: { start_state: string; end_state: string; arc_type: string };
   motivation?: { want: string; need?: string; wound?: string };
 }

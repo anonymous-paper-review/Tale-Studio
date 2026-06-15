@@ -30,7 +30,6 @@ async function upsertProducerCast(projectId: string, cast: CastContract): Promis
     entity_type: c.entity_type === 'object' ? 'object' : 'person',
     appearance: c.appearance,
     description: c.appearance, // 레거시 미러
-    voice: c.voice ?? null,
     arc: c.arc ?? null,
     motivation: c.motivation ?? null,
     origin: 'producer',

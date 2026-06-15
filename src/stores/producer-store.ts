@@ -20,7 +20,6 @@ export interface ExtractedCastMember {
   entityType?: EntityType
   appearance?: string
   role?: string
-  voice?: string
   arc?: Partial<CastArc>
   motivation?: Partial<CastMotivation>
 }
@@ -31,7 +30,6 @@ export interface ExtractedSettings {
   subGenre?: string
   format?: ProjectFormat
   tone?: string[]
-  targetEmotion?: string[]
   dialogueLanguage?: string
   storyText?: string
   storyReady?: boolean
@@ -60,7 +58,6 @@ function mergeExtractedCast(
     const match = next.find((m) => m.name.trim().toLowerCase() === name.toLowerCase())
     if (match) {
       if (!match.appearance && e.appearance) match.appearance = e.appearance
-      if (!match.voice && e.voice) match.voice = e.voice
       if (!match.role && e.role) match.role = e.role
       if (!match.arc && e.arc && (e.arc.start_state || e.arc.end_state || e.arc.arc_type))
         match.arc = { start_state: '', end_state: '', arc_type: '', ...e.arc }
@@ -73,7 +70,6 @@ function mergeExtractedCast(
         entityType: e.entityType === 'object' ? 'object' : 'person',
         appearance: e.appearance ?? '',
         role: e.role,
-        voice: e.voice,
         arc:
           e.arc && (e.arc.start_state || e.arc.end_state || e.arc.arc_type)
             ? { start_state: '', end_state: '', arc_type: '', ...e.arc }
@@ -112,7 +108,6 @@ const DEFAULT_SETTINGS: ProjectSettings = {
   genre: '',
   format: 'horizontal_16:9',
   tone: [],
-  targetEmotion: [],
   dialogueLanguage: '',
 }
 
@@ -122,7 +117,6 @@ const SOURCE_SETTING_KEYS = [
   'subGenre',
   'format',
   'tone',
-  'targetEmotion',
   'dialogueLanguage',
 ] as const
 
@@ -166,6 +160,27 @@ function extractedOverwritesExisting(
 
   return overwritten
 }
+
+function settingsPatchFromExtracted(patch: ExtractedSettings): Partial<ProjectSettings> {
+  const next: Partial<ProjectSettings> = {}
+  if (patch.playtime !== undefined) next.playtime = patch.playtime
+  if (patch.genre !== undefined) next.genre = patch.genre
+  if (patch.subGenre !== undefined) next.subGenre = patch.subGenre
+  if (patch.format !== undefined) next.format = patch.format
+  if (patch.tone !== undefined) next.tone = patch.tone
+  if (patch.dialogueLanguage !== undefined) next.dialogueLanguage = patch.dialogueLanguage
+  return next
+}
+
+function normalizeProducerSettings(settings: Partial<ProjectSettings> | null | undefined): ProjectSettings {
+  const producerSettings = { ...(settings ?? {}) }
+  delete producerSettings.targetEmotion
+  return {
+    ...DEFAULT_SETTINGS,
+    ...producerSettings,
+  }
+}
+
 
 export const useProducerStore = create<ProducerState>((set, get) => ({
   storyText: '',
@@ -217,8 +232,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         storyText: nextStory,
         storyReady: nextReady,
         characters: extractedCast,
-        ...settingsPatch
       } = patch
+      const settingsPatch = settingsPatchFromExtracted(patch)
       return {
         projectSettings: {
           ...state.projectSettings,
@@ -269,9 +284,10 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     }
 
     try {
+      const producerSettings = normalizeProducerSettings(projectSettings)
       const producerSourceHash = computeProducerSourceHash({
         storyText,
-        settings: projectSettings,
+        settings: producerSettings,
         cast,
       })
       const supabase = createClient()
@@ -279,7 +295,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         .from('projects')
         .update({
           story_text: storyText,
-          settings: projectSettings,
+          settings: producerSettings,
           // current_stage 는 MVP에서 "최고로 열린 단계"로 재사용한다.
           // Producer gate 통과 후 Writer를 보여주되 Artist도 병렬 작업 가능해야 하므로
           // DB unlock은 artist까지 올리고, 클라이언트 currentStage만 writer로 둔다.
@@ -307,7 +323,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             entity_type: m.entityType,
             role: m.role,
             appearance: m.appearance,
-            voice: m.voice,
             arc: m.arc,
             motivation: m.motivation,
           })),
@@ -316,7 +331,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           genre: projectSettings.genre,
           subGenre: projectSettings.subGenre || undefined,
           tone: projectSettings.tone,
-          targetEmotion: projectSettings.targetEmotion,
+          targetEmotion: [],
           runtime_seconds: projectSettings.playtime,
           depth_level: depthLevelFromRuntime(projectSettings.playtime || 0),
           format: projectSettings.format,
@@ -370,7 +385,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       //   재진입 시 기존(producer·writer-origin 무관) 행을 카드로 복원.
       const { data: chars } = await supabase
         .from('characters')
-        .select('id, character_id, name, role, entity_type, appearance, voice, arc, motivation, origin')
+        .select('id, character_id, name, role, entity_type, appearance, arc, motivation, origin')
         .eq('project_id', projectId)
 
       if (project) {
@@ -379,10 +394,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           // 이미 저장된 스토리가 있으면 "준비됨"으로 본다 — 핸드오프/재실행 버튼이
           //   storyReady 게이트에 막혀 비활성화되지 않도록 (writer 재실행 가능하게).
           storyReady: !!(project.story_text && project.story_text.trim().length > 0),
-          projectSettings: {
-            ...DEFAULT_SETTINGS,
-            ...(project.settings as Partial<ProjectSettings>),
-          },
+          projectSettings: normalizeProducerSettings(project.settings as Partial<ProjectSettings>),
           cast: (chars ?? []).map((c): CastMember => ({
             localId: c.id as string,
             characterId: c.character_id as string,
@@ -390,7 +402,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             entityType: c.entity_type === 'object' ? 'object' : 'person',
             appearance: (c.appearance as string) ?? '',
             role: (c.role as string) ?? undefined,
-            voice: (c.voice as string) ?? undefined,
             arc: (c.arc as CastArc) ?? undefined,
             motivation: (c.motivation as CastMotivation) ?? undefined,
             origin: c.origin === 'writer' ? 'writer' : 'producer',

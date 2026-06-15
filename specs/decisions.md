@@ -1,6 +1,6 @@
 # Decisions
 
-> 최종 수정: 2026-06-12
+> 최종 수정: 2026-06-15
 > 레거시 아카이브: `specs/archive/decisions_legacy_2026-03-03.md`
 > superseded/archive-event 결정: `specs/decisions-archive.md` (아래 인덱스 참조)
 
@@ -21,6 +21,11 @@
 - **관계 편집(Section 2.5)**: 결정 9로 **보류** — 관계는 스토리 텍스트에서 파생, producer 전용 UI 미구현. 저장 테이블(018 `character_relationships`)은 미래용 보존, 핸드오프는 빈 배열.
 - **신설 결정**: 본 change 진행 중 #57(provenance, cross-cutting) + 내부 결정 1~9(proposal §Decisions). 결정 8(이미지 초기생성 자동/재생성 수동)은 architecture §5의 "과금 파생물 사람 방아쇠" 예외를 폐기.
 - **일자**: 2026-06-13
+
+### 59. producer-ui-redesign archived
+- **결정**: Producer 메인 UI를 `Handoff readiness board` 단일 surface로 전환하고, 기존 `ProjectDashboard`/`CastPanel`/`GateStatus` 분할을 제거했다. Producer는 더 이상 `targetEmotion`을 입력·추출·검증하지 않으며 writer 호환 payload에는 `targetEmotion: []`만 유지한다. character/cast `voice`는 Producer/Writer metadata·prompt·gate·writer DB write path에서 제거했고, `characters.voice` live DB column도 Gate G 후 `021_drop_characters_voice.sql`로 드롭 완료. `specs/archive/2026-06-15-producer-ui-redesign/`로 이동.
+- **검증**: `tsc --noEmit`, focused Vitest 18 tests, `pnpm run lint`(0 errors, 기존 warning 14), `pnpm run build`, authenticated browser E2E(`/tmp/producer-readiness-board-e2e.png`), pre-drop and post-drop authenticated `/api/writer/start` smoke 통과. Post-drop smoke에서 no-voice producer character upsert + writer_run 생성 + `targetEmotion: []` + serialized state에 `voice` 없음 확인.
+- **일자**: 2026-06-15
 
 ### 57. 데이터 정합 원칙 — 원천/파생(provenance) 모델 채택 (cross-cutting)
 - **결정**: 다단계(stage) 공유 데이터의 정합성 원칙 확정. 데이터는 **원천**(사람이 직접 정한 값)과 **파생**(원천을 읽어 생성된 결과물)으로 나뉘며, 파생물에는 sync가 아니라 **provenance(입력 지문)**를 설계한다. 5원칙: ① **빌드는 독립** ② **원천은 공동 편집**(자율 실행=빈칸만, 덮어쓰기=사람의 명시적 행동만) ③ **합류는 하류**(스테이지 간 영향은 통지/sync가 아니라 하류 빌드의 재료로만 — writer·artist는 형제, 합류는 director) ④ **일관성 = 순간이 아니라 수습 가능성**(전역 불일치는 정상 — 파생물이 입력 지문 보유 + 낡음(stale) 표시 + 명시적 재생성으로 수렴) ⑤ **통합 경험은 에이전트**(낡음을 읽고 재생성을 *제안* — 데이터 자동 연쇄 금지).
