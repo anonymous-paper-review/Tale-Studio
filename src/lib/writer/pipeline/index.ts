@@ -414,6 +414,7 @@ async function _runPipelineInner(
     characterVisual,
     worldVisual,
     sceneCinematography,
+    decoupage,
     shotDesign,
     shotCheck,
     shotSequence,

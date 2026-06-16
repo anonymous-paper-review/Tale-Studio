@@ -557,6 +557,12 @@ export interface ShotIntent {
   audience_focus: string;            // 관객 시선이 머무는 지점
   shot_position_in_scene:
     | 'opening' | 'developing' | 'climax' | 'resolution' | 'transition';
+
+  // 데쿠파주 출처 (decoupageDriven 시 v4 가 결정론적 주입 — beat→shot 추적성 #8). compact/legacy 면 미설정.
+  operation?: ShotOperation;
+  source_beats?: number[];           // 이 샷이 담는 scene_actions 인덱스 (story_beat_ref 단수의 확장)
+  shot_function?: ShotFunction;
+  rhythm_role?: RhythmRole;
 }
 
 export interface ShotStaticSpec {
@@ -754,6 +760,7 @@ export interface PipelineResult {
   characterVisual: CharacterVisual;      // v2 (인물 비주얼)
   worldVisual: WorldVisual;              // v2 (월드 비주얼)
   sceneCinematography: SceneCinematography[];   // 씬 단위 비주얼 플랜
+  decoupage: DecoupagePlan;              // 감독 beat→shot 분해 (#8 가시화)
   shotDesign: ShotDesign[];              // 샷 단위 3분할 (intent + static + dynamic)
   shotCheck: ShotCheckReport;
   shotSequence: ShotSequence;

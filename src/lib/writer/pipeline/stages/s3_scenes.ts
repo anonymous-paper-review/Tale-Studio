@@ -54,6 +54,13 @@ export function mergeOpenWorld(prev: BackgroundContract | undefined, scenes: Sce
   return { ...base, locations: [...base.locations, ...fresh] };
 }
 
+// act 커버리지 검증: narrativeStructure.acts 중 어떤 씬의 act_ref 로도 안 덮인 act_id 목록.
+//   비어있으면 모든 막에 ≥1 씬 (정합). #3 — s1 act 설계 ↔ s3 씬 분배 불일치 방지.
+function uncoveredActs(scenes: Scenes, ns: NarrativeStructure): string[] {
+  const covered = new Set(scenes.scenes.map((s) => s.act_ref));
+  return ns.acts.map((a) => a.act_id).filter((id) => !covered.has(id));
+}
+
 export async function runScenes(
   input: PipelineInput,
   genre: Genre,
@@ -98,6 +105,12 @@ export async function runScenes(
 
 각 씬에 estimated_seconds를 추정 (총합 ≈ ${totalSecondsTarget}초).
 ${sceneCountHint} 권장.
+
+act 커버리지 (필수):
+- S1.acts의 모든 act_id가 최소 1개 씬의 act_ref로 등장해야 한다 (빠지는 막 금지).
+- 따라서 씬 수는 최소 S1.acts 개수 이상. 권장 씬 수와 충돌하면 act 커버리지를 우선한다.
+- 가능하면 각 act.proportion 비율로 씬을 분배한다 (proportion 큰 막에 더 많은 씬).
+- act_ref는 S1.acts의 act_id를 그대로 쓴다.
 
 scene_actions:
 - 씬에서 일어나는 주요 액션을 텍스트로 (예: "카이가 일어선다", "편지를 펼친다", "문을 연다")
@@ -177,7 +190,35 @@ new_characters는 전개상 새 인물이 정말 필요할 때만 채운다. 기
     provider: axisConfig.provider,
   });
 
-  await logger.saveStage('05_scenes.json', result);
-  await logger.markStage('scenes', 'completed', { scene_count: result.scenes.length });
-  return result;
+  // act 커버리지 자기검증 (#3): S1.acts 의 모든 막이 어떤 씬의 act_ref 로 덮였는가.
+  //   누락 막이 있으면 위반 목록을 첨부해 1회 교정 재생성하고, 커버리지가 더 나은 쪽을 채택 (v3 validator 패턴).
+  let scenes = result;
+  let uncovered = uncoveredActs(scenes, narrativeStructure);
+  if (uncovered.length) {
+    const repairPrompt = `${userPrompt}
+
+[규칙 위반 — S1.acts 중 다음 막에 씬이 없음: ${uncovered.join(', ')}.
+ 각 막에 최소 1개 씬(act_ref = 해당 act_id)을 포함하도록 동일 JSON 형식으로 다시 출력하라. 씬 수가 늘어도 된다.]`;
+    const repaired = await generateJson<Scenes>(repairPrompt, axisConfig, {
+      systemInstruction,
+      temperature: 0.6,
+    });
+    await logger.saveLlmCall('scenes_repair', {
+      prompt: repairPrompt,
+      response: JSON.stringify(repaired, null, 2),
+      model: describeAxisConfig(axisConfig),
+      provider: axisConfig.provider,
+    });
+    if (uncoveredActs(repaired, narrativeStructure).length < uncovered.length) {
+      scenes = repaired;
+      uncovered = uncoveredActs(scenes, narrativeStructure);
+    }
+  }
+
+  await logger.saveStage('05_scenes.json', scenes);
+  await logger.markStage('scenes', 'completed', {
+    scene_count: scenes.scenes.length,
+    uncovered_acts: uncovered, // 비어있어야 정상 (남으면 막 수 > 가능 씬 수 등 구조적 한계)
+  });
+  return scenes;
 }
