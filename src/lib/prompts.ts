@@ -31,8 +31,7 @@ export function buildWorldPrompt(
   boostPreset?: string | null,
 ): string {
   const boost = boostPreset ? BOOST_KEYWORDS[boostPreset] ?? '' : ''
-  const parts = [visualDescription, `during ${timeOfDay}`, mood, boost].filter(
-    Boolean,
-  )
+  const time = timeOfDay.trim() ? `during ${timeOfDay.trim()}` : ''
+  const parts = [visualDescription, time, mood, boost].filter(Boolean)
   return parts.join(', ')
 }

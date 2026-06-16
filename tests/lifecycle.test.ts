@@ -41,6 +41,16 @@ const producerSource = {
       appearance: '은빛 고리',
     },
   ],
+  backgrounds: [
+    {
+      localId: 'bg-alley',
+      locationId: 'neon_alley',
+      name: '네온 골목',
+      visualDescription: '젖은 아스팔트와 붉은 네온',
+      purpose: '추격 시작',
+      origin: 'producer',
+    },
+  ],
 }
 
 describe('computeProducerSourceHash', () => {
@@ -54,6 +64,18 @@ describe('computeProducerSourceHash', () => {
       ...producerSource,
       cast: producerSource.cast.map((c) =>
         c.characterId === 'char_a' ? { ...c, appearance: '흰 후디' } : c,
+      ),
+    }
+    expect(computeProducerSourceHash(changed)).not.toBe(computeProducerSourceHash(producerSource))
+  })
+
+  it('background source changes alter the source hash', () => {
+    const changed = {
+      ...producerSource,
+      backgrounds: producerSource.backgrounds.map((background) =>
+        background.locationId === 'neon_alley'
+          ? { ...background, purpose: '결말 대면' }
+          : background,
       ),
     }
     expect(computeProducerSourceHash(changed)).not.toBe(computeProducerSourceHash(producerSource))

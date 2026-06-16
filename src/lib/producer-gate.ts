@@ -33,6 +33,17 @@ export interface CastMember {
   origin?: 'producer' | 'writer'
 }
 
+export interface BackgroundSource {
+  localId: string
+  locationId?: string
+  name: string
+  visualDescription: string
+  purpose: string
+  origin?: 'producer' | 'writer'
+  userEdited?: boolean
+  stale?: boolean
+}
+
 export interface GateIssue {
   field: string
   label: string // 한국어 — UI 노출
@@ -50,6 +61,7 @@ export interface GateInput {
   settings: ProjectSettings
   storyReady: boolean
   cast: CastMember[]
+  backgrounds: BackgroundSource[]
 }
 
 function isFilled(v: unknown): boolean {
@@ -98,7 +110,15 @@ function depthAtLeast(
   return DEPTH_ORDER.indexOf(depth) >= DEPTH_ORDER.indexOf(min)
 }
 
-export function evaluateProducerGate({ settings, storyReady, cast }: GateInput): GateResult {
+export function isProducerBackgroundComplete(background: BackgroundSource): boolean {
+  return (
+    isFilled(background.name) &&
+    isFilled(background.visualDescription) &&
+    isFilled(background.purpose)
+  )
+}
+
+export function evaluateProducerGate({ settings, storyReady, cast, backgrounds }: GateInput): GateResult {
   const hardMissing: GateIssue[] = []
   const softMissing: GateIssue[] = []
 
@@ -152,6 +172,15 @@ export function evaluateProducerGate({ settings, storyReady, cast }: GateInput):
       hardMissing.push({ field: `cast:${o.localId}:name`, label: `${who}: 이름 필요` })
     if (!isFilled(o.appearance))
       hardMissing.push({ field: `cast:${o.localId}:appearance`, label: `${who}: 외모(appearance) 필요` })
+  }
+
+  // ── 게이트 C: Background source (producer-owned location pool) ───────
+  if (!backgrounds.some(isProducerBackgroundComplete)) {
+    hardMissing.push({
+      field: 'background:minComplete',
+      label: '배경 1개 이상 필요',
+      detail: '이름, 시각 설명, 목적이 모두 있는 배경 카드가 필요합니다',
+    })
   }
 
   return {

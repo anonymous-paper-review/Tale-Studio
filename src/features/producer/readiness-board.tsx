@@ -31,7 +31,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { depthLevelFromRuntime } from '@/lib/depth'
-import type { CastMember, GateIssue, GateResult, EntityType } from '@/lib/producer-gate'
+import type { BackgroundSource, CastMember, GateIssue, GateResult, EntityType } from '@/lib/producer-gate'
+import { isProducerBackgroundComplete } from '@/lib/producer-gate'
 import type { ProjectFormat } from '@/types'
 import { CastEditDialog } from './cast-edit-dialog'
 import { TagInput } from './tag-input'
@@ -228,6 +229,105 @@ function CastCard({
   )
 }
 
+function backgroundReady(background: BackgroundSource): boolean {
+  return isProducerBackgroundComplete(background)
+}
+
+function backgroundDraftPrompt(background?: BackgroundSource) {
+  const current = background
+    ? [
+        background.name ? `이름: ${background.name}` : null,
+        background.visualDescription ? `시각 설명: ${background.visualDescription}` : null,
+        background.purpose ? `목적: ${background.purpose}` : null,
+      ].filter(Boolean).join(' / ')
+    : ''
+  return `Producer, writer와 artist가 바로 쓸 수 있는 배경 카드 1개를 채워 주세요. 필수는 이름, 시각 설명, 이야기 속 목적입니다.${current ? ` 현재 정보: ${current}.` : ''}`
+}
+
+function BackgroundCard({
+  background,
+  onPatch,
+  onAskProducer,
+  onDelete,
+}: {
+  background: BackgroundSource
+  onPatch: (localId: string, patch: Partial<BackgroundSource>) => void
+  onAskProducer: (prompt: string) => void
+  onDelete: (localId: string) => void
+}) {
+  const ready = backgroundReady(background)
+  return (
+    <div className="rounded-xl border border-border bg-card/70 p-4">
+      <div className="mb-3 flex items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          <Monitor className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate text-sm font-medium">{background.name || '이름 미정 배경'}</span>
+            {background.origin === 'writer' ? (
+              <Badge variant="ghost" className="text-[10px] text-muted-foreground">writer 추가</Badge>
+            ) : null}
+            {background.stale ? (
+              <Badge variant="outline" className="text-[10px] text-warning">stale</Badge>
+            ) : null}
+            {ready ? (
+              <Badge variant="outline" className="ml-auto gap-1 border-success/40 text-success">
+                <CheckCircle2 className="size-3" /> 준비됨
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="ml-auto gap-1 border-destructive/40 text-destructive">
+                <AlertCircle className="size-3" /> 필요
+              </Badge>
+            )}
+          </div>
+          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+            {background.visualDescription || '시각 설명 미입력'}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">이름</label>
+          <Input
+            value={background.name}
+            placeholder="예: 네온 뒷골목"
+            onChange={(e) => onPatch(background.localId, { name: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">목적</label>
+          <Input
+            value={background.purpose}
+            placeholder="예: 추격이 시작되는 공간"
+            onChange={(e) => onPatch(background.localId, { purpose: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-1.5">
+        <label className="text-xs font-medium text-muted-foreground">시각 설명</label>
+        <Textarea
+          value={background.visualDescription}
+          rows={2}
+          placeholder="색감, 구조, 소품, 분위기"
+          onChange={(e) => onPatch(background.localId, { visualDescription: e.target.value })}
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button size="sm" variant="ghost" onClick={() => onAskProducer(backgroundDraftPrompt(background))}>
+          <Wand2 className="size-3.5" /> 프로듀서에게 채워달라
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => onDelete(background.localId)}>
+          삭제
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const projectSettings = useProducerStore((s) => s.projectSettings)
   const updateSettings = useProducerStore((s) => s.updateSettings)
@@ -238,6 +338,10 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const addCastMember = useProducerStore((s) => s.addCastMember)
   const updateCastMember = useProducerStore((s) => s.updateCastMember)
   const removeCastMember = useProducerStore((s) => s.removeCastMember)
+  const backgrounds = useProducerStore((s) => s.backgrounds)
+  const addBackground = useProducerStore((s) => s.addBackground)
+  const updateBackground = useProducerStore((s) => s.updateBackground)
+  const removeBackground = useProducerStore((s) => s.removeBackground)
   const requestDraftPrompt = useChatUiStore((s) => s.requestDraftPrompt)
 
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -245,6 +349,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const depth = depthLevelFromRuntime(projectSettings.playtime || 0)
   const persons = cast.filter((m) => m.entityType === 'person')
   const objects = cast.filter((m) => m.entityType === 'object')
+  const readyBackgrounds = backgrounds.filter(backgroundReady)
 
   const hardByField = useMemo(
     () => new Map(gate.hardMissing.map((issue) => [issue.field, issue])),
@@ -259,6 +364,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const add = (entityType: EntityType) => {
     const id = addCastMember(entityType)
     setEditingId(id)
+  }
+  const addBg = () => {
+    addBackground()
   }
 
   return (
@@ -428,6 +536,50 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                     onPatch={updateCastMember}
                     onEdit={() => setEditingId(member.localId)}
                     onAskProducer={askProducer}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold">Background readiness</h2>
+                <Badge variant="outline" className="text-[10px]">locations</Badge>
+                <span className="text-xs text-muted-foreground">준비됨 {readyBackgrounds.length} / 전체 {backgrounds.length}</span>
+              </div>
+              <Button size="sm" variant="outline" onClick={addBg}>
+                <Plus className="size-4" /> 배경
+              </Button>
+            </div>
+
+            {issueByField(gate.hardMissing, 'background:minComplete') ? (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                {issueByField(gate.hardMissing, 'background:minComplete')?.label}
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {issueByField(gate.hardMissing, 'background:minComplete')?.detail}
+                </span>
+              </div>
+            ) : null}
+
+            {backgrounds.length === 0 ? (
+              <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-border p-8 text-center">
+                <Monitor className="size-10 text-muted-foreground" />
+                <p className="mt-3 text-sm font-medium">아직 배경 카드가 없어요</p>
+                <p className="mt-1 max-w-md text-xs text-muted-foreground">
+                  Producer가 만든 배경은 writer의 장소 풀과 artist의 월드 이미지 시작점이 됩니다.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-3 xl:grid-cols-2">
+                {backgrounds.map((background) => (
+                  <BackgroundCard
+                    key={background.localId}
+                    background={background}
+                    onPatch={updateBackground}
+                    onAskProducer={askProducer}
+                    onDelete={removeBackground}
                   />
                 ))}
               </div>

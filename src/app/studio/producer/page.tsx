@@ -24,8 +24,9 @@ export default function MeetingPage() {
 
   const storyReady = useProducerStore((s) => s.storyReady)
   const cast = useProducerStore((s) => s.cast)
+  const backgrounds = useProducerStore((s) => s.backgrounds)
   // 핸드오프 가부는 결정적 게이트가 판정 (architecture §3 — 채팅은 제안일 뿐).
-  const gate = evaluateProducerGate({ settings: projectSettings, storyReady, cast })
+  const gate = evaluateProducerGate({ settings: projectSettings, storyReady, cast, backgrounds })
   const canHandoff = gate.canHandoff
 
   // writer 산출물 게이트백 — 씬/샷이 없어 producer 로 되돌려진 프로젝트면 재실행 배너 노출.

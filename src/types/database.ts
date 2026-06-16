@@ -304,6 +304,10 @@ export type Database = {
           style_description: string | null
           lighting_sources: string[] | null
           props: string[] | null
+          purpose: string | null
+          origin: 'producer' | 'writer'
+          user_edited: boolean
+          last_writer_run_id: string | null
         }
         Insert: {
           id?: string
@@ -321,6 +325,10 @@ export type Database = {
           style_description?: string | null
           lighting_sources?: string[] | null
           props?: string[] | null
+          purpose?: string | null
+          origin?: 'producer' | 'writer'
+          user_edited?: boolean
+          last_writer_run_id?: string | null
         }
         Update: {
           id?: string
@@ -338,6 +346,10 @@ export type Database = {
           style_description?: string | null
           lighting_sources?: string[] | null
           props?: string[] | null
+          purpose?: string | null
+          origin?: 'producer' | 'writer'
+          user_edited?: boolean
+          last_writer_run_id?: string | null
         }
         Relationships: [
           {
@@ -345,6 +357,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_last_writer_run_id_fkey"
+            columns: ["last_writer_run_id"]
+            isOneToOne: false
+            referencedRelation: "writer_runs"
             referencedColumns: ["id"]
           },
         ]
@@ -396,6 +415,7 @@ export type Database = {
           created_at: string | null
           updated_at: string | null
           design_tokens: Json | null
+          last_writer_run_id: string | null
         }
         Insert: {
           id?: string
@@ -408,6 +428,7 @@ export type Database = {
           created_at?: string | null
           updated_at?: string | null
           design_tokens?: Json | null
+          last_writer_run_id?: string | null
         }
         Update: {
           id?: string
@@ -420,6 +441,7 @@ export type Database = {
           created_at?: string | null
           updated_at?: string | null
           design_tokens?: Json | null
+          last_writer_run_id?: string | null
         }
         Relationships: [
           {
@@ -427,6 +449,13 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_last_writer_run_id_fkey"
+            columns: ["last_writer_run_id"]
+            isOneToOne: false
+            referencedRelation: "writer_runs"
             referencedColumns: ["id"]
           },
         ]

@@ -10,6 +10,18 @@ import { createRun, getActiveRun } from '@/lib/writer/run-store';
 import { WRITER_TOTAL_UNITS, triggerWriterStep } from '@/lib/writer/pipeline/steps';
 import type { PipelineInput, Genre, CastContract } from '@/lib/writer/types/pipeline';
 
+// producer 핸드오프 배경 페이로드(원천 rich shape). writer 내부 BackgroundContract 와 분리 —
+//   locations 테이블엔 full 필드로 즉시 upsert 하고, 파이프라인엔 BackgroundContract 로 매핑해 전달한다.
+interface ProducerBackgrounds {
+  locations: Array<{
+    location_id: string;
+    name: string;
+    visual_description: string;
+    purpose?: string;
+    user_edited?: boolean;
+  }>;
+}
+
 export const runtime = 'nodejs';
 // 시작만 응답하고 첫 step 은 after()로 트리거. 짧게.
 export const maxDuration = 60;
@@ -40,6 +52,41 @@ async function upsertProducerCast(projectId: string, cast: CastContract): Promis
   if (error) throw new Error(`cast upsert failed: ${error.message}`);
 }
 
+async function upsertProducerBackgrounds(projectId: string, backgrounds: ProducerBackgrounds): Promise<void> {
+  if (!backgrounds.locations.length) return;
+
+  const { data: existing, error: selectError } = await supabaseAdmin
+    .from('locations')
+    .select('location_id')
+    .eq('project_id', projectId);
+  if (selectError) throw new Error(`background select failed: ${selectError.message}`);
+
+  const existingIds = new Set((existing ?? []).map((row) => row.location_id as string));
+  for (const background of backgrounds.locations) {
+    const row = {
+      project_id: projectId,
+      location_id: background.location_id,
+      name: background.name,
+      visual_description: background.visual_description,
+      style_description: background.visual_description,
+      purpose: background.purpose,
+      origin: 'producer',
+      user_edited: background.user_edited === true,
+    };
+
+    const query = existingIds.has(background.location_id)
+      ? supabaseAdmin
+          .from('locations')
+          .update(row)
+          .eq('project_id', projectId)
+          .eq('location_id', background.location_id)
+      : supabaseAdmin.from('locations').insert(row);
+
+    const { error } = await query;
+    if (error) throw new Error(`background upsert failed: ${error.message}`);
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await getUser();
@@ -54,8 +101,9 @@ export async function POST(req: NextRequest) {
       models?: PipelineInput['models'];
       genre?: Genre;
       cast?: CastContract;
+      backgrounds?: ProducerBackgrounds;
     };
-    const { projectId, story, runtimeSeconds, models, genre, cast } = body;
+    const { projectId, story, runtimeSeconds, models, genre, cast, backgrounds } = body;
 
     if (!projectId || typeof projectId !== 'string') {
       return NextResponse.json({ error: 'projectId required' }, { status: 400 });
@@ -74,9 +122,27 @@ export async function POST(req: NextRequest) {
     if (cast?.characters?.length) {
       await upsertProducerCast(projectId, cast);
     }
+    if (backgrounds?.locations?.length) {
+      await upsertProducerBackgrounds(projectId, backgrounds);
+    }
 
     // 2. run 시작 (genre/cast seed → s0/s2 생략).
-    const input: PipelineInput = { story, runtimeSeconds, models, genre, cast };
+    const input: PipelineInput = {
+      story,
+      runtimeSeconds,
+      models,
+      genre,
+      cast,
+      background: backgrounds?.locations?.length
+        ? {
+            locations: backgrounds.locations.map((b) => ({
+              id: b.location_id,
+              name: b.name,
+              description: b.visual_description,
+            })),
+          }
+        : undefined,
+    };
     const run = await createRun(projectId, input, WRITER_TOTAL_UNITS);
 
     // 첫 step 트리거 (응답 후 별도 서버리스 인스턴스에서 실행).

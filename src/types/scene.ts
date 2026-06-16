@@ -24,6 +24,13 @@ export interface Location {
   visualDescription: string
   timeOfDay: string
   lightingDirection: string
+  purpose?: string
+  origin?: 'producer' | 'writer'
+  userEdited?: boolean
+  stale?: boolean
+  styleDescription?: string
+  lightingSources?: string[]
+  props?: string[]
 }
 
 export interface SceneManifest {

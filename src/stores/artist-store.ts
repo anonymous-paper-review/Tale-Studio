@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { SceneManifest, CharacterAsset, WorldAsset } from '@/types'
+import type { Scene, SceneManifest, Location as ManifestLocation, CharacterAsset, WorldAsset } from '@/types'
 import { type CharacterViewKey } from '@/types/asset'
 import { CHARACTER_DIRECTIONAL_VIEWS } from '@/lib/artist/turnaround'
 import { candidateViewToViewKey, type CandidateImage } from '@/lib/image-provenance'
@@ -35,8 +35,8 @@ export type ArtistUpdate =
   | { type: 'regenerateWorldAsset'; locationId: string }
   | ({ type: 'createCharacter' } & NewCharacterInput)
 
-/** 생성 트리거 주체 (generation_jobs.actor 귀속) — 채팅 applyUpdates 경로만 'chat', 나머지는 'ui'. */
-export type GenerationActor = 'ui' | 'chat'
+/** 생성 트리거 주체. `auto`는 Artist 자동 first-fill 내부 표식이며 서버 job actor 로는 ui 처리된다. */
+export type GenerationActor = 'ui' | 'chat' | 'auto'
 
 // fal 계정 concurrent limit을 여러 유저가 공유하므로, dispatcher 전 단계에서는 화면별 submit 풀을
 // 보수적으로 유지한다. 계정 전역 공정성은 generation_jobs dispatcher 도입 시 중앙화한다.
@@ -66,6 +66,50 @@ function worldShotPrompt(
   shot: WorldShotKey,
 ): string {
   return `${buildWorldPrompt(visualDescription, timeOfDay, mood, boost)}, ${WORLD_SHOT_SUFFIX[shot]}`
+}
+
+function joinPromptParts(parts: Array<string | null | undefined>): string {
+  return parts.map((part) => part?.trim()).filter(Boolean).join(', ')
+}
+
+export function buildWorldShotPromptForLocation(
+  location: ManifestLocation,
+  scene: Scene | null | undefined,
+  boost: string | null,
+  shot: WorldShotKey,
+): string {
+  const visual = joinPromptParts([
+    location.visualDescription,
+    location.styleDescription,
+    location.lightingDirection ? `lighting direction: ${location.lightingDirection}` : '',
+    location.lightingSources?.length ? `lighting sources: ${location.lightingSources.join(', ')}` : '',
+    location.props?.length ? `key props: ${location.props.join(', ')}` : '',
+    location.purpose ? `story purpose: ${location.purpose}` : '',
+    location.name,
+  ])
+
+  const timeOfDay = location.timeOfDay || scene?.timeOfDay || ''
+  const mood = joinPromptParts([
+    scene?.mood,
+    scene?.narrativeSummary ? `scene context: ${scene.narrativeSummary}` : '',
+    !scene && location.purpose ? `producer background purpose: ${location.purpose}` : '',
+  ])
+
+  return worldShotPrompt(visual, timeOfDay, mood, boost, shot)
+}
+
+export function shouldMarkWorldGenerationUserEdited(actor: GenerationActor): boolean {
+  return actor !== 'auto'
+}
+
+async function markLocationUserEdited(projectId: string, locationId: string): Promise<void> {
+  const { error } = await createClient()
+    .from('locations')
+    .update({ user_edited: true })
+    .eq('project_id', projectId)
+    .eq('location_id', locationId)
+
+  if (error) throw new Error(`location user_edited update failed: ${error.message}`)
 }
 
 async function generateImage(
@@ -357,19 +401,35 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           }
         }
 
-        if (dbChars?.length) {
+        const dbScenes = (scenes ?? []).map((s) => ({
+          sceneId: s.scene_id,
+          narrativeSummary: s.narrative_summary ?? '',
+          originalTextQuote: s.original_text_quote ?? '',
+          location: s.location ?? '',
+          timeOfDay: s.time_of_day ?? '',
+          mood: s.mood ?? '',
+          charactersPresent: s.characters_present ?? [],
+          estimatedDurationSeconds: s.estimated_duration_seconds ?? 30,
+        }))
+        const dbLocations = (dbLocs ?? []).map((l) => ({
+          locationId: l.location_id,
+          name: l.name ?? l.location_id,
+          visualDescription: l.visual_description ?? l.style_description ?? '',
+          timeOfDay: l.time_of_day ?? '',
+          lightingDirection: l.lighting_direction ?? '',
+          purpose: l.purpose ?? '',
+          origin: l.origin === 'producer' ? ('producer' as const) : ('writer' as const),
+          userEdited: l.user_edited === true,
+          styleDescription: l.style_description ?? '',
+          lightingSources: Array.isArray(l.lighting_sources) ? l.lighting_sources : [],
+          props: Array.isArray(l.props) ? l.props : [],
+        }))
+        const sceneByLocation = new Map(dbScenes.map((scene) => [scene.location, scene]))
+
+        if ((dbChars?.length ?? 0) || dbLocations.length) {
           const manifest: SceneManifest = {
-            scenes: (scenes ?? []).map((s) => ({
-              sceneId: s.scene_id,
-              narrativeSummary: s.narrative_summary ?? '',
-              originalTextQuote: s.original_text_quote ?? '',
-              location: s.location ?? '',
-              timeOfDay: s.time_of_day ?? '',
-              mood: s.mood ?? '',
-              charactersPresent: s.characters_present ?? [],
-              estimatedDurationSeconds: s.estimated_duration_seconds ?? 30,
-            })),
-            characters: dbChars.map((c) => ({
+            scenes: dbScenes,
+            characters: (dbChars ?? []).map((c) => ({
               characterId: c.character_id,
               name: c.name,
               role: c.role as 'protagonist' | 'antagonist' | 'supporting',
@@ -377,15 +437,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               fixedPrompt: c.appearance ?? '',
               referenceImages: [],
             })),
-            locations: (dbLocs ?? []).map((l) => ({
-              locationId: l.location_id,
-              name: l.name,
-              visualDescription: l.visual_description ?? '',
-              timeOfDay: l.time_of_day ?? '',
-              lightingDirection: l.lighting_direction ?? '',
-            })),
+            locations: dbLocations,
           }
-          const characterAssets: CharacterAsset[] = dbChars.map((c) => ({
+          const characterAssets: CharacterAsset[] = (dbChars ?? []).map((c) => ({
             characterId: c.character_id,
             name: c.name,
             views: {
@@ -399,14 +453,25 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             fixedPrompt: c.appearance ?? '',
             viewCandidates: candidatesByCharView[c.character_id] ?? {},
           }))
-          const worldAssets: WorldAsset[] = (dbLocs ?? []).map((l) => ({
-            locationId: l.location_id,
-            name: l.name,
-            sceneId: l.scene_id ?? '',
-            wideShot: l.wide_shot ?? null,
-            establishingShot: l.establishing_shot ?? null,
-            visualDescription: l.visual_description ?? '',
-          }))
+          const worldAssets: WorldAsset[] = dbLocations.map((location) => {
+            const scene = sceneByLocation.get(location.locationId)
+            return {
+              locationId: location.locationId,
+              name: location.name,
+              sceneId: scene?.sceneId ?? '',
+              wideShot: (dbLocs ?? []).find((l) => l.location_id === location.locationId)?.wide_shot ?? null,
+              establishingShot: (dbLocs ?? []).find((l) => l.location_id === location.locationId)?.establishing_shot ?? null,
+              visualDescription: location.visualDescription,
+              timeOfDay: location.timeOfDay || scene?.timeOfDay || '',
+              mood: scene?.mood ?? '',
+              purpose: location.purpose,
+              origin: location.origin,
+              userEdited: location.userEdited,
+              styleDescription: location.styleDescription,
+              lightingSources: location.lightingSources,
+              props: location.props,
+            }
+          })
 
           set({
             sceneManifest: manifest,
@@ -626,8 +691,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const location = sceneManifest?.locations.find(
       (l) => l.locationId === locationId,
     )
-    const scene = sceneManifest?.scenes.find((s) => s.location === locationId)
-    if (!location || !scene) return
+    const scene = sceneManifest?.scenes.find((s) => s.location === locationId) ?? null
+    if (!location) return
     if (get().generatingLocations.includes(locationId)) return
 
     set((state) => ({
@@ -637,20 +702,34 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }))
 
     try {
-      const basePrompt = buildWorldPrompt(
-        location.visualDescription,
-        location.timeOfDay,
-        scene.mood,
-        selectedBoostPreset,
-      )
-
       const pid = useProjectStore.getState().projectId
+      if (pid && shouldMarkWorldGenerationUserEdited(actor)) {
+        await markLocationUserEdited(pid, locationId)
+        set((state) => ({
+          worldAssets: state.worldAssets.map((w) =>
+            w.locationId === locationId ? { ...w, userEdited: true } : w,
+          ),
+          sceneManifest: state.sceneManifest
+            ? {
+                ...state.sceneManifest,
+                locations: state.sceneManifest.locations.map((l) =>
+                  l.locationId === locationId ? { ...l, userEdited: true } : l,
+                ),
+              }
+            : state.sceneManifest,
+        }))
+      }
 
       // Generate sequentially to avoid timeout. fal이면 webhook job 경로, 아니면 동기.
       // suffix는 WORLD_SHOT_SUFFIX 단일 출처 사용 (generateWorldShot과 동일 문구).
       // 1) Wide shot
       const wideShot = await generateAndPersistWorldShot(
-        pid, locationId, 'wide_shot', `${basePrompt}, ${WORLD_SHOT_SUFFIX.wideShot}`, imageProvider, actor,
+        pid,
+        locationId,
+        'wide_shot',
+        buildWorldShotPromptForLocation(location, scene, selectedBoostPreset, 'wideShot'),
+        imageProvider,
+        actor,
       )
       set((state) => ({
         worldAssets: state.worldAssets.map((w) =>
@@ -660,7 +739,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
       // 2) Establishing shot
       const establishingShot = await generateAndPersistWorldShot(
-        pid, locationId, 'establishing_shot', `${basePrompt}, ${WORLD_SHOT_SUFFIX.establishingShot}`, imageProvider, actor,
+        pid,
+        locationId,
+        'establishing_shot',
+        buildWorldShotPromptForLocation(location, scene, selectedBoostPreset, 'establishingShot'),
+        imageProvider,
+        actor,
       )
       set((state) => ({
         worldAssets: state.worldAssets.map((w) =>
@@ -688,15 +772,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const location = sceneManifest?.locations.find(
       (l) => l.locationId === locationId,
     )
-    const scene = sceneManifest?.scenes.find((s) => s.location === locationId)
-    if (!location || !scene) {
-      // ⚠️ silent-skip 지점: location/scene 매칭 실패면 월드가 *조용히* 생성 안 됨(스피너도 안 뜸).
-      //   주로 scenes.location(=writer scene.location) ↔ locations.location_id 식별자 불일치가 원인.
-      console.warn(
-        `[autogen] world ${locationId}:${shot} SKIPPED — ${
-          !location ? 'no matching location' : 'no matching scene (scene.location !== locationId)'
-        } in sceneManifest`,
-      )
+    const scene = sceneManifest?.scenes.find((s) => s.location === locationId) ?? null
+    if (!location) {
+      console.warn(`[autogen] world ${locationId}:${shot} SKIPPED — no matching location in sceneManifest`)
       return
     }
 
@@ -710,17 +788,27 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const t0 = Date.now()
     alog(`[autogen] world ${locationId}:${shot} → submitting…`)
     try {
-      // 사용자 편집 프롬프트 우선, 없으면 기본 빌드 프롬프트.
+      // 사용자 편집 프롬프트 우선, 없으면 Producer-only 또는 Writer scene context 를 포함한 기본 프롬프트.
       const prompt =
         promptOverride ??
-        worldShotPrompt(
-          location.visualDescription,
-          location.timeOfDay,
-          scene.mood,
-          selectedBoostPreset,
-          shot,
-        )
+        buildWorldShotPromptForLocation(location, scene, selectedBoostPreset, shot)
       const pid = useProjectStore.getState().projectId
+      if (pid && shouldMarkWorldGenerationUserEdited(actor)) {
+        await markLocationUserEdited(pid, locationId)
+        set((state) => ({
+          worldAssets: state.worldAssets.map((w) =>
+            w.locationId === locationId ? { ...w, userEdited: true } : w,
+          ),
+          sceneManifest: state.sceneManifest
+            ? {
+                ...state.sceneManifest,
+                locations: state.sceneManifest.locations.map((l) =>
+                  l.locationId === locationId ? { ...l, userEdited: true } : l,
+                ),
+              }
+            : state.sceneManifest,
+        }))
+      }
       const url = await generateAndPersistWorldShot(
         pid,
         locationId,
@@ -780,7 +868,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     for (const c of characterAssets) {
       if (c.views.main == null) {
         queuedMain.push(`char ${c.characterId}:main`)
-        mainTasks.push(() => get().generateCharacterView(c.characterId, 'main'))
+        mainTasks.push(() => get().generateCharacterView(c.characterId, 'main', 'auto'))
       }
     }
 
@@ -798,7 +886,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       for (const v of CHARACTER_DIRECTIONAL_VIEWS) {
         if (c.views[v] == null) {
           queuedRest.push(`char ${c.characterId}:${v}`)
-          restTasks.push(() => get().generateCharacterView(c.characterId, v))
+          restTasks.push(() => get().generateCharacterView(c.characterId, v, 'auto'))
         } else {
           skipped.push(`char ${c.characterId}:${v}`)
         }
@@ -812,7 +900,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         queuedRest.push(`world ${locId}:wideShot (await server pre-gen → fallback)`)
         restTasks.push(async () => {
           if (!projectId) {
-            await get().generateWorldShot(locId, 'wideShot')
+            await get().generateWorldShot(locId, 'wideShot', undefined, 'auto')
             return
           }
           set((s) => ({
@@ -840,14 +928,14 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             return
           }
           alog(`[autogen] world ${locId}:wideShot — server pre-gen 미도착, client fallback`)
-          await get().generateWorldShot(locId, 'wideShot')
+          await get().generateWorldShot(locId, 'wideShot', undefined, 'auto')
         })
       } else {
         skipped.push(`world ${w.locationId}:wideShot`)
       }
       if (w.establishingShot == null) {
         queuedRest.push(`world ${w.locationId}:establishingShot`)
-        restTasks.push(() => get().generateWorldShot(w.locationId, 'establishingShot'))
+        restTasks.push(() => get().generateWorldShot(w.locationId, 'establishingShot', undefined, 'auto'))
       } else {
         skipped.push(`world ${w.locationId}:establishingShot`)
       }
@@ -963,12 +1051,11 @@ export function worldShotDefaultPrompt(
   const location = sceneManifest?.locations.find(
     (l) => l.locationId === locationId,
   )
-  const scene = sceneManifest?.scenes.find((s) => s.location === locationId)
-  if (!location || !scene) return ''
-  return worldShotPrompt(
-    location.visualDescription,
-    location.timeOfDay,
-    scene.mood,
+  const scene = sceneManifest?.scenes.find((s) => s.location === locationId) ?? null
+  if (!location) return ''
+  return buildWorldShotPromptForLocation(
+    location,
+    scene,
     selectedBoostPreset,
     shot,
   )

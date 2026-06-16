@@ -174,6 +174,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           history: historyPayload,
           currentSettings: p.projectSettings,
           storyText: p.storyText,
+          currentBackgrounds: p.backgrounds,
         }
         break
       }

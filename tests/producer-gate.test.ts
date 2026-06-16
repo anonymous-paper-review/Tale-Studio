@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { evaluateProducerGate, type CastMember } from '@/lib/producer-gate'
+import { evaluateProducerGate, type BackgroundSource, type CastMember } from '@/lib/producer-gate'
 import type { ProjectSettings } from '@/types'
 
 const baseSettings: ProjectSettings = {
@@ -21,19 +21,29 @@ const fullPerson = (over: Partial<CastMember> = {}): CastMember => ({
   ...over,
 })
 
+const fullBackground = (over: Partial<BackgroundSource> = {}): BackgroundSource => ({
+  localId: 'b1',
+  name: '네온 골목',
+  visualDescription: '젖은 아스팔트와 붉은 네온 간판이 있는 좁은 골목',
+  purpose: '추격이 시작되는 압박감 있는 공간',
+  origin: 'producer',
+  ...over,
+})
+
 describe('evaluateProducerGate — gate A (story foundation)', () => {
   it('blocks when a hard setting is missing', () => {
     const r = evaluateProducerGate({
       settings: { ...baseSettings, genre: '' },
       storyReady: true,
       cast: [fullPerson()],
+      backgrounds: [fullBackground()],
     })
     expect(r.canHandoff).toBe(false)
     expect(r.hardMissing.map((i) => i.field)).toContain('genre')
   })
 
   it('blocks when story is not ready', () => {
-    const r = evaluateProducerGate({ settings: baseSettings, storyReady: false, cast: [fullPerson()] })
+    const r = evaluateProducerGate({ settings: baseSettings, storyReady: false, cast: [fullPerson()], backgrounds: [fullBackground()] })
     expect(r.canHandoff).toBe(false)
     expect(r.hardMissing.map((i) => i.field)).toContain('storyText')
   })
@@ -43,6 +53,7 @@ describe('evaluateProducerGate — gate A (story foundation)', () => {
       settings: { ...baseSettings, tone: [], subGenre: '' },
       storyReady: true,
       cast: [fullPerson()],
+      backgrounds: [fullBackground()],
     })
     expect(r.canHandoff).toBe(true)
     const softFields = r.softMissing.map((i) => i.field)
@@ -57,12 +68,13 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
       settings: { ...baseSettings, playtime: 10 },
       storyReady: true,
       cast: [],
+      backgrounds: [fullBackground()],
     })
     expect(r.canHandoff).toBe(true)
   })
 
   it('D3 (120s) requires at least one person', () => {
-    const r = evaluateProducerGate({ settings: baseSettings, storyReady: true, cast: [] })
+    const r = evaluateProducerGate({ settings: baseSettings, storyReady: true, cast: [], backgrounds: [fullBackground()] })
     expect(r.canHandoff).toBe(false)
     expect(r.hardMissing.map((i) => i.field)).toContain('cast:minPerson')
   })
@@ -72,6 +84,7 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
       settings: baseSettings,
       storyReady: true,
       cast: [fullPerson({ arc: undefined, motivation: undefined })],
+      backgrounds: [fullBackground()],
     })
     expect(r.canHandoff).toBe(false)
     const fields = r.hardMissing.map((i) => i.field)
@@ -87,6 +100,7 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
         fullPerson(),
         { localId: 'o1', name: '반지', entityType: 'object', appearance: '은빛 고리' },
       ],
+      backgrounds: [fullBackground()],
     })
     expect(r.canHandoff).toBe(true)
   })
@@ -96,8 +110,20 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
       settings: { ...baseSettings, playtime: 600 },
       storyReady: true,
       cast: [fullPerson()],
+      backgrounds: [fullBackground()],
     })
     expect(r.canHandoff).toBe(true)
     expect(r.softMissing.map((i) => i.field)).toContain('cast:recommendPersons')
+  })
+
+  it('requires at least one complete background source card', () => {
+    const r = evaluateProducerGate({
+      settings: baseSettings,
+      storyReady: true,
+      cast: [fullPerson()],
+      backgrounds: [{ ...fullBackground(), visualDescription: '' }],
+    })
+    expect(r.canHandoff).toBe(false)
+    expect(r.hardMissing.map((i) => i.field)).toContain('background:minComplete')
   })
 })

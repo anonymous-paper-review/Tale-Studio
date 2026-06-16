@@ -24,10 +24,22 @@ export interface ProducerSourceCastMember {
   } | null
 }
 
+export interface ProducerSourceBackground {
+  localId?: string
+  locationId?: string
+  location_id?: string
+  name?: string | null
+  visualDescription?: string | null
+  visual_description?: string | null
+  purpose?: string | null
+  origin?: 'producer' | 'writer' | string | null
+}
+
 export interface ProducerSourceInput {
   storyText: string | null | undefined
   settings: Partial<ProjectSettings> | null | undefined
   cast: ProducerSourceCastMember[] | null | undefined
+  backgrounds?: ProducerSourceBackground[] | null | undefined
 }
 
 export type ProducerSourceImpactKind =
@@ -162,8 +174,8 @@ function stableStringify(value: unknown): string {
 
 function castStableId(cast: ProducerSourceCastMember): string {
   return normalizeText(cast.characterId ?? cast.character_id)
-    || normalizeText(cast.localId)
     || normalizeText(cast.name)
+    || normalizeText(cast.localId)
 }
 
 function normalizeEntityType(value: unknown): LifecycleEntityType {
@@ -172,12 +184,11 @@ function normalizeEntityType(value: unknown): LifecycleEntityType {
 
 function normalizeCastMember(cast: ProducerSourceCastMember) {
   const characterId = normalizeText(cast.characterId ?? cast.character_id)
-  const localId = normalizeText(cast.localId)
   const name = normalizeText(cast.name)
   return {
     stableId: castStableId(cast),
     characterId,
-    localId,
+    localId: '',
     name,
     entityType: normalizeEntityType(cast.entityType ?? cast.entity_type),
     role: normalizeText(cast.role),
@@ -195,11 +206,34 @@ function normalizeCastMember(cast: ProducerSourceCastMember) {
   }
 }
 
+function backgroundStableId(background: ProducerSourceBackground): string {
+  return normalizeText(background.locationId ?? background.location_id)
+    || normalizeText(background.name)
+    || normalizeText(background.localId)
+}
+
+function normalizeBackground(background: ProducerSourceBackground) {
+  return {
+    stableId: backgroundStableId(background),
+    locationId: normalizeText(background.locationId ?? background.location_id),
+    localId: '',
+    name: normalizeText(background.name),
+    visualDescription: normalizeText(background.visualDescription ?? background.visual_description),
+    purpose: normalizeText(background.purpose),
+    origin: normalizeText(background.origin),
+  }
+}
+
 function normalizeProducerSource(input: ProducerSourceInput) {
   const settings = input.settings ?? {}
   const cast = (input.cast ?? [])
     .map(normalizeCastMember)
     .sort((a, b) => a.stableId.localeCompare(b.stableId))
+    .map(({ stableId: _stableId, ...member }) => member)
+  const backgrounds = (input.backgrounds ?? [])
+    .map(normalizeBackground)
+    .sort((a, b) => a.stableId.localeCompare(b.stableId))
+    .map(({ stableId: _stableId, ...background }) => background)
 
   return {
     version: 1,
@@ -214,6 +248,7 @@ function normalizeProducerSource(input: ProducerSourceInput) {
       dialogueLanguage: normalizeText(settings.dialogueLanguage),
     },
     cast,
+    backgrounds,
   }
 }
 

@@ -72,6 +72,15 @@ export interface WorldAsset {
   sceneId: string
   wideShot: string | null
   establishingShot: string | null
-  /** Writer 정의 계승 — asset-storage 등록 시 description/prompt로 전파 */
+  /** Writer/Producer 정의 계승 — asset-storage 등록 시 description/prompt로 전파 */
   visualDescription?: string
+  timeOfDay?: string
+  mood?: string
+  purpose?: string
+  origin?: 'producer' | 'writer'
+  userEdited?: boolean
+  stale?: boolean
+  styleDescription?: string
+  lightingSources?: string[]
+  props?: string[]
 }

@@ -3,14 +3,18 @@
 //   결과가 비면(예: 순수 한글 이름) 'char' 로 폴백하고, 중복은 _2, _3… suffix 로 푼다.
 //   slug 는 생성 후 불변(rename 은 표시명 name 만 변경) — OQ3 결정.
 
-export function slugifyName(name: string): string {
+export function slugifyIdentifier(name: string, fallback: string): string {
   const base = name
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9\s_-]/g, '') // ascii 영숫자/공백/_/- 만 남김 (한글·기호 제거)
     .replace(/[\s-]+/g, '_')
     .replace(/^_+|_+$/g, '')
-  return base || 'char'
+  return base || fallback
+}
+
+export function slugifyName(name: string): string {
+  return slugifyIdentifier(name, 'char')
 }
 
 /**
@@ -28,5 +32,19 @@ export function assignCastSlugs<T extends { name: string; characterId?: string }
     while (used.has(slug)) slug = `${base}_${n++}`
     used.add(slug)
     return { ...m, character_id: slug }
+  })
+}
+
+export function assignLocationSlugs<T extends { name: string; locationId?: string }>(
+  locations: T[],
+): (T & { location_id: string })[] {
+  const used = new Set<string>()
+  return locations.map((location) => {
+    const base = location.locationId?.trim() || slugifyIdentifier(location.name, 'location')
+    let slug = base
+    let n = 2
+    while (used.has(slug)) slug = `${base}_${n++}`
+    used.add(slug)
+    return { ...location, location_id: slug }
   })
 }
