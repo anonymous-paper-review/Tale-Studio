@@ -114,7 +114,7 @@ ${JSON.stringify(scenes)}
     retry_count: retryCount,
   };
 
-  await logger.saveStage('06_storyCheck.json', report);
+  await logger.saveStage('06_c1_storyCheck.json', report);
   await logger.markStage('storyCheck', 'completed', {
     passed: report.passed,
     issue_count: report.issues.length,

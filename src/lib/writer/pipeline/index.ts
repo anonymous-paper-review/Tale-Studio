@@ -196,8 +196,8 @@ async function _runPipelineInner(
     : { characters: [], relationships: [], subtext_notes: [] };
   await logger.markStage('characters', 'completed', { seeded: true, count: characters.characters.length });
 
-  const narrativeStructure = (await loadOrRun<NarrativeStructure>(resume, '03_narrativeStructure.json', () => runNarrativeStructure(input, genre, logger, models.S), 'narrativeStructure', logger)).value;
-  const scenes = (await loadOrRun<Scenes>(resume, '05_scenes.json', () => runScenes(input, genre, narrativeStructure, characters, logger, models.S), 'scenes', logger)).value;
+  const narrativeStructure = (await loadOrRun<NarrativeStructure>(resume, '03_s1_narrativeStructure.json', () => runNarrativeStructure(input, genre, logger, models.S), 'narrativeStructure', logger)).value;
+  const scenes = (await loadOrRun<Scenes>(resume, '05_s3_scenes.json', () => runScenes(input, genre, narrativeStructure, characters, logger, models.S), 'scenes', logger)).value;
   // 오픈 캐스트(§4): 전개상 추가된 new_characters 를 머지 → 하류 stage 와 persistAssetsToDb(origin='writer' insert)가 본다.
   characters = mergeOpenCast(characters, scenes);
 
@@ -211,7 +211,7 @@ async function _runPipelineInner(
       })())
     : (await loadOrRun<StoryCheckReport>(
         resume,
-        '06_storyCheck.json',
+        '06_c1_storyCheck.json',
         () => runStoryCheck(genre, narrativeStructure, characters, scenes, logger, models.C),
         'storyCheck',
         logger,
@@ -225,7 +225,7 @@ async function _runPipelineInner(
       })())
     : (await loadOrRun<MidPreview>(
         resume,
-        '07_midPreview.json',
+        '07_bridge_midPreview.json',
         () => runMidPreview(genre, narrativeStructure, characters, scenes, storyCheck, logger, models.V),
         'midPreview',
         logger,
@@ -235,7 +235,7 @@ async function _runPipelineInner(
   // v0: VisualIdentity 직접 생성 (genre + bridge seed.v0)
   const visualIdentity = (await loadOrRun<VisualIdentity>(
     resume,
-    '08_visualIdentity.json',
+    '08_v0_visualIdentity.json',
     () => runVisualIdentity(genre, midPreview, logger, models.V),
     'visualIdentity',
     logger,
@@ -244,7 +244,7 @@ async function _runPipelineInner(
   // v1: 막별 비주얼 아크 (s1 + v0 + bridge seed.v1)
   const actVisualArc = (await loadOrRun<ActVisualArc>(
     resume,
-    '08b_actVisualArc.json',
+    '08b_v1_actVisualArc.json',
     () => runActVisualArc(narrativeStructure, visualIdentity, midPreview.v_recommendations.v1, logger, models.V),
     'actVisualArc',
     logger,
@@ -256,7 +256,7 @@ async function _runPipelineInner(
   // v2: 인물/월드 비주얼 직접 생성 (v0 + v1 + s2 chars/world + bridge seed.v2). 옛 productionDesign+derive 대체.
   const { characterVisual, worldVisual } = (await loadOrRun<{ characterVisual: CharacterVisual; worldVisual: WorldVisual }>(
     resume,
-    '09_v2Design.json',
+    '09_v2_design.json',
     () => runV2Design(visualIdentity, actVisualArc, characters, world, midPreview.v_recommendations.v2, logger, models.V),
     'v2Design',
     logger,
@@ -286,8 +286,8 @@ async function _runPipelineInner(
 
   // sceneCinematography resume: compact면 별도 파일(_inferred), 아니면 정상 파일
   type SceneCinematographySavedShape = { scene_plans: SceneCinematography[]; budget_issues?: ValidationIssue[] };
-  const sceneCinematographyFileNormal = '10_sceneCinematography.json';
-  const sceneCinematographyFileInferred = '10_sceneCinematography_inferred.json';
+  const sceneCinematographyFileNormal = '10_v3_sceneCinematography.json';
+  const sceneCinematographyFileInferred = '10_v3_sceneCinematography_inferred.json';
 
   let sceneCinematographyLoaded = false;
   if (resume) {
@@ -324,7 +324,7 @@ async function _runPipelineInner(
   // 시간 제약은 driver가 아니라 validator — 감독이 샷 수/경계를 저작한다 (linear_pipeline Turn 7).
   const decoupage = (await loadOrRun<DecoupagePlan>(
     resume,
-    '10b_decoupage.json',
+    '10b_c_decoupage.json',
     () => runDecoupage(genre, characters, scenes, worldVisual, compact ? null : sceneCinematography, logger, models.V),
     'decoupage',
     logger,
@@ -333,7 +333,7 @@ async function _runPipelineInner(
   // shotDesign: 샷 단위 3분할 (intent + static + dynamic). 데쿠파주가 정한 샷에 spec을 붙인다.
   const shotDesignResult = await loadOrRun<{ shots: ShotDesign[]; compact_mode: boolean }>(
     resume,
-    '11_shotDesign.json',
+    '11_v4_shotDesign.json',
     async () => {
       const shots = await runShotDesign(genre, characters, scenes, visualIdentity, worldVisual, characterVisual, compact ? null : sceneCinematography, decoupage, midPreview.v_recommendations.v4, logger, models.V);
       return { shots, compact_mode: compact };
@@ -361,8 +361,8 @@ async function _runPipelineInner(
   };
   let shotCheckResult: ShotCheckShape;
   if (resume) {
-    const cachedSeq = await logger.loadStage<PipelineResult['shotSequence']>('13_shotSequence.json');
-    const cachedReport = await logger.loadStage<PipelineResult['shotCheck']>('12_shotCheck.json');
+    const cachedSeq = await logger.loadStage<PipelineResult['shotSequence']>('13_c2_shotSequence.json');
+    const cachedReport = await logger.loadStage<PipelineResult['shotCheck']>('12_c2_shotCheck.json');
     if (cachedSeq && cachedReport) {
       shotCheckResult = { shotSequence: cachedSeq, report: cachedReport };
       await logger.markStage('shotCheck', 'completed', { resumed: true });
@@ -382,7 +382,7 @@ async function _runPipelineInner(
   // 없는 경우만 LLM(Visual 축)로 보충 생성.
   const renderPrompts = (await loadOrRun<RenderPromptsOutput>(
     resume,
-    '14_renderPrompts.json',
+    '14_v5_renderPrompts.json',
     () => runRenderPrompts(shotSequence, visualIdentity, worldVisual, logger, models.V),
     'renderPrompts',
     logger,

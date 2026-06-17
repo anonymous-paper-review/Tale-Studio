@@ -63,7 +63,7 @@ acts의 proportion 합은 1.0이어야 함.`;
     provider: axisConfig.provider,
   });
 
-  await logger.saveStage('03_narrativeStructure.json', result);
+  await logger.saveStage('03_s1_narrativeStructure.json', result);
   await logger.markStage('narrativeStructure', 'completed');
   return result;
 }

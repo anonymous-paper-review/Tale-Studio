@@ -345,8 +345,8 @@ ${JSON.stringify(genResult.shots, null, 2)}
     total_action_violations_fixed: valResult.shots_to_split.length,
   };
 
-  await logger.saveStage('12_shotCheck.json', report);
-  await logger.saveStage('13_shotSequence.json', shotSequence);
+  await logger.saveStage('12_c2_shotCheck.json', report);
+  await logger.saveStage('13_c2_shotSequence.json', shotSequence);
   await logger.markStage('shotCheck', 'completed', {
     final_shot_count: finalShots.length,
     split_count: splitCount,

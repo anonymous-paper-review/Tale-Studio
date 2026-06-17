@@ -55,7 +55,7 @@ ${JSON.stringify(midPreview.v_recommendations.v0, null, 2)}
     provider: axisConfig.provider,
   });
 
-  await logger.saveStage('08_visualIdentity.json', result);
+  await logger.saveStage('08_v0_visualIdentity.json', result);
   await logger.markStage('visualIdentity', 'completed');
   return result;
 }

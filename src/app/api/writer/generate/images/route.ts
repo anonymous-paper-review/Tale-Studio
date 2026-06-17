@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const logger = new PipelineLogger(projectId);
     await logger.init();
 
-    const finalPrompts = await logger.loadStage<RenderPromptsOutput>('14_renderPrompts.json');
+    const finalPrompts = await logger.loadStage<RenderPromptsOutput>('14_v5_renderPrompts.json');
     if (!finalPrompts) {
       return NextResponse.json(
         { error: '14_renderPrompts.json 없음. 파이프라인이 L5까지 완료되어야 함.' },

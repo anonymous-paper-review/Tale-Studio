@@ -50,7 +50,7 @@ export async function runShotDesign(
     allShots.push(...sceneShots);
   }
 
-  await logger.saveStage('11_shotDesign.json', { shots: allShots, compact_mode: compactMode });
+  await logger.saveStage('11_v4_shotDesign.json', { shots: allShots, compact_mode: compactMode });
   await logger.markStage('shotDesign', 'completed', { shot_count: allShots.length, compact_mode: compactMode });
 
   return allShots;

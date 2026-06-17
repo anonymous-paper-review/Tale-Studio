@@ -46,7 +46,7 @@ export async function runShotVideos(
 ): Promise<ShotVideosOutput> {
   const modelLabel = opts.model ?? 'alibaba/happy-horse/reference-to-video';
 
-  const cachedFile = !opts.force ? await logger.loadStage<ShotVideosOutput>('16_shotVideos.json') : null;
+  const cachedFile = !opts.force ? await logger.loadStage<ShotVideosOutput>('16_v7_shotVideos.json') : null;
   const cachedSuccess = new Map<string, ShotVideoResult>(
     (cachedFile?.shots ?? [])
       .filter((s) => s.status === 'success' && s.video_url)
@@ -86,7 +86,7 @@ export async function runShotVideos(
   };
   const saveProgress = (): Promise<void> => {
     writeLock = writeLock
-      .then(() => logger.saveStage('16_shotVideos.json', buildOutput()))
+      .then(() => logger.saveStage('16_v7_shotVideos.json', buildOutput()))
       .then(() => undefined)
       .catch((e) => {
         console.warn('[L7] progress save failed:', e);

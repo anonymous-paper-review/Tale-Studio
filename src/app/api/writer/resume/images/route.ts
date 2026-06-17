@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const logger = new PipelineLogger(projectId);
     await logger.init();
 
-    const file = await logger.loadStage<ShotImagesOutput>('15_shotImages.json');
+    const file = await logger.loadStage<ShotImagesOutput>('15_v6_shotImages.json');
     if (!file) {
       return NextResponse.json({ error: '15_shotImages.json 없음' }, { status: 400 });
     }
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       model: file.model,
       shots: sorted,
     };
-    await logger.saveStage('15_shotImages.json', output);
+    await logger.saveStage('15_v6_shotImages.json', output);
     return NextResponse.json({ ...output, resumed, still_pending: output.pending_count });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

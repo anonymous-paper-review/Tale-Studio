@@ -89,7 +89,7 @@ ${JSON.stringify(validation, null, 2)}
     provider: axisConfig.provider,
   });
 
-  await logger.saveStage('07_midPreview.json', result);
+  await logger.saveStage('07_bridge_midPreview.json', result);
   await logger.markStage('midPreview', 'completed');
   return result;
 }

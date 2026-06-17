@@ -215,7 +215,7 @@ new_characters는 전개상 새 인물이 정말 필요할 때만 채운다. 기
     }
   }
 
-  await logger.saveStage('05_scenes.json', scenes);
+  await logger.saveStage('05_s3_scenes.json', scenes);
   await logger.markStage('scenes', 'completed', {
     scene_count: scenes.scenes.length,
     uncovered_acts: uncovered, // 비어있어야 정상 (남으면 막 수 > 가능 씬 수 등 구조적 한계)

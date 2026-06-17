@@ -54,7 +54,7 @@ export async function runShotImages(
   const hasAnyAssets = assetUrlById.size > 0;
   const modelLabel = opts.model ?? (hasAnyAssets ? 'openai/gpt-image-2/edit' : 'openai/gpt-image-2');
 
-  const cachedFile = !opts.force ? await logger.loadStage<ShotImagesOutput>('15_shotImages.json') : null;
+  const cachedFile = !opts.force ? await logger.loadStage<ShotImagesOutput>('15_v6_shotImages.json') : null;
   const cachedSuccess = new Map<string, ShotImageResult>(
     (cachedFile?.shots ?? [])
       .filter((s) => s.status === 'success' && s.image_url)
@@ -93,7 +93,7 @@ export async function runShotImages(
   };
   const saveProgress = (): Promise<void> => {
     writeLock = writeLock
-      .then(() => logger.saveStage('15_shotImages.json', buildOutput()))
+      .then(() => logger.saveStage('15_v6_shotImages.json', buildOutput()))
       .then(() => undefined)
       .catch((e) => {
         console.warn('[L6] progress save failed:', e);

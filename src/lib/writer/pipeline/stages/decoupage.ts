@@ -239,7 +239,7 @@ export async function runDecoupage(
     director_notes: sceneDecoupages.map((s) => `${s.scene_id}: ${s.beat_count}beats→${s.shot_count}shots (${s.rhythm_profile})`).join(' | '),
   };
 
-  await logger.saveStage('10b_decoupage.json', plan);
+  await logger.saveStage('10b_c_decoupage.json', plan);
   await logger.markStage('decoupage', 'completed', {
     total_shots: plan.total_shots,
     total_added: plan.total_added,

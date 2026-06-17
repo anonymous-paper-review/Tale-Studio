@@ -99,7 +99,7 @@ export async function runRenderPrompts(
     },
   };
 
-  await logger.saveStage('14_renderPrompts.json', output);
+  await logger.saveStage('14_v5_renderPrompts.json', output);
   await logger.markStage('renderPrompts', 'completed', {
     total: shots.length,
     t2i_fallback: t2iFallbacks,

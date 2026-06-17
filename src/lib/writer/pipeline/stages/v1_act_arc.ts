@@ -67,7 +67,7 @@ ${bridgeHint || '(없음)'}
     provider: axisConfig.provider,
   });
 
-  await logger.saveStage('08b_actVisualArc.json', result);
+  await logger.saveStage('08b_v1_actVisualArc.json', result);
   await logger.markStage('actVisualArc', 'completed', { act_count: result.acts?.length ?? 0 });
   return result;
 }

@@ -153,7 +153,7 @@ ${sceneToShotHint}
 
   // rule-base 자기 검증 (V3 내용을 V3에서 확인) — enum/수치/상류(V2 팔레트·씬 등장인물) 정합.
   //   CRITICAL 위반 시 위반 목록을 첨부해 1회 교정 재생성하고, CRITICAL 이 더 적은 쪽을 채택한다.
-  let scenePlans = llmResult.scene_plans;
+  let scenePlans = Array.isArray(llmResult?.scene_plans) ? llmResult.scene_plans : [];
   let validation = validateSceneCinematography(scenePlans, scenes, worldVisual);
   const criticalCount = (v: typeof validation) =>
     v.issues.filter((i) => i.severity === 'CRITICAL').length;
@@ -173,9 +173,11 @@ ${buildCorrectionNote(validation.issues)}`;
       model: describeAxisConfig(axisConfig),
       provider: axisConfig.provider,
     });
-    const repairedValidation = validateSceneCinematography(repaired.scene_plans, scenes, worldVisual);
-    if (criticalCount(repairedValidation) <= criticalCount(validation)) {
-      scenePlans = repaired.scene_plans;
+    const repairedPlans = Array.isArray(repaired?.scene_plans) ? repaired.scene_plans : [];
+    const repairedValidation = validateSceneCinematography(repairedPlans, scenes, worldVisual);
+    // malformed/빈 repair 는 채택 안 함(원본 유지) — "not iterable" 크래시·퇴화 방지.
+    if (repairedPlans.length > 0 && criticalCount(repairedValidation) <= criticalCount(validation)) {
+      scenePlans = repairedPlans;
       validation = repairedValidation;
     }
   }
@@ -188,7 +190,7 @@ ${buildCorrectionNote(validation.issues)}`;
   // action_budget 이슈 + 자기 검증 이슈 합본 영속(둘 다 ValidationIssue).
   const allIssues = [...allBudgetIssues, ...validation.issues];
 
-  await logger.saveStage('10_sceneCinematography.json', {
+  await logger.saveStage('10_v3_sceneCinematography.json', {
     scene_plans: scenePlans,
     shot_count_total: shotCountTotal,
     budget_issues: allIssues,

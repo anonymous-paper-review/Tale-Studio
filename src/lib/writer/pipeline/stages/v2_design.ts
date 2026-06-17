@@ -127,7 +127,7 @@ locations=${JSON.stringify(locations, null, 2)}
     vfx_approach: result.worldVisual?.vfx_approach ?? '',
   };
 
-  await logger.saveStage('09_v2Design.json', { characterVisual, worldVisual });
+  await logger.saveStage('09_v2_design.json', { characterVisual, worldVisual });
   await logger.markStage('v2Design', 'completed', {
     character_count: characterVisual.characters.length,
     location_count: worldVisual.locations.length,
