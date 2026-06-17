@@ -15,10 +15,19 @@ import {
   Camera,
   Users,
   ShieldCheck,
+  LogOut,
 } from 'lucide-react'
 import { useProjectStore } from '@/stores/project-store'
 import { Input } from '@/components/ui/input'
 import type { StageId } from '@/types'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { createClient } from '@/lib/supabase/client'
+import { clearLastProjectId } from '@/lib/session-restore'
 
 interface ProjectItem {
   id: string
@@ -210,6 +219,14 @@ export default function HomePage() {
       ?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  const handleLogout = async () => {
+    // 공용 브라우저에서 다음 계정에게 마지막 프로젝트 힌트가 안 새도록 제거.
+    clearLastProjectId()
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
   return (
     <div className="min-h-screen bg-white text-black selection:bg-primary selection:text-white">
       {/* ── Navbar ── */}
@@ -242,23 +259,34 @@ export default function HomePage() {
               {creating ? 'Creating...' : 'Get Started'}
             </button>
             {userInfo && (
-              <div className="flex items-center gap-2">
-                {userInfo.avatar ? (
-                  <img
-                    src={userInfo.avatar}
-                    alt={userInfo.name}
-                    className="size-8 rounded-full border border-white/20 object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="flex size-8 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white">
-                    {userInfo.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <span className="max-w-[120px] truncate text-xs text-gray-300">
-                  {userInfo.name}
-                </span>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 rounded-full focus:outline-none">
+                    {userInfo.avatar ? (
+                      <img
+                        src={userInfo.avatar}
+                        alt={userInfo.name}
+                        className="size-8 rounded-full border border-white/20 object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="flex size-8 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white">
+                        {userInfo.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="max-w-[120px] truncate text-xs text-gray-300">
+                      {userInfo.name}
+                    </span>
+                    <ChevronDown className="size-4 text-gray-300" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </div>
