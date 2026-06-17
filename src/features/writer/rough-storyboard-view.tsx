@@ -56,7 +56,7 @@ export function RoughStoryboardView() {
   }, [status?.pipeline_completed, loadProject])
 
   const generate = useCallback(
-    async (shotIds?: string[], force?: boolean) => {
+    async (shotIds?: string[], force?: boolean, auto?: boolean) => {
       if (!projectId) return
       if (shotIds?.length) {
         // 클릭 즉시 피드백 — 서버가 in_flight skip 으로 응답하면 아래에서 정리됨
@@ -79,6 +79,17 @@ export function RoughStoryboardView() {
           shotId: string
           jobId: string
         }>
+        // give-up 게이트로 건너뛴 샷 안내 — 진입 자동 생성(auto)에는 매번 뜨지 않도록 억제.
+        if (!auto) {
+          const gaveUp = (
+            (j.data?.skipped ?? []) as Array<{ reason: string }>
+          ).filter((x) => x.reason === 'gave_up')
+          if (gaveUp.length) {
+            toast.info(
+              `패널 ${gaveUp.length}개는 반복 실패로 자동 생성을 멈췄어요. 카드의 "다시 시도"로 재생성할 수 있어요.`,
+            )
+          }
+        }
         setPanelJobs((prev) => ({
           ...prev,
           ...Object.fromEntries(
@@ -148,7 +159,7 @@ export function RoughStoryboardView() {
     if (!hasShots || running) return
     if (missingIds.length === 0) return
     autoTriggeredRef.current = true
-    void generate()
+    void generate(undefined, false, true) // auto=true → give-up 안내 토스트 억제
   }, [hasShots, running, missingIds.length, generate])
 
   // 보드 drag-to-scroll (빈 영역을 잡고 끌면 패닝). 버튼/입력 위에서 시작한 드래그는 무시.
@@ -337,7 +348,8 @@ export function RoughStoryboardView() {
                                 variant="outline"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  void generate([shot.shotId])
+                                  // 사람의 명시적 클릭 → force(give-up 게이트 통과). 빈 패널엔 무해.
+                                  void generate([shot.shotId], true)
                                 }}
                               >
                                 패널 생성

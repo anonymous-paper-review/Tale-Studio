@@ -78,11 +78,20 @@ export function buildWorldShotPromptForLocation(
   boost: string | null,
   shot: WorldShotKey,
 ): string {
+  // writer(v2 worldVisual)가 visual_description==style_description, lighting_direction==lighting_sources
+  //   처럼 같은 내용을 두 칸에 채우는 경우가 있어 동일 내용은 한 번만 넣는다(프롬프트 중복·토큰 낭비 방지).
+  const visualDesc = location.visualDescription?.trim() ?? ''
+  const styleDesc = location.styleDescription?.trim() ?? ''
+  const lightDir = location.lightingDirection?.trim() ?? ''
+  const lightSrc = location.lightingSources?.length
+    ? location.lightingSources.join(', ').trim()
+    : ''
+
   const visual = joinPromptParts([
-    location.visualDescription,
-    location.styleDescription,
-    location.lightingDirection ? `lighting direction: ${location.lightingDirection}` : '',
-    location.lightingSources?.length ? `lighting sources: ${location.lightingSources.join(', ')}` : '',
+    visualDesc,
+    styleDesc && styleDesc !== visualDesc ? styleDesc : '',
+    lightDir ? `lighting direction: ${lightDir}` : '',
+    lightSrc && lightSrc !== lightDir ? `lighting sources: ${lightSrc}` : '',
     location.props?.length ? `key props: ${location.props.join(', ')}` : '',
     location.purpose ? `story purpose: ${location.purpose}` : '',
     location.name,
@@ -171,7 +180,7 @@ async function generateAndPersistWorldShot(
   prompt: string,
   provider: ImageProvider,
   actor: GenerationActor = 'ui',
-): Promise<string> {
+): Promise<string | null> {
   if (provider === 'fal' && projectId) {
     const res = await fetch('/api/artist/generate-world', {
       method: 'POST',
@@ -182,8 +191,10 @@ async function generateAndPersistWorldShot(
       const body = await res.json().catch(() => ({}))
       throw new Error(body.error ?? `HTTP ${res.status}`)
     }
-    const { jobId } = (await res.json()) as { jobId: string }
-    return await pollGenerationJob(jobId)
+    const body = (await res.json()) as { jobId?: string; skipped?: boolean }
+    // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음. 에러 아님: null 로 조용히 종료.
+    if (body.skipped || !body.jobId) return null
+    return await pollGenerationJob(body.jobId)
   }
   // 비-fal provider 또는 projectId 없음 → 동기 경로
   const blobUrl = await generateImage(prompt, '16:9', provider)
@@ -640,7 +651,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         throw new Error(body.error ?? `HTTP ${res.status}`)
       }
       // 비동기: 라우트는 jobId만 반환 — 완료까지 polling (webhook이 서버사이드로 storage+DB 갱신).
-      const { jobId } = (await res.json()) as { jobId: string }
+      const body = (await res.json()) as { jobId?: string; skipped?: boolean }
+      // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음. 에러 아님: 조용히 종료.
+      if (body.skipped || !body.jobId) {
+        alog(`[autogen] char ${key} — give-up 게이트로 자동 생성 skip`)
+        return
+      }
+      const jobId = body.jobId
       alog(`[autogen] char ${key} job ${jobId} queued, polling…`)
       const url = await pollGenerationJob(jobId)
       alog(`[autogen] char ${key} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
@@ -722,7 +739,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
       // Generate sequentially to avoid timeout. fal이면 webhook job 경로, 아니면 동기.
       // suffix는 WORLD_SHOT_SUFFIX 단일 출처 사용 (generateWorldShot과 동일 문구).
-      // 1) Wide shot
+      // 1) Wide shot (null = 서버 give-up skip — 성공 시에만 반영)
       const wideShot = await generateAndPersistWorldShot(
         pid,
         locationId,
@@ -731,11 +748,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         imageProvider,
         actor,
       )
-      set((state) => ({
-        worldAssets: state.worldAssets.map((w) =>
-          w.locationId === locationId ? { ...w, wideShot } : w,
-        ),
-      }))
+      if (wideShot) {
+        set((state) => ({
+          worldAssets: state.worldAssets.map((w) =>
+            w.locationId === locationId ? { ...w, wideShot } : w,
+          ),
+        }))
+      }
 
       // 2) Establishing shot
       const establishingShot = await generateAndPersistWorldShot(
@@ -746,11 +765,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         imageProvider,
         actor,
       )
-      set((state) => ({
-        worldAssets: state.worldAssets.map((w) =>
-          w.locationId === locationId ? { ...w, establishingShot } : w,
-        ),
-      }))
+      if (establishingShot) {
+        set((state) => ({
+          worldAssets: state.worldAssets.map((w) =>
+            w.locationId === locationId ? { ...w, establishingShot } : w,
+          ),
+        }))
+      }
       notifyGenerationComplete('artist', '배경 이미지') // 다른 stage에 있을 때만 알림(store가 판단)
     } catch (err) {
       set({
@@ -817,6 +838,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         imageProvider,
         actor,
       )
+      if (!url) {
+        // 서버 give-up 게이트로 자동 생성 skip — 에러 아님(finally 가 generatingLocations 정리).
+        alog(`[autogen] world ${locationId}:${shot} — give-up 게이트로 자동 생성 skip`)
+        return
+      }
       alog(`[autogen] world ${locationId}:${shot} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
       set((state) => ({
         worldAssets: state.worldAssets.map((w) =>

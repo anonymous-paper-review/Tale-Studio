@@ -224,6 +224,39 @@ export async function failGenerationJob(
 }
 
 /**
+ * 자율 생성 give-up 게이트 임계값 — 같은 슬롯(target)으로 실패가 이만큼 쌓이면 자율 재생성을 멈춘다.
+ *   "빈칸 자율 채움은 실패를 배지로 남기고 무한 재시도하지 않는다"(architecture §5). 사람의 명시적
+ *   행동(actor='ui'/'chat' 또는 force)은 이 게이트를 통과한다 — 회복은 항상 명시적.
+ *   2 = 일시적 fal 실패 1회는 자동 재시도하되, 결정론적 실패(모더레이션·잘못된 입력)는 곧 멈춤.
+ */
+export const AUTO_GENERATION_GIVE_UP_THRESHOLD = 2
+
+/**
+ * 같은 target 으로 누적된 실패 잡 수 (give-up 게이트용). target 부분일치(JSONB @>):
+ *   world_shot={locationId,column} / character_view={characterId,column} / 러프보드={writerShotId} 등.
+ *   별도 상태 저장 없이 '실패 잡의 존재가 진실'(architecture §0)을 그대로 집계한다.
+ *   게이트는 비용 방어 — 조회 실패 시 fail-open(0)으로 정상 생성을 막지 않되 반드시 로그한다.
+ */
+export async function countFailedJobsForTarget(
+  projectId: string,
+  kind: GenerationJobKind,
+  target: Partial<GenerationJobTarget>,
+): Promise<number> {
+  const { count, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('project_id', projectId)
+    .eq('kind', kind)
+    .eq('status', 'failed')
+    .contains('target', target)
+  if (error) {
+    console.warn('[generation-jobs] countFailedJobsForTarget failed:', error.message)
+    return 0
+  }
+  return count ?? 0
+}
+
+/**
  * 유저가 현재 in-flight(queued)로 보유한 생성 작업 수 (chat-proactive-copilot Phase 3 — 멀티유저 쿼터).
  *   016 이후에는 generation_jobs.user_id 로 직접 집계한다.
  *   016 미적용/오류 시 workspace→project 2-hop 으로 fallback 한다.

@@ -10,6 +10,23 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { completeGenerationJob, type GenerationJob } from '@/lib/generation-jobs'
 import { CANDIDATE_RETENTION, type CandidateView } from '@/lib/image-provenance'
 
+// Supabase Storage 객체 키는 ASCII-safe 여야 한다 (공백·한글 등 → "Invalid key" 업로드 실패).
+//   버그: 오픈캐스트 로케이션 id 가 scene.location 원문(한글+공백)이라 키에 그대로 들어가 거부 →
+//   업로드 실패 → wide_shot 영영 NULL → artist autoGen 이 진입마다 재생성(무한 + fal 비용).
+//   DB id 는 원문 유지(행 매칭) — 스토리지 파일명 세그먼트만 안전화한다.
+//   이미 안전한 id 는 그대로(기존 키 무변경), 아니면 슬러그+해시(서로 다른 id 의 키 충돌 방지).
+function storageKeySegment(raw: string): string {
+  if (/^[A-Za-z0-9._-]+$/.test(raw)) return raw
+  const slug = raw
+    .normalize('NFKD')
+    .replace(/[^A-Za-z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  let h = 0
+  for (let i = 0; i < raw.length; i++) h = (Math.imul(31, h) + raw.charCodeAt(i)) | 0
+  const hash = (h >>> 0).toString(36)
+  return slug ? `${slug}_${hash}` : `id_${hash}`
+}
+
 /** 캐릭터 뷰 이미지 영속화 → 저장된 publicUrl 반환. */
 export async function finalizeCharacterViewJob(
   job: GenerationJob,
@@ -24,7 +41,7 @@ export async function finalizeCharacterViewJob(
   if (!imgRes.ok) throw new Error(`fal image fetch failed: ${imgRes.status}`)
   const buf = Buffer.from(await imgRes.arrayBuffer())
 
-  const path = `${workspaceId}/${job.project_id}/characters/${characterId}_${column}.png`
+  const path = `${workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}_${column}.png`
   const { error: upErr } = await supabaseAdmin.storage
     .from('media')
     .upload(path, buf, { contentType: 'image/png', upsert: true })
@@ -136,7 +153,7 @@ export async function finalizeWorldShotJob(
   if (!workspaceId || !locationId || !column) {
     throw new Error('world_shot job target missing workspaceId/locationId/column')
   }
-  const path = `${workspaceId}/${job.project_id}/locations/${locationId}_${column}.png`
+  const path = `${workspaceId}/${job.project_id}/locations/${storageKeySegment(locationId)}_${column}.png`
   const publicUrl = await uploadImageFromUrl(falImageUrl, path)
 
   const { error } = await supabaseAdmin
@@ -159,7 +176,7 @@ export async function finalizeShotStoryboardJob(
   if (!workspaceId || !writerShotId) {
     throw new Error('shot_storyboard job target missing workspaceId/writerShotId')
   }
-  const path = `${workspaceId}/${job.project_id}/shots/${writerShotId}_storyboard_image.png`
+  const path = `${workspaceId}/${job.project_id}/shots/${storageKeySegment(writerShotId)}_storyboard_image.png`
   const publicUrl = await uploadImageFromUrl(falImageUrl, path)
 
   // upload-image 라우트와 동일한 JSONB shape (ShotNode/StoryboardGridView가 소비).
@@ -190,7 +207,7 @@ export async function finalizeShotRoughStoryboardJob(
   if (!workspaceId || !writerShotId) {
     throw new Error('shot_rough_storyboard job target missing workspaceId/writerShotId')
   }
-  const path = `${workspaceId}/${job.project_id}/shots/${writerShotId}_rough_storyboard.png`
+  const path = `${workspaceId}/${job.project_id}/shots/${storageKeySegment(writerShotId)}_rough_storyboard.png`
   const publicUrl = await uploadImageFromUrl(falImageUrl, path)
 
   // RoughStoryboardImage shape (src/types/shot.ts — writer 러프 보드가 소비).

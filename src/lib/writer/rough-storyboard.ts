@@ -118,6 +118,12 @@ const PANEL_STYLE_BASE = `Style: loose, rough, monochrome pencil-sketch storyboa
 
 const MANNEQUIN_RULE = `Figures: draw every character as a featureless wooden mannequin / rough stick figure — no face, no identity — keeping only pose, gesture, and position in frame.`
 
+// 인물 0인 샷(설정/환경샷) 전용 — MANNEQUIN_RULE(목각 인형 그리기 명령) 대신 사용.
+//   모델(fal flux-2 klein)은 text-encoder 확산이라 부정문("no people") 해석이 약하다 → 긍정문을 앞세워
+//   "빈 풍경만 그려라"를 직설적으로 지시하고, 인물 명령 토큰(mannequin/stick figure)을 아예 뺀다.
+//   (이전 버그: 인물·blocking이 비어도 MANNEQUIN_RULE이 무조건 들어가 빈 풍경에 인형이 생성됨.)
+const ENV_ONLY_RULE = `Environment-only shot: draw the empty landscape and setting described above — terrain, sky, structures, and objects, with no people or figures in the frame.`
+
 function joinPanel(lines: Array<string | null | undefined>): string {
   return lines
     .filter((l): l is string => typeof l === 'string')
@@ -168,6 +174,17 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
       }.`
     : ''
 
+  // 인물(blocking)이 있을 때만 mannequin 규칙 — 비면 ENV_ONLY_RULE 로 교체(빈 풍경에 인형 생성 방지).
+  const figureBlock = blocking.length
+    ? `${MANNEQUIN_RULE} ${blocking.join(' ')} Represent any held prop or key object as a simple line or geometric shape${
+        props.length ? `, labeled with a single word if useful: ${props.join(', ')}` : ''
+      }.`
+    : `${ENV_ONLY_RULE}${
+        props.length
+          ? ` Show any key objects as simple lines or geometric shapes, labeled with a single word if useful: ${props.join(', ')}.`
+          : ''
+      }`
+
   return joinPanel([
     PANEL_HEADER,
     ``,
@@ -185,9 +202,7 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
         }`,
     motionNote,
     ``,
-    `${MANNEQUIN_RULE}${blocking.length ? ` ${blocking.join(' ')}` : ''} Represent any held prop or key object as a simple line or geometric shape${
-      props.length ? `, labeled with a single word if useful: ${props.join(', ')}` : ''
-    }.`,
+    figureBlock,
     ``,
     `Focal point: ${s.framing?.focal_point || spec.intent?.audience_focus || 'the main action'} — lead the eye there.`,
     ``,
@@ -205,13 +220,14 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
   const aspect = input.aspectRatio ?? '16:9'
 
   const setting = [input.location, input.timeOfDay].filter(Boolean).join(', ')
-  const figures = input.characterNames.length
-    ? `${input.characterNames.length} figure(s): ${input.characterNames.join(', ')} — ${
+  // 인물 있을 때만 mannequin 규칙 — 비면 ENV_ONLY_RULE (모순된 "draw mannequin … No characters" 제거).
+  const figureBlock = input.characterNames.length
+    ? `${MANNEQUIN_RULE} ${input.characterNames.length} figure(s): ${input.characterNames.join(', ')} — ${
         input.safeMode
           ? 'neutral standing poses, composed naturally in the frame.'
           : 'place and pose them according to the action above.'
-      }`
-    : 'No characters — environment only.'
+      } Represent any held prop or key object as a simple line or geometric shape.`
+    : `${ENV_ONLY_RULE} Show any key objects as simple lines or geometric shapes.`
   const focal = input.characterNames[0]
     ? `${input.characterNames[0]} and the main action`
     : 'the main action'
@@ -232,7 +248,7 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
       ? `Setting (background): ${setting}.${!input.safeMode && input.mood ? ` Mood: ${input.mood}.` : ''}`
       : '',
     ``,
-    `${MANNEQUIN_RULE} ${figures} Represent any held prop or key object as a simple line or geometric shape.`,
+    figureBlock,
     ``,
     `Focal point: ${focal} — lead the eye there.`,
     ``,

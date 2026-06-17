@@ -9,6 +9,8 @@ import { getUser } from '@/lib/supabase/auth'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import {
   createGenerationJob,
+  countFailedJobsForTarget,
+  AUTO_GENERATION_GIVE_UP_THRESHOLD,
   type GenerationJobActor,
 } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
@@ -48,6 +50,21 @@ export async function POST(req: Request) {
     }
     if (!VALID_COLUMNS.has(column)) {
       return NextResponse.json({ error: `invalid column: ${column}` }, { status: 400 })
+    }
+
+    // give-up 게이트: 자율 first-fill(actor='auto')은 같은 슬롯 실패가 임계값 이상이면 멈춘다
+    //   (무한 재시도·fal 과금 차단). 사람의 명시적 재생성(ui/chat)은 통과 → 회복 경로(architecture §5).
+    if (actor === 'auto') {
+      const failed = await countFailedJobsForTarget(projectId, 'world_shot', {
+        locationId,
+        column,
+      })
+      if (failed >= AUTO_GENERATION_GIVE_UP_THRESHOLD) {
+        console.warn(
+          `[artist/generate-world] give-up: ${locationId}/${column} 실패 ${failed}회 누적 → 자동 생성 skip`,
+        )
+        return NextResponse.json({ ok: true, skipped: true, reason: 'gave_up', failed })
+      }
     }
 
     const { data: project } = await supabaseAdmin

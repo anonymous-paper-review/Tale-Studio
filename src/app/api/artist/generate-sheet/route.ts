@@ -11,6 +11,8 @@ import { getUser } from '@/lib/supabase/auth'
 import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
 import {
   createGenerationJob,
+  countFailedJobsForTarget,
+  AUTO_GENERATION_GIVE_UP_THRESHOLD,
   type GenerationJobActor,
 } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
@@ -63,6 +65,21 @@ export async function POST(req: Request) {
     }
     if (!CHARACTER_VIEW_KEYS.includes(view)) {
       return NextResponse.json({ error: `invalid view: ${view}` }, { status: 400 })
+    }
+
+    // give-up 게이트: 자율 first-fill(actor='auto')은 같은 슬롯(캐릭터×뷰) 실패가 임계값 이상이면
+    //   멈춘다(무한 재시도·fal 과금 차단). 사람의 명시적 재생성(ui/chat)은 통과 → 회복(architecture §5).
+    if (actor === 'auto') {
+      const failed = await countFailedJobsForTarget(projectId, 'character_view', {
+        characterId,
+        column: CHARACTER_VIEW_COLUMNS[view],
+      })
+      if (failed >= AUTO_GENERATION_GIVE_UP_THRESHOLD) {
+        console.warn(
+          `[artist/generate-sheet] give-up: ${characterId}/${view} 실패 ${failed}회 누적 → 자동 생성 skip`,
+        )
+        return NextResponse.json({ ok: true, skipped: true, reason: 'gave_up', failed })
+      }
     }
 
     // 1. 프로젝트(workspace + 디자인 토큰) + 캐릭터 로드 (view_main = i2i reference)

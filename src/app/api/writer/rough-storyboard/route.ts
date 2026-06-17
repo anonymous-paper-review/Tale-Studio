@@ -9,7 +9,10 @@ import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
 import { falImageSubmit, ROUGH_STORYBOARD_IMAGE_MODEL } from '@/lib/writer/llm/fal'
-import { createGenerationJob } from '@/lib/generation-jobs'
+import {
+  createGenerationJob,
+  AUTO_GENERATION_GIVE_UP_THRESHOLD,
+} from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import {
@@ -147,11 +150,13 @@ export async function POST(req: Request) {
         .map((j) => (j.target as { writerShotId?: string })?.writerShotId)
         .filter(Boolean),
     )
-    const previouslyFailed = new Set(
-      (failedJobs ?? [])
-        .map((j) => (j.target as { writerShotId?: string })?.writerShotId)
-        .filter(Boolean),
-    )
+    // 실패 누적 횟수(샷별) — safeMode 파생 + give-up 게이트(임계값 이상이면 자율 재생성 멈춤).
+    const failCountByShot = new Map<string, number>()
+    for (const j of failedJobs ?? []) {
+      const id = (j.target as { writerShotId?: string })?.writerShotId
+      if (id) failCountByShot.set(id, (failCountByShot.get(id) ?? 0) + 1)
+    }
+    const previouslyFailed = new Set(failCountByShot.keys())
 
     const wanted = shotIds?.length
       ? (shots ?? []).filter((s) => shotIds.includes(s.shot_id as string))
@@ -163,7 +168,10 @@ export async function POST(req: Request) {
       promptSource: 'shotDesign' | 'db_fallback'
       safeMode: boolean
     }> = []
-    const skipped: Array<{ shotId: string; reason: 'exists' | 'in_flight' }> = []
+    const skipped: Array<{
+      shotId: string
+      reason: 'exists' | 'in_flight' | 'gave_up'
+    }> = []
 
     for (const s of wanted) {
       const shotId = s.shot_id as string
@@ -173,6 +181,12 @@ export async function POST(req: Request) {
       }
       if (!force && s.rough_storyboard) {
         skipped.push({ shotId, reason: 'exists' })
+        continue
+      }
+      // give-up 게이트: force(사람의 명시적 재생성)가 아니면, 반복 실패 샷은 자율 재생성을 멈춘다
+      //   (모더레이션 등 결정론적 실패의 무한 재제출·fal 과금 차단). 회복은 카드의 "다시 시도"(force).
+      if (!force && (failCountByShot.get(shotId) ?? 0) >= AUTO_GENERATION_GIVE_UP_THRESHOLD) {
+        skipped.push({ shotId, reason: 'gave_up' })
         continue
       }
 
