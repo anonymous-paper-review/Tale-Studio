@@ -112,17 +112,18 @@ export interface RoughStoryboardPromptInput {
   safeMode?: boolean
 }
 
-const PANEL_HEADER = `Create a single rough storyboard panel for film previsualization, drawn FROM THE CAMERA'S POINT OF VIEW — what the lens sees on screen. This is NOT an overhead map.`
+// 모델(fal flux-2 klein)은 text-encoder 확산(instruction LLM 아님) — 직설 단어 나열·긍정문·앞쪽 토큰에
+//   강하게 반응하고 문장형 서사·부정문은 약하다. 그래서 템플릿을 단어 나열·긍정문 위주로 압축한다.
+const PANEL_HEADER = `Rough storyboard previsualization panel, single frame, camera POV, lens-eye view.`
 
-const PANEL_STYLE_BASE = `Style: loose, rough, monochrome pencil-sketch storyboard — quick gestural lines, gray shading for depth and mood, plenty of negative space. A rough board, not a finished illustration.`
+const PANEL_STYLE_BASE = `Style: loose rough monochrome pencil-sketch, quick gestural lines, gray shading, ample negative space, unfinished rough board.`
 
-const MANNEQUIN_RULE = `Figures: draw every character as a featureless wooden mannequin / rough stick figure — no face, no identity — keeping only pose, gesture, and position in frame.`
+// "rough stick figure" 제거(featureless wooden mannequin 으로 통일), "no face/no identity"→"anonymous"(긍정).
+const MANNEQUIN_RULE = `Figures: draw every character as a featureless wooden mannequin, anonymous — pose, gesture, and position only.`
 
-// 인물 0인 샷(설정/환경샷) 전용 — MANNEQUIN_RULE(목각 인형 그리기 명령) 대신 사용.
-//   모델(fal flux-2 klein)은 text-encoder 확산이라 부정문("no people") 해석이 약하다 → 긍정문을 앞세워
-//   "빈 풍경만 그려라"를 직설적으로 지시하고, 인물 명령 토큰(mannequin/stick figure)을 아예 뺀다.
-//   (이전 버그: 인물·blocking이 비어도 MANNEQUIN_RULE이 무조건 들어가 빈 풍경에 인형이 생성됨.)
-const ENV_ONLY_RULE = `Environment-only shot: draw the empty landscape and setting described above — terrain, sky, structures, and objects, with no people or figures in the frame.`
+// 인물 0인 샷(설정/환경샷) 전용 — MANNEQUIN_RULE 대신. 인물 토큰을 아예 빼고 "빈 풍경만"을 긍정형 직설 지시
+//   (klein 은 부정문이 약해 "no people" 류는 비효율 → 긍정문 + 인물 명령어 미포함이 robust).
+const ENV_ONLY_RULE = `Environment-only shot: draw the empty landscape and setting above — terrain, sky, structures, and objects.`
 
 function joinPanel(lines: Array<string | null | undefined>): string {
   return lines
@@ -134,14 +135,20 @@ function joinPanel(lines: Array<string | null | undefined>): string {
 /** rich 경로 — L4 static_spec 이 템플릿 슬롯과 1:1 이므로 원본 facet 을 그대로 치환. */
 function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardSpec): string {
   const s = spec.staticSpec
-  const aspect = input.aspectRatio ?? '16:9'
   const sizeCode = String(s.shot_type ?? '').toUpperCase()
   const size = SHOT_SIZE_WORDS[sizeCode] ?? (words(s.shot_type) || 'medium shot')
   const lens = s.lens_mm || input.focalLength || 35
   const dof = s.depth_of_field ?? 'deep'
-  const rule = FRAMING_RULE_WORDS[s.framing?.rule ?? ''] ?? 'the rule of thirds'
+  // 카메라 intrinsic 은 단어 나열로 — 앞 관사 제거(angleWords/FRAMING_RULE_WORDS 의 'a/an/the').
+  const angle = angleWords(s.camera_angle).replace(/^an? /, '')
+  const rule = (FRAMING_RULE_WORDS[s.framing?.rule ?? ''] ?? 'the rule of thirds').replace(
+    /^(an?|the) /,
+    '',
+  )
 
-  // safe mode: 서사 동사·감정어가 실리는 구도 레이어/액션문/모션을 제외 (모더레이션 우회)
+  const nameOf = (id: string) => input.characterNameById?.get(id) ?? id
+
+  // safe mode: 서사 동사·감정어가 실리는 구도 레이어/모션을 제외 (모더레이션 우회)
   const layers = input.safeMode ? {} : (s.framing?.layers ?? {})
   const layerLines = [
     layers.foreground ? `- Foreground: ${layers.foreground}.` : null,
@@ -149,14 +156,17 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
     layers.background ? `- Background: ${layers.background}.` : null,
   ].filter(Boolean) as string[]
 
-  const nameOf = (id: string) => input.characterNameById?.get(id) ?? id
   const blocking = (s.character_blocking ?? []).map(
     (b) =>
       `${nameOf(b.character_id)}: ${words(b.position_in_frame)}, ${words(b.pose)}, gaze ${words(b.gaze)}.`,
   )
-  const props = (s.prop_placement ?? []).map(
-    (p) => `${p.prop} (${words(p.position_in_frame)})`,
-  )
+  // 앞쪽 배치할 주제 = 인물 수·이름 / 빈 풍경.
+  const subjectNames = (s.character_blocking ?? []).map((b) => nameOf(b.character_id))
+  const subject = subjectNames.length
+    ? `${subjectNames.length} figure${subjectNames.length > 1 ? 's' : ''}: ${subjectNames.join(', ')}`
+    : 'empty landscape'
+
+  const props = (s.prop_placement ?? []).map((p) => `${p.prop} (${words(p.position_in_frame)})`)
 
   // 동적 스펙은 "어느 순간을 얼릴지" 가이드로만 — 패널은 정지화.
   const motion = input.safeMode ? undefined : spec.dynamicSpec
@@ -169,90 +179,81 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
     : null
 
   const light = s.lighting?.key_direction
-    ? ` Keep light and shadow weighted toward the ${words(s.lighting.key_direction)} side${
-        s.lighting.quality ? ` (${s.lighting.quality} light)` : ''
+    ? ` Lighting: key from the ${words(s.lighting.key_direction)} side${
+        s.lighting.quality ? `, ${s.lighting.quality}` : ''
       }.`
     : ''
 
   // 인물(blocking)이 있을 때만 mannequin 규칙 — 비면 ENV_ONLY_RULE 로 교체(빈 풍경에 인형 생성 방지).
   const figureBlock = blocking.length
-    ? `${MANNEQUIN_RULE} ${blocking.join(' ')} Represent any held prop or key object as a simple line or geometric shape${
-        props.length ? `, labeled with a single word if useful: ${props.join(', ')}` : ''
+    ? `${MANNEQUIN_RULE} ${blocking.join(' ')} Props as simple lines or geometric shapes${
+        props.length ? `, labeled if useful: ${props.join(', ')}` : ''
       }.`
     : `${ENV_ONLY_RULE}${
-        props.length
-          ? ` Show any key objects as simple lines or geometric shapes, labeled with a single word if useful: ${props.join(', ')}.`
-          : ''
+        props.length ? ` Key objects as simple lines or geometric shapes, labeled if useful: ${props.join(', ')}.` : ''
       }`
 
   return joinPanel([
     PANEL_HEADER,
     ``,
-    `Frame: one ${aspect} storyboard panel with a thin rectangular border. This is a ${size} from ${angleWords(s.camera_angle)}, ${lens}mm-lens feel, ${dof} focus. Compose using ${rule}.`,
+    `${size[0].toUpperCase()}${size.slice(1)} — ${subject}.`,
+    `Camera: ${angle}, ${lens}mm, ${dof} focus, ${rule}.`,
     ``,
-    layerLines.length ? `Composition (camera POV, three depth layers):` : null,
+    layerLines.length ? `Composition, three depth layers:` : null,
     ...layerLines,
     ``,
-    input.safeMode
-      ? `Neutral staging panel — place the figures exactly as specified below; no dramatic action.`
-      : `Action this panel captures: ${input.actionDescription}${
-          spec.intent?.dramatic_purpose && spec.intent.dramatic_purpose !== input.actionDescription
-            ? ` (dramatic purpose: ${spec.intent.dramatic_purpose})`
-            : ''
-        }`,
     motionNote,
     ``,
     figureBlock,
     ``,
-    `Focal point: ${s.framing?.focal_point || spec.intent?.audience_focus || 'the main action'} — lead the eye there.`,
+    `Focal point: ${s.framing?.focal_point || spec.intent?.audience_focus || 'the main action'}.`,
     ``,
-    `${PANEL_STYLE_BASE}${light} Do not write any story text or captions inside the panel.`,
+    `${PANEL_STYLE_BASE}${light} Wordless panel.`,
   ])
 }
 
 /** fallback 경로 — DB shots/scenes 평탄화 필드 근사 (rich 미보유 프로젝트). */
 function buildFromDbRow(input: RoughStoryboardPromptInput): string {
   const size = SHOT_SIZE_WORDS[input.shotType] ?? 'medium shot'
-  const angle = angleFromPitch(input.cameraPitch)
+  const angle = angleFromPitch(input.cameraPitch).replace(/^an? /, '')
   const lens = input.focalLength ?? 35
   const focus =
     typeof input.aperture === 'number' && input.aperture <= 2.8 ? 'shallow' : 'deep'
-  const aspect = input.aspectRatio ?? '16:9'
 
   const setting = [input.location, input.timeOfDay].filter(Boolean).join(', ')
+  // 앞쪽 배치할 주제 = 인물 수·이름 / 빈 풍경.
+  const subject = input.characterNames.length
+    ? `${input.characterNames.length} figure${input.characterNames.length > 1 ? 's' : ''}: ${input.characterNames.join(', ')}`
+    : 'empty landscape'
   // 인물 있을 때만 mannequin 규칙 — 비면 ENV_ONLY_RULE (모순된 "draw mannequin … No characters" 제거).
   const figureBlock = input.characterNames.length
-    ? `${MANNEQUIN_RULE} ${input.characterNames.length} figure(s): ${input.characterNames.join(', ')} — ${
-        input.safeMode
-          ? 'neutral standing poses, composed naturally in the frame.'
-          : 'place and pose them according to the action above.'
-      } Represent any held prop or key object as a simple line or geometric shape.`
-    : `${ENV_ONLY_RULE} Show any key objects as simple lines or geometric shapes.`
+    ? `${MANNEQUIN_RULE} ${
+        input.safeMode ? 'Neutral standing poses, composed naturally.' : 'Place and pose them per the action.'
+      } Props as simple lines or geometric shapes.`
+    : `${ENV_ONLY_RULE} Key objects as simple lines or geometric shapes.`
   const focal = input.characterNames[0]
     ? `${input.characterNames[0]} and the main action`
     : 'the main action'
   const light =
     input.lightPosition && input.lightPosition !== 'front'
-      ? ` Keep light and shadow weighted toward the ${input.lightPosition} side.`
+      ? ` Lighting: key from the ${input.lightPosition} side.`
       : ''
 
   return joinPanel([
     PANEL_HEADER,
     ``,
-    `Frame: one ${aspect} storyboard panel with a thin rectangular border. This is a ${size} from ${angle}, ${lens}mm-lens feel, ${focus} focus. Compose using the rule of thirds.`,
+    `${size[0].toUpperCase()}${size.slice(1)} — ${subject}.`,
+    `Camera: ${angle}, ${lens}mm, ${focus} focus, rule of thirds.`,
     ``,
-    input.safeMode
-      ? `Neutral staging panel — no dramatic action.`
-      : `Action in frame (midground focus): ${input.actionDescription}`,
-    setting
-      ? `Setting (background): ${setting}.${!input.safeMode && input.mood ? ` Mood: ${input.mood}.` : ''}`
-      : '',
+    // fallback 은 구조화 스펙(blocking/layers)이 없어 action 이 유일한 '무엇을' 신호 → 유지(safe mode 제외).
+    input.safeMode ? null : `Action: ${input.actionDescription}.`,
+    setting ? `Setting: ${setting}.${!input.safeMode && input.mood ? ` Mood: ${input.mood}.` : ''}` : '',
     ``,
     figureBlock,
     ``,
-    `Focal point: ${focal} — lead the eye there.`,
+    `Focal point: ${focal}.`,
     ``,
-    `${PANEL_STYLE_BASE}${light} Do not write any story text, captions, or labels inside the panel.`,
+    `${PANEL_STYLE_BASE}${light} Wordless panel.`,
   ])
 }
 
