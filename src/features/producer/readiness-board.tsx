@@ -481,7 +481,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
 
               <FieldShell icon={<Languages className="size-4" />} label="대사 언어" issue={hardByField.get('dialogueLanguage')}>
                 <Select
-                  value={projectSettings.dialogueLanguage || undefined}
+                  value={projectSettings.dialogueLanguage || ''}
                   onValueChange={(v) => updateSettings({ dialogueLanguage: v })}
                 >
                   <SelectTrigger className="w-full"><SelectValue placeholder="선택…" /></SelectTrigger>

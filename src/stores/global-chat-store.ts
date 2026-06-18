@@ -335,6 +335,26 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (immediateUpdates.length > 0) {
           void useArtistStore.getState().applyUpdates(immediateUpdates)
         }
+
+        // 원천(외형) 변경 제안(C3 F6) — 자동 실행 금지, pending-proposal 승인 게이트 전용.
+        const appearanceProposals = Array.isArray(data.proposals) ? data.proposals : []
+        if (appearanceProposals.length > 0 && !get().pendingProposal) {
+          const ap = appearanceProposals[0] as { characterId: string; appearance: string }
+          get().offerPendingProposal(
+            createPendingProposal({
+              stage: 'artist',
+              kind: 'artistSourceAppearancePatch',
+              target: ap.characterId,
+              action: `캐릭터 기본 외형(원천) 변경: ${ap.appearance.slice(0, 60)}${ap.appearance.length > 60 ? '…' : ''}`,
+              impact: [
+                '캐릭터의 canonical 외형(원천)이 바뀝니다.',
+                '승인 후 그 캐릭터의 기존 이미지들이 낡음(stale)으로 표시돼요 — 자동 재생성은 하지 않아요.',
+                '승인 전에는 외형이 바뀌지 않습니다.',
+              ],
+              payload: { characterId: ap.characterId, appearance: ap.appearance },
+            }),
+          )
+        }
       }
       if (stage === 'director') {
         // Agentic 응답 — DirectorCanvasUpdate[]
@@ -434,6 +454,24 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const locationId = proposal.payload.locationId
         if (typeof locationId !== 'string') throw new Error('locationId missing')
         await useArtistStore.getState().generateWorldAsset(locationId, 'chat')
+      } else if (proposal.kind === 'artistSourceAppearancePatch') {
+        const characterId = proposal.payload.characterId
+        const appearance = proposal.payload.appearance
+        if (typeof characterId !== 'string' || typeof appearance !== 'string') {
+          throw new Error('appearance patch payload missing')
+        }
+        const projectId = useProjectStore.getState().projectId
+        const res = await fetch('/api/artist/appearance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, characterId, appearance }),
+        })
+        if (!res.ok) {
+          const b = await res.json().catch(() => ({}))
+          throw new Error(b.error ?? `appearance patch failed HTTP ${res.status}`)
+        }
+        // 로컬 외형 갱신 → 기존 파생 이미지가 즉시 stale 로 표시(자동 재생성 없음, #57). 이후 cc 가 재생성 제안.
+        useArtistStore.getState().applyAppearancePatch(characterId, appearance)
       }
       set({ pendingProposal: null })
       return true

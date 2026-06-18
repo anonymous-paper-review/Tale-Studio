@@ -86,7 +86,7 @@ export function CharacterPanel() {
           const isViewStale = (v: CharacterViewKey): boolean => {
             const selected = (char.viewCandidates[v] ?? []).find((c) => c.isSelected)
             if (!selected) return false
-            return isImageStale(char.fixedPrompt, selected.sourceHash)
+            return isImageStale(char.fixedPrompt, char.lookFingerprint ?? null, selected.sourceHash)
           }
 
           // hover 정보 본문 — 4개 뷰 이미지의 개별 Tooltip 에 공유(같은 캐릭터 정보).

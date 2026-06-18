@@ -66,20 +66,111 @@ function fnv1a(str: string): string {
   return (h >>> 0).toString(16).padStart(8, '0')
 }
 
-/** 캐릭터 이미지 생성 입력(외모)의 지문. submit 시점·stale 비교 시점이 같은 함수를 호출해야 한다. */
-export function computeImageSourceHash(appearance: string | null | undefined): string {
-  return fnv1a(normalizeAppearance(appearance))
+// 룩(전역 디자인 토큰 + 의상) 지문 구분자 — 룩 부재 시 미부착(레거시 바이트 동일 보장, F1).
+const LOOK_SEP = '\u0000look:'
+
+// computeLookFingerprint 입력 — projects.design_tokens(l1.art_style/shape_language, palette) + characters.costume.
+export interface LookTokens {
+  l1?: { art_style?: string | null; shape_language?: string | null } | null
+  palette?: { primary?: string | null; secondary?: string | null; accent?: string | null } | null
 }
 
 /**
- * stale = 현재 외모로 만든 지문이 선택 후보의 지문과 다른가.
+ * 룩(전역 그림체/형태/팔레트 + 캐릭터 의상) 지문. 룩이 전혀 없으면 null(=룩 미반영).
+ *   결정적: 키 고정 + 공백 정규화 + palette 정렬(입력 순서 비의존)으로 헛-stale 방지.
+ */
+export function computeLookFingerprint(
+  tokens: LookTokens | null | undefined,
+  costume: string | null | undefined,
+): string | null {
+  const norm = (s: string | null | undefined) => (s ?? '').trim().replace(/\s+/g, ' ')
+  const art = norm(tokens?.l1?.art_style)
+  const shape = norm(tokens?.l1?.shape_language)
+  const palette = [tokens?.palette?.primary, tokens?.palette?.secondary, tokens?.palette?.accent]
+    .map(norm)
+    .filter(Boolean)
+    .sort()
+  const cost = norm(costume)
+  const parts: string[] = []
+  if (art) parts.push(`art:${art}`)
+  if (shape) parts.push(`shape:${shape}`)
+  if (palette.length) parts.push(`palette:${palette.join(',')}`)
+  if (cost) parts.push(`costume:${cost}`)
+  return parts.length ? parts.join('|') : null
+}
+
+/**
+ * 캐릭터 이미지 생성 입력 지문. submit 시점·stale 비교 시점이 같은 함수를 호출해야 한다.
+ *   하위호환(F1): lookFingerprint 부재(null/undefined)면 SEP/sentinel을 부착하지 않고
+ *   fnv1a(normalizeAppearance(appearance))를 그대로 반환 → 레거시 1인자 호출과 바이트 동일
+ *   (룩 미반영 초안·기존 후보가 거짓 stale 안 됨). 룩 존재 시에만 appearance + LOOK_SEP + lookFingerprint.
+ */
+export function computeImageSourceHash(
+  appearance: string | null | undefined,
+  lookFingerprint?: string | null,
+): string {
+  const base = normalizeAppearance(appearance)
+  // 룩 부재: 레거시 바이트 동일(F1). 룩 존재: appearance를 먼저 해시(고정폭 hex)해 도메인 분리 —
+  //   appearance 원문이 LOOK_SEP 시퀀스를 포함해도 룩-스코프 지문과 충돌하지 않는다.
+  return lookFingerprint ? fnv1a(fnv1a(base) + LOOK_SEP + lookFingerprint) : fnv1a(base)
+}
+
+/** 월드(로케이션) 이미지 생성 입력 지문 — 캐릭터와 동일 하위호환 규칙(룩 부재=visualDescription만). */
+export function computeWorldImageSourceHash(
+  visualDescription: string | null | undefined,
+  lookFingerprint?: string | null,
+): string {
+  const base = normalizeAppearance(visualDescription)
+  return lookFingerprint ? fnv1a(fnv1a(base) + LOOK_SEP + lookFingerprint) : fnv1a(base)
+}
+
+/**
+ * stale = 현재 외모+룩으로 만든 지문이 선택 후보의 지문과 다른가.
  *   candidateSourceHash 가 null(레거시 backfill — 지문 미상)이면 stale 아님(unknown, 강제 없음).
+ *   currentLookFingerprint 부재 시 appearance-only 비교(F1 하위호환). 룩 도착 후엔 룩 미반영 초안이 stale.
  *   stale 은 정보일 뿐 — 자동 무효화/재생성 금지(architecture §5).
  */
 export function isImageStale(
   currentAppearance: string | null | undefined,
+  currentLookFingerprint: string | null | undefined,
   candidateSourceHash: string | null | undefined,
 ): boolean {
   if (!candidateSourceHash) return false
-  return computeImageSourceHash(currentAppearance) !== candidateSourceHash
+  return computeImageSourceHash(currentAppearance, currentLookFingerprint) !== candidateSourceHash
+}
+
+// ── 후보 경계버퍼 evict 선정 (C4 AC16/17) ───────────────────────────────────
+//
+// 슬롯 키(C5 시간축 경계 결정): 현재 후보 슬롯 = (project_id, character_id|location_id, view).
+//   이번 범위는 캐릭터/로케이션당 단일 canonical 이미지를 가정한다(코드에 variant_key 미사용).
+//   스토리 시점별 변형은 깨지 않는 확장점으로 둔다 — 마이그레이션 023/024가 nullable variant_key를
+//   예약(항상 null=canonical)하고, 도입 시 슬롯 키를 (…, view, COALESCE(variant_key,'canonical'))로 확장한다.
+//   타임라인 이미지의 관리 위치/UX(artist inventory vs director i2i)는 본 범위 비목표(별도 인터뷰/플랜 보류).
+/** evict 선정 입력 — 한 슬롯(project+character/location+view)의 후보들. */
+export interface RetentionCandidate {
+  id: string
+  isSelected: boolean
+  pinned: boolean
+  generatedAt: string
+}
+
+/**
+ * 슬롯당 최근 retention개만 보관하도록 삭제할 후보 id를 고른다(결정적).
+ *   - 보호: is_selected || pinned 인 후보는 절대 evict 대상이 아니다(사람 선별 보호 — #57).
+ *   - evict: 비선택·비핀 후보를 generatedAt desc(최신 우선)로 두고, (retention - 보호수)만큼만 남긴 뒤
+ *     나머지(가장 오래된 비보호분)를 삭제 대상으로 반환한다.
+ *   - 보호 후보만으로 retention을 넘으면 비보호분은 전부 삭제(보호는 그대로 유지 → 총량이 retention을 넘을 수 있음).
+ *   캐릭터(character_image_candidates)·월드(location_image_candidates) 공통.
+ */
+export function selectCandidatesToEvict(
+  candidates: RetentionCandidate[],
+  retention: number = CANDIDATE_RETENTION,
+): string[] {
+  const protectedCount = candidates.filter((c) => c.isSelected || c.pinned).length
+  const keep = Math.max(0, retention - protectedCount)
+  return candidates
+    .filter((c) => !c.isSelected && !c.pinned)
+    .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
+    .slice(keep)
+    .map((c) => c.id)
 }

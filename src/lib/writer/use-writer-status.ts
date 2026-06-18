@@ -13,12 +13,20 @@ export interface WriterStatus {
   current_status: string | null
   last_timestamp: string | null
   error: string | null
+  // 단계별 소요시간 (timing pipeline) — status 라우트가 state._timings 에서 계산.
   timings?: {
     pipeline_started_at: string | null
-    assets_ready_ms: number | null   // artist 언블록(이미지 생성 시작 가능) 지연
-    shots_ready_ms: number | null    // director 콘티 준비 지연
-    total_ms: number | null          // 전체 텍스트 파이프라인 완료
-  }
+    total_ms: number | null
+    stages?: Record<string, number>  // stage key → ms
+  } | null
+  // 단계별 타임라인 (실행 순서). 각 항목 = 한 stage 의 소요시간.
+  timeline?: {
+    stage: string
+    ms: number
+    seconds: number
+    attempts: number
+    ended_at: string
+  }[]
   available: Record<string, boolean>
 }
 

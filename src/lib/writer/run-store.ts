@@ -32,6 +32,13 @@ export interface WriterRunRow {
 }
 
 // status 라우트용 경량 컬럼 (무거운 state 블롭 제외).
+// 단계별 소요시간 1건 (steps.ts 가 state._timings 에 기록).
+export interface StageTiming {
+  ms: number;
+  attempts: number;
+  endedAt: string;
+}
+
 export interface WriterRunStatusLight {
   status: WriterRunStatus;
   current_stage: string | null;
@@ -40,10 +47,12 @@ export interface WriterRunStatusLight {
   error: string | null;
   updated_at: string;
   created_at: string;
+  // state._timings (jsonb) — 단계별 소요시간. 없으면 null.
+  timings: Record<string, StageTiming> | null;
 }
 
 const STATUS_LIGHT_COLUMNS =
-  'status,current_stage,completed_units,total_units,error,updated_at,created_at';
+  'status,current_stage,completed_units,total_units,error,updated_at,created_at,timings:state->_timings';
 
 /**
  * 새 run 행 삽입 (status 'running', state={input}, completed_units 0).

@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     const quota = await checkUserQuota(user.id)
     if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
 
-    const { projectId, locationId, column, prompt, aspectRatio, actor } =
+    const { projectId, locationId, column, prompt, aspectRatio, actor, sourceHash } =
       (await req.json()) as {
         projectId?: string
         locationId?: string
@@ -38,6 +38,7 @@ export async function POST(req: Request) {
         prompt?: string
         aspectRatio?: string
         actor?: string
+        sourceHash?: string // F2: 호출자가 computeWorldImageSourceHash(prompt)로 계산해 동반 — 라우트는 DB 재조립 안 함.
       }
     // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
     const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
@@ -92,6 +93,7 @@ export async function POST(req: Request) {
       inputSnapshot: {
         prompt,
         aspect_ratio: aspectRatio ?? '16:9',
+        source_hash: sourceHash ?? null,
       },
       target: { workspaceId: project.workspace_id, locationId, column },
     })

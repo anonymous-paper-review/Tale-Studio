@@ -8,7 +8,7 @@
 //         가드(호출부)로 1차 차단하고, storage upsert/컬럼 update는 동일 결과라 재실행돼도 무해.
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { completeGenerationJob, type GenerationJob } from '@/lib/generation-jobs'
-import { CANDIDATE_RETENTION, type CandidateView } from '@/lib/image-provenance'
+import { selectCandidatesToEvict, type CandidateView } from '@/lib/image-provenance'
 
 // Supabase Storage 객체 키는 ASCII-safe 여야 한다 (공백·한글 등 → "Invalid key" 업로드 실패).
 //   버그: 오픈캐스트 로케이션 id 가 scene.location 원문(한글+공백)이라 키에 그대로 들어가 거부 →
@@ -114,19 +114,12 @@ async function recordCharacterImageCandidate(
   })
   if (insErr) throw insErr
 
-  // 3) 보관 정리: 미선택 후보를 최근 N장만 남기고 삭제(선택본은 항상 보존).
-  const { data: unselected } = await supabaseAdmin
-    .from('character_image_candidates')
-    .select('id')
-    .eq('project_id', job.project_id)
-    .eq('character_id', characterId)
-    .eq('view', view)
-    .eq('is_selected', false)
-    .order('generated_at', { ascending: false })
-  const stale = (unselected ?? []).slice(CANDIDATE_RETENTION).map((r) => r.id as string)
-  if (stale.length) {
-    await supabaseAdmin.from('character_image_candidates').delete().in('id', stale)
-  }
+  // 3) 보관 정리(C4 AC16/17): 슬롯당 최근 N장, 선택본/핀 보호. pinned(023) 미적용 환경 대비 fallback.
+  await evictSlotCandidates('character_image_candidates', {
+    project_id: job.project_id,
+    character_id: characterId,
+    view,
+  })
 }
 
 /** 공통: 원격 이미지 바이트 회수 → media 스토리지 업로드 → publicUrl. */
@@ -142,6 +135,78 @@ export async function uploadImageFromUrl(
     .upload(path, buf, { contentType: 'image/png', upsert: true })
   if (upErr) throw upErr
   return supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl
+}
+
+/**
+ * 슬롯당 최근 N장만 남기고 오래된 비보호(비선택·비핀) 후보를 삭제(C4 AC16/17). best-effort.
+ *   pinned 컬럼(023) 미적용 환경에선 pinned 없이 재조회(전부 비핀 취급) → 선택본만 보호.
+ *   선정 로직은 image-provenance.selectCandidatesToEvict(결정적, 단위검증).
+ */
+async function evictSlotCandidates(
+  table: 'character_image_candidates' | 'location_image_candidates',
+  slot: Record<string, string>,
+): Promise<void> {
+  const withPinned = await supabaseAdmin
+    .from(table)
+    .select('id, is_selected, pinned, generated_at')
+    .match(slot)
+  let rows: Array<{ id: string; isSelected: boolean; pinned: boolean; generatedAt: string }>
+  if (withPinned.error) {
+    const noPinned = await supabaseAdmin
+      .from(table)
+      .select('id, is_selected, generated_at')
+      .match(slot)
+    if (noPinned.error) return // best-effort: 테이블/컬럼 미적용(024/023 전)
+    rows = (noPinned.data ?? []).map((r) => ({
+      id: r.id as string,
+      isSelected: !!r.is_selected,
+      pinned: false,
+      generatedAt: r.generated_at as string,
+    }))
+  } else {
+    rows = (withPinned.data ?? []).map((r) => ({
+      id: r.id as string,
+      isSelected: !!r.is_selected,
+      pinned: !!(r as { pinned?: boolean }).pinned,
+      generatedAt: r.generated_at as string,
+    }))
+  }
+  const evict = selectCandidatesToEvict(rows)
+  if (evict.length) {
+    await supabaseAdmin.from(table).delete().in('id', evict)
+  }
+}
+
+/**
+ * 착지한 월드 이미지를 location_image_candidates 의 새 선택본으로 기록(#57, AC18 — 캐릭터 대칭).
+ *   024 미적용 환경에선 update/insert 에러를 흡수(locations 컬럼 미러만으로 동작). best-effort.
+ */
+async function recordLocationImageCandidate(
+  job: GenerationJob,
+  locationId: string,
+  view: string,
+  url: string,
+): Promise<void> {
+  const sourceHash =
+    (job.input_snapshot as { source_hash?: string } | null | undefined)?.source_hash ?? null
+  const slot = { project_id: job.project_id, location_id: locationId, view }
+  const clear = await supabaseAdmin
+    .from('location_image_candidates')
+    .update({ is_selected: false })
+    .match(slot)
+    .eq('is_selected', true)
+  if (clear.error) return // 024 미적용 → best-effort skip(locations 미러만 동작)
+  const ins = await supabaseAdmin.from('location_image_candidates').insert({
+    project_id: job.project_id,
+    location_id: locationId,
+    view,
+    url,
+    source_hash: sourceHash,
+    job_id: job.id,
+    is_selected: true,
+  })
+  if (ins.error) return
+  await evictSlotCandidates('location_image_candidates', slot)
 }
 
 /** 월드 샷(wide/establishing) 이미지 영속화 → locations[column] 갱신. */
@@ -162,6 +227,8 @@ export async function finalizeWorldShotJob(
     .eq('project_id', job.project_id)
     .eq('location_id', locationId)
   if (error) throw error
+  // world 후보 히스토리 기록(AC18, 캐릭터 019/023과 대칭). 024 미적용이면 best-effort skip.
+  await recordLocationImageCandidate(job, locationId, column, publicUrl)
 
   await completeGenerationJob(job.id, publicUrl)
   return publicUrl

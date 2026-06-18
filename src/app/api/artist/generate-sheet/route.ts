@@ -28,7 +28,7 @@ import {
   CHARACTER_VIEW_KEYS,
   type CharacterViewKey,
 } from '@/types/asset'
-import { computeImageSourceHash } from '@/lib/image-provenance'
+import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-provenance'
 
 export const runtime = 'nodejs'
 // submit만 하고 끝 — 실제 생성은 fal 큐에서 진행, 완료는 webhook(/poll reconcile)이 처리.
@@ -49,11 +49,12 @@ export async function POST(req: Request) {
     const quota = await checkUserQuota(user.id)
     if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
 
-    const { projectId, characterId, view, actor } = (await req.json()) as {
+    const { projectId, characterId, view, actor, instruction } = (await req.json()) as {
       projectId?: string
       characterId?: string
       view?: CharacterViewKey
       actor?: string
+      instruction?: string // 재생성 시 유저 델타(merge) — 룩 토대 위에 덮음(AC13).
     }
     // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
     const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
@@ -111,6 +112,7 @@ export async function POST(req: Request) {
       artStyle: dt.l1?.art_style,
       shapeLanguage: dt.l1?.shape_language,
       palette,
+      delta: typeof instruction === 'string' ? instruction : undefined,
     }
 
     // 2. 프롬프트 + 모델 결정
@@ -141,9 +143,12 @@ export async function POST(req: Request) {
     const { request_id, model } = await falImageSubmit(submitOpts)
     // provenance(#57): 생성 입력(외모) 지문을 submit 시점에 함께 계산해 input_snapshot 에 동봉.
     //   착지 시 finalize 가 이 지문으로 character_image_candidates 행을 남긴다(분리 금지 — architecture §5).
+    // 룩(전역 토큰 + 의상) 지문 — 룩 부재 시 null(레거시 동일). 룩 도착 후 룩 미반영 초안이 stale로 판정(AC6/7).
+    const lookFingerprint = computeLookFingerprint(dt, character.costume)
     const inputSnapshot: Record<string, unknown> = {
       ...submitOpts,
-      source_hash: computeImageSourceHash(character.appearance),
+      source_hash: computeImageSourceHash(character.appearance, lookFingerprint),
+      look_present: lookFingerprint != null,
     }
     delete inputSnapshot.webhookUrl
 

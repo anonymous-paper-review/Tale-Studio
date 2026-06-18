@@ -35,6 +35,8 @@ export interface CharacterPromptInput {
   shapeLanguage?: string
   /** 글로벌 팔레트 색상들 */
   palette?: string[]
+  /** 재생성 시 유저 요청 델타(merge) — 룩 토대 위에 덮어쓰는 명시 지시(AC13). 룩(스타일/팔레트/의상)은 토대로 유지. */
+  delta?: string
 }
 
 function styleTokens(input: CharacterPromptInput): string[] {
@@ -44,6 +46,12 @@ function styleTokens(input: CharacterPromptInput): string[] {
     input.shapeLanguage ? `shape language: ${input.shapeLanguage}` : '',
     palette ? `palette: ${palette}` : '',
   ].filter(Boolean)
+}
+
+// 유저 델타(재생성 요청) — 룩 토대 뒤에 두어 충돌 시 우선 적용되게 한다(AC13 merge: 룩 토대 + 델타 덮음).
+function deltaClause(input: CharacterPromptInput): string[] {
+  const d = input.delta?.trim()
+  return d ? [`apply requested changes (override defaults where conflicting): ${d}`] : []
 }
 
 function describe(input: CharacterPromptInput): string[] {
@@ -67,6 +75,7 @@ export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
     `Character reference portrait of ${input.name}`,
     ...describe(input),
     ...styleTokens(input),
+    ...deltaClause(input),
     'full body, single character, front view, neutral grey background, even studio lighting, clean composition, no text, no logo',
   ]
     .filter(Boolean)
@@ -87,6 +96,7 @@ export function buildCharacterViewPrompt(
     VIEW_ANGLE[view],
     ...describe(input),
     ...styleTokens(input),
+    ...deltaClause(input),
     'identical character, identical outfit and proportions to the reference, full body, single character, neutral grey background, even studio lighting, no text, no logo',
   ]
     .filter(Boolean)

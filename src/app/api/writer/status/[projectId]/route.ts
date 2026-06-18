@@ -2,7 +2,7 @@
 //   writer_runs 행에서 읽는다 (파일시스템 참조 제거). 무거운 state 블롭은 SELECT 안 함
 //   (getRunStatusLight 가 경량 컬럼만 조회). 반환 shape 은 기존 WriterStatus 와 동일하게 유지.
 import { NextRequest, NextResponse } from 'next/server';
-import { getRunStatusLight } from '@/lib/writer/run-store';
+import { getRunStatusLight, type StageTiming } from '@/lib/writer/run-store';
 
 export const runtime = 'nodejs';
 
@@ -26,6 +26,19 @@ export async function GET(
           : 0
       : 0;
 
+    // 단계별 소요시간 (timing pipeline) — state._timings 를 평탄화해 타임라인으로.
+    const stageTimings: Record<string, StageTiming> = row?.timings ?? {};
+    const timeline = Object.entries(stageTimings).map(([stage, t]) => ({
+      stage,
+      ms: t.ms,
+      seconds: +(t.ms / 1000).toFixed(1),
+      attempts: t.attempts,
+      ended_at: t.endedAt,
+    }));
+    const totalMs = timeline.reduce((sum, s) => sum + s.ms, 0);
+    const stagesMs: Record<string, number> = {};
+    for (const s of timeline) stagesMs[s.stage] = s.ms;
+
     return NextResponse.json({
       projectId,
       started: !!row,
@@ -36,9 +49,15 @@ export async function GET(
       current_status: row?.status ?? null,
       last_timestamp: row?.updated_at ?? null,
       error: row?.error ?? null,
-      timings: null,
+      timings: row
+        ? {
+            pipeline_started_at: row.created_at,
+            total_ms: totalMs,
+            stages: stagesMs,
+          }
+        : null,
       available: {},
-      timeline: [],
+      timeline,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

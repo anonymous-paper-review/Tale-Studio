@@ -9,6 +9,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { createRun, getActiveRun } from '@/lib/writer/run-store';
 import { WRITER_TOTAL_UNITS, triggerWriterStep } from '@/lib/writer/pipeline/steps';
 import type { PipelineInput, Genre, CastContract } from '@/lib/writer/types/pipeline';
+import { triggerCharacterDrafts } from '@/lib/artist/draft-trigger';
 
 // producer 핸드오프 배경 페이로드(원천 rich shape). writer 내부 BackgroundContract 와 분리 —
 //   locations 테이블엔 full 필드로 즉시 upsert 하고, 파이프라인엔 BackgroundContract 로 매핑해 전달한다.
@@ -145,8 +146,10 @@ export async function POST(req: NextRequest) {
     };
     const run = await createRun(projectId, input, WRITER_TOTAL_UNITS);
 
-    // 첫 step 트리거 (응답 후 별도 서버리스 인스턴스에서 실행).
+    // 응답 후 별도 서버리스 인스턴스에서 실행: (1) artist 초안(대표 main) 병렬 생성, (2) 첫 writer step.
+    //   초안 트리거는 멱등(차 있으면 skip)·실패 흡수라 writer 체이닝과 독립적으로 안전하다(C1).
     after(async () => {
+      await triggerCharacterDrafts(projectId);
       await triggerWriterStep(req.nextUrl.origin, projectId);
     });
 

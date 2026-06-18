@@ -305,6 +305,7 @@ export function evaluateProducerSourceImpact({
       continue
     }
 
+    // F4: appearance 델타 감지 전용(룩 무관) — lookFingerprint 미전달로 레거시 appearance-only 자기비교 유지.
     if (selectedSet.has(id) && computeImageSourceHash(prev.appearance) !== computeImageSourceHash(next.appearance)) {
       impacts.push({
         kind: 'artistImageStale',

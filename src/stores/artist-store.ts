@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { Scene, SceneManifest, Location as ManifestLocation, CharacterAsset, WorldAsset } from '@/types'
 import { type CharacterViewKey } from '@/types/asset'
 import { CHARACTER_DIRECTIONAL_VIEWS } from '@/lib/artist/turnaround'
-import { candidateViewToViewKey, type CandidateImage } from '@/lib/image-provenance'
+import { candidateViewToViewKey, computeLookFingerprint, computeWorldImageSourceHash, type CandidateImage, type LookTokens } from '@/lib/image-provenance'
 import { buildWorldPrompt } from '@/lib/prompts'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -31,6 +31,8 @@ export type ArtistUpdate =
       type: 'regenerateCharacter'
       characterId: string
       views?: CharacterViewKey[]
+      /** 재생성 시 유저 요청 델타(merge, AC13) — generate-sheet instruction 으로 전달. */
+      instruction?: string
     }
   | { type: 'regenerateWorldAsset'; locationId: string }
   | ({ type: 'createCharacter' } & NewCharacterInput)
@@ -185,7 +187,7 @@ async function generateAndPersistWorldShot(
     const res = await fetch('/api/artist/generate-world', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, locationId, column, prompt, aspectRatio: '16:9', actor }),
+      body: JSON.stringify({ projectId, locationId, column, prompt, aspectRatio: '16:9', actor, sourceHash: computeWorldImageSourceHash(prompt) }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
@@ -211,6 +213,11 @@ const AUTOGEN_DEBUG = false
 const alog = (...args: unknown[]) => {
   if (AUTOGEN_DEBUG) console.log(...args)
 }
+
+// 단계별 소요시간 측정 (timing pipeline) — AUTOGEN_DEBUG 와 무관하게 항상 출력.
+//   서버(writer)의 `[writer timing]` 과 짝을 이뤄 생성 전 구간을 단계별로 추적한다.
+const atime = (step: string, ms: number, extra?: Record<string, unknown>) =>
+  console.log(`[artist timing] ${step} ${(ms / 1000).toFixed(1)}s`, extra ?? '')
 
 /**
  * 서버 핸드오프(assetImages step)가 미리 submit 한 로케이션 wide_shot 이 webhook 으로 DB 에 채워지길
@@ -316,11 +323,13 @@ interface ArtistState {
     characterId: string,
     view: CharacterViewKey,
     actor?: GenerationActor,
+    instruction?: string,
   ) => Promise<void>
   /** main → 4방향(i2i)을 순서대로 생성. 카드 "Generate All Views"용. */
   generateCharacterAllViews: (
     characterId: string,
     actor?: GenerationActor,
+    instruction?: string,
   ) => Promise<void>
   generateWorldAsset: (
     locationId: string,
@@ -340,6 +349,14 @@ interface ArtistState {
   markEntered: (projectId: string) => void
   /** 후보 이미지를 선택본으로 교체. 서버에 persist 후 로컬 상태 즉시 반영. */
   selectCandidate: (characterId: string, viewKey: CharacterViewKey, candidateId: string) => Promise<void>
+  /** world 후보 선택본 교체(C4 AC18, 캐릭터 selectCandidate 대칭). 서버 persist 후 로컬 즉시 반영. */
+  selectWorldCandidate: (
+    locationId: string,
+    viewKey: 'wideShot' | 'establishingShot',
+    candidateId: string,
+  ) => Promise<void>
+  /** 승인된 원천 외형 변경을 로컬 반영(C3 F6) — fixedPrompt 갱신 → 기존 파생 이미지가 stale 로 표시(자동 재생성 없음). */
+  applyAppearancePatch: (characterId: string, appearance: string) => void
   reset: () => void
 }
 
@@ -369,6 +386,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           { data: dbChars },
           { data: dbLocs },
           { data: dbCandidates },
+          { data: project },
+          { data: dbLocCandidates },
         ] = await Promise.all([
           supabase
             .from('scenes')
@@ -386,6 +405,15 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           supabase
             .from('character_image_candidates')
             .select('id, character_id, view, url, source_hash, is_selected, generated_at')
+            .eq('project_id', projectId),
+          supabase
+            .from('projects')
+            .select('design_tokens')
+            .eq('id', projectId)
+            .maybeSingle(),
+          supabase
+            .from('location_image_candidates')
+            .select('id, location_id, view, url, source_hash, is_selected, generated_at')
             .eq('project_id', projectId),
         ])
 
@@ -409,6 +437,35 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         for (const charMap of Object.values(candidatesByCharView)) {
           for (const key of Object.keys(charMap)) {
             charMap[key].sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
+          }
+        }
+        // world 후보 히스토리(C4 AC18): location_id + viewKey 그룹핑(024 테이블, 미적용이면 빈 맵).
+        const LOC_VIEW_KEY: Record<string, 'wideShot' | 'establishingShot'> = {
+          wide_shot: 'wideShot',
+          establishing_shot: 'establishingShot',
+        }
+        const candidatesByLocView: Record<
+          string,
+          Partial<Record<'wideShot' | 'establishingShot', CandidateImage[]>>
+        > = {}
+        for (const row of dbLocCandidates ?? []) {
+          const viewKey = LOC_VIEW_KEY[row.view as string]
+          if (!viewKey) continue
+          const locMap = candidatesByLocView[row.location_id] ?? {}
+          const list = locMap[viewKey] ?? []
+          list.push({
+            id: row.id,
+            url: row.url,
+            sourceHash: row.source_hash ?? null,
+            isSelected: row.is_selected ?? false,
+            generatedAt: row.generated_at,
+          })
+          locMap[viewKey] = list
+          candidatesByLocView[row.location_id] = locMap
+        }
+        for (const locMap of Object.values(candidatesByLocView)) {
+          for (const k of Object.keys(locMap) as Array<'wideShot' | 'establishingShot'>) {
+            locMap[k]?.sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
           }
         }
 
@@ -436,6 +493,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           props: Array.isArray(l.props) ? l.props : [],
         }))
         const sceneByLocation = new Map(dbScenes.map((scene) => [scene.location, scene]))
+        // C2: 룩(전역 디자인 토큰 + 캐릭터 의상) 지문 — stale 비교 입력. 룩 미반영이면 null.
+        const designTokens = (project?.design_tokens ?? null) as LookTokens | null
 
         if ((dbChars?.length ?? 0) || dbLocations.length) {
           const manifest: SceneManifest = {
@@ -463,6 +522,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             description: c.description ?? '',
             fixedPrompt: c.appearance ?? '',
             viewCandidates: candidatesByCharView[c.character_id] ?? {},
+            lookFingerprint: computeLookFingerprint(designTokens, c.costume),
           }))
           const worldAssets: WorldAsset[] = dbLocations.map((location) => {
             const scene = sceneByLocation.get(location.locationId)
@@ -481,6 +541,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               styleDescription: location.styleDescription,
               lightingSources: location.lightingSources,
               props: location.props,
+              viewCandidates: candidatesByLocView[location.locationId] ?? {},
             }
           })
 
@@ -627,7 +688,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectLocation: (id) => set({ selectedLocationId: id }),
 
   // 단일 뷰 생성 (crop 폐기, 2026-06-05). main=T2I, 방향=main 기반 i2i. 서버가 해당 뷰 컬럼만 갱신.
-  generateCharacterView: async (characterId, view, actor = 'ui') => {
+  generateCharacterView: async (characterId, view, actor = 'ui', instruction) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
     const key = `${characterId}:${view}`
@@ -644,7 +705,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const res = await fetch('/api/artist/generate-sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, characterId, view, actor }),
+        body: JSON.stringify({ projectId, characterId, view, actor, instruction }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -661,6 +722,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       alog(`[autogen] char ${key} job ${jobId} queued, polling…`)
       const url = await pollGenerationJob(jobId)
       alog(`[autogen] char ${key} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
+      atime(`char ${key}`, Date.now() - t0)
       set((state) => ({
         characterAssets: state.characterAssets.map((a) =>
           a.characterId === characterId
@@ -691,13 +753,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   // main → 4방향 순서 생성. 방향 i2i 는 main 이 DB 에 있어야 하므로 main 을 먼저 await 한 뒤
   // 4방향을 제한된 풀로 병렬 생성. 카드 "Generate All Views" / 시트 재생성용.
   // object 캐릭터는 main 만 생성 — 방향뷰 불필요.
-  generateCharacterAllViews: async (characterId, actor = 'ui') => {
-    await get().generateCharacterView(characterId, 'main', actor)
+  generateCharacterAllViews: async (characterId, actor = 'ui', instruction) => {
+    await get().generateCharacterView(characterId, 'main', actor, instruction)
     const char = get().characterAssets.find((c) => c.characterId === characterId)
     if (char?.entityType === 'object') return
     await runPool(
       CHARACTER_DIRECTIONAL_VIEWS.map(
-        (v) => () => get().generateCharacterView(characterId, v, actor),
+        (v) => () => get().generateCharacterView(characterId, v, actor, instruction),
       ),
       ARTIST_GENERATION_CONCURRENCY,
     )
@@ -844,6 +906,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         return
       }
       alog(`[autogen] world ${locationId}:${shot} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
+      atime(`world ${locationId}:${shot}`, Date.now() - t0)
       set((state) => ({
         worldAssets: state.worldAssets.map((w) =>
           w.locationId === locationId ? { ...w, [shot]: url } : w,
@@ -877,36 +940,28 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   // Writer→Artist 진입 시 비어있는 이미지 자동생성 (crop 폐기 후 재설계, 2026-06-05 / main 우선 2단계 2026-06-07).
   //   대표 이미지(캐릭터 view_main, 로케이션 wide_shot)는 핸드오프 'assetImages' step 이 미리 채울 수 있으나,
   //   실패/미도착이면 여기서 보강한다.
-  //   ★ 큐는 "메인 우선": Phase 1 에서 비어있는 캐릭터 main 을 전부 먼저 생성(가장 먼저 보여야 할 대표),
-  //     Phase 2 에서 방향뷰(main 기반 i2i)+월드를 생성한다. fal 은 동시성 초과분을 '거부'가 아니라 큐
-  //     대기시키므로(IN_QUEUE 무제한) 제출 순서가 곧 디스패치 순서 → main 이 먼저 뜬다. 또 dir i2i 가
-  //     main 이 DB 에 들어간 뒤 실행돼 reference 정합성도 보장된다.
-  //   생성물은 DB 영속 → 재진입 시 not-null 이라 자동 skip(자연 캐시).
+  //   대표 main(view_main)은 핸드오프 서버 초안 트리거(draft-trigger.ts)가 단일 생산자다(C1) — 여기서
+  //   client 가 main 을 다시 자동 제출하지 않는다(이중 생성/과금 방지; 서버 실패는 카드 배지로 표시).
+  //   여기선 main 이 들어온 캐릭터의 빈 방향뷰(main reference i2i)와 월드 빈칸만 보강한다(자연 캐시 skip).
   autoGenerateBaseImages: async () => {
     const { characterAssets, worldAssets } = get()
     const projectId = useProjectStore.getState().projectId
     // 동시 in-flight 상한 (fal 한도가 아니라 클라 폴링/부하 상한 — fal 은 초과분을 큐 대기시킴).
     const CONCURRENCY = ARTIST_GENERATION_CONCURRENCY
 
-    // ── Phase 1: 캐릭터 대표(main) — 가장 먼저 보여야 할 이미지부터 ──
-    const mainTasks: Array<() => Promise<void>> = []
-    const queuedMain: string[] = []
-    for (const c of characterAssets) {
-      if (c.views.main == null) {
-        queuedMain.push(`char ${c.characterId}:main`)
-        mainTasks.push(() => get().generateCharacterView(c.characterId, 'main', 'auto'))
-      }
-    }
-
-    // ── Phase 2: 방향뷰(main reference i2i) + 월드 ──
+    // 방향뷰(main reference i2i) + 월드 빈칸 보강. main 은 서버 초안이 채우므로 client 는 main 제출 안 함.
     const restTasks: Array<() => Promise<void>> = []
     const queuedRest: string[] = []
     const skipped: string[] = []
     for (const c of characterAssets) {
-      if (c.views.main != null) skipped.push(`char ${c.characterId}:main`)
-      // object 캐릭터는 방향뷰 불필요 — Phase 2 directional 루프 skip
+      // object 캐릭터는 방향뷰 불필요
       if (c.entityType === 'object') {
         skipped.push(`char ${c.characterId}:directional (object — skip)`)
+        continue
+      }
+      // main 미도착(서버 초안 진행/실패)이면 방향뷰를 미룬다 — dir 은 main reference 가 필요(i2i).
+      if (c.views.main == null) {
+        skipped.push(`char ${c.characterId}:directional (main 대기 — server 초안)`)
         continue
       }
       for (const v of CHARACTER_DIRECTIONAL_VIEWS) {
@@ -968,15 +1023,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
 
     console.log(
-      `[autogen] start — main:${mainTasks.length} 먼저 → rest:${restTasks.length} @ concurrency ${CONCURRENCY}`,
-      { mainFirst: queuedMain, then: queuedRest, skipped },
+      `[autogen] start — rest:${restTasks.length} @ concurrency ${CONCURRENCY} (main=서버 초안 단일 생산)`,
+      { then: queuedRest, skipped },
     )
     const t0 = Date.now()
-    await runPool(mainTasks, CONCURRENCY) // Phase 1: 대표(main) 먼저 완료
-    await runPool(restTasks, CONCURRENCY) // Phase 2: 방향뷰 + 월드
-    console.log(
-      `[autogen] all done in ${((Date.now() - t0) / 1000).toFixed(1)}s (main ${mainTasks.length} + rest ${restTasks.length})`,
-    )
+    await runPool(restTasks, CONCURRENCY)
+    atime('autogen total', Date.now() - t0, { rest: restTasks.length })
   },
 
   applyUpdates: async (updates) => {
@@ -992,11 +1044,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         // 채팅발 재생성 — generation_jobs.actor='chat' 귀속 (chat-aware-regeneration).
         if (u.views?.length) {
           await runPool(
-            u.views.map((v) => () => get().generateCharacterView(u.characterId, v, 'chat')),
+            u.views.map((v) => () => get().generateCharacterView(u.characterId, v, 'chat', u.instruction)),
             ARTIST_GENERATION_CONCURRENCY,
           )
         } else {
-          await get().generateCharacterAllViews(u.characterId, 'chat')
+          await get().generateCharacterAllViews(u.characterId, 'chat', u.instruction)
         }
       } else if (u.type === 'regenerateWorldAsset') {
         await get().generateWorldAsset(u.locationId, 'chat')
@@ -1037,6 +1089,34 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     if (asset) registerCharacterCard(asset, projectId)
   },
 
+  selectWorldCandidate: async (locationId, viewKey, candidateId) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    const res = await fetch('/api/artist/select-world-candidate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, locationId, view: viewKey, candidateId }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      set({ error: body.error ?? `선택 교체 실패 HTTP ${res.status}` })
+      return
+    }
+    const { url } = (await res.json()) as { url: string }
+    set((state) => ({
+      worldAssets: state.worldAssets.map((w) => {
+        if (w.locationId !== locationId) return w
+        const prev = w.viewCandidates?.[viewKey] ?? []
+        const next = prev.map((c) => ({ ...c, isSelected: c.id === candidateId }))
+        return {
+          ...w,
+          [viewKey]: url,
+          viewCandidates: { ...w.viewCandidates, [viewKey]: next },
+        }
+      }),
+    }))
+  },
+
   selectBoostPreset: (preset) =>
     set((state) => ({
       selectedBoostPreset: state.selectedBoostPreset === preset ? null : preset,
@@ -1050,6 +1130,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         ? state
         : { enteredProjects: { ...state.enteredProjects, [projectId]: true } },
     ),
+
+  applyAppearancePatch: (characterId, appearance) =>
+    set((state) => ({
+      characterAssets: state.characterAssets.map((a) =>
+        a.characterId === characterId ? { ...a, fixedPrompt: appearance } : a,
+      ),
+    })),
 
   reset: () =>
     set({

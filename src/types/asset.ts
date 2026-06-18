@@ -62,6 +62,8 @@ export interface CharacterAsset {
   /** Writer 정의 계승 — asset-storage 등록 시 description/prompt로 전파 */
   description?: string
   fixedPrompt?: string
+  /** 현재 룩(전역 디자인 토큰 + 의상) 지문 — stale 비교 시 전달(C2). 룩 미반영이면 null. */
+  lookFingerprint?: string | null
   /** 뷰별 후보 히스토리 (character_image_candidates). 없으면 빈 객체. */
   viewCandidates: Partial<Record<CharacterViewKey, CandidateImage[]>>
 }
@@ -83,4 +85,6 @@ export interface WorldAsset {
   styleDescription?: string
   lightingSources?: string[]
   props?: string[]
+  /** world 샷별 후보 히스토리 (location_image_candidates, C4 AC18 — 캐릭터 viewCandidates 대칭). 없으면 빈 객체. */
+  viewCandidates?: Partial<Record<'wideShot' | 'establishingShot', CandidateImage[]>>
 }

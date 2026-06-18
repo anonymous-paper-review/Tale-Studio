@@ -141,6 +141,29 @@ export async function createGenerationJob(input: {
 }
 
 /**
+ * 멱등 가드(C1): 해당 슬롯(project+character+view)에 status=queued character_view 잡이 이미 있는가.
+ *   핸드오프 초안 submit~finalize 윈도우의 재핸드오프 중복 제출을 차단한다.
+ *   조회 실패는 best-effort로 false(다른 멱등 조건 = view_main/후보 존재가 1차 방어) — 자동 재시도 루프 없음.
+ */
+export async function hasQueuedCharacterViewJob(
+  projectId: string,
+  characterId: string,
+  view: string,
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id, target')
+    .eq('project_id', projectId)
+    .eq('kind', 'character_view')
+    .eq('status', 'queued')
+  if (error || !data) return false
+  return data.some((row) => {
+    const t = (row.target ?? {}) as GenerationJobTarget
+    return t.characterId === characterId && t.view === view
+  })
+}
+
+/**
  * 활동 로그 조회 — 프로젝트의 최근 24시간 잡 N개 (chat-aware-regeneration: 채팅 컨텍스트 빌더용).
  * 24h 창: 오래된 실패 잡이 매 턴 컨텍스트에 반복 주입되는 노이즈 방지.
  */

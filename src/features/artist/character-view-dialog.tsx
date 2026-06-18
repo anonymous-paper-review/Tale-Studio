@@ -47,7 +47,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
   // stale 판정: 선택된 후보의 sourceHash 기준 (정보 표시만)
   const candidates = char.viewCandidates[view] ?? []
   const selectedCandidate = candidates.find((c) => c.isSelected)
-  const isStale = isImageStale(char.fixedPrompt, selectedCandidate?.sourceHash ?? null)
+  const isStale = isImageStale(char.fixedPrompt, char.lookFingerprint ?? null, selectedCandidate?.sourceHash ?? null)
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -97,7 +97,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
               </p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {candidates.map((cand) => {
-                  const candStale = isImageStale(char.fixedPrompt, cand.sourceHash)
+                  const candStale = isImageStale(char.fixedPrompt, char.lookFingerprint ?? null, cand.sourceHash)
                   return (
                     <button
                       key={cand.id}

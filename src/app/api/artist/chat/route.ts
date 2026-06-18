@@ -10,6 +10,11 @@ import { getUser } from '@/lib/supabase/auth'
 import { llmChat } from '@/lib/llm'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildArtistActivityContext } from '@/lib/artist/chat-context'
+import {
+  validateUpdates,
+  extractAppearanceProposals,
+  type AppearanceProposal,
+} from '@/lib/artist/chat-updates'
 
 const ARTIST_SYSTEM = `You are the Concept Artist agent for the Tale L0 Artist studio — a CARD-based studio (no node graph). Users define Characters and World locations as cards. Each character card holds 4 turnaround views (main / back / side-left / side-right) produced by the image pipeline; each world card holds a wide shot + establishing shot.
 
@@ -36,6 +41,14 @@ Every image generation call is billed. Emit regenerate actions ONLY when the use
 3. {"type":"regenerateWorldAsset","locationId":"<id>"}
    - context 의 정확한 id 사용.
 </actions>
+
+<source-vs-derived>
+사용자의 수정 요청이 (a) 이 이미지 한 장만 다시 뽑는 것(파생)인지, (b) 캐릭터의 기본 외형 자체를 바꾸는 것(원천)인지 먼저 판단하라.
+- 파생(이 이미지만): regenerateCharacter 로 즉시 처리. 사용자가 말한 변경 요청은 instruction 필드로 함께 전달한다.
+- 원천(캐릭터 기본 외형 자체 변경, 예: "얘는 원래 머리가 붉은색이야"): updates 에 {"type":"changeAppearance","characterId":"<id>","appearance":"바뀐 전체 외형 prose"} 를 emit하라. 이건 자동 실행되지 않고, 앱이 "캐릭터 기본 외형을 …로 바꿀까요?" 승인 절차로 띄운다 — 승인 시에만 characters.appearance 가 커밋되고 그 캐릭터의 기존 이미지들이 갱신 대상(stale)이 된다. appearance 는 델타가 아니라 변경 후 전체 외형을 적어라(외형을 통째 대체하므로).
+- 애매하면("머리 붉게") 되물어라: 이 이미지만 바꿀지, 아니면 캐릭터 기본 외형을 붉은 머리로 바꿀지.
+- writer 디자인(룩: 그림체/팔레트/의상)이 아직 준비 안 된 상태로 보이면, 지금 임시본으로 만들지 룩이 나온 뒤 만들지 먼저 물어보고 진행하라.
+</source-vs-derived>
 
 <format>
 Emit updates ONLY when the user clearly intends a mutation. For pure discussion/questions, omit the JSON block entirely.
@@ -104,85 +117,25 @@ function normalizeHistory(history: unknown): ChatMessage[] {
   })
 }
 
-// ── 카드 모델 update 검증 (artist-store ArtistUpdate 와 1:1) ────────────────
-const VALID_ROLES = new Set(['protagonist', 'antagonist', 'supporting'])
-const VALID_VIEWS = new Set(['main', 'back', 'sideLeft', 'sideRight'])
-const VALID_TYPES = new Set([
-  'createCharacter',
-  'regenerateCharacter',
-  'regenerateWorldAsset',
-])
+// 카드 모델 update 검증(F6 화이트리스트)은 src/lib/artist/chat-updates.ts 로 분리(순수 단위 테스트 대상).
+//   외형(원천) 변경 type 은 화이트리스트 밖이라 자동경로에서 드롭된다 — 승인 경로는 pending-proposal.
 
-function asString(x: unknown): string | undefined {
-  return typeof x === 'string' ? x : undefined
-}
-
-function validateUpdates(raw: unknown[]): unknown[] {
-  const out: unknown[] = []
-  for (const u of raw) {
-    if (!u || typeof u !== 'object') continue
-    const rec = u as Record<string, unknown>
-    if (typeof rec.type !== 'string' || !VALID_TYPES.has(rec.type)) continue
-
-    switch (rec.type) {
-      case 'createCharacter': {
-        const name = asString(rec.name)?.trim()
-        if (name) {
-          out.push({
-            type: 'createCharacter',
-            name,
-            ...(typeof rec.role === 'string' && VALID_ROLES.has(rec.role)
-              ? { role: rec.role }
-              : {}),
-            ...(asString(rec.description)
-              ? { description: rec.description }
-              : {}),
-            ...(asString(rec.appearance)
-              ? { appearance: rec.appearance }
-              : {}),
-          })
-        }
-        break
-      }
-      case 'regenerateCharacter':
-        if (asString(rec.characterId)) {
-          const views = Array.isArray(rec.views)
-            ? rec.views.filter(
-                (v): v is string =>
-                  typeof v === 'string' && VALID_VIEWS.has(v),
-              )
-            : []
-          out.push({
-            type: 'regenerateCharacter',
-            characterId: rec.characterId,
-            ...(views.length ? { views } : {}),
-          })
-        }
-        break
-      case 'regenerateWorldAsset':
-        if (asString(rec.locationId)) {
-          out.push({
-            type: 'regenerateWorldAsset',
-            locationId: rec.locationId,
-          })
-        }
-        break
-    }
-  }
-  return out
-}
-
-function parseUpdates(text: string): { reply: string; updates: unknown[] } {
+function parseUpdates(text: string): {
+  reply: string
+  updates: unknown[]
+  proposals: AppearanceProposal[]
+} {
   const jsonMatch = text.match(/```json\s*\n?([\s\S]*?)\n?```\s*$/)
-  if (!jsonMatch) return { reply: text, updates: [] }
+  if (!jsonMatch) return { reply: text, updates: [], proposals: [] }
 
   const reply = text.slice(0, jsonMatch.index).trim()
   try {
     const parsed = JSON.parse(jsonMatch[1])
     const raw = Array.isArray(parsed.updates) ? parsed.updates : []
-    return { reply, updates: validateUpdates(raw) }
+    // updates = 자동 실행(화이트리스트). proposals = 원천 외형 변경(승인 게이트 — F6).
+    return { reply, updates: validateUpdates(raw), proposals: extractAppearanceProposals(raw) }
   } catch {
-    return { reply: text, updates: [] }
+    return { reply: text, updates: [], proposals: [] }
   }
 }
 
@@ -238,9 +191,9 @@ export async function POST(req: Request) {
       0.7,
     )
 
-    const { reply, updates } = parseUpdates(text)
+    const { reply, updates, proposals } = parseUpdates(text)
 
-    return NextResponse.json({ reply, updates })
+    return NextResponse.json({ reply, updates, proposals })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[artist/chat]', message)

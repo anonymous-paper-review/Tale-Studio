@@ -91,6 +91,8 @@ export interface WriterRunState extends WriterRunStateBase {
 
   // 재시도/타임아웃 가드 (중도 kill 시 attempt 증가분이 남는다)
   _attempt?: { stage: string; count: number };
+  // 단계별 소요시간 (timing pipeline). key=stage → 마지막 성공 실행의 wall-clock(ms).
+  _timings?: Record<string, { ms: number; attempts: number; endedAt: string }>;
 }
 
 interface StepContext {
@@ -435,7 +437,8 @@ export async function runWriterSteps(
       return { paused: true };
     }
 
-    // 단계 실행.
+    // 단계 실행 (단계별 소요시간 측정 — timing pipeline).
+    const stageStartedMs = Date.now();
     let patch: Partial<WriterRunState>;
     try {
       patch = await step.run(state, { logger, projectId });
@@ -443,10 +446,18 @@ export async function runWriterSteps(
       await markFailed(run.id, e instanceof Error ? e.message : String(e));
       return { failed: true };
     }
+    const stageMs = Date.now() - stageStartedMs;
 
-    // 산출물 병합 + attempt 리셋 + 진행률 증가 → 체크포인트.
+    // 산출물 병합 + attempt 리셋 + 단계별 타이밍 기록 + 진행률 증가 → 체크포인트.
     Object.assign(state, patch);
     state._attempt = undefined;
+    state._timings = {
+      ...(state._timings ?? {}),
+      [step.key]: { ms: stageMs, attempts: nextCount, endedAt: new Date().toISOString() },
+    };
+    console.log(
+      `[writer timing] ${projectId} · ${step.key} ${(stageMs / 1000).toFixed(1)}s (attempt ${nextCount})`,
+    );
     completedUnits += 1;
     try {
       await saveRunState(run.id, state, { completed_units: completedUnits, current_stage: step.key });

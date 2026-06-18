@@ -481,7 +481,10 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             backgrounds: backgroundContract,
           }),
         })
-        if (!writerResponse.ok) {
+        // 409 = 이미 writer run 이 진행 중. 실패가 아니라 "이미 돌고 있음" → throw 하지 않고
+        //   그대로 진행해 writer 탭으로 보낸다(중복 시작 방지 + 네비게이션 보장).
+        //   (이전엔 throw 해서 "이미 진행 중인데도 writer 로 못 넘어가는" CS 가 발생했다.)
+        if (!writerResponse.ok && writerResponse.status !== 409) {
           let detail = writerResponse.statusText
           try {
             const body = await writerResponse.json()
