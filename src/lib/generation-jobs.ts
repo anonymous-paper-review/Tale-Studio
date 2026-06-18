@@ -54,7 +54,11 @@ export interface GenerationJob {
 // ⚠️ actor/runtime metadata 는 의도적으로 제외 — 015/016 마이그레이션 적용 전 라이브 DB에서도
 //   완료(웹훅)·폴링 read 경로가 깨지지 않게 한다. 필요한 곳(create/활동 로그/quota)만 명시 사용.
 const COLUMNS =
-  'id, project_id, request_id, model, kind, status, target, result_url, error'
+  'id, project_id, request_id, model, kind, status, target, input_snapshot, result_url, error'
+
+// 웹훅 finalize/폴링 경로가 의존하는 컬럼 집합(회귀 가드용 export). finalize 는 job.target.workspaceId 와
+//   job.input_snapshot.source_hash 를 읽으므로 둘 다 반드시 포함돼야 한다(누락 시 후보 source_hash=null → stale 무력화).
+export const GENERATION_JOB_COLUMNS = COLUMNS
 
 function toJsonSnapshot(value: unknown): Json {
   try {

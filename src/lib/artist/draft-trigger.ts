@@ -53,7 +53,7 @@ export async function triggerCharacterDrafts(
         .eq('project_id', projectId),
       supabaseAdmin
         .from('projects')
-        .select('design_tokens')
+        .select('design_tokens, workspace_id')
         .eq('id', projectId)
         .maybeSingle(),
     ])
@@ -115,6 +115,7 @@ export async function triggerCharacterDrafts(
             look_present: lookFingerprint != null,
           },
           target: {
+            workspaceId: project?.workspace_id ?? undefined,
             characterId: c.character_id,
             view: 'main',
             column: CHARACTER_VIEW_COLUMNS.main,
