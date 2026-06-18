@@ -13,7 +13,8 @@ Rewrite it into ONE new English prompt that keeps the SAME camera framing, compo
 Rules:
 - This is a rough monochrome pencil-sketch previz; every character is a featureless wooden mannequin (no face, no identity). No realism, no gore.
 - Convey tension or conflict through posture, distance, gesture, and composition — never through blood, wounds, weapon impact, or violent verbs.
-- Keep: shot size, camera angle + lens, three depth layers, mannequin positions, focal point, loose pencil-sketch style, camera-POV framing, wordless panel.
+- Keep: shot size, camera angle + lens, three depth layers, mannequin positions, focal point, loose pencil-sketch style, camera-POV framing.
+- No text, letters, captions, or labels anywhere in the image — do not name or label objects (wordless panel).
 - Replace any word a content filter could flag (kill, stab, blood, wound, corpse, strike, attack, …) with neutral staging language.
 - Output ENGLISH only, and output ONLY the final prompt text — no preamble, no quotes, no explanation.`
 

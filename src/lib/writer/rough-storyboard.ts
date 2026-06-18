@@ -166,8 +166,6 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
     ? `${subjectNames.length} figure${subjectNames.length > 1 ? 's' : ''}: ${subjectNames.join(', ')}`
     : 'empty landscape'
 
-  const props = (s.prop_placement ?? []).map((p) => `${p.prop} (${words(p.position_in_frame)})`)
-
   // 동적 스펙은 "어느 순간을 얼릴지" 가이드로만 — 패널은 정지화.
   const motion = input.safeMode ? undefined : spec.dynamicSpec
   const motionNote = motion
@@ -186,13 +184,10 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
     : ''
 
   // 인물(blocking)이 있을 때만 mannequin 규칙 — 비면 ENV_ONLY_RULE 로 교체(빈 풍경에 인형 생성 방지).
+  // 무자막: prop 이름을 프롬프트에 넣으면 모델이 그 텍스트를 라벨로 그려 넣음 → 이름 빼고 "단순 도형"으로만.
   const figureBlock = blocking.length
-    ? `${MANNEQUIN_RULE} ${blocking.join(' ')} Props as simple lines or geometric shapes${
-        props.length ? `, labeled if useful: ${props.join(', ')}` : ''
-      }.`
-    : `${ENV_ONLY_RULE}${
-        props.length ? ` Key objects as simple lines or geometric shapes, labeled if useful: ${props.join(', ')}.` : ''
-      }`
+    ? `${MANNEQUIN_RULE} ${blocking.join(' ')} Props as simple lines or geometric shapes.`
+    : `${ENV_ONLY_RULE} Key objects as simple lines or geometric shapes.`
 
   return joinPanel([
     PANEL_HEADER,
@@ -209,7 +204,7 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
     ``,
     `Focal point: ${s.framing?.focal_point || spec.intent?.audience_focus || 'the main action'}.`,
     ``,
-    `${PANEL_STYLE_BASE}${light} Wordless panel.`,
+    `${PANEL_STYLE_BASE}${light} Wordless panel: no text, letters, captions, or labels anywhere.`,
   ])
 }
 
@@ -258,7 +253,7 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
     ``,
     `Focal point: ${focal}.`,
     ``,
-    `${PANEL_STYLE_BASE}${light} Wordless panel.`,
+    `${PANEL_STYLE_BASE}${light} Wordless panel: no text, letters, captions, or labels anywhere.`,
   ])
 }
 

@@ -26,6 +26,13 @@ import type { RoughStoryboardImage, Shot } from '@/types'
 
 type PanelJob = { status: 'generating' | 'failed'; error?: string }
 
+// 재생성 즉시 반영: 스토리지 url 은 같은 경로 덮어쓰기(upsert)라 URL 이 동일 → 브라우저/CDN 캐시 잔상이 남는다.
+//   generatedAt 을 쿼리로 붙여 매 생성마다 src 가 바뀌게 해 새 이미지를 즉시 가져온다.
+function withCacheBust(url: string, v?: number): string {
+  if (!v) return url
+  return `${url}${url.includes('?') ? '&' : '?'}v=${v}`
+}
+
 export function RoughStoryboardView() {
   const projectId = useProjectStore((s) => s.projectId)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
@@ -237,6 +244,7 @@ export function RoughStoryboardView() {
 
   // ── 보드 ────────────────────────────────────────────────────────────────
   const detailShot = detailShotId ? shots.find((s) => s.shotId === detailShotId) : undefined
+  const detailPanel = detailShot ? panelOf(detailShot) : null
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -299,7 +307,7 @@ export function RoughStoryboardView() {
                             <>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
-                                src={panel.url}
+                                src={withCacheBust(panel.url, panel.generatedAt)}
                                 alt={`${shot.shotId} rough storyboard`}
                                 className="size-full object-cover"
                                 loading="lazy"
@@ -402,7 +410,7 @@ export function RoughStoryboardView() {
 
       <ShotDetailDialog
         shotId={detailShotId}
-        panelUrl={detailShot ? panelOf(detailShot)?.url ?? null : null}
+        panelUrl={detailPanel ? withCacheBust(detailPanel.url, detailPanel.generatedAt) : null}
         generating={!!(detailShotId && panelJobs[detailShotId]?.status === 'generating')}
         onOpenChange={(open) => {
           if (!open) setDetailShotId(null)
