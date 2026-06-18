@@ -19,6 +19,7 @@ import {
   buildRoughStoryboardPrompt,
   type RoughStoryboardSpec,
 } from '@/lib/writer/rough-storyboard'
+import { rewriteRoughStoryboardPromptViaLLM } from '@/lib/writer/rough-storyboard-llm'
 import { writerShotIdToMain } from '@/lib/writer/adapters'
 import type { ShotDesign } from '@/lib/writer/types/pipeline'
 
@@ -165,7 +166,7 @@ export async function POST(req: Request) {
     const submitted: Array<{
       shotId: string
       jobId: string
-      promptSource: 'shotDesign' | 'db_fallback'
+      promptSource: 'shotDesign' | 'db_fallback' | 'llm_rewrite'
       safeMode: boolean
     }> = []
     const skipped: Array<{
@@ -195,7 +196,7 @@ export async function POST(req: Request) {
       const lighting = (s.lighting_config ?? {}) as { position?: string }
       const spec = specByShotId.get(shotId) ?? null
       const safeMode = previouslyFailed.has(shotId)
-      const prompt = buildRoughStoryboardPrompt({
+      const rulePrompt = buildRoughStoryboardPrompt({
         shotType: (s.shot_type as string) ?? 'MS',
         actionDescription: (s.action_description as string) ?? '',
         characterNames: ((s.characters as string[]) ?? []).map(
@@ -214,6 +215,26 @@ export async function POST(req: Request) {
         safeMode,
       })
 
+      // 3차+ (force 재시도 & 실패 ≥ 임계값) → LLM이 프롬프트 자체를 moderation-safe 영어로 재생성.
+      //   auto 는 위 give-up 게이트에서 이미 skip 되므로, 여기 도달하는 failCount≥임계값은 force 뿐.
+      //   호출마다 변주 → "동일 프롬프트 반복" 회피. 실패/거부 시 rulePrompt 로 폴백(모델은 제안만, §3).
+      const failCount = failCountByShot.get(shotId) ?? 0
+      let prompt = rulePrompt
+      let promptSource: 'shotDesign' | 'db_fallback' | 'llm_rewrite' = spec
+        ? 'shotDesign'
+        : 'db_fallback'
+      if (failCount >= AUTO_GENERATION_GIVE_UP_THRESHOLD) {
+        const rewritten = await rewriteRoughStoryboardPromptViaLLM({
+          previousPrompt: rulePrompt,
+          shotType: (s.shot_type as string) ?? 'MS',
+          attempt: failCount + 1,
+        })
+        if (rewritten) {
+          prompt = rewritten
+          promptSource = 'llm_rewrite'
+        }
+      }
+
       const { request_id, model } = await falImageSubmit({
         // previz 스케치 — 비용/속도 우선 경량 모델 (모델 ID 의 진실은 fal.ts)
         model: ROUGH_STORYBOARD_IMAGE_MODEL,
@@ -227,11 +248,13 @@ export async function POST(req: Request) {
         model,
         kind: 'shot_rough_storyboard',
         target: { workspaceId: project.workspace_id, writerShotId: shotId },
+        // 재생성 프롬프트를 회수 가능하게 저장(이전엔 미저장이라 DB에서 못 봤음).
+        inputSnapshot: { prompt, promptSource, safeMode },
       })
       submitted.push({
         shotId,
         jobId: job.id,
-        promptSource: spec ? 'shotDesign' : 'db_fallback',
+        promptSource,
         safeMode,
       })
     }

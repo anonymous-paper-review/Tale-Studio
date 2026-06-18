@@ -178,8 +178,9 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
       }.`
     : null
 
+  // 곁다듬음: "side_right" 등 값이 " side" 접미사와 겹쳐 "side right side"가 되던 중복 제거.
   const light = s.lighting?.key_direction
-    ? ` Lighting: key from the ${words(s.lighting.key_direction)} side${
+    ? ` Lighting: key from the ${words(s.lighting.key_direction)}${
         s.lighting.quality ? `, ${s.lighting.quality}` : ''
       }.`
     : ''
@@ -212,6 +213,10 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
   ])
 }
 
+// fallback action(서사 문장)은 현재 비활성화 — rich가 action을 뺀 것과 parity(klein은 서사문이 약함).
+//   코드는 보존: 재활성화하려면 true. 켜면 1차 시도에만 출력(safeMode 재시도엔 모더레이션 회피로 미출력).
+const FALLBACK_EMIT_ACTION: boolean = false
+
 /** fallback 경로 — DB shots/scenes 평탄화 필드 근사 (rich 미보유 프로젝트). */
 function buildFromDbRow(input: RoughStoryboardPromptInput): string {
   const size = SHOT_SIZE_WORDS[input.shotType] ?? 'medium shot'
@@ -228,7 +233,7 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
   // 인물 있을 때만 mannequin 규칙 — 비면 ENV_ONLY_RULE (모순된 "draw mannequin … No characters" 제거).
   const figureBlock = input.characterNames.length
     ? `${MANNEQUIN_RULE} ${
-        input.safeMode ? 'Neutral standing poses, composed naturally.' : 'Place and pose them per the action.'
+        input.safeMode ? 'Neutral standing poses, composed naturally.' : 'Place and pose them naturally in frame.'
       } Props as simple lines or geometric shapes.`
     : `${ENV_ONLY_RULE} Key objects as simple lines or geometric shapes.`
   const focal = input.characterNames[0]
@@ -236,7 +241,7 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
     : 'the main action'
   const light =
     input.lightPosition && input.lightPosition !== 'front'
-      ? ` Lighting: key from the ${input.lightPosition} side.`
+      ? ` Lighting: key from the ${input.lightPosition}.`
       : ''
 
   return joinPanel([
@@ -245,8 +250,8 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
     `${size[0].toUpperCase()}${size.slice(1)} — ${subject}.`,
     `Camera: ${angle}, ${lens}mm, ${focus} focus, rule of thirds.`,
     ``,
-    // fallback 은 구조화 스펙(blocking/layers)이 없어 action 이 유일한 '무엇을' 신호 → 유지(safe mode 제외).
-    input.safeMode ? null : `Action: ${input.actionDescription}.`,
+    // fallback action: FALLBACK_EMIT_ACTION 으로 토글(현재 off). 켜면 1차 시도에만(safeMode 제외) 출력.
+    FALLBACK_EMIT_ACTION && !input.safeMode ? `Action: ${input.actionDescription}.` : null,
     setting ? `Setting: ${setting}.${!input.safeMode && input.mood ? ` Mood: ${input.mood}.` : ''}` : '',
     ``,
     figureBlock,
