@@ -82,6 +82,8 @@ export interface FalImageOptions {
   aspect_ratio?: string;
   reference_image_urls?: string[];
   negative_prompt?: string;
+  /** 고정 시 diffusion 노이즈 초기값 고정 → 스타일 베이스라인 일관성 + 재생성 재현성 (flux 계열 지원). */
+  seed?: number;
   webhookUrl?: string;        // 설정 시 fal 큐가 완료를 이 URL로 POST (비동기 webhook 전환)
 }
 
@@ -97,7 +99,8 @@ const DEFAULT_IMAGE_MODEL = 'openai/gpt-image-2';
 const DEFAULT_EDIT_IMAGE_MODEL = 'openai/gpt-image-2/edit';
 // 러프 스토리보드(previz 스케치) 전용 — 비용/속도 우선 경량 모델 (2026-06-12 사용자 결정).
 //   흑백 연필 스케치 + 목각 인형 수준이라 소형 모델로 충분. LoRA 미지정 시 base 로 동작.
-export const ROUGH_STORYBOARD_IMAGE_MODEL = 'fal-ai/flux-2/klein/4b/lora';
+//   2026-06-18: 4b → 9b 격상 (4b 가 monochrome/featureless 지시 위반·구도 결함 심함, 일관성 개선 목적).
+export const ROUGH_STORYBOARD_IMAGE_MODEL = 'fal-ai/flux-2/klein/9b/lora';
 
 // flux 계열 입력 스키마 모델인지 (aspect_ratio 대신 image_size preset 사용)
 function isFluxFamilyModel(model: string): boolean {
@@ -150,6 +153,7 @@ function resolveImageModel(opts: FalImageOptions): string {
 function buildFalImageInput(opts: FalImageOptions, model: string): Record<string, unknown> {
   const input: Record<string, unknown> = { prompt: opts.prompt };
   if (opts.negative_prompt) input.negative_prompt = opts.negative_prompt;
+  if (typeof opts.seed === 'number') input.seed = opts.seed;
 
   if (isImageEditModel(model)) {
     // edit 모델: image_urls 필수 + image_size preset

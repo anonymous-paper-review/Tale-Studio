@@ -48,6 +48,37 @@ function words(v: string | null | undefined): string {
   return (v ?? '').replace(/_/g, ' ').trim()
 }
 
+// 색상(채도) 단어만 제거 — 흑백 previz 보장 (2026-06-18). 명암어(dark/black/검은/어두운)는 흑백 스케치의
+//   음영 정보라 보존; shotDesign(LLM)이 자유 텍스트에 섞어 넣는 색조(붉은 암석·crimson sun·오렌지빛 하늘 등)만 스트립.
+const COLOR_WORD_EN =
+  /\b(crimson|scarlet|vermilion|reddish|red|orange|amber|golden|gold|yellow|bluish|blue|azure|cyan|teal|green|emerald|verdant|purple|violet|magenta|pink|brown|tan|ochre|sepia|rusty|fiery)\b/gi
+const COLOR_WORD_KO =
+  /(붉은|불그스름한|빨간|빨강|적색|적갈색|주황빛?|주황색?|오렌지빛?|오렌지색?|노란|노랑|황금빛?|금빛|황톳빛?|푸른|파란|파랑|청색|초록빛?|초록색?|녹색|보랏빛?|보라색?|분홍빛?|갈색)/g
+function stripColor(text: string | null | undefined): string {
+  if (!text) return ''
+  return text
+    .replace(COLOR_WORD_EN, '')
+    .replace(COLOR_WORD_KO, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.])/g, '$1')
+    .replace(/^[\s,]+/, '')
+    .trim()
+}
+
+/**
+ * 러프 보드 공통 네거티브 — flux klein 이 monochrome/featureless 지시를 자주 위반하므로 명시 차단(2026-06-18).
+ *   색·채색 / 얼굴·인물 디테일 / 갑옷 / 프레임 분할(이중 패널)·테두리 / 텍스트 / 유령 큐브 / 잉여 인물·크롭.
+ */
+export const ROUGH_STORYBOARD_NEGATIVE_PROMPT = [
+  'color', 'colored', 'colored wash', 'red wash', 'orange sky', 'vibrant', 'saturated', 'cinematic render', 'painterly', 'digital painting',
+  'detailed face', 'facial features', 'eyes', 'nose', 'mouth', 'eyebrows', 'beard', 'hair', 'ears', 'portrait', 'realistic human face',
+  'helmet face', 'ornate armor', 'armor detail', 'rendered armor',
+  'split screen', 'panel border', 'multiple panels', 'frame within frame', 'comic grid', 'gutter', 'horizontal divider line',
+  'text', 'letters', 'caption', 'label', 'watermark', 'signature',
+  'cube', 'box', 'floating geometric object',
+  'extra characters', 'crowd', 'duplicated figures', 'cropped subject', 'cut off',
+].join(', ')
+
 function angleWords(angleRaw: string | null | undefined): string {
   // 실데이터는 'low'/'low_angle' 혼용 (enum 비강제) — 접미사 정규화 후 매핑
   const angle = (angleRaw ?? '').replace(/_angle$/, '')
@@ -116,10 +147,17 @@ export interface RoughStoryboardPromptInput {
 //   강하게 반응하고 문장형 서사·부정문은 약하다. 그래서 템플릿을 단어 나열·긍정문 위주로 압축한다.
 const PANEL_HEADER = `Rough storyboard previsualization panel, single frame, camera POV, lens-eye view.`
 
-const PANEL_STYLE_BASE = `Style: loose rough monochrome pencil-sketch, quick gestural lines, gray shading, ample negative space, unfinished rough board.`
+// strictly black-and-white·grayscale only → klein 의 채색 폭주 억제(네거티브와 이중 방어).
+//   single uninterrupted panel → 이중 패널/프레임-인-프레임(가로 거터) 방지.
+const PANEL_STYLE_BASE = `Style: loose rough monochrome pencil-sketch, strictly black and white, grayscale only, no color, quick gestural lines, gray shading, ample negative space, unfinished rough board. Single uninterrupted full-bleed panel, no internal frames or dividing lines.`
 
 // "rough stick figure" 제거(featureless wooden mannequin 으로 통일), "no face/no identity"→"anonymous"(긍정).
-const MANNEQUIN_RULE = `Figures: draw every character as a featureless wooden mannequin, anonymous — pose, gesture, and position only.`
+//   2026-06-18: smooth blank head 명시 추가 — klein 이 인물에 얼굴을 그리는 경향 억제.
+const MANNEQUIN_RULE = `Figures: draw every character as a featureless wooden artist mannequin with a smooth blank rounded head and no face — anonymous, pose, gesture, and position only.`
+// 클로즈업(ECU/CU/MCU)은 머리가 프레임을 채워 klein 이 사람 얼굴을 그리려는 경향이 특히 강함(2026-06-18 관측) →
+//   머리를 "빈 목구"로 못박는 추가 지시. 와이드/풀샷은 머리가 작아 불필요(샷 사이즈로 조건부 주입).
+const CLOSEUP_HEAD_RULE = `The head is a smooth featureless wooden ball with no face whatsoever — no eyes, no nose, no mouth, no eyebrows, no hair.`
+const CLOSEUP_SIZES = new Set(['ECU', 'CU', 'MCU'])
 
 // 인물 0인 샷(설정/환경샷) 전용 — MANNEQUIN_RULE 대신. 인물 토큰을 아예 빼고 "빈 풍경만"을 긍정형 직설 지시
 //   (klein 은 부정문이 약해 "no people" 류는 비효율 → 긍정문 + 인물 명령어 미포함이 robust).
@@ -135,8 +173,10 @@ function joinPanel(lines: Array<string | null | undefined>): string {
 /** rich 경로 — L4 static_spec 이 템플릿 슬롯과 1:1 이므로 원본 facet 을 그대로 치환. */
 function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardSpec): string {
   const s = spec.staticSpec
-  const sizeCode = String(s.shot_type ?? '').toUpperCase()
-  const size = SHOT_SIZE_WORDS[sizeCode] ?? (words(s.shot_type) || 'medium shot')
+  // shot_type 은 DB(shots.shot_type, 영속 진실 — UI·director·video 가 참조)를 우선.
+  //   static_spec.shot_type 은 writer 실행 state(증발) 산출이라 DB 와 어긋날 수 있음(12/19 불일치, 2026-06-18).
+  const sizeCode = String(input.shotType || s.shot_type || '').toUpperCase()
+  const size = SHOT_SIZE_WORDS[sizeCode] ?? (words(input.shotType || s.shot_type) || 'medium shot')
   const lens = s.lens_mm || input.focalLength || 35
   const dof = s.depth_of_field ?? 'deep'
   // 카메라 intrinsic 은 단어 나열로 — 앞 관사 제거(angleWords/FRAMING_RULE_WORDS 의 'a/an/the').
@@ -151,14 +191,14 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
   // safe mode: 서사 동사·감정어가 실리는 구도 레이어/모션을 제외 (모더레이션 우회)
   const layers = input.safeMode ? {} : (s.framing?.layers ?? {})
   const layerLines = [
-    layers.foreground ? `- Foreground: ${layers.foreground}.` : null,
-    layers.midground ? `- Midground: ${layers.midground}.` : null,
-    layers.background ? `- Background: ${layers.background}.` : null,
+    layers.foreground ? `- Foreground: ${stripColor(layers.foreground)}.` : null,
+    layers.midground ? `- Midground: ${stripColor(layers.midground)}.` : null,
+    layers.background ? `- Background: ${stripColor(layers.background)}.` : null,
   ].filter(Boolean) as string[]
 
   const blocking = (s.character_blocking ?? []).map(
     (b) =>
-      `${nameOf(b.character_id)}: ${words(b.position_in_frame)}, ${words(b.pose)}, gaze ${words(b.gaze)}.`,
+      `${nameOf(b.character_id)}: ${words(b.position_in_frame)}, ${stripColor(words(b.pose))}, gaze ${words(b.gaze)}.`,
   )
   // 앞쪽 배치할 주제 = 인물 수·이름 / 빈 풍경.
   const subjectNames = (s.character_blocking ?? []).map((b) => nameOf(b.character_id))
@@ -185,8 +225,9 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
 
   // 인물(blocking)이 있을 때만 mannequin 규칙 — 비면 ENV_ONLY_RULE 로 교체(빈 풍경에 인형 생성 방지).
   // 무자막: prop 이름을 프롬프트에 넣으면 모델이 그 텍스트를 라벨로 그려 넣음 → 이름 빼고 "단순 도형"으로만.
+  const headRule = CLOSEUP_SIZES.has(sizeCode) ? ` ${CLOSEUP_HEAD_RULE}` : ''
   const figureBlock = blocking.length
-    ? `${MANNEQUIN_RULE} ${blocking.join(' ')} Props as simple lines or geometric shapes.`
+    ? `${MANNEQUIN_RULE}${headRule} ${blocking.join(' ')} Props as simple lines or geometric shapes.`
     : `${ENV_ONLY_RULE} Key objects as simple lines or geometric shapes.`
 
   return joinPanel([
@@ -202,7 +243,7 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
     ``,
     figureBlock,
     ``,
-    `Focal point: ${s.framing?.focal_point || spec.intent?.audience_focus || 'the main action'}.`,
+    `Focal point: ${stripColor(s.framing?.focal_point) || stripColor(spec.intent?.audience_focus) || 'the main action'}.`,
     ``,
     `${PANEL_STYLE_BASE}${light} Wordless panel: no text, letters, captions, or labels anywhere.`,
   ])
@@ -220,14 +261,17 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
   const focus =
     typeof input.aperture === 'number' && input.aperture <= 2.8 ? 'shallow' : 'deep'
 
-  const setting = [input.location, input.timeOfDay].filter(Boolean).join(', ')
+  const setting = [stripColor(input.location), input.timeOfDay].filter(Boolean).join(', ')
   // 앞쪽 배치할 주제 = 인물 수·이름 / 빈 풍경.
   const subject = input.characterNames.length
     ? `${input.characterNames.length} figure${input.characterNames.length > 1 ? 's' : ''}: ${input.characterNames.join(', ')}`
     : 'empty landscape'
   // 인물 있을 때만 mannequin 규칙 — 비면 ENV_ONLY_RULE (모순된 "draw mannequin … No characters" 제거).
+  const headRule = CLOSEUP_SIZES.has(String(input.shotType ?? '').toUpperCase())
+    ? ` ${CLOSEUP_HEAD_RULE}`
+    : ''
   const figureBlock = input.characterNames.length
-    ? `${MANNEQUIN_RULE} ${
+    ? `${MANNEQUIN_RULE}${headRule} ${
         input.safeMode ? 'Neutral standing poses, composed naturally.' : 'Place and pose them naturally in frame.'
       } Props as simple lines or geometric shapes.`
     : `${ENV_ONLY_RULE} Key objects as simple lines or geometric shapes.`

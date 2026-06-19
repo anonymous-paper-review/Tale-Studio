@@ -17,6 +17,7 @@ import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import {
   buildRoughStoryboardPrompt,
+  ROUGH_STORYBOARD_NEGATIVE_PROMPT,
   type RoughStoryboardSpec,
 } from '@/lib/writer/rough-storyboard'
 import { rewriteRoughStoryboardPromptViaLLM } from '@/lib/writer/rough-storyboard-llm'
@@ -58,6 +59,17 @@ async function loadShotDesignByMainId(
     console.error('[writer/rough-storyboard] shotDesign state load failed:', e)
   }
   return byId
+}
+
+/**
+ * projectId → 결정적 seed. 프로젝트 내 전 샷이 동일 노이즈 베이스를 공유해 스타일 톤(선·음영·마네킹 질감)이
+ *   통일되고, force 재생성 시 재현성이 생긴다(같은 프롬프트→같은 그림). 샷별 변주는 프롬프트 차이가 만든다.
+ *   (캐릭터 외형 일관성의 주 레버는 프롬프트의 featureless 강제+네거티브이며, seed 는 톤 베이스라인 보조.)
+ */
+function seedFromProjectId(projectId: string): number {
+  let h = 0
+  for (let i = 0; i < projectId.length; i++) h = (Math.imul(31, h) + projectId.charCodeAt(i)) | 0
+  return (h >>> 0) % 2_000_000_000
 }
 
 export const runtime = 'nodejs'
@@ -239,6 +251,10 @@ export async function POST(req: Request) {
         // previz 스케치 — 비용/속도 우선 경량 모델 (모델 ID 의 진실은 fal.ts)
         model: ROUGH_STORYBOARD_IMAGE_MODEL,
         prompt,
+        // 흑백·마네킹·단일패널 위반과 텍스트/잉여인물 차단 (klein 이 긍정 지시를 자주 무시 → 이중 방어).
+        negative_prompt: ROUGH_STORYBOARD_NEGATIVE_PROMPT,
+        // 프로젝트 단위 고정 seed → 패널 간 스타일 톤 통일 + 재생성 재현성.
+        seed: seedFromProjectId(projectId),
         aspect_ratio: '16:9',
         webhookUrl: resolveWebhookUrl(),
       })
