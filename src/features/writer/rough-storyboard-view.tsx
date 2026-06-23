@@ -11,13 +11,14 @@
 // 완료는 webhook → shots.rough_storyboard. 클라는 jobId 폴링으로 카드만 갱신.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertCircle, ImageIcon, Loader2, RefreshCw } from 'lucide-react'
+import { AlertCircle, ImageIcon, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
+import { SceneEditDialog } from '@/features/writer/scene-edit-dialog'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
@@ -38,6 +39,8 @@ export function RoughStoryboardView() {
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
   const loadProject = useWriterStore((s) => s.loadProject)
+  const addScene = useWriterStore((s) => s.addScene)
+  const addShot = useWriterStore((s) => s.addShot)
   const { status } = useWriterStatus(projectId)
 
   // 패널 단위 생성 상태(jobId 폴링) + 완료 즉시 반영용 로컬 오버라이드.
@@ -45,6 +48,7 @@ export function RoughStoryboardView() {
   const [panelJobs, setPanelJobs] = useState<Record<string, PanelJob>>({})
   const [overrides, setOverrides] = useState<Record<string, RoughStoryboardImage>>({})
   const [detailShotId, setDetailShotId] = useState<string | null>(null)
+  const [editSceneId, setEditSceneId] = useState<string | null>(null)
   const autoTriggeredRef = useRef(false)
   const reloadedAfterCompleteRef = useRef(false)
   // drag-to-scroll 직후의 click 이 카드 팝업을 여는 오발 방지
@@ -266,6 +270,10 @@ export function RoughStoryboardView() {
               누락 패널 {missingIds.length}개 생성
             </Button>
           )}
+          <Button size="sm" variant="outline" onClick={() => void addScene()}>
+            <Plus className="size-3.5" />
+            씬 추가
+          </Button>
         </div>
       </div>
 
@@ -273,18 +281,49 @@ export function RoughStoryboardView() {
         <div className="cursor-grab space-y-8 p-6" onPointerDown={handleBoardPointerDown}>
           {(sceneManifest?.scenes ?? []).map((scene) => {
             const sceneShots = shots.filter((s) => s.sceneId === scene.sceneId)
-            if (sceneShots.length === 0) return null
             return (
               <section key={scene.sceneId} className="space-y-3">
-                {/* 씬 구분선 — 내용(요약/장소) 없이 id만 (사용자 결정 2026-06-12) */}
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs text-muted-foreground">
+                {/* 씬 구분선 — id 만 노출(사용자 결정 2026-06-12). 장소·분위기는 편집 팝업에서.
+                    CRUD(2026-06-24): id 클릭/편집 → 씬 상세, 샷 추가 버튼. 빈 씬도 표시. */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditSceneId(scene.sceneId)}
+                    className="font-mono text-xs text-muted-foreground hover:text-foreground hover:underline"
+                  >
                     {scene.sceneId}
-                  </span>
+                  </button>
                   <div className="h-px flex-1 bg-border" />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    onClick={() => void addShot(scene.sceneId)}
+                  >
+                    <Plus className="size-3.5" />
+                    샷 추가
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    onClick={() => setEditSceneId(scene.sceneId)}
+                  >
+                    편집
+                  </Button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {sceneShots.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void addShot(scene.sceneId)}
+                      className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground transition-colors hover:bg-accent/40"
+                    >
+                      <Plus className="size-6" />
+                      <span className="text-sm">샷 추가</span>
+                    </button>
+                  )}
                   {sceneShots.map((shot) => {
                     const panel = panelOf(shot)
                     const job = panelJobs[shot.shotId]
@@ -416,6 +455,13 @@ export function RoughStoryboardView() {
           if (!open) setDetailShotId(null)
         }}
         onRegenerate={(id) => void generate([id], true)}
+      />
+
+      <SceneEditDialog
+        sceneId={editSceneId}
+        onOpenChange={(open) => {
+          if (!open) setEditSceneId(null)
+        }}
       />
     </div>
   )

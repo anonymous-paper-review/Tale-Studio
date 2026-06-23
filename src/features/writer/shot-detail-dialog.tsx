@@ -8,7 +8,7 @@
 // 재생성은 수정 반영을 위해 디바운스 플러시를 기다린 뒤 발사한다.
 
 import { useState } from 'react'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -54,6 +54,7 @@ export function ShotDetailDialog({
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const updateShot = useWriterStore((s) => s.updateShot)
   const updateDialogueLine = useWriterStore((s) => s.updateDialogueLine)
+  const deleteShot = useWriterStore((s) => s.deleteShot)
   // updateShot 디바운스(500ms)가 DB에 닿기 전에 재생성 라우트가 행을 읽는 레이스 방지 대기
   const [flushing, setFlushing] = useState(false)
 
@@ -70,6 +71,12 @@ export function ShotDetailDialog({
   }
 
   const busy = generating || flushing
+
+  const handleDelete = async () => {
+    if (!window.confirm(`${shot.shotId} 샷을 삭제할까요? 되돌릴 수 없습니다.`)) return
+    onOpenChange(false)
+    await deleteShot(shot.shotId)
+  }
 
   return (
     <Dialog open={!!shotId} onOpenChange={onOpenChange}>
@@ -181,6 +188,15 @@ export function ShotDetailDialog({
         </div>
 
         <DialogFooter>
+          <Button
+            variant="ghost"
+            className="mr-auto text-destructive hover:text-destructive"
+            onClick={() => void handleDelete()}
+            disabled={busy}
+          >
+            <Trash2 className="size-4" />
+            샷 삭제
+          </Button>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             닫기
           </Button>

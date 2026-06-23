@@ -52,6 +52,39 @@ function nextSceneId(existingSceneIds: string[]): string {
   return `sc_${next}`
 }
 
+// writer 채팅(/api/writer/chat)이 내는 검증된 액션 — applyChatUpdates 가 기존 CRUD 로 실행한다.
+export type WriterChatUpdate =
+  | ({ type: 'addScene'; tempId?: string } & Partial<Scene>)
+  | ({ type: 'addShot'; sceneId: string; tempId?: string } & Partial<Shot>)
+  | { type: 'updateScene'; id: string; patch: Partial<Scene> }
+  | { type: 'updateShot'; id: string; patch: Partial<Shot> }
+  | { type: 'deleteShot'; id: string }
+  | { type: 'deleteScene'; id: string }
+
+// applyChatUpdates 보조 — update 에서 Scene/Shot 칸만 추린다(route 가 1차 검증, 여기선 타입 좁힘 + 잉여 키 제거).
+function pickSceneFields(u: WriterChatUpdate): Partial<Scene> {
+  const o = u as Record<string, unknown>
+  const out: Partial<Scene> = {}
+  if (typeof o.location === 'string') out.location = o.location
+  if (typeof o.timeOfDay === 'string') out.timeOfDay = o.timeOfDay
+  if (typeof o.mood === 'string') out.mood = o.mood
+  if (typeof o.narrativeSummary === 'string') out.narrativeSummary = o.narrativeSummary
+  if (typeof o.originalTextQuote === 'string') out.originalTextQuote = o.originalTextQuote
+  if (Array.isArray(o.charactersPresent)) out.charactersPresent = o.charactersPresent as string[]
+  if (typeof o.estimatedDurationSeconds === 'number')
+    out.estimatedDurationSeconds = o.estimatedDurationSeconds
+  return out
+}
+function pickShotFields(u: WriterChatUpdate): Partial<Shot> {
+  const o = u as Record<string, unknown>
+  const out: Partial<Shot> = {}
+  if (typeof o.shotType === 'string') out.shotType = o.shotType as Shot['shotType']
+  if (typeof o.actionDescription === 'string') out.actionDescription = o.actionDescription
+  if (Array.isArray(o.characters)) out.characters = o.characters as string[]
+  if (typeof o.durationSeconds === 'number') out.durationSeconds = o.durationSeconds
+  return out
+}
+
 interface WriterState {
   storyText: string
   expandedStory: string | null
@@ -83,6 +116,7 @@ interface WriterState {
     index: number,
     changes: Partial<DialogueLine>,
   ) => void
+  applyChatUpdates: (updates: WriterChatUpdate[]) => Promise<void>
   clearError: () => void
   reset: () => void
 }
@@ -373,6 +407,41 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         shots: prevShots,
         error: (shotErr ?? sceneErr)?.message ?? 'Delete failed',
       })
+    }
+  },
+
+  // 채팅(/api/writer/chat)이 낸 검증된 updates 를 기존 CRUD 로 실행한다.
+  //   LLM 은 add(scene→shot) → update → delete 순으로 배치하고, 같은 배치의 새 노드는 tempId 로 참조한다.
+  //   각 update 는 best-effort — 하나 실패해도 나머지는 진행(에러는 store.error 로 표면화).
+  applyChatUpdates: async (updates) => {
+    const tempMap = new Map<string, string>() // tempId → 실제 id
+    for (const u of updates) {
+      try {
+        if (u.type === 'addScene') {
+          const newId = await get().addScene()
+          if (!newId) continue
+          if (u.tempId) tempMap.set(u.tempId, newId)
+          const fields = pickSceneFields(u)
+          if (Object.keys(fields).length > 0) get().updateScene(newId, fields)
+        } else if (u.type === 'addShot') {
+          const realSceneId = tempMap.get(u.sceneId) ?? u.sceneId
+          const newId = await get().addShot(realSceneId)
+          if (!newId) continue
+          if (u.tempId) tempMap.set(u.tempId, newId)
+          const fields = pickShotFields(u)
+          if (Object.keys(fields).length > 0) get().updateShot(newId, fields)
+        } else if (u.type === 'updateScene') {
+          get().updateScene(tempMap.get(u.id) ?? u.id, u.patch)
+        } else if (u.type === 'updateShot') {
+          get().updateShot(tempMap.get(u.id) ?? u.id, u.patch)
+        } else if (u.type === 'deleteShot') {
+          await get().deleteShot(tempMap.get(u.id) ?? u.id)
+        } else if (u.type === 'deleteScene') {
+          await get().deleteScene(tempMap.get(u.id) ?? u.id)
+        }
+      } catch (e) {
+        set({ error: e instanceof Error ? e.message : 'chat update failed' })
+      }
     }
   },
 

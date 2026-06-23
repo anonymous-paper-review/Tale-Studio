@@ -89,16 +89,17 @@ export const STAGE_FACE_COLOR: Record<StageId, string> = {
 
 export const STAGE_PLACEHOLDER: Record<StageId, string> = {
   producer: '스토리에 대해 말해주세요…',
-  writer: '아직 이 단계에서는 채팅을 쓸 수 없어요.',
+  writer: '예: 마지막 씬에 클로즈업 샷 추가해줘 / sc_02 분위기를 더 어둡게',
   artist: '예: Kai 캐릭터 만들어줘, 갈색머리 검은코트',
   director: '촬영 기법에 대해 물어보세요…',
   editor: '아직 이 단계에서는 채팅을 쓸 수 없어요.',
 }
 
-// writer 탭은 부활했지만(러프 스토리보드 검토) /api/writer/chat 이 없어 채팅은 여전히 미지원.
-//   (global-chat-store switch 에 'writer' case 없음 — 지원하려면 라우트+case 둘 다 추가)
+// writer 채팅: 러프 스토리보드 검토 단계에서 씬/샷 CRUD (api/writer/chat + global-chat-store 'writer' case).
+//   editor 만 미지원 (라우트·case 없음).
 export const CHAT_SUPPORTED_STAGES: ReadonlySet<StageId> = new Set<StageId>([
   'producer',
+  'writer',
   'artist',
   'director',
 ])

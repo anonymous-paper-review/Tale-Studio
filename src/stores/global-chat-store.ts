@@ -10,6 +10,7 @@ import {
   serializeDirectorCanvasContext,
   type DirectorCanvasUpdate,
 } from '@/stores/director-store'
+import { useWriterStore, type WriterChatUpdate } from '@/stores/writer-store'
 import { saveChatMessage } from '@/lib/chat-persistence'
 import {
   STAGE_LABEL,
@@ -65,6 +66,38 @@ interface GlobalChatState {
 
 function makeId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+// writer 채팅 컨텍스트 — 현재 씬/샷을 LLM 이 scene_id·shot_id 로 정확히 참조하도록 직렬화(pull).
+function serializeWriterContext(
+  w: ReturnType<typeof useWriterStore.getState>,
+): string {
+  const scenes = w.sceneManifest?.scenes ?? []
+  const shots = w.shots
+  const nameOf = (id: string) =>
+    w.sceneManifest?.characters.find((c) => c.characterId === id)?.name ?? id
+  if (scenes.length === 0 && shots.length === 0) return '## 현재 씬/샷\n(아직 없음)'
+  const lines: string[] = ['## 현재 씬/샷 (scene_id·shot_id 를 그대로 사용)']
+  for (const sc of scenes) {
+    const present = (sc.charactersPresent ?? []).map(nameOf).join(', ') || '없음'
+    lines.push(
+      `\n### ${sc.sceneId} — 장소:${sc.location || '?'} / ${sc.timeOfDay || '?'} / 분위기:${sc.mood || '?'} (등장: ${present})`,
+    )
+    if (sc.narrativeSummary) lines.push(`  요약: ${sc.narrativeSummary}`)
+    for (const sh of shots.filter((s) => s.sceneId === sc.sceneId)) {
+      const chars = (sh.characters ?? []).map(nameOf).join(', ') || '없음'
+      lines.push(
+        `  - ${sh.shotId} [${sh.shotType}] ${sh.actionDescription || '(설명 없음)'} (등장: ${chars}, ${sh.durationSeconds}s)`,
+      )
+    }
+  }
+  const orphan = shots.filter((s) => !scenes.some((sc) => sc.sceneId === s.sceneId))
+  if (orphan.length > 0) {
+    lines.push('\n### (씬 미배정 샷)')
+    for (const sh of orphan)
+      lines.push(`  - ${sh.shotId} [${sh.shotType}] ${sh.actionDescription || ''}`)
+  }
+  return lines.join('\n')
 }
 
 // 완료 알림 채팅 메시지 스로틀 — stage별 마지막 메시지 시각. 배치 생성(이미지 12장)에서
@@ -228,6 +261,16 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         break
       }
+      case 'writer': {
+        // Writers' Room agentic 모드 — 씬/샷 CRUD. 현재 씬/샷을 컨텍스트로 pull.
+        endpoint = '/api/writer/chat'
+        body = {
+          message: trimmed,
+          history: historyPayload,
+          writerContext: serializeWriterContext(useWriterStore.getState()),
+        }
+        break
+      }
       default:
         set({
           error: 'Chat is not available on this stage yet.',
@@ -369,6 +412,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             )
           }
         }
+      }
+      if (stage === 'writer' && Array.isArray(data.updates)) {
+        // 검증된 씬/샷 CRUD 액션 — writer-store 가 기존 CRUD 로 DB 반영.
+        await useWriterStore
+          .getState()
+          .applyChatUpdates(data.updates as WriterChatUpdate[])
       }
     } catch (err) {
       set({
