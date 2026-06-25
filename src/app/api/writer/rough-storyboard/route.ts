@@ -75,6 +75,12 @@ function seedFromProjectId(projectId: string): number {
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
+// queued 잡이 webhook 유실(서버리스 fire-and-forget 종료 등)로 영영 미해결로 남으면, in_flight 가드가
+//   그 샷의 재생성을 영구 차단한다(아래 루프에서 force 보다 먼저 검사 → 사람이 눌러도 skip). fal 잡은
+//   maxDuration(60s) 안에 끝나므로, 이보다 한참 오래된 queued 는 버려진 것으로 보고 in_flight 에서 제외한다
+//   (2026-06-26, shot_9 가 stuck queued 로 재생성이 막혀 "검은 화면 그대로"이던 버그). 정상 중복 방지는 유지.
+const STALE_QUEUED_MS = 10 * 60 * 1000
+
 const BodySchema = z.object({
   projectId: z.string().uuid(),
   /** 지정 시 해당 샷만 (per-shot 재생성). 미지정 시 누락분 전체. */
@@ -144,7 +150,8 @@ export async function POST(req: Request) {
           .select('target')
           .eq('project_id', projectId)
           .eq('kind', 'shot_rough_storyboard')
-          .eq('status', 'queued'),
+          .eq('status', 'queued')
+          .gte('created_at', new Date(Date.now() - STALE_QUEUED_MS).toISOString()),
         // 직전 실패 이력 → safe mode 파생 (fal 입력 모더레이션 우회 재시도).
         // 별도 상태 저장 없음 — 실패 잡의 존재가 진실 (architecture §0).
         supabaseAdmin

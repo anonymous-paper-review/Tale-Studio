@@ -179,14 +179,24 @@ export function RoughStoryboardView() {
 
   // Ctrl + wheel → 보드 축척(zoom). 브라우저 페이지 줌을 막아야 하므로 native wheel 리스너(passive:false)로
   //   붙인다(React onWheel 은 passive 라 preventDefault 가 안 먹을 수 있음). up=확대(열↓), down=축소(열↑).
+  //   한 번의 휠 제스처가 여러 wheel 이벤트로 쪼개져 들어와 단번에 여러 단계가 바뀌던 문제(2026-06-26):
+  //   deltaY 를 누적해 STEP_PX 를 넘을 때만 1단계씩 바꾸고 누적을 리셋한다(deltaMode→px 정규화).
   //   board div 는 hasShots 일 때만 렌더되므로 deps 에 hasShots 를 넣어 마운트 후 재바인딩한다.
   useEffect(() => {
     const el = boardRef.current
     if (!el) return
+    let acc = 0
+    const STEP_PX = 100 // 마우스 휠 한 칸(≈100px)=1단계; 트랙패드 미세 델타는 누적
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return
       e.preventDefault()
-      setZoomLevel((z) => Math.max(1, Math.min(6, e.deltaY < 0 ? z + 1 : z - 1)))
+      // deltaMode: 0=픽셀, 1=줄, 2=페이지 → 픽셀로 정규화
+      const px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY
+      acc += px
+      if (Math.abs(acc) < STEP_PX) return
+      const dir = acc < 0 ? 1 : -1 // 위로(deltaY<0)=확대(열↓)
+      acc = 0
+      setZoomLevel((z) => Math.max(1, Math.min(6, z + dir)))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)

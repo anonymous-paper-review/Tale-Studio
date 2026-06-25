@@ -138,6 +138,8 @@ export interface RoughStoryboardPromptInput {
    * 콘텐츠 체커 우회 모드 — fal 입력 모더레이션(content_policy_violation, 토글 불가)에
    * 걸린 샷의 재시도용. 서사 동사·감정어(액션문/무드/모션/구도 레이어)를 빼고
    * 기계적 스테이징(샷 사이즈·blocking·포즈·소품·focal point)만 남긴다.
+   *   (모더레이션 트리거는 구도 레이어/모션 서사에 있음 — blocking 포즈는 무해함이 실측 확인됨,
+   *    shot_9 2026-06-26: 레이어·모션만 제거하면 정상 생성. 그래서 포즈는 보존해 가독성 유지.)
    * 직전 잡이 실패한 샷에만 라우트가 자동 적용 — 1차 시도는 항상 원문.
    */
   safeMode?: boolean
@@ -272,18 +274,33 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
     typeof input.aperture === 'number' && input.aperture <= 2.8 ? 'shallow' : 'deep'
 
   const setting = [stripColor(input.location), input.timeOfDay].filter(Boolean).join(', ')
-  // 앞쪽 배치할 주제 = 인물 수·이름 / 빈 풍경.
-  const subject = input.characterNames.length
+
+  const hasChars = input.characterNames.length > 0
+  // 액션문은 인물을 함의한다("용사가 …"). characters 가 비어도 action 을 내보내면 그 인물이 그려지는데,
+  //   ENV_ONLY(빈 풍경, 마네킹 규칙 없음) 경로로 가면 "Action: 용사가 …"가 무제약 실사 인물로 그려진다
+  //   (수동 추가 샷의 목각인형 미출력 버그, 2026-06-26). → 액션을 내보내면 인물 유무와 무관하게 마네킹 규칙 적용.
+  const emitAction =
+    FALLBACK_EMIT_ACTION && !input.safeMode && !!input.actionDescription?.trim()
+  const drawsFigures = hasChars || emitAction
+
+  // 앞쪽 배치할 주제 = 인물 수·이름 / (이름 없이 액션이 함의한) 익명 인물 / 빈 풍경.
+  const subject = hasChars
     ? `${input.characterNames.length} figure${input.characterNames.length > 1 ? 's' : ''}: ${input.characterNames.join(', ')}`
-    : 'empty landscape'
-  // 인물 있을 때만 mannequin 규칙 — 비면 ENV_ONLY_RULE (모순된 "draw mannequin … No characters" 제거).
+    : drawsFigures
+      ? 'anonymous figure(s)'
+      : 'empty landscape'
+
   const headRule = CLOSEUP_SIZES.has(String(input.shotType ?? '').toUpperCase())
     ? ` ${CLOSEUP_HEAD_RULE}`
     : ''
-  const figureBlock = input.characterNames.length
-    ? `${MANNEQUIN_RULE}${headRule} ${
-        input.safeMode ? 'Neutral standing poses, composed naturally.' : 'Place and pose them naturally in frame.'
-      } Props as simple lines or geometric shapes.`
+  // 인물(명시 or 액션 함의)이 있으면 mannequin 규칙 — 완전히 비면 ENV_ONLY_RULE.
+  const poseLine = hasChars
+    ? input.safeMode
+      ? 'Neutral standing poses, composed naturally.'
+      : 'Place and pose them naturally in frame.'
+    : 'Pose the mannequins to depict the action above.'
+  const figureBlock = drawsFigures
+    ? `${MANNEQUIN_RULE}${headRule} ${poseLine} Props as simple lines or geometric shapes.`
     : `${ENV_ONLY_RULE} Key objects as simple lines or geometric shapes.`
   const focal = input.characterNames[0]
     ? `${input.characterNames[0]} and the main action`
@@ -299,8 +316,8 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
     `${size[0].toUpperCase()}${size.slice(1)} — ${subject}.`,
     `Camera: ${angle}, ${lens}mm, ${focus} focus, rule of thirds.`,
     ``,
-    // fallback action: FALLBACK_EMIT_ACTION 으로 토글(현재 off). 켜면 1차 시도에만(safeMode 제외) 출력.
-    FALLBACK_EMIT_ACTION && !input.safeMode ? `Action: ${input.actionDescription}.` : null,
+    // fallback action: FALLBACK_EMIT_ACTION 으로 토글. 켜면 1차 시도에만(safeMode 제외) 출력.
+    emitAction ? `Action: ${input.actionDescription}.` : null,
     setting ? `Setting: ${setting}.${!input.safeMode && input.mood ? ` Mood: ${input.mood}.` : ''}` : '',
     ``,
     figureBlock,
