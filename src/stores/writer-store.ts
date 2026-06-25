@@ -105,6 +105,7 @@ interface WriterState {
   updateShot: (id: string, changes: Partial<Shot>) => void
   addShot: (sceneId: string) => Promise<string | null>
   deleteShot: (shotId: string) => Promise<void>
+  recomputeSceneDuration: (sceneId: string) => void
   addScene: () => Promise<string | null>
   deleteScene: (sceneId: string) => Promise<void>
   reorderScenes: (orderedIds: string[]) => Promise<void>
@@ -196,6 +197,12 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       ),
     }))
 
+    // duration 변경 시 해당 scene 길이를 재계산 (CRUD 동기화)
+    if ('durationSeconds' in changes) {
+      const shot = get().shots.find((s) => s.shotId === id)
+      if (shot) get().recomputeSceneDuration(shot.sceneId)
+    }
+
     const existing = shotSaveTimers.get(id)
     if (existing) clearTimeout(existing)
     shotSaveTimers.set(
@@ -277,6 +284,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       return null
     }
     void sceneShots
+    get().recomputeSceneDuration(sceneId)
     return shotId
   },
 
@@ -306,7 +314,18 @@ export const useWriterStore = create<WriterState>((set, get) => ({
 
     if (error) {
       set({ shots: prev, error: error.message })
+      return
     }
+    get().recomputeSceneDuration(target.sceneId)
+  },
+
+  // shot 변경 후 해당 scene 길이를 shot duration 합으로 재계산 (persistShotsToDb 와 동일 규칙 — CRUD 동기화).
+  //   updateScene 경유라 state 즉시 갱신 + 500ms 디바운스로 scenes.estimated_duration_seconds 저장.
+  recomputeSceneDuration: (sceneId) => {
+    const sum = get()
+      .shots.filter((s) => s.sceneId === sceneId)
+      .reduce((acc, s) => acc + (s.durationSeconds ?? 5), 0)
+    get().updateScene(sceneId, { estimatedDurationSeconds: sum })
   },
 
   addScene: async () => {

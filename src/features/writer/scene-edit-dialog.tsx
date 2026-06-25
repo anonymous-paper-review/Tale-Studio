@@ -95,19 +95,18 @@ export function SceneEditDialog({ sceneId, onOpenChange }: SceneEditDialogProps)
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">예상 길이 (초)</label>
+            <label className="text-sm font-medium">길이 (초) — 샷 합 자동</label>
             <Input
               type="number"
-              min={1}
-              max={600}
-              value={scene.estimatedDurationSeconds ?? 30}
-              onChange={(e) =>
-                updateScene(scene.sceneId, {
-                  estimatedDurationSeconds: Math.max(1, Number(e.target.value) || 1),
-                })
-              }
+              value={scene.estimatedDurationSeconds ?? 0}
+              readOnly
+              disabled
               className="font-mono tabular-nums"
             />
+            <p className="text-xs text-muted-foreground">
+              씬 길이는 포함된 샷들의 duration 합으로 자동 계산됩니다 — 샷을 추가·삭제하거나 길이를
+              바꾸면 갱신돼요.
+            </p>
           </div>
         </div>
 

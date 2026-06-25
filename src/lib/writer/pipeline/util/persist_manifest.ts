@@ -207,6 +207,25 @@ export async function persistShotsToDb(
         }
       }),
     )
+
+    // scene 길이를 데쿠파주(shots) duration 합으로 수렴 (2026-06-24).
+    //   scene.estimated_seconds 는 s3_scenes(Story축)가 shot 분해 *전* playtime 을 배분한 추정이라
+    //   실제 shot duration 합과 어긋난다(축 독립 생성). shots 가 확정된 직후, 그 합을 진실로 삼아 갱신.
+    //   기본값(?? 5)은 insert 의 duration_seconds 와 동일하게 맞춘다.
+    const secondsByScene = new Map<string, number>()
+    for (const it of shotSequence.shots) {
+      const sid = writerSceneIdToMain(it.S.scene_id)
+      secondsByScene.set(sid, (secondsByScene.get(sid) ?? 0) + (it.duration_seconds ?? 5))
+    }
+    await Promise.all(
+      [...secondsByScene].map(([sceneId, sum]) =>
+        supabaseAdmin
+          .from('scenes')
+          .update({ estimated_duration_seconds: sum })
+          .eq('project_id', projectId)
+          .eq('scene_id', sceneId),
+      ),
+    )
   }
 }
 
