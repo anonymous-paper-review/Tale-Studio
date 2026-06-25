@@ -67,7 +67,7 @@ export function RoughStoryboardView() {
   }, [status?.pipeline_completed, loadProject])
 
   const generate = useCallback(
-    async (shotIds?: string[], force?: boolean, auto?: boolean) => {
+    async (shotIds?: string[], force?: boolean, auto?: boolean, styleHints?: string[]) => {
       if (!projectId) return
       if (shotIds?.length) {
         // 클릭 즉시 피드백 — 서버가 in_flight skip 으로 응답하면 아래에서 정리됨
@@ -80,7 +80,7 @@ export function RoughStoryboardView() {
         const res = await fetch('/api/writer/rough-storyboard', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ projectId, shotIds, force }),
+          body: JSON.stringify({ projectId, shotIds, force, styleHints }),
         })
         const j = await res.json().catch(() => null)
         if (!res.ok || !j?.ok) {
@@ -454,7 +454,7 @@ export function RoughStoryboardView() {
         onOpenChange={(open) => {
           if (!open) setDetailShotId(null)
         }}
-        onRegenerate={(id) => void generate([id], true)}
+        onRegenerate={(id, hints) => void generate([id], true, false, hints)}
       />
 
       <SceneEditDialog

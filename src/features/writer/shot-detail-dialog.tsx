@@ -35,12 +35,23 @@ const SHOT_TYPES: ShotType[] = [
   'ECU', 'CU', 'MCU', 'MS', 'MFS', 'FS', 'WS', 'EWS', 'OTS', 'POV', 'TRACK', '2S',
 ]
 
+// 방향 칩 — 프롬프트를 직접 쓰지 못/안 하는 사용자를 위한 상대적 연출 조정. 누르면 그 영문 수식어로
+//   force 재생성(seed 변주 + Emphasis 주입). label=사람이 보는 말, hint=프롬프트에 주입되는 영문.
+const DIRECTION_CHIPS: Array<{ label: string; hint: string }> = [
+  { label: '더 어둡게', hint: 'darker, deeper shadows, more ominous mood' },
+  { label: '더 밝게', hint: 'brighter, softer light, more open' },
+  { label: '더 가까이', hint: 'tighter, closer framing on the subject' },
+  { label: '더 넓게', hint: 'wider framing, more of the environment' },
+  { label: '더 역동적으로', hint: 'more dynamic, stronger sense of motion and energy' },
+  { label: '더 차분하게', hint: 'calmer, stiller, more balanced composition' },
+]
+
 interface ShotDetailDialogProps {
   shotId: string | null
   panelUrl: string | null
   generating: boolean
   onOpenChange: (open: boolean) => void
-  onRegenerate: (shotId: string) => void
+  onRegenerate: (shotId: string, styleHints?: string[]) => void
 }
 
 export function ShotDetailDialog({
@@ -63,11 +74,11 @@ export function ShotDetailDialog({
   const nameOf = (id: string) =>
     sceneManifest?.characters.find((c) => c.characterId === id)?.name ?? id
 
-  const handleRegenerate = async () => {
+  const handleRegenerate = async (styleHints?: string[]) => {
     setFlushing(true)
     await new Promise((r) => setTimeout(r, 700))
     setFlushing(false)
-    onRegenerate(shot.shotId)
+    onRegenerate(shot.shotId, styleHints)
   }
 
   const busy = generating || flushing
@@ -164,6 +175,27 @@ export function ShotDetailDialog({
             />
             <p className="text-xs text-muted-foreground">
               러프 패널·콘티·영상 생성 프롬프트의 원천이 되는 문장입니다.
+            </p>
+          </div>
+
+          {/* 방향 칩 — 프롬프트 없이 상대 조정. 누르면 그 방향으로 변주 재생성(seed 변주 + Emphasis). */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">방향 조정</label>
+            <div className="flex flex-wrap gap-1.5">
+              {DIRECTION_CHIPS.map((c) => (
+                <Button
+                  key={c.hint}
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => void handleRegenerate([c.hint])}
+                >
+                  {c.label}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              프롬프트를 직접 쓰지 않아도, 방향만 누르면 그 느낌으로 변주 재생성됩니다.
             </p>
           </div>
 

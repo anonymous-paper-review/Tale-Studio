@@ -81,6 +81,8 @@ const BodySchema = z.object({
   shotIds: z.array(z.string()).optional(),
   /** true 면 기존 rough_storyboard 가 있어도 재생성 (단, queued 잡 중복은 여전히 skip) */
   force: z.boolean().optional(),
+  /** 방향 칩 — 상대적 연출 방향(영문 수식어). force 재생성과 함께 프롬프트 Emphasis 로 주입. */
+  styleHints: z.array(z.string()).max(8).optional(),
 })
 
 export async function POST(req: Request) {
@@ -98,7 +100,7 @@ export async function POST(req: Request) {
         { ok: false, error: { code: 'bad_request', message: parsed.error.message } },
         { status: 400 },
       )
-    const { projectId, shotIds, force } = parsed.data
+    const { projectId, shotIds, force, styleHints } = parsed.data
 
     const quota = await checkUserQuota(user.id)
     if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
@@ -225,6 +227,7 @@ export async function POST(req: Request) {
         aspectRatio: '16:9',
         spec,
         safeMode,
+        styleHints,
       })
 
       // 3차+ (force 재시도 & 실패 ≥ 임계값) → LLM이 프롬프트 자체를 moderation-safe 영어로 재생성.
@@ -247,14 +250,18 @@ export async function POST(req: Request) {
         }
       }
 
+      // seed 정책: 재생성(force=사람의 명시적 클릭)은 매 호출 다른 seed 로 변주("다시 굴리기" — 같은
+      //   프롬프트라도 새 느낌). 파이프라인 첫 생성(!force)은 프로젝트 고정 seed 로 패널 간 톤 통일 유지. (2026-06-25)
+      const seed = force
+        ? Math.floor(Math.random() * 2_000_000_000)
+        : seedFromProjectId(projectId)
       const { request_id, model } = await falImageSubmit({
         // previz 스케치 — 비용/속도 우선 경량 모델 (모델 ID 의 진실은 fal.ts)
         model: ROUGH_STORYBOARD_IMAGE_MODEL,
         prompt,
         // 흑백·마네킹·단일패널 위반과 텍스트/잉여인물 차단 (klein 이 긍정 지시를 자주 무시 → 이중 방어).
         negative_prompt: ROUGH_STORYBOARD_NEGATIVE_PROMPT,
-        // 프로젝트 단위 고정 seed → 패널 간 스타일 톤 통일 + 재생성 재현성.
-        seed: seedFromProjectId(projectId),
+        seed,
         aspect_ratio: '16:9',
         webhookUrl: resolveWebhookUrl(),
       })
@@ -265,7 +272,7 @@ export async function POST(req: Request) {
         kind: 'shot_rough_storyboard',
         target: { workspaceId: project.workspace_id, writerShotId: shotId },
         // 재생성 프롬프트를 회수 가능하게 저장(이전엔 미저장이라 DB에서 못 봤음).
-        inputSnapshot: { prompt, promptSource, safeMode },
+        inputSnapshot: { prompt, promptSource, safeMode, seed },
       })
       submitted.push({
         shotId,

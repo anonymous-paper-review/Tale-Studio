@@ -141,6 +141,8 @@ export interface RoughStoryboardPromptInput {
    * 직전 잡이 실패한 샷에만 라우트가 자동 적용 — 1차 시도는 항상 원문.
    */
   safeMode?: boolean
+  /** 방향 칩 — 사용자가 누른 상대적 연출 방향(영문 수식어). 프롬프트 끝 Emphasis 절로 주입(2026-06-25). */
+  styleHints?: string[]
 }
 
 // 모델(fal flux-2 klein)은 text-encoder 확산(instruction LLM 아님) — 직설 단어 나열·긍정문·앞쪽 토큰에
@@ -168,6 +170,11 @@ function joinPanel(lines: Array<string | null | undefined>): string {
     .filter((l): l is string => typeof l === 'string')
     .filter((line, i, arr) => !(line === '' && arr[i - 1] === ''))
     .join('\n')
+}
+
+/** 방향 칩(styleHints) → 프롬프트 끝에 붙일 Emphasis 절. 없으면 빈 문자열. */
+function emphasisClause(hints?: string[]): string {
+  return hints?.length ? ` Emphasis: ${hints.join(', ')}.` : ''
 }
 
 /** rich 경로 — L4 static_spec 이 템플릿 슬롯과 1:1 이므로 원본 facet 을 그대로 치환. */
@@ -245,7 +252,7 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
     ``,
     `Focal point: ${stripColor(s.framing?.focal_point) || stripColor(spec.intent?.audience_focus) || 'the main action'}.`,
     ``,
-    `${PANEL_STYLE_BASE}${light} Wordless panel: no text, letters, captions, or labels anywhere.`,
+    `${PANEL_STYLE_BASE}${light}${emphasisClause(input.styleHints)} Wordless panel: no text, letters, captions, or labels anywhere.`,
   ])
 }
 
@@ -300,7 +307,7 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
     ``,
     `Focal point: ${focal}.`,
     ``,
-    `${PANEL_STYLE_BASE}${light} Wordless panel: no text, letters, captions, or labels anywhere.`,
+    `${PANEL_STYLE_BASE}${light}${emphasisClause(input.styleHints)} Wordless panel: no text, letters, captions, or labels anywhere.`,
   ])
 }
 
