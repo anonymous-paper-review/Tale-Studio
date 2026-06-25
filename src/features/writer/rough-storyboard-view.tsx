@@ -11,11 +11,12 @@
 // 완료는 webhook → shots.rough_storyboard. 클라는 jobId 폴링으로 카드만 갱신.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertCircle, ImageIcon, Loader2, Plus, RefreshCw } from 'lucide-react'
+import { AlertCircle, ImageIcon, Loader2, Plus, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Slider } from '@/components/ui/slider'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { SceneEditDialog } from '@/features/writer/scene-edit-dialog'
@@ -49,6 +50,9 @@ export function RoughStoryboardView() {
   const [overrides, setOverrides] = useState<Record<string, RoughStoryboardImage>>({})
   const [detailShotId, setDetailShotId] = useState<string | null>(null)
   const [editSceneId, setEditSceneId] = useState<string | null>(null)
+  // 보드 축척: zoomLevel 1(축소·6열)~6(확대·1열). 가로 열 수 cols = 7 - zoomLevel. 기본 4 → 3열(기존 동작).
+  const [zoomLevel, setZoomLevel] = useState(4)
+  const boardRef = useRef<HTMLDivElement>(null)
   const autoTriggeredRef = useRef(false)
   const reloadedAfterCompleteRef = useRef(false)
   // drag-to-scroll 직후의 click 이 카드 팝업을 여는 오발 방지
@@ -173,6 +177,21 @@ export function RoughStoryboardView() {
     void generate(undefined, false, true) // auto=true → give-up 안내 토스트 억제
   }, [hasShots, running, missingIds.length, generate])
 
+  // Ctrl + wheel → 보드 축척(zoom). 브라우저 페이지 줌을 막아야 하므로 native wheel 리스너(passive:false)로
+  //   붙인다(React onWheel 은 passive 라 preventDefault 가 안 먹을 수 있음). up=확대(열↓), down=축소(열↑).
+  //   board div 는 hasShots 일 때만 렌더되므로 deps 에 hasShots 를 넣어 마운트 후 재바인딩한다.
+  useEffect(() => {
+    const el = boardRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      setZoomLevel((z) => Math.max(1, Math.min(6, e.deltaY < 0 ? z + 1 : z - 1)))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [hasShots])
+
   // 보드 drag-to-scroll (빈 영역을 잡고 끌면 패닝). 버튼/입력 위에서 시작한 드래그는 무시.
   const handleBoardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
@@ -249,6 +268,7 @@ export function RoughStoryboardView() {
   // ── 보드 ────────────────────────────────────────────────────────────────
   const detailShot = detailShotId ? shots.find((s) => s.shotId === detailShotId) : undefined
   const detailPanel = detailShot ? panelOf(detailShot) : null
+  const cols = 7 - zoomLevel // zoomLevel 1~6 → 6~1열
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -258,6 +278,36 @@ export function RoughStoryboardView() {
           연출 확인용 previz — 카드를 클릭하면 수정·재생성할 수 있어요
         </p>
         <div className="ml-auto flex items-center gap-2">
+          {/* 축척 — 가로 열 수 조절 (Ctrl+wheel 로도 가능) */}
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7"
+              aria-label="축소 (열 늘리기)"
+              onClick={() => setZoomLevel((z) => Math.max(1, z - 1))}
+            >
+              <ZoomOut className="size-4" />
+            </Button>
+            <Slider
+              className="w-24"
+              min={1}
+              max={6}
+              step={1}
+              value={[zoomLevel]}
+              onValueChange={([v]) => setZoomLevel(v)}
+              aria-label="러프보드 축척"
+            />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7"
+              aria-label="확대 (열 줄이기)"
+              onClick={() => setZoomLevel((z) => Math.min(6, z + 1))}
+            >
+              <ZoomIn className="size-4" />
+            </Button>
+          </div>
           {generatingCount > 0 && (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" />
@@ -278,7 +328,11 @@ export function RoughStoryboardView() {
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="cursor-grab space-y-8 p-6" onPointerDown={handleBoardPointerDown}>
+        <div
+          ref={boardRef}
+          className="cursor-grab space-y-8 p-6"
+          onPointerDown={handleBoardPointerDown}
+        >
           {(sceneManifest?.scenes ?? []).map((scene) => {
             const sceneShots = shots.filter((s) => s.sceneId === scene.sceneId)
             return (
@@ -313,7 +367,10 @@ export function RoughStoryboardView() {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div
+                  className="grid gap-4"
+                  style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+                >
                   {sceneShots.length === 0 && (
                     <button
                       type="button"
