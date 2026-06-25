@@ -241,12 +241,15 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     )
     const sortOrder = shots.length
 
+    // 새 샷 기본 등장인물 = 씬 등장인물 상속. 빈 배열이면 rough-storyboard db_fallback 이
+    //   "인물 없는 빈 풍경(empty landscape)"으로 그려 사용자가 의도한 인물 샷이 안 나온다(2026-06-24).
+    const scene = get().sceneManifest?.scenes.find((s) => s.sceneId === sceneId)
     const newShot: Shot = {
       shotId,
       sceneId,
       shotType: 'MS',
       actionDescription: '',
-      characters: [],
+      characters: scene?.charactersPresent ?? [],
       durationSeconds: 5,
       generationMethod: 'T2V',
       dialogueLines: [],

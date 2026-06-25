@@ -251,7 +251,10 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
 
 // fallback action(서사 문장)은 현재 비활성화 — rich가 action을 뺀 것과 parity(klein은 서사문이 약함).
 //   코드는 보존: 재활성화하려면 true. 켜면 1차 시도에만 출력(safeMode 재시도엔 모더레이션 회피로 미출력).
-const FALLBACK_EMIT_ACTION: boolean = false
+// db_fallback(shotDesign 없는 샷 — 예: writer 탭에서 사용자가 추가한 샷)은 rich spec 이 없어
+//   action_description 이 유일한 서사 단서다. 켜야 스토리 수정이 프롬프트에 반영된다(2026-06-24).
+//   (rich 경로는 framing/blocking 이 풍부해 action 없이도 충분 — parity 우려는 rich 한정.)
+const FALLBACK_EMIT_ACTION: boolean = true
 
 /** fallback 경로 — DB shots/scenes 평탄화 필드 근사 (rich 미보유 프로젝트). */
 function buildFromDbRow(input: RoughStoryboardPromptInput): string {

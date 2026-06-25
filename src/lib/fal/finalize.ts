@@ -126,10 +126,19 @@ async function recordCharacterImageCandidate(
 export async function uploadImageFromUrl(
   remoteUrl: string,
   path: string,
+  opts?: { minBytes?: number },
 ): Promise<string> {
   const imgRes = await fetch(remoteUrl)
   if (!imgRes.ok) throw new Error(`fal image fetch failed: ${imgRes.status}`)
   const buf = Buffer.from(await imgRes.arrayBuffer())
+  // 검은/빈 이미지 방어 — klein 등은 입력 모더레이션에 걸리면 에러가 아니라 검은 이미지(수 KB)를 반환한다.
+  //   completed 로 저장하면 재생성해도 같은 검정(seed 무관) → throw 로 failed 처리해, 호출부(webhook)가
+  //   job 을 실패로 기록하고 다음 재생성의 safeMode(서사·동사 제거) 재시도를 깨우게 한다. (2026-06-25)
+  if (opts?.minBytes && buf.length < opts.minBytes) {
+    throw new Error(
+      `image too small (${buf.length}b < ${opts.minBytes}) — likely blank/moderated output`,
+    )
+  }
   const { error: upErr } = await supabaseAdmin.storage
     .from('media')
     .upload(path, buf, { contentType: 'image/png', upsert: true })
@@ -275,7 +284,9 @@ export async function finalizeShotRoughStoryboardJob(
     throw new Error('shot_rough_storyboard job target missing workspaceId/writerShotId')
   }
   const path = `${workspaceId}/${job.project_id}/shots/${storageKeySegment(writerShotId)}_rough_storyboard.png`
-  const publicUrl = await uploadImageFromUrl(falImageUrl, path)
+  // klein 모더레이션 검은 이미지(~2KB) 방어 — 정상 러프 스케치는 수백 KB. 작으면 throw → failed →
+  //   재생성 시 safeMode(폭력 동사·구도 레이어 제외)로 자동 우회. (shot_9 검은 화면 버그, 2026-06-25)
+  const publicUrl = await uploadImageFromUrl(falImageUrl, path, { minBytes: 20_000 })
 
   // RoughStoryboardImage shape (src/types/shot.ts — writer 러프 보드가 소비).
   const { error } = await supabaseAdmin
