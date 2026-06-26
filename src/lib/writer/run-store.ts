@@ -7,6 +7,7 @@
 // 접근은 전부 supabaseAdmin (service_role). writer_runs 는 RLS ENABLE + policy 없음 = 서버 전용.
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import type { PipelineInput } from '@/lib/writer/types/pipeline';
+import type { Json } from '@/types/database';
 import { castContractToCharacters } from '@/lib/writer/cast-contract';
 
 export type WriterRunStatus = 'running' | 'completed' | 'failed';
@@ -137,12 +138,45 @@ export async function markCompleted(id: string): Promise<void> {
 }
 
 /**
- * run 을 failed 로 마킹 (error 메시지 포함).
+ * 한 LLM 호출의 진단 스냅샷 (실패 원인 추적용 — error_detail 에 적재).
  */
-export async function markFailed(id: string, errorMessage: string): Promise<void> {
+export interface WriterErrorCall {
+  provider: string
+  model: string
+  error?: string
+  finish_reason?: string
+  duration_ms: number
+  input_chars: number
+  output_chars: number
+  prompt: string
+  response: string
+}
+
+export interface WriterErrorDetail {
+  stage?: string
+  message: string
+  at: string
+  calls: WriterErrorCall[]
+}
+
+/**
+ * run 을 failed 로 마킹 (error 메시지 + 선택적 진단 detail 포함).
+ *   detail 은 직전 LLM 호출들(prompt/response/error)을 담아 "왜 실패했나"를 DB 에 영속화한다
+ *   (서버리스에선 FS raw 로그가 no-op 이라 이게 유일한 durable 진단 — error-logging-mvp).
+ */
+export async function markFailed(
+  id: string,
+  errorMessage: string,
+  detail?: WriterErrorDetail,
+): Promise<void> {
   const { error } = await supabaseAdmin
     .from('writer_runs')
-    .update({ status: 'failed', error: errorMessage, updated_at: new Date().toISOString() })
+    .update({
+      status: 'failed',
+      error: errorMessage,
+      error_detail: (detail ?? null) as unknown as Json,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', id);
 
   if (error) throw new Error(`markFailed failed: ${error.message}`);

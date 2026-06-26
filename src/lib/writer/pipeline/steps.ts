@@ -33,7 +33,9 @@ import {
   markFailed,
   advanceProjectStageAfterWriter,
   type WriterRunStateBase,
+  type WriterErrorDetail,
 } from '@/lib/writer/run-store';
+import { getPendingRawCalls } from '@/lib/writer/llm/raw_collector';
 import type {
   PipelineInput,
   SceneCinematography,
@@ -390,6 +392,27 @@ export async function triggerWriterStep(origin: string, projectId: string): Prom
 
 const MAX_STAGE_ATTEMPTS = 3;
 
+// 실패 시 진단 스냅샷 — 직전 LLM 호출(prompt/response/error)을 truncate 해 DB(error_detail)에 남긴다.
+//   서버리스에선 FS raw 로그가 no-op 이라 이게 유일한 durable 진단 (error-logging-mvp).
+const ERROR_DETAIL_MAX_CALLS = 3;
+const ERROR_DETAIL_CHARS = 4000;
+function captureErrorDetail(stage: string, message: string): WriterErrorDetail {
+  const calls = getPendingRawCalls()
+    .slice(-ERROR_DETAIL_MAX_CALLS)
+    .map((c) => ({
+      provider: c.provider,
+      model: c.model,
+      error: c.error,
+      finish_reason: c.finish_reason,
+      duration_ms: c.duration_ms,
+      input_chars: c.input_chars,
+      output_chars: c.output_chars,
+      prompt: c.prompt.slice(0, ERROR_DETAIL_CHARS),
+      response: c.response.slice(0, ERROR_DETAIL_CHARS),
+    }));
+  return { stage, message, at: new Date().toISOString(), calls };
+}
+
 /**
  * 한 step 호출 동안 시간 예산(deadlineMs) 내에서 단계들을 실행한다.
  *   - done   : 모든 단계 완료 (markCompleted)
@@ -422,7 +445,8 @@ export async function runWriterSteps(
 
     // 재시도/타임아웃 가드: 같은 단계가 MAX_STAGE_ATTEMPTS 회 이상 진입했으면 실패 처리.
     if (state._attempt?.stage === step.key && state._attempt.count >= MAX_STAGE_ATTEMPTS) {
-      await markFailed(run.id, `stage ${step.key} exceeded retry/time budget`);
+      const message = `stage ${step.key} exceeded retry/time budget`;
+      await markFailed(run.id, message, captureErrorDetail(step.key, message));
       return { failed: true };
     }
 
@@ -443,7 +467,8 @@ export async function runWriterSteps(
     try {
       patch = await step.run(state, { logger, projectId });
     } catch (e) {
-      await markFailed(run.id, e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
+      await markFailed(run.id, message, captureErrorDetail(step.key, message));
       return { failed: true };
     }
     const stageMs = Date.now() - stageStartedMs;
@@ -462,7 +487,8 @@ export async function runWriterSteps(
     try {
       await saveRunState(run.id, state, { completed_units: completedUnits, current_stage: step.key });
     } catch (e) {
-      await markFailed(run.id, e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
+      await markFailed(run.id, message, captureErrorDetail(step.key, message));
       return { failed: true };
     }
 

@@ -726,6 +726,7 @@ export type Database = {
           total_units: number
           state: Json
           error: string | null
+          error_detail: Json | null
           created_at: string
           updated_at: string
         }
@@ -738,6 +739,7 @@ export type Database = {
           total_units?: number
           state?: Json
           error?: string | null
+          error_detail?: Json | null
           created_at?: string
           updated_at?: string
         }
@@ -750,6 +752,7 @@ export type Database = {
           total_units?: number
           state?: Json
           error?: string | null
+          error_detail?: Json | null
           created_at?: string
           updated_at?: string
         }
