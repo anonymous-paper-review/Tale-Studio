@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { usePresetStorageStore } from '@/stores/preset-storage-store'
 import { isShotData, isVideoData } from '@/types/director'
+import { editActionForKind } from '@/features/director/canvas-interaction'
 
 const PRESET_DND_TYPE = 'application/preset-id'
 
@@ -79,12 +80,15 @@ function BaseNodeImpl({
 }: BaseNodeProps) {
   const palette = THEME_CLASS[theme]
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
+  const selectNode = useDirectorCanvasStore((s) => s.selectNode)
   const openDeleteConfirm = useDirectorCanvasStore((s) => s.openDeleteConfirm)
 
   const stop = (e: React.MouseEvent) => e.stopPropagation()
   const handleEdit = (e: React.MouseEvent) => {
     stop(e)
-    openPopup(id)
+    // theme별 분기: scene=모달, shot/video=좌측 상세 패널 선택 (노드 뷰 격리)
+    if (editActionForKind(theme) === 'popup') openPopup(id)
+    else selectNode(id)
   }
   const handleBranch = (e: React.MouseEvent) => {
     stop(e)

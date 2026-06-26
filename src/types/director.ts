@@ -11,12 +11,13 @@ import type { VideoModelKey } from '@/lib/video-models'
 // Director Canvas Types — specs/layers/director.md §2~7
 // ============================================================================
 
-export type DirectorNodeKind = 'scene' | 'shot' | 'video' | 'asset'
+export type DirectorNodeKind = 'scene' | 'shot' | 'video' | 'asset' | 'prompt'
 
 export type DirectorEdgeCategory =
   | 'parent' // Scene→Shot, Shot→Video (계층)
   | 'relates-to' // 사용자 정의 내러티브 관계
   | 'references' // Asset→Shot (Artist 에셋을 참조하는 샷, 파생 — DB 미영속)
+  | 'prompt' // Prompt 노드 → Shot T 입력 (프롬프트 와이어, 영속)
 
 export type DirectorVideoStatus =
   | 'pending'
@@ -147,6 +148,24 @@ export type AssetNodeData = {
   [key: string]: unknown
 }
 
+// ─── Prompt Node (Higgsfield식 분리 프롬프트) ────────────────────────────────
+
+/**
+ * 이미지 노드의 프롬프트를 캔버스에 별도 노드로 분리한 것 (Higgsfield "Prompt" 노드).
+ * 우측 출력 핸들을 Shot 노드의 T 입력에 와이어링하면 wirePromptToShot이
+ * 대상 Shot.prompt를 이 노드의 text로 동기화한다. DB 미영속(파생/보조 UI).
+ */
+export type PromptNodeData = {
+  kind: 'prompt'
+  /** 노드 라벨 (union 공통 속성) */
+  label: string
+  /** 프롬프트 텍스트 (Shot.prompt의 source) */
+  text: string
+  /** 와이어링된 대상 Shot 노드 ID. null = 아직 미연결 */
+  targetShotNodeId: string | null
+  [key: string]: unknown
+}
+
 // ─── Discriminated union ───────────────────────────────────────────────────
 
 export type DirectorNodeData =
@@ -154,6 +173,7 @@ export type DirectorNodeData =
   | ShotNodeData
   | VideoNodeData
   | AssetNodeData
+  | PromptNodeData
 
 export type DirectorEdgeData = {
   category: DirectorEdgeCategory
@@ -206,4 +226,8 @@ export function isVideoData(d: DirectorNodeData): d is VideoNodeData {
 }
 export function isAssetData(d: DirectorNodeData): d is AssetNodeData {
   return d.kind === 'asset'
+}
+
+export function isPromptData(d: DirectorNodeData): d is PromptNodeData {
+  return d.kind === 'prompt'
 }

@@ -19,6 +19,7 @@ import {
   isSceneData,
   isVideoData,
   isAssetData,
+  isPromptData,
   type DirectorNode,
   type DirectorEdge,
   type DirectorNodeData,
@@ -28,6 +29,7 @@ import {
   type SceneNodeData,
   type ShotNodeData,
   type VideoNodeData,
+  type PromptNodeData,
   type VideoOverride,
   type DirectorVideoStatus,
   type DirectorVideoProvider,
@@ -517,6 +519,16 @@ interface DirectorCanvasState {
   /** 기존 Video 노드 1개를 effective 설정으로 (재)생성 (D-5). 마더 Shot storyboardImage 있으면 I2V */
   regenerateVideo: (videoNodeId: string) => Promise<void>
 
+  // stage progression (Higgsfield 진행 버튼)
+  /** 진행 버튼: 현 단계 기준 다음 산출물 생성 — rough→generateStoryboardImage(in-place 실사), live/video→generateVideoForShot(별도 Video 노드) */
+  advanceShot: (shotNodeId: string) => Promise<void>
+
+  // prompt node (Higgsfield식 분리 프롬프트)
+  /** Prompt 노드 추가 (캔버스 보조 노드). 생성된 노드 id 반환 */
+  addPromptNode: (position?: XYPosition, text?: string) => string
+  /** Prompt 노드를 Shot T 입력에 와이어링 — prompt 엣지 추가 + 대상 Shot.prompt 동기 */
+  wirePromptToShot: (promptNodeId: string, shotNodeId: string) => void
+
   // playback + thumbnail (ST-4 후속 — Node 탭 영상 재생)
   /** single-play 토글 — 이 노드만 재생, 나머지 Video 는 자동 정지. id=null 이면 전부 정지 */
   setPlayingNode: (id: string | null) => void
@@ -679,6 +691,37 @@ export function getEffectiveShotConfig(
     cameraPreset: o.cameraPreset ?? m.cameraPreset,
     provider: o.provider ?? m.provider,
   }
+}
+
+/**
+ * 샷 노드의 파이프라인 단계 파생 (우선순위 고정: video > live > rough).
+ * - 자식 Video 노드 존재 → 'video'
+ * - storyboardImage 완료 → 'live' (실사)
+ * - 그 외 → 'rough' (목각, roughStoryboard 표시 단계)
+ * rough/live/video는 director-store 상태만으로 판정 — writer-store를 끌어들이지 않는다.
+ */
+export type ShotStage = 'rough' | 'live' | 'video'
+
+export function getShotStage(
+  state: Pick<DirectorCanvasState, 'nodes'>,
+  shotNodeId: string,
+): ShotStage {
+  const shot = state.nodes.find((n) => n.id === shotNodeId)
+  if (!shot || !isShotData(shot.data)) return 'rough'
+  if (getChildVideos(state, shotNodeId).length > 0) return 'video'
+  if (shot.data.storyboardImage?.status === 'completed') return 'live'
+  return 'rough'
+}
+
+const SHOT_STAGE_LABEL: Record<ShotStage, string> = {
+  rough: '실사화',
+  live: '영상 생성',
+  video: '새 영상 테이크',
+}
+
+/** 진행 버튼 라벨 = 현 단계에서 누르면 일어나는 '다음' 행동 */
+export function shotStageLabel(stage: ShotStage): string {
+  return SHOT_STAGE_LABEL[stage]
 }
 
 /** 다음 take_vN 번호 계산 (Shot 자식 중 최대 + 1) */
@@ -1073,6 +1116,68 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           })()
         }
         return id
+      },
+
+      // ─── stage progression (진행 버튼) ──────────────────────────────────
+      advanceShot: async (shotNodeId) => {
+        const api = get()
+        const node = api.nodes.find((n) => n.id === shotNodeId)
+        if (!node || !isShotData(node.data)) return
+        const stage = getShotStage(api, shotNodeId)
+        if (stage === 'rough') {
+          // 목각 → 실사: 같은 Shot 노드에서 storyboardImage 생성 (in-place)
+          await api.generateStoryboardImage(shotNodeId)
+        } else {
+          // 실사/영상 → 영상: 기존 수명주기 유지 (별도 Video 노드 생성, 결정 #40)
+          await api.generateVideoForShot(shotNodeId)
+        }
+      },
+
+      // ─── prompt node (Higgsfield식 분리 프롬프트) ───────────────────────
+      addPromptNode: (position, text) => {
+        get().commitHistory()
+        const id = newDirectorId('dn')
+        const data: PromptNodeData = {
+          kind: 'prompt',
+          label: 'Prompt',
+          text: text ?? '',
+          targetShotNodeId: null,
+        }
+        const node: DirectorNode = {
+          id,
+          type: 'prompt',
+          position: position ?? { x: 80, y: 80 },
+          data,
+        }
+        set((s) => ({ nodes: [...s.nodes, node], lastSavedAt: Date.now() }))
+        return id
+      },
+
+      wirePromptToShot: (promptNodeId, shotNodeId) => {
+        const api = get()
+        const promptNode = api.nodes.find((n) => n.id === promptNodeId)
+        const shotNode = api.nodes.find((n) => n.id === shotNodeId)
+        if (!promptNode || !isPromptData(promptNode.data)) return
+        if (!shotNode || !isShotData(shotNode.data)) return
+        const text = promptNode.data.text
+        // prompt 엣지 추가 (출력 'right' → Shot T 입력 'prompt'). 중복이면 addEdge가 무시.
+        api.addEdge(
+          promptNodeId,
+          shotNodeId,
+          { category: 'prompt', relationText: '' },
+          'right',
+          'prompt',
+        )
+        // Prompt 노드의 target 기록
+        set((s) => ({
+          nodes: s.nodes.map((n) =>
+            n.id === promptNodeId && isPromptData(n.data)
+              ? ({ ...n, data: { ...n.data, targetShotNodeId: shotNodeId } } as DirectorNode)
+              : n,
+          ),
+        }))
+        // 대상 Shot.prompt 동기 (updateNodeData 경로 → undo 제외)
+        api.updateNodeData<'shot'>(shotNodeId, { prompt: text })
       },
 
       updateNodeData: (id, patch) => {

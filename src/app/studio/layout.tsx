@@ -65,7 +65,11 @@ export default function StudioLayout({
   // URL ↔ currentStage 동기화 + 잠긴 stage 리다이렉트.
   // Sidebar 클릭이나 직접 URL 진입 시에도 GlobalChat/Samantha가 올바른 stage로 동작하도록.
   useEffect(() => {
-    if (initLoading) return
+    // projectId가 확정되기 전(초기 로드/새로고침/북마크 진입)에는 게이트를 판단하지 않는다.
+    // reachedStage는 initProject가 DB current_stage에서 복원하므로, 그 전에 평가하면
+    // 초기값 'producer'를 보고 이미 도달한 단계(예: director)까지 producer로 잘못 튕긴다.
+    // (도달 안 한 단계 잠금은 init 완료 후 평가에서 그대로 유지된다.)
+    if (initLoading || !projectId) return
     const stage = STAGES.find((s) => pathname.startsWith(s.path))
     if (!stage) return
     if (!canNavigateTo(stage.id as StageId)) {
@@ -77,7 +81,7 @@ export default function StudioLayout({
     }
     // 진입한 stage의 완료 알림 배지 클리어 (chat-proactive-copilot Phase 2)
     useGlobalChatStore.getState().clearStageBadge(stage.id as StageId)
-  }, [pathname, canNavigateTo, initLoading, router, setStage])
+  }, [pathname, canNavigateTo, initLoading, projectId, router, setStage])
 
   return (
     <>

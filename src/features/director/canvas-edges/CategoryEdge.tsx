@@ -14,6 +14,7 @@ const STYLE_BY_CATEGORY: Record<
   parent: { strokeWidth: 2 },
   'relates-to': { strokeWidth: 1.5 },
   references: { strokeWidth: 1.5, strokeDasharray: '4 4' }, // Asset→Shot, 점선
+  prompt: { strokeWidth: 1.5, strokeDasharray: '2 3' }, // Prompt→Shot T 입력
 }
 
 function CategoryEdgeImpl({

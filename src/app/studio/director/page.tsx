@@ -21,7 +21,7 @@ import {
   type OnConnectEnd,
   type XYPosition,
 } from '@xyflow/react'
-import { Loader2, ImageIcon, X, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock } from 'lucide-react'
+import { Loader2, ImageIcon, X, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
 
 import { toast } from 'sonner'
 
@@ -47,17 +47,25 @@ import { SceneNode } from '@/features/director/canvas-nodes/SceneNode'
 import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
 import { VideoNode } from '@/features/director/canvas-nodes/VideoNode'
 import { AssetNode } from '@/features/director/canvas-nodes/AssetNode'
+import { PromptNode } from '@/features/director/canvas-nodes/PromptNode'
 import { CategoryEdge } from '@/features/director/canvas-edges/CategoryEdge'
 import { CreatorModal } from '@/features/director/canvas-popups/CreatorModal'
 import { RelationModal } from '@/features/director/canvas-popups/RelationModal'
 import { DeleteConfirmModal } from '@/features/director/canvas-popups/DeleteConfirmModal'
 import { DirectorNodePopup } from '@/features/director/canvas-popups/DirectorNodePopup'
+import { DirectorDetailPanel } from '@/features/director/canvas-panels/DirectorDetailPanel'
+import {
+  doubleClickActionForKind,
+  clickToggleSelection,
+  connectRouteForTargetHandle,
+} from '@/features/director/canvas-interaction'
 
 const nodeTypes = {
   scene: SceneNode,
   shot: ShotNode,
   video: VideoNode,
   asset: AssetNode,
+  prompt: PromptNode,
 } as const
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -205,9 +213,11 @@ function CanvasInner() {
   const setViewport = useDirectorCanvasStore((s) => s.setViewport)
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
   const openRelationModal = useDirectorCanvasStore((s) => s.openRelationModal)
+  const wirePromptToShot = useDirectorCanvasStore((s) => s.wirePromptToShot)
   const addShotNode = useDirectorCanvasStore((s) => s.addShotNode)
   const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
+  const selectedNodeId = useDirectorCanvasStore((s) => s.selectedNodeId)
   const selectEdge = useDirectorCanvasStore((s) => s.selectEdge)
   const persistNodePosition = useDirectorCanvasStore(
     (s) => s.persistNodePosition,
@@ -294,6 +304,11 @@ function CanvasInner() {
   const onConnect = useCallback(
     (params: Connection) => {
       if (!params.source || !params.target) return
+      // Prompt 노드 출력(right) → Shot T 입력(prompt) 연결이면 와이어링 + prompt 동기
+      if (connectRouteForTargetHandle(params.targetHandle) === 'prompt-wire') {
+        wirePromptToShot(params.source, params.target)
+        return
+      }
       openRelationModal(
         params.source,
         params.target,
@@ -301,7 +316,7 @@ function CanvasInner() {
         params.targetHandle,
       )
     },
-    [openRelationModal],
+    [openRelationModal, wirePromptToShot],
   )
 
   const dragFromRef = useRef<string | null>(null)
@@ -385,9 +400,21 @@ function CanvasInner() {
           selectNode(null)
           selectEdge(null)
         }}
-        onNodeClick={(_event, node) => selectNode(node.id)}
+        onNodeClick={(_event, node) => {
+          // shot/video는 재클릭 토글(패널 닫기), scene/asset 등은 단순 선택
+          if (node.data.kind === 'shot' || node.data.kind === 'video') {
+            selectNode(clickToggleSelection(selectedNodeId, node.id))
+          } else {
+            selectNode(node.id)
+          }
+        }}
         onEdgeClick={(_event, edge) => selectEdge(edge.id)}
-        onNodeDoubleClick={(_event, node) => openPopup(node.id)}
+        onNodeDoubleClick={(_event, node) => {
+          // kind 분기: scene=모달, shot/video=좌측 패널 닫기, 그 외 no-op
+          const action = doubleClickActionForKind(node.data.kind)
+          if (action === 'popup') openPopup(node.id)
+          else if (action === 'close-panel') selectNode(null)
+        }}
         onNodeDragStart={() => commitHistory()}
         onMove={(_, vp) => setViewport(vp)}
         snapToGrid
@@ -432,6 +459,7 @@ function CanvasInner() {
       <RelationModal />
       <DeleteConfirmModal />
       <DirectorNodePopup />
+      <DirectorDetailPanel />
     </div>
   )
 }
@@ -507,6 +535,8 @@ function PaletteBar() {
   const relayoutCanvas = useDirectorCanvasStore((s) => s.relayoutCanvas)
   const showUnusedAssets = useDirectorCanvasStore((s) => s.showUnusedAssets)
   const toggleUnusedAssets = useDirectorCanvasStore((s) => s.toggleUnusedAssets)
+  const addPromptNode = useDirectorCanvasStore((s) => s.addPromptNode)
+  const promptCount = nodes.filter((n) => n.data.kind === 'prompt').length
 
   const shots = nodes.filter((n) => isShotData(n.data))
   const totalShots = shots.length
@@ -611,6 +641,19 @@ function PaletteBar() {
       >
         <LayoutGrid className="size-4" />
         <span>자동 정렬</span>
+      </button>
+
+      {/* 프롬프트 노드 추가 — Higgsfield식 분리 프롬프트(우측 핸들을 Shot T 입력에 연결) */}
+      <button
+        type="button"
+        onClick={() =>
+          addPromptNode({ x: 80, y: 120 + promptCount * 180 })
+        }
+        title="분리된 프롬프트 노드를 추가합니다. 우측 핸들을 Shot의 T 입력에 연결하면 Shot 프롬프트가 동기됩니다."
+        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground"
+      >
+        <Type className="size-4" />
+        <span>프롬프트 노드</span>
       </button>
     </div>
   )

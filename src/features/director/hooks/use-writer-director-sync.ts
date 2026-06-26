@@ -31,9 +31,11 @@ import type { CameraConfig, LightingConfig } from '@/types/shot'
 export function useWriterDirectorSync() {
   const manifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
+  // projectId 구독 — director 직행/새로고침/북마크 진입에서 init이 늦게 projectId를
+  // 채우는 경우에도 이 effect가 재실행되어 writer 데이터를 로드하도록 deps에 포함한다.
+  const projectId = useProjectStore((s) => s.projectId)
 
-  // 스토리보드 자동생성 마운트당 1회 가드 (재진입 중복 방지).
-  const autoStoryboardTriggeredRef = useRef(false)
+  // (Pass 3 스토리보드 자동생성은 Higgsfield 노드 뷰 전환으로 비활성화됨 — 아래 Pass 3 참고)
   // Step 2: DB hydrate 가드 (projectId별 1회 호출) — promise를 보관해 매 실행이 완료를 기다린다.
   // Pass 3의 storyboardImage null 판정이 DB 복원 전 상태를 읽으면 완료된 샷을 전부
   // 재생성하므로 (재생성 폭주 버그), 호출 여부가 아니라 완료 여부가 동기화 기준이어야 한다.
@@ -222,41 +224,11 @@ export function useWriterDirectorSync() {
     useDirectorCanvasStore.getState().rebuildAssetNodes()
     if (cancelled) return
 
-    // ── Pass 3: 스토리보드 이미지 자동생성 (병렬2 + 1회 + null만 = 캐시) ──
-    // 마운트당 1회. storyboardImage가 null인 shot만 생성 — Pass 2.5에서 DB hydrate를
-    // 기다린 후이므로 DB에 완료본이 있는 샷은 여기서 null이 아니다 (재진입 skip).
-    // 각 generateStoryboardImage는 90s 타임아웃 + 1회 재시도 + 실패로그 보유.
-    if (autoStoryboardTriggeredRef.current) return
-    const after = useDirectorCanvasStore.getState()
-    const shotNodes = after.nodes.filter((n) => isShotData(n.data))
-    const anyGenerating = shotNodes.some(
-      (n) =>
-        isShotData(n.data) && n.data.storyboardImage?.status === 'generating',
-    )
-    const pendingShotIds = shotNodes
-      .filter((n) => isShotData(n.data) && n.data.storyboardImage == null)
-      .map((n) => n.id)
-    if (anyGenerating || pendingShotIds.length === 0) return
-
-    autoStoryboardTriggeredRef.current = true
-    void (async () => {
-      const CONCURRENCY = 2
-      let cursor = 0
-      const worker = async () => {
-        while (cursor < pendingShotIds.length) {
-          const i = cursor++
-          await useDirectorCanvasStore
-            .getState()
-            .generateStoryboardImage(pendingShotIds[i]!)
-        }
-      }
-      await Promise.all(
-        Array.from(
-          { length: Math.min(CONCURRENCY, pendingShotIds.length) },
-          worker,
-        ),
-      )
-    })()
+    // ── Pass 3: 스토리보드 자동생성 — 비활성화 (Higgsfield 노드 뷰 전환) ──
+    // 목각(roughStoryboard)이 노드 뷰의 초기 상태로 남아야 하므로, 진입 시
+    // storyboardImage(실사)를 자동 생성하지 않는다. 실사화는 사용자가 진행 버튼
+    // (advanceShot → generateStoryboardImage)으로만 트리거한다. 재진입 시
+    // 완료된 storyboardImage는 Pass 2.5 hydrate로 그대로 복원된다(멱등 보존).
     })().finally(() => {
       useDirectorCanvasStore.setState({ _historySuppressed: false })
     })
@@ -264,5 +236,5 @@ export function useWriterDirectorSync() {
     return () => {
       cancelled = true
     }
-  }, [manifest, shots])
+  }, [manifest, shots, projectId])
 }
