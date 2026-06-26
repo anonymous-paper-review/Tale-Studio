@@ -125,6 +125,7 @@ export async function POST(req: Request) {
     const [
       { data: shots },
       { data: scenes },
+      { data: locations },
       { data: chars },
       { data: queuedJobs },
       { data: failedJobs },
@@ -140,6 +141,10 @@ export async function POST(req: Request) {
         supabaseAdmin
           .from('scenes')
           .select('scene_id, location, time_of_day, mood')
+          .eq('project_id', projectId),
+        supabaseAdmin
+          .from('locations')
+          .select('location_id, visual_description')
           .eq('project_id', projectId),
         supabaseAdmin
           .from('characters')
@@ -164,6 +169,11 @@ export async function POST(req: Request) {
       ])
 
     const sceneById = new Map((scenes ?? []).map((s) => [s.scene_id as string, s]))
+    // scene.location 은 location_id (오픈캐스트: 원문 텍스트가 곧 id). 그 로케이션의 visual_description 을
+    //   db_fallback 배경으로 끌어온다 (rich 경로는 framing.layers 사용 → 미사용).
+    const locationDescById = new Map(
+      (locations ?? []).map((l) => [l.location_id as string, l.visual_description as string | null]),
+    )
     const nameById = new Map(
       (chars ?? []).map((c) => [c.character_id as string, c.name as string]),
     )
@@ -225,6 +235,7 @@ export async function POST(req: Request) {
         ),
         characterNameById: nameById,
         location: scene?.location as string | undefined,
+        locationDescription: locationDescById.get(scene?.location as string) ?? null,
         timeOfDay: scene?.time_of_day as string | undefined,
         mood: scene?.mood as string | undefined,
         cameraPitch: camera.pan ?? null,

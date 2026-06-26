@@ -65,6 +65,22 @@ function stripColor(text: string | null | undefined): string {
     .trim()
 }
 
+// 렌더/스타일 어휘 — 로케이션 visual_description(아트디렉션 텍스트)을 흑백 스케치 배경으로 빌릴 때, 채색·렌더
+//   계열 단어가 klein 의 흑백/스케치 지시를 흔들지 않도록 제거(네거티브와 이중 방어). 지오메트리·설정은 보존.
+const STYLE_WORD =
+  /\b(cinematic|painterly|photo-?real\w*|hyper-?real\w*|pbr|render(?:ed|ing)?|digital painting|concept art|high[- ]fantasy|volumetric|octane|unreal engine|4k|8k)\b/gi
+
+/** 로케이션 visual_description(asset) → 배경 한 줄. 색·스타일어 제거 후 앞 1~2문장(~200자)으로 압축. */
+function conciseEnvDescription(desc: string | null | undefined): string {
+  const s = stripColor((desc ?? '').replace(STYLE_WORD, '')).replace(/\s{2,}/g, ' ').trim()
+  if (!s) return ''
+  const sentences = s.split(/(?<=[.!?])\s+/)
+  let out = sentences[0] ?? s
+  if (out.length < 110 && sentences[1]) out = `${out} ${sentences[1]}`
+  // 끝 구두점/생략부호 제거 — 호출부가 "Background: ${bg}." 로 마침표를 붙이므로 ".." 중복 방지.
+  return out.slice(0, 200).replace(/[.…\s]+$/, '').trim()
+}
+
 /**
  * 러프 보드 공통 네거티브 — flux klein 이 monochrome/featureless 지시를 자주 위반하므로 명시 차단(2026-06-18).
  *   색·채색 / 얼굴·인물 디테일 / 갑옷 / 프레임 분할(이중 패널)·테두리 / 텍스트 / 유령 큐브 / 잉여 인물·크롭.
@@ -123,6 +139,8 @@ export interface RoughStoryboardPromptInput {
   /** character_id → name (rich 경로의 blocking 치환용. 없으면 id 그대로 노출) */
   characterNameById?: Map<string, string>
   location?: string | null
+  /** 로케이션 visual_description (asset) — db_fallback 배경 묘사용. rich 경로는 framing.layers 사용(미사용). */
+  locationDescription?: string | null
   timeOfDay?: string | null
   mood?: string | null
   /** camera_config.pan = pitch(상하 회전, -10~+10) — fallback 전용 */
@@ -274,6 +292,10 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
     typeof input.aperture === 'number' && input.aperture <= 2.8 ? 'shallow' : 'deep'
 
   const setting = [stripColor(input.location), input.timeOfDay].filter(Boolean).join(', ')
+  // rich 경로는 framing.layers 로 배경을 그리지만 db_fallback 은 로케이션 이름만 있어 배경이 비어 나온다
+  //   (수동 추가 샷 배경 누락, 2026-06-26). shot→scene→location 이 이미 연결돼 있으므로 그 asset 의
+  //   visual_description 을 끌어와 배경 한 줄로 준다(선택 UI 불필요 — 데이터는 이미 결정됨).
+  const bg = conciseEnvDescription(input.locationDescription)
 
   const hasChars = input.characterNames.length > 0
   // 액션문은 인물을 함의한다("용사가 …"). characters 가 비어도 action 을 내보내면 그 인물이 그려지는데,
@@ -319,6 +341,7 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
     // fallback action: FALLBACK_EMIT_ACTION 으로 토글. 켜면 1차 시도에만(safeMode 제외) 출력.
     emitAction ? `Action: ${input.actionDescription}.` : null,
     setting ? `Setting: ${setting}.${!input.safeMode && input.mood ? ` Mood: ${input.mood}.` : ''}` : '',
+    bg ? `Background: ${bg}.` : null,
     ``,
     figureBlock,
     ``,
