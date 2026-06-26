@@ -31,6 +31,8 @@ export interface CastMember {
   arc?: CastArc
   motivation?: CastMotivation
   origin?: 'producer' | 'writer'
+  // 사용자가 카드 UI 로 직접 손댄 값인지. true 면 채팅이 덮어쓰기 전에 승인 게이트를 거친다.
+  userEdited?: boolean
 }
 
 export interface BackgroundSource {

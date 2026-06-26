@@ -416,6 +416,7 @@ export type Database = {
           updated_at: string | null
           design_tokens: Json | null
           last_writer_run_id: string | null
+          producer_draft: Json | null
         }
         Insert: {
           id?: string
@@ -429,6 +430,7 @@ export type Database = {
           updated_at?: string | null
           design_tokens?: Json | null
           last_writer_run_id?: string | null
+          producer_draft?: Json | null
         }
         Update: {
           id?: string
@@ -442,6 +444,7 @@ export type Database = {
           updated_at?: string | null
           design_tokens?: Json | null
           last_writer_run_id?: string | null
+          producer_draft?: Json | null
         }
         Relationships: [
           {

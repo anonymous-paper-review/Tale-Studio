@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { ProjectSettings, ProjectFormat } from '@/types'
+import type { Json } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -24,12 +25,16 @@ export interface ExtractedCastMember {
   role?: string
   arc?: Partial<CastArc>
   motivation?: Partial<CastMotivation>
+  // true 면 이름이 일치하는 기존 카드를 삭제(병합/중복 정리). 다른 필드는 무시된다.
+  remove?: boolean
 }
 
 export interface ExtractedBackground {
   name?: string
   visualDescription?: string
   purpose?: string
+  // true 면 이름이 일치하는 기존 배경 카드를 삭제한다.
+  remove?: boolean
 }
 
 export interface ExtractedSettings {
@@ -53,25 +58,33 @@ function newLocalId(prefix = 'cast'): string {
   }
 }
 
-// 추출 캐스트 병합: 빈칸만 채우는 자율 규칙 (architecture §5 원천 공동편집).
-//   - 이름이 같은 기존 멤버가 있으면 비어 있는 필드만 보강 (사용자 입력 덮어쓰기 금지).
+// 추출 캐스트 병합: 양방향 동기화 (chat ↔ 보드). architecture §5 원천 공동편집.
+//   - 이 함수는 "적용해도 되는" 패치만 받는다(사용자가 직접 손댄 값 덮어쓰기는 호출 전에
+//     승인 게이트로 걸러진다). 따라서 여기서는 LLM 제안을 그대로 반영한다:
+//   - remove=true → 이름이 같은 카드 삭제(병합/중복 정리).
+//   - 이름이 같은 기존 멤버가 있으면 제시된 필드를 덮어쓴다(빈 칸 채우기 + 갱신).
 //   - 없으면 신규 후보로 추가.
 function mergeExtractedCast(
   existing: CastMember[],
   extracted: ExtractedCastMember[],
 ): CastMember[] {
-  const next = existing.map((m) => ({ ...m }))
+  let next = existing.map((m) => ({ ...m }))
   for (const e of extracted) {
     const name = (e.name ?? '').trim()
     if (!name) continue
     const match = next.find((m) => m.name.trim().toLowerCase() === name.toLowerCase())
+    if (e.remove) {
+      if (match) next = next.filter((m) => m !== match)
+      continue
+    }
     if (match) {
-      if (!match.appearance && e.appearance) match.appearance = e.appearance
-      if (!match.role && e.role) match.role = e.role
-      if (!match.arc && e.arc && (e.arc.start_state || e.arc.end_state || e.arc.arc_type))
-        match.arc = { start_state: '', end_state: '', arc_type: '', ...e.arc }
-      if (!match.motivation && e.motivation && e.motivation.want)
-        match.motivation = { want: '', ...e.motivation }
+      if (e.appearance) match.appearance = e.appearance
+      if (e.role) match.role = e.role
+      if (e.entityType) match.entityType = e.entityType === 'object' ? 'object' : 'person'
+      if (e.arc && (e.arc.start_state || e.arc.end_state || e.arc.arc_type))
+        match.arc = { start_state: '', end_state: '', arc_type: '', ...match.arc, ...e.arc }
+      if (e.motivation && e.motivation.want)
+        match.motivation = { want: '', ...match.motivation, ...e.motivation }
     } else {
       next.push({
         localId: newLocalId(),
@@ -85,6 +98,7 @@ function mergeExtractedCast(
             : undefined,
         motivation: e.motivation?.want ? { want: '', ...e.motivation } : undefined,
         origin: 'producer',
+        userEdited: false,
       })
     }
   }
@@ -95,14 +109,18 @@ function mergeExtractedBackgrounds(
   existing: BackgroundSource[],
   extracted: ExtractedBackground[],
 ): BackgroundSource[] {
-  const next = existing.map((background) => ({ ...background }))
+  let next = existing.map((background) => ({ ...background }))
   for (const e of extracted) {
     const name = (e.name ?? '').trim()
     if (!name) continue
     const match = next.find((background) => background.name.trim().toLowerCase() === name.toLowerCase())
+    if (e.remove) {
+      if (match) next = next.filter((background) => background !== match)
+      continue
+    }
     if (match) {
-      if (!match.visualDescription && e.visualDescription) match.visualDescription = e.visualDescription
-      if (!match.purpose && e.purpose) match.purpose = e.purpose
+      if (e.visualDescription) match.visualDescription = e.visualDescription
+      if (e.purpose) match.purpose = e.purpose
     } else {
       next.push({
         localId: newLocalId('background'),
@@ -172,7 +190,71 @@ function normalizedComparable(value: unknown): string {
   return JSON.stringify(value ?? null)
 }
 
-function extractedOverwritesExisting(
+function findByName<T extends { name: string }>(list: T[], name?: string): T | undefined {
+  const n = (name ?? '').trim().toLowerCase()
+  if (!n) return undefined
+  return list.find((x) => x.name.trim().toLowerCase() === n)
+}
+
+// 한 캐스트 제안이 현재 상태를 바꾸는가 (추가/채움/덮어쓰기/삭제 모두 포함).
+function castEntryAffects(existing: CastMember | undefined, e: ExtractedCastMember): boolean {
+  if (e.remove) return !!existing
+  if (!existing) return true
+  return (
+    (isMeaningfulExtractedValue(e.appearance) &&
+      normalizedComparable(e.appearance) !== normalizedComparable(existing.appearance)) ||
+    (isMeaningfulExtractedValue(e.role) &&
+      normalizedComparable(e.role) !== normalizedComparable(existing.role)) ||
+    (isMeaningfulExtractedValue(e.entityType) && e.entityType !== existing.entityType) ||
+    (!!e.arc && normalizedComparable(e.arc) !== normalizedComparable(existing.arc)) ||
+    (!!e.motivation?.want && normalizedComparable(e.motivation) !== normalizedComparable(existing.motivation))
+  )
+}
+
+// 한 캐스트 제안이 "사용자가 직접 손댄" 비어있지 않은 값을 덮어쓰거나 삭제하는가.
+function castEntryClobbersUser(existing: CastMember | undefined, e: ExtractedCastMember): boolean {
+  if (!existing || !existing.userEdited) return false
+  if (e.remove) return true
+  return (
+    (isMeaningfulExtractedValue(e.appearance) &&
+      isMeaningfulExtractedValue(existing.appearance) &&
+      normalizedComparable(e.appearance) !== normalizedComparable(existing.appearance)) ||
+    (isMeaningfulExtractedValue(e.role) &&
+      isMeaningfulExtractedValue(existing.role) &&
+      normalizedComparable(e.role) !== normalizedComparable(existing.role)) ||
+    (!!e.arc && !!existing.arc && normalizedComparable(e.arc) !== normalizedComparable(existing.arc)) ||
+    (!!e.motivation?.want &&
+      !!existing.motivation?.want &&
+      normalizedComparable(e.motivation) !== normalizedComparable(existing.motivation))
+  )
+}
+
+function backgroundEntryAffects(existing: BackgroundSource | undefined, e: ExtractedBackground): boolean {
+  if (e.remove) return !!existing
+  if (!existing) return true
+  return (
+    (isMeaningfulExtractedValue(e.visualDescription) &&
+      normalizedComparable(e.visualDescription) !== normalizedComparable(existing.visualDescription)) ||
+    (isMeaningfulExtractedValue(e.purpose) &&
+      normalizedComparable(e.purpose) !== normalizedComparable(existing.purpose))
+  )
+}
+
+function backgroundEntryClobbersUser(existing: BackgroundSource | undefined, e: ExtractedBackground): boolean {
+  if (!existing || !existing.userEdited) return false
+  if (e.remove) return true
+  return (
+    (isMeaningfulExtractedValue(e.visualDescription) &&
+      isMeaningfulExtractedValue(existing.visualDescription) &&
+      normalizedComparable(e.visualDescription) !== normalizedComparable(existing.visualDescription)) ||
+    (isMeaningfulExtractedValue(e.purpose) &&
+      isMeaningfulExtractedValue(existing.purpose) &&
+      normalizedComparable(e.purpose) !== normalizedComparable(existing.purpose))
+  )
+}
+
+// 핸드오프 이후 게이트용 — 채팅 제안이 현재 Producer 원천(스토리/설정/캐스트/배경)을 바꾸는가.
+function extractedAffectsExisting(
   state: Pick<ProducerState, 'storyText' | 'projectSettings' | 'cast' | 'backgrounds'>,
   extracted: ExtractedSettings,
 ): string[] {
@@ -197,44 +279,41 @@ function extractedOverwritesExisting(
     }
   }
 
-  if (Array.isArray(extracted.characters)) {
-    const castChanged = extracted.characters.some((character) => {
-      const name = (character.name ?? '').trim()
-      if (!name) return false
-      const existing = state.cast.find(
-        (candidate) => candidate.name.trim().toLowerCase() === name.toLowerCase(),
-      )
-      if (!existing) return true
-      return (
-        (isMeaningfulExtractedValue(character.appearance) &&
-          !isMeaningfulExtractedValue(existing.appearance)) ||
-        (isMeaningfulExtractedValue(character.role) &&
-          !isMeaningfulExtractedValue(existing.role)) ||
-        (!!character.arc && !existing.arc) ||
-        (!!character.motivation?.want && !existing.motivation?.want)
-      )
-    })
-    if (castChanged) overwritten.push('characters')
+  if (
+    Array.isArray(extracted.characters) &&
+    extracted.characters.some((c) => castEntryAffects(findByName(state.cast, c.name), c))
+  ) {
+    overwritten.push('characters')
   }
-  if (Array.isArray(extracted.backgrounds)) {
-    const backgroundChanged = extracted.backgrounds.some((background) => {
-      const name = (background.name ?? '').trim()
-      if (!name) return false
-      const existing = state.backgrounds.find(
-        (candidate) => candidate.name.trim().toLowerCase() === name.toLowerCase(),
-      )
-      if (!existing) return true
-      return (
-        (isMeaningfulExtractedValue(background.visualDescription) &&
-          !isMeaningfulExtractedValue(existing.visualDescription)) ||
-        (isMeaningfulExtractedValue(background.purpose) &&
-          !isMeaningfulExtractedValue(existing.purpose))
-      )
-    })
-    if (backgroundChanged) overwritten.push('backgrounds')
+  if (
+    Array.isArray(extracted.backgrounds) &&
+    extracted.backgrounds.some((b) => backgroundEntryAffects(findByName(state.backgrounds, b.name), b))
+  ) {
+    overwritten.push('backgrounds')
   }
 
   return overwritten
+}
+
+// 항상 적용되는 보호 게이트 — 채팅 제안이 사용자가 직접 손댄 카드 값을 덮어쓰거나 삭제하는가.
+function extractedClobbersUserEdited(
+  state: Pick<ProducerState, 'cast' | 'backgrounds'>,
+  extracted: ExtractedSettings,
+): string[] {
+  const conflicts: string[] = []
+  if (
+    Array.isArray(extracted.characters) &&
+    extracted.characters.some((c) => castEntryClobbersUser(findByName(state.cast, c.name), c))
+  ) {
+    conflicts.push('characters')
+  }
+  if (
+    Array.isArray(extracted.backgrounds) &&
+    extracted.backgrounds.some((b) => backgroundEntryClobbersUser(findByName(state.backgrounds, b.name), b))
+  ) {
+    conflicts.push('backgrounds')
+  }
+  return conflicts
 }
 
 function settingsPatchFromExtracted(patch: ExtractedSettings): Partial<ProjectSettings> {
@@ -257,6 +336,134 @@ function normalizeProducerSettings(settings: Partial<ProjectSettings> | null | u
   }
 }
 
+const PRODUCER_DRAFT_VERSION = 1
+
+// 핸드오프 전 프로듀서 보드의 working-copy 스냅샷 (projects.producer_draft 에 자동저장).
+export interface ProducerDraft {
+  version: number
+  savedAt: number
+  storyText: string
+  storyReady: boolean
+  settings: ProjectSettings
+  cast: CastMember[]
+  backgrounds: BackgroundSource[]
+}
+
+export interface ProducerBoardState {
+  storyText: string
+  storyReady: boolean
+  settings: ProjectSettings
+  cast: CastMember[]
+  backgrounds: BackgroundSource[]
+}
+
+// jsonb 값을 안전하게 ProducerDraft 로 파싱 (형태가 안 맞으면 null).
+export function parseProducerDraft(raw: unknown): ProducerDraft | null {
+  if (!raw || typeof raw !== 'object') return null
+  const d = raw as Partial<ProducerDraft>
+  if (!Array.isArray(d.cast) || !Array.isArray(d.backgrounds)) return null
+  if (!d.settings || typeof d.settings !== 'object') return null
+  return {
+    version: typeof d.version === 'number' ? d.version : PRODUCER_DRAFT_VERSION,
+    savedAt: typeof d.savedAt === 'number' ? d.savedAt : 0,
+    storyText: typeof d.storyText === 'string' ? d.storyText : '',
+    storyReady: d.storyReady === true,
+    settings: normalizeProducerSettings(d.settings),
+    cast: d.cast as CastMember[],
+    backgrounds: d.backgrounds as BackgroundSource[],
+  }
+}
+
+// 재진입 복원: 드래프트(프로듀서 working copy)를 우선하되, DB(characters/locations)에만 있는
+//   카드(예: writer-origin)는 이름 기준으로 합쳐 누락 없이 보여준다.
+export function mergeDraftWithDb(
+  draft: ProducerDraft | null,
+  db: ProducerBoardState,
+): ProducerBoardState {
+  if (!draft) return db
+  const key = (name: string) => name.trim().toLowerCase()
+  const draftCastNames = new Set(draft.cast.map((c) => key(c.name)).filter(Boolean))
+  const extraCast = db.cast.filter((c) => {
+    const k = key(c.name)
+    return k.length > 0 && !draftCastNames.has(k)
+  })
+  const draftBgNames = new Set(draft.backgrounds.map((b) => key(b.name)).filter(Boolean))
+  const extraBackgrounds = db.backgrounds.filter((b) => {
+    const k = key(b.name)
+    return k.length > 0 && !draftBgNames.has(k)
+  })
+  return {
+    storyText: draft.storyText || db.storyText,
+    storyReady: draft.storyReady || db.storyReady,
+    settings: draft.settings,
+    cast: [...draft.cast, ...extraCast],
+    backgrounds: [...draft.backgrounds, ...extraBackgrounds],
+  }
+}
+
+function buildProducerDraft(state: ProducerBoardState): ProducerDraft {
+  return {
+    version: PRODUCER_DRAFT_VERSION,
+    savedAt: Date.now(),
+    storyText: state.storyText,
+    storyReady: state.storyReady,
+    settings: state.settings,
+    cast: state.cast,
+    backgrounds: state.backgrounds,
+  }
+}
+function boardOf(
+  s: Pick<ProducerState, 'storyText' | 'storyReady' | 'projectSettings' | 'cast' | 'backgrounds'>,
+): ProducerBoardState {
+  return {
+    storyText: s.storyText,
+    storyReady: s.storyReady,
+    settings: s.projectSettings,
+    cast: s.cast,
+    backgrounds: s.backgrounds,
+  }
+}
+
+// 디바운스 자동저장 — 보드 변경 후 800ms 무편집이면 projects.producer_draft 에 1회 저장.
+const DRAFT_SAVE_DEBOUNCE_MS = 800
+let draftSaveTimer: ReturnType<typeof setTimeout> | null = null
+let pendingDraftProjectId: string | null = null
+
+function cancelDraftSave(): void {
+  if (draftSaveTimer) {
+    clearTimeout(draftSaveTimer)
+    draftSaveTimer = null
+  }
+  pendingDraftProjectId = null
+}
+
+function scheduleDraftSave(getState: () => ProducerBoardState): void {
+  if (typeof window === 'undefined') return
+  const projectId = useProjectStore.getState().projectId
+  if (!projectId) return
+  pendingDraftProjectId = projectId
+  if (draftSaveTimer) clearTimeout(draftSaveTimer)
+  draftSaveTimer = setTimeout(() => {
+    draftSaveTimer = null
+    const targetId = pendingDraftProjectId
+    pendingDraftProjectId = null
+    // 저장 직전 프로젝트가 바뀌었으면 교차오염 방지를 위해 건너뛴다.
+    if (!targetId || useProjectStore.getState().projectId !== targetId) return
+    const draft = buildProducerDraft(getState())
+    void (async () => {
+      try {
+        const supabase = createClient()
+        await supabase
+          .from('projects')
+          .update({ producer_draft: draft as unknown as Json })
+          .eq('id', targetId)
+      } catch (err) {
+        console.error('[producer-store] draft save failed:', err)
+      }
+    })()
+  }, DRAFT_SAVE_DEBOUNCE_MS)
+}
+
 
 export const useProducerStore = create<ProducerState>((set, get) => ({
   storyText: '',
@@ -267,30 +474,43 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   syncing: false,
   error: null,
 
-  setStoryText: (text) => set({ storyText: text }),
+  setStoryText: (text) => {
+    set({ storyText: text })
+    scheduleDraftSave(() => boardOf(get()))
+  },
 
-  updateSettings: (partial) =>
+  updateSettings: (partial) => {
     set((state) => ({
       projectSettings: { ...state.projectSettings, ...partial },
-    })),
+    }))
+    scheduleDraftSave(() => boardOf(get()))
+  },
 
   applyExtractedSettings: (extracted) => {
     if (!extracted) return
     const project = useProjectStore.getState()
     const current = get()
     const afterHandoff = project.reachedStage !== 'producer'
-    const overwritten = extractedOverwritesExisting(current, extracted)
+    const affected = extractedAffectsExisting(current, extracted)
+    const protectedConflicts = extractedClobbersUserEdited(current, extracted)
+    // 게이트: (핸드오프 후 원천 변경) 또는 (사용자가 직접 손댄 카드 값 덮어쓰기/삭제).
+    //   그 외(빈 칸 채우기·신규 추가·미정 갱신·핸드오프 전 변경)는 즉시 반영해 보드와 동기화한다.
+    const needsApproval =
+      (afterHandoff && affected.length > 0) || protectedConflicts.length > 0
 
-    if (afterHandoff && overwritten.length > 0) {
+    if (needsApproval) {
+      const impactFields = Array.from(new Set([...affected, ...protectedConflicts]))
       const accepted = useGlobalChatStore.getState().offerPendingProposal(
         createPendingProposal({
           stage: 'producer',
           kind: 'producerSourcePatch',
           target: 'Producer source',
-          action: '채팅이 제안한 story/settings 변경 적용',
+          action: '채팅이 제안한 story/settings/카드 변경 적용',
           impact: [
-            `덮어쓰기 필드: ${overwritten.join(', ')}`,
-            '기존 Writer/Artist 산출물이 낡을 수 있어요.',
+            `변경 필드: ${impactFields.join(', ')}`,
+            protectedConflicts.length > 0
+              ? '사용자가 직접 수정한 카드 값을 덮어쓰거나 삭제해요.'
+              : '기존 Writer/Artist 산출물이 낡을 수 있어요.',
             '승인 전에는 현재 Producer 값이 유지됩니다.',
           ],
           payload: { patch: extracted },
@@ -303,7 +523,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     get().applyProducerSourcePatch(extracted)
   },
 
-  applyProducerSourcePatch: (patch) =>
+  applyProducerSourcePatch: (patch) => {
     set((state) => {
       const {
         storyText: nextStory,
@@ -328,28 +548,35 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         storyText: nextStory ? nextStory : state.storyText,
         storyReady: nextReady === true ? true : state.storyReady,
       }
-    }),
+    })
+    scheduleDraftSave(() => boardOf(get()))
+  },
 
   addCastMember: (entityType) => {
     const localId = newLocalId()
     set((state) => ({
       cast: [
         ...state.cast,
-        { localId, name: '', entityType, appearance: '', origin: 'producer' },
+        { localId, name: '', entityType, appearance: '', origin: 'producer', userEdited: true },
       ],
     }))
+    scheduleDraftSave(() => boardOf(get()))
     return localId
   },
 
-  updateCastMember: (localId, patch) =>
+  updateCastMember: (localId, patch) => {
     set((state) => ({
-      cast: state.cast.map((m) => (m.localId === localId ? { ...m, ...patch } : m)),
-    })),
+      cast: state.cast.map((m) => (m.localId === localId ? { ...m, ...patch, userEdited: true } : m)),
+    }))
+    scheduleDraftSave(() => boardOf(get()))
+  },
 
-  removeCastMember: (localId) =>
+  removeCastMember: (localId) => {
     set((state) => ({
       cast: state.cast.filter((m) => m.localId !== localId),
-    })),
+    }))
+    scheduleDraftSave(() => boardOf(get()))
+  },
 
   addBackground: () => {
     const localId = newLocalId('background')
@@ -359,22 +586,27 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         { localId, name: '', visualDescription: '', purpose: '', origin: 'producer', userEdited: true },
       ],
     }))
+    scheduleDraftSave(() => boardOf(get()))
     return localId
   },
 
-  updateBackground: (localId, patch) =>
+  updateBackground: (localId, patch) => {
     set((state) => ({
       backgrounds: state.backgrounds.map((background) =>
         background.localId === localId
           ? { ...background, ...patch, userEdited: true }
           : background,
       ),
-    })),
+    }))
+    scheduleDraftSave(() => boardOf(get()))
+  },
 
-  removeBackground: (localId) =>
+  removeBackground: (localId) => {
     set((state) => ({
       backgrounds: state.backgrounds.filter((background) => background.localId !== localId),
-    })),
+    }))
+    scheduleDraftSave(() => boardOf(get()))
+  },
 
   saveAndHandoff: async () => {
     const { storyText, projectSettings, cast, backgrounds } = get()
@@ -522,12 +754,14 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   loadProject: async () => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
+    // 재로드 중에는 이전 편집으로 예약된 자동저장이 끼어들지 않게 취소.
+    cancelDraftSave()
 
     try {
       const supabase = createClient()
       const { data: project } = await supabase
         .from('projects')
-        .select('story_text, settings, last_writer_run_id')
+        .select('story_text, settings, last_writer_run_id, producer_draft')
         .eq('id', projectId)
         .single()
 
@@ -545,12 +779,12 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         .eq('project_id', projectId)
 
       if (project) {
-        set({
+        const dbBoard: ProducerBoardState = {
           storyText: project.story_text ?? '',
           // 이미 저장된 스토리가 있으면 "준비됨"으로 본다 — 핸드오프/재실행 버튼이
           //   storyReady 게이트에 막혀 비활성화되지 않도록 (writer 재실행 가능하게).
           storyReady: !!(project.story_text && project.story_text.trim().length > 0),
-          projectSettings: normalizeProducerSettings(project.settings as Partial<ProjectSettings>),
+          settings: normalizeProducerSettings(project.settings as Partial<ProjectSettings>),
           cast: (chars ?? []).map((c): CastMember => ({
             localId: c.id as string,
             characterId: c.character_id as string,
@@ -561,6 +795,9 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             arc: (c.arc as CastArc) ?? undefined,
             motivation: (c.motivation as CastMotivation) ?? undefined,
             origin: c.origin === 'writer' ? 'writer' : 'producer',
+            // DB 재로드 값은 파이프라인 산출(예: "미정")일 수 있어 보호 대상 아님.
+            //   세션 내 카드 UI 편집 시에만 userEdited 가 true 로 올라간다.
+            userEdited: false,
           })),
           backgrounds: (locationRows ?? []).map((location): BackgroundSource => {
             const origin = location.origin === 'writer' ? 'writer' : 'producer'
@@ -575,6 +812,18 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
               stale: origin === 'writer' && !!project.last_writer_run_id && location.last_writer_run_id !== project.last_writer_run_id,
             }
           }),
+        }
+
+        // 핸드오프 전 세션에서 채운 보드는 producer_draft 에만 남는다 → 있으면 그걸로 복원.
+        //   DB(characters/locations)에만 있는 writer-origin 카드는 이름 기준으로 합쳐 누락 없이 보여준다.
+        const draft = parseProducerDraft((project as { producer_draft?: unknown }).producer_draft)
+        const restored = mergeDraftWithDb(draft, dbBoard)
+        set({
+          storyText: restored.storyText,
+          storyReady: restored.storyReady,
+          projectSettings: restored.settings,
+          cast: restored.cast,
+          backgrounds: restored.backgrounds,
         })
       }
     } catch (err) {
@@ -584,7 +833,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   clearError: () => set({ error: null }),
 
-  reset: () =>
+  reset: () => {
+    cancelDraftSave()
     set({
       storyText: '',
       storyReady: false,
@@ -593,5 +843,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       backgrounds: [],
       syncing: false,
       error: null,
-    }),
+    })
+  },
 }))

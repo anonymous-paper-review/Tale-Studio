@@ -4,6 +4,7 @@ import type { PendingProposal } from '@/lib/pending-proposal'
 import { createPendingProposal, isApprovalUtterance } from '@/lib/pending-proposal'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore, type ExtractedSettings } from '@/stores/producer-store'
+import { evaluateProducerGate } from '@/lib/producer-gate'
 import { useArtistStore, type ArtistUpdate } from '@/stores/artist-store'
 import {
   useDirectorCanvasStore,
@@ -202,12 +203,26 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       case 'producer': {
         const p = useProducerStore.getState()
         endpoint = '/api/produce/chat'
+        // 게이트 상태를 함께 보낸다 — 핸드오프 가부는 코드 게이트가 판정하므로(architecture §3),
+        //   채팅이 자기 기준으로 "준비 완료"를 선언하지 않고 실제 남은 항목을 안내하도록.
+        const gate = evaluateProducerGate({
+          settings: p.projectSettings,
+          storyReady: p.storyReady,
+          cast: p.cast,
+          backgrounds: p.backgrounds,
+        })
         body = {
           message: trimmed,
           history: historyPayload,
           currentSettings: p.projectSettings,
           storyText: p.storyText,
+          currentCast: p.cast,
           currentBackgrounds: p.backgrounds,
+          gate: {
+            canHandoff: gate.canHandoff,
+            hardMissing: gate.hardMissing.map((i) => (i.detail ? `${i.label} (${i.detail})` : i.label)),
+            softMissing: gate.softMissing.map((i) => (i.detail ? `${i.label} (${i.detail})` : i.label)),
+          },
         }
         break
       }
