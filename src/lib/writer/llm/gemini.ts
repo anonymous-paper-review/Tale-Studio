@@ -11,6 +11,11 @@ if (!apiKey) {
 
 const client = new GoogleGenerativeAI(apiKey || '');
 
+// per-request 타임아웃 — 절전/네트워크 stall 로 호출이 무한정 매달리는 것 방지.
+//   초과 시 SDK 가 AbortError 를 던지고, retry 분류기가 transient 로 보아 재시도한다.
+//   (없으면 dev 에서 맥 절전 시 한 step 이 수십 분간 hang — writer hang 회귀 케이스.)
+const GEMINI_REQUEST_TIMEOUT_MS = 120_000;
+
 let callCount = 0;
 export function getGeminiCallCount() {
   return callCount;
@@ -48,7 +53,10 @@ export async function geminiGenerate(
   let finishReason: string | undefined;
   let error: string | undefined;
   try {
-    const result = await withLlmRetry(() => model.generateContent(userPrompt), 'gemini');
+    const result = await withLlmRetry(
+      () => model.generateContent(userPrompt, { timeout: GEMINI_REQUEST_TIMEOUT_MS }),
+      'gemini',
+    );
     finishReason = result.response.candidates?.[0]?.finishReason;
     text = result.response.text();
 

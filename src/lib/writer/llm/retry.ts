@@ -10,6 +10,8 @@ const TRANSIENT_PATTERNS: RegExp[] = [
   /too many requests/i,
   /service unavailable/i,
   /ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|fetch failed|socket hang up/i,
+  // per-request timeout / AbortController (절전·네트워크 stall 로 매달린 호출을 끊은 경우).
+  /\baborted\b|AbortError|timed?[ -]?out|\btimeout\b|deadline exceeded/i,
 ];
 
 export function isTransientLlmError(e: unknown): boolean {
