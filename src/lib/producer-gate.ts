@@ -146,7 +146,12 @@ export function evaluateProducerGate({ settings, storyReady, cast, backgrounds }
   const depth = depthLevelFromRuntime(
     typeof settings.playtime === 'number' ? settings.playtime : 0,
   )
-  const persons = cast.filter((c) => c.entityType === 'person')
+  // 핸드오프 하드게이트는 producer 원천 카드만 평가한다 — writer 파이프라인이 (부분/실패 run 중)
+  //   추가한 writer-origin 카드(미완성일 수 있음)가 producer 의 재핸드오프/재실행을 막지 않도록.
+  //   origin 미지정(레거시)은 producer 로 간주해 포함한다.
+  const isProducerOrigin = (c: { origin?: 'producer' | 'writer' }) => c.origin !== 'writer'
+  const producerCast = cast.filter(isProducerOrigin)
+  const persons = producerCast.filter((c) => c.entityType === 'person')
 
   // 최소 캐스트: D1~D2 = 0명, D3 = 1명, D4+ = 1명 필수 + 2명 권장.
   if (depthAtLeast(depth, 'D3') && persons.length < 1) {
@@ -168,7 +173,7 @@ export function evaluateProducerGate({ settings, storyReady, cast, backgrounds }
   for (const p of persons) {
     hardMissing.push(...evaluatePersonFields(p, depth))
   }
-  for (const o of cast.filter((c) => c.entityType === 'object')) {
+  for (const o of producerCast.filter((c) => c.entityType === 'object')) {
     const who = o.name || '이름 미정 사물'
     if (!isFilled(o.name))
       hardMissing.push({ field: `cast:${o.localId}:name`, label: `${who}: 이름 필요` })
@@ -177,7 +182,7 @@ export function evaluateProducerGate({ settings, storyReady, cast, backgrounds }
   }
 
   // ── 게이트 C: Background source (producer-owned location pool) ───────
-  if (!backgrounds.some(isProducerBackgroundComplete)) {
+  if (!backgrounds.filter(isProducerOrigin).some(isProducerBackgroundComplete)) {
     hardMissing.push({
       field: 'background:minComplete',
       label: '배경 1개 이상 필요',

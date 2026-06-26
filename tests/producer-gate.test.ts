@@ -127,3 +127,52 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
     expect(r.hardMissing.map((i) => i.field)).toContain('background:minComplete')
   })
 })
+
+describe('evaluateProducerGate — writer-origin cards do not block handoff', () => {
+  it('ignores an incomplete writer-origin person (partial writer run addition)', () => {
+    // producer 카스트는 완성, writer 가 부분 실행 중 arc/motivation 없는 인물을 추가한 상황.
+    const r = evaluateProducerGate({
+      settings: baseSettings,
+      storyReady: true,
+      cast: [
+        fullPerson(),
+        {
+          localId: 'w1',
+          name: 'Anonymous Villager',
+          entityType: 'person',
+          appearance: '평범한 마을 주민',
+          origin: 'writer',
+        },
+      ],
+      backgrounds: [fullBackground()],
+    })
+    expect(r.canHandoff).toBe(true)
+    expect(r.hardMissing).toHaveLength(0)
+  })
+
+  it('ignores writer-origin backgrounds for the min-complete requirement', () => {
+    const r = evaluateProducerGate({
+      settings: baseSettings,
+      storyReady: true,
+      cast: [fullPerson()],
+      backgrounds: [
+        fullBackground(), // producer-origin, complete
+        { localId: 'wl', name: 'location_2', visualDescription: 'A gothic studio', purpose: '', origin: 'writer' },
+      ],
+    })
+    expect(r.canHandoff).toBe(true)
+  })
+
+  it('still requires a producer-origin background (writer-only backgrounds do not satisfy)', () => {
+    const r = evaluateProducerGate({
+      settings: baseSettings,
+      storyReady: true,
+      cast: [fullPerson()],
+      backgrounds: [
+        { localId: 'wl', name: 'location', visualDescription: 'A gothic studio', purpose: '핵심 공간', origin: 'writer' },
+      ],
+    })
+    expect(r.canHandoff).toBe(false)
+    expect(r.hardMissing.map((i) => i.field)).toContain('background:minComplete')
+  })
+})
