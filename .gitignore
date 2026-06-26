@@ -79,6 +79,8 @@ experiment/
 
 # logs
 logs/*
+# scratch artifacts — 로컬 테스트/디버그 산출물(로그·스크린샷·vitest json)
+artifacts/
 # Windows ADS metadata
 *:Zone.Identifier
 
