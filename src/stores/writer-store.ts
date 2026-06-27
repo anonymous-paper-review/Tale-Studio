@@ -173,11 +173,14 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         await supabase
           .from('scenes')
           .update({
+            // 편집은 유저 언어 → primary·_native 둘 다 native 기록(생성측은 러프 라우트가 EN skip-or-derive). (S3b)
             narrative_summary: scene.narrativeSummary,
+            narrative_summary_native: scene.narrativeSummary,
             original_text_quote: scene.originalTextQuote,
             location: scene.location,
             time_of_day: scene.timeOfDay,
             mood: scene.mood,
+            mood_native: scene.mood,
             characters_present: scene.charactersPresent,
             estimated_duration_seconds: scene.estimatedDurationSeconds,
           })
@@ -217,7 +220,9 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           .from('shots')
           .update({
             shot_type: shot.shotType,
+            // 편집은 유저 언어 → primary·_native 둘 다 native. 러프 라우트가 EN skip-or-derive. (S3b)
             action_description: shot.actionDescription,
+            action_description_native: shot.actionDescription,
             characters: shot.characters,
             duration_seconds: shot.durationSeconds,
             dialogue_lines: shot.dialogueLines,
@@ -669,11 +674,12 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       const manifest: SceneManifest = {
         scenes: scenes.map((s) => ({
           sceneId: s.scene_id,
-          narrativeSummary: s.narrative_summary ?? '',
+          // 표시는 유저 언어(_native), 생성은 주 컬럼(EN). (language boundary S3b)
+          narrativeSummary: s.narrative_summary_native ?? s.narrative_summary ?? '',
           originalTextQuote: s.original_text_quote ?? '',
           location: s.location ?? '',
           timeOfDay: s.time_of_day ?? '',
-          mood: s.mood ?? '',
+          mood: s.mood_native ?? s.mood ?? '',
           charactersPresent: s.characters_present ?? [],
           estimatedDurationSeconds: s.estimated_duration_seconds ?? 30,
         })),
@@ -698,7 +704,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         shotId: s.shot_id,
         sceneId: s.scene_id,
         shotType: s.shot_type as Shot['shotType'],
-        actionDescription: s.action_description ?? '',
+        actionDescription: s.action_description_native ?? s.action_description ?? '',
         characters: s.characters ?? [],
         durationSeconds: s.duration_seconds ?? 5,
         generationMethod: (s.generation_method ?? 'T2V') as Shot['generationMethod'],

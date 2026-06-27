@@ -22,6 +22,7 @@ import {
 } from '@/lib/writer/rough-storyboard'
 import { rewriteRoughStoryboardPromptViaLLM } from '@/lib/writer/rough-storyboard-llm'
 import { writerShotIdToMain } from '@/lib/writer/adapters'
+import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import type { ShotDesign } from '@/lib/writer/types/pipeline'
 
 /**
@@ -90,6 +91,76 @@ const BodySchema = z.object({
   /** 방향 칩 — 상대적 연출 방향(영문 수식어). force 재생성과 함께 프롬프트 Emphasis 로 주입. */
   styleHints: z.array(z.string()).max(8).optional(),
 })
+
+/**
+ * rich 경로 shotDesign(state)의 자유서술(framing layers·focal·blocking 포즈·motion verb)을 영어 base 로 정규화.
+ *   shotDesign 은 표시되지 않는 파이프라인 내부 상태라 native 보존 불요 — 생성용 EN 만 필요(language boundary S3c).
+ *   deriveEnBatch 가 이미 영어면 LLM skip(파이프라인 한국어 산출만 번역). 캐싱 없이 호출당 1배치(추후 최적화 여지).
+ */
+async function translateRoughSpecsEn(
+  specByShotId: Map<string, RoughStoryboardSpec>,
+  shotIds: string[],
+): Promise<Map<string, RoughStoryboardSpec>> {
+  const items: Array<{ id: string; native: string }> = []
+  for (const sid of shotIds) {
+    const spec = specByShotId.get(sid)
+    if (!spec) continue
+    const s = spec.staticSpec
+    const layers = s.framing.layers
+    if (layers.foreground) items.push({ id: `${sid}|fg`, native: layers.foreground })
+    if (layers.midground) items.push({ id: `${sid}|mg`, native: layers.midground })
+    if (layers.background) items.push({ id: `${sid}|bg`, native: layers.background })
+    if (s.framing.focal_point) items.push({ id: `${sid}|focal`, native: s.framing.focal_point })
+    if (spec.intent?.audience_focus) items.push({ id: `${sid}|aud`, native: spec.intent.audience_focus })
+    s.character_blocking.forEach((b, i) => {
+      if (b.pose) items.push({ id: `${sid}|pose.${i}`, native: b.pose })
+    })
+    ;(spec.dynamicSpec?.character_motion ?? []).forEach((m, i) => {
+      if (m.verb) items.push({ id: `${sid}|verb.${i}`, native: m.verb })
+    })
+  }
+  if (!items.length) return specByShotId
+  const en = await deriveEnBatch(items, 'rough storyboard shot-design facets')
+  const out = new Map(specByShotId)
+  for (const sid of shotIds) {
+    const spec = specByShotId.get(sid)
+    if (!spec) continue
+    const s = spec.staticSpec
+    const layers = s.framing.layers
+    out.set(sid, {
+      ...spec,
+      staticSpec: {
+        ...s,
+        framing: {
+          ...s.framing,
+          layers: {
+            foreground: en.get(`${sid}|fg`) ?? layers.foreground,
+            midground: en.get(`${sid}|mg`) ?? layers.midground,
+            background: en.get(`${sid}|bg`) ?? layers.background,
+          },
+          focal_point: en.get(`${sid}|focal`) ?? s.framing.focal_point,
+        },
+        character_blocking: s.character_blocking.map((b, i) => ({
+          ...b,
+          pose: en.get(`${sid}|pose.${i}`) ?? b.pose,
+        })),
+      },
+      intent: spec.intent
+        ? { ...spec.intent, audience_focus: en.get(`${sid}|aud`) ?? spec.intent.audience_focus }
+        : spec.intent,
+      dynamicSpec: spec.dynamicSpec
+        ? {
+            ...spec.dynamicSpec,
+            character_motion: spec.dynamicSpec.character_motion.map((m, i) => ({
+              ...m,
+              verb: en.get(`${sid}|verb.${i}`) ?? m.verb,
+            })),
+          }
+        : spec.dynamicSpec,
+    })
+  }
+  return out
+}
 
 export async function POST(req: Request) {
   try {
@@ -194,6 +265,21 @@ export async function POST(req: Request) {
       ? (shots ?? []).filter((s) => shotIds.includes(s.shot_id as string))
       : (shots ?? [])
 
+    // 언어 경계(S3b): 주 컬럼이 native(수동/편집 샷)일 수 있어, 프롬프트 주입 전 action·mood 를 EN 으로 정규화.
+    //   deriveEnBatch 가 이미 영어인 값은 LLM 호출 없이 통과(파이프라인 EN 산출은 무비용, native 만 번역).
+    const [actionEnByShot, moodEnByScene, translatedSpecs] = await Promise.all([
+      deriveEnBatch(
+        wanted.map((s) => ({ id: s.shot_id as string, native: (s.action_description as string) ?? '' })),
+        'shot action description',
+      ),
+      deriveEnBatch(
+        (scenes ?? []).map((sc) => ({ id: sc.scene_id as string, native: (sc.mood as string) ?? '' })),
+        'scene mood',
+      ),
+      // rich 경로 shotDesign 자유서술(blocking·layers·focal·motion) → EN (S3c)
+      translateRoughSpecsEn(specByShotId, wanted.map((s) => s.shot_id as string)),
+    ])
+
     const submitted: Array<{
       shotId: string
       jobId: string
@@ -225,11 +311,11 @@ export async function POST(req: Request) {
       const scene = sceneById.get(s.scene_id as string)
       const camera = (s.camera_config ?? {}) as { pan?: number }
       const lighting = (s.lighting_config ?? {}) as { position?: string }
-      const spec = specByShotId.get(shotId) ?? null
+      const spec = translatedSpecs.get(shotId) ?? null
       const safeMode = previouslyFailed.has(shotId)
       const rulePrompt = buildRoughStoryboardPrompt({
         shotType: (s.shot_type as string) ?? 'MS',
-        actionDescription: (s.action_description as string) ?? '',
+        actionDescription: actionEnByShot.get(shotId) ?? (s.action_description as string) ?? '',
         characterNames: ((s.characters as string[]) ?? []).map(
           (id) => nameById.get(id) ?? id,
         ),
@@ -237,7 +323,9 @@ export async function POST(req: Request) {
         location: scene?.location as string | undefined,
         locationDescription: locationDescById.get(scene?.location as string) ?? null,
         timeOfDay: scene?.time_of_day as string | undefined,
-        mood: scene?.mood as string | undefined,
+        mood: scene
+          ? moodEnByScene.get(scene.scene_id as string) ?? (scene.mood as string)
+          : undefined,
         cameraPitch: camera.pan ?? null,
         focalLength: (s.focal_length as number | null) ?? null,
         aperture: (s.aperture as number | null) ?? null,

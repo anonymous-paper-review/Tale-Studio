@@ -169,8 +169,10 @@ KO-only → `_en` sibling 추가 대상:
 
 ### S3 — 파이프라인 생성물 bilingual (씬·샷)
 - **S3a — persist 경계 EN 파생 ✅ (2026-06-27)**: `deriveEnBatch` 에 "이미 영어면 LLM skip"(CJK/Hangul 필터) 추가. `persist_manifest.ts` 의 scenes(narrative/mood)·shots(action) insert 를 재구성 → 주 컬럼=EN, `_native`=원천, provenance. best-effort(실패→native). 검증: 실데이터 read-only — action(KO→EN) 번역·mood(영어) skip 확인. tsc/lint clean. ⚠️ S3b 전엔 실데이터 재실행 시 writer 탭이 EN 표시.
-- **S3b — writer 탭 표시·편집 split**: writer-store 가 `action_description_native`(표시) 로드; rough 라우트는 `action_description`(EN) 사용(이미 그러함). shot-detail/scene-edit 다이얼로그 표시=native, 편집=native 기록 + EN 파생(updateShot/updateScene 가 클라 직접 update → 서버 라우트 경유 필요).
-- **S3c — rich path shotDesign state**: 러프 rich 경로가 state 의 blocking 포즈·framing layer(한국어)를 영어 골격에 주입. v4 산출 또는 라우트에서 EN 파생 필요(state JSONB라 별도 설계). 러프보드 rich 충실도의 잔여.
+- **S3b — writer 탭 표시·편집 split ✅ (2026-06-27)**: writer-store 로드가 action/narrative/mood 를 `_native` 우선(표시=유저 언어). updateShot/updateScene 편집은 primary·`_native` 둘 다 native 기록(클라 직접 update — 서버 파생 불요). **러프 라우트가 action·mood 를 주입 직전 `deriveEnBatch`(skip-if-English)로 정규화** → 파이프라인 EN 산출은 무비용, 수동/편집 native 만 번역 → klein 은 항상 EN. tsc/lint clean. (mood/narrative primary 가 편집 후 native 가 돼도 라우트가 skip-or-derive 로 흡수.)
+- **S3c — rich path shotDesign state ✅ (2026-06-27)**: 러프 라우트에 `translateRoughSpecsEn` 추가 — rich spec 의 framing layers·focal·blocking 포즈·motion verb 를 `deriveEnBatch`(skip-if-English)로 정규화해 `buildFromSpec` 전 치환. shotDesign 은 표시 안 되는 내부 state 라 native 보존·provenance 불요(생성용 EN 만). 호출당 1배치(캐싱 없음 — 추후 최적화 여지). 검증: 실데이터 — shot_1/2 의 한국어 layers·포즈 → EN 충실(예: "검을 든 채 서 있는 실루엣"→"silhouette standing with sword in hand"). tsc/lint clean.
+
+### S3 완료 — 러프보드 양 경로(db_fallback + rich) + writer DB 필드 전부 생성=EN / 표시=native.
 
 ### 후속 (첫 출하 밖)
 - **S4** locale 감지(en→SSO→ASCII/LLM) · **S5** 표시 locale 배선 · **S6** stale/재생성 UX.
