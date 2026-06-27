@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
+import { appearanceI18nFields } from '@/lib/writer/i18n/derive-en'
 
 export const runtime = 'nodejs'
 
@@ -45,6 +46,8 @@ export async function POST(req: Request) {
     const safeEntityType =
       entity_type && VALID_ENTITY_TYPES.has(entity_type) ? entity_type : 'person'
 
+    // 언어 경계(S2c): 입력 외형(native) → appearance_native 보존 + EN base 파생 → appearance. description 은 별개(유저 입력).
+    const i18n = await appearanceI18nFields(characterId, appearance)
     const { data, error } = await supabaseAdmin
       .from('characters')
       .insert({
@@ -54,7 +57,9 @@ export async function POST(req: Request) {
         role: safeRole,
         entity_type: safeEntityType,
         description: description?.trim() || null,
-        appearance: appearance?.trim() || null,
+        appearance: i18n.appearance,
+        appearance_native: i18n.appearance_native,
+        i18n_provenance: i18n.i18n_provenance,
       })
       .select('character_id')
       .single()

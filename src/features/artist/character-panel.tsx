@@ -104,10 +104,10 @@ export function CharacterPanel() {
                   {char.description}
                 </p>
               ) : null}
-              {char.fixedPrompt ? (
+              {(char.appearanceNative || char.fixedPrompt) ? (
                 <p className="leading-snug text-background/70">
                   <span className="text-background/50">외형 · </span>
-                  {char.fixedPrompt}
+                  {char.appearanceNative || char.fixedPrompt}
                 </p>
               ) : null}
               {bgScenes.length > 0 ? (

@@ -483,6 +483,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           locationId: l.location_id,
           name: l.name ?? l.location_id,
           visualDescription: l.visual_description ?? l.style_description ?? '',
+          visualDescriptionNative: l.visual_description_native ?? l.visual_description ?? l.style_description ?? '',
           timeOfDay: l.time_of_day ?? '',
           lightingDirection: l.lighting_direction ?? '',
           purpose: l.purpose ?? '',
@@ -521,6 +522,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             entityType: c.entity_type === 'object' ? 'object' : 'person',
             description: c.description ?? '',
             fixedPrompt: c.appearance ?? '',
+            // 생성·stale 은 fixedPrompt(영어 base), 표시는 appearance_native(유저 언어). 없으면 EN 폴백. (S2)
+            appearanceNative: c.appearance_native ?? c.appearance ?? '',
             viewCandidates: candidatesByCharView[c.character_id] ?? {},
             lookFingerprint: computeLookFingerprint(designTokens, c.costume),
           }))
@@ -533,6 +536,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               wideShot: (dbLocs ?? []).find((l) => l.location_id === location.locationId)?.wide_shot ?? null,
               establishingShot: (dbLocs ?? []).find((l) => l.location_id === location.locationId)?.establishing_shot ?? null,
               visualDescription: location.visualDescription,
+              visualDescriptionNative: location.visualDescriptionNative,
               timeOfDay: location.timeOfDay || scene?.timeOfDay || '',
               mood: scene?.mood ?? '',
               purpose: location.purpose,
@@ -1134,7 +1138,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   applyAppearancePatch: (characterId, appearance) =>
     set((state) => ({
       characterAssets: state.characterAssets.map((a) =>
-        a.characterId === characterId ? { ...a, fixedPrompt: appearance } : a,
+        // appearance = 유저 언어 패치 → 카드 표시(appearanceNative) 즉시 갱신. fixedPrompt(EN)는 reload 시 동기화.
+        a.characterId === characterId ? { ...a, fixedPrompt: appearance, appearanceNative: appearance } : a,
       ),
     })),
 

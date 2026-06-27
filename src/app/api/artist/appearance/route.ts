@@ -9,6 +9,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { validateAppearancePatch } from '@/lib/artist/appearance-patch'
+import { appearanceI18nFields } from '@/lib/writer/i18n/derive-en'
 
 export const runtime = 'nodejs'
 
@@ -35,14 +36,27 @@ export async function POST(req: Request) {
     const result = validateAppearancePatch(body)
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
 
+    // 언어 경계(S2c): 패치는 유저 언어(native) → appearance_native 보존 + EN base 파생 → appearance.
+    //   description 은 표시 미러라 native 유지. 파생 실패 시 native 폴백(오염 아님).
+    const i18n = await appearanceI18nFields(characterId, result.appearance)
     const { error } = await supabaseAdmin
       .from('characters')
-      .update({ appearance: result.appearance, description: result.appearance })
+      .update({
+        appearance: i18n.appearance,
+        appearance_native: i18n.appearance_native,
+        description: result.appearance,
+        i18n_provenance: i18n.i18n_provenance,
+      })
       .eq('project_id', projectId)
       .eq('character_id', characterId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    return NextResponse.json({ ok: true, characterId, appearance: result.appearance })
+    return NextResponse.json({
+      ok: true,
+      characterId,
+      appearance: i18n.appearance,
+      appearanceNative: i18n.appearance_native,
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[artist/appearance]', msg)

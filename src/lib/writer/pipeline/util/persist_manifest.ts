@@ -13,6 +13,7 @@
 //     → shots.characters 와 characters.character_id 가 동일 id 공간(referential 정합).
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { writerSceneIdToMain, writerShotIdToMain } from '@/lib/writer/adapters'
+import { deriveEnBatch, i18nHash } from '@/lib/writer/i18n/derive-en'
 import type { ShotType } from '@/types'
 import type {
   Characters,
@@ -93,18 +94,40 @@ export async function persistAssetsToDb(
 
   // scenes (world 이미지 생성이 scene.mood 에 의존 → Tier 1 에 포함)
   if (scenes.scenes.length) {
+    // 언어 경계(S3): 파이프라인 산출 자유서술(narrative/mood) → EN base 파생(이미 영어면 skip). 표시는 _native.
+    const sRows = scenes.scenes.map((sc, i) => ({
+      id: writerSceneIdToMain(sc.scene_id),
+      narrativeNative: sc.dialogue_summary ?? sc.purpose ?? '',
+      moodNative: `${sc.emotion_beat?.start ?? ''} → ${sc.emotion_beat?.end ?? ''}`,
+      quote: (sc.scene_actions ?? []).join(' '),
+      location: sc.location ?? '',
+      timeOfDay: sc.time_of_day ?? '',
+      chars: sc.characters_in_scene ?? [],
+      seconds: sc.estimated_seconds ?? 0,
+      i,
+    }))
+    const [narrEn, moodEn] = await Promise.all([
+      deriveEnBatch(sRows.map((r) => ({ id: r.id, native: r.narrativeNative })), 'scene narrative summary'),
+      deriveEnBatch(sRows.map((r) => ({ id: r.id, native: r.moodNative })), 'scene mood'),
+    ])
     await supabaseAdmin.from('scenes').insert(
-      scenes.scenes.map((sc, i) => ({
+      sRows.map((r) => ({
         project_id: projectId,
-        scene_id: writerSceneIdToMain(sc.scene_id),
-        narrative_summary: sc.dialogue_summary ?? sc.purpose ?? '',
-        original_text_quote: (sc.scene_actions ?? []).join(' '),
-        location: sc.location ?? '',
-        time_of_day: sc.time_of_day ?? '',
-        mood: `${sc.emotion_beat?.start ?? ''} → ${sc.emotion_beat?.end ?? ''}`,
-        characters_present: sc.characters_in_scene ?? [],
-        estimated_duration_seconds: sc.estimated_seconds ?? 0,
-        sort_order: i,
+        scene_id: r.id,
+        narrative_summary: narrEn.get(r.id) ?? r.narrativeNative,
+        narrative_summary_native: r.narrativeNative,
+        original_text_quote: r.quote,
+        location: r.location,
+        time_of_day: r.timeOfDay,
+        mood: moodEn.get(r.id) ?? r.moodNative,
+        mood_native: r.moodNative,
+        i18n_provenance: {
+          narrative_summary: i18nHash(r.narrativeNative),
+          mood: i18nHash(r.moodNative),
+        },
+        characters_present: r.chars,
+        estimated_duration_seconds: r.seconds,
+        sort_order: r.i,
       })),
     )
   }
@@ -183,29 +206,45 @@ export async function persistShotsToDb(
 
   // shots (shot_sequence — 대사 보유)
   if (shotSequence.shots.length) {
+    // 언어 경계(S3): action_description(파이프라인 산출) → EN base 파생(이미 영어면 skip). 표시는 _native.
+    const shRows = shotSequence.shots.map((it, i) => {
+      const chars = (it.assets?.characters ?? [])
+        .map((c) => c.id)
+        .filter((id): id is string => typeof id === 'string')
+      return {
+        sceneMainId: writerSceneIdToMain(it.S.scene_id),
+        shotMainId: writerShotIdToMain(it.shot_id, it.S.scene_id),
+        shotType: normShotType(it.V?.camera?.type),
+        actionNative: it.S?.character_action ?? '',
+        chars: Array.from(new Set(chars)),
+        dialogue: it.S?.dialogue,
+        duration: it.duration_seconds ?? 5,
+        i,
+      }
+    })
+    const actionEn = await deriveEnBatch(
+      shRows.map((r) => ({ id: r.shotMainId, native: r.actionNative })),
+      'shot action description',
+    )
     await supabaseAdmin.from('shots').insert(
-      shotSequence.shots.map((it, i) => {
-        const chars = (it.assets?.characters ?? [])
-          .map((c) => c.id)
-          .filter((id): id is string => typeof id === 'string')
-        const dialogue = it.S?.dialogue
-        return {
-          project_id: projectId,
-          scene_id: writerSceneIdToMain(it.S.scene_id),
-          shot_id: writerShotIdToMain(it.shot_id, it.S.scene_id),
-          shot_type: normShotType(it.V?.camera?.type),
-          action_description: it.S?.character_action ?? '',
-          characters: Array.from(new Set(chars)),
-          duration_seconds: it.duration_seconds ?? 5,
-          generation_method: 'I2V',
-          dialogue_lines: dialogue
-            ? [{ characterId: chars[0] ?? null, text: dialogue, emotion: '', delivery: '', durationHint: 0 }]
-            : [],
-          camera_config: { ...DEFAULT_CAMERA },
-          lighting_config: { ...DEFAULT_LIGHTING },
-          sort_order: i,
-        }
-      }),
+      shRows.map((r) => ({
+        project_id: projectId,
+        scene_id: r.sceneMainId,
+        shot_id: r.shotMainId,
+        shot_type: r.shotType,
+        action_description: actionEn.get(r.shotMainId) ?? r.actionNative,
+        action_description_native: r.actionNative,
+        i18n_provenance: { action_description: i18nHash(r.actionNative) },
+        characters: r.chars,
+        duration_seconds: r.duration,
+        generation_method: 'I2V',
+        dialogue_lines: r.dialogue
+          ? [{ characterId: r.chars[0] ?? null, text: r.dialogue, emotion: '', delivery: '', durationHint: 0 }]
+          : [],
+        camera_config: { ...DEFAULT_CAMERA },
+        lighting_config: { ...DEFAULT_LIGHTING },
+        sort_order: r.i,
+      })),
     )
 
     // scene 길이를 데쿠파주(shots) duration 합으로 수렴 (2026-06-24).

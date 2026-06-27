@@ -290,7 +290,7 @@ export function worldAssetToRegisterInput(
     name: asset.name,
     alias: '',
     background: '',
-    description: asset.visualDescription ?? '',
+    description: asset.visualDescriptionNative ?? asset.visualDescription ?? '',
     prompt: asset.visualDescription ?? '',
     referenceImages: wide ? [wide] : [],
     views: { single, fiveView: [], sixteenAngle: [] },

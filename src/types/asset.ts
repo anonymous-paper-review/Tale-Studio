@@ -62,6 +62,8 @@ export interface CharacterAsset {
   /** Writer 정의 계승 — asset-storage 등록 시 description/prompt로 전파 */
   description?: string
   fixedPrompt?: string
+  /** 표시용 외형 — 유저 언어(characters.appearance_native). 없으면 fixedPrompt(영어 base) 폴백. (language boundary S2) */
+  appearanceNative?: string
   /** 현재 룩(전역 디자인 토큰 + 의상) 지문 — stale 비교 시 전달(C2). 룩 미반영이면 null. */
   lookFingerprint?: string | null
   /** 뷰별 후보 히스토리 (character_image_candidates). 없으면 빈 객체. */
@@ -74,8 +76,10 @@ export interface WorldAsset {
   sceneId: string
   wideShot: string | null
   establishingShot: string | null
-  /** Writer/Producer 정의 계승 — asset-storage 등록 시 description/prompt로 전파 */
+  /** Writer/Producer 정의 계승 — asset-storage 등록 시 prompt(생성)로 전파. 영어 base. */
   visualDescription?: string
+  /** 표시·등록 description 용 — 유저 언어(locations.visual_description_native). 없으면 visualDescription 폴백. (S2b) */
+  visualDescriptionNative?: string
   timeOfDay?: string
   mood?: string
   purpose?: string

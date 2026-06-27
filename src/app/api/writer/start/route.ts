@@ -10,6 +10,7 @@ import { createRun, getActiveRun } from '@/lib/writer/run-store';
 import { WRITER_TOTAL_UNITS, triggerWriterStep } from '@/lib/writer/pipeline/steps';
 import type { PipelineInput, Genre, CastContract } from '@/lib/writer/types/pipeline';
 import { triggerCharacterDrafts } from '@/lib/artist/draft-trigger';
+import { applyProducerI18n } from '@/lib/writer/i18n/derive-en';
 
 // producer 핸드오프 배경 페이로드(원천 rich shape). writer 내부 BackgroundContract 와 분리 —
 //   locations 테이블엔 full 필드로 즉시 upsert 하고, 파이프라인엔 BackgroundContract 로 매핑해 전달한다.
@@ -125,6 +126,17 @@ export async function POST(req: NextRequest) {
     }
     if (backgrounds?.locations?.length) {
       await upsertProducerBackgrounds(projectId, backgrounds);
+    }
+
+    // 1.5 언어 경계(S1a): producer native 자유서술(외형·배경)을 영어 base 로 파생 → DB 주 컬럼(EN) + `_native` 보존.
+    //   동기 실행(Hobby `after()` 죽음 회피) + best-effort(실패해도 핸드오프 진행, 주 컬럼=native 유지).
+    //   drafts/step 트리거보다 먼저 await → 캐릭터 초안 이미지가 EN appearance 를 사용. (표시→`_native` 재배선은 S2)
+    if (cast?.characters?.length || backgrounds?.locations?.length) {
+      const n = await applyProducerI18n(projectId, cast, backgrounds).catch((e) => {
+        console.error('[writer/start] i18n derive failed (proceeding):', e);
+        return { characters: 0, locations: 0 };
+      });
+      console.log(`[writer/start] i18n EN base: chars=${n.characters} locs=${n.locations}`);
     }
 
     // 2. run 시작 (genre/cast seed → s0/s2 생략).

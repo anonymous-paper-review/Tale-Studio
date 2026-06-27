@@ -805,7 +805,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
               localId: location.id as string,
               locationId: location.location_id as string,
               name: (location.name as string) ?? '',
-              visualDescription: ((location.visual_description as string | null) ?? (location.style_description as string | null) ?? ''),
+              visualDescription: ((location.visual_description_native as string | null) ?? (location.visual_description as string | null) ?? (location.style_description as string | null) ?? ''),
               purpose: (location.purpose as string | null) ?? '',
               origin,
               userEdited: location.user_edited === true,

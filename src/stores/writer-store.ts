@@ -688,7 +688,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         locations: (locations ?? []).map((l) => ({
           locationId: l.location_id,
           name: l.name,
-          visualDescription: l.visual_description ?? '',
+          visualDescription: l.visual_description_native ?? l.visual_description ?? '',
           timeOfDay: l.time_of_day ?? '',
           lightingDirection: l.lighting_direction ?? '',
         })),
