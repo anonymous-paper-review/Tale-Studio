@@ -174,5 +174,11 @@ KO-only → `_en` sibling 추가 대상:
 
 ### S3 완료 — 러프보드 양 경로(db_fallback + rich) + writer DB 필드 전부 생성=EN / 표시=native.
 
-### 후속 (첫 출하 밖)
-- **S4** locale 감지(en→SSO→ASCII/LLM) · **S5** 표시 locale 배선 · **S6** stale/재생성 UX.
+### S4 — locale 해석 (foundation) ✅ (2026-06-27)
+- `src/lib/locale.ts`: `detectLocaleFromText`(한글→'ko' rule-base) + `DEFAULT_LOCALE='en'`.
+- `api/writer/start`(handoff): `locale_locked` 아니면 스토리 언어 감지 → `projects.locale` 확정 + lock. best-effort.
+- 흐름: 기본 'en'(S0) → 첫 콘텐츠(handoff)에서 확정. (producer 가 이미 `dialogueLanguage` 추출 — 후속에 그걸로도 동기화 가능. SSO `user_metadata.locale` 힌트는 가용성 확인 후 추가.)
+- ⚠️ **소비자 없음(현재)**: projects.locale 을 읽어 표시를 바꾸는 건 **S5**. 콘텐츠는 이미 `_native`(유저 언어)로 표시되므로 한국어 단일 유저엔 당장 효과 없음 — 다국어 토대. tsc/lint clean.
+
+### 후속
+- **S5** locale 소비 — (a) 콘텐츠 표시를 `locale==='en' ? EN base : _native` 로 전환(S2/S3b 표시 reads 를 locale 조건부로), (b) **UI 크롬 i18n**(하드코딩 한국어 문자열 번역 + 프레임워크 — 대형 별건). · **S6** stale/재생성 UX(native 편집 → EN 낡음 배지 + 명시 재생성).

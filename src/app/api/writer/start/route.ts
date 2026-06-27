@@ -11,6 +11,7 @@ import { WRITER_TOTAL_UNITS, triggerWriterStep } from '@/lib/writer/pipeline/ste
 import type { PipelineInput, Genre, CastContract } from '@/lib/writer/types/pipeline';
 import { triggerCharacterDrafts } from '@/lib/artist/draft-trigger';
 import { applyProducerI18n } from '@/lib/writer/i18n/derive-en';
+import { detectLocaleFromText } from '@/lib/locale';
 
 // producer 핸드오프 배경 페이로드(원천 rich shape). writer 내부 BackgroundContract 와 분리 —
 //   locations 테이블엔 full 필드로 즉시 upsert 하고, 파이프라인엔 BackgroundContract 로 매핑해 전달한다.
@@ -137,6 +138,25 @@ export async function POST(req: NextRequest) {
         return { characters: 0, locations: 0 };
       });
       console.log(`[writer/start] i18n EN base: chars=${n.characters} locs=${n.locations}`);
+    }
+
+    // 1.6 언어 경계(S4): 표시 locale 확정 — 스토리(유저 입력) 언어를 rule-base 감지 → projects.locale.
+    //   기본 'en'(S0) → 첫 콘텐츠(handoff)에서 확정. locale_locked 면 보존(재핸드오프 덮어쓰기 방지). SSO 힌트는 후속.
+    //   소비자(표시 전환·UI i18n)는 S5 — 지금은 값만 기록. best-effort.
+    try {
+      const { data: proj } = await supabaseAdmin
+        .from('projects')
+        .select('locale_locked')
+        .eq('id', projectId)
+        .maybeSingle();
+      if (!proj?.locale_locked) {
+        await supabaseAdmin
+          .from('projects')
+          .update({ locale: detectLocaleFromText(story), locale_locked: true })
+          .eq('id', projectId);
+      }
+    } catch (e) {
+      console.error('[writer/start] locale resolve failed (proceeding):', e);
     }
 
     // 2. run 시작 (genre/cast seed → s0/s2 생략).
