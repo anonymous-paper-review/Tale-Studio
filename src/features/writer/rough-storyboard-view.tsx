@@ -50,6 +50,8 @@ export function RoughStoryboardView() {
   const [overrides, setOverrides] = useState<Record<string, RoughStoryboardImage>>({})
   const [detailShotId, setDetailShotId] = useState<string | null>(null)
   const [editSceneId, setEditSceneId] = useState<string | null>(null)
+  // 진행 중 단계 경과시간 라이브 표시(긴 단계에서 "멈춤" 오인 방지) — 1s 틱.
+  const [nowMs, setNowMs] = useState(0)
   // 보드 축척: zoomLevel 1(축소·6열)~6(확대·1열). 가로 열 수 cols = 7 - zoomLevel. 기본 4 → 3열(기존 동작).
   const [zoomLevel, setZoomLevel] = useState(4)
   const boardRef = useRef<HTMLDivElement>(null)
@@ -202,6 +204,14 @@ export function RoughStoryboardView() {
     return () => el.removeEventListener('wheel', onWheel)
   }, [hasShots])
 
+  // 진행 중일 때만 1초마다 현재 시각 갱신 → 현재 단계 경과시간 라이브 표시(shotCheck 등 100s+ 단계가 "멈춘" 듯 보이는 오인 방지).
+  useEffect(() => {
+    if (hasShots || !running) return
+    setNowMs(Date.now())
+    const t = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [hasShots, running])
+
   // 보드 drag-to-scroll (빈 영역을 잡고 끌면 패닝). 버튼/입력 위에서 시작한 드래그는 무시.
   const handleBoardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
@@ -245,6 +255,10 @@ export function RoughStoryboardView() {
 
   // ── 파이프라인 진행 중 (샷이 아직 없음) ─────────────────────────────────
   if (!hasShots && running) {
+    // 현재 단계 경과시간 — last_timestamp(직전 단계 종료=현재 단계 시작) 기준. 라이브로 늘어나며 "작동 중"임을 보임.
+    const stageElapsedSec = status?.last_timestamp
+      ? Math.max(0, Math.floor((nowMs - Date.parse(status.last_timestamp)) / 1000))
+      : null
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
         <Loader2 className="size-6 animate-spin text-muted-foreground" aria-busy="true" />
@@ -252,9 +266,12 @@ export function RoughStoryboardView() {
         <p className="text-sm text-muted-foreground">
           <span className="font-mono tabular-nums">{status?.progress_percent ?? 0}%</span>
           {status?.current_stage ? ` · ${status.current_stage}` : ''}
+          {stageElapsedSec != null ? (
+            <span className="font-mono tabular-nums"> · {stageElapsedSec}s 진행 중</span>
+          ) : null}
         </p>
         <p className="text-xs text-muted-foreground">
-          완료되면 샷별 러프 스토리보드가 자동으로 생성됩니다.
+          샷 설계·검증 같은 복잡한 단계는 1~2분 걸릴 수 있어요 — 멈춘 게 아니라 진행 중입니다.
         </p>
       </div>
     )
