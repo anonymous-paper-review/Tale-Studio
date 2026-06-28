@@ -12,6 +12,7 @@ import type { PipelineInput, Genre, CastContract } from '@/lib/writer/types/pipe
 import { triggerCharacterDrafts } from '@/lib/artist/draft-trigger';
 import { applyProducerI18n } from '@/lib/writer/i18n/derive-en';
 import { detectLocaleFromText } from '@/lib/locale';
+import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
 
 // producer 핸드오프 배경 페이로드(원천 rich shape). writer 내부 BackgroundContract 와 분리 —
 //   locations 테이블엔 full 필드로 즉시 upsert 하고, 파이프라인엔 BackgroundContract 로 매핑해 전달한다.
@@ -113,6 +114,28 @@ export async function POST(req: NextRequest) {
     }
     if (!story || typeof story !== 'string') {
       return NextResponse.json({ error: 'story required' }, { status: 400 });
+    }
+
+    // 0.5 콘텐츠 안전 힌트(인지용, 비차단): 미성년+위해(피·폭력) 조합은 Gemini PROHIBITED_CONTENT
+    //   차단을 유발하기 쉽다. 막지 않고 경고만 남겨 작성자가 사전에 우회(예: 피→검은 액체 심볼릭)하게 한다.
+    try {
+      const hintText = [
+        story,
+        ...(cast?.characters ?? []).map(
+          (c) => `${c.appearance ?? ''} ${JSON.stringify(c.arc ?? '')} ${JSON.stringify(c.motivation ?? '')}`,
+        ),
+        ...(backgrounds?.locations ?? []).map((b) => b.visual_description ?? ''),
+      ].join(' ');
+      const hint = assessContentSafetyRisk(hintText);
+      if (hint.risky) {
+        console.warn(
+          `[writer/start] ⚠️ content-safety-hint(${projectId}): 미성년+위해 조합 감지 — Gemini 차단 위험. ` +
+            `minor=[${hint.minorTerms.join(', ')}] harm=[${hint.harmTerms.join(', ')}]. ` +
+            `차단 시 해당 표현을 심볼릭(예: 피→검은 액체)으로 우회 권장.`,
+        );
+      }
+    } catch {
+      // 힌트는 best-effort — 절대 핸드오프를 막지 않는다.
     }
 
     // 이미 실행 중이면 거부 (중복 시작 방지).

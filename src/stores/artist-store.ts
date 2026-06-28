@@ -388,6 +388,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           { data: dbCandidates },
           { data: project },
           { data: dbLocCandidates },
+          { data: dbMainJobs },
         ] = await Promise.all([
           supabase
             .from('scenes')
@@ -415,6 +416,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .from('location_image_candidates')
             .select('id, location_id, view, url, source_hash, is_selected, generated_at')
             .eq('project_id', projectId),
+          supabase
+            .from('generation_jobs')
+            .select('id, target')
+            .eq('project_id', projectId)
+            .eq('kind', 'character_view')
+            .eq('status', 'queued'),
         ])
 
         // 후보 히스토리: character_id + viewKey 로 그룹핑, generated_at desc 정렬
@@ -556,6 +563,40 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             selectedCharacterId: characterAssets[0]?.characterId ?? null,
             selectedLocationId: worldAssets[0]?.locationId ?? null,
           })
+
+          // webhook 누락 백스톱(2026-06-28): 핸드오프 draft 의 main 잡은 webhook 으로만 완료되는데,
+          //   로컬 터널이 빗나가면 영구 queued 로 남아 view_main 이 안 채워진다. autogen 은 main 을
+          //   폴링하지 않으므로(서버 초안 단일 생산), 여기서 queued main 잡을 poll-reconcile 로 채운다.
+          //   fire-and-forget — 로드 차단 없이 완료되는 대로 해당 캐릭터 main 을 갱신.
+          const queuedMainByChar = new Map<string, string>()
+          for (const j of dbMainJobs ?? []) {
+            const t = (j.target ?? {}) as { characterId?: string; view?: string }
+            if (t.view === 'main' && t.characterId) {
+              queuedMainByChar.set(t.characterId, j.id as string)
+            }
+          }
+          for (const c of characterAssets) {
+            if (c.views.main != null) continue
+            const jobId = queuedMainByChar.get(c.characterId)
+            if (!jobId) continue
+            const charId = c.characterId
+            void pollGenerationJob(jobId)
+              .then((url) => {
+                set((state) => ({
+                  characterAssets: state.characterAssets.map((ca) =>
+                    ca.characterId === charId
+                      ? { ...ca, views: { ...ca.views, main: url } }
+                      : ca,
+                  ),
+                }))
+              })
+              .catch((e) =>
+                console.warn(
+                  `[artist] main draft reconcile failed ${charId}:`,
+                  e instanceof Error ? e.message : e,
+                ),
+              )
+          }
           return
         }
       } catch (err) {

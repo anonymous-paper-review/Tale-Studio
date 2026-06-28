@@ -1,5 +1,10 @@
 // Gemini 클라이언트 (생성 전용)
-import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import {
+  GoogleGenerativeAI,
+  GenerativeModel,
+  HarmCategory,
+  HarmBlockThreshold,
+} from '@google/generative-ai';
 import { recordRawCall } from './raw_collector';
 import { repairJson } from './json_repair';
 import { withLlmRetry } from './retry';
@@ -10,6 +15,16 @@ if (!apiKey) {
 }
 
 const client = new GoogleGenerativeAI(apiKey || '');
+
+// 창작(다크/폭력/공포 픽션) 도구 — 기본 안전필터가 정상적인 서사(납치/유혈/공포 등)를
+//   PROHIBITED_CONTENT 로 차단해 파이프라인을 죽인다(2026-06-28 shotCheck 실패). 전 카테고리 BLOCK_NONE.
+//   주의: 일부 코어 안전(아동 성착취 등)은 BLOCK_NONE 으로도 비활성화 불가(구글 비설정 영역).
+const SAFETY_SETTINGS = [
+  HarmCategory.HARM_CATEGORY_HARASSMENT,
+  HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+  HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+  HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+].map((category) => ({ category, threshold: HarmBlockThreshold.BLOCK_NONE }));
 
 // per-request 타임아웃 — 절전/네트워크 stall 로 호출이 무한정 매달리는 것 방지.
 //   초과 시 SDK 가 AbortError 를 던지고, retry 분류기가 transient 로 보아 재시도한다.
@@ -47,6 +62,7 @@ export async function geminiGenerate(
       temperature: opts.temperature ?? 0.7,
       responseMimeType: mime,
     },
+    safetySettings: SAFETY_SETTINGS,
   });
 
   let text = '';

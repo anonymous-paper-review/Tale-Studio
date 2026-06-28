@@ -11,6 +11,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "seed:test-accounts": "node scripts/seed-test-accounts.mjs",
+    "seed:producer:snapshot": "node scripts/producer-seed.mjs snapshot",
+    "seed:producer:clone": "node scripts/producer-seed.mjs clone",
+    "seed:producer:reset": "node scripts/producer-seed.mjs reset",
+    "seed:producer:prune": "node scripts/producer-seed.mjs prune",
+    "seed:producer:status": "node scripts/producer-seed.mjs status",
     "e2e:db": "node e2e/harness.mjs"
   },
   "dependencies": {

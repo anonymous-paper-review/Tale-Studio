@@ -25,6 +25,14 @@ interface L3Result {
   budget_issues: ValidationIssue[];
 }
 
+// Gemini 응답 shape 비결정성 방어: 기대형 { scene_plans: [...] } 와 최상위 배열 [...] 둘 다 수용.
+//   (둘째 형태를 못 받으면 멀쩡한 플랜 전체가 []로 버려져 shot_count=0 → 샷 붕괴, 2026-06-28 사고.)
+export function extractScenePlans(raw: unknown): SceneCinematography[] {
+  if (Array.isArray(raw)) return raw as SceneCinematography[];
+  const sp = (raw as { scene_plans?: unknown } | null)?.scene_plans;
+  return Array.isArray(sp) ? (sp as SceneCinematography[]) : [];
+}
+
 export async function runSceneCinematography(
   genre: Genre,
   characters: Characters,
@@ -153,7 +161,7 @@ ${sceneToShotHint}
 
   // rule-base 자기 검증 (V3 내용을 V3에서 확인) — enum/수치/상류(V2 팔레트·씬 등장인물) 정합.
   //   CRITICAL 위반 시 위반 목록을 첨부해 1회 교정 재생성하고, CRITICAL 이 더 적은 쪽을 채택한다.
-  let scenePlans = Array.isArray(llmResult?.scene_plans) ? llmResult.scene_plans : [];
+  let scenePlans = extractScenePlans(llmResult);
   let validation = validateSceneCinematography(scenePlans, scenes, worldVisual);
   const criticalCount = (v: typeof validation) =>
     v.issues.filter((i) => i.severity === 'CRITICAL').length;
@@ -173,7 +181,7 @@ ${buildCorrectionNote(validation.issues)}`;
       model: describeAxisConfig(axisConfig),
       provider: axisConfig.provider,
     });
-    const repairedPlans = Array.isArray(repaired?.scene_plans) ? repaired.scene_plans : [];
+    const repairedPlans = extractScenePlans(repaired);
     const repairedValidation = validateSceneCinematography(repairedPlans, scenes, worldVisual);
     // malformed/빈 repair 는 채택 안 함(원본 유지) — "not iterable" 크래시·퇴화 방지.
     if (repairedPlans.length > 0 && criticalCount(repairedValidation) <= criticalCount(validation)) {
