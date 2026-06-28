@@ -775,7 +775,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       // 배경은 locations 테이블이 단일 진실 (pull) — producer/writer/artist 공용.
       const { data: locationRows } = await supabase
         .from('locations')
-        .select('id, location_id, name, visual_description, style_description, purpose, origin, user_edited, last_writer_run_id')
+        .select('id, location_id, name, visual_description, visual_description_native, style_description, purpose, origin, user_edited, last_writer_run_id')
         .eq('project_id', projectId)
 
       if (project) {
