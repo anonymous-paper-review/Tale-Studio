@@ -3,12 +3,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  Check,
   ChevronsLeft,
   ChevronsRight,
+  Copy,
   Loader2,
   Send,
   Upload,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -28,6 +31,35 @@ import {
   STAGE_PLACEHOLDER,
   CHAT_SUPPORTED_STAGES,
 } from '@/lib/constants'
+
+/** 말풍선 우상단 호버 복사 버튼. 클립보드 복사 후 1.5초간 체크 표시. */
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      toast.error('복사에 실패했어요.')
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      title="메시지 복사"
+      aria-label="메시지 복사"
+      className="absolute right-1 top-1 rounded-md border border-border bg-card/80 p-1 text-muted-foreground opacity-0 backdrop-blur transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+    >
+      {copied ? (
+        <Check className="size-3 text-success" />
+      ) : (
+        <Copy className="size-3" />
+      )}
+    </button>
+  )
+}
 
 export function GlobalChat() {
   const messages = useGlobalChatStore((s) => s.messages)
@@ -220,7 +252,7 @@ export function GlobalChat() {
                 <div
                   key={msg.id}
                   className={cn(
-                    'rounded-lg px-3 py-2 text-xs whitespace-pre-wrap',
+                    'group relative select-text rounded-lg px-3 py-2 pr-8 text-xs whitespace-pre-wrap',
                     msg.role === 'user'
                       ? 'ml-4 bg-primary/10 text-foreground'
                       : 'mr-4 bg-muted text-foreground',
@@ -228,13 +260,14 @@ export function GlobalChat() {
                 >
                   <span
                     className={cn(
-                      'mr-1.5 inline-flex items-center rounded-full border px-1.5 py-0 align-middle text-[9px] font-medium',
+                      'mr-1.5 inline-flex items-center rounded-full border px-1.5 py-0 align-middle text-[9px] font-medium select-none',
                       badgeClass,
                     )}
                   >
                     {STAGE_BADGE[msg.stage]}
                   </span>
                   {msg.content}
+                  <CopyButton text={msg.content} />
                 </div>
               )
             })}
