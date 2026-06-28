@@ -81,7 +81,7 @@ export interface LookTokens {
  */
 export function computeLookFingerprint(
   tokens: LookTokens | null | undefined,
-  costume: string | null | undefined,
+  costume: string | string[] | null | undefined,
 ): string | null {
   const norm = (s: string | null | undefined) => (s ?? '').trim().replace(/\s+/g, ' ')
   const art = norm(tokens?.l1?.art_style)
@@ -90,7 +90,9 @@ export function computeLookFingerprint(
     .map(norm)
     .filter(Boolean)
     .sort()
-  const cost = norm(costume)
+  // costume 은 DB characters.costume(text[]) 라 배열로 들어온다 — 합쳐서 정규화(단일 문자열도 허용).
+  //   배열을 norm 에 그대로 넘기면 (배열 ?? '').trim() 이 깨짐(generate-sheet 'trim is not a function' 버그, 2026-06-28).
+  const cost = norm(Array.isArray(costume) ? costume.join(', ') : costume)
   const parts: string[] = []
   if (art) parts.push(`art:${art}`)
   if (shape) parts.push(`shape:${shape}`)
