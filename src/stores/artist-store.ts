@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { Scene, SceneManifest, Location as ManifestLocation, CharacterAsset, WorldAsset } from '@/types'
 import { type CharacterViewKey } from '@/types/asset'
 import { CHARACTER_DIRECTIONAL_VIEWS } from '@/lib/artist/turnaround'
-import { candidateViewToViewKey, computeLookFingerprint, computeWorldImageSourceHash, type CandidateImage, type LookTokens } from '@/lib/image-provenance'
+import { candidateViewToViewKey, classifyImageStale, computeLookFingerprint, computeWorldImageSourceHash, type CandidateImage, type LookTokens } from '@/lib/image-provenance'
 import { buildWorldPrompt } from '@/lib/prompts'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -342,6 +342,8 @@ interface ArtistState {
     actor?: GenerationActor,
   ) => Promise<void>
   autoGenerateBaseImages: () => Promise<void>
+  /** 온보딩 "진행" 단일 진입점 — look-pending 초안 + writer-추가 무이미지 캐릭터의 main 을 재생성(유저 클릭만). */
+  refreshLookPendingDrafts: () => Promise<void>
   applyUpdates: (updates: ArtistUpdate[]) => Promise<void>
   selectBoostPreset: (preset: string) => void
   setImageProvider: (provider: ImageProvider) => void
@@ -761,7 +763,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         throw new Error(body.error ?? `HTTP ${res.status}`)
       }
       // 비동기: 라우트는 jobId만 반환 — 완료까지 polling (webhook이 서버사이드로 storage+DB 갱신).
-      const body = (await res.json()) as { jobId?: string; skipped?: boolean }
+      const body = (await res.json()) as { jobId?: string; skipped?: boolean; deduped?: boolean }
+      // 서버 dedupe(이미 같은 슬롯에 queued 잡 존재) → 새 fal 제출 없이 종료. 에러/재시도 아님(중복 방지).
+      if (body.deduped) {
+        alog(`[autogen] char ${key} — 이미 큐에 있음(서버 dedupe), 제출 생략`)
+        return
+      }
       // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음. 에러 아님: 조용히 종료.
       if (body.skipped || !body.jobId) {
         alog(`[autogen] char ${key} — give-up 게이트로 자동 생성 skip`)
@@ -1078,6 +1085,28 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const t0 = Date.now()
     await runPool(restTasks, CONCURRENCY)
     atime('autogen total', Date.now() - t0, { rest: restTasks.length })
+  },
+
+  // 온보딩 "진행" 단일 진입점(유저 클릭만 — architecture §5). look-pending 초안(룩 도착 전 생성) +
+  //   writer 가 추가한 무이미지 캐릭터(origin='writer' && main 없음)의 main 을 재생성한다. 멱등:
+  //   generateCharacterView 가 generatingViews/서버 dedupe 로 중복 제출을 막는다.
+  refreshLookPendingDrafts: async () => {
+    const { characterAssets } = get()
+    const targets = characterAssets.filter((c) => {
+      const selectedMain = (c.viewCandidates['main'] ?? []).find((cand) => cand.isSelected)
+      const lookPending =
+        classifyImageStale(c.fixedPrompt, c.lookFingerprint ?? null, {
+          sourceHash: selectedMain?.sourceHash ?? null,
+          appearanceHash: selectedMain?.appearanceHash ?? null,
+        }) === 'look-pending'
+      const writerNoMain = c.origin === 'writer' && c.views.main == null
+      return lookPending || writerNoMain
+    })
+    if (targets.length === 0) return
+    await runPool(
+      targets.map((c) => () => get().generateCharacterView(c.characterId, 'main', 'ui')),
+      ARTIST_GENERATION_CONCURRENCY,
+    )
   },
 
   applyUpdates: async (updates) => {

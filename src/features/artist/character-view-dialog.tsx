@@ -1,18 +1,17 @@
 'use client'
 
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles, RefreshCw } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { useArtistStore } from '@/stores/artist-store'
 import { CHARACTER_VIEW_LABELS, type CharacterViewKey } from '@/types/asset'
-import { isImageStale } from '@/lib/image-provenance'
+import { classifyImageStale } from '@/lib/image-provenance'
 
 type Props = {
   charId: string | null
@@ -44,10 +43,13 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
   const isDirectional = !isObject && view !== 'main'
   const needsMain = isDirectional && !char.views.main
 
-  // stale 판정: 선택된 후보의 sourceHash 기준 (정보 표시만)
+  // stale 원인 분류(027): look-pending(룩만 도착) vs edited(외형 변경). dialog 포커스에서만 표시.
   const candidates = char.viewCandidates[view] ?? []
   const selectedCandidate = candidates.find((c) => c.isSelected)
-  const isStale = isImageStale(char.fixedPrompt, char.lookFingerprint ?? null, selectedCandidate?.sourceHash ?? null)
+  const staleClass = classifyImageStale(char.fixedPrompt, char.lookFingerprint ?? null, {
+    sourceHash: selectedCandidate?.sourceHash ?? null,
+    appearanceHash: selectedCandidate?.appearanceHash ?? null,
+  })
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -59,12 +61,12 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
         </DialogHeader>
 
         <div className="space-y-3">
-          {isStale && (
-            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              <Badge variant="destructive" className="shrink-0 px-1.5 py-0 text-[10px]">
-                낡음
-              </Badge>
-              외모가 바뀌어 이 이미지는 낡았어요 — 재생성하거나 후보를 고르세요
+          {staleClass !== 'fresh' && (
+            <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+              <RefreshCw className="size-3.5 shrink-0" />
+              {staleClass === 'look-pending'
+                ? '최종 룩 반영 전 초안이에요 — 재생성하면 최종 그림체로 다시 만들어요'
+                : '외형이 수정됐어요 — 재생성하면 새 외형이 반영돼요'}
             </div>
           )}
 
@@ -97,7 +99,10 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
               </p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {candidates.map((cand) => {
-                  const candStale = isImageStale(char.fixedPrompt, char.lookFingerprint ?? null, cand.sourceHash)
+                  const candClass = classifyImageStale(char.fixedPrompt, char.lookFingerprint ?? null, {
+                    sourceHash: cand.sourceHash,
+                    appearanceHash: cand.appearanceHash ?? null,
+                  })
                   return (
                     <button
                       key={cand.id}
@@ -116,9 +121,9 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
                         alt="후보 이미지"
                         className="size-full object-cover"
                       />
-                      {candStale && (
-                        <span className="absolute bottom-0 left-0 right-0 bg-black/60 px-0.5 py-px text-center text-[9px] leading-tight text-white">
-                          옛 묘사
+                      {candClass !== 'fresh' && (
+                        <span className="absolute bottom-0 left-0 right-0 bg-amber-500/80 px-0.5 py-px text-center text-[9px] leading-tight text-white">
+                          {candClass === 'look-pending' ? '룩 이전' : '외형 이전'}
                         </span>
                       )}
                     </button>

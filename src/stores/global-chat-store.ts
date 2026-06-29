@@ -38,7 +38,10 @@ export interface ChatSuggestion {
   id: string
   stage: StageId
   content: string
-  action: { kind: 'navigate'; targetStage: StageId; label: string } | null
+  action:
+    | { kind: 'navigate'; targetStage: StageId; label: string }
+    | { kind: 'artist-refresh-look'; label: string }
+    | null
 }
 
 interface GlobalChatState {

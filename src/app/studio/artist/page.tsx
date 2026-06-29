@@ -16,6 +16,7 @@ import {
   evaluateDirectorGate,
   type WriterGateStatus,
 } from '@/lib/lifecycle'
+import { classifyImageStale, lookVersionKey } from '@/lib/image-provenance'
 
 type ArtistTab = 'characters' | 'world' | 'inventory'
 
@@ -93,6 +94,19 @@ export default function VisualPage() {
   const directorGate = evaluateDirectorGate({ writer: writerGateStatus, artist: artistGate })
   const writerReady = writerGateStatus.state === 'ready'
 
+  // 온보딩 갭(상태기반): look-pending 초안 + writer-추가 무이미지 캐릭터 수. 룩 버전키로 해소 추적.
+  const lookVersion = lookVersionKey(characterAssets.map((c) => c.lookFingerprint ?? null))
+  const refreshGap = characterAssets.reduce((n, c) => {
+    const sel = (c.viewCandidates.main ?? []).find((cand) => cand.isSelected)
+    const lookPending =
+      classifyImageStale(c.fixedPrompt, c.lookFingerprint ?? null, {
+        sourceHash: sel?.sourceHash ?? null,
+        appearanceHash: sel?.appearanceHash ?? null,
+      }) === 'look-pending'
+    const writerNoMain = c.origin === 'writer' && c.views.main == null
+    return n + (lookPending || writerNoMain ? 1 : 0)
+  }, 0)
+
   // Producer handoff 직후 characters가 먼저 들어오면 Writer가 계속 도는 동안에도 Artist 작업을 시작한다.
   const ready = charsLoaded || !!writerStatus?.pipeline_completed || enterFallback
 
@@ -131,6 +145,15 @@ export default function VisualPage() {
     const id = setInterval(() => loadData(), 3000)
     return () => clearInterval(id)
   }, [projectId, ready, loadData])
+
+  // writer 완료 이벤트(writerReady flip) → 데이터 1회 재로드(룩/writer-추가 캐릭터 반영). 폴링 아님.
+  const writerReadyReloadRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!projectId || !writerReady) return
+    if (writerReadyReloadRef.current === projectId) return
+    writerReadyReloadRef.current = projectId
+    void loadData()
+  }, [projectId, writerReady, loadData])
 
   // 진입(ready) 시 비어있는 이미지 자동생성 (1회+캐시).
   //   mainReady 진입: main 은 이미 있으므로 비어있는 4방향만 i2i 생성.
@@ -182,7 +205,7 @@ export default function VisualPage() {
   const generatingCount = generatingViews.length + generatingLocations.length
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   useEffect(() => {
-    if (!projectId || !ready || !writerReady || !artistGate.ready) return
+    if (!projectId || !ready || !writerReady || !artistGate.ready || refreshGap > 0) return
     if (nudgeOfferedRef.current === projectId) return
     if (characterAssets.length === 0 || generatingCount > 0) return
     const t = setTimeout(() => {
@@ -210,7 +233,22 @@ export default function VisualPage() {
     offerSuggestion,
     writerReady,
     artistGate.ready,
+    refreshGap,
   ])
+
+  // 온보딩(상태기반, 2시점=mount/ready + writerReady flip): 갭>0 면 "최종 룩으로 정리" 제안.
+  //   offerSuggestion 이 id(lookVersion)로 세션 dedupe + 단일활성 → 핑퐁/재진입 안전, 재실행(새 룩)=새 id=재발사.
+  //   exit 넛지와 배타(위 effect 는 refreshGap>0 면 return). 비용 트리거는 유저가 버튼 클릭할 때만.
+  useEffect(() => {
+    if (!projectId || !ready) return
+    if (refreshGap <= 0) return
+    offerSuggestion({
+      id: `artist-refresh-${projectId}-${lookVersion}`,
+      stage: 'artist',
+      content: `writer가 최종 그림체를 정했어요. 대표 이미지 중 ${refreshGap}건이 그 전에 만든 초안이거나 아직 없어요. "최종 룩으로 정리"를 누르면 새 그림체로 한 번에 만들어드려요.`,
+      action: { kind: 'artist-refresh-look', label: '최종 룩으로 정리' },
+    })
+  }, [projectId, ready, writerReady, refreshGap, lookVersion, offerSuggestion])
 
   // 진입 전 = 백그라운드 생성/ main 준비 진행 중 → progress bar 블로킹.
   //   단, 한 번이라도 진입한 프로젝트면(gateOpen) 탭 전환 후에도 다시 막지 않는다.

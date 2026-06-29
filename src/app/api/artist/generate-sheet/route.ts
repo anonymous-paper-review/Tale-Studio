@@ -12,6 +12,7 @@ import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
 import {
   createGenerationJob,
   countFailedJobsForTarget,
+  hasQueuedCharacterViewJob,
   AUTO_GENERATION_GIVE_UP_THRESHOLD,
   type GenerationJobActor,
 } from '@/lib/generation-jobs'
@@ -81,6 +82,13 @@ export async function POST(req: Request) {
         )
         return NextResponse.json({ ok: true, skipped: true, reason: 'gave_up', failed })
       }
+    }
+
+    // 중복 제출 가드(DB-authoritative): 같은 슬롯(캐릭터×뷰)에 이미 queued 잡이 있으면 새 fal 제출 생략.
+    //   in-memory generatingViews 는 remount 에 소실되므로 서버 DB 가 진실. 온보딩 "진행" 재클릭/
+    //   탭 복귀 시 in-flight 슬롯의 이중 과금을 막는다. 정당한 재생성(비-queued 슬롯)은 그대로 통과.
+    if (await hasQueuedCharacterViewJob(projectId, characterId, view)) {
+      return NextResponse.json({ ok: true, status: 'queued', deduped: true, view })
     }
 
     // 1. 프로젝트(workspace + 디자인 토큰) + 캐릭터 로드 (view_main = i2i reference)

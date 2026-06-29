@@ -20,6 +20,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
+import { useArtistStore } from '@/stores/artist-store'
 import { useDirectorCanvasWarmStarting } from '@/features/director/hooks/use-director-warm-starting'
 import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
@@ -130,11 +131,16 @@ export function GlobalChat() {
     await sendMessage(msg)
   }
 
-  // 프로액티브 제안 승인 — 현재 Phase 1은 'navigate' 액션만 (handoffToStage 공통 헬퍼 재사용).
+  // 프로액티브 제안 승인 — 'navigate'(stage 이동) / 'artist-refresh-look'(초안 일괄 재생성, 유저 클릭).
   const handleSuggestionAction = async () => {
     const action = suggestion?.action
     if (!action) {
       dismissSuggestion()
+      return
+    }
+    if (action.kind === 'artist-refresh-look') {
+      dismissSuggestion()
+      await useArtistStore.getState().refreshLookPendingDrafts()
       return
     }
     const path = await handoffToStage(action.targetStage)
