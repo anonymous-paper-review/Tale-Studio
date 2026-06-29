@@ -13,7 +13,12 @@
 //     → shots.characters 와 characters.character_id 가 동일 id 공간(referential 정합).
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { writerSceneIdToMain, writerShotIdToMain } from '@/lib/writer/adapters'
-import { deriveEnBatch, i18nHash } from '@/lib/writer/i18n/derive-en'
+import {
+  deriveEnBatch,
+  deriveNativeBatch,
+  i18nHash,
+  isTargetScript,
+} from '@/lib/writer/i18n/derive-en'
 import type { ShotType } from '@/types'
 import type {
   Characters,
@@ -42,6 +47,16 @@ function normRole(role: string): 'protagonist' | 'antagonist' | 'supporting' {
   return ['protagonist', 'antagonist', 'supporting'].includes(role)
     ? (role as 'protagonist' | 'antagonist' | 'supporting')
     : 'supporting'
+}
+
+// 프로젝트 표시 locale — _native 역파생(EN→유저언어) 대상 판정. 미설정/조회실패 시 'en'(역파생 skip).
+async function projectLocale(projectId: string): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from('projects')
+    .select('locale')
+    .eq('id', projectId)
+    .maybeSingle()
+  return ((data?.locale as string) ?? 'en').trim() || 'en'
 }
 
 /**
@@ -94,6 +109,7 @@ export async function persistAssetsToDb(
 
   // scenes (world 이미지 생성이 scene.mood 에 의존 → Tier 1 에 포함)
   if (scenes.scenes.length) {
+    const locale = await projectLocale(projectId)
     // 언어 경계(S3): 파이프라인 산출 자유서술(narrative/mood) → EN base 파생(이미 영어면 skip). 표시는 _native.
     const sRows = scenes.scenes.map((sc, i) => ({
       id: writerSceneIdToMain(sc.scene_id),
@@ -110,25 +126,48 @@ export async function persistAssetsToDb(
       deriveEnBatch(sRows.map((r) => ({ id: r.id, native: r.narrativeNative })), 'scene narrative summary'),
       deriveEnBatch(sRows.map((r) => ({ id: r.id, native: r.moodNative })), 'scene mood'),
     ])
+    // 표시용 _native(유저 locale): 파이프라인이 영어를 산출하므로 EN base → locale 역파생(S7).
+    //   파이프라인이 이미 타깃 언어를 준 행은 원문 보존(round-trip 회피). locale=en 이면 deriveNativeBatch=no-op.
+    const enSrc = (native: string, en: string | undefined) =>
+      isTargetScript(native, locale) ? native : en ?? native
+    const [narrKo, moodKo] = await Promise.all([
+      deriveNativeBatch(
+        sRows.map((r) => ({ id: r.id, en: enSrc(r.narrativeNative, narrEn.get(r.id)) })),
+        locale,
+        'scene narrative summary',
+      ),
+      deriveNativeBatch(
+        sRows.map((r) => ({ id: r.id, en: enSrc(r.moodNative, moodEn.get(r.id)) })),
+        locale,
+        'scene mood',
+      ),
+    ])
     await supabaseAdmin.from('scenes').insert(
-      sRows.map((r) => ({
-        project_id: projectId,
-        scene_id: r.id,
-        narrative_summary: narrEn.get(r.id) ?? r.narrativeNative,
-        narrative_summary_native: r.narrativeNative,
-        original_text_quote: r.quote,
-        location: r.location,
-        time_of_day: r.timeOfDay,
-        mood: moodEn.get(r.id) ?? r.moodNative,
-        mood_native: r.moodNative,
-        i18n_provenance: {
-          narrative_summary: i18nHash(r.narrativeNative),
-          mood: i18nHash(r.moodNative),
-        },
-        characters_present: r.chars,
-        estimated_duration_seconds: r.seconds,
-        sort_order: r.i,
-      })),
+      sRows.map((r) => {
+        const narrTx = !isTargetScript(r.narrativeNative, locale) && narrKo.has(r.id)
+        const moodTx = !isTargetScript(r.moodNative, locale) && moodKo.has(r.id)
+        return {
+          project_id: projectId,
+          scene_id: r.id,
+          narrative_summary: narrEn.get(r.id) ?? r.narrativeNative,
+          narrative_summary_native: narrKo.get(r.id) ?? r.narrativeNative,
+          original_text_quote: r.quote,
+          location: r.location,
+          time_of_day: r.timeOfDay,
+          mood: moodEn.get(r.id) ?? r.moodNative,
+          mood_native: moodKo.get(r.id) ?? r.moodNative,
+          i18n_provenance: {
+            narrative_summary: i18nHash(r.narrativeNative),
+            mood: i18nHash(r.moodNative),
+            // 역파생(EN→native) 출처 해시 — EN 주 컬럼 변경 시 _native stale 판정.
+            ...(narrTx ? { narrative_summary_native: i18nHash(narrEn.get(r.id) ?? r.narrativeNative) } : {}),
+            ...(moodTx ? { mood_native: i18nHash(moodEn.get(r.id) ?? r.moodNative) } : {}),
+          },
+          characters_present: r.chars,
+          estimated_duration_seconds: r.seconds,
+          sort_order: r.i,
+        }
+      }),
     )
   }
 
@@ -226,15 +265,30 @@ export async function persistShotsToDb(
       shRows.map((r) => ({ id: r.shotMainId, native: r.actionNative })),
       'shot action description',
     )
-    await supabaseAdmin.from('shots').insert(
+    // 표시용 _native(유저 locale): EN base → locale 역파생(S7). 파이프라인이 타깃 언어를 준 행은 원문 보존.
+    const locale = await projectLocale(projectId)
+    const actionKo = await deriveNativeBatch(
       shRows.map((r) => ({
+        id: r.shotMainId,
+        en: isTargetScript(r.actionNative, locale) ? r.actionNative : actionEn.get(r.shotMainId) ?? r.actionNative,
+      })),
+      locale,
+      'shot action description',
+    )
+    await supabaseAdmin.from('shots').insert(
+      shRows.map((r) => {
+        const actTx = !isTargetScript(r.actionNative, locale) && actionKo.has(r.shotMainId)
+        return {
         project_id: projectId,
         scene_id: r.sceneMainId,
         shot_id: r.shotMainId,
         shot_type: r.shotType,
         action_description: actionEn.get(r.shotMainId) ?? r.actionNative,
-        action_description_native: r.actionNative,
-        i18n_provenance: { action_description: i18nHash(r.actionNative) },
+        action_description_native: actionKo.get(r.shotMainId) ?? r.actionNative,
+        i18n_provenance: {
+          action_description: i18nHash(r.actionNative),
+          ...(actTx ? { action_description_native: i18nHash(actionEn.get(r.shotMainId) ?? r.actionNative) } : {}),
+        },
         characters: r.chars,
         duration_seconds: r.duration,
         generation_method: 'I2V',
@@ -244,7 +298,8 @@ export async function persistShotsToDb(
         camera_config: { ...DEFAULT_CAMERA },
         lighting_config: { ...DEFAULT_LIGHTING },
         sort_order: r.i,
-      })),
+        }
+      }),
     )
 
     // scene 길이를 데쿠파주(shots) duration 합으로 수렴 (2026-06-24).
