@@ -13,6 +13,7 @@ import {
 import {
   getGenerationJobByRequestId,
   failGenerationJob,
+  classifyFalFailure,
 } from '@/lib/generation-jobs'
 import {
   finalizeCharacterViewJob,
@@ -77,7 +78,10 @@ export async function POST(req: Request) {
   if (job.status !== 'queued') return NextResponse.json({ ok: true }) // 멱등: 이미 처리됨
 
   if (body.status !== 'OK') {
-    await failGenerationJob(job.id, body.payload_error ?? 'fal webhook reported ERROR')
+    // 실패 분류(#A) 태그를 메시지 앞에 붙여 generation-status 가 moderation vs generic 을 구분하게 한다(원본 보존).
+    const raw = body.payload_error ?? 'fal webhook reported ERROR'
+    const cls = classifyFalFailure(raw)
+    await failGenerationJob(job.id, cls === 'moderation' ? `[moderation] ${raw}` : raw)
     return NextResponse.json({ ok: true })
   }
 

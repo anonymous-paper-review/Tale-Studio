@@ -14,6 +14,7 @@ import {
   countFailedJobsForTarget,
   hasQueuedCharacterViewJob,
   AUTO_GENERATION_GIVE_UP_THRESHOLD,
+  listFailedCharacterViewJobs,
   type GenerationJobActor,
 } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
@@ -30,6 +31,7 @@ import {
   type CharacterViewKey,
 } from '@/types/asset'
 import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-provenance'
+import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 
 export const runtime = 'nodejs'
 // submit만 하고 끝 — 실제 생성은 fal 큐에서 진행, 완료는 webhook(/poll reconcile)이 처리.
@@ -50,12 +52,13 @@ export async function POST(req: Request) {
     const quota = await checkUserQuota(user.id)
     if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
 
-    const { projectId, characterId, view, actor, instruction } = (await req.json()) as {
+    const { projectId, characterId, view, actor, instruction, safeMode } = (await req.json()) as {
       projectId?: string
       characterId?: string
       view?: CharacterViewKey
       actor?: string
       instruction?: string // 재생성 시 유저 델타(merge) — 룩 토대 위에 덮음(AC13).
+      safeMode?: boolean // 모더레이션 우회 재시도(#A) — 직전 실패가 moderation-class 인 슬롯에만 적용.
     }
     // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
     const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
@@ -91,6 +94,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, status: 'queued', deduped: true, view })
     }
 
+    // safe-mode 자격/상한(#A): 요청 시 슬롯의 최근 실패를 본다 — moderation-class 실패에만 safe transform 적용,
+    //   일반 실패는 원본 프롬프트로 재시도(충실도 보존). ui/chat 은 SAFE_RETRY_CAP 으로 비용 ceiling(give-up 미적용).
+    let effectiveSafeMode = false
+    if (safeMode === true) {
+      const failures = await listFailedCharacterViewJobs(projectId)
+      const slot = failures.find((f) => f.characterId === characterId && f.view === view)
+      if (slot) {
+        if ((jobActor === 'ui' || jobActor === 'chat') && slot.safeFailCount >= SAFE_RETRY_CAP) {
+          return NextResponse.json({ ok: true, skipped: true, reason: 'capped', safeFailCount: slot.safeFailCount })
+        }
+        effectiveSafeMode = slot.moderation
+      }
+    }
+
     // 1. 프로젝트(workspace + 디자인 토큰) + 캐릭터 로드 (view_main = i2i reference)
     const [{ data: project }, { data: character }] = await Promise.all([
       supabaseAdmin
@@ -121,6 +138,7 @@ export async function POST(req: Request) {
       shapeLanguage: dt.l1?.shape_language,
       palette,
       delta: typeof instruction === 'string' ? instruction : undefined,
+      safeMode: effectiveSafeMode,
     }
 
     // 2. 프롬프트 + 모델 결정
@@ -159,6 +177,7 @@ export async function POST(req: Request) {
       // 외형만의 지문(룩 무관) — look-pending vs edited 구분용(027). finalize 가 후보에 영속.
       appearance_hash: computeImageSourceHash(character.appearance, null),
       look_present: lookFingerprint != null,
+      safe_mode: effectiveSafeMode,
     }
     delete inputSnapshot.webhookUrl
 

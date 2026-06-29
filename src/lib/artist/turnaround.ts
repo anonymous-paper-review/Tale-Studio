@@ -37,8 +37,24 @@ export interface CharacterPromptInput {
   palette?: string[]
   /** 재생성 시 유저 요청 델타(merge) — 룩 토대 위에 덮어쓰는 명시 지시(AC13). 룩(스타일/팔레트/의상)은 토대로 유지. */
   delta?: string
+  /** safe-mode(모더레이션 우회 재시도, #A): 명시 미성년 나이/그래픽 묘사를 제거하고 adult·stylized·non-graphic 토큰을 더한다.
+   *   합법 픽션 false-positive 회피용. safeMode 미지정/false면 출력은 기존과 byte-identical. */
+  safeMode?: boolean
 }
 
+
+// safe-mode 스크럽(순수): 명시적 미성년 나이 마커 + 그래픽/유혈 묘사만 제거. 보수적 — 성별 명사(소녀/girl)는
+//   유지(adult 토큰이 연령 상향), "피부(skin)" 등 오삭제 방지로 bare "피"는 제외.
+const SAFE_MINOR_AGE_RE =
+  /(\d{1,2}\s*(?:살|세)|(?:1[0-9]|십)\s*대(?:\s*(?:초반|중반|후반))?|어린(?=\s|$)|유아|미성년자?|초등학생|\b\d{1,2}[-\s]?year[-\s]?old\b|\bchild(?:ren)?\b|\bkids?\b|\btoddlers?\b|\binfants?\b|\bminors?\b|\bunderage\b)/gi
+const SAFE_GRAPHIC_RE =
+  /(유혈|혈흔|선혈|피범벅|피투성이|낭자|상처|훼손|시체|시신|사체|고문|학살|절단|\bblood(?:y|stained|ied)?\b|\bgore\b|\bgory\b|\bwounds?\b|\bwounded\b|\bmutilat\w*|\bcorpses?\b|\bdismember\w*|\bgruesome\b|\bviscera\w*)/gi
+const SAFE_TOKENS =
+  'depicted as an adult, age-ambiguous, stylized non-graphic illustration, tasteful, safe-for-work'
+
+function safeScrub(s: string): string {
+  return s.replace(SAFE_MINOR_AGE_RE, ' ').replace(SAFE_GRAPHIC_RE, ' ').replace(/\s{2,}/g, ' ').trim()
+}
 function styleTokens(input: CharacterPromptInput): string[] {
   const palette = input.palette?.filter(Boolean).join(', ')
   return [
@@ -55,13 +71,17 @@ function deltaClause(input: CharacterPromptInput): string[] {
 }
 
 function describe(input: CharacterPromptInput): string[] {
-  const costumes = input.costumes?.length
-    ? `wearing ${input.costumes.join(', ')}`
-    : ''
+  const safe = input.safeMode === true
+  const appearance = safe ? safeScrub(input.appearance) : input.appearance
+  const costumeList = safe
+    ? (input.costumes ?? []).map(safeScrub).filter(Boolean)
+    : (input.costumes ?? [])
+  const costumes = costumeList.length ? `wearing ${costumeList.join(', ')}` : ''
   return [
-    input.age ? `age ${input.age}` : '',
+    // safe-mode: 명시 나이 토큰 제거(age-ambiguous 로 대체).
+    safe ? '' : input.age ? `age ${input.age}` : '',
     input.role,
-    input.appearance,
+    appearance,
     costumes,
   ].filter((x): x is string => !!x)
 }
@@ -76,6 +96,7 @@ export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
     ...describe(input),
     ...styleTokens(input),
     ...deltaClause(input),
+    ...(input.safeMode ? [SAFE_TOKENS] : []),
     'full body, single character, front view, neutral grey background, even studio lighting, clean composition, no text, no logo',
   ]
     .filter(Boolean)
@@ -97,6 +118,7 @@ export function buildCharacterViewPrompt(
     ...describe(input),
     ...styleTokens(input),
     ...deltaClause(input),
+    ...(input.safeMode ? [SAFE_TOKENS] : []),
     'identical character, identical outfit and proportions to the reference, full body, single character, neutral grey background, even studio lighting, no text, no logo',
   ]
     .filter(Boolean)

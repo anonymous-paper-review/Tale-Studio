@@ -180,44 +180,65 @@ export interface CharacterViewFailure {
   characterId: string
   view: string
   error: string | null
+  /** 슬롯의 24h 누적 실패 수(표시용). */
   failCount: number
+  /** safe-mode(우회) 시도 실패 수 — SAFE_RETRY_CAP 게이트 기준(auto give-up 실패와 분리). */
+  safeFailCount: number
   moderation: boolean
 }
 
 /**
- * 최근 24h 실패한 character_view 슬롯 목록(슬롯=characterId+view, 최신 에러/분류 + 누적 실패수).
+ * 최근 24h 기준, **현재 실패 상태인** character_view 슬롯 목록(슬롯=characterId+view).
+ *   슬롯의 최신 잡이 'failed' 일 때만 포함 → 성공 회복(완료/큐) 후엔 빠진다(거짓-실패 방지, P1).
+ *   safeFailCount = input_snapshot.safe_mode=true 인 실패 수(우회 재시도 cap 기준, auto 실패와 분리, P2).
  *   owner 확인은 호출 라우트가 한다(service-role 직접 조회). reload-survivable 실패 노출용.
  */
 export async function listFailedCharacterViewJobs(projectId: string): Promise<CharacterViewFailure[]> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const { data, error } = await supabaseAdmin
     .from('generation_jobs')
-    .select('target, error, created_at')
+    .select('target, error, status, input_snapshot, created_at')
     .eq('project_id', projectId)
     .eq('kind', 'character_view')
-    .eq('status', 'failed')
     .gte('created_at', since)
     .order('created_at', { ascending: false })
   if (error || !data) return []
-  const bySlot = new Map<string, CharacterViewFailure>()
-  for (const row of data as Array<{ target: GenerationJobTarget | null; error: string | null }>) {
+  type Row = {
+    target: GenerationJobTarget | null
+    error: string | null
+    status: string
+    input_snapshot: { safe_mode?: boolean } | null
+  }
+  const bySlot = new Map<string, CharacterViewFailure & { _latestSeen: boolean }>()
+  for (const row of data as Row[]) {
     const t = row.target ?? {}
     if (!t.characterId || !t.view) continue
     const key = `${t.characterId}\u0000${t.view}`
-    const existing = bySlot.get(key)
-    if (existing) {
-      existing.failCount++ // 최신(desc 첫 행)이 이미 error/moderation 보유, 이후는 카운트만.
-      continue
+    let slot = bySlot.get(key)
+    if (!slot) {
+      // 첫 행 = 최신. 최신이 failed 가 아니면(완료/큐) 이 슬롯은 현재 실패 아님 → 비실패로 표시(집계 제외).
+      slot = {
+        characterId: t.characterId,
+        view: t.view,
+        error: row.error,
+        failCount: 0,
+        safeFailCount: 0,
+        moderation: classifyFalFailure(row.error) === 'moderation',
+        _latestSeen: row.status === 'failed',
+      }
+      bySlot.set(key, slot)
     }
-    bySlot.set(key, {
-      characterId: t.characterId,
-      view: t.view,
-      error: row.error,
-      failCount: 1,
-      moderation: classifyFalFailure(row.error) === 'moderation',
-    })
+    if (row.status === 'failed') {
+      slot.failCount++
+      if (row.input_snapshot?.safe_mode === true) slot.safeFailCount++
+    }
   }
   return [...bySlot.values()]
+    .filter((s) => s._latestSeen) // 최신 잡이 failed 인 슬롯만(회복된 슬롯 제외)
+    .map(({ _latestSeen, ...s }) => {
+      void _latestSeen
+      return s
+    })
 }
 
 /** queued 인 character_view main 잡 목록(클라가 [id] reconcile 로 마무리할 대상). */

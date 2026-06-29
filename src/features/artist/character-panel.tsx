@@ -42,6 +42,7 @@ export function CharacterPanel() {
     selectedCharacterId,
     generatingViews,
     generatingStartedAt,
+    viewFailures,
     selectCharacter,
     generateCharacterAllViews,
   } = useArtistStore()
@@ -166,6 +167,12 @@ export function CharacterPanel() {
                     필수
                   </Badge>
                 )}
+                {viewFailures[char.characterId] &&
+                  Object.keys(viewFailures[char.characterId]).length > 0 && (
+                    <Badge variant="destructive" className="text-[10px]">
+                      이미지 실패
+                    </Badge>
+                  )}
               </div>
 
               {/* object: 단일 main 이미지 셀 / person: 기존 4뷰 그리드 */}

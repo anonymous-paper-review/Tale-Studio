@@ -20,6 +20,8 @@ export interface ViewFailure {
   error: string | null
   moderation: boolean
   failCount: number
+  /** safe-mode(우회) 실패 수 — 우회 버튼 cap 기준(auto 실패와 분리). */
+  safeFailCount: number
 }
 export type ViewFailures = Record<string, Record<string, ViewFailure>>
 
@@ -334,7 +336,12 @@ interface ArtistState {
     view: CharacterViewKey,
     actor?: GenerationActor,
     instruction?: string,
+    safeMode?: boolean,
   ) => Promise<void>
+  /** 모더레이션 우회(safe-mode) 재시도 — 유저 클릭 전용(#A). 서버가 자격/캡 판정, 일반 실패는 원본. */
+  retryCharacterViewSafe: (characterId: string, view: CharacterViewKey) => Promise<void>
+  /** generation-status 엔드포인트로 viewFailures 재조회(배지/우회버튼 reload 없이 최신화). */
+  refreshViewFailures: () => Promise<void>
   /** main → 4방향(i2i)을 순서대로 생성. 카드 "Generate All Views"용. */
   generateCharacterAllViews: (
     characterId: string,
@@ -587,6 +594,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
                   view: string
                   error: string | null
                   failCount: number
+                  safeFailCount: number
                   moderation: boolean
                 }>
                 queuedMain: Array<{ characterId: string; jobId: string }>
@@ -597,6 +605,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
                   error: f.error,
                   moderation: f.moderation,
                   failCount: f.failCount,
+                  safeFailCount: f.safeFailCount,
                 }
               }
               set({ viewFailures: vf })
@@ -755,7 +764,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectLocation: (id) => set({ selectedLocationId: id }),
 
   // 단일 뷰 생성 (crop 폐기, 2026-06-05). main=T2I, 방향=main 기반 i2i. 서버가 해당 뷰 컬럼만 갱신.
-  generateCharacterView: async (characterId, view, actor = 'ui', instruction) => {
+  generateCharacterView: async (characterId, view, actor = 'ui', instruction, safeMode) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
     const key = `${characterId}:${view}`
@@ -772,7 +781,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const res = await fetch('/api/artist/generate-sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, characterId, view, actor, instruction }),
+        body: JSON.stringify({ projectId, characterId, view, actor, instruction, safeMode }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -795,13 +804,24 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const url = await pollGenerationJob(jobId)
       alog(`[autogen] char ${key} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
       atime(`char ${key}`, Date.now() - t0)
-      set((state) => ({
-        characterAssets: state.characterAssets.map((a) =>
-          a.characterId === characterId
-            ? { ...a, views: { ...a.views, [view]: url } }
-            : a,
-        ),
-      }))
+      set((state) => {
+        // 성공 → 해당 슬롯 실패 상태 낙관적 제거(거짓-실패 잔존 방지, P1). finally 의 refresh 가 서버 기준으로 재확인.
+        const charFailures = state.viewFailures[characterId]
+        let viewFailures = state.viewFailures
+        if (charFailures && charFailures[view]) {
+          const { [view]: _drop, ...rest } = charFailures
+          void _drop
+          viewFailures = { ...state.viewFailures, [characterId]: rest }
+        }
+        return {
+          characterAssets: state.characterAssets.map((a) =>
+            a.characterId === characterId
+              ? { ...a, views: { ...a.views, [view]: url } }
+              : a,
+          ),
+          viewFailures,
+        }
+      })
       const asset = get().characterAssets.find((a) => a.characterId === characterId)
       if (asset) registerCharacterCard(asset, projectId)
       notifyGenerationComplete('artist', '캐릭터 이미지') // 다른 stage에 있을 때만 알림(store가 판단)
@@ -819,6 +839,45 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         generatingViews: state.generatingViews.filter((k) => k !== key),
         generatingStartedAt: withoutStartedAt(state.generatingStartedAt, key),
       }))
+      // 시도 후 실패 상태(viewFailures) 갱신 — 배지/우회버튼이 reload 없이 최신화. best-effort.
+      void get().refreshViewFailures()
+    }
+  },
+
+  retryCharacterViewSafe: async (characterId, view) => {
+    await get().generateCharacterView(characterId, view, 'ui', undefined, true)
+  },
+
+  refreshViewFailures: async () => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    try {
+      const res = await fetch(
+        `/api/artist/generation-status?projectId=${encodeURIComponent(projectId)}`,
+      )
+      if (!res.ok) return
+      const { failures } = (await res.json()) as {
+        failures: Array<{
+          characterId: string
+          view: string
+          error: string | null
+          failCount: number
+          safeFailCount: number
+          moderation: boolean
+        }>
+      }
+      const vf: ViewFailures = {}
+      for (const f of failures) {
+        ;(vf[f.characterId] ??= {})[f.view] = {
+          error: f.error,
+          moderation: f.moderation,
+          failCount: f.failCount,
+          safeFailCount: f.safeFailCount,
+        }
+      }
+      set({ viewFailures: vf })
+    } catch {
+      // best-effort
     }
   },
 
