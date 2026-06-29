@@ -167,6 +167,78 @@ export async function hasQueuedCharacterViewJob(
   })
 }
 
+// fal 실패 메시지 분류(best-effort) — 모더레이션/콘텐츠정책류 vs 일반. safe-mode 재시도 자격 판정에 쓴다.
+//   오분류 시 generic 으로 떨어져 원본 프롬프트 재시도(안전 측). 키워드는 fal/openai 모더레이션 문구 기준.
+const MODERATION_KEYWORDS =
+  /moderation|safety|content[ _-]?policy|content_policy|\bblocked\b|nsfw|prohibited|flagged|violat|disallow/i
+
+export function classifyFalFailure(message: string | null | undefined): 'moderation' | 'generic' {
+  return message && MODERATION_KEYWORDS.test(message) ? 'moderation' : 'generic'
+}
+
+export interface CharacterViewFailure {
+  characterId: string
+  view: string
+  error: string | null
+  failCount: number
+  moderation: boolean
+}
+
+/**
+ * 최근 24h 실패한 character_view 슬롯 목록(슬롯=characterId+view, 최신 에러/분류 + 누적 실패수).
+ *   owner 확인은 호출 라우트가 한다(service-role 직접 조회). reload-survivable 실패 노출용.
+ */
+export async function listFailedCharacterViewJobs(projectId: string): Promise<CharacterViewFailure[]> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('target, error, created_at')
+    .eq('project_id', projectId)
+    .eq('kind', 'character_view')
+    .eq('status', 'failed')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+  if (error || !data) return []
+  const bySlot = new Map<string, CharacterViewFailure>()
+  for (const row of data as Array<{ target: GenerationJobTarget | null; error: string | null }>) {
+    const t = row.target ?? {}
+    if (!t.characterId || !t.view) continue
+    const key = `${t.characterId}\u0000${t.view}`
+    const existing = bySlot.get(key)
+    if (existing) {
+      existing.failCount++ // 최신(desc 첫 행)이 이미 error/moderation 보유, 이후는 카운트만.
+      continue
+    }
+    bySlot.set(key, {
+      characterId: t.characterId,
+      view: t.view,
+      error: row.error,
+      failCount: 1,
+      moderation: classifyFalFailure(row.error) === 'moderation',
+    })
+  }
+  return [...bySlot.values()]
+}
+
+/** queued 인 character_view main 잡 목록(클라가 [id] reconcile 로 마무리할 대상). */
+export async function listQueuedMainJobs(
+  projectId: string,
+): Promise<Array<{ characterId: string; jobId: string }>> {
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id, target')
+    .eq('project_id', projectId)
+    .eq('kind', 'character_view')
+    .eq('status', 'queued')
+  if (error || !data) return []
+  const out: Array<{ characterId: string; jobId: string }> = []
+  for (const row of data as Array<{ id: string; target: GenerationJobTarget | null }>) {
+    const t = row.target ?? {}
+    if (t.view === 'main' && t.characterId) out.push({ characterId: t.characterId, jobId: row.id as string })
+  }
+  return out
+}
+
 /**
  * 활동 로그 조회 — 프로젝트의 최근 24시간 잡 N개 (chat-aware-regeneration: 채팅 컨텍스트 빌더용).
  * 24h 창: 오래된 실패 잡이 매 턴 컨텍스트에 반복 주입되는 노이즈 방지.

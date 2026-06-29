@@ -25,6 +25,10 @@ import {
 
 import { cn } from '@/lib/utils'
 
+// useSyncExternalStore 안정 스냅샷: selector 가 매 호출 새 [] 를 반환하면 무한루프(getServerSnapshot
+//   should be cached). 폴백은 모듈레벨 frozen 상수로 참조 고정한다.
+const EMPTY_REQUIRED_IDS: readonly string[] = Object.freeze([])
+
 const ROLE_VARIANT = {
   protagonist: 'default',
   antagonist: 'destructive',
@@ -45,7 +49,7 @@ export function CharacterPanel() {
   const projectId = useProjectStore((s) => s.projectId)
   const workspaceId = useProjectStore((s) => s.workspaceId)
   const saveFromAsset = useInventoryStore((s) => s.saveFromAsset)
-  const requiredCharacterIds = useProjectStore((s) => s.lifecycleStatus.artist?.requiredCharacterIds ?? [])
+  const requiredCharacterIds = useProjectStore((s) => s.lifecycleStatus.artist?.requiredCharacterIds ?? EMPTY_REQUIRED_IDS)
   const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set())
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [viewDialog, setViewDialog] = useState<{
