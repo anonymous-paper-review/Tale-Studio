@@ -112,6 +112,8 @@ export async function triggerCharacterDrafts(
             prompt,
             aspect_ratio: '1:1',
             source_hash: computeImageSourceHash(c.appearance, lookFingerprint),
+            // 외형만의 지문(룩 무관) — look-pending vs edited 구분용(027).
+            appearance_hash: computeImageSourceHash(c.appearance, null),
             look_present: lookFingerprint != null,
           },
           target: {

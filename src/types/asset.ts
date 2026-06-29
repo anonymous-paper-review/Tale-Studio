@@ -66,6 +66,8 @@ export interface CharacterAsset {
   appearanceNative?: string
   /** 현재 룩(전역 디자인 토큰 + 의상) 지문 — stale 비교 시 전달(C2). 룩 미반영이면 null. */
   lookFingerprint?: string | null
+  /** 출처 — producer 정의(핸드오프) vs writer 파이프라인 추가. 온보딩 갭 계산에 사용. */
+  origin?: 'producer' | 'writer'
   /** 뷰별 후보 히스토리 (character_image_candidates). 없으면 빈 객체. */
   viewCandidates: Partial<Record<CharacterViewKey, CandidateImage[]>>
 }

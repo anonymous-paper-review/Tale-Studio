@@ -90,8 +90,12 @@ async function recordCharacterImageCandidate(
   const view = viewKey ? map[viewKey] : undefined
   if (!view) return
 
-  const sourceHash =
-    (job.input_snapshot as { source_hash?: string } | null | undefined)?.source_hash ?? null
+  const snapshot = job.input_snapshot as
+    | { source_hash?: string; appearance_hash?: string }
+    | null
+    | undefined
+  const sourceHash = snapshot?.source_hash ?? null
+  const appearanceHash = snapshot?.appearance_hash ?? null
 
   // 1) 기존 선택본 해제.
   await supabaseAdmin
@@ -109,6 +113,7 @@ async function recordCharacterImageCandidate(
     view,
     url,
     source_hash: sourceHash,
+    appearance_hash: appearanceHash,
     job_id: job.id,
     is_selected: true,
   })
@@ -196,8 +201,12 @@ async function recordLocationImageCandidate(
   view: string,
   url: string,
 ): Promise<void> {
-  const sourceHash =
-    (job.input_snapshot as { source_hash?: string } | null | undefined)?.source_hash ?? null
+  const snapshot = job.input_snapshot as
+    | { source_hash?: string; appearance_hash?: string }
+    | null
+    | undefined
+  const sourceHash = snapshot?.source_hash ?? null
+  const appearanceHash = snapshot?.appearance_hash ?? null
   const slot = { project_id: job.project_id, location_id: locationId, view }
   const clear = await supabaseAdmin
     .from('location_image_candidates')
@@ -211,6 +220,7 @@ async function recordLocationImageCandidate(
     view,
     url,
     source_hash: sourceHash,
+    appearance_hash: appearanceHash,
     job_id: job.id,
     is_selected: true,
   })

@@ -405,7 +405,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .eq('project_id', projectId),
           supabase
             .from('character_image_candidates')
-            .select('id, character_id, view, url, source_hash, is_selected, generated_at')
+            .select('id, character_id, view, url, source_hash, appearance_hash, is_selected, generated_at')
             .eq('project_id', projectId),
           supabase
             .from('projects')
@@ -434,6 +434,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             id: row.id,
             url: row.url,
             sourceHash: row.source_hash ?? null,
+            appearanceHash: row.appearance_hash ?? null,
             isSelected: row.is_selected ?? false,
             generatedAt: row.generated_at,
           })
@@ -533,6 +534,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             appearanceNative: c.appearance_native ?? c.appearance ?? '',
             viewCandidates: candidatesByCharView[c.character_id] ?? {},
             lookFingerprint: computeLookFingerprint(designTokens, c.costume),
+            origin: c.origin === 'writer' ? 'writer' : 'producer',
           }))
           const worldAssets: WorldAsset[] = dbLocations.map((location) => {
             const scene = sceneByLocation.get(location.locationId)
@@ -621,6 +623,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           description: c.description ?? '',
           fixedPrompt: c.fixedPrompt ?? '',
           viewCandidates: {},
+          origin: 'writer',
         }),
       )
       const worldAssets: WorldAsset[] = writerManifest.locations.map((loc) => {
@@ -671,6 +674,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       description,
       fixedPrompt: appearance,
       viewCandidates: {},
+      origin: 'producer',
     }
 
     set((state) => ({

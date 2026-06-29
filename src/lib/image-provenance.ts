@@ -14,6 +14,8 @@ export interface CandidateImage {
   id: string
   url: string
   sourceHash: string | null
+  /** 외형만의 입력 지문(룩 무관, 027). look-pending vs edited 구분. 레거시 행은 null. */
+  appearanceHash?: string | null
   isSelected: boolean
   generatedAt: string
 }
@@ -139,6 +141,51 @@ export function isImageStale(
 ): boolean {
   if (!candidateSourceHash) return false
   return computeImageSourceHash(currentAppearance, currentLookFingerprint) !== candidateSourceHash
+}
+
+/**
+ * stale 의 원인 분류 — '초안→최종룩' 온보딩의 핵심(stale UX 재설계).
+ *   - fresh: stale 아님(또는 지문 미상).
+ *   - look-pending: 외형은 그대로인데 룩만 나중에 도착(=핸드오프 초안이 writer 룩 전에 만들어짐).
+ *       온보딩이 일괄 재생성으로 해소. appearanceHash(027)가 현재 외형-only 지문과 일치하면 확정.
+ *   - edited: 유저가 외형을 직접 바꿈 → 이미지가 옛 외형. (dialog 포커스 신호로만 표시)
+ *
+ *   appearanceHash 가 있으면 룩 사이클에 무관하게 정확(refresh 후 writer 재실행에도 look-pending 유지).
+ *   appearanceHash 가 null(레거시 pre-027)이면: 핸드오프 초안은 submit 시 룩 부재라 source_hash 자체가
+ *   외형-only → "외형-only 지문 == source_hash" 면 look-pending 으로 폴백 분류. (단 pre-027 에 이미 룩이
+ *   박힌 후보는 외형-only != source_hash 라 'edited' 로 보수적 분류 — 전이적 degrade.)
+ */
+export type StaleClass = 'fresh' | 'look-pending' | 'edited'
+
+export function classifyImageStale(
+  currentAppearance: string | null | undefined,
+  currentLookFingerprint: string | null | undefined,
+  candidate: { sourceHash: string | null | undefined; appearanceHash?: string | null },
+): StaleClass {
+  const { sourceHash, appearanceHash } = candidate
+  if (!sourceHash || !isImageStale(currentAppearance, currentLookFingerprint, sourceHash)) {
+    return 'fresh'
+  }
+  const appearanceOnly = computeImageSourceHash(currentAppearance, null)
+  if (appearanceHash != null) {
+    return appearanceOnly === appearanceHash ? 'look-pending' : 'edited'
+  }
+  // 레거시(027 전) 폴백: 룩 부재로 submit 된 핸드오프 초안은 source_hash == 외형-only.
+  return appearanceOnly === sourceHash ? 'look-pending' : 'edited'
+}
+
+/**
+ * 룩 버전 키 — 온보딩 해소(suggestion id) 버전키. freshness 와 동일 룩 도메인을 커버해야 하므로
+ *   캐릭터별 lookFingerprint(=computeLookFingerprint(designTokens, costume))를 결정적으로 집계한다.
+ *   정렬 후 결합 → reorder 불변, designTokens/costume 변경 시 키 변경(=writer 재실행 시 온보딩 재발사).
+ *   룩 부재(전부 null)면 'none'.
+ */
+export function lookVersionKey(
+  lookFingerprints: Array<string | null | undefined>,
+): string {
+  const present = lookFingerprints.filter((f): f is string => !!f).sort()
+  if (present.length === 0) return 'none'
+  return fnv1a(present.join('\u0000'))
 }
 
 // ── 후보 경계버퍼 evict 선정 (C4 AC16/17) ───────────────────────────────────

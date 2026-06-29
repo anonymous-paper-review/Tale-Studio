@@ -148,6 +148,8 @@ export async function POST(req: Request) {
     const inputSnapshot: Record<string, unknown> = {
       ...submitOpts,
       source_hash: computeImageSourceHash(character.appearance, lookFingerprint),
+      // 외형만의 지문(룩 무관) — look-pending vs edited 구분용(027). finalize 가 후보에 영속.
+      appearance_hash: computeImageSourceHash(character.appearance, null),
       look_present: lookFingerprint != null,
     }
     delete inputSnapshot.webhookUrl
