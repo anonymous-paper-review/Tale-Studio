@@ -17,6 +17,11 @@ import {
   type WriterGateStatus,
 } from '@/lib/lifecycle'
 import { classifyImageStale, lookVersionKey } from '@/lib/image-provenance'
+import {
+  buildArtistRefreshMessage,
+  artistRefreshSuggestionKey,
+  type ArtistCharacterState,
+} from '@/lib/artist/onboarding-message'
 
 type ArtistTab = 'characters' | 'world' | 'inventory'
 
@@ -28,6 +33,8 @@ export default function VisualPage() {
     generatingLocations,
     error,
     loadData,
+    viewFailures,
+    lookSummary,
     autoGenerateBaseImages,
   } = useArtistStore()
 
@@ -44,6 +51,8 @@ export default function VisualPage() {
   const timingLoggedRef = useRef<string | null>(null)
   // 프로액티브 넛지 1회 가드 (프로젝트당) — chat-proactive-copilot Phase 1
   const nudgeOfferedRef = useRef<string | null>(null)
+  // refresh 온보딩 버블 1회 가드 — 시그니처(룩/갭/실패 델타) 바뀔 때만 재발사.
+  const refreshNudgeKeyRef = useRef<string | null>(null)
   // 진입 fallback: main 이 너무 오래 안 차도 일정 시간 뒤 진입 (이후 client 가 보강).
   //   프로젝트별로 기록 → projectId 변경 시 파생값이 자동 false (effect 내 동기 setState 회피).
   const [fallbackProject, setFallbackProject] = useState<string | null>(null)
@@ -94,18 +103,25 @@ export default function VisualPage() {
   const directorGate = evaluateDirectorGate({ writer: writerGateStatus, artist: artistGate })
   const writerReady = writerGateStatus.state === 'ready'
 
-  // 온보딩 갭(상태기반): look-pending 초안 + writer-추가 무이미지 캐릭터 수. 룩 버전키로 해소 추적.
+  // 온보딩 상태(상태기반): 캐릭터별 look-pending(초안)/no-image(미생성)/failed(콘텐츠정책) 분류.
+  //   refreshGap = 일괄("최종 룩으로 정리") 대상(look-pending+no-image). failedCount = 카드별 우회 대상.
   const lookVersion = lookVersionKey(characterAssets.map((c) => c.lookFingerprint ?? null))
-  const refreshGap = characterAssets.reduce((n, c) => {
-    const sel = (c.viewCandidates.main ?? []).find((cand) => cand.isSelected)
-    const lookPending =
-      classifyImageStale(c.fixedPrompt, c.lookFingerprint ?? null, {
-        sourceHash: sel?.sourceHash ?? null,
-        appearanceHash: sel?.appearanceHash ?? null,
-      }) === 'look-pending'
-    const writerNoMain = c.origin === 'writer' && c.views.main == null
-    return n + (lookPending || writerNoMain ? 1 : 0)
-  }, 0)
+  const refreshChars = characterAssets
+    .map((c): { name: string; state: ArtistCharacterState } | null => {
+      if (viewFailures[c.characterId]?.main) return { name: c.name, state: 'failed' }
+      const sel = (c.viewCandidates.main ?? []).find((cand) => cand.isSelected)
+      const lookPending =
+        classifyImageStale(c.fixedPrompt, c.lookFingerprint ?? null, {
+          sourceHash: sel?.sourceHash ?? null,
+          appearanceHash: sel?.appearanceHash ?? null,
+        }) === 'look-pending'
+      if (lookPending) return { name: c.name, state: 'look-pending' }
+      if (c.origin === 'writer' && c.views.main == null) return { name: c.name, state: 'no-image' }
+      return null
+    })
+    .filter((x): x is { name: string; state: ArtistCharacterState } => x !== null)
+  const refreshGap = refreshChars.filter((c) => c.state !== 'failed').length
+  const failedCount = refreshChars.filter((c) => c.state === 'failed').length
 
   // Producer handoff 직후 characters가 먼저 들어오면 Writer가 계속 도는 동안에도 Artist 작업을 시작한다.
   const ready = charsLoaded || !!writerStatus?.pipeline_completed || enterFallback
@@ -205,7 +221,8 @@ export default function VisualPage() {
   const generatingCount = generatingViews.length + generatingLocations.length
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   useEffect(() => {
-    if (!projectId || !ready || !writerReady || !artistGate.ready || refreshGap > 0) return
+    if (!projectId || !ready || !writerReady || !artistGate.ready || refreshGap > 0 || failedCount > 0)
+      return
     if (nudgeOfferedRef.current === projectId) return
     if (characterAssets.length === 0 || generatingCount > 0) return
     const t = setTimeout(() => {
@@ -234,21 +251,42 @@ export default function VisualPage() {
     writerReady,
     artistGate.ready,
     refreshGap,
+    failedCount,
   ])
 
-  // 온보딩(상태기반, 2시점=mount/ready + writerReady flip): 갭>0 면 "최종 룩으로 정리" 제안.
-  //   offerSuggestion 이 id(lookVersion)로 세션 dedupe + 단일활성 → 핑퐁/재진입 안전, 재실행(새 룩)=새 id=재발사.
-  //   exit 넛지와 배타(위 effect 는 refreshGap>0 면 return). 비용 트리거는 유저가 버튼 클릭할 때만.
+  // 온보딩(상태기반): look-pending/no-image/failed 가 있으면 상태별 카피의 버블 제안.
+  //   key = artistRefreshSuggestionKey(룩버전+갭+실패) → 델타마다 새 id. ref 가드로 같은 시그니처 재호출 차단,
+  //   offerSuggestion 의 dismissed/단일활성과 합쳐 핑퐁·스팸 방지. exit 넛지와 배타.
   useEffect(() => {
     if (!projectId || !ready) return
-    if (refreshGap <= 0) return
+    if (refreshGap <= 0 && failedCount <= 0) return
+    const content = buildArtistRefreshMessage({ characters: refreshChars, look: lookSummary })
+    if (!content) return
+    const id = artistRefreshSuggestionKey({ projectId, lookVersion, refreshGap, failedCount })
+    if (refreshNudgeKeyRef.current === id) return
+    const dismissed = useGlobalChatStore.getState().dismissedSuggestionIds.includes(id)
     offerSuggestion({
-      id: `artist-refresh-${projectId}-${lookVersion}`,
+      id,
       stage: 'artist',
-      content: `writer가 최종 그림체를 정했어요. 대표 이미지 중 ${refreshGap}건이 그 전에 만든 초안이거나 아직 없어요. "최종 룩으로 정리"를 누르면 새 그림체로 한 번에 만들어드려요.`,
-      action: { kind: 'artist-refresh-look', label: '최종 룩으로 정리' },
+      content,
+      action: refreshGap > 0 ? { kind: 'artist-refresh-look', label: '최종 룩으로 정리' } : null,
     })
-  }, [projectId, ready, writerReady, refreshGap, lookVersion, offerSuggestion])
+    // 실제 표면화(같은 id 활성)됐거나 이미 dismiss 된 경우만 1회 가드 고정 — 다른 제안이 활성이라
+    //   no-op 됐다면 ref 미고정 → 그 제안 해소 후 같은 시그니처 1회 재시도(버블 유실 방지).
+    if (dismissed || useGlobalChatStore.getState().suggestion?.id === id) {
+      refreshNudgeKeyRef.current = id
+    }
+  }, [
+    projectId,
+    ready,
+    writerReady,
+    refreshGap,
+    failedCount,
+    lookVersion,
+    refreshChars,
+    lookSummary,
+    offerSuggestion,
+  ])
 
   // 진입 전 = 백그라운드 생성/ main 준비 진행 중 → progress bar 블로킹.
   //   단, 한 번이라도 진입한 프로젝트면(gateOpen) 탭 전환 후에도 다시 막지 않는다.

@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { notifyGenerationComplete } from '@/lib/generation-notify'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
+import type { ArtistLookSummary } from '@/lib/artist/onboarding-message'
 
 export type ImageProvider = 'fal' | 'gemini' | 'tailscale'
 
@@ -307,6 +308,8 @@ interface ArtistState {
   characterAssets: CharacterAsset[]
   /** per-character/per-view 생성 실패(콘텐츠정책/일반). G001은 채우기만 — 소비는 G002(배지·우회)·G003(온보딩). */
   viewFailures: ViewFailures
+  /** 최종 룩 요약(art_style + color_meaning) — 온보딩 버블 카피용. 룩 미반영이면 null. */
+  lookSummary: ArtistLookSummary | null
   worldAssets: WorldAsset[]
   selectedCharacterId: string | null
   selectedLocationId: string | null
@@ -383,6 +386,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   sceneManifest: null,
   characterAssets: [],
   viewFailures: {},
+  lookSummary: null,
   worldAssets: [],
   selectedCharacterId: null,
   selectedLocationId: null,
@@ -571,10 +575,17 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             }
           })
 
+          // 룩 요약(온보딩 카피용) — design_tokens.l1.art_style + design_tokens.color_meaning(top-level).
+          const dtFull = (project?.design_tokens ?? null) as
+            | (LookTokens & { color_meaning?: Record<string, string> })
+            | null
           set({
             sceneManifest: manifest,
             characterAssets,
             worldAssets,
+            lookSummary: dtFull
+              ? { artStyle: dtFull.l1?.art_style ?? null, colorMeaning: dtFull.color_meaning ?? null }
+              : null,
             selectedCharacterId: characterAssets[0]?.characterId ?? null,
             selectedLocationId: worldAssets[0]?.locationId ?? null,
           })
@@ -1166,8 +1177,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   //   writer 가 추가한 무이미지 캐릭터(origin='writer' && main 없음)의 main 을 재생성한다. 멱등:
   //   generateCharacterView 가 generatingViews/서버 dedupe 로 중복 제출을 막는다.
   refreshLookPendingDrafts: async () => {
-    const { characterAssets } = get()
+    const { characterAssets, viewFailures } = get()
     const targets = characterAssets.filter((c) => {
+      // 콘텐츠정책/일반 실패 슬롯은 일괄 비대상 — 카드별 우회(safe) 전용(버블 카피 계약과 정합).
+      if (viewFailures[c.characterId]?.main) return false
       const selectedMain = (c.viewCandidates['main'] ?? []).find((cand) => cand.isSelected)
       const lookPending =
         classifyImageStale(c.fixedPrompt, c.lookFingerprint ?? null, {
@@ -1297,6 +1310,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       sceneManifest: null,
       characterAssets: [],
       viewFailures: {},
+      lookSummary: null,
       worldAssets: [],
       selectedCharacterId: null,
       selectedLocationId: null,
