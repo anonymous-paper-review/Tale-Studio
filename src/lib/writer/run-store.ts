@@ -105,6 +105,22 @@ export async function getActiveRun(projectId: string): Promise<WriterRunRow | nu
 }
 
 /**
+ * 정체된 run 의 projectId 목록 — status='running' 인데 updated_at 이 staleMs 이상 갱신 안 됨.
+ *   서버측 keepalive(instrumentation)가 자가-체이닝이 끊긴 파이프라인을 재발사하는 데 쓴다.
+ *   staleMs 는 한 step 의 maxDuration(300s)보다 크게 잡아 "아직 살아있는 step" 오인 재발사를 피한다.
+ */
+export async function listStalledRunningProjects(staleMs: number): Promise<string[]> {
+  const cutoff = new Date(Date.now() - staleMs).toISOString();
+  const { data, error } = await supabaseAdmin
+    .from('writer_runs')
+    .select('project_id')
+    .eq('status', 'running')
+    .lt('updated_at', cutoff);
+  if (error || !data) return [];
+  return [...new Set((data as Array<{ project_id: string }>).map((r) => r.project_id))];
+}
+
+/**
  * state + 진행률 필드 업데이트 (updated_at = now()).
  */
 export async function saveRunState(
