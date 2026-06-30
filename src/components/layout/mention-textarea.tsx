@@ -32,6 +32,8 @@ interface Props {
   onChange: (v: string) => void
   onSubmit: () => void
   items: MentionItem[]
+  /** 위/아래 화살표로 불러올 직전 전송 메시지들 (오래된→최신 순). 드롭다운이 닫혀 있고 캐럿이 첫/끝 줄일 때만 동작. */
+  history?: string[]
   disabled?: boolean
   placeholder?: string
   className?: string
@@ -39,7 +41,7 @@ interface Props {
 
 export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
   function MentionTextarea(
-    { value, onChange, onSubmit, items, disabled, placeholder, className },
+    { value, onChange, onSubmit, items, history = [], disabled, placeholder, className },
     ref,
   ) {
     const innerRef = useRef<HTMLTextAreaElement>(null)
@@ -49,6 +51,58 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
     const [query, setQuery] = useState('')
     const [start, setStart] = useState(0)
     const [active, setActive] = useState(0)
+    // 전송 메시지 히스토리 탐색 상태. null = 현재 초안(미탐색). number = history 인덱스.
+    const [histIdx, setHistIdx] = useState<number | null>(null)
+    const draftRef = useRef('')
+
+    // 캐럿이 첫 줄(위에 줄 없음) / 끝 줄(아래 줄 없음)에 있는지 — 멀티라인 편집을 깨지 않으려 경계에서만 히스토리 탐색.
+    const onFirstLine = (el: HTMLTextAreaElement) =>
+      el.value.lastIndexOf('\n', (el.selectionStart ?? 0) - 1) === -1
+    const onLastLine = (el: HTMLTextAreaElement) =>
+      el.value.indexOf('\n', el.selectionStart ?? el.value.length) === -1
+
+    const applyHistory = (next: string) => {
+      onChange(next)
+      requestAnimationFrame(() => {
+        const el = innerRef.current
+        if (!el) return
+        el.focus()
+        const pos = next.length
+        el.setSelectionRange(pos, pos)
+      })
+    }
+    // 위 화살표: 더 오래된 메시지로. (이미 가장 오래된 것이면 그대로 소비)
+    const recallOlder = (): boolean => {
+      if (history.length === 0) return false
+      if (histIdx === null) {
+        draftRef.current = value
+        const ni = history.length - 1
+        setHistIdx(ni)
+        applyHistory(history[ni])
+        return true
+      }
+      if (histIdx > 0) {
+        const ni = histIdx - 1
+        setHistIdx(ni)
+        applyHistory(history[ni])
+      }
+      return true
+    }
+    // 아래 화살표: 더 최신 메시지로. 가장 최신을 지나면 작성 중이던 초안 복원 후 탐색 종료.
+    const recallNewer = (): boolean => {
+      if (histIdx === null) return false
+      if (histIdx < history.length - 1) {
+        const ni = histIdx + 1
+        setHistIdx(ni)
+        applyHistory(history[ni])
+      } else {
+        setHistIdx(null)
+        applyHistory(draftRef.current)
+      }
+      return true
+    }
+    // 입력이 외부에서 비워지면(전송 등) 탐색 상태 해제. (set-state-in-render 패턴 — 빈 값에서만 수렴)
+    if (value === '' && histIdx !== null) setHistIdx(null)
 
     const filtered = open
       ? items
@@ -108,6 +162,20 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
           return
         }
       }
+      // 드롭다운이 닫혀 있을 때 위/아래 화살표 → 전송 메시지 히스토리 호출(경계 줄에서만).
+      const el = innerRef.current
+      if (!showList && el && e.key === 'ArrowUp' && onFirstLine(el)) {
+        if (recallOlder()) {
+          e.preventDefault()
+          return
+        }
+      }
+      if (!showList && el && e.key === 'ArrowDown' && histIdx !== null && onLastLine(el)) {
+        if (recallNewer()) {
+          e.preventDefault()
+          return
+        }
+      }
       if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
         e.preventDefault()
         onSubmit()
@@ -152,6 +220,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
           onChange={(e) => {
             onChange(e.target.value)
             sync(e.target)
+            setHistIdx(null) // 직접 타이핑하면 히스토리 탐색 종료
           }}
           onClick={(e) => sync(e.currentTarget)}
           onKeyUp={(e) => {

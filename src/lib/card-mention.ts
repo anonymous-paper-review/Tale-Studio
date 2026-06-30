@@ -49,6 +49,18 @@ export function backgroundMentions(backgrounds: BackgroundLike[]): CardMention[]
   })
 }
 
+// 스토리/설정 등 비-엔티티 보드 요소도 @멘션·선택 가능하게 하는 고정 ref/label.
+// AI는 보드 설정/스토리를 항상 컨텍스트로 받으므로 이 라벨 참조는 별도 매핑 없이 자연 해석된다.
+export const FOUNDATION_MENTIONS: CardMention[] = [
+  { ref: 'story', label: '스토리', hint: '설정' },
+  { ref: 'setting:playtime', label: '러닝타임', hint: '설정' },
+  { ref: 'setting:genre', label: '장르', hint: '설정' },
+  { ref: 'setting:subGenre', label: '세부 장르', hint: '설정' },
+  { ref: 'setting:format', label: '포맷', hint: '설정' },
+  { ref: 'setting:tone', label: '톤', hint: '설정' },
+  { ref: 'setting:dialogueLanguage', label: '대사 언어', hint: '설정' },
+]
+
 // 입력창 텍스트에서 현재 @멘션된 카드들의 ref를 추출한다(입력↔카드 하이라이트 동기화용).
 // 긴 라벨부터 매칭/소비해 "이름 미정 인물"이 "이름 미정 인물 2"의 접두어로 오인식되지 않게 한다.
 export function activeMentionRefs(

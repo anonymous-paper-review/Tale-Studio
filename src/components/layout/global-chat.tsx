@@ -25,7 +25,7 @@ import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
-import { castMentions, backgroundMentions, activeMentionRefs } from '@/lib/card-mention'
+import { castMentions, backgroundMentions, activeMentionRefs, FOUNDATION_MENTIONS } from '@/lib/card-mention'
 import {
   STAGE_BADGE,
   STAGE_LABEL,
@@ -107,6 +107,7 @@ export function GlobalChat() {
   const mentionItems = useMemo<MentionItem[]>(() => {
     if (currentStage === 'producer') {
       return [
+        ...FOUNDATION_MENTIONS.map((m) => ({ id: m.ref, label: m.label, hint: m.hint })),
         ...castMentions(producerCast).map((m) => ({ id: m.ref, label: m.label, hint: m.hint })),
         ...backgroundMentions(producerBackgrounds).map((m) => ({ id: m.ref, label: m.label, hint: m.hint })),
       ]
@@ -124,6 +125,11 @@ export function GlobalChat() {
     return []
   }, [currentStage, producerCast, producerBackgrounds, artistCharacters, artistWorlds])
   const [input, setInput] = useState('')
+  // 위/아래 화살표로 호출할 전송 메시지 히스토리(유저 발화만, 오래된→최신).
+  const userHistory = useMemo(
+    () => messages.filter((m) => m.role === 'user').map((m) => m.content),
+    [messages],
+  )
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -407,6 +413,7 @@ export function GlobalChat() {
               onChange={setInput}
               onSubmit={handleSend}
               items={mentionItems}
+              history={userHistory}
               disabled={inputDisabled}
               placeholder={STAGE_PLACEHOLDER[currentStage]}
               className="max-h-40 min-h-9 w-full resize-none py-2"

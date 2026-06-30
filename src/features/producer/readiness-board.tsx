@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   AlertCircle,
+  AtSign,
   Box,
   CheckCircle2,
   Clock,
@@ -38,6 +39,8 @@ import { depthLevelFromRuntime } from '@/lib/depth'
 import type { ProjectFormat } from '@/types'
 import { HOVER_RED_BORDER } from './interaction-styles'
 import { HoverBeam } from '@/components/hover-beam'
+import { cn } from '@/lib/utils'
+import { useModifierHeld } from '@/hooks/use-modifier-held'
 import { TagInput } from './tag-input'
 
 const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [
@@ -66,18 +69,76 @@ const ROLE_TOGGLE: [string, string][] = [
   ['supporting', '조연'],
 ]
 
+// 보드 카드/필드를 @멘션 대상으로 만드는 공통 래퍼.
+// - 입력창에 @라벨이 있으면 시안 링으로 "참조 중" 표시(mentionedRefs 동기화).
+// - Cmd/Ctrl+클릭 → 입력창에 @멘션 삽입.
+// - 어포던스: 호버 시 상단에 "⌘/Ctrl+클릭 멘션" 핀, 모디파이어를 누르면 모든 멘션 카드가 cursor-copy + 시안 외곽선으로 떠올라 클릭 가능함을 알린다.
+function MentionableCard({
+  refId,
+  label,
+  pulse = false,
+  className,
+  children,
+}: {
+  refId: string
+  label: string
+  pulse?: boolean
+  className?: string
+  children: ReactNode
+}) {
+  const mentioned = useChatUiStore((s) => s.mentionedRefs.includes(refId))
+  const requestMentionInsert = useChatUiStore((s) => s.requestMentionInsert)
+  const armed = useModifierHeld()
+  return (
+    <div
+      className={cn(
+        'group relative rounded-xl border p-4 transition-shadow',
+        mentioned
+          ? 'border-sky-400/50 bg-sky-400/10 ring-2 ring-sky-400/70 shadow-lg shadow-sky-500/10'
+          : pulse
+            ? 'animate-pulse border-success/50 bg-card/70 ring-2 ring-success/60'
+            : armed
+              ? 'cursor-copy border-sky-400/40 bg-card/70 ring-1 ring-sky-400/40'
+              : 'border-border bg-card/70',
+        armed && 'cursor-copy',
+        className,
+      )}
+      title="⌘/Ctrl+클릭으로 채팅에 멘션"
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey) {
+          e.preventDefault()
+          requestMentionInsert(label)
+        }
+      }}
+    >
+      <span
+        className={cn(
+          'pointer-events-none absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded-full border border-sky-400/50 bg-popover px-2 py-0.5 text-[10px] font-medium text-sky-300 opacity-0 shadow-sm transition-opacity group-hover:opacity-100',
+          armed && 'opacity-100',
+        )}
+      >
+        <AtSign className="size-3" /> ⌘/Ctrl+클릭 멘션
+      </span>
+      {children}
+    </div>
+  )
+}
 function FieldShell({
   icon,
   label,
   issue,
   softIssue,
   children,
+  mentionRef,
+  mentionLabel,
 }: {
   icon: ReactNode
   label: string
   issue?: GateIssue
   softIssue?: GateIssue
   children: ReactNode
+  mentionRef?: string
+  mentionLabel?: string
 }) {
   const state = issue ? 'missing' : softIssue ? 'recommended' : 'ready'
   // C7: 필드가 채워져 'ready'로 전환되면 잠깐 펄스 하이라이트(채팅으로 채워질 때 시각 피드백).
@@ -93,12 +154,8 @@ function FieldShell({
     const t = setTimeout(() => setJustReady(false), 1500)
     return () => clearTimeout(t)
   }, [justReady])
-  return (
-    <div
-      className={`rounded-xl border bg-card/70 p-4 transition-shadow ${
-        justReady ? 'animate-pulse border-success/50 ring-2 ring-success/60' : 'border-border'
-      }`}
-    >
+  const inner = (
+    <>
       <div className="mb-2 flex items-center gap-2 text-sm font-medium">
         <span className="text-muted-foreground">{icon}</span>
         {label}
@@ -125,6 +182,22 @@ function FieldShell({
           </p>
         ) : null}
       </div>
+    </>
+  )
+  if (mentionRef) {
+    return (
+      <MentionableCard refId={mentionRef} label={mentionLabel ?? label} pulse={justReady}>
+        {inner}
+      </MentionableCard>
+    )
+  }
+  return (
+    <div
+      className={`rounded-xl border bg-card/70 p-4 transition-shadow ${
+        justReady ? 'animate-pulse border-success/50 ring-2 ring-success/60' : 'border-border'
+      }`}
+    >
+      {inner}
     </div>
   )
 }
@@ -165,8 +238,6 @@ function CastCard({
   runtimeSeconds: number
   mentionLabel: string
 }) {
-  const mentioned = useChatUiStore((s) => s.mentionedRefs.includes(member.localId))
-  const requestMentionInsert = useChatUiStore((s) => s.requestMentionInsert)
   const isPerson = member.entityType === 'person'
   const ready = issues.length === 0
   const nameIssue = issues.find((i) => i.field.endsWith(':name'))
@@ -186,17 +257,7 @@ function CastCard({
     })
 
   return (
-    <div
-      className={`rounded-xl border p-4 transition-shadow ${
-        mentioned ? 'border-sky-400/50 bg-sky-400/10 ring-2 ring-sky-400/70 shadow-lg shadow-sky-500/10' : 'border-border bg-card/70'
-      }`}
-      onClick={(e) => {
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault()
-          requestMentionInsert(mentionLabel)
-        }
-      }}
-    >
+    <MentionableCard refId={member.localId} label={mentionLabel}>
       <div className="mb-3 flex items-start gap-3">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
           {isPerson ? <User className="size-5" /> : <Box className="size-5" />}
@@ -311,7 +372,7 @@ function CastCard({
           <Trash2 className="size-3.5" /> 삭제
         </Button>
       </div>
-    </div>
+    </MentionableCard>
   )
 }
 
@@ -344,20 +405,8 @@ function BackgroundCard({
   mentionLabel: string
 }) {
   const ready = backgroundReady(background)
-  const mentioned = useChatUiStore((s) => s.mentionedRefs.includes(background.localId))
-  const requestMentionInsert = useChatUiStore((s) => s.requestMentionInsert)
   return (
-    <div
-      className={`rounded-xl border p-4 transition-shadow ${
-        mentioned ? 'border-sky-400/50 bg-sky-400/10 ring-2 ring-sky-400/70 shadow-lg shadow-sky-500/10' : 'border-border bg-card/70'
-      }`}
-      onClick={(e) => {
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault()
-          requestMentionInsert(mentionLabel)
-        }
-      }}
-    >
+    <MentionableCard refId={background.localId} label={mentionLabel}>
       <div className="mb-3 flex items-start gap-3">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
           <Monitor className="size-5" />
@@ -430,7 +479,7 @@ function BackgroundCard({
           <Trash2 className="size-3.5" /> 삭제
         </Button>
       </div>
-    </div>
+    </MentionableCard>
   )
 }
 
@@ -502,6 +551,8 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
             icon={<Sparkles className="size-4" />}
             label="Brief Story"
             issue={hardByField.get('storyText')}
+            mentionRef="story"
+            mentionLabel="스토리"
           >
             <div className="rounded-lg border border-border bg-background/40 p-3">
               <div className="mb-2 flex items-center justify-between">
@@ -530,7 +581,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               <h2 className="text-sm font-semibold">Story Foundation</h2>
             </div>
             <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-              <FieldShell icon={<Clock className="size-4" />} label="러닝타임" issue={hardByField.get('playtime')}>
+              <FieldShell icon={<Clock className="size-4" />} label="러닝타임" issue={hardByField.get('playtime')} mentionRef="setting:playtime" mentionLabel="러닝타임">
                 <HoverBeam>
                   <Input
                     type="number"
@@ -543,7 +594,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </HoverBeam>
               </FieldShell>
 
-              <FieldShell icon={<Film className="size-4" />} label="장르" issue={hardByField.get('genre')}>
+              <FieldShell icon={<Film className="size-4" />} label="장르" issue={hardByField.get('genre')} mentionRef="setting:genre" mentionLabel="장르">
                 <HoverBeam>
                   <Input
                     value={projectSettings.genre}
@@ -553,7 +604,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </HoverBeam>
               </FieldShell>
 
-              <FieldShell icon={<Tag className="size-4" />} label="세부 장르" softIssue={softByField.get('subGenre')}>
+              <FieldShell icon={<Tag className="size-4" />} label="세부 장르" softIssue={softByField.get('subGenre')} mentionRef="setting:subGenre" mentionLabel="세부 장르">
                 <HoverBeam>
                   <Input
                     value={projectSettings.subGenre ?? ''}
@@ -563,7 +614,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </HoverBeam>
               </FieldShell>
 
-              <FieldShell icon={<Monitor className="size-4" />} label="포맷" issue={hardByField.get('format')}>
+              <FieldShell icon={<Monitor className="size-4" />} label="포맷" issue={hardByField.get('format')} mentionRef="setting:format" mentionLabel="포맷">
                 <Select
                   value={projectSettings.format}
                   onValueChange={(v) => updateSettings({ format: v as ProjectFormat })}
@@ -577,7 +628,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </Select>
               </FieldShell>
 
-              <FieldShell icon={<Palette className="size-4" />} label="톤" softIssue={softByField.get('tone')}>
+              <FieldShell icon={<Palette className="size-4" />} label="톤" softIssue={softByField.get('tone')} mentionRef="setting:tone" mentionLabel="톤">
                 <HoverBeam>
                   <TagInput
                     values={projectSettings.tone}
@@ -587,7 +638,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </HoverBeam>
               </FieldShell>
 
-              <FieldShell icon={<Languages className="size-4" />} label="대사 언어" issue={hardByField.get('dialogueLanguage')}>
+              <FieldShell icon={<Languages className="size-4" />} label="대사 언어" issue={hardByField.get('dialogueLanguage')} mentionRef="setting:dialogueLanguage" mentionLabel="대사 언어">
                 <Select
                   value={projectSettings.dialogueLanguage || ''}
                   onValueChange={(v) => updateSettings({ dialogueLanguage: v })}
