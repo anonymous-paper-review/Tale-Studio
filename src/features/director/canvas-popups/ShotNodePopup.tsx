@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { HoverBeam } from '@/components/hover-beam'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-store'
@@ -171,29 +172,33 @@ export function ShotNodePopup({ nodeId, data }: Props) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-chart-4" />
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              onBlur={commit}
-              className={cn(
-                'border-b border-transparent bg-transparent text-sm font-medium outline-none',
-                'focus:border-border',
-              )}
-              placeholder="Shot 라벨"
-            />
+            <HoverBeam>
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                onBlur={commit}
+                className={cn(
+                  'border-b border-transparent bg-transparent text-sm font-medium outline-none',
+                  'focus:border-border',
+                )}
+                placeholder="Shot 라벨"
+              />
+            </HoverBeam>
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Prompt */}
           <Field label="프롬프트 (영상 생성용)">
-            <Textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onBlur={commit}
-              rows={3}
-              placeholder="이 샷에서 일어나는 액션, 분위기, 카메라 의도 등"
-            />
+            <HoverBeam className="w-full">
+              <Textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onBlur={commit}
+                rows={3}
+                placeholder="이 샷에서 일어나는 액션, 분위기, 카메라 의도 등"
+              />
+            </HoverBeam>
           </Field>
 
           {/* Reference images */}

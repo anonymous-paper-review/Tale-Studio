@@ -35,7 +35,7 @@ import { isProducerBackgroundComplete } from '@/lib/producer-gate'
 import { depthLevelFromRuntime } from '@/lib/depth'
 import type { ProjectFormat } from '@/types'
 import { HOVER_RED_BORDER } from './interaction-styles'
-import { HoverBeam } from './hover-beam'
+import { HoverBeam } from '@/components/hover-beam'
 import { TagInput } from './tag-input'
 
 const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [

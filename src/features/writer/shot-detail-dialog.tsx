@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { HoverBeam } from '@/components/hover-beam'
 import {
   Select,
   SelectContent,
@@ -122,7 +123,7 @@ export function ShotDetailDialog({
                 value={shot.shotType}
                 onValueChange={(v) => updateShot(shot.shotId, { shotType: v as ShotType })}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full hover-red-beam">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -136,18 +137,20 @@ export function ShotDetailDialog({
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">길이 (초)</label>
-              <Input
-                type="number"
-                min={1}
-                max={60}
-                value={shot.durationSeconds}
-                onChange={(e) =>
-                  updateShot(shot.shotId, {
-                    durationSeconds: Math.max(1, Number(e.target.value) || 1),
-                  })
-                }
-                className="font-mono tabular-nums"
-              />
+              <HoverBeam>
+                <Input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={shot.durationSeconds}
+                  onChange={(e) =>
+                    updateShot(shot.shotId, {
+                      durationSeconds: Math.max(1, Number(e.target.value) || 1),
+                    })
+                  }
+                  className="font-mono tabular-nums"
+                />
+              </HoverBeam>
             </div>
           </div>
 
@@ -167,12 +170,14 @@ export function ShotDetailDialog({
           {/* 스토리 */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">스토리 (액션)</label>
-            <Textarea
-              value={shot.actionDescription}
-              rows={4}
-              onChange={(e) => updateShot(shot.shotId, { actionDescription: e.target.value })}
-              placeholder="이 샷에서 일어나는 일"
-            />
+            <HoverBeam>
+              <Textarea
+                value={shot.actionDescription}
+                rows={4}
+                onChange={(e) => updateShot(shot.shotId, { actionDescription: e.target.value })}
+                placeholder="이 샷에서 일어나는 일"
+              />
+            </HoverBeam>
             <p className="text-xs text-muted-foreground">
               러프 패널·콘티·영상 생성 프롬프트의 원천이 되는 문장입니다.
             </p>
@@ -207,12 +212,14 @@ export function ShotDetailDialog({
                   <span className="w-24 shrink-0 truncate font-mono text-xs text-muted-foreground">
                     {nameOf(dl.characterId)}
                   </span>
-                  <Input
-                    value={dl.text}
-                    onChange={(e) =>
-                      updateDialogueLine(shot.shotId, i, { text: e.target.value })
-                    }
-                  />
+                  <HoverBeam className="min-w-0 flex-1">
+                    <Input
+                      value={dl.text}
+                      onChange={(e) =>
+                        updateDialogueLine(shot.shotId, i, { text: e.target.value })
+                      }
+                    />
+                  </HoverBeam>
                 </div>
               ))}
             </div>

@@ -5,6 +5,7 @@ import { Plus, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { HoverBeam } from '@/components/hover-beam'
 import {
   Dialog,
   DialogClose,
@@ -140,15 +141,17 @@ export function AddCharacterDialog() {
           </Field>
 
           <Field label="이름">
-            <Input
-              autoFocus
-              value={name}
-              placeholder={entityType === 'object' ? '예: 마법 검' : '예: Kai'}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSubmit()
-              }}
-            />
+            <HoverBeam>
+              <Input
+                autoFocus
+                value={name}
+                placeholder={entityType === 'object' ? '예: 마법 검' : '예: Kai'}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSubmit()
+                }}
+              />
+            </HoverBeam>
           </Field>
 
           {/* object 는 role 필드 숨김 */}
@@ -158,7 +161,7 @@ export function AddCharacterDialog() {
                 value={role}
                 onValueChange={(v) => setRole(v as CharacterRole)}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full hover-red-beam">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -173,32 +176,36 @@ export function AddCharacterDialog() {
           )}
 
           <Field label="설정 / 배경" hint="카드 hover 정보에 표시됩니다.">
-            <Textarea
-              value={description}
-              placeholder={
-                entityType === 'object'
-                  ? '사물의 특성·용도·서사적 의미'
-                  : '캐릭터의 성격·역할·서사적 배경'
-              }
-              rows={2}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+            <HoverBeam>
+              <Textarea
+                value={description}
+                placeholder={
+                  entityType === 'object'
+                    ? '사물의 특성·용도·서사적 의미'
+                    : '캐릭터의 성격·역할·서사적 배경'
+                }
+                rows={2}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </HoverBeam>
           </Field>
 
           <Field
             label="외형"
             hint="이미지 생성 프롬프트로 사용됩니다. (선택)"
           >
-            <Textarea
-              value={appearance}
-              placeholder={
-                entityType === 'object'
-                  ? '예: 고대 룬 문자가 새겨진 은빛 검, 빛나는 칼날'
-                  : '예: 갈색 머리, 검은 롱코트, 날카로운 눈매'
-              }
-              rows={2}
-              onChange={(e) => setAppearance(e.target.value)}
-            />
+            <HoverBeam>
+              <Textarea
+                value={appearance}
+                placeholder={
+                  entityType === 'object'
+                    ? '예: 고대 룬 문자가 새겨진 은빛 검, 빛나는 칼날'
+                    : '예: 갈색 머리, 검은 롱코트, 날카로운 눈매'
+                }
+                rows={2}
+                onChange={(e) => setAppearance(e.target.value)}
+              />
+            </HoverBeam>
           </Field>
         </div>
 

@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { HoverBeam } from '@/components/hover-beam'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -135,16 +136,18 @@ export function VideoNodePopup({ nodeId, data }: Props) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-chart-5" />
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              onBlur={commitLabel}
-              className={cn(
-                'border-b border-transparent bg-transparent text-sm font-medium outline-none',
-                'focus:border-border',
-              )}
-              placeholder="Video 라벨"
-            />
+            <HoverBeam>
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                onBlur={commitLabel}
+                className={cn(
+                  'border-b border-transparent bg-transparent text-sm font-medium outline-none',
+                  'focus:border-border',
+                )}
+                placeholder="Video 라벨"
+              />
+            </HoverBeam>
             <Badge variant="secondary" className="ml-2 text-[10px]">
               from {mother.label}
             </Badge>
@@ -210,13 +213,15 @@ export function VideoNodePopup({ nodeId, data }: Props) {
               </span>
             }
           >
-            <Textarea
-              value={overridePrompt || mother.prompt}
-              onChange={(e) => setOverridePrompt(e.target.value)}
-              onBlur={commitPromptOverride}
-              rows={3}
-              placeholder={mother.prompt || '마더 Shot의 prompt가 비어있음'}
-            />
+            <HoverBeam className="w-full">
+              <Textarea
+                value={overridePrompt || mother.prompt}
+                onChange={(e) => setOverridePrompt(e.target.value)}
+                onBlur={commitPromptOverride}
+                rows={3}
+                placeholder={mother.prompt || '마더 Shot의 prompt가 비어있음'}
+              />
+            </HoverBeam>
             <p className="mt-1 text-[10px] text-muted-foreground">
               비워두면 마더 Shot의 prompt가 그대로 사용됩니다.
             </p>

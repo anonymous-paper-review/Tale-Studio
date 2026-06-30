@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Bookmark, Images, Loader2, RefreshCw, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { HoverBeam } from '@/components/hover-beam'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
@@ -120,27 +121,31 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
       <header className="space-y-2">
         <div className="flex items-center gap-2">
           <span className="inline-block size-2 rounded-full bg-chart-4" />
-          <Input
-            value={data.label}
-            onChange={(e) =>
-              updateNodeData<'shot'>(nodeId, { label: e.target.value })
-            }
-            className="h-8 border-transparent bg-transparent px-0 text-sm font-medium shadow-none focus-visible:border-border focus-visible:ring-0"
-            placeholder="Shot 라벨"
-          />
+          <HoverBeam className="min-w-0 flex-1">
+            <Input
+              value={data.label}
+              onChange={(e) =>
+                updateNodeData<'shot'>(nodeId, { label: e.target.value })
+              }
+              className="h-8 border-transparent bg-transparent px-0 text-sm font-medium shadow-none focus-visible:border-border focus-visible:ring-0"
+              placeholder="Shot 라벨"
+            />
+          </HoverBeam>
         </div>
       </header>
 
       <Section title="Prompt">
         <Field label="프롬프트 (영상 생성용)">
-          <Textarea
-            value={data.prompt}
-            onChange={(e) =>
-              updateNodeData<'shot'>(nodeId, { prompt: e.target.value })
-            }
-            rows={4}
-            placeholder="이 샷에서 일어나는 액션, 분위기, 카메라 의도 등"
-          />
+          <HoverBeam>
+            <Textarea
+              value={data.prompt}
+              onChange={(e) =>
+                updateNodeData<'shot'>(nodeId, { prompt: e.target.value })
+              }
+              rows={4}
+              placeholder="이 샷에서 일어나는 액션, 분위기, 카메라 의도 등"
+            />
+          </HoverBeam>
         </Field>
       </Section>
 
@@ -180,15 +185,21 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
         <div className="grid grid-cols-3 gap-2">
           <Field label="Aspect Ratio">
             {/* 추후 영속 필요 */}
-            <Input value="16:9" disabled readOnly />
+            <HoverBeam>
+              <Input value="16:9" disabled readOnly />
+            </HoverBeam>
           </Field>
           <Field label="Resolution">
             {/* 추후 영속 필요 */}
-            <Input placeholder="default" disabled />
+            <HoverBeam>
+              <Input placeholder="default" disabled />
+            </HoverBeam>
           </Field>
           <Field label="Batch Size">
             {/* 추후 영속 필요 */}
-            <Input placeholder="1" disabled />
+            <HoverBeam>
+              <Input placeholder="1" disabled />
+            </HoverBeam>
           </Field>
         </div>
       </Section>

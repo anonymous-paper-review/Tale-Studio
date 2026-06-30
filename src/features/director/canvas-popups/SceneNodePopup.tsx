@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { HoverBeam } from '@/components/hover-beam'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import {
@@ -80,58 +81,68 @@ export function SceneNodePopup({ nodeId, data }: Props) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-chart-3" />
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              onBlur={commit}
-              className={cn(
-                'border-b border-transparent bg-transparent text-sm font-medium outline-none',
-                'focus:border-border',
-              )}
-              placeholder="Scene 라벨"
-            />
+            <HoverBeam>
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                onBlur={commit}
+                className={cn(
+                  'border-b border-transparent bg-transparent text-sm font-medium outline-none',
+                  'focus:border-border',
+                )}
+                placeholder="Scene 라벨"
+              />
+            </HoverBeam>
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
           <Field label="Location (장소)">
-            <input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              onBlur={commit}
-              placeholder="예: 다리 위, 폐허가 된 도시"
-              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-            />
+            <HoverBeam className="w-full">
+              <input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                onBlur={commit}
+                placeholder="예: 다리 위, 폐허가 된 도시"
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+              />
+            </HoverBeam>
           </Field>
 
           <Field label="Time of Day (시간대)">
-            <input
-              value={timeOfDay}
-              onChange={(e) => setTimeOfDay(e.target.value)}
-              onBlur={commit}
-              placeholder="예: golden hour, midnight"
-              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-            />
+            <HoverBeam className="w-full">
+              <input
+                value={timeOfDay}
+                onChange={(e) => setTimeOfDay(e.target.value)}
+                onBlur={commit}
+                placeholder="예: golden hour, midnight"
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+              />
+            </HoverBeam>
           </Field>
 
           <Field label="Mood (분위기)">
-            <input
-              value={mood}
-              onChange={(e) => setMood(e.target.value)}
-              onBlur={commit}
-              placeholder="예: tense, melancholic, hopeful"
-              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-            />
+            <HoverBeam className="w-full">
+              <input
+                value={mood}
+                onChange={(e) => setMood(e.target.value)}
+                onBlur={commit}
+                placeholder="예: tense, melancholic, hopeful"
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+              />
+            </HoverBeam>
           </Field>
 
           <Field label="Description (씬 설명)">
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              onBlur={commit}
-              rows={3}
-              placeholder="씬의 내러티브, 등장 인물, 사건 요약…"
-            />
+            <HoverBeam className="w-full">
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                onBlur={commit}
+                rows={3}
+                placeholder="씬의 내러티브, 등장 인물, 사건 요약…"
+              />
+            </HoverBeam>
           </Field>
         </div>
 

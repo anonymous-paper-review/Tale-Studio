@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { HoverBeam } from '@/components/hover-beam'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import {
   useArtistStore,
@@ -113,12 +114,14 @@ export function WorldViewDialog({ locationId, shot, onClose }: Props) {
             <label className="mb-1.5 block text-xs text-muted-foreground">
               프롬프트 (수정 후 생성)
             </label>
-            <Textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={4}
-              placeholder="이 배경 이미지를 만들 프롬프트"
-            />
+            <HoverBeam>
+              <Textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={4}
+                placeholder="이 배경 이미지를 만들 프롬프트"
+              />
+            </HoverBeam>
           </div>
 
           {/* 생성 버튼 */}

@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { HoverBeam } from '@/components/hover-beam'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 
 /**
@@ -58,13 +59,15 @@ export function RelationModal() {
           <label className="mb-1.5 block text-xs text-muted-foreground">
             내러티브 (선택)
           </label>
-          <Textarea
-            rows={2}
-            value={relationText}
-            onChange={(e) => setRelationText(e.target.value)}
-            placeholder="예: Shot A의 연속 동작 / 같은 인물의 다른 시점"
-            autoFocus
-          />
+          <HoverBeam className="w-full">
+            <Textarea
+              rows={2}
+              value={relationText}
+              onChange={(e) => setRelationText(e.target.value)}
+              placeholder="예: Shot A의 연속 동작 / 같은 인물의 다른 시점"
+              autoFocus
+            />
+          </HoverBeam>
         </div>
 
         <DialogFooter>

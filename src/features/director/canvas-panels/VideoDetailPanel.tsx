@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Bookmark, Loader2, Play, RefreshCw, Star, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { HoverBeam } from '@/components/hover-beam'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -136,16 +137,18 @@ export function VideoDetailPanel({
       <section className="rounded-lg border border-border bg-background p-3">
         <div className="flex items-center gap-2">
           <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-chart-5" />
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            onBlur={commitLabel}
-            className={cn(
-              'min-w-0 flex-1 border-b border-transparent bg-transparent text-sm font-medium outline-none',
-              'focus:border-border',
-            )}
-            placeholder="Video 라벨"
-          />
+          <HoverBeam className="min-w-0 flex-1">
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              onBlur={commitLabel}
+              className={cn(
+                'w-full border-b border-transparent bg-transparent text-sm font-medium outline-none',
+                'focus:border-border',
+              )}
+              placeholder="Video 라벨"
+            />
+          </HoverBeam>
           <Badge variant="secondary" className="shrink-0 text-[10px]">
             from {mother.label}
           </Badge>
@@ -224,13 +227,15 @@ export function VideoDetailPanel({
           </span>
         }
       >
-        <Textarea
-          value={overridePrompt || mother.prompt}
-          onChange={(e) => setOverridePrompt(e.target.value)}
-          onBlur={commitPromptOverride}
-          rows={3}
-          placeholder={mother.prompt || '마더 Shot의 prompt가 비어있음'}
-        />
+        <HoverBeam>
+          <Textarea
+            value={overridePrompt || mother.prompt}
+            onChange={(e) => setOverridePrompt(e.target.value)}
+            onBlur={commitPromptOverride}
+            rows={3}
+            placeholder={mother.prompt || '마더 Shot의 prompt가 비어있음'}
+          />
+        </HoverBeam>
         <p className="mt-1 text-[10px] text-muted-foreground">
           비워두면 마더 Shot의 prompt가 그대로 사용됩니다.
         </p>
