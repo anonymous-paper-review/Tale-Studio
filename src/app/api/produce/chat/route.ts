@@ -26,7 +26,7 @@ const STAGE_BADGE: Record<string, string> = {
 function normalizeHistory(history: unknown): ChatMessage[] {
   if (!Array.isArray(history)) return []
   return (history as IncomingHistoryItem[]).map((m) => {
-    const badge = m.stage ? STAGE_BADGE[m.stage] : null
+    const badge = m.stage && m.stage !== 'producer' ? STAGE_BADGE[m.stage] : null
     const prefix = badge ? `[${badge}] ` : ''
     return { role: m.role, content: `${prefix}${m.content}` }
   })
@@ -111,8 +111,10 @@ export async function POST(req: Request) {
     )
 
     const { reply, extractedSettings } = parseExtractedSettings(text)
+    // 방어: 모델이 히스토리의 [Pn] 접두어를 흉내내 답변 앞에 붙이는 경우 제거(사용자에게 stage 마커 노출 금지).
+    const cleanReply = reply.replace(/^\s*(?:\[P[1-5]\]\s*)+/, '')
 
-    return NextResponse.json({ reply, extractedSettings })
+    return NextResponse.json({ reply: cleanReply, extractedSettings })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[produce/chat]', message)
