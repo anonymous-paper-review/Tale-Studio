@@ -48,3 +48,21 @@ export function backgroundMentions(backgrounds: BackgroundLike[]): CardMention[]
     return { ref: b.localId, label, hint: '배경' }
   })
 }
+
+// 입력창 텍스트에서 현재 @멘션된 카드들의 ref를 추출한다(입력↔카드 하이라이트 동기화용).
+// 긴 라벨부터 매칭/소비해 "이름 미정 인물"이 "이름 미정 인물 2"의 접두어로 오인식되지 않게 한다.
+export function activeMentionRefs(
+  text: string,
+  items: { ref: string; label: string }[],
+): string[] {
+  let work = text
+  const refs: string[] = []
+  for (const it of [...items].sort((a, b) => b.label.length - a.label.length)) {
+    const token = `@${it.label}`
+    if (work.includes(token)) {
+      refs.push(it.ref)
+      work = work.split(token).join(' ')
+    }
+  }
+  return refs
+}

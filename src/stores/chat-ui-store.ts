@@ -11,6 +11,10 @@ import {
  * persist: 직렬화 가능한 값(width/collapsed)만 (stores 룰).
  */
 
+interface MentionInsertRequest {
+  id: number
+  label: string
+}
 
 interface ChatUiState {
   chatWidth: number
@@ -18,6 +22,13 @@ interface ChatUiState {
   setChatWidth: (w: number) => void
   toggleCollapsed: () => void
   setCollapsed: (v: boolean) => void
+  // @멘션 ↔ 카드 하이라이트 동기화. 입력창에 @멘션돼 있는 카드 ref 집합(파생, 미영속).
+  mentionedRefs: string[]
+  setMentionedRefs: (refs: string[]) => void
+  // Cmd/Ctrl+클릭으로 카드 → 입력창 멘션 삽입 요청(브리지). GlobalChat이 소비.
+  mentionInsert: MentionInsertRequest | null
+  requestMentionInsert: (label: string) => void
+  consumeMentionInsert: (id: number) => void
 }
 
 const clampWidth = (w: number) =>
@@ -32,6 +43,18 @@ export const useChatUiStore = create<ChatUiState>()(
       setChatWidth: (w) => set({ chatWidth: clampWidth(w) }),
       toggleCollapsed: () => set((s) => ({ collapsed: !s.collapsed })),
       setCollapsed: (v) => set({ collapsed: v }),
+      mentionedRefs: [],
+      setMentionedRefs: (refs) =>
+        set((s) =>
+          s.mentionedRefs.length === refs.length &&
+          s.mentionedRefs.every((r, i) => r === refs[i])
+            ? s
+            : { mentionedRefs: refs },
+        ),
+      mentionInsert: null,
+      requestMentionInsert: (label) => set({ mentionInsert: { id: Date.now(), label } }),
+      consumeMentionInsert: (id) =>
+        set((s) => (s.mentionInsert?.id === id ? { mentionInsert: null } : s)),
     }),
     {
       name: 'tale-chat-ui',

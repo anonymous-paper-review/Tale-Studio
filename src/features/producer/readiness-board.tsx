@@ -29,6 +29,8 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useChatUiStore } from '@/stores/chat-ui-store'
+import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import { useProducerStore } from '@/stores/producer-store'
 import type { BackgroundSource, CastArc, CastMember, CastMotivation, GateIssue, GateResult, EntityType } from '@/lib/producer-gate'
 import { isProducerBackgroundComplete } from '@/lib/producer-gate'
@@ -153,6 +155,7 @@ function CastCard({
   onAskProducer,
   onDelete,
   runtimeSeconds,
+  mentionLabel,
 }: {
   member: CastMember
   issues: GateIssue[]
@@ -160,7 +163,10 @@ function CastCard({
   onAskProducer: (prompt: string) => void
   onDelete: (localId: string) => void
   runtimeSeconds: number
+  mentionLabel: string
 }) {
+  const mentioned = useChatUiStore((s) => s.mentionedRefs.includes(member.localId))
+  const requestMentionInsert = useChatUiStore((s) => s.requestMentionInsert)
   const isPerson = member.entityType === 'person'
   const ready = issues.length === 0
   const nameIssue = issues.find((i) => i.field.endsWith(':name'))
@@ -180,7 +186,17 @@ function CastCard({
     })
 
   return (
-    <div className="rounded-xl border border-border bg-card/70 p-4">
+    <div
+      className={`rounded-xl border p-4 transition-shadow ${
+        mentioned ? 'border-sky-400/50 bg-sky-400/10 ring-2 ring-sky-400/70 shadow-lg shadow-sky-500/10' : 'border-border bg-card/70'
+      }`}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey) {
+          e.preventDefault()
+          requestMentionInsert(mentionLabel)
+        }
+      }}
+    >
       <div className="mb-3 flex items-start gap-3">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
           {isPerson ? <User className="size-5" /> : <Box className="size-5" />}
@@ -319,15 +335,29 @@ function BackgroundCard({
   onPatch,
   onAskProducer,
   onDelete,
+  mentionLabel,
 }: {
   background: BackgroundSource
   onPatch: (localId: string, patch: Partial<BackgroundSource>) => void
   onAskProducer: (prompt: string) => void
   onDelete: (localId: string) => void
+  mentionLabel: string
 }) {
   const ready = backgroundReady(background)
+  const mentioned = useChatUiStore((s) => s.mentionedRefs.includes(background.localId))
+  const requestMentionInsert = useChatUiStore((s) => s.requestMentionInsert)
   return (
-    <div className="rounded-xl border border-border bg-card/70 p-4">
+    <div
+      className={`rounded-xl border p-4 transition-shadow ${
+        mentioned ? 'border-sky-400/50 bg-sky-400/10 ring-2 ring-sky-400/70 shadow-lg shadow-sky-500/10' : 'border-border bg-card/70'
+      }`}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey) {
+          e.preventDefault()
+          requestMentionInsert(mentionLabel)
+        }
+      }}
+    >
       <div className="mb-3 flex items-start gap-3">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
           <Monitor className="size-5" />
@@ -423,6 +453,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const persons = cast.filter((m) => m.entityType === 'person')
   const objects = cast.filter((m) => m.entityType === 'object')
   const readyBackgrounds = backgrounds.filter(backgroundReady)
+  // @멘션 라벨(ref 정렬) — cast/backgrounds 배열과 인덱스 일치. 카드에 라벨 전달(Cmd+클릭 삽입용).
+  const castMentionList = castMentions(cast)
+  const bgMentionList = backgroundMentions(backgrounds)
 
   const hardByField = useMemo(
     () => new Map(gate.hardMissing.map((issue) => [issue.field, issue])),
@@ -602,7 +635,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               </div>
             ) : (
               <div className="grid gap-3 xl:grid-cols-2">
-                {cast.map((member) => (
+                {cast.map((member, i) => (
                   <CastCard
                     key={member.localId}
                     member={member}
@@ -611,6 +644,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                     onAskProducer={askProducer}
                     onDelete={removeCastMember}
                     runtimeSeconds={projectSettings.playtime || 0}
+                    mentionLabel={castMentionList[i]?.label ?? member.name}
                   />
                 ))}
               </div>
@@ -647,13 +681,14 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               </div>
             ) : (
               <div className="grid gap-3 xl:grid-cols-2">
-                {backgrounds.map((background) => (
+                {backgrounds.map((background, i) => (
                   <BackgroundCard
                     key={background.localId}
                     background={background}
                     onPatch={updateBackground}
                     onAskProducer={askProducer}
                     onDelete={removeBackground}
+                    mentionLabel={bgMentionList[i]?.label ?? background.name}
                   />
                 ))}
               </div>

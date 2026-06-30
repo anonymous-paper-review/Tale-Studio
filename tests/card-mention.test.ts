@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { castMentions, backgroundMentions } from '@/lib/card-mention'
+import { castMentions, backgroundMentions, activeMentionRefs } from '@/lib/card-mention'
 
 describe('castMentions (@mention labels incl. empty cards)', () => {
   it('uses the name when present, type as hint', () => {
@@ -37,5 +37,25 @@ describe('castMentions (@mention labels incl. empty cards)', () => {
       { ref: 'b1', label: '네온 골목', hint: '배경' },
       { ref: 'b2', label: '이름 미정 배경', hint: '배경' },
     ])
+  })
+})
+
+describe('activeMentionRefs (input text -> mentioned card refs)', () => {
+  const items = [
+    { ref: 'a', label: '카르타' },
+    { ref: 'p1', label: '이름 미정 인물' },
+    { ref: 'p2', label: '이름 미정 인물 2' },
+  ]
+  it('extracts refs for @mentions present in the text', () => {
+    expect(activeMentionRefs('@카르타 외모 바꿔줘', items)).toEqual(['a'])
+  })
+  it('returns empty when the mention is removed', () => {
+    expect(activeMentionRefs('외모 바꿔줘', items)).toEqual([])
+  })
+  it('does not confuse a prefix label with the longer indexed one', () => {
+    expect(activeMentionRefs('@이름 미정 인물 2 이름 정해줘', items)).toEqual(['p2'])
+  })
+  it('handles multiple distinct mentions', () => {
+    expect(activeMentionRefs('@카르타 와 @이름 미정 인물 비교', items).sort()).toEqual(['a', 'p1'])
   })
 })

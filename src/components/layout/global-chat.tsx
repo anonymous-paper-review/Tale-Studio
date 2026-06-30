@@ -25,7 +25,7 @@ import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
-import { castMentions, backgroundMentions } from '@/lib/card-mention'
+import { castMentions, backgroundMentions, activeMentionRefs } from '@/lib/card-mention'
 import {
   STAGE_BADGE,
   STAGE_LABEL,
@@ -94,6 +94,9 @@ export function GlobalChat() {
   const collapsed = useChatUiStore((s) => s.collapsed)
   const setChatWidth = useChatUiStore((s) => s.setChatWidth)
   const toggleCollapsed = useChatUiStore((s) => s.toggleCollapsed)
+  const setMentionedRefs = useChatUiStore((s) => s.setMentionedRefs)
+  const mentionInsert = useChatUiStore((s) => s.mentionInsert)
+  const consumeMentionInsert = useChatUiStore((s) => s.consumeMentionInsert)
   const [dragging, setDragging] = useState(false)
 
   // @멘션 후보 — 현재 stage에서 UI에 표기되는 카드/오브젝트
@@ -132,6 +135,24 @@ export function GlobalChat() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length, loading])
+
+  // 입력창의 @멘션 ↔ 카드 하이라이트 동기화 (입력에서 지우면 자동 해제)
+  useEffect(() => {
+    setMentionedRefs(activeMentionRefs(input, mentionItems.map((m) => ({ ref: m.id, label: m.label }))))
+  }, [input, mentionItems, setMentionedRefs])
+
+  // Cmd/Ctrl+클릭으로 카드 → 입력창에 @멘션 삽입
+  useEffect(() => {
+    if (!mentionInsert) return
+    const token = `@${mentionInsert.label}`
+    setInput((prev) =>
+      prev.includes(token)
+        ? prev
+        : `${prev.replace(/\s*$/, prev.trim() ? ' ' : '')}${token} `,
+    )
+    consumeMentionInsert(mentionInsert.id)
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }, [mentionInsert, consumeMentionInsert])
 
   const stageSupported = CHAT_SUPPORTED_STAGES.has(currentStage)
   const inputDisabled = !stageSupported || loading
