@@ -137,7 +137,7 @@ export default function MeetingPage() {
             </>
           ) : (
             <>
-              필수 항목을 채워 주세요
+              남은 {gate.hardMissing.length}개를 채워 주세요
               <ArrowRight className="ml-2 size-4" />
             </>
           )}
