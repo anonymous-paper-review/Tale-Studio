@@ -140,23 +140,37 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
     }
 
     const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      // IME(한글 등) 조합 중 Chrome은 키다운을 key='Process'/keyCode 229로 보고해 e.key 검사가 빗나간다.
+      // 물리 키(e.code)로 화살표/Enter/Tab/Esc를 복구해 조합 중에도 리스트 조작이 동작하게 한다.
+      const navKey =
+        e.key === 'Process' || e.key === 'Unidentified'
+          ? (({
+              ArrowDown: 'ArrowDown',
+              ArrowUp: 'ArrowUp',
+              Enter: 'Enter',
+              NumpadEnter: 'Enter',
+              Tab: 'Tab',
+              Escape: 'Escape',
+            } as Record<string, string>)[e.code] ?? e.key)
+          : e.key
       if (showList) {
-        if (e.key === 'ArrowDown') {
+        if (navKey === 'ArrowDown') {
           e.preventDefault()
           setActive((a) => (a + 1) % filtered.length)
           return
         }
-        if (e.key === 'ArrowUp') {
+        if (navKey === 'ArrowUp') {
           e.preventDefault()
           setActive((a) => (a - 1 + filtered.length) % filtered.length)
           return
         }
-        if (e.key === 'Enter' || e.key === 'Tab') {
+        // 조합 중 Enter/Tab은 음절 확정이 우선 — 멘션 선택은 조합이 끝났을 때만.
+        if ((navKey === 'Enter' || navKey === 'Tab') && !e.nativeEvent.isComposing) {
           e.preventDefault()
           insert(filtered[active])
           return
         }
-        if (e.key === 'Escape') {
+        if (navKey === 'Escape') {
           e.preventDefault()
           setOpen(false)
           return
@@ -164,19 +178,19 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
       }
       // 드롭다운이 닫혀 있을 때 위/아래 화살표 → 전송 메시지 히스토리 호출(경계 줄에서만).
       const el = innerRef.current
-      if (!showList && el && e.key === 'ArrowUp' && onFirstLine(el)) {
+      if (!showList && el && navKey === 'ArrowUp' && onFirstLine(el)) {
         if (recallOlder()) {
           e.preventDefault()
           return
         }
       }
-      if (!showList && el && e.key === 'ArrowDown' && histIdx !== null && onLastLine(el)) {
+      if (!showList && el && navKey === 'ArrowDown' && histIdx !== null && onLastLine(el)) {
         if (recallNewer()) {
           e.preventDefault()
           return
         }
       }
-      if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      if (navKey === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
         e.preventDefault()
         onSubmit()
       }
