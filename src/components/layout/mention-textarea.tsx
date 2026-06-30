@@ -7,6 +7,7 @@ import {
   forwardRef,
   useImperativeHandle,
   useRef,
+  useLayoutEffect,
   useState,
   type KeyboardEvent,
 } from 'react'
@@ -54,6 +55,8 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
     // 전송 메시지 히스토리 탐색 상태. null = 현재 초안(미탐색). number = history 인덱스.
     const [histIdx, setHistIdx] = useState<number | null>(null)
     const draftRef = useRef('')
+    // 활성 항목을 스크롤 영역 안으로 자동 노출(아래로 길게 내려가도 선택이 보이게).
+    const activeItemRef = useRef<HTMLButtonElement>(null)
 
     // 캐럿이 첫 줄(위에 줄 없음) / 끝 줄(아래 줄 없음)에 있는지 — 멀티라인 편집을 깨지 않으려 경계에서만 히스토리 탐색.
     const onFirstLine = (el: HTMLTextAreaElement) =>
@@ -110,6 +113,9 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
           .slice(0, 8)
       : []
     const showList = open && filtered.length > 0
+    useLayoutEffect(() => {
+      if (showList) activeItemRef.current?.scrollIntoView({ block: 'nearest' })
+    }, [active, showList])
 
     const sync = (el: HTMLTextAreaElement) => {
       const am = activeMention(el.value, el.selectionStart ?? el.value.length)
@@ -207,13 +213,17 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
               <button
                 key={it.id}
                 type="button"
+                ref={i === active ? activeItemRef : undefined}
+                onMouseEnter={() => setActive(i)}
                 onMouseDown={(e) => {
                   e.preventDefault()
                   insert(it)
                 }}
                 className={cn(
-                  'flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs',
-                  i === active ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
+                  'flex w-full items-center justify-between gap-2 rounded border-l-2 px-2 py-1.5 text-left text-xs transition-colors',
+                  i === active
+                    ? 'border-sky-400 bg-sky-400/20 font-medium text-foreground'
+                    : 'border-transparent text-foreground/80 hover:bg-accent/50',
                 )}
               >
                 <span className="truncate">@{it.label}</span>
