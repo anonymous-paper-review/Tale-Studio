@@ -19,6 +19,8 @@ import type {
 
 // 채팅이 스토리에서 추출한 캐스트 후보 (제안일 뿐 — 사용자가 카드에서 확정/수정).
 export interface ExtractedCastMember {
+  // 카드 안정 핸들(localId). 있으면 이름 대신 이 카드를 지정 — 이름 없는 빈 카드도 채울 수 있다.
+  ref?: string
   name?: string
   entityType?: EntityType
   appearance?: string
@@ -30,6 +32,8 @@ export interface ExtractedCastMember {
 }
 
 export interface ExtractedBackground {
+  // 카드 안정 핸들(localId). 있으면 이름 대신 이 배경 카드를 지정.
+  ref?: string
   name?: string
   visualDescription?: string
   purpose?: string
@@ -71,13 +75,16 @@ function mergeExtractedCast(
   let next = existing.map((m) => ({ ...m }))
   for (const e of extracted) {
     const name = (e.name ?? '').trim()
-    if (!name) continue
-    const match = next.find((m) => m.name.trim().toLowerCase() === name.toLowerCase())
+    if (!name && !e.ref) continue
+    const match = e.ref
+      ? next.find((m) => m.localId === e.ref)
+      : next.find((m) => m.name.trim().toLowerCase() === name.toLowerCase())
     if (e.remove) {
       if (match) next = next.filter((m) => m !== match)
       continue
     }
     if (match) {
+      if (name) match.name = name
       if (e.appearance) match.appearance = e.appearance
       if (e.role) match.role = e.role
       if (e.entityType) match.entityType = e.entityType === 'object' ? 'object' : 'person'
@@ -85,7 +92,7 @@ function mergeExtractedCast(
         match.arc = { start_state: '', end_state: '', arc_type: '', ...match.arc, ...e.arc }
       if (e.motivation && e.motivation.want)
         match.motivation = { want: '', ...match.motivation, ...e.motivation }
-    } else {
+    } else if (name) {
       next.push({
         localId: newLocalId(),
         name,
@@ -112,16 +119,19 @@ function mergeExtractedBackgrounds(
   let next = existing.map((background) => ({ ...background }))
   for (const e of extracted) {
     const name = (e.name ?? '').trim()
-    if (!name) continue
-    const match = next.find((background) => background.name.trim().toLowerCase() === name.toLowerCase())
+    if (!name && !e.ref) continue
+    const match = e.ref
+      ? next.find((background) => background.localId === e.ref)
+      : next.find((background) => background.name.trim().toLowerCase() === name.toLowerCase())
     if (e.remove) {
       if (match) next = next.filter((background) => background !== match)
       continue
     }
     if (match) {
+      if (name) match.name = name
       if (e.visualDescription) match.visualDescription = e.visualDescription
       if (e.purpose) match.purpose = e.purpose
-    } else {
+    } else if (name) {
       next.push({
         localId: newLocalId('background'),
         name,
@@ -194,6 +204,15 @@ function findByName<T extends { name: string }>(list: T[], name?: string): T | u
   const n = (name ?? '').trim().toLowerCase()
   if (!n) return undefined
   return list.find((x) => x.name.trim().toLowerCase() === n)
+}
+
+// ref(localId) 있으면 그 카드를, 없으면 이름으로 기존 카드를 찾는다 (승인 게이트 판정용).
+function findForEntry<T extends { localId: string; name: string }>(
+  list: T[],
+  e: { ref?: string; name?: string },
+): T | undefined {
+  if (e.ref) return list.find((x) => x.localId === e.ref)
+  return findByName(list, e.name)
 }
 
 // 한 캐스트 제안이 현재 상태를 바꾸는가 (추가/채움/덮어쓰기/삭제 모두 포함).
@@ -281,13 +300,13 @@ function extractedAffectsExisting(
 
   if (
     Array.isArray(extracted.characters) &&
-    extracted.characters.some((c) => castEntryAffects(findByName(state.cast, c.name), c))
+    extracted.characters.some((c) => castEntryAffects(findForEntry(state.cast, c), c))
   ) {
     overwritten.push('characters')
   }
   if (
     Array.isArray(extracted.backgrounds) &&
-    extracted.backgrounds.some((b) => backgroundEntryAffects(findByName(state.backgrounds, b.name), b))
+    extracted.backgrounds.some((b) => backgroundEntryAffects(findForEntry(state.backgrounds, b), b))
   ) {
     overwritten.push('backgrounds')
   }
@@ -303,13 +322,13 @@ function extractedClobbersUserEdited(
   const conflicts: string[] = []
   if (
     Array.isArray(extracted.characters) &&
-    extracted.characters.some((c) => castEntryClobbersUser(findByName(state.cast, c.name), c))
+    extracted.characters.some((c) => castEntryClobbersUser(findForEntry(state.cast, c), c))
   ) {
     conflicts.push('characters')
   }
   if (
     Array.isArray(extracted.backgrounds) &&
-    extracted.backgrounds.some((b) => backgroundEntryClobbersUser(findByName(state.backgrounds, b.name), b))
+    extracted.backgrounds.some((b) => backgroundEntryClobbersUser(findForEntry(state.backgrounds, b), b))
   ) {
     conflicts.push('backgrounds')
   }

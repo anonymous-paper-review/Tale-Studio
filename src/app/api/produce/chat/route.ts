@@ -3,6 +3,7 @@ import { getUser } from '@/lib/supabase/auth'
 import { llmChat } from '@/lib/llm'
 import { PRODUCER_SYSTEM } from './system-prompt'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
+import { castMentions, backgroundMentions } from '@/lib/card-mention'
 
 interface ChatMessage {
   role: 'user' | 'model'
@@ -61,22 +62,32 @@ export async function POST(req: Request) {
     if (Array.isArray(currentCast) && currentCast.length > 0) {
       // 캐스트 카드를 LLM 에 노출 — 이게 없으면 LLM 이 기존 인물/사물을 못 보고
       //   "캐릭터가 없다"고 환각하거나 같은 카드를 중복 제안한다.
-      const castSummary = (currentCast as Array<Record<string, unknown>>).map((m) => ({
-        name: m.name,
-        entityType: m.entityType,
-        appearance: m.appearance,
-        role: m.role,
-        arc: m.arc,
-        motivation: m.motivation,
+      //   ref/mention 포함 — @멘션(이름 없는 빈 카드 포함)을 정확한 카드로 매핑/수정 가능하게 한다.
+      const castList = currentCast as Array<{ localId: string; name?: string; entityType?: string } & Record<string, unknown>>
+      const m = castMentions(castList)
+      const castSummary = castList.map((c, i) => ({
+        ref: m[i].ref,
+        mention: `@${m[i].label}`,
+        name: c.name,
+        entityType: c.entityType,
+        appearance: c.appearance,
+        role: c.role,
+        arc: c.arc,
+        motivation: c.motivation,
       }))
-      contextParts.push(
-        `[Current Cast Cards]\n${JSON.stringify(castSummary)}`,
-      )
+      contextParts.push(`[Current Cast Cards]\n${JSON.stringify(castSummary)}`)
     }
-    if (currentBackgrounds) {
-      contextParts.push(
-        `[Current Background Cards]\n${JSON.stringify(currentBackgrounds)}`,
-      )
+    if (Array.isArray(currentBackgrounds) && currentBackgrounds.length > 0) {
+      const bgList = currentBackgrounds as Array<{ localId: string; name?: string } & Record<string, unknown>>
+      const m = backgroundMentions(bgList)
+      const bgSummary = bgList.map((b, i) => ({
+        ref: m[i].ref,
+        mention: `@${m[i].label}`,
+        name: b.name,
+        visualDescription: b.visualDescription,
+        purpose: b.purpose,
+      }))
+      contextParts.push(`[Current Background Cards]\n${JSON.stringify(bgSummary)}`)
     }
     // 핸드오프 가부의 단일 판정자 = 코드 게이트. LLM 이 자기 기준으로 "준비 완료"를 선언하지 않도록
     //   실제 게이트 상태(남은 하드 항목)를 명시 주입한다.

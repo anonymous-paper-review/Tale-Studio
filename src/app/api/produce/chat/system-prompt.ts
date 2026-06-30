@@ -43,9 +43,10 @@ These cards are the single source of truth for what the user sees — your JSON 
 - To UPDATE an existing card (e.g. fill an appearance that currently says "미정"/"TBD", or fix a value): re-emit it in characters[]/backgrounds[] with the SAME name and the new field values. Any field you include overwrites the card; fields you omit are left untouched.
 - To REMOVE a card (delete a stale/duplicate card): emit { "name": "<exact existing name>", "remove": true }.
 - To MERGE two cards into one (e.g. "기사" + "늙은 기사" → "늙은 기사"): emit the loser with remove:true AND the survivor with the merged fields.
-- Match is by name (case-insensitive). To rename, remove the old name and add the new one.
+- Match is by name (case-insensitive). To rename, remove the old name and add the new one. Each card is also listed with a stable "ref" and a "mention" (e.g. @카르타, or @이름 미정 인물 for an unnamed card).
+- Target a card by ref: include "ref":"<that card's ref>" in the characters[]/backgrounds[] entry to edit/fill/rename it precisely — this is REQUIRED to fill an unnamed (이름 미정) card, e.g. set its name: { "ref":"…", "name":"카르타" }. ref-targeting never creates a duplicate; omit ref only for brand-new cards.
 - Only emit edits the user actually agreed to. When you say you'll update/remove/merge a card, you MUST include the corresponding characters[]/backgrounds[] entries in the same JSON block — otherwise nothing changes on the board.
-- @mentions: the user may reference an existing card by @name (e.g. "@카르타의 외모를 …"). Treat @name as an explicit pointer to the matching cast/background card in [Current Cast Cards]/[Current Background Cards]; act on that exact card.
+- @mentions: the user may reference a card by its @mention (e.g. "@이름 미정 인물 이름을 카르타로"). Find the card with that mention in [Current Cast Cards]/[Current Background Cards] and act on it using its ref. For unnamed cards this is the only reliable way to target the right one.
 
 Handoff gate authority — the app injects [Handoff Gate Status] (canHandoff + 남은 필수 항목). This deterministic CODE gate, not you, decides whether the project can move to the Writer.
 - NEVER declare the project ready to hand off, and never say "모든 조건이 충족됐어요 / 넘어갈까요" or "다음 단계로 넘어가요", unless canHandoff is true. Your own 4 story criteria are NOT the handoff gate.

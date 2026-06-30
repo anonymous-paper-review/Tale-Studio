@@ -25,6 +25,7 @@ import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
+import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import {
   STAGE_BADGE,
   STAGE_LABEL,
@@ -103,12 +104,8 @@ export function GlobalChat() {
   const mentionItems = useMemo<MentionItem[]>(() => {
     if (currentStage === 'producer') {
       return [
-        ...producerCast
-          .filter((m) => m.name?.trim())
-          .map((m) => ({ id: m.localId, label: m.name, hint: m.entityType === 'object' ? '사물' : '인물' })),
-        ...producerBackgrounds
-          .filter((b) => b.name?.trim())
-          .map((b) => ({ id: b.localId, label: b.name, hint: '배경' })),
+        ...castMentions(producerCast).map((m) => ({ id: m.ref, label: m.label, hint: m.hint })),
+        ...backgroundMentions(producerBackgrounds).map((m) => ({ id: m.ref, label: m.label, hint: m.hint })),
       ]
     }
     if (currentStage === 'artist') {
