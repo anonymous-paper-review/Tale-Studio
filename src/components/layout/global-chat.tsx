@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Check,
@@ -13,7 +13,6 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { AgentFace } from '@/components/agent-face'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -25,6 +24,7 @@ import { useDirectorCanvasWarmStarting } from '@/features/director/hooks/use-dir
 import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
 import { MarkdownText } from '@/components/layout/markdown-text'
+import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
 import {
   STAGE_BADGE,
   STAGE_LABEL,
@@ -95,7 +95,34 @@ export function GlobalChat() {
   const toggleCollapsed = useChatUiStore((s) => s.toggleCollapsed)
   const [dragging, setDragging] = useState(false)
 
-
+  // @멘션 후보 — 현재 stage에서 UI에 표기되는 카드/오브젝트
+  const producerCast = useProducerStore((s) => s.cast)
+  const producerBackgrounds = useProducerStore((s) => s.backgrounds)
+  const artistCharacters = useArtistStore((s) => s.characterAssets)
+  const artistWorlds = useArtistStore((s) => s.worldAssets)
+  const mentionItems = useMemo<MentionItem[]>(() => {
+    if (currentStage === 'producer') {
+      return [
+        ...producerCast
+          .filter((m) => m.name?.trim())
+          .map((m) => ({ id: m.localId, label: m.name, hint: m.entityType === 'object' ? '사물' : '인물' })),
+        ...producerBackgrounds
+          .filter((b) => b.name?.trim())
+          .map((b) => ({ id: b.localId, label: b.name, hint: '배경' })),
+      ]
+    }
+    if (currentStage === 'artist') {
+      return [
+        ...artistCharacters
+          .filter((c) => c.name?.trim())
+          .map((c) => ({ id: c.characterId, label: c.name, hint: '캐릭터' })),
+        ...artistWorlds
+          .filter((w) => w.name?.trim())
+          .map((w) => ({ id: w.locationId, label: w.name, hint: '장소' })),
+      ]
+    }
+    return []
+  }, [currentStage, producerCast, producerBackgrounds, artistCharacters, artistWorlds])
   const [input, setInput] = useState('')
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -356,24 +383,15 @@ export function GlobalChat() {
             Enter 전송 / Shift+Enter 개행. 버튼은 items-end로 입력창 하단에 정렬. */}
         <div className="shrink-0 border-t border-border p-4">
           <div className="flex items-end gap-2">
-            <Textarea
+            <MentionTextarea
               ref={textareaRef}
-              rows={1}
-              className="max-h-40 min-h-9 flex-1 resize-none py-2"
-              placeholder={STAGE_PLACEHOLDER[currentStage]}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={setInput}
+              onSubmit={handleSend}
+              items={mentionItems}
               disabled={inputDisabled}
-              onKeyDown={(e) => {
-                if (
-                  e.key === 'Enter' &&
-                  !e.shiftKey &&
-                  !e.nativeEvent.isComposing
-                ) {
-                  e.preventDefault()
-                  handleSend()
-                }
-              }}
+              placeholder={STAGE_PLACEHOLDER[currentStage]}
+              className="max-h-40 min-h-9 w-full resize-none py-2"
             />
             {currentStage === 'producer' && (
               <>
