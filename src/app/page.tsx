@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId } from '@/lib/session-restore'
+import { ContactPopover } from '@/components/contact-popover'
 
 interface ProjectItem {
   id: string
@@ -507,7 +508,7 @@ export default function HomePage() {
 
       {/* ── Footer ── */}
       <footer className="bg-black px-6 pb-12 pt-24 text-white md:px-12">
-        <div className="mx-auto mb-20 grid max-w-7xl grid-cols-1 gap-12 md:grid-cols-4 md:gap-8">
+        <div className="mx-auto mb-20 grid max-w-7xl grid-cols-1 gap-12 md:grid-cols-3 md:gap-8">
           <div className="col-span-1 md:col-span-2">
             <div className="mb-6 flex items-center gap-2 text-white">
               <Film className="size-8 text-primary" />
@@ -522,77 +523,10 @@ export default function HomePage() {
           </div>
 
           <div>
-            <h4 className="mb-6 font-semibold text-gray-200">Platform</h4>
-            <ul className="space-y-4 font-light text-gray-400">
-              <li>
-                <a
-                  href="#services"
-                  className="transition-colors hover:text-primary"
-                >
-                  AI Production
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#services"
-                  className="transition-colors hover:text-primary"
-                >
-                  Cinematography
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#services"
-                  className="transition-colors hover:text-primary"
-                >
-                  Video Generation
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#services"
-                  className="transition-colors hover:text-primary"
-                >
-                  Security
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          <div>
             <h4 className="mb-6 font-semibold text-gray-200">Studio</h4>
             <ul className="space-y-4 font-light text-gray-400">
               <li>
-                <a
-                  href="#projects"
-                  className="transition-colors hover:text-primary"
-                >
-                  Projects
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="transition-colors hover:text-primary"
-                >
-                  About Us
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="transition-colors hover:text-primary"
-                >
-                  Careers
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="transition-colors hover:text-primary"
-                >
-                  Contact
-                </a>
+                <ContactPopover />
               </li>
             </ul>
           </div>

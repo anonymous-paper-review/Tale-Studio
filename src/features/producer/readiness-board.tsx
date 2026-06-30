@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   AlertCircle,
   Box,
@@ -10,7 +10,7 @@ import {
   Languages,
   Monitor,
   Palette,
-  Pencil,
+  Trash2,
   Plus,
   Sparkles,
   Tag,
@@ -28,13 +28,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { useChatUiStore } from '@/stores/chat-ui-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
-import { depthLevelFromRuntime } from '@/lib/depth'
-import type { BackgroundSource, CastMember, GateIssue, GateResult, EntityType } from '@/lib/producer-gate'
+import type { BackgroundSource, CastArc, CastMember, CastMotivation, GateIssue, GateResult, EntityType } from '@/lib/producer-gate'
 import { isProducerBackgroundComplete } from '@/lib/producer-gate'
+import { depthLevelFromRuntime } from '@/lib/depth'
 import type { ProjectFormat } from '@/types'
-import { CastEditDialog } from './cast-edit-dialog'
+import { HOVER_RED_BORDER, HOVER_RED_BORDER_CHILD_INPUT } from './interaction-styles'
 import { TagInput } from './tag-input'
 
 const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [
@@ -57,6 +57,12 @@ const ROLE_LABEL: Record<string, string> = {
   supporting: '조연',
 }
 
+const ROLE_TOGGLE: [string, string][] = [
+  ['protagonist', '주인공'],
+  ['antagonist', '적대자'],
+  ['supporting', '조연'],
+]
+
 function FieldShell({
   icon,
   label,
@@ -71,34 +77,51 @@ function FieldShell({
   children: ReactNode
 }) {
   const state = issue ? 'missing' : softIssue ? 'recommended' : 'ready'
+  // C7: 필드가 채워져 'ready'로 전환되면 잠깐 펄스 하이라이트(채팅으로 채워질 때 시각 피드백).
+  //   상태 전환 감지는 set-state-in-render 패턴(권장)으로, 자동 해제만 effect 타이머로.
+  const [prevState, setPrevState] = useState(state)
+  const [justReady, setJustReady] = useState(false)
+  if (state !== prevState) {
+    if (prevState !== 'ready' && state === 'ready') setJustReady(true)
+    setPrevState(state)
+  }
+  useEffect(() => {
+    if (!justReady) return
+    const t = setTimeout(() => setJustReady(false), 1500)
+    return () => clearTimeout(t)
+  }, [justReady])
   return (
-    <div className="rounded-xl border border-border bg-card/70 p-4">
-      <div className="mb-2 flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <span className="text-muted-foreground">{icon}</span>
-          {label}
-        </div>
+    <div
+      className={`rounded-xl border bg-card/70 p-4 transition-shadow ${
+        justReady ? 'animate-pulse border-success/50 ring-2 ring-success/60' : 'border-border'
+      }`}
+    >
+      <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+        <span className="text-muted-foreground">{icon}</span>
+        {label}
+      </div>
+      <div>{children}</div>
+      <div className="mt-2 flex items-start gap-2 text-xs">
         {state === 'ready' ? (
-          <Badge variant="outline" className="gap-1 border-success/40 text-success">
+          <Badge variant="outline" className="shrink-0 gap-1 border-success/40 text-success">
             <CheckCircle2 className="size-3" /> 준비됨
           </Badge>
         ) : state === 'missing' ? (
-          <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
+          <Badge variant="outline" className="shrink-0 gap-1 border-destructive/40 text-destructive">
             <AlertCircle className="size-3" /> 필요
           </Badge>
         ) : (
-          <Badge variant="outline" className="gap-1 border-warning/40 text-warning">
+          <Badge variant="outline" className="shrink-0 gap-1 border-warning/40 text-warning">
             <AlertCircle className="size-3" /> 권장
           </Badge>
         )}
+        {(issue ?? softIssue) ? (
+          <p className={`pt-0.5 ${issue ? 'text-destructive' : 'text-warning'}`}>
+            {(issue ?? softIssue)?.label}
+            {(issue ?? softIssue)?.detail ? ` · ${(issue ?? softIssue)?.detail}` : ''}
+          </p>
+        ) : null}
       </div>
-      <div>{children}</div>
-      {(issue ?? softIssue) ? (
-        <p className={`mt-2 text-xs ${issue ? 'text-destructive' : 'text-warning'}`}>
-          {(issue ?? softIssue)?.label}
-          {(issue ?? softIssue)?.detail ? ` · ${(issue ?? softIssue)?.detail}` : ''}
-        </p>
-      ) : null}
     </div>
   )
 }
@@ -126,22 +149,34 @@ function CastCard({
   member,
   issues,
   onPatch,
-  onEdit,
   onAskProducer,
+  onDelete,
+  runtimeSeconds,
 }: {
   member: CastMember
   issues: GateIssue[]
   onPatch: (localId: string, patch: Partial<CastMember>) => void
-  onEdit: () => void
   onAskProducer: (prompt: string) => void
+  onDelete: (localId: string) => void
+  runtimeSeconds: number
 }) {
   const isPerson = member.entityType === 'person'
   const ready = issues.length === 0
   const nameIssue = issues.find((i) => i.field.endsWith(':name'))
   const appearanceIssue = issues.find((i) => i.field.endsWith(':appearance'))
-  const complexIssues = issues.filter(
-    (i) => !i.field.endsWith(':name') && !i.field.endsWith(':appearance'),
-  )
+  const arcIssue = issues.find((i) => i.field.endsWith(':arc'))
+  const motivationIssue = issues.find((i) => i.field.endsWith(':want'))
+  const depth = depthLevelFromRuntime(runtimeSeconds || 0)
+  const deepPerson = isPerson && depth !== 'D1' && depth !== 'D2' // D3+ : arc/motivation 인라인 편집
+
+  const patchArc = (p: Partial<CastArc>) =>
+    onPatch(member.localId, {
+      arc: { start_state: '', end_state: '', arc_type: '', ...member.arc, ...p },
+    })
+  const patchMot = (p: Partial<CastMotivation>) =>
+    onPatch(member.localId, {
+      motivation: { want: '', ...member.motivation, ...p },
+    })
 
   return (
     <div className="rounded-xl border border-border bg-card/70 p-4">
@@ -180,49 +215,83 @@ function CastCard({
 
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">이름 quick edit</label>
+          <label className="text-xs font-medium text-muted-foreground">이름</label>
           <Input
             value={member.name}
             placeholder={isPerson ? '예: 지아' : '예: 은빛 반지'}
             aria-invalid={!!nameIssue}
+            className={HOVER_RED_BORDER}
             onChange={(e) => onPatch(member.localId, { name: e.target.value })}
           />
           {nameIssue ? <p className="text-xs text-destructive">{nameIssue.label}</p> : null}
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">외모 quick edit</label>
+          <label className="text-xs font-medium text-muted-foreground">외모</label>
           <Textarea
             value={member.appearance}
             rows={2}
             placeholder={isPerson ? '복장, 나이, 특징' : '형태, 재질, 특징'}
             aria-invalid={!!appearanceIssue}
+            className={HOVER_RED_BORDER}
             onChange={(e) => onPatch(member.localId, { appearance: e.target.value })}
           />
           {appearanceIssue ? <p className="text-xs text-destructive">{appearanceIssue.label}</p> : null}
         </div>
       </div>
 
-      {complexIssues.length > 0 ? (
-        <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-          <p className="text-xs font-medium text-destructive">상세 필드 필요</p>
-          <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
-            {complexIssues.map((issue) => (
-              <li key={issue.field}>{issue.label}</li>
-            ))}
-          </ul>
+      {isPerson ? (
+        <div className="mt-3 space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">역할</label>
+          <div className="flex gap-2">
+            {ROLE_TOGGLE.map(([value, label]) => {
+              const active = (member.role ?? 'supporting') === value
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onPatch(member.localId, { role: value })}
+                  className={`rounded-md border px-3 py-1.5 text-xs ${
+                    active
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : `border-border text-muted-foreground ${HOVER_RED_BORDER}`
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {deepPerson ? (
+        <div className="mt-3 space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">아크 (시작 / 끝 / 유형)</label>
+            <div className="grid grid-cols-3 gap-2">
+              <Input value={member.arc?.start_state ?? ''} placeholder="시작 상태" aria-invalid={!!arcIssue} className={HOVER_RED_BORDER} onChange={(e) => patchArc({ start_state: e.target.value })} />
+              <Input value={member.arc?.end_state ?? ''} placeholder="끝 상태" aria-invalid={!!arcIssue} className={HOVER_RED_BORDER} onChange={(e) => patchArc({ end_state: e.target.value })} />
+              <Input value={member.arc?.arc_type ?? ''} placeholder="유형" aria-invalid={!!arcIssue} className={HOVER_RED_BORDER} onChange={(e) => patchArc({ arc_type: e.target.value })} />
+            </div>
+            {arcIssue ? <p className="text-xs text-destructive">{arcIssue.label}</p> : null}
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">동기 (want / need)</label>
+            <div className="grid grid-cols-2 gap-2">
+              <Input value={member.motivation?.want ?? ''} placeholder="want (필수)" aria-invalid={!!motivationIssue} className={HOVER_RED_BORDER} onChange={(e) => patchMot({ want: e.target.value })} />
+              <Input value={member.motivation?.need ?? ''} placeholder="need (선택)" className={HOVER_RED_BORDER} onChange={(e) => patchMot({ need: e.target.value })} />
+            </div>
+            {motivationIssue ? <p className="text-xs text-destructive">{motivationIssue.label}</p> : null}
+          </div>
         </div>
       ) : null}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={onEdit}>
-          <Pencil className="size-3.5" /> 상세 편집
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => onAskProducer(castDraftPrompt(member, issues[0]))}
-        >
+        <Button size="sm" variant="ghost" className={HOVER_RED_BORDER} onClick={() => onAskProducer(castDraftPrompt(member, issues[0]))}>
           <Wand2 className="size-3.5" /> 프로듀서에게 채워달라
+        </Button>
+        <Button size="sm" variant="ghost" className={`text-destructive hover:text-destructive ${HOVER_RED_BORDER}`} onClick={() => onDelete(member.localId)}>
+          <Trash2 className="size-3.5" /> 삭제
         </Button>
       </div>
     </div>
@@ -293,6 +362,7 @@ function BackgroundCard({
           <Input
             value={background.name}
             placeholder="예: 네온 뒷골목"
+            className={HOVER_RED_BORDER}
             onChange={(e) => onPatch(background.localId, { name: e.target.value })}
           />
         </div>
@@ -301,6 +371,7 @@ function BackgroundCard({
           <Input
             value={background.purpose}
             placeholder="예: 추격이 시작되는 공간"
+            className={HOVER_RED_BORDER}
             onChange={(e) => onPatch(background.localId, { purpose: e.target.value })}
           />
         </div>
@@ -312,16 +383,17 @@ function BackgroundCard({
           value={background.visualDescription}
           rows={2}
           placeholder="색감, 구조, 소품, 분위기"
+          className={HOVER_RED_BORDER}
           onChange={(e) => onPatch(background.localId, { visualDescription: e.target.value })}
         />
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="sm" variant="ghost" onClick={() => onAskProducer(backgroundDraftPrompt(background))}>
+        <Button size="sm" variant="ghost" className={HOVER_RED_BORDER} onClick={() => onAskProducer(backgroundDraftPrompt(background))}>
           <Wand2 className="size-3.5" /> 프로듀서에게 채워달라
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => onDelete(background.localId)}>
-          삭제
+        <Button size="sm" variant="ghost" className={`text-destructive hover:text-destructive ${HOVER_RED_BORDER}`} onClick={() => onDelete(background.localId)}>
+          <Trash2 className="size-3.5" /> 삭제
         </Button>
       </div>
     </div>
@@ -342,11 +414,8 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const addBackground = useProducerStore((s) => s.addBackground)
   const updateBackground = useProducerStore((s) => s.updateBackground)
   const removeBackground = useProducerStore((s) => s.removeBackground)
-  const requestDraftPrompt = useChatUiStore((s) => s.requestDraftPrompt)
 
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const editing = cast.find((m) => m.localId === editingId) ?? null
-  const depth = depthLevelFromRuntime(projectSettings.playtime || 0)
+
   const persons = cast.filter((m) => m.entityType === 'person')
   const objects = cast.filter((m) => m.entityType === 'object')
   const readyBackgrounds = backgrounds.filter(backgroundReady)
@@ -360,10 +429,12 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
     [gate.softMissing],
   )
 
-  const askProducer = (prompt: string) => requestDraftPrompt(prompt)
+  // C5: 버튼 클릭 시 프롬프트를 타이핑창에 채우는 대신 대화에 바로 보내고 전송 동작을 수행한다.
+  const askProducer = (prompt: string) => {
+    void useGlobalChatStore.getState().sendMessage(prompt)
+  }
   const add = (entityType: EntityType) => {
-    const id = addCastMember(entityType)
-    setEditingId(id)
+    addCastMember(entityType)
   }
   const addBg = () => {
     addBackground()
@@ -374,19 +445,15 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
       <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold">Handoff readiness board</h1>
+            <h1 className="text-lg font-semibold">Meeting Room</h1>
             {gate.canHandoff ? (
               <Badge variant="outline" className="gap-1 border-success/40 text-success">
                 <CheckCircle2 className="size-3" /> Writer 계약 준비 완료
               </Badge>
-            ) : (
-              <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
-                <AlertCircle className="size-3" /> 남은 {gate.hardMissing.length}개
-              </Badge>
-            )}
+            ) : null}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            오른쪽 GlobalChat이 채우고, 이 보드가 writer로 넘길 계약 준비 상태를 확인합니다.
+            오른쪽 AI Producer가 당신의 시작을 도와줍니다.
           </p>
         </div>
         {syncing ? <Badge variant="outline">저장 중</Badge> : null}
@@ -396,17 +463,14 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
         <div className="mx-auto max-w-6xl space-y-5">
           <FieldShell
             icon={<Sparkles className="size-4" />}
-            label="스토리 준비"
+            label="Brief Story"
             issue={hardByField.get('storyText')}
           >
             <div className="rounded-lg border border-border bg-background/40 p-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Story brief</span>
                 {storyReady ? (
                   <Badge variant="outline" className="border-success/40 text-success">준비됨</Badge>
-                ) : (
-                  <Badge variant="outline">더 구체화 필요</Badge>
-                )}
+                ) : null}
               </div>
               <p className="text-sm text-muted-foreground italic">
                 {storyText
@@ -419,15 +483,14 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 className="mt-3"
                 onClick={() => askProducer('Producer, 이 이야기가 writer로 넘어갈 수 있게 캐릭터·장소·시작-갈등-결말 중 부족한 한 가지를 질문해 주세요.')}
               >
-                <Wand2 className="size-3.5" /> 스토리 보강 질문 채우기
+                <Wand2 className="size-3.5" /> 기본적인 스토리를 AI Producer에게 알려주세요
               </Button>
             </div>
           </FieldShell>
 
           <section className="space-y-3">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold">Story foundation</h2>
-              <Badge variant="outline" className="text-[10px]">settings</Badge>
+              <h2 className="text-sm font-semibold">Story Foundation</h2>
             </div>
             <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
               <FieldShell icon={<Clock className="size-4" />} label="러닝타임" issue={hardByField.get('playtime')}>
@@ -437,7 +500,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                   value={projectSettings.playtime || ''}
                   placeholder="예: 120"
                   onChange={(e) => updateSettings({ playtime: Number(e.target.value) || 0 })}
-                  className="font-mono tabular-nums"
+                  className={`font-mono tabular-nums ${HOVER_RED_BORDER}`}
                 />
               </FieldShell>
 
@@ -445,6 +508,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 <Input
                   value={projectSettings.genre}
                   placeholder="예: thriller"
+                  className={HOVER_RED_BORDER}
                   onChange={(e) => updateSettings({ genre: e.target.value })}
                 />
               </FieldShell>
@@ -453,6 +517,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 <Input
                   value={projectSettings.subGenre ?? ''}
                   placeholder="예: psychological"
+                  className={HOVER_RED_BORDER}
                   onChange={(e) => updateSettings({ subGenre: e.target.value })}
                 />
               </FieldShell>
@@ -462,7 +527,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                   value={projectSettings.format}
                   onValueChange={(v) => updateSettings({ format: v as ProjectFormat })}
                 >
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className={`w-full ${HOVER_RED_BORDER}`}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {FORMAT_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
@@ -472,11 +537,13 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               </FieldShell>
 
               <FieldShell icon={<Palette className="size-4" />} label="톤" softIssue={softByField.get('tone')}>
-                <TagInput
-                  values={projectSettings.tone}
-                  onChange={(tone) => updateSettings({ tone })}
-                  placeholder="예: dark"
-                />
+                <div className={HOVER_RED_BORDER_CHILD_INPUT}>
+                  <TagInput
+                    values={projectSettings.tone}
+                    onChange={(tone) => updateSettings({ tone })}
+                    placeholder="예: dark"
+                  />
+                </div>
               </FieldShell>
 
               <FieldShell icon={<Languages className="size-4" />} label="대사 언어" issue={hardByField.get('dialogueLanguage')}>
@@ -484,7 +551,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                   value={projectSettings.dialogueLanguage || ''}
                   onValueChange={(v) => updateSettings({ dialogueLanguage: v })}
                 >
-                  <SelectTrigger className="w-full"><SelectValue placeholder="선택…" /></SelectTrigger>
+                  <SelectTrigger className={`w-full ${HOVER_RED_BORDER}`}><SelectValue placeholder="선택…" /></SelectTrigger>
                   <SelectContent>
                     {LANGUAGE_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
@@ -498,15 +565,14 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold">Cast readiness</h2>
-                <Badge variant="outline" className="font-mono text-[10px] tabular-nums">{depth}</Badge>
+                <h2 className="text-sm font-semibold">Casting</h2>
                 <span className="text-xs text-muted-foreground">인물 {persons.length} · 사물 {objects.length}</span>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => add('person')}>
+                <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={() => add('person')}>
                   <Plus className="size-4" /> 인물
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => add('object')}>
+                <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={() => add('object')}>
                   <Plus className="size-4" /> 사물
                 </Button>
               </div>
@@ -523,7 +589,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 <User className="size-10 text-muted-foreground" />
                 <p className="mt-3 text-sm font-medium">아직 캐스트가 없어요</p>
                 <p className="mt-1 max-w-md text-xs text-muted-foreground">
-                  채팅이 만든 인물·사물을 이 보드에서 확인하고, 부족한 필드는 quick edit나 채팅 보강으로 채웁니다.
+                  추가하고 싶은 인물과 사물에 대한 묘사를 AI Producer에게 알려주세요
                 </p>
               </div>
             ) : (
@@ -534,8 +600,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                     member={member}
                     issues={castIssuesFor(gate, member.localId)}
                     onPatch={updateCastMember}
-                    onEdit={() => setEditingId(member.localId)}
                     onAskProducer={askProducer}
+                    onDelete={removeCastMember}
+                    runtimeSeconds={projectSettings.playtime || 0}
                   />
                 ))}
               </div>
@@ -545,11 +612,10 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold">Background readiness</h2>
-                <Badge variant="outline" className="text-[10px]">locations</Badge>
+                <h2 className="text-sm font-semibold">Background</h2>
                 <span className="text-xs text-muted-foreground">준비됨 {readyBackgrounds.length} / 전체 {backgrounds.length}</span>
               </div>
-              <Button size="sm" variant="outline" onClick={addBg}>
+              <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={addBg}>
                 <Plus className="size-4" /> 배경
               </Button>
             </div>
@@ -566,9 +632,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
             {backgrounds.length === 0 ? (
               <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-border p-8 text-center">
                 <Monitor className="size-10 text-muted-foreground" />
-                <p className="mt-3 text-sm font-medium">아직 배경 카드가 없어요</p>
+                <p className="mt-3 text-sm font-medium">아직 배경 설정이 없어요</p>
                 <p className="mt-1 max-w-md text-xs text-muted-foreground">
-                  Producer가 만든 배경은 writer의 장소 풀과 artist의 월드 이미지 시작점이 됩니다.
+                  추가하고 싶은 배경이나 세계관에 대한 묘사를 AI Producer에게 알려주세요
                 </p>
               </div>
             ) : (
@@ -588,16 +654,6 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
         </div>
       </div>
 
-      <CastEditDialog
-        member={editing}
-        runtimeSeconds={projectSettings.playtime || 0}
-        open={editingId !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditingId(null)
-        }}
-        onSave={updateCastMember}
-        onDelete={removeCastMember}
-      />
     </div>
   )
 }

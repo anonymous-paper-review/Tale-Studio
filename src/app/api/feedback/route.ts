@@ -6,6 +6,10 @@ export async function POST(req: Request): Promise<Response> {
   try {
     const body = await req.json()
     const message: string | undefined = body?.message
+    // kind='contact' → 랜딩 Contact 문의: daewon 주소로 발송. 그 외(기본) → 피드백 talestudio24.
+    const isContact = body?.kind === 'contact'
+    const recipient = isContact ? 'daewon.yoon.ai@gmail.com' : 'talestudio24@gmail.com'
+    const subject = isContact ? '[TaleStudio] Contact 문의' : '[TaleStudio] 사용자 피드백'
 
     if (!message?.trim()) {
       return NextResponse.json({ error: 'message required' }, { status: 400 })
@@ -44,8 +48,8 @@ export async function POST(req: Request): Promise<Response> {
           },
           body: JSON.stringify({
             from: 'TaleStudio <onboarding@resend.dev>',
-            to: ['talestudio24@gmail.com'],
-            subject: '[TaleStudio] 사용자 피드백',
+            to: [recipient],
+            subject,
             text: emailBody,
           }),
         })

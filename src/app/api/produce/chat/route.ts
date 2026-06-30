@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { llmChat } from '@/lib/llm'
 import { PRODUCER_SYSTEM } from './system-prompt'
+import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 
 interface ChatMessage {
   role: 'user' | 'model'
@@ -31,23 +32,6 @@ function normalizeHistory(history: unknown): ChatMessage[] {
   })
 }
 
-function parseExtractedSettings(
-  text: string,
-): { reply: string; extractedSettings: Record<string, unknown> } {
-  const jsonMatch = text.match(/```json\s*\n?([\s\S]*?)\n?```\s*$/)
-
-  if (jsonMatch) {
-    const reply = text.slice(0, jsonMatch.index).trim()
-    try {
-      const parsed = JSON.parse(jsonMatch[1])
-      return { reply, extractedSettings: parsed.extractedSettings ?? {} }
-    } catch {
-      return { reply: text, extractedSettings: {} }
-    }
-  }
-
-  return { reply: text, extractedSettings: {} }
-}
 
 export async function POST(req: Request) {
   try {

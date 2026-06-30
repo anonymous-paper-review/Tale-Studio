@@ -24,6 +24,7 @@ import { useArtistStore } from '@/stores/artist-store'
 import { useDirectorCanvasWarmStarting } from '@/features/director/hooks/use-director-warm-starting'
 import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
+import { MarkdownText } from '@/components/layout/markdown-text'
 import {
   STAGE_BADGE,
   STAGE_LABEL,
@@ -92,9 +93,8 @@ export function GlobalChat() {
   const collapsed = useChatUiStore((s) => s.collapsed)
   const setChatWidth = useChatUiStore((s) => s.setChatWidth)
   const toggleCollapsed = useChatUiStore((s) => s.toggleCollapsed)
-  const draftPrompt = useChatUiStore((s) => s.draftPrompt)
-  const consumeDraftPrompt = useChatUiStore((s) => s.consumeDraftPrompt)
   const [dragging, setDragging] = useState(false)
+
 
   const [input, setInput] = useState('')
   const chatEndRef = useRef<HTMLDivElement>(null)
@@ -108,18 +108,6 @@ export function GlobalChat() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length, loading])
-
-  useEffect(() => {
-    if (!draftPrompt) return
-    // No-clobber default: preserve in-progress user typing and consume the draft once.
-    if (input.trim().length > 0) {
-      consumeDraftPrompt(draftPrompt.id)
-      return
-    }
-    setInput(draftPrompt.text)
-    consumeDraftPrompt(draftPrompt.id)
-    requestAnimationFrame(() => textareaRef.current?.focus())
-  }, [consumeDraftPrompt, draftPrompt, input])
 
   const stageSupported = CHAT_SUPPORTED_STAGES.has(currentStage)
   const inputDisabled = !stageSupported || loading
@@ -225,12 +213,9 @@ export function GlobalChat() {
                   STAGE_BADGE_CLASS[currentStage],
                 )}
               >
-                {STAGE_BADGE[currentStage]} · {STAGE_LABEL[currentStage]}
+                {currentStage === 'producer' ? 'AI' : STAGE_BADGE[currentStage]} · {STAGE_LABEL[currentStage]}
               </span>
             </div>
-            <p className="truncate text-[11px] text-muted-foreground">
-              모든 단계 통합
-            </p>
           </div>
           <Button
             size="icon-sm"
@@ -246,11 +231,6 @@ export function GlobalChat() {
         {/* Messages */}
         <ScrollArea className="min-h-0 flex-1 px-4 py-3">
           <div className="space-y-2">
-            {messages.length === 0 && (
-              <div className="mr-4 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-                대화를 시작해보세요. 모든 단계(P1–P5)의 메시지가 시간순으로 표시됩니다.
-              </div>
-            )}
 
             {messages.map((msg) => {
               const badgeClass = STAGE_BADGE_CLASS[msg.stage]
@@ -270,9 +250,9 @@ export function GlobalChat() {
                       badgeClass,
                     )}
                   >
-                    {STAGE_BADGE[msg.stage]}
+                    {msg.stage === 'producer' ? 'AI Producer' : STAGE_BADGE[msg.stage]}
                   </span>
-                  {msg.content}
+                  <MarkdownText text={msg.content} />
                   <CopyButton text={msg.content} />
                 </div>
               )
@@ -297,7 +277,7 @@ export function GlobalChat() {
                   >
                     {STAGE_BADGE[suggestion.stage]}
                   </span>
-                  <span className="whitespace-pre-wrap">{suggestion.content}</span>
+                  <MarkdownText className="whitespace-pre-wrap" text={suggestion.content} />
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   {suggestion.action && (
@@ -324,12 +304,12 @@ export function GlobalChat() {
                     제안
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium">{pendingProposal.target}</p>
-                    <p className="mt-0.5 text-muted-foreground">{pendingProposal.action}</p>
+                    <p className="font-medium"><MarkdownText text={pendingProposal.target} /></p>
+                    <p className="mt-0.5 text-muted-foreground"><MarkdownText text={pendingProposal.action} /></p>
                     {pendingProposal.impact.length > 0 && (
                       <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
                         {pendingProposal.impact.map((item) => (
-                          <li key={item}>{item}</li>
+                          <li key={item}><MarkdownText text={item} /></li>
                         ))}
                       </ul>
                     )}
