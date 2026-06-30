@@ -221,7 +221,6 @@ function CastCard({
             <Input
               value={member.name}
               placeholder={isPerson ? '예: 지아' : '예: 은빛 반지'}
-              aria-invalid={!!nameIssue}
               onChange={(e) => onPatch(member.localId, { name: e.target.value })}
             />
           </HoverBeam>
@@ -234,7 +233,6 @@ function CastCard({
               value={member.appearance}
               rows={2}
               placeholder={isPerson ? '복장, 나이, 특징' : '형태, 재질, 특징'}
-              aria-invalid={!!appearanceIssue}
               onChange={(e) => onPatch(member.localId, { appearance: e.target.value })}
             />
           </HoverBeam>
@@ -272,16 +270,16 @@ function CastCard({
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">아크 (시작 / 끝 / 유형)</label>
             <div className="grid grid-cols-3 gap-2">
-              <HoverBeam><Input value={member.arc?.start_state ?? ''} placeholder="시작 상태" aria-invalid={!!arcIssue} onChange={(e) => patchArc({ start_state: e.target.value })} /></HoverBeam>
-              <HoverBeam><Input value={member.arc?.end_state ?? ''} placeholder="끝 상태" aria-invalid={!!arcIssue} onChange={(e) => patchArc({ end_state: e.target.value })} /></HoverBeam>
-              <HoverBeam><Input value={member.arc?.arc_type ?? ''} placeholder="유형" aria-invalid={!!arcIssue} onChange={(e) => patchArc({ arc_type: e.target.value })} /></HoverBeam>
+              <HoverBeam><Input value={member.arc?.start_state ?? ''} placeholder="시작 상태" onChange={(e) => patchArc({ start_state: e.target.value })} /></HoverBeam>
+              <HoverBeam><Input value={member.arc?.end_state ?? ''} placeholder="끝 상태" onChange={(e) => patchArc({ end_state: e.target.value })} /></HoverBeam>
+              <HoverBeam><Input value={member.arc?.arc_type ?? ''} placeholder="유형" onChange={(e) => patchArc({ arc_type: e.target.value })} /></HoverBeam>
             </div>
             {arcIssue ? <p className="text-xs text-destructive">{arcIssue.label}</p> : null}
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">동기 (want / need)</label>
             <div className="grid grid-cols-2 gap-2">
-              <HoverBeam><Input value={member.motivation?.want ?? ''} placeholder="want (필수)" aria-invalid={!!motivationIssue} onChange={(e) => patchMot({ want: e.target.value })} /></HoverBeam>
+              <HoverBeam><Input value={member.motivation?.want ?? ''} placeholder="want (필수)" onChange={(e) => patchMot({ want: e.target.value })} /></HoverBeam>
               <HoverBeam><Input value={member.motivation?.need ?? ''} placeholder="need (선택)" onChange={(e) => patchMot({ need: e.target.value })} /></HoverBeam>
             </div>
             {motivationIssue ? <p className="text-xs text-destructive">{motivationIssue.label}</p> : null}
