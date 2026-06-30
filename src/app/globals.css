@@ -328,6 +328,55 @@
   }
 }
 
+/* ── Hover "red beam" (June 2026 UI 통일) ──
+   입력창·버튼에 마우스 호버(또는 포커스) 시 빨간 빛이 테두리를 따라 도는 효과.
+   .tale-beam(생성중 accent)과 동일 메커니즘(conic ring + beam-spin)이되 destructive 색 +
+   hover/focus 게이트 + ::before 오버레이. D20/D21/P2/P4/P5 공통 hover 통일.
+   주의: <input>/<textarea>는 ::before 미지원 → HoverBeam 래퍼(div)로 감싼다. <button>은 직접 적용. */
+.hover-red-beam {
+  position: relative;
+}
+.hover-red-beam::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--beam-angle),
+    transparent 0deg,
+    var(--destructive) 55deg,
+    transparent 135deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+.hover-red-beam:hover::before,
+.hover-red-beam:focus-visible::before,
+.hover-red-beam:focus-within::before {
+  opacity: 1;
+  animation: beam-spin 1.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hover-red-beam:hover::before,
+  .hover-red-beam:focus-visible::before,
+  .hover-red-beam:focus-within::before {
+    animation: none;
+    background: var(--destructive);
+    opacity: 0.55;
+  }
+}
+
 /* ── React Flow — Director 캔버스 컨트롤/미니맵 ──
    xyflow 기본 컨트롤은 흰 배경 + 흰 아이콘이라 dark 테마에서 화이트온화이트로 안 보인다.
    xyflow 기본(.react-flow__controls-button, specificity 0,1,0)이 page.tsx의 style.css import로

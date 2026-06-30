@@ -34,7 +34,8 @@ import type { BackgroundSource, CastArc, CastMember, CastMotivation, GateIssue, 
 import { isProducerBackgroundComplete } from '@/lib/producer-gate'
 import { depthLevelFromRuntime } from '@/lib/depth'
 import type { ProjectFormat } from '@/types'
-import { HOVER_RED_BORDER, HOVER_RED_BORDER_CHILD_INPUT } from './interaction-styles'
+import { HOVER_RED_BORDER } from './interaction-styles'
+import { HoverBeam } from './hover-beam'
 import { TagInput } from './tag-input'
 
 const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [
@@ -216,25 +217,27 @@ function CastCard({
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">이름</label>
-          <Input
-            value={member.name}
-            placeholder={isPerson ? '예: 지아' : '예: 은빛 반지'}
-            aria-invalid={!!nameIssue}
-            className={HOVER_RED_BORDER}
-            onChange={(e) => onPatch(member.localId, { name: e.target.value })}
-          />
+          <HoverBeam>
+            <Input
+              value={member.name}
+              placeholder={isPerson ? '예: 지아' : '예: 은빛 반지'}
+              aria-invalid={!!nameIssue}
+              onChange={(e) => onPatch(member.localId, { name: e.target.value })}
+            />
+          </HoverBeam>
           {nameIssue ? <p className="text-xs text-destructive">{nameIssue.label}</p> : null}
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">외모</label>
-          <Textarea
-            value={member.appearance}
-            rows={2}
-            placeholder={isPerson ? '복장, 나이, 특징' : '형태, 재질, 특징'}
-            aria-invalid={!!appearanceIssue}
-            className={HOVER_RED_BORDER}
-            onChange={(e) => onPatch(member.localId, { appearance: e.target.value })}
-          />
+          <HoverBeam>
+            <Textarea
+              value={member.appearance}
+              rows={2}
+              placeholder={isPerson ? '복장, 나이, 특징' : '형태, 재질, 특징'}
+              aria-invalid={!!appearanceIssue}
+              onChange={(e) => onPatch(member.localId, { appearance: e.target.value })}
+            />
+          </HoverBeam>
           {appearanceIssue ? <p className="text-xs text-destructive">{appearanceIssue.label}</p> : null}
         </div>
       </div>
@@ -269,17 +272,17 @@ function CastCard({
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">아크 (시작 / 끝 / 유형)</label>
             <div className="grid grid-cols-3 gap-2">
-              <Input value={member.arc?.start_state ?? ''} placeholder="시작 상태" aria-invalid={!!arcIssue} className={HOVER_RED_BORDER} onChange={(e) => patchArc({ start_state: e.target.value })} />
-              <Input value={member.arc?.end_state ?? ''} placeholder="끝 상태" aria-invalid={!!arcIssue} className={HOVER_RED_BORDER} onChange={(e) => patchArc({ end_state: e.target.value })} />
-              <Input value={member.arc?.arc_type ?? ''} placeholder="유형" aria-invalid={!!arcIssue} className={HOVER_RED_BORDER} onChange={(e) => patchArc({ arc_type: e.target.value })} />
+              <HoverBeam><Input value={member.arc?.start_state ?? ''} placeholder="시작 상태" aria-invalid={!!arcIssue} onChange={(e) => patchArc({ start_state: e.target.value })} /></HoverBeam>
+              <HoverBeam><Input value={member.arc?.end_state ?? ''} placeholder="끝 상태" aria-invalid={!!arcIssue} onChange={(e) => patchArc({ end_state: e.target.value })} /></HoverBeam>
+              <HoverBeam><Input value={member.arc?.arc_type ?? ''} placeholder="유형" aria-invalid={!!arcIssue} onChange={(e) => patchArc({ arc_type: e.target.value })} /></HoverBeam>
             </div>
             {arcIssue ? <p className="text-xs text-destructive">{arcIssue.label}</p> : null}
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">동기 (want / need)</label>
             <div className="grid grid-cols-2 gap-2">
-              <Input value={member.motivation?.want ?? ''} placeholder="want (필수)" aria-invalid={!!motivationIssue} className={HOVER_RED_BORDER} onChange={(e) => patchMot({ want: e.target.value })} />
-              <Input value={member.motivation?.need ?? ''} placeholder="need (선택)" className={HOVER_RED_BORDER} onChange={(e) => patchMot({ need: e.target.value })} />
+              <HoverBeam><Input value={member.motivation?.want ?? ''} placeholder="want (필수)" aria-invalid={!!motivationIssue} onChange={(e) => patchMot({ want: e.target.value })} /></HoverBeam>
+              <HoverBeam><Input value={member.motivation?.need ?? ''} placeholder="need (선택)" onChange={(e) => patchMot({ need: e.target.value })} /></HoverBeam>
             </div>
             {motivationIssue ? <p className="text-xs text-destructive">{motivationIssue.label}</p> : null}
           </div>
@@ -359,33 +362,36 @@ function BackgroundCard({
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">이름</label>
-          <Input
-            value={background.name}
-            placeholder="예: 네온 뒷골목"
-            className={HOVER_RED_BORDER}
-            onChange={(e) => onPatch(background.localId, { name: e.target.value })}
-          />
+          <HoverBeam>
+            <Input
+              value={background.name}
+              placeholder="예: 네온 뒷골목"
+              onChange={(e) => onPatch(background.localId, { name: e.target.value })}
+            />
+          </HoverBeam>
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">목적</label>
-          <Input
-            value={background.purpose}
-            placeholder="예: 추격이 시작되는 공간"
-            className={HOVER_RED_BORDER}
-            onChange={(e) => onPatch(background.localId, { purpose: e.target.value })}
-          />
+          <HoverBeam>
+            <Input
+              value={background.purpose}
+              placeholder="예: 추격이 시작되는 공간"
+              onChange={(e) => onPatch(background.localId, { purpose: e.target.value })}
+            />
+          </HoverBeam>
         </div>
       </div>
 
       <div className="mt-3 space-y-1.5">
         <label className="text-xs font-medium text-muted-foreground">시각 설명</label>
-        <Textarea
-          value={background.visualDescription}
-          rows={2}
-          placeholder="색감, 구조, 소품, 분위기"
-          className={HOVER_RED_BORDER}
-          onChange={(e) => onPatch(background.localId, { visualDescription: e.target.value })}
-        />
+        <HoverBeam>
+          <Textarea
+            value={background.visualDescription}
+            rows={2}
+            placeholder="색감, 구조, 소품, 분위기"
+            onChange={(e) => onPatch(background.localId, { visualDescription: e.target.value })}
+          />
+        </HoverBeam>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -494,32 +500,36 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
             </div>
             <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
               <FieldShell icon={<Clock className="size-4" />} label="러닝타임" issue={hardByField.get('playtime')}>
-                <Input
-                  type="number"
-                  min={5}
-                  value={projectSettings.playtime || ''}
-                  placeholder="예: 120"
-                  onChange={(e) => updateSettings({ playtime: Number(e.target.value) || 0 })}
-                  className={`font-mono tabular-nums ${HOVER_RED_BORDER}`}
-                />
+                <HoverBeam>
+                  <Input
+                    type="number"
+                    min={5}
+                    value={projectSettings.playtime || ''}
+                    placeholder="예: 120"
+                    onChange={(e) => updateSettings({ playtime: Number(e.target.value) || 0 })}
+                    className="font-mono tabular-nums"
+                  />
+                </HoverBeam>
               </FieldShell>
 
               <FieldShell icon={<Film className="size-4" />} label="장르" issue={hardByField.get('genre')}>
-                <Input
-                  value={projectSettings.genre}
-                  placeholder="예: thriller"
-                  className={HOVER_RED_BORDER}
-                  onChange={(e) => updateSettings({ genre: e.target.value })}
-                />
+                <HoverBeam>
+                  <Input
+                    value={projectSettings.genre}
+                    placeholder="예: thriller"
+                    onChange={(e) => updateSettings({ genre: e.target.value })}
+                  />
+                </HoverBeam>
               </FieldShell>
 
               <FieldShell icon={<Tag className="size-4" />} label="세부 장르" softIssue={softByField.get('subGenre')}>
-                <Input
-                  value={projectSettings.subGenre ?? ''}
-                  placeholder="예: psychological"
-                  className={HOVER_RED_BORDER}
-                  onChange={(e) => updateSettings({ subGenre: e.target.value })}
-                />
+                <HoverBeam>
+                  <Input
+                    value={projectSettings.subGenre ?? ''}
+                    placeholder="예: psychological"
+                    onChange={(e) => updateSettings({ subGenre: e.target.value })}
+                  />
+                </HoverBeam>
               </FieldShell>
 
               <FieldShell icon={<Monitor className="size-4" />} label="포맷" issue={hardByField.get('format')}>
@@ -537,13 +547,13 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               </FieldShell>
 
               <FieldShell icon={<Palette className="size-4" />} label="톤" softIssue={softByField.get('tone')}>
-                <div className={HOVER_RED_BORDER_CHILD_INPUT}>
+                <HoverBeam>
                   <TagInput
                     values={projectSettings.tone}
                     onChange={(tone) => updateSettings({ tone })}
                     placeholder="예: dark"
                   />
-                </div>
+                </HoverBeam>
               </FieldShell>
 
               <FieldShell icon={<Languages className="size-4" />} label="대사 언어" issue={hardByField.get('dialogueLanguage')}>
