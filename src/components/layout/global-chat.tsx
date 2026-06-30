@@ -244,14 +244,16 @@ export function GlobalChat() {
                       : 'mr-4 bg-muted text-foreground',
                   )}
                 >
-                  <span
-                    className={cn(
-                      'mr-1.5 inline-flex items-center rounded-full border px-1.5 py-0 align-middle text-[9px] font-medium select-none',
-                      badgeClass,
-                    )}
-                  >
-                    {msg.stage === 'producer' ? 'AI Producer' : STAGE_BADGE[msg.stage]}
-                  </span>
+                  {msg.role !== 'user' && (
+                    <span
+                      className={cn(
+                        'mr-1.5 inline-flex items-center rounded-full border px-1.5 py-0 align-middle text-[9px] font-medium select-none',
+                        badgeClass,
+                      )}
+                    >
+                      {msg.stage === 'producer' ? 'AI Producer' : STAGE_BADGE[msg.stage]}
+                    </span>
+                  )}
                   <MarkdownText text={msg.content} />
                   <CopyButton text={msg.content} />
                 </div>
