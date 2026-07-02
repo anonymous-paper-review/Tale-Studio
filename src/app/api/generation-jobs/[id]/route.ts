@@ -5,63 +5,11 @@
 // 견고성: 아직 queued면 FAL 큐를 직접 reconcile — webhook이 안 왔어도(로컬 터널 없음 등) 결과를 즉시 영속화.
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
-import {
-  getGenerationJobById,
-  failGenerationJob,
-  userOwnsProject,
-  type GenerationJob,
-} from '@/lib/generation-jobs'
-import { falImageFetch, falVideoFetch } from '@/lib/writer/llm/fal'
-import {
-  finalizeCharacterViewJob,
-  finalizeWorldShotJob,
-  finalizeShotStoryboardJob,
-  finalizeShotRoughStoryboardJob,
-  finalizeShotVideoJob,
-} from '@/lib/fal/finalize'
+import { getGenerationJobById, userOwnsProject } from '@/lib/generation-jobs'
+import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
-
-/** queued 상태면 FAL을 직접 확인해 완료/실패를 반영 (webhook 누락 대비 안전망). */
-async function reconcile(job: GenerationJob): Promise<GenerationJob> {
-  try {
-    if (job.kind === 'shot_video') {
-      const r = await falVideoFetch(job.model, job.request_id)
-      if (r.status === 'COMPLETED') {
-        const url = await finalizeShotVideoJob(job, r.url)
-        return { ...job, status: 'completed', result_url: url }
-      }
-      if (r.status === 'FAILED') {
-        await failGenerationJob(job.id, r.error)
-        return { ...job, status: 'failed', error: r.error }
-      }
-    } else {
-      // 이미지 계열 (character_view / world_shot / shot_storyboard / shot_rough_storyboard)
-      const r = await falImageFetch(job.model, job.request_id)
-      if (r.status === 'COMPLETED') {
-        let url: string
-        if (job.kind === 'character_view') url = await finalizeCharacterViewJob(job, r.url)
-        else if (job.kind === 'world_shot') url = await finalizeWorldShotJob(job, r.url)
-        else if (job.kind === 'shot_rough_storyboard')
-          url = await finalizeShotRoughStoryboardJob(job, r.url)
-        else url = await finalizeShotStoryboardJob(job, r.url)
-        return { ...job, status: 'completed', result_url: url }
-      }
-      if (r.status === 'FAILED') {
-        await failGenerationJob(job.id, r.error)
-        return { ...job, status: 'failed', error: r.error }
-      }
-    }
-  } catch (e) {
-    // 일시 오류 → queued 유지, 다음 polling에서 재시도
-    console.error(
-      '[generation-jobs] reconcile failed:',
-      e instanceof Error ? e.message : e,
-    )
-  }
-  return job
-}
 
 export async function GET(
   _req: Request,
@@ -91,7 +39,7 @@ export async function GET(
     )
   }
 
-  if (job.status === 'queued') job = await reconcile(job)
+  if (job.status === 'queued') job = await reconcileJobFromFal(job)
 
   return NextResponse.json({
     ok: true,

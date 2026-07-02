@@ -65,7 +65,8 @@ async function projectLocale(projectId: string): Promise<string> {
  *   캐릭터/월드 레퍼런스 이미지 생성을 일찍 시작할 수 있다 (shots/director 단계 10~14를 안 기다림).
  *   scenes 도 여기 포함 — world(로케이션) 이미지 생성이 scene.mood 에 의존하므로
  *   scenes 가 없으면 generateWorldAsset 이 조용히 스킵된다. scenes 는 stage 05 에서 이미 준비됨.
- *   기존 행은 project_id 기준 삭제 후 재삽입(idempotent). projectId 는 DB UUID 여야 함.
+ *   idempotent: scenes + writer-origin locations 는 삭제 후 재삽입, producer-origin locations 와
+ *   characters 는 보존(파생/빈 필드만 갱신 — §5 원칙 2). projectId 는 DB UUID 여야 함.
  *   호출자는 non-blocking 으로 감싼다.
  */
 export async function persistAssetsToDb(
@@ -77,10 +78,20 @@ export async function persistAssetsToDb(
 ): Promise<void> {
   if (!UUID_RE.test(projectId)) return // 핸드오프 외 run — DB project 없음
 
-  // locations/scenes 는 writer 출력 → 매 실행 재생성(delete-then-insert).
-  //   characters 는 입력(producer-story-gate §4) → 삭제하지 않고 additive 로만 보강(아래).
+  // scenes 는 writer 출력 → 매 실행 재생성(delete-then-insert).
+  // locations 는 혼합(characters 와 동일한 §5 원칙 2): producer 가 핸드오프로 upsert 한 행
+  //   (origin='producer' — name/purpose/visual_description 은 사람이 확정한 원천)은 **입력**이라
+  //   보존하고 writer 파생 필드만 갱신, writer-origin 행만 재생성한다.
+  //   (전체 wipe 가 producer 배경의 이름을 slug 그대로("location_2"), purpose 를 빈칸으로
+  //   갈아엎고 origin 까지 'writer' 로 강등시키던 버그 — 2026-06-30. origin 은 NOT NULL default 'writer'.)
+  const { data: producerLocRows } = await supabaseAdmin
+    .from('locations')
+    .select('location_id')
+    .eq('project_id', projectId)
+    .eq('origin', 'producer')
+  const producerLocIds = new Set((producerLocRows ?? []).map((r) => r.location_id as string))
   await Promise.all([
-    supabaseAdmin.from('locations').delete().eq('project_id', projectId),
+    supabaseAdmin.from('locations').delete().eq('project_id', projectId).neq('origin', 'producer'),
     supabaseAdmin.from('scenes').delete().eq('project_id', projectId),
   ])
 
@@ -89,22 +100,45 @@ export async function persistAssetsToDb(
   //   누락될 수 있다. 그래서 locations → scenes 를 먼저 넣고 characters 를 마지막에 넣어,
   //   characters 가 보이는 순간 나머지가 보장되도록 한다.
 
-  // locations (writer worldVisual.locations — name 은 id 기반, time_of_day 는 미보유)
+  // locations (writer worldVisual.locations — 신규 행 name 은 id 기반, time_of_day 는 미보유)
   if (worldVisual.locations?.length) {
-    await supabaseAdmin.from('locations').insert(
-      worldVisual.locations.map((loc) => ({
-        project_id: projectId,
-        location_id: loc.id,
-        name: loc.id,
-        time_of_day: '',
-        style_description: loc.style_description ?? '',
-        lighting_sources: loc.lighting_sources ?? [],
-        props: loc.props ?? [],
-        // 레거시 필드도 채워 기존 소비측(l.visual_description / l.lighting_direction) 무변경 유지.
-        visual_description: loc.style_description ?? '',
-        lighting_direction: (loc.lighting_sources ?? []).join(', '),
-      })),
-    )
+    const freshLocs = worldVisual.locations.filter((loc) => !producerLocIds.has(loc.id))
+    const producerLocs = worldVisual.locations.filter((loc) => producerLocIds.has(loc.id))
+    if (freshLocs.length) {
+      await supabaseAdmin.from('locations').insert(
+        freshLocs.map((loc) => ({
+          project_id: projectId,
+          location_id: loc.id,
+          name: loc.id,
+          time_of_day: '',
+          style_description: loc.style_description ?? '',
+          lighting_sources: loc.lighting_sources ?? [],
+          props: loc.props ?? [],
+          // 레거시 필드도 채워 기존 소비측(l.visual_description / l.lighting_direction) 무변경 유지.
+          visual_description: loc.style_description ?? '',
+          lighting_direction: (loc.lighting_sources ?? []).join(', '),
+        })),
+      )
+    }
+    // producer 행: writer 파생 필드(아트디렉션)만 갱신 — 원천(name/purpose/visual_description*·
+    //   user_edited·origin)은 불변. visual_description 은 producer 원문(EN 파생본)이 그대로
+    //   rough-board db_fallback/월드 이미지 입력이 된다.
+    if (producerLocs.length) {
+      await Promise.all(
+        producerLocs.map((loc) =>
+          supabaseAdmin
+            .from('locations')
+            .update({
+              style_description: loc.style_description ?? '',
+              lighting_sources: loc.lighting_sources ?? [],
+              props: loc.props ?? [],
+              lighting_direction: (loc.lighting_sources ?? []).join(', '),
+            })
+            .eq('project_id', projectId)
+            .eq('location_id', loc.id),
+        ),
+      )
+    }
   }
 
   // scenes (world 이미지 생성이 scene.mood 에 의존 → Tier 1 에 포함)

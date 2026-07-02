@@ -22,6 +22,7 @@ import {
   finalizeShotRoughStoryboardJob,
   finalizeShotVideoJob,
 } from '@/lib/fal/finalize'
+import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -78,10 +79,18 @@ export async function POST(req: Request) {
   if (job.status !== 'queued') return NextResponse.json({ ok: true }) // 멱등: 이미 처리됨
 
   if (body.status !== 'OK') {
-    // 실패 분류(#A) 태그를 메시지 앞에 붙여 generation-status 가 moderation vs generic 을 구분하게 한다(원본 보존).
     const raw = body.payload_error ?? 'fal webhook reported ERROR'
     const cls = classifyFalFailure(raw)
-    await failGenerationJob(job.id, cls === 'moderation' ? `[moderation] ${raw}` : raw)
+    // moderation(콘텐츠 차단)은 결정론적 실패 → 그대로 터미널 처리 (#A 태그로 generation-status 가 구분, 원본 보존).
+    if (cls === 'moderation') {
+      await failGenerationJob(job.id, `[moderation] ${raw}`)
+      return NextResponse.json({ ok: true })
+    }
+    // 사유(payload_error) 없는 generic 'ERROR' — 느린 i2i 의 fal webhook 조기/타임아웃일 수 있다
+    //   (같은 입력을 폴링하면 완료됨, 실측 확인 2026-06-30). webhook 을 진실로 믿지 말고 FAL 큐 상태로
+    //   reconcile: 완료면 회수, 진행 중이면 queued 유지(클라 5분 폴링 → /generation-jobs/[id] reconcile 이
+    //   마저 회수), FAL 이 진짜 FAILED 면 그때 fail. (shot_storyboard 느린 샷이 영영 실패로 굳던 버그)
+    await reconcileJobFromFal(job)
     return NextResponse.json({ ok: true })
   }
 
