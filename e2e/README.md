@@ -1,5 +1,8 @@
 # Artist 파이프라인 라이브 e2e
 
+> **이 문서 = Full 모드**(시나리오 기반, 비용 발생) 레지스트리다. 테스트 3층(단위/Skip/Full)과
+> **커밋 전 기본 점검인 Skip 모드**(무비용, 세션 변경분만 실브라우저로 확인)는 **[`TEST-MODES.md`](./TEST-MODES.md)** 참고.
+
 > Artist 이미지 파이프라인(C1~C5: 서버 초안 / provenance / 대화형 재생성 / 후보 일관성 / 시간축)을
 > **실제 fal 생성 + 실제 webhook + 라이브 Supabase**로 검증하는 방법론과 시나리오 레지스트리.
 > 단위테스트(vitest)가 못 잡는 **통합 경계 버그**(webhook→finalize→DB)를 잡는 것이 목적.

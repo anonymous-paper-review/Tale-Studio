@@ -21,8 +21,19 @@
 //   failRun <pid>             최신 writer_run 을 failed 로 (핸드오프 후 텍스트 파이프라인 비용 캡)
 //   runs <pid>                writer_runs 상태
 //   loginCheck                E2E_EMAIL/E2E_PASSWORD 로 anon 로그인 가능 여부 확인
+//   ── skip-mode (커밋 전 실브라우저 점검용 셋업; README "Skip 모드") ──
+//   newProject [title]        E2E 워크스페이스에 throwaway 프로젝트 생성 → `NEW_PROJECT <pid>`
+//   skipArtist <pid>          seedCast + stubWorld + setStage artist (artist 게이트를 비용 0 으로 오픈)
+//   stubWorld <pid>           로케이션 shot 더미 채움(autogen fal 호출 skip)
+//   cookies [outPath]         E2E 세션 쿠키를 파일로 굽기(브라우저 주입용, 기본 tmp)
+//   rmProject <pid>           throwaway 프로젝트 + 자식행 삭제
+//   pruneSkip                 [e2e-skip] 프로젝트 일괄 삭제
 import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
+import { createServerClient } from '@supabase/ssr'
+import { writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 dotenv.config({ path: '.env.local', quiet: true })
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -197,7 +208,112 @@ async function loginCheck() {
   console.log('LOGIN_OK user=' + data.user.id + ' confirmed=' + !!data.user.email_confirmed_at)
 }
 
-const map = { seedCast, chars, locs, candidates, jobs, setStage, setLook, clearLook, failRun, runs, loginCheck }
+// ── skip-mode 셋업 (README "Skip 모드" 참고) ────────────────────────────────
+// 세션에서 구현한 기능을 커밋 전에 실브라우저로 눌러보기 위한 최소 상태 준비.
+// service-role 로 E2E 계정 워크스페이스에 throwaway 프로젝트를 만들고 게이트만 연다.
+const SKIP_MARKER = '[e2e-skip]'
+const STUB_IMG = 'https://example.com/e2e-stub.png' // autoGenerateBaseImages 우회용 더미(=fal 호출 0)
+
+async function e2eWorkspace() {
+  const { data: list } = await s.auth.admin.listUsers({ perPage: 1000 })
+  const user = list?.users?.find((u) => u.email === process.env.E2E_EMAIL)
+  if (!user) throw new Error('E2E_EMAIL 유저 없음 — .env.local / seed:test-accounts 확인')
+  const { data: ws } = await s
+    .from('workspaces')
+    .select('id')
+    .eq('owner_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (!ws) throw new Error('E2E 유저 워크스페이스 없음')
+  return { user, workspaceId: ws.id }
+}
+
+// 새 throwaway 프로젝트(제목에 SKIP_MARKER) — 마지막 줄 `NEW_PROJECT <pid>`
+async function newProject(titleArg) {
+  const { workspaceId } = await e2eWorkspace()
+  const title = `${SKIP_MARKER} ${titleArg || new Date().toISOString()}`
+  const { data, error } = await s
+    .from('projects')
+    .insert({ workspace_id: workspaceId, title })
+    .select('id')
+    .single()
+  if (error) throw new Error(error.message)
+  console.log('NEW_PROJECT ' + data.id)
+}
+
+// 모든 로케이션 shot 을 더미로 채워 artist 진입 자동생성(fal) 을 skip → 비용 0
+async function stubWorld(pid) {
+  need(pid, 'projectId')
+  const { error } = await s
+    .from('locations')
+    .update({ wide_shot: STUB_IMG, establishing_shot: STUB_IMG })
+    .eq('project_id', pid)
+  if (error) throw new Error(error.message)
+  console.log('world shots stubbed (autogen skip) for', pid)
+}
+
+// seedCast + stubWorld + setStage artist 한 방 — artist UI 게이트를 비용 0 으로 연다
+async function skipArtist(pid) {
+  need(pid, 'projectId')
+  await seedCast(pid)
+  await stubWorld(pid)
+  await setStage(pid, 'artist')
+  console.log('SKIP_READY artist', pid)
+}
+
+// E2E 계정 @supabase/ssr 세션 쿠키를 굽어 파일로 저장(브라우저 주입용). 기본 tmp 경로.
+async function cookies(outPath) {
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const out = outPath || join(tmpdir(), 'e2e-cookies.json')
+  const anon = createClient(URL, anonKey, { auth: { persistSession: false } })
+  const { data: signIn, error } = await anon.auth.signInWithPassword({
+    email: process.env.E2E_EMAIL,
+    password: process.env.E2E_PASSWORD,
+  })
+  if (error) throw error
+  const jar = []
+  const ssr = createServerClient(URL, anonKey, {
+    cookies: { getAll: () => jar, setAll: (cs) => cs.forEach(({ name, value }) => jar.push({ name, value })) },
+  })
+  await ssr.auth.setSession({
+    access_token: signIn.session.access_token,
+    refresh_token: signIn.session.refresh_token,
+  })
+  writeFileSync(out, JSON.stringify({ userId: signIn.user.id, cookies: jar }))
+  console.log('COOKIES ' + out + ' (' + jar.length + ')')
+}
+
+// throwaway 프로젝트 + 자식행 삭제
+const CHILD_TABLES = [
+  'shots', 'scenes', 'generation_jobs', 'character_image_candidates',
+  'location_image_candidates', 'characters', 'locations', 'writer_runs',
+  'editor_states', 'video_clips', 'messages',
+]
+async function rmProject(pid) {
+  need(pid, 'projectId')
+  for (const t of CHILD_TABLES) {
+    const { error } = await s.from(t).delete().eq('project_id', pid)
+    if (error && !/does not exist|column/.test(error.message)) console.error(t, 'del:', error.message)
+  }
+  const { error } = await s.from('projects').delete().eq('id', pid)
+  if (error) throw new Error(error.message)
+  console.log('removed project', pid)
+}
+
+// SKIP_MARKER 붙은 throwaway 프로젝트 일괄 삭제(E2E 워크스페이스 한정)
+async function pruneSkip() {
+  const { workspaceId } = await e2eWorkspace()
+  const { data } = await s
+    .from('projects')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .like('title', SKIP_MARKER + '%')
+  for (const p of data ?? []) await rmProject(p.id)
+  console.log('pruned', (data ?? []).length, 'skip projects')
+}
+
+const map = { seedCast, chars, locs, candidates, jobs, setStage, setLook, clearLook, failRun, runs, loginCheck, newProject, stubWorld, skipArtist, cookies, rmProject, pruneSkip }
 const fn = map[cmd]
 if (!fn) {
   console.error('cmd 미지정/오타:', cmd, '\n사용 가능:', Object.keys(map).join(', '), '\n(상단 주석 또는 e2e/README.md 참고)')
