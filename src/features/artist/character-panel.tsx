@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, Sparkles, Check, Share2, BookmarkCheck, BookmarkPlus } from 'lucide-react'
+import { Loader2, Sparkles, Check, Share2, BookmarkCheck, BookmarkPlus, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -12,8 +12,10 @@ import {
 } from '@/components/ui/tooltip'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
-import { AddCharacterDialog } from '@/features/artist/add-character-dialog'
-import { useArtistStore } from '@/stores/artist-store'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { HoverBeam } from '@/components/hover-beam'
+import { useArtistStore, type CharacterRole } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { useInventoryStore } from '@/stores/inventory-store'
@@ -29,11 +31,11 @@ import { cn } from '@/lib/utils'
 //   should be cached). 폴백은 모듈레벨 frozen 상수로 참조 고정한다.
 const EMPTY_REQUIRED_IDS: readonly string[] = Object.freeze([])
 
-const ROLE_VARIANT = {
-  protagonist: 'default',
-  antagonist: 'destructive',
-  supporting: 'secondary',
-} as const
+const ROLE_TOGGLE: { value: CharacterRole; label: string }[] = [
+  { value: 'protagonist', label: '주인공' },
+  { value: 'antagonist', label: '적대자' },
+  { value: 'supporting', label: '조연' },
+]
 
 export function CharacterPanel() {
   const {
@@ -45,6 +47,8 @@ export function CharacterPanel() {
     viewFailures,
     selectCharacter,
     generateCharacterAllViews,
+    addCharacter,
+    updateCharacter,
   } = useArtistStore()
 
   const projectId = useProjectStore((s) => s.projectId)
@@ -154,25 +158,60 @@ export function CharacterPanel() {
                   : 'border-border hover:bg-accent/50',
               )}
             >
-              {/* Header: Name + Role + entity 배지 */}
-              <div className="mb-3 flex items-center gap-2">
-                <span className="font-medium">{char.name}</span>
-                {isObject ? (
-                  <Badge variant="secondary">사물</Badge>
-                ) : (
-                  <Badge variant={ROLE_VARIANT[role]}>{role}</Badge>
-                )}
-                {isRequired && (
-                  <Badge variant={hasMainImage ? 'outline' : 'destructive'} className="text-[10px]">
-                    필수
-                  </Badge>
-                )}
-                {viewFailures[char.characterId] &&
-                  Object.keys(viewFailures[char.characterId]).length > 0 && (
-                    <Badge variant="destructive" className="text-[10px]">
-                      이미지 실패
+              {/* Header: 편집 가능한 이름 + 역할 토글 + 배지 (인라인 편집 — 팝업 없음) */}
+              <div className="mb-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <HoverBeam className="min-w-0 flex-1">
+                    <Input
+                      value={char.name}
+                      placeholder={isObject ? '사물 이름' : '캐릭터 이름'}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        updateCharacter(char.characterId, { name: e.target.value })
+                      }
+                      className="h-9 text-base font-medium"
+                    />
+                  </HoverBeam>
+                  {isObject ? <Badge variant="secondary">사물</Badge> : null}
+                  {isRequired && (
+                    <Badge variant={hasMainImage ? 'outline' : 'destructive'} className="text-[10px]">
+                      필수
                     </Badge>
                   )}
+                  {viewFailures[char.characterId] &&
+                    Object.keys(viewFailures[char.characterId]).length > 0 && (
+                      <Badge variant="destructive" className="text-[10px]">
+                        이미지 실패
+                      </Badge>
+                    )}
+                </div>
+                {/* 역할 토글 — 카드에서 바로 주인공/적대자/조연 전환 (hover 색 변경으로 변경 가능 표시) */}
+                {!isObject && (
+                  <div className="flex gap-1.5">
+                    {ROLE_TOGGLE.map(({ value, label }) => {
+                      const active = role === value
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            updateCharacter(char.characterId, { role: value })
+                          }}
+                          className={cn(
+                            'rounded-md border px-2.5 py-1 text-xs transition-colors',
+                            active
+                              ? 'border-primary bg-primary/15 font-medium text-foreground'
+                              : 'border-border text-muted-foreground hover:border-primary/60 hover:bg-accent hover:text-foreground',
+                          )}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* object: 단일 main 이미지 셀 / person: 기존 4뷰 그리드 */}
@@ -254,6 +293,35 @@ export function CharacterPanel() {
                 </div>
               )}
 
+              {/* 설정 / 외형 — 카드에서 바로 편집 (팝업 없음). hover 시 빨간 빔으로 입력 가능 표시. */}
+              <div className="mt-3 space-y-2">
+                <HoverBeam>
+                  <Textarea
+                    value={char.description ?? ''}
+                    rows={2}
+                    placeholder={isObject ? '사물의 특성·용도·서사적 의미' : '성격·역할·서사적 배경'}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onChange={(e) =>
+                      updateCharacter(char.characterId, { description: e.target.value })
+                    }
+                    className="text-xs"
+                  />
+                </HoverBeam>
+                <HoverBeam>
+                  <Textarea
+                    value={char.fixedPrompt ?? ''}
+                    rows={2}
+                    placeholder={isObject ? '외형: 형태·재질·특징 (이미지 프롬프트)' : '외형: 헤어·의상·특징 (이미지 프롬프트)'}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onChange={(e) =>
+                      updateCharacter(char.characterId, { appearance: e.target.value })
+                    }
+                    className="text-xs"
+                  />
+                </HoverBeam>
+              </div>
               {/* Actions */}
               <div className="mt-3 flex gap-2">
                 <Button
@@ -360,8 +428,23 @@ export function CharacterPanel() {
           )
         })}
 
-        {/* 새 캐릭터 추가 — 카드 목록 하단 (+) 버튼 (채팅으로도 생성 가능) */}
-        <AddCharacterDialog />
+        {/* 새 인물/사물 추가 — 팝업 없이 즉시 카드 생성 후 카드에서 바로 인라인 편집 (채팅으로도 생성 가능) */}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1 border-dashed text-muted-foreground hover:text-foreground"
+            onClick={() => addCharacter({ name: '새 캐릭터', entityType: 'person' })}
+          >
+            <Plus className="size-4" /> 인물
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1 border-dashed text-muted-foreground hover:text-foreground"
+            onClick={() => addCharacter({ name: '새 사물', entityType: 'object' })}
+          >
+            <Plus className="size-4" /> 사물
+          </Button>
+        </div>
       </div>
       </ScrollArea>
 

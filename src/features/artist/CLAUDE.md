@@ -12,11 +12,11 @@
 - `canvas-store.ts` — **삭제됨** (노드 그래프 폐기)
 
 ## 디렉토리 anatomy
-- `character-panel.tsx` — 캐릭터 카드 목록 (이미지 생성 + Register)
+- `character-panel.tsx` — 캐릭터 카드 목록 (인라인 편집: 이름/역할 토글/설정/외형 + 이미지 생성 + Register. 추가는 팝업 없이 +인물/+사물 버튼으로 즉시 카드 생성)
 - `world-panel.tsx` — 월드 카드 목록 (이미지 생성 + Register)
 - `inventory-grid.tsx` — 워크스페이스 인벤토리 그리드 (`inventory_items` DB 로드/업로드/삭제, inventory-store 경유 — 프로젝트 간 재사용 라이브러리)
 - `image-placeholder.tsx` — 이미지 없을 때 placeholder
-- `add-character-dialog.tsx` / `character-view-dialog.tsx` / `world-view-dialog.tsx` — 추가/상세 다이얼로그
+- `character-view-dialog.tsx` / `world-view-dialog.tsx` — 이미지 뷰 상세/재생성 다이얼로그
 
 ## 자주 하는 작업
 | 무엇 | 어디 |

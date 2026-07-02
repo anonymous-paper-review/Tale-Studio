@@ -266,6 +266,29 @@ function makeCharacterId(name: string): string {
   return `char_${slug || 'new'}_${rand}`
 }
 
+// 캐릭터 인라인 편집의 DB PATCH 디바운스 — 캐릭터별 최신 patch를 모아 350ms 후 1회 전송.
+const charPatchTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const charPatchPending = new Map<
+  string,
+  { name?: string; role?: string; description?: string; appearance?: string }
+>()
+function scheduleCharacterPatch(
+  characterId: string,
+  patch: { name?: string; role?: string; description?: string; appearance?: string },
+  flush: (characterId: string) => void,
+) {
+  charPatchPending.set(characterId, { ...charPatchPending.get(characterId), ...patch })
+  const prev = charPatchTimers.get(characterId)
+  if (prev) clearTimeout(prev)
+  charPatchTimers.set(
+    characterId,
+    setTimeout(() => {
+      charPatchTimers.delete(characterId)
+      flush(characterId)
+    }, 350),
+  )
+}
+
 // generatingStartedAt 맵 헬퍼 — 생성 시작 시각을 store 에 들고 있어 GeneratingOverlay 가 mount 가
 //   아니라 이 시각 기준으로 경과를 센다(탭 전환=remount 에도 타이머 안 리셋). 시작시각은 호출자가 넘긴다.
 function withStartedAt(
@@ -331,6 +354,11 @@ interface ArtistState {
   loadData: () => void
   /** 새 캐릭터 카드를 추가 (낙관적 로컬 + projectId 있으면 DB persist). 새 characterId 반환. */
   addCharacter: (input: NewCharacterInput) => Promise<string>
+  /** 캐릭터 메타(이름/역할/설정/외형) 인라인 편집 — 낙관적 로컬 + 디바운스 DB PATCH. */
+  updateCharacter: (
+    characterId: string,
+    patch: { name?: string; role?: CharacterRole; description?: string; appearance?: string },
+  ) => void
   selectCharacter: (id: string) => void
   selectLocation: (id: string) => void
   /** 단일 뷰 생성 (main=T2I, 방향=main 기반 i2i). 서버가 view 컬럼만 갱신. */
@@ -768,6 +796,66 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
 
     return characterId
+  },
+
+  // 캐릭터 메타 인라인 편집 — characterAssets(name/description/fixedPrompt)와
+  //   sceneManifest.characters(name/role/description/fixedPrompt)를 함께 낙관적 갱신 후 디바운스 PATCH.
+  updateCharacter: (characterId, patch) => {
+    set((state) => ({
+      characterAssets: state.characterAssets.map((c) =>
+        c.characterId === characterId
+          ? {
+              ...c,
+              ...(patch.name !== undefined ? { name: patch.name } : {}),
+              ...(patch.description !== undefined ? { description: patch.description } : {}),
+              ...(patch.appearance !== undefined ? { fixedPrompt: patch.appearance } : {}),
+            }
+          : c,
+      ),
+      sceneManifest: state.sceneManifest
+        ? {
+            ...state.sceneManifest,
+            characters: state.sceneManifest.characters.map((c) =>
+              c.characterId === characterId
+                ? {
+                    ...c,
+                    ...(patch.name !== undefined ? { name: patch.name } : {}),
+                    ...(patch.role !== undefined ? { role: patch.role } : {}),
+                    ...(patch.description !== undefined ? { description: patch.description } : {}),
+                    ...(patch.appearance !== undefined ? { fixedPrompt: patch.appearance } : {}),
+                  }
+                : c,
+            ),
+          }
+        : state.sceneManifest,
+    }))
+
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    scheduleCharacterPatch(characterId, patch, (id) => {
+      const body = charPatchPending.get(id)
+      charPatchPending.delete(id)
+      if (!body) return
+      void fetch('/api/artist/character', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, characterId: id, ...body }),
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const b = await res.json().catch(() => ({}))
+            throw new Error(b.error ?? `HTTP ${res.status}`)
+          }
+        })
+        .catch((err) => {
+          set({
+            error:
+              err instanceof Error
+                ? `캐릭터 수정 저장 실패 (카드는 유지됨): ${err.message}`
+                : 'Character update failed',
+          })
+        })
+    })
   },
 
   selectCharacter: (id) => set({ selectedCharacterId: id }),

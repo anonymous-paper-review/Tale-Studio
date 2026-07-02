@@ -76,3 +76,68 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+// 기존 캐릭터 메타 수정 — 카드 인라인 편집(이름/역할/설정/외형)에서 호출.
+// 전달된 필드만 부분 갱신. 외형은 언어 경계(S2c) i18n 파생을 거친다.
+export async function PATCH(req: Request) {
+  try {
+    const user = await getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { projectId, characterId, name, role, description, appearance } =
+      (await req.json()) as {
+        projectId?: string
+        characterId?: string
+        name?: string
+        role?: string
+        description?: string
+        appearance?: string
+      }
+
+    if (!projectId || !characterId) {
+      return NextResponse.json(
+        { error: 'projectId, characterId required' },
+        { status: 400 },
+      )
+    }
+
+    const patch: Record<string, unknown> = {}
+    if (name !== undefined) {
+      if (!name.trim()) {
+        return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 })
+      }
+      patch.name = name.trim()
+    }
+    if (role !== undefined && VALID_ROLES.has(role)) patch.role = role
+    if (description !== undefined) patch.description = description.trim() || null
+    if (appearance !== undefined) {
+      const i18n = await appearanceI18nFields(characterId, appearance)
+      patch.appearance = i18n.appearance
+      patch.appearance_native = i18n.appearance_native
+      patch.i18n_provenance = i18n.i18n_provenance
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json({ ok: true })
+    }
+
+    const { error } = await supabaseAdmin
+      .from('characters')
+      .update(patch)
+      .eq('project_id', projectId)
+      .eq('character_id', characterId)
+
+    if (error) {
+      console.error('[artist/character PATCH] update failed:', error.message)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[artist/character PATCH]', message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
