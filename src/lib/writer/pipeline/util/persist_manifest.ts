@@ -90,6 +90,8 @@ export async function persistAssetsToDb(
     .eq('project_id', projectId)
     .eq('origin', 'producer')
   const producerLocIds = new Set((producerLocRows ?? []).map((r) => r.location_id as string))
+  // 표시 locale — locations/scenes 의 _native 역파생(EN base → 유저 언어, S7)에 공용.
+  const locale = await projectLocale(projectId)
   await Promise.all([
     supabaseAdmin.from('locations').delete().eq('project_id', projectId).neq('origin', 'producer'),
     supabaseAdmin.from('scenes').delete().eq('project_id', projectId),
@@ -105,19 +107,33 @@ export async function persistAssetsToDb(
     const freshLocs = worldVisual.locations.filter((loc) => !producerLocIds.has(loc.id))
     const producerLocs = worldVisual.locations.filter((loc) => producerLocIds.has(loc.id))
     if (freshLocs.length) {
+      // 표시용 _native(유저 locale): writer-신규 로케이션 묘사도 EN base → locale 역파생(S7 —
+      //   scenes/shots 와 동일. 빠뜨리면 오픈캐스트 로케이션 설명이 producer 보드에 영어로 뜬다, 2026-07-03).
+      //   v2 가 이미 타깃 언어를 준 행은 원문 보존, locale=en 이면 no-op.
+      const locNativeKo = await deriveNativeBatch(
+        freshLocs.map((loc) => ({ id: loc.id, en: loc.style_description ?? '' })),
+        locale,
+        'location visual description',
+      )
       await supabaseAdmin.from('locations').insert(
-        freshLocs.map((loc) => ({
-          project_id: projectId,
-          location_id: loc.id,
-          name: loc.id,
-          time_of_day: '',
-          style_description: loc.style_description ?? '',
-          lighting_sources: loc.lighting_sources ?? [],
-          props: loc.props ?? [],
-          // 레거시 필드도 채워 기존 소비측(l.visual_description / l.lighting_direction) 무변경 유지.
-          visual_description: loc.style_description ?? '',
-          lighting_direction: (loc.lighting_sources ?? []).join(', '),
-        })),
+        freshLocs.map((loc) => {
+          const en = loc.style_description ?? ''
+          const locTx = !isTargetScript(en, locale) && locNativeKo.has(loc.id)
+          return {
+            project_id: projectId,
+            location_id: loc.id,
+            name: loc.id,
+            time_of_day: '',
+            style_description: en,
+            lighting_sources: loc.lighting_sources ?? [],
+            props: loc.props ?? [],
+            // 레거시 필드도 채워 기존 소비측(l.visual_description / l.lighting_direction) 무변경 유지.
+            visual_description: en,
+            visual_description_native: locNativeKo.get(loc.id) ?? en,
+            ...(locTx ? { i18n_provenance: { visual_description_native: i18nHash(en) } } : {}),
+            lighting_direction: (loc.lighting_sources ?? []).join(', '),
+          }
+        }),
       )
     }
     // producer 행: writer 파생 필드(아트디렉션)만 갱신 — 원천(name/purpose/visual_description*·
@@ -143,7 +159,6 @@ export async function persistAssetsToDb(
 
   // scenes (world 이미지 생성이 scene.mood 에 의존 → Tier 1 에 포함)
   if (scenes.scenes.length) {
-    const locale = await projectLocale(projectId)
     // 언어 경계(S3): 파이프라인 산출 자유서술(narrative/mood) → EN base 파생(이미 영어면 skip). 표시는 _native.
     const sRows = scenes.scenes.map((sc, i) => ({
       id: writerSceneIdToMain(sc.scene_id),
@@ -223,19 +238,53 @@ export async function persistAssetsToDb(
       (existingRows ?? []).map((r) => [r.character_id as string, r]),
     )
 
+    // 언어 경계: writer-신규 인물 외형도 EN base + _native 표기로 분리(생성=EN, 표시=유저 언어).
+    //   빠뜨리면 appearance(생성 canonical)가 스토리 언어 그대로 들어간다(라이브 8건 확인, 2026-07-03).
+    //   deriveEnBatch 는 이미 영어면 무비용 통과, deriveNativeBatch 는 locale=en 이면 no-op.
+    const appearRaw = new Map(
+      characters.characters
+        .filter((c) => (c.appearance_description ?? '').trim())
+        .map((c) => [c.id, (c.appearance_description as string).trim()]),
+    )
+    const appearEn = await deriveEnBatch(
+      [...appearRaw].map(([id, native]) => ({ id, native })),
+      'character appearance',
+    )
+    const appearKo = await deriveNativeBatch(
+      [...appearRaw]
+        .filter(([, raw]) => !isTargetScript(raw, locale))
+        .map(([id, raw]) => ({ id, en: appearEn.get(id) ?? raw })),
+      locale,
+      'character appearance',
+    )
+    // 한 인물의 3면: en(생성 base) / native(표시 — 원문이 타깃 언어면 원문, 아니면 역파생) / provenance
+    const appearFields = (id: string) => {
+      const raw = appearRaw.get(id) ?? ''
+      if (!raw) return { appearance: '', appearance_native: '', i18n_provenance: {} as Record<string, string> }
+      const en = appearEn.get(id) ?? raw
+      const native = isTargetScript(raw, locale) ? raw : appearKo.get(id) ?? raw
+      const prov: Record<string, string> = {}
+      if (en !== raw) prov.appearance = i18nHash(raw)
+      if (native !== raw && native !== en) prov.appearance_native = i18nHash(en)
+      return { appearance: en, appearance_native: native, i18n_provenance: prov }
+    }
+
     const toInsert: Record<string, unknown>[] = []
     for (const c of characters.characters) {
       const prev = existing.get(c.id)
       if (!prev) {
-        // 새 인물 (writer 가 전개상 추가) — 최소 필드 insert.
+        // 새 인물 (writer 가 전개상 추가) — 최소 필드 insert. description 은 표시용 → native.
+        const af = appearFields(c.id)
         toInsert.push({
           project_id: projectId,
           character_id: c.id,
           name: c.name,
           role: normRole(c.role),
           entity_type: 'person',
-          appearance: c.appearance_description ?? '',
-          description: c.appearance_description ?? '',
+          appearance: af.appearance,
+          appearance_native: af.appearance_native,
+          i18n_provenance: af.i18n_provenance,
+          description: af.appearance_native,
           costume: costumes[c.id] ?? null,
           origin: 'writer',
         })
@@ -244,8 +293,11 @@ export async function persistAssetsToDb(
       // 기존 행: 빈 보강 필드만 채움 (덮어쓰기 금지).
       const patch: Record<string, unknown> = {}
       if (!prev.appearance && c.appearance_description) {
-        patch.appearance = c.appearance_description
-        patch.description = c.appearance_description
+        const af = appearFields(c.id)
+        patch.appearance = af.appearance
+        patch.appearance_native = af.appearance_native
+        patch.i18n_provenance = af.i18n_provenance
+        patch.description = af.appearance_native
       }
       if (prev.costume == null && costumes[c.id]) patch.costume = costumes[c.id]
       if (Object.keys(patch).length) {
