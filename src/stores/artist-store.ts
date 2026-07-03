@@ -1189,9 +1189,29 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         skipped.push(`char ${c.characterId}:directional (object — skip)`)
         continue
       }
-      // main 미도착(서버 초안 진행/실패)이면 방향뷰를 미룬다 — dir 은 main reference 가 필요(i2i).
       if (c.views.main == null) {
-        skipped.push(`char ${c.characterId}:directional (main 대기 — server 초안)`)
+        // producer 인물: main 은 서버 초안(핸드오프 triggerCharacterDrafts)이 채우므로 방향뷰만 미룬다.
+        // writer-origin(오픈캐스트) 인물: 서버 초안 대상이 아니라 main 이 영영 안 온다 → 여기서 자율로
+        //   main 을 먼저 생성(빈칸 채움, §5)하고, 완료되면 이어서 방향뷰까지 만든다(dir 은 main reference i2i 필요).
+        //   한 태스크로 순차 처리 — autoGen 은 세션당 1회라 별도 재트리거가 없으므로 main→dir 을 체이닝한다.
+        //   (오픈캐스트 인물 자동 생성, 2026-07-03. 멱등: generateCharacterView 가 generatingViews/서버 dedupe.)
+        if (c.origin === 'writer') {
+          queuedRest.push(`char ${c.characterId}:main+directional (opencast 자율)`)
+          restTasks.push(async () => {
+            await get().generateCharacterView(c.characterId, 'main', 'auto')
+            // main 완료(views.main 채워짐) 확인 후 비어있는 방향뷰 생성. 실패/skip 이면 main null → 방향뷰 보류(배지).
+            const cur = get().characterAssets.find((x) => x.characterId === c.characterId)
+            if (!cur || cur.views.main == null) return
+            await runPool(
+              CHARACTER_DIRECTIONAL_VIEWS.filter((v) => cur.views[v] == null).map(
+                (v) => () => get().generateCharacterView(c.characterId, v, 'auto'),
+              ),
+              CONCURRENCY,
+            )
+          })
+        } else {
+          skipped.push(`char ${c.characterId}:directional (main 대기 — server 초안)`)
+        }
         continue
       }
       for (const v of CHARACTER_DIRECTIONAL_VIEWS) {
@@ -1253,7 +1273,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
 
     console.log(
-      `[autogen] start — rest:${restTasks.length} @ concurrency ${CONCURRENCY} (main=서버 초안 단일 생산)`,
+      `[autogen] start — rest:${restTasks.length} @ concurrency ${CONCURRENCY} (producer main=서버 초안 / writer main=자율)`,
       { then: queuedRest, skipped },
     )
     const t0 = Date.now()
