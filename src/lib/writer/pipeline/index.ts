@@ -197,7 +197,7 @@ async function _runPipelineInner(
   await logger.markStage('characters', 'completed', { seeded: true, count: characters.characters.length });
 
   const narrativeStructure = (await loadOrRun<NarrativeStructure>(resume, '03_s1_narrativeStructure.json', () => runNarrativeStructure(input, genre, logger, models.S), 'narrativeStructure', logger)).value;
-  const scenes = (await loadOrRun<Scenes>(resume, '05_s3_scenes.json', () => runScenes(input, genre, narrativeStructure, characters, logger, models.S), 'scenes', logger)).value;
+  const scenes = (await loadOrRun<Scenes>(resume, '05_s3_scenes.json', () => runScenes(input, genre, narrativeStructure, characters, input.background, logger, models.S), 'scenes', logger)).value;
   // 오픈 캐스트(§4): 전개상 추가된 new_characters 를 머지 → 하류 stage 와 persistAssetsToDb(origin='writer' insert)가 본다.
   characters = mergeOpenCast(characters, scenes);
 

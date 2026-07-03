@@ -132,7 +132,7 @@ export const WRITER_STEPS: WriterStep[] = [
     has: (s) => s.scenes !== undefined,
     run: async (s, { logger }) => {
       const models = resolveModels(s.input);
-      const scenes = await runScenes(s.input, s.genre!, s.narrativeStructure!, s.characters!, logger, models.S);
+      const scenes = await runScenes(s.input, s.genre!, s.narrativeStructure!, s.characters!, s.world, logger, models.S);
       await logger.flushRawLlm('scenes');
       // 오픈 캐스트(§4 + V축 재설계): 전개상 필요한 인물/월드를 producer 베이스라인에 append.
       //   producer 전달값(원천)은 불변 — mergeOpen* 가 append-only(아키텍처 §5#2).

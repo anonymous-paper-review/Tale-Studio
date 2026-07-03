@@ -61,11 +61,34 @@ function uncoveredActs(scenes: Scenes, ns: NarrativeStructure): string[] {
   return ns.acts.map((a) => a.act_id).filter((id) => !covered.has(id));
 }
 
+// 로케이션 참조 정규화 (§3 — 모델은 제안, 검증은 제품): LLM이 오픈 로케이션 규칙을 어기고 기존
+//   로케이션의 name(표시명)이나 대소문자 변형으로 답하면 id 로 되돌린다. scenes.location 은
+//   locations.location_id 와 조인되는 참조값 — 어긋나면 같은 장소가 이중 생성된다(2026-06-30 한/영 중복 버그).
+function normalizeSceneLocations(scenes: Scenes, world: BackgroundContract | undefined): Scenes {
+  if (!world?.locations.length) return scenes;
+  const idByKey = new Map<string, string>();
+  for (const l of world.locations) {
+    idByKey.set(l.id.toLowerCase().trim(), l.id);
+    if (l.name) idByKey.set(l.name.toLowerCase().trim(), l.id);
+  }
+  let changed = false;
+  const fixed = scenes.scenes.map((sc) => {
+    const id = idByKey.get((sc.location ?? '').toLowerCase().trim());
+    if (id && id !== sc.location) {
+      changed = true;
+      return { ...sc, location: id };
+    }
+    return sc;
+  });
+  return changed ? { ...scenes, scenes: fixed } : scenes;
+}
+
 export async function runScenes(
   input: PipelineInput,
   genre: Genre,
   narrativeStructure: NarrativeStructure,
   characters: Characters,
+  world: BackgroundContract | undefined,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
 ): Promise<Scenes> {
@@ -124,6 +147,13 @@ scene_actions:
 - **스토리 전개상 꼭 필요한 새 인물만** new_characters에 추가하고, 그 새 slug를 등장 씬의
   characters_in_scene에도 쓴다. 새 slug는 기존 캐스트 slug와 절대 중복되지 않게 snake_case로 만든다.
 - 카드(기존 캐스트)에 자리가 없는 인물을 억지로 등장시키지 말 것. 등장은 스토리가 결정한다.
+
+오픈 로케이션 규칙 (중요 — 캐스트와 동일 원칙):
+- 씬이 [기존 로케이션] 중 한 곳에서 벌어지면 scene.location에 **반드시 그 id를 글자 그대로** 쓴다
+  (번역·의역·새 이름 금지. 같은 장소를 다른 이름으로 다시 만들면 배경 이미지가 이중 생성된다).
+- 기존 로케이션만으로 전개 가능하면 새 장소를 만들지 말 것.
+- 전개상 꼭 필요한 새 장소만 새 이름으로 쓰되, **스토리와 같은 언어**로 짧고 구체적인 장소명을 짓는다
+  (스토리가 한국어면 한국어 지명 — 임의로 영어 이름을 만들지 않는다).
 `;
 
   const userPrompt = `[스토리]
@@ -142,6 +172,15 @@ ${
         .map((c) => `- ${c.id} (${c.name}, ${c.role})${c.appearance_description ? `: ${c.appearance_description}` : ''}`)
         .join('\n')
     : '(없음 — 사물/풍경 중심이거나 전개상 인물이 필요하면 new_characters로 추가)'
+}
+
+[기존 로케이션] (producer 확정 — scene.location에 id 그대로 사용)
+${
+  world?.locations.length
+    ? world.locations
+        .map((l) => `- ${l.id}${l.name && l.name !== l.id ? ` (${l.name})` : ''}${l.description ? `: ${l.description}` : ''}`)
+        .join('\n')
+    : '(없음 — 씬 전개에 필요한 장소명을 스토리와 같은 언어로 새로 만든다)'
 }
 
 [출력 형식 - JSON]
@@ -192,7 +231,7 @@ new_characters는 전개상 새 인물이 정말 필요할 때만 채운다. 기
 
   // act 커버리지 자기검증 (#3): S1.acts 의 모든 막이 어떤 씬의 act_ref 로 덮였는가.
   //   누락 막이 있으면 위반 목록을 첨부해 1회 교정 재생성하고, 커버리지가 더 나은 쪽을 채택 (v3 validator 패턴).
-  let scenes = result;
+  let scenes = normalizeSceneLocations(result, world);
   let uncovered = uncoveredActs(scenes, narrativeStructure);
   if (uncovered.length) {
     const repairPrompt = `${userPrompt}
@@ -210,7 +249,7 @@ new_characters는 전개상 새 인물이 정말 필요할 때만 채운다. 기
       provider: axisConfig.provider,
     });
     if (uncoveredActs(repaired, narrativeStructure).length < uncovered.length) {
-      scenes = repaired;
+      scenes = normalizeSceneLocations(repaired, world);
       uncovered = uncoveredActs(scenes, narrativeStructure);
     }
   }
