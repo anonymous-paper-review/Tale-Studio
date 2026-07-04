@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { llmChat } from '@/lib/llm'
+import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
 import { normalizeProvider } from '@/lib/video-models'
 
 // ──────────────────────────────────────────────────────────────────────
@@ -431,7 +432,7 @@ export async function POST(req: Request) {
     // 분기: canvasContext가 있으면 agentic 모드 (Director Canvas), 없으면 legacy 모드
     if (typeof canvasContext === 'string' && canvasContext.trim()) {
       const text = await llmChat(
-        DIRECTOR_CANVAS_SYSTEM + crossStageNote,
+        DIRECTOR_CANVAS_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE,
         normalizedHistory,
         `${canvasContext}\n\n---\n\n${message}`,
         0.7,
@@ -445,7 +446,7 @@ export async function POST(req: Request) {
       ? `[Current Shot]\n${JSON.stringify(shotContext)}\n\n`
       : ''
     const text = await llmChat(
-      DIRECTOR_LEGACY_SYSTEM + crossStageNote,
+      DIRECTOR_LEGACY_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE,
       normalizedHistory,
       `${contextPrefix}${message}`,
       0.7,

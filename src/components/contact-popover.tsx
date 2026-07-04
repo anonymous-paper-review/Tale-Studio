@@ -2,13 +2,25 @@
 
 // 랜딩 footer의 Contact (L3). 클릭하면 메신저형 팝업이 떠서 이메일 주소를 보여주고,
 // 작성한 메시지를 /api/feedback (kind:'contact') 로 보내 daewon.yoon.ai@gmail.com 으로 포워딩한다.
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Loader2, Send } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 const CONTACT_EMAIL = 'daewon.yoon.ai@gmail.com'
 
-export function ContactPopover() {
+export function ContactPopover({
+  trigger,
+  side = 'top',
+  align = 'start',
+  note,
+}: {
+  /** 커스텀 트리거(사이드바 아이콘 등). 없으면 기본 "Contact" 텍스트 버튼. */
+  trigger?: ReactNode
+  side?: 'top' | 'right' | 'bottom' | 'left'
+  align?: 'start' | 'center' | 'end'
+  /** 팝업 상단 안내 문구(예: 사이드바 Help의 응답/보상 안내). 없으면 미표시. */
+  note?: ReactNode
+} = {}) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -40,11 +52,13 @@ export function ContactPopover() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button type="button" className="transition-colors hover:text-primary">
-          Contact
-        </button>
+        {trigger ?? (
+          <button type="button" className="transition-colors hover:text-primary">
+            Contact
+          </button>
+        )}
       </PopoverTrigger>
-      <PopoverContent side="top" align="start" className="w-80 text-foreground">
+      <PopoverContent side={side} align={align} className="w-80 text-foreground">
         <div className="space-y-3">
           <div>
             <h4 className="font-medium">Contact</h4>
@@ -55,6 +69,9 @@ export function ContactPopover() {
               {CONTACT_EMAIL}
             </a>
           </div>
+          {note ? (
+            <p className="text-xs leading-relaxed text-muted-foreground">{note}</p>
+          ) : null}
           <textarea
             className="w-full resize-none rounded-md border border-input bg-transparent p-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             rows={4}

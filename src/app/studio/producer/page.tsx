@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
+import { ArrowRight, Loader2, RefreshCw, AlertTriangle, X } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { ProducerReadinessBoard } from '@/features/producer/readiness-board'
 import { useProducerStore } from '@/stores/producer-store'
@@ -10,6 +11,15 @@ import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { evaluateProducerGate } from '@/lib/producer-gate'
 import { createPendingProposal } from '@/lib/pending-proposal'
+import { useChatUiStore } from '@/stores/chat-ui-store'
+
+// 첫 프로젝트 진입 시 프로듀서가 먼저 거는 인사·시작 넛지 — 유저가 바로 한 줄로 시작할 수 있게.
+const PRODUCER_WELCOME =
+  '안녕하세요! 저는 당신의 AI 프로듀서예요.\n' +
+  '만들고 싶은 이야기를 편하게 한 줄로 들려주세요.\n' +
+  '장르, 주인공, 떠오르는 한 장면 — 무엇이든 좋아요.\n\n' +
+  '예) "비 오는 도시, 기억을 잃은 형사의 하룻밤"\n\n' +
+  '캐릭터·장소·구조는 제가 함께 정리해 드릴게요.'
 
 export default function MeetingPage() {
   const router = useRouter()
@@ -18,8 +28,12 @@ export default function MeetingPage() {
   const { saveAndHandoff, syncing, projectSettings, error, clearError } =
     useProducerStore()
 
+  // loadProject 완료 후에만 웰컴을 판단(초기 storyReady=false 윈도우에서 기존 프로젝트가 오탐되지 않게).
+  const [producerLoaded, setProducerLoaded] = useState(false)
   useEffect(() => {
-    if (projectId) loadProject()
+    if (!projectId) return
+    setProducerLoaded(false)
+    void loadProject().then(() => setProducerLoaded(true))
   }, [projectId, loadProject])
 
   const storyReady = useProducerStore((s) => s.storyReady)
@@ -34,12 +48,58 @@ export default function MeetingPage() {
   const reachedStage = useProjectStore((s) => s.reachedStage)
   const offerPendingProposal = useGlobalChatStore((s) => s.offerPendingProposal)
   const afterHandoff = reachedStage !== 'producer'
+  const storyText = useProducerStore((s) => s.storyText)
+  const messages = useGlobalChatStore((s) => s.messages)
+  const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
+  const requestChatFocus = useChatUiStore((s) => s.requestChatFocus)
+  const welcomeFiredRef = useRef(false)
 
   // Redirect via useEffect to avoid router.push failing inside async handlers
   const [redirectTo, setRedirectTo] = useState<string | null>(null)
   useEffect(() => {
     if (redirectTo) router.replace(redirectTo)
   }, [redirectTo, router])
+
+  // 첫 진입(스토리·프로듀서 채팅 모두 비어있음)에만 프로듀서가 먼저 인사 + 입력창 포커스(빔).
+  //   offerSuggestion 은 dismiss/중복 가드 내장 → 한 번만, 세션 재진입 시 재노출 안 함.
+  useEffect(() => {
+    if (!projectId || welcomeFiredRef.current || !producerLoaded) return
+    if (storyReady || storyText.trim()) return
+    if (messages.some((m) => m.stage === 'producer')) return
+    welcomeFiredRef.current = true
+    offerSuggestion({
+      id: `producer-welcome:${projectId}`,
+      stage: 'producer',
+      content: PRODUCER_WELCOME,
+      action: null,
+      dismissible: false,
+    })
+    requestChatFocus()
+  }, [projectId, producerLoaded, storyReady, storyText, messages, offerSuggestion, requestChatFocus])
+
+  // 상단→하단으로 옮긴 배너들의 닫기 상태.
+  //  - stale 경고: 핸드오프 후 상시 상주형 → 프로젝트별로 영구 저장(한 번 닫으면 다시 안 뜸).
+  //  - writer 재실행: 실제 문제 상태 기반 → 세션 한정, 문제가 다시 발생하면 재노출.
+  const [staleDismissed, setStaleDismissed] = useState(false)
+  const [rerunDismissed, setRerunDismissed] = useState(false)
+
+  const staleDismissKey = projectId
+    ? `tale:producer-stale-banner-dismissed:${projectId}`
+    : null
+  useEffect(() => {
+    setStaleDismissed(
+      staleDismissKey ? localStorage.getItem(staleDismissKey) === '1' : false,
+    )
+  }, [staleDismissKey])
+  const dismissStale = () => {
+    setStaleDismissed(true)
+    if (staleDismissKey) localStorage.setItem(staleDismissKey, '1')
+  }
+
+  // writer 재실행 배너: 문제가 해소(플래그 off)되면 닫힘 상태 리셋 → 재발 시 다시 뜬다.
+  useEffect(() => {
+    if (!writerNeedsRerun) setRerunDismissed(false)
+  }, [writerNeedsRerun])
 
   const handleHandoff = async () => {
     // 씬/샷/연출 생성(writer 파이프라인)은 saveAndHandoff가 백그라운드로 발사하고,
@@ -70,15 +130,29 @@ export default function MeetingPage() {
 
   return (
     <>
-      {afterHandoff && (
-        <div className="border-b border-warning/30 bg-warning/10 px-6 py-2 text-xs text-warning">
-          Producer source를 수정하면 기존 Writer/Artist 산출물이 낡을 수 있어요. 수동 수정은 보존되며, 재실행/재생성은 제안 승인 후에만 진행합니다.
+      <ProducerReadinessBoard gate={gate} />
+
+      {/* 하단 상태 배너 (구 상단 배너 이전) — 우측 X 로 닫는다. */}
+      {afterHandoff && !staleDismissed && (
+        <div className="flex items-center gap-3 border-t border-warning/30 bg-warning/10 px-6 py-2 text-xs text-warning">
+          <span className="flex-1">
+            Producer source를 수정하면 기존 Writer/Artist 산출물이 낡을 수 있어요. 수동 수정은 보존되며, 재실행/재생성은 제안 승인 후에만 진행합니다.
+          </span>
+          <button
+            type="button"
+            onClick={dismissStale}
+            aria-label="배너 닫기"
+            className="shrink-0 rounded p-0.5 text-warning/70 transition-colors hover:bg-warning/20 hover:text-warning"
+          >
+            <X className="size-3.5" />
+          </button>
         </div>
       )}
+
       {/* writer 미완료 게이트백 배너 — 씬/샷이 없어 Director/Editor 가 빈 화면이던 프로젝트.
           스토리/설정은 그대로 두고 'Writer 다시 실행'으로 재생성한다(persist 는 멱등 — 중복 안 생김). */}
-      {writerNeedsRerun && (
-        <div className="flex items-center gap-3 border-b border-warning/30 bg-warning/10 px-6 py-3 text-sm">
+      {writerNeedsRerun && !rerunDismissed && (
+        <div className="flex items-center gap-3 border-t border-warning/30 bg-warning/10 px-6 py-3 text-sm">
           <AlertTriangle className="size-4 shrink-0 text-warning" />
           <div className="flex-1">
             <p className="font-medium text-foreground">
@@ -101,11 +175,16 @@ export default function MeetingPage() {
             )}
             Writer 다시 실행 제안
           </Button>
+          <button
+            type="button"
+            onClick={() => setRerunDismissed(true)}
+            aria-label="배너 닫기"
+            className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-warning/20 hover:text-warning"
+          >
+            <X className="size-3.5" />
+          </button>
         </div>
       )}
-
-      <ProducerReadinessBoard gate={gate} />
-
       {/* Error bar */}
       {error && (
         <button

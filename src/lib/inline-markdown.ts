@@ -22,8 +22,8 @@ export function renderInlineMarkdown(input: string): string {
         /`([^`\n]+)`/g,
         '<code class="rounded bg-black/30 px-1 py-0.5 font-mono text-[0.95em]">$1</code>',
       )
-      // **bold**
-      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      // **bold** → UI에서 굵게 표시하지 않음(별표만 제거해 평문으로). (사용자 요청: 채팅 bold 억제)
+      .replace(/\*\*([^*\n]+)\*\*/g, '$1')
       // *italic* (앞에 *가 아닐 때만 — **bold**의 잔여 별표 오인 방지)
       .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
       // _italic_

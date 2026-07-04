@@ -10,6 +10,7 @@ import {
   Film,
   Home,
   Pencil,
+  MessageCircle,
 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -20,6 +21,7 @@ import {
 import { cn } from '@/lib/utils'
 import { STAGES } from '@/lib/constants'
 import { UserMenu } from '@/components/layout/user-menu'
+import { ContactPopover } from '@/components/contact-popover'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import type { StageId } from '@/types'
@@ -177,6 +179,35 @@ export function Sidebar() {
         })}
       </div>
 
+      {/* 문의/도움("채널톡") — 프로필(UserMenu) 바로 위. 프로필과 동일한 40px 원형.
+          빨간 원(bg-primary) + 흰 말풍선 아이콘, 아래 "Help" 캡션.
+          클릭 시 우측으로 문의 팝업. (구 floating Samantha를 여기로 이동) */}
+      <div className="mb-2 flex flex-col items-center gap-1">
+        <ContactPopover
+          side="right"
+          align="end"
+          note={
+            <>
+              피드백은 항상 열려있습니다. 12시간 내로 답변 없을 시 시간당{' '}
+              <strong className="font-bold text-foreground">100 Credit</strong>을
+              제공해드립니다.
+            </>
+          }
+          trigger={
+            <button
+              type="button"
+              aria-label="문의 / Help"
+              title="문의 / Help"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <MessageCircle className="h-5 w-5" />
+            </button>
+          }
+        />
+        <span className="text-[10px] font-medium leading-none text-muted-foreground">
+          Help
+        </span>
+      </div>
       <UserMenu />
     </aside>
   )

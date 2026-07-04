@@ -31,7 +31,7 @@ Room                  Studio            Suite
 | 패턴 | 의도 |
 |------|------|
 | **사이드바** | 좌측 고정. 4 Stage 아이콘 수직 배치 (Producer > Concept Artist > Director > Editor). 활성 Stage 강조. 구현 = `src/components/layout/` |
-| **Samantha** | 우측 하단 플로팅 아이콘. 피드백 전송 팝오버 (`src/components/layout/samantha.tsx`) |
+| **문의/Help ("채널톡")** | 사이드바 하단 프로필(UserMenu) 바로 위. 빨간 말풍선(bg-primary) + "Help" 글자. 클릭 시 우측 팝오버로 피드백 전송(`/api/feedback`). 구현 = `ContactPopover` in `src/components/layout/sidebar.tsx` (구 우측하단 플로팅 Samantha에서 이동, 2026-07-04) |
 | **Handoff 버튼** | 각 Stage 하단/우상단. 다음 Stage로 이동하는 CTA. |
 | **디자인 테마** | Netflix Dark Mode (Deep Black #121212, Accent #E50914 또는 #7A285E) |
 

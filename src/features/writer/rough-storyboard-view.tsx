@@ -22,6 +22,7 @@ import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { SceneEditDialog } from '@/features/writer/scene-edit-dialog'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import type { RoughStoryboardImage, Shot } from '@/types'
@@ -43,6 +44,9 @@ export function RoughStoryboardView() {
   const addScene = useWriterStore((s) => s.addScene)
   const addShot = useWriterStore((s) => s.addShot)
   const { status } = useWriterStatus(projectId)
+  const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
+  const chatMessages = useGlobalChatStore((s) => s.messages)
+  const briefedRef = useRef(false)
 
   // 패널 단위 생성 상태(jobId 폴링) + 완료 즉시 반영용 로컬 오버라이드.
   // DB 진실은 shots.rough_storyboard — 오버라이드는 다음 loadProject 전까지의 캐시.
@@ -63,6 +67,28 @@ export function RoughStoryboardView() {
   useEffect(() => {
     if (projectId) void loadProject()
   }, [projectId, loadProject])
+
+  // 첫 진입 브리핑 — 씬/샷이 준비됐고 writer 채팅 기록이 없으면 Writer가 먼저 "이렇게 나눴어요"라고 알린다.
+  //   Producer 웰컴과 같은 방식: dismissible:false(넘김 버튼 없음), 유저가 말을 걸면 자동으로 사라짐.
+  useEffect(() => {
+    if (!projectId || briefedRef.current) return
+    const sceneCount = sceneManifest?.scenes.length ?? 0
+    if (sceneCount === 0) return
+    if (chatMessages.some((m) => m.stage === 'writer')) return
+    briefedRef.current = true
+    offerSuggestion({
+      id: `writer-brief:${projectId}`,
+      stage: 'writer',
+      dismissible: false,
+      action: null,
+      content:
+        '스토리를 촬영할 수 있게 정리해뒀어요.\n\n' +
+        `· 씬 ${sceneCount}개, 샷 ${shots.length}개로 나눴어요\n` +
+        '· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n' +
+        '카드를 누르면 확인·수정·재생성할 수 있어요.\n' +
+        '바꾸고 싶은 부분이 있으면 편하게 말씀해 주세요.',
+    })
+  }, [projectId, sceneManifest, shots.length, chatMessages, offerSuggestion])
 
   // 파이프라인이 이 화면을 보는 중에 완료되면 씬/샷을 1회 재로드.
   useEffect(() => {
@@ -310,7 +336,7 @@ export function RoughStoryboardView() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-7"
+              className="size-7 hover-red-beam"
               aria-label="축소 (열 늘리기)"
               onClick={() => setZoomLevel((z) => Math.max(1, z - 1))}
             >
@@ -328,7 +354,7 @@ export function RoughStoryboardView() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-7"
+              className="size-7 hover-red-beam"
               aria-label="확대 (열 줄이기)"
               onClick={() => setZoomLevel((z) => Math.min(6, z + 1))}
             >
@@ -342,12 +368,12 @@ export function RoughStoryboardView() {
             </span>
           )}
           {missingIds.length > 0 && generatingCount === 0 && (
-            <Button size="sm" variant="secondary" onClick={() => void generate()}>
+            <Button size="sm" variant="secondary" className="hover-red-beam" onClick={() => void generate()}>
               <RefreshCw className="size-3.5" />
               누락 패널 {missingIds.length}개 생성
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => void addScene()}>
+          <Button size="sm" variant="outline" className="hover-red-beam" onClick={() => void addScene()}>
             <Plus className="size-3.5" />
             씬 추가
           </Button>
@@ -370,7 +396,7 @@ export function RoughStoryboardView() {
                   <button
                     type="button"
                     onClick={() => setEditSceneId(scene.sceneId)}
-                    className="font-mono text-xs text-muted-foreground hover:text-foreground hover:underline"
+                    className="font-mono text-xs text-muted-foreground hover:text-foreground hover:underline hover-red-beam"
                   >
                     {scene.sceneId}
                   </button>
@@ -378,7 +404,7 @@ export function RoughStoryboardView() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-muted-foreground"
+                    className="text-muted-foreground hover-red-beam"
                     onClick={() => void addShot(scene.sceneId)}
                   >
                     <Plus className="size-3.5" />
@@ -387,7 +413,7 @@ export function RoughStoryboardView() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-muted-foreground"
+                    className="text-muted-foreground hover-red-beam"
                     onClick={() => setEditSceneId(scene.sceneId)}
                   >
                     편집
@@ -402,7 +428,7 @@ export function RoughStoryboardView() {
                     <button
                       type="button"
                       onClick={() => void addShot(scene.sceneId)}
-                      className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground transition-colors hover:bg-accent/40"
+                      className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground transition-colors hover:bg-accent/40 hover-red-beam"
                     >
                       <Plus className="size-6" />
                       <span className="text-sm">샷 추가</span>
@@ -439,7 +465,7 @@ export function RoughStoryboardView() {
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="absolute right-2 top-2 size-7 bg-background/80 opacity-0 transition-opacity duration-100 group-hover:opacity-100"
+                                className="absolute right-2 top-2 size-7 bg-background/80 opacity-0 transition-opacity duration-100 group-hover:opacity-100 hover-red-beam"
                                 aria-label="패널 재생성"
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -477,6 +503,7 @@ export function RoughStoryboardView() {
                               <Button
                                 size="sm"
                                 variant="outline"
+                                className="hover-red-beam"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   // 사람의 명시적 클릭 → force(give-up 게이트 통과). 빈 패널엔 무해.

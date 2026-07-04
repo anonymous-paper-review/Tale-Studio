@@ -139,7 +139,7 @@ function MiniMapPanel() {
       <button
         type="button"
         onClick={() => setVisible(true)}
-        className="absolute bottom-4 right-4 z-10 flex h-8 items-center gap-1.5 rounded-md border border-border bg-card/50 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        className="absolute bottom-4 right-4 z-10 flex h-8 items-center gap-1.5 rounded-md border border-border bg-card/50 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground hover-red-beam"
       >
         <MapIcon className="size-3.5" />
         미니맵
@@ -172,7 +172,7 @@ function MiniMapPanel() {
             type="button"
             onClick={() => setLocked((v) => !v)}
             title={locked ? '위치 잠금 해제' : '위치 잠금'}
-            className="rounded p-0.5 hover:bg-accent hover:text-foreground"
+            className="rounded p-0.5 hover:bg-accent hover:text-foreground hover-red-beam"
           >
             {locked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
           </button>
@@ -180,7 +180,7 @@ function MiniMapPanel() {
             type="button"
             onClick={() => setVisible(false)}
             title="미니맵 숨기기"
-            className="rounded p-0.5 hover:bg-accent hover:text-foreground"
+            className="rounded p-0.5 hover:bg-accent hover:text-foreground hover-red-beam"
           >
             <X className="size-3" />
           </button>
@@ -492,7 +492,7 @@ function PresetCard({ preset }: { preset: CameraLightPreset }) {
         type="button"
         onClick={() => void deletePreset(preset.id)}
         aria-label="프리셋 삭제"
-        className="rounded-sm p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+        className="rounded-sm p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 hover-red-beam"
       >
         <X className="size-3" />
       </button>
@@ -563,6 +563,7 @@ function PaletteBar() {
                 viewMode === mode
                   ? 'bg-accent text-foreground'
                   : 'text-muted-foreground hover:text-foreground',
+                'hover-red-beam',
               )}
             >
               {mode === 'node' ? 'Node' : 'Storyboard'}
@@ -598,6 +599,7 @@ function PaletteBar() {
             (isGenerating || totalShots === 0) &&
               'cursor-not-allowed opacity-50',
             isGenerating && 'opacity-70',
+            'hover-red-beam',
           )}
         >
           {isGenerating ? (
@@ -626,6 +628,7 @@ function PaletteBar() {
           showUnusedAssets
             ? 'border-primary bg-primary/10 text-foreground'
             : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
+          'hover-red-beam',
         )}
       >
         <Boxes className="size-4" />
@@ -637,7 +640,7 @@ function PaletteBar() {
         type="button"
         onClick={() => relayoutCanvas()}
         title="에셋·씬·샷·영상을 좌→우 레이아웃으로 정렬하고 간격을 확보 (DB 저장)"
-        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground"
+        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground hover-red-beam"
       >
         <LayoutGrid className="size-4" />
         <span>자동 정렬</span>
@@ -650,7 +653,7 @@ function PaletteBar() {
           addPromptNode({ x: 80, y: 120 + promptCount * 180 })
         }
         title="분리된 프롬프트 노드를 추가합니다. 우측 핸들을 Shot의 T 입력에 연결하면 Shot 프롬프트가 동기됩니다."
-        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground"
+        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground hover-red-beam"
       >
         <Type className="size-4" />
         <span>프롬프트 노드</span>

@@ -9,6 +9,8 @@ interface AgentFaceProps {
   color?: string
   size?: number
   name?: string
+  /** false면 깜빡임/말하기 애니메이션을 끄고 정적 얼굴로 렌더(리스트에 다수 렌더 시 성능/시각 안정). */
+  animate?: boolean
 }
 
 export function AgentFace({
@@ -16,23 +18,25 @@ export function AgentFace({
   color = 'var(--primary)',
   size = 48,
   name,
+  animate = true,
 }: AgentFaceProps) {
   const [blinking, setBlinking] = useState(false)
   const [mouthFrame, setMouthFrame] = useState(0)
 
   // Blink randomly
   useEffect(() => {
+    if (!animate) return
     const blink = () => {
       setBlinking(true)
       setTimeout(() => setBlinking(false), 150)
     }
     const interval = setInterval(blink, 2500 + Math.random() * 2000)
     return () => clearInterval(interval)
-  }, [])
+  }, [animate])
 
   // Mouth animation when talking
   useEffect(() => {
-    if (expression !== 'talking') return
+    if (!animate || expression !== 'talking') return
     const interval = setInterval(() => {
       setMouthFrame((f) => (f + 1) % 4)
     }, 120)

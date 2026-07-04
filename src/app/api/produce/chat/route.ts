@@ -4,6 +4,7 @@ import { llmChat } from '@/lib/llm'
 import { PRODUCER_SYSTEM } from './system-prompt'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
+import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
 
 interface ChatMessage {
   role: 'user' | 'model'
@@ -115,7 +116,7 @@ export async function POST(req: Request) {
       : ''
 
     const text = await llmChat(
-      PRODUCER_SYSTEM + crossStageNote,
+      PRODUCER_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE,
       normalizedHistory,
       `${contextPrefix}${message}`,
       0.7,

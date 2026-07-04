@@ -53,6 +53,8 @@ export default function VisualPage() {
   const nudgeOfferedRef = useRef<string | null>(null)
   // refresh 온보딩 버블 1회 가드 — 시그니처(룩/갭/실패 델타) 바뀔 때만 재발사.
   const refreshNudgeKeyRef = useRef<string | null>(null)
+  // 첫 진입 브리핑(캐릭터·장소 요약) 1회 가드 — 프로젝트별.
+  const artistBriefedRef = useRef<string | null>(null)
   // 진입 fallback: main 이 너무 오래 안 차도 일정 시간 뒤 진입 (이후 client 가 보강).
   //   프로젝트별로 기록 → projectId 변경 시 파생값이 자동 false (effect 내 동기 setState 회피).
   const [fallbackProject, setFallbackProject] = useState<string | null>(null)
@@ -259,22 +261,47 @@ export default function VisualPage() {
   //   offerSuggestion 의 dismissed/단일활성과 합쳐 핑퐁·스팸 방지. exit 넛지와 배타.
   useEffect(() => {
     if (!projectId || !ready) return
-    if (refreshGap <= 0 && failedCount <= 0) return
-    const content = buildArtistRefreshMessage({ characters: refreshChars, look: lookSummary })
+    // 첫 진입 여부 — artist 채팅 기록이 없고 아직 브리핑 안 했으면 "무엇을 준비했는지" 요약을 얹는다.
+    const hasArtistChat = useGlobalChatStore.getState().messages.some((m) => m.stage === 'artist')
+    const firstBrief = !hasArtistChat && artistBriefedRef.current !== projectId
+    const needsSync = refreshGap > 0 || failedCount > 0
+    if (!needsSync && !firstBrief) return
+
+    const summary = firstBrief
+      ? `등장인물과 장소의 컨셉을 준비했어요.\n· 캐릭터 ${characterAssets.length}명 · 장소 ${worldAssets.length}곳\n\n`
+      : ''
+
+    let content: string
+    let action: { kind: 'artist-refresh-look'; label: string } | null
+    if (needsSync) {
+      content = summary + buildArtistRefreshMessage({ characters: refreshChars, look: lookSummary })
+      action = refreshGap > 0 ? { kind: 'artist-refresh-look', label: '최종 룩으로 정리' } : null
+    } else {
+      // Case B — 이미 모두 최종 룩. 첫 진입 브리핑만 보여준다.
+      content =
+        summary +
+        'writer가 정한 최종 그림체로 이미지를 맞춰뒀어요.\n마음에 안 드는 카드는 "지아를 더 차갑게"처럼 말씀해 주세요.'
+      action = null
+    }
     if (!content) return
-    const id = artistRefreshSuggestionKey({ projectId, lookVersion, refreshGap, failedCount })
+
+    const id =
+      firstBrief && !needsSync
+        ? `artist-brief:${projectId}`
+        : artistRefreshSuggestionKey({ projectId, lookVersion, refreshGap, failedCount })
     if (refreshNudgeKeyRef.current === id) return
     const dismissed = useGlobalChatStore.getState().dismissedSuggestionIds.includes(id)
     offerSuggestion({
       id,
       stage: 'artist',
       content,
-      action: refreshGap > 0 ? { kind: 'artist-refresh-look', label: '최종 룩으로 정리' } : null,
+      action,
+      dismissible: firstBrief ? false : undefined,
     })
-    // 실제 표면화(같은 id 활성)됐거나 이미 dismiss 된 경우만 1회 가드 고정 — 다른 제안이 활성이라
-    //   no-op 됐다면 ref 미고정 → 그 제안 해소 후 같은 시그니처 1회 재시도(버블 유실 방지).
+    // 실제 표면화(같은 id 활성)됐거나 이미 dismiss 된 경우만 1회 가드 고정.
     if (dismissed || useGlobalChatStore.getState().suggestion?.id === id) {
       refreshNudgeKeyRef.current = id
+      if (firstBrief) artistBriefedRef.current = projectId
     }
   }, [
     projectId,
@@ -286,6 +313,8 @@ export default function VisualPage() {
     refreshChars,
     lookSummary,
     offerSuggestion,
+    characterAssets.length,
+    worldAssets.length,
   ])
 
   // 진입 전 = 백그라운드 생성/ main 준비 진행 중 → progress bar 블로킹.

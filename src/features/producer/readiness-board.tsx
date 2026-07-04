@@ -6,6 +6,7 @@ import {
   AtSign,
   Box,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Film,
   Languages,
@@ -72,7 +73,8 @@ const ROLE_TOGGLE: [string, string][] = [
 // 보드 카드/필드를 @멘션 대상으로 만드는 공통 래퍼.
 // - 입력창에 @라벨이 있으면 시안 링으로 "참조 중" 표시(mentionedRefs 동기화).
 // - Cmd/Ctrl+클릭 → 입력창에 @멘션 삽입.
-// - 어포던스: 호버 시 상단에 "⌘/Ctrl+클릭 멘션" 핀, 모디파이어를 누르면 모든 멘션 카드가 cursor-copy + 시안 외곽선으로 떠올라 클릭 가능함을 알린다.
+// - 어포던스: ⌘/Ctrl(모디파이어)를 누르면 상단에 "⌘/Ctrl+클릭 멘션" 핀 + 모든 멘션 카드가
+//   cursor-copy + 시안 외곽선으로 떠올라 클릭 가능함을 알린다. (호버만으로는 표시 안 함)
 function MentionableCard({
   refId,
   label,
@@ -103,7 +105,6 @@ function MentionableCard({
         armed && 'cursor-copy',
         className,
       )}
-      title="⌘/Ctrl+클릭으로 채팅에 멘션"
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey) {
           e.preventDefault()
@@ -113,7 +114,7 @@ function MentionableCard({
     >
       <span
         className={cn(
-          'pointer-events-none absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded-full border border-sky-400/50 bg-popover px-2 py-0.5 text-[10px] font-medium text-sky-300 opacity-0 shadow-sm transition-opacity group-hover:opacity-100',
+          'pointer-events-none absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded-full border border-sky-400/50 bg-popover px-2 py-0.5 text-[10px] font-medium text-sky-300 opacity-0 shadow-sm transition-opacity',
           armed && 'opacity-100',
         )}
       >
@@ -487,7 +488,6 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const projectSettings = useProducerStore((s) => s.projectSettings)
   const updateSettings = useProducerStore((s) => s.updateSettings)
   const storyText = useProducerStore((s) => s.storyText)
-  const storyReady = useProducerStore((s) => s.storyReady)
   const cast = useProducerStore((s) => s.cast)
   const syncing = useProducerStore((s) => s.syncing)
   const addCastMember = useProducerStore((s) => s.addCastMember)
@@ -498,7 +498,8 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const updateBackground = useProducerStore((s) => s.updateBackground)
   const removeBackground = useProducerStore((s) => s.removeBackground)
 
-
+  // Brief Story 전체보기 토글 — 길면 4줄로 클램프, "더 보기"로 스크롤 박스 펼침.
+  const [storyExpanded, setStoryExpanded] = useState(false)
   const persons = cast.filter((m) => m.entityType === 'person')
   const objects = cast.filter((m) => m.entityType === 'object')
   const readyBackgrounds = backgrounds.filter(backgroundReady)
@@ -555,16 +556,36 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
             mentionLabel="스토리"
           >
             <div className="rounded-lg border border-border bg-background/40 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                {storyReady ? (
-                  <Badge variant="outline" className="border-success/40 text-success">준비됨</Badge>
-                ) : null}
-              </div>
-              <p className="text-sm text-muted-foreground italic">
-                {storyText
-                  ? storyText.slice(0, 360).concat(storyText.length > 360 ? '…' : '')
-                  : '채팅으로 촬영 가능한 스토리를 정리해 주세요.'}
-              </p>
+              {storyText ? (
+                <>
+                  <p
+                    className={cn(
+                      'text-sm text-muted-foreground italic whitespace-pre-wrap',
+                      storyExpanded
+                        ? 'max-h-72 overflow-y-auto pr-1'
+                        : 'line-clamp-4',
+                    )}
+                  >
+                    {storyText}
+                  </p>
+                  {storyText.length > 200 && (
+                    <button
+                      type="button"
+                      onClick={() => setStoryExpanded((v) => !v)}
+                      className="mt-2 flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {storyExpanded ? '접기' : '더 보기'}
+                      <ChevronDown
+                        className={cn('size-3.5 transition-transform', storyExpanded && 'rotate-180')}
+                      />
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">
+                  채팅으로 촬영 가능한 스토리를 정리해 주세요.
+                </p>
+              )}
               <Button
                 size="sm"
                 variant="ghost"

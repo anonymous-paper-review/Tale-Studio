@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   const rawNext = cookieStore.get(NEXT_PATH_COOKIE)?.value
   const next = sanitizeNextPath(rawNext ? decodeURIComponent(rawNext) : null)
 
-  const res = NextResponse.redirect(`${origin}${next ?? '/studio/producer'}`)
+  const res = NextResponse.redirect(`${origin}${next ?? '/#projects'}`)
   if (rawNext) res.cookies.set(NEXT_PATH_COOKIE, '', { path: '/', maxAge: 0 })
   return res
 }

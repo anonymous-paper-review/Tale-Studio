@@ -210,6 +210,7 @@ function BaseNodeImpl({
               size="icon-xs"
               onClick={handleEdit}
               aria-label="Edit"
+              className="hover-red-beam"
             >
               <Edit className="size-3" />
             </Button>
@@ -219,6 +220,7 @@ function BaseNodeImpl({
                 size="icon-xs"
                 onClick={handleBranch}
                 aria-label="Branch"
+                className="hover-red-beam"
               >
                 <GitBranch className="size-3" />
               </Button>
@@ -229,6 +231,7 @@ function BaseNodeImpl({
               onClick={handleDuplicate}
               aria-label="Duplicate"
               disabled
+              className="hover-red-beam"
             >
               <Copy className="size-3 opacity-30" />
             </Button>
@@ -237,7 +240,7 @@ function BaseNodeImpl({
               size="icon-xs"
               onClick={handleDelete}
               aria-label="Delete"
-              className="text-destructive"
+              className="text-destructive hover-red-beam"
             >
               <Trash2 className="size-3" />
             </Button>

@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { renderInlineMarkdown, escapeHtml } from '@/lib/inline-markdown'
 
 describe('renderInlineMarkdown (C6 chat markdown)', () => {
-  it('renders **bold** as <strong> and removes the raw asterisks', () => {
+  it('strips **bold** markers to plain text (bold suppressed in chat UI)', () => {
     const out = renderInlineMarkdown('이건 **굵게** 입니다')
-    expect(out).toContain('<strong>굵게</strong>')
+    expect(out).toBe('이건 굵게 입니다')
     expect(out).not.toContain('**')
+    expect(out).not.toContain('<strong>')
   })
 
   it('renders *italic* and _italic_ as <em>', () => {
@@ -18,9 +19,9 @@ describe('renderInlineMarkdown (C6 chat markdown)', () => {
     expect(renderInlineMarkdown('use `npm run` here')).toContain('npm run</code>')
   })
 
-  it('does not leave double asterisks for bold', () => {
+  it('removes all double asterisks without leaving <strong>', () => {
     const out = renderInlineMarkdown('**A** and **B**')
-    expect(out).toBe('<strong>A</strong> and <strong>B</strong>')
+    expect(out).toBe('A and B')
   })
 
   it('escapes raw HTML so injected markup cannot execute (XSS)', () => {
@@ -30,9 +31,9 @@ describe('renderInlineMarkdown (C6 chat markdown)', () => {
     expect(out).not.toContain('onerror="alert(1)"') // quotes escaped too
   })
 
-  it('escapes a script tag wrapped in bold', () => {
+  it('strips bold markers around a script tag but still escapes it (no <strong>, no exec)', () => {
     const out = renderInlineMarkdown('**<script>evil()</script>**')
-    expect(out).toContain('<strong>')
+    expect(out).not.toContain('<strong>')
     expect(out).toContain('&lt;script&gt;')
     expect(out).not.toContain('<script>')
   })

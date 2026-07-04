@@ -29,6 +29,10 @@ interface ChatUiState {
   mentionInsert: MentionInsertRequest | null
   requestMentionInsert: (label: string) => void
   consumeMentionInsert: (id: number) => void
+  // 채팅 입력창 포커스(+빔) 요청 브리지 — 첫 진입 웰컴 등에서 set, GlobalChat이 소비.
+  focusRequest: number | null
+  requestChatFocus: () => void
+  consumeChatFocus: () => void
 }
 
 const clampWidth = (w: number) =>
@@ -55,6 +59,9 @@ export const useChatUiStore = create<ChatUiState>()(
       requestMentionInsert: (label) => set({ mentionInsert: { id: Date.now(), label } }),
       consumeMentionInsert: (id) =>
         set((s) => (s.mentionInsert?.id === id ? { mentionInsert: null } : s)),
+      focusRequest: null,
+      requestChatFocus: () => set({ focusRequest: Date.now() }),
+      consumeChatFocus: () => set({ focusRequest: null }),
     }),
     {
       name: 'tale-chat-ui',

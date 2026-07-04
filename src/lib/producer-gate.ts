@@ -97,9 +97,9 @@ function evaluatePersonFields(
   // D3+ : arc / motivation.want 추가 필수.
   if (depthAtLeast(depth, 'D3')) {
     if (!arcComplete(person.arc))
-      issues.push({ field: `cast:${person.localId}:arc`, label: `${who}: 아크(시작/끝/유형) 필요`, detail: 'D3+ 필수' })
+      issues.push({ field: `cast:${person.localId}:arc`, label: `${who}: 아크(시작/끝/유형) 필요` })
     if (!isFilled(person.motivation?.want))
-      issues.push({ field: `cast:${person.localId}:want`, label: `${who}: 동기(want) 필요`, detail: 'D3+ 필수' })
+      issues.push({ field: `cast:${person.localId}:want`, label: `${who}: 동기(want) 필요` })
   }
   return issues
 }
@@ -157,14 +157,14 @@ export function evaluateProducerGate({ settings, storyReady, cast, backgrounds }
   if (depthAtLeast(depth, 'D3') && persons.length < 1) {
     hardMissing.push({
       field: 'cast:minPerson',
-      label: `${depth}: 주인공(person) 1명 이상 필요`,
+      label: '주인공 1명 이상 필요 (필수)',
       detail: '러닝타임이 1분 이상이면 최소 1명의 인물이 필요합니다',
     })
   }
   if (depthAtLeast(depth, 'D4') && persons.length < 2) {
     softMissing.push({
       field: 'cast:recommendPersons',
-      label: `${depth}: 인물 2명 이상 권장`,
+      label: '인물 2명 이상 권장',
       detail: '5분 이상 영상은 관계가 있는 다중 인물을 권장',
     })
   }

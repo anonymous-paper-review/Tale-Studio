@@ -330,7 +330,7 @@ export default function PostPage() {
             <Button
               size="icon"
               variant={toolMode === 'select' ? 'default' : 'ghost'}
-              className="size-6"
+              className="size-6 hover-red-beam"
               onClick={() => setToolMode('select')}
               title="선택 도구 (V)"
             >
@@ -339,7 +339,7 @@ export default function PostPage() {
             <Button
               size="icon"
               variant={toolMode === 'cut' ? 'default' : 'ghost'}
-              className="size-6"
+              className="size-6 hover-red-beam"
               onClick={() => setToolMode('cut')}
               title="자르기 도구 (C)"
             >
@@ -352,7 +352,7 @@ export default function PostPage() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-7"
+              className="size-7 hover-red-beam"
               onPointerDown={() => startFrameHold(-FRAME)}
               onPointerUp={stopFrameHold}
               onPointerLeave={stopFrameHold}
@@ -361,13 +361,13 @@ export default function PostPage() {
             >
               <ChevronLeft className="size-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="size-7" onClick={togglePlay} title="재생/정지 (Space)">
+            <Button size="icon" variant="ghost" className="size-7 hover-red-beam" onClick={togglePlay} title="재생/정지 (Space)">
               {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
             </Button>
             <Button
               size="icon"
               variant="ghost"
-              className="size-7"
+              className="size-7 hover-red-beam"
               onPointerDown={() => startFrameHold(FRAME)}
               onPointerUp={stopFrameHold}
               onPointerLeave={stopFrameHold}
@@ -380,10 +380,10 @@ export default function PostPage() {
 
           {/* Undo / Redo */}
           <div className="flex items-center gap-0.5">
-            <Button size="icon" variant="ghost" className="size-7" onClick={undo} disabled={past.length === 0} title="실행취소 (Ctrl+Z)">
+            <Button size="icon" variant="ghost" className="size-7 hover-red-beam" onClick={undo} disabled={past.length === 0} title="실행취소 (Ctrl+Z)">
               <Undo2 className="size-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="size-7" onClick={redo} disabled={future.length === 0} title="다시실행 (Ctrl+Y)">
+            <Button size="icon" variant="ghost" className="size-7 hover-red-beam" onClick={redo} disabled={future.length === 0} title="다시실행 (Ctrl+Y)">
               <Redo2 className="size-4" />
             </Button>
           </div>
@@ -398,7 +398,7 @@ export default function PostPage() {
               size="sm"
               variant="outline"
               disabled={exportingZip}
-              className="gap-1.5"
+              className="gap-1.5 hover-red-beam"
               onClick={async () => {
                 setExportingZip(true)
                 try {
@@ -431,7 +431,7 @@ export default function PostPage() {
               )}
               {exportingZip ? '압축 중…' : '샷 ZIP'}
             </Button>
-            <Button size="sm" variant="outline" onClick={renderDraft} disabled={rendering} className="gap-1.5">
+            <Button size="sm" variant="outline" onClick={renderDraft} disabled={rendering} className="gap-1.5 hover-red-beam">
               {rendering ? <Loader2 className="size-3 animate-spin" /> : <Download className="size-3" />}
               {rendering ? 'Rendering…' : 'Draft Render'}
             </Button>

@@ -30,9 +30,22 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Not logged in → redirect to /login (?next= 로 원래 위치 보존 — 세션 만료 후
+  // 공개 경로: 로그인 전에도 볼 수 있는 랜딩(홈)·로그인 페이지.
+  // 그 외(스튜디오/디자인 등)는 로그인 필요 — 접근 시 /login 으로 보냄.
+  const { pathname } = request.nextUrl
+  const isPublicPath = pathname === '/' || pathname.startsWith('/login')
+
+  // 리다이렉트 응답에도 getUser()가 방금 갱신한 세션 쿠키를 실어 보낸다.
+  // (누락 시 토큰 갱신 타이밍에 걸린 유저가 로그인 ↔ 목적지 무한루프에 빠짐 — Supabase SSR 필수 패턴)
+  const redirectWithSession = (url: URL) => {
+    const res = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c))
+    return res
+  }
+
+  // Not logged in & 보호 경로 → /login (?next= 로 원래 위치 보존 — 세션 만료 후
   // 재로그인 시 보던 스테이지/프로젝트(?projectId 쿼리 포함)로 복귀)
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
+  if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
     const next = sanitizeNextPath(
       request.nextUrl.pathname + request.nextUrl.search,
@@ -40,13 +53,13 @@ export async function middleware(request: NextRequest) {
     url.pathname = '/login'
     url.search = ''
     if (next && next !== '/') url.searchParams.set('next', next)
-    return NextResponse.redirect(url)
+    return redirectWithSession(url)
   }
 
   // Logged in but on /login → next 가 있으면 그곳으로(검증 통과분만), 없으면 home
   if (user && request.nextUrl.pathname.startsWith('/login')) {
     const next = sanitizeNextPath(request.nextUrl.searchParams.get('next'))
-    return NextResponse.redirect(new URL(next ?? '/', request.url))
+    return redirectWithSession(new URL(next ?? '/', request.url))
   }
 
   return supabaseResponse

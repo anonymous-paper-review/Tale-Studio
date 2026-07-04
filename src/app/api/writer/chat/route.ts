@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { llmChat } from '@/lib/llm'
+import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
 
 const SHOT_TYPES = new Set([
   'ECU', 'CU', 'MCU', 'MS', 'MFS', 'FS', 'WS', 'EWS', 'OTS', 'POV', 'TRACK', '2S',
@@ -240,7 +241,7 @@ export async function POST(req: Request) {
         : ''
 
     const text = await llmChat(
-      WRITER_CHAT_SYSTEM + crossStageNote,
+      WRITER_CHAT_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE,
       normalizedHistory,
       `${ctx}${message}`,
       0.5,

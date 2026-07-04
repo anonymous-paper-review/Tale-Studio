@@ -6,7 +6,6 @@ import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { Sidebar } from '@/components/layout/sidebar'
-import { Samantha } from '@/components/layout/samantha'
 import { GlobalChat } from '@/components/layout/global-chat'
 import { useIdleTimeout } from '@/hooks/use-idle-timeout'
 import { readLastProjectId, writeLastProjectId } from '@/lib/session-restore'
@@ -63,7 +62,7 @@ export default function StudioLayout({
   }, [projectId, pathname])
 
   // URL ↔ currentStage 동기화 + 잠긴 stage 리다이렉트.
-  // Sidebar 클릭이나 직접 URL 진입 시에도 GlobalChat/Samantha가 올바른 stage로 동작하도록.
+  // Sidebar 클릭이나 직접 URL 진입 시에도 GlobalChat이 올바른 stage로 동작하도록.
   useEffect(() => {
     // projectId가 확정되기 전(초기 로드/새로고침/북마크 진입)에는 게이트를 판단하지 않는다.
     // reachedStage는 initProject가 DB current_stage에서 복원하므로, 그 전에 평가하면
@@ -96,7 +95,6 @@ export default function StudioLayout({
         <div className="flex h-screen flex-col overflow-y-auto">{children}</div>
       </main>
       <GlobalChat />
-      <Samantha />
     </>
   )
 }

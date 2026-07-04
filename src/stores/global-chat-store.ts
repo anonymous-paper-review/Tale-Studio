@@ -38,6 +38,8 @@ export interface ChatSuggestion {
   id: string
   stage: StageId
   content: string
+  /** false면 dismiss(나중에) 버튼을 숨긴다 — 온보딩 인사처럼 넘길 필요 없는 제안. */
+  dismissible?: boolean
   action:
     | { kind: 'navigate'; targetStage: StageId; label: string }
     | { kind: 'artist-refresh-look'; label: string }
@@ -104,10 +106,28 @@ function serializeWriterContext(
   return lines.join('\n')
 }
 
-// 완료 알림 채팅 메시지 스로틀 — stage별 마지막 메시지 시각. 배치 생성(이미지 12장)에서
-//   매 완료마다 메시지가 쌓이지 않도록 stage당 10초에 1개로 제한(배지 카운트는 매번 bump).
-const NOTIFY_THROTTLE_MS = 10_000
-const lastNotifyAt: Partial<Record<StageId, number>> = {}
+// 완료 알림 코얼레싱 — 같은 stage+label 완료를 짧은 윈도우로 모아 한 줄("N개 생성 완료")로 emit.
+//   배치 이미지(웹훅 다발) 스팸 방지. 창 안에 이어지면 누적, 조용해지면 1개 메시지로 flush.
+const COMPLETION_COALESCE_MS = 2500
+type PendingCompletion = { count: number; timer: ReturnType<typeof setTimeout> }
+const pendingCompletions: Record<string, PendingCompletion> = {}
+const completionKey = (stage: StageId, label: string) => `${stage}::${label}`
+
+function flushCompletion(stage: StageId, label: string): void {
+  const key = completionKey(stage, label)
+  const entry = pendingCompletions[key]
+  if (!entry) return
+  delete pendingCompletions[key]
+  const projectId = useProjectStore.getState().projectId
+  const content =
+    entry.count > 1
+      ? `✓ ${label} ${entry.count}개 생성이 완료됐어요. ${STAGE_LABEL[stage]} 탭에서 확인하세요.`
+      : `✓ ${label} 생성이 완료됐어요. ${STAGE_LABEL[stage]} 탭에서 확인하세요.`
+  useGlobalChatStore.setState((state) => ({
+    messages: [...state.messages, { id: makeId(), stage, role: 'model', content }],
+  }))
+  if (projectId) saveChatMessage(projectId, stage, 'model', content)
+}
 
 export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   messages: [],
@@ -144,6 +164,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   sendMessage: async (content) => {
     const trimmed = content.trim()
     if (!trimmed || get().loading) return
+
+    // 온보딩 인사 등 비-dismissible 제안은 유저가 말을 걸면 자동으로 치운다(넘김 버튼 없이).
+    if (get().suggestion?.dismissible === false) get().dismissSuggestion()
 
     const stage = useProjectStore.getState().currentStage
     const projectId = useProjectStore.getState().projectId
@@ -561,19 +584,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       },
     }))
 
-    const now = Date.now()
-    if (now - (lastNotifyAt[stage] ?? 0) < NOTIFY_THROTTLE_MS) return
-    lastNotifyAt[stage] = now
-
-    const projectId = useProjectStore.getState().projectId
-    const content = `✓ ${label} 생성이 완료됐어요. ${STAGE_LABEL[stage]} 탭에서 확인하세요.`
-    set((state) => ({
-      messages: [
-        ...state.messages,
-        { id: makeId(), stage, role: 'model', content },
-      ],
-    }))
-    if (projectId) saveChatMessage(projectId, stage, 'model', content)
+    // 완료 메시지는 즉시 쌓지 않고 stage+label 로 모아 조용해지면 한 줄로 flush(스팸 방지).
+    const key = completionKey(stage, label)
+    const existing = pendingCompletions[key]
+    if (existing) {
+      existing.count += 1
+      clearTimeout(existing.timer)
+      existing.timer = setTimeout(() => flushCompletion(stage, label), COMPLETION_COALESCE_MS)
+    } else {
+      pendingCompletions[key] = {
+        count: 1,
+        timer: setTimeout(() => flushCompletion(stage, label), COMPLETION_COALESCE_MS),
+      }
+    }
   },
 
   // stage 진입 시 배지 클리어 (studio layout에서 호출).
@@ -588,9 +611,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   clearError: () => set({ error: null }),
 
   reset: () => {
-    // 프로젝트 전환 시 모듈 전역 스로틀 클럭도 비운다 — 새 프로젝트 첫 완료 알림이 이전
-    //   프로젝트 타임스탬프에 막혀 누락되지 않도록(code-review MEDIUM).
-    for (const k of Object.keys(lastNotifyAt)) delete lastNotifyAt[k as StageId]
+    // 프로젝트 전환 시 진행 중인 완료-코얼레싱 타이머/누적도 비운다.
+    for (const k of Object.keys(pendingCompletions)) {
+      clearTimeout(pendingCompletions[k].timer)
+      delete pendingCompletions[k]
+    }
     set({
       messages: [],
       loading: false,

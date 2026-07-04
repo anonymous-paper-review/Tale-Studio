@@ -204,6 +204,7 @@ export function CharacterPanel() {
                             active
                               ? 'border-primary bg-primary/15 font-medium text-foreground'
                               : 'border-border text-muted-foreground hover:border-primary/60 hover:bg-accent hover:text-foreground',
+                            'hover-red-beam',
                           )}
                         >
                           {label}
@@ -224,7 +225,7 @@ export function CharacterPanel() {
                         e.stopPropagation()
                         setViewDialog({ charId: char.characterId, view: 'main' })
                       }}
-                      className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                     >
                       <ImagePlaceholder
                         label={CHARACTER_VIEW_LABELS['main']}
@@ -265,7 +266,7 @@ export function CharacterPanel() {
                               e.stopPropagation()
                               setViewDialog({ charId: char.characterId, view })
                             }}
-                            className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                           >
                             <ImagePlaceholder
                               label={CHARACTER_VIEW_LABELS[view]}
@@ -327,7 +328,7 @@ export function CharacterPanel() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1"
+                  className="flex-1 hover-red-beam"
                   disabled={isGenerating}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -352,6 +353,7 @@ export function CharacterPanel() {
                     <Button
                       variant={isRegistered ? 'secondary' : 'default'}
                       size="sm"
+                      className="hover-red-beam"
                       disabled={!hasImage || isGenerating}
                       onClick={(e) => {
                         e.stopPropagation()
@@ -384,6 +386,7 @@ export function CharacterPanel() {
                     <Button
                       variant={isSaved ? 'secondary' : 'outline'}
                       size="sm"
+                      className="hover-red-beam"
                       disabled={!hasMainImage || !workspaceId}
                       onClick={async (e) => {
                         e.stopPropagation()
@@ -432,14 +435,14 @@ export function CharacterPanel() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            className="flex-1 border-dashed text-muted-foreground hover:text-foreground"
+            className="flex-1 border-dashed text-muted-foreground hover:text-foreground hover-red-beam"
             onClick={() => addCharacter({ name: '새 캐릭터', entityType: 'person' })}
           >
             <Plus className="size-4" /> 인물
           </Button>
           <Button
             variant="outline"
-            className="flex-1 border-dashed text-muted-foreground hover:text-foreground"
+            className="flex-1 border-dashed text-muted-foreground hover:text-foreground hover-red-beam"
             onClick={() => addCharacter({ name: '새 사물', entityType: 'object' })}
           >
             <Plus className="size-4" /> 사물

@@ -2,6 +2,10 @@
 
 > 텍스트 → 전문 촬영 기법 적용 고품질 AI 비디오 자동 생성 (B2B). 차별화는 Knowledge DB 기반 cinematography RAG.
 
+## 용어 (이 정의가 최우선 — 반사 해석 금지)
+
+- **"클론" / "클론 떠줘"** = `pnpm seed:producer:clone` (fixture 기반 throwaway 프로젝트 생성, 출력 마지막 줄 = 새 projectId). **git clone 아님.** 상세: 아래 "프로듀서 시드 / 핸드오프 검증 하니스".
+
 ## 상태
 
 보일러플레이트 완료, 구현 진행 (2026-03-03). 구현 순서: P3+P4 (Phase 1) → P5 → P2 → P1.

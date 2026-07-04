@@ -64,11 +64,12 @@ export default function LoginPage() {
       }
 
       // 성공: 비번 로그인은 OAuth 왕복이 없어 URL ?next 를 직접 읽는다(NEXT_PATH_COOKIE 불필요).
-      // 기본 목적지 '/' 는 middleware 기본과 일치. sanitizeNextPath 가 open redirect/로그인 루프 차단.
+      // 기본 목적지 '/#projects' — 로그인 후 홈 하단 프로젝트 리스트로 스크롤(OAuth 콜백과 통일).
+      // sanitizeNextPath 가 open redirect/로그인 루프 차단.
       const next = sanitizeNextPath(
         new URLSearchParams(window.location.search).get('next'),
       )
-      router.replace(next ?? '/')
+      router.replace(next ?? '/#projects')
       router.refresh()
     } catch {
       // 네트워크/예외도 원본 비노출 동일 일반 메시지 + submitting 해제(버튼 고착 방지).

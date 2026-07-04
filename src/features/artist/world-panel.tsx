@@ -92,6 +92,7 @@ export function WorldPanel() {
               imageProvider === 'fal'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground',
+              'hover-red-beam',
             )}
           >
             Fal
@@ -104,6 +105,7 @@ export function WorldPanel() {
               imageProvider === 'gemini'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground',
+              'hover-red-beam',
             )}
           >
             Gemini
@@ -123,6 +125,7 @@ export function WorldPanel() {
                     : selfHostedStatus === 'online'
                       ? 'text-muted-foreground hover:text-foreground'
                       : 'cursor-not-allowed text-muted-foreground/50',
+                  'hover-red-beam',
                 )}
               >
                 <span
@@ -164,6 +167,7 @@ export function WorldPanel() {
               selectedBoostPreset === preset
                 ? 'border-primary bg-primary/10 text-primary'
                 : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground',
+              'hover-red-beam',
             )}
           >
             {preset}
@@ -220,7 +224,7 @@ export function WorldPanel() {
                         shot: 'wideShot',
                       })
                     }}
-                    className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                   >
                     <ImagePlaceholder
                       label="Wide Shot"
@@ -240,7 +244,7 @@ export function WorldPanel() {
                         shot: 'establishingShot',
                       })
                     }}
-                    className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                   >
                     <ImagePlaceholder
                       label="Establishing"
@@ -256,7 +260,7 @@ export function WorldPanel() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1"
+                    className="flex-1 hover-red-beam"
                     disabled={isGenerating}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -281,6 +285,7 @@ export function WorldPanel() {
                       <Button
                         variant={isRegistered ? 'secondary' : 'default'}
                         size="sm"
+                        className="hover-red-beam"
                         disabled={!hasImage || isGenerating}
                         onClick={(e) => {
                           e.stopPropagation()
@@ -313,6 +318,7 @@ export function WorldPanel() {
                       <Button
                         variant={isSaved ? 'secondary' : 'outline'}
                         size="sm"
+                        className="hover-red-beam"
                         disabled={!representativeImage || !workspaceId}
                         onClick={async (e) => {
                           e.stopPropagation()

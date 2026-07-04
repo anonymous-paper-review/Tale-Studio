@@ -23,11 +23,11 @@ import { useArtistStore } from '@/stores/artist-store'
 import { useDirectorCanvasWarmStarting } from '@/features/director/hooks/use-director-warm-starting'
 import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
+import { HoverBeam } from '@/components/hover-beam'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
 import { castMentions, backgroundMentions, activeMentionRefs, FOUNDATION_MENTIONS } from '@/lib/card-mention'
 import {
-  STAGE_BADGE,
   STAGE_LABEL,
   STAGE_BADGE_CLASS,
   STAGE_FACE_COLOR,
@@ -97,6 +97,8 @@ export function GlobalChat() {
   const setMentionedRefs = useChatUiStore((s) => s.setMentionedRefs)
   const mentionInsert = useChatUiStore((s) => s.mentionInsert)
   const consumeMentionInsert = useChatUiStore((s) => s.consumeMentionInsert)
+  const focusRequest = useChatUiStore((s) => s.focusRequest)
+  const consumeChatFocus = useChatUiStore((s) => s.consumeChatFocus)
   const [dragging, setDragging] = useState(false)
 
   // @멘션 후보 — 현재 stage에서 UI에 표기되는 카드/오브젝트
@@ -159,6 +161,13 @@ export function GlobalChat() {
     consumeMentionInsert(mentionInsert.id)
     requestAnimationFrame(() => textareaRef.current?.focus())
   }, [mentionInsert, consumeMentionInsert])
+
+  // 첫 진입 웰컴 등 → 채팅 입력창 포커스. HoverBeam 래퍼의 focus-within 이 빨간 빔을 켜 주의를 끈다.
+  useEffect(() => {
+    if (focusRequest == null) return
+    requestAnimationFrame(() => textareaRef.current?.focus())
+    consumeChatFocus()
+  }, [focusRequest, consumeChatFocus])
 
   const stageSupported = CHAT_SUPPORTED_STAGES.has(currentStage)
   const inputDisabled = !stageSupported || loading
@@ -223,8 +232,6 @@ export function GlobalChat() {
     setDragging(false)
   }
 
-  const expression = loading ? 'thinking' : 'idle'
-
   return (
     <>
       <aside
@@ -250,23 +257,8 @@ export function GlobalChat() {
 
         {/* Header */}
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
-          <AgentFace
-            expression={expression}
-            color={STAGE_FACE_COLOR[currentStage]}
-            size={32}
-          />
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold">채팅</span>
-              <span
-                className={cn(
-                  'rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
-                  STAGE_BADGE_CLASS[currentStage],
-                )}
-              >
-                {currentStage === 'producer' ? 'AI' : STAGE_BADGE[currentStage]} · {STAGE_LABEL[currentStage]}
-              </span>
-            </div>
+            <span className="text-sm font-semibold text-white">에이전트 채팅</span>
           </div>
           <Button
             size="icon-sm"
@@ -284,29 +276,38 @@ export function GlobalChat() {
           <div className="space-y-2">
 
             {messages.map((msg) => {
-              const badgeClass = STAGE_BADGE_CLASS[msg.stage]
+              // 유저 메시지 — 오른쪽 정렬 말풍선(아바타 없음).
+              if (msg.role === 'user') {
+                return (
+                  <div
+                    key={msg.id}
+                    className="group relative ml-4 select-text whitespace-pre-wrap rounded-lg bg-primary/10 px-3 py-2 pr-8 text-xs text-foreground"
+                  >
+                    <MarkdownText text={msg.content} />
+                    <CopyButton text={msg.content} />
+                  </div>
+                )
+              }
+              // AI 메시지 — 카톡 수신형: 아바타(말풍선 밖 왼쪽 상단) + 이름(말풍선 위) + 말풍선.
               return (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    'group relative select-text rounded-lg px-3 py-2 pr-8 text-xs whitespace-pre-wrap',
-                    msg.role === 'user'
-                      ? 'ml-4 bg-primary/10 text-foreground'
-                      : 'mr-4 bg-muted text-foreground',
-                  )}
-                >
-                  {msg.role !== 'user' && (
-                    <span
-                      className={cn(
-                        'mr-1.5 inline-flex items-center rounded-full border px-1.5 py-0 align-middle text-[9px] font-medium select-none',
-                        badgeClass,
-                      )}
-                    >
-                      {msg.stage === 'producer' ? 'AI Producer' : STAGE_BADGE[msg.stage]}
+                <div key={msg.id} className="mr-4 flex items-start gap-2">
+                  <div
+                    className={cn(
+                      'flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border',
+                      STAGE_BADGE_CLASS[msg.stage],
+                    )}
+                  >
+                    <AgentFace color={STAGE_FACE_COLOR[msg.stage]} size={20} animate={false} />
+                  </div>
+                  <div className="flex min-w-0 flex-col">
+                    <span className="mb-0.5 text-[11px] font-medium text-muted-foreground">
+                      {STAGE_LABEL[msg.stage]}
                     </span>
-                  )}
-                  <MarkdownText text={msg.content} />
-                  <CopyButton text={msg.content} />
+                    <div className="group relative select-text whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 pr-8 text-xs text-foreground">
+                      <MarkdownText text={msg.content} />
+                      <CopyButton text={msg.content} />
+                    </div>
+                  </div>
                 </div>
               )
             })}
@@ -321,27 +322,27 @@ export function GlobalChat() {
             {/* 프로액티브 제안 (chat-proactive-copilot Phase 1) — 시스템이 먼저 거는 actionable 넛지 */}
             {suggestion && suggestion.stage === currentStage && (
               <div className="mr-4 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-foreground">
-                <div className="flex items-start gap-1.5">
-                  <span
-                    className={cn(
-                      'mt-px inline-flex items-center rounded-full border px-1.5 py-0 align-middle text-[9px] font-medium',
-                      STAGE_BADGE_CLASS[suggestion.stage],
-                    )}
-                  >
-                    {STAGE_BADGE[suggestion.stage]}
+                <div className="mb-1 flex items-center gap-1.5">
+                  <AgentFace color={STAGE_FACE_COLOR[suggestion.stage]} size={18} animate={false} />
+                  <span className="text-[11px] font-medium text-muted-foreground">
+                    {STAGE_LABEL[suggestion.stage]}
                   </span>
-                  <MarkdownText className="whitespace-pre-wrap" text={suggestion.content} />
                 </div>
-                <div className="mt-2 flex items-center gap-2">
-                  {suggestion.action && (
-                    <Button size="sm" onClick={handleSuggestionAction}>
-                      {suggestion.action.label}
-                    </Button>
-                  )}
-                  <Button size="sm" variant="ghost" onClick={dismissSuggestion}>
-                    나중에
-                  </Button>
-                </div>
+                <MarkdownText className="whitespace-pre-wrap" text={suggestion.content} />
+                {(suggestion.action || suggestion.dismissible !== false) && (
+                  <div className="mt-2 flex items-center gap-2">
+                    {suggestion.action && (
+                      <Button size="sm" onClick={handleSuggestionAction}>
+                        {suggestion.action.label}
+                      </Button>
+                    )}
+                    {suggestion.dismissible !== false && (
+                      <Button size="sm" variant="ghost" onClick={dismissSuggestion}>
+                        나중에
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -407,17 +408,19 @@ export function GlobalChat() {
             Enter 전송 / Shift+Enter 개행. 버튼은 items-end로 입력창 하단에 정렬. */}
         <div className="shrink-0 border-t border-border p-4">
           <div className="flex items-end gap-2">
-            <MentionTextarea
-              ref={textareaRef}
-              value={input}
-              onChange={setInput}
-              onSubmit={handleSend}
-              items={mentionItems}
-              history={userHistory}
-              disabled={inputDisabled}
-              placeholder={STAGE_PLACEHOLDER[currentStage]}
-              className="max-h-40 min-h-9 w-full resize-none py-2"
-            />
+            <HoverBeam className="flex-1">
+              <MentionTextarea
+                ref={textareaRef}
+                value={input}
+                onChange={setInput}
+                onSubmit={handleSend}
+                items={mentionItems}
+                history={userHistory}
+                disabled={inputDisabled}
+                placeholder={STAGE_PLACEHOLDER[currentStage]}
+                className="max-h-40 min-h-9 w-full resize-none py-2"
+              />
+            </HoverBeam>
             {currentStage === 'producer' && (
               <>
                 <input

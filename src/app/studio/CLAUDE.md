@@ -28,7 +28,7 @@
   <div className="flex h-screen flex-col">{children}</div>
 </main>
 <GlobalChat />              // w-80 fixed right (전 stage 공통 렌더 — layout.tsx:87, 조건부 hide 없음)
-<Samantha />                // floating CTA
+<!-- 문의/Help("채널톡")는 Sidebar 하단 프로필 위 빨간 말풍선으로 이동 (구 floating Samantha 폐기) -->
 ```
 
 - 좌측 Sidebar `w-16`, 우측 GlobalChat `w-80`. `main`의 `ml-16 mr-80`은 이 두 fixed 패널의 공간 확보.
@@ -81,5 +81,5 @@ canNavigateTo: (stage) => {
 
 ## 안 건드릴 곳
 
-- `src/components/layout/sidebar.tsx`, `global-chat.tsx`, `samantha.tsx` — 공유 컴포넌트, 변경 시 신중하게 편집
+- `src/components/layout/sidebar.tsx`, `global-chat.tsx` — 공유 컴포넌트, 변경 시 신중하게 편집
 - `src/stores/project-store.ts` — 공유 컨테이너, 변경 시 PR 필요

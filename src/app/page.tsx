@@ -177,27 +177,44 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [userInfo, setUserInfo] = useState<{ name: string; avatar: string | null } | null>(null)
+  const [isAuthed, setIsAuthed] = useState<boolean | null>(null)
 
   useEffect(() => {
-    fetch('/api/project/list')
-      .then((r) => r.json())
-      .then((data) => setProjects(data.projects ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false))
-
-    // Load user info
+    // 인증 먼저 확인 → 로그인한 경우에만 프로젝트 목록 요청(비로그인 헛요청 방지).
     import('@/lib/supabase/client').then(({ createClient }) => {
       const supabase = createClient()
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user) {
+      supabase.auth
+        .getUser()
+        .then(({ data: { user } }) => {
+          setIsAuthed(!!user)
+          if (!user) {
+            // 비로그인: 프로젝트가 있을 수 없으므로 목록 요청 생략.
+            setLoading(false)
+            return
+          }
           setUserInfo({
             name: user.user_metadata?.full_name ?? user.email ?? '',
             avatar: user.user_metadata?.avatar_url ?? null,
           })
-        }
-      })
+          fetch('/api/project/list')
+            .then((r) => r.json())
+            .then((data) => setProjects(data.projects ?? []))
+            .catch(() => {})
+            .finally(() => setLoading(false))
+        })
+        .catch(() => setLoading(false))
     })
   }, [])
+
+  // 로그인 직후(#projects 로 착지) 프로젝트 목록이 렌더된 뒤 그 섹션으로 스크롤.
+  // 이메일/OAuth 로그인 모두 next 없으면 '/#projects' 로 보내므로 양쪽을 커버.
+  useEffect(() => {
+    if (loading) return
+    if (window.location.hash !== '#projects') return
+    document
+      .getElementById('projects')
+      ?.scrollIntoView({ behavior: 'smooth' })
+  }, [loading])
 
   const handleOpen = (project: ProjectItem) => {
     const stage = project.current_stage ?? 'producer'
@@ -206,6 +223,11 @@ export default function HomePage() {
   }
 
   const handleNew = async () => {
+    // 비로그인 → 로그인부터. 로그인 후 홈으로 복귀하면 다시 눌러 생성.
+    if (isAuthed === false) {
+      router.push('/login')
+      return
+    }
     setCreating(true)
     await createNewProject()
     const newId = useProjectStore.getState().projectId
@@ -225,7 +247,11 @@ export default function HomePage() {
     clearLastProjectId()
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.push('/login')
+    // 홈에 머무르므로(로그아웃 버튼이 홈에만 있음) 로그인 UI 상태를 즉시 초기화.
+    setUserInfo(null)
+    setIsAuthed(false)
+    setProjects([])
+    router.push('/')
   }
 
   return (

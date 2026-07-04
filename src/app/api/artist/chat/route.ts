@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { llmChat } from '@/lib/llm'
+import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildArtistActivityContext } from '@/lib/artist/chat-context'
 import {
@@ -185,7 +186,7 @@ export async function POST(req: Request) {
     const normalizedHistory = normalizeHistory(history)
 
     const text = await llmChat(
-      ARTIST_SYSTEM,
+      ARTIST_SYSTEM + CHAT_OUTPUT_FORMAT_GUIDE,
       normalizedHistory,
       `${contextPrefix}${message}`,
       0.7,
