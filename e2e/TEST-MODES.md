@@ -64,6 +64,8 @@ pnpm e2e:db skipArtist <pid>          # seedCast + stubWorld + setStage artist
 | 날짜 | 기능(세션 변경분) | 스테이지 | 확인한 것 | 상태 |
 |---|---|---|---|---|
 | 2026-06-29 | artist 캐릭터 카드 인라인 편집(팝업 제거·역할 토글·설정/외형·+인물) | artist | 새 프로젝트 생성 → producer→artist SPA 진입 → +인물 카드 생성(DB 행) → 이름 인라인 편집 PATCH(카이→카이-E2E) → 역할 토글(protagonist→antagonist) → 설정/외형 입력 저장 → 새로고침 라운드트립. fal 호출 0. | ✅ 2026-06-29 |
+| 2026-07-06 | writer 헤더 producer 정합(타이틀 Writers' Room + 하단 설명, px-6 py-4 justify-between) | writer | 쿠키 주입 → producer SPA 진입 → 사이드바로 writer 이동 → 헤더 렌더·클래스 producer와 일치 확인(스크린샷 /tmp/writer-header-after.png). 읽기 전용 — DB write·fal 호출 0. | ✅ 2026-07-06 |
+| 2026-07-06 | 로그인 이메일 전용 전환(Google OAuth UI 제거·reveal 토글 제거·폼 직접 노출) + admin 계정 생성 | login | 쿠키 없는 탭 → /login 렌더(Google 버튼 0·이메일/비번 폼 노출, 스크린샷 /tmp/login-after.png) → talestudio@tale.studio 실 UI 로그인 → /#projects 리다이렉트·워크스페이스 진입. fal 호출 0. | ✅ 2026-07-06 |
 
 ---
 
