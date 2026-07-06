@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { StageId } from '@/types'
+import type { DialogueLine, StageId } from '@/types'
 import type { PendingProposal } from '@/lib/pending-proposal'
 import { createPendingProposal, isApprovalUtterance } from '@/lib/pending-proposal'
 import { useProjectStore } from '@/stores/project-store'
@@ -12,6 +12,11 @@ import {
   type DirectorCanvasUpdate,
 } from '@/stores/director-store'
 import { useWriterStore, type WriterChatUpdate } from '@/stores/writer-store'
+import {
+  buildScriptLines,
+  resolveLineRefs,
+  serializeWriterScriptContext,
+} from '@/lib/script-lines'
 import { saveChatMessage } from '@/lib/chat-persistence'
 import {
   STAGE_LABEL,
@@ -74,36 +79,35 @@ function makeId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-// writer 채팅 컨텍스트 — 현재 씬/샷을 LLM 이 scene_id·shot_id 로 정확히 참조하도록 직렬화(pull).
-function serializeWriterContext(
-  w: ReturnType<typeof useWriterStore.getState>,
-): string {
-  const scenes = w.sceneManifest?.scenes ?? []
-  const shots = w.shots
-  const nameOf = (id: string) =>
-    w.sceneManifest?.characters.find((c) => c.characterId === id)?.name ?? id
-  if (scenes.length === 0 && shots.length === 0) return '## 현재 씬/샷\n(아직 없음)'
-  const lines: string[] = ['## 현재 씬/샷 (scene_id·shot_id 를 그대로 사용)']
-  for (const sc of scenes) {
-    const present = (sc.charactersPresent ?? []).map(nameOf).join(', ') || '없음'
-    lines.push(
-      `\n### ${sc.sceneId} — 장소:${sc.location || '?'} / ${sc.timeOfDay || '?'} / 분위기:${sc.mood || '?'} (등장: ${present})`,
-    )
-    if (sc.narrativeSummary) lines.push(`  요약: ${sc.narrativeSummary}`)
-    for (const sh of shots.filter((s) => s.sceneId === sc.sceneId)) {
-      const chars = (sh.characters ?? []).map(nameOf).join(', ') || '없음'
-      lines.push(
-        `  - ${sh.shotId} [${sh.shotType}] ${sh.actionDescription || '(설명 없음)'} (등장: ${chars}, ${sh.durationSeconds}s)`,
-      )
+function dialogueKey(line: DialogueLine): string {
+  return `${line.characterId}\u0000${line.text}`
+}
+
+function deletedDialoguePreview(current: DialogueLine[], next: DialogueLine[]): string {
+  const remaining = new Map<string, number>()
+  for (const line of next) {
+    const key = dialogueKey(line)
+    remaining.set(key, (remaining.get(key) ?? 0) + 1)
+  }
+
+  const deleted: DialogueLine[] = []
+  for (const line of current) {
+    const key = dialogueKey(line)
+    const count = remaining.get(key) ?? 0
+    if (count > 0) {
+      remaining.set(key, count - 1)
+    } else {
+      deleted.push(line)
     }
   }
-  const orphan = shots.filter((s) => !scenes.some((sc) => sc.sceneId === s.sceneId))
-  if (orphan.length > 0) {
-    lines.push('\n### (씬 미배정 샷)')
-    for (const sh of orphan)
-      lines.push(`  - ${sh.shotId} [${sh.shotType}] ${sh.actionDescription || ''}`)
-  }
-  return lines.join('\n')
+
+  const previewLines = (deleted.length > 0 ? deleted : current.slice(next.length))
+    .slice(0, 3)
+    .map((line) => `${line.characterId}: "${line.text.slice(0, 80)}${line.text.length > 80 ? '…' : ''}"`)
+  const suffix = deleted.length > 3 ? ` 외 ${deleted.length - 3}개` : ''
+  return previewLines.length > 0
+    ? `삭제되는 대사: ${previewLines.join(' / ')}${suffix}`
+    : `삭제되는 대사: ${Math.max(0, current.length - next.length)}개`
 }
 
 // 완료 알림 코얼레싱 — 같은 stage+label 완료를 짧은 윈도우로 모아 한 줄("N개 생성 완료")로 emit.
@@ -303,12 +307,20 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         break
       }
       case 'writer': {
-        // Writers' Room agentic 모드 — 씬/샷 CRUD. 현재 씬/샷을 컨텍스트로 pull.
+        // Writers' Room agentic 모드 — 스크립트 라인 스냅샷을 컨텍스트와 L번호 해석표에 함께 사용.
+        const writerState = useWriterStore.getState()
+        const scriptLines = buildScriptLines(writerState.sceneManifest, writerState.shots)
+        const lineRefs = resolveLineRefs(trimmed, scriptLines)
         endpoint = '/api/writer/chat'
         body = {
           message: trimmed,
           history: historyPayload,
-          writerContext: serializeWriterContext(useWriterStore.getState()),
+          writerContext: serializeWriterScriptContext(
+            writerState.sceneManifest,
+            writerState.shots,
+            scriptLines,
+          ),
+          ...(lineRefs.length > 0 ? { lineRefs } : {}),
         }
         break
       }
@@ -456,9 +468,30 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       }
       if (stage === 'writer' && Array.isArray(data.updates)) {
         // 검증된 씬/샷 CRUD 액션 — writer-store 가 기존 CRUD 로 DB 반영.
-        await useWriterStore
+        const result = await useWriterStore
           .getState()
           .applyChatUpdates(data.updates as WriterChatUpdate[])
+        for (const shrink of result.pendingDialogueShrinks) {
+          const proposal = createPendingProposal({
+            stage: 'writer',
+            kind: 'writerShrinkDialogue',
+            target: shrink.shotId,
+            action: `대사 ${shrink.currentDialogueLines.length}개 → ${shrink.dialogueLines.length}개로 줄이는 수정`,
+            impact: [
+              deletedDialoguePreview(shrink.currentDialogueLines, shrink.dialogueLines),
+              '승인 전에는 적용되지 않습니다.',
+            ],
+            payload: {
+              shotId: shrink.shotId,
+              dialogueLines: shrink.dialogueLines,
+            },
+          })
+          const accepted = get().offerPendingProposal(proposal)
+          if (!accepted) {
+            set({ error: '이미 대기 중인 제안이 있어 새 Writer 대사 축소 제안을 보류했어요.' })
+            break
+          }
+        }
       }
     } catch (err) {
       set({
@@ -562,6 +595,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         // 로컬 외형 갱신 → 기존 파생 이미지가 즉시 stale 로 표시(자동 재생성 없음, #57). 이후 cc 가 재생성 제안.
         useArtistStore.getState().applyAppearancePatch(characterId, appearance)
+      } else if (proposal.kind === 'writerShrinkDialogue') {
+        const shotId = proposal.payload.shotId
+        const dialogueLines = proposal.payload.dialogueLines
+        if (typeof shotId !== 'string' || !Array.isArray(dialogueLines)) {
+          throw new Error('dialogue shrink payload missing')
+        }
+        useWriterStore
+          .getState()
+          .updateShot(shotId, { dialogueLines: dialogueLines as DialogueLine[] })
       }
       set({ pendingProposal: null })
       return true

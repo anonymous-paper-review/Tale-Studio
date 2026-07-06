@@ -24,6 +24,7 @@
 //   ── skip-mode (커밋 전 실브라우저 점검용 셋업; README "Skip 모드") ──
 //   newProject [title]        E2E 워크스페이스에 throwaway 프로젝트 생성 → `NEW_PROJECT <pid>`
 //   skipArtist <pid>          seedCast + stubWorld + setStage artist (artist 게이트를 비용 0 으로 오픈)
+//   skipWriter <pid>          seedCast + 씬/샷(대사) 시드 + rough_storyboard 스텁 + setStage writer (writer 멀티탭 게이트 비용 0)
 //   stubWorld <pid>           로케이션 shot 더미 채움(autogen fal 호출 skip)
 //   cookies [outPath]         E2E 세션 쿠키를 파일로 굽기(브라우저 주입용, 기본 tmp)
 //   rmProject <pid>           throwaway 프로젝트 + 자식행 삭제
@@ -262,6 +263,53 @@ async function skipArtist(pid) {
   console.log('SKIP_READY artist', pid)
 }
 
+// seedCast + 씬/샷(대사 포함) 시드 + rough_storyboard 스텁 + setStage writer 한 방.
+// writer 멀티탭 뷰어(스토리보드/스크립트) 를 비용 0 으로 연다 — rough_storyboard 를 completed 더미로
+// 채워 진입 자동생성(fal) 을 skip. 라인: L1=sc_01 heading, L2=sh_01_01 action, L3=sh_01_01 대사,
+// L4=sh_01_02 action, L5/L6=sh_01_02 대사 2줄(→ L5/L6 이 대사 축소 가드 테스트 대상).
+async function skipWriter(pid) {
+  need(pid, 'projectId')
+  await seedCast(pid)
+  const stub = { url: STUB_IMG, status: 'completed', errorMessage: null, generatedAt: Date.now() }
+  await s.from('scenes').delete().eq('project_id', pid)
+  await s.from('shots').delete().eq('project_id', pid)
+  const { error: se } = await s.from('scenes').insert({
+    project_id: pid,
+    scene_id: 'sc_01',
+    narrative_summary: '카이가 폐허가 된 성에서 마지막 결투를 앞두고 있다.',
+    location: '폐허가 된 성',
+    time_of_day: 'dusk',
+    mood: '긴장된',
+    characters_present: ['char_hero'],
+    estimated_duration_seconds: 30,
+    sort_order: 0,
+  })
+  if (se) throw new Error('scene insert: ' + se.message)
+  const shotRows = [
+    {
+      project_id: pid, scene_id: 'sc_01', shot_id: 'sh_01_01', shot_type: 'WS', sort_order: 0,
+      action_description: '카이가 무너진 성벽 사이로 천천히 걸어 들어온다.',
+      characters: ['char_hero'], duration_seconds: 6, generation_method: 'T2V',
+      dialogue_lines: [{ characterId: 'char_hero', text: '드디어 여기까지 왔군.', emotion: '', delivery: '', durationHint: 0 }],
+      rough_storyboard: stub,
+    },
+    {
+      project_id: pid, scene_id: 'sc_01', shot_id: 'sh_01_02', shot_type: 'CU', sort_order: 1,
+      action_description: '카이가 검을 뽑아 상대를 겨눈다.',
+      characters: ['char_hero'], duration_seconds: 5, generation_method: 'T2V',
+      dialogue_lines: [
+        { characterId: 'char_hero', text: '각오는 됐겠지.', emotion: '', delivery: '', durationHint: 0 },
+        { characterId: 'char_hero', text: '물러설 곳은 없어.', emotion: '', delivery: '', durationHint: 0 },
+      ],
+      rough_storyboard: stub,
+    },
+  ]
+  const { error: she } = await s.from('shots').insert(shotRows)
+  if (she) throw new Error('shots insert: ' + she.message)
+  await setStage(pid, 'writer')
+  console.log('SKIP_READY writer', pid)
+}
+
 // E2E 계정 @supabase/ssr 세션 쿠키를 굽어 파일로 저장(브라우저 주입용). 기본 tmp 경로.
 async function cookies(outPath) {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -313,7 +361,7 @@ async function pruneSkip() {
   console.log('pruned', (data ?? []).length, 'skip projects')
 }
 
-const map = { seedCast, chars, locs, candidates, jobs, setStage, setLook, clearLook, failRun, runs, loginCheck, newProject, stubWorld, skipArtist, cookies, rmProject, pruneSkip }
+const map = { seedCast, chars, locs, candidates, jobs, setStage, setLook, clearLook, failRun, runs, loginCheck, newProject, stubWorld, skipArtist, skipWriter, cookies, rmProject, pruneSkip }
 const fn = map[cmd]
 if (!fn) {
   console.error('cmd 미지정/오타:', cmd, '\n사용 가능:', Object.keys(map).join(', '), '\n(상단 주석 또는 e2e/README.md 참고)')

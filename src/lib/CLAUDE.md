@@ -24,6 +24,8 @@
 |---|---|
 | `stage-nav.ts` | 스테이지 핸드오프 공통 로직 (lib→store 패턴의 기준 예시) |
 | `completeness.ts` | Artist/Director 산출물 누락 감지 (chat-proactive-copilot) |
+| `script-lines.ts` | Writer 스크립트 라인맵·@L 멘션·채팅 컨텍스트 [L#] 주석 파생 |
+| `writer-chat-updates.ts` | Writer 채팅 updates[] 화이트리스트 검증·라인 참조 sanitize |
 | `artist/` | artist 도메인 헬퍼 (turnaround, chat-context = 채팅 워크스페이스 인식 활동 로그 빌더) |
 | `chat-persistence.ts` / `editor-persistence.ts` | 채팅/에디터 영속화 |
 | `editor-zip-export.ts` | 샷 ZIP 일괄 다운로드 |

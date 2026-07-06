@@ -9,6 +9,7 @@ import type {
   RoughStoryboardImage,
 } from '@/types'
 import { createClient } from '@/lib/supabase/client'
+import { classifyDialoguePatch } from '@/lib/writer-chat-updates'
 import { useProjectStore } from '@/stores/project-store'
 
 
@@ -61,6 +62,16 @@ export type WriterChatUpdate =
   | { type: 'deleteShot'; id: string }
   | { type: 'deleteScene'; id: string }
 
+export interface WriterDialogueShrinkProposal {
+  shotId: string
+  currentDialogueLines: DialogueLine[]
+  dialogueLines: DialogueLine[]
+}
+
+export interface WriterApplyChatUpdatesResult {
+  pendingDialogueShrinks: WriterDialogueShrinkProposal[]
+}
+
 // applyChatUpdates 보조 — update 에서 Scene/Shot 칸만 추린다(route 가 1차 검증, 여기선 타입 좁힘 + 잉여 키 제거).
 function pickSceneFields(u: WriterChatUpdate): Partial<Scene> {
   const o = u as Record<string, unknown>
@@ -82,6 +93,7 @@ function pickShotFields(u: WriterChatUpdate): Partial<Shot> {
   if (typeof o.actionDescription === 'string') out.actionDescription = o.actionDescription
   if (Array.isArray(o.characters)) out.characters = o.characters as string[]
   if (typeof o.durationSeconds === 'number') out.durationSeconds = o.durationSeconds
+  if (Array.isArray(o.dialogueLines)) out.dialogueLines = o.dialogueLines as DialogueLine[]
   return out
 }
 
@@ -117,7 +129,7 @@ interface WriterState {
     index: number,
     changes: Partial<DialogueLine>,
   ) => void
-  applyChatUpdates: (updates: WriterChatUpdate[]) => Promise<void>
+  applyChatUpdates: (updates: WriterChatUpdate[]) => Promise<WriterApplyChatUpdatesResult>
   clearError: () => void
   reset: () => void
 }
@@ -442,6 +454,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   //   각 update 는 best-effort — 하나 실패해도 나머지는 진행(에러는 store.error 로 표면화).
   applyChatUpdates: async (updates) => {
     const tempMap = new Map<string, string>() // tempId → 실제 id
+    const pendingDialogueShrinks: WriterDialogueShrinkProposal[] = []
     for (const u of updates) {
       try {
         if (u.type === 'addScene') {
@@ -460,7 +473,28 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         } else if (u.type === 'updateScene') {
           get().updateScene(tempMap.get(u.id) ?? u.id, u.patch)
         } else if (u.type === 'updateShot') {
-          get().updateShot(tempMap.get(u.id) ?? u.id, u.patch)
+          const shotId = tempMap.get(u.id) ?? u.id
+          const nextDialogueLines = u.patch.dialogueLines
+          if (Array.isArray(nextDialogueLines)) {
+            const currentShot = get().shots.find((shot) => shot.shotId === shotId)
+            if (
+              currentShot &&
+              classifyDialoguePatch(currentShot.dialogueLines, nextDialogueLines) === 'confirm'
+            ) {
+              const restPatch = { ...u.patch }
+              delete restPatch.dialogueLines
+              if (Object.keys(restPatch).length > 0) get().updateShot(shotId, restPatch)
+              pendingDialogueShrinks.push({
+                shotId,
+                currentDialogueLines: currentShot.dialogueLines,
+                dialogueLines: nextDialogueLines,
+              })
+            } else {
+              get().updateShot(shotId, u.patch)
+            }
+          } else {
+            get().updateShot(shotId, u.patch)
+          }
         } else if (u.type === 'deleteShot') {
           await get().deleteShot(tempMap.get(u.id) ?? u.id)
         } else if (u.type === 'deleteScene') {
@@ -470,6 +504,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         set({ error: e instanceof Error ? e.message : 'chat update failed' })
       }
     }
+    return { pendingDialogueShrinks }
   },
 
   reorderScenes: async (orderedIds) => {

@@ -20,6 +20,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useArtistStore } from '@/stores/artist-store'
+import { useWriterStore } from '@/stores/writer-store'
 import { useDirectorCanvasWarmStarting } from '@/features/director/hooks/use-director-warm-starting'
 import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
@@ -27,6 +28,7 @@ import { HoverBeam } from '@/components/hover-beam'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
 import { castMentions, backgroundMentions, activeMentionRefs, FOUNDATION_MENTIONS } from '@/lib/card-mention'
+import { buildScriptLines, scriptLineMentions } from '@/lib/script-lines'
 import {
   STAGE_LABEL,
   STAGE_BADGE_CLASS,
@@ -106,6 +108,8 @@ export function GlobalChat() {
   const producerBackgrounds = useProducerStore((s) => s.backgrounds)
   const artistCharacters = useArtistStore((s) => s.characterAssets)
   const artistWorlds = useArtistStore((s) => s.worldAssets)
+  const writerManifest = useWriterStore((s) => s.sceneManifest)
+  const writerShots = useWriterStore((s) => s.shots)
   const mentionItems = useMemo<MentionItem[]>(() => {
     if (currentStage === 'producer') {
       return [
@@ -124,8 +128,23 @@ export function GlobalChat() {
           .map((w) => ({ id: w.locationId, label: w.name, hint: '장소' })),
       ]
     }
+    if (currentStage === 'writer') {
+      return scriptLineMentions(buildScriptLines(writerManifest, writerShots)).map((m) => ({
+        id: m.ref,
+        label: m.label,
+        hint: m.hint,
+      }))
+    }
     return []
-  }, [currentStage, producerCast, producerBackgrounds, artistCharacters, artistWorlds])
+  }, [
+    currentStage,
+    producerCast,
+    producerBackgrounds,
+    artistCharacters,
+    artistWorlds,
+    writerManifest,
+    writerShots,
+  ])
   const [input, setInput] = useState('')
   // 위/아래 화살표로 호출할 전송 메시지 히스토리(유저 발화만, 오래된→최신).
   const userHistory = useMemo(

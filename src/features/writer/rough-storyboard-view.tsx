@@ -20,6 +20,7 @@ import { Slider } from '@/components/ui/slider'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { SceneEditDialog } from '@/features/writer/scene-edit-dialog'
+import { WriterHeader } from '@/features/writer/writer-header'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -195,6 +196,57 @@ export function RoughStoryboardView() {
   const generatingCount = Object.values(panelJobs).filter(
     (j) => j.status === 'generating',
   ).length
+  const headerDescription = '러프 스토리보드 previz — 카드를 클릭하면 수정·재생성할 수 있어요'
+  const storyboardActions = hasShots ? (
+    <>
+      {/* 축척 — 가로 열 수 조절 (Ctrl+wheel 로도 가능) */}
+      <div className="flex items-center gap-1.5">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7 hover-red-beam"
+          aria-label="축소 (열 늘리기)"
+          onClick={() => setZoomLevel((z) => Math.max(1, z - 1))}
+        >
+          <ZoomOut className="size-4" />
+        </Button>
+        <Slider
+          className="w-24"
+          min={1}
+          max={6}
+          step={1}
+          value={[zoomLevel]}
+          onValueChange={([v]) => setZoomLevel(v)}
+          aria-label="러프보드 축척"
+        />
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7 hover-red-beam"
+          aria-label="확대 (열 줄이기)"
+          onClick={() => setZoomLevel((z) => Math.min(6, z + 1))}
+        >
+          <ZoomIn className="size-4" />
+        </Button>
+      </div>
+      {generatingCount > 0 && (
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" />
+          패널 {generatingCount}개 생성 중
+        </span>
+      )}
+      {missingIds.length > 0 && generatingCount === 0 && (
+        <Button size="sm" variant="secondary" className="hover-red-beam" onClick={() => void generate()}>
+          <RefreshCw className="size-3.5" />
+          누락 패널 {missingIds.length}개 생성
+        </Button>
+      )}
+      <Button size="sm" variant="outline" className="hover-red-beam" onClick={() => void addScene()}>
+        <Plus className="size-3.5" />
+        씬 추가
+      </Button>
+    </>
+  ) : null
 
   // 진입 자동 생성: 샷이 로드됐고 파이프라인이 돌고 있지 않을 때, 누락 패널만 1회.
   useEffect(() => {
@@ -286,19 +338,22 @@ export function RoughStoryboardView() {
       ? Math.max(0, Math.floor((nowMs - Date.parse(status.last_timestamp)) / 1000))
       : null
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" aria-busy="true" />
-        <p className="text-base font-medium">Writer가 스토리와 연출을 설계하는 중…</p>
-        <p className="text-sm text-muted-foreground">
-          <span className="font-mono tabular-nums">{status?.progress_percent ?? 0}%</span>
-          {status?.current_stage ? ` · ${status.current_stage}` : ''}
-          {stageElapsedSec != null ? (
-            <span className="font-mono tabular-nums"> · {stageElapsedSec}s 진행 중</span>
-          ) : null}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          샷 설계·검증 같은 복잡한 단계는 1~2분 걸릴 수 있어요 — 멈춘 게 아니라 진행 중입니다.
-        </p>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <WriterHeader description={headerDescription} />
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" aria-busy="true" />
+          <p className="text-base font-medium">Writer가 스토리와 연출을 설계하는 중…</p>
+          <p className="text-sm text-muted-foreground">
+            <span className="font-mono tabular-nums">{status?.progress_percent ?? 0}%</span>
+            {status?.current_stage ? ` · ${status.current_stage}` : ''}
+            {stageElapsedSec != null ? (
+              <span className="font-mono tabular-nums"> · {stageElapsedSec}s 진행 중</span>
+            ) : null}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            샷 설계·검증 같은 복잡한 단계는 1~2분 걸릴 수 있어요 — 멈춘 게 아니라 진행 중입니다.
+          </p>
+        </div>
       </div>
     )
   }
@@ -306,14 +361,17 @@ export function RoughStoryboardView() {
   // ── 빈 상태 (파이프라인 미실행 + 산출물 없음) ───────────────────────────
   if (!hasShots) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
-        <ImageIcon className="size-12 text-muted-foreground" />
-        <p className="text-base font-medium">아직 생성된 씬·샷이 없어요</p>
-        <p className="text-sm text-muted-foreground">
-          {status?.pipeline_failed
-            ? 'Writer 실행이 실패했어요. Producer에서 다시 실행해주세요.'
-            : 'Producer에서 스토리를 핸드오프하면 씬·샷이 생성됩니다.'}
-        </p>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <WriterHeader description={headerDescription} />
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
+          <ImageIcon className="size-12 text-muted-foreground" />
+          <p className="text-base font-medium">아직 생성된 씬·샷이 없어요</p>
+          <p className="text-sm text-muted-foreground">
+            {status?.pipeline_failed
+              ? 'Writer 실행이 실패했어요. Producer에서 다시 실행해주세요.'
+              : 'Producer에서 스토리를 핸드오프하면 씬·샷이 생성됩니다.'}
+          </p>
+        </div>
       </div>
     )
   }
@@ -325,60 +383,7 @@ export function RoughStoryboardView() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-6">
-        <h1 className="text-xl font-semibold">러프 스토리보드</h1>
-        <p className="text-xs text-muted-foreground">
-          연출 확인용 previz — 카드를 클릭하면 수정·재생성할 수 있어요
-        </p>
-        <div className="ml-auto flex items-center gap-2">
-          {/* 축척 — 가로 열 수 조절 (Ctrl+wheel 로도 가능) */}
-          <div className="flex items-center gap-1.5">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-7 hover-red-beam"
-              aria-label="축소 (열 늘리기)"
-              onClick={() => setZoomLevel((z) => Math.max(1, z - 1))}
-            >
-              <ZoomOut className="size-4" />
-            </Button>
-            <Slider
-              className="w-24"
-              min={1}
-              max={6}
-              step={1}
-              value={[zoomLevel]}
-              onValueChange={([v]) => setZoomLevel(v)}
-              aria-label="러프보드 축척"
-            />
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-7 hover-red-beam"
-              aria-label="확대 (열 줄이기)"
-              onClick={() => setZoomLevel((z) => Math.min(6, z + 1))}
-            >
-              <ZoomIn className="size-4" />
-            </Button>
-          </div>
-          {generatingCount > 0 && (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" />
-              패널 {generatingCount}개 생성 중
-            </span>
-          )}
-          {missingIds.length > 0 && generatingCount === 0 && (
-            <Button size="sm" variant="secondary" className="hover-red-beam" onClick={() => void generate()}>
-              <RefreshCw className="size-3.5" />
-              누락 패널 {missingIds.length}개 생성
-            </Button>
-          )}
-          <Button size="sm" variant="outline" className="hover-red-beam" onClick={() => void addScene()}>
-            <Plus className="size-3.5" />
-            씬 추가
-          </Button>
-        </div>
-      </div>
+      <WriterHeader description={headerDescription} actions={storyboardActions} />
 
       <ScrollArea className="min-h-0 flex-1">
         <div

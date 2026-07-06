@@ -7,10 +7,7 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { llmChat } from '@/lib/llm'
 import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
-
-const SHOT_TYPES = new Set([
-  'ECU', 'CU', 'MCU', 'MS', 'MFS', 'FS', 'WS', 'EWS', 'OTS', 'POV', 'TRACK', '2S',
-])
+import { sanitizeLineRefs, validateWriterUpdates } from '@/lib/writer-chat-updates'
 
 const WRITER_CHAT_SYSTEM = `You are the Writers' Room assistant in an AI video production pipeline called "The Set."
 The user is reviewing the rough storyboard (pre-concept previz) of a story already broken into Scenes and Shots.
@@ -23,9 +20,10 @@ For pure discussion or questions, omit the JSON block entirely.
 
 <model>
 - Scene (씬, 서사 컨테이너): location, timeOfDay, mood, narrativeSummary, charactersPresent[], estimatedDurationSeconds
-- Shot (샷, 한 컷): belongs to a scene. shotType, actionDescription, characters[], durationSeconds
+- Shot (샷, 한 컷): belongs to a scene. shotType, actionDescription, characters[], durationSeconds, dialogueLines[]
+- Dialogue line (대사): {characterId, text}. characterId must be one of the character IDs shown in context.
 - shotType ∈ ECU,CU,MCU,MS,MFS,FS,WS,EWS,OTS,POV,TRACK,2S (촬영 사이즈, 클로즈업→와이드)
-- characters / charactersPresent use the character IDs shown in the context (e.g. "char", "char_2") — never invent new IDs.
+- characters / charactersPresent / dialogueLines[].characterId use the character IDs from the "## 등장인물" roster. In context speakers appear as characterId(name) — always emit the characterId (the part before the parenthesis), never the name. Never invent new IDs.
 </model>
 
 <actions>
@@ -35,7 +33,7 @@ Non-destructive:
 1. {"type":"addScene","location":"...","timeOfDay":"...","mood":"...","narrativeSummary":"...","charactersPresent":["char"],"tempId":"S1"}
 2. {"type":"addShot","sceneId":"<sceneId|tempId>","shotType":"MS","actionDescription":"...","characters":["char"],"durationSeconds":5,"tempId":"H1"}
 3. {"type":"updateScene","id":"<sceneId>","patch":{"location":"...","timeOfDay":"...","mood":"...","narrativeSummary":"...","charactersPresent":["char"],"estimatedDurationSeconds":30}}
-4. {"type":"updateShot","id":"<shotId>","patch":{"shotType":"CU","actionDescription":"...","characters":["char"],"durationSeconds":4}}
+4. {"type":"updateShot","id":"<shotId>","patch":{"shotType":"CU","actionDescription":"...","characters":["char"],"durationSeconds":4,"dialogueLines":[{"characterId":"char","text":"..."}]}}
 
 Destructive — emit ONLY when the user clearly asks to remove something:
 5. {"type":"deleteShot","id":"<shotId>"}
@@ -43,6 +41,22 @@ Destructive — emit ONLY when the user clearly asks to remove something:
 
 Only include patch fields you are actually changing. Omit unknown fields rather than guessing.
 </actions>
+
+<script-lines>
+The context may contain script line labels like [L45], and the request may also include a line reference table.
+L-number resolution priority:
+1. Use "## 라인 참조 해석표" first. It is the send-time snapshot and overrides [L#] markers.
+2. If the table is absent, fall back to the [L#] markers in the context.
+If the user asks to mutate an L-number that is not in the line reference table when a table is present, do not guess; ask which line they mean.
+If neither the table nor the context has that L-number, do not mutate anything; ask which line they mean.
+
+Ref mapping:
+- sc_01.heading means a scene heading. Use updateScene for location, timeOfDay, mood, narrativeSummary, charactersPresent, or estimatedDurationSeconds.
+- sh_01_03.action means a shot action line. Use updateShot.patch.actionDescription for action/staging wording.
+- sh_01_03.dialogue[1] means one dialogue line in that shot. To change dialogue, submit updateShot.patch.dialogueLines as the shot's complete dialogueLines array, with every retained line included.
+
+대사 수를 줄이는 수정은 사용자 확인을 거친다. 삭제 의도가 아니면 전체 dialogueLines 배열을 빠짐없이 재제출하라.
+</script-lines>
 
 <format>
 Reply text in 1-3 sentences (Korean if the user wrote Korean), then — only if mutating — a single JSON block as the LAST element:
@@ -74,6 +88,19 @@ Reply text in 1-3 sentences (Korean if the user wrote Korean), then — only if 
 \`\`\`</assistant>
 </example>
 <example>
+<user>L3 대사를 "여기야, 분명해."로 바꿔줘</user>
+<assistant>L3의 대사를 더 확신하는 톤으로 바꿨어요.
+
+\`\`\`json
+{"updates":[
+  {"type":"updateShot","id":"sh_01_01","patch":{"dialogueLines":[
+    {"characterId":"char","text":"여기야, 분명해."},
+    {"characterId":"char_2","text":"조심해."}
+  ]}}
+]}
+\`\`\`</assistant>
+</example>
+<example>
 <user>이 컷 구도가 왜 와이드샷이야?</user>
 <assistant>와이드샷은 두 인물의 거리와 공간의 규모를 한 프레임에 담아 대치의 긴장을 보여주려는 의도예요. 더 가까운 사이즈로 바꾸고 싶으면 말씀해 주세요.</assistant>
 </example>
@@ -97,6 +124,15 @@ const STAGE_BADGE: Record<string, string> = {
   editor: 'P5',
 }
 
+function formatLineRefTable(rawLineRefs: unknown): string {
+  const lineRefs = sanitizeLineRefs(rawLineRefs)
+  if (lineRefs.length === 0) return ''
+  return [
+    '## 라인 참조 해석표 (전송 시점 스냅샷 — 이 표가 [L#] 마커보다 우선한다)',
+    ...lineRefs.map((lineRef) => `${lineRef.label} → ${lineRef.ref}`),
+  ].join('\n')
+}
+
 function normalizeHistory(history: unknown): ChatMessage[] {
   if (!Array.isArray(history)) return []
   return (history as IncomingHistoryItem[]).map((m) => {
@@ -104,109 +140,6 @@ function normalizeHistory(history: unknown): ChatMessage[] {
     const prefix = badge ? `[${badge}] ` : ''
     return { role: m.role, content: `${prefix}${m.content}` }
   })
-}
-
-function asString(x: unknown): string | undefined {
-  return typeof x === 'string' && x.trim() ? x : undefined
-}
-function asObj(x: unknown): Record<string, unknown> | null {
-  return x && typeof x === 'object' ? (x as Record<string, unknown>) : null
-}
-function asStringArray(x: unknown): string[] | undefined {
-  if (!Array.isArray(x)) return undefined
-  const out = x.filter((v): v is string => typeof v === 'string')
-  return out.length > 0 ? out : undefined
-}
-function asInt(x: unknown, min: number, max: number): number | undefined {
-  if (typeof x !== 'number' || !Number.isFinite(x)) return undefined
-  return Math.max(min, Math.min(max, Math.round(x)))
-}
-
-const VALID_UPDATE_TYPES = new Set([
-  'addScene',
-  'addShot',
-  'updateScene',
-  'updateShot',
-  'deleteShot',
-  'deleteScene',
-])
-
-// scene 자유 텍스트/배열 필드 (addScene 와 updateScene.patch 공용)
-function pickSceneFields(src: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  for (const k of ['location', 'timeOfDay', 'mood', 'narrativeSummary', 'originalTextQuote']) {
-    const v = asString(src[k])
-    if (v !== undefined) out[k] = v
-  }
-  const cp = asStringArray(src.charactersPresent)
-  if (cp) out.charactersPresent = cp
-  const dur = asInt(src.estimatedDurationSeconds, 1, 600)
-  if (dur !== undefined) out.estimatedDurationSeconds = dur
-  return out
-}
-
-// shot 필드 (addShot 와 updateShot.patch 공용 — sceneId/tempId 제외)
-function pickShotFields(src: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  if (typeof src.shotType === 'string' && SHOT_TYPES.has(src.shotType))
-    out.shotType = src.shotType
-  const ad = asString(src.actionDescription)
-  if (ad !== undefined) out.actionDescription = ad
-  const ch = asStringArray(src.characters)
-  if (ch) out.characters = ch
-  const dur = asInt(src.durationSeconds, 1, 60)
-  if (dur !== undefined) out.durationSeconds = dur
-  return out
-}
-
-function validateWriterUpdates(raw: unknown[]): unknown[] {
-  const out: unknown[] = []
-  for (const u of raw) {
-    const rec = asObj(u)
-    if (!rec || typeof rec.type !== 'string' || !VALID_UPDATE_TYPES.has(rec.type))
-      continue
-
-    switch (rec.type) {
-      case 'addScene': {
-        out.push({
-          type: 'addScene',
-          ...pickSceneFields(rec),
-          ...(asString(rec.tempId) ? { tempId: rec.tempId } : {}),
-        })
-        break
-      }
-      case 'addShot': {
-        if (!asString(rec.sceneId)) break
-        out.push({
-          type: 'addShot',
-          sceneId: rec.sceneId,
-          ...pickShotFields(rec),
-          ...(asString(rec.tempId) ? { tempId: rec.tempId } : {}),
-        })
-        break
-      }
-      case 'updateScene': {
-        if (!asString(rec.id)) break
-        const patch = pickSceneFields(asObj(rec.patch) ?? {})
-        if (Object.keys(patch).length > 0)
-          out.push({ type: 'updateScene', id: rec.id, patch })
-        break
-      }
-      case 'updateShot': {
-        if (!asString(rec.id)) break
-        const patch = pickShotFields(asObj(rec.patch) ?? {})
-        if (Object.keys(patch).length > 0)
-          out.push({ type: 'updateShot', id: rec.id, patch })
-        break
-      }
-      case 'deleteShot':
-      case 'deleteScene': {
-        if (asString(rec.id)) out.push({ type: rec.type, id: rec.id })
-        break
-      }
-    }
-  }
-  return out
 }
 
 function parseAgenticResponse(text: string): { reply: string; updates: unknown[] } {
@@ -227,7 +160,7 @@ export async function POST(req: Request) {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { message, history, writerContext } = await req.json()
+    const { message, history, writerContext, lineRefs } = await req.json()
     if (!message || typeof message !== 'string')
       return NextResponse.json({ error: 'message is required' }, { status: 400 })
 
@@ -235,10 +168,11 @@ export async function POST(req: Request) {
     const crossStageNote = normalizedHistory.some((m) => /^\[P[1-5]\]/.test(m.content))
       ? `\n\nNote: prior messages from other stages are prefixed with [P1]-[P5]. Reference for continuity.`
       : ''
-    const ctx =
-      typeof writerContext === 'string' && writerContext.trim()
-        ? `${writerContext}\n\n---\n\n`
-        : ''
+    const contextSections = [
+      formatLineRefTable(lineRefs),
+      typeof writerContext === 'string' && writerContext.trim() ? writerContext : '',
+    ].filter(Boolean)
+    const ctx = contextSections.length > 0 ? `${contextSections.join('\n\n')}\n\n---\n\n` : ''
 
     const text = await llmChat(
       WRITER_CHAT_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE,
