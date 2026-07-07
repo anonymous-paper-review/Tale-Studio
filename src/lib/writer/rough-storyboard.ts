@@ -1,7 +1,7 @@
 // 러프 스토리보드(pre-concept previz) 프롬프트 빌더 — writer 탭.
 //
 // 컨셉 아트 이전에 샷의 연출(구도·포즈·배치)만 확인하는 패널:
-// 인물은 전부 목각 인형/스틱 피겨, 흑백 연필 스케치, 카메라 POV 고정.
+// 인물은 느슨한 제스처 스케치(연출·블로킹 우선), 흑백 연필 스케치, 카메라 POV 고정.
 // 템플릿 원본: 사용자 제공 previz 프롬프트 (2026-06-12).
 //
 // 입력 2계층 (증발 우회 — dev/PIPELINE_IO_MAP 참조):
@@ -82,13 +82,12 @@ function conciseEnvDescription(desc: string | null | undefined): string {
 }
 
 /**
- * 러프 보드 공통 네거티브 — flux klein 이 monochrome/featureless 지시를 자주 위반하므로 명시 차단(2026-06-18).
- *   색·채색 / 얼굴·인물 디테일 / 갑옷 / 프레임 분할(이중 패널)·테두리 / 텍스트 / 유령 큐브 / 잉여 인물·크롭.
+ * 러프 보드 공통 네거티브 — flux klein 이 monochrome 지시를 자주 위반하므로 명시 차단.
+ *   색·채색·포토리얼 렌더 / 프레임 분할(이중 패널)·테두리 / 텍스트 / 유령 큐브 / 잉여 인물·크롭.
+ *   (얼굴·인물 특징 차단어는 제거 — 인물을 러프 스케치로 그리면 자연히 단순화되므로 특징을 억지로 지우지 않음, 2026-07-07)
  */
 export const ROUGH_STORYBOARD_NEGATIVE_PROMPT = [
   'color', 'colored', 'colored wash', 'red wash', 'orange sky', 'vibrant', 'saturated', 'cinematic render', 'painterly', 'digital painting',
-  'detailed face', 'facial features', 'eyes', 'nose', 'mouth', 'eyebrows', 'beard', 'hair', 'ears', 'portrait', 'realistic human face',
-  'helmet face', 'ornate armor', 'armor detail', 'rendered armor',
   'split screen', 'panel border', 'multiple panels', 'frame within frame', 'comic grid', 'gutter', 'horizontal divider line',
   'text', 'letters', 'caption', 'label', 'watermark', 'signature',
   'cube', 'box', 'floating geometric object',
@@ -173,15 +172,12 @@ const PANEL_HEADER = `Rough storyboard previsualization panel, single frame, cam
 //   single uninterrupted panel → 이중 패널/프레임-인-프레임(가로 거터) 방지.
 const PANEL_STYLE_BASE = `Style: loose rough monochrome pencil-sketch, strictly black and white, grayscale only, no color, quick gestural lines, gray shading, ample negative space, unfinished rough board. Single uninterrupted full-bleed panel, no internal frames or dividing lines.`
 
-// "rough stick figure" 제거(featureless wooden mannequin 으로 통일), "no face/no identity"→"anonymous"(긍정).
-//   2026-06-18: smooth blank head 명시 추가 — klein 이 인물에 얼굴을 그리는 경향 억제.
-const MANNEQUIN_RULE = `Figures: draw every character as a featureless wooden artist mannequin with a smooth blank rounded head and no face — anonymous, pose, gesture, and position only.`
-// 클로즈업(ECU/CU/MCU)은 머리가 프레임을 채워 klein 이 사람 얼굴을 그리려는 경향이 특히 강함(2026-06-18 관측) →
-//   머리를 "빈 목구"로 못박는 추가 지시. 와이드/풀샷은 머리가 작아 불필요(샷 사이즈로 조건부 주입).
-const CLOSEUP_HEAD_RULE = `The head is a smooth featureless wooden ball with no face whatsoever — no eyes, no nose, no mouth, no eyebrows, no hair.`
-const CLOSEUP_SIZES = new Set(['ECU', 'CU', 'MCU'])
+// 인물 = 느슨한 제스처 스케치(연출·블로킹 우선). 특징을 억지로 지우지 않는다 — 러프하게 그리면 자연히
+//   디테일이 적어짐(2026-07-07, 사용자 레퍼런스 반영). klein 은 긍정·직설어에 강하므로 긍정형 단어 위주.
+//   (옛 featureless wooden mannequin / 클로즈업 blank-head 억제 규칙은 폐기 — 특징 제거 프롬프트 미사용.)
+const FIGURE_RULE = `Figures: loose quick gestural sketch of each character — rough contour lines, simplified forms, emphasis on pose, gesture, weight, and body position over detail; rough and unfinished.`
 
-// 인물 0인 샷(설정/환경샷) 전용 — MANNEQUIN_RULE 대신. 인물 토큰을 아예 빼고 "빈 풍경만"을 긍정형 직설 지시
+// 인물 0인 샷(설정/환경샷) 전용 — FIGURE_RULE 대신. 인물 토큰을 아예 빼고 "빈 풍경만"을 긍정형 직설 지시
 //   (klein 은 부정문이 약해 "no people" 류는 비효율 → 긍정문 + 인물 명령어 미포함이 robust).
 const ENV_ONLY_RULE = `Environment-only shot: draw the empty landscape and setting above — terrain, sky, structures, and objects.`
 
@@ -250,11 +246,10 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
       }.`
     : ''
 
-  // 인물(blocking)이 있을 때만 mannequin 규칙 — 비면 ENV_ONLY_RULE 로 교체(빈 풍경에 인형 생성 방지).
+  // 인물(blocking)이 있을 때만 figure 규칙 — 비면 ENV_ONLY_RULE 로 교체(빈 풍경에 인물 생성 방지).
   // 무자막: prop 이름을 프롬프트에 넣으면 모델이 그 텍스트를 라벨로 그려 넣음 → 이름 빼고 "단순 도형"으로만.
-  const headRule = CLOSEUP_SIZES.has(sizeCode) ? ` ${CLOSEUP_HEAD_RULE}` : ''
   const figureBlock = blocking.length
-    ? `${MANNEQUIN_RULE}${headRule} ${blocking.join(' ')} Props as simple lines or geometric shapes.`
+    ? `${FIGURE_RULE} ${blocking.join(' ')} Props as simple lines or geometric shapes.`
     : `${ENV_ONLY_RULE} Key objects as simple lines or geometric shapes.`
 
   return joinPanel([
@@ -299,8 +294,8 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
 
   const hasChars = input.characterNames.length > 0
   // 액션문은 인물을 함의한다("용사가 …"). characters 가 비어도 action 을 내보내면 그 인물이 그려지는데,
-  //   ENV_ONLY(빈 풍경, 마네킹 규칙 없음) 경로로 가면 "Action: 용사가 …"가 무제약 실사 인물로 그려진다
-  //   (수동 추가 샷의 목각인형 미출력 버그, 2026-06-26). → 액션을 내보내면 인물 유무와 무관하게 마네킹 규칙 적용.
+  //   ENV_ONLY(빈 풍경, figure 규칙 없음) 경로로 가면 "Action: 용사가 …"가 무제약 실사 인물로 그려진다
+  //   (수동 추가 샷의 figure 미출력 버그, 2026-06-26). → 액션을 내보내면 인물 유무와 무관하게 figure 규칙 적용.
   const emitAction =
     FALLBACK_EMIT_ACTION && !input.safeMode && !!input.actionDescription?.trim()
   const drawsFigures = hasChars || emitAction
@@ -312,17 +307,14 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
       ? 'anonymous figure(s)'
       : 'empty landscape'
 
-  const headRule = CLOSEUP_SIZES.has(String(input.shotType ?? '').toUpperCase())
-    ? ` ${CLOSEUP_HEAD_RULE}`
-    : ''
-  // 인물(명시 or 액션 함의)이 있으면 mannequin 규칙 — 완전히 비면 ENV_ONLY_RULE.
+  // 인물(명시 or 액션 함의)이 있으면 figure 규칙 — 완전히 비면 ENV_ONLY_RULE.
   const poseLine = hasChars
     ? input.safeMode
       ? 'Neutral standing poses, composed naturally.'
       : 'Place and pose them naturally in frame.'
-    : 'Pose the mannequins to depict the action above.'
+    : 'Sketch the figures loosely to depict the action above.'
   const figureBlock = drawsFigures
-    ? `${MANNEQUIN_RULE}${headRule} ${poseLine} Props as simple lines or geometric shapes.`
+    ? `${FIGURE_RULE} ${poseLine} Props as simple lines or geometric shapes.`
     : `${ENV_ONLY_RULE} Key objects as simple lines or geometric shapes.`
   const focal = input.characterNames[0]
     ? `${input.characterNames[0]} and the main action`
