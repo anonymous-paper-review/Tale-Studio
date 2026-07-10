@@ -34,6 +34,13 @@ const UUID_RE =
 const DEFAULT_CAMERA = { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }
 const DEFAULT_LIGHTING = { position: 'front', brightness: 50, colorTemp: 5000 }
 
+// 샷 길이 상한 — 파이프라인이 과다 산정한 길이(예: 18s)의 백스톱(#9, 2026-07-09). 가이드는 2~8초
+//   (decoupage/v4 프롬프트), 이 클램프는 LLM 초과분만 막는다. 수동 편집은 상세 팝업에서 최대 60s 허용.
+const MAX_SHOT_SECONDS = 10
+function clampShotSeconds(s: number | null | undefined): number {
+  return Math.min(MAX_SHOT_SECONDS, Math.max(1, Math.round(s ?? 5)))
+}
+
 const SHOT_TYPES: ShotType[] = ['ECU', 'CU', 'MCU', 'MS', 'MFS', 'FS', 'WS', 'EWS', 'OTS', 'POV', 'TRACK', '2S']
 function normShotType(input: unknown): ShotType {
   const s = String(input ?? '').toUpperCase()
@@ -343,7 +350,7 @@ export async function persistShotsToDb(
         actionNative: it.S?.character_action ?? '',
         chars: Array.from(new Set(chars)),
         dialogue: it.S?.dialogue,
-        duration: it.duration_seconds ?? 5,
+        duration: clampShotSeconds(it.duration_seconds), // #9 페이싱 상한
         i,
       }
     })
@@ -395,7 +402,8 @@ export async function persistShotsToDb(
     const secondsByScene = new Map<string, number>()
     for (const it of shotSequence.shots) {
       const sid = writerSceneIdToMain(it.S.scene_id)
-      secondsByScene.set(sid, (secondsByScene.get(sid) ?? 0) + (it.duration_seconds ?? 5))
+      // 클램프된 shot 길이 합 = insert 의 duration 과 일치(#9).
+      secondsByScene.set(sid, (secondsByScene.get(sid) ?? 0) + clampShotSeconds(it.duration_seconds))
     }
     await Promise.all(
       [...secondsByScene].map(([sceneId, sum]) =>

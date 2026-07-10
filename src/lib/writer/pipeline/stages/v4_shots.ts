@@ -112,7 +112,7 @@ V4는 3분할:
 ${disciplineSection}
 
 샷 분배 원칙:
-- 1 샷 = 5~15초${compactMode ? '' : ' (V3.avg_shot_seconds 기준 ±2)'}
+- 1 샷 = 2~8초 (짧고 스냅있게)${compactMode ? '' : ' (V3.avg_shot_seconds 기준 ±2)'}. 긴 침묵 등 예외만 최대 10초.
 - duration은 story_beat의 무게에 따라 가변 (긴 침묵 = 길게, 빠른 액션 = 짧게)
 
 V4c (Dynamic) 작성 규칙 (가장 중요):

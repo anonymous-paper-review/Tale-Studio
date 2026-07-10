@@ -65,7 +65,6 @@ export function ShotDetailDialog({
   const shot = useWriterStore((s) => s.shots.find((x) => x.shotId === shotId))
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const updateShot = useWriterStore((s) => s.updateShot)
-  const updateDialogueLine = useWriterStore((s) => s.updateDialogueLine)
   const deleteShot = useWriterStore((s) => s.deleteShot)
   // updateShot 디바운스(500ms)가 DB에 닿기 전에 재생성 라우트가 행을 읽는 레이스 방지 대기
   const [flushing, setFlushing] = useState(false)
@@ -204,26 +203,7 @@ export function ShotDetailDialog({
             </p>
           </div>
 
-          {shot.dialogueLines.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">대사</label>
-              {shot.dialogueLines.map((dl, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="w-24 shrink-0 truncate font-mono text-xs text-muted-foreground">
-                    {nameOf(dl.characterId)}
-                  </span>
-                  <HoverBeam className="min-w-0 flex-1">
-                    <Input
-                      value={dl.text}
-                      onChange={(e) =>
-                        updateDialogueLine(shot.shotId, i, { text: e.target.value })
-                      }
-                    />
-                  </HoverBeam>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* #8: 대사 표시 제거 — 파이프라인이 대사 슬롯에 상황 요약을 채워 실제 대사가 아님(2026-07-09). */}
         </div>
 
         <DialogFooter>

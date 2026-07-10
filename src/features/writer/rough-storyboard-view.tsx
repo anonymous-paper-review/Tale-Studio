@@ -14,12 +14,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertCircle, ImageIcon, Loader2, Plus, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Slider } from '@/components/ui/slider'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
-import { SceneEditDialog } from '@/features/writer/scene-edit-dialog'
 import { WriterHeader } from '@/features/writer/writer-header'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
@@ -35,6 +40,44 @@ type PanelJob = { status: 'generating' | 'failed'; error?: string }
 function withCacheBust(url: string, v?: number): string {
   if (!v) return url
   return `${url}${url.includes('?') ? '&' : '?'}v=${v}`
+}
+
+// 표시용 샷 이름 — DB id(sh_02_13 / shot_5)를 사람이 읽는 라벨로. 언더바·개발용 접두사 제거, 단어 첫 글자 대문자. (#6)
+//   id 자체(DB 키)는 불변 — 표시만 변환.
+function formatShotName(shotId: string): string {
+  const m = shotId.match(/^sh_(\d+)_(\d+)$/)
+  if (m) return `Scene ${Number(m[1])} · Shot ${Number(m[2])}`
+  const m2 = shotId.match(/^shot_?(\d+)$/i)
+  if (m2) return `Shot ${Number(m2[1])}`
+  return shotId.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
+}
+
+// 표시용 씬 이름 — 샷과 동일 규칙(sc_02 → "Scene 2"). (#6 일관성)
+function formatSceneName(sceneId: string): string {
+  const m = sceneId.match(/^sc_?(\d+)$/i)
+  if (m) return `Scene ${Number(m[1])}`
+  return sceneId.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
+}
+
+// 샷 타입(MS/CU/EWS…) hover 설명 — 카드의 샷 타입 배지 위에 표시. (#7)
+const SHOT_TYPE_DESCRIPTIONS: Record<string, string> = {
+  ECU: 'Extreme close-up — 눈·손처럼 아주 좁은 부분만',
+  CU: 'Close-up — 얼굴 위주',
+  MCU: 'Medium close-up — 가슴 위',
+  MS: 'Medium shot — 허리 위',
+  MFS: 'Medium full shot — 무릎 위',
+  FS: 'Full shot — 전신',
+  WS: 'Wide shot — 인물과 주변 공간',
+  EWS: 'Extreme wide shot — 광활한 배경, 인물은 작게',
+  OTS: 'Over-the-shoulder — 어깨 너머로 상대를',
+  POV: 'Point of view — 인물의 시점',
+  TRACK: 'Tracking shot — 피사체를 따라 이동',
+  '2S': 'Two shot — 인물 둘을 한 프레임에',
+}
+
+// 샷에 생성할 "정보"가 있는가 — 액션(스토리)이 비면 러프 패널을 만들 근거가 없음. (#5)
+function shotHasInfo(actionDescription?: string | null): boolean {
+  return !!actionDescription?.trim()
 }
 
 export function RoughStoryboardView() {
@@ -54,11 +97,20 @@ export function RoughStoryboardView() {
   const [panelJobs, setPanelJobs] = useState<Record<string, PanelJob>>({})
   const [overrides, setOverrides] = useState<Record<string, RoughStoryboardImage>>({})
   const [detailShotId, setDetailShotId] = useState<string | null>(null)
-  const [editSceneId, setEditSceneId] = useState<string | null>(null)
   // 진행 중 단계 경과시간 라이브 표시(긴 단계에서 "멈춤" 오인 방지) — 1s 틱.
   const [nowMs, setNowMs] = useState(0)
   // 보드 축척: zoomLevel 1(축소·6열)~6(확대·1열). 가로 열 수 cols = 7 - zoomLevel. 기본 4 → 3열(기존 동작).
+  //   탭 전환(리마운트)에도 유지 — localStorage 영속(#4, 2026-07-09).
   const [zoomLevel, setZoomLevel] = useState(4)
+  useEffect(() => {
+    const saved = Number(localStorage.getItem('writer:zoomLevel'))
+    if (saved >= 1 && saved <= 6) setZoomLevel(saved)
+  }, [])
+  useEffect(() => {
+    try {
+      localStorage.setItem('writer:zoomLevel', String(zoomLevel))
+    } catch {}
+  }, [zoomLevel])
   const boardRef = useRef<HTMLDivElement>(null)
   const autoTriggeredRef = useRef(false)
   const reloadedAfterCompleteRef = useRef(false)
@@ -190,8 +242,9 @@ export function RoughStoryboardView() {
   const hasShots = shots.length > 0
   const panelOf = (shot: Shot): RoughStoryboardImage | null =>
     overrides[shot.shotId] ?? shot.roughStoryboard ?? null
+  // #5: 정보(액션)가 없는 샷은 자동 생성 대상에서 제외 — 근거 없는 빈 패널 생성 방지.
   const missingIds = shots
-    .filter((s) => !panelOf(s) && !panelJobs[s.shotId])
+    .filter((s) => !panelOf(s) && !panelJobs[s.shotId] && shotHasInfo(s.actionDescription))
     .map((s) => s.shotId)
   const generatingCount = Object.values(panelJobs).filter(
     (j) => j.status === 'generating',
@@ -398,13 +451,10 @@ export function RoughStoryboardView() {
                 {/* 씬 구분선 — id 만 노출(사용자 결정 2026-06-12). 장소·분위기는 편집 팝업에서.
                     CRUD(2026-06-24): id 클릭/편집 → 씬 상세, 샷 추가 버튼. 빈 씬도 표시. */}
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditSceneId(scene.sceneId)}
-                    className="font-mono text-xs text-muted-foreground hover:text-foreground hover:underline hover-red-beam"
-                  >
-                    {scene.sceneId}
-                  </button>
+                  {/* #2: 씬 이름 클릭 편집 제거 — 비상호작용 라벨(편집 버튼도 삭제). */}
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {formatSceneName(scene.sceneId)}
+                  </span>
                   <div className="h-px flex-1 bg-border" />
                   <Button
                     size="sm"
@@ -414,14 +464,6 @@ export function RoughStoryboardView() {
                   >
                     <Plus className="size-3.5" />
                     샷 추가
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-muted-foreground hover-red-beam"
-                    onClick={() => setEditSceneId(scene.sceneId)}
-                  >
-                    편집
                   </Button>
                 </div>
 
@@ -454,7 +496,7 @@ export function RoughStoryboardView() {
                             openDetail(shot.shotId)
                           }
                         }}
-                        className="group cursor-pointer overflow-hidden rounded-xl border bg-card transition-colors duration-100 hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
+                        className="group cursor-pointer overflow-hidden rounded-xl border bg-card transition-colors duration-100 hover:bg-accent/40 hover-red-beam focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
                       >
                         <div className="relative aspect-video bg-muted">
                           {panel?.url && job?.status !== 'generating' ? (
@@ -503,32 +545,48 @@ export function RoughStoryboardView() {
                               </Button>
                             </div>
                           ) : (
-                            <div className="flex size-full flex-col items-center justify-center gap-2">
+                            <div className="flex size-full flex-col items-center justify-center gap-2 p-3 text-center">
                               <ImageIcon className="size-8 text-muted-foreground" />
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="hover-red-beam"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  // 사람의 명시적 클릭 → force(give-up 게이트 통과). 빈 패널엔 무해.
-                                  void generate([shot.shotId], true)
-                                }}
-                              >
-                                패널 생성
-                              </Button>
+                              {/* #5: 정보(액션) 없으면 생성 불가 — 카드 클릭해 스토리부터 입력하게 유도. */}
+                              {shotHasInfo(shot.actionDescription) ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="hover-red-beam"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    // 사람의 명시적 클릭 → force(give-up 게이트 통과).
+                                    void generate([shot.shotId], true)
+                                  }}
+                                >
+                                  패널 생성
+                                </Button>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">
+                                  스토리(액션)를 입력하면 생성할 수 있어요
+                                </p>
+                              )}
                             </div>
                           )}
                         </div>
 
                         <div className="space-y-2 p-4">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs text-muted-foreground">
-                              {shot.shotId}
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {formatShotName(shot.shotId)}
                             </span>
-                            <Badge variant="outline" className="text-xs">
-                              {shot.shotType}
-                            </Badge>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="cursor-help text-xs">
+                                    {shot.shotType}
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {SHOT_TYPE_DESCRIPTIONS[shot.shotType] ?? shot.shotType}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                             <span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground">
                               {shot.durationSeconds}s
                             </span>
@@ -536,20 +594,7 @@ export function RoughStoryboardView() {
                           <p className="line-clamp-3 text-sm leading-relaxed">
                             {shot.actionDescription}
                           </p>
-                          {shot.dialogueLines.length > 0 && (
-                            <div className="space-y-1 border-l-2 border-border pl-3">
-                              {shot.dialogueLines.map((dl, i) => (
-                                <p key={i} className="line-clamp-1 text-xs text-muted-foreground">
-                                  <span className="font-mono">
-                                    {sceneManifest?.characters.find(
-                                      (c) => c.characterId === dl.characterId,
-                                    )?.name ?? dl.characterId}
-                                  </span>{' '}
-                                  {dl.text}
-                                </p>
-                              ))}
-                            </div>
-                          )}
+                          {/* #8: 대사 표시 제거 — 파이프라인이 대사 슬롯에 상황 요약을 채워 실제 대사가 아님(2026-07-09). */}
                         </div>
                       </article>
                     )
@@ -571,13 +616,6 @@ export function RoughStoryboardView() {
           if (!open) setDetailShotId(null)
         }}
         onRegenerate={(id, hints) => void generate([id], true, false, hints)}
-      />
-
-      <SceneEditDialog
-        sceneId={editSceneId}
-        onOpenChange={(open) => {
-          if (!open) setEditSceneId(null)
-        }}
       />
     </div>
   )

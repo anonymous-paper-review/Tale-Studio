@@ -788,7 +788,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       //   재진입 시 기존(producer·writer-origin 무관) 행을 카드로 복원.
       const { data: chars } = await supabase
         .from('characters')
-        .select('id, character_id, name, role, entity_type, appearance, arc, motivation, origin')
+        .select('id, character_id, name, role, entity_type, appearance, appearance_native, arc, motivation, origin')
         .eq('project_id', projectId)
 
       // 배경은 locations 테이블이 단일 진실 (pull) — producer/writer/artist 공용.
@@ -809,7 +809,9 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             characterId: c.character_id as string,
             name: (c.name as string) ?? '',
             entityType: c.entity_type === 'object' ? 'object' : 'person',
-            appearance: (c.appearance as string) ?? '',
+            // 표시·편집은 유저 언어(appearance_native), 생성 base(EN)는 핸드오프 때 파생. draft 없는
+            //   opencast(writer-origin) 인물이 외모를 영어로 표시하던 버그(2026-07-09). producer 인물은 draft(한국어) 우선.
+            appearance: (c.appearance_native as string | null) ?? (c.appearance as string | null) ?? '',
             role: (c.role as string) ?? undefined,
             arc: (c.arc as CastArc) ?? undefined,
             motivation: (c.motivation as CastMotivation) ?? undefined,
