@@ -82,12 +82,14 @@ function conciseEnvDescription(desc: string | null | undefined): string {
 }
 
 /**
- * 러프 보드 공통 네거티브 — flux klein 이 monochrome 지시를 자주 위반하므로 명시 차단.
- *   색·채색·포토리얼 렌더 / 프레임 분할(이중 패널)·테두리 / 텍스트 / 유령 큐브 / 잉여 인물·크롭.
- *   (얼굴·인물 특징 차단어는 제거 — 인물을 러프 스케치로 그리면 자연히 단순화되므로 특징을 억지로 지우지 않음, 2026-07-07)
+ * 러프 보드 공통 네거티브 — flux klein 이 monochrome/featureless 지시를 자주 위반하므로 명시 차단.
+ *   색·채색·포토리얼 / 얼굴·인물 특징·의상(샷 간 일관성 위해 특징 억제, L4) / 프레임 분할·테두리 / 텍스트 / 유령 큐브 / 잉여 인물·크롭.
+ *   (2026-07-09: 샷마다 인물이 달라 보이는 이질감 → 특징 차단어 재장착. 인물은 동일 featureless 마네킹으로 통일 — L1.)
  */
 export const ROUGH_STORYBOARD_NEGATIVE_PROMPT = [
   'color', 'colored', 'colored wash', 'red wash', 'orange sky', 'vibrant', 'saturated', 'cinematic render', 'painterly', 'digital painting',
+  'detailed face', 'facial features', 'eyes', 'nose', 'mouth', 'eyebrows', 'beard', 'hair', 'ears', 'portrait', 'realistic human face',
+  'distinct clothing', 'costume detail', 'armor detail', 'varied body types', 'individual appearance', 'unique character design',
   'split screen', 'panel border', 'multiple panels', 'frame within frame', 'comic grid', 'gutter', 'horizontal divider line',
   'text', 'letters', 'caption', 'label', 'watermark', 'signature',
   'cube', 'box', 'floating geometric object',
@@ -172,10 +174,10 @@ const PANEL_HEADER = `Rough storyboard previsualization panel, single frame, cam
 //   single uninterrupted panel → 이중 패널/프레임-인-프레임(가로 거터) 방지.
 const PANEL_STYLE_BASE = `Style: loose rough monochrome pencil-sketch, strictly black and white, grayscale only, no color, quick gestural lines, gray shading, ample negative space, unfinished rough board. Single uninterrupted full-bleed panel, no internal frames or dividing lines.`
 
-// 인물 = 느슨한 제스처 스케치(연출·블로킹 우선). 특징을 억지로 지우지 않는다 — 러프하게 그리면 자연히
-//   디테일이 적어짐(2026-07-07, 사용자 레퍼런스 반영). klein 은 긍정·직설어에 강하므로 긍정형 단어 위주.
-//   (옛 featureless wooden mannequin / 클로즈업 blank-head 억제 규칙은 폐기 — 특징 제거 프롬프트 미사용.)
-const FIGURE_RULE = `Figures: loose quick gestural sketch of each character — rough contour lines, simplified forms, emphasis on pose, gesture, weight, and body position over detail; rough and unfinished.`
+// 인물 = 모든 샷·모든 인물이 "동일한 featureless 마네킹"(L1). 샷 간 이질감의 근본 원인은 패널마다 독립
+//   T2I 라 특징이 있으면 klein 이 매번 다르게 상상하는 것 → 특징을 없애 변할 게 없게 만들어 일관성 확보
+//   (2026-07-09, 이질감 대응). klein 은 긍정·직설어에 강하므로 "동일 마네킹을 그려라"는 긍정형 스타일 토큰.
+const FIGURE_RULE = `Figures: draw every character as the same identical featureless artist mannequin — smooth uniform matte-gray body, plain rounded head with no face, no clothing or costume detail, consistent simple proportions. Every figure is the same mannequin; only pose and position differ.`
 
 // 인물 0인 샷(설정/환경샷) 전용 — FIGURE_RULE 대신. 인물 토큰을 아예 빼고 "빈 풍경만"을 긍정형 직설 지시
 //   (klein 은 부정문이 약해 "no people" 류는 비효율 → 긍정문 + 인물 명령어 미포함이 robust).
@@ -209,7 +211,13 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
     '',
   )
 
-  const nameOf = (id: string) => input.characterNameById?.get(id) ?? id
+  // L2(샷 간 일관성): 프롬프트에서 캐릭터 이름 제거 — 이름은 klein 이 "특정 인물"을 매번 다르게 상상하게 함.
+  //   blocking 순서 기반 "figure N" 위치 라벨로 대체(모션도 같은 인덱스를 참조해 정합).
+  const blockingIds = (s.character_blocking ?? []).map((b) => b.character_id)
+  const figLabel = (id: string) => {
+    const i = blockingIds.indexOf(id)
+    return i >= 0 ? `figure ${i + 1}` : 'a figure'
+  }
 
   // safe mode: 서사 동사·감정어가 실리는 구도 레이어/모션을 제외 (모더레이션 우회)
   const layers = input.safeMode ? {} : (s.framing?.layers ?? {})
@@ -220,13 +228,13 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
   ].filter(Boolean) as string[]
 
   const blocking = (s.character_blocking ?? []).map(
-    (b) =>
-      `${nameOf(b.character_id)}: ${words(b.position_in_frame)}, ${stripColor(words(b.pose))}, gaze ${words(b.gaze)}.`,
+    (b, i) =>
+      `Figure ${i + 1}: ${words(b.position_in_frame)}, ${stripColor(words(b.pose))}, gaze ${words(b.gaze)}.`,
   )
-  // 앞쪽 배치할 주제 = 인물 수·이름 / 빈 풍경.
-  const subjectNames = (s.character_blocking ?? []).map((b) => nameOf(b.character_id))
-  const subject = subjectNames.length
-    ? `${subjectNames.length} figure${subjectNames.length > 1 ? 's' : ''}: ${subjectNames.join(', ')}`
+  // 앞쪽 배치할 주제 = 인물 수(이름 없음 — L2) / 빈 풍경.
+  const figureCount = (s.character_blocking ?? []).length
+  const subject = figureCount
+    ? `${figureCount} identical mannequin figure${figureCount > 1 ? 's' : ''}`
     : 'empty landscape'
 
   // 동적 스펙은 "어느 순간을 얼릴지" 가이드로만 — 패널은 정지화.
@@ -234,7 +242,7 @@ function buildFromSpec(input: RoughStoryboardPromptInput, spec: RoughStoryboardS
   const motionNote = motion
     ? `Freeze the most readable instant of: ${
         (motion.character_motion ?? [])
-          .map((m) => `${nameOf(m.character_id)} ${words(m.verb)} (${m.magnitude})`)
+          .map((m) => `${figLabel(m.character_id)} ${words(m.verb)} (${m.magnitude})`)
           .join(', ') || words(motion.camera_motion?.type ?? '')
       }.`
     : null
@@ -300,11 +308,11 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
     FALLBACK_EMIT_ACTION && !input.safeMode && !!input.actionDescription?.trim()
   const drawsFigures = hasChars || emitAction
 
-  // 앞쪽 배치할 주제 = 인물 수·이름 / (이름 없이 액션이 함의한) 익명 인물 / 빈 풍경.
+  // 앞쪽 배치할 주제 = 인물 수(이름 없음 — L2) / (액션이 함의한) 익명 인물 / 빈 풍경.
   const subject = hasChars
-    ? `${input.characterNames.length} figure${input.characterNames.length > 1 ? 's' : ''}: ${input.characterNames.join(', ')}`
+    ? `${input.characterNames.length} identical mannequin figure${input.characterNames.length > 1 ? 's' : ''}`
     : drawsFigures
-      ? 'anonymous figure(s)'
+      ? 'anonymous mannequin figure(s)'
       : 'empty landscape'
 
   // 인물(명시 or 액션 함의)이 있으면 figure 규칙 — 완전히 비면 ENV_ONLY_RULE.
@@ -316,9 +324,7 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
   const figureBlock = drawsFigures
     ? `${FIGURE_RULE} ${poseLine} Props as simple lines or geometric shapes.`
     : `${ENV_ONLY_RULE} Key objects as simple lines or geometric shapes.`
-  const focal = input.characterNames[0]
-    ? `${input.characterNames[0]} and the main action`
-    : 'the main action'
+  const focal = hasChars ? 'the figures and the main action' : 'the main action'
   const light =
     input.lightPosition && input.lightPosition !== 'front'
       ? ` Lighting: key from the ${input.lightPosition}.`
