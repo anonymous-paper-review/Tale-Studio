@@ -33,12 +33,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
 import { useWriterStore } from '@/stores/writer-store'
-import type { ShotType } from '@/types'
+import type { GenerationMethod, LightingConfig, ShotType } from '@/types'
 
 const SHOT_TYPES: ShotType[] = [
   'ECU', 'CU', 'MCU', 'MS', 'MFS', 'FS', 'WS', 'EWS', 'OTS', 'POV', 'TRACK', '2S',
+]
+
+// 카메라 앵글 — writer 배지(shot.camera.pan) 규칙과 왕복 일치: pan>=3=low, <=-3=high, else eye.
+type CameraAngle = 'low' | 'eye' | 'high'
+const CAMERA_ANGLES: Array<{ value: CameraAngle; label: string; pan: number }> = [
+  { value: 'low', label: '로우앵글 (아래에서 위로)', pan: 5 },
+  { value: 'eye', label: '아이레벨 (눈높이)', pan: 0 },
+  { value: 'high', label: '하이앵글 (위에서 아래로)', pan: -5 },
+]
+const LIGHT_POSITIONS: Array<{ value: LightingConfig['position']; label: string }> = [
+  { value: 'front', label: '정면' },
+  { value: 'left', label: '좌측' },
+  { value: 'right', label: '우측' },
+  { value: 'top', label: '상단' },
+]
+const COLOR_TEMPS: Array<{ value: number; label: string }> = [
+  { value: 3200, label: '3200K · 따뜻 (백열등)' },
+  { value: 4500, label: '4500K · 중간' },
+  { value: 5600, label: '5600K · 주광 (기본)' },
+  { value: 6500, label: '6500K · 차가움 (흐림)' },
+]
+const GEN_METHODS: Array<{ value: GenerationMethod; label: string }> = [
+  { value: 'T2V', label: 'T2V · 텍스트→영상' },
+  { value: 'I2V', label: 'I2V · 이미지→영상' },
 ]
 
 export type AddMode = 'shot' | 'scene'
@@ -102,14 +127,19 @@ function InsertionGap({
           onToggle(gap)
         }
       }}
-      className="cursor-pointer select-none"
+      // 벌어짐은 마진이 아니라 패딩으로 — 마진은 hover 박스 밖이라 커서가 걸치면 mouseLeave→접힘→재진입
+      //   플리커가 난다. 패딩은 박스 안이므로 진입 후 커서가 계속 요소 위에 머문다. 접힌 hit 영역도 넉넉히.
+      className={cn(
+        'cursor-pointer select-none transition-all duration-200 ease-out',
+        reveal ? 'py-2' : 'py-1',
+      )}
     >
       <div
         className={cn(
           'flex items-center justify-center gap-1 overflow-hidden rounded-md text-xs font-medium transition-all duration-200 ease-out',
           reveal
-            ? 'my-1.5 h-9 border border-dashed opacity-100'
-            : 'my-0 h-2.5 border border-transparent opacity-0',
+            ? 'h-9 border border-dashed opacity-100'
+            : 'h-2 border border-transparent opacity-0',
           isLocked
             ? 'border-green-500 bg-green-500/10 text-green-600 dark:text-green-400'
             : 'border-muted-foreground/40 text-muted-foreground',
@@ -159,6 +189,11 @@ export function AddItemDialog({
   const [shotType, setShotType] = useState<ShotType>('MS')
   const [durationSeconds, setDurationSeconds] = useState(5)
   const [actionText, setActionText] = useState('')
+  const [cameraAngle, setCameraAngle] = useState<CameraAngle>('eye')
+  const [lightPosition, setLightPosition] = useState<LightingConfig['position']>('front')
+  const [colorTemp, setColorTemp] = useState(5600)
+  const [brightness, setBrightness] = useState(50)
+  const [genMethod, setGenMethod] = useState<GenerationMethod>('T2V')
   // 우 패널 폼 — scene
   const [summaryText, setSummaryText] = useState('')
   const [locationText, setLocationText] = useState('')
@@ -176,6 +211,11 @@ export function AddItemDialog({
     setShotType('MS')
     setDurationSeconds(5)
     setActionText('')
+    setCameraAngle('eye')
+    setLightPosition('front')
+    setColorTemp(5600)
+    setBrightness(50)
+    setGenMethod('T2V')
     setSummaryText('')
     setLocationText('')
     setTimeText('')
@@ -213,12 +253,16 @@ export function AddItemDialog({
     setSubmitting(true)
     try {
       if (locked.kind === 'shot') {
+        const pan = CAMERA_ANGLES.find((a) => a.value === cameraAngle)?.pan ?? 0
         await addShot(locked.sceneId, {
           afterShotId: locked.afterShotId,
           fields: {
             shotType,
             durationSeconds,
             actionDescription: actionText.trim(),
+            generationMethod: genMethod,
+            camera: { horizontal: 0, vertical: 0, pan, tilt: 0, roll: 0, zoom: 0 },
+            lighting: { position: lightPosition, brightness, colorTemp },
           },
         })
       } else {
@@ -428,6 +472,107 @@ export function AddItemDialog({
                   <p className="text-xs text-muted-foreground">
                     러프 패널·콘티·영상 생성 프롬프트의 원천이 되는 문장입니다.
                   </p>
+                </div>
+
+                {/* 연출 — 카메라 앵글·조명·생성 방식. 추가 후 카드 상세에서 미세 조정 가능. */}
+                <div className="space-y-3 rounded-lg border p-3">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                    연출
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">카메라 앵글</label>
+                      <Select
+                        value={cameraAngle}
+                        onValueChange={(v) => setCameraAngle(v as CameraAngle)}
+                      >
+                        <SelectTrigger className="w-full hover-red-beam">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CAMERA_ANGLES.map((a) => (
+                            <SelectItem key={a.value} value={a.value}>
+                              {a.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">생성 방식</label>
+                      <Select
+                        value={genMethod}
+                        onValueChange={(v) => setGenMethod(v as GenerationMethod)}
+                      >
+                        <SelectTrigger className="w-full hover-red-beam">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GEN_METHODS.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>
+                              {m.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">조명 위치</label>
+                      <Select
+                        value={lightPosition}
+                        onValueChange={(v) =>
+                          setLightPosition(v as LightingConfig['position'])
+                        }
+                      >
+                        <SelectTrigger className="w-full hover-red-beam">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LIGHT_POSITIONS.map((p) => (
+                            <SelectItem key={p.value} value={p.value}>
+                              {p.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">색온도</label>
+                      <Select
+                        value={String(colorTemp)}
+                        onValueChange={(v) => setColorTemp(Number(v))}
+                      >
+                        <SelectTrigger className="w-full hover-red-beam">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COLOR_TEMPS.map((c) => (
+                            <SelectItem key={c.value} value={String(c.value)}>
+                              {c.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="flex items-center justify-between text-sm font-medium">
+                      <span>밝기</span>
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                        {brightness}
+                      </span>
+                    </label>
+                    <Slider
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={[brightness]}
+                      onValueChange={([v]) => setBrightness(v)}
+                      aria-label="밝기"
+                    />
+                  </div>
                 </div>
 
                 {lockedShotSceneChars && (

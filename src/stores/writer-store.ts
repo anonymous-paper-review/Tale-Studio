@@ -299,8 +299,8 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       durationSeconds: f?.durationSeconds ?? 5,
       generationMethod: f?.generationMethod ?? 'T2V',
       dialogueLines: f?.dialogueLines ?? [],
-      camera: { ...DEFAULT_CAMERA },
-      lighting: { ...DEFAULT_LIGHTING },
+      camera: f?.camera ?? { ...DEFAULT_CAMERA },
+      lighting: f?.lighting ?? { ...DEFAULT_LIGHTING },
       sortOrder: newOrder,
     }
 
