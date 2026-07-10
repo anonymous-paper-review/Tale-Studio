@@ -25,6 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Slider } from '@/components/ui/slider'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
+import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
 import { WriterHeader } from '@/features/writer/writer-header'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
@@ -85,8 +86,6 @@ export function RoughStoryboardView() {
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
   const loadProject = useWriterStore((s) => s.loadProject)
-  const addScene = useWriterStore((s) => s.addScene)
-  const addShot = useWriterStore((s) => s.addShot)
   const { status } = useWriterStatus(projectId)
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   const chatMessages = useGlobalChatStore((s) => s.messages)
@@ -97,6 +96,11 @@ export function RoughStoryboardView() {
   const [panelJobs, setPanelJobs] = useState<Record<string, PanelJob>>({})
   const [overrides, setOverrides] = useState<Record<string, RoughStoryboardImage>>({})
   const [detailShotId, setDetailShotId] = useState<string | null>(null)
+  // 추가 팝업(#3) — 어느 버튼으로 열렸는지(mode) + 맥락 씬. null=닫힘.
+  const [addDialog, setAddDialog] = useState<{
+    mode: AddMode
+    contextSceneId: string | null
+  } | null>(null)
   // 진행 중 단계 경과시간 라이브 표시(긴 단계에서 "멈춤" 오인 방지) — 1s 틱.
   const [nowMs, setNowMs] = useState(0)
   // 보드 축척: zoomLevel 1(축소·6열)~6(확대·1열). 가로 열 수 cols = 7 - zoomLevel. 기본 4 → 3열(기존 동작).
@@ -294,7 +298,12 @@ export function RoughStoryboardView() {
           누락 패널 {missingIds.length}개 생성
         </Button>
       )}
-      <Button size="sm" variant="outline" className="hover-red-beam" onClick={() => void addScene()}>
+      <Button
+        size="sm"
+        variant="outline"
+        className="hover-red-beam"
+        onClick={() => setAddDialog({ mode: 'scene', contextSceneId: null })}
+      >
         <Plus className="size-3.5" />
         씬 추가
       </Button>
@@ -460,7 +469,9 @@ export function RoughStoryboardView() {
                     size="sm"
                     variant="ghost"
                     className="text-muted-foreground hover-red-beam"
-                    onClick={() => void addShot(scene.sceneId)}
+                    onClick={() =>
+                      setAddDialog({ mode: 'shot', contextSceneId: scene.sceneId })
+                    }
                   >
                     <Plus className="size-3.5" />
                     샷 추가
@@ -474,7 +485,9 @@ export function RoughStoryboardView() {
                   {sceneShots.length === 0 && (
                     <button
                       type="button"
-                      onClick={() => void addShot(scene.sceneId)}
+                      onClick={() =>
+                        setAddDialog({ mode: 'shot', contextSceneId: scene.sceneId })
+                      }
                       className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground transition-colors hover:bg-accent/40 hover-red-beam"
                     >
                       <Plus className="size-6" />
@@ -617,6 +630,17 @@ export function RoughStoryboardView() {
         }}
         onRegenerate={(id, hints) => void generate([id], true, false, hints)}
       />
+
+      {addDialog && (
+        <AddItemDialog
+          open={!!addDialog}
+          mode={addDialog.mode}
+          contextSceneId={addDialog.contextSceneId}
+          onOpenChange={(open) => {
+            if (!open) setAddDialog(null)
+          }}
+        />
+      )}
     </div>
   )
 }

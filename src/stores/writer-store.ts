@@ -115,10 +115,17 @@ interface WriterState {
   updateScene: (id: string, changes: Partial<Scene>) => void
   selectShot: (id: string) => void
   updateShot: (id: string, changes: Partial<Shot>) => void
-  addShot: (sceneId: string) => Promise<string | null>
+  // opts.afterShotId: undefined=씬 끝에 append(기존 동작), null=씬 맨 앞, shotId=그 샷 뒤에 삽입.
+  addShot: (
+    sceneId: string,
+    opts?: { afterShotId?: string | null; fields?: Partial<Shot> },
+  ) => Promise<string | null>
   deleteShot: (shotId: string) => Promise<void>
   recomputeSceneDuration: (sceneId: string) => void
-  addScene: () => Promise<string | null>
+  // opts.afterSceneId: undefined=맨 끝 append(기존 동작), null=맨 앞, sceneId=그 씬 뒤에 삽입.
+  addScene: (
+    opts?: { afterSceneId?: string | null; fields?: Partial<Scene> },
+  ) => Promise<string | null>
   deleteScene: (sceneId: string) => Promise<void>
   reorderScenes: (orderedIds: string[]) => Promise<void>
   regenerateScene: (sceneId: string) => Promise<void>
@@ -247,63 +254,104 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     )
   },
 
-  addShot: async (sceneId) => {
+  addShot: async (sceneId, opts) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return null
-    const { shots } = get()
-    const sceneShots = shots.filter((s) => s.sceneId === sceneId)
+    const prevShots = get().shots
     const shotId = nextShotId(
       sceneId,
-      shots.map((s) => s.shotId),
+      prevShots.map((s) => s.shotId),
     )
-    const sortOrder = shots.length
+
+    // 삽입 sort_order — 이웃의 실제 sort_order 기준(배열 index 아님: 기존 데이터에 gap 이 있어도 안전).
+    //   append=맨 뒤(시프트 불요), 그 외(맨 앞/특정 샷 뒤)=신규 order 이상을 전부 +1 밀어 자리 확보.
+    const after = opts?.afterShotId
+    const orders = prevShots.map((s) => s.sortOrder ?? 0)
+    const maxOrder = orders.length ? Math.max(...orders) : -1
+    let newOrder: number
+    let shift = false
+    if (after === undefined) {
+      newOrder = maxOrder + 1
+    } else if (after === null) {
+      const first = prevShots.find((s) => s.sceneId === sceneId)
+      if (first) {
+        newOrder = first.sortOrder ?? 0
+        shift = true
+      } else {
+        newOrder = maxOrder + 1
+      }
+    } else {
+      const x = prevShots.find((s) => s.shotId === after)
+      newOrder = (x?.sortOrder ?? maxOrder) + 1
+      shift = true
+    }
 
     // 새 샷 기본 등장인물 = 씬 등장인물 상속. 빈 배열이면 rough-storyboard db_fallback 이
     //   "인물 없는 빈 풍경(empty landscape)"으로 그려 사용자가 의도한 인물 샷이 안 나온다(2026-06-24).
     const scene = get().sceneManifest?.scenes.find((s) => s.sceneId === sceneId)
+    const f = opts?.fields
     const newShot: Shot = {
       shotId,
       sceneId,
-      shotType: 'MS',
-      actionDescription: '',
-      characters: scene?.charactersPresent ?? [],
-      durationSeconds: 5,
-      generationMethod: 'T2V',
-      dialogueLines: [],
+      shotType: f?.shotType ?? 'MS',
+      actionDescription: f?.actionDescription ?? '',
+      characters: f?.characters ?? scene?.charactersPresent ?? [],
+      durationSeconds: f?.durationSeconds ?? 5,
+      generationMethod: f?.generationMethod ?? 'T2V',
+      dialogueLines: f?.dialogueLines ?? [],
       camera: { ...DEFAULT_CAMERA },
       lighting: { ...DEFAULT_LIGHTING },
+      sortOrder: newOrder,
     }
 
-    set((state) => ({
-      shots: [...state.shots, newShot],
-      selectedShotId: shotId,
-    }))
+    // optimistic: tail 시프트 + 신규 삽입, sort_order 기준 재정렬
+    const shifted = shift
+      ? prevShots.map((s) =>
+          (s.sortOrder ?? 0) >= newOrder ? { ...s, sortOrder: (s.sortOrder ?? 0) + 1 } : s,
+        )
+      : prevShots
+    const nextShots = [...shifted, newShot].sort(
+      (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+    )
+    set({ shots: nextShots, selectedShotId: shotId })
 
     const supabase = createClient()
+    // 편집(추가 폼)은 유저 언어 → primary·_native 둘 다 native 로 기록(러프 라우트가 EN skip-or-derive). (S3b)
     const { error } = await supabase.from('shots').insert({
       project_id: projectId,
       scene_id: sceneId,
       shot_id: shotId,
       shot_type: newShot.shotType,
       action_description: newShot.actionDescription,
+      action_description_native: newShot.actionDescription,
       characters: newShot.characters,
       duration_seconds: newShot.durationSeconds,
       generation_method: newShot.generationMethod,
       dialogue_lines: newShot.dialogueLines,
       camera_config: newShot.camera,
       lighting_config: newShot.lighting,
-      sort_order: sortOrder,
+      sort_order: newOrder,
     })
 
     if (error) {
-      // Roll back on failure
-      set((state) => ({
-        shots: state.shots.filter((s) => s.shotId !== shotId),
-        error: error.message,
-      }))
+      set({ shots: prevShots, error: error.message })
       return null
     }
-    void sceneShots
+    // 자리 확보: 신규 order 이상이던 기존 샷들을 +1 로 밀어 DB 반영(순서 무결성). insert 성공 후 실행 —
+    //   중간 실패해도 sort_order 중복은 grouping-by-scene 표시에 무해(다음 재정렬에서 수렴).
+    if (shift) {
+      await Promise.all(
+        prevShots
+          .filter((s) => (s.sortOrder ?? 0) >= newOrder)
+          .map((s) =>
+            supabase
+              .from('shots')
+              .update({ sort_order: (s.sortOrder ?? 0) + 1 })
+              .eq('project_id', projectId)
+              .eq('shot_id', s.shotId),
+          ),
+      )
+    }
     get().recomputeSceneDuration(sceneId)
     return shotId
   },
@@ -348,60 +396,96 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     get().updateScene(sceneId, { estimatedDurationSeconds: sum })
   },
 
-  addScene: async () => {
+  addScene: async (opts) => {
     const projectId = useProjectStore.getState().projectId
     const manifest = get().sceneManifest
     if (!projectId || !manifest) return null
 
-    const sceneId = nextSceneId(manifest.scenes.map((s) => s.sceneId))
+    const prevScenes = manifest.scenes
+    const sceneId = nextSceneId(prevScenes.map((s) => s.sceneId))
+
+    // 삽입 sort_order — 이웃의 실제 sort_order 기준(샷과 동일 규칙). append=맨 뒤, 그 외=신규 order 이상 +1.
+    const after = opts?.afterSceneId
+    const orders = prevScenes.map((s) => s.sortOrder ?? 0)
+    const maxOrder = orders.length ? Math.max(...orders) : -1
+    let newOrder: number
+    let shift = false
+    if (after === undefined) {
+      newOrder = maxOrder + 1
+    } else if (after === null) {
+      newOrder = orders.length ? Math.min(...orders) : 0
+      shift = orders.length > 0
+    } else {
+      const x = prevScenes.find((s) => s.sceneId === after)
+      newOrder = (x?.sortOrder ?? maxOrder) + 1
+      shift = true
+    }
+
+    const f = opts?.fields
     const newScene: Scene = {
       sceneId,
-      narrativeSummary: '',
-      originalTextQuote: '',
-      location: manifest.locations[0]?.locationId ?? '',
-      timeOfDay: 'day',
-      mood: '',
-      charactersPresent: [],
-      estimatedDurationSeconds: 30,
+      narrativeSummary: f?.narrativeSummary ?? '',
+      originalTextQuote: f?.originalTextQuote ?? '',
+      location: f?.location ?? manifest.locations[0]?.locationId ?? '',
+      timeOfDay: f?.timeOfDay ?? 'day',
+      mood: f?.mood ?? '',
+      charactersPresent: f?.charactersPresent ?? [],
+      estimatedDurationSeconds: f?.estimatedDurationSeconds ?? 30,
+      sortOrder: newOrder,
     }
-    const sortOrder = manifest.scenes.length
 
+    const shifted = shift
+      ? prevScenes.map((s) =>
+          (s.sortOrder ?? 0) >= newOrder ? { ...s, sortOrder: (s.sortOrder ?? 0) + 1 } : s,
+        )
+      : prevScenes
+    const nextScenes = [...shifted, newScene].sort(
+      (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+    )
     set((state) => ({
       sceneManifest: state.sceneManifest
-        ? {
-            ...state.sceneManifest,
-            scenes: [...state.sceneManifest.scenes, newScene],
-          }
+        ? { ...state.sceneManifest, scenes: nextScenes }
         : state.sceneManifest,
     }))
 
     const supabase = createClient()
+    // 편집(추가 폼)은 유저 언어 → primary·_native 둘 다 native 로 기록. (S3b)
     const { error } = await supabase.from('scenes').insert({
       project_id: projectId,
       scene_id: sceneId,
       narrative_summary: newScene.narrativeSummary,
+      narrative_summary_native: newScene.narrativeSummary,
       original_text_quote: newScene.originalTextQuote,
       location: newScene.location,
       time_of_day: newScene.timeOfDay,
       mood: newScene.mood,
+      mood_native: newScene.mood,
       characters_present: newScene.charactersPresent,
       estimated_duration_seconds: newScene.estimatedDurationSeconds,
-      sort_order: sortOrder,
+      sort_order: newOrder,
     })
 
     if (error) {
       set((state) => ({
         sceneManifest: state.sceneManifest
-          ? {
-              ...state.sceneManifest,
-              scenes: state.sceneManifest.scenes.filter(
-                (s) => s.sceneId !== sceneId,
-              ),
-            }
+          ? { ...state.sceneManifest, scenes: prevScenes }
           : state.sceneManifest,
         error: error.message,
       }))
       return null
+    }
+    if (shift) {
+      await Promise.all(
+        prevScenes
+          .filter((s) => (s.sortOrder ?? 0) >= newOrder)
+          .map((s) =>
+            supabase
+              .from('scenes')
+              .update({ sort_order: (s.sortOrder ?? 0) + 1 })
+              .eq('project_id', projectId)
+              .eq('scene_id', s.sceneId),
+          ),
+      )
     }
     return sceneId
   },
@@ -707,7 +791,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       }
 
       const manifest: SceneManifest = {
-        scenes: scenes.map((s) => ({
+        scenes: scenes.map((s, i) => ({
           sceneId: s.scene_id,
           // 표시는 유저 언어(_native), 생성은 주 컬럼(EN). (language boundary S3b)
           narrativeSummary: s.narrative_summary_native ?? s.narrative_summary ?? '',
@@ -717,6 +801,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           mood: s.mood_native ?? s.mood ?? '',
           charactersPresent: s.characters_present ?? [],
           estimatedDurationSeconds: s.estimated_duration_seconds ?? 30,
+          sortOrder: s.sort_order ?? i, // 정렬은 .order('sort_order') → i 는 값 없을 때 안전 폴백
         })),
         characters: (characters ?? []).map((c) => ({
           characterId: c.character_id,
@@ -735,9 +820,10 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         })),
       }
 
-      const shots: Shot[] = (shotsData ?? []).map((s) => ({
+      const shots: Shot[] = (shotsData ?? []).map((s, i) => ({
         shotId: s.shot_id,
         sceneId: s.scene_id,
+        sortOrder: s.sort_order ?? i, // 정렬은 .order('sort_order') → i 는 값 없을 때 안전 폴백
         shotType: s.shot_type as Shot['shotType'],
         actionDescription: s.action_description_native ?? s.action_description ?? '',
         characters: s.characters ?? [],

@@ -70,6 +70,8 @@ export interface Shot {
   lighting: LightingConfig
   referenceImageUrl?: string | null
   roughStoryboard?: RoughStoryboardImage | null
+  /** DB shots.sort_order — 씬 내 순서. 위치 삽입(추가 팝업)에서 이웃 기준 계산에 사용. */
+  sortOrder?: number
 }
 
 export interface VideoClip {
