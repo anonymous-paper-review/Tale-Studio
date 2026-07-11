@@ -26,6 +26,7 @@ import { Slider } from '@/components/ui/slider'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
+import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { WriterHeader } from '@/features/writer/writer-header'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
@@ -43,38 +44,8 @@ function withCacheBust(url: string, v?: number): string {
   return `${url}${url.includes('?') ? '&' : '?'}v=${v}`
 }
 
-// 표시용 샷 이름 — DB id(sh_02_13 / shot_5)를 사람이 읽는 라벨로. 언더바·개발용 접두사 제거, 단어 첫 글자 대문자. (#6)
-//   id 자체(DB 키)는 불변 — 표시만 변환.
-function formatShotName(shotId: string): string {
-  const m = shotId.match(/^sh_(\d+)_(\d+)$/)
-  if (m) return `Scene ${Number(m[1])} · Shot ${Number(m[2])}`
-  const m2 = shotId.match(/^shot_?(\d+)$/i)
-  if (m2) return `Shot ${Number(m2[1])}`
-  return shotId.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
-}
-
-// 표시용 씬 이름 — 샷과 동일 규칙(sc_02 → "Scene 2"). (#6 일관성)
-function formatSceneName(sceneId: string): string {
-  const m = sceneId.match(/^sc_?(\d+)$/i)
-  if (m) return `Scene ${Number(m[1])}`
-  return sceneId.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
-}
-
-// 샷 타입(MS/CU/EWS…) hover 설명 — 카드의 샷 타입 배지 위에 표시. (#7)
-const SHOT_TYPE_DESCRIPTIONS: Record<string, string> = {
-  ECU: 'Extreme close-up — 눈·손처럼 아주 좁은 부분만',
-  CU: 'Close-up — 얼굴 위주',
-  MCU: 'Medium close-up — 가슴 위',
-  MS: 'Medium shot — 허리 위',
-  MFS: 'Medium full shot — 무릎 위',
-  FS: 'Full shot — 전신',
-  WS: 'Wide shot — 인물과 주변 공간',
-  EWS: 'Extreme wide shot — 광활한 배경, 인물은 작게',
-  OTS: 'Over-the-shoulder — 어깨 너머로 상대를',
-  POV: 'Point of view — 인물의 시점',
-  TRACK: 'Tracking shot — 피사체를 따라 이동',
-  '2S': 'Two shot — 인물 둘을 한 프레임에',
-}
+// 표시 번호는 "순서(위치)" 기준으로 렌더 지점에서 계산 — 불변 id 접미사가 아니라(중간 삽입 시 번호
+//   뒤죽박죽 방지, #5). 샷 타입 설명(SHOT_TYPE_DESCRIPTIONS)은 shot-type-info 로 공용화(#2).
 
 // 샷에 생성할 "정보"가 있는가 — 액션(스토리)이 비면 러프 패널을 만들 근거가 없음. (#5)
 function shotHasInfo(actionDescription?: string | null): boolean {
@@ -196,6 +167,20 @@ export function RoughStoryboardView() {
             submitted.map((s) => [s.shotId, { status: 'generating' } as PanelJob]),
           ),
         }))
+        // 서버가 정보 없음(no_info)으로 건너뛴 샷은 낙관적 'generating' 을 지운다 — 안 지우면 제출 안 된
+        //   샷의 스피너가 영구히 돈다(in_flight 등 '실제 생성 중' 사유는 그대로 두어야 하므로 no_info 만).
+        const noInfoSkipped = (
+          (j.data?.skipped ?? []) as Array<{ shotId: string; reason: string }>
+        )
+          .filter((x) => x.reason === 'no_info')
+          .map((x) => x.shotId)
+        if (noInfoSkipped.length) {
+          setPanelJobs((prev) => {
+            const next = { ...prev }
+            for (const id of noInfoSkipped) delete next[id]
+            return next
+          })
+        }
         for (const { shotId, jobId } of submitted) {
           void pollGenerationJob(jobId)
             .then((url) => {
@@ -453,7 +438,7 @@ export function RoughStoryboardView() {
           className="cursor-grab space-y-8 p-6"
           onPointerDown={handleBoardPointerDown}
         >
-          {(sceneManifest?.scenes ?? []).map((scene) => {
+          {(sceneManifest?.scenes ?? []).map((scene, sceneIdx) => {
             const sceneShots = shots.filter((s) => s.sceneId === scene.sceneId)
             return (
               <section key={scene.sceneId} className="space-y-3">
@@ -462,7 +447,7 @@ export function RoughStoryboardView() {
                 <div className="flex items-center gap-2">
                   {/* #2: 씬 이름 클릭 편집 제거 — 비상호작용 라벨(편집 버튼도 삭제). */}
                   <span className="text-xs font-medium text-muted-foreground">
-                    {formatSceneName(scene.sceneId)}
+                    Scene {sceneIdx + 1}
                   </span>
                   <div className="h-px flex-1 bg-border" />
                   <Button
@@ -494,7 +479,7 @@ export function RoughStoryboardView() {
                       <span className="text-sm">샷 추가</span>
                     </button>
                   )}
-                  {sceneShots.map((shot) => {
+                  {sceneShots.map((shot, shotIdx) => {
                     const panel = panelOf(shot)
                     const job = panelJobs[shot.shotId]
                     return (
@@ -586,7 +571,7 @@ export function RoughStoryboardView() {
                         <div className="space-y-2 p-4">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-muted-foreground">
-                              {formatShotName(shot.shotId)}
+                              Scene {sceneIdx + 1} · Shot {shotIdx + 1}
                             </span>
                             <TooltipProvider>
                               <Tooltip>

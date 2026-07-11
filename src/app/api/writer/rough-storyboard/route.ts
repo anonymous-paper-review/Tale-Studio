@@ -310,11 +310,18 @@ export async function POST(req: Request) {
     }> = []
     const skipped: Array<{
       shotId: string
-      reason: 'exists' | 'in_flight' | 'gave_up'
+      reason: 'exists' | 'in_flight' | 'gave_up' | 'no_info'
     }> = []
 
     for (const s of wanted) {
       const shotId = s.shot_id as string
+      // #5 정보 가드(서버 = 최종 방어선): 액션(스토리)이 비면 만들 근거가 없다 — 누가 호출하든
+      //   (자동/누락 일괄/상세 재생성/방향칩) 생성하지 않는다. force 도 예외 아님(빈 입력엔 재생성도 무의미).
+      //   클라 게이트는 UX일 뿐, 실제 차단·과금 방어는 여기서 한다(architecture §3).
+      if (!((s.action_description as string) ?? '').trim()) {
+        skipped.push({ shotId, reason: 'no_info' })
+        continue
+      }
       if (inFlight.has(shotId)) {
         skipped.push({ shotId, reason: 'in_flight' })
         continue

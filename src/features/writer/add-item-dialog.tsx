@@ -6,10 +6,10 @@
 //   좌(어디에) — 씬·샷 스토리를 계층 아웃라인으로 나열. 항목 사이의 "삽입 갭"에 마우스가 가까이
 //     가면 회색 "이곳에 추가하기" 문구가 뜨며 갭이 벌어진다(ghost). 클릭하면 초록 잠금, 한 번 더
 //     누르면 취소. 잠긴 갭이 있으면 다른 갭은 호버해도 회색 문구를 띄우지 않는다.
-//   우(무엇을) — 새 항목의 내용 설정(샷: 타입·길이·스토리 / 씬: 장소·시간·분위기·요약).
+//     스토리 텍스트는 잘리되 호버하면 전체가 툴팁으로 뜬다(#4).
+//   우(무엇을) — 새 항목의 내용 설정(샷: 타입·길이·스토리·연출 / 씬: 장소·시간·분위기·요약).
 //
-// 추가 타입(shot|scene)은 "어느 버튼으로 열었는가"로 고정 — 활성 갭은 그 레벨만(샷 모드=샷 사이,
-//   씬 모드=씬 사이). 반대 레벨 항목은 맥락용으로 흐리게만 표시.
+// 표시 번호는 "순서(위치)" 기준 — 불변 id 접미사가 아니라(중간 삽입 시 번호 뒤죽박죽 방지, #5).
 // 확정 시 writer-store.addShot/addScene(위치 삽입)으로 생성. 위치는 팝업 안의 일시적 로컬 상태.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -34,13 +34,17 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useWriterStore } from '@/stores/writer-store'
+import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import type { GenerationMethod, LightingConfig, ShotType } from '@/types'
-
-const SHOT_TYPES: ShotType[] = [
-  'ECU', 'CU', 'MCU', 'MS', 'MFS', 'FS', 'WS', 'EWS', 'OTS', 'POV', 'TRACK', '2S',
-]
 
 // 카메라 앵글 — writer 배지(shot.camera.pan) 규칙과 왕복 일치: pan>=3=low, <=-3=high, else eye.
 type CameraAngle = 'low' | 'eye' | 'high'
@@ -80,16 +84,25 @@ function gapKey(g: Gap): string {
     : `scene:${g.afterSceneId ?? 'START'}`
 }
 
-// 표시용 이름 — rough-storyboard-view 와 동일 규칙(중복이지만 컴포넌트 지역 유지).
-function fmtScene(sceneId: string): string {
-  const m = sceneId.match(/^sc_?(\d+)$/i)
-  return m ? `Scene ${Number(m[1])}` : sceneId
-}
-function fmtShot(shotId: string): string {
-  const m = shotId.match(/^sh_(\d+)_(\d+)$/)
-  if (m) return `Shot ${Number(m[2])}`
-  const m2 = shotId.match(/^shot_?(\d+)$/i)
-  return m2 ? `Shot ${Number(m2[1])}` : shotId
+// 잘린 스토리 텍스트 — 호버 시 전체 미리보기(#4). 텍스트 없으면 플레이스홀더만(툴팁 없음).
+function TruncatedStory({
+  text,
+  placeholder,
+  className,
+}: {
+  text: string
+  placeholder: string
+  className?: string
+}) {
+  if (!text) return <span className={cn('truncate', className)}>{placeholder}</span>
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn('truncate', className)}>{text}</span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-sm whitespace-pre-wrap">{text}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 interface InsertionGapProps {
@@ -286,7 +299,7 @@ export function AddItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] gap-0 overflow-hidden p-0 sm:max-w-4xl">
+      <DialogContent className="max-h-[93vh] gap-0 overflow-hidden p-0 sm:max-w-[67rem]">
         <DialogHeader className="border-b px-6 py-4">
           <DialogTitle className="flex items-center gap-2">
             <Plus className="size-4" />
@@ -297,345 +310,367 @@ export function AddItemDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid min-h-0 md:grid-cols-2">
-          {/* ── 좌: 어디에 (아웃라인 + 삽입 갭) ─────────────────────────── */}
-          <div className="max-h-[62vh] overflow-y-auto border-b px-4 py-3 md:border-b-0 md:border-r">
-            <p className="mb-2 px-1 text-xs uppercase tracking-wider text-muted-foreground">
-              어디에 추가할까요
-            </p>
+        <TooltipProvider>
+          <div className="grid min-h-0 md:grid-cols-2">
+            {/* ── 좌: 어디에 (아웃라인 + 삽입 갭) ─────────────────────────── */}
+            <ScrollArea className="h-[68vh] border-b md:border-b-0 md:border-r">
+              <div className="px-4 py-3">
+                <p className="mb-2 px-1 text-xs uppercase tracking-wider text-muted-foreground">
+                  어디에 추가할까요
+                </p>
 
-            {/* 씬 모드: 맨 앞 갭 */}
-            {mode === 'scene' && (
-              <InsertionGap
-                gap={{ kind: 'scene', afterSceneId: null }}
-                isLocked={lockedKey === gapKey({ kind: 'scene', afterSceneId: null })}
-                anyLocked={anyLocked}
-                isHovered={hovered === gapKey({ kind: 'scene', afterSceneId: null })}
-                onHover={setHovered}
-                onToggle={toggleGap}
-              />
-            )}
+                {/* 씬 모드: 맨 앞 갭 */}
+                {mode === 'scene' && (
+                  <InsertionGap
+                    gap={{ kind: 'scene', afterSceneId: null }}
+                    isLocked={lockedKey === gapKey({ kind: 'scene', afterSceneId: null })}
+                    anyLocked={anyLocked}
+                    isHovered={hovered === gapKey({ kind: 'scene', afterSceneId: null })}
+                    onHover={setHovered}
+                    onToggle={toggleGap}
+                  />
+                )}
 
-            {scenes.map((scene) => {
-              const sceneShots = shots.filter((s) => s.sceneId === scene.sceneId)
-              const isContext = mode === 'shot' && scene.sceneId === contextSceneId
-              const startGap: Gap = {
-                kind: 'shot',
-                sceneId: scene.sceneId,
-                afterShotId: null,
-              }
-              const afterSceneGap: Gap = {
-                kind: 'scene',
-                afterSceneId: scene.sceneId,
-              }
-              return (
-                <div key={scene.sceneId} ref={isContext ? contextRef : undefined}>
-                  {/* 씬 헤더 (맥락) */}
-                  <div className="flex items-baseline gap-2 px-1 pt-2">
-                    <span className="text-xs font-semibold text-foreground">
-                      {fmtScene(scene.sceneId)}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {scene.narrativeSummary || '(요약 없음)'}
-                    </span>
-                  </div>
+                {scenes.map((scene, si) => {
+                  const sceneShots = shots.filter((s) => s.sceneId === scene.sceneId)
+                  const isContext = mode === 'shot' && scene.sceneId === contextSceneId
+                  const startGap: Gap = {
+                    kind: 'shot',
+                    sceneId: scene.sceneId,
+                    afterShotId: null,
+                  }
+                  const afterSceneGap: Gap = {
+                    kind: 'scene',
+                    afterSceneId: scene.sceneId,
+                  }
+                  return (
+                    <div key={scene.sceneId} ref={isContext ? contextRef : undefined}>
+                      {/* 씬 헤더 (맥락) — 번호는 위치 기준(#5) */}
+                      <div className="flex items-baseline gap-2 px-1 pt-2">
+                        <span className="shrink-0 text-xs font-semibold text-foreground">
+                          Scene {si + 1}
+                        </span>
+                        <TruncatedStory
+                          text={scene.narrativeSummary}
+                          placeholder="(요약 없음)"
+                          className="min-w-0 flex-1 text-xs text-muted-foreground"
+                        />
+                      </div>
 
-                  {/* 샷 목록 + (샷 모드) 갭 */}
-                  <div className="pl-3">
-                    {mode === 'shot' && (
-                      <InsertionGap
-                        gap={startGap}
-                        isLocked={lockedKey === gapKey(startGap)}
-                        anyLocked={anyLocked}
-                        isHovered={hovered === gapKey(startGap)}
-                        onHover={setHovered}
-                        onToggle={toggleGap}
-                      />
-                    )}
-                    {sceneShots.length === 0 && (
-                      <p className="px-1 py-1 text-xs italic text-muted-foreground/70">
-                        빈 씬
-                      </p>
-                    )}
-                    {sceneShots.map((shot) => {
-                      const afterGap: Gap = {
-                        kind: 'shot',
-                        sceneId: scene.sceneId,
-                        afterShotId: shot.shotId,
-                      }
-                      return (
-                        <div key={shot.shotId}>
-                          <div
-                            className={cn(
-                              'flex items-baseline gap-2 rounded-md px-1 py-1',
-                              mode === 'scene' && 'opacity-50',
-                            )}
-                          >
-                            <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                              {fmtShot(shot.shotId)}
-                            </span>
-                            <span className="truncate text-xs">
-                              {shot.actionDescription || '(내용 없음)'}
-                            </span>
-                          </div>
-                          {mode === 'shot' && (
-                            <InsertionGap
-                              gap={afterGap}
-                              isLocked={lockedKey === gapKey(afterGap)}
-                              anyLocked={anyLocked}
-                              isHovered={hovered === gapKey(afterGap)}
-                              onHover={setHovered}
-                              onToggle={toggleGap}
-                            />
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
+                      {/* 샷 목록 + (샷 모드) 갭 */}
+                      <div className="pl-3">
+                        {mode === 'shot' && (
+                          <InsertionGap
+                            gap={startGap}
+                            isLocked={lockedKey === gapKey(startGap)}
+                            anyLocked={anyLocked}
+                            isHovered={hovered === gapKey(startGap)}
+                            onHover={setHovered}
+                            onToggle={toggleGap}
+                          />
+                        )}
+                        {sceneShots.length === 0 && (
+                          <p className="px-1 py-1 text-xs italic text-muted-foreground/70">
+                            빈 씬
+                          </p>
+                        )}
+                        {sceneShots.map((shot, ki) => {
+                          const afterGap: Gap = {
+                            kind: 'shot',
+                            sceneId: scene.sceneId,
+                            afterShotId: shot.shotId,
+                          }
+                          return (
+                            <div key={shot.shotId}>
+                              <div
+                                className={cn(
+                                  'flex items-baseline gap-2 rounded-md px-1 py-1',
+                                  mode === 'scene' && 'opacity-50',
+                                )}
+                              >
+                                <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                                  Shot {ki + 1}
+                                </span>
+                                <TruncatedStory
+                                  text={shot.actionDescription}
+                                  placeholder="(내용 없음)"
+                                  className="min-w-0 flex-1 text-xs"
+                                />
+                              </div>
+                              {mode === 'shot' && (
+                                <InsertionGap
+                                  gap={afterGap}
+                                  isLocked={lockedKey === gapKey(afterGap)}
+                                  anyLocked={anyLocked}
+                                  isHovered={hovered === gapKey(afterGap)}
+                                  onHover={setHovered}
+                                  onToggle={toggleGap}
+                                />
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
 
-                  {/* 씬 모드: 이 씬 뒤 갭 */}
-                  {mode === 'scene' && (
-                    <InsertionGap
-                      gap={afterSceneGap}
-                      isLocked={lockedKey === gapKey(afterSceneGap)}
-                      anyLocked={anyLocked}
-                      isHovered={hovered === gapKey(afterSceneGap)}
-                      onHover={setHovered}
-                      onToggle={toggleGap}
-                    />
-                  )}
-                </div>
-              )
-            })}
-
-            {scenes.length === 0 && (
-              <p className="px-1 py-4 text-center text-xs text-muted-foreground">
-                아직 씬이 없어요.
-              </p>
-            )}
-          </div>
-
-          {/* ── 우: 무엇을 (내용 설정) ──────────────────────────────────── */}
-          <div className="max-h-[62vh] space-y-4 overflow-y-auto px-6 py-4">
-            <p className="px-0 text-xs uppercase tracking-wider text-muted-foreground">
-              내용 설정
-            </p>
-
-            {mode === 'shot' ? (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">샷 타입</label>
-                    <Select
-                      value={shotType}
-                      onValueChange={(v) => setShotType(v as ShotType)}
-                    >
-                      <SelectTrigger className="w-full hover-red-beam">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SHOT_TYPES.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">길이 (초)</label>
-                    <HoverBeam>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={60}
-                        value={durationSeconds}
-                        onChange={(e) =>
-                          setDurationSeconds(Math.max(1, Number(e.target.value) || 1))
-                        }
-                        className="font-mono tabular-nums"
-                      />
-                    </HoverBeam>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">스토리 (액션)</label>
-                  <HoverBeam>
-                    <Textarea
-                      value={actionText}
-                      rows={4}
-                      onChange={(e) => setActionText(e.target.value)}
-                      placeholder="이 샷에서 일어나는 일"
-                    />
-                  </HoverBeam>
-                  <p className="text-xs text-muted-foreground">
-                    러프 패널·콘티·영상 생성 프롬프트의 원천이 되는 문장입니다.
-                  </p>
-                </div>
-
-                {/* 연출 — 카메라 앵글·조명·생성 방식. 추가 후 카드 상세에서 미세 조정 가능. */}
-                <div className="space-y-3 rounded-lg border p-3">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                    연출
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">카메라 앵글</label>
-                      <Select
-                        value={cameraAngle}
-                        onValueChange={(v) => setCameraAngle(v as CameraAngle)}
-                      >
-                        <SelectTrigger className="w-full hover-red-beam">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CAMERA_ANGLES.map((a) => (
-                            <SelectItem key={a.value} value={a.value}>
-                              {a.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {/* 씬 모드: 이 씬 뒤 갭 */}
+                      {mode === 'scene' && (
+                        <InsertionGap
+                          gap={afterSceneGap}
+                          isLocked={lockedKey === gapKey(afterSceneGap)}
+                          anyLocked={anyLocked}
+                          isHovered={hovered === gapKey(afterSceneGap)}
+                          onHover={setHovered}
+                          onToggle={toggleGap}
+                        />
+                      )}
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">생성 방식</label>
-                      <Select
-                        value={genMethod}
-                        onValueChange={(v) => setGenMethod(v as GenerationMethod)}
-                      >
-                        <SelectTrigger className="w-full hover-red-beam">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {GEN_METHODS.map((m) => (
-                            <SelectItem key={m.value} value={m.value}>
-                              {m.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">조명 위치</label>
-                      <Select
-                        value={lightPosition}
-                        onValueChange={(v) =>
-                          setLightPosition(v as LightingConfig['position'])
-                        }
-                      >
-                        <SelectTrigger className="w-full hover-red-beam">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {LIGHT_POSITIONS.map((p) => (
-                            <SelectItem key={p.value} value={p.value}>
-                              {p.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">색온도</label>
-                      <Select
-                        value={String(colorTemp)}
-                        onValueChange={(v) => setColorTemp(Number(v))}
-                      >
-                        <SelectTrigger className="w-full hover-red-beam">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {COLOR_TEMPS.map((c) => (
-                            <SelectItem key={c.value} value={String(c.value)}>
-                              {c.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="flex items-center justify-between text-sm font-medium">
-                      <span>밝기</span>
-                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                        {brightness}
-                      </span>
-                    </label>
-                    <Slider
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={[brightness]}
-                      onValueChange={([v]) => setBrightness(v)}
-                      aria-label="밝기"
-                    />
-                  </div>
-                </div>
+                  )
+                })}
 
-                {lockedShotSceneChars && (
-                  <p className="text-xs text-muted-foreground">
-                    등장: {lockedShotSceneChars.join(', ') || '없음'}
-                    <span className="text-muted-foreground/70">
-                      {' '}
-                      (씬에서 상속 — 추가 후 조정 가능)
-                    </span>
+                {scenes.length === 0 && (
+                  <p className="px-1 py-4 text-center text-xs text-muted-foreground">
+                    아직 씬이 없어요.
                   </p>
                 )}
-              </>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">장소</label>
-                    <HoverBeam>
-                      <Input
-                        value={locationText}
-                        onChange={(e) => setLocationText(e.target.value)}
-                        placeholder="예: 황량한 돌산"
-                      />
-                    </HoverBeam>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">시간대</label>
-                    <HoverBeam>
-                      <Input
-                        value={timeText}
-                        onChange={(e) => setTimeText(e.target.value)}
-                        placeholder="예: 낮, 밤, 황혼"
-                      />
-                    </HoverBeam>
-                  </div>
-                </div>
+              </div>
+            </ScrollArea>
 
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">분위기</label>
-                  <HoverBeam>
-                    <Input
-                      value={moodText}
-                      onChange={(e) => setMoodText(e.target.value)}
-                      placeholder="예: 긴장된, 비장한"
-                    />
-                  </HoverBeam>
-                </div>
+            {/* ── 우: 무엇을 (내용 설정) ──────────────────────────────────── */}
+            <ScrollArea className="h-[68vh]">
+              <div className="space-y-4 px-6 py-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  내용 설정
+                </p>
 
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">서사 요약</label>
-                  <HoverBeam>
-                    <Textarea
-                      value={summaryText}
-                      rows={4}
-                      onChange={(e) => setSummaryText(e.target.value)}
-                      placeholder="이 씬에서 일어나는 일"
-                    />
-                  </HoverBeam>
-                </div>
-              </>
-            )}
+                {mode === 'shot' ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">샷 타입 (카메라 초점)</label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div>
+                              <Select
+                                value={shotType}
+                                onValueChange={(v) => setShotType(v as ShotType)}
+                              >
+                                <SelectTrigger className="w-full hover-red-beam">
+                                  <span>{shotType}</span>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {SHOT_TYPES.map((t) => (
+                                    <SelectItem key={t} value={t}>
+                                      <span className="font-medium">{t}</span>
+                                      <span className="ml-1 text-xs text-muted-foreground">
+                                        · {SHOT_TYPE_DESCRIPTIONS[t]}
+                                      </span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {SHOT_TYPE_DESCRIPTIONS[shotType] ?? shotType}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">길이 (초)</label>
+                        <HoverBeam>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={60}
+                            value={durationSeconds}
+                            onChange={(e) =>
+                              setDurationSeconds(Math.max(1, Number(e.target.value) || 1))
+                            }
+                            className="font-mono tabular-nums"
+                          />
+                        </HoverBeam>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">스토리 (액션)</label>
+                      <HoverBeam>
+                        <Textarea
+                          value={actionText}
+                          rows={4}
+                          onChange={(e) => setActionText(e.target.value)}
+                          placeholder="이 샷에서 일어나는 일"
+                        />
+                      </HoverBeam>
+                      <p className="text-xs text-muted-foreground">
+                        러프 패널·콘티·영상 생성 프롬프트의 원천이 되는 문장입니다.
+                      </p>
+                    </div>
+
+                    {/* 연출 — 카메라 앵글·조명·생성 방식. 추가 후 카드 상세에서 미세 조정 가능. */}
+                    <div className="space-y-3 rounded-lg border p-3">
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                        연출
+                      </p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">카메라 앵글</label>
+                          <Select
+                            value={cameraAngle}
+                            onValueChange={(v) => setCameraAngle(v as CameraAngle)}
+                          >
+                            <SelectTrigger className="w-full hover-red-beam">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CAMERA_ANGLES.map((a) => (
+                                <SelectItem key={a.value} value={a.value}>
+                                  {a.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">생성 방식</label>
+                          <Select
+                            value={genMethod}
+                            onValueChange={(v) => setGenMethod(v as GenerationMethod)}
+                          >
+                            <SelectTrigger className="w-full hover-red-beam">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {GEN_METHODS.map((m) => (
+                                <SelectItem key={m.value} value={m.value}>
+                                  {m.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">조명 위치</label>
+                          <Select
+                            value={lightPosition}
+                            onValueChange={(v) =>
+                              setLightPosition(v as LightingConfig['position'])
+                            }
+                          >
+                            <SelectTrigger className="w-full hover-red-beam">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {LIGHT_POSITIONS.map((p) => (
+                                <SelectItem key={p.value} value={p.value}>
+                                  {p.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">색온도</label>
+                          <Select
+                            value={String(colorTemp)}
+                            onValueChange={(v) => setColorTemp(Number(v))}
+                          >
+                            <SelectTrigger className="w-full hover-red-beam">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {COLOR_TEMPS.map((c) => (
+                                <SelectItem key={c.value} value={String(c.value)}>
+                                  {c.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="flex items-center justify-between text-sm font-medium">
+                          <span>밝기</span>
+                          <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                            {brightness}
+                          </span>
+                        </label>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[brightness]}
+                          onValueChange={([v]) => setBrightness(v)}
+                          aria-label="밝기"
+                        />
+                      </div>
+                    </div>
+
+                    {lockedShotSceneChars && (
+                      <p className="text-xs text-muted-foreground">
+                        등장: {lockedShotSceneChars.join(', ') || '없음'}
+                        <span className="text-muted-foreground/70">
+                          {' '}
+                          (씬에서 상속 — 추가 후 조정 가능)
+                        </span>
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">장소</label>
+                        <HoverBeam>
+                          <Input
+                            value={locationText}
+                            onChange={(e) => setLocationText(e.target.value)}
+                            placeholder="예: 황량한 돌산"
+                          />
+                        </HoverBeam>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">시간대</label>
+                        <HoverBeam>
+                          <Input
+                            value={timeText}
+                            onChange={(e) => setTimeText(e.target.value)}
+                            placeholder="예: 낮, 밤, 황혼"
+                          />
+                        </HoverBeam>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">분위기</label>
+                      <HoverBeam>
+                        <Input
+                          value={moodText}
+                          onChange={(e) => setMoodText(e.target.value)}
+                          placeholder="예: 긴장된, 비장한"
+                        />
+                      </HoverBeam>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">서사 요약</label>
+                      <HoverBeam>
+                        <Textarea
+                          value={summaryText}
+                          rows={4}
+                          onChange={(e) => setSummaryText(e.target.value)}
+                          placeholder="이 씬에서 일어나는 일"
+                        />
+                      </HoverBeam>
+                    </div>
+                  </>
+                )}
+              </div>
+            </ScrollArea>
           </div>
-        </div>
+        </TooltipProvider>
 
         <DialogFooter className="items-center border-t px-6 py-4">
           <span className="mr-auto text-xs text-muted-foreground">
