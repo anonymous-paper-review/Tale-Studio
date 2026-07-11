@@ -35,12 +35,6 @@ import {
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useWriterStore } from '@/stores/writer-store'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
@@ -84,7 +78,8 @@ function gapKey(g: Gap): string {
     : `scene:${g.afterSceneId ?? 'START'}`
 }
 
-// 잘린 스토리 텍스트 — 호버 시 전체 미리보기(#4). 텍스트 없으면 플레이스홀더만(툴팁 없음).
+// 잘린 스토리 텍스트 — 호버 시 전체 미리보기. 네이티브 title 사용(Radix Tooltip 은 ScrollArea 안에서
+//   휠 스크롤을 막던 문제라 교체. 2026-07-11). 텍스트 없으면 플레이스홀더만.
 function TruncatedStory({
   text,
   placeholder,
@@ -96,12 +91,9 @@ function TruncatedStory({
 }) {
   if (!text) return <span className={cn('truncate', className)}>{placeholder}</span>
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className={cn('truncate', className)}>{text}</span>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-sm whitespace-pre-wrap">{text}</TooltipContent>
-    </Tooltip>
+    <span className={cn('truncate', className)} title={text}>
+      {text}
+    </span>
   )
 }
 
@@ -310,8 +302,7 @@ export function AddItemDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <TooltipProvider>
-          <div className="grid min-h-0 md:grid-cols-2">
+        <div className="grid min-h-0 md:grid-cols-2">
             {/* ── 좌: 어디에 (아웃라인 + 삽입 갭) ─────────────────────────── */}
             <ScrollArea className="h-[68vh] border-b md:border-b-0 md:border-r">
               <div className="px-4 py-3">
@@ -447,33 +438,27 @@ export function AddItemDialog({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-sm font-medium">샷 타입 (카메라 초점)</label>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div>
-                              <Select
-                                value={shotType}
-                                onValueChange={(v) => setShotType(v as ShotType)}
-                              >
-                                <SelectTrigger className="w-full hover-red-beam">
-                                  <span>{shotType}</span>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {SHOT_TYPES.map((t) => (
-                                    <SelectItem key={t} value={t}>
-                                      <span className="font-medium">{t}</span>
-                                      <span className="ml-1 text-xs text-muted-foreground">
-                                        · {SHOT_TYPE_DESCRIPTIONS[t]}
-                                      </span>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {SHOT_TYPE_DESCRIPTIONS[shotType] ?? shotType}
-                          </TooltipContent>
-                        </Tooltip>
+                        <Select
+                          value={shotType}
+                          onValueChange={(v) => setShotType(v as ShotType)}
+                        >
+                          <SelectTrigger className="w-full hover-red-beam">
+                            <span>{shotType}</span>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SHOT_TYPES.map((t) => (
+                              <SelectItem key={t} value={t}>
+                                <span className="font-medium">{t}</span>
+                                <span className="ml-1 text-xs text-muted-foreground">
+                                  · {SHOT_TYPE_DESCRIPTIONS[t]}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          {SHOT_TYPE_DESCRIPTIONS[shotType] ?? ''}
+                        </p>
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-sm font-medium">길이 (초)</label>
@@ -669,8 +654,7 @@ export function AddItemDialog({
                 )}
               </div>
             </ScrollArea>
-          </div>
-        </TooltipProvider>
+        </div>
 
         <DialogFooter className="items-center border-t px-6 py-4">
           <span className="mr-auto text-xs text-muted-foreground">

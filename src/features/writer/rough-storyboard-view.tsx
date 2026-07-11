@@ -464,7 +464,7 @@ export function RoughStoryboardView() {
                 </div>
 
                 <div
-                  className="grid gap-4"
+                  className="grid items-start gap-4"
                   style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
                 >
                   {sceneShots.length === 0 && (
