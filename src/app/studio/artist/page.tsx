@@ -1,11 +1,15 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { FlaskConical } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { CharacterPanel } from '@/features/artist/character-panel'
 import { WorldPanel } from '@/features/artist/world-panel'
 import { InventoryGrid } from '@/features/artist/inventory-grid'
+import { AssetShotBoard } from '@/features/artist/asset-shot-board'
+import { useArtistBoardStore } from '@/stores/artist-board-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -40,6 +44,11 @@ export default function VisualPage() {
 
   const projectId = useProjectStore((s) => s.projectId)
   const [tab, setTab] = useState<ArtistTab>('characters')
+
+  // 실험 New UI(에셋·샷 보드) 토글 — 스토어 보관으로 탭 전환(remount)에도 유지.
+  const newUi = useArtistBoardStore((s) => s.boardMode)
+  const setBoardMode = useArtistBoardStore((s) => s.setBoardMode)
+  const toggleNewUi = () => setBoardMode(!newUi)
 
   // writer-pipeline 진행상황 (producer→artist 직행 시 백그라운드 생성 진행 표시용, decisions #37)
   const { status: writerStatus } = useWriterStatus(projectId)
@@ -344,49 +353,74 @@ export default function VisualPage() {
     )
   }
 
+  // 메인 헤더 — 사이드바 호버에 뜨는 스테이지 이름(STAGES.artist.name)을 여기 노출(#1).
+  //   오른쪽 New UI 버튼 = 실험 에셋·샷 보드 토글(#12). 두 모드가 같은 헤더를 공유한다.
+  const headerRow = (
+    <div className="mb-3 flex items-start justify-between gap-3">
+      <div>
+        <h1 className="text-lg font-bold">The Visual Studio</h1>
+        <p className="text-sm text-muted-foreground">
+          {newUi
+            ? '샷마다 어떤 인물·배경이 쓰이는지 연결합니다 — 에셋을 드래그해 참조를 구성하세요.'
+            : '캐릭터·월드의 컨셉 이미지를 만들고 다듬어 다음 단계로 넘깁니다.'}
+        </p>
+      </div>
+      <Button
+        size="sm"
+        variant={newUi ? 'secondary' : 'outline'}
+        onClick={toggleNewUi}
+        className="shrink-0"
+      >
+        <FlaskConical className="size-3.5" />
+        {newUi ? '기존 UI' : 'New UI'}
+      </Button>
+    </div>
+  )
+
   return (
     <>
-      <Tabs
-        value={tab}
-        onValueChange={(v) => setTab(v as ArtistTab)}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-      >
-        <div className="border-b border-border px-6 py-3">
-          {/* 메인 헤더 — 사이드바 호버에 뜨는 스테이지 이름(STAGES.artist.name)을 여기 노출(#1). */}
-          <div className="mb-3">
-            <h1 className="text-lg font-bold">The Visual Studio</h1>
-            <p className="text-sm text-muted-foreground">
-              캐릭터·월드의 컨셉 이미지를 만들고 다듬어 다음 단계로 넘깁니다.
-            </p>
-          </div>
-          <TabsList>
-            <TabsTrigger value="characters">Characters</TabsTrigger>
-            <TabsTrigger value="world">World</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          </TabsList>
+      {newUi ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="border-b border-border px-6 py-3">{headerRow}</div>
+          <AssetShotBoard />
         </div>
-
-        <TabsContent
-          value="characters"
-          className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+      ) : (
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as ArtistTab)}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <CharacterPanel />
-        </TabsContent>
+          <div className="border-b border-border px-6 py-3">
+            {headerRow}
+            <TabsList>
+              <TabsTrigger value="characters">Characters</TabsTrigger>
+              <TabsTrigger value="world">World</TabsTrigger>
+              <TabsTrigger value="inventory">Inventory</TabsTrigger>
+            </TabsList>
+          </div>
 
-        <TabsContent
-          value="world"
-          className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
-        >
-          <WorldPanel />
-        </TabsContent>
+          <TabsContent
+            value="characters"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+          >
+            <CharacterPanel />
+          </TabsContent>
 
-        <TabsContent
-          value="inventory"
-          className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
-        >
-          <InventoryGrid />
-        </TabsContent>
-      </Tabs>
+          <TabsContent
+            value="world"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+          >
+            <WorldPanel />
+          </TabsContent>
+
+          <TabsContent
+            value="inventory"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+          >
+            <InventoryGrid />
+          </TabsContent>
+        </Tabs>
+      )}
 
       {error && (
         <div className="border-t border-destructive/30 bg-destructive/10 px-6 py-2 text-sm text-destructive">
