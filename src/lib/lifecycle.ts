@@ -391,17 +391,11 @@ export function evaluateArtistGate({
   }
 
   for (const world of worlds ?? []) {
+    // 배경 = 이미지 1장(#6·#9): wide 만 확인. establishing 경고 폐기.
     if (!normalizeText(world.wideShot)) {
       warnings.push({
         field: `artist:${world.locationId}:wideShot`,
-        label: `${world.name || world.locationId}: wide shot 없음`,
-        detail: 'Director 보조 이미지이며 MVP 기본 경로에서는 경고입니다.',
-      })
-    }
-    if (!normalizeText(world.establishingShot)) {
-      warnings.push({
-        field: `artist:${world.locationId}:establishingShot`,
-        label: `${world.name || world.locationId}: establishing shot 없음`,
+        label: `${world.name || world.locationId}: 배경 이미지 없음`,
         detail: 'Director 보조 이미지이며 MVP 기본 경로에서는 경고입니다.',
       })
     }

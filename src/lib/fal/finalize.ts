@@ -8,7 +8,7 @@
 //         가드(호출부)로 1차 차단하고, storage upsert/컬럼 update는 동일 결과라 재실행돼도 무해.
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { completeGenerationJob, type GenerationJob } from '@/lib/generation-jobs'
-import { selectCandidatesToEvict, type CandidateView } from '@/lib/image-provenance'
+import { type CandidateView } from '@/lib/image-provenance'
 
 // Supabase Storage 객체 키는 ASCII-safe 여야 한다 (공백·한글 등 → "Invalid key" 업로드 실패).
 //   버그: 오픈캐스트 로케이션 id 가 scene.location 원문(한글+공백)이라 키에 그대로 들어가 거부 →
@@ -120,7 +120,7 @@ async function recordCharacterImageCandidate(
   if (insErr) throw insErr
 
   // 3) 단일 이미지 정책(#5, 2026-07-11): 이 슬롯의 비선택 후보를 전부 삭제 — 최신 선택본 1장만 유지(누적→교체).
-  //    (예전 "최근 N장 보관 + 후보 히스토리 스트립" 폐기. 월드는 여전히 evictSlotCandidates 로 히스토리 유지.)
+  //    (예전 "최근 N장 보관 + 후보 히스토리 스트립" 폐기. 월드도 동일 정책, #6.)
   await supabaseAdmin
     .from('character_image_candidates')
     .delete()
@@ -152,46 +152,6 @@ export async function uploadImageFromUrl(
     .upload(path, buf, { contentType: 'image/png', upsert: true })
   if (upErr) throw upErr
   return supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl
-}
-
-/**
- * 슬롯당 최근 N장만 남기고 오래된 비보호(비선택·비핀) 후보를 삭제(C4 AC16/17). best-effort.
- *   pinned 컬럼(023) 미적용 환경에선 pinned 없이 재조회(전부 비핀 취급) → 선택본만 보호.
- *   선정 로직은 image-provenance.selectCandidatesToEvict(결정적, 단위검증).
- */
-async function evictSlotCandidates(
-  table: 'character_image_candidates' | 'location_image_candidates',
-  slot: Record<string, string>,
-): Promise<void> {
-  const withPinned = await supabaseAdmin
-    .from(table)
-    .select('id, is_selected, pinned, generated_at')
-    .match(slot)
-  let rows: Array<{ id: string; isSelected: boolean; pinned: boolean; generatedAt: string }>
-  if (withPinned.error) {
-    const noPinned = await supabaseAdmin
-      .from(table)
-      .select('id, is_selected, generated_at')
-      .match(slot)
-    if (noPinned.error) return // best-effort: 테이블/컬럼 미적용(024/023 전)
-    rows = (noPinned.data ?? []).map((r) => ({
-      id: r.id as string,
-      isSelected: !!r.is_selected,
-      pinned: false,
-      generatedAt: r.generated_at as string,
-    }))
-  } else {
-    rows = (withPinned.data ?? []).map((r) => ({
-      id: r.id as string,
-      isSelected: !!r.is_selected,
-      pinned: !!(r as { pinned?: boolean }).pinned,
-      generatedAt: r.generated_at as string,
-    }))
-  }
-  const evict = selectCandidatesToEvict(rows)
-  if (evict.length) {
-    await supabaseAdmin.from(table).delete().in('id', evict)
-  }
 }
 
 /**
@@ -228,7 +188,12 @@ async function recordLocationImageCandidate(
     is_selected: true,
   })
   if (ins.error) return
-  await evictSlotCandidates('location_image_candidates', slot)
+  // 단일 이미지 정책(#6, 2026-07-11): 이 슬롯의 비선택 후보 전부 삭제 — 최신 선택본 1장만 유지(누적→교체).
+  await supabaseAdmin
+    .from('location_image_candidates')
+    .delete()
+    .match(slot)
+    .eq('is_selected', false)
 }
 
 /** 월드 샷(wide/establishing) 이미지 영속화 → locations[column] 갱신. */

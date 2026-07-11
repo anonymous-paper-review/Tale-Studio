@@ -35,7 +35,6 @@ export function WorldViewDialog({ locationId, shot, onClose }: Props) {
     s.worldAssets.find((w) => w.locationId === locationId),
   )
   const generateWorldShot = useArtistStore((s) => s.generateWorldShot)
-  const selectWorldCandidate = useArtistStore((s) => s.selectWorldCandidate)
   const isGenerating = useArtistStore((s) =>
     locationId ? s.generatingLocations.includes(locationId) : false,
   )
@@ -74,40 +73,7 @@ export function WorldViewDialog({ locationId, shot, onClose }: Props) {
             imageUrl={imageUrl}
           />
 
-          {/* 후보 히스토리 스트립 — 2개 이상일 때만 (C4 AC18, 캐릭터 대칭). 클릭 = 선택본 되돌리기. */}
-          {(world.viewCandidates?.[shot]?.length ?? 0) >= 2 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                후보 히스토리
-              </p>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {(world.viewCandidates?.[shot] ?? []).map((cand) => (
-                  <button
-                    key={cand.id}
-                    type="button"
-                    onClick={() => selectWorldCandidate(world.locationId, shot, cand.id)}
-                    className={`relative shrink-0 overflow-hidden rounded-md border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      cand.isSelected
-                        ? 'border-primary'
-                        : 'border-transparent hover:border-muted-foreground/40'
-                    }`}
-                  >
-                    <img
-                      src={cand.url}
-                      alt=""
-                      className="h-16 w-24 object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                    {cand.isSelected && (
-                      <span className="absolute right-0.5 top-0.5 rounded bg-primary px-1 text-[9px] text-primary-foreground">
-                        선택
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* 후보 히스토리 스트립 제거(#6) — 배경 이미지 1장 정책: 재생성은 누적 아닌 교체(finalize 최신 1장). */}
 
           {/* 사용 프롬프트 (수정 가능) */}
           <div>

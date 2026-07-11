@@ -53,8 +53,8 @@ export function WorldPanel() {
             const isSelected = selectedLocationId === world.locationId
             const isRegistered = registeredIds.has(world.locationId)
             const isSaved = savedIds.has(world.locationId)
-            const hasImage = Boolean(world.wideShot || world.establishingShot)
-            const representativeImage = world.wideShot ?? world.establishingShot ?? null
+            const hasImage = Boolean(world.wideShot)
+            const representativeImage = world.wideShot ?? null
 
             return (
               <div
@@ -82,49 +82,24 @@ export function WorldPanel() {
                   )}
                 </div>
 
-                {/* 샷 셀 클릭 → 프롬프트 확인/수정 + 재생성 Dialog */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    title="Wide Shot — 클릭해서 프롬프트 보기/재생성"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setViewDialog({
-                        locationId: world.locationId,
-                        shot: 'wideShot',
-                      })
-                    }}
-                    className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
-                  >
-                    <ImagePlaceholder
-                      label="Wide Shot"
-                      aspectRatio="video"
-                      imageUrl={world.wideShot}
-                      generating={isGenerating && !world.wideShot}
-                      generatingStartedAt={generatingStartedAt[world.locationId]}
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    title="Establishing — 클릭해서 프롬프트 보기/재생성"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setViewDialog({
-                        locationId: world.locationId,
-                        shot: 'establishingShot',
-                      })
-                    }}
-                    className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
-                  >
-                    <ImagePlaceholder
-                      label="Establishing"
-                      aspectRatio="video"
-                      imageUrl={world.establishingShot}
-                      generating={isGenerating && !world.establishingShot}
-                      generatingStartedAt={generatingStartedAt[world.locationId]}
-                    />
-                  </button>
-                </div>
+                {/* 배경 = 이미지 1장(#6·#9): establishing 셀 제거, wide 1컷만. 클릭 → 프롬프트/재생성 Dialog. */}
+                <button
+                  type="button"
+                  title="배경 — 클릭해서 프롬프트 보기/재생성"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setViewDialog({ locationId: world.locationId, shot: 'wideShot' })
+                  }}
+                  className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
+                >
+                  <ImagePlaceholder
+                    label="배경"
+                    aspectRatio="video"
+                    imageUrl={world.wideShot}
+                    generating={isGenerating && !world.wideShot}
+                    generatingStartedAt={generatingStartedAt[world.locationId]}
+                  />
+                </button>
 
                 <div className="mt-3 flex gap-2">
                   <Button

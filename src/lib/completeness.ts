@@ -5,7 +5,6 @@
 import type { CharacterAsset, WorldAsset } from '@/types'
 import type { DirectorNode } from '@/types/director'
 import { isShotData } from '@/types/director'
-import { CHARACTER_DIRECTIONAL_VIEWS } from '@/lib/artist/turnaround'
 
 export interface CompletenessGap {
   /** 사람이 읽는 한 줄 설명 */
@@ -19,15 +18,12 @@ export function getArtistGaps(
 ): CompletenessGap[] {
   const gaps: CompletenessGap[] = []
   for (const c of characters) {
-    if (c.views.main == null) gaps.push({ label: `${c.name}: 대표 이미지 없음` })
-    const missing = CHARACTER_DIRECTIONAL_VIEWS.filter((v) => c.views[v] == null)
-    if (missing.length > 0)
-      gaps.push({ label: `${c.name}: 방향뷰 ${missing.length}개 비어있음` })
+    // 캐릭터 = 턴어라운드 시트 1장(#7·#9): main(시트)만 확인. 방향뷰 개별 생성 폐기.
+    if (c.views.main == null) gaps.push({ label: `${c.name}: 이미지 없음` })
   }
   for (const w of worlds) {
-    if (w.wideShot == null) gaps.push({ label: `${w.name}: 와이드샷 없음` })
-    if (w.establishingShot == null)
-      gaps.push({ label: `${w.name}: 설정샷 없음` })
+    // 배경 = 이미지 1장(#6·#9): wide 만 확인. establishing 폐기.
+    if (w.wideShot == null) gaps.push({ label: `${w.name}: 배경 이미지 없음` })
   }
   return gaps
 }

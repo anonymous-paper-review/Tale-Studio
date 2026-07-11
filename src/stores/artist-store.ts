@@ -1035,9 +1035,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         }))
       }
 
-      // Generate sequentially to avoid timeout. fal이면 webhook job 경로, 아니면 동기.
-      // suffix는 WORLD_SHOT_SUFFIX 단일 출처 사용 (generateWorldShot과 동일 문구).
-      // 1) Wide shot (null = 서버 give-up skip — 성공 시에만 반영)
+      // 배경 = 이미지 1장(#6·#9): consistency 위해 wide 1컷만 생성·관리. establishing 생성 폐기.
+      //   suffix는 WORLD_SHOT_SUFFIX 단일 출처 사용 (generateWorldShot과 동일 문구).
       const wideShot = await generateAndPersistWorldShot(
         pid,
         locationId,
@@ -1050,23 +1049,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         set((state) => ({
           worldAssets: state.worldAssets.map((w) =>
             w.locationId === locationId ? { ...w, wideShot } : w,
-          ),
-        }))
-      }
-
-      // 2) Establishing shot
-      const establishingShot = await generateAndPersistWorldShot(
-        pid,
-        locationId,
-        'establishing_shot',
-        buildWorldShotPromptForLocation(location, scene, selectedBoostPreset, 'establishingShot'),
-        imageProvider,
-        actor,
-      )
-      if (establishingShot) {
-        set((state) => ({
-          worldAssets: state.worldAssets.map((w) =>
-            w.locationId === locationId ? { ...w, establishingShot } : w,
           ),
         }))
       }
@@ -1250,12 +1232,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       } else {
         skipped.push(`world ${w.locationId}:wideShot`)
       }
-      if (w.establishingShot == null) {
-        queuedRest.push(`world ${w.locationId}:establishingShot`)
-        restTasks.push(() => get().generateWorldShot(w.locationId, 'establishingShot', undefined, 'auto'))
-      } else {
-        skipped.push(`world ${w.locationId}:establishingShot`)
-      }
+      // establishing shot 자동 생성 폐기(#6·#9) — 배경은 wide 1장만.
     }
 
     console.log(
