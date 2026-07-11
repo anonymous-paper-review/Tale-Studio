@@ -19,7 +19,7 @@ import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-const VALID_COLUMNS = new Set(['wide_shot', 'establishing_shot'])
+const VALID_COLUMNS = new Set(['wide_shot'])
 
 export async function POST(req: Request) {
   try {

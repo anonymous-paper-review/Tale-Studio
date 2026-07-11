@@ -77,7 +77,6 @@ export interface WorldAsset {
   name: string
   sceneId: string
   wideShot: string | null
-  establishingShot: string | null
   /** Writer/Producer 정의 계승 — asset-storage 등록 시 prompt(생성)로 전파. 영어 base. */
   visualDescription?: string
   /** 표시·등록 description 용 — 유저 언어(locations.visual_description_native). 없으면 visualDescription 폴백. (S2b) */
@@ -91,6 +90,4 @@ export interface WorldAsset {
   styleDescription?: string
   lightingSources?: string[]
   props?: string[]
-  /** world 샷별 후보 히스토리 (location_image_candidates, C4 AC18 — 캐릭터 viewCandidates 대칭). 없으면 빈 객체. */
-  viewCandidates?: Partial<Record<'wideShot' | 'establishingShot', CandidateImage[]>>
 }

@@ -76,7 +76,6 @@ export interface LifecycleWorldAsset {
   locationId: string
   name?: string | null
   wideShot?: string | null
-  establishingShot?: string | null
 }
 
 export interface LifecycleGateIssue {

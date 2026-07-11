@@ -45,7 +45,6 @@ function worldAssets(): WorldAsset[] {
       name: '네온 시장',
       sceneId: '',
       wideShot: null,
-      establishingShot: null,
       origin: 'producer',
       userEdited: false,
     },

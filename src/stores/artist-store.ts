@@ -54,20 +54,17 @@ export type GenerationActor = 'ui' | 'chat' | 'auto'
 // 보수적으로 유지한다. 계정 전역 공정성은 generation_jobs dispatcher 도입 시 중앙화한다.
 const ARTIST_GENERATION_CONCURRENCY = 2
 
-// World 샷 (wide/establishing) — 캐릭터 뷰와 대칭 구조
-export type WorldShotKey = 'wideShot' | 'establishingShot'
+// World 샷 — 배경 = 이미지 1장(#6·#9): wide 1컷만. establishing 폐기(2026-07-11 죽은 코드 정리).
+export type WorldShotKey = 'wideShot'
 
 const WORLD_SHOT_SUFFIX: Record<WorldShotKey, string> = {
   wideShot: 'wide shot, panoramic',
-  establishingShot: 'establishing shot, aerial view',
 }
 const WORLD_SHOT_COLUMN: Record<WorldShotKey, string> = {
   wideShot: 'wide_shot',
-  establishingShot: 'establishing_shot',
 }
 export const WORLD_SHOT_LABELS: Record<WorldShotKey, string> = {
   wideShot: 'Wide Shot',
-  establishingShot: 'Establishing',
 }
 
 function worldShotPrompt(
@@ -188,7 +185,7 @@ async function persistImage(
 async function generateAndPersistWorldShot(
   projectId: string | null,
   locationId: string,
-  column: 'wide_shot' | 'establishing_shot',
+  column: 'wide_shot',
   prompt: string,
   provider: ImageProvider,
   actor: GenerationActor = 'ui',
@@ -424,14 +421,6 @@ interface ArtistState {
   setImageProvider: (provider: ImageProvider) => void
   /** 진입 허용된 projectId 기록 (멱등). 페이지가 ready 도달 시 1회 호출. */
   markEntered: (projectId: string) => void
-  /** 후보 이미지를 선택본으로 교체. 서버에 persist 후 로컬 상태 즉시 반영. */
-  selectCandidate: (characterId: string, viewKey: CharacterViewKey, candidateId: string) => Promise<void>
-  /** world 후보 선택본 교체(C4 AC18, 캐릭터 selectCandidate 대칭). 서버 persist 후 로컬 즉시 반영. */
-  selectWorldCandidate: (
-    locationId: string,
-    viewKey: 'wideShot' | 'establishingShot',
-    candidateId: string,
-  ) => Promise<void>
   /** 승인된 원천 외형 변경을 로컬 반영(C3 F6) — fixedPrompt 갱신 → 기존 파생 이미지가 stale 로 표시(자동 재생성 없음). */
   applyAppearancePatch: (characterId: string, appearance: string) => void
   reset: () => void
@@ -466,7 +455,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           { data: dbLocs },
           { data: dbCandidates },
           { data: project },
-          { data: dbLocCandidates },
         ] = await Promise.all([
           supabase
             .from('scenes')
@@ -490,10 +478,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .select('design_tokens')
             .eq('id', projectId)
             .maybeSingle(),
-          supabase
-            .from('location_image_candidates')
-            .select('id, location_id, view, url, source_hash, is_selected, generated_at')
-            .eq('project_id', projectId),
         ])
 
         // 후보 히스토리: character_id + viewKey 로 그룹핑, generated_at desc 정렬
@@ -519,36 +503,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             charMap[key].sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
           }
         }
-        // world 후보 히스토리(C4 AC18): location_id + viewKey 그룹핑(024 테이블, 미적용이면 빈 맵).
-        const LOC_VIEW_KEY: Record<string, 'wideShot' | 'establishingShot'> = {
-          wide_shot: 'wideShot',
-          establishing_shot: 'establishingShot',
-        }
-        const candidatesByLocView: Record<
-          string,
-          Partial<Record<'wideShot' | 'establishingShot', CandidateImage[]>>
-        > = {}
-        for (const row of dbLocCandidates ?? []) {
-          const viewKey = LOC_VIEW_KEY[row.view as string]
-          if (!viewKey) continue
-          const locMap = candidatesByLocView[row.location_id] ?? {}
-          const list = locMap[viewKey] ?? []
-          list.push({
-            id: row.id,
-            url: row.url,
-            sourceHash: row.source_hash ?? null,
-            isSelected: row.is_selected ?? false,
-            generatedAt: row.generated_at,
-          })
-          locMap[viewKey] = list
-          candidatesByLocView[row.location_id] = locMap
-        }
-        for (const locMap of Object.values(candidatesByLocView)) {
-          for (const k of Object.keys(locMap) as Array<'wideShot' | 'establishingShot'>) {
-            locMap[k]?.sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
-          }
-        }
-
         const dbScenes = (scenes ?? []).map((s) => ({
           sceneId: s.scene_id,
           narrativeSummary: s.narrative_summary ?? '',
@@ -615,7 +569,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               name: location.name,
               sceneId: scene?.sceneId ?? '',
               wideShot: (dbLocs ?? []).find((l) => l.location_id === location.locationId)?.wide_shot ?? null,
-              establishingShot: (dbLocs ?? []).find((l) => l.location_id === location.locationId)?.establishing_shot ?? null,
               visualDescription: location.visualDescription,
               visualDescriptionNative: location.visualDescriptionNative,
               timeOfDay: location.timeOfDay || scene?.timeOfDay || '',
@@ -626,7 +579,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               styleDescription: location.styleDescription,
               lightingSources: location.lightingSources,
               props: location.props,
-              viewCandidates: candidatesByLocView[location.locationId] ?? {},
             }
           })
 
@@ -728,7 +680,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           name: loc.name,
           sceneId: scene?.sceneId ?? '',
           wideShot: null,
-          establishingShot: null,
           visualDescription: loc.visualDescription ?? '',
         }
       })
@@ -1113,7 +1064,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const url = await generateAndPersistWorldShot(
         pid,
         locationId,
-        WORLD_SHOT_COLUMN[shot] as 'wide_shot' | 'establishing_shot',
+        WORLD_SHOT_COLUMN[shot] as 'wide_shot',
         prompt,
         imageProvider,
         actor,
@@ -1291,67 +1242,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         await get().generateWorldAsset(u.locationId, 'chat')
       }
     }
-  },
-
-  selectCandidate: async (characterId, viewKey, candidateId) => {
-    const projectId = useProjectStore.getState().projectId
-    if (!projectId) return
-    const res = await fetch('/api/artist/select-candidate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, characterId, view: viewKey, candidateId }),
-    })
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}))
-      set({ error: body.error ?? `선택 교체 실패 HTTP ${res.status}` })
-      return
-    }
-    const { url } = (await res.json()) as { url: string }
-    set((state) => ({
-      characterAssets: state.characterAssets.map((a) => {
-        if (a.characterId !== characterId) return a
-        const prevCandidates = a.viewCandidates[viewKey] ?? []
-        const nextCandidates = prevCandidates.map((c) => ({
-          ...c,
-          isSelected: c.id === candidateId,
-        }))
-        return {
-          ...a,
-          views: { ...a.views, [viewKey]: url },
-          viewCandidates: { ...a.viewCandidates, [viewKey]: nextCandidates },
-        }
-      }),
-    }))
-    const asset = get().characterAssets.find((a) => a.characterId === characterId)
-    if (asset) registerCharacterCard(asset, projectId)
-  },
-
-  selectWorldCandidate: async (locationId, viewKey, candidateId) => {
-    const projectId = useProjectStore.getState().projectId
-    if (!projectId) return
-    const res = await fetch('/api/artist/select-world-candidate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, locationId, view: viewKey, candidateId }),
-    })
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}))
-      set({ error: body.error ?? `선택 교체 실패 HTTP ${res.status}` })
-      return
-    }
-    const { url } = (await res.json()) as { url: string }
-    set((state) => ({
-      worldAssets: state.worldAssets.map((w) => {
-        if (w.locationId !== locationId) return w
-        const prev = w.viewCandidates?.[viewKey] ?? []
-        const next = prev.map((c) => ({ ...c, isSelected: c.id === candidateId }))
-        return {
-          ...w,
-          [viewKey]: url,
-          viewCandidates: { ...w.viewCandidates, [viewKey]: next },
-        }
-      }),
-    }))
   },
 
   selectBoostPreset: (preset) =>

@@ -149,7 +149,7 @@ export const useAssetStorageStore = create<AssetStorageState>()(
             supabase
               .from('locations')
               .select(
-                'location_id, name, scene_id, wide_shot, establishing_shot, visual_description',
+                'location_id, name, scene_id, wide_shot, visual_description',
               )
               .eq('project_id', projectId),
           ])
@@ -184,7 +184,6 @@ export const useAssetStorageStore = create<AssetStorageState>()(
               name: l.name,
               sceneId: l.scene_id ?? '',
               wideShot: l.wide_shot ?? null,
-              establishingShot: l.establishing_shot ?? null,
               visualDescription: l.visual_description ?? '',
             }
             get().registerWorld(

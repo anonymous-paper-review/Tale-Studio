@@ -55,7 +55,7 @@ describe('artist background source prompts', () => {
         estimatedDurationSeconds: 45,
       },
       'Cinematic',
-      'establishingShot',
+      'wideShot',
     )
 
     expect(prompt).toContain('windy rooftop safehouse')
@@ -63,7 +63,7 @@ describe('artist background source prompts', () => {
     expect(prompt).toContain('tense but hopeful')
     expect(prompt).toContain('scene context: The protagonists decide whether to run or fight.')
     expect(prompt).toContain('cinematic lighting, dramatic composition')
-    expect(prompt).toContain('establishing shot, aerial view')
+    expect(prompt).toContain('wide shot, panoramic')
   })
 
   it('marks explicit generation as user-edited but leaves auto first-fill unmarked', () => {

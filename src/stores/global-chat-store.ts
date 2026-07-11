@@ -268,10 +268,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           return `- ${c.name} (${c.characterId}) — views: ${filled || '(없음)'}`
         })
         const worldLines = a.worldAssets.map((w) => {
-          const shots = [
-            w.wideShot ? 'wide' : null,
-            w.establishingShot ? 'establishing' : null,
-          ]
+          const shots = [w.wideShot ? 'wide' : null]
             .filter(Boolean)
             .join(', ')
           return `- ${w.name} (${w.locationId}) — shots: ${shots || '(없음)'}`

@@ -99,7 +99,6 @@ export default function VisualPage() {
       locationId: w.locationId,
       name: w.name,
       wideShot: w.wideShot,
-      establishingShot: w.establishingShot,
     })),
   })
   const directorGate = evaluateDirectorGate({ writer: writerGateStatus, artist: artistGate })
