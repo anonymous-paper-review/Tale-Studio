@@ -112,18 +112,18 @@ export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
  */
 export function buildCharacterTurnaroundPrompt(input: CharacterPromptInput): string {
   return [
-    `Character turnaround model sheet of ${input.name}`,
+    `Fill in this character reference-sheet template with ${input.name}`,
     ...describe(input),
     ...styleTokens(input),
     ...deltaClause(input),
     ...(input.safeMode ? [SAFE_TOKENS] : []),
-    'fill the turnaround row of this model-sheet template with the SAME character — full-body front, three-quarter front, side profile, three-quarter back, and back views, matching the template layout, poses and alignment',
-    'identical character design, outfit, colors and proportions across all views, consistent scale on the same ground line',
-    'keep the sheet clean and readable, neutral background, flat even lighting, no extra text or logo',
+    'keep the template EXACTLY as-is — all of its section boxes, dividers, labels and headings stay in place (character concept, color palette, size guide, turnaround, detail notes, sketch style, face expression guide)',
+    'replace every placeholder figure with the SAME character and fill each figure section: the full-body turnaround row (front, three-quarter front, side profile, three-quarter back, and back), the concept portrait, the sketch-style row, and the face-expression variations',
+    'identical character design, outfit, colors and proportions across every view, consistent art style, clean line art',
   ]
     .filter(Boolean)
     .join('. ')
-    .slice(0, 1100)
+    .slice(0, 1200)
 }
 
 /**
