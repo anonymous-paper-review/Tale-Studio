@@ -23,6 +23,7 @@
 | 모듈 | 용도 |
 |---|---|
 | `stage-nav.ts` | 스테이지 핸드오프 공통 로직 (lib→store 패턴의 기준 예시) |
+| `export/` | 단계별/전체 프로젝트 산출물 export (md+미디어→ZIP, 사이드바 버튼) |
 | `completeness.ts` | Artist/Director 산출물 누락 감지 (chat-proactive-copilot) |
 | `script-lines.ts` | Writer 스크립트 라인맵·@L 멘션·채팅 컨텍스트 [L#] 주석 파생 |
 | `writer-chat-updates.ts` | Writer 채팅 updates[] 화이트리스트 검증·라인 참조 sanitize |

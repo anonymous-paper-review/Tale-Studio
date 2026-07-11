@@ -97,3 +97,6 @@ docs/*.html
 
 # 
 dev/Skill_Test/*
+# 테스트 계정 평문 비번 (커밋 금지)
+docs/test-accounts.md
+docs/test-accounts.csv
