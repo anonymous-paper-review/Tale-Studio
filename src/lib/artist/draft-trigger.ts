@@ -7,7 +7,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { createGenerationJob, hasQueuedCharacterViewJob } from '@/lib/generation-jobs'
-import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
+import { resolveWebhookUrl, resolveWebhookBaseUrl } from '@/lib/fal/webhook-url'
 import { buildCharacterMainPrompt, buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
 import { CHARACTER_VIEW_COLUMNS } from '@/types/asset'
 import {
@@ -90,7 +90,8 @@ export async function triggerCharacterDrafts(
 
       try {
         const lookFingerprint = computeLookFingerprint(designTokens, c.costume)
-        // 사람 = 턴어라운드 시트(모든 뷰 한 장, 와이드 3:2), 사물 = 단일 포트레이트(1:1). (#7)
+        // 사람 = 턴어라운드 시트: 캐릭터 템플릿(public asset)을 reference 로 넣은 I2I(edit) — 버튼 경로(generate-sheet)와 정합.
+        //   base URL 없으면 동일 프롬프트 T2I(3:2) 폴백. 사물 = 단일 포트레이트(1:1). (#7)
         const isPerson = c.entity_type !== 'object'
         const promptInput = {
           name: c.name,
@@ -100,13 +101,12 @@ export async function triggerCharacterDrafts(
         const prompt = isPerson
           ? buildCharacterTurnaroundPrompt(promptInput)
           : buildCharacterMainPrompt(promptInput)
-        const aspectRatio = isPerson ? '3:2' : '1:1'
-        const { request_id, model } = await falImageSubmit({
-          model: DRAFT_MODEL,
-          prompt,
-          aspect_ratio: aspectRatio,
-          webhookUrl,
-        })
+        const base = resolveWebhookBaseUrl()
+        const templateUrl = isPerson && base ? `${base}/character-template.png` : null
+        const submitOpts = templateUrl
+          ? { model: 'openai/gpt-image-2/edit', prompt, reference_image_urls: [templateUrl], webhookUrl }
+          : { model: DRAFT_MODEL, prompt, aspect_ratio: isPerson ? '3:2' : '1:1', webhookUrl }
+        const { request_id, model } = await falImageSubmit(submitOpts)
         await createGenerationJob({
           projectId,
           requestId: request_id,
@@ -117,7 +117,9 @@ export async function triggerCharacterDrafts(
           inputSnapshot: {
             model,
             prompt,
-            aspect_ratio: aspectRatio,
+            ...(templateUrl
+              ? { reference_image_urls: [templateUrl] }
+              : { aspect_ratio: isPerson ? '3:2' : '1:1' }),
             source_hash: computeImageSourceHash(c.appearance, lookFingerprint),
             // 외형만의 지문(룩 무관) — look-pending vs edited 구분용(027).
             appearance_hash: computeImageSourceHash(c.appearance, null),

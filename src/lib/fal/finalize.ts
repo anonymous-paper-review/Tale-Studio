@@ -119,12 +119,15 @@ async function recordCharacterImageCandidate(
   })
   if (insErr) throw insErr
 
-  // 3) 보관 정리(C4 AC16/17): 슬롯당 최근 N장, 선택본/핀 보호. pinned(023) 미적용 환경 대비 fallback.
-  await evictSlotCandidates('character_image_candidates', {
-    project_id: job.project_id,
-    character_id: characterId,
-    view,
-  })
+  // 3) 단일 이미지 정책(#5, 2026-07-11): 이 슬롯의 비선택 후보를 전부 삭제 — 최신 선택본 1장만 유지(누적→교체).
+  //    (예전 "최근 N장 보관 + 후보 히스토리 스트립" 폐기. 월드는 여전히 evictSlotCandidates 로 히스토리 유지.)
+  await supabaseAdmin
+    .from('character_image_candidates')
+    .delete()
+    .eq('project_id', job.project_id)
+    .eq('character_id', characterId)
+    .eq('view', view)
+    .eq('is_selected', false)
 }
 
 /** 공통: 원격 이미지 바이트 회수 → media 스토리지 업로드 → publicUrl. */

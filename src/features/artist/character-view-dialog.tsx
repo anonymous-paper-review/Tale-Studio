@@ -29,7 +29,6 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
     s.characterAssets.find((c) => c.characterId === charId),
   )
   const generateCharacterView = useArtistStore((s) => s.generateCharacterView)
-  const selectCandidate = useArtistStore((s) => s.selectCandidate)
   const viewFailures = useArtistStore((s) => s.viewFailures)
   const retryCharacterViewSafe = useArtistStore((s) => s.retryCharacterViewSafe)
   const isGenerating = useArtistStore((s) =>
@@ -108,47 +107,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
                   : '이 뷰는 Main 이미지를 기준으로 재생성됩니다.'}
           </p>
 
-          {/* 후보 히스토리 스트립 — 2개 이상일 때만 표시 */}
-          {candidates.length >= 2 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                후보 히스토리
-              </p>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {candidates.map((cand) => {
-                  const candClass = classifyImageStale(char.fixedPrompt, char.lookFingerprint ?? null, {
-                    sourceHash: cand.sourceHash,
-                    appearanceHash: cand.appearanceHash ?? null,
-                  })
-                  return (
-                    <button
-                      key={cand.id}
-                      type="button"
-                      onClick={() => selectCandidate(char.characterId, view, cand.id)}
-                      className={`relative shrink-0 overflow-hidden rounded-md border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                        cand.isSelected
-                          ? 'border-primary'
-                          : 'border-transparent hover:border-border'
-                      }`}
-                      style={{ width: 64, height: 64 }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={cand.url}
-                        alt="후보 이미지"
-                        className="size-full object-cover"
-                      />
-                      {candClass !== 'fresh' && (
-                        <span className="absolute bottom-0 left-0 right-0 bg-amber-500/80 px-0.5 py-px text-center text-[9px] leading-tight text-white">
-                          {candClass === 'look-pending' ? '룩 이전' : '외형 이전'}
-                        </span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+          {/* 후보 히스토리 스트립 제거(#5) — 이미지 1장 정책: 재생성은 누적 아닌 교체(finalize 가 최신 1장만 보관). */}
 
           <Button
             className="w-full"
