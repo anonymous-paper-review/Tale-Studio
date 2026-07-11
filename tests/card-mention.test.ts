@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { castMentions, backgroundMentions, activeMentionRefs } from '@/lib/card-mention'
+import {
+  castMentions,
+  backgroundMentions,
+  activeMentionRefs,
+  toggleMentionToken,
+} from '@/lib/card-mention'
 
 describe('castMentions (@mention labels incl. empty cards)', () => {
   it('uses the name when present, type as hint', () => {
@@ -57,5 +62,29 @@ describe('activeMentionRefs (input text -> mentioned card refs)', () => {
   })
   it('handles multiple distinct mentions', () => {
     expect(activeMentionRefs('@카르타 와 @이름 미정 인물 비교', items).sort()).toEqual(['a', 'p1'])
+  })
+})
+
+describe('toggleMentionToken (script line click add/remove)', () => {
+  it('appends the token to empty input', () => {
+    expect(toggleMentionToken('', 'L5')).toBe('@L5 ')
+  })
+
+  it('appends after existing text with a single separating space', () => {
+    expect(toggleMentionToken('이거 고쳐줘', 'L5')).toBe('이거 고쳐줘 @L5 ')
+    expect(toggleMentionToken('앞 @L3 ', 'L5')).toBe('앞 @L3 @L5 ')
+  })
+
+  it('removes the token on re-toggle and tidies whitespace', () => {
+    expect(toggleMentionToken('@L5 ', 'L5')).toBe('')
+    expect(toggleMentionToken('앞 @L5 뒤', 'L5')).toBe('앞 뒤')
+    expect(toggleMentionToken('@L5 @L6 ', 'L5')).toBe('@L6')
+  })
+
+  it('is prefix-safe: toggling L5 never touches L51', () => {
+    // L5 없음 → 붙임 (L51 을 L5 로 오인해 지우지 않는다)
+    expect(toggleMentionToken('@L51 고쳐', 'L5')).toBe('@L51 고쳐 @L5 ')
+    // 둘 다 있을 때 L5 만 제거, L51 보존
+    expect(toggleMentionToken('@L5 @L51 ', 'L5')).toBe('@L51')
   })
 })

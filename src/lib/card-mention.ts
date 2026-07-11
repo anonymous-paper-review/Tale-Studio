@@ -78,3 +78,23 @@ export function activeMentionRefs(
   }
   return refs
 }
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// 입력창에서 한 멘션을 토글한다: 이미 있으면 지우고, 없으면 끝에 붙인다.
+// 스크립트 라인(@L5)처럼 숫자 접미어가 접두 충돌하는 라벨을 위해 제거는 경계 인식
+//   — @L5 는 지우되 @L51 은 건드리지 않는다((?![0-9A-Za-z_]) lookahead).
+// 삽입 규칙은 global-chat 의 기존 append 동작과 일치시킨다.
+export function toggleMentionToken(text: string, label: string): string {
+  const token = `@${label}`
+  const boundary = escapeRegExp(token) + '(?![0-9A-Za-z_])'
+  if (new RegExp(boundary).test(text)) {
+    return text
+      .replace(new RegExp(boundary, 'g'), '')
+      .replace(/ {2,}/g, ' ')
+      .replace(/^ +| +$/g, '')
+  }
+  return `${text.replace(/\s*$/, text.trim() ? ' ' : '')}${token} `
+}

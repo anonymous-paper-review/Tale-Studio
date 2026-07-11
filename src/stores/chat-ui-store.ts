@@ -14,6 +14,8 @@ import {
 interface MentionInsertRequest {
   id: number
   label: string
+  // 'toggle': 입력창에 이미 있으면 제거(선택 해제), 없으면 삽입. 기본(undefined)=삽입만.
+  mode?: 'toggle'
 }
 
 interface ChatUiState {
@@ -28,6 +30,8 @@ interface ChatUiState {
   // Cmd/Ctrl+클릭으로 카드 → 입력창 멘션 삽입 요청(브리지). GlobalChat이 소비.
   mentionInsert: MentionInsertRequest | null
   requestMentionInsert: (label: string) => void
+  // 라인 재클릭 시 선택 해제까지 지원하는 토글 요청(스크립트 뷰어). GlobalChat이 소비.
+  requestMentionToggle: (label: string) => void
   consumeMentionInsert: (id: number) => void
   // 채팅 입력창 포커스(+빔) 요청 브리지 — 첫 진입 웰컴 등에서 set, GlobalChat이 소비.
   focusRequest: number | null
@@ -57,6 +61,8 @@ export const useChatUiStore = create<ChatUiState>()(
         ),
       mentionInsert: null,
       requestMentionInsert: (label) => set({ mentionInsert: { id: Date.now(), label } }),
+      requestMentionToggle: (label) =>
+        set({ mentionInsert: { id: Date.now(), label, mode: 'toggle' } }),
       consumeMentionInsert: (id) =>
         set((s) => (s.mentionInsert?.id === id ? { mentionInsert: null } : s)),
       focusRequest: null,

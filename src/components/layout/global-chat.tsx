@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils'
 import { HoverBeam } from '@/components/hover-beam'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
-import { castMentions, backgroundMentions, activeMentionRefs, FOUNDATION_MENTIONS } from '@/lib/card-mention'
+import { castMentions, backgroundMentions, activeMentionRefs, toggleMentionToken, FOUNDATION_MENTIONS } from '@/lib/card-mention'
 import { buildScriptLines, scriptLineMentions } from '@/lib/script-lines'
 import {
   STAGE_LABEL,
@@ -168,14 +168,16 @@ export function GlobalChat() {
     setMentionedRefs(activeMentionRefs(input, mentionItems.map((m) => ({ ref: m.id, label: m.label }))))
   }, [input, mentionItems, setMentionedRefs])
 
-  // Cmd/Ctrl+클릭으로 카드 → 입력창에 @멘션 삽입
+  // Cmd/Ctrl+클릭(카드) 또는 스크립트 라인 클릭 → 입력창에 @멘션 삽입/토글
   useEffect(() => {
     if (!mentionInsert) return
     const token = `@${mentionInsert.label}`
     setInput((prev) =>
-      prev.includes(token)
-        ? prev
-        : `${prev.replace(/\s*$/, prev.trim() ? ' ' : '')}${token} `,
+      mentionInsert.mode === 'toggle'
+        ? toggleMentionToken(prev, mentionInsert.label)
+        : prev.includes(token)
+          ? prev
+          : `${prev.replace(/\s*$/, prev.trim() ? ' ' : '')}${token} `,
     )
     consumeMentionInsert(mentionInsert.id)
     requestAnimationFrame(() => textareaRef.current?.focus())
