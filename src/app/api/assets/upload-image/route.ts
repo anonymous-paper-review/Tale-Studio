@@ -49,10 +49,13 @@ export async function POST(req: Request) {
 
     if (uploadErr) throw uploadErr
 
-    // 4. Get public URL
+    // 4. Get public URL — 결정적 경로 + upsert 는 URL 이 영원히 같아 브라우저/CDN(max-age=3600)이
+    //    재업로드 후에도 옛 이미지를 보여준다 → 업로드 시각 버전 쿼리로 캐시 키를 갈아준다
+    //    (fal finalize.ts 의 versionedUrl 과 동일 패턴, 2026-07-12). 저장 객체는 한 개 그대로.
     const {
-      data: { publicUrl },
+      data: { publicUrl: rawPublicUrl },
     } = supabaseAdmin.storage.from('media').getPublicUrl(path)
+    const publicUrl = `${rawPublicUrl}?v=${Date.now()}`
 
     // 5. Update DB row
     if (type === 'video') {

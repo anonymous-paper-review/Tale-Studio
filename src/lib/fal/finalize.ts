@@ -27,6 +27,15 @@ function storageKeySegment(raw: string): string {
   return slug ? `${slug}_${hash}` : `id_${hash}`
 }
 
+// 결정적 경로 + upsert 는 재생성 후에도 public URL 이 영원히 같다 → 브라우저/CDN(max-age=3600)이
+//   옛 이미지를 계속 서빙하고, src 문자열이 동일해 React 재렌더도 없어 "재생성했는데 그대로"로 보인다
+//   (턴어라운드가 저장소엔 있는데 화면은 옛 정면샷이던 버그, 2026-07-12). 업로드 시각 버전 쿼리로
+//   캐시 키만 갈아준다 — 저장 객체는 한 개 그대로(단일 이미지 정책 유지). webhook 재전송 시 ?v 값만
+//   달라질 뿐 같은 객체를 가리켜 재실행 무해성도 유지된다.
+function versionedUrl(publicUrl: string): string {
+  return `${publicUrl}?v=${Date.now()}`
+}
+
 /** 캐릭터 뷰 이미지 영속화 → 저장된 publicUrl 반환. */
 export async function finalizeCharacterViewJob(
   job: GenerationJob,
@@ -46,8 +55,9 @@ export async function finalizeCharacterViewJob(
     .from('media')
     .upload(path, buf, { contentType: 'image/png', upsert: true })
   if (upErr) throw upErr
-  const publicUrl = supabaseAdmin.storage.from('media').getPublicUrl(path).data
-    .publicUrl
+  const publicUrl = versionedUrl(
+    supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl,
+  )
 
   // 선택본 URL 은 기존대로 characters.view_* 에 미러(read 경로 무변경).
   const { error: updErr } = await supabaseAdmin
@@ -151,7 +161,7 @@ export async function uploadImageFromUrl(
     .from('media')
     .upload(path, buf, { contentType: 'image/png', upsert: true })
   if (upErr) throw upErr
-  return supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl
+  return versionedUrl(supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl)
 }
 
 /**
