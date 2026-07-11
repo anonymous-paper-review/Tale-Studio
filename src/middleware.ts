@@ -33,7 +33,12 @@ export async function middleware(request: NextRequest) {
   // 공개 경로: 로그인 전에도 볼 수 있는 랜딩(홈)·로그인 페이지.
   // 그 외(스튜디오/디자인 등)는 로그인 필요 — 접근 시 /login 으로 보냄.
   const { pathname } = request.nextUrl
-  const isPublicPath = pathname === '/' || pathname.startsWith('/login')
+  // 정적 에셋(public/ 의 확장자 파일)은 로그인 불필요 — public/ 은 본래 공개 자산.
+  //   fal.ai 가 익명으로 fetch 하는 character-template.png 가 /login 으로 리다이렉트되면 edit 모델이
+  //   참조 이미지 대신 로그인 HTML 을 받아 캐릭터 턴어라운드가 정면샷으로 깨졌다 (2026-07-11 수정).
+  const isPublicAsset = /\.(?:png|jpe?g|gif|svg|webp|avif|ico)$/i.test(pathname)
+  const isPublicPath =
+    pathname === '/' || pathname.startsWith('/login') || isPublicAsset
 
   // 리다이렉트 응답에도 getUser()가 방금 갱신한 세션 쿠키를 실어 보낸다.
   // (누락 시 토큰 갱신 타이밍에 걸린 유저가 로그인 ↔ 목적지 무한루프에 빠짐 — Supabase SSR 필수 패턴)
@@ -67,6 +72,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|auth/callback|api/).*)',
+    // 정적 이미지 에셋은 미들웨어 자체를 건너뛴다 (public/ 은 공개 + getUser 왕복 절약).
+    '/((?!_next/static|_next/image|favicon.ico|auth/callback|api/|.*\\.(?:png|jpg|jpeg|gif|svg|webp|avif|ico)$).*)',
   ],
 }
