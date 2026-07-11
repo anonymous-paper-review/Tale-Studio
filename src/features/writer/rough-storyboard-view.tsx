@@ -464,7 +464,7 @@ export function RoughStoryboardView() {
                 </div>
 
                 <div
-                  className="grid items-start gap-4"
+                  className="grid gap-4"
                   style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
                 >
                   {sceneShots.length === 0 && (
@@ -499,11 +499,14 @@ export function RoughStoryboardView() {
                         <div className="relative aspect-video bg-muted">
                           {panel?.url && job?.status !== 'generating' ? (
                             <>
+                              {/* absolute inset-0: aspect-video 컨테이너 박스를 무조건 채운다. in-flow
+                                  size-full 은 일부 브라우저/배율에서 h-full(=%)이 aspect-ratio 높이로 안 풀려
+                                  이미지가 위쪽만 채우고 아래 bg-muted 회색이 남던 버그(2026-07-11). */}
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={withCacheBust(panel.url, panel.generatedAt)}
                                 alt={`${shot.shotId} rough storyboard`}
-                                className="size-full object-cover"
+                                className="absolute inset-0 size-full object-cover"
                                 loading="lazy"
                                 draggable={false}
                               />

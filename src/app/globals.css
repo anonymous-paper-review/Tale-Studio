@@ -377,6 +377,30 @@
   }
 }
 
+/* ── Thin styled scrollbar ──
+   네이티브 스크롤 컨테이너(overflow-auto)용 얇은 테마 스크롤바. Radix ScrollArea 는 Radix Select/Dialog 와
+   중첩되면 콤보박스/휠 상호작용을 깨는 케이스가 있어(추가 팝업), 네이티브 스크롤 + 이 유틸로 스타일만 입힌다. */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
+}
+
 /* ── React Flow — Director 캔버스 컨트롤/미니맵 ──
    xyflow 기본 컨트롤은 흰 배경 + 흰 아이콘이라 dark 테마에서 화이트온화이트로 안 보인다.
    xyflow 기본(.react-flow__controls-button, specificity 0,1,0)이 page.tsx의 style.css import로

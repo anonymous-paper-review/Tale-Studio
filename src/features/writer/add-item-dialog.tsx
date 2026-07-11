@@ -34,7 +34,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { useWriterStore } from '@/stores/writer-store'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
@@ -304,7 +303,8 @@ export function AddItemDialog({
 
         <div className="grid min-h-0 md:grid-cols-2">
             {/* ── 좌: 어디에 (아웃라인 + 삽입 갭) ─────────────────────────── */}
-            <ScrollArea className="h-[68vh] border-b md:border-b-0 md:border-r">
+            {/* 네이티브 스크롤 + .scrollbar-thin — Radix ScrollArea 는 내부 Select/휠 상호작용을 깨서 교체(2026-07-11) */}
+            <div className="h-[68vh] overflow-y-auto border-b scrollbar-thin md:border-b-0 md:border-r">
               <div className="px-4 py-3">
                 <p className="mb-2 px-1 text-xs uppercase tracking-wider text-muted-foreground">
                   어디에 추가할까요
@@ -424,10 +424,10 @@ export function AddItemDialog({
                   </p>
                 )}
               </div>
-            </ScrollArea>
+            </div>
 
             {/* ── 우: 무엇을 (내용 설정) ──────────────────────────────────── */}
-            <ScrollArea className="h-[68vh]">
+            <div className="h-[68vh] overflow-y-auto scrollbar-thin">
               <div className="space-y-4 px-6 py-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">
                   내용 설정
@@ -653,7 +653,7 @@ export function AddItemDialog({
                   </>
                 )}
               </div>
-            </ScrollArea>
+            </div>
         </div>
 
         <DialogFooter className="items-center border-t px-6 py-4">
