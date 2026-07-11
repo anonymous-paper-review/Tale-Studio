@@ -68,6 +68,8 @@ export interface CharacterAsset {
   lookFingerprint?: string | null
   /** 출처 — producer 정의(핸드오프) vs writer 파이프라인 추가. 온보딩 갭 계산에 사용. */
   origin?: 'producer' | 'writer'
+  /** 대표 포트레이트(028) — 턴어라운드 시트 좌상단 CHARACTER CONCEPT 크롭. 없으면 views.main 폴백. */
+  portrait?: string | null
   /** 뷰별 후보 히스토리 (character_image_candidates). 없으면 빈 객체. */
   viewCandidates: Partial<Record<CharacterViewKey, CandidateImage[]>>
 }

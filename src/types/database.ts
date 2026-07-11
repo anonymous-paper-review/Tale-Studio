@@ -69,6 +69,7 @@ export type Database = {
           view_main: string | null
           view_side_left: string | null
           view_side_right: string | null
+          portrait: string | null
         }
         Insert: {
           id?: string
@@ -85,6 +86,7 @@ export type Database = {
           view_main?: string | null
           view_side_left?: string | null
           view_side_right?: string | null
+          portrait?: string | null
         }
         Update: {
           id?: string
@@ -101,6 +103,7 @@ export type Database = {
           view_main?: string | null
           view_side_left?: string | null
           view_side_right?: string | null
+          portrait?: string | null
         }
         Relationships: [
           {
@@ -530,7 +533,9 @@ export type Database = {
           shot_id: string
           shot_type: string
           action_description: string | null
+          action_description_native: string | null
           characters: string[] | null
+          location_ids: string[] | null
           duration_seconds: number | null
           generation_method: string | null
           dialogue_lines: Json | null
@@ -561,7 +566,9 @@ export type Database = {
           shot_id: string
           shot_type: string
           action_description?: string | null
+          action_description_native?: string | null
           characters?: string[] | null
+          location_ids?: string[] | null
           duration_seconds?: number | null
           generation_method?: string | null
           dialogue_lines?: Json | null
@@ -592,7 +599,9 @@ export type Database = {
           shot_id?: string
           shot_type?: string
           action_description?: string | null
+          action_description_native?: string | null
           characters?: string[] | null
+          location_ids?: string[] | null
           duration_seconds?: number | null
           generation_method?: string | null
           dialogue_lines?: Json | null

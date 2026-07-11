@@ -558,6 +558,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             fixedPrompt: c.appearance ?? '',
             // 생성·stale 은 fixedPrompt(영어 base), 표시는 appearance_native(유저 언어). 없으면 EN 폴백. (S2)
             appearanceNative: c.appearance_native ?? c.appearance ?? '',
+            portrait: c.portrait ?? null,
             viewCandidates: candidatesByCharView[c.character_id] ?? {},
             lookFingerprint: computeLookFingerprint(designTokens, c.costume),
             origin: c.origin === 'writer' ? 'writer' : 'producer',

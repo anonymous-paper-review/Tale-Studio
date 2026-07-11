@@ -9,6 +9,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { completeGenerationJob, type GenerationJob } from '@/lib/generation-jobs'
 import { type CandidateView } from '@/lib/image-provenance'
+import { cropTurnaroundPortrait } from '@/lib/artist/portrait'
 
 // Supabase Storage 객체 키는 ASCII-safe 여야 한다 (공백·한글 등 → "Invalid key" 업로드 실패).
 //   버그: 오픈캐스트 로케이션 id 가 scene.location 원문(한글+공백)이라 키에 그대로 들어가 거부 →
@@ -74,8 +75,56 @@ export async function finalizeCharacterViewJob(
     console.warn('[finalize] candidate record failed (image landed):', e instanceof Error ? e.message : e)
   })
 
+  // 대표 포트레이트(New UI 에셋 칩) — 사람 main 은 시트 좌상단 CHARACTER CONCEPT 크롭,
+  //   사물/비-시트는 main 그대로. best-effort(실패해도 시트 착지는 유지).
+  if (view === 'main') {
+    await savePortraitFromMain(job, characterId, buf, publicUrl).catch((e) => {
+      console.warn('[finalize] portrait crop failed (sheet landed):', e instanceof Error ? e.message : e)
+    })
+  }
+
   await completeGenerationJob(job.id, publicUrl)
   return publicUrl
+}
+
+/**
+ * main 착지분에서 대표 포트레이트를 파생해 characters.portrait 에 저장(028).
+ *   사람(entity_type≠object) + 시트(landscape)면 좌상단 컨셉 박스 크롭 업로드, 아니면 main URL 그대로.
+ */
+async function savePortraitFromMain(
+  job: GenerationJob,
+  characterId: string,
+  sheetBuf: Buffer,
+  mainUrl: string,
+): Promise<void> {
+  const { data: ch } = await supabaseAdmin
+    .from('characters')
+    .select('entity_type')
+    .eq('project_id', job.project_id)
+    .eq('character_id', characterId)
+    .maybeSingle()
+
+  let portraitUrl = mainUrl // 사물 or 비-시트 폴백: main 자체가 이미 단일 포트레이트
+  if (ch?.entity_type !== 'object') {
+    const cropped = await cropTurnaroundPortrait(sheetBuf)
+    if (cropped) {
+      const path = `${job.target.workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}_portrait.png`
+      const { error: upErr } = await supabaseAdmin.storage
+        .from('media')
+        .upload(path, cropped, { contentType: 'image/png', upsert: true })
+      if (upErr) throw upErr
+      portraitUrl = versionedUrl(
+        supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl,
+      )
+    }
+  }
+
+  const { error } = await supabaseAdmin
+    .from('characters')
+    .update({ portrait: portraitUrl })
+    .eq('project_id', job.project_id)
+    .eq('character_id', characterId)
+  if (error) throw error
 }
 
 /**
