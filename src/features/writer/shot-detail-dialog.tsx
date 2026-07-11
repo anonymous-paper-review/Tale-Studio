@@ -194,7 +194,7 @@ export function ShotDetailDialog({
                 <SelectTrigger className="w-full hover-red-beam">
                   <span>{draft.shotType}</span>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper">
                   {SHOT_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
                       <span className="font-medium">{t}</span>

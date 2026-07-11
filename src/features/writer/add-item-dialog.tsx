@@ -445,7 +445,7 @@ export function AddItemDialog({
                           <SelectTrigger className="w-full hover-red-beam">
                             <span>{shotType}</span>
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent position="popper">
                             {SHOT_TYPES.map((t) => (
                               <SelectItem key={t} value={t}>
                                 <span className="font-medium">{t}</span>
@@ -507,7 +507,7 @@ export function AddItemDialog({
                             <SelectTrigger className="w-full hover-red-beam">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent position="popper">
                               {CAMERA_ANGLES.map((a) => (
                                 <SelectItem key={a.value} value={a.value}>
                                   {a.label}
@@ -525,7 +525,7 @@ export function AddItemDialog({
                             <SelectTrigger className="w-full hover-red-beam">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent position="popper">
                               {GEN_METHODS.map((m) => (
                                 <SelectItem key={m.value} value={m.value}>
                                   {m.label}
@@ -547,7 +547,7 @@ export function AddItemDialog({
                             <SelectTrigger className="w-full hover-red-beam">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent position="popper">
                               {LIGHT_POSITIONS.map((p) => (
                                 <SelectItem key={p.value} value={p.value}>
                                   {p.label}
@@ -565,7 +565,7 @@ export function AddItemDialog({
                             <SelectTrigger className="w-full hover-red-beam">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent position="popper">
                               {COLOR_TEMPS.map((c) => (
                                 <SelectItem key={c.value} value={String(c.value)}>
                                   {c.label}
