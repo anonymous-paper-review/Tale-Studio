@@ -212,7 +212,18 @@ export async function falImageFetch(
   const status = await fal.queue.status(model, { requestId: request_id, logs: false });
   const s = (status.status as string).toUpperCase();
   if (s === 'COMPLETED') {
-    const result = await fal.queue.result(model, { requestId: request_id });
+    let result;
+    try {
+      result = await fal.queue.result(model, { requestId: request_id });
+    } catch (e) {
+      // fal 큐는 처리 중 실패한 요청도 status=COMPLETED 로 두고, result 조회가 422 로 실패 상세를 돌려준다.
+      //   422 = 터미널 실패(예: reference 이미지 fetch 불가) → FAILED 매핑. 이를 transient 로 취급해
+      //   reconcile 이 잡을 영영 queued 로 두고 dedupe 가 재생성까지 막던 버그 수정 (2026-07-12).
+      //   그 외(네트워크/5xx)는 일시 오류 → 재던져 호출자가 queued 유지·다음 폴링에서 재시도.
+      if ((e as { status?: number })?.status === 422)
+        return { status: 'FAILED', error: falErrorDetail(e) };
+      throw e;
+    }
     const { url, width, height } = extractImageUrlFromData(result.data);
     if (!url) return { status: 'FAILED', error: 'no image URL in result' };
     return { status: 'COMPLETED', url, width, height, raw: result.data };
@@ -364,7 +375,15 @@ export async function falVideoFetch(
   const status = await fal.queue.status(model, { requestId: request_id, logs: false });
   const s = (status.status as string).toUpperCase();
   if (s === 'COMPLETED') {
-    const result = await fal.queue.result(model, { requestId: request_id });
+    let result;
+    try {
+      result = await fal.queue.result(model, { requestId: request_id });
+    } catch (e) {
+      // falImageFetch 와 동일: result 422 = 터미널 실패 → FAILED 매핑 (queued 고착 방지, 2026-07-12).
+      if ((e as { status?: number })?.status === 422)
+        return { status: 'FAILED', error: falErrorDetail(e) };
+      throw e;
+    }
     const { url, duration } = extractVideoUrlFromData(result.data);
     if (!url) return { status: 'FAILED', error: 'no video URL in result' };
     return { status: 'COMPLETED', url, duration, raw: result.data };
