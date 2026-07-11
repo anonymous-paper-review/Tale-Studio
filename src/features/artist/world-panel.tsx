@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Loader2, Sparkles, Check, Share2, BookmarkCheck, BookmarkPlus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
 import {
   Tooltip,
   TooltipContent,
@@ -19,14 +18,6 @@ import { registerWorldCard } from '@/stores/asset-storage-store'
 import { useInventoryStore } from '@/stores/inventory-store'
 import { cn } from '@/lib/utils'
 
-const BOOST_PRESETS = [
-  'Cinematic',
-  'High-Res',
-  'Film Grain',
-  'Neon Noir',
-  'Golden Hour',
-] as const
-
 export function WorldPanel() {
   const {
     sceneManifest,
@@ -34,12 +25,8 @@ export function WorldPanel() {
     selectedLocationId,
     generatingLocations,
     generatingStartedAt,
-    selectedBoostPreset,
-    imageProvider,
     selectLocation,
     generateWorldAsset,
-    selectBoostPreset,
-    setImageProvider,
   } = useArtistStore()
 
   const projectId = useProjectStore((s) => s.projectId)
@@ -52,129 +39,12 @@ export function WorldPanel() {
     shot: WorldShotKey
   } | null>(null)
 
-  const [selfHostedStatus, setSelfHostedStatus] = useState<
-    'checking' | 'online' | 'offline' | 'unconfigured'
-  >('checking')
-
-  useEffect(() => {
-    let cancelled = false
-    const check = async () => {
-      try {
-        const res = await fetch('/api/generate/health')
-        const data = await res.json()
-        if (!cancelled) setSelfHostedStatus(data.status)
-      } catch {
-        if (!cancelled) setSelfHostedStatus('offline')
-      }
-    }
-    check()
-    const interval = setInterval(check, 30_000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [])
-
   const getScene = (sceneId: string) =>
     sceneManifest?.scenes.find((s) => s.sceneId === sceneId)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* Provider Toggle + Cinematic Boost Chips */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
-        {/* Image Provider Toggle */}
-        <div className="mr-3 flex items-center gap-1 rounded-lg border border-border p-0.5">
-          <button
-            type="button"
-            onClick={() => setImageProvider('fal')}
-            className={cn(
-              'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-              imageProvider === 'fal'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-              'hover-red-beam',
-            )}
-          >
-            Fal
-          </button>
-          <button
-            type="button"
-            onClick={() => setImageProvider('gemini')}
-            className={cn(
-              'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-              imageProvider === 'gemini'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-              'hover-red-beam',
-            )}
-          >
-            Gemini
-          </button>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => {
-                  if (selfHostedStatus === 'online')
-                    setImageProvider('tailscale')
-                }}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                  imageProvider === 'tailscale'
-                    ? 'bg-primary text-primary-foreground'
-                    : selfHostedStatus === 'online'
-                      ? 'text-muted-foreground hover:text-foreground'
-                      : 'cursor-not-allowed text-muted-foreground/50',
-                  'hover-red-beam',
-                )}
-              >
-                <span
-                  className={cn(
-                    'size-1.5 rounded-full',
-                    selfHostedStatus === 'online' && 'bg-success',
-                    selfHostedStatus === 'offline' && 'bg-destructive',
-                    selfHostedStatus === 'checking' &&
-                      'bg-warning animate-pulse',
-                    selfHostedStatus === 'unconfigured' && 'bg-muted-foreground',
-                  )}
-                />
-                Self-hosted
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {selfHostedStatus === 'online' && 'h100-image-gen connected'}
-              {selfHostedStatus === 'offline' &&
-                'Server offline — check h100-image-gen'}
-              {selfHostedStatus === 'checking' && 'Checking connection…'}
-              {selfHostedStatus === 'unconfigured' &&
-                'TAILSCALE_IMAGE_API_URL not set'}
-            </TooltipContent>
-          </Tooltip>
-        </div>
-
-        <Separator orientation="vertical" className="!h-5" />
-
-        <span className="mr-1 text-xs font-medium text-muted-foreground">
-          Cinematic Boost
-        </span>
-        {BOOST_PRESETS.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            onClick={() => selectBoostPreset(preset)}
-            className={cn(
-              'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-              selectedBoostPreset === preset
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground',
-              'hover-red-beam',
-            )}
-          >
-            {preset}
-          </button>
-        ))}
-      </div>
-
+      {/* 모델(provider)·톤(boost) 선택 툴바 제거(#10). 생성은 store 기본값으로 수행. */}
       <ScrollArea className="min-h-0 flex-1 px-6 py-4">
         <div className="space-y-6">
           {worldAssets.map((world) => {

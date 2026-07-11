@@ -353,6 +353,13 @@ export default function VisualPage() {
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <div className="border-b border-border px-6 py-3">
+          {/* 메인 헤더 — 사이드바 호버에 뜨는 스테이지 이름(STAGES.artist.name)을 여기 노출(#1). */}
+          <div className="mb-3">
+            <h1 className="text-lg font-bold">The Visual Studio</h1>
+            <p className="text-sm text-muted-foreground">
+              캐릭터·월드의 컨셉 이미지를 만들고 다듬어 다음 단계로 넘깁니다.
+            </p>
+          </div>
           <TabsList>
             <TabsTrigger value="characters">Characters</TabsTrigger>
             <TabsTrigger value="world">World</TabsTrigger>

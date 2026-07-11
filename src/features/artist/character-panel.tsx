@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/tooltip'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
-import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { HoverBeam } from '@/components/hover-beam'
 import { useArtistStore, type CharacterRole } from '@/stores/artist-store'
@@ -161,18 +160,10 @@ export function CharacterPanel() {
               {/* Header: 편집 가능한 이름 + 역할 토글 + 배지 (인라인 편집 — 팝업 없음) */}
               <div className="mb-3 space-y-2">
                 <div className="flex items-center gap-2">
-                  <HoverBeam className="min-w-0 flex-1">
-                    <Input
-                      value={char.name}
-                      placeholder={isObject ? '사물 이름' : '캐릭터 이름'}
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        updateCharacter(char.characterId, { name: e.target.value })
-                      }
-                      className="h-9 text-base font-medium"
-                    />
-                  </HoverBeam>
+                  {/* 이름은 채팅으로만 변경 — 수동 편집 불가(#2). */}
+                  <span className="min-w-0 flex-1 truncate text-base font-medium">
+                    {char.name || (isObject ? '사물' : '캐릭터')}
+                  </span>
                   {isObject ? <Badge variant="secondary">사물</Badge> : null}
                   {isRequired && (
                     <Badge variant={hasMainImage ? 'outline' : 'destructive'} className="text-[10px]">
@@ -186,32 +177,11 @@ export function CharacterPanel() {
                       </Badge>
                     )}
                 </div>
-                {/* 역할 토글 — 카드에서 바로 주인공/적대자/조연 전환 (hover 색 변경으로 변경 가능 표시) */}
+                {/* 역할은 채팅으로만 변경 — 수동 편집 불가(#3). 현재 역할만 읽기전용 배지로 표시. */}
                 {!isObject && (
-                  <div className="flex gap-1.5">
-                    {ROLE_TOGGLE.map(({ value, label }) => {
-                      const active = role === value
-                      return (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            updateCharacter(char.characterId, { role: value })
-                          }}
-                          className={cn(
-                            'rounded-md border px-2.5 py-1 text-xs transition-colors',
-                            active
-                              ? 'border-primary bg-primary/15 font-medium text-foreground'
-                              : 'border-border text-muted-foreground hover:border-primary/60 hover:bg-accent hover:text-foreground',
-                            'hover-red-beam',
-                          )}
-                        >
-                          {label}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <Badge variant="outline" className="w-fit text-xs font-normal">
+                    {ROLE_TOGGLE.find((r) => r.value === role)?.label ?? role}
+                  </Badge>
                 )}
               </div>
 

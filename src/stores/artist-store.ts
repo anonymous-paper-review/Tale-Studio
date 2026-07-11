@@ -266,16 +266,38 @@ function makeCharacterId(name: string): string {
   return `char_${slug || 'new'}_${rand}`
 }
 
-// 캐릭터 인라인 편집의 DB PATCH 디바운스 — 캐릭터별 최신 patch를 모아 350ms 후 1회 전송.
+// 캐릭터 인라인 편집의 DB PATCH — 디바운스(350ms)로 모아 1회 전송. 단, 이미지 생성 직전엔
+//   sendCharacterPatchNow 로 즉시 flush + await 해서 서버(generate-sheet)가 최신 프롬프트를 읽게 한다
+//   (편집 직후 생성 시 옛 프롬프트로 그려지던 버그 방지, #11 2026-07-11).
 const charPatchTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const charPatchPending = new Map<
   string,
   { name?: string; role?: string; description?: string; appearance?: string }
 >()
+async function sendCharacterPatchNow(characterId: string): Promise<void> {
+  const timer = charPatchTimers.get(characterId)
+  if (timer) {
+    clearTimeout(timer)
+    charPatchTimers.delete(characterId)
+  }
+  const body = charPatchPending.get(characterId)
+  if (!body) return
+  charPatchPending.delete(characterId)
+  const projectId = useProjectStore.getState().projectId
+  if (!projectId) return
+  const res = await fetch('/api/artist/character', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, characterId, ...body }),
+  })
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}))
+    throw new Error(b.error ?? `HTTP ${res.status}`)
+  }
+}
 function scheduleCharacterPatch(
   characterId: string,
   patch: { name?: string; role?: string; description?: string; appearance?: string },
-  flush: (characterId: string) => void,
 ) {
   charPatchPending.set(characterId, { ...charPatchPending.get(characterId), ...patch })
   const prev = charPatchTimers.get(characterId)
@@ -283,8 +305,14 @@ function scheduleCharacterPatch(
   charPatchTimers.set(
     characterId,
     setTimeout(() => {
-      charPatchTimers.delete(characterId)
-      flush(characterId)
+      void sendCharacterPatchNow(characterId).catch((err) => {
+        useArtistStore.setState({
+          error:
+            err instanceof Error
+              ? `캐릭터 수정 저장 실패 (카드는 유지됨): ${err.message}`
+              : 'Character update failed',
+        })
+      })
     }, 350),
   )
 }
@@ -832,30 +860,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
-    scheduleCharacterPatch(characterId, patch, (id) => {
-      const body = charPatchPending.get(id)
-      charPatchPending.delete(id)
-      if (!body) return
-      void fetch('/api/artist/character', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, characterId: id, ...body }),
-      })
-        .then(async (res) => {
-          if (!res.ok) {
-            const b = await res.json().catch(() => ({}))
-            throw new Error(b.error ?? `HTTP ${res.status}`)
-          }
-        })
-        .catch((err) => {
-          set({
-            error:
-              err instanceof Error
-                ? `캐릭터 수정 저장 실패 (카드는 유지됨): ${err.message}`
-                : 'Character update failed',
-          })
-        })
-    })
+    scheduleCharacterPatch(characterId, patch)
   },
 
   selectCharacter: (id) => set({ selectedCharacterId: id }),
@@ -868,6 +873,14 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     if (!projectId) return
     const key = `${characterId}:${view}`
     if (get().generatingViews.includes(key)) return
+
+    // 편집(디바운스 저장)이 서버에 닿기 전에 생성 라우트가 DB를 읽어 옛 프롬프트로 그리는 레이스 방지 —
+    //   대기 중인 캐릭터 수정 PATCH 를 먼저 flush+await 한 뒤 제출한다(#11).
+    try {
+      await sendCharacterPatchNow(characterId)
+    } catch {
+      // 저장 실패해도 생성은 시도(서버가 현재 DB 기준으로 그림). 에러는 updateCharacter 경로에서 표면화.
+    }
 
     set((state) => ({
       generatingViews: [...state.generatingViews, key],
