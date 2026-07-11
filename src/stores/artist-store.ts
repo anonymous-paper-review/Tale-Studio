@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import type { Scene, SceneManifest, Location as ManifestLocation, CharacterAsset, WorldAsset } from '@/types'
 import { type CharacterViewKey } from '@/types/asset'
-import { CHARACTER_DIRECTIONAL_VIEWS } from '@/lib/artist/turnaround'
 import { candidateViewToViewKey, classifyImageStale, computeLookFingerprint, computeWorldImageSourceHash, type CandidateImage, type LookTokens } from '@/lib/image-provenance'
 import { buildWorldPrompt } from '@/lib/prompts'
 import { useWriterStore } from '@/stores/writer-store'
@@ -997,15 +996,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   // 4방향을 제한된 풀로 병렬 생성. 카드 "Generate All Views" / 시트 재생성용.
   // object 캐릭터는 main 만 생성 — 방향뷰 불필요.
   generateCharacterAllViews: async (characterId, actor = 'ui', instruction) => {
+    // 캐릭터 = 턴어라운드 시트 1장(모든 뷰 포함), 사물 = 단일 이미지 — 둘 다 main 하나만 생성(#7·#9 2026-07-11).
+    //   방향뷰(개별 i2i) 생성 폐기: 라우트가 사람 main 을 와이드 턴어라운드로 그린다.
     await get().generateCharacterView(characterId, 'main', actor, instruction)
-    const char = get().characterAssets.find((c) => c.characterId === characterId)
-    if (char?.entityType === 'object') return
-    await runPool(
-      CHARACTER_DIRECTIONAL_VIEWS.map(
-        (v) => () => get().generateCharacterView(characterId, v, actor, instruction),
-      ),
-      ARTIST_GENERATION_CONCURRENCY,
-    )
   },
 
   generateWorldAsset: async (locationId, actor = 'ui') => {
@@ -1197,43 +1190,23 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const queuedRest: string[] = []
     const skipped: string[] = []
     for (const c of characterAssets) {
-      // object 캐릭터는 방향뷰 불필요
+      // 캐릭터 = 턴어라운드 시트 1장(#7): 방향뷰 자동 생성 폐기. main(시트) 빈칸만 자율 채움.
       if (c.entityType === 'object') {
-        skipped.push(`char ${c.characterId}:directional (object — skip)`)
+        // 사물: 단일 이미지는 사용자 버튼 생성(자동 대상 아님) — 기존 동작 유지.
+        skipped.push(`char ${c.characterId} (object — 버튼 생성)`)
         continue
       }
-      if (c.views.main == null) {
-        // producer 인물: main 은 서버 초안(핸드오프 triggerCharacterDrafts)이 채우므로 방향뷰만 미룬다.
-        // writer-origin(오픈캐스트) 인물: 서버 초안 대상이 아니라 main 이 영영 안 온다 → 여기서 자율로
-        //   main 을 먼저 생성(빈칸 채움, §5)하고, 완료되면 이어서 방향뷰까지 만든다(dir 은 main reference i2i 필요).
-        //   한 태스크로 순차 처리 — autoGen 은 세션당 1회라 별도 재트리거가 없으므로 main→dir 을 체이닝한다.
-        //   (오픈캐스트 인물 자동 생성, 2026-07-03. 멱등: generateCharacterView 가 generatingViews/서버 dedupe.)
-        if (c.origin === 'writer') {
-          queuedRest.push(`char ${c.characterId}:main+directional (opencast 자율)`)
-          restTasks.push(async () => {
-            await get().generateCharacterView(c.characterId, 'main', 'auto')
-            // main 완료(views.main 채워짐) 확인 후 비어있는 방향뷰 생성. 실패/skip 이면 main null → 방향뷰 보류(배지).
-            const cur = get().characterAssets.find((x) => x.characterId === c.characterId)
-            if (!cur || cur.views.main == null) return
-            await runPool(
-              CHARACTER_DIRECTIONAL_VIEWS.filter((v) => cur.views[v] == null).map(
-                (v) => () => get().generateCharacterView(c.characterId, v, 'auto'),
-              ),
-              CONCURRENCY,
-            )
-          })
-        } else {
-          skipped.push(`char ${c.characterId}:directional (main 대기 — server 초안)`)
-        }
+      if (c.views.main != null) {
+        skipped.push(`char ${c.characterId}:main (이미 있음)`)
         continue
       }
-      for (const v of CHARACTER_DIRECTIONAL_VIEWS) {
-        if (c.views[v] == null) {
-          queuedRest.push(`char ${c.characterId}:${v}`)
-          restTasks.push(() => get().generateCharacterView(c.characterId, v, 'auto'))
-        } else {
-          skipped.push(`char ${c.characterId}:${v}`)
-        }
+      // main(턴어라운드 시트) 빈칸: writer-origin(오픈캐스트)은 서버 초안 대상이 아니므로 자율 생성,
+      //   producer 인물은 서버 초안(핸드오프)이 채우므로 대기. 멱등: generateCharacterView 가 generatingViews/서버 dedupe.
+      if (c.origin === 'writer') {
+        queuedRest.push(`char ${c.characterId}:main (opencast 턴어라운드 자율)`)
+        restTasks.push(() => get().generateCharacterView(c.characterId, 'main', 'auto'))
+      } else {
+        skipped.push(`char ${c.characterId}:main (server 초안 대기)`)
       }
     }
     for (const w of worldAssets) {

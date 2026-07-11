@@ -105,6 +105,28 @@ export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
 }
 
 /**
+ * 턴어라운드 시트 프롬프트 — "한 장에 모든 뷰"(정면·3/4·측면·3/4 후면·후면) 모델시트.
+ *   기본 경로는 캐릭터 템플릿(public/character-template.png)을 reference 로 넣은 I2I(edit) — 그 레이아웃에
+ *   캐릭터를 채운다. 템플릿 URL 을 못 구하면 같은 프롬프트로 T2I 폴백. 동일 캐릭터/의상/비율을 뷰마다
+ *   강하게 고정해 director 단계의 뷰 참조 일관성을 확보(#7). 개별 방향 뷰(i2i) 생성 대체 — 캐릭터당 1장(#9, 2026-07-11).
+ */
+export function buildCharacterTurnaroundPrompt(input: CharacterPromptInput): string {
+  return [
+    `Character turnaround model sheet of ${input.name}`,
+    ...describe(input),
+    ...styleTokens(input),
+    ...deltaClause(input),
+    ...(input.safeMode ? [SAFE_TOKENS] : []),
+    'fill the turnaround row of this model-sheet template with the SAME character — full-body front, three-quarter front, side profile, three-quarter back, and back views, matching the template layout, poses and alignment',
+    'identical character design, outfit, colors and proportions across all views, consistent scale on the same ground line',
+    'keep the sheet clean and readable, neutral background, flat even lighting, no extra text or logo',
+  ]
+    .filter(Boolean)
+    .join('. ')
+    .slice(0, 1100)
+}
+
+/**
  * 방향 뷰 프롬프트 — main 이미지를 reference 로 넘긴 image-to-image(edit) 용.
  * "동일 캐릭터/의상을 이 각도에서" 를 강하게 지시해 일관성을 유지한다.
  */

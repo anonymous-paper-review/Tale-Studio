@@ -18,9 +18,10 @@ import {
   type GenerationJobActor,
 } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
-import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
+import { resolveWebhookUrl, resolveWebhookBaseUrl } from '@/lib/fal/webhook-url'
 import {
   buildCharacterMainPrompt,
+  buildCharacterTurnaroundPrompt,
   buildCharacterViewPrompt,
   type CharacterPromptInput,
   type DirectionalView,
@@ -117,7 +118,7 @@ export async function POST(req: Request) {
         .single(),
       supabaseAdmin
         .from('characters')
-        .select('character_id, name, role, appearance, costume, view_main')
+        .select('character_id, name, role, appearance, costume, view_main, entity_type')
         .eq('project_id', projectId)
         .eq('character_id', characterId)
         .single(),
@@ -147,11 +148,34 @@ export async function POST(req: Request) {
     const webhookUrl = resolveWebhookUrl()
     let submitOpts: FalImageOptions
     if (view === 'main') {
-      submitOpts = {
-        model: 'openai/gpt-image-2',
-        prompt: buildCharacterMainPrompt(input),
-        aspect_ratio: '1:1',
-        webhookUrl,
+      const isPerson = character.entity_type !== 'object'
+      if (isPerson) {
+        // 사람 = 턴어라운드 시트: 캐릭터 모델시트 템플릿(public asset)을 reference 로 넣어 그 레이아웃에
+        //   캐릭터를 채우는 I2I(edit). fal 이 fetch 가능한 public URL 필요 → base 없으면(로컬) T2I 폴백. (#7)
+        const base = resolveWebhookBaseUrl()
+        const templateUrl = base ? `${base}/character-template.png` : null
+        submitOpts = templateUrl
+          ? {
+              model: 'openai/gpt-image-2/edit',
+              prompt: buildCharacterTurnaroundPrompt(input),
+              reference_image_urls: [templateUrl],
+              webhookUrl,
+              // aspect_ratio 생략 → edit 모델이 템플릿 비율(≈16:9)을 따름
+            }
+          : {
+              model: 'openai/gpt-image-2',
+              prompt: buildCharacterTurnaroundPrompt(input),
+              aspect_ratio: '3:2',
+              webhookUrl,
+            }
+      } else {
+        // 사물 = 단일 대표 포트레이트(1:1).
+        submitOpts = {
+          model: 'openai/gpt-image-2',
+          prompt: buildCharacterMainPrompt(input),
+          aspect_ratio: '1:1',
+          webhookUrl,
+        }
       }
     } else {
       const prompt = buildCharacterViewPrompt(input, view as DirectionalView)

@@ -8,7 +8,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { createGenerationJob, hasQueuedCharacterViewJob } from '@/lib/generation-jobs'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
-import { buildCharacterMainPrompt } from '@/lib/artist/turnaround'
+import { buildCharacterMainPrompt, buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
 import { CHARACTER_VIEW_COLUMNS } from '@/types/asset'
 import {
   computeImageSourceHash,
@@ -25,6 +25,7 @@ interface DraftCharacterRow {
   appearance: string | null
   costume: string | null
   view_main: string | null
+  entity_type: string | null
 }
 
 export interface DraftTriggerResult {
@@ -49,7 +50,7 @@ export async function triggerCharacterDrafts(
     const [{ data: chars }, { data: project }] = await Promise.all([
       supabaseAdmin
         .from('characters')
-        .select('character_id, name, role, appearance, costume, view_main')
+        .select('character_id, name, role, appearance, costume, view_main, entity_type')
         .eq('project_id', projectId),
       supabaseAdmin
         .from('projects')
@@ -89,15 +90,21 @@ export async function triggerCharacterDrafts(
 
       try {
         const lookFingerprint = computeLookFingerprint(designTokens, c.costume)
-        const prompt = buildCharacterMainPrompt({
+        // 사람 = 턴어라운드 시트(모든 뷰 한 장, 와이드 3:2), 사물 = 단일 포트레이트(1:1). (#7)
+        const isPerson = c.entity_type !== 'object'
+        const promptInput = {
           name: c.name,
           appearance: c.appearance ?? c.name,
           role: c.role ?? undefined,
-        })
+        }
+        const prompt = isPerson
+          ? buildCharacterTurnaroundPrompt(promptInput)
+          : buildCharacterMainPrompt(promptInput)
+        const aspectRatio = isPerson ? '3:2' : '1:1'
         const { request_id, model } = await falImageSubmit({
           model: DRAFT_MODEL,
           prompt,
-          aspect_ratio: '1:1',
+          aspect_ratio: aspectRatio,
           webhookUrl,
         })
         await createGenerationJob({
@@ -110,7 +117,7 @@ export async function triggerCharacterDrafts(
           inputSnapshot: {
             model,
             prompt,
-            aspect_ratio: '1:1',
+            aspect_ratio: aspectRatio,
             source_hash: computeImageSourceHash(c.appearance, lookFingerprint),
             // 외형만의 지문(룩 무관) — look-pending vs edited 구분용(027).
             appearance_hash: computeImageSourceHash(c.appearance, null),

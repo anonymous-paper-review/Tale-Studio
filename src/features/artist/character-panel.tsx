@@ -19,7 +19,6 @@ import { useProjectStore } from '@/stores/project-store'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { useInventoryStore } from '@/stores/inventory-store'
 import {
-  CHARACTER_VIEW_KEYS,
   CHARACTER_VIEW_LABELS,
   type CharacterViewKey,
 } from '@/types/asset'
@@ -85,7 +84,8 @@ export function CharacterPanel() {
           const isRegistered = registeredIds.has(char.characterId)
           const isSaved = savedIds.has(char.characterId)
           const isObject = char.entityType === 'object'
-          const hasImage = isObject ? Boolean(char.views.main) : CHARACTER_VIEW_KEYS.some((v) => char.views[v])
+          // 캐릭터=턴어라운드 시트 1장, 사물=단일 이미지 — 둘 다 main 하나로 판정(#7).
+          const hasImage = Boolean(char.views.main)
           const hasMainImage = Boolean(char.views.main)
           const isRequired = requiredCharacterIds.includes(char.characterId)
           const bgScenes = getBackgroundScenes(char.characterId)
@@ -185,84 +185,37 @@ export function CharacterPanel() {
                 )}
               </div>
 
-              {/* object: 단일 main 이미지 셀 / person: 기존 4뷰 그리드 */}
-              {isObject ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setViewDialog({ charId: char.characterId, view: 'main' })
-                      }}
-                      className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
-                    >
-                      <ImagePlaceholder
-                        label={CHARACTER_VIEW_LABELS['main']}
-                        aspectRatio="square"
-                        imageUrl={char.views.main ?? null}
-                        generating={isViewGenerating('main')}
-                        generatingStartedAt={
-                          generatingStartedAt[`${char.characterId}:main`]
-                        }
-                      />
-
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="right"
-                    align="center"
-                    sideOffset={8}
-                    collisionPadding={12}
-                    className="max-w-[260px] space-y-1.5 whitespace-normal text-left"
+              {/* 캐릭터 = 턴어라운드 시트 1장(모든 뷰, 와이드 3:2) / 사물 = 단일 이미지(정사각). 둘 다 main 하나(#7).
+                  셀 클릭 → 상세/재생성 Dialog. */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setViewDialog({ charId: char.characterId, view: 'main' })
+                    }}
+                    className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                   >
-                    {charTooltipBody}
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                /* main(정면 대표) + 3방향 뷰를 동일 크기로 병렬 표시 (front 통합·hero 폐기, 2026-06-05).
-                   셀 클릭 → 상세/재생성 Dialog. 각 이미지에 개별 Tooltip 부착 → 호버한 "그 이미지"의
-                   좌/우(side="right" + avoidCollisions 기본)로 떠서 화면 밖으로 나가면 자동으로 반대편(left)으로
-                   뒤집힘. collisionPadding 으로 뷰포트 가장자리 여백 확보 (이전: 그리드 전체를 한 트리거로 잡아
-                   맨 왼/오른쪽에만 떠서 화면 밖 이탈). */
-                <div className="grid grid-cols-4 gap-2">
-                  {(['main', 'back', 'sideLeft', 'sideRight'] as const).map(
-                    (view) => (
-                      <Tooltip key={view}>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setViewDialog({ charId: char.characterId, view })
-                            }}
-                            className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
-                          >
-                            <ImagePlaceholder
-                              label={CHARACTER_VIEW_LABELS[view]}
-                              aspectRatio="square"
-                              imageUrl={char.views[view] ?? null}
-                              generating={isViewGenerating(view)}
-                              generatingStartedAt={
-                                generatingStartedAt[`${char.characterId}:${view}`]
-                              }
-                            />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent
-                          side="right"
-                          align="center"
-                          sideOffset={8}
-                          collisionPadding={12}
-                          className="max-w-[260px] space-y-1.5 whitespace-normal text-left"
-                        >
-                          {charTooltipBody}
-                        </TooltipContent>
-                      </Tooltip>
-                    ),
-                  )}
-                </div>
-              )}
+                    <ImagePlaceholder
+                      label={isObject ? CHARACTER_VIEW_LABELS['main'] : '턴어라운드 (모든 뷰)'}
+                      aspectRatio={isObject ? 'square' : 'video'}
+                      imageUrl={char.views.main ?? null}
+                      generating={isViewGenerating('main')}
+                      generatingStartedAt={generatingStartedAt[`${char.characterId}:main`]}
+                    />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  align="center"
+                  sideOffset={8}
+                  collisionPadding={12}
+                  className="max-w-[260px] space-y-1.5 whitespace-normal text-left"
+                >
+                  {charTooltipBody}
+                </TooltipContent>
+              </Tooltip>
 
               {/* 설정 / 외형 — 카드에서 바로 편집 (팝업 없음). hover 시 빨간 빔으로 입력 가능 표시. */}
               <div className="mt-3 space-y-2">
@@ -313,7 +266,7 @@ export function CharacterPanel() {
                   ) : (
                     <>
                       <Sparkles className="size-3.5" />
-                      {isObject ? '이미지 생성' : 'Generate All Views'}
+                      {isObject ? '이미지 생성' : '턴어라운드 생성'}
                     </>
                   )}
                 </Button>
