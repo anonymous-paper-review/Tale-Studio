@@ -33,6 +33,12 @@ export interface CharacterPromptInput {
   /** 디자인 토큰 (projects.design_tokens.l1) */
   artStyle?: string
   shapeLanguage?: string
+  /** l1.line_quality — 선 스타일(예: sharp_defined). 옛 하드코딩 "clean line art"(애니 토큰) 대체(#B). */
+  lineQuality?: string
+  /** l1.texture_philosophy — 질감 방향(예: weathered_industrial). 애니 디폴트 견제(#B). */
+  texturePhilosophy?: string
+  /** l1.character_proportion — 두신 비율(예: 8:1). 애니 등신 견제(#B). */
+  characterProportion?: string
   /** 글로벌 팔레트 색상들 */
   palette?: string[]
   /** 재생성 시 유저 요청 델타(merge) — 룩 토대 위에 덮어쓰는 명시 지시(AC13). 룩(스타일/팔레트/의상)은 토대로 유지. */
@@ -59,7 +65,12 @@ function styleTokens(input: CharacterPromptInput): string[] {
   const palette = input.palette?.filter(Boolean).join(', ')
   return [
     input.artStyle ? `art style: ${input.artStyle}` : '',
+    input.lineQuality ? `line quality: ${input.lineQuality}` : '',
     input.shapeLanguage ? `shape language: ${input.shapeLanguage}` : '',
+    input.texturePhilosophy ? `texture: ${input.texturePhilosophy}` : '',
+    input.characterProportion
+      ? `character proportions: ${input.characterProportion} head-to-body ratio`
+      : '',
     palette ? `palette: ${palette}` : '',
   ].filter(Boolean)
 }
@@ -118,12 +129,16 @@ export function buildCharacterTurnaroundPrompt(input: CharacterPromptInput): str
     ...deltaClause(input),
     ...(input.safeMode ? [SAFE_TOKENS] : []),
     'keep the template EXACTLY as-is — all of its section boxes, dividers, labels and headings stay in place (character concept, color palette, size guide, turnaround, detail notes, sketch style, face expression guide)',
-    'replace every placeholder figure with the SAME character and fill each figure section: the full-body turnaround row (front, three-quarter front, side profile, three-quarter back, and back), the concept portrait, the sketch-style row, and the face-expression variations',
-    'identical character design, outfit, colors and proportions across every view, consistent art style, clean line art',
+    // 템플릿 v2(스타일 중립 마네킹판): 마네킹은 "포즈 자리표시"임을 명시 — 마네킹 질감/형태를 계승하지 않게.
+    'the gray mannequin figures are pose placeholders ONLY — replace every one of them with the SAME character in that exact pose: the full-body turnaround row (front, three-quarter front, side profile, three-quarter back, and back), the concept portrait, the size-guide figure, the sketch-style row, the action pose, and the face-expression variations',
+    'identical character design, outfit, colors and proportions across every view, consistent art style',
+    // #B: 옛 "clean line art"(애니 토큰) 삭제 + 애니 디폴트 차단. "declared art style"을 따르라는 조건부
+    //   표현이라 아트 스타일 자체가 애니인 프로젝트와는 충돌하지 않는다(디폴트 회귀만 금지).
+    'follow the declared art style exactly — never fall back to a generic anime, chibi or mascot look, and never inherit any art style from the template mannequins',
   ]
     .filter(Boolean)
     .join('. ')
-    .slice(0, 1200)
+    .slice(0, 1500)
 }
 
 /**

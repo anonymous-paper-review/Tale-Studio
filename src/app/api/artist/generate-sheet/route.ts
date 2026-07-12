@@ -40,7 +40,13 @@ export const maxDuration = 60
 
 // projects.design_tokens JSONB shape (008_svc_design_tokens.sql 주석 기준, 부분)
 interface DesignTokens {
-  l1?: { art_style?: string; shape_language?: string }
+  l1?: {
+    art_style?: string
+    shape_language?: string
+    line_quality?: string
+    texture_philosophy?: string
+    character_proportion?: string
+  }
   palette?: { primary?: string; secondary?: string; accent?: string }
 }
 
@@ -137,6 +143,9 @@ export async function POST(req: Request) {
       costumes: character.costume ?? undefined,
       artStyle: dt.l1?.art_style,
       shapeLanguage: dt.l1?.shape_language,
+      lineQuality: dt.l1?.line_quality,
+      texturePhilosophy: dt.l1?.texture_philosophy,
+      characterProportion: dt.l1?.character_proportion,
       palette,
       delta: typeof instruction === 'string' ? instruction : undefined,
       safeMode: effectiveSafeMode,
