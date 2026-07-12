@@ -29,7 +29,7 @@
 
 - **L1** — footer 우측 영역의 **Platform 컬럼 전체 삭제** (AI Production / Cinematography / Video Generation / Security 모두 제거).
 - **L2** — footer **Studio 컬럼은 `Contact`만 남기고 나머지 삭제** (Projects / About Us / Careers 제거).
-- **L3** — `Contact` 클릭 시 **팝업으로 이메일 주소 노출**: `daewon.yoon.ai@gmail.com`.
+- **L3** — `Contact` 클릭 시 **팝업으로 이메일 주소 노출**: `talestudio24@gmail.com` (2026-07-12 개인 주소 → 팀 주소로 교체).
 
 ---
 

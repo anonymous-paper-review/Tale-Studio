@@ -6,9 +6,9 @@ export async function POST(req: Request): Promise<Response> {
   try {
     const body = await req.json()
     const message: string | undefined = body?.message
-    // kind='contact' → 랜딩 Contact 문의: daewon 주소로 발송. 그 외(기본) → 피드백 talestudio24.
+    // Contact 문의·피드백 모두 talestudio24 단일 수신(2026-07-12 개인 주소 제거) — 제목으로만 구분.
     const isContact = body?.kind === 'contact'
-    const recipient = isContact ? 'daewon.yoon.ai@gmail.com' : 'talestudio24@gmail.com'
+    const recipient = 'talestudio24@gmail.com'
     const subject = isContact ? '[TaleStudio] Contact 문의' : '[TaleStudio] 사용자 피드백'
 
     if (!message?.trim()) {

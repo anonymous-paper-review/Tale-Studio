@@ -1,12 +1,12 @@
 'use client'
 
 // 랜딩 footer의 Contact (L3). 클릭하면 메신저형 팝업이 떠서 이메일 주소를 보여주고,
-// 작성한 메시지를 /api/feedback (kind:'contact') 로 보내 daewon.yoon.ai@gmail.com 으로 포워딩한다.
+// 작성한 메시지를 /api/feedback (kind:'contact') 로 보내 talestudio24@gmail.com 으로 포워딩한다.
 import { useState, type ReactNode } from 'react'
 import { Loader2, Send } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
-const CONTACT_EMAIL = 'daewon.yoon.ai@gmail.com'
+const CONTACT_EMAIL = 'talestudio24@gmail.com'
 
 export function ContactPopover({
   trigger,
