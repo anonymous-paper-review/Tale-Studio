@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Loader2, Sparkles, RefreshCw, AlertTriangle } from 'lucide-react'
 import {
   Dialog,
@@ -8,11 +9,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { HoverBeam } from '@/components/hover-beam'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { useArtistStore } from '@/stores/artist-store'
 import { CHARACTER_VIEW_LABELS, type CharacterViewKey } from '@/types/asset'
 import { classifyImageStale } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
+import { cn } from '@/lib/utils'
 
 type Props = {
   charId: string | null
@@ -29,11 +33,16 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
     s.characterAssets.find((c) => c.characterId === charId),
   )
   const generateCharacterView = useArtistStore((s) => s.generateCharacterView)
+  const updateCharacter = useArtistStore((s) => s.updateCharacter)
   const viewFailures = useArtistStore((s) => s.viewFailures)
   const retryCharacterViewSafe = useArtistStore((s) => s.retryCharacterViewSafe)
   const isGenerating = useArtistStore((s) =>
     view ? s.generatingViews.includes(`${charId}:${view}`) : false,
   )
+
+  // 외형 프롬프트(수정 후 재생성, 월드 다이얼로그와 대칭) — 대상(캐릭터×뷰) 전환 시 초기화.
+  const [prompt, setPrompt] = useState('')
+  const [promptKey, setPromptKey] = useState<string | null>(null)
 
   const open = !!charId && !!view
   if (!open || !char || !view) return null
@@ -44,6 +53,15 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
   // object 캐릭터는 방향뷰 개념 없음 — isDirectional/needsMain 로직 미적용
   const isDirectional = !isObject && view !== 'main'
   const needsMain = isDirectional && !char.views.main
+  // 사람 main = 와이드 턴어라운드 시트 → 넓은 다이얼로그 + 16:9 프레임으로 전체 표시(잘림 방지, #4).
+  const isSheet = !isObject && view === 'main'
+
+  const initialPrompt = char.appearanceNative || char.fixedPrompt || ''
+  const key = `${charId}:${view}`
+  if (promptKey !== key) {
+    setPromptKey(key)
+    setPrompt(initialPrompt)
+  }
 
   // stale 원인 분류(027): look-pending(룩만 도착) vs edited(외형 변경). dialog 포커스에서만 표시.
   const candidates = char.viewCandidates[view] ?? []
@@ -58,7 +76,12 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent
+        className={cn(
+          isSheet ? 'sm:max-w-3xl' : 'sm:max-w-lg',
+          'max-h-[92vh] overflow-y-auto scrollbar-thin',
+        )}
+      >
         <DialogHeader>
           <DialogTitle className="text-sm">
             {char.name} — {label}
@@ -86,10 +109,11 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
             </div>
           )}
 
-          <div className="mx-auto w-full max-w-sm">
+          {/* 사람 main = 시트 전체(16:9), 그 외 = 기존 1:1 프레임 */}
+          <div className={cn('mx-auto w-full', !isSheet && 'max-w-sm')}>
             <ImagePlaceholder
               label={label}
-              aspectRatio="square"
+              aspectRatio={isSheet ? 'video' : 'square'}
               imageUrl={imageUrl}
               generating={isGenerating}
             />
@@ -101,18 +125,41 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
                 ? '재생성하면 새 이미지를 만듭니다.'
                 : '이미지를 생성합니다.'
               : view === 'main'
-                ? 'Main 은 대표 포트레이트입니다. 재생성하면 새 이미지를 만듭니다.'
+                ? '턴어라운드 시트입니다. 아래 외형 프롬프트를 수정하고 재생성하면 반영돼요.'
                 : needsMain
                   ? '방향 뷰는 Main 을 기준으로 생성됩니다. 먼저 Main 을 생성하세요.'
                   : '이 뷰는 Main 이미지를 기준으로 재생성됩니다.'}
           </p>
+
+          {/* 외형 프롬프트(#4) — 월드 다이얼로그와 대칭. 수정하면 재생성 시 캐릭터 원천(appearance)에 반영. */}
+          {view === 'main' && (
+            <div>
+              <label className="mb-1.5 block text-xs text-muted-foreground">
+                외형 프롬프트 (수정 후 재생성)
+              </label>
+              <HoverBeam>
+                <Textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  rows={4}
+                  placeholder="이 캐릭터의 외형 묘사"
+                />
+              </HoverBeam>
+            </div>
+          )}
 
           {/* 후보 히스토리 스트립 제거(#5) — 이미지 1장 정책: 재생성은 누적 아닌 교체(finalize 가 최신 1장만 보관). */}
 
           <Button
             className="w-full"
             disabled={isGenerating || needsMain}
-            onClick={() => generateCharacterView(char.characterId, view)}
+            onClick={() => {
+              // 프롬프트가 편집됐으면 원천(appearance)에 먼저 반영 — 생성 직전 flush(#11)가 저장을 보장.
+              const next = prompt.trim()
+              if (view === 'main' && next && next !== initialPrompt)
+                updateCharacter(char.characterId, { appearance: next })
+              void generateCharacterView(char.characterId, view)
+            }}
           >
             {isGenerating ? (
               <>

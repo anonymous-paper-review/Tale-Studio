@@ -33,6 +33,14 @@ export function effectiveLocationIds(
   return { ids: sceneLocation ? [sceneLocation] : [], inherited: true }
 }
 
+/** undo/redo 히스토리 엔트리 — 한 편집 = 한 샷의 한 필드 전이. locationIds 는 null(씬 상속) 복원 가능. */
+interface BoardHistoryEntry {
+  shotId: string
+  field: 'characters' | 'locationIds'
+  before: string[] | null
+  after: string[] | null
+}
+
 interface ArtistBoardState {
   /** 실험 New UI 토글 — 스토어에 두어 탭 전환(route remount)에도 유지(page-local useState 리셋 방지). */
   boardMode: boolean
@@ -41,22 +49,56 @@ interface ArtistBoardState {
   /** 로드 완료된 projectId — 프로젝트 전환 감지용 */
   loadedProjectId: string | null
   error: string | null
+  /** undo/redo 스택 — 성공 저장된 편집만 쌓인다(실패 편집은 히스토리 미기록). */
+  past: BoardHistoryEntry[]
+  future: BoardHistoryEntry[]
 
   setBoardMode: (on: boolean) => void
   load: () => Promise<void>
-  /** 샷의 인물 참조 교체 — 낙관적 반영 + DB update, 실패 시 롤백. */
+  /** 샷의 인물 참조 교체 — 낙관적 반영 + DB update, 실패 시 롤백. 성공 시 undo 히스토리 기록. */
   setShotCharacters: (shotId: string, next: string[]) => Promise<void>
-  /** 샷의 배경 참조 교체(명시화) — 낙관적 반영 + DB update, 실패 시 롤백. */
+  /** 샷의 배경 참조 교체(명시화) — 낙관적 반영 + DB update, 실패 시 롤백. 성공 시 undo 히스토리 기록. */
   setShotLocationIds: (shotId: string, next: string[]) => Promise<void>
+  undo: () => Promise<void>
+  redo: () => Promise<void>
   reset: () => void
 }
 
-export const useArtistBoardStore = create<ArtistBoardState>((set, get) => ({
+export const useArtistBoardStore = create<ArtistBoardState>((set, get) => {
+  // 한 필드 전이를 낙관적 반영 + DB 저장. 실패 시 전체 롤백 후 false — 호출자가 히스토리를 안 쌓게.
+  const applyShotField = async (
+    shotId: string,
+    field: 'characters' | 'locationIds',
+    value: string[] | null,
+  ): Promise<boolean> => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return false
+    const prev = get().shots
+    set({
+      shots: prev.map((s) => (s.shotId === shotId ? { ...s, [field]: value } : s)),
+      error: null,
+    })
+    const column = field === 'characters' ? 'characters' : 'location_ids'
+    const { error } = await createClient()
+      .from('shots')
+      .update({ [column]: value } as { characters?: string[] | null; location_ids?: string[] | null })
+      .eq('project_id', projectId)
+      .eq('shot_id', shotId)
+    if (error) {
+      set({ shots: prev, error: `참조 저장 실패: ${error.message}` })
+      return false
+    }
+    return true
+  }
+
+  return {
   boardMode: false,
   shots: [],
   loading: false,
   loadedProjectId: null,
   error: null,
+  past: [],
+  future: [],
 
   setBoardMode: (on) => set({ boardMode: on }),
 
@@ -86,6 +128,8 @@ export const useArtistBoardStore = create<ArtistBoardState>((set, get) => ({
         })),
         loadedProjectId: projectId,
         loading: false,
+        past: [],
+        future: [],
       })
     } catch (err) {
       set({
@@ -96,36 +140,46 @@ export const useArtistBoardStore = create<ArtistBoardState>((set, get) => ({
   },
 
   setShotCharacters: async (shotId, next) => {
-    const projectId = useProjectStore.getState().projectId
-    if (!projectId) return
-    const prev = get().shots
-    set({
-      shots: prev.map((s) => (s.shotId === shotId ? { ...s, characters: next } : s)),
-      error: null,
-    })
-    const { error } = await createClient()
-      .from('shots')
-      .update({ characters: next })
-      .eq('project_id', projectId)
-      .eq('shot_id', shotId)
-    if (error) set({ shots: prev, error: `인물 참조 저장 실패: ${error.message}` })
+    const shot = get().shots.find((s) => s.shotId === shotId)
+    if (!shot) return
+    const entry: BoardHistoryEntry = {
+      shotId,
+      field: 'characters',
+      before: shot.characters,
+      after: next,
+    }
+    if (await applyShotField(shotId, 'characters', next))
+      set((st) => ({ past: [...st.past, entry], future: [] }))
   },
 
   setShotLocationIds: async (shotId, next) => {
-    const projectId = useProjectStore.getState().projectId
-    if (!projectId) return
-    const prev = get().shots
-    set({
-      shots: prev.map((s) => (s.shotId === shotId ? { ...s, locationIds: next } : s)),
-      error: null,
-    })
-    const { error } = await createClient()
-      .from('shots')
-      .update({ location_ids: next })
-      .eq('project_id', projectId)
-      .eq('shot_id', shotId)
-    if (error) set({ shots: prev, error: `배경 참조 저장 실패: ${error.message}` })
+    const shot = get().shots.find((s) => s.shotId === shotId)
+    if (!shot) return
+    const entry: BoardHistoryEntry = {
+      shotId,
+      field: 'locationIds',
+      before: shot.locationIds, // null(씬 상속)일 수 있음 — undo 가 상속 상태를 그대로 복원
+      after: next,
+    }
+    if (await applyShotField(shotId, 'locationIds', next))
+      set((st) => ({ past: [...st.past, entry], future: [] }))
   },
 
-  reset: () => set({ shots: [], loading: false, loadedProjectId: null, error: null }),
-}))
+  undo: async () => {
+    const entry = get().past.at(-1)
+    if (!entry) return
+    if (await applyShotField(entry.shotId, entry.field, entry.before))
+      set((st) => ({ past: st.past.slice(0, -1), future: [...st.future, entry] }))
+  },
+
+  redo: async () => {
+    const entry = get().future.at(-1)
+    if (!entry) return
+    if (await applyShotField(entry.shotId, entry.field, entry.after))
+      set((st) => ({ future: st.future.slice(0, -1), past: [...st.past, entry] }))
+  },
+
+  reset: () =>
+    set({ shots: [], loading: false, loadedProjectId: null, error: null, past: [], future: [] }),
+  }
+})

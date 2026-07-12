@@ -6,8 +6,9 @@
 // 아래: 씬 순서대로 샷 카드(카메라 앵글·길이·스토리 + 상속된 인물/배경 칩. 칩 클릭=참조 해제).
 // director 전단계의 "샷 ↔ 에셋 연결" 편집이 목적 — 인물은 shots.characters, 배경은 shots.location_ids(029).
 import { useEffect, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { Redo2, Undo2, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { startBinDrag } from '@/lib/pointer-drag'
 import { useArtistStore } from '@/stores/artist-store'
@@ -26,7 +27,10 @@ const DROP_SELECTOR = '[data-shot-drop]'
 export function AssetShotBoard() {
   const characterAssets = useArtistStore((s) => s.characterAssets)
   const worldAssets = useArtistStore((s) => s.worldAssets)
-  const scenes = useArtistStore((s) => s.sceneManifest?.scenes ?? [])
+  // ⚠️ 셀렉터에서 `?.scenes ?? []` 금지 — null 매니페스트일 때 매 스냅샷 새 배열 → 무한 리렌더
+  //   (Maximum update depth). 객체를 선택하고 파생은 렌더 로컬에서.
+  const sceneManifest = useArtistStore((s) => s.sceneManifest)
+  const scenes = useMemo(() => sceneManifest?.scenes ?? [], [sceneManifest])
   const projectId = useProjectStore((s) => s.projectId)
 
   const shots = useArtistBoardStore((s) => s.shots)
@@ -36,14 +40,40 @@ export function AssetShotBoard() {
   const load = useArtistBoardStore((s) => s.load)
   const setShotCharacters = useArtistBoardStore((s) => s.setShotCharacters)
   const setShotLocationIds = useArtistBoardStore((s) => s.setShotLocationIds)
+  const undo = useArtistBoardStore((s) => s.undo)
+  const redo = useArtistBoardStore((s) => s.redo)
+  const canUndo = useArtistBoardStore((s) => s.past.length > 0)
+  const canRedo = useArtistBoardStore((s) => s.future.length > 0)
 
   const [hoverShotId, setHoverShotId] = useState<string | null>(null)
   const [dlgCharId, setDlgCharId] = useState<string | null>(null)
   const [dlgWorldId, setDlgWorldId] = useState<string | null>(null)
+  // 드래그 중엔 hover 가 벗어나도 스트립을 펼친 채 고정 — 접히면서 카드가 위로 밀리면 드롭 좌표가 어긋난다.
+  const [dragActive, setDragActive] = useState(false)
 
   useEffect(() => {
     if (projectId && loadedProjectId !== projectId) void load()
   }, [projectId, loadedProjectId, load])
+
+  // undo/redo 키보드 오버로드 — Ctrl/Cmd+Z(취소) · Ctrl/Cmd+Shift+Z 또는 Ctrl/Cmd+Y(재실행).
+  //   입력 필드(채팅 textarea 등) 포커스 중엔 네이티브 텍스트 undo 를 방해하지 않는다.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      const t = e.target as HTMLElement | null
+      if (t?.closest('input, textarea, select, [contenteditable="true"]')) return
+      const k = e.key.toLowerCase()
+      if (k === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        void undo()
+      } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
+        e.preventDefault()
+        void redo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undo, redo])
 
   const charById = useMemo(
     () => new Map(characterAssets.map((c) => [c.characterId, c])),
@@ -93,9 +123,13 @@ export function AssetShotBoard() {
       dropSelector: DROP_SELECTOR,
       onClick: () =>
         kind === 'character' ? setDlgCharId(assetId) : setDlgWorldId(assetId),
+      onDragStart: () => setDragActive(true),
       onDragOver: (target) =>
         setHoverShotId(target ? ((target as HTMLElement).dataset.shotId ?? null) : null),
-      onDragEnd: () => setHoverShotId(null),
+      onDragEnd: () => {
+        setDragActive(false)
+        setHoverShotId(null)
+      },
       onDrop: ({ target }) => {
         const shotId = (target as HTMLElement).dataset.shotId
         if (shotId) dropAsset(kind, assetId, shotId)
@@ -105,38 +139,79 @@ export function AssetShotBoard() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* ── 상단: 에셋 스트립 ── */}
-      <div className="border-b border-border px-6 py-3">
-        <div className="flex items-start gap-8 overflow-x-auto pb-1 scrollbar-thin">
-          <AssetGroup label="인물">
-            {characterAssets.map((c) => (
-              <AssetCard
-                key={c.characterId}
-                name={c.name}
-                imageUrl={c.portrait ?? c.views.main}
-                aspect="portrait"
-                onPointerDown={(e) => dragChip(e, 'character', c.characterId, c.name)}
-              />
-            ))}
-            {characterAssets.length === 0 && <EmptyNote>인물 없음</EmptyNote>}
-          </AssetGroup>
-          <AssetGroup label="배경">
-            {worldAssets.map((w) => (
-              <AssetCard
-                key={w.locationId}
-                name={w.name}
-                imageUrl={w.wideShot}
-                aspect="video"
-                onPointerDown={(e) => dragChip(e, 'world', w.locationId, w.name)}
-              />
-            ))}
-            {worldAssets.length === 0 && <EmptyNote>배경 없음</EmptyNote>}
-          </AssetGroup>
+      {/* ── 상단: 에셋 스트립 — 평소엔 요약 한 줄, hover(또는 드래그 중)에 아래로 펼쳐져 그림 표시 ── */}
+      <div className="group border-b border-border px-6 py-2">
+        <div className="flex h-8 items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">에셋</span>
+          <Badge variant="secondary" className="text-[10px]">
+            인물 {characterAssets.length}
+          </Badge>
+          <Badge variant="secondary" className="text-[10px]">
+            배경 {worldAssets.length}
+          </Badge>
+          <span className="truncate">
+            — 마우스를 올리면 펼쳐집니다 · 드래그해 샷에 연결, 카드의 칩 클릭으로 해제
+          </span>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              title="실행 취소 (Ctrl+Z)"
+              disabled={!canUndo}
+              onClick={() => void undo()}
+            >
+              <Undo2 className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              title="다시 실행 (Ctrl+Shift+Z / Ctrl+Y)"
+              disabled={!canRedo}
+              onClick={() => void redo()}
+            >
+              <Redo2 className="size-3.5" />
+            </Button>
+          </div>
         </div>
-        <p className="mt-1.5 text-xs text-muted-foreground">
-          에셋을 드래그해 샷 카드에 놓으면 참조가 추가되고, 카드의 인물·배경을 클릭하면
-          해제됩니다. 에셋 클릭 = 상세 보기.
-        </p>
+        <div
+          className={cn(
+            'grid transition-[grid-template-rows] duration-300 ease-out',
+            dragActive
+              ? '[grid-template-rows:1fr]'
+              : '[grid-template-rows:0fr] group-hover:[grid-template-rows:1fr]',
+          )}
+        >
+          <div className="overflow-hidden">
+            <div className="flex items-start gap-8 overflow-x-auto pb-2 pt-3 scrollbar-thin">
+              <AssetGroup label="인물">
+                {characterAssets.map((c) => (
+                  <AssetCard
+                    key={c.characterId}
+                    name={c.name}
+                    imageUrl={c.portrait ?? c.views.main}
+                    aspect="portrait"
+                    onPointerDown={(e) => dragChip(e, 'character', c.characterId, c.name)}
+                  />
+                ))}
+                {characterAssets.length === 0 && <EmptyNote>인물 없음</EmptyNote>}
+              </AssetGroup>
+              <AssetGroup label="배경">
+                {worldAssets.map((w) => (
+                  <AssetCard
+                    key={w.locationId}
+                    name={w.name}
+                    imageUrl={w.wideShot}
+                    aspect="video"
+                    onPointerDown={(e) => dragChip(e, 'world', w.locationId, w.name)}
+                  />
+                ))}
+                {worldAssets.length === 0 && <EmptyNote>배경 없음</EmptyNote>}
+              </AssetGroup>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── 하단: 씬별 샷 카드 ── */}
@@ -271,7 +346,11 @@ function AssetCard({
       tabIndex={0}
       onPointerDown={onPointerDown}
       title={`${name} — 클릭: 상세 / 드래그: 샷에 연결`}
-      className="w-24 shrink-0 cursor-grab touch-none select-none active:cursor-grabbing"
+      className={cn(
+        'shrink-0 cursor-grab touch-none select-none active:cursor-grabbing',
+        // 배경(landscape)은 한 단계 크게 — 와이드샷 디테일이 보이는 사이즈(#2).
+        aspect === 'portrait' ? 'w-24' : 'w-44',
+      )}
     >
       <div
         className={cn(
