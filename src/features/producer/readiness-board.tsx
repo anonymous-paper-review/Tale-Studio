@@ -7,6 +7,8 @@ import {
   Box,
   CheckCircle2,
   ChevronDown,
+  ChevronsDown,
+  ChevronsUp,
   Clock,
   Film,
   Languages,
@@ -322,23 +324,25 @@ function CastCard({
         </div>
       </div>
 
-      {/* 상세 정보(역할·아크·동기) 접기 토글 — V 버튼(접힘 ∨ / 펼침 ∧) */}
+      {/* 상세 정보(역할·아크·동기) 접기 토글 — »를 눕힌 이중 셰브런(⌄⌄), 아이콘 폭만큼의 borderless
+          버튼(호버 하이라이트 최소화). 접힘+미완료면 우상단 빨간 점으로만 표시. */}
       {isPerson ? (
         <button
           type="button"
           onClick={() => setDetailsOpen((v) => !v)}
           aria-expanded={detailsOpen}
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label={detailsOpen ? '상세 접기' : '상세 정보 (역할·아크·동기) 펼치기'}
+          title={detailsOpen ? '상세 접기' : '상세 정보 (역할·아크·동기)'}
+          className="relative mx-auto mt-2 flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
-          {detailsOpen ? '상세 접기' : '상세 정보 (역할·아크·동기)'}
+          {detailsOpen ? (
+            <ChevronsUp className="size-4" />
+          ) : (
+            <ChevronsDown className="size-4" />
+          )}
           {!detailsOpen && detailIssueCount > 0 ? (
-            <span className="rounded-full bg-destructive/15 px-1.5 text-[10px] text-destructive">
-              {detailIssueCount}
-            </span>
+            <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-destructive" />
           ) : null}
-          <ChevronDown
-            className={cn('size-3.5 transition-transform', detailsOpen && 'rotate-180')}
-          />
         </button>
       ) : null}
 
