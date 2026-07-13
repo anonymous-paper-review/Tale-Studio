@@ -427,28 +427,31 @@ export default function VisualPage() {
           {error}
         </div>
       )}
-      <div className="border-t border-border bg-card px-6 py-3 text-xs">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={writerReady ? 'text-success' : 'text-warning'}>
-            Writer: {writerReady ? 'ready' : writerGateStatus.state}
-          </span>
-          <span className={artistGate.ready ? 'text-success' : 'text-warning'}>
-            Artist: {artistGate.requiredCharacterIds.length - artistGate.blockers.length}/{artistGate.requiredCharacterIds.length} required ready
-          </span>
+      {/* 게이트 상태 푸터 — 평소엔 접힘, 미완료 항목이 있을 때만 Approve 버튼 바로 위에 표시(#d1 2026-07-13). */}
+      {(!writerReady || !artistGate.ready || directorGate.blockers.length > 0) && (
+        <div className="border-t border-border bg-card px-6 py-3 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={writerReady ? 'text-success' : 'text-warning'}>
+              Writer: {writerReady ? 'ready' : writerGateStatus.state}
+            </span>
+            <span className={artistGate.ready ? 'text-success' : 'text-warning'}>
+              Artist: {artistGate.requiredCharacterIds.length - artistGate.blockers.length}/{artistGate.requiredCharacterIds.length} required ready
+            </span>
+          </div>
+          {directorGate.blockers.length > 0 && (
+            <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
+              {directorGate.blockers.slice(0, 4).map((issue) => (
+                <li key={issue.field}>{issue.label}</li>
+              ))}
+            </ul>
+          )}
+          {artistGate.warnings.length > 0 && (
+            <p className="mt-2 text-muted-foreground">
+              경고 {artistGate.warnings.length}개: object/world 이미지는 MVP 기본 경로에서 보조 자료입니다.
+            </p>
+          )}
         </div>
-        {directorGate.blockers.length > 0 && (
-          <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
-            {directorGate.blockers.slice(0, 4).map((issue) => (
-              <li key={issue.field}>{issue.label}</li>
-            ))}
-          </ul>
-        )}
-        {artistGate.warnings.length > 0 && (
-          <p className="mt-2 text-muted-foreground">
-            경고 {artistGate.warnings.length}개: object/world 이미지는 MVP 기본 경로에서 보조 자료입니다.
-          </p>
-        )}
-      </div>
+      )}
       <HandoffButton
         label="Approve & Direct"
         targetStage="director"

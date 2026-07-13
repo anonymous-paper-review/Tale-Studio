@@ -34,6 +34,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import { useProducerStore } from '@/stores/producer-store'
+import { useProjectStore } from '@/stores/project-store'
 import type { BackgroundSource, CastArc, CastMember, CastMotivation, GateIssue, GateResult, EntityType } from '@/lib/producer-gate'
 import { isProducerBackgroundComplete } from '@/lib/producer-gate'
 import { depthLevelFromRuntime } from '@/lib/depth'
@@ -247,6 +248,9 @@ function CastCard({
   const motivationIssue = issues.find((i) => i.field.endsWith(':want'))
   const depth = depthLevelFromRuntime(runtimeSeconds || 0)
   const deepPerson = isPerson && depth !== 'D1' && depth !== 'D2' // D3+ : arc/motivation 인라인 편집
+  // 상세(역할·아크·동기) 접기 — 기본 접힘, V(chevron) 버튼으로 펼침/접힘 토글(#b2 2026-07-13).
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const detailIssueCount = [arcIssue, motivationIssue].filter(Boolean).length
 
   const patchArc = (p: Partial<CastArc>) =>
     onPatch(member.localId, {
@@ -318,7 +322,27 @@ function CastCard({
         </div>
       </div>
 
+      {/* 상세 정보(역할·아크·동기) 접기 토글 — V 버튼(접힘 ∨ / 펼침 ∧) */}
       {isPerson ? (
+        <button
+          type="button"
+          onClick={() => setDetailsOpen((v) => !v)}
+          aria-expanded={detailsOpen}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          {detailsOpen ? '상세 접기' : '상세 정보 (역할·아크·동기)'}
+          {!detailsOpen && detailIssueCount > 0 ? (
+            <span className="rounded-full bg-destructive/15 px-1.5 text-[10px] text-destructive">
+              {detailIssueCount}
+            </span>
+          ) : null}
+          <ChevronDown
+            className={cn('size-3.5 transition-transform', detailsOpen && 'rotate-180')}
+          />
+        </button>
+      ) : null}
+
+      {isPerson && detailsOpen ? (
         <div className="mt-3 space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">역할</label>
           <div className="flex gap-2">
@@ -343,7 +367,7 @@ function CastCard({
         </div>
       ) : null}
 
-      {deepPerson ? (
+      {deepPerson && detailsOpen ? (
         <div className="mt-3 space-y-3">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">아크 (시작 / 끝 / 유형)</label>
@@ -497,6 +521,15 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const addBackground = useProducerStore((s) => s.addBackground)
   const updateBackground = useProducerStore((s) => s.updateBackground)
   const removeBackground = useProducerStore((s) => s.removeBackground)
+  // 스타일&톤 (style_anchors 카탈로그 + projects.style_anchor_key) — 세부 장르 슬롯 대체.
+  const styleAnchors = useProducerStore((s) => s.styleAnchors)
+  const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
+  const loadStyleAnchors = useProducerStore((s) => s.loadStyleAnchors)
+  const setStyleAnchor = useProducerStore((s) => s.setStyleAnchor)
+  const projectId = useProjectStore((s) => s.projectId)
+  useEffect(() => {
+    if (projectId) void loadStyleAnchors()
+  }, [projectId, loadStyleAnchors])
 
   // Brief Story 전체보기 토글 — 길면 4줄로 클램프, "더 보기"로 스크롤 박스 펼침.
   const [storyExpanded, setStoryExpanded] = useState(false)
@@ -539,9 +572,6 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               </Badge>
             ) : null}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            오른쪽 AI Producer가 당신의 시작을 도와줍니다.
-          </p>
         </div>
         {syncing ? <Badge variant="outline">저장 중</Badge> : null}
       </div>
@@ -625,14 +655,33 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </HoverBeam>
               </FieldShell>
 
-              <FieldShell icon={<Tag className="size-4" />} label="세부 장르" softIssue={softByField.get('subGenre')} mentionRef="setting:subGenre" mentionLabel="세부 장르">
-                <HoverBeam>
-                  <Input
-                    value={projectSettings.subGenre ?? ''}
-                    placeholder="예: psychological"
-                    onChange={(e) => updateSettings({ subGenre: e.target.value })}
-                  />
-                </HoverBeam>
+              {/* 세부 장르 필드는 숨김(2026-07-13 — 데이터(settings.subGenre)는 유지) → 스타일&톤(style_anchors)으로 대체 */}
+              <FieldShell icon={<Tag className="size-4" />} label="스타일&톤" mentionRef="setting:styleAnchor" mentionLabel="스타일&톤">
+                <Select
+                  value={styleAnchorKey ?? ''}
+                  onValueChange={(v) => void setStyleAnchor(v)}
+                >
+                  <SelectTrigger className={`w-full ${HOVER_RED_BORDER}`}>
+                    <SelectValue placeholder="선택…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {styleAnchors.map((anchor) => (
+                      <SelectItem key={anchor.key} value={anchor.key}>
+                        <span className="flex items-center gap-2">
+                          {anchor.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={anchor.imageUrl}
+                              alt=""
+                              className="size-5 rounded object-cover"
+                            />
+                          ) : null}
+                          {anchor.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </FieldShell>
 
               <FieldShell icon={<Monitor className="size-4" />} label="포맷" issue={hardByField.get('format')} mentionRef="setting:format" mentionLabel="포맷">

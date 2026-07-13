@@ -13,6 +13,7 @@ import {
 } from '@/stores/director-store'
 import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
 import { isShotData, isPromptData, type DirectorNode } from '@/types/director'
+import { prettyNodeLabel } from '@/features/director/node-label'
 
 
 function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
@@ -93,7 +94,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       <BaseNode
         id={id}
         theme="shot"
-        title={data.label}
+        title={prettyNodeLabel(data.label)}
         selected={selected}
         width={280}
         stale={data.stale}

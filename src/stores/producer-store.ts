@@ -145,16 +145,31 @@ function mergeExtractedBackgrounds(
   return next
 }
 
+/** 스타일 앵커 프리셋 (style_anchors 테이블 — 실사/3D/2D애니 등 시각 스타일 카탈로그). */
+export interface StyleAnchor {
+  key: string
+  label: string
+  medium: string
+  imageUrl: string | null
+}
+
 interface ProducerState {
   storyText: string
   storyReady: boolean
   projectSettings: ProjectSettings
   cast: CastMember[]
   backgrounds: BackgroundSource[]
+  /** 스타일&톤 앵커 카탈로그(style_anchors) + 이 프로젝트의 선택 키(projects.style_anchor_key). */
+  styleAnchors: StyleAnchor[]
+  styleAnchorKey: string | null
   syncing: boolean
   error: string | null
 
   setStoryText: (text: string) => void
+  /** 앵커 카탈로그 + 현재 프로젝트 선택값 로드 (readiness board 진입 시). */
+  loadStyleAnchors: () => Promise<void>
+  /** 스타일 앵커 선택 — 낙관적 반영 + projects.style_anchor_key 저장. */
+  setStyleAnchor: (key: string | null) => Promise<void>
   updateSettings: (partial: Partial<ProjectSettings>) => void
   applyExtractedSettings: (extracted: ExtractedSettings) => void
   applyProducerSourcePatch: (patch: ExtractedSettings) => void
@@ -490,12 +505,57 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   projectSettings: { ...DEFAULT_SETTINGS },
   cast: [],
   backgrounds: [],
+  styleAnchors: [],
+  styleAnchorKey: null,
   syncing: false,
   error: null,
 
   setStoryText: (text) => {
     set({ storyText: text })
     scheduleDraftSave(() => boardOf(get()))
+  },
+
+  loadStyleAnchors: async () => {
+    const projectId = useProjectStore.getState().projectId
+    try {
+      const supabase = createClient()
+      const [{ data: anchors }, projRes] = await Promise.all([
+        supabase
+          .from('style_anchors')
+          .select('key, label, medium, image_url, sort_order')
+          .eq('is_active', true)
+          .order('sort_order'),
+        projectId
+          ? supabase.from('projects').select('style_anchor_key').eq('id', projectId).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ])
+      set({
+        styleAnchors: (anchors ?? []).map((a) => ({
+          key: a.key,
+          label: a.label,
+          medium: a.medium,
+          imageUrl: a.image_url ?? null,
+        })),
+        styleAnchorKey:
+          (projRes.data as { style_anchor_key?: string | null } | null)?.style_anchor_key || null,
+      })
+    } catch (err) {
+      console.error('[producer-store] style anchors load failed:', err)
+    }
+  },
+
+  setStyleAnchor: async (key) => {
+    const projectId = useProjectStore.getState().projectId
+    const prev = get().styleAnchorKey
+    set({ styleAnchorKey: key })
+    if (!projectId) return
+    const { error } = await createClient()
+      .from('projects')
+      .update({ style_anchor_key: key ?? '' })
+      .eq('id', projectId)
+    if (error) {
+      set({ styleAnchorKey: prev, error: `스타일 저장 실패: ${error.message}` })
+    }
   },
 
   updateSettings: (partial) => {
@@ -862,6 +922,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       projectSettings: { ...DEFAULT_SETTINGS },
       cast: [],
       backgrounds: [],
+      styleAnchorKey: null, // 카탈로그(styleAnchors)는 프로젝트 무관 — 유지
       syncing: false,
       error: null,
     })

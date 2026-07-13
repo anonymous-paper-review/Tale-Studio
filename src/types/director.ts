@@ -196,12 +196,12 @@ export const newDirectorId = (
 export const SCENE_OFFSET_X = 360
 /** Shot 노드 폭 + gap (Scene 우측에 stacking) */
 export const SHOT_OFFSET_X = 360
-/** Shot 형제 간 세로 간격 */
-export const SHOT_OFFSET_Y = 200
+/** Shot 형제 간 세로 간격 — 스토리보드 썸네일 포함 카드 실높이(~300px)보다 커야 자동 정렬 시 안 겹친다(#e3 2026-07-13) */
+export const SHOT_OFFSET_Y = 340
 /** Video 노드 폭 + gap (Shot 우측 stacking). Scene→Shot(360)과 동일 간격으로 여유 확보 */
 export const VIDEO_OFFSET_X = 360
-/** Video 형제 간 세로 간격 */
-export const VIDEO_OFFSET_Y = 180
+/** Video 형제 간 세로 간격 — 썸네일 카드 겹침 방지 여유 포함(#e3) */
+export const VIDEO_OFFSET_Y = 260
 /** snap-to-grid */
 export const SNAP_GRID: [number, number] = [16, 16]
 

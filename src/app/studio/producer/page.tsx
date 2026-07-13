@@ -45,9 +45,7 @@ export default function MeetingPage() {
 
   // writer 산출물 게이트백 — 씬/샷이 없어 producer 로 되돌려진 프로젝트면 재실행 배너 노출.
   const writerNeedsRerun = useProjectStore((s) => s.writerNeedsRerun)
-  const reachedStage = useProjectStore((s) => s.reachedStage)
   const offerPendingProposal = useGlobalChatStore((s) => s.offerPendingProposal)
-  const afterHandoff = reachedStage !== 'producer'
   const storyText = useProducerStore((s) => s.storyText)
   const messages = useGlobalChatStore((s) => s.messages)
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
@@ -77,24 +75,9 @@ export default function MeetingPage() {
     requestChatFocus()
   }, [projectId, producerLoaded, storyReady, storyText, messages, offerSuggestion, requestChatFocus])
 
-  // 상단→하단으로 옮긴 배너들의 닫기 상태.
-  //  - stale 경고: 핸드오프 후 상시 상주형 → 프로젝트별로 영구 저장(한 번 닫으면 다시 안 뜸).
-  //  - writer 재실행: 실제 문제 상태 기반 → 세션 한정, 문제가 다시 발생하면 재노출.
-  const [staleDismissed, setStaleDismissed] = useState(false)
+  // 배너 닫기 상태 — writer 재실행: 실제 문제 상태 기반 → 세션 한정, 문제 재발 시 재노출.
+  //   (stale 경고 상주 배너는 2026-07-13 제거 — 문구 박스 정리.)
   const [rerunDismissed, setRerunDismissed] = useState(false)
-
-  const staleDismissKey = projectId
-    ? `tale:producer-stale-banner-dismissed:${projectId}`
-    : null
-  useEffect(() => {
-    setStaleDismissed(
-      staleDismissKey ? localStorage.getItem(staleDismissKey) === '1' : false,
-    )
-  }, [staleDismissKey])
-  const dismissStale = () => {
-    setStaleDismissed(true)
-    if (staleDismissKey) localStorage.setItem(staleDismissKey, '1')
-  }
 
   // writer 재실행 배너: 문제가 해소(플래그 off)되면 닫힘 상태 리셋 → 재발 시 다시 뜬다.
   useEffect(() => {
@@ -131,23 +114,6 @@ export default function MeetingPage() {
   return (
     <>
       <ProducerReadinessBoard gate={gate} />
-
-      {/* 하단 상태 배너 (구 상단 배너 이전) — 우측 X 로 닫는다. */}
-      {afterHandoff && !staleDismissed && (
-        <div className="flex items-center gap-3 border-t border-warning/30 bg-warning/10 px-6 py-2 text-xs text-warning">
-          <span className="flex-1">
-            Producer source를 수정하면 기존 Writer/Artist 산출물이 낡을 수 있어요. 수동 수정은 보존되며, 재실행/재생성은 제안 승인 후에만 진행합니다.
-          </span>
-          <button
-            type="button"
-            onClick={dismissStale}
-            aria-label="배너 닫기"
-            className="shrink-0 rounded p-0.5 text-warning/70 transition-colors hover:bg-warning/20 hover:text-warning"
-          >
-            <X className="size-3.5" />
-          </button>
-        </div>
-      )}
 
       {/* writer 미완료 게이트백 배너 — 씬/샷이 없어 Director/Editor 가 빈 화면이던 프로젝트.
           스토리/설정은 그대로 두고 'Writer 다시 실행'으로 재생성한다(persist 는 멱등 — 중복 안 생김). */}

@@ -15,6 +15,7 @@ import {
   type DirectorNode,
   type ShotNodeData,
 } from '@/types/director'
+import { prettyNodeLabel } from '@/features/director/node-label'
 
 type SceneGroup = {
   key: string
@@ -127,7 +128,7 @@ function ShotCell({ node }: { node: DirectorNode }) {
 
       <div className="flex flex-col gap-1 p-3">
         <span className="truncate text-sm font-medium text-foreground">
-          {data.label}
+          {prettyNodeLabel(data.label)}
         </span>
         {data.prompt && (
           <p className="line-clamp-2 text-xs text-muted-foreground">
@@ -197,7 +198,7 @@ export function StoryboardGridView() {
           <section key={group.key} className="flex flex-col gap-4">
             <div className="flex items-baseline gap-3">
               <h2 className="text-lg font-medium text-foreground">
-                {group.label}
+                {prettyNodeLabel(group.label)}
               </h2>
               <span className="flex items-center gap-3 text-xs text-muted-foreground">
                 {group.location && (

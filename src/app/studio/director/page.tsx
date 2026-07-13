@@ -26,6 +26,7 @@ import { Loader2, ImageIcon, X, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock,
 import { toast } from 'sonner'
 
 import { HandoffButton } from '@/components/layout/handoff-button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
 import { useDirectorCanvasStore } from '@/stores/director-store'
@@ -548,28 +549,18 @@ function PaletteBar() {
       isShotData(n.data) && n.data.storyboardImage?.status === 'generating',
   )
 
+  // 상단 이동(#e1 2026-07-13): 하단 border-t 바 → 캔버스 위 border-b 바.
+  //   Node/Storyboard 토글은 artist 탭(Characters/World/Inventory)과 동일한 TabsList 스타일.
   return (
-    <div className="flex h-11 items-center justify-between border-t border-border px-4">
-      <div className="flex items-center gap-4">
+    <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
+      <div className="flex items-center gap-3">
         {/* Node / Storyboard 토글 */}
-        <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-          {(['node', 'storyboard'] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setViewMode(mode)}
-              className={cn(
-                'rounded px-3 py-1 text-xs font-medium transition-colors duration-100',
-                viewMode === mode
-                  ? 'bg-accent text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-                'hover-red-beam',
-              )}
-            >
-              {mode === 'node' ? 'Node' : 'Storyboard'}
-            </button>
-          ))}
-        </div>
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'node' | 'storyboard')}>
+          <TabsList>
+            <TabsTrigger value="node">Node</TabsTrigger>
+            <TabsTrigger value="storyboard">Storyboard</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {/* 스토리보드 일괄 생성 */}
         <button
@@ -618,46 +609,51 @@ function PaletteBar() {
         <PresetStrip />
       </div>
 
-      {/* 미사용 에셋 불러오기 — 씬마다 그 씬이 참조 안 하는 등록 에셋도 좌측 컬럼에 표시(표시만) */}
-      <button
-        type="button"
-        onClick={() => toggleUnusedAssets()}
-        title="씬마다 해당 씬이 참조하지 않는 등록 에셋도 좌측 에셋 컬럼에 표시"
-        className={cn(
-          'flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-3 text-xs transition-colors duration-100',
-          showUnusedAssets
-            ? 'border-primary bg-primary/10 text-foreground'
-            : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
-          'hover-red-beam',
-        )}
-      >
-        <Boxes className="size-4" />
-        <span>{showUnusedAssets ? '미사용 에셋 숨기기' : '미사용 에셋 불러오기'}</span>
-      </button>
+      {/* 캔버스 전용 액션 3종 — Node 탭에서만 표시, 오른쪽 정렬(#e2 2026-07-13) */}
+      {viewMode === 'node' && (
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {/* 미사용 에셋 불러오기 — 씬마다 그 씬이 참조 안 하는 등록 에셋도 좌측 컬럼에 표시(표시만) */}
+          <button
+            type="button"
+            onClick={() => toggleUnusedAssets()}
+            title="씬마다 해당 씬이 참조하지 않는 등록 에셋도 좌측 에셋 컬럼에 표시"
+            className={cn(
+              'flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-3 text-xs transition-colors duration-100',
+              showUnusedAssets
+                ? 'border-primary bg-primary/10 text-foreground'
+                : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
+              'hover-red-beam',
+            )}
+          >
+            <Boxes className="size-4" />
+            <span>{showUnusedAssets ? '미사용 에셋 숨기기' : '미사용 에셋 불러오기'}</span>
+          </button>
 
-      {/* 노드 자동 정렬 — asset·scene·shot·video를 다이어그램 레이아웃으로 재배치 (DB 반영) */}
-      <button
-        type="button"
-        onClick={() => relayoutCanvas()}
-        title="에셋·씬·샷·영상을 좌→우 레이아웃으로 정렬하고 간격을 확보 (DB 저장)"
-        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground hover-red-beam"
-      >
-        <LayoutGrid className="size-4" />
-        <span>자동 정렬</span>
-      </button>
+          {/* 노드 자동 정렬 — asset·scene·shot·video를 다이어그램 레이아웃으로 재배치 (DB 반영) */}
+          <button
+            type="button"
+            onClick={() => relayoutCanvas()}
+            title="에셋·씬·샷·영상을 좌→우 레이아웃으로 정렬하고 간격을 확보 (DB 저장)"
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground hover-red-beam"
+          >
+            <LayoutGrid className="size-4" />
+            <span>자동 정렬</span>
+          </button>
 
-      {/* 프롬프트 노드 추가 — Higgsfield식 분리 프롬프트(우측 핸들을 Shot T 입력에 연결) */}
-      <button
-        type="button"
-        onClick={() =>
-          addPromptNode({ x: 80, y: 120 + promptCount * 180 })
-        }
-        title="분리된 프롬프트 노드를 추가합니다. 우측 핸들을 Shot의 T 입력에 연결하면 Shot 프롬프트가 동기됩니다."
-        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground hover-red-beam"
-      >
-        <Type className="size-4" />
-        <span>프롬프트 노드</span>
-      </button>
+          {/* 프롬프트 노드 추가 — Higgsfield식 분리 프롬프트(우측 핸들을 Shot T 입력에 연결) */}
+          <button
+            type="button"
+            onClick={() =>
+              addPromptNode({ x: 80, y: 120 + promptCount * 180 })
+            }
+            title="분리된 프롬프트 노드를 추가합니다. 우측 핸들을 Shot의 T 입력에 연결하면 Shot 프롬프트가 동기됩니다."
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground hover-red-beam"
+          >
+            <Type className="size-4" />
+            <span>프롬프트 노드</span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -673,9 +669,11 @@ export default function DirectorCanvasPage() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex flex-1 overflow-hidden">
-        {/* Center: Canvas (Node/Storyboard) + bottom Palette bar */}
+        {/* Center: top Palette bar(#e1 — 하단→상단 이동) + Canvas (Node/Storyboard) */}
         <div className="relative flex flex-1 flex-col overflow-hidden">
-          {/* min-h-0: flex-1이 내용 높이만큼 커져 하단 PaletteBar(토글)를
+          <PaletteBar />
+
+          {/* min-h-0: flex-1이 내용 높이만큼 커져 PaletteBar(토글)를
               밀어내고 StoryboardGridView의 overflow-auto가 안 걸리던 문제 수정.
               이걸로 storyboard 그리드 스크롤 + Node/Storyboard 토글 항상 노출. */}
           <div className="relative min-h-0 flex-1">
@@ -690,8 +688,6 @@ export default function DirectorCanvasPage() {
 
           {/* Storyboard 뷰에서도 더블클릭 편집 팝업이 동작하도록 viewMode 무관 마운트 */}
           {viewMode === 'storyboard' && <DirectorNodePopup />}
-
-          <PaletteBar />
         </div>
 
         {/* 결정 #12 완료: D-3 NodePopup이 카메라/조명/렌즈 편집을 흡수.

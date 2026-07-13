@@ -9,6 +9,7 @@ import { useDirectorCanvasStore } from '@/stores/director-store'
 import { usePresetStorageStore } from '@/stores/preset-storage-store'
 import { isShotData, isVideoData } from '@/types/director'
 import { editActionForKind } from '@/features/director/canvas-interaction'
+import { prettyNodeLabel } from '@/features/director/node-label'
 
 const PRESET_DND_TYPE = 'application/preset-id'
 
@@ -38,10 +39,11 @@ const THEME_CLASS: Record<
   },
 }
 
+// shot/video 카드 종류 라벨(#e5 2026-07-13): 산출물 기준 명명 — CSS uppercase 로 SHOT IMAGE / SHOT VIDEO 표기.
 const LABEL_BY_THEME: Record<Theme, string> = {
   scene: 'Scene',
-  shot: 'Shot',
-  video: 'Video',
+  shot: 'Shot image',
+  video: 'Shot video',
 }
 
 type BaseNodeProps = {
@@ -250,7 +252,7 @@ function BaseNodeImpl({
 
       {/* Body */}
       <div className="p-3">
-        <div className="text-sm font-medium">{title || '(untitled)'}</div>
+        <div className="text-sm font-medium">{prettyNodeLabel(title) || '(untitled)'}</div>
         {children}
       </div>
     </div>

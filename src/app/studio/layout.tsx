@@ -87,7 +87,8 @@ export default function StudioLayout({
       <Sidebar />
       <main
         className="ml-16 min-h-screen transition-[margin] duration-350 ease-out"
-        style={{ marginRight: chatCollapsed ? 0 : chatWidth }}
+        // 접힘 시 44px = 채팅 열기 레일(global-chat w-11) 전용 폭 — 페이지 우상단 버튼과 겹침 방지.
+        style={{ marginRight: chatCollapsed ? 44 : chatWidth }}
       >
         {/* h-screen으로 높이 고정 + overflow-y-auto: 내용이 화면을 넘치면
             세로 스크롤 자동 생성. 캔버스 페이지(director)는 flex-1로 딱 채워

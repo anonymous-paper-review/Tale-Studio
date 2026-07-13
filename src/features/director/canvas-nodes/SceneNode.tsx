@@ -9,6 +9,7 @@ import {
   useDirectorCanvasStore,
 } from '@/stores/director-store'
 import { isSceneData, type DirectorNode } from '@/types/director'
+import { prettyNodeLabel } from '@/features/director/node-label'
 
 function SceneNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const childCount = useDirectorCanvasStore(
@@ -28,7 +29,7 @@ function SceneNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     <BaseNode
       id={id}
       theme="scene"
-      title={data.label}
+      title={prettyNodeLabel(data.label)}
       selected={selected}
       width={280}
       canBranch

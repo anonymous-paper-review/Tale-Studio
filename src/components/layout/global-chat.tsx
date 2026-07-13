@@ -473,18 +473,21 @@ export function GlobalChat() {
         </div>
       </aside>
 
-      {/* 접힌 상태 — 다시 여는 버튼 */}
+      {/* 접힌 상태 — 우측 슬림 레일 + 상단 열기 버튼.
+          닫기 버튼(패널 헤더 상단)과 수직 위치를 맞추고, 레일이 우측 44px를 전용 점유해
+          (layout.tsx 가 접힘 시 marginRight 44 확보) 페이지 우상단 버튼들과의 겹침을 원천 차단한다. */}
       {collapsed && (
-        <Button
-          size="icon-sm"
-          variant="secondary"
-          onClick={toggleCollapsed}
-          title="채팅 열기"
-          aria-label="채팅 열기"
-          className="fixed right-2 top-1/2 z-sidebar -translate-y-1/2 border border-border shadow-md"
-        >
-          <ChevronsLeft className="size-4" />
-        </Button>
+        <aside className="z-sidebar fixed right-0 top-0 flex h-full w-11 flex-col items-center border-l border-border bg-card pt-3">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={toggleCollapsed}
+            title="채팅 열기"
+            aria-label="채팅 열기"
+          >
+            <ChevronsLeft className="size-4" />
+          </Button>
+        </aside>
       )}
     </>
   )
