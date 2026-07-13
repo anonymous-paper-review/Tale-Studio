@@ -14,6 +14,7 @@ import type {
   Scenes,
   ShotSequence,
   ShotSequenceItem,
+  StoryScene,
   ValidationIssue,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
@@ -48,6 +49,12 @@ export async function runShotCheck(
   // ===== Step 1: Gemini로 L4 → ShotSequenceItem 조립 =====
   const genSystem = `당신은 S+V 변환의 마지막 단계 디자이너이다.
 L4 (intent + static + dynamic) 3분할 샷을 받아 최종 ShotSequenceItem으로 조립한다.
+
+★★ 1:1 보존 규칙 (최우선, 절대 위반 금지):
+- 입력 [L4 shots] 배열의 샷 개수 = 출력 shots 배열의 샷 개수 (정확히 동일).
+- 각 L4 샷 1개 → ShotSequenceItem 정확히 1개. 순서도 입력과 동일하게 유지.
+- shot_id 는 입력 L4 샷의 shot_id 를 그대로 사용한다 (재번호·개명 금지).
+- 절대 샷을 병합·삭제·요약·생략하지 마라. 한 씬이 여러 샷을 가지면 전부 개별 샷으로 출력한다.
 
 핵심 원칙:
 - L4b.first_frame_prompt는 이미 200~400자로 풍부 → 그대로 사용
@@ -213,11 +220,32 @@ locations: ${worldVisual.locations.map((l) => l.id).join(', ')}
     throw new Error(`C2 generation unexpected shape: ${JSON.stringify(r).slice(0, 200)}`);
   }
 
-  const genShots = extractShots(genRaw);
-  if (!Array.isArray(genShots) || genShots.length === 0) {
-    throw new Error('C2 generation produced empty shots');
+  // Step 1 방어: LLM 응답 파싱. 실패해도 아래 Step 1.5 결정론적 정합이 전량 복원한다.
+  let genShots: ShotSequenceItem[] = [];
+  try {
+    genShots = extractShots(genRaw);
+  } catch (e) {
+    console.warn('[C2_generate] 응답 shape 파싱 실패 → 결정론적 재구성 폴백:', e);
   }
-  const genResult: ShotSequenceGenResponse = { shots: genShots };
+
+  // ===== Step 1.5: 결정론적 정합 (shot loss 방지) =====
+  // LLM 조립이 샷을 병합·누락시키는 버그 관측(49→16). 입력 shotDesign 1개당 ShotSequenceItem
+  // 정확히 1개를 보장한다 — LLM 출력은 shot_id 로 매칭해 재사용(메타 보존)하되 scene 귀속은
+  // 결정론적 소스(intent)로 강제, 누락분은 L4(static/dynamic_spec)에서 결정론적으로 복원.
+  if (shotDesigns.length === 0) {
+    throw new Error('C2: shotDesigns 비어있음 — 조립할 샷 없음');
+  }
+  const { shots: assembledShots, reconstructed } = reconcileAssembledShots(
+    genShots,
+    shotDesigns,
+    scenes,
+  );
+  if (reconstructed > 0) {
+    console.warn(
+      `[C2_generate] LLM이 ${shotDesigns.length}개 입력 중 ${reconstructed}개 샷 누락/불일치 → 결정론적 복원 (shot loss 차단)`,
+    );
+  }
+  const genResult: ShotSequenceGenResponse = { shots: assembledShots };
 
   // ===== Step 2: Claude로 샷별 액션 스코프 + 의미 검증 =====
   const valSystem = `당신은 샷 시퀀스의 액션 스코프와 의미적 정합성을 검증한다.
@@ -354,4 +382,93 @@ ${JSON.stringify(genResult.shots, null, 2)}
   });
 
   return { shotSequence, report };
+}
+// LLM 조립 출력(부분·누락 가능)을 입력 shotDesign 과 정합. 입력 1개당 ShotSequenceItem 정확히 1개
+// 보장: shot_id 매칭분은 LLM 메타 재사용(scene 귀속만 intent 로 강제), 누락분은 L4 에서 결정론 복원.
+export function reconcileAssembledShots(
+  llmShots: ShotSequenceItem[],
+  shotDesigns: ShotDesign[],
+  scenes: Scenes,
+): { shots: ShotSequenceItem[]; reconstructed: number } {
+  const sceneById = new Map(scenes.scenes.map((sc) => [sc.scene_id, sc]));
+  const bySid = new Map<string, ShotSequenceItem>();
+  for (const s of llmShots) {
+    if (s && typeof s.shot_id === 'string') bySid.set(s.shot_id, s);
+  }
+  let reconstructed = 0;
+  const shots = shotDesigns.map((d) => {
+    const matched = bySid.get(d.intent.shot_id);
+    if (matched) return { ...matched, S: { ...matched.S, scene_id: d.intent.scene_id } };
+    reconstructed += 1;
+    return buildShotSequenceItemFromDesign(d, sceneById.get(d.intent.scene_id));
+  });
+  return { shots, reconstructed };
+}
+
+// L4 ShotDesign → ShotSequenceItem 결정론적 매퍼 (Step 1.5 fallback).
+// static_spec.first_frame_prompt / dynamic_spec.motion_prompt 는 이미 최종 프롬프트라
+// LLM 없이도 렌더 입력을 온전히 확보한다. S/C/V 메타는 L4 로부터 근사 채움.
+function buildShotSequenceItemFromDesign(
+  design: ShotDesign,
+  scene: StoryScene | undefined,
+): ShotSequenceItem {
+  const st = design.static_spec;
+  const dyn = design.dynamic_spec;
+
+  const characters = (st.character_blocking ?? []).map((b) => ({
+    id: b.character_id,
+    asset_version: b.asset_version || 'v1',
+    visible_parts: ['full'],
+  }));
+  const locationId = scene?.location ?? '';
+  const locations = locationId ? [{ id: locationId, asset_version: 'a' }] : [];
+  const props = (st.prop_placement ?? []).map((p) => ({ id: p.prop, asset_version: 'v1' }));
+  const motionCount = (dyn.character_motion ?? []).length;
+  const cameraType = dyn.camera_motion?.type ?? 'static';
+
+  return {
+    shot_id: design.intent.shot_id,
+    duration_seconds: design.intent.duration_seconds,
+    S: {
+      scene_id: design.intent.scene_id,
+      scene_purpose: scene?.purpose ?? design.intent.dramatic_purpose,
+      emotion_beat: scene?.emotion_beat ?? { start: '', end: '' },
+      character_action: design.intent.dramatic_purpose,
+      dialogue: scene?.dialogue_summary || undefined,
+    },
+    C: {
+      // causal_link 는 호출부 Step 3 에서 순서 기반으로 재계산됨.
+      causal_link: { from: null, to: null },
+      info_disclosure: design.intent.dramatic_purpose,
+    },
+    V: {
+      camera: { type: st.shot_type, angle: st.camera_angle, movement: cameraType },
+      lighting: {
+        key_fill_ratio: st.lighting?.key_fill_ratio ?? '',
+        color_temp: st.lighting?.color_temp_kelvin ? `${st.lighting.color_temp_kelvin}K` : '',
+      },
+      composition: st.framing?.focal_point ?? '',
+      mood: st.color_grading_intent ?? '',
+    },
+    assets: { characters, locations, props },
+    first_frame_generation: {
+      base_assets: [...characters.map((c) => c.id), ...locations.map((l) => l.id)],
+      composition_prompt: st.first_frame_prompt,
+    },
+    video_generation: { motion_prompt: dyn.motion_prompt },
+    action_budget: {
+      primary_action_count: 1,
+      secondary_action_count: motionCount > 1 ? 1 : 0,
+      camera_movement_complexity:
+        cameraType === 'static' ? 'none' : dyn.camera_motion?.magnitude === 'large' ? 'complex' : 'simple',
+      environmental_changes: (dyn.environmental_change ?? []).length,
+      passed_validation: true,
+    },
+    continuity: {
+      carry_forward_from: null,
+      consistent_elements: [],
+      changes: [],
+      is_scene_transition: design.intent.shot_position_in_scene === 'opening',
+    },
+  };
 }
