@@ -50,11 +50,9 @@ export async function runShotCheck(
   const genSystem = `당신은 S+V 변환의 마지막 단계 디자이너이다.
 L4 (intent + static + dynamic) 3분할 샷을 받아 최종 ShotSequenceItem으로 조립한다.
 
-★★ 1:1 보존 규칙 (최우선, 절대 위반 금지):
-- 입력 [L4 shots] 배열의 샷 개수 = 출력 shots 배열의 샷 개수 (정확히 동일).
-- 각 L4 샷 1개 → ShotSequenceItem 정확히 1개. 순서도 입력과 동일하게 유지.
-- shot_id 는 입력 L4 샷의 shot_id 를 그대로 사용한다 (재번호·개명 금지).
-- 절대 샷을 병합·삭제·요약·생략하지 마라. 한 씬이 여러 샷을 가지면 전부 개별 샷으로 출력한다.
+샷 처리:
+- 각 L4 샷을 개별 ShotSequenceItem 으로 변환하고 shot_id 는 입력값을 그대로 유지한다 (후처리 매칭용).
+- 다루지 못한 샷은 시스템이 L4 원본에서 자동 보완하니, 억지로 요약·병합해 채우지 마라.
 
 핵심 원칙:
 - L4b.first_frame_prompt는 이미 200~400자로 풍부 → 그대로 사용
@@ -176,17 +174,7 @@ locations: ${worldVisual.locations.map((l) => l.id).join(', ')}
   ]
 }`;
 
-  const genRaw = await generateJson<unknown>(genUser, vAxisConfig, {
-    systemInstruction: genSystem,
-    temperature: 0.4,
-  });
-
-  await logger.saveLlmCall('shotCheck_generate', {
-    prompt: genUser,
-    response: JSON.stringify(genRaw, null, 2),
-    model: describeAxisConfig(vAxisConfig),
-    provider: vAxisConfig.provider,
-  });
+  // (Step 1 실행은 아래 try 블록으로 이동 — 타임아웃/실패를 흡수해 stage 를 죽이지 않는다.)
 
   // 방어: 모델이 다양한 shape으로 응답
   //   ① { shots: [...] }                ← 기대 형식
@@ -220,12 +208,24 @@ locations: ${worldVisual.locations.map((l) => l.id).join(', ')}
     throw new Error(`C2 generation unexpected shape: ${JSON.stringify(r).slice(0, 200)}`);
   }
 
-  // Step 1 방어: LLM 응답 파싱. 실패해도 아래 Step 1.5 결정론적 정합이 전량 복원한다.
+  // ===== Step 1 실행 + 파싱 (실패 흡수) =====
+  // shotCheck gemini 는 49샷 입력이 무거워 120s per-request 타임아웃에 걸리기 쉽다.
+  //   타임아웃/실패/이상 shape 이면 genShots=[] → 아래 Step 1.5 가 L4 에서 전량 결정론 복원.
   let genShots: ShotSequenceItem[] = [];
   try {
+    const genRaw = await generateJson<unknown>(genUser, vAxisConfig, {
+      systemInstruction: genSystem,
+      temperature: 0.4,
+    });
+    await logger.saveLlmCall('shotCheck_generate', {
+      prompt: genUser,
+      response: JSON.stringify(genRaw, null, 2),
+      model: describeAxisConfig(vAxisConfig),
+      provider: vAxisConfig.provider,
+    });
     genShots = extractShots(genRaw);
   } catch (e) {
-    console.warn('[C2_generate] 응답 shape 파싱 실패 → 결정론적 재구성 폴백:', e);
+    console.warn('[C2_generate] LLM 조립 실패/타임아웃/이상 → 결정론적 재구성 폴백:', e);
   }
 
   // ===== Step 1.5: 결정론적 정합 (shot loss 방지) =====
