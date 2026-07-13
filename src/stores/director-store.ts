@@ -417,6 +417,10 @@ interface DirectorCanvasState {
   selectedNodeId: string | null
   selectedEdgeId: string | null
   viewport: { x: number; y: number; zoom: number }
+  // 뷰포트 최초 초기화 여부 (ephemeral, persist 제외). false → Node 뷰 최초 진입에서 fitView,
+  //   true → 마지막 뷰포트 복원. 탭 전환·스테이지 이동에 CanvasInner가 remount돼도 store(싱글턴)에
+  //   살아있어, 재진입 시 fitView로 위치가 초기화되던 문제를 막는다.
+  viewportInitialized: boolean
   viewMode: 'node' | 'storyboard'
 
   // popup/modal
@@ -790,6 +794,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       selectedNodeId: null,
       selectedEdgeId: null,
       viewport: { x: 0, y: 0, zoom: 1 },
+      viewportInitialized: false,
       viewMode: 'node',
       popupNodeId: null,
       deleteConfirmInfo: null,
@@ -816,6 +821,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             edges: initialEdges,
             selectedNodeId: null,
             selectedEdgeId: null,
+            viewportInitialized: false,
             popupNodeId: null,
             deleteConfirmInfo: null,
             relationModal: null,
@@ -2347,6 +2353,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           selectedNodeId: null,
           selectedEdgeId: null,
           viewport: { x: 0, y: 0, zoom: 1 },
+          viewportInitialized: false,
           popupNodeId: null,
           deleteConfirmInfo: null,
           relationModal: null,

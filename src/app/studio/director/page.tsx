@@ -14,6 +14,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   useReactFlow,
+  useNodesInitialized,
   type NodeChange,
   type EdgeChange,
   type Connection,
@@ -269,7 +270,40 @@ function CanvasInner() {
     return () => clearTimeout(t)
   }, [directorProjectId, nodes, offerSuggestion])
 
-  const { screenToFlowPosition } = useReactFlow()
+  const {
+    screenToFlowPosition,
+    setViewport: applyViewport,
+    getViewport,
+    fitView,
+  } = useReactFlow()
+  const nodesInitialized = useNodesInitialized()
+
+  // Node 뷰 재진입 시 마지막 뷰포트 복원 (#e 2026-07-14).
+  //   CanvasInner는 Node↔Storyboard 토글·스테이지 이동마다 remount된다. 예전엔 매 mount마다
+  //   fitView가 돌아 위치가 초기화됐다. 이제 최초 진입(viewportInitialized=false)만 fitView하고,
+  //   이후엔 store에 유지된 viewport(onMove로 갱신, 싱글턴+persist)를 복원한다.
+  //   fitView 타이밍은 useNodesInitialized로 노드 측정 완료를 기다린다.
+  const initialViewportRef = useRef(
+    useDirectorCanvasStore.getState().viewport,
+  )
+  const didInitViewportRef = useRef(false)
+  useEffect(() => {
+    if (didInitViewportRef.current || !nodesInitialized) return
+    didInitViewportRef.current = true
+    const st = useDirectorCanvasStore.getState()
+    if (st.viewportInitialized) {
+      void applyViewport(st.viewport)
+    } else {
+      // 최초 진입: fitView 후 그 결과 뷰포트를 store에 저장해 다음 재진입의 복원 기준점으로 삼는다
+      //   (프로그램적 fitView가 onMove를 안 쏘는 경우에도 첫 재진입이 원점으로 튀지 않게).
+      void fitView().then(() => {
+        useDirectorCanvasStore.setState({
+          viewport: getViewport(),
+          viewportInitialized: true,
+        })
+      })
+    }
+  }, [nodesInitialized, applyViewport, getViewport, fitView])
 
   const [creatorOpen, setCreatorOpen] = useState(false)
   const [creatorPosition, setCreatorPosition] = useState<XYPosition | null>(
@@ -422,7 +456,9 @@ function CanvasInner() {
         snapGrid={SNAP_GRID}
         connectionMode={ConnectionMode.Loose}
         deleteKeyCode={['Backspace', 'Delete']}
-        fitView={nodes.length > 0}
+        // fitView/복원은 위 useEffect가 useNodesInitialized 타이밍에 제어(#e). defaultViewport로
+        //   remount 시 첫 페인트를 마지막 위치에서 시작해 깜빡임을 줄인다.
+        defaultViewport={initialViewportRef.current}
         zoomOnDoubleClick={false}
         // 스크롤 = 상하/좌우 화면 이동(패닝), Ctrl+스크롤 = 확대/축소.
         //   panOnScroll 모드에서 xyflow는 ctrl/meta 누른 스크롤을 줌으로 처리한다.
