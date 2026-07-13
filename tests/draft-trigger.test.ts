@@ -39,7 +39,10 @@ vi.mock('@/lib/generation-jobs', () => ({
   createGenerationJob: (...a: unknown[]) => createGenerationJob(...a),
   hasQueuedCharacterViewJob: (...a: unknown[]) => hasQueuedCharacterViewJob(...a),
 }))
-vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => undefined }))
+vi.mock('@/lib/fal/webhook-url', () => ({
+  resolveWebhookUrl: () => undefined,
+  resolveWebhookBaseUrl: () => undefined,
+}))
 
 import { triggerCharacterDrafts } from '@/lib/artist/draft-trigger'
 
