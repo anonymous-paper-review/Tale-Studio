@@ -17,7 +17,6 @@ import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import {
   buildRoughStoryboardPrompt,
-  ROUGH_STORYBOARD_NEGATIVE_PROMPT,
   type RoughStoryboardSpec,
 } from '@/lib/writer/rough-storyboard'
 import { rewriteRoughStoryboardPromptViaLLM } from '@/lib/writer/rough-storyboard-llm'
@@ -394,8 +393,8 @@ export async function POST(req: Request) {
         // previz 스케치 — 비용/속도 우선 경량 모델 (모델 ID 의 진실은 fal.ts)
         model: ROUGH_STORYBOARD_IMAGE_MODEL,
         prompt,
-        // 흑백·마네킹·단일패널 위반과 텍스트/잉여인물 차단 (klein 이 긍정 지시를 자주 무시 → 이중 방어).
-        negative_prompt: ROUGH_STORYBOARD_NEGATIVE_PROMPT,
+        // negative_prompt 미전달 — klein 은 CFG/negative 미지원(스키마 확인, 2026-07-13). 차단 의도는
+        //   buildRoughStoryboardPrompt 의 긍정문(FIGURE_RULE·CU_FRONT·SINGLE_FRONT·PANEL_STYLE)으로 이관.
         seed,
         aspect_ratio: '16:9',
         webhookUrl: resolveWebhookUrl(),

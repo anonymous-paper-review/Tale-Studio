@@ -81,20 +81,11 @@ function conciseEnvDescription(desc: string | null | undefined): string {
   return out.slice(0, 200).replace(/[.…\s]+$/, '').trim()
 }
 
-/**
- * 러프 보드 공통 네거티브 — flux klein 이 monochrome/featureless 지시를 자주 위반하므로 명시 차단.
- *   색·채색·포토리얼 / 얼굴·인물 특징·의상(샷 간 일관성 위해 특징 억제, L4) / 프레임 분할·테두리 / 텍스트 / 유령 큐브 / 잉여 인물·크롭.
- *   (2026-07-09: 샷마다 인물이 달라 보이는 이질감 → 특징 차단어 재장착. 인물은 동일 featureless 마네킹으로 통일 — L1.)
- */
-export const ROUGH_STORYBOARD_NEGATIVE_PROMPT = [
-  'color', 'colored', 'colored wash', 'red wash', 'orange sky', 'vibrant', 'saturated', 'cinematic render', 'painterly', 'digital painting',
-  'detailed face', 'facial features', 'eyes', 'nose', 'mouth', 'eyebrows', 'beard', 'hair', 'ears', 'portrait', 'realistic human face',
-  'distinct clothing', 'costume detail', 'armor detail', 'varied body types', 'individual appearance', 'unique character design',
-  'split screen', 'panel border', 'multiple panels', 'frame within frame', 'comic grid', 'gutter', 'horizontal divider line',
-  'text', 'letters', 'caption', 'label', 'watermark', 'signature',
-  'cube', 'box', 'floating geometric object',
-  'extra characters', 'crowd', 'duplicated figures', 'cropped subject', 'cut off',
-].join(', ')
+// ⚠️ 네거티브 프롬프트 폐기(2026-07-13): flux-2 klein 은 증류 모델로 CFG 가 없고 API 스키마에
+//   negative_prompt 필드 자체가 없다(fal 은 미지원 필드를 조용히 무시) — 옛 40여 개 차단어 리스트는
+//   klein 전환 이후 줄곧 no-op 이었다. 차단 의도는 전부 긍정문으로 이관됨:
+//   얼굴/의상 → FIGURE_RULE(blank egg head·bare doll body), 흑백·단일패널·무텍스트 → PANEL_STYLE_BASE,
+//   클로즈업 얼굴 prior → CU_FRONT(최앞단), 잉여 인물 → SINGLE_FRONT. (3샷 A/B 실측으로 검증)
 
 function angleWords(angleRaw: string | null | undefined): string {
   // 실데이터는 'low'/'low_angle' 혼용 (enum 비강제) — 접미사 정규화 후 매핑
@@ -170,14 +161,17 @@ export interface RoughStoryboardPromptInput {
 //   강하게 반응하고 문장형 서사·부정문은 약하다. 그래서 템플릿을 단어 나열·긍정문 위주로 압축한다.
 const PANEL_HEADER = `Rough storyboard previsualization panel, single frame, camera POV, lens-eye view.`
 
-// strictly black-and-white·grayscale only → klein 의 채색 폭주 억제(네거티브와 이중 방어).
+// strictly black-and-white·grayscale only → klein 의 채색 폭주 억제(긍정문이 유일 방어 — negative 미지원).
 //   single uninterrupted panel → 이중 패널/프레임-인-프레임(가로 거터) 방지.
 const PANEL_STYLE_BASE = `Style: loose rough monochrome pencil-sketch, strictly black and white, grayscale only, no color, quick gestural lines, gray shading, ample negative space, unfinished rough board. Single uninterrupted full-bleed panel, no internal frames or dividing lines.`
 
 // 인물 = 모든 샷·모든 인물이 "동일한 featureless 마네킹"(L1). 샷 간 이질감의 근본 원인은 패널마다 독립
 //   T2I 라 특징이 있으면 klein 이 매번 다르게 상상하는 것 → 특징을 없애 변할 게 없게 만들어 일관성 확보
-//   (2026-07-09, 이질감 대응). klein 은 긍정·직설어에 강하므로 "동일 마네킹을 그려라"는 긍정형 스타일 토큰.
-const FIGURE_RULE = `Figures: draw every character as the same identical featureless artist mannequin — smooth uniform matte-gray body, plain rounded head with no face, no clothing or costume detail, consistent simple proportions. Every figure is the same mannequin; only pose and position differ.`
+//   (2026-07-09, 이질감 대응).
+// v2(2026-07-13, 얼굴 누출 대응): "no face/no clothing"(부재의 부정) → "blank egg-like oval head/bare
+//   doll body"(존재의 서술)로 재작성. klein 은 부정문에 약하고 negative_prompt 는 아예 미지원(스키마
+//   확인)이라, 그려야 할 것을 직접 묘사하는 긍정문이 유일하게 작동하는 얼굴 억제였다(3샷 A/B 실측).
+const FIGURE_RULE = `Figures: draw every character as the same identical artist mannequin — smooth uniform matte-gray body, a completely blank smooth egg-like oval head with a uniform featureless surface, bare simple doll body, consistent simple proportions. Every figure is the same blank mannequin; only pose and position differ.`
 
 // 인물 0인 샷(설정/환경샷) 전용 — FIGURE_RULE 대신. 인물 토큰을 아예 빼고 "빈 풍경만"을 긍정형 직설 지시
 //   (klein 은 부정문이 약해 "no people" 류는 비효율 → 긍정문 + 인물 명령어 미포함이 robust).
@@ -349,7 +343,29 @@ function buildFromDbRow(input: RoughStoryboardPromptInput): string {
   ])
 }
 
+// 앞토큰 강조절(v2, 2026-07-13): klein 은 프롬프트 맨 앞 토큰에 가장 강하게 반응한다(실측).
+//   CU 계열은 "블랭크 계란 두상"을 최앞단에 — "클로즈업=얼굴" prior 를 이기는 유일한 방법이었다
+//   (negative 미지원 + 본문 중간의 FIGURE_RULE 만으로는 CU 거리에서 뚫림). 인물 1인 샷은 단독·빈
+//   배경을 앞단 강조해 군중 발생 억제(옛 negative 'crowd' 가 no-op 이었어서 필요).
+const CU_FRONT = `Close-up of a blank featureless artist mannequin head — a smooth egg-shaped oval with a perfectly uniform blank surface, matte gray. `
+// 문구 튜닝 이력(실측, 2026-07-13): "vast empty surroundings" → 배경(로케이션)까지 소거(shot_5) /
+//   "single lone … only figure" 절충안 → 개선 없음. 채택안은 MS 거리에서 1인+환경 보존이 가장 안정.
+//   ⚠️ 알려진 한계: EWS(원경)에선 어떤 문구로도 인원 과다(7~9인)를 못 잡음 — klein(4-step 증류)의
+//   카운트 준수 한계. 개선하려면 프롬프트가 아니라 모델/LoRA 축(후속 과제).
+const SINGLE_FRONT = `Exactly one mannequin figure, alone in the scene. `
+const CU_TYPES = new Set(['CU', 'ECU', 'MCU'])
+
 export function buildRoughStoryboardPrompt(input: RoughStoryboardPromptInput): string {
-  if (input.spec?.staticSpec) return buildFromSpec(input, input.spec)
-  return buildFromDbRow(input)
+  const base = input.spec?.staticSpec ? buildFromSpec(input, input.spec) : buildFromDbRow(input)
+  // 인물 수 — rich 경로는 blocking, fallback 은 characterNames 기준(각 빌더의 subject 계산과 동일 출처).
+  const figureCount = input.spec?.staticSpec
+    ? (input.spec.staticSpec.character_blocking ?? []).length
+    : input.characterNames.length
+  if (figureCount === 0) return base // 환경샷 — 인물 절을 아예 넣지 않는다(ENV_ONLY_RULE 경로와 정합)
+  const cu = CU_TYPES.has(String(input.shotType ?? '').toUpperCase()) ? CU_FRONT : ''
+  // 군집 엔티티 가드: '추적자들'처럼 캐릭터 1행이 다수 인물을 뜻하는 경우(복수 표지 '들') 단독절을
+  //   붙이면 배경까지 소거된 1인 화면으로 붕괴한다(shot_5 실측, 2026-07-13). 복수 표지면 생략.
+  const groupish = input.characterNames.some((n) => /들\s*$/.test(n))
+  const single = figureCount === 1 && !groupish ? SINGLE_FRONT : ''
+  return cu + single + base
 }
