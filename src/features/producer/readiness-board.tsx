@@ -5,12 +5,14 @@ import {
   AlertCircle,
   AtSign,
   Box,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronsDown,
   ChevronsUp,
   Clock,
   Film,
+  ImageIcon,
   Languages,
   Monitor,
   Palette,
@@ -31,11 +33,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
-import { useProducerStore } from '@/stores/producer-store'
+import { useProducerStore, type StyleAnchor } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { BackgroundSource, CastArc, CastMember, CastMotivation, GateIssue, GateResult, EntityType } from '@/lib/producer-gate'
 import { isProducerBackgroundComplete } from '@/lib/producer-gate'
@@ -203,6 +213,97 @@ function FieldShell({
     >
       {inner}
     </div>
+  )
+}
+
+// 스타일&톤 선택기 — 콤보 박스(글자만 표기) → 클릭 시 그리드 팝업(#b 2026-07-14).
+//   실제 I2I 레퍼런스 이미지(anchor.imageUrl)는 노출하지 않는다. 예시 이미지 자리는 빈
+//   플레이스홀더 — 사용자가 추후 예시 이미지를 넣을 예정. 선택 표시는 라벨 텍스트로만.
+function StyleAnchorPicker({
+  anchors,
+  value,
+  onSelect,
+}: {
+  anchors: StyleAnchor[]
+  value: string | null
+  onSelect: (key: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = anchors.find((a) => a.key === value) ?? null
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50',
+            HOVER_RED_BORDER,
+            !selected && 'text-muted-foreground',
+          )}
+        >
+          <span className="line-clamp-1 text-left">
+            {selected ? selected.label : '선택…'}
+          </span>
+          <ChevronDown className="size-4 shrink-0 opacity-50" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>스타일 & 톤 선택</DialogTitle>
+          <DialogDescription>
+            영상 전체에 적용할 시각 스타일을 골라 주세요.
+          </DialogDescription>
+        </DialogHeader>
+        {anchors.length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            아직 등록된 스타일이 없어요.
+          </p>
+        ) : (
+          <div className="grid max-h-[60vh] grid-cols-2 gap-3 overflow-y-auto p-0.5 sm:grid-cols-3">
+            {anchors.map((anchor) => {
+              const active = anchor.key === value
+              return (
+                <button
+                  key={anchor.key}
+                  type="button"
+                  onClick={() => {
+                    onSelect(anchor.key)
+                    setOpen(false)
+                  }}
+                  className={cn(
+                    'group flex flex-col overflow-hidden rounded-lg border text-left transition-colors',
+                    active
+                      ? 'border-primary ring-2 ring-primary/50'
+                      : 'border-border hover:border-primary/60',
+                  )}
+                >
+                  {/* 예시 이미지 자리 — 실제 I2I 레퍼런스(anchor.imageUrl)는 노출하지 않는다.
+                      사용자가 예시 이미지를 넣기 전까지 빈 플레이스홀더. */}
+                  <div className="relative flex aspect-video items-center justify-center bg-muted">
+                    <ImageIcon className="size-6 text-muted-foreground opacity-40" />
+                    {active ? (
+                      <span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <Check className="size-3" />
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col gap-0.5 px-3 py-2">
+                    <span className="line-clamp-1 text-sm font-medium text-foreground">
+                      {anchor.label}
+                    </span>
+                    {anchor.medium ? (
+                      <span className="line-clamp-1 text-xs text-muted-foreground">
+                        {anchor.medium}
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -659,33 +760,14 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </HoverBeam>
               </FieldShell>
 
-              {/* 세부 장르 필드는 숨김(2026-07-13 — 데이터(settings.subGenre)는 유지) → 스타일&톤(style_anchors)으로 대체 */}
+              {/* 세부 장르 필드는 숨김(2026-07-13 — 데이터(settings.subGenre)는 유지) → 스타일&톤(style_anchors)으로 대체.
+                  콤보 박스는 글자만, 클릭 시 그리드 팝업으로 선택(#b 2026-07-14). */}
               <FieldShell icon={<Tag className="size-4" />} label="스타일&톤" mentionRef="setting:styleAnchor" mentionLabel="스타일&톤">
-                <Select
-                  value={styleAnchorKey ?? ''}
-                  onValueChange={(v) => void setStyleAnchor(v)}
-                >
-                  <SelectTrigger className={`w-full ${HOVER_RED_BORDER}`}>
-                    <SelectValue placeholder="선택…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {styleAnchors.map((anchor) => (
-                      <SelectItem key={anchor.key} value={anchor.key}>
-                        <span className="flex items-center gap-2">
-                          {anchor.imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={anchor.imageUrl}
-                              alt=""
-                              className="size-5 rounded object-cover"
-                            />
-                          ) : null}
-                          {anchor.label}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <StyleAnchorPicker
+                  anchors={styleAnchors}
+                  value={styleAnchorKey}
+                  onSelect={(k) => void setStyleAnchor(k)}
+                />
               </FieldShell>
 
               <FieldShell icon={<Monitor className="size-4" />} label="포맷" issue={hardByField.get('format')} mentionRef="setting:format" mentionLabel="포맷">
