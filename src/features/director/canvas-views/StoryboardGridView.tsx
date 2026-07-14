@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { ImageIcon, MapPin, Clock } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -9,6 +10,8 @@ import {
   getChildShots,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
+import { useAssetStorageStore } from '@/stores/asset-storage-store'
+import { replaceSlugs, type SlugEntry } from '@/lib/script-lines'
 import {
   isSceneData,
   isShotData,
@@ -25,7 +28,7 @@ type SceneGroup = {
   shots: DirectorNode[]
 }
 
-function ShotCell({ node }: { node: DirectorNode }) {
+function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] }) {
   const generateStoryboardImage = useDirectorCanvasStore(
     (s) => s.generateStoryboardImage,
   )
@@ -132,7 +135,8 @@ function ShotCell({ node }: { node: DirectorNode }) {
         </span>
         {data.prompt && (
           <p className="line-clamp-2 text-xs text-muted-foreground">
-            {data.prompt}
+            {/* 프롬프트 속 char_2·location_2 등 슬러그 → @실제 이름 (표시 전용, #e6) */}
+            {replaceSlugs(data.prompt, roster)}
           </p>
         )}
       </div>
@@ -142,6 +146,23 @@ function ShotCell({ node }: { node: DirectorNode }) {
 
 export function StoryboardGridView() {
   const nodes = useDirectorCanvasStore((s) => s.nodes)
+  const projectId = useDirectorCanvasStore((s) => s.projectId)
+
+  // 슬러그 → 실제 이름 로스터(#e6) — asset-storage(진입 시 DB hydrate)에서 인물·장소 이름.
+  //   표시 전용: 노드 데이터·프롬프트 원문(구동)은 그대로 둔다.
+  const registeredCharacters = useAssetStorageStore((s) => s.characters)
+  const registeredWorlds = useAssetStorageStore((s) => s.worlds)
+  const roster = useMemo<SlugEntry[]>(
+    () => [
+      ...Object.values(registeredCharacters)
+        .filter((c) => c.projectId === projectId)
+        .map((c) => ({ slug: c.id, name: c.name })),
+      ...Object.values(registeredWorlds)
+        .filter((w) => w.projectId === projectId)
+        .map((w) => ({ slug: w.id, name: w.name })),
+    ],
+    [registeredCharacters, registeredWorlds, projectId],
+  )
 
   const scenes = nodes.filter((n) => isSceneData(n.data))
   const orphanShots = nodes.filter(
@@ -204,7 +225,8 @@ export function StoryboardGridView() {
                 {group.location && (
                   <span className="flex items-center gap-1">
                     <MapPin className="size-3" />
-                    {group.location}
+                    {/* location_2 등 슬러그 → 실제 장소명 (구조 필드라 플레인, #e6) */}
+                    {replaceSlugs(group.location, roster, '')}
                   </span>
                 )}
                 {group.timeOfDay && (
@@ -219,7 +241,7 @@ export function StoryboardGridView() {
             {group.shots.length > 0 ? (
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
                 {group.shots.map((shot) => (
-                  <ShotCell key={shot.id} node={shot} />
+                  <ShotCell key={shot.id} node={shot} roster={roster} />
                 ))}
               </div>
             ) : (
