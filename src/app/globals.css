@@ -299,12 +299,15 @@
   }
 }
 
+/* --beam-color 로 빛 색을 파라미터화(#e13 2026-07-14) — 기본은 기존과 동일한 accent(red).
+   이미지 생성=success(초록), 영상 생성=primary(빨강) 구분에 사용. 새 토큰이 아니라
+   기존 토큰을 골라 쓰는 스위치다. */
 .tale-beam {
   padding: 1.5px;
   background: conic-gradient(
     from var(--beam-angle),
     transparent 0deg,
-    var(--primary) 55deg,
+    var(--beam-color, var(--primary)) 55deg,
     transparent 135deg,
     transparent 360deg
   );
@@ -323,7 +326,7 @@
 @media (prefers-reduced-motion: reduce) {
   .tale-beam {
     animation: none;
-    background: var(--primary);
+    background: var(--beam-color, var(--primary));
     opacity: 0.55;
   }
 }

@@ -16,6 +16,7 @@ export function GeneratingOverlay({
   label = '생성 중',
   showElapsed = true,
   startedAt,
+  beamColor = 'primary',
   className,
 }: {
   active: boolean
@@ -26,6 +27,8 @@ export function GeneratingOverlay({
   /** 생성 시작 시각(epoch ms). 주면 이 시점부터 경과를 센다 → 탭 전환(remount)에도 타이머 안 리셋.
    *  없으면(undefined) 기존처럼 mount 시점부터 센다. */
   startedAt?: number
+  /** 테두리 빛 색(#e13): 이미지 생성=success(초록), 영상 생성=primary(빨강). */
+  beamColor?: 'primary' | 'success'
   className?: string
 }) {
   if (!active) return null
@@ -34,6 +37,7 @@ export function GeneratingOverlay({
       label={label}
       showElapsed={showElapsed}
       startedAt={startedAt}
+      beamColor={beamColor}
       className={className}
     />
   )
@@ -43,11 +47,13 @@ function ActiveOverlay({
   label,
   showElapsed,
   startedAt,
+  beamColor,
   className,
 }: {
   label: string
   showElapsed: boolean
   startedAt?: number
+  beamColor: 'primary' | 'success'
   className?: string
 }) {
   const elapsed = useElapsedSeconds(startedAt)
@@ -59,7 +65,13 @@ function ActiveOverlay({
       role="status"
     >
       {/* 회전하는 accent 테두리 빛 */}
-      <span className="tale-beam absolute inset-0 rounded-[inherit]" aria-hidden />
+      <span
+        className={cn(
+          'tale-beam absolute inset-0 rounded-[inherit]',
+          beamColor === 'success' && '[--beam-color:var(--success)]',
+        )}
+        aria-hidden
+      />
       {/* 작업 중임을 알리는 옅은 scrim (glass blur 아님 — flat tint) */}
       <span
         className="absolute inset-0 rounded-[inherit] bg-background/20"

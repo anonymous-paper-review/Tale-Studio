@@ -87,6 +87,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       width={240}
       stale={data.stale}
       strongStale={isStrongStale}
+      beam={data.status === 'generating' ? 'primary' : null}
       headerExtra={
         <Button
           variant="ghost"

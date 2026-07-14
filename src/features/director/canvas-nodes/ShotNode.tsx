@@ -84,6 +84,12 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         selected={selected}
         width={280}
         stale={data.stale}
+        // 빔은 로컬 플래그(즉시 반응) + DB status(재진입/웹훅 경로) 둘 다에서 켜진다
+        beam={
+          isGenerating || data.storyboardImage?.status === 'generating'
+            ? 'success'
+            : null
+        }
         canBranch
         onBranch={() => {
           addVideoTake(id)

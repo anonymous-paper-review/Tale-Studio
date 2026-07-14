@@ -16,6 +16,7 @@ import { replaceSlugs, type SlugEntry } from '@/lib/script-lines'
 import {
   isSceneData,
   isShotData,
+  isVideoData,
   type DirectorNode,
   type ShotNodeData,
 } from '@/types/director'
@@ -42,6 +43,27 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
   const rough = useRoughStoryboard(writerShotId)
   // 영상 생성(이미지→영상 체인 포함) 진행 플래그 — 버튼 잠금 + 오버레이(#e12)
   const [videoBusy, setVideoBusy] = useState(false)
+  // 완료된 자식 테이크 영상(#e13): final 우선, 없으면 최근 완료분 — 있으면 썸네일을 영상으로.
+  //   selector는 문자열/불리언만 반환(참조 안정성).
+  const completedVideoUrl = useDirectorCanvasStore((s) => {
+    let fallback: string | null = null
+    for (const n of s.nodes) {
+      if (!isVideoData(n.data) || n.data.parentShotNodeId !== node.id) continue
+      if (n.data.status !== 'completed' || !n.data.videoUrl) continue
+      if (n.data.final) return n.data.videoUrl
+      fallback = n.data.videoUrl
+    }
+    return fallback
+  })
+  // 자식 테이크가 생성 중(#e13) — Node 탭/리테이크에서 시작된 영상 생성도 그리드에 반영.
+  const childVideoGenerating = useDirectorCanvasStore((s) =>
+    s.nodes.some(
+      (n) =>
+        isVideoData(n.data) &&
+        n.data.parentShotNodeId === node.id &&
+        n.data.status === 'generating',
+    ),
+  )
 
   if (!isShotData(node.data)) return null
   const data: ShotNodeData = node.data
@@ -75,7 +97,8 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
     }
   }
 
-  const generating = status === 'generating' || videoBusy
+  const imageGenerating = status === 'generating'
+  const generating = imageGenerating || videoBusy || childVideoGenerating
 
   return (
     <div
@@ -83,7 +106,18 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
       onDoubleClick={() => openPopup(node.id)}
     >
       <div className="relative aspect-video bg-muted">
-        {hasImage ? (
+        {completedVideoUrl ? (
+          // 영상까지 완성된 샷 — 썸네일 자리를 영상으로(#e13). 음소거 루프 재생.
+          <video
+            src={completedVideoUrl}
+            muted
+            loop
+            autoPlay
+            playsInline
+            preload="metadata"
+            className="size-full object-cover"
+          />
+        ) : hasImage ? (
           <GeneratedImage
             src={img!.url}
             alt={data.label}
@@ -119,10 +153,12 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
           </div>
         )}
 
-        {/* 생성 중 — border beam + 경과시간 오버레이 */}
+        {/* 생성 중 — border beam + 경과시간 오버레이. 색 구분(#e13): 이미지=초록, 영상=빨강.
+            동시 진행이면 라벨·빔 모두 이미지(선행 단계) 우선 — 표기 불일치 방지. */}
         <GeneratingOverlay
           active={generating}
-          label={status === 'generating' ? '이미지 생성 중' : '영상 생성 중'}
+          label={imageGenerating ? '이미지 생성 중' : '영상 생성 중'}
+          beamColor={imageGenerating ? 'success' : 'primary'}
         />
 
         {/* 우하단 생성 스택(#e12) — 기본 버튼 = 영상 생성(이미지 없으면 이미지→영상 체인).

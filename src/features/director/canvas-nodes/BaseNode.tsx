@@ -65,6 +65,8 @@ type BaseNodeProps = {
   stale?: boolean
   /** 강한 stale (border 강조) */
   strongStale?: boolean
+  /** 생성 중 테두리 회전 빛(#e5): 'success'=이미지(초록) / 'primary'=영상(빨강). null=없음 */
+  beam?: 'success' | 'primary' | null
 }
 
 function BaseNodeImpl({
@@ -79,6 +81,7 @@ function BaseNodeImpl({
   onBranch,
   stale,
   strongStale,
+  beam,
 }: BaseNodeProps) {
   const palette = THEME_CLASS[theme]
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
@@ -151,6 +154,17 @@ function BaseNodeImpl({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      {/* 생성 중 — 테두리를 도는 색 빛(#e5). 이미지=초록(success), 영상=빨강(primary). */}
+      {beam && (
+        <span
+          className={cn(
+            'tale-beam pointer-events-none absolute inset-0 z-10 rounded-[inherit]',
+            beam === 'success' && '[--beam-color:var(--success)]',
+          )}
+          aria-hidden
+        />
+      )}
+
       {stale && (
         <div
           className={cn(

@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils'
 
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useProjectStore } from '@/stores/project-store'
 import { getDirectorGaps, summarizeGaps } from '@/lib/completeness'
 import {
   usePresetStorageStore,
@@ -291,16 +292,40 @@ function CanvasInner() {
     const st = useDirectorCanvasStore.getState()
     if (st.viewportInitialized) {
       void applyViewport(st.viewport)
-    } else {
-      // 최초 진입: fitView 후 그 결과 뷰포트를 store에 저장해 다음 재진입의 복원 기준점으로 삼는다
-      //   (프로그램적 fitView가 onMove를 안 쏘는 경우에도 첫 재진입이 원점으로 튀지 않게).
-      void fitView().then(() => {
+      return
+    }
+    // 최초 진입(#e9): 전체 fitView(정중앙)로 시작한 뒤 가장 왼쪽 Scene(Scene 1)으로
+    //   수평 팬 애니메이션. 종료 뷰포트를 store에 저장해 재진입 복원 기준점으로 삼는다.
+    void (async () => {
+      await fitView()
+      const scenes = useDirectorCanvasStore
+        .getState()
+        .nodes.filter((n) => n.data.kind === 'scene')
+      if (scenes.length === 0) {
         useDirectorCanvasStore.setState({
           viewport: getViewport(),
           viewportInitialized: true,
         })
+        return
+      }
+      const first = scenes.reduce((a, b) =>
+        a.position.x <= b.position.x ? a : b,
+      )
+      const pane = document.querySelector('.react-flow')
+      const w = pane?.clientWidth ?? 1200
+      const h = pane?.clientHeight ?? 800
+      const zoom = 0.75
+      const target = {
+        x: w / 2 - (first.position.x + 130) * zoom,
+        y: h / 3 - (first.position.y + 60) * zoom,
+        zoom,
+      }
+      await applyViewport(target, { duration: 900 })
+      useDirectorCanvasStore.setState({
+        viewport: target,
+        viewportInitialized: true,
       })
-    }
+    })()
   }, [nodesInitialized, applyViewport, getViewport, fitView])
 
   const [creatorOpen, setCreatorOpen] = useState(false)
@@ -689,9 +714,53 @@ function PaletteBar() {
 
 export default function DirectorCanvasPage() {
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
+  const guideProjectId = useDirectorCanvasStore((s) => s.projectId)
+  const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
+  // 프로젝트 init(resetChildStores)이 끝나기 전에 올린 제안은 reset()에 지워진다 —
+  //   스테이지 동기 + init 완료 후에만 발화.
+  const stageReady = useProjectStore(
+    (s) => s.currentStage === 'director' && !s.initLoading,
+  )
 
   // Writer Scene/Shot → Director 노드 자동 셋업 (프롬프트 + 에셋 바인딩, 스펙 §8)
   useWriterDirectorSync()
+
+  // 첫 진입 사용법 안내(#e3) — Node/Storyboard 탭 각각 프로젝트당 1회(localStorage 가드).
+  //   제안 슬롯은 선점형: 갭 넛지가 점유 중이면 내리고 안내를 올리고, 그 외 제안이면 양보.
+  useEffect(() => {
+    if (!guideProjectId || guideProjectId === 'default' || !stageReady) return
+    const key = viewMode === 'storyboard' ? 'storyboardGuide' : 'nodeGuide'
+    const guardKey = `director:${key}:${guideProjectId}`
+    try {
+      if (localStorage.getItem(guardKey)) return
+    } catch {
+      return
+    }
+    const chat = useGlobalChatStore.getState()
+    if (chat.suggestion) {
+      if (chat.suggestion.id.startsWith('director-gaps-')) chat.dismissSuggestion()
+      else return
+    }
+    try {
+      localStorage.setItem(guardKey, '1')
+    } catch {}
+    offerSuggestion({
+      id: `director-${key}:${guideProjectId}`,
+      stage: 'director',
+      dismissible: false,
+      action: null,
+      content:
+        viewMode === 'storyboard'
+          ? '씬별 샷 이미지를 한눈에 보는 스토리보드예요.\n\n' +
+            '· "이미지 생성 필요" 카드는 아직 러프 상태예요\n' +
+            '· 카드의 "영상 생성"을 누르면 이미지부터 영상까지 이어서 만들어요\n' +
+            '· 카드를 더블클릭하면 상세 편집이 열려요'
+          : '여기는 The Set — 촬영장이에요. 씬 → 샷 → 영상이 노드로 이어져 있어요.\n\n' +
+            '· 카드를 더블클릭하면 상세 편집이 열려요\n' +
+            '· 샷 카드를 선택하면 위에 이미지 생성 버튼이 떠요\n' +
+            '· 상단 "스토리보드 생성"으로 모든 샷을 한 번에 실사화할 수 있어요',
+    })
+  }, [guideProjectId, viewMode, stageReady, offerSuggestion])
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
