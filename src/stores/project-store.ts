@@ -31,7 +31,7 @@ interface ProjectState {
   unlockThrough: (stage: StageId) => void
   canNavigateTo: (stage: StageId) => boolean
   initProject: (projectId?: string) => Promise<void>
-  createNewProject: () => Promise<void>
+  createNewProject: (title?: string) => Promise<void>
   switchProject: (id: string, title: string, stage?: StageId) => void
   renameProject: (title: string) => Promise<void>
   /** 진입 시 writer 산출물(씬) 검증 → 없으면 producer 로 게이트백 + writerNeedsRerun 표시 */
@@ -135,17 +135,22 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  createNewProject: async () => {
+  createNewProject: async (title) => {
     resetChildStores()
     set({ initLoading: true })
     try {
-      const res = await fetch('/api/project/new', { method: 'POST' })
+      const trimmed = title?.trim() || 'Untitled'
+      const res = await fetch('/api/project/new', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: trimmed }),
+      })
       if (!res.ok) throw new Error('Failed to create project')
       const { workspaceId, projectId } = await res.json()
       set({
         workspaceId,
         projectId,
-        projectTitle: 'Untitled',
+        projectTitle: trimmed,
         initLoading: false,
         currentStage: 'producer',
         reachedStage: 'producer',
