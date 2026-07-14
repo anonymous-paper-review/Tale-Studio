@@ -63,6 +63,13 @@ export async function buildZipBlob(
       continue
     }
 
+    // 클라 생성 바이너리(캔버스 캡처 등) — fetch 없이 바로 zip에 담는다.
+    if (file.blob) {
+      zip.file(file.path, file.blob)
+      downloaded += 1
+      continue
+    }
+
     const url = file.url
     if (!url) {
       failed.push(`${file.path}\t\tmissing url`)

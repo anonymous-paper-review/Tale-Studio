@@ -58,7 +58,6 @@ import { DirectorNodePopup } from '@/features/director/canvas-popups/DirectorNod
 import { DirectorDetailPanel } from '@/features/director/canvas-panels/DirectorDetailPanel'
 import {
   doubleClickActionForKind,
-  clickToggleSelection,
   connectRouteForTargetHandle,
 } from '@/features/director/canvas-interaction'
 
@@ -219,7 +218,6 @@ function CanvasInner() {
   const addShotNode = useDirectorCanvasStore((s) => s.addShotNode)
   const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
-  const selectedNodeId = useDirectorCanvasStore((s) => s.selectedNodeId)
   const selectEdge = useDirectorCanvasStore((s) => s.selectEdge)
   const persistNodePosition = useDirectorCanvasStore(
     (s) => s.persistNodePosition,
@@ -435,20 +433,12 @@ function CanvasInner() {
           selectNode(null)
           selectEdge(null)
         }}
-        onNodeClick={(_event, node) => {
-          // shot/video는 재클릭 토글(패널 닫기), scene/asset 등은 단순 선택
-          if (node.data.kind === 'shot' || node.data.kind === 'video') {
-            selectNode(clickToggleSelection(selectedNodeId, node.id))
-          } else {
-            selectNode(node.id)
-          }
-        }}
+        // 단일클릭 커스텀 액션(onNodeClick) 제거(#e2) — RF 기본 선택(하이라이트·툴바)만 유지
         onEdgeClick={(_event, edge) => selectEdge(edge.id)}
         onNodeDoubleClick={(_event, node) => {
-          // kind 분기: scene=모달, shot/video=좌측 패널 닫기, 그 외 no-op
+          // Storyboard 뷰 더블클릭과 동일(#e2): scene/shot/video 모두 모달 열기
           const action = doubleClickActionForKind(node.data.kind)
           if (action === 'popup') openPopup(node.id)
-          else if (action === 'close-panel') selectNode(null)
         }}
         onNodeDragStart={() => commitHistory()}
         onMove={(_, vp) => setViewport(vp)}
@@ -601,6 +591,7 @@ function PaletteBar() {
         {/* 스토리보드 일괄 생성 */}
         <button
           type="button"
+          title="러프 스토리보드를 실제 촬영 이미지 스토리보드로 한번에 생성할 수 있어요"
           onClick={() => {
             // #2: 이미 모두 생성됐으면 재생성 대신 알림.
             const shots = nodes.filter((n) => isShotData(n.data))
@@ -704,6 +695,13 @@ export default function DirectorCanvasPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
+      {/* 스테이지 헤더(#e1 2026-07-14) — 다른 탭(writer/artist)과 동일한 제목+설명 구조 */}
+      <div className="shrink-0 border-b border-border px-6 py-3">
+        <h1 className="text-lg font-semibold">The Set</h1>
+        <p className="mt-1 text-xs text-muted-foreground">
+          러프 스토리보드와 등장인물, 월드를 바탕으로 실제 이미지/영상으로 촬영을 시작하세요
+        </p>
+      </div>
       <div className="flex flex-1 overflow-hidden">
         {/* Center: top Palette bar(#e1 — 하단→상단 이동) + Canvas (Node/Storyboard) */}
         <div className="relative flex flex-1 flex-col overflow-hidden">

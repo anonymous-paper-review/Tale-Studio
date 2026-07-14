@@ -1,8 +1,8 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
     const {
@@ -12,6 +12,12 @@ export async function POST() {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // 이름 지정 팝업(#a1)이 title을 보낸다. body 없는 기존 호출은 'Untitled' 유지.
+    const body = await req.json().catch(() => null)
+    const title =
+      (typeof body?.title === 'string' ? body.title.trim().slice(0, 120) : '') ||
+      'Untitled'
 
     // Find workspace for this user
     const { data: workspace } = await supabaseAdmin
@@ -32,7 +38,7 @@ export async function POST() {
     // Create new project
     const { data: project, error } = await supabaseAdmin
       .from('projects')
-      .insert({ workspace_id: workspace.id, title: 'Untitled' })
+      .insert({ workspace_id: workspace.id, title })
       .select()
       .single()
 

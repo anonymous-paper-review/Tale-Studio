@@ -32,6 +32,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
+import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import type { RoughStoryboardImage, Shot } from '@/types'
 
@@ -110,7 +111,7 @@ export function RoughStoryboardView() {
       dismissible: false,
       action: null,
       content:
-        '스토리를 촬영할 수 있게 정리해뒀어요.\n\n' +
+        '스토리를 구체화할 수 있는 틀을 마련했어요.\n\n' +
         `· 씬 ${sceneCount}개, 샷 ${shots.length}개로 나눴어요\n` +
         '· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n' +
         '카드를 누르면 확인·수정·재생성할 수 있어요.\n' +
@@ -238,7 +239,8 @@ export function RoughStoryboardView() {
   const generatingCount = Object.values(panelJobs).filter(
     (j) => j.status === 'generating',
   ).length
-  const headerDescription = '러프 스토리보드 previz — 카드를 클릭하면 수정·재생성할 수 있어요'
+  // 제목 아래 설명문은 제거(#c2 2026-07-14) — 카드 사용법은 첫 진입 브리핑 채팅이 안내한다.
+  const headerDescription = undefined
   const storyboardActions = hasShots ? (
     <>
       {/* 축척 — 가로 열 수 조절 (Ctrl+wheel 로도 가능) */}
@@ -380,25 +382,48 @@ export function RoughStoryboardView() {
 
   // ── 파이프라인 진행 중 (샷이 아직 없음) ─────────────────────────────────
   if (!hasShots && running) {
-    // 현재 단계 경과시간 — last_timestamp(직전 단계 종료=현재 단계 시작) 기준. 라이브로 늘어나며 "작동 중"임을 보임.
-    const stageElapsedSec = status?.last_timestamp
-      ? Math.max(0, Math.floor((nowMs - Date.parse(status.last_timestamp)) / 1000))
+    const pct = Math.max(0, Math.min(100, status?.progress_percent ?? 0))
+    // 진행(경과) 시간은 계산만 하고 표시하지 않는다(#c4) — 남은 예상 시간 산출에만 사용.
+    //   실측 자체는 writer_runs(created_at/updated_at + state._timings)에 이미 영속된다.
+    const startedAtMs = status?.timings?.pipeline_started_at
+      ? Date.parse(status.timings.pipeline_started_at)
       : null
+    const elapsedMs = startedAtMs != null ? Math.max(0, nowMs - startedAtMs) : null
+    const etaTotalMs = status?.eta_total_ms ?? null
+    const remainingMs =
+      etaTotalMs != null && elapsedMs != null ? etaTotalMs - elapsedMs : null
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <WriterHeader description={headerDescription} />
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
           <Loader2 className="size-6 animate-spin text-muted-foreground" aria-busy="true" />
-          <p className="text-base font-medium">Writer가 스토리와 연출을 설계하는 중…</p>
-          <p className="text-sm text-muted-foreground">
-            <span className="font-mono tabular-nums">{status?.progress_percent ?? 0}%</span>
-            {status?.current_stage ? ` · ${status.current_stage}` : ''}
-            {stageElapsedSec != null ? (
-              <span className="font-mono tabular-nums"> · {stageElapsedSec}s 진행 중</span>
-            ) : null}
-          </p>
+          <p className="text-base font-medium">{friendlyStageLabel(status?.current_stage)}</p>
+
+          {/* 진행률 바(#c3) — 우측에 % 병기 */}
+          <div className="flex w-full max-w-md items-center gap-3">
+            <div
+              role="progressbar"
+              aria-valuenow={pct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              className="h-2 flex-1 overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-500"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className="w-10 shrink-0 text-right font-mono text-sm tabular-nums text-muted-foreground">
+              {pct}%
+            </span>
+          </div>
+
+          {/* 남은 예상 시간 — 과거 실행 실측이 있을 때만(#c4, 기록 없으면 비움) */}
+          {remainingMs != null ? (
+            <p className="text-sm text-muted-foreground">{formatRemaining(remainingMs)}</p>
+          ) : null}
           <p className="text-xs text-muted-foreground">
-            샷 설계·검증 같은 복잡한 단계는 1~2분 걸릴 수 있어요 — 멈춘 게 아니라 진행 중입니다.
+            샷 설계·검증 같은 복잡한 단계는 1~2분 걸릴 수 있어요.
           </p>
         </div>
       </div>

@@ -18,7 +18,6 @@ import {
   Palette,
   Trash2,
   Plus,
-  Sparkles,
   Tag,
   User,
   Wand2,
@@ -56,6 +55,8 @@ import { HoverBeam } from '@/components/hover-beam'
 import { cn } from '@/lib/utils'
 import { useModifierHeld } from '@/hooks/use-modifier-held'
 import { TagInput } from './tag-input'
+import { AgentFace } from '@/components/agent-face'
+import { STAGE_FACE_COLOR } from '@/lib/constants'
 
 const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [
   { value: 'horizontal_16:9', label: '16:9 Horizontal' },
@@ -70,6 +71,11 @@ const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
   { value: 'ja', label: '日本語' },
   { value: 'zh', label: '中文' },
 ]
+
+// 카드 안 자동확장 textarea(외모/시각 설명)용 — 네이티브 스크롤바 대신 얇은 테마 스크롤바(#b5).
+//   max-h로 카드 폭주를 막고, 넘치면 얇은 썸만 보이게.
+const CARD_TEXTAREA =
+  'max-h-40 resize-none [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border'
 
 const ROLE_LABEL: Record<string, string> = {
   protagonist: '주인공',
@@ -102,7 +108,8 @@ function MentionableCard({
   children: ReactNode
 }) {
   const mentioned = useChatUiStore((s) => s.mentionedRefs.includes(refId))
-  const requestMentionInsert = useChatUiStore((s) => s.requestMentionInsert)
+  // toggle 모드: 이미 멘션된 카드를 다시 Ctrl+클릭하면 입력창에서 @라벨 제거(언멘션, #b6).
+  const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
   const armed = useModifierHeld()
   return (
     <div
@@ -121,7 +128,7 @@ function MentionableCard({
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey) {
           e.preventDefault()
-          requestMentionInsert(label)
+          requestMentionToggle(label)
         }
       }}
     >
@@ -131,7 +138,7 @@ function MentionableCard({
           armed && 'opacity-100',
         )}
       >
-        <AtSign className="size-3" /> ⌘/Ctrl+클릭 멘션
+        <AtSign className="size-3" /> {mentioned ? '⌘/Ctrl+클릭 멘션 해제' : '⌘/Ctrl+클릭 멘션'}
       </span>
       {children}
     </div>
@@ -417,6 +424,7 @@ function CastCard({
             <Textarea
               value={member.appearance}
               rows={2}
+              className={CARD_TEXTAREA}
               placeholder={isPerson ? '복장, 나이, 특징' : '형태, 재질, 특징'}
               onChange={(e) => onPatch(member.localId, { appearance: e.target.value })}
             />
@@ -425,8 +433,9 @@ function CastCard({
         </div>
       </div>
 
-      {/* 상세 정보(역할·아크·동기) 접기 토글 — »를 눕힌 이중 셰브런(⌄⌄), 아이콘 폭만큼의 borderless
-          버튼(호버 하이라이트 최소화). 접힘+미완료면 우상단 빨간 점으로만 표시. */}
+      {/* 상세 정보(역할·아크·동기) 접기 토글 — 테두리 둥근 사각형(#b4). mx-auto 중앙 배치라
+          호버 시 폭이 늘며 중앙 기준으로 확장되고, 옆에 "상세 정보" 문구가 슬라이드로 나타난다.
+          접힘+미완료면 우상단 빨간 점으로만 표시. */}
       {isPerson ? (
         <button
           type="button"
@@ -434,13 +443,16 @@ function CastCard({
           aria-expanded={detailsOpen}
           aria-label={detailsOpen ? '상세 접기' : '상세 정보 (역할·아크·동기) 펼치기'}
           title={detailsOpen ? '상세 접기' : '상세 정보 (역할·아크·동기)'}
-          className="relative mx-auto mt-2 flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="group/detail relative mx-auto mt-2 flex h-6 min-w-6 items-center justify-center rounded-md border border-border px-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           {detailsOpen ? (
-            <ChevronsUp className="size-4" />
+            <ChevronsUp className="size-4 shrink-0" />
           ) : (
-            <ChevronsDown className="size-4" />
+            <ChevronsDown className="size-4 shrink-0" />
           )}
+          <span className="max-w-0 overflow-hidden whitespace-nowrap text-[11px] opacity-0 transition-all duration-200 group-hover/detail:ml-1 group-hover/detail:max-w-16 group-hover/detail:opacity-100">
+            상세 정보
+          </span>
           {!detailsOpen && detailIssueCount > 0 ? (
             <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-destructive" />
           ) : null}
@@ -595,6 +607,7 @@ function BackgroundCard({
           <Textarea
             value={background.visualDescription}
             rows={2}
+            className={CARD_TEXTAREA}
             placeholder="색감, 구조, 소품, 분위기"
             onChange={(e) => onPatch(background.localId, { visualDescription: e.target.value })}
           />
@@ -654,9 +667,34 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
     [gate.softMissing],
   )
 
+  // Brief Story 준비 전환 시 잠깐 펄스 — FieldShell 시절의 justReady 피드백을 섹션 승격(#b7)
+  //   후에도 유지. 상태 전환 감지는 set-state-in-render 패턴, 자동 해제만 effect 타이머.
+  const storyIssue = hardByField.get('storyText')
+  const storyReadyNow = !storyIssue
+  const [prevStoryReady, setPrevStoryReady] = useState(storyReadyNow)
+  const [storyPulse, setStoryPulse] = useState(false)
+  if (storyReadyNow !== prevStoryReady) {
+    if (storyReadyNow) setStoryPulse(true)
+    setPrevStoryReady(storyReadyNow)
+  }
+  useEffect(() => {
+    if (!storyPulse) return
+    const t = setTimeout(() => setStoryPulse(false), 1500)
+    return () => clearTimeout(t)
+  }, [storyPulse])
+
   // C5: 버튼 클릭 시 프롬프트를 타이핑창에 채우는 대신 대화에 바로 보내고 전송 동작을 수행한다.
   const askProducer = (prompt: string) => {
     void useGlobalChatStore.getState().sendMessage(prompt)
+  }
+  // 헤더 우측 Producer 호출 버튼(#b8) — 옛 Brief Story 카드의 "기본적인 스토리를 알려주세요"
+  //   기능을 승격. 접힌 채팅을 펴고 프롬프트 전송 + 입력창 포커스.
+  const callProducerForStory = () => {
+    useChatUiStore.getState().setCollapsed(false)
+    askProducer(
+      'Producer, 이 이야기가 writer로 넘어갈 수 있게 캐릭터·장소·시작-갈등-결말 중 부족한 한 가지를 질문해 주세요.',
+    )
+    useChatUiStore.getState().requestChatFocus()
   }
   const add = (entityType: EntityType) => {
     addCastMember(entityType)
@@ -667,7 +705,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-6 py-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold">Meeting Room</h1>
@@ -678,59 +716,82 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
             ) : null}
           </div>
         </div>
-        {syncing ? <Badge variant="outline">저장 중</Badge> : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {syncing ? <Badge variant="outline">저장 중</Badge> : null}
+          {/* Producer 호출 CTA(#b8) — 얼굴 + 이름 병기, 헤더 맨오른쪽 */}
+          <Button
+            variant="outline"
+            size="sm"
+            className={HOVER_RED_BORDER}
+            onClick={callProducerForStory}
+          >
+            <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+              <AgentFace color={STAGE_FACE_COLOR.producer} size={15} animate={false} />
+            </span>
+            Producer와 스토리 만들기
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="mx-auto max-w-6xl space-y-5">
-          <FieldShell
-            icon={<Sparkles className="size-4" />}
-            label="Brief Story"
-            issue={hardByField.get('storyText')}
-            mentionRef="story"
-            mentionLabel="스토리"
-          >
-            <div className="rounded-lg border border-border bg-background/40 p-3">
-              {storyText ? (
-                <>
-                  <p
-                    className={cn(
-                      'text-sm text-muted-foreground italic whitespace-pre-wrap',
-                      storyExpanded
-                        ? 'max-h-72 overflow-y-auto pr-1'
-                        : 'line-clamp-4',
-                    )}
-                  >
-                    {storyText}
-                  </p>
-                  {storyText.length > 200 && (
-                    <button
-                      type="button"
-                      onClick={() => setStoryExpanded((v) => !v)}
-                      className="mt-2 flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      {storyExpanded ? '접기' : '더 보기'}
-                      <ChevronDown
-                        className={cn('size-3.5 transition-transform', storyExpanded && 'rotate-180')}
-                      />
-                    </button>
-                  )}
-                </>
+          {/* Brief Story — Story Foundation과 같은 레벨의 메인 섹션(#b7). 게이트 배지는 제목 옆,
+              카드 본문은 스토리 텍스트만. 프로듀서 호출 버튼은 헤더로 이동(#b8). */}
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-semibold">Brief Story</h2>
+              {storyIssue ? (
+                <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
+                  <AlertCircle className="size-3" /> 필요
+                </Badge>
               ) : (
-                <p className="text-sm text-muted-foreground italic">
-                  채팅으로 촬영 가능한 스토리를 정리해 주세요.
-                </p>
+                <Badge variant="outline" className="gap-1 border-success/40 text-success">
+                  <CheckCircle2 className="size-3" /> 준비됨
+                </Badge>
               )}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="mt-3"
-                onClick={() => askProducer('Producer, 이 이야기가 writer로 넘어갈 수 있게 캐릭터·장소·시작-갈등-결말 중 부족한 한 가지를 질문해 주세요.')}
-              >
-                <Wand2 className="size-3.5" /> 기본적인 스토리를 AI Producer에게 알려주세요
-              </Button>
+              {storyIssue ? (
+                <span className="text-xs text-destructive">
+                  {storyIssue.label}
+                  {storyIssue.detail ? ` · ${storyIssue.detail}` : ''}
+                </span>
+              ) : null}
             </div>
-          </FieldShell>
+            <MentionableCard refId="story" label="스토리" pulse={storyPulse}>
+              <div className="rounded-lg border border-border bg-background/40 p-3">
+                {storyText ? (
+                  <>
+                    <p
+                      className={cn(
+                        'text-sm text-muted-foreground italic whitespace-pre-wrap',
+                        storyExpanded
+                          ? 'max-h-72 overflow-y-auto pr-1'
+                          : 'line-clamp-4',
+                      )}
+                    >
+                      {storyText}
+                    </p>
+                    {storyText.length > 200 && (
+                      <button
+                        type="button"
+                        onClick={() => setStoryExpanded((v) => !v)}
+                        className="mt-2 flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {storyExpanded ? '접기' : '더 보기'}
+                        <ChevronDown
+                          className={cn('size-3.5 transition-transform', storyExpanded && 'rotate-180')}
+                        />
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    채팅으로 촬영 가능한 스토리를 정리해 주세요. 우상단의 Producer 버튼으로
+                    시작할 수 있어요.
+                  </p>
+                )}
+              </div>
+            </MentionableCard>
+          </section>
 
           <section className="space-y-3">
             <div className="flex items-center gap-2">
@@ -841,7 +902,8 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </p>
               </div>
             ) : (
-              <div className="grid gap-3 xl:grid-cols-2">
+              // items-start: 같은 행의 이웃 카드가 확장된 카드 높이로 같이 늘어나지 않게(#b4).
+              <div className="grid items-start gap-3 xl:grid-cols-2">
                 {cast.map((member, i) => (
                   <CastCard
                     key={member.localId}
@@ -887,7 +949,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </p>
               </div>
             ) : (
-              <div className="grid gap-3 xl:grid-cols-2">
+              <div className="grid items-start gap-3 xl:grid-cols-2">
                 {backgrounds.map((background, i) => (
                   <BackgroundCard
                     key={background.localId}

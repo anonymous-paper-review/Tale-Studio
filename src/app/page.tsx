@@ -7,6 +7,7 @@ import {
   Loader2,
   Film,
   Pencil,
+  Trash2,
   Clock,
   ArrowRight,
   Sparkles,
@@ -19,6 +20,15 @@ import {
 } from 'lucide-react'
 import { useProjectStore } from '@/stores/project-store'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import type { StageId } from '@/types'
 import {
   DropdownMenu,
@@ -27,7 +37,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { createClient } from '@/lib/supabase/client'
-import { clearLastProjectId } from '@/lib/session-restore'
+import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
 import { ContactPopover } from '@/components/contact-popover'
 
 interface ProjectItem {
@@ -95,10 +105,12 @@ function ProjectCard({
   project,
   onOpen,
   onRenamed,
+  onDeleteRequest,
 }: {
   project: ProjectItem
   onOpen: (p: ProjectItem) => void
   onRenamed: (id: string, title: string) => void
+  onDeleteRequest: (p: ProjectItem) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(project.title || 'Untitled')
@@ -141,15 +153,30 @@ function ProjectCard({
             <h3 className="text-lg font-semibold text-white transition-colors group-hover:text-primary">
               {title}
             </h3>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setEditing(true)
-              }}
-              className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
-            >
-              <Pencil className="size-3.5" />
-            </button>
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setEditing(true)
+                }}
+                title="이름 변경"
+                aria-label="프로젝트 이름 변경"
+                className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDeleteRequest(project)
+                }}
+                title="프로젝트 삭제"
+                aria-label="프로젝트 삭제"
+                className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </div>
           </>
         )}
       </div>
@@ -178,6 +205,13 @@ export default function HomePage() {
   const [creating, setCreating] = useState(false)
   const [userInfo, setUserInfo] = useState<{ name: string; avatar: string | null } | null>(null)
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null)
+  // 새 프로젝트 이름 지정 팝업(#a1) — 모든 생성 진입점(Get Started/New Project)이 이 팝업을 거친다.
+  const [nameOpen, setNameOpen] = useState(false)
+  const [nameValue, setNameValue] = useState('')
+  // 삭제 확인 팝업(#a2) — 타일 휴지통 클릭 시 대상 지정.
+  const [deleteTarget, setDeleteTarget] = useState<ProjectItem | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     // 인증 먼저 확인 → 로그인한 경우에만 프로젝트 목록 요청(비로그인 헛요청 방지).
@@ -222,18 +256,48 @@ export default function HomePage() {
     router.push(`/studio/${stage}?projectId=${project.id}`)
   }
 
-  const handleNew = async () => {
+  const handleNew = () => {
     // 비로그인 → 로그인부터. 로그인 후 홈으로 복귀하면 다시 눌러 생성.
     if (isAuthed === false) {
       router.push('/login')
       return
     }
+    setNameValue('')
+    setNameOpen(true)
+  }
+
+  const handleCreate = async () => {
+    const name = nameValue.trim()
+    if (!name || creating) return
     setCreating(true)
-    await createNewProject()
+    await createNewProject(name)
     const newId = useProjectStore.getState().projectId
     router.push(
       newId ? `/studio/producer?projectId=${newId}` : '/studio/producer',
     )
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget || deleting) return
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`/api/project/${deleteTarget.id}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error ?? res.statusText)
+      }
+      setProjects((prev) => prev.filter((p) => p.id !== deleteTarget.id))
+      // 세션 복원 힌트가 방금 지운 프로젝트를 가리키면 제거 (재진입 시 죽은 링크 방지).
+      if (readLastProjectId() === deleteTarget.id) clearLastProjectId()
+      setDeleteTarget(null)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : '삭제에 실패했어요')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const scrollToProjects = () => {
@@ -525,12 +589,92 @@ export default function HomePage() {
                       prev.map((p) => (p.id === id ? { ...p, title } : p)),
                     )
                   }
+                  onDeleteRequest={(p) => {
+                    setDeleteError(null)
+                    setDeleteTarget(p)
+                  }}
                 />
               ))}
             </div>
           )}
         </div>
       </section>
+
+      {/* ── 새 프로젝트 이름 지정 팝업 (#a1) ── */}
+      <Dialog open={nameOpen} onOpenChange={(o) => !creating && setNameOpen(o)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>새 프로젝트</DialogTitle>
+            <DialogDescription>
+              프로젝트 이름을 지어 주세요. 나중에 언제든 바꿀 수 있어요.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={nameValue}
+            onChange={(e) => setNameValue(e.target.value)}
+            placeholder="예: 비 오는 도시의 하룻밤"
+            autoFocus
+            maxLength={120}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault()
+                void handleCreate()
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={creating}
+              onClick={() => setNameOpen(false)}
+            >
+              취소
+            </Button>
+            <Button
+              disabled={creating || !nameValue.trim()}
+              onClick={() => void handleCreate()}
+            >
+              {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              만들기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 프로젝트 삭제 확인 팝업 (#a2) ── */}
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>프로젝트 삭제</DialogTitle>
+            <DialogDescription>
+              {`"${deleteTarget?.title || 'Untitled'}" 프로젝트와 모든 산출물(스토리·캐릭터·씬·샷·영상)이 삭제됩니다. 되돌릴 수 없어요.`}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError ? (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={deleting}
+              onClick={() => setDeleteTarget(null)}
+            >
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={() => void handleDelete()}
+            >
+              {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Footer ── */}
       <footer className="bg-black px-6 pb-12 pt-24 text-white md:px-12">

@@ -37,6 +37,42 @@ import {
   CHAT_SUPPORTED_STAGES,
 } from '@/lib/constants'
 
+// 이 세션에서 이미 타이핑 연출을 재생한 suggestion id — 재렌더/스테이지 왕복 시 재생 방지(#b1).
+const typedSuggestionIds = new Set<string>()
+
+/** 에이전트 제안 말풍선의 타이핑(캐스케이드) 연출 — 전체 출력 5초 미만 보장(#b1). */
+function TypewriterMarkdown({ id, text }: { id: string; text: string }) {
+  const [shown, setShown] = useState(() =>
+    typedSuggestionIds.has(id) ? text.length : 0,
+  )
+  useEffect(() => {
+    if (typedSuggestionIds.has(id)) return
+    typedSuggestionIds.add(id)
+    // 글자당 ~14ms, 최소 600ms·최대 4.5초(5초 미만). rAF로 진행률 기반 부드럽게.
+    const total = text.length
+    const duration = Math.min(4500, Math.max(600, total * 14))
+    const start = performance.now()
+    let raf = 0
+    let done = false
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / duration)
+      setShown(Math.ceil(p * total))
+      if (p < 1) raf = requestAnimationFrame(tick)
+      else done = true
+    }
+    raf = requestAnimationFrame(tick)
+    return () => {
+      cancelAnimationFrame(raf)
+      // 완주 전에 정리되면(StrictMode 이중 실행·중도 unmount) 가드를 되돌려 재생 가능하게.
+      //   없으면 dev StrictMode에서 2번째 effect가 가드에 걸려 0자에서 멈춘다.
+      if (!done) typedSuggestionIds.delete(id)
+    }
+  }, [id, text])
+  return (
+    <MarkdownText className="whitespace-pre-wrap" text={text.slice(0, shown)} />
+  )
+}
+
 /** 말풍선 우상단 호버 복사 버튼. 클립보드 복사 후 1.5초간 체크 표시. */
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
@@ -192,6 +228,21 @@ export function GlobalChat() {
 
   const stageSupported = CHAT_SUPPORTED_STAGES.has(currentStage)
   const inputDisabled = !stageSupported || loading
+
+  // 전송 후에도 연이어 입력할 수 있게 포커스 유지(#b3). 응답 대기 중 textarea가 disabled로
+  //   바뀌며 포커스를 잃으므로, loading이 풀리는 시점(disabled 해제 직후)에 다시 포커스.
+  const wasLoadingRef = useRef(false)
+  useEffect(() => {
+    if (wasLoadingRef.current && !loading && stageSupported && !collapsed) {
+      requestAnimationFrame(() => textareaRef.current?.focus())
+    }
+    wasLoadingRef.current = loading
+  }, [loading, stageSupported, collapsed])
+
+  // 첫 진입(프로듀서 발화 전) 동안 placeholder "스토리에 대해 말해주세요…"를 초록으로 점멸(#b2).
+  const producerUntouched =
+    currentStage === 'producer' &&
+    !messages.some((m) => m.stage === 'producer' && m.role === 'user')
 
   const handleSend = async () => {
     if (!input.trim() || inputDisabled) return
@@ -349,7 +400,11 @@ export function GlobalChat() {
                     {STAGE_LABEL[suggestion.stage]}
                   </span>
                 </div>
-                <MarkdownText className="whitespace-pre-wrap" text={suggestion.content} />
+                <TypewriterMarkdown
+                  key={suggestion.id}
+                  id={suggestion.id}
+                  text={suggestion.content}
+                />
                 {(suggestion.action || suggestion.dismissible !== false) && (
                   <div className="mt-2 flex items-center gap-2">
                     {suggestion.action && (
@@ -425,7 +480,9 @@ export function GlobalChat() {
             </div>
           )}
 
-        {/* Input footer — Textarea가 입력 길이에 따라 자동 확장 (한 줄 min-h-9 → 최대 max-h-40).
+        {/* Input footer — Textarea가 입력 길이에 따라 자동 확장 (한 줄 min-h-9 → 최대 10줄).
+            max-h = 10줄(leading-5 20px×10) + py-2(16px) + border(2px) = 218px. 그 이상은 내부
+            스크롤 — 네이티브 스크롤바는 숨기고 MentionTextarea의 ^/v 버튼으로 안내(#a3).
             Enter 전송 / Shift+Enter 개행. 버튼은 items-end로 입력창 하단에 정렬. */}
         <div className="shrink-0 border-t border-border p-4">
           <div className="flex items-end gap-2">
@@ -439,7 +496,11 @@ export function GlobalChat() {
                 history={userHistory}
                 disabled={inputDisabled}
                 placeholder={STAGE_PLACEHOLDER[currentStage]}
-                className="max-h-40 min-h-9 w-full resize-none py-2"
+                className={cn(
+                  'max-h-[13.625rem] min-h-9 w-full resize-none py-2 leading-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+                  producerUntouched &&
+                    'placeholder:text-success placeholder:animate-pulse',
+                )}
               />
             </HoverBeam>
             {currentStage === 'producer' && (

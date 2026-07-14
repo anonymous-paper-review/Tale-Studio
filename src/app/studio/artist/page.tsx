@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { FlaskConical } from 'lucide-react'
+import { FlaskConical, ZoomIn, ZoomOut } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
+import { Slider } from '@/components/ui/slider'
 import { HandoffButton } from '@/components/layout/handoff-button'
 import { CharacterPanel } from '@/features/artist/character-panel'
 import { WorldPanel } from '@/features/artist/world-panel'
@@ -44,6 +45,31 @@ export default function VisualPage() {
 
   const projectId = useProjectStore((s) => s.projectId)
   const [tab, setTab] = useState<ArtistTab>('characters')
+
+  // 보드 축척(#d1 2026-07-14) — writer 러프 보드와 같은 슬라이더. 인물/배경 탭별로 저장.
+  //   레벨 1(축소·3열) ~ 3(확대·1열, 기존 모습), cols = 4 - level. localStorage 탭별 키.
+  const [zoomByTab, setZoomByTab] = useState<{ characters: number; world: number }>({
+    characters: 3,
+    world: 3,
+  })
+  useEffect(() => {
+    const read = (key: string) => {
+      const v = Number(localStorage.getItem(`artist:zoomLevel:${key}`))
+      return v >= 1 && v <= 3 ? v : 3
+    }
+    // rAF 경유 — 하이드레이션 mismatch 없이 저장값 반영 + set-state-in-effect 린트 준수.
+    const id = requestAnimationFrame(() =>
+      setZoomByTab({ characters: read('characters'), world: read('world') }),
+    )
+    return () => cancelAnimationFrame(id)
+  }, [])
+  const setZoom = (key: 'characters' | 'world', v: number) => {
+    const clamped = Math.min(3, Math.max(1, v))
+    setZoomByTab((prev) => ({ ...prev, [key]: clamped }))
+    try {
+      localStorage.setItem(`artist:zoomLevel:${key}`, String(clamped))
+    } catch {}
+  }
 
   // 실험 New UI(에셋·샷 보드) 토글 — 스토어 보관으로 탭 전환(remount)에도 유지.
   const newUi = useArtistBoardStore((s) => s.boardMode)
@@ -392,25 +418,59 @@ export default function VisualPage() {
         >
           <div className="border-b border-border px-6 py-3">
             {headerRow}
-            <TabsList>
-              <TabsTrigger value="characters">Characters</TabsTrigger>
-              <TabsTrigger value="world">World</TabsTrigger>
-              <TabsTrigger value="inventory">Inventory</TabsTrigger>
-            </TabsList>
+            <div className="flex items-center justify-between gap-4">
+              <TabsList>
+                <TabsTrigger value="characters">Characters</TabsTrigger>
+                <TabsTrigger value="world">World</TabsTrigger>
+                <TabsTrigger value="inventory">Inventory</TabsTrigger>
+              </TabsList>
+              {/* 보드 축척(#d1) — writer 러프 보드와 동일 UI, 인물/배경 탭별 저장 */}
+              {(tab === 'characters' || tab === 'world') && (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 hover-red-beam"
+                    aria-label="축소 (열 늘리기)"
+                    onClick={() => setZoom(tab, zoomByTab[tab] - 1)}
+                  >
+                    <ZoomOut className="size-4" />
+                  </Button>
+                  <Slider
+                    className="w-24"
+                    min={1}
+                    max={3}
+                    step={1}
+                    value={[zoomByTab[tab]]}
+                    onValueChange={([v]) => setZoom(tab, v)}
+                    aria-label="보드 축척"
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 hover-red-beam"
+                    aria-label="확대 (열 줄이기)"
+                    onClick={() => setZoom(tab, zoomByTab[tab] + 1)}
+                  >
+                    <ZoomIn className="size-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
 
           <TabsContent
             value="characters"
             className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
           >
-            <CharacterPanel />
+            <CharacterPanel columns={4 - zoomByTab.characters} />
           </TabsContent>
 
           <TabsContent
             value="world"
             className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
           >
-            <WorldPanel />
+            <WorldPanel columns={4 - zoomByTab.world} />
           </TabsContent>
 
           <TabsContent

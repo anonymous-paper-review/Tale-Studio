@@ -16,7 +16,11 @@ const mocks = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('@/lib/writer/run-store', () => ({ getRunStatusLight: mocks.getRunStatusLight }))
+vi.mock('@/lib/writer/run-store', () => ({
+  getRunStatusLight: mocks.getRunStatusLight,
+  // 병합(#c4 ETA): 라우트가 cachedEta→estimateRunTotalMs 를 호출 → 테스트에선 "기록 없음"(null) stub.
+  estimateRunTotalMs: vi.fn(async () => null),
+}))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from } }))
 vi.mock('@/lib/generation-jobs', () => ({ STALE_QUEUED_MS }))
 

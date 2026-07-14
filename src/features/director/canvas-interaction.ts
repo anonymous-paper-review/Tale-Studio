@@ -8,43 +8,38 @@ import type { DirectorNodeKind } from '@/types/director'
 export type DirectorViewMode = 'node' | 'storyboard'
 
 /**
- * BaseNode Edit 버튼 동작 분기.
- * - scene: 기존 모달(SceneNodePopup) 열기
- * - shot/video: 좌측 상세 패널 선택(좌측 패널이 상세를 담당, 모달 미사용)
+ * BaseNode Edit 버튼 동작 분기(#e2 2026-07-14).
+ * - scene/shot/video: 모달(DirectorNodePopup) — Storyboard 뷰와 동일 경로로 통일.
+ *   (옛 shot/video 좌측 패널 선택 경로는 폐기 — 단일클릭 선택 기능 제거와 함께)
  * - 그 외(asset/prompt): 액션 없음
  */
 export function editActionForKind(
   kind: DirectorNodeKind,
 ): 'popup' | 'select' | 'none' {
-  if (kind === 'scene') return 'popup'
-  if (kind === 'shot' || kind === 'video') return 'select'
+  if (kind === 'scene' || kind === 'shot' || kind === 'video') return 'popup'
   return 'none'
 }
 
 /**
- * DirectorNodePopup(모달) 가시성 가드.
- * - 그리드(storyboard) 뷰: 모든 종류 모달 허용(기존 동작 보존)
- * - 노드 뷰: Scene만 모달 허용. Shot/Video는 좌측 패널로 가므로 모달 차단.
+ * DirectorNodePopup(모달) 가시성 가드(#e2).
+ * 노드 뷰도 Storyboard 뷰와 동일하게 scene/shot/video 모달 허용.
  */
 export function popupVisibleInView(
-  viewMode: DirectorViewMode,
+  _viewMode: DirectorViewMode,
   kind: DirectorNodeKind,
 ): boolean {
-  if (viewMode !== 'node') return true
-  return kind === 'scene'
+  return kind === 'scene' || kind === 'shot' || kind === 'video'
 }
 
 /**
- * 노드 뷰 더블클릭 동작 분기.
- * - scene: 모달 열기(openPopup)
- * - shot/video: 좌측 패널 닫기(선택 해제)
+ * 노드 뷰 더블클릭 동작 분기(#e2) — Storyboard 뷰 더블클릭과 동일: 모달 열기.
+ * - scene/shot/video: 모달 열기(openPopup)
  * - 그 외: no-op
  */
 export function doubleClickActionForKind(
   kind: DirectorNodeKind,
 ): 'popup' | 'close-panel' | 'none' {
-  if (kind === 'scene') return 'popup'
-  if (kind === 'shot' || kind === 'video') return 'close-panel'
+  if (kind === 'scene' || kind === 'shot' || kind === 'video') return 'popup'
   return 'none'
 }
 

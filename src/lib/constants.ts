@@ -91,7 +91,7 @@ export const STAGE_PLACEHOLDER: Record<StageId, string> = {
   producer: '스토리에 대해 말해주세요…',
   writer: '예: 마지막 씬에 클로즈업 샷 추가해줘 / sc_02 분위기를 더 어둡게',
   artist: '예: Kai 캐릭터 만들어줘, 갈색머리 검은코트',
-  director: '촬영 기법에 대해 물어보세요…',
+  director: '러프 스토리보드를 실제 촬영 이미지로 생성해보세요.',
   editor: '아직 이 단계에서는 채팅을 쓸 수 없어요.',
 }
 

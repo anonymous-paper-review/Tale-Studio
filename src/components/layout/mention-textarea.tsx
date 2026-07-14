@@ -11,6 +11,7 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react'
+import { ChevronUp, ChevronDown } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
@@ -52,6 +53,25 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
     const [query, setQuery] = useState('')
     const [start, setStart] = useState(0)
     const [active, setActive] = useState(0)
+    // 입력이 max-height를 넘어 내부 스크롤이 생겼을 때, 안 보이는 내용이 위/아래에 있는지(#a3).
+    //   있으면 회색 ^/v 버튼을 띄워 클릭으로 몇 줄씩 스크롤할 수 있게 한다.
+    const [scrollHint, setScrollHint] = useState({ up: false, down: false })
+    const syncScrollHint = () => {
+      const el = innerRef.current
+      if (!el) return
+      const up = el.scrollTop > 1
+      const down = el.scrollTop + el.clientHeight < el.scrollHeight - 1
+      setScrollHint((prev) =>
+        prev.up === up && prev.down === down ? prev : { up, down },
+      )
+    }
+    // 값이 바뀌면(auto-grow 반영 후) 오버플로 상태 재측정.
+    useLayoutEffect(() => {
+      syncScrollHint()
+    })
+    const scrollByLines = (dir: 1 | -1) => {
+      innerRef.current?.scrollBy({ top: dir * 60, behavior: 'smooth' })
+    }
     // 전송 메시지 히스토리 탐색 상태. null = 현재 초안(미탐색). number = history 인덱스.
     const [histIdx, setHistIdx] = useState<number | null>(null)
     const draftRef = useRef('')
@@ -251,8 +271,33 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
             if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) sync(e.currentTarget)
           }}
           onKeyDown={handleKeyDown}
+          onScroll={syncScrollHint}
           onBlur={() => setTimeout(() => setOpen(false), 120)}
         />
+        {/* 위/아래에 가려진 입력 내용이 있음을 알리는 회색 ^/v — 클릭 시 몇 줄씩 스크롤(#a3).
+            mousedown preventDefault로 textarea 포커스를 뺏지 않는다. */}
+        {scrollHint.up && (
+          <button
+            type="button"
+            aria-label="입력 위쪽 내용 보기"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => scrollByLines(-1)}
+            className="absolute left-1/2 top-1 z-10 -translate-x-1/2 rounded-full border border-border bg-card/90 p-0.5 text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+          >
+            <ChevronUp className="size-3" />
+          </button>
+        )}
+        {scrollHint.down && (
+          <button
+            type="button"
+            aria-label="입력 아래쪽 내용 보기"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => scrollByLines(1)}
+            className="absolute bottom-1 left-1/2 z-10 -translate-x-1/2 rounded-full border border-border bg-card/90 p-0.5 text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+          >
+            <ChevronDown className="size-3" />
+          </button>
+        )}
       </div>
     )
   },

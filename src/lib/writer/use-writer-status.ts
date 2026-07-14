@@ -19,6 +19,9 @@ export interface WriterStatus {
     total_ms: number | null
     stages?: Record<string, number>  // stage key → ms
   } | null
+  // 예상 총 소요시간(ms) — 과거 완료 run 실측 기반(#c4). 기록 없으면 null(UI 숨김).
+  eta_total_ms?: number | null
+  eta_based_on_runs?: number
   // 단계별 타임라인 (실행 순서). 각 항목 = 한 stage 의 소요시간.
   timeline?: {
     stage: string
