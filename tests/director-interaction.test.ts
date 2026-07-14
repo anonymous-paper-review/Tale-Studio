@@ -8,12 +8,11 @@ import {
 } from '@/features/director/canvas-interaction'
 
 describe('editActionForKind (BaseNode Edit 분기)', () => {
-  it('scene은 모달', () => {
+  // #e2 2026-07-14: shot/video도 Storyboard 뷰와 동일하게 모달로 통일 (좌측 패널 경로 폐기).
+  it('scene/shot/video는 모달', () => {
     expect(editActionForKind('scene')).toBe('popup')
-  })
-  it('shot/video는 좌측 패널 선택', () => {
-    expect(editActionForKind('shot')).toBe('select')
-    expect(editActionForKind('video')).toBe('select')
+    expect(editActionForKind('shot')).toBe('popup')
+    expect(editActionForKind('video')).toBe('popup')
   })
   it('asset/prompt는 액션 없음', () => {
     expect(editActionForKind('asset')).toBe('none')
@@ -22,25 +21,27 @@ describe('editActionForKind (BaseNode Edit 분기)', () => {
 })
 
 describe('popupVisibleInView (DirectorNodePopup 가드)', () => {
-  it('그리드 뷰는 모든 종류 모달 허용', () => {
+  it('그리드 뷰는 scene/shot/video 모달 허용', () => {
     expect(popupVisibleInView('storyboard', 'shot')).toBe(true)
     expect(popupVisibleInView('storyboard', 'video')).toBe(true)
     expect(popupVisibleInView('storyboard', 'scene')).toBe(true)
   })
-  it('노드 뷰는 Scene만 모달 허용', () => {
+  it('노드 뷰도 scene/shot/video 모달 허용 (#e2)', () => {
     expect(popupVisibleInView('node', 'scene')).toBe(true)
-    expect(popupVisibleInView('node', 'shot')).toBe(false)
-    expect(popupVisibleInView('node', 'video')).toBe(false)
+    expect(popupVisibleInView('node', 'shot')).toBe(true)
+    expect(popupVisibleInView('node', 'video')).toBe(true)
+  })
+  it('asset/prompt는 모달 없음', () => {
+    expect(popupVisibleInView('node', 'asset')).toBe(false)
+    expect(popupVisibleInView('storyboard', 'prompt')).toBe(false)
   })
 })
 
 describe('doubleClickActionForKind (노드 뷰 더블클릭)', () => {
-  it('scene은 모달 열기', () => {
+  it('scene/shot/video는 모달 열기 (#e2 — Storyboard 더블클릭과 동일)', () => {
     expect(doubleClickActionForKind('scene')).toBe('popup')
-  })
-  it('shot/video는 패널 닫기', () => {
-    expect(doubleClickActionForKind('shot')).toBe('close-panel')
-    expect(doubleClickActionForKind('video')).toBe('close-panel')
+    expect(doubleClickActionForKind('shot')).toBe('popup')
+    expect(doubleClickActionForKind('video')).toBe('popup')
   })
   it('그 외는 no-op', () => {
     expect(doubleClickActionForKind('asset')).toBe('none')

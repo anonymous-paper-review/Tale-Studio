@@ -1,8 +1,8 @@
 'use client'
 
 import { memo, useEffect } from 'react'
-import type { NodeProps } from '@xyflow/react'
-import { Play, Square, Star } from 'lucide-react'
+import { NodeToolbar, Position, type NodeProps } from '@xyflow/react'
+import { Play, RefreshCw, Square, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import { BaseNode } from './BaseNode'
@@ -16,6 +16,14 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const setPlayingNode = useDirectorCanvasStore((s) => s.setPlayingNode)
   const ensureVideoThumbnail = useDirectorCanvasStore(
     (s) => s.ensureVideoThumbnail,
+  )
+  const generateVideoForShot = useDirectorCanvasStore(
+    (s) => s.generateVideoForShot,
+  )
+  // 부모 샷에서 새 테이크 생성 중이면 리테이크 버튼 잠금 (#e4)
+  const parentShotId = isVideoData(data) ? data.parentShotNodeId : null
+  const parentGenerating = useDirectorCanvasStore(
+    (s) => !!(parentShotId && s.generatingNodeIds[parentShotId]),
   )
 
   // effect 입력은 early-return 전에 안전 추출 (훅은 무조건 호출돼야 함).
@@ -52,6 +60,25 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   }
 
   return (
+    <>
+      {/* 선택 시 상단 플로팅 툴바(#e4) — 옛 SHOT IMAGE 카드의 '새 영상 테이크'가 여기로 이동.
+          부모 샷 설정으로 새 테이크를 만들어 재생성한다. */}
+      <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
+        <div className="flex items-center gap-1 rounded-md border border-border bg-popover p-1 shadow-md">
+          <Button
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs"
+            disabled={parentGenerating || data.status === 'generating' || !parentShotId}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (parentShotId) void generateVideoForShot(parentShotId)
+            }}
+          >
+            <RefreshCw className="size-3" />
+            영상 리테이크
+          </Button>
+        </div>
+      </NodeToolbar>
     <BaseNode
       id={id}
       theme="video"
@@ -164,6 +191,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         )}
       </div>
     </BaseNode>
+    </>
   )
 }
 

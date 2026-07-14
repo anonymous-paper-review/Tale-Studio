@@ -2,13 +2,12 @@
 
 import { memo } from 'react'
 import { Handle, NodeToolbar, Position, type NodeProps } from '@xyflow/react'
-import { Camera, Lightbulb, RefreshCw, ChevronRight } from 'lucide-react'
+import { Camera, Lightbulb, ImageIcon, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BaseNode } from './BaseNode'
 import {
   getChildVideos,
   getShotStage,
-  shotStageLabel,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
 import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
@@ -20,7 +19,6 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const takeCount = useDirectorCanvasStore((s) => getChildVideos(s, id).length)
   const stage = useDirectorCanvasStore((s) => getShotStage(s, id))
   const isGenerating = useDirectorCanvasStore((s) => !!s.generatingNodeIds[id])
-  const advanceShot = useDirectorCanvasStore((s) => s.advanceShot)
   const generateStoryboardImage = useDirectorCanvasStore(
     (s) => s.generateStoryboardImage,
   )
@@ -55,7 +53,9 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
 
   return (
     <>
-      {/* 선택 시 상단 플로팅 툴바 (Higgsfield "Run pipeline" 등가): 진행 버튼 + 재생성 + 모델 칩 */}
+      {/* 선택 시 상단 플로팅 툴바(#e4 2026-07-14) — SHOT IMAGE 카드는 이미지 생성 관련만:
+          러프만 보이는 상태 → '이미지 생성', 실사 이미지가 있으면 → '이미지 리터칭'(재생성).
+          영상 테이크 버튼은 SHOT VIDEO 카드('영상 리테이크')로 이동. */}
       <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
         <div className="flex items-center gap-1 rounded-md border border-border bg-popover p-1 shadow-md">
           <Button
@@ -64,27 +64,13 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             disabled={isGenerating}
             onClick={(e) => {
               e.stopPropagation()
-              void advanceShot(id)
+              void generateStoryboardImage(id)
             }}
           >
-            {shotStageLabel(stage)}
+            <ImageIcon className="size-3" />
+            {stage === 'rough' ? '이미지 생성' : '이미지 리터칭'}
             <ChevronRight className="size-3" />
           </Button>
-          {stage !== 'rough' && (
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label="재생성"
-              disabled={isGenerating}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (stage === 'live') void generateStoryboardImage(id)
-                else addVideoTake(id)
-              }}
-            >
-              <RefreshCw className="size-3" />
-            </Button>
-          )}
           <span className="px-1 font-mono text-[10px] text-muted-foreground">
             {data.provider}
           </span>

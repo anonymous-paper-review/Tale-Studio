@@ -58,7 +58,6 @@ import { DirectorNodePopup } from '@/features/director/canvas-popups/DirectorNod
 import { DirectorDetailPanel } from '@/features/director/canvas-panels/DirectorDetailPanel'
 import {
   doubleClickActionForKind,
-  clickToggleSelection,
   connectRouteForTargetHandle,
 } from '@/features/director/canvas-interaction'
 
@@ -219,7 +218,6 @@ function CanvasInner() {
   const addShotNode = useDirectorCanvasStore((s) => s.addShotNode)
   const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
-  const selectedNodeId = useDirectorCanvasStore((s) => s.selectedNodeId)
   const selectEdge = useDirectorCanvasStore((s) => s.selectEdge)
   const persistNodePosition = useDirectorCanvasStore(
     (s) => s.persistNodePosition,
@@ -435,20 +433,12 @@ function CanvasInner() {
           selectNode(null)
           selectEdge(null)
         }}
-        onNodeClick={(_event, node) => {
-          // shot/video는 재클릭 토글(패널 닫기), scene/asset 등은 단순 선택
-          if (node.data.kind === 'shot' || node.data.kind === 'video') {
-            selectNode(clickToggleSelection(selectedNodeId, node.id))
-          } else {
-            selectNode(node.id)
-          }
-        }}
+        // 단일클릭 커스텀 액션(onNodeClick) 제거(#e2) — RF 기본 선택(하이라이트·툴바)만 유지
         onEdgeClick={(_event, edge) => selectEdge(edge.id)}
         onNodeDoubleClick={(_event, node) => {
-          // kind 분기: scene=모달, shot/video=좌측 패널 닫기, 그 외 no-op
+          // Storyboard 뷰 더블클릭과 동일(#e2): scene/shot/video 모두 모달 열기
           const action = doubleClickActionForKind(node.data.kind)
           if (action === 'popup') openPopup(node.id)
-          else if (action === 'close-panel') selectNode(null)
         }}
         onNodeDragStart={() => commitHistory()}
         onMove={(_, vp) => setViewport(vp)}
