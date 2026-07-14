@@ -29,12 +29,19 @@ export default function MeetingPage() {
     useProducerStore()
 
   // loadProject 완료 후에만 웰컴을 판단(초기 storyReady=false 윈도우에서 기존 프로젝트가 오탐되지 않게).
-  const [producerLoaded, setProducerLoaded] = useState(false)
+  const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null)
   useEffect(() => {
     if (!projectId) return
-    setProducerLoaded(false)
-    void loadProject().then(() => setProducerLoaded(true))
+    let cancelled = false
+    void loadProject().then(() => {
+      if (!cancelled) setLoadedProjectId(projectId)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [projectId, loadProject])
+  // loadProject 가 현재 projectId 로 완료된 뒤에만 true (파생 — set-state-in-effect 회피).
+  const producerLoaded = loadedProjectId === projectId
 
   const storyReady = useProducerStore((s) => s.storyReady)
   const cast = useProducerStore((s) => s.cast)
@@ -80,9 +87,10 @@ export default function MeetingPage() {
   const [rerunDismissed, setRerunDismissed] = useState(false)
 
   // writer 재실행 배너: 문제가 해소(플래그 off)되면 닫힘 상태 리셋 → 재발 시 다시 뜬다.
-  useEffect(() => {
-    if (!writerNeedsRerun) setRerunDismissed(false)
-  }, [writerNeedsRerun])
+  //   (렌더 중 조정 — set-state-in-effect 회피, React 권장 reset-on-change 패턴)
+  if (!writerNeedsRerun && rerunDismissed) {
+    setRerunDismissed(false)
+  }
 
   const handleHandoff = async () => {
     // 씬/샷/연출 생성(writer 파이프라인)은 saveAndHandoff가 백그라운드로 발사하고,
