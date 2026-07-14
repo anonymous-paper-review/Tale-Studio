@@ -239,3 +239,65 @@ export async function getRunStatusLight(
   if (error) throw new Error(`getRunStatusLight failed: ${error.message}`);
   return (data as WriterRunStatusLight | null) ?? null;
 }
+
+// ── 예상 총 소요시간 추정(#c4 2026-07-14) ───────────────────────────────────
+// 과거 완료 run들의 실측(경과시간 = updated_at - created_at; 완료 전이가 마지막 update)을
+// 근거로 현 프로젝트의 예상 총 소요시간을 낸다. 러닝타임(projects.settings.playtime)이
+// 있는 run들은 초당 소요율 평균 × 현 러닝타임으로 스케일, 없으면 절대 시간 평균.
+// 실행 기록이 하나도 없으면 null — UI는 예상 시간을 숨긴다(실측 축적 전까지 비움).
+export interface RunEtaEstimate {
+  totalMs: number;
+  basedOnRuns: number;
+}
+
+export async function estimateRunTotalMs(
+  projectId: string,
+): Promise<RunEtaEstimate | null> {
+  const { data: runs, error } = await supabaseAdmin
+    .from('writer_runs')
+    .select('id, project_id, created_at, updated_at')
+    .eq('status', 'completed')
+    .order('updated_at', { ascending: false })
+    .limit(10);
+  if (error || !runs?.length) return null;
+
+  const projectIds = [...new Set([...runs.map((r) => r.project_id), projectId])];
+  const { data: projects } = await supabaseAdmin
+    .from('projects')
+    .select('id, settings')
+    .in('id', projectIds);
+  const playtimeOf = (id: string): number | null => {
+    const settings = projects?.find((p) => p.id === id)?.settings as
+      | { playtime?: unknown }
+      | null
+      | undefined;
+    const v = settings?.playtime;
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
+  };
+
+  const durations: number[] = [];
+  const perSecondRates: number[] = [];
+  for (const run of runs) {
+    const dur = Date.parse(run.updated_at) - Date.parse(run.created_at);
+    // 5초 미만/음수는 시계 왜곡·수동 조작 잔재로 보고 제외.
+    if (!Number.isFinite(dur) || dur < 5_000) continue;
+    durations.push(dur);
+    const runtime = playtimeOf(run.project_id);
+    if (runtime) perSecondRates.push(dur / runtime);
+  }
+  if (durations.length === 0) return null;
+
+  // 중앙값 — 중단됐다 한참 뒤 완료된 run(수 시간짜리 경과) 같은 아웃라이어에 강건하게.
+  const median = (xs: number[]) => {
+    const sorted = [...xs].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+  const currentRuntime = playtimeOf(projectId);
+  const totalMs =
+    currentRuntime && perSecondRates.length > 0
+      ? median(perSecondRates) * currentRuntime
+      : median(durations);
+
+  return { totalMs: Math.round(totalMs), basedOnRuns: durations.length };
+}

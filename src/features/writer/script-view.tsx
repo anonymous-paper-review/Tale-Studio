@@ -4,17 +4,20 @@
 //   씬 단위 블록: 씬 헤딩(클릭=@L 멘션) → 스토리 비트(읽기 본문, primary) → 샷 섹션(접힘, 클릭=@L).
 //   직접 편집은 없다 — 수정은 @L 라인 클릭으로 채팅에 지시한다.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, FileText, Loader2 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { WriterHeader } from '@/features/writer/writer-header'
 import { buildScriptLines, replaceSlugs, type ScriptLine, type SlugEntry } from '@/lib/script-lines'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
+import { friendlyStageLabel } from '@/lib/writer/stage-labels'
 import { cn } from '@/lib/utils'
 import type { Scene } from '@/types'
 import { useChatUiStore } from '@/stores/chat-ui-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
+import { useWriterUiStore } from '@/stores/writer-ui-store'
 
 // 라벨 없는 헤딩 텍스트 컬럼과 정렬시키는 들여쓰기 (px-6 + w-16 라벨열 + gap-4).
 const TEXT_INDENT = 'pl-[6.5rem] pr-6'
@@ -240,6 +243,42 @@ export function ScriptView() {
     !status.pipeline_failed
   )
 
+  // 트리트먼트 첫 진입 사용법 안내(#c10) — 탭이 "활성"이고 내용이 준비된 뒤 프로젝트당 1회
+  //   (localStorage 가드). 활성 조건이 없으면 두 뷰가 동시 마운트된 구조에서 러프 보드의
+  //   첫 진입 브리핑과 제안 슬롯을 두고 경합해 이 안내가 덮여 사라진다.
+  const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
+  const activeTab = useWriterUiStore((s) => s.activeTab)
+  useEffect(() => {
+    if (!projectId || lines.length === 0 || activeTab !== 'script') return
+    const guardKey = `writer:treatmentGuide:${projectId}`
+    try {
+      if (localStorage.getItem(guardKey)) return
+    } catch {
+      return
+    }
+    // 제안 슬롯은 선점형(offerSuggestion: 이미 떠 있으면 무시) — 러프 보드 첫 진입 브리핑이
+    //   떠 있으면 내리고 이 안내를 올린다. 다른 제안이면 이번엔 양보(가드 안 태움 → 다음 진입에 재시도).
+    const chat = useGlobalChatStore.getState()
+    if (chat.suggestion) {
+      if (chat.suggestion.id === `writer-brief:${projectId}`) chat.dismissSuggestion()
+      else return
+    }
+    try {
+      localStorage.setItem(guardKey, '1')
+    } catch {}
+    offerSuggestion({
+      id: `writer-treatment-guide:${projectId}`,
+      stage: 'writer',
+      dismissible: false,
+      action: null,
+      content:
+        '이 탭에서는 스토리를 다듬을 수 있어요.\n\n' +
+        '· 클릭한 부분의 스토리를 수정할 수 있어요\n' +
+        '· 클릭한 부분의 앞뒤에 스토리를 추가할 수 있어요\n\n' +
+        '수정한 스토리를 기반으로 전체적인 스토리를 재구성해 달라고 저에게 요청할 수도 있어요.',
+    })
+  }, [projectId, lines.length, activeTab, offerSuggestion])
+
   const header = (
     <WriterHeader description="트리트먼트 뷰어 — 라인을 클릭하면 채팅에서 바로 수정을 지시할 수 있어요 (다시 클릭하면 해제)" />
   )
@@ -252,13 +291,25 @@ export function ScriptView() {
           {running ? (
             <>
               <Loader2 className="size-6 animate-spin text-muted-foreground" aria-busy="true" />
-              <p className="text-base font-medium">Writer가 대본을 쓰는 중…</p>
-              <p className="text-sm text-muted-foreground">
-                <span className="font-mono tabular-nums">
+              <p className="text-base font-medium">{friendlyStageLabel(status?.current_stage)}</p>
+              {/* 진행률 바(#c3) — 러프 보드 진행 화면과 동일 스타일 */}
+              <div className="flex w-full max-w-md items-center gap-3">
+                <div
+                  role="progressbar"
+                  aria-valuenow={status?.progress_percent ?? 0}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  className="h-2 flex-1 overflow-hidden rounded-full bg-muted"
+                >
+                  <div
+                    className="h-full rounded-full bg-primary transition-[width] duration-500"
+                    style={{ width: `${Math.max(0, Math.min(100, status?.progress_percent ?? 0))}%` }}
+                  />
+                </div>
+                <span className="w-10 shrink-0 text-right font-mono text-sm tabular-nums text-muted-foreground">
                   {status?.progress_percent ?? 0}%
                 </span>
-                {status?.current_stage ? ` · ${status.current_stage}` : ''}
-              </p>
+              </div>
             </>
           ) : (
             <>

@@ -2,9 +2,26 @@
 //   writer_runs 행에서 읽는다 (파일시스템 참조 제거). 무거운 state 블롭은 SELECT 안 함
 //   (getRunStatusLight 가 경량 컬럼만 조회). 반환 shape 은 기존 WriterStatus 와 동일하게 유지.
 import { NextRequest, NextResponse } from 'next/server';
-import { getRunStatusLight, type StageTiming } from '@/lib/writer/run-store';
+import {
+  estimateRunTotalMs,
+  getRunStatusLight,
+  type RunEtaEstimate,
+  type StageTiming,
+} from '@/lib/writer/run-store';
 
 export const runtime = 'nodejs';
+
+// ETA 추정은 폴링(3s)마다 다시 계산할 필요가 없다 — 인스턴스 로컬 60초 캐시(#c4).
+const ETA_CACHE_TTL_MS = 60_000;
+const etaCache = new Map<string, { at: number; value: RunEtaEstimate | null }>();
+
+async function cachedEta(projectId: string): Promise<RunEtaEstimate | null> {
+  const hit = etaCache.get(projectId);
+  if (hit && Date.now() - hit.at < ETA_CACHE_TTL_MS) return hit.value;
+  const value = await estimateRunTotalMs(projectId).catch(() => null);
+  etaCache.set(projectId, { at: Date.now(), value });
+  return value;
+}
 
 export async function GET(
   _req: NextRequest,
@@ -39,6 +56,10 @@ export async function GET(
     const stagesMs: Record<string, number> = {};
     for (const s of timeline) stagesMs[s.stage] = s.ms;
 
+    // 진행 중일 때만 예상 총 소요시간을 동봉 — 기록 없으면 null(UI가 숨김)(#c4).
+    const runningNow = !!row && row.status !== 'completed' && row.status !== 'failed';
+    const eta = runningNow ? await cachedEta(projectId) : null;
+
     return NextResponse.json({
       projectId,
       started: !!row,
@@ -56,6 +77,8 @@ export async function GET(
             stages: stagesMs,
           }
         : null,
+      eta_total_ms: eta?.totalMs ?? null,
+      eta_based_on_runs: eta?.basedOnRuns ?? 0,
       available: {},
       timeline,
     });
