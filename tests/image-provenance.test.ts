@@ -4,6 +4,8 @@ import {
   computeWorldImageSourceHash,
   computeLookFingerprint,
   isImageStale,
+  classifyImageStale,
+  lookVersionKey,
   viewKeyToCandidateView,
   CANDIDATE_RETENTION,
   selectCandidatesToEvict,
@@ -86,6 +88,76 @@ describe('computeLookFingerprint', () => {
     expect(computeLookFingerprint(null, '붉은  코트 ')).toBe(
       computeLookFingerprint(null, '붉은 코트'),
     )
+  })
+
+  it('Q5: 앵커 키 부재/null/undefined ⇒ 레거시 바이트 동일 (F1)', () => {
+    const tokens = { l1: { art_style: 'anime' }, palette: { primary: '#111' } }
+    const base = computeLookFingerprint(tokens, '붉은 코트')
+    expect(computeLookFingerprint(tokens, '붉은 코트', null)).toBe(base)
+    expect(computeLookFingerprint(tokens, '붉은 코트', undefined)).toBe(base)
+    expect(computeLookFingerprint(tokens, '붉은 코트', '  ')).toBe(base)
+  })
+
+  it('Q5: 앵커 키 있으면 anchor: 파트 추가 + 값 변경', () => {
+    const tokens = { l1: { art_style: 'anime' } }
+    const withAnchor = computeLookFingerprint(tokens, null, 'real')
+    expect(withAnchor).toContain('anchor:real')
+    expect(withAnchor).not.toBe(computeLookFingerprint(tokens, null))
+  })
+
+  it('Q5: 앵커만 있어도 룩 지문 생성', () => {
+    expect(computeLookFingerprint(null, null, 'real')).toBe('anchor:real')
+    expect(computeLookFingerprint(null, null, null)).toBeNull()
+  })
+
+  it('Q5: 앵커 키 변경 ⇒ 지문 변경 (결정적)', () => {
+    const tokens = { l1: { art_style: 'anime' } }
+    const a = computeLookFingerprint(tokens, '코트', 'real')
+    const b = computeLookFingerprint(tokens, '코트', 'jp_anime')
+    expect(a).not.toBe(b)
+    expect(computeLookFingerprint(tokens, '코트', 'real')).toBe(a)
+  })
+
+  it('Q5: 서버/클라 동일 raw 키 ⇒ 지문 일치 (false-stale 방지)', () => {
+    const tokens = { l1: { art_style: 'anime' }, palette: { primary: '#111' } }
+    const server = computeLookFingerprint(tokens, '코트', 'real')
+    const client = computeLookFingerprint(tokens, '코트', 'real')
+    expect(server).toBe(client)
+    expect(computeLookFingerprint(tokens, '코트', 'real')).not.toBe(
+      computeLookFingerprint(tokens, '코트', null),
+    )
+  })
+})
+
+describe('classifyImageStale — 앵커 변경 (Q5)', () => {
+  it('앵커 변경(외형 불변) ⇒ look-pending (edited 아님)', () => {
+    const appearance = 'a knight in silver armor'
+    const tokens = { l1: { art_style: 'anime' } }
+    const oldFingerprint = computeLookFingerprint(tokens, '망토', 'real')
+    const candidate = {
+      sourceHash: computeImageSourceHash(appearance, oldFingerprint),
+      appearanceHash: computeImageSourceHash(appearance, null),
+    }
+    const newFingerprint = computeLookFingerprint(tokens, '망토', 'jp_anime')
+    expect(classifyImageStale(appearance, newFingerprint, candidate)).toBe('look-pending')
+  })
+
+  it('앵커 그대로면 fresh', () => {
+    const appearance = 'a knight'
+    const tokens = { l1: { art_style: 'anime' } }
+    const fp = computeLookFingerprint(tokens, '망토', 'real')
+    const candidate = {
+      sourceHash: computeImageSourceHash(appearance, fp),
+      appearanceHash: computeImageSourceHash(appearance, null),
+    }
+    expect(classifyImageStale(appearance, fp, candidate)).toBe('fresh')
+  })
+
+  it('lookVersionKey — 앵커 변경 시 버전키 변경', () => {
+    const tokens = { l1: { art_style: 'anime' } }
+    const before = lookVersionKey([computeLookFingerprint(tokens, '망토', 'real')])
+    const after = lookVersionKey([computeLookFingerprint(tokens, '망토', 'jp_anime')])
+    expect(before).not.toBe(after)
   })
 })
 

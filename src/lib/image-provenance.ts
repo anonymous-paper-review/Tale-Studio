@@ -84,6 +84,7 @@ export interface LookTokens {
 export function computeLookFingerprint(
   tokens: LookTokens | null | undefined,
   costume: string | string[] | null | undefined,
+  styleAnchorKey?: string | null,
 ): string | null {
   const norm = (s: string | null | undefined) => (s ?? '').trim().replace(/\s+/g, ' ')
   const art = norm(tokens?.l1?.art_style)
@@ -100,6 +101,11 @@ export function computeLookFingerprint(
   if (shape) parts.push(`shape:${shape}`)
   if (palette.length) parts.push(`palette:${palette.join(',')}`)
   if (cost) parts.push(`costume:${cost}`)
+  // 스타일 앵커 키(projects.style_anchor_key) — 앵커 선택/변경이 기존 생성물을 stale(look-pending)로 만든다(Q5).
+  //   부재/null ⇒ 미추가 = 레거시 바이트 동일(F1 보존). 서버·클라 모두 raw 프로젝트 키를 넘겨야 지문이 일치한다
+  //   (resolved anchor?.key 를 쓰면 inactive 앵커에서 서버=null vs 클라=key 로 갈려 false-stale).
+  const anchor = norm(styleAnchorKey)
+  if (anchor) parts.push(`anchor:${anchor}`)
   return parts.length ? parts.join('|') : null
 }
 

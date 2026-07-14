@@ -33,6 +33,7 @@ import {
 } from '@/types/asset'
 import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
+import { applyStyleAnchor, resolveStyleAnchorByKey } from '@/lib/style-anchor'
 
 export const runtime = 'nodejs'
 // submit만 하고 끝 — 실제 생성은 fal 큐에서 진행, 완료는 webhook(/poll reconcile)이 처리.
@@ -119,7 +120,7 @@ export async function POST(req: Request) {
     const [{ data: project }, { data: character }] = await Promise.all([
       supabaseAdmin
         .from('projects')
-        .select('workspace_id, design_tokens')
+        .select('workspace_id, design_tokens, style_anchor_key')
         .eq('id', projectId)
         .single(),
       supabaseAdmin
@@ -131,6 +132,7 @@ export async function POST(req: Request) {
     ])
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
     if (!character) return NextResponse.json({ error: 'character not found' }, { status: 404 })
+    const anchor = await resolveStyleAnchorByKey(project.style_anchor_key)
 
     const dt = (project.design_tokens ?? {}) as DesignTokens
     const palette = [dt.palette?.primary, dt.palette?.secondary, dt.palette?.accent].filter(
@@ -156,6 +158,7 @@ export async function POST(req: Request) {
     const refMain = character.view_main as string | null
     const webhookUrl = resolveWebhookUrl()
     let submitOpts: FalImageOptions
+    let styleAnchorMode: 'turnaround' | 'single' | null = null
     if (view === 'main') {
       const isPerson = character.entity_type !== 'object'
       if (isPerson) {
@@ -163,21 +166,26 @@ export async function POST(req: Request) {
         //   캐릭터를 채우는 I2I(edit). fal 이 fetch 가능한 public URL 필요 → base 없으면(로컬) T2I 폴백. (#7)
         const base = resolveWebhookBaseUrl()
         const templateUrl = base ? `${base}/character-template.png` : null
-        submitOpts = templateUrl
-          ? {
-              model: 'openai/gpt-image-2/edit',
-              prompt: buildCharacterTurnaroundPrompt(input),
-              reference_image_urls: [templateUrl],
-              webhookUrl,
-              // aspect_ratio 생략 → edit 모델이 템플릿 비율(≈16:9)을 따름
-            }
-          : {
-              model: 'openai/gpt-image-2',
-              prompt: buildCharacterTurnaroundPrompt(input),
-              aspect_ratio: '3:2',
-              webhookUrl,
-            }
+        if (templateUrl) {
+          styleAnchorMode = 'turnaround'
+          submitOpts = {
+            model: 'openai/gpt-image-2/edit',
+            prompt: buildCharacterTurnaroundPrompt(input),
+            reference_image_urls: [templateUrl],
+            webhookUrl,
+            // aspect_ratio 생략 → edit 모델이 템플릿 비율(≈16:9)을 따름
+          }
+        } else {
+          styleAnchorMode = 'single'
+          submitOpts = {
+            model: 'openai/gpt-image-2',
+            prompt: buildCharacterTurnaroundPrompt(input),
+            aspect_ratio: '3:2',
+            webhookUrl,
+          }
+        }
       } else {
+        styleAnchorMode = 'single'
         // 사물 = 단일 대표 포트레이트(1:1).
         submitOpts = {
           model: 'openai/gpt-image-2',
@@ -197,13 +205,21 @@ export async function POST(req: Request) {
           } // aspect_ratio 생략 → edit 모델이 reference 비율을 따름
         : { model: 'openai/gpt-image-2', prompt, aspect_ratio: '1:1', webhookUrl }
     }
+    if (anchor && styleAnchorMode) {
+      const { webhookUrl: wh, ...anchorable } = submitOpts
+      const anchored =
+        styleAnchorMode === 'turnaround'
+          ? applyStyleAnchor(anchor, anchorable, 'turnaround', { pinAspectRatio: '16:9' })
+          : applyStyleAnchor(anchor, anchorable, 'single')
+      submitOpts = { ...anchored, webhookUrl: wh }
+    }
 
     // 3. fal 큐에 submit (비동기). 완료는 webhook(/poll reconcile)이 storage 업로드 + DB 갱신.
     const { request_id, model } = await falImageSubmit(submitOpts)
     // provenance(#57): 생성 입력(외모) 지문을 submit 시점에 함께 계산해 input_snapshot 에 동봉.
     //   착지 시 finalize 가 이 지문으로 character_image_candidates 행을 남긴다(분리 금지 — architecture §5).
     // 룩(전역 토큰 + 의상) 지문 — 룩 부재 시 null(레거시 동일). 룩 도착 후 룩 미반영 초안이 stale로 판정(AC6/7).
-    const lookFingerprint = computeLookFingerprint(dt, character.costume)
+    const lookFingerprint = computeLookFingerprint(dt, character.costume, project.style_anchor_key)
     const inputSnapshot: Record<string, unknown> = {
       ...submitOpts,
       source_hash: computeImageSourceHash(character.appearance, lookFingerprint),
@@ -211,6 +227,7 @@ export async function POST(req: Request) {
       appearance_hash: computeImageSourceHash(character.appearance, null),
       look_present: lookFingerprint != null,
       safe_mode: effectiveSafeMode,
+      style_anchor_key: anchor?.key ?? null,
     }
     delete inputSnapshot.webhookUrl
 

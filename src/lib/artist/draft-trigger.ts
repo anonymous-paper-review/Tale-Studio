@@ -5,7 +5,7 @@
 //   바이트 동일(룩 미반영 초안, AC6). writer v2Design 도착 후 이 초안은 stale로 판정된다(AC7, C2).
 //   대표 main 1장만 생성한다(4방향/디테일은 룩 확정·사람 선별 이후 — 비용 튜닝). 서버가 main 단일 생산자.
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { falImageSubmit } from '@/lib/writer/llm/fal'
+import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
 import { createGenerationJob, hasQueuedCharacterViewJob } from '@/lib/generation-jobs'
 import { resolveWebhookUrl, resolveWebhookBaseUrl } from '@/lib/fal/webhook-url'
 import { buildCharacterMainPrompt, buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
@@ -15,6 +15,7 @@ import {
   computeLookFingerprint,
   type LookTokens,
 } from '@/lib/image-provenance'
+import { applyStyleAnchor, resolveStyleAnchorByKey } from '@/lib/style-anchor'
 
 const DRAFT_MODEL = 'openai/gpt-image-2'
 
@@ -54,7 +55,7 @@ export async function triggerCharacterDrafts(
         .eq('project_id', projectId),
       supabaseAdmin
         .from('projects')
-        .select('design_tokens, workspace_id')
+        .select('design_tokens, workspace_id, style_anchor_key')
         .eq('id', projectId)
         .maybeSingle(),
     ])
@@ -63,6 +64,7 @@ export async function triggerCharacterDrafts(
     // 핸드오프 시점엔 보통 design_tokens 부재(writer v2Design 미완) → lookFingerprint=null.
     const designTokens = (project?.design_tokens ?? null) as LookTokens | null
     const webhookUrl = resolveWebhookUrl()
+    const anchor = await resolveStyleAnchorByKey(project?.style_anchor_key)
 
     for (const c of chars as DraftCharacterRow[]) {
       // (a) 대표 이미지 이미 있음
@@ -89,7 +91,7 @@ export async function triggerCharacterDrafts(
       }
 
       try {
-        const lookFingerprint = computeLookFingerprint(designTokens, c.costume)
+        const lookFingerprint = computeLookFingerprint(designTokens, c.costume, project?.style_anchor_key ?? null)
         // 사람 = 턴어라운드 시트: 캐릭터 템플릿(public asset)을 reference 로 넣은 I2I(edit) — 버튼 경로(generate-sheet)와 정합.
         //   base URL 없으면 동일 프롬프트 T2I(3:2) 폴백. 사물 = 단일 포트레이트(1:1). (#7)
         const isPerson = c.entity_type !== 'object'
@@ -103,9 +105,16 @@ export async function triggerCharacterDrafts(
           : buildCharacterMainPrompt(promptInput)
         const base = resolveWebhookBaseUrl()
         const templateUrl = isPerson && base ? `${base}/character-template.png` : null
-        const submitOpts = templateUrl
+        let submitOpts: FalImageOptions = templateUrl
           ? { model: 'openai/gpt-image-2/edit', prompt, reference_image_urls: [templateUrl], webhookUrl }
           : { model: DRAFT_MODEL, prompt, aspect_ratio: isPerson ? '3:2' : '1:1', webhookUrl }
+        if (anchor) {
+          const { webhookUrl: wh, ...anchorable } = submitOpts
+          const anchored = templateUrl
+            ? applyStyleAnchor(anchor, anchorable, 'turnaround', { pinAspectRatio: '16:9' })
+            : applyStyleAnchor(anchor, anchorable, 'single')
+          submitOpts = { ...anchored, webhookUrl: wh }
+        }
         const { request_id, model } = await falImageSubmit(submitOpts)
         await createGenerationJob({
           projectId,
@@ -116,14 +125,16 @@ export async function triggerCharacterDrafts(
           provider: 'fal',
           inputSnapshot: {
             model,
-            prompt,
-            ...(templateUrl
-              ? { reference_image_urls: [templateUrl] }
-              : { aspect_ratio: isPerson ? '3:2' : '1:1' }),
+            prompt: submitOpts.prompt,
+            ...(submitOpts.reference_image_urls
+              ? { reference_image_urls: submitOpts.reference_image_urls }
+              : {}),
+            ...(submitOpts.aspect_ratio ? { aspect_ratio: submitOpts.aspect_ratio } : {}),
             source_hash: computeImageSourceHash(c.appearance, lookFingerprint),
             // 외형만의 지문(룩 무관) — look-pending vs edited 구분용(027).
             appearance_hash: computeImageSourceHash(c.appearance, null),
             look_present: lookFingerprint != null,
+            style_anchor_key: anchor?.key ?? null,
           },
           target: {
             workspaceId: project?.workspace_id ?? undefined,

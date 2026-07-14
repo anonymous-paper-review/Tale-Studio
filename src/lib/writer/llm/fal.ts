@@ -95,8 +95,8 @@ export interface FalImageResult {
 }
 
 const DEFAULT_IMAGE_MODEL = 'openai/gpt-image-2';
-// reference 있을 때 자동 사용할 edit 모델 (image_urls 입력)
-const DEFAULT_EDIT_IMAGE_MODEL = 'openai/gpt-image-2/edit';
+/** Consumed by src/lib/style-anchor.ts for Rule M model normalization. */
+export const DEFAULT_EDIT_IMAGE_MODEL = 'openai/gpt-image-2/edit';
 // 러프 스토리보드(previz 스케치) 전용 — 비용/속도 우선 경량 모델 (2026-06-12 사용자 결정).
 //   흑백 연필 스케치 + 목각 인형 수준이라 소형 모델로 충분.
 //   2026-06-18: 4b → 9b 격상 (4b 가 monochrome/featureless 지시 위반·구도 결함 심함, 일관성 개선 목적).
@@ -109,8 +109,8 @@ function isFluxFamilyModel(model: string): boolean {
   return /\bflux\b|\/flux/.test(model);
 }
 
-// reference_image_urls 필요한 edit 류 모델인지
-function isImageEditModel(model: string): boolean {
+/** Consumed by src/lib/style-anchor.ts for Rule M model normalization. */
+export function isImageEditModel(model: string): boolean {
   return /\/edit$/.test(model) || /redux/.test(model) || /ip-adapter/.test(model);
 }
 

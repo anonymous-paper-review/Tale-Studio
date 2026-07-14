@@ -15,6 +15,7 @@ import {
 } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
+import { applyStyleAnchor, resolveStyleAnchorByKey, type AnchorableSubmit } from '@/lib/style-anchor'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -70,14 +71,17 @@ export async function POST(req: Request) {
 
     const { data: project } = await supabaseAdmin
       .from('projects')
-      .select('workspace_id')
+      .select('workspace_id, style_anchor_key')
       .eq('id', projectId)
       .maybeSingle()
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
+    const anchor = await resolveStyleAnchorByKey(project.style_anchor_key)
+
+    const baseOpts: AnchorableSubmit = { prompt, aspect_ratio: aspectRatio ?? '16:9' }
+    const finalOpts = anchor ? applyStyleAnchor(anchor, baseOpts, 'single') : baseOpts
 
     const { request_id, model } = await falImageSubmit({
-      prompt,
-      aspect_ratio: aspectRatio ?? '16:9',
+      ...finalOpts,
       webhookUrl: resolveWebhookUrl(),
     })
 
@@ -91,9 +95,12 @@ export async function POST(req: Request) {
       workspaceId: project.workspace_id,
       provider: 'fal',
       inputSnapshot: {
-        prompt,
-        aspect_ratio: aspectRatio ?? '16:9',
+        prompt: finalOpts.prompt,
+        aspect_ratio: finalOpts.aspect_ratio,
+        ...(finalOpts.reference_image_urls ? { reference_image_urls: finalOpts.reference_image_urls } : {}),
+        ...(finalOpts.model ? { model: finalOpts.model } : {}),
         source_hash: sourceHash ?? null,
+        style_anchor_key: anchor?.key ?? null,
       },
       target: { workspaceId: project.workspace_id, locationId, column },
     })

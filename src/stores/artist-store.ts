@@ -475,7 +475,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .eq('project_id', projectId),
           supabase
             .from('projects')
-            .select('design_tokens')
+            .select('design_tokens, style_anchor_key')
             .eq('id', projectId)
             .maybeSingle(),
         ])
@@ -530,6 +530,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         const sceneByLocation = new Map(dbScenes.map((scene) => [scene.location, scene]))
         // C2: 룩(전역 디자인 토큰 + 캐릭터 의상) 지문 — stale 비교 입력. 룩 미반영이면 null.
         const designTokens = (project?.design_tokens ?? null) as LookTokens | null
+        // Q5: 앵커 키도 룩 지문 입력 — 서버(generate-sheet/draft-trigger)와 동일 raw 키를 넘겨 stale 비교 일치.
+        const styleAnchorKey = (project?.style_anchor_key ?? null) as string | null
 
         if ((dbChars?.length ?? 0) || dbLocations.length) {
           const manifest: SceneManifest = {
@@ -560,7 +562,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             appearanceNative: c.appearance_native ?? c.appearance ?? '',
             portrait: c.portrait ?? null,
             viewCandidates: candidatesByCharView[c.character_id] ?? {},
-            lookFingerprint: computeLookFingerprint(designTokens, c.costume),
+            lookFingerprint: computeLookFingerprint(designTokens, c.costume, styleAnchorKey),
             origin: c.origin === 'writer' ? 'writer' : 'producer',
           }))
           const worldAssets: WorldAsset[] = dbLocations.map((location) => {
