@@ -35,7 +35,8 @@ const ROLE_TOGGLE: { value: CharacterRole; label: string }[] = [
   { value: 'supporting', label: '조연' },
 ]
 
-export function CharacterPanel() {
+// columns: 보드 축척(#d1) — 1(기존 세로 스택)~3열 그리드. 페이지 헤더의 슬라이더가 결정.
+export function CharacterPanel({ columns = 1 }: { columns?: number } = {}) {
   const {
     sceneManifest,
     characterAssets,
@@ -72,7 +73,13 @@ export function CharacterPanel() {
   return (
     <>
       <ScrollArea className="min-h-0 flex-1 px-6 py-4">
-      <div className="space-y-4">
+      <div
+        className={cn(
+          columns >= 3 && 'grid grid-cols-3 items-start gap-4',
+          columns === 2 && 'grid grid-cols-2 items-start gap-4',
+          columns <= 1 && 'space-y-4',
+        )}
+      >
         {characterAssets.map((char) => {
           const role = getRole(char.characterId)
           const isSelected = selectedCharacterId === char.characterId

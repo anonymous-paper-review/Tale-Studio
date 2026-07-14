@@ -18,7 +18,8 @@ import { registerWorldCard } from '@/stores/asset-storage-store'
 import { useInventoryStore } from '@/stores/inventory-store'
 import { cn } from '@/lib/utils'
 
-export function WorldPanel() {
+// columns: 보드 축척(#d1) — 1(기존 세로 스택)~3열 그리드. 페이지 헤더의 슬라이더가 결정.
+export function WorldPanel({ columns = 1 }: { columns?: number } = {}) {
   const {
     sceneManifest,
     worldAssets,
@@ -46,7 +47,13 @@ export function WorldPanel() {
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* 모델(provider)·톤(boost) 선택 툴바 제거(#10). 생성은 store 기본값으로 수행. */}
       <ScrollArea className="min-h-0 flex-1 px-6 py-4">
-        <div className="space-y-6">
+        <div
+          className={cn(
+            columns >= 3 && 'grid grid-cols-3 items-start gap-4',
+            columns === 2 && 'grid grid-cols-2 items-start gap-4',
+            columns <= 1 && 'space-y-6',
+          )}
+        >
           {worldAssets.map((world) => {
             const scene = getScene(world.sceneId)
             const isGenerating = generatingLocations.includes(world.locationId)
