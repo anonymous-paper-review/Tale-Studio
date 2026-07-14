@@ -12,6 +12,7 @@ import { falImageSubmit, ROUGH_STORYBOARD_IMAGE_MODEL } from '@/lib/writer/llm/f
 import {
   createGenerationJob,
   AUTO_GENERATION_GIVE_UP_THRESHOLD,
+  STALE_QUEUED_MS,
 } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
@@ -79,7 +80,7 @@ export const maxDuration = 60
 //   그 샷의 재생성을 영구 차단한다(아래 루프에서 force 보다 먼저 검사 → 사람이 눌러도 skip). fal 잡은
 //   maxDuration(60s) 안에 끝나므로, 이보다 한참 오래된 queued 는 버려진 것으로 보고 in_flight 에서 제외한다
 //   (2026-06-26, shot_9 가 stuck queued 로 재생성이 막혀 "검은 화면 그대로"이던 버그). 정상 중복 방지는 유지.
-const STALE_QUEUED_MS = 10 * 60 * 1000
+//   TTL 값은 generation_jobs 상태/lock 집계와 공유한다(STALE_QUEUED_MS).
 
 const BodySchema = z.object({
   projectId: z.string().uuid(),

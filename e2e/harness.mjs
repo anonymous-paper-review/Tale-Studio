@@ -23,9 +23,11 @@
 //   loginCheck                E2E_EMAIL/E2E_PASSWORD 로 anon 로그인 가능 여부 확인
 //   ── skip-mode (커밋 전 실브라우저 점검용 셋업; README "Skip 모드") ──
 //   newProject [title]        E2E 워크스페이스에 throwaway 프로젝트 생성 → `NEW_PROJECT <pid>`
-//   skipArtist <pid>          seedCast + stubWorld + setStage artist (artist 게이트를 비용 0 으로 오픈)
+//   skipArtist <pid>          seedCast + stubMains + stubWorld + setStage artist (artist 게이트를 비용 0 으로 오픈)
 //   skipWriter <pid>          seedCast + 씬/샷(대사) 시드 + rough_storyboard 스텁 + setStage writer (writer 멀티탭 게이트 비용 0)
 //   stubWorld <pid>           로케이션 shot 더미 채움(autogen fal 호출 skip)
+//   stubMains <pid>           producer 캐릭터 view_main 더미 채움(이미지-락 게이트 언락 — stubWorld 의 캐릭터판)
+//   triggerDrafts <pid>       인증 POST /api/artist/retry-drafts (=triggerAssetDrafts) — v2Design 트리거 대리(실 writer run 불요)
 //   cookies [outPath]         E2E 세션 쿠키를 파일로 굽기(브라우저 주입용, 기본 tmp)
 //   rmProject <pid>           throwaway 프로젝트 + 자식행 삭제
 //   pruneSkip                 [e2e-skip] 프로젝트 일괄 삭제
@@ -254,10 +256,53 @@ async function stubWorld(pid) {
   console.log('world shots stubbed (autogen skip) for', pid)
 }
 
-// seedCast + stubWorld + setStage artist 한 방 — artist UI 게이트를 비용 0 으로 연다
+// 모든 producer 캐릭터 view_main 을 더미로 채워 이미지-락 게이트(canNavigateTo artist)를 비용 0 으로 언락.
+//   stubWorld 의 캐릭터판 — 새 게이트는 producer-origin view_main(또는 후보)가 있어야 artist 를 연다.
+async function stubMains(pid) {
+  need(pid, 'projectId')
+  const { error } = await s
+    .from('characters')
+    .update({ view_main: STUB_IMG })
+    .eq('project_id', pid)
+  if (error) throw new Error(error.message)
+  console.log('character mains stubbed (image-lock unlock) for', pid)
+}
+
+// v2Design 이미지 트리거를 실 writer run 없이 도달 — 인증 POST /api/artist/retry-drafts
+//   (retry-drafts 는 triggerAssetDrafts 동일 경로: look-gate/origin 필터/멱등/job shape 를 그대로 탄다).
+//   cookies() 와 동일한 @supabase/ssr 세션으로 Cookie 헤더를 구워 앱(dev)으로 쏜다.
+async function triggerDrafts(pid) {
+  need(pid, 'projectId')
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const anon = createClient(URL, anonKey, { auth: { persistSession: false } })
+  const { data: signIn, error } = await anon.auth.signInWithPassword({
+    email: process.env.E2E_EMAIL,
+    password: process.env.E2E_PASSWORD,
+  })
+  if (error) throw error
+  const jar = []
+  const ssr = createServerClient(URL, anonKey, {
+    cookies: { getAll: () => jar, setAll: (cs) => cs.forEach(({ name, value }) => jar.push({ name, value })) },
+  })
+  await ssr.auth.setSession({
+    access_token: signIn.session.access_token,
+    refresh_token: signIn.session.refresh_token,
+  })
+  const cookieHeader = jar.map(({ name, value }) => `${name}=${value}`).join('; ')
+  const appUrl = process.env.E2E_APP_URL || 'http://localhost:3000'
+  const res = await fetch(`${appUrl}/api/artist/retry-drafts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookieHeader },
+    body: JSON.stringify({ projectId: pid }),
+  })
+  console.log('TRIGGER_DRAFTS', res.status, await res.text())
+}
+
+// seedCast + stubMains + stubWorld + setStage artist 한 방 — artist UI 게이트를 비용 0 으로 연다
 async function skipArtist(pid) {
   need(pid, 'projectId')
   await seedCast(pid)
+  await stubMains(pid)
   await stubWorld(pid)
   await setStage(pid, 'artist')
   console.log('SKIP_READY artist', pid)
@@ -361,7 +406,7 @@ async function pruneSkip() {
   console.log('pruned', (data ?? []).length, 'skip projects')
 }
 
-const map = { seedCast, chars, locs, candidates, jobs, setStage, setLook, clearLook, failRun, runs, loginCheck, newProject, stubWorld, skipArtist, skipWriter, cookies, rmProject, pruneSkip }
+const map = { seedCast, chars, locs, candidates, jobs, setStage, setLook, clearLook, failRun, runs, loginCheck, newProject, stubWorld, stubMains, skipArtist, skipWriter, triggerDrafts, cookies, rmProject, pruneSkip }
 const fn = map[cmd]
 if (!fn) {
   console.error('cmd 미지정/오타:', cmd, '\n사용 가능:', Object.keys(map).join(', '), '\n(상단 주석 또는 e2e/README.md 참고)')

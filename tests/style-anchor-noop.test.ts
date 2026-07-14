@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   quotaExceededBody: vi.fn(),
   createGenerationJob: vi.fn(),
   hasQueuedCharacterViewJob: vi.fn(),
+  hasQueuedWorldShotJob: vi.fn(),
   countFailedJobsForTarget: vi.fn(),
   listFailedCharacterViewJobs: vi.fn(),
   userOwnsProject: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock('@/lib/generation-quota', () => ({
 vi.mock('@/lib/generation-jobs', () => ({
   createGenerationJob: mocks.createGenerationJob,
   hasQueuedCharacterViewJob: mocks.hasQueuedCharacterViewJob,
+  hasQueuedWorldShotJob: mocks.hasQueuedWorldShotJob,
   countFailedJobsForTarget: mocks.countFailedJobsForTarget,
   listFailedCharacterViewJobs: mocks.listFailedCharacterViewJobs,
   userOwnsProject: mocks.userOwnsProject,
@@ -46,7 +48,6 @@ import {
   buildCharacterTurnaroundPrompt,
   buildCharacterViewPrompt,
   type CharacterPromptInput,
-  type DirectionalView,
 } from '@/lib/artist/turnaround'
 
 const USER = { id: 'user-1' }
@@ -87,6 +88,7 @@ interface CharacterRow {
   costume: string[] | string | null
   view_main: string | null
   entity_type: 'person' | 'object' | null
+  origin: 'producer' | 'writer'
 }
 
 interface CandidateRow {
@@ -146,6 +148,8 @@ beforeEach(() => {
   mocks.createGenerationJob.mockResolvedValue({ id: 'job-1' })
   mocks.hasQueuedCharacterViewJob.mockReset()
   mocks.hasQueuedCharacterViewJob.mockResolvedValue(false)
+  mocks.hasQueuedWorldShotJob.mockReset()
+  mocks.hasQueuedWorldShotJob.mockResolvedValue(false)
   mocks.countFailedJobsForTarget.mockReset()
   mocks.countFailedJobsForTarget.mockResolvedValue(0)
   mocks.listFailedCharacterViewJobs.mockReset()
@@ -353,7 +357,7 @@ describe('style-anchor Phase 0 no-op characterization', () => {
   })
 
   it('D.8 triggerCharacterDrafts submits current template, fallback, and object opts', async () => {
-    dbState.projects = [projectFixture({ design_tokens: null })]
+    dbState.projects = [projectFixture({ design_tokens: designTokens })]
     const templatePerson = draftCharacter({
       character_id: 'draft-person-template',
       name: 'Draft Template Person',
@@ -460,6 +464,7 @@ function characterFixture(overrides: Partial<CharacterRow> = {}): CharacterRow {
     costume: ['navy flight coat', 'brass utility boots'],
     view_main: null,
     entity_type: 'person',
+    origin: 'producer',
     ...overrides,
   }
 }
@@ -473,6 +478,7 @@ function draftCharacter(overrides: Partial<CharacterRow>): CharacterRow {
     costume: null,
     view_main: null,
     entity_type: 'person',
+    origin: 'producer',
     ...overrides,
   })
 }

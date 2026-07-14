@@ -60,6 +60,8 @@ const COLUMNS =
 //   job.input_snapshot.source_hash 를 읽으므로 둘 다 반드시 포함돼야 한다(누락 시 후보 source_hash=null → stale 무력화).
 export const GENERATION_JOB_COLUMNS = COLUMNS
 
+export const STALE_QUEUED_MS = 10 * 60 * 1000
+
 function toJsonSnapshot(value: unknown): Json {
   try {
     const serialized = JSON.stringify(value ?? {})
@@ -164,6 +166,28 @@ export async function hasQueuedCharacterViewJob(
   return data.some((row) => {
     const t = (row.target ?? {}) as GenerationJobTarget
     return t.characterId === characterId && t.view === view
+  })
+}
+
+/**
+ * 멱등 가드: 해당 슬롯(project+location+column)에 status=queued world_shot 잡이 이미 있는가.
+ *   조회 실패는 best-effort로 false(다른 멱등 조건 = locations[column] 존재가 1차 방어).
+ */
+export async function hasQueuedWorldShotJob(
+  projectId: string,
+  locationId: string,
+  column: string,
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id, target')
+    .eq('project_id', projectId)
+    .eq('kind', 'world_shot')
+    .eq('status', 'queued')
+  if (error || !data) return false
+  return data.some((row) => {
+    const t = (row.target ?? {}) as GenerationJobTarget
+    return t.locationId === locationId && t.column === column
   })
 }
 

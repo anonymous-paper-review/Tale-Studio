@@ -8,6 +8,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { Sidebar } from '@/components/layout/sidebar'
 import { GlobalChat } from '@/components/layout/global-chat'
 import { useIdleTimeout } from '@/hooks/use-idle-timeout'
+import { useArtistLockPoll } from '@/hooks/use-artist-lock-poll'
 import { readLastProjectId, writeLastProjectId } from '@/lib/session-restore'
 import { STAGES } from '@/lib/constants'
 import type { StageId } from '@/types'
@@ -28,6 +29,7 @@ export default function StudioLayout({
   const chatWidth = useChatUiStore((s) => s.chatWidth)
   const chatCollapsed = useChatUiStore((s) => s.collapsed)
   useIdleTimeout()
+  useArtistLockPoll()
 
   // mount: URL ?projectId 힌트로 프로젝트 복원 → 없으면 localStorage 마지막 본 프로젝트
   // → 그것도 없으면 store가 최신 fallback. 어느 경로든 서버(/api/project/init)가

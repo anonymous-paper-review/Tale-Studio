@@ -9,7 +9,6 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { createRun, getActiveRun } from '@/lib/writer/run-store';
 import { WRITER_TOTAL_UNITS, triggerWriterStep } from '@/lib/writer/pipeline/steps';
 import type { PipelineInput, Genre, CastContract } from '@/lib/writer/types/pipeline';
-import { triggerCharacterDrafts } from '@/lib/artist/draft-trigger';
 import { applyProducerI18n } from '@/lib/writer/i18n/derive-en';
 import { detectLocaleFromText } from '@/lib/locale';
 import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
@@ -226,10 +225,9 @@ export async function POST(req: NextRequest) {
     };
     const run = await createRun(projectId, input, WRITER_TOTAL_UNITS);
 
-    // 응답 후 별도 서버리스 인스턴스에서 실행: (1) artist 초안(대표 main) 병렬 생성, (2) 첫 writer step.
-    //   초안 트리거는 멱등(차 있으면 skip)·실패 흡수라 writer 체이닝과 독립적으로 안전하다(C1).
+    // 응답 후 별도 서버리스 인스턴스에서 첫 writer step 실행.
+    //   Artist 이미지 초안은 writer v2Design post-persist hook 에서 look+anchor 확정 후 submit 한다.
     after(async () => {
-      await triggerCharacterDrafts(projectId);
       await triggerWriterStep(req.nextUrl.origin, projectId);
     });
 

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   quotaExceededBody: vi.fn(),
   createGenerationJob: vi.fn(),
   hasQueuedCharacterViewJob: vi.fn(),
+  hasQueuedWorldShotJob: vi.fn(),
   countFailedJobsForTarget: vi.fn(),
   listFailedCharacterViewJobs: vi.fn(),
   userOwnsProject: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('@/lib/generation-quota', () => ({
 vi.mock('@/lib/generation-jobs', () => ({
   createGenerationJob: mocks.createGenerationJob,
   hasQueuedCharacterViewJob: mocks.hasQueuedCharacterViewJob,
+  hasQueuedWorldShotJob: mocks.hasQueuedWorldShotJob,
   countFailedJobsForTarget: mocks.countFailedJobsForTarget,
   listFailedCharacterViewJobs: mocks.listFailedCharacterViewJobs,
   userOwnsProject: mocks.userOwnsProject,
@@ -51,7 +53,6 @@ import {
   buildCharacterTurnaroundPrompt,
   buildCharacterViewPrompt,
   type CharacterPromptInput,
-  type DirectionalView,
 } from '@/lib/artist/turnaround'
 import {
   STYLE_ANCHOR_CLAUSE,
@@ -102,6 +103,7 @@ interface CharacterRow {
   costume: string[] | string | null
   view_main: string | null
   entity_type: 'person' | 'object' | null
+  origin: 'producer' | 'writer'
 }
 
 interface StyleAnchorRow {
@@ -161,6 +163,8 @@ beforeEach(() => {
   mocks.createGenerationJob.mockResolvedValue({ id: 'job-1' })
   mocks.hasQueuedCharacterViewJob.mockReset()
   mocks.hasQueuedCharacterViewJob.mockResolvedValue(false)
+  mocks.hasQueuedWorldShotJob.mockReset()
+  mocks.hasQueuedWorldShotJob.mockResolvedValue(false)
   mocks.countFailedJobsForTarget.mockReset()
   mocks.countFailedJobsForTarget.mockResolvedValue(0)
   mocks.listFailedCharacterViewJobs.mockReset()
@@ -430,7 +434,7 @@ describe('style-anchor route integration', () => {
   })
 
   it('AC7 triggerCharacterDrafts injects anchor for character main template, fallback, and object drafts', async () => {
-    dbState.projects = [projectFixture({ design_tokens: null, style_anchor_key: ANCHOR_KEY })]
+    dbState.projects = [projectFixture({ design_tokens: designTokens, style_anchor_key: ANCHOR_KEY })]
     const templatePerson = draftCharacter({
       character_id: 'draft-person-template',
       name: 'Draft Template Person',
@@ -484,7 +488,7 @@ describe('style-anchor route integration', () => {
     expect(generationJobArgAt(0).inputSnapshot.source_hash).toBe(
       computeImageSourceHash(
         templatePerson.appearance,
-        computeLookFingerprint(null, templatePerson.costume, ANCHOR_KEY),
+        computeLookFingerprint(designTokens, templatePerson.costume, ANCHOR_KEY),
       ),
     )
     expect(generationJobArgAt(0).inputSnapshot.source_hash).not.toBe(
@@ -524,7 +528,7 @@ describe('style-anchor route integration', () => {
   })
 
   it('AC7 triggerCharacterDrafts treats an inactive anchor as a fail-soft no-op for draft opts', async () => {
-    dbState.projects = [projectFixture({ design_tokens: null, style_anchor_key: ANCHOR_KEY })]
+    dbState.projects = [projectFixture({ design_tokens: designTokens, style_anchor_key: ANCHOR_KEY })]
     dbState.styleAnchors = [styleAnchorFixture({ is_active: false })]
     const templatePerson = draftCharacter({
       character_id: 'draft-person-template',
@@ -641,6 +645,7 @@ function characterFixture(overrides: Partial<CharacterRow> = {}): CharacterRow {
     costume: ['navy flight coat', 'brass utility boots'],
     view_main: null,
     entity_type: 'person',
+    origin: 'producer',
     ...overrides,
   }
 }

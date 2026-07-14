@@ -104,7 +104,7 @@
 | **S2** | C2 | main 재생성(`/api/artist/generate-sheet` actor=ui) | `candidates`: 2번째 main 후보, is_selected 플립(one_selected), **source_hash 채워짐** | ✅ 2026-06-18 |
 | **S3** | C3 | artist 챗(`/api/artist/chat`) 원천 외형 변경 → 제안 → `/api/artist/appearance` 승인 | chat 응답 `proposals`에 changeAppearance + `updates:[]`(F6) · 커밋 후 자동재생성 0 · 파생 stale | ✅ 2026-06-18 |
 | **S4** | C4 | 월드 후보 링버퍼 + 옛 후보 선택(`/api/artist/select-world-candidate`) | `candidates`: location 후보 누적(N=5 보호) · 선택 플립 후 selected=1(one_selected) · locations 컬럼 미러 | ✅ 2026-06-18 |
-| **S5** | C2/§5 | **writer↔artist 왕복**: `setLook`(룩 도착) → artist 재진입 → stale → 명시적 재생성 수렴 | 룩 전 `낡음`=0 → 후 `낡음`>0(전파) · 후보 보존 · character_view job 0건(무자동재생성) · 재생성 후 `낡음` 감소(수렴) — [#57 체크리스트](#57--architecture-5-불변식-체크리스트-모든-stale-시나리오-공통) 전부 | ✅ 2026-06-18 |
+| **S5′** | §60/§5 | **v2Design 게이트 생성 + 탭 잠금**: 핸드오프 →(탭 잠금, producer char/world job 0)→ `setLook`(design_tokens 도착) + `triggerDrafts`(v2Design 트리거 대리, =triggerAssetDrafts) → job `look_present:true` → webhook → 탭 언락 → 사람 의상 편집 → stale → 명시적 재생성 수렴 | 트리거 전 producer char/world job **0** · `?assets=1` `images_ready:false`(탭 disabled·`X/Y`) → 트리거 후 job `look_present:true`+룩반영 source_hash · webhook 후 `images_ready:true`(언락)·`낡음`=0(무자동재생성) · **stalled 분기**: `setLook`만·트리거 없음 → `assets.stalled:true`→재시도 CTA · **실패 분기**: `failRun`(v2Design 전) → 탭 잠금 유지+CTA · 사람 편집 후 stale→재생성 수렴 [#57 체크리스트](#57--architecture-5-불변식-체크리스트-모든-stale-시나리오-공통) | 🔲 대기(2026-07-14 재정의) |
 
 ## 시나리오 추가/삭제 방법
 

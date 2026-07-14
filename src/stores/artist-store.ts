@@ -1,8 +1,13 @@
 import { create } from 'zustand'
-import type { Scene, SceneManifest, Location as ManifestLocation, CharacterAsset, WorldAsset } from '@/types'
+import type { SceneManifest, CharacterAsset, WorldAsset } from '@/types'
 import { type CharacterViewKey } from '@/types/asset'
 import { candidateViewToViewKey, classifyImageStale, computeLookFingerprint, computeWorldImageSourceHash, type CandidateImage, type LookTokens } from '@/lib/image-provenance'
-import { buildWorldPrompt } from '@/lib/prompts'
+import {
+  buildWorldShotPromptForLocation,
+  WORLD_SHOT_COLUMN,
+  WORLD_SHOT_LABELS,
+  type WorldShotKey,
+} from '@/lib/artist/world-prompt'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
@@ -54,67 +59,8 @@ export type GenerationActor = 'ui' | 'chat' | 'auto'
 // 보수적으로 유지한다. 계정 전역 공정성은 generation_jobs dispatcher 도입 시 중앙화한다.
 const ARTIST_GENERATION_CONCURRENCY = 2
 
-// World 샷 — 배경 = 이미지 1장(#6·#9): wide 1컷만. establishing 폐기(2026-07-11 죽은 코드 정리).
-export type WorldShotKey = 'wideShot'
-
-const WORLD_SHOT_SUFFIX: Record<WorldShotKey, string> = {
-  wideShot: 'wide shot, panoramic',
-}
-const WORLD_SHOT_COLUMN: Record<WorldShotKey, string> = {
-  wideShot: 'wide_shot',
-}
-export const WORLD_SHOT_LABELS: Record<WorldShotKey, string> = {
-  wideShot: 'Wide Shot',
-}
-
-function worldShotPrompt(
-  visualDescription: string,
-  timeOfDay: string,
-  mood: string,
-  boost: string | null,
-  shot: WorldShotKey,
-): string {
-  return `${buildWorldPrompt(visualDescription, timeOfDay, mood, boost)}, ${WORLD_SHOT_SUFFIX[shot]}`
-}
-
-function joinPromptParts(parts: Array<string | null | undefined>): string {
-  return parts.map((part) => part?.trim()).filter(Boolean).join(', ')
-}
-
-export function buildWorldShotPromptForLocation(
-  location: ManifestLocation,
-  scene: Scene | null | undefined,
-  boost: string | null,
-  shot: WorldShotKey,
-): string {
-  // writer(v2 worldVisual)가 visual_description==style_description, lighting_direction==lighting_sources
-  //   처럼 같은 내용을 두 칸에 채우는 경우가 있어 동일 내용은 한 번만 넣는다(프롬프트 중복·토큰 낭비 방지).
-  const visualDesc = location.visualDescription?.trim() ?? ''
-  const styleDesc = location.styleDescription?.trim() ?? ''
-  const lightDir = location.lightingDirection?.trim() ?? ''
-  const lightSrc = location.lightingSources?.length
-    ? location.lightingSources.join(', ').trim()
-    : ''
-
-  const visual = joinPromptParts([
-    visualDesc,
-    styleDesc && styleDesc !== visualDesc ? styleDesc : '',
-    lightDir ? `lighting direction: ${lightDir}` : '',
-    lightSrc && lightSrc !== lightDir ? `lighting sources: ${lightSrc}` : '',
-    location.props?.length ? `key props: ${location.props.join(', ')}` : '',
-    location.purpose ? `story purpose: ${location.purpose}` : '',
-    location.name,
-  ])
-
-  const timeOfDay = location.timeOfDay || scene?.timeOfDay || ''
-  const mood = joinPromptParts([
-    scene?.mood,
-    scene?.narrativeSummary ? `scene context: ${scene.narrativeSummary}` : '',
-    !scene && location.purpose ? `producer background purpose: ${location.purpose}` : '',
-  ])
-
-  return worldShotPrompt(visual, timeOfDay, mood, boost, shot)
-}
+export { WORLD_SHOT_LABELS }
+export type { WorldShotKey }
 
 export function shouldMarkWorldGenerationUserEdited(actor: GenerationActor): boolean {
   return actor !== 'auto'
@@ -1109,12 +1055,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
   },
 
-  // Writer→Artist 진입 시 비어있는 이미지 자동생성 (crop 폐기 후 재설계, 2026-06-05 / main 우선 2단계 2026-06-07).
-  //   대표 이미지(캐릭터 view_main, 로케이션 wide_shot)는 핸드오프 'assetImages' step 이 미리 채울 수 있으나,
-  //   실패/미도착이면 여기서 보강한다.
-  //   대표 main(view_main)은 핸드오프 서버 초안 트리거(draft-trigger.ts)가 단일 생산자다(C1) — 여기서
+  // Artist 탭 unlock 이후 비어있는 이미지 자동생성 (crop 폐기 후 재설계, 2026-06-05 / main 우선 2단계 2026-06-07).
+  //   대표 이미지(프로듀서 캐릭터 view_main, 로케이션 wide_shot)는 writer v2Design 직후 서버 초안이 채운다.
+  //   이 함수는 post-unlock 경로라 design_tokens/look 이 이미 존재하는 상태에서만 보강한다.
+  //   producer main 은 서버 초안 트리거(draft-trigger.ts)가 단일 생산자다(C1) — 여기서
   //   client 가 main 을 다시 자동 제출하지 않는다(이중 생성/과금 방지; 서버 실패는 카드 배지로 표시).
-  //   여기선 main 이 들어온 캐릭터의 빈 방향뷰(main reference i2i)와 월드 빈칸만 보강한다(자연 캐시 skip).
+  //   여기선 writer-origin 오픈캐스트 main 과 월드 fallback 만 보강한다(자연 캐시 skip).
   autoGenerateBaseImages: async () => {
     const { characterAssets, worldAssets } = get()
     const projectId = useProjectStore.getState().projectId
@@ -1136,8 +1082,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         skipped.push(`char ${c.characterId}:main (이미 있음)`)
         continue
       }
-      // main(턴어라운드 시트) 빈칸: writer-origin(오픈캐스트)은 서버 초안 대상이 아니므로 자율 생성,
-      //   producer 인물은 서버 초안(핸드오프)이 채우므로 대기. 멱등: generateCharacterView 가 generatingViews/서버 dedupe.
+      // main(턴어라운드 시트) 빈칸: writer-origin(오픈캐스트)은 서버 초안 대상이 아니므로 post-unlock 자율 생성,
+      //   producer 인물은 writer v2Design 서버 초안이 채우므로 대기. 멱등: generateCharacterView 가 generatingViews/서버 dedupe.
       if (c.origin === 'writer') {
         queuedRest.push(`char ${c.characterId}:main (opencast 턴어라운드 자율)`)
         restTasks.push(() => get().generateCharacterView(c.characterId, 'main', 'auto'))
@@ -1147,10 +1093,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
     for (const w of worldAssets) {
       if (w.wideShot == null) {
-        // (b) 중복 제거: 서버 assetImages step 이 이미 wide 를 submit 했으면 webhook 으로 채워진다 →
-        //   잠깐 기다렸다 채워지면 client skip, timeout 이면 client fallback 생성.
+        // (b) 중복 제거: writer v2Design 서버 초안이 이미 wide 를 submit 했으면 webhook 으로 채워진다 →
+        //   잠깐 기다렸다 채워지면 client skip, timeout 이면 post-unlock client fallback 생성.
         const locId = w.locationId
-        queuedRest.push(`world ${locId}:wideShot (await server pre-gen → fallback)`)
+        queuedRest.push(`world ${locId}:wideShot (await v2Design server draft → fallback)`)
         restTasks.push(async () => {
           if (!projectId) {
             await get().generateWorldShot(locId, 'wideShot', undefined, 'auto')
@@ -1198,7 +1144,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     atime('autogen total', Date.now() - t0, { rest: restTasks.length })
   },
 
-  // 온보딩 "진행" 단일 진입점(유저 클릭만 — architecture §5). look-pending 초안(룩 도착 전 생성) +
+  // 온보딩 "진행" 단일 진입점(유저 클릭만 — architecture §5). look-pending 은 룩 부재 초안 레거시 전용 +
   //   writer 가 추가한 무이미지 캐릭터(origin='writer' && main 없음)의 main 을 재생성한다. 멱등:
   //   generateCharacterView 가 generatingViews/서버 dedupe 로 중복 제출을 막는다.
   refreshLookPendingDrafts: async () => {
@@ -1207,6 +1153,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       // 콘텐츠정책/일반 실패 슬롯은 일괄 비대상 — 카드별 우회(safe) 전용(버블 카피 계약과 정합).
       if (viewFailures[c.characterId]?.main) return false
       const selectedMain = (c.viewCandidates['main'] ?? []).find((cand) => cand.isSelected)
+      // v2Design 이전에 만들어진 룩 부재 초안만 이 분기로 온다(legacy-only).
       const lookPending =
         classifyImageStale(c.fixedPrompt, c.lookFingerprint ?? null, {
           sourceHash: selectedMain?.sourceHash ?? null,

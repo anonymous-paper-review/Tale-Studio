@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  buildWorldShotPromptForLocation,
-  shouldMarkWorldGenerationUserEdited,
-} from '@/stores/artist-store'
+import { buildWorldShotPromptForLocation } from '@/lib/artist/world-prompt'
+import { shouldMarkWorldGenerationUserEdited } from '@/stores/artist-store'
 
 describe('artist background source prompts', () => {
   it('builds a Producer-only world prompt when no writer scene exists yet', () => {

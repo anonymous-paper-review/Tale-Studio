@@ -6,16 +6,14 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
-import { falImageSubmit } from '@/lib/writer/llm/fal'
 import {
-  createGenerationJob,
   countFailedJobsForTarget,
   AUTO_GENERATION_GIVE_UP_THRESHOLD,
   type GenerationJobActor,
 } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
-import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
-import { applyStyleAnchor, resolveStyleAnchorByKey, type AnchorableSubmit } from '@/lib/style-anchor'
+import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
+import { submitWorldShotJob } from '@/lib/artist/world-submit'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -77,32 +75,17 @@ export async function POST(req: Request) {
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
     const anchor = await resolveStyleAnchorByKey(project.style_anchor_key)
 
-    const baseOpts: AnchorableSubmit = { prompt, aspect_ratio: aspectRatio ?? '16:9' }
-    const finalOpts = anchor ? applyStyleAnchor(anchor, baseOpts, 'single') : baseOpts
-
-    const { request_id, model } = await falImageSubmit({
-      ...finalOpts,
-      webhookUrl: resolveWebhookUrl(),
-    })
-
-    const job = await createGenerationJob({
+    const job = await submitWorldShotJob({
       projectId,
-      requestId: request_id,
-      model,
-      kind: 'world_shot',
+      locationId,
+      column: column as 'wide_shot',
+      prompt,
+      aspectRatio: aspectRatio ?? '16:9',
       actor: jobActor,
       userId: user.id,
       workspaceId: project.workspace_id,
-      provider: 'fal',
-      inputSnapshot: {
-        prompt: finalOpts.prompt,
-        aspect_ratio: finalOpts.aspect_ratio,
-        ...(finalOpts.reference_image_urls ? { reference_image_urls: finalOpts.reference_image_urls } : {}),
-        ...(finalOpts.model ? { model: finalOpts.model } : {}),
-        source_hash: sourceHash ?? null,
-        style_anchor_key: anchor?.key ?? null,
-      },
-      target: { workspaceId: project.workspace_id, locationId, column },
+      sourceHash: sourceHash ?? null,
+      anchor,
     })
 
     return NextResponse.json({ ok: true, jobId: job.id, status: 'queued' })

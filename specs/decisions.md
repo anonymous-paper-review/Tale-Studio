@@ -15,6 +15,16 @@
 
 ## 확정
 
+### 60. artist 이미지 생성 타이밍 재설계 — v2Design 게이트 생성 + 아티스트 탭 잠금
+- **결정**: producer 핸드오프 즉시 룩없이 뽑던 초안(look-less draft)을 폐기하고, 캐릭터+월드 이미지 초기 생성을 **writer v2Design 완료 시점(design_tokens 확정)** 으로 미룬다. 앵커+룩을 함께 먹여 **1회** 생성(트리거 이동: `writer/start` after() → `pipeline/steps.ts` v2Design post-persist). 아티스트 사이드바 탭은 이미지가 실제 생성되기 전까지 **disabled**(canNavigateTo 이미지-락) — 잠금 중 `이미지 생성 중 X/Y` 최소 표시, 실패/stalled 시 `생성 실패·재시도` CTA(풀 OQ-5 진행바는 후속, `status.assets`가 데이터 훅).
+- **§5(#57) 정합**: stale 모델을 갈아엎는 게 아니라 **인지 불가능한 머신 유발 stale 1종(design_tokens look=null→present)만 제거**한다 — 룩없는 초안 자체가 사라져 그 전이가 발생하지 않는다. `computeLookFingerprint`와 사람 편집(의상/외형) stale은 보존. 오히려 "빈칸 자율 채움 = **상류가 확정한 입력으로**"(§5)에 더 충실(옛 초안은 룩 미확정 입력으로 생성).
+- **가드(리뷰 합의)**: (R1) 새 트리거는 **절대 look_present=false job을 만들지 않는다** — design_tokens 부재 시 생성 skip + stalled 경로(`persistDesignTokens` un-absorb → 실패 시 run 깨끗이 fail→재실행). (R3) **잠금은 항상 가시적 탈출구**: status `assets.stalled` = (룩 present OR pipeline_completed) AND !images_ready AND queued_count=0 → 재시도 CTA(제출 실패로 job row 없음·레거시 무-job·부분완료 전부 커버).
+- **amend #57 / producer-story-gate 결정 8**: 결정 8("이미지 초기생성 = artist 진입 시 자동 1회")의 **트리거를 진입 시점 → v2Design 확정 시점**으로 이동(서버 단일 생산자·producer-origin only·멱등 유지). opencast(writer-origin) 캐릭터는 artist 진입 클라 자동채움 유지.
+- **폐기(retire)**: producer-origin 로케이션만으로 아티스트를 열던 진입 우회(`verifyWriterGate` location 예외, `project-store.ts` ~L239-246)를 **이미지-락에 종속**시킨다 — 이제 producer-origin 로케이션 단독으로는 아티스트가 열리지 않는다(이미지 생성 후 열림).
+- **검증**: 본 변경의 파일 `tsc`/`eslint` 클린 + 전체 유닛 스위트 통과(focused: draft-trigger 확장·v2design-image-trigger·writer-status-assets·artist-retry-drafts·artist-lock-gate·artist-lock-poll). (저장소 전체 `tsc`는 동시 진행 중인 `project-share-demo-mode` 작업으로 별개 red — 본 변경 소관 아님.) e2e S5→S5′ 재작성(하네스 `stubMains`/`triggerDrafts` 추가). 앵커+룩 co-injection·월드 source_hash prompt-only·사람 편집 stale 잔존 검증 포함.
+- **범위/계획**: ralplan 합의(Architect CLEAR/APPROVE + Critic OKAY) → ultragoal 실행. 상세: 세션 `plans/ralplan/.../pending-approval.md`.
+- **일자**: 2026-07-14
+
 ### 58. producer-story-gate archived
 - **결정**: producer-story-gate 구현 완료 — s0(장르축)·s2(캐릭터 정의)를 producer 게이트로 승격, writer는 s1부터 + 오픈 캐스트(`new_characters[]`/`mergeOpenCast`), 이미지 생성 artist 일원화(진입 시 자동 1회·결정 8), 파생 이미지 provenance + stale 배지 + 후보 히스토리(#57), Lock 플래그 전면 폐기(결정 4). `specs/archive/2026-06-13-producer-story-gate/`로 이동.
 - **검증**: 코드/빌드/유닛(provenance 9 테스트) + **A3 진입게이트 회귀 발견·수정**(writer view_main 사전생성 제거로 mainReady 데드락 → `pipeline_completed` 진입). 생성 의존 브라우저 플로우(자동생성 실이미지·stale 실편집·후보 교체·object ref·additive 재실행)는 **수동 확인 권장**으로 남김(사용자 (A) 결정, 2026-06-13).

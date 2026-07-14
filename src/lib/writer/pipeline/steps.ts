@@ -23,6 +23,7 @@ import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
 import { persistAssetsToDb, persistShotsToDb } from '@/lib/writer/pipeline/util/persist_manifest';
+import { triggerAssetDrafts } from '@/lib/artist/draft-trigger';
 import { isCompactDepth } from '@/lib/writer/types/pipeline';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
 import { resolveModels, resolveSkip, emptyC1Report, emptyMidPreview } from '@/lib/writer/pipeline';
@@ -227,12 +228,11 @@ export const WRITER_STEPS: WriterStep[] = [
       await logger.flushRawLlm('v2Design');
 
       // v2 직후 → 전역 디자인 토큰 + Tier 1 에셋(characters/locations/scenes)을 DB 기록.
-      //   serverless 에선 함수가 응답 후 동결되므로 fire-and-forget 불가 → await + catch 로 흡수.
-      await persistDesignTokens(projectId, s.visualIdentity!, worldVisual).catch(() => {});
+      //   design_tokens 는 이미지 초안의 hard gate 이므로 실패를 흡수하지 않는다(실패 → writer rerun).
+      //   assets persist 는 기존처럼 best-effort, 이후 writer 가 v2Design 확인점에서 producer-origin drafts 를 submit 한다.
+      await persistDesignTokens(projectId, s.visualIdentity!, worldVisual);
       await persistAssetsToDb(projectId, s.characters!, s.scenes!, worldVisual, characterVisual).catch(() => {});
-
-      // ⚠️ 이미지 생성은 writer 에서 하지 않는다 (producer-story-gate 결정 8) — artist 전담
-      //   (artist 진입 시 autoGenerateBaseImages 멱등 1회). writer 는 텍스트(행/씬/샷)만 채운다.
+      await triggerAssetDrafts(projectId).catch(() => {});
       return { characterVisual, worldVisual };
     },
   },

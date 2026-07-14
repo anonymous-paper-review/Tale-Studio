@@ -39,12 +39,22 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const canNavigateTo = useProjectStore((s) => s.canNavigateTo)
-  // reachedStage 구독 — 단계가 열리면(잠금 해제) sidebar가 리렌더되도록 (canNavigateTo는 함수 참조라 단독으론 반응 안 함)
-  useProjectStore((s) => s.reachedStage)
+  const reachedStage = useProjectStore((s) => s.reachedStage)
+  const artistImagesReady = useProjectStore((s) => s.artistImagesReady)
+  const artistAssetProgress = useProjectStore((s) => s.artistAssetProgress)
+  const artistImagesFailed = useProjectStore((s) => s.artistImagesFailed)
+  const artistImagesStalled = useProjectStore((s) => s.artistImagesStalled)
+  const retryArtistDrafts = useProjectStore((s) => s.retryArtistDrafts)
   // 크로스스테이지 완료 알림 배지 (chat-proactive-copilot Phase 2)
   const stageBadges = useGlobalChatStore((s) => s.stageBadges)
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const renameProject = useProjectStore((s) => s.renameProject)
+
+  const reachedStageIndex = STAGES.findIndex((stage) => stage.id === reachedStage)
+  const artistImageLockCopy =
+    artistImagesFailed || artistImagesStalled
+      ? '생성 실패·재시도'
+      : `이미지 생성 중 ${artistAssetProgress?.ready ?? 0}/${artistAssetProgress?.total ?? 0}`
 
   // Home HoverCard: 프로젝트명 인라인 편집. 편집 중에는 hover가 벗어나도 카드 유지(controlled open).
   const [homeOpen, setHomeOpen] = useState(false)
@@ -144,6 +154,12 @@ export function Sidebar() {
           const Icon = STAGE_ICONS[stage.id]
           const isActive = pathname.startsWith(stage.path)
           const isLocked = !canNavigateTo(stage.id)
+          const reachedByStage =
+            STAGES.findIndex((item) => item.id === stage.id) <= reachedStageIndex
+          const isArtistImageLocked =
+            stage.id === 'artist' && reachedByStage && !artistImagesReady
+          const isArtistRetryable =
+            isArtistImageLocked && (artistImagesFailed || artistImagesStalled)
           // 다른 stage 작업 완료 배지 — 활성/잠금 stage엔 표시 안 함(활성은 진입 시 클리어됨)
           const badge = !isActive && !isLocked ? (stageBadges[stage.id] ?? 0) : 0
 
@@ -151,11 +167,15 @@ export function Sidebar() {
             <Tooltip key={stage.id} delayDuration={0}>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => !isLocked && router.push(stage.path)}
-                  disabled={isLocked}
+                  onClick={() => {
+                    if (isArtistRetryable) void retryArtistDrafts()
+                    else if (!isLocked) router.push(stage.path)
+                  }}
+                  disabled={isLocked && !isArtistRetryable}
                   className={cn(
                     'relative flex h-12 w-12 items-center justify-center rounded-lg transition-colors',
-                    isLocked && 'cursor-not-allowed opacity-30',
+                    isLocked && !isArtistRetryable && 'cursor-not-allowed opacity-30',
+                    isArtistRetryable && 'cursor-pointer text-destructive hover:bg-accent',
                     isActive && !isLocked
                       ? 'border-l-2 border-primary bg-accent text-primary'
                       : !isLocked && 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -172,7 +192,11 @@ export function Sidebar() {
               <TooltipContent side="right" className="flex flex-col">
                 <span className="font-medium">{stage.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  {isLocked ? 'Complete previous step first' : stage.agent}
+                  {isLocked
+                    ? isArtistImageLocked
+                      ? artistImageLockCopy
+                      : 'Complete previous step first'
+                    : stage.agent}
                 </span>
               </TooltipContent>
             </Tooltip>

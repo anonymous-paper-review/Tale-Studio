@@ -2,12 +2,174 @@
 //   writer_runs 행에서 읽는다 (파일시스템 참조 제거). 무거운 state 블롭은 SELECT 안 함
 //   (getRunStatusLight 가 경량 컬럼만 조회). 반환 shape 은 기존 WriterStatus 와 동일하게 유지.
 import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+import { STALE_QUEUED_MS } from '@/lib/generation-jobs';
 import { getRunStatusLight, type StageTiming } from '@/lib/writer/run-store';
 
+
 export const runtime = 'nodejs';
+interface WriterStatusAssets {
+  chars_ready: number;
+  chars_total: number;
+  worlds_ready: number;
+  worlds_total: number;
+  queued_count: number;
+  failed_count: number;
+  stalled: boolean;
+  images_ready: boolean;
+}
+
+function emptyAssets(): WriterStatusAssets {
+  return {
+    chars_ready: 0,
+    chars_total: 0,
+    worlds_ready: 0,
+    worlds_total: 0,
+    queued_count: 0,
+    failed_count: 0,
+    stalled: false,
+    images_ready: false,
+  };
+}
+
+async function countRows(
+  query: PromiseLike<{ count: number | null; error: { message?: string } | null }>,
+): Promise<number> {
+  const { count, error } = await query;
+  if (error) throw new Error(error.message ?? 'asset count query failed');
+  return count ?? 0;
+}
+
+async function computeAssets(
+  projectId: string,
+  pipelineCompleted: boolean,
+): Promise<WriterStatusAssets> {
+  try {
+    const cutoff = new Date(Date.now() - STALE_QUEUED_MS).toISOString();
+
+    const [
+      projectResult,
+      charsTotal,
+      charsWithImage,
+      worldsTotal,
+      worldsReady,
+      queuedCount,
+      failedJobs,
+      staleQueuedJobs,
+      candidateResult,
+    ] = await Promise.all([
+      supabaseAdmin
+        .from('projects')
+        .select('design_tokens')
+        .eq('id', projectId)
+        .maybeSingle(),
+      countRows(
+        supabaseAdmin
+          .from('characters')
+          .select('character_id', { count: 'exact', head: true })
+          .eq('project_id', projectId)
+          .eq('origin', 'producer'),
+      ),
+      countRows(
+        supabaseAdmin
+          .from('characters')
+          .select('character_id', { count: 'exact', head: true })
+          .eq('project_id', projectId)
+          .eq('origin', 'producer')
+          .not('view_main', 'is', null),
+      ),
+      countRows(
+        supabaseAdmin
+          .from('locations')
+          .select('location_id', { count: 'exact', head: true })
+          .eq('project_id', projectId),
+      ),
+      countRows(
+        supabaseAdmin
+          .from('locations')
+          .select('location_id', { count: 'exact', head: true })
+          .eq('project_id', projectId)
+          .not('wide_shot', 'is', null),
+      ),
+      countRows(
+        supabaseAdmin
+          .from('generation_jobs')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', projectId)
+          .in('kind', ['character_view', 'world_shot'])
+          .eq('status', 'queued')
+          .gte('created_at', cutoff),
+      ),
+      countRows(
+        supabaseAdmin
+          .from('generation_jobs')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', projectId)
+          .in('kind', ['character_view', 'world_shot'])
+          .in('status', ['failed', 'errored']),
+      ),
+      countRows(
+        supabaseAdmin
+          .from('generation_jobs')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', projectId)
+          .in('kind', ['character_view', 'world_shot'])
+          .eq('status', 'queued')
+          .lt('created_at', cutoff),
+      ),
+      supabaseAdmin
+        .from('character_image_candidates')
+        .select('character_id')
+        .eq('project_id', projectId)
+        .eq('view', 'main'),
+    ]);
+
+    if (projectResult.error) throw new Error(projectResult.error.message ?? 'project query failed');
+    if (candidateResult.error) throw new Error(candidateResult.error.message ?? 'candidate query failed');
+
+    const candidateIds = [
+      ...new Set(
+        ((candidateResult.data ?? []) as Array<{ character_id?: unknown }>)
+          .map((row) => row.character_id)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0),
+      ),
+    ];
+    const charsReadyFromCandidates = candidateIds.length
+      ? await countRows(
+          supabaseAdmin
+            .from('characters')
+            .select('character_id', { count: 'exact', head: true })
+            .eq('project_id', projectId)
+            .eq('origin', 'producer')
+            .in('character_id', candidateIds)
+            .is('view_main', null),
+        )
+      : 0;
+
+    const charsReady = Math.min(charsTotal, charsWithImage + charsReadyFromCandidates);
+    const failedCount = failedJobs + staleQueuedJobs;
+    const imagesReady = charsReady === charsTotal && worldsReady === worldsTotal;
+    const designTokensPresent = projectResult.data?.design_tokens != null;
+
+    return {
+      chars_ready: charsReady,
+      chars_total: charsTotal,
+      worlds_ready: worldsReady,
+      worlds_total: worldsTotal,
+      queued_count: queuedCount,
+      failed_count: failedCount,
+      stalled: (designTokensPresent || pipelineCompleted) && !imagesReady && queuedCount === 0,
+      images_ready: imagesReady,
+    };
+  } catch (e) {
+    console.warn('[writer/status] assets query failed:', e instanceof Error ? e.message : e);
+    return emptyAssets();
+  }
+}
+
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
@@ -39,7 +201,21 @@ export async function GET(
     const stagesMs: Record<string, number> = {};
     for (const s of timeline) stagesMs[s.stage] = s.ms;
 
-    return NextResponse.json({
+    const body: {
+      projectId: string;
+      started: boolean;
+      pipeline_completed: boolean;
+      pipeline_failed: boolean;
+      progress_percent: number;
+      current_stage: string | null;
+      current_status: string | null;
+      last_timestamp: string | null;
+      error: string | null;
+      timings: { pipeline_started_at: string; total_ms: number; stages: Record<string, number> } | null;
+      available: Record<string, never>;
+      timeline: Array<{ stage: string; ms: number; seconds: number; attempts: number; ended_at: string }>;
+      assets?: WriterStatusAssets;
+    } = {
       projectId,
       started: !!row,
       pipeline_completed: row?.status === 'completed',
@@ -58,7 +234,13 @@ export async function GET(
         : null,
       available: {},
       timeline,
-    });
+    };
+
+    if (new URL(req.url).searchParams.get('assets') === '1') {
+      body.assets = await computeAssets(projectId, body.pipeline_completed);
+    }
+
+    return NextResponse.json(body);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 500 });
