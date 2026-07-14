@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
+import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { PRODUCER_SYSTEM } from './system-prompt'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
@@ -36,6 +37,8 @@ function normalizeHistory(history: unknown): ChatMessage[] {
 
 
 export async function POST(req: Request) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
   try {
     const user = await getUser()
     if (!user) {

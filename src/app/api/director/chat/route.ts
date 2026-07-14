@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
+import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
 import { normalizeProvider } from '@/lib/video-models'
@@ -407,6 +408,8 @@ function parseLegacyResponse(text: string): {
 }
 
 export async function POST(req: Request) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
   try {
     const user = await getUser()
     if (!user) {

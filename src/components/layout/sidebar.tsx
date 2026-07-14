@@ -26,6 +26,8 @@ import { ExportMenu } from '@/components/export-menu'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import type { StageId } from '@/types'
+import { OwnerOnly } from '@/components/demo/owner-only'
+import { ShareButton } from '@/components/demo/share-button'
 
 const STAGE_ICONS: Record<StageId, React.ElementType> = {
   producer: Users,
@@ -204,9 +206,12 @@ export function Sidebar() {
         })}
       </div>
 
-      <div className="mb-2 flex flex-col items-center gap-1">
-        <ExportMenu />
-      </div>
+      <OwnerOnly>
+        <div className="mb-2 flex flex-col items-center gap-1">
+          <ShareButton />
+          <ExportMenu />
+        </div>
+      </OwnerOnly>
       {/* 문의/도움("채널톡") — 프로필(UserMenu) 바로 위. 프로필과 동일한 40px 원형.
           빨간 원(bg-primary) + 흰 말풍선 아이콘, 아래 "Help" 캡션.
           클릭 시 우측으로 문의 팝업. (구 floating Samantha를 여기로 이동) */}
@@ -236,7 +241,9 @@ export function Sidebar() {
           Help
         </span>
       </div>
-      <UserMenu />
+      <OwnerOnly>
+        <UserMenu />
+      </OwnerOnly>
     </aside>
   )
 }

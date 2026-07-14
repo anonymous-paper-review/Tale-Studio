@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
+import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { fal } from '@fal-ai/client'
 import { cameraToText } from '@/lib/kling'
 import { findCameraMovement, findCameraBrand } from '@/lib/knowledge'
@@ -157,6 +158,8 @@ async function submitLocalI2V(prompt: string, imageUrl: string) {
 }
 
 export async function POST(req: Request) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
   try {
     const user = await getUser()
     if (!user) {

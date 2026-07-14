@@ -25,18 +25,20 @@
 ### 서버 방어
 - [c] `src/lib/demo/guard-server.ts` — `demoWriteBlock(req)` 403 헬퍼(테스트됨). ※ 각 라우트 적용 = 통합
 
-## ⛔ 대기 — 통합 배선 (다른 ultragoal 세션 커밋 후, 핫파일 위에 얹음)
+## 완료 — 통합 배선 (2026-07-14, ea03960 위)
 
-> 그 세션이 producer→artist 이중생성 방지로 생성 트리거·`project-store`·`artist-store`·`layout`·`sidebar`·`generation-jobs`를 재작성 중. 아래는 그 최종본 위에 얹어야 정합.
+- [c] `project-store.initProject` 데모 분기 — 스냅샷으로 부팅(쿠키 토큰 재fetch 포함). 브라우저 검증 대기
+- [c] 생성 no-op — **별도 분기 불필요**: fetch-guard(write no-op) + supabase shim(write no-op)이 자동 중립화(Q4: 기존 스냅샷 자산 유지)
+- [c] `studio/layout.tsx` — `<DemoBanner/>` + 모듈 로드 시 `installDemoFetchGuard()`
+- [c] `sidebar.tsx` — `ExportMenu`·`UserMenu` `<OwnerOnly>` 숨김 + `<ShareButton/>`(링크 생성·복사, OwnerOnly)
+- [c] `global-chat-store.send` 데모 분기 — `cannedFor(stage)` typing 후 고정 답변
+- [c] 서버 가드 `demoWriteBlock(req)` — 생성 5 + 채팅 4 라우트(=fal/Claude 태우는 경로) 적용
 
-- [ ] `project-store` 데모 hydrate 배선 (스냅샷→스토어; 전체 새로고침 시 쿠키 토큰으로 재fetch)
-- [ ] 생성 액션(artist/director/writer) 데모 no-op 분기 — 걔네 최종 트리거 위에
-- [ ] `studio/layout.tsx` — `<DemoBanner/>` + `installDemoFetchGuard()` 부팅 + 소유자 UI `<OwnerOnly>`
-- [ ] `sidebar.tsx` — 소유자 nav `<OwnerOnly>` + "공유" 버튼/팝오버 배치
-- [ ] `global-chat-store` 채팅 척 — 서버 호출 대신 `cannedFor(stage)`
-- [ ] 생성·쓰기 라우트에 `demoWriteBlock(req)` 적용 (generate-*·*/chat·assets/upload*·editor/*)
-- [ ] 편집 잠금(Q6a): 노드 드래그 persist off·필드 read-only·카드 편집 비활성
-- [ ] 한 프로젝트 락(다른 프로젝트 진입 차단)
+## 남은 폴리시 (선택 — 없어도 데모 동작·안전 성립)
+- [ ] `demoWriteBlock` 확대: `assets/upload*`·`editor/*` 쓰기(비용 낮음 — seam이 이미 클라 차단)
+- [ ] 편집 잠금(Q6a) 명시 UI: 영속은 seam이 막지만 필드 disabled/드래그 lock 미적용
+- [ ] 한 프로젝트 락: 다른 프로젝트 진입 차단 UI
+- [ ] 공유 링크 취소/목록 UI (DELETE·GET `/api/share` 존재, UI 미연결)
 
 ## Verification
 - [ ] e2e(Skip 모드): 실브라우저 `/share/<token>` → 로그인 없이 열림, 5스테이지 네비, 채팅 척, 재생성 no-op, 실 DB/외부 API 무호출을 네트워크 탭으로 확인

@@ -12,6 +12,12 @@ import { useArtistLockPoll } from '@/hooks/use-artist-lock-poll'
 import { readLastProjectId, writeLastProjectId } from '@/lib/session-restore'
 import { STAGES } from '@/lib/constants'
 import type { StageId } from '@/types'
+import { installDemoFetchGuard } from '@/lib/demo/fetch-guard'
+import { DemoBanner } from '@/components/demo/demo-banner'
+
+// 데모(공유) 세션이면 첫 클라 진입 시 window.fetch 를 가드로 교체(멱등, 내부에서 isDemoSession 판정).
+//   초기 effect fetch(verifyWriterGate 등)보다 먼저 걸리도록 모듈 로드 시점에 설치.
+installDemoFetchGuard()
 
 export default function StudioLayout({
   children,
@@ -86,6 +92,7 @@ export default function StudioLayout({
 
   return (
     <>
+      <DemoBanner />
       <Sidebar />
       <main
         className="ml-16 min-h-screen transition-[margin] duration-350 ease-out"

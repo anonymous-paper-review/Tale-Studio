@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
+import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { falImageGenerate } from '@/lib/writer/llm/fal'
 
 function getApiKey(): string {
@@ -130,6 +131,8 @@ async function generateViaFal(
 }
 
 export async function POST(req: Request) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
   let providerUsed: 'fal' | 'tailscale' | 'gemini' = 'fal'
   try {
     const user = await getUser()

@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
+import { demoWriteBlock } from '@/lib/demo/guard-server'
 import {
   countFailedJobsForTarget,
   AUTO_GENERATION_GIVE_UP_THRESHOLD,
@@ -21,6 +22,8 @@ export const maxDuration = 60
 const VALID_COLUMNS = new Set(['wide_shot'])
 
 export async function POST(req: Request) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
   try {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

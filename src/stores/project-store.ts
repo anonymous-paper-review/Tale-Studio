@@ -4,6 +4,12 @@ import { STAGES } from '@/lib/constants'
 import type { LifecycleStatus } from '@/lib/lifecycle'
 import { EMPTY_LIFECYCLE_STATUS } from '@/lib/lifecycle'
 import { createClient } from '@/lib/supabase/client'
+import {
+  isDemoSession,
+  getDemoSnapshot,
+  setDemoSnapshot,
+  readDemoToken,
+} from '@/lib/demo/context'
 
 /* eslint-disable @typescript-eslint/no-require-imports -- Lazy store imports avoid circular Zustand dependencies. */
 export type ArtistAssetProgress = { ready: number; total: number }
@@ -193,6 +199,46 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   initProject: async (restoreId?: string) => {
     if (get().projectId) return
+    // 데모(공유) 세션: 실 /api/project/init 대신 스냅샷으로 부팅(로그인·백엔드 없이).
+    if (typeof document !== 'undefined' && isDemoSession()) {
+      set({ initLoading: true })
+      let snap = getDemoSnapshot()
+      if (!snap) {
+        const token = readDemoToken()
+        if (token) {
+          try {
+            const res = await fetch(`/api/share/${token}`)
+            if (res.ok) {
+              snap = await res.json()
+              setDemoSnapshot(snap)
+            }
+          } catch {
+            /* 무시 — 아래에서 initLoading 해제 */
+          }
+        }
+      }
+      const p = snap?.project as
+        | { title?: string; current_stage?: StageId }
+        | null
+        | undefined
+      if (snap && p) {
+        set({
+          workspaceId: snap.workspaceId,
+          projectId: snap.projectId,
+          projectTitle: p.title ?? 'Untitled',
+          initLoading: false,
+          currentStage: p.current_stage ?? 'producer',
+          reachedStage: p.current_stage ?? 'producer',
+          lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
+          ...DEFAULT_ARTIST_ASSET_GATE,
+        })
+        const { useDirectorCanvasStore } = require('@/stores/director-store')
+        useDirectorCanvasStore.getState().setProjectId(snap.projectId)
+      } else {
+        set({ initLoading: false })
+      }
+      return
+    }
     set({ initLoading: true })
     try {
       // restoreId 힌트(URL ?projectId)가 있으면 그 프로젝트를 복원, 없으면 최신 fallback

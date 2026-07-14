@@ -18,6 +18,8 @@ import {
   serializeWriterScriptContext,
 } from '@/lib/script-lines'
 import { saveChatMessage } from '@/lib/chat-persistence'
+import { isDemoSession } from '@/lib/demo/context'
+import { cannedFor } from '@/lib/demo/canned'
 import {
   STAGE_LABEL,
   CHAT_HISTORY_WINDOW,
@@ -225,6 +227,31 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       role: m.role,
       content: m.content,
     }))
+
+    // 데모(공유) 세션: 서버 LLM 호출 없이 canned 응답으로 "척"(typing 후 고정 답변).
+    if (isDemoSession()) {
+      const uMsg: GlobalChatMessage = {
+        id: makeId(),
+        stage,
+        role: 'user',
+        content: trimmed,
+      }
+      set((s) => ({
+        messages: [...s.messages, uMsg],
+        loading: true,
+        error: null,
+      }))
+      setTimeout(() => {
+        set((s) => ({
+          loading: false,
+          messages: [
+            ...s.messages,
+            { id: makeId(), stage, role: 'model', content: cannedFor(stage) },
+          ],
+        }))
+      }, 700)
+      return
+    }
 
     let endpoint: string
     let body: Record<string, unknown>

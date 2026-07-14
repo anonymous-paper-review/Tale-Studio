@@ -5,6 +5,7 @@
 // 적용(DB 반영)은 클라(writer-store.applyChatUpdates)가 한다 — writer-store 가 shots/scenes 의 단일 진실.
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
+import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
 import { sanitizeLineRefs, validateWriterUpdates } from '@/lib/writer-chat-updates'
@@ -156,6 +157,8 @@ function parseAgenticResponse(text: string): { reply: string; updates: unknown[]
 }
 
 export async function POST(req: Request) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
   try {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

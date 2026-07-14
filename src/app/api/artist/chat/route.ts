@@ -7,6 +7,7 @@
 // artist-store.applyUpdates)가 수행하고, 이 라우트는 검증된 updates[] 만 반환한다.
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
+import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
 import { userOwnsProject } from '@/lib/generation-jobs'
@@ -141,6 +142,8 @@ function parseUpdates(text: string): {
 }
 
 export async function POST(req: Request) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
   try {
     const user = await getUser()
     if (!user) {
