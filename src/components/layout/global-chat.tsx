@@ -425,7 +425,9 @@ export function GlobalChat() {
             </div>
           )}
 
-        {/* Input footer — Textarea가 입력 길이에 따라 자동 확장 (한 줄 min-h-9 → 최대 max-h-40).
+        {/* Input footer — Textarea가 입력 길이에 따라 자동 확장 (한 줄 min-h-9 → 최대 10줄).
+            max-h = 10줄(leading-5 20px×10) + py-2(16px) + border(2px) = 218px. 그 이상은 내부
+            스크롤 — 네이티브 스크롤바는 숨기고 MentionTextarea의 ^/v 버튼으로 안내(#a3).
             Enter 전송 / Shift+Enter 개행. 버튼은 items-end로 입력창 하단에 정렬. */}
         <div className="shrink-0 border-t border-border p-4">
           <div className="flex items-end gap-2">
@@ -439,7 +441,7 @@ export function GlobalChat() {
                 history={userHistory}
                 disabled={inputDisabled}
                 placeholder={STAGE_PLACEHOLDER[currentStage]}
-                className="max-h-40 min-h-9 w-full resize-none py-2"
+                className="max-h-[13.625rem] min-h-9 w-full resize-none py-2 leading-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               />
             </HoverBeam>
             {currentStage === 'producer' && (
