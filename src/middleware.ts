@@ -37,8 +37,16 @@ export async function middleware(request: NextRequest) {
   //   fal.ai 가 익명으로 fetch 하는 character-template.png 가 /login 으로 리다이렉트되면 edit 모델이
   //   참조 이미지 대신 로그인 HTML 을 받아 캐릭터 턴어라운드가 정면샷으로 깨졌다 (2026-07-11 수정).
   const isPublicAsset = /\.(?:png|jpe?g|gif|svg|webp|avif|ico)$/i.test(pathname)
+  // 공유 데모(project-share-demo-mode): /share 링크는 공개, demo_share 쿠키 소지 시 /studio 도
+  //   로그인 없이 읽기전용 열람. 실제 백엔드 쓰기·생성은 서버 403 가드 + 클라 seam 이 차단.
+  const isSharePath = pathname.startsWith('/share')
+  const hasDemoShare = request.cookies.has('demo_share')
   const isPublicPath =
-    pathname === '/' || pathname.startsWith('/login') || isPublicAsset
+    pathname === '/' ||
+    pathname.startsWith('/login') ||
+    isPublicAsset ||
+    isSharePath ||
+    (hasDemoShare && pathname.startsWith('/studio'))
 
   // 리다이렉트 응답에도 getUser()가 방금 갱신한 세션 쿠키를 실어 보낸다.
   // (누락 시 토큰 갱신 타이밍에 걸린 유저가 로그인 ↔ 목적지 무한루프에 빠짐 — Supabase SSR 필수 패턴)
