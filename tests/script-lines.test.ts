@@ -173,8 +173,9 @@ describe('buildScriptLines', () => {
     const { manifest, shots } = fixture()
     const lines = buildScriptLines(manifest, shots)
 
-    expect(lines.find((line) => line.ref === 'sc_01.heading')?.text).toBe('sc_01 — 골목 · 긴장')
-    expect(lines.find((line) => line.ref === 'sc_02.heading')?.text).toBe('sc_02 — 옥상')
+    // sceneId(SC_01 등)는 뷰어 헤딩에서 제거(#c11 2026-07-14) — 장소·분위기만 표시.
+    expect(lines.find((line) => line.ref === 'sc_01.heading')?.text).toBe('골목 · 긴장')
+    expect(lines.find((line) => line.ref === 'sc_02.heading')?.text).toBe('옥상')
   })
 
   it('handles empty input, scenes without shots, and orphan shots at the end', () => {
@@ -186,7 +187,7 @@ describe('buildScriptLines', () => {
         lineNo: 1,
         kind: 'sceneHeading',
         ref: 'sc_01.heading',
-        text: 'sc_01 — 골목 · 긴장',
+        text: '골목 · 긴장',
         sceneId: 'sc_01',
       },
     ])

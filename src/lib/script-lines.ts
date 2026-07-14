@@ -27,10 +27,12 @@ const KIND_HINTS: Record<ScriptLineKind, string> = {
   dialogue: '대사',
 }
 
+// 씬 헤딩 표시 텍스트 — sceneId(SC_01 등) 노출 제거(#c11 2026-07-14). 뷰어 표시 전용이며
+//   채팅 컨텍스트(serializeWriterScriptContext)는 자체 포맷으로 sceneId를 계속 명시한다.
 function sceneHeadingText(scene: Scene): string {
   const location = scene.location || '?'
   const mood = scene.mood?.trim()
-  return `${scene.sceneId} — ${location}${mood ? ` · ${mood}` : ''}`
+  return `${location}${mood ? ` · ${mood}` : ''}`
 }
 
 function characterNameOf(manifest: SceneManifest | null, characterId: string): string {
@@ -105,6 +107,39 @@ export function buildScriptLines(
   }
 
   return lines
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export interface SlugEntry {
+  slug: string
+  name: string
+}
+
+/**
+ * 표시 전용 슬러그 치환(#c13) — 텍스트 안의 엔티티 id(dr_lee·location_2 등)를 이름으로 바꾼다.
+ * prefix '@'면 인라인 멘션 표기(@이름), ''면 구조 필드용 플레인 이름.
+ * 데이터·멘션 ref·채팅 컨텍스트는 원문(슬러그) 유지 — 구동은 변수명, 표시는 실제 이름.
+ * 로스터에 없는 슬러그는 해석 불가이므로 그대로 둔다. 대소문자 무시(CSS uppercase 표시 대비).
+ */
+export function replaceSlugs(
+  text: string,
+  entries: SlugEntry[],
+  prefix: '@' | '' = '@',
+): string {
+  let out = text
+  for (const e of entries) {
+    const slug = e.slug?.trim()
+    const name = e.name?.trim()
+    if (!slug || !name || name === slug) continue
+    out = out.replace(
+      new RegExp(`\\b${escapeRegExp(slug)}\\b`, 'gi'),
+      `${prefix}${name}`,
+    )
+  }
+  return out
 }
 
 export function scriptLineMentions(lines: ScriptLine[]): CardMention[] {
