@@ -110,7 +110,7 @@ export function RoughStoryboardView() {
       dismissible: false,
       action: null,
       content:
-        '스토리를 촬영할 수 있게 정리해뒀어요.\n\n' +
+        '스토리를 구체화할 수 있는 틀을 마련했어요.\n\n' +
         `· 씬 ${sceneCount}개, 샷 ${shots.length}개로 나눴어요\n` +
         '· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n' +
         '카드를 누르면 확인·수정·재생성할 수 있어요.\n' +
@@ -238,7 +238,8 @@ export function RoughStoryboardView() {
   const generatingCount = Object.values(panelJobs).filter(
     (j) => j.status === 'generating',
   ).length
-  const headerDescription = '러프 스토리보드 previz — 카드를 클릭하면 수정·재생성할 수 있어요'
+  // 제목 아래 설명문은 제거(#c2 2026-07-14) — 카드 사용법은 첫 진입 브리핑 채팅이 안내한다.
+  const headerDescription = undefined
   const storyboardActions = hasShots ? (
     <>
       {/* 축척 — 가로 열 수 조절 (Ctrl+wheel 로도 가능) */}
@@ -398,7 +399,7 @@ export function RoughStoryboardView() {
             ) : null}
           </p>
           <p className="text-xs text-muted-foreground">
-            샷 설계·검증 같은 복잡한 단계는 1~2분 걸릴 수 있어요 — 멈춘 게 아니라 진행 중입니다.
+            샷 설계·검증 같은 복잡한 단계는 1~2분 걸릴 수 있어요.
           </p>
         </div>
       </div>

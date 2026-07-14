@@ -18,8 +18,8 @@ export function WriterTabs() {
       className="w-fit shrink-0"
     >
       <TabsList>
-        <TabsTrigger value="storyboard">스토리보드</TabsTrigger>
-        <TabsTrigger value="script">스크립트</TabsTrigger>
+        <TabsTrigger value="storyboard">러프 스토리보드</TabsTrigger>
+        <TabsTrigger value="script">트리트먼트</TabsTrigger>
         <TabsTrigger value="dialogue" disabled>
           <span>대사</span>
           <Badge variant="outline" className="ml-1 px-1.5 py-0 text-[10px]">
