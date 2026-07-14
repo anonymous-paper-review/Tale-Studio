@@ -5,6 +5,8 @@ export interface ArtifactFile {
   kind: 'text' | 'media'
   content?: string | null
   url?: string
+  /** 클라이언트에서 생성한 바이너리(캔버스 캡처 등) — url 대신 그대로 zip에 담는다. */
+  blob?: Blob
 }
 
 export interface StageExport {

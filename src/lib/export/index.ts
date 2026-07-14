@@ -85,7 +85,16 @@ export function createDefaultExportDeps(): CompleteExportDeps {
     },
     writer: async (project) => {
       const { collectWriterArtifacts } = await import('./writer')
-      return collectWriterArtifacts(project.id)
+      const base = await collectWriterArtifacts(project.id)
+      // 러프 보드 산출물(#c7·#c12): treatment.md + 패널 png + 보드 컨택트 시트.
+      //   보조 수집이 실패해도 기본 md 묶음 내보내기는 계속한다.
+      try {
+        const { collectWriterBoardArtifacts } = await import('./writer-board')
+        return [...base, ...(await collectWriterBoardArtifacts(project.id))]
+      } catch (error) {
+        console.warn('[export] writer board artifacts failed:', error)
+        return base
+      }
     },
     artist: async (project) => {
       const { collectArtistArtifacts, loadArtistData } = await import('./artist')
