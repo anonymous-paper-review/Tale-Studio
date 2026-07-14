@@ -185,7 +185,7 @@ export const WRITER_STEPS: WriterStep[] = [
     has: (s) => s.visualIdentity !== undefined,
     run: async (s, { logger }) => {
       const models = resolveModels(s.input);
-      const visualIdentity = await runVisualIdentity(s.genre!, s.midPreview!, logger, models.V);
+      const visualIdentity = await runVisualIdentity(s.genre!, s.midPreview!, logger, models.V, s.input.styleAnchor);
       await logger.flushRawLlm('visualIdentity');
       return { visualIdentity };
     },

@@ -143,7 +143,11 @@ export async function POST(req: Request) {
       appearance: character.appearance ?? character.name,
       role: character.role ?? undefined,
       costumes: character.costume ?? undefined,
-      artStyle: dt.l1?.art_style,
+      // 앵커 존재 시 art_style 토큰 억제 (2026-07-14 실측, docs/style-anchor-art-style-authority.md §9-2):
+      //   art_style 값에 매체어가 실리면(예: dark_cinematic_realism) 앵커 이미지를 이겨 매체 전이가 깨진다
+      //   (d6208bba 거인 실사화 재현 2/2 → 토큰 제거로 카툰 복원 2/2). 앵커가 곧 art style authority 이므로
+      //   무조건 생략(값 검사 없이 단순·안전). 분위기는 palette·외모 텍스트가 유지. 앵커 없으면 기존 그대로(no-op).
+      artStyle: anchor ? undefined : dt.l1?.art_style,
       shapeLanguage: dt.l1?.shape_language,
       lineQuality: dt.l1?.line_quality,
       texturePhilosophy: dt.l1?.texture_philosophy,

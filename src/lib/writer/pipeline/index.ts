@@ -236,7 +236,7 @@ async function _runPipelineInner(
   const visualIdentity = (await loadOrRun<VisualIdentity>(
     resume,
     '08_v0_visualIdentity.json',
-    () => runVisualIdentity(genre, midPreview, logger, models.V),
+    () => runVisualIdentity(genre, midPreview, logger, models.V, input.styleAnchor),
     'visualIdentity',
     logger,
   )).value;

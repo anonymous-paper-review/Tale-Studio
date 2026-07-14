@@ -1,9 +1,9 @@
 # 스타일 앵커 vs 텍스트 재료어 권위 — 후속 수정 제안 (검증용)
 
-> 2026-07-14 · 상태: **제안(설계)** · 다음 세션 검증/구현 대기 · **미구현**
+> 2026-07-14 · 상태: **판정·수정 완료** (§9-1 Q3b: texture 토큰 무해 → 무변경 / §9-2 exp4: **art_style 매체어가 진짜 범인** → 앵커 존재 시 art_style 토큰 억제 적용).
 > 부모: `docs/style-anchor-injection.md` (§4 충돌 규칙 · §8 Q3 결과). 이 문서는 §8 Q3 실패의 후속 결정.
 >
-> **한 줄**: 스타일 앵커(그림체를 정하는 견본 이미지)와, 프롬프트에 들어가는 텍스트 재료어(`texture: photorealistic` 등)가 **"재료(그림체)를 누가 정하냐"를 놓고 담당이 겹친다.** 충돌 시 현재는 **텍스트가 이겨서** 앵커가 무시된다. 이 문서는 담당을 앵커 쪽으로 넘기는 최소 수정을 제안한다.
+> **한 줄**: 범인은 **슬롯이 아니라 값**이다. `texture: photorealistic`(bare 토큰)은 앵커를 못 이기지만(§9-1), `art style:` 슬롯에 매체어가 실리면(`dark_cinematic_realism`, §8 Q3 의 `photorealistic live-action`) 앵커를 이겨 매체 전이가 깨진다(§9-2 실 사고 실측). 수정: 앵커 존재 시 `artStyle` 토큰만 무조건 억제 — texture/line/shape/palette 는 유지.
 >
 > **범위**: 백엔드 프롬프트/토큰만. UI 피커·프로듀서 흐름은 비목표(부모 문서와 동일).
 
@@ -139,3 +139,46 @@ const input: CharacterPromptInput = {
 - **옵션 A만으로 충분한가**: 권위 문장만으로 앵커가 이기면 토큰 억제 불필요(가장 싸다).
 - **배경/샷 표면**: `location.styleDescription`/director 프롬프트에 매체어가 실제로 들어가 충돌하는가? (별도 확인)
 - **실사 앵커 + 실사 텍스트**: 동일 매체면 충돌 없음(억제 skip해도 무해). 억제를 "앵커 매체 ≠ 텍스트 매체"로 좁힐지, "앵커 있으면 무조건"으로 할지 — 후자가 단순·안전(권장).
+
+---
+
+## 9. 실측 결과 (2026-07-14)
+
+### 9-1. Q3b — 실 토큰 조합 A/B (오전, `scripts/_anchor-exp3.mjs` q3b 섹션)
+
+> 실행: `node scripts/_anchor-exp3.mjs` (기본 섹션 q3b, 클론 `c4e478e6`, `openai/gpt-image-2/edit`, watercolor 앵커, n=2/조건). 판정: vision 검수(8/8장).
+
+| # | 조건 | ①수채 채택 | ②정체성 | ③아티팩트 없음 | 판정 |
+|---|---|---|---|---|---|
+| C0 | 현행 그대로 (noir·clean·angular·**photorealistic**·palette + 앵커) | **Y** (수채 종이결+워시, 실사 아님) | Y | Y | ✅ 통과 |
+| C1 | + 옵션 A 권위 문장 | Y | Y | Y | ✅ (C0 대비 델타 미미) |
+| C2 | `texture` 제거 | Y (워시 약간 강함) | Y | Y | ✅ |
+| C3 | `texture`+`line_quality` 제거 | Y (워시 가장 강함) | Y | Y | ✅ |
+
+**결론: C0 통과 → §4 채택 규칙("가장 싼 통과")에 따라 코드 무변경.**
+
+- §8 Q3 실패의 원인은 **값의 강도/위치**였다: `art style: photorealistic live-action` 이라는 문장형 매체 선언은 앵커를 이기지만, 실 데이터의 bare 토큰 `texture: photorealistic` 은 못 이긴다. §1 의 "범인 후보" 추정(texture_philosophy)은 실측에서 **기각**.
+- C2/C3 은 워시 강도가 미세하게 올라가나(수채 순도↑), C0 이 이미 3항 루브릭을 통과하므로 억제의 비용(경로 분기·회귀면 확대)을 지불할 근거 없음.
+- ~~현행(C0) 특성은 AC1b 로 잠금~~ → **§9-2 로 갱신**: 같은 날 오후 실 사고(art_style 매체어)로 art_style 만 억제 채택, AC1b 도 억제 계약으로 교체.
+- ~~재개 조건~~ → 같은 날 §9-2 에서 발동·소진.
+- URL(판정 근거): C0 `…0aa22dc5/BYUdBpUvbpA0k0gc90dnK…`·`…hUp01ALoZyNvdFGj3KeiZ…` / C1 `…0aa22dd8/daoH6mg…`·`…ay8gOEbWM…` / C2 `…0aa22dec/QT62CHEXbb…`·`…0aa22df8/LfrkZ9QV3…` / C3 `…0aa22dff/YtS4Jztsrf…`·`…zbkvKM4Lw…`
+
+### 9-2. exp4 — 실 사고 재개 A/B (2026-07-14 오후, `scripts/_anchor-exp4-us-cartoon.mjs`)
+
+> §9-1 의 재개 조건 발동: 실 프로젝트 `d6208bba`(jh_test_1) — 유저가 us_cartoon 앵커를 골랐고 백엔드 주입도 정상(잡 스냅샷에 앵커 ref+절 확인)이나, `art style: dark_cinematic_realism` 토큰이 나간 캐릭터(초대형 거인)만 실사/3D 로 출력. 같은 프로젝트에서 토큰 없이 나간 캐릭터 3명(draft 경로)·배경은 카툰/2D 정상. **해당 잡의 프로덕션 프롬프트 원문 그대로** 조건 치환 A/B(n=2/조건, vision 검수 8/8).
+
+| # | 조건 | ①카툰 채택 | 판정 |
+|---|---|---|---|
+| C0r | 프로덕션 재현 (전 토큰) | N — 실사 2/2 (사고 재현) | ❌ |
+| C1r | + 옵션 A 권위 문장 | N — 실사 2/2 | ❌ (문장으론 못 막음) |
+| C2r | `art style: dark_cinematic_realism` 제거 | **Y — 굵은 외곽선 카툰 2/2** | ✅ **채택** |
+| C3r | art_style + texture 제거 | Y — 카툰 2/2 (약간 더 플랫) | ✅ (과잉) |
+
+**확정 규칙**: `texture:` 슬롯의 매체어는 무해(§9-1), **`art style:` 슬롯의 매체어는 앵커를 이긴다**(§8 Q3 + §9-2 정합). §1 역할표의 "art_style = 분위기, 충돌 ✗" 가정은 실 데이터(`dark_cinematic_realism` 등 매체어 혼입 값)에서 깨짐.
+
+**적용된 수정 (C2r 검증본, 최소)**: `generate-sheet` route — 앵커 존재 시 `artStyle: undefined` (값 검사 없이 무조건 — 매체어 denylist 는 취약, noir 류 분위기 손실은 palette·외모 텍스트가 보상). texture/line/shape/palette 유지. 옵션 A 문장은 실측 무효라 미적용. 테스트: `tests/style-anchor-routes.test.ts` AC1b 가 "art_style 억제 + 나머지 유지"를 잠금, no-op(앵커 없음) 불변.
+
+**근본 연결 (같은 날 후속)**: producer 앵커 선택을 writer 에 직결 — `/api/writer/start` 가 `projects.style_anchor_key` 를 resolve 해 `PipelineInput.styleAnchor{key,label,medium}` 로 seed, `v0_visual` 이 앵커 존재 시 매체 필드(art_style·medium·rendering_method·texture_philosophy)를 앵커에 고정(장르 발명 금지)하고 나머지(shape/line/proportion)만 장르에 맞게 채움. → 이후 프로젝트는 design_tokens 자체가 앵커와 정합해 v1~v5 텍스트(외모·배경·샷)까지 유저 선택을 따름. 소비 시점 art_style 억제는 "핸드오프 후 앵커 변경" 케이스의 안전망으로 유지(이중 방어). 테스트: `tests/writer-v0-style-anchor.test.ts` (앵커 유/무 프롬프트 계약).
+
+- 잔여 관찰(비차단): 소재 프라이어(가죽 없는 근육 거인)가 실사를 끄는 힘이 강해 C2r 도 카툰 순도는 캐릭터별 편차 있음. 유저 델타/외모 텍스트에 카툰 명시가 있으면(에렌 사례) 순도가 올라감 — writer 가 외모에 스타일 문구를 쓰는 현행 관행은 유지 가치 있음.
+- URL(판정 근거): C0r `…0aa22ed3/bh1Nasmj…`·`…OPayPTUR…` / C1r `…0aa22ef1/EHCEw…`·`…0aa22ee5/Qxrzepme…` / C2r `…0aa22f01/_dYnqoMV…`·`…va60Y_Xhm…` / C3r `…0aa22f11/Id2tFTJy…`·`…0aa22f1d/-A82PKi3…`

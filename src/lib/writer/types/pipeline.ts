@@ -173,6 +173,11 @@ export interface PipelineInput {
   cast?: CastContract;
   // V축 재설계(2026-06-13): 월드/세팅 seed (s2 = characters + 월드). createRun이 state.world로 seed.
   background?: BackgroundContract;
+  // 스타일 앵커 연결(2026-07-14): producer "스타일&톤"에서 유저가 직접 고른 전역 그림체 견본
+  //   (projects.style_anchor_key → style_anchors 행). 있으면 v0가 art_style/매체를 장르에서
+  //   발명하지 않고 앵커 매체로 고정 → writer 전 체인(v1~v5 텍스트)이 유저 선택과 정합.
+  //   소비 시점 art_style 억제(generate-sheet)는 "앵커를 나중에 바꾸는" 경우의 안전망으로 별도 유지.
+  styleAnchor?: { key: string; label?: string; medium?: string };
   /**
    * Stage skip 플래그. 피드백이 다운스트림에 실질 반영되지 않는 stage를
    * 건너뛰어 LLM 호출/시간을 절약한다. 미지정 시 default = skip(true).

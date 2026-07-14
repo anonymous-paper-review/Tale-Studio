@@ -182,10 +182,35 @@ export async function POST(req: NextRequest) {
       console.error('[writer/start] locale resolve failed (proceeding):', e);
     }
 
+    // 1.7 스타일 앵커 seed (2026-07-14): producer "스타일&톤"에서 고른 그림체 견본을 v0 에 연결 —
+    //   v0 가 장르에서 매체를 발명(예: dark_cinematic_realism)해 앵커와 충돌하는 것을 근본 차단.
+    //   best-effort: 미선택/비활성/조회 실패면 undefined → 기존 동작(장르 기반 추론) 그대로.
+    let styleAnchor: PipelineInput['styleAnchor'];
+    try {
+      const { data: proj } = await supabaseAdmin
+        .from('projects')
+        .select('style_anchor_key')
+        .eq('id', projectId)
+        .maybeSingle();
+      if (proj?.style_anchor_key) {
+        const { data: row } = await supabaseAdmin
+          .from('style_anchors')
+          .select('key, label, medium, is_active')
+          .eq('key', proj.style_anchor_key)
+          .maybeSingle();
+        if (row?.is_active) {
+          styleAnchor = { key: row.key, label: row.label ?? undefined, medium: row.medium ?? undefined };
+        }
+      }
+    } catch (e) {
+      console.error('[writer/start] style anchor resolve failed (proceeding):', e);
+    }
+
     // 2. run 시작 (genre/cast seed → s0/s2 생략).
     const input: PipelineInput = {
       story,
       runtimeSeconds,
+      styleAnchor,
       models,
       genre,
       cast,

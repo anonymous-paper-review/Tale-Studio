@@ -2,6 +2,16 @@
 
 B2B AI 영상 제작 도구. 텍스트 → 전문 촬영 기법(cinematography) 적용 고품질 AI 비디오 자동 생성. 차별화는 **Knowledge DB 기반 cinematography RAG**.
 
+## 현재 상태 (2026-07-14 — 스타일 앵커)
+
+프로젝트 전역 그림체는 **스타일 앵커**(견본 이미지, producer "스타일&톤" 그리드에서 선택)가 결정한다.
+
+- **배선 완료**: 앵커가 캐릭터 시트·배경·스토리보드 생성에 공유 스타일 레퍼런스로 주입됨. 앵커 미선택 시 기존 동작과 바이트 동일(no-op).
+- **충돌 규칙 (실측 확정)**: 프롬프트 텍스트 중 `art style:` 슬롯에 매체어가 실리면(예: `dark_cinematic_realism`) 앵커를 이겨 그림체가 깨진다 — 실사고: `d6208bba` 거인 실사화. `texture:`·`line quality:`·`palette:` 등 나머지 토큰은 무해.
+- **수정 적용 (이중 방어)**: ① 근본 — producer 앵커 선택을 writer 핸드오프에 seed(`PipelineInput.styleAnchor`), v0 가 매체를 장르에서 발명하지 않고 앵커에 고정 → design_tokens·외모 텍스트가 유저 선택과 정합. ② 안전망 — 앵커 존재 시 `generate-sheet`가 `art style:` 토큰 억제(핸드오프 후 앵커 변경 대비). A/B 재현·복원 각 2/2 검증, 전 스위트 442 그린.
+- **판정 근거·상세**: `docs/style-anchor-art-style-authority.md` §9 (실험 스크립트 `scripts/_anchor-exp3.mjs`·`_anchor-exp4-us-cartoon.mjs`, 증거 그리드 `logs/anchor-exp*.html`) · 부모 설계 `docs/style-anchor-injection.md`
+- **남은 일**: ① 배포 후 `d6208bba` 거인 재생성(기존 이미지는 자동 갱신 안 됨) ② producer 그리드의 예시 이미지 슬롯 채우기 — 앵커 원본(정물) 말고 **해당 앵커로 뽑은 캐릭터 샘플** 권장 ③ `ink`(그래픽노블) 앵커 미시드(6/7)
+
 ## 기술 스택
 
 - **Frontend**: Next.js 16 (App Router) + Tailwind v4 + shadcn/ui + Zustand

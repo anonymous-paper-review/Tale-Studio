@@ -215,6 +215,33 @@ describe('style-anchor route integration', () => {
     })
   })
 
+  // Q3b/exp4 판정 잠금 (2026-07-14, docs/style-anchor-art-style-authority.md §9):
+  //   - texture/line/shape/palette 토큰은 앵커와 공존해도 앵커가 매체를 이긴다(실측) → 그대로 나간다.
+  //   - art_style 토큰은 값에 매체어가 실리면(dark_cinematic_realism) 앵커를 이겨버린다(실측, d6208bba
+  //     거인 실사화) → 앵커 존재 시 무조건 억제. 이 특성을 고정한다 — 되돌리려면 실 A/B 재판정 선행.
+  it('AC1b generate-sheet with anchor suppresses the art_style token but keeps texture/line/palette (judged behavior)', async () => {
+    const character = characterFixture({ view_main: null, entity_type: 'person' })
+    dbState.characters = [character]
+
+    const response = await generateSheetPOST(
+      postRequest('/api/artist/generate-sheet', {
+        projectId: PROJECT_ID,
+        characterId: CHARACTER_ID,
+        view: 'main',
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    const prompt = firstFalOpts().prompt
+    expect(prompt).toContain(STYLE_ANCHOR_CLAUSE)
+    // art_style 토큰만 억제 — 매체어 값이 앵커를 override 하는 실측 사고 차단.
+    expect(prompt).not.toContain('art style:')
+    // 나머지 재료/색 토큰은 앵커와 함께 그대로 나간다 (실측 무해 = 판정된 현행).
+    expect(prompt).toContain('line quality: crisp confident contour lines')
+    expect(prompt).toContain('texture: matte paper grain')
+    expect(prompt).toContain('palette: deep cobalt, warm ochre, signal red')
+  })
+
   it('AC10 Q5 generate-sheet folds the anchor key into source_hash (false-stale guard)', async () => {
     const character = characterFixture({ view_main: null, entity_type: 'person' })
     dbState.characters = [character]
@@ -649,7 +676,9 @@ function sheetPromptInput(character: CharacterRow, dt: DesignTokens): CharacterP
     appearance: character.appearance ?? character.name,
     role: character.role ?? undefined,
     costumes: (character.costume ?? undefined) as string[] | undefined,
-    artStyle: dt.l1?.art_style,
+    // 앵커 존재 시 route 가 artStyle 토큰을 억제한다 (2026-07-14 exp4 실측 — authority doc §9-2).
+    //   이 파일의 sheet 테스트는 전부 활성 앵커 fixture 를 쓰므로 undefined 미러.
+    artStyle: undefined,
     shapeLanguage: dt.l1?.shape_language,
     lineQuality: dt.l1?.line_quality,
     texturePhilosophy: dt.l1?.texture_philosophy,
