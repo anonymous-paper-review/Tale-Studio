@@ -34,6 +34,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
+import { createWheelNotchStepper } from '@/lib/wheel-notch'
 import type { RoughStoryboardImage, Shot } from '@/types'
 
 type PanelJob = { status: 'generating' | 'failed'; error?: string }
@@ -308,24 +309,19 @@ export function RoughStoryboardView() {
 
   // Ctrl + wheel → 보드 축척(zoom). 브라우저 페이지 줌을 막아야 하므로 native wheel 리스너(passive:false)로
   //   붙인다(React onWheel 은 passive 라 preventDefault 가 안 먹을 수 있음). up=확대(열↓), down=축소(열↑).
-  //   (#c1 2026-07-15) 옛 px-누적 방식은 OS 스크롤 설정(줄 수·가속)에 따라 임계 미달로 반응이
-  //   늦었다 → 델타 크기 판정을 버리고 "휠 이벤트 방향당 1단계 + 짧은 쿨다운"으로. 마우스 휠
-  //   한 칸 = 이벤트 1개 = 1단계(세팅 무관), 트랙패드의 연속 미세 이벤트는 쿨다운이 폭주만 막는다.
+  //   (#a1 2026-07-15) 굴림 판정은 공용 스텝퍼(wheel-notch) — 스무스 스크롤 드라이버가 노치
+  //   1칸을 여러 이벤트로 쪼개도 burst = 1단계로 정규화(옛 이벤트당 쿨다운은 2단계+ 튐).
   //   board div 는 hasShots 일 때만 렌더되므로 deps 에 hasShots 를 넣어 마운트 후 재바인딩한다.
   useEffect(() => {
     const el = boardRef.current
     if (!el) return
-    let lastStepAt = 0
-    const COOLDOWN_MS = 140
+    const step = createWheelNotchStepper((dir) =>
+      setZoomLevel((z) => Math.max(1, Math.min(6, z + dir))),
+    )
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return
       e.preventDefault()
-      if (e.deltaY === 0) return
-      const now = performance.now()
-      if (now - lastStepAt < COOLDOWN_MS) return
-      lastStepAt = now
-      const dir = e.deltaY < 0 ? 1 : -1 // 위로(deltaY<0)=확대(열↓)
-      setZoomLevel((z) => Math.max(1, Math.min(6, z + dir)))
+      step(e)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)

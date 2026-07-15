@@ -45,4 +45,29 @@ describe('renderInlineMarkdown (C6 chat markdown)', () => {
   it('plain text passes through unchanged', () => {
     expect(renderInlineMarkdown('just plain text 123')).toBe('just plain text 123')
   })
+
+  describe('@멘션 하늘색(#a2 2026-07-15)', () => {
+    it('문두/공백 뒤 @토큰을 sky span으로 감싼다', () => {
+      expect(renderInlineMarkdown('@차미르 등장')).toContain(
+        '<span class="font-medium text-sky-300">@차미르</span>',
+      )
+      expect(renderInlineMarkdown('배경은 @장소 로 하자')).toContain('text-sky-300">@장소</span>')
+    })
+
+    it('구두점 앞에서 토큰이 끝난다', () => {
+      const out = renderInlineMarkdown('@스토리, 그리고')
+      expect(out).toContain('>@스토리</span>,')
+    })
+
+    it('이메일 주소는 물들이지 않는다', () => {
+      const out = renderInlineMarkdown('mail: user@example.com')
+      expect(out).not.toContain('text-sky-300')
+    })
+
+    it('escape된 HTML 안전성 유지 (멘션 뒤 태그 주입 불가)', () => {
+      const out = renderInlineMarkdown('@x <script>evil()</script>')
+      expect(out).toContain('&lt;script&gt;')
+      expect(out).not.toContain('<script>')
+    })
+  })
 })

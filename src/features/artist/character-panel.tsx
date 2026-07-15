@@ -22,6 +22,7 @@ import {
 } from '@/types/asset'
 
 import { cn } from '@/lib/utils'
+import { createWheelNotchStepper } from '@/lib/wheel-notch'
 
 // useSyncExternalStore 안정 스냅샷: selector 가 매 호출 새 [] 를 반환하면 무한루프(getServerSnapshot
 //   should be cached). 폴백은 모듈레벨 frozen 상수로 참조 고정한다.
@@ -58,20 +59,16 @@ export function CharacterPanel({
   } | null>(null)
 
   // Ctrl+휠 → 축척(#d1). passive:false 네이티브 리스너로 브라우저 페이지 줌을 막는다.
-  //   휠 이벤트 방향당 1단계 + 쿨다운 — OS 스크롤 설정과 무관(#c1과 동일 방식).
+  //   굴림 판정은 공용 스텝퍼(wheel-notch, #a1) — burst = 1단계, OS 스크롤 설정과 무관.
   const wheelRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = wheelRef.current
     if (!el || !onZoomStep) return
-    let lastStepAt = 0
+    const step = createWheelNotchStepper(onZoomStep)
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return
       e.preventDefault()
-      if (e.deltaY === 0) return
-      const now = performance.now()
-      if (now - lastStepAt < 140) return
-      lastStepAt = now
-      onZoomStep(e.deltaY < 0 ? 1 : -1) // 위로 = 확대(열↓)
+      step(e)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)

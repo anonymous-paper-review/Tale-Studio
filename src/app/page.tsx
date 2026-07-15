@@ -137,7 +137,8 @@ function ProjectCard({
         {editing ? (
           <Input
             ref={inputRef}
-            className="h-9 text-lg font-semibold"
+            // 랜딩 카드가 다크 배경이라 기본 글자색이 검정으로 떨어지면 안 보임(#a3) — 흰 글씨 강제.
+            className="h-9 text-lg font-semibold text-white caret-white placeholder:text-gray-500"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleSave}

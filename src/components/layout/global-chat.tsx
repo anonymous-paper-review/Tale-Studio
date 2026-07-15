@@ -239,6 +239,20 @@ export function GlobalChat() {
     wasLoadingRef.current = loading
   }, [loading, stageSupported, collapsed])
 
+  // 입력이 길어져 textarea가 높아지면(4줄+) 업로드/전송 버튼을 세로로 쌓는다(#b2 2026-07-15).
+  //   가로 배치는 긴 입력에서 두 버튼이 겹쳐 보이는 문제가 있었음. 높이는 ResizeObserver로 추적.
+  const [inputTall, setInputTall] = useState(false)
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      // 버튼 2개 세로(40×2+gap 8=88px)가 입력창 높이 안에 들어올 때만 전환.
+      setInputTall(el.offsetHeight >= 88)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   // 첫 진입(프로듀서 발화 전) 동안 placeholder "스토리에 대해 말해주세요…"를 초록으로 점멸(#b2).
   const producerUntouched =
     currentStage === 'producer' &&
@@ -506,33 +520,37 @@ export function GlobalChat() {
                 )}
               />
             </HoverBeam>
-            {currentStage === 'producer' && (
-              <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".txt"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-                <Button
-                  size="icon-lg"
-                  variant="ghost"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={loading}
-                  title="스크립트 파일 업로드 (.txt)"
-                >
-                  <Upload className="size-4" />
-                </Button>
-              </>
-            )}
-            <Button
-              size="icon-lg"
-              onClick={handleSend}
-              disabled={inputDisabled || !input.trim()}
-            >
-              <Send className="size-4" />
-            </Button>
+            {/* 버튼 그룹 — 입력창이 낮으면 가로(업로드|전송), 높아지면 세로(업로드 위/전송 아래).
+                긴 입력에서 버튼끼리 겹치던 문제의 우회(#b2 2026-07-15). */}
+            <div className={cn('flex shrink-0 gap-2', inputTall ? 'flex-col' : 'items-end')}>
+              {currentStage === 'producer' && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".txt"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <Button
+                    size="icon-lg"
+                    variant="ghost"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={loading}
+                    title="스크립트 파일 업로드 (.txt)"
+                  >
+                    <Upload className="size-4" />
+                  </Button>
+                </>
+              )}
+              <Button
+                size="icon-lg"
+                onClick={handleSend}
+                disabled={inputDisabled || !input.trim()}
+              >
+                <Send className="size-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </aside>

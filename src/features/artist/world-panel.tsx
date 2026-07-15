@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,9 +9,14 @@ import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { WorldViewDialog } from '@/features/artist/world-view-dialog'
 import { useArtistStore, type WorldShotKey } from '@/stores/artist-store'
 import { cn } from '@/lib/utils'
+import { createWheelNotchStepper } from '@/lib/wheel-notch'
 
 // columns: 보드 축척(#d1) — 1(기존 세로 스택)~3열 그리드. 페이지 헤더의 슬라이더가 결정.
-export function WorldPanel({ columns = 1 }: { columns?: number } = {}) {
+// onZoomStep: Ctrl+휠 축척(#a1 2026-07-15) — 캐릭터 탭과 동일한 굴림당 1단계.
+export function WorldPanel({
+  columns = 1,
+  onZoomStep,
+}: { columns?: number; onZoomStep?: (dir: 1 | -1) => void } = {}) {
   const {
     sceneManifest,
     worldAssets,
@@ -27,11 +32,26 @@ export function WorldPanel({ columns = 1 }: { columns?: number } = {}) {
     shot: WorldShotKey
   } | null>(null)
 
+  // Ctrl+휠 → 축척(#a1). passive:false 네이티브 리스너로 브라우저 페이지 줌을 막는다.
+  const wheelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = wheelRef.current
+    if (!el || !onZoomStep) return
+    const step = createWheelNotchStepper(onZoomStep)
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      step(e)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [onZoomStep])
+
   const getScene = (sceneId: string) =>
     sceneManifest?.scenes.find((s) => s.sceneId === sceneId)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div ref={wheelRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* 모델(provider)·톤(boost) 선택 툴바 제거(#10). 생성은 store 기본값으로 수행. */}
       <ScrollArea className="min-h-0 flex-1 px-6 py-4">
         <div

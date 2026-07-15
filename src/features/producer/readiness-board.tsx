@@ -25,6 +25,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Select,
   SelectContent,
@@ -714,6 +715,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const addBg = () => {
     addBackground()
   }
+  // Producer 호출 버튼 호버(#b1 2026-07-15) — 얼굴이 웃고 깜빡이는 인터랙션. CSS로는
+  //   AgentFace의 expression/animate prop을 못 바꾸므로 상태로 전달.
+  const [producerHover, setProducerHover] = useState(false)
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -730,18 +734,36 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {syncing ? <Badge variant="outline">저장 중</Badge> : null}
-          {/* Producer 호출 CTA(#b8) — 얼굴 + 이름 병기, 헤더 맨오른쪽 */}
-          <Button
-            variant="outline"
-            size="sm"
-            className={HOVER_RED_BORDER}
-            onClick={callProducerForStory}
-          >
-            <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
-              <AgentFace color={STAGE_FACE_COLOR.producer} size={15} animate={false} />
-            </span>
-            Producer와 스토리 만들기
-          </Button>
+          {/* Producer 호출 CTA(#b8) — 얼굴 + 이름 병기, 헤더 맨오른쪽.
+              호버 시 얼굴이 활짝 웃으며 깜빡이고(#b1) 살짝 커진다 + 툴팁 안내. */}
+          <Tooltip delayDuration={150}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={HOVER_RED_BORDER}
+                onClick={callProducerForStory}
+                onMouseEnter={() => setProducerHover(true)}
+                onMouseLeave={() => setProducerHover(false)}
+              >
+                <span
+                  className={cn(
+                    'flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted transition-transform duration-200',
+                    producerHover && 'scale-125',
+                  )}
+                >
+                  <AgentFace
+                    color={STAGE_FACE_COLOR.producer}
+                    size={15}
+                    expression={producerHover ? 'happy' : 'idle'}
+                    animate={producerHover}
+                  />
+                </span>
+                Producer와 스토리 만들기
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">도움이 필요하시면 저를 불러주세요</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

@@ -28,5 +28,12 @@ export function renderInlineMarkdown(input: string): string {
       .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
       // _italic_
       .replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>')
+      // @멘션(#a2 2026-07-15) — "@차미르", "@스토리" 같은 멘션 토큰을 하늘색으로.
+      //   시작 경계: 문자열 시작/공백/여는 괄호/세미콜론(escape된 따옴표 &#39; 뒤 포함)만
+      //   허용해 이메일(user@domain)은 물들이지 않는다. 토큰은 공백·구두점 전까지.
+      .replace(
+        /(^|[\s([{;“‘])@([A-Za-z0-9가-힣_][A-Za-z0-9가-힣_·-]*)/gm,
+        '$1<span class="font-medium text-sky-300">@$2</span>',
+      )
   )
 }

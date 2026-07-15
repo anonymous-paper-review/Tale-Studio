@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-type Expression = 'idle' | 'thinking' | 'talking'
+type Expression = 'idle' | 'thinking' | 'talking' | 'happy'
 
 interface AgentFaceProps {
   expression?: Expression
@@ -23,15 +23,25 @@ export function AgentFace({
   const [blinking, setBlinking] = useState(false)
   const [mouthFrame, setMouthFrame] = useState(0)
 
-  // Blink randomly
+  // Blink randomly — 첫 깜빡임은 짧게(호버로 animate가 켜진 직후에도 보이도록, #b1),
+  //   이후 1.8~4초 랜덤 간격. 꺼질 때 눈 감긴 채 멈추지 않게 cleanup에서 복원.
   useEffect(() => {
     if (!animate) return
-    const blink = () => {
-      setBlinking(true)
-      setTimeout(() => setBlinking(false), 150)
+    let closeTimer: ReturnType<typeof setTimeout> | undefined
+    let nextTimer: ReturnType<typeof setTimeout> | undefined
+    const schedule = (delay: number) => {
+      nextTimer = setTimeout(() => {
+        setBlinking(true)
+        closeTimer = setTimeout(() => setBlinking(false), 150)
+        schedule(1800 + Math.random() * 2200)
+      }, delay)
     }
-    const interval = setInterval(blink, 2500 + Math.random() * 2000)
-    return () => clearInterval(interval)
+    schedule(350 + Math.random() * 400)
+    return () => {
+      clearTimeout(nextTimer)
+      clearTimeout(closeTimer)
+      setBlinking(false)
+    }
   }, [animate])
 
   // Mouth animation when talking
@@ -41,7 +51,7 @@ export function AgentFace({
       setMouthFrame((f) => (f + 1) % 4)
     }, 120)
     return () => clearInterval(interval)
-  }, [expression])
+  }, [animate, expression])
 
   const eyeH = blinking ? 1 : 4.5
   const eyeY = blinking ? 20 : 18
@@ -50,6 +60,10 @@ export function AgentFace({
   const getMouth = () => {
     if (expression === 'thinking') {
       return <ellipse cx="24" cy="31" rx="2.5" ry="2" fill="#555" />
+    }
+    if (expression === 'happy') {
+      // 활짝 웃는 입(#b1) — idle의 잔잔한 미소보다 깊고 벌어진 스마일.
+      return <path d="M16.5 27.5 Q24 37.5 31.5 27.5 Q24 31.5 16.5 27.5" fill="#555" />
     }
     if (expression === 'talking') {
       const shapes = [
@@ -149,9 +163,9 @@ export function AgentFace({
             strokeLinecap="round"
           />
 
-          {/* Cheeks (blush) */}
-          <circle cx="10" cy="24" r="3" fill="currentColor" opacity="0.15" />
-          <circle cx="38" cy="24" r="3" fill="currentColor" opacity="0.15" />
+          {/* Cheeks (blush) — happy일 땐 홍조 진하게(#b1) */}
+          <circle cx="10" cy="24" r="3" fill="currentColor" opacity={expression === 'happy' ? 0.3 : 0.15} />
+          <circle cx="38" cy="24" r="3" fill="currentColor" opacity={expression === 'happy' ? 0.3 : 0.15} />
 
           {/* Mouth */}
           {getMouth()}

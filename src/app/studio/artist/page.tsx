@@ -490,7 +490,10 @@ export default function VisualPage() {
             value="world"
             className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
           >
-            <WorldPanel columns={4 - zoomByTab.world} />
+            <WorldPanel
+              columns={4 - zoomByTab.world}
+              onZoomStep={(dir) => stepZoom('world', dir)}
+            />
           </TabsContent>
 
           <TabsContent
