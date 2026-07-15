@@ -9,6 +9,7 @@ import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
 import { sanitizeLineRefs, validateWriterUpdates } from '@/lib/writer-chat-updates'
+import { stripLeakedUpdatesBlock } from '@/lib/agentic-reply-guard'
 
 const WRITER_CHAT_SYSTEM = `You are the Writers' Room assistant in an AI video production pipeline called "The Set."
 The user is reviewing the rough storyboard (pre-concept previz) of a story already broken into Scenes and Shots.
@@ -145,14 +146,15 @@ function normalizeHistory(history: unknown): ChatMessage[] {
 
 function parseAgenticResponse(text: string): { reply: string; updates: unknown[] } {
   const jsonMatch = text.match(/```json\s*\n?([\s\S]*?)\n?```\s*$/)
-  if (!jsonMatch) return { reply: text, updates: [] }
+  // 펜스 미완결(max_tokens 잘림)·파싱 실패 시 raw JSON 을 채팅에 노출하지 않는다(유출 방어, 임시 조치).
+  if (!jsonMatch) return { reply: stripLeakedUpdatesBlock(text), updates: [] }
   const reply = text.slice(0, jsonMatch.index).trim()
   try {
     const parsed = JSON.parse(jsonMatch[1])
     const raw = Array.isArray(parsed.updates) ? parsed.updates : []
     return { reply, updates: validateWriterUpdates(raw) }
   } catch {
-    return { reply: text, updates: [] }
+    return { reply: stripLeakedUpdatesBlock(text), updates: [] }
   }
 }
 
