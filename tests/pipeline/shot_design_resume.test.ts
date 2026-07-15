@@ -10,7 +10,7 @@ vi.mock('@/lib/writer/llm/dispatch', () => ({
   describeAxisConfig: () => 'stub-model',
 }))
 
-import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots'
+import { parseL4Shots, runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots'
 import type { PipelineLogger } from '@/lib/writer/logger'
 
 // 로거는 no-op 스텁 (인터페이스에서 쓰는 메서드만)
@@ -166,5 +166,65 @@ describe('runShotDesign — 샷 청크 분할(#B)', () => {
     const res = await run(inputs)
     expect(generateJsonMock).toHaveBeenCalledTimes(1)
     expect(res.shots).toHaveLength(8)
+  })
+})
+
+describe('parseL4Shots — 응답 shape 방어(#shape-resilience)', () => {
+  it('케이스 ⑤: 샷 id 키 맵(배열 래핑, 2026-07-15 실측 shape)을 순서대로 평탄화한다', () => {
+    const raw = [{ shot_1: makeShot('a'), shot_2: makeShot('b'), shot_3: makeShot('c') }]
+    const shots = parseL4Shots(raw, 'sc_1')
+    expect(shots.map((s) => s.intent.shot_id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('케이스 ⑤: 단일 객체 id 맵도 파싱한다', () => {
+    const raw = { shot_1: makeShot('a'), shot_2: makeShot('b') }
+    expect(parseL4Shots(raw, 'sc_1')).toHaveLength(2)
+  })
+
+  it('기존 케이스(①~③) 회귀 없음', () => {
+    expect(parseL4Shots({ shots: [makeShot('a')] }, 'sc_1')).toHaveLength(1)
+    expect(parseL4Shots([{ shots: [makeShot('a')] }], 'sc_1')).toHaveLength(1)
+    expect(parseL4Shots([makeShot('a'), makeShot('b')], 'sc_1')).toHaveLength(2)
+  })
+
+  it('해석 불가 shape은 throw', () => {
+    expect(() => parseL4Shots([{ nonsense: 1 }], 'sc_1')).toThrow(/unexpected/)
+    expect(() => parseL4Shots('garbage', 'sc_1')).toThrow(/unexpected/)
+  })
+})
+
+describe('generateL4ForScene 재시도(#shape-resilience)', () => {
+  it('첫 응답이 비정형이면 1회 재시도 후 성공한다', async () => {
+    let call = 0
+    generateJsonMock.mockImplementation(async (userPrompt: string) => {
+      call++
+      if (call === 1) return { totally: 'wrong' } // 1차: 해석 불가
+      const m = /샷 수 = (\d+)개/.exec(userPrompt)
+      const n = m ? Number(m[1]) : 1
+      return { shots: Array.from({ length: n }, (_, i) => makeShot(`stub_${i}`)) }
+    })
+    const inputs = makeInputs(1, 4)
+    const res = await run(inputs)
+    expect(res.done).toBe(true)
+    expect(res.shots).toHaveLength(4)
+    expect(generateJsonMock).toHaveBeenCalledTimes(2) // 실패 1 + 재시도 성공 1
+  })
+
+  it('2회 연속 비정형이면 그 씬에서 throw(스테이지 실패로 표면화)', async () => {
+    generateJsonMock.mockImplementation(async () => ({ totally: 'wrong' }))
+    const inputs = makeInputs(1, 4)
+    await expect(run(inputs)).rejects.toThrow(/unexpected/)
+    expect(generateJsonMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('데쿠파주 샷 수 불일치는 재시도로 교정을 시도하고, 최종 시도는 경고 후 수용한다', async () => {
+    generateJsonMock.mockImplementation(async () => ({
+      shots: [makeShot('only_one')], // 항상 1개만 반환 (기대 4개)
+    }))
+    const inputs = makeInputs(1, 4)
+    const res = await run(inputs)
+    expect(res.done).toBe(true)
+    expect(generateJsonMock).toHaveBeenCalledTimes(2) // 불일치 재시도 1회
+    expect(res.shots).toHaveLength(1) // 최종 시도 수용 (기존 동작 보존)
   })
 })
