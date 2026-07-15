@@ -265,43 +265,7 @@ export async function POST(req: Request) {
       ? (shots ?? []).filter((s) => shotIds.includes(s.shot_id as string))
       : (shots ?? [])
 
-    // 언어 경계(S3b): 주 컬럼이 native(수동/편집 샷)일 수 있어, 프롬프트 주입 전 action·mood 를 EN 으로 정규화.
-    //   deriveEnBatch 가 이미 영어인 값은 LLM 호출 없이 통과(파이프라인 EN 산출은 무비용, native 만 번역).
-    //   장소 라벨·시간대·인물 이름도 정규화(2026-07-03) — s3 오픈 로케이션 계약으로 로케이션 id 가
-    //   스토리 언어가 되면서 Setting 줄에 비영어가 그대로 실리게 됨(klein 은 영어 편향 텍스트 인코더).
-    const [actionEnByShot, moodEnByScene, translatedSpecs, timeEnByScene, locEnByScene, nameEnById] =
-      await Promise.all([
-        deriveEnBatch(
-          wanted.map((s) => ({ id: s.shot_id as string, native: (s.action_description as string) ?? '' })),
-          'shot action description',
-        ),
-        deriveEnBatch(
-          (scenes ?? []).map((sc) => ({ id: sc.scene_id as string, native: (sc.mood as string) ?? '' })),
-          'scene mood',
-        ),
-        // rich 경로 shotDesign 자유서술(blocking·layers·focal·motion) → EN (S3c)
-        translateRoughSpecsEn(specByShotId, wanted.map((s) => s.shot_id as string)),
-        deriveEnBatch(
-          (scenes ?? []).map((sc) => ({ id: sc.scene_id as string, native: (sc.time_of_day as string) ?? '' })),
-          'scene time of day',
-        ),
-        deriveEnBatch(
-          (scenes ?? []).map((sc) => ({ id: sc.scene_id as string, native: (sc.location as string) ?? '' })),
-          'location place label',
-        ),
-        deriveEnBatch(
-          (chars ?? []).map((c) => ({ id: c.character_id as string, native: (c.name as string) ?? '' })),
-          'character name (transliterate to Latin)',
-        ),
-      ])
-    // 프롬프트용 EN 이름 맵 — DB 조회 키(scene.location / characters id)는 원문 유지, 라벨만 EN.
-    const nameEnMap = new Map(
-      (chars ?? []).map((c) => [
-        c.character_id as string,
-        nameEnById.get(c.character_id as string) ?? (c.name as string),
-      ]),
-    )
-
+    // 게이트 선별(번역·제출 전 무비용 판정) — 대상 확정을 먼저 해서 아래 무거운 작업을 캡에 맞춘다.
     const submitted: Array<{
       shotId: string
       jobId: string
@@ -312,7 +276,7 @@ export async function POST(req: Request) {
       shotId: string
       reason: 'exists' | 'in_flight' | 'gave_up' | 'no_info'
     }> = []
-
+    const eligible: NonNullable<typeof shots> = []
     for (const s of wanted) {
       const shotId = s.shot_id as string
       // #5 정보 가드(서버 = 최종 방어선): 액션(스토리)이 비면 만들 근거가 없다 — 누가 호출하든
@@ -336,7 +300,61 @@ export async function POST(req: Request) {
         skipped.push({ shotId, reason: 'gave_up' })
         continue
       }
+      eligible.push(s)
+    }
 
+    // 호출당 제출 캡(#c1·#c3 2026-07-15) — 76샷급 프로젝트에서 캡 없이 돌면 ①번역 배치가
+    //   maxDuration(60s)을 넘겨 504로 죽고 ②유저 쿼터(8)를 한 번에 다 먹어 artist 등 다른
+    //   생성이 굶는다. 6 = 쿼터 8 - artist 자동(1) - 수동 여유(1). 잔여는 remaining 으로
+    //   알려 클라이언트 펌프가 라운드를 이어간다.
+    const MAX_SUBMIT_PER_CALL = 6
+    const targets = eligible.slice(0, MAX_SUBMIT_PER_CALL)
+    const remaining = eligible.length - targets.length
+
+    // 언어 경계(S3b): 주 컬럼이 native(수동/편집 샷)일 수 있어, 프롬프트 주입 전 action·mood 를 EN 으로 정규화.
+    //   deriveEnBatch 가 이미 영어인 값은 LLM 호출 없이 통과(파이프라인 EN 산출은 무비용, native 만 번역).
+    //   장소 라벨·시간대·인물 이름도 정규화(2026-07-03) — s3 오픈 로케이션 계약으로 로케이션 id 가
+    //   스토리 언어가 되면서 Setting 줄에 비영어가 그대로 실리게 됨(klein 은 영어 편향 텍스트 인코더).
+    //   범위는 이번 호출의 targets(캡 이후)가 속한 씬/등장 인물로 한정 — 캡의 시간 예산을 지키는 본체.
+    const targetSceneIds = new Set(targets.map((s) => s.scene_id as string))
+    const targetScenes = (scenes ?? []).filter((sc) => targetSceneIds.has(sc.scene_id as string))
+    const targetCharIds = new Set(targets.flatMap((s) => ((s.characters as string[]) ?? [])))
+    const targetChars = (chars ?? []).filter((c) => targetCharIds.has(c.character_id as string))
+    const [actionEnByShot, moodEnByScene, translatedSpecs, timeEnByScene, locEnByScene, nameEnById] =
+      await Promise.all([
+        deriveEnBatch(
+          targets.map((s) => ({ id: s.shot_id as string, native: (s.action_description as string) ?? '' })),
+          'shot action description',
+        ),
+        deriveEnBatch(
+          targetScenes.map((sc) => ({ id: sc.scene_id as string, native: (sc.mood as string) ?? '' })),
+          'scene mood',
+        ),
+        // rich 경로 shotDesign 자유서술(blocking·layers·focal·motion) → EN (S3c)
+        translateRoughSpecsEn(specByShotId, targets.map((s) => s.shot_id as string)),
+        deriveEnBatch(
+          targetScenes.map((sc) => ({ id: sc.scene_id as string, native: (sc.time_of_day as string) ?? '' })),
+          'scene time of day',
+        ),
+        deriveEnBatch(
+          targetScenes.map((sc) => ({ id: sc.scene_id as string, native: (sc.location as string) ?? '' })),
+          'location place label',
+        ),
+        deriveEnBatch(
+          targetChars.map((c) => ({ id: c.character_id as string, native: (c.name as string) ?? '' })),
+          'character name (transliterate to Latin)',
+        ),
+      ])
+    // 프롬프트용 EN 이름 맵 — DB 조회 키(scene.location / characters id)는 원문 유지, 라벨만 EN.
+    const nameEnMap = new Map(
+      targetChars.map((c) => [
+        c.character_id as string,
+        nameEnById.get(c.character_id as string) ?? (c.name as string),
+      ]),
+    )
+
+    for (const s of targets) {
+      const shotId = s.shot_id as string
       const scene = sceneById.get(s.scene_id as string)
       const camera = (s.camera_config ?? {}) as { pan?: number }
       const lighting = (s.lighting_config ?? {}) as { position?: string }
@@ -417,7 +435,7 @@ export async function POST(req: Request) {
       })
     }
 
-    return NextResponse.json({ ok: true, data: { submitted, skipped } })
+    return NextResponse.json({ ok: true, data: { submitted, skipped, remaining } })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[writer/rough-storyboard]', msg)

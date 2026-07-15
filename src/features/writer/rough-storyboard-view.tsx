@@ -129,8 +129,13 @@ export function RoughStoryboardView() {
   }, [status?.pipeline_completed, loadProject])
 
   const generate = useCallback(
-    async (shotIds?: string[], force?: boolean, auto?: boolean, styleHints?: string[]) => {
-      if (!projectId) return
+    async (
+      shotIds?: string[],
+      force?: boolean,
+      auto?: boolean,
+      styleHints?: string[],
+    ): Promise<{ submitted: number; remaining: number; quota: boolean; done: Promise<unknown> } | null> => {
+      if (!projectId) return null
       if (shotIds?.length) {
         // 클릭 즉시 피드백 — 서버가 in_flight skip 으로 응답하면 아래에서 정리됨
         setPanelJobs((prev) => ({
@@ -144,6 +149,17 @@ export function RoughStoryboardView() {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ projectId, shotIds, force, styleHints }),
         })
+        // 쿼터 초과(429)는 실패가 아니라 "큐가 빌 때까지 대기" 신호 — 펌프가 재시도한다(#c1).
+        if (res.status === 429) {
+          if (shotIds?.length) {
+            setPanelJobs((prev) => {
+              const next = { ...prev }
+              for (const id of shotIds) delete next[id]
+              return next
+            })
+          }
+          return { submitted: 0, remaining: 0, quota: true, done: Promise.resolve() }
+        }
         const j = await res.json().catch(() => null)
         if (!res.ok || !j?.ok) {
           throw new Error(j?.error?.message ?? `HTTP ${res.status}`)
@@ -183,8 +199,8 @@ export function RoughStoryboardView() {
             return next
           })
         }
-        for (const { shotId, jobId } of submitted) {
-          void pollGenerationJob(jobId)
+        const polls = submitted.map(({ shotId, jobId }) =>
+          pollGenerationJob(jobId)
             .then((url) => {
               setOverrides((prev) => ({
                 ...prev,
@@ -209,7 +225,14 @@ export function RoughStoryboardView() {
                   error: e instanceof Error ? e.message : String(e),
                 },
               }))
-            })
+            }),
+        )
+        return {
+          submitted: submitted.length,
+          remaining: (j.data?.remaining as number | undefined) ?? 0,
+          quota: false,
+          // 이번 라운드 잡들의 종결(성공/실패 모두 위에서 상태 반영) — 펌프의 라운드 배리어.
+          done: Promise.allSettled(polls),
         }
       } catch (e) {
         if (shotIds?.length) {
@@ -220,9 +243,55 @@ export function RoughStoryboardView() {
           })
         }
         toast.error(e instanceof Error ? e.message : '러프 스토리보드 생성 요청 실패')
+        return null
       }
     },
     [projectId],
+  )
+
+  // 누락 패널 전체 생성 펌프(#c1·#c2·#c3 2026-07-15) — 서버가 호출당 6샷으로 캡하므로(504·쿼터
+  //   독점 방지) remaining 이 0이 될 때까지 라운드를 이어간다. 라운드 배리어(이전 잡 완료 대기)로
+  //   쿼터를 넘지 않고, 429(다른 생성이 큐 점유)는 8초 대기 후 재시도. 실패 샷은 다음 라운드가
+  //   자연 재제출하고 반복 실패는 서버 give-up 게이트가 멈춘다 → 수렴 보장.
+  const pumpRunningRef = useRef(false)
+  const pumpAbortRef = useRef(false)
+  useEffect(() => {
+    pumpAbortRef.current = false
+    return () => {
+      pumpAbortRef.current = true
+    }
+  }, [])
+  const generateAllMissing = useCallback(
+    async (auto: boolean) => {
+      if (pumpRunningRef.current) return
+      pumpRunningRef.current = true
+      let quotaToasted = false
+      try {
+        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+        const MAX_ROUNDS = 40 // 76샷=13라운드 + 429 대기 여유. 폭주 방지 상한.
+        for (let round = 0; round < MAX_ROUNDS; round++) {
+          if (pumpAbortRef.current) return
+          // give-up 안내 토스트는 수동 1라운드에서만 (라운드마다 반복 방지)
+          const r = await generate(undefined, false, auto || round > 0)
+          if (!r) return // 요청 실패 — generate 가 이미 토스트
+          if (r.quota) {
+            if (!auto && !quotaToasted) {
+              quotaToasted = true
+              toast.info('다른 생성 작업이 대기열을 쓰고 있어요. 자리가 나는 대로 이어서 생성할게요.')
+            }
+            await sleep(8000)
+            continue
+          }
+          if (r.submitted === 0) return // 전부 완료/제외 — 수렴
+          await r.done
+          // remaining<=0 이어도 바로 끝내지 않는다 — 다음 라운드가 이번 라운드 실패분을
+          //   재제출할 기회(그 라운드 submitted 0 이면 그때 종료). give-up 게이트가 무한 재시도를 막는다.
+        }
+      } finally {
+        pumpRunningRef.current = false
+      }
+    },
+    [generate],
   )
 
   const running = !!(
@@ -281,7 +350,12 @@ export function RoughStoryboardView() {
         </span>
       )}
       {missingIds.length > 0 && generatingCount === 0 && (
-        <Button size="sm" variant="secondary" className="hover-red-beam" onClick={() => void generate()}>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="hover-red-beam"
+          onClick={() => void generateAllMissing(false)}
+        >
           <RefreshCw className="size-3.5" />
           누락 패널 {missingIds.length}개 생성
         </Button>
@@ -298,14 +372,15 @@ export function RoughStoryboardView() {
     </>
   ) : null
 
-  // 진입 자동 생성: 샷이 로드됐고 파이프라인이 돌고 있지 않을 때, 누락 패널만 1회.
+  // 진입 자동 생성: 샷이 로드됐고 파이프라인이 돌고 있지 않을 때, 누락 패널 전체를 1회씩 —
+  //   펌프가 6샷 라운드로 나눠 remaining 0 까지 이어간다(#c1). auto=true → give-up 토스트 억제.
   useEffect(() => {
     if (autoTriggeredRef.current) return
     if (!hasShots || running) return
     if (missingIds.length === 0) return
     autoTriggeredRef.current = true
-    void generate(undefined, false, true) // auto=true → give-up 안내 토스트 억제
-  }, [hasShots, running, missingIds.length, generate])
+    void generateAllMissing(true)
+  }, [hasShots, running, missingIds.length, generateAllMissing])
 
   // Ctrl + wheel → 보드 축척(zoom). 브라우저 페이지 줌을 막아야 하므로 native wheel 리스너(passive:false)로
   //   붙인다(React onWheel 은 passive 라 preventDefault 가 안 먹을 수 있음). up=확대(열↓), down=축소(열↑).

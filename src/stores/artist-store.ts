@@ -58,7 +58,9 @@ export type GenerationActor = 'ui' | 'chat' | 'auto'
 
 // fal 계정 concurrent limit을 여러 유저가 공유하므로, dispatcher 전 단계에서는 화면별 submit 풀을
 // 보수적으로 유지한다. 계정 전역 공정성은 generation_jobs dispatcher 도입 시 중앙화한다.
-const ARTIST_GENERATION_CONCURRENCY = 2
+// 1로 하향(#c1 2026-07-15): artist 턴어라운드(장당 1~2분)가 동시 2개면 유저 쿼터(8)·fal 슬롯을
+//   길게 점유해 러프 스토리보드 첫 일괄 생성이 굶는다 — artist 는 하나씩, 나머지는 러프보드 몫.
+const ARTIST_GENERATION_CONCURRENCY = 1
 
 export { WORLD_SHOT_LABELS }
 export type { WorldShotKey }
