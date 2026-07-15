@@ -835,6 +835,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         sortOrder: s.sort_order ?? i, // 정렬은 .order('sort_order') → i 는 값 없을 때 안전 폴백
         shotType: s.shot_type as Shot['shotType'],
         actionDescription: s.action_description_native ?? s.action_description ?? '',
+        prompt: (s.prompt as string | null) ?? undefined,
         characters: s.characters ?? [],
         durationSeconds: s.duration_seconds ?? 5,
         generationMethod: (s.generation_method ?? 'T2V') as Shot['generationMethod'],

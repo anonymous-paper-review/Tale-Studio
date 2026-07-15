@@ -59,6 +59,8 @@ export interface Shot {
   sceneId: string
   shotType: ShotType
   actionDescription: string
+  /** 이미지/영상 생성용 rich 프롬프트(구도·의상·인물 명시). 없으면 actionDescription 폴백. */
+  prompt?: string
   characters: string[]
   durationSeconds: number
   generationMethod: GenerationMethod

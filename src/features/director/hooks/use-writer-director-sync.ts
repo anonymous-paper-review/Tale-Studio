@@ -181,7 +181,8 @@ export function useWriterDirectorSync() {
 
       const patch: Record<string, unknown> = {
         writerShotId: shot.shotId,
-        prompt: shot.actionDescription ?? '',
+        // rich 생성 프롬프트 우선(구도·의상·인물 명시) → 없으면 actionDescription 폴백.
+        prompt: shot.prompt || shot.actionDescription || '',
         characterAssetIds,
         worldAssetIds,
         camera:

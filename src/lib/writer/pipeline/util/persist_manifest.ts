@@ -352,11 +352,23 @@ export async function persistShotsToDb(
       const chars = (it.assets?.characters ?? [])
         .map((c) => c.id)
         .filter((id): id is string => typeof id === 'string')
+      // rich 생성 프롬프트(구도/의상/인물 명시) — 스토리보드·영상 생성이 쓰는 shots.prompt 로 저장.
+      //   추상 연출의도(character_action)가 아니라 이 값이 이미지/영상 모델에 들어가야 정체성/의상이 고정된다.
+      const rich = it as {
+        first_frame_generation?: { composition_prompt?: string }
+        static_spec?: { first_frame_prompt?: string }
+      }
+      const composition = (
+        rich.first_frame_generation?.composition_prompt ??
+        rich.static_spec?.first_frame_prompt ??
+        ''
+      ).trim()
       return {
         sceneMainId: writerSceneIdToMain(sceneId),
         shotMainId: writerShotIdToMain(it.shot_id, sceneId),
         shotType: normShotType(it.V?.camera?.type),
         actionNative: it.S?.character_action ?? '',
+        composition,
         chars: Array.from(new Set(chars)),
         dialogue: it.S?.dialogue,
         duration: clampShotSeconds(it.duration_seconds), // #9 페이싱 상한
@@ -392,6 +404,8 @@ export async function persistShotsToDb(
           ...(actTx ? { action_description_native: i18nHash(actionEn.get(r.shotMainId) ?? r.actionNative) } : {}),
         },
         characters: r.chars,
+        // 생성 프롬프트: rich composition(있으면) → 없으면 action_description 폴백.
+        prompt: r.composition || (actionEn.get(r.shotMainId) ?? r.actionNative),
         duration_seconds: r.duration,
         generation_method: 'I2V',
         dialogue_lines: r.dialogue
