@@ -47,6 +47,19 @@ export async function middleware(request: NextRequest) {
     isPublicAsset ||
     isSharePath ||
     (hasDemoShare && pathname.startsWith('/studio'))
+  // 서버측 쿠키 세팅(project-share-demo-mode 강건화, 2026-07-15): 기존엔 /share 페이지가
+  //   document.cookie 로만 demo_share 를 심었는데, JS 쿠키 쓰기가 막힌 브라우저(시크릿 "모든
+  //   쿠키 차단"·일부 인앱 브라우저)에선 쿠키가 안 박혀 /studio 진입이 /login 으로 튕겼다.
+  //   미들웨어가 Set-Cookie 로 직접 심으면 HTTP 쿠키만 허용돼도 데모 진입이 성립한다.
+  //   토큰 형태(64-hex)만 세팅 — 아무 /share/* 경로로 쿠키가 오염되지 않게. 유효성은
+  //   /api/share/<token> 이 게이트하므로 여기선 DB 왕복 없이 형태만 본다.
+  const shareToken = isSharePath ? pathname.split('/')[2] : undefined
+  if (shareToken && /^[0-9a-f]{64}$/i.test(shareToken)) {
+    supabaseResponse.cookies.set('demo_share', shareToken, {
+      path: '/',
+      sameSite: 'lax',
+    })
+  }
 
   // 데모 탈출(project-share-demo-mode): demo_share 쿠키는 path=/ 무만료라 share 링크를 한 번 열면
   //   홈/로그인/실 스튜디오까지 사이트 전체가 데모모드(createClient→shim)로 오염된다. 데모는 /share·/studio
