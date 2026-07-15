@@ -348,15 +348,18 @@ export function GlobalChat() {
           <div className="space-y-2">
 
             {messages.map((msg) => {
-              // 유저 메시지 — 오른쪽 정렬 말풍선(아바타 없음).
+              // 유저 메시지(#a1 2026-07-15) — 오른쪽 정렬 + "You" 이름 + 에이전트(bg-muted)보다
+              //   밝은 말풍선(bg-input, dark L 0.278 > muted 0.243)으로 구분.
               if (msg.role === 'user') {
                 return (
-                  <div
-                    key={msg.id}
-                    className="group relative ml-4 select-text whitespace-pre-wrap rounded-lg bg-primary/10 px-3 py-2 pr-8 text-xs text-foreground"
-                  >
-                    <MarkdownText text={msg.content} />
-                    <CopyButton text={msg.content} />
+                  <div key={msg.id} className="ml-8 flex flex-col items-end">
+                    <span className="mb-0.5 text-[11px] font-medium text-muted-foreground">
+                      You
+                    </span>
+                    <div className="group relative w-fit max-w-full select-text whitespace-pre-wrap rounded-lg bg-input px-3 py-2 pr-8 text-xs text-foreground">
+                      <MarkdownText text={msg.content} />
+                      <CopyButton text={msg.content} />
+                    </div>
                   </div>
                 )
               }
