@@ -48,6 +48,15 @@ export async function middleware(request: NextRequest) {
     isSharePath ||
     (hasDemoShare && pathname.startsWith('/studio'))
 
+  // 데모 탈출(project-share-demo-mode): demo_share 쿠키는 path=/ 무만료라 share 링크를 한 번 열면
+  //   홈/로그인/실 스튜디오까지 사이트 전체가 데모모드(createClient→shim)로 오염된다. 데모는 /share·/studio
+  //   에서만 유효하므로, 실제 진입면(홈·로그인)에 도달하면 쿠키를 만료시켜 실 세션/인증을 복구한다.
+  //   (share 링크 재진입 시 /share 페이지가 쿠키를 다시 세팅한다.)
+  if (hasDemoShare && (pathname === '/' || pathname.startsWith('/login'))) {
+    supabaseResponse.cookies.set('demo_share', '', { path: '/', maxAge: 0 })
+    request.cookies.delete('demo_share')
+  }
+
   // 리다이렉트 응답에도 getUser()가 방금 갱신한 세션 쿠키를 실어 보낸다.
   // (누락 시 토큰 갱신 타이밍에 걸린 유저가 로그인 ↔ 목적지 무한루프에 빠짐 — Supabase SSR 필수 패턴)
   const redirectWithSession = (url: URL) => {
