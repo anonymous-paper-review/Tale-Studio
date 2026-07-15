@@ -380,7 +380,13 @@ export const WRITER_STEPS: WriterStep[] = [
       await logger.flushRawLlm('renderPrompts');
 
       // ★ Tier 2 persist: shots → DB. serverless 동결 회피 위해 await + catch.
-      await persistShotsToDb(projectId, s.shotSequence!).catch(() => {});
+      //   silent 삼킴 금지(#long-writer-run 2026-07-15) — shots 0행으로 조용히 끝나던 원인.
+      await persistShotsToDb(projectId, s.shotSequence!).catch((e) => {
+        console.error(
+          '[writer] persistShotsToDb failed:',
+          e instanceof Error ? e.message : e,
+        );
+      });
       return { renderPrompts };
     },
   },
@@ -463,6 +469,14 @@ export async function runWriterSteps(
 
     // 재시도/타임아웃 가드: 같은 단계가 MAX_STAGE_ATTEMPTS 회 이상 진입했으면 실패 처리.
     if (state._attempt?.stage === step.key && state._attempt.count >= MAX_STAGE_ATTEMPTS) {
+      // (#long-writer-run 2026-07-15) 레이스 방어: 마지막 진입 마킹(updated_at) 후 함수 수명
+      //   (300s)+마진이 지나기 전이면 그 attempt 인보케이션이 아직 돌고 있을 수 있다 —
+      //   keepalive가 띄운 경쟁 인보케이션이 성공 직전의 run을 failed로 마킹하던 것(실측:
+      //   shotCheck 278s 성공 저장 직전에 failed). 확정 전엔 양보(paused)한다.
+      const sinceLastMarkMs = Date.now() - Date.parse(run.updated_at);
+      if (Number.isFinite(sinceLastMarkMs) && sinceLastMarkMs < 330_000) {
+        return { paused: true };
+      }
       const message = `stage ${step.key} exceeded retry/time budget`;
       await markFailed(run.id, message, captureErrorDetail(step.key, message));
       return { failed: true };

@@ -339,13 +339,22 @@ export async function persistShotsToDb(
   // shots (shot_sequence — 대사 보유)
   if (shotSequence.shots.length) {
     // 언어 경계(S3): action_description(파이프라인 산출) → EN base 파생(이미 영어면 skip). 표시는 _native.
+    // S 블록 누락 방어(#long-writer-run 2026-07-15): 분할 샷이 S 없이 오면 직전 샷의 씬으로
+    //   귀속시킨다(분할은 원본 위치 삽입이라 이웃과 같은 씬) — 한 샷 결손이 전체 persist를
+    //   죽이던 것(47a62d1d: shots 0행) 방지. 스테이지 쪽 보정과 이중 방어.
+    let lastSceneId = ''
     const shRows = shotSequence.shots.map((it, i) => {
+      const sceneId = it.S?.scene_id ?? lastSceneId
+      if (!it.S?.scene_id) {
+        console.warn(`[persistShotsToDb] shot ${it.shot_id}: S.scene_id 누락 → 직전 씬(${sceneId})으로 귀속`)
+      }
+      lastSceneId = sceneId
       const chars = (it.assets?.characters ?? [])
         .map((c) => c.id)
         .filter((id): id is string => typeof id === 'string')
       return {
-        sceneMainId: writerSceneIdToMain(it.S.scene_id),
-        shotMainId: writerShotIdToMain(it.shot_id, it.S.scene_id),
+        sceneMainId: writerSceneIdToMain(sceneId),
+        shotMainId: writerShotIdToMain(it.shot_id, sceneId),
         shotType: normShotType(it.V?.camera?.type),
         actionNative: it.S?.character_action ?? '',
         chars: Array.from(new Set(chars)),
@@ -400,8 +409,12 @@ export async function persistShotsToDb(
     //   실제 shot duration 합과 어긋난다(축 독립 생성). shots 가 확정된 직후, 그 합을 진실로 삼아 갱신.
     //   기본값(?? 5)은 insert 의 duration_seconds 와 동일하게 맞춘다.
     const secondsByScene = new Map<string, number>()
+    let lastSumSceneId = ''
     for (const it of shotSequence.shots) {
-      const sid = writerSceneIdToMain(it.S.scene_id)
+      // S 누락 방어 — 위 shRows 와 동일한 직전-씬 귀속 규칙.
+      lastSumSceneId = it.S?.scene_id ?? lastSumSceneId
+      if (!lastSumSceneId) continue
+      const sid = writerSceneIdToMain(lastSumSceneId)
       // 클램프된 shot 길이 합 = insert 의 duration 과 일치(#9).
       secondsByScene.set(sid, (secondsByScene.get(sid) ?? 0) + clampShotSeconds(it.duration_seconds))
     }

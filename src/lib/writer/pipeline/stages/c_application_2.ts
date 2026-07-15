@@ -211,21 +211,31 @@ locations: ${worldVisual.locations.map((l) => l.id).join(', ')}
   // ===== Step 1 실행 + 파싱 (실패 흡수) =====
   // shotCheck gemini 는 49샷 입력이 무거워 120s per-request 타임아웃에 걸리기 쉽다.
   //   타임아웃/실패/이상 shape 이면 genShots=[] → 아래 Step 1.5 가 L4 에서 전량 결정론 복원.
+  // (#long-writer-run 2026-07-15) 대형 프로젝트는 LLM 조립을 아예 건너뛴다 — 어차피
+  //   병합/누락 버그로 결정론 정합(Step 1.5)이 진실이고, 대형 입력은 타임아웃(~120s)만
+  //   태우고 버려져 step 예산(240s) 초과 → 재시도 루프의 주범이었다(47a62d1d 실측 278s).
+  const SKIP_LLM_ASSEMBLY_ABOVE = 24;
   let genShots: ShotSequenceItem[] = [];
-  try {
-    const genRaw = await generateJson<unknown>(genUser, vAxisConfig, {
-      systemInstruction: genSystem,
-      temperature: 0.4,
-    });
-    await logger.saveLlmCall('shotCheck_generate', {
-      prompt: genUser,
-      response: JSON.stringify(genRaw, null, 2),
-      model: describeAxisConfig(vAxisConfig),
-      provider: vAxisConfig.provider,
-    });
-    genShots = extractShots(genRaw);
-  } catch (e) {
-    console.warn('[C2_generate] LLM 조립 실패/타임아웃/이상 → 결정론적 재구성 폴백:', e);
+  if (shotDesigns.length > SKIP_LLM_ASSEMBLY_ABOVE) {
+    console.log(
+      `[C2_generate] ${shotDesigns.length}샷 > ${SKIP_LLM_ASSEMBLY_ABOVE} — LLM 조립 skip, 결정론 조립 직행`,
+    );
+  } else {
+    try {
+      const genRaw = await generateJson<unknown>(genUser, vAxisConfig, {
+        systemInstruction: genSystem,
+        temperature: 0.4,
+      });
+      await logger.saveLlmCall('shotCheck_generate', {
+        prompt: genUser,
+        response: JSON.stringify(genRaw, null, 2),
+        model: describeAxisConfig(vAxisConfig),
+        provider: vAxisConfig.provider,
+      });
+      genShots = extractShots(genRaw);
+    } catch (e) {
+      console.warn('[C2_generate] LLM 조립 실패/타임아웃/이상 → 결정론적 재구성 폴백:', e);
+    }
   }
 
   // ===== Step 1.5: 결정론적 정합 (shot loss 방지) =====
@@ -326,8 +336,24 @@ ${JSON.stringify(genResult.shots, null, 2)}
   for (const split of valResult.shots_to_split) {
     const idx = finalShots.findIndex((s) => s.shot_id === split.shot_id);
     if (idx === -1) continue;
-    finalShots.splice(idx, 1, ...split.new_shots);
-    splitCount += split.new_shots.length - 1;
+    // (#long-writer-run 2026-07-15) Claude 분할안(new_shots)이 S/V 등 필수 블록을 빼먹는
+    //   경우가 실측됨(47a62d1d: S 누락 4샷) → persistShotsToDb가 it.S.scene_id에서 죽는다.
+    //   누락 블록은 원본 샷에서 결정론 상속해 스키마를 보장한다.
+    const original = finalShots[idx];
+    const patched = split.new_shots.map((ns) => ({
+      ...ns,
+      S: ns.S ?? original.S,
+      C: ns.C ?? original.C,
+      V: ns.V ?? original.V,
+      assets: ns.assets ?? original.assets,
+      first_frame_generation: ns.first_frame_generation ?? original.first_frame_generation,
+      video_generation: ns.video_generation ?? original.video_generation,
+      duration_seconds: ns.duration_seconds ?? original.duration_seconds,
+      continuity: ns.continuity ?? original.continuity,
+      action_budget: ns.action_budget ?? original.action_budget,
+    }));
+    finalShots.splice(idx, 1, ...patched);
+    splitCount += patched.length - 1;
   }
 
   finalShots = finalShots.map((shot, i) => ({
