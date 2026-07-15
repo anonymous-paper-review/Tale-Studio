@@ -95,6 +95,12 @@ export interface WriterRunState extends WriterRunStateBase {
   // Compact Mode (genre.depth_level 기반). sceneCinematography step 에서 확정.
   compact?: boolean;
 
+  // shots DB 기록 완료 마커(#persist-step 2026-07-15) — persistShots step의 has 판정.
+  //   persist 내부의 i18n(EN/native 파생) LLM 호출이 40s+라 renderPrompts 꼬리에서
+  //   함수 수명에 잘리거나 실패해도 조용히 지나가던 것을 독립 step + 재시도로 승격.
+  _shotsPersisted?: boolean;
+  _persistTries?: number;
+
   // 재시도/타임아웃 가드 (중도 kill 시 attempt 증가분이 남는다)
   _attempt?: { stage: string; count: number };
   // 단계별 소요시간 (timing pipeline). key=stage → 마지막 성공 실행의 wall-clock(ms).
@@ -378,16 +384,34 @@ export const WRITER_STEPS: WriterStep[] = [
         models.V,
       );
       await logger.flushRawLlm('renderPrompts');
-
-      // ★ Tier 2 persist: shots → DB. serverless 동결 회피 위해 await + catch.
-      //   silent 삼킴 금지(#long-writer-run 2026-07-15) — shots 0행으로 조용히 끝나던 원인.
-      await persistShotsToDb(projectId, s.shotSequence!).catch((e) => {
+      return { renderPrompts };
+    },
+  },
+  {
+    // ★ Tier 2 persist: shots → DB — 독립 step(#persist-step 2026-07-15).
+    //   내부 i18n(EN/native 파생) 배치가 76샷 기준 40~60s 걸려, renderPrompts 꼬리에
+    //   붙어 있으면 함수 수명(300s) 끝자락에서 잘리거나 실패해도 지나쳐 shots 0행으로
+    //   끝났다(47a62d1d 실측 2회). 자체 step 예산 + 실패 시 최대 3회 재시도.
+    key: 'persistShots',
+    has: (s) => s._shotsPersisted === true,
+    run: async (s, { projectId }) => {
+      try {
+        await persistShotsToDb(projectId, s.shotSequence!);
+        return { _shotsPersisted: true };
+      } catch (e) {
+        const tries = (s._persistTries ?? 0) + 1;
         console.error(
-          '[writer] persistShotsToDb failed:',
+          `[writer] persistShotsToDb 실패 (try ${tries}/3):`,
           e instanceof Error ? e.message : e,
         );
-      });
-      return { renderPrompts };
+        if (tries >= 3) {
+          // 포기 — 파이프라인은 완료시키되(러프 보드 외 진행 가능) 미기록을 로그로 남긴다.
+          //   (기존 silent-skip과 동일한 최악치. shots는 state.shotSequence에 남아 수동 복구 가능)
+          return { _shotsPersisted: true, _persistTries: tries };
+        }
+        // has=false 유지 → 부분 진행 경로로 paused → 다음 step이 재시도.
+        return { _persistTries: tries };
+      }
     },
   },
 ];
