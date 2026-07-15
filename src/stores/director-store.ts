@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import { toast } from 'sonner'
 import type { XYPosition } from '@xyflow/react'
 import {
   DEFAULT_CAMERA_PRESET,
@@ -520,8 +521,9 @@ interface DirectorCanvasState {
   // video generation (ST-4, I2V/T2V) — 항상 사용자 클릭으로만 (결정 #40)
   /** Shot에 새 Video take 생성 + 영상 생성 API 호출(+폴링). storyboardImage 있으면 I2V. 생성된 Video 노드 id 반환 */
   generateVideoForShot: (shotNodeId: string) => Promise<string | null>
-  /** 기존 Video 노드 1개를 effective 설정으로 (재)생성 (D-5). 마더 Shot storyboardImage 있으면 I2V */
-  regenerateVideo: (videoNodeId: string) => Promise<void>
+  /** 기존 Video 노드 1개를 effective 설정으로 (재)생성 (D-5). 마더 Shot storyboardImage 있으면 I2V.
+   *  반환 false = 생성 대기열(쿼터) 초과로 시작하지 못함(#e5) — 노드는 pending으로 되돌려짐. */
+  regenerateVideo: (videoNodeId: string) => Promise<boolean>
 
   // stage progression (Higgsfield 진행 버튼)
   /** 진행 버튼: 현 단계 기준 다음 산출물 생성 — rough→generateStoryboardImage(in-place 실사), live/video→generateVideoForShot(별도 Video 노드) */
@@ -1794,24 +1796,54 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const videoNodeId = api.addVideoTake(shotNodeId)
         if (!videoNodeId) return null
 
-        await get().regenerateVideo(videoNodeId)
+        const started = await get().regenerateVideo(videoNodeId)
+        if (!started) {
+          // 대기열(쿼터) 초과 — 방금 만든 take 노드를 롤백해 에러 노드를 남기지 않는다(#e5).
+          const node = get().nodes.find((n) => n.id === videoNodeId)
+          const clipId =
+            node && isVideoData(node.data) ? node.data.videoClipId : null
+          const takeLabel =
+            node && isVideoData(node.data) ? node.data.label : null
+          get().deleteNode(videoNodeId)
+          // addVideoTake의 clip INSERT는 fire-and-forget — 429가 그보다 빨리 돌아오면
+          // 노드에 videoClipId가 아직 없어 deleteNode가 클립을 못 지운다 → 지연 정리.
+          // (같은 take_label의 pending 행만 — 쿼터 초과 상태라 동일 라벨 재생성 경합은 사실상 없음)
+          if (!clipId && takeLabel && isShotData(shotNode.data) && shotNode.data.writerShotId) {
+            const writerShotId = shotNode.data.writerShotId
+            const projectId = get().projectId
+            setTimeout(() => {
+              void createClient()
+                .from('video_clips')
+                .delete()
+                .eq('project_id', projectId)
+                .eq('shot_id', writerShotId)
+                .eq('take_label', takeLabel)
+                .eq('status', 'pending')
+                .then(({ error }) => {
+                  if (error)
+                    console.warn('[director-store] quota rollback clip cleanup:', error.message)
+                })
+            }, 4000)
+          }
+          return null
+        }
         return videoNodeId
       },
 
       regenerateVideo: async (videoNodeId) => {
         const api = get()
         const videoNode = api.nodes.find((n) => n.id === videoNodeId)
-        if (!videoNode || !isVideoData(videoNode.data)) return
+        if (!videoNode || !isVideoData(videoNode.data)) return true
         const shotNode = api.nodes.find(
           (n) => n.id === (videoNode.data as VideoNodeData).parentShotNodeId,
         )
-        if (!shotNode || !isShotData(shotNode.data)) return
+        if (!shotNode || !isShotData(shotNode.data)) return true
         const shot = shotNode.data
         const shotNodeId = shotNode.id
 
         // effective 설정 = 마더 Shot 상속 + 이 Video의 override
         const eff = getEffectiveShotConfig(get(), videoNodeId)
-        if (!eff) return
+        if (!eff) return true
 
         // 레퍼런스 결정: 마더 storyboardImage(완료) 우선 → 유저 업로드 → 없으면 T2V (결정 #40)
         const storyboardUrl =
@@ -1855,6 +1887,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           })
           if (!res.ok) {
             const body = await res.json().catch(() => ({}))
+            // 생성 대기열(유저 쿼터) 초과(#e5) — 에러 노드를 만들지 않고 하단 알림으로만.
+            //   기존 노드는 pending으로 되돌리고, 새 take였다면 호출자가 노드를 롤백한다.
+            if (res.status === 429 && body?.code === 'quota_exceeded') {
+              get().setVideoStatus(videoNodeId, 'pending')
+              toast.error(
+                body.error ??
+                  '생성 대기열이 가득 찼어요. 진행 중인 작업이 끝나면 다시 시도해주세요.',
+                { duration: 5000, closeButton: true },
+              )
+              return false
+            }
             throw new Error(body.error ?? `HTTP ${res.status}`)
           }
           const { taskId, provider: respProvider, model } = await res.json()
@@ -1893,6 +1936,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           const message = err instanceof Error ? err.message : 'Unknown error'
           get().setVideoStatus(videoNodeId, 'failed', { error: message })
         }
+        return true
       },
 
       // ─── playback + thumbnail ──────────────────────────────────────────

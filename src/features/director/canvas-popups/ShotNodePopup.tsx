@@ -350,6 +350,32 @@ export function ShotNodePopup({ nodeId, data }: Props) {
 
           <Separator />
 
+          {/* 이미지 생성 모델(#e4 2026-07-15) — SHOT IMAGE는 GPT Image 2.0으로 생성된다.
+              Midjourney 8.1은 도입 예정(비활성). 선택 상태는 표시 전용. */}
+          <Field label="이미지 생성 모델">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <button
+                type="button"
+                className="rounded-md border border-primary bg-primary/10 px-3 py-1.5 text-left text-xs"
+              >
+                <span className="block font-medium">GPT Image 2.0</span>
+                <span className="block font-mono text-[10px] text-muted-foreground">
+                  기본 · 16:9
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled
+                className="cursor-not-allowed rounded-md border border-border px-3 py-1.5 text-left text-xs opacity-60"
+              >
+                <span className="block font-medium">Midjourney 8.1</span>
+                <span className="block font-mono text-[10px] text-muted-foreground">
+                  준비 중
+                </span>
+              </button>
+            </div>
+          </Field>
+
           {/* Provider (영상 생성 모델 — video-models 레지스트리) */}
           <Field label="영상 생성 모델">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { ImageIcon, MapPin, Clock, Play } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -28,6 +28,52 @@ type SceneGroup = {
   location: string
   timeOfDay: string
   shots: DirectorNode[]
+}
+
+/** 완료 영상 썸네일(#e1 2026-07-15) — 호버 시에만 재생, 클릭 = 일시정지 잠금(중앙 ⏸ 표시).
+ *  다시 클릭하면 잠금 해제 + 재생 재개. 카드 더블클릭(팝업)은 dblclick 이벤트라 그대로 동작. */
+function HoverPlayVideo({ src, label }: { src: string; label: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [pausedLock, setPausedLock] = useState(false)
+  const play = () => void videoRef.current?.play().catch(() => {})
+  const pause = () => videoRef.current?.pause()
+  return (
+    <button
+      type="button"
+      aria-label={pausedLock ? `${label} 재생 재개` : `${label} 일시정지`}
+      onMouseEnter={() => {
+        if (!pausedLock) play()
+      }}
+      onMouseLeave={() => {
+        if (!pausedLock) pause()
+      }}
+      onClick={(e) => {
+        e.stopPropagation()
+        setPausedLock((prev) => {
+          const next = !prev
+          if (next) pause()
+          else play()
+          return next
+        })
+      }}
+      className="relative block size-full cursor-pointer"
+    >
+      <video
+        ref={videoRef}
+        src={src}
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        className="size-full object-cover"
+      />
+      {pausedLock && (
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25">
+          <Pause className="size-8 fill-white text-white drop-shadow" />
+        </span>
+      )}
+    </button>
+  )
 }
 
 function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] }) {
@@ -107,16 +153,8 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
     >
       <div className="relative aspect-video bg-muted">
         {completedVideoUrl ? (
-          // 영상까지 완성된 샷 — 썸네일 자리를 영상으로(#e13). 음소거 루프 재생.
-          <video
-            src={completedVideoUrl}
-            muted
-            loop
-            autoPlay
-            playsInline
-            preload="metadata"
-            className="size-full object-cover"
-          />
+          // 영상까지 완성된 샷(#e13) — 호버 시에만 재생, 클릭 = 일시정지(#e1).
+          <HoverPlayVideo src={completedVideoUrl} label={prettyNodeLabel(data.label)} />
         ) : hasImage ? (
           <GeneratedImage
             src={img!.url}
@@ -161,42 +199,52 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
           beamColor={imageGenerating ? 'success' : 'primary'}
         />
 
-        {/* 우하단 생성 스택(#e12) — 기본 버튼 = 영상 생성(이미지 없으면 이미지→영상 체인).
-            호버 시 위로 '이미지 생성' 항목이 펼쳐진다. 생성 중엔 숨김. */}
+        {/* 우하단 생성 스택(#e12→#e6 2026-07-15) — 기본 버튼 = 영상 생성(이미지 없으면
+            이미지→영상 체인). 호버 시 같은 너비의 슬라이딩 카드(살짝 밝은 빨강)가
+            버튼 위로 올라온다. 생성 중엔 숨김. */}
         {!generating && (
-          <div className="group/gen absolute bottom-2 right-2 flex flex-col items-end gap-1">
-            <button
-              type="button"
-              onClick={() => void runImage()}
-              title={
-                status === 'failed' && img?.errorMessage
-                  ? img.errorMessage
-                  : hasImage
-                    ? '이미지 리터칭 (재생성)'
-                    : '이미지만 생성'
-              }
-              className={cn(
-                'pointer-events-none flex h-7 translate-y-1 items-center gap-1 rounded-md border border-border bg-card/95 px-2 text-[11px] font-medium text-foreground opacity-0 shadow-sm backdrop-blur transition-all duration-150',
-                'group-hover/gen:pointer-events-auto group-hover/gen:translate-y-0 group-hover/gen:opacity-100',
-                'hover:bg-accent',
-                status === 'failed' && 'border-destructive text-destructive',
-              )}
-            >
-              <ImageIcon className="size-3.5" />
-              {hasImage ? '이미지 리터칭' : '이미지 생성'}
-            </button>
-            <button
-              type="button"
-              onClick={() => void runVideo()}
-              title="영상 생성 — 촬영 이미지가 없으면 먼저 생성한 뒤 영상을 만들어요"
-              className={cn(
-                'flex h-7 items-center gap-1 rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground shadow-sm',
-                'transition-colors duration-100 hover:bg-primary/80',
-              )}
-            >
-              <Play className="size-3.5 fill-current" />
-              영상 생성
-            </button>
+          <div className="group/gen absolute bottom-2 right-2">
+            <div className="relative flex w-28 flex-col items-stretch">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void runImage()
+                }}
+                title={
+                  status === 'failed' && img?.errorMessage
+                    ? img.errorMessage
+                    : hasImage
+                      ? '이미지 리터칭 (재생성)'
+                      : '이미지만 생성'
+                }
+                className={cn(
+                  'pointer-events-none absolute inset-x-0 bottom-full mb-1 flex h-7 translate-y-2 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-medium text-primary-foreground opacity-0 shadow-sm transition-all duration-200',
+                  // 살짝 밝은 빨강 — primary에 흰색 18% 혼합(토큰 파생 셰이드)
+                  'bg-[color-mix(in_srgb,var(--primary)_82%,white)]',
+                  'group-hover/gen:pointer-events-auto group-hover/gen:translate-y-0 group-hover/gen:opacity-100',
+                  'hover:bg-[color-mix(in_srgb,var(--primary)_70%,white)]',
+                )}
+              >
+                <ImageIcon className="size-3.5" />
+                {hasImage ? '이미지 리터칭' : '이미지 생성'}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void runVideo()
+                }}
+                title="영상 생성 — 촬영 이미지가 없으면 먼저 생성한 뒤 영상을 만들어요"
+                className={cn(
+                  'flex h-7 w-full items-center justify-center gap-1 rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground shadow-sm',
+                  'transition-colors duration-100 hover:bg-primary/85',
+                )}
+              >
+                <Play className="size-3.5 fill-current" />
+                영상 생성
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -71,8 +71,16 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             {stage === 'rough' ? '이미지 생성' : '이미지 리터칭'}
             <ChevronRight className="size-3" />
           </Button>
-          <span className="px-1 font-mono text-[10px] text-muted-foreground">
-            {data.provider}
+          {/* 이미지 생성 모델 표기(#e4 2026-07-15) — 영상 모델 칩 대신 이미지 모델 2종.
+              GPT Image 2.0 = 현재 사용 모델, Midjourney 8.1 = 준비 중(비활성). */}
+          <span className="rounded-sm border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+            GPT Image 2.0
+          </span>
+          <span
+            className="cursor-not-allowed rounded-sm border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground opacity-60"
+            title="준비 중"
+          >
+            Midjourney 8.1
           </span>
         </div>
       </NodeToolbar>

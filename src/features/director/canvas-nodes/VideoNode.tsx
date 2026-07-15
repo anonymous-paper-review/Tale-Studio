@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import { BaseNode } from './BaseNode'
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import { isVideoData, type DirectorNode } from '@/types/director'
+import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { cn } from '@/lib/utils'
 
 function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
@@ -25,6 +25,13 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const parentGenerating = useDirectorCanvasStore(
     (s) => !!(parentShotId && s.generatingNodeIds[parentShotId]),
   )
+  // 카드 제목 = 연결된 부모 샷 번호(#e3 2026-07-15): take_v1 대신 'Shot 14'처럼 표기.
+  //   selector는 라벨 문자열만 반환(참조 안정). 부모가 없으면 자체 라벨(take 패턴 변환) 폴백.
+  const parentShotLabel = useDirectorCanvasStore((s) => {
+    if (!parentShotId) return null
+    const p = s.nodes.find((n) => n.id === parentShotId)
+    return p && isShotData(p.data) ? p.data.label : null
+  })
 
   // effect 입력은 early-return 전에 안전 추출 (훅은 무조건 호출돼야 함).
   const vStatus = isVideoData(data) ? data.status : null
@@ -82,7 +89,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     <BaseNode
       id={id}
       theme="video"
-      title={data.label}
+      title={parentShotLabel ?? data.label}
       selected={selected}
       width={240}
       stale={data.stale}

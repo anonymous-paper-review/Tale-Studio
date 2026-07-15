@@ -469,6 +469,9 @@ function CanvasInner() {
         onMove={(_, vp) => setViewport(vp)}
         snapToGrid
         snapGrid={SNAP_GRID}
+        // 더 넓게 축소 가능하게(#e2 2026-07-15) — RF 기본 minZoom 0.5는 넓은 그래프에서
+        //   fitView가 잘리는 원인이기도 했다.
+        minZoom={0.1}
         connectionMode={ConnectionMode.Loose}
         deleteKeyCode={['Backspace', 'Delete']}
         // fitView/복원은 위 useEffect가 useNodesInitialized 타이밍에 제어(#e). defaultViewport로
