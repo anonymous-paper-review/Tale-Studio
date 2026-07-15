@@ -38,5 +38,10 @@ export function getDemoSnapshot(): ProjectSnapshot | null {
 
 /** 스냅샷의 특정 테이블 행들(없으면 빈 배열). supabase 데모 shim 이 읽는다. */
 export function demoTableRows(table: string): Record<string, unknown>[] {
+  // projects 행은 스냅샷 최상위(snapshot.project)에 있고 tables[] 에는 없다.
+  //   from('projects').eq('id',…).single() 이 shim 에서 동작하도록 단일 행 배열로 서빙.
+  if (table === 'projects') {
+    return _snapshot?.project ? [_snapshot.project as Record<string, unknown>] : []
+  }
   return _snapshot?.tables[table] ?? []
 }
