@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { FlaskConical, ZoomIn, ZoomOut } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { HandoffButton } from '@/components/layout/handoff-button'
@@ -69,6 +70,16 @@ export default function VisualPage() {
     try {
       localStorage.setItem(`artist:zoomLevel:${key}`, String(clamped))
     } catch {}
+  }
+  // Ctrl+휠 축척(#d1 2026-07-15) — 함수형 업데이트라 휠 연타에도 최신값 기준으로 단계 이동.
+  const stepZoom = (key: 'characters' | 'world', dir: 1 | -1) => {
+    setZoomByTab((prev) => {
+      const next = Math.min(3, Math.max(1, prev[key] + dir))
+      try {
+        localStorage.setItem(`artist:zoomLevel:${key}`, String(next))
+      } catch {}
+      return { ...prev, [key]: next }
+    })
   }
 
   // 실험 New UI(에셋·샷 보드) 토글 — 스토어 보관으로 탭 전환(remount)에도 유지.
@@ -422,7 +433,13 @@ export default function VisualPage() {
               <TabsList>
                 <TabsTrigger value="characters">Characters</TabsTrigger>
                 <TabsTrigger value="world">World</TabsTrigger>
-                <TabsTrigger value="inventory">Inventory</TabsTrigger>
+                {/* Inventory는 준비 중(#d4 2026-07-15) — writer 대사 탭과 동일한 비활성 패턴 */}
+                <TabsTrigger value="inventory" disabled>
+                  <span>Inventory</span>
+                  <Badge variant="outline" className="ml-1 px-1.5 py-0 text-[10px]">
+                    준비 중
+                  </Badge>
+                </TabsTrigger>
               </TabsList>
               {/* 보드 축척(#d1) — writer 러프 보드와 동일 UI, 인물/배경 탭별 저장 */}
               {(tab === 'characters' || tab === 'world') && (
@@ -463,7 +480,10 @@ export default function VisualPage() {
             value="characters"
             className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
           >
-            <CharacterPanel columns={4 - zoomByTab.characters} />
+            <CharacterPanel
+              columns={4 - zoomByTab.characters}
+              onZoomStep={(dir) => stepZoom('characters', dir)}
+            />
           </TabsContent>
 
           <TabsContent

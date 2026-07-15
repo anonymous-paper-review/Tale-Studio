@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Loader2, Sparkles, Check, Share2, BookmarkCheck, BookmarkPlus, Plus } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Loader2, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -16,8 +16,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { HoverBeam } from '@/components/hover-beam'
 import { useArtistStore, type CharacterRole } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
-import { registerCharacterCard } from '@/stores/asset-storage-store'
-import { useInventoryStore } from '@/stores/inventory-store'
 import {
   CHARACTER_VIEW_LABELS,
   type CharacterViewKey,
@@ -36,7 +34,11 @@ const ROLE_TOGGLE: { value: CharacterRole; label: string }[] = [
 ]
 
 // columns: 보드 축척(#d1) — 1(기존 세로 스택)~3열 그리드. 페이지 헤더의 슬라이더가 결정.
-export function CharacterPanel({ columns = 1 }: { columns?: number } = {}) {
+// onZoomStep: Ctrl+휠 축척(#d1 2026-07-15) — 이벤트 방향당 1단계(쿨다운), 브라우저 줌 차단.
+export function CharacterPanel({
+  columns = 1,
+  onZoomStep,
+}: { columns?: number; onZoomStep?: (dir: 1 | -1) => void } = {}) {
   const {
     sceneManifest,
     characterAssets,
@@ -46,20 +48,34 @@ export function CharacterPanel({ columns = 1 }: { columns?: number } = {}) {
     viewFailures,
     selectCharacter,
     generateCharacterAllViews,
-    addCharacter,
     updateCharacter,
   } = useArtistStore()
 
-  const projectId = useProjectStore((s) => s.projectId)
-  const workspaceId = useProjectStore((s) => s.workspaceId)
-  const saveFromAsset = useInventoryStore((s) => s.saveFromAsset)
   const requiredCharacterIds = useProjectStore((s) => s.lifecycleStatus.artist?.requiredCharacterIds ?? EMPTY_REQUIRED_IDS)
-  const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set())
-  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [viewDialog, setViewDialog] = useState<{
     charId: string
     view: CharacterViewKey
   } | null>(null)
+
+  // Ctrl+휠 → 축척(#d1). passive:false 네이티브 리스너로 브라우저 페이지 줌을 막는다.
+  //   휠 이벤트 방향당 1단계 + 쿨다운 — OS 스크롤 설정과 무관(#c1과 동일 방식).
+  const wheelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = wheelRef.current
+    if (!el || !onZoomStep) return
+    let lastStepAt = 0
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      if (e.deltaY === 0) return
+      const now = performance.now()
+      if (now - lastStepAt < 140) return
+      lastStepAt = now
+      onZoomStep(e.deltaY < 0 ? 1 : -1) // 위로 = 확대(열↓)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [onZoomStep])
 
   const getRole = (id: string) =>
     sceneManifest?.characters.find((c) => c.characterId === id)?.role ??
@@ -71,7 +87,7 @@ export function CharacterPanel({ columns = 1 }: { columns?: number } = {}) {
     []
 
   return (
-    <>
+    <div ref={wheelRef} className="flex min-h-0 flex-1 flex-col">
       <ScrollArea className="min-h-0 flex-1 px-6 py-4">
       <div
         className={cn(
@@ -88,11 +104,8 @@ export function CharacterPanel({ columns = 1 }: { columns?: number } = {}) {
           )
           const isViewGenerating = (v: CharacterViewKey) =>
             generatingViews.includes(`${char.characterId}:${v}`)
-          const isRegistered = registeredIds.has(char.characterId)
-          const isSaved = savedIds.has(char.characterId)
           const isObject = char.entityType === 'object'
           // 캐릭터=턴어라운드 시트 1장, 사물=단일 이미지 — 둘 다 main 하나로 판정(#7).
-          const hasImage = Boolean(char.views.main)
           const hasMainImage = Boolean(char.views.main)
           const isRequired = requiredCharacterIds.includes(char.characterId)
           const bgScenes = getBackgroundScenes(char.characterId)
@@ -253,7 +266,8 @@ export function CharacterPanel({ columns = 1 }: { columns?: number } = {}) {
                   />
                 </HoverBeam>
               </div>
-              {/* Actions */}
+              {/* Actions(#d3 2026-07-15) — Register(에셋은 진입 시 DB 하이드레이트로 자동 공급)·
+                  인벤토리 저장 버튼 제거, 생성 버튼 문구는 '이미지 생성'으로 통일. */}
               <div className="mt-3 flex gap-2">
                 <Button
                   variant="outline"
@@ -273,111 +287,16 @@ export function CharacterPanel({ columns = 1 }: { columns?: number } = {}) {
                   ) : (
                     <>
                       <Sparkles className="size-3.5" />
-                      {isObject ? '이미지 생성' : '턴어라운드 생성'}
+                      이미지 생성
                     </>
                   )}
                 </Button>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={isRegistered ? 'secondary' : 'default'}
-                      size="sm"
-                      className="hover-red-beam"
-                      disabled={!hasImage || isGenerating}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        registerCharacterCard(char, projectId ?? 'default')
-                        setRegisteredIds((prev) =>
-                          new Set(prev).add(char.characterId),
-                        )
-                      }}
-                    >
-                      {isRegistered ? (
-                        <>
-                          <Check className="size-3.5" />
-                          Registered
-                        </>
-                      ) : (
-                        <>
-                          <Share2 className="size-3.5" />
-                          Register
-                        </>
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Register to Asset Storage for the Director stage
-                  </TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={isSaved ? 'secondary' : 'outline'}
-                      size="sm"
-                      className="hover-red-beam"
-                      disabled={!hasMainImage || !workspaceId}
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        const item = await saveFromAsset({
-                          workspaceId: workspaceId!,
-                          kind: 'character',
-                          name: char.name,
-                          sourceImageUrl: char.views.main!,
-                          sourceProjectId: projectId ?? undefined,
-                          sourceCharacterId: char.characterId,
-                        })
-                        if (item) {
-                          setSavedIds((prev) =>
-                            new Set(prev).add(char.characterId),
-                          )
-                        }
-                      }}
-                    >
-                      {isSaved ? (
-                        <>
-                          <BookmarkCheck className="size-3.5" />
-                          저장됨
-                        </>
-                      ) : (
-                        <>
-                          <BookmarkPlus className="size-3.5" />
-                          인벤토리에 저장
-                        </>
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {workspaceId
-                      ? hasMainImage
-                        ? '워크스페이스 인벤토리에 저장'
-                        : 'main 이미지가 있어야 저장할 수 있습니다'
-                      : '프로젝트 로드 후 사용 가능합니다'}
-                  </TooltipContent>
-                </Tooltip>
               </div>
             </div>
           )
         })}
 
-        {/* 새 인물/사물 추가 — 팝업 없이 즉시 카드 생성 후 카드에서 바로 인라인 편집 (채팅으로도 생성 가능) */}
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex-1 border-dashed text-muted-foreground hover:text-foreground hover-red-beam"
-            onClick={() => addCharacter({ name: '새 캐릭터', entityType: 'person' })}
-          >
-            <Plus className="size-4" /> 인물
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1 border-dashed text-muted-foreground hover:text-foreground hover-red-beam"
-            onClick={() => addCharacter({ name: '새 사물', entityType: 'object' })}
-          >
-            <Plus className="size-4" /> 사물
-          </Button>
-        </div>
+        {/* 인물/사물 추가 버튼 제거(#d2 2026-07-15) — 캐스트 구성은 Producer 단계·채팅 경로로만. */}
       </div>
       </ScrollArea>
 
@@ -386,6 +305,6 @@ export function CharacterPanel({ columns = 1 }: { columns?: number } = {}) {
         view={viewDialog?.view ?? null}
         onClose={() => setViewDialog(null)}
       />
-    </>
+    </div>
   )
 }
