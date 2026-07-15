@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { setDemoSnapshot } from '@/lib/demo/context'
+import { setDemoSnapshot, parseShareParam, withDemoShare } from '@/lib/demo/context'
 import { createDemoClient } from '@/lib/demo/supabase-shim'
 import { classifyDemoFetch } from '@/lib/demo/fetch-guard'
 import { CANNED_CHAT } from '@/lib/demo/canned'
@@ -120,5 +120,27 @@ describe('demo server guard', () => {
   it('blocks writes with 403 when demo cookie present', () => {
     expect(demoWriteBlock(withCookie('demo_share=abc'))?.status).toBe(403)
     expect(demoWriteBlock(withCookie('x=1'))).toBeNull()
+  })
+})
+
+describe('share url ticket (URL 티켓 방식)', () => {
+  // 실 토큰 형태(64-hex)와 동일한 합성 값 — 라이브 공유 토큰을 저장소에 남기지 않는다.
+  const token = '0123456789abcdef'.repeat(4)
+
+  it('parses valid 64-hex share param', () => {
+    expect(parseShareParam(`?share=${token}`)).toBe(token)
+    expect(parseShareParam(`?projectId=p1&share=${token}`)).toBe(token)
+  })
+
+  it('rejects malformed tokens', () => {
+    expect(parseShareParam('?share=short')).toBeNull()
+    expect(parseShareParam(`?share=${token}zz`)).toBeNull()
+    expect(parseShareParam('?share=')).toBeNull()
+    expect(parseShareParam('')).toBeNull()
+  })
+
+  it('withDemoShare is a no-op outside browser (SSR/node)', () => {
+    // node 컨텍스트(document 없음)에선 데모 판정 불가 → 경로 그대로.
+    expect(withDemoShare('/studio/writer')).toBe('/studio/writer')
   })
 })

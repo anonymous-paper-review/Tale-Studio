@@ -37,23 +37,31 @@ export async function middleware(request: NextRequest) {
   //   fal.ai 가 익명으로 fetch 하는 character-template.png 가 /login 으로 리다이렉트되면 edit 모델이
   //   참조 이미지 대신 로그인 HTML 을 받아 캐릭터 턴어라운드가 정면샷으로 깨졌다 (2026-07-11 수정).
   const isPublicAsset = /\.(?:png|jpe?g|gif|svg|webp|avif|ico)$/i.test(pathname)
-  // 공유 데모(project-share-demo-mode): /share 링크는 공개, demo_share 쿠키 소지 시 /studio 도
-  //   로그인 없이 읽기전용 열람. 실제 백엔드 쓰기·생성은 서버 403 가드 + 클라 seam 이 차단.
+  // 공유 데모(project-share-demo-mode): /share 링크는 공개, demo_share 쿠키 또는 URL
+  //   ?share=<티켓> 소지 시 /studio 도 로그인 없이 읽기전용 열람. 실제 백엔드 쓰기·생성은
+  //   서버 403 가드 + 클라 seam 이 차단.
+  // URL 티켓(2026-07-15): 쿠키가 전면 차단된 브라우저에서도 열리도록 주소의 토큰 자체를
+  //   입장권으로 인정(노션 공유 방식). 클라(withDemoShare/layout)가 스테이지 이동·새로고침에도
+  //   share 쿼리를 유지한다. 형태(64-hex)만 보고 통과 — 유효성은 /api/share/<token> 이 게이트.
   const isSharePath = pathname.startsWith('/share')
   const hasDemoShare = request.cookies.has('demo_share')
+  const shareParam = request.nextUrl.searchParams.get('share')
+  const hasShareTicket = !!shareParam && /^[0-9a-f]{64}$/i.test(shareParam)
   const isPublicPath =
     pathname === '/' ||
     pathname.startsWith('/login') ||
     isPublicAsset ||
     isSharePath ||
-    (hasDemoShare && pathname.startsWith('/studio'))
-  // 서버측 쿠키 세팅(project-share-demo-mode 강건화, 2026-07-15): 기존엔 /share 페이지가
-  //   document.cookie 로만 demo_share 를 심었는데, JS 쿠키 쓰기가 막힌 브라우저(시크릿 "모든
-  //   쿠키 차단"·일부 인앱 브라우저)에선 쿠키가 안 박혀 /studio 진입이 /login 으로 튕겼다.
-  //   미들웨어가 Set-Cookie 로 직접 심으면 HTTP 쿠키만 허용돼도 데모 진입이 성립한다.
-  //   토큰 형태(64-hex)만 세팅 — 아무 /share/* 경로로 쿠키가 오염되지 않게. 유효성은
-  //   /api/share/<token> 이 게이트하므로 여기선 DB 왕복 없이 형태만 본다.
-  const shareToken = isSharePath ? pathname.split('/')[2] : undefined
+    ((hasDemoShare || hasShareTicket) && pathname.startsWith('/studio'))
+
+  // 서버측 쿠키 세팅(강건화): /share/<토큰> 진입·share 쿼리 요청에 Set-Cookie 로 직접 심음 —
+  //   JS 쿠키 쓰기가 막힌 브라우저에서도 HTTP 쿠키만 허용되면 이후 요청이 쿠키로도 성립.
+  //   쿠키까지 전면 차단이면 URL 티켓만으로 동작한다(위 hasShareTicket).
+  const shareToken = isSharePath
+    ? pathname.split('/')[2]
+    : hasShareTicket
+      ? shareParam
+      : undefined
   if (shareToken && /^[0-9a-f]{64}$/i.test(shareToken)) {
     supabaseResponse.cookies.set('demo_share', shareToken, {
       path: '/',

@@ -2,6 +2,7 @@ import { STAGES } from '@/lib/constants'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 import type { StageId } from '@/types'
+import { withDemoShare } from '@/lib/demo/context'
 
 /**
  * 스테이지 핸드오프 공통 로직 — HandoffButton 과 채팅 프로액티브 제안(chat-proactive-copilot)이 공유.
@@ -29,5 +30,6 @@ export async function handoffToStage(
   }
 
   setStage(targetStage)
-  return target.path
+  // 데모(URL 티켓): 반환 경로에 share 쿼리 유지 — 쿠키 차단 브라우저에서도 이동 생존.
+  return withDemoShare(target.path)
 }

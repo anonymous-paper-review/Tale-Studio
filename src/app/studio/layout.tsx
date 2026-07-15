@@ -13,6 +13,7 @@ import { readLastProjectId, writeLastProjectId } from '@/lib/session-restore'
 import { STAGES } from '@/lib/constants'
 import type { StageId } from '@/types'
 import { installDemoFetchGuard } from '@/lib/demo/fetch-guard'
+import { readDemoToken, withDemoShare } from '@/lib/demo/context'
 import { DemoBanner } from '@/components/demo/demo-banner'
 
 // 데모(공유) 세션이면 첫 클라 진입 시 window.fetch 를 가드로 교체(멱등, 내부에서 isDemoSession 판정).
@@ -24,6 +25,9 @@ export default function StudioLayout({
 }: {
   children: React.ReactNode
 }) {
+  // 렌더 시점 재시도(멱등): 모듈 eval 이 프리페치 등으로 데모 판정 확정(URL 티켓/시드) 전에
+  //   일어났을 수 있어, 컴포넌트 렌더에서 한 번 더 설치를 시도한다 — effect fetch 보다 선행.
+  installDemoFetchGuard()
   const initProject = useProjectStore((s) => s.initProject)
   const canNavigateTo = useProjectStore((s) => s.canNavigateTo)
   const setStage = useProjectStore((s) => s.setStage)
@@ -64,8 +68,13 @@ export default function StudioLayout({
     // 마지막 본 프로젝트 기록 — 쿼리 없는 재진입(북마크/홈) 시 복원 힌트
     writeLastProjectId(projectId)
     const params = new URLSearchParams(window.location.search)
-    if (params.get('projectId') === projectId) return
+    // 데모(URL 티켓): share 쿼리도 함께 유지 — 쿠키 차단 브라우저에서 새로고침 생존.
+    const demoToken = readDemoToken()
+    const projectSynced = params.get('projectId') === projectId
+    const shareSynced = !demoToken || params.get('share') === demoToken
+    if (projectSynced && shareSynced) return
     params.set('projectId', projectId)
+    if (demoToken) params.set('share', demoToken)
     window.history.replaceState(null, '', `${pathname}?${params.toString()}`)
   }, [projectId, pathname])
 
@@ -80,7 +89,7 @@ export default function StudioLayout({
     const stage = STAGES.find((s) => pathname.startsWith(s.path))
     if (!stage) return
     if (!canNavigateTo(stage.id as StageId)) {
-      router.replace('/studio/producer')
+      router.replace(withDemoShare('/studio/producer'))
       return
     }
     if (useProjectStore.getState().currentStage !== stage.id) {

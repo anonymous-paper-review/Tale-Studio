@@ -28,6 +28,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import type { StageId } from '@/types'
 import { OwnerOnly } from '@/components/demo/owner-only'
 import { ShareButton } from '@/components/demo/share-button'
+import { withDemoShare } from '@/lib/demo/context'
 
 const STAGE_ICONS: Record<StageId, React.ElementType> = {
   producer: Users,
@@ -171,7 +172,8 @@ export function Sidebar() {
                 <button
                   onClick={() => {
                     if (isArtistRetryable) void retryArtistDrafts()
-                    else if (!isLocked) router.push(stage.path)
+                    // 데모(URL 티켓): share 쿼리 유지 — 쿠키 차단 브라우저에서도 스테이지 이동 생존
+                    else if (!isLocked) router.push(withDemoShare(stage.path))
                   }}
                   disabled={isLocked && !isArtistRetryable}
                   className={cn(

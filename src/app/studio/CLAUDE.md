@@ -44,7 +44,7 @@ useEffect(() => {
   const stage = STAGES.find((s) => pathname.startsWith(s.path))
   if (!stage) return
   if (!canNavigateTo(stage.id as StageId)) {
-    router.replace('/studio/producer')
+    router.replace(withDemoShare('/studio/producer')) // 데모(URL 티켓)면 share 쿼리 유지
     return
   }
   if (useProjectStore.getState().currentStage !== stage.id) {
