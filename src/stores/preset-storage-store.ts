@@ -47,7 +47,7 @@ export const usePresetStorageStore = create<PresetStorageState>()((set) => ({
       const { presets } = (await res.json()) as {
         presets: CameraLightPreset[]
       }
-      set({ presets, loadedProjectId: projectId, loading: false })
+      set({ presets: presets ?? [], loadedProjectId: projectId, loading: false })
     } catch (err) {
       console.warn('[preset-storage] loadPresets failed', err)
       set({ loadedProjectId: projectId, loading: false })

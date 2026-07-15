@@ -18,7 +18,7 @@ import {
   serializeWriterScriptContext,
 } from '@/lib/script-lines'
 import { saveChatMessage } from '@/lib/chat-persistence'
-import { isDemoSession } from '@/lib/demo/context'
+import { isDemoSession, getDemoSnapshot } from '@/lib/demo/context'
 import { cannedFor } from '@/lib/demo/canned'
 import {
   STAGE_LABEL,
@@ -145,6 +145,27 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   stageBadges: {},
 
   loadMessages: async (projectId) => {
+    // 데모(공유) 세션: /api/* 는 fetch-guard 로 중립화(빈 응답)되므로 스냅샷에서 직접 채팅 이력을 읽는다.
+    if (isDemoSession()) {
+      const rows = (getDemoSnapshot()?.tables?.messages ?? []) as Array<{
+        stage: string
+        role: 'user' | 'model'
+        content: string
+        created_at?: string
+      }>
+      const ordered = [...rows].sort((a, b) =>
+        (a.created_at ?? '').localeCompare(b.created_at ?? ''),
+      )
+      set({
+        messages: ordered.map((m) => ({
+          id: makeId(),
+          stage: m.stage as StageId,
+          role: m.role,
+          content: m.content,
+        })),
+      })
+      return
+    }
     try {
       const res = await fetch(`/api/project/${projectId}/messages`)
       if (!res.ok) {
