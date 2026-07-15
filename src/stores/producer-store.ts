@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { depthLevelFromRuntime } from '@/lib/depth'
+import { isDemoSession } from '@/lib/demo/context'
 import { assignCastSlugs, assignLocationSlugs } from '@/lib/cast-slug'
 import { computeProducerSourceHash } from '@/lib/lifecycle'
 import { createPendingProposal } from '@/lib/pending-proposal'
@@ -511,6 +512,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   error: null,
 
   setStoryText: (text) => {
+    if (isDemoSession()) return
     set({ storyText: text })
     scheduleDraftSave(() => boardOf(get()))
   },
@@ -545,6 +547,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   setStyleAnchor: async (key) => {
+    if (isDemoSession()) return
     const projectId = useProjectStore.getState().projectId
     const prev = get().styleAnchorKey
     set({ styleAnchorKey: key })
@@ -559,6 +562,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   updateSettings: (partial) => {
+    if (isDemoSession()) return
     set((state) => ({
       projectSettings: { ...state.projectSettings, ...partial },
     }))
@@ -632,6 +636,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   addCastMember: (entityType) => {
+    // 데모(공유) 세션: 읽기전용 — 카드 추가/편집/삭제 무시(로컬 상태도 안 바꿔 "삭제된 척" 방지).
+    if (isDemoSession()) return ''
     const localId = newLocalId()
     set((state) => ({
       cast: [
@@ -644,6 +650,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   updateCastMember: (localId, patch) => {
+    if (isDemoSession()) return
     set((state) => ({
       cast: state.cast.map((m) => (m.localId === localId ? { ...m, ...patch, userEdited: true } : m)),
     }))
@@ -651,6 +658,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   removeCastMember: (localId) => {
+    if (isDemoSession()) return
     set((state) => ({
       cast: state.cast.filter((m) => m.localId !== localId),
     }))
@@ -658,6 +666,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   addBackground: () => {
+    if (isDemoSession()) return ''
     const localId = newLocalId('background')
     set((state) => ({
       backgrounds: [
@@ -670,6 +679,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   updateBackground: (localId, patch) => {
+    if (isDemoSession()) return
     set((state) => ({
       backgrounds: state.backgrounds.map((background) =>
         background.localId === localId
@@ -681,6 +691,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   removeBackground: (localId) => {
+    if (isDemoSession()) return
     set((state) => ({
       backgrounds: state.backgrounds.filter((background) => background.localId !== localId),
     }))
@@ -688,6 +699,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   saveAndHandoff: async () => {
+    if (isDemoSession()) return false
     const { storyText, projectSettings, cast, backgrounds } = get()
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return false

@@ -14,6 +14,7 @@ import { createClient } from '@/lib/supabase/client'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { notifyGenerationComplete } from '@/lib/generation-notify'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
+import { isDemoSession } from '@/lib/demo/context'
 import type { ArtistLookSummary } from '@/lib/artist/onboarding-message'
 
 export type ImageProvider = 'fal' | 'gemini' | 'tailscale'
@@ -651,6 +652,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   //   2) projectId 있으면 /api/artist/character 로 DB 영속 (실패해도 로컬 카드는 유지, error 표기)
   // 이미지(views)는 비워둠 — 사용자가 "Generate All Views" 로 생성하거나 autoGenerate가 보강.
   addCharacter: async (input) => {
+    if (isDemoSession()) return ''
     const name = input.name.trim()
     if (!name) return ''
     const role: CharacterRole = input.role ?? 'supporting'
@@ -728,6 +730,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   // 캐릭터 메타 인라인 편집 — characterAssets(name/description/fixedPrompt)와
   //   sceneManifest.characters(name/role/description/fixedPrompt)를 함께 낙관적 갱신 후 디바운스 PATCH.
   updateCharacter: (characterId, patch) => {
+    if (isDemoSession()) return
     set((state) => ({
       characterAssets: state.characterAssets.map((c) =>
         c.characterId === characterId
@@ -768,6 +771,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
   // 단일 뷰 생성 (crop 폐기, 2026-06-05). main=T2I, 방향=main 기반 i2i. 서버가 해당 뷰 컬럼만 갱신.
   generateCharacterView: async (characterId, view, actor = 'ui', instruction, safeMode) => {
+    if (isDemoSession()) return
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
     const key = `${characterId}:${view}`
@@ -902,6 +906,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   },
 
   generateWorldAsset: async (locationId, actor = 'ui') => {
+    if (isDemoSession()) return
     const { sceneManifest, selectedBoostPreset, imageProvider } = get()
     const location = sceneManifest?.locations.find(
       (l) => l.locationId === locationId,
@@ -969,6 +974,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   },
 
   generateWorldShot: async (locationId, shot, promptOverride, actor = 'ui') => {
+    if (isDemoSession()) return
     const { sceneManifest, selectedBoostPreset, imageProvider } = get()
     const location = sceneManifest?.locations.find(
       (l) => l.locationId === locationId,

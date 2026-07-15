@@ -40,6 +40,7 @@ import {
   type RegisteredCharacter,
 } from '@/stores/asset-storage-store'
 import { createClient } from '@/lib/supabase/client'
+import { isDemoSession } from '@/lib/demo/context'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { notifyGenerationComplete } from '@/lib/generation-notify'
 import { DEFAULT_VIDEO_MODEL, normalizeProvider } from '@/lib/video-models'
@@ -1014,6 +1015,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       // ─── node lifecycle ────────────────────────────────────────────────
 
       addSceneNode: (position, label) => {
+        if (isDemoSession()) return ''
         get().commitHistory()
         const id = newDirectorId('dn')
         const node: DirectorNode = {
@@ -1027,6 +1029,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       addShotNode: (parentSceneNodeId, position, label) => {
+        if (isDemoSession()) return ''
         get().commitHistory()
         const id = newDirectorId('dn')
         const node: DirectorNode = {
@@ -1057,6 +1060,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       addVideoTake: (parentShotNodeId, position) => {
+        if (isDemoSession()) return null
         const state = get()
         const mother = state.nodes.find((n) => n.id === parentShotNodeId)
         if (!mother || !isShotData(mother.data)) return null
@@ -1128,6 +1132,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       // ─── stage progression (진행 버튼) ──────────────────────────────────
       advanceShot: async (shotNodeId) => {
+        if (isDemoSession()) return
         const api = get()
         const node = api.nodes.find((n) => n.id === shotNodeId)
         if (!node || !isShotData(node.data)) return
@@ -1143,6 +1148,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       // ─── prompt node (Higgsfield식 분리 프롬프트) ───────────────────────
       addPromptNode: (position, text) => {
+        if (isDemoSession()) return ''
         get().commitHistory()
         const id = newDirectorId('dn')
         const data: PromptNodeData = {
@@ -1162,6 +1168,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       wirePromptToShot: (promptNodeId, shotNodeId) => {
+        if (isDemoSession()) return
         const api = get()
         const promptNode = api.nodes.find((n) => n.id === promptNodeId)
         const shotNode = api.nodes.find((n) => n.id === shotNodeId)
@@ -1189,6 +1196,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       updateNodeData: (id, patch) => {
+        if (isDemoSession()) return
         const prev = get().nodes.find((n) => n.id === id)
         if (!prev) return
         // 노드 데이터 수정은 undo 대상에서 제외 — generateStoryboardImage 등 생성 결과도
@@ -1249,6 +1257,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       deleteNode: (id) => {
+        if (isDemoSession()) return
         get().commitHistory()
         const ids = collectCascadeIds(get().nodes, id)
 
@@ -1298,6 +1307,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       // ─── edge lifecycle ────────────────────────────────────────────────
 
       addEdge: (source, target, data, sourceHandle, targetHandle) => {
+        if (isDemoSession()) return null
         if (source === target) return null
         get().commitHistory()
         const exists = get().edges.find(
@@ -1319,6 +1329,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       updateEdge: (id, patch) => {
+        if (isDemoSession()) return
         set((s) => ({
           edges: s.edges.map((e) =>
             e.id === id
@@ -1451,6 +1462,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       deleteEdge: (id) => {
+        if (isDemoSession()) return
         set((s) => ({
           edges: s.edges.filter((e) => e.id !== id),
           selectedEdgeId: s.selectedEdgeId === id ? null : s.selectedEdgeId,
@@ -1595,6 +1607,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       applyVideoOverride: (videoNodeId, override) => {
+        if (isDemoSession()) return
         set((s) => ({
           nodes: s.nodes.map((n) => {
             if (n.id !== videoNodeId || !isVideoData(n.data)) return n
@@ -1622,6 +1635,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       // ─── storyboard image (ST-2, I2I) ──────────────────────────────────
 
       generateStoryboardImage: async (shotNodeId) => {
+        if (isDemoSession()) return
         const api = get()
         const node = api.nodes.find((n) => n.id === shotNodeId)
         if (!node || !isShotData(node.data)) return
@@ -1755,6 +1769,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       generateAllStoryboardImages: async () => {
+        if (isDemoSession()) return
         // 씬 순서대로 Shot 수집 후 동시성 제한 병렬(2).
         // 순차(20장 직렬 → 수 분)에서 병렬로 단축. 각 샷은 자체 재시도/타임아웃 보유.
         const sceneNodes = get().nodes.filter((n) => isSceneData(n.data))
@@ -1788,6 +1803,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       // ─── video generation (ST-4) ────────────────────────────────────────
 
       generateVideoForShot: async (shotNodeId) => {
+        if (isDemoSession()) return null
         const api = get()
         const shotNode = api.nodes.find((n) => n.id === shotNodeId)
         if (!shotNode || !isShotData(shotNode.data)) return null
@@ -1831,6 +1847,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       regenerateVideo: async (videoNodeId) => {
+        if (isDemoSession()) return true
         const api = get()
         const videoNode = api.nodes.find((n) => n.id === videoNodeId)
         if (!videoNode || !isVideoData(videoNode.data)) return true

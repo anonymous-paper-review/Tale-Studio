@@ -11,6 +11,7 @@ import type {
 import { createClient } from '@/lib/supabase/client'
 import { classifyDialoguePatch } from '@/lib/writer-chat-updates'
 import { useProjectStore } from '@/stores/project-store'
+import { isDemoSession } from '@/lib/demo/context'
 
 
 const DEFAULT_CAMERA = {
@@ -165,6 +166,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   },
 
   updateScene: (id, changes) => {
+    if (isDemoSession()) return
     set((state) => {
       if (!state.sceneManifest) return state
       return {
@@ -213,6 +215,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   selectShot: (id) => set({ selectedShotId: id }),
 
   updateShot: (id, changes) => {
+    if (isDemoSession()) return
     set((state) => ({
       shots: state.shots.map((s) =>
         s.shotId === id ? { ...s, ...changes } : s,
@@ -255,6 +258,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   },
 
   addShot: async (sceneId, opts) => {
+    if (isDemoSession()) return null
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return null
     const prevShots = get().shots
@@ -357,6 +361,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   },
 
   deleteShot: async (shotId) => {
+    if (isDemoSession()) return
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
     const prev = get().shots
@@ -397,6 +402,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   },
 
   addScene: async (opts) => {
+    if (isDemoSession()) return null
     const projectId = useProjectStore.getState().projectId
     const manifest = get().sceneManifest
     if (!projectId || !manifest) return null
@@ -491,6 +497,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   },
 
   deleteScene: async (sceneId) => {
+    if (isDemoSession()) return
     const projectId = useProjectStore.getState().projectId
     const prevManifest = get().sceneManifest
     const prevShots = get().shots
@@ -592,6 +599,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   },
 
   reorderScenes: async (orderedIds) => {
+    if (isDemoSession()) return
     const projectId = useProjectStore.getState().projectId
     const manifest = get().sceneManifest
     if (!projectId || !manifest) return
@@ -620,6 +628,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   },
 
   regenerateScene: async (sceneId) => {
+    if (isDemoSession()) return
     const projectId = useProjectStore.getState().projectId
     const manifest = get().sceneManifest
     const scene = manifest?.scenes.find((s) => s.sceneId === sceneId)
