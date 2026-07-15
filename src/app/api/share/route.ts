@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
     projectId?: string
     expiresInDays?: number
+    live?: boolean
   }
   if (!body.projectId)
     return NextResponse.json({ error: 'projectId required' }, { status: 400 })
@@ -42,7 +43,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const token = newToken()
-  const snapshot = await buildProjectSnapshot(body.projectId)
+  // live=true → 동결 스냅샷 대신 { __live:true } 마커 저장. GET 라우트가 매 로드마다 현재 DB 를
+  //   재조회해 프로젝트 편집이 뷰어에 실시간 반영된다.
+  const snapshot = body.live ? { __live: true } : await buildProjectSnapshot(body.projectId)
   const expires_at = body.expiresInDays
     ? new Date(Date.now() + body.expiresInDays * 86_400_000).toISOString()
     : null

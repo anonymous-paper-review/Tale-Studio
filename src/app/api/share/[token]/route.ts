@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { buildProjectSnapshot } from '@/lib/demo/snapshot'
 import { NextResponse } from 'next/server'
 
 // project-share-demo-mode — 토큰 게이트 스냅샷 반환(무인증, 공개).
@@ -12,7 +13,7 @@ export async function GET(
 
   const { data: share } = await supabaseAdmin
     .from('project_shares')
-    .select('snapshot, expires_at, revoked_at')
+    .select('project_id, snapshot, expires_at, revoked_at')
     .eq('token', token)
     .maybeSingle()
 
@@ -20,6 +21,14 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (share.expires_at && new Date(share.expires_at).getTime() < Date.now())
     return NextResponse.json({ error: 'Expired' }, { status: 410 })
+
+  // 라이브 공유: snapshot 에 { __live: true } 마커가 있으면 매 로드마다 현재 DB 를 재조회해
+  //   프로젝트 편집(샷 이미지·영상 URL 등)이 뷰어에 그대로 반영된다(동결 스냅샷의 반대).
+  const live = (share.snapshot as { __live?: boolean } | null)?.__live === true
+  if (live && share.project_id) {
+    const fresh = await buildProjectSnapshot(share.project_id as string)
+    return NextResponse.json(fresh)
+  }
 
   return NextResponse.json(share.snapshot ?? {})
 }
