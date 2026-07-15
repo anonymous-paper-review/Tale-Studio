@@ -459,49 +459,61 @@ function CastCard({
         </button>
       ) : null}
 
-      {isPerson && detailsOpen ? (
-        <div className="mt-3 space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">역할</label>
-          <div className="flex gap-2">
-            {ROLE_TOGGLE.map(([value, label]) => {
-              const active = (member.role ?? 'supporting') === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => onPatch(member.localId, { role: value })}
-                  className={`rounded-md border px-3 py-1.5 text-xs ${
-                    active
-                      ? 'border-primary bg-primary/10 text-foreground'
-                      : `border-border text-muted-foreground ${HOVER_RED_BORDER}`
-                  }`}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      ) : null}
+      {/* 상세 본문 — 항상 마운트하고 grid-rows 0fr↔1fr 전환으로 펼침/접힘 애니메이션(#b1 2026-07-15). */}
+      {isPerson ? (
+        <div
+          className={cn(
+            'grid transition-[grid-template-rows] duration-300 ease-out',
+            detailsOpen ? '[grid-template-rows:1fr]' : '[grid-template-rows:0fr]',
+          )}
+          aria-hidden={!detailsOpen}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div className="mt-3 space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">역할</label>
+              <div className="flex gap-2">
+                {ROLE_TOGGLE.map(([value, label]) => {
+                  const active = (member.role ?? 'supporting') === value
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      tabIndex={detailsOpen ? 0 : -1}
+                      onClick={() => onPatch(member.localId, { role: value })}
+                      className={`rounded-md border px-3 py-1.5 text-xs ${
+                        active
+                          ? 'border-primary bg-primary/10 text-foreground'
+                          : `border-border text-muted-foreground ${HOVER_RED_BORDER}`
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
 
-      {deepPerson && detailsOpen ? (
-        <div className="mt-3 space-y-3">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">아크 (시작 / 끝 / 유형)</label>
-            <div className="grid grid-cols-3 gap-2">
-              <HoverBeam><Input value={member.arc?.start_state ?? ''} placeholder="시작 상태" onChange={(e) => patchArc({ start_state: e.target.value })} /></HoverBeam>
-              <HoverBeam><Input value={member.arc?.end_state ?? ''} placeholder="끝 상태" onChange={(e) => patchArc({ end_state: e.target.value })} /></HoverBeam>
-              <HoverBeam><Input value={member.arc?.arc_type ?? ''} placeholder="유형" onChange={(e) => patchArc({ arc_type: e.target.value })} /></HoverBeam>
-            </div>
-            {arcIssue ? <p className="text-xs text-destructive">{arcIssue.label}</p> : null}
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">동기 (want / need)</label>
-            <div className="grid grid-cols-2 gap-2">
-              <HoverBeam><Input value={member.motivation?.want ?? ''} placeholder="want (필수)" onChange={(e) => patchMot({ want: e.target.value })} /></HoverBeam>
-              <HoverBeam><Input value={member.motivation?.need ?? ''} placeholder="need (선택)" onChange={(e) => patchMot({ need: e.target.value })} /></HoverBeam>
-            </div>
-            {motivationIssue ? <p className="text-xs text-destructive">{motivationIssue.label}</p> : null}
+            {deepPerson ? (
+              <div className="mt-3 space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">아크 (시작 / 끝 / 유형)</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <HoverBeam><Input value={member.arc?.start_state ?? ''} placeholder="시작 상태" tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchArc({ start_state: e.target.value })} /></HoverBeam>
+                    <HoverBeam><Input value={member.arc?.end_state ?? ''} placeholder="끝 상태" tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchArc({ end_state: e.target.value })} /></HoverBeam>
+                    <HoverBeam><Input value={member.arc?.arc_type ?? ''} placeholder="유형" tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchArc({ arc_type: e.target.value })} /></HoverBeam>
+                  </div>
+                  {arcIssue ? <p className="text-xs text-destructive">{arcIssue.label}</p> : null}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">동기 (want / need)</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <HoverBeam><Input value={member.motivation?.want ?? ''} placeholder="want (필수)" tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchMot({ want: e.target.value })} /></HoverBeam>
+                    <HoverBeam><Input value={member.motivation?.need ?? ''} placeholder="need (선택)" tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchMot({ need: e.target.value })} /></HoverBeam>
+                  </div>
+                  {motivationIssue ? <p className="text-xs text-destructive">{motivationIssue.label}</p> : null}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
