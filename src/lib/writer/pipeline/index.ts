@@ -335,8 +335,9 @@ async function _runPipelineInner(
     resume,
     '11_v4_shotDesign.json',
     async () => {
-      const shots = await runShotDesign(genre, characters, scenes, visualIdentity, worldVisual, characterVisual, compact ? null : sceneCinematography, decoupage, midPreview.v_recommendations.v4, logger, models.V);
-      return { shots, compact_mode: compact };
+      // 로컬 전체 실행 — 시간 예산 없음(opts 생략 → 항상 done까지 완주).
+      const result = await runShotDesign(genre, characters, scenes, visualIdentity, worldVisual, characterVisual, compact ? null : sceneCinematography, decoupage, midPreview.v_recommendations.v4, logger, models.V);
+      return { shots: result.shots, compact_mode: compact };
     },
     'shotDesign',
     logger,

@@ -85,6 +85,9 @@ export interface WriterRunState extends WriterRunStateBase {
   // Shot 축
   decoupage?: DecoupagePlan;
   shotDesign?: ShotDesign[];
+  /** shotDesign 씬 단위 부분 진행(#long-writer-run 2026-07-15) — 긴 러닝타임 프로젝트에서
+   *  한 step(240s 예산) 안에 전 씬을 못 끝낼 때 완료 씬을 체크포인트하고 다음 step이 이어간다. */
+  shotDesignPartial?: { doneSceneIds: string[]; shots: ShotDesign[] };
   shotSequence?: ShotSequence;
   shotCheck?: ShotCheckReport;
   renderPrompts?: RenderPromptsOutput;
@@ -101,6 +104,8 @@ export interface WriterRunState extends WriterRunStateBase {
 interface StepContext {
   logger: PipelineLogger;
   projectId: string;
+  /** 이 step 인보케이션의 시간 예산(epoch ms) — 부분 진행 가능한 스테이지가 씬 사이에서 양보할 때 사용. */
+  deadlineMs?: number;
 }
 
 interface WriterStep {
@@ -297,10 +302,10 @@ export const WRITER_STEPS: WriterStep[] = [
   {
     key: 'shotDesign',
     has: (s) => s.shotDesign !== undefined,
-    run: async (s, { logger }) => {
+    run: async (s, { logger, deadlineMs }) => {
       const models = resolveModels(s.input);
       const compact = s.compact === true;
-      const shotDesign = await runShotDesign(
+      const result = await runShotDesign(
         s.genre!,
         s.characters!,
         s.scenes!,
@@ -312,13 +317,26 @@ export const WRITER_STEPS: WriterStep[] = [
         s.midPreview!.v_recommendations.v4, // bridge 거친 seed.v4 (샷 레시피)
         logger,
         models.V,
+        // 씬 단위 이어달리기(#long-writer-run): 이전 부분 진행 재개 + step 예산에서 양보.
+        { resume: s.shotDesignPartial ?? null, softDeadlineMs: deadlineMs },
       );
       await logger.flushRawLlm('shotDesign');
 
-      const patch: Partial<WriterRunState> = { shotDesign };
+      // 부분 진행 — 완료 씬 체크포인트만 남기고 스테이지 미완(has=false 유지).
+      //   runWriterSteps가 이를 감지해 attempt를 리셋하고 다음 step에서 이어간다.
+      if (!result.done) {
+        return {
+          shotDesignPartial: { doneSceneIds: result.doneSceneIds, shots: result.shots },
+        };
+      }
+
+      const patch: Partial<WriterRunState> = {
+        shotDesign: result.shots,
+        shotDesignPartial: undefined, // 체크포인트 정리 (JSONB 직렬화에서 키 제거)
+      };
       // Compact mode 사후처리: shotDesign 으로부터 sceneCinematography 역추론 (다운스트림 호환).
       if (compact) {
-        patch.sceneCinematography = inferSceneCinematographyFromShots(shotDesign, s.scenes!);
+        patch.sceneCinematography = inferSceneCinematographyFromShots(result.shots, s.scenes!);
       }
       return patch;
     },
@@ -465,7 +483,7 @@ export async function runWriterSteps(
     const stageStartedMs = Date.now();
     let patch: Partial<WriterRunState>;
     try {
-      patch = await step.run(state, { logger, projectId });
+      patch = await step.run(state, { logger, projectId, deadlineMs: opts.deadlineMs });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       await markFailed(run.id, message, captureErrorDetail(step.key, message));
@@ -475,6 +493,24 @@ export async function runWriterSteps(
 
     // 산출물 병합 + attempt 리셋 + 단계별 타이밍 기록 + 진행률 증가 → 체크포인트.
     Object.assign(state, patch);
+
+    // 부분 진행(#long-writer-run 2026-07-15): 병합 후에도 has()가 false = 스테이지가 씬
+    //   체크포인트만 남기고 양보한 것. 러너는 정상 반환 시 패스당 최소 1단위 진행을 보장하므로
+    //   attempt를 리셋하고(중도 kill과 구분) 유닛/타이밍은 최종 완료 패스에서만 기록한다.
+    //   같은 인보케이션에서 재진입하지 않고 paused로 양보 — 다음 step이 이어간다.
+    if (!step.has(state)) {
+      state._attempt = undefined;
+      try {
+        await saveRunState(run.id, state, { completed_units: completedUnits, current_stage: step.key });
+      } catch {
+        return { paused: true };
+      }
+      console.log(
+        `[writer timing] ${projectId} · ${step.key} partial checkpoint (${((Date.now() - stageStartedMs) / 1000).toFixed(1)}s)`,
+      );
+      return { paused: true };
+    }
+
     state._attempt = undefined;
     state._timings = {
       ...(state._timings ?? {}),
