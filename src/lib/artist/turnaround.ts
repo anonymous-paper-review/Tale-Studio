@@ -87,15 +87,17 @@ function describe(input: CharacterPromptInput): string[] {
   const costumeList = safe
     ? (input.costumes ?? []).map(safeScrub).filter(Boolean)
     : (input.costumes ?? [])
-  // 캐릭터 레퍼런스(정체성 앵커)는 대표(첫) 의상 1벌만 쓴다 (A, 2026-07-15).
-  //   costume 목록엔 스토리상 여러 씬 의상이 섞일 수 있어(예: 정장+잠옷) 전부 넘기면
-  //   모델이 임의로 하나(잠옷)를 골라 레퍼런스가 엉뚱한 옷으로 굳고 → 그 레퍼런스를 참조하는
-  //   모든 샷에 전파된다(사무실인데 잠옷). 씬별 올바른 의상은 이미 샷 프롬프트
-  //   (first_frame_prompt)가 지정하므로, 레퍼런스는 대표 의상만 앵커한다.
-  //   TODO(B, open_questions Q-ART-1): 아티스트 단계에서 타임라인/씬별 의상 스냅샷을
-  //     별도 레퍼런스로 추가하면 의상 변화까지 이미지로 고정 가능(현재는 대표 1벌만).
-  const primaryCostume = costumeList[0]
-  const costumes = primaryCostume ? `wearing ${primaryCostume}` : ''
+  // 캐릭터 레퍼런스(정체성 앵커)는 "기본 착장"만 앵커한다 (A, 2026-07-15).
+  //   costume 목록엔 스토리상 씬별 대체 의상(잠옷 등)이 섞일 수 있는데, 이런 대체 착장이
+  //   레퍼런스 이미지에 잡히면 그 옷이 그 레퍼런스를 참조하는 전 샷에 전파된다(사무실인데 잠옷).
+  //   넥타이·시계·안경·터틀넥처럼 같이 입는 상시 아이템은 보존하고, 명백한 취침/대체 착장만 제외한다.
+  //   씬별 올바른 의상은 이미 샷 프롬프트(first_frame_prompt)가 텍스트로 지정한다.
+  //   TODO(B, open_questions Q-ART-1): 아티스트 단계에서 씬/타임라인별 의상 스냅샷을
+  //     별도 레퍼런스로 추가하면 의상 변화까지 이미지로 고정 가능(현재는 기본 착장만 앵커).
+  const ALT_OUTFIT = /pajama|pyjama|nightwear|nightgown|nightdress|sleepwear|loungewear|잠옷|파자마|나이트가운/i
+  const anchorCostumes = costumeList.filter((c) => !ALT_OUTFIT.test(c))
+  const finalCostumes = anchorCostumes.length ? anchorCostumes : costumeList
+  const costumes = finalCostumes.length ? `wearing ${finalCostumes.join(', ')}` : ''
   return [
     // safe-mode: 명시 나이 토큰 제거(age-ambiguous 로 대체).
     safe ? '' : input.age ? `age ${input.age}` : '',
