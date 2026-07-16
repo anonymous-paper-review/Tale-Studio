@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { ProjectSettings, ProjectFormat } from '@/types'
 import type { Json } from '@/types/database'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, createCatalogClient } from '@/lib/supabase/client'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { depthLevelFromRuntime } from '@/lib/depth'
@@ -522,9 +522,12 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   loadStyleAnchors: async () => {
     const projectId = useProjectStore.getState().projectId
     try {
+      // style_anchors 는 전역 공개 카탈로그 → 데모(공유) 세션에서도 실 anon 으로 읽는다(스냅샷 미포함,
+      //   프리뷰 등 최신 반영). 프로젝트의 선택 키(style_anchor_key)는 createClient()로 — 데모면 스냅샷.
+      const catalog = createCatalogClient()
       const supabase = createClient()
       const [{ data: anchors }, projRes] = await Promise.all([
-        supabase
+        catalog
           .from('style_anchors')
           .select('key, label, medium, image_url, preview_url, sort_order')
           .eq('is_active', true)

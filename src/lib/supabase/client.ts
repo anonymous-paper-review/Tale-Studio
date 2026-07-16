@@ -21,3 +21,11 @@ export function createClient(): ReturnType<typeof realClient> {
   }
   return realClient()
 }
+
+// 전역 공개 카탈로그(예: style_anchors) 읽기 전용 클라이언트 — 데모 세션에서도 실 anon DB 로
+//   읽는다. 이런 테이블은 프로젝트/유저 데이터가 아니라 모두에게 동일한 참조 카탈로그(RLS off,
+//   공개)라 스냅샷에 얼릴 대상이 아니다: 얼리면 공유 시점 값에 고정돼 카탈로그 갱신(새 프리뷰 등)이
+//   기존 공유에 반영되지 않는다. 오직 공개 카탈로그 읽기에만 사용 — 프로젝트/유저 데이터엔 쓰지 말 것.
+export function createCatalogClient(): ReturnType<typeof realClient> {
+  return realClient()
+}
