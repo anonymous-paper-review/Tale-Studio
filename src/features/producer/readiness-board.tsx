@@ -285,12 +285,22 @@ function StyleAnchorPicker({
                       : 'border-border hover:border-primary/60',
                   )}
                 >
-                  {/* 예시 이미지 자리 — 실제 I2I 레퍼런스(anchor.imageUrl)는 노출하지 않는다.
-                      사용자가 예시 이미지를 넣기 전까지 빈 플레이스홀더. */}
-                  <div className="relative flex aspect-video items-center justify-center bg-muted">
-                    <ImageIcon className="size-6 text-muted-foreground opacity-40" />
+                  {/* 예시 이미지(preview_url) — I2I 레퍼런스(anchor.imageUrl)와 분리된 표시 전용.
+                      정사각 원본을 그대로 보여준다. 프리뷰 없으면 플레이스홀더 폴백. */}
+                  <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted">
+                    {anchor.previewUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={anchor.previewUrl}
+                        alt={anchor.label}
+                        loading="lazy"
+                        className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <ImageIcon className="size-6 text-muted-foreground opacity-40" />
+                    )}
                     {active ? (
-                      <span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                      <span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
                         <Check className="size-3" />
                       </span>
                     ) : null}

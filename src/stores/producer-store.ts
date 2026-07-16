@@ -152,6 +152,8 @@ export interface StyleAnchor {
   label: string
   medium: string
   imageUrl: string | null
+  /** 픽커 표시용 예시 이미지(preview_url) — I2I 레퍼런스(imageUrl)와 분리. */
+  previewUrl: string | null
 }
 
 interface ProducerState {
@@ -524,7 +526,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       const [{ data: anchors }, projRes] = await Promise.all([
         supabase
           .from('style_anchors')
-          .select('key, label, medium, image_url, sort_order')
+          .select('key, label, medium, image_url, preview_url, sort_order')
           .eq('is_active', true)
           .order('sort_order'),
         projectId
@@ -537,6 +539,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           label: a.label,
           medium: a.medium,
           imageUrl: a.image_url ?? null,
+          previewUrl: a.preview_url ?? null,
         })),
         styleAnchorKey:
           (projRes.data as { style_anchor_key?: string | null } | null)?.style_anchor_key || null,
