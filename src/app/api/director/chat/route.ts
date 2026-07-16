@@ -87,6 +87,11 @@ JSON block must be the LAST element.
 \`\`\`
 </format>
 
+<batch-limit>
+Emit AT MOST 12 updates in a single response. This is a hard cap — a larger JSON block gets truncated mid-output and nothing applies.
+If the request needs more (e.g. "모든 샷", "전체 씬에 대해"), do only the first batch, then in the reply text say what you did and ask the user to say "계속" for the next batch. Never attempt dozens of updates at once.
+</batch-limit>
+
 <examples>
 <example>
 <user>오프닝 씬 만들어줘, 다리 위에서 황혼 무렵.</user>

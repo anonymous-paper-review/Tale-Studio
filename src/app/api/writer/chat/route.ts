@@ -68,6 +68,11 @@ Reply text in 1-3 sentences (Korean if the user wrote Korean), then — only if 
 \`\`\`
 </format>
 
+<batch-limit>
+Emit AT MOST 12 updates in a single response. This is a hard cap — a larger JSON block gets truncated mid-output and nothing applies.
+If the user's request needs more (e.g. "rewrite every shot", "모든 샷", "전체 씬"), do only the first batch (e.g. the current or first scene), then in the reply text say which part you did and ask them to say "계속" to continue with the next batch. Never attempt to emit dozens of updates at once.
+</batch-limit>
+
 <examples>
 <example>
 <user>마지막 씬에 용사 클로즈업 샷 하나 추가해줘</user>

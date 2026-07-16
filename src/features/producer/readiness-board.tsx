@@ -257,7 +257,7 @@ function StyleAnchorPicker({
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>스타일 & 톤 선택</DialogTitle>
+          <DialogTitle>스타일 선택</DialogTitle>
           <DialogDescription>
             영상 전체에 적용할 시각 스타일을 골라 주세요.
           </DialogDescription>
@@ -867,7 +867,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
 
               {/* 세부 장르 필드는 숨김(2026-07-13 — 데이터(settings.subGenre)는 유지) → 스타일&톤(style_anchors)으로 대체.
                   콤보 박스는 글자만, 클릭 시 그리드 팝업으로 선택(#b 2026-07-14). */}
-              <FieldShell icon={<Tag className="size-4" />} label="스타일&톤" mentionRef="setting:styleAnchor" mentionLabel="스타일&톤">
+              <FieldShell icon={<Tag className="size-4" />} label="스타일" mentionRef="setting:styleAnchor" mentionLabel="스타일">
                 <StyleAnchorPicker
                   anchors={styleAnchors}
                   value={styleAnchorKey}
