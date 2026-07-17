@@ -42,10 +42,43 @@ export async function POST(req: NextRequest) {
   if (!(await isOwner(body.projectId, user.id)))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  // 재사용: 이 프로젝트에 활성(미취소·미만료) 링크가 이미 있으면 새 토큰을 만들지 않고 그대로 돌려준다
+  //   — 클릭마다 링크가 늘어나던 문제 제거. 프로젝트당 안정된 링크 하나.
+  //   레거시 동결 스냅샷 링크는 라이브로 정규화해, 재사용 링크가 항상 현재 상태를 반영하게 한다.
+  const { data: existing } = await supabaseAdmin
+    .from('project_shares')
+    .select('id, token, snapshot')
+    .eq('project_id', body.projectId)
+    .is('revoked_at', null)
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (existing) {
+    const isLive =
+      (existing.snapshot as { __live?: boolean } | null)?.__live === true
+    if (!isLive) {
+      await supabaseAdmin
+        .from('project_shares')
+        .update({ snapshot: { __live: true } })
+        .eq('id', existing.id)
+    }
+    return NextResponse.json({
+      id: existing.id,
+      token: existing.token,
+      path: `/share/${existing.token}`,
+      reused: true,
+    })
+  }
+
   const token = newToken()
-  // live=true → 동결 스냅샷 대신 { __live:true } 마커 저장. GET 라우트가 매 로드마다 현재 DB 를
-  //   재조회해 프로젝트 편집이 뷰어에 실시간 반영된다.
-  const snapshot = body.live ? { __live: true } : await buildProjectSnapshot(body.projectId)
+  // 기본은 라이브 링크({ __live:true }): GET 라우트가 매 로드마다 현재 DB 를 재조회해
+  //   공유 후 편집이 뷰어에 그대로 반영된다. (live:false 를 명시해야 생성 시점 동결 스냅샷)
+  const live = body.live !== false
+  const snapshot = live
+    ? { __live: true }
+    : await buildProjectSnapshot(body.projectId)
   const expires_at = body.expiresInDays
     ? new Date(Date.now() + body.expiresInDays * 86_400_000).toISOString()
     : null
