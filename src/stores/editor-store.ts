@@ -616,11 +616,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (projectId) {
       try {
         const supabase = createClient()
-        const { data: dbShots } = await supabase
-          .from('shots')
-          .select('*')
-          .eq('project_id', projectId)
-          .order('sort_order')
+        const [{ data: dbShots }, { data: dbClips }] = await Promise.all([
+          supabase
+            .from('shots')
+            .select('*')
+            .eq('project_id', projectId)
+            .order('sort_order'),
+          supabase
+            .from('video_clips')
+            .select('shot_id, thumbnail_url, is_final')
+            .eq('project_id', projectId),
+        ])
+
+        // shot_id → thumbnail_url (is_final 우선). Editor 타임라인/소스 패널이 <video> 대신
+        //   poster 이미지로 그려 진입 시 N개 비디오 메타데이터 요청 폭주를 없앤다.
+        const thumbByShot = new Map<string, string>()
+        for (const c of dbClips ?? []) {
+          if (!c.shot_id || !c.thumbnail_url) continue
+          if (c.is_final || !thumbByShot.has(c.shot_id)) {
+            thumbByShot.set(c.shot_id, c.thumbnail_url as string)
+          }
+        }
 
         if (dbShots?.length) {
           const shots: Shot[] = dbShots.map((s) => ({
@@ -641,7 +657,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             shotId: s.shot_id,
             url: s.video_url ?? null,
             status: s.video_url ? 'completed' : 'pending',
-            thumbnailUrl: null,
+            thumbnailUrl: thumbByShot.get(s.shot_id) ?? null,
             trimStart: s.trim_start ?? undefined,
             trimEnd: s.trim_end ?? undefined,
             speed: s.speed ?? 1.0,

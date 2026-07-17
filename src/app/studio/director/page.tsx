@@ -485,6 +485,9 @@ function CanvasInner() {
         zoomOnScroll={false}
         zoomActivationKeyCode="Control"
         proOptions={{ hideAttribution: true }}
+        // 큰 그래프(완성 프로젝트)에서 오프스크린 노드까지 전부 마운트하면 풀해상도
+        //   스토리보드 <img> 수십 장이 한 번에 렌더돼 초기 진입이 느리다 → 보이는 노드만 렌더.
+        onlyRenderVisibleElements
         className="bg-background"
       >
         <Background gap={16} size={1} className="opacity-30" />

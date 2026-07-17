@@ -12,6 +12,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { ImageIcon, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isAssetData, type DirectorNode } from '@/types/director'
+import { thumbUrl } from '@/lib/image-url'
 
 const KIND_STYLE = {
   character: { border: 'border-chart-1/70', dot: 'bg-chart-1', label: 'Character' },
@@ -52,8 +53,10 @@ function AssetNodeImpl({ data }: NodeProps<DirectorNode>) {
           {data.imageUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
-              src={data.imageUrl}
+              src={thumbUrl(data.imageUrl, 96)}
               alt={data.label}
+              loading="lazy"
+              decoding="async"
               className="size-full object-cover"
               draggable={false}
             />

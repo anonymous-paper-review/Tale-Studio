@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { Shot, VideoClip } from '@/types'
 import { cn } from '@/lib/utils'
+import { thumbUrl } from '@/lib/image-url'
 
 interface ShotTimelineProps {
   orderedShotIds: string[]
@@ -116,9 +117,10 @@ export function ShotTimeline({
               {clip?.url ? (
                 <video
                   src={clip.url}
+                  poster={thumbUrl(clip.thumbnailUrl ?? shot.referenceImageUrl, 256)}
                   className="h-full w-full rounded object-cover"
                   muted
-                  preload="metadata"
+                  preload="none"
                 />
               ) : shot.referenceImageUrl ? (
                 <img

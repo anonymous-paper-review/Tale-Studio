@@ -15,6 +15,7 @@ import {
 import type { Shot, VideoClip, AudioSource } from '@/types'
 import { ingestAudioFile } from '@/lib/audio-waveform'
 import { startBinDrag, dropTargetSec } from '@/lib/pointer-drag'
+import { thumbUrl } from '@/lib/image-url'
 
 interface VideoSourcePanelProps {
   open: boolean
@@ -141,7 +142,7 @@ export function VideoSourcePanel({
                       >
                         <div className="flex aspect-video items-center justify-center overflow-hidden rounded bg-muted text-[9px] text-muted-foreground">
                           {clip?.url ? (
-                            <video src={clip.url} className="h-full w-full rounded object-cover" muted preload="metadata" draggable={false} />
+                            <video src={clip.url} poster={thumbUrl(clip.thumbnailUrl ?? shot.referenceImageUrl, 256)} className="h-full w-full rounded object-cover" muted preload="none" draggable={false} />
                           ) : shot.referenceImageUrl ? (
                             <img src={shot.referenceImageUrl} alt={shot.shotType} className="h-full w-full rounded object-cover" draggable={false} />
                           ) : clip?.thumbnailUrl ? (

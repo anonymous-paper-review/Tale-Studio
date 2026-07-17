@@ -20,6 +20,7 @@ import {
   ContextMenuRadioItem,
 } from '@/components/ui/context-menu'
 import { TimelineScrollbars } from '@/features/editor/timeline-scrollbars'
+import { thumbUrl } from '@/lib/image-url'
 
 const CLIP_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4]
 const TRIM_MIN = 0.1 // 트림 최소 길이(초)
@@ -841,7 +842,7 @@ export function Timeline({
                       >
                         <div className="pointer-events-none flex h-full w-full items-center justify-center bg-muted text-[8px] text-muted-foreground">
                           {clip?.url ? (
-                            <video src={clip.url} className="h-full w-full object-cover" muted preload="metadata" draggable={false} />
+                            <video src={clip.url} poster={thumbUrl(clip.thumbnailUrl ?? shot.referenceImageUrl, 256)} className="h-full w-full object-cover" muted preload="none" draggable={false} />
                           ) : shot.referenceImageUrl ? (
                             <img src={shot.referenceImageUrl} alt={shot.shotType} className="h-full w-full object-cover" draggable={false} />
                           ) : (

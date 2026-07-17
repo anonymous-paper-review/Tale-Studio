@@ -13,6 +13,7 @@ import {
 import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
 import { isShotData, isPromptData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
+import { thumbUrl } from '@/lib/image-url'
 
 
 function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
@@ -123,8 +124,10 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           <div className="group/img relative mt-2 aspect-video w-full overflow-hidden rounded-sm border border-border/40">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={stageImageUrl}
+              src={thumbUrl(stageImageUrl, 512)}
               alt={stage === 'rough' ? 'rough storyboard' : 'storyboard'}
+              loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover transition-opacity group-hover/img:opacity-30"
             />
             {/* 호버 시 디밍 + 생성 정보(프롬프트/모델/따로 뺀 프롬프트 칩) */}
@@ -170,7 +173,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
                 className="h-8 w-8 overflow-hidden rounded-sm border border-border/40"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img.url} alt="ref" className="h-full w-full object-cover" />
+                <img src={thumbUrl(img.url, 96)} alt="ref" loading="lazy" decoding="async" className="h-full w-full object-cover" />
               </div>
             ))}
             {data.referenceImages.length > 4 && (

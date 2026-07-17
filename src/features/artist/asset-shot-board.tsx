@@ -18,6 +18,7 @@ import {
   type BoardShot,
 } from '@/stores/artist-board-store'
 import { useProjectStore } from '@/stores/project-store'
+import { thumbUrl } from '@/lib/image-url'
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
 import { WorldViewDialog } from '@/features/artist/world-view-dialog'
 import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
@@ -360,9 +361,11 @@ function AssetCard({
       >
         {imageUrl ? (
           <img
-            src={imageUrl}
+            src={thumbUrl(imageUrl, 384)}
             alt={name}
             draggable={false}
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 size-full object-cover"
           />
         ) : (
@@ -492,9 +495,11 @@ function RefChip({
     >
       {imageUrl ? (
         <img
-          src={imageUrl}
+          src={thumbUrl(imageUrl, 64)}
           alt=""
           draggable={false}
+          loading="lazy"
+          decoding="async"
           className="size-6 shrink-0 rounded-full object-cover"
         />
       ) : (

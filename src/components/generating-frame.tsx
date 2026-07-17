@@ -112,6 +112,8 @@ export function GeneratedImage({
     <img
       src={src}
       alt={alt}
+      loading="lazy"
+      decoding="async"
       onLoad={() => setLoaded(true)}
       className={cn(
         'transition-[filter,opacity,transform] duration-500 ease-out',
