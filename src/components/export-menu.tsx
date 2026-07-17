@@ -9,11 +9,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { errorMessage, exportProject, exportStage } from '@/lib/export'
 import type { ExportResult, ExportStage } from '@/lib/export/types'
 import { useProjectStore } from '@/stores/project-store'
 import type { StageId } from '@/types'
+import { captureScreenJpeg } from '@/lib/export/screenshot'
 
 export type ExportFileKind = 'image' | 'video' | 'audio' | 'text' | 'other'
 export type ExportFileCountsByKind = Partial<Record<ExportFileKind, number>>
@@ -66,7 +68,9 @@ export function ExportMenu() {
   const projectId = useProjectStore((s) => s.projectId)
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const currentStage = useProjectStore((s) => s.currentStage)
-  const [busyScope, setBusyScope] = useState<ExportScope | null>(null)
+  const [busyScope, setBusyScope] = useState<
+    ExportScope | 'screenshot' | null
+  >(null)
 
   const stage = resolveExportStage(currentStage)
   const isBusy = busyScope !== null
@@ -111,45 +115,65 @@ export function ExportMenu() {
     }
   }
 
+  const runScreenshot = async () => {
+    if (!projectId || isBusy) return
+    setBusyScope('screenshot')
+    try {
+      const base = projectTitle.trim() || 'tale-studio'
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
+      // 드롭다운이 닫혀 캡처에 잡히지 않도록 한 박자 양보
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      await captureScreenJpeg(`${base}-${stamp}.jpg`)
+      toast.success('화면을 JPEG로 저장했어요')
+    } catch (error) {
+      toast.error(`캡처 실패: ${errorMessage(error, '알 수 없는 오류')}`)
+    } finally {
+      setBusyScope(null)
+    }
+  }
+
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            aria-label="내보내기 / Export"
-            title={projectId ? '내보내기 / Export' : '프로젝트를 먼저 열어주세요'}
-            disabled={disabled}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isBusy ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Download className="h-5 w-5" />
-            )}
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="right" align="end" className="min-w-44">
-          <DropdownMenuItem
-            disabled={!projectId || isBusy || !stage}
-            onSelect={() => void runExport('stage')}
-            className="cursor-pointer"
-          >
-            이 단계만 내보내기
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            disabled={!projectId || isBusy}
-            onSelect={() => void runExport('project')}
-            className="cursor-pointer"
-          >
-            전체 프로젝트 ZIP
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <span className="text-[10px] font-medium leading-none text-muted-foreground">
-        내보내기
-      </span>
-    </>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="내보내기 / Export"
+          title={projectId ? '내보내기 / Export' : '프로젝트를 먼저 열어주세요'}
+          disabled={disabled}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isBusy ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <Download className="h-5 w-5" />
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="right" align="end" className="min-w-44">
+        <DropdownMenuItem
+          disabled={!projectId || isBusy}
+          onSelect={() => void runScreenshot()}
+          className="cursor-pointer"
+        >
+          화면 JPEG로 저장
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          disabled={!projectId || isBusy || !stage}
+          onSelect={() => void runExport('stage')}
+          className="cursor-pointer"
+        >
+          이 단계 ZIP
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={!projectId || isBusy}
+          onSelect={() => void runExport('project')}
+          className="cursor-pointer"
+        >
+          전체 프로젝트 ZIP
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
