@@ -117,7 +117,7 @@ export function ShotTimeline({
               {clip?.url ? (
                 <video
                   src={clip.url}
-                  poster={thumbUrl(clip.thumbnailUrl ?? shot.referenceImageUrl, 256)}
+                  poster={clip.thumbnailUrl ?? thumbUrl(shot.referenceImageUrl)}
                   className="h-full w-full rounded object-cover"
                   muted
                   preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'}

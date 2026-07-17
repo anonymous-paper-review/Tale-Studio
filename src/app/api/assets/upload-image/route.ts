@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
+import { uploadThumbnail } from '@/lib/storage-thumb'
 
 export async function POST(req: Request) {
   try {
@@ -48,6 +49,9 @@ export async function POST(req: Request) {
       .upload(path, buffer, { contentType: mimeType, upsert: true })
 
     if (uploadErr) throw uploadErr
+
+    // 방법 B: 원본 옆에 작은 WebP 썸네일 생성 (영상 썸네일 업로드는 이미 작으므로 제외).
+    if (type !== 'video') await uploadThumbnail(path, buffer)
 
     // 4. Get public URL — 결정적 경로 + upsert 는 URL 이 영원히 같아 브라우저/CDN(max-age=3600)이
     //    재업로드 후에도 옛 이미지를 보여준다 → 업로드 시각 버전 쿼리로 캐시 키를 갈아준다

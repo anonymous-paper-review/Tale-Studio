@@ -142,7 +142,7 @@ export function VideoSourcePanel({
                       >
                         <div className="flex aspect-video items-center justify-center overflow-hidden rounded bg-muted text-[9px] text-muted-foreground">
                           {clip?.url ? (
-                            <video src={clip.url} poster={thumbUrl(clip.thumbnailUrl ?? shot.referenceImageUrl, 256)} className="h-full w-full rounded object-cover" muted preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'} draggable={false} />
+                            <video src={clip.url} poster={clip.thumbnailUrl ?? thumbUrl(shot.referenceImageUrl)} className="h-full w-full rounded object-cover" muted preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'} draggable={false} />
                           ) : shot.referenceImageUrl ? (
                             <img src={shot.referenceImageUrl} alt={shot.shotType} className="h-full w-full rounded object-cover" draggable={false} />
                           ) : clip?.thumbnailUrl ? (

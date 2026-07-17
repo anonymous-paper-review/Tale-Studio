@@ -842,7 +842,7 @@ export function Timeline({
                       >
                         <div className="pointer-events-none flex h-full w-full items-center justify-center bg-muted text-[8px] text-muted-foreground">
                           {clip?.url ? (
-                            <video src={clip.url} poster={thumbUrl(clip.thumbnailUrl ?? shot.referenceImageUrl, 256)} className="h-full w-full object-cover" muted preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'} draggable={false} />
+                            <video src={clip.url} poster={clip.thumbnailUrl ?? thumbUrl(shot.referenceImageUrl)} className="h-full w-full object-cover" muted preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'} draggable={false} />
                           ) : shot.referenceImageUrl ? (
                             <img src={shot.referenceImageUrl} alt={shot.shotType} className="h-full w-full object-cover" draggable={false} />
                           ) : (

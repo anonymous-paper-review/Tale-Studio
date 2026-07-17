@@ -10,6 +10,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { completeGenerationJob, type GenerationJob } from '@/lib/generation-jobs'
 import { type CandidateView } from '@/lib/image-provenance'
 import { cropTurnaroundPortrait } from '@/lib/artist/portrait'
+import { uploadThumbnail } from '@/lib/storage-thumb'
 
 // Supabase Storage 객체 키는 ASCII-safe 여야 한다 (공백·한글 등 → "Invalid key" 업로드 실패).
 //   버그: 오픈캐스트 로케이션 id 가 scene.location 원문(한글+공백)이라 키에 그대로 들어가 거부 →
@@ -56,6 +57,7 @@ export async function finalizeCharacterViewJob(
     .from('media')
     .upload(path, buf, { contentType: 'image/png', upsert: true })
   if (upErr) throw upErr
+  await uploadThumbnail(path, buf)
   const publicUrl = versionedUrl(
     supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl,
   )
@@ -113,6 +115,7 @@ async function savePortraitFromMain(
         .from('media')
         .upload(path, cropped, { contentType: 'image/png', upsert: true })
       if (upErr) throw upErr
+      await uploadThumbnail(path, cropped)
       portraitUrl = versionedUrl(
         supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl,
       )
@@ -210,6 +213,7 @@ export async function uploadImageFromUrl(
     .from('media')
     .upload(path, buf, { contentType: 'image/png', upsert: true })
   if (upErr) throw upErr
+  await uploadThumbnail(path, buf)
   return versionedUrl(supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl)
 }
 
