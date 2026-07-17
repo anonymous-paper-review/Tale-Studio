@@ -120,7 +120,7 @@ export function ShotTimeline({
                   poster={thumbUrl(clip.thumbnailUrl ?? shot.referenceImageUrl, 256)}
                   className="h-full w-full rounded object-cover"
                   muted
-                  preload="none"
+                  preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'}
                 />
               ) : shot.referenceImageUrl ? (
                 <img
