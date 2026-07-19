@@ -8,12 +8,16 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronsDown,
   ChevronsUp,
   Clock,
   Film,
+  GalleryHorizontal,
   ImageIcon,
   Languages,
+  LayoutGrid,
   Monitor,
   Palette,
   Trash2,
@@ -227,6 +231,45 @@ function FieldShell({
 // 스타일&톤 선택기 — 콤보 박스(글자만 표기) → 클릭 시 그리드 팝업(#b 2026-07-14).
 //   실제 I2I 레퍼런스 이미지(anchor.imageUrl)는 노출하지 않는다. 예시 이미지 자리는 빈
 //   플레이스홀더 — 사용자가 추후 예시 이미지를 넣을 예정. 선택 표시는 라벨 텍스트로만.
+/** 예시 이미지 + 라벨 카드 내용(그리드·슬라이더 공용). */
+function StyleAnchorCardBody({ anchor, active }: { anchor: StyleAnchor; active: boolean }) {
+  return (
+    <>
+      {/* 예시 이미지(preview_url) — I2I 레퍼런스(anchor.imageUrl)와 분리된 표시 전용.
+          정사각 원본을 그대로 보여준다. 프리뷰 없으면 플레이스홀더 폴백. */}
+      <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted">
+        {anchor.previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={anchor.previewUrl}
+            alt={anchor.label}
+            loading="lazy"
+            className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <ImageIcon className="size-6 text-muted-foreground opacity-40" />
+        )}
+        {active ? (
+          <span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+            <Check className="size-3" />
+          </span>
+        ) : null}
+      </div>
+      <div className="flex flex-col gap-0.5 px-3 py-2">
+        <span className="line-clamp-1 text-sm font-medium text-foreground">{anchor.label}</span>
+        {anchor.medium ? (
+          <span className="line-clamp-1 text-xs text-muted-foreground">{anchor.medium}</span>
+        ) : null}
+      </div>
+    </>
+  )
+}
+
+// 스타일 선택기 — 콤보 박스(글자만) → 그리드/슬라이더 두 뷰 팝업(#b1 2026-07-18).
+//   헤더 우상단 토글 아이콘으로 grid ↔ sliding card 전환. 슬라이더는 한 장씩 크게 보여주며
+//   좌우 화살표/도트로 이동하고, 이동 시 트랙이 translateX 로 미끄러진다(카드 이동 애니메이션).
+type StyleView = 'grid' | 'slider'
+
 function StyleAnchorPicker({
   anchors,
   value,
@@ -237,9 +280,29 @@ function StyleAnchorPicker({
   onSelect: (key: string) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [view, setView] = useState<StyleView>('grid')
+  const [slide, setSlide] = useState(0)
   const selected = anchors.find((a) => a.key === value) ?? null
+  const selectedIdx = Math.max(0, anchors.findIndex((a) => a.key === value))
+
+  // 슬라이더로 전환하거나 팝업을 열 때 현재 선택 카드로 위치를 맞춘다.
+  const syncSlideToSelected = () => setSlide(selectedIdx)
+
+  const choose = (key: string) => {
+    onSelect(key)
+    setOpen(false)
+  }
+  const move = (dir: 1 | -1) =>
+    setSlide((i) => (i + dir + anchors.length) % anchors.length)
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o)
+        if (o) syncSlideToSelected()
+      }}
+    >
       <DialogTrigger asChild>
         <button
           type="button"
@@ -261,63 +324,119 @@ function StyleAnchorPicker({
           <DialogDescription>
             영상 전체에 적용할 시각 스타일을 골라 주세요.
           </DialogDescription>
+          {/* 뷰 전환 토글 — 우상단(닫기 X 왼쪽). grid ↔ sliding card. */}
+          {anchors.length > 0 ? (
+            <div className="absolute right-12 top-4 inline-flex items-center gap-0.5 rounded-md border border-border bg-muted/50 p-0.5">
+              <button
+                type="button"
+                aria-label="그리드 보기"
+                aria-pressed={view === 'grid'}
+                onClick={() => setView('grid')}
+                className={cn(
+                  'flex size-6 items-center justify-center rounded transition-colors',
+                  view === 'grid' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <LayoutGrid className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label="슬라이드 보기"
+                aria-pressed={view === 'slider'}
+                onClick={() => {
+                  syncSlideToSelected()
+                  setView('slider')
+                }}
+                className={cn(
+                  'flex size-6 items-center justify-center rounded transition-colors',
+                  view === 'slider' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <GalleryHorizontal className="size-3.5" />
+              </button>
+            </div>
+          ) : null}
         </DialogHeader>
         {anchors.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
             아직 등록된 스타일이 없어요.
           </p>
-        ) : (
+        ) : view === 'grid' ? (
           <div className="grid max-h-[60vh] grid-cols-2 gap-3 overflow-y-auto p-0.5 sm:grid-cols-3">
-            {anchors.map((anchor) => {
-              const active = anchor.key === value
-              return (
+            {anchors.map((anchor) => (
+              <button
+                key={anchor.key}
+                type="button"
+                onClick={() => choose(anchor.key)}
+                className={cn(
+                  'group flex flex-col overflow-hidden rounded-lg border text-left transition-colors',
+                  anchor.key === value
+                    ? 'border-primary ring-2 ring-primary/50'
+                    : 'border-border hover:border-primary/60',
+                )}
+              >
+                <StyleAnchorCardBody anchor={anchor} active={anchor.key === value} />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="p-0.5">
+            {/* 슬라이딩 카드 — 한 장씩 크게. 트랙을 translateX 로 밀어 카드 이동 애니메이션. */}
+            <div className="relative overflow-hidden rounded-lg">
+              <div
+                className="flex transition-transform duration-300 ease-out"
+                style={{ transform: `translateX(-${slide * 100}%)` }}
+              >
+                {anchors.map((anchor) => (
+                  <div key={anchor.key} className="w-full shrink-0 px-8">
+                    <button
+                      type="button"
+                      onClick={() => choose(anchor.key)}
+                      className={cn(
+                        'group mx-auto flex w-full max-w-sm flex-col overflow-hidden rounded-lg border text-left transition-colors',
+                        anchor.key === value
+                          ? 'border-primary ring-2 ring-primary/50'
+                          : 'border-border hover:border-primary/60',
+                      )}
+                    >
+                      <StyleAnchorCardBody anchor={anchor} active={anchor.key === value} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {/* 좌우 이동 화살표 */}
+              <button
+                type="button"
+                aria-label="이전 스타일"
+                onClick={() => move(-1)}
+                className="absolute left-1 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="다음 스타일"
+                onClick={() => move(1)}
+                className="absolute right-1 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+            {/* 도트 인디케이터 — 클릭 시 해당 카드로 이동 */}
+            <div className="mt-3 flex items-center justify-center gap-1.5">
+              {anchors.map((anchor, i) => (
                 <button
                   key={anchor.key}
                   type="button"
-                  onClick={() => {
-                    onSelect(anchor.key)
-                    setOpen(false)
-                  }}
+                  aria-label={`${anchor.label}로 이동`}
+                  onClick={() => setSlide(i)}
                   className={cn(
-                    'group flex flex-col overflow-hidden rounded-lg border text-left transition-colors',
-                    active
-                      ? 'border-primary ring-2 ring-primary/50'
-                      : 'border-border hover:border-primary/60',
+                    'h-1.5 rounded-full transition-all',
+                    i === slide ? 'w-4 bg-primary' : 'w-1.5 bg-border hover:bg-muted-foreground',
                   )}
-                >
-                  {/* 예시 이미지(preview_url) — I2I 레퍼런스(anchor.imageUrl)와 분리된 표시 전용.
-                      정사각 원본을 그대로 보여준다. 프리뷰 없으면 플레이스홀더 폴백. */}
-                  <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted">
-                    {anchor.previewUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={anchor.previewUrl}
-                        alt={anchor.label}
-                        loading="lazy"
-                        className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-                    ) : (
-                      <ImageIcon className="size-6 text-muted-foreground opacity-40" />
-                    )}
-                    {active ? (
-                      <span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-                        <Check className="size-3" />
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-col gap-0.5 px-3 py-2">
-                    <span className="line-clamp-1 text-sm font-medium text-foreground">
-                      {anchor.label}
-                    </span>
-                    {anchor.medium ? (
-                      <span className="line-clamp-1 text-xs text-muted-foreground">
-                        {anchor.medium}
-                      </span>
-                    ) : null}
-                  </div>
-                </button>
-              )
-            })}
+                />
+              ))}
+            </div>
           </div>
         )}
       </DialogContent>
