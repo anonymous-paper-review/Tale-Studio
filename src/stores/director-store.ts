@@ -1259,17 +1259,24 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       deleteNode: (id) => {
         if (isDemoSession()) return
         get().commitHistory()
+        const projectId = get().projectId
         const ids = collectCascadeIds(get().nodes, id)
 
         // Step 2: cascade에 포함된 Video 노드의 videoClipId를 제거 전에 수집 → DB DELETE
+        // 그리고 scene/shot 노드의 writer id 도 수집 → scenes/shots 행 DELETE(#e5 2026-07-18).
+        //   삭제가 DB에 반영되지 않으면 writer→director sync 가 재진입 시 writer manifest 에서
+        //   노드를 재생성해 "삭제가 안 먹는" 것처럼 보인다(사용자의 명시적 삭제 = 상류 수정 허용, §5 rule2).
         const clipIdsToDelete: string[] = []
+        const sceneIdsToDelete: string[] = []
+        const shotIdsToDelete: string[] = []
         for (const n of get().nodes) {
-          if (
-            ids.has(n.id) &&
-            isVideoData(n.data) &&
-            n.data.videoClipId
-          ) {
+          if (!ids.has(n.id)) continue
+          if (isVideoData(n.data) && n.data.videoClipId) {
             clipIdsToDelete.push(n.data.videoClipId)
+          } else if (isSceneData(n.data) && n.data.writerSceneId) {
+            sceneIdsToDelete.push(n.data.writerSceneId)
+          } else if (isShotData(n.data) && n.data.writerShotId) {
+            shotIdsToDelete.push(n.data.writerShotId)
           }
         }
 
@@ -1285,23 +1292,32 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           lastSavedAt: Date.now(),
         }))
 
-        // Step 2: video_clips 행 DELETE (fire-and-forget)
-        if (clipIdsToDelete.length > 0) {
-          void (async () => {
-            try {
-              const supabase = createClient()
-              await supabase
-                .from('video_clips')
-                .delete()
-                .in('id', clipIdsToDelete)
-            } catch (err) {
-              console.error(
-                '[director-store] video_clip DELETE failed:',
-                err,
-              )
+        // Step 2: DB 행 DELETE (fire-and-forget). scenes/shots 는 canvas_position 과 동일한
+        //   키(project_id + scene_id/shot_id = writer id)로 지운다. FK 미설정이라 순서 무관.
+        void (async () => {
+          try {
+            const supabase = createClient()
+            if (clipIdsToDelete.length > 0) {
+              await supabase.from('video_clips').delete().in('id', clipIdsToDelete)
             }
-          })()
-        }
+            if (projectId && shotIdsToDelete.length > 0) {
+              await supabase
+                .from('shots')
+                .delete()
+                .eq('project_id', projectId)
+                .in('shot_id', shotIdsToDelete)
+            }
+            if (projectId && sceneIdsToDelete.length > 0) {
+              await supabase
+                .from('scenes')
+                .delete()
+                .eq('project_id', projectId)
+                .in('scene_id', sceneIdsToDelete)
+            }
+          } catch (err) {
+            console.error('[director-store] node DB DELETE failed:', err)
+          }
+        })()
       },
 
       // ─── edge lifecycle ────────────────────────────────────────────────
