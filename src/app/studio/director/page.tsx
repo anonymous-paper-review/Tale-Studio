@@ -247,11 +247,15 @@ function CanvasInner() {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return
       // 삭제: Del/Backspace → 선택 노드가 있으면 확인 모달(버튼 삭제와 동일 경로). RF 내장
       //   deleteKeyCode 는 비활성화(null)라 여기서만 삭제가 시작된다 → 항상 확인을 거친다.
+      //   선택 기준은 RF 선택(node.selected) — 캔버스 클릭 선택이 여기 반영된다(store.selectedNodeId는
+      //   상세 패널용 별개 상태라 캔버스 클릭으로는 안 채워진다).
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const st = useDirectorCanvasStore.getState()
-        if (st.selectedNodeId && !st.deleteConfirmInfo) {
+        if (st.deleteConfirmInfo) return
+        const target = st.nodes.find((n) => n.selected) ?? null
+        if (target) {
           e.preventDefault()
-          st.openDeleteConfirm(st.selectedNodeId)
+          st.openDeleteConfirm(target.id)
         }
         return
       }
