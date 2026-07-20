@@ -231,6 +231,15 @@ function FieldShell({
 // 스타일&톤 선택기 — 콤보 박스(글자만 표기) → 클릭 시 그리드 팝업(#b 2026-07-14).
 //   실제 I2I 레퍼런스 이미지(anchor.imageUrl)는 노출하지 않는다. 예시 이미지 자리는 빈
 //   플레이스홀더 — 사용자가 추후 예시 이미지를 넣을 예정. 선택 표시는 라벨 텍스트로만.
+// medium 슬러그(2d_cartoon 등)를 표시용으로 정리 — 언더바 제거 + 단어별 대문자, 2d/3d는 통째 대문자.
+//   예) 2d_cartoon → "2D Cartoon", live_action → "Live Action", 3d → "3D".
+function prettyMedium(medium: string): string {
+  return medium
+    .split('_')
+    .map((w) => (/^\d+d$/i.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(' ')
+}
+
 /** 예시 이미지 + 라벨 카드 내용(그리드·슬라이더 공용). */
 function StyleAnchorCardBody({ anchor, active }: { anchor: StyleAnchor; active: boolean }) {
   return (
@@ -258,7 +267,9 @@ function StyleAnchorCardBody({ anchor, active }: { anchor: StyleAnchor; active: 
       <div className="flex flex-col gap-0.5 px-3 py-2">
         <span className="line-clamp-1 text-sm font-medium text-foreground">{anchor.label}</span>
         {anchor.medium ? (
-          <span className="line-clamp-1 text-xs text-muted-foreground">{anchor.medium}</span>
+          <span className="line-clamp-1 text-xs text-muted-foreground">
+            {prettyMedium(anchor.medium)}
+          </span>
         ) : null}
       </div>
     </>
