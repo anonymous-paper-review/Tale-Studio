@@ -411,7 +411,7 @@ function StyleAnchorPicker({
           // 그리드 진입 시 카드가 아래에서 살짝 확대되며 순차로 날아든다(#b1).
           <div
             key="grid"
-            className="grid max-h-[60vh] grid-cols-2 gap-3 overflow-y-auto p-0.5 sm:grid-cols-3"
+            className="scrollbar-thin grid max-h-[60vh] grid-cols-2 gap-3 overflow-y-auto p-0.5 sm:grid-cols-3"
           >
             {anchors.map((anchor, i) => (
               <button
