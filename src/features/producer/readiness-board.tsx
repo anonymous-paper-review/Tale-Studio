@@ -381,35 +381,61 @@ function StyleAnchorPicker({
           </div>
         ) : (
           <div className="p-0.5">
-            {/* 슬라이딩 카드 — 한 장씩 크게. 트랙을 translateX 로 밀어 카드 이동 애니메이션. */}
-            <div className="relative overflow-hidden rounded-lg">
-              <div
-                className="flex transition-transform duration-300 ease-out"
-                style={{ transform: `translateX(-${slide * 100}%)` }}
-              >
-                {anchors.map((anchor) => (
-                  <div key={anchor.key} className="w-full shrink-0 px-8">
+            {/* Stacked sliding card(#b1 2026-07-18) — 활성 카드를 앞으로, 양옆은 뒤로 겹쳐 쌓는 덱.
+                각 카드 위치를 활성 인덱스와의 wrap-around 거리(offset)로 계산 → 마지막→첫 카드로
+                넘어가도 offset 이 1씩 밀릴 뿐이라 트랙 리셋 없는 자연스러운 무한 루프. */}
+            <div className="relative flex h-[19rem] items-center justify-center overflow-hidden">
+              {anchors.map((anchor, i) => {
+                const n = anchors.length
+                // 활성(slide)로부터의 최단 부호 거리 — 무한 루프의 핵심.
+                let off = i - slide
+                if (off > n / 2) off -= n
+                if (off < -n / 2) off += n
+                const abs = Math.abs(off)
+                const hidden = abs > 2
+                const isFront = off === 0
+                return (
+                  <div
+                    key={anchor.key}
+                    // 숨은 카드는 transition 없이 순간이동(opacity 0이라 안 보임) → 마지막↔첫 카드
+                    //   전환 시 반대편 카드가 화면을 가로질러 슬라이드하는 어색함을 없앤다(무한 루프).
+                    className={cn(
+                      'absolute',
+                      hidden ? 'transition-none' : 'transition-all duration-300 ease-out',
+                    )}
+                    style={{
+                      transform: `translateX(${off * 42}%) scale(${1 - abs * 0.16})`,
+                      opacity: hidden ? 0 : 1 - abs * 0.32,
+                      zIndex: 30 - abs,
+                      pointerEvents: hidden ? 'none' : 'auto',
+                    }}
+                    aria-hidden={hidden}
+                  >
                     <button
                       type="button"
-                      onClick={() => choose(anchor.key)}
+                      // 앞 카드 클릭 = 선택, 옆 카드 클릭 = 그 카드를 앞으로.
+                      onClick={() => (isFront ? choose(anchor.key) : setSlide(i))}
+                      tabIndex={hidden ? -1 : 0}
                       className={cn(
-                        'group mx-auto flex w-full max-w-sm flex-col overflow-hidden rounded-lg border text-left transition-colors',
+                        'group flex w-56 flex-col overflow-hidden rounded-xl border bg-card text-left shadow-lg transition-colors',
                         anchor.key === value
                           ? 'border-primary ring-2 ring-primary/50'
-                          : 'border-border hover:border-primary/60',
+                          : isFront
+                            ? 'border-border hover:border-primary/60'
+                            : 'border-border',
                       )}
                     >
                       <StyleAnchorCardBody anchor={anchor} active={anchor.key === value} />
                     </button>
                   </div>
-                ))}
-              </div>
-              {/* 좌우 이동 화살표 */}
+                )
+              })}
+              {/* 좌우 이동 화살표 — 덱 위(z 최상단) */}
               <button
                 type="button"
                 aria-label="이전 스타일"
                 onClick={() => move(-1)}
-                className="absolute left-1 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background"
+                className="absolute left-1 top-1/2 z-40 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background"
               >
                 <ChevronLeft className="size-4" />
               </button>
@@ -417,7 +443,7 @@ function StyleAnchorPicker({
                 type="button"
                 aria-label="다음 스타일"
                 onClick={() => move(1)}
-                className="absolute right-1 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background"
+                className="absolute right-1 top-1/2 z-40 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background"
               >
                 <ChevronRight className="size-4" />
               </button>
