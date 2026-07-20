@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertCircle,
   AtSign,
@@ -291,13 +291,32 @@ function StyleAnchorPicker({
   onSelect: (key: string) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [view, setView] = useState<StyleView>('grid')
+  // stacked deck(slider)를 기본 뷰로(#b1 2026-07-18).
+  const [view, setView] = useState<StyleView>('slider')
   const [slide, setSlide] = useState(0)
   const selected = anchors.find((a) => a.key === value) ?? null
   const selectedIdx = Math.max(0, anchors.findIndex((a) => a.key === value))
 
   // 슬라이더로 전환하거나 팝업을 열 때 현재 선택 카드로 위치를 맞춘다.
   const syncSlideToSelected = () => setSlide(selectedIdx)
+
+  // 뷰 전환 애니메이션(#b1):
+  //   - 팝업 크기: 뷰별 max-width(위 DialogContent) + 내용 높이를 측정해 래퍼 height 트랜지션.
+  //   - 카드 진입("딜"): 덱/그리드 카드가 각자 자리로 날아든다 — 위치 transform 은 바깥 래퍼가,
+  //     진입 애니메이션은 안쪽 버튼의 CSS animate-in 이 담당(둘이 곱해져 충돌 없음). 뷰를 바꾸면
+  //     카드가 새로 마운트돼 애니메이션이 다시 재생된다(별도 상태 불요).
+  // 내용 높이 측정 → 래퍼 height 트랜지션(뷰 전환 시 팝업 높이가 부드럽게 변함).
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [bodyH, setBodyH] = useState<number>()
+  useLayoutEffect(() => {
+    const el = bodyRef.current
+    if (!el) return
+    const measure = () => setBodyH(el.offsetHeight)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [open, view, anchors.length])
 
   const choose = (key: string) => {
     onSelect(key)
@@ -329,7 +348,13 @@ function StyleAnchorPicker({
           <ChevronDown className="size-4 shrink-0 opacity-50" />
         </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent
+        className={cn(
+          // 뷰별 팝업 폭 + 전환 애니메이션(#b1) — 덱은 좁게, 그리드는 넓게, max-width 를 트랜지션.
+          'transition-[max-width] duration-300 ease-out',
+          view === 'grid' ? 'sm:max-w-2xl' : 'sm:max-w-lg',
+        )}
+      >
         <DialogHeader>
           <DialogTitle>스타일 선택</DialogTitle>
           <DialogDescription>
@@ -368,19 +393,31 @@ function StyleAnchorPicker({
             </div>
           ) : null}
         </DialogHeader>
+        {/* 뷰 전환 시 팝업 높이가 부드럽게 변하도록, 내용 높이를 측정해 래퍼 height 를 트랜지션. */}
+        <div
+          className="overflow-hidden transition-[height] duration-300 ease-out"
+          style={{ height: bodyH }}
+        >
+        <div ref={bodyRef}>
         {anchors.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
             아직 등록된 스타일이 없어요.
           </p>
         ) : view === 'grid' ? (
-          <div className="grid max-h-[60vh] grid-cols-2 gap-3 overflow-y-auto p-0.5 sm:grid-cols-3">
-            {anchors.map((anchor) => (
+          // 그리드 진입 시 카드가 아래에서 살짝 확대되며 순차로 날아든다(#b1).
+          <div
+            key="grid"
+            className="grid max-h-[60vh] grid-cols-2 gap-3 overflow-y-auto p-0.5 sm:grid-cols-3"
+          >
+            {anchors.map((anchor, i) => (
               <button
                 key={anchor.key}
                 type="button"
                 onClick={() => choose(anchor.key)}
+                style={{ animationDelay: `${i * 35}ms`, animationFillMode: 'backwards' }}
                 className={cn(
                   'group flex flex-col overflow-hidden rounded-lg border text-left transition-colors',
+                  'animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-300',
                   anchor.key === value
                     ? 'border-primary ring-2 ring-primary/50'
                     : 'border-border hover:border-primary/60',
@@ -427,8 +464,12 @@ function StyleAnchorPicker({
                       // 앞 카드 클릭 = 선택, 옆 카드 클릭 = 그 카드를 앞으로.
                       onClick={() => (isFront ? choose(anchor.key) : setSlide(i))}
                       tabIndex={hidden ? -1 : 0}
+                      // 진입 딜(#b1): 마운트 시 작게 튀어나오듯 확대+페이드, 바깥 카드일수록 늦게(cascade).
+                      //   위치는 래퍼가 잡으므로 여기선 scale/opacity만 → 스택 transform과 곱해져 충돌 없음.
+                      style={{ animationDelay: `${abs * 55}ms`, animationFillMode: 'backwards' }}
                       className={cn(
                         'group flex w-56 flex-col overflow-hidden rounded-xl border bg-card text-left shadow-lg transition-colors',
+                        'animate-in fade-in-0 zoom-in-50 duration-500',
                         anchor.key === value
                           ? 'border-primary ring-2 ring-primary/50'
                           : isFront
@@ -476,6 +517,8 @@ function StyleAnchorPicker({
             </div>
           </div>
         )}
+        </div>
+        </div>
       </DialogContent>
     </Dialog>
   )
