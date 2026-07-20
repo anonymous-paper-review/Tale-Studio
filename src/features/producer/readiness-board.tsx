@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertCircle,
   AtSign,
@@ -306,17 +306,19 @@ function StyleAnchorPicker({
   //     진입 애니메이션은 안쪽 버튼의 CSS animate-in 이 담당(둘이 곱해져 충돌 없음). 뷰를 바꾸면
   //     카드가 새로 마운트돼 애니메이션이 다시 재생된다(별도 상태 불요).
   // 내용 높이 측정 → 래퍼 height 트랜지션(뷰 전환 시 팝업 높이가 부드럽게 변함).
-  const bodyRef = useRef<HTMLDivElement>(null)
+  //   콜백 ref 로 ResizeObserver 를 붙인다 — 포털(radix Dialog) 콘텐츠가 부모 effect 보다
+  //   늦게 마운트돼도, 노드가 실제로 붙는 그 순간 관찰이 시작돼 측정이 누락되지 않는다.
+  //   (닫힘/재오픈 시 내용이 안 보이던 버그 수정, 2026-07-18)
   const [bodyH, setBodyH] = useState<number>()
-  useLayoutEffect(() => {
-    const el = bodyRef.current
+  const roRef = useRef<ResizeObserver | null>(null)
+  const bodyRef = useCallback((el: HTMLDivElement | null) => {
+    roRef.current?.disconnect()
+    roRef.current = null
     if (!el) return
-    const measure = () => setBodyH(el.offsetHeight)
-    measure()
-    const ro = new ResizeObserver(measure)
+    const ro = new ResizeObserver(() => setBodyH(el.offsetHeight))
     ro.observe(el)
-    return () => ro.disconnect()
-  }, [open, view, anchors.length])
+    roRef.current = ro
+  }, [])
 
   const choose = (key: string) => {
     onSelect(key)
@@ -331,6 +333,8 @@ function StyleAnchorPicker({
       onOpenChange={(o) => {
         setOpen(o)
         if (o) syncSlideToSelected()
+        // 닫을 때 측정 높이 리셋 → 재오픈 시 auto 로 시작해 stale 높이로 클리핑되지 않는다.
+        else setBodyH(undefined)
       }}
     >
       <DialogTrigger asChild>
