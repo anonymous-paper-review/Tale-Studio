@@ -98,7 +98,7 @@ const CAMERA_MOVEMENTS: CameraMovement[] = [
 // Techniques: 라이브 DB 에 knowledge_techniques 테이블이 있으나 본 로더는 아직 YAML 을 읽는다.
 //   해당 YAML(camera_language/rendering_style/shot_grammar.yaml)도 gitignore 라 Vercel 에 없음.
 //   → 읽기 실패는 throw 하지 않고 [] 로 graceful degrade (generate-shots 가 죽지 않게).
-//   TODO(후속): queryTechniques 를 knowledge_techniques DB(어댑터)로 전환. (CLAUDE.md: 프로덕션=Supabase)
+//   TODO(후속): queryTechniques 를 knowledge_techniques DB(어댑터)로 전환.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const KB_DIR = path.join(process.cwd(), 'databases', 'knowledge')

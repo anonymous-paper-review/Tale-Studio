@@ -13,7 +13,7 @@ model: sonnet
 
 ## Process
 1. `specs/design.md` + `specs/design-references.md` 읽기 (이번 세션 처음이라면)
-2. 작업 영역의 `src/features/.../CLAUDE.md`, `src/components/ui/CLAUDE.md`, 인접 컴포넌트 코드를 직접 읽기
+2. 작업 영역의 인접 컴포넌트와 `src/app/globals.css` 토큰을 직접 읽기
 3. shadcn primitive로 구현. 토큰은 `globals.css`에서 — raw hex / 임의 px / 신규 토큰 금지
 4. 캔버스 작업이면 design.md §17 strict 적용
 5. 완료 시 사용 토큰 + 적용한 design.md 섹션 1줄 요약 보고

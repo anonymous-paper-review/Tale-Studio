@@ -8,7 +8,7 @@ import type {
 import type { VideoModelKey } from '@/lib/video-models'
 
 // ============================================================================
-// Director Canvas Types — specs/layers/director.md §2~7
+// Director Canvas Types
 // ============================================================================
 
 export type DirectorNodeKind = 'scene' | 'shot' | 'video' | 'asset' | 'prompt'

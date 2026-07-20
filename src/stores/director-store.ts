@@ -571,7 +571,7 @@ interface DirectorCanvasState {
 }
 
 // ============================================================================
-// Agent Actions — specs/layers/director.md §12.2 (DirectorCanvasUpdate)
+// Agent Actions — DirectorCanvasUpdate
 // ============================================================================
 
 export type DirectorCanvasUpdate =
@@ -2500,7 +2500,7 @@ export function nextScenePosition(
 }
 
 // ============================================================================
-// Context serialization for LLM — specs/layers/director.md §12.4
+// Context serialization for LLM
 // ============================================================================
 
 /**

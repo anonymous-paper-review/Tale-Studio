@@ -17,7 +17,7 @@ import {
 import type { CameraConfig, LightingConfig } from '@/types/shot'
 
 /**
- * Writer → Director 초기 셋업 (스펙 director.md §8).
+ * Writer → Director 초기 셋업.
  *
  * Director 진입 시 Writer가 정의한 Scene/Shot 구조를 노드로 자동 생성하고,
  * 각 Shot의 프롬프트(actionDescription)와 등장 캐릭터/월드 에셋을 seed한다.

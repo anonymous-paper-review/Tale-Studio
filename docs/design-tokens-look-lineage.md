@@ -1,7 +1,7 @@
 # design_tokens · 이미지/룩 계보 정리
 
 > 작성: 2026-07-13 · source-of-truth: `src/lib/writer/`·`src/lib/artist/`·`src/stores/` 코드 (이 문서는 코드 미러, 다르면 코드가 진실)
-> 성격: 현황 audit + 개선 리스트 (캐넌 아님). 방향 확정 시 `specs/decisions.md`로 승격.
+> 성격: 현황 audit + 개선 리스트 (캐넌 아님). 방향 확정 시 `specs/changes/<name>/`의 active change로 명세.
 
 ## 한 줄 요약
 

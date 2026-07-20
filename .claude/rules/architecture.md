@@ -22,8 +22,7 @@ paths:
 
 1. **상태** — 새 진실인가? DB인가 클라 임시인가? 기존 테이블 확장인가?
 2. **성숙도** — 이 복잡도가 현재 제품 단계에 정합한가?
-   → `specs/_DECISION_TEMPLATE.md`를 **게이트로 통과**시킨다 (기록 양식 아님 —
-   채운 내용은 작업 메모리, 영속은 proposal 한 섹션 또는 decisions.md 한 줄 압축만).
+   → active change의 proposal에 상태 소유권·복잡도·트레이드오프를 기록한다.
 3. **지능** — 모델이 개입하나? 개입하면 제안까지인가? (§3)
 4. **시간** — 요청-응답인가 백그라운드인가? (백그라운드면 기존 잡 패턴 준수:
    submit→webhook→CAS 터미널 전이 — `src/lib/generation-jobs.ts`와 generate-* 라우트가 진실)

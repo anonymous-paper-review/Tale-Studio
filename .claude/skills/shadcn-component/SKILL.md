@@ -16,7 +16,7 @@ shadcn/ui primitive 추가 워크플로.
 5. 새 variant나 토큰이 있으면 `specs/design.md` §components 섹션에 추가 권장
 6. 사용 예시 1개를 적절한 곳에 작성 (사용자 컨텍스트에 따라)
 
-## 컨벤션 (`src/components/ui/CLAUDE.md`, `specs/design.md`와 일관)
+## 컨벤션 (`specs/design.md`와 일관)
 - React 19+ `data-slot` 컨벤션 유지. forwardRef 패턴 금지
-- 새 토큰은 `src/app/globals.css`에만 추가 (decisions #30)
+- 새 토큰은 `src/app/globals.css`에만 추가
 - 캔버스 확장 토큰 (`--canvas-*` 등)은 여기서 import 금지 — 캔버스 노드에서만

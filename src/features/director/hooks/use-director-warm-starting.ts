@@ -6,7 +6,7 @@ import { isSceneData, isShotData, isVideoData } from '@/types/director'
 
 /**
  * 룰 기반 Director Canvas warm starting 메시지.
- * specs/layers/director.md §12.3 — 4단계 (Scene 0 / Shot 0 / Video 0 / Video ≥3).
+ * 4단계 분기: Scene 0 / Shot 0 / Video 0 / Video ≥3.
  * LLM 호출 없음.
  */
 export function useDirectorCanvasWarmStarting(): string | null {

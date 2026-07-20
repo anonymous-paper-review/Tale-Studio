@@ -1,8 +1,7 @@
 # Open Questions
 
-> **열린 질문만 유지** (게이트 원칙: 닫힌 질문 장부는 두지 않는다 — 결정의 정본은
-> `specs/decisions.md`, 과거 Q&A 이력은 git history / `specs/archive/`).
-> 질문이 닫히면: 결정을 decisions.md(cross-cutting) 또는 해당 spec에 반영하고 **여기서 삭제**.
+> **열린 질문만 유지**한다. 질문이 닫히면 해당 `specs/changes/<name>/` capability 계약이나
+> 코드에 반영하고 여기서 삭제한다. 과거 Q&A 이력은 git history / `specs/archive/`에만 둔다.
 >
 > 최종 수정: 2026-06-11 (다이어트 — 닫힌 질문 27건 삭제, 폐기된 V2/reference_v2 서술 제거)
 

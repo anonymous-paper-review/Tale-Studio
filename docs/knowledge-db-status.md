@@ -1,7 +1,7 @@
 # Knowledge DB (cinematography RAG) — 현황·문제 노트
 
 > 작성 2026-07-11. **성격: WIP 상태 기록 (캐넌 아님).** 정식 결정·descope는 아직 없음 —
-> 이 문서는 "문제가 있다"를 명시해 두는 용도. 향후 방향을 정하면 `specs/decisions.md`로 승격.
+> 이 문서는 "문제가 있다"를 명시해 두는 용도. 향후 방향은 `specs/changes/<name>/`의 active change로 명세.
 
 ## 한 줄 요약
 
@@ -18,7 +18,7 @@
 - 현재 30행은 2026-01-28에 한 번 시드된 씨앗이며 그 뒤로 증가 경로가 없다.
 
 ### 2. 원래 설계된 적재 파이프라인은 라이브 DB에 미배포
-- 설계상 성장 수단 = **Video Reference DB** (decision #12, `specs/decisions.md:262`):
+- 설계상 성장 수단 = **Video Reference DB** (historical decision #12, `docs/legacy/decisions/decisions.md`):
   `videos → analysis_jobs → shot_analysis`, 워크플로우 `pending → analyzed(LLM) → reviewed(Human)`.
 - 그러나 이 3테이블은 `databases/migrations/001_video_reference.sql`에만 있고
   **라이브 DB엔 없음** — `.claude/cache/db/_migration-sync.md`의
@@ -43,10 +43,8 @@
 ### 5. 문서·하네스 부패
 - `queryTechniques` 필터 버그: `src/lib/knowledge.ts`의 `moodMatch || shotMatch`는
   `moods`가 비면 전체 30행 매칭. 지금은 항상 `[]`라 잠들어 있는 버그 — DB 연결 시 반드시 동시 수정.
-- `CLAUDE.md` 라우터가 가리키는 `specs/api_features.md`는 **존재하지 않음**.
-- `src/lib/CLAUDE.md`는 `knowledge.ts`를 "Knowledge DB 조회"라 적었으나 실제로는 DB 미조회.
-- decisions.md/decisions-archive.md 어디에도 **descope 결정 없음** —
-  의도적으로 미룬 게 아니라 명시적 결정 없이 방치된 상태.
+- 2026-07-20 문서 정리에서 stale `CLAUDE.md` 라우터와 현재 결정 장부는 제거됐다.
+- 과거 결정 이력은 `docs/legacy/decisions/`에 격리됐으며 현재 구현의 권위가 아니다.
 
 ## 살아 있는 부분 (참고 — 전부 죽은 건 아님)
 - 카메라 기어/무브먼트는 `src/lib/knowledge.ts`에 **코드 상수로 인라인**되어 정상 작동.
