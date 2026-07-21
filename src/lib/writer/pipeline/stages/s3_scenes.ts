@@ -14,14 +14,19 @@ export function mergeOpenCast(prev: Characters, scenes: Scenes): Characters {
   for (const n of scenes.new_characters) {
     if (!n.id || existing.has(n.id)) continue; // 빈 id / 기존 slug 충돌 → 기존 행 사용
     existing.add(n.id);
+    // 서사 속성은 s3 반환값 우선(#opencast-arc 2026-07-21) — 미반환 필드만 빈 기본값.
     fresh.push({
       id: n.id,
       name: n.name,
       role: n.role ?? 'supporting',
-      personality: [],
-      arc: { start_state: '', end_state: '', arc_type: '' },
+      personality: Array.isArray(n.personality) ? n.personality.filter((p) => typeof p === 'string') : [],
+      arc: {
+        start_state: n.arc?.start_state ?? '',
+        end_state: n.arc?.end_state ?? '',
+        arc_type: n.arc?.arc_type ?? '',
+      },
       appearance_description: n.appearance_description ?? '',
-      motivation: { want: '', need: '' },
+      motivation: { want: n.motivation?.want ?? '', need: n.motivation?.need ?? '' },
     });
   }
   if (!fresh.length) return prev;
@@ -210,12 +215,18 @@ ${
       "id": "string (새 slug, snake_case — 기존 캐스트와 중복 금지)",
       "name": "string",
       "role": "protagonist" | "antagonist" | "supporting",
-      "appearance_description": "string (간단한 외형 한 줄)"
+      "appearance_description": "string (간단한 외형 한 줄)",
+      "personality": ["string", ...],
+      "arc": {"start_state": "string", "end_state": "string", "arc_type": "string"},
+      "motivation": {"want": "string (표면적 욕구)", "need": "string (내면의 필요)"}
     }
   ]
 }
 
-new_characters는 전개상 새 인물이 정말 필요할 때만 채운다. 기존 캐스트로 충분하면 빈 배열([])로 둔다.`;
+new_characters는 전개상 새 인물이 정말 필요할 때만 채운다. 기존 캐스트로 충분하면 빈 배열([])로 둔다.
+new_characters에도 기존 캐스트와 같은 깊이의 서사 속성(personality/arc/motivation)을 채운다 —
+이 인물이 전개상 왜 필요한지(어떤 변화를 겪고 무엇을 원하는지)를 스토리에 근거해 구체적으로.
+집단 인물(예: 추적자들)이면 집단의 목적/상태 변화로 쓴다.`;
 
   const result = await generateJson<Scenes>(userPrompt, axisConfig, {
     systemInstruction,

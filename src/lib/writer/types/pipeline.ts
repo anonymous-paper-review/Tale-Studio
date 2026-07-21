@@ -297,6 +297,11 @@ export interface NewCharacter {
   name: string;
   role?: string; // "protagonist" | "antagonist" | "supporting"
   appearance_description?: string;
+  // 오픈캐스트도 서사 속성을 가진다(#opencast-arc 2026-07-21) — s3가 "전개상 왜 필요한지" 아는
+  //   시점에 함께 산출. mergeOpenCast가 기본값 대신 사용, persist가 DB(arc/motivation JSONB)에 기록.
+  personality?: string[];
+  arc?: { start_state?: string; end_state?: string; arc_type?: string };
+  motivation?: { want?: string; need?: string };
 }
 
 export interface Scenes {
