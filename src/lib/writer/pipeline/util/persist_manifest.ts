@@ -13,6 +13,13 @@
 //     → shots.characters 와 characters.character_id 가 동일 id 공간(referential 정합).
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { writerSceneIdToMain, writerShotIdToMain } from '@/lib/writer/adapters'
+import { isFlagOn } from '@/lib/flags'
+import {
+  facetsHash,
+  renderDirectorPromptFromFacets,
+  renderDirectorPromptTemplate,
+  type FacetRenderSpec,
+} from '@/lib/writer/facet-render'
 import {
   deriveEnBatch,
   deriveNativeBatch,
@@ -26,6 +33,7 @@ import type {
   WorldVisual,
   CharacterVisual,
   ShotSequence,
+  ShotStaticSpec,
 } from '@/lib/writer/types/pipeline'
 
 const UUID_RE =
@@ -321,6 +329,167 @@ export async function persistAssetsToDb(
   }
 }
 
+// v4_shots 의 SHOT_CHUNK_SIZE 와 맞춘 8개 단위 — 서버리스 타임아웃/LLM 팬아웃 방어.
+const SHOT_CHUNK_SIZE = 8
+
+const SHOT_USER_CARRY_FORWARD_COLUMNS = [
+  'camera_config',
+  'lighting_config',
+  'canvas_position',
+  'speed',
+  'trim_start',
+  'trim_end',
+  'location_ids',
+  // TODO(P4): prompt_override / manual prompt edit provenance columns land here once migrated.
+] as const
+
+type ShotUserCarryForwardColumn = (typeof SHOT_USER_CARRY_FORWARD_COLUMNS)[number]
+type ExistingShotCarryForward = Record<string, unknown> & {
+  shot_id?: unknown
+  prompt?: unknown
+  prompt_source_hash?: unknown
+}
+type PersistShotDraft = {
+  sceneMainId: string
+  shotMainId: string
+  shotType: ShotType
+  actionNative: string
+  composition: string
+  staticSpec: FacetRenderSpec | null
+  promptSourceHash: string | null
+  chars: string[]
+  dialogue?: string
+  duration: number
+  i: number
+}
+
+function warnShotPersistFallback(scope: string, error: unknown) {
+  console.warn(
+    `[persistShotsToDb] ${scope} 실패 — 기본 경로로 계속:`,
+    error instanceof Error ? error.message : error,
+  )
+}
+
+function toFacetSpec(value: unknown): FacetRenderSpec | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Partial<ShotStaticSpec>)
+    : null
+}
+
+function safeFacetsHash(spec: FacetRenderSpec | null): string | null {
+  if (!spec) return null
+  try {
+    return facetsHash(spec)
+  } catch (error) {
+    warnShotPersistFallback('static_spec hash', error)
+    return null
+  }
+}
+
+function defaultPersistPrompt(row: PersistShotDraft, actionEn: Map<string, string>): string {
+  return row.composition || (actionEn.get(row.shotMainId) ?? row.actionNative)
+}
+
+function templatePromptOrDefault(row: PersistShotDraft, actionEn: Map<string, string>): string {
+  if (!row.staticSpec) return defaultPersistPrompt(row, actionEn)
+  try {
+    return renderDirectorPromptTemplate(row.staticSpec) || defaultPersistPrompt(row, actionEn)
+  } catch (error) {
+    warnShotPersistFallback('FACET_RENDER template fallback', error)
+    return defaultPersistPrompt(row, actionEn)
+  }
+}
+
+function cachedPromptFor(row: PersistShotDraft, existing?: ExistingShotCarryForward): string | null {
+  if (!row.promptSourceHash || !existing) return null
+  const existingHash =
+    typeof existing.prompt_source_hash === 'string' ? existing.prompt_source_hash : null
+  const existingPrompt = typeof existing.prompt === 'string' ? existing.prompt : null
+  if (existingHash !== row.promptSourceHash || !existingPrompt?.trim()) return null
+  return existingPrompt
+}
+
+export async function resolvePersistShotPrompts(
+  rows: PersistShotDraft[],
+  actionEn: Map<string, string>,
+  existingByShotId: Map<string, ExistingShotCarryForward>,
+): Promise<Map<string, string>> {
+  const prompts = new Map(rows.map((row) => [row.shotMainId, defaultPersistPrompt(row, actionEn)]))
+
+  let facetRenderEnabled = false
+  try {
+    facetRenderEnabled = isFlagOn('FACET_RENDER')
+  } catch (error) {
+    warnShotPersistFallback('FACET_RENDER flag 확인', error)
+    return prompts
+  }
+  if (!facetRenderEnabled) return prompts
+
+  const facetRows = rows.filter((row) => row.staticSpec)
+  for (let start = 0; start < facetRows.length; start += SHOT_CHUNK_SIZE) {
+    const chunk = facetRows.slice(start, start + SHOT_CHUNK_SIZE)
+    const toRender: PersistShotDraft[] = []
+    for (const row of chunk) {
+      const cached = cachedPromptFor(row, existingByShotId.get(row.shotMainId))
+      if (cached) {
+        prompts.set(row.shotMainId, cached)
+      } else {
+        toRender.push(row)
+      }
+    }
+    if (!toRender.length) continue
+
+    try {
+      const rendered = await Promise.all(
+        toRender.map(async (row) => {
+          const prompt = (await renderDirectorPromptFromFacets(row.staticSpec!)).trim()
+          return [row.shotMainId, prompt || templatePromptOrDefault(row, actionEn)] as const
+        }),
+      )
+      for (const [shotId, prompt] of rendered) prompts.set(shotId, prompt)
+    } catch (error) {
+      warnShotPersistFallback('FACET_RENDER chunk render', error)
+      for (const row of toRender) {
+        prompts.set(row.shotMainId, templatePromptOrDefault(row, actionEn))
+      }
+    }
+  }
+
+  return prompts
+}
+
+export async function readShotCarryForwardById(
+  projectId: string,
+): Promise<Map<string, ExistingShotCarryForward>> {
+  try {
+    const { data, error } = await supabaseAdmin.from('shots').select('*').eq('project_id', projectId)
+    if (error) throw error
+    const rows = new Map<string, ExistingShotCarryForward>()
+    for (const row of data ?? []) {
+      const shotId = (row as ExistingShotCarryForward).shot_id
+      if (typeof shotId === 'string') rows.set(shotId, row as ExistingShotCarryForward)
+    }
+    return rows
+  } catch (error) {
+    warnShotPersistFallback('carry-forward 조회', error)
+    return new Map()
+  }
+}
+
+export function applyShotCarryForward<T extends Record<string, unknown>>(
+  row: T,
+  existing?: ExistingShotCarryForward,
+): T {
+  if (!existing) return row
+  const carry: Partial<Record<ShotUserCarryForwardColumn, unknown>> = {}
+  for (const column of SHOT_USER_CARRY_FORWARD_COLUMNS) {
+    if (Object.prototype.hasOwnProperty.call(existing, column) && existing[column] !== undefined) {
+      carry[column] = existing[column]
+    }
+  }
+  return Object.keys(carry).length ? ({ ...row, ...carry } as T) : row
+}
+
 /**
  * Tier 2 (스토리보드/director): shots 만 DB 기록.
  *   writer 파이프라인 마지막(stage 14 renderPrompts 직후) 호출 → director 가 콘티 노드를 채운다.
@@ -333,6 +502,8 @@ export async function persistShotsToDb(
 ): Promise<void> {
   if (!UUID_RE.test(projectId)) return // 핸드오프 외 run — DB project 없음
 
+  const existingByShotId = await readShotCarryForwardById(projectId)
+
   // 자신이 채우는 테이블만 정리 (shots). characters/locations/scenes 는 Tier 1 소관.
   await supabaseAdmin.from('shots').delete().eq('project_id', projectId)
 
@@ -343,7 +514,7 @@ export async function persistShotsToDb(
     //   귀속시킨다(분할은 원본 위치 삽입이라 이웃과 같은 씬) — 한 샷 결손이 전체 persist를
     //   죽이던 것(47a62d1d: shots 0행) 방지. 스테이지 쪽 보정과 이중 방어.
     let lastSceneId = ''
-    const shRows = shotSequence.shots.map((it, i) => {
+    const shRows: PersistShotDraft[] = shotSequence.shots.map((it, i) => {
       const sceneId = it.S?.scene_id ?? lastSceneId
       if (!it.S?.scene_id) {
         console.warn(`[persistShotsToDb] shot ${it.shot_id}: S.scene_id 누락 → 직전 씬(${sceneId})으로 귀속`)
@@ -354,21 +525,24 @@ export async function persistShotsToDb(
         .filter((id): id is string => typeof id === 'string')
       // rich 생성 프롬프트(구도/의상/인물 명시) — 스토리보드·영상 생성이 쓰는 shots.prompt 로 저장.
       //   추상 연출의도(character_action)가 아니라 이 값이 이미지/영상 모델에 들어가야 정체성/의상이 고정된다.
-      const rich = it as {
+      const rich = it as typeof it & {
         first_frame_generation?: { composition_prompt?: string }
-        static_spec?: { first_frame_prompt?: string }
+        static_spec?: Partial<ShotStaticSpec>
       }
       const composition = (
         rich.first_frame_generation?.composition_prompt ??
         rich.static_spec?.first_frame_prompt ??
         ''
       ).trim()
+      const staticSpec = toFacetSpec(rich.static_spec)
       return {
         sceneMainId: writerSceneIdToMain(sceneId),
         shotMainId: writerShotIdToMain(it.shot_id, sceneId),
         shotType: normShotType(it.V?.camera?.type),
         actionNative: it.S?.character_action ?? '',
         composition,
+        staticSpec,
+        promptSourceHash: safeFacetsHash(staticSpec),
         chars: Array.from(new Set(chars)),
         dialogue: it.S?.dialogue,
         duration: clampShotSeconds(it.duration_seconds), // #9 페이싱 상한
@@ -379,6 +553,7 @@ export async function persistShotsToDb(
       shRows.map((r) => ({ id: r.shotMainId, native: r.actionNative })),
       'shot action description',
     )
+    const prompts = await resolvePersistShotPrompts(shRows, actionEn, existingByShotId)
     // 표시용 _native(유저 locale): EN base → locale 역파생(S7). 파이프라인이 타깃 언어를 준 행은 원문 보존.
     const locale = await projectLocale(projectId)
     const actionKo = await deriveNativeBatch(
@@ -392,29 +567,32 @@ export async function persistShotsToDb(
     await supabaseAdmin.from('shots').insert(
       shRows.map((r) => {
         const actTx = !isTargetScript(r.actionNative, locale) && actionKo.has(r.shotMainId)
-        return {
-        project_id: projectId,
-        scene_id: r.sceneMainId,
-        shot_id: r.shotMainId,
-        shot_type: r.shotType,
-        action_description: actionEn.get(r.shotMainId) ?? r.actionNative,
-        action_description_native: actionKo.get(r.shotMainId) ?? r.actionNative,
-        i18n_provenance: {
-          action_description: i18nHash(r.actionNative),
-          ...(actTx ? { action_description_native: i18nHash(actionEn.get(r.shotMainId) ?? r.actionNative) } : {}),
-        },
-        characters: r.chars,
-        // 생성 프롬프트: rich composition(있으면) → 없으면 action_description 폴백.
-        prompt: r.composition || (actionEn.get(r.shotMainId) ?? r.actionNative),
-        duration_seconds: r.duration,
-        generation_method: 'I2V',
-        dialogue_lines: r.dialogue
-          ? [{ characterId: r.chars[0] ?? null, text: r.dialogue, emotion: '', delivery: '', durationHint: 0 }]
-          : [],
-        camera_config: { ...DEFAULT_CAMERA },
-        lighting_config: { ...DEFAULT_LIGHTING },
-        sort_order: r.i,
+        const row = {
+          project_id: projectId,
+          scene_id: r.sceneMainId,
+          shot_id: r.shotMainId,
+          shot_type: r.shotType,
+          action_description: actionEn.get(r.shotMainId) ?? r.actionNative,
+          action_description_native: actionKo.get(r.shotMainId) ?? r.actionNative,
+          i18n_provenance: {
+            action_description: i18nHash(r.actionNative),
+            ...(actTx ? { action_description_native: i18nHash(actionEn.get(r.shotMainId) ?? r.actionNative) } : {}),
+          },
+          characters: r.chars,
+          // 생성 프롬프트: flag off 는 rich composition → action, flag on 은 static_spec facet 렌더(캐시 가능).
+          prompt: prompts.get(r.shotMainId) ?? defaultPersistPrompt(r, actionEn),
+          static_spec: r.staticSpec ?? null,
+          prompt_source_hash: r.promptSourceHash,
+          duration_seconds: r.duration,
+          generation_method: 'I2V',
+          dialogue_lines: r.dialogue
+            ? [{ characterId: r.chars[0] ?? null, text: r.dialogue, emotion: '', delivery: '', durationHint: 0 }]
+            : [],
+          camera_config: { ...DEFAULT_CAMERA },
+          lighting_config: { ...DEFAULT_LIGHTING },
+          sort_order: r.i,
         }
+        return applyShotCarryForward(row, existingByShotId.get(r.shotMainId))
       }),
     )
 

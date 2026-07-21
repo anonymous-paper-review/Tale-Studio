@@ -37,6 +37,16 @@ export interface RunShotDesignResult extends ShotDesignProgress {
 //   응답 잘림·초장시간 호출을 출력 크기 상한으로 방어한다.
 const SHOT_CHUNK_SIZE = 8;
 
+// 씬 단위 동시성(#parallel-shotdesign 2026-07-21). 씬끼리는 상류 산출물(plan·decoupage)만 읽고
+//   서로의 출력을 참조하지 않는 data-parallel 작업이라, 순차 실행이 유일 병목인 shotDesign의
+//   wall-clock을 워커 풀로 줄인다. Gemini 텍스트 호출이라 fal 쿼터와 무관 — rate-limit 여유 기준값.
+//   env(SHOTDESIGN_CONCURRENCY)로 무중단 튜닝, opts.concurrency로 테스트/실험 오버라이드. 1=순차.
+const MAX_SHOT_CONCURRENCY = 12;
+const DEFAULT_SHOT_CONCURRENCY = (() => {
+  const raw = Number(process.env.SHOTDESIGN_CONCURRENCY);
+  return Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), MAX_SHOT_CONCURRENCY) : 4;
+})();
+
 export async function runShotDesign(
   genre: Genre,
   characters: Characters,
@@ -55,43 +65,36 @@ export async function runShotDesign(
     /** 이 시각(epoch ms)을 넘기면 남은 씬을 다음 step으로 미룬다.
      *  단, 패스당 최소 1씬은 처리한다(정상 반환 = 진행 보장 — steps.ts의 attempt 리셋 계약). */
     softDeadlineMs?: number;
+    /** 씬 동시성(#parallel-shotdesign). 미지정 시 DEFAULT_SHOT_CONCURRENCY(env). 1이면 순차. */
+    concurrency?: number;
   },
 ): Promise<RunShotDesignResult> {
   const compactMode = sceneCinematographyPlans === null;
   const resume = opts?.resume ?? null;
+  const softDeadlineMs = opts?.softDeadlineMs;
+  const concurrency = Math.max(
+    1,
+    Math.min(opts?.concurrency ?? DEFAULT_SHOT_CONCURRENCY, MAX_SHOT_CONCURRENCY),
+  );
   const doneSceneIds = new Set(resume?.doneSceneIds ?? []);
   const allShots: ShotDesign[] = [...(resume?.shots ?? [])];
   await logger.markStage('shotDesign', 'started', {
     compact_mode: compactMode,
     decoupage_driven: decoupage !== null,
     resumed_scenes: doneSceneIds.size,
+    concurrency,
   });
 
-  // 씬별로 V4 생성 (씬 디시플린 명확하게 적용하기 위해 분리 호출)
-  let processedThisPass = 0;
-  for (const scene of scenes.scenes) {
-    if (doneSceneIds.has(scene.scene_id)) continue;
-    // 시간 예산 체크는 씬 "사이"에서만 — 이번 패스에서 1씬도 못 하고 미루지는 않는다.
-    if (
-      processedThisPass > 0 &&
-      opts?.softDeadlineMs != null &&
-      Date.now() > opts.softDeadlineMs
-    ) {
-      console.log(
-        `[shotDesign] checkpoint: ${doneSceneIds.size}/${scenes.scenes.length} scenes done — 다음 step에서 이어감`,
-      );
-      return { done: false, doneSceneIds: [...doneSceneIds], shots: allShots };
-    }
-
+  // 씬 하나 → 3분할 샷 배열. 씬끼리는 상류 산출물(plan·decoupage)만 읽고 서로의 출력을 참조하지
+  //   않으므로 병렬 안전(#parallel-shotdesign). 청크는 씬 내부에서 순차 유지 — 청크 shot_id index
+  //   매핑이 호출 내부에서 닫히기 때문. plan 없으면 빈 배열(스킵, 재방문 방지용으로 완료 처리됨).
+  const processScene = async (scene: StoryScene): Promise<ShotDesign[]> => {
     const plan = compactMode ? null : sceneCinematographyPlans!.find((p) => p.scene_id === scene.scene_id) ?? null;
     if (!compactMode && !plan) {
       console.warn(`[shotDesign] no sceneCinematography plan for ${scene.scene_id}, skipping`);
-      doneSceneIds.add(scene.scene_id); // 재방문 방지 — resume 시에도 동일하게 스킵되게 기록
-      continue;
+      return [];
     }
     const sceneDec = decoupage?.scenes.find((d) => d.scene_id === scene.scene_id)?.shots ?? null;
-
-    // 샷이 많은 씬은 청크 분할 호출(#B) — sceneDec를 청크로 넘기면 출력·id 매핑이 청크 단위로 닫힌다.
     const sceneShots: ShotDesign[] = [];
     if (sceneDec && sceneDec.length > SHOT_CHUNK_SIZE) {
       const totalChunks = Math.ceil(sceneDec.length / SHOT_CHUNK_SIZE);
@@ -106,10 +109,62 @@ export async function runShotDesign(
         ...(await generateL4ForScene(scene, plan, sceneDec, genre, characters, visualIdentity, worldVisual, characterVisual, seedV4, logger, axisConfig)),
       );
     }
+    return sceneShots;
+  };
 
-    allShots.push(...sceneShots);
+  // 이번 패스 대상 = 아직 완료 안 된 씬(원래 순서 보존 → 병합 결정론적).
+  const pending = scenes.scenes.filter((s) => !doneSceneIds.has(s.scene_id));
+  const resultsByScene = new Map<string, ShotDesign[]>();
+  let cursor = 0;
+  let startedThisPass = 0;
+  let firstError: unknown = null;
+
+  // 동기 claim: 예산 초과 시 남은 씬을 다음 step으로 양보하되, 패스당 최소 1씬은 시작한다
+  //   (정상 반환 = 진행 보장 계약). 여러 워커가 동시에 claim해도 JS 단일 스레드라 원자적.
+  //   "started"(완료 아님) 기준 게이팅 — in-flight 웨이브가 있어도 예산을 정확히 지킨다.
+  const claimNext = (): StoryScene | null => {
+    if (firstError !== null) return null;
+    if (startedThisPass > 0 && softDeadlineMs != null && Date.now() > softDeadlineMs) {
+      return null;
+    }
+    if (cursor >= pending.length) return null;
+    const scene = pending[cursor];
+    cursor += 1;
+    startedThisPass += 1;
+    return scene;
+  };
+
+  const worker = async (): Promise<void> => {
+    let scene: StoryScene | null;
+    while ((scene = claimNext()) !== null) {
+      try {
+        resultsByScene.set(scene.scene_id, await processScene(scene));
+      } catch (e) {
+        if (firstError === null) firstError = e;
+        return;
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, pending.length) }, () => worker()),
+  );
+  if (firstError !== null) throw firstError; // 씬 실패는 스테이지 실패로 표면화(순차 때와 동일)
+
+  // 결정론적 병합: 씬 원래 순서로 이번 패스 완료 씬만 doneSceneIds/allShots에 확장.
+  for (const scene of scenes.scenes) {
+    const shots = resultsByScene.get(scene.scene_id);
+    if (shots === undefined) continue; // resume 완료 씬 또는 예산 양보로 미처리
+    allShots.push(...shots);
     doneSceneIds.add(scene.scene_id);
-    processedThisPass += 1;
+  }
+
+  // 남은 씬이 있으면 부분 반환 — 다음 step 인보케이션이 resume으로 이어간다.
+  if (!scenes.scenes.every((s) => doneSceneIds.has(s.scene_id))) {
+    console.log(
+      `[shotDesign] checkpoint: ${doneSceneIds.size}/${scenes.scenes.length} scenes done (concurrency=${concurrency}) — 다음 step에서 이어감`,
+    );
+    return { done: false, doneSceneIds: [...doneSceneIds], shots: allShots };
   }
 
   await logger.saveStage('11_v4_shotDesign.json', { shots: allShots, compact_mode: compactMode });
