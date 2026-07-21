@@ -19,9 +19,10 @@ import { runScenes } from '@/lib/writer/pipeline/stages/s3_scenes'
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage'
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots'
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1'
+import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2'
 import { getPendingRawCalls, resetRawSeq } from '@/lib/writer/llm/raw_collector'
 import type { PipelineLogger } from '@/lib/writer/logger'
-import type { Genre, Characters, BackgroundContract, PipelineInput, Scenes, DecoupagePlan, VisualIdentity, WorldVisual, CharacterVisual } from '@/lib/writer/types/pipeline'
+import type { Genre, Characters, BackgroundContract, PipelineInput, Scenes, DecoupagePlan, VisualIdentity, WorldVisual, CharacterVisual, ShotDesign } from '@/lib/writer/types/pipeline'
 
 const ENABLED = process.env.RUN_WRITER_STAGE === '1' && !!process.env.GEMINI_API_KEY
 const MODEL = { provider: process.env.WRITER_PROVIDER ?? 'gemini', model: process.env.WRITER_MODEL ?? 'gemini-3-flash-preview' }
@@ -344,6 +345,21 @@ const STAGE_FNS: Record<string, (st: State, p: Preset) => Promise<unknown>> = {
       logger,
       MODEL as never,
     ),
+  // C축 확장 (E12b): shotCheck — 결정론 조립 + Step2 검증. 파일 주입(WRITER_SCENES_FILE/
+  //   WRITER_SHOTS_FILE) 우선, 없으면 체인 state. C축 검증은 실 파이프라인 기본값
+  //   (claude-sonnet-4-6) 고정 — CLAUDE_API_KEY 필요.
+  shotCheck: (st, p) =>
+    runShotCheck(
+      'exp-project',
+      st.genre,
+      p.characters,
+      (loadInjected('WRITER_SCENES_FILE') ?? st.scenes) as Scenes,
+      stubWorldVisual(p.world),
+      (loadInjected('WRITER_SHOTS_FILE') ?? st.shotDesign) as ShotDesign[],
+      [],
+      logger,
+      { provider: 'claude', model: 'claude-sonnet-4-6' } as never,
+    ),
   // V축 확장 (스텁 비주얼 — 위 주석 참조). sceneCinematography plans=null → 프롬프트의 Compact 분기 사용.
   decoupage: (st, p) => runDecoupage(st.genre, p.characters, st.scenes as Scenes, stubWorldVisual(p.world), null, logger, MODEL as never),
   shotDesign: async (st, p) => {
@@ -407,6 +423,9 @@ describe('writer 단계 실험 (길이 양극화)', () => {
           const r = result as { passed: boolean; issues: { severity: string }[]; cliche_count: number }
           const sev = (s: string) => r.issues.filter((i) => i.severity === s).length
           summary = `passed=${r.passed} issues=${r.issues.length} [C${sev('CRITICAL')}/W${sev('WARNING')}/I${sev('INFO')}] cliche_count=${r.cliche_count}`
+        } else if (stage === 'shotCheck' && result) {
+          const r = result as { shotSequence: { total_shots: number; total_duration_seconds: number }; report: { passed: boolean; issues: unknown[]; shots_split_count: number } }
+          summary = `shots=${r.shotSequence.total_shots} total=${r.shotSequence.total_duration_seconds}s passed=${r.report.passed} issues=${r.report.issues.length} split=${r.report.shots_split_count}`
         }
         console.log(`[${stage}] ${(ms / 1000).toFixed(1)}s  ${err ? 'ERR=' + err.slice(0, 80) : summary}  → ${path.relative(process.cwd(), outPath)}`)
       }
