@@ -152,7 +152,7 @@
 | D1 | DB 감사 묶음 | 1 | ✅ (E4·E10 기각 판정 포함) | `results/D1-db-audit.md` |
 | W1~W5+R1 | 청소 + 회귀 | 2 | ✅ 통과 (악화 0) — W1~W5 워킹트리 적용됨 | `results/R1-cleanup-regression.md` |
 | E0b | 사다리 재작성 | 3 | ⏸ 보류 (E0a 기준 미충족) | — |
-| E3b | 예산표 주입 | 3 | ⬜ | — |
+| E3b | 예산표 주입 (2층) | 3 | ✅ 채택 — 전 기준 통과, 교정 0회 발동 | `results/E3b-budget-injection.md` |
 | E1 | 원장 3블록 | 3 | ⬜ | — |
 | E5 | C1 존폐 | 3 | ⬜ | — |
 | E6 | midPreview 존폐 | 3 | ⬜ | — |
