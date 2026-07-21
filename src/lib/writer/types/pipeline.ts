@@ -321,7 +321,7 @@ export interface Scenes {
 export type ValidationSeverity = 'CRITICAL' | 'WARNING' | 'INFO';
 
 export interface ValidationIssue {
-  category: 'causality' | 'cdq' | 'verisimilitude' | 'cliche' | 'action_budget' | 'continuity' | 'theme' | 'cinematography';
+  category: 'causality' | 'cdq' | 'verisimilitude' | 'cliche' | 'differentiator' | 'action_budget' | 'continuity' | 'theme' | 'cinematography';
   severity: ValidationSeverity;
   location: string; // "S3.scene_2" or "shot_5" etc
   message: string;

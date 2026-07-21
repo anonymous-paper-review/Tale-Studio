@@ -1,5 +1,8 @@
 // C 적용 ①: S 완료 후 서사 검증
-// 룰 기반 (인과 체인) + LLM 기반 (CDQ, 핍진성, 클리셰) 하이브리드
+// 룰 기반 (인과 체인) + LLM 기반 (인과·핍진성, 차별점 보존, CDQ) 하이브리드
+// P5 재정의 (E5 2026-07-21): 클리셰는 감점하지 않는다 — 이 제품에서 관습 디폴트는 명세다(독트린 §0-5).
+//   감점 대상은 (a) 인과·핍진성 붕괴 (b) 유저 차별점 실종뿐. 1차 측정에서 구판은 정상 산출물 4/4에
+//   클리셰 WARNING을 내고 광고 장르 관습(제품 매직 모먼트)을 데우스 엑스 마키나 CRITICAL로 오판했다.
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { analyzeCausalityChain } from '@/lib/writer/pipeline/validators/causality';
 import type {
@@ -35,31 +38,36 @@ export async function runStoryCheck(
   const ruleIssues: ValidationIssue[] = [...causality.issues];
 
   // ===== LLM 기반 검증 (Claude) =====
-  const system = `당신은 영상 서사의 핍진성 검증자이다. 주어진 genre·내러티브 구조·캐릭터·씬을 보고
-다음을 평가한다:
+  const system = `당신은 영상 서사의 검증자이다. 주어진 genre·내러티브 구조·캐릭터·씬에서 **진짜 결함만** 찾는다.
 
-1. CDQ (Central Dramatic Question) 존재 여부와 명확도
-   - S1.central_dramatic_question이 존재하는가?
-   - 5가지 속성 충족: 명확성, 개인적 stakes, 불확실성, 보편성, 긴급성
-   - 0~1 점수
+검사 원칙 (가장 중요):
+- 관습적·전통적·클리셰적 선택은 결함이 아니다 — 이 제품에서 장르 관습 디폴트는 명세다.
+  "전형적이다", "많이 본 연출이다", "예측 가능하다"는 이유로는 이슈를 만들지 마라.
+- 장르 계약 안의 개입은 정상이다. 예: 광고에서 제품이 인물에게 힘을 주는 매직 모먼트는
+  광고 장르의 핵심 관습이지 데우스 엑스 마키나가 아니다. 데우스 엑스 마키나 판정은
+  **장르 계약과 무관한 외부 우연**(셋업 없이 등장해 곤경을 대신 해소하는 요소)에만 내린다.
 
-2. 핍진성 (Verisimilitude)
-   - 캐릭터 행동이 S2.personality와 일치하는가?
-   - 인과 체인이 자연스러운가?
-   - 우연이 곤경에서 캐릭터를 빼내는 데우스 엑스 마키나가 있는가?
+검사 항목:
 
-3. 클리셰 감지
-   - 장르 클리셰 (호러=점프스케어 남용, 로맨스=오해 기반 갈등 등)
-   - 캐릭터 클리셰 (선택받은 자, 마법 흑인, MPDG 등)
-   - 서사 클리셰 (악당이 계획 설명, 1초 전 해제 등)
-   - 발견된 클리셰의 개수와 위치
+1. 인과·핍진성 — CRITICAL 후보
+   - 감정·행동의 급변에 유발 사건이 있는가 (예: 절망→환희 전환에 매개 부재 = 인과 붕괴)
+   - 캐릭터 행동이 주어진 설정(personality가 주어진 경우만)과 정면 모순되는가
+   - 장르 계약 밖의 우연이 곤경을 해소하는가 (진짜 데우스 엑스 마키나)
 
-4. 주제 관통
-   - S1.theme이 S3 씬들에 일관되게 표현되는가?
+2. 차별점 보존 (category: "differentiator") — CRITICAL 후보
+   - narrativeStructure에 명시된 고유 요소(핵심 소품·설정·사건)가 씬에서 실종되거나
+     무관한 다른 것으로 대체되었는가 (예: 제품이 할 역할을 외부 요소가 대신함)
 
-CRITICAL: 핍진성 붕괴 (캐릭터 행동 불일치, 데우스 엑스 마키나)
-WARNING: CDQ 약함, 인과 약함, 명백한 클리셰
-INFO: 미세 개선 제안`;
+3. CDQ — S1.central_dramatic_question 존재 여부와 명확도(0~1 점수). 약해도 WARNING까지만.
+
+4. 주제 관통 — S1.theme이 씬들에 표현되는가. 단절이어도 WARNING까지만.
+
+심각도:
+CRITICAL: 인과·핍진성 붕괴, 차별점 실종 — 재생성이 필요한 수준만
+WARNING: CDQ 약함, 인과 연결 약함, 주제 단절
+INFO: 미세 개선 제안
+
+cliche_count는 참고용 카운트로만 반환한다 — 클리셰를 이유로 llm_issues를 만들지 않는다.`;
 
   const user = `[genre]
 ${JSON.stringify(genre)}
@@ -80,7 +88,7 @@ ${JSON.stringify(scenes)}
   "cliche_count": number,
   "llm_issues": [
     {
-      "category": "causality" | "cdq" | "verisimilitude" | "cliche" | "theme",
+      "category": "causality" | "cdq" | "verisimilitude" | "differentiator" | "theme",
       "severity": "CRITICAL" | "WARNING" | "INFO",
       "location": "string (예: S2.character_id, S3.scene_id, S1)",
       "message": "string",
