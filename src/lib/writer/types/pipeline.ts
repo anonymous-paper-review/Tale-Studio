@@ -309,6 +309,9 @@ export interface Scenes {
   total_estimated_seconds: number;
   // 전개상 추가된 새 인물 (기존 캐스트로 충분하면 [] 또는 미반환). §4 오픈 캐스트.
   new_characters?: NewCharacter[];
+  // E3b 시간 예산 모드 — 코드가 설정(LLM 출력 아님). honest=씬초↔액션 결합 검증됨,
+  // representative=장편 대표 스토리보드(씬 초가 액션보다 클 수 있음 — 의도된 것).
+  coverage_mode?: 'honest' | 'representative';
 }
 
 // =====================================================================

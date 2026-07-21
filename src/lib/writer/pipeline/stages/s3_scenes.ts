@@ -1,5 +1,7 @@
 // S3: 씬 브레이크다운, 감정 비트, 정보 비대칭
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import { computeSceneBudget, renderBudgetBlock, validateSceneBudget } from '@/lib/writer/pipeline/budget';
+import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
 import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, StoryCharacter, BackgroundContract } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
@@ -99,17 +101,10 @@ export async function runScenes(
 ): Promise<Scenes> {
   await logger.markStage('scenes', 'started');
 
-  const totalSecondsTarget = genre.runtime_seconds;
-  const sceneCountHintMap: Record<string, string> = {
-    D1: '1개 씬 (한 순간, 단일 액션)',
-    D2: '1~2개 씬',
-    D3: '3~5개 씬',
-    D4: '5~10개 씬',
-    D5: '10~20개 씬',
-    D6: '20~30개 씬',
-    D7: '30개+ 씬',
-  };
-  const sceneCountHint = sceneCountHintMap[genre.depth_level] ?? '5~10개 씬';
+  // 시간 예산 (E3b): 산수는 코드가 — 씬 수·총합·씬당 액션의 정합표를 계산해 주입한다 (독트린 P6).
+  //   E3a 실측: 산문 힌트("총합 ≈ N초" + depth별 씬 수)만 주면 장편에서 씬당 액션 3개 고정인 채
+  //   씬 초만 부풀었다(M2 9~10배). honest/representative 모드는 budget.ts(정책) 참조.
+  const budget = computeSceneBudget(genre, narrativeStructure.acts.length);
 
   const systemInstruction = `당신은 영상 제작의 S3(씬 브레이크다운) 디자이너이다.
 주어진 스토리·genre·내러티브 구조(S1)·캐스트/로케이션 위에서 씬 단위 분해를 한다.
@@ -131,8 +126,7 @@ export async function runScenes(
 - "audience>character": 드라마틱 아이러니
 - "character>audience": 미스터리
 
-각 씬에 estimated_seconds를 추정 (총합 ≈ ${totalSecondsTarget}초).
-${sceneCountHint} 권장.
+${renderBudgetBlock(budget)}
 
 act 커버리지 (필수):
 - S1.acts의 모든 act_id가 최소 1개 씬의 act_ref로 등장해야 한다 (빠지는 막 금지).
@@ -142,8 +136,8 @@ act 커버리지 (필수):
 
 scene_actions:
 - 씬에서 일어나는 주요 액션을 텍스트로 (예: "카이가 일어선다", "편지를 펼친다", "문을 연다")
-- 5초 한 샷에 한 액션이 들어가도록 분리해서 작성
-- 너무 많은 액션을 한 씬에 몰지 말 것 (한 씬은 보통 1~3 액션)
+- 한 액션 = 한 샷(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초)에 들어가도록 분리해서 작성
+- 씬당 액션 수는 위 시간 예산을 따른다
 
 오픈 캐스트 규칙 (중요):
 - 위 [기존 캐스트]는 producer가 이미 확정한 인물/사물이다. 등장시킬 때 **반드시 주어진 slug 그대로**
@@ -265,10 +259,46 @@ new_characters에도 기존 캐스트와 같은 깊이의 서사 속성(personal
     }
   }
 
+  // 시간 예산 자기검증 (E3b): honest 모드에서 총합·씬 수·씬 초↔액션 정합 위반 시 1회 교정 재생성.
+  //   act 커버리지가 나빠지지 않고 위반이 줄어든 쪽만 채택 (act repair와 동일 패턴).
+  //   representative 모드는 검증 없음 — 씬 초 > 액션 용량이 의도된 것 (budget.ts 정책).
+  let budgetViolations = validateSceneBudget(scenes, budget);
+  if (budgetViolations.length) {
+    const budgetRepairPrompt = `${userPrompt}
+
+[시간 예산 위반 — 아래 항목을 고쳐 동일 JSON 형식으로 다시 출력하라.
+${renderBudgetBlock(budget)}]
+${budgetViolations.map((x) => `- ${x.scene_id ?? '(전체)'}: ${x.message}`).join('\n')}`;
+    const budgetRepaired = await generateJson<Scenes>(budgetRepairPrompt, axisConfig, {
+      systemInstruction,
+      temperature: 0.5,
+    });
+    await logger.saveLlmCall('scenes_budget_repair', {
+      prompt: budgetRepairPrompt,
+      response: JSON.stringify(budgetRepaired, null, 2),
+      model: describeAxisConfig(axisConfig),
+      provider: axisConfig.provider,
+    });
+    const repairedNorm = normalizeSceneLocations(budgetRepaired, world);
+    if (
+      uncoveredActs(repairedNorm, narrativeStructure).length <= uncovered.length &&
+      validateSceneBudget(repairedNorm, budget).length < budgetViolations.length
+    ) {
+      scenes = repairedNorm;
+      uncovered = uncoveredActs(scenes, narrativeStructure);
+      budgetViolations = validateSceneBudget(scenes, budget);
+    }
+  }
+
+  // coverage_mode는 코드가 설정 (LLM 출력 아님) — 하류가 대표 스토리보드 여부를 판별하는 근거.
+  scenes = { ...scenes, coverage_mode: budget.mode };
+
   await logger.saveStage('05_s3_scenes.json', scenes);
   await logger.markStage('scenes', 'completed', {
     scene_count: scenes.scenes.length,
     uncovered_acts: uncovered, // 비어있어야 정상 (남으면 막 수 > 가능 씬 수 등 구조적 한계)
+    budget_mode: budget.mode,
+    budget_violations: budgetViolations.length, // honest에서 0이어야 정상 (교정 후 잔존 수)
   });
   return scenes;
 }

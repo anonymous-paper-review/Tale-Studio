@@ -9,6 +9,7 @@
 // 출력 DecoupagePlan은 V4 입력으로 사용됨 (V4가 각 샷에 3분할 spec을 붙임).
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX } from '@/lib/writer/pipeline/physics';
+import { REPRESENTATIVE_DEPTHS, REPRESENTATIVE_SHOT_CAP } from '@/lib/writer/pipeline/budget';
 import type {
   DecoupagePlan,
   DecoupageShot,
@@ -68,6 +69,7 @@ function buildUserPrompt(
   genre: Genre,
   characters: Characters,
   worldVisual: WorldVisual,
+  shotBudgetHint: number | null,
 ): string {
   const beatList = scene.scene_actions
     .map((a, i) => `  [${i}] ${a}`)
@@ -77,6 +79,15 @@ function buildUserPrompt(
     ? `[sceneCinematography 비주얼 플랜 — 참고용 힌트 (제약 아님)]
 coverage_pattern=${plan.coverage_pattern}, shot_count_target=${plan.shot_count_target} (힌트), rhythm_profile=${plan.rhythm_profile}, cut_pace=${plan.cut_pace}, avg_shot_seconds=${plan.avg_shot_seconds}, lens=${plan.lens_vocabulary.join('/')}mm, energy=${plan.camera_energy}`
     : `[sceneCinematography 미제공 — Compact Mode. 데쿠파주를 자체 판단으로 저작]`;
+
+  // 대표 스토리보드 모드 (E3b 정책 — budget.ts): 장편은 전역 상한을 씬으로 배분한 예산 안에서 저작.
+  const budgetHint = shotBudgetHint !== null
+    ? `
+
+[샷 예산 — 대표 스토리보드 모드 (장편 정책)]
+이 프로젝트는 대표 샷 스토리보드로 제작된다 (전역 정책 상한 ~${REPRESENTATIVE_SHOT_CAP}샷). 이 씬은 **최대 ~${shotBudgetHint}샷**.
+모든 비트 커버 원칙은 유지하되 added(설정/반응/인서트)를 아껴 예산 안에서 리듬을 저작하라.`
+    : '';
 
   return `[씬 정보]
 scene_id=${scene.scene_id}, purpose=${scene.purpose}, location=${scene.location}, time=${scene.time_of_day}
@@ -89,7 +100,7 @@ ${scene.key_dialogue && scene.key_dialogue.length > 0 ? `key_dialogue=${JSON.str
 [내러티브 비트 (scene_actions) — 인덱스 주목]
 ${beatList}
 
-${planHint}
+${planHint}${budgetHint}
 
 [genre 장르/톤]
 genre=${genre.genre}, tone=${genre.tone.join('/')}, targetEmotion=${genre.targetEmotion.join('/')}
@@ -157,10 +168,11 @@ async function decoupageForScene(
   genre: Genre,
   characters: Characters,
   worldVisual: WorldVisual,
+  shotBudgetHint: number | null,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
 ): Promise<SceneDecoupage> {
-  const userPrompt = buildUserPrompt(scene, plan, genre, characters, worldVisual);
+  const userPrompt = buildUserPrompt(scene, plan, genre, characters, worldVisual, shotBudgetHint);
 
   const raw = await generateJson<unknown>(userPrompt, axisConfig, {
     systemInstruction: SYSTEM_INSTRUCTION,
@@ -214,10 +226,19 @@ export async function runDecoupage(
 ): Promise<DecoupagePlan> {
   await logger.markStage('decoupage', 'started', { scene_count: scenes.scenes.length });
 
+  // 대표 스토리보드 모드 (E3b): 장편(D6~D7)은 전역 샷 상한을 씬 수로 배분해 씬당 예산 힌트로 준다.
+  //   scenes.coverage_mode가 있으면 그것이 진실(코드 설정값), 없으면(구버전 산출) depth로 판정.
+  const representative = scenes.coverage_mode
+    ? scenes.coverage_mode === 'representative'
+    : REPRESENTATIVE_DEPTHS.includes(genre.depth_level);
+  const shotBudgetHint = representative
+    ? Math.max(3, Math.round(REPRESENTATIVE_SHOT_CAP / Math.max(1, scenes.scenes.length)))
+    : null;
+
   const sceneDecoupages: SceneDecoupage[] = [];
   for (const scene of scenes.scenes) {
     const plan = sceneCinematographyPlans?.find((p) => p.scene_id === scene.scene_id) ?? null;
-    const sceneDec = await decoupageForScene(scene, plan, genre, characters, worldVisual, logger, axisConfig);
+    const sceneDec = await decoupageForScene(scene, plan, genre, characters, worldVisual, shotBudgetHint, logger, axisConfig);
     sceneDecoupages.push(sceneDec);
   }
 
