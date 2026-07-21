@@ -47,8 +47,8 @@ function withCacheBust(url: string, v?: number): string {
   return `${url}${url.includes('?') ? '&' : '?'}v=${v}`
 }
 
-// 3프레임 순환 라벨 — start(시작 프레임) → direction(연출 화살표/지시) → end(끝 프레임).
-const FRAME_LABELS = ['START', '연출', 'END'] as const
+// 3프레임 순환 라벨 — START → DIRECTING(연출 화살표/지시) → END (2026-07-22 라벨 영문 통일).
+const FRAME_LABELS = ['START', 'DIRECTING', 'END'] as const
 const FRAME_CYCLE_MS = 1200
 
 /** 러프 3프레임 순환 표시(#rough-grid 2026-07-22) — 기본은 START 정지 프레임, hover 중에만 순환

@@ -142,6 +142,9 @@ export interface RoughStoryboardPromptInput {
   aperture?: number | null
   /** lighting_config.position: 'left' | 'top' | 'right' | 'front' — fallback 전용 */
   lightPosition?: string | null
+  /** 샷 길이(초) — DB shots.duration_seconds. START↔END 변화량 힌트(#rough-grid duration 상속).
+   *  rich 경로는 spec.intent.duration_seconds 우선, 이 값은 폴백. */
+  durationSeconds?: number | null
   aspectRatio?: string
   /** L4(shotDesign) 원본 — 있으면 rich 경로, 없으면 DB fallback */
   spec?: RoughStoryboardSpec | null

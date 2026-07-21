@@ -128,10 +128,16 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
     .filter((g) => g.from !== g.to)
     .map((g) => `blank head turns ${words(g.from)} → ${words(g.to)}`)
   const motionParts = [camMove, ...charMoves, ...gazeMoves].filter(Boolean) as string[]
-  const motion = motionParts.length ? motionParts.join('; ') : 'static hold — no camera or figure movement'
+  // 샷 길이(초) 상속(#rough-grid duration, 2026-07-22): START↔END 변화량의 기준 —
+  //   없으면 모델이 미세한 변화만 그리는 경향(실측). rich(intent) 우선, DB 폴백.
+  const dur = input.spec?.intent?.duration_seconds ?? input.durationSeconds ?? null
+  const durNote = typeof dur === 'number' && dur > 0 ? `${Math.round(dur)}` : null
+  const motion = motionParts.length
+    ? `${durNote ? `over this shot's full ${durNote}-second duration: ` : ''}${motionParts.join('; ')}`
+    : 'static hold — no camera or figure movement'
 
   const end = motionParts.length
-    ? `the same shot after the motion completes — ${motionParts.join('; ')} has finished; show the resulting poses, positions and framing`
+    ? `the same shot after ${durNote ? `the full ${durNote} seconds of` : ''} the movement completes — ${motionParts.join('; ')} has fully finished. END must be clearly and visibly different from START: show how far ${durNote ? `${durNote} seconds` : 'the shot'} of this movement actually carries the figures and camera (changed poses, positions and framing), not a subtle variation`
     : 'nearly identical to START (static shot) — only a subtle natural settling'
 
   return { shotId, start: startParts.join('. '), motion, end }
@@ -159,13 +165,13 @@ export function buildRoughGridPrompt(cells: RoughGridCell[], variant: RoughGridV
 Each COLUMN is one shot of a film, read top to bottom as three frames:
 - Row 1 (top) = START: the composition at the beginning of the shot.
 - Row 2 (middle) = DIRECTION: an EXACT identical copy of Row 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Row 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Row 1 and Row 2 is the arrows and labels drawn on top. Row 2 is the ONLY place where text is allowed.
-- Row 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Row 3 is the only frame where the motion has visibly progressed.`
+- Row 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Row 3 is the only frame where the motion has visibly progressed — and when a shot has movement, its END must differ clearly and unmistakably from its START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
       : `The reference image is a paper storyboard strip with 3 empty panels stacked vertically. Keep the sheet, panel borders and corner marks exactly as they are — draw only INSIDE the panels.
 
 The strip is ONE shot of a film, read top to bottom as three frames:
 - Panel 1 (top) = START: the composition at the beginning of the shot.
 - Panel 2 (middle) = DIRECTION: an EXACT identical copy of Panel 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Panel 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Panel 1 and Panel 2 is the arrows and labels drawn on top. Panel 2 is the ONLY place where text is allowed.
-- Panel 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Panel 3 is the only frame where the motion has visibly progressed.`
+- Panel 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Panel 3 is the only frame where the motion has visibly progressed — and when the shot has movement, END must differ clearly and unmistakably from START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
 
   const body = cells
     .map((c, i) => {

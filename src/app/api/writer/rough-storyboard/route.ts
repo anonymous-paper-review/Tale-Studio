@@ -198,7 +198,7 @@ export async function POST(req: Request) {
         supabaseAdmin
           .from('shots')
           .select(
-            'shot_id, scene_id, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, rough_storyboard',
+            'shot_id, scene_id, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, duration_seconds, rough_storyboard',
           )
           .eq('project_id', projectId)
           .order('sort_order'),
@@ -390,6 +390,7 @@ export async function POST(req: Request) {
             focalLength: (s.focal_length as number | null) ?? null,
             aperture: (s.aperture as number | null) ?? null,
             lightPosition: lighting.position ?? null,
+            durationSeconds: (s.duration_seconds as number | null) ?? null,
             spec: translatedSpecs.get(shotId) ?? null,
             styleHints,
           },
