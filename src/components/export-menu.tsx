@@ -123,15 +123,22 @@ export function ExportMenu() {
   const runScreenshot = async () => {
     if (!projectId || isBusy) return
     setBusyScope('screenshot')
+    // 진행 상황 토스트(#c1) — 전체 보드 캡처는 이미지 임베드에 수 초 걸려 피드백이 필요하다.
+    const toastId = toast.loading('화면을 준비하고 있어요…')
     try {
       const base = projectTitle.trim() || 'tale-studio'
       const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
       // 드롭다운이 닫혀 캡처에 잡히지 않도록 한 박자 양보
       await new Promise((resolve) => setTimeout(resolve, 300))
-      await captureScreenJpeg(`${base}-${stamp}.jpg`)
-      toast.success('화면을 JPEG로 저장했어요')
+      await captureScreenJpeg(`${base}-${stamp}.jpg`, (current, total) => {
+        toast.loading(
+          total > 0 ? `화면 캡처 중… 이미지 ${current}/${total}` : '화면 캡처 중…',
+          { id: toastId },
+        )
+      })
+      toast.success('화면을 JPEG로 저장했어요', { id: toastId })
     } catch (error) {
-      toast.error(`캡처 실패: ${errorMessage(error, '알 수 없는 오류')}`)
+      toast.error(`캡처 실패: ${errorMessage(error, '알 수 없는 오류')}`, { id: toastId })
     } finally {
       setBusyScope(null)
     }

@@ -1562,6 +1562,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const clipIdsToDelete = removedNodes.flatMap((node) =>
           isVideoData(node.data) && node.data.videoClipId ? [node.data.videoClipId] : [],
         )
+        const sceneIdsToDelete = removedNodes.flatMap((node) =>
+          isSceneData(node.data) && node.data.writerSceneId ? [node.data.writerSceneId] : [],
+        )
+        const shotIdsToDelete = removedNodes.flatMap((node) =>
+          isShotData(node.data) && node.data.writerShotId ? [node.data.writerShotId] : [],
+        )
 
         set((s) => ({
           nodes: s.nodes.filter((node) => !ids.has(node.id)),
@@ -1584,6 +1590,23 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               if (!response.ok) throw new Error(`HTTP ${response.status}`)
             }),
           )
+          const supabase = createClient()
+          if (projectId && shotIdsToDelete.length > 0) {
+            const { error } = await supabase
+              .from('shots')
+              .delete()
+              .eq('project_id', projectId)
+              .in('shot_id', shotIdsToDelete)
+            if (error) throw error
+          }
+          if (projectId && sceneIdsToDelete.length > 0) {
+            const { error } = await supabase
+              .from('scenes')
+              .delete()
+              .eq('project_id', projectId)
+              .in('scene_id', sceneIdsToDelete)
+            if (error) throw error
+          }
         } catch (error) {
           if (
             latestVideoDeleteIntent.get(deleteKey) === intent &&
@@ -2939,12 +2962,14 @@ export function nextVideoPosition(
 export function nextScenePosition(
   state: Pick<DirectorCanvasState, 'nodes'>,
 ): XYPosition {
+  // 초기 배치를 '자동 정렬'(relayoutCanvas)과 동일하게(#d1 2026-07-18). 그룹 폭·시작 x 에
+  //   ASSET_OFFSET_X(좌측 asset 컬럼)를 포함해야 asset 노드가 옆 그룹과 겹치지 않는다.
+  //   (옛 nextScenePosition 은 ASSET_OFFSET_X 를 빠뜨려 촘촘한 '예전 layout' 이 됐다.)
+  const GROUP_WIDTH = ASSET_OFFSET_X + SHOT_OFFSET_X + VIDEO_OFFSET_X + 400
   const scenes = state.nodes.filter((n) => n.data.kind === 'scene')
-  if (scenes.length === 0) return { x: 80, y: 80 }
-  // Scene을 가로로 배치 — 각 그룹(scene + 우측 shot 컬럼 + video 공간)이 겹치지 않게
-  // 그룹 폭(scene→shot + shot→video + video 노드/여백)만큼 우측으로. (#1 레이아웃)
+  if (scenes.length === 0) return { x: 80 + ASSET_OFFSET_X, y: 80 }
   const maxX = Math.max(...scenes.map((n) => n.position.x))
-  return { x: maxX + SHOT_OFFSET_X + VIDEO_OFFSET_X + 400, y: 80 }
+  return { x: maxX + GROUP_WIDTH, y: 80 }
 }
 
 // ============================================================================

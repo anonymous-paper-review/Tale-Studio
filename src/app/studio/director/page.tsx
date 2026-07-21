@@ -22,7 +22,7 @@ import {
   type OnConnectEnd,
   type XYPosition,
 } from '@xyflow/react'
-import { Loader2, ImageIcon, X, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
+import { Loader2, ImageIcon, X, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
 
 import { toast } from 'sonner'
 
@@ -71,10 +71,12 @@ const nodeTypes = {
 } as const
 
 // ────────────────────────────────────────────────────────────────────────────
-// MiniMap 상태창 — 숨기기/켜기 토글 + 드래그 이동 + 잠금(위치 고정).
+// MiniMap 상태창 — 접기/펼치기 토글 + 드래그 이동 + 잠금(위치 고정).
 //   ReactFlow 자식이라 MiniMap이 viewport context를 받는다. 위치는 우/하단 offset(px).
+//   (#d2 2026-07-18) 옛 "숨기기(X)→별도 재열기 버튼"은 재열기 버튼을 못 찾는 문제가 있어,
+//   X 대신 접기 토글로 바꾼다: 접으면 헤더 바만 남고 아주 투명해져(hover 시 또렷) 항상 다시 펼 수 있다.
 function MiniMapPanel() {
-  const [visible, setVisible] = useState(true)
+  const [collapsed, setCollapsed] = useState(false)
   const [locked, setLocked] = useState(false)
   const [pos, setPos] = useState({ right: 16, bottom: 16 })
   const [size, setSize] = useState({ w: 200, h: 150 })
@@ -136,65 +138,72 @@ function MiniMapPanel() {
     window.addEventListener('pointerup', up)
   }
 
-  if (!visible) {
-    return (
-      <button
-        type="button"
-        onClick={() => setVisible(true)}
-        className="absolute bottom-4 right-4 z-10 flex h-8 items-center gap-1.5 rounded-md border border-border bg-card/50 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground hover-red-beam"
-      >
-        <MapIcon className="size-3.5" />
-        미니맵
-      </button>
-    )
-  }
-
   return (
     <div
-      className="absolute z-10 overflow-hidden rounded-lg border border-border bg-card/50"
+      className={cn(
+        'absolute z-10 overflow-hidden rounded-lg border bg-card/50 transition-opacity',
+        // 접힘: 헤더 바만 남기고 아주 투명하게(hover 시 또렷해져 다시 펼치기 유도).
+        collapsed
+          ? 'border-border/40 opacity-35 hover:opacity-100'
+          : 'border-border opacity-100',
+      )}
       style={{ right: pos.right, bottom: pos.bottom }}
     >
-      {/* 크기 조절 핸들 — 좌상단 코너(앵커가 우하단). 드래그로 미니맵 크기 조절 */}
-      <div
-        onPointerDown={onResizePointerDown}
-        title="크기 조절 (드래그)"
-        className="absolute left-0 top-0 z-30 size-3.5 cursor-nwse-resize rounded-tl-lg transition-colors hover:bg-primary/30"
-        style={{ touchAction: 'none' }}
-      />
+      {/* 크기 조절 핸들 — 좌상단 코너(앵커가 우하단). 펼친 상태에서만 노출 */}
+      {!collapsed && (
+        <div
+          onPointerDown={onResizePointerDown}
+          title="크기 조절 (드래그)"
+          className="absolute left-0 top-0 z-30 size-3.5 cursor-nwse-resize rounded-tl-lg transition-colors hover:bg-primary/30"
+          style={{ touchAction: 'none' }}
+        />
+      )}
       <div
         onPointerDown={onHeaderPointerDown}
         className={cn(
-          'flex h-6 items-center justify-between border-b border-border/60 px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground',
+          'flex h-6 items-center justify-between gap-2 px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground',
+          !collapsed && 'border-b border-border/60',
           locked ? 'cursor-default' : 'cursor-grab active:cursor-grabbing',
         )}
       >
-        <span>미니맵</span>
+        <span className="flex items-center gap-1">
+          <MapIcon className="size-3" />
+          미니맵
+        </span>
         <div className="flex items-center gap-0.5">
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={() => setLocked((v) => !v)}
+              title={locked ? '위치 잠금 해제' : '위치 잠금'}
+              className="rounded p-0.5 hover:bg-accent hover:text-foreground hover-red-beam"
+            >
+              {locked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setLocked((v) => !v)}
-            title={locked ? '위치 잠금 해제' : '위치 잠금'}
+            onClick={() => setCollapsed((v) => !v)}
+            title={collapsed ? '미니맵 펼치기' : '미니맵 접기'}
             className="rounded p-0.5 hover:bg-accent hover:text-foreground hover-red-beam"
           >
-            {locked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
-          </button>
-          <button
-            type="button"
-            onClick={() => setVisible(false)}
-            title="미니맵 숨기기"
-            className="rounded p-0.5 hover:bg-accent hover:text-foreground hover-red-beam"
-          >
-            <X className="size-3" />
+            {collapsed ? (
+              <ChevronUp className="size-3" />
+            ) : (
+              <ChevronDown className="size-3" />
+            )}
           </button>
         </div>
       </div>
-      <div style={{ width: size.w, height: size.h }}>
-        <MiniMap
-          className="!static !m-0 !h-full !w-full !bg-transparent"
-          pannable
-          zoomable
-        />
-      </div>
+      {!collapsed && (
+        <div style={{ width: size.w, height: size.h }}>
+          <MiniMap
+            className="!static !m-0 !h-full !w-full !bg-transparent"
+            pannable
+            zoomable
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -229,13 +238,28 @@ function CanvasInner() {
   const directorProjectId = useDirectorCanvasStore((s) => s.projectId)
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
 
-  // undo/redo 키보드 — Ctrl/Cmd+Z = undo, Ctrl/Cmd+Y 또는 Ctrl/Cmd+Shift+Z = redo.
-  //   입력 필드(input/textarea)에서는 브라우저 텍스트 편집 undo를 우선해 무시.
+  // 키보드 — Ctrl/Cmd+Z=undo, Ctrl/Cmd+Y·Shift+Z=redo, Del/Backspace=선택 노드 삭제 확인(#e3).
+  //   입력 필드(input/textarea/contentEditable)에서는 브라우저 기본 편집을 우선해 무시.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null
+      const tag = el?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return
+      // 삭제: Del/Backspace → 선택 노드가 있으면 확인 모달(버튼 삭제와 동일 경로). RF 내장
+      //   deleteKeyCode 는 비활성화(null)라 여기서만 삭제가 시작된다 → 항상 확인을 거친다.
+      //   선택 기준은 RF 선택(node.selected) — 캔버스 클릭 선택이 여기 반영된다(store.selectedNodeId는
+      //   상세 패널용 별개 상태라 캔버스 클릭으로는 안 채워진다).
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const st = useDirectorCanvasStore.getState()
+        if (st.deleteConfirmInfo) return
+        const target = st.nodes.find((n) => n.selected) ?? null
+        if (target) {
+          e.preventDefault()
+          st.openDeleteConfirm(target.id)
+        }
+        return
+      }
       if (!(e.ctrlKey || e.metaKey)) return
-      const tag = (e.target as HTMLElement | null)?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return
       const k = e.key.toLowerCase()
       if (k === 'z' && !e.shiftKey) {
         e.preventDefault()
@@ -480,7 +504,8 @@ function CanvasInner() {
         //   fitView가 잘리는 원인이기도 했다.
         minZoom={0.1}
         connectionMode={ConnectionMode.Loose}
-        deleteKeyCode={['Backspace', 'Delete']}
+        // 내장 삭제 비활성화(#e3) — Del/Backspace 는 위 keydown 핸들러가 확인 모달로 라우팅한다.
+        deleteKeyCode={null}
         // fitView/복원은 위 useEffect가 useNodesInitialized 타이밍에 제어(#e). defaultViewport로
         //   remount 시 첫 페인트를 마지막 위치에서 시작해 깜빡임을 줄인다.
         defaultViewport={initialViewportRef.current}

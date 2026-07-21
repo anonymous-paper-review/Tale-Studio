@@ -188,6 +188,16 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
   const roughUrl = rough?.status === 'completed' ? rough.url : null
   const prompt = effectivePrompt(data)
 
+  // 파이프라인 단계 배지(#e2 2026-07-18) — 이 샷이 어느 단계인지 한눈에: 영상 완료 / 이미지 완료
+  //   (영상 대기) / 이미지 생성 필요(러프만). 색으로도 구분: 영상=빨강(primary), 이미지=하늘, 러프=경고.
+  const stageBadge = completedVideoUrl
+    ? { label: '영상 단계', cls: 'border-primary/50 text-primary', video: true }
+    : hasImage
+      ? { label: '이미지 단계', cls: 'border-sky-400/50 text-sky-300', video: false }
+      : roughUrl
+        ? { label: '이미지 생성 필요', cls: 'border-warning/50 text-warning', video: false }
+        : null
+
   const runImage = async () => {
     try {
       await generateStoryboardImage(node.id)
@@ -251,23 +261,37 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
             )}
           </div>
         ) : roughUrl ? (
-          // 실사 이미지 미생성 → 러프 스토리보드 표시 + 좌상단 안내 배지(#e11)
-          <>
-            <GeneratedImage
-              src={roughUrl}
-              alt={`${data.label} (rough)`}
-              className="size-full object-cover"
-            />
-            <span className="absolute left-2 top-2 rounded-md border border-warning/50 bg-background/85 px-1.5 py-0.5 text-[10px] font-medium text-warning">
-              이미지 생성 필요
-            </span>
-          </>
+          // 실사 이미지 미생성 → 러프 스토리보드 표시(안내 배지는 아래 통일 단계 배지가 담당, #e2)
+          <GeneratedImage
+            src={roughUrl}
+            alt={`${data.label} (rough)`}
+            className="size-full object-cover"
+          />
         ) : (
           <div className="flex size-full items-center justify-center">
             <ImageIcon className="size-8 text-muted-foreground opacity-50" />
           </div>
         )}
 
+        {/* 단계 배지(#e2) — 좌상단. 생성 중엔 오버레이가 덮으므로 숨긴다. */}
+        {!generating && stageBadge && (
+          <span
+            className={cn(
+              'absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-md border bg-background/85 px-1.5 py-0.5 text-[10px] font-medium',
+              stageBadge.cls,
+            )}
+          >
+            {stageBadge.video ? (
+              <Play className="size-3 fill-current" />
+            ) : (
+              <ImageIcon className="size-3" />
+            )}
+            {stageBadge.label}
+          </span>
+        )}
+
+        {/* 생성 중 — border beam + 경과시간 오버레이. 색 구분(#e13): 이미지=초록, 영상=빨강.
+            동시 진행이면 라벨·빔 모두 이미지(선행 단계) 우선 — 표기 불일치 방지. */}
         <GeneratingOverlay
           active={generating}
           label={imageGenerating ? '이미지 생성 중' : '영상 생성 중'}
@@ -307,7 +331,10 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
                       : '이미지만 생성'
                 }
                 className={cn(
-                  'pointer-events-none absolute inset-x-0 bottom-full mb-1 flex h-7 translate-y-2 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-medium text-primary-foreground opacity-0 shadow-sm transition-all duration-200',
+                  // bottom-full 로 영상 버튼 바로 위에 붙인다 — mb 갭을 없애 두 버튼 사이 죽은 영역을
+                  //   제거(#e1 2026-07-18). 갭이 있으면 마우스가 그 틈을 지날 때 group-hover가 풀려
+                  //   이미지 버튼이 다시 내려가버렸다.
+                  'pointer-events-none absolute inset-x-0 bottom-full flex h-7 translate-y-2 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-medium text-primary-foreground opacity-0 shadow-sm transition-all duration-200',
                   // 살짝 밝은 빨강 — primary에 흰색 18% 혼합(토큰 파생 셰이드)
                   'bg-[color-mix(in_srgb,var(--primary)_82%,white)]',
                   'group-hover/gen:pointer-events-auto group-hover/gen:translate-y-0 group-hover/gen:opacity-100',
