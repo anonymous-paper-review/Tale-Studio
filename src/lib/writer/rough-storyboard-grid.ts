@@ -143,14 +143,14 @@ export function buildRoughGridPrompt(cells: RoughGridCell[], variant: RoughGridV
 
 Each COLUMN is one shot of a film, read top to bottom as three frames:
 - Row 1 (top) = START: the composition at the beginning of the shot.
-- Row 2 (middle) = DIRECTION: redraw the exact same drawing as Row 1, then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). Row 2 is the ONLY place where text is allowed.
-- Row 3 (bottom) = END: the composition at the end of the shot, after the movement completes.`
+- Row 2 (middle) = DIRECTION: an EXACT identical copy of Row 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Row 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Row 1 and Row 2 is the arrows and labels drawn on top. Row 2 is the ONLY place where text is allowed.
+- Row 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Row 3 is the only frame where the motion has visibly progressed.`
       : `The reference image is a paper storyboard strip with 3 empty panels stacked vertically. Keep the sheet, panel borders and corner marks exactly as they are — draw only INSIDE the panels.
 
 The strip is ONE shot of a film, read top to bottom as three frames:
 - Panel 1 (top) = START: the composition at the beginning of the shot.
-- Panel 2 (middle) = DIRECTION: redraw the exact same drawing as Panel 1, then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). Panel 2 is the ONLY place where text is allowed.
-- Panel 3 (bottom) = END: the composition at the end of the shot, after the movement completes.`
+- Panel 2 (middle) = DIRECTION: an EXACT identical copy of Panel 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Panel 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Panel 1 and Panel 2 is the arrows and labels drawn on top. Panel 2 is the ONLY place where text is allowed.
+- Panel 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Panel 3 is the only frame where the motion has visibly progressed.`
 
   const body = cells
     .map((c, i) => {
@@ -173,5 +173,5 @@ ${GRID_STYLE}
 
 ${body}${empties}
 
-Within each column, the three frames depict the SAME camera setup, location, figures and props — continuity between START, DIRECTION and END must be obvious. Different columns are different shots and may differ. No text, captions or labels anywhere except the DIRECTION row's arrow labels.`
+Within each column, the three frames depict the SAME camera setup, location, figures and props — continuity between START, DIRECTION and END must be obvious. START and DIRECTION are the same frozen instant (annotations are the only difference); motion progresses ONLY in END. Different columns are different shots and may differ. No text, captions or labels anywhere except the DIRECTION row's arrow labels.`
 }

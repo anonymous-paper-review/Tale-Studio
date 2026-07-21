@@ -51,7 +51,8 @@ function withCacheBust(url: string, v?: number): string {
 const FRAME_LABELS = ['START', '연출', 'END'] as const
 const FRAME_CYCLE_MS = 1200
 
-/** 러프 3프레임 순환 표시(#rough-grid 2026-07-22) — gif 느낌의 자동 순환, hover 시 일시정지.
+/** 러프 3프레임 순환 표시(#rough-grid 2026-07-22) — 기본은 START 정지 프레임, hover 중에만 순환
+ *  (전 카드 동시 재생은 정보 과다 — 2026-07-22 피드백). 점 클릭 = 그 프레임 고정(leave 시 리셋).
  *  frames 없는 구버전 패널(단일 이미지)은 정적 표시로 폴백. */
 function RoughFrameCycle({
   panel,
@@ -65,21 +66,27 @@ function RoughFrameCycle({
     ? [f.start, f.direction, f.end].map((u) => withCacheBust(u, panel.generatedAt))
     : [withCacheBust(panel.url, panel.generatedAt)]
   const [idx, setIdx] = useState(0)
-  const [paused, setPaused] = useState(false)
+  const [hovering, setHovering] = useState(false)
+  const [pinned, setPinned] = useState(false)
   const multi = urls.length > 1
 
   useEffect(() => {
-    if (!multi || paused) return
+    if (!multi || !hovering || pinned) return
     const t = setInterval(() => setIdx((i) => (i + 1) % urls.length), FRAME_CYCLE_MS)
     return () => clearInterval(t)
-  }, [multi, paused, urls.length])
+  }, [multi, hovering, pinned, urls.length])
 
   const current = idx % urls.length
   return (
     <div
       className="absolute inset-0"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => {
+        // 카드를 떠나면 START 정지 상태로 복귀 — 보드 전체가 조용해진다.
+        setHovering(false)
+        setPinned(false)
+        setIdx(0)
+      }}
     >
       {/* 프레임 전환 시 로딩 깜빡임 방지 — 3장을 모두 마운트하고 opacity 로 스위치 */}
       {urls.map((u, i) => (
@@ -97,17 +104,18 @@ function RoughFrameCycle({
           draggable={false}
         />
       ))}
-      {multi ? (
+      {/* 인디케이터는 hover 중에만 — 기본 상태의 시각 노이즈 제거 */}
+      {multi && hovering ? (
         <div className="absolute bottom-1.5 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-background/70 px-2 py-0.5 backdrop-blur-sm">
           {urls.map((_, i) => (
             <button
               key={i}
               type="button"
-              aria-label={`${FRAME_LABELS[i]} 프레임 보기`}
+              aria-label={`${FRAME_LABELS[i]} 프레임 고정`}
               onClick={(e) => {
                 e.stopPropagation()
                 setIdx(i)
-                setPaused(true)
+                setPinned(true)
               }}
               className={cn(
                 'size-1.5 rounded-full transition-colors',
@@ -277,32 +285,40 @@ export function RoughStoryboardView() {
             return next
           })
         }
-        const polls = submitted.map(({ shotId, jobId }) =>
+        // 잡 단위 dedupe(#rough-grid): 그리드 잡 1개가 샷 최대 4개를 커버 — 같은 jobId 를 샷 수만큼
+        //   중복 폴링하지 않는다. 완료 시 result_url 은 "그리드 원본"(4샷 공용)이라 카드에 쓰면
+        //   크롭 전 전체 그리드가 그대로 보인다(2026-07-22 실측) → URL 대신 크롭이 끝난 DB 진실
+        //   (shots.rough_storyboard.frames)을 리로드하고, stale override 를 지워 그 진실이 보이게 한다.
+        const shotIdsByJob = new Map<string, string[]>()
+        for (const { shotId, jobId } of submitted) {
+          shotIdsByJob.set(jobId, [...(shotIdsByJob.get(jobId) ?? []), shotId])
+        }
+        const polls = [...shotIdsByJob.entries()].map(([jobId, jobShotIds]) =>
           pollGenerationJob(jobId)
-            .then((url) => {
-              setOverrides((prev) => ({
-                ...prev,
-                [shotId]: {
-                  url,
-                  status: 'completed',
-                  errorMessage: null,
-                  generatedAt: Date.now(),
-                },
-              }))
+            .then(async () => {
+              await loadProject()
+              setOverrides((prev) => {
+                const next = { ...prev }
+                for (const id of jobShotIds) delete next[id]
+                return next
+              })
               setPanelJobs((prev) => {
                 const next = { ...prev }
-                delete next[shotId]
+                for (const id of jobShotIds) delete next[id]
                 return next
               })
             })
             .catch((e: unknown) => {
-              setPanelJobs((prev) => ({
-                ...prev,
-                [shotId]: {
-                  status: 'failed',
-                  error: e instanceof Error ? e.message : String(e),
-                },
-              }))
+              setPanelJobs((prev) => {
+                const next = { ...prev }
+                for (const id of jobShotIds) {
+                  next[id] = {
+                    status: 'failed',
+                    error: e instanceof Error ? e.message : String(e),
+                  }
+                }
+                return next
+              })
             }),
         )
         return {
@@ -324,7 +340,7 @@ export function RoughStoryboardView() {
         return null
       }
     },
-    [projectId],
+    [projectId, loadProject],
   )
 
   // 누락 패널 전체 생성 펌프(#c1·#c2·#c3 2026-07-15) — 서버가 호출당 6샷으로 캡하므로(504·쿼터
