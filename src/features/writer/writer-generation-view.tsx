@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { WriterStoryStream } from '@/features/writer/writer-story-stream'
+import { WriterCharacterPanel } from '@/features/writer/writer-character-panel'
 import type { WriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
@@ -49,9 +50,15 @@ export function WriterGenerationView({
         </p>
       </header>
 
-      {/* 메인 스크롤 뷰어 */}
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
-        <WriterStoryStream preview={preview} />
+      {/* 메인 줄글 스토리 + 우측 캐릭터 사이드바 */}
+      <div className="flex min-h-0 flex-1">
+        <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+          <WriterStoryStream preview={preview} />
+        </div>
+        <WriterCharacterPanel
+          characters={preview?.characters ?? []}
+          className="hidden min-h-0 md:block"
+        />
       </div>
 
       {/* 하단 바 — 문구 + 진행바 + 남은 예상시간 */}

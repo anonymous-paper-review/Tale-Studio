@@ -8,18 +8,17 @@ import { useEffect, useRef, useState } from 'react'
 export interface PreviewScene {
   sceneId: string
   index: number
-  location: string
-  timeOfDay: string
-  purpose: string
-  summary: string
+  /** 씬의 scene_actions(네이티브 서사 비트) — 줄글 스토리 본문. */
   beats: string[]
-  characters: string[]
 }
-export interface PreviewShot {
-  shotId: string
-  purpose: string
-  shotType: string | null
-  duration: number | null
+export interface PreviewCharacter {
+  id: string
+  name: string
+  role: string
+  /** 네이티브 설명(characters 테이블). 이른 시점엔 빈 문자열일 수 있음. */
+  description: string
+  /** 초안 이미지(view_main) — 생성 완료 전엔 null. */
+  imageUrl: string | null
 }
 export interface WriterPreview {
   started: boolean
@@ -28,8 +27,7 @@ export interface WriterPreview {
   failed: boolean
   roster: { slug: string; name: string }[]
   scenes: PreviewScene[]
-  shotsByScene: Record<string, PreviewShot[]>
-  shotsDoneSceneIds: string[]
+  characters: PreviewCharacter[]
 }
 
 interface Options {
