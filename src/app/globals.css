@@ -404,6 +404,26 @@
   background-color: var(--muted-foreground);
 }
 
+/* ── Writer 생성 스트림 — 은은한 "문서가 스르륵" 연출(#story-stream 2026-07-21) ──
+   대기 아이콘의 미세한 부유(float). transform-only라 리플로 없음. */
+@keyframes writer-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.animate-writer-float {
+  animation: writer-float 3.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-writer-float {
+    animation: none;
+  }
+}
+
 /* ── React Flow — Director 캔버스 컨트롤/미니맵 ──
    xyflow 기본 컨트롤은 흰 배경 + 흰 아이콘이라 dark 테마에서 화이트온화이트로 안 보인다.
    xyflow 기본(.react-flow__controls-button, specificity 0,1,0)이 page.tsx의 style.css import로
