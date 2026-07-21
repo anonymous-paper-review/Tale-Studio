@@ -14,12 +14,15 @@ import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
 
 // status 는 상위(WriterWorkspace)가 폴링해 내려준다 — 중복 status 폴링 방지.
+//   debug: admin 디버그 진입(#gen-debug) — 실행 중이 아닌데 강제 렌더된 상태 표시.
 export function WriterGenerationView({
   projectId,
   status,
+  debug = false,
 }: {
   projectId: string
   status: WriterStatus | null
+  debug?: boolean
 }) {
   const { preview } = useWriterPreview(projectId)
 
@@ -44,9 +47,18 @@ export function WriterGenerationView({
     <div className="flex min-h-0 flex-1 flex-col">
       {/* 슬림 헤더 (실행 중엔 탭 전환이 무의미 → 컨텍스트 문구만) */}
       <header className="shrink-0 border-b border-border px-6 py-3">
-        <h1 className="text-lg font-semibold">Writers&apos; Room</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-semibold">Writers&apos; Room</h1>
+          {debug ? (
+            <span className="rounded-full border border-warning/50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-warning">
+              debug preview
+            </span>
+          ) : null}
+        </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          이야기를 생성하는 중이에요 — 완성되는 씬부터 아래에서 바로 읽어볼 수 있어요.
+          {debug
+            ? '디버그 프리뷰 — 마지막 실행의 산출물로 생성 화면을 표시하고 있어요.'
+            : '이야기를 생성하는 중이에요 — 완성되는 씬부터 아래에서 바로 읽어볼 수 있어요.'}
         </p>
       </header>
 
