@@ -522,7 +522,8 @@ export interface DecoupageShot {
   //   derived=[i] / merged=[i,j,..] / split=[i] (여러 split 샷이 같은 i 공유) / added=[]
   source_beats: number[];
   added_rationale?: string;        // operation==='added'일 때 필수: 왜 이 스토리-부재 샷이 필요한가
-  beat_summary: string;            // 이 샷이 담는 내용 (derived/merged/split=비트 텍스트, added=추가 내용)
+  beat_summary: string;            // 이 샷이 담는 내용 (derived/merged/split=비트 텍스트, added=추가 내용) — EN base(S7)
+  beat_summary_native?: string;    // 같은 내용의 유저 언어 병기(#shot-story 2026-07-21) — 표시 전용(실행 중 프리뷰). 하류 생성은 beat_summary(EN)만 소비.
   shot_size: 'EWS' | 'WS' | 'FS' | 'MFS' | 'MS' | 'MCU' | 'CU' | 'ECU' | 'OTS' | '2S' | 'POV';
   intended_duration_seconds: number;
   rhythm_role: RhythmRole;
