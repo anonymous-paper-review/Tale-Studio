@@ -355,16 +355,12 @@ export const WRITER_STEPS: WriterStep[] = [
       const result = await runShotCheck(
         projectId,
         s.genre!,
-        s.narrativeStructure!,
         s.characters!,
         s.scenes!,
-        s.visualIdentity!, // v0 (format+style) — 옛 renderFormat+artDirection
-        s.worldVisual!,    // v2 (palette/locations) — 옛 productionDesign
-        s.sceneCinematography!,
+        s.worldVisual!,    // v2 (palette/locations) — asset 정규화용
         s.shotDesign!,
         s.sceneBudgetIssues ?? [],
         logger,
-        models.V,
         models.C,
       );
       await logger.flushRawLlm('shotCheck');
