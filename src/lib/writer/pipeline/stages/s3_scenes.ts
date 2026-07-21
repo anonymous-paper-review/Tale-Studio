@@ -112,7 +112,7 @@ export async function runScenes(
   const sceneCountHint = sceneCountHintMap[genre.depth_level] ?? '5~10개 씬';
 
   const systemInstruction = `당신은 영상 제작의 S3(씬 브레이크다운) 디자이너이다.
-주어진 S0/S1/S2 위에서 씬 단위 분해를 한다.
+주어진 스토리·genre·내러티브 구조(S1)·캐스트/로케이션 위에서 씬 단위 분해를 한다.
 
 씬 목적 분류:
 - exposition: 정보 전달 (세계/캐릭터 소개)

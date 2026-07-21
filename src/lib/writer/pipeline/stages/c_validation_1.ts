@@ -35,7 +35,7 @@ export async function runStoryCheck(
   const ruleIssues: ValidationIssue[] = [...causality.issues];
 
   // ===== LLM 기반 검증 (Claude) =====
-  const system = `당신은 영상 서사의 핍진성 검증자이다. 주어진 S0~S3를 보고
+  const system = `당신은 영상 서사의 핍진성 검증자이다. 주어진 genre·내러티브 구조·캐릭터·씬을 보고
 다음을 평가한다:
 
 1. CDQ (Central Dramatic Question) 존재 여부와 명확도

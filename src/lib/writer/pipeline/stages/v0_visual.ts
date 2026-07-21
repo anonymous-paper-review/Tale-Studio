@@ -21,14 +21,14 @@ export async function runVisualIdentity(
   await logger.markStage('visualIdentity', 'started');
 
   const systemInstruction = `당신은 V축 V0(비주얼 아이덴티티)를 확정한다 — 전역 고정 스타일.
-Mid Preview 제안을 채택하되 누락 필드를 채우고 검증한다. format(기술 스펙)과 style(미학)을 분리한다.
+Mid Preview seed가 있으면 채택해 정밀화하고, 없으면(빈 seed) genre와 스타일 앵커에서 직접 결정한다. format(기술 스펙)과 style(미학)을 분리한다.
 스타일 앵커가 주어지면 매체 관련 필드(art_style·medium·rendering_method·texture_philosophy)는 앵커가 최우선이다 — 장르에서 매체를 추론(발명)하지 않는다.
 
 format 필수:
 - medium: "live_action_stylized" | "3d_cgi" | "2d_animation" 등
 - resolution: { width, height }
 - fps: 24 | 30 | 60
-- aspect_ratio: "16:9" | "9:16" | "2.39:1" 등
+- aspect_ratio: genre.format의 비율 그대로 (예: vertical_9:16 → "9:16") — 시스템이 최종 강제한다
 - rendering_method: "stylized_pbr" | "cel_shaded" | "photorealistic" 등
 
 style 필수:
@@ -66,6 +66,18 @@ ${JSON.stringify(midPreview.v_recommendations.v0, null, 2)}${anchorBlock}
     systemInstruction,
     temperature: 0.4,
   });
+
+  // 원장 고정(#prompt-audit W4): 화면비는 producer 확정값(genre.format)의 복사 — LLM 재량을 경유하지 않는다.
+  //   해상도 방향(세로/가로)도 화면비와 모순되면 축만 교환해 정합시킨다.
+  const aspect = genre.format.split('_').pop();
+  if (aspect && result.format) {
+    result.format.aspect_ratio = aspect;
+    const res = result.format.resolution;
+    const wantPortrait = aspect === '9:16';
+    if (res && typeof res.width === 'number' && typeof res.height === 'number' && res.width > 0 && res.height > 0 && wantPortrait !== res.height > res.width) {
+      result.format.resolution = { width: res.height, height: res.width };
+    }
+  }
 
   await logger.saveLlmCall('visualIdentity', {
     prompt: userPrompt,

@@ -4,6 +4,7 @@
 //   - 둘 중 하나라도 없으면 LLM 호출로 생성 (fallback)
 //   - 다양한 샷 스키마(rich-A / declared-B / V4 3분할 등) 모두 수용
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import { SHOT_PHYSICS, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/writer/pipeline/physics';
 import type {
   RenderPromptsOutput,
   ShotGenerationPrompts,
@@ -210,7 +211,7 @@ async function llmGenerateT2I(
 주어진 샷 정보로 첫 프레임 생성용 프롬프트를 작성한다.
 
 원칙:
-- 200~400자
+- ${FIRST_FRAME_CHARS}
 - 정적 묘사만 (움직임/순차 표현 금지 — 첫 프레임은 멈춘 한 컷)
 - 구체적 디테일: 인물 의상/포즈/표정, 배경 요소, 조명 방향, 색감, 카메라(렌즈/앵글)
 - V2 global_palette를 우선 반영
@@ -223,7 +224,7 @@ ${JSON.stringify(shot, null, 2)}
 ${JSON.stringify({ global_palette: worldVisual.global_palette, color_meaning: worldVisual.color_meaning }, null, 2)}
 
 [출력 - JSON]
-{ "prompt": "정적 첫 프레임 묘사 (한글, 200~400자)" }`;
+{ "prompt": "정적 첫 프레임 묘사 (한글, ${FIRST_FRAME_CHARS})" }`;
 
   const r = await generateJson<{ prompt: string }>(user, axisConfig, {
     systemInstruction: system,
@@ -247,8 +248,8 @@ async function llmGenerateTI2V(
 첫 프레임에서 출발하는 영상의 모션을 압축적으로 묘사한다.
 
 원칙:
-- 50~100자
-- 동사 1~2개 이내
+- ${MOTION_PROMPT_CHARS}
+- 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개 이내
 - 순차 표현("그 다음에", "그리고") 금지
 - 단일 동작 + 카메라 움직임 정도까지만
 - 첫 프레임을 부정하지 말 것 (예: 첫 프레임에 앉아 있는데 "걸어간다" 안 됨)
@@ -258,7 +259,7 @@ async function llmGenerateTI2V(
 ${JSON.stringify(shot, null, 2)}
 
 [출력 - JSON]
-{ "motion_prompt": "동적 영상 묘사 (한글, 50~100자)" }`;
+{ "motion_prompt": "동적 영상 묘사 (한글, ${MOTION_PROMPT_CHARS})" }`;
 
   const r = await generateJson<{ motion_prompt: string }>(user, axisConfig, {
     systemInstruction: system,
