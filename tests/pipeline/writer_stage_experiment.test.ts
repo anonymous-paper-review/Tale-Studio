@@ -16,9 +16,11 @@ import path from 'node:path'
 
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure'
 import { runScenes } from '@/lib/writer/pipeline/stages/s3_scenes'
+import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage'
+import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots'
 import { getPendingRawCalls, resetRawSeq } from '@/lib/writer/llm/raw_collector'
 import type { PipelineLogger } from '@/lib/writer/logger'
-import type { Genre, Characters, BackgroundContract, PipelineInput } from '@/lib/writer/types/pipeline'
+import type { Genre, Characters, BackgroundContract, PipelineInput, Scenes, DecoupagePlan, VisualIdentity, WorldVisual, CharacterVisual } from '@/lib/writer/types/pipeline'
 
 const ENABLED = process.env.RUN_WRITER_STAGE === '1' && !!process.env.GEMINI_API_KEY
 const MODEL = { provider: process.env.WRITER_PROVIDER ?? 'gemini', model: process.env.WRITER_MODEL ?? 'gemini-3-flash-preview' }
@@ -104,14 +106,62 @@ const PRESETS: Record<string, Preset> = {
     characters: cast(ch('char', '남자', 'protagonist', '30대, 늘 같은 회색 셔츠를 입은 무표정한 남자')),
     world: world('반복되는 월요일', loc('location', '원룸', '알람 시계와 식은 커피가 놓인 좁은 원룸'), loc('location_2', '지하철역 앞', '출근길 인파로 붐비는 지하철역 입구, 건너편에 큰 간판이 보인다')),
   },
+  // E0a 프로브 — 저깊이 × 기승전결 콘텐츠. D2 사다리("setup→action→result")가 형태 선택을 꺾는지 본다.
+  'kishoten-d2': {
+    label: '기승전결 프로브 (30s · D2 · 갈등 없음)',
+    input: {
+      story: '카페 창가에 앉은 여자가 김이 오르는 찻잔을 가만히 바라본다. 창밖에는 비가 내리고 행인들이 우산 속에서 종종걸음친다. 문득 비가 그치고, 젖은 거리 위로 햇살이 쏟아지며 유리창에 맺힌 물방울이 일제히 반짝인다. 여자는 첫 모금을 마시고, 거리의 소음이 천천히 잦아든다. 갈등도 해결할 문제도 없다 — 비에서 햇살로의 전환과 여운뿐.',
+      genre: { genre: 'advertisement', subGenre: 'brand_film', tone: ['calm', 'warm'], targetEmotion: [], runtime_seconds: 30, depth_level: 'D2', format: 'vertical_9:16' } as Genre,
+    },
+    characters: cast(ch('char', '여자', 'protagonist', '30대, 니트 차림으로 창가에 앉은 차분한 인상')),
+    world: world('비 오는 오후의 카페', loc('location', '카페 창가', '통유리 창가 자리, 김 오르는 찻잔과 빗방울 맺힌 유리')),
+  },
+  // E0a 프로브 — 최저깊이 × 순환 콘텐츠. D1 "구조 없음"이 circular 선택을 꺾는지 본다.
+  'loop-d1': {
+    label: '순환 프로브 (15s · D1 · 퍼펙트 루프)',
+    input: {
+      story: '물방울 하나가 수면에 떨어져 파문이 퍼진다. 파문의 동심원이 유리창의 빗방울 무늬로 번지고, 빗방울이 유리를 타고 흘러내리다 창틀 끝에 맺혀 다시 처음의 물방울로 떨어진다. 끝 프레임이 첫 프레임과 정확히 이어지는 무한 루프 영상.',
+      genre: { genre: 'art_film', subGenre: 'perfect_loop', tone: ['hypnotic', 'calm'], targetEmotion: [], runtime_seconds: 15, depth_level: 'D1', format: 'vertical_9:16' } as Genre,
+    },
+    characters: cast(),
+    world: world('비 오는 창가', loc('location', '창가의 수면', '빗방울이 떨어지는 어항 수면과 그 너머의 유리창')),
+  },
 }
 
+// ── V축 스텁 (R1 회귀 실험용, #prompt-audit 2026-07-21): v0/v2 산출을 중립 상수로 대체.
+//    decoupage/shotDesign 프롬프트 회귀의 관심사는 샷 분해·spec 규율이지 스타일 정합이 아니라
+//    중립 스타일이면 충분하다. 스타일 의존 실험엔 부적합 — 그땐 실제 v0/v2 체인을 이어야 함.
+const stubVisualIdentity = (g: Genre): VisualIdentity => ({
+  format: {
+    medium: 'live_action_stylized',
+    resolution: g.format === 'vertical_9:16' ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 },
+    fps: 24,
+    aspect_ratio: g.format.split('_').pop() ?? '16:9',
+    rendering_method: 'photorealistic',
+  },
+  style: { art_style: 'cinematic_realism', shape_language: 'mixed', line_quality: 'clean', character_proportion: '7.5:1', texture_philosophy: 'photorealistic' },
+})
+const stubWorldVisual = (w: BackgroundContract): WorldVisual => ({
+  global_palette: { primary: 'slate_blue', secondary: 'warm_gray', accent: 'amber', forbidden: [] },
+  color_meaning: {},
+  locations: w.locations.map((l) => ({ id: l.id, style_description: l.description ?? '', lighting_sources: [], props: [] })),
+  vfx_approach: 'minimal_practical',
+})
+const stubCharacterVisual = (c: Characters): CharacterVisual => ({
+  characters: c.characters.map((x) => ({ character_id: x.id, appearance: x.appearance_description ?? '', costume: [], palette: [] })),
+})
+
 // ── stage 레지스트리 (실 함수 호출 — 시스템 프롬프트는 코드 그대로) ──
-type State = { genre: Genre; narrativeStructure?: unknown; scenes?: unknown }
+type State = { genre: Genre; narrativeStructure?: unknown; scenes?: unknown; decoupage?: unknown; shotDesign?: unknown }
 const STAGE_FNS: Record<string, (st: State, p: Preset) => Promise<unknown>> = {
   narrativeStructure: (st, p) => runNarrativeStructure(p.input, st.genre, logger, MODEL as never),
   scenes: (st, p) => runScenes(p.input, st.genre, st.narrativeStructure as never, p.characters, p.world, logger, MODEL as never),
-  // 확장: sceneCinematography/decoupage/shotDesign 은 visualIdentity·worldVisual·characterVisual(v0/v2) 선행 필요.
+  // V축 확장 (스텁 비주얼 — 위 주석 참조). sceneCinematography plans=null → 프롬프트의 Compact 분기 사용.
+  decoupage: (st, p) => runDecoupage(st.genre, p.characters, st.scenes as Scenes, stubWorldVisual(p.world), null, logger, MODEL as never),
+  shotDesign: async (st, p) => {
+    const r = await runShotDesign(st.genre, p.characters, st.scenes as Scenes, stubVisualIdentity(st.genre), stubWorldVisual(p.world), stubCharacterVisual(p.characters), null, st.decoupage as DecoupagePlan, '', logger, MODEL as never)
+    return r.shots
+  },
 }
 
 describe('writer 단계 실험 (길이 양극화)', () => {
@@ -157,6 +207,14 @@ describe('writer 단계 실험 (길이 양극화)', () => {
         } else if (stage === 'scenes' && result) {
           const r = result as { scenes?: unknown[]; total_estimated_seconds?: number }
           summary = `scenes=${r.scenes?.length} total=${r.total_estimated_seconds}s`
+        } else if (stage === 'decoupage' && result) {
+          const r = result as DecoupagePlan
+          const durs = r.scenes.flatMap((s) => s.shots.map((x) => x.intended_duration_seconds)).sort((a, b) => a - b)
+          summary = `shots=${r.total_shots} added=${r.total_added} dur[min/med/max]=${durs[0]}/${durs[Math.floor(durs.length / 2)]}/${durs[durs.length - 1]}`
+        } else if (stage === 'shotDesign' && result) {
+          const shots = result as { intent: { duration_seconds: number } }[]
+          const durs = shots.map((s) => s.intent.duration_seconds).sort((a, b) => a - b)
+          summary = `shots=${shots.length} dur[min/med/max]=${durs[0]}/${durs[Math.floor(durs.length / 2)]}/${durs[durs.length - 1]}`
         }
         console.log(`[${stage}] ${(ms / 1000).toFixed(1)}s  ${err ? 'ERR=' + err.slice(0, 80) : summary}  → ${path.relative(process.cwd(), outPath)}`)
       }
