@@ -100,7 +100,7 @@ export interface FalImageResult {
   raw: unknown;
 }
 
-const DEFAULT_IMAGE_MODEL = 'openai/gpt-image-2';
+export const DEFAULT_IMAGE_MODEL = 'openai/gpt-image-2';
 /** Consumed by src/lib/style-anchor.ts for Rule M model normalization. */
 export const DEFAULT_EDIT_IMAGE_MODEL = 'openai/gpt-image-2/edit';
 // 러프 스토리보드(previz 스케치) 전용 — 비용/속도 우선 경량 모델 (2026-06-12 사용자 결정).

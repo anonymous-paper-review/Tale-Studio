@@ -17,8 +17,9 @@ import type {
   ShotDynamicSpec,
 } from '@/lib/writer/types/pipeline'
 
-/** ShotType 코드 → 프롬프트용 영문 샷 사이즈 (L4 static_spec.shot_type 과 동일 코드 공간). */
-const SHOT_SIZE_WORDS: Record<string, string> = {
+/** ShotType 코드 → 프롬프트용 영문 샷 사이즈 (L4 static_spec.shot_type 과 동일 코드 공간).
+ *  (grid 빌더 rough-storyboard-grid.ts 가 재사용 — export, #rough-grid 2026-07-22) */
+export const SHOT_SIZE_WORDS: Record<string, string> = {
   ECU: 'extreme close-up',
   CU: 'close-up',
   MCU: 'medium close-up',
@@ -34,7 +35,7 @@ const SHOT_SIZE_WORDS: Record<string, string> = {
   INSERT: 'insert detail shot',
 }
 
-const FRAMING_RULE_WORDS: Record<string, string> = {
+export const FRAMING_RULE_WORDS: Record<string, string> = {
   thirds: 'the rule of thirds',
   center: 'a centered composition',
   symmetry: 'a symmetrical composition',
@@ -44,7 +45,7 @@ const FRAMING_RULE_WORDS: Record<string, string> = {
 }
 
 /** snake_case enum 값(eye_level, left_third, off_screen_left …) → 읽히는 영문. */
-function words(v: string | null | undefined): string {
+export function words(v: string | null | undefined): string {
   return (v ?? '').replace(/_/g, ' ').trim()
 }
 
@@ -54,7 +55,7 @@ const COLOR_WORD_EN =
   /\b(crimson|scarlet|vermilion|reddish|red|orange|amber|golden|gold|yellow|bluish|blue|azure|cyan|teal|green|emerald|verdant|purple|violet|magenta|pink|brown|tan|ochre|sepia|rusty|fiery)\b/gi
 const COLOR_WORD_KO =
   /(붉은|불그스름한|빨간|빨강|적색|적갈색|주황빛?|주황색?|오렌지빛?|오렌지색?|노란|노랑|황금빛?|금빛|황톳빛?|푸른|파란|파랑|청색|초록빛?|초록색?|녹색|보랏빛?|보라색?|분홍빛?|갈색)/g
-function stripColor(text: string | null | undefined): string {
+export function stripColor(text: string | null | undefined): string {
   if (!text) return ''
   return text
     .replace(COLOR_WORD_EN, '')
@@ -87,7 +88,7 @@ function conciseEnvDescription(desc: string | null | undefined): string {
 //   얼굴/의상 → FIGURE_RULE(blank egg head·bare doll body), 흑백·단일패널·무텍스트 → PANEL_STYLE_BASE,
 //   클로즈업 얼굴 prior → CU_FRONT(최앞단), 잉여 인물 → SINGLE_FRONT. (3샷 A/B 실측으로 검증)
 
-function angleWords(angleRaw: string | null | undefined): string {
+export function angleWords(angleRaw: string | null | undefined): string {
   // 실데이터는 'low'/'low_angle' 혼용 (enum 비강제) — 접미사 정규화 후 매핑
   const angle = (angleRaw ?? '').replace(/_angle$/, '')
   switch (angle) {

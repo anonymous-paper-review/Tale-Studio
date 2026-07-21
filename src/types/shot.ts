@@ -48,10 +48,19 @@ export const DEFAULT_CAMERA_PRESET: CameraPreset = {
  * DB shots.rough_storyboard JSONB — Director의 storyboard_image와 동일 shape, 다른 용도.
  */
 export interface RoughStoryboardImage {
+  /** 대표 프레임(3프레임 세트에선 start) — 단일 패널 구버전과의 하위 호환 필드. */
   url: string
   status: 'pending' | 'generating' | 'completed' | 'failed'
   errorMessage: string | null
   generatedAt: number
+  /** 3프레임 세트(#rough-grid 2026-07-22): start → direction(화살표/지시문) → end. UI 는 순환 재생. */
+  frames?: {
+    start: string
+    direction: string
+    end: string
+  }
+  /** 이 세트가 잘려 나온 원본 그리드/스트립 이미지 (디버그·재현용). */
+  gridUrl?: string
 }
 
 export interface Shot {

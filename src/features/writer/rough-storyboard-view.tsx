@@ -35,6 +35,7 @@ import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
+import { cn } from '@/lib/utils'
 import type { RoughStoryboardImage, Shot } from '@/types'
 
 type PanelJob = { status: 'generating' | 'failed'; error?: string }
@@ -44,6 +45,83 @@ type PanelJob = { status: 'generating' | 'failed'; error?: string }
 function withCacheBust(url: string, v?: number): string {
   if (!v) return url
   return `${url}${url.includes('?') ? '&' : '?'}v=${v}`
+}
+
+// 3프레임 순환 라벨 — start(시작 프레임) → direction(연출 화살표/지시) → end(끝 프레임).
+const FRAME_LABELS = ['START', '연출', 'END'] as const
+const FRAME_CYCLE_MS = 1200
+
+/** 러프 3프레임 순환 표시(#rough-grid 2026-07-22) — gif 느낌의 자동 순환, hover 시 일시정지.
+ *  frames 없는 구버전 패널(단일 이미지)은 정적 표시로 폴백. */
+function RoughFrameCycle({
+  panel,
+  alt,
+}: {
+  panel: RoughStoryboardImage
+  alt: string
+}) {
+  const f = panel.frames
+  const urls = f
+    ? [f.start, f.direction, f.end].map((u) => withCacheBust(u, panel.generatedAt))
+    : [withCacheBust(panel.url, panel.generatedAt)]
+  const [idx, setIdx] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const multi = urls.length > 1
+
+  useEffect(() => {
+    if (!multi || paused) return
+    const t = setInterval(() => setIdx((i) => (i + 1) % urls.length), FRAME_CYCLE_MS)
+    return () => clearInterval(t)
+  }, [multi, paused, urls.length])
+
+  const current = idx % urls.length
+  return (
+    <div
+      className="absolute inset-0"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      {/* 프레임 전환 시 로딩 깜빡임 방지 — 3장을 모두 마운트하고 opacity 로 스위치 */}
+      {urls.map((u, i) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={u}
+          src={u}
+          alt={i === current ? alt : ''}
+          aria-hidden={i !== current}
+          className={cn(
+            'absolute inset-0 size-full object-cover transition-opacity duration-150',
+            i === current ? 'opacity-100' : 'opacity-0',
+          )}
+          loading="lazy"
+          draggable={false}
+        />
+      ))}
+      {multi ? (
+        <div className="absolute bottom-1.5 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-background/70 px-2 py-0.5 backdrop-blur-sm">
+          {urls.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`${FRAME_LABELS[i]} 프레임 보기`}
+              onClick={(e) => {
+                e.stopPropagation()
+                setIdx(i)
+                setPaused(true)
+              }}
+              className={cn(
+                'size-1.5 rounded-full transition-colors',
+                i === current ? 'bg-primary' : 'bg-muted-foreground/40 hover:bg-muted-foreground',
+              )}
+            />
+          ))}
+          <span className="ml-0.5 font-mono text-[9px] tabular-nums text-muted-foreground">
+            {FRAME_LABELS[current]}
+          </span>
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 // 표시 번호는 "순서(위치)" 기준으로 렌더 지점에서 계산 — 불변 id 접미사가 아니라(중간 삽입 시 번호
@@ -597,14 +675,11 @@ export function RoughStoryboardView() {
                             <>
                               {/* absolute inset-0: aspect-video 컨테이너 박스를 무조건 채운다. in-flow
                                   size-full 은 일부 브라우저/배율에서 h-full(=%)이 aspect-ratio 높이로 안 풀려
-                                  이미지가 위쪽만 채우고 아래 bg-muted 회색이 남던 버그(2026-07-11). */}
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={withCacheBust(panel.url, panel.generatedAt)}
+                                  이미지가 위쪽만 채우고 아래 bg-muted 회색이 남던 버그(2026-07-11).
+                                  3프레임 세트(#rough-grid)는 순환 재생 — 구버전 단일 패널은 정적 폴백. */}
+                              <RoughFrameCycle
+                                panel={panel}
                                 alt={`${shot.shotId} rough storyboard`}
-                                className="absolute inset-0 size-full object-cover"
-                                loading="lazy"
-                                draggable={false}
                               />
                               <Button
                                 size="icon"
