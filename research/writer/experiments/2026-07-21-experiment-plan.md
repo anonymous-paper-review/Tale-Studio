@@ -130,11 +130,14 @@
 - 판정: 주입판에서 분산 발생 + rubric 우세 = 배선 복원. 아니면 v1 콜 제거(6.8s↓).
 - 변경 대상: `v3_scene_plan.ts` 시그니처+프롬프트 또는 `v1_act_arc.ts` 삭제. 부수: "≤10분 전제" 문구는 어느 안이든 제거.
 
-**E12b. C2 Step1 완전 결정론화** ⬜ (D1-④ 결과로 강화)
+**E12b. C2 Step1 완전 결정론화** 🔵 (D1-④ 결과로 강화 · 방법 구체화 2026-07-21)
 - 가설: LLM 조립은 reconcile이 진실인 현행에서 무가치 — 제거해도 최종 필드 충실도 동일, 콜 1개↓.
-- 방법: Step1 제거판 vs 현행 × ≤24샷 프로젝트 2개 (그 이상은 이미 skip이라 동일).
-- 지표: 최종 shotSequence 필드 충실도 diff, M7.
-- 판정: 유의미 손실 필드 0개 = 채택. hook/motif는 소비처 생기기 전까지 타입에서 optional 유지.
+- 방법(구체화): **입력 고정 격리** — E1 배터리 저장분(ad 12샷·ledger 16샷 체인의 NS/scenes/shotDesign)을
+  파일 주입으로 C2에만 투입. A(현행 Step1 실행) vs B(`WRITER_C2_SKIP_ASSEMBLY=1` — 기존 >24샷 skip
+  경로를 게이트로 확장) × 각 2 run = 8 run. Step2(Claude 검증)는 양팔 공통.
+- 지표: 최종 shotSequence 필드 충실도 diff(렌더 소비 필드: duration·composition/motion_prompt·assets·
+  scene_id vs Step1-only 메타: hook_type·motif·continuity 채움률), Step2 이슈 수 변화, M7(wall-clock).
+- 판정: 렌더 소비 필드 손실 0 + Step2 산출 악화 없음 = 채택. hook/motif는 소비처 생기기 전까지 타입에서 optional 유지.
 - 변경 대상: `c_application_2.ts` Step1 프롬프트·호출 제거 (Step2 검증은 유지).
 
 **E11. 렌더 프롬프트 언어 (한→영 정본)** ⬜ (fal 크레딧 필요 — P3 후순위)
@@ -175,7 +178,7 @@
 | E5 | C1 존폐 | 3 | ✅ **재정의판 채택** (클리셰 감점 제거·differentiator 신설 — 오탐 0·검출력 4/4·10장르 일반화) | `results/E5-c1-storycheck.md` |
 | E6 | midPreview 존폐 | 3 | ⬜ | — |
 | E8 | v1 배선 | 3 | ⬜ | — |
-| E12b | C2 결정론화 | 3 | ⬜ | — |
+| E12b | C2 결정론화 | 3 | ✅ **채택·구현 완료** (렌더 필드 동일·메타 소비처 0·2~4배 빠름 — Step1 제거+Step2 보정) | `results/E12b-c2-step1.md` |
 | E11 | 프롬프트 언어 | 3 | ⬜ | — |
 | E9 | V3 흡수 | 4 | ⬜ | — |
 | E13 | S1+S3 병합 | 4 | ⬜ | — |
