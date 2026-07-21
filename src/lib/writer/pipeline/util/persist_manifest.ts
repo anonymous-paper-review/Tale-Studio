@@ -288,8 +288,14 @@ export async function persistAssetsToDb(
     for (const c of characters.characters) {
       const prev = existing.get(c.id)
       if (!prev) {
-        // 새 인물 (writer 가 전개상 추가) — 최소 필드 insert. description 은 표시용 → native.
+        // 새 인물 (writer 가 전개상 추가) — description 은 표시용 → native.
+        //   서사 속성(arc/motivation)도 기록(#opencast-arc 2026-07-21): s3 오픈캐스트가 산출한
+        //   값을 producer 캐릭터와 같은 JSONB shape 으로. 빈 껍데기면 null(UI 빈 표시 방지).
         const af = appearFields(c.id)
+        const arc =
+          c.arc && (c.arc.start_state || c.arc.end_state || c.arc.arc_type) ? c.arc : null
+        const motivation =
+          c.motivation && (c.motivation.want || c.motivation.need) ? c.motivation : null
         toInsert.push({
           project_id: projectId,
           character_id: c.id,
@@ -301,6 +307,8 @@ export async function persistAssetsToDb(
           i18n_provenance: af.i18n_provenance,
           description: af.appearance_native,
           costume: costumes[c.id] ?? null,
+          arc,
+          motivation,
           origin: 'writer',
         })
         continue
