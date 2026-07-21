@@ -74,8 +74,9 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   const figures = blocking.length
     ? blocking
         .map(
+          // 시선은 "머리(얼굴 없음)가 향하는 방향"으로 — gaze 단어는 눈/얼굴을 유발한다(목각 인형 캐논).
           (b, i) =>
-            `figure ${i + 1} at ${words(b.position_in_frame) || 'center'}, ${stripColor(words(b.pose)) || 'standing'}, gaze ${words(b.gaze) || 'ahead'}`,
+            `figure ${i + 1} at ${words(b.position_in_frame) || 'center'}, ${stripColor(words(b.pose)) || 'standing'}, blank head facing ${words(b.gaze) || 'ahead'}`,
         )
         .join('; ')
     : figureCount
@@ -96,9 +97,18 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
     stripColor(input.spec?.intent?.audience_focus) ||
     'the main action'
 
+  // CU 얼굴 방어(v1 CU_FRONT 교훈): 클로즈업 거리는 "얼굴" prior 가 가장 강한 지점 —
+  //   프레임에 잡히는 머리가 '빈 목각 두상'임을 셀 단위로 한 번 더 못박는다.
+  const CU_TYPES = new Set(['CU', 'ECU', 'MCU'])
+  const cuGuard =
+    figureCount > 0 && CU_TYPES.has(sizeCode)
+      ? 'the framed head is the blank egg-smooth wooden mannequin head with no face'
+      : null
+
   const startParts = [
     `${size}, ${angle}, ${lens}mm, ${rule}`,
     figures || 'empty landscape, no figures',
+    cuGuard,
     layerLine || (setting ? `setting: ${setting}` : null),
     input.actionDescription ? `moment: ${stripColor(input.actionDescription)}` : null,
     `focal point: ${focal}`,
@@ -116,7 +126,7 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
     .filter((v) => v.trim().length > 0)
   const gazeMoves = (dyn?.gaze_arc ?? [])
     .filter((g) => g.from !== g.to)
-    .map((g) => `gaze ${words(g.from)} → ${words(g.to)}`)
+    .map((g) => `blank head turns ${words(g.from)} → ${words(g.to)}`)
   const motionParts = [camMove, ...charMoves, ...gazeMoves].filter(Boolean) as string[]
   const motion = motionParts.length ? motionParts.join('; ') : 'static hold — no camera or figure movement'
 
@@ -129,7 +139,12 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
 
 // ── 그리드 프롬프트 ──────────────────────────────────────────────────────────
 
-const GRID_STYLE = `Global style for every panel: loose rough monochrome pencil previz sketch, strictly black-and-white grayscale, quick gestural lines, light gray shading, ample white space, unfinished rough-board feel. Every human figure is the same identical blank artist mannequin — matte gray, smooth egg-like featureless oval head with no face, bare simple doll body; only pose and position differ between figures. Props and objects as simple lines and geometric shapes. No color anywhere.`
+// 그림체 통일 + 목각 인형 강제(2026-07-22 피드백): "artist mannequin"(해석 여지)→ 고전 볼조인트
+//   목각 데생 인형으로 캐논 고정 — 시각적으로 결정적인 앵커라 그리드 간 스타일 편차도 줄인다.
+//   시선(gaze)은 얼굴이 없으므로 "머리가 향하는 방향"으로만 — 셀 빌더의 문구와 짝(head facing/turns).
+const GRID_STYLE = `Global style for every panel: loose rough monochrome pencil previz sketch, strictly black-and-white grayscale, quick gestural lines, light gray shading, ample white space, unfinished rough-board feel. Draw the entire sheet in the exact same hand — same line weight, same hatching and shading technique in every panel, as if one artist drew everything in one sitting.
+
+Every human figure — in every panel, every column, every frame — is the same classic wooden artist's drawing mannequin: a ball-jointed wooden pose doll with segmented limbs, visible sphere joints, mitten-like hands without fingers, and a completely smooth egg-shaped wooden head. The head is entirely blank — absolutely no face, no eyes, no nose, no mouth, no hair, no expression. No clothing. All figures are this one identical wooden mannequin; only pose, position and scale differ. Where a figure is looking is shown ONLY by the direction its blank head points. Props and objects as simple lines and geometric shapes. No color anywhere.`
 
 /**
  * 템플릿 12칸(또는 스트립 3칸)을 채우는 edit 지시문.
