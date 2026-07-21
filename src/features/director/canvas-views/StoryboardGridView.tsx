@@ -7,7 +7,13 @@ import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import {
+  selectLatestAttempt,
+  selectNewestSuccessfulTake,
+  type VideoTakeSelectionRecord,
+} from '@/lib/director-video-take-selection'
+import {
   getChildShots,
+  effectivePrompt,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
@@ -18,6 +24,7 @@ import {
   isShotData,
   isVideoData,
   type DirectorNode,
+  type DirectorVideoStatus,
   type ShotNodeData,
 } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
@@ -29,13 +36,58 @@ type SceneGroup = {
   timeOfDay: string
   shots: DirectorNode[]
 }
+export type GridAttemptRecord = VideoTakeSelectionRecord & {
+  last_attempt_status: DirectorVideoStatus | null
+  last_attempt_error: string | null
+}
+type GridVideoTakeRecord = GridAttemptRecord & {
+  last_attempt_status: DirectorVideoStatus | null
+  node: DirectorNode
+  url: string | null
+  status: DirectorVideoStatus
+  is_final: boolean
+  take_number: number
+  created_at: string | null
+  last_attempt_at: string | null
+  last_attempt_error: string | null
+}
+export function selectGridVideoAttemptState(takes: GridAttemptRecord[]) {
+  const latestAttempt = selectLatestAttempt(takes)
+  return {
+    latestAttempt,
+    generating: latestAttempt?.last_attempt_status === 'generating',
+    failure:
+      latestAttempt?.last_attempt_status === 'failed'
+        ? latestAttempt.last_attempt_error ?? '영상 생성 실패'
+        : null,
+  }
+}
+
+function isExpectedMediaPlayInterruption(error: unknown): boolean {
+  return (
+    error instanceof DOMException &&
+    error.name === 'AbortError'
+  ) || (
+    error instanceof Error &&
+    /play\(\) request was interrupted/i.test(error.message)
+  )
+}
 
 /** 완료 영상 썸네일(#e1 2026-07-15) — 호버 시에만 재생, 클릭 = 일시정지 잠금(중앙 ⏸ 표시).
  *  다시 클릭하면 잠금 해제 + 재생 재개. 카드 더블클릭(팝업)은 dblclick 이벤트라 그대로 동작. */
 function HoverPlayVideo({ src, label }: { src: string; label: string }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [pausedLock, setPausedLock] = useState(false)
-  const play = () => void videoRef.current?.play().catch(() => {})
+  const [playbackError, setPlaybackError] = useState<string | null>(null)
+  const play = () =>
+    void videoRef.current?.play().then(
+      () => setPlaybackError(null),
+      (error: unknown) => {
+        if (!isExpectedMediaPlayInterruption(error)) {
+          setPlaybackError(error instanceof Error ? error.message : '영상 재생에 실패했습니다.')
+        }
+      },
+    )
   const pause = () => videoRef.current?.pause()
   return (
     <button
@@ -72,6 +124,14 @@ function HoverPlayVideo({ src, label }: { src: string; label: string }) {
           <Pause className="size-8 fill-white text-white drop-shadow" />
         </span>
       )}
+      {playbackError && (
+        <span
+          role="alert"
+          className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded bg-destructive/90 px-1 py-0.5 text-[10px] text-destructive-foreground"
+        >
+          {playbackError}
+        </span>
+      )}
     </button>
   )
 }
@@ -89,27 +149,36 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
   const rough = useRoughStoryboard(writerShotId)
   // 영상 생성(이미지→영상 체인 포함) 진행 플래그 — 버튼 잠금 + 오버레이(#e12)
   const [videoBusy, setVideoBusy] = useState(false)
-  // 완료된 자식 테이크 영상(#e13): final 우선, 없으면 최근 완료분 — 있으면 썸네일을 영상으로.
-  //   selector는 문자열/불리언만 반환(참조 안정성).
-  const completedVideoUrl = useDirectorCanvasStore((s) => {
-    let fallback: string | null = null
-    for (const n of s.nodes) {
-      if (!isVideoData(n.data) || n.data.parentShotNodeId !== node.id) continue
-      if (n.data.status !== 'completed' || !n.data.videoUrl) continue
-      if (n.data.final) return n.data.videoUrl
-      fallback = n.data.videoUrl
-    }
-    return fallback
-  })
-  // 자식 테이크가 생성 중(#e13) — Node 탭/리테이크에서 시작된 영상 생성도 그리드에 반영.
-  const childVideoGenerating = useDirectorCanvasStore((s) =>
-    s.nodes.some(
-      (n) =>
-        isVideoData(n.data) &&
-        n.data.parentShotNodeId === node.id &&
-        n.data.status === 'generating',
-    ),
+  const [videoError, setVideoError] = useState<string | null>(null)
+  // Grid always projects the newest successful take; Final is an editor/export decision.
+  const directorNodes = useDirectorCanvasStore((s) => s.nodes)
+  const takeRecords = useMemo(
+    () =>
+      directorNodes.flatMap((n) => {
+        if (!isVideoData(n.data) || n.data.parentShotNodeId !== node.id) {
+          return []
+        }
+        const record: GridVideoTakeRecord = {
+          id: n.id,
+          take_number: n.data.takeNumber,
+          created_at: n.data.createdAt ?? null,
+          status: n.data.status,
+          url: n.data.videoUrl,
+          is_final: n.data.final,
+          last_attempt_status: n.data.lastAttemptStatus,
+          last_attempt_at: n.data.lastAttemptAt,
+          last_attempt_error: n.data.lastAttemptError,
+          node: n,
+        }
+        return [record]
+      }),
+    [directorNodes, node.id],
   )
+  // Grid always projects the newest successful take; Final is an editor/export decision.
+  const newestSuccessful = selectNewestSuccessfulTake(takeRecords)
+  const completedVideoUrl = newestSuccessful?.url ?? null
+  const { generating: childVideoGenerating, failure: childVideoFailure } =
+    selectGridVideoAttemptState(takeRecords)
 
   if (!isShotData(node.data)) return null
   const data: ShotNodeData = node.data
@@ -117,14 +186,20 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
   const status = img?.status ?? null
   const hasImage = status === 'completed' && !!img?.url
   const roughUrl = rough?.status === 'completed' ? rough.url : null
+  const prompt = effectivePrompt(data)
 
   const runImage = async () => {
-    await generateStoryboardImage(node.id)
+    try {
+      await generateStoryboardImage(node.id)
+    } catch (error) {
+      setVideoError(error instanceof Error ? error.message : '이미지 생성에 실패했습니다.')
+    }
   }
   // 영상 생성(#e12): 이미지가 없으면 먼저 생성하고, 성공했을 때만 영상으로 이어간다.
   const runVideo = async () => {
     if (videoBusy) return
     setVideoBusy(true)
+    setVideoError(null)
     try {
       if (!hasImage) {
         await generateStoryboardImage(node.id)
@@ -135,9 +210,11 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
           fresh &&
           isShotData(fresh.data) &&
           fresh.data.storyboardImage?.status === 'completed'
-        if (!ok) return // 이미지 실패 — 카드에 실패 표시, 영상은 진행하지 않음
+        if (!ok) return
       }
       await generateVideoForShot(node.id)
+    } catch (error) {
+      setVideoError(error instanceof Error ? error.message : '영상 생성에 실패했습니다.')
     } finally {
       setVideoBusy(false)
     }
@@ -191,13 +268,24 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
           </div>
         )}
 
-        {/* 생성 중 — border beam + 경과시간 오버레이. 색 구분(#e13): 이미지=초록, 영상=빨강.
-            동시 진행이면 라벨·빔 모두 이미지(선행 단계) 우선 — 표기 불일치 방지. */}
         <GeneratingOverlay
           active={generating}
           label={imageGenerating ? '이미지 생성 중' : '영상 생성 중'}
           beamColor={imageGenerating ? 'success' : 'primary'}
         />
+        {childVideoFailure && (
+          <span
+            title={childVideoFailure}
+            className="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded bg-destructive/90 px-1.5 py-0.5 text-[10px] text-destructive-foreground"
+          >
+            최신 영상 시도 실패
+          </span>
+        )}
+        {videoError && (
+          <span className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded bg-destructive/90 px-1.5 py-0.5 text-xs text-destructive-foreground">
+            {videoError}
+          </span>
+        )}
 
         {/* 우하단 생성 스택(#e12→#e6 2026-07-15) — 기본 버튼 = 영상 생성(이미지 없으면
             이미지→영상 체인). 호버 시 같은 너비의 슬라이딩 카드(살짝 밝은 빨강)가
@@ -253,10 +341,10 @@ function ShotCell({ node, roster }: { node: DirectorNode; roster: SlugEntry[] })
         <span className="truncate text-sm font-medium text-foreground">
           {prettyNodeLabel(data.label)}
         </span>
-        {data.prompt && (
+        {prompt && (
           <p className="line-clamp-2 text-xs text-muted-foreground">
             {/* 프롬프트 속 char_2·location_2 등 슬러그 → @실제 이름 (표시 전용, #e6) */}
-            {replaceSlugs(data.prompt, roster)}
+            {replaceSlugs(prompt, roster)}
           </p>
         )}
       </div>

@@ -3,6 +3,11 @@ import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource } from 
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 import {
+  selectHandoffTake,
+  selectLatestAttempt,
+  type VideoTakeSelectionRecord,
+} from '@/lib/director-video-take-selection'
+import {
   saveEditorState,
   loadEditorState,
   deleteAudioBlob,
@@ -23,6 +28,17 @@ const DEFAULT_LIGHTING = {
   brightness: 50,
   colorTemp: 5000,
 }
+type HandoffClip = VideoTakeSelectionRecord & {
+  shot_id?: unknown
+  thumbnail_url?: unknown
+  last_attempt_status?: unknown
+}
+
+
+// Each persistence read is tied to the project that initiated it. A late read must
+// never apply local state to the project selected while it was in flight.
+let persistedLoadEpoch = 0
+let editorLoadEpoch = 0
 
 // Per-shot debounce timers for speed persist (300ms)
 const speedPersistTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -554,13 +570,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return { panelSizes: { ...state.panelSizes, [key]: clamped } }
     }),
 
-  // ── 영속화 로드 (loadData 후 호출) — 저장된 편집이 있으면 덮어씀 ──
+  // ── 영속화 로드 (loadData 후 호출) — canonical media is never restored locally ──
   loadPersisted: async () => {
     if (typeof window === 'undefined') return
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
+    const loadToken = ++persistedLoadEpoch
     const saved = await loadEditorState(projectId)
-    if (!saved) return
+    if (
+      !saved ||
+      persistedLoadEpoch !== loadToken ||
+      useProjectStore.getState().projectId !== projectId
+    ) return
 
     // 복구: 이전 버전(모듈 카운터)에서 중복된 트랙/오디오 클립 id 제거
     const seenTracks = new Set<string>()
@@ -581,18 +602,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return { ...c, id, trackId }
     })
 
-    // shots/videoClips는 DB 캐넌(loadData가 직전에 채움)이 진실 — 저장본(editor_states)으로
-    //   덮어쓰지 않는다. 과거 빈/stale 저장본(shots=[])이 loadData가 채운 shots를 비워
-    //   "Complete previous steps first" 빈 화면에 갇히던 버그 방지. trim/speed/순서는 DB write-through
-    //   (editor/trim·speed·reorder)로 이미 shots에 반영됨. clipOrder는 유효 저장본만 복원.
     const cur = get()
+    const canonicalShotIds = new Set(cur.shots.map((shot) => shot.shotId))
+    const canonicalOrder = new Map<string, string[]>()
+    for (const shot of cur.shots) {
+      const order = canonicalOrder.get(shot.sceneId) ?? []
+      order.push(shot.shotId)
+      canonicalOrder.set(shot.sceneId, order)
+    }
+    const clipOrder: Record<string, string[]> = {}
+    for (const [sceneId, canonicalIds] of canonicalOrder) {
+      const savedIds = saved.clipOrder?.[sceneId] ?? []
+      const retained = savedIds.filter(
+        (shotId, index) => canonicalShotIds.has(shotId) && savedIds.indexOf(shotId) === index,
+      )
+      clipOrder[sceneId] = [...retained, ...canonicalIds.filter((id) => !retained.includes(id))]
+    }
     set({
-      shots: cur.shots.length ? cur.shots : (saved.shots ?? []),
-      videoClips: cur.videoClips.length ? cur.videoClips : (saved.videoClips ?? []),
-      clipOrder:
-        saved.clipOrder && Object.keys(saved.clipOrder).length
-          ? saved.clipOrder
-          : cur.clipOrder,
+      // shots/videoClips are loaded from the canonical DB by loadData; a local
+      // snapshot must not resurrect deleted media when that DB snapshot is empty.
+      clipOrder,
       audioClips: dedupAudioClips,
       audioSources: saved.audioSources ?? [],
       audioTracks: dedupTracks,
@@ -610,13 +639,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   loadData: async () => {
+    const loadEpoch = ++editorLoadEpoch
     const projectId = useProjectStore.getState().projectId
+    const emptyProjectData = {
+      shots: [] as Shot[],
+      videoClips: [] as VideoClip[],
+      clipOrder: {} as Record<string, string[]>,
+      selectedSceneId: null,
+      selectedClipShotId: null,
+      selectedShotIds: [] as string[],
+      selectedAudioId: null,
+      selectedAudioIds: [] as string[],
+      previewSourceShotId: null,
+      currentTime: 0,
+      isPlaying: false,
+      audioClips: [] as AudioTrackClip[],
+      audioSources: [] as AudioSource[],
+      audioTracks: [{ id: 'atrack_1' }],
+      rendering: false,
+      binDragKind: null,
+      binDropSec: null,
+    }
 
     // 1) Try Supabase
     if (projectId) {
       try {
         const supabase = createClient()
-        const [{ data: dbShots }, { data: dbClips }] = await Promise.all([
+        const [{ data: dbShots, error: shotsError }, { data: dbClips, error: clipsError }] = await Promise.all([
           supabase
             .from('shots')
             .select('*')
@@ -624,18 +673,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             .order('sort_order'),
           supabase
             .from('video_clips')
-            .select('shot_id, thumbnail_url, is_final')
+            .select('id, shot_id, url, status, is_final, take_number, created_at, deleted_at, thumbnail_url, last_attempt_status, last_attempt_at')
             .eq('project_id', projectId),
         ])
+        if (
+          editorLoadEpoch !== loadEpoch ||
+          useProjectStore.getState().projectId !== projectId
+        ) {
+          return
+        }
+        if (shotsError) throw new Error(`Editor shots load failed: ${shotsError.message}`)
+        if (clipsError) throw new Error(`Editor video clips load failed: ${clipsError.message}`)
 
-        // shot_id → thumbnail_url (is_final 우선). Editor 타임라인/소스 패널이 <video> 대신
-        //   poster 이미지로 그려 진입 시 N개 비디오 메타데이터 요청 폭주를 없앤다.
-        const thumbByShot = new Map<string, string>()
-        for (const c of dbClips ?? []) {
-          if (!c.shot_id || !c.thumbnail_url) continue
-          if (c.is_final || !thumbByShot.has(c.shot_id)) {
-            thumbByShot.set(c.shot_id, c.thumbnail_url as string)
-          }
+        // The thumbnail must represent the same successful take chosen for export/editor handoff.
+        const clipsByShot = new Map<string, HandoffClip[]>()
+        for (const clip of dbClips ?? []) {
+          if (typeof clip.shot_id !== 'string') continue
+          const clips = clipsByShot.get(clip.shot_id) ?? []
+          clips.push(clip)
+          clipsByShot.set(clip.shot_id, clips)
+        }
+        const handoffByShot = new Map<string, HandoffClip>()
+        const latestAttemptByShot = new Map<string, HandoffClip>()
+        for (const [shotId, clips] of clipsByShot) {
+          const handoff = selectHandoffTake(clips)
+          if (handoff) handoffByShot.set(shotId, handoff)
+          const latestAttempt = selectLatestAttempt(clips)
+          if (latestAttempt) latestAttemptByShot.set(shotId, latestAttempt)
         }
 
         if (dbShots?.length) {
@@ -653,40 +717,86 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             referenceImageUrl: s.reference_image ?? null,
           }))
 
-          const videoClips: VideoClip[] = dbShots.map((s) => ({
-            shotId: s.shot_id,
-            url: s.video_url ?? null,
-            status: s.video_url ? 'completed' : 'pending',
-            thumbnailUrl: thumbByShot.get(s.shot_id) ?? null,
-            trimStart: s.trim_start ?? undefined,
-            trimEnd: s.trim_end ?? undefined,
-            speed: s.speed ?? 1.0,
-          }))
+          const videoClips: VideoClip[] = dbShots.map((s) => {
+            const relationalRows = clipsByShot.get(s.shot_id) ?? []
+            const handoff = handoffByShot.get(s.shot_id)
+            const handoffUrl =
+              typeof handoff?.url === 'string' && handoff.url.trim()
+                ? handoff.url.trim()
+                : null
+            const legacyUrl =
+              relationalRows.length === 0 &&
+              typeof s.video_url === 'string' &&
+              s.video_url.trim()
+                ? s.video_url.trim()
+                : null
+            const url = handoffUrl ?? legacyUrl
+            const latestStatus =
+              latestAttemptByShot.get(s.shot_id)?.last_attempt_status ??
+              latestAttemptByShot.get(s.shot_id)?.status
+            const status: VideoClip['status'] = url
+              ? 'completed'
+              : latestStatus === 'failed'
+                ? 'failed'
+                : latestStatus === 'generating' ||
+                    latestStatus === 'queued' ||
+                    latestStatus === 'processing'
+                  ? 'generating'
+                  : 'pending'
+            const thumbnailUrl =
+              typeof handoff?.thumbnail_url === 'string' &&
+              handoff.thumbnail_url.trim()
+                ? handoff.thumbnail_url.trim()
+                : null
+            return {
+              shotId: s.shot_id,
+              url,
+              status,
+              thumbnailUrl,
+              trimStart: s.trim_start ?? undefined,
+              trimEnd: s.trim_end ?? undefined,
+              speed: s.speed ?? 1.0,
+            }
+          })
 
           const order = buildClipOrder(shots)
           const firstSceneId = shots[0]?.sceneId ?? null
 
           set({
+            ...emptyProjectData,
             shots,
             videoClips,
             clipOrder: order,
             selectedSceneId: firstSceneId,
             selectedClipShotId: order[firstSceneId!]?.[0] ?? null,
+            error: null,
           })
           return
         }
+        set({ ...emptyProjectData, error: null })
+        return
       } catch (err) {
-        console.error('[editor-store] DB load failed, falling back:', err)
+        console.error('[editor-store] DB load failed:', err)
+        if (editorLoadEpoch !== loadEpoch || useProjectStore.getState().projectId !== projectId) {
+          return
+        }
+        set({
+          ...emptyProjectData,
+          error: err instanceof Error ? err.message : 'Editor data load failed',
+        })
+        return
       }
     }
 
     // 2) DB가 단일 진실 (unify-director-store-db Step 1) — 옛 director-store fallback 제거.
     //    Director 캔버스 편집은 Step 0 write-through로 DB shots에 반영되므로 위 (1) 경로가 캐넌.
 
-    // No data available — keep empty state (don't show fake mock data)
+    set({ ...emptyProjectData, error: null })
   },
 
-  reset: () =>
+  reset: () => {
+    ++editorLoadEpoch
+    ++persistedLoadEpoch
     set({
       shots: [],
       videoClips: [],
@@ -711,7 +821,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       panelSizes: { ...DEFAULT_PANEL_SIZES },
       past: [],
       future: [],
-    }),
+    })
+  },
 
   selectScene: (sceneId) =>
     set((state) => {
@@ -1151,30 +1262,85 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 }))
 
-// ── 자동 저장 ────────────────────────────────────────────────────────────────
-// 영속화 대상 슬라이스(편집 상태)가 바뀔 때만 저장. currentTime/isPlaying 등 재생
-// 상태 변화(60fps)에는 반응하지 않도록 ref 비교로 거른다.
-//   1) localStorage (+ IndexedDB blob) — saveEditorState 내부 debounce. 항상 동작.
-//   2) /api/editor/state (DB) — best-effort. 테이블 미적용(마이그레이션 전)이면 첫 실패 후 비활성.
-let _serverSaveDisabled = false
-let _serverSaveTimer: ReturnType<typeof setTimeout> | null = null
+// ── 자동 저장 ─────────────────────────────────────────────────────────────────
+const serverSaveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const serverSaveGenerations = new Map<string, number>()
+const serverSaveSnapshots = new Map<string, PersistedEditor>()
+const serverSaveInFlight = new Map<string, boolean>()
 
-function scheduleServerSave(projectId: string, snapshot: PersistedEditor) {
-  if (_serverSaveDisabled) return
-  if (_serverSaveTimer) clearTimeout(_serverSaveTimer)
-  _serverSaveTimer = setTimeout(() => {
-    fetch('/api/editor/state', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, state: snapshot }),
+async function saveEditorStateToServer(
+  projectId: string,
+  snapshot: PersistedEditor,
+  isCurrent: () => boolean,
+): Promise<boolean> {
+  let diagnostic = 'Unknown error'
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!isCurrent()) return false
+    try {
+      const response = await fetch('/api/editor/state', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, state: snapshot }),
+      })
+      if (response.ok) return true
+      diagnostic = `HTTP ${response.status}`
+    } catch (error) {
+      diagnostic = error instanceof Error ? error.message : 'Network error'
+    }
+    if (!isCurrent()) return false
+    if (attempt < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
+    }
+  }
+  if (isCurrent()) {
+    console.error('[editor-store] server state save failed after retries:', diagnostic)
+  }
+  return false
+}
+
+export function scheduleServerSave(
+  projectId: string,
+  snapshot: PersistedEditor,
+  delay = 1500,
+  generation = (serverSaveGenerations.get(projectId) ?? 0) + 1,
+) {
+  if (generation === (serverSaveGenerations.get(projectId) ?? 0) + 1) {
+    serverSaveGenerations.set(projectId, generation)
+    serverSaveSnapshots.set(projectId, snapshot)
+  }
+
+  const timer = serverSaveTimers.get(projectId)
+  if (timer) clearTimeout(timer)
+  const scheduled = setTimeout(() => {
+    if (serverSaveTimers.get(projectId) !== scheduled) return
+    serverSaveTimers.delete(projectId)
+    if (serverSaveGenerations.get(projectId) !== generation) return
+    if (serverSaveInFlight.get(projectId)) return
+
+    const latestSnapshot = serverSaveSnapshots.get(projectId)
+    if (!latestSnapshot) return
+    serverSaveInFlight.set(projectId, true)
+    void saveEditorStateToServer(
+      projectId,
+      latestSnapshot,
+      () => serverSaveGenerations.get(projectId) === generation,
+    ).then((saved) => {
+      serverSaveInFlight.delete(projectId)
+      const latestGeneration = serverSaveGenerations.get(projectId)
+      if (latestGeneration !== generation) {
+        const newestSnapshot = serverSaveSnapshots.get(projectId)
+        if (newestSnapshot) scheduleServerSave(projectId, newestSnapshot, 0, latestGeneration)
+        return
+      }
+      if (saved) {
+        serverSaveSnapshots.delete(projectId)
+        return
+      }
+      const retrySnapshot = serverSaveSnapshots.get(projectId)
+      if (retrySnapshot) scheduleServerSave(projectId, retrySnapshot, 5000, generation)
     })
-      .then((r) => {
-        if (!r.ok) _serverSaveDisabled = true // 테이블 없음(500) 등 → 세션 동안 서버 저장 중단
-      })
-      .catch(() => {
-        _serverSaveDisabled = true
-      })
-  }, 1500)
+  }, delay)
+  serverSaveTimers.set(projectId, scheduled)
 }
 
 if (typeof window !== 'undefined') {

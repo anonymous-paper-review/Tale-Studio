@@ -16,6 +16,7 @@ import type { ExportResult, ExportStage } from '@/lib/export/types'
 import { useProjectStore } from '@/stores/project-store'
 import type { StageId } from '@/types'
 import { captureScreenJpeg } from '@/lib/export/screenshot'
+import { selectHandoffTake, type VideoTakeSelectionRecord } from '@/lib/director-video-take-selection'
 
 export type ExportFileKind = 'image' | 'video' | 'audio' | 'text' | 'other'
 export type ExportFileCountsByKind = Partial<Record<ExportFileKind, number>>
@@ -36,6 +37,10 @@ type FileCountEstimate = {
   counts: ExportFileCountsByKind
   known: boolean
 }
+type HandoffClip = VideoTakeSelectionRecord & {
+  shot_id?: unknown
+}
+
 
 export function estimateExportBytes(fileCountsByKind: ExportFileCountsByKind): number {
   return Object.entries(fileCountsByKind).reduce((total, [kind, count]) => {
@@ -209,7 +214,7 @@ function formatBytes(bytes: number): string {
 
 
 
-async function estimateWholeProjectFileCounts(projectId: string): Promise<FileCountEstimate> {
+export async function estimateWholeProjectFileCounts(projectId: string): Promise<FileCountEstimate> {
   try {
     const { createClient } = await import('@/lib/supabase/client')
     const supabase = createClient()
@@ -224,19 +229,19 @@ async function estimateWholeProjectFileCounts(projectId: string): Promise<FileCo
         .eq('project_id', projectId),
       supabase
         .from('shots')
-        .select('storyboard_image,video_url')
+        .select('shot_id,storyboard_image,video_url')
         .eq('project_id', projectId),
       supabase
         .from('video_clips')
-        .select('url,status,is_final')
+        .select('id,shot_id,url,status,is_final,take_number,created_at,deleted_at')
         .eq('project_id', projectId),
     ])
 
     if (charactersRes.error || locationsRes.error || shotsRes.error || clipsRes.error) {
       const failure =
         charactersRes.error ?? locationsRes.error ?? shotsRes.error ?? clipsRes.error
-      console.warn('[export-menu] DB size estimate failed; falling back:', failure)
-      return { counts: await fallbackWholeProjectFileCounts(projectId), known: false }
+      console.warn('[export-menu] DB size estimate failed; requiring unknown-size confirmation:', failure)
+      return { counts: emptyCounts(), known: false }
     }
 
     const counts = emptyCounts()
@@ -253,91 +258,33 @@ async function estimateWholeProjectFileCounts(projectId: string): Promise<FileCo
       addUrlCount(counts, 'image', row.establishing_shot)
     }
 
-    for (const row of shotsRes.data ?? []) {
-      addStoryboardCount(counts, row.storyboard_image)
-      addUrlCount(counts, 'video', row.video_url)
+    const clipsByShot = new Map<string, HandoffClip[]>()
+    for (const clip of clipsRes.data ?? []) {
+      if (typeof clip.shot_id !== 'string') continue
+      const clips = clipsByShot.get(clip.shot_id) ?? []
+      clips.push(clip)
+      clipsByShot.set(clip.shot_id, clips)
     }
 
-    for (const row of clipsRes.data ?? []) {
-      const status = typeof row.status === 'string' ? row.status : ''
-      if (status === 'completed' || row.is_final === true) {
-        addUrlCount(counts, 'video', row.url)
-      }
+    for (const row of shotsRes.data ?? []) {
+      addStoryboardCount(counts, row.storyboard_image)
+      const clips = clipsByShot.get(row.shot_id) ?? []
+      const videoUrl = clips.length === 0 ? row.video_url : selectHandoffTake(clips)?.url
+      addUrlCount(counts, 'video', videoUrl)
     }
 
     return { counts, known: true }
   } catch (error) {
-    console.warn('[export-menu] DB size estimate threw; falling back:', errorMessage(error))
-    return { counts: await fallbackWholeProjectFileCounts(projectId), known: false }
+    console.warn('[export-menu] DB size estimate threw; requiring unknown-size confirmation:', errorMessage(error))
+    return { counts: emptyCounts(), known: false }
   }
 }
 
-async function fallbackWholeProjectFileCounts(projectId: string): Promise<ExportFileCountsByKind> {
-  const counts = emptyCounts()
-
-  try {
-    const [{ useAssetStorageStore }, { useWriterStore }, { useDirectorCanvasStore }] = await Promise.all([
-      import('@/stores/asset-storage-store'),
-      import('@/stores/writer-store'),
-      import('@/stores/director-store'),
-    ])
-
-    const assetStore = useAssetStorageStore.getState()
-    const assets = [
-      ...assetStore.listCharactersByProject(projectId),
-      ...assetStore.listWorldsByProject(projectId),
-    ]
-
-    for (const asset of assets) {
-      const multiViewCount = countGeneratedImages(counts, asset.views.fiveView)
-      countGeneratedImages(counts, asset.views.sixteenAngle)
-      if (multiViewCount === 0) countGeneratedImages(counts, asset.views.single)
-      for (const variant of asset.statusVariants) {
-        countGeneratedImages(counts, variant.images)
-      }
-    }
-
-    for (const shot of useWriterStore.getState().shots) {
-      addUrlCount(counts, 'image', shot.referenceImageUrl)
-      addUrlCount(counts, 'image', shot.roughStoryboard?.url)
-    }
-
-    for (const node of useDirectorCanvasStore.getState().nodes) {
-      const data = recordValue(node.data)
-      if (data?.kind === 'shot') {
-        if (Array.isArray(data.referenceImages)) {
-          for (const image of data.referenceImages) {
-            addUrlCount(counts, 'image', recordValue(image)?.url)
-          }
-        }
-        addStoryboardCount(counts, data.storyboardImage)
-      }
-      if (data?.kind === 'video') {
-        addUrlCount(counts, 'video', data.videoUrl)
-      }
-    }
-  } catch (error) {
-    console.warn('[export-menu] fallback size estimate failed:', errorMessage(error))
-  }
-
-  return counts
-}
 
 function emptyCounts(): Required<ExportFileCountsByKind> {
   return { image: 0, video: 0, audio: 0, text: 0, other: 0 }
 }
 
-function countGeneratedImages(counts: ExportFileCountsByKind, images: unknown): number {
-  if (!Array.isArray(images)) return 0
-
-  let count = 0
-  for (const image of images) {
-    const before = counts.image ?? 0
-    addUrlCount(counts, 'image', recordValue(image)?.url)
-    if ((counts.image ?? 0) > before) count += 1
-  }
-  return count
-}
 
 function addStoryboardCount(counts: ExportFileCountsByKind, value: unknown) {
   const storyboard = recordValue(value)

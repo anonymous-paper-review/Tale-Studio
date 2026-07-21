@@ -15,12 +15,10 @@ import {
   failGenerationJob,
   classifyFalFailure,
 } from '@/lib/generation-jobs'
+import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
 import {
-  finalizeCharacterViewJob,
-  finalizeWorldShotJob,
-  finalizeShotStoryboardJob,
-  finalizeShotRoughStoryboardJob,
-  finalizeShotVideoJob,
+  DirectorVideoCompletionPersistenceError,
+  finalizeGenerationJob,
 } from '@/lib/fal/finalize'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 
@@ -72,7 +70,13 @@ export async function POST(req: Request) {
   }
 
   const requestId = body.request_id ?? body.gateway_request_id
-  if (!requestId) return NextResponse.json({ ok: true }) // 식별 불가 → 무시
+  if (!requestId || typeof requestId !== 'string') {
+    console.warn('[fal/webhook] signed payload missing request identifier')
+    return NextResponse.json(
+      { ok: false, error: { code: 'missing_request_id', message: 'request_id is required' } },
+      { status: 400 },
+    )
+  }
 
   const job = await getGenerationJobByRequestId(requestId)
   if (!job) return NextResponse.json({ ok: true }) // 추적 안 하는 작업 → 무시
@@ -83,7 +87,11 @@ export async function POST(req: Request) {
     const cls = classifyFalFailure(raw)
     // moderation(콘텐츠 차단)은 결정론적 실패 → 그대로 터미널 처리 (#A 태그로 generation-status 가 구분, 원본 보존).
     if (cls === 'moderation') {
-      await failGenerationJob(job.id, `[moderation] ${raw}`)
+      if (job.video_clip_id) {
+        await markDirectorVideoAttemptFailed(job.project_id, job.id, `[moderation] ${raw}`)
+      } else {
+        await failGenerationJob(job.id, `[moderation] ${raw}`)
+      }
       return NextResponse.json({ ok: true })
     }
     // 사유(payload_error) 없는 generic 'ERROR' — 느린 i2i 의 fal webhook 조기/타임아웃일 수 있다
@@ -95,24 +103,23 @@ export async function POST(req: Request) {
   }
 
   try {
-    if (job.kind === 'shot_video') {
-      const url = extractVideoUrl(body.payload)
-      if (!url) throw new Error('no video url in webhook payload')
-      await finalizeShotVideoJob(job, url)
-    } else {
-      // 이미지 계열 (character_view / world_shot / shot_storyboard / shot_rough_storyboard)
-      const url = extractImageUrl(body.payload)
-      if (!url) throw new Error('no image url in webhook payload')
-      if (job.kind === 'character_view') await finalizeCharacterViewJob(job, url)
-      else if (job.kind === 'world_shot') await finalizeWorldShotJob(job, url)
-      else if (job.kind === 'shot_storyboard') await finalizeShotStoryboardJob(job, url)
-      else if (job.kind === 'shot_rough_storyboard')
-        await finalizeShotRoughStoryboardJob(job, url)
-    }
+    const result = job.kind === 'shot_video'
+      ? { media: 'video' as const, url: extractVideoUrl(body.payload), payload: body.payload }
+      : { media: 'image' as const, url: extractImageUrl(body.payload), payload: body.payload }
+    if (!result.url) throw new Error(`no ${result.media} url in webhook payload`)
+    await finalizeGenerationJob(job, result)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    if (e instanceof DirectorVideoCompletionPersistenceError) {
+      console.error('[fal/webhook] video persistence failed; retaining queued attempt:', msg)
+      throw e
+    }
     console.error('[fal/webhook] finalize failed:', msg)
-    await failGenerationJob(job.id, msg)
+    if (job.video_clip_id) {
+      await markDirectorVideoAttemptFailed(job.project_id, job.id, msg)
+    } else {
+      await failGenerationJob(job.id, msg)
+    }
   }
 
   return NextResponse.json({ ok: true })

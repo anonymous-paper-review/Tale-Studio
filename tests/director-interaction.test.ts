@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  compareDirectorVideoTakeOrder,
+  selectLatestAttempt,
+  selectNewestSuccessfulTake,
+  type VideoTakeSelectionRecord,
+} from '@/lib/director-video-take-selection'
+import {
   editActionForKind,
   popupVisibleInView,
   doubleClickActionForKind,
@@ -7,6 +13,7 @@ import {
   connectRouteForTargetHandle,
 } from '@/features/director/canvas-interaction'
 
+import { selectGridVideoAttemptState } from '@/features/director/canvas-views/StoryboardGridView'
 describe('editActionForKind (BaseNode Edit 분기)', () => {
   // #e2 2026-07-14: shot/video도 Storyboard 뷰와 동일하게 모달로 통일 (좌측 패널 경로 폐기).
   it('scene/shot/video는 모달', () => {
@@ -69,5 +76,97 @@ describe('connectRouteForTargetHandle (onConnect 라우팅)', () => {
     expect(connectRouteForTargetHandle('left')).toBe('relation')
     expect(connectRouteForTargetHandle(null)).toBe('relation')
     expect(connectRouteForTargetHandle(undefined)).toBe('relation')
+  })
+})
+
+type TestVideoTake = VideoTakeSelectionRecord & {
+  status: string
+  last_attempt_status: 'pending' | 'generating' | 'completed' | 'failed' | null
+  last_attempt_error: string | null
+}
+
+describe('Director video-take selection contracts', () => {
+  const take = (
+    id: string,
+    takeNumber: number,
+    status: TestVideoTake['status'],
+    url: string | null,
+    lastAttemptStatus: TestVideoTake['last_attempt_status'],
+    lastAttemptAt: string,
+    lastAttemptError: string | null = null,
+  ): TestVideoTake => ({
+    id,
+    take_number: takeNumber,
+    created_at: `2026-07-20T00:00:0${takeNumber}.000Z`,
+    status,
+    url,
+    is_final: false,
+    last_attempt_status: lastAttemptStatus,
+    last_attempt_at: lastAttemptAt,
+    last_attempt_error: lastAttemptError,
+  })
+
+  it('keeps the newest successful playback when a newer attempt fails', () => {
+    const successful = take('success', 1, 'completed', 'https://video.example/success.mp4', 'completed', '2026-07-20T00:00:01.000Z')
+    const failed = take('failed', 2, 'completed', 'https://video.example/previous.mp4', 'failed', '2026-07-20T00:00:02.000Z')
+
+    expect(selectNewestSuccessfulTake([successful, failed])).toBe(failed)
+    expect(selectLatestAttempt([successful, failed])).toBe(failed)
+  })
+
+  it('treats the latest overall attempt, rather than any historical failure, as the failure badge source', () => {
+    const failed = take('failed', 1, 'failed', null, 'failed', '2026-07-20T00:00:01.000Z')
+    const completed = take('completed', 2, 'completed', 'https://video.example/latest.mp4', 'completed', '2026-07-20T00:00:02.000Z')
+
+    expect(selectNewestSuccessfulTake([failed, completed])).toBe(completed)
+    expect(selectLatestAttempt([failed, completed])).toBe(completed)
+  })
+  it('derives generation and failure badges from the same newest attempt', () => {
+    const oldGenerating = take(
+      'old-generating',
+      1,
+      'completed',
+      'https://video.example/old.mp4',
+      'generating',
+      '2026-07-20T00:00:01.000Z',
+    )
+    const latestFailure = take(
+      'latest-failure',
+      2,
+      'completed',
+      'https://video.example/current.mp4',
+      'failed',
+      '2026-07-20T00:00:02.000Z',
+      'provider rejected request',
+    )
+
+    expect(selectGridVideoAttemptState([oldGenerating, latestFailure])).toMatchObject({
+      latestAttempt: latestFailure,
+      generating: false,
+      failure: 'provider rejected request',
+    })
+  })
+  it('orders malformed take values deterministically without NaN', () => {
+    const malformed: VideoTakeSelectionRecord[] = [
+      { id: 'a', take_number: null, created_at: '' },
+      { id: 'z', take_number: 'not-a-number', created_at: '' },
+      { id: 'newer', take_number: ' ', created_at: '2026-07-20T00:00:02.000Z' },
+      { id: 'older', take_number: undefined, created_at: '2026-07-20T00:00:01.000Z' },
+      { id: 'valid', take_number: 1, created_at: null },
+    ]
+
+    for (const a of malformed) {
+      for (const b of malformed) {
+        expect(Number.isNaN(compareDirectorVideoTakeOrder(a, b))).toBe(false)
+      }
+    }
+
+    expect([...malformed].sort(compareDirectorVideoTakeOrder).map((take) => take.id)).toEqual([
+      'valid',
+      'newer',
+      'older',
+      'z',
+      'a',
+    ])
   })
 })

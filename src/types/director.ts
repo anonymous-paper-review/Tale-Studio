@@ -72,7 +72,14 @@ export type ShotNodeData = {
   writerShotId: string | null
   /** 부모 Scene Canvas 노드 ID */
   parentSceneNodeId: string | null
+  /** 하위호환 legacy prompt fallback. Writer sync v2는 derivedPrompt를 갱신한다. */
   prompt: string
+  /** Writer sync가 관리하는 파생 prompt. 사용자 편집 금지. */
+  derivedPrompt?: string
+  /** 사용자 편집 prompt override. Writer sync는 이 필드를 건드리지 않는다. */
+  promptOverride?: string
+  /** legacy prompt를 v2 필드로 1회 이관했는지 표시하는 멱등 플래그. */
+  promptMigratedV2?: boolean
   /** 사용자 업로드 보조 참고 이미지 (생성물 아님 — storyboardImage와 구분, 결정 #37) */
   referenceImages: DirectorReferenceImage[]
   /** I2I 생성 샷 대표 이미지 (샷당 1장, I2V 기본 레퍼런스). null = 미생성 */
@@ -110,8 +117,17 @@ export type VideoNodeData = {
   label: string
   /** 마더 Shot Canvas 노드 ID (반드시 존재) */
   parentShotNodeId: string
-  /** 연결된 `video_clips.id` (uuid). null = 아직 DB에 영속 안 됨 (수동 노드 등) */
+  /** 연결된 `video_clips.id` (uuid). null = 아직 서버에 영속 안 됨 */
   videoClipId: string | null
+  /** DB가 부여한 logical take 순서 */
+  takeNumber: number
+  /** 가장 최근 생성 attempt의 durable job id와 상태 */
+  generationJobId: string | null
+  lastAttemptStatus: DirectorVideoStatus | null
+  lastAttemptError: string | null
+  lastAttemptAt: string | null
+  /** Logical take creation time for deterministic projection ordering. */
+  createdAt: string | null
   /** 마더 대비 변경된 필드 (없으면 마더 값 그대로 사용) */
   override: VideoOverride
   /** 생성 결과 */
@@ -153,13 +169,13 @@ export type AssetNodeData = {
 /**
  * 이미지 노드의 프롬프트를 캔버스에 별도 노드로 분리한 것 (Higgsfield "Prompt" 노드).
  * 우측 출력 핸들을 Shot 노드의 T 입력에 와이어링하면 wirePromptToShot이
- * 대상 Shot.prompt를 이 노드의 text로 동기화한다. DB 미영속(파생/보조 UI).
+ * 대상 Shot.promptOverride를 이 노드의 text로 동기화한다. DB 미영속(파생/보조 UI).
  */
 export type PromptNodeData = {
   kind: 'prompt'
   /** 노드 라벨 (union 공통 속성) */
   label: string
-  /** 프롬프트 텍스트 (Shot.prompt의 source) */
+  /** 프롬프트 텍스트 (Shot.promptOverride의 source) */
   text: string
   /** 와이어링된 대상 Shot 노드 ID. null = 아직 미연결 */
   targetShotNodeId: string | null

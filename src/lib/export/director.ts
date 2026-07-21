@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { selectHandoffTake } from '@/lib/director-video-take-selection'
 
 import { bulletList, escapeMd, h1, h2, isRecord, kvSection, labelPart, nativeText, pickNative, table, textOrUnset } from './md'
 import { PathAllocator } from './sanitize'
@@ -53,6 +54,8 @@ export interface ClipRow extends Record<string, unknown> {
   created_at?: string | null
   updated_at?: string | null
   is_final?: boolean | null
+  take_number?: number | null
+  deleted_at?: string | null
   take_label?: string | null
 }
 
@@ -71,7 +74,7 @@ export const DIRECTOR_SCENES_SELECT =
 export const DIRECTOR_SHOTS_SELECT =
   'id,project_id,scene_id,shot_id,shot_type,action_description,action_description_native,dialogue_lines,camera_config,lighting_config,movement_preset,sort_order,created_at,updated_at,video_url,storyboard_image'
 export const DIRECTOR_VIDEO_CLIPS_SELECT =
-  'id,project_id,shot_id,url,status,created_at,updated_at,is_final,take_label'
+  'id,project_id,shot_id,url,status,created_at,updated_at,is_final,take_number,deleted_at,take_label'
 
 export function collectDirectorArtifacts(data: DirectorExportData): ArtifactFile[] {
   const allocator = new PathAllocator()
@@ -91,11 +94,11 @@ export function collectDirectorArtifacts(data: DirectorExportData): ArtifactFile
       mediaFiles.push({ path: imagePath, kind: 'media', url: storyboardUrl })
     }
 
-    const clip = selectClip(clipsByShotId.get(requiredShotId(shot)) ?? [])
+    const clips = clipsByShotId.get(requiredShotId(shot)) ?? []
+    const clip = selectHandoffTake(clips)
     const clipUrl = clip ? mediaUrl(clip.url) : undefined
-    // Clip exports prefer video_clips final/completed rows; shots.video_url is a last-resort
-    // completed source because webhook/upload persists the final video there while video_clips.url is client fire-and-forget.
-    const clipSourceUrl = clipUrl ?? mediaUrl(shot.video_url)
+    // shots.video_url is a legacy boundary for shots with no relational clip rows.
+    const clipSourceUrl = clipUrl ?? (clips.length === 0 ? mediaUrl(shot.video_url) : undefined)
     const clipPath = clipSourceUrl ? allocator.file('director/clips', baseName, 'mp4') : null
 
     if (clipPath && clipSourceUrl) {
@@ -266,30 +269,6 @@ function clipCell(path: string, clip: ClipRow | null): string {
   return takeLabel ? `${path} (${takeLabel})` : path
 }
 
-function selectClip(clips: ClipRow[]): ClipRow | null {
-  return (
-    latestClip(clips.filter((clip) => clip.is_final === true && mediaUrl(clip.url))) ??
-    latestClip(
-      clips.filter(
-        (clip) => textValue(clip.status) === 'completed' && mediaUrl(clip.url),
-      ),
-    ) ??
-    null
-  )
-}
-
-function latestClip(clips: ClipRow[]): ClipRow | null {
-  if (clips.length === 0) return null
-  return [...clips].sort((a, b) => {
-    const byTime = clipTime(b) - clipTime(a)
-    if (byTime !== 0) return byTime
-    return textValue(b.id)?.localeCompare(textValue(a.id) ?? '') ?? 0
-  })[0] ?? null
-}
-
-function clipTime(clip: ClipRow): number {
-  return dateValue(clip.created_at) || dateValue(clip.updated_at)
-}
 
 function completedStoryboardUrl(storyboard: StoryboardImageValue | null): string | undefined {
   if (textValue(storyboard?.status) !== 'completed') return undefined
@@ -435,12 +414,6 @@ function textValue(value: unknown): string | undefined {
   return undefined
 }
 
-function dateValue(value: unknown): number {
-  const text = textValue(value)
-  if (!text) return 0
-  const parsed = Date.parse(text)
-  return Number.isFinite(parsed) ? parsed : 0
-}
 
 function joinParts(parts: Array<string | undefined | null>, separator = ' / '): string {
   return parts.map((part) => part?.trim()).filter(Boolean).join(separator)

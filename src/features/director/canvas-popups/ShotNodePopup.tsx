@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { HoverBeam } from '@/components/hover-beam'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
-import { useDirectorCanvasStore } from '@/stores/director-store'
+import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { usePresetStorageStore } from '@/stores/preset-storage-store'
 import {
@@ -45,7 +45,9 @@ export function ShotNodePopup({ nodeId, data }: Props) {
   const closePopup = useDirectorCanvasStore((s) => s.closePopup)
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
   const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
-  const regenerateVideo = useDirectorCanvasStore((s) => s.regenerateVideo)
+  const generateVideoForShot = useDirectorCanvasStore(
+    (s) => s.generateVideoForShot,
+  )
   const openDeleteConfirm = useDirectorCanvasStore(
     (s) => s.openDeleteConfirm,
   )
@@ -84,39 +86,19 @@ export function ShotNodePopup({ nodeId, data }: Props) {
     updateNodeData<'shot'>(nodeId, { worldAssetIds: next })
   }
 
-  const [label, setLabel] = useState(data.label)
-  const [prompt, setPrompt] = useState(data.prompt)
-
-  // external data 변경 시 derived state 리셋 (effect 없이 render 중)
-  const [prevNodeId, setPrevNodeId] = useState(nodeId)
-  if (nodeId !== prevNodeId) {
-    setPrevNodeId(nodeId)
-    setLabel(data.label)
-    setPrompt(data.prompt)
-  }
-
-  const commit = () => {
-    updateNodeData<'shot'>(nodeId, { label, prompt })
-  }
+  const currentPrompt = effectivePrompt(data)
 
   // 새 Video 테이크 생성 + 실제 영상 생성 (D-5). storyboardImage 있으면 I2V.
   const handleGenerateTake = () => {
-    commit()
-    const newId = addVideoTake(nodeId)
-    if (!newId) return
-    // 새 Video 노드로 popup 전환 → 생성 진행/스피너는 VideoNodePopup에서 표시
-    useDirectorCanvasStore.getState().openPopup(newId)
-    void regenerateVideo(newId)
+    void generateVideoForShot(nodeId).then((newId) => {
+      if (newId) useDirectorCanvasStore.getState().openPopup(newId)
+    })
   }
 
   // Branch = 빈 Video 노드만 생성 (생성은 별도, 결정 #13)
   const handleAddTake = () => {
-    commit()
     const newId = addVideoTake(nodeId)
-    if (newId) {
-      // 새 Video 노드로 popup 전환
-      useDirectorCanvasStore.getState().openPopup(newId)
-    }
+    if (newId) useDirectorCanvasStore.getState().openPopup(newId)
   }
 
   const handleDelete = () => {
@@ -174,9 +156,10 @@ export function ShotNodePopup({ nodeId, data }: Props) {
             <span className="inline-block h-2 w-2 rounded-full bg-chart-4" />
             <HoverBeam>
               <input
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                onBlur={commit}
+                value={data.label}
+                onChange={(e) =>
+                  updateNodeData<'shot'>(nodeId, { label: e.target.value })
+                }
                 className={cn(
                   'border-b border-transparent bg-transparent text-sm font-medium outline-none',
                   'focus:border-border',
@@ -192,9 +175,10 @@ export function ShotNodePopup({ nodeId, data }: Props) {
           <Field label="프롬프트 (영상 생성용)">
             <HoverBeam className="w-full">
               <Textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onBlur={commit}
+                value={currentPrompt}
+                onChange={(e) =>
+                  updateNodeData<'shot'>(nodeId, { promptOverride: e.target.value })
+                }
                 rows={3}
                 placeholder="이 샷에서 일어나는 액션, 분위기, 카메라 의도 등"
               />
@@ -216,9 +200,10 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                     className="h-full w-full object-cover"
                   />
                   <button
+                    type="button"
                     onClick={() => handleRemoveRef(img.id)}
-                    className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-                    aria-label="Remove"
+                    className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+                    aria-label="참고 이미지 삭제"
                   >
                     <X className="size-3 text-white" />
                   </button>
@@ -229,7 +214,8 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                 <input
                   type="file"
                   accept="image/*"
-                  className="hidden"
+                  className="sr-only"
+                  aria-label="참고 이미지 업로드"
                   onChange={(e) => {
                     const file = e.target.files?.[0]
                     if (file) handleAddReferenceImage(file)
@@ -242,6 +228,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                 onClick={() => setInventoryPickerOpen(true)}
                 className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-md border border-dashed border-border text-muted-foreground hover:bg-accent"
                 title="인벤토리에서 선택"
+                aria-label="인벤토리에서 참고 이미지 선택"
               >
                 <Images className="size-4" />
               </button>

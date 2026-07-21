@@ -2,32 +2,30 @@
 //
 // 캐릭터 뷰: FAL 이미지 URL → 바이트 회수 → Supabase storage 업로드 → characters 컬럼 갱신.
 //            (옛 동기 generate-sheet 라우트의 3~4단계를 그대로 서버사이드로 이동)
-// 샷 영상:   FAL 영상 URL → shots.video_url 갱신(writerShotId 있을 때만) + job 완료.
+// 샷 영상:   linked job은 clip/job별 immutable Storage 경로에 보관하고 RPC로 take를 완료한다.
+//            연결되지 않은 legacy job만 shots.video_url을 직접 갱신한다.
 //
-// 멱등성: webhook은 같은 request_id를 재전송할 수 있다(2시간 10회). 호출 전 job.status==='queued'
-//         가드(호출부)로 1차 차단하고, storage upsert/컬럼 update는 동일 결과라 재실행돼도 무해.
+// 멱등성: 호출부와 DB 상태 가드가 중복 webhook을 차단한다. linked 영상은 upsert 없이 같은
+//         clip/job 키만 재사용하며, DB 완료 실패는 queued 상태로 남겨 다음 webhook/poll이 재시도한다.
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { completeGenerationJob, type GenerationJob } from '@/lib/generation-jobs'
+import {
+  completeGenerationJob,
+  patchGenerationJobResponseSnapshotByRequestId,
+  type GenerationJob,
+} from '@/lib/generation-jobs'
 import { type CandidateView } from '@/lib/image-provenance'
 import { cropTurnaroundPortrait } from '@/lib/artist/portrait'
 import { uploadThumbnail } from '@/lib/storage-thumb'
+import { completeDirectorVideoAttempt } from '@/lib/director-video-takes'
+import { buildFalResponseSnapshot } from '@/lib/fal/observability'
+import {
+  ImmutableObjectMismatchError,
+  uploadImmutableObject,
+} from '@/lib/storage/immutable-object'
+import { storageKeySegment } from '@/lib/storage/key-segment'
 
-// Supabase Storage 객체 키는 ASCII-safe 여야 한다 (공백·한글 등 → "Invalid key" 업로드 실패).
-//   버그: 오픈캐스트 로케이션 id 가 scene.location 원문(한글+공백)이라 키에 그대로 들어가 거부 →
-//   업로드 실패 → wide_shot 영영 NULL → artist autoGen 이 진입마다 재생성(무한 + fal 비용).
-//   DB id 는 원문 유지(행 매칭) — 스토리지 파일명 세그먼트만 안전화한다.
-//   이미 안전한 id 는 그대로(기존 키 무변경), 아니면 슬러그+해시(서로 다른 id 의 키 충돌 방지).
-function storageKeySegment(raw: string): string {
-  if (/^[A-Za-z0-9._-]+$/.test(raw)) return raw
-  const slug = raw
-    .normalize('NFKD')
-    .replace(/[^A-Za-z0-9._-]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-  let h = 0
-  for (let i = 0; i < raw.length; i++) h = (Math.imul(31, h) + raw.charCodeAt(i)) | 0
-  const hash = (h >>> 0).toString(36)
-  return slug ? `${slug}_${hash}` : `id_${hash}`
-}
+// Natural IDs stay in the database; new storage objects use the shared versioned,
+// collision-resistant segment so every writer resolves the same namespace.
 
 // 결정적 경로 + upsert 는 재생성 후에도 public URL 이 영원히 같다 → 브라우저/CDN(max-age=3600)이
 //   옛 이미지를 계속 서빙하고, src 문자열이 동일해 React 재렌더도 없어 "재생성했는데 그대로"로 보인다
@@ -38,15 +36,532 @@ function versionedUrl(publicUrl: string): string {
   return `${publicUrl}?v=${Date.now()}`
 }
 
+function submittedIgnoredFields(job: GenerationJob): string[] {
+  const snapshot = job.input_snapshot as { ignored_fields?: unknown } | null | undefined
+  return Array.isArray(snapshot?.ignored_fields)
+    ? snapshot.ignored_fields.filter((field): field is string => typeof field === 'string')
+    : []
+}
+
+export async function recordFalResponseSnapshot(
+  job: GenerationJob,
+  falPayload: unknown,
+): Promise<void> {
+  if (falPayload === undefined) return
+  try {
+    await patchGenerationJobResponseSnapshotByRequestId(
+      job.request_id,
+      buildFalResponseSnapshot(falPayload, job.model, submittedIgnoredFields(job)),
+    )
+  } catch (e) {
+    console.warn('[finalize] response snapshot capture failed:', e instanceof Error ? e.message : e)
+  }
+}
+export type DirectorVideoPersistenceCode =
+  | 'provider_fetch_retryable'
+  | 'provider_fetch_terminal'
+  | 'invalid_provider_result'
+  | 'storage_retryable'
+  | 'storage_conflict'
+  | 'storage_terminal'
+  | 'database_retryable'
+  | 'database_constraint'
+  | 'database_state'
+  | 'database_terminal'
+
+type RetryableDirectorVideoPersistenceCode = Extract<
+  DirectorVideoPersistenceCode,
+  'provider_fetch_retryable' | 'storage_retryable' | 'database_retryable'
+>
+
+export class DirectorVideoCompletionPersistenceError extends Error {
+  readonly code: RetryableDirectorVideoPersistenceCode
+  readonly cause: unknown
+
+  constructor(code: RetryableDirectorVideoPersistenceCode, cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause)
+    super(`director video persistence failed [${code}]: ${detail}`)
+    this.name = 'DirectorVideoCompletionPersistenceError'
+    this.code = code
+    this.cause = cause
+  }
+}
+
+export class DirectorVideoTerminalError extends Error {
+  constructor(readonly code: Exclude<DirectorVideoPersistenceCode, RetryableDirectorVideoPersistenceCode>, message: string) {
+    super(message)
+    this.name = 'DirectorVideoTerminalError'
+  }
+}
+
+function providerVideoFetchFailure(status: number): Error {
+  if (status === 408 || status === 425 || status === 429 || status >= 500) {
+    return new DirectorVideoCompletionPersistenceError('provider_fetch_retryable', new Error(`provider video fetch failed: ${status}`))
+  }
+  return new DirectorVideoTerminalError('provider_fetch_terminal', `provider video fetch failed: ${status}`)
+}
+
+const MAX_VIDEO_BYTES = 128 * 1024 * 1024
+const VIDEO_DOWNLOAD_TIMEOUT_MS = 45_000
+const MAX_VIDEO_REDIRECTS = 3
+
+function assertValidVideoResponse(response: Response, bytes: Buffer): void {
+  const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+  if (contentType !== 'video/mp4' || !hasPlayableMp4Structure(bytes)) {
+    throw new DirectorVideoTerminalError('invalid_provider_result', 'provider returned invalid MP4 video bytes')
+  }
+}
+
+type IsoBox = { type: string; start: number; headerSize: number; end: number }
+type IsoParseBudget = {
+  boxesRemaining: number
+  tableEntriesRemaining: number
+  sampleValidationsRemaining: number
+}
+
+function readIsoBoxes(
+  bytes: Buffer,
+  start: number,
+  end: number,
+  budget: IsoParseBudget,
+): IsoBox[] | null {
+  const boxes: IsoBox[] = []
+  for (let offset = start; offset < end;) {
+    if (budget.boxesRemaining-- <= 0 || end - offset < 8) return null
+    let size = bytes.readUInt32BE(offset)
+    const type = bytes.subarray(offset + 4, offset + 8).toString('ascii')
+    let headerSize = 8
+    if (size === 1) {
+      if (end - offset < 16) return null
+      const largeSize = bytes.readBigUInt64BE(offset + 8)
+      if (largeSize > BigInt(Number.MAX_SAFE_INTEGER)) return null
+      size = Number(largeSize)
+      headerSize = 16
+    } else if (size === 0) {
+      size = end - offset
+    }
+    if (size < headerSize || size > end - offset) return null
+    boxes.push({ type, start: offset, headerSize, end: offset + size })
+    offset += size
+  }
+  return boxes
+}
+
+function boxPayload(box: IsoBox): number {
+  return box.start + box.headerSize
+}
+
+// Bound parser work independently of file size. A 128 MiB video with one-byte samples
+// could otherwise force tens of millions of table/sample iterations.
+const MAX_MP4_TABLE_ENTRIES = 1_000_000
+const MAX_MP4_BOXES = 10_000
+
+type SampleSizes = { count: number; fixedSize?: number; sizes?: number[] }
+type MdatRange = { start: number; end: number }
+
+function hasPlayableMp4Structure(bytes: Buffer): boolean {
+  const budget: IsoParseBudget = {
+    boxesRemaining: MAX_MP4_BOXES,
+    tableEntriesRemaining: MAX_MP4_TABLE_ENTRIES,
+    sampleValidationsRemaining: MAX_MP4_TABLE_ENTRIES,
+  }
+  const boxes = readIsoBoxes(bytes, 0, bytes.length, budget)
+  if (!boxes || boxes[0]?.type !== 'ftyp' || boxes[0].end - boxes[0].start < 16) return false
+  const moov = boxes.find((box) => box.type === 'moov')
+  const mdats = mergeMdatRanges(boxes)
+  if (!moov || mdats.length === 0) return false
+
+  const moovChildren = readIsoBoxes(bytes, boxPayload(moov), moov.end, budget)
+  if (!moovChildren) return false
+  return moovChildren.some((trak) => trak.type === 'trak' && hasPlayableTrack(bytes, trak, mdats, budget))
+}
+
+function hasPlayableTrack(bytes: Buffer, trak: IsoBox, mdats: MdatRange[], budget: IsoParseBudget): boolean {
+  const trakChildren = readIsoBoxes(bytes, boxPayload(trak), trak.end, budget)
+  const mdia = trakChildren?.find((box) => box.type === 'mdia')
+  const mdiaChildren = mdia && readIsoBoxes(bytes, boxPayload(mdia), mdia.end, budget)
+  const hdlr = mdiaChildren?.find((box) => box.type === 'hdlr')
+  const minf = mdiaChildren?.find((box) => box.type === 'minf')
+  const minfChildren = minf && readIsoBoxes(bytes, boxPayload(minf), minf.end, budget)
+  const stbl = minfChildren?.find((box) => box.type === 'stbl')
+  const boxes = stbl && readIsoBoxes(bytes, boxPayload(stbl), stbl.end, budget)
+  if (!hdlr || !isVideoHandler(bytes, hdlr) || !boxes) return false
+
+  const stsd = boxes.find((box) => box.type === 'stsd')
+  const stts = boxes.find((box) => box.type === 'stts')
+  const stsc = boxes.find((box) => box.type === 'stsc')
+  const stsz = boxes.find((box) => box.type === 'stsz')
+  const chunkOffsets = boxes.find((box) => box.type === 'stco' || box.type === 'co64')
+  if (!stsd || !stts || !stsc || !stsz || !chunkOffsets) return false
+
+  const sampleSizes = readSampleSizes(bytes, stsz, budget)
+  const offsets = readChunkOffsets(bytes, chunkOffsets, budget)
+  const stsdCount = readTableCount(bytes, stsd, 8, budget)
+  const sttsCount = readTimeToSampleCount(bytes, stts, budget)
+  const chunkSamples = readSampleToChunk(bytes, stsc, offsets?.length ?? 0, stsdCount ?? 0, budget)
+  if (
+    !sampleSizes
+    || !offsets
+    || !stsdCount
+    || sttsCount !== sampleSizes.count
+    || !chunkSamples
+    || sampleSizes.count > budget.sampleValidationsRemaining
+  ) return false
+  budget.sampleValidationsRemaining -= sampleSizes.count
+
+  let sampleIndex = 0
+  for (let chunkIndex = 0; chunkIndex < offsets.length; chunkIndex += 1) {
+    let position = offsets[chunkIndex]
+    for (let index = 0; index < chunkSamples[chunkIndex]; index += 1) {
+      if (sampleIndex >= sampleSizes.count) return false
+      const sampleSize = sampleSizes.fixedSize ?? sampleSizes.sizes?.[sampleIndex]
+      if (!sampleSize || !isWithinMdat(position, sampleSize, mdats)) return false
+      position += sampleSize
+      sampleIndex += 1
+    }
+  }
+  return sampleIndex === sampleSizes.count
+}
+
+function isVideoHandler(bytes: Buffer, box: IsoBox): boolean {
+  const payload = boxPayload(box)
+  return box.end - payload >= 12 && bytes.subarray(payload + 8, payload + 12).toString('ascii') === 'vide'
+}
+
+function readTableCount(
+  bytes: Buffer,
+  box: IsoBox,
+  entrySize: number,
+  budget: IsoParseBudget,
+): number | null {
+  const payload = boxPayload(box)
+  if (box.end - payload < 8) return null
+  const count = bytes.readUInt32BE(payload + 4)
+  if (
+    count === 0
+    || count > MAX_MP4_TABLE_ENTRIES
+    || count > budget.tableEntriesRemaining
+    || count > Math.floor((box.end - payload - 8) / entrySize)
+  ) return null
+  budget.tableEntriesRemaining -= count
+  return count
+}
+
+function readTimeToSampleCount(bytes: Buffer, box: IsoBox, budget: IsoParseBudget): number | null {
+  const count = readTableCount(bytes, box, 8, budget)
+  if (!count) return null
+  const payload = boxPayload(box)
+  let samples = 0
+  for (let index = 0; index < count; index += 1) {
+    const entryCount = bytes.readUInt32BE(payload + 8 + index * 8)
+    if (entryCount === 0 || samples > MAX_MP4_TABLE_ENTRIES - entryCount) return null
+    samples += entryCount
+  }
+  return samples
+}
+
+function readSampleToChunk(
+  bytes: Buffer,
+  box: IsoBox,
+  chunkCount: number,
+  stsdCount: number,
+  budget: IsoParseBudget,
+): number[] | null {
+  const count = readTableCount(bytes, box, 12, budget)
+  if (!count || chunkCount === 0) return null
+  const payload = boxPayload(box)
+  const entries: Array<{ firstChunk: number; samplesPerChunk: number }> = []
+  for (let index = 0; index < count; index += 1) {
+    const offset = payload + 8 + index * 12
+    const firstChunk = bytes.readUInt32BE(offset)
+    const samplesPerChunk = bytes.readUInt32BE(offset + 4)
+    const descriptionIndex = bytes.readUInt32BE(offset + 8)
+    if (
+      firstChunk === 0
+      || samplesPerChunk === 0
+      || descriptionIndex === 0
+      || descriptionIndex > stsdCount
+      || (index === 0 && firstChunk !== 1)
+      || (index > 0 && firstChunk <= entries[index - 1].firstChunk)
+      || firstChunk > chunkCount
+    ) return null
+    entries.push({ firstChunk, samplesPerChunk })
+  }
+
+  const chunks: number[] = []
+  for (let chunk = 1, entryIndex = 0; chunk <= chunkCount; chunk += 1) {
+    while (entryIndex + 1 < entries.length && entries[entryIndex + 1].firstChunk <= chunk) entryIndex += 1
+    chunks.push(entries[entryIndex].samplesPerChunk)
+  }
+  return chunks
+}
+
+function readSampleSizes(bytes: Buffer, box: IsoBox, budget: IsoParseBudget): SampleSizes | null {
+  const payload = boxPayload(box)
+  if (box.end - payload < 12) return null
+  const fixedSize = bytes.readUInt32BE(payload + 4)
+  const count = bytes.readUInt32BE(payload + 8)
+  if (count === 0 || count > MAX_MP4_TABLE_ENTRIES) return null
+  if (fixedSize > 0) return { count, fixedSize }
+  if (count > budget.tableEntriesRemaining || count > Math.floor((box.end - payload - 12) / 4)) return null
+  budget.tableEntriesRemaining -= count
+  const sizes: number[] = []
+  for (let index = 0; index < count; index += 1) {
+    const size = bytes.readUInt32BE(payload + 12 + index * 4)
+    if (size === 0) return null
+    sizes.push(size)
+  }
+  return { count, sizes }
+}
+
+function readChunkOffsets(bytes: Buffer, box: IsoBox, budget: IsoParseBudget): number[] | null {
+  const payload = boxPayload(box)
+  if (box.end - payload < 8) return null
+  const count = bytes.readUInt32BE(payload + 4)
+  const entrySize = box.type === 'co64' ? 8 : 4
+  if (
+    count === 0
+    || count > MAX_MP4_TABLE_ENTRIES
+    || count > budget.tableEntriesRemaining
+    || count > Math.floor((box.end - payload - 8) / entrySize)
+  ) return null
+  budget.tableEntriesRemaining -= count
+  const offsets: number[] = []
+  for (let index = 0; index < count; index += 1) {
+    const offset = box.type === 'co64'
+      ? Number(bytes.readBigUInt64BE(payload + 8 + index * 8))
+      : bytes.readUInt32BE(payload + 8 + index * 4)
+    if (!Number.isSafeInteger(offset)) return null
+    offsets.push(offset)
+  }
+  return offsets
+}
+
+function mergeMdatRanges(boxes: IsoBox[]): MdatRange[] {
+  const ranges: MdatRange[] = []
+  for (const box of boxes) {
+    if (box.type !== 'mdat' || boxPayload(box) >= box.end) continue
+    const range = { start: boxPayload(box), end: box.end }
+    const previous = ranges[ranges.length - 1]
+    if (previous && range.start <= previous.end) previous.end = Math.max(previous.end, range.end)
+    else ranges.push(range)
+  }
+  return ranges
+}
+
+function isWithinMdat(start: number, size: number, ranges: MdatRange[]): boolean {
+  const end = start + size
+  if (!Number.isSafeInteger(end)) return false
+  let low = 0
+  let high = ranges.length - 1
+  while (low <= high) {
+    const middle = low + Math.floor((high - low) / 2)
+    const range = ranges[middle]
+    if (start < range.start) high = middle - 1
+    else if (start >= range.end) low = middle + 1
+    else return end <= range.end
+  }
+  return false
+}
+
+function errorCode(error: unknown): string | undefined {
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? (error as { code?: unknown }).code
+    : undefined
+  return typeof code === 'string' ? code : undefined
+}
+
+const TERMINAL_DATABASE_CODES = new Set(['23502', '23503', '23505', '23514', '3D000', '42P01', '42703', 'P0001', '28P01', '42501'])
+
+function databaseTerminalPersistenceError(error: unknown): DirectorVideoTerminalError | null {
+  const code = errorCode(error)
+  if (code === '23502' || code === '23503' || code === '23505' || code === '23514') {
+    return new DirectorVideoTerminalError('database_constraint', `director video persistence violated database constraint ${code}`)
+  }
+  if (code === 'P0001') return new DirectorVideoTerminalError('database_state', 'director video attempt is not eligible for completion')
+  if (code && TERMINAL_DATABASE_CODES.has(code)) {
+    return new DirectorVideoTerminalError('database_terminal', `director video persistence failed permanently [${code}]`)
+  }
+  return null
+}
+function storageTerminalPersistenceError(error: unknown): DirectorVideoTerminalError | null {
+  const code = errorCode(error)?.toLowerCase()
+  const statusValue = typeof error === 'object' && error !== null
+    ? (error as { status?: unknown; statusCode?: unknown }).status
+      ?? (error as { statusCode?: unknown }).statusCode
+    : undefined
+  const status = typeof statusValue === 'number'
+    ? statusValue
+    : typeof statusValue === 'string' ? Number(statusValue) : undefined
+  if (
+    (typeof status === 'number' && status >= 400 && status < 500 && ![408, 425, 429].includes(status))
+    || ['400', '401', '403', '404', '422', 'accessdenied', 'unauthorized', 'forbidden', 'invalidrequest', 'invalidkey', 'nosuchbucket'].includes(code ?? '')
+  ) {
+    return new DirectorVideoTerminalError('storage_terminal', 'director video storage request failed permanently')
+  }
+  const message = error instanceof Error ? error.message.toLowerCase() : ''
+  if (/(row-level security|storage policy|permission denied|authorization|malformed|invalid (?:key|request)|bucket .*not found)/.test(message)) {
+    return new DirectorVideoTerminalError('storage_terminal', 'director video storage request failed permanently')
+  }
+  return null
+}
+
+function invalidProviderVideoUrl(): never {
+  throw new DirectorVideoTerminalError('invalid_provider_result', 'invalid video url in provider result')
+}
+
+function allowedFalHosts(): Set<string> {
+  const configured = process.env.FAL_MEDIA_ALLOWED_HOSTS?.split(',').map((host) => host.trim().toLowerCase()).filter(Boolean) ?? []
+  return new Set(['fal.media', 'v3.fal.media', ...configured])
+}
+
+function assertValidProviderVideoUrl(videoUrl: string, provider: GenerationJob['provider']): URL {
+  let parsed: URL
+  try {
+    parsed = new URL(videoUrl)
+  } catch {
+    return invalidProviderVideoUrl()
+  }
+  if (parsed.username || parsed.password) return invalidProviderVideoUrl()
+
+  if (provider === 'fal') {
+    if (parsed.protocol !== 'https:' || parsed.port || !allowedFalHosts().has(parsed.hostname.toLowerCase())) {
+      return invalidProviderVideoUrl()
+    }
+    return parsed
+  }
+
+  let configured: URL
+  try {
+    configured = new URL(process.env.TAILSCALE_VIDEO_API_URL ?? '')
+  } catch {
+    return invalidProviderVideoUrl()
+  }
+  if (
+    configured.username
+    || configured.password
+    || (configured.protocol !== 'http:' && configured.protocol !== 'https:')
+    || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+    || parsed.origin !== configured.origin
+  ) {
+    return invalidProviderVideoUrl()
+  }
+  return parsed
+}
+
+export async function readProviderVideoBytes(
+  response: Response,
+  maxBytes = MAX_VIDEO_BYTES,
+  abort?: () => void,
+  signal?: AbortSignal,
+): Promise<Buffer> {
+  if (!response.ok) throw providerVideoFetchFailure(response.status)
+
+  const declaredLength = Number(response.headers.get('content-length'))
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    abort?.()
+    throw new DirectorVideoTerminalError('invalid_provider_result', 'provider video exceeds maximum size')
+  }
+  if (!response.body) {
+    throw new DirectorVideoCompletionPersistenceError(
+      'provider_fetch_retryable',
+      new Error('provider video response has no body'),
+    )
+  }
+
+  const reader = response.body.getReader()
+  const cancelBody = () => {
+    void reader.cancel().catch(() => {
+      // The timeout error remains authoritative after cancellation failure.
+    })
+  }
+  signal?.addEventListener('abort', cancelBody, { once: true })
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) {
+        abort?.()
+        cancelBody()
+        throw new DirectorVideoTerminalError(
+          'invalid_provider_result',
+          'provider video exceeds maximum size',
+        )
+      }
+      chunks.push(value)
+    }
+  } catch (error) {
+    if (error instanceof DirectorVideoTerminalError) throw error
+    throw new DirectorVideoCompletionPersistenceError('provider_fetch_retryable', error)
+  } finally {
+    signal?.removeEventListener('abort', cancelBody)
+    reader.releaseLock()
+  }
+  if (signal?.aborted) {
+    throw new DirectorVideoCompletionPersistenceError(
+      'provider_fetch_retryable',
+      new Error('provider video download timed out'),
+    )
+  }
+  return Buffer.concat(chunks, total)
+}
+
+async function downloadProviderVideo(videoUrl: string, provider: GenerationJob['provider']): Promise<{ response: Response; bytes: Buffer }> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), VIDEO_DOWNLOAD_TIMEOUT_MS)
+  let currentUrl = assertValidProviderVideoUrl(videoUrl, provider)
+  try {
+    for (let redirects = 0; redirects <= MAX_VIDEO_REDIRECTS; redirects += 1) {
+      let response: Response
+      try {
+        response = await fetch(currentUrl, { redirect: 'manual', signal: controller.signal })
+      } catch (error) {
+        throw new DirectorVideoCompletionPersistenceError('provider_fetch_retryable', error)
+      }
+      if (response.status < 300 || response.status >= 400) {
+        try {
+          return {
+            response,
+            bytes: await readProviderVideoBytes(
+              response,
+              MAX_VIDEO_BYTES,
+              () => controller.abort(),
+              controller.signal,
+            ),
+          }
+        } finally {
+          if (!response.ok) await response.body?.cancel().catch(() => {})
+        }
+      }
+      const location = response.headers.get('location')
+      if (!location || redirects === MAX_VIDEO_REDIRECTS) {
+        await response.body?.cancel().catch(() => {})
+        throw new DirectorVideoTerminalError('invalid_provider_result', 'provider video redirect is invalid')
+      }
+      await response.body?.cancel().catch(() => {})
+      currentUrl = assertValidProviderVideoUrl(new URL(location, currentUrl).toString(), provider)
+    }
+    throw new DirectorVideoTerminalError('invalid_provider_result', 'provider video redirect is invalid')
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+
 /** 캐릭터 뷰 이미지 영속화 → 저장된 publicUrl 반환. */
 export async function finalizeCharacterViewJob(
   job: GenerationJob,
   falImageUrl: string,
+  falPayload?: unknown,
 ): Promise<string> {
   const { workspaceId, characterId, column, view } = job.target
   if (!workspaceId || !characterId || !column) {
     throw new Error('character_view job target missing workspaceId/characterId/column')
   }
+  await recordFalResponseSnapshot(job, falPayload)
 
   const imgRes = await fetch(falImageUrl)
   if (!imgRes.ok) throw new Error(`fal image fetch failed: ${imgRes.status}`)
@@ -263,11 +778,13 @@ async function recordLocationImageCandidate(
 export async function finalizeWorldShotJob(
   job: GenerationJob,
   falImageUrl: string,
+  falPayload?: unknown,
 ): Promise<string> {
   const { workspaceId, locationId, column } = job.target
   if (!workspaceId || !locationId || !column) {
     throw new Error('world_shot job target missing workspaceId/locationId/column')
   }
+  await recordFalResponseSnapshot(job, falPayload)
   const path = `${workspaceId}/${job.project_id}/locations/${storageKeySegment(locationId)}_${column}.png`
   const publicUrl = await uploadImageFromUrl(falImageUrl, path)
 
@@ -288,11 +805,13 @@ export async function finalizeWorldShotJob(
 export async function finalizeShotStoryboardJob(
   job: GenerationJob,
   falImageUrl: string,
+  falPayload?: unknown,
 ): Promise<string> {
   const { workspaceId, writerShotId } = job.target
   if (!workspaceId || !writerShotId) {
     throw new Error('shot_storyboard job target missing workspaceId/writerShotId')
   }
+  await recordFalResponseSnapshot(job, falPayload)
   const path = `${workspaceId}/${job.project_id}/shots/${storageKeySegment(writerShotId)}_storyboard_image.png`
   const publicUrl = await uploadImageFromUrl(falImageUrl, path)
 
@@ -319,11 +838,13 @@ export async function finalizeShotStoryboardJob(
 export async function finalizeShotRoughStoryboardJob(
   job: GenerationJob,
   falImageUrl: string,
+  falPayload?: unknown,
 ): Promise<string> {
   const { workspaceId, writerShotId } = job.target
   if (!workspaceId || !writerShotId) {
     throw new Error('shot_rough_storyboard job target missing workspaceId/writerShotId')
   }
+  await recordFalResponseSnapshot(job, falPayload)
   const path = `${workspaceId}/${job.project_id}/shots/${storageKeySegment(writerShotId)}_rough_storyboard.png`
   // klein 모더레이션 검은 이미지(~2KB) 방어 — 정상 러프 스케치는 수백 KB. 작으면 throw → failed →
   //   재생성 시 safeMode(폭력 동사·구도 레이어 제외)로 자동 우회. (shot_9 검은 화면 버그, 2026-06-25)
@@ -348,11 +869,41 @@ export async function finalizeShotRoughStoryboardJob(
   return publicUrl
 }
 
-/** 샷 영상 URL 영속화. writerShotId 있으면 shots.video_url 갱신. */
+/** Persist a v2 take immutably; retain legacy shot_video behavior for unlinked jobs. */
 export async function finalizeShotVideoJob(
   job: GenerationJob,
   videoUrl: string,
+  falPayload?: unknown,
 ): Promise<string> {
+  await recordFalResponseSnapshot(job, falPayload)
+  if (job.video_clip_id) {
+    const workspaceId = job.target.workspaceId
+    if (!workspaceId) throw new DirectorVideoTerminalError('database_state', 'linked shot_video job target missing workspaceId')
+    const { response, bytes } = await downloadProviderVideo(videoUrl, job.provider)
+    assertValidVideoResponse(response, bytes)
+    const path = `${workspaceId}/${job.project_id}/videos/${job.video_clip_id}/${job.id}.mp4`
+    try {
+      await uploadImmutableObject(path, bytes, 'video/mp4')
+    } catch (error) {
+      if (error instanceof ImmutableObjectMismatchError) {
+        throw new DirectorVideoTerminalError('storage_conflict', error.message)
+      }
+      const terminalError = storageTerminalPersistenceError(error)
+      if (terminalError) throw terminalError
+      throw new DirectorVideoCompletionPersistenceError('storage_retryable', error)
+    }
+    const publicUrl = supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl
+    if (!publicUrl) throw new DirectorVideoTerminalError('database_state', `video public URL derivation failed: ${path}`)
+    try {
+      await completeDirectorVideoAttempt(job.project_id, job.id, job.video_clip_id, publicUrl, path)
+    } catch (error) {
+      const terminalError = databaseTerminalPersistenceError(error)
+      if (terminalError) throw terminalError
+      throw new DirectorVideoCompletionPersistenceError('database_retryable', error)
+    }
+    return publicUrl
+  }
+
   const { writerShotId } = job.target
   if (writerShotId) {
     const { error } = await supabaseAdmin
@@ -364,4 +915,33 @@ export async function finalizeShotVideoJob(
   }
   await completeGenerationJob(job.id, videoUrl)
   return videoUrl
+}
+export type FinalizeProviderResult =
+  | { media: 'image'; url: string; payload?: unknown }
+  | { media: 'video'; url: string; payload?: unknown }
+
+function assertNever(value: never): never {
+  throw new Error(`unsupported generation job kind: ${String(value)}`)
+}
+
+export async function finalizeGenerationJob(job: GenerationJob, result: FinalizeProviderResult): Promise<string> {
+  switch (job.kind) {
+    case 'character_view':
+      if (result.media !== 'image') throw new Error('character_view requires an image result')
+      return finalizeCharacterViewJob(job, result.url, result.payload)
+    case 'world_shot':
+      if (result.media !== 'image') throw new Error('world_shot requires an image result')
+      return finalizeWorldShotJob(job, result.url, result.payload)
+    case 'shot_storyboard':
+      if (result.media !== 'image') throw new Error('shot_storyboard requires an image result')
+      return finalizeShotStoryboardJob(job, result.url, result.payload)
+    case 'shot_rough_storyboard':
+      if (result.media !== 'image') throw new Error('shot_rough_storyboard requires an image result')
+      return finalizeShotRoughStoryboardJob(job, result.url, result.payload)
+    case 'shot_video':
+      if (result.media !== 'video') throw new Error('shot_video requires a video result')
+      return finalizeShotVideoJob(job, result.url, result.payload)
+    default:
+      return assertNever(job.kind)
+  }
 }

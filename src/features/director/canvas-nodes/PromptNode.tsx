@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 /**
  * Higgsfield식 분리 프롬프트 노드.
  * 우측 출력 핸들(id="right")을 Shot 노드의 T 입력(id="prompt")에 연결하면
- * store.wirePromptToShot이 Shot.prompt를 이 노드 text로 동기한다.
+ * store.wirePromptToShot이 Shot.promptOverride를 이 노드 text로 동기한다.
  */
 function PromptNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
   if (!isPromptData(data)) return null

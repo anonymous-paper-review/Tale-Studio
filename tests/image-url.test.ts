@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { toThumbUrl, thumbUrl, imageThumbsEnabled } from '@/lib/image-url'
+import { describe, it, expect, vi } from 'vitest'
+import { toThumbUrl, thumbUrl } from '@/lib/image-url'
 
 const PUBLIC =
   'https://abc.supabase.co/storage/v1/object/public/media/proj/shot_1_storyboard.png'
@@ -33,8 +33,12 @@ describe('thumbUrl', () => {
     expect(thumbUrl('')).toBeUndefined()
   })
 
-  it('passes through the original when the thumbs flag is disabled (test env default)', () => {
-    expect(imageThumbsEnabled).toBe(false)
-    expect(thumbUrl(PUBLIC)).toBe(PUBLIC)
+  it('passes through the original when the thumbs flag is disabled', async () => {
+    vi.stubEnv('NEXT_PUBLIC_IMAGE_THUMBS', '0')
+    vi.resetModules()
+    const disabledModule = await import('@/lib/image-url')
+    expect(disabledModule.imageThumbsEnabled).toBe(false)
+    expect(disabledModule.thumbUrl(PUBLIC)).toBe(PUBLIC)
+    vi.unstubAllEnvs()
   })
 })

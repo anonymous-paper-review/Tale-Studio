@@ -408,6 +408,8 @@ describe('style-anchor route integration', () => {
       reference_image_urls: [ANCHOR_URL, 'a', 'b'],
       model: DEFAULT_EDIT_IMAGE_MODEL,
       style_anchor_key: ANCHOR_KEY,
+      fal_request: {},
+      ignored_fields: [],
     })
   })
 

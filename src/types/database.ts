@@ -175,6 +175,8 @@ export type Database = {
           kind: string
           status: string
           target: Json
+          video_clip_id: string | null
+          idempotency_key: string | null
           result_url: string | null
           error: string | null
           created_at: string
@@ -184,6 +186,7 @@ export type Database = {
           workspace_id: string | null
           provider: string
           input_snapshot: Json
+          response_snapshot: Json | null
           submitted_at: string | null
           completed_at: string | null
           attempts: number
@@ -197,6 +200,8 @@ export type Database = {
           kind: string
           status?: string
           target?: Json
+          video_clip_id?: string | null
+          idempotency_key?: string | null
           result_url?: string | null
           error?: string | null
           created_at?: string
@@ -206,6 +211,7 @@ export type Database = {
           workspace_id?: string | null
           provider?: string
           input_snapshot?: Json
+          response_snapshot?: Json | null
           submitted_at?: string | null
           completed_at?: string | null
           attempts?: number
@@ -219,6 +225,8 @@ export type Database = {
           kind?: string
           status?: string
           target?: Json
+          video_clip_id?: string | null
+          idempotency_key?: string | null
           result_url?: string | null
           error?: string | null
           created_at?: string
@@ -228,6 +236,7 @@ export type Database = {
           workspace_id?: string | null
           provider?: string
           input_snapshot?: Json
+          response_snapshot?: Json | null
           submitted_at?: string | null
           completed_at?: string | null
           attempts?: number
@@ -240,6 +249,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generation_jobs_video_clip_project_fkey"
+            columns: ["video_clip_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "video_clips"
+            referencedColumns: ["id", "project_id"]
           },
           {
             foreignKeyName: "generation_jobs_workspace_id_fkey"
@@ -652,6 +668,12 @@ export type Database = {
           is_final: boolean
           take_label: string | null
           override: Json | null
+          take_number: number
+          deleted_at: string | null
+          last_attempt_status: string | null
+          last_attempt_job_id: string | null
+          last_attempt_error: string | null
+          last_attempt_at: string | null
         }
         Insert: {
           id?: string
@@ -669,6 +691,12 @@ export type Database = {
           is_final?: boolean
           take_label?: string | null
           override?: Json | null
+          take_number?: number
+          deleted_at?: string | null
+          last_attempt_status?: string | null
+          last_attempt_job_id?: string | null
+          last_attempt_error?: string | null
+          last_attempt_at?: string | null
         }
         Update: {
           id?: string
@@ -686,6 +714,12 @@ export type Database = {
           is_final?: boolean
           take_label?: string | null
           override?: Json | null
+          take_number?: number
+          deleted_at?: string | null
+          last_attempt_status?: string | null
+          last_attempt_job_id?: string | null
+          last_attempt_error?: string | null
+          last_attempt_at?: string | null
         }
         Relationships: [
           {
@@ -780,7 +814,85 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      attach_director_video_provider_request: {
+        Args: {
+          p_project_id: string
+          p_job_id: string
+          p_provider_request_id: string
+          p_provider?: string | null
+          p_model?: string | null
+        }
+        Returns: undefined
+      }
+      complete_director_video_attempt: {
+        Args: {
+          p_project_id: string
+          p_job_id: string
+          p_video_clip_id: string
+          p_result_url: string
+          p_storage_path: string
+        }
+        Returns: undefined
+      }
+      fail_director_video_attempt: {
+        Args: { p_project_id: string; p_job_id: string; p_error: string }
+        Returns: undefined
+      }
+      refresh_director_video_projection: {
+        Args: { p_project_id: string; p_shot_id: string }
+        Returns: undefined
+      }
+      reserve_director_video_regeneration: {
+        Args: {
+          p_project_id: string
+          p_video_clip_id: string
+          p_model: string
+          p_target: Json
+          p_idempotency_key: string
+          p_input_snapshot?: Json
+          p_user_id?: string | null
+          p_workspace_id?: string | null
+          p_provider?: string | null
+          p_actor?: string | null
+        }
+        Returns: {
+          video_clip_id: string
+          job_id: string
+          take_number: number
+          replayed: boolean
+        }[]
+      }
+      reserve_director_video_take: {
+        Args: {
+          p_project_id: string
+          p_shot_id: string
+          p_model: string
+          p_target: Json
+          p_idempotency_key: string
+          p_input_snapshot?: Json
+          p_user_id?: string | null
+          p_workspace_id?: string | null
+          p_provider?: string | null
+          p_actor?: string | null
+          p_take_label?: string | null
+          p_override?: Json
+          p_canvas_position?: Json | null
+        }
+        Returns: {
+          video_clip_id: string
+          job_id: string
+          take_number: number
+          replayed: boolean
+        }[]
+      }
+      set_director_video_final: {
+        Args: { p_project_id: string; p_video_clip_id: string; p_final: boolean }
+        Returns: undefined
+      }
+      soft_delete_director_video_take: {
+        Args: { p_project_id: string; p_video_clip_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

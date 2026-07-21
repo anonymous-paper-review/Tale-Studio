@@ -8,6 +8,7 @@ import { BaseNode } from './BaseNode'
 import {
   getChildVideos,
   getShotStage,
+  effectivePrompt,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
 import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
@@ -23,7 +24,9 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const generateStoryboardImage = useDirectorCanvasStore(
     (s) => s.generateStoryboardImage,
   )
-  const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
+  const generateVideoForShot = useDirectorCanvasStore(
+    (s) => s.generateVideoForShot,
+  )
   // 와이어링된 Prompt 노드 text (Higgsfield "따로 뺀 프롬프트" 칩)
   const wiredPromptText = useDirectorCanvasStore((s) => {
     const p = s.nodes.find(
@@ -51,6 +54,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       : (data.storyboardImage?.url ?? null)
 
   const failed = data.storyboardImage?.status === 'failed'
+  const prompt = effectivePrompt(data)
 
   return (
     <>
@@ -101,7 +105,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         }
         canBranch
         onBranch={() => {
-          addVideoTake(id)
+          void generateVideoForShot(id)
         }}
       >
         {/* Prompt 노드 와이어링용 T 입력 핸들 (좌측) */}
@@ -113,9 +117,9 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           style={{ top: 64 }}
         />
 
-        {data.prompt && (
+        {prompt && (
           <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-            {data.prompt}
+            {prompt}
           </p>
         )}
 
@@ -130,7 +134,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             {/* 호버 시 디밍 + 생성 정보(프롬프트/모델/따로 뺀 프롬프트 칩) */}
             <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-2 opacity-0 transition-opacity group-hover/img:opacity-100">
               <p className="line-clamp-3 text-[10px] leading-tight text-foreground">
-                {data.prompt || '(프롬프트 없음)'}
+                {prompt || '(프롬프트 없음)'}
               </p>
               <div className="flex flex-wrap items-center gap-1">
                 <span className="rounded-sm bg-background/80 px-1 font-mono text-[9px] text-muted-foreground">

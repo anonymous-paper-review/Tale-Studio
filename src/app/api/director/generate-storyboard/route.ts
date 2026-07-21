@@ -12,6 +12,7 @@ import { createGenerationJob } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { applyStyleAnchor, resolveStyleAnchorByKey, type AnchorableSubmit } from '@/lib/style-anchor'
+import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -60,10 +61,11 @@ export async function POST(req: Request) {
     const mode = callerRefs ? 'multiref' : 'single'
     const finalOpts = anchor ? applyStyleAnchor(anchor, baseOpts, mode) : baseOpts
 
-    const { request_id, model } = await falImageSubmit({
+    const { request_id, model, fal_request } = await falImageSubmit({
       ...finalOpts,
       webhookUrl: resolveWebhookUrl(),
     })
+    const falCapture = buildBestEffortFalRequestCapturePatch(fal_request, model)
 
     const job = await createGenerationJob({
       projectId,
@@ -79,6 +81,7 @@ export async function POST(req: Request) {
         reference_image_urls: finalOpts.reference_image_urls,
         ...(finalOpts.model ? { model: finalOpts.model } : {}),
         style_anchor_key: anchor?.key ?? null,
+        ...falCapture,
       },
       target: { workspaceId: project.workspace_id, writerShotId },
     })

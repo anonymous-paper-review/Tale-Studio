@@ -48,6 +48,7 @@ export async function GET(
       resultUrl: job.result_url,
       error: job.error,
       kind: job.kind,
+      videoClipId: job.video_clip_id,
     },
   })
 }

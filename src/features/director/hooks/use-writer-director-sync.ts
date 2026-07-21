@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
@@ -9,12 +9,96 @@ import {
   nextScenePosition,
   nextShotPosition,
 } from '@/stores/director-store'
-import { isShotData } from '@/types/director'
+import { isShotData, type ShotNodeData } from '@/types/director'
 import {
   isDefaultCamera,
   isDefaultLighting,
 } from '@/lib/writer/shot-config-from-design'
 import type { CameraConfig, LightingConfig } from '@/types/shot'
+
+type WriterPromptSource = {
+  prompt?: string | null
+  actionDescription?: string | null
+}
+
+export function writerDirectorPromptSource(shot: WriterPromptSource): string {
+  return shot.prompt || shot.actionDescription || ''
+}
+
+function normalizePromptForMigration(value: string | null | undefined): string {
+  return (value ?? '').trim()
+}
+
+export function buildWriterDirectorPromptPatch(
+  data: Pick<ShotNodeData, 'prompt' | 'promptOverride' | 'promptMigratedV2'>,
+  sourcePrompt: string,
+): Partial<ShotNodeData> {
+  const patch: Partial<ShotNodeData> = { derivedPrompt: sourcePrompt }
+
+  if (data.promptMigratedV2) return patch
+
+  if (
+    data.promptOverride === undefined &&
+    normalizePromptForMigration(data.prompt) !== normalizePromptForMigration(sourcePrompt)
+  ) {
+    patch.promptOverride = data.prompt ?? ''
+  }
+  patch.promptMigratedV2 = true
+
+  return patch
+}
+let historySuppressionRuns = 0
+
+function suppressDirectorHistory() {
+  historySuppressionRuns += 1
+  useDirectorCanvasStore.setState({ _historySuppressed: true })
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    historySuppressionRuns = Math.max(0, historySuppressionRuns - 1)
+    if (historySuppressionRuns === 0) {
+      useDirectorCanvasStore.setState({ _historySuppressed: false })
+    }
+  }
+}
+
+async function retrySyncOperation(operation: () => Promise<void>, label: string) {
+  let error: unknown
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await operation()
+      return
+    } catch (caught) {
+      error = caught
+      console.error(`[director] ${label} failed (attempt ${attempt + 1}/2)`, caught)
+    }
+  }
+  throw error
+}
+// Concurrent Director mounts share only pending work. Successful hydration belongs to
+// each hook instance so a later unmount/remount reads the current canonical state.
+const videoTakeHydrationPromises = new Map<string, Promise<void>>()
+
+function hydrateVideoTakes(projectId: string): Promise<void> {
+  const inFlight = videoTakeHydrationPromises.get(projectId)
+  if (inFlight) return inFlight
+
+  const promise = retrySyncOperation(
+    () => useDirectorCanvasStore.getState().hydrateFromDb(projectId),
+    `failed to hydrate video takes for ${projectId}`,
+  )
+  videoTakeHydrationPromises.set(projectId, promise)
+  void promise.then(
+    () => undefined,
+    () => undefined,
+  ).finally(() => {
+    if (videoTakeHydrationPromises.get(projectId) === promise) {
+      videoTakeHydrationPromises.delete(projectId)
+    }
+  })
+  return promise
+}
 
 /**
  * Writer → Director 초기 셋업.
@@ -24,9 +108,9 @@ import type { CameraConfig, LightingConfig } from '@/types/shot'
  * → 이렇게 채워진 characterAssetIds/worldAssetIds가 스토리보드 생성(I2I)의
  *   레퍼런스 이미지로 들어간다 (resolveShotAssetImages).
  *
- * MVP: 단방향 create-only 동기화. writerSceneId/writerShotId로 이미 존재하는
- * 노드는 건너뛰므로 진입할 때마다 안전하게 재실행 가능(중복 생성 X, 사용자 편집 보존).
- * 양방향 sync / 수정 전파 / cascade 삭제는 후속(§8 전체).
+ * MVP: 단방향 sync. writerSceneId/writerShotId 중복 생성은 막고, 기존 Shot의
+ * derivedPrompt/에셋 바인딩은 refresh하되 사용자 promptOverride는 보존한다.
+ * 양방향 sync / cascade 삭제는 후속(§8 전체).
  */
 export function useWriterDirectorSync() {
   const manifest = useWriterStore((s) => s.sceneManifest)
@@ -35,20 +119,48 @@ export function useWriterDirectorSync() {
   // 채우는 경우에도 이 effect가 재실행되어 writer 데이터를 로드하도록 deps에 포함한다.
   const projectId = useProjectStore((s) => s.projectId)
 
-  // (Pass 3 스토리보드 자동생성은 Higgsfield 노드 뷰 전환으로 비활성화됨 — 아래 Pass 3 참고)
-  // Step 2: DB hydrate 가드 (projectId별 1회 호출) — promise를 보관해 매 실행이 완료를 기다린다.
-  // Pass 3의 storyboardImage null 판정이 DB 복원 전 상태를 읽으면 완료된 샷을 전부
-  // 재생성하므로 (재생성 폭주 버그), 호출 여부가 아니라 완료 여부가 동기화 기준이어야 한다.
-  const hydratePromiseRef = useRef<{ projectId: string; promise: Promise<void> } | null>(null)
-  // asset-storage DB hydrate 1회 가드 (projectId별). Pass 2 에셋 바인딩이 이 결과에 의존.
+  // Pass 2.5 hydration is shared across consumers and marked complete only after
+  // success, preventing duplicate calls and stale "hydrated" state after failures.
+  const [retryEpoch, setRetryEpoch] = useState(0)
+  // Video-take hydration is cached only for this mounted Director entry. The
+  // module-level map above still deduplicates concurrent mounts.
+  const videoTakeHydratedProjectIdRef = useRef<string | null>(null)
+  const retryTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+  const retryAttemptsRef = useRef(new Map<string, number>())
+  // asset-storage DB hydrate is committed only after success so a transient failure retries.
   const assetHydratedProjectIdRef = useRef<string | null>(null)
-  // writer-store DB 로드 1회 가드 (projectId별). director 직행/새로고침 대응.
+  const assetHydratePromiseRef = useRef<{ projectId: string; promise: Promise<void> } | null>(null)
+  // writer-store DB load is committed only after success so a transient failure retries.
   const writerLoadedProjectIdRef = useRef<string | null>(null)
+  const writerLoadPromiseRef = useRef<{ projectId: string; promise: Promise<void> } | null>(null)
   // shotDesign 파생 camera/lighting 1회 가드 (projectId별). Option B: Director 진입 시 자동 채움.
   const shotConfigsRef = useRef<{
     projectId: string
     configs: Record<string, { camera_config: CameraConfig; lighting_config: LightingConfig }>
   } | null>(null)
+  const shotConfigPromiseRef = useRef<{ projectId: string; promise: Promise<void> } | null>(null)
+  const scheduleRetry = (retryProjectId: string, label: string) => {
+    if (useProjectStore.getState().projectId !== retryProjectId) return
+    if (retryTimersRef.current.has(retryProjectId)) return
+    const attempts = retryAttemptsRef.current.get(retryProjectId) ?? 0
+    if (attempts >= 3) {
+      console.error(`[director] ${label} retry budget exhausted for ${retryProjectId}`)
+      return
+    }
+    retryAttemptsRef.current.set(retryProjectId, attempts + 1)
+    const timer = setTimeout(() => {
+      retryTimersRef.current.delete(retryProjectId)
+      if (useProjectStore.getState().projectId === retryProjectId) {
+        setRetryEpoch((epoch) => epoch + 1)
+      }
+    }, 1000 * (attempts + 1))
+    retryTimersRef.current.set(retryProjectId, timer)
+  }
+
+  useEffect(() => () => {
+    for (const timer of retryTimersRef.current.values()) clearTimeout(timer)
+    retryTimersRef.current.clear()
+  }, [projectId])
 
   useEffect(() => {
     // Writer 데이터(sceneManifest/shots)는 writer-store.loadProject()로만 채워지는데,
@@ -57,16 +169,35 @@ export function useWriterDirectorSync() {
     // 이 effect가 재실행되어 아래 Pass들이 진행된다.
     if (!manifest) {
       const pid = useProjectStore.getState().projectId
-      if (pid && writerLoadedProjectIdRef.current !== pid) {
-        writerLoadedProjectIdRef.current = pid
-        void useWriterStore.getState().loadProject()
+      if (pid && writerLoadedProjectIdRef.current !== pid && writerLoadPromiseRef.current?.projectId !== pid) {
+        const promise = retrySyncOperation(
+          () => useWriterStore.getState().loadProject(),
+          `failed to load Writer data for ${pid}`,
+        )
+        writerLoadPromiseRef.current = { projectId: pid, promise }
+        void promise.then(
+          () => {
+            if (writerLoadPromiseRef.current?.promise === promise) {
+              writerLoadedProjectIdRef.current = pid
+              writerLoadPromiseRef.current = null
+              retryAttemptsRef.current.delete(pid)
+            }
+          },
+          (error) => {
+            if (writerLoadPromiseRef.current?.promise === promise) {
+              writerLoadPromiseRef.current = null
+            }
+            console.error(`[director] Writer data remains unavailable for ${pid}; sync will retry`, error)
+            scheduleRetry(pid, 'Writer data load')
+          },
+        )
       }
       return
     }
     let cancelled = false
 
     // sync 셋업(addSceneNode/addShotNode 등)은 undo 히스토리에서 제외 (시스템 변경).
-    useDirectorCanvasStore.setState({ _historySuppressed: true })
+    const releaseHistorySuppression = suppressDirectorHistory()
     void (async () => {
     // ── Pass 0: asset-storage DB hydrate (projectId별 1회) ─────────────
     // Director 직행/타브라우저/localStorage 비움에서도 캐릭터·월드 이미지가 채워지도록
@@ -74,8 +205,29 @@ export function useWriterDirectorSync() {
     // 바인딩이 이 등록 결과(assets.getCharacter/getWorld)에 의존하므로 먼저 await.
     const assetProjectId = useDirectorCanvasStore.getState().projectId
     if (assetProjectId && assetHydratedProjectIdRef.current !== assetProjectId) {
-      assetHydratedProjectIdRef.current = assetProjectId
-      await useAssetStorageStore.getState().hydrateFromDb(assetProjectId)
+      if (assetHydratePromiseRef.current?.projectId !== assetProjectId) {
+        const promise = retrySyncOperation(
+          () => useAssetStorageStore.getState().hydrateFromDb(assetProjectId),
+          `failed to hydrate Director assets for ${assetProjectId}`,
+        )
+        assetHydratePromiseRef.current = { projectId: assetProjectId, promise }
+      }
+      const pending = assetHydratePromiseRef.current!
+      try {
+        await pending.promise
+        if (assetHydratePromiseRef.current?.promise === pending.promise) {
+          assetHydratedProjectIdRef.current = assetProjectId
+          assetHydratePromiseRef.current = null
+          retryAttemptsRef.current.delete(assetProjectId)
+        }
+      } catch (error) {
+        if (assetHydratePromiseRef.current?.promise === pending.promise) {
+          assetHydratePromiseRef.current = null
+        }
+        console.error(`[director] assets remain unavailable for ${assetProjectId}; sync will retry`, error)
+        scheduleRetry(assetProjectId, 'Director asset hydration')
+        return
+      }
     }
     if (cancelled) return
 
@@ -84,16 +236,39 @@ export function useWriterDirectorSync() {
     // ->shotDesign 에서 6축 config 를 복원해 둔다. 적용은 Pass 2에서 "DB가 DEFAULT일 때만".
     const cfgProjectId = useDirectorCanvasStore.getState().projectId
     if (cfgProjectId && shotConfigsRef.current?.projectId !== cfgProjectId) {
-      try {
-        const res = await fetch('/api/writer/shot-configs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId: cfgProjectId }),
+      if (shotConfigPromiseRef.current?.projectId !== cfgProjectId) {
+        let configs: Record<string, { camera_config: CameraConfig; lighting_config: LightingConfig }> = {}
+        const promise = retrySyncOperation(async () => {
+          const res = await fetch('/api/writer/shot-configs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectId: cfgProjectId }),
+          })
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const json = await res.json()
+          if (!json?.configs || typeof json.configs !== 'object' || Array.isArray(json.configs)) {
+            throw new Error('Invalid shot config response')
+          }
+          configs = json.configs
+        }, `failed to load shot configs for ${cfgProjectId}`).then(() => {
+          if (shotConfigPromiseRef.current?.promise === promise) {
+            shotConfigsRef.current = { projectId: cfgProjectId, configs }
+            shotConfigPromiseRef.current = null
+            retryAttemptsRef.current.delete(cfgProjectId)
+          }
         })
-        const json = res.ok ? await res.json() : null
-        shotConfigsRef.current = { projectId: cfgProjectId, configs: json?.configs ?? {} }
-      } catch {
-        shotConfigsRef.current = { projectId: cfgProjectId, configs: {} }
+        shotConfigPromiseRef.current = { projectId: cfgProjectId, promise }
+      }
+      const pending = shotConfigPromiseRef.current!
+      try {
+        await pending.promise
+      } catch (error) {
+        if (shotConfigPromiseRef.current?.promise === pending.promise) {
+          shotConfigPromiseRef.current = null
+        }
+        console.error(`[director] shot configs remain unavailable for ${cfgProjectId}; sync will retry`, error)
+        scheduleRetry(cfgProjectId, 'shot config load')
+        return
       }
     }
     if (cancelled) return
@@ -137,18 +312,20 @@ export function useWriterDirectorSync() {
     }
 
     for (const shot of shots) {
+      const sourcePrompt = writerDirectorPromptSource(shot)
       const cur = useDirectorCanvasStore.getState()
       const existing = cur.nodes.find(
         (n) => isShotData(n.data) && n.data.writerShotId === shot.shotId,
       )
       if (existing) {
-        // 이미 있는 shot은 사용자 편집(prompt/카메라 등)을 보존하되, 파생 필드인
-        // 에셋 바인딩만 재계산해 갱신한다. persist 캐시에 빈 바인딩으로 굳은 노드가
-        // asset-storage hydrate 후에도 안 채워지던 문제 수정 — 값이 바뀔 때만 set(stale 최소).
+        // 이미 있는 shot은 사용자 promptOverride를 보존하되 sync 파생 필드는 refresh한다.
+        // derivedPrompt는 writer prompt/actionDescription에서 매번 갱신하고, legacy prompt는
+        // promptMigratedV2가 없을 때 1회만 derivedPrompt 또는 promptOverride로 이관한다.
         if (isShotData(existing.data)) {
           const { characterAssetIds, worldAssetIds } = resolveAssetIds(shot)
           const d = existing.data
-          const patch: Record<string, unknown> = {}
+          const patch: Partial<ShotNodeData> = {}
+          Object.assign(patch, buildWriterDirectorPromptPatch(d, sourcePrompt))
           if (
             characterAssetIds.join(',') !== d.characterAssetIds.join(',') ||
             worldAssetIds.join(',') !== d.worldAssetIds.join(',')
@@ -179,10 +356,11 @@ export function useWriterDirectorSync() {
       const pos = nextShotPosition(cur, parent.id)
       const id = dir.addShotNode(parent.id, pos, shot.shotId)
 
-      const patch: Record<string, unknown> = {
+      const patch: Partial<ShotNodeData> = {
         writerShotId: shot.shotId,
         // rich 생성 프롬프트 우선(구도·의상·인물 명시) → 없으면 actionDescription 폴백.
-        prompt: shot.prompt || shot.actionDescription || '',
+        derivedPrompt: sourcePrompt,
+        promptMigratedV2: true,
         characterAssetIds,
         worldAssetIds,
         camera:
@@ -207,14 +385,18 @@ export function useWriterDirectorSync() {
     // 완료된 샷 전체를 재생성하던 레이스의 본질 수정. effect가 재실행돼도 같은
     // promise를 기다리므로 "호출 1회 + 진행 중 통과" 구멍이 없다.
     const projectId = useDirectorCanvasStore.getState().projectId
-    if (projectId) {
-      if (hydratePromiseRef.current?.projectId !== projectId) {
-        hydratePromiseRef.current = {
-          projectId,
-          promise: useDirectorCanvasStore.getState().hydrateFromDb(projectId),
+    if (projectId && videoTakeHydratedProjectIdRef.current !== projectId) {
+      try {
+        await hydrateVideoTakes(projectId)
+        if (!cancelled) {
+          videoTakeHydratedProjectIdRef.current = projectId
+          retryAttemptsRef.current.delete(projectId)
         }
+      } catch (error) {
+        console.error(`[director] video takes remain unavailable for ${projectId}; sync will retry`, error)
+        scheduleRetry(projectId, 'video take hydration')
+        return
       }
-      await hydratePromiseRef.current.promise
       if (cancelled) return
     }
 
@@ -231,11 +413,11 @@ export function useWriterDirectorSync() {
     // (advanceShot → generateStoryboardImage)으로만 트리거한다. 재진입 시
     // 완료된 storyboardImage는 Pass 2.5 hydrate로 그대로 복원된다(멱등 보존).
     })().finally(() => {
-      useDirectorCanvasStore.setState({ _historySuppressed: false })
+      releaseHistorySuppression()
     })
 
     return () => {
       cancelled = true
     }
-  }, [manifest, shots, projectId])
+  }, [manifest, shots, projectId, retryEpoch])
 }

@@ -8,48 +8,106 @@
 // 멱등: 호출 전 job.status==='queued' 전제(각 finalize 가 다시 가드). COMPLETED→finalize, FAILED→fail,
 //   그 외(IN_QUEUE/IN_PROGRESS/일시오류)→그대로 두어 다음 폴링/webhook 이 마저 처리.
 import { failGenerationJob, type GenerationJob } from '@/lib/generation-jobs'
+import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
 import { falImageFetch, falVideoFetch } from '@/lib/writer/llm/fal'
 import {
-  finalizeCharacterViewJob,
-  finalizeWorldShotJob,
-  finalizeShotStoryboardJob,
-  finalizeShotRoughStoryboardJob,
-  finalizeShotVideoJob,
+  DirectorVideoCompletionPersistenceError,
+  finalizeGenerationJob,
 } from '@/lib/fal/finalize'
 
-/** queued job 을 FAL 큐 진실로 reconcile — 완료면 finalize, FAL이 FAILED면 fail, 그 외는 그대로(진행중/일시오류). */
-export async function reconcileJobFromFal(job: GenerationJob): Promise<GenerationJob> {
-  try {
-    if (job.kind === 'shot_video') {
-      const r = await falVideoFetch(job.model, job.request_id)
-      if (r.status === 'COMPLETED') {
-        const url = await finalizeShotVideoJob(job, r.url)
-        return { ...job, status: 'completed', result_url: url }
-      }
-      if (r.status === 'FAILED') {
-        await failGenerationJob(job.id, r.error)
-        return { ...job, status: 'failed', error: r.error }
-      }
-    } else {
-      // 이미지 계열 (character_view / world_shot / shot_storyboard / shot_rough_storyboard)
-      const r = await falImageFetch(job.model, job.request_id)
-      if (r.status === 'COMPLETED') {
-        let url: string
-        if (job.kind === 'character_view') url = await finalizeCharacterViewJob(job, r.url)
-        else if (job.kind === 'world_shot') url = await finalizeWorldShotJob(job, r.url)
-        else if (job.kind === 'shot_rough_storyboard')
-          url = await finalizeShotRoughStoryboardJob(job, r.url)
-        else url = await finalizeShotStoryboardJob(job, r.url)
-        return { ...job, status: 'completed', result_url: url }
-      }
-      if (r.status === 'FAILED') {
-        await failGenerationJob(job.id, r.error)
-        return { ...job, status: 'failed', error: r.error }
-      }
-    }
-  } catch (e) {
-    // 일시 오류 → queued 유지, 다음 polling/webhook 에서 재시도
-    console.error('[fal/reconcile] failed:', e instanceof Error ? e.message : e)
+async function terminalizeJob(job: GenerationJob, message: string): Promise<GenerationJob> {
+  if (job.kind === 'shot_video' && job.video_clip_id) {
+    await markDirectorVideoAttemptFailed(job.project_id, job.id, message)
+  } else {
+    await failGenerationJob(job.id, message)
   }
-  return job
+  return { ...job, status: 'failed', error: message }
+}
+
+async function completeOrTerminalizeJob(
+  job: GenerationJob,
+  result: Parameters<typeof finalizeGenerationJob>[1] | (() => Parameters<typeof finalizeGenerationJob>[1]),
+): Promise<GenerationJob> {
+  try {
+    const url = await finalizeGenerationJob(job, typeof result === 'function' ? result() : result)
+    return { ...job, status: 'completed', result_url: url }
+  } catch (error) {
+    if (error instanceof DirectorVideoCompletionPersistenceError) {
+      console.error('[fal/reconcile] video persistence failed; retaining queued attempt:', error.message)
+      throw error
+    }
+    const message = error instanceof Error ? error.message : String(error)
+    return terminalizeJob(job, message)
+  }
+}
+
+function resolveLocalVideoResultUrl(job: GenerationJob): string {
+  try {
+    const result = new URL(job.request_id)
+    const configured = new URL(process.env.TAILSCALE_VIDEO_API_URL ?? '')
+    if (
+      result.username
+      || result.password
+      || configured.username
+      || configured.password
+      || (result.protocol !== 'http:' && result.protocol !== 'https:')
+      || (configured.protocol !== 'http:' && configured.protocol !== 'https:')
+      || result.origin !== configured.origin
+    ) throw new Error('untrusted local video result URL')
+    return result.toString()
+  } catch {
+    throw new Error('local video job has no valid result URL')
+  }
+}
+
+function isPermanentProviderLookupFailure(error: unknown): boolean {
+  const statusValue = typeof error === 'object' && error !== null
+    ? (error as { status?: unknown; statusCode?: unknown }).status
+      ?? (error as { statusCode?: unknown }).statusCode
+    : undefined
+  const status = typeof statusValue === 'number'
+    ? statusValue
+    : typeof statusValue === 'string' ? Number(statusValue) : undefined
+  return typeof status === 'number' && Number.isFinite(status) && status >= 400 && status < 500 && status !== 408 && status !== 425 && status !== 429
+}
+
+/** queued job을 persisted provider의 진실로 reconcile한다. Provider 조회 오류만 queued로 남긴다. */
+export async function reconcileJobFromFal(job: GenerationJob): Promise<GenerationJob> {
+  if (job.request_id.startsWith('reserved:')) return job
+
+  if (job.provider === 'local') {
+    if (job.kind !== 'shot_video') return job
+    return completeOrTerminalizeJob(job, () => ({
+      media: 'video',
+      url: resolveLocalVideoResultUrl(job),
+    }))
+  }
+
+  let result: Awaited<ReturnType<typeof falImageFetch | typeof falVideoFetch>>
+  try {
+    result = job.kind === 'shot_video'
+      ? await falVideoFetch(job.model, job.request_id)
+      : await falImageFetch(job.model, job.request_id)
+  } catch (error) {
+    if (isPermanentProviderLookupFailure(error)) {
+      const message = error instanceof Error ? error.message : String(error)
+      return terminalizeJob(job, message)
+    }
+    console.error('[fal/reconcile] transient provider fetch failed:', error instanceof Error ? error.message : error)
+    return job
+  }
+
+  if (result.status === 'IN_QUEUE' || result.status === 'IN_PROGRESS') return job
+
+  if (result.status === 'FAILED') {
+    return terminalizeJob(job, result.error)
+  }
+  if (result.status !== 'COMPLETED') return job
+
+  return completeOrTerminalizeJob(
+    job,
+    job.kind === 'shot_video'
+      ? { media: 'video', url: result.url, payload: result.raw }
+      : { media: 'image', url: result.url, payload: result.raw },
+  )
 }

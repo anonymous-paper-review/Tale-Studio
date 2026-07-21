@@ -51,6 +51,12 @@ export interface FalFetchFailed {
 export type FalImageFetchResult = FalFetchPending | FalImageFetchSuccess | FalFetchFailed;
 export type FalVideoFetchResult = FalFetchPending | FalVideoFetchSuccess | FalFetchFailed;
 
+export interface FalSubmitReceipt {
+  request_id: string;
+  model: string;
+  fal_request: Record<string, unknown>;
+}
+
 /**
  * fal 클라이언트 에러에서 진단 가능한 상세(status + 본문)를 뽑는다.
  *   "Forbidden"(HTTP status text)만으론 원인(잔액/모델권한/OpenAI org 인증/레이트리밋)을 구분 못 하므로,
@@ -186,7 +192,7 @@ function extractImageUrlFromData(raw: unknown): { url: string; width?: number; h
 /** submit only — request_id 반환 즉시 리턴. polling은 별도. */
 export async function falImageSubmit(
   opts: FalImageOptions,
-): Promise<{ request_id: string; model: string }> {
+): Promise<FalSubmitReceipt> {
   if (!apiKey) throw new Error('FAL_KEY not set');
   const model = resolveImageModel(opts);
   const input = buildFalImageInput(opts, model);
@@ -196,7 +202,7 @@ export async function falImageSubmit(
         fal.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
       'fal-image-submit',
     );
-    return { request_id, model };
+    return { request_id, model, fal_request: input };
   } catch (e) {
     // fal 실패 상세를 표면화 — 라우트(500 body.error)→client(✗ failed)까지 진짜 이유가 전파된다.
     const detail = falErrorDetail(e);
@@ -356,7 +362,7 @@ function extractVideoUrlFromData(raw: unknown): { url: string; duration?: number
 /** submit only */
 export async function falVideoSubmit(
   opts: FalVideoOptions,
-): Promise<{ request_id: string; model: string }> {
+): Promise<FalSubmitReceipt> {
   if (!apiKey) throw new Error('FAL_KEY not set');
   const model = opts.model ?? DEFAULT_VIDEO_MODEL;
   const input = buildFalVideoInput(opts, model);
@@ -365,7 +371,7 @@ export async function falVideoSubmit(
       fal.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
     'fal-video-submit',
   );
-  return { request_id, model };
+  return { request_id, model, fal_request: input };
 }
 
 /** fetch — fal queue status + result. */

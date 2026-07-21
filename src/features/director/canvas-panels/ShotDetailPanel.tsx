@@ -1,14 +1,14 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Bookmark, Images, Loader2, RefreshCw, Trash2, Upload, X } from 'lucide-react'
+import { Bookmark, Film, Images, Loader2, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HoverBeam } from '@/components/hover-beam'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import { useDirectorCanvasStore } from '@/stores/director-store'
+import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { usePresetStorageStore } from '@/stores/preset-storage-store'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
@@ -35,8 +35,8 @@ const MODEL_ORDER: VideoModelKey[] = [
 
 export function ShotDetailPanel({ nodeId, data }: Props) {
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
-  const generateStoryboardImage = useDirectorCanvasStore(
-    (s) => s.generateStoryboardImage,
+  const generateVideoForShot = useDirectorCanvasStore(
+    (s) => s.generateVideoForShot,
   )
   const openDeleteConfirm = useDirectorCanvasStore(
     (s) => s.openDeleteConfirm,
@@ -55,11 +55,12 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
     [worldRecords, projectId],
   )
 
-  const isGenerating = data.storyboardImage?.status === 'generating'
-  const generationError =
-    data.storyboardImage?.status === 'failed'
-      ? data.storyboardImage.errorMessage
-      : null
+  const isGenerating = useDirectorCanvasStore(
+    (s) => !!s.generatingNodeIds[nodeId],
+  )
+  const generationError = useDirectorCanvasStore(
+    (s) => s.generationErrors[nodeId],
+  )
 
   const toggleCharacter = (id: string) => {
     const next = data.characterAssetIds.includes(id)
@@ -138,9 +139,9 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
         <Field label="프롬프트 (영상 생성용)">
           <HoverBeam>
             <Textarea
-              value={data.prompt}
+              value={effectivePrompt(data)}
               onChange={(e) =>
-                updateNodeData<'shot'>(nodeId, { prompt: e.target.value })
+                updateNodeData<'shot'>(nodeId, { promptOverride: e.target.value })
               }
               rows={4}
               placeholder="이 샷에서 일어나는 액션, 분위기, 카메라 의도 등"
@@ -221,8 +222,8 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
                 <button
                   type="button"
                   onClick={() => handleRemoveRef(img.id)}
-                  className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-                  aria-label="Remove"
+                  className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+                  aria-label="참고 이미지 삭제"
                 >
                   <X className="size-3 text-white" />
                 </button>
@@ -233,7 +234,8 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
               <input
                 type="file"
                 accept="image/*"
-                className="hidden"
+                className="sr-only"
+                aria-label="참고 이미지 업로드"
                 onChange={(e) => {
                   const file = e.target.files?.[0]
                   if (file) handleAddReferenceImage(file)
@@ -246,6 +248,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
               onClick={() => setInventoryPickerOpen(true)}
               className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-md border border-dashed border-border text-muted-foreground hover:bg-accent"
               title="인벤토리에서 선택"
+              aria-label="인벤토리에서 참고 이미지 선택"
             >
               <Images className="size-4" />
             </button>
@@ -358,7 +361,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
         <Button
           type="button"
           size="sm"
-          onClick={() => void generateStoryboardImage(nodeId)}
+          onClick={() => void generateVideoForShot(nodeId)}
           disabled={isGenerating}
           className="w-full gap-1.5"
         >
@@ -369,8 +372,8 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
             </>
           ) : (
             <>
-              <RefreshCw className="size-3.5" />
-              REGENERATE
+              <Film className="size-3.5" />
+              새 Video 테이크 생성
             </>
           )}
         </Button>

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import { collectDirectorArtifacts, type DirectorExportData } from '@/lib/export/director'
+import {
+  compareDirectorVideoTakeOrder,
+  selectHandoffTake,
+  selectLatestAttempt,
+  selectNewestSuccessfulTake,
+  type VideoTakeSelectionRecord,
+} from '@/lib/director-video-take-selection'
 import type { ArtifactFile } from '@/lib/export/types'
 
 const fixtureData: DirectorExportData = {
@@ -73,6 +80,7 @@ const fixtureData: DirectorExportData = {
         errorMessage: 'moderation blocked',
         generatedAt: 0,
       },
+      video_url: 'https://cdn.example.com/shots/stale-projection.mp4',
     },
     {
       scene_id: 'sc_02',
@@ -94,7 +102,7 @@ const fixtureData: DirectorExportData = {
       url: 'https://cdn.example.com/clips/old-completed.mp4',
       status: 'completed',
       is_final: false,
-      created_at: '2026-07-11T10:00:00.000Z',
+      take_number: 1,
     },
     {
       id: 'clip-final',
@@ -102,7 +110,7 @@ const fixtureData: DirectorExportData = {
       url: 'https://cdn.example.com/clips/final.mp4',
       status: 'completed',
       is_final: true,
-      created_at: '2026-07-11T09:00:00.000Z',
+      take_number: 1,
     },
     {
       id: 'clip-completed-old',
@@ -110,7 +118,7 @@ const fixtureData: DirectorExportData = {
       url: 'https://cdn.example.com/clips/completed-old.mp4',
       status: 'completed',
       is_final: false,
-      created_at: '2026-07-11T08:00:00.000Z',
+      take_number: 1,
     },
     {
       id: 'clip-completed-new',
@@ -118,7 +126,7 @@ const fixtureData: DirectorExportData = {
       url: 'https://cdn.example.com/clips/completed-new.mp4',
       status: 'completed',
       is_final: false,
-      created_at: '2026-07-11T11:00:00.000Z',
+      take_number: 2,
     },
     {
       id: 'clip-pending',
@@ -126,15 +134,34 @@ const fixtureData: DirectorExportData = {
       url: 'https://cdn.example.com/clips/pending.mp4',
       status: 'pending',
       is_final: false,
-      created_at: '2026-07-11T12:00:00.000Z',
+      take_number: 3,
     },
     {
       id: 'clip-failed',
       shot_id: 'sh_02_01',
       url: 'https://cdn.example.com/clips/failed.mp4',
       status: 'failed',
+      is_final: true,
+      take_number: 4,
+    },
+    {
+      id: 'clip-newer-generating',
+      shot_id: 'sh_01_01',
+      url: 'https://cdn.example.com/clips/generating.mp4',
+      status: 'generating',
       is_final: false,
-      created_at: '2026-07-11T13:00:00.000Z',
+      take_number: 4,
+      created_at: '2026-07-11T14:00:00.000Z',
+    },
+    {
+      id: 'clip-newer-deleted',
+      shot_id: 'sh_01_02',
+      url: 'https://cdn.example.com/clips/deleted.mp4',
+      status: 'completed',
+      is_final: true,
+      take_number: 3,
+      deleted_at: '2026-07-11T15:00:00.000Z',
+      created_at: '2026-07-11T15:00:00.000Z',
     },
   ],
 }
@@ -156,7 +183,7 @@ describe('collectDirectorArtifacts', () => {
     expect(shotlist).not.toContain('https://cdn.example.com/storyboards/stale-failed.png')
   })
 
-  it('selects final clips first, then latest completed clips, falls back to shots.video_url, and omits pending or failed clips', () => {
+  it('selects a successful live Final over newer takes, otherwise uses the newest successful take, and only uses shots.video_url without relational rows', () => {
     const files = collectDirectorArtifacts(fixtureData)
 
     expect(mediaFile(files, 'director/clips/sc_01-sh_01_01.mp4')?.url).toBe(
@@ -171,6 +198,8 @@ describe('collectDirectorArtifacts', () => {
     )
 
     expect(textFile(files, 'director/shotlist.md')).toContain('생성 중/최종 없음 — 미포함')
+    expect(files.filter((file) => file.path.startsWith('director/clips/'))).toHaveLength(3)
+    expect(files.some((file) => file.url === 'https://cdn.example.com/shots/stale-projection.mp4')).toBe(false)
   })
 
   it('renders a readable native-first shotlist without raw JSON bodies', () => {
@@ -197,6 +226,46 @@ describe('collectDirectorArtifacts', () => {
   })
 })
 
+describe('Director video take selection', () => {
+  function take(overrides: Partial<VideoTakeSelectionRecord> = {}): VideoTakeSelectionRecord {
+    return {
+      id: 'take-1',
+      take_number: 1,
+      created_at: '2026-07-20T00:00:00.000Z',
+      last_attempt_at: '2026-07-20T00:00:00.000Z',
+      deleted_at: null,
+      status: 'completed',
+      url: 'https://cdn.example.com/take.mp4',
+      is_final: false,
+      ...overrides,
+    }
+  }
+
+  it('prefers a usable Final, then the newest usable take while excluding deleted, failed, pending, and whitespace URLs', () => {
+    const takes = [
+      take({ id: 'final', take_number: 1, is_final: true }),
+      take({ id: 'newest', take_number: 2 }),
+      take({ id: 'whitespace', take_number: 6, url: '  ' }),
+      take({ id: 'pending', take_number: 5, status: 'pending' }),
+      take({ id: 'failed', take_number: 4, status: 'failed' }),
+      take({ id: 'deleted', take_number: 3, deleted_at: '2026-07-20T01:00:00.000Z' }),
+    ]
+
+    expect(selectHandoffTake(takes)?.id).toBe('final')
+    expect(selectNewestSuccessfulTake(takes)?.id).toBe('newest')
+    expect(selectHandoffTake(takes.map(item => item.id === 'final' ? { ...item, url: ' ' } : item))?.id).toBe('newest')
+  })
+
+  it('uses deterministic ids to resolve equal take timestamps and attempt timestamps before take ordering', () => {
+    const a = take({ id: 'a', take_number: 2, last_attempt_at: '2026-07-20T02:00:00.000Z' })
+    const z = take({ id: 'z', take_number: 2, last_attempt_at: '2026-07-20T02:00:00.000Z' })
+    const newestAttempt = take({ id: 'older-take-new-attempt', take_number: 1, last_attempt_at: '2026-07-20T03:00:00.000Z' })
+
+    expect(compareDirectorVideoTakeOrder(a, z)).toBeGreaterThan(0)
+    expect(selectNewestSuccessfulTake([a, z])?.id).toBe('z')
+    expect(selectLatestAttempt([a, z, newestAttempt])?.id).toBe('older-take-new-attempt')
+  })
+})
 function textFile(files: ArtifactFile[], path: string): string {
   const file = files.find((candidate) => candidate.path === path)
   expect(file).toMatchObject({ kind: 'text' })

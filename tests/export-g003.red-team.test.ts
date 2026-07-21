@@ -221,7 +221,7 @@ describe('G003 director collector red-team coverage', () => {
     expect(shotlist).not.toContain('https://cdn.test/storyboards/stale-failed.png')
   })
 
-  it('selects clips by final flag first, then latest completed, and omits unusable clips with the Korean note', () => {
+  it('selects successful live Finals before newer takes, otherwise orders successful takes deterministically, and falls back to legacy URLs', () => {
     const files = collectDirectorArtifacts({
       scenes: [scene('sc_clip')],
       shots: [
@@ -233,34 +233,52 @@ describe('G003 director collector red-team coverage', () => {
       ],
       videoClips: [
         clip('clip-final-old', 'sh_final', 'https://cdn.test/clips/final-old.mp4', {
-          status: 'failed',
+          status: 'completed',
           is_final: true,
+          take_number: 1,
           created_at: '2026-07-11T08:00:00.000Z',
         }),
         clip('clip-newer-completed', 'sh_final', 'https://cdn.test/clips/newer-completed.mp4', {
           status: 'completed',
           is_final: false,
+          take_number: 2,
           created_at: '2026-07-11T12:00:00.000Z',
         }),
         clip('clip-completed-old', 'sh_latest_completed', 'https://cdn.test/clips/completed-old.mp4', {
           status: 'completed',
+          take_number: 1,
           created_at: '2026-07-11T09:00:00.000Z',
         }),
         clip('clip-completed-new', 'sh_latest_completed', 'https://cdn.test/clips/completed-new.mp4', {
           status: 'completed',
+          take_number: 2,
+          created_at: '2026-07-11T13:00:00.000Z',
+        }),
+        clip('clip-completed-z', 'sh_latest_completed', 'https://cdn.test/clips/completed-z.mp4', {
+          status: 'completed',
+          take_number: 2,
           created_at: '2026-07-11T13:00:00.000Z',
         }),
         clip('clip-pending', 'sh_pending_failed', 'https://cdn.test/clips/pending.mp4', {
-          status: 'pending',
+          status: 'generating',
+          take_number: 3,
           created_at: '2026-07-11T14:00:00.000Z',
         }),
         clip('clip-failed', 'sh_pending_failed', 'https://cdn.test/clips/failed.mp4', {
           status: 'failed',
+          take_number: 4,
           created_at: '2026-07-11T15:00:00.000Z',
         }),
         clip('clip-empty-completed', 'sh_empty_completed', '   ', {
           status: 'completed',
+          take_number: 1,
           created_at: '2026-07-11T16:00:00.000Z',
+        }),
+        clip('clip-deleted-newest', 'sh_latest_completed', 'https://cdn.test/clips/deleted.mp4', {
+          status: 'completed',
+          take_number: 3,
+          deleted_at: '2026-07-11T17:00:00.000Z',
+          created_at: '2026-07-11T17:00:00.000Z',
         }),
       ],
     })
@@ -269,7 +287,7 @@ describe('G003 director collector red-team coverage', () => {
       'https://cdn.test/clips/final-old.mp4',
     )
     expect(mediaFile(files, 'director/clips/sc_clip-sh_latest_completed.mp4')?.url).toBe(
-      'https://cdn.test/clips/completed-new.mp4',
+      'https://cdn.test/clips/completed-z.mp4',
     )
     expect(mediaPaths(files)).not.toContain('director/clips/sc_clip-sh_pending_failed.mp4')
     expect(mediaPaths(files)).not.toContain('director/clips/sc_clip-sh_empty_completed.mp4')

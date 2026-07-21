@@ -3,6 +3,7 @@ import {
   useDirectorCanvasStore,
   getShotStage,
   shotStageLabel,
+  effectivePrompt,
 } from '@/stores/director-store'
 import { selectRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
 import type { ShotNodeData, PromptNodeData } from '@/types/director'
@@ -131,14 +132,15 @@ describe('addPromptNode / wirePromptToShot', () => {
     expect((node?.data as PromptNodeData).targetShotNodeId).toBeNull()
   })
 
-  it('wirePromptToShot이 prompt 엣지를 추가하고 Shot.prompt를 동기', () => {
+  it('wirePromptToShot이 prompt 엣지를 추가하고 Shot.promptOverride를 동기', () => {
     const shotId = makeShot()
     const promptId = api().addPromptNode({ x: 0, y: 0 }, '강아지가 소년 옆에 앉아있음')
 
     api().wirePromptToShot(promptId, shotId)
 
     const shot = api().nodes.find((n) => n.id === shotId)!
-    expect((shot.data as ShotNodeData).prompt).toBe('강아지가 소년 옆에 앉아있음')
+    expect((shot.data as ShotNodeData).promptOverride).toBe('강아지가 소년 옆에 앉아있음')
+    expect(effectivePrompt(shot.data as ShotNodeData)).toBe('강아지가 소년 옆에 앉아있음')
 
     const edge = api().edges.find((e) => e.source === promptId && e.target === shotId)
     expect(edge).toBeDefined()

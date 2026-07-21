@@ -23,10 +23,11 @@ export interface GenerationJobTarget {
   column?: string // character_view: view_* / world_shot: wide_shot|establishing_shot
   // world_shot: locations[column] 갱신
   locationId?: string
-  // shot_video: shots.video_url / shot_storyboard: shots.storyboard_image (JSONB)
-  // shot_rough_storyboard: shots.rough_storyboard (JSONB)
+  // shot_video: legacy jobs may mirror shots.video_url; v2 linked jobs target a logical video take.
   shotId?: string
   writerShotId?: string
+  videoClipId?: string
+  retakeMode?: 'new_take' | 'regeneration'
 }
 
 export interface GenerationJob {
@@ -42,7 +43,10 @@ export interface GenerationJob {
   workspace_id?: string | null
   provider?: string
   input_snapshot?: Json
+  response_snapshot?: Json | null
   target: GenerationJobTarget
+  video_clip_id: string | null
+  idempotency_key: string | null
   result_url: string | null
   error: string | null
   submitted_at?: string | null
@@ -51,10 +55,10 @@ export interface GenerationJob {
   last_error?: string | null
 }
 
-// ⚠️ actor/runtime metadata 는 의도적으로 제외 — 015/016 마이그레이션 적용 전 라이브 DB에서도
-//   완료(웹훅)·폴링 read 경로가 깨지지 않게 한다. 필요한 곳(create/활동 로그/quota)만 명시 사용.
+// Read/finalize paths intentionally select only the fields they consume. Provider is authoritative for
+// local-vs-FAL reconciliation; actor/runtime metadata is selected only by activity/quota callsites.
 const COLUMNS =
-  'id, project_id, request_id, model, kind, status, target, input_snapshot, result_url, error'
+  'id, project_id, request_id, model, kind, status, target, video_clip_id, idempotency_key, provider, input_snapshot, response_snapshot, result_url, error'
 
 // 웹훅 finalize/폴링 경로가 의존하는 컬럼 집합(회귀 가드용 export). finalize 는 job.target.workspaceId 와
 //   job.input_snapshot.source_hash 를 읽으므로 둘 다 반드시 포함돼야 한다(누락 시 후보 source_hash=null → stale 무력화).
@@ -64,12 +68,24 @@ export const STALE_QUEUED_MS = 10 * 60 * 1000
 
 function toJsonSnapshot(value: unknown): Json {
   try {
-    const serialized = JSON.stringify(value ?? {})
-    return JSON.parse(serialized ?? '{}') as Json
-  } catch {
-    return {}
+    const serialized = JSON.stringify(value)
+    if (serialized === undefined) {
+      throw new Error('snapshot cannot be represented as JSON')
+    }
+    return JSON.parse(serialized) as Json
+  } catch (error) {
+    throw new Error('generation job snapshot serialization failed', { cause: error })
   }
 }
+
+function toJsonObjectSnapshot(value: unknown): { [key: string]: Json | undefined } {
+  const snapshot = toJsonSnapshot(value)
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    throw new Error('generation job snapshot must be a JSON object')
+  }
+  return snapshot
+}
+
 
 async function resolveJobOwnership(input: {
   projectId: string
@@ -80,20 +96,22 @@ async function resolveJobOwnership(input: {
   let userId = input.userId ?? null
 
   if (!workspaceId) {
-    const { data: project } = await supabaseAdmin
+    const { data: project, error } = await supabaseAdmin
       .from('projects')
       .select('workspace_id')
       .eq('id', input.projectId)
       .maybeSingle()
+    if (error) throw error
     workspaceId = (project?.workspace_id as string | undefined) ?? null
   }
 
   if (workspaceId && !userId) {
-    const { data: workspace } = await supabaseAdmin
+    const { data: workspace, error } = await supabaseAdmin
       .from('workspaces')
       .select('owner_id')
       .eq('id', workspaceId)
       .maybeSingle()
+    if (error) throw error
     userId = (workspace?.owner_id as string | undefined) ?? null
   }
 
@@ -117,6 +135,9 @@ export async function createGenerationJob(input: {
   /** provider submit 입력 스냅샷. webhook URL/secret 같은 runtime 값은 호출자가 제외한다. */
   inputSnapshot?: unknown
 }): Promise<GenerationJob> {
+  if (input.kind === 'shot_video') {
+    throw new Error('shot_video jobs must be created by a director video reservation')
+  }
   const ownership = await resolveJobOwnership({
     projectId: input.projectId,
     workspaceId: input.workspaceId ?? input.target.workspaceId,
@@ -135,7 +156,7 @@ export async function createGenerationJob(input: {
       user_id: ownership.userId,
       workspace_id: ownership.workspaceId,
       provider: input.provider ?? 'fal',
-      input_snapshot: toJsonSnapshot(input.inputSnapshot),
+      input_snapshot: toJsonSnapshot(input.inputSnapshot === undefined ? {} : input.inputSnapshot),
       submitted_at: now,
       attempts: 1,
       status: 'queued',
@@ -149,7 +170,6 @@ export async function createGenerationJob(input: {
 /**
  * 멱등 가드(C1): 해당 슬롯(project+character+view)에 status=queued character_view 잡이 이미 있는가.
  *   핸드오프 초안 submit~finalize 윈도우의 재핸드오프 중복 제출을 차단한다.
- *   조회 실패는 best-effort로 false(다른 멱등 조건 = view_main/후보 존재가 1차 방어) — 자동 재시도 루프 없음.
  */
 export async function hasQueuedCharacterViewJob(
   projectId: string,
@@ -162,7 +182,8 @@ export async function hasQueuedCharacterViewJob(
     .eq('project_id', projectId)
     .eq('kind', 'character_view')
     .eq('status', 'queued')
-  if (error || !data) return false
+  if (error) throw error
+  if (!data) throw new Error('generation job queued-character query returned no data')
   return data.some((row) => {
     const t = (row.target ?? {}) as GenerationJobTarget
     return t.characterId === characterId && t.view === view
@@ -171,7 +192,6 @@ export async function hasQueuedCharacterViewJob(
 
 /**
  * 멱등 가드: 해당 슬롯(project+location+column)에 status=queued world_shot 잡이 이미 있는가.
- *   조회 실패는 best-effort로 false(다른 멱등 조건 = locations[column] 존재가 1차 방어).
  */
 export async function hasQueuedWorldShotJob(
   projectId: string,
@@ -184,7 +204,8 @@ export async function hasQueuedWorldShotJob(
     .eq('project_id', projectId)
     .eq('kind', 'world_shot')
     .eq('status', 'queued')
-  if (error || !data) return false
+  if (error) throw error
+  if (!data) throw new Error('generation job queued-world query returned no data')
   return data.some((row) => {
     const t = (row.target ?? {}) as GenerationJobTarget
     return t.locationId === locationId && t.column === column
@@ -226,7 +247,8 @@ export async function listFailedCharacterViewJobs(projectId: string): Promise<Ch
     .eq('kind', 'character_view')
     .gte('created_at', since)
     .order('created_at', { ascending: false })
-  if (error || !data) return []
+  if (error) throw error
+  if (!data) throw new Error('generation job failed-character query returned no data')
   type Row = {
     target: GenerationJobTarget | null
     error: string | null
@@ -275,7 +297,8 @@ export async function listQueuedMainJobs(
     .eq('project_id', projectId)
     .eq('kind', 'character_view')
     .eq('status', 'queued')
-  if (error || !data) return []
+  if (error) throw error
+  if (!data) throw new Error('generation job queued-main query returned no data')
   const out: Array<{ characterId: string; jobId: string }> = []
   for (const row of data as Array<{ id: string; target: GenerationJobTarget | null }>) {
     const t = row.target ?? {}
@@ -300,43 +323,110 @@ export async function listRecentGenerationJobs(
     .gte('created_at', since)
     .order('created_at', { ascending: false })
     .limit(limit)
-  if (error) {
-    // 활동 로그는 부가 기능 — 실패해도 채팅은 계속. 단, 조용히 죽으면 진단 불가라 반드시 로그.
-    //   (015 미적용으로 actor 컬럼이 없으면 여기로 떨어진다.)
-    console.warn('[generation-jobs] listRecentGenerationJobs failed:', error.message)
-    return []
-  }
-  return (data ?? []) as Array<GenerationJob & { created_at: string }>
+  if (error) throw error
+  if (!data) throw new Error('generation job recent query returned no data')
+  return data as Array<GenerationJob & { created_at: string }>
 }
 
 export async function getGenerationJobById(
   id: string,
 ): Promise<GenerationJob | null> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('generation_jobs')
     .select(COLUMNS)
     .eq('id', id)
     .maybeSingle()
+  if (error) throw error
   return (data as GenerationJob | null) ?? null
 }
 
 export async function getGenerationJobByRequestId(
   requestId: string,
 ): Promise<GenerationJob | null> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('generation_jobs')
     .select(COLUMNS)
     .eq('request_id', requestId)
     .maybeSingle()
+  if (error) throw error
   return (data as GenerationJob | null) ?? null
+}
+
+
+export async function patchGenerationJobResponseSnapshotByRequestId(
+  requestId: string,
+  patch: unknown,
+): Promise<void> {
+  if (typeof requestId !== 'string' || !requestId.trim()) throw new Error('generation job request ID must be nonblank')
+  const patchSnapshot = toJsonObjectSnapshot(patch)
+  const { error } = await supabaseAdmin.rpc('patch_generation_job_response_snapshot', {
+    p_request_id: requestId,
+    p_patch: patchSnapshot,
+  })
+  if (error) throw error
+}
+
+export class GenerationJobTerminalTransitionError extends Error {
+  constructor(id: string, status: string | null) {
+    super(status
+      ? `generation job ${id} cannot transition from ${status}`
+      : `generation job ${id} was not found during terminal transition`)
+    this.name = 'GenerationJobTerminalTransitionError'
+  }
+}
+
+export class GenerationJobLinkedVideoTerminalizationError extends Error {
+  constructor(id: string) {
+    super(`linked shot_video job ${id} must be terminalized by a director video attempt RPC`)
+    this.name = 'GenerationJobLinkedVideoTerminalizationError'
+  }
+}
+
+async function ensureTerminalTransition(
+  id: string,
+  expectedStatus: 'completed' | 'failed',
+  expectedResultUrl: string | null,
+  expectedError: string | null,
+  data: unknown,
+  error: unknown,
+): Promise<void> {
+  if (error) throw error
+  if (data) return
+
+  const { data: current, error: currentError } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('kind, video_clip_id, status, result_url, error, last_error')
+    .eq('id', id)
+    .maybeSingle()
+  if (currentError) throw currentError
+  const job = current as {
+    kind?: string
+    video_clip_id?: string | null
+    status?: string
+    result_url?: string | null
+    error?: string | null
+    last_error?: string | null
+  } | null
+  const status = job?.status ?? null
+  if (job?.kind === 'shot_video' && job.video_clip_id !== null && job.video_clip_id !== undefined) {
+    throw new GenerationJobLinkedVideoTerminalizationError(id)
+  }
+  if (
+    status === expectedStatus
+    && job?.result_url === expectedResultUrl
+    && job?.error === expectedError
+    && (expectedStatus === 'completed' || job?.last_error === expectedError)
+  ) return
+  throw new GenerationJobTerminalTransitionError(id, status)
 }
 
 export async function completeGenerationJob(
   id: string,
   resultUrl: string,
 ): Promise<void> {
+  if (!resultUrl.trim()) throw new Error('generation job result URL must be nonblank')
   // CAS: queued일 때만 완료로 전이 — 동시/지연 webhook이 터미널 상태를 덮어쓰지 못하게.
-  await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('generation_jobs')
     .update({
       status: 'completed',
@@ -347,24 +437,34 @@ export async function completeGenerationJob(
     })
     .eq('id', id)
     .eq('status', 'queued')
+    .is('video_clip_id', null)
+    .select('id')
+    .maybeSingle()
+  await ensureTerminalTransition(id, 'completed', resultUrl, null, data, error)
 }
 
 export async function failGenerationJob(
   id: string,
   message: string,
 ): Promise<void> {
-  const errorMessage = message.slice(0, 1000)
+  const errorMessage = message.trim().slice(0, 1000)
+  if (!errorMessage) throw new Error('generation job failure evidence must be nonblank')
   // CAS: queued일 때만 실패로 전이 — 이미 완료된 작업을 늦은 ERROR webhook이 덮어쓰지 못하게.
-  await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('generation_jobs')
     .update({
       status: 'failed',
       error: errorMessage,
       last_error: errorMessage,
+      completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
     .eq('status', 'queued')
+    .is('video_clip_id', null)
+    .select('id')
+    .maybeSingle()
+  await ensureTerminalTransition(id, 'failed', null, errorMessage, data, error)
 }
 
 /**
@@ -379,7 +479,7 @@ export const AUTO_GENERATION_GIVE_UP_THRESHOLD = 2
  * 같은 target 으로 누적된 실패 잡 수 (give-up 게이트용). target 부분일치(JSONB @>):
  *   world_shot={locationId,column} / character_view={characterId,column} / 러프보드={writerShotId} 등.
  *   별도 상태 저장 없이 '실패 잡의 존재가 진실'(architecture §0)을 그대로 집계한다.
- *   게이트는 비용 방어 — 조회 실패 시 fail-open(0)으로 정상 생성을 막지 않되 반드시 로그한다.
+ *   게이트는 비용 방어 — 조회 실패 시 생성이 진행되지 않도록 실패를 호출자에게 전파한다.
  */
 export async function countFailedJobsForTarget(
   projectId: string,
@@ -393,51 +493,68 @@ export async function countFailedJobsForTarget(
     .eq('kind', kind)
     .eq('status', 'failed')
     .contains('target', target)
-  if (error) {
-    console.warn('[generation-jobs] countFailedJobsForTarget failed:', error.message)
-    return 0
-  }
-  return count ?? 0
+  if (error) throw error
+  if (count === null) throw new Error('generation job failed-target count returned no count')
+  return count
 }
 
 /**
  * 유저가 현재 in-flight(queued)로 보유한 생성 작업 수 (chat-proactive-copilot Phase 3 — 멀티유저 쿼터).
- *   016 이후에는 generation_jobs.user_id 로 직접 집계한다.
- *   016 미적용/오류 시 workspace→project 2-hop 으로 fallback 한다.
- *   단일 FAL_KEY 동시 풀(현재 대시보드 기준 20)을 한 유저가 독점하지 못하게 앱 레이어에서 공정 분배하는 가드의 기반.
- *   참고: fal 은 동시 한도 초과분을 '거부'가 아니라 큐 대기시키므로 이 쿼터는 'UX 보호'(대기 폭주 방지)용.
+ * generation_jobs.user_id 로 직접 집계한다. 정확히 알려진 이전 스키마의 user_id schema-cache
+ * 오류에서만 workspace→project 2-hop을 사용하며, 그 fallback의 모든 조회 오류도 전파한다.
  */
+const LEGACY_USER_ID_SCHEMA_ERROR = {
+  code: 'PGRST204',
+  message: "Could not find the 'user_id' column of 'generation_jobs' in the schema cache",
+} as const
+
+function isLegacyUserIdSchemaError(error: unknown): boolean {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && 'message' in error
+    && error.code === LEGACY_USER_ID_SCHEMA_ERROR.code
+    && error.message === LEGACY_USER_ID_SCHEMA_ERROR.message
+}
+
 export async function countQueuedJobsByUser(userId: string): Promise<number> {
   const direct = await supabaseAdmin
     .from('generation_jobs')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('status', 'queued')
-  if (!direct.error) return direct.count ?? 0
+  if (!direct.error) {
+    if (direct.count === null) throw new Error('generation job user quota count returned no count')
+    return direct.count
+  }
+  if (!isLegacyUserIdSchemaError(direct.error)) throw direct.error
 
-  // 1) 유저 소유 workspace
-  const { data: workspaces } = await supabaseAdmin
+  const { data: workspaces, error: workspacesError } = await supabaseAdmin
     .from('workspaces')
     .select('id')
     .eq('owner_id', userId)
-  const workspaceIds = (workspaces ?? []).map((w) => w.id as string)
+  if (workspacesError) throw workspacesError
+  if (!workspaces) throw new Error('generation job workspace quota query returned no data')
+  const workspaceIds = workspaces.map((w) => w.id as string)
   if (workspaceIds.length === 0) return 0
 
-  // 2) 그 workspace 들의 project
-  const { data: projects } = await supabaseAdmin
+  const { data: projects, error: projectsError } = await supabaseAdmin
     .from('projects')
     .select('id')
     .in('workspace_id', workspaceIds)
-  const projectIds = (projects ?? []).map((p) => p.id as string)
+  if (projectsError) throw projectsError
+  if (!projects) throw new Error('generation job project quota query returned no data')
+  const projectIds = projects.map((p) => p.id as string)
   if (projectIds.length === 0) return 0
 
-  // 3) queued 작업 수
-  const { count } = await supabaseAdmin
+  const { count, error: countError } = await supabaseAdmin
     .from('generation_jobs')
     .select('id', { count: 'exact', head: true })
     .in('project_id', projectIds)
     .eq('status', 'queued')
-  return count ?? 0
+  if (countError) throw countError
+  if (count === null) throw new Error('generation job fallback quota count returned no count')
+  return count
 }
 
 /** project → workspace.owner_id == userId 소유권 확인 (인증 polling 라우트에서 사용). */
@@ -445,16 +562,18 @@ export async function userOwnsProject(
   projectId: string,
   userId: string,
 ): Promise<boolean> {
-  const { data: project } = await supabaseAdmin
+  const { data: project, error: projectError } = await supabaseAdmin
     .from('projects')
     .select('workspace_id')
     .eq('id', projectId)
     .maybeSingle()
+  if (projectError) throw projectError
   if (!project?.workspace_id) return false
-  const { data: ws } = await supabaseAdmin
+  const { data: ws, error: workspaceError } = await supabaseAdmin
     .from('workspaces')
     .select('owner_id')
     .eq('id', project.workspace_id)
     .maybeSingle()
+  if (workspaceError) throw workspaceError
   return !!ws && ws.owner_id === userId
 }

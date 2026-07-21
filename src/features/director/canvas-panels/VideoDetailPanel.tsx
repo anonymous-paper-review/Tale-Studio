@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Bookmark, Loader2, Play, RefreshCw, Star, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HoverBeam } from '@/components/hover-beam'
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
   getEffectiveShotConfig,
+  effectivePrompt,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
 import { usePresetStorageStore } from '@/stores/preset-storage-store'
@@ -58,23 +59,56 @@ export function VideoDetailPanel({
     () => nodes.find((n) => n.id === data.parentShotNodeId),
     [nodes, data.parentShotNodeId],
   )
-  const isGenerating = useDirectorCanvasStore(
-    (s) => !!s.generatingNodeIds[nodeId],
+  const isGenerating = nodes.some(
+    (node) =>
+      node.data.kind === 'video' &&
+      node.data.parentShotNodeId === data.parentShotNodeId &&
+      node.data.lastAttemptStatus === 'generating',
   )
   const projectId = useDirectorCanvasStore((s) => s.projectId)
+  const [regenerationState, setRegenerationState] = useState<{
+    nodeId: string
+    error: string | null
+  } | null>(null)
+  const [finalState, setFinalState] = useState<{
+    nodeId: string
+    intent: boolean
+    busy: boolean
+    error: string | null
+  } | null>(null)
+  const finalOperationRef = useRef(0)
+  const regenerationOperationRef = useRef(0)
+  const activeNodeIdRef = useRef(nodeId)
+  const nodeSessionRef = useRef(0)
+  const canMarkFinal = !!data.videoUrl && data.status === 'completed'
+  const finalBusy = finalState?.nodeId === nodeId ? finalState.busy : false
+  const finalError =
+    finalState?.nodeId === nodeId && finalState.intent !== data.final
+      ? finalState.error
+      : null
+  const regenerationError =
+    regenerationState?.nodeId === nodeId ? regenerationState.error : null
+  const [labelDraft, setLabelDraft] = useState({
+    nodeId,
+    value: data.label,
+    dirty: false,
+  })
+  const [promptDraft, setPromptDraft] = useState({
+    nodeId,
+    value: data.override.prompt ?? '',
+    dirty: false,
+  })
+  const label =
+    labelDraft.nodeId === nodeId && labelDraft.dirty ? labelDraft.value : data.label
+  const overridePrompt =
+    promptDraft.nodeId === nodeId && promptDraft.dirty
+      ? promptDraft.value
+      : data.override.prompt ?? ''
 
-  const [label, setLabel] = useState(data.label)
-  const [overridePrompt, setOverridePrompt] = useState(
-    data.override.prompt ?? '',
-  )
-
-  // external data 변경 시 derived state 리셋
-  const [prevNodeId, setPrevNodeId] = useState(nodeId)
-  if (nodeId !== prevNodeId) {
-    setPrevNodeId(nodeId)
-    setLabel(data.label)
-    setOverridePrompt(data.override.prompt ?? '')
-  }
+  useEffect(() => {
+    activeNodeIdRef.current = nodeId
+    nodeSessionRef.current += 1
+  }, [nodeId])
 
   if (!effective || !motherNode || !isShotData(motherNode.data)) {
     return (
@@ -89,13 +123,17 @@ export function VideoDetailPanel({
   }
 
   const mother = motherNode.data
+  const motherPrompt = effectivePrompt(mother)
 
-  const commitLabel = () => updateNodeData<'video'>(nodeId, { label })
+  const commitLabel = () => {
+    setLabelDraft({ nodeId, value: label, dirty: false })
+    updateNodeData<'video'>(nodeId, { label })
+  }
 
   const commitPromptOverride = () => {
+    setPromptDraft({ nodeId, value: overridePrompt, dirty: false })
     const trimmed = overridePrompt.trim()
-    if (trimmed === '' || trimmed === mother.prompt) {
-      // override 제거 — 마더 값 그대로 사용
+    if (trimmed === '') {
       const next = { ...data.override }
       delete next.prompt
       updateNodeData<'video'>(nodeId, { override: next })
@@ -106,13 +144,63 @@ export function VideoDetailPanel({
 
   const overrideKeys = Object.keys(data.override) as (keyof typeof data.override)[]
 
-  const handleFinalToggle = () => {
-    setVideoFinal(nodeId, !data.final)
+  const handleFinalToggle = async () => {
+    if (!canMarkFinal || finalBusy) return
+    const operation = ++finalOperationRef.current
+    const session = nodeSessionRef.current
+    const intent = !data.final
+    setFinalState({ nodeId, intent, busy: true, error: null })
+    try {
+      await setVideoFinal(nodeId, intent)
+      if (
+        operation === finalOperationRef.current &&
+        activeNodeIdRef.current === nodeId &&
+        nodeSessionRef.current === session
+      ) {
+        setFinalState(null)
+      }
+    } catch (error) {
+      if (
+        operation === finalOperationRef.current &&
+        activeNodeIdRef.current === nodeId &&
+        nodeSessionRef.current === session
+      ) {
+        setFinalState({
+          nodeId,
+          intent,
+          busy: false,
+          error: error instanceof Error ? error.message : 'Final 설정에 실패했습니다.',
+        })
+      }
+    }
   }
 
-  const handleRegenerate = () => {
-    // D-5: effective 설정으로 이 Video 노드를 실제 (재)생성. 마더 storyboardImage 있으면 I2V.
-    void regenerateVideo(nodeId)
+  const handleRegenerate = async () => {
+    if (isGenerating) return
+    const operation = ++regenerationOperationRef.current
+    const session = nodeSessionRef.current
+    setRegenerationState({ nodeId, error: null })
+    try {
+      await regenerateVideo(nodeId)
+      if (
+        operation === regenerationOperationRef.current &&
+        activeNodeIdRef.current === nodeId &&
+        nodeSessionRef.current === session
+      ) {
+        setRegenerationState(null)
+      }
+    } catch (error) {
+      if (
+        operation === regenerationOperationRef.current &&
+        activeNodeIdRef.current === nodeId &&
+        nodeSessionRef.current === session
+      ) {
+        setRegenerationState({
+          nodeId,
+          error: error instanceof Error ? error.message : '영상 생성에 실패했습니다.',
+        })
+      }
+    }
   }
 
   const handleDelete = () => {
@@ -140,7 +228,9 @@ export function VideoDetailPanel({
           <HoverBeam className="min-w-0 flex-1">
             <input
               value={label}
-              onChange={(e) => setLabel(e.target.value)}
+              onChange={(e) =>
+                setLabelDraft({ nodeId, value: e.target.value, dirty: true })
+              }
               onBlur={commitLabel}
               className={cn(
                 'w-full border-b border-transparent bg-transparent text-sm font-medium outline-none',
@@ -154,7 +244,8 @@ export function VideoDetailPanel({
           </Badge>
           <button
             type="button"
-            onClick={handleFinalToggle}
+            onClick={() => void handleFinalToggle()}
+            disabled={!canMarkFinal || finalBusy}
             className={cn(
               'ml-auto inline-flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent',
               data.final
@@ -190,19 +281,19 @@ export function VideoDetailPanel({
         }
       >
         <div className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40">
-          {data.status === 'generating' ? (
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
-          ) : data.status === 'failed' ? (
-            <span className="px-4 text-center text-xs text-destructive">
-              {data.errorMessage ?? '생성 실패'}
-            </span>
-          ) : data.videoUrl ? (
+          {data.videoUrl ? (
             <video
               src={data.videoUrl}
               controls
               className="h-full w-full"
               poster={data.thumbnailUrl ?? undefined}
             />
+          ) : data.lastAttemptStatus === 'generating' ? (
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          ) : data.lastAttemptStatus === 'failed' || data.status === 'failed' ? (
+            <span className="px-4 text-center text-xs text-destructive">
+              {data.lastAttemptError ?? data.errorMessage ?? '생성 실패'}
+            </span>
           ) : (
             <div className="flex flex-col items-center gap-1 text-muted-foreground">
               <Play className="size-5" />
@@ -211,6 +302,17 @@ export function VideoDetailPanel({
           )}
         </div>
       </PanelSection>
+      {isGenerating && (
+        <p className="text-xs text-muted-foreground">
+          새 생성 시도를 진행 중입니다. 기존 영상은 계속 재생할 수 있습니다.
+        </p>
+      )}
+      {(data.lastAttemptStatus === 'failed' && data.lastAttemptError) || regenerationError ? (
+        <p className="text-xs text-destructive">
+          {regenerationError ?? data.lastAttemptError}
+        </p>
+      ) : null}
+      {finalError && <p className="text-xs text-destructive">{finalError}</p>}
 
       <PanelSection
         title={
@@ -229,11 +331,13 @@ export function VideoDetailPanel({
       >
         <HoverBeam>
           <Textarea
-            value={overridePrompt || mother.prompt}
-            onChange={(e) => setOverridePrompt(e.target.value)}
+            value={overridePrompt}
+            onChange={(e) =>
+              setPromptDraft({ nodeId, value: e.target.value, dirty: true })
+            }
             onBlur={commitPromptOverride}
             rows={3}
-            placeholder={mother.prompt || '마더 Shot의 prompt가 비어있음'}
+            placeholder={motherPrompt || '마더 Shot의 prompt가 비어있음'}
           />
         </HoverBeam>
         <p className="mt-1 text-[10px] text-muted-foreground">
@@ -297,7 +401,7 @@ export function VideoDetailPanel({
       <footer className="mt-auto flex flex-wrap gap-2 border-t border-border pt-4">
         <Button
           size="sm"
-          onClick={handleRegenerate}
+          onClick={() => void handleRegenerate()}
           disabled={isGenerating}
           className="gap-1.5"
         >

@@ -335,10 +335,17 @@ function CanvasInner() {
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      const next = applyNodeChanges(changes, nodes)
+      const next = applyNodeChanges(
+        changes.filter((change) => change.type !== 'remove'),
+        nodes,
+      )
       useDirectorCanvasStore.setState({ nodes: next as typeof nodes })
       changes.forEach((c) => {
-        if (c.type === 'remove') deleteNode(c.id)
+        if (c.type === 'remove') {
+          void deleteNode(c.id).catch((error) => {
+            console.error('[director/delete-node]', error)
+          })
+        }
         // Step 2: drag end 시점에만 canvas_position을 DB로 write-back (매 프레임 X)
         else if (c.type === 'position' && c.dragging === false) {
           persistNodePosition(c.id)

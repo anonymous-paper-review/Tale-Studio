@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { toast } from 'sonner'
 import type { XYPosition } from '@xyflow/react'
 import {
   DEFAULT_CAMERA_PRESET,
@@ -85,6 +84,9 @@ function makeShotData(label: string, parentSceneNodeId: string | null): ShotNode
     writerShotId: null,
     parentSceneNodeId,
     prompt: '',
+    derivedPrompt: '',
+    promptOverride: undefined,
+    promptMigratedV2: true,
     referenceImages: [],
     storyboardImage: null,
     characterAssetIds: [],
@@ -99,6 +101,105 @@ function makeShotData(label: string, parentSceneNodeId: string | null): ShotNode
   }
 }
 
+type HydratedVideoTake = {
+  id: string
+  shot_id: string
+  take_number: number
+  take_label: string | null
+  override: VideoOverride | null
+  canvas_position: { x: number; y: number } | null
+  is_final: boolean
+  url: string | null
+  thumbnail_url: string | null
+  status: DirectorVideoStatus | 'queued'
+  latestJobId: string | null
+  last_attempt_status: DirectorVideoStatus | 'queued' | null
+  last_attempt_error: string | null
+  last_attempt_at: string | null
+  created_at: string | null
+  updated_at: string | null
+  latestJobStatus: DirectorVideoStatus | null
+  latestJobError: string | null
+  latestAttemptAt: string | null
+}
+type VideoGenerationResponse = {
+  error?: string
+  code?: string
+  jobId?: string
+  videoClipId?: string
+  takeNumber?: number
+  status?: DirectorVideoStatus | 'queued'
+  retryable?: boolean
+  recoveryReceipt?: string
+}
+
+function isHydratedVideoTake(value: unknown): value is HydratedVideoTake {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const row = value as Record<string, unknown>
+  const nullableString = (field: unknown) => field === null || typeof field === 'string'
+  const nullableStatus = (field: unknown) =>
+    field === null ||
+    field === 'queued' ||
+    field === 'pending' ||
+    field === 'generating' ||
+    field === 'completed' ||
+    field === 'failed'
+  const position =
+    row.canvas_position === null ||
+    (!!row.canvas_position &&
+      typeof row.canvas_position === 'object' &&
+      !Array.isArray(row.canvas_position) &&
+      typeof (row.canvas_position as Record<string, unknown>).x === 'number' &&
+      typeof (row.canvas_position as Record<string, unknown>).y === 'number')
+  return (
+    typeof row.id === 'string' &&
+    typeof row.shot_id === 'string' &&
+    typeof row.take_number === 'number' &&
+    nullableString(row.take_label) &&
+    (row.override === null ||
+      (!!row.override && typeof row.override === 'object' && !Array.isArray(row.override))) &&
+    position &&
+    typeof row.is_final === 'boolean' &&
+    nullableString(row.url) &&
+    nullableString(row.thumbnail_url) &&
+    nullableStatus(row.status) &&
+    nullableString(row.latestJobId) &&
+    nullableStatus(row.latestJobStatus) &&
+    nullableString(row.latestJobError) &&
+    nullableString(row.latestAttemptAt) &&
+    nullableStatus(row.last_attempt_status) &&
+    nullableString(row.last_attempt_error) &&
+    nullableString(row.last_attempt_at) &&
+    nullableString(row.created_at) &&
+    nullableString(row.updated_at)
+  )
+}
+/**
+ * `queued` predates the client-facing `generating` state and is the only legacy
+ * status projection retained during hydration. A URL never overrides canonical
+ * terminal status: failed attempts may deliberately retain their prior success.
+ */
+export function hydratedVideoStatus(row: HydratedVideoTake): DirectorVideoStatus {
+  return row.status === 'queued' ? 'generating' : row.status
+}
+
+export function canRecoverGenerationAttempt(
+  response: Pick<VideoGenerationResponse, 'retryable' | 'recoveryReceipt'>,
+  recoveryAttempts: number,
+  isCurrentAttempt: boolean,
+): response is VideoGenerationResponse & { recoveryReceipt: string } {
+  const receipt = response.recoveryReceipt
+  return (
+    isCurrentAttempt &&
+    response.retryable === true &&
+    recoveryAttempts < 3 &&
+    typeof receipt === 'string' &&
+    receipt.length <= 4096 &&
+    /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(receipt)
+  )
+}
+
+
 function makeVideoData(
   parentShotNodeId: string,
   takeIndex: number,
@@ -108,6 +209,12 @@ function makeVideoData(
     label: `take_v${takeIndex}`,
     parentShotNodeId,
     videoClipId: null,
+    takeNumber: takeIndex,
+    generationJobId: null,
+    lastAttemptStatus: null,
+    lastAttemptError: null,
+    lastAttemptAt: null,
+    createdAt: new Date().toISOString(),
     override: {},
     videoUrl: null,
     thumbnailUrl: null,
@@ -177,26 +284,26 @@ async function persistStoryboardImage(
 
 const VIDEO_POLL_INTERVAL_MS = 5_000
 const VIDEO_POLL_TIMEOUT_MS = 300_000
+type GenerationLock = { key: string; token: symbol }
 
-/** 완료된 영상 URL을 Storage에 영속화 → 저장 URL (실패 시 원본 URL) */
-async function persistDirectorVideo(
-  projectId: string,
-  shotId: string,
-  videoUrl: string,
-): Promise<string> {
-  try {
-    const res = await fetch('/api/assets/upload-video', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videoUrl, projectId, shotId }),
-    })
-    if (!res.ok) return videoUrl
-    const { url } = await res.json()
-    return url ?? videoUrl
-  } catch {
-    return videoUrl
-  }
+const generationLocks = new Map<string, symbol>()
+
+function generationLockKey(projectId: string, shotNodeId: string) {
+  return JSON.stringify([projectId, shotNodeId])
 }
+
+function acquireGenerationLock(projectId: string, shotNodeId: string): GenerationLock | null {
+  const key = generationLockKey(projectId, shotNodeId)
+  if (generationLocks.has(key)) return null
+  const token = Symbol(key)
+  generationLocks.set(key, token)
+  return { key, token }
+}
+
+function releaseGenerationLock(lock: GenerationLock | null) {
+  if (lock && generationLocks.get(lock.key) === lock.token) generationLocks.delete(lock.key)
+}
+
 
 /** director provider(kling/veo/local) → generate-video 라우트 provider(fal/local) 매핑 */
 function toRouteProvider(p: DirectorVideoProvider): 'fal' | 'local' {
@@ -207,7 +314,6 @@ function toRouteProvider(p: DirectorVideoProvider): 'fal' | 'local' {
 // Thumbnail capture (Node 탭 영상 카드용)
 // 서버 ffmpeg 불가(Vercel Hobby) → 클라이언트에서 <video>+<canvas>로 첫 프레임 캡처.
 // CORS 차단 시 canvas 가 taint 되어 toBlob 이 throw → null 반환(graceful, 영상 재생엔 무영향).
-// 영상 URL 은 우리 Storage(persistDirectorVideo)라 보통 same-CORS 라 캡처 가능.
 // ============================================================================
 
 /** 같은 노드 썸네일 중복 캡처 방지 (in-flight 가드). */
@@ -355,24 +461,100 @@ function debouncedPositionSaveToDb(
             .eq('shot_id', node.data.writerShotId)
         } else if (isVideoData(node.data)) {
           if (!node.data.videoClipId) return
-          await supabase
-            .from('video_clips')
-            .update({ canvas_position: pos })
-            .eq('id', node.data.videoClipId)
+          const response = await fetch(
+            `/api/director/video-takes/${encodeURIComponent(node.data.videoClipId)}`,
+            {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ projectId, canvas_position: pos }),
+            },
+          )
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
         }
       } catch (err) {
         console.error('[director-store] position DB save failed:', err)
+        if (isVideoData(node.data)) {
+          try {
+            await getState().hydrateFromDb(projectId)
+          } catch (hydrateErr) {
+            console.error('[director-store] position rollback hydration failed:', hydrateErr)
+          }
+        }
       }
     }, 500),
   )
 }
 
 const pendingVideoClipSaves = new Map<string, ReturnType<typeof setTimeout>>()
+const pendingVideoFinalWrites = new Map<string, Promise<void>>()
+const latestVideoFinalIntent = new Map<string, number>()
+const latestVideoDeleteIntent = new Map<string, number>()
+let hydrationEpoch = 0
+type HydrationLocalSnapshot = {
+  position: XYPosition
+  label?: string
+  override?: string
+  final?: boolean
+  storyboardImage?: string
+}
+const stableHydrationValue = (value: unknown): string => JSON.stringify(value) ?? ''
+const snapshotHydrationLocals = (nodes: DirectorNode[]) =>
+  new Map(
+    nodes.map((node): [string, HydrationLocalSnapshot] => [
+      node.id,
+      {
+        position: { ...node.position },
+        ...(isVideoData(node.data)
+          ? {
+              label: node.data.label,
+              override: stableHydrationValue(node.data.override),
+              final: node.data.final,
+            }
+          : isShotData(node.data)
+            ? { storyboardImage: stableHydrationValue(node.data.storyboardImage) }
+            : {}),
+      },
+    ]),
+  )
+const positionMatchesHydrationSnapshot = (
+  node: DirectorNode,
+  snapshot: HydrationLocalSnapshot | undefined,
+) =>
+  !!snapshot &&
+  node.position.x === snapshot.position.x &&
+  node.position.y === snapshot.position.y
+const videoFieldMatchesHydrationSnapshot = (
+  node: DirectorNode,
+  snapshot: HydrationLocalSnapshot | undefined,
+  field: 'label' | 'override' | 'final',
+) =>
+  isVideoData(node.data) &&
+  !!snapshot &&
+  (field === 'label'
+    ? node.data.label === snapshot.label
+    : field === 'override'
+      ? stableHydrationValue(node.data.override) === snapshot.override
+      : node.data.final === snapshot.final)
+const shotStoryboardMatchesHydrationSnapshot = (
+  node: DirectorNode,
+  snapshot: HydrationLocalSnapshot | undefined,
+) =>
+  isShotData(node.data) &&
+  !!snapshot &&
+  stableHydrationValue(node.data.storyboardImage) === snapshot.storyboardImage
+const isStrictlyNewerAttempt = (localAttemptAt: string | null, canonicalAttemptAt: string | null) => {
+  if (!localAttemptAt || !canonicalAttemptAt) return false
+  const localTime = Date.parse(localAttemptAt)
+  const canonicalTime = Date.parse(canonicalAttemptAt)
+  return Number.isFinite(localTime) && Number.isFinite(canonicalTime) && localTime > canonicalTime
+}
 
-/** video_clips 행 1개를 debounce update (override 등). videoClipId 기준. */
+/** Persist a clip patch through the Director API rather than direct client DB writes. */
 function debouncedVideoClipSaveToDb(
   videoClipId: string,
+  projectId: string,
   getPatch: () => Record<string, unknown> | undefined,
+  onFailure: () => Promise<void>,
 ) {
   const existing = pendingVideoClipSaves.get(videoClipId)
   if (existing) clearTimeout(existing)
@@ -383,10 +565,19 @@ function debouncedVideoClipSaveToDb(
       const patch = getPatch()
       if (!patch) return
       try {
-        const supabase = createClient()
-        await supabase.from('video_clips').update(patch).eq('id', videoClipId)
+        const response = await fetch(`/api/director/video-takes/${encodeURIComponent(videoClipId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, ...patch }),
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
       } catch (err) {
-        console.error('[director-store] video_clip DB save failed:', err)
+        console.error('[director-store] video take save failed:', err)
+        try {
+          await onFailure()
+        } catch (hydrateErr) {
+          console.error('[director-store] video take rollback hydration failed:', hydrateErr)
+        }
       }
     }, 500),
   )
@@ -478,7 +669,7 @@ interface DirectorCanvasState {
     id: string,
     patch: Partial<Extract<DirectorNodeData, { kind: K }>>,
   ) => void
-  deleteNode: (id: string) => void
+  deleteNode: (id: string) => Promise<void>
 
   // edge lifecycle
   addEdge: (
@@ -505,7 +696,7 @@ interface DirectorCanvasState {
 
   // video specific
   /** Shot당 1개 강제 enforce (결정 #11) */
-  setVideoFinal: (videoNodeId: string, final: boolean) => void
+  setVideoFinal: (videoNodeId: string, final: boolean) => Promise<void>
   setVideoStatus: (
     videoNodeId: string,
     status: DirectorVideoStatus,
@@ -524,7 +715,7 @@ interface DirectorCanvasState {
   generateVideoForShot: (shotNodeId: string) => Promise<string | null>
   /** 기존 Video 노드 1개를 effective 설정으로 (재)생성 (D-5). 마더 Shot storyboardImage 있으면 I2V.
    *  반환 false = 생성 대기열(쿼터) 초과로 시작하지 못함(#e5) — 노드는 pending으로 되돌려짐. */
-  regenerateVideo: (videoNodeId: string) => Promise<boolean>
+  regenerateVideo: (videoNodeId: string, heldLock?: GenerationLock) => Promise<boolean>
 
   // stage progression (Higgsfield 진행 버튼)
   /** 진행 버튼: 현 단계 기준 다음 산출물 생성 — rough→generateStoryboardImage(in-place 실사), live/video→generateVideoForShot(별도 Video 노드) */
@@ -533,7 +724,7 @@ interface DirectorCanvasState {
   // prompt node (Higgsfield식 분리 프롬프트)
   /** Prompt 노드 추가 (캔버스 보조 노드). 생성된 노드 id 반환 */
   addPromptNode: (position?: XYPosition, text?: string) => string
-  /** Prompt 노드를 Shot T 입력에 와이어링 — prompt 엣지 추가 + 대상 Shot.prompt 동기 */
+  /** Prompt 노드를 Shot T 입력에 와이어링 — prompt 엣지 추가 + 대상 Shot.promptOverride 동기 */
   wirePromptToShot: (promptNodeId: string, shotNodeId: string) => void
 
   // playback + thumbnail (ST-4 후속 — Node 탭 영상 재생)
@@ -555,7 +746,7 @@ interface DirectorCanvasState {
   closePopup: () => void
   openDeleteConfirm: (id: string) => void
   closeDeleteConfirm: () => void
-  confirmDelete: () => void
+  confirmDelete: () => Promise<void>
   openRelationModal: (
     source: string,
     target: string,
@@ -674,6 +865,12 @@ export function getFinalVideo(
   return children.find((n) => isVideoData(n.data) && n.data.final)
 }
 
+export function effectivePrompt(
+  data: Pick<ShotNodeData, 'prompt' | 'derivedPrompt' | 'promptOverride'>,
+): string {
+  return data.promptOverride ?? data.derivedPrompt ?? data.prompt ?? ''
+}
+
 /** Video 노드의 effective 설정 (마더 Shot 상속 + override) */
 export function getEffectiveShotConfig(
   state: Pick<DirectorCanvasState, 'nodes'>,
@@ -692,7 +889,7 @@ export function getEffectiveShotConfig(
   const m = mother.data
   const o = video.data.override
   return {
-    prompt: o.prompt ?? m.prompt,
+    prompt: o.prompt ?? effectivePrompt(m),
     camera: o.camera ?? m.camera,
     lighting: o.lighting ?? m.lighting,
     cameraPreset: o.cameraPreset ?? m.cameraPreset,
@@ -818,6 +1015,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         // localStorage 잔존 노드가 새 프로젝트로 새지 않도록 in-memory를 리셋하고,
         // 변경된 빈 상태가 곧바로 persist에 덮어써지게 한다.
         if (get().projectId !== projectId) {
+          hydrationEpoch += 1
           set({
             projectId,
             nodes: initialNodes,
@@ -897,7 +1095,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       hydrateFromDb: async (projectId) => {
-        if (!projectId) return
+        if (!projectId || get().projectId !== projectId) return
+        const hydrationToken = ++hydrationEpoch
+        const localSnapshot = snapshotHydrationLocals(get().nodes)
         try {
           const supabase = createClient()
           const [scenesRes, shotsRes, clipsRes] = await Promise.all([
@@ -909,11 +1109,23 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               .from('shots')
               .select('shot_id, canvas_position, storyboard_image')
               .eq('project_id', projectId),
-            supabase.from('video_clips').select('*').eq('project_id', projectId),
+            fetch(`/api/director/video-takes?projectId=${encodeURIComponent(projectId)}`).then(
+              async (response) => {
+                if (!response.ok) throw new Error(`video takes HTTP ${response.status}`)
+                const body: unknown = await response.json()
+                const rawTakes =
+                  body && typeof body === 'object'
+                    ? (body as Record<string, unknown>).takes
+                    : null
+                if (!Array.isArray(rawTakes) || !rawTakes.every(isHydratedVideoTake)) {
+                  throw new Error('Invalid video takes payload')
+                }
+                return { data: rawTakes }
+              },
+            ),
           ])
           if (scenesRes.error) throw scenesRes.error
           if (shotsRes.error) throw shotsRes.error
-          if (clipsRes.error) throw clipsRes.error
 
           const scenePosBySceneId = new Map<string, { x: number; y: number }>()
           for (const r of scenesRes.data ?? []) {
@@ -925,90 +1137,182 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             const p = r.canvas_position as { x: number; y: number } | null
             if (p && r.shot_id) shotPosByShotId.set(r.shot_id, p)
           }
-          // #3: DB(shots.storyboard_image)가 진실 — 재진입 시 stale(실패/구버전) 상태를 DB로 덮어쓴다.
-          const storyboardByShotId = new Map<string, ShotNodeData['storyboardImage']>()
+          // DB is canonical. Apply one current-project snapshot so an older response cannot
+          // leak cached media, positions, or takes into a subsequently selected project.
+          const storyboardByShotId = new Map<string, ShotNodeData['storyboardImage'] | null>()
           for (const r of shotsRes.data ?? []) {
-            const sb = r.storyboard_image as ShotNodeData['storyboardImage'] | null
-            if (sb && r.shot_id) storyboardByShotId.set(r.shot_id, sb)
+            if (r.shot_id) {
+              storyboardByShotId.set(
+                r.shot_id,
+                (r.storyboard_image as ShotNodeData['storyboardImage'] | null) ?? null,
+              )
+            }
           }
+          const liveSceneIds = new Set(
+            (scenesRes.data ?? []).map((row) => row.scene_id as string).filter(Boolean),
+          )
+          const liveShotIds = new Set(
+            (shotsRes.data ?? []).map((row) => row.shot_id as string).filter(Boolean),
+          )
+          const liveClipIds = new Set(
+            (clipsRes.data ?? []).map((row) => row.id as string).filter(Boolean),
+          )
 
-          // 1) 기존 Scene/Shot 노드에 canvas_position 덮어쓰기 (DB 우선)
-          set((s) => ({
-            nodes: s.nodes.map((n) => {
-              if (isSceneData(n.data) && n.data.writerSceneId) {
-                const p = scenePosBySceneId.get(n.data.writerSceneId)
-                if (p) return { ...n, position: { x: p.x, y: p.y } }
-              } else if (isShotData(n.data) && n.data.writerShotId) {
-                const p = shotPosByShotId.get(n.data.writerShotId)
-                const sb = storyboardByShotId.get(n.data.writerShotId)
-                if (p || sb) {
+          set((s) => {
+            if (s.projectId !== projectId || hydrationEpoch !== hydrationToken) return {}
+
+            // writer-backed scene/shot nodes are canonical. Nodes without a writer
+            // backing ID are the explicitly supported local-only canvas nodes.
+            let nodes = s.nodes
+              .filter((node) => {
+                if (isSceneData(node.data) && node.data.writerSceneId) {
+                  return liveSceneIds.has(node.data.writerSceneId)
+                }
+                if (isShotData(node.data) && node.data.writerShotId) {
+                  return liveShotIds.has(node.data.writerShotId)
+                }
+                return !isVideoData(node.data) ||
+                  node.data.lastAttemptStatus === 'generating' ||
+                  (node.data.videoClipId !== null && liveClipIds.has(node.data.videoClipId))
+              })
+              .map((n) => {
+                if (isSceneData(n.data) && n.data.writerSceneId) {
+                  const p = scenePosBySceneId.get(n.data.writerSceneId)
+                  return p && positionMatchesHydrationSnapshot(n, localSnapshot.get(n.id))
+                    ? { ...n, position: { x: p.x, y: p.y } }
+                    : n
+                }
+                if (isShotData(n.data) && n.data.writerShotId) {
+                  const p = shotPosByShotId.get(n.data.writerShotId)
                   return {
                     ...n,
-                    position: p ? { x: p.x, y: p.y } : n.position,
-                    data: sb ? { ...n.data, storyboardImage: sb } : n.data,
-                  }
+                    position:
+                      p && positionMatchesHydrationSnapshot(n, localSnapshot.get(n.id))
+                        ? { x: p.x, y: p.y }
+                        : n.position,
+                    data: {
+                      ...n.data,
+                      storyboardImage: shotStoryboardMatchesHydrationSnapshot(
+                        n,
+                        localSnapshot.get(n.id),
+                      )
+                        ? storyboardByShotId.get(n.data.writerShotId) ?? null
+                        : n.data.storyboardImage,
+                    },
+                  } as DirectorNode
                 }
+                return n
+              })
+            const retainedNodeIds = new Set(nodes.map((node) => node.id))
+            let edges = s.edges.filter(
+              (edge) => retainedNodeIds.has(edge.source) && retainedNodeIds.has(edge.target),
+            )
+
+            for (const row of clipsRes.data ?? []) {
+              const clipId = row.id as string
+              if (!clipId) continue
+              const existingIndex = nodes.findIndex(
+                (n) => isVideoData(n.data) && n.data.videoClipId === clipId,
+              )
+              const dbPos = row.canvas_position as { x: number; y: number } | null
+              if (existingIndex >= 0) {
+                const existingNode = nodes[existingIndex]
+                if (!isVideoData(existingNode.data)) continue
+                const snapshot = localSnapshot.get(existingNode.id)
+                const canonicalAttemptAt =
+                  row.latestAttemptAt ?? row.last_attempt_at ?? row.updated_at ?? null
+                const preserveLocalAttempt =
+                  existingNode.data.lastAttemptStatus === 'generating' &&
+                  existingNode.data.generationJobId !== null &&
+                  row.latestJobId !== existingNode.data.generationJobId &&
+                  isStrictlyNewerAttempt(existingNode.data.lastAttemptAt, canonicalAttemptAt)
+                const preserveLocalFinal =
+                  !videoFieldMatchesHydrationSnapshot(existingNode, snapshot, 'final') ||
+                  pendingVideoFinalWrites.has(`${projectId}:${existingNode.data.parentShotNodeId}`)
+                nodes[existingIndex] = {
+                  ...existingNode,
+                  position:
+                    dbPos && positionMatchesHydrationSnapshot(existingNode, snapshot)
+                      ? { x: dbPos.x, y: dbPos.y }
+                      : existingNode.position,
+                  data: {
+                    ...existingNode.data,
+                    label: videoFieldMatchesHydrationSnapshot(existingNode, snapshot, 'label')
+                      ? (row.take_label as string) ?? `take_v${row.take_number}`
+                      : existingNode.data.label,
+                    takeNumber: (row.take_number as number) ?? existingNode.data.takeNumber,
+                    override: videoFieldMatchesHydrationSnapshot(existingNode, snapshot, 'override')
+                      ? (row.override as VideoOverride) ?? {}
+                      : existingNode.data.override,
+                    final: preserveLocalFinal
+                      ? existingNode.data.final
+                      : (row.is_final as boolean) ?? false,
+                    videoUrl: (row.url as string) ?? null,
+                    thumbnailUrl: (row.thumbnail_url as string) ?? null,
+                    status: preserveLocalAttempt ? existingNode.data.status : hydratedVideoStatus(row),
+                    generationJobId: preserveLocalAttempt
+                      ? existingNode.data.generationJobId
+                      : row.latestJobId ?? null,
+                    lastAttemptStatus: preserveLocalAttempt
+                      ? existingNode.data.lastAttemptStatus
+                      : row.latestJobStatus ??
+                        (row.last_attempt_status === 'queued'
+                          ? 'generating'
+                          : row.last_attempt_status),
+                    lastAttemptError: preserveLocalAttempt
+                      ? existingNode.data.lastAttemptError
+                      : row.latestJobError ?? row.last_attempt_error ?? null,
+                    lastAttemptAt: preserveLocalAttempt
+                      ? existingNode.data.lastAttemptAt
+                      : row.latestAttemptAt ?? row.last_attempt_at ?? row.updated_at ?? null,
+                    createdAt: row.created_at ?? existingNode.data.createdAt,
+                  },
+                } as DirectorNode
+                continue
               }
-              return n
-            }),
-            lastSavedAt: Date.now(),
-          }))
 
-          // 2) video_clips 행 → 누락 Video 노드 생성 (parent Shot은 1)에서 위치 확정됨)
-          for (const row of clipsRes.data ?? []) {
-            const clipId = row.id as string
-            if (!clipId) continue
-            const state = get()
-            // 이미 이 videoClipId를 가진 노드가 있으면 skip
-            const exists = state.nodes.some(
-              (n) => isVideoData(n.data) && n.data.videoClipId === clipId,
-            )
-            if (exists) continue
-            // 부모 Shot 노드 매칭 (shot_id == writerShotId)
-            const parentShot = state.nodes.find(
-              (n) => isShotData(n.data) && n.data.writerShotId === row.shot_id,
-            )
-            if (!parentShot) continue // 부모 없으면 생성 안 함
-
-            const takeIndex = nextTakeIndex(state, parentShot.id)
-            const dbPos = row.canvas_position as { x: number; y: number } | null
-            const position: XYPosition = dbPos
-              ? { x: dbPos.x, y: dbPos.y }
-              : nextVideoPosition(state, parentShot.id)
-
-            const id = newDirectorId('dn')
-            const data = makeVideoData(parentShot.id, takeIndex)
-            data.videoClipId = clipId
-            data.label = (row.take_label as string) ?? data.label
-            data.override = (row.override as VideoOverride) ?? {}
-            data.final = (row.is_final as boolean) ?? false
-            data.videoUrl = (row.url as string) ?? null
-            data.thumbnailUrl = (row.thumbnail_url as string) ?? null
-            data.status = ((row.status as DirectorVideoStatus) ??
-              'pending') as DirectorVideoStatus
-            const videoNode: DirectorNode = {
-              id,
-              type: 'video',
-              position,
-              data,
+              const parentShot = nodes.find(
+                (n) => isShotData(n.data) && n.data.writerShotId === row.shot_id,
+              )
+              if (!parentShot) continue
+              const takeIndex = (row.take_number as number) ?? nextTakeIndex({ ...s, nodes }, parentShot.id)
+              const data = makeVideoData(parentShot.id, takeIndex)
+              data.videoClipId = clipId
+              data.label = (row.take_label as string) ?? data.label
+              data.takeNumber = takeIndex
+              data.generationJobId = row.latestJobId ?? null
+              data.lastAttemptStatus = row.latestJobStatus ?? (row.last_attempt_status === 'queued' ? 'generating' : row.last_attempt_status)
+              data.lastAttemptError = row.latestJobError ?? row.last_attempt_error ?? null
+              data.lastAttemptAt = row.latestAttemptAt ?? row.last_attempt_at ?? row.updated_at ?? null
+              data.createdAt = row.created_at ?? data.createdAt
+              data.override = (row.override as VideoOverride) ?? {}
+              data.final = (row.is_final as boolean) ?? false
+              data.videoUrl = (row.url as string) ?? null
+              data.thumbnailUrl = (row.thumbnail_url as string) ?? null
+              data.status = hydratedVideoStatus(row)
+              const id = newDirectorId('dn')
+              nodes = [...nodes, {
+                id,
+                type: 'video',
+                position: dbPos ? { x: dbPos.x, y: dbPos.y } : nextVideoPosition({ ...s, nodes }, parentShot.id),
+                data,
+              }]
+              edges = [...edges, {
+                id: newDirectorId('de'),
+                source: parentShot.id,
+                target: id,
+                sourceHandle: 'right',
+                targetHandle: 'left',
+                type: 'parent',
+                data: { category: 'parent', relationText: '' },
+              }]
             }
-            const parentEdge: DirectorEdge = {
-              id: newDirectorId('de'),
-              source: parentShot.id,
-              target: id,
-              sourceHandle: 'right',
-              targetHandle: 'left',
-              type: 'parent',
-              data: { category: 'parent', relationText: '' },
-            }
-            set((s) => ({
-              nodes: [...s.nodes, videoNode],
-              edges: [...s.edges, parentEdge],
-              lastSavedAt: Date.now(),
-            }))
-          }
+
+            return { nodes, edges, lastSavedAt: Date.now() }
+          })
         } catch (err) {
           console.error('[director-store] hydrateFromDb failed:', err)
+          throw err
         }
       },
 
@@ -1092,41 +1396,6 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           lastSavedAt: Date.now(),
         }))
 
-        // Step 2: video_clips 행 INSERT (fire-and-forget). 마더 Shot에 writerShotId
-        // 있을 때만 — 수동 노드(shots 행 없음)는 local-only로 두고 videoClipId=null 유지.
-        const parentWriterShotId = isShotData(mother.data)
-          ? mother.data.writerShotId
-          : null
-        const projectId = state.projectId
-        if (parentWriterShotId && projectId) {
-          void (async () => {
-            try {
-              const supabase = createClient()
-              const { data: inserted, error } = await supabase
-                .from('video_clips')
-                .insert({
-                  project_id: projectId,
-                  shot_id: parentWriterShotId,
-                  take_label: videoData.label,
-                  is_final: false,
-                  canvas_position: { x: defaultPos.x, y: defaultPos.y },
-                  status: 'pending',
-                })
-                .select('id')
-                .single()
-              if (error) throw error
-              const clipId = inserted?.id as string | undefined
-              if (clipId) {
-                get().updateNodeData<'video'>(id, { videoClipId: clipId })
-              }
-            } catch (err) {
-              console.error(
-                '[director-store] video_clip INSERT failed:',
-                err,
-              )
-            }
-          })()
-        }
         return id
       },
 
@@ -1191,8 +1460,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               : n,
           ),
         }))
-        // 대상 Shot.prompt 동기 (updateNodeData 경로 → undo 제외)
-        api.updateNodeData<'shot'>(shotNodeId, { prompt: text })
+        // 대상 Shot의 사용자 prompt override 동기 (writer sync derivedPrompt 불가침)
+        api.updateNodeData<'shot'>(shotNodeId, { promptOverride: text })
       },
 
       updateNodeData: (id, patch) => {
@@ -1202,9 +1471,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         // 노드 데이터 수정은 undo 대상에서 제외 — generateStoryboardImage 등 생성 결과도
         // 이 경로로 들어와 history를 오염시키기 때문. undo는 드래그/추가/삭제/연결/정렬만.
 
-        // Shot 설정 변경 시 prompt/camera/lighting/cameraPreset/provider 변경이면 자식 Video stale
+        // Shot 생성 설정 변경 시 prompt/camera/lighting/cameraPreset/provider 변경이면 자식 Video stale
         const shotConfigKeys: (keyof ShotNodeData)[] = [
           'prompt',
+          'derivedPrompt',
+          'promptOverride',
           'camera',
           'lighting',
           'cameraPreset',
@@ -1214,11 +1485,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           'characterAssetIds',
           'worldAssetIds',
         ]
+        const shotPatch = patch as Partial<ShotNodeData>
         // 주: storyboardImage는 제외 — 생성 status 전이(generating/failed)마다 stale 전파되는
         // 것을 피하기 위함. "새 storyboardImage → 자식 Video stale"은 ST-4에서 명시 처리.
         const isShotConfigChange =
           isShotData(prev.data) &&
-          shotConfigKeys.some((k) => k in patch)
+          shotConfigKeys.some((k) => k in shotPatch && prev.data[k] !== shotPatch[k])
 
         set((s) => ({
           nodes: s.nodes.map((n) =>
@@ -1254,53 +1526,92 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             })
           }
         }
-      },
-
-      deleteNode: (id) => {
-        if (isDemoSession()) return
-        get().commitHistory()
-        const ids = collectCascadeIds(get().nodes, id)
-
-        // Step 2: cascade에 포함된 Video 노드의 videoClipId를 제거 전에 수집 → DB DELETE
-        const clipIdsToDelete: string[] = []
-        for (const n of get().nodes) {
-          if (
-            ids.has(n.id) &&
-            isVideoData(n.data) &&
-            n.data.videoClipId
-          ) {
-            clipIdsToDelete.push(n.data.videoClipId)
+        if (isVideoData(prev.data) && ('label' in patch || 'override' in patch)) {
+          const node = get().nodes.find((n) => n.id === id)
+          if (node && isVideoData(node.data) && node.data.videoClipId) {
+            const clipId = node.data.videoClipId
+            debouncedVideoClipSaveToDb(
+              clipId,
+              get().projectId,
+              () => {
+                const current = get().nodes.find((n) => n.id === id)
+                if (!current || !isVideoData(current.data)) return undefined
+                return {
+                  ...('label' in patch ? { take_label: current.data.label } : {}),
+                  ...('override' in patch ? { override: current.data.override } : {}),
+                }
+              },
+              () => get().hydrateFromDb(get().projectId),
+            )
           }
         }
+      },
+
+      deleteNode: async (id) => {
+        if (isDemoSession()) return
+        get().commitHistory()
+        const projectId = get().projectId
+        const deleteKey = `${projectId}:${id}`
+        const intent = (latestVideoDeleteIntent.get(deleteKey) ?? 0) + 1
+        latestVideoDeleteIntent.set(deleteKey, intent)
+        const ids = collectCascadeIds(get().nodes, id)
+        const removedNodes = get().nodes.filter((node) => ids.has(node.id))
+        const removedEdges = get().edges.filter(
+          (edge) => ids.has(edge.source) || ids.has(edge.target),
+        )
+        const clipIdsToDelete = removedNodes.flatMap((node) =>
+          isVideoData(node.data) && node.data.videoClipId ? [node.data.videoClipId] : [],
+        )
 
         set((s) => ({
-          nodes: s.nodes.filter((n) => !ids.has(n.id)),
-          edges: s.edges.filter(
-            (e) => !ids.has(e.source) && !ids.has(e.target),
-          ),
-          selectedNodeId:
-            s.selectedNodeId && ids.has(s.selectedNodeId)
-              ? null
-              : s.selectedNodeId,
+          nodes: s.nodes.filter((node) => !ids.has(node.id)),
+          edges: s.edges.filter((edge) => !ids.has(edge.source) && !ids.has(edge.target)),
+          selectedNodeId: s.selectedNodeId && ids.has(s.selectedNodeId) ? null : s.selectedNodeId,
           lastSavedAt: Date.now(),
         }))
 
-        // Step 2: video_clips 행 DELETE (fire-and-forget)
-        if (clipIdsToDelete.length > 0) {
-          void (async () => {
-            try {
-              const supabase = createClient()
-              await supabase
-                .from('video_clips')
-                .delete()
-                .in('id', clipIdsToDelete)
-            } catch (err) {
-              console.error(
-                '[director-store] video_clip DELETE failed:',
-                err,
+        try {
+          await Promise.all(
+            clipIdsToDelete.map(async (clipId) => {
+              const response = await fetch(
+                `/api/director/video-takes/${encodeURIComponent(clipId)}`,
+                {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ projectId }),
+                },
               )
+              if (!response.ok) throw new Error(`HTTP ${response.status}`)
+            }),
+          )
+        } catch (error) {
+          if (
+            latestVideoDeleteIntent.get(deleteKey) === intent &&
+            get().projectId === projectId
+          ) {
+            // Restore only removed entities, preserving edits made after this optimistic delete.
+            set((s) => ({
+              nodes: [
+                ...s.nodes,
+                ...removedNodes.filter((node) => !s.nodes.some((current) => current.id === node.id)),
+              ],
+              edges: [
+                ...s.edges,
+                ...removedEdges.filter((edge) => !s.edges.some((current) => current.id === edge.id)),
+              ],
+              generationErrors: {
+                ...s.generationErrors,
+                [id]: error instanceof Error ? error.message : 'Video take deletion failed',
+              },
+              lastSavedAt: Date.now(),
+            }))
+            try {
+              await get().hydrateFromDb(projectId)
+            } catch (hydrateError) {
+              console.error('[director-store] delete reconciliation failed:', hydrateError)
             }
-          })()
+          }
+          throw error
         }
       },
 
@@ -1473,81 +1784,118 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       // ─── video ─────────────────────────────────────────────────────────
 
       setVideoFinal: (videoNodeId, final) => {
-        const video = get().nodes.find((n) => n.id === videoNodeId)
-        if (!video || !isVideoData(video.data)) return
-        const shotId = video.data.parentShotNodeId
-
-        // Step 2: DB로 flip할 형제 clip id 수집 (final=true일 때 기존 final 해제)
-        const demotedClipIds: string[] = []
-        if (final) {
-          for (const n of get().nodes) {
-            if (
-              n.id !== videoNodeId &&
-              isVideoData(n.data) &&
-              n.data.parentShotNodeId === shotId &&
-              n.data.final &&
-              n.data.videoClipId
-            ) {
-              demotedClipIds.push(n.data.videoClipId)
-            }
-          }
+        const video = get().nodes.find((node) => node.id === videoNodeId)
+        if (!video || !isVideoData(video.data)) {
+          return Promise.reject(new Error('Video take not found'))
+        }
+        if (final && (!video.data.videoUrl || video.data.status !== 'completed')) {
+          return Promise.reject(new Error('Only completed playable videos can be Final'))
         }
 
+        const clipId = video.data.videoClipId
+        const projectId = get().projectId
+        if (!clipId || !projectId) {
+          return Promise.reject(new Error('Video take is not persisted'))
+        }
+        const queueKey = `${projectId}:${video.data.parentShotNodeId}`
+        const intent = (latestVideoFinalIntent.get(queueKey) ?? 0) + 1
+        latestVideoFinalIntent.set(queueKey, intent)
+        const previousFinalFlags = new Map(
+          get().nodes
+            .filter(
+              (node): node is DirectorNode =>
+                isVideoData(node.data) &&
+                node.data.parentShotNodeId === video.data.parentShotNodeId,
+            )
+            .map((node) => [node.id, node.data.final]),
+        )
+
         set((s) => ({
-          nodes: s.nodes.map((n) => {
-            if (n.id === videoNodeId && isVideoData(n.data)) {
-              return { ...n, data: { ...n.data, final } } as DirectorNode
+          nodes: s.nodes.map((node) => {
+            if (!isVideoData(node.data) || node.data.parentShotNodeId !== video.data.parentShotNodeId) {
+              return node
             }
-            // Shot당 1개 강제: 같은 Shot 다른 Video는 final 해제
-            if (
-              final &&
-              isVideoData(n.data) &&
-              n.data.parentShotNodeId === shotId &&
-              n.id !== videoNodeId
-            ) {
-              return { ...n, data: { ...n.data, final: false } } as DirectorNode
-            }
-            return n
+            return {
+              ...node,
+              data: { ...node.data, final: node.id === videoNodeId ? final : false },
+            } as DirectorNode
           }),
+          generationErrors: { ...s.generationErrors, [videoNodeId]: '' },
           lastSavedAt: Date.now(),
         }))
 
-        // Step 2: is_final → video_clips 행 write (fire-and-forget)
-        const clipId = isVideoData(video.data) ? video.data.videoClipId : null
-        if (clipId || demotedClipIds.length > 0) {
-          void (async () => {
-            try {
-              const supabase = createClient()
-              const ops: Promise<unknown>[] = []
-              if (clipId) {
-                ops.push(
-                  Promise.resolve(
-                    supabase
-                      .from('video_clips')
-                      .update({ is_final: final })
-                      .eq('id', clipId),
-                  ),
-                )
-              }
-              for (const demoted of demotedClipIds) {
-                ops.push(
-                  Promise.resolve(
-                    supabase
-                      .from('video_clips')
-                      .update({ is_final: false })
-                      .eq('id', demoted),
-                  ),
-                )
-              }
-              await Promise.all(ops)
-            } catch (err) {
-              console.error(
-                '[director-store] setVideoFinal DB write failed:',
-                err,
-              )
+        let patchSucceeded = false
+        const previous = pendingVideoFinalWrites.get(queueKey) ?? Promise.resolve()
+        const write = previous
+          .catch(() => undefined)
+          .then(async () => {
+            const response = await fetch(`/api/director/video-takes/${encodeURIComponent(clipId)}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ projectId, is_final: final }),
+            })
+            if (!response.ok) throw new Error(`HTTP ${response.status}`)
+            patchSucceeded = true
+            if (
+              latestVideoFinalIntent.get(queueKey) === intent &&
+              get().projectId === projectId
+            ) {
+              await get().hydrateFromDb(projectId)
             }
-          })()
-        }
+          })
+          .catch(async (error) => {
+            if (
+              latestVideoFinalIntent.get(queueKey) === intent &&
+              get().projectId === projectId
+            ) {
+              set((s) => ({
+                generationErrors: {
+                  ...s.generationErrors,
+                  [videoNodeId]: error instanceof Error ? error.message : 'Final update failed',
+                },
+              }))
+              // Remove only this failed queue entry before reconciliation. A newer
+              // intent owns a different entry and must continue protecting its
+              // optimistic Final state from hydration.
+              if (!patchSucceeded && pendingVideoFinalWrites.get(queueKey) === write) {
+                pendingVideoFinalWrites.delete(queueKey)
+              }
+              try {
+                await get().hydrateFromDb(projectId)
+              } catch (hydrateError) {
+                console.error('[director-store] Final reconciliation failed:', hydrateError)
+                if (
+                  !patchSucceeded &&
+                  latestVideoFinalIntent.get(queueKey) === intent &&
+                  get().projectId === projectId
+                ) {
+                  set((s) => ({
+                    nodes: s.nodes.map((node) => {
+                      const previousFinal = previousFinalFlags.get(node.id)
+                      return previousFinal === undefined || !isVideoData(node.data)
+                        ? node
+                        : { ...node, data: { ...node.data, final: previousFinal } } as DirectorNode
+                    }),
+                  }))
+                }
+              }
+            }
+            throw error
+          })
+        pendingVideoFinalWrites.set(queueKey, write)
+        void write.then(
+          () => {
+            if (pendingVideoFinalWrites.get(queueKey) === write) {
+              pendingVideoFinalWrites.delete(queueKey)
+            }
+          },
+          () => {
+            if (pendingVideoFinalWrites.get(queueKey) === write) {
+              pendingVideoFinalWrites.delete(queueKey)
+            }
+          },
+        )
+        return write
       },
 
       setVideoStatus: (videoNodeId, status, payload) => {
@@ -1576,33 +1924,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           lastSavedAt: Date.now(),
         }))
 
-        // Step 2: completed 시 url/status를 video_clips 행에 반영 (videoClipId 있을 때만).
-        // 파일 영속은 이미 /api/assets/upload-video가 처리 — 여기선 row에 url+status만 반영.
         if (status === 'completed') {
-          // 완료 즉시 썸네일 생성(첫 프레임 캡처 → Storage 업로드). 수동 노드 포함.
           void get().ensureVideoThumbnail(videoNodeId)
-          const node = get().nodes.find((n) => n.id === videoNodeId)
-          if (node && isVideoData(node.data) && node.data.videoClipId) {
-            const clipId = node.data.videoClipId
-            const url = node.data.videoUrl
-            void (async () => {
-              try {
-                const supabase = createClient()
-                await supabase
-                  .from('video_clips')
-                  .update({
-                    status: 'completed',
-                    ...(url ? { url } : {}),
-                  })
-                  .eq('id', clipId)
-              } catch (err) {
-                console.error(
-                  '[director-store] setVideoStatus DB write failed:',
-                  err,
-                )
-              }
-            })()
-          }
         }
       },
 
@@ -1623,12 +1946,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const node = get().nodes.find((n) => n.id === videoNodeId)
         if (node && isVideoData(node.data) && node.data.videoClipId) {
           const clipId = node.data.videoClipId
-          debouncedVideoClipSaveToDb(clipId, () => {
-            const n = get().nodes.find((x) => x.id === videoNodeId)
-            return n && isVideoData(n.data)
-              ? { override: n.data.override }
-              : undefined
-          })
+          debouncedVideoClipSaveToDb(
+            clipId,
+            get().projectId,
+            () => {
+              const n = get().nodes.find((x) => x.id === videoNodeId)
+              return n && isVideoData(n.data)
+                ? { override: n.data.override }
+                : undefined
+            },
+            () => get().hydrateFromDb(get().projectId),
+          )
         }
       },
 
@@ -1641,6 +1969,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         if (!node || !isShotData(node.data)) return
         const data = node.data
         const prevUrl = data.storyboardImage?.url ?? ''
+        const prompt = effectivePrompt(data) || data.label
 
         // status → generating (storyboardImage는 shotConfigKeys 아님 → stale 전파 없음)
         api.updateNodeData<'shot'>(shotNodeId, {
@@ -1666,7 +1995,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               body: JSON.stringify({
                 projectId,
                 writerShotId,
-                prompt: data.prompt || data.label,
+                prompt,
                 referenceImageUrls,
                 aspectRatio: '16:9',
               }),
@@ -1710,7 +2039,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                prompt: data.prompt || data.label,
+                prompt,
                 aspectRatio: '16:9',
                 referenceImageUrls,
               }),
@@ -1807,153 +2136,230 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const api = get()
         const shotNode = api.nodes.find((n) => n.id === shotNodeId)
         if (!shotNode || !isShotData(shotNode.data)) return null
+        const lock = acquireGenerationLock(api.projectId, shotNodeId)
+        if (!lock) return null
+        try {
+          // 새 Video take 생성 (마더 설정 상속, 결정 #13) → 그 노드를 생성
+          const videoNodeId = api.addVideoTake(shotNodeId)
+          if (!videoNodeId) return null
 
-        // 새 Video take 생성 (마더 설정 상속, 결정 #13) → 그 노드를 생성
-        const videoNodeId = api.addVideoTake(shotNodeId)
-        if (!videoNodeId) return null
-
-        const started = await get().regenerateVideo(videoNodeId)
-        if (!started) {
-          // 대기열(쿼터) 초과 — 방금 만든 take 노드를 롤백해 에러 노드를 남기지 않는다(#e5).
-          const node = get().nodes.find((n) => n.id === videoNodeId)
-          const clipId =
-            node && isVideoData(node.data) ? node.data.videoClipId : null
-          const takeLabel =
-            node && isVideoData(node.data) ? node.data.label : null
-          get().deleteNode(videoNodeId)
-          // addVideoTake의 clip INSERT는 fire-and-forget — 429가 그보다 빨리 돌아오면
-          // 노드에 videoClipId가 아직 없어 deleteNode가 클립을 못 지운다 → 지연 정리.
-          // (같은 take_label의 pending 행만 — 쿼터 초과 상태라 동일 라벨 재생성 경합은 사실상 없음)
-          if (!clipId && takeLabel && isShotData(shotNode.data) && shotNode.data.writerShotId) {
-            const writerShotId = shotNode.data.writerShotId
-            const projectId = get().projectId
-            setTimeout(() => {
-              void createClient()
-                .from('video_clips')
-                .delete()
-                .eq('project_id', projectId)
-                .eq('shot_id', writerShotId)
-                .eq('take_label', takeLabel)
-                .eq('status', 'pending')
-                .then(({ error }) => {
-                  if (error)
-                    console.warn('[director-store] quota rollback clip cleanup:', error.message)
-                })
-            }, 4000)
+          const started = await get().regenerateVideo(videoNodeId, lock)
+          if (!started) {
+            // 대기열(쿼터) 초과 — 방금 만든 take 노드를 롤백해 에러 노드를 남기지 않는다(#e5).
+            const node = get().nodes.find((n) => n.id === videoNodeId)
+            // Only an unsaved local take is rolled back on quota rejection.
+            if (node && isVideoData(node.data) && !node.data.videoClipId) {
+              await get().deleteNode(videoNodeId)
+            }
+            return null
           }
-          return null
+          return videoNodeId
+        } finally {
+          releaseGenerationLock(lock)
         }
-        return videoNodeId
       },
 
-      regenerateVideo: async (videoNodeId) => {
+      regenerateVideo: async (videoNodeId, heldLock) => {
         if (isDemoSession()) return true
-        const api = get()
-        const videoNode = api.nodes.find((n) => n.id === videoNodeId)
+        const videoNode = get().nodes.find((n) => n.id === videoNodeId)
         if (!videoNode || !isVideoData(videoNode.data)) return true
-        const shotNode = api.nodes.find(
-          (n) => n.id === (videoNode.data as VideoNodeData).parentShotNodeId,
-        )
+        const shotNode = get().nodes.find((n) => n.id === videoNode.data.parentShotNodeId)
         if (!shotNode || !isShotData(shotNode.data)) return true
-        const shot = shotNode.data
-        const shotNodeId = shotNode.id
-
-        // effective 설정 = 마더 Shot 상속 + 이 Video의 override
         const eff = getEffectiveShotConfig(get(), videoNodeId)
         if (!eff) return true
-
-        // 레퍼런스 결정: 마더 storyboardImage(완료) 우선 → 유저 업로드 → 없으면 T2V (결정 #40)
-        const storyboardUrl =
-          shot.storyboardImage?.status === 'completed' &&
-          shot.storyboardImage.url
-            ? shot.storyboardImage.url
-            : null
+        const projectId = get().projectId
+        const lockIsHeld = !!heldLock && generationLocks.get(heldLock.key) === heldLock.token
+        const lock = lockIsHeld ? null : acquireGenerationLock(projectId, shotNode.id)
+        if (!lockIsHeld && !lock) return true
+        const idempotencyKey = crypto.randomUUID()
+        const preserveSuccess = !!videoNode.data.videoUrl
         const referenceImageUrl =
-          storyboardUrl ?? shot.referenceImages[0]?.url ?? null
-        const generationMethod: 'T2V' | 'I2V' = referenceImageUrl
-          ? 'I2V'
-          : 'T2V'
-
-        get().setVideoStatus(videoNodeId, 'generating')
-
-        try {
-          const res = await fetch('/api/director/generate-video', {
+          shotNode.data.storyboardImage?.status === 'completed'
+            ? shotNode.data.storyboardImage.url
+            : shotNode.data.referenceImages[0]?.url ?? null
+        get().updateNodeData<'video'>(videoNodeId, {
+          lastAttemptStatus: 'generating',
+          lastAttemptError: null,
+          lastAttemptAt: new Date().toISOString(),
+          generationJobId: idempotencyKey,
+          ...(preserveSuccess ? {} : { status: 'generating', errorMessage: null }),
+        })
+        const requestPayload = {
+          projectId,
+          shotId: shotNode.id,
+          writerShotId: shotNode.data.writerShotId,
+          videoClipId: videoNode.data.videoClipId,
+          takeNumber: videoNode.data.takeNumber,
+          takeLabel: videoNode.data.label,
+          canvasPosition: videoNode.position,
+          idempotencyKey,
+          prompt: eff.prompt,
+          camera: eff.camera,
+          cameraPreset: eff.cameraPreset,
+          aspectRatio: '16:9',
+          generationMethod: referenceImageUrl ? 'I2V' : 'T2V',
+          model: normalizeProvider(eff.provider),
+          provider: toRouteProvider(eff.provider),
+          durationSeconds: shotNode.data.durationSeconds ?? 5,
+          referenceImageUrl,
+        }
+        const postGeneration = (recoveryReceipt?: string) =>
+          fetch('/api/director/generate-video', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              shotId: shotNodeId,
-              // webhook 서버사이드 영속(shots.video_url)을 위해 projectId + DB shot_id 전달.
-              // writerShotId 없으면(수동 노드) job 추적 없이 client polling만으로 동작.
-              projectId: get().projectId,
-              writerShotId: shot.writerShotId,
-              // TODO(ST-4 후속): writer 시간 축 연출 정보(움직임/카메라 동선)를 prompt에 추가 투입.
-              // 현재는 Shot prompt만 사용 (writer-store 연동은 D-4 sync 이후).
-              prompt: eff.prompt,
-              camera: eff.camera,
-              cameraPreset: eff.cameraPreset,
-              aspectRatio: '16:9',
-              generationMethod,
-              // #5: 모델 레지스트리 키 전달 (legacy 'kling'→'kling-o3' 정규화).
-              // provider는 라우트 back-compat 위해 병행 전송 (fal/local 매핑).
-              model: normalizeProvider(eff.provider),
-              provider: toRouteProvider(eff.provider),
-              // #4: flexible 모델 duration + Veo 트림 기준이 되는 설계 샷 길이
-              durationSeconds: shot.durationSeconds ?? 5,
-              referenceImageUrl,
-            }),
+            headers: {
+              'Content-Type': 'application/json',
+              'Idempotency-Key': idempotencyKey,
+            },
+            body: JSON.stringify(
+              recoveryReceipt ? { ...requestPayload, recoveryReceipt } : requestPayload,
+            ),
           })
+        let activeJobId: string | null = null
+        try {
+          let res = await postGeneration()
+          let body = (await res.json().catch(() => ({}))) as VideoGenerationResponse
+          for (
+            let recoveryAttempt = 0;
+            !res.ok &&
+            canRecoverGenerationAttempt(
+              body,
+              recoveryAttempt,
+              (() => {
+                const current = get().nodes.find((node) => node.id === videoNodeId)
+                return (
+                  get().projectId === projectId &&
+                  !!current &&
+                  isVideoData(current.data) &&
+                  current.data.generationJobId === idempotencyKey
+                )
+              })(),
+            );
+            recoveryAttempt += 1
+          ) {
+            await new Promise((resolve) => setTimeout(resolve, 250 * (recoveryAttempt + 1)))
+            const current = get().nodes.find((node) => node.id === videoNodeId)
+            if (
+              get().projectId !== projectId ||
+              !current ||
+              !isVideoData(current.data) ||
+              current.data.generationJobId !== idempotencyKey
+            ) {
+              return true
+            }
+            res = await postGeneration(body.recoveryReceipt)
+            body = (await res.json().catch(() => ({}))) as VideoGenerationResponse
+          }
+          const currentAttemptNode = get().nodes.find((n) => n.id === videoNodeId)
+          if (
+            get().projectId !== projectId ||
+            !currentAttemptNode ||
+            !isVideoData(currentAttemptNode.data) ||
+            currentAttemptNode.data.generationJobId !== idempotencyKey
+          ) return true
           if (!res.ok) {
-            const body = await res.json().catch(() => ({}))
-            // 생성 대기열(유저 쿼터) 초과(#e5) — 에러 노드를 만들지 않고 하단 알림으로만.
-            //   기존 노드는 pending으로 되돌리고, 새 take였다면 호출자가 노드를 롤백한다.
+            if (body.jobId || body.videoClipId) {
+              get().updateNodeData<'video'>(videoNodeId, {
+                videoClipId: body.videoClipId ?? videoNode.data.videoClipId,
+                takeNumber: body.takeNumber ?? videoNode.data.takeNumber,
+                generationJobId: body.jobId ?? videoNode.data.generationJobId,
+                lastAttemptStatus: body.status === 'queued' ? 'generating' : body.status ?? 'failed',
+                lastAttemptError: body.error ?? null,
+              })
+              await get().hydrateFromDb(projectId)
+            }
             if (res.status === 429 && body?.code === 'quota_exceeded') {
-              get().setVideoStatus(videoNodeId, 'pending')
-              toast.error(
-                body.error ??
-                  '생성 대기열이 가득 찼어요. 진행 중인 작업이 끝나면 다시 시도해주세요.',
-                { duration: 5000, closeButton: true },
-              )
+              if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
               return false
             }
             throw new Error(body.error ?? `HTTP ${res.status}`)
           }
-          const { taskId, provider: respProvider, model } = await res.json()
-
-          const pollUrl = `/api/director/generate-video/${encodeURIComponent(
-            taskId,
-          )}?provider=${respProvider}&model=${encodeURIComponent(model)}`
-
-          const startedAt = Date.now()
-          while (true) {
-            if (Date.now() - startedAt > VIDEO_POLL_TIMEOUT_MS) {
-              throw new Error('영상 생성 타임아웃 (5분)')
-            }
-            const pollRes = await fetch(pollUrl)
-            if (!pollRes.ok) {
-              const e = await pollRes.json().catch(() => ({}))
-              throw new Error(e.error ?? `폴링 실패 HTTP ${pollRes.status}`)
-            }
-            const poll = await pollRes.json()
-            if (poll.status === 'completed') {
-              const savedUrl = await persistDirectorVideo(
-                get().projectId,
-                shotNodeId,
-                poll.url,
-              )
-              get().setVideoStatus(videoNodeId, 'completed', { url: savedUrl })
-              notifyGenerationComplete('director', '영상') // 다른 stage에 있을 때만 알림
-              break
-            }
-            if (poll.status === 'failed') {
-              throw new Error(poll.error ?? '영상 생성 실패')
-            }
-            await new Promise((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS))
+          const jobId = body.jobId
+          if (typeof jobId !== 'string' || !jobId) {
+            throw new Error('Generation response missing jobId')
           }
+          get().updateNodeData<'video'>(videoNodeId, {
+            videoClipId: body.videoClipId ?? videoNode.data.videoClipId,
+            takeNumber: body.takeNumber ?? videoNode.data.takeNumber,
+            generationJobId: jobId,
+            lastAttemptStatus: body.status === 'queued' ? 'generating' : body.status ?? 'generating',
+          })
+          activeJobId = jobId
+          const isCurrentAttempt = () => {
+            const current = get()
+            const node = current.nodes.find((n) => n.id === videoNodeId)
+            return (
+              current.projectId === projectId &&
+              !!node &&
+              isVideoData(node.data) &&
+              node.data.generationJobId === jobId
+            )
+          }
+          const startedAt = Date.now()
+          while (Date.now() - startedAt < VIDEO_POLL_TIMEOUT_MS) {
+            const pollResponse = await fetch(`/api/generation-jobs/${encodeURIComponent(jobId)}`)
+            if (!pollResponse.ok) throw new Error(`Polling HTTP ${pollResponse.status}`)
+            const envelope: unknown = await pollResponse.json()
+            const job =
+              envelope &&
+              typeof envelope === 'object' &&
+              (envelope as Record<string, unknown>).ok === true &&
+              (envelope as Record<string, unknown>).data &&
+              typeof (envelope as Record<string, unknown>).data === 'object'
+                ? ((envelope as Record<string, unknown>).data as Record<string, unknown>)
+                : null
+            if (!job || typeof job.status !== 'string') throw new Error('Invalid polling response')
+            if (!isCurrentAttempt()) return true
+            const status = job.status === 'queued' ? 'generating' : job.status as DirectorVideoStatus
+            get().updateNodeData<'video'>(videoNodeId, {
+              lastAttemptStatus: status,
+              lastAttemptError: typeof job.error === 'string' ? job.error : null,
+              lastAttemptAt: new Date().toISOString(),
+            })
+            if (status === 'completed' || status === 'failed') {
+              if (!isCurrentAttempt()) return true
+              // The provider terminal outcome is authoritative for this attempt. A
+              // reconciliation failure is a separate canonical-sync error and must
+              // never rewrite that outcome.
+              const acceptedJobId = jobId
+              try {
+                await get().hydrateFromDb(projectId)
+              } catch (err) {
+                const message = `Canonical video-take hydration failed: ${
+                  err instanceof Error ? err.message : 'Unknown error'
+                }`
+                set((s) => ({
+                  generationErrors: { ...s.generationErrors, [videoNodeId]: message },
+                }))
+                console.error(`[director-store] ${message} for accepted job ${acceptedJobId}`)
+              }
+              if (!isCurrentAttempt()) return true
+              if (status === 'completed') notifyGenerationComplete('director', '영상')
+              return true
+            }
+            await new Promise((resolve) => setTimeout(resolve, VIDEO_POLL_INTERVAL_MS))
+          }
+          throw new Error('영상 생성 타임아웃 (5분)')
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Unknown error'
-          get().setVideoStatus(videoNodeId, 'failed', { error: message })
+          if (message.startsWith('Canonical video-take hydration failed:')) throw err
+          const current = get()
+          const node = current.nodes.find((n) => n.id === videoNodeId)
+          if (
+            current.projectId !== projectId ||
+            !node ||
+            !isVideoData(node.data) ||
+            node.data.generationJobId !== (activeJobId ?? idempotencyKey)
+          ) return true
+          get().updateNodeData<'video'>(videoNodeId, {
+            lastAttemptStatus: 'failed',
+            lastAttemptError: message,
+            ...(preserveSuccess ? {} : { status: 'failed', errorMessage: message }),
+          })
+          return true
         }
-        return true
+        finally {
+          releaseGenerationLock(lock)
+        }
       },
 
       // ─── playback + thumbnail ──────────────────────────────────────────
@@ -2016,51 +2422,71 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const node = get().nodes.find((n) => n.id === videoNodeId)
         if (!node || !isVideoData(node.data)) return
         const data = node.data
-        // 이미 썸네일 있거나, 영상 없거나, 캡처 진행 중이면 skip.
         if (!data.videoUrl || data.thumbnailUrl) return
-        if (thumbnailInFlight.has(videoNodeId)) return
-        thumbnailInFlight.add(videoNodeId)
+        const clipId = data.videoClipId
+        const generationJobId = data.generationJobId
+        const captureKey = clipId && generationJobId ? `${clipId}:${generationJobId}` : videoNodeId
+        if (thumbnailInFlight.has(captureKey)) return
+        thumbnailInFlight.add(captureKey)
         try {
           const blob = await captureVideoThumbnail(data.videoUrl)
           if (!blob) return
 
+          const current = get().nodes.find((n) => n.id === videoNodeId)
+          if (
+            !current ||
+            !isVideoData(current.data) ||
+            current.data.videoUrl !== data.videoUrl ||
+            current.data.videoClipId !== clipId ||
+            current.data.generationJobId !== generationJobId ||
+            current.data.thumbnailUrl
+          ) {
+            return
+          }
+
           const projectId = get().projectId
-          const clipId = data.videoClipId
-          // DB 샷(video_clips 행 존재) → Storage 업로드 + thumbnail_url/path 영속(속도·전송 안정).
-          if (clipId && projectId && projectId !== 'default') {
+          if (clipId && generationJobId && projectId && projectId !== 'default') {
+            const form = new FormData()
+            form.append('projectId', projectId)
+            form.append('type', 'video')
+            form.append('entityId', clipId)
+            form.append('field', 'thumbnail')
+            form.append('generationJobId', generationJobId)
+            form.append('file', blob, `${clipId}_thumbnail.jpg`)
             try {
-              const form = new FormData()
-              form.append('projectId', projectId)
-              form.append('type', 'video')
-              form.append('entityId', clipId)
-              form.append('field', 'thumbnail')
-              form.append('file', blob, `${clipId}_thumbnail.jpg`)
               const res = await fetch('/api/assets/upload-image', {
                 method: 'POST',
                 body: form,
               })
-              if (res.ok) {
-                const { publicUrl } = await res.json()
-                if (publicUrl) {
-                  get().updateNodeData<'video'>(videoNodeId, {
-                    thumbnailUrl: publicUrl,
-                  })
-                  return
-                }
+              if (!res.ok) throw new Error(`HTTP ${res.status}`)
+              const { publicUrl } = await res.json()
+              if (!publicUrl) throw new Error('Thumbnail upload returned no publicUrl')
+
+              const latest = get().nodes.find((n) => n.id === videoNodeId)
+              if (
+                latest &&
+                isVideoData(latest.data) &&
+                latest.data.videoUrl === data.videoUrl &&
+                latest.data.videoClipId === clipId &&
+                latest.data.generationJobId === generationJobId &&
+                !latest.data.thumbnailUrl
+              ) {
+                get().updateNodeData<'video'>(videoNodeId, { thumbnailUrl: publicUrl })
               }
             } catch (err) {
-              console.error(
-                '[director-store] thumbnail upload failed:',
-                err,
-              )
+              console.error('[director-store] thumbnail upload failed:', err)
             }
+            return
           }
-          // 수동 노드(clip 없음) 또는 업로드 실패 → 로컬 objectURL 폴백(세션 한정).
-          get().updateNodeData<'video'>(videoNodeId, {
-            thumbnailUrl: URL.createObjectURL(blob),
-          })
+
+          // Local object URLs are only valid for truly unpersisted manual nodes.
+          if (!clipId) {
+            get().updateNodeData<'video'>(videoNodeId, {
+              thumbnailUrl: URL.createObjectURL(blob),
+            })
+          }
         } finally {
-          thumbnailInFlight.delete(videoNodeId)
+          thumbnailInFlight.delete(captureKey)
         }
       },
 
@@ -2136,10 +2562,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         set({ deleteConfirmInfo: info })
       },
       closeDeleteConfirm: () => set({ deleteConfirmInfo: null }),
-      confirmDelete: () => {
+      confirmDelete: async () => {
         const info = get().deleteConfirmInfo
         if (!info) return
-        get().deleteNode(info.nodeId)
+        await get().deleteNode(info.nodeId)
         set({ deleteConfirmInfo: null })
       },
 
@@ -2209,7 +2635,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 const newId = api.addShotNode(sceneId, pos, u.label)
                 if (u.tempId) tempIdMap.set(u.tempId, newId)
                 if (u.prompt !== undefined) {
-                  api.updateNodeData<'shot'>(newId, { prompt: u.prompt })
+                  api.updateNodeData<'shot'>(newId, { promptOverride: u.prompt })
                 }
                 result.applied += 1
                 break
@@ -2234,7 +2660,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   result.skipped.push({ update: u, reason: 'not a Shot' })
                   break
                 }
-                api.updateNodeData<'shot'>(id, u.patch)
+                const { prompt, ...shotPatch } = u.patch
+                api.updateNodeData<'shot'>(id, {
+                  ...shotPatch,
+                  ...(prompt !== undefined ? { promptOverride: prompt } : {}),
+                })
                 result.applied += 1
                 break
               }
@@ -2436,8 +2866,26 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       partialize: (s) => ({
         // asset 노드/references 엣지는 파생물(asset-storage가 진실) — persist 제외.
         // 매 진입 시 sync가 rebuildAssetNodes로 재생성하므로 캐시에 남기면 stale 위험.
-        nodes: s.nodes.filter((n) => n.data.kind !== 'asset'),
-        edges: s.edges.filter((e) => e.data?.category !== 'references'),
+        nodes: s.nodes.filter(
+          (n) => n.data.kind !== 'asset' && (!isVideoData(n.data) || n.data.videoClipId !== null),
+        ),
+        edges: (() => {
+          const persistedNodeIds = new Set(
+            s.nodes
+              .filter(
+                (n) =>
+                  n.data.kind !== 'asset' &&
+                  (!isVideoData(n.data) || n.data.videoClipId !== null),
+              )
+              .map((n) => n.id),
+          )
+          return s.edges.filter(
+            (e) =>
+              e.data?.category !== 'references' &&
+              persistedNodeIds.has(e.source) &&
+              persistedNodeIds.has(e.target),
+          )
+        })(),
         viewport: s.viewport,
         viewMode: s.viewMode,
         projectId: s.projectId,
@@ -2548,10 +2996,9 @@ export function serializeDirectorCanvasContext(
       childShots.forEach((sh) => {
         if (!isShotData(sh.data)) return
         const shData = sh.data
+        const prompt = effectivePrompt(shData)
         const promptSnippet =
-          shData.prompt.length > 60
-            ? `${shData.prompt.slice(0, 60)}…`
-            : shData.prompt
+          prompt.length > 60 ? `${prompt.slice(0, 60)}…` : prompt
         const camActive = (
           ['horizontal', 'vertical', 'pan', 'tilt', 'roll', 'zoom'] as const
         ).filter((k) => shData.camera[k] !== 0).length
@@ -2608,7 +3055,7 @@ export function serializeDirectorCanvasContext(
       lines.push(`- 종류: ${sel.data.kind}`)
       lines.push(`- 라벨: ${sel.data.label}`)
       if (isShotData(sel.data)) {
-        lines.push(`- prompt (full): ${sel.data.prompt || '(빈)'}`)
+        lines.push(`- prompt (full): ${effectivePrompt(sel.data) || '(빈)'}`)
         lines.push(`- camera: ${JSON.stringify(sel.data.camera)}`)
         lines.push(`- lighting: ${JSON.stringify(sel.data.lighting)}`)
         lines.push(`- cameraPreset: ${JSON.stringify(sel.data.cameraPreset)}`)
