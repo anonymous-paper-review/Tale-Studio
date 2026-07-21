@@ -100,6 +100,7 @@ narrativeStructure에선 **depth 효과가 약하다**:
 - `research/writer/narrative/2026-07-21-structure-form-vs-scale-axes.md` — (후속 토론) 구조유형=형태 vs 깊이레벨=규모 축 분석, 사다리 결함 3개, 수정 방향 + 프로브 2셀.
 - `research/writer/doctrine/2026-07-21-writer-job-model.md` — (후속) writer 직무 모델 + 프롬프트 독트린 P1~P6 (원장/물리/관습 3진실).
 - `research/writer/prompts/2026-07-21-writer-prompt-audit.md` — (후속) 12개 스테이지 시스템프롬프트 전수 감사 — 전역 결함 5 + 스테이지별 피드백 + 실험 백로그 E1~E13.
+- `research/writer/experiments/2026-07-21-experiment-plan.md` — (후속) 감사 백로그의 실행 계획 승격 — W그룹(청소)/E그룹(A/B) 구분, Phase 1~4, 결과는 `experiments/results/`.
 - `docs/writer-llm-model-strategy-2026-07-21.md` — gemini-3-flash 사용처 지도, 유형(저작/수행/검수)×파급(뿌리/가지) 분류, 모델 배치 제안, Haiku/Sonnet 벤치.
 - `docs/writer-narrativestructure-vs-scenes-example-2026-07-21.md` — 실 프롬프트(verbatim)+결과, 유저입력→프롬프트→결과 흐름.
 - `docs/writer-stage-length-experiment-2026-07-21.md` — 길이 양극화 실험 설계.
