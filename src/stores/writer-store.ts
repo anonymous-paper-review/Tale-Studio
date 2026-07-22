@@ -785,8 +785,17 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         throw new Error(body.error ?? `HTTP ${res.status}`)
       }
       const { jobId } = (await res.json()) as { jobId: string }
-      await pollGenerationJob(jobId)
-      await get().loadProject() // DB 진실(previz_video 완료본) 리로드
+      // 잡 폴링은 best-effort — 폴링이 일시 오류로 던져도(webhook 이 이미 완료한 경쟁 등)
+      //   아래 진실 폴링이 shots.previz_video 를 회수한다(새로고침 불필요, 2026-07-22).
+      await pollGenerationJob(jobId).catch(() => {})
+      // 진실 폴링: previz_video 가 terminal(completed/failed)로 보일 때까지 리로드.
+      for (let i = 0; i < 30; i++) {
+        await get().loadProject()
+        const st = get().shots.find((sh) => sh.shotId === shotId)?.previzVideo?.status
+        if (st === 'completed' || st === 'failed') return
+        await new Promise((r) => setTimeout(r, 10_000))
+      }
+      throw new Error('previz 영상이 제한 시간 안에 완료되지 않았습니다')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'previz 영상 생성 실패'
       set((state) => ({
