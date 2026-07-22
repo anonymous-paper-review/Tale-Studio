@@ -5,7 +5,6 @@ import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure
 import { runScenes, mergeOpenCast, mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
 import { castContractToCharacters } from '@/lib/writer/cast-contract';
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
-import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview';
 import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual';
 import { runActVisualArc } from '@/lib/writer/pipeline/stages/v1_act_arc';
 import { runV2Design } from '@/lib/writer/pipeline/stages/v2_design';
@@ -35,7 +34,6 @@ import type {
   Characters,
   Scenes,
   StoryCheckReport,
-  MidPreview,
   VisualIdentity,
   ActVisualArc,
   CharacterVisual,
@@ -47,10 +45,9 @@ import type {
 
 // Skip 모드 default = true (피드백 미반영 stage 건너뜀, 비용 절감)
 // export: stepwise 엔진(pipeline/steps.ts)이 동일 로직 재사용.
-export function resolveSkip(input: PipelineInput): { validation1: boolean; midPreview: boolean } {
+export function resolveSkip(input: PipelineInput): { validation1: boolean } {
   return {
     validation1: input.skip?.validation1 ?? true,
-    midPreview: input.skip?.midPreview ?? true,
   };
 }
 
@@ -64,17 +61,6 @@ export function emptyC1Report(): StoryCheckReport {
     cdq_clarity_score: 0,
     cliche_count: 0,
     retry_count: 0,
-  };
-}
-
-// mid_preview skip 시 빈 추천 (V0V1/V2/V3이 S·L 기반 자체 결정)
-export function emptyMidPreview(): MidPreview {
-  return {
-    v_recommendations: { v0: { format: {}, style: {} }, v1: '', v2: '', v3: '', v4: '' },
-    color_script: [],
-    emotional_arc_visualization: '',
-    production_difficulty: 'medium',
-    warnings: [],
   };
 }
 
@@ -217,35 +203,21 @@ async function _runPipelineInner(
         logger,
       )).value;
 
-  // ===== Mid Preview (Visual 축 — 시각 제안 생성. skip 시 빈 추천) =====
-  const midPreview = skip.midPreview
-    ? (await (async () => {
-        await logger.markStage('midPreview', 'completed', { skipped: true });
-        return emptyMidPreview();
-      })())
-    : (await loadOrRun<MidPreview>(
-        resume,
-        '07_bridge_midPreview.json',
-        () => runMidPreview(genre, narrativeStructure, characters, scenes, storyCheck, logger, models.V),
-        'midPreview',
-        logger,
-      )).value;
-
   // ===== Visual 축 (native — steps.ts 서버리스 경로와 동일) =====
-  // v0: VisualIdentity 직접 생성 (genre + bridge seed.v0)
+  // v0: VisualIdentity 직접 생성 (genre + 스타일 앵커)
   const visualIdentity = (await loadOrRun<VisualIdentity>(
     resume,
     '08_v0_visualIdentity.json',
-    () => runVisualIdentity(genre, midPreview, logger, models.V, input.styleAnchor),
+    () => runVisualIdentity(genre, logger, models.V, input.styleAnchor),
     'visualIdentity',
     logger,
   )).value;
 
-  // v1: 막별 비주얼 아크 (s1 + v0 + bridge seed.v1)
+  // v1: 막별 비주얼 아크 (s1 + v0)
   const actVisualArc = (await loadOrRun<ActVisualArc>(
     resume,
     '08b_v1_actVisualArc.json',
-    () => runActVisualArc(narrativeStructure, visualIdentity, midPreview.v_recommendations.v1, logger, models.V),
+    () => runActVisualArc(narrativeStructure, visualIdentity, logger, models.V),
     'actVisualArc',
     logger,
   )).value;
@@ -253,11 +225,11 @@ async function _runPipelineInner(
   // s2 월드: producer background seed + 오픈캐스트(씬 로케이션 append-only). v2 입력.
   const world = mergeOpenWorld(input.background, scenes);
 
-  // v2: 인물/월드 비주얼 직접 생성 (v0 + v1 + s2 chars/world + bridge seed.v2). 옛 productionDesign+derive 대체.
+  // v2: 인물/월드 비주얼 직접 생성 (v0 + v1 + s2 chars/world). 옛 productionDesign+derive 대체.
   const { characterVisual, worldVisual } = (await loadOrRun<{ characterVisual: CharacterVisual; worldVisual: WorldVisual }>(
     resume,
     '09_v2_design.json',
-    () => runV2Design(visualIdentity, actVisualArc, characters, world, midPreview.v_recommendations.v2, logger, models.V),
+    () => runV2Design(visualIdentity, actVisualArc, characters, world, '', logger, models.V),
     'v2Design',
     logger,
   )).value;
@@ -313,7 +285,7 @@ async function _runPipelineInner(
       await logger.markStage('sceneCinematography', 'completed', { skipped: true, reason: `Compact Mode (${genre.depth_level})` });
       sceneBudgetIssues = scenes.scenes.flatMap((sc) => analyzeSceneActionBudget(sc).issues);
     } else {
-      const planResult = await runSceneCinematography(genre, characters, scenes, visualIdentity, worldVisual, midPreview, logger, models.V);
+      const planResult = await runSceneCinematography(genre, characters, scenes, visualIdentity, worldVisual, logger, models.V);
       await logger.flushRawLlm('sceneCinematography');
       sceneCinematography = planResult.scene_plans;
       sceneBudgetIssues = planResult.budget_issues;
@@ -336,7 +308,7 @@ async function _runPipelineInner(
     '11_v4_shotDesign.json',
     async () => {
       // 로컬 전체 실행 — 시간 예산 없음(opts 생략 → 항상 done까지 완주).
-      const result = await runShotDesign(genre, characters, scenes, visualIdentity, worldVisual, characterVisual, compact ? null : sceneCinematography, decoupage, midPreview.v_recommendations.v4, logger, models.V);
+      const result = await runShotDesign(genre, characters, scenes, visualIdentity, worldVisual, characterVisual, compact ? null : sceneCinematography, decoupage, '', logger, models.V);
       return { shots: result.shots, compact_mode: compact };
     },
     'shotDesign',
@@ -409,7 +381,6 @@ async function _runPipelineInner(
     characters,
     scenes,
     storyCheck,
-    midPreview,
     visualIdentity,
     actVisualArc,
     characterVisual,

@@ -12,7 +12,6 @@ import type { PipelineLogger } from '@/lib/writer/logger';
 export async function runActVisualArc(
   narrativeStructure: NarrativeStructure,
   visualIdentity: VisualIdentity, // v0 번들 (format+style) — 직전 단계
-  bridgeHint: string, // bridge(midPreview) v_recommendations.v1 — 거친 seed (skip 시 '')
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
 ): Promise<ActVisualArc> {
@@ -37,9 +36,6 @@ ${JSON.stringify(narrativeStructure, null, 2)}
 
 [v0 비주얼 아이덴티티 — 이 스타일 안에서만 변화]
 ${JSON.stringify(visualIdentity, null, 2)}
-
-[bridge 거친 힌트(v1) — 있으면 참고, 없으면 무시]
-${bridgeHint || '(없음)'}
 
 [출력 형식 - JSON]
 {

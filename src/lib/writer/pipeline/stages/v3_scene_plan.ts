@@ -11,7 +11,6 @@ import type {
   VisualIdentity,
   WorldVisual,
   SceneCinematography,
-  MidPreview,
   ActVisualArc,
   Genre,
   Characters,
@@ -40,7 +39,6 @@ export async function runSceneCinematography(
   scenes: Scenes,
   visualIdentity: VisualIdentity,
   worldVisual: WorldVisual,
-  midPreview: MidPreview,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
   // E8 실험 (기록만 2026-07-21): v1 actVisualArc 배선 복원 후보. 미전달(기본) = 현행과 프롬프트 동일.
@@ -120,8 +118,6 @@ ${JSON.stringify(visualIdentity.style)}
 palette=${JSON.stringify(worldVisual.global_palette)}
 locations=${worldVisual.locations.map((l) => l.id).join(', ')}
 
-[Mid Preview 거친 seed (v3 씬 전략)]
-${midPreview.v_recommendations.v3 ?? ''}
 ${actVisualArc ? `
 [막별 비주얼 아크 (v1) — 각 씬이 속한 막(act)의 팔레트/조명/에너지 방향을 lighting_arc·palette_emphasis에 반영하라]
 ${JSON.stringify(actVisualArc)}` : ''}

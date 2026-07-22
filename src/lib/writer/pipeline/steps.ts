@@ -12,7 +12,6 @@ import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure
 import { runScenes, mergeOpenCast, mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
 import { runStructureScenesMerged } from '@/lib/writer/pipeline/stages/s1s3_merged';
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
-import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview';
 import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual';
 import { runActVisualArc } from '@/lib/writer/pipeline/stages/v1_act_arc';
 import { runV2Design } from '@/lib/writer/pipeline/stages/v2_design';
@@ -27,7 +26,7 @@ import { persistAssetsToDb, persistShotsToDb } from '@/lib/writer/pipeline/util/
 import { triggerAssetDrafts } from '@/lib/artist/draft-trigger';
 import { isCompactDepth } from '@/lib/writer/types/pipeline';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
-import { resolveModels, resolveSkip, emptyC1Report, emptyMidPreview } from '@/lib/writer/pipeline';
+import { resolveModels, resolveSkip, emptyC1Report } from '@/lib/writer/pipeline';
 import {
   getActiveRun,
   saveRunState,
@@ -48,7 +47,6 @@ import type {
   BackgroundContract,
   Scenes,
   StoryCheckReport,
-  MidPreview,
   ActVisualArc,
   VisualIdentity,
   CharacterVisual,
@@ -73,7 +71,6 @@ export interface WriterRunState extends WriterRunStateBase {
   world?: BackgroundContract;        // s2 월드/세팅 seed (producer background) — V축 재설계
   scenes?: Scenes;
   storyCheck?: StoryCheckReport;
-  midPreview?: MidPreview;
 
   // Visual 축
   visualIdentity?: VisualIdentity;   // v0 (format+style)
@@ -194,33 +191,11 @@ export const WRITER_STEPS: WriterStep[] = [
     },
   },
   {
-    key: 'midPreview',
-    has: (s) => s.midPreview !== undefined,
-    run: async (s, { logger }) => {
-      const models = resolveModels(s.input);
-      if (resolveSkip(s.input).midPreview) {
-        await logger.markStage('midPreview', 'completed', { skipped: true });
-        return { midPreview: emptyMidPreview() };
-      }
-      const midPreview = await runMidPreview(
-        s.genre!,
-        s.narrativeStructure!,
-        s.characters!,
-        s.scenes!,
-        s.storyCheck!,
-        logger,
-        models.V,
-      );
-      await logger.flushRawLlm('midPreview');
-      return { midPreview };
-    },
-  },
-  {
     key: 'visualFormat',
     has: (s) => s.visualIdentity !== undefined,
     run: async (s, { logger }) => {
       const models = resolveModels(s.input);
-      const visualIdentity = await runVisualIdentity(s.genre!, s.midPreview!, logger, models.V, s.input.styleAnchor);
+      const visualIdentity = await runVisualIdentity(s.genre!, logger, models.V, s.input.styleAnchor);
       await logger.flushRawLlm('visualIdentity');
       return { visualIdentity };
     },
@@ -235,7 +210,6 @@ export const WRITER_STEPS: WriterStep[] = [
       const actVisualArc = await runActVisualArc(
         s.narrativeStructure!,
         s.visualIdentity!, // v0 번들 (format+style) — coarse-to-fine 직전 단계
-        s.midPreview!.v_recommendations.v1, // bridge 거친 seed(v1) 직접 참조 (거미줄)
         logger,
         models.V,
       );
@@ -255,7 +229,7 @@ export const WRITER_STEPS: WriterStep[] = [
         s.actVisualArc!,                      // v1 막별 아크 (v-체인 상속)
         s.characters!,                        // s2 인물
         s.world,                              // s2 월드 (producer + 오픈캐스트)
-        s.midPreview!.v_recommendations.v2,   // bridge 거친 seed.v2
+        '',                                    // bridge seed 제거(E6 삭제 채택) — v2Design 시그니처 하위호환용 빈 값
         logger,
         models.V,
       );
@@ -297,7 +271,6 @@ export const WRITER_STEPS: WriterStep[] = [
         scenes,
         s.visualIdentity!, // v0 (전역 스타일) — 직전 v 체인의 루트 상수
         s.worldVisual!,    // v2 (월드 디자인: 팔레트/로케이션)
-        s.midPreview!,
         logger,
         models.V,
       );
@@ -343,7 +316,7 @@ export const WRITER_STEPS: WriterStep[] = [
         s.characterVisual!,  // v2 (인물 의상) — character_blocking 생성용
         compact ? null : s.sceneCinematography!,
         s.decoupage!,
-        s.midPreview!.v_recommendations.v4, // bridge 거친 seed.v4 (샷 레시피)
+        '', // bridge seed 제거(E6 삭제 채택) — shotDesign 시그니처 하위호환용 빈 값
         logger,
         models.V,
         // 씬 단위 이어달리기(#long-writer-run): 이전 부분 진행 재개 + step 예산에서 양보.

@@ -18,7 +18,6 @@ vi.mock('@/lib/writer/pipeline/stages/s3_scenes', () => ({
   mergeOpenWorld: vi.fn(),
 }))
 vi.mock('@/lib/writer/pipeline/stages/c_validation_1', () => ({ runStoryCheck: vi.fn() }))
-vi.mock('@/lib/writer/pipeline/stages/mid_preview', () => ({ runMidPreview: vi.fn() }))
 vi.mock('@/lib/writer/pipeline/stages/v0_visual', () => ({ runVisualIdentity: vi.fn() }))
 vi.mock('@/lib/writer/pipeline/stages/v1_act_arc', () => ({ runActVisualArc: vi.fn() }))
 vi.mock('@/lib/writer/pipeline/stages/v2_design', () => ({ runV2Design: mocks.runV2Design }))
@@ -37,9 +36,8 @@ vi.mock('@/lib/writer/types/pipeline', () => ({ isCompactDepth: vi.fn(() => fals
 vi.mock('@/lib/writer/pipeline/validators/action_budget', () => ({ analyzeSceneActionBudget: vi.fn(() => ({ issues: [] })) }))
 vi.mock('@/lib/writer/pipeline', () => ({
   resolveModels: vi.fn(() => ({ S: { provider: 'mock' }, V: { provider: 'mock' }, C: { provider: 'mock' } })),
-  resolveSkip: vi.fn(() => ({ validation1: false, midPreview: false })),
+  resolveSkip: vi.fn(() => ({ validation1: false })),
   emptyC1Report: vi.fn(() => ({})),
-  emptyMidPreview: vi.fn(() => ({})),
 }))
 vi.mock('@/lib/writer/run-store', () => ({
   getActiveRun: vi.fn(),
@@ -130,7 +128,6 @@ function baseState() {
     actVisualArc: { acts: [] },
     characters: { characters: [] },
     world: { locations: [] },
-    midPreview: { v_recommendations: { v2: '' } },
     scenes: { scenes: [] },
   } as never
 }

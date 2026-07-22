@@ -21,18 +21,16 @@ import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage'
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots'
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1'
 import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2'
-import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview'
 import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual'
 import { runActVisualArc } from '@/lib/writer/pipeline/stages/v1_act_arc'
 import { runV2Design } from '@/lib/writer/pipeline/stages/v2_design'
 import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan'
-import { emptyMidPreview } from '@/lib/writer/pipeline'
 import { generateJson } from '@/lib/writer/llm/dispatch'
 import { computeSceneBudget, renderBudgetBlock } from '@/lib/writer/pipeline/budget'
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics'
 import { getPendingRawCalls, resetRawSeq } from '@/lib/writer/llm/raw_collector'
 import type { PipelineLogger } from '@/lib/writer/logger'
-import type { Genre, Characters, BackgroundContract, PipelineInput, Scenes, DecoupagePlan, DecoupageShot, SceneDecoupage, VisualIdentity, ActVisualArc, WorldVisual, CharacterVisual, ShotDesign, MidPreview, SceneCinematography, StoryCheckReport } from '@/lib/writer/types/pipeline'
+import type { Genre, Characters, BackgroundContract, PipelineInput, Scenes, DecoupagePlan, DecoupageShot, SceneDecoupage, VisualIdentity, ActVisualArc, WorldVisual, CharacterVisual, ShotDesign, SceneCinematography } from '@/lib/writer/types/pipeline'
 
 const ENABLED = process.env.RUN_WRITER_STAGE === '1' && !!process.env.GEMINI_API_KEY
 const MODEL = { provider: process.env.WRITER_PROVIDER ?? 'gemini', model: process.env.WRITER_MODEL ?? 'gemini-3-flash-preview' }
@@ -342,16 +340,10 @@ const loadInjected = (envKey: string): unknown => {
   return j.result ?? j
 }
 
-// E6: midPreview가 소비하는 C1 리포트 — 실 파이프라인 skip 경로와 동일한 빈 리포트.
-const EMPTY_STORY_CHECK = {
-  passed: true, issues: [], causality_chain: [], cdq_present: true,
-  cdq_clarity_score: 1, cliche_count: 0, retry_count: 0,
-} as unknown as StoryCheckReport
-
 // ── stage 레지스트리 (실 함수 호출 — 시스템 프롬프트는 코드 그대로) ──
 type State = {
   genre: Genre; narrativeStructure?: unknown; scenes?: unknown; decoupage?: unknown; shotDesign?: unknown;
-  midPreview?: unknown; visualIdentity?: unknown; actVisualArc?: unknown; v2Design?: unknown; sceneCinematography?: unknown;
+  visualIdentity?: unknown; actVisualArc?: unknown; v2Design?: unknown; sceneCinematography?: unknown;
   // E9b (Phase 5): 씬 상세화(A) vs 씬·샷 근접 생성(B).
   sceneAbsorbedPlan?: unknown; decoupageExecutorA?: unknown; sceneShotCoGen?: unknown;
 }
@@ -503,16 +495,12 @@ const STAGE_FNS: Record<string, (st: State, p: Preset) => Promise<unknown>> = {
   // V축 확장 (스텁 비주얼 — 위 주석 참조). sceneCinematography plans=null → 프롬프트의 Compact 분기 사용.
   decoupage: (st, p) => runDecoupage(st.genre, p.characters, st.scenes as Scenes, stubWorldVisual(p.world), null, logger, MODEL as never),
   // ── V축 실스테이지 (E6·E8·E9 기록만 배터리, 2026-07-21): 실 함수 호출, 미실행 상류만 스텁 대체 ──
-  midPreview: (st, p) =>
-    runMidPreview(st.genre, st.narrativeStructure as never, p.characters, st.scenes as Scenes, EMPTY_STORY_CHECK, logger, MODEL as never),
-  // E6: 체인에 midPreview가 없으면 emptyMidPreview() — 실 파이프라인 skip 경로와 동일한 OFF팔.
   visualIdentity: (st) =>
-    runVisualIdentity(st.genre, (st.midPreview ?? emptyMidPreview()) as MidPreview, logger, MODEL as never),
+    runVisualIdentity(st.genre, logger, MODEL as never),
   actVisualArc: (st) =>
     runActVisualArc(
       st.narrativeStructure as never,
       (st.visualIdentity ?? stubVisualIdentity(st.genre)) as VisualIdentity,
-      ((st.midPreview as MidPreview | undefined)?.v_recommendations.v1 ?? ''),
       logger,
       MODEL as never,
     ),
@@ -524,7 +512,7 @@ const STAGE_FNS: Record<string, (st: State, p: Preset) => Promise<unknown>> = {
       (st.actVisualArc ?? null) as ActVisualArc | null,
       p.characters,
       p.world,
-      ((st.midPreview as MidPreview | undefined)?.v_recommendations.v2 ?? ''),
+      '',
       logger,
       MODEL as never,
     ),
@@ -535,7 +523,6 @@ const STAGE_FNS: Record<string, (st: State, p: Preset) => Promise<unknown>> = {
       st.genre, p.characters, st.scenes as Scenes,
       (st.visualIdentity ?? stubVisualIdentity(st.genre)) as VisualIdentity,
       ((st.v2Design as { worldVisual?: WorldVisual } | undefined)?.worldVisual ?? stubWorldVisual(p.world)),
-      (st.midPreview ?? emptyMidPreview()) as MidPreview,
       logger, MODEL as never,
       process.env.WRITER_V3_ARC === '1' ? (st.actVisualArc as never) : undefined,
     ),
@@ -858,9 +845,6 @@ describe('writer 단계 실험 (길이 양극화)', () => {
         } else if (stage === 'shotCheck' && result) {
           const r = result as { shotSequence: { total_shots: number; total_duration_seconds: number }; report: { passed: boolean; issues: unknown[]; shots_split_count: number } }
           summary = `shots=${r.shotSequence.total_shots} total=${r.shotSequence.total_duration_seconds}s passed=${r.report.passed} issues=${r.report.issues.length} split=${r.report.shots_split_count}`
-        } else if (stage === 'midPreview' && result) {
-          const r = result as MidPreview
-          summary = `difficulty=${r.production_difficulty} colors=${r.color_script?.length} warnings=${r.warnings?.length}`
         } else if (stage === 'visualIdentity' && result) {
           const r = result as VisualIdentity
           summary = `medium=${r.format?.medium} style=${r.style?.art_style} render=${r.format?.rendering_method} texture=${r.style?.texture_philosophy}`

@@ -15,7 +15,6 @@ const STAGE_LABELS: Record<string, string> = {
   characters: '캐릭터에 숨을 불어넣는 중…',
   scenes: '장면을 나누는 중…',
   storyCheck: '이야기에 구멍이 없나 살피는 중…',
-  midPreview: '초벌 스케치를 그려보는 중…',
   renderFormat_artDirection: '화면의 톤앤매너를 잡는 중…',
   productionDesign: '세트를 짓고 소품을 채우는 중…',
   sceneCinematography: '카메라 자리를 잡는 중…',

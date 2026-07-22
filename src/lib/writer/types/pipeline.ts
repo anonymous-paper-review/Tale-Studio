@@ -182,11 +182,9 @@ export interface PipelineInput {
    * Stage skip 플래그. 피드백이 다운스트림에 실질 반영되지 않는 stage를
    * 건너뛰어 LLM 호출/시간을 절약한다. 미지정 시 default = skip(true).
    *   - validation1: c_validation_1 (C 검증 ①) 통째 skip
-   *   - midPreview:  mid_preview 통째 skip (빈 추천으로 V0V1/V2/V3 자체 결정)
    */
   skip?: {
     validation1?: boolean;
-    midPreview?: boolean;
   };
 }
 
@@ -343,26 +341,6 @@ export interface ShotCheckReport {
   issues: ValidationIssue[];
   shots_split_count: number;
   total_action_violations_fixed: number;
-}
-
-// =====================================================================
-// Mid Preview
-// =====================================================================
-
-export interface MidPreview {
-  // 거친 seed (거미줄 fan-out, V축 재설계): 각 v_n 스테이지가 자기 키를 직접 참조.
-  //   bridge skip 시 전부 빈값 → 각 층은 s_n + 직전 v 로 자체 결정.
-  v_recommendations: {
-    v0: { format: Partial<RenderFormat>; style: Partial<ArtDirection>; mood_note?: string }; // 옛 L0+L1 → 새 v0(VisualIdentity). mood_note: 자유 서술 격리 필드(WRITER_MIDPREVIEW_V2, E6b) — format/style 표준 필드를 오염시키지 않기 위한 분위기·모티프 전용 칸.
-    v1: string;   // 막별 비주얼 아크 거친 힌트 (신규)
-    v2: string;   // 글로벌 디자인 방향 (옛 L2_summary)
-    v3: string;   // 씬 전략 (옛 L3_scene_strategy)
-    v4: string;   // 샷 레시피 (옛 L4_shot_recipe)
-  };
-  color_script: Array<{ scene_id: string; dominant: string; mood: string }>;
-  emotional_arc_visualization: string;
-  production_difficulty: 'low' | 'medium' | 'high';
-  warnings: string[];
 }
 
 // =====================================================================
@@ -767,7 +745,6 @@ export interface PipelineResult {
   characters: Characters;
   scenes: Scenes;
   storyCheck: StoryCheckReport;
-  midPreview: MidPreview;
   visualIdentity: VisualIdentity;        // v0 (format+style)
   actVisualArc: ActVisualArc;            // v1 (막별 비주얼 아크)
   characterVisual: CharacterVisual;      // v2 (인물 비주얼)

@@ -1,10 +1,10 @@
-// V0: 비주얼 아이덴티티 (전역 고정 스타일) — Mid Preview 제안을 정식 V축 데이터로 확정.
+// V0: 비주얼 아이덴티티 (전역 고정 스타일) — genre와 스타일 앵커에서 직접 결정한다.
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
-import type { MidPreview, Genre, VisualIdentity, PipelineInput } from '@/lib/writer/types/pipeline';
+import type { Genre, VisualIdentity, PipelineInput } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
 // ── native v0 (V축 재설계): VisualIdentity 를 LLM 으로 직접 생성 ──
-//   읽음: genre(s0) + bridge seed.v0(이미 {format,style} shape) + styleAnchor(선택).
+//   읽음: genre(s0) + styleAnchor(선택).
 //   format(기술 스펙) + style(미학)을 nested VisualIdentity 로 직접 산출.
 //
 //   styleAnchor 연결(2026-07-14, docs/style-anchor-art-style-authority.md §9-2 후속):
@@ -13,7 +13,6 @@ import type { PipelineLogger } from '@/lib/writer/logger';
 //   정면 충돌해 매체 전이가 깨진다(d6208bba 실측). 앵커가 있으면 매체 필드를 앵커에 고정한다.
 export async function runVisualIdentity(
   genre: Genre,
-  midPreview: MidPreview,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
   styleAnchor?: PipelineInput['styleAnchor'],
@@ -21,7 +20,7 @@ export async function runVisualIdentity(
   await logger.markStage('visualIdentity', 'started');
 
   const systemInstruction = `당신은 V축 V0(비주얼 아이덴티티)를 확정한다 — 전역 고정 스타일.
-Mid Preview seed가 있으면 채택해 정밀화하고, 없으면(빈 seed) genre와 스타일 앵커에서 직접 결정한다. format(기술 스펙)과 style(미학)을 분리한다.
+genre와 스타일 앵커에서 직접 결정한다. format(기술 스펙)과 style(미학)을 분리한다.
 스타일 앵커가 주어지면 매체 관련 필드(art_style·medium·rendering_method·texture_philosophy)는 앵커가 최우선이다 — 장르에서 매체를 추론(발명)하지 않는다.
 
 format 필수:
@@ -51,10 +50,7 @@ ${JSON.stringify(styleAnchor)}
     : '';
 
   const userPrompt = `[genre]
-${JSON.stringify(genre, null, 2)}
-
-[Mid Preview 거친 seed (v0 — {format,style})]
-${JSON.stringify(midPreview.v_recommendations.v0, null, 2)}${anchorBlock}
+${JSON.stringify(genre, null, 2)}${anchorBlock}
 
 [출력 형식 - JSON]
 {

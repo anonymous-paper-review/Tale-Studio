@@ -7,7 +7,6 @@ const STAGE_LABELS: Record<string, string> = {
   narrativeStructure: 'Writer가 이야기 구조를 짜고 있습니다',
   scenes: 'Writer가 씬과 배경, 인물을 만들고 있습니다',
   storyCheck: 'Writer가 스토리를 검토하고 있습니다',
-  midPreview: 'Writer가 중간 결과를 정리하고 있습니다',
   visualFormat: 'Artist가 화면 포맷과 룩을 정하고 있습니다',
   actVisualArc: 'Artist가 막(Act)별 비주얼 흐름을 잡고 있습니다',
   v2Design: 'Artist가 배경과 인물을 디자인하고 있습니다',

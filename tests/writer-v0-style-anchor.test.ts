@@ -17,11 +17,10 @@ vi.mock('@/lib/writer/llm/dispatch', () => ({
 }))
 
 import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual'
-import type { Genre, MidPreview, VisualIdentity } from '@/lib/writer/types/pipeline'
+import type { Genre, VisualIdentity } from '@/lib/writer/types/pipeline'
 import type { PipelineLogger } from '@/lib/writer/logger'
 
 const genre = { genre: 'action', subGenre: 'post-apocalyptic survival', tone: ['dread'] } as unknown as Genre
-const midPreview = { v_recommendations: { v0: { style: {}, format: {} } } } as unknown as MidPreview
 const axisConfig = { provider: 'gemini' } as never
 
 const identity: VisualIdentity = {
@@ -44,7 +43,7 @@ beforeEach(() => {
 
 describe('v0 visualIdentity × style anchor', () => {
   it('앵커 있으면 프롬프트에 매체-고정 제약 블록이 들어간다', async () => {
-    await runVisualIdentity(genre, midPreview, stubLogger(), axisConfig, {
+    await runVisualIdentity(genre, stubLogger(), axisConfig, {
       key: 'us_cartoon',
       label: '미국 카툰',
       medium: '2d_cartoon',
@@ -60,11 +59,10 @@ describe('v0 visualIdentity × style anchor', () => {
   })
 
   it('앵커 없으면 프롬프트에 앵커 블록이 없다 (기존 동작 보존)', async () => {
-    await runVisualIdentity(genre, midPreview, stubLogger(), axisConfig)
+    await runVisualIdentity(genre, stubLogger(), axisConfig)
 
     const [userPrompt] = mocks.generateJson.mock.calls[0]
     expect(userPrompt).not.toContain('스타일 앵커')
     expect(userPrompt).toContain('[genre]')
-    expect(userPrompt).toContain('[Mid Preview 거친 seed')
   })
 })
