@@ -353,7 +353,7 @@ export interface MidPreview {
   // 거친 seed (거미줄 fan-out, V축 재설계): 각 v_n 스테이지가 자기 키를 직접 참조.
   //   bridge skip 시 전부 빈값 → 각 층은 s_n + 직전 v 로 자체 결정.
   v_recommendations: {
-    v0: { format: Partial<RenderFormat>; style: Partial<ArtDirection> }; // 옛 L0+L1 → 새 v0(VisualIdentity)
+    v0: { format: Partial<RenderFormat>; style: Partial<ArtDirection>; mood_note?: string }; // 옛 L0+L1 → 새 v0(VisualIdentity). mood_note: 자유 서술 격리 필드(WRITER_MIDPREVIEW_V2, E6b) — format/style 표준 필드를 오염시키지 않기 위한 분위기·모티프 전용 칸.
     v1: string;   // 막별 비주얼 아크 거친 힌트 (신규)
     v2: string;   // 글로벌 디자인 방향 (옛 L2_summary)
     v3: string;   // 씬 전략 (옛 L3_scene_strategy)

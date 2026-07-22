@@ -10,6 +10,7 @@
 import { PipelineLogger } from '@/lib/writer/logger';
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure';
 import { runScenes, mergeOpenCast, mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
+import { runStructureScenesMerged } from '@/lib/writer/pipeline/stages/s1s3_merged';
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
 import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview';
 import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual';
@@ -134,6 +135,28 @@ export const WRITER_STEPS: WriterStep[] = [
     has: (s) => s.narrativeStructure !== undefined,
     run: async (s, { logger }) => {
       const models = resolveModels(s.input);
+      // E13b 체크포인트 재설계: S1+S3 병합 게이트(기본 off — 프로덕션 기본은 현행 2콜).
+      //   게이트 on 이면 병합 1콜로 구조+씬을 함께 산출해 narrativeStructure/scenes 두 슬롯에
+      //   모두 기록한다 — 다음 루프에서 scenes step 은 has()=true 로 투명하게 skip 되고, 하류
+      //   스테이지와 재실행 단위(체크포인트)는 2콜 때와 동일하게 보인다. 오픈 캐스트/월드 머지도
+      //   scenes step 과 동일하게 여기서 수행(append-only, 원천 불변).
+      if (process.env.WRITER_MERGE_S1S3 === '1') {
+        const { narrativeStructure, scenes } = await runStructureScenesMerged(
+          s.input,
+          s.genre!,
+          s.characters!,
+          s.world,
+          logger,
+          models.S,
+        );
+        await logger.flushRawLlm('structureScenesMerged');
+        const characters = mergeOpenCast(s.characters!, scenes);
+        const world = mergeOpenWorld(s.world, scenes);
+        const patch: Partial<WriterRunState> = { narrativeStructure, scenes };
+        if (characters !== s.characters) patch.characters = characters;
+        if (world !== s.world) patch.world = world;
+        return patch;
+      }
       const narrativeStructure = await runNarrativeStructure(s.input, s.genre!, logger, models.S);
       await logger.flushRawLlm('narrativeStructure');
       return { narrativeStructure };

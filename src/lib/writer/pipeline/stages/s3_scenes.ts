@@ -63,7 +63,8 @@ export function mergeOpenWorld(prev: BackgroundContract | undefined, scenes: Sce
 
 // act 커버리지 검증: narrativeStructure.acts 중 어떤 씬의 act_ref 로도 안 덮인 act_id 목록.
 //   비어있으면 모든 막에 ≥1 씬 (정합). #3 — s1 act 설계 ↔ s3 씬 분배 불일치 방지.
-function uncoveredActs(scenes: Scenes, ns: NarrativeStructure): string[] {
+//   export: 병합 스테이지(s1s3_merged, E13b)가 같은 후처리를 재사용한다 — 로직 이관용.
+export function uncoveredActs(scenes: Scenes, ns: NarrativeStructure): string[] {
   const covered = new Set(scenes.scenes.map((s) => s.act_ref));
   return ns.acts.map((a) => a.act_id).filter((id) => !covered.has(id));
 }
@@ -71,7 +72,8 @@ function uncoveredActs(scenes: Scenes, ns: NarrativeStructure): string[] {
 // 로케이션 참조 정규화 (§3 — 모델은 제안, 검증은 제품): LLM이 오픈 로케이션 규칙을 어기고 기존
 //   로케이션의 name(표시명)이나 대소문자 변형으로 답하면 id 로 되돌린다. scenes.location 은
 //   locations.location_id 와 조인되는 참조값 — 어긋나면 같은 장소가 이중 생성된다(2026-06-30 한/영 중복 버그).
-function normalizeSceneLocations(scenes: Scenes, world: BackgroundContract | undefined): Scenes {
+//   export: 병합 스테이지(s1s3_merged, E13b)가 같은 정규화를 재사용한다 — 로직 이관용.
+export function normalizeSceneLocations(scenes: Scenes, world: BackgroundContract | undefined): Scenes {
   if (!world?.locations.length) return scenes;
   const idByKey = new Map<string, string>();
   for (const l of world.locations) {
