@@ -17,21 +17,23 @@ import {
 
 // ── 셀 지오메트리 (finalize crop 이 소비) ─────────────────────────────────────
 // 템플릿 실측 비례 좌표(격자선 3px 인셋) — public/rough-storyboard-grid.png 1672×941 기준.
-//   ⚠️ 템플릿 교체 시 재실측 (dev/Rough_Storyboard_Template 분석 스크립트로 격자 검출).
+//   2026-07-22 교체: Rough_Storyboard_Template_2(단순판 — 코너 마크·이중 보더 제거, 얇은 단일
+//   보더 + 외곽 시트 보더만). 크기·격자 위치는 구판과 거의 동일해 비례 좌표만 수px 재실측.
+//   ⚠️ 템플릿 교체 시 재실측 (격자선 dark-ratio 프로파일로 검출).
 //   edit 모델 출력이 리샘플돼도 종횡비가 유지되면 비례 좌표는 유효하다.
 export const GRID_COLS: ReadonlyArray<readonly [number, number]> = [
-  [0.0377, 0.259],
-  [0.2715, 0.4928],
-  [0.506, 0.7273],
-  [0.7404, 0.9617],
+  [0.0347, 0.2572],
+  [0.2697, 0.4928],
+  [0.506, 0.7285],
+  [0.7416, 0.9641],
 ]
 export const GRID_ROWS: ReadonlyArray<readonly [number, number]> = [
-  [0.0744, 0.3316],
-  [0.3549, 0.6121],
+  [0.0744, 0.3305],
+  [0.3549, 0.6132],
   [0.6355, 0.8927],
 ]
-// 스트립 템플릿(420×941) — 열 1개, 행은 grid 와 동일.
-export const STRIP_COLS: ReadonlyArray<readonly [number, number]> = [[0.0595, 0.9405]]
+// 스트립 템플릿(488×941, 그리드 1열 크롭 + 좌측 마진 미러) — 열 1개, 행은 grid 와 동일.
+export const STRIP_COLS: ReadonlyArray<readonly [number, number]> = [[0.1189, 0.8811]]
 export const STRIP_ROWS = GRID_ROWS
 
 export type RoughGridVariant = 'grid4' | 'strip1'
@@ -160,13 +162,13 @@ export function buildRoughGridPrompt(cells: RoughGridCell[], variant: RoughGridV
   const colCount = variant === 'grid4' ? GRID_COLS.length : 1
   const head =
     variant === 'grid4'
-      ? `The reference image is a paper storyboard sheet with 12 empty panels in a 4-column × 3-row grid. Keep the sheet, panel borders, margins and corner marks exactly as they are — draw only INSIDE the panels, never across panel borders.
+      ? `The reference image is a paper storyboard sheet with 12 empty panels in a 4-column × 3-row grid. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels, never across panel borders.
 
 Each COLUMN is one shot of a film, read top to bottom as three frames:
 - Row 1 (top) = START: the composition at the beginning of the shot.
 - Row 2 (middle) = DIRECTION: an EXACT identical copy of Row 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Row 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Row 1 and Row 2 is the arrows and labels drawn on top. Row 2 is the ONLY place where text is allowed.
 - Row 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Row 3 is the only frame where the motion has visibly progressed — and when a shot has movement, its END must differ clearly and unmistakably from its START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
-      : `The reference image is a paper storyboard strip with 3 empty panels stacked vertically. Keep the sheet, panel borders and corner marks exactly as they are — draw only INSIDE the panels.
+      : `The reference image is a paper storyboard strip with 3 empty panels stacked vertically. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels.
 
 The strip is ONE shot of a film, read top to bottom as three frames:
 - Panel 1 (top) = START: the composition at the beginning of the shot.
