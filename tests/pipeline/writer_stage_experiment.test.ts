@@ -313,6 +313,18 @@ const PRESETS: Record<string, Preset> = {
     characters: cast(),
     world: world('비 오는 창가', loc('location', '창가의 수면', '빗방울이 떨어지는 어항 수면과 그 너머의 유리창')),
   },
+  // E9d-proto (Phase 5, 2026-07-23 오너 지시): 연속성 문법 60초 시제품 — 코인세탁방.
+  //   단일 공간·단일 인물·무대사 슬라이스오브라이프. 레퍼런스(거울 앞 소녀) 구조를 목표로
+  //   sceneShotCoGenGrammar(연출 연속성 문법 주입)로 저작한다.
+  laundromat: {
+    label: '코인세탁방 (60s · D3 · 16:9 · 연속성 문법)',
+    input: {
+      story: '새벽 두 시의 코인세탁방. 소녀가 빨래 바구니를 안고 유리문을 밀고 들어온다. 민트색 세탁기들이 늘어선 텅 빈 공간. 소녀는 세탁기에 빨래를 넣고, 동전을 하나씩 넣고, 기계가 도는 것을 바라본다. 빨간 의자에 앉아 다리를 흔들며 기다리다, 회전하는 드럼의 거품에 이끌려 유리창에 얼굴을 가까이 댄다. 종료음과 함께 따뜻한 빨래를 꺼내 품에 안고, 소녀는 들어왔던 문으로 나간다. 마지막 컷은 처음과 같은 텅 빈 세탁방.',
+      genre: { genre: 'art_film', subGenre: 'slice_of_life', tone: ['quiet', 'tender', 'nocturnal'], targetEmotion: [], runtime_seconds: 60, depth_level: 'D3', format: 'horizontal_16:9' } as Genre,
+    },
+    characters: cast(ch('girl', '소녀', 'protagonist', '20대 초반, 검은 단발머리에 크림색 니트 스웨터와 데님 스커트, 흰 양말과 흰 운동화')),
+    world: world('새벽 코인세탁방', loc('laundromat', '코인세탁방', '민트색 세탁기가 늘어선 텅 빈 심야 코인세탁방, 빨간 플라스틱 의자, 크림색 타일 바닥, 따뜻한 형광등, 대칭 구도')),
+  },
 }
 
 // ── V축 스텁 (R1 회귀 실험용, #prompt-audit 2026-07-21): v0/v2 산출을 중립 상수로 대체.
@@ -1000,6 +1012,117 @@ ${p.world.locations.length ? p.world.locations.map((l) => `- ${l.id}${l.name && 
     ;(st as Record<string, unknown>).decoupage = plan
     return plan
   },
+  // ── E9d-proto (Phase 5, 2026-07-23 오너 지시): 연속성 문법 60초 시제품 저작. ──
+  // B'(sceneShotCoGenHi) 복제 + 연출 연속성 문법 블록 주입 + 샷마다 cluster_id(사건 번호)·
+  //   carry_from(직전 샷에서 이어받는 동작 위상 한 줄, 클러스터 첫 샷은 없음) 출력. 하류 shotDesign은
+  //   st.decoupage(정규화된 DecoupagePlan)를 그대로 소비하고, cluster/carry는 shot_meta로 전역
+  //   shot_id(shot_1..N)에 조인해 반환한다(e9bFinalizeDecoupage의 전역 인덱싱과 동일 순서 — 렌더 스크립트가 재조인).
+  sceneShotCoGenGrammar: async (st, p) => {
+    const genre = st.genre
+    const budget = e9bBudget(genre, st.narrativeStructure)
+    const system = `당신은 영상 제작의 S3(씬 브레이크다운) + 데쿠파주(샷 분해) 통합 디자이너 겸 감독이다.
+씬을 확정하는 즉시 그 씬의 샷을 의도와 함께 저작한다 — 씬 분해와 샷 분해가 **한 판단 안에서 함께 태어난다**.
+
+[S3 — 씬 브레이크다운]
+씬 목적 분류: exposition / conflict / decision / revelation / transformation / transition / setup / payoff / climax / resolution
+정보 비대칭 (Hitchcock): "audience=character" | "audience>character" | "character>audience"
+
+${renderBudgetBlock(budget)}
+
+act 커버리지 (필수):
+- narrativeStructure.acts의 모든 act_id가 최소 1개 씬의 act_ref로 등장해야 한다. 씬 수는 최소 acts 개수 이상.
+
+scene_actions:
+- 씬의 주요 액션(비트)을 텍스트로. 한 액션 = 한 샷(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초)에 들어가도록 분리. 씬당 액션 수는 위 예산을 따른다.
+
+오픈 캐스트/로케이션 규칙 (중요):
+- [기존 캐스트]는 producer 확정 — slug 그대로 characters_in_scene에. 충분하면 new_characters=[].
+- 씬이 [기존 로케이션] 중 한 곳이면 scene.location에 그 id를 글자 그대로.
+
+[데쿠파주 — 씬마다 그 씬의 샷을 함께 저작]
+각 씬의 scene_actions(비트, 인덱스 0부터)를 샷으로 분해한다:
+- 비트 ≠ 샷. 한 비트를 여러 샷으로, 여러 비트를 한 샷으로 자유롭게 매핑.
+- 4연산: derived(비트 1:1) / added(스토리에 없는 establishing·reaction·insert 추가, added_rationale 필수) / merged(여러 비트 롱테이크) / split(한 비트 여러 샷).
+- 각 샷에 **dramatic_purpose(왜 이 샷인가)와 rhythm_role을 반드시 동봉**한다.
+- camera_intent는 'static' 기본. 'motivated_move'는 감정적 동기가 명확할 때만(camera_move_motivation에 기재).
+
+[연출 연속성 문법 — 반드시 따를 것]
+1. 사건 클러스터: 이야기의 사건 하나를 샷 2~4개가 나눠 갖는다. 각 샷은 같은 사건을 다른 앵글·다른 사이즈로 커버한다. 같은 사건을 다루는 샷들은 같은 cluster_id(정수, 1부터)를 갖는다.
+2. 동작 이어받기: 같은 클러스터의 인접 샷은 앞 샷이 끝나는 동작의 다음 위상에서 시작한다(동작이 컷을 관통). 단 앵글과 사이즈는 반드시 크게 바꾼다. 클러스터의 첫 샷을 제외한 모든 샷은 carry_from에 "직전 샷에서 이어받는 동작 위상"을 한 줄로 적는다(각 클러스터의 첫 샷은 carry_from을 빈 문자열로 둔다).
+3. 마스터 후렴: 공간 전체가 보이는 대칭 와이드 "마스터 구도"를 하나 정하고 3회 이상 복귀한다(도입·중간·수미상관 결말). 이 마스터 샷들은 shot_function=master, shot_size=EWS 또는 WS로 하고 같은 cluster_id를 재사용하지 말고 각 복귀 지점의 사건 클러스터에 속하게 한다.
+4. 인서트 쉼표: 사건과 사건 사이에 같은 공간의 정적 사물 클로즈업을 쉼표로 배치한다(shot_function=insert 또는 detail). 인서트는 새 사건이 아니다.
+5. 리듬: 도입 0~4초는 0.8~1.5초 플래시 컷 3~4개(공간·사물·인물 디테일 몽타주 — rhythm_role=establish, intended_duration_seconds를 가능한 짧게). 본편은 샷당 2.5~4초. 마스터 와이드와 절정(회전 드럼 응시) 2곳은 5초 이상 홀드.
+6. 불변 앵커: 공간·인물 외형·의상·조명·팔레트는 전 샷 동일(모든 beat_summary가 같은 공간·같은 인물을 전제).
+7. 총 60초를 정확히 맞춘다. 샷 수는 16~18개 권장. 사건 클러스터는 약 7개.
+
+전체 시간 규율: 모든 씬 estimated_seconds 총합·모든 샷 intended_duration_seconds 총합 모두 60초를 지향한다.`
+    const user = `[스토리]
+${p.input.story}
+
+[genre]
+${JSON.stringify(genre, null, 2)}
+
+[narrativeStructure]
+${JSON.stringify(st.narrativeStructure, null, 2)}
+
+[기존 캐스트] (producer 확정 — slug 그대로 사용)
+${p.characters.characters.length ? p.characters.characters.map((c) => `- ${c.id} (${c.name}, ${c.role})`).join('\n') : '(없음)'}
+
+[기존 로케이션] (producer 확정 — scene.location에 id 그대로 사용)
+${p.world.locations.length ? p.world.locations.map((l) => `- ${l.id}${l.name && l.name !== l.id ? ` (${l.name})` : ''}`).join('\n') : '(없음)'}
+
+[출력 형식 - JSON]
+{
+  "scenes": [
+    {"scene_id": "scene_1", "act_ref": "act_id", "location": "string", "time_of_day": "string",
+     "characters_in_scene": ["char_id"], "purpose": "string", "emotion_beat": {"start": "string", "end": "string"},
+     "dialogue_summary": "string", "key_dialogue": [], "info_asymmetry": "string",
+     "estimated_seconds": number, "scene_actions": ["action 1", ...],
+     "shots": [
+       {"operation": "derived|added|merged|split", "shot_function": "establishing|master|action|reaction|insert|cutaway|detail|pov|reveal|transition",
+        "cluster_id": 1, "carry_from": "직전 샷에서 이어받는 동작 위상 한 줄 (각 클러스터 첫 샷은 빈 문자열)",
+        "source_beats": [0], "added_rationale": "operation=added일 때만", "beat_summary": "이 샷이 담는 내용",
+        "shot_size": "EWS|WS|FS|MFS|MS|MCU|CU|ECU|OTS|2S|POV", "intended_duration_seconds": number,
+        "rhythm_role": "establish|develop|punctuate|sustain|accelerate|breath",
+        "camera_intent": "static|motivated_move", "camera_move_motivation": "motivated_move일 때만",
+        "dramatic_purpose": "왜 이 샷인가"}
+     ]}
+  ],
+  "total_estimated_seconds": number,
+  "new_characters": []
+}`
+    const raw = await generateJson<{ scenes?: Array<Record<string, unknown>>; total_estimated_seconds?: number; new_characters?: unknown[] }>(
+      user, HI_MODEL as never, { systemInstruction: system, temperature: 0.7, maxTokens: 20000 },
+    )
+    const scenes = Array.isArray(raw?.scenes) ? raw.scenes : []
+    const total = raw?.total_estimated_seconds ?? scenes.reduce((s, x) => s + (Number(x.estimated_seconds) || 0), 0)
+    const plan = e9bNormalizeCoGen(scenes)
+    // shot_meta: e9bFinalizeDecoupage 전역 shot_id(shot_1..N, scenes 순회 × 샷 순회 순서)에 cluster_id/carry_from 조인.
+    let g = 0
+    const shot_meta: Array<Record<string, unknown>> = []
+    for (const sc of scenes) {
+      const shots = Array.isArray(sc.shots) ? (sc.shots as Array<Record<string, unknown>>) : []
+      for (const s of shots) {
+        g += 1
+        shot_meta.push({
+          shot_id: `shot_${g}`,
+          scene_id: String(sc.scene_id),
+          cluster_id: typeof s.cluster_id === 'number' ? s.cluster_id : null,
+          carry_from: typeof s.carry_from === 'string' && s.carry_from.trim() ? s.carry_from.trim() : null,
+          shot_function: typeof s.shot_function === 'string' ? s.shot_function : null,
+          shot_size: typeof s.shot_size === 'string' ? s.shot_size : null,
+          rhythm_role: typeof s.rhythm_role === 'string' ? s.rhythm_role : null,
+          intended_duration_seconds: typeof s.intended_duration_seconds === 'number' ? s.intended_duration_seconds : null,
+          beat_summary: typeof s.beat_summary === 'string' ? s.beat_summary : '',
+          dramatic_purpose: typeof s.dramatic_purpose === 'string' ? s.dramatic_purpose : '',
+          camera_intent: s.camera_intent === 'motivated_move' ? 'motivated_move' : 'static',
+        })
+      }
+    }
+    ;(st as Record<string, unknown>).scenes = { scenes, total_estimated_seconds: total, new_characters: raw?.new_characters ?? [], coverage_mode: budget.mode }
+    ;(st as Record<string, unknown>).decoupage = plan
+    return { ...plan, shot_meta, scenes_raw: scenes }
+  },
   shotDesign: async (st, p) => {
     const r = await runShotDesign(st.genre, p.characters, st.scenes as Scenes, stubVisualIdentity(st.genre), stubWorldVisual(p.world), stubCharacterVisual(p.characters), null, st.decoupage as DecoupagePlan, '', logger, MODEL as never)
     return r.shots
@@ -1091,7 +1214,7 @@ describe('writer 단계 실험 (길이 양극화)', () => {
           const r = result as { scenes?: Array<{ shot_count_target?: number; estimated_seconds?: number }>; total_estimated_seconds?: number }
           const tgt = (r.scenes ?? []).reduce((s, x) => s + (Number(x.shot_count_target) || 0), 0)
           summary = `scenes=${r.scenes?.length} total=${r.total_estimated_seconds}s shot_target_sum=${tgt}`
-        } else if ((stage === 'decoupageExecutorA' || stage === 'sceneShotCoGen' || stage === 'decoupageExecutorAHi' || stage === 'sceneShotCoGenHi') && result) {
+        } else if ((stage === 'decoupageExecutorA' || stage === 'sceneShotCoGen' || stage === 'decoupageExecutorAHi' || stage === 'sceneShotCoGenHi' || stage === 'sceneShotCoGenGrammar') && result) {
           const r = result as DecoupagePlan
           const durs = r.scenes.flatMap((s) => s.shots.map((x) => x.intended_duration_seconds)).sort((a, b) => a - b)
           const sum = durs.reduce((a, b) => a + b, 0)
