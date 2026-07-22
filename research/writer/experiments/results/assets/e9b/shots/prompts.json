@@ -1,0 +1,167 @@
+[
+  {
+    "file": "a1.jpg",
+    "arm": "A",
+    "shot_id": "shot_1",
+    "shot_type": "EWS",
+    "shot_type_label": "익스트림와이드",
+    "camera_motion": "static",
+    "camera_motion_label": "정적",
+    "duration_seconds": 4,
+    "first_frame_prompt": "Vertical 9:16 cinematic shot. A low-angle extreme wide shot of a dark, wet urban alley at dawn. In the center, a pair of high-performance running shoes with amber accents strikes the cold, dark slate blue pavement. Water droplets spray from the impact. The alley walls are cast in deep shadows with a single overhead streetlight creating a hard rim light. Photorealistic textures of wet asphalt and modern athletic gear. Inspiring and moody atmosphere."
+  },
+  {
+    "file": "a2.jpg",
+    "arm": "A",
+    "shot_id": "shot_2",
+    "shot_type": "MS",
+    "shot_type_label": "미디엄",
+    "camera_motion": "static",
+    "camera_motion_label": "정적",
+    "duration_seconds": 4,
+    "first_frame_prompt": "Vertical 9:16 medium shot of a 30-year-old male runner's face at dawn. He has a determined expression with sweat glistening on his forehead. The background is a beautifully blurred urban alley in slate blue. His eyes are sharp and focused forward. A thick cloud of white mist is just beginning to form at his lips. Soft side lighting highlights the contours of his face and the moisture on his skin. Cinematic realism."
+  },
+  {
+    "file": "a3.jpg",
+    "arm": "A",
+    "shot_id": "shot_3",
+    "shot_type": "EWS",
+    "shot_type_label": "익스트림와이드",
+    "camera_motion": "static",
+    "camera_motion_label": "정적",
+    "duration_seconds": 5,
+    "first_frame_prompt": "Cinematic 9:16 vertical shot, EWS. A dark, narrow city alley at dawn with wet asphalt reflecting dim amber streetlights. A 30-year-old male runner in sweaty athletic gear is positioned in the distance, his silhouette hunched and exhausted. Slate blue and warm gray palette with deep shadows. Photorealistic texture, 35mm lens, high contrast, moody atmosphere."
+  },
+  {
+    "file": "a4.jpg",
+    "arm": "A",
+    "shot_id": "shot_4",
+    "shot_type": "MS",
+    "shot_type_label": "미디엄",
+    "camera_motion": "static",
+    "camera_motion_label": "정적",
+    "duration_seconds": 5,
+    "first_frame_prompt": "Cinematic 9:16 vertical shot, MS. Focus on the runner's feet on the wet asphalt. The high-tech shoe soles begin to emit a subtle, pulsing amber glow, illuminating the dark ground and water ripples beneath. Slate blue shadows contrast with the sharp amber light. Detailed texture of the shoe fabric and wet pavement. 50mm lens, shallow depth of field."
+  },
+  {
+    "file": "a5.jpg",
+    "arm": "A",
+    "shot_id": "shot_5",
+    "shot_type": "CU",
+    "shot_type_label": "클로즈업",
+    "camera_motion": "static",
+    "camera_motion_label": "정적",
+    "duration_seconds": 4,
+    "first_frame_prompt": "Cinematic 9:16 vertical shot, CU. Close-up of the runner's face and upper torso. Sweat glistens on his skin under the dim dawn light. His expression is intense. Sharp amber rim light highlights his tensed neck muscles against the slate blue background. 85mm lens, very shallow depth of field, photorealistic texture."
+  },
+  {
+    "file": "a6.jpg",
+    "arm": "A",
+    "shot_id": "shot_6",
+    "shot_type": "EWS",
+    "shot_type_label": "익스트림와이드",
+    "camera_motion": "static",
+    "camera_motion_label": "정적",
+    "duration_seconds": 4,
+    "first_frame_prompt": "Extreme wide shot in 9:16 vertical format. A dark, narrow urban alleyway opens up to a vast, shimmering riverfront path at dawn. A 30-year-old male runner in sweaty athletic gear is positioned at the mouth of the alley, transitioning into the open space. The sky is a gradient of deep slate blue and fiery amber. The ground is damp asphalt reflecting the first light. Cinematic realism, photorealistic textures, high contrast lighting."
+  },
+  {
+    "file": "a7.jpg",
+    "arm": "A",
+    "shot_id": "shot_7",
+    "shot_type": "MS",
+    "shot_type_label": "미디엄",
+    "camera_motion": "static",
+    "camera_motion_label": "정적",
+    "duration_seconds": 4,
+    "first_frame_prompt": "Medium shot in 9:16 vertical format. The runner's back and profile are visible as he sprints with intense determination. He is framed against a massive, glowing golden sun rising over the horizon of a calm river. Intense golden light creates a rim light around his silhouette. Sweat glitters on his skin. The background is a soft-focus landscape of warm grays and brilliant ambers. Cinematic brand film aesthetic, photorealistic."
+  },
+  {
+    "file": "b1.jpg",
+    "arm": "B",
+    "shot_id": "shot_1",
+    "shot_type": "ECU",
+    "shot_type_label": "익스트림클로즈업",
+    "camera_motion": "static",
+    "camera_motion_label": "정적",
+    "duration_seconds": 3,
+    "first_frame_prompt": "An extreme close-up of a high-performance running shoe at dawn. The focus is on the intricate technical mesh and the tight, precise lacing. The material has a slight sheen from the damp air. The background is a dark, wet asphalt alley with cool slate blue tones. A soft amber light from a distant source grazes the side of the shoe, revealing its premium texture. Cinematic realism, photorealistic."
+  },
+  {
+    "file": "b2.jpg",
+    "arm": "B",
+    "shot_id": "shot_2",
+    "shot_type": "FS",
+    "shot_type_label": "풀샷",
+    "camera_motion": "handheld_drift",
+    "camera_motion_label": "핸드헬드",
+    "duration_seconds": 5,
+    "first_frame_prompt": "A full shot of a runner in silhouette, moving through a narrow, dark city alley at dawn. The walls are aged brick, and the ground is wet asphalt reflecting the dim, cool light. The runner is in mid-stride, captured in a moment of athletic grace. The overall mood is quiet and intense, dominated by slate blue and dark gray tones with a single amber glow from a far-off lamp."
+  },
+  {
+    "file": "b3.jpg",
+    "arm": "B",
+    "shot_id": "shot_3",
+    "shot_type": "MCU",
+    "shot_type_label": "미디엄클로즈업",
+    "camera_motion": "handheld_drift",
+    "camera_motion_label": "핸드헬드",
+    "duration_seconds": 4,
+    "first_frame_prompt": "A cinematic medium close-up of a 30-year-old male runner at dawn. His face is drenched in sweat, glistening under a dim amber streetlight. He is gasping for air with a look of pure physical exhaustion. The background is a dark, wet alleyway in slate blue tones. Shallow depth of field, photorealistic texture, 9:16 vertical format."
+  },
+  {
+    "file": "b4.jpg",
+    "arm": "B",
+    "shot_id": "shot_4",
+    "shot_type": "CU",
+    "shot_type_label": "클로즈업",
+    "camera_motion": "static",
+    "camera_motion_label": "정적",
+    "duration_seconds": 3,
+    "first_frame_prompt": "Extreme close-up of a high-tech running shoe sole making contact with wet, dark asphalt. The sole is translucent and begins to emit a faint, pulsing amber light. Water droplets splash from the impact. High contrast, cinematic lighting, photorealistic, 9:16 vertical format."
+  },
+  {
+    "file": "b5.jpg",
+    "arm": "B",
+    "shot_id": "shot_5",
+    "shot_type": "MFS",
+    "shot_type_label": "미디엄풀샷",
+    "camera_motion": "dolly_in",
+    "camera_motion_label": "달리인",
+    "duration_seconds": 4,
+    "first_frame_prompt": "Medium full shot from a low angle of a runner accelerating down a dark alley. His legs are a blur of motion, with bright amber light trailing from his shoes. The dark slate-blue walls of the alley create a tunnel effect. Cinematic realism, high speed sensation, 9:16 vertical format."
+  },
+  {
+    "file": "b6.jpg",
+    "arm": "B",
+    "shot_id": "shot_6",
+    "shot_type": "POV",
+    "shot_type_label": "시점샷",
+    "camera_motion": "dolly_in",
+    "camera_motion_label": "달리인",
+    "duration_seconds": 3,
+    "first_frame_prompt": "First-person perspective (POV) of a high-speed run through a dark urban alley at dawn. The brick walls are blurred into long horizontal streaks of light and shadow. A sense of immense speed and transcendence. Cinematic realism, motion blur, 9:16 vertical format."
+  },
+  {
+    "file": "b7.jpg",
+    "arm": "B",
+    "shot_id": "shot_7",
+    "shot_type": "WS",
+    "shot_type_label": "와이드",
+    "camera_motion": "static",
+    "camera_motion_label": "정적",
+    "duration_seconds": 4,
+    "first_frame_prompt": "Cinematic wide shot in vertical 9:16. A 30-year-old male runner with a muscular build, wearing sweat-soaked athletic gear, is captured mid-stride as he exits a dark, narrow alley. To the left, the alley walls are in deep slate blue shadow. To the right, the scene opens to a vast riverbank under a brilliant amber sunrise. The ground is wet asphalt reflecting the golden light. Photorealistic, 8k, high contrast."
+  },
+  {
+    "file": "b8.jpg",
+    "arm": "B",
+    "shot_id": "shot_8",
+    "shot_type": "EWS",
+    "shot_type_label": "익스트림와이드",
+    "camera_motion": "static",
+    "camera_motion_label": "정적",
+    "duration_seconds": 4,
+    "first_frame_prompt": "Extreme wide shot in vertical 9:16. The runner is a tiny black silhouette in the center of the frame, running away from the camera toward a massive, glowing orange sun on the horizon. The sky is a gradient of fiery amber and soft slate blue. A wide river to the side reflects the sun's path. Heroic composition, cinematic realism, photorealistic."
+  }
+]

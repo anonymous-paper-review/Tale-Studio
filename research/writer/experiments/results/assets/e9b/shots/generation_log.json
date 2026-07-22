@@ -1,0 +1,122 @@
+[
+  {
+    "arm": "A",
+    "index": 1,
+    "file": "a1.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34235/7SNJgif2Qm1B-lMyDs3gC_RNZJgNzV.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "A",
+    "index": 2,
+    "file": "a2.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34235/t5CrlkdKWe2-Ji8Oo4NZt_YxI5d4bK.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "A",
+    "index": 3,
+    "file": "a3.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34236/_0KhEjht7tgP2i6LVKxjk_gpehD5Pe.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "A",
+    "index": 4,
+    "file": "a4.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34236/2g4sR4zthUPigeR2VwDI5_uyaYU8Rg.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "A",
+    "index": 5,
+    "file": "a5.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34236/pfHwosFGHnu5SuccK0PCl_Xd0zkXQY.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "A",
+    "index": 6,
+    "file": "a6.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34236/neumDYKHNSdsQdvPrnb4Y_3GreGA9J.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "A",
+    "index": 7,
+    "file": "a7.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34237/m2ycLcMC5_VuB9fCSZf1u_FxCyzCfe.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "B",
+    "index": 1,
+    "file": "b1.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34237/uj7TI5k3cJTQqHXrykKEZ_r5SQWzdu.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "B",
+    "index": 2,
+    "file": "b2.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34237/-3QE5NlBhzvtYmZ-jxJhL_yWGMD5Vc.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "B",
+    "index": 3,
+    "file": "b3.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34237/Q9CJO1pcWmplbu4q-PmRt_32yJi6Wa.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "B",
+    "index": 4,
+    "file": "b4.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34238/oB1fod_Aw_3m-MM6KKNbH_OjwPItat.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "B",
+    "index": 5,
+    "file": "b5.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34238/VH6iNesEMYfXy9nECLtTk_Hjkc0He8.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "B",
+    "index": 6,
+    "file": "b6.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34238/VQaRO9iehVUQvBd9k91EX_8VyPwTLW.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "B",
+    "index": 7,
+    "file": "b7.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34238/cFbgjhC8ZAH1DpXL6tTAN_DCFrnJ9n.jpg",
+    "attempt": 1
+  },
+  {
+    "arm": "B",
+    "index": 8,
+    "file": "b8.jpg",
+    "status": "OK",
+    "url": "https://v3b.fal.media/files/b/0aa34239/M069IkcfNie2IGPdoa-Vn_Tu75E5SF.jpg",
+    "attempt": 1
+  }
+]
