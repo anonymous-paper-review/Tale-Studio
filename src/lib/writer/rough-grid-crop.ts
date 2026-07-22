@@ -158,6 +158,21 @@ function scanAxisBounds(
 }
 
 /**
+ * 행 높이 균일화(2026-07-22, 실측 e18940f4) — 한 샷의 START/DIRECTING/END 는 각 "행"에서
+ *   나오므로 행 높이가 다르면 순환 재생 시 스케일 점프가 보인다(모델이 중간 행을 16px 크게
+ *   그린 실측). 클러스터 기준 크기보다 큰 행만 top-anchor 로 축소 — 패널 콘텐츠는 상단부터
+ *   그려지므로 초과분은 하단 여백/변형이다. 작은 행의 확장은 거터·이웃 침범 위험이라 유지.
+ *   열은 대상 아님: 한 샷 = 한 열이라 열 폭 차이는 순환 점프를 만들지 않는다(참 셀 유지가 정확).
+ */
+function uniformizeRows(rowsPx: Array<[number, number]>): Array<[number, number]> {
+  if (rowsPx.length < 2) return rowsPx
+  const ref = referenceSize(rowsPx.map(([a, b]) => b - a))
+  return rowsPx.map(([a, b]) =>
+    b - a - ref > SIZE_TOLERANCE_PX ? ([a, a + ref] as [number, number]) : ([a, b] as [number, number]),
+  )
+}
+
+/**
  * 그리드 버퍼에서 shotCount 개 열의 3프레임을 크롭.
  *   반환 배열 길이 = shotCount (열 순서 = 제출 시 writerShotIds 순서).
  *   shotCount 가 variant 열 수를 넘으면 throw (호출부 버그).
@@ -192,7 +207,9 @@ export async function cropRoughGridFrames(
 
   // v5: 전역 거터 검출 우선(재배치된 출력도 정합) → 검증 불통과 시 v4 앵커 스캔.
   const colPx = globalAxisBounds(colProfile, cols.length, width) ?? scanAxisBounds(colProfile, cols, width)
-  const rowPx = globalAxisBounds(rowProfile, rows.length, height) ?? scanAxisBounds(rowProfile, rows, height)
+  const rowPx = uniformizeRows(
+    globalAxisBounds(rowProfile, rows.length, height) ?? scanAxisBounds(rowProfile, rows, height),
+  )
 
   const out: RoughGridFrames[] = []
   for (let c = 0; c < shotCount; c++) {
