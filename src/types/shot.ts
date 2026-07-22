@@ -5,7 +5,8 @@ export type ShotType =
 export type GenerationMethod = 'T2V' | 'I2V'
 
 export interface DialogueLine {
-  characterId: string
+  /** null = 내레이션(V.O.) 라인 (#dialogue-v4) — 기존 DB에도 null 실재(persist가 화자 미상 시 null 기록). */
+  characterId: string | null
   text: string
   emotion: string
   delivery: string

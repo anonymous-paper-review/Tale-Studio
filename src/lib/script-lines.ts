@@ -35,11 +35,13 @@ function sceneHeadingText(scene: Scene): string {
   return `${location}${mood ? ` · ${mood}` : ''}`
 }
 
-function characterNameOf(manifest: SceneManifest | null, characterId: string): string {
+function characterNameOf(manifest: SceneManifest | null, characterId: string | null): string {
+  if (!characterId) return 'V.O.' // 내레이션 라인 (#dialogue-v4 — characterId null)
   return manifest?.characters.find((c) => c.characterId === characterId)?.name ?? characterId
 }
 
-function characterRef(manifest: SceneManifest | null, characterId: string): string {
+function characterRef(manifest: SceneManifest | null, characterId: string | null): string {
+  if (!characterId) return 'V.O.' // 내레이션 — 채팅 컨텍스트에서도 화자 슬러그 없음
   const name = characterNameOf(manifest, characterId)
   return name === characterId ? characterId : `${characterId}(${name})`
 }

@@ -3,6 +3,7 @@
 // Writer 워크스페이스 — 탭 뷰를 동시에 마운트해 내부 상태를 보존한다.
 
 import { useEffect, useState } from 'react'
+import { DialogueView } from '@/features/writer/dialogue-view'
 import { RoughStoryboardView } from '@/features/writer/rough-storyboard-view'
 import { ScriptView } from '@/features/writer/script-view'
 import { WriterGenerationView } from '@/features/writer/writer-generation-view'
@@ -43,7 +44,7 @@ function useGenerationDebug(): boolean {
 
 export function WriterWorkspace() {
   const activeTab = useWriterUiStore((state) => state.activeTab)
-  const visibleTab = activeTab === 'script' ? 'script' : 'storyboard'
+  const visibleTab = activeTab // storyboard | script | dialogue (#dialogue-v4: 대사탭 활성화)
   const projectId = useProjectStore((state) => state.projectId)
   const { status } = useWriterStatus(projectId)
   const debugGeneration = useGenerationDebug()
@@ -78,6 +79,12 @@ export function WriterWorkspace() {
         className={cn(visibleTab === 'script' ? 'flex min-h-0 flex-1 flex-col' : 'hidden')}
       >
         <ScriptView />
+      </div>
+      <div
+        aria-hidden={visibleTab !== 'dialogue'}
+        className={cn(visibleTab === 'dialogue' ? 'flex min-h-0 flex-1 flex-col' : 'hidden')}
+      >
+        <DialogueView />
       </div>
     </div>
   )

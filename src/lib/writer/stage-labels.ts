@@ -16,6 +16,7 @@ const STAGE_LABELS: Record<string, string> = {
   shotDesign: 'Director가 샷들에 연출을 손보고 있습니다',
   shotCheck: 'Director가 샷 연출을 검증하고 있습니다',
   renderPrompts: 'Director가 촬영 지시서를 쓰고 있습니다',
+  dialogue: 'Writer가 인물 대사를 쓰고 있습니다',
   persistShots: 'Director가 샷 목록을 정리해 저장하고 있습니다',
 }
 

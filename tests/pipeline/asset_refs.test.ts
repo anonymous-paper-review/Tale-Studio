@@ -20,7 +20,8 @@ describe.skipIf(!hasFixture)('asset_refs normalization (real logged data)', () =
   const s2 = read('04_S2.json') as Characters;
   const l2 = read('09_L2.json') as WorldVisual;
   const s3 = read('05_S3.json') as Scenes;
-  const reg = buildAssetRegistry(s2, l2);
+  // skipIf 여도 본문은 수집 시 실행 — 픽스처 없으면 registry 계산도 건너뛴다(빈 폴백).
+  const reg = hasFixture ? buildAssetRegistry(s2, l2) : ({ characterIds: new Set<string>(), locationIds: [] } as ReturnType<typeof buildAssetRegistry>);
 
   it('builds canonical registry from S2 + L2', () => {
     expect(reg.characterIds.has('the_silver_knight')).toBe(true);

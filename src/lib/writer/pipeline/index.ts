@@ -14,6 +14,7 @@ import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
 import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
+import { runDialogue, toDialogueTrack } from '@/lib/writer/pipeline/stages/dialogue';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
 import { persistAssetsToDb, persistShotsToDb } from '@/lib/writer/pipeline/util/persist_manifest';
@@ -43,6 +44,7 @@ import type {
   ShotDesign,
   DecoupagePlan,
   RenderPromptsOutput,
+  DialogueTrack,
 } from '@/lib/writer/types/pipeline';
 
 // Skip 모드 default = true (피드백 미반영 stage 건너뜀, 비용 절감)
@@ -389,10 +391,23 @@ async function _runPipelineInner(
     logger,
   )).value;
 
+  // ===== dialogue: 샷 단위 대사 후처리 (#dialogue-v4) =====
+  // 샷 확정 후 V4 구성(보이스 프로파일 + 씬 순차 메모리 + 3규율)으로 대사를 저작한다.
+  const dialogueTrack = (await loadOrRun<DialogueTrack>(
+    resume,
+    '14b_dialogue.json',
+    async () => {
+      const result = await runDialogue(input.story, genre, characters, scenes, decoupage, logger, models.S);
+      return toDialogueTrack(result);
+    },
+    'dialogue',
+    logger,
+  )).value;
+
   // ★ Tier 2 persist (스토리보드/director): shots 를 마지막에 DB 기록.
   //   characters/locations/scenes 는 Tier 1(stage 09)이 이미 기록 — 여기선 건드리지 않음(artist 편집 보존).
-  //   shotSequence 는 샷별 대사를 보유. non-blocking — 실패해도 파이프라인 계속.
-  persistShotsToDb(projectId, shotSequence)
+  //   shots.dialogue_lines 는 dialogue 트랙(화자 명시)에서 매핑. non-blocking — 실패해도 파이프라인 계속.
+  persistShotsToDb(projectId, shotSequence, dialogueTrack)
     .then(() => logger.markStage('persistShots', 'completed'))
     .catch((e) => {
       console.warn('[writer] Tier2 shots persist failed (pipeline continues):', e);
