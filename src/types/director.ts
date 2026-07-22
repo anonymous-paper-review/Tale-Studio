@@ -43,10 +43,19 @@ export type DirectorReferenceImage = {
  * 이 이미지가 해당 샷 I2V 영상 생성의 기본 레퍼런스가 된다.
  */
 export type StoryboardImage = {
+  /** 대표 프레임(3프레임 세트에선 start) — 단일 이미지 구버전과의 하위 호환 필드. */
   url: string
   status: DirectorVideoStatus // 'pending'|'generating'|'completed'|'failed' 재사용
   errorMessage: string | null
   generatedAt: number
+  /** 실사 3프레임 세트(#real-strip 2026-07-22): 러프 스트립을 레퍼런스로 리페인트한 start→direction→end. */
+  frames?: {
+    start: string
+    direction: string
+    end: string
+  }
+  /** 이 세트가 잘려 나온 원본 스트립 이미지 (디버그·재현용). */
+  stripUrl?: string
 }
 
 // ─── Scene Node ────────────────────────────────────────────────────────────

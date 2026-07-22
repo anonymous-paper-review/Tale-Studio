@@ -2037,6 +2037,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 generatedAt: Date.now(),
               },
             })
+            // 스트립 모드(#real-strip)의 frames{start,direction,end}는 잡 result_url(=start)에
+            //   실리지 않는다 — DB 진실 재수화로 회수(로컬이 방금 쓴 완료값 그대로면 DB 값 채택).
+            await get().hydrateFromDb(projectId).catch(() => {})
             notifyGenerationComplete('director', '스토리보드') // 다른 stage에 있을 때만 알림
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error'
@@ -2200,6 +2203,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           shotNode.data.storyboardImage?.status === 'completed'
             ? shotNode.data.storyboardImage.url
             : shotNode.data.referenceImages[0]?.url ?? null
+        // V2 refs(#real-strip): 실사 3프레임이 있으면 [START, END] 2장 — 시작·끝 구도 고정.
+        const sbFrames =
+          shotNode.data.storyboardImage?.status === 'completed'
+            ? shotNode.data.storyboardImage.frames
+            : undefined
+        const referenceImageUrls = sbFrames ? [sbFrames.start, sbFrames.end] : undefined
         get().updateNodeData<'video'>(videoNodeId, {
           lastAttemptStatus: 'generating',
           lastAttemptError: null,
@@ -2225,6 +2234,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           provider: toRouteProvider(eff.provider),
           durationSeconds: shotNode.data.durationSeconds ?? 5,
           referenceImageUrl,
+          ...(referenceImageUrls ? { referenceImageUrls } : {}),
         }
         const postGeneration = (recoveryReceipt?: string) =>
           fetch('/api/director/generate-video', {

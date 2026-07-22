@@ -75,8 +75,8 @@ function canonicalJson(value: Json): string {
 function snapshotValueMatches(snapshot: Record<string, unknown>, candidate: Record<string, unknown>): boolean {
   return [
     'prompt', 'full_prompt', 'camera', 'duration_seconds', 'aspect_ratio', 'generation_method',
-    'provider', 'model', 'resolved_model_key', 'reference_image_url', 'movement_preset',
-    'camera_preset', 'fal_request', 'new_take_metadata',
+    'provider', 'model', 'resolved_model_key', 'reference_image_url', 'reference_image_urls',
+    'movement_preset', 'camera_preset', 'fal_request', 'new_take_metadata',
   ].every((key) => {
     const snapshotHasKey = Object.prototype.hasOwnProperty.call(snapshot, key)
     const candidateHasKey = Object.prototype.hasOwnProperty.call(candidate, key)
@@ -137,11 +137,13 @@ function buildFalT2VFallbackRequest(
   }
 }
 
-/* ── FAL.ai reference-to-video (레지스트리 기반, #5) ── */
+/* ── FAL.ai reference-to-video (레지스트리 기반, #5) ──
+   V2 refs(#real-strip 2026-07-22): imageUrls 가 [START, END] 2장이면 시작·끝 구도 고정 —
+   전 모델 refParam 이 image_urls 배열이라 스키마 변경 없이 원소만 늘어난다. */
 function buildFalReferenceToVideoRequest(
   modelKey: VideoModelKey,
   prompt: string,
-  imageUrl: string,
+  imageUrls: string[],
   durationSeconds: number,
   aspectRatio: string,
 ): FalVideoSubmitRequest {
@@ -150,7 +152,7 @@ function buildFalReferenceToVideoRequest(
   const input: Record<string, unknown> = {
     prompt,
     negative_prompt: 'blurry, low quality, distorted, deformed',
-    [spec.refParam]: [imageUrl],
+    [spec.refParam]: imageUrls,
   }
 
   // duration: flexible=정수(clamp), fixed(veo)='8s'
@@ -374,13 +376,19 @@ export async function POST(req: Request) {
     const body = (await req.json()) as {
       shotId?: string; projectId?: string; writerShotId?: string | null; prompt?: string; camera?: CameraConfig
       durationSeconds?: number; aspectRatio?: string; generationMethod?: GenerationMethod; provider?: VideoProvider
-      model?: string; referenceImageUrl?: string; movementPreset?: string | null; cameraPreset?: CameraPreset | null
+      model?: string; referenceImageUrl?: string; referenceImageUrls?: string[]; movementPreset?: string | null
+      cameraPreset?: CameraPreset | null
       idempotencyKey?: string; videoClipId?: string; takeLabel?: string | null; override?: Json; canvasPosition?: Json | null
       recoveryReceipt?: string
     }
     const { prompt, camera, durationSeconds, aspectRatio, generationMethod = 'T2V', provider, model,
       referenceImageUrl, movementPreset, cameraPreset, idempotencyKey, videoClipId, takeLabel, override, canvasPosition,
       recoveryReceipt } = body
+    // V2 refs(#real-strip): [START, END] 등 다중 레퍼런스. referenceImageUrl(단일)과 병행 수신 —
+    //   단일은 I2V 판별·스냅샷 하위호환 축, 배열은 실제 제출 레퍼런스로 우선.
+    const referenceImageUrlsV2 = Array.isArray(body.referenceImageUrls)
+      ? body.referenceImageUrls.filter((u): u is string => typeof u === 'string' && !!u).slice(0, 4)
+      : undefined
     const writerShotId = body.writerShotId ?? body.shotId
     projectId = body.projectId ?? ''
     if (!projectId || !writerShotId || !prompt || !idempotencyKey) {
@@ -442,6 +450,11 @@ export async function POST(req: Request) {
     const modelKey: VideoModelKey = model != null ? normalizeProvider(model) : provider === 'local' ? 'local' : normalizeProvider('')
     const isLocal = modelKey === 'local'
     const dur = durationSeconds ?? 5
+    const submitRefUrls = referenceImageUrl
+      ? referenceImageUrlsV2?.length
+        ? referenceImageUrlsV2
+        : [referenceImageUrl]
+      : null
     const { fullPrompt, prompt_parts: promptParts } = buildVideoPrompt({
       prompt,
       camera,
@@ -450,11 +463,12 @@ export async function POST(req: Request) {
       generationMethod,
       modelKey,
       durationSeconds: dur,
+      startEndReference: (submitRefUrls?.length ?? 0) >= 2,
     })
     const falSubmitRequest = isLocal
       ? null
-      : referenceImageUrl
-        ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, referenceImageUrl, dur, aspectRatio ?? '16:9')
+      : submitRefUrls
+        ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, aspectRatio ?? '16:9')
         : buildFalT2VFallbackRequest(fullPrompt, dur, aspectRatio ?? '16:9')
     const falCapture = falSubmitRequest
       ? buildBestEffortFalRequestCapturePatch(falSubmitRequest.input, falSubmitRequest.model)
@@ -476,6 +490,8 @@ export async function POST(req: Request) {
       model: model ?? null,
       resolved_model_key: modelKey,
       reference_image_url: referenceImageUrl ?? null,
+      // 배열 키는 존재할 때만 — 구버전 예약 잡의 리플레이 비교(snapshotValueMatches)와 호환.
+      ...(referenceImageUrlsV2?.length ? { reference_image_urls: referenceImageUrlsV2 } : {}),
       movement_preset: movementPreset ?? null,
       camera_preset: cameraPreset ?? null,
       ...(videoClipId ? {} : { new_take_metadata: normalizedNewTakeMetadata }),

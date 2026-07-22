@@ -802,12 +802,80 @@ export async function finalizeWorldShotJob(
   return publicUrl
 }
 
+/**
+ * 실사 3프레임 스트립(#real-strip 2026-07-22) 영속화 — 스트립 원본 업로드 → strip1 크롭 →
+ *   샷별 3프레임 업로드 → shots.storyboard_image 를 frames shape(url=start 하위호환)로 갱신.
+ *   잡 result_url 은 start 프레임 — 레거시 클라 폴링(url 만 소비)이 대표 프레임을 받는다.
+ */
+async function finalizeStoryboardStripJob(
+  job: GenerationJob,
+  falImageUrl: string,
+  falPayload?: unknown,
+): Promise<string> {
+  const { workspaceId, writerShotId } = job.target
+  if (!workspaceId || !writerShotId) {
+    throw new Error('shot_storyboard strip job target missing workspaceId/writerShotId')
+  }
+  await recordFalResponseSnapshot(job, falPayload)
+
+  const res = await fetch(falImageUrl)
+  if (!res.ok) throw new Error(`fal strip image fetch failed: ${res.status}`)
+  const stripBuf = Buffer.from(await res.arrayBuffer())
+  // 빈/모더레이션 출력 방어 — 정상 스트립은 수백 KB.
+  if (stripBuf.length < 50_000) {
+    throw new Error(`strip image too small (${stripBuf.length}b) — likely blank/moderated output`)
+  }
+
+  const upload = async (path: string, buf: Buffer): Promise<string> => {
+    const { error } = await supabaseAdmin.storage
+      .from('media')
+      .upload(path, buf, { contentType: 'image/png', upsert: true })
+    if (error) throw error
+    return versionedUrl(supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl)
+  }
+
+  const seg = storageKeySegment(writerShotId)
+  const base = `${workspaceId}/${job.project_id}/shots`
+  const stripUrl = await upload(`${base}/${seg}_storyboard_strip.png`, stripBuf)
+
+  const [frames] = await cropRoughGridFrames(stripBuf, 'strip1', 1)
+  const [startUrl, directionUrl, endUrl] = await Promise.all([
+    upload(`${base}/${seg}_storyboard_start.png`, frames.start),
+    upload(`${base}/${seg}_storyboard_direction.png`, frames.direction),
+    upload(`${base}/${seg}_storyboard_end.png`, frames.end),
+  ])
+  await uploadThumbnail(`${base}/${seg}_storyboard_start.png`, frames.start)
+
+  const { error } = await supabaseAdmin
+    .from('shots')
+    .update({
+      storyboard_image: {
+        url: startUrl, // 하위 호환 대표 프레임 (Node 뷰 등 구 소비처는 url 만 읽음)
+        frames: { start: startUrl, direction: directionUrl, end: endUrl },
+        stripUrl,
+        status: 'completed',
+        errorMessage: null,
+        generatedAt: Date.now(),
+      },
+    })
+    .eq('project_id', job.project_id)
+    .eq('shot_id', writerShotId)
+  if (error) throw error
+
+  await completeGenerationJob(job.id, startUrl)
+  return startUrl
+}
+
 /** 샷 스토리보드 이미지(I2I) 영속화 → shots.storyboard_image(JSONB) 갱신(writerShotId 있을 때). */
 export async function finalizeShotStoryboardJob(
   job: GenerationJob,
   falImageUrl: string,
   falPayload?: unknown,
 ): Promise<string> {
+  // 스트립 잡(#real-strip): target.gridVariant === 'strip1' 이 판별 신호.
+  if (job.target.gridVariant === 'strip1') {
+    return finalizeStoryboardStripJob(job, falImageUrl, falPayload)
+  }
   const { workspaceId, writerShotId } = job.target
   if (!workspaceId || !writerShotId) {
     throw new Error('shot_storyboard job target missing workspaceId/writerShotId')

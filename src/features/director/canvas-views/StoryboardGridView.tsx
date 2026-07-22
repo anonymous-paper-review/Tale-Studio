@@ -6,6 +6,7 @@ import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
+import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import {
   selectLatestAttempt,
   selectNewestSuccessfulTake,
@@ -283,11 +284,16 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
           // 영상까지 완성된 샷(#e13) — 호버 시에만 재생, 클릭 = 일시정지(#e1).
           <HoverPlayVideo src={completedVideoUrl} label={prettyNodeLabel(data.label)} />
         ) : hasImage ? (
-          <GeneratedImage
-            src={img!.url}
-            alt={data.label}
-            className="size-full object-cover"
-          />
+          img!.frames ? (
+            // 실사 3프레임(#real-strip) — 러프 보드와 동일한 hover 순환(START→DIRECTING→END).
+            <RoughFrameCycle panel={img!} alt={data.label} />
+          ) : (
+            <GeneratedImage
+              src={img!.url}
+              alt={data.label}
+              className="size-full object-cover"
+            />
+          )
         ) : status === 'failed' ? (
           // 실패 시 이미지 자리에 로그 표시 (사용자 요청)
           <div className="flex size-full flex-col items-center justify-center gap-1 bg-destructive/10 p-2 text-center">

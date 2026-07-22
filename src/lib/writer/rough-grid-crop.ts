@@ -16,6 +16,14 @@
 //   교정으로 잡는다: 크기를 ±6px 로 클러스터링 → (최다, 동수면 작은 쪽) 클러스터를 기준으로
 //   **과대 크기만** 기대값에서 먼 경계를 축소. (과소는 모델이 실제로 작게 그린 패널일 수 있어 유지.)
 //   4종 실측(클린/어두운/shot_1 그리드 + 실사 스트립)으로 행·열 전부 검증.
+//
+// ── v5 (2026-07-22, 실사 스트립 e2e 실측): 전역 거터 검출 1차 + v4 앵커 스캔 폴백 ──
+// gpt-image-2 가 채운 패널을 리페인트할 때(실사 스트립) 템플릿의 외곽 마진을 버리고 패널을
+//   균등 재배치한 출력이 관측됨(패널 위치가 기대에서 최대 ~10% 이동 — ±3% 앵커 밖 → 비례
+//   폴백이 이웃 패널 조각을 물었다). 위치는 변해도 **"밝은 런(거터/마진)이 셀을 나눈다 + 셀
+//   크기는 균일"** 불변식은 유지되므로, 축 전체에서 밝은 런을 찾아 셀 구간을 직접 유도한다.
+//   채택 조건(둘 다): 유도된 셀 개수 == 기대 개수, 셀 크기 균일(±max(6px, 2%)).
+//   불통과(밝은 콘텐츠 밴드로 인한 가짜 분할, 거터 소실 병합 등) 시 v4 앵커 스캔으로 폴백.
 import sharp from 'sharp'
 import { gridGeometry, type RoughGridVariant } from '@/lib/writer/rough-storyboard-grid'
 
@@ -44,6 +52,49 @@ function referenceSize(sizes: number[]): number {
   clusters.sort((a, b) => b.length - a.length || a[0] - b[0])
   const top = clusters[0]
   return top[Math.floor(top.length / 2)]
+}
+
+/**
+ * 전역 거터 검출(v5) — 축 전체에서 밝은 런(거터·마진)을 찾아 셀 구간을 직접 유도.
+ *   템플릿 비례에 무관: 모델이 시트를 재배치해도 "밝은 띠가 셀을 나눈다"는 불변식만 쓴다.
+ *   검증(셀 개수 일치 + 크기 균일) 불통과면 null → 호출부가 v4 앵커 스캔으로 폴백.
+ */
+function globalAxisBounds(
+  profile: Float32Array,
+  cellCount: number,
+  total: number,
+): Array<[number, number]> | null {
+  const MIN_RUN = 3 // 거터 최소 두께(px) — 노이즈 행/열 배제
+  const runs: Array<[number, number]> = []
+  let runStart = -1
+  for (let i = 0; i <= total; i++) {
+    const bright = i < total && profile[i] <= GUTTER_RATIO
+    if (bright && runStart < 0) runStart = i
+    else if (!bright && runStart >= 0) {
+      if (i - runStart >= MIN_RUN) runs.push([runStart, i - 1])
+      runStart = -1
+    }
+  }
+
+  // 셀 후보 = 밝은 런 사이(및 축 양끝)의 어두운 구간. 축 크기 10% 미만은 슬리버(노이즈)로 배제.
+  const intervals: Array<[number, number]> = []
+  let prevEnd = -1
+  for (const [rs, re] of runs) {
+    if (rs - 1 > prevEnd) intervals.push([prevEnd + 1, rs - 1])
+    prevEnd = re
+  }
+  if (total - 1 > prevEnd) intervals.push([prevEnd + 1, total - 1])
+  const cells = intervals.filter(([a, b]) => b - a + 1 >= total * 0.1)
+
+  if (cells.length !== cellCount) return null
+  const sizes = cells.map(([a, b]) => b - a + 1)
+  const spread = Math.max(...sizes) - Math.min(...sizes)
+  if (spread > Math.max(SIZE_TOLERANCE_PX, total * 0.02)) return null
+  // 커버리지 검증 — 전 패널이 같은 위치에 밝은 콘텐츠 밴드(하늘 등)를 가지면 개수·균일을 통과한
+  //   "패널 하부만" 오검출이 남는다(실측 prodgrid_2: 4샷 모두 상단 하늘 → 행 커버리지 0.49).
+  //   정상 레이아웃의 셀 합은 축의 0.77 이상(템플릿 행) — 0.65 미만이면 기각 → v4 앵커 폴백.
+  if (sizes.reduce((a, b) => a + b, 0) < total * 0.65) return null
+  return cells.map(([a, b]) => [a + CELL_INSET, b - CELL_INSET] as [number, number])
 }
 
 /**
@@ -139,8 +190,9 @@ export async function cropRoughGridFrames(
   for (let x = 0; x < width; x++) colProfile[x] /= height
   for (let y = 0; y < height; y++) rowProfile[y] /= width
 
-  const colPx = scanAxisBounds(colProfile, cols, width)
-  const rowPx = scanAxisBounds(rowProfile, rows, height)
+  // v5: 전역 거터 검출 우선(재배치된 출력도 정합) → 검증 불통과 시 v4 앵커 스캔.
+  const colPx = globalAxisBounds(colProfile, cols.length, width) ?? scanAxisBounds(colProfile, cols, width)
+  const rowPx = globalAxisBounds(rowProfile, rows.length, height) ?? scanAxisBounds(rowProfile, rows, height)
 
   const out: RoughGridFrames[] = []
   for (let c = 0; c < shotCount; c++) {
