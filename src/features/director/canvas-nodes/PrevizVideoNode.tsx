@@ -31,6 +31,8 @@ function PrevizVideoNodeImpl({ data }: NodeProps<DirectorNode>) {
     rough?.frames?.start ?? (rough?.status === 'completed' ? rough.url : null)
   const url = previz?.status === 'completed' && previz.url ? previz.url : null
   const generating = previz?.status === 'generating' || busy
+  // 산출물(previz 영상) 유무로 카드 톤 전환 — 없으면 플레이스홀더와 같은 회색 대시(2026-07-23 피드백).
+  const hasContent = !!url
 
   const run = async () => {
     if (busy || !writerShotId || !roughStartUrl) return
@@ -46,32 +48,67 @@ function PrevizVideoNodeImpl({ data }: NodeProps<DirectorNode>) {
   }
 
   return (
-    <div className="group relative w-[260px] rounded-lg border border-chart-5/70 bg-node-bg-default">
+    <div
+      className={cn(
+        'group relative w-[260px] rounded-lg border',
+        hasContent
+          ? 'border-chart-5/70 bg-node-bg-default'
+          : 'border-dashed border-border bg-node-bg-default/60 opacity-80 transition-opacity hover:opacity-100',
+      )}
+    >
       <Handle
         type="target"
         position={Position.Left}
         id="left"
-        className="!h-2 !w-2 !border-0 bg-chart-5 opacity-0 group-hover:opacity-100"
+        className={cn(
+          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
+          hasContent ? 'bg-chart-5' : 'bg-muted-foreground/60',
+        )}
       />
       <Handle
         type="source"
         position={Position.Right}
         id="right"
-        className="!h-2 !w-2 !border-0 bg-chart-5 opacity-0 group-hover:opacity-100"
+        className={cn(
+          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
+          hasContent ? 'bg-chart-5' : 'bg-muted-foreground/60',
+        )}
       />
 
-      <div className="flex h-7 items-center justify-between border-b border-border/60 px-3 text-xs">
-        <span className="flex items-center gap-1.5 font-medium uppercase tracking-wide text-muted-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-chart-5" />
+      <div
+        className={cn(
+          'flex h-7 items-center justify-between border-b px-3 text-xs',
+          hasContent ? 'border-border/60' : 'border-dashed border-border/60',
+        )}
+      >
+        <span
+          className={cn(
+            'flex items-center gap-1.5 font-medium uppercase tracking-wide',
+            hasContent ? 'text-muted-foreground' : 'text-muted-foreground/70',
+          )}
+        >
+          <span
+            className={cn(
+              'h-1.5 w-1.5 rounded-full',
+              hasContent ? 'bg-chart-5' : 'bg-muted-foreground/50',
+            )}
+          />
           Previz shot video
         </span>
-        <span className="max-w-24 truncate text-[10px] text-muted-foreground">
+        <span className="max-w-24 truncate text-[10px] text-muted-foreground/70">
           {prettyNodeLabel(data.label)}
         </span>
       </div>
 
       <div className="p-2">
-        <div className="relative aspect-video w-full overflow-hidden rounded-sm border border-border/40 bg-muted/40">
+        <div
+          className={cn(
+            'relative aspect-video w-full overflow-hidden rounded-sm border',
+            hasContent
+              ? 'border-border/40 bg-muted/40'
+              : 'border-dashed border-border/60 bg-muted/20',
+          )}
+        >
           {playing && url ? (
             <>
               <video

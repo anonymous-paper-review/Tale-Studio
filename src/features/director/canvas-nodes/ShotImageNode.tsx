@@ -36,26 +36,59 @@ function ShotImageNodeImpl({ data }: NodeProps<DirectorNode>) {
   const failed = storyboardImage?.status === 'failed'
 
   return (
-    <div className="group relative w-[260px] rounded-lg border border-chart-4/70 bg-node-bg-default">
+    <div
+      className={cn(
+        'group relative w-[260px] rounded-lg border',
+        // 산출물(실사 이미지) 없으면 플레이스홀더와 같은 회색 대시 톤(2026-07-23 피드백).
+        hasImage
+          ? 'border-chart-4/70 bg-node-bg-default'
+          : 'border-dashed border-border bg-node-bg-default/60 opacity-80 transition-opacity hover:opacity-100',
+      )}
+    >
       <Handle
         type="source"
         position={Position.Right}
         id="right"
-        className="!h-2 !w-2 !border-0 bg-chart-4 opacity-0 group-hover:opacity-100"
+        className={cn(
+          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
+          hasImage ? 'bg-chart-4' : 'bg-muted-foreground/60',
+        )}
       />
 
-      <div className="flex h-7 items-center justify-between border-b border-border/60 px-3 text-xs">
-        <span className="flex items-center gap-1.5 font-medium uppercase tracking-wide text-muted-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-chart-4" />
+      <div
+        className={cn(
+          'flex h-7 items-center justify-between border-b px-3 text-xs',
+          hasImage ? 'border-border/60' : 'border-dashed border-border/60',
+        )}
+      >
+        <span
+          className={cn(
+            'flex items-center gap-1.5 font-medium uppercase tracking-wide',
+            hasImage ? 'text-muted-foreground' : 'text-muted-foreground/70',
+          )}
+        >
+          <span
+            className={cn(
+              'h-1.5 w-1.5 rounded-full',
+              hasImage ? 'bg-chart-4' : 'bg-muted-foreground/50',
+            )}
+          />
           Shot image
         </span>
-        <span className="max-w-24 truncate text-[10px] text-muted-foreground">
+        <span className="max-w-24 truncate text-[10px] text-muted-foreground/70">
           {prettyNodeLabel(data.label)}
         </span>
       </div>
 
       <div className="p-2">
-        <div className="relative aspect-video w-full overflow-hidden rounded-sm border border-border/40 bg-muted/40">
+        <div
+          className={cn(
+            'relative aspect-video w-full overflow-hidden rounded-sm border',
+            hasImage
+              ? 'border-border/40 bg-muted/40'
+              : 'border-dashed border-border/60 bg-muted/20',
+          )}
+        >
           {hasImage ? (
             storyboardImage.frames ? (
               <RoughFrameCycle panel={storyboardImage} alt={`${data.label} storyboard`} />
@@ -76,8 +109,9 @@ function ShotImageNodeImpl({ data }: NodeProps<DirectorNode>) {
               )}
             </div>
           ) : (
-            <span className="flex h-full w-full items-center justify-center">
-              <ImageIcon className="size-6 text-muted-foreground opacity-50" />
+            <span className="flex h-full w-full flex-col items-center justify-center gap-1">
+              <ImageIcon className="size-5 text-muted-foreground/40" />
+              <span className="text-[10px] text-muted-foreground/70">아직 이미지가 없어요</span>
             </span>
           )}
           <GeneratingOverlay active={!!generating} label="이미지 생성 중" beamColor="success" />
