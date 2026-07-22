@@ -1,0 +1,17 @@
+{
+  "rubric": "(a) 프롬프트 명세 충실도 1~5 + (b) 이미지 품질 1~5, 합(최대 10)으로 승자 결정, 동점 무승부. 블라인드(X/Y 무작위 라벨)로 채점 후 mapping.json 공개.",
+  "judge": "서브에이전트(Sonnet) 비전 판정 — 2026-07-21",
+  "shots": [
+    { "shot": 1,  "ko": { "fidelity": 4, "quality": 5, "total": 9 },  "en": { "fidelity": 5, "quality": 5, "total": 10 }, "winner": "en" },
+    { "shot": 2,  "ko": { "fidelity": 5, "quality": 5, "total": 10 }, "en": { "fidelity": 4, "quality": 5, "total": 9 },  "winner": "ko" },
+    { "shot": 3,  "ko": { "fidelity": 4, "quality": 5, "total": 9 },  "en": { "fidelity": 3, "quality": 5, "total": 8 },  "winner": "ko" },
+    { "shot": 4,  "ko": { "fidelity": 4, "quality": 5, "total": 9 },  "en": { "fidelity": 5, "quality": 5, "total": 10 }, "winner": "en" },
+    { "shot": 5,  "ko": { "fidelity": 4, "quality": 4, "total": 8 },  "en": { "fidelity": 4, "quality": 5, "total": 9 },  "winner": "en" },
+    { "shot": 6,  "ko": { "fidelity": 4, "quality": 5, "total": 9 },  "en": { "fidelity": 4, "quality": 5, "total": 9 },  "winner": "draw" },
+    { "shot": 7,  "ko": { "fidelity": 4, "quality": 5, "total": 9 },  "en": { "fidelity": 5, "quality": 5, "total": 10 }, "winner": "en" },
+    { "shot": 8,  "ko": { "fidelity": 4, "quality": 5, "total": 9 },  "en": { "fidelity": 5, "quality": 5, "total": 10 }, "winner": "en" },
+    { "shot": 9,  "ko": { "fidelity": 5, "quality": 4, "total": 9 },  "en": { "fidelity": 4, "quality": 5, "total": 9 },  "winner": "draw" },
+    { "shot": 10, "ko": { "fidelity": 4, "quality": 5, "total": 9 },  "en": { "fidelity": 5, "quality": 5, "total": 10 }, "winner": "en" }
+  ],
+  "totals": { "en_wins": 6, "ko_wins": 2, "draws": 2 }
+}
