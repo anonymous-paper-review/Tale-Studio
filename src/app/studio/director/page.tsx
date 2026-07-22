@@ -53,6 +53,7 @@ import { AssetNode } from '@/features/director/canvas-nodes/AssetNode'
 import { PromptNode } from '@/features/director/canvas-nodes/PromptNode'
 import { PrevizVideoNode } from '@/features/director/canvas-nodes/PrevizVideoNode'
 import { ShotImageNode } from '@/features/director/canvas-nodes/ShotImageNode'
+import { VideoPlaceholderNode } from '@/features/director/canvas-nodes/VideoPlaceholderNode'
 import { CategoryEdge } from '@/features/director/canvas-edges/CategoryEdge'
 import { CreatorModal } from '@/features/director/canvas-popups/CreatorModal'
 import { RelationModal } from '@/features/director/canvas-popups/RelationModal'
@@ -72,6 +73,7 @@ const nodeTypes = {
   prompt: PromptNode,
   previzVideo: PrevizVideoNode,
   shotImage: ShotImageNode,
+  videoPlaceholder: VideoPlaceholderNode,
 } as const
 
 // ────────────────────────────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ import {
   isPrevizVideoData,
   isShotImageData,
   isVideoData,
+  isVideoPlaceholderData,
 } from '@/types/director'
 
 beforeEach(() => {
@@ -115,6 +116,45 @@ describe('rebuildShotChainNodes', () => {
       x: shot.position.x + PREVIZ_VIDEO_OFFSET_X,
       y: shot.position.y,
     })
+  })
+
+  it('테이크 0개면 회색 SHOT VIDEO 플레이스홀더가 종점을 안내하고, 테이크 생성 시 사라진다', () => {
+    const [writerShot, manualShot] = seed()
+    api().rebuildShotChainNodes()
+
+    const phId = `dn_vph_${writerShot}`
+    const ph = api().nodes.find((n) => n.id === phId)
+    expect(ph && isVideoPlaceholderData(ph.data)).toBe(true)
+    expect(ph!.position).toEqual({ x: 360 + VIDEO_OFFSET_X, y: 0 })
+    // 체인 배선: pv→ph, simg→ph
+    const chain = api().edges.filter((e) => e.data?.category === 'chain')
+    expect(chain.map((e) => [e.source, e.target])).toEqual(
+      expect.arrayContaining([
+        [`dn_pv_${writerShot}`, phId],
+        [`dn_simg_${writerShot}`, phId],
+      ]),
+    )
+    // 수동 샷엔 플레이스홀더 없음
+    expect(api().nodes.find((n) => n.id === `dn_vph_${manualShot}`)).toBeUndefined()
+
+    // 첫 테이크 생성 → 플레이스홀더 제거 + 실제 Video 배선으로 대체
+    const videoId = api().addVideoTake(writerShot)!
+    expect(api().nodes.find((n) => n.id === phId)).toBeUndefined()
+    expect(
+      api().edges.some(
+        (e) => e.data?.category === 'chain' && e.target === videoId,
+      ),
+    ).toBe(true)
+  })
+
+  it('followChainNodePositions — 플레이스홀더도 Shot 이동을 따라온다', () => {
+    const [writerShot] = seed()
+    api().rebuildShotChainNodes()
+    const moved = api().nodes.map((n) =>
+      n.id === writerShot ? { ...n, position: { x: 800, y: 200 } } : n,
+    )
+    const ph = followChainNodePositions(moved).find((n) => n.id === `dn_vph_${writerShot}`)!
+    expect(ph.position).toEqual({ x: 800 + VIDEO_OFFSET_X, y: 200 })
   })
 
   it('undo 후에도 체인이 재생성된다 (파생은 스냅샷 제외)', () => {

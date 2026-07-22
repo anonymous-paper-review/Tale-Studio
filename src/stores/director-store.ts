@@ -24,6 +24,7 @@ import {
   isPromptData,
   isPrevizVideoData,
   isShotImageData,
+  isVideoPlaceholderData,
   isDerivedNodeData,
   type DirectorNode,
   type DirectorEdge,
@@ -1823,7 +1824,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         set((s) => {
           // 1) 기존 파생물 제거 — 멱등 재생성
           const nodes = s.nodes.filter(
-            (n) => !isPrevizVideoData(n.data) && !isShotImageData(n.data),
+            (n) =>
+              !isPrevizVideoData(n.data) &&
+              !isShotImageData(n.data) &&
+              !isVideoPlaceholderData(n.data),
           )
           let edges = s.edges.filter((e) => e.data?.category !== 'chain')
 
@@ -1891,10 +1895,31 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               data: { kind: 'shotImage', label: sd.label, parentShotNodeId: shot.id },
             })
             edges.push(chainEdge(`de_chain_${shot.id}_pv`, shot.id, pvId))
+            let hasVideo = false
             for (const v of nodes) {
               if (!isVideoData(v.data) || v.data.parentShotNodeId !== shot.id) continue
+              hasVideo = true
               edges.push(chainEdge(`de_chain_pv_${v.id}`, pvId, v.id))
               edges.push(chainEdge(`de_chain_simg_${v.id}`, simgId, v.id))
+            }
+            // 테이크 0개 — 회색 SHOT VIDEO 플레이스홀더로 체인 종점을 안내(2026-07-22 피드백).
+            //   첫 테이크가 생기면 다음 rebuild 가 실제 Video 노드 배선으로 대체한다.
+            if (!hasVideo) {
+              const phId = `dn_vph_${shot.id}`
+              nodes.push({
+                id: phId,
+                type: 'videoPlaceholder',
+                position: {
+                  x: shot.position.x + VIDEO_OFFSET_X,
+                  y: shot.position.y,
+                },
+                draggable: false,
+                selectable: false,
+                connectable: false,
+                data: { kind: 'videoPlaceholder', label: sd.label, parentShotNodeId: shot.id },
+              })
+              edges.push(chainEdge(`de_chain_pv_${phId}`, pvId, phId))
+              edges.push(chainEdge(`de_chain_simg_${phId}`, simgId, phId))
             }
           }
 
@@ -3094,14 +3119,21 @@ export function followChainNodePositions(nodes: DirectorNode[]): DirectorNode[] 
   let shotById: Map<string, DirectorNode> | null = null
   let changed = false
   const out = nodes.map((n) => {
-    if (!isPrevizVideoData(n.data) && !isShotImageData(n.data)) return n
+    if (
+      !isPrevizVideoData(n.data) &&
+      !isShotImageData(n.data) &&
+      !isVideoPlaceholderData(n.data)
+    )
+      return n
     if (!shotById) {
       shotById = new Map(nodes.filter((x) => isShotData(x.data)).map((x) => [x.id, x]))
     }
     const shot = shotById.get((n.data as { parentShotNodeId: string }).parentShotNodeId)
     if (!shot) return n
     const want = {
-      x: shot.position.x + PREVIZ_VIDEO_OFFSET_X,
+      x:
+        shot.position.x +
+        (isVideoPlaceholderData(n.data) ? VIDEO_OFFSET_X : PREVIZ_VIDEO_OFFSET_X),
       y: shot.position.y + (isShotImageData(n.data) ? SHOT_IMAGE_OFFSET_Y : 0),
     }
     if (n.position.x === want.x && n.position.y === want.y) return n

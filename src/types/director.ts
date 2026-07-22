@@ -19,6 +19,7 @@ export type DirectorNodeKind =
   | 'prompt'
   | 'previzVideo'
   | 'shotImage'
+  | 'videoPlaceholder'
 
 export type DirectorEdgeCategory =
   | 'parent' // Scene→Shot, Shot→Video (계층)
@@ -210,6 +211,18 @@ export type ShotImageNodeData = {
   [key: string]: unknown
 }
 
+/**
+ * SHOT VIDEO 자리 표시 파생 노드 — 테이크가 0개인 체인 샷의 종점을 회색 카드로 보여줘
+ * "여기서 영상이 나온다"는 연결성을 넌지시 안내한다(2026-07-22 피드백). 생성 버튼으로
+ * 첫 테이크를 만들면 rebuild 가 실제 Video 노드로 대체(플레이스홀더 제거)한다.
+ */
+export type VideoPlaceholderNodeData = {
+  kind: 'videoPlaceholder'
+  label: string
+  parentShotNodeId: string
+  [key: string]: unknown
+}
+
 // ─── Prompt Node (Higgsfield식 분리 프롬프트) ────────────────────────────────
 
 /**
@@ -238,6 +251,7 @@ export type DirectorNodeData =
   | PromptNodeData
   | PrevizVideoNodeData
   | ShotImageNodeData
+  | VideoPlaceholderNodeData
 
 export type DirectorEdgeData = {
   category: DirectorEdgeCategory
@@ -309,7 +323,18 @@ export function isShotImageData(d: DirectorNodeData): d is ShotImageNodeData {
   return d.kind === 'shotImage'
 }
 
+export function isVideoPlaceholderData(
+  d: DirectorNodeData,
+): d is VideoPlaceholderNodeData {
+  return d.kind === 'videoPlaceholder'
+}
+
 /** DB 미영속 파생 노드(재생성 대상) 판별 — persist/undo 스냅샷 제외용. */
 export function isDerivedNodeData(d: DirectorNodeData): boolean {
-  return d.kind === 'asset' || d.kind === 'previzVideo' || d.kind === 'shotImage'
+  return (
+    d.kind === 'asset' ||
+    d.kind === 'previzVideo' ||
+    d.kind === 'shotImage' ||
+    d.kind === 'videoPlaceholder'
+  )
 }
