@@ -300,6 +300,18 @@ V4는 3분할:
   V4b (Static): Image 생성기 입력. 첫 프레임의 모든 정적 요소.
   V4c (Dynamic): Video 생성기 입력. 샷 길이(${SHOT_SECONDS_RANGE}) 안의 동적 변화. 압축 필수.
 
+[출력 언어 — 전 필드 영어 고정 (2026-07-22 제품 오너 판정 E11)]
+아래 자유서술 텍스트 필드는 예외 없이 영어(English)로 작성한다. 한국어 등 다른 언어 절대 금지 —
+이 값들은 번역 없이 그대로 이미지/영상 생성기 프롬프트가 되거나(first_frame_prompt, motion_prompt),
+다른 영어 문장에 그대로 삽입된다(스토리보드/디렉터 프롬프트 렌더 템플릿).
+- intent: dramatic_purpose, duration_justification, audience_focus
+- static_spec: framing.focal_point, framing.layers.foreground/midground/background,
+  lighting.quality, lighting.key_direction, character_blocking[].pose/gaze/position_in_frame,
+  prop_placement[].position_in_frame/significance, texture_notes, color_grading_intent, first_frame_prompt
+- dynamic_spec: character_motion[].verb, gaze_arc[].from/to, environmental_change[].type, motion_prompt
+(shot_type/camera_angle/depth_of_field/camera_motion.type/transition_in/out 등 고정 enum 필드는
+ 원래부터 영어 vocabulary라 이 지시의 대상이 아님 — 그대로 유지)
+
 ${disciplineSection}
 
 샷 분배 원칙:

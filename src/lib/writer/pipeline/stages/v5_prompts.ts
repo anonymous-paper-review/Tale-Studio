@@ -215,6 +215,8 @@ async function llmGenerateT2I(
 - 정적 묘사만 (움직임/순차 표현 금지 — 첫 프레임은 멈춘 한 컷)
 - 구체적 디테일: 인물 의상/포즈/표정, 배경 요소, 조명 방향, 색감, 카메라(렌즈/앵글)
 - V2 global_palette를 우선 반영
+- 출력 언어: 영어(English) 고정 (2026-07-22 제품 오너 판정 E11) — 이 프롬프트는 번역 없이 그대로
+  이미지 생성기에 들어간다. 한국어 등 다른 언어 절대 금지.
 `;
 
   const user = `[샷 정보 — 부분 누락 가능]
@@ -224,7 +226,7 @@ ${JSON.stringify(shot, null, 2)}
 ${JSON.stringify({ global_palette: worldVisual.global_palette, color_meaning: worldVisual.color_meaning }, null, 2)}
 
 [출력 - JSON]
-{ "prompt": "정적 첫 프레임 묘사 (한글, ${FIRST_FRAME_CHARS})" }`;
+{ "prompt": "정적 첫 프레임 묘사 (English, ${FIRST_FRAME_CHARS})" }`;
 
   const r = await generateJson<{ prompt: string }>(user, axisConfig, {
     systemInstruction: system,
@@ -253,13 +255,15 @@ async function llmGenerateTI2V(
 - 순차 표현("그 다음에", "그리고") 금지
 - 단일 동작 + 카메라 움직임 정도까지만
 - 첫 프레임을 부정하지 말 것 (예: 첫 프레임에 앉아 있는데 "걸어간다" 안 됨)
+- 출력 언어: 영어(English) 고정 (2026-07-22 제품 오너 판정 E11) — 이 프롬프트는 번역 없이 그대로
+  영상 생성기에 들어간다. 한국어 등 다른 언어 절대 금지.
 `;
 
   const user = `[샷 정보]
 ${JSON.stringify(shot, null, 2)}
 
 [출력 - JSON]
-{ "motion_prompt": "동적 영상 묘사 (한글, ${MOTION_PROMPT_CHARS})" }`;
+{ "motion_prompt": "동적 영상 묘사 (English, ${MOTION_PROMPT_CHARS})" }`;
 
   const r = await generateJson<{ motion_prompt: string }>(user, axisConfig, {
     systemInstruction: system,
