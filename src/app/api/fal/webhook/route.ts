@@ -103,7 +103,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = job.kind === 'shot_video'
+    const result = job.kind === 'shot_video' || job.kind === 'shot_previz_video'
       ? { media: 'video' as const, url: extractVideoUrl(body.payload), payload: body.payload }
       : { media: 'image' as const, url: extractImageUrl(body.payload), payload: body.payload }
     if (!result.url) throw new Error(`no ${result.media} url in webhook payload`)

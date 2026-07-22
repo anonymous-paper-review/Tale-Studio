@@ -942,6 +942,48 @@ export async function finalizeShotRoughStoryboardJob(
   return publicUrl
 }
 
+/** 목각 previz 영상(#previz-video 2026-07-22) 영속화 → shots.previz_video(JSONB) 갱신.
+ *   video_clips(테이크/리테이크·Node 뷰) 밖의 단순 파생물 — 러프 프레임에서 결정론적 재생성 가능.
+ */
+export async function finalizeShotPrevizVideoJob(
+  job: GenerationJob,
+  videoUrl: string,
+  falPayload?: unknown,
+): Promise<string> {
+  const { workspaceId, writerShotId } = job.target
+  if (!workspaceId || !writerShotId) {
+    throw new Error('shot_previz_video job target missing workspaceId/writerShotId')
+  }
+  await recordFalResponseSnapshot(job, falPayload)
+  // fal CDN 영상 → storage 영속(만료 방지). 실패는 잡 실패로 승격(재생성 유도).
+  const res = await fetch(videoUrl)
+  if (!res.ok) throw new Error(`previz video fetch failed: ${res.status}`)
+  const bytes = Buffer.from(await res.arrayBuffer())
+  const path = `${workspaceId}/${job.project_id}/shots/${storageKeySegment(writerShotId)}_previz.mp4`
+  const { error: upErr } = await supabaseAdmin.storage
+    .from('media')
+    .upload(path, bytes, { contentType: 'video/mp4', upsert: true })
+  if (upErr) throw upErr
+  const publicUrl = versionedUrl(
+    supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl,
+  )
+  const { error } = await supabaseAdmin
+    .from('shots')
+    .update({
+      previz_video: {
+        url: publicUrl,
+        status: 'completed',
+        errorMessage: null,
+        generatedAt: Date.now(),
+      },
+    })
+    .eq('project_id', job.project_id)
+    .eq('shot_id', writerShotId)
+  if (error) throw error
+  await completeGenerationJob(job.id, publicUrl)
+  return publicUrl
+}
+
 /** Persist a v2 take immutably; retain legacy shot_video behavior for unlinked jobs. */
 export async function finalizeShotVideoJob(
   job: GenerationJob,
@@ -1014,6 +1056,9 @@ export async function finalizeGenerationJob(job: GenerationJob, result: Finalize
     case 'shot_video':
       if (result.media !== 'video') throw new Error('shot_video requires a video result')
       return finalizeShotVideoJob(job, result.url, result.payload)
+    case 'shot_previz_video':
+      if (result.media !== 'video') throw new Error('shot_previz_video requires a video result')
+      return finalizeShotPrevizVideoJob(job, result.url, result.payload)
     default:
       return assertNever(job.kind)
   }

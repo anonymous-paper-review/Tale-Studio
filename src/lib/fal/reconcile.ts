@@ -85,7 +85,7 @@ export async function reconcileJobFromFal(job: GenerationJob): Promise<Generatio
 
   let result: Awaited<ReturnType<typeof falImageFetch | typeof falVideoFetch>>
   try {
-    result = job.kind === 'shot_video'
+    result = job.kind === 'shot_video' || job.kind === 'shot_previz_video'
       ? await falVideoFetch(job.model, job.request_id)
       : await falImageFetch(job.model, job.request_id)
   } catch (error) {
@@ -106,7 +106,7 @@ export async function reconcileJobFromFal(job: GenerationJob): Promise<Generatio
 
   return completeOrTerminalizeJob(
     job,
-    job.kind === 'shot_video'
+    job.kind === 'shot_video' || job.kind === 'shot_previz_video'
       ? { media: 'video', url: result.url, payload: result.raw }
       : { media: 'image', url: result.url, payload: result.raw },
   )

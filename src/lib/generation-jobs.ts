@@ -11,6 +11,7 @@ export type GenerationJobKind =
   | 'shot_storyboard'
   | 'shot_rough_storyboard'
   | 'shot_video'
+  | 'shot_previz_video'
 export type GenerationJobStatus = 'queued' | 'completed' | 'failed'
 /** 잡 트리거 주체 — ui(직접 조작) | chat(글로벌 채팅 updates) | writer(핸드오프 파이프라인) */
 export type GenerationJobActor = 'ui' | 'chat' | 'writer'
