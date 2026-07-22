@@ -201,10 +201,11 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
 
   // 파이프라인 단계 배지(#e2 2026-07-18) — 이 샷이 어느 단계인지 한눈에: 영상 완료 / 이미지 완료
   //   (영상 대기) / 이미지 생성 필요(러프만). 색으로도 구분: 영상=빨강(primary), 이미지=하늘, 러프=경고.
+  //   previz 영상 有 = previz 이미지(러프)까지 있다는 뜻 → Real 뷰의 이미지 단계와 같은 하늘색(2026-07-22).
   const stageBadge =
     mediaMode === 'previz'
       ? previzUrl
-        ? { label: 'Previz 영상', cls: 'border-primary/50 text-primary', video: true }
+        ? { label: 'Previz 영상', cls: 'border-sky-400/50 text-sky-300', video: true }
         : roughStartUrl
           ? { label: 'Previz 생성 필요', cls: 'border-warning/50 text-warning', video: false }
           : null
@@ -319,20 +320,23 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
           </div>
         )}
 
-        {/* 단계 배지(#e2) — 좌상단. 생성 중엔 오버레이가 덮으므로 숨긴다. */}
+        {/* 단계 배지(#e2) — 좌상단. 기본은 아이콘만, 호버 시 문구가 확장(2026-07-22 축소).
+            생성 중엔 오버레이가 덮으므로 숨긴다. */}
         {!generating && stageBadge && (
           <span
             className={cn(
-              'absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-md border bg-background/85 px-1.5 py-0.5 text-[10px] font-medium',
+              'group/badge absolute left-2 top-2 z-10 inline-flex items-center rounded-md border bg-background/85 px-1.5 py-1 text-[10px] font-medium',
               stageBadge.cls,
             )}
           >
             {stageBadge.video ? (
-              <Play className="size-3 fill-current" />
+              <Play className="size-3 shrink-0 fill-current" />
             ) : (
-              <ImageIcon className="size-3" />
+              <ImageIcon className="size-3 shrink-0" />
             )}
-            {stageBadge.label}
+            <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/badge:ml-1 group-hover/badge:max-w-40 group-hover/badge:opacity-100">
+              {stageBadge.label}
+            </span>
           </span>
         )}
 
@@ -363,60 +367,59 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
           </span>
         )}
 
-        {/* 우하단 생성 스택(#e12→#e6 2026-07-15) — 기본 버튼 = 영상 생성(이미지 없으면
-            이미지→영상 체인). 호버 시 같은 너비의 슬라이딩 카드(살짝 밝은 빨강)가
-            버튼 위로 올라온다. 생성 중엔 숨김. */}
+        {/* 우하단 생성 스택(#e12→#e6 2026-07-15, 2026-07-22 축소) — 기본은 ▶ 아이콘만,
+            호버 시 문구가 확장되고 이미지 버튼이 위로 올라온다. 생성 중엔 숨김. */}
         {!generating && (
-          <div className="group/gen absolute bottom-2 right-2">
-            <div className="relative flex w-28 flex-col items-stretch">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  void runImage()
-                }}
-                title={
-                  status === 'failed' && img?.errorMessage
-                    ? img.errorMessage
-                    : hasImage
-                      ? '이미지 리터칭 (재생성)'
-                      : '이미지만 생성'
-                }
-                className={cn(
-                  // bottom-full 로 영상 버튼 바로 위에 붙인다 — mb 갭을 없애 두 버튼 사이 죽은 영역을
-                  //   제거(#e1 2026-07-18). 갭이 있으면 마우스가 그 틈을 지날 때 group-hover가 풀려
-                  //   이미지 버튼이 다시 내려가버렸다.
-                  'pointer-events-none absolute inset-x-0 bottom-full flex h-7 translate-y-2 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-medium text-primary-foreground opacity-0 shadow-sm transition-all duration-200',
-                  // 살짝 밝은 빨강 — primary에 흰색 18% 혼합(토큰 파생 셰이드)
-                  'bg-[color-mix(in_srgb,var(--primary)_82%,white)]',
-                  'group-hover/gen:pointer-events-auto group-hover/gen:translate-y-0 group-hover/gen:opacity-100',
-                  'hover:bg-[color-mix(in_srgb,var(--primary)_70%,white)]',
-                )}
-              >
-                <ImageIcon className="size-3.5" />
-                {hasImage ? '이미지 리터칭' : '이미지 생성'}
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  void (mediaMode === 'previz' ? runPreviz() : runVideo())
-                }}
-                title={
-                  mediaMode === 'previz'
-                    ? 'Previz 영상 생성 — 러프 START+END 프레임으로 목각 인형 연출 영상을 만들어요'
-                    : '영상 생성 — 촬영 이미지가 없으면 먼저 생성한 뒤 영상을 만들어요'
-                }
-                disabled={mediaMode === 'previz' && (!roughStartUrl || previzGenerating)}
-                className={cn(
-                  'flex h-7 w-full items-center justify-center gap-1 rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground shadow-sm',
-                  'transition-colors duration-100 hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-50',
-                )}
-              >
-                <Play className="size-3.5 fill-current" />
+          <div className="group/gen absolute bottom-2 right-2 flex flex-col items-end">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                void runImage()
+              }}
+              title={
+                status === 'failed' && img?.errorMessage
+                  ? img.errorMessage
+                  : hasImage
+                    ? '이미지 리터칭 (재생성)'
+                    : '이미지만 생성'
+              }
+              className={cn(
+                // bottom-full 로 영상 버튼 바로 위에 붙인다 — mb 갭을 없애 두 버튼 사이 죽은 영역을
+                //   제거(#e1 2026-07-18). 갭이 있으면 마우스가 그 틈을 지날 때 group-hover가 풀려
+                //   이미지 버튼이 다시 내려가버렸다.
+                'pointer-events-none absolute bottom-full right-0 flex h-7 translate-y-2 items-center gap-1 whitespace-nowrap rounded-md px-2 text-[11px] font-medium text-primary-foreground opacity-0 shadow-sm transition-all duration-200',
+                // 살짝 밝은 빨강 — primary에 흰색 18% 혼합(토큰 파생 셰이드)
+                'bg-[color-mix(in_srgb,var(--primary)_82%,white)]',
+                'group-hover/gen:pointer-events-auto group-hover/gen:translate-y-0 group-hover/gen:opacity-100',
+                'hover:bg-[color-mix(in_srgb,var(--primary)_70%,white)]',
+              )}
+            >
+              <ImageIcon className="size-3.5 shrink-0" />
+              {hasImage ? '이미지 리터칭' : '이미지 생성'}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                void (mediaMode === 'previz' ? runPreviz() : runVideo())
+              }}
+              title={
+                mediaMode === 'previz'
+                  ? 'Previz 영상 생성 — 러프 START+END 프레임으로 목각 인형 연출 영상을 만들어요'
+                  : '영상 생성 — 촬영 이미지가 없으면 먼저 생성한 뒤 영상을 만들어요'
+              }
+              disabled={mediaMode === 'previz' && (!roughStartUrl || previzGenerating)}
+              className={cn(
+                'flex h-7 items-center rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground shadow-sm',
+                'transition-colors duration-100 hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-50',
+              )}
+            >
+              <Play className="size-3.5 shrink-0 fill-current" />
+              <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/gen:ml-1 group-hover/gen:max-w-40 group-hover/gen:opacity-100">
                 {mediaMode === 'previz' ? (previzUrl ? 'Previz 재생성' : 'Previz 영상') : '영상 생성'}
-              </button>
-            </div>
+              </span>
+            </button>
           </div>
         )}
       </div>
@@ -439,8 +442,8 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
 export function StoryboardGridView() {
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const projectId = useDirectorCanvasStore((s) => s.projectId)
-  // 미디어 모드(#previz-video): Previz(목각, 기본) | Real(실사). UI 디테일은 후속 조정 예정.
-  const [mediaMode, setMediaMode] = useState<StoryboardMediaMode>('previz')
+  // 미디어 모드(#previz-video): Previz(목각, 기본) | Real(실사) — 상단바(PaletteBar) 토글이 제어(2026-07-22).
+  const mediaMode: StoryboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
 
   // 슬러그 → 실제 이름 로스터(#e6) — asset-storage(진입 시 DB hydrate)에서 인물·장소 이름.
   //   표시 전용: 노드 데이터·프롬프트 원문(구동)은 그대로 둔다.
@@ -509,27 +512,6 @@ export function StoryboardGridView() {
     // 기존 raw overflow-auto(네이티브 스크롤바)를 교체. 부모 `min-h-0 flex-1`가 높이를 가둔다.
     <ScrollArea className="size-full bg-background">
       <div className="flex flex-col gap-6 p-6">
-        {/* Previz | Real 토글(#previz-video) — 우상단. 기본 Previz(연출 판독용 목각 영상). */}
-        <div className="sticky top-0 z-20 -mb-4 flex justify-end">
-          <div className="flex items-center gap-0.5 rounded-lg border border-border bg-background/90 p-0.5 backdrop-blur-sm">
-            {(['previz', 'real'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMediaMode(m)}
-                aria-pressed={mediaMode === m}
-                className={cn(
-                  'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                  mediaMode === m
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {m === 'previz' ? 'Previz' : 'Real'}
-              </button>
-            ))}
-          </div>
-        </div>
         {groups.map((group) => (
           <section key={group.key} className="flex flex-col gap-4">
             <div className="flex items-baseline gap-3">

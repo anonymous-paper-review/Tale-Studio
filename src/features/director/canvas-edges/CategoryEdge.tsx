@@ -15,6 +15,7 @@ const STYLE_BY_CATEGORY: Record<
   'relates-to': { strokeWidth: 1.5 },
   references: { strokeWidth: 1.5, strokeDasharray: '4 4' }, // Asset→Shot, 점선
   prompt: { strokeWidth: 1.5, strokeDasharray: '2 3' }, // Prompt→Shot T 입력
+  chain: { strokeWidth: 2 }, // previz 체인(파생) — parent 와 동일한 실선 계층 표현
 }
 
 function CategoryEdgeImpl({

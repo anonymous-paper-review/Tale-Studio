@@ -45,15 +45,18 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     ['horizontal', 'vertical', 'pan', 'tilt', 'roll', 'zoom'] as const
   ).filter((k) => data.camera[k] !== 0).length
 
-  // 단계별 표시 이미지: rough=목각, live/video=실사(storyboardImage)
-  const stageImageUrl =
-    stage === 'rough'
-      ? rough?.status === 'completed'
-        ? rough.url
-        : null
+  // #previz-chain: writer 샷 카드는 항상 목각(previz) 이미지 — 실사는 SHOT IMAGE 파생 노드가 표시.
+  //   수동 노드(writerShotId 없음, 체인 미생성)만 기존 단계별 표시(rough→실사) 유지.
+  const isChainShot = !!data.writerShotId
+  const roughUrl =
+    rough?.status === 'completed' ? (rough.frames?.start ?? rough.url) : null
+  const stageImageUrl = isChainShot
+    ? roughUrl
+    : stage === 'rough'
+      ? roughUrl
       : (data.storyboardImage?.url ?? null)
 
-  const failed = data.storyboardImage?.status === 'failed'
+  const failed = !isChainShot && data.storyboardImage?.status === 'failed'
   const prompt = effectivePrompt(data)
 
   return (
@@ -97,9 +100,11 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         selected={selected}
         width={280}
         stale={data.stale}
-        // 빔은 로컬 플래그(즉시 반응) + DB status(재진입/웹훅 경로) 둘 다에서 켜진다
+        // 빔은 로컬 플래그(즉시 반응) + DB status(재진입/웹훅 경로) 둘 다에서 켜진다.
+        //   #previz-chain: 체인 샷의 실사 생성 빔은 SHOT IMAGE 파생 노드가 담당.
         beam={
-          isGenerating || data.storyboardImage?.status === 'generating'
+          isGenerating ||
+          (!isChainShot && data.storyboardImage?.status === 'generating')
             ? 'success'
             : null
         }
@@ -148,7 +153,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
               </div>
             </div>
             <span className="absolute left-1 top-1 rounded-sm bg-background/70 px-1 text-[9px] uppercase text-muted-foreground">
-              {stage === 'rough' ? '목각' : stage === 'live' ? '실사' : '영상'}
+              {isChainShot ? '목각' : stage === 'rough' ? '목각' : stage === 'live' ? '실사' : '영상'}
             </span>
           </div>
         )}

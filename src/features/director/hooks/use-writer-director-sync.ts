@@ -405,6 +405,8 @@ export function useWriterDirectorSync() {
     // 세로 컬럼으로 표시하고 참조 shot에 references 엣지를 잇는다. asset-storage가
     // 진실(Pass 0에서 hydrate 완료)이므로 매번 재생성해도 멱등. DB 미영속(persist 제외).
     useDirectorCanvasStore.getState().rebuildAssetNodes()
+    // Previz 체인 파생 노드(#previz-chain) — Shot 우측 PREVIZ VIDEO / SHOT IMAGE 재생성(멱등).
+    useDirectorCanvasStore.getState().rebuildShotChainNodes()
     if (cancelled) return
 
     // ── Pass 3: 스토리보드 자동생성 — 비활성화 (Higgsfield 노드 뷰 전환) ──

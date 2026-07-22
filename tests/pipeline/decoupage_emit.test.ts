@@ -8,13 +8,17 @@ import { buildAssetRegistry, normalizeShotSequenceAssetRefs } from '@/lib/writer
 import type { WorldVisual, Characters, Scenes, ShotSequenceItem } from '@/lib/writer/types/pipeline';
 
 const LOG = path.resolve(__dirname, '../../logs/1f0cc616-40ff-449f-8dda-ae7e6dd8e5e0');
-const read = (f: string) => JSON.parse(fs.readFileSync(path.join(LOG, f), 'utf8'));
+// logs/ 는 gitignore — 해당 run 로그가 있는 머신에서만 실행 가능한 실측 픽스처 테스트.
+//   skipIf 여도 describe 본문은 수집 시 실행되므로 read 도 가드(빈 객체 폴백).
+const hasFixture = fs.existsSync(LOG);
+const read = (f: string) =>
+  hasFixture ? JSON.parse(fs.readFileSync(path.join(LOG, f), 'utf8')) : ({} as never);
 
 type TestShot = ShotSequenceItem & {
   V?: { camera?: { movement?: string } }
 }
 
-describe('découpage → final_prompts emit (fixed pipeline, no L6/L7)', () => {
+describe.skipIf(!hasFixture)('découpage → final_prompts emit (fixed pipeline, no L6/L7)', () => {
   it('normalizes refs (real Layer-1) and emits I2I + TI2V prompts for every fixture shot', () => {
     const s2 = read('04_S2.json') as Characters;
     const l2 = read('09_L2.json') as WorldVisual;

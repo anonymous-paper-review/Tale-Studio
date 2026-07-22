@@ -6,7 +6,13 @@ vi.mock('@/lib/storage/immutable-object', async (importOriginal) => ({
   uploadImmutableObject: mocks.uploadImmutableObject,
 }))
 vi.mock('@/lib/director-video-takes', () => ({ completeDirectorVideoAttempt: mocks.complete, markDirectorVideoAttemptFailed: mocks.fail }))
-vi.mock('@/lib/generation-jobs', () => ({ completeGenerationJob: mocks.completeJob, failGenerationJob: mocks.failJob, patchGenerationJobResponseSnapshotByRequestId: mocks.patch }))
+vi.mock('@/lib/generation-jobs', () => ({
+  completeGenerationJob: mocks.completeJob,
+  failGenerationJob: mocks.failJob,
+  patchGenerationJobResponseSnapshotByRequestId: mocks.patch,
+  // reconcile 의 터미널 전이 dedupe(2026-07-22)가 instanceof 로 판별하는 클래스 — 목에도 제공.
+  GenerationJobTerminalTransitionError: class GenerationJobTerminalTransitionError extends Error {},
+}))
 vi.mock('@/lib/fal/observability', () => ({ buildFalResponseSnapshot: () => ({}) }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from, storage: { from: mocks.from } } }))
 vi.mock('@/lib/artist/portrait', () => ({ cropTurnaroundPortrait: vi.fn() }))
