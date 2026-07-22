@@ -62,6 +62,7 @@ import { DirectorNodePopup } from '@/features/director/canvas-popups/DirectorNod
 import { DirectorDetailPanel } from '@/features/director/canvas-panels/DirectorDetailPanel'
 import {
   doubleClickActionForKind,
+  chainParentShotNodeId,
   connectRouteForTargetHandle,
 } from '@/features/director/canvas-interaction'
 
@@ -503,7 +504,13 @@ function CanvasInner() {
         onNodeDoubleClick={(_event, node) => {
           // Storyboard 뷰 더블클릭과 동일(#e2): scene/shot/video 모두 모달 열기
           const action = doubleClickActionForKind(node.data.kind)
-          if (action === 'popup') openPopup(node.id)
+          if (action === 'popup') {
+            openPopup(node.id)
+            return
+          }
+          // previz 체인 파생 카드(#previz-chain) — 부모 Shot 모달로 위임
+          const parentShotId = chainParentShotNodeId(node.data)
+          if (parentShotId) openPopup(parentShotId)
         }}
         onNodeDragStart={() => commitHistory()}
         onMove={(_, vp) => setViewport(vp)}

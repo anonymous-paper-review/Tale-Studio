@@ -12,7 +12,7 @@ import { useDirectorCanvasStore } from '@/stores/director-store'
 import { isVideoData, isVideoPlaceholderData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
 
-function VideoPlaceholderNodeImpl({ data }: NodeProps<DirectorNode>) {
+function VideoPlaceholderNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
   const parentShotNodeId = isVideoPlaceholderData(data) ? data.parentShotNodeId : null
   const generateVideoForShot = useDirectorCanvasStore((s) => s.generateVideoForShot)
   // 형제 테이크가 생성 중이면 잠금 (VideoNode 의 parentGenerating 과 동일 판정)
@@ -41,7 +41,13 @@ function VideoPlaceholderNodeImpl({ data }: NodeProps<DirectorNode>) {
   }
 
   return (
-    <div className="group relative w-[240px] rounded-lg border border-dashed border-border bg-node-bg-default/60 opacity-80 transition-opacity hover:opacity-100">
+    <div
+      className={cn(
+        'group relative w-[240px] rounded-lg border border-dashed border-border bg-node-bg-default/60 opacity-80 transition-opacity hover:opacity-100',
+        // RF 선택 링(클릭) — 더블클릭은 부모 Shot 모달로 위임(2026-07-23)
+        selected && 'border-2 ring-4 ring-muted-foreground/30 opacity-100',
+      )}
+    >
       <Handle
         type="target"
         position={Position.Left}

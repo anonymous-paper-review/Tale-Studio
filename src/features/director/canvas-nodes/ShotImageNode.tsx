@@ -16,7 +16,7 @@ import { useDirectorCanvasStore } from '@/stores/director-store'
 import { isShotData, isShotImageData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
 
-function ShotImageNodeImpl({ data }: NodeProps<DirectorNode>) {
+function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
   const parentShotNodeId = isShotImageData(data) ? data.parentShotNodeId : null
   // 부모 Shot 스코프 구독 — storyboardImage 객체 참조는 노드 데이터 교체 시에만 바뀐다.
   const storyboardImage = useDirectorCanvasStore((s) => {
@@ -43,6 +43,11 @@ function ShotImageNodeImpl({ data }: NodeProps<DirectorNode>) {
         hasImage
           ? 'border-chart-4/70 bg-node-bg-default'
           : 'border-dashed border-border bg-node-bg-default/60 opacity-80 transition-opacity hover:opacity-100',
+        // RF 선택 링(클릭) — BaseNode 와 동일 시각 언어(2026-07-23)
+        selected &&
+          (hasImage
+            ? 'border-2 ring-4 ring-chart-4/60'
+            : 'border-2 ring-4 ring-muted-foreground/30 opacity-100'),
       )}
     >
       <Handle

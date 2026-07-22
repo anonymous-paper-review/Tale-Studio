@@ -6,6 +6,7 @@ import {
   useDirectorCanvasStore,
   followChainNodePositions,
 } from '@/stores/director-store'
+import { chainParentShotNodeId } from '@/features/director/canvas-interaction'
 import {
   PREVIZ_VIDEO_OFFSET_X,
   SHOT_IMAGE_OFFSET_Y,
@@ -155,6 +156,24 @@ describe('rebuildShotChainNodes', () => {
     )
     const ph = followChainNodePositions(moved).find((n) => n.id === `dn_vph_${writerShot}`)!
     expect(ph.position).toEqual({ x: 800 + VIDEO_OFFSET_X, y: 200 })
+  })
+
+  it('파생 카드 상호작용(2026-07-23) — 선택 가능 + 더블클릭은 부모 Shot 으로 위임 + 삭제 불가', () => {
+    const [writerShot] = seed()
+    api().rebuildShotChainNodes()
+    const derived = [`dn_pv_${writerShot}`, `dn_simg_${writerShot}`, `dn_vph_${writerShot}`]
+    for (const id of derived) {
+      const n = api().nodes.find((x) => x.id === id)!
+      expect(n.selectable).toBe(true)
+      // 더블클릭 위임 대상 = 부모 Shot
+      expect(chainParentShotNodeId(n.data)).toBe(writerShot)
+      // 삭제 가드: 확인 모달이 열리지 않는다
+      api().openDeleteConfirm(id)
+      expect(api().deleteConfirmInfo).toBeNull()
+    }
+    // 일반 노드는 위임 대상 아님
+    const shotNode = api().nodes.find((x) => x.id === writerShot)!
+    expect(chainParentShotNodeId(shotNode.data)).toBeNull()
   })
 
   it('undo 후에도 체인이 재생성된다 (파생은 스냅샷 제외)', () => {

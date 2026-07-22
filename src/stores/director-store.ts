@@ -1873,7 +1873,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 y: shot.position.y,
               },
               draggable: false,
-              selectable: false,
+              selectable: true, // 클릭=선택 링, 더블클릭=부모 Shot 모달(2026-07-23 피드백)
               connectable: false,
               data: {
                 kind: 'previzVideo',
@@ -1890,7 +1890,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 y: shot.position.y + SHOT_IMAGE_OFFSET_Y,
               },
               draggable: false,
-              selectable: false,
+              selectable: true,
               connectable: false,
               data: { kind: 'shotImage', label: sd.label, parentShotNodeId: shot.id },
             })
@@ -1914,7 +1914,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   y: shot.position.y,
                 },
                 draggable: false,
-                selectable: false,
+                selectable: true,
                 connectable: false,
                 data: { kind: 'videoPlaceholder', label: sd.label, parentShotNodeId: shot.id },
               })
@@ -2707,6 +2707,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       openDeleteConfirm: (id) => {
         const node = get().nodes.find((n) => n.id === id)
         if (!node) return
+        // 파생 노드(asset/previz 체인)는 삭제 대상이 아니다 — 진실이 따로 있고 rebuild 가 재생성.
+        if (isDerivedNodeData(node.data)) return
         const info: DeleteCascadeInfo = {
           nodeId: id,
           shotCount: 0,

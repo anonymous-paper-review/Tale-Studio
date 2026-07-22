@@ -16,7 +16,7 @@ import { useWriterStore } from '@/stores/writer-store'
 import { isPrevizVideoData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
 
-function PrevizVideoNodeImpl({ data }: NodeProps<DirectorNode>) {
+function PrevizVideoNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
   const writerShotId = isPrevizVideoData(data) ? data.writerShotId : null
   const rough = useRoughStoryboard(writerShotId)
   const previz = usePrevizVideo(writerShotId)
@@ -54,6 +54,11 @@ function PrevizVideoNodeImpl({ data }: NodeProps<DirectorNode>) {
         hasContent
           ? 'border-chart-5/70 bg-node-bg-default'
           : 'border-dashed border-border bg-node-bg-default/60 opacity-80 transition-opacity hover:opacity-100',
+        // RF 선택 링(클릭) — BaseNode 와 동일 시각 언어(2026-07-23)
+        selected &&
+          (hasContent
+            ? 'border-2 ring-4 ring-chart-5/60'
+            : 'border-2 ring-4 ring-muted-foreground/30 opacity-100'),
       )}
     >
       <Handle
