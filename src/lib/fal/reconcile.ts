@@ -7,8 +7,10 @@
 //
 // 멱등: 호출 전 job.status==='queued' 전제(각 finalize 가 다시 가드). COMPLETED→finalize, FAILED→fail,
 //   그 외(IN_QUEUE/IN_PROGRESS/일시오류)→그대로 두어 다음 폴링/webhook 이 마저 처리.
-import { failGenerationJob, type GenerationJob
+import {
+  failGenerationJob,
   GenerationJobTerminalTransitionError,
+  type GenerationJob,
 } from '@/lib/generation-jobs'
 import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
 import { falImageFetch, falVideoFetch } from '@/lib/writer/llm/fal'
