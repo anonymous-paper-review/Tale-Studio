@@ -7,7 +7,9 @@
 //
 // 멱등: 호출 전 job.status==='queued' 전제(각 finalize 가 다시 가드). COMPLETED→finalize, FAILED→fail,
 //   그 외(IN_QUEUE/IN_PROGRESS/일시오류)→그대로 두어 다음 폴링/webhook 이 마저 처리.
-import { failGenerationJob, type GenerationJob } from '@/lib/generation-jobs'
+import { failGenerationJob, type GenerationJob
+  GenerationJobTerminalTransitionError,
+} from '@/lib/generation-jobs'
 import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
 import { falImageFetch, falVideoFetch } from '@/lib/writer/llm/fal'
 import {
@@ -32,6 +34,11 @@ async function completeOrTerminalizeJob(
     const url = await finalizeGenerationJob(job, typeof result === 'function' ? result() : result)
     return { ...job, status: 'completed', result_url: url }
   } catch (error) {
+    if (error instanceof GenerationJobTerminalTransitionError) {
+      // 중복 finalize 경쟁(폴링 ↔ webhook) — 이미 종결된 잡은 성공으로 간주(no-op).
+      console.warn('[fal/reconcile] duplicate finalize ignored (already terminal):', job.id)
+      return { ...job, status: 'completed' }
+    }
     if (error instanceof DirectorVideoCompletionPersistenceError) {
       console.error('[fal/reconcile] video persistence failed; retaining queued attempt:', error.message)
       throw error
