@@ -12,6 +12,7 @@ import type {
   WorldVisual,
   SceneCinematography,
   MidPreview,
+  ActVisualArc,
   Genre,
   Characters,
   Scenes,
@@ -42,6 +43,9 @@ export async function runSceneCinematography(
   midPreview: MidPreview,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
+  // E8 실험 (기록만 2026-07-21): v1 actVisualArc 배선 복원 후보. 미전달(기본) = 현행과 프롬프트 동일.
+  //   판정 후 정식 배선(호출부 전달) 또는 v1 제거와 함께 이 파라미터도 정리한다.
+  actVisualArc?: ActVisualArc | null,
 ): Promise<L3Result> {
   await logger.markStage('sceneCinematography', 'started');
 
@@ -105,7 +109,7 @@ ${JSON.stringify(characters.characters.map((c) => ({ id: c.id, name: c.name, rol
 ${scenes.scenes
   .map(
     (sc) =>
-      `${sc.scene_id} (${sc.estimated_seconds}s): purpose="${sc.purpose}", emotion=${sc.emotion_beat.start}→${sc.emotion_beat.end}, location=${sc.location}, 인물=[${sc.characters_in_scene.join(', ')}]`
+      `${sc.scene_id} (${sc.estimated_seconds}s${actVisualArc ? `, act=${sc.act_ref}` : ''}): purpose="${sc.purpose}", emotion=${sc.emotion_beat.start}→${sc.emotion_beat.end}, location=${sc.location}, 인물=[${sc.characters_in_scene.join(', ')}]`
   )
   .join('\n')}
 
@@ -118,6 +122,9 @@ locations=${worldVisual.locations.map((l) => l.id).join(', ')}
 
 [Mid Preview 거친 seed (v3 씬 전략)]
 ${midPreview.v_recommendations.v3 ?? ''}
+${actVisualArc ? `
+[막별 비주얼 아크 (v1) — 각 씬이 속한 막(act)의 팔레트/조명/에너지 방향을 lighting_arc·palette_emphasis에 반영하라]
+${JSON.stringify(actVisualArc)}` : ''}
 
 [액션 예산 분석]
 ${sceneToShotHint}

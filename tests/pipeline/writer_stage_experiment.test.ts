@@ -20,9 +20,17 @@ import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage'
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots'
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1'
 import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2'
+import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview'
+import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual'
+import { runActVisualArc } from '@/lib/writer/pipeline/stages/v1_act_arc'
+import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan'
+import { emptyMidPreview } from '@/lib/writer/pipeline'
+import { generateJson } from '@/lib/writer/llm/dispatch'
+import { computeSceneBudget, renderBudgetBlock } from '@/lib/writer/pipeline/budget'
+import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics'
 import { getPendingRawCalls, resetRawSeq } from '@/lib/writer/llm/raw_collector'
 import type { PipelineLogger } from '@/lib/writer/logger'
-import type { Genre, Characters, BackgroundContract, PipelineInput, Scenes, DecoupagePlan, VisualIdentity, WorldVisual, CharacterVisual, ShotDesign } from '@/lib/writer/types/pipeline'
+import type { Genre, Characters, BackgroundContract, PipelineInput, Scenes, DecoupagePlan, VisualIdentity, WorldVisual, CharacterVisual, ShotDesign, MidPreview, SceneCinematography, StoryCheckReport } from '@/lib/writer/types/pipeline'
 
 const ENABLED = process.env.RUN_WRITER_STAGE === '1' && !!process.env.GEMINI_API_KEY
 const MODEL = { provider: process.env.WRITER_PROVIDER ?? 'gemini', model: process.env.WRITER_MODEL ?? 'gemini-3-flash-preview' }
@@ -329,8 +337,17 @@ const loadInjected = (envKey: string): unknown => {
   return j.result ?? j
 }
 
+// E6: midPreview가 소비하는 C1 리포트 — 실 파이프라인 skip 경로와 동일한 빈 리포트.
+const EMPTY_STORY_CHECK = {
+  passed: true, issues: [], causality_chain: [], cdq_present: true,
+  cdq_clarity_score: 1, cliche_count: 0, retry_count: 0,
+} as unknown as StoryCheckReport
+
 // ── stage 레지스트리 (실 함수 호출 — 시스템 프롬프트는 코드 그대로) ──
-type State = { genre: Genre; narrativeStructure?: unknown; scenes?: unknown; decoupage?: unknown; shotDesign?: unknown }
+type State = {
+  genre: Genre; narrativeStructure?: unknown; scenes?: unknown; decoupage?: unknown; shotDesign?: unknown;
+  midPreview?: unknown; visualIdentity?: unknown; actVisualArc?: unknown; sceneCinematography?: unknown;
+}
 const STAGE_FNS: Record<string, (st: State, p: Preset) => Promise<unknown>> = {
   narrativeStructure: (st, p) => runNarrativeStructure(p.input, st.genre, logger, MODEL as never),
   scenes: (st, p) => runScenes(p.input, st.genre, st.narrativeStructure as never, p.characters, p.world, logger, MODEL as never),
@@ -362,6 +379,116 @@ const STAGE_FNS: Record<string, (st: State, p: Preset) => Promise<unknown>> = {
     ),
   // V축 확장 (스텁 비주얼 — 위 주석 참조). sceneCinematography plans=null → 프롬프트의 Compact 분기 사용.
   decoupage: (st, p) => runDecoupage(st.genre, p.characters, st.scenes as Scenes, stubWorldVisual(p.world), null, logger, MODEL as never),
+  // ── V축 실스테이지 (E6·E8·E9 기록만 배터리, 2026-07-21): 실 함수 호출, 미실행 상류만 스텁 대체 ──
+  midPreview: (st, p) =>
+    runMidPreview(st.genre, st.narrativeStructure as never, p.characters, st.scenes as Scenes, EMPTY_STORY_CHECK, logger, MODEL as never),
+  // E6: 체인에 midPreview가 없으면 emptyMidPreview() — 실 파이프라인 skip 경로와 동일한 OFF팔.
+  visualIdentity: (st) =>
+    runVisualIdentity(st.genre, (st.midPreview ?? emptyMidPreview()) as MidPreview, logger, MODEL as never),
+  actVisualArc: (st) =>
+    runActVisualArc(
+      st.narrativeStructure as never,
+      (st.visualIdentity ?? stubVisualIdentity(st.genre)) as VisualIdentity,
+      ((st.midPreview as MidPreview | undefined)?.v_recommendations.v1 ?? ''),
+      logger,
+      MODEL as never,
+    ),
+  // E8: WRITER_V3_ARC=1 이면 v1 산출을 V3에 주입 (선택 파라미터 — 미설정 시 현행 프롬프트와 동일).
+  sceneCinematography: (st, p) =>
+    runSceneCinematography(
+      st.genre, p.characters, st.scenes as Scenes,
+      (st.visualIdentity ?? stubVisualIdentity(st.genre)) as VisualIdentity,
+      stubWorldVisual(p.world),
+      (st.midPreview ?? emptyMidPreview()) as MidPreview,
+      logger, MODEL as never,
+      process.env.WRITER_V3_ARC === '1' ? (st.actVisualArc as never) : undefined,
+    ),
+  // E9 A팔: V3 플랜을 받은 정식 2단 decoupage (B팔 = 위 'decoupage'의 Compact 분기).
+  decoupagePlanned: (st, p) =>
+    runDecoupage(
+      st.genre, p.characters, st.scenes as Scenes, stubWorldVisual(p.world),
+      ((st.sceneCinematography as { scene_plans?: SceneCinematography[] } | undefined)?.scene_plans ?? null),
+      logger, MODEL as never,
+    ),
+  // E13 (기록만): S1+S3 병합 1콜 — 프롬프트는 현행 s1_structure/s3_scenes 시스템프롬프트의 기계적 결합.
+  //   ⚠️ 하네스 로컬 실험 프롬프트: 채택 판정이 나면 실 스테이지로 정식 구현해 재검증해야 한다.
+  //   예산표는 막 수를 아직 모르므로 computeSceneBudget(genre, 1) — act 하한은 프롬프트 규칙으로 대체.
+  structureScenesMerged: async (st, p) => {
+    const genre = st.genre
+    const budget = computeSceneBudget(genre, 1)
+    const system = `당신은 영상 제작의 S1+S3(내러티브 구조 + 씬 브레이크다운) 통합 디자이너이다.
+주어진 스토리·genre·캐스트/로케이션에서 (1) 구조 유형·POV·주제·CDQ를 결정하고, (2) 같은 판단 안에서 씬 단위 분해까지 한 번에 완성한다.
+
+구조 유형 (우열이 아니라 서로 다른 형태다 — 스토리의 실제 형태에 맞는 것을 고른다):
+- 3-act: 설정→대립→해소의 선형 인과. 목표를 향한 갈등이 세워지고 고조됐다 풀릴 때. (막 3개)
+- kishōtenketsu (기승전결): 갈등·악당 없이 도입→전개→전환(예상 밖 국면)→여운. 정적·관조·일상·대비가 핵심일 때(동아시아 전통). (막 4개)
+- hero's journey: 평범한 세계→모험의 부름→시련·조력자→최대 시험→변화한 채 귀환. 주인공의 성장·변신 여정이 중심일 때.
+- non-linear: 시간순이 아닌 배열(회상·플래시포워드·교차 편집). 과거 사건이 현재의 의미를 결정하거나 시점이 뒤섞일 때.
+- circular: 끝이 시작으로 돌아오거나 같은 국면이 반복되는 순환. 시간 루프·반복·데자뷔·수미상관이 핵심 장치일 때.
+
+먼저 스토리의 형태를 판별하라: 선형 인과 / 갈등 없는 대비 / 성장 여정 / 시간 비선형 / 반복·순환. 그 형태에 가장 맞는 구조를 고르고, 억지로 3-act에 끼워 맞추지 마라. acts 수는 고른 구조를 따른다(3-act=3, 기승전결=4 등).
+
+CDQ (Central Dramatic Question):
+- yes/no로 답할 수 있는 하나의 질문. 1막 끝에 제기되고 클라이맥스에서 답해짐.
+
+깊이 레벨 ${genre.depth_level} 권장:
+- D1: 구조 없음 — 한 순간/한 비트. CDQ 생략 가능 / D2: 미니 구조 / D3: 단순 구조 (서브플롯 0)
+- D4~D5: 표준 구조 + 서브플롯 1~2개 / D6~D7: 다층 구조 + 서브플롯 다수
+
+씬 목적 분류: exposition / conflict / decision / revelation / transformation / transition / setup / payoff / climax / resolution
+
+정보 비대칭 (Hitchcock): "audience=character" | "audience>character" | "character>audience"
+
+${renderBudgetBlock(budget)}
+
+act 커버리지 (필수):
+- 네가 방금 정한 acts의 모든 act_id가 최소 1개 씬의 act_ref로 등장해야 한다 (빠지는 막 금지).
+- 따라서 씬 수는 최소 acts 개수 이상. 권장 씬 수와 충돌하면 act 커버리지를 우선한다.
+- 가능하면 각 act.proportion 비율로 씬을 분배한다.
+
+scene_actions:
+- 씬에서 일어나는 주요 액션을 텍스트로. 한 액션 = 한 샷(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초)에 들어가도록 분리해서 작성.
+- 씬당 액션 수는 위 시간 예산을 따른다.
+
+오픈 캐스트 규칙 (중요):
+- [기존 캐스트]는 producer가 이미 확정한 인물이다. 등장시킬 때 **반드시 주어진 slug 그대로** characters_in_scene에 쓴다.
+- 기존 캐스트만으로 전개 가능하면 새 인물을 만들지 말 것 — new_characters는 빈 배열.
+
+오픈 로케이션 규칙 (중요):
+- 씬이 [기존 로케이션] 중 한 곳이면 scene.location에 **반드시 그 id를 글자 그대로** 쓴다 (번역·의역·새 이름 금지).
+- 기존 로케이션만으로 전개 가능하면 새 장소를 만들지 말 것.`
+    const user = `[스토리]
+${p.input.story}
+
+[genre]
+${JSON.stringify(genre, null, 2)}
+
+[기존 캐스트] (producer 확정 — slug 그대로 사용)
+${p.characters.characters.length ? p.characters.characters.map((c) => `- ${c.id} (${c.name}, ${c.role})`).join('\n') : '(없음)'}
+
+[기존 로케이션] (producer 확정 — scene.location에 id 그대로 사용)
+${p.world.locations.length ? p.world.locations.map((l) => `- ${l.id}${l.name && l.name !== l.id ? ` (${l.name})` : ''}`).join('\n') : '(없음)'}
+
+[출력 형식 - JSON]
+{
+  "narrative_structure": {
+    "structure_type": "string",
+    "acts": [{"act_id": "string", "purpose": "string", "proportion": number}],
+    "pov": "string", "theme": "string",
+    "central_dramatic_question": "string",
+    "turning_point_position": number
+  },
+  "scenes": [
+    {"scene_id": "scene_1", "act_ref": "act_id", "location": "string", "time_of_day": "string",
+     "characters_in_scene": ["char_id"], "purpose": "string", "emotion_beat": {"start": "string", "end": "string"},
+     "dialogue_summary": "string", "key_dialogue": [], "info_asymmetry": "string",
+     "estimated_seconds": number, "scene_actions": ["action 1", ...]}
+  ],
+  "total_estimated_seconds": number,
+  "new_characters": []
+}`
+    return generateJson(user, MODEL as never, { systemInstruction: system, temperature: 0.7 })
+  },
   shotDesign: async (st, p) => {
     const r = await runShotDesign(st.genre, p.characters, st.scenes as Scenes, stubVisualIdentity(st.genre), stubWorldVisual(p.world), stubCharacterVisual(p.characters), null, st.decoupage as DecoupagePlan, '', logger, MODEL as never)
     return r.shots
@@ -426,6 +553,25 @@ describe('writer 단계 실험 (길이 양극화)', () => {
         } else if (stage === 'shotCheck' && result) {
           const r = result as { shotSequence: { total_shots: number; total_duration_seconds: number }; report: { passed: boolean; issues: unknown[]; shots_split_count: number } }
           summary = `shots=${r.shotSequence.total_shots} total=${r.shotSequence.total_duration_seconds}s passed=${r.report.passed} issues=${r.report.issues.length} split=${r.report.shots_split_count}`
+        } else if (stage === 'midPreview' && result) {
+          const r = result as MidPreview
+          summary = `difficulty=${r.production_difficulty} colors=${r.color_script?.length} warnings=${r.warnings?.length}`
+        } else if (stage === 'visualIdentity' && result) {
+          const r = result as VisualIdentity
+          summary = `medium=${r.format?.medium} style=${r.style?.art_style} render=${r.format?.rendering_method} texture=${r.style?.texture_philosophy}`
+        } else if (stage === 'actVisualArc' && result) {
+          const r = result as { acts?: { energy: string }[] }
+          summary = `acts=${r.acts?.length} energy=[${r.acts?.map((a) => a.energy).join('/')}]`
+        } else if (stage === 'sceneCinematography' && result) {
+          const r = result as { scene_plans: unknown[]; shot_count_total: number; budget_issues: unknown[] }
+          summary = `plans=${r.scene_plans.length} shot_target=${r.shot_count_total} issues=${r.budget_issues.length}`
+        } else if (stage === 'decoupagePlanned' && result) {
+          const r = result as DecoupagePlan
+          const durs = r.scenes.flatMap((s) => s.shots.map((x) => x.intended_duration_seconds)).sort((a, b) => a - b)
+          summary = `shots=${r.total_shots} added=${r.total_added} dur[min/med/max]=${durs[0]}/${durs[Math.floor(durs.length / 2)]}/${durs[durs.length - 1]}`
+        } else if (stage === 'structureScenesMerged' && result) {
+          const r = result as { narrative_structure?: { structure_type?: string; acts?: unknown[] }; scenes?: unknown[]; total_estimated_seconds?: number }
+          summary = `structure=${r.narrative_structure?.structure_type} acts=${r.narrative_structure?.acts?.length} scenes=${r.scenes?.length} total=${r.total_estimated_seconds}s`
         }
         console.log(`[${stage}] ${(ms / 1000).toFixed(1)}s  ${err ? 'ERR=' + err.slice(0, 80) : summary}  → ${path.relative(process.cwd(), outPath)}`)
       }
