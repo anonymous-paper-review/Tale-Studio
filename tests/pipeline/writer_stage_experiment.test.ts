@@ -16,6 +16,7 @@ import path from 'node:path'
 
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure'
 import { runScenes } from '@/lib/writer/pipeline/stages/s3_scenes'
+import { runStructureScenesMerged } from '@/lib/writer/pipeline/stages/s1s3_merged'
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage'
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots'
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1'
@@ -23,6 +24,7 @@ import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2'
 import { runMidPreview } from '@/lib/writer/pipeline/stages/mid_preview'
 import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual'
 import { runActVisualArc } from '@/lib/writer/pipeline/stages/v1_act_arc'
+import { runV2Design } from '@/lib/writer/pipeline/stages/v2_design'
 import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan'
 import { emptyMidPreview } from '@/lib/writer/pipeline'
 import { generateJson } from '@/lib/writer/llm/dispatch'
@@ -30,12 +32,15 @@ import { computeSceneBudget, renderBudgetBlock } from '@/lib/writer/pipeline/bud
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics'
 import { getPendingRawCalls, resetRawSeq } from '@/lib/writer/llm/raw_collector'
 import type { PipelineLogger } from '@/lib/writer/logger'
-import type { Genre, Characters, BackgroundContract, PipelineInput, Scenes, DecoupagePlan, VisualIdentity, WorldVisual, CharacterVisual, ShotDesign, MidPreview, SceneCinematography, StoryCheckReport } from '@/lib/writer/types/pipeline'
+import type { Genre, Characters, BackgroundContract, PipelineInput, Scenes, DecoupagePlan, DecoupageShot, SceneDecoupage, VisualIdentity, ActVisualArc, WorldVisual, CharacterVisual, ShotDesign, MidPreview, SceneCinematography, StoryCheckReport } from '@/lib/writer/types/pipeline'
 
 const ENABLED = process.env.RUN_WRITER_STAGE === '1' && !!process.env.GEMINI_API_KEY
 const MODEL = { provider: process.env.WRITER_PROVIDER ?? 'gemini', model: process.env.WRITER_MODEL ?? 'gemini-3-flash-preview' }
 const INPUT_KEY = process.env.WRITER_INPUT ?? 'shorts'
 const STAGES = (process.env.WRITER_STAGES ?? 'narrativeStructure,scenes').split(',').map((s) => s.trim()).filter(Boolean)
+// run-id 접미사(선택): 같은 프리셋·스테이지를 여러 회 돌릴 때 로그 파일을 구분한다(예: e13b1..e13b5).
+//   미설정 시 접미사 없음 — 기존 파일명(<preset>__<stage>.json) 그대로 유지.
+const RUN_ID = process.env.WRITER_RUN_ID ?? ''
 const OUT_DIR = path.join(process.cwd(), 'logs', 'writer-stage-exp')
 
 const logger = {
@@ -346,8 +351,126 @@ const EMPTY_STORY_CHECK = {
 // ── stage 레지스트리 (실 함수 호출 — 시스템 프롬프트는 코드 그대로) ──
 type State = {
   genre: Genre; narrativeStructure?: unknown; scenes?: unknown; decoupage?: unknown; shotDesign?: unknown;
-  midPreview?: unknown; visualIdentity?: unknown; actVisualArc?: unknown; sceneCinematography?: unknown;
+  midPreview?: unknown; visualIdentity?: unknown; actVisualArc?: unknown; v2Design?: unknown; sceneCinematography?: unknown;
+  // E9b (Phase 5): 씬 상세화(A) vs 씬·샷 근접 생성(B).
+  sceneAbsorbedPlan?: unknown; decoupageExecutorA?: unknown; sceneShotCoGen?: unknown;
 }
+// ── E9b 헬퍼 (Phase 5): 씬 상세화(A) vs 씬·샷 근접 생성(B). 전부 하네스 로컬 — 프로덕션 변경 0. ──
+// 상류 예산 블록: narrativeStructure의 막 수로 정직/표면 예산 계산(체인에 구조가 선행돼야 함).
+const e9bBudget = (genre: Genre, ns: unknown) =>
+  computeSceneBudget(genre, Math.max(1, (ns as { acts?: unknown[] } | undefined)?.acts?.length ?? 1))
+
+// 결정론 duration 배분: n개 샷에 totalSeconds를 [min,max] 클램프로 고르게 나눈다.
+//   합 = clamp(round(totalSeconds), min*n, max*n) — 달성 가능 대역 안에선 정확히 목표 초에 수렴.
+function e9bDistributeDurations(
+  totalSeconds: number, n: number,
+  min = SHOT_PHYSICS.shotSecondsMin, max = SHOT_PHYSICS.shotSecondsMax,
+): number[] {
+  if (n <= 0) return []
+  const lo = min * n, hi = max * n
+  const target = Math.max(lo, Math.min(hi, Math.round(totalSeconds > 0 ? totalSeconds : lo)))
+  const durs = new Array<number>(n).fill(min)
+  let remaining = target - lo, i = 0
+  while (remaining > 0) {
+    if (durs[i] < max) { durs[i] += 1; remaining -= 1 }
+    i = (i + 1) % n
+  }
+  return durs
+}
+
+// A안 결정론 집행자 (LLM 0콜): 씬이 정한 shot_count_target개 샷으로 DecoupagePlan을 코드가 조립.
+//   duration = 씬 estimated_seconds를 target으로 배분(2~8s 클램프), beat_summary/source_beats = scene_actions 순환.
+//   ⚠️ 이것이 A안의 요체 — LLM 자유도가 완전히 제거된 결정론 코드여야 한다(E9의 4/4회 목표 초과를 차단).
+function e9bBuildDecoupageFromScenes(scenes: Array<Record<string, unknown>>): DecoupagePlan {
+  const sceneDecoupages: SceneDecoupage[] = scenes.map((sc) => {
+    const actions = Array.isArray(sc.scene_actions) ? (sc.scene_actions as string[]) : []
+    const beatCount = actions.length
+    const est = typeof sc.estimated_seconds === 'number' ? sc.estimated_seconds : 0
+    const rawTarget = typeof sc.shot_count_target === 'number' ? Math.round(sc.shot_count_target) : NaN
+    const n = Math.max(1, Number.isFinite(rawTarget) ? rawTarget : Math.max(1, Math.round(est / 6.5)))
+    const durs = e9bDistributeDurations(est, n)
+    const shots: DecoupageShot[] = Array.from({ length: n }, (_, i) => {
+      const beatIdx = beatCount ? i % beatCount : -1
+      const derived = i < beatCount
+      const size = (['WS', 'MS', 'CU', 'MFS'] as const)[i % 4]
+      return {
+        shot_id: `shot_${String(sc.scene_id)}_${String(i + 1).padStart(3, '0')}`,
+        scene_id: String(sc.scene_id),
+        operation: derived ? 'derived' : (beatCount ? 'split' : 'added'),
+        shot_function: i === 0 ? 'establishing' : (i % 2 ? 'reaction' : 'action'),
+        source_beats: beatIdx >= 0 ? [beatIdx] : [],
+        ...(beatCount ? {} : { added_rationale: '결정론 집행: scene_actions 부재 씬의 커버 샷' }),
+        beat_summary: beatIdx >= 0 ? actions[beatIdx] : String(sc.purpose ?? sc.dialogue_summary ?? ''),
+        shot_size: i === 0 ? 'EWS' : size,
+        intended_duration_seconds: durs[i],
+        rhythm_role: i === 0 ? 'establish' : i === n - 1 ? 'breath' : (i % 2 ? 'develop' : 'punctuate'),
+        camera_intent: 'static',
+        dramatic_purpose: `결정론 집행 — 씬 목표 ${n}샷 중 ${i + 1}번`,
+      }
+    })
+    const uncovered = beatCount > n ? Array.from({ length: beatCount - n }, (_, k) => n + k) : []
+    return {
+      scene_id: String(sc.scene_id),
+      beat_count: beatCount,
+      shot_count: shots.length,
+      coverage_ratio: beatCount > 0 ? Number((shots.length / beatCount).toFixed(2)) : 0,
+      rhythm_profile: typeof sc.rhythm_profile === 'string' ? sc.rhythm_profile : '',
+      uncovered_beats: uncovered,
+      shots,
+    }
+  })
+  return e9bFinalizeDecoupage(sceneDecoupages, '[E9b-A 결정론 집행]')
+}
+
+// B안 정규화: 융합 응답의 scenes[].shots를 DecoupagePlan으로 정규화(채점·하류 주입용).
+function e9bNormalizeCoGen(scenes: Array<Record<string, unknown>>): DecoupagePlan {
+  const OPS = ['derived', 'added', 'merged', 'split']
+  const sceneDecoupages: SceneDecoupage[] = scenes.map((sc) => {
+    const beatCount = Array.isArray(sc.scene_actions) ? (sc.scene_actions as string[]).length : 0
+    const rawShots = Array.isArray(sc.shots) ? (sc.shots as Array<Record<string, unknown>>) : []
+    const shots: DecoupageShot[] = rawShots.map((s, i) => ({
+      shot_id: typeof s.shot_id === 'string' ? s.shot_id : `shot_${String(sc.scene_id)}_${String(i + 1).padStart(3, '0')}`,
+      scene_id: String(sc.scene_id),
+      operation: (OPS.includes(s.operation as string) ? s.operation : 'derived') as DecoupageShot['operation'],
+      shot_function: (typeof s.shot_function === 'string' ? s.shot_function : 'action') as DecoupageShot['shot_function'],
+      source_beats: Array.isArray(s.source_beats) ? (s.source_beats as number[]) : [],
+      added_rationale: typeof s.added_rationale === 'string' ? s.added_rationale : undefined,
+      beat_summary: typeof s.beat_summary === 'string' ? s.beat_summary : '',
+      shot_size: (typeof s.shot_size === 'string' ? s.shot_size : 'MS') as DecoupageShot['shot_size'],
+      intended_duration_seconds: typeof s.intended_duration_seconds === 'number' ? s.intended_duration_seconds : 0,
+      rhythm_role: (typeof s.rhythm_role === 'string' ? s.rhythm_role : 'develop') as DecoupageShot['rhythm_role'],
+      camera_intent: s.camera_intent === 'motivated_move' ? 'motivated_move' : 'static',
+      camera_move_motivation: typeof s.camera_move_motivation === 'string' ? s.camera_move_motivation : undefined,
+      dramatic_purpose: typeof s.dramatic_purpose === 'string' ? s.dramatic_purpose : '',
+    }))
+    return {
+      scene_id: String(sc.scene_id),
+      beat_count: beatCount,
+      shot_count: shots.length,
+      coverage_ratio: beatCount > 0 ? Number((shots.length / beatCount).toFixed(2)) : 0,
+      rhythm_profile: typeof sc.rhythm_profile === 'string' ? sc.rhythm_profile : '',
+      uncovered_beats: Array.isArray(sc.uncovered_beats) ? (sc.uncovered_beats as number[]) : [],
+      shots,
+    }
+  })
+  return e9bFinalizeDecoupage(sceneDecoupages, '[E9b-B 근접생성]')
+}
+
+// 공통 마무리: 전역 shot_id 재인덱싱(production runDecoupage와 동일) + 총계 집계.
+function e9bFinalizeDecoupage(sceneDecoupages: SceneDecoupage[], tag: string): DecoupagePlan {
+  let g = 0
+  for (const sd of sceneDecoupages) sd.shots = sd.shots.map((s) => { g += 1; return { ...s, shot_id: `shot_${g}` } })
+  const all = sceneDecoupages.flatMap((s) => s.shots)
+  return {
+    scenes: sceneDecoupages,
+    total_shots: all.length,
+    total_added: all.filter((s) => s.operation === 'added').length,
+    total_merged: all.filter((s) => s.operation === 'merged').length,
+    total_split: all.filter((s) => s.operation === 'split').length,
+    director_notes: `${tag} ${sceneDecoupages.map((s) => `${s.scene_id}: ${s.beat_count}b→${s.shot_count}s`).join(' | ')}`,
+  }
+}
+
 const STAGE_FNS: Record<string, (st: State, p: Preset) => Promise<unknown>> = {
   narrativeStructure: (st, p) => runNarrativeStructure(p.input, st.genre, logger, MODEL as never),
   scenes: (st, p) => runScenes(p.input, st.genre, st.narrativeStructure as never, p.characters, p.world, logger, MODEL as never),
@@ -393,12 +516,25 @@ const STAGE_FNS: Record<string, (st: State, p: Preset) => Promise<unknown>> = {
       logger,
       MODEL as never,
     ),
+  // E8b: 실 v2Design(월드 팔레트) 체인 — 프로덕션과 동일하게 v1(actVisualArc)을 v2에 상속.
+  //   v2Design=null 이면(미실행) sceneCinematography는 stubWorldVisual로 폴백(다른 실험 영향 없음).
+  v2Design: (st, p) =>
+    runV2Design(
+      (st.visualIdentity ?? stubVisualIdentity(st.genre)) as VisualIdentity,
+      (st.actVisualArc ?? null) as ActVisualArc | null,
+      p.characters,
+      p.world,
+      ((st.midPreview as MidPreview | undefined)?.v_recommendations.v2 ?? ''),
+      logger,
+      MODEL as never,
+    ),
   // E8: WRITER_V3_ARC=1 이면 v1 산출을 V3에 주입 (선택 파라미터 — 미설정 시 현행 프롬프트와 동일).
+  // E8b: v2Design이 체인에 있으면 그 실 worldVisual을 쓴다(없으면 stub — 하위 실험 호환).
   sceneCinematography: (st, p) =>
     runSceneCinematography(
       st.genre, p.characters, st.scenes as Scenes,
       (st.visualIdentity ?? stubVisualIdentity(st.genre)) as VisualIdentity,
-      stubWorldVisual(p.world),
+      ((st.v2Design as { worldVisual?: WorldVisual } | undefined)?.worldVisual ?? stubWorldVisual(p.world)),
       (st.midPreview ?? emptyMidPreview()) as MidPreview,
       logger, MODEL as never,
       process.env.WRITER_V3_ARC === '1' ? (st.actVisualArc as never) : undefined,
@@ -410,6 +546,11 @@ const STAGE_FNS: Record<string, (st: State, p: Preset) => Promise<unknown>> = {
       ((st.sceneCinematography as { scene_plans?: SceneCinematography[] } | undefined)?.scene_plans ?? null),
       logger, MODEL as never,
     ),
+  // E13b: S1+S3 병합 정식 스테이지 — 실 함수 runStructureScenesMerged 호출(후처리 이관 포함).
+  //   E13 근사판(아래 structureScenesMerged)과 달리 장소 정규화·오염 복원·커버리지/예산 교정·
+  //   coverage_mode 를 전부 적용한다. 결과는 { narrativeStructure, scenes }(후처리된 Scenes) 형태.
+  structureScenesMergedFormal: (st, p) =>
+    runStructureScenesMerged(p.input, st.genre, p.characters, p.world, logger, MODEL as never),
   // E13 (기록만): S1+S3 병합 1콜 — 프롬프트는 현행 s1_structure/s3_scenes 시스템프롬프트의 기계적 결합.
   //   ⚠️ 하네스 로컬 실험 프롬프트: 채택 판정이 나면 실 스테이지로 정식 구현해 재검증해야 한다.
   //   예산표는 막 수를 아직 모르므로 computeSceneBudget(genre, 1) — act 하한은 프롬프트 규칙으로 대체.
@@ -489,6 +630,170 @@ ${p.world.locations.length ? p.world.locations.map((l) => `- ${l.id}${l.name && 
 }`
     return generateJson(user, MODEL as never, { systemInstruction: system, temperature: 0.7 })
   },
+  // ── E9b (Phase 5): 씬 상세화(A) vs 씬·샷 근접 생성(B). 병합 프롬프트는 하네스 로컬(현행 s3/v3/decoupage 시스템프롬프트의 기계적 결합). ──
+  // A-1) sceneAbsorbedPlan (LLM 1콜): 씬 나누기(s3) + 씬 촬영 계획(v3) 병합. 각 씬이 scene_actions·
+  //   estimated_seconds와 함께 shot_count_target·avg_shot_seconds·rhythm_profile·coverage_pattern을 동봉.
+  //   상류 narrativeStructure 필요(막 수 → 예산). 하류(집행자·shotDesign)용 Scenes를 st.scenes에 주입.
+  sceneAbsorbedPlan: async (st, p) => {
+    const genre = st.genre
+    const budget = e9bBudget(genre, st.narrativeStructure)
+    const system = `당신은 영상 제작의 S3(씬 브레이크다운) + V3(씬 촬영 계획) 통합 디자이너이다.
+주어진 스토리·genre·내러티브 구조(S1)·캐스트/로케이션 위에서 (1) 씬 단위 분해와 (2) 각 씬을 "어떻게 찍을 것인가"(촬영 계획)를 한 판단으로 함께 완성한다.
+**씬이 권위를 가진다**: 각 씬은 자신의 샷 수(shot_count_target)까지 스스로 확정하며, 하류 샷 집행은 이 수를 그대로 실현한다(가감 없음). 따라서 shot_count_target·avg_shot_seconds·estimated_seconds를 반드시 정합시켜라.
+
+[S3 — 씬 브레이크다운]
+씬 목적 분류: exposition / conflict / decision / revelation / transformation / transition / setup / payoff / climax / resolution
+정보 비대칭 (Hitchcock): "audience=character" | "audience>character" | "character>audience"
+
+${renderBudgetBlock(budget)}
+
+act 커버리지 (필수):
+- narrativeStructure.acts의 모든 act_id가 최소 1개 씬의 act_ref로 등장해야 한다 (빠지는 막 금지).
+- 씬 수는 최소 acts 개수 이상. 가능하면 act.proportion 비율로 씬을 분배한다.
+
+scene_actions:
+- 씬의 주요 액션을 텍스트로. 한 액션 = 한 샷(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초)에 들어가도록 분리.
+- 씬당 액션 수는 위 시간 예산을 따른다.
+
+오픈 캐스트/로케이션 규칙 (중요):
+- [기존 캐스트]는 producer 확정 인물 — 등장 시 **주어진 slug 그대로** characters_in_scene에 쓴다. 충분하면 새 인물 금지(new_characters=[]).
+- 씬이 [기존 로케이션] 중 한 곳이면 scene.location에 **그 id를 글자 그대로** 쓴다(번역·새 이름 금지).
+
+[V3 — 씬 촬영 계획 (씬마다 함께 결정)]
+씬마다 촬영 문법을 확정한다:
+- coverage_pattern: master_inserts(정보 전달) / shot_reverse(대화 2인+) / developing(긴장 상승) / handheld_continuous(액션·친밀) / montage(압축) / single_take(침묵·긴장)
+- shot_count_target: 이 씬을 몇 샷으로 찍을지 (정수). **씬 estimated_seconds ÷ avg_shot_seconds에 근접**하게 정한다.
+- avg_shot_seconds: 이 씬 샷의 평균 길이(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초 대역).
+- rhythm_profile: accelerating / sustained / decaying / punctuated 중 하나.
+
+시간 정합 규율 (가장 중요 — 씬이 곧 최종 러닝타임을 확정한다):
+- 각 씬에서 shot_count_target × avg_shot_seconds ≈ estimated_seconds가 되도록 세 값을 맞춰라.
+- 씬 estimated_seconds가 길면 shot_count_target을 늘리고, 짧으면 줄인다.
+- 전체 estimated_seconds 총합은 위 예산의 runtime 목표를 지킨다.`
+    const user = `[스토리]
+${p.input.story}
+
+[genre]
+${JSON.stringify(genre, null, 2)}
+
+[narrativeStructure]
+${JSON.stringify(st.narrativeStructure, null, 2)}
+
+[기존 캐스트] (producer 확정 — slug 그대로 사용)
+${p.characters.characters.length ? p.characters.characters.map((c) => `- ${c.id} (${c.name}, ${c.role})`).join('\n') : '(없음)'}
+
+[기존 로케이션] (producer 확정 — scene.location에 id 그대로 사용)
+${p.world.locations.length ? p.world.locations.map((l) => `- ${l.id}${l.name && l.name !== l.id ? ` (${l.name})` : ''}`).join('\n') : '(없음)'}
+
+[출력 형식 - JSON]
+{
+  "scenes": [
+    {"scene_id": "scene_1", "act_ref": "act_id", "location": "string", "time_of_day": "string",
+     "characters_in_scene": ["char_id"], "purpose": "string", "emotion_beat": {"start": "string", "end": "string"},
+     "dialogue_summary": "string", "key_dialogue": [], "info_asymmetry": "string",
+     "estimated_seconds": number, "scene_actions": ["action 1", ...],
+     "coverage_pattern": "string", "shot_count_target": number, "avg_shot_seconds": number, "rhythm_profile": "string"}
+  ],
+  "total_estimated_seconds": number,
+  "new_characters": []
+}`
+    const raw = await generateJson<{ scenes?: Array<Record<string, unknown>>; total_estimated_seconds?: number; new_characters?: unknown[] }>(
+      user, MODEL as never, { systemInstruction: system, temperature: 0.7 },
+    )
+    const scenes = Array.isArray(raw?.scenes) ? raw.scenes : []
+    const total = raw?.total_estimated_seconds ?? scenes.reduce((s, x) => s + (Number(x.estimated_seconds) || 0), 0)
+    // 하류(집행자·shotDesign)용 Scenes 주입 — cinematography 필드가 함께 실려도 런타임 무해.
+    ;(st as Record<string, unknown>).scenes = { scenes, total_estimated_seconds: total, new_characters: raw?.new_characters ?? [], coverage_mode: budget.mode }
+    return raw
+  },
+  // A-2) decoupageExecutorA (LLM 0콜 — 순수 결정론): 씬이 정한 shot_count_target을 코드가 그대로 실현.
+  //   st.sceneAbsorbedPlan의 씬을 읽어 e9bBuildDecoupageFromScenes로 DecoupagePlan 조립 → st.decoupage 주입.
+  decoupageExecutorA: async (st) => {
+    const absorbed = st.sceneAbsorbedPlan as { scenes?: Array<Record<string, unknown>> } | undefined
+    const fromChain = (st.scenes as { scenes?: Array<Record<string, unknown>> } | undefined)?.scenes
+    const scenes = (Array.isArray(absorbed?.scenes) ? absorbed!.scenes : undefined) ?? fromChain ?? []
+    const plan = e9bBuildDecoupageFromScenes(scenes)
+    ;(st as Record<string, unknown>).decoupage = plan
+    return plan
+  },
+  // B) sceneShotCoGen (LLM 1콜): 씬 나누기(s3) + 샷 나누기(decoupage) 병합. 각 씬 breakdown과 그 씬의
+  //   intent-동봉 샷 리스트(dramatic_purpose·rhythm_role 포함)를 한 응답에. DecoupagePlan으로 정규화 → st.decoupage.
+  sceneShotCoGen: async (st, p) => {
+    const genre = st.genre
+    const budget = e9bBudget(genre, st.narrativeStructure)
+    const system = `당신은 영상 제작의 S3(씬 브레이크다운) + 데쿠파주(샷 분해) 통합 디자이너 겸 감독이다.
+씬을 확정하는 즉시 그 씬의 샷을 의도와 함께 저작한다 — 씬 분해와 샷 분해가 **한 판단 안에서 함께 태어난다**.
+
+[S3 — 씬 브레이크다운]
+씬 목적 분류: exposition / conflict / decision / revelation / transformation / transition / setup / payoff / climax / resolution
+정보 비대칭 (Hitchcock): "audience=character" | "audience>character" | "character>audience"
+
+${renderBudgetBlock(budget)}
+
+act 커버리지 (필수):
+- narrativeStructure.acts의 모든 act_id가 최소 1개 씬의 act_ref로 등장해야 한다. 씬 수는 최소 acts 개수 이상.
+
+scene_actions:
+- 씬의 주요 액션(비트)을 텍스트로. 한 액션 = 한 샷(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초)에 들어가도록 분리. 씬당 액션 수는 위 예산을 따른다.
+
+오픈 캐스트/로케이션 규칙 (중요):
+- [기존 캐스트]는 producer 확정 — slug 그대로 characters_in_scene에. 충분하면 new_characters=[].
+- 씬이 [기존 로케이션] 중 한 곳이면 scene.location에 그 id를 글자 그대로.
+
+[데쿠파주 — 씬마다 그 씬의 샷을 함께 저작]
+각 씬의 scene_actions(비트, 인덱스 0부터)를 샷으로 분해한다:
+- 비트 ≠ 샷. 한 비트를 여러 샷으로, 여러 비트를 한 샷으로 자유롭게 매핑.
+- 4연산: derived(비트 1:1, source_beats=[i]) / added(스토리에 없는 establishing·reaction·insert 추가, source_beats=[], added_rationale 필수) / merged(여러 비트 롱테이크, source_beats=[i,j]) / split(한 비트 여러 샷, 같은 source_beats=[i] 공유).
+- 리듬 저작: rhythm_role을 establish→develop→punctuate→breath로 다양하게. 정적 breath(쉼) 1개 이상.
+- 각 샷 intended_duration_seconds = ${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초(긴 침묵 등 예외만 최대 ${SHOT_PHYSICS.shotSecondsHardMax}초). 한 씬 샷 길이 합 ≈ 씬 estimated_seconds.
+- 각 샷에 **dramatic_purpose(왜 이 샷인가)와 rhythm_role을 반드시 동봉**한다.
+- camera_intent는 'static' 기본. 'motivated_move'는 감정적 동기가 명확할 때만(camera_move_motivation에 기재).
+
+전체 시간 규율: 모든 씬 estimated_seconds 총합은 위 예산의 runtime 목표를, 모든 샷 intended_duration_seconds 총합도 같은 목표를 지향한다.`
+    const user = `[스토리]
+${p.input.story}
+
+[genre]
+${JSON.stringify(genre, null, 2)}
+
+[narrativeStructure]
+${JSON.stringify(st.narrativeStructure, null, 2)}
+
+[기존 캐스트] (producer 확정 — slug 그대로 사용)
+${p.characters.characters.length ? p.characters.characters.map((c) => `- ${c.id} (${c.name}, ${c.role})`).join('\n') : '(없음)'}
+
+[기존 로케이션] (producer 확정 — scene.location에 id 그대로 사용)
+${p.world.locations.length ? p.world.locations.map((l) => `- ${l.id}${l.name && l.name !== l.id ? ` (${l.name})` : ''}`).join('\n') : '(없음)'}
+
+[출력 형식 - JSON]
+{
+  "scenes": [
+    {"scene_id": "scene_1", "act_ref": "act_id", "location": "string", "time_of_day": "string",
+     "characters_in_scene": ["char_id"], "purpose": "string", "emotion_beat": {"start": "string", "end": "string"},
+     "dialogue_summary": "string", "key_dialogue": [], "info_asymmetry": "string",
+     "estimated_seconds": number, "scene_actions": ["action 1", ...],
+     "shots": [
+       {"operation": "derived|added|merged|split", "shot_function": "establishing|master|action|reaction|insert|cutaway|detail|pov|reveal|transition",
+        "source_beats": [0], "added_rationale": "operation=added일 때만", "beat_summary": "이 샷이 담는 내용",
+        "shot_size": "EWS|WS|FS|MFS|MS|MCU|CU|ECU|OTS|2S|POV", "intended_duration_seconds": number,
+        "rhythm_role": "establish|develop|punctuate|sustain|accelerate|breath",
+        "camera_intent": "static|motivated_move", "camera_move_motivation": "motivated_move일 때만",
+        "dramatic_purpose": "왜 이 샷인가"}
+     ]}
+  ],
+  "total_estimated_seconds": number,
+  "new_characters": []
+}`
+    const raw = await generateJson<{ scenes?: Array<Record<string, unknown>>; total_estimated_seconds?: number; new_characters?: unknown[] }>(
+      user, MODEL as never, { systemInstruction: system, temperature: 0.7 },
+    )
+    const scenes = Array.isArray(raw?.scenes) ? raw.scenes : []
+    const total = raw?.total_estimated_seconds ?? scenes.reduce((s, x) => s + (Number(x.estimated_seconds) || 0), 0)
+    const plan = e9bNormalizeCoGen(scenes)
+    ;(st as Record<string, unknown>).scenes = { scenes, total_estimated_seconds: total, new_characters: raw?.new_characters ?? [], coverage_mode: budget.mode }
+    ;(st as Record<string, unknown>).decoupage = plan
+    return plan
+  },
   shotDesign: async (st, p) => {
     const r = await runShotDesign(st.genre, p.characters, st.scenes as Scenes, stubVisualIdentity(st.genre), stubWorldVisual(p.world), stubCharacterVisual(p.characters), null, st.decoupage as DecoupagePlan, '', logger, MODEL as never)
     return r.shots
@@ -522,7 +827,7 @@ describe('writer 단계 실험 (길이 양극화)', () => {
         }
         const ms = Date.now() - t0
         const calls = getPendingRawCalls()
-        const outPath = path.join(OUT_DIR, `${INPUT_KEY}__${stage}.json`)
+        const outPath = path.join(OUT_DIR, `${INPUT_KEY}__${stage}${RUN_ID ? `__${RUN_ID}` : ''}.json`)
         fs.writeFileSync(outPath, JSON.stringify({
           input: INPUT_KEY, label: preset.label, stage, model: MODEL.model,
           duration_ms: ms, error: err ?? null,
@@ -562,6 +867,9 @@ describe('writer 단계 실험 (길이 양극화)', () => {
         } else if (stage === 'actVisualArc' && result) {
           const r = result as { acts?: { energy: string }[] }
           summary = `acts=${r.acts?.length} energy=[${r.acts?.map((a) => a.energy).join('/')}]`
+        } else if (stage === 'v2Design' && result) {
+          const r = result as { characterVisual?: CharacterVisual; worldVisual?: WorldVisual }
+          summary = `palette=${JSON.stringify(r.worldVisual?.global_palette)} locations=${r.worldVisual?.locations?.length}`
         } else if (stage === 'sceneCinematography' && result) {
           const r = result as { scene_plans: unknown[]; shot_count_total: number; budget_issues: unknown[] }
           summary = `plans=${r.scene_plans.length} shot_target=${r.shot_count_total} issues=${r.budget_issues.length}`
@@ -572,6 +880,20 @@ describe('writer 단계 실험 (길이 양극화)', () => {
         } else if (stage === 'structureScenesMerged' && result) {
           const r = result as { narrative_structure?: { structure_type?: string; acts?: unknown[] }; scenes?: unknown[]; total_estimated_seconds?: number }
           summary = `structure=${r.narrative_structure?.structure_type} acts=${r.narrative_structure?.acts?.length} scenes=${r.scenes?.length} total=${r.total_estimated_seconds}s`
+        } else if (stage === 'structureScenesMergedFormal' && result) {
+          const r = result as { narrativeStructure?: { structure_type?: string; acts?: unknown[] }; scenes?: { scenes?: unknown[]; total_estimated_seconds?: number; coverage_mode?: string } }
+          const locs = (r.scenes?.scenes as { location?: string }[] | undefined)?.map((s) => s.location) ?? []
+          summary = `structure=${r.narrativeStructure?.structure_type} acts=${r.narrativeStructure?.acts?.length} scenes=${r.scenes?.scenes?.length} total=${r.scenes?.total_estimated_seconds}s mode=${r.scenes?.coverage_mode} locs=[${locs.join('/')}]`
+        } else if (stage === 'sceneAbsorbedPlan' && result) {
+          const r = result as { scenes?: Array<{ shot_count_target?: number; estimated_seconds?: number }>; total_estimated_seconds?: number }
+          const tgt = (r.scenes ?? []).reduce((s, x) => s + (Number(x.shot_count_target) || 0), 0)
+          summary = `scenes=${r.scenes?.length} total=${r.total_estimated_seconds}s shot_target_sum=${tgt}`
+        } else if ((stage === 'decoupageExecutorA' || stage === 'sceneShotCoGen') && result) {
+          const r = result as DecoupagePlan
+          const durs = r.scenes.flatMap((s) => s.shots.map((x) => x.intended_duration_seconds)).sort((a, b) => a - b)
+          const sum = durs.reduce((a, b) => a + b, 0)
+          const out = durs.filter((d) => d < SHOT_PHYSICS.shotSecondsMin || d > SHOT_PHYSICS.shotSecondsMax).length
+          summary = `shots=${r.total_shots} added=${r.total_added} durSum=${sum}s 2~8s밖=${out} dur[min/med/max]=${durs[0]}/${durs[Math.floor(durs.length / 2)]}/${durs[durs.length - 1]}`
         }
         console.log(`[${stage}] ${(ms / 1000).toFixed(1)}s  ${err ? 'ERR=' + err.slice(0, 80) : summary}  → ${path.relative(process.cwd(), outPath)}`)
       }
