@@ -14,6 +14,7 @@ import {
   getGenerationJobByRequestId,
   failGenerationJob,
   classifyFalFailure,
+  GenerationJobTerminalTransitionError,
 } from '@/lib/generation-jobs'
 import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
 import {
