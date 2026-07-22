@@ -1,0 +1,136 @@
+{
+  "final_seconds": 60.63,
+  "resolution": "1920x1080",
+  "fps": 24,
+  "segments": 21,
+  "freeze_fallback": [],
+  "filmstrip_grid": "10x6",
+  "segments_detail": [
+    {
+      "shot_id": "shot_1",
+      "source": "video",
+      "target": 0.9,
+      "actual": 0.92
+    },
+    {
+      "shot_id": "shot_2",
+      "source": "video",
+      "target": 1.2,
+      "actual": 1.21
+    },
+    {
+      "shot_id": "shot_3",
+      "source": "video",
+      "target": 1.5,
+      "actual": 1.5
+    },
+    {
+      "shot_id": "shot_4",
+      "source": "video",
+      "target": 5,
+      "actual": 5
+    },
+    {
+      "shot_id": "shot_5",
+      "source": "video",
+      "target": 4,
+      "actual": 4
+    },
+    {
+      "shot_id": "shot_6",
+      "source": "video",
+      "target": 3,
+      "actual": 3
+    },
+    {
+      "shot_id": "shot_7",
+      "source": "video",
+      "target": 2,
+      "actual": 2
+    },
+    {
+      "shot_id": "shot_8",
+      "source": "video",
+      "target": 3,
+      "actual": 3
+    },
+    {
+      "shot_id": "shot_9",
+      "source": "video",
+      "target": 2,
+      "actual": 2
+    },
+    {
+      "shot_id": "shot_10",
+      "source": "video",
+      "target": 4,
+      "actual": 4
+    },
+    {
+      "shot_id": "shot_11",
+      "source": "video",
+      "target": 2,
+      "actual": 2
+    },
+    {
+      "shot_id": "shot_12",
+      "source": "video",
+      "target": 2,
+      "actual": 2
+    },
+    {
+      "shot_id": "shot_13",
+      "source": "video",
+      "target": 3,
+      "actual": 3
+    },
+    {
+      "shot_id": "shot_14",
+      "source": "video",
+      "target": 6,
+      "actual": 6
+    },
+    {
+      "shot_id": "shot_15",
+      "source": "video",
+      "target": 3,
+      "actual": 3
+    },
+    {
+      "shot_id": "shot_16",
+      "source": "video",
+      "target": 3,
+      "actual": 3
+    },
+    {
+      "shot_id": "shot_17",
+      "source": "video",
+      "target": 3,
+      "actual": 3
+    },
+    {
+      "shot_id": "shot_18",
+      "source": "video",
+      "target": 3,
+      "actual": 3
+    },
+    {
+      "shot_id": "shot_19",
+      "source": "video",
+      "target": 2,
+      "actual": 2
+    },
+    {
+      "shot_id": "shot_20",
+      "source": "video",
+      "target": 2,
+      "actual": 2
+    },
+    {
+      "shot_id": "shot_21",
+      "source": "video",
+      "target": 5,
+      "actual": 5
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "run": "e9dp1",
+  "counts": {
+    "t2i_attempts": 0,
+    "t2i_success": 0,
+    "t2i_fail": 0,
+    "i2v_attempts": 21,
+    "i2v_success": 21,
+    "i2v_fail": 0
+  },
+  "total_shots": 21,
+  "missing_images": [],
+  "missing_videos": []
+}

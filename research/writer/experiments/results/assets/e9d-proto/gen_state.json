@@ -1,0 +1,149 @@
+{
+  "shot_1": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a15/n48v4veYffYbnpKT8DNpk_i6WoRdIQ.png",
+    "image_bytes": 942118,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a25/yuTrO-Wf3Cg0P_Q5vq5L0_I3Rn9SdH.mp4",
+    "video_bytes": 2643254,
+    "video_request_seconds": 3
+  },
+  "shot_2": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a15/9IbYOUjQq9WrioSXthio5_vgENvv1x.png",
+    "image_bytes": 843542,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a25/FBPGg_wJ6Vb2fSgJnP87E_2EqrCZxZ.mp4",
+    "video_bytes": 1969442,
+    "video_request_seconds": 3
+  },
+  "shot_3": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a15/WfCrfLwsxvIjjhldc-Ve7_cdERBY42.png",
+    "image_bytes": 973473,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a25/bLly7UX6sB9Tt2isQo85e_wvKrEdT6.mp4",
+    "video_bytes": 2022310,
+    "video_request_seconds": 3
+  },
+  "shot_4": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a15/5MhuY0dWD0MsZz5pO2xoV_iGqiEwU1.png",
+    "image_bytes": 1013394,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a38/PiOYlpA1cpyqrPrsCpCl-_0H4VCH2X.mp4",
+    "video_bytes": 5367490,
+    "video_request_seconds": 5
+  },
+  "shot_5": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a16/XTcqLvpEvbQlObjaX12Aa_b2F6Yhaq.png",
+    "image_bytes": 971477,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a33/lAUzrQzcu83KwDrDmH6aK_hJMezTy6.mp4",
+    "video_bytes": 4923769,
+    "video_request_seconds": 4
+  },
+  "shot_6": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a16/IAa0ZXUzQxoWRyAdwtOQ7_g1mS1qqD.png",
+    "image_bytes": 995012,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a2f/RchJ9Gjmvsb3-ymurfQT4_fJMfsKQr.mp4",
+    "video_bytes": 4142597,
+    "video_request_seconds": 3
+  },
+  "shot_7": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a16/4e0yJnbUlLr7doYqBvBOr_XJejVRUY.png",
+    "image_bytes": 959082,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a39/vBViXIi-oP8Sp0BvujRAY_3nzZlZ3Y.mp4",
+    "video_bytes": 3758172,
+    "video_request_seconds": 3
+  },
+  "shot_8": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a16/Hu5WxR6JqCg73oT_EuRsz_j4ljxgVJ.png",
+    "image_bytes": 927550,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a3d/nFYegSvwTBg5aGwUaOEAx_dskdmtET.mp4",
+    "video_bytes": 2076668,
+    "video_request_seconds": 3
+  },
+  "shot_9": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a16/hDxYV4Q_Gr_K4yhemd6Wu_dr9dUEOW.png",
+    "image_bytes": 977725,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a42/wFLsgfM2DZlMPVL3bhos__uV5quUCe.mp4",
+    "video_bytes": 1905630,
+    "video_request_seconds": 3
+  },
+  "shot_10": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a16/eukzmHu6tAXQOEfv9YlZX_Uk3d9IcI.png",
+    "image_bytes": 1008549,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a47/dxyGxIC1iwOrpNrI8wX74_5RHpeJqQ.mp4",
+    "video_bytes": 2463807,
+    "video_request_seconds": 4
+  },
+  "shot_11": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a16/3yce-q8dhQH4z7g2Jp9K__pPDHY8Eo.png",
+    "image_bytes": 996559,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a48/CIhxsECev_d1CHZSY29Y4_72daD8FS.mp4",
+    "video_bytes": 3072719,
+    "video_request_seconds": 3
+  },
+  "shot_12": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a16/ukzyXRM5SJtR9tBE7W5QP_d6oQru8P.png",
+    "image_bytes": 874705,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a4c/TTGZn8qCdh7vxe385r1Yc_300mpMqo.mp4",
+    "video_bytes": 1229190,
+    "video_request_seconds": 3
+  },
+  "shot_13": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a17/P83eDO9v4Bicedz8SP9Ur_8Mf53odA.png",
+    "image_bytes": 1003634,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a51/gY4pnfMG33ftpx0lwpfnJ_CdvZkbda.mp4",
+    "video_bytes": 3563951,
+    "video_request_seconds": 3
+  },
+  "shot_14": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a17/AyiUaOZK5hhpjyE51W8E4_m7hhsCAV.png",
+    "image_bytes": 1009185,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a56/H6AgvN0H5NYgp62lfqjGp_ZJUpROH2.mp4",
+    "video_bytes": 8675093,
+    "video_request_seconds": 6
+  },
+  "shot_15": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a17/cPdv2tYXFrsdq6ND4QVL__FfW8qFpe.png",
+    "image_bytes": 961529,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a56/KdMwgyuXvCdPDmz-iUxzi_jUX2KRaH.mp4",
+    "video_bytes": 1883587,
+    "video_request_seconds": 3
+  },
+  "shot_16": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a17/BWYAWusKrT0sF1inm4jyA_TBuWkzCu.png",
+    "image_bytes": 969028,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a5c/ulzs2_IUHRKe5XM8Q0xBZ_7VJi5Qw5.mp4",
+    "video_bytes": 3409360,
+    "video_request_seconds": 3
+  },
+  "shot_17": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a17/0yItwtvnI3BbJ4UftQ7TK_AaT9HVpY.png",
+    "image_bytes": 1004941,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a60/szmkgyGY3xFpk5x-KWEMD_S5QOfuSY.mp4",
+    "video_bytes": 3614420,
+    "video_request_seconds": 3
+  },
+  "shot_18": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a17/pwYvkXNGqHvGU0f-Dplfu_fu7UWO0P.png",
+    "image_bytes": 976383,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a60/EgLjZx1hV2i8cd_pVgKQc_2AEOobUn.mp4",
+    "video_bytes": 5250118,
+    "video_request_seconds": 3
+  },
+  "shot_19": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a17/lexFSC0HRvkfTyx0m0bj1_j0VmPEbj.png",
+    "image_bytes": 988806,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a66/8n1iMjXTOXiCV9aXoA-xF_8sIKfASb.mp4",
+    "video_bytes": 3217912,
+    "video_request_seconds": 3
+  },
+  "shot_20": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a17/6mwAv5-MSU9Xz_p0K0dIi_TOdXkp64.png",
+    "image_bytes": 843957,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a6a/2daXwPl56vjqMyHYd43_W_eb4lg3oH.mp4",
+    "video_bytes": 1463084,
+    "video_request_seconds": 3
+  },
+  "shot_21": {
+    "image_url": "https://v3b.fal.media/files/b/0aa34a17/jAQFBshnjyy110JCqE5DK_qDVCha8j.png",
+    "image_bytes": 975859,
+    "video_url": "https://v3b.fal.media/files/b/0aa34a73/wCuLCj4HVRxNx-5nb9vjX_szPyonP3.mp4",
+    "video_bytes": 5905842,
+    "video_request_seconds": 5
+  }
+}

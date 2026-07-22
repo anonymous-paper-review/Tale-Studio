@@ -1,0 +1,128 @@
+[
+  {
+    "shot_id": "shot_1",
+    "seed": 12345,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. Extreme close-up of a polished cream tile floor in a laundromat at night. A sharp, bright white reflection of a long fluorescent light tube stretches diagonally across the frame. The surface is pristine and cold. Cinematic lighting, photorealistic texture, 8k resolution.",
+    "motion_prompt": "Static shot with a very subtle flicker in the bright fluorescent reflection on the tile floor."
+  },
+  {
+    "shot_id": "shot_2",
+    "seed": 12346,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. Extreme close-up of a mint green metallic washing machine panel. The paint has a subtle industrial texture and a soft sheen. A sliver of chrome trim is visible on the edge. Clean, minimalist aesthetic, cinematic macro photography.",
+    "motion_prompt": "Completely static macro shot focusing on the mint green metallic texture and soft light. Match-on-action continuity: the subject's movement picks up seamlessly from the previous shot's ending motion, now seen from this new angle and shot size."
+  },
+  {
+    "shot_id": "shot_3",
+    "seed": 12347,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. Close-up of a glass entrance door looking out from a brightly lit laundromat into the pitch-black night. Outside, a deserted street is barely visible under a single dim streetlamp. The glass shows sharp reflections of interior fluorescent tubes. Nocturnal atmosphere, urban loneliness.",
+    "motion_prompt": "Static shot with faint dust motes dancing in the light against the dark exterior window. Match-on-action continuity: the subject's movement picks up seamlessly from the previous shot's ending motion, now seen from this new angle and shot size."
+  },
+  {
+    "shot_id": "shot_4",
+    "seed": 12348,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. Extreme wide shot of a symmetrical coin laundromat at 2 AM. Rows of mint green washing machines line both sides of the frame in perfect perspective. The floor is cream tile, reflecting the bright fluorescent lights from the ceiling. A few red plastic chairs are neatly placed. The space is completely empty and unnervingly quiet.",
+    "motion_prompt": "Static shot of the empty, brightly lit laundromat, maintaining a heavy, motionless silence."
+  },
+  {
+    "shot_id": "shot_5",
+    "seed": 70723,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A young woman in her early twenties with a black bob haircut, wearing a cream knit sweater, denim skirt, white socks and white sneakers. Full shot of the laundromat entrance. A young woman with short black hair, wearing a cream knit sweater and denim skirt, stands at the glass door. She holds a white laundry basket. She is pushing the glass door open, stepping from the dark night outside into the bright, clinical mint-colored interior.",
+    "motion_prompt": "The girl pushes the glass door open and walks into the laundromat, holding her basket."
+  },
+  {
+    "shot_id": "shot_6",
+    "seed": 70723,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A young woman in her early twenties with a black bob haircut, wearing a cream knit sweater, denim skirt, white socks and white sneakers. Cinematic medium shot of a young woman with a black bob, wearing a cream sweater, standing in a quiet laundromat at night. She is positioned next to a mint-green washing machine with the door open. The lighting is soft and top-down, creating a peaceful, nocturnal mood. The background shows a row of machines in soft focus.",
+    "motion_prompt": "The girl picks up a piece of white clothing and places it inside the machine."
+  },
+  {
+    "shot_id": "shot_7",
+    "seed": 12351,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. Close-up shot looking into the dark, metallic drum of a washing machine. The silver surface reflects faint light. The rim of the machine is visible at the edges. The space is empty, waiting for the fabric to fall.",
+    "motion_prompt": "A white cotton shirt falls from the top and lands softly inside the drum. Match-on-action continuity: the subject's movement picks up seamlessly from the previous shot's ending motion, now seen from this new angle and shot size."
+  },
+  {
+    "shot_id": "shot_8",
+    "seed": 70723,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A young woman in her early twenties with a black bob haircut, wearing a cream knit sweater, denim skirt, white socks and white sneakers. Extreme close-up of a young woman's hand holding a silver coin near a vertical coin slot on a mint-green washing machine. The lighting is soft, highlighting the texture of the skin and the metallic edge of the slot. The background is a soft-focus mint green.",
+    "motion_prompt": "The fingers slowly push the silver coin into the narrow slot."
+  },
+  {
+    "shot_id": "shot_9",
+    "seed": 70723,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A young woman in her early twenties with a black bob haircut, wearing a cream knit sweater, denim skirt, white socks and white sneakers. Medium close-up of a washing machine's control panel. A finger is poised just above a round plastic button. The panel is mint-green with black text. The lighting is clinical but soft, typical of a late-night laundromat.",
+    "motion_prompt": "The finger presses the button, and a red light illuminates on the panel. Match-on-action continuity: the subject's movement picks up seamlessly from the previous shot's ending motion, now seen from this new angle and shot size."
+  },
+  {
+    "shot_id": "shot_10",
+    "seed": 70723,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A young woman in her early twenties with a black bob haircut, wearing a cream knit sweater, denim skirt, white socks and white sneakers. Wide shot of a symmetrical laundromat at 2 AM. A young woman sits alone on a bright red plastic chair in the center of the frame. Rows of mint-green washing machines line the walls. The floor is made of cream-colored tiles. The lighting is warm and overhead, casting soft shadows.",
+    "motion_prompt": "The camera drifts slightly as the girl gently swings her legs while sitting."
+  },
+  {
+    "shot_id": "shot_11",
+    "seed": 70723,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A young woman in her early twenties with a black bob haircut, wearing a cream knit sweater, denim skirt, white socks and white sneakers. Close-up low angle shot of a girl's feet dangling from a chair. She is wearing white socks and white sneakers. The feet are positioned above a cream-tiled floor. The legs of a red chair are visible at the top of the frame.",
+    "motion_prompt": "The white sneakers swing rhythmically back and forth in the air. Match-on-action continuity: the subject's movement picks up seamlessly from the previous shot's ending motion, now seen from this new angle and shot size."
+  },
+  {
+    "shot_id": "shot_12",
+    "seed": 12356,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. Extreme close-up, top-down view of a single silver coin lying on a cream-colored tile floor. A soft shadow from a chair leg falls across one corner of the frame. The scene is perfectly still and quiet.",
+    "motion_prompt": "The shot remains completely static, capturing the absolute stillness of the coin. Match-on-action continuity: the subject's movement picks up seamlessly from the previous shot's ending motion, now seen from this new angle and shot size."
+  },
+  {
+    "shot_id": "shot_13",
+    "seed": 70723,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A young woman in her early twenties with a black bob haircut, wearing a cream knit sweater, denim skirt, white socks and white sneakers. A cinematic medium shot of a young girl with short black hair wearing a cream knit sweater, rising from a red plastic chair in a quiet, nocturnal laundromat. She leans her face toward a mint-colored washing machine. Soft top-down lighting creates a moody atmosphere with slate blue shadows and warm amber highlights.",
+    "motion_prompt": "The girl slowly leans her face closer to the washing machine window."
+  },
+  {
+    "shot_id": "shot_14",
+    "seed": 12358,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A close-up POV shot of the circular glass window of a washing machine. Inside, thick white soapy bubbles and water are swirling rhythmically. The lighting is warm and internal, making the foam glisten against the dark metallic drum. Cinematic textures of water and suds.",
+    "motion_prompt": "The soapy bubbles and water swirl continuously in a circular motion. Match-on-action continuity: the subject's movement picks up seamlessly from the previous shot's ending motion, now seen from this new angle and shot size."
+  },
+  {
+    "shot_id": "shot_15",
+    "seed": 70723,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A young woman in her early twenties with a black bob haircut, wearing a cream knit sweater, denim skirt, white socks and white sneakers. A medium close-up of a young girl's face, her forehead gently pressed against the washing machine glass. Her eyes are filled with quiet wonder. Flickering amber light from the rotating bubbles reflects across her cheek and eyes. The background is a soft-focus, dark laundromat.",
+    "motion_prompt": "The girl blinks slowly as amber light reflections flicker across her face. Match-on-action continuity: the subject's movement picks up seamlessly from the previous shot's ending motion, now seen from this new angle and shot size."
+  },
+  {
+    "shot_id": "shot_16",
+    "seed": 70723,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A young woman in her early twenties with a black bob haircut, wearing a cream knit sweater, denim skirt, white socks and white sneakers. A medium full shot from a low angle of a young girl in a laundromat. She has just opened the mint-colored washing machine door and is pulling out a large, fluffy bundle of warm white laundry. The scene is lit with warm overhead light, casting a cozy glow on the cream tiles.",
+    "motion_prompt": "The girl pulls a bundle of warm laundry out of the machine and hugs it."
+  },
+  {
+    "shot_id": "shot_17",
+    "seed": 70723,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A young woman in her early twenties with a black bob haircut, wearing a cream knit sweater, denim skirt, white socks and white sneakers. A tight close-up of a girl's arms and chest as she tightly embraces a bundle of warm, fluffy white towels. The texture of her cream knit sweater blends with the laundry. Her hands are buried in the soft fabric. The lighting is warm and gentle, creating a sense of total peace.",
+    "motion_prompt": "The girl's hands gently squeeze the soft, warm laundry against her chest. Match-on-action continuity: the subject's movement picks up seamlessly from the previous shot's ending motion, now seen from this new angle and shot size."
+  },
+  {
+    "shot_id": "shot_18",
+    "seed": 70723,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A young woman in her early twenties with a black bob haircut, wearing a cream knit sweater, denim skirt, white socks and white sneakers. Cinematic full shot from behind. A girl with a black bob, wearing a cream knit sweater and denim skirt, walks away from the camera toward the glass exit door of a laundromat. She carries a laundry basket filled with clothes. The laundromat features rows of mint-colored washing machines and cream-tiled floors. Soft, warm fluorescent lighting creates a peaceful, nocturnal atmosphere.",
+    "motion_prompt": "The girl walks slowly toward the exit door, her footsteps steady in the silence."
+  },
+  {
+    "shot_id": "shot_19",
+    "seed": 70723,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. A young woman in her early twenties with a black bob haircut, wearing a cream knit sweater, denim skirt, white socks and white sneakers. Medium close-up of a girl's hand reaching out to push a glass exit door. The reflection of the warm laundromat interior is visible on the glass surface. Outside the door is a dark, quiet night. The lighting is focused on the hand, highlighting the texture of the skin against the cold glass.",
+    "motion_prompt": "The hand pushes the glass door open smoothly, revealing the darkness outside. Match-on-action continuity: the subject's movement picks up seamlessly from the previous shot's ending motion, now seen from this new angle and shot size."
+  },
+  {
+    "shot_id": "shot_20",
+    "seed": 12364,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. Close-up of an empty red plastic chair in a laundromat. The seat has a slight indentation, suggesting someone was recently sitting there. The background is a soft blur of mint-green washing machines and cream tiles. The lighting is gentle, casting a warm glow on the red plastic.",
+    "motion_prompt": "A perfectly still shot of the empty red chair, emphasizing the silence. Match-on-action continuity: the subject's movement picks up seamlessly from the previous shot's ending motion, now seen from this new angle and shot size."
+  },
+  {
+    "shot_id": "shot_21",
+    "seed": 12365,
+    "first_frame_prompt": "Retro late-night coin laundromat interior: rows of mint-green washing machines with round glass doors, cherry-red plastic chairs, cream tile floor, warm fluorescent lighting, symmetrical planimetric composition, cinematic photorealism. Extreme wide shot of a symmetrical, empty coin laundromat at 2 AM. Rows of mint-green washing machines line the walls. Red plastic chairs stand empty. The floor is clean and reflects the overhead warm fluorescent lights. The glass door is closed, showing the dark night outside. The scene is perfectly still and quiet.",
+    "motion_prompt": "A still, wide shot of the empty laundromat, capturing the absolute quiet."
+  }
+]
