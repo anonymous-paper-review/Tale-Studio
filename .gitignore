@@ -55,8 +55,11 @@ PROGRESS.md
 BUGS.md
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
-docs/internal/
-docs/research/
+# docs/ 전체 로컬 전용(내부 노트) — 공개 repo 미추적. legacy는 로컬에서도 삭제함
+docs/
+
+# supabase CLI 로컬 상태(project-ref·버전 등) — 추적 금지
+supabase/.temp/
 
 # Experimental/debug scripts
 scripts/

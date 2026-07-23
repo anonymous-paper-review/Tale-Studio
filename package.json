@@ -16,7 +16,6 @@
     "seed:producer:reset": "node scripts/producer-seed.mjs reset",
     "seed:producer:prune": "node scripts/producer-seed.mjs prune",
     "seed:producer:status": "node scripts/producer-seed.mjs status",
-    "e2e:db": "node e2e/harness.mjs",
     "reset:producer": "node scripts/reset-to-producer.mjs",
     "backfill:native-i18n": "node scripts/backfill-native-i18n.mjs"
   },

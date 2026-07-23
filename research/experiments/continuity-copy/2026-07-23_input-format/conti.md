@@ -21,12 +21,12 @@
 
 | # | 길이 | 시작 | 중간 | 끝 | 내용 |
 |---|---|---|---|---|---|
-| **1** | 5.53초 (홀드) | <img src="assets/conti/s1_start.jpg" width="150"> | <img src="assets/conti/s1_mid.jpg" width="150"> | <img src="assets/conti/s1_end.jpg" width="150"> | 둥근 거울 정면. 립글로스를 천천히 입술로 가져가 바른다. 손과 입술만 움직임 |
-| **2** | 3.43초 | <img src="assets/conti/s2_start.jpg" width="150"> | <img src="assets/conti/s2_mid.jpg" width="150"> | <img src="assets/conti/s2_end.jpg" width="150"> | **같은 동작을 옆모습으로 이어받음**(앵글 점프). 프로필로 계속 바른다 |
-| **3** | 1.44초 | <img src="assets/conti/s3_start.jpg" width="150"> | <img src="assets/conti/s3_mid.jpg" width="150"> | <img src="assets/conti/s3_end.jpg" width="150"> | **마스터 와이드 쉼표** — 대칭 전경, 소녀가 중앙에 작게. 거의 정지 |
-| **4** | 3.30초 | <img src="assets/conti/s4_start.jpg" width="150"> | <img src="assets/conti/s4_mid.jpg" width="150"> | <img src="assets/conti/s4_end.jpg" width="150"> | 뒤통수 너머 거울 반사 — 거울 확인 동작을 세 번째 앵글로 이어받음. 고개 미세 회전 |
-| **5** | 3.63초 | <img src="assets/conti/s5_start.jpg" width="150"> | <img src="assets/conti/s5_mid.jpg" width="150"> | <img src="assets/conti/s5_end.jpg" width="150"> | **사건 전환** — 세면대 안에서 올려다본 시점. 얼굴이 세면대를 내려다보며 다가옴 |
-| **6** | 1.57초 | <img src="assets/conti/s6_start.jpg" width="150"> | <img src="assets/conti/s6_mid.jpg" width="150"> | <img src="assets/conti/s6_end.jpg" width="150"> | **인서트 쉼표** — 주황 세면대 배수구 클로즈업. 인물 없음, 완전 정지 |
+| **1** | 5.53초 (홀드) | ![|150](assets/conti/s1_start.jpg) | ![|150](assets/conti/s1_mid.jpg) | ![|150](assets/conti/s1_end.jpg) | 둥근 거울 정면. 립글로스를 천천히 입술로 가져가 바른다. 손과 입술만 움직임 |
+| **2** | 3.43초 | ![|150](assets/conti/s2_start.jpg) | ![|150](assets/conti/s2_mid.jpg) | ![|150](assets/conti/s2_end.jpg) | **같은 동작을 옆모습으로 이어받음**(앵글 점프). 프로필로 계속 바른다 |
+| **3** | 1.44초 | ![|150](assets/conti/s3_start.jpg) | ![|150](assets/conti/s3_mid.jpg) | ![|150](assets/conti/s3_end.jpg) | **마스터 와이드 쉼표** — 대칭 전경, 소녀가 중앙에 작게. 거의 정지 |
+| **4** | 3.30초 | ![|150](assets/conti/s4_start.jpg) | ![|150](assets/conti/s4_mid.jpg) | ![|150](assets/conti/s4_end.jpg) | 뒤통수 너머 거울 반사 — 거울 확인 동작을 세 번째 앵글로 이어받음. 고개 미세 회전 |
+| **5** | 3.63초 | ![|150](assets/conti/s5_start.jpg) | ![|150](assets/conti/s5_mid.jpg) | ![|150](assets/conti/s5_end.jpg) | **사건 전환** — 세면대 안에서 올려다본 시점. 얼굴이 세면대를 내려다보며 다가옴 |
+| **6** | 1.57초 | ![|150](assets/conti/s6_start.jpg) | ![|150](assets/conti/s6_mid.jpg) | ![|150](assets/conti/s6_end.jpg) | **인서트 쉼표** — 주황 세면대 배수구 클로즈업. 인물 없음, 완전 정지 |
 
 ## 2. 샷 사이의 연결 (이 콘티가 연속으로 읽히는 이유)
 
