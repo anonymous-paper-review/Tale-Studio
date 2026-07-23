@@ -13,6 +13,7 @@ import {
   normalizeSceneDialogue,
   runDialogue,
 } from '@/lib/writer/pipeline/stages/dialogue'
+import { normalizeWriterTab } from '@/stores/writer-ui-store'
 import type { PipelineLogger } from '@/lib/writer/logger'
 import type {
   Characters,
@@ -108,6 +109,14 @@ const PROFILES_RESPONSE = {
 
 beforeEach(() => {
   generateJsonMock.mockReset()
+})
+
+describe('normalizeWriterTab — 대사탭 활성화 회귀 가드', () => {
+  it("'dialogue'가 유효 탭으로 통과한다 (준비 중 시절 가드 잔존 시 탭 클릭 무시 사고)", () => {
+    expect(normalizeWriterTab('dialogue')).toBe('dialogue')
+    expect(normalizeWriterTab('script')).toBe('script')
+    expect(normalizeWriterTab('unknown')).toBe('storyboard')
+  })
 })
 
 describe('normalizeSceneDialogue — 샷 집합 계약', () => {

@@ -11,7 +11,11 @@ interface WriterUiState {
 }
 
 export function normalizeWriterTab(value: unknown): WriterTab {
-  return value === 'storyboard' || value === 'script' ? value : 'storyboard'
+  // 'dialogue'는 #dialogue-v4(2026-07-23)에서 활성화 — "준비 중" 시절 가드에 남아있으면
+  //   setActiveTab이 대사탭 클릭을 조용히 무시한다(탭 전환 불가 실사고).
+  return value === 'storyboard' || value === 'script' || value === 'dialogue'
+    ? value
+    : 'storyboard'
 }
 
 export const useWriterUiStore = create<WriterUiState>()(
