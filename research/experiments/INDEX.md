@@ -71,13 +71,13 @@
 |---|---|---|---|
 | [laundromat-proto](continuity-copy/2026-07-23_laundromat-proto/result.md) | E9d-proto | ✅ | 제작 완료 (07-23) — 오너 평가: 클러스터 구조는 맞으나 연속감 미달·불필요 샷·카메라/시선 불안정 → E9d-copy로 전환 |
 | [character-canon](continuity-copy/2026-07-23_character-canon/notes.md) | E9d-copy (캐릭터) | ✅ | 텍스트 후보 4종 폐기, 레퍼런스 정면 1장 정본 확정, 신원 전파 2컷 성공 |
-| [input-format](continuity-copy/2026-07-23_input-format/conti.md) | E9d-copy (설계도) | 🟠 | 설계도 완성 — **오너 검토 대기** (07-23): 콘티(6샷 18.9초) + 방식 4종 설계도. 승인 시 생성 착수 |
+| [input-format](continuity-copy/2026-07-23_input-format/notes.md) | E9d-copy (설계도) | 🟠 | 입력 스테이징 완료 (07-23): 5팔(A·B1·B2·C·R) 이미지 38장 + I2V 페이로드 준비. 남은 것: I2V 모델 스크리닝(§4-가) → 영상 생성 |
 
 ## 2. 판정 대기 목록 (2026-07-23 기준)
 
 - **E8b [palette-conformance](visual-wiring/2026-07-22_palette-conformance/result.md)** — v1 색·조명 배선 복원 vs 제거. 이탈 0% 기준 통과, 지표 변별력 낮음.
 - **E13b [merge-formal](stage-merge/2026-07-22_merge-formal/result.md)** — S1+S3 병합 채택 상신 (사전 기준 4/4 통과).
-- **입력 포맷 실험 [input-format](continuity-copy/2026-07-23_input-format/conti.md)** — 설계도 4종 + 콘티, 오너 검토 후 생성 착수.
+- **입력 포맷 실험 [input-format](continuity-copy/2026-07-23_input-format/notes.md)** — 이미지 계층 스테이징 완료, I2V 실행(모델 스크리닝 포함) 승인 대기.
 - **E0c 모호 입력 의도파악 프로브** — 제안(카드만), 실행 여부 오너 판정 대기 (폴더 미생성).
 
 (참고: E9c [model-tier](scene-shot-authoring/2026-07-22_model-tier/result.md)도 권고+판정 보류 상태.)

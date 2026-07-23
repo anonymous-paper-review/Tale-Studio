@@ -14,19 +14,38 @@
 사례라, 자르지 않고 그대로 포함했다. 뒤이어 세면대 사건 시작(5번)과 배수구 인서트(6번)까지 물면
 문법 요소(홀드·클러스터·마스터·사건 전환·인서트)가 전부 이 한 구간에 들어온다.
 
-## 1. 콘티표 — 6샷 (원본 시작/중간/끝 프레임)
+## 1. 콘티 — 6샷 (원본 시작/중간/끝 프레임)
 
 **이 구간의 카메라는 6샷 전부 고정(무브 없음)이다.** 화면의 모든 움직임은 인물의 동작이 만든다 —
 그래서 "AI가 멋대로 카메라를 움직였는가"를 판별하기 가장 좋은 구간이다.
 
-| # | 길이 | 시작 | 중간 | 끝 | 내용 |
-|---|---|---|---|---|---|
-| **1** | 5.53초 (홀드) | ![|150](assets/conti/s1_start.jpg) | ![|150](assets/conti/s1_mid.jpg) | ![|150](assets/conti/s1_end.jpg) | 둥근 거울 정면. 립글로스를 천천히 입술로 가져가 바른다. 손과 입술만 움직임 |
-| **2** | 3.43초 | ![|150](assets/conti/s2_start.jpg) | ![|150](assets/conti/s2_mid.jpg) | ![|150](assets/conti/s2_end.jpg) | **같은 동작을 옆모습으로 이어받음**(앵글 점프). 프로필로 계속 바른다 |
-| **3** | 1.44초 | ![|150](assets/conti/s3_start.jpg) | ![|150](assets/conti/s3_mid.jpg) | ![|150](assets/conti/s3_end.jpg) | **마스터 와이드 쉼표** — 대칭 전경, 소녀가 중앙에 작게. 거의 정지 |
-| **4** | 3.30초 | ![|150](assets/conti/s4_start.jpg) | ![|150](assets/conti/s4_mid.jpg) | ![|150](assets/conti/s4_end.jpg) | 뒤통수 너머 거울 반사 — 거울 확인 동작을 세 번째 앵글로 이어받음. 고개 미세 회전 |
-| **5** | 3.63초 | ![|150](assets/conti/s5_start.jpg) | ![|150](assets/conti/s5_mid.jpg) | ![|150](assets/conti/s5_end.jpg) | **사건 전환** — 세면대 안에서 올려다본 시점. 얼굴이 세면대를 내려다보며 다가옴 |
-| **6** | 1.57초 | ![|150](assets/conti/s6_start.jpg) | ![|150](assets/conti/s6_mid.jpg) | ![|150](assets/conti/s6_end.jpg) | **인서트 쉼표** — 주황 세면대 배수구 클로즈업. 인물 없음, 완전 정지 |
+> **읽는 법**: 세 프레임 중 실제 영상 모델 입력으로 쓰이는 건 **시작**(A안)·**시작+끝**(B1·B2·C·R)뿐이다. **중간 프레임은 입력이 아니라 원본 동작 궤적을 눈으로 대조하는 리뷰용 참고 이미지**다(정량평가도 시작/끝 프레임만 사용 — design.md §5-3·4).
+
+아래 각 샷의 이미지 줄은 왼쪽부터 **시작 · 중간 · 끝** 순서다. 표시용은 300px 썸네일(`assets/conti/thumbs/`)이고, 전체 해상도 원본(1280×720, 입력·R대조군용)은 `assets/conti/`에 그대로 있다. (Orca가 표 셀 안 이미지·HTML·`|width` 폭 지정을 안 먹어, 표 대신 샷별 블록 + 실물 썸네일로 배치했다 — 옵시디언·GitHub·VS Code에서도 동일하게 보인다.)
+
+**샷 1 · 5.53초 (홀드)** — 둥근 거울 정면. 립글로스를 천천히 입술로 가져가 바른다. 손과 입술만 움직임.
+
+![](assets/conti/thumbs/s1_start.jpg) ![](assets/conti/thumbs/s1_mid.jpg) ![](assets/conti/thumbs/s1_end.jpg)
+
+**샷 2 · 3.43초** — **같은 동작을 옆모습으로 이어받음**(앵글 점프). 프로필로 계속 바른다.
+
+![](assets/conti/thumbs/s2_start.jpg) ![](assets/conti/thumbs/s2_mid.jpg) ![](assets/conti/thumbs/s2_end.jpg)
+
+**샷 3 · 1.44초** — **마스터 와이드 쉼표**. 대칭 전경, 소녀가 중앙에 작게. 거의 정지.
+
+![](assets/conti/thumbs/s3_start.jpg) ![](assets/conti/thumbs/s3_mid.jpg) ![](assets/conti/thumbs/s3_end.jpg)
+
+**샷 4 · 3.30초** — 뒤통수 너머 거울 반사. 거울 확인 동작을 세 번째 앵글로 이어받음. 고개 미세 회전.
+
+![](assets/conti/thumbs/s4_start.jpg) ![](assets/conti/thumbs/s4_mid.jpg) ![](assets/conti/thumbs/s4_end.jpg)
+
+**샷 5 · 3.63초** — **사건 전환**. 세면대 안에서 올려다본 시점. 얼굴이 세면대를 내려다보며 다가옴.
+
+![](assets/conti/thumbs/s5_start.jpg) ![](assets/conti/thumbs/s5_mid.jpg) ![](assets/conti/thumbs/s5_end.jpg)
+
+**샷 6 · 1.57초** — **인서트 쉼표**. 주황 세면대 배수구 클로즈업. 인물 없음, 완전 정지.
+
+![](assets/conti/thumbs/s6_start.jpg) ![](assets/conti/thumbs/s6_mid.jpg) ![](assets/conti/thumbs/s6_end.jpg)
 
 ## 2. 샷 사이의 연결 (이 콘티가 연속으로 읽히는 이유)
 

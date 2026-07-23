@@ -1,0 +1,387 @@
+{
+  "experiment": "continuity-copy/2026-07-23_input-format",
+  "staged_at": "2026-07-23T05:56:45.858Z",
+  "model_requirements": {
+    "a": [
+      "strict I2V: 픽셀 단위 첫 프레임 고정 (참조형 금지)"
+    ],
+    "b1": [
+      "strict I2V + start_image/end_image 동시 입력 (Seedance 계열 등 — 선행 스크리닝 §4-가에서 확정)"
+    ],
+    "b2_alpha": [
+      "b1과 동일"
+    ],
+    "b2_beta": [
+      "시트 통째 입력 해석 가능 모델 — 오작동 여부만 기록, 판정 제외 (blueprint-b2 v2)"
+    ],
+    "c": [
+      "b1과 동일 + 순차 실행 (체인 샷은 앞 클립 완료 후 시작 프레임 제작)"
+    ],
+    "r": [
+      "b1과 동일 (원본 프레임 직접 입력 — 상한선)"
+    ]
+  },
+  "common": {
+    "bible": "Continuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.",
+    "negative": "Never: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark.",
+    "seed_policy": "가능한 모델이면 시드 고정 (시리즈 일관성, design.md §8-3)"
+  },
+  "arms": {
+    "a": {
+      "label": "A — 자산+연출 텍스트 (끝 프레임 없음)",
+      "shots": [
+        {
+          "shot": 1,
+          "duration_s": 5.53,
+          "duration_hint_int": 6,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-a/frames/s1_start.jpg",
+          "video_prompt": "She slowly applies lip gloss; only her hand and lips move. Camera locked, no movement. Ending state: Same scene, same locked camera as the start frame. End state: the gloss wand touches her lips, her chin tilted slightly up, lips freshly glossed.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 2,
+          "duration_s": 3.43,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-a/frames/s2_start.jpg",
+          "video_prompt": "She keeps applying gloss in profile; tiny head adjustments only. Camera locked. Ending state: Same profile framing. End state: wand lowered a few centimeters from her lips, her eyes checking the mirror.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 3,
+          "duration_s": 1.44,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-a/frames/s3_start.jpg",
+          "video_prompt": "She stands almost still, slight weight shift. Camera locked. Ending state: Same wide master framing. End state: nearly identical, her weight shifted to the other leg.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 4,
+          "duration_s": 3.3,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-a/frames/s4_start.jpg",
+          "video_prompt": "She studies herself in the mirror, head turns a few degrees. Camera locked. Ending state: Same over-the-shoulder framing. End state: her head turned a few degrees, eyes meeting her own reflection.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 5,
+          "duration_s": 3.63,
+          "duration_hint_int": 4,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-a/frames/s5_start.jpg",
+          "video_prompt": "She leans a little closer over the sink, eyes scanning downward. Camera locked. Ending state: Same top-down sink POV. End state: her face a little closer to the rim, gaze fixed downward.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 6,
+          "duration_s": 1.57,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-a/frames/s6_start.jpg",
+          "video_prompt": "Static insert; faint light shimmer only. Camera locked. Ending state: Same macro framing of the drain, unchanged (static insert). The basin stays dry and empty — no water, no running faucet, nothing added.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        }
+      ]
+    },
+    "b1": {
+      "label": "B1 — 시작+끝 프레임 쌍",
+      "shots": [
+        {
+          "shot": 1,
+          "duration_s": 5.53,
+          "duration_hint_int": 6,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b1/frames/s1_start.jpg",
+          "end_image": "assets/arm-b1/frames/s1_end.jpg",
+          "video_prompt": "She applies the gloss from start pose to end pose. Ending state: Same scene, same locked camera as the start frame. End state: the gloss wand touches her lips, her chin tilted slightly up, lips freshly glossed.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 2,
+          "duration_s": 3.43,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b1/frames/s2_start.jpg",
+          "end_image": "assets/arm-b1/frames/s2_end.jpg",
+          "video_prompt": "She finishes the stroke and lowers the wand slightly. Ending state: Same profile framing. End state: wand lowered a few centimeters from her lips, her eyes checking the mirror.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 3,
+          "duration_s": 1.44,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b1/frames/s3_start.jpg",
+          "end_image": "assets/arm-b1/frames/s3_end.jpg",
+          "video_prompt": "She stands almost still. Ending state: Same wide master framing. End state: nearly identical, her weight shifted to the other leg.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 4,
+          "duration_s": 3.3,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b1/frames/s4_start.jpg",
+          "end_image": "assets/arm-b1/frames/s4_end.jpg",
+          "video_prompt": "Her head turns slightly toward the mirror. Ending state: Same over-the-shoulder framing. End state: her head turned a few degrees, eyes meeting her own reflection.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 5,
+          "duration_s": 3.63,
+          "duration_hint_int": 4,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b1/frames/s5_start.jpg",
+          "end_image": "assets/arm-b1/frames/s5_end.jpg",
+          "video_prompt": "She leans in slowly over the sink. Ending state: Same top-down sink POV. End state: her face a little closer to the rim, gaze fixed downward.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 6,
+          "duration_s": 1.57,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b1/frames/s6_start.jpg",
+          "end_image": "assets/arm-b1/frames/s6_end.jpg",
+          "video_prompt": "Static shot, faint shimmer. Ending state: Same macro framing of the drain, unchanged (static insert). The basin stays dry and empty — no water, no running faucet, nothing added.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        }
+      ]
+    },
+    "b2": {
+      "label": "B2 — 콘티 시트 셀 수확 → 시작+끝 (v2)",
+      "shots": [
+        {
+          "shot": 1,
+          "duration_s": 5.53,
+          "duration_hint_int": 6,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b2/frames/s1_start.jpg",
+          "end_image": "assets/arm-b2/frames/s1_end.jpg",
+          "video_prompt": "She applies the gloss from start pose to end pose. Ending state: Same scene, same locked camera as the start frame. End state: the gloss wand touches her lips, her chin tilted slightly up, lips freshly glossed.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 2,
+          "duration_s": 3.43,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b2/frames/s2_start.jpg",
+          "end_image": "assets/arm-b2/frames/s2_end.jpg",
+          "video_prompt": "She finishes the stroke and lowers the wand slightly. Ending state: Same profile framing. End state: wand lowered a few centimeters from her lips, her eyes checking the mirror.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 3,
+          "duration_s": 1.44,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b2/frames/s3_start.jpg",
+          "end_image": "assets/arm-b2/frames/s3_end.jpg",
+          "video_prompt": "She stands almost still. Ending state: Same wide master framing. End state: nearly identical, her weight shifted to the other leg.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 4,
+          "duration_s": 3.3,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b2/frames/s4_start.jpg",
+          "end_image": "assets/arm-b2/frames/s4_end.jpg",
+          "video_prompt": "Her head turns slightly toward the mirror. Ending state: Same over-the-shoulder framing. End state: her head turned a few degrees, eyes meeting her own reflection.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 5,
+          "duration_s": 3.63,
+          "duration_hint_int": 4,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b2/frames/s5_start.jpg",
+          "end_image": "assets/arm-b2/frames/s5_end.jpg",
+          "video_prompt": "She leans in slowly over the sink. Ending state: Same top-down sink POV. End state: her face a little closer to the rim, gaze fixed downward.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 6,
+          "duration_s": 1.57,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b2/frames/s6_start.jpg",
+          "end_image": "assets/arm-b2/frames/s6_end.jpg",
+          "video_prompt": "Static shot, faint shimmer. Ending state: Same macro framing of the drain, unchanged (static insert). The basin stays dry and empty — no water, no running faucet, nothing added.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        }
+      ],
+      "beta": {
+        "label": "B2β — 시트 통째 입력 (원안, 1회 시도·판정 제외)",
+        "sheet_image": "assets/arm-b2/beta_sheet.jpg",
+        "per_shot_prompt": "Follow row \"SHOT N\" of the reference sheet exactly: start from the left image, end at the right image, duration and camera as written. Do not show the sheet itself.",
+        "full_prompt": "Create the full sequence: each row is one shot, in order, with the written durations. Cut between shots. Do not show the sheet itself."
+      }
+    },
+    "c": {
+      "label": "C — 클러스터 체이닝 (1→2, 4→5, 5→6)",
+      "execution": "sequential",
+      "shots": [
+        {
+          "shot": 1,
+          "duration_s": 5.53,
+          "duration_hint_int": 6,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b1/frames/s1_start.jpg",
+          "end_image": "assets/arm-b1/frames/s1_end.jpg",
+          "video_prompt": "She applies the gloss from start pose to end pose. Ending state: Same scene, same locked camera as the start frame. End state: the gloss wand touches her lips, her chin tilted slightly up, lips freshly glossed.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 2,
+          "duration_s": 3.43,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": null,
+          "end_image": "assets/arm-b1/frames/s2_end.jpg",
+          "video_prompt": "She finishes the stroke and lowers the wand slightly. Ending state: Same profile framing. End state: wand lowered a few centimeters from her lips, her eyes checking the mirror.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark.",
+          "chain": {
+            "note": "시작 프레임은 사전 생성 불가 — 앞 샷 클립의 실제 마지막 프레임에서 영상 단계에 만든다.",
+            "from_shot_clip": 1,
+            "steps": [
+              "ffmpeg으로 clip 1의 마지막 프레임 추출",
+              "편집 모델(openai/gpt-image-2/edit)에 [추출 프레임, 캐릭터 정본] + chain_prompt → 이 샷의 시작 프레임"
+            ],
+            "chain_prompt": "Continue this exact moment: the same woman, same wand position at her lips, but seen from a left side profile at the counter. Same lighting, same room.",
+            "identity_ref": "../2026-07-23_character-canon/assets/identity_ref.jpg"
+          }
+        },
+        {
+          "shot": 3,
+          "duration_s": 1.44,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b1/frames/s3_start.jpg",
+          "end_image": "assets/arm-b1/frames/s3_end.jpg",
+          "video_prompt": "She stands almost still. Ending state: Same wide master framing. End state: nearly identical, her weight shifted to the other leg.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 4,
+          "duration_s": 3.3,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/arm-b1/frames/s4_start.jpg",
+          "end_image": "assets/arm-b1/frames/s4_end.jpg",
+          "video_prompt": "Her head turns slightly toward the mirror. Ending state: Same over-the-shoulder framing. End state: her head turned a few degrees, eyes meeting her own reflection.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 5,
+          "duration_s": 3.63,
+          "duration_hint_int": 4,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": null,
+          "end_image": "assets/arm-b1/frames/s5_end.jpg",
+          "video_prompt": "She leans in slowly over the sink. Ending state: Same top-down sink POV. End state: her face a little closer to the rim, gaze fixed downward.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark.",
+          "chain": {
+            "note": "시작 프레임은 사전 생성 불가 — 앞 샷 클립의 실제 마지막 프레임에서 영상 단계에 만든다.",
+            "from_shot_clip": 4,
+            "steps": [
+              "ffmpeg으로 clip 4의 마지막 프레임 추출",
+              "편집 모델(openai/gpt-image-2/edit)에 [추출 프레임, 캐릭터 정본] + chain_prompt → 이 샷의 시작 프레임"
+            ],
+            "chain_prompt": "The next instant: her gaze drops from the mirror to the sink below — now seen from inside the sink looking up at her face over the orange rim.",
+            "identity_ref": "../2026-07-23_character-canon/assets/identity_ref.jpg"
+          }
+        },
+        {
+          "shot": 6,
+          "duration_s": 1.57,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": null,
+          "end_image": "assets/arm-b1/frames/s6_end.jpg",
+          "video_prompt": "Static shot, faint shimmer. Ending state: Same macro framing of the drain, unchanged (static insert). The basin stays dry and empty — no water, no running faucet, nothing added.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark.",
+          "chain": {
+            "note": "시작 프레임은 사전 생성 불가 — 앞 샷 클립의 실제 마지막 프레임에서 영상 단계에 만든다.",
+            "from_shot_clip": 5,
+            "steps": [
+              "ffmpeg으로 clip 5의 마지막 프레임 추출",
+              "편집 모델(openai/gpt-image-2/edit)에 [추출 프레임, 캐릭터 정본] + chain_prompt → 이 샷의 시작 프레임"
+            ],
+            "chain_prompt": "What she is looking at: extreme close-up of the same orange basin and chrome drain, no person.",
+            "identity_ref": "../2026-07-23_character-canon/assets/identity_ref.jpg"
+          }
+        }
+      ]
+    },
+    "r": {
+      "label": "R — 상한 대조군 (원본 프레임)",
+      "shots": [
+        {
+          "shot": 1,
+          "duration_s": 5.53,
+          "duration_hint_int": 6,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/conti/s1_start.jpg",
+          "end_image": "assets/conti/s1_end.jpg",
+          "video_prompt": "She applies the gloss from start pose to end pose. Ending state: Same scene, same locked camera as the start frame. End state: the gloss wand touches her lips, her chin tilted slightly up, lips freshly glossed.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 2,
+          "duration_s": 3.43,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/conti/s2_start.jpg",
+          "end_image": "assets/conti/s2_end.jpg",
+          "video_prompt": "She finishes the stroke and lowers the wand slightly. Ending state: Same profile framing. End state: wand lowered a few centimeters from her lips, her eyes checking the mirror.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 3,
+          "duration_s": 1.44,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/conti/s3_start.jpg",
+          "end_image": "assets/conti/s3_end.jpg",
+          "video_prompt": "She stands almost still. Ending state: Same wide master framing. End state: nearly identical, her weight shifted to the other leg.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 4,
+          "duration_s": 3.3,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/conti/s4_start.jpg",
+          "end_image": "assets/conti/s4_end.jpg",
+          "video_prompt": "Her head turns slightly toward the mirror. Ending state: Same over-the-shoulder framing. End state: her head turned a few degrees, eyes meeting her own reflection.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 5,
+          "duration_s": 3.63,
+          "duration_hint_int": 4,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/conti/s5_start.jpg",
+          "end_image": "assets/conti/s5_end.jpg",
+          "video_prompt": "She leans in slowly over the sink. Ending state: Same top-down sink POV. End state: her face a little closer to the rim, gaze fixed downward.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        },
+        {
+          "shot": 6,
+          "duration_s": 1.57,
+          "duration_hint_int": 3,
+          "aspect_ratio": "16:9",
+          "camera": "locked",
+          "start_image": "assets/conti/s6_start.jpg",
+          "end_image": "assets/conti/s6_end.jpg",
+          "video_prompt": "Static shot, faint shimmer. Ending state: Same macro framing of the drain, unchanged (static insert). The basin stays dry and empty — no water, no running faucet, nothing added.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark."
+        }
+      ]
+    }
+  }
+}
