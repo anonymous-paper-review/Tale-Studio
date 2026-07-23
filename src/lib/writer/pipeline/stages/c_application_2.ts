@@ -237,7 +237,7 @@ function buildShotSequenceItemFromDesign(
       scene_purpose: scene?.purpose ?? design.intent.dramatic_purpose,
       emotion_beat: scene?.emotion_beat ?? { start: '', end: '' },
       character_action: design.intent.dramatic_purpose,
-      dialogue: scene?.dialogue_summary || undefined,
+      // #dialogue-v4: 옛 dialogue_summary 폴백 폐기 — 샷 대사는 dialogue 스테이지가 전담.
     },
     C: {
       // causal_link 는 호출부 Step 3 에서 순서 기반으로 재계산됨.

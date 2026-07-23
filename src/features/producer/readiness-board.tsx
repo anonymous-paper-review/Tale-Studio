@@ -268,7 +268,7 @@ function StyleAnchorCardBody({ anchor, active }: { anchor: StyleAnchor; active: 
         <span className="line-clamp-1 text-sm font-medium text-foreground">{anchor.label}</span>
         {anchor.medium ? (
           <span className="line-clamp-1 text-xs text-muted-foreground">
-            {prettyMedium(anchor.medium)}
+            {anchor.subtitle ?? prettyMedium(anchor.medium)}
           </span>
         ) : null}
       </div>

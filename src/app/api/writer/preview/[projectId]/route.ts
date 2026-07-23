@@ -9,7 +9,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getActiveRun } from '@/lib/writer/run-store';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import type { StoryScene } from '@/lib/writer/types/pipeline';
+import { isTargetScript } from '@/lib/writer/i18n/derive-en';
+import type { StoryScene, DecoupagePlan } from '@/lib/writer/types/pipeline';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,7 @@ export const dynamic = 'force-dynamic';
 // state 에서 필요한 필드만 구조적으로 읽는다(steps.ts 의 무거운 import 회피).
 interface PreviewState {
   scenes?: { scenes?: StoryScene[] };
+  decoupage?: DecoupagePlan;
   characters?: { characters?: Array<{ id?: string; name?: string; role?: string }> };
   world?: { locations?: Array<{ id?: string; name?: string }> };
   worldVisual?: { locations?: Array<{ id?: string; name?: string }> };
@@ -26,13 +28,19 @@ interface PreviewScene {
   sceneId: string;
   index: number;
   beats: string[];
+  /** 샷 단위 이야기(#shot-story 2026-07-21) — decoupage beat_summary_native(유저 언어).
+   *  decoupage 완료 전이거나 유저 언어 라인이 없으면 빈 배열(UI는 토글 숨김). */
+  shotStories: string[];
 }
 interface PreviewCharacter {
   id: string;
   name: string;
   role: string;
   description: string;
-  imageUrl: string | null;
+  /** 카드용 정면샷(portrait). 없으면 templateUrl 폴백은 클라 몫. */
+  portraitUrl: string | null;
+  /** 클릭 팝업용 캐릭터 템플릿(턴어라운드 시트, view_main). */
+  templateUrl: string | null;
 }
 
 function pushRoster(
@@ -83,26 +91,64 @@ export async function GET(
     pushRoster(roster, seen, state.worldVisual?.locations);
     pushRoster(roster, seen, state.world?.locations);
 
+    // 프로젝트 표시 locale — 샷 이야기 라인의 언어 필터(구형 run 의 EN 라인 숨김)에 사용.
+    let locale = 'en';
+    try {
+      const { data } = await supabaseAdmin.from('projects').select('locale').eq('id', projectId).maybeSingle();
+      locale = ((data?.locale as string) ?? 'en').trim() || 'en';
+    } catch {
+      // locale 조회 실패 → 'en' (스크립트 검출 없음 → native 병기 필드만 통과)
+    }
+
+    // 샷 단위 이야기(#shot-story): decoupage 의 유저 언어 병기(beat_summary_native) 우선,
+    //   없으면 beat_summary 가 유저 언어 스크립트일 때만(구형 run 호환). 연출 스펙(EN)은 제외.
+    const shotStoriesByScene = new Map<string, string[]>();
+    for (const sc of state.decoupage?.scenes ?? []) {
+      const lines: string[] = [];
+      for (const sh of sc.shots ?? []) {
+        const native = typeof sh.beat_summary_native === 'string' ? sh.beat_summary_native.trim() : '';
+        if (native) {
+          lines.push(native);
+          continue;
+        }
+        const base = typeof sh.beat_summary === 'string' ? sh.beat_summary.trim() : '';
+        if (base && isTargetScript(base, locale)) lines.push(base);
+      }
+      if (lines.length) shotStoriesByScene.set(sc.scene_id, lines);
+    }
+
     // 스토리 본문 = 씬별 scene_actions(네이티브 서사 비트). 씬 헤딩/요약/대사/연출은 제외.
     const rawScenes = state.scenes?.scenes ?? [];
     const scenes: PreviewScene[] = rawScenes.map((s, i) => ({
       sceneId: s.scene_id,
       index: i,
       beats: Array.isArray(s.scene_actions) ? s.scene_actions.filter((b) => typeof b === 'string' && b.trim()) : [],
+      shotStories: shotStoriesByScene.get(s.scene_id) ?? [],
     }));
 
     // 캐릭터 = state.characters(이름/역할, 이른 시점부터) + characters 테이블(네이티브 설명 + 초안 이미지).
+    //   카드=portrait(정면샷), 클릭 팝업=view_main(캐릭터 템플릿/턴어라운드 시트) — 2026-07-21 피드백.
     const stateChars = state.characters?.characters ?? [];
-    const dbCharById = new Map<string, { description: string | null; view_main: string | null; name: string | null }>();
+    const dbCharById = new Map<
+      string,
+      { description: string | null; portrait: string | null; view_main: string | null; name: string | null }
+    >();
     try {
       const { data } = await supabaseAdmin
         .from('characters')
-        .select('character_id,name,description,view_main')
+        .select('character_id,name,description,portrait,view_main')
         .eq('project_id', projectId);
-      for (const row of (data ?? []) as Array<{ character_id?: string; name?: string; description?: string; view_main?: string }>) {
+      for (const row of (data ?? []) as Array<{
+        character_id?: string;
+        name?: string;
+        description?: string;
+        portrait?: string;
+        view_main?: string;
+      }>) {
         if (row.character_id) {
           dbCharById.set(row.character_id, {
             description: row.description ?? null,
+            portrait: row.portrait ?? null,
             view_main: row.view_main ?? null,
             name: row.name ?? null,
           });
@@ -120,7 +166,8 @@ export async function GET(
           name: c.name ?? db?.name ?? c.id,
           role: c.role ?? '',
           description: db?.description ?? '',
-          imageUrl: db?.view_main ?? null,
+          portraitUrl: db?.portrait ?? null,
+          templateUrl: db?.view_main ?? null,
         };
       });
 

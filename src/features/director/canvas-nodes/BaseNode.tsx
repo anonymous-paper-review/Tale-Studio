@@ -39,10 +39,11 @@ const THEME_CLASS: Record<
   },
 }
 
-// shot/video 카드 종류 라벨(#e5 2026-07-13): 산출물 기준 명명 — CSS uppercase 로 SHOT IMAGE / SHOT VIDEO 표기.
+// shot/video 카드 종류 라벨(#e5 2026-07-13): 산출물 기준 명명 — CSS uppercase 표기.
+//   #previz-chain: Shot 카드는 목각(previz) 이미지 담당 — 실사는 별도 SHOT IMAGE 파생 노드.
 const LABEL_BY_THEME: Record<Theme, string> = {
   scene: 'Scene',
-  shot: 'Shot image',
+  shot: 'Previz shot image',
   video: 'Shot video',
 }
 

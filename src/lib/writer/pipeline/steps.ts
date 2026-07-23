@@ -20,6 +20,7 @@ import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
 import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
+import { runDialogue, toDialogueTrack, type DialogueProgress } from '@/lib/writer/pipeline/stages/dialogue';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
 import { persistAssetsToDb, persistShotsToDb } from '@/lib/writer/pipeline/util/persist_manifest';
@@ -56,6 +57,7 @@ import type {
   ShotSequence,
   ShotCheckReport,
   RenderPromptsOutput,
+  DialogueTrack,
 } from '@/lib/writer/types/pipeline';
 
 // =====================================================================
@@ -89,6 +91,11 @@ export interface WriterRunState extends WriterRunStateBase {
   shotSequence?: ShotSequence;
   shotCheck?: ShotCheckReport;
   renderPrompts?: RenderPromptsOutput;
+
+  // 샷 단위 대사 트랙(#dialogue-v4 2026-07-23) — persistShots가 shots.dialogue_lines로 매핑.
+  dialogue?: DialogueTrack;
+  /** dialogue 씬 단위 부분 진행 — shotDesignPartial과 동일 계약(체크포인트 후 다음 step 이어감). */
+  dialoguePartial?: DialogueProgress;
 
   // Compact Mode (genre.depth_level 기반). sceneCinematography step 에서 확정.
   compact?: boolean;
@@ -380,6 +387,39 @@ export const WRITER_STEPS: WriterStep[] = [
     },
   },
   {
+    // 샷 단위 대사(#dialogue-v4) — 샷 확정 후 후처리 저작. persistShots 직전에 두어
+    //   persist가 state.dialogue를 dialogue_lines로 매핑한다. 씬 순차(메모리 캐리)라
+    //   shotDesign과 같은 부분 진행 체크포인트를 쓴다. S축 모델(스토리 도메인).
+    key: 'dialogue',
+    has: (s) => s.dialogue !== undefined,
+    run: async (s, { logger, deadlineMs }) => {
+      const models = resolveModels(s.input);
+      const result = await runDialogue(
+        s.input.story,
+        s.genre!,
+        s.characters!,
+        s.scenes!,
+        s.decoupage!,
+        logger,
+        models.S,
+        { resume: s.dialoguePartial ?? null, softDeadlineMs: deadlineMs },
+      );
+      await logger.flushRawLlm('dialogue');
+
+      if (!result.done) {
+        return {
+          dialoguePartial: {
+            doneSceneIds: result.doneSceneIds,
+            scenes: result.scenes,
+            memory: result.memory,
+            profiles: result.profiles,
+          },
+        };
+      }
+      return { dialogue: toDialogueTrack(result), dialoguePartial: undefined };
+    },
+  },
+  {
     // ★ Tier 2 persist: shots → DB — 독립 step(#persist-step 2026-07-15).
     //   내부 i18n(EN/native 파생) 배치가 76샷 기준 40~60s 걸려, renderPrompts 꼬리에
     //   붙어 있으면 함수 수명(300s) 끝자락에서 잘리거나 실패해도 지나쳐 shots 0행으로
@@ -388,7 +428,7 @@ export const WRITER_STEPS: WriterStep[] = [
     has: (s) => s._shotsPersisted === true,
     run: async (s, { projectId }) => {
       try {
-        await persistShotsToDb(projectId, s.shotSequence!);
+        await persistShotsToDb(projectId, s.shotSequence!, s.dialogue ?? null);
         return { _shotsPersisted: true };
       } catch (e) {
         const tries = (s._persistTries ?? 0) + 1;

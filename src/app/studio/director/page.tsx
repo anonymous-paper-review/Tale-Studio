@@ -30,7 +30,7 @@ import { HandoffButton } from '@/components/layout/handoff-button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
-import { useDirectorCanvasStore } from '@/stores/director-store'
+import { followChainNodePositions, useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { getDirectorGaps, summarizeGaps } from '@/lib/completeness'
@@ -51,6 +51,9 @@ import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
 import { VideoNode } from '@/features/director/canvas-nodes/VideoNode'
 import { AssetNode } from '@/features/director/canvas-nodes/AssetNode'
 import { PromptNode } from '@/features/director/canvas-nodes/PromptNode'
+import { PrevizVideoNode } from '@/features/director/canvas-nodes/PrevizVideoNode'
+import { ShotImageNode } from '@/features/director/canvas-nodes/ShotImageNode'
+import { VideoPlaceholderNode } from '@/features/director/canvas-nodes/VideoPlaceholderNode'
 import { CategoryEdge } from '@/features/director/canvas-edges/CategoryEdge'
 import { CreatorModal } from '@/features/director/canvas-popups/CreatorModal'
 import { RelationModal } from '@/features/director/canvas-popups/RelationModal'
@@ -59,6 +62,7 @@ import { DirectorNodePopup } from '@/features/director/canvas-popups/DirectorNod
 import { DirectorDetailPanel } from '@/features/director/canvas-panels/DirectorDetailPanel'
 import {
   doubleClickActionForKind,
+  chainParentShotNodeId,
   connectRouteForTargetHandle,
 } from '@/features/director/canvas-interaction'
 
@@ -68,6 +72,9 @@ const nodeTypes = {
   video: VideoNode,
   asset: AssetNode,
   prompt: PromptNode,
+  previzVideo: PrevizVideoNode,
+  shotImage: ShotImageNode,
+  videoPlaceholder: VideoPlaceholderNode,
 } as const
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -359,9 +366,12 @@ function CanvasInner() {
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      const next = applyNodeChanges(
-        changes.filter((change) => change.type !== 'remove'),
-        nodes,
+      // #previz-chain: Shot 드래그 시 파생 체인 노드(PrevizVideo/ShotImage)가 함께 따라온다.
+      const next = followChainNodePositions(
+        applyNodeChanges(
+          changes.filter((change) => change.type !== 'remove'),
+          nodes,
+        ) as typeof nodes,
       )
       useDirectorCanvasStore.setState({ nodes: next as typeof nodes })
       changes.forEach((c) => {
@@ -494,7 +504,13 @@ function CanvasInner() {
         onNodeDoubleClick={(_event, node) => {
           // Storyboard 뷰 더블클릭과 동일(#e2): scene/shot/video 모두 모달 열기
           const action = doubleClickActionForKind(node.data.kind)
-          if (action === 'popup') openPopup(node.id)
+          if (action === 'popup') {
+            openPopup(node.id)
+            return
+          }
+          // previz 체인 파생 카드(#previz-chain) — 부모 Shot 모달로 위임
+          const parentShotId = chainParentShotNodeId(node.data)
+          if (parentShotId) openPopup(parentShotId)
         }}
         onNodeDragStart={() => commitHistory()}
         onMove={(_, vp) => setViewport(vp)}
@@ -618,6 +634,8 @@ function PresetStrip() {
 function PaletteBar() {
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
   const setViewMode = useDirectorCanvasStore((s) => s.setViewMode)
+  const storyboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
+  const setStoryboardMediaMode = useDirectorCanvasStore((s) => s.setStoryboardMediaMode)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const generateAllStoryboardImages = useDirectorCanvasStore(
     (s) => s.generateAllStoryboardImages,
@@ -650,6 +668,28 @@ function PaletteBar() {
             <TabsTrigger value="storyboard">Storyboard</TabsTrigger>
           </TabsList>
         </Tabs>
+
+        {/* Previz | Real 미디어 토글(#previz-video) — Storyboard 뷰 전용, 상단바 상주(2026-07-22). */}
+        {viewMode === 'storyboard' && (
+          <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5">
+            {(['previz', 'real'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setStoryboardMediaMode(m)}
+                aria-pressed={storyboardMediaMode === m}
+                className={cn(
+                  'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                  storyboardMediaMode === m
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {m === 'previz' ? 'Previz' : 'Real'}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* 스토리보드 일괄 생성 */}
         <button

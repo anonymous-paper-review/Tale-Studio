@@ -503,7 +503,8 @@ export interface DecoupageShot {
   //   derived=[i] / merged=[i,j,..] / split=[i] (여러 split 샷이 같은 i 공유) / added=[]
   source_beats: number[];
   added_rationale?: string;        // operation==='added'일 때 필수: 왜 이 스토리-부재 샷이 필요한가
-  beat_summary: string;            // 이 샷이 담는 내용 (derived/merged/split=비트 텍스트, added=추가 내용)
+  beat_summary: string;            // 이 샷이 담는 내용 (derived/merged/split=비트 텍스트, added=추가 내용) — EN base(S7)
+  beat_summary_native?: string;    // 같은 내용의 유저 언어 병기(#shot-story 2026-07-21) — 표시 전용(실행 중 프리뷰). 하류 생성은 beat_summary(EN)만 소비.
   shot_size: 'EWS' | 'WS' | 'FS' | 'MFS' | 'MS' | 'MCU' | 'CU' | 'ECU' | 'OTS' | '2S' | 'POV';
   intended_duration_seconds: number;
   rhythm_role: RhythmRole;
@@ -727,6 +728,56 @@ export interface ShotSequence {
   total_duration_seconds: number;
   depth_level: DepthLevel;
   shots: ShotSequenceItem[];
+}
+
+// =====================================================================
+// 샷 단위 대사 트랙 (#dialogue-v4 2026-07-23) — 대사 스테이지(stages/dialogue.ts) 산출.
+//   lab/exp2 블라인드 A/B에서 확정된 V4 구성: 보이스 프로파일 + 씬 순차 글로벌 메모리
+//   + 3규율(침묵 예산·정보 공개 순서·명대사 금지). persist가 shots.dialogue_lines로 매핑한다.
+// =====================================================================
+
+/** 인물 보이스(어투) 프로파일 — 대사 스테이지 상류에서 캐스트로부터 설계 */
+export interface VoiceProfile {
+  character_id: string;
+  name: string;
+  speech_style: string;          // 말투 한 줄 (예: "무뚝뚝한 반말, 필요한 말만")
+  formality: string;             // 반말/존댓말/혼용 + 상대별 변화
+  sentence_length: string;
+  verbal_tics: string[];         // 말버릇
+  emotional_expression: string;  // 감정을 말로 드러내는 방식
+  taboo: string;                 // 절대 쓰지 않을 말투/어휘
+  example_lines: string[];
+}
+
+export interface ShotDialogueLine {
+  character_id: string;
+  line: string;
+  delivery?: string;
+}
+
+export interface ShotDialogue {
+  shot_id: string;               // decoupage 표준화 shot_id (shot_N)
+  dialogue: ShotDialogueLine[];  // 빈 배열 = 침묵 샷 (정상)
+  narration: string | null;      // 보이스오버 — 서사적으로 필요할 때만
+}
+
+export interface SceneShotDialogue {
+  scene_id: string;
+  shots: ShotDialogue[];
+}
+
+/** 씬 순차 전개 메모리 — 대사 일관성 저장소 (V4의 "확립된 사실"이 정보 공개 순서의 진실) */
+export interface DialogueMemory {
+  established_facts: string[];
+  relationship_state: string;
+  tone_notes: string;
+  notable_lines: { character_id: string; line: string }[];
+}
+
+/** 대사 스테이지 최종 산출 — writer_runs.state.dialogue */
+export interface DialogueTrack {
+  profiles: VoiceProfile[];
+  scenes: SceneShotDialogue[];
 }
 
 // Render Spec 타입(`RenderPromptsOutput`/`T2IPrompt`/`TI2VPrompt`/`ShotGenerationPrompts`)은

@@ -9,6 +9,7 @@ import type {
   RoughStoryboardImage,
 } from '@/types'
 import { createClient } from '@/lib/supabase/client'
+import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { classifyDialoguePatch } from '@/lib/writer-chat-updates'
 import { useProjectStore } from '@/stores/project-store'
 import { isDemoSession } from '@/lib/demo/context'
@@ -112,6 +113,8 @@ interface WriterState {
 
   setStoryText: (text: string) => void
   loadProject: () => Promise<void>
+  /** 목각 previz 영상 생성(#previz-video) — 러프 START+END refs. 완료 시 shots 리로드. */
+  generatePrevizVideo: (shotId: string) => Promise<void>
   selectScene: (id: string) => void
   updateScene: (id: string, changes: Partial<Scene>) => void
   selectShot: (id: string) => void
@@ -752,6 +755,68 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       error: null,
     }),
 
+  generatePrevizVideo: async (shotId) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    // 낙관 상태 — 카드가 즉시 '생성 중' 표시
+    set((state) => ({
+      shots: state.shots.map((sh) =>
+        sh.shotId === shotId
+          ? {
+              ...sh,
+              previzVideo: {
+                url: sh.previzVideo?.url ?? '',
+                status: 'generating',
+                errorMessage: null,
+                generatedAt: sh.previzVideo?.generatedAt ?? 0,
+              },
+            }
+          : sh,
+      ),
+    }))
+    try {
+      const res = await fetch('/api/director/generate-previz-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, writerShotId: shotId }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `HTTP ${res.status}`)
+      }
+      const { jobId } = (await res.json()) as { jobId: string }
+      // 잡 폴링은 best-effort — 폴링이 일시 오류로 던져도(webhook 이 이미 완료한 경쟁 등)
+      //   아래 진실 폴링이 shots.previz_video 를 회수한다(새로고침 불필요, 2026-07-22).
+      await pollGenerationJob(jobId).catch(() => {})
+      // 진실 폴링: previz_video 가 terminal(completed/failed)로 보일 때까지 리로드.
+      for (let i = 0; i < 30; i++) {
+        await get().loadProject()
+        const st = get().shots.find((sh) => sh.shotId === shotId)?.previzVideo?.status
+        if (st === 'completed' || st === 'failed') return
+        await new Promise((r) => setTimeout(r, 10_000))
+      }
+      throw new Error('previz 영상이 제한 시간 안에 완료되지 않았습니다')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'previz 영상 생성 실패'
+      set((state) => ({
+        shots: state.shots.map((sh) =>
+          sh.shotId === shotId
+            ? {
+                ...sh,
+                previzVideo: {
+                  url: sh.previzVideo?.url ?? '',
+                  status: 'failed',
+                  errorMessage: message,
+                  generatedAt: 0,
+                },
+              }
+            : sh,
+        ),
+      }))
+      throw err
+    }
+  },
+
   loadProject: async () => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
@@ -850,6 +915,8 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         },
         // 러프 스토리보드 패널 (writer 탭). 마이그레이션 016 이전 DB 에선 undefined → null.
         roughStoryboard: (s.rough_storyboard as RoughStoryboardImage | null) ?? null,
+        // 목각 previz 영상 (director storyboard 뷰, #previz-video)
+        previzVideo: (s.previz_video as RoughStoryboardImage | null) ?? null,
       }))
 
       const firstSceneId = manifest.scenes[0]?.sceneId ?? null

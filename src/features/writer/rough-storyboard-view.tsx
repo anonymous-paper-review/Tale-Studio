@@ -35,16 +35,11 @@ import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
+import { cn } from '@/lib/utils'
+import { RoughFrameCycle, withCacheBust } from '@/components/rough-frame-cycle'
 import type { RoughStoryboardImage, Shot } from '@/types'
 
 type PanelJob = { status: 'generating' | 'failed'; error?: string }
-
-// 재생성 즉시 반영: 스토리지 url 은 같은 경로 덮어쓰기(upsert)라 URL 이 동일 → 브라우저/CDN 캐시 잔상이 남는다.
-//   generatedAt 을 쿼리로 붙여 매 생성마다 src 가 바뀌게 해 새 이미지를 즉시 가져온다.
-function withCacheBust(url: string, v?: number): string {
-  if (!v) return url
-  return `${url}${url.includes('?') ? '&' : '?'}v=${v}`
-}
 
 // 표시 번호는 "순서(위치)" 기준으로 렌더 지점에서 계산 — 불변 id 접미사가 아니라(중간 삽입 시 번호
 //   뒤죽박죽 방지, #5). 샷 타입 설명(SHOT_TYPE_DESCRIPTIONS)은 shot-type-info 로 공용화(#2).
@@ -199,32 +194,40 @@ export function RoughStoryboardView() {
             return next
           })
         }
-        const polls = submitted.map(({ shotId, jobId }) =>
+        // 잡 단위 dedupe(#rough-grid): 그리드 잡 1개가 샷 최대 4개를 커버 — 같은 jobId 를 샷 수만큼
+        //   중복 폴링하지 않는다. 완료 시 result_url 은 "그리드 원본"(4샷 공용)이라 카드에 쓰면
+        //   크롭 전 전체 그리드가 그대로 보인다(2026-07-22 실측) → URL 대신 크롭이 끝난 DB 진실
+        //   (shots.rough_storyboard.frames)을 리로드하고, stale override 를 지워 그 진실이 보이게 한다.
+        const shotIdsByJob = new Map<string, string[]>()
+        for (const { shotId, jobId } of submitted) {
+          shotIdsByJob.set(jobId, [...(shotIdsByJob.get(jobId) ?? []), shotId])
+        }
+        const polls = [...shotIdsByJob.entries()].map(([jobId, jobShotIds]) =>
           pollGenerationJob(jobId)
-            .then((url) => {
-              setOverrides((prev) => ({
-                ...prev,
-                [shotId]: {
-                  url,
-                  status: 'completed',
-                  errorMessage: null,
-                  generatedAt: Date.now(),
-                },
-              }))
+            .then(async () => {
+              await loadProject()
+              setOverrides((prev) => {
+                const next = { ...prev }
+                for (const id of jobShotIds) delete next[id]
+                return next
+              })
               setPanelJobs((prev) => {
                 const next = { ...prev }
-                delete next[shotId]
+                for (const id of jobShotIds) delete next[id]
                 return next
               })
             })
             .catch((e: unknown) => {
-              setPanelJobs((prev) => ({
-                ...prev,
-                [shotId]: {
-                  status: 'failed',
-                  error: e instanceof Error ? e.message : String(e),
-                },
-              }))
+              setPanelJobs((prev) => {
+                const next = { ...prev }
+                for (const id of jobShotIds) {
+                  next[id] = {
+                    status: 'failed',
+                    error: e instanceof Error ? e.message : String(e),
+                  }
+                }
+                return next
+              })
             }),
         )
         return {
@@ -246,7 +249,7 @@ export function RoughStoryboardView() {
         return null
       }
     },
-    [projectId],
+    [projectId, loadProject],
   )
 
   // 누락 패널 전체 생성 펌프(#c1·#c2·#c3 2026-07-15) — 서버가 호출당 6샷으로 캡하므로(504·쿼터
@@ -597,14 +600,11 @@ export function RoughStoryboardView() {
                             <>
                               {/* absolute inset-0: aspect-video 컨테이너 박스를 무조건 채운다. in-flow
                                   size-full 은 일부 브라우저/배율에서 h-full(=%)이 aspect-ratio 높이로 안 풀려
-                                  이미지가 위쪽만 채우고 아래 bg-muted 회색이 남던 버그(2026-07-11). */}
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={withCacheBust(panel.url, panel.generatedAt)}
+                                  이미지가 위쪽만 채우고 아래 bg-muted 회색이 남던 버그(2026-07-11).
+                                  3프레임 세트(#rough-grid)는 순환 재생 — 구버전 단일 패널은 정적 폴백. */}
+                              <RoughFrameCycle
+                                panel={panel}
                                 alt={`${shot.shotId} rough storyboard`}
-                                className="absolute inset-0 size-full object-cover"
-                                loading="lazy"
-                                draggable={false}
                               />
                               <Button
                                 size="icon"

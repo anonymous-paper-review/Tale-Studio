@@ -42,7 +42,7 @@ describe('buildVideoPrompt', () => {
     expect(result.fullPrompt).toMatchInlineSnapshot('"Macro shot of a glass orchid. shot on Arri Alexa, 50mm, f/2.8, white balance 5600K"')
   })
 
-  it('snapshots the Veo under-8s black-screen instruction and 800 character cap path', () => {
+  it('snapshots the Veo under-8s black-screen instruction and 1000 character cap path', () => {
     const result = buildVideoPrompt({
       prompt: 'A lighthouse keeper extinguishes the lamp',
       generationMethod: 'I2V',
@@ -50,8 +50,31 @@ describe('buildVideoPrompt', () => {
       durationSeconds: 6,
     })
 
-    expect(result.fullPrompt.length).toBeLessThanOrEqual(800)
+    expect(result.fullPrompt.length).toBeLessThanOrEqual(1000)
     expect(result.fullPrompt).toMatchInlineSnapshot('"A lighthouse keeper extinguishes the lamp Show the described action only for the first 6 seconds; after 6s the frame must be a completely black screen — no subject, no motion — until the video ends."')
+  })
+
+  it('appends the START/END convergence clause for V2 two-reference I2V, but not for T2V', () => {
+    const i2v = buildVideoPrompt({
+      prompt: 'A duelist draws a rapier',
+      generationMethod: 'I2V',
+      modelKey: 'happy-horse',
+      durationSeconds: 5,
+      startEndReference: true,
+    })
+    expect(i2v.fullPrompt).toContain("START frame")
+    expect(i2v.fullPrompt).toContain('finish exactly at the END composition')
+    expect(i2v.prompt_parts.startEnd).toBeTruthy()
+
+    const t2v = buildVideoPrompt({
+      prompt: 'A duelist draws a rapier',
+      generationMethod: 'T2V',
+      modelKey: 'happy-horse',
+      durationSeconds: 5,
+      startEndReference: true,
+    })
+    expect(t2v.fullPrompt).not.toContain('START frame')
+    expect(t2v.prompt_parts.startEnd).toBeUndefined()
   })
 
   it('snapshots the 500 character base prompt cap boundary', () => {

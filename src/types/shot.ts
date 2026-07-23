@@ -5,7 +5,8 @@ export type ShotType =
 export type GenerationMethod = 'T2V' | 'I2V'
 
 export interface DialogueLine {
-  characterId: string
+  /** null = 내레이션(V.O.) 라인 (#dialogue-v4) — 기존 DB에도 null 실재(persist가 화자 미상 시 null 기록). */
+  characterId: string | null
   text: string
   emotion: string
   delivery: string
@@ -48,10 +49,19 @@ export const DEFAULT_CAMERA_PRESET: CameraPreset = {
  * DB shots.rough_storyboard JSONB — Director의 storyboard_image와 동일 shape, 다른 용도.
  */
 export interface RoughStoryboardImage {
+  /** 대표 프레임(3프레임 세트에선 start) — 단일 패널 구버전과의 하위 호환 필드. */
   url: string
   status: 'pending' | 'generating' | 'completed' | 'failed'
   errorMessage: string | null
   generatedAt: number
+  /** 3프레임 세트(#rough-grid 2026-07-22): start → direction(화살표/지시문) → end. UI 는 순환 재생. */
+  frames?: {
+    start: string
+    direction: string
+    end: string
+  }
+  /** 이 세트가 잘려 나온 원본 그리드/스트립 이미지 (디버그·재현용). */
+  gridUrl?: string
 }
 
 export interface Shot {
@@ -72,6 +82,8 @@ export interface Shot {
   lighting: LightingConfig
   referenceImageUrl?: string | null
   roughStoryboard?: RoughStoryboardImage | null
+  /** 목각 previz 영상(#previz-video 2026-07-22) — 러프 START+END 로 생성한 연출 판독용 영상. */
+  previzVideo?: RoughStoryboardImage | null
   /** DB shots.sort_order — 씬 내 순서. 위치 삽입(추가 팝업)에서 이웃 기준 계산에 사용. */
   sortOrder?: number
 }

@@ -100,7 +100,7 @@ export interface FalImageResult {
   raw: unknown;
 }
 
-const DEFAULT_IMAGE_MODEL = 'openai/gpt-image-2';
+export const DEFAULT_IMAGE_MODEL = 'openai/gpt-image-2';
 /** Consumed by src/lib/style-anchor.ts for Rule M model normalization. */
 export const DEFAULT_EDIT_IMAGE_MODEL = 'openai/gpt-image-2/edit';
 // 러프 스토리보드(previz 스케치) 전용 — 비용/속도 우선 경량 모델 (2026-06-12 사용자 결정).
@@ -285,6 +285,8 @@ export interface FalVideoOptions {
   model?: string;
   prompt: string;
   image_url: string;
+  /** reference-to-video 다중 레퍼런스(#previz-video 2026-07-22, START+END 등). 지정 시 image_url 대신 사용. */
+  image_urls?: string[];
   duration?: number;
   aspect_ratio?: string;
   negative_prompt?: string;
@@ -331,9 +333,9 @@ function buildFalVideoInput(opts: FalVideoOptions, model: string): Record<string
   const input: Record<string, unknown> = { prompt: opts.prompt };
 
   if (isReferenceToVideo) {
-    input.image_urls = opts.image_url ? [opts.image_url] : [];
+    input.image_urls = opts.image_urls?.length ? opts.image_urls : opts.image_url ? [opts.image_url] : [];
   } else {
-    input.image_url = opts.image_url;
+    input.image_url = opts.image_urls?.[0] ?? opts.image_url;
   }
 
   // happy-horse는 3~15 정수 enum, 다른 모델은 5/10 문자열

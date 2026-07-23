@@ -8,19 +8,23 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
-import { falImageSubmit, ROUGH_STORYBOARD_IMAGE_MODEL } from '@/lib/writer/llm/fal'
+import { falImageSubmit, DEFAULT_EDIT_IMAGE_MODEL, DEFAULT_IMAGE_MODEL } from '@/lib/writer/llm/fal'
 import {
   createGenerationJob,
   AUTO_GENERATION_GIVE_UP_THRESHOLD,
   STALE_QUEUED_MS,
 } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
-import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
+import { resolveWebhookUrl, resolveWebhookBaseUrl } from '@/lib/fal/webhook-url'
+import { type RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
 import {
-  buildRoughStoryboardPrompt,
-  type RoughStoryboardSpec,
-} from '@/lib/writer/rough-storyboard'
-import { rewriteRoughStoryboardPromptViaLLM } from '@/lib/writer/rough-storyboard-llm'
+  buildRoughGridCell,
+  buildRoughGridPrompt,
+  GRID_MAX_SHOTS,
+  GRID_TEMPLATE_PATH,
+  STRIP_TEMPLATE_PATH,
+  type RoughGridVariant,
+} from '@/lib/writer/rough-storyboard-grid'
 import { writerShotIdToMain } from '@/lib/writer/adapters'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import type { ShotDesign } from '@/lib/writer/types/pipeline'
@@ -60,17 +64,6 @@ async function loadShotDesignByMainId(
     console.error('[writer/rough-storyboard] shotDesign state load failed:', e)
   }
   return byId
-}
-
-/**
- * projectId → 결정적 seed. 프로젝트 내 전 샷이 동일 노이즈 베이스를 공유해 스타일 톤(선·음영·마네킹 질감)이
- *   통일되고, force 재생성 시 재현성이 생긴다(같은 프롬프트→같은 그림). 샷별 변주는 프롬프트 차이가 만든다.
- *   (캐릭터 외형 일관성의 주 레버는 프롬프트의 featureless 강제+네거티브이며, seed 는 톤 베이스라인 보조.)
- */
-function seedFromProjectId(projectId: string): number {
-  let h = 0
-  for (let i = 0; i < projectId.length; i++) h = (Math.imul(31, h) + projectId.charCodeAt(i)) | 0
-  return (h >>> 0) % 2_000_000_000
 }
 
 export const runtime = 'nodejs'
@@ -205,7 +198,7 @@ export async function POST(req: Request) {
         supabaseAdmin
           .from('shots')
           .select(
-            'shot_id, scene_id, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, rough_storyboard',
+            'shot_id, scene_id, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, duration_seconds, rough_storyboard',
           )
           .eq('project_id', projectId)
           .order('sort_order'),
@@ -249,9 +242,11 @@ export async function POST(req: Request) {
       (chars ?? []).map((c) => [c.character_id as string, c.name as string]),
     )
     const inFlight = new Set(
-      (queuedJobs ?? [])
-        .map((j) => (j.target as { writerShotId?: string })?.writerShotId)
-        .filter(Boolean),
+      (queuedJobs ?? []).flatMap((j) => {
+        const t = j.target as { writerShotId?: string; writerShotIds?: string[] }
+        // 그리드 잡(writerShotIds, #rough-grid)과 구 단일 잡(writerShotId) 모두 중복 방지 대상.
+        return [...(t?.writerShotIds ?? []), ...(t?.writerShotId ? [t.writerShotId] : [])]
+      }),
     )
     // 실패 누적 횟수(샷별) — safeMode 파생 + give-up 게이트(임계값 이상이면 자율 재생성 멈춤).
     const failCountByShot = new Map<string, number>()
@@ -259,7 +254,6 @@ export async function POST(req: Request) {
       const id = (j.target as { writerShotId?: string })?.writerShotId
       if (id) failCountByShot.set(id, (failCountByShot.get(id) ?? 0) + 1)
     }
-    const previouslyFailed = new Set(failCountByShot.keys())
 
     const wanted = shotIds?.length
       ? (shots ?? []).filter((s) => shotIds.includes(s.shot_id as string))
@@ -303,12 +297,15 @@ export async function POST(req: Request) {
       eligible.push(s)
     }
 
-    // 호출당 제출 캡(#c1·#c3 2026-07-15) — 76샷급 프로젝트에서 캡 없이 돌면 ①번역 배치가
-    //   maxDuration(60s)을 넘겨 504로 죽고 ②유저 쿼터(8)를 한 번에 다 먹어 artist 등 다른
-    //   생성이 굶는다. 6 = 쿼터 8 - artist 자동(1) - 수동 여유(1). 잔여는 remaining 으로
-    //   알려 클라이언트 펌프가 라운드를 이어간다.
-    const MAX_SUBMIT_PER_CALL = 6
-    const targets = eligible.slice(0, MAX_SUBMIT_PER_CALL)
+    // 그리드 제출 캡(#rough-grid 2026-07-22, 구 #c1·#c3 계승) — 잡 1개 = 그리드 1장 = 샷 최대 4개.
+    //   호출당 그리드 2장(샷 8) = 쿼터 8 중 잡 2개만 소비(구 klein 6잡 대비 여유). 번역 배치도
+    //   샷 8개 분량이라 maxDuration(60s) 내 안전. 잔여는 remaining 으로 클라 펌프가 라운드를 이어간다.
+    //   단일샷 재생성(shotIds 1개)은 1열 스트립(strip1)으로 3프레임만 다시 만든다.
+    const MAX_GRID_JOBS_PER_CALL = 2
+    const gridVariant: RoughGridVariant =
+      shotIds?.length === 1 && eligible.length === 1 ? 'strip1' : 'grid4'
+    const perGrid = gridVariant === 'strip1' ? 1 : GRID_MAX_SHOTS
+    const targets = eligible.slice(0, MAX_GRID_JOBS_PER_CALL * perGrid)
     const remaining = eligible.length - targets.length
 
     // 언어 경계(S3b): 주 컬럼이 native(수동/편집 샷)일 수 있어, 프롬프트 주입 전 action·mood 를 EN 으로 정규화.
@@ -353,86 +350,98 @@ export async function POST(req: Request) {
       ]),
     )
 
-    for (const s of targets) {
-      const shotId = s.shot_id as string
-      const scene = sceneById.get(s.scene_id as string)
-      const camera = (s.camera_config ?? {}) as { pan?: number }
-      const lighting = (s.lighting_config ?? {}) as { position?: string }
-      const spec = translatedSpecs.get(shotId) ?? null
-      const safeMode = previouslyFailed.has(shotId)
-      const rulePrompt = buildRoughStoryboardPrompt({
-        shotType: (s.shot_type as string) ?? 'MS',
-        actionDescription: actionEnByShot.get(shotId) ?? (s.action_description as string) ?? '',
-        characterNames: ((s.characters as string[]) ?? []).map(
-          (id) => nameEnMap.get(id) ?? nameById.get(id) ?? id,
-        ),
-        characterNameById: nameEnMap,
-        location: (scene ? locEnByScene.get(scene.scene_id as string) : undefined) ?? (scene?.location as string | undefined),
-        locationDescription: locationDescById.get(scene?.location as string) ?? null,
-        timeOfDay: (scene ? timeEnByScene.get(scene.scene_id as string) : undefined) ?? (scene?.time_of_day as string | undefined),
-        mood: scene
-          ? moodEnByScene.get(scene.scene_id as string) ?? (scene.mood as string)
-          : undefined,
-        cameraPitch: camera.pan ?? null,
-        focalLength: (s.focal_length as number | null) ?? null,
-        aperture: (s.aperture as number | null) ?? null,
-        lightPosition: lighting.position ?? null,
-        aspectRatio: '16:9',
-        spec,
-        safeMode,
-        styleHints,
+    // 그리드 청크 제출(#rough-grid): targets 를 열 수(perGrid)씩 묶어 그리드/스트립 1장씩 submit.
+    //   템플릿(public asset)을 gpt-image-2/edit reference 로 — base URL 없으면(로컬 무터널) T2I 폴백
+    //   (모델이 시트째 그림 — crop 비례 좌표가 근사라 dev 전용 저품질 경로. 프로덕션은 항상 edit).
+    //   klein 전용 장치(seed 톤 고정·safeMode 프롬프트 축약·llm_rewrite)는 폐기 — instruction 모델이라
+    //   불필요. give-up 게이트(반복 실패 자율 재생성 중단)는 위 선별에서 그대로 작동.
+    const baseUrl = resolveWebhookBaseUrl()
+    const templatePath = gridVariant === 'grid4' ? GRID_TEMPLATE_PATH : STRIP_TEMPLATE_PATH
+    const templateUrl = baseUrl ? `${baseUrl}${templatePath}` : null
+    const webhookUrl = resolveWebhookUrl()
+
+    for (let gi = 0; gi < targets.length; gi += perGrid) {
+      const chunk = targets.slice(gi, gi + perGrid)
+      const cells = chunk.map((s) => {
+        const shotId = s.shot_id as string
+        const scene = sceneById.get(s.scene_id as string)
+        const camera = (s.camera_config ?? {}) as { pan?: number }
+        const lighting = (s.lighting_config ?? {}) as { position?: string }
+        return buildRoughGridCell(
+          {
+            shotType: (s.shot_type as string) ?? 'MS',
+            actionDescription:
+              actionEnByShot.get(shotId) ?? (s.action_description as string) ?? '',
+            characterNames: ((s.characters as string[]) ?? []).map(
+              (id) => nameEnMap.get(id) ?? nameById.get(id) ?? id,
+            ),
+            characterNameById: nameEnMap,
+            location:
+              (scene ? locEnByScene.get(scene.scene_id as string) : undefined) ??
+              (scene?.location as string | undefined),
+            locationDescription: locationDescById.get(scene?.location as string) ?? null,
+            timeOfDay:
+              (scene ? timeEnByScene.get(scene.scene_id as string) : undefined) ??
+              (scene?.time_of_day as string | undefined),
+            mood: scene
+              ? moodEnByScene.get(scene.scene_id as string) ?? (scene.mood as string)
+              : undefined,
+            cameraPitch: camera.pan ?? null,
+            focalLength: (s.focal_length as number | null) ?? null,
+            aperture: (s.aperture as number | null) ?? null,
+            lightPosition: lighting.position ?? null,
+            durationSeconds: (s.duration_seconds as number | null) ?? null,
+            spec: translatedSpecs.get(shotId) ?? null,
+            styleHints,
+          },
+          shotId,
+        )
       })
 
-      // 3차+ (force 재시도 & 실패 ≥ 임계값) → LLM이 프롬프트 자체를 moderation-safe 영어로 재생성.
-      //   auto 는 위 give-up 게이트에서 이미 skip 되므로, 여기 도달하는 failCount≥임계값은 force 뿐.
-      //   호출마다 변주 → "동일 프롬프트 반복" 회피. 실패/거부 시 rulePrompt 로 폴백(모델은 제안만, §3).
-      const failCount = failCountByShot.get(shotId) ?? 0
-      let prompt = rulePrompt
-      let promptSource: 'shotDesign' | 'db_fallback' | 'llm_rewrite' = spec
-        ? 'shotDesign'
-        : 'db_fallback'
-      if (failCount >= AUTO_GENERATION_GIVE_UP_THRESHOLD) {
-        const rewritten = await rewriteRoughStoryboardPromptViaLLM({
-          previousPrompt: rulePrompt,
-          shotType: (s.shot_type as string) ?? 'MS',
-          attempt: failCount + 1,
-        })
-        if (rewritten) {
-          prompt = rewritten
-          promptSource = 'llm_rewrite'
-        }
+      let prompt = buildRoughGridPrompt(cells, gridVariant)
+      if (styleHints?.length) prompt += `\n\nEmphasis for every panel: ${styleHints.join(', ')}.`
+      if (!templateUrl) {
+        prompt = `Create the storyboard sheet yourself on clean paper (no reference image available), matching the panel layout described below, then fill it.\n\n${prompt}`
       }
 
-      // seed 정책: 재생성(force=사람의 명시적 클릭)은 매 호출 다른 seed 로 변주("다시 굴리기" — 같은
-      //   프롬프트라도 새 느낌). 파이프라인 첫 생성(!force)은 프로젝트 고정 seed 로 패널 간 톤 통일 유지. (2026-06-25)
-      const seed = force
-        ? Math.floor(Math.random() * 2_000_000_000)
-        : seedFromProjectId(projectId)
-      const { request_id, model } = await falImageSubmit({
-        // previz 스케치 — 비용/속도 우선 경량 모델 (모델 ID 의 진실은 fal.ts)
-        model: ROUGH_STORYBOARD_IMAGE_MODEL,
-        prompt,
-        // negative_prompt 미전달 — klein 은 CFG/negative 미지원(스키마 확인, 2026-07-13). 차단 의도는
-        //   buildRoughStoryboardPrompt 의 긍정문(FIGURE_RULE·CU_FRONT·SINGLE_FRONT·PANEL_STYLE)으로 이관.
-        seed,
-        aspect_ratio: '16:9',
-        webhookUrl: resolveWebhookUrl(),
-      })
+      const { request_id, model } = await falImageSubmit(
+        templateUrl
+          ? {
+              model: DEFAULT_EDIT_IMAGE_MODEL, // gpt-image-2/edit — 템플릿 칸에 그려 넣기
+              prompt,
+              reference_image_urls: [templateUrl],
+              // aspect_ratio 미전달 → image_size 'auto' (reference 비율 유지 — crop 좌표 정합의 핵심)
+              webhookUrl,
+            }
+          : {
+              model: DEFAULT_IMAGE_MODEL, // T2I 폴백 (dev)
+              prompt,
+              aspect_ratio: gridVariant === 'grid4' ? '16:9' : '9:16',
+              webhookUrl,
+            },
+      )
+      const chunkShotIds = chunk.map((s) => s.shot_id as string)
       const job = await createGenerationJob({
         projectId,
         requestId: request_id,
         model,
         kind: 'shot_rough_storyboard',
-        target: { workspaceId: project.workspace_id, writerShotId: shotId },
-        // 재생성 프롬프트를 회수 가능하게 저장(이전엔 미저장이라 DB에서 못 봤음).
-        inputSnapshot: { prompt, promptSource, safeMode, seed },
+        target: {
+          workspaceId: project.workspace_id,
+          writerShotIds: chunkShotIds,
+          gridVariant,
+        },
+        inputSnapshot: { prompt, gridVariant, shotIds: chunkShotIds, templateUrl },
       })
-      submitted.push({
-        shotId,
-        jobId: job.id,
-        promptSource,
-        safeMode,
-      })
+      for (const s of chunk) {
+        const shotId = s.shot_id as string
+        submitted.push({
+          shotId,
+          jobId: job.id,
+          promptSource: translatedSpecs.get(shotId) ? 'shotDesign' : 'db_fallback',
+          safeMode: false,
+        })
+      }
     }
 
     return NextResponse.json({ ok: true, data: { submitted, skipped, remaining } })

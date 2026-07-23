@@ -2,7 +2,6 @@
 
 // Writer 탭 — shadcn Tabs를 controlled store 값으로 구동한다.
 
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useWriterUiStore, type WriterTab } from '@/stores/writer-ui-store'
 
@@ -20,12 +19,7 @@ export function WriterTabs() {
       <TabsList>
         <TabsTrigger value="storyboard">러프 스토리보드</TabsTrigger>
         <TabsTrigger value="script">트리트먼트</TabsTrigger>
-        <TabsTrigger value="dialogue" disabled>
-          <span>대사</span>
-          <Badge variant="outline" className="ml-1 px-1.5 py-0 text-[10px]">
-            준비 중
-          </Badge>
-        </TabsTrigger>
+        <TabsTrigger value="dialogue">대사</TabsTrigger>
       </TabsList>
     </Tabs>
   )

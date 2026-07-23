@@ -10,6 +10,8 @@ export interface PreviewScene {
   index: number
   /** 씬의 scene_actions(네이티브 서사 비트) — 줄글 스토리 본문. */
   beats: string[]
+  /** 샷 단위 이야기(유저 언어) — decoupage 완료 후 채워짐. 없으면 빈 배열(토글 숨김). */
+  shotStories: string[]
 }
 export interface PreviewCharacter {
   id: string
@@ -17,8 +19,10 @@ export interface PreviewCharacter {
   role: string
   /** 네이티브 설명(characters 테이블). 이른 시점엔 빈 문자열일 수 있음. */
   description: string
-  /** 초안 이미지(view_main) — 생성 완료 전엔 null. */
-  imageUrl: string | null
+  /** 카드용 정면샷(portrait) — 생성 완료 전엔 null. */
+  portraitUrl: string | null
+  /** 클릭 팝업용 캐릭터 템플릿(턴어라운드 시트, view_main). */
+  templateUrl: string | null
 }
 export interface WriterPreview {
   started: boolean

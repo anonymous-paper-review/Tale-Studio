@@ -33,3 +33,14 @@ export function useRoughStoryboard(
 ): RoughStoryboardImage | null {
   return useWriterStore((s) => selectRoughStoryboard(s.shots, writerShotId))
 }
+
+/** Shot 의 목각 previz 영상(shots.previz_video)을 writerShotId 스코프로 구독(#previz-video). */
+export function usePrevizVideo(
+  writerShotId: string | null,
+): RoughStoryboardImage | null {
+  return useWriterStore((s) => {
+    if (!writerShotId) return null
+    const shot = s.shots.find((sh) => sh.shotId === writerShotId)
+    return shot?.previzVideo ?? null
+  })
+}

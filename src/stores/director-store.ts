@@ -11,6 +11,8 @@ import {
   newDirectorId,
   SHOT_OFFSET_X,
   SHOT_OFFSET_Y,
+  PREVIZ_VIDEO_OFFSET_X,
+  SHOT_IMAGE_OFFSET_Y,
   VIDEO_OFFSET_X,
   VIDEO_OFFSET_Y,
   ASSET_OFFSET_X,
@@ -20,6 +22,10 @@ import {
   isVideoData,
   isAssetData,
   isPromptData,
+  isPrevizVideoData,
+  isShotImageData,
+  isVideoPlaceholderData,
+  isDerivedNodeData,
   type DirectorNode,
   type DirectorEdge,
   type DirectorNodeData,
@@ -615,6 +621,8 @@ interface DirectorCanvasState {
   //   살아있어, 재진입 시 fitView로 위치가 초기화되던 문제를 막는다.
   viewportInitialized: boolean
   viewMode: 'node' | 'storyboard'
+  /** Storyboard 뷰 미디어 모드(#previz-video) — Previz(목각, 기본) | Real(실사). 상단바 토글이 제어. */
+  storyboardMediaMode: 'previz' | 'real'
 
   // popup/modal
   popupNodeId: string | null
@@ -646,6 +654,7 @@ interface DirectorCanvasState {
   setProjectId: (projectId: string) => void
   setViewport: (vp: { x: number; y: number; zoom: number }) => void
   setViewMode: (m: 'node' | 'storyboard') => void
+  setStoryboardMediaMode: (m: 'previz' | 'real') => void
 
   // Step 2 (unify-director-store-db): DB 일원화
   /** 노드 이동 후 canvas_position을 해당 테이블에 debounce write (drag end에서 호출) */
@@ -687,6 +696,13 @@ interface DirectorCanvasState {
    * shot에 references 엣지를 잇는다. asset과 겹치는 shot은 우측으로 밀어 정렬.
    */
   rebuildAssetNodes: () => void
+  /**
+   * Previz 체인 파생 노드/엣지 재생성(#previz-chain 2026-07-22, 멱등) —
+   * writerShotId 있는 Shot 마다 PREVIZ SHOT VIDEO(우측)·SHOT IMAGE(그 아래) 노드를 만들고
+   * Shot→PrevizVideo→Video, ShotImage→Video 체인 엣지로 배선한다.
+   * 해당 Shot 의 기존 Shot→Video parent 엣지는 체인으로 대체(제거)된다.
+   */
+  rebuildShotChainNodes: () => void
   /** 미사용 에셋 표시 토글 — 켜면 좌상단에 참조되지 않은 character/world 노드를 추가 */
   toggleUnusedAssets: () => void
   /** 현재 노드/엣지 스냅샷을 히스토리에 기록 (변경 직전 호출, suppress 중엔 무시) */
@@ -996,6 +1012,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       viewport: { x: 0, y: 0, zoom: 1 },
       viewportInitialized: false,
       viewMode: 'node',
+      storyboardMediaMode: 'previz',
       popupNodeId: null,
       deleteConfirmInfo: null,
       relationModal: null,
@@ -1040,6 +1057,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
       setViewport: (vp) => set({ viewport: vp }),
       setViewMode: (m) => set({ viewMode: m }),
+      setStoryboardMediaMode: (m) => set({ storyboardMediaMode: m }),
 
       // ─── Step 2: DB 일원화 (position write-back + hydrate) ──────────────
 
@@ -1090,8 +1108,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           lastSavedAt: Date.now(),
         }))
         for (const id of posById.keys()) get().persistNodePosition(id)
-        // asset 컬럼을 새 scene 위치 기준으로 재배치
+        // asset 컬럼·previz 체인을 새 위치 기준으로 재배치 (둘 다 파생 — 멱등 재생성)
         get().rebuildAssetNodes()
+        get().rebuildShotChainNodes()
       },
 
       hydrateFromDb: async (projectId) => {
@@ -1310,6 +1329,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
             return { nodes, edges, lastSavedAt: Date.now() }
           })
+          // hydrate 로 Video 노드 집합이 바뀌었을 수 있음 — previz 체인 엣지 재배선(멱등).
+          get().rebuildShotChainNodes()
         } catch (err) {
           console.error('[director-store] hydrateFromDb failed:', err)
           throw err
@@ -1395,6 +1416,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           edges: [...s.edges, parentEdge],
           lastSavedAt: Date.now(),
         }))
+        // 체인 샷이면 parent 엣지를 previz 체인(PrevizVideo/ShotImage→Video)으로 즉시 전환.
+        get().rebuildShotChainNodes()
 
         return id
       },
@@ -1575,6 +1598,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           selectedNodeId: s.selectedNodeId && ids.has(s.selectedNodeId) ? null : s.selectedNodeId,
           lastSavedAt: Date.now(),
         }))
+        // 삭제된 샷의 previz 체인 파생 노드 정리 (부모 없는 파생은 rebuild 가 재생성 안 함)
+        get().rebuildShotChainNodes()
 
         try {
           await Promise.all(
@@ -1788,6 +1813,113 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   data: { category: 'references', relationText: '' },
                 })
               }
+            }
+          }
+
+          return { nodes, edges, lastSavedAt: Date.now() }
+        })
+      },
+
+      rebuildShotChainNodes: () => {
+        set((s) => {
+          // 1) 기존 파생물 제거 — 멱등 재생성
+          const nodes = s.nodes.filter(
+            (n) =>
+              !isPrevizVideoData(n.data) &&
+              !isShotImageData(n.data) &&
+              !isVideoPlaceholderData(n.data),
+          )
+          let edges = s.edges.filter((e) => e.data?.category !== 'chain')
+
+          // 체인 대상: writer 파이프라인 샷(writerShotId 有)만 — 수동 노드는 기존 직결 유지.
+          const chainShots = nodes.filter(
+            (n) => isShotData(n.data) && !!n.data.writerShotId,
+          )
+          if (chainShots.length === 0) return { nodes, edges, lastSavedAt: Date.now() }
+
+          // 2) 체인 샷의 기존 Shot→Video parent 엣지는 previz 체인으로 대체(제거).
+          const chainShotIds = new Set(chainShots.map((n) => n.id))
+          const videoNodeIds = new Set(
+            nodes.filter((n) => isVideoData(n.data)).map((n) => n.id),
+          )
+          edges = edges.filter(
+            (e) =>
+              !(
+                e.data?.category === 'parent' &&
+                chainShotIds.has(e.source) &&
+                videoNodeIds.has(e.target)
+              ),
+          )
+
+          const chainEdge = (id: string, source: string, target: string): DirectorEdge => ({
+            id,
+            source,
+            target,
+            sourceHandle: 'right',
+            targetHandle: 'left',
+            type: 'chain',
+            data: { category: 'chain', relationText: '' },
+          })
+
+          for (const shot of chainShots) {
+            const sd = shot.data as ShotNodeData
+            const pvId = `dn_pv_${shot.id}`
+            const simgId = `dn_simg_${shot.id}`
+            nodes.push({
+              id: pvId,
+              type: 'previzVideo',
+              position: {
+                x: shot.position.x + PREVIZ_VIDEO_OFFSET_X,
+                y: shot.position.y,
+              },
+              draggable: false,
+              selectable: true, // 클릭=선택 링, 더블클릭=부모 Shot 모달(2026-07-23 피드백)
+              connectable: false,
+              data: {
+                kind: 'previzVideo',
+                label: sd.label,
+                parentShotNodeId: shot.id,
+                writerShotId: sd.writerShotId as string,
+              },
+            })
+            nodes.push({
+              id: simgId,
+              type: 'shotImage',
+              position: {
+                x: shot.position.x + PREVIZ_VIDEO_OFFSET_X,
+                y: shot.position.y + SHOT_IMAGE_OFFSET_Y,
+              },
+              draggable: false,
+              selectable: true,
+              connectable: false,
+              data: { kind: 'shotImage', label: sd.label, parentShotNodeId: shot.id },
+            })
+            edges.push(chainEdge(`de_chain_${shot.id}_pv`, shot.id, pvId))
+            let hasVideo = false
+            for (const v of nodes) {
+              if (!isVideoData(v.data) || v.data.parentShotNodeId !== shot.id) continue
+              hasVideo = true
+              edges.push(chainEdge(`de_chain_pv_${v.id}`, pvId, v.id))
+              edges.push(chainEdge(`de_chain_simg_${v.id}`, simgId, v.id))
+            }
+            // 테이크 0개 — 회색 SHOT VIDEO 플레이스홀더로 체인 종점을 안내(2026-07-22 피드백).
+            //   첫 테이크가 생기면 다음 rebuild 가 실제 Video 노드 배선으로 대체한다.
+            if (!hasVideo) {
+              const phId = `dn_vph_${shot.id}`
+              nodes.push({
+                id: phId,
+                type: 'videoPlaceholder',
+                position: {
+                  x: shot.position.x + VIDEO_OFFSET_X,
+                  y: shot.position.y,
+                },
+                draggable: false,
+                selectable: true,
+                connectable: false,
+                data: { kind: 'videoPlaceholder', label: sd.label, parentShotNodeId: shot.id },
+              })
+              edges.push(chainEdge(`de_chain_pv_${phId}`, pvId, phId))
+              edges.push(chainEdge(`de_chain_simg_${phId}`, simgId, phId))
             }
           }
 
@@ -2037,6 +2169,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 generatedAt: Date.now(),
               },
             })
+            // 스트립 모드(#real-strip)의 frames{start,direction,end}는 잡 result_url(=start)에
+            //   실리지 않는다 — DB 진실 재수화로 회수(로컬이 방금 쓴 완료값 그대로면 DB 값 채택).
+            await get().hydrateFromDb(projectId).catch(() => {})
             notifyGenerationComplete('director', '스토리보드') // 다른 stage에 있을 때만 알림
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error'
@@ -2200,6 +2335,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           shotNode.data.storyboardImage?.status === 'completed'
             ? shotNode.data.storyboardImage.url
             : shotNode.data.referenceImages[0]?.url ?? null
+        // V2 refs(#real-strip): 실사 3프레임이 있으면 [START, END] 2장 — 시작·끝 구도 고정.
+        const sbFrames =
+          shotNode.data.storyboardImage?.status === 'completed'
+            ? shotNode.data.storyboardImage.frames
+            : undefined
+        const referenceImageUrls = sbFrames ? [sbFrames.start, sbFrames.end] : undefined
         get().updateNodeData<'video'>(videoNodeId, {
           lastAttemptStatus: 'generating',
           lastAttemptError: null,
@@ -2225,6 +2366,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           provider: toRouteProvider(eff.provider),
           durationSeconds: shotNode.data.durationSeconds ?? 5,
           referenceImageUrl,
+          ...(referenceImageUrls ? { referenceImageUrls } : {}),
         }
         const postGeneration = (recoveryReceipt?: string) =>
           fetch('/api/director/generate-video', {
@@ -2395,13 +2537,15 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       // ─── undo/redo ─────────────────────────────────────────────────────
-      // 스냅샷은 asset/references 파생 제외 — 복원 후 rebuildAssetNodes가 재생성.
+      // 스냅샷은 파생물(asset/previz 체인) 제외 — 복원 후 rebuild* 가 재생성.
       commitHistory: () => {
         if (get()._historySuppressed) return
         const s = get()
         const snap = {
-          nodes: s.nodes.filter((n) => !isAssetData(n.data)),
-          edges: s.edges.filter((e) => e.data?.category !== 'references'),
+          nodes: s.nodes.filter((n) => !isDerivedNodeData(n.data)),
+          edges: s.edges.filter(
+            (e) => e.data?.category !== 'references' && e.data?.category !== 'chain',
+          ),
         }
         // past 최대 50개 유지, 새 변경이 생기면 redo 가지(future)는 버린다
         set({ historyPast: [...s.historyPast.slice(-49), snap], historyFuture: [] })
@@ -2411,8 +2555,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         if (!s.historyPast.length) return
         const prev = s.historyPast[s.historyPast.length - 1]!
         const cur = {
-          nodes: s.nodes.filter((n) => !isAssetData(n.data)),
-          edges: s.edges.filter((e) => e.data?.category !== 'references'),
+          nodes: s.nodes.filter((n) => !isDerivedNodeData(n.data)),
+          edges: s.edges.filter(
+            (e) => e.data?.category !== 'references' && e.data?.category !== 'chain',
+          ),
         }
         set({
           nodes: prev.nodes,
@@ -2422,14 +2568,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           lastSavedAt: Date.now(),
         })
         get().rebuildAssetNodes()
+        get().rebuildShotChainNodes()
       },
       redo: () => {
         const s = get()
         if (!s.historyFuture.length) return
         const next = s.historyFuture[s.historyFuture.length - 1]!
         const cur = {
-          nodes: s.nodes.filter((n) => !isAssetData(n.data)),
-          edges: s.edges.filter((e) => e.data?.category !== 'references'),
+          nodes: s.nodes.filter((n) => !isDerivedNodeData(n.data)),
+          edges: s.edges.filter(
+            (e) => e.data?.category !== 'references' && e.data?.category !== 'chain',
+          ),
         }
         set({
           nodes: next.nodes,
@@ -2439,6 +2588,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           lastSavedAt: Date.now(),
         })
         get().rebuildAssetNodes()
+        get().rebuildShotChainNodes()
       },
 
       ensureVideoThumbnail: async (videoNodeId) => {
@@ -2557,6 +2707,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       openDeleteConfirm: (id) => {
         const node = get().nodes.find((n) => n.id === id)
         if (!node) return
+        // 파생 노드(asset/previz 체인)는 삭제 대상이 아니다 — 진실이 따로 있고 rebuild 가 재생성.
+        if (isDerivedNodeData(node.data)) return
         const info: DeleteCascadeInfo = {
           nodeId: id,
           shotCount: 0,
@@ -2887,17 +3039,19 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       name: 'tale-director-v1-default',
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
-        // asset 노드/references 엣지는 파생물(asset-storage가 진실) — persist 제외.
-        // 매 진입 시 sync가 rebuildAssetNodes로 재생성하므로 캐시에 남기면 stale 위험.
+        // 파생물(asset/previz 체인 노드, references/chain 엣지)은 persist 제외.
+        // 매 진입 시 sync가 rebuild* 로 재생성하므로 캐시에 남기면 stale 위험.
         nodes: s.nodes.filter(
-          (n) => n.data.kind !== 'asset' && (!isVideoData(n.data) || n.data.videoClipId !== null),
+          (n) =>
+            !isDerivedNodeData(n.data) &&
+            (!isVideoData(n.data) || n.data.videoClipId !== null),
         ),
         edges: (() => {
           const persistedNodeIds = new Set(
             s.nodes
               .filter(
                 (n) =>
-                  n.data.kind !== 'asset' &&
+                  !isDerivedNodeData(n.data) &&
                   (!isVideoData(n.data) || n.data.videoClipId !== null),
               )
               .map((n) => n.id),
@@ -2905,12 +3059,14 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           return s.edges.filter(
             (e) =>
               e.data?.category !== 'references' &&
+              e.data?.category !== 'chain' &&
               persistedNodeIds.has(e.source) &&
               persistedNodeIds.has(e.target),
           )
         })(),
         viewport: s.viewport,
         viewMode: s.viewMode,
+        storyboardMediaMode: s.storyboardMediaMode,
         projectId: s.projectId,
         lastSavedAt: s.lastSavedAt,
       }),
@@ -2954,6 +3110,39 @@ export function nextVideoPosition(
     x: parent.position.x + VIDEO_OFFSET_X,
     y: parent.position.y + siblings.length * VIDEO_OFFSET_Y,
   }
+}
+
+/**
+ * Previz 체인 파생 노드(드래그 불가)를 부모 Shot 위치에 상시 정합시킨다(#previz-chain).
+ * 페이지 onNodesChange 가 드래그 적용 직후 호출 — Shot 을 끌면 체인이 함께 따라온다.
+ * 변경이 없으면 입력 배열을 그대로 반환(참조 안정 — 불필요 재렌더 방지).
+ */
+export function followChainNodePositions(nodes: DirectorNode[]): DirectorNode[] {
+  let shotById: Map<string, DirectorNode> | null = null
+  let changed = false
+  const out = nodes.map((n) => {
+    if (
+      !isPrevizVideoData(n.data) &&
+      !isShotImageData(n.data) &&
+      !isVideoPlaceholderData(n.data)
+    )
+      return n
+    if (!shotById) {
+      shotById = new Map(nodes.filter((x) => isShotData(x.data)).map((x) => [x.id, x]))
+    }
+    const shot = shotById.get((n.data as { parentShotNodeId: string }).parentShotNodeId)
+    if (!shot) return n
+    const want = {
+      x:
+        shot.position.x +
+        (isVideoPlaceholderData(n.data) ? VIDEO_OFFSET_X : PREVIZ_VIDEO_OFFSET_X),
+      y: shot.position.y + (isShotImageData(n.data) ? SHOT_IMAGE_OFFSET_Y : 0),
+    }
+    if (n.position.x === want.x && n.position.y === want.y) return n
+    changed = true
+    return { ...n, position: want }
+  })
+  return changed ? out : nodes
 }
 
 /**

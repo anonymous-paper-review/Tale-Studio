@@ -154,6 +154,9 @@ export interface StyleAnchor {
   imageUrl: string | null
   /** 픽커 표시용 예시 이미지(preview_url) — I2I 레퍼런스(imageUrl)와 분리. */
   previewUrl: string | null
+  /** 픽커 카드 영문 부제(표시 전용) — 없으면 UI 가 medium 표기로 폴백. 톤 프리셋 6종은
+   *  medium 이 전부 live_action(생성 소비값)이라 구분용 부제를 DB 에 둔다(2026-07-22). */
+  subtitle: string | null
 }
 
 interface ProducerState {
@@ -529,7 +532,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       const [{ data: anchors }, projRes] = await Promise.all([
         catalog
           .from('style_anchors')
-          .select('key, label, medium, image_url, preview_url, sort_order')
+          .select('key, label, medium, image_url, preview_url, subtitle, sort_order')
           .eq('is_active', true)
           .order('sort_order'),
         projectId
@@ -543,6 +546,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           medium: a.medium,
           imageUrl: a.image_url ?? null,
           previewUrl: a.preview_url ?? null,
+          subtitle: a.subtitle ?? null,
         })),
         styleAnchorKey:
           (projRes.data as { style_anchor_key?: string | null } | null)?.style_anchor_key || null,

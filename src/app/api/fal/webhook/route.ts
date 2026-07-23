@@ -14,6 +14,7 @@ import {
   getGenerationJobByRequestId,
   failGenerationJob,
   classifyFalFailure,
+  GenerationJobTerminalTransitionError,
 } from '@/lib/generation-jobs'
 import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
 import {
@@ -103,13 +104,19 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = job.kind === 'shot_video'
+    const result = job.kind === 'shot_video' || job.kind === 'shot_previz_video'
       ? { media: 'video' as const, url: extractVideoUrl(body.payload), payload: body.payload }
       : { media: 'image' as const, url: extractImageUrl(body.payload), payload: body.payload }
     if (!result.url) throw new Error(`no ${result.media} url in webhook payload`)
     await finalizeGenerationJob(job, result)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    if (e instanceof GenerationJobTerminalTransitionError) {
+      // 중복 finalize 경쟁(webhook ↔ 폴링 reconcile) — 다른 경로가 이미 종결한 잡.
+      //   실패 아님: fail 마킹을 시도하면 같은 에러가 또 나서 500 이 됐다(2026-07-22 previz 실측).
+      console.warn('[fal/webhook] duplicate finalize ignored (already terminal):', job.id)
+      return NextResponse.json({ ok: true, deduped: true })
+    }
     if (e instanceof DirectorVideoCompletionPersistenceError) {
       console.error('[fal/webhook] video persistence failed; retaining queued attempt:', msg)
       throw e

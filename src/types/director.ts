@@ -11,13 +11,22 @@ import type { VideoModelKey } from '@/lib/video-models'
 // Director Canvas Types
 // ============================================================================
 
-export type DirectorNodeKind = 'scene' | 'shot' | 'video' | 'asset' | 'prompt'
+export type DirectorNodeKind =
+  | 'scene'
+  | 'shot'
+  | 'video'
+  | 'asset'
+  | 'prompt'
+  | 'previzVideo'
+  | 'shotImage'
+  | 'videoPlaceholder'
 
 export type DirectorEdgeCategory =
   | 'parent' // Scene→Shot, Shot→Video (계층)
   | 'relates-to' // 사용자 정의 내러티브 관계
   | 'references' // Asset→Shot (Artist 에셋을 참조하는 샷, 파생 — DB 미영속)
   | 'prompt' // Prompt 노드 → Shot T 입력 (프롬프트 와이어, 영속)
+  | 'chain' // Shot→PrevizVideo→Video, ShotImage→Video (previz 체인, 파생 — DB 미영속)
 
 export type DirectorVideoStatus =
   | 'pending'
@@ -43,10 +52,19 @@ export type DirectorReferenceImage = {
  * 이 이미지가 해당 샷 I2V 영상 생성의 기본 레퍼런스가 된다.
  */
 export type StoryboardImage = {
+  /** 대표 프레임(3프레임 세트에선 start) — 단일 이미지 구버전과의 하위 호환 필드. */
   url: string
   status: DirectorVideoStatus // 'pending'|'generating'|'completed'|'failed' 재사용
   errorMessage: string | null
   generatedAt: number
+  /** 실사 3프레임 세트(#real-strip 2026-07-22): 러프 스트립을 레퍼런스로 리페인트한 start→direction→end. */
+  frames?: {
+    start: string
+    direction: string
+    end: string
+  }
+  /** 이 세트가 잘려 나온 원본 스트립 이미지 (디버그·재현용). */
+  stripUrl?: string
 }
 
 // ─── Scene Node ────────────────────────────────────────────────────────────
@@ -164,6 +182,47 @@ export type AssetNodeData = {
   [key: string]: unknown
 }
 
+// ─── Previz 체인 파생 노드 (#previz-chain 2026-07-22) ────────────────────────
+
+/**
+ * Shot 의 목각 previz 영상(shots.previz_video)을 표시하는 파생 노드.
+ * 체인: SCENE → PREVIZ SHOT IMAGE(Shot) → PREVIZ SHOT VIDEO(이 노드) → SHOT VIDEO,
+ *       SHOT IMAGE(실사)가 아래에서 SHOT VIDEO 로 합류.
+ * DB 미영속 — writer-store shots(previz_video/rough)가 진실, rebuildShotChainNodes 가 재생성.
+ * 위치는 부모 Shot 기준 고정(draggable=false, 드래그 따라오기는 followChainNodePositions).
+ */
+export type PrevizVideoNodeData = {
+  kind: 'previzVideo'
+  label: string
+  parentShotNodeId: string
+  /** writer shots.shot_id — previz_video/rough_storyboard 구독 키 */
+  writerShotId: string
+  [key: string]: unknown
+}
+
+/**
+ * Shot 의 실사 스토리보드 이미지(shots.storyboard_image)를 표시하는 파생 노드.
+ * 진실은 부모 Shot 노드 data.storyboardImage — 이 노드는 표시+생성 트리거만.
+ */
+export type ShotImageNodeData = {
+  kind: 'shotImage'
+  label: string
+  parentShotNodeId: string
+  [key: string]: unknown
+}
+
+/**
+ * SHOT VIDEO 자리 표시 파생 노드 — 테이크가 0개인 체인 샷의 종점을 회색 카드로 보여줘
+ * "여기서 영상이 나온다"는 연결성을 넌지시 안내한다(2026-07-22 피드백). 생성 버튼으로
+ * 첫 테이크를 만들면 rebuild 가 실제 Video 노드로 대체(플레이스홀더 제거)한다.
+ */
+export type VideoPlaceholderNodeData = {
+  kind: 'videoPlaceholder'
+  label: string
+  parentShotNodeId: string
+  [key: string]: unknown
+}
+
 // ─── Prompt Node (Higgsfield식 분리 프롬프트) ────────────────────────────────
 
 /**
@@ -190,6 +249,9 @@ export type DirectorNodeData =
   | VideoNodeData
   | AssetNodeData
   | PromptNodeData
+  | PrevizVideoNodeData
+  | ShotImageNodeData
+  | VideoPlaceholderNodeData
 
 export type DirectorEdgeData = {
   category: DirectorEdgeCategory
@@ -212,10 +274,15 @@ export const newDirectorId = (
 export const SCENE_OFFSET_X = 360
 /** Shot 노드 폭 + gap (Scene 우측에 stacking) */
 export const SHOT_OFFSET_X = 360
-/** Shot 형제 간 세로 간격 — 스토리보드 썸네일 포함 카드 실높이(~300px)보다 커야 자동 정렬 시 안 겹친다(#e3 2026-07-13) */
-export const SHOT_OFFSET_Y = 340
-/** Video 노드 폭 + gap (Shot 우측 stacking). Scene→Shot(360)과 동일 간격으로 여유 확보 */
-export const VIDEO_OFFSET_X = 360
+/** Shot 형제 간 세로 간격(#previz-chain) — previz 체인 컬럼(PREVIZ VIDEO 위 + SHOT IMAGE 아래,
+ *  ~520px)이 다음 샷 행과 안 겹치는 높이. (구 340 — 체인 도입으로 확대) */
+export const SHOT_OFFSET_Y = 560
+/** Previz Video 노드 x (Shot 우측 stacking, #previz-chain) */
+export const PREVIZ_VIDEO_OFFSET_X = 360
+/** Shot Image(실사) 노드 y — previz 컬럼에서 PREVIZ VIDEO 아래 (#previz-chain) */
+export const SHOT_IMAGE_OFFSET_Y = 260
+/** Video 노드 x (Shot 기준) — previz 체인 컬럼 다음 (#previz-chain: 360→720) */
+export const VIDEO_OFFSET_X = 720
 /** Video 형제 간 세로 간격 — 썸네일 카드 겹침 방지 여유 포함(#e3) */
 export const VIDEO_OFFSET_Y = 260
 /** snap-to-grid */
@@ -246,4 +313,28 @@ export function isAssetData(d: DirectorNodeData): d is AssetNodeData {
 
 export function isPromptData(d: DirectorNodeData): d is PromptNodeData {
   return d.kind === 'prompt'
+}
+
+export function isPrevizVideoData(d: DirectorNodeData): d is PrevizVideoNodeData {
+  return d.kind === 'previzVideo'
+}
+
+export function isShotImageData(d: DirectorNodeData): d is ShotImageNodeData {
+  return d.kind === 'shotImage'
+}
+
+export function isVideoPlaceholderData(
+  d: DirectorNodeData,
+): d is VideoPlaceholderNodeData {
+  return d.kind === 'videoPlaceholder'
+}
+
+/** DB 미영속 파생 노드(재생성 대상) 판별 — persist/undo 스냅샷 제외용. */
+export function isDerivedNodeData(d: DirectorNodeData): boolean {
+  return (
+    d.kind === 'asset' ||
+    d.kind === 'previzVideo' ||
+    d.kind === 'shotImage' ||
+    d.kind === 'videoPlaceholder'
+  )
 }

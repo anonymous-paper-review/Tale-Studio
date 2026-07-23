@@ -34,6 +34,8 @@ import type {
   CharacterVisual,
   ShotSequence,
   ShotStaticSpec,
+  DialogueTrack,
+  ShotDialogue,
 } from '@/lib/writer/types/pipeline'
 
 const UUID_RE =
@@ -366,7 +368,7 @@ type PersistShotDraft = {
   staticSpec: FacetRenderSpec | null
   promptSourceHash: string | null
   chars: string[]
-  dialogue?: string
+  shotDialogue: ShotDialogue | null
   duration: number
   i: number
 }
@@ -507,10 +509,19 @@ export function applyShotCarryForward<T extends Record<string, unknown>>(
 export async function persistShotsToDb(
   projectId: string,
   shotSequence: ShotSequence,
+  // 샷 단위 대사 트랙(#dialogue-v4 2026-07-23) — dialogue 스테이지 산출. null이면 대사 없이 기록
+  //   (구 run resume 등). 옛 S.dialogue(무스펙 + chars[0] 화자 추정 + dialogue_summary 폴백)는 폐기.
+  dialogue?: DialogueTrack | null,
 ): Promise<void> {
   if (!UUID_RE.test(projectId)) return // 핸드오프 외 run — DB project 없음
 
   const existingByShotId = await readShotCarryForwardById(projectId)
+
+  // shot_id → 대사 매핑 (화자 명시 — 옛 chars[0] 추정 제거)
+  const dialogueByShotId = new Map<string, ShotDialogue>()
+  for (const sc of dialogue?.scenes ?? []) {
+    for (const sh of sc.shots) dialogueByShotId.set(sh.shot_id, sh)
+  }
 
   // 자신이 채우는 테이블만 정리 (shots). characters/locations/scenes 는 Tier 1 소관.
   await supabaseAdmin.from('shots').delete().eq('project_id', projectId)
@@ -552,7 +563,8 @@ export async function persistShotsToDb(
         staticSpec,
         promptSourceHash: safeFacetsHash(staticSpec),
         chars: Array.from(new Set(chars)),
-        dialogue: it.S?.dialogue,
+        // #dialogue-v4: 대사 트랙(화자 명시)에서 조회 — it.shot_id는 decoupage 표준화 id 그대로.
+        shotDialogue: dialogueByShotId.get(it.shot_id) ?? null,
         duration: clampShotSeconds(it.duration_seconds), // #9 페이싱 상한
         i,
       }
@@ -593,8 +605,21 @@ export async function persistShotsToDb(
           prompt_source_hash: r.promptSourceHash,
           duration_seconds: r.duration,
           generation_method: 'I2V',
-          dialogue_lines: r.dialogue
-            ? [{ characterId: r.chars[0] ?? null, text: r.dialogue, emotion: '', delivery: '', durationHint: 0 }]
+          // #dialogue-v4: 화자 명시 대사 라인 (옛 chars[0] 화자 추정·dialogue_summary 폴백 폐기).
+          //   내레이션(V.O.)은 characterId null 라인으로 — 뷰가 'V.O.'로 표기.
+          dialogue_lines: r.shotDialogue
+            ? [
+                ...r.shotDialogue.dialogue.map((l) => ({
+                  characterId: l.character_id,
+                  text: l.line,
+                  emotion: '',
+                  delivery: l.delivery ?? '',
+                  durationHint: 0,
+                })),
+                ...(r.shotDialogue.narration
+                  ? [{ characterId: null, text: r.shotDialogue.narration, emotion: '', delivery: 'V.O.', durationHint: 0 }]
+                  : []),
+              ]
             : [],
           camera_config: { ...DEFAULT_CAMERA },
           lighting_config: { ...DEFAULT_LIGHTING },

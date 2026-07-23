@@ -11,6 +11,7 @@ export type GenerationJobKind =
   | 'shot_storyboard'
   | 'shot_rough_storyboard'
   | 'shot_video'
+  | 'shot_previz_video'
 export type GenerationJobStatus = 'queued' | 'completed' | 'failed'
 /** 잡 트리거 주체 — ui(직접 조작) | chat(글로벌 채팅 updates) | writer(핸드오프 파이프라인) */
 export type GenerationJobActor = 'ui' | 'chat' | 'writer'
@@ -28,6 +29,10 @@ export interface GenerationJobTarget {
   writerShotId?: string
   videoClipId?: string
   retakeMode?: 'new_take' | 'regeneration'
+  // shot_rough_storyboard 그리드(#rough-grid 2026-07-22): 잡 1개 = 그리드 1장 = 샷 최대 4개.
+  //   열 순서와 배열 순서가 1:1 — finalize 가 셀을 잘라 각 샷에 배분한다. (writerShotId 단일은 구버전 경로)
+  writerShotIds?: string[]
+  gridVariant?: 'grid4' | 'strip1'
 }
 
 export interface GenerationJob {
