@@ -102,3 +102,6 @@ dev/Image_Style/
 # 테스트 계정 평문 비번 (커밋 금지)
 docs/test-accounts.md
 docs/test-accounts.csv
+
+# research: 재생성 가능한 중간 클립은 로컬만 (CONVENTIONS 규칙 7)
+research/experiments/**/assets/clips/

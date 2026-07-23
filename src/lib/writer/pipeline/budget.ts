@@ -2,7 +2,7 @@
 //
 // physics.ts(물리 — 백엔드 법칙, 협상 불가)와 달리 여기는 **제품 정책**이다:
 // 장편(D6~D7)은 MVP에서 "겉으로 30~60분 되는 척"이 목표이지 정직한 커버가 아니다
-// (제품 오너 결정 2026-07-21 — research/writer/experiments/results/E3a-time-budget.md).
+// (제품 오너 결정 2026-07-21 — research/experiments/time-budget/2026-07-21_collapse-diagnosis/result.md).
 // 장편이 진짜 스코프가 되면 이 파일의 정책 상수만 조정한다.
 //
 // 배경 실측(E3a): 모델은 총합 산수(총 estimated_seconds ≈ runtime)는 잘 맞추지만,

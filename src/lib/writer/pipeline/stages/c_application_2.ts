@@ -2,7 +2,7 @@
 // Step 1: 결정론 조립 — L4 1개당 ShotSequenceItem 정확히 1개 (E12b 2026-07-21: LLM 조립 제거.
 //   렌더 소비 필드(first_frame/motion 프롬프트·duration·assets)는 L4가 이미 최종본이라 LLM 조립은
 //   같은 값을 복사할 뿐이었고(A/B 실측: 렌더 필드 변조 0), LLM만 채우던 메타(hook_type/motif/
-//   continuity)는 소비처 0. 제거로 콜 1개·60~160s 절감. 근거: research/writer/experiments/results/E12b-c2-step1.md)
+//   continuity)는 소비처 0. 제거로 콜 1개·60~160s 절감. 근거: research/experiments/validators/2026-07-21_shotcheck-deterministic/result.md)
 // Step 2: Claude로 액션 스코프 + 일관성 검증 (실패 시 split)
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import type {

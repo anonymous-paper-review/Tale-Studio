@@ -1,7 +1,7 @@
 // 영상 생성 물리 상수 — 프롬프트에 주입되는 백엔드 법칙의 단일 소스 (#prompt-audit 2026-07-21, 독트린 P2).
 // 같은 법칙(샷 초 대역·프롬프트 자수)이 스테이지 산문마다 다른 숫자로 표류하던 것을 여기로 수렴한다
 // (실측: decoupage "2~8초" vs v4 "5~15초" 동거, v4 "50~80자" vs v5 "50~100자").
-// 값 변경 시 회귀 배터리(research/writer/experiments — R1) 재실행이 계약이다.
+// 값 변경 시 회귀 배터리(research/experiments/foundation/2026-07-21_cleanup-regression — R1) 재실행이 계약이다.
 
 export const SHOT_PHYSICS = {
   /** 샷 하나의 초 대역 — 생성 클립 단위. 짧고 스냅있게. */
