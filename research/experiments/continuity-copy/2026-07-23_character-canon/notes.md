@@ -6,14 +6,14 @@
 ## 무엇을 했나
 
 1. **텍스트 후보 4종 생성 → 폐기**. 인물을 글(프롬프트)로만 묘사해 4장을 뽑아봤다
-   ([candidate_1](assets/candidate_1.jpg) · [candidate_2](assets/candidate_2.jpg) ·
-   [candidate_3](assets/candidate_3.jpg) · [candidate_4](assets/candidate_4.jpg)).
+   (![|180](assets/candidate_1.jpg) · ![|180](assets/candidate_2.jpg) ·
+   ![|180](assets/candidate_3.jpg) · ![|180](assets/candidate_4.jpg)).
    오너 판정: 글 묘사로는 레퍼런스의 인물과 같은 사람이 안 나온다 → **전부 폐기**.
 2. **레퍼런스 정면 1장을 정본으로 확정**. 원본 영상 10.9초 지점의 정면 프레임 한 장을
-   신원 기준으로 채택했다 → [identity_ref.jpg](assets/identity_ref.jpg).
-   (레퍼런스에서 뽑아둔 각도 팩은 [assets/ref_extracted/](assets/ref_extracted/_pack_preview.jpg)에 보관.)
+   신원 기준으로 채택했다 → ![|180](assets/identity_ref.jpg).
+   (레퍼런스에서 뽑아둔 각도 팩은 ![|180](assets/ref_extracted/_pack_preview.jpg)에 보관.)
 3. **신원 전파 테스트 2컷 성공**. 정본 1장으로 다른 포즈·앵글을 생성해 같은 인물로 유지되는지 확인 —
-   [전신 3/4](assets/test_34_fullbody.jpg), [앉은 프로필](assets/test_profile_sit.jpg) 모두 통과.
+   ![|180](assets/test_34_fullbody.jpg), ![|180](assets/test_profile_sit.jpg) 모두 통과.
 
 ## 다음 용도
 

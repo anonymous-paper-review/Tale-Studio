@@ -126,7 +126,7 @@ LLM 비용은 0원이다.
   비용 0
 - 실행: 서브에이전트(Sonnet) / 판정: Claude(Fable)
 - 스크립트: 스크래치패드 throwaway (`d1_audit.mjs` — 세션 종료 시 소멸, 패턴은 `scripts/verify-db.mjs`)
-- 판정 기준 원문: 실험 계획서(`../../campaign-2607/plan.md`) §3 D1 카드
+- 판정 기준 원문: 실험 계획서(`../../utils/campaign-2607/plan.md`) §3 D1 카드
 - 질문–실험ID 매핑(재현용): 질문1=세션 열린질문 #3(구조 다양성 재감사) · 질문2=E4(관습 씬 흐름 힌트)
   → 기각 · 질문3=E10(uncovered_beats validator) → 기각 · 질문4=E12a(hook_type 실태) → E12b(C2
   결정론화) 근거 강화 · 질문5=E11(언어 실험 범위 축소) + W5(V5 자수 정렬, 최하 우선순위)

@@ -1,8 +1,8 @@
 # 실험 INDEX — 유일한 상태판
 
 > 트랙별 실험 목록·상태·한 줄 결론의 단일 진실원. 폴더·명명 규칙은 [`CONVENTIONS.md`](CONVENTIONS.md),
-> 하네스 실행 런북은 [`README.md`](README.md), 첫 캠페인 회고는 [`campaign-2607/retrospective.md`](campaign-2607/retrospective.md).
-> 상태·결론은 각 `result.md` 머리말과 [`campaign-2607/plan.md`](campaign-2607/plan.md) §4에서 그대로 옮긴 것이다(재해석 없음).
+> 하네스 실행 런북은 [`README.md`](README.md), 첫 캠페인 회고는 [`utils/campaign-2607/retrospective.md`](utils/campaign-2607/retrospective.md).
+> 상태·결론은 각 `result.md` 머리말과 [`utils/campaign-2607/plan.md`](utils/campaign-2607/plan.md) §4에서 그대로 옮긴 것이다(재해석 없음).
 > 옛 E번호는 검색용 별칭으로만 남긴다.
 
 ## 1. 트랙별 실험

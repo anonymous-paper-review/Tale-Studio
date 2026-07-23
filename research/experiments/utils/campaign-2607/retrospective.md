@@ -26,7 +26,7 @@ E7은 W1/R1 관찰로 흡수, E4·E10은 D1 감사에서 기각, E12a는 E12b로
 → **07-22 오너 일괄 판정 완료**: E6·E8·E9·E13은 "조건 변경 후 재측정" 판정으로 2일차 후속 실험(아래
 ⑭~⑱)이 파생됐고, E11만 판정 대기로 남았다. 판정 기록은 같은 문서 §5.
 
-**독트린이란**: [`../../canon/writer-job-model.md`](../../canon/writer-job-model.md) —
+**독트린이란**: [`../../canon/writer-job-model.md`](../../../canon/writer-job-model.md) —
 "writer는 결정 압축기다"라는 직무 정의와, 그로부터 유도한 프롬프트 작성 원칙 P1~P7.
 이번 캠페인의 절반은 프롬프트 개선이고 절반은 **이 독트린 자체가 맞는지 실측 검증**이었다.
 
@@ -39,56 +39,56 @@ E7은 W1/R1 관찰로 흡수, E4·E10은 D1 감사에서 기각, E12a는 E12b로
 - **방법**: 까다로운 프리셋 2종(갈등 없는 대비 광고, 순환 루프) × 각 3회 생성.
 - **결과**: **꺾임 미확정** — 대체로 콘텐츠를 따라갔다. 재작성(E0b)은 보류.
 - **독트린 연결**: P3(축 어휘 분리)의 필요성 진단 — "지금 당장 깨져 있진 않다"로 판명.
-- 상세: [`../foundation/2026-07-21_ladder-probe/result.md`](../foundation/2026-07-21_ladder-probe/result.md)
+- 상세: [`../foundation/2026-07-21_ladder-probe/result.md`](../../foundation/2026-07-21_ladder-probe/result.md)
 
 ### ② E3a — 시간 예산이 정말 무너져 있는가 (진단)
 - **의심**: 총 러닝타임 정합을 아무 스테이지도 소유하지 않아 씬 시간이 뻥튀기된다.
 - **방법**: 길이 3종(숏폼/광고/장편) × 각 3회. 두 가지를 쟀다 — 총 길이가 목표와 맞는가, 씬 하나 안에서 "예상 초"와 "행동 개수×5~8초"가 맞는가.
 - **결과**: **씬 내부 산술 붕괴 확정** (씬에 적힌 초와 실제 행동 분량이 안 맞음). 총 길이 가설은 기각 — 총합은 잘 맞고 있었다.
 - **독트린 연결**: P6(산수는 모델에게 시키지 않는다)의 근거 실측 — 처방 E3b의 입력.
-- 상세: [`../time-budget/2026-07-21_collapse-diagnosis/result.md`](../time-budget/2026-07-21_collapse-diagnosis/result.md)
+- 상세: [`../time-budget/2026-07-21_collapse-diagnosis/result.md`](../../time-budget/2026-07-21_collapse-diagnosis/result.md)
 
 ### ③ D1 — DB에 쌓인 과거 산출물 전수 감사 (진단, LLM 비용 0)
 - **의심**: 여러 실험 후보들이 진짜 문제인지 기존 데이터로 먼저 거를 수 있다.
 - **방법**: 저장된 run들의 구조 분포·씬 목적·미커버 비트·메타 채움률 집계.
 - **결과**: E4·E10은 **문제 없음으로 기각**(실험 안 함), C2 메타가 희박하다는 발견이 E12b를 강화.
 - **독트린 연결**: "실측 없는 프롬프트 변경 금지" 규칙의 실천 — 실험 대기열 자체를 데이터로 확정.
-- 상세: [`../foundation/2026-07-21_db-audit/result.md`](../foundation/2026-07-21_db-audit/result.md)
+- 상세: [`../foundation/2026-07-21_db-audit/result.md`](../../foundation/2026-07-21_db-audit/result.md)
 
 ### ④ W1~W5 + R1 — 청소 5건 일괄 적용 + 회귀 확인
 - **내용**: 물리 상수 단일화, 죽은 지시 제거, 낡은 명칭 정리, 화면비 코드 고정, fallback 자수 일치.
 - **방법**: 실험 불요(코드 리딩으로 증명) — 대신 적용 전/후 회귀 배터리로 악화 0을 확인.
 - **결과**: **통과 (악화 지표 0)**.
 - **독트린 연결**: P2(물리 상수 단일 소스)·P4(프롬프트는 실제 배선만 말한다)의 직접 집행.
-- 상세: [`../foundation/2026-07-21_cleanup-regression/result.md`](../foundation/2026-07-21_cleanup-regression/result.md)
+- 상세: [`../foundation/2026-07-21_cleanup-regression/result.md`](../../foundation/2026-07-21_cleanup-regression/result.md)
 
 ### ⑤ E3b — 씬 시간 예산표를 코드가 계산해서 주입 ✅ 채택
 - **가설**: ②에서 확정된 붕괴는 모델에게 암산을 시켜서다 — 코드가 예산표를 주면 수렴한다.
 - **방법**: 주입판 vs 현행 × 4종 길이 × 각 3회. 장편은 제품 결정(겉보기 스코프)에 따라 2층 예산.
 - **결과**: **채택** — 전 기준 통과, 검증 교정 0회 발동.
 - **독트린 연결**: **P6 채택 확정** — 독트린 §4에 판정 기록됨.
-- 상세: [`../time-budget/2026-07-21_budget-injection/result.md`](../time-budget/2026-07-21_budget-injection/result.md)
+- 상세: [`../time-budget/2026-07-21_budget-injection/result.md`](../../time-budget/2026-07-21_budget-injection/result.md)
 
 ### ⑥ E1 — 원장 3블록 서두 (독트린 심장 검증 1) ✅ 미채택
 - **가설**: 모든 저작 프롬프트에 [불변 입력/저작 범위/채움 원칙] 표준 서두를 달면 유저 확정값 이탈이 준다.
 - **방법**: 지켜야 할 확정값을 일부러 잔뜩 심은 이야기 소재를 신설(고정 소품·고정 결말·차별점 설정), 16쌍 32회, 코드가 교정하기 **전**의 모델 원본 응답 기준으로 채점.
 - **결과**: **미채택 — 바닥 효과**. 현행도 위반이 거의 0이라 서두를 달아도 줄일 것이 없었다.
 - **독트린 연결**: **P1은 "위반 예방책"으로는 기각**, "프롬프트 재작성 시 보존해야 할 목록"으로 재해석 — 독트린 §4 수정.
-- 상세: [`../foundation/2026-07-21_ledger-blocks/result.md`](../foundation/2026-07-21_ledger-blocks/result.md)
+- 상세: [`../foundation/2026-07-21_ledger-blocks/result.md`](../../foundation/2026-07-21_ledger-blocks/result.md)
 
 ### ⑦ E5 — 스토리 검수(C1)의 존폐 (독트린 심장 검증 2) ✅ 재정의판 채택
 - **가설**: C1은 의도된 관습(클리셰)을 감점한다(P5 위반). 정작 진짜 결함은 잡는지 불명.
 - **방법**: 오탐 배터리(정상 산출물 5건) + 검출력 배터리(결함 주입 변이) 직접 측정, 이후 10장르 일반화 확인.
 - **결과**: 원판은 오탐 실재 + 검출력도 있음 → **클리셰 감점을 제거한 재정의판으로 교체 채택** (오탐 0, 검출력 4/4, 10장르 통과).
 - **독트린 연결**: **P5 채택 확정** — "관습은 결함이 아니다, 감점은 인과 붕괴·차별점 실종만" 이 문장이 코드(프롬프트)가 됨.
-- 상세: [`../validators/2026-07-21_storycheck-redefine/result.md`](../validators/2026-07-21_storycheck-redefine/result.md)
+- 상세: [`../validators/2026-07-21_storycheck-redefine/result.md`](../../validators/2026-07-21_storycheck-redefine/result.md)
 
 ### ⑧ E12b — 샷 조립 LLM 제거, 결정론화 ✅ 채택·구현 완료
 - **가설**: C2의 1단계(LLM이 샷 조립)는 코드 reconcile이 어차피 진실이라 무가치 — 제거해도 결과 동일.
 - **방법**: 입력 고정 파일 주입으로 C2만 격리, 조립 있음/없음 각 2회 × 2프리셋, 렌더 소비 필드 diff.
 - **결과**: **채택** — 렌더 필드 동일, 남는 메타는 소비처 0(grep 실측), 콜 1개↓·60~160초↓, 샷 유실이 구조적으로 불가능해짐. 코드 반영 완료.
 - **독트린 연결**: P4의 연장(코드가 진실인 곳에 LLM 서사를 두지 않는다) + D1-④ 감사의 처방.
-- 상세: [`../validators/2026-07-21_shotcheck-deterministic/result.md`](../validators/2026-07-21_shotcheck-deterministic/result.md)
+- 상세: [`../validators/2026-07-21_shotcheck-deterministic/result.md`](../../validators/2026-07-21_shotcheck-deterministic/result.md)
 
 ---
 
@@ -100,31 +100,31 @@ E7은 W1/R1 관찰로 흡수, E4·E10은 D1 감사에서 기각, E12a는 E12b로
 - **질문**: 항상 꺼져 있는 밑그림 단계, 켜면 나아지나?
 - **결과**: 켠 쪽이 **오히려 불안정** (매체가 run마다 바뀜, 정해진 어휘가 자유 문장으로 붕괴) + 9~10초 손해.
 - **권고**: 삭제. **독트린 연결**: P4 — 죽은 배선은 프롬프트에서도 코드에서도 지운다.
-- 상세: [`../visual-wiring/2026-07-21_midpreview-onoff/result.md`](../visual-wiring/2026-07-21_midpreview-onoff/result.md)
+- 상세: [`../visual-wiring/2026-07-21_midpreview-onoff/result.md`](../../visual-wiring/2026-07-21_midpreview-onoff/result.md)
 
 ### ⑩ E8 — 막별 색·조명 설계(v1)의 끊긴 배선 🟡
 - **질문**: 매번 만들고 버려지는 v1 설계를 V3에 이어주면 효과가 있나?
 - **결과**: **있다** — 막 사이 색온도 진행폭 약 2배, 팔레트 3색→6~11색 분화. 검증 위반 증가 없음.
 - **권고**: 배선 복원 우세 (1줄 수정 + 팔레트 준수 1회 확인 조건). **독트린 연결**: P4의 반대 방향 사례 — "죽은 배선"이 아니라 "살릴 가치가 있는 끊긴 배선"이었다.
-- 상세: [`../visual-wiring/2026-07-21_act-arc-wiring/result.md`](../visual-wiring/2026-07-21_act-arc-wiring/result.md)
+- 상세: [`../visual-wiring/2026-07-21_act-arc-wiring/result.md`](../../visual-wiring/2026-07-21_act-arc-wiring/result.md)
 
 ### ⑪ E9 — 씬 촬영계획(V3)과 샷 나누기(decoupage) 통합 🟡
 - **질문**: 두 번 시키는 일을 한 번에 시켜도 되나?
 - **결과**: 시간 ~40% 절감·규율 동등, 대가는 샷 수 +24%(하류 생성 비용). 부수 실측: 2단을 유지해도 V3의 샷 수 목표를 어차피 안 지키고 있었다(권위 사슬 반쪽).
 - **권고**: 조건부 통합 우세 (샷 예산 힌트 동반). **독트린 연결**: 파이프라인 구조(12→7콜) 트랙 — 프롬프트가 아니라 배선의 진실성(P4) 문제로 판명.
-- 상세: [`../scene-shot-authoring/2026-07-21_v3-absorb/result.md`](../scene-shot-authoring/2026-07-21_v3-absorb/result.md)
+- 상세: [`../scene-shot-authoring/2026-07-21_v3-absorb/result.md`](../../scene-shot-authoring/2026-07-21_v3-absorb/result.md)
 
 ### ⑫ E11 — 렌더 프롬프트 언어, 한국어 vs 영어 (실제 이미지 블라인드) 🟡
 - **질문**: 이미지 생성기에 주는 프롬프트는 어느 언어가 명세에 더 충실한 그림을 만드나?
 - **결과**: 20장 눈가림 채점 **영어 6 : 한국어 2 : 무승부 2**. 더 큰 발견 — 지금은 언어 지시가 아예 없어 모델이 임의 선택 중(운영 산출물은 이미 사실상 영어).
 - **권고**: 영어 정본 우세. 단 "언어 명시" 자체는 어느 판정이든 필요. **독트린 연결**: P2류 결정론 결함 발견(같은 입력의 산출 언어가 비결정).
-- 상세: [`../render-language/2026-07-21_ko-vs-en/result.md`](../render-language/2026-07-21_ko-vs-en/result.md) · **프롬프트·이미지 20장 갤러리**: [`../render-language/2026-07-21_ko-vs-en/assets/`](../render-language/2026-07-21_ko-vs-en/assets/) (뷰어 아티팩트는 세션 보고 참조)
+- 상세: [`../render-language/2026-07-21_ko-vs-en/result.md`](../../render-language/2026-07-21_ko-vs-en/result.md) · **프롬프트·이미지 20장 갤러리**: [`../render-language/2026-07-21_ko-vs-en/assets/`](../../render-language/2026-07-21_ko-vs-en/assets/) (뷰어 아티팩트는 세션 보고 참조)
 
 ### ⑬ E13 — 구조 정하기(S1)와 장면 나누기(S3) 통합 🟡
 - **질문**: 항상 연달아 실행되는 두 단계를 한 번에 시켜도 되나?
 - **결과**: 접합부 오류(막 누락)가 구조적으로 소멸(0/8), 까다로운 구조도 전부 정답, ~25% 절감. 단 실험판엔 S3의 코드 후처리가 빠져 장소 표기 오염이 재현 — 정식 구현 시 후처리 이관이 필수임을 실증.
 - **권고**: 유망 (정식 구현 후 재검증 조건). **독트린 연결**: 구조 트랙 + P2(후처리·정규화는 코드 소관) 재확인.
-- 상세: [`../stage-merge/2026-07-21_merge-approx/result.md`](../stage-merge/2026-07-21_merge-approx/result.md)
+- 상세: [`../stage-merge/2026-07-21_merge-approx/result.md`](../../stage-merge/2026-07-21_merge-approx/result.md)
 
 ---
 
@@ -134,29 +134,29 @@ E7은 W1/R1 관찰로 흡수, E4·E10은 D1 감사에서 기각, E12a는 E12b로
 - **질문(오너)**: 설계 카드(facet)를 만들 때 최종 산출물도 같이 만들어 내보내면 안 되나? 코드 조립과 속도·품질 비교하자.
 - **결과**: **그 방식이 이미 지금 방식** — 렌더 문장은 샷 설계 호출에서 설계 카드와 함께 태어나고, 이후 두 번 모두 코드가 복사만 한다(재조립 AI는 E12b가 마지막 하나를 제거해 0개). 속도 축 비교는 성립 불가.
 - **판정(07-22 저녁)**: ✅ 오너 확인 — 종결. 품질 축 변형(E12c-B)은 실행하지 않기로.
-- 상세: [`../validators/2026-07-22_facet-direct-emit/result.md`](../validators/2026-07-22_facet-direct-emit/result.md)
+- 상세: [`../validators/2026-07-22_facet-direct-emit/result.md`](../../validators/2026-07-22_facet-direct-emit/result.md)
 
 ### ⑮ E6b — 밑그림 프롬프트 최적화 후 재비교 ✅ → 밑그림 삭제 채택
 - **판정 배경**: "최적화부터 하고 삭제를 결정하라."
 - **결과**: 문장형 이탈 11/28칸→**0칸**, 매체 일관 회복(꺼짐과 동등) — 불안정은 잡혔다. 그러나 꺼짐보다 나은 지표가 없고(+8.6초 손해), 스타일 이름 수렴은 미회복. "안정은 회복, 확인된 이득은 없음".
 - **판정(07-22 저녁)**: ✅ 이 결과를 근거로 오너가 **밑그림 탈락(삭제) 채택** — 코드 제거 집행.
-- 상세: [`../visual-wiring/2026-07-22_midpreview-optimized/result.md`](../visual-wiring/2026-07-22_midpreview-optimized/result.md)
+- 상세: [`../visual-wiring/2026-07-22_midpreview-optimized/result.md`](../../visual-wiring/2026-07-22_midpreview-optimized/result.md)
 
 ### ⑯ E8b — 진짜 세계 팔레트 체인에서 준수 검증 🟡
 - **판정 배경**: "팔레트 내 변주인지 확인할 기준을 세우고 실험 후 결정."
 - **결과**: 이탈률 0%로 사전 기준(≤10%) 통과 — 단 강조색 79건 중 78건이 팔레트 값 그대로 복사라 이 지표가 두 조건을 가르지 못했다(정직 단서). E8의 색온도 진행 효과는 2~5배로 증폭 재현, 색 다양성 효과는 실팔레트 앞에서 소멸. 복원의 근거는 다양성이 아니라 색온도 진행 쪽.
-- 상세: [`../visual-wiring/2026-07-22_palette-conformance/result.md`](../visual-wiring/2026-07-22_palette-conformance/result.md)
+- 상세: [`../visual-wiring/2026-07-22_palette-conformance/result.md`](../../visual-wiring/2026-07-22_palette-conformance/result.md)
 
 ### ⑰ E9b — 씬 상세화+기계 집행(A) vs 씬·샷 근접 생성(B) 🟡
 - **판정 배경**: 두 아키텍처 비교, 목표 분량·샷 수·샷 길이 충족 최우선(오너 지정).
 - **결과**: **최우선 3지표 동률(둘 다 거의 완벽)** — E9의 샷 24% 초과·규율 위반이 양쪽 다 사라짐(A는 코드 강제, B는 예산 주입). 갈림길은 그 아래: A=러닝타임·샷 수 100% 보증+30~40% 빠름, 대신 화면 단조(카메라 전부 정적·추가 샷 0) / B=샷마다 연출 의도·추가 샷 20~24%로 화면 풍부, 대신 통제가 모델 선의. 어느 쪽이든 현행 3단계→1단계.
-- 상세: [`../scene-shot-authoring/2026-07-22_detail-vs-cogen/result.md`](../scene-shot-authoring/2026-07-22_detail-vs-cogen/result.md)
+- 상세: [`../scene-shot-authoring/2026-07-22_detail-vs-cogen/result.md`](../../scene-shot-authoring/2026-07-22_detail-vs-cogen/result.md)
 
 ### ⑱ E13b — 구조+장면 병합 정식 구현 재검증 🟡 (사전 기준 4/4 통과 — **채택 상신**)
 - **판정 배경**: "선행 3건(정식 구현·표본 확대·체크포인트 재설계) 수행 후 재검증."
 - **결과**: 접합부 오류 0/8 · **장소 오염 0/8**(모델 원출력은 여전히 오염 → 이관된 뒷정리가 같은 실행에서 복원 — 이관 증명) · 구조 프로브 4/4 정답 · 시간 18.7→12.6초(약 ⅓ 절감 유지). 광고 구조 분산 표본 5회: 3막극 4·영웅의 여정 1. 스위치 뒤 구현(기본 off), 병합 산출은 기존 두 저장 슬롯에 모두 기록.
 - **덤 발견**: 현행 2콜 경로의 장소 정규화에도 같은 잠복 구멍 존재(개선 백로그 I7).
-- 상세: [`../stage-merge/2026-07-22_merge-formal/result.md`](../stage-merge/2026-07-22_merge-formal/result.md)
+- 상세: [`../stage-merge/2026-07-22_merge-formal/result.md`](../../stage-merge/2026-07-22_merge-formal/result.md)
 
 ---
 

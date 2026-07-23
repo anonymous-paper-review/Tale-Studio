@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const LOG_DIR = process.argv[2] ?? path.join(__dirname, '../../../logs/writer-stage-exp');
+const LOG_DIR = process.argv[2] ?? path.join(__dirname, '../../../../logs/writer-stage-exp');
 const OUT_ROOT = path.join(__dirname, '../results/assets');
 const load = (f) => JSON.parse(fs.readFileSync(path.join(LOG_DIR, f), 'utf8'));
 

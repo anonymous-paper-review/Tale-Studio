@@ -260,6 +260,6 @@ node research/experiments/continuity-copy/2026-07-23_laundromat-proto/tools/e9dp
 - 키(`FAL_KEY`/`CLAUDE_API_KEY`/`GEMINI_API_KEY`)는 `.env.local`에서 `set -a && source` 로만 주입 —
   로그 출력 금지. git 커밋 없음. run-id `e9dp*`.
 - 관련: 레퍼런스 해석 `../../../references/2026-07-22-girls-in-mirror-continuity.md`, 모델 티어 근거
-  `../../scene-shot-authoring/2026-07-22_model-tier/result.md`(B' 채용), 실험 카드 `../../campaign-2607/plan.md` Phase 5.
+  `../../scene-shot-authoring/2026-07-22_model-tier/result.md`(B' 채용), 실험 카드 `../../utils/campaign-2607/plan.md` Phase 5.
 
 <!-- 작성 규칙 준수(MEMORY): 본문 사람 언어·코드 식별자 없음, 실제 입력 원문 blockquote 인용, 모델명·env·비용·재현은 부록에만. -->

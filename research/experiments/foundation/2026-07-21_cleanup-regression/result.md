@@ -148,5 +148,5 @@
   데이터는 E3a의 `*__run{1..3}.json` 재사용
 - 프리셋: `shorts`/`ad`/`kishoten-d2`/`loop-d1`(S축=narrativeStructure+scenes), `ad` 풀체인(V축=
   decoupage+shotDesign, 스텁 비주얼)
-- 지표 정의: M1~M6 (실험 계획서 `../../campaign-2607/plan.md` §5)
+- 지표 정의: M1~M6 (실험 계획서 `../../utils/campaign-2607/plan.md` §5)
 - 후속: 계획서 상태 표 W1~W5+R1 ✅

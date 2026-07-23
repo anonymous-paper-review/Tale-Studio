@@ -13,9 +13,9 @@ experiments/
   INDEX.md                     ← 상태판 (트랙별 실험 목록·옛 E번호 별칭·판정 결과)
   CONVENTIONS.md               ← 폴더·명명 규칙
   README.md                    ← 이 파일 (하네스 실행 런북)
-  _templates/result.md         ← 결과 기록 템플릿
-  _tools/                      ← 트랙 공용 스크립트
-  campaign-2607/               ← 첫 캠페인의 계획서·회고·일괄 판정
+  utils/templates/result.md         ← 결과 기록 템플릿
+  utils/tools/                      ← 트랙 공용 스크립트
+  utils/campaign-2607/               ← 첫 캠페인의 계획서·회고·일괄 판정
   <트랙-슬러그>/                ← 예: foundation, validators, continuity-copy …
     <ISO날짜_실험-슬러그>/       ← 실험 폴더 (design.md·result.md·assets/·tools/)
 ```
@@ -40,6 +40,6 @@ experiments/
 
 ## 관련 문서
 - [`INDEX.md`](INDEX.md) — 트랙별 실험 상태판 (옛 E번호 별칭·판정 결과)
-- [`campaign-2607/plan.md`](campaign-2607/plan.md) — 첫 캠페인 계획서
+- [`utils/campaign-2607/plan.md`](utils/campaign-2607/plan.md) — 첫 캠페인 계획서
 - [`../records/2026-07-21-writer-prompt-audit.md`](../records/2026-07-21-writer-prompt-audit.md) — 실험의 출처(감사 발견)
 - [`../canon/writer-job-model.md`](../canon/writer-job-model.md) — 판정의 기준(P1~P7)

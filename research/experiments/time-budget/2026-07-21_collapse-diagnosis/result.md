@@ -131,4 +131,4 @@ writer 파이프라인은 이야기를 여러 개의 씬으로 쪼개는 장면 
   정합=estimated_seconds vs scene_actions×5~8s 배율)
 - 상태 판정: ✅ 붕괴 확정 (M2 축) → E3b 착수. 단 M1 가설은 기각
 - 후속: `../2026-07-21_budget-injection/result.md`
-- 독트린 연결: 실험 계획서(`../../campaign-2607/plan.md`) §3 E3a 카드, 지표 정의 §5 M1·M2
+- 독트린 연결: 실험 계획서(`../../utils/campaign-2607/plan.md`) §3 E3a 카드, 지표 정의 §5 M1·M2
