@@ -72,7 +72,8 @@
 | [laundromat-proto](continuity-copy/2026-07-23_laundromat-proto/result.md) | E9d-proto | ✅ | 제작 완료 (07-23) — 오너 평가: 클러스터 구조는 맞으나 연속감 미달·불필요 샷·카메라/시선 불안정 → E9d-copy로 전환 |
 | [character-canon](continuity-copy/2026-07-23_character-canon/notes.md) | E9d-copy (캐릭터) | ✅ | 텍스트 후보 4종 폐기, 레퍼런스 정면 1장 정본 확정, 신원 전파 2컷 성공 |
 | [input-format](continuity-copy/2026-07-23_input-format/result.md) | E9d-copy (설계도) | ✅ | 판정 완료 (07-23): 승자 채택 없음 — B1 가설(그림 못박기=카메라 통제) 기각, R 상한도 임의 오빗. 전환: 컷편집 허용+카메라 교정+사건 맥락층 재실험 |
-| [full-copy-bundle](continuity-copy/2026-07-23_full-copy-bundle/result.md) | — | 🟡 | 생성 전량 완료 (07-23): R 29 + BKM 27 + BASE 19클립(writer 자생 20샷, 1샷 Ⓑ 차단), 4팔 조립·블라인드 모자이크 완성. **오너 블라인드 판정 대기** (compare/mosaic_blind_full.mp4 → 판정 절차는 result.md §6) |
+| [full-copy-bundle](continuity-copy/2026-07-23_full-copy-bundle/result.md) | — | ✅ | 판정 (07-24): **무효** — ① BASE 입력 결함: 정본 i2i 미공급(제품 v6의 에셋 매니페스트 생성 주체가 리팩토링 때 삭제 → 순수 T2I 폴백, 샷별 스타일·신원 붕괴 — I9) ② BKM 테이크 계획 결함: 도입 플래시 1초 컷들에 독립 4초 테이크 할당. 블라인드 순위 판정 없이 종결 → full-copy-v2 재설계 |
+| [full-copy-v2](continuity-copy/2026-07-24_full-copy-v2/design.md) | — | ⬜ | 재설계 (07-24): 3팔 — ORIGIN(정본 i2i 배선 복원 제품판) · FRAMEFIX(시작+끝 프레임 고정 제품 업그레이드판) · BKM2(도입 플래시 테이크 재사용 + 구도 정밀화 사람판). R·원본 대조군은 v1 산출 재사용. **설계도 3장 오너 확인 대기** |
 
 ## 2. 판정 대기 목록 (2026-07-23 기준)
 
@@ -94,6 +95,7 @@
 | I6 | C1 스토리 검수 재가동 검토 (현재 속도 문제로 꺼둠) — 절감 채택 시 그 예산으로 재검토 | 오너(07-22) + E5 | ⬜ |
 | I7 | 장면 나누기 장소 정규화가 "식별자(표시명)" 괄호 통째 복사를 못 되돌리는 잠복 구멍 | E13b 발견 | ⬜ (E13b 채택 시 자연 해소) |
 | I8 | 엄격 I2V(첫 프레임 고정) 배선 부재 — 배선된 영상 모델 3종 전부 reference-to-video | E9d-proto 오너 검수(07-23) | ⬜ (E9d-copy에서 엄격 I2V 검증 후 배선 후보 확정) |
+| I9 | writer 샷 이미지(v6)의 정본 참조 배선 단절 — 에셋 매니페스트(14b_assets) 생성 스테이지가 비주얼 축 리디자인 때 삭제됐고 artist 정본(DB)과도 미연결 → 샷 프레임이 무앵커 순수 T2I로 생성됨 | full-copy-bundle 무효 판정(07-24) | ⬜ (full-copy-v2 ORIGIN 팔이 배선 복원 효과를 실측) |
 
 ## 4. 상태 이모지 범례
 
