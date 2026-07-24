@@ -1,0 +1,22 @@
+{
+  "mode": "higgsfield",
+  "attempts": {
+    "fal": 0,
+    "higgsfield": 1
+  },
+  "provenance": [
+    {
+      "id": "base_09",
+      "done": true,
+      "provider": "higgsfield",
+      "model": "seedance_2_0",
+      "task": "i2v_se",
+      "out": "clips/arm-base/09.mp4",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260723_150848_4dbadf91-4d36-4b17-a605-a88dbad1d941.mp4",
+      "bytes": 1993911,
+      "jobId": "4dbadf91-4d36-4b17-a605-a88dbad1d941",
+      "seconds": 3,
+      "ts": "2026-07-23T15:13:01.771Z"
+    }
+  ]
+}

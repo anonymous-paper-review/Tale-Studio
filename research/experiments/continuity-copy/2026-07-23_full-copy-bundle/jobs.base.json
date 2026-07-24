@@ -1,0 +1,173 @@
+[
+  {
+    "id": "base_01",
+    "task": "i2v_se",
+    "prompt": "The overhead fluorescent lights flicker subtly in the empty, silent restroom.",
+    "image": "arm-base/frames/01.png",
+    "seconds": 5,
+    "aspect": "16:9",
+    "out": "clips/arm-base/01.mp4"
+  },
+  {
+    "id": "base_03",
+    "task": "i2v_se",
+    "prompt": "The girl slowly applies lip gloss to her lips while staring blankly at her reflection.",
+    "image": "arm-base/frames/03.png",
+    "seconds": 7,
+    "aspect": "16:9",
+    "out": "clips/arm-base/03.mp4"
+  },
+  {
+    "id": "base_04",
+    "task": "i2v_se",
+    "prompt": "The camera remains perfectly still on the dark, yawning hole of the drain.",
+    "image": "arm-base/frames/04.png",
+    "seconds": 3,
+    "aspect": "16:9",
+    "out": "clips/arm-base/04.mp4"
+  },
+  {
+    "id": "base_05",
+    "task": "i2v_se",
+    "prompt": "The girl adjusts her hair with a blank expression before the scene fades.",
+    "image": "arm-base/frames/05.png",
+    "seconds": 4,
+    "aspect": "16:9",
+    "out": "clips/arm-base/05.mp4"
+  },
+  {
+    "id": "base_06",
+    "task": "i2v_se",
+    "prompt": "The girl remains completely frozen, her eyes subtly shifting to scan the reflection of the empty stalls.",
+    "image": "arm-base/frames/06.png",
+    "seconds": 4,
+    "aspect": "16:9",
+    "out": "clips/arm-base/06.mp4"
+  },
+  {
+    "id": "base_07",
+    "task": "i2v_se",
+    "prompt": "A static shot focusing on the dark void of the drain as the shadows within seem to pulse.",
+    "image": "arm-base/frames/07.png",
+    "seconds": 3,
+    "aspect": "16:9",
+    "out": "clips/arm-base/07.mp4"
+  },
+  {
+    "id": "base_08",
+    "task": "i2v_se",
+    "prompt": "The camera slowly dollys in as the girl leans her head down toward the sink, bringing her ear closer to the drain.",
+    "image": "arm-base/frames/08.png",
+    "seconds": 5,
+    "aspect": "16:9",
+    "out": "clips/arm-base/08.mp4"
+  },
+  {
+    "id": "base_09",
+    "task": "i2v_se",
+    "prompt": "The girl leans deeper into the shadows while the camera drifts slightly forward.",
+    "image": "arm-base/frames/09.png",
+    "seconds": 3,
+    "aspect": "16:9",
+    "out": "clips/arm-base/09.mp4"
+  },
+  {
+    "id": "base_10",
+    "task": "i2v_se",
+    "prompt": "A sharp magenta flash bursts across the screen then fades into darkness.",
+    "image": "arm-base/frames/10.png",
+    "seconds": 2,
+    "aspect": "16:9",
+    "out": "clips/arm-base/10.mp4"
+  },
+  {
+    "id": "base_11",
+    "task": "i2v_se",
+    "prompt": "The doppelganger stands perfectly still while the camera breathes with a handheld drift.",
+    "image": "arm-base/frames/11.png",
+    "seconds": 4,
+    "aspect": "16:9",
+    "out": "clips/arm-base/11.mp4"
+  },
+  {
+    "id": "base_12",
+    "task": "i2v_se",
+    "prompt": "The doppelganger slowly drags the limp body across the floor toward the left.",
+    "image": "arm-base/frames/12.png",
+    "seconds": 5,
+    "aspect": "16:9",
+    "out": "clips/arm-base/12.mp4"
+  },
+  {
+    "id": "base_13",
+    "task": "i2v_se",
+    "prompt": "The doppelganger stares into the camera with absolute stillness and no blinking.",
+    "image": "arm-base/frames/13.png",
+    "seconds": 4,
+    "aspect": "16:9",
+    "out": "clips/arm-base/13.mp4"
+  },
+  {
+    "id": "base_14",
+    "task": "i2v_se",
+    "prompt": "The doppelganger slowly lowers the limp body of the girl onto the tiles with a heavy, physical weight.",
+    "image": "arm-base/frames/14.png",
+    "seconds": 3,
+    "aspect": "16:9",
+    "out": "clips/arm-base/14.mp4"
+  },
+  {
+    "id": "base_15",
+    "task": "i2v_se",
+    "prompt": "The hand subtly tightens its grip on the shoe while the camera drifts slightly forward.",
+    "image": "arm-base/frames/15.png",
+    "seconds": 2,
+    "aspect": "16:9",
+    "out": "clips/arm-base/15.mp4"
+  },
+  {
+    "id": "base_16",
+    "task": "i2v_se",
+    "prompt": "The doppelganger remains unnervingly still, staring blankly as the camera drifts with a subtle handheld breathing.",
+    "image": "arm-base/frames/16.png",
+    "seconds": 4,
+    "aspect": "16:9",
+    "out": "clips/arm-base/16.mp4"
+  },
+  {
+    "id": "base_17",
+    "task": "i2v_se",
+    "prompt": "The doppelganger walks away with a cold, steady pace as the stall door swings shut behind her.",
+    "image": "arm-base/frames/17.png",
+    "seconds": 3,
+    "aspect": "16:9",
+    "out": "clips/arm-base/17.mp4"
+  },
+  {
+    "id": "base_18",
+    "task": "i2v_se",
+    "prompt": "The doppelganger walks steadily across the frame with mechanical indifference, exiting the shot.",
+    "image": "arm-base/frames/18.png",
+    "seconds": 2.5,
+    "aspect": "16:9",
+    "out": "clips/arm-base/18.mp4"
+  },
+  {
+    "id": "base_19",
+    "task": "i2v_se",
+    "prompt": "The restroom door swings shut slowly, clicking into place, leaving the room completely still.",
+    "image": "arm-base/frames/19.png",
+    "seconds": 2.5,
+    "aspect": "16:9",
+    "out": "clips/arm-base/19.mp4"
+  },
+  {
+    "id": "base_20",
+    "task": "i2v_se",
+    "prompt": "The camera slowly dollies forward toward the stall gap, revealing the motionless white-socked feet of the original girl.",
+    "image": "arm-base/frames/20.png",
+    "seconds": 4,
+    "aspect": "16:9",
+    "out": "clips/arm-base/20.mp4"
+  }
+]

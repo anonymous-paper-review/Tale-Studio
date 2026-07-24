@@ -1,0 +1,3 @@
+# 시작 프레임 생성 실패 목록 (재시도 후에도 1건 잔존)
+
+- 02 (shot_2): status=422 | body={"detail":[{"loc":["body","prompt"],"msg":"The content could not be processed because it contained material flagged by a content checker.","type":"content_policy_violation","url":"https://docs.fal.ai/errors#content_policy_violation","input":{"prompt":"A medium full shot of a young woman with a black bob entering a mint-tiled restroom. She wears a pale blue satin slip dress and white socks. The lighting is hard and top-down, casting sharp shadows on the angular floor tiles. Her expression is calm and indifferent.","num_images":1,"output_format":"png","quality":"high","image_size":{"width":1024,

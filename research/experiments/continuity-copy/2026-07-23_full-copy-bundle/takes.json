@@ -1,0 +1,333 @@
+{
+  "bible": "Continuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.",
+  "bible_two": "Continuity bible (LOCKED): TWO identical young women (the girl and her doppelganger — identical face, hair, dress) (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.",
+  "negative": "Never: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark.",
+  "takes": [
+    {
+      "id": "T01",
+      "cuts": [
+        "s01",
+        "s04"
+      ],
+      "secs": 5,
+      "two": false,
+      "camera": "Ultra-wide lens (14mm feel, mild fisheye distortion), extreme close-up from inside the orange sink looking up over the rim, her face large in frame. Camera locked, no movement. Warm fluorescent glow from the ceiling behind her head.",
+      "action": "She leans over the sink rim, peering down into it, head tilting slowly a few degrees.",
+      "event": "She is searching for the source of a faint voice that seemed to come from the drain.",
+      "video_prompt": "She leans over the sink rim, peering down into it, head tilting slowly a few degrees. Ultra-wide lens (14mm feel, mild fisheye distortion), extreme close-up from inside the orange sink looking up over the rim, her face large in frame. Camera locked, no movement. Warm fluorescent glow from the ceiling behind her head.\nContext: She is searching for the source of a faint voice that seemed to come from the drain.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T02",
+      "cuts": [
+        "s02"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "35mm, low-angle close-up rising toward her face as she bends forward over the counter. Camera locked. Shallow depth of field, tube lights soft in background.",
+      "action": "She bends down slowly, eyes scanning downward, lips slightly parted in concentration.",
+      "event": "She is leaning in to listen — something in the sink area caught her attention.",
+      "video_prompt": "She bends down slowly, eyes scanning downward, lips slightly parted in concentration. 35mm, low-angle close-up rising toward her face as she bends forward over the counter. Camera locked. Shallow depth of field, tube lights soft in background.\nContext: She is leaning in to listen — something in the sink area caught her attention.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T03",
+      "cuts": [
+        "s03"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "35mm, medium shot of her lower body — skirt hem, bare legs, socks and heels — in front of the mirror wall, tube lights flanking. Camera locked at hip height.",
+      "action": "She stands nearly still, weight shifting once from one leg to the other.",
+      "event": "A quiet moment; the restroom is silent around her.",
+      "video_prompt": "She stands nearly still, weight shifting once from one leg to the other. 35mm, medium shot of her lower body — skirt hem, bare legs, socks and heels — in front of the mirror wall, tube lights flanking. Camera locked at hip height.\nContext: A quiet moment; the restroom is silent around her.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T04",
+      "cuts": [
+        "s06"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "Macro close-up, 60mm, of her black mary-jane heels and white crew socks on the mint tile floor. Camera locked at floor level. Crisp focus on the shoes.",
+      "action": "Feet nearly still; one heel lifts a centimeter and settles.",
+      "event": "Detail beat — her shoes on the spotless tile, the room utterly quiet.",
+      "video_prompt": "Feet nearly still; one heel lifts a centimeter and settles. Macro close-up, 60mm, of her black mary-jane heels and white crew socks on the mint tile floor. Camera locked at floor level. Crisp focus on the shoes.\nContext: Detail beat — her shoes on the spotless tile, the room utterly quiet.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T05",
+      "cuts": [
+        "s07"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "35mm, medium back view: she faces the mirror wall, her back to camera, red door visible in the mirror reflection. Camera locked at shoulder height.",
+      "action": "She stands facing the mirrors, head turning a few degrees as she checks the room in the reflection.",
+      "event": "She has just walked in; she surveys the empty restroom through the mirror.",
+      "video_prompt": "She stands facing the mirrors, head turning a few degrees as she checks the room in the reflection. 35mm, medium back view: she faces the mirror wall, her back to camera, red door visible in the mirror reflection. Camera locked at shoulder height.\nContext: She has just walked in; she surveys the empty restroom through the mirror.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T06",
+      "cuts": [
+        "s08"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "35mm, full-body left profile at the counter, mirrors and sinks receding to the right. Camera locked at chest height.",
+      "action": "She stands at the counter and takes out a small lip-gloss wand from her hand, raising it.",
+      "event": "She begins her makeup routine, unhurried.",
+      "video_prompt": "She stands at the counter and takes out a small lip-gloss wand from her hand, raising it. 35mm, full-body left profile at the counter, mirrors and sinks receding to the right. Camera locked at chest height.\nContext: She begins her makeup routine, unhurried.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T07",
+      "cuts": [
+        "s09"
+      ],
+      "secs": 6,
+      "two": false,
+      "camera": "50mm, straight-on eye-level close-up framed inside the round mirror, chest-up composition, tube lights at both edges. Camera locked on tripod, no movement.",
+      "action": "She slowly applies lip gloss; only her hand and lips move. Near the end her hand hesitates for one beat, then continues.",
+      "event": "A faint female whisper — \"somebody… help me…\" — drifts in, almost inaudible, like ASMR. She barely registers it and keeps applying.",
+      "video_prompt": "She slowly applies lip gloss; only her hand and lips move. Near the end her hand hesitates for one beat, then continues. 50mm, straight-on eye-level close-up framed inside the round mirror, chest-up composition, tube lights at both edges. Camera locked on tripod, no movement.\nContext: A faint female whisper — \"somebody… help me…\" — drifts in, almost inaudible, like ASMR. She barely registers it and keeps applying.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T08",
+      "cuts": [
+        "s10"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "50mm, over-shoulder from behind her head, her face visible in the round mirror reflection. Camera locked.",
+      "action": "She finishes the gloss, lowers the wand, studies her reflection.",
+      "event": "The whisper is gone; she returns to her routine, faintly uneasy.",
+      "video_prompt": "She finishes the gloss, lowers the wand, studies her reflection. 50mm, over-shoulder from behind her head, her face visible in the round mirror reflection. Camera locked.\nContext: The whisper is gone; she returns to her routine, faintly uneasy.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T09",
+      "cuts": [
+        "s11"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "24mm, symmetrical master wide of the whole restroom, she stands small right of center facing the mirror wall. Camera locked, perfectly level, one-point perspective.",
+      "action": "She stands almost still at the counter.",
+      "event": "Wide pause — the room is large, symmetrical, and empty around her.",
+      "video_prompt": "She stands almost still at the counter. 24mm, symmetrical master wide of the whole restroom, she stands small right of center facing the mirror wall. Camera locked, perfectly level, one-point perspective.\nContext: Wide pause — the room is large, symmetrical, and empty around her.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T10",
+      "cuts": [
+        "s12"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "50mm, three-quarter face close-up, her head and shoulders, mirror edge soft behind. Camera locked.",
+      "action": "She startles — a small jolt — glances up at the mirror, scans it, then her gaze drops down toward the sink below.",
+      "event": "The voice comes again, clearer this time — \"help me.\" It seems to come from below, from the sink.",
+      "video_prompt": "She startles — a small jolt — glances up at the mirror, scans it, then her gaze drops down toward the sink below. 50mm, three-quarter face close-up, her head and shoulders, mirror edge soft behind. Camera locked.\nContext: The voice comes again, clearer this time — \"help me.\" It seems to come from below, from the sink.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T11",
+      "cuts": [
+        "s13"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "Ultra-wide from inside the sink basin looking straight up, orange rim framing the edges, her face above looking down, ceiling lamp behind her head. Camera locked.",
+      "action": "She leans in slowly over the sink, face lowering toward the rim, eyes fixed downward, listening.",
+      "event": "She is certain now the voice came from the drain; she searches it.",
+      "video_prompt": "She leans in slowly over the sink, face lowering toward the rim, eyes fixed downward, listening. Ultra-wide from inside the sink basin looking straight up, orange rim framing the edges, her face above looking down, ceiling lamp behind her head. Camera locked.\nContext: She is certain now the voice came from the drain; she searches it.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T12",
+      "cuts": [
+        "s14"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "Macro, 90mm, extreme close-up of the chrome drain in the orange basin. Camera locked. Completely static; the basin dry and empty.",
+      "action": "Static insert; only a faint shimmer of light on the chrome.",
+      "event": "The drain — silent, ordinary, and somehow wrong.",
+      "video_prompt": "Static insert; only a faint shimmer of light on the chrome. Macro, 90mm, extreme close-up of the chrome drain in the orange basin. Camera locked. Completely static; the basin dry and empty.\nContext: The drain — silent, ordinary, and somehow wrong.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T13",
+      "cuts": [
+        "s15"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "50mm, close left profile at the faucet, flowers and mirror soft behind. Camera locked.",
+      "action": "She leans down, ear tilting toward the faucet and drain, hand resting on the rim, examining.",
+      "event": "She listens for the voice at the fixture itself. Nothing answers.",
+      "video_prompt": "She leans down, ear tilting toward the faucet and drain, hand resting on the rim, examining. 50mm, close left profile at the faucet, flowers and mirror soft behind. Camera locked.\nContext: She listens for the voice at the fixture itself. Nothing answers.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T14",
+      "cuts": [
+        "s16"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "35mm, front high angle over the sink rim, her face looking down into the basin, orange rim bottom of frame. Camera locked.",
+      "action": "She peers down into the basin, eyes scanning slowly.",
+      "event": "Still searching — her calm is starting to crack.",
+      "video_prompt": "She peers down into the basin, eyes scanning slowly. 35mm, front high angle over the sink rim, her face looking down into the basin, orange rim bottom of frame. Camera locked.\nContext: Still searching — her calm is starting to crack.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T15",
+      "cuts": [
+        "s17"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "24mm, symmetrical master wide, same framing as the earlier master. Camera locked.",
+      "action": "She walks slowly leftward along the counter, trailing her hand near the rim, checking each sink.",
+      "event": "She checks the other sinks one by one — was it this one? Or that one?",
+      "video_prompt": "She walks slowly leftward along the counter, trailing her hand near the rim, checking each sink. 24mm, symmetrical master wide, same framing as the earlier master. Camera locked.\nContext: She checks the other sinks one by one — was it this one? Or that one?\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T16a",
+      "cuts": [
+        "s18"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "85mm, tight front close-up of her face, eyes large, background melted to soft color. Camera locked.",
+      "action": "She holds still, listening hard; only her eyes move.",
+      "event": "Total silence — which is somehow worse than the voice.",
+      "video_prompt": "She holds still, listening hard; only her eyes move. 85mm, tight front close-up of her face, eyes large, background melted to soft color. Camera locked.\nContext: Total silence — which is somehow worse than the voice.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T16b",
+      "cuts": [
+        "s20"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "35mm, close profile at knee height: she crouches down beside the counter. Camera locked low.",
+      "action": "She crouches, head dipping to look under the counter, hair falling forward.",
+      "event": "She checks under the counter — the last place the voice could hide.",
+      "video_prompt": "She crouches, head dipping to look under the counter, hair falling forward. 35mm, close profile at knee height: she crouches down beside the counter. Camera locked low.\nContext: She checks under the counter — the last place the voice could hide.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T17",
+      "cuts": [
+        "s19"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "35mm, medium of her lower body at the counter, legs and skirt, tile floor. Camera locked at knee height.",
+      "action": "She takes one slow step along the counter, then stops.",
+      "event": "Moving along the counter, cautious now.",
+      "video_prompt": "She takes one slow step along the counter, then stops. 35mm, medium of her lower body at the counter, legs and skirt, tile floor. Camera locked at knee height.\nContext: Moving along the counter, cautious now.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T18",
+      "cuts": [
+        "s21"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "50mm, insert of the chrome pipes under the sink against mint tiles, no person. Camera locked. Static.",
+      "action": "Static insert; the pipes sit silent, one faint drip glint.",
+      "event": "Under the sink — where the voice would have to live.",
+      "video_prompt": "Static insert; the pipes sit silent, one faint drip glint. 50mm, insert of the chrome pipes under the sink against mint tiles, no person. Camera locked. Static.\nContext: Under the sink — where the voice would have to live.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T19a",
+      "cuts": [
+        "s22"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "35mm, top close-up over the rim: the crown of her head and nape as she bends deep over the basin. Camera locked above the sink.",
+      "action": "She bends deeper over the basin, hair curtaining forward, holding still.",
+      "event": "Ear almost to the drain now — she is fully committed to finding it.",
+      "video_prompt": "She bends deeper over the basin, hair curtaining forward, holding still. 35mm, top close-up over the rim: the crown of her head and nape as she bends deep over the basin. Camera locked above the sink.\nContext: Ear almost to the drain now — she is fully committed to finding it.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T19b",
+      "cuts": [
+        "s23"
+      ],
+      "secs": 6,
+      "two": false,
+      "camera": "Ultra-wide low angle from the floor under the counter line, her socks and legs large in foreground, room stretching behind. Camera locked at floor level.",
+      "action": "She stands at the sink above, shifting her weight; the room holds still around her legs. In the last beat everything freezes.",
+      "event": "The quiet stretches too long — and then a woman's scream tears through the room as everything cuts to black.",
+      "video_prompt": "She stands at the sink above, shifting her weight; the room holds still around her legs. In the last beat everything freezes. Ultra-wide low angle from the floor under the counter line, her socks and legs large in foreground, room stretching behind. Camera locked at floor level.\nContext: The quiet stretches too long — and then a woman's scream tears through the room as everything cuts to black.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T20a",
+      "cuts": [
+        "s25"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "35mm, floor-level close-up of her body lying on the mint tile, skirt and limbs foreground. Camera locked at floor level.",
+      "action": "She lies on the floor, motionless except the faintest breath.",
+      "event": "After the blackout — she is down, unconscious on the tile.",
+      "video_prompt": "She lies on the floor, motionless except the faintest breath. 35mm, floor-level close-up of her body lying on the mint tile, skirt and limbs foreground. Camera locked at floor level.\nContext: After the blackout — she is down, unconscious on the tile.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T20b",
+      "cuts": [
+        "s26"
+      ],
+      "secs": 5,
+      "two": true,
+      "camera": "24mm, wide shot of the restroom: one girl lies on the floor, an IDENTICAL girl stands over her. Camera locked.",
+      "action": "The standing girl grips the lying girl's arms and drags her slowly across the tile toward the stalls. The lying girl does not move.",
+      "event": "Her doppelganger — same face, same dress — has her, and is taking her away.",
+      "video_prompt": "The standing girl grips the lying girl's arms and drags her slowly across the tile toward the stalls. The lying girl does not move. 24mm, wide shot of the restroom: one girl lies on the floor, an IDENTICAL girl stands over her. Camera locked.\nContext: Her doppelganger — same face, same dress — has her, and is taking her away.\nContinuity bible (LOCKED): TWO identical young women (the girl and her doppelganger — identical face, hair, dress) (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T21",
+      "cuts": [
+        "s05",
+        "s28"
+      ],
+      "secs": 6,
+      "two": false,
+      "camera": "Top-down overhead shot of the toilet stall: the girl lies on the floor beside the toilet, seen from directly above. Camera locked, perpendicular.",
+      "action": "She lies beside the toilet, completely motionless.",
+      "event": "Where the doppelganger left her — arranged, almost peaceful, beside the toilet.",
+      "video_prompt": "She lies beside the toilet, completely motionless. Top-down overhead shot of the toilet stall: the girl lies on the floor beside the toilet, seen from directly above. Camera locked, perpendicular.\nContext: Where the doppelganger left her — arranged, almost peaceful, beside the toilet.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T22",
+      "cuts": [
+        "s27"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "35mm, front medium inside the stall: she sits on the closed toilet lid holding the black heels in both hands, stall walls framing. Camera locked.",
+      "action": "She sits calmly holding the shoes, unhurried, gaze steady ahead.",
+      "event": "The doppelganger rests a moment with the shoes — no rush, no feeling.",
+      "video_prompt": "She sits calmly holding the shoes, unhurried, gaze steady ahead. 35mm, front medium inside the stall: she sits on the closed toilet lid holding the black heels in both hands, stall walls framing. Camera locked.\nContext: The doppelganger rests a moment with the shoes — no rush, no feeling.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T23",
+      "cuts": [
+        "s29"
+      ],
+      "secs": 4,
+      "two": false,
+      "camera": "35mm, corridor view along the stall doors, she stands at an open stall door. Camera locked.",
+      "action": "She steps out of the stall and pauses, one hand leaving the door.",
+      "event": "The doppelganger leaves the stall behind.",
+      "video_prompt": "She steps out of the stall and pauses, one hand leaving the door. 35mm, corridor view along the stall doors, she stands at an open stall door. Camera locked.\nContext: The doppelganger leaves the stall behind.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    },
+    {
+      "id": "T24",
+      "cuts": [
+        "s30"
+      ],
+      "secs": 5,
+      "two": false,
+      "camera": "24mm, symmetrical master wide, same master framing. Camera locked.",
+      "action": "She walks unhurried across the restroom toward the exit and passes out of frame; the room stands empty.",
+      "event": "She leaves the way the first girl came in. The restroom is empty again — except for what is left in the stall.",
+      "video_prompt": "She walks unhurried across the restroom toward the exit and passes out of frame; the room stands empty. 24mm, symmetrical master wide, same master framing. Camera locked.\nContext: She leaves the way the first girl came in. The restroom is empty again — except for what is left in the stall.\nContinuity bible (LOCKED): the same young woman (black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim, white crew socks, black mary-jane heels); wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights, red-orange stall doors. Light: warm fluorescent from above the mirrors, constant, same time of day. Signature props: small lip-gloss wand; chrome drain. Genre mood: quiet thriller — calm, uncanny stillness.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people beyond those specified, duplicate faces beyond those specified, plastic skin, morphing hands, on-screen text, watermark."
+    }
+  ]
+}
