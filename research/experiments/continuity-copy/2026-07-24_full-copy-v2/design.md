@@ -38,6 +38,11 @@
   쓰므로 두 팔의 차이는 오직 프레임 공급 형태다. LLM 재실행 없음(비용 0, 비교 성립).
 - **정본 세트**: 캐릭터 정본 `../2026-07-23_character-canon/assets/identity_ref.jpg` + 빈 방
   플레이트 `../2026-07-23_input-format/assets/plates/src_empty_wide.jpg`.
+
+  ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg)
+
+  왼쪽부터: 캐릭터 정본(신원 앵커) · 빈 방 플레이트(공간 앵커) — ORIGIN·FRAMEFIX·BKM2 세 팔의
+  모든 i2i가 이 두 장에서 출발한다. 샷/테이크별 입력 구성은 각 설계도의 블록에 썸네일로 첨부.
 - **모델·레인 통일 (v1 확정 유지)**: 영상 전 팔 Seedance 2.0 · 힉스필드 레인. 이미지 fal
   `openai/gpt-image-2/edit`.
 - **시나리오·원본**: v1과 동일 (`../2026-07-23_full-copy-bundle/scenario.md`, 원본 67초·30컷).
