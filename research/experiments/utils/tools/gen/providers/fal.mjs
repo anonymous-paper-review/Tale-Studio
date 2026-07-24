@@ -40,11 +40,23 @@ export async function run(job, { assetsDir }) {
       duration: job.seconds ?? 5,
       aspect_ratio: job.aspect ?? '16:9',
     }
+  } else if (job.task === 'i2v_se') {
+    // Seedance 2.0 i2v — duration은 문자열 enum "4"~"15"(최소 4초), end_image_url 선택.
+    const secs = Math.min(15, Math.max(4, Math.round(job.seconds ?? 5)))
+    input = {
+      prompt: job.prompt,
+      image_url: await toUrl(job.image, assetsDir),
+      duration: String(secs),
+      resolution: spec.resolution ?? '720p',
+      aspect_ratio: job.aspect ?? '16:9',
+    }
+    if (job.end_image) input.end_image_url = await toUrl(job.end_image, assetsDir)
   } else {
     throw new Error(`fal: 알 수 없는 task '${job.task}'`)
   }
   const r = await fal.subscribe(model, { input, logs: false })
   const url = r?.data?.images?.[0]?.url ?? r?.data?.video?.url
   if (!url) throw new Error('fal: 결과 URL 없음')
-  return { url, model, meta: {} }
+  const seed = r?.data?.seed
+  return { url, model, meta: seed != null ? { seed } : {} }
 }

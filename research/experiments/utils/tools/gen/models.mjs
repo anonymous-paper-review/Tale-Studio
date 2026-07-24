@@ -16,7 +16,7 @@ const FAL_IMAGE_SIZE = {
 export const falImageSize = (aspect) => FAL_IMAGE_SIZE[aspect] ?? 'landscape_16_9'
 
 // task가 이미지를 만드는지 영상을 만드는지 — i2v는 이미지 산출을 입력으로 받으므로 이미지 단계 뒤에 돈다.
-export const TASK_KIND = { t2i: 'image', edit: 'image', i2v: 'video' }
+export const TASK_KIND = { t2i: 'image', edit: 'image', i2v: 'video', i2v_se: 'video' }
 
 export const PROVIDERS = ['fal', 'higgsfield']
 
@@ -26,12 +26,18 @@ export const MODELS = {
     t2i: { model: 'fal-ai/flux-2/klein/9b' },
     edit: { model: 'openai/gpt-image-2/edit' },
     i2v: { model: 'alibaba/happy-horse/reference-to-video' },
+    // i2v_se: 시작+끝 프레임 쌍 I2V — Seedance 2.0 (2026-07-23 오너 확정, 입력 포맷 실험용).
+    //   fal openapi 실측: image_url(필수)·end_image_url(선택)·duration은 문자열 "4"~"15"(최소 4초)·
+    //   seed는 입력 불가(출력에만 존재 → 프로버넌스에 기록).
+    i2v_se: { model: 'bytedance/seedance-2.0/image-to-video', resolution: '720p' },
   },
   higgsfield: {
     // `higgsfield model get <jobType>` 로 확정한 job_type + 기본 해상도
     t2i: { jobType: 'flux_2', resolution: '2k' },
     edit: { jobType: 'gpt_image_2', resolution: '2k' },
     i2v: { jobType: 'happy_horse_video', resolution: '720p' },
+    // `model get seedance_2_0` 실측: start_image/end_image 지원, seed 파라미터 없음, duration 정수(최소 4).
+    i2v_se: { jobType: 'seedance_2_0', resolution: '720p' },
   },
 }
 

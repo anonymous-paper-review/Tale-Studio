@@ -111,7 +111,7 @@ function costHiggsfield(job) {
   const args = ['generate', 'cost', spec.jobType, '--prompt', job.prompt, '--json']
   if (job.aspect) args.push('--aspect_ratio', job.aspect)
   if (spec.resolution) args.push('--resolution', spec.resolution)
-  if (job.task === 'i2v') args.push('--duration', String(job.seconds ?? 5))
+  if (TASK_KIND[job.task] === 'video') args.push('--duration', String(Math.min(15, Math.max(job.task === 'i2v_se' ? 4 : 3, Math.round(job.seconds ?? 5)))))
   try {
     const out = execFileSync('higgsfield', args, { encoding: 'utf8' })
     return JSON.parse(out).credits ?? null
@@ -177,7 +177,7 @@ async function main() {
     try {
       const { url, model, meta } = await PROVIDER_IMPL[provider].run(jobForRun, { assetsDir })
       const bytes = await download(url, outAbs)
-      const entry = { done: true, provider, model, task: job.task, out: unit.out, url, bytes, jobId: meta.jobId ?? null, seconds: job.task === 'i2v' ? job.seconds ?? 5 : undefined, ts: new Date().toISOString() }
+      const entry = { done: true, provider, model, task: job.task, out: unit.out, url, bytes, jobId: meta.jobId ?? null, seed: meta.seed ?? undefined, seconds: TASK_KIND[job.task] === 'video' ? job.seconds ?? 5 : undefined, ts: new Date().toISOString() }
       state[unit.key] = entry
       provenance.push({ id: job.id, ...entry })
       saveState()

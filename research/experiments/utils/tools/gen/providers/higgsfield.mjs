@@ -41,6 +41,11 @@ export async function run(job, { assetsDir, waitTimeout = '20m', waitInterval = 
   if (job.task === 'i2v') {
     args.push('--start-image', localPath(job.image, assetsDir))
     args.push('--duration', String(job.seconds ?? 5))
+  } else if (job.task === 'i2v_se') {
+    // seedance_2_0 — duration 최소 4초, end_image 선택.
+    args.push('--start-image', localPath(job.image, assetsDir))
+    if (job.end_image) args.push('--end-image', localPath(job.end_image, assetsDir))
+    args.push('--duration', String(Math.min(15, Math.max(4, Math.round(job.seconds ?? 5)))))
   } else if (job.task === 'edit') {
     args.push('--image', localPath(job.image, assetsDir))
   }
