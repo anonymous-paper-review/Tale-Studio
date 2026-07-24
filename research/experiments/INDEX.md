@@ -73,7 +73,8 @@
 | [character-canon](continuity-copy/2026-07-23_character-canon/notes.md) | E9d-copy (캐릭터) | ✅ | 텍스트 후보 4종 폐기, 레퍼런스 정면 1장 정본 확정, 신원 전파 2컷 성공 |
 | [input-format](continuity-copy/2026-07-23_input-format/result.md) | E9d-copy (설계도) | ✅ | 판정 완료 (07-23): 승자 채택 없음 — B1 가설(그림 못박기=카메라 통제) 기각, R 상한도 임의 오빗. 전환: 컷편집 허용+카메라 교정+사건 맥락층 재실험 |
 | [full-copy-bundle](continuity-copy/2026-07-23_full-copy-bundle/result.md) | — | ✅ | 판정 (07-24): **무효** — ① BASE 입력 결함: 정본 i2i 미공급(제품 v6의 에셋 매니페스트 생성 주체가 리팩토링 때 삭제 → 순수 T2I 폴백, 샷별 스타일·신원 붕괴 — I9) ② BKM 테이크 계획 결함: 도입 플래시 1초 컷들에 독립 4초 테이크 할당. 블라인드 순위 판정 없이 종결 → full-copy-v2 재설계 |
-| [full-copy-v2](continuity-copy/2026-07-24_full-copy-v2/design.md) | — | ⬜ | 재설계 (07-24): 3팔 — ORIGIN(정본 i2i 배선 복원 제품판) · FRAMEFIX(시작+끝 프레임 고정 제품 업그레이드판) · BKM2(도입 플래시 테이크 재사용 + 구도 정밀화 사람판). R·원본 대조군은 v1 산출 재사용. **설계도 3장 오너 확인 대기** |
+| [full-copy-v2](continuity-copy/2026-07-24_full-copy-v2/design.md) | — | ⬜ | 재설계 (07-24): 3팔 — ORIGIN(정본 i2i 배선 복원 제품판) · FRAMEFIX(시작+끝 프레임 고정 제품 업그레이드판) · BKM2(도입 재사용 + 구도 정밀화 사람판, 18테이크 — 도입 전용 생성 제거 확정 07-24). R·원본 대조군은 v1 산출 재사용. **설계도 오너 확인 대기** |
+| [intro-montage](continuity-copy/2026-07-24_intro-montage/design.md) | β-프로브 승격 | ⬜ | 설계 (07-24): 원본 도입 0~5.8초 빨리감기 몽타주를 통째로 만드는 3경로 — 편집 배속(0콜) vs 원샷 몽타주 프롬프트 vs Seedance multi_shots. 합격 산출은 full-copy-v2 BKM2 도입 슬롯에 합류 |
 
 ## 2. 판정 대기 목록 (2026-07-23 기준)
 
