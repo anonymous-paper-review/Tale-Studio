@@ -1,0 +1,12 @@
+[
+  {
+    "id": "r_s1",
+    "task": "i2v_se",
+    "prompt": "She applies the gloss from start pose to end pose. Ending state: Same scene, same locked camera as the start frame. End state: the gloss wand touches her lips, her chin tilted slightly up, lips freshly glossed.\nContinuity bible (LOCKED): the same young woman in every shot — black lip-length bob with wispy bangs, layered silver charm choker, pale blue satin slip dress with white daisy lace trim; wardrobe and hairstyle never change. Location: retro pastel public restroom — mint-green tiles, orange-red round sinks on a mint counter, large round mirrors with vertical tube lights. Light: warm fluorescent from above the mirrors, constant, same time of day. She stays on the same side of the 180-degree line, facing the mirror wall. Signature props: small lip-gloss wand; chrome drain.\nNever: any camera movement beyond what is specified, wardrobe or hairstyle change, shadow direction flip, day/night jump, extra people, duplicate faces, plastic skin, morphing hands, on-screen text, watermark.",
+    "image": "conti/s1_start.jpg",
+    "end_image": "conti/s1_end.jpg",
+    "seconds": 5.53,
+    "aspect": "16:9",
+    "out": "clips/arm-r/s1.mp4"
+  }
+]

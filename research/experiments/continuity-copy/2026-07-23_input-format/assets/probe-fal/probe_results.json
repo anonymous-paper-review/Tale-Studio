@@ -1,0 +1,37 @@
+[
+  {
+    "name": "1_seedance_noperson_neutral",
+    "result": "PASS",
+    "detail": "video saved"
+  },
+  {
+    "name": "2_seedance_aiface_neutral",
+    "result": "BLOCK",
+    "detail": "422 content_policy_violation @body.image_url — The images or videos provided may contain likenesses of real people or other private infor"
+  },
+  {
+    "name": "3_seedance_aiface_fullprompt",
+    "result": "BLOCK",
+    "detail": "422 content_policy_violation @body.image_url — The images or videos provided may contain likenesses of real people or other private infor"
+  },
+  {
+    "name": "4_seedance_realface_neutral",
+    "result": "BLOCK",
+    "detail": "422 content_policy_violation @body.image_url — The images or videos provided may contain likenesses of real people or other private infor"
+  },
+  {
+    "name": "5_seedance_tinyperson_neutral",
+    "result": "PASS",
+    "detail": "video saved"
+  },
+  {
+    "name": "6_seedance_anime_neutral",
+    "result": "PASS",
+    "detail": "video saved"
+  },
+  {
+    "name": "7_horse_realface_neutral",
+    "result": "PASS",
+    "detail": "video saved"
+  }
+]

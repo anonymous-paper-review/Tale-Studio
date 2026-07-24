@@ -1,0 +1,6 @@
+file '/Users/xcape/projects/tale-studio/research/experiments/continuity-copy/2026-07-23_input-format/assets/compare/retimed/b1_s1.mp4'
+file '/Users/xcape/projects/tale-studio/research/experiments/continuity-copy/2026-07-23_input-format/assets/compare/retimed/b1_s2.mp4'
+file '/Users/xcape/projects/tale-studio/research/experiments/continuity-copy/2026-07-23_input-format/assets/compare/retimed/b1_s3.mp4'
+file '/Users/xcape/projects/tale-studio/research/experiments/continuity-copy/2026-07-23_input-format/assets/compare/retimed/b1_s4.mp4'
+file '/Users/xcape/projects/tale-studio/research/experiments/continuity-copy/2026-07-23_input-format/assets/compare/retimed/b1_s5.mp4'
+file '/Users/xcape/projects/tale-studio/research/experiments/continuity-copy/2026-07-23_input-format/assets/compare/retimed/b1_s6.mp4'

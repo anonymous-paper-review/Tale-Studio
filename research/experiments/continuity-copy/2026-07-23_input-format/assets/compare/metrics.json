@@ -1,0 +1,242 @@
+[
+  {
+    "arm": "a",
+    "shot": 1,
+    "clip_s": 6.06,
+    "target_s": 5.53,
+    "first_frame_ssim": 0.760269,
+    "end_frame_ssim": null
+  },
+  {
+    "arm": "a",
+    "shot": 2,
+    "clip_s": 4.06,
+    "target_s": 3.43,
+    "first_frame_ssim": 0.762842,
+    "end_frame_ssim": null
+  },
+  {
+    "arm": "a",
+    "shot": 3,
+    "clip_s": 4.06,
+    "target_s": 1.44,
+    "first_frame_ssim": 0.779444,
+    "end_frame_ssim": null
+  },
+  {
+    "arm": "a",
+    "shot": 4,
+    "clip_s": 4.06,
+    "target_s": 3.3,
+    "first_frame_ssim": 0.839102,
+    "end_frame_ssim": null
+  },
+  {
+    "arm": "a",
+    "shot": 5,
+    "clip_s": 4.06,
+    "target_s": 3.63,
+    "first_frame_ssim": 0.889711,
+    "end_frame_ssim": null
+  },
+  {
+    "arm": "a",
+    "shot": 6,
+    "clip_s": 4.06,
+    "target_s": 1.57,
+    "first_frame_ssim": 0.656791,
+    "end_frame_ssim": null
+  },
+  {
+    "arm": "b1",
+    "shot": 1,
+    "clip_s": 6.06,
+    "target_s": 5.53,
+    "first_frame_ssim": 0.863637,
+    "end_frame_ssim": 0.883856
+  },
+  {
+    "arm": "b1",
+    "shot": 2,
+    "clip_s": 4.06,
+    "target_s": 3.43,
+    "first_frame_ssim": 0.729429,
+    "end_frame_ssim": 0.817743
+  },
+  {
+    "arm": "b1",
+    "shot": 3,
+    "clip_s": 4.06,
+    "target_s": 1.44,
+    "first_frame_ssim": 0.696916,
+    "end_frame_ssim": 0.705058
+  },
+  {
+    "arm": "b1",
+    "shot": 4,
+    "clip_s": 4.06,
+    "target_s": 3.3,
+    "first_frame_ssim": 0.814342,
+    "end_frame_ssim": 0.848638
+  },
+  {
+    "arm": "b1",
+    "shot": 5,
+    "clip_s": 4.06,
+    "target_s": 3.63,
+    "first_frame_ssim": 0.620848,
+    "end_frame_ssim": 0.620405
+  },
+  {
+    "arm": "b1",
+    "shot": 6,
+    "clip_s": 4.06,
+    "target_s": 1.57,
+    "first_frame_ssim": 0.796381,
+    "end_frame_ssim": 0.8483
+  },
+  {
+    "arm": "b2",
+    "shot": 1,
+    "clip_s": 6.06,
+    "target_s": 5.53,
+    "first_frame_ssim": 0.624139,
+    "end_frame_ssim": 0.614195
+  },
+  {
+    "arm": "b2",
+    "shot": 2,
+    "clip_s": 4.06,
+    "target_s": 3.43,
+    "first_frame_ssim": 0.665381,
+    "end_frame_ssim": 0.65383
+  },
+  {
+    "arm": "b2",
+    "shot": 3,
+    "clip_s": 4.06,
+    "target_s": 1.44,
+    "first_frame_ssim": 0.786534,
+    "end_frame_ssim": 0.847284
+  },
+  {
+    "arm": "b2",
+    "shot": 4,
+    "clip_s": 4.06,
+    "target_s": 3.3,
+    "first_frame_ssim": 0.792506,
+    "end_frame_ssim": 0.853751
+  },
+  {
+    "arm": "b2",
+    "shot": 5,
+    "clip_s": 4.06,
+    "target_s": 3.63,
+    "first_frame_ssim": 0.68411,
+    "end_frame_ssim": 0.659419
+  },
+  {
+    "arm": "b2",
+    "shot": 6,
+    "clip_s": 4.06,
+    "target_s": 1.57,
+    "first_frame_ssim": 0.88873,
+    "end_frame_ssim": 0.804642
+  },
+  {
+    "arm": "c",
+    "shot": 1,
+    "clip_s": 6.06,
+    "target_s": 5.53,
+    "first_frame_ssim": 0.863637,
+    "end_frame_ssim": 0.883856
+  },
+  {
+    "arm": "c",
+    "shot": 2,
+    "clip_s": 4.06,
+    "target_s": 3.43,
+    "first_frame_ssim": 0.867241,
+    "end_frame_ssim": 0.589682
+  },
+  {
+    "arm": "c",
+    "shot": 3,
+    "clip_s": 4.06,
+    "target_s": 1.44,
+    "first_frame_ssim": 0.696916,
+    "end_frame_ssim": 0.705058
+  },
+  {
+    "arm": "c",
+    "shot": 4,
+    "clip_s": 4.06,
+    "target_s": 3.3,
+    "first_frame_ssim": 0.814342,
+    "end_frame_ssim": 0.848638
+  },
+  {
+    "arm": "c",
+    "shot": 5,
+    "clip_s": 4.06,
+    "target_s": 3.63,
+    "first_frame_ssim": 0.707462,
+    "end_frame_ssim": 0.689689
+  },
+  {
+    "arm": "c",
+    "shot": 6,
+    "clip_s": 4.06,
+    "target_s": 1.57,
+    "first_frame_ssim": 0.720975,
+    "end_frame_ssim": 0.860691
+  },
+  {
+    "arm": "r",
+    "shot": 1,
+    "clip_s": 6.06,
+    "target_s": 5.53,
+    "first_frame_ssim": 0.921546,
+    "end_frame_ssim": 0.878275
+  },
+  {
+    "arm": "r",
+    "shot": 2,
+    "clip_s": 4.06,
+    "target_s": 3.43,
+    "first_frame_ssim": 0.672838,
+    "end_frame_ssim": 0.772556
+  },
+  {
+    "arm": "r",
+    "shot": 3,
+    "clip_s": 4.06,
+    "target_s": 1.44,
+    "first_frame_ssim": 0.763065,
+    "end_frame_ssim": 0.751445
+  },
+  {
+    "arm": "r",
+    "shot": 4,
+    "clip_s": 4.06,
+    "target_s": 3.3,
+    "first_frame_ssim": 0.851817,
+    "end_frame_ssim": 0.858661
+  },
+  {
+    "arm": "r",
+    "shot": 5,
+    "clip_s": 4.06,
+    "target_s": 3.63,
+    "first_frame_ssim": 0.690183,
+    "end_frame_ssim": 0.610633
+  },
+  {
+    "arm": "r",
+    "shot": 6,
+    "clip_s": 4.06,
+    "target_s": 1.57,
+    "first_frame_ssim": 0.957408,
+    "end_frame_ssim": 0.95686
+  }
+]

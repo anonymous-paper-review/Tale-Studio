@@ -1,0 +1,35 @@
+{
+  "mode": "higgsfield",
+  "attempts": {
+    "fal": 0,
+    "higgsfield": 2
+  },
+  "provenance": [
+    {
+      "id": "b2_s1",
+      "done": true,
+      "provider": "higgsfield",
+      "model": "seedance_2_0",
+      "task": "i2v_se",
+      "out": "clips/arm-b2/s1.mp4",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260723_072141_83a2a3aa-1d25-46e4-b8f1-ba7c222bdb62.mp4",
+      "bytes": 1577780,
+      "jobId": "83a2a3aa-1d25-46e4-b8f1-ba7c222bdb62",
+      "seconds": 5.53,
+      "ts": "2026-07-23T07:27:34.335Z"
+    },
+    {
+      "id": "b2beta_full",
+      "done": true,
+      "provider": "higgsfield",
+      "model": "seedance_2_0",
+      "task": "i2v_se",
+      "out": "clips/arm-b2/beta_full.mp4",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260723_072140_314b281f-6711-455e-a7ca-1b376661c64a.mp4",
+      "bytes": 3843562,
+      "jobId": "314b281f-6711-455e-a7ca-1b376661c64a",
+      "seconds": 15,
+      "ts": "2026-07-23T07:27:44.821Z"
+    }
+  ]
+}
