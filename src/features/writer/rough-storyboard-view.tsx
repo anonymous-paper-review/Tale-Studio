@@ -41,6 +41,10 @@ import type { RoughStoryboardImage, Shot } from '@/types'
 
 type PanelJob = { status: 'generating' | 'failed'; error?: string }
 
+// 진실 리로드 수렴 상한(#rough-refresh 2026-07-24) — previz(5분) 대응. 정상 경로는 폴링 성공 후
+//   첫 리로드(2s 간격)에 끝나고, 이 상한은 어떤 실패 경로에서도 UI 가 스피너에 갇히지 않게 하는 백스톱.
+const ROUGH_CONVERGE_MAX_RELOADS = 40
+
 // 표시 번호는 "순서(위치)" 기준으로 렌더 지점에서 계산 — 불변 id 접미사가 아니라(중간 삽입 시 번호
 //   뒤죽박죽 방지, #5). 샷 타입 설명(SHOT_TYPE_DESCRIPTIONS)은 shot-type-info 로 공용화(#2).
 
@@ -202,33 +206,71 @@ export function RoughStoryboardView() {
         for (const { shotId, jobId } of submitted) {
           shotIdsByJob.set(jobId, [...(shotIdsByJob.get(jobId) ?? []), shotId])
         }
-        const polls = [...shotIdsByJob.entries()].map(([jobId, jobShotIds]) =>
-          pollGenerationJob(jobId)
-            .then(async () => {
-              await loadProject()
-              setOverrides((prev) => {
-                const next = { ...prev }
-                for (const id of jobShotIds) delete next[id]
-                return next
-              })
-              setPanelJobs((prev) => {
-                const next = { ...prev }
-                for (const id of jobShotIds) delete next[id]
-                return next
-              })
-            })
-            .catch((e: unknown) => {
+        // 진실 리로드 수렴(#rough-refresh 2026-07-24) — previz(f392cbb)와 동일 패턴.
+        //   잡 폴링을 best-effort 로 두고(일시 오류로 던져도 무시), shots.rough_storyboard.status 가
+        //   'completed' 로 보일 때까지 loadProject 를 리로드한다. 폴링이 일시 오류(웹훅과 경쟁 등)로
+        //   던지거나 완료가 loadProject 한 번에 안 잡히던 어떤 경로에서도 UI 가 수렴한다
+        //   (카드가 새로고침 전까지 안 갱신되던 문제 해소). finalize 는 rough_storyboard 를 먼저 쓰고
+        //   completeGenerationJob 을 하므로 폴링 성공 후 첫 리로드가 곧 완료 프레임을 본다(정상=리로드 1회).
+        //   폴링 실패는 실패로 단정하지 않는다 — 일시 오류(정상 잡)를 거짓 실패로 만들던 게 원래 버그.
+        //   상한 도달 시엔 아직 미완인 샷의 스피너만 걷어 사용자가 재시도할 수 있게 한다(실패 확정 X).
+        const isDone = (id: string) =>
+          useWriterStore.getState().shots.find((s) => s.shotId === id)?.roughStoryboard?.status ===
+          'completed'
+        const clearShots = (ids: string[]) => {
+          if (!ids.length) return
+          setOverrides((prev) => {
+            const next = { ...prev }
+            for (const id of ids) delete next[id]
+            return next
+          })
+          setPanelJobs((prev) => {
+            const next = { ...prev }
+            for (const id of ids) delete next[id]
+            return next
+          })
+        }
+        const convergeJob = async (jobId: string, jobShotIds: string[]) => {
+          const pollOk = await pollGenerationJob(jobId)
+            .then(() => true)
+            .catch(() => false)
+          // 폴링이 던졌으면(pollOk=false) 실패인지 일시 오류인지 잡 상태를 한 번 권위 있게 확인한다.
+          //   진짜 실패면 펌프 배리어(r.done)를 오래 붙잡지 않고 즉시 실패 표기 후 종료.
+          let jobFailed = false
+          if (!pollOk) {
+            jobFailed = await fetch(`/api/generation-jobs/${encodeURIComponent(jobId)}`)
+              .then((r) => (r.ok ? r.json() : null))
+              .then((b) => b?.data?.status === 'failed')
+              .catch(() => false)
+          }
+          for (let i = 0; i < ROUGH_CONVERGE_MAX_RELOADS; i++) {
+            await loadProject()
+            const settled = jobShotIds.filter(isDone)
+            clearShots(settled)
+            if (settled.length === jobShotIds.length) return
+            if (jobFailed) {
+              // 잡 실패 확정 — 미완 샷을 실패 표기(재시도 버튼 노출)하고 종료.
               setPanelJobs((prev) => {
                 const next = { ...prev }
                 for (const id of jobShotIds) {
-                  next[id] = {
-                    status: 'failed',
-                    error: e instanceof Error ? e.message : String(e),
-                  }
+                  if (!isDone(id)) next[id] = { status: 'failed', error: '생성 실패' }
                 }
                 return next
               })
-            }),
+              return
+            }
+            // 폴링 성공(완료 확정)이면 짧게, 미확정이면 웹훅 지연을 감안해 길게 재확인.
+            await new Promise((r) => setTimeout(r, pollOk ? 2000 : 10_000))
+          }
+          // 상한 초과 — 미완 샷 스피너 해제(missing 으로 되돌려 펌프/재시도가 이어받게).
+          setPanelJobs((prev) => {
+            const next = { ...prev }
+            for (const id of jobShotIds) if (!isDone(id)) delete next[id]
+            return next
+          })
+        }
+        const polls = [...shotIdsByJob.entries()].map(([jobId, jobShotIds]) =>
+          convergeJob(jobId, jobShotIds),
         )
         return {
           submitted: submitted.length,
