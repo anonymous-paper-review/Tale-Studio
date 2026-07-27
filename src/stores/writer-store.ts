@@ -113,7 +113,9 @@ interface WriterState {
 
   setStoryText: (text: string) => void
   loadProject: () => Promise<void>
-  /** 목각 previz 영상 생성(#previz-video) — 러프 START+END refs. 완료 시 shots 리로드. */
+  /** 목각 previz 영상 생성(#previz-video) — 러프 START+END refs. 완료 시 shots 리로드.
+   *  ⚠️ 2026-07-27 UI 에서 진입점 제거(유저 부담 완화 — 영상 생성은 SHOT VIDEO 하나로 통일).
+   *  현재 호출자 없음. 백엔드(API/webhook/DB 컬럼)와 함께 남겨둔 휴면 경로 — 되살릴 때 UI 만 붙이면 된다. */
   generatePrevizVideo: (shotId: string) => Promise<void>
   selectScene: (id: string) => void
   updateScene: (id: string, changes: Partial<Scene>) => void

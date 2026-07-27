@@ -51,7 +51,6 @@ import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
 import { VideoNode } from '@/features/director/canvas-nodes/VideoNode'
 import { AssetNode } from '@/features/director/canvas-nodes/AssetNode'
 import { PromptNode } from '@/features/director/canvas-nodes/PromptNode'
-import { PrevizVideoNode } from '@/features/director/canvas-nodes/PrevizVideoNode'
 import { ShotImageNode } from '@/features/director/canvas-nodes/ShotImageNode'
 import { VideoPlaceholderNode } from '@/features/director/canvas-nodes/VideoPlaceholderNode'
 import { CategoryEdge } from '@/features/director/canvas-edges/CategoryEdge'
@@ -72,7 +71,6 @@ const nodeTypes = {
   video: VideoNode,
   asset: AssetNode,
   prompt: PromptNode,
-  previzVideo: PrevizVideoNode,
   shotImage: ShotImageNode,
   videoPlaceholder: VideoPlaceholderNode,
 } as const
@@ -366,7 +364,7 @@ function CanvasInner() {
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      // #previz-chain: Shot 드래그 시 파생 체인 노드(PrevizVideo/ShotImage)가 함께 따라온다.
+      // #previz-chain: Shot 드래그 시 파생 체인 노드(ShotImage/플레이스홀더)가 함께 따라온다.
       const next = followChainNodePositions(
         applyNodeChanges(
           changes.filter((change) => change.type !== 'remove'),

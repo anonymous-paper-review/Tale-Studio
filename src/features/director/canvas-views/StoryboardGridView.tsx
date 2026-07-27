@@ -18,8 +18,7 @@ import {
   useDirectorCanvasStore,
 } from '@/stores/director-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
-import { useRoughStoryboard, usePrevizVideo } from '@/features/director/hooks/use-rough-storyboard'
-import { useWriterStore } from '@/stores/writer-store'
+import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
 import { replaceSlugs, type SlugEntry } from '@/lib/script-lines'
 import {
   isSceneData,
@@ -151,10 +150,6 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
   // 실사 이미지가 없을 때 러프 스토리보드 폴백 표시(#e11) — writer-store 스코프 구독
   const writerShotId = isShotData(node.data) ? node.data.writerShotId : null
   const rough = useRoughStoryboard(writerShotId)
-  // 목각 previz 영상(#previz-video) — writer-store shots.previz_video 스코프 구독
-  const previz = usePrevizVideo(writerShotId)
-  const generatePrevizVideo = useWriterStore((st) => st.generatePrevizVideo)
-  const [previzBusy, setPrevizBusy] = useState(false)
   // 영상 생성(이미지→영상 체인 포함) 진행 플래그 — 버튼 잠금 + 오버레이(#e12)
   const [videoBusy, setVideoBusy] = useState(false)
   const [videoError, setVideoError] = useState<string | null>(null)
@@ -195,20 +190,16 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
   const hasImage = status === 'completed' && !!img?.url
   const roughUrl = rough?.status === 'completed' ? rough.url : null
   const roughStartUrl = rough?.frames?.start ?? roughUrl
-  const previzUrl = previz?.status === 'completed' && previz.url ? previz.url : null
-  const previzGenerating = previz?.status === 'generating' || previzBusy
   const prompt = effectivePrompt(data)
 
   // 파이프라인 단계 배지(#e2 2026-07-18) — 이 샷이 어느 단계인지 한눈에: 영상 완료 / 이미지 완료
   //   (영상 대기) / 이미지 생성 필요(러프만). 색으로도 구분: 영상=빨강(primary), 이미지=하늘, 러프=경고.
-  //   previz 영상 有 = previz 이미지(러프)까지 있다는 뜻 → Real 뷰의 이미지 단계와 같은 하늘색(2026-07-22).
+  //   Previz 뷰(2026-07-27): 영상 단계가 사라져 러프 보드 유무만 표시한다.
   const stageBadge =
     mediaMode === 'previz'
-      ? previzUrl
-        ? { label: 'Previz 영상', cls: 'border-sky-400/50 text-sky-300', video: true }
-        : roughStartUrl
-          ? { label: 'Previz 생성 필요', cls: 'border-warning/50 text-warning', video: false }
-          : null
+      ? roughStartUrl
+        ? { label: 'Previz 보드', cls: 'border-sky-400/50 text-sky-300', video: false }
+        : { label: '러프 생성 필요', cls: 'border-warning/50 text-warning', video: false }
       : completedVideoUrl
         ? { label: '영상 단계', cls: 'border-primary/50 text-primary', video: true }
         : hasImage
@@ -216,19 +207,6 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
           : roughUrl
             ? { label: '이미지 생성 필요', cls: 'border-warning/50 text-warning', video: false }
             : null
-
-  const runPreviz = async () => {
-    if (previzBusy || !writerShotId) return
-    setPrevizBusy(true)
-    setVideoError(null)
-    try {
-      await generatePrevizVideo(writerShotId)
-    } catch (error) {
-      setVideoError(error instanceof Error ? error.message : 'previz 영상 생성에 실패했습니다.')
-    } finally {
-      setPrevizBusy(false)
-    }
-  }
 
   const runImage = async () => {
     try {
@@ -271,11 +249,11 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
       onDoubleClick={() => openPopup(node.id)}
     >
       <div className="relative aspect-video bg-muted">
-        {mediaMode === 'previz' && previzUrl ? (
-          // 목각 previz 영상(#previz-video) — 연출 판독용 메인. 호버 재생 동일.
-          <HoverPlayVideo src={previzUrl} label={prettyNodeLabel(data.label)} />
+        {mediaMode === 'previz' && rough?.frames ? (
+          // Previz = 러프 3프레임 순환 재생(2026-07-27) — 목각 영상 생성을 걷어내고 보드만 남겼다.
+          <RoughFrameCycle panel={rough} alt={`${data.label} (previz)`} />
         ) : mediaMode === 'previz' && roughStartUrl ? (
-          // previz 영상 미생성 → 러프 START 프레임 표시
+          // 구형 단일 패널 러프(3프레임 이전 데이터) → 대표 프레임 표시
           <GeneratedImage
             src={roughStartUrl}
             alt={`${data.label} (previz)`}
@@ -343,14 +321,8 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
         {/* 생성 중 — border beam + 경과시간 오버레이. 색 구분(#e13): 이미지=초록, 영상=빨강.
             동시 진행이면 라벨·빔 모두 이미지(선행 단계) 우선 — 표기 불일치 방지. */}
         <GeneratingOverlay
-          active={generating || (mediaMode === 'previz' && previzGenerating)}
-          label={
-            mediaMode === 'previz' && previzGenerating
-              ? 'Previz 영상 생성 중'
-              : imageGenerating
-                ? '이미지 생성 중'
-                : '영상 생성 중'
-          }
+          active={generating}
+          label={imageGenerating ? '이미지 생성 중' : '영상 생성 중'}
           beamColor={imageGenerating ? 'success' : 'primary'}
         />
         {childVideoFailure && (
@@ -398,18 +370,14 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
               <ImageIcon className="size-3.5 shrink-0" />
               {hasImage ? '이미지 리터칭' : '이미지 생성'}
             </button>
+            {/* 영상 생성 진입점은 SHOT VIDEO 하나(2026-07-27) — Previz 뷰에서도 같은 실사 영상을 만든다. */}
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
-                void (mediaMode === 'previz' ? runPreviz() : runVideo())
+                void runVideo()
               }}
-              title={
-                mediaMode === 'previz'
-                  ? 'Previz 영상 생성 — 러프 START+END 프레임으로 목각 인형 연출 영상을 만들어요'
-                  : '영상 생성 — 촬영 이미지가 없으면 먼저 생성한 뒤 영상을 만들어요'
-              }
-              disabled={mediaMode === 'previz' && (!roughStartUrl || previzGenerating)}
+              title="영상 생성 — 촬영 이미지가 없으면 먼저 생성한 뒤 영상을 만들어요"
               className={cn(
                 'flex h-7 items-center rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground shadow-sm',
                 'transition-colors duration-100 hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-50',
@@ -417,7 +385,7 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
             >
               <Play className="size-3.5 shrink-0 fill-current" />
               <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/gen:ml-1 group-hover/gen:max-w-40 group-hover/gen:opacity-100">
-                {mediaMode === 'previz' ? (previzUrl ? 'Previz 재생성' : 'Previz 영상') : '영상 생성'}
+                영상 생성
               </span>
             </button>
           </div>
@@ -442,7 +410,7 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
 export function StoryboardGridView() {
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const projectId = useDirectorCanvasStore((s) => s.projectId)
-  // 미디어 모드(#previz-video): Previz(목각, 기본) | Real(실사) — 상단바(PaletteBar) 토글이 제어(2026-07-22).
+  // 미디어 모드: Previz(러프 3프레임 보드, 기본) | Real(실사) — 상단바(PaletteBar) 토글이 제어(2026-07-22).
   const mediaMode: StoryboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
 
   // 슬러그 → 실제 이름 로스터(#e6) — asset-storage(진입 시 DB hydrate)에서 인물·장소 이름.

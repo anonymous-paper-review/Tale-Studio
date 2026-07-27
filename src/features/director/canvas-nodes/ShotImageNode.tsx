@@ -3,7 +3,8 @@
 // SHOT IMAGE 노드(#previz-chain 2026-07-22) — shots.storyboard_image(실사 3프레임)의 파생 표시.
 //
 // 진실은 부모 Shot 노드 data.storyboardImage — 이 노드는 표시 + 생성 트리거만.
-// 체인에서 SHOT VIDEO 로 합류하는 하단 입력: PREVIZ SHOT VIDEO 아래에 배치된다.
+// 체인 중간 단계(2026-07-27 직선화): SHOT(previz 보드) → 이 노드 → SHOT VIDEO.
+//   좌측 target(체인 입력) + 우측 source(SHOT VIDEO 로) 양쪽 핸들을 가진다.
 // 실사 3프레임(frames)이 있으면 러프 보드와 동일한 hover 순환(START→DIRECTING→END).
 
 import { memo } from 'react'
@@ -50,6 +51,15 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
             : 'border-2 ring-4 ring-muted-foreground/30 opacity-100'),
       )}
     >
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="left"
+        className={cn(
+          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
+          hasImage ? 'bg-chart-4' : 'bg-muted-foreground/60',
+        )}
+      />
       <Handle
         type="source"
         position={Position.Right}

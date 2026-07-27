@@ -17,7 +17,6 @@ export type DirectorNodeKind =
   | 'video'
   | 'asset'
   | 'prompt'
-  | 'previzVideo'
   | 'shotImage'
   | 'videoPlaceholder'
 
@@ -26,7 +25,7 @@ export type DirectorEdgeCategory =
   | 'relates-to' // 사용자 정의 내러티브 관계
   | 'references' // Asset→Shot (Artist 에셋을 참조하는 샷, 파생 — DB 미영속)
   | 'prompt' // Prompt 노드 → Shot T 입력 (프롬프트 와이어, 영속)
-  | 'chain' // Shot→PrevizVideo→Video, ShotImage→Video (previz 체인, 파생 — DB 미영속)
+  | 'chain' // Shot→ShotImage→Video (샷 체인, 파생 — DB 미영속)
 
 export type DirectorVideoStatus =
   | 'pending'
@@ -182,23 +181,12 @@ export type AssetNodeData = {
   [key: string]: unknown
 }
 
-// ─── Previz 체인 파생 노드 (#previz-chain 2026-07-22) ────────────────────────
-
-/**
- * Shot 의 목각 previz 영상(shots.previz_video)을 표시하는 파생 노드.
- * 체인: SCENE → PREVIZ SHOT IMAGE(Shot) → PREVIZ SHOT VIDEO(이 노드) → SHOT VIDEO,
- *       SHOT IMAGE(실사)가 아래에서 SHOT VIDEO 로 합류.
- * DB 미영속 — writer-store shots(previz_video/rough)가 진실, rebuildShotChainNodes 가 재생성.
- * 위치는 부모 Shot 기준 고정(draggable=false, 드래그 따라오기는 followChainNodePositions).
- */
-export type PrevizVideoNodeData = {
-  kind: 'previzVideo'
-  label: string
-  parentShotNodeId: string
-  /** writer shots.shot_id — previz_video/rough_storyboard 구독 키 */
-  writerShotId: string
-  [key: string]: unknown
-}
+// ─── Shot 체인 파생 노드 (#previz-chain 2026-07-22) ──────────────────────────
+//
+// 체인: SCENE → SHOT(previz 3프레임 보드) → SHOT IMAGE(실사) → SHOT VIDEO.
+// 2026-07-27: PREVIZ SHOT VIDEO 노드 제거 — previz 는 3프레임 순환 재생 전용이 되고
+//   영상 생성 진입점은 SHOT VIDEO 하나로 통일(유저 부담 완화). 백엔드(previz_video 컬럼·
+//   생성 API·webhook finalize)는 남아 있어 되살릴 때 UI 만 복구하면 된다.
 
 /**
  * Shot 의 실사 스토리보드 이미지(shots.storyboard_image)를 표시하는 파생 노드.
@@ -249,7 +237,6 @@ export type DirectorNodeData =
   | VideoNodeData
   | AssetNodeData
   | PromptNodeData
-  | PrevizVideoNodeData
   | ShotImageNodeData
   | VideoPlaceholderNodeData
 
@@ -274,14 +261,13 @@ export const newDirectorId = (
 export const SCENE_OFFSET_X = 360
 /** Shot 노드 폭 + gap (Scene 우측에 stacking) */
 export const SHOT_OFFSET_X = 360
-/** Shot 형제 간 세로 간격(#previz-chain) — previz 체인 컬럼(PREVIZ VIDEO 위 + SHOT IMAGE 아래,
- *  ~520px)이 다음 샷 행과 안 겹치는 높이. (구 340 — 체인 도입으로 확대) */
+/** Shot 형제 간 세로 간격 — Video 테이크 2개(260 stacking + 카드 높이)가 다음 샷 행과 안 겹치는 높이.
+ *  (#previz-chain 때 340→560. 2026-07-27 previz 영상 제거로 체인이 1행이 됐지만, 테이크 stacking이
+ *   같은 높이를 요구하므로 값은 유지 — 근거만 바뀜) */
 export const SHOT_OFFSET_Y = 560
-/** Previz Video 노드 x (Shot 우측 stacking, #previz-chain) */
-export const PREVIZ_VIDEO_OFFSET_X = 360
-/** Shot Image(실사) 노드 y — previz 컬럼에서 PREVIZ VIDEO 아래 (#previz-chain) */
-export const SHOT_IMAGE_OFFSET_Y = 260
-/** Video 노드 x (Shot 기준) — previz 체인 컬럼 다음 (#previz-chain: 360→720) */
+/** Shot Image(실사) 노드 x — Shot 우측(#previz-chain. 2026-07-27: previz 영상 컬럼을 이어받아 같은 행) */
+export const SHOT_IMAGE_OFFSET_X = 360
+/** Video 노드 x (Shot 기준) — SHOT IMAGE 다음 컬럼 */
 export const VIDEO_OFFSET_X = 720
 /** Video 형제 간 세로 간격 — 썸네일 카드 겹침 방지 여유 포함(#e3) */
 export const VIDEO_OFFSET_Y = 260
@@ -315,10 +301,6 @@ export function isPromptData(d: DirectorNodeData): d is PromptNodeData {
   return d.kind === 'prompt'
 }
 
-export function isPrevizVideoData(d: DirectorNodeData): d is PrevizVideoNodeData {
-  return d.kind === 'previzVideo'
-}
-
 export function isShotImageData(d: DirectorNodeData): d is ShotImageNodeData {
   return d.kind === 'shotImage'
 }
@@ -333,7 +315,6 @@ export function isVideoPlaceholderData(
 export function isDerivedNodeData(d: DirectorNodeData): boolean {
   return (
     d.kind === 'asset' ||
-    d.kind === 'previzVideo' ||
     d.kind === 'shotImage' ||
     d.kind === 'videoPlaceholder'
   )

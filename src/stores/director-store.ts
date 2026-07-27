@@ -11,8 +11,7 @@ import {
   newDirectorId,
   SHOT_OFFSET_X,
   SHOT_OFFSET_Y,
-  PREVIZ_VIDEO_OFFSET_X,
-  SHOT_IMAGE_OFFSET_Y,
+  SHOT_IMAGE_OFFSET_X,
   VIDEO_OFFSET_X,
   VIDEO_OFFSET_Y,
   ASSET_OFFSET_X,
@@ -22,7 +21,6 @@ import {
   isVideoData,
   isAssetData,
   isPromptData,
-  isPrevizVideoData,
   isShotImageData,
   isVideoPlaceholderData,
   isDerivedNodeData,
@@ -697,9 +695,9 @@ interface DirectorCanvasState {
    */
   rebuildAssetNodes: () => void
   /**
-   * Previz 체인 파생 노드/엣지 재생성(#previz-chain 2026-07-22, 멱등) —
-   * writerShotId 있는 Shot 마다 PREVIZ SHOT VIDEO(우측)·SHOT IMAGE(그 아래) 노드를 만들고
-   * Shot→PrevizVideo→Video, ShotImage→Video 체인 엣지로 배선한다.
+   * Shot 체인 파생 노드/엣지 재생성(#previz-chain 2026-07-22, 멱등) —
+   * writerShotId 있는 Shot 마다 SHOT IMAGE(우측) 노드를 만들고
+   * Shot→ShotImage→Video 직선 체인 엣지로 배선한다(2026-07-27: previz 영상 단계 제거).
    * 해당 Shot 의 기존 Shot→Video parent 엣지는 체인으로 대체(제거)된다.
    */
   rebuildShotChainNodes: () => void
@@ -1416,7 +1414,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           edges: [...s.edges, parentEdge],
           lastSavedAt: Date.now(),
         }))
-        // 체인 샷이면 parent 엣지를 previz 체인(PrevizVideo/ShotImage→Video)으로 즉시 전환.
+        // 체인 샷이면 parent 엣지를 샷 체인(ShotImage→Video)으로 즉시 전환.
         get().rebuildShotChainNodes()
 
         return id
@@ -1824,10 +1822,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         set((s) => {
           // 1) 기존 파생물 제거 — 멱등 재생성
           const nodes = s.nodes.filter(
-            (n) =>
-              !isPrevizVideoData(n.data) &&
-              !isShotImageData(n.data) &&
-              !isVideoPlaceholderData(n.data),
+            (n) => !isShotImageData(n.data) && !isVideoPlaceholderData(n.data),
           )
           let edges = s.edges.filter((e) => e.data?.category !== 'chain')
 
@@ -1861,45 +1856,29 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             data: { category: 'chain', relationText: '' },
           })
 
+          // 체인: SHOT(previz 3프레임) → SHOT IMAGE(실사) → SHOT VIDEO — 2026-07-27 직선화.
+          //   (구 SHOT→PREVIZ VIDEO→VIDEO + SHOT IMAGE 하단 합류. previz 영상 제거로 단일 경로가 됐고,
+          //    실제 인과와도 일치한다: 러프 3프레임 → 실사 이미지 → 그 이미지 refs 로 영상.)
           for (const shot of chainShots) {
             const sd = shot.data as ShotNodeData
-            const pvId = `dn_pv_${shot.id}`
             const simgId = `dn_simg_${shot.id}`
             nodes.push({
-              id: pvId,
-              type: 'previzVideo',
+              id: simgId,
+              type: 'shotImage',
               position: {
-                x: shot.position.x + PREVIZ_VIDEO_OFFSET_X,
+                x: shot.position.x + SHOT_IMAGE_OFFSET_X,
                 y: shot.position.y,
               },
               draggable: false,
               selectable: true, // 클릭=선택 링, 더블클릭=부모 Shot 모달(2026-07-23 피드백)
               connectable: false,
-              data: {
-                kind: 'previzVideo',
-                label: sd.label,
-                parentShotNodeId: shot.id,
-                writerShotId: sd.writerShotId as string,
-              },
-            })
-            nodes.push({
-              id: simgId,
-              type: 'shotImage',
-              position: {
-                x: shot.position.x + PREVIZ_VIDEO_OFFSET_X,
-                y: shot.position.y + SHOT_IMAGE_OFFSET_Y,
-              },
-              draggable: false,
-              selectable: true,
-              connectable: false,
               data: { kind: 'shotImage', label: sd.label, parentShotNodeId: shot.id },
             })
-            edges.push(chainEdge(`de_chain_${shot.id}_pv`, shot.id, pvId))
+            edges.push(chainEdge(`de_chain_${shot.id}_simg`, shot.id, simgId))
             let hasVideo = false
             for (const v of nodes) {
               if (!isVideoData(v.data) || v.data.parentShotNodeId !== shot.id) continue
               hasVideo = true
-              edges.push(chainEdge(`de_chain_pv_${v.id}`, pvId, v.id))
               edges.push(chainEdge(`de_chain_simg_${v.id}`, simgId, v.id))
             }
             // 테이크 0개 — 회색 SHOT VIDEO 플레이스홀더로 체인 종점을 안내(2026-07-22 피드백).
@@ -1918,7 +1897,6 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 connectable: false,
                 data: { kind: 'videoPlaceholder', label: sd.label, parentShotNodeId: shot.id },
               })
-              edges.push(chainEdge(`de_chain_pv_${phId}`, pvId, phId))
               edges.push(chainEdge(`de_chain_simg_${phId}`, simgId, phId))
             }
           }
@@ -3121,12 +3099,7 @@ export function followChainNodePositions(nodes: DirectorNode[]): DirectorNode[] 
   let shotById: Map<string, DirectorNode> | null = null
   let changed = false
   const out = nodes.map((n) => {
-    if (
-      !isPrevizVideoData(n.data) &&
-      !isShotImageData(n.data) &&
-      !isVideoPlaceholderData(n.data)
-    )
-      return n
+    if (!isShotImageData(n.data) && !isVideoPlaceholderData(n.data)) return n
     if (!shotById) {
       shotById = new Map(nodes.filter((x) => isShotData(x.data)).map((x) => [x.id, x]))
     }
@@ -3135,8 +3108,8 @@ export function followChainNodePositions(nodes: DirectorNode[]): DirectorNode[] 
     const want = {
       x:
         shot.position.x +
-        (isVideoPlaceholderData(n.data) ? VIDEO_OFFSET_X : PREVIZ_VIDEO_OFFSET_X),
-      y: shot.position.y + (isShotImageData(n.data) ? SHOT_IMAGE_OFFSET_Y : 0),
+        (isVideoPlaceholderData(n.data) ? VIDEO_OFFSET_X : SHOT_IMAGE_OFFSET_X),
+      y: shot.position.y,
     }
     if (n.position.x === want.x && n.position.y === want.y) return n
     changed = true

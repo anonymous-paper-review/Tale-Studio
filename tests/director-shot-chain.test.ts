@@ -1,6 +1,6 @@
-// Previz 체인 파생 그래프(#previz-chain 2026-07-22) — rebuildShotChainNodes 배선 검증.
-//   체인: SCENE → Shot(PREVIZ SHOT IMAGE) → PREVIZ SHOT VIDEO → SHOT VIDEO,
-//         SHOT IMAGE(실사)가 아래에서 SHOT VIDEO 로 합류.
+// Shot 체인 파생 그래프(#previz-chain 2026-07-22, 2026-07-27 직선화) — rebuildShotChainNodes 배선 검증.
+//   체인: SCENE → SHOT(previz 3프레임 보드) → SHOT IMAGE(실사) → SHOT VIDEO.
+//   (구 PREVIZ SHOT VIDEO 노드는 previz 영상 기능 숨김으로 제거 — 영상 진입점은 SHOT VIDEO 하나.)
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   useDirectorCanvasStore,
@@ -8,10 +8,8 @@ import {
 } from '@/stores/director-store'
 import { chainParentShotNodeId } from '@/features/director/canvas-interaction'
 import {
-  PREVIZ_VIDEO_OFFSET_X,
-  SHOT_IMAGE_OFFSET_Y,
+  SHOT_IMAGE_OFFSET_X,
   VIDEO_OFFSET_X,
-  isPrevizVideoData,
   isShotImageData,
   isVideoData,
   isVideoPlaceholderData,
@@ -35,24 +33,28 @@ function seed(): [string, string] {
 }
 
 describe('rebuildShotChainNodes', () => {
-  it('writer 샷에만 PrevizVideo/ShotImage 파생 노드를 만들고 오프셋에 배치한다', () => {
+  it('writer 샷에만 ShotImage 파생 노드를 만들고 Shot 우측 같은 행에 배치한다', () => {
     const [writerShot, manualShot] = seed()
     api().rebuildShotChainNodes()
 
     const nodes = api().nodes
-    const pv = nodes.find((n) => n.id === `dn_pv_${writerShot}`)
     const simg = nodes.find((n) => n.id === `dn_simg_${writerShot}`)
-    expect(pv && isPrevizVideoData(pv.data)).toBe(true)
     expect(simg && isShotImageData(simg.data)).toBe(true)
-    expect(pv!.position).toEqual({ x: 360 + PREVIZ_VIDEO_OFFSET_X, y: 0 })
-    expect(simg!.position).toEqual({ x: 360 + PREVIZ_VIDEO_OFFSET_X, y: SHOT_IMAGE_OFFSET_Y })
-    expect(pv!.draggable).toBe(false)
+    expect(simg!.position).toEqual({ x: 360 + SHOT_IMAGE_OFFSET_X, y: 0 })
+    expect(simg!.draggable).toBe(false)
 
-    expect(nodes.find((n) => n.id === `dn_pv_${manualShot}`)).toBeUndefined()
+    // previz 영상 노드 제거(2026-07-27) — 'previzVideo' 는 타입 유니온에서 빠져 비교 자체가
+    //   불가하므로(컴파일 타임 보장), 파생물이 ShotImage + 플레이스홀더 2개뿐임으로 확인한다.
+    const derivedOfShot = nodes.filter(
+      (n) => (n.data as { parentShotNodeId?: string }).parentShotNodeId === writerShot,
+    )
+    expect(derivedOfShot.map((n) => n.id).sort()).toEqual(
+      [`dn_simg_${writerShot}`, `dn_vph_${writerShot}`].sort(),
+    )
     expect(nodes.find((n) => n.id === `dn_simg_${manualShot}`)).toBeUndefined()
   })
 
-  it('Shot→Video parent 엣지를 PrevizVideo/ShotImage→Video 체인으로 대체한다', () => {
+  it('Shot→Video parent 엣지를 Shot→ShotImage→Video 직선 체인으로 대체한다', () => {
     const [writerShot] = seed()
     const videoId = api().addVideoTake(writerShot)! // addVideoTake 가 rebuild 를 내장 호출
 
@@ -63,16 +65,15 @@ describe('rebuildShotChainNodes', () => {
         (e) => e.data?.category === 'parent' && e.source === writerShot && e.target === videoId,
       ),
     ).toBe(false)
-    // 체인 배선: shot→pv, pv→video, simg→video
+    // 체인 배선: shot→simg, simg→video (직선)
     const chain = edges.filter((e) => e.data?.category === 'chain')
     expect(chain.map((e) => [e.source, e.target])).toEqual(
       expect.arrayContaining([
-        [writerShot, `dn_pv_${writerShot}`],
-        [`dn_pv_${writerShot}`, videoId],
+        [writerShot, `dn_simg_${writerShot}`],
         [`dn_simg_${writerShot}`, videoId],
       ]),
     )
-    // 비디오 테이크 기본 위치는 previz 컬럼 다음(x+720)
+    // 비디오 테이크 기본 위치는 SHOT IMAGE 다음 컬럼(x+720)
     const video = api().nodes.find((n) => n.id === videoId)!
     expect(video.position.x).toBe(360 + VIDEO_OFFSET_X)
   })
@@ -81,9 +82,7 @@ describe('rebuildShotChainNodes', () => {
     seed()
     api().rebuildShotChainNodes()
     const count = () => ({
-      derived: api().nodes.filter(
-        (n) => isPrevizVideoData(n.data) || isShotImageData(n.data),
-      ).length,
+      derived: api().nodes.filter((n) => isShotImageData(n.data)).length,
       chain: api().edges.filter((e) => e.data?.category === 'chain').length,
     })
     const first = count()
@@ -98,23 +97,21 @@ describe('rebuildShotChainNodes', () => {
       n.id === writerShot ? { ...n, position: { x: 1000, y: 500 } } : n,
     )
     const out = followChainNodePositions(moved)
-    const pv = out.find((n) => n.id === `dn_pv_${writerShot}`)!
     const simg = out.find((n) => n.id === `dn_simg_${writerShot}`)!
-    expect(pv.position).toEqual({ x: 1000 + PREVIZ_VIDEO_OFFSET_X, y: 500 })
-    expect(simg.position).toEqual({ x: 1000 + PREVIZ_VIDEO_OFFSET_X, y: 500 + SHOT_IMAGE_OFFSET_Y })
+    expect(simg.position).toEqual({ x: 1000 + SHOT_IMAGE_OFFSET_X, y: 500 })
   })
 
-  it('relayoutCanvas — 체인 포함 자동 정렬: video x=+720, 파생 노드 재배치', () => {
+  it('relayoutCanvas — 체인 포함 자동 정렬: video x=+720, ShotImage x=+360 같은 행', () => {
     const [writerShot] = seed()
     const videoId = api().addVideoTake(writerShot)!
     api().relayoutCanvas()
 
     const shot = api().nodes.find((n) => n.id === writerShot)!
     const video = api().nodes.find((n) => n.id === videoId)!
-    const pv = api().nodes.find((n) => n.id === `dn_pv_${writerShot}`)!
+    const simg = api().nodes.find((n) => n.id === `dn_simg_${writerShot}`)!
     expect(video.position.x).toBe(shot.position.x + VIDEO_OFFSET_X)
-    expect(pv.position).toEqual({
-      x: shot.position.x + PREVIZ_VIDEO_OFFSET_X,
+    expect(simg.position).toEqual({
+      x: shot.position.x + SHOT_IMAGE_OFFSET_X,
       y: shot.position.y,
     })
   })
@@ -127,13 +124,10 @@ describe('rebuildShotChainNodes', () => {
     const ph = api().nodes.find((n) => n.id === phId)
     expect(ph && isVideoPlaceholderData(ph.data)).toBe(true)
     expect(ph!.position).toEqual({ x: 360 + VIDEO_OFFSET_X, y: 0 })
-    // 체인 배선: pv→ph, simg→ph
+    // 체인 배선: simg→ph
     const chain = api().edges.filter((e) => e.data?.category === 'chain')
     expect(chain.map((e) => [e.source, e.target])).toEqual(
-      expect.arrayContaining([
-        [`dn_pv_${writerShot}`, phId],
-        [`dn_simg_${writerShot}`, phId],
-      ]),
+      expect.arrayContaining([[`dn_simg_${writerShot}`, phId]]),
     )
     // 수동 샷엔 플레이스홀더 없음
     expect(api().nodes.find((n) => n.id === `dn_vph_${manualShot}`)).toBeUndefined()
@@ -142,9 +136,7 @@ describe('rebuildShotChainNodes', () => {
     const videoId = api().addVideoTake(writerShot)!
     expect(api().nodes.find((n) => n.id === phId)).toBeUndefined()
     expect(
-      api().edges.some(
-        (e) => e.data?.category === 'chain' && e.target === videoId,
-      ),
+      api().edges.some((e) => e.data?.category === 'chain' && e.target === videoId),
     ).toBe(true)
   })
 
@@ -161,7 +153,7 @@ describe('rebuildShotChainNodes', () => {
   it('파생 카드 상호작용(2026-07-23) — 선택 가능 + 더블클릭은 부모 Shot 으로 위임 + 삭제 불가', () => {
     const [writerShot] = seed()
     api().rebuildShotChainNodes()
-    const derived = [`dn_pv_${writerShot}`, `dn_simg_${writerShot}`, `dn_vph_${writerShot}`]
+    const derived = [`dn_simg_${writerShot}`, `dn_vph_${writerShot}`]
     for (const id of derived) {
       const n = api().nodes.find((x) => x.id === id)!
       expect(n.selectable).toBe(true)
@@ -183,9 +175,9 @@ describe('rebuildShotChainNodes', () => {
     api().undo()
     // 비디오는 undo 로 사라지고, 파생 노드는 rebuild 로 존재
     expect(api().nodes.some((n) => isVideoData(n.data))).toBe(false)
-    expect(api().nodes.some((n) => n.id === `dn_pv_${writerShot}`)).toBe(true)
+    expect(api().nodes.some((n) => n.id === `dn_simg_${writerShot}`)).toBe(true)
     expect(
       api().edges.filter((e) => e.data?.category === 'chain').map((e) => e.target),
-    ).toContain(`dn_pv_${writerShot}`)
+    ).toContain(`dn_simg_${writerShot}`)
   })
 })

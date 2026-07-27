@@ -44,14 +44,12 @@ export function doubleClickActionForKind(
 }
 
 /**
- * previz 체인 파생 카드 더블클릭 위임 대상(#previz-chain 2026-07-23) — 파생 카드는 자체
+ * 샷 체인 파생 카드 더블클릭 위임 대상(#previz-chain 2026-07-23) — 파생 카드는 자체
  * 모달이 없고 진실이 부모 Shot 에 있으므로, 더블클릭을 부모 Shot 모달로 위임한다.
  * 파생 카드가 아니면 null.
  */
 export function chainParentShotNodeId(data: DirectorNodeData): string | null {
-  return data.kind === 'previzVideo' ||
-    data.kind === 'shotImage' ||
-    data.kind === 'videoPlaceholder'
+  return data.kind === 'shotImage' || data.kind === 'videoPlaceholder'
     ? (data as { parentShotNodeId: string }).parentShotNodeId
     : null
 }
