@@ -10,7 +10,12 @@ import { GlobalChat } from '@/components/layout/global-chat'
 import { useIdleTimeout } from '@/hooks/use-idle-timeout'
 import { useArtistLockPoll } from '@/hooks/use-artist-lock-poll'
 import { readLastProjectId, writeLastProjectId } from '@/lib/session-restore'
-import { STAGES } from '@/lib/constants'
+import {
+  STAGES,
+  SHELL_INSET,
+  SHELL_RAIL_WIDTH,
+  CHAT_COLLAPSED_RAIL,
+} from '@/lib/constants'
 import type { StageId } from '@/types'
 import { installDemoFetchGuard } from '@/lib/demo/fetch-guard'
 import { readDemoToken, withDemoShare } from '@/lib/demo/context'
@@ -104,9 +109,14 @@ export default function StudioLayout({
       <DemoBanner />
       <Sidebar />
       <main
-        className="ml-16 min-h-screen transition-[margin] duration-350 ease-out"
-        // 접힘 시 44px = 채팅 열기 레일(global-chat w-11) 전용 폭 — 페이지 우상단 버튼과 겹침 방지.
-        style={{ marginRight: chatCollapsed ? 44 : chatWidth }}
+        className="min-h-screen transition-[margin] duration-350 ease-out"
+        // 좌우 패널은 INSET 만큼 띄운 둥근 패널(#shell-lift) — 본문 여백은
+        //   바깥 INSET + 패널폭 + 패널↔본문 INSET. 접힘 시 폭은 열기 레일(w-11) 전용.
+        style={{
+          marginLeft: SHELL_INSET * 2 + SHELL_RAIL_WIDTH,
+          marginRight:
+            SHELL_INSET * 2 + (chatCollapsed ? CHAT_COLLAPSED_RAIL : chatWidth),
+        }}
       >
         {/* h-screen으로 높이 고정 + overflow-y-auto: 내용이 화면을 넘치면
             세로 스크롤 자동 생성. 캔버스 페이지(director)는 flex-1로 딱 채워

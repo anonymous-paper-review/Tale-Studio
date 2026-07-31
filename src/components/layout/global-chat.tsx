@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   Check,
   ChevronsLeft,
@@ -30,12 +30,16 @@ import { MentionTextarea, type MentionItem } from '@/components/layout/mention-t
 import { castMentions, backgroundMentions, activeMentionRefs, toggleMentionToken, FOUNDATION_MENTIONS } from '@/lib/card-mention'
 import { buildScriptLines, scriptLineMentions } from '@/lib/script-lines'
 import {
+  STAGES,
   STAGE_LABEL,
   STAGE_BADGE_CLASS,
   STAGE_FACE_COLOR,
   STAGE_PLACEHOLDER,
   CHAT_SUPPORTED_STAGES,
+  SHELL_INSET,
 } from '@/lib/constants'
+import { buildChatSections } from '@/lib/chat-sections'
+import type { StageId } from '@/types'
 
 // 이 세션에서 이미 타이핑 연출을 재생한 suggestion id — 재렌더/스테이지 왕복 시 재생 방지(#b1).
 const typedSuggestionIds = new Set<string>()
@@ -70,6 +74,32 @@ function TypewriterMarkdown({ id, text }: { id: string; text: string }) {
   }, [id, text])
   return (
     <MarkdownText className="whitespace-pre-wrap" text={text.slice(0, shown)} />
+  )
+}
+
+/**
+ * stage 구간 구분선 (#chat-continuity 2026-07-31) — 채팅방은 프로젝트당 하나인데 구분이 없으면
+ * 탭마다 새 방이 열린 것처럼 보인다. "같은 방의 새 챕터"임을 보이는 표식.
+ */
+function StageDivider({ stage, current }: { stage: StageId; current: boolean }) {
+  return (
+    <div
+      role="separator"
+      aria-label={`${STAGE_LABEL[stage]} 구간`}
+      className="flex items-center gap-2 py-1"
+    >
+      <span className="h-px flex-1 bg-border-subtle" />
+      <span
+        className={cn(
+          'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+          STAGE_BADGE_CLASS[stage],
+        )}
+      >
+        {STAGE_LABEL[stage]}
+        {current && <span className="opacity-70">· 지금</span>}
+      </span>
+      <span className="h-px flex-1 bg-border-subtle" />
+    </div>
   )
 }
 
@@ -116,7 +146,15 @@ export function GlobalChat() {
   const dismissPendingProposal = useGlobalChatStore((s) => s.dismissPendingProposal)
 
   const router = useRouter()
-  const currentStage = useProjectStore((s) => s.currentStage)
+  // stage 는 URL 에서 직접 읽는다 (#chat-continuity 2026-07-31). store.currentStage 는
+  //   layout 의 effect 가 pathname 변화를 본 *다음* 틱에 갱신되므로, 그 사이 한 프레임 동안
+  //   채팅 패널이 이전 stage 로 렌더된다 — placeholder·제안·팁이 깜빡여 "방이 다시 로딩된다"로 읽힌다.
+  //   URL 이 곧 stage 라 파생값을 기다릴 이유가 없다. (store 는 /studio 밖 fallback)
+  const pathname = usePathname()
+  const storeStage = useProjectStore((s) => s.currentStage)
+  const currentStage =
+    (STAGES.find((s) => pathname.startsWith(s.path))?.id as StageId | undefined) ??
+    storeStage
   const projectId = useProjectStore((s) => s.projectId)
   // Artist는 카드 UI로 롤백되어 노드 전용 warm tip 훅 제거. 정적 안내로 대체.
   const directorWarmTip = useDirectorCanvasWarmStarting()
@@ -182,6 +220,11 @@ export function GlobalChat() {
     writerShots,
   ])
   const [input, setInput] = useState('')
+  // 하나의 스레드를 stage 구간으로 쪼갠다 — 필터가 아니라 구분선용(전 메시지가 그대로 보인다).
+  const sections = useMemo(
+    () => buildChatSections(messages, currentStage),
+    [messages, currentStage],
+  )
   // 위/아래 화살표로 호출할 전송 메시지 히스토리(유저 발화만, 오래된→최신).
   const userHistory = useMemo(
     () => messages.filter((m) => m.role === 'user').map((m) => m.content),
@@ -195,9 +238,11 @@ export function GlobalChat() {
     if (projectId) loadMessages(projectId)
   }, [projectId, loadMessages])
 
+  // 새 메시지·stage 이동 시 스레드 끝으로. stage 를 넣는 이유는 이동하면 끝에 "지금" 구간
+  //   구분선이 새로 붙기 때문 — 같은 방이 이어졌다는 표식이 화면 안에 들어와야 의미가 있다.
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length, loading])
+  }, [messages.length, loading, currentStage])
 
   // 입력창의 @멘션 ↔ 카드 하이라이트 동기화 (입력에서 지우면 자동 해제)
   useEffect(() => {
@@ -309,7 +354,8 @@ export function GlobalChat() {
   }
   const handleResizePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragging) return
-    setChatWidth(window.innerWidth - e.clientX) // clamp은 store에서
+    // 패널이 우측에서 INSET 만큼 떠 있으므로 그만큼 빼야 커서와 좌측 경계가 붙어 움직인다.
+    setChatWidth(window.innerWidth - e.clientX - SHELL_INSET) // clamp은 store에서
   }
   const handleResizePointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
@@ -320,12 +366,22 @@ export function GlobalChat() {
 
   return (
     <>
+      {/* 좌측 레일과 짝을 이루는 둥근 부유 패널 (#shell-lift 2026-07-31).
+          접힘 이동거리는 100% + INSET — inset 만큼 띄워 놨으므로 100% 만으론 가장자리가 남는다. */}
       <aside
         className={cn(
-          'fixed right-0 top-0 z-sidebar flex h-full flex-col border-l border-border bg-card transition-transform duration-350 ease-out',
-          collapsed && 'translate-x-full',
+          'fixed z-sidebar flex flex-col rounded-2xl border border-border bg-card shadow-lg transition-transform duration-350 ease-out',
+          collapsed && 'translate-x-[calc(100%_+_var(--shell-inset))]',
         )}
-        style={{ width: chatWidth }}
+        style={
+          {
+            width: chatWidth,
+            right: SHELL_INSET,
+            top: SHELL_INSET,
+            bottom: SHELL_INSET,
+            '--shell-inset': `${SHELL_INSET}px`,
+          } as React.CSSProperties
+        }
       >
         {/* 좌측 리사이즈 핸들 */}
         <div
@@ -341,10 +397,23 @@ export function GlobalChat() {
           )}
         />
 
-        {/* Header */}
+        {/* Header — 지금 어느 stage 챕터인지 표시하되, 부제로 "방은 하나"임을 명시(#chat-continuity) */}
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0 flex-1">
-            <span className="text-sm font-semibold text-white">에이전트 채팅</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">에이전트 채팅</span>
+              <span
+                className={cn(
+                  'shrink-0 rounded-full border px-1.5 text-[10px] font-medium leading-4',
+                  STAGE_BADGE_CLASS[currentStage],
+                )}
+              >
+                {STAGE_LABEL[currentStage]}
+              </span>
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              모든 단계가 이어지는 하나의 대화
+            </span>
           </div>
           <Button
             size="icon-sm"
@@ -361,45 +430,57 @@ export function GlobalChat() {
         <ScrollArea className="min-h-0 flex-1 px-4 py-3">
           <div className="space-y-2">
 
-            {messages.map((msg) => {
-              // 유저 메시지(#a1 2026-07-15) — 오른쪽 정렬 + "You" 이름 + 에이전트(bg-muted)보다
-              //   밝은 말풍선(bg-input, dark L 0.278 > muted 0.243)으로 구분.
-              if (msg.role === 'user') {
-                return (
-                  <div key={msg.id} className="ml-8 flex flex-col items-end">
-                    <span className="mb-0.5 text-[11px] font-medium text-muted-foreground">
-                      You
-                    </span>
-                    <div className="group relative w-fit max-w-full select-text whitespace-pre-wrap rounded-lg bg-input px-3 py-2 pr-8 text-xs text-foreground">
-                      <MarkdownText text={msg.content} />
-                      <CopyButton text={msg.content} />
+            {sections.map((section, si) => (
+              <section
+                key={`${section.stage}-${si}`}
+                className={cn('space-y-2', si > 0 && 'pt-2')}
+              >
+                <StageDivider stage={section.stage} current={section.current} />
+                {section.messages.map((msg) => {
+                  // 유저 메시지(#a1 2026-07-15) — 오른쪽 정렬 + "You" 이름 + 에이전트(bg-muted)
+                  //   보다 밝은 말풍선(bg-input, dark L 0.278 > muted 0.243)으로 구분.
+                  if (msg.role === 'user') {
+                    return (
+                      <div key={msg.id} className="ml-8 flex flex-col items-end">
+                        <span className="mb-0.5 text-[11px] font-medium text-muted-foreground">
+                          You
+                        </span>
+                        <div className="group relative w-fit max-w-full select-text whitespace-pre-wrap rounded-lg bg-input px-3 py-2 pr-8 text-xs text-foreground">
+                          <MarkdownText text={msg.content} />
+                          <CopyButton text={msg.content} />
+                        </div>
+                      </div>
+                    )
+                  }
+                  // AI 메시지 — 카톡 수신형: 아바타(말풍선 밖 왼쪽 상단) + 이름 + 말풍선.
+                  return (
+                    <div key={msg.id} className="mr-4 flex items-start gap-2">
+                      <div
+                        className={cn(
+                          'flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border',
+                          STAGE_BADGE_CLASS[msg.stage],
+                        )}
+                      >
+                        <AgentFace
+                          color={STAGE_FACE_COLOR[msg.stage]}
+                          size={20}
+                          animate={false}
+                        />
+                      </div>
+                      <div className="flex min-w-0 flex-col">
+                        <span className="mb-0.5 text-[11px] font-medium text-muted-foreground">
+                          {STAGE_LABEL[msg.stage]}
+                        </span>
+                        <div className="group relative select-text whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 pr-8 text-xs text-foreground">
+                          <MarkdownText text={msg.content} />
+                          <CopyButton text={msg.content} />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )
-              }
-              // AI 메시지 — 카톡 수신형: 아바타(말풍선 밖 왼쪽 상단) + 이름(말풍선 위) + 말풍선.
-              return (
-                <div key={msg.id} className="mr-4 flex items-start gap-2">
-                  <div
-                    className={cn(
-                      'flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border',
-                      STAGE_BADGE_CLASS[msg.stage],
-                    )}
-                  >
-                    <AgentFace color={STAGE_FACE_COLOR[msg.stage]} size={20} animate={false} />
-                  </div>
-                  <div className="flex min-w-0 flex-col">
-                    <span className="mb-0.5 text-[11px] font-medium text-muted-foreground">
-                      {STAGE_LABEL[msg.stage]}
-                    </span>
-                    <div className="group relative select-text whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 pr-8 text-xs text-foreground">
-                      <MarkdownText text={msg.content} />
-                      <CopyButton text={msg.content} />
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+                  )
+                })}
+              </section>
+            ))}
 
             {loading && (
               <div className="mr-4 flex items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
@@ -559,7 +640,10 @@ export function GlobalChat() {
           닫기 버튼(패널 헤더 상단)과 수직 위치를 맞추고, 레일이 우측 44px를 전용 점유해
           (layout.tsx 가 접힘 시 marginRight 44 확보) 페이지 우상단 버튼들과의 겹침을 원천 차단한다. */}
       {collapsed && (
-        <aside className="z-sidebar fixed right-0 top-0 flex h-full w-11 flex-col items-center border-l border-border bg-card pt-3">
+        <aside
+          className="z-sidebar fixed flex w-11 flex-col items-center rounded-2xl border border-border bg-card pt-3 shadow-lg"
+          style={{ right: SHELL_INSET, top: SHELL_INSET, bottom: SHELL_INSET }}
+        >
           <Button
             size="icon-sm"
             variant="ghost"

@@ -211,14 +211,18 @@
   --chart-4: oklch(0.648 0.174 142.5);
   --chart-5: oklch(0.628 0.225 26.5);
 
-  /* Sidebar: #1a1a1a */
-  --sidebar: oklch(0.185 0 0);
+  /* Sidebar: 좌측 스테이지 레일 전용 surface (#shell-lift 2026-07-31).
+     card(#1a1a1a)가 아니라 surface 사다리 최상단보다도 한 단 위로 올린다 — 배경(#121212) 위에
+     떠 있는 둥근 패널이라, 밝을수록 패널이 앞으로 나오고 화면이 넓어 보인다(개활감).
+     accent(hover/active)는 레일보다 *더* 밝아야 한다: 기존 --accent(0.222)를 그대로 쓰면
+     밝아진 레일 위에서 눌린 것처럼 어두워져 elevation 이 뒤집힌다. */
+  --sidebar: oklch(0.255 0 0);
   --sidebar-foreground: oklch(1 0 0);
   --sidebar-primary: oklch(0.537 0.234 29.23);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.222 0 0);
+  --sidebar-accent: oklch(0.315 0 0);
   --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border: oklch(0.278 0 0);
+  --sidebar-border: oklch(0.34 0 0);
   --sidebar-ring: oklch(0.537 0.234 29.23);
 
   /* Surface hierarchy */

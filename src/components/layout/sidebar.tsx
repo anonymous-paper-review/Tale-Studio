@@ -19,7 +19,7 @@ import {
   HoverCardTrigger,
 } from '@/components/ui/hover-card'
 import { cn } from '@/lib/utils'
-import { STAGES } from '@/lib/constants'
+import { STAGES, STAGE_LABEL, SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
 import { UserMenu } from '@/components/layout/user-menu'
 import { ContactPopover } from '@/components/contact-popover'
 import { ExportMenu } from '@/components/export-menu'
@@ -84,8 +84,19 @@ export function Sidebar() {
     setEditingName(false)
   }
 
+  // 화면 가장자리에 붙은 area 가 아니라 INSET 만큼 띄운 둥근 패널 (#shell-lift 2026-07-31).
+  //   실제 가용 면적은 그대로지만 배경이 사방으로 비쳐 화면이 넓어 보인다. bg-sidebar 는
+  //   surface 사다리 최상단보다 밝은 전용 토큰 — 레일만 앞으로 떠오르게 한다.
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-full w-16 flex-col items-center border-r border-border bg-card py-4">
+    <aside
+      className="fixed z-40 flex flex-col items-center rounded-2xl border border-sidebar-border bg-sidebar py-3 shadow-lg"
+      style={{
+        left: SHELL_INSET,
+        top: SHELL_INSET,
+        bottom: SHELL_INSET,
+        width: SHELL_RAIL_WIDTH,
+      }}
+    >
       {/* Home / Back button — hover 시 프로젝트명 표시 + 연필로 인라인 이름변경(HoverCard).
           편집 중엔 controlled open으로 카드 유지(Tooltip과 달리 상호작용 가능). */}
       <HoverCard
@@ -97,7 +108,7 @@ export function Sidebar() {
         <HoverCardTrigger asChild>
           <button
             onClick={() => router.push('/')}
-            className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
           >
             <Home className="h-5 w-5" />
           </button>
@@ -150,10 +161,12 @@ export function Sidebar() {
         </HoverCardContent>
       </HoverCard>
 
-      <div className="mb-2 h-px w-8 bg-border" />
+      <div className="mb-2 h-px w-8 bg-sidebar-border" />
 
-      {/* Stage navigation — STAGES(constants.ts) 순서 그대로 (writer 탭 2026-06-12 부활) */}
-      <div className="flex flex-1 flex-col items-center gap-2">
+      {/* Stage navigation — STAGES(constants.ts) 순서 그대로 (writer 탭 2026-06-12 부활).
+          아이콘 + 라벨이 한 버튼 안에 들어간다: 활성 배경이 둘을 함께 감싸야 하나의 탭으로 읽힌다.
+          라벨이 5줄 늘어난 만큼 세로가 빠듯해질 수 있어 낮은 뷰포트에선 이 영역만 스크롤한다. */}
+      <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto">
         {STAGES.map((stage) => {
           const Icon = STAGE_ICONS[stage.id]
           const isActive = pathname.startsWith(stage.path)
@@ -178,17 +191,25 @@ export function Sidebar() {
                   }}
                   disabled={isLocked && !isArtistRetryable}
                   className={cn(
-                    'relative flex h-12 w-12 items-center justify-center rounded-lg transition-colors',
+                    'relative flex h-14 w-14 flex-col items-center justify-center gap-1 rounded-xl transition-colors',
                     isLocked && !isArtistRetryable && 'cursor-not-allowed opacity-30',
-                    isArtistRetryable && 'cursor-pointer text-destructive hover:bg-accent',
+                    isArtistRetryable && 'cursor-pointer text-destructive hover:bg-sidebar-accent',
                     isActive && !isLocked
-                      ? 'border-l-2 border-primary bg-accent text-primary'
-                      : !isLocked && 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                      ? 'bg-sidebar-accent text-primary'
+                      : !isLocked &&
+                          'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground',
                   )}
                 >
-                  <Icon className="h-5 w-5" />
+                  {/* 활성 표시 — 둥근 패널에 직각 border-l 은 어울리지 않아 좌측 pill 로 대체 */}
+                  {isActive && !isLocked && (
+                    <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
+                  )}
+                  <Icon className="size-5" />
+                  <span className="text-[10px] font-medium leading-none tracking-tight">
+                    {STAGE_LABEL[stage.id]}
+                  </span>
                   {badge > 0 && (
-                    <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-primary-foreground">
+                    <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-primary-foreground">
                       {badge > 9 ? '9+' : badge}
                     </span>
                   )}
@@ -210,7 +231,7 @@ export function Sidebar() {
       </div>
 
       {/* 푸터 액션 — 공유·내보내기·문의·프로필: 버튼 크기·캡션 타이포·세로 간격을 FooterIconItem 로 통일 */}
-      <div className="flex flex-col items-center gap-3">
+      <div className="mt-2 flex shrink-0 flex-col items-center gap-2.5">
         <OwnerOnly>
           <FooterIconItem label="공유">
             <ShareButton />

@@ -124,3 +124,13 @@ export const CHAT_COMPACTION_TRIGGER_TOKENS = 600_000
 export const CHAT_DEFAULT_WIDTH = 320 // = 기존 w-80 (20rem)
 export const CHAT_MIN_WIDTH = 280
 export const CHAT_MAX_WIDTH = 560
+
+// ── Studio shell 기하 (#shell-lift 2026-07-31) ──
+// 좌측 레일·우측 채팅은 뷰포트 가장자리에 붙은 area 가 아니라 INSET 만큼 띄운 둥근 패널이다.
+//   본문 여백 = INSET(패널 바깥) + 패널폭 + INSET(패널과 본문 사이). 세 곳(레일·채팅·본문)이
+//   같은 값을 봐야 어긋나지 않으므로 여기서만 정의한다.
+export const SHELL_INSET = 8
+/** 좌측 스테이지 레일 폭 — 셀(w-14=56) + 좌우 여백. 아이콘 아래 stage 라벨이 들어갈 만큼. */
+export const SHELL_RAIL_WIDTH = 76
+/** 채팅 접힘 시 남는 열기 레일 폭 (global-chat 의 w-11). */
+export const CHAT_COLLAPSED_RAIL = 44
