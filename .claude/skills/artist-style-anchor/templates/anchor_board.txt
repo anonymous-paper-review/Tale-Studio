@@ -1,0 +1,4 @@
+STYLE REFERENCE — the reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, color saturation and overall finish exactly. Do NOT reproduce its subjects, characters, faces, hairstyles, costumes, poses, background layout, patterns or any identifiable motif from it.
+Create a neutral visual style reference board in exactly that style. CONTENT LOCK: a simple material study on a plain tabletop: a matte sphere, a draped cloth fold, a metal cup, a drinking glass, a piece of fruit, and a small potted plant, set in front of a plain room corner with a window. No people, no figures, no characters, no faces.
+Rendering rules: {RENDERING_RULES}
+Plain uncluttered composition. No text, no letters, no logo, no watermark. 1:1.
