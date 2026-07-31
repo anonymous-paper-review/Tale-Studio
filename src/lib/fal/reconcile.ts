@@ -9,6 +9,7 @@
 //   그 외(IN_QUEUE/IN_PROGRESS/일시오류)→그대로 두어 다음 폴링/webhook 이 마저 처리.
 import {
   failGenerationJob,
+  getGenerationJobById,
   GenerationJobTerminalTransitionError,
   type GenerationJob,
 } from '@/lib/generation-jobs'
@@ -37,9 +38,13 @@ async function completeOrTerminalizeJob(
     return { ...job, status: 'completed', result_url: url }
   } catch (error) {
     if (error instanceof GenerationJobTerminalTransitionError) {
-      // 중복 finalize 경쟁(폴링 ↔ webhook) — 이미 종결된 잡은 성공으로 간주(no-op).
+      // 중복 finalize 경쟁(폴링 ↔ webhook) — 이미 종결됐으니 진실은 DB 에 있다. 반드시 다시 읽는다.
+      //   여기서 job 은 요청 시작 시점의 *queued* 스냅샷이라 result_url 이 null 이다. 그대로
+      //   completed 로 돌려주면 폴링 클라(pollGenerationJob)가 "완료됐지만 결과 URL이 없음"으로
+      //   던져, 서버에선 멀쩡히 끝난 생성이 화면에선 실패로 굳었다(#dup-finalize-null-url 2026-07-31).
+      //   경쟁의 승자가 실패로 종결했을 수도 있으므로 status 까지 DB 값을 그대로 채택한다.
       console.warn('[fal/reconcile] duplicate finalize ignored (already terminal):', job.id)
-      return { ...job, status: 'completed' }
+      return (await getGenerationJobById(job.id)) ?? { ...job, status: 'completed' }
     }
     if (error instanceof DirectorVideoCompletionPersistenceError) {
       console.error('[fal/reconcile] video persistence failed; retaining queued attempt:', error.message)
