@@ -16,7 +16,9 @@ export function withCacheBust(url: string, v?: number): string {
 
 // 3프레임 순환 라벨 — START → DIRECTING(연출 화살표/지시) → END (2026-07-22 라벨 영문 통일).
 const FRAME_LABELS = ['START', 'DIRECTING', 'END'] as const
-const FRAME_CYCLE_MS = 1200
+// 순환 간격 — 2026-07-31 요청으로 전환 속도 20% 상향(1200ms → 1000ms).
+//   writer 러프 보드와 director Previz 가 같은 컴포넌트를 쓰므로 두 화면이 함께 빨라진다.
+const FRAME_CYCLE_MS = 1000
 
 /** 3프레임 순환 표시(#rough-grid 2026-07-22) — 기본은 START 정지 프레임, hover 중에만 순환
  *  (전 카드 동시 재생은 정보 과다 — 2026-07-22 피드백). 점 클릭 = 그 프레임 고정(leave 시 리셋).

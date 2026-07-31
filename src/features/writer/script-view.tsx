@@ -67,7 +67,9 @@ function ScriptLineButton({
       onClick={() => onToggle(line.lineNo)}
       aria-pressed={mentioned}
       className={cn(
-        'hover-red-beam flex w-full items-start gap-4 px-6 py-1.5 text-left text-sm leading-7 transition-colors [content-visibility:auto] hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring/50',
+        'hover-red-beam flex w-full items-start gap-4 py-1.5 pr-6 text-left text-sm leading-7 transition-colors [content-visibility:auto] hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring/50',
+        // 대사는 바로 위 샷에 딸린 줄 — 행 전체(라벨 열 포함)를 한 단 들여써서 종속 관계를 보이게 한다.
+        line.kind === 'dialogue' ? 'pl-12' : 'pl-6',
         mentioned && 'bg-sky-400/10 ring-1 ring-inset ring-sky-400/60 hover:bg-sky-400/15',
       )}
     >

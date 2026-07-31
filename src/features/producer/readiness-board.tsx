@@ -1,6 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ElementType,
+  type ReactNode,
+} from 'react'
 import {
   AlertCircle,
   AtSign,
@@ -19,6 +28,7 @@ import {
   Languages,
   LayoutGrid,
   Monitor,
+  Mountain,
   Palette,
   Trash2,
   Plus,
@@ -82,6 +92,12 @@ const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
 const CARD_TEXTAREA =
   'max-h-40 resize-none [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border'
 
+// Brief Story 접힘 상태(#b1 2026-07-31) — 4줄(text-sm 20px × 4)만 보이고, 마우스를 올리면
+//   넘친 만큼 일정한 속도로 천천히 올라온다. 속도를 고정했으므로 글이 길수록 오래 흐른다.
+const STORY_PEEK_VIEW_PX = 80
+const STORY_PEEK_SPEED_PX_PER_SEC = 26
+const STORY_PEEK_RETURN_MS = 240
+
 const ROLE_LABEL: Record<string, string> = {
   protagonist: '주인공',
   antagonist: '적대자',
@@ -94,21 +110,117 @@ const ROLE_TOGGLE: [string, string][] = [
   ['supporting', '조연'],
 ]
 
+// ── 줄(row) 레이아웃 공통 (#b-rows 2026-07-31) ───────────────────────────────
+// 카드 격자는 같은 행의 이웃과 높이가 동기화돼 짧은 항목 아래에 빈 공간이 남는다. 줄 목록은
+//   각 항목이 필요한 높이만 쓰고, 테두리는 목록 컨테이너가 한 번만 갖는다.
+const ROW_LIST = 'divide-y divide-border overflow-hidden rounded-xl border border-border bg-card/70'
+const ROW_LABEL =
+  'flex w-24 shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground'
+
+// 줄 안의 입력/선택 컨트롤 — 채워진 값은 테두리 없이 텍스트처럼 조용히 있고, hover·focus·열림
+//   이나 "아직 채워야 하는 필드"(FieldSlot needs)에서만 테두리·드롭다운 화살표가 드러난다.
+//   (#b2: 항상 떠 있는 선택 버튼이 유저에게 "골라야 한다"는 부담을 준다는 피드백)
+const QUIET_CONTROL =
+  'border-transparent bg-transparent shadow-none dark:bg-transparent hover:border-input focus-visible:border-ring data-[state=open]:border-input group-data-[needs=true]/field:border-input'
+const QUIET_CHEVRON =
+  '[&>svg]:opacity-0 [&>svg]:transition-opacity hover:[&>svg]:opacity-60 focus-visible:[&>svg]:opacity-60 data-[state=open]:[&>svg]:opacity-60 group-data-[needs=true]/field:[&>svg]:opacity-60'
+
+/** 컨트롤 슬롯 — 아직 채워야 하는 필드면 조용한 컨트롤의 테두리를 드러낸다(group-data). */
+function FieldSlot({
+  needs,
+  className,
+  children,
+}: {
+  needs?: boolean
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <div className={cn('group/field min-w-0', className)} data-needs={needs ? 'true' : undefined}>
+      {children}
+    </div>
+  )
+}
+
+/** 줄 끝 아이콘 버튼 — 아이콘만 두고 전체 문구는 호버 툴팁으로(#b4, 폭이 흔들리지 않게). */
+function RowIconButton({
+  icon: Icon,
+  label,
+  onClick,
+  destructive = false,
+}: {
+  icon: ElementType
+  label: string
+  onClick: () => void
+  destructive?: boolean
+}) {
+  return (
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={label}
+          className={cn(
+            'flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors',
+            destructive
+              ? 'hover:bg-destructive/10 hover:text-destructive'
+              : 'hover:bg-accent hover:text-foreground',
+          )}
+        >
+          <Icon className="size-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 // 보드 카드/필드를 @멘션 대상으로 만드는 공통 래퍼.
 // - 입력창에 @라벨이 있으면 시안 링으로 "참조 중" 표시(mentionedRefs 동기화).
 // - Cmd/Ctrl+클릭 → 입력창에 @멘션 삽입.
-// - 어포던스: ⌘/Ctrl(모디파이어)를 누르면 상단에 "⌘/Ctrl+클릭 멘션" 핀 + 모든 멘션 카드가
+// - 어포던스: ⌘/Ctrl(모디파이어)를 누르면 "⌘/Ctrl+클릭 멘션" 핀 + 모든 멘션 대상이
 //   cursor-copy + 시안 외곽선으로 떠올라 클릭 가능함을 알린다. (호버만으로는 표시 안 함)
+// - variant: 'card'(독립 카드) | 'row'(줄 목록의 한 줄 — 테두리는 목록 컨테이너 몫이라
+//   상태는 안쪽 ring/배경으로만 표시하고, 핀은 줄 오른쪽 끝 세로 중앙에 건다).
+type MentionVariant = 'card' | 'row'
+type MentionTone = 'mentioned' | 'pulse' | 'armed' | 'idle'
+
+const MENTION_BASE: Record<MentionVariant, string> = {
+  card: 'group relative rounded-xl border p-4 transition-shadow',
+  row: 'group relative px-3 py-1.5 transition-colors',
+}
+const MENTION_TONE: Record<MentionVariant, Record<MentionTone, string>> = {
+  card: {
+    mentioned: 'border-sky-400/50 bg-sky-400/10 ring-2 ring-sky-400/70 shadow-lg shadow-sky-500/10',
+    pulse: 'animate-pulse border-success/50 bg-card/70 ring-2 ring-success/60',
+    armed: 'cursor-copy border-sky-400/40 bg-card/70 ring-1 ring-sky-400/40',
+    idle: 'border-border bg-card/70',
+  },
+  row: {
+    mentioned: 'bg-sky-400/10 ring-1 ring-inset ring-sky-400/60',
+    pulse: 'animate-pulse bg-success/10 ring-1 ring-inset ring-success/50',
+    armed: 'cursor-copy ring-1 ring-inset ring-sky-400/30',
+    idle: '',
+  },
+}
+const MENTION_PIN: Record<MentionVariant, string> = {
+  card: '-top-2.5 left-3',
+  row: 'right-2 top-1/2 -translate-y-1/2',
+}
+
 function MentionableCard({
   refId,
   label,
   pulse = false,
+  variant = 'card',
   className,
   children,
 }: {
   refId: string
   label: string
   pulse?: boolean
+  variant?: MentionVariant
   className?: string
   children: ReactNode
 }) {
@@ -116,20 +228,10 @@ function MentionableCard({
   // toggle 모드: 이미 멘션된 카드를 다시 Ctrl+클릭하면 입력창에서 @라벨 제거(언멘션, #b6).
   const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
   const armed = useModifierHeld()
+  const tone: MentionTone = mentioned ? 'mentioned' : pulse ? 'pulse' : armed ? 'armed' : 'idle'
   return (
     <div
-      className={cn(
-        'group relative rounded-xl border p-4 transition-shadow',
-        mentioned
-          ? 'border-sky-400/50 bg-sky-400/10 ring-2 ring-sky-400/70 shadow-lg shadow-sky-500/10'
-          : pulse
-            ? 'animate-pulse border-success/50 bg-card/70 ring-2 ring-success/60'
-            : armed
-              ? 'cursor-copy border-sky-400/40 bg-card/70 ring-1 ring-sky-400/40'
-              : 'border-border bg-card/70',
-        armed && 'cursor-copy',
-        className,
-      )}
+      className={cn(MENTION_BASE[variant], MENTION_TONE[variant][tone], armed && 'cursor-copy', className)}
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey) {
           e.preventDefault()
@@ -139,7 +241,8 @@ function MentionableCard({
     >
       <span
         className={cn(
-          'pointer-events-none absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded-full border border-sky-400/50 bg-popover px-2 py-0.5 text-[10px] font-medium text-sky-300 opacity-0 shadow-sm transition-opacity',
+          'pointer-events-none absolute z-10 inline-flex items-center gap-1 rounded-full border border-sky-400/50 bg-popover px-2 py-0.5 text-[10px] font-medium text-sky-300 opacity-0 shadow-sm transition-opacity',
+          MENTION_PIN[variant],
           armed && 'opacity-100',
         )}
       >
@@ -149,7 +252,37 @@ function MentionableCard({
     </div>
   )
 }
-function FieldShell({
+
+/** 줄 오른쪽 끝 상태 표시 — 준비된 필드는 체크 하나로, 미완료면 사유를 그 자리에 적는다. */
+function RowStatus({
+  state,
+  issue,
+}: {
+  state: 'ready' | 'missing' | 'recommended'
+  issue?: GateIssue
+}) {
+  if (state === 'ready') {
+    return (
+      <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label="준비됨" />
+    )
+  }
+  const text = issue ? `${issue.label}${issue.detail ? ` · ${issue.detail}` : ''}` : '필요'
+  return (
+    <span
+      title={text}
+      className={cn(
+        'flex max-w-56 shrink-0 items-center gap-1 text-xs',
+        state === 'missing' ? 'text-destructive' : 'text-warning',
+      )}
+    >
+      <AlertCircle className="size-3.5 shrink-0" />
+      <span className="truncate">{text}</span>
+    </span>
+  )
+}
+
+/** Story Foundation 한 줄 — [아이콘+라벨] [컨트롤] [상태]. */
+function FieldRow({
   icon,
   label,
   issue,
@@ -163,8 +296,8 @@ function FieldShell({
   issue?: GateIssue
   softIssue?: GateIssue
   children: ReactNode
-  mentionRef?: string
-  mentionLabel?: string
+  mentionRef: string
+  mentionLabel: string
 }) {
   const state = issue ? 'missing' : softIssue ? 'recommended' : 'ready'
   // C7: 필드가 채워져 'ready'로 전환되면 잠깐 펄스 하이라이트(채팅으로 채워질 때 시각 피드백).
@@ -180,51 +313,20 @@ function FieldShell({
     const t = setTimeout(() => setJustReady(false), 1500)
     return () => clearTimeout(t)
   }, [justReady])
-  const inner = (
-    <>
-      <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-        <span className="text-muted-foreground">{icon}</span>
-        {label}
-      </div>
-      <div>{children}</div>
-      <div className="mt-2 flex items-start gap-2 text-xs">
-        {state === 'ready' ? (
-          <Badge variant="outline" className="shrink-0 gap-1 border-success/40 text-success">
-            <CheckCircle2 className="size-3" /> 준비됨
-          </Badge>
-        ) : state === 'missing' ? (
-          <Badge variant="outline" className="shrink-0 gap-1 border-destructive/40 text-destructive">
-            <AlertCircle className="size-3" /> 필요
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="shrink-0 gap-1 border-warning/40 text-warning">
-            <AlertCircle className="size-3" /> 권장
-          </Badge>
-        )}
-        {(issue ?? softIssue) ? (
-          <p className={`pt-0.5 ${issue ? 'text-destructive' : 'text-warning'}`}>
-            {(issue ?? softIssue)?.label}
-            {(issue ?? softIssue)?.detail ? ` · ${(issue ?? softIssue)?.detail}` : ''}
-          </p>
-        ) : null}
-      </div>
-    </>
-  )
-  if (mentionRef) {
-    return (
-      <MentionableCard refId={mentionRef} label={mentionLabel ?? label} pulse={justReady}>
-        {inner}
-      </MentionableCard>
-    )
-  }
+
   return (
-    <div
-      className={`rounded-xl border bg-card/70 p-4 transition-shadow ${
-        justReady ? 'animate-pulse border-success/50 ring-2 ring-success/60' : 'border-border'
-      }`}
-    >
-      {inner}
-    </div>
+    <MentionableCard variant="row" refId={mentionRef} label={mentionLabel} pulse={justReady}>
+      <div className="flex items-center gap-3">
+        <span className={ROW_LABEL}>
+          <span className="text-muted-foreground/70">{icon}</span>
+          {label}
+        </span>
+        <FieldSlot needs={state !== 'ready'} className="flex-1">
+          {children}
+        </FieldSlot>
+        <RowStatus state={state} issue={issue ?? softIssue} />
+      </div>
+    </MentionableCard>
   )
 }
 
@@ -341,7 +443,9 @@ function StyleAnchorPicker({
         <button
           type="button"
           className={cn(
-            'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50',
+            'flex h-9 w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:hover:bg-input/50',
+            QUIET_CONTROL,
+            QUIET_CHEVRON,
             HOVER_RED_BORDER,
             !selected && 'text-muted-foreground',
           )}
@@ -349,7 +453,7 @@ function StyleAnchorPicker({
           <span className="line-clamp-1 text-left">
             {selected ? selected.label : '선택…'}
           </span>
-          <ChevronDown className="size-4 shrink-0 opacity-50" />
+          <ChevronDown className="size-4 shrink-0" />
         </button>
       </DialogTrigger>
       <DialogContent
@@ -547,7 +651,9 @@ function castDraftPrompt(member: CastMember, issue?: GateIssue) {
   return `Producer, ${target}을 채울 수 있게 한 가지 질문을 해 주세요.${current ? ` 현재 정보: ${current}.` : ''}`
 }
 
-function CastCard({
+// 캐스트 한 줄(#b-rows) — [삭제] [아이콘] [이름] [외모] [배지] [상태] [상세] [프로듀서 호출].
+//   필수 두 칸(이름·외모)은 줄 위에서 바로 고치고, 역할·아크·동기는 아래로 펼친다.
+function CastRow({
   member,
   issues,
   onPatch,
@@ -586,92 +692,101 @@ function CastCard({
     })
 
   return (
-    <MentionableCard refId={member.localId} label={mentionLabel}>
-      <div className="mb-3 flex items-start gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-          {isPerson ? <User className="size-5" /> : <Box className="size-5" />}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-sm font-medium">
-              {member.name || (isPerson ? '이름 미정 인물' : '이름 미정 사물')}
-            </span>
-            <Badge variant="outline" className="text-[10px]">
-              {isPerson ? ROLE_LABEL[member.role ?? 'supporting'] ?? '인물' : '사물'}
-            </Badge>
-            {member.origin === 'writer' ? (
-              <Badge variant="ghost" className="text-[10px] text-muted-foreground">
-                writer 추가
-              </Badge>
-            ) : null}
-            {ready ? (
-              <Badge variant="outline" className="ml-auto gap-1 border-success/40 text-success">
-                <CheckCircle2 className="size-3" /> 준비됨
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="ml-auto gap-1 border-destructive/40 text-destructive">
-                <AlertCircle className="size-3" /> {issues.length}개 필요
-              </Badge>
-            )}
-          </div>
-          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-            {member.appearance || '외모 미입력'}
-          </p>
-        </div>
-      </div>
+    <MentionableCard variant="row" refId={member.localId} label={mentionLabel} className="px-2">
+      <div className="flex items-center gap-2">
+        {/* 삭제는 줄 왼쪽 끝, 프로듀서 호출은 오른쪽 끝 (#b4) */}
+        <RowIconButton
+          icon={Trash2}
+          label="삭제"
+          destructive
+          onClick={() => onDelete(member.localId)}
+        />
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          {isPerson ? <User className="size-4" /> : <Box className="size-4" />}
+        </span>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">이름</label>
+        <FieldSlot needs={!!nameIssue} className="w-36 shrink-0">
           <HoverBeam>
             <Input
               value={member.name}
-              placeholder={isPerson ? '예: 지아' : '예: 은빛 반지'}
+              placeholder={isPerson ? '이름 (예: 지아)' : '이름 (예: 은빛 반지)'}
+              className={cn(QUIET_CONTROL, 'h-8')}
               onChange={(e) => onPatch(member.localId, { name: e.target.value })}
             />
           </HoverBeam>
-          {nameIssue ? <p className="text-xs text-destructive">{nameIssue.label}</p> : null}
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">외모</label>
+        </FieldSlot>
+        <FieldSlot needs={!!appearanceIssue} className="flex-1">
           <HoverBeam>
             <Textarea
               value={member.appearance}
-              rows={2}
-              className={CARD_TEXTAREA}
-              placeholder={isPerson ? '복장, 나이, 특징' : '형태, 재질, 특징'}
+              rows={1}
+              className={cn(CARD_TEXTAREA, QUIET_CONTROL, 'min-h-8 py-1.5')}
+              placeholder={isPerson ? '외모 — 복장, 나이, 특징' : '형태, 재질, 특징'}
               onChange={(e) => onPatch(member.localId, { appearance: e.target.value })}
             />
           </HoverBeam>
-          {appearanceIssue ? <p className="text-xs text-destructive">{appearanceIssue.label}</p> : null}
-        </div>
-      </div>
+        </FieldSlot>
 
-      {/* 상세 정보(역할·아크·동기) 접기 토글 — 테두리 둥근 사각형(#b4). mx-auto 중앙 배치라
-          호버 시 폭이 늘며 중앙 기준으로 확장되고, 옆에 "상세 정보" 문구가 슬라이드로 나타난다.
-          접힘+미완료면 우상단 빨간 점으로만 표시. */}
-      {isPerson ? (
-        <button
-          type="button"
-          onClick={() => setDetailsOpen((v) => !v)}
-          aria-expanded={detailsOpen}
-          aria-label={detailsOpen ? '상세 접기' : '상세 정보 (역할·아크·동기) 펼치기'}
-          title={detailsOpen ? '상세 접기' : '상세 정보 (역할·아크·동기)'}
-          className="group/detail relative mx-auto mt-2 flex h-6 min-w-6 items-center justify-center rounded-md border border-border px-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        >
-          {detailsOpen ? (
-            <ChevronsUp className="size-4 shrink-0" />
-          ) : (
-            <ChevronsDown className="size-4 shrink-0" />
-          )}
-          <span className="max-w-0 overflow-hidden whitespace-nowrap text-[11px] opacity-0 transition-all duration-200 group-hover/detail:ml-1 group-hover/detail:max-w-16 group-hover/detail:opacity-100">
-            상세 정보
-          </span>
-          {!detailsOpen && detailIssueCount > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-destructive" />
+        <div className="flex shrink-0 items-center gap-1">
+          {isPerson ? (
+            <Badge variant="outline" className="text-[10px]">
+              {ROLE_LABEL[member.role ?? 'supporting'] ?? '조연'}
+            </Badge>
           ) : null}
-        </button>
-      ) : null}
+          {member.origin === 'writer' ? (
+            <Badge variant="ghost" className="text-[10px] text-muted-foreground">
+              writer
+            </Badge>
+          ) : null}
+        </div>
+
+        {/* 상태 — 준비됐으면 체크 하나, 아니면 남은 개수(전체 사유는 호버 툴팁) */}
+        {ready ? (
+          <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label="준비됨" />
+        ) : (
+          <span
+            title={issues.map((i) => i.label).join(' · ')}
+            className="flex shrink-0 items-center gap-1 text-xs text-destructive"
+          >
+            <AlertCircle className="size-3.5" />
+            {issues.length}
+          </span>
+        )}
+
+        {/* 상세(역할·아크·동기) 펼침 — 접힘+미완료면 빨간 점으로만 알린다 */}
+        {isPerson ? (
+          <Tooltip delayDuration={150}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setDetailsOpen((v) => !v)}
+                aria-expanded={detailsOpen}
+                aria-label={detailsOpen ? '상세 접기' : '상세 정보 (역할·아크·동기) 펼치기'}
+                className="relative flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                {detailsOpen ? (
+                  <ChevronsUp className="size-3.5" />
+                ) : (
+                  <ChevronsDown className="size-3.5" />
+                )}
+                {!detailsOpen && detailIssueCount > 0 ? (
+                  <span className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-destructive" />
+                ) : null}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {detailsOpen ? '상세 접기' : '상세 정보 (역할·아크·동기)'}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <span className="size-7 shrink-0" aria-hidden />
+        )}
+        <RowIconButton
+          icon={Wand2}
+          label="프로듀서에게 채워달라"
+          onClick={() => onAskProducer(castDraftPrompt(member, issues[0]))}
+        />
+      </div>
 
       {/* 상세 본문 — 항상 마운트하고 grid-rows 0fr↔1fr 전환으로 펼침/접힘 애니메이션(#b1 2026-07-15). */}
       {isPerson ? (
@@ -682,8 +797,9 @@ function CastCard({
           )}
           aria-hidden={!detailsOpen}
         >
-          <div className="min-h-0 overflow-hidden">
-            <div className="mt-3 space-y-1.5">
+          {/* 줄의 이름 칸(삭제 버튼 + 아이콘 폭)에 맞춰 들여쓴다 — 어느 줄에 딸린 상세인지 보이게. */}
+          <div className="min-h-0 overflow-hidden pl-[4.5rem] pr-2">
+            <div className="mt-2 space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">역할</label>
               <div className="flex gap-2">
                 {ROLE_TOGGLE.map(([value, label]) => {
@@ -732,14 +848,6 @@ function CastCard({
         </div>
       ) : null}
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="sm" variant="ghost" className={HOVER_RED_BORDER} onClick={() => onAskProducer(castDraftPrompt(member, issues[0]))}>
-          <Wand2 className="size-3.5" /> 프로듀서에게 채워달라
-        </Button>
-        <Button size="sm" variant="ghost" className={`text-destructive hover:text-destructive ${HOVER_RED_BORDER}`} onClick={() => onDelete(member.localId)}>
-          <Trash2 className="size-3.5" /> 삭제
-        </Button>
-      </div>
     </MentionableCard>
   )
 }
@@ -759,7 +867,9 @@ function backgroundDraftPrompt(background?: BackgroundSource) {
   return `Producer, writer와 artist가 바로 쓸 수 있는 배경 카드 1개를 채워 주세요. 필수는 이름, 시각 설명, 이야기 속 목적입니다.${current ? ` 현재 정보: ${current}.` : ''}`
 }
 
-function BackgroundCard({
+// 배경 한 줄(#b-rows) — [삭제] [아이콘] [이름] [시각 설명] [목적] [배지] [상태] [프로듀서 호출].
+//   세 칸 모두 완성돼야 배경 게이트를 통과하므로(isProducerBackgroundComplete) 셋 다 줄 위에 둔다.
+function BackgroundRow({
   background,
   onPatch,
   onAskProducer,
@@ -773,80 +883,82 @@ function BackgroundCard({
   mentionLabel: string
 }) {
   const ready = backgroundReady(background)
-  return (
-    <MentionableCard refId={background.localId} label={mentionLabel}>
-      <div className="mb-3 flex items-start gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-          <Monitor className="size-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-sm font-medium">{background.name || '이름 미정 배경'}</span>
-            {background.origin === 'writer' ? (
-              <Badge variant="ghost" className="text-[10px] text-muted-foreground">writer 추가</Badge>
-            ) : null}
-            {background.stale ? (
-              <Badge variant="outline" className="text-[10px] text-warning">stale</Badge>
-            ) : null}
-            {ready ? (
-              <Badge variant="outline" className="ml-auto gap-1 border-success/40 text-success">
-                <CheckCircle2 className="size-3" /> 준비됨
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="ml-auto gap-1 border-destructive/40 text-destructive">
-                <AlertCircle className="size-3" /> 필요
-              </Badge>
-            )}
-          </div>
-          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-            {background.visualDescription || '시각 설명 미입력'}
-          </p>
-        </div>
-      </div>
+  const missing = [
+    background.name?.trim() ? null : '이름',
+    background.visualDescription?.trim() ? null : '시각 설명',
+    background.purpose?.trim() ? null : '목적',
+  ].filter(Boolean) as string[]
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">이름</label>
+  return (
+    <MentionableCard variant="row" refId={background.localId} label={mentionLabel} className="px-2">
+      <div className="flex items-center gap-2">
+        <RowIconButton
+          icon={Trash2}
+          label="삭제"
+          destructive
+          onClick={() => onDelete(background.localId)}
+        />
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          <Mountain className="size-4" />
+        </span>
+
+        <FieldSlot needs={missing.includes('이름')} className="w-36 shrink-0">
           <HoverBeam>
             <Input
               value={background.name}
-              placeholder="예: 네온 뒷골목"
+              placeholder="이름 (예: 네온 뒷골목)"
+              className={cn(QUIET_CONTROL, 'h-8')}
               onChange={(e) => onPatch(background.localId, { name: e.target.value })}
             />
           </HoverBeam>
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">목적</label>
+        </FieldSlot>
+        <FieldSlot needs={missing.includes('시각 설명')} className="flex-1">
+          <HoverBeam>
+            <Textarea
+              value={background.visualDescription}
+              rows={1}
+              className={cn(CARD_TEXTAREA, QUIET_CONTROL, 'min-h-8 py-1.5')}
+              placeholder="시각 설명 — 색감, 구조, 소품, 분위기"
+              onChange={(e) => onPatch(background.localId, { visualDescription: e.target.value })}
+            />
+          </HoverBeam>
+        </FieldSlot>
+        <FieldSlot needs={missing.includes('목적')} className="w-44 shrink-0">
           <HoverBeam>
             <Input
               value={background.purpose}
-              placeholder="예: 추격이 시작되는 공간"
+              placeholder="목적 (예: 추격의 시작)"
+              className={cn(QUIET_CONTROL, 'h-8')}
               onChange={(e) => onPatch(background.localId, { purpose: e.target.value })}
             />
           </HoverBeam>
+        </FieldSlot>
+
+        <div className="flex shrink-0 items-center gap-1">
+          {background.origin === 'writer' ? (
+            <Badge variant="ghost" className="text-[10px] text-muted-foreground">writer</Badge>
+          ) : null}
+          {background.stale ? (
+            <Badge variant="outline" className="text-[10px] text-warning">stale</Badge>
+          ) : null}
         </div>
-      </div>
 
-      <div className="mt-3 space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">시각 설명</label>
-        <HoverBeam>
-          <Textarea
-            value={background.visualDescription}
-            rows={2}
-            className={CARD_TEXTAREA}
-            placeholder="색감, 구조, 소품, 분위기"
-            onChange={(e) => onPatch(background.localId, { visualDescription: e.target.value })}
-          />
-        </HoverBeam>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="sm" variant="ghost" className={HOVER_RED_BORDER} onClick={() => onAskProducer(backgroundDraftPrompt(background))}>
-          <Wand2 className="size-3.5" /> 프로듀서에게 채워달라
-        </Button>
-        <Button size="sm" variant="ghost" className={`text-destructive hover:text-destructive ${HOVER_RED_BORDER}`} onClick={() => onDelete(background.localId)}>
-          <Trash2 className="size-3.5" /> 삭제
-        </Button>
+        {ready ? (
+          <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label="준비됨" />
+        ) : (
+          <span
+            title={`${missing.join(' · ')} 필요`}
+            className="flex shrink-0 items-center gap-1 text-xs text-destructive"
+          >
+            <AlertCircle className="size-3.5" />
+            {missing.length}
+          </span>
+        )}
+        <RowIconButton
+          icon={Wand2}
+          label="프로듀서에게 채워달라"
+          onClick={() => onAskProducer(backgroundDraftPrompt(background))}
+        />
       </div>
     </MentionableCard>
   )
@@ -877,6 +989,24 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
 
   // Brief Story 전체보기 토글 — 길면 4줄로 클램프, "더 보기"로 스크롤 박스 펼침.
   const [storyExpanded, setStoryExpanded] = useState(false)
+  // 접힘 상태에서 hover 하면 잘린 뒷부분이 천천히 올라온다(#b1). 이동 거리는 실제로 넘친
+  //   높이라 렌더 후 측정해야 하고, 텍스트·패널 폭이 바뀌면 다시 재야 해서 ResizeObserver 로 본다.
+  const [storyPeek, setStoryPeek] = useState(0)
+  const [storyHover, setStoryHover] = useState(false)
+  const storyPeekRo = useRef<ResizeObserver | null>(null)
+  const storyBodyRef = useCallback((el: HTMLParagraphElement | null) => {
+    storyPeekRo.current?.disconnect()
+    storyPeekRo.current = null
+    if (!el) {
+      setStoryPeek(0)
+      return
+    }
+    const measure = () => setStoryPeek(Math.max(0, el.scrollHeight - STORY_PEEK_VIEW_PX))
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    storyPeekRo.current = ro
+  }, [])
   const persons = cast.filter((m) => m.entityType === 'person')
   const objects = cast.filter((m) => m.entityType === 'object')
   const readyBackgrounds = backgrounds.filter(backgroundReady)
@@ -1007,17 +1137,38 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               <div className="rounded-lg border border-border bg-background/40 p-3">
                 {storyText ? (
                   <>
-                    <p
-                      className={cn(
-                        'text-sm text-muted-foreground italic whitespace-pre-wrap',
-                        storyExpanded
-                          ? 'max-h-72 overflow-y-auto pr-1'
-                          : 'line-clamp-4',
-                      )}
-                    >
-                      {storyText}
-                    </p>
-                    {storyText.length > 200 && (
+                    {storyExpanded ? (
+                      <p className="max-h-72 overflow-y-auto pr-1 text-sm italic whitespace-pre-wrap text-muted-foreground">
+                        {storyText}
+                      </p>
+                    ) : (
+                      <div
+                        onMouseEnter={() => setStoryHover(true)}
+                        onMouseLeave={() => setStoryHover(false)}
+                        className={cn(
+                          'max-h-20 overflow-hidden',
+                          // 아래를 흐리게 — 아직 더 남았다는 신호(line-clamp 말줄임의 대체).
+                          storyPeek > 0 &&
+                            '[mask-image:linear-gradient(to_bottom,#000_72%,transparent)]',
+                        )}
+                      >
+                        <p
+                          ref={storyBodyRef}
+                          style={
+                            {
+                              '--peek-shift': storyHover ? `-${storyPeek}px` : '0px',
+                              transitionDuration: storyHover
+                                ? `${Math.round((storyPeek / STORY_PEEK_SPEED_PX_PER_SEC) * 1000)}ms`
+                                : `${STORY_PEEK_RETURN_MS}ms`,
+                            } as CSSProperties
+                          }
+                          className="translate-y-[var(--peek-shift)] text-sm italic whitespace-pre-wrap text-muted-foreground transition-transform ease-linear motion-reduce:translate-y-0 motion-reduce:transition-none"
+                        >
+                          {storyText}
+                        </p>
+                      </div>
+                    )}
+                    {(storyExpanded || storyPeek > 0) && (
                       <button
                         type="button"
                         onClick={() => setStoryExpanded((v) => !v)}
@@ -1044,8 +1195,10 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold">Story Foundation</h2>
             </div>
-            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-              <FieldShell icon={<Clock className="size-4" />} label="러닝타임" issue={hardByField.get('playtime')} mentionRef="setting:playtime" mentionLabel="러닝타임">
+            {/* 카드 격자 → 줄 목록(#b-rows 2026-07-31). 여섯 필드는 서로 높이가 다를 이유가
+                없는데 카드 격자에선 같은 행끼리 높이가 맞춰져 빈 공간이 생겼다. */}
+            <div className={ROW_LIST}>
+              <FieldRow icon={<Clock className="size-4" />} label="러닝타임" issue={hardByField.get('playtime')} mentionRef="setting:playtime" mentionLabel="러닝타임">
                 <HoverBeam>
                   <Input
                     type="number"
@@ -1053,46 +1206,49 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                     value={projectSettings.playtime || ''}
                     placeholder="예: 120"
                     onChange={(e) => updateSettings({ playtime: Number(e.target.value) || 0 })}
-                    className="font-mono tabular-nums"
+                    className={cn(QUIET_CONTROL, 'h-8 font-mono tabular-nums')}
                   />
                 </HoverBeam>
-              </FieldShell>
+              </FieldRow>
 
-              <FieldShell icon={<Film className="size-4" />} label="장르" issue={hardByField.get('genre')} mentionRef="setting:genre" mentionLabel="장르">
+              <FieldRow icon={<Film className="size-4" />} label="장르" issue={hardByField.get('genre')} mentionRef="setting:genre" mentionLabel="장르">
                 <HoverBeam>
                   <Input
                     value={projectSettings.genre}
                     placeholder="예: thriller"
+                    className={cn(QUIET_CONTROL, 'h-8')}
                     onChange={(e) => updateSettings({ genre: e.target.value })}
                   />
                 </HoverBeam>
-              </FieldShell>
+              </FieldRow>
 
               {/* 세부 장르 필드는 숨김(2026-07-13 — 데이터(settings.subGenre)는 유지) → 스타일&톤(style_anchors)으로 대체.
                   콤보 박스는 글자만, 클릭 시 그리드 팝업으로 선택(#b 2026-07-14). */}
-              <FieldShell icon={<Tag className="size-4" />} label="스타일" mentionRef="setting:styleAnchor" mentionLabel="스타일">
+              <FieldRow icon={<Tag className="size-4" />} label="스타일" mentionRef="setting:styleAnchor" mentionLabel="스타일">
                 <StyleAnchorPicker
                   anchors={styleAnchors}
                   value={styleAnchorKey}
                   onSelect={(k) => void setStyleAnchor(k)}
                 />
-              </FieldShell>
+              </FieldRow>
 
-              <FieldShell icon={<Monitor className="size-4" />} label="포맷" issue={hardByField.get('format')} mentionRef="setting:format" mentionLabel="포맷">
+              <FieldRow icon={<Monitor className="size-4" />} label="포맷" issue={hardByField.get('format')} mentionRef="setting:format" mentionLabel="포맷">
                 <Select
                   value={projectSettings.format}
                   onValueChange={(v) => updateSettings({ format: v as ProjectFormat })}
                 >
-                  <SelectTrigger className={`w-full ${HOVER_RED_BORDER}`}><SelectValue /></SelectTrigger>
+                  <SelectTrigger size="sm" className={cn('w-full', QUIET_CONTROL, QUIET_CHEVRON, HOVER_RED_BORDER)}>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {FORMAT_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </FieldShell>
+              </FieldRow>
 
-              <FieldShell icon={<Palette className="size-4" />} label="톤" softIssue={softByField.get('tone')} mentionRef="setting:tone" mentionLabel="톤">
+              <FieldRow icon={<Palette className="size-4" />} label="톤" softIssue={softByField.get('tone')} mentionRef="setting:tone" mentionLabel="톤">
                 <HoverBeam>
                   <TagInput
                     values={projectSettings.tone}
@@ -1100,21 +1256,23 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                     placeholder="예: dark"
                   />
                 </HoverBeam>
-              </FieldShell>
+              </FieldRow>
 
-              <FieldShell icon={<Languages className="size-4" />} label="대사 언어" issue={hardByField.get('dialogueLanguage')} mentionRef="setting:dialogueLanguage" mentionLabel="대사 언어">
+              <FieldRow icon={<Languages className="size-4" />} label="대사 언어" issue={hardByField.get('dialogueLanguage')} mentionRef="setting:dialogueLanguage" mentionLabel="대사 언어">
                 <Select
                   value={projectSettings.dialogueLanguage || ''}
                   onValueChange={(v) => updateSettings({ dialogueLanguage: v })}
                 >
-                  <SelectTrigger className={`w-full ${HOVER_RED_BORDER}`}><SelectValue placeholder="선택…" /></SelectTrigger>
+                  <SelectTrigger size="sm" className={cn('w-full', QUIET_CONTROL, QUIET_CHEVRON, HOVER_RED_BORDER)}>
+                    <SelectValue placeholder="선택…" />
+                  </SelectTrigger>
                   <SelectContent>
                     {LANGUAGE_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </FieldShell>
+              </FieldRow>
             </div>
           </section>
 
@@ -1149,10 +1307,10 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </p>
               </div>
             ) : (
-              // items-start: 같은 행의 이웃 카드가 확장된 카드 높이로 같이 늘어나지 않게(#b4).
-              <div className="grid items-start gap-3 xl:grid-cols-2">
+              // 줄 목록(#b-rows) — 카드 격자의 높이 동기화 문제가 애초에 생기지 않는다.
+              <div className={ROW_LIST}>
                 {cast.map((member, i) => (
-                  <CastCard
+                  <CastRow
                     key={member.localId}
                     member={member}
                     issues={castIssuesFor(gate, member.localId)}
@@ -1189,16 +1347,16 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
 
             {backgrounds.length === 0 ? (
               <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-border p-8 text-center">
-                <Monitor className="size-10 text-muted-foreground" />
+                <Mountain className="size-10 text-muted-foreground" />
                 <p className="mt-3 text-sm font-medium">아직 배경 설정이 없어요</p>
                 <p className="mt-1 max-w-md text-xs text-muted-foreground">
                   추가하고 싶은 배경이나 세계관에 대한 묘사를 AI Producer에게 알려주세요
                 </p>
               </div>
             ) : (
-              <div className="grid items-start gap-3 xl:grid-cols-2">
+              <div className={ROW_LIST}>
                 {backgrounds.map((background, i) => (
-                  <BackgroundCard
+                  <BackgroundRow
                     key={background.localId}
                     background={background}
                     onPatch={updateBackground}

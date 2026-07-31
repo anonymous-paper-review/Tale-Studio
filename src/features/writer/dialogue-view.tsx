@@ -126,6 +126,8 @@ export function DialogueView() {
 
       {/* 인물 칩 + 생성 버튼 */}
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-2.5">
+        {/* 선택된 인물만 색을 갖는다(2026-07-31) — 아무도 선택 안 한 기본 상태는 전부 회색이라
+            대본이 조용하고, 색은 "지금 보고 있는 인물"이라는 한 가지 뜻만 갖는다. */}
         {speakers.map((s) => {
           const active = selectedSpeaker === s.id
           return (
@@ -136,8 +138,9 @@ export function DialogueView() {
               onClick={() => setSelectedSpeaker(active ? null : s.id)}
               className={cn(
                 'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                s.color.chip,
-                active ? s.color.on : 'hover:bg-accent',
+                active
+                  ? cn(s.color.chip, s.color.on)
+                  : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
               )}
             >
               {s.name}
@@ -222,8 +225,10 @@ export function DialogueView() {
                                   <div
                                     key={i}
                                     className={cn(
+                                      // 색은 선택된 인물의 대사에만. 그 외에는 위 샷 스토리와 같은
+                                      //   muted 톤으로 가라앉아 대본 전체가 한 색으로 읽힌다.
                                       'rounded-sm border-l-2 py-1 pl-3 pr-2 transition-opacity',
-                                      color?.bar ?? 'border-l-border',
+                                      focused ? (color?.bar ?? 'border-l-border') : 'border-l-border',
                                       focused && (color?.on ?? 'bg-accent'),
                                       dimmed && 'opacity-30',
                                     )}
@@ -236,7 +241,12 @@ export function DialogueView() {
                                     >
                                       {speakerName}
                                     </span>
-                                    <span className={cn('text-sm', focused && 'font-medium')}>
+                                    <span
+                                      className={cn(
+                                        'text-sm',
+                                        focused ? 'font-medium' : 'text-muted-foreground',
+                                      )}
+                                    >
                                       &ldquo;{line.text}&rdquo;
                                     </span>
                                     {line.delivery && (
