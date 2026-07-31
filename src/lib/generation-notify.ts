@@ -13,3 +13,17 @@ import type { StageId } from '@/types'
 export function notifyGenerationComplete(stage: StageId, label: string): void {
   useGlobalChatStore.getState().notifyCompletion(stage, label)
 }
+
+/**
+ * 생성 트리거 실패 → 사유를 채팅에 남긴다 (#double-fire 2026-07-31).
+ *   실패를 삼키고 노드/카드 상태로만 표시하던 store 액션들이 쓴다 — 카드의 작은 빨간 글씨는
+ *   캔버스를 스크롤하면 안 보이지만, 채팅은 stage 를 옮겨도 남는 기록이다.
+ *   완료 통지와 달리 보고 있는 stage 여도 띄운다(방금 누른 버튼의 즉답).
+ */
+export function notifyGenerationFailure(
+  stage: StageId,
+  label: string,
+  message: string,
+): void {
+  useGlobalChatStore.getState().notifyActionError(stage, label, message)
+}

@@ -13,6 +13,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { notifyGenerationComplete } from '@/lib/generation-notify'
+import { claimAction } from '@/lib/action-guard'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
 import type { ArtistLookSummary } from '@/lib/artist/onboarding-message'
@@ -778,6 +779,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     if (!projectId) return
     const key = `${characterId}:${view}`
     if (get().generatingViews.includes(key)) return
+    // 연타 방어(#double-fire) — 사람이 누른 경로만. autogen 은 자체 흐름으로 중복을 관리하므로
+    //   1초 창에 걸리면 정상 재시도가 조용히 사라진다.
+    if (actor === 'ui' && !claimAction(`artist:character:${key}`)) return
 
     // 편집(디바운스 저장)이 서버에 닿기 전에 생성 라우트가 DB를 읽어 옛 프롬프트로 그리는 레이스 방지 —
     //   대기 중인 캐릭터 수정 PATCH 를 먼저 flush+await 한 뒤 제출한다(#11).
@@ -977,6 +981,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
   generateWorldShot: async (locationId, shot, promptOverride, actor = 'ui') => {
     if (isDemoSession()) return
+    // 연타 방어(#double-fire) — 사람이 누른 경로만. 키는 로케이션+샷이라 같은 로케이션의
+    //   wide/establishing 병렬 생성은 그대로 통과한다(아래 주석의 기존 정책 유지).
+    if (actor === 'ui' && !claimAction(`artist:world:${locationId}:${shot}`)) return
     const { sceneManifest, selectedBoostPreset, imageProvider } = get()
     const location = sceneManifest?.locations.find(
       (l) => l.locationId === locationId,

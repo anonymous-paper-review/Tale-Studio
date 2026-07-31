@@ -45,7 +45,8 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { isDemoSession } from '@/lib/demo/context'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
-import { notifyGenerationComplete } from '@/lib/generation-notify'
+import { notifyGenerationComplete, notifyGenerationFailure } from '@/lib/generation-notify'
+import { claimAction, releaseAction } from '@/lib/action-guard'
 import { DEFAULT_VIDEO_MODEL, normalizeProvider } from '@/lib/video-models'
 
 // ============================================================================
@@ -2097,6 +2098,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       generateStoryboardImage: async (shotNodeId) => {
         if (isDemoSession()) return
+        // 연타 방어(#double-fire) — 같은 샷의 생성 버튼은 캔버스 노드/그리드 카드/상세 패널에
+        //   동시에 떠 있다. 버튼마다 잠가서는 서로를 못 막으므로 샷 키 하나로 창을 공유한다.
+        if (!claimAction(`director:storyboard:${shotNodeId}`)) return
         const api = get()
         const node = api.nodes.find((n) => n.id === shotNodeId)
         if (!node || !isShotData(node.data)) return
@@ -2161,6 +2165,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 generatedAt: 0,
               },
             })
+            // 실패한 시도가 1초 창을 붙잡고 있으면 즉시 재시도가 막힌다 — 창을 바로 연다.
+            releaseAction(`director:storyboard:${shotNodeId}`)
+            // 카드의 작은 빨간 글씨는 캔버스를 스크롤하면 사라진다 — 사유를 채팅에도 남긴다(#double-fire).
+            notifyGenerationFailure('director', '스토리보드 이미지', message)
           }
           return
         }
@@ -2235,6 +2243,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       generateAllStoryboardImages: async () => {
         if (isDemoSession()) return
+        if (!claimAction('director:storyboard:all')) return
         // 씬 순서대로 Shot 수집 후 동시성 제한 병렬(2).
         // 순차(20장 직렬 → 수 분)에서 병렬로 단축. 각 샷은 자체 재시도/타임아웃 보유.
         const sceneNodes = get().nodes.filter((n) => isSceneData(n.data))
@@ -2267,6 +2276,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       // ─── video generation (ST-4) ────────────────────────────────────────
 
+      // 연타 방어는 아래 acquireGenerationLock 이 이미 담당한다 — 1초 창이 아니라 생성 전 구간을
+      //   잠그므로 더 강하다. 여기에 창을 덧대면 앞 시도가 *끝난 뒤*의 정당한 재시도까지 막힌다.
       generateVideoForShot: async (shotNodeId) => {
         if (isDemoSession()) return null
         const api = get()
@@ -2295,6 +2306,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         }
       },
 
+      // generateVideoForShot 과 같은 이유로 창을 두지 않는다 — 아래 lock 이 전 구간을 덮는다.
       regenerateVideo: async (videoNodeId, heldLock) => {
         if (isDemoSession()) return true
         const videoNode = get().nodes.find((n) => n.id === videoNodeId)

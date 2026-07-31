@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react'
 import { Loader2, MessageSquareText, RefreshCw } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { WriterHeader } from '@/features/writer/writer-header'
+import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
@@ -106,10 +107,20 @@ export function DialogueView() {
       await loadProject()
     } catch (e) {
       setError(e instanceof Error ? e.message : '대사 생성에 실패했습니다.')
+      throw e // 훅이 받아 채팅에도 사유를 남긴다(#double-fire) — 여기 빨간 줄은 탭을 떠나면 사라진다.
     } finally {
       setGenerating(false)
     }
   }
+
+  // 클릭 즉시 잠금 + 1초 창(#double-fire). 대사 생성은 1~2분짜리라 연타가 특히 비싸다.
+  const generate = useGuardedAction({
+    actionKey: `writer:dialogue:${projectId ?? 'none'}`,
+    stage: 'writer',
+    label: '대사',
+    busy: generating,
+    action: runGenerate,
+  })
 
   const onGenerateClick = () => {
     // 이미 대사가 있으면 덮어쓰기 — 2단 확인 (차 있는 것 교체는 사람의 명시 행동, architecture §5).
@@ -117,7 +128,7 @@ export function DialogueView() {
       setConfirming(true)
       return
     }
-    void runGenerate()
+    generate.run()
   }
 
   return (
@@ -161,18 +172,22 @@ export function DialogueView() {
           <button
             type="button"
             onClick={onGenerateClick}
-            disabled={generating || !projectId}
+            disabled={generate.locked || !projectId}
             className={cn(
               'flex h-7 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50',
               confirming && 'border-destructive/50 text-destructive',
             )}
           >
-            {generating ? (
+            {generate.locked ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : (
               <RefreshCw className="size-3.5" />
             )}
-            {generating ? '대사 쓰는 중… (1~2분)' : totalLines > 0 ? '대사 재생성' : '대사 생성'}
+            {generate.locked
+              ? '대사 쓰는 중… (1~2분)'
+              : totalLines > 0
+                ? '대사 재생성'
+                : '대사 생성'}
           </button>
         </div>
       </div>

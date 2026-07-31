@@ -72,6 +72,8 @@ interface GlobalChatState {
   approvePendingProposal: (id?: string) => Promise<boolean>
   /** 백그라운드 생성 완료 통지 — 다른 stage에 있을 때만 배지 bump + 스로틀된 채팅 메시지. */
   notifyCompletion: (stage: StageId, label: string) => void
+  /** 생성 트리거 실패 통지 — 사유를 채팅에 남긴다 (#double-fire). 완료와 달리 즉시. */
+  notifyActionError: (stage: StageId, label: string, message: string) => void
   clearStageBadge: (stage: StageId) => void
   clearError: () => void
   reset: () => void
@@ -684,6 +686,22 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         timer: setTimeout(() => flushCompletion(stage, label), COMPLETION_COALESCE_MS),
       }
     }
+  },
+
+  // 생성 트리거 실패 통지(#double-fire 2026-07-31) — 방금 누른 버튼의 즉답이므로 완료 통지와
+  //   달리 코얼레싱하지 않고 바로 띄우고, 보고 있는 stage 여도 띄운다(사용자가 결과를 기다리는 중).
+  //   다만 같은 문구가 연속으로 쌓이는 것은 막는다 — 일괄 생성이 같은 사유로 무더기 실패할 때
+  //   채팅이 같은 줄로 도배되는 것을 피한다.
+  notifyActionError: (stage, label, message) => {
+    const trimmed = message.trim()
+    const content = `⚠ ${label} 생성을 시작하지 못했어요 — ${trimmed || '알 수 없는 오류'}`
+    const last = get().messages[get().messages.length - 1]
+    if (last && last.role === 'model' && last.content === content) return
+    set((state) => ({
+      messages: [...state.messages, { id: makeId(), stage, role: 'model', content }],
+    }))
+    const projectId = useProjectStore.getState().projectId
+    if (projectId) saveChatMessage(projectId, stage, 'model', content)
   },
 
   // stage 진입 시 배지 클리어 (studio layout에서 호출).

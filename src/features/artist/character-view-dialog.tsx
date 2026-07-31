@@ -16,6 +16,7 @@ import { useArtistStore } from '@/stores/artist-store'
 import { CHARACTER_VIEW_LABELS, type CharacterViewKey } from '@/types/asset'
 import { classifyImageStale } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
+import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -43,6 +44,36 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
   // 외형 프롬프트(수정 후 재생성, 월드 다이얼로그와 대칭) — 대상(캐릭터×뷰) 전환 시 초기화.
   const [prompt, setPrompt] = useState('')
   const [promptKey, setPromptKey] = useState<string | null>(null)
+
+  // 클릭 즉시 잠금(#double-fire) — generatingViews 는 sendCharacterPatchNow 왕복 *뒤에* 세워지므로,
+  //   느린 서버에서 그 사이 버튼이 열려 있어 두 번째 클릭이 기존 중복 가드까지 통과했다.
+  //   아래 훅은 store 상태를 기다리지 않고 클릭 순간 잠그고, busy 가 올라오면 잠금을 넘긴다.
+  const generate = useGuardedAction({
+    actionKey: `artist:character:${charId}:${view}`,
+    stage: 'artist',
+    label: '캐릭터 이미지',
+    busy: isGenerating,
+    action: async () => {
+      if (!char || !view) return
+      // 프롬프트가 편집됐으면 원천(appearance)에 먼저 반영 — 생성 직전 flush(#11)가 저장을 보장.
+      const next = prompt.trim()
+      const base = char.appearanceNative || char.fixedPrompt || ''
+      if (view === 'main' && next && next !== base) {
+        updateCharacter(char.characterId, { appearance: next })
+      }
+      await generateCharacterView(char.characterId, view)
+    },
+  })
+  const safeRetry = useGuardedAction({
+    actionKey: `artist:character-safe:${charId}:${view}`,
+    stage: 'artist',
+    label: '캐릭터 이미지(우회 재시도)',
+    busy: isGenerating,
+    action: async () => {
+      if (!char || !view) return
+      await retryCharacterViewSafe(char.characterId, view)
+    },
+  })
 
   const open = !!charId && !!view
   if (!open || !char || !view) return null
@@ -150,18 +181,8 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
 
           {/* 후보 히스토리 스트립 제거(#5) — 이미지 1장 정책: 재생성은 누적 아닌 교체(finalize 가 최신 1장만 보관). */}
 
-          <Button
-            className="w-full"
-            disabled={isGenerating || needsMain}
-            onClick={() => {
-              // 프롬프트가 편집됐으면 원천(appearance)에 먼저 반영 — 생성 직전 flush(#11)가 저장을 보장.
-              const next = prompt.trim()
-              if (view === 'main' && next && next !== initialPrompt)
-                updateCharacter(char.characterId, { appearance: next })
-              void generateCharacterView(char.characterId, view)
-            }}
-          >
-            {isGenerating ? (
+          <Button className="w-full" disabled={generate.locked || needsMain} onClick={generate.run}>
+            {generate.locked ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
                 생성 중…
@@ -178,10 +199,14 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
             <Button
               variant="outline"
               className="w-full"
-              disabled={isGenerating || capReached}
-              onClick={() => retryCharacterViewSafe(char.characterId, view)}
+              disabled={safeRetry.locked || capReached}
+              onClick={safeRetry.run}
             >
-              <RefreshCw className="size-4" />
+              {safeRetry.locked ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <RefreshCw className="size-4" />
+              )}
               {capReached ? '우회 재시도 한도 도달' : '우회(safe)로 다시 만들기'}
             </Button>
           )}

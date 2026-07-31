@@ -7,6 +7,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { depthLevelFromRuntime } from '@/lib/depth'
 import { isDemoSession } from '@/lib/demo/context'
 import { assignCastSlugs, assignLocationSlugs } from '@/lib/cast-slug'
+import { claimAction } from '@/lib/action-guard'
 import { computeProducerSourceHash } from '@/lib/lifecycle'
 import { createPendingProposal } from '@/lib/pending-proposal'
 import { evaluateProducerGate } from '@/lib/producer-gate'
@@ -730,6 +731,12 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       })
       return false
     }
+
+    // 연타 방어(#double-fire) — 핸드오프는 writer 파이프라인을 발사한다. 두 번 나가면 같은
+    //   프로젝트에 실행이 겹친다. 버튼 disabled 와 별개인 최종 방어선.
+    //   게이트 *뒤*에 둔다: 게이트 거절은 빠른 로컬 실패라, 앞에 두면 사용자가 빈 칸을 채우고
+    //   바로 다시 눌렀을 때 아직 닫힌 창에 막힌다.
+    if (!claimAction(`producer:handoff:${projectId}`)) return false
 
     set({ syncing: true, error: null })
 

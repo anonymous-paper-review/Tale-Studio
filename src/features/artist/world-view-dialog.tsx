@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { HoverBeam } from '@/components/hover-beam'
+import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import {
   useArtistStore,
@@ -49,6 +50,18 @@ export function WorldViewDialog({ locationId, shot, onClose }: Props) {
     setPrevKey(key)
     setPrompt(defaultPrompt)
   }
+
+  // 클릭 즉시 잠금 + 1초 창(#double-fire) — store 의 generatingLocations 를 기다리지 않는다.
+  const generate = useGuardedAction({
+    actionKey: `artist:world:${locationId}:${shot}`,
+    stage: 'artist',
+    label: '배경 이미지',
+    busy: isGenerating,
+    action: async () => {
+      if (!world || !shot) return
+      await generateWorldShot(world.locationId, shot, prompt)
+    },
+  })
 
   const open = !!locationId && !!shot
   if (!open || !world || !shot) return null
@@ -93,10 +106,10 @@ export function WorldViewDialog({ locationId, shot, onClose }: Props) {
           {/* 생성 버튼 */}
           <Button
             className="w-full"
-            disabled={isGenerating || !prompt.trim()}
-            onClick={() => generateWorldShot(world.locationId, shot, prompt)}
+            disabled={generate.locked || !prompt.trim()}
+            onClick={generate.run}
           >
-            {isGenerating ? (
+            {generate.locked ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
                 생성 중…
