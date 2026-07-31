@@ -26,10 +26,11 @@ import { Loader2, ImageIcon, X, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map a
 
 import { toast } from 'sonner'
 
-import { HandoffButton } from '@/components/layout/handoff-button'
+import { handoffFrom } from '@/lib/handoff-intent'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
+import { isVideoData } from '@/types/director'
 import { followChainNodePositions, useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -297,6 +298,26 @@ function CanvasInner() {
     }, 2000)
     return () => clearTimeout(t)
   }, [directorProjectId, nodes, offerSuggestion])
+
+  // Editor 핸드오프(#handoff-to-chat 2026-07-31) — 탭 하단 'Head to Editor' 버튼을 걷어내고
+  //   채팅 제안으로 옮겼다. 옛 버튼은 게이트 없이 항상 활성이었으므로 여기서도 막지 않는다.
+  //   다만 *버튼*은 편집할 영상이 하나라도 생겼을 때만 띄운다 — 빈 캔버스에서 권하면 의미가 없다.
+  //   (채팅에 직접 "Editor로 넘겨줘"라고 쓰면 이 조건과 무관하게 언제든 넘어간다.)
+  const editorNudgeRef = useRef<string | null>(null)
+  const hasRenderedVideo = nodes.some((n) => isVideoData(n.data) && !!n.data.videoUrl)
+  useEffect(() => {
+    if (!directorProjectId || !hasRenderedVideo) return
+    if (editorNudgeRef.current === directorProjectId) return
+    editorNudgeRef.current = directorProjectId
+    const spec = handoffFrom('director')
+    if (!spec) return
+    offerSuggestion({
+      id: `handoff:director:${directorProjectId}`,
+      stage: 'director',
+      content: '완성된 영상이 있어요. Editor로 넘어가 이어 붙여볼까요?',
+      action: { kind: 'handoff', utterance: spec.utterance, label: spec.label },
+    })
+  }, [directorProjectId, hasRenderedVideo, offerSuggestion])
 
   const {
     screenToFlowPosition,
@@ -873,7 +894,6 @@ export default function DirectorCanvasPage() {
             우측 Inspector aside 제거됨 (D-3 마일스톤, 2026-05-25) */}
       </div>
 
-      <HandoffButton label="Head to Editor" targetStage="editor" />
     </div>
   )
 }

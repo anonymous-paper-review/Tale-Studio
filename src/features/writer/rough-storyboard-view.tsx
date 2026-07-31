@@ -23,7 +23,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Slider } from '@/components/ui/slider'
-import { HandoffButton } from '@/components/layout/handoff-button'
+import { handoffFrom } from '@/lib/handoff-intent'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
 import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
@@ -118,6 +118,27 @@ export function RoughStoryboardView() {
         '바꾸고 싶은 부분이 있으면 편하게 말씀해 주세요.',
     })
   }, [projectId, sceneManifest, shots.length, chatMessages, offerSuggestion])
+
+  // Artist 핸드오프(#handoff-to-chat 2026-07-31) — 탭 하단 'Hand over to Concept Artist' 버튼을
+  //   걷어내고 채팅 제안으로 옮겼다. 옛 버튼은 게이트 없이 항상 활성이었으므로 여기서도 막지 않고,
+  //   러프 보드가 다 그려졌을 때(= 검토할 게 생겼을 때) 버튼을 띄운다. 채팅에 직접 말하면 언제든 된다.
+  const artistNudgeRef = useRef<string | null>(null)
+  const roughAllReady =
+    shots.length > 0 && shots.every((s) => s.roughStoryboard?.status === 'completed')
+  useEffect(() => {
+    if (!projectId || !roughAllReady) return
+    if (artistNudgeRef.current === projectId) return
+    artistNudgeRef.current = projectId
+    const spec = handoffFrom('writer')
+    if (!spec) return
+    offerSuggestion({
+      id: `handoff:writer:${projectId}`,
+      stage: 'writer',
+      content:
+        '러프 스토리보드가 모두 준비됐어요. Artist로 넘어가 캐릭터·배경 컨셉을 잡아볼까요?',
+      action: { kind: 'handoff', utterance: spec.utterance, label: spec.label },
+    })
+  }, [projectId, roughAllReady, offerSuggestion])
 
   // 파이프라인이 이 화면을 보는 중에 완료되면 씬/샷을 1회 재로드.
   useEffect(() => {
@@ -744,8 +765,6 @@ export function RoughStoryboardView() {
           })}
         </div>
       </ScrollArea>
-
-      <HandoffButton label="Hand over to Concept Artist" targetStage="artist" />
 
       <ShotDetailDialog
         shotId={detailShotId}

@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
-import { HandoffButton } from '@/components/layout/handoff-button'
+import { handoffFrom } from '@/lib/handoff-intent'
 import { CharacterPanel } from '@/features/artist/character-panel'
 import { WorldPanel } from '@/features/artist/world-panel'
 import { InventoryGrid } from '@/features/artist/inventory-grid'
@@ -279,11 +279,16 @@ export default function VisualPage() {
         worldAssets.length > 0
           ? `캐릭터 ${characterAssets.length}명·배경 ${worldAssets.length}개가`
           : `캐릭터 ${characterAssets.length}명이`
+      // 탭 하단의 'Approve & Direct' 버튼을 걷어내고 이 제안이 그 자리를 대신한다(#handoff-to-chat).
+      //   버튼은 직접 이동하지 않고 문장을 채팅에 입력해 보낸다 — 직접 타이핑과 같은 경로.
+      const spec = handoffFrom('artist')
       offerSuggestion({
         id: `artist-ready-${projectId}`,
         stage: 'artist',
         content: `${subject} 모두 준비됐어요. 마음에 들면 Director로 넘어가 콘티를 짜볼까요?`,
-        action: { kind: 'navigate', targetStage: 'director', label: 'Director로 가기' },
+        action: spec
+          ? { kind: 'handoff', utterance: spec.utterance, label: spec.label }
+          : null,
       })
     }, 1500)
     return () => clearTimeout(t)
@@ -535,11 +540,6 @@ export default function VisualPage() {
           )}
         </div>
       )}
-      <HandoffButton
-        label="Approve & Direct"
-        targetStage="director"
-        disabled={!directorGate.ready}
-      />
     </>
   )
 }

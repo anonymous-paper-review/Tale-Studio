@@ -17,6 +17,8 @@ import {
   resolveLineRefs,
   serializeWriterScriptContext,
 } from '@/lib/script-lines'
+import { matchHandoffIntent, type HandoffSpec } from '@/lib/handoff-intent'
+import { handoffToStage } from '@/lib/stage-nav'
 import { saveChatMessage } from '@/lib/chat-persistence'
 import { isDemoSession, getDemoSnapshot } from '@/lib/demo/context'
 import { cannedFor } from '@/lib/demo/canned'
@@ -50,6 +52,9 @@ export interface ChatSuggestion {
   action:
     | { kind: 'navigate'; targetStage: StageId; label: string }
     | { kind: 'artist-refresh-look'; label: string }
+    // 핸드오프(#handoff-to-chat) — 누르면 utterance 를 채팅에 그대로 입력해 보낸다.
+    //   버튼이 직접 이동시키지 않는 이유: 타이핑 경로와 갈리면 두 벌을 유지해야 한다.
+    | { kind: 'handoff'; utterance: string; label: string }
     | null
 }
 
@@ -62,6 +67,8 @@ interface GlobalChatState {
   pendingProposal: PendingProposal | null
   /** 크로스스테이지 완료 알림 배지 카운트 (chat-proactive-copilot Phase 2). 사이드바가 읽는다. */
   stageBadges: Partial<Record<StageId, number>>
+  /** 핸드오프 성공 후 이동할 경로 — 라우팅은 컴포넌트 몫이라 GlobalChat 이 소비하고 비운다. */
+  pendingNavigatePath: string | null
 
   loadMessages: (projectId: string) => Promise<void>
   sendMessage: (content: string) => Promise<void>
@@ -137,6 +144,41 @@ function flushCompletion(stage: StageId, label: string): void {
   if (projectId) saveChatMessage(projectId, stage, 'model', content)
 }
 
+// ── 스테이지 핸드오프 (#handoff-to-chat 2026-07-31) ──────────────────────────
+// 탭 하단 버튼을 걷어내고 채팅으로 옮겼다. 제안 버튼은 utterance 를 입력창에 넣어 보낼 뿐이라,
+//   버튼과 타이핑이 아래 같은 함수로 수렴한다(경로가 갈리지 않는다).
+
+/** 핸드오프 가부 — 코드 게이트가 판정한다(모델 아님, architecture §3). 막혔으면 사유 목록. */
+function handoffBlockers(spec: HandoffSpec): string[] {
+  if (spec.from === 'producer') {
+    const p = useProducerStore.getState()
+    const gate = evaluateProducerGate({
+      settings: p.projectSettings,
+      storyReady: p.storyReady,
+      cast: p.cast,
+      backgrounds: p.backgrounds,
+    })
+    return gate.canHandoff
+      ? []
+      : gate.hardMissing.map((i) => (i.detail ? `${i.label} (${i.detail})` : i.label))
+  }
+  if (spec.from === 'artist') {
+    const gate = useProjectStore.getState().lifecycleStatus.director
+    return gate?.ready === false ? gate.blockers.map((b) => b.label) : []
+  }
+  // director → editor 는 게이트가 없다 (걷어낸 버튼도 항상 활성이었다).
+  return []
+}
+
+/** 게이트 통과 후 실제 전이. producer 는 writer 파이프라인 발사까지 포함한다. */
+async function runHandoff(spec: HandoffSpec): Promise<{ ok: boolean; path: string | null }> {
+  if (spec.from === 'producer') {
+    const ok = await useProducerStore.getState().saveAndHandoff()
+    return { ok, path: ok ? await handoffToStage(spec.to) : null }
+  }
+  return { ok: true, path: await handoffToStage(spec.to) }
+}
+
 export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   messages: [],
   loading: false,
@@ -145,6 +187,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   dismissedSuggestionIds: [],
   pendingProposal: null,
   stageBadges: {},
+  pendingNavigatePath: null,
 
   loadMessages: async (projectId) => {
     // 데모(공유) 세션: /api/* 는 fetch-guard 로 중립화(빈 응답)되므로 스냅샷에서 직접 채팅 이력을 읽는다.
@@ -228,6 +271,40 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         ],
       }))
       if (projectId) saveChatMessage(projectId, stage, 'model', content)
+      return
+    }
+
+    // 핸드오프 요청(#handoff-to-chat) — LLM 을 거치지 않는다. 되돌리기 어려운 상태 전이라
+    //   모델의 해석이 아니라 코드 게이트가 판정해야 한다. 제안 버튼과 직접 타이핑이 모두 여기로 온다.
+    const handoffSpec = matchHandoffIntent(trimmed, stage)
+    if (handoffSpec) {
+      const userMsg: GlobalChatMessage = { id: makeId(), stage, role: 'user', content: trimmed }
+      set((state) => ({ messages: [...state.messages, userMsg], loading: true, error: null }))
+      if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+
+      const blockers = handoffBlockers(handoffSpec)
+      let reply: string
+      let path: string | null = null
+      if (blockers.length > 0) {
+        reply =
+          `아직 ${STAGE_LABEL[handoffSpec.to]}로 넘어갈 수 없어요. 먼저 이것들을 채워 주세요:\n`
+          + blockers.map((b) => `· ${b}`).join('\n')
+      } else {
+        const result = await runHandoff(handoffSpec)
+        path = result.path
+        reply = result.ok
+          ? handoffSpec.from === 'producer'
+            ? `${STAGE_LABEL[handoffSpec.to]}에게 넘겼어요. 씬·샷 생성을 시작할게요 — 진행 상황은 ${STAGE_LABEL[handoffSpec.to]} 탭에서 볼 수 있어요.`
+            : `${STAGE_LABEL[handoffSpec.to]}로 넘어갈게요.`
+          : '핸드오프에 실패했어요. 잠시 후 다시 시도해 주세요.'
+      }
+
+      set((state) => ({
+        loading: false,
+        messages: [...state.messages, { id: makeId(), stage, role: 'model', content: reply }],
+        pendingNavigatePath: path,
+      }))
+      if (projectId) saveChatMessage(projectId, stage, 'model', reply)
       return
     }
 

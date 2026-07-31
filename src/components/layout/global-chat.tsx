@@ -140,6 +140,7 @@ export function GlobalChat() {
   const clearError = useGlobalChatStore((s) => s.clearError)
   const loadMessages = useGlobalChatStore((s) => s.loadMessages)
   const suggestion = useGlobalChatStore((s) => s.suggestion)
+  const pendingNavigatePath = useGlobalChatStore((s) => s.pendingNavigatePath)
   const dismissSuggestion = useGlobalChatStore((s) => s.dismissSuggestion)
   const pendingProposal = useGlobalChatStore((s) => s.pendingProposal)
   const approvePendingProposal = useGlobalChatStore((s) => s.approvePendingProposal)
@@ -238,6 +239,14 @@ export function GlobalChat() {
     if (projectId) loadMessages(projectId)
   }, [projectId, loadMessages])
 
+  // 핸드오프 성공 후 이동(#handoff-to-chat) — 라우팅은 컴포넌트 책임이라 store 가 남긴 경로를
+  //   여기서 소비하고 즉시 비운다(같은 경로로 두 번 밀지 않게).
+  useEffect(() => {
+    if (!pendingNavigatePath) return
+    useGlobalChatStore.setState({ pendingNavigatePath: null })
+    router.push(pendingNavigatePath)
+  }, [pendingNavigatePath, router])
+
   // 새 메시지·stage 이동 시 스레드 끝으로. stage 를 넣는 이유는 이동하면 끝에 "지금" 구간
   //   구분선이 새로 붙기 때문 — 같은 방이 이어졌다는 표식이 화면 안에 들어와야 의미가 있다.
   useEffect(() => {
@@ -320,6 +329,13 @@ export function GlobalChat() {
     if (action.kind === 'artist-refresh-look') {
       dismissSuggestion()
       await useArtistStore.getState().refreshLookPendingDrafts()
+      return
+    }
+    // 핸드오프(#handoff-to-chat) — 버튼이 직접 이동시키지 않는다. 문장을 채팅에 입력해 보내고,
+    //   게이트 판정·전이·이동은 타이핑했을 때와 똑같이 sendMessage 안에서 일어난다.
+    if (action.kind === 'handoff') {
+      dismissSuggestion()
+      await sendMessage(action.utterance)
       return
     }
     const path = await handoffToStage(action.targetStage)

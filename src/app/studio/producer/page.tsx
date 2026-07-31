@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { ArrowRight, Loader2, RefreshCw, AlertTriangle, X } from 'lucide-react'
+import { Loader2, RefreshCw, AlertTriangle, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { ProducerReadinessBoard } from '@/features/producer/readiness-board'
@@ -11,6 +10,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { evaluateProducerGate } from '@/lib/producer-gate'
 import { createPendingProposal } from '@/lib/pending-proposal'
+import { handoffFrom } from '@/lib/handoff-intent'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 
 // 첫 프로젝트 진입 시 프로듀서가 먼저 거는 인사·시작 넛지 — 유저가 바로 한 줄로 시작할 수 있게.
@@ -22,11 +22,10 @@ const PRODUCER_WELCOME =
 
 
 export default function MeetingPage() {
-  const router = useRouter()
   const projectId = useProjectStore((s) => s.projectId)
   const loadProject = useProducerStore((s) => s.loadProject)
-  const { saveAndHandoff, syncing, projectSettings, error, clearError } =
-    useProducerStore()
+  // saveAndHandoff 는 더 이상 이 페이지가 부르지 않는다 — 핸드오프는 채팅이 맡는다(#handoff-to-chat).
+  const { syncing, projectSettings, error, clearError } = useProducerStore()
 
   // loadProject 완료 후에만 웰컴을 판단(초기 storyReady=false 윈도우에서 기존 프로젝트가 오탐되지 않게).
   const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null)
@@ -59,11 +58,23 @@ export default function MeetingPage() {
   const requestChatFocus = useChatUiStore((s) => s.requestChatFocus)
   const welcomeFiredRef = useRef(false)
 
-  // Redirect via useEffect to avoid router.push failing inside async handlers
-  const [redirectTo, setRedirectTo] = useState<string | null>(null)
+  // 핸드오프는 탭 하단 버튼이 아니라 채팅이 맡는다(#handoff-to-chat 2026-07-31) — 게이트가
+  //   충족되면 채팅에 제안 버튼이 뜨고, 누르면 그 문장이 채팅에 입력돼 전송된다. 채팅에 직접
+  //   "Writer로 넘겨줘"라고 써도 같은 경로(global-chat-store)를 탄다.
+  const handoffOfferedRef = useRef(false)
   useEffect(() => {
-    if (redirectTo) router.replace(redirectTo)
-  }, [redirectTo, router])
+    if (!projectId || !canHandoff || handoffOfferedRef.current) return
+    const spec = handoffFrom('producer')
+    if (!spec) return
+    handoffOfferedRef.current = true
+    offerSuggestion({
+      id: `handoff:producer:${projectId}`,
+      stage: 'producer',
+      content:
+        '필요한 항목이 모두 채워졌어요. Writer에게 넘기면 씬·샷 생성이 시작돼요.',
+      action: { kind: 'handoff', utterance: spec.utterance, label: spec.label },
+    })
+  }, [projectId, canHandoff, offerSuggestion])
 
   // 첫 진입(스토리·프로듀서 채팅 모두 비어있음)에만 프로듀서가 먼저 인사 + 입력창 포커스(빔).
   //   offerSuggestion 은 dismiss/중복 가드 내장 → 한 번만, 세션 재진입 시 재노출 안 함.
@@ -90,13 +101,6 @@ export default function MeetingPage() {
   //   (렌더 중 조정 — set-state-in-effect 회피, React 권장 reset-on-change 패턴)
   if (!writerNeedsRerun && rerunDismissed) {
     setRerunDismissed(false)
-  }
-
-  const handleHandoff = async () => {
-    // 씬/샷/연출 생성(writer 파이프라인)은 saveAndHandoff가 백그라운드로 발사하고,
-    // 사용자는 writer 탭에서 진행 상황과 러프 스토리보드를 본다 (2026-06-12 탭 부활).
-    const ok = await saveAndHandoff()
-    if (ok) setRedirectTo('/studio/writer')
   }
 
   const handleWriterRerunProposal = () => {
@@ -170,32 +174,6 @@ export default function MeetingPage() {
         </button>
       )}
 
-      {/* Handoff — 하드 게이트만 차단, 상세 사유는 readiness board inline 표시 */}
-      <div className="space-y-3 border-t border-border p-4">
-        <Button
-          onClick={handleHandoff}
-          disabled={!canHandoff || syncing}
-          className={`w-full ${canHandoff && !syncing ? 'animate-pulse bg-success hover:bg-success/90' : ''}`}
-          size="lg"
-        >
-          {syncing ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              저장 중…
-            </>
-          ) : canHandoff ? (
-            <>
-              Writer로 핸드오프 · Artist도 열기
-              <ArrowRight className="ml-2 size-4" />
-            </>
-          ) : (
-            <>
-              남은 {gate.hardMissing.length}개를 채워 주세요
-              <ArrowRight className="ml-2 size-4" />
-            </>
-          )}
-        </Button>
-      </div>
     </>
   )
 }
