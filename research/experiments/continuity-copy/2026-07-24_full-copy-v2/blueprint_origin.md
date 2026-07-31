@@ -1,9 +1,10 @@
-# ORIGIN 팔 설계도 — 정본 i2i 배선 복원판, 현행 제품 실력 재측정
+# ORIGIN 팔 설계도 — 제품 선행 수리 후, 실백엔드 정직 실행
 
-> 제품이 원래 의도한 배선(정본 이미지 + writer 샷 프롬프트 → i2i → 샷 프레임 → 영상)을 복원한 상태에서, 어제 무효가 된 BASE 팔을 다시 측정하는 팔이다.
+> 끊어져 있던 제품의 정본 i2i 배선을 **제품 코드에서 수리**하고(§2), 정본을 artist 산출 대행으로 DB에 시딩한 뒤(§3), **수리된 실백엔드(runShotImages)를 그대로 실행**해 현행 제품 실력을 재측정하는 팔이다.
 >
 > - 상태: **오너 확인 대기** (이 문서 승인 전 유료 호출 없음)
-> - 작성일: 2026-07-24
+> - 작성일: 2026-07-24 · 개정일: 2026-07-31
+> - 개정 이력: 2026-07-31 — **B안 전환**(오너 결정). A안(손 복원 모조: 사람이 참조를 고르고 실험 도구가 i2i를 대행) 폐기 → 선행 수리 + 실백엔드 정직 실행. 프롬프트 원문·영상 페이로드는 불변, 바뀐 것은 "시작 프레임을 누가 어떻게 만드나"뿐.
 > - 상위 설계: [design.md](design.md)
 > - 팔 이름: ORIGIN ("origin product pipeline")
 
@@ -13,14 +14,14 @@
 
 각 샷 블록은 위에서부터 세 덩어리다:
 
-1. **이미지 줄** — 이 샷의 i2i에 **실제로 들어가는 참조 이미지들**. 맨 오른쪽 한 장은 (참고) v1 무효 팔이 같은 샷을 T2I로 뽑았던 결과 — 이번 입력이 아니고, 이 샷이 무엇인지 감 잡는 용도다.
-2. **1단계 · 시작 프레임 생성 (i2i)** — 참조 + 프롬프트를 넣어 시작 프레임 1장을 만든다.
+1. **이미지 줄** — 이 샷에 들어가는 참조 이미지들(**writer가 지정**하고, 수리된 v6가 DB에서 조회해 첨부). 맨 오른쪽 한 장은 (참고) v1 무효 팔이 같은 샷을 T2I로 뽑았던 결과 — 이번 입력이 아니고, 이 샷이 무엇인지 감 잡는 용도다.
+2. **1단계 · 시작 프레임 생성 (수리된 v6 → i2i)** — 수리된 실백엔드가 writer 지정 참조 + 프롬프트로 시작 프레임 1장을 만든다. **실험 도구는 참조 선택에 개입하지 않는다.**
 3. **2단계 · ▶ 영상 API 입력** — 1단계 산출 프레임 **1장** + 모션 문장. 이 두 가지가 영상 API에 들어가는 전부다.
 
 이미지 파이프라인 한 줄:
 
 ```
-정본(identity_ref) + 플레이트(plate) ─ i2i(gpt-image-2/edit) → 시작 프레임 NN.png ─ + 모션 문장(Seedance 2.0) → 클립 NN.mp4
+DB 정본 시딩(identity_ref·plate) → 수리된 v6(runShotImages)가 writer 지정 참조를 DB에서 조회 ─ i2i(gpt-image-2/edit) → 시작 프레임 NN.png ─ + 모션 문장(Seedance 2.0) → 클립 NN.mp4
 ```
 
 ---
@@ -29,17 +30,29 @@
 
 ### 지난 실험이 어떻게 박살났는가
 
-어제 실험([2026-07-23_full-copy-bundle](../2026-07-23_full-copy-bundle/design.md))의 BASE 팔은 **무효 판정**됐다. 제품 writer의 샷 이미지 스테이지(`v6_images.ts`)는 정본 에셋 매니페스트(`14b_assets.json`)가 있으면 i2i(`openai/gpt-image-2/edit` + 참조 이미지)로 라우팅하게 되어 있는데, 그 매니페스트를 만들던 스테이지가 리팩토링 때 삭제되어 있었다. 그 결과 실험은 매니페스트 없는 경로 — **순수 T2I** — 로 흘렀고, 샷마다 스타일·의상·공간이 제각각인 쓰레기 프레임이 그대로 영상 입력으로 들어갔다. 우리가 측정한 것은 "현행 제품의 실력"이 아니라 "배선이 끊긴 제품의 사고 현장"이었다. (아래 샷 블록마다 붙은 v1 참고 썸네일이 그 사고 현장의 실물이다.)
+지난 실험([2026-07-23_full-copy-bundle](../2026-07-23_full-copy-bundle/design.md))의 BASE 팔은 **무효 판정**됐다. 제품 writer의 샷 이미지 스테이지(`v6_images.ts`)는 정본 에셋 매니페스트(`14b_assets.json`)가 있으면 i2i(`openai/gpt-image-2/edit` + 참조 이미지)로 라우팅하게 되어 있는데, 그 매니페스트를 만들던 스테이지가 리팩토링 때 삭제되어 있었다. 그 결과 실험은 매니페스트 없는 경로 — **순수 T2I** — 로 흘렀고, 샷마다 스타일·의상·공간이 제각각인 쓰레기 프레임이 그대로 영상 입력으로 들어갔다. 우리가 측정한 것은 "현행 제품의 실력"이 아니라 "배선이 끊긴 제품의 사고 현장"이었다. (아래 샷 블록마다 붙은 v1 참고 썸네일이 그 사고 현장의 실물이다.)
 
 제품이 원래 의도한 배선은 이렇다:
 
 > artist 탭의 정본 이미지(캐릭터 시트 + 배경) + writer 샷 프롬프트 → i2i → 샷 시작 프레임 → 영상
 
-### 이 팔의 의도
+### A안(07-24 초판)의 문제 — 손 복원 모조
 
-ORIGIN 팔은 그 배선을 손으로 복원한 상태에서 **현행 제품 실력을 재측정**한다. writer가 만든 프롬프트는 한 글자도 고치지 않고(제품이 쓴 프롬프트가 측정 대상), 끊겨 있던 참조 이미지 연결만 되살린다. 즉 "매니페스트 스테이지가 삭제되지 않았다면 제품이 냈을 결과"의 근사치다.
+07-24 초판(A안)은 사람이 image_prompt를 읽고 샷마다 참조를 골라, 실험 도구(stage_origin.mjs)가 i2i를 대행하는 설계였다. 문제는 미스매치다: **참조의 출처**(실험 폴더의 파일)와 **선택 주체**(사람 판단)가 제품과 다르다. 그 상태로 측정하면 대상이 "제품"이 아니라 "제품 + 사람 모조"가 된다.
 
-### 가설 (사전 고정)
+이건 관념적 우려가 아니라 실측으로 확인된 격차다. writer의 실제 참조 지정(`reference_assets`, 아래 §4 로그)과 A안의 사람 표는 4개 샷에서 갈렸다:
+
+- shot_10 — 사람: 무참조(T2I 유지) / writer: 장소 참조 지정
+- shot_13·15 — 사람: 정본만 / writer: 장소 참조 포함
+- shot_20 — 사람: 플레이트만 / writer: girl 포함
+
+### B안 결정 (2026-07-31, 오너)
+
+> 제품을 먼저 수리하고, 수리된 실백엔드를 정직하게 실행한다.
+
+끊어진 배선을 실험 폴더에서 모조하는 게 아니라 **제품 코드에서 수리**하고(§2 선행 수리), 실험 정본을 artist 산출 대행으로 DB에 시딩한 뒤(§3 정본 시딩), 제품의 이미지 스테이지(`runShotImages`)를 그대로 재실행한다. 참조 선택을 포함한 모든 판단이 제품 몫이므로 **실험 결과가 곧 제품 결과**다 — A안의 "제품+사람 모조" 오염이 구조적으로 사라진다.
+
+### 가설 (사전 고정, 유지)
 
 > 정본 i2i 배선을 복원하면 BASE의 신원·스타일 드리프트는 사라지지만, 연출(카메라·컷 연결) 품질은 여전히 사람판(BKM)에 못 미친다.
 
@@ -48,62 +61,95 @@ ORIGIN 팔은 그 배선을 손으로 복원한 상태에서 **현행 제품 실
 
 ---
 
-## 2. 공통 재료
+## 2. 선행 수리 (I9) — DB→v6 참조 연결 복원
+
+**이 수리가 끝나야 이 팔을 실행할 수 있다.** 수리는 실험용 우회가 아니라 제품의 원래 의도 배선 복원이다.
+
+### 끊어진 지점의 실체 (조사 확정)
+
+- `src/lib/writer/pipeline/stages/v6_images.ts:49-55`는 참조 매핑을 `14b_assets.json` **파일에서만** 찾는다.
+- 그 파일을 만들던 `assets_generate.ts`는 커밋 `f9fadf8`에서 **의도적으로 삭제**됐다(정본 생성은 artist 탭 담당으로 이동한 설계 변경). 남은 문제는 DB→v6 연결 코드가 미구현이라는 것뿐이다.
+- 참조가 잡히면 모델이 `openai/gpt-image-2/edit`(i2i)로 자동 전환되는 라우팅은 **살아 있다**.
+- ID 정합은 이미 성립한다: DB `characters.character_id` = canonical ID("girl", "doppelganger"), `locations.location_id` = "새벽 공중화장실" — persist_manifest.ts가 같은 ID 공간으로 기록한다(주석 "referential 정합"). 이미지 컬럼은 `characters.view_main`(string|null), `locations.wide_shot`(string|null) — types/database.ts에서 실재 확인.
+
+### 수리 사양
+
+- v6의 매니페스트 로드를 **"DB에서 조립 + 레거시 `14b_assets.json` 폴백"**으로 교체한다:
+  - `characters.character_id` → `view_main`, `locations.location_id` → `wide_shot`으로 canonical ID→이미지 매핑을 조립.
+  - DB에 이미지가 없으면(빈칸) 기존과 동일하게 레거시 파일 폴백 → 그것도 없으면 현행 T2I 경로.
+- 수정 파일: `src/lib/writer/pipeline/stages/v6_images.ts` (+ DB 조회 lib 함수 1개 신설).
+
+---
+
+## 3. 정본 시딩 — artist 산출 대행
+
+실험 프로젝트(`2026-07-23_14-25-51_bzb8`)는 artist 단계를 타지 않았으므로 `view_main`/`wide_shot`이 빈칸(null)이다. 실험 정본 세트를 artist 산출 대행으로 DB에 등록한다:
+
+| canonical ID | 컬럼 | 값 |
+|---|---|---|
+| girl | `characters.view_main` | identity_ref ([../2026-07-23_character-canon/assets/identity_ref.jpg](../2026-07-23_character-canon/assets/identity_ref.jpg)) |
+| doppelganger | `characters.view_main` | identity_ref — 시나리오상 동일 외모 1인 2역이므로 같은 정본 |
+| 새벽 공중화장실 | `locations.wide_shot` | plate ([../2026-07-23_input-format/assets/plates/src_empty_wide.jpg](../2026-07-23_input-format/assets/plates/src_empty_wide.jpg)) |
+
+- 도구: `tools/seed_canon.mjs` (설계도에는 사양만, 승인 후 구현) — upsert, 멱등(재실행 안전).
+- 이 시딩이 이 팔에서 사람 손이 들어가는 유일한 지점이며, 제품 정의상 artist 탭이 하는 일의 대행이므로 측정 오염이 아니다.
+
+---
+
+## 4. 공통 재료
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg)
 
-왼쪽부터: **정본 캐릭터(identity_ref)** · **배경 플레이트(plate)** — 20샷 전체가 이 두 장을 공유한다.
+왼쪽부터: **정본 캐릭터(identity_ref)** · **배경 플레이트(plate)** — §3 시딩으로 DB에 등록되어 20샷 전체가 공유한다.
 
-모든 경로는 이 문서 기준 상대경로.
+모든 경로는 이 문서 기준 상대경로(로그·소스는 리포 루트 기준 표기).
 
 | 재료 | 경로 | 비고 |
 |---|---|---|
 | writer 산출 20샷 | [../2026-07-23_full-copy-bundle/assets/arm-base/shots.json](../2026-07-23_full-copy-bundle/assets/arm-base/shots.json) | **재사용, 재실행 없음** — FRAMEFIX 팔과 동일 재료를 써야 비교가 성립. 20샷 · 총 74초 |
-| 정본 캐릭터 | [../2026-07-23_character-canon/assets/identity_ref.jpg](../2026-07-23_character-canon/assets/identity_ref.jpg) | 이하 "identity_ref". 위 썸네일 왼쪽 |
-| 배경 플레이트 | [../2026-07-23_input-format/assets/plates/src_empty_wide.jpg](../2026-07-23_input-format/assets/plates/src_empty_wide.jpg) | 빈 화장실 와이드. 이하 "plate". 위 썸네일 오른쪽 |
+| writer 참조 지정 실측 | `logs/2026-07-23_14-25-51_bzb8/14_v5_renderPrompts.json` (리포 루트 기준) | `shots[].t2i.reference_assets` — 샷별 canonical ID 지정의 원천. §5 각 블록에 원문 수록 |
+| 정본 캐릭터 | [../2026-07-23_character-canon/assets/identity_ref.jpg](../2026-07-23_character-canon/assets/identity_ref.jpg) | 이하 "identity_ref". §3 시딩으로 girl·doppelganger의 `view_main`에 등록 |
+| 배경 플레이트 | [../2026-07-23_input-format/assets/plates/src_empty_wide.jpg](../2026-07-23_input-format/assets/plates/src_empty_wide.jpg) | 빈 화장실 와이드. 이하 "plate". §3 시딩으로 새벽 공중화장실의 `wide_shot`에 등록 |
 | v1 참고 썸네일 | `assets/thumbs/base_NN.jpg` | v1 무효 팔(BASE)의 T2I 산출 19장 — **이번 입력 아님**, 샷 파악용. 02는 4회 차단으로 산출 없음 |
 | jobs 스키마 전례 | [../2026-07-23_full-copy-bundle/jobs.base.json](../2026-07-23_full-copy-bundle/jobs.base.json) | task `i2v_se` · image · seconds · aspect `16:9` · out |
-| i2i 스테이징 패턴 전례 | [../2026-07-23_full-copy-bundle/tools/stage_bkm.mjs](../2026-07-23_full-copy-bundle/tools/stage_bkm.mjs) | fal `openai/gpt-image-2/edit`, 참조 업로드·resume 방식 |
 
 모델·레인:
 
-- **이미지(i2i)**: fal `openai/gpt-image-2/edit` · `image_size: landscape_16_9` · 출력 png. 프롬프트는 shots.json의 `image_prompt` **원문 그대로(한 글자도 수정 금지)** + 샷별 참조 이미지(샷 블록에 명시).
-- **이미지(T2I, shot_10 한정)**: fal `openai/gpt-image-2` — 참조 없음. BASE 프레임 스테이징과 동일 모델·동일 조건.
+- **이미지**: 수리된 v6(`runShotImages`) 경유 — writer 지정 참조가 DB에서 잡히므로 20샷 전부 fal `openai/gpt-image-2/edit`(i2i)로 자동 라우팅 · `image_size: landscape_16_9` · 출력 png. 프롬프트는 shots.json의 `image_prompt` **원문 그대로**(제품이 쓴 프롬프트를 제품이 그대로 사용 — 실험이 손대지 않는다).
 - **영상**: Seedance 2.0, **힉스필드 레인**(`dispatch.mjs --mode higgsfield`, jobType `seedance_2_0`, 720p) · task `i2v_se`(끝 프레임 없음) · seconds = `duration_seconds` 그대로. 전례: jobs.base.json이 2~7초 값으로 19/19 완주.
 - **편집 없음**: 제품 정의 그대로 생성 순서·길이로 이어붙임. 트리밍·재배열·속도 조정 일절 없음.
 
+참조 선정 주체는 **writer**다:
+
+- renderPrompts의 `shots[].t2i.reference_assets`가 샷마다 canonical ID를 지정한다(위 로그 실측). 특기할 점 둘 — writer가 doppelganger를 오픈 캐스트로 **스스로 추가**했고(1인 2역), 암전 샷(shot_10)에도 장소 참조를 넣었다.
+- 07-24판(A안)의 사람 판단 참조 표는 **전면 삭제**했다. §5 각 샷 블록에 writer 실측 원문을 그대로 수록한다.
+
 산출 경로(실험 루트 = 이 문서가 있는 폴더):
 
-- 시작 프레임: `assets/arm-origin/frames/NN.png`
+- 시작 프레임: 제품 산출을 회수해 `assets/arm-origin/frames/NN.png`
 - 클립: `assets/clips/arm-origin/NN.mp4` (jobs의 `out`은 assets 기준 `clips/arm-origin/NN.mp4`)
 - 잡 파일: `jobs.origin.json` (실험 루트)
-
-참조 선정 규칙(샷별 판단은 각 블록에 개별 명시):
-
-1. 인물(신체 일부 포함: 손·발·양말 등)이 등장하는 샷 → identity_ref 포함
-2. 공간(화장실)이 보이는 샷 → plate 포함
-3. 완전 암전·추상 샷 → 참조 없음(T2I 유지), 근거 명시
 
 shot_2 특례: 지난번 fal T2I에서 4회 연속 content_policy_violation(422)으로 차단돼 Ⓑ 확정·제외됐던 샷. 이번엔 **포함**한다 — edit 레인 + 참조라 재시도 가치가 있다. 재차단 시 처리는 지난 규칙 유지: 동일 입력 4회 재시도 후에도 차단이면 Ⓑ 분류·제외.
 
 ---
 
-## 3. 샷별 설계 (본체)
+## 5. 샷별 설계 (본체)
 
 ### 샷 01 — shot_1 · 5초 → `clips/arm-origin/01.mp4`
 
 ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_01.jpg)
 
-왼쪽부터: **i2i 참조 ① 플레이트(단독)** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Establish the clinical, eerie atmosphere of the retro-pastel restroom at dawn.
 - **카메라(writer 산출)**: `{"type":"WS","angle":"eye_level","movement":"static"}` · 구도: The vanishing point at the center of the restroom corridor. · 무드: Desaturated pastels with a cold, clinical blue undertone.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 1장(플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/01.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 인물 없는 빈 화장실 와이드 샷. 공간이 프레임 전체이므로 플레이트만. identity_ref는 넣을 근거 없음.
+- 참조 (writer 지정, `reference_assets` 원문): `["새벽 공중화장실"]` → plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/01.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -144,17 +190,17 @@ The overhead fluorescent lights flicker subtly in the empty, silent restroom.
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본** · **i2i 참조 ② 플레이트** (v1 산출 없음 — 4회 차단됐던 샷)
+왼쪽부터: **writer 지정 참조 ① 정본(girl)** · **writer 지정 참조 ② 플레이트** (v1 산출 없음 — 4회 차단됐던 샷)
 
 - **행동**: Introduce the protagonist into the sterile environment, emphasizing her isolation.
 - **카메라(writer 산출)**: `{"type":"MFS","angle":"eye_level","movement":"static"}` · 구도: The girl as she enters the frame. · 무드: Maintain the cold dawn light, highlighting the pale blue of the dress.
 - **특례**: 지난번 fal T2I에서 4회 연속 차단(422 content_policy_violation)돼 제외됐던 샷. 이번엔 edit 레인 + 참조로 재시도. 재차단 시 동일 입력 4회 재시도 후 Ⓑ 분류·제외(지난 규칙 유지).
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 2장(정본+플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/02.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 주인공이 화면에 등장("a young woman with a black bob entering") → 정본. 민트 타일 화장실 공간이 배경 전체 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["girl","새벽 공중화장실"]` → identity_ref + plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/02.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -195,16 +241,16 @@ The girl walks steadily across the tile floor toward the sinks.
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_03.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본** · **i2i 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(girl)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Create suspense by showing the girl's ignorance of the ghostly whisper coming from below.
 - **카메라(writer 산출)**: `{"type":"MCU","angle":"eye_level","movement":"static"}` · 구도: The girl's eyes in the mirror reflection. · 무드: Focus on the pink of the lip gloss and the pale blue of her dress reflection.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 2장(정본+플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/03.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 거울에 비친 주인공 얼굴이 프레임 중심("the girl's reflection", 단발·초커) → 정본. 배경 반영에 민트 타일 벽이 보임 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["girl","새벽 공중화장실"]` → identity_ref + plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/03.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -245,16 +291,16 @@ The girl slowly applies lip gloss to her lips while staring blankly at her refle
 
 ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_04.jpg)
 
-왼쪽부터: **i2i 참조 ① 플레이트(단독)** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Identify the source of the whisper, grounding the horror in a physical object.
 - **카메라(writer 산출)**: `{"type":"ECU","angle":"high_angle","movement":"static"}` · 구도: The center of the drain hole. · 무드: High contrast between the bright sink and the absolute black of the drain.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 1장(플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/04.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 인물 없음, 화장실 설비(세면볼·배수구) 클로즈업이므로 공간의 재질·색만 정박 → 플레이트. identity_ref는 넣을 근거 없음.
+- 참조 (writer 지정, `reference_assets` 원문): `["새벽 공중화장실"]` → plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/04.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -295,16 +341,16 @@ The camera remains perfectly still on the dark, yawning hole of the drain.
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_05.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본** · **i2i 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(girl)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Conclude the scene with the girl's unsettling normalcy, leaving the audience in dread.
 - **카메라(writer 산출)**: `{"type":"MS","angle":"eye_level","movement":"static"}` · 구도: The girl's face. · 무드: A slightly colder, more clinical blue tone to end the scene.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 2장(정본+플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/05.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 주인공이 프레임 중심("the girl", 드레스·헤어) → 정본. 민트 타일 화장실 공간이 배경 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["girl","새벽 공중화장실"]` → identity_ref + plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/05.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -345,16 +391,16 @@ The girl adjusts her hair with a blank expression before the scene fades.
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_06.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본** · **i2i 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(girl)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Visualize the girl's sudden isolation and the eerie realization of an uncanny presence in the empty space.
 - **카메라(writer 산출)**: `{"type":"MCU","angle":"eye_level","movement":"static"}` · 구도: The girl's eyes in the mirror reflection. · 무드: Cool dawn tones with a hint of retro pastel blue to enhance the quiet dread.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 2장(정본+플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/06.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 거울 앞 주인공("a young woman with a sharp black bob") → 정본. 배경에 빈 칸막이·타일 공간이 보임 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["girl","새벽 공중화장실"]` → identity_ref + plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/06.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -395,16 +441,16 @@ The girl remains completely frozen, her eyes subtly shifting to scan the reflect
 
 ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_07.jpg)
 
-왼쪽부터: **i2i 참조 ① 플레이트(단독)** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Clearly identify the source of the whisper, transforming a vague feeling into a specific, localized threat.
 - **카메라(writer 산출)**: `{"type":"ECU","angle":"high_angle","movement":"static"}` · 구도: The center of the drain grating. · 무드: High contrast to emphasize the darkness within the drain.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 1장(플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/07.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 인물 없음, 바닥 배수구 그레이팅과 주변 타일뿐이므로 공간 재질·색만 정박 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["새벽 공중화장실"]` → plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/07.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -445,16 +491,16 @@ A static shot focusing on the dark void of the drain as the shadows within seem 
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_08.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본** · **i2i 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(girl)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Escalate suspense by showing the character's fatal curiosity as she draws closer to the source of the voice.
 - **카메라(writer 산출)**: `{"type":"CU","angle":"low_angle","movement":"dolly_in"}` · 구도: The girl's ear and her wide, anxious eye. · 무드: Deepen the cool blues while introducing a faint magenta glow in the shadows.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 2장(정본+플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/08.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 주인공 얼굴 클로즈업("the girl's face", 초커·단발) → 정본. 배경에 화장실의 각진 선들이 보임 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["girl","새벽 공중화장실"]` → identity_ref + plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/08.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -495,16 +541,16 @@ The camera slowly dollys in as the girl leans her head down toward the sink, bri
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_09.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본** · **i2i 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(girl)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Capture the peak of the girl's curiosity and tension as she investigates the source of the sound.
 - **카메라(writer 산출)**: `{"type":"MS","angle":"low_angle","movement":"handheld_drift"}` · 구도: The girl's hands near the pipes · 무드: Cold dawn blue tones with high contrast shadows.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 2장(정본+플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/09.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 주인공 전신이 등장("a young woman with a black bob, wearing a pale blue satin slip dress") → 정본. 세면대 하부·타일 등 화장실 공간이 보임 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["girl","새벽 공중화장실"]` → identity_ref + plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/09.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -543,19 +589,19 @@ The girl leans deeper into the shadows while the camera drifts slightly forward.
 
 ### 샷 10 — shot_10 · 2초 → `clips/arm-origin/10.mp4`
 
-![](assets/thumbs/base_10.jpg)
+![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_10.jpg)
 
-**참조 없음(T2I)** — 위 이미지는 (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과일 뿐, 이번 입력 아님. 이 샷은 이번에도 참조 없이 생성한다.
+왼쪽부터: **writer 지정 참조 ① 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Shock the audience with a sensory blackout and a brief flash of violence.
 - **카메라(writer 산출)**: `{"type":"POV","angle":"eye_level","movement":"static"}` · 구도: The center of the frame · 무드: Pitch black interrupted by an aggressive, saturated magenta burst.
 
-**1단계 · 시작 프레임 생성 (T2I — 참조 없음)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 아래 프롬프트만(참조 없음) → `openai/gpt-image-2` (fal, T2I — edit 아님, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/10.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 완전 암전 POV 샷. 프레임에 인물도 공간 표면도 없으므로(칠흑 + 희미한 금속 질감뿐) 정본과 대조할 시각 정보가 없고, 참조를 넣으면 오히려 암전을 깨뜨릴 위험이 있다. T2I 유지.
-- 열린 결정: BASE 팔의 `frames/10.png`(위 참고 썸네일의 원본)가 동일 프롬프트·동일 무참조 T2I로 이미 존재한다. 재사용하면 콜 1회 절약 + 조건 동일. 신규 생성 vs 재사용은 오너 결정 대기.
+- 참조 (writer 지정, `reference_assets` 원문): `["새벽 공중화장실"]` → plate (§3 시딩 기준)
+- 특기: writer는 이 완전 암전 샷에도 장소 참조를 지정했다. 제품 결정을 그대로 따르는 것이 이 팔의 정의다. (07-24판의 "참조가 암전을 깨뜨릴 위험 → 무참조 T2I 유지" 사람 판단은 B안 전환으로 폐기)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/10.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -596,16 +642,16 @@ A sharp magenta flash bursts across the screen then fades into darkness.
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_11.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본** · **i2i 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(girl·doppelganger — 동일 시딩)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Establish the uncanny presence of the doppelganger and the girl's defeat.
 - **카메라(writer 산출)**: `{"type":"WS","angle":"high_angle","movement":"handheld_drift"}` · 구도: The doppelganger's standing figure · 무드: Desaturated, clinical dawn light with deep blue shadows.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 2장(정본+플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/11.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 인물 2명(쓰러진 소녀 + 도플갱어)이 모두 동일 인물이므로 정본 1장이 둘 다 커버(BKM 팔 2인 샷 전례와 동일 처리). 하이앵글 와이드로 화장실 공간 전체가 보임 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["girl","doppelganger","새벽 공중화장실"]` → identity_ref(두 ID 모두 동일 시딩, 1인 2역) + plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/11.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -646,16 +692,16 @@ The doppelganger stands perfectly still while the camera breathes with a handhel
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_12.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본** · **i2i 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(girl·doppelganger — 동일 시딩)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Demonstrate the doppelganger's cold, mechanical efficiency in disposing of the original.
 - **카메라(writer 산출)**: `{"type":"MFS","angle":"eye_level","movement":"handheld_drift"}` · 구도: The doppelganger's hand on the girl's arm · 무드: Clinical, muted tones to match the emotionless action.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 2장(정본+플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/12.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 동일 인물 2명(끌고 가는 도플갱어 + 끌려가는 소녀), 정본 1장이 둘 다 커버. 배경에 각진 화장실 칸막이가 보임 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["girl","doppelganger","새벽 공중화장실"]` → identity_ref(두 ID 모두 동일 시딩, 1인 2역) + plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/12.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -694,18 +740,18 @@ The doppelganger slowly drags the limp body across the floor toward the left.
 
 ### 샷 13 — shot_13 · 4초 → `clips/arm-origin/13.mp4`
 
-![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/base_13.jpg)
+![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_13.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본(단독)** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(doppelganger)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Final reveal of the doppelganger's perfect, terrifying lack of emotion.
 - **카메라(writer 산출)**: `{"type":"CU","angle":"eye_level","movement":"handheld_drift"}` · 구도: Doppelganger's eyes · 무드: High contrast, emphasizing the pale skin and dark hair.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 1장(정본 단독) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/13.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 얼굴 익스트림 클로즈업(단발·초커·드레스 어깨선) → 정본. image_prompt에 화장실 표면이 전혀 등장하지 않으므로 plate는 넣을 근거 없음.
+- 참조 (writer 지정, `reference_assets` 원문): `["doppelganger","새벽 공중화장실"]` → identity_ref(doppelganger) + plate (§3 시딩 기준. 07-24판 사람 표는 "정본만"이었으나 writer는 장소 참조도 지정 — writer 실측을 따름)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/13.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -746,16 +792,16 @@ The doppelganger stares into the camera with absolute stillness and no blinking.
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_14.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본** · **i2i 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(doppelganger·girl — 동일 시딩)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: To emphasize the physical weight and total lack of life in the victim's body through a grounding floor-level perspective.
 - **카메라(writer 산출)**: `{"type":"FS","angle":"low_angle","movement":"handheld_drift"}` · 구도: The point of contact between the girl's shoulder and the floor. · 무드: Cold, clinical dawn light with harsh magenta shadows in the corners.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 2장(정본+플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/14.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 동일 인물 2명(내려놓는 도플갱어 + 축 늘어진 소녀) → 정본 1장이 둘 다 커버. 바닥 타일 등 화장실 공간이 보임 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["doppelganger","girl","새벽 공중화장실"]` → identity_ref(두 ID 모두 동일 시딩, 1인 2역) + plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/14.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -794,18 +840,18 @@ The doppelganger slowly lowers the limp body of the girl onto the tiles with a h
 
 ### 샷 15 — shot_15 · 2초 → `clips/arm-origin/15.mp4`
 
-![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/base_15.jpg)
+![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_15.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본(단독)** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(doppelganger)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: Highlight the uncanny and fetishistic detachment of the antagonist through a close-up of a stolen personal item.
 - **카메라(writer 산출)**: `{"type":"ECU","angle":"eye_level","movement":"handheld_drift"}` · 구도: The angular toe of the black Mary Jane heel. · 무드: High contrast with magenta highlights reflecting off the black leather.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 1장(정본 단독) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/15.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 신체 일부(창백한 손)가 등장하므로 인물 참조 규칙 적용 → 정본. 배경은 흐릿한 새틴뿐이고 image_prompt에 화장실 표면이 없으므로 plate는 넣을 근거 없음.
+- 참조 (writer 지정, `reference_assets` 원문): `["doppelganger","새벽 공중화장실"]` → identity_ref(doppelganger) + plate (§3 시딩 기준. 07-24판 사람 표는 "정본만"이었으나 writer는 장소 참조도 지정 — writer 실측을 따름)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/15.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -846,16 +892,16 @@ The hand subtly tightens its grip on the shoe while the camera drifts slightly f
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_16.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본** · **i2i 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(doppelganger)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: To build dread through a prolonged moment of unnatural stillness and psychological void.
 - **카메라(writer 산출)**: `{"type":"MS","angle":"eye_level","movement":"handheld_drift"}` · 구도: The doppelganger's eyes. · 무드: Desaturated blues and pinks with deep, oppressive shadows.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 2장(정본+플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/16.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 도플갱어가 프레임 중심(드레스·표정) → 정본. 화장실 칸 내부(변기·각진 타일)가 보임 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["doppelganger","새벽 공중화장실"]` → identity_ref(doppelganger) + plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/16.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -896,16 +942,16 @@ The doppelganger remains unnervingly still, staring blankly as the camera drifts
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_17.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본** · **i2i 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(doppelganger)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: To signify the completion of the 'replacement' and the abandonment of the original girl.
 - **카메라(writer 산출)**: `{"type":"MFS","angle":"eye_level","movement":"tracking"}` · 구도: The doppelganger's back as she walks away. · 무드: Cold blue dominance with a final flash of magenta from the overhead lights.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 2장(정본+플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/17.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 도플갱어 전신(드레스·흰 양말) → 정본. 칸막이·타일 바닥 등 화장실 공간이 보임 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["doppelganger","새벽 공중화장실"]` → identity_ref(doppelganger) + plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/17.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -946,16 +992,16 @@ The doppelganger walks away with a cold, steady pace as the stall door swings sh
 
 ![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_18.jpg)
 
-왼쪽부터: **i2i 참조 ① 정본** · **i2i 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(doppelganger)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: To convey a sense of uncanny detachment by showing the doppelganger's mechanical and indifferent movement as she replaces the original girl.
 - **카메라(writer 산출)**: `{"type":"MS","angle":"eye_level","movement":"static"}` · 구도: The doppelganger's face · 무드: Cool and clinical, emphasizing the pale blue tones to match the dawn light.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 2장(정본+플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/18.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 도플갱어가 프레임 중심("a girl with a black bob and pale blue satin slip dress") → 정본. 거울·각진 타일 벽 등 화장실 공간이 보임 → 플레이트.
+- 참조 (writer 지정, `reference_assets` 원문): `["doppelganger","새벽 공중화장실"]` → identity_ref(doppelganger) + plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/18.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -996,16 +1042,16 @@ The doppelganger walks steadily across the frame with mechanical indifference, e
 
 ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_19.jpg)
 
-왼쪽부터: **i2i 참조 ① 플레이트(단독)** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: To create a vacuum of sound and presence, heightening the dread through the sudden emptiness of the space.
 - **카메라(writer 산출)**: `{"type":"WS","angle":"eye_level","movement":"static"}` · 구도: The closing door · 무드: Desaturated and hollow, emphasizing the lack of life in the room.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 1장(플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/19.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: 인물 없는 빈 화장실 와이드(닫히는 문만). 공간이 프레임 전체이므로 플레이트만.
+- 참조 (writer 지정, `reference_assets` 원문): `["새벽 공중화장실"]` → plate (§3 시딩 기준)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/19.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -1044,18 +1090,18 @@ The restroom door swings shut slowly, clicking into place, leaving the room comp
 
 ### 샷 20 — shot_20 · 4초 → `clips/arm-origin/20.mp4`
 
-![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_20.jpg)
+![](assets/thumbs/ref_identity.jpg) ![](assets/thumbs/ref_plate.jpg) ![](assets/thumbs/base_20.jpg)
 
-왼쪽부터: **i2i 참조 ① 플레이트(단독)** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
+왼쪽부터: **writer 지정 참조 ① 정본(girl)** · **writer 지정 참조 ② 플레이트** · (참고) v1 무효 팔이 이 샷을 T2I로 뽑았던 결과 — 이번 입력 아님, 이 샷이 무엇인지 감 잡는 용도
 
 - **행동**: To deliver the final chilling revelation that the original girl is still there, discarded and forgotten.
 - **카메라(writer 산출)**: `{"type":"CU","angle":"low_angle","movement":"dolly_in"}` · 구도: The white crew socks and black Mary Jane heels · 무드: The warmest but most ominous tone, with deep shadows creeping from the stall.
 
-**1단계 · 시작 프레임 생성 (i2i)**
+**1단계 · 시작 프레임 생성 (수리된 v6 → i2i)**
 
-- 넣는 것: 위 참조 이미지 1장(플레이트) + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`)
-- 나오는 것: `assets/arm-origin/frames/20.png` ← **이 파일이 2단계 영상의 입력이 된다**
-- 참조 선정 근거: image_prompt에는 칸막이 문 아래 틈과 타일 바닥만 있고 인물·신체 요소가 없으므로 플레이트만. 구도(composition) 필드는 양말·구두를 지목하지만 발이 드러나는 것은 video_prompt(달리 인 후반)의 일이고, 시작 프레임의 측정 대상은 image_prompt다. 인물 없는 프롬프트에 identity_ref를 붙이면 모델이 인물을 지어 넣을 위험이 있어 배제. (이 판단은 오너 확인 포인트 — 아래 열린 결정 참조)
+- 참조 (writer 지정, `reference_assets` 원문): `["girl","새벽 공중화장실"]` → identity_ref + plate (§3 시딩 기준. 07-24판 사람 표는 "플레이트만"이었으나 writer는 girl을 지정 — 구도의 양말·구두와 정합, writer 실측을 따름)
+- 넣는 것: 위 참조 + 아래 프롬프트 → `openai/gpt-image-2/edit` (fal, `image_size: landscape_16_9`) — 참조는 **수리된 v6(runShotImages)가 DB에서 스스로 조회**해 첨부, 실험 도구는 개입하지 않음
+- 나오는 것: 제품 산출 프레임을 회수해 `assets/arm-origin/frames/20.png` ← **이 파일이 2단계 영상의 입력이 된다**
 
 프롬프트 원문 (`image_prompt`, 무수정):
 
@@ -1094,11 +1140,24 @@ The camera slowly dollies forward toward the stall gap, revealing the motionless
 
 ---
 
-## 4. 실행 스펙
+## 6. 실행 스펙
 
-### 4-1. jobs.origin.json 스키마
+### 6-1. 실행 절차 (B안)
 
-실험 루트의 `jobs.origin.json`은 위 20개 조각의 배열이다(전례: [../2026-07-23_full-copy-bundle/jobs.base.json](../2026-07-23_full-copy-bundle/jobs.base.json)). 필드:
+07-24판(A안)의 모조 스테이징 도구 사양(tools/stage_origin.mjs)은 **폐기**한다. 실행은 다음 4단계다:
+
+1. **선행 수리** — §2(I9) 구현: `v6_images.ts` 매니페스트 로드를 DB 조립 + 레거시 폴백으로 교체 (제품 코드 수정).
+2. **정본 시딩** — §3: `tools/seed_canon.mjs`로 girl/doppelganger `view_main` = identity_ref, 새벽 공중화장실 `wide_shot` = plate 등록 (upsert, 멱등).
+3. **이미지 스테이지 재실행** — 기존 vitest 하네스 패턴(전례: [../2026-07-23_full-copy-bundle/tools/run-writer-base.test.ts](../2026-07-23_full-copy-bundle/tools/run-writer-base.test.ts))으로 `runShotImages`만 재호출. projectId `2026-07-23_14-25-51_bzb8` 고정 — writer 파이프라인은 resume 캐시라 **LLM 재호출 없음**, 이미지 스테이지만 돈다.
+4. **프레임 회수 → 영상 발사** — 제품 산출 프레임 20장을 `assets/arm-origin/frames/NN.png`로 회수하고 `jobs.origin.json`을 생성한 뒤, QC 게이트(§7) 통과 후 디스패처 발사(아래 6-3).
+
+**배선 검증 포인트**: 3단계 실행 로그의 model이 `openai/gpt-image-2/edit`로 찍히면 수리 성공이다. (무효 BASE 실행 때는 T2I `openai/gpt-image-2`로 찍혔다 — 이 로그 한 줄이 두 팔의 배선 차이를 증명한다.)
+
+재시도 규칙: 콘텐츠 차단(422 content_policy_violation)은 동일 입력 최대 4회, 그 외 오류는 2회. 4회 차단 시 Ⓑ 분류·해당 샷 제외 후 계속 (shot_2 특례 — §4).
+
+### 6-2. jobs.origin.json 스키마
+
+실험 루트의 `jobs.origin.json`은 §5의 20개 조각의 배열이다(전례: [../2026-07-23_full-copy-bundle/jobs.base.json](../2026-07-23_full-copy-bundle/jobs.base.json)). 필드:
 
 | 필드 | 값 | 설명 |
 |---|---|---|
@@ -1112,23 +1171,9 @@ The camera slowly dollies forward toward the stall gap, revealing the motionless
 
 seconds 클램프 주의: 힉스필드 레인 디스패처(`utils/tools/gen/providers/higgsfield.mjs`)는 `i2v_se`에서 duration을 `min 4 · max 15 · 반올림`으로 클램프한다. 즉 4초 미만 9개 샷(04·07·09·10·14·15·17·18·19)은 실제로 4초 클립으로 돌아온다. 이는 BASE 팔(19/19 완주)과 동일한 처리라 팔 간 비교에는 영향이 없고, 편집 없음 원칙에 따라 반환 길이 그대로 이어붙인다.
 
-### 4-2. i2i 스테이징 도구 — tools/stage_origin.mjs (신규, 설계도에는 사양만)
+### 6-3. 영상 디스패치 커맨드
 
-[stage_bkm.mjs](../2026-07-23_full-copy-bundle/tools/stage_bkm.mjs) 패턴을 따르는 신규 도구. 이 문서 승인 후 구현한다.
-
-- 입력: `../2026-07-23_full-copy-bundle/assets/arm-base/shots.json` + 본 문서 §3의 샷별 참조 테이블(코드 내 상수로 고정)
-- 모델: fal `openai/gpt-image-2/edit` (shot_10만 `openai/gpt-image-2` T2I) · `image_size: landscape_16_9`
-- 프롬프트: `image_prompt` 원문 그대로 전달. 래퍼 문장·참조 설명문 추가 금지(stage_bkm은 자체 프롬프트를 합성했지만, ORIGIN은 제품 프롬프트가 측정 대상이라 무수정이 원칙)
-- 참조 업로드: `fal.storage.upload` 1회 업로드 후 URL 캐시(state 파일에 기록, stage_bkm 방식)
-- resume: `assets/origin_state.json` — 샷별 성공 URL·실패 사유 기록, 재실행 시 성공분 스킵
-- 재시도: 콘텐츠 차단(422 content_policy_violation)은 동일 입력 최대 4회, 그 외 오류는 2회. 4회 차단 시 Ⓑ 분류·해당 샷 제외 후 계속
-- 콜 상한: 40 (기본 20콜 + 재시도·QC 재생성 여유)
-- FAL_KEY: stage_bkm과 동일하게 `.env.local`에서 로드
-- 산출: `assets/arm-origin/frames/NN.png` 20장 + `jobs.origin.json` (Ⓑ 제외분 반영)
-
-### 4-3. 영상 디스패치 커맨드
-
-프레임 20장이 QC 게이트(§5)를 통과한 뒤 발사:
+프레임 20장이 QC 게이트(§7)를 통과한 뒤 발사:
 
 ```bash
 node research/experiments/utils/tools/gen/dispatch.mjs \
@@ -1137,33 +1182,33 @@ node research/experiments/utils/tools/gen/dispatch.mjs \
   --mode higgsfield --hf-concurrency 4 --hf-cap 80
 ```
 
-### 4-4. 예산 추정
+### 6-4. 예산 추정
 
 | 항목 | 추정 | 근거 |
 |---|---|---|
 | 영상 (힉스필드) | 74초 × 4.6크레딧/초 ≈ **340크레딧** | 총 duration_seconds 74초 기준 |
 | 영상 상한 (클램프 반영) | 최대 86초 ≈ **396크레딧** | 4초 미만 9개 샷이 4초로 클램프될 경우의 생성 초수 상한 |
-| 이미지 (fal, 별도 과금) | **20콜 + 재시도 여유** (상한 40콜) | i2i 19 + T2I 1, shot_2 최대 4회 재시도 + QC 재생성 여유 |
+| 이미지 (수리된 v6 경유, fal 별도 과금) | **20콜 + 재시도 여유** (상한 40콜) | i2i 20 (writer 지정 참조로 전 샷 edit 레인), shot_2 최대 4회 재시도 + QC 재생성 여유 |
 
 ---
 
-## 5. QC 게이트 — 발사 전 프레임 검수
+## 7. QC 게이트 — 발사 전 프레임 검수
 
 영상 디스패치 전, 프레임 20장 전수 검수. 4항목:
 
-1. **신원 정본 대조** — 인물 등장 샷(14개)의 얼굴·검은 단발·은색 초커·연파랑 새틴 드레스·흰 양말을 identity_ref와 대조. 2인 샷(11·12·14)은 두 인물 모두.
+1. **신원 정본 대조** — writer가 인물 참조(girl/doppelganger)를 지정한 15개 샷에서, 프레임에 나타난 인물의 얼굴·검은 단발·은색 초커·연파랑 새틴 드레스·흰 양말을 identity_ref와 대조. 2인 샷(11·12·14)은 두 인물 모두.
 2. **시선 방향** — composition·character_action이 지정한 응시 방향(거울 응시, 렌즈 정면 응시, 배수구 하향 등)과 프레임의 실제 시선 일치 여부.
 3. **소품 접촉** — 립글로스·메리제인 힐·팔 붙잡기 등 프롬프트가 명시한 손·신체와 소품의 접촉 상태가 프레임에서 성립하는지.
 4. **구도** — camera(type·angle)와 composition 필드 대비 실제 프레임 구도(WS/MS/CU/ECU 스케일, 하이/로우 앵글, 프레임 내 배치) 일치 여부.
 
 ### ORIGIN 팔의 QC 원칙 (측정 오염 방지)
 
-ORIGIN은 "제품 자생" 실력 측정이다. 따라서 QC 탈락 시 허용되는 조치는 **동일 입력(같은 프롬프트 + 같은 참조) 재생성뿐이다.** 프롬프트 수기 보정·참조 추가/교체·수동 리터치는 전면 금지 — 사람 손이 한 번이라도 들어가면 측정 대상이 "제품"에서 "제품+사람"으로 바뀌어 측정이 오염된다. 재생성 반복 후에도 탈락이면 마지막 산출을 그대로 쓰고 결함을 결과 문서에 기록한다 — 제품의 실패도 이 팔에서는 데이터다.
+ORIGIN은 "제품 자생" 실력 측정이다. 따라서 QC 탈락 시 허용되는 조치는 **동일 입력 재생성(같은 프롬프트 + 같은 참조 = 동일 이미지 스테이지 재실행)뿐이다.** 프롬프트 수기 보정·참조 추가/교체·수동 리터치는 전면 금지 — 사람 손이 한 번이라도 들어가면 측정 대상이 "제품"에서 "제품+사람"으로 바뀌어 측정이 오염된다. (§3 정본 시딩은 artist 산출 대행이므로 예외 — 제품 정의 안의 입력이다.) 재생성 반복 후에도 탈락이면 마지막 산출을 그대로 쓰고 결함을 결과 문서에 기록한다 — 제품의 실패도 이 팔에서는 데이터다.
 
 ---
 
 ## 열린 결정 (오너 확인 대기)
 
-1. **shot_10 프레임**: 신규 T2I 생성 vs BASE 팔 `frames/10.png` 재사용(동일 프롬프트·동일 무참조 조건, 콜 1회 절약). — §3 샷 10 참조
-2. **shot_20 참조 선정**: image_prompt 기준으로 plate만 채택(인물 요소 없음). composition 필드가 양말·구두를 지목하는 것과 어긋나 보일 수 있어 확인 요청. — §3 샷 20 참조
-3. **QC 재생성 상한**: 샷당 재생성 횟수 상한(제안: 2회, 콜 상한 40 내). 초과 시 마지막 산출 채택 + 결함 기록.
+1. **QC 재생성 상한**: 샷당 재생성 횟수 상한(제안: 2회, 콜 상한 40 내). 초과 시 마지막 산출 채택 + 결함 기록.
+
+(07-24판의 열린 결정이었던 shot_10 프레임 재사용·shot_20 참조 선정은 B안 전환으로 **소멸** — 참조 선택이 제품(writer + 수리된 v6) 몫이 되어 사람이 결정할 대상이 아니다.)

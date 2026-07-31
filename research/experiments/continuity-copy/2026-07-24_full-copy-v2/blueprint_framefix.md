@@ -5,7 +5,8 @@
 - **상태: 오너 확인 대기** (이 문서의 페이로드로 생성 착수하기 전 오너 컨펌 필요 — 유료 호출 없음, 문서만 작성된 상태)
 - 작성일: 2026-07-24
 - 상위 설계: [design.md](design.md)
-- **실행 의존성: ORIGIN 팔의 시작 프레임 스테이징이 먼저 끝나야 한다.** 이 팔의 시작 프레임은 `assets/arm-origin/frames/NN.png`를 그대로 공유하며(재생성 금지), [blueprint_origin.md](blueprint_origin.md)가 해당 파일의 정의·QC를 담당한다. ORIGIN 프레임 20장이 QC를 통과하기 전에는 이 팔의 어떤 생성도 시작하지 않는다.
+- **실행 의존성: ORIGIN 팔의 선행 수리(I9) + 정본 시딩 + 시작 프레임 생성이 먼저 끝나야 한다.** 이 팔의 시작 프레임은 `assets/arm-origin/frames/NN.png` — **수리된 실백엔드(v6)가 writer 자신이 지정한 참조(`reference_assets`)로 생성한 프레임** — 를 그대로 공유하며(재생성 금지), [blueprint_origin.md](blueprint_origin.md)가 해당 파일의 정의·QC를 담당한다. ORIGIN 프레임 20장이 QC를 통과하기 전에는 이 팔의 어떤 생성도 시작하지 않는다.
+- 개정 이력: 2026-07-31 — ORIGIN 팔이 B안(제품 수리 I9: 샷 이미지 스테이지가 artist 정본을 DB에서 읽게 배선 → 실백엔드 정직 실행)으로 재정의됨에 따라 시작 프레임 공유·실행 순서 문구만 연동 갱신. **끝 프레임 로직·끝 상태 문장·프롬프트 문자열·jobs 조각은 불변** (이 팔의 유일 변수 = 끝 프레임 정의 유지).
 
 ## 읽는 법
 
@@ -29,7 +30,7 @@
 
 | 팔 | 정의 | 설계도 |
 |---|---|---|
-| ORIGIN | 정본 i2i 배선을 복원한 현행 제품 — 시작 프레임 1장 + writer 모션 프롬프트 | [blueprint_origin.md](blueprint_origin.md) |
+| ORIGIN | 제품 수리(I9: 샷 이미지 스테이지가 artist 정본을 DB에서 읽게 배선) 후 **실백엔드(v6) 정직 실행** — 시작 프레임 1장 + writer 모션 프롬프트, 참조 선정은 writer의 `reference_assets` 자체 결정 | [blueprint_origin.md](blueprint_origin.md) |
 | **FRAMEFIX (이 문서)** | ORIGIN과 1·2단계 동일 + **끝 프레임 한 장 추가** → 영상 모델에 시작·끝 둘 다 고정 | 이 문서 |
 | BKM2 | 원본 분석 기반 사람 고점 | (별도 문서) |
 
@@ -43,7 +44,7 @@
 
 이 팔의 유일 변수는 ORIGIN 대비 **끝 프레임 추가**다. 그 외는 전부 ORIGIN과 동일해야 비교가 성립한다:
 
-- 시작 프레임: ORIGIN과 **같은 파일** (`arm-origin/frames/NN.png` 공유, 재생성 없음)
+- 시작 프레임: ORIGIN과 **같은 파일** (`arm-origin/frames/NN.png` 공유, 재생성 없음 — 수리된 실백엔드(v6)가 생성한 프레임)
 - 모션 프롬프트: shots.json `video_prompt` **원문 그대로** (ORIGIN과 바이트 동일 문자열)
 - 모델: Seedance 2.0 · 레인: 힉스필드 · task: `i2v_se` · seconds: `duration_seconds` 그대로
 - 편집: 없음 (생성 순서·길이 그대로 이어붙임 — ORIGIN과 동일)
@@ -64,10 +65,11 @@
 ### 2-2. 시작 프레임 공유 규약
 
 - 경로: `assets/arm-origin/frames/01.png` ~ `20.png` (assets 기준 상대경로 `arm-origin/frames/NN.png`)
+- 생성 주체: **수리된 실백엔드(v6)** — 샷 이미지 스테이지가 artist 정본을 DB에서 읽도록 수리(I9)된 제품이, **writer 자신이 지정한 참조(`reference_assets`)** 로 시작 프레임을 생성한다. 참조 선정이 사람 표 → 제품 자체 결정으로 바뀌었다 (상세는 [blueprint_origin.md](blueprint_origin.md)).
 - 소유권: **ORIGIN 설계도([blueprint_origin.md](blueprint_origin.md))가 정의·생성·QC** — 이 팔은 읽기 전용으로 참조만 하고 절대 재생성하지 않는다. 파일을 공유하는 것 자체가 통제 변인이다(시작 프레임이 다르면 끝 프레임 효과와 분리 불가).
-- 게이트: ORIGIN 프레임 20장 스테이징+QC 완료 전 이 팔 착수 금지.
+- 게이트: ORIGIN의 선행 수리(I9) + 정본 시딩 + 프레임 20장 생성·QC 완료 전 이 팔 착수 금지.
 
-ORIGIN 1단계(정본 i2i)가 쓰는 정본 참조는 아래 두 장이다 — 이 팔은 이 정본을 직접 쓰지 않고, 그로부터 만들어진 시작 프레임 파일만 공유받는다 (상세 배선은 [blueprint_origin.md](blueprint_origin.md)):
+ORIGIN 쪽에서 DB에 시딩되는 artist 정본 참조는 아래 두 장이다(샷별 실제 사용은 writer의 `reference_assets` 지정을 따른다) — 이 팔은 이 정본을 직접 쓰지 않고, 그로부터 만들어진 시작 프레임 파일만 공유받는다:
 
 ![](assets/thumbs/ref_identity.jpg)
 
@@ -1067,7 +1069,7 @@ The camera slowly dollies forward toward the stall gap, revealing the motionless
 
 ### 4-1. 실행 순서
 
-1. **전제 게이트**: ORIGIN 팔 시작 프레임 20장(`assets/arm-origin/frames/01.png`~`20.png`) 스테이징+QC 완료 확인. 누락·미완이면 착수 금지. shot_2가 ORIGIN에서 제외됐으면 이 팔의 `ff_02_end`·`ff_02`도 잡에서 뺀다(§2-6).
+1. **전제 게이트**: ORIGIN 팔의 선행 수리(I9) + 정본 시딩 + 시작 프레임 20장(`assets/arm-origin/frames/01.png`~`20.png`) 생성·QC 완료 확인 ([blueprint_origin.md](blueprint_origin.md) 실행 스펙과 동일 표기). 누락·미완이면 착수 금지. shot_2가 ORIGIN에서 제외됐으면 이 팔의 `ff_02_end`·`ff_02`도 잡에서 뺀다(§2-6).
 2. **jobs.framefix.json 조립**: 3장의 샷별 조각을 순서대로 이어붙여 배열로 만든다 (`tools/stage_framefix.mjs`가 자동화 — 아래 사양).
 3. **끝 프레임 생성**: 디스패처 `--mode fal --only edit` (fal `openai/gpt-image-2/edit` 20콜).
 4. **QC 게이트 1** (5장): 끝 프레임 20장 사람 검수. 탈락 샷은 동일 입력 재생성 후 재검수.
