@@ -41,6 +41,15 @@ import type {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// DB 쓰기 결과 검증(#persist-guard 2026-07-31) — supabase-js 는 DB 에러를 throw 하지 않고
+//   { error } 로 반환하므로, 결과를 버리면 실패가 조용히 지나간다. 실사고: 미적용 스키마
+//   (shots.static_spec 부재, 42703)로 insert 전체가 거부됐는데 run 은 completed 13/13 —
+//   shots 0행(fe699c5b, 2026-07-31). 크리티컬 쓰기는 전부 이 헬퍼로 실패를 던져
+//   상위(persistShots step 재시도/give-up 로그)에 드러낸다.
+function assertDbOk(op: string, error: { message: string } | null): void {
+  if (error) throw new Error(`[persist] ${op} failed: ${error.message}`)
+}
+
 const DEFAULT_CAMERA = { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }
 const DEFAULT_LIGHTING = { position: 'front', brightness: 50, colorTemp: 5000 }
 
@@ -110,8 +119,18 @@ export async function persistAssetsToDb(
   // 표시 locale — locations/scenes 의 _native 역파생(EN base → 유저 언어, S7)에 공용.
   const locale = await projectLocale(projectId)
   await Promise.all([
-    supabaseAdmin.from('locations').delete().eq('project_id', projectId).neq('origin', 'producer'),
-    supabaseAdmin.from('scenes').delete().eq('project_id', projectId),
+    (async () => {
+      const { error } = await supabaseAdmin
+        .from('locations')
+        .delete()
+        .eq('project_id', projectId)
+        .neq('origin', 'producer')
+      assertDbOk('locations delete', error)
+    })(),
+    (async () => {
+      const { error } = await supabaseAdmin.from('scenes').delete().eq('project_id', projectId)
+      assertDbOk('scenes delete', error)
+    })(),
   ])
 
   // ⚠️ insert 순서 주의: artist 의 loadData 는 `dbChars?.length` 만 보고 hydrate 한다.
@@ -132,7 +151,7 @@ export async function persistAssetsToDb(
         locale,
         'location visual description',
       )
-      await supabaseAdmin.from('locations').insert(
+      const { error: locInsertErr } = await supabaseAdmin.from('locations').insert(
         freshLocs.map((loc) => {
           const en = loc.style_description ?? ''
           const locTx = !isTargetScript(en, locale) && locNativeKo.has(loc.id)
@@ -152,14 +171,15 @@ export async function persistAssetsToDb(
           }
         }),
       )
+      assertDbOk('locations insert', locInsertErr)
     }
     // producer 행: writer 파생 필드(아트디렉션)만 갱신 — 원천(name/purpose/visual_description*·
     //   user_edited·origin)은 불변. visual_description 은 producer 원문(EN 파생본)이 그대로
     //   rough-board db_fallback/월드 이미지 입력이 된다.
     if (producerLocs.length) {
       await Promise.all(
-        producerLocs.map((loc) =>
-          supabaseAdmin
+        producerLocs.map(async (loc) => {
+          const { error } = await supabaseAdmin
             .from('locations')
             .update({
               style_description: loc.style_description ?? '',
@@ -168,8 +188,9 @@ export async function persistAssetsToDb(
               lighting_direction: (loc.lighting_sources ?? []).join(', '),
             })
             .eq('project_id', projectId)
-            .eq('location_id', loc.id),
-        ),
+            .eq('location_id', loc.id)
+          assertDbOk(`locations update(${loc.id})`, error)
+        }),
       )
     }
   }
@@ -208,7 +229,7 @@ export async function persistAssetsToDb(
         'scene mood',
       ),
     ])
-    await supabaseAdmin.from('scenes').insert(
+    const { error: sceneInsertErr } = await supabaseAdmin.from('scenes').insert(
       sRows.map((r) => {
         const narrTx = !isTargetScript(r.narrativeNative, locale) && narrKo.has(r.id)
         const moodTx = !isTargetScript(r.moodNative, locale) && moodKo.has(r.id)
@@ -235,6 +256,7 @@ export async function persistAssetsToDb(
         }
       }),
     )
+    assertDbOk('scenes insert', sceneInsertErr)
   }
 
   // characters: additive (producer-story-gate §4 — 인물=입력). 기존 행(producer·writer-origin)은
@@ -326,15 +348,17 @@ export async function persistAssetsToDb(
       }
       if (prev.costume == null && costumes[c.id]) patch.costume = costumes[c.id]
       if (Object.keys(patch).length) {
-        await supabaseAdmin
+        const { error: charPatchErr } = await supabaseAdmin
           .from('characters')
           .update(patch)
           .eq('project_id', projectId)
           .eq('character_id', c.id)
+        assertDbOk(`characters update(${c.id})`, charPatchErr)
       }
     }
     if (toInsert.length) {
-      await supabaseAdmin.from('characters').insert(toInsert)
+      const { error: charInsertErr } = await supabaseAdmin.from('characters').insert(toInsert)
+      assertDbOk('characters insert', charInsertErr)
     }
   }
 }
@@ -524,7 +548,11 @@ export async function persistShotsToDb(
   }
 
   // 자신이 채우는 테이블만 정리 (shots). characters/locations/scenes 는 Tier 1 소관.
-  await supabaseAdmin.from('shots').delete().eq('project_id', projectId)
+  const { error: shotDeleteErr } = await supabaseAdmin
+    .from('shots')
+    .delete()
+    .eq('project_id', projectId)
+  assertDbOk('shots delete', shotDeleteErr)
 
   // shots (shot_sequence — 대사 보유)
   if (shotSequence.shots.length) {
@@ -584,7 +612,7 @@ export async function persistShotsToDb(
       locale,
       'shot action description',
     )
-    await supabaseAdmin.from('shots').insert(
+    const { error: shotInsertErr } = await supabaseAdmin.from('shots').insert(
       shRows.map((r) => {
         const actTx = !isTargetScript(r.actionNative, locale) && actionKo.has(r.shotMainId)
         const row = {
@@ -628,6 +656,7 @@ export async function persistShotsToDb(
         return applyShotCarryForward(row, existingByShotId.get(r.shotMainId))
       }),
     )
+    assertDbOk('shots insert', shotInsertErr)
 
     // scene 길이를 데쿠파주(shots) duration 합으로 수렴 (2026-06-24).
     //   scene.estimated_seconds 는 s3_scenes(Story축)가 shot 분해 *전* playtime 을 배분한 추정이라
@@ -644,13 +673,14 @@ export async function persistShotsToDb(
       secondsByScene.set(sid, (secondsByScene.get(sid) ?? 0) + clampShotSeconds(it.duration_seconds))
     }
     await Promise.all(
-      [...secondsByScene].map(([sceneId, sum]) =>
-        supabaseAdmin
+      [...secondsByScene].map(async ([sceneId, sum]) => {
+        const { error } = await supabaseAdmin
           .from('scenes')
           .update({ estimated_duration_seconds: sum })
           .eq('project_id', projectId)
-          .eq('scene_id', sceneId),
-      ),
+          .eq('scene_id', sceneId)
+        assertDbOk(`scenes duration update(${sceneId})`, error)
+      }),
     )
   }
 }
