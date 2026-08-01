@@ -116,6 +116,15 @@ describe('linked director video finalization', () => {
     expect(mocks.uploadImmutableObject).toHaveBeenCalledWith(path, expect.any(Buffer), 'video/mp4')
     expect(mocks.complete).toHaveBeenCalledWith('project-1', 'job-1', 'clip-1', 'https://media.test/video.mp4', path)
   })
+  it('accepts a new fal CDN subdomain (#fal-cdn-host) — 정적 목록에 없어도 도메인 소속이면 통과', async () => {
+    // 2026-07-31 실패 재현: fal 이 v3b.fal.media 로 내보내자 정상 영상이 전부 죽었다.
+    await expect(finalizeShotVideoJob(job, 'https://v3b.fal.media/files/b/0aa/x.mp4'))
+      .resolves.toBe('https://media.test/video.mp4')
+  })
+  it('still rejects a host that merely impersonates the fal domain', async () => {
+    await expect(finalizeShotVideoJob(job, 'https://evilfal.media/video.mp4'))
+      .rejects.toThrow('invalid video url in provider result')
+  })
   it('propagates immutable storage conflicts and does not falsely complete the attempt', async () => {
     mocks.uploadImmutableObject.mockRejectedValue(new ImmutableObjectMismatchError('workspace-1/project-1/videos/clip-1/job-1.mp4', 'content'))
     await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4'))

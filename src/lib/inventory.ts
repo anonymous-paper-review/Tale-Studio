@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { isFalMediaHost } from '@/lib/fal/media-host'
 import type { InventoryItem, InventoryKind } from '@/types/inventory'
 
 /**
@@ -21,8 +22,8 @@ function imageHostAllowlist(): Set<string> {
   } catch {
     // env 미설정 시 Supabase 호스트 생략.
   }
-  hosts.add('fal.media')
-  hosts.add('v3.fal.media')
+  // fal CDN 은 여기 열거하지 않는다 — 호스트명이 계속 늘어나 정적 목록이 낡는다(#fal-cdn-host).
+  //   아래 assertSafeImageUrl 이 도메인 소속으로 판정한다.
   return hosts
 }
 
@@ -35,6 +36,8 @@ export function assertSafeImageUrl(raw: string): void {
     throw new Error('invalid image url')
   }
   if (u.protocol !== 'https:') throw new Error('image url must be https')
+  // fal 미디어 CDN(서브도메인 포함, 포트 없음)은 통과. 그 외는 정적 allowlist(Supabase).
+  if (isFalMediaHost(u.hostname) && !u.port) return
   if (!imageHostAllowlist().has(u.host)) throw new Error('image host not allowed')
 }
 

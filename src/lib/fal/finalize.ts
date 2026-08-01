@@ -19,6 +19,7 @@ import { cropRoughGridFrames } from '@/lib/writer/rough-grid-crop'
 import { uploadThumbnail } from '@/lib/storage-thumb'
 import { completeDirectorVideoAttempt } from '@/lib/director-video-takes'
 import { buildFalResponseSnapshot } from '@/lib/fal/observability'
+import { isFalMediaHost } from '@/lib/fal/media-host'
 import {
   ImmutableObjectMismatchError,
   uploadImmutableObject,
@@ -411,9 +412,10 @@ function invalidProviderVideoUrl(): never {
   throw new DirectorVideoTerminalError('invalid_provider_result', 'invalid video url in provider result')
 }
 
-function allowedFalHosts(): Set<string> {
+/** 도메인 판정(#fal-cdn-host) 밖의 추가 허용 호스트 — 셀프호스트/프록시용 escape hatch. */
+function extraAllowedFalHosts(): Set<string> {
   const configured = process.env.FAL_MEDIA_ALLOWED_HOSTS?.split(',').map((host) => host.trim().toLowerCase()).filter(Boolean) ?? []
-  return new Set(['fal.media', 'v3.fal.media', ...configured])
+  return new Set(configured)
 }
 
 function assertValidProviderVideoUrl(videoUrl: string, provider: GenerationJob['provider']): URL {
@@ -426,7 +428,14 @@ function assertValidProviderVideoUrl(videoUrl: string, provider: GenerationJob['
   if (parsed.username || parsed.password) return invalidProviderVideoUrl()
 
   if (provider === 'fal') {
-    if (parsed.protocol !== 'https:' || parsed.port || !allowedFalHosts().has(parsed.hostname.toLowerCase())) {
+    // 호스트는 개별 이름이 아니라 fal.media 도메인 소속으로 판정한다(#fal-cdn-host 2026-08-01) —
+    //   fal 이 v3b.fal.media 같은 새 CDN 호스트를 추가할 때마다 정상 영상이 죽던 문제.
+    const host = parsed.hostname.toLowerCase()
+    if (
+      parsed.protocol !== 'https:'
+      || parsed.port
+      || !(isFalMediaHost(host) || extraAllowedFalHosts().has(host))
+    ) {
       return invalidProviderVideoUrl()
     }
     return parsed
