@@ -41,9 +41,9 @@ export default function StudioTemplate({ children }: { children: React.ReactNode
         // 레이아웃 체인 보존 — 페이지들은 flex column 부모의 flex-1 자식을 전제한다.
         'flex min-h-0 flex-1 flex-col',
         direction === 'forward' &&
-          'animate-in fade-in-25 slide-in-from-bottom-6 duration-300 ease-out motion-reduce:animate-none',
+          'animate-in fade-in-25 slide-in-from-bottom-6 duration-500 ease-out motion-reduce:animate-none',
         direction === 'back' &&
-          'animate-in fade-in-25 slide-in-from-top-6 duration-300 ease-out motion-reduce:animate-none',
+          'animate-in fade-in-25 slide-in-from-top-6 duration-500 ease-out motion-reduce:animate-none',
       )}
     >
       {children}

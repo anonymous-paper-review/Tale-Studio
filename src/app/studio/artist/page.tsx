@@ -61,9 +61,9 @@ export default function VisualPage() {
   }
   const tabSlideClass =
     tabSlide === 'forward'
-      ? 'animate-in fade-in-25 slide-in-from-right-6 duration-300 ease-out motion-reduce:animate-none'
+      ? 'animate-in fade-in-25 slide-in-from-right-6 duration-500 ease-out motion-reduce:animate-none'
       : tabSlide === 'back'
-        ? 'animate-in fade-in-25 slide-in-from-left-6 duration-300 ease-out motion-reduce:animate-none'
+        ? 'animate-in fade-in-25 slide-in-from-left-6 duration-500 ease-out motion-reduce:animate-none'
         : undefined
 
   // 보드 축척(#d1 2026-07-14) — writer 러프 보드와 같은 슬라이더. 인물/배경 탭별로 저장.

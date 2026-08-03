@@ -149,8 +149,18 @@ function ShotSection({
           샷 {shotCount}개 {open ? '접기' : '보기'}
         </span>
       </button>
-      {open
-        ? lines.map((line) => (
+      {/* 펼침/접힘 애니메이션(#c3 2026-08-03) — 항상 마운트 + grid-rows 0fr↔1fr (인물 상세와
+          동일 패턴). inert: 접힌 상태의 라인 버튼이 탭 포커스를 받지 않게. */}
+      <div
+        className={cn(
+          'grid transition-[grid-template-rows] duration-300 ease-out',
+          open ? '[grid-template-rows:1fr]' : '[grid-template-rows:0fr]',
+        )}
+        aria-hidden={!open}
+        inert={!open}
+      >
+        <div className="min-h-0 overflow-hidden">
+          {lines.map((line) => (
             <ScriptLineButton
               key={line.ref}
               line={line}
@@ -159,8 +169,9 @@ function ShotSection({
               roster={roster}
               onToggle={onToggle}
             />
-          ))
-        : null}
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

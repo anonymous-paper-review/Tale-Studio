@@ -466,7 +466,8 @@
 @media (prefers-reduced-motion: no-preference) {
   html[data-stage-nav]::view-transition-old(stage-content),
   html[data-stage-nav]::view-transition-new(stage-content) {
-    animation-duration: 340ms;
+    /* 520ms (#a1 2026-08-03): 340ms 는 인지 전에 끝났다 — 전환을 "보이게" + 로딩 마스킹 겸용 */
+    animation-duration: 520ms;
     animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
     animation-fill-mode: both;
   }
@@ -502,4 +503,19 @@
   from {
     transform: translateY(-100%);
   }
+}
+
+/* number 입력의 네이티브 위아래 스피너(#b4 2026-08-03, Chromium) — Tailwind arbitrary variant
+   ([&::-webkit-inner-spin-button]:…)가 이 의사요소를 생성하지 못해 일반 CSS 로 정의.
+   기본은 은은하게, hover/focus 시 또렷하게. dark 에선 invert 로 테마에 맞춘다. */
+.number-spin::-webkit-inner-spin-button {
+  opacity: 0.4;
+  cursor: pointer;
+}
+.number-spin:hover::-webkit-inner-spin-button,
+.number-spin:focus-visible::-webkit-inner-spin-button {
+  opacity: 0.9;
+}
+.dark .number-spin::-webkit-inner-spin-button {
+  filter: invert(1);
 }

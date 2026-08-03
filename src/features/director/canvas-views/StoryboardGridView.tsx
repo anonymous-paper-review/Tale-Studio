@@ -485,7 +485,7 @@ export function StoryboardGridView() {
         key={mediaMode}
         className={cn(
           'flex flex-col gap-6 p-6',
-          'animate-in fade-in-25 duration-300 ease-out motion-reduce:animate-none',
+          'animate-in fade-in-25 duration-500 ease-out motion-reduce:animate-none',
           mediaMode === 'real' ? 'slide-in-from-right-6' : 'slide-in-from-left-6',
         )}
       >

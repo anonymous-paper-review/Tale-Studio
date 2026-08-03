@@ -22,12 +22,19 @@ interface SheetRegion {
 
 const FULL_SHEET: SheetRegion = { label: '', x0: 0, y0: 0, x1: 1, y1: 1 }
 
-/** hover 순환 순서 (사용자 지정 2026-08-03): 컨셉 → 디테일 3칸 → 스케치 → 표정 3칸 */
+/** hover 순환 순서 (사용자 지정 2026-08-03): 컨셉 → 디테일 3칸 → 스케치 → 표정 3칸.
+ *
+ * 좌표 규칙(#d1-fix): 컨테이너와 시트가 같은 16:9 이므로 **w 프랙션 == h 프랙션**이어야
+ * cover 크롭이 지정 창과 정확히 일치한다(WYSIWYG). v1 은 박스 외곽선 좌표를 그대로 써서
+ * 비율이 어긋났고, cover 가 임의로 잘라 이웃 박스의 경계선들이 새어 들어왔다.
+ * 각 리전은 박스 테두리 *안쪽*을 기준으로 잡고 비율을 맞춰 상하/좌우로 확장한다 —
+ * detail 행처럼 행이 창보다 낮으면 위아래로 이웃 테두리가 한 줄씩 걸리는 건 기하상 불가피
+ * (전폭 3칸을 다 보여야 하므로), 대신 프레임 라인처럼 가장자리에 붙게 중심을 잡았다. */
 const CYCLE_REGIONS: readonly SheetRegion[] = [
-  { label: 'Character concept', x0: 0.01, y0: 0.016, x1: 0.312, y1: 0.412 },
-  { label: 'Detail points', x0: 0.01, y0: 0.43, x1: 0.312, y1: 0.668 },
-  { label: 'Sketch style', x0: 0.01, y0: 0.683, x1: 0.312, y1: 0.982 },
-  { label: 'Face expression guide', x0: 0.556, y0: 0.788, x1: 0.842, y1: 0.988 },
+  { label: 'Character concept', x0: 0.0135, y0: 0.0876, x1: 0.3094, y1: 0.3835 },
+  { label: 'Detail points', x0: 0.0135, y0: 0.3995, x1: 0.3094, y1: 0.6955 },
+  { label: 'Sketch style', x0: 0.0185, y0: 0.69, x1: 0.3045, y1: 0.976 },
+  { label: 'Face expression guide', x0: 0.5625, y0: 0.7225, x1: 0.84, y1: 1.0 },
 ]
 
 const REGION_HOLD_MS = 1600 // 팬(700ms) + 정지 — 읽을 시간을 준다

@@ -704,12 +704,12 @@ export function RoughStoryboardView() {
                                 panel={panel}
                                 alt={`${shot.shotId} rough storyboard`}
                               />
-                              {/* 재생성 — 카드 경계에서 한 뼘 안쪽(right-3/top-3, #c3 2026-08-03).
-                                  버튼 hover 시 오른쪽으로 펼쳐지며 "재생성" 라벨 표출(그리드 영상
-                                  버튼과 같은 max-w 슬라이드 패턴). */}
+              {/* 재생성 — 사진 위 우상단 칩(#c3-fix 2026-08-03): 반투명 배경이 사진과 섞여
+                                  경계 밖처럼 보이던 문제 → 불투명 배경 + 테두리로 "카드 위" 를 명확히.
+                                  버튼 hover 시 오른쪽으로 "재생성" 라벨 확장은 유지. */}
                               <button
                                 type="button"
-                                className="group/regen absolute right-3 top-3 flex h-7 items-center rounded-md bg-background/80 px-1.5 text-foreground opacity-0 shadow-sm transition-opacity duration-100 hover:bg-background group-hover:opacity-100 hover-red-beam"
+                                className="group/regen absolute right-2 top-2 flex h-7 items-center rounded-md border border-border bg-background px-1.5 text-foreground opacity-0 shadow-sm transition-opacity duration-100 hover:bg-accent group-hover:opacity-100 hover-red-beam"
                                 aria-label="패널 재생성"
                                 onClick={(e) => {
                                   e.stopPropagation()

@@ -57,7 +57,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
-import { launchMentionFlight } from '@/lib/mention-flight'
+import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { useProducerStore, type StyleAnchor } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { BackgroundSource, CastArc, CastMember, CastMotivation, GateIssue, GateResult, EntityType } from '@/lib/producer-gate'
@@ -215,6 +215,7 @@ function MentionableCard({
   pulse = false,
   variant = 'card',
   className,
+  onClick,
   children,
 }: {
   refId: string
@@ -222,6 +223,8 @@ function MentionableCard({
   pulse?: boolean
   variant?: MentionVariant
   className?: string
+  /** 일반 클릭 핸들러 — ⌘/Ctrl 클릭은 캡처 단계가 선점하므로 여기엔 오지 않는다. */
+  onClick?: (e: React.MouseEvent<HTMLDivElement>) => void
   children: ReactNode
 }) {
   const mentioned = useChatUiStore((s) => s.mentionedRefs.includes(refId))
@@ -232,6 +235,7 @@ function MentionableCard({
   return (
     <div
       className={cn(MENTION_BASE[variant], MENTION_TONE[variant][tone], armed && 'cursor-copy', className)}
+      onClick={onClick}
       // ⌘/Ctrl 클릭은 멘션 전용(#b5 2026-08-03) — 캡처 단계에서 기본 동작을 끊는다.
       //   포커스는 pointerdown 에서 일어나고 radix 콤보박스도 pointerdown 으로 열리므로,
       //   click 만 막으면 입력창에 커서가 앉거나 드롭다운이 펼쳐진 채 멘션된다.
@@ -245,9 +249,12 @@ function MentionableCard({
         if (!(e.metaKey || e.ctrlKey)) return
         e.preventDefault()
         e.stopPropagation()
+        // 방향은 입력창 텍스트가 진실(#b2) — mentioned prop 은 mentionItems 미등록 필드(스타일 등)
+        //   에서 항상 false 라 해제 비행이 나오지 않았다. 토글 반영 전 값으로 판정.
+        const removing = chatInputHasMention(label)
         requestMentionToggle(label)
         // 비행 연출 — 추가면 클릭 지점 → 채팅, 해제면 채팅 → 클릭 지점 (표시 전용)
-        launchMentionFlight({ label, clickX: e.clientX, clickY: e.clientY, toChat: !mentioned })
+        launchMentionFlight({ label, clickX: e.clientX, clickY: e.clientY, toChat: !removing })
       }}
     >
       <span
@@ -703,18 +710,22 @@ function CastRow({
     })
 
   return (
-    <MentionableCard variant="row" refId={member.localId} label={mentionLabel} className="px-2">
-      {/* 상세 토글은 줄의 빈 공간 클릭(#b3 2026-08-03) — 버튼을 없애고 행 전체가 진입점.
-          입력·버튼 등 상호작용 요소 위 클릭은 무시. ⌘/Ctrl 은 카드 래퍼의 멘션 캡처가 선점. */}
-      <div
-        className={cn('flex items-center gap-2', isPerson && 'cursor-pointer')}
-        onClick={(e) => {
-          if (!isPerson || e.metaKey || e.ctrlKey) return
-          const target = e.target as HTMLElement
-          if (target.closest('input,textarea,button,a,[role="combobox"]')) return
-          setDetailsOpen((v) => !v)
-        }}
-      >
+    <MentionableCard
+      variant="row"
+      refId={member.localId}
+      label={mentionLabel}
+      className={cn('px-2', isPerson && 'cursor-pointer')}
+      // 상세 토글은 줄의 빈 공간 클릭(#b3) — 카드 래퍼(py-3 패딩 포함)가 진입점이라 이름·묘사
+      //   위아래 여백 클릭도 동작한다(2026-08-03). 입력·버튼 등 상호작용 요소와 펼쳐진 상세
+      //   본문 위 클릭은 무시. ⌘/Ctrl 은 멘션 캡처가 선점해 여기 오지 않는다.
+      onClick={(e) => {
+        if (!isPerson) return
+        const target = e.target as HTMLElement
+        if (target.closest('input,textarea,button,a,[role="combobox"],[data-cast-details]')) return
+        setDetailsOpen((v) => !v)
+      }}
+    >
+      <div className="flex items-center gap-2">
         {/* 삭제는 줄 왼쪽 끝, 프로듀서 호출은 오른쪽 끝 (#b4) */}
         <RowIconButton
           icon={Trash2}
@@ -733,9 +744,7 @@ function CastRow({
                 ) : null}
               </span>
             </TooltipTrigger>
-            <TooltipContent side="top">
-              상세 정보 (역할·아크·동기) — 줄의 빈 곳을 클릭하면 {detailsOpen ? '접혀요' : '펼쳐져요'}
-            </TooltipContent>
+            <TooltipContent side="top">상세 정보 (역할·아크·동기)</TooltipContent>
           </Tooltip>
         ) : (
           <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
@@ -807,8 +816,9 @@ function CastRow({
           )}
           aria-hidden={!detailsOpen}
         >
-          {/* 줄의 이름 칸(삭제 버튼 + 아이콘 폭)에 맞춰 들여쓴다 — 어느 줄에 딸린 상세인지 보이게. */}
-          <div className="min-h-0 overflow-hidden pl-[4.5rem] pr-2">
+          {/* 줄의 이름 칸(삭제 버튼 + 아이콘 폭)에 맞춰 들여쓴다 — 어느 줄에 딸린 상세인지 보이게.
+              data-cast-details: 빈 공간 클릭 토글(#b3)에서 제외 — 편집 중 오접힘 방지. */}
+          <div data-cast-details className="min-h-0 overflow-hidden pl-[4.5rem] pr-2">
             <div className="mt-2 space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">역할</label>
               <div className="flex gap-2">
@@ -962,8 +972,9 @@ function BackgroundRow({
           onClick={() => onAskProducer(backgroundDraftPrompt(background))}
         />
       </div>
-      {/* 목적 — 둘째 줄. 들여쓰기는 첫 줄의 [삭제 28 + gap 8 + 아이콘 28 + gap 8] 에 맞춘다. */}
-      <div className="mt-1.5 flex items-center gap-2 pl-[4.5rem] pr-2">
+      {/* 목적 — 둘째 줄. 들여쓰기는 첫 줄 "묘사" head 의 x 위치에 맞춘다(#b1 2026-08-03):
+          삭제(28)+gap(8)+아이콘(28)+gap(8)+이름(144)+gap(8) = 224px = pl-56. */}
+      <div className="mt-1.5 flex items-center gap-2 pl-56 pr-2">
         <span className="shrink-0 text-[11px] font-medium text-muted-foreground">목적</span>
         <FieldSlot needs={missing.includes('목적')} className="max-w-md flex-1">
           <HoverBeam>
@@ -1222,7 +1233,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                     value={projectSettings.playtime || ''}
                     placeholder="예: 120"
                     onChange={(e) => updateSettings({ playtime: Number(e.target.value) || 0 })}
-                    className={cn(QUIET_CONTROL, 'h-8 font-mono tabular-nums')}
+                    // 네이티브 위아래 스피너 스타일(#b4 2026-08-03) — globals.css .number-spin.
+                    //   기본은 은은하게, hover 시 또렷하게 + 커서, dark 에선 invert(Chromium 계열).
+                    className={cn(QUIET_CONTROL, 'number-spin h-8 font-mono tabular-nums')}
                   />
                 </HoverBeam>
               </FieldRow>

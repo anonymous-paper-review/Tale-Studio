@@ -65,9 +65,9 @@ export function WriterWorkspace() {
   }
   const slideClass =
     slideDir === 'forward'
-      ? 'animate-in fade-in-25 slide-in-from-right-6 duration-300 ease-out motion-reduce:animate-none'
+      ? 'animate-in fade-in-25 slide-in-from-right-6 duration-500 ease-out motion-reduce:animate-none'
       : slideDir === 'back'
-        ? 'animate-in fade-in-25 slide-in-from-left-6 duration-300 ease-out motion-reduce:animate-none'
+        ? 'animate-in fade-in-25 slide-in-from-left-6 duration-500 ease-out motion-reduce:animate-none'
         : undefined
 
   // 실행 중(생성 진행)엔 탭 뷰 대신 점진적 스토리 뷰어 + 하단 진행바(#story-stream 2026-07-21).

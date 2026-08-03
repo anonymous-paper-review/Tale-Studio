@@ -822,9 +822,9 @@ export default function DirectorCanvasPage() {
   }
   const viewSlideClass =
     viewSlide === 'forward'
-      ? 'animate-in fade-in-25 slide-in-from-right-6 duration-300 ease-out motion-reduce:animate-none'
+      ? 'animate-in fade-in-25 slide-in-from-right-6 duration-500 ease-out motion-reduce:animate-none'
       : viewSlide === 'back'
-        ? 'animate-in fade-in-25 slide-in-from-left-6 duration-300 ease-out motion-reduce:animate-none'
+        ? 'animate-in fade-in-25 slide-in-from-left-6 duration-500 ease-out motion-reduce:animate-none'
         : undefined
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   // 프로젝트 init(resetChildStores)이 끝나기 전에 올린 제안은 reset()에 지워진다 —

@@ -220,8 +220,9 @@ export function DialogueView() {
                       const lines = dialogueLinesOf(shot)
                       return (
                         <div key={shot.shotId} className="group">
-                          {/* 글자 크기는 트리트먼트와 통일(#c5) — 샷 스토리 text-sm leading-7 */}
-                          <p className="text-sm leading-7 text-muted-foreground">
+                          {/* 글자 크기는 트리트먼트와 통일(#c5), 본문은 흰색(#c2 2026-08-03) —
+                              muted 회색은 대본이 부차 정보처럼 읽혔다. 라벨(Shot N)만 muted 유지. */}
+                          <p className="text-sm leading-7 text-foreground">
                             <span className="mr-1.5 font-mono text-xs font-semibold text-muted-foreground/60">
                               Shot {shotIdx + 1}
                             </span>
@@ -250,24 +251,19 @@ export function DialogueView() {
                                       dimmed && 'opacity-30',
                                     )}
                                   >
-                                    <span
-                                      className={cn(
-                                        'mr-2 font-mono text-[11px] font-semibold uppercase tracking-wide',
-                                        focused ? undefined : 'text-muted-foreground',
-                                      )}
-                                    >
+                                    <span className="mr-2 font-mono text-[11px] font-semibold uppercase tracking-wide text-foreground">
                                       {speakerName}
                                     </span>
                                     <span
                                       className={cn(
-                                        'text-[15px] leading-7',
-                                        focused ? 'font-medium' : 'text-muted-foreground',
+                                        'text-[15px] leading-7 text-foreground',
+                                        focused && 'font-medium',
                                       )}
                                     >
                                       &ldquo;{line.text}&rdquo;
                                     </span>
                                     {line.delivery && (
-                                      <span className="ml-2 text-[11px] text-muted-foreground">({line.delivery})</span>
+                                      <span className="ml-2 text-[11px] text-foreground/70">({line.delivery})</span>
                                     )}
                                   </div>
                                 )

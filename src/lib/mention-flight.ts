@@ -7,6 +7,18 @@
 
 const FLIGHT_MS = 600
 
+/**
+ * 채팅 입력창에 @라벨이 이미 있는가 — 비행 방향 판정용 (#b2 2026-08-03).
+ * mentioned prop(카드 ring)은 mentionItems 에 등록된 ref 만 추적해 일부 설정 필드(스타일 등)에서
+ * 항상 false 였다 — 해제인데도 "카드 → 채팅"으로 날아가는 버그. requestMentionToggle 이 실제로
+ * 토글하는 진실은 입력창 텍스트이므로 그걸 직접 본다(토글 반영 전, 클릭 시점 값 기준).
+ */
+export function chatInputHasMention(label: string): boolean {
+  if (typeof document === 'undefined') return false
+  const input = document.querySelector<HTMLTextAreaElement>('[data-chat-panel] textarea')
+  return !!input && input.value.includes(`@${label}`)
+}
+
 export function launchMentionFlight(opts: {
   label: string
   clickX: number
