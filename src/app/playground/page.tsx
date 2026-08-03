@@ -1,14 +1,18 @@
 'use client'
 
 // Playground — 공개 갤러리 (#landing-v2 2026-08-03).
-//   다른 창작자들이 공개한 영상·이미지가 뜨는 페이지. 로그인 없이 접근 가능(마케팅 표면),
-//   프로젝트 대시보드의 탭에서도 진입한다. 데이터는 /api/playground(큐레이션 테이블).
+//   다른 창작자들이 공개한 영상·이미지가 뜨는 페이지. 데이터는 /api/playground(큐레이션 테이블).
 //   영상은 hover 재생(디렉터 그리드와 같은 UX — 전 카드 동시 재생은 소음).
+// 헤더는 세션에 따라 갈린다(#landing-v2b): 로그인 사용자에겐 대시보드 탭 헤더(프로젝트|Playground)
+//   — 마케팅 헤더를 그대로 쓰면 프로젝트 탭에서 넘어왔을 때 랜딩의 자식 페이지처럼 읽힌다.
+//   비로그인 방문자에겐 마케팅 헤더+푸터(랜딩에서 "구경하기"로 온 사람).
 
 import { useEffect, useRef, useState } from 'react'
 import { Clapperboard, Loader2 } from 'lucide-react'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
+import { DashboardHeader } from '@/components/dashboard/dashboard-header'
+import { createClient } from '@/lib/supabase/client'
 
 interface PlaygroundItem {
   id: string
@@ -39,18 +43,31 @@ function HoverVideo({ item }: { item: PlaygroundItem }) {
 
 export default function PlaygroundPage() {
   const [items, setItems] = useState<PlaygroundItem[] | null>(null)
+  // null = 판별 전 — 어느 헤더도 그리지 않아 마케팅↔대시보드 헤더가 스왑되는 깜빡임을 피한다.
+  const [authed, setAuthed] = useState<boolean | null>(null)
 
   useEffect(() => {
     fetch('/api/playground')
       .then((r) => r.json())
       .then((data) => setItems(data.items ?? []))
       .catch(() => setItems([]))
+    createClient()
+      .auth.getUser()
+      .then(({ data: { user } }) => setAuthed(!!user))
+      .catch(() => setAuthed(false))
   }, [])
 
   return (
     <div className="flex min-h-screen flex-col bg-black text-white">
-      <SiteHeader />
-      <main className="mx-auto w-full max-w-7xl flex-1 px-6 pb-20 pt-28">
+      {authed === true ? <DashboardHeader active="playground" /> : null}
+      {authed === false ? <SiteHeader /> : null}
+      <main
+        className={
+          authed === true
+            ? 'mx-auto w-full max-w-7xl flex-1 px-6 py-10'
+            : 'mx-auto w-full max-w-7xl flex-1 px-6 pb-20 pt-28'
+        }
+      >
         <div className="mb-10">
           <h1 className="mb-2 text-3xl font-semibold tracking-tighter md:text-4xl">Playground</h1>
           <p className="text-sm font-light text-gray-400">
@@ -105,7 +122,8 @@ export default function PlaygroundPage() {
           </div>
         )}
       </main>
-      <SiteFooter />
+      {/* 푸터는 마케팅 방문자에게만 — 대시보드 문맥에선 소음 */}
+      {authed === false ? <SiteFooter /> : null}
     </div>
   )
 }

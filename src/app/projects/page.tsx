@@ -7,17 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import {
-  ChevronDown,
-  Clock,
-  Film,
-  Loader2,
-  LogOut,
-  Pencil,
-  Plus,
-  Trash2,
-} from 'lucide-react'
+import { Clock, Film, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useProjectStore } from '@/stores/project-store'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -30,13 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import type { StageId } from '@/types'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { createClient } from '@/lib/supabase/client'
+import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
 
 interface ProjectItem {
@@ -44,6 +28,8 @@ interface ProjectItem {
   title: string
   current_stage: string | null
   updated_at: string | null
+  /** 대표 이미지(실사 스토리보드 > 러프 > 캐릭터, api/project/list) — 없으면 그라디언트 폴백 */
+  thumbnail_url: string | null
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -97,8 +83,29 @@ function ProjectCard({
   return (
     <div
       onClick={() => !editing && onOpen(project)}
-      className="group flex cursor-pointer flex-col rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:bg-white/10 hover:shadow-[0_10px_30px_rgba(229,9,20,0.1)]"
+      className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5 text-left backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:bg-white/10 hover:shadow-[0_10px_30px_rgba(229,9,20,0.1)]"
     >
+      {/* 대표 썸네일(#landing-v2b) — 이름만으로는 구별이 어려워 프로젝트의 첫 그림을 얹는다.
+          아직 그림이 없는 프로젝트는 제목 이니셜 워터마크가 구별을 돕는다. */}
+      <div className="relative aspect-video overflow-hidden bg-black/60">
+        {project.thumbnail_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={project.thumbnail_url}
+            alt=""
+            loading="lazy"
+            className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <div className="flex size-full items-center justify-center bg-[radial-gradient(ellipse_at_top_left,rgba(229,9,20,0.18),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(70,130,180,0.12),transparent_60%)]">
+            <span className="select-none text-5xl font-bold text-white/15">
+              {(project.title || 'U').charAt(0).toUpperCase()}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col p-5">
       <div className="flex items-center justify-between">
         {editing ? (
           <Input
@@ -149,7 +156,7 @@ function ProjectCard({
           </>
         )}
       </div>
-      <div className="mt-4 flex items-center gap-3 text-xs text-gray-400">
+      <div className="mt-3 flex items-center gap-3 text-xs text-gray-400">
         <span className="rounded-md bg-white/10 px-2.5 py-1 font-medium">
           {STAGE_LABELS[project.current_stage ?? 'producer'] ?? 'Producer'}
         </span>
@@ -159,6 +166,7 @@ function ProjectCard({
             {formatDate(project.updated_at)}
           </span>
         )}
+      </div>
       </div>
     </div>
   )
@@ -172,7 +180,6 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  const [userInfo, setUserInfo] = useState<{ name: string; avatar: string | null } | null>(null)
   const [nameOpen, setNameOpen] = useState(false)
   const [nameValue, setNameValue] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<ProjectItem | null>(null)
@@ -180,26 +187,12 @@ export default function ProjectsPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
-    // middleware 가 비로그인은 이미 /login 으로 보냈다 — 여기서는 사용자 정보·목록만.
-    const supabase = createClient()
-    supabase.auth
-      .getUser()
-      .then(({ data: { user } }) => {
-        if (!user) {
-          setLoading(false)
-          return
-        }
-        setUserInfo({
-          name: user.user_metadata?.full_name ?? user.email ?? '',
-          avatar: user.user_metadata?.avatar_url ?? null,
-        })
-        fetch('/api/project/list')
-          .then((r) => r.json())
-          .then((data) => setProjects(data.projects ?? []))
-          .catch(() => {})
-          .finally(() => setLoading(false))
-      })
-      .catch(() => setLoading(false))
+    // middleware 가 비로그인은 이미 /login 으로 보냈다 — 여기서는 목록만(유저 메뉴는 헤더 담당).
+    fetch('/api/project/list')
+      .then((r) => r.json())
+      .then((data) => setProjects(data.projects ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
   const handleOpen = (project: ProjectItem) => {
@@ -242,73 +235,19 @@ export default function ProjectsPage() {
     }
   }
 
-  const handleLogout = async () => {
-    clearLastProjectId()
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/')
-  }
-
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* ── 헤더: 로고 + 탭(프로젝트|Playground) + 새 프로젝트 + 유저 메뉴 ── */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-black/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2">
-              <Film className="size-6 text-primary" />
-              <span className="text-lg font-bold tracking-tight">Tale Studio</span>
-            </div>
-            <nav className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 text-sm font-medium">
-              <span className="rounded-full bg-white px-4 py-1.5 text-black">프로젝트</span>
-              <Link
-                href="/playground"
-                className="rounded-full px-4 py-1.5 text-gray-300 transition-colors hover:text-white"
-              >
-                Playground
-              </Link>
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleNew}
-              disabled={creating}
-              className="flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90"
-            >
-              {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-              새 프로젝트
-            </button>
-            {userInfo && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 rounded-full focus:outline-none">
-                    {userInfo.avatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={userInfo.avatar}
-                        alt={userInfo.name}
-                        className="size-8 rounded-full border border-white/20 object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="flex size-8 items-center justify-center rounded-full bg-white/10 text-xs font-medium">
-                        {userInfo.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <ChevronDown className="size-4 text-gray-400" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem onClick={handleLogout}>
-                    <LogOut className="mr-2 size-4" />
-                    로그아웃
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        </div>
-      </header>
+      {/* 공용 대시보드 헤더(#landing-v2b) — 탭·유저 메뉴는 헤더가, 새 프로젝트 버튼만 이 페이지 전용 */}
+      <DashboardHeader active="projects">
+        <button
+          onClick={handleNew}
+          disabled={creating}
+          className="flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90"
+        >
+          {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+          새 프로젝트
+        </button>
+      </DashboardHeader>
 
       {/* ── 프로젝트 그리드 ── */}
       <main className="mx-auto max-w-7xl px-6 py-10">
