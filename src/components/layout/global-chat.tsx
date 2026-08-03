@@ -39,6 +39,7 @@ import {
   SHELL_INSET,
 } from '@/lib/constants'
 import { buildChatSections } from '@/lib/chat-sections'
+import { CASCADE_STEP_MS, EPHEMERAL_SETTLE_MS } from '@/lib/stage-transition'
 import type { StageId } from '@/types'
 
 // 이 세션에서 이미 타이핑 연출을 재생한 suggestion id — 재렌더/스테이지 왕복 시 재생 방지(#b1).
@@ -157,6 +158,22 @@ export function GlobalChat() {
     (STAGES.find((s) => pathname.startsWith(s.path))?.id as StageId | undefined) ??
     storeStage
   const projectId = useProjectStore((s) => s.projectId)
+
+  // 탭 전환 직후엔 임시 요소(제안·승인 카드·워밍 팁)를 숨겼다가 1초 뒤 계단식으로 등장
+  //   (#chat-settle 2026-08-03). 진입 즉시 이들이 그려지면 스레드가 밀리며 "채팅방이 다시
+  //   조립된다"로 읽힌다 — 잠깐의 정적 후 순서대로 나타나면 방은 그대로 있고 에이전트가
+  //   말을 거는 것으로 읽힌다. (stage 전환 감지는 set-state-in-render 패턴)
+  const [stageSettled, setStageSettled] = useState(false)
+  const [settledStage, setSettledStage] = useState(currentStage)
+  if (currentStage !== settledStage) {
+    setSettledStage(currentStage)
+    setStageSettled(false)
+  }
+  useEffect(() => {
+    if (stageSettled) return
+    const t = setTimeout(() => setStageSettled(true), EPHEMERAL_SETTLE_MS)
+    return () => clearTimeout(t)
+  }, [stageSettled, settledStage])
   // Artist는 카드 UI로 롤백되어 노드 전용 warm tip 훅 제거. 정적 안내로 대체.
   const directorWarmTip = useDirectorCanvasWarmStarting()
   const warmStartingTip =
@@ -251,7 +268,9 @@ export function GlobalChat() {
   //   구분선이 새로 붙기 때문 — 같은 방이 이어졌다는 표식이 화면 안에 들어와야 의미가 있다.
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length, loading, currentStage])
+    // stageSettled: 1초 뒤 계단식으로 등장하는 제안/승인 카드(#chat-settle)가 스레드 끝에
+    //   붙으므로, 나타나는 순간 끝까지 따라가야 화면 밖에서 조용히 뜨지 않는다.
+  }, [messages.length, loading, currentStage, stageSettled])
 
   // 입력창의 @멘션 ↔ 카드 하이라이트 동기화 (입력에서 지우면 자동 해제)
   useEffect(() => {
@@ -380,6 +399,25 @@ export function GlobalChat() {
     setDragging(false)
   }
 
+  // 계단식 등장(#chat-settle) — settle 후 보이는 임시 블록이 위에서부터 CASCADE_STEP_MS 간격으로
+  //   나타난다. fill-mode backwards: 자기 차례 전까지 첫 키프레임(투명)에 머문다.
+  const showSuggestion = stageSettled && !!suggestion && suggestion.stage === currentStage
+  const showProposal = stageSettled && !!pendingProposal && pendingProposal.stage === currentStage
+  const showWarmTip =
+    stageSettled &&
+    (currentStage === 'artist' || currentStage === 'director') &&
+    !!warmStartingTip
+  let cascadeSlots = 0
+  const suggestionSlot = showSuggestion ? cascadeSlots++ : 0
+  const proposalSlot = showProposal ? cascadeSlots++ : 0
+  const tipSlot = showWarmTip ? cascadeSlots++ : 0
+  const cascadeStyle = (slot: number): React.CSSProperties => ({
+    animationDelay: `${slot * CASCADE_STEP_MS}ms`,
+    animationFillMode: 'backwards',
+  })
+  const CASCADE_IN =
+    'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out motion-reduce:animate-none'
+
   return (
     <>
       {/* 좌측 레일과 짝을 이루는 둥근 부유 패널 (#shell-lift 2026-07-31).
@@ -505,9 +543,16 @@ export function GlobalChat() {
               </div>
             )}
 
-            {/* 프로액티브 제안 (chat-proactive-copilot Phase 1) — 시스템이 먼저 거는 actionable 넛지 */}
-            {suggestion && suggestion.stage === currentStage && (
-              <div className="mr-4 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-foreground">
+            {/* 프로액티브 제안 (chat-proactive-copilot Phase 1) — 시스템이 먼저 거는 actionable 넛지.
+                탭 전환 후 1초 정적을 두고 계단식 등장(#chat-settle). */}
+            {showSuggestion && suggestion && (
+              <div
+                className={cn(
+                  'mr-4 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-foreground',
+                  CASCADE_IN,
+                )}
+                style={cascadeStyle(suggestionSlot)}
+              >
                 <div className="mb-1 flex items-center gap-1.5">
                   <AgentFace color={STAGE_FACE_COLOR[suggestion.stage]} size={18} animate={false} />
                   <span className="text-[11px] font-medium text-muted-foreground">
@@ -536,8 +581,14 @@ export function GlobalChat() {
               </div>
             )}
 
-            {pendingProposal && pendingProposal.stage === currentStage && (
-              <div className="mr-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground">
+            {showProposal && pendingProposal && (
+              <div
+                className={cn(
+                  'mr-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground',
+                  CASCADE_IN,
+                )}
+                style={cascadeStyle(proposalSlot)}
+              >
                 <div className="flex items-start gap-1.5">
                   <span
                     className={cn(
@@ -587,12 +638,17 @@ export function GlobalChat() {
           </button>
         )}
 
-        {(currentStage === 'artist' || currentStage === 'director') &&
-          warmStartingTip && (
-            <div className="shrink-0 border-t border-warning/30 bg-warning/10 px-4 py-1.5 text-[11px] text-warning">
-              {warmStartingTip}
-            </div>
-          )}
+        {showWarmTip && (
+          <div
+            className={cn(
+              'shrink-0 border-t border-warning/30 bg-warning/10 px-4 py-1.5 text-[11px] text-warning',
+              CASCADE_IN,
+            )}
+            style={cascadeStyle(tipSlot)}
+          >
+            {warmStartingTip}
+          </div>
+        )}
 
         {/* Input footer — Textarea가 입력 길이에 따라 자동 확장 (한 줄 min-h-9 → 최대 10줄).
             max-h = 10줄(leading-5 20px×10) + py-2(16px) + border(2px) = 218px. 그 이상은 내부

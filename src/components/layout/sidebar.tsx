@@ -9,6 +9,7 @@ import {
   Clapperboard,
   Film,
   Home,
+  Loader2,
   Pencil,
   MessageCircle,
 } from 'lucide-react'
@@ -53,6 +54,23 @@ export function Sidebar() {
   const stageBadges = useGlobalChatStore((s) => s.stageBadges)
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const renameProject = useProjectStore((s) => s.renameProject)
+
+  // 스테이지 라우트 프리페치(#tab-slide 2026-08-03) — 탭 클릭 시점에 RSC payload·JS 청크를
+  //   받기 시작하면 그 다운로드가 곧 "무응답 구간"이 된다. 미리 받아두면 클릭 → 커밋이 즉시다.
+  //   (dev 서버는 prefetch 를 무시하므로 효과는 프로덕션에서만 보인다.)
+  useEffect(() => {
+    for (const stage of STAGES) router.prefetch(stage.path)
+  }, [router])
+
+  // 클릭 즉시 피드백(#tab-slide) — 라우트 커밋(청크 로드·렌더)까지의 공백 동안 아무 반응이
+  //   없으면 유저는 다시 누른다. 클릭 순간 목적지 셀을 활성으로 옮기고, 150ms 넘게 걸리면
+  //   스피너를 보인다. pathname 이 바뀌면(어디로든) 해제.
+  const [pendingStage, setPendingStage] = useState<StageId | null>(null)
+  const [prevPathname, setPrevPathname] = useState(pathname)
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname)
+    setPendingStage(null)
+  }
 
   const reachedStageIndex = STAGES.findIndex((stage) => stage.id === reachedStage)
   const artistImageLockCopy =
@@ -169,7 +187,11 @@ export function Sidebar() {
       <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto">
         {STAGES.map((stage) => {
           const Icon = STAGE_ICONS[stage.id]
-          const isActive = pathname.startsWith(stage.path)
+          const isCommitted = pathname.startsWith(stage.path)
+          // 이동 중엔 목적지가 곧 활성 — 클릭 프레임부터 하이라이트가 옮겨가 있어야
+          //   "눌렸다"가 보인다. 커밋되면 pendingStage 가 해제되며 pathname 기준으로 복귀.
+          const isActive = pendingStage ? pendingStage === stage.id : isCommitted
+          const isPending = pendingStage === stage.id && !isCommitted
           const isLocked = !canNavigateTo(stage.id)
           const reachedByStage =
             STAGES.findIndex((item) => item.id === stage.id) <= reachedStageIndex
@@ -187,7 +209,10 @@ export function Sidebar() {
                   onClick={() => {
                     if (isArtistRetryable) void retryArtistDrafts()
                     // 데모(URL 티켓): share 쿼리 유지 — 쿠키 차단 브라우저에서도 스테이지 이동 생존
-                    else if (!isLocked) router.push(withDemoShare(stage.path))
+                    else if (!isLocked && !isCommitted) {
+                      setPendingStage(stage.id)
+                      router.push(withDemoShare(stage.path))
+                    }
                   }}
                   disabled={isLocked && !isArtistRetryable}
                   className={cn(
@@ -211,6 +236,15 @@ export function Sidebar() {
                   {badge > 0 && (
                     <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-primary-foreground">
                       {badge > 9 ? '9+' : badge}
+                    </span>
+                  )}
+                  {/* 이동 중 스피너 — 150ms 안에 커밋되면 안 보인다(fill-mode backwards 로 지연). */}
+                  {isPending && (
+                    <span
+                      className="absolute bottom-0.5 right-0.5 animate-in fade-in-0 duration-150 motion-reduce:animate-none"
+                      style={{ animationDelay: '150ms', animationFillMode: 'backwards' }}
+                    >
+                      <Loader2 className="size-3 animate-spin text-muted-foreground" />
                     </span>
                   )}
                 </button>

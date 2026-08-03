@@ -1,10 +1,13 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useProducerStore } from '@/stores/producer-store'
+import { useWriterStore } from '@/stores/writer-store'
+import { useArtistStore } from '@/stores/artist-store'
 import { Sidebar } from '@/components/layout/sidebar'
 import { GlobalChat } from '@/components/layout/global-chat'
 import { useIdleTimeout } from '@/hooks/use-idle-timeout'
@@ -18,7 +21,7 @@ import {
 } from '@/lib/constants'
 import type { StageId } from '@/types'
 import { installDemoFetchGuard } from '@/lib/demo/fetch-guard'
-import { readDemoToken, withDemoShare } from '@/lib/demo/context'
+import { isDemoSession, readDemoToken, withDemoShare } from '@/lib/demo/context'
 import { DemoBanner } from '@/components/demo/demo-banner'
 
 // 데모(공유) 세션이면 첫 클라 진입 시 window.fetch 를 가드로 교체(멱등, 내부에서 isDemoSession 판정).
@@ -83,6 +86,28 @@ export default function StudioLayout({
     window.history.replaceState(null, '', `${pathname}?${params.toString()}`)
   }, [projectId, pathname])
 
+  // 스테이지 데이터 워밍(#tab-slide 2026-08-03) — 탭 최초 진입의 "빈 화면 + 스피너" 구간 축소.
+  //   다섯 뷰를 동시에 마운트하는 대신(저사양에서 부담) 각 store 의 데이터만 미리 채운다:
+  //   뷰 마운트는 클릭 시점 그대로지만 렌더에 필요한 진실이 이미 store 에 있어 첫 프레임부터
+  //   내용이 나온다. director 는 writer store 를 재료로 mount 시 조립하므로 writer 워밍이 곧
+  //   director 워밍이다. 규칙:
+  //   - 현재 stage 는 자기 페이지가 직접 로드 → 건너뜀 (중복 fetch 방지)
+  //   - demo 세션은 스냅샷이 진실 — DB 를 읽으면 빈 값으로 덮어써 데모가 깨진다 → 전면 skip
+  //   - 프로젝트당 1회, 진입 1.5s 뒤(현재 페이지의 자체 로딩과 대역폭 경합하지 않게)
+  const warmedProjectRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!projectId || initLoading || isDemoSession()) return
+    if (warmedProjectRef.current === projectId) return
+    warmedProjectRef.current = projectId
+    const t = setTimeout(() => {
+      const stage = useProjectStore.getState().currentStage
+      if (stage !== 'producer') void useProducerStore.getState().loadProject()
+      if (stage !== 'writer') void useWriterStore.getState().loadProject()
+      if (stage !== 'artist') void useArtistStore.getState().loadData()
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [projectId, initLoading])
+
   // URL ↔ currentStage 동기화 + 잠긴 stage 리다이렉트.
   // Sidebar 클릭이나 직접 URL 진입 시에도 GlobalChat이 올바른 stage로 동작하도록.
   useEffect(() => {
@@ -120,8 +145,10 @@ export default function StudioLayout({
       >
         {/* h-screen으로 높이 고정 + overflow-y-auto: 내용이 화면을 넘치면
             세로 스크롤 자동 생성. 캔버스 페이지(director)는 flex-1로 딱 채워
-            넘치지 않으므로 스크롤 미발생 — 카드 페이지만 스크롤된다. */}
-        <div className="flex h-screen flex-col overflow-y-auto">{children}</div>
+            넘치지 않으므로 스크롤 미발생 — 카드 페이지만 스크롤된다.
+            overflow-x-hidden: 전환 슬라이드(#tab-slide, template.tsx)가 24px 를 밀고
+            들어오는 동안 가로 스크롤바가 깜빡이지 않게. */}
+        <div className="flex h-screen flex-col overflow-x-hidden overflow-y-auto">{children}</div>
       </main>
       <GlobalChat />
     </>
