@@ -12,13 +12,15 @@ import {
 } from 'lucide-react'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
+import { SectionNav } from '@/components/marketing/section-nav'
 import { LANDING_SHOWCASE, type ShowcaseSlot } from '@/lib/landing-content'
 import { cn } from '@/lib/utils'
 
 // 랜딩 (#landing-v2 2026-08-03) — aistudio.google.com/models/veo 참고: 풀스크린 몰입 섹션들이
-//   한 기능씩 보여주고 스냅 스크롤로 넘어간다. 프로젝트 목록은 /projects 로 분리됐고,
-//   로그인 상태는 middleware 가 이 페이지 진입 자체를 /projects 로 돌린다.
-// 서버 컴포넌트(클라 JS 0) — 영상은 네이티브 속성(autoPlay/muted/loop)만으로 재생.
+//   한 기능씩 보여준다. 프로젝트 목록은 /projects 로 분리됐고, 로그인 상태는 middleware 가
+//   이 페이지 진입 자체를 /projects 로 돌린다.
+// 스크롤(#landing-v2c): 스냅(y-mandatory)은 트랙패드에서 뚝뚝 끊겨 제거 — 연속 스크롤 +
+//   우측 "-" 목차(SectionNav)로 섹션 점프. 섹션 id 는 아래 LANDING_SECTIONS 가 진실.
 
 export const metadata: Metadata = {
   title: 'Tale Studio — 스토리 한 줄이 Previz 영상이 되기까지',
@@ -29,6 +31,15 @@ export const metadata: Metadata = {
     description: '스토리 한 줄이 Previz 영상이 되기까지 — AI 프리프로덕션 스튜디오',
   },
 }
+
+// 우측 "-" 목차의 진실 — 섹션 id·표시명 (SectionNav 와 아래 <section id> 가 함께 쓴다)
+const LANDING_SECTIONS = [
+  { id: 'hero', label: '홈' },
+  { id: 'pipeline', label: 'AI 팀' },
+  { id: 'previz', label: 'Previz' },
+  { id: 'collab', label: '공유·리뷰' },
+  { id: 'start', label: '시작하기' },
+] as const
 
 const STAGES_SHOWCASE = [
   {
@@ -102,11 +113,12 @@ function ShowcaseVideo({
 
 export default function LandingPage() {
   return (
-    <div className="h-svh snap-y snap-mandatory overflow-y-auto bg-black text-white">
+    <div className="bg-black text-white">
       <SiteHeader />
+      <SectionNav sections={LANDING_SECTIONS} />
 
       {/* ── 1. Hero — 무엇을 하는 곳인지 한 문장 + 대표 영상 ── */}
-      <section className="relative flex min-h-svh snap-start flex-col items-center justify-center px-6">
+      <section id="hero" className="relative flex min-h-svh flex-col items-center justify-center px-6">
         <ShowcaseVideo slot={LANDING_SHOWCASE.hero} />
         <div className="relative z-10 mx-auto max-w-4xl text-center">
           <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-medium tracking-wide text-gray-300 backdrop-blur-md">
@@ -145,7 +157,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── 2. 파이프라인 — 5명의 AI 팀이 이어달리는 과정 ── */}
-      <section className="relative flex min-h-svh snap-start flex-col items-center justify-center px-6 py-20">
+      <section id="pipeline" className="relative flex min-h-svh flex-col items-center justify-center px-6 py-20">
         <div className="mx-auto w-full max-w-6xl">
           <p className="mb-3 text-center text-xs font-bold uppercase tracking-[0.25em] text-gray-500">
             How it works
@@ -177,7 +189,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── 3. Previz — 같은 샷의 3단 변신 ── */}
-      <section className="relative flex min-h-svh snap-start flex-col items-center justify-center overflow-hidden px-6 py-20">
+      <section id="previz" className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-20">
         <ShowcaseVideo slot={LANDING_SHOWCASE.previz} />
         <div className="relative z-10 mx-auto w-full max-w-5xl text-center">
           <p className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-gray-500">Previz</p>
@@ -203,7 +215,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── 4. 공유·리뷰 ── */}
-      <section className="relative flex min-h-svh snap-start flex-col items-center justify-center overflow-hidden px-6 py-20">
+      <section id="collab" className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-20">
         <ShowcaseVideo slot={LANDING_SHOWCASE.collab} />
         <div className="relative z-10 mx-auto max-w-3xl text-center">
           <Share2 className="mx-auto mb-6 size-10 text-primary" />
@@ -226,7 +238,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── 5. 마지막 CTA + 푸터 ── */}
-      <section className="relative flex min-h-svh snap-start flex-col justify-between">
+      <section id="start" className="relative flex min-h-svh flex-col justify-between">
         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
           <h2 className="mb-6 text-4xl font-semibold tracking-tighter md:text-6xl">
             오늘의 아이디어를
