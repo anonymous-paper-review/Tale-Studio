@@ -5,9 +5,14 @@
 // 기본은 전체 시트 정지. hover 하면 Character Concept → Detail Point(3칸 한 번에) →
 //   Sketch Style → Face Expression Guide(앞 3칸) 순으로 확대 이동하고, 벗어나면 전체로 복귀.
 //   RoughFrameCycle 과 같은 UX 원칙 — 전 카드 동시 재생은 정보 과다, hover 중에만 움직인다.
-// 리전 좌표는 public/character-template.png 실측 비율. 생성 프롬프트가 템플릿 레이아웃을
-//   그대로 유지하라고 강제하므로(lib/artist/turnaround.ts) 상대 좌표가 안정적이다 —
-//   lib/artist/portrait.ts 의 서버 크롭과 같은 전제. 템플릿을 교체하면 여기도 재실측할 것.
+//
+// 좌표 정합(#d1-fix2 2026-08-03): 리전 좌표는 실제 생성 시트 실측 프랙션(데모 프로젝트 시트
+//   2장에서 박스 위치 확인 — 프롬프트가 템플릿 레이아웃을 고정하므로 시트 간 안정적).
+//   치우침의 진범은 종횡비였다: 생성 시트는 정확한 16:9 가 아니라(실측 1088×608 = 1.7895)
+//   object-cover 가 그 차이를 좌우 중앙 크롭으로 흡수하며 콘텐츠가 한쪽으로 밀렸다.
+//   → naturalWidth/Height 를 로드 시 읽어 시트 비율 그대로의 박스를 계산하고 object-fill 로
+//   왜곡·암묵 크롭 없이 매핑한다(WYSIWYG). 리전이 컨테이너 비율과 다르면 초과 축을 중앙에서
+//   대칭으로 잘라 경계 노출을 최소화한다.
 
 import { useEffect, useState, type CSSProperties } from 'react'
 import { cn } from '@/lib/utils'
@@ -23,30 +28,32 @@ interface SheetRegion {
 const FULL_SHEET: SheetRegion = { label: '', x0: 0, y0: 0, x1: 1, y1: 1 }
 
 /** hover 순환 순서 (사용자 지정 2026-08-03): 컨셉 → 디테일 3칸 → 스케치 → 표정 3칸.
- *
- * 좌표 규칙(#d1-fix): 컨테이너와 시트가 같은 16:9 이므로 **w 프랙션 == h 프랙션**이어야
- * cover 크롭이 지정 창과 정확히 일치한다(WYSIWYG). v1 은 박스 외곽선 좌표를 그대로 써서
- * 비율이 어긋났고, cover 가 임의로 잘라 이웃 박스의 경계선들이 새어 들어왔다.
- * 각 리전은 박스 테두리 *안쪽*을 기준으로 잡고 비율을 맞춰 상하/좌우로 확장한다 —
- * detail 행처럼 행이 창보다 낮으면 위아래로 이웃 테두리가 한 줄씩 걸리는 건 기하상 불가피
- * (전폭 3칸을 다 보여야 하므로), 대신 프레임 라인처럼 가장자리에 붙게 중심을 잡았다. */
+ *  좌표는 실제 생성 시트 실측 — 왼쪽 열 박스 x 0.006..0.304 공통(사용자 확인대로 한 번에 정렬). */
 const CYCLE_REGIONS: readonly SheetRegion[] = [
-  { label: 'Character concept', x0: 0.0135, y0: 0.0876, x1: 0.3094, y1: 0.3835 },
-  { label: 'Detail points', x0: 0.0135, y0: 0.3995, x1: 0.3094, y1: 0.6955 },
-  { label: 'Sketch style', x0: 0.0185, y0: 0.69, x1: 0.3045, y1: 0.976 },
-  { label: 'Face expression guide', x0: 0.5625, y0: 0.7225, x1: 0.84, y1: 1.0 },
+  { label: 'Character concept', x0: 0.006, y0: 0.0615, x1: 0.304, y1: 0.3595 },
+  { label: 'Detail points', x0: 0.006, y0: 0.4085, x1: 0.304, y1: 0.7065 },
+  { label: 'Sketch style', x0: 0.006, y0: 0.6965, x1: 0.304, y1: 0.9945 },
+  { label: 'Face expression guide', x0: 0.538, y0: 0.739, x1: 0.801, y1: 1.0 },
 ]
 
 const REGION_HOLD_MS = 1600 // 팬(700ms) + 정지 — 읽을 시간을 준다
+const CONTAINER_AR = 16 / 9
 
-/** 리전이 컨테이너를 cover 하도록 시트 이미지를 확대·이동. 컨테이너/시트 모두 16:9 전제. */
-function regionStyle(r: SheetRegion): CSSProperties {
-  const k = Math.max(1 / (r.x1 - r.x0), 1 / (r.y1 - r.y0))
+/**
+ * 리전이 컨테이너를 cover 하도록 시트 이미지를 확대·이동.
+ * sheetAr(시트 실제 종횡비)를 반영해 요소 박스를 시트 비율 그대로 잡는다 — object-fill 이라
+ * 브라우저의 암묵 크롭이 없고, 프랙션 좌표가 두 축 모두 정확히 매핑된다.
+ */
+function regionStyle(r: SheetRegion, sheetAr: number | null): CSSProperties {
+  const ratio = (sheetAr ?? CONTAINER_AR) / CONTAINER_AR // >1 = 시트가 컨테이너보다 넓다
+  // 컨테이너 대비 렌더 폭/높이 배수 — 두 축 모두 리전을 덮는 최소 확대(왜곡 없음).
+  const wFrac = Math.max(1 / (r.x1 - r.x0), ratio / (r.y1 - r.y0))
+  const hFrac = wFrac / ratio
   const cx = (r.x0 + r.x1) / 2
   const cy = (r.y0 + r.y1) / 2
   return {
-    width: `${k * 100}%`,
-    height: `${k * 100}%`,
+    width: `${wFrac * 100}%`,
+    height: `${hFrac * 100}%`,
     left: '50%',
     top: '50%',
     transform: `translate(-${cx * 100}%, -${cy * 100}%)`,
@@ -56,6 +63,7 @@ function regionStyle(r: SheetRegion): CSSProperties {
 export function TurnaroundRegionCycle({ url, alt }: { url: string; alt: string }) {
   const [hovering, setHovering] = useState(false)
   const [idx, setIdx] = useState(0) // CYCLE_REGIONS 인덱스 (hover 중에만 의미)
+  const [sheetAr, setSheetAr] = useState<number | null>(null)
 
   useEffect(() => {
     if (!hovering) return
@@ -79,8 +87,12 @@ export function TurnaroundRegionCycle({ url, alt }: { url: string; alt: string }
         src={url}
         alt={alt}
         draggable={false}
-        className="absolute max-w-none object-cover transition-[width,height,transform] duration-700 ease-in-out motion-reduce:transition-none"
-        style={regionStyle(region)}
+        onLoad={(e) => {
+          const el = e.currentTarget
+          if (el.naturalWidth && el.naturalHeight) setSheetAr(el.naturalWidth / el.naturalHeight)
+        }}
+        className="absolute max-w-none object-fill transition-[width,height,transform] duration-700 ease-in-out motion-reduce:transition-none"
+        style={regionStyle(region, sheetAr)}
       />
       {/* 현재 리전 라벨 — hover 중에만 (RoughFrameCycle 인디케이터와 동일 톤) */}
       <span
