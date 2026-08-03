@@ -18,7 +18,8 @@ export async function GET(request: Request) {
   const rawNext = cookieStore.get(NEXT_PATH_COOKIE)?.value
   const next = sanitizeNextPath(rawNext ? decodeURIComponent(rawNext) : null)
 
-  const res = NextResponse.redirect(`${origin}${next ?? '/#projects'}`)
+  // #landing-v2: 프로젝트 목록이 /projects 독립 페이지가 됐다 (옛 기본값 '/#projects').
+  const res = NextResponse.redirect(`${origin}${next ?? '/projects'}`)
   if (rawNext) res.cookies.set(NEXT_PATH_COOKIE, '', { path: '/', maxAge: 0 })
   return res
 }

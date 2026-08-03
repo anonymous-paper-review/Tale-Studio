@@ -49,7 +49,7 @@ export default function LoginPage() {
       const next = sanitizeNextPath(
         new URLSearchParams(window.location.search).get('next'),
       )
-      router.replace(next ?? '/#projects')
+      router.replace(next ?? '/projects') // #landing-v2: 프로젝트 목록은 /projects 독립 페이지
       router.refresh()
     } catch {
       // 네트워크/예외도 원본 비노출 동일 일반 메시지 + submitting 해제(버튼 고착 방지).

@@ -47,8 +47,14 @@ export async function middleware(request: NextRequest) {
   const hasDemoShare = request.cookies.has('demo_share')
   const shareParam = request.nextUrl.searchParams.get('share')
   const hasShareTicket = !!shareParam && /^[0-9a-f]{64}$/i.test(shareParam)
-  const isPublicPath =
+  // 마케팅 표면(#landing-v2 2026-08-03): 랜딩·요금·문서·공개 갤러리 — 로그인 없이 접근.
+  const isMarketingPath =
     pathname === '/' ||
+    pathname.startsWith('/pricing') ||
+    pathname.startsWith('/docs') ||
+    pathname.startsWith('/playground')
+  const isPublicPath =
+    isMarketingPath ||
     pathname.startsWith('/login') ||
     isPublicAsset ||
     isSharePath ||
@@ -73,7 +79,12 @@ export async function middleware(request: NextRequest) {
   //   홈/로그인/실 스튜디오까지 사이트 전체가 데모모드(createClient→shim)로 오염된다. 데모는 /share·/studio
   //   에서만 유효하므로, 실제 진입면(홈·로그인)에 도달하면 쿠키를 만료시켜 실 세션/인증을 복구한다.
   //   (share 링크 재진입 시 /share 페이지가 쿠키를 다시 세팅한다.)
-  if (hasDemoShare && (pathname === '/' || pathname.startsWith('/login'))) {
+  //   (#landing-v2: 실 진입면이 홈·로그인에서 마케팅 표면 전체 + /projects 로 넓어졌다 —
+  //   demo_share 가 남으면 playground 의 /api fetch 까지 데모 shim 에 중립화된다.)
+  if (
+    hasDemoShare &&
+    (isMarketingPath || pathname.startsWith('/login') || pathname.startsWith('/projects'))
+  ) {
     supabaseResponse.cookies.set('demo_share', '', { path: '/', maxAge: 0 })
     request.cookies.delete('demo_share')
   }
@@ -99,10 +110,16 @@ export async function middleware(request: NextRequest) {
     return redirectWithSession(url)
   }
 
-  // Logged in but on /login → next 가 있으면 그곳으로(검증 통과분만), 없으면 home
+  // Logged in but on /login → next 가 있으면 그곳으로(검증 통과분만), 없으면 프로젝트 페이지
   if (user && request.nextUrl.pathname.startsWith('/login')) {
     const next = sanitizeNextPath(request.nextUrl.searchParams.get('next'))
-    return redirectWithSession(new URL(next ?? '/', request.url))
+    return redirectWithSession(new URL(next ?? '/projects', request.url))
+  }
+
+  // 로그인 상태의 랜딩 진입 차단(#landing-v2) — `/` 는 순수 마케팅 페이지가 됐다.
+  //   재방문 사용자에게 매번 랜딩을 보여주는 건 마찰이므로 프로젝트 페이지로 보낸다.
+  if (user && pathname === '/') {
+    return redirectWithSession(new URL('/projects', request.url))
   }
 
   return supabaseResponse

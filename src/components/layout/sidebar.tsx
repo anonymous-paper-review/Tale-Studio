@@ -126,7 +126,7 @@ export function Sidebar() {
       >
         <HoverCardTrigger asChild>
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/projects')}
             className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
           >
             <Home className="h-5 w-5" />
