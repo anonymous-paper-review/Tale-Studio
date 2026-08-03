@@ -147,8 +147,15 @@ export default function StudioLayout({
             세로 스크롤 자동 생성. 캔버스 페이지(director)는 flex-1로 딱 채워
             넘치지 않으므로 스크롤 미발생 — 카드 페이지만 스크롤된다.
             overflow-x-hidden: 전환 슬라이드(#tab-slide, template.tsx)가 24px 를 밀고
-            들어오는 동안 가로 스크롤바가 깜빡이지 않게. */}
-        <div className="flex h-screen flex-col overflow-x-hidden overflow-y-auto">{children}</div>
+            들어오는 동안 가로 스크롤바가 깜빡이지 않게.
+            data-stage-content: 세로 연속 스트립(#tab-slide-v2)의 view-transition-name 대상 —
+            h-screen 고정 높이라 스냅샷이 뷰포트 크기로 안정된다(globals.css §stage-strip). */}
+        <div
+          data-stage-content
+          className="flex h-screen flex-col overflow-x-hidden overflow-y-auto"
+        >
+          {children}
+        </div>
       </main>
       <GlobalChat />
     </>

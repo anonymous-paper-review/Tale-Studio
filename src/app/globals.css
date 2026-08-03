@@ -451,3 +451,55 @@
   max-width: 14px;
   max-height: 14px;
 }
+
+/* ── 스테이지 전환: 세로 연속 스트립 (#tab-slide-v2 2026-08-03) ──
+   다섯 탭을 세로로 이어 붙인 필름 스트립 연출 — 순방향(레일 아래쪽으로)이면 옛 화면이 위로
+   빠지며 새 화면이 아래에서 이어져 들어온다(역방향은 반대). old/new 가 같은 거리(100%)·같은
+   타이밍으로 움직여 두 화면이 한 장의 스트립으로 읽힌다.
+   본문 스크롤 컨테이너(studio layout)에만 view-transition-name 을 부여 — 레일·채팅은 root
+   크로스페이드(픽셀 동일 → 비가시). 방향은 startStageViewTransition(stage-transition.ts)이
+   <html data-stage-nav> 로 지정하고 종료 시 제거한다. reduced-motion 이면 JS 가 VT 자체를
+   건너뛰지만, CSS 도 no-preference 로 이중 방어. */
+[data-stage-content] {
+  view-transition-name: stage-content;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html[data-stage-nav]::view-transition-old(stage-content),
+  html[data-stage-nav]::view-transition-new(stage-content) {
+    animation-duration: 340ms;
+    animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+    animation-fill-mode: both;
+  }
+  html[data-stage-nav='forward']::view-transition-old(stage-content) {
+    animation-name: stage-strip-out-up;
+  }
+  html[data-stage-nav='forward']::view-transition-new(stage-content) {
+    animation-name: stage-strip-in-up;
+  }
+  html[data-stage-nav='back']::view-transition-old(stage-content) {
+    animation-name: stage-strip-out-down;
+  }
+  html[data-stage-nav='back']::view-transition-new(stage-content) {
+    animation-name: stage-strip-in-down;
+  }
+}
+@keyframes stage-strip-out-up {
+  to {
+    transform: translateY(-100%);
+  }
+}
+@keyframes stage-strip-in-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes stage-strip-out-down {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes stage-strip-in-down {
+  from {
+    transform: translateY(-100%);
+  }
+}

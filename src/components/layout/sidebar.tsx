@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/hover-card'
 import { cn } from '@/lib/utils'
 import { STAGES, STAGE_LABEL, SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
+import { navigateWithStageSlide } from '@/lib/stage-transition'
 import { UserMenu } from '@/components/layout/user-menu'
 import { ContactPopover } from '@/components/contact-popover'
 import { ExportMenu } from '@/components/export-menu'
@@ -211,7 +212,10 @@ export function Sidebar() {
                     // 데모(URL 티켓): share 쿼리 유지 — 쿠키 차단 브라우저에서도 스테이지 이동 생존
                     else if (!isLocked && !isCommitted) {
                       setPendingStage(stage.id)
-                      router.push(withDemoShare(stage.path))
+                      // 세로 연속 스트립 전환(#tab-slide-v2) — 방향은 현재 경로 ↔ 목적지로 계산.
+                      navigateWithStageSlide(pathname, stage.path, () =>
+                        router.push(withDemoShare(stage.path)),
+                      )
                     }
                   }}
                   disabled={isLocked && !isArtistRetryable}

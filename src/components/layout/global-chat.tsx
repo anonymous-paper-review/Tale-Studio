@@ -39,7 +39,11 @@ import {
   SHELL_INSET,
 } from '@/lib/constants'
 import { buildChatSections } from '@/lib/chat-sections'
-import { CASCADE_STEP_MS, EPHEMERAL_SETTLE_MS } from '@/lib/stage-transition'
+import {
+  CASCADE_STEP_MS,
+  EPHEMERAL_SETTLE_MS,
+  navigateWithStageSlide,
+} from '@/lib/stage-transition'
 import type { StageId } from '@/types'
 
 // 이 세션에서 이미 타이핑 연출을 재생한 suggestion id — 재렌더/스테이지 왕복 시 재생 방지(#b1).
@@ -257,12 +261,12 @@ export function GlobalChat() {
   }, [projectId, loadMessages])
 
   // 핸드오프 성공 후 이동(#handoff-to-chat) — 라우팅은 컴포넌트 책임이라 store 가 남긴 경로를
-  //   여기서 소비하고 즉시 비운다(같은 경로로 두 번 밀지 않게).
+  //   여기서 소비하고 즉시 비운다(같은 경로로 두 번 밀지 않게). 세로 스트립 전환(#tab-slide-v2).
   useEffect(() => {
     if (!pendingNavigatePath) return
     useGlobalChatStore.setState({ pendingNavigatePath: null })
-    router.push(pendingNavigatePath)
-  }, [pendingNavigatePath, router])
+    navigateWithStageSlide(pathname, pendingNavigatePath, () => router.push(pendingNavigatePath))
+  }, [pendingNavigatePath, router, pathname])
 
   // 새 메시지·stage 이동 시 스레드 끝으로. stage 를 넣는 이유는 이동하면 끝에 "지금" 구간
   //   구분선이 새로 붙기 때문 — 같은 방이 이어졌다는 표식이 화면 안에 들어와야 의미가 있다.
@@ -359,7 +363,7 @@ export function GlobalChat() {
     }
     const path = await handoffToStage(action.targetStage)
     dismissSuggestion()
-    if (path) router.push(path)
+    if (path) navigateWithStageSlide(pathname, path, () => router.push(path))
   }
 
   const handlePendingProposalApprove = async () => {
