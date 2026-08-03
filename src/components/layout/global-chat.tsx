@@ -178,14 +178,10 @@ export function GlobalChat() {
     const t = setTimeout(() => setStageSettled(true), EPHEMERAL_SETTLE_MS)
     return () => clearTimeout(t)
   }, [stageSettled, settledStage])
-  // Artist는 카드 UI로 롤백되어 노드 전용 warm tip 훅 제거. 정적 안내로 대체.
+  // artist 정적 팁은 제거(#d1 2026-08-03 — 헤더 도움말과 중복인 상시 경고 바였다).
+  //   director 는 캔버스 워밍 상태를 알리는 동적 팁만 유지.
   const directorWarmTip = useDirectorCanvasWarmStarting()
-  const warmStartingTip =
-    currentStage === 'artist'
-      ? '캐릭터/장소 시트를 생성한 뒤 Register로 Director에 넘기세요.'
-      : currentStage === 'director'
-        ? directorWarmTip
-        : null
+  const warmStartingTip = currentStage === 'director' ? directorWarmTip : null
 
   // 폭 리사이즈 + 접기 (chat-ui-store, persist)
   const chatWidth = useChatUiStore((s) => s.chatWidth)
@@ -407,10 +403,7 @@ export function GlobalChat() {
   //   나타난다. fill-mode backwards: 자기 차례 전까지 첫 키프레임(투명)에 머문다.
   const showSuggestion = stageSettled && !!suggestion && suggestion.stage === currentStage
   const showProposal = stageSettled && !!pendingProposal && pendingProposal.stage === currentStage
-  const showWarmTip =
-    stageSettled &&
-    (currentStage === 'artist' || currentStage === 'director') &&
-    !!warmStartingTip
+  const showWarmTip = stageSettled && currentStage === 'director' && !!warmStartingTip
   let cascadeSlots = 0
   const suggestionSlot = showSuggestion ? cascadeSlots++ : 0
   const proposalSlot = showProposal ? cascadeSlots++ : 0
@@ -427,6 +420,8 @@ export function GlobalChat() {
       {/* 좌측 레일과 짝을 이루는 둥근 부유 패널 (#shell-lift 2026-07-31).
           접힘 이동거리는 100% + INSET — inset 만큼 띄워 놨으므로 100% 만으론 가장자리가 남는다. */}
       <aside
+        // data-chat-panel: 멘션 비행 연출(mention-flight)이 입력창 위치를 찾는 앵커
+        data-chat-panel
         className={cn(
           'fixed z-sidebar flex flex-col rounded-2xl border border-border bg-card shadow-lg transition-transform duration-350 ease-out',
           collapsed && 'translate-x-[calc(100%_+_var(--shell-inset))]',

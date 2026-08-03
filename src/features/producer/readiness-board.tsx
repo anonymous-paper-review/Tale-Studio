@@ -19,8 +19,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronsDown,
-  ChevronsUp,
   Clock,
   Film,
   GalleryHorizontal,
@@ -59,6 +57,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
+import { launchMentionFlight } from '@/lib/mention-flight'
 import { useProducerStore, type StyleAnchor } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { BackgroundSource, CastArc, CastMember, CastMotivation, GateIssue, GateResult, EntityType } from '@/lib/producer-gate'
@@ -188,7 +187,8 @@ type MentionTone = 'mentioned' | 'pulse' | 'armed' | 'idle'
 
 const MENTION_BASE: Record<MentionVariant, string> = {
   card: 'group relative rounded-xl border p-4 transition-shadow',
-  row: 'group relative px-3 py-1.5 transition-colors',
+  // py-3: 줄 사이 숨 쉴 틈 (#b1 2026-08-03 — py-1.5 는 정보 밀도가 너무 높았다)
+  row: 'group relative px-3 py-3 transition-colors',
 }
 const MENTION_TONE: Record<MentionVariant, Record<MentionTone, string>> = {
   card: {
@@ -232,11 +232,22 @@ function MentionableCard({
   return (
     <div
       className={cn(MENTION_BASE[variant], MENTION_TONE[variant][tone], armed && 'cursor-copy', className)}
-      onClick={(e) => {
+      // ⌘/Ctrl 클릭은 멘션 전용(#b5 2026-08-03) — 캡처 단계에서 기본 동작을 끊는다.
+      //   포커스는 pointerdown 에서 일어나고 radix 콤보박스도 pointerdown 으로 열리므로,
+      //   click 만 막으면 입력창에 커서가 앉거나 드롭다운이 펼쳐진 채 멘션된다.
+      onPointerDownCapture={(e) => {
         if (e.metaKey || e.ctrlKey) {
           e.preventDefault()
-          requestMentionToggle(label)
+          e.stopPropagation()
         }
+      }}
+      onClickCapture={(e) => {
+        if (!(e.metaKey || e.ctrlKey)) return
+        e.preventDefault()
+        e.stopPropagation()
+        requestMentionToggle(label)
+        // 비행 연출 — 추가면 클릭 지점 → 채팅, 해제면 채팅 → 클릭 지점 (표시 전용)
+        launchMentionFlight({ label, clickX: e.clientX, clickY: e.clientY, toChat: !mentioned })
       }}
     >
       <span
@@ -693,7 +704,17 @@ function CastRow({
 
   return (
     <MentionableCard variant="row" refId={member.localId} label={mentionLabel} className="px-2">
-      <div className="flex items-center gap-2">
+      {/* 상세 토글은 줄의 빈 공간 클릭(#b3 2026-08-03) — 버튼을 없애고 행 전체가 진입점.
+          입력·버튼 등 상호작용 요소 위 클릭은 무시. ⌘/Ctrl 은 카드 래퍼의 멘션 캡처가 선점. */}
+      <div
+        className={cn('flex items-center gap-2', isPerson && 'cursor-pointer')}
+        onClick={(e) => {
+          if (!isPerson || e.metaKey || e.ctrlKey) return
+          const target = e.target as HTMLElement
+          if (target.closest('input,textarea,button,a,[role="combobox"]')) return
+          setDetailsOpen((v) => !v)
+        }}
+      >
         {/* 삭제는 줄 왼쪽 끝, 프로듀서 호출은 오른쪽 끝 (#b4) */}
         <RowIconButton
           icon={Trash2}
@@ -701,9 +722,26 @@ function CastRow({
           destructive
           onClick={() => onDelete(member.localId)}
         />
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-          {isPerson ? <User className="size-4" /> : <Box className="size-4" />}
-        </span>
+        {/* 인물 아이콘 — hover 로 상세 안내, 미완료면 빨간 점(#b3) */}
+        {isPerson ? (
+          <Tooltip delayDuration={150}>
+            <TooltipTrigger asChild>
+              <span className="relative flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <User className="size-4" />
+                {!detailsOpen && detailIssueCount > 0 ? (
+                  <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-destructive" />
+                ) : null}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              상세 정보 (역할·아크·동기) — 줄의 빈 곳을 클릭하면 {detailsOpen ? '접혀요' : '펼쳐져요'}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+            <Box className="size-4" />
+          </span>
+        )}
 
         <FieldSlot needs={!!nameIssue} className="w-36 shrink-0">
           <HoverBeam>
@@ -753,34 +791,6 @@ function CastRow({
           </span>
         )}
 
-        {/* 상세(역할·아크·동기) 펼침 — 접힘+미완료면 빨간 점으로만 알린다 */}
-        {isPerson ? (
-          <Tooltip delayDuration={150}>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => setDetailsOpen((v) => !v)}
-                aria-expanded={detailsOpen}
-                aria-label={detailsOpen ? '상세 접기' : '상세 정보 (역할·아크·동기) 펼치기'}
-                className="relative flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                {detailsOpen ? (
-                  <ChevronsUp className="size-3.5" />
-                ) : (
-                  <ChevronsDown className="size-3.5" />
-                )}
-                {!detailsOpen && detailIssueCount > 0 ? (
-                  <span className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-destructive" />
-                ) : null}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              {detailsOpen ? '상세 접기' : '상세 정보 (역할·아크·동기)'}
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          <span className="size-7 shrink-0" aria-hidden />
-        )}
         <RowIconButton
           icon={Wand2}
           label="프로듀서에게 채워달라"
@@ -912,24 +922,16 @@ function BackgroundRow({
             />
           </HoverBeam>
         </FieldSlot>
+        {/* 묘사는 줄에, 목적은 아래 줄로(#b4 2026-08-03) — 각 필드에 row head 를 붙인다. */}
+        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">묘사</span>
         <FieldSlot needs={missing.includes('시각 설명')} className="flex-1">
           <HoverBeam>
             <Textarea
               value={background.visualDescription}
               rows={1}
               className={cn(CARD_TEXTAREA, QUIET_CONTROL, 'min-h-8 py-1.5')}
-              placeholder="시각 설명 — 색감, 구조, 소품, 분위기"
+              placeholder="색감, 구조, 소품, 분위기"
               onChange={(e) => onPatch(background.localId, { visualDescription: e.target.value })}
-            />
-          </HoverBeam>
-        </FieldSlot>
-        <FieldSlot needs={missing.includes('목적')} className="w-44 shrink-0">
-          <HoverBeam>
-            <Input
-              value={background.purpose}
-              placeholder="목적 (예: 추격의 시작)"
-              className={cn(QUIET_CONTROL, 'h-8')}
-              onChange={(e) => onPatch(background.localId, { purpose: e.target.value })}
             />
           </HoverBeam>
         </FieldSlot>
@@ -959,6 +961,20 @@ function BackgroundRow({
           label="프로듀서에게 채워달라"
           onClick={() => onAskProducer(backgroundDraftPrompt(background))}
         />
+      </div>
+      {/* 목적 — 둘째 줄. 들여쓰기는 첫 줄의 [삭제 28 + gap 8 + 아이콘 28 + gap 8] 에 맞춘다. */}
+      <div className="mt-1.5 flex items-center gap-2 pl-[4.5rem] pr-2">
+        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">목적</span>
+        <FieldSlot needs={missing.includes('목적')} className="max-w-md flex-1">
+          <HoverBeam>
+            <Input
+              value={background.purpose}
+              placeholder="예: 추격이 시작되는 공간"
+              className={cn(QUIET_CONTROL, 'h-8')}
+              onChange={(e) => onPatch(background.localId, { purpose: e.target.value })}
+            />
+          </HoverBeam>
+        </FieldSlot>
       </div>
     </MentionableCard>
   )

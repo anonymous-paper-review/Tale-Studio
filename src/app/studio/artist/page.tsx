@@ -23,6 +23,7 @@ import {
   type WriterGateStatus,
 } from '@/lib/lifecycle'
 import { classifyImageStale, lookVersionKey } from '@/lib/image-provenance'
+import { cn } from '@/lib/utils'
 import {
   buildArtistRefreshMessage,
   artistRefreshSuggestionKey,
@@ -30,6 +31,9 @@ import {
 } from '@/lib/artist/onboarding-message'
 
 type ArtistTab = 'characters' | 'world' | 'inventory'
+
+// 탭 순서 — 전환 슬라이드 방향의 기준 (#d3 2026-08-03, writer 탭과 동일 패턴).
+const ARTIST_TAB_ORDER: readonly ArtistTab[] = ['characters', 'world', 'inventory']
 
 export default function VisualPage() {
   const {
@@ -46,6 +50,21 @@ export default function VisualPage() {
 
   const projectId = useProjectStore((s) => s.projectId)
   const [tab, setTab] = useState<ArtistTab>('characters')
+  // 탭 전환 슬라이드(#d3) — 방향은 탭 순서 기준(왼→오른쪽 = forward). set-state-in-render 패턴.
+  const [prevTab, setPrevTab] = useState<ArtistTab>(tab)
+  const [tabSlide, setTabSlide] = useState<'forward' | 'back' | 'none'>('none')
+  if (tab !== prevTab) {
+    setTabSlide(
+      ARTIST_TAB_ORDER.indexOf(tab) > ARTIST_TAB_ORDER.indexOf(prevTab) ? 'forward' : 'back',
+    )
+    setPrevTab(tab)
+  }
+  const tabSlideClass =
+    tabSlide === 'forward'
+      ? 'animate-in fade-in-25 slide-in-from-right-6 duration-300 ease-out motion-reduce:animate-none'
+      : tabSlide === 'back'
+        ? 'animate-in fade-in-25 slide-in-from-left-6 duration-300 ease-out motion-reduce:animate-none'
+        : undefined
 
   // 보드 축척(#d1 2026-07-14) — writer 러프 보드와 같은 슬라이더. 인물/배경 탭별로 저장.
   //   레벨 1(축소·3열) ~ 3(확대·1열, 기존 모습), cols = 4 - level. localStorage 탭별 키.
@@ -400,8 +419,9 @@ export default function VisualPage() {
   const headerRow = (
     <div className="mb-3 flex items-start justify-between gap-3">
       <div>
-        <h1 className="text-lg font-bold">The Visual Studio</h1>
-        <p className="text-sm text-muted-foreground">
+        {/* writer 헤더(Writers' Room)와 타이포 통일(#d7 2026-08-03) — semibold + mt-1 text-xs */}
+        <h1 className="text-lg font-semibold">The Visual Studio</h1>
+        <p className="mt-1 text-xs text-muted-foreground">
           {newUi
             ? '샷마다 어떤 인물·배경이 쓰이는지 연결합니다 — 에셋을 드래그해 참조를 구성하세요.'
             : '캐릭터·월드의 컨셉 이미지를 만들고 다듬어 다음 단계로 넘깁니다.'}
@@ -436,11 +456,12 @@ export default function VisualPage() {
             {headerRow}
             <div className="flex items-center justify-between gap-4">
               <TabsList>
-                <TabsTrigger value="characters">Characters</TabsTrigger>
-                <TabsTrigger value="world">World</TabsTrigger>
+                {/* 탭 한글화(#d3 2026-08-03) — writer 탭(러프 스토리보드…)과 표기 통일 */}
+                <TabsTrigger value="characters">인물</TabsTrigger>
+                <TabsTrigger value="world">배경</TabsTrigger>
                 {/* Inventory는 준비 중(#d4 2026-07-15) — writer 대사 탭과 동일한 비활성 패턴 */}
                 <TabsTrigger value="inventory" disabled>
-                  <span>Inventory</span>
+                  <span>인벤토리</span>
                   <Badge variant="outline" className="ml-1 px-1.5 py-0 text-[10px]">
                     준비 중
                   </Badge>
@@ -483,7 +504,10 @@ export default function VisualPage() {
 
           <TabsContent
             value="characters"
-            className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+            className={cn(
+              'flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden',
+              tabSlideClass,
+            )}
           >
             <CharacterPanel
               columns={4 - zoomByTab.characters}
@@ -493,7 +517,10 @@ export default function VisualPage() {
 
           <TabsContent
             value="world"
-            className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+            className={cn(
+              'flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden',
+              tabSlideClass,
+            )}
           >
             <WorldPanel
               columns={4 - zoomByTab.world}
@@ -515,8 +542,12 @@ export default function VisualPage() {
           {error}
         </div>
       )}
-      {/* 게이트 상태 푸터 — 평소엔 접힘, 미완료 항목이 있을 때만 Approve 버튼 바로 위에 표시(#d1 2026-07-13). */}
-      {(!writerReady || !artistGate.ready || directorGate.blockers.length > 0) && (
+      {/* 게이트 상태 푸터 — 평소엔 접힘, 미완료 항목이 있을 때만 표시(#d1 2026-07-13).
+          writerStatus === null 은 "아직 fetch 전"(판단 유보) — 이 프레임에 렌더하면 진입 직후
+          "Writer: unknown" 바가 떴다가 상태 도착과 함께 사라지는 깜빡임이 된다(#d6 2026-08-03).
+          run 이 정말 없으면 fetch 후 started:false 객체가 오므로 그때 정당하게 표시된다. */}
+      {writerStatus !== null &&
+        (!writerReady || !artistGate.ready || directorGate.blockers.length > 0) && (
         <div className="border-t border-border bg-card px-6 py-3 text-xs">
           <div className="flex flex-wrap items-center gap-2">
             <span className={writerReady ? 'text-success' : 'text-warning'}>

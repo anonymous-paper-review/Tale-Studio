@@ -195,9 +195,10 @@ export function DialogueView() {
         <p className="border-b border-border bg-destructive/10 px-6 py-1.5 text-xs text-destructive">{error}</p>
       )}
 
-      {/* 대본 본문 */}
+      {/* 대본 본문 — 왼쪽 정렬(#c5 2026-08-03): 트리트먼트와 같은 축이라 탭을 오가도 시선이
+          안 흔들린다. max-w 는 가독 폭 유지용으로만 남긴다(중앙 배치 제거). */}
       <ScrollArea className="min-h-0 flex-1">
-        <div className="mx-auto w-full max-w-3xl px-6 py-6">
+        <div className="w-full max-w-3xl px-6 py-6">
           {scenes.length === 0 ? (
             <p className="py-16 text-center text-sm text-muted-foreground">
               씬이 아직 없어요 — writer 생성이 끝나면 여기에 대본이 나타나요.
@@ -219,8 +220,9 @@ export function DialogueView() {
                       const lines = dialogueLinesOf(shot)
                       return (
                         <div key={shot.shotId} className="group">
-                          <p className="text-xs leading-relaxed text-muted-foreground">
-                            <span className="mr-1.5 font-mono text-[10px] font-semibold text-muted-foreground/60">
+                          {/* 글자 크기는 트리트먼트와 통일(#c5) — 샷 스토리 text-sm leading-7 */}
+                          <p className="text-sm leading-7 text-muted-foreground">
+                            <span className="mr-1.5 font-mono text-xs font-semibold text-muted-foreground/60">
                               Shot {shotIdx + 1}
                             </span>
                             {shot.actionDescription}
@@ -258,7 +260,7 @@ export function DialogueView() {
                                     </span>
                                     <span
                                       className={cn(
-                                        'text-sm',
+                                        'text-[15px] leading-7',
                                         focused ? 'font-medium' : 'text-muted-foreground',
                                       )}
                                     >

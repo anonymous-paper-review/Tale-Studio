@@ -812,6 +812,20 @@ function PaletteBar() {
 export default function DirectorCanvasPage() {
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
   const guideProjectId = useDirectorCanvasStore((s) => s.projectId)
+  // Node↔Storyboard 전환 슬라이드(#e2 2026-08-03) — 두 뷰는 조건 렌더(원래 remount)라
+  //   mount 애니메이션이 곧 전환 연출. 방향은 토글 순서(Node 왼쪽·Storyboard 오른쪽).
+  const [prevViewMode, setPrevViewMode] = useState(viewMode)
+  const [viewSlide, setViewSlide] = useState<'forward' | 'back' | 'none'>('none')
+  if (viewMode !== prevViewMode) {
+    setViewSlide(viewMode === 'storyboard' ? 'forward' : 'back')
+    setPrevViewMode(viewMode)
+  }
+  const viewSlideClass =
+    viewSlide === 'forward'
+      ? 'animate-in fade-in-25 slide-in-from-right-6 duration-300 ease-out motion-reduce:animate-none'
+      : viewSlide === 'back'
+        ? 'animate-in fade-in-25 slide-in-from-left-6 duration-300 ease-out motion-reduce:animate-none'
+        : undefined
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   // 프로젝트 init(resetChildStores)이 끝나기 전에 올린 제안은 reset()에 지워진다 —
   //   스테이지 동기 + init 완료 후에만 발화.
@@ -877,13 +891,17 @@ export default function DirectorCanvasPage() {
               밀어내고 StoryboardGridView의 overflow-auto가 안 걸리던 문제 수정.
               이걸로 storyboard 그리드 스크롤 + Node/Storyboard 토글 항상 노출. */}
           <div className="relative min-h-0 flex-1">
-            {viewMode === 'storyboard' ? (
-              <StoryboardGridView />
-            ) : (
-              <ReactFlowProvider>
-                <CanvasInner />
-              </ReactFlowProvider>
-            )}
+            {/* key=viewMode: 전환 시 래퍼 remount 로 슬라이드 재생(#e2) — 뷰 자체도 원래 조건
+                렌더로 remount 되던 구조라 추가 비용 없음. */}
+            <div key={viewMode} className={cn('flex h-full min-h-0 flex-col', viewSlideClass)}>
+              {viewMode === 'storyboard' ? (
+                <StoryboardGridView />
+              ) : (
+                <ReactFlowProvider>
+                  <CanvasInner />
+                </ReactFlowProvider>
+              )}
+            </div>
           </div>
 
           {/* Storyboard 뷰에서도 더블클릭 편집 팝업이 동작하도록 viewMode 무관 마운트 */}

@@ -479,7 +479,16 @@ export function StoryboardGridView() {
     // Artist/Editor와 동일한 디자인 룰 — shadcn ScrollArea(스타일된 스크롤바).
     // 기존 raw overflow-auto(네이티브 스크롤바)를 교체. 부모 `min-h-0 flex-1`가 높이를 가둔다.
     <ScrollArea className="size-full bg-background">
-      <div className="flex flex-col gap-6 p-6">
+      {/* key=mediaMode: Previz↔Real 전환 시 remount 로 슬라이드 재생(#e2 2026-08-03).
+          방향은 토글 순서(Previz 왼쪽·Real 오른쪽) — real 로 갈 땐 오른쪽에서, 되돌아오면 왼쪽에서. */}
+      <div
+        key={mediaMode}
+        className={cn(
+          'flex flex-col gap-6 p-6',
+          'animate-in fade-in-25 duration-300 ease-out motion-reduce:animate-none',
+          mediaMode === 'real' ? 'slide-in-from-right-6' : 'slide-in-from-left-6',
+        )}
+      >
         {groups.map((group) => (
           <section key={group.key} className="flex flex-col gap-4">
             <div className="flex items-baseline gap-3">

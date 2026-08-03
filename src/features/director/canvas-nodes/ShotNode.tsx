@@ -12,7 +12,8 @@ import {
   useDirectorCanvasStore,
 } from '@/stores/director-store'
 import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
-import { isShotData, isPromptData, type DirectorNode } from '@/types/director'
+import { RoughFrameCycle } from '@/components/rough-frame-cycle'
+import { isShotData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
 import { ThumbImage } from '@/components/thumb-image'
 
@@ -27,13 +28,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const generateVideoForShot = useDirectorCanvasStore(
     (s) => s.generateVideoForShot,
   )
-  // 와이어링된 Prompt 노드 text (Higgsfield "따로 뺀 프롬프트" 칩)
-  const wiredPromptText = useDirectorCanvasStore((s) => {
-    const p = s.nodes.find(
-      (n) => isPromptData(n.data) && n.data.targetShotNodeId === id,
-    )
-    return p && isPromptData(p.data) ? p.data.text : null
-  })
+  // (#e3 2026-08-03) 와이어링된 Prompt 칩은 hover 오버레이 제거와 함께 표시처를 잃었다 —
+  //   프롬프트·모델 정보는 카드 본문과 편집 팝업이 담당한다.
 
   // 목각(rough) 단계 이미지는 writer-store roughStoryboard에서 (writerShotId 스코프 구독)
   const writerShotId = isShotData(data) ? data.writerShotId : null
@@ -128,31 +124,21 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           </p>
         )}
 
-        {/* 단계 이미지 + 호버 프로비넌스 오버레이 */}
+        {/* 단계 이미지 — previz 3프레임이 있으면 hover 순환(#e3 2026-08-03, 러프 보드와 동일).
+            옛 hover 디밍+프로비넌스 오버레이는 순환을 가리는 회색 화면이라 제거 — 프롬프트는
+            카드 본문·팝업에서 이미 보인다. 3프레임 없는 이미지(구버전/수동 노드)는 정적 표시. */}
         {stageImageUrl && (
-          <div className="group/img relative mt-2 aspect-video w-full overflow-hidden rounded-sm border border-border/40">
-            <ThumbImage
-              src={stageImageUrl}
-              alt={stage === 'rough' ? 'rough storyboard' : 'storyboard'}
-              className="h-full w-full object-cover transition-opacity group-hover/img:opacity-30"
-            />
-            {/* 호버 시 디밍 + 생성 정보(프롬프트/모델/따로 뺀 프롬프트 칩) */}
-            <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-2 opacity-0 transition-opacity group-hover/img:opacity-100">
-              <p className="line-clamp-3 text-[10px] leading-tight text-foreground">
-                {prompt || '(프롬프트 없음)'}
-              </p>
-              <div className="flex flex-wrap items-center gap-1">
-                <span className="rounded-sm bg-background/80 px-1 font-mono text-[9px] text-muted-foreground">
-                  {data.provider}
-                </span>
-                {wiredPromptText && (
-                  <span className="max-w-full truncate rounded-sm bg-background/80 px-1 text-[9px] text-muted-foreground">
-                    + {wiredPromptText}
-                  </span>
-                )}
-              </div>
-            </div>
-            <span className="absolute left-1 top-1 rounded-sm bg-background/70 px-1 text-[9px] uppercase text-muted-foreground">
+          <div className="relative mt-2 aspect-video w-full overflow-hidden rounded-sm border border-border/40">
+            {rough?.status === 'completed' && rough.frames ? (
+              <RoughFrameCycle panel={rough} alt={`${data.label} (previz)`} />
+            ) : (
+              <ThumbImage
+                src={stageImageUrl}
+                alt={stage === 'rough' ? 'rough storyboard' : 'storyboard'}
+                className="h-full w-full object-cover"
+              />
+            )}
+            <span className="pointer-events-none absolute left-1 top-1 rounded-sm bg-background/70 px-1 text-[9px] uppercase text-muted-foreground">
               {isChainShot ? '목각' : stage === 'rough' ? '목각' : stage === 'live' ? '실사' : '영상'}
             </span>
           </div>

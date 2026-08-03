@@ -11,7 +11,7 @@
 // 완료는 webhook → shots.rough_storyboard. 클라는 jobId 폴링으로 카드만 갱신.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertCircle, ImageIcon, Loader2, Plus, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
+import { AlertCircle, ChevronDown, ImageIcon, Loader2, Plus, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -68,6 +68,15 @@ export function RoughStoryboardView() {
   const [panelJobs, setPanelJobs] = useState<Record<string, PanelJob>>({})
   const [overrides, setOverrides] = useState<Record<string, RoughStoryboardImage>>({})
   const [detailShotId, setDetailShotId] = useState<string | null>(null)
+  // 씬 접기(#c2 2026-08-03) — 씬 이름 클릭으로 토글. 세션 로컬(새로고침 시 전부 펼침).
+  const [collapsedScenes, setCollapsedScenes] = useState<ReadonlySet<string>>(new Set())
+  const toggleSceneCollapsed = (sceneId: string) =>
+    setCollapsedScenes((prev) => {
+      const next = new Set(prev)
+      if (next.has(sceneId)) next.delete(sceneId)
+      else next.add(sceneId)
+      return next
+    })
   // 추가 팝업(#3) — 어느 버튼으로 열렸는지(mode) + 맥락 씬. null=닫힘.
   const [addDialog, setAddDialog] = useState<{
     mode: AddMode
@@ -376,7 +385,9 @@ export function RoughStoryboardView() {
     (j) => j.status === 'generating',
   ).length
   // 제목 아래 설명문은 제거(#c2 2026-07-14) — 카드 사용법은 첫 진입 브리핑 채팅이 안내한다.
-  const headerDescription = undefined
+  // 트리트먼트·대사 탭과 같은 자리의 도움말(#c4 2026-08-03) — 헤더 아래 한 줄.
+  const headerDescription =
+    '러프 스토리보드 — 카드를 클릭하면 확인·수정·재생성, 씬 이름을 클릭하면 접을 수 있어요'
   const storyboardActions = hasShots ? (
     <>
       {/* 축척 — 가로 열 수 조절 (Ctrl+wheel 로도 가능) */}
@@ -602,15 +613,28 @@ export function RoughStoryboardView() {
         >
           {(sceneManifest?.scenes ?? []).map((scene, sceneIdx) => {
             const sceneShots = shots.filter((s) => s.sceneId === scene.sceneId)
+            const sceneCollapsed = collapsedScenes.has(scene.sceneId)
             return (
               <section key={scene.sceneId} className="space-y-3">
                 {/* 씬 구분선 — id 만 노출(사용자 결정 2026-06-12). 장소·분위기는 편집 팝업에서.
-                    CRUD(2026-06-24): id 클릭/편집 → 씬 상세, 샷 추가 버튼. 빈 씬도 표시. */}
+                    씬 이름 클릭 = 접기/펼치기 토글(#c2 2026-08-03, chevron 회전으로 상태 표시). */}
                 <div className="flex items-center gap-2">
-                  {/* #2: 씬 이름 클릭 편집 제거 — 비상호작용 라벨(편집 버튼도 삭제). */}
-                  <span className="text-xs font-medium text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={() => toggleSceneCollapsed(scene.sceneId)}
+                    aria-expanded={!sceneCollapsed}
+                    className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <ChevronDown
+                      className={cn('size-3.5 transition-transform', sceneCollapsed && '-rotate-90')}
+                    />
                     Scene {sceneIdx + 1}
-                  </span>
+                    {sceneCollapsed ? (
+                      <span className="font-normal text-muted-foreground/70">
+                        · 샷 {sceneShots.length}개
+                      </span>
+                    ) : null}
+                  </button>
                   <div className="h-px flex-1 bg-border" />
                   <Button
                     size="sm"
@@ -625,8 +649,19 @@ export function RoughStoryboardView() {
                   </Button>
                 </div>
 
+                {/* 접힘 애니메이션 — 항상 마운트 + grid-rows 0fr↔1fr (인물 상세와 동일 패턴) */}
                 <div
-                  className="grid gap-4"
+                  className={cn(
+                    'grid transition-[grid-template-rows] duration-300 ease-out',
+                    sceneCollapsed
+                      ? '[grid-template-rows:0fr]'
+                      : '[grid-template-rows:1fr]',
+                  )}
+                  aria-hidden={sceneCollapsed}
+                >
+                <div className="min-h-0 overflow-hidden">
+                <div
+                  className="grid gap-4 p-0.5"
                   style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
                 >
                   {sceneShots.length === 0 && (
@@ -669,18 +704,23 @@ export function RoughStoryboardView() {
                                 panel={panel}
                                 alt={`${shot.shotId} rough storyboard`}
                               />
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="absolute right-2 top-2 size-7 bg-background/80 opacity-0 transition-opacity duration-100 group-hover:opacity-100 hover-red-beam"
+                              {/* 재생성 — 카드 경계에서 한 뼘 안쪽(right-3/top-3, #c3 2026-08-03).
+                                  버튼 hover 시 오른쪽으로 펼쳐지며 "재생성" 라벨 표출(그리드 영상
+                                  버튼과 같은 max-w 슬라이드 패턴). */}
+                              <button
+                                type="button"
+                                className="group/regen absolute right-3 top-3 flex h-7 items-center rounded-md bg-background/80 px-1.5 text-foreground opacity-0 shadow-sm transition-opacity duration-100 hover:bg-background group-hover:opacity-100 hover-red-beam"
                                 aria-label="패널 재생성"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   void generate([shot.shotId], true)
                                 }}
                               >
-                                <RefreshCw className="size-3.5" />
-                              </Button>
+                                <RefreshCw className="size-3.5 shrink-0" />
+                                <span className="max-w-0 overflow-hidden whitespace-nowrap text-[11px] font-medium opacity-0 transition-all duration-200 group-hover/regen:ml-1 group-hover/regen:max-w-12 group-hover/regen:opacity-100">
+                                  재생성
+                                </span>
+                              </button>
                             </>
                           ) : job?.status === 'generating' ? (
                             <div className="absolute inset-0" aria-busy="true">
@@ -759,6 +799,8 @@ export function RoughStoryboardView() {
                       </article>
                     )
                   })}
+                </div>
+                </div>
                 </div>
               </section>
             )

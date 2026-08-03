@@ -250,7 +250,8 @@ export function VideoNodePopup({ nodeId, data }: Props) {
               type="button"
               onClick={() => void handleFinalToggle()}
               disabled={!canMarkFinal || finalBusy}
-              className="ml-auto rounded p-1 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+              // mr-8: DialogContent 자체 닫기(X, absolute right-4)와 겹치지 않게(#e1 2026-08-03)
+              className="ml-auto mr-8 rounded p-1 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
               aria-label={data.final ? 'Unmark Final' : 'Mark Final'}
               title={
                 canMarkFinal

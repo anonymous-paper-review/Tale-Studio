@@ -12,8 +12,7 @@ import {
 } from '@/components/ui/tooltip'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
-import { Textarea } from '@/components/ui/textarea'
-import { HoverBeam } from '@/components/hover-beam'
+import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle'
 import { useArtistStore, type CharacterRole } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import {
@@ -49,7 +48,6 @@ export function CharacterPanel({
     viewFailures,
     selectCharacter,
     generateCharacterAllViews,
-    updateCharacter,
   } = useArtistStore()
 
   const requiredCharacterIds = useProjectStore((s) => s.lifecycleStatus.artist?.requiredCharacterIds ?? EMPTY_REQUIRED_IDS)
@@ -163,6 +161,10 @@ export function CharacterPanel({
               role="button"
               tabIndex={0}
               onClick={() => selectCharacter(char.characterId)}
+              // 더블 클릭 = 사진 클릭과 동일(#d5 2026-08-03) — 상세/재생성 팝업
+              onDoubleClick={() =>
+                setViewDialog({ charId: char.characterId, view: 'main' })
+              }
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ')
                   selectCharacter(char.characterId)
@@ -214,13 +216,22 @@ export function CharacterPanel({
                     }}
                     className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                   >
-                    <ImagePlaceholder
-                      label={isObject ? CHARACTER_VIEW_LABELS['main'] : '턴어라운드 (모든 뷰)'}
-                      aspectRatio={isObject ? 'square' : 'video'}
-                      imageUrl={char.views.main ?? null}
-                      generating={isViewGenerating('main')}
-                      generatingStartedAt={generatingStartedAt[`${char.characterId}:main`]}
-                    />
+                    {/* 사람 시트는 hover 리전 순환(#d2) — 컨셉→디테일→스케치→표정을 잘라 옮겨
+                        다닌다. 생성 중·이미지 없음·사물은 기존 placeholder 경로 그대로. */}
+                    {!isObject && char.views.main && !isViewGenerating('main') ? (
+                      <TurnaroundRegionCycle
+                        url={char.views.main}
+                        alt={`${char.name || '캐릭터'} 턴어라운드 시트`}
+                      />
+                    ) : (
+                      <ImagePlaceholder
+                        label={isObject ? CHARACTER_VIEW_LABELS['main'] : '턴어라운드 (모든 뷰)'}
+                        aspectRatio={isObject ? 'square' : 'video'}
+                        imageUrl={char.views.main ?? null}
+                        generating={isViewGenerating('main')}
+                        generatingStartedAt={generatingStartedAt[`${char.characterId}:main`]}
+                      />
+                    )}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent
@@ -234,35 +245,8 @@ export function CharacterPanel({
                 </TooltipContent>
               </Tooltip>
 
-              {/* 설정 / 외형 — 카드에서 바로 편집 (팝업 없음). hover 시 빨간 빔으로 입력 가능 표시. */}
-              <div className="mt-3 space-y-2">
-                <HoverBeam>
-                  <Textarea
-                    value={char.description ?? ''}
-                    rows={2}
-                    placeholder={isObject ? '사물의 특성·용도·서사적 의미' : '성격·역할·서사적 배경'}
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    onChange={(e) =>
-                      updateCharacter(char.characterId, { description: e.target.value })
-                    }
-                    className="text-xs"
-                  />
-                </HoverBeam>
-                <HoverBeam>
-                  <Textarea
-                    value={char.fixedPrompt ?? ''}
-                    rows={2}
-                    placeholder={isObject ? '외형: 형태·재질·특징 (이미지 프롬프트)' : '외형: 헤어·의상·특징 (이미지 프롬프트)'}
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    onChange={(e) =>
-                      updateCharacter(char.characterId, { appearance: e.target.value })
-                    }
-                    className="text-xs"
-                  />
-                </HoverBeam>
-              </div>
+              {/* 카드 인라인 설정/외형 편집 제거(#d4 2026-08-03) — World 탭과 같은 이미지 중심
+                  카드로. 텍스트 수정은 상세 팝업(사진/더블 클릭)과 채팅 경로가 담당한다. */}
               {/* Actions(#d3 2026-07-15) — Register(에셋은 진입 시 DB 하이드레이트로 자동 공급)·
                   인벤토리 저장 버튼 제거, 생성 버튼 문구는 '이미지 생성'으로 통일. */}
               <div className="mt-3 flex gap-2">

@@ -72,6 +72,10 @@ export function WorldPanel({
                 role="button"
                 tabIndex={0}
                 onClick={() => selectLocation(world.locationId)}
+                // 더블 클릭 = 사진 클릭과 동일(#d5 2026-08-03) — 프롬프트/재생성 팝업
+                onDoubleClick={() =>
+                  setViewDialog({ locationId: world.locationId, shot: 'wideShot' })
+                }
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ')
                     selectLocation(world.locationId)

@@ -1,14 +1,17 @@
 'use client'
 
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Plus, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 
 /**
  * 문자열 배열(tone[]) 칩 편집기.
- * Enter 또는 blur 로 추가, 칩의 X 로 제거. 중복(대소문자 무시)은 무시.
- * design.md §2.5 — 칩은 Badge(secondary), 색만으로 상태 전달 안 함.
+ * 기본 상태는 칩만 — 입력창은 "+" 버튼을 눌렀을 때만 열린다(#b2 2026-08-03: 항상 떠 있는
+ * 입력창이 줄을 시끄럽게 했다). "+"는 줄 hover 에서 드러나되, 칩이 하나도 없으면 은은하게
+ * 상시 노출(빈 줄에서 진입점이 사라지지 않게). Enter 추가(연속 입력 유지), blur 로 닫힘,
+ * Escape 취소. 중복(대소문자 무시)은 무시. design.md §2.5 — 칩은 Badge(secondary).
  */
 export function TagInput({
   values,
@@ -20,11 +23,16 @@ export function TagInput({
   placeholder?: string
 }) {
   const [draft, setDraft] = useState('')
+  const [editing, setEditing] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
 
   const add = () => {
     const v = draft.trim()
-    if (!v) return
-    if (!values.some((x) => x.toLowerCase() === v.toLowerCase())) {
+    if (v && !values.some((x) => x.toLowerCase() === v.toLowerCase())) {
       onChange([...values, v])
     }
     setDraft('')
@@ -45,19 +53,43 @@ export function TagInput({
           </button>
         </Badge>
       ))}
-      <Input
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault()
+      {editing ? (
+        <Input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              add()
+            } else if (e.key === 'Escape') {
+              e.preventDefault()
+              setDraft('')
+              setEditing(false)
+            }
+          }}
+          onBlur={() => {
             add()
-          }
-        }}
-        onBlur={add}
-        placeholder={placeholder ?? '추가…'}
-        className="h-7 w-24 min-w-24 flex-1 border-dashed text-xs"
-      />
+            setEditing(false)
+          }}
+          placeholder={placeholder ?? '추가…'}
+          className="h-7 w-28 min-w-24 border-dashed text-xs"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label={placeholder ? `추가 (${placeholder})` : '추가'}
+          title="추가"
+          className={cn(
+            'flex size-6 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100',
+            // group = MentionableCard 줄 래퍼 — 줄에 마우스가 올라와야 "+"가 드러난다.
+            values.length === 0 ? 'opacity-60' : 'opacity-0 group-hover:opacity-100',
+          )}
+        >
+          <Plus className="size-3.5" />
+        </button>
+      )}
     </div>
   )
 }
