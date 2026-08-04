@@ -20,6 +20,7 @@ import { type RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
 import {
   buildRoughGridCell,
   buildRoughGridPrompt,
+  buildCellContinuityLine,
   GRID_MAX_SHOTS,
   GRID_TEMPLATE_PATH,
   STRIP_TEMPLATE_PATH,
@@ -204,7 +205,7 @@ export async function POST(req: Request) {
         supabaseAdmin
           .from('shots')
           .select(
-            'shot_id, scene_id, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, duration_seconds, rough_storyboard, design_ref, check_notes',
+            'shot_id, scene_id, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, duration_seconds, rough_storyboard, design_ref, check_notes, prompt',
           )
           .eq('project_id', projectId)
           .order('sort_order'),
@@ -323,6 +324,19 @@ export async function POST(req: Request) {
     const targetScenes = (scenes ?? []).filter((sc) => targetSceneIds.has(sc.scene_id as string))
     const targetCharIds = new Set(targets.flatMap((s) => ((s.characters as string[]) ?? [])))
     const targetChars = (chars ?? []).filter((c) => targetCharIds.has(c.character_id as string))
+    // #n-1: 같은 씬 직전 샷의 종료 상태 텍스트(EN prompt 우선) — 그리드 경계를 넘는 연속성 줄 재료.
+    const prevTextByShotId = new Map<string, string>()
+    {
+      let prevRow: Record<string, unknown> | null = null
+      for (const s of shots ?? []) {
+        if (prevRow && prevRow.scene_id === s.scene_id) {
+          const t = ((prevRow.prompt as string) || (prevRow.action_description as string) || '').trim()
+          if (t) prevTextByShotId.set(s.shot_id as string, t)
+        }
+        prevRow = s as Record<string, unknown>
+      }
+    }
+
     // #p2-wiring: 분할·리넘버를 겪은 샷은 design_ref(부모 v4 id)로 rich spec 을 조인.
     //   구 행(design_ref 없음)은 기존 main id 직조인 폴백 — 분할이 없던 프로젝트에선 그대로 맞는다.
     const resolvedSpecByShotId = new Map<string, RoughStoryboardSpec>()
@@ -411,12 +425,14 @@ export async function POST(req: Request) {
           },
           shotId,
         )
-        // shotCheck 채널1(#p2-wiring): CRITICAL/WARNING 제약을 START 서술 꼬리에 첨부 —
-        //   검증이 감지한 연속성 사실(소품 상태·공간 관계)이 러프 단계에서부터 지켜지게.
+        // shotCheck 채널1(#p2-wiring) 제약 + 이전 샷 연속성 줄(#n-1)을 START 꼬리에 첨부.
         const constraints = parseCheckConstraints(s.check_notes)
-        return constraints.length
-          ? { ...cell, start: `${cell.start}. Continuity constraints: ${constraints.join('; ')}` }
-          : cell
+        const contLine = buildCellContinuityLine(prevTextByShotId.get(shotId))
+        const extra = [
+          contLine,
+          constraints.length ? `Continuity constraints: ${constraints.join('; ')}` : null,
+        ].filter(Boolean)
+        return extra.length ? { ...cell, start: `${cell.start}. ${extra.join('. ')}` } : cell
       })
 
       let prompt = buildRoughGridPrompt(cells, gridVariant)

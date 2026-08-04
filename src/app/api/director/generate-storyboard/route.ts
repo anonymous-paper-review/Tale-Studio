@@ -60,7 +60,7 @@ export async function POST(req: Request) {
         .maybeSingle(),
       supabaseAdmin
         .from('shots')
-        .select('shot_id, rough_storyboard, check_notes')
+        .select('shot_id, scene_id, sort_order, rough_storyboard, check_notes')
         .eq('project_id', projectId)
         .eq('shot_id', writerShotId)
         .maybeSingle(),
@@ -81,12 +81,28 @@ export async function POST(req: Request) {
         ? { start: roughFrames.start, direction: roughFrames.direction, end: roughFrames.end }
         : null
 
+    // #n-1(2026-08-05): 같은 씬 직전 샷의 종료 상태를 서버측 첨부 — 샷별 독립 잡이던 실사의
+    //   연속성 봉합. DB pull 이라 잡 간 의존이 생기지 않는다 (architecture §0: 둘 다 진실을 읽는다).
+    let continuityLine = ''
+    const shotMeta = shot as { scene_id?: string; sort_order?: number } | null
+    if (typeof shotMeta?.sort_order === 'number' && shotMeta.sort_order > 0) {
+      const { data: prev } = await supabaseAdmin
+        .from('shots')
+        .select('scene_id, prompt, action_description')
+        .eq('project_id', projectId)
+        .eq('sort_order', shotMeta.sort_order - 1)
+        .maybeSingle()
+      const prevText = (((prev?.prompt as string) || (prev?.action_description as string)) ?? '').trim()
+      if (prev?.scene_id === shotMeta.scene_id && prevText) {
+        continuityLine = `\nContinuity with the previous shot (do not depict that moment): it showed "${prevText.slice(0, 110)}". Keep the character's wardrobe, props and lighting consistent with it.`
+      }
+    }
+
     // shotCheck 채널1(#p2-wiring): 검증이 남긴 연속성 제약을 서버에서 최종 첨부 —
     //   클라가 어떤 프롬프트를 보내든(derivedPrompt/promptOverride) 시각적 사실은 지켜지게.
-    const guardedPrompt = appendCheckConstraints(
-      prompt,
-      (shot as { check_notes?: unknown } | null)?.check_notes,
-    )
+    const guardedPrompt =
+      appendCheckConstraints(prompt, (shot as { check_notes?: unknown } | null)?.check_notes) +
+      continuityLine
 
     let finalOpts: AnchorableSubmit
     let stripRefUrl: string | null = null

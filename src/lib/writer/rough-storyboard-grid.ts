@@ -145,6 +145,17 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   return { shotId, start: startParts.join('. '), motion, end }
 }
 
+/**
+ * 이전 샷 종료 상태의 연속성 줄(#n-1 2026-08-05) — 그리드 경계(4샷)를 넘는 샷 간 연속성.
+ *   "그리지 말라"를 명시해 이전 순간이 셀에 그려지는 오염을 막고, 인물·소품·조명 일관만 계약한다.
+ */
+export function buildCellContinuityLine(prevText: string | null | undefined): string | null {
+  const t = (prevText ?? '').trim()
+  if (!t) return null
+  const clipped = t.length > 110 ? `${t.slice(0, 110)}…` : t
+  return `continuity only — do NOT draw this moment: the previous shot ended with "${clipped}"; keep the figures, props and lighting consistent with it`
+}
+
 // ── 그리드 프롬프트 ──────────────────────────────────────────────────────────
 
 // 그림체 통일 + 목각 인형 강제(2026-07-22 피드백): "artist mannequin"(해석 여지)→ 고전 볼조인트

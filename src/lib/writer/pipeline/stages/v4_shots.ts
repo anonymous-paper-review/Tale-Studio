@@ -102,7 +102,8 @@ export async function runShotDesign(
       for (let i = 0; i < sceneDec.length; i += SHOT_CHUNK_SIZE) {
         const chunk = sceneDec.slice(i, i + SHOT_CHUNK_SIZE);
         const chunkNote = `(씬 전체 데쿠파주 ${sceneDec.length}개 중 ${i + 1}~${i + chunk.length}번째 묶음 — ${Math.floor(i / SHOT_CHUNK_SIZE) + 1}/${totalChunks}. 이 묶음의 샷들만 출력하라)`;
-        const part = await generateL4ForScene(scene, plan, chunk, genre, characters, visualIdentity, worldVisual, characterVisual, seedV4, logger, axisConfig, chunkNote);
+        // #n-1: 직전 청크의 확정 스펙 꼬리를 다음 청크에 계약으로 — 청크 경계 연속성.
+        const part = await generateL4ForScene(scene, plan, chunk, genre, characters, visualIdentity, worldVisual, characterVisual, seedV4, logger, axisConfig, chunkNote, sceneShots);
         sceneShots.push(...part);
       }
     } else {
@@ -247,6 +248,26 @@ export function parseL4Shots(rawResult: unknown, sceneId: string): ShotDesign[] 
   return shots;
 }
 
+/**
+ * 직전 확정 샷들의 연속성 계약 블록(#n-1 2026-08-05). 같은 씬의 앞선 청크가 설계를 마친
+ * 샷 꼬리(K개)를 다음 청크 프롬프트에 주입한다 — 의상·소품·조명·공간이 청크 경계에서
+ * 리셋되던 단절의 봉합. 씬 간에는 쓰지 않는다(씬 병렬 설계 보존).
+ */
+export function buildV4ContinuityBlock(prevDesigned: ShotDesign[], k = 2): string {
+  const tail = prevDesigned.slice(-k);
+  if (!tail.length) return '';
+  const lines = tail.map(
+    (d) =>
+      `  ${d.intent.shot_id} [${d.static_spec.shot_type}]\n    first_frame: ${d.static_spec.first_frame_prompt}\n    motion: ${d.dynamic_spec.motion_prompt}`,
+  );
+  return `[직전 확정 샷 스펙 — 연속성 계약]
+같은 씬에서 바로 앞서 확정된 샷들이다. 의상·소품·조명·공간 배치를 모순 없이 이어가고,
+인물의 위치·시선은 이 종료 상태에서 자연스럽게 이어지게 설계하라 (동일 구도 복제 금지 — 이어지되 새 프레임).
+${lines.join('\n')}
+
+`;
+}
+
 async function generateL4ForScene(
   scene: StoryScene,
   plan: SceneCinematography | null,    // null = Compact Mode (sceneCinematography 미제공)
@@ -260,6 +281,9 @@ async function generateL4ForScene(
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
   chunkNote?: string, // 청크 분할 호출(#B) 시 "전체 N개 중 i~j" 안내 — 프롬프트에 병기
+  // #n-1 2026-08-05: 같은 씬의 직전 청크가 확정한 스펙 — 청크 경계의 연속성 단절 봉합.
+  //   씬 간에는 전달하지 않는다(씬 병렬 처리 #parallel-shotdesign 보존).
+  prevDesigned?: ShotDesign[],
 ): Promise<ShotDesign[]> {
   const compactMode = plan === null;
   const decoupageDriven = sceneDec !== null && sceneDec.length > 0;
@@ -364,7 +388,7 @@ costumes=${JSON.stringify(
     )
   )}
 
-${decoupageDriven
+${prevDesigned?.length ? buildV4ContinuityBlock(prevDesigned) : ''}${decoupageDriven
     ? `[감독 데쿠파주 — 이 샷들에 정확히 1:1로 spec을 붙여라 (샷 수 = ${sceneDec!.length}개, 추가/삭제 금지)]${chunkNote ? `\n${chunkNote}` : ''}
 ${sceneDec!
         .map(
