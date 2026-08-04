@@ -260,8 +260,10 @@ export function buildSplitChildren(
     duration_seconds: ns.duration_seconds ?? original.duration_seconds,
     continuity: ns.continuity ?? original.continuity,
     action_budget: ns.action_budget ?? original.action_budget,
-    design_ref: ns.design_ref ?? (childIdx === 0 ? original.design_ref : undefined),
-    static_spec: ns.static_spec ?? (childIdx === 0 ? original.static_spec : undefined),
+    // provenance 는 시스템 소유 필드 — 모델이 new_shots 에 부모 값을 복사해 와도 무시한다
+    //   (실측 92948d6f: sol 이 design_ref 를 에코해 F2 를 우회 → 형제 중복 재발).
+    design_ref: childIdx === 0 ? original.design_ref : undefined,
+    static_spec: childIdx === 0 ? original.static_spec : undefined,
     // 이슈 location(분할 전 id) 매칭용 임시 태그 — 리넘버에서 제거.
     _splitFrom: parentId,
   }));

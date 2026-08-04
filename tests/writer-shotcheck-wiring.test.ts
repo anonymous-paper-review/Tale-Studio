@@ -178,6 +178,18 @@ describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
     expect(c2.static_spec).toBeUndefined()
   })
 
+  it('모델이 new_shots 에 design_ref 를 에코해도 무시된다 — provenance 는 시스템 소유 (실측 92948d6f)', () => {
+    const echoed = newShots().map((ns) => ({
+      ...(ns as object),
+      design_ref: 'shot_3',
+      static_spec: { shot_id: 'shot_3', shot_type: 'MS' },
+    })) as never[]
+    const [c1, c2] = buildSplitChildren(parent(), 'shot_3', echoed)
+    expect(c1.design_ref).toBe('shot_3')
+    expect(c2.design_ref).toBeUndefined()
+    expect(c2.static_spec).toBeUndefined()
+  })
+
   it('S 누락 자식은 자기 모션 서술로 표시문이 개별화된다 (T4)', () => {
     const [c1, c2] = buildSplitChildren(parent(), 'shot_3', newShots())
     expect(c1.S.character_action).toBe('She shakes the canteen at her ear.')
