@@ -38,25 +38,40 @@ export async function claudeGenerate(
   let stopReason: string | undefined;
   let error: string | undefined;
 
-  // Claude 5 계열(opus-5/sonnet-5/fable-5 등)은 temperature 가 deprecated — 전달 시 400.
-  //   (#p2-maxmodel 2026-08-05 실측: "`temperature` is deprecated for this model.")
-  const supportsTemperature = !/^claude-[a-z]+-5/.test(model);
+  // Claude 5 계열(opus-5/sonnet-5/fable-5 등) 차이 흡수(#p2-maxmodel 2026-08-05 실측):
+  //   ① temperature deprecated — 전달 시 400. ② 기본으로 thinking 블록을 먼저 반환하며
+  //   thinking 토큰이 max_tokens 를 함께 소모 → 바닥을 32k 로 올려 본문 절단을 막는다.
+  const isClaude5 = /^claude-[a-z]+-5/.test(model);
 
   try {
-    const response = await withLlmRetry(() => client.messages.create({
+    const params = {
       model,
-      max_tokens: opts.maxTokens ?? 4096,
-      ...(supportsTemperature ? { temperature: opts.temperature ?? 0.3 } : {}),
+      max_tokens: isClaude5 ? Math.max(opts.maxTokens ?? 4096, 32000) : (opts.maxTokens ?? 4096),
+      ...(isClaude5 ? {} : { temperature: opts.temperature ?? 0.3 }),
       system: opts.system,
-      messages: [{ role: 'user', content: userPrompt }],
-    }), 'claude');
+      messages: [{ role: 'user', content: userPrompt }] as const,
+    };
+    // Claude 5 는 max_tokens 바닥(32k) 때문에 SDK 가 비스트리밍을 거부("Streaming is required
+    //   for operations that may take longer than 10 minutes") — 스트리밍 수집으로 동일 응답을 얻는다.
+    const response = await withLlmRetry<Anthropic.Messages.Message>(
+      async () =>
+        isClaude5
+          ? await client.messages.stream(params as never).finalMessage()
+          : await client.messages.create(params as never),
+      'claude',
+    );
 
     stopReason = response.stop_reason ?? undefined;
-    const block = response.content[0];
-    if (block.type !== 'text') {
-      throw new Error(`Unexpected content type: ${block.type}`);
+    // thinking 등 비텍스트 블록을 건너뛰고 텍스트 블록 전체를 이어붙인다.
+    text = response.content
+      .filter((b): b is Extract<typeof b, { type: 'text' }> => b.type === 'text')
+      .map((b) => b.text)
+      .join('');
+    if (!text) {
+      throw new Error(
+        `No text block in response (types: ${response.content.map((b) => b.type).join(',')})`,
+      );
     }
-    text = block.text;
 
     if (stopReason === 'max_tokens') {
       throw new Error(
