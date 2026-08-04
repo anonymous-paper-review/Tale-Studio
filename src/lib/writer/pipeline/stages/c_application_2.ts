@@ -14,8 +14,10 @@ import type {
   Scenes,
   ShotSequence,
   ShotSequenceItem,
+  ShotCheckNote,
   StoryScene,
   ValidationIssue,
+  DecoupagePlan,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 import { buildAssetRegistry, normalizeShotSequenceAssetRefs } from '@/lib/writer/pipeline/util/asset_refs';
@@ -32,6 +34,9 @@ export async function runShotCheck(
   scenes: Scenes,
   worldVisual: WorldVisual,
   shotDesigns: ShotDesign[],
+  // #p2-wiring 2026-08-04: 표시문(action_description) 소스 — 데쿠파주의 구체 액션(beat_summary).
+  //   null 이면(구 state resume) 기존 폴백 사슬로 동작.
+  decoupage: DecoupagePlan | null,
   sceneBudgetIssues: ValidationIssue[],
   logger: PipelineLogger,
   cAxisConfig: LlmAxisConfig,   // C축: 의미/액션 검증 (현재 Claude)
@@ -42,7 +47,13 @@ export async function runShotCheck(
   if (shotDesigns.length === 0) {
     throw new Error('C2: shotDesigns 비어있음 — 조립할 샷 없음');
   }
-  const assembledShots = assembleShotsFromDesigns(shotDesigns, scenes);
+  const beatByShotId = new Map<string, { en: string; native?: string }>();
+  for (const sc of decoupage?.scenes ?? []) {
+    for (const sh of sc.shots) {
+      beatByShotId.set(sh.shot_id, { en: sh.beat_summary, native: sh.beat_summary_native });
+    }
+  }
+  const assembledShots = assembleShotsFromDesigns(shotDesigns, scenes, beatByShotId);
 
   // ===== Step 2: Claude로 샷별 액션 스코프 + 의미 검증 =====
   const valSystem = `당신은 샷 시퀀스의 액션 스코프와 의미적 정합성을 검증한다.
@@ -65,6 +76,11 @@ CRITICAL: 명백히 불가능한 샷 → split 권장
 WARNING: 약한 일관성, 모호한 프롬프트
 INFO: 미세 개선
 
+CRITICAL/WARNING 이슈에는 constraint 필드를 반드시 포함하라 — 그 샷의 이미지/영상 생성 모델에
+그대로 주입할 명령형 영어 한 문장으로, 샷이 지켜야 할 '시각적 사실'만 담는다
+(예: "The blueprints are tucked inside her vest, not held in her hands.").
+카메라 용어·연출 의도가 아니라 화면에 보여야 하는 상태를 서술한다. INFO 는 constraint 생략.
+
 split 권장 시 new_shots 배열로 분할안 제시 (각각 1 주요 액션).`;
 
   const valUser = `[샷 시퀀스]
@@ -85,7 +101,8 @@ ${JSON.stringify(assembledShots, null, 2)}
       "severity": "CRITICAL" | "WARNING" | "INFO",
       "location": "shot_id",
       "message": "string",
-      "suggestion": "string (optional)"
+      "suggestion": "string (optional)",
+      "constraint": "string — imperative EN sentence of the visual fact this shot must keep (required for CRITICAL/WARNING)"
     }
   ]
 }`;
@@ -122,7 +139,7 @@ ${JSON.stringify(assembledShots, null, 2)}
   }
 
   // ===== Step 3: 분할 적용 + shot_id 재정렬 =====
-  let finalShots = [...assembledShots];
+  let finalShots: WorkingShot[] = [...assembledShots];
   let splitCount = 0;
   for (const split of valResult.shots_to_split) {
     const idx = finalShots.findIndex((s) => s.shot_id === split.shot_id);
@@ -131,7 +148,7 @@ ${JSON.stringify(assembledShots, null, 2)}
     //   경우가 실측됨(47a62d1d: S 누락 4샷) → persistShotsToDb가 it.S.scene_id에서 죽는다.
     //   누락 블록은 원본 샷에서 결정론 상속해 스키마를 보장한다.
     const original = finalShots[idx];
-    const patched = split.new_shots.map((ns) => ({
+    const patched: WorkingShot[] = split.new_shots.map((ns) => ({
       ...ns,
       S: ns.S ?? original.S,
       C: ns.C ?? original.C,
@@ -142,15 +159,32 @@ ${JSON.stringify(assembledShots, null, 2)}
       duration_seconds: ns.duration_seconds ?? original.duration_seconds,
       continuity: ns.continuity ?? original.continuity,
       action_budget: ns.action_budget ?? original.action_budget,
+      // #p2-wiring: 분할 자식은 부모의 v4 설계를 상속 — 러프보드 spec 조인이 리넘버 후에도 살아남는다.
+      design_ref: ns.design_ref ?? original.design_ref,
+      static_spec: ns.static_spec ?? original.static_spec,
+      // 이슈 location(분할 전 id) 매칭용 임시 태그 — 리넘버에서 제거.
+      _splitFrom: split.shot_id,
     }));
     finalShots.splice(idx, 1, ...patched);
     splitCount += patched.length - 1;
   }
 
-  finalShots = finalShots.map((shot, i) => ({
-    ...shot,
-    shot_id: `shot_${i + 1}`,
-  }));
+  // #p2-wiring 채널1: CRITICAL/WARNING constraint 를 해당 샷에 부착 — 리넘버 *전* id 공간에서
+  //   매칭해야 한다 (이슈 location = Claude 가 본 조립 시퀀스의 id).
+  finalShots = attachCheckNotes(finalShots, valResult.semantic_issues);
+
+  // 리넘버 + (분할 전 id → 분할 후 id) 매핑 — report 의 이슈 location 을 최종 id 로 재표기.
+  const preToPost = new Map<string, string[]>();
+  finalShots = finalShots.map((shot, i) => {
+    const post = `shot_${i + 1}`;
+    for (const pre of [shot.shot_id, shot._splitFrom]) {
+      if (!pre) continue;
+      preToPost.set(pre, [...(preToPost.get(pre) ?? []), post]);
+    }
+    const { _splitFrom: _stripped, ...rest } = shot;
+    void _stripped;
+    return { ...rest, shot_id: post };
+  });
   finalShots = finalShots.map((shot, i) => ({
     ...shot,
     C: {
@@ -180,7 +214,13 @@ ${JSON.stringify(assembledShots, null, 2)}
     shots: finalShots,
   };
 
-  const allIssues = [...sceneBudgetIssues, ...valResult.semantic_issues, ...assetNorm.issues];
+  // semantic_issues 의 location 은 분할 전 id 공간 — report 에는 최종 id 로 재표기한다.
+  //   (sceneBudget/assetNorm 이슈는 각각 씬 id/최종 id 공간이라 재매핑 대상이 아님.)
+  const semanticRemapped = valResult.semantic_issues.map((issue) => {
+    const post = preToPost.get(issue.location);
+    return post?.length ? { ...issue, location: post.join('+') } : issue;
+  });
+  const allIssues = [...sceneBudgetIssues, ...semanticRemapped, ...assetNorm.issues];
   const hasCritical = allIssues.some((i) => i.severity === 'CRITICAL');
 
   const report: ShotCheckReport = {
@@ -200,12 +240,51 @@ ${JSON.stringify(assembledShots, null, 2)}
 
   return { shotSequence, report };
 }
+// 분할 처리 중 임시 태그를 얹은 작업용 샷 (저장 전 리넘버에서 태그 제거).
+type WorkingShot = ShotSequenceItem & { _splitFrom?: string };
+
+/**
+ * shotCheck 채널1(#p2-wiring): CRITICAL/WARNING + constraint 이슈를 해당 샷에 check_notes 로 부착.
+ *   매칭은 분할 전 id 공간 — 샷의 shot_id 또는 _splitFrom(분할 자식의 부모 id)과 location 일치.
+ *   INFO/constraint 부재는 부착하지 않는다 (오탐 노이즈가 생성 프롬프트를 오염시키지 않게).
+ */
+export function attachCheckNotes<T extends ShotSequenceItem & { _splitFrom?: string }>(
+  shots: T[],
+  issues: ValidationIssue[],
+): T[] {
+  const notesByPreId = new Map<string, ShotCheckNote[]>();
+  for (const issue of issues) {
+    if (issue.severity === 'INFO') continue;
+    const constraint = issue.constraint?.trim();
+    if (!constraint) continue;
+    const list = notesByPreId.get(issue.location) ?? [];
+    list.push({ category: issue.category, severity: issue.severity, constraint });
+    notesByPreId.set(issue.location, list);
+  }
+  if (notesByPreId.size === 0) return shots;
+  return shots.map((shot) => {
+    const notes = [
+      ...(notesByPreId.get(shot.shot_id) ?? []),
+      ...(shot._splitFrom ? notesByPreId.get(shot._splitFrom) ?? [] : []),
+    ];
+    if (!notes.length) return shot;
+    return { ...shot, check_notes: [...(shot.check_notes ?? []), ...notes] };
+  });
+}
+
 // L4 ShotDesign[] → ShotSequenceItem[] 결정론 조립. 입력 1개당 정확히 1개 보장 (shot loss 원천 차단).
 // static_spec.first_frame_prompt / dynamic_spec.motion_prompt 는 이미 최종 렌더 프롬프트라 LLM 없이
 // 렌더 입력을 온전히 확보한다 (E12b 실측: LLM 조립판과 렌더 필드 완전 동일, 변조 0).
-export function assembleShotsFromDesigns(shotDesigns: ShotDesign[], scenes: Scenes): ShotSequenceItem[] {
+export function assembleShotsFromDesigns(
+  shotDesigns: ShotDesign[],
+  scenes: Scenes,
+  // #p2-wiring: shot_id → 데쿠파주 구체 액션 (표시문 소스). 미제공(구 resume)이면 폴백 사슬.
+  beatByShotId: Map<string, { en: string; native?: string }> = new Map(),
+): ShotSequenceItem[] {
   const sceneById = new Map(scenes.scenes.map((sc) => [sc.scene_id, sc]));
-  return shotDesigns.map((d) => buildShotSequenceItemFromDesign(d, sceneById.get(d.intent.scene_id)));
+  return shotDesigns.map((d) =>
+    buildShotSequenceItemFromDesign(d, sceneById.get(d.intent.scene_id), beatByShotId.get(d.intent.shot_id)),
+  );
 }
 
 // L4 ShotDesign → ShotSequenceItem 결정론적 매퍼.
@@ -214,9 +293,16 @@ export function assembleShotsFromDesigns(shotDesigns: ShotDesign[], scenes: Scen
 function buildShotSequenceItemFromDesign(
   design: ShotDesign,
   scene: StoryScene | undefined,
+  beat?: { en: string; native?: string },
 ): ShotSequenceItem {
   const st = design.static_spec;
   const dyn = design.dynamic_spec;
+
+  // 표시문 소스 랭킹(#p2-wiring W3): 데쿠파주 구체 액션(유저 언어 → EN) → motion_prompt(EN 구체 동작)
+  //   → dramatic_purpose(추상 의도 — 최후 폴백). 25샷 중 20샷이 "충격을 안긴다"류 의도문으로
+  //   표시·생성되던 원인이 이 자리의 dramatic_purpose 직결이었다 (진단: lab/previz-quality).
+  const characterAction =
+    beat?.native?.trim() || beat?.en?.trim() || dyn.motion_prompt?.trim() || design.intent.dramatic_purpose;
 
   const characters = (st.character_blocking ?? []).map((b) => ({
     id: b.character_id,
@@ -232,11 +318,14 @@ function buildShotSequenceItemFromDesign(
   return {
     shot_id: design.intent.shot_id,
     duration_seconds: design.intent.duration_seconds,
+    // #p2-wiring: 러프보드 rich spec 조인용 provenance + persist 가 운반할 static_spec 원본.
+    design_ref: design.intent.shot_id,
+    static_spec: st,
     S: {
       scene_id: design.intent.scene_id,
       scene_purpose: scene?.purpose ?? design.intent.dramatic_purpose,
       emotion_beat: scene?.emotion_beat ?? { start: '', end: '' },
-      character_action: design.intent.dramatic_purpose,
+      character_action: characterAction,
       // #dialogue-v4: 옛 dialogue_summary 폴백 폐기 — 샷 대사는 dialogue 스테이지가 전담.
     },
     C: {

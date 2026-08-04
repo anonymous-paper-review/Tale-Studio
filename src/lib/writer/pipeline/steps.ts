@@ -365,6 +365,7 @@ export const WRITER_STEPS: WriterStep[] = [
         s.scenes!,
         s.worldVisual!,    // v2 (palette/locations) — asset 정규화용
         s.shotDesign!,
+        s.decoupage ?? null, // #p2-wiring: 표시문 소스(beat_summary) — 구 state resume 이면 null 폴백
         s.sceneBudgetIssues ?? [],
         logger,
         models.C,
@@ -515,6 +516,9 @@ export async function runWriterSteps(
   await logger.init();
 
   let completedUnits = run.completed_units;
+  // CAS 토큰(#p2-wiring): 이 인보케이션이 이어받은 state_version. 저장마다 +1로 갱신되고,
+  // 매치 실패(=다른 인보케이션이 먼저 씀/run 종결)면 즉시 양보한다 — stale 사본이 최종본을 덮는 것 방지.
+  let version = run.state_version ?? 0;
 
   for (;;) {
     const step = WRITER_STEPS.find((st) => !st.has(state));
@@ -545,7 +549,14 @@ export async function runWriterSteps(
     const nextCount = state._attempt?.stage === step.key ? state._attempt.count + 1 : 1;
     state._attempt = { stage: step.key, count: nextCount };
     try {
-      await saveRunState(run.id, state, { completed_units: completedUnits, current_stage: step.key });
+      const saved = await saveRunState(
+        run.id,
+        state,
+        { completed_units: completedUnits, current_stage: step.key },
+        version,
+      );
+      if (saved === null) return { paused: true }; // CAS 패배 — 다른 인보케이션이 run 을 소유
+      version = saved;
     } catch {
       // 진입 체크포인트 쓰기 실패(아직 stage 미실행)는 영구 실패로 보지 않는다 — 일시적 DB 블립일 수
       //   있으니 paused 로 두고 watchdog/keepalive 가 재시도하게 한다.
@@ -574,7 +585,14 @@ export async function runWriterSteps(
     if (!step.has(state)) {
       state._attempt = undefined;
       try {
-        await saveRunState(run.id, state, { completed_units: completedUnits, current_stage: step.key });
+        const saved = await saveRunState(
+          run.id,
+          state,
+          { completed_units: completedUnits, current_stage: step.key },
+          version,
+        );
+        if (saved === null) return { paused: true };
+        version = saved;
       } catch {
         return { paused: true };
       }
@@ -594,7 +612,15 @@ export async function runWriterSteps(
     );
     completedUnits += 1;
     try {
-      await saveRunState(run.id, state, { completed_units: completedUnits, current_stage: step.key });
+      const saved = await saveRunState(
+        run.id,
+        state,
+        { completed_units: completedUnits, current_stage: step.key },
+        version,
+      );
+      // CAS 패배는 실패가 아니다 — 다른 인보케이션이 run 을 이어받았으니 조용히 양보.
+      if (saved === null) return { paused: true };
+      version = saved;
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       await markFailed(run.id, message, captureErrorDetail(step.key, message));

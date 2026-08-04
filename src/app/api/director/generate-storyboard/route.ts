@@ -18,6 +18,7 @@ import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { applyStyleAnchor, resolveStyleAnchorByKey, type AnchorableSubmit } from '@/lib/style-anchor'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
+import { appendCheckConstraints } from '@/lib/writer/check-notes'
 import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
         .maybeSingle(),
       supabaseAdmin
         .from('shots')
-        .select('shot_id, rough_storyboard')
+        .select('shot_id, rough_storyboard, check_notes')
         .eq('project_id', projectId)
         .eq('shot_id', writerShotId)
         .maybeSingle(),
@@ -80,6 +81,13 @@ export async function POST(req: Request) {
         ? { start: roughFrames.start, direction: roughFrames.direction, end: roughFrames.end }
         : null
 
+    // shotCheck 채널1(#p2-wiring): 검증이 남긴 연속성 제약을 서버에서 최종 첨부 —
+    //   클라가 어떤 프롬프트를 보내든(derivedPrompt/promptOverride) 시각적 사실은 지켜지게.
+    const guardedPrompt = appendCheckConstraints(
+      prompt,
+      (shot as { check_notes?: unknown } | null)?.check_notes,
+    )
+
     let finalOpts: AnchorableSubmit
     let stripRefUrl: string | null = null
     if (stripFrames) {
@@ -95,7 +103,7 @@ export async function POST(req: Request) {
       // 레퍼런스 계약(buildRealStripPrompt 와 합치): [스트립, ...캐릭터/월드, 앵커?].
       //   applyStyleAnchor 는 앵커를 1번에 놓아 스트립 프롬프트와 충돌 → 스트립 모드는 수동 조립.
       finalOpts = {
-        prompt: buildRealStripPrompt(prompt, {
+        prompt: buildRealStripPrompt(guardedPrompt, {
           characterRefCount: callerRefs?.length ?? 0,
           hasStyleRef: !!anchor,
         }),
@@ -108,7 +116,7 @@ export async function POST(req: Request) {
       }
     } else {
       const baseOpts: AnchorableSubmit = {
-        prompt,
+        prompt: guardedPrompt,
         aspect_ratio: aspectRatio ?? '16:9',
         ...(callerRefs ? { reference_image_urls: callerRefs } : {}),
       }

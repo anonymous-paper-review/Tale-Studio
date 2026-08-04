@@ -26,6 +26,7 @@ import {
   type RoughGridVariant,
 } from '@/lib/writer/rough-storyboard-grid'
 import { writerShotIdToMain } from '@/lib/writer/adapters'
+import { parseCheckConstraints } from '@/lib/writer/check-notes'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import type { ShotDesign } from '@/lib/writer/types/pipeline'
 
@@ -54,11 +55,16 @@ async function loadShotDesignByMainId(
       const writerShotId = d?.static_spec?.shot_id ?? d?.intent?.shot_id
       const writerSceneId = d?.intent?.scene_id
       if (!writerShotId || !writerSceneId) continue
-      byId.set(writerShotIdToMain(writerShotId, writerSceneId), {
+      const spec = {
         staticSpec: d.static_spec,
         intent: d.intent,
         dynamicSpec: d.dynamic_spec,
-      })
+      }
+      // main 정규화 id(구 행 폴백 조인 키) + 원본 writer id(#p2-wiring: shots.design_ref 조인 키).
+      //   분할·리넘버를 겪은 프로젝트는 main id 조인이 옆 샷 스펙에 꽂히던 오프셋 결함(진단:
+      //   lab/previz-quality — scene_2 +1, scene_3 +2)이 있어 design_ref 조인이 진실이다.
+      byId.set(writerShotIdToMain(writerShotId, writerSceneId), spec)
+      byId.set(writerShotId, spec)
     }
   } catch (e) {
     console.error('[writer/rough-storyboard] shotDesign state load failed:', e)
@@ -198,7 +204,7 @@ export async function POST(req: Request) {
         supabaseAdmin
           .from('shots')
           .select(
-            'shot_id, scene_id, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, duration_seconds, rough_storyboard',
+            'shot_id, scene_id, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, duration_seconds, rough_storyboard, design_ref, check_notes',
           )
           .eq('project_id', projectId)
           .order('sort_order'),
@@ -317,6 +323,15 @@ export async function POST(req: Request) {
     const targetScenes = (scenes ?? []).filter((sc) => targetSceneIds.has(sc.scene_id as string))
     const targetCharIds = new Set(targets.flatMap((s) => ((s.characters as string[]) ?? [])))
     const targetChars = (chars ?? []).filter((c) => targetCharIds.has(c.character_id as string))
+    // #p2-wiring: 분할·리넘버를 겪은 샷은 design_ref(부모 v4 id)로 rich spec 을 조인.
+    //   구 행(design_ref 없음)은 기존 main id 직조인 폴백 — 분할이 없던 프로젝트에선 그대로 맞는다.
+    const resolvedSpecByShotId = new Map<string, RoughStoryboardSpec>()
+    for (const s of targets) {
+      const sid = s.shot_id as string
+      const ref = typeof s.design_ref === 'string' && s.design_ref ? s.design_ref : null
+      const spec = (ref ? specByShotId.get(ref) : undefined) ?? specByShotId.get(sid)
+      if (spec) resolvedSpecByShotId.set(sid, spec)
+    }
     const [actionEnByShot, moodEnByScene, translatedSpecs, timeEnByScene, locEnByScene, nameEnById] =
       await Promise.all([
         deriveEnBatch(
@@ -328,7 +343,7 @@ export async function POST(req: Request) {
           'scene mood',
         ),
         // rich 경로 shotDesign 자유서술(blocking·layers·focal·motion) → EN (S3c)
-        translateRoughSpecsEn(specByShotId, targets.map((s) => s.shot_id as string)),
+        translateRoughSpecsEn(resolvedSpecByShotId, targets.map((s) => s.shot_id as string)),
         deriveEnBatch(
           targetScenes.map((sc) => ({ id: sc.scene_id as string, native: (sc.time_of_day as string) ?? '' })),
           'scene time of day',
@@ -367,7 +382,7 @@ export async function POST(req: Request) {
         const scene = sceneById.get(s.scene_id as string)
         const camera = (s.camera_config ?? {}) as { pan?: number }
         const lighting = (s.lighting_config ?? {}) as { position?: string }
-        return buildRoughGridCell(
+        const cell = buildRoughGridCell(
           {
             shotType: (s.shot_type as string) ?? 'MS',
             actionDescription:
@@ -396,6 +411,12 @@ export async function POST(req: Request) {
           },
           shotId,
         )
+        // shotCheck 채널1(#p2-wiring): CRITICAL/WARNING 제약을 START 서술 꼬리에 첨부 —
+        //   검증이 감지한 연속성 사실(소품 상태·공간 관계)이 러프 단계에서부터 지켜지게.
+        const constraints = parseCheckConstraints(s.check_notes)
+        return constraints.length
+          ? { ...cell, start: `${cell.start}. Continuity constraints: ${constraints.join('; ')}` }
+          : cell
       })
 
       let prompt = buildRoughGridPrompt(cells, gridVariant)

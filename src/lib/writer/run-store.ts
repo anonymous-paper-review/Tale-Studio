@@ -30,6 +30,8 @@ export interface WriterRunRow {
   error: string | null;
   created_at: string;
   updated_at: string;
+  // 낙관적 동시성 토큰(#p2-wiring CAS 2026-08-04) — 구 행/마이그레이션 직후엔 0.
+  state_version: number;
 }
 
 // status 라우트용 경량 컬럼 (무거운 state 블롭 제외).
@@ -122,35 +124,57 @@ export async function listStalledRunningProjects(staleMs: number): Promise<strin
 
 /**
  * state + 진행률 필드 업데이트 (updated_at = now()).
+ *
+ * CAS(#p2-wiring 2026-08-04): expectedVersion 을 주면 `status='running' AND
+ * state_version=expectedVersion` 일 때만 쓰고 version 을 +1 한다. 매치 실패(다른 인보케이션이
+ * 먼저 썼거나 run 이 종결됨)면 null — 호출자는 낡은 사본으로 더 쓰지 말고 양보(paused)해야 한다.
+ * 실측 원인: 긴 스테이지 중 keepalive 가 띄운 경쟁 인보케이션의 stale 진입 마킹이,
+ * 완주한 인보케이션의 최종 state 를 덮어 "status=completed + state=11/13" 모순 행을 만들었다.
+ * 반환: 새 state_version (CAS 미사용 호출은 0).
  */
 export async function saveRunState(
   id: string,
   state: WriterRunStateBase,
   fields: { completed_units: number; current_stage: string | null },
-): Promise<void> {
-  const { error } = await supabaseAdmin
+  expectedVersion?: number,
+): Promise<number | null> {
+  const useCas = expectedVersion !== undefined;
+  const nextVersion = (expectedVersion ?? 0) + 1;
+  let query = supabaseAdmin
     .from('writer_runs')
     .update({
       state,
       completed_units: fields.completed_units,
       current_stage: fields.current_stage,
       updated_at: new Date().toISOString(),
+      ...(useCas ? { state_version: nextVersion } : {}),
     })
     .eq('id', id);
+  if (useCas) {
+    query = query.eq('status', 'running').eq('state_version', expectedVersion);
+  }
+  const { data, error } = await query.select('id');
 
   if (error) throw new Error(`saveRunState failed: ${error.message}`);
+  if (useCas && (!data || data.length === 0)) return null;
+  return useCas ? nextVersion : 0;
 }
 
 /**
- * run 을 completed 로 마킹.
+ * run 을 completed 로 마킹 — running 일 때만 (종결 상태 CAS: 먼저 닿은 터미널이 이긴다).
  */
 export async function markCompleted(id: string): Promise<void> {
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('writer_runs')
     .update({ status: 'completed', updated_at: new Date().toISOString() })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('status', 'running')
+    .select('id');
 
   if (error) throw new Error(`markCompleted failed: ${error.message}`);
+  if (!data || data.length === 0) {
+    console.warn(`[run-store] markCompleted(${id}): run 이 이미 종결 상태 — no-op`);
+  }
 }
 
 /**
@@ -185,7 +209,7 @@ export async function markFailed(
   errorMessage: string,
   detail?: WriterErrorDetail,
 ): Promise<void> {
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('writer_runs')
     .update({
       status: 'failed',
@@ -193,9 +217,14 @@ export async function markFailed(
       error_detail: (detail ?? null) as unknown as Json,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('status', 'running')
+    .select('id');
 
   if (error) throw new Error(`markFailed failed: ${error.message}`);
+  if (!data || data.length === 0) {
+    console.warn(`[run-store] markFailed(${id}): run 이 이미 종결 상태 — no-op (${errorMessage})`);
+  }
 }
 
 /**

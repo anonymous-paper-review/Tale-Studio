@@ -342,11 +342,11 @@ async function _runPipelineInner(
       shotCheckResult = { shotSequence: cachedSeq, report: cachedReport };
       await logger.markStage('shotCheck', 'completed', { resumed: true });
     } else {
-      shotCheckResult = await runShotCheck(projectId, genre, characters, scenes, worldVisual, shotDesign, sceneBudgetIssues, logger, models.C);
+      shotCheckResult = await runShotCheck(projectId, genre, characters, scenes, worldVisual, shotDesign, decoupage, sceneBudgetIssues, logger, models.C);
       await logger.flushRawLlm('shotCheck');
     }
   } else {
-    shotCheckResult = await runShotCheck(projectId, genre, characters, scenes, worldVisual, shotDesign, sceneBudgetIssues, logger, models.C);
+    shotCheckResult = await runShotCheck(projectId, genre, characters, scenes, worldVisual, shotDesign, decoupage, sceneBudgetIssues, logger, models.C);
     await logger.flushRawLlm('shotCheck');
   }
 

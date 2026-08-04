@@ -545,6 +545,7 @@ const STAGE_FNS: Record<string, (st: State, p: Preset) => Promise<unknown>> = {
       (loadInjected('WRITER_SCENES_FILE') ?? st.scenes) as Scenes,
       stubWorldVisual(p.world),
       (loadInjected('WRITER_SHOTS_FILE') ?? st.shotDesign) as ShotDesign[],
+      (st.decoupage ?? null) as never, // #p2-wiring: 표시문 소스 — 체인 state 의 데쿠파주
       [],
       logger,
       { provider: 'claude', model: 'claude-sonnet-4-6' } as never,

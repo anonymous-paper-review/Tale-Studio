@@ -324,6 +324,15 @@ export interface ValidationIssue {
   location: string; // "S3.scene_2" or "shot_5" etc
   message: string;
   suggestion?: string;
+  // 생성 모델에 그대로 주입할 명령형 EN 한 문장 — 샷이 지켜야 할 시각적 사실(#p2-wiring shotCheck 채널1).
+  constraint?: string;
+}
+
+// shotCheck 채널1: 샷에 부착돼 생성 프롬프트까지 운반되는 제약 (CRITICAL/WARNING만).
+export interface ShotCheckNote {
+  category: ValidationIssue['category'];
+  severity: ValidationSeverity;
+  constraint: string;
 }
 
 export interface StoryCheckReport {
@@ -720,6 +729,15 @@ export interface ShotSequenceItem {
     changes: string[];
     is_scene_transition: boolean;
   };
+
+  // ── #p2-wiring 2026-08-04 ──
+  // 원본 v4 설계의 shot_id — shotCheck 분할·리넘버 뒤에도 러프보드가 state.shotDesign 의
+  // rich spec 을 올바른 샷에 조인하기 위한 provenance 포인터 (분할 자식은 부모 설계 상속).
+  design_ref?: string;
+  // v4 static_spec 원본 — persist 가 shots.static_spec 으로 운반 (facet 렌더·prompt 캐시 소스).
+  static_spec?: ShotStaticSpec;
+  // shotCheck 채널1: CRITICAL/WARNING 제약 — persist 가 shots.check_notes 로 운반, 생성 프롬프트에 첨부.
+  check_notes?: ShotCheckNote[];
 }
 
 export interface ShotSequence {

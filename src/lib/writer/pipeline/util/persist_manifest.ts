@@ -34,6 +34,7 @@ import type {
   CharacterVisual,
   ShotSequence,
   ShotStaticSpec,
+  ShotCheckNote,
   DialogueTrack,
   ShotDialogue,
 } from '@/lib/writer/types/pipeline'
@@ -395,6 +396,9 @@ type PersistShotDraft = {
   shotDialogue: ShotDialogue | null
   duration: number
   i: number
+  // #p2-wiring: v4 설계 provenance(분할 자식은 부모 id) + shotCheck 채널1 제약.
+  designRef: string | null
+  checkNotes: ShotCheckNote[] | null
 }
 
 function warnShotPersistFallback(scope: string, error: unknown) {
@@ -595,6 +599,8 @@ export async function persistShotsToDb(
         shotDialogue: dialogueByShotId.get(it.shot_id) ?? null,
         duration: clampShotSeconds(it.duration_seconds), // #9 페이싱 상한
         i,
+        designRef: it.design_ref ?? null,
+        checkNotes: it.check_notes?.length ? it.check_notes : null,
       }
     })
     const actionEn = await deriveEnBatch(
@@ -615,6 +621,12 @@ export async function persistShotsToDb(
     const { error: shotInsertErr } = await supabaseAdmin.from('shots').insert(
       shRows.map((r) => {
         const actTx = !isTargetScript(r.actionNative, locale) && actionKo.has(r.shotMainId)
+        const promptValue = prompts.get(r.shotMainId) ?? defaultPersistPrompt(r, actionEn)
+        // #p2-wiring 가드: 프롬프트 공란 persist 는 하류(실사/영상)를 추상 폴백에 밀어넣는다 —
+        //   과거 실측(25샷 prompt='')의 재발을 로그로 가시화 (composition·action 모두 빈 경우만 남는다).
+        if (!promptValue.trim()) {
+          console.warn(`[persistShotsToDb] shot ${r.shotMainId}: 생성 프롬프트 공란 — composition/action 모두 비어 있음`)
+        }
         const row = {
           project_id: projectId,
           scene_id: r.sceneMainId,
@@ -628,9 +640,12 @@ export async function persistShotsToDb(
           },
           characters: r.chars,
           // 생성 프롬프트: flag off 는 rich composition → action, flag on 은 static_spec facet 렌더(캐시 가능).
-          prompt: prompts.get(r.shotMainId) ?? defaultPersistPrompt(r, actionEn),
+          prompt: promptValue,
           static_spec: r.staticSpec ?? null,
           prompt_source_hash: r.promptSourceHash,
+          // #p2-wiring: 러프보드 spec 조인 provenance + shotCheck 채널1 제약 운반.
+          design_ref: r.designRef,
+          check_notes: r.checkNotes,
           duration_seconds: r.duration,
           generation_method: 'I2V',
           // #dialogue-v4: 화자 명시 대사 라인 (옛 chars[0] 화자 추정·dialogue_summary 폴백 폐기).
