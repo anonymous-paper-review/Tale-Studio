@@ -41,12 +41,15 @@ export async function openaiGenerate(
     }
     messages.push({ role: 'user', content: userPrompt });
 
+    // gpt-5*/o* 추론 계열: temperature(≠1) 거부 + max_tokens 대신 max_completion_tokens 요구.
+    //   (#p2-maxmodel 2026-08-05 — gpt-5.6-sol 배선하며 정리. 구 모델은 기존 동작 유지.)
+    const reasoningFamily = /^(gpt-5|o\d)/.test(model);
     const body: Record<string, unknown> = {
       model,
       messages,
-      temperature: opts.temperature ?? 0.7,
+      ...(reasoningFamily ? {} : { temperature: opts.temperature ?? 0.7 }),
     };
-    if (opts.maxTokens) body.max_tokens = opts.maxTokens;
+    if (opts.maxTokens) body[reasoningFamily ? 'max_completion_tokens' : 'max_tokens'] = opts.maxTokens;
     if (opts.expectJson) body.response_format = { type: 'json_object' };
 
     const r = await withLlmRetry(async () => {

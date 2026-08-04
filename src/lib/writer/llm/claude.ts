@@ -38,11 +38,15 @@ export async function claudeGenerate(
   let stopReason: string | undefined;
   let error: string | undefined;
 
+  // Claude 5 계열(opus-5/sonnet-5/fable-5 등)은 temperature 가 deprecated — 전달 시 400.
+  //   (#p2-maxmodel 2026-08-05 실측: "`temperature` is deprecated for this model.")
+  const supportsTemperature = !/^claude-[a-z]+-5/.test(model);
+
   try {
     const response = await withLlmRetry(() => client.messages.create({
       model,
       max_tokens: opts.maxTokens ?? 4096,
-      temperature: opts.temperature ?? 0.3,
+      ...(supportsTemperature ? { temperature: opts.temperature ?? 0.3 } : {}),
       system: opts.system,
       messages: [{ role: 'user', content: userPrompt }],
     }), 'claude');
