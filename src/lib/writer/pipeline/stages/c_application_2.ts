@@ -149,31 +149,7 @@ ${JSON.stringify(assembledShots, null, 2)}
     //   경우가 실측됨(47a62d1d: S 누락 4샷) → persistShotsToDb가 it.S.scene_id에서 죽는다.
     //   누락 블록은 원본 샷에서 결정론 상속해 스키마를 보장한다.
     const original = finalShots[idx];
-    const patched: WorkingShot[] = split.new_shots.map((ns) => ({
-      ...ns,
-      // #p2-pacing T4: S 누락 시 부모 통째 복제 대신 자식 자신의 서술로 표시문을 개별화 —
-      //   같은 표시문 2연속(실측 2쌍: shot_4/5 등) 방지. 자기 서술도 없으면 부모 폴백.
-      S: ns.S ?? {
-        ...original.S,
-        character_action:
-          ns.video_generation?.motion_prompt?.trim() ||
-          ns.first_frame_generation?.composition_prompt?.trim() ||
-          original.S.character_action,
-      },
-      C: ns.C ?? original.C,
-      V: ns.V ?? original.V,
-      assets: ns.assets ?? original.assets,
-      first_frame_generation: ns.first_frame_generation ?? original.first_frame_generation,
-      video_generation: ns.video_generation ?? original.video_generation,
-      duration_seconds: ns.duration_seconds ?? original.duration_seconds,
-      continuity: ns.continuity ?? original.continuity,
-      action_budget: ns.action_budget ?? original.action_budget,
-      // #p2-wiring: 분할 자식은 부모의 v4 설계를 상속 — 러프보드 spec 조인이 리넘버 후에도 살아남는다.
-      design_ref: ns.design_ref ?? original.design_ref,
-      static_spec: ns.static_spec ?? original.static_spec,
-      // 이슈 location(분할 전 id) 매칭용 임시 태그 — 리넘버에서 제거.
-      _splitFrom: split.shot_id,
-    }));
+    const patched = buildSplitChildren(original, split.shot_id, split.new_shots);
     finalShots.splice(idx, 1, ...patched);
     splitCount += patched.length - 1;
   }
@@ -255,6 +231,42 @@ ${JSON.stringify(assembledShots, null, 2)}
 // 분할 처리 중 임시 태그를 얹은 작업용 샷 (저장 전 리넘버에서 태그 제거).
 type WorkingShot = ShotSequenceItem & { _splitFrom?: string };
 
+/**
+ * 분할안(new_shots) → 자식 샷 조립. (#p2-split-siblings 2026-08-05 — 실측: shot_3/4 러프 동일 그림)
+ *   - S 누락 시 부모 복제 대신 자식 자신의 서술로 표시문 개별화 (T4).
+ *   - design_ref/static_spec 은 **첫 자식만** 상속 — 부모의 첫 프레임 스펙은 통상 첫 자식의
+ *     시작 순간이다. 나머지 자식이 같은 스펙을 공유하면 러프가 같은 그림을 두 번 그린다(F2).
+ *     둘째부터는 자기 액션 텍스트 기반(db_fallback)으로 — 차별화를 구조로 보장.
+ */
+export function buildSplitChildren(
+  original: WorkingShot,
+  parentId: string,
+  newShots: ShotSequenceItem[],
+): WorkingShot[] {
+  return newShots.map((ns, childIdx) => ({
+    ...ns,
+    S: ns.S ?? {
+      ...original.S,
+      character_action:
+        ns.video_generation?.motion_prompt?.trim() ||
+        ns.first_frame_generation?.composition_prompt?.trim() ||
+        original.S.character_action,
+    },
+    C: ns.C ?? original.C,
+    V: ns.V ?? original.V,
+    assets: ns.assets ?? original.assets,
+    first_frame_generation: ns.first_frame_generation ?? original.first_frame_generation,
+    video_generation: ns.video_generation ?? original.video_generation,
+    duration_seconds: ns.duration_seconds ?? original.duration_seconds,
+    continuity: ns.continuity ?? original.continuity,
+    action_budget: ns.action_budget ?? original.action_budget,
+    design_ref: ns.design_ref ?? (childIdx === 0 ? original.design_ref : undefined),
+    static_spec: ns.static_spec ?? (childIdx === 0 ? original.static_spec : undefined),
+    // 이슈 location(분할 전 id) 매칭용 임시 태그 — 리넘버에서 제거.
+    _splitFrom: parentId,
+  }));
+}
+
 // 사이즈 사다리 — decoupage 프롬프트의 규칙과 같은 표. 비거리형(OTS/POV/2S)은 중간값 취급.
 const SIZE_LADDER: Record<string, number> = {
   ECU: 0, BCU: 0, CU: 1, MCU: 2, OTS: 2, POV: 2, MS: 3, '2S': 3,
@@ -320,10 +332,13 @@ export function attachCheckNotes<T extends ShotSequenceItem & { _splitFrom?: str
   }
   if (notesByPreId.size === 0) return shots;
   return shots.map((shot) => {
-    const notes = [
-      ...(notesByPreId.get(shot.shot_id) ?? []),
-      ...(shot._splitFrom ? notesByPreId.get(shot._splitFrom) ?? [] : []),
-    ];
+    // F1(#p2-split-siblings): 분할 부모의 action_budget 이슈는 자식에게 상속하지 않는다 —
+    //   분할 자체가 그 이슈의 수정이다. "either A or B" 제약이 두 자식 모두에 주입돼
+    //   같은 그림을 두 번 그리게 하던 실측 결함(shot_3/4). continuity 등은 상속 유지.
+    const inherited = shot._splitFrom
+      ? (notesByPreId.get(shot._splitFrom) ?? []).filter((n) => n.category !== 'action_budget')
+      : [];
+    const notes = [...(notesByPreId.get(shot.shot_id) ?? []), ...inherited];
     if (!notes.length) return shot;
     return { ...shot, check_notes: [...(shot.check_notes ?? []), ...notes] };
   });

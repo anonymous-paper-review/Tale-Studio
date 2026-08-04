@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest'
 import {
   assembleShotsFromDesigns,
   attachCheckNotes,
+  buildSplitChildren,
 } from '@/lib/writer/pipeline/stages/c_application_2'
 import { parseCheckConstraints, appendCheckConstraints } from '@/lib/writer/check-notes'
 import type { Scenes, ShotDesign, ValidationIssue } from '@/lib/writer/types/pipeline'
@@ -132,6 +133,56 @@ describe('attachCheckNotes — 채널1 부착 규칙 (W4)', () => {
     const shots = baseShots()
     const out = attachCheckNotes(shots, [])
     expect(out[0].check_notes).toBeUndefined()
+  })
+
+  it('F1: 분할 부모의 action_budget 제약은 자식에게 상속되지 않는다 (분할이 곧 수정)', () => {
+    const [a] = assembleShotsFromDesigns([makeDesign({ shotId: 'shot_9' })], SCENES)
+    const child = { ...a, shot_id: 'shot_9b', _splitFrom: 'shot_9' }
+    const out = attachCheckNotes([child], [
+      {
+        category: 'action_budget',
+        severity: 'CRITICAL',
+        location: 'shot_9',
+        message: '액션 2개',
+        constraint: 'Show only one major action: either A or B.',
+      },
+      {
+        category: 'continuity',
+        severity: 'WARNING',
+        location: 'shot_9',
+        message: '소품 상태',
+        constraint: 'The canteen stays in her left hand.',
+      },
+    ])
+    expect(out[0].check_notes).toHaveLength(1)
+    expect(out[0].check_notes?.[0].category).toBe('continuity')
+  })
+})
+
+describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
+  const parent = () => {
+    const [p] = assembleShotsFromDesigns([makeDesign({ shotId: 'shot_3' })], SCENES)
+    return p
+  }
+  const newShots = () =>
+    [
+      { shot_id: 'shot_3a', video_generation: { motion_prompt: 'She shakes the canteen at her ear.' } },
+      { shot_id: 'shot_3b', video_generation: { motion_prompt: 'She reaches into the broken window.' } },
+    ] as never[]
+
+  it('design_ref/static_spec 은 첫 자식만 상속한다 — 형제가 같은 스펙으로 같은 그림을 그리는 결함 방지', () => {
+    const [c1, c2] = buildSplitChildren(parent(), 'shot_3', newShots())
+    expect(c1.design_ref).toBe('shot_3')
+    expect(c1.static_spec).toBeTruthy()
+    expect(c2.design_ref).toBeUndefined()
+    expect(c2.static_spec).toBeUndefined()
+  })
+
+  it('S 누락 자식은 자기 모션 서술로 표시문이 개별화된다 (T4)', () => {
+    const [c1, c2] = buildSplitChildren(parent(), 'shot_3', newShots())
+    expect(c1.S.character_action).toBe('She shakes the canteen at her ear.')
+    expect(c2.S.character_action).toBe('She reaches into the broken window.')
+    expect(c1._splitFrom).toBe('shot_3')
   })
 })
 
