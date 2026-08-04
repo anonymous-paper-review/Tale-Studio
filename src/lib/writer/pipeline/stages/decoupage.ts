@@ -75,10 +75,21 @@ function buildUserPrompt(
     .map((a, i) => `  [${i}] ${a}`)
     .join('\n');
 
+  // #p2-pacing 2026-08-04: "참고용 힌트 (제약 아님)" → 협상 규칙 승격. 힌트 시절 실측:
+  //   타깃 5샷×6s 설계가 8샷 평균 3.2s 로 압착돼 인지 과부하 컷이 됐다 (lab/previz-quality §7).
   const planHint = plan
-    ? `[sceneCinematography 비주얼 플랜 — 참고용 힌트 (제약 아님)]
-coverage_pattern=${plan.coverage_pattern}, shot_count_target=${plan.shot_count_target} (힌트), rhythm_profile=${plan.rhythm_profile}, cut_pace=${plan.cut_pace}, avg_shot_seconds=${plan.avg_shot_seconds}, lens=${plan.lens_vocabulary.join('/')}mm, energy=${plan.camera_energy}`
+    ? `[sceneCinematography 비주얼 플랜 — 협상 규칙 (단순 힌트 아님)]
+coverage_pattern=${plan.coverage_pattern}, shot_count_target=${plan.shot_count_target}, rhythm_profile=${plan.rhythm_profile}, cut_pace=${plan.cut_pace}, avg_shot_seconds=${plan.avg_shot_seconds}, lens=${plan.lens_vocabulary.join('/')}mm, energy=${plan.camera_energy}
+- shot_count_target ±1 을 상한으로 삼아라. 초과가 필요하면 먼저 인접 샷 병합(merge)으로 되돌리고,
+  그래도 초과라면 해당 샷 dramatic_purpose 에 초과 사유를 명시하라.
+- avg_shot_seconds 는 시청자의 인지 예산이다. intended_duration_seconds 합이 estimated_seconds 를
+  넘는 것은 허용된다(하류가 씬 길이를 증액한다) — 샷 수를 늘리려고 개별 샷을 짧게 압착하지 마라.`
     : `[sceneCinematography 미제공 — Compact Mode. 데쿠파주를 자체 판단으로 저작]`;
+
+  // 사이즈 사다리 규칙 — cine 플랜 유무와 무관한 일반 연출 문법 (급전환 45% 실측의 상류 방어).
+  const ladderRule = `[샷 사이즈 연속성]
+인접 샷의 shot_size 사다리(ECU-CU-MCU-MS-MFS-WS-EWS)에서 3단계 이상 점프는 인서트(ECU 소품 강조)나
+POV 같은 명시적 동기 없이 금지 — 사이즈는 점진적으로 이동시켜 시청자의 공간 감각을 보존하라.`;
 
   // 대표 스토리보드 모드 (E3b 정책 — budget.ts): 장편은 전역 상한을 씬으로 배분한 예산 안에서 저작.
   const budgetHint = shotBudgetHint !== null
@@ -100,7 +111,9 @@ ${scene.key_dialogue && scene.key_dialogue.length > 0 ? `key_dialogue=${JSON.str
 [내러티브 비트 (scene_actions) — 인덱스 주목]
 ${beatList}
 
-${planHint}${budgetHint}
+${planHint}
+
+${ladderRule}${budgetHint}
 
 [genre 장르/톤]
 genre=${genre.genre}, tone=${genre.tone.join('/')}, targetEmotion=${genre.targetEmotion.join('/')}

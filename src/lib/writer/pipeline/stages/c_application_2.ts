@@ -81,7 +81,8 @@ CRITICAL/WARNING 이슈에는 constraint 필드를 반드시 포함하라 — �
 (예: "The blueprints are tucked inside her vest, not held in her hands.").
 카메라 용어·연출 의도가 아니라 화면에 보여야 하는 상태를 서술한다. INFO 는 constraint 생략.
 
-split 권장 시 new_shots 배열로 분할안 제시 (각각 1 주요 액션).`;
+split 권장 시 new_shots 배열로 분할안 제시 (각각 1 주요 액션). 각 new_shot 에는 S 블록을
+반드시 포함하고, S.character_action 에는 그 반쪽이 담는 구체 행동을 써라 (부모 문장 복사 금지).`;
 
   const valUser = `[샷 시퀀스]
 ${JSON.stringify(assembledShots, null, 2)}
@@ -150,7 +151,15 @@ ${JSON.stringify(assembledShots, null, 2)}
     const original = finalShots[idx];
     const patched: WorkingShot[] = split.new_shots.map((ns) => ({
       ...ns,
-      S: ns.S ?? original.S,
+      // #p2-pacing T4: S 누락 시 부모 통째 복제 대신 자식 자신의 서술로 표시문을 개별화 —
+      //   같은 표시문 2연속(실측 2쌍: shot_4/5 등) 방지. 자기 서술도 없으면 부모 폴백.
+      S: ns.S ?? {
+        ...original.S,
+        character_action:
+          ns.video_generation?.motion_prompt?.trim() ||
+          ns.first_frame_generation?.composition_prompt?.trim() ||
+          original.S.character_action,
+      },
       C: ns.C ?? original.C,
       V: ns.V ?? original.V,
       assets: ns.assets ?? original.assets,
@@ -220,7 +229,10 @@ ${JSON.stringify(assembledShots, null, 2)}
     const post = preToPost.get(issue.location);
     return post?.length ? { ...issue, location: post.join('+') } : issue;
   });
-  const allIssues = [...sceneBudgetIssues, ...semanticRemapped, ...assetNorm.issues];
+  // #p2-pacing T3: 사이즈 급전환 결정론 검출 — report 전용(constraint 없음 → check_notes 미부착,
+  //   생성 프롬프트를 오염시키지 않는다). 사람 채널(Phase 3)과 후속 튜닝의 계측 소스.
+  const ladderIssues = detectLadderJumpIssues(finalShots);
+  const allIssues = [...sceneBudgetIssues, ...semanticRemapped, ...assetNorm.issues, ...ladderIssues];
   const hasCritical = allIssues.some((i) => i.severity === 'CRITICAL');
 
   const report: ShotCheckReport = {
@@ -242,6 +254,51 @@ ${JSON.stringify(assembledShots, null, 2)}
 }
 // 분할 처리 중 임시 태그를 얹은 작업용 샷 (저장 전 리넘버에서 태그 제거).
 type WorkingShot = ShotSequenceItem & { _splitFrom?: string };
+
+// 사이즈 사다리 — decoupage 프롬프트의 규칙과 같은 표. 비거리형(OTS/POV/2S)은 중간값 취급.
+const SIZE_LADDER: Record<string, number> = {
+  ECU: 0, BCU: 0, CU: 1, MCU: 2, OTS: 2, POV: 2, MS: 3, '2S': 3,
+  MFS: 4, MLS: 4, FS: 4, WS: 5, LS: 5, EWS: 6, ELS: 6,
+};
+
+/**
+ * 급전환 결정론 검출(#p2-pacing T3): 같은 씬 인접 샷의 사이즈 사다리 점프 ≥3 을 WARNING 으로.
+ *   인서트 문법(급접근 CU/ECU 후 즉시 원 사이즈 복귀)은 면제 — 동기 있는 점프이기 때문.
+ *   constraint 를 달지 않아 report 전용이다 (급전환은 설계 사실이라 생성 프롬프트로 못 고친다).
+ */
+export function detectLadderJumpIssues(shots: ShotSequenceItem[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const rung = (s: ShotSequenceItem | undefined) =>
+    s ? SIZE_LADDER[String(s.V?.camera?.type ?? '').toUpperCase()] : undefined;
+  for (let i = 1; i < shots.length; i += 1) {
+    const prev = shots[i - 1];
+    const cur = shots[i];
+    if (prev.S?.scene_id !== cur.S?.scene_id) continue; // 씬 경계 전환은 정상
+    const a = rung(prev);
+    const b = rung(cur);
+    if (a === undefined || b === undefined) continue;
+    const jump = Math.abs(a - b);
+    if (jump < 3) continue;
+    // 인서트 문법 면제 — 진입 다리(원 사이즈→CU/ECU, 다음 샷이 원 사이즈로 복귀)와
+    //   복귀 다리(CU/ECU→원 사이즈, 직전-직전 샷이 그 원 사이즈) 둘 다.
+    const next = shots[i + 1];
+    const nb = next && next.S?.scene_id === cur.S?.scene_id ? rung(next) : undefined;
+    const isInsertEntry = b <= 1 && nb !== undefined && Math.abs(a - nb) <= 1;
+    const beforePrev = shots[i - 2];
+    const pb =
+      beforePrev && beforePrev.S?.scene_id === cur.S?.scene_id ? rung(beforePrev) : undefined;
+    const isInsertReturn = a <= 1 && pb !== undefined && Math.abs(pb - b) <= 1;
+    if (isInsertEntry || isInsertReturn) continue;
+    issues.push({
+      category: 'cinematography',
+      severity: 'WARNING',
+      location: `${prev.shot_id}→${cur.shot_id}`,
+      message: `샷 사이즈 급전환 (${prev.V?.camera?.type}→${cur.V?.camera?.type}, ${jump}단계) — 동기 없는 점프는 공간 감각을 깬다.`,
+      suggestion: '중간 사이즈 경유 또는 인서트/POV 동기 명시',
+    });
+  }
+  return issues;
+}
 
 /**
  * shotCheck 채널1(#p2-wiring): CRITICAL/WARNING + constraint 이슈를 해당 샷에 check_notes 로 부착.

@@ -13,6 +13,7 @@
 //     → shots.characters 와 characters.character_id 가 동일 id 공간(referential 정합).
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { writerSceneIdToMain, writerShotIdToMain } from '@/lib/writer/adapters'
+import { reallocateShotDurations } from '@/lib/writer/pipeline/util/duration_reallocation'
 import { isFlagOn } from '@/lib/flags'
 import {
   facetsHash,
@@ -551,6 +552,17 @@ export async function persistShotsToDb(
     for (const sh of sc.shots) dialogueByShotId.set(sh.shot_id, sh)
   }
 
+  // 인지 부하 재배분(#p2-pacing): 대사가 확정된 유일한 시점이 여기다 — 발화·액션·신규 정보 기준
+  //   필요 시간에 못 미치는 샷만 증액한다(단축 금지). 씬 길이는 아래 scene 수렴이 합으로 갱신.
+  const realloc = reallocateShotDurations(shotSequence.shots, dialogueByShotId)
+  if (realloc.changed.length) {
+    console.log(
+      `[persistShotsToDb] 인지 부하 재배분: ${realloc.changed.length}샷 증액 — ` +
+        realloc.changed.map((c) => `${c.shot_id} ${c.from}→${c.to}s(need ${c.needed})`).join(', '),
+    )
+  }
+  const seqShots = realloc.shots
+
   // 자신이 채우는 테이블만 정리 (shots). characters/locations/scenes 는 Tier 1 소관.
   const { error: shotDeleteErr } = await supabaseAdmin
     .from('shots')
@@ -559,13 +571,13 @@ export async function persistShotsToDb(
   assertDbOk('shots delete', shotDeleteErr)
 
   // shots (shot_sequence — 대사 보유)
-  if (shotSequence.shots.length) {
+  if (seqShots.length) {
     // 언어 경계(S3): action_description(파이프라인 산출) → EN base 파생(이미 영어면 skip). 표시는 _native.
     // S 블록 누락 방어(#long-writer-run 2026-07-15): 분할 샷이 S 없이 오면 직전 샷의 씬으로
     //   귀속시킨다(분할은 원본 위치 삽입이라 이웃과 같은 씬) — 한 샷 결손이 전체 persist를
     //   죽이던 것(47a62d1d: shots 0행) 방지. 스테이지 쪽 보정과 이중 방어.
     let lastSceneId = ''
-    const shRows: PersistShotDraft[] = shotSequence.shots.map((it, i) => {
+    const shRows: PersistShotDraft[] = seqShots.map((it, i) => {
       const sceneId = it.S?.scene_id ?? lastSceneId
       if (!it.S?.scene_id) {
         console.warn(`[persistShotsToDb] shot ${it.shot_id}: S.scene_id 누락 → 직전 씬(${sceneId})으로 귀속`)
@@ -679,7 +691,7 @@ export async function persistShotsToDb(
     //   기본값(?? 5)은 insert 의 duration_seconds 와 동일하게 맞춘다.
     const secondsByScene = new Map<string, number>()
     let lastSumSceneId = ''
-    for (const it of shotSequence.shots) {
+    for (const it of seqShots) {
       // S 누락 방어 — 위 shRows 와 동일한 직전-씬 귀속 규칙.
       lastSumSceneId = it.S?.scene_id ?? lastSumSceneId
       if (!lastSumSceneId) continue
