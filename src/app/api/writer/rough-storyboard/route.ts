@@ -313,7 +313,17 @@ export async function POST(req: Request) {
       shotIds?.length === 1 && eligible.length === 1 ? 'strip1' : 'grid4'
     const perGrid = gridVariant === 'strip1' ? 1 : GRID_MAX_SHOTS
     const targets = eligible.slice(0, MAX_GRID_JOBS_PER_CALL * perGrid)
-    const remaining = eligible.length - targets.length
+    // #grid-shift(2026-08-05): 그리드가 씬 경계를 가로지르지 않게 절단 — 혼재 시트(sc_01 5·6 +
+    //   sc_02 7·8)에서 칸 밀림 실측. 남는 칸은 기존 empties 처리(빈 종이). 잡 수 상한은 유지.
+    const chunkPlan: Array<typeof targets> = []
+    for (const s of targets) {
+      const last = chunkPlan[chunkPlan.length - 1]
+      if (!last || last.length >= perGrid || last[0].scene_id !== s.scene_id) chunkPlan.push([s])
+      else last.push(s)
+    }
+    const cappedChunks = chunkPlan.slice(0, MAX_GRID_JOBS_PER_CALL)
+    const plannedCount = cappedChunks.reduce((n, c) => n + c.length, 0)
+    const remaining = eligible.length - plannedCount
 
     // 언어 경계(S3b): 주 컬럼이 native(수동/편집 샷)일 수 있어, 프롬프트 주입 전 action·mood 를 EN 으로 정규화.
     //   deriveEnBatch 가 이미 영어인 값은 LLM 호출 없이 통과(파이프라인 EN 산출은 무비용, native 만 번역).
@@ -389,9 +399,8 @@ export async function POST(req: Request) {
     const templateUrl = baseUrl ? `${baseUrl}${templatePath}` : null
     const webhookUrl = resolveWebhookUrl()
 
-    for (let gi = 0; gi < targets.length; gi += perGrid) {
-      const chunk = targets.slice(gi, gi + perGrid)
-      const cells = chunk.map((s) => {
+    for (const chunk of cappedChunks) {
+      const cells = chunk.map((s, ci) => {
         const shotId = s.shot_id as string
         const scene = sceneById.get(s.scene_id as string)
         const camera = (s.camera_config ?? {}) as { pan?: number }
@@ -426,8 +435,10 @@ export async function POST(req: Request) {
           shotId,
         )
         // shotCheck 채널1(#p2-wiring) 제약 + 이전 샷 연속성 줄(#n-1)을 START 꼬리에 첨부.
+        //   #grid-shift: 연속성 줄은 그리드의 "첫 칸"에만 — 같은 시트 안 인접 칸은 모델이 옆
+        //   칸을 직접 보며 그리므로 텍스트 참조가 중복이고, 과잉 참조가 칸 밀림을 유발했다.
         const constraints = parseCheckConstraints(s.check_notes)
-        const contLine = buildCellContinuityLine(prevTextByShotId.get(shotId))
+        const contLine = ci === 0 ? buildCellContinuityLine(prevTextByShotId.get(shotId)) : null
         const extra = [
           contLine,
           constraints.length ? `Continuity constraints: ${constraints.join('; ')}` : null,

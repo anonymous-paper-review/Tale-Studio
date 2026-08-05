@@ -39,7 +39,9 @@ describe('buildV4ContinuityBlock — 청크 경계 연속성 계약', () => {
 describe('buildCellContinuityLine — 러프 셀 연속성 줄', () => {
   it('그리기 금지를 명시하고 110자에서 클립한다', () => {
     const line = buildCellContinuityLine('X'.repeat(200))
-    expect(line).toContain('do NOT draw')
+    // #grid-shift: 부정 지시("do NOT draw")는 칸 밀림 유발 실측 — 긍정 참조형이어야 한다.
+    expect(line).not.toContain('do NOT')
+    expect(line).toContain('carry over')
     expect(line).toContain('…')
     expect(line).toContain('X'.repeat(110))
     expect(line).not.toContain('X'.repeat(111))

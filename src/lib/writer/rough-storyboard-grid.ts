@@ -153,9 +153,10 @@ export function buildCellContinuityLine(prevText: string | null | undefined): st
   const t = (prevText ?? '').trim()
   if (!t) return null
   const clipped = t.length > 110 ? `${t.slice(0, 110)}…` : t
-  // FIX-A(#space-anchor 2026-08-05): 배경이 계약 항목에서 빠져 있던 구멍 — shot_6 실측
-  //   (직전 샷의 폐허 도시가 다음 샷에서 통째 증발)의 마지막 방어선 보강.
-  return `continuity only — do NOT draw this moment: the previous shot ended with "${clipped}"; keep the figures, props, lighting and the surrounding environment (background landmarks) consistent with it`
+  // FIX-A(#space-anchor): 배경까지 계약. #grid-shift(2026-08-05) 재작성: 부정 지시("do NOT
+  //   draw")는 현재 순간이 직전 순간과 시각적으로 비슷할 때 모델이 현재 순간까지 건너뛰게
+  //   만들어 칸 밀림 연쇄를 유발했다(실측 9ef0af50 — 시트 전체가 한 칸씩 밀림). 긍정 참조형으로.
+  return `continuity: moments earlier the previous shot ended with "${clipped}" — carry over the same figures, props, lighting and surrounding environment from it, while drawing this shot's own moment described above`
 }
 
 // ── 그리드 프롬프트 ──────────────────────────────────────────────────────────
