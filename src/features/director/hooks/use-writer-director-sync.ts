@@ -14,6 +14,7 @@ import {
   isDefaultCamera,
   isDefaultLighting,
 } from '@/lib/writer/shot-config-from-design'
+import { runRealBatch } from '@/lib/director/real-batch-client'
 import type { CameraConfig, LightingConfig } from '@/types/shot'
 
 type WriterPromptSource = {
@@ -79,6 +80,10 @@ async function retrySyncOperation(operation: () => Promise<void>, label: string)
 // Concurrent Director mounts share only pending work. Successful hydration belongs to
 // each hook instance so a later unmount/remount reads the current canonical state.
 const videoTakeHydrationPromises = new Map<string, Promise<void>>()
+
+// #real-grid-auto: 실사 보드 자율 채움 — 프로젝트당 세션 1회 (라우트가 멱등이라 재호출도 안전하지만
+//   진입마다 재시도하지 않는다: "진입/세션당 1회 + 실패는 배지" — architecture §5).
+const realBatchAutofillTriggered = new Set<string>()
 
 function hydrateVideoTakes(projectId: string): Promise<void> {
   const inFlight = videoTakeHydrationPromises.get(projectId)
@@ -408,6 +413,15 @@ export function useWriterDirectorSync() {
     // Previz 체인 파생 노드(#previz-chain) — Shot 우측 PREVIZ VIDEO / SHOT IMAGE 재생성(멱등).
     useDirectorCanvasStore.getState().rebuildShotChainNodes()
     if (cancelled) return
+
+    // ── Pass 2.7: 실사 보드 자율 채움(#real-grid-auto 2026-08-06) ──────────
+    // Director 첫 진입 시 러프 완비·실사 미생성 샷을 4샷 시트로 일괄 생성 — 빈칸 자율 채움(멱등).
+    // 진행 중엔 realBatchBusy 플래그가 개별 생성/재생성을 잠근다. hydrate(Pass 2.5) 이후라
+    // "미생성" 판정이 DB 진실 기준. await 하지 않음 — 캔버스 진입을 막지 않는다.
+    if (projectId && !realBatchAutofillTriggered.has(projectId)) {
+      realBatchAutofillTriggered.add(projectId)
+      void runRealBatch(projectId, { silent: true })
+    }
 
     // ── Pass 3: 스토리보드 자동생성 — 비활성화 (Higgsfield 노드 뷰 전환) ──
     // 목각(roughStoryboard)이 노드 뷰의 초기 상태로 남아야 하므로, 진입 시

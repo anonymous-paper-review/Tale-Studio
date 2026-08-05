@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { ImageIcon, MapPin, Clock, Pause, Play, Loader2, Grid2x2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { runRealBatch } from '@/lib/director/real-batch-client'
 
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -209,7 +209,13 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
             ? { label: '이미지 생성 필요', cls: 'border-warning/50 text-warning', video: false }
             : null
 
+  // #real-grid-auto: 일괄 시트 생성 중엔 개별 생성/재생성 잠금 (스토어 가드와 이중 방어).
+  const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
   const runImage = async () => {
+    if (realBatchBusy) {
+      setVideoError('실사 일괄 생성 중이에요 — 완료 후 다시 시도해 주세요.')
+      return
+    }
     try {
       await generateStoryboardImage(node.id)
     } catch (error) {
@@ -219,6 +225,10 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
   // 영상 생성(#e12): 이미지가 없으면 먼저 생성하고, 성공했을 때만 영상으로 이어간다.
   const runVideo = async () => {
     if (videoBusy) return
+    if (realBatchBusy) {
+      setVideoError('실사 일괄 생성 중이에요 — 완료 후 다시 시도해 주세요.')
+      return
+    }
     setVideoBusy(true)
     setVideoError(null)
     try {
@@ -414,53 +424,12 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
  * 개별 재생성(품질 축)은 기존 셀의 단일 스트립 경로 그대로.
  */
 function RealBatchBar({ projectId }: { projectId: string | null }) {
-  const [busy, setBusy] = useState(false)
+  // 진행 상태는 스토어 단일 플래그 — 진입 자동 실행(#real-grid-auto)과 수동 버튼이 공유하고,
+  //   같은 플래그가 개별 생성/재생성을 잠근다.
+  const busy = useDirectorCanvasStore((s) => s.realBatchBusy)
   const run = async () => {
     if (!projectId || busy) return
-    setBusy(true)
-    try {
-      let total = 0
-      for (let round = 0; round < 10; round++) {
-        const res = await fetch('/api/director/generate-storyboard-batch', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ projectId }),
-        })
-        const j = (await res.json().catch(() => null)) as {
-          data?: { submitted: Array<{ jobId: string; shotIds: string[] }>; remaining: number }
-          error?: string
-        } | null
-        if (res.status === 429) {
-          toast.info('생성 대기열이 가득 찼어요 — 잠시 후 다시 시도해 주세요.')
-          break
-        }
-        if (!res.ok || !j?.data) throw new Error(j?.error ?? `HTTP ${res.status}`)
-        const { submitted, remaining } = j.data
-        if (!submitted.length) break
-        total += submitted.reduce((n, s) => n + s.shotIds.length, 0)
-        // 이번 라운드 잡 완료 대기 — 완료 후 다음 라운드(잔여) 진행.
-        for (const s of submitted) {
-          for (let i = 0; i < 60; i++) {
-            const st = (await (await fetch(`/api/generation-jobs/${encodeURIComponent(s.jobId)}`)).json()) as {
-              status?: string
-            }
-            if (st.status === 'completed' || st.status === 'failed') break
-            await new Promise((r) => setTimeout(r, 5000))
-          }
-        }
-        if (remaining <= 0) break
-      }
-      if (total > 0) {
-        await useDirectorCanvasStore.getState().hydrateFromDb(projectId)
-        toast.success(`실사 스토리보드 ${total}샷 일괄 생성 완료`)
-      } else {
-        toast.info('생성할 샷이 없어요 — 러프가 준비된 미생성 샷이 대상이에요.')
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '일괄 생성에 실패했어요')
-    } finally {
-      setBusy(false)
-    }
+    await runRealBatch(projectId)
   }
   return (
     <div className="flex items-center justify-end">

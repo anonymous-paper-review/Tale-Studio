@@ -622,6 +622,8 @@ interface DirectorCanvasState {
   viewMode: 'node' | 'storyboard'
   /** Storyboard 뷰 미디어 모드(#previz-video) — Previz(목각, 기본) | Real(실사). 상단바 토글이 제어. */
   storyboardMediaMode: 'previz' | 'real'
+  // #real-grid-auto: 실사 일괄 생성 진행 중 — 개별 이미지 생성/재생성을 잠근다(시트 단위 작업과 충돌 방지).
+  realBatchBusy: boolean
 
   // popup/modal
   popupNodeId: string | null
@@ -1012,6 +1014,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       viewportInitialized: false,
       viewMode: 'node',
       storyboardMediaMode: 'previz',
+      realBatchBusy: false,
       popupNodeId: null,
       deleteConfirmInfo: null,
       relationModal: null,
@@ -2097,6 +2100,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       // ─── storyboard image (ST-2, I2I) ──────────────────────────────────
 
       generateStoryboardImage: async (shotNodeId) => {
+        // #real-grid-auto: 일괄 시트 생성 중 개별 생성 차단 — 같은 샷이 시트와 단일 잡에서
+        //   동시에 그려지는 충돌 방지. UI 버튼도 disabled 지만 스토어가 최종 방어선.
+        if (get().realBatchBusy) {
+          console.warn('[director] 실사 일괄 생성 중 — 개별 생성 요청 무시:', shotNodeId)
+          return
+        }
         if (isDemoSession()) return
         // 연타 방어(#double-fire) — 같은 샷의 생성 버튼은 캔버스 노드/그리드 카드/상세 패널에
         //   동시에 떠 있다. 버튼마다 잠가서는 서로를 못 막으므로 샷 키 하나로 창을 공유한다.
