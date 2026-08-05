@@ -65,6 +65,8 @@ export async function runShotCheck(
    - 1 주요 + 0~1 보조 액션
 2. composition_prompt와 motion_prompt가 일관되는가?
 3. 연속성: 인접 샷의 실제 내용(composition/motion 프롬프트 속 의상·소품·조명·공간 묘사)이 서로 모순되는가?
+   같은 씬 인접 샷에서 배경/공간 앵커(지형지물·구조물)가 이동 설명 없이 통째로 사라지는 것도 모순이다 —
+   이 경우 사라진 앵커를 명시적으로 되살리는 constraint 를 달아라 (예: "The ruined cityscape remains visible around the pipes.").
 4. 캐릭터 외형/의상 묘사가 asset_version 변화 없이 달라지지 않는가? (판단은 프롬프트 내용 기준)
 5. 씬 디시플린: 같은 scene_id 샷들의 V.camera.type 다양성이 합리적인가?
 

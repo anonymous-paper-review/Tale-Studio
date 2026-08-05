@@ -94,7 +94,7 @@ export async function POST(req: Request) {
         .maybeSingle()
       const prevText = (((prev?.prompt as string) || (prev?.action_description as string)) ?? '').trim()
       if (prev?.scene_id === shotMeta.scene_id && prevText) {
-        continuityLine = `\nContinuity with the previous shot (do not depict that moment): it showed "${prevText.slice(0, 110)}". Keep the character's wardrobe, props and lighting consistent with it.`
+        continuityLine = `\nContinuity with the previous shot (do not depict that moment): it showed "${prevText.slice(0, 110)}". Keep the character's wardrobe, props, lighting and the surrounding environment (background landmarks) consistent with it.`
       }
     }
 

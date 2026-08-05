@@ -43,6 +43,8 @@ describe('buildCellContinuityLine — 러프 셀 연속성 줄', () => {
     expect(line).toContain('…')
     expect(line).toContain('X'.repeat(110))
     expect(line).not.toContain('X'.repeat(111))
+    // FIX-A(#space-anchor): 배경도 계약 항목 — 공간 앵커 증발 실측(scene2 shot_6) 재발 방지.
+    expect(line).toContain('surrounding environment')
   })
 
   it('이전 텍스트가 없으면 null — 셀은 그대로', () => {

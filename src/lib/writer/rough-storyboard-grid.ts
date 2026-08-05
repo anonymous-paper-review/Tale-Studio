@@ -153,7 +153,9 @@ export function buildCellContinuityLine(prevText: string | null | undefined): st
   const t = (prevText ?? '').trim()
   if (!t) return null
   const clipped = t.length > 110 ? `${t.slice(0, 110)}…` : t
-  return `continuity only — do NOT draw this moment: the previous shot ended with "${clipped}"; keep the figures, props and lighting consistent with it`
+  // FIX-A(#space-anchor 2026-08-05): 배경이 계약 항목에서 빠져 있던 구멍 — shot_6 실측
+  //   (직전 샷의 폐허 도시가 다음 샷에서 통째 증발)의 마지막 방어선 보강.
+  return `continuity only — do NOT draw this moment: the previous shot ended with "${clipped}"; keep the figures, props, lighting and the surrounding environment (background landmarks) consistent with it`
 }
 
 // ── 그리드 프롬프트 ──────────────────────────────────────────────────────────
