@@ -27,9 +27,13 @@ const FRAME_CYCLE_MS = 1000
 export function RoughFrameCycle({
   panel,
   alt,
+  introPlay = false,
 }: {
   panel: Pick<RoughStoryboardImage, 'url' | 'generatedAt' | 'frames'>
   alt: string
+  /** 마운트 시 1회 전체 순환(START→DIRECTING→END→START) 후 정지 — writer 러프 보드 첫 진입용
+   *  (#p1-quickwin W3 2026-08-05: "처음 탭 들어왔을 때 한 번에 모두 움직이고 그 다음은 호버만"). */
+  introPlay?: boolean
 }) {
   const f = panel.frames
   const urls = f
@@ -38,7 +42,29 @@ export function RoughFrameCycle({
   const [idx, setIdx] = useState(0)
   const [hovering, setHovering] = useState(false)
   const [pinned, setPinned] = useState(false)
+  const [introDone, setIntroDone] = useState(!introPlay)
   const multi = urls.length > 1
+
+  // 인트로 1회 재생 — reduced-motion 은 건너뛰고, hover 가 시작되면 즉시 양보한다.
+  useEffect(() => {
+    if (!multi || introDone) return
+    if (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setIntroDone(true)
+      return
+    }
+    let step = 0
+    const t = setInterval(() => {
+      step += 1
+      if (step >= urls.length) {
+        clearInterval(t)
+        setIdx(0)
+        setIntroDone(true)
+        return
+      }
+      setIdx(step)
+    }, FRAME_CYCLE_MS)
+    return () => clearInterval(t)
+  }, [multi, introDone, urls.length])
 
   useEffect(() => {
     if (!multi || !hovering || pinned) return
@@ -50,7 +76,10 @@ export function RoughFrameCycle({
   return (
     <div
       className="absolute inset-0"
-      onMouseEnter={() => setHovering(true)}
+      onMouseEnter={() => {
+        setIntroDone(true) // 인트로 중 hover 진입 → 인트로 중단, hover 순환이 이어받는다
+        setHovering(true)
+      }}
       onMouseLeave={() => {
         // 카드를 떠나면 START 정지 상태로 복귀 — 보드 전체가 조용해진다.
         setHovering(false)

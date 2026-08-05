@@ -700,27 +700,14 @@ export function RoughStoryboardView() {
                                   size-full 은 일부 브라우저/배율에서 h-full(=%)이 aspect-ratio 높이로 안 풀려
                                   이미지가 위쪽만 채우고 아래 bg-muted 회색이 남던 버그(2026-07-11).
                                   3프레임 세트(#rough-grid)는 순환 재생 — 구버전 단일 패널은 정적 폴백. */}
+                              {/* #p1-quickwin W3: 첫 진입 시 전 카드 1회 순환 후 hover 전용.
+                                  W4: 카드 위 재생성 칩 제거 — 재생성은 카드 팝업·채팅으로 일원화
+                                  (실패 카드의 "다시 시도"와 빈 카드의 "패널 생성"은 복구/최초 경로라 유지). */}
                               <RoughFrameCycle
                                 panel={panel}
                                 alt={`${shot.shotId} rough storyboard`}
+                                introPlay
                               />
-              {/* 재생성 — 사진 위 우상단 칩(#c3-fix 2026-08-03): 반투명 배경이 사진과 섞여
-                                  경계 밖처럼 보이던 문제 → 불투명 배경 + 테두리로 "카드 위" 를 명확히.
-                                  버튼 hover 시 오른쪽으로 "재생성" 라벨 확장은 유지. */}
-                              <button
-                                type="button"
-                                className="group/regen absolute right-2 top-2 flex h-7 items-center rounded-md border border-border bg-background px-1.5 text-foreground opacity-0 shadow-sm transition-opacity duration-100 hover:bg-accent group-hover:opacity-100 hover-red-beam"
-                                aria-label="패널 재생성"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  void generate([shot.shotId], true)
-                                }}
-                              >
-                                <RefreshCw className="size-3.5 shrink-0" />
-                                <span className="max-w-0 overflow-hidden whitespace-nowrap text-[11px] font-medium opacity-0 transition-all duration-200 group-hover/regen:ml-1 group-hover/regen:max-w-12 group-hover/regen:opacity-100">
-                                  재생성
-                                </span>
-                              </button>
                             </>
                           ) : job?.status === 'generating' ? (
                             <div className="absolute inset-0" aria-busy="true">

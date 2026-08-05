@@ -243,15 +243,22 @@ export function DialogueView() {
                                   <div
                                     key={i}
                                     className={cn(
-                                      // 색은 선택된 인물의 대사에만. 그 외에는 위 샷 스토리와 같은
-                                      //   muted 톤으로 가라앉아 대본 전체가 한 색으로 읽힌다.
-                                      'rounded-sm border-l-2 py-1 pl-3 pr-2 transition-opacity',
+                                      // 라인 바/배경 색은 선택된 인물의 대사에만 — 본문은 한 색으로.
+                                      //   (#p1-quickwin W6: 화자 "이름"만은 상시 화자 색 — 스캔 가능성.)
+                                      'rounded-sm border-l-2 py-1 pl-3 pr-2 transition-opacity hover:bg-accent/30',
                                       focused ? (color?.bar ?? 'border-l-border') : 'border-l-border',
                                       focused && (color?.on ?? 'bg-accent'),
                                       dimmed && 'opacity-30',
                                     )}
                                   >
-                                    <span className="mr-2 font-mono text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                                    <span
+                                      className={cn(
+                                        'mr-2 font-mono text-[11px] font-semibold uppercase tracking-wide',
+                                        line.characterId
+                                          ? (color?.chip ?? 'text-foreground')
+                                          : 'italic text-muted-foreground', // V.O./내레이션 구분
+                                      )}
+                                    >
                                       {speakerName}
                                     </span>
                                     <span
