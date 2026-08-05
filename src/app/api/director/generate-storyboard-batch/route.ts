@@ -61,12 +61,13 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 그룹핑: 같은 씬(#grid-shift 교훈) + 같은 캐릭터 세트, 4개 단위.
+    // 그룹핑: 같은 씬(#grid-shift 교훈)만 키 — 캐릭터 세트는 시트 내 혼재 허용(#real-grid-fix):
+    //   세트를 키에 넣으면 시트가 잘게 쪼개져 배칭 이득이 반감(실측 8시트/12샷). 레퍼런스는
+    //   합집합으로 전달되고 프롬프트가 칸별 대응("corresponding character")을 지시하므로 안전.
     const groups: EligibleShot[][] = []
     for (const s of eligible) {
       const last = groups[groups.length - 1]
-      const key = (x: EligibleShot) => `${x.scene_id}|${x.characters.join(',')}`
-      if (!last || last.length >= 4 || key(last[0]) !== key(s)) groups.push([s])
+      if (!last || last.length >= 4 || last[0].scene_id !== s.scene_id) groups.push([s])
       else last.push(s)
     }
     const planned = groups.slice(0, MAX_GRID_JOBS_PER_CALL)

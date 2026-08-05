@@ -45,10 +45,12 @@ export async function runRealBatch(
       generated += submitted.reduce((n, s) => n + s.shotIds.length, 0)
       for (const s of submitted) {
         for (let i = 0; i < 60; i++) {
-          const st = (await (
+          // 응답은 {ok, data:{status}} 봉투(#real-grid-fix 실측: 최상위 status 읽기로 8잡×300s 헛대기)
+          const envelope = (await (
             await fetch(`/api/generation-jobs/${encodeURIComponent(s.jobId)}`)
-          ).json()) as { status?: string }
-          if (st.status === 'completed' || st.status === 'failed') break
+          ).json().catch(() => null)) as { data?: { status?: string } } | null
+          const status = envelope?.data?.status
+          if (status === 'completed' || status === 'failed') break
           await new Promise((r) => setTimeout(r, 5000))
         }
       }
