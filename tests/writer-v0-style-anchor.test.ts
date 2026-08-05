@@ -20,7 +20,7 @@ import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual'
 import type { Genre, VisualIdentity } from '@/lib/writer/types/pipeline'
 import type { PipelineLogger } from '@/lib/writer/logger'
 
-const genre = { genre: 'action', subGenre: 'post-apocalyptic survival', tone: ['dread'] } as unknown as Genre
+const genre = { genre: 'action', subGenre: 'post-apocalyptic survival', tone: ['dread'], format: 'horizontal_16:9' } as unknown as Genre
 const axisConfig = { provider: 'gemini' } as never
 
 const identity: VisualIdentity = {
