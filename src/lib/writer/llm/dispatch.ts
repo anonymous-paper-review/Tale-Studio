@@ -36,6 +36,32 @@ export async function generateJson<T>(
   cfg: LlmAxisConfig,
   opts: DispatchOptions = {},
 ): Promise<T> {
+  try {
+    return await dispatchOnce<T>(prompt, cfg, opts);
+  } catch (e) {
+    // 모더레이션 폴백(#moderation-fallback 2026-08-05): gemini 의 PROHIBITED_CONTENT 는
+    //   safetySettings(BLOCK_NONE)로도 못 끄는 하드 필터 층 — 픽션 previz 텍스트(10대 주인공+
+    //   추격/무기)가 확률적으로 걸리고, 씬 병렬 콜 1개 실패 = 런 전체 사망이었다(실측 2d47b311).
+    //   동일 콜을 검열 층이 다른 C축 기본(claude)으로 1회 재시도. 실증: 같은 스토리를
+    //   claude(opus-5/sonnet)가 정상 처리(#p2-maxmodel). 폴백도 실패하면 원 오류 의미로 표면화.
+    const msg = e instanceof Error ? e.message : String(e);
+    if (cfg.provider === 'gemini' && msg.includes('PROHIBITED_CONTENT')) {
+      const fb = DEFAULT_MODELS.C;
+      console.warn(
+        `[dispatch] gemini PROHIBITED_CONTENT → ${fb.provider}/${fb.model} 폴백 재시도 (프롬프트 ${prompt.length}자)`,
+      );
+      // v4 등 대형 JSON 응답이 claude 기본 max_tokens(4096)에 절단되지 않게 바닥 확보.
+      return dispatchOnce<T>(prompt, fb, { ...opts, maxTokens: Math.max(opts.maxTokens ?? 0, 16000) });
+    }
+    throw e;
+  }
+}
+
+async function dispatchOnce<T>(
+  prompt: string,
+  cfg: LlmAxisConfig,
+  opts: DispatchOptions = {},
+): Promise<T> {
   switch (cfg.provider) {
     case 'gemini':
       return geminiGenerateJson<T>(prompt, {
