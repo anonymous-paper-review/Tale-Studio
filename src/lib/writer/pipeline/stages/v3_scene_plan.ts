@@ -98,15 +98,15 @@ cut_pace ↔ rhythm_profile:
 - punctuated + decaying → 충격 후 여운
 
 [매체 인지 예산 — 스타일 ↔ 페이싱 (#style-pacing)]
-샷 길이는 "관객이 프레임을 다 읽는 시간"이다. [비주얼 스타일]의 매체·화면 밀도에 맞춰
-avg_shot_seconds 와 cut_pace 기준선을 조정하라:
-- 고밀도 매체 (실사 live_action, 시네마틱 3D, 스톱모션): 질감·조명·구성 정보가 많아 독해가 느리다
-  → avg_shot_seconds 상향(+1~2s), long_takes/medium 성향, 동작 전후의 관조 여백 허용.
-- 중밀도 (2d_anime 등): 표준 기준선.
+샷 길이는 "관객이 프레임을 다 읽는 시간"이다. [비주얼 스타일]의 매체·화면 밀도가
+avg_shot_seconds 의 **허용 구간을 결정한다** — 아래 구간 밖의 값을 쓰지 마라:
+- 고밀도 매체 (실사 live_action, 시네마틱 3D, 스톱모션): 질감·조명·구성 독해가 느리다
+  → avg_shot_seconds **6~9s**, long_takes/medium 성향, 동작 전후 관조 여백 허용.
+- 중밀도 (2d_anime 등): avg_shot_seconds **5~7s**, 표준 캐던스.
 - 저밀도/미니멀 (2d_cartoon 등 플랫 스타일): 화면이 즉시 읽힌다 — 여백은 곧 지루함
-  → avg_shot_seconds 하향(-1~2s), medium/rapid 캐던스, 동작·대화 중심의 촘촘한 진행.
+  → avg_shot_seconds **3.5~5s**, medium/rapid 캐던스, 동작·대화 중심의 촘촘한 진행.
 단, 대사 발화 시간은 매체와 무관한 물리량이다 — 캐던스 명목으로 대사 샷을 발화 시간
-밑으로 설계하지 마라.`;
+밑으로 설계하지 마라 (긴 대사 샷은 구간을 초과해도 된다).`;
 
   const userPrompt = `[genre]
 ${JSON.stringify(genre)}
