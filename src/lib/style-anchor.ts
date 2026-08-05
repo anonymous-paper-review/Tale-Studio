@@ -16,6 +16,8 @@ export interface AnchorableSubmit {
   prompt: string
   reference_image_urls?: string[]
   aspect_ratio?: string
+  // gpt-image 계열 전용 캔버스 지정(#real-strip-guard) — 모델 스키마 필터가 비지원 모델에선 걸러낸다.
+  image_size?: string
   model?: string
 }
 
