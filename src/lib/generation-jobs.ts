@@ -522,12 +522,19 @@ function isLegacyUserIdSchemaError(error: unknown): boolean {
     && error.message === LEGACY_USER_ID_SCHEMA_ERROR.message
 }
 
+// 쿼터 집계의 신선도 컷(#quota-staleness 2026-08-05): webhook 유실로 queued 에 영원히 남은
+//   좀비가 유저 쿼터를 영구 점유해 모든 생성이 429 로 잠기던 실측(12좀비 > 상한 8 → 러프 전면 불능).
+//   정상 fal 잡은 수 분 내 종결된다 — 이보다 훨씬 관대한 창 밖의 queued 는 죽은 것으로 간주.
+const QUOTA_COUNT_WINDOW_MIN = 30
+
 export async function countQueuedJobsByUser(userId: string): Promise<number> {
+  const cutoffIso = new Date(Date.now() - QUOTA_COUNT_WINDOW_MIN * 60_000).toISOString()
   const direct = await supabaseAdmin
     .from('generation_jobs')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('status', 'queued')
+    .gte('created_at', cutoffIso)
   if (!direct.error) {
     if (direct.count === null) throw new Error('generation job user quota count returned no count')
     return direct.count
@@ -557,6 +564,7 @@ export async function countQueuedJobsByUser(userId: string): Promise<number> {
     .select('id', { count: 'exact', head: true })
     .in('project_id', projectIds)
     .eq('status', 'queued')
+    .gte('created_at', cutoffIso) // 신선도 컷 — direct 경로와 동일 규칙(#quota-staleness)
   if (countError) throw countError
   if (count === null) throw new Error('generation job fallback quota count returned no count')
   return count
