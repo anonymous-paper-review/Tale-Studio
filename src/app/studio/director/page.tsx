@@ -25,6 +25,7 @@ import {
 import { Loader2, ImageIcon, X, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
 
 import { toast } from 'sonner'
+import { runRealBatch } from '@/lib/director/real-batch-client'
 
 import { handoffFrom } from '@/lib/handoff-intent'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -656,9 +657,8 @@ function PaletteBar() {
   const storyboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
   const setStoryboardMediaMode = useDirectorCanvasStore((s) => s.setStoryboardMediaMode)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
-  const generateAllStoryboardImages = useDirectorCanvasStore(
-    (s) => s.generateAllStoryboardImages,
-  )
+  // #real-grid: 일괄 생성은 4샷 시트 러너(runRealBatch)로 통합 — 진행 플래그는 스토어 공유.
+  const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
   const relayoutCanvas = useDirectorCanvasStore((s) => s.relayoutCanvas)
   const showUnusedAssets = useDirectorCanvasStore((s) => s.showUnusedAssets)
   const toggleUnusedAssets = useDirectorCanvasStore((s) => s.toggleUnusedAssets)
@@ -728,21 +728,24 @@ function PaletteBar() {
               })
               return
             }
-            void generateAllStoryboardImages()
+            // #real-grid: 샷별 단일 잡 루프(generateAllStoryboardImages) → 4샷 시트 일괄로 교체.
+            //   미생성 샷만 채우는 멱등 경로 — 개별 재생성(고해상 단일 스트립)은 더블클릭 그대로.
+            const pid = useDirectorCanvasStore.getState().projectId
+            if (pid) void runRealBatch(pid)
           }}
-          disabled={isGenerating || totalShots === 0}
-          aria-busy={isGenerating}
+          disabled={isGenerating || realBatchBusy || totalShots === 0}
+          aria-busy={isGenerating || realBatchBusy}
           className={cn(
             'flex h-8 items-center gap-2 rounded-md border border-border px-3',
             'text-xs font-medium text-foreground',
             'transition-colors duration-100 hover:bg-accent',
-            (isGenerating || totalShots === 0) &&
+            (isGenerating || realBatchBusy || totalShots === 0) &&
               'cursor-not-allowed opacity-50',
-            isGenerating && 'opacity-70',
+            (isGenerating || realBatchBusy) && 'opacity-70',
             'hover-red-beam',
           )}
         >
-          {isGenerating ? (
+          {isGenerating || realBatchBusy ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
             <ImageIcon className="size-4" />

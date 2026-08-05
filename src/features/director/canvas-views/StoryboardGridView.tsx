@@ -1,8 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
-import { ImageIcon, MapPin, Clock, Pause, Play, Loader2, Grid2x2 } from 'lucide-react'
-import { runRealBatch } from '@/lib/director/real-batch-client'
+import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -418,33 +417,8 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
   )
 }
 
-/**
- * 실사 일괄 생성 바(#real-grid 2026-08-06, 이원화의 일괄 축) — 미생성 샷을 같은 씬·같은
- * 레퍼런스 4개 단위 시트로 1콜 리페인트. remaining>0 이면 라운드 반복, 완료 시 캔버스 rehydrate.
- * 개별 재생성(품질 축)은 기존 셀의 단일 스트립 경로 그대로.
- */
-function RealBatchBar({ projectId }: { projectId: string | null }) {
-  // 진행 상태는 스토어 단일 플래그 — 진입 자동 실행(#real-grid-auto)과 수동 버튼이 공유하고,
-  //   같은 플래그가 개별 생성/재생성을 잠근다.
-  const busy = useDirectorCanvasStore((s) => s.realBatchBusy)
-  const run = async () => {
-    if (!projectId || busy) return
-    await runRealBatch(projectId)
-  }
-  return (
-    <div className="flex items-center justify-end">
-      <button
-        type="button"
-        onClick={() => void run()}
-        disabled={busy || !projectId}
-        className="flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 hover-red-beam"
-      >
-        {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Grid2x2 className="size-3.5" />}
-        {busy ? '일괄 생성 중… (시트 단위 진행)' : '미생성 샷 일괄 생성 (4샷/시트)'}
-      </button>
-    </div>
-  )
-}
+// #real-grid 일괄 생성 UI 는 별도 바 대신 상단 팔레트의 기존 "스토리보드 생성" 버튼으로 통합
+//   (2026-08-06 피드백) — 그 버튼이 runRealBatch(4샷 시트 일괄)를 호출한다.
 
 export function StoryboardGridView() {
   const nodes = useDirectorCanvasStore((s) => s.nodes)
@@ -528,7 +502,6 @@ export function StoryboardGridView() {
           mediaMode === 'real' ? 'slide-in-from-right-6' : 'slide-in-from-left-6',
         )}
       >
-        {mediaMode === 'real' ? <RealBatchBar projectId={projectId} /> : null}
         {groups.map((group) => (
           <section key={group.key} className="flex flex-col gap-4">
             <div className="flex items-baseline gap-3">
