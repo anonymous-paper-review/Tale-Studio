@@ -36,7 +36,10 @@ export function writerSceneIdToMain(rawId: string): string {
 export function writerShotIdToMain(rawShotId: string, sceneId: string): string {
   const sceneMain = writerSceneIdToMain(sceneId);
   const sceneNum = sceneMain.replace('sc_', '');
-  const m = /[_-](\d{2,3})$/.exec(rawShotId);
+  // #id-unify(2026-08-05): 1자리도 변환 — 구 정규식(\d{2,3})이 shot_1~9 를 통과시켜 한
+  //   프로젝트에 shot_N/sh_XX_NN 두 체계가 공존했다. 구 프로젝트 행은 러프 조인이 raw 키를
+  //   병행 색인하므로 무영향, 새 persist 부터 전 샷이 sh_XX_NN 으로 통일된다.
+  const m = /[_-](\d{1,3})$/.exec(rawShotId);
   if (m) {
     const n = parseInt(m[1], 10);
     return `sh_${sceneNum}_${String(n).padStart(2, '0')}`;

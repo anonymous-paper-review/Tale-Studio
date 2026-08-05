@@ -15,6 +15,7 @@ import {
   buildSplitChildren,
 } from '@/lib/writer/pipeline/stages/c_application_2'
 import { parseCheckConstraints, appendCheckConstraints } from '@/lib/writer/check-notes'
+import { writerShotIdToMain } from '@/lib/writer/adapters'
 import type { Scenes, ShotDesign, ValidationIssue } from '@/lib/writer/types/pipeline'
 
 function makeDesign(overrides: {
@@ -195,6 +196,15 @@ describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
     expect(c1.S.character_action).toBe('She shakes the canteen at her ear.')
     expect(c2.S.character_action).toBe('She reaches into the broken window.')
     expect(c1._splitFrom).toBe('shot_3')
+  })
+})
+
+describe('writerShotIdToMain — id 체계 통일 (#id-unify)', () => {
+  it('1자리 번호도 메인 포맷으로 — 한 프로젝트 두 체계 공존 결함 재발 방지', () => {
+    expect(writerShotIdToMain('shot_1', 'scene_1')).toBe('sh_01_01')
+    expect(writerShotIdToMain('shot_9', 'scene_1')).toBe('sh_01_09')
+    expect(writerShotIdToMain('shot_10', 'scene_2')).toBe('sh_02_10')
+    expect(writerShotIdToMain('sh_02_10', 'scene_2')).toBe('sh_02_10') // 이미 메인 포맷 — 멱등
   })
 })
 
