@@ -123,7 +123,9 @@ export async function POST(req: Request) {
           characterRefCount: callerRefs?.length ?? 0,
           hasStyleRef: !!anchor,
         }),
-        // aspect_ratio 생략 → image_size 'auto' — 모델이 1번 레퍼런스(세로 스트립) 비율을 따른다.
+        // #real-strip-guard(2026-08-06): 'auto' 위임이 가로 단일컷 반환을 허용했다(실측 011fd4bd —
+        //   액자 테두리 단일컷을 고정 크롭이 액자째 3분할). 세로 캔버스를 강제해 시트 계약 준수를 유도.
+        image_size: '1024x1536',
         reference_image_urls: [
           stripRefUrl,
           ...(callerRefs ?? []),

@@ -16,6 +16,7 @@ import {
 import { type CandidateView } from '@/lib/image-provenance'
 import { cropTurnaroundPortrait } from '@/lib/artist/portrait'
 import { cropRoughGridFrames } from '@/lib/writer/rough-grid-crop'
+import sharp from 'sharp'
 import { uploadThumbnail } from '@/lib/storage-thumb'
 import { completeDirectorVideoAttempt } from '@/lib/director-video-takes'
 import { buildFalResponseSnapshot } from '@/lib/fal/observability'
@@ -847,7 +848,24 @@ async function finalizeStoryboardStripJob(
   const base = `${workspaceId}/${job.project_id}/shots`
   const stripUrl = await upload(`${base}/${seg}_storyboard_strip.png`, stripBuf)
 
-  const [frames] = await cropRoughGridFrames(stripBuf, 'strip1', 1)
+  // #real-strip-guard: 모델이 시트 계약을 어기고 가로 단일컷을 반환하면(실측: 액자 테두리 단일컷)
+  //   고정 크롭이 액자째 3분할하던 침묵 실패 대신 — 테두리 인셋 크롭한 단일컷을 3프레임에 복제.
+  const stripMeta = await sharp(stripBuf).metadata()
+  const sw = stripMeta.width ?? 0
+  const sh = stripMeta.height ?? 0
+  let frames: { start: Buffer; direction: Buffer; end: Buffer }
+  if (sw > 0 && sh > 0 && sw >= sh) {
+    console.warn(`[finalize] real strip 계약 위반(가로 ${sw}x${sh}) — 단일컷 인셋 폴백`)
+    const ix = Math.round(sw * 0.04)
+    const iy = Math.round(sh * 0.06)
+    const inset = await sharp(stripBuf)
+      .extract({ left: ix, top: iy, width: sw - ix * 2, height: sh - iy * 2 })
+      .png()
+      .toBuffer()
+    frames = { start: inset, direction: inset, end: inset }
+  } else {
+    ;[frames] = await cropRoughGridFrames(stripBuf, 'strip1', 1)
+  }
   const [startUrl, directionUrl, endUrl] = await Promise.all([
     upload(`${base}/${seg}_storyboard_start.png`, frames.start),
     upload(`${base}/${seg}_storyboard_direction.png`, frames.direction),
