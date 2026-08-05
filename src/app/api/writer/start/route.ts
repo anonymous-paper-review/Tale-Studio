@@ -137,9 +137,9 @@ export async function POST(req: NextRequest) {
       // 힌트는 best-effort — 절대 핸드오프를 막지 않는다.
     }
 
-    // 이미 실행 중이면 거부 (중복 시작 방지).
+    // 이미 실행 중이거나 씬 게이트 대기 중이면 거부 (중복 시작 방지 — 게이트는 확정/수정으로만 진행).
     const existing = await getActiveRun(projectId);
-    if (existing && existing.status === 'running') {
+    if (existing && (existing.status === 'running' || existing.status === 'awaiting_confirmation')) {
       return NextResponse.json({ error: 'already running', projectId }, { status: 409 });
     }
 
@@ -211,6 +211,8 @@ export async function POST(req: NextRequest) {
       runtimeSeconds,
       styleAnchor,
       models,
+      // #s3-gate: UI 핸드오프는 씬 스토리 확정 게이트를 켠다 — storyCheck 후 유저 검토·확정.
+      sceneGate: true,
       genre,
       cast,
       background: backgrounds?.locations?.length

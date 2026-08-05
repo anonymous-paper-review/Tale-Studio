@@ -100,6 +100,8 @@ export async function runScenes(
   world: BackgroundContract | undefined,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
+  // #s3-gate: 씬 게이트에서 유저가 남긴 수정 요청(누적) — 개정 실행 시 프롬프트에 주입.
+  revisionNotes?: string[],
 ): Promise<Scenes> {
   await logger.markStage('scenes', 'started');
 
@@ -157,7 +159,15 @@ scene_actions:
   (스토리가 한국어면 한국어 지명 — 임의로 영어 이름을 만들지 않는다).
 `;
 
-  const userPrompt = `[스토리]
+  const revisionBlock = revisionNotes?.length
+    ? `[유저 수정 요청 — 씬 게이트 피드백 (#s3-gate, 최우선 반영)]
+이전 씬 초안에 대해 유저가 아래 수정을 요청했다. 다른 규칙과 충돌하면 이 요청이 이긴다.
+${revisionNotes.map((n, i) => `${i + 1}. ${n}`).join('\n')}
+
+`
+    : '';
+
+  const userPrompt = `${revisionBlock}[스토리]
 ${input.story}
 
 [genre]

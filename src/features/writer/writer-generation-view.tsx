@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { WriterStoryStream } from '@/features/writer/writer-story-stream'
+import { SceneGatePanel } from '@/features/writer/scene-gate-panel'
 import { WriterCharacterPanel } from '@/features/writer/writer-character-panel'
 import type { WriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
@@ -42,6 +43,8 @@ export function WriterGenerationView({
   const remainingMs =
     etaTotalMs != null && elapsedMs != null ? etaTotalMs - elapsedMs : null
   const phrase = friendlyStageLabel(status?.current_stage)
+  // #s3-gate: storyCheck 후 씬 확정 대기 — 진행 바 대신 게이트 패널.
+  const awaiting = status?.current_status === 'awaiting_confirmation'
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -58,7 +61,9 @@ export function WriterGenerationView({
         <p className="mt-1 text-xs text-muted-foreground">
           {debug
             ? '디버그 프리뷰 — 마지막 실행의 산출물로 생성 화면을 표시하고 있어요.'
-            : '이야기를 생성하는 중이에요 — 완성되는 씬부터 아래에서 바로 읽어볼 수 있어요.'}
+            : awaiting
+              ? '씬 스토리 초안이 준비됐어요 — 검토 후 수정 요청하거나 확정하면 다음 단계를 진행해요.'
+              : '이야기를 생성하는 중이에요 — 완성되는 씬부터 아래에서 바로 읽어볼 수 있어요.'}
         </p>
       </header>
 
@@ -73,7 +78,10 @@ export function WriterGenerationView({
         />
       </div>
 
-      {/* 하단 바 — 문구 + 진행바 + 남은 예상시간 */}
+      {/* 하단 바 — 게이트 대기 중엔 확정/수정 패널(#s3-gate), 그 외엔 진행바 */}
+      {awaiting ? (
+        <SceneGatePanel />
+      ) : (
       <div className="shrink-0 border-t border-border bg-background/95 px-6 py-3 backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-4">
           <div className="flex min-w-0 items-center gap-2">
@@ -104,6 +112,7 @@ export function WriterGenerationView({
           ) : null}
         </div>
       </div>
+      )}
     </div>
   )
 }

@@ -33,6 +33,7 @@ import {
   saveRunState,
   markCompleted,
   markFailed,
+  markAwaiting,
   advanceProjectStageAfterWriter,
   type WriterRunStateBase,
   type WriterErrorDetail,
@@ -65,6 +66,10 @@ import type {
 // =====================================================================
 export interface WriterRunState extends WriterRunStateBase {
   input: PipelineInput;
+
+  // #s3-gate: 씬 게이트 확정 플래그 + 수정 요청 누적(개정 시 scenes/storyCheck 를 지워 s3 재실행).
+  _gateConfirmed?: boolean;
+  _sceneRevisionNotes?: string[];
 
   // Story 축
   genre?: Genre;
@@ -171,7 +176,7 @@ export const WRITER_STEPS: WriterStep[] = [
     has: (s) => s.scenes !== undefined,
     run: async (s, { logger }) => {
       const models = resolveModels(s.input);
-      const scenes = await runScenes(s.input, s.genre!, s.narrativeStructure!, s.characters!, s.world, logger, models.S);
+      const scenes = await runScenes(s.input, s.genre!, s.narrativeStructure!, s.characters!, s.world, logger, models.S, s._sceneRevisionNotes);
       await logger.flushRawLlm('scenes');
       // 오픈 캐스트(§4 + V축 재설계): 전개상 필요한 인물/월드를 producer 베이스라인에 append.
       //   producer 전달값(원천)은 불변 — mergeOpen* 가 append-only(아키텍처 §5#2).
@@ -506,7 +511,7 @@ function captureErrorDetail(stage: string, message: string): WriterErrorDetail {
 export async function runWriterSteps(
   projectId: string,
   opts: { deadlineMs: number },
-): Promise<{ done?: true; failed?: true; paused?: true }> {
+): Promise<{ done?: true; failed?: true; paused?: true; gated?: true }> {
   const run = await getActiveRun(projectId);
   if (!run || run.status !== 'running') return { done: true };
 
@@ -625,6 +630,13 @@ export async function runWriterSteps(
       const message = e instanceof Error ? e.message : String(e);
       await markFailed(run.id, message, captureErrorDetail(step.key, message));
       return { failed: true };
+    }
+
+    // #s3-gate: 씬 스토리 확정 게이트 — storyCheck 완료 직후 일시정지. 재개는
+    //   /api/writer/scene-gate(confirm) 가 status 를 running 으로 되돌리고 step 을 재발사.
+    if (step.key === 'storyCheck' && state.input?.sceneGate === true && state._gateConfirmed !== true) {
+      await markAwaiting(run.id);
+      return { gated: true };
     }
 
     // 시간 예산 초과면 일시정지 (호출자가 다음 step self-trigger).

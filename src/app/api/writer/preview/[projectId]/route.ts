@@ -100,22 +100,9 @@ export async function GET(
       // locale 조회 실패 → 'en' (스크립트 검출 없음 → native 병기 필드만 통과)
     }
 
-    // 샷 단위 이야기(#shot-story): decoupage 의 유저 언어 병기(beat_summary_native) 우선,
-    //   없으면 beat_summary 가 유저 언어 스크립트일 때만(구형 run 호환). 연출 스펙(EN)은 제외.
-    const shotStoriesByScene = new Map<string, string[]>();
-    for (const sc of state.decoupage?.scenes ?? []) {
-      const lines: string[] = [];
-      for (const sh of sc.shots ?? []) {
-        const native = typeof sh.beat_summary_native === 'string' ? sh.beat_summary_native.trim() : '';
-        if (native) {
-          lines.push(native);
-          continue;
-        }
-        const base = typeof sh.beat_summary === 'string' ? sh.beat_summary.trim() : '';
-        if (base && isTargetScript(base, locale)) lines.push(base);
-      }
-      if (lines.length) shotStoriesByScene.set(sc.scene_id, lines);
-    }
+    // #s3-gate(2026-08-05): 샷 단위 이야기(#shot-story) 노출 중단 — 게이트 검토 대상은 씬 스토리다
+    //   (요구: "shot 스토리 제거"). 필드는 클라 호환용으로 빈 배열 유지 — 토글이 자연히 숨는다.
+    void locale; // isTargetScript 소비처가 빠지며 남은 locale — worlds 병기 등 후속 소비 전까지 유지
 
     // 스토리 본문 = 씬별 scene_actions(네이티브 서사 비트). 씬 헤딩/요약/대사/연출은 제외.
     const rawScenes = state.scenes?.scenes ?? [];
@@ -123,7 +110,7 @@ export async function GET(
       sceneId: s.scene_id,
       index: i,
       beats: Array.isArray(s.scene_actions) ? s.scene_actions.filter((b) => typeof b === 'string' && b.trim()) : [],
-      shotStories: shotStoriesByScene.get(s.scene_id) ?? [],
+      shotStories: [],
     }));
 
     // 캐릭터 = state.characters(이름/역할, 이른 시점부터) + characters 테이블(네이티브 설명 + 초안 이미지).

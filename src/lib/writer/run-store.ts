@@ -10,7 +10,7 @@ import type { PipelineInput } from '@/lib/writer/types/pipeline';
 import type { Json } from '@/types/database';
 import { castContractToCharacters } from '@/lib/writer/cast-contract';
 
-export type WriterRunStatus = 'running' | 'completed' | 'failed';
+export type WriterRunStatus = 'running' | 'completed' | 'failed' | 'awaiting_confirmation';
 
 // state jsonb 의 최소 보장 형태. 구체 필드(genre/scenes/...)는 steps.ts 의 WriterRunState 가 정의.
 // run-store ↔ steps 순환 import 를 피하려고 여기선 input 만 알고 나머지는 통과시킨다.
@@ -158,6 +158,23 @@ export async function saveRunState(
   if (error) throw new Error(`saveRunState failed: ${error.message}`);
   if (useCas && (!data || data.length === 0)) return null;
   return useCas ? nextVersion : 0;
+}
+
+/**
+ * run 을 씬 게이트 대기(awaiting_confirmation)로 마킹 — running 일 때만(#s3-gate).
+ *   awaiting 은 keepalive/watchdog 의 stalled-running 재발사 대상에서 자연히 빠진다(status 필터).
+ */
+export async function markAwaiting(id: string): Promise<void> {
+  const { data, error } = await supabaseAdmin
+    .from('writer_runs')
+    .update({ status: 'awaiting_confirmation', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'running')
+    .select('id');
+  if (error) throw new Error(`markAwaiting failed: ${error.message}`);
+  if (!data || data.length === 0) {
+    console.warn(`[run-store] markAwaiting(${id}): run 이 running 이 아님 — no-op`);
+  }
 }
 
 /**
