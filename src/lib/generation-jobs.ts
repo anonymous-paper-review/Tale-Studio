@@ -9,6 +9,7 @@ export type GenerationJobKind =
   | 'character_view'
   | 'world_shot'
   | 'shot_storyboard'
+  | 'storyboard_real_grid' // #real-grid: 실사 4샷 일괄(1콜 시트→크롭 분배). 개별 재생성은 shot_storyboard 유지
   | 'shot_rough_storyboard'
   | 'shot_video'
   | 'shot_previz_video'

@@ -931,6 +931,76 @@ export async function finalizeShotStoryboardJob(
 }
 
 /**
+ * 실사 4샷 그리드(#real-grid 2026-08-06) 영속화 — 러프 그리드 경로의 실사판.
+ *   시트 계약 위반(세로 반환) 시 명시 실패 — 해당 샷들은 단일 스트립 재생성으로 복구(이원화).
+ */
+async function finalizeRealGridJob(
+  job: GenerationJob,
+  falImageUrl: string,
+  falPayload?: unknown,
+): Promise<string> {
+  const { workspaceId, writerShotIds, gridVariant } = job.target
+  if (!workspaceId || !writerShotIds?.length) {
+    throw new Error('real grid job target missing workspaceId/writerShotIds')
+  }
+  await recordFalResponseSnapshot(job, falPayload)
+
+  const res = await fetch(falImageUrl)
+  if (!res.ok) throw new Error(`fal real grid fetch failed: ${res.status}`)
+  const gridBuf = Buffer.from(await res.arrayBuffer())
+  if (gridBuf.length < 50_000) {
+    throw new Error(`real grid too small (${gridBuf.length}b) — likely blank/moderated output`)
+  }
+  const meta = await sharp(gridBuf).metadata()
+  if ((meta.width ?? 0) <= (meta.height ?? 1)) {
+    throw new Error(`real grid 계약 위반(세로 ${meta.width}x${meta.height}) — 단일 스트립 재생성으로 복구하세요`)
+  }
+
+  const upload = async (path: string, buf: Buffer): Promise<string> => {
+    const { error } = await supabaseAdmin.storage
+      .from('media')
+      .upload(path, buf, { contentType: 'image/png', upsert: true })
+    if (error) throw error
+    return versionedUrl(supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl)
+  }
+
+  const base = `${workspaceId}/${job.project_id}/shots`
+  const gridUrl = await upload(`${base}/real_grid_${job.id}.png`, gridBuf)
+
+  const perShot = await cropRoughGridFrames(gridBuf, gridVariant ?? 'grid4', writerShotIds.length)
+  for (let i = 0; i < writerShotIds.length; i++) {
+    const shotId = writerShotIds[i]
+    const seg = storageKeySegment(shotId)
+    const frames = perShot[i]
+    const [startUrl, directionUrl, endUrl] = await Promise.all([
+      upload(`${base}/${seg}_storyboard_start.png`, frames.start),
+      upload(`${base}/${seg}_storyboard_direction.png`, frames.direction),
+      upload(`${base}/${seg}_storyboard_end.png`, frames.end),
+    ])
+    await uploadThumbnail(`${base}/${seg}_storyboard_start.png`, frames.start)
+
+    const { error } = await supabaseAdmin
+      .from('shots')
+      .update({
+        storyboard_image: {
+          url: startUrl, // 하위 호환 대표 프레임 (Node 뷰 등 구 소비처는 url 만 읽음)
+          frames: { start: startUrl, direction: directionUrl, end: endUrl },
+          stripUrl: gridUrl,
+          status: 'completed',
+          errorMessage: null,
+          generatedAt: Date.now(),
+        },
+      })
+      .eq('project_id', job.project_id)
+      .eq('shot_id', shotId)
+    if (error) throw error
+  }
+
+  await completeGenerationJob(job.id, gridUrl)
+  return gridUrl
+}
+
+/**
  * 러프 그리드(#rough-grid 2026-07-22) 영속화 — 잡 1개 = 그리드 1장 = 샷 최대 4개.
  *   그리드 원본 업로드 → 셀 크롭(cropRoughGridFrames) → 샷별 3프레임 업로드 →
  *   shots.rough_storyboard 를 3프레임 shape(frames+gridUrl, url=start 하위호환)로 갱신.
@@ -1145,6 +1215,9 @@ export async function finalizeGenerationJob(job: GenerationJob, result: Finalize
     case 'shot_storyboard':
       if (result.media !== 'image') throw new Error('shot_storyboard requires an image result')
       return finalizeShotStoryboardJob(job, result.url, result.payload)
+    case 'storyboard_real_grid':
+      if (result.media !== 'image') throw new Error('storyboard_real_grid requires an image result')
+      return finalizeRealGridJob(job, result.url, result.payload)
     case 'shot_rough_storyboard':
       if (result.media !== 'image') throw new Error('shot_rough_storyboard requires an image result')
       return finalizeShotRoughStoryboardJob(job, result.url, result.payload)

@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
-import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
+import { ImageIcon, MapPin, Clock, Pause, Play, Loader2, Grid2x2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -407,6 +408,75 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
   )
 }
 
+/**
+ * 실사 일괄 생성 바(#real-grid 2026-08-06, 이원화의 일괄 축) — 미생성 샷을 같은 씬·같은
+ * 레퍼런스 4개 단위 시트로 1콜 리페인트. remaining>0 이면 라운드 반복, 완료 시 캔버스 rehydrate.
+ * 개별 재생성(품질 축)은 기존 셀의 단일 스트립 경로 그대로.
+ */
+function RealBatchBar({ projectId }: { projectId: string | null }) {
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    if (!projectId || busy) return
+    setBusy(true)
+    try {
+      let total = 0
+      for (let round = 0; round < 10; round++) {
+        const res = await fetch('/api/director/generate-storyboard-batch', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ projectId }),
+        })
+        const j = (await res.json().catch(() => null)) as {
+          data?: { submitted: Array<{ jobId: string; shotIds: string[] }>; remaining: number }
+          error?: string
+        } | null
+        if (res.status === 429) {
+          toast.info('생성 대기열이 가득 찼어요 — 잠시 후 다시 시도해 주세요.')
+          break
+        }
+        if (!res.ok || !j?.data) throw new Error(j?.error ?? `HTTP ${res.status}`)
+        const { submitted, remaining } = j.data
+        if (!submitted.length) break
+        total += submitted.reduce((n, s) => n + s.shotIds.length, 0)
+        // 이번 라운드 잡 완료 대기 — 완료 후 다음 라운드(잔여) 진행.
+        for (const s of submitted) {
+          for (let i = 0; i < 60; i++) {
+            const st = (await (await fetch(`/api/generation-jobs/${encodeURIComponent(s.jobId)}`)).json()) as {
+              status?: string
+            }
+            if (st.status === 'completed' || st.status === 'failed') break
+            await new Promise((r) => setTimeout(r, 5000))
+          }
+        }
+        if (remaining <= 0) break
+      }
+      if (total > 0) {
+        await useDirectorCanvasStore.getState().hydrateFromDb(projectId)
+        toast.success(`실사 스토리보드 ${total}샷 일괄 생성 완료`)
+      } else {
+        toast.info('생성할 샷이 없어요 — 러프가 준비된 미생성 샷이 대상이에요.')
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '일괄 생성에 실패했어요')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="flex items-center justify-end">
+      <button
+        type="button"
+        onClick={() => void run()}
+        disabled={busy || !projectId}
+        className="flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 hover-red-beam"
+      >
+        {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Grid2x2 className="size-3.5" />}
+        {busy ? '일괄 생성 중… (시트 단위 진행)' : '미생성 샷 일괄 생성 (4샷/시트)'}
+      </button>
+    </div>
+  )
+}
+
 export function StoryboardGridView() {
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const projectId = useDirectorCanvasStore((s) => s.projectId)
@@ -489,6 +559,7 @@ export function StoryboardGridView() {
           mediaMode === 'real' ? 'slide-in-from-right-6' : 'slide-in-from-left-6',
         )}
       >
+        {mediaMode === 'real' ? <RealBatchBar projectId={projectId} /> : null}
         {groups.map((group) => (
           <section key={group.key} className="flex flex-col gap-4">
             <div className="flex items-baseline gap-3">

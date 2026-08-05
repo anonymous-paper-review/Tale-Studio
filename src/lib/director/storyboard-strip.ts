@@ -9,6 +9,7 @@ import path from 'node:path'
 import sharp from 'sharp'
 import {
   STRIP_TEMPLATE_PATH,
+  GRID_TEMPLATE_PATH,
   gridGeometry,
 } from '@/lib/writer/rough-storyboard-grid'
 import { resolveWebhookBaseUrl } from '@/lib/fal/webhook-url'
@@ -64,6 +65,81 @@ export async function composeRoughReferenceStrip(frames: {
     overlays.push({ input: resized, left, top })
   }
   return sharp(template).composite(overlays).png().toBuffer()
+}
+
+/**
+ * #real-grid(2026-08-06, 실험 검증: 011fd4bd 4샷 시트 1콜 리페인트 — 시트 계약·정체성·모션 전부 통과):
+ *   같은 씬·같은 레퍼런스의 러프 3프레임 세트들을 grid4 템플릿(4열×3행)에 합성 — 일괄 리페인트 참조 시트.
+ */
+export async function composeRoughReferenceGrid(
+  shotFrames: Array<{ start: string; direction: string; end: string }>,
+): Promise<Buffer> {
+  if (!shotFrames.length || shotFrames.length > 4) throw new Error(`grid frames 1~4 필요 (${shotFrames.length})`)
+  const base = resolveWebhookBaseUrl()
+  const template = await (async () => {
+    try {
+      return await readFile(path.join(process.cwd(), 'public', GRID_TEMPLATE_PATH))
+    } catch {
+      if (!base) throw new Error('grid template unavailable')
+      const res = await fetch(`${base}${GRID_TEMPLATE_PATH}`)
+      if (!res.ok) throw new Error(`grid template fetch failed: ${res.status}`)
+      return Buffer.from(await res.arrayBuffer())
+    }
+  })()
+  const meta = await sharp(template).metadata()
+  const W = meta.width
+  const H = meta.height
+  if (!W || !H) throw new Error('grid template metadata missing')
+  const { cols, rows } = gridGeometry('grid4')
+  const overlays: sharp.OverlayOptions[] = []
+  for (let c = 0; c < shotFrames.length; c++) {
+    const urls = [shotFrames[c].start, shotFrames[c].direction, shotFrames[c].end]
+    for (let r = 0; r < rows.length; r++) {
+      const [c0, c1] = cols[c]
+      const [r0, r1] = rows[r]
+      const w = Math.max(1, Math.round((c1 - c0) * W))
+      const h = Math.max(1, Math.round((r1 - r0) * H))
+      const buf = await fetchImage(urls[r])
+      overlays.push({
+        input: await sharp(buf).resize(w, h, { fit: 'fill' }).png().toBuffer(),
+        left: Math.round(c0 * W),
+        top: Math.round(r0 * H),
+      })
+    }
+  }
+  return sharp(template).composite(overlays).png().toBuffer()
+}
+
+/** 4샷 그리드 일괄 리페인트 프롬프트 — strip 문안의 grid 일반화 (#real-grid 실험 문안 그대로). */
+export function buildRealGridPrompt(
+  shotCount: number,
+  opts: { characterRefCount: number; hasStyleRef: boolean },
+): string {
+  const { characterRefCount, hasStyleRef } = opts
+  const target = hasStyleRef
+    ? 'finished, final-quality film frames'
+    : 'finished photorealistic live-action cinematic film frames'
+  const charLocation = hasStyleRef
+    ? 'the reference images between the first and the last'
+    : 'the remaining reference images'
+  return [
+    `The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.${shotCount < 4 ? ` Only the first ${shotCount} column(s) contain shots — keep the remaining column(s) as empty blank panels.` : ''}`,
+    '',
+    `Repaint this exact sheet as ${target}:`,
+    `- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.`,
+    `- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.`,
+    ...(characterRefCount > 0
+      ? [
+          `- Replace every wooden mannequin with the corresponding character(s) from ${charLocation} (character/world references): keep their identity, design and outfit, consistent across all panels.`,
+        ]
+      : []),
+    ...(hasStyleRef
+      ? [
+          `- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.`,
+        ]
+      : []),
+    `- No text anywhere except row 2's arrow labels.`,
+  ].join('\n')
 }
 
 /**
