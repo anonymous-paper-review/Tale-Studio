@@ -25,6 +25,7 @@ export const VALID_UPDATE_TYPES = new Set([
   'updateShot',
   'deleteShot',
   'deleteScene',
+  'clarify', // #p4-understand B2: 모호 대상 되묻기 (CRUD 아님 — 채팅이 후보 버튼으로 소비)
 ])
 
 export function asString(x: unknown): string | undefined {
@@ -136,6 +137,14 @@ export function validateWriterUpdates(raw: unknown[]): unknown[] {
       case 'deleteShot':
       case 'deleteScene': {
         if (asString(rec.id)) out.push({ type: rec.type, id: rec.id })
+        break
+      }
+      case 'clarify': {
+        const question = asString(rec.question)
+        const candidates = Array.isArray(rec.candidates)
+          ? (rec.candidates as unknown[]).filter((c): c is string => typeof c === 'string' && !!c.trim()).slice(0, 4)
+          : []
+        if (question && candidates.length >= 2) out.push({ type: 'clarify', question, candidates })
         break
       }
     }

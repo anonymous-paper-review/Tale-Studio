@@ -40,6 +40,9 @@ Non-destructive:
 Destructive — emit ONLY when the user clearly asks to remove something:
 5. {"type":"deleteShot","id":"<shotId>"}
 6. {"type":"deleteScene","id":"<sceneId>"}   // also removes that scene's shots
+7. {"type":"clarify","question":"<짧은 되묻기>","candidates":["<shot_id 또는 문구>", ...]}
+   // 수정 대상이 모호하면(어느 샷/씬인지 특정 불가) 임의로 고르지 말고 clarify 하나만 내라 —
+   //   candidates 는 2~4개, 사용자가 그대로 답할 수 있는 구체 표현으로. 다른 액션과 섞지 마라.
 
 Only include patch fields you are actually changing. Omit unknown fields rather than guessing.
 </actions>

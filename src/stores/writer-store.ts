@@ -62,6 +62,8 @@ export type WriterChatUpdate =
   | ({ type: 'addShot'; sceneId: string; tempId?: string } & Partial<Shot>)
   | { type: 'updateScene'; id: string; patch: Partial<Scene> }
   | { type: 'updateShot'; id: string; patch: Partial<Shot> }
+  // #p4-understand B2: 대상 모호 시 임의 적용 대신 되묻기 — 채팅이 후보 버튼으로 렌더(CRUD 아님).
+  | { type: 'clarify'; question: string; candidates: string[] }
   | { type: 'deleteShot'; id: string }
   | { type: 'deleteScene'; id: string }
 

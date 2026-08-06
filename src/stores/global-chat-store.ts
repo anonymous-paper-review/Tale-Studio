@@ -611,10 +611,27 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
       }
       if (stage === 'writer' && Array.isArray(data.updates)) {
+        // #p4-understand B2: clarify(되묻기)는 CRUD 가 아님 — 후보 버튼 제안으로 분리.
+        const rawUpdates = data.updates as WriterChatUpdate[]
+        const clarify = rawUpdates.find(
+          (u): u is Extract<WriterChatUpdate, { type: 'clarify' }> => u.type === 'clarify',
+        )
+        if (clarify) {
+          get().offerSuggestion({
+            id: `clarify:${makeId()}`,
+            stage: 'writer',
+            dismissible: true,
+            content: clarify.question,
+            action: {
+              kind: 'choices',
+              options: clarify.candidates.map((c) => ({ label: c, utterance: c })),
+            },
+          })
+        }
         // 검증된 씬/샷 CRUD 액션 — writer-store 가 기존 CRUD 로 DB 반영.
         const result = await useWriterStore
           .getState()
-          .applyChatUpdates(data.updates as WriterChatUpdate[])
+          .applyChatUpdates(rawUpdates.filter((u) => u.type !== 'clarify'))
         // #p4-understand B: 침묵 no-op 제거 — 적용/건너뜀을 즉시 표면화.
         if (result.skipped.length > 0) {
           toast.warning(
