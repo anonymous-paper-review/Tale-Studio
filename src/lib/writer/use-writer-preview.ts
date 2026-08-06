@@ -24,6 +24,13 @@ export interface PreviewCharacter {
   /** 클릭 팝업용 캐릭터 템플릿(턴어라운드 시트, view_main). */
   templateUrl: string | null
 }
+// #p3b: 뒷단 로딩 쇼케이스의 배경 카드 — locations 테이블(이름 + 비주얼 서술). 이미지 컬럼은 없음(텍스트 카드).
+export interface PreviewWorld {
+  id: string
+  name: string
+  description: string
+}
+
 export interface WriterPreview {
   started: boolean
   running: boolean
@@ -32,6 +39,7 @@ export interface WriterPreview {
   roster: { slug: string; name: string }[]
   scenes: PreviewScene[]
   characters: PreviewCharacter[]
+  worlds?: PreviewWorld[]
 }
 
 interface Options {

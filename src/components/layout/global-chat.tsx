@@ -350,6 +350,25 @@ export function GlobalChat() {
       await useArtistStore.getState().refreshLookPendingDrafts()
       return
     }
+    // 씬 게이트 확정(#s3-gate P3b) — 게이트 패널의 [이대로 확정]과 같은 API. 성공 전환은
+    //   writer 화면의 상태 폴링이 집어간다.
+    if (action.kind === 'confirmScenes') {
+      dismissSuggestion()
+      const pid = useProjectStore.getState().projectId
+      if (!pid) return
+      try {
+        const res = await fetch('/api/writer/scene-gate', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ projectId: pid, action: 'confirm' }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        toast.success('씬 확정 — 인물·비주얼·샷 설계를 시작해요')
+      } catch {
+        toast.error('확정에 실패했어요 — writer 화면의 게이트 패널에서 시도해 주세요')
+      }
+      return
+    }
     // 핸드오프(#handoff-to-chat) — 버튼이 직접 이동시키지 않는다. 문장을 채팅에 입력해 보내고,
     //   게이트 판정·전이·이동은 타이핑했을 때와 똑같이 sendMessage 안에서 일어난다.
     if (action.kind === 'handoff') {

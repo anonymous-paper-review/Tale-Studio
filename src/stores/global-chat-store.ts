@@ -55,6 +55,8 @@ export interface ChatSuggestion {
     // 핸드오프(#handoff-to-chat) — 누르면 utterance 를 채팅에 그대로 입력해 보낸다.
     //   버튼이 직접 이동시키지 않는 이유: 타이핑 경로와 갈리면 두 벌을 유지해야 한다.
     | { kind: 'handoff'; utterance: string; label: string }
+    // #s3-gate P3b: 씬 게이트 확정 버튼 — 클릭 시 /api/writer/scene-gate confirm (수정 요청은 게이트 패널이 주 경로)
+    | { kind: 'confirmScenes'; label: string }
     | null
 }
 

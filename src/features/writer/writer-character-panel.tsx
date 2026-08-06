@@ -15,7 +15,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import type { PreviewCharacter } from '@/lib/writer/use-writer-preview'
+import type { PreviewCharacter, PreviewWorld } from '@/lib/writer/use-writer-preview'
 
 const ROLE_LABEL: Record<string, string> = {
   protagonist: '주인공',
@@ -83,9 +83,12 @@ function CharacterCard({
 
 export function WriterCharacterPanel({
   characters,
+  worlds,
   className,
 }: {
   characters: PreviewCharacter[]
+  // #p3b: 뒷단 로딩 쇼케이스 — 배경 텍스트 카드 (writer 가 서술을 채우는 대로 점진 노출)
+  worlds?: PreviewWorld[]
   className?: string
 }) {
   const [detail, setDetail] = useState<PreviewCharacter | null>(null)
@@ -111,6 +114,28 @@ export function WriterCharacterPanel({
           ))}
         </div>
       )}
+      {worlds?.length ? (
+        <>
+          <h2 className="mb-3 mt-6 px-0.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            배경
+          </h2>
+          <div className="space-y-2.5">
+            {worlds.map((w) => (
+              <div
+                key={w.id}
+                className="animate-in fade-in rounded-lg border border-border/60 bg-card/40 p-2.5 duration-500"
+              >
+                <p className="text-sm font-semibold text-foreground">{w.name}</p>
+                {w.description ? (
+                  <p className="mt-1 line-clamp-4 text-xs leading-relaxed text-muted-foreground">
+                    {w.description}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
 
       {/* 캐릭터 템플릿 팝업 — 턴어라운드 시트(view_main) 전체 보기 */}
       <Dialog open={detail !== null} onOpenChange={(o) => !o && setDetail(null)}>

@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { WriterStoryStream } from '@/features/writer/writer-story-stream'
 import { SceneGatePanel } from '@/features/writer/scene-gate-panel'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { WriterCharacterPanel } from '@/features/writer/writer-character-panel'
 import type { WriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
@@ -46,6 +47,19 @@ export function WriterGenerationView({
   // #s3-gate: storyCheck 후 씬 확정 대기 — 진행 바 대신 게이트 패널.
   const awaiting = status?.current_status === 'awaiting_confirmation'
 
+  // #s3-gate P3b: 게이트 진입 시 채팅에도 확정 제안 버튼 — #handoff-to-chat 문법 정합.
+  useEffect(() => {
+    if (!awaiting || !projectId) return
+    useGlobalChatStore.getState().offerSuggestion({
+      id: `scene-gate:${projectId}`,
+      stage: 'writer',
+      dismissible: true,
+      content:
+        '씬 스토리 초안이 준비됐어요. 화면에서 검토하고 마음에 들면 확정해 주세요 —\n수정하고 싶은 부분은 아래 게이트 패널에 적으면 다시 써 드려요.',
+      action: { kind: 'confirmScenes', label: '이대로 확정' },
+    })
+  }, [awaiting, projectId])
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* 슬림 헤더 (실행 중엔 탭 전환이 무의미 → 컨텍스트 문구만) */}
@@ -74,6 +88,7 @@ export function WriterGenerationView({
         </div>
         <WriterCharacterPanel
           characters={preview?.characters ?? []}
+          worlds={preview?.worlds ?? []}
           className="hidden min-h-0 md:block"
         />
       </div>

@@ -158,6 +158,24 @@ export async function GET(
         };
       });
 
+    // #p3b 쇼케이스: 배경(locations) 텍스트 카드 — writer 뒷단(v2)이 서술을 채우면 점진 노출.
+    let worlds: Array<{ id: string; name: string; description: string }> = [];
+    try {
+      const { data: locRows } = await supabaseAdmin
+        .from('locations')
+        .select('location_id, name, visual_description')
+        .eq('project_id', projectId);
+      worlds = (locRows ?? [])
+        .map((r) => ({
+          id: (r.location_id as string) ?? '',
+          name: ((r.name as string) ?? '').trim(),
+          description: ((r.visual_description as string) ?? '').trim(),
+        }))
+        .filter((w) => w.id && w.name);
+    } catch {
+      // best-effort — 배경 카드는 부가 정보
+    }
+
     return NextResponse.json(
       {
         started: true,
@@ -167,6 +185,7 @@ export async function GET(
         roster,
         scenes,
         characters,
+        worlds,
       },
       { headers: { 'cache-control': 'no-store' } },
     );
