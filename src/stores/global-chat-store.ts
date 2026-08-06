@@ -57,6 +57,8 @@ export interface ChatSuggestion {
     | { kind: 'handoff'; utterance: string; label: string }
     // #s3-gate P3b: 씬 게이트 확정 버튼 — 클릭 시 /api/writer/scene-gate confirm (수정 요청은 게이트 패널이 주 경로)
     | { kind: 'confirmScenes'; label: string }
+    // #p4-choices: 다중 선택지 — 클릭 = 그 문구를 채팅 입력(핸드오프 패턴, 직접 입력과 동일 경로)
+    | { kind: 'choices'; options: Array<{ label: string; utterance: string }> }
     | null
 }
 
@@ -505,6 +507,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         useProducerStore
           .getState()
           .applyExtractedSettings(data.extractedSettings)
+      }
+      // #p4-choices: 에이전트가 낸 선택지를 버튼 제안으로 — 클릭 = 채팅 입력.
+      if (stage === 'producer' && Array.isArray(data.choices) && data.choices.length >= 2) {
+        get().offerSuggestion({
+          id: `choices:${makeId()}`,
+          stage: 'producer',
+          dismissible: true,
+          content: '아래에서 골라 주세요 — 직접 입력하셔도 돼요.',
+          action: {
+            kind: 'choices',
+            options: (data.choices as string[]).slice(0, 4).map((c) => ({ label: c, utterance: c })),
+          },
+        })
       }
       if (stage === 'artist' && Array.isArray(data.updates)) {
         const updates = data.updates as ArtistUpdate[]

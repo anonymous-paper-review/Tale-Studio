@@ -4,6 +4,7 @@ import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { PRODUCER_SYSTEM } from './system-prompt'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
+import { parseChatChoices } from '@/lib/chat-choices'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
 
@@ -128,11 +129,13 @@ export async function POST(req: Request) {
       { webSearch: true },
     )
 
-    const { reply, extractedSettings } = parseExtractedSettings(text)
+    const { reply: replyRaw, extractedSettings } = parseExtractedSettings(text)
+    // #p4-choices: Foundation 빈칸을 되묻기 대신 선택지 버튼으로 — [CHOICES] 라인 추출.
+    const { reply, choices } = parseChatChoices(replyRaw)
     // 방어: 모델이 히스토리의 [Pn] 접두어를 흉내내 답변 앞에 붙이는 경우 제거(사용자에게 stage 마커 노출 금지).
     const cleanReply = reply.replace(/^\s*(?:\[P[1-5]\]\s*)+/, '')
 
-    return NextResponse.json({ reply: cleanReply, extractedSettings })
+    return NextResponse.json({ reply: cleanReply, extractedSettings, choices })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[produce/chat]', message)

@@ -350,6 +350,8 @@ export function GlobalChat() {
       await useArtistStore.getState().refreshLookPendingDrafts()
       return
     }
+    // #p4-choices 는 렌더에서 버튼별 인라인 처리 — 이 핸들러엔 도달하지 않는다(타입 내로잉용).
+    if (action.kind === 'choices') return
     // 씬 게이트 확정(#s3-gate P3b) — 게이트 패널의 [이대로 확정]과 같은 API. 성공 전환은
     //   writer 화면의 상태 폴링이 집어간다.
     if (action.kind === 'confirmScenes') {
@@ -583,12 +585,27 @@ export function GlobalChat() {
                   text={suggestion.content}
                 />
                 {(suggestion.action || suggestion.dismissible !== false) && (
-                  <div className="mt-2 flex items-center gap-2">
-                    {suggestion.action && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {suggestion.action?.kind === 'choices' ? (
+                      // #p4-choices: 다중 선택지 — 클릭 = 그 문구를 채팅에 입력(타이핑과 동일 경로)
+                      suggestion.action.options.map((opt) => (
+                        <Button
+                          key={opt.label}
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            dismissSuggestion()
+                            void sendMessage(opt.utterance)
+                          }}
+                        >
+                          {opt.label}
+                        </Button>
+                      ))
+                    ) : suggestion.action ? (
                       <Button size="sm" onClick={handleSuggestionAction}>
                         {suggestion.action.label}
                       </Button>
-                    )}
+                    ) : null}
                     {suggestion.dismissible !== false && (
                       <Button size="sm" variant="ghost" onClick={dismissSuggestion}>
                         나중에

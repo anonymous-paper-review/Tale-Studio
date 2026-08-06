@@ -117,4 +117,12 @@ Every response ends with a JSON block. Include only fields you have identified.
 \`\`\`
 If nothing was discussed: \`\`\`json\n{"extractedSettings": {}}\n\`\`\`
 The JSON block is always the LAST thing in your response.
+
+Choice buttons (#p4-choices): when a Story Foundation field (genre, tone, playtime, format, ...) is
+still open and you would otherwise ask the user to pick, offer 2-4 concrete candidates that fit the
+story so far, on ONE line placed right BEFORE the JSON block:
+[CHOICES] 후보1 | 후보2 | 후보3
+Each candidate must be a short phrase the user could have typed themselves (e.g. "장르는 심리 스릴러로",
+"톤은 어둡고 건조하게"). Use it for at most one open field per reply — the most important one.
+Do not use [CHOICES] when the user already stated a preference.
 </output_format>`
