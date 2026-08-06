@@ -11,6 +11,7 @@ import type {
 import { createClient } from '@/lib/supabase/client'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { classifyDialoguePatch } from '@/lib/writer-chat-updates'
+import { resolveChatShotId } from '@/lib/writer/chat-id-resolve'
 import { useProjectStore } from '@/stores/project-store'
 import { isDemoSession } from '@/lib/demo/context'
 
@@ -72,6 +73,9 @@ export interface WriterDialogueShrinkProposal {
 
 export interface WriterApplyChatUpdatesResult {
   pendingDialogueShrinks: WriterDialogueShrinkProposal[]
+  // #p4-understand B: 침묵 no-op 제거 — 채팅이 적용/건너뜀을 사용자에게 표면화한다.
+  applied: number
+  skipped: Array<{ type: string; id?: string; reason: string }>
 }
 
 // applyChatUpdates 보조 — update 에서 Scene/Shot 칸만 추린다(route 가 1차 검증, 여기선 타입 좁힘 + 잉여 키 제거).
@@ -551,6 +555,17 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   applyChatUpdates: async (updates) => {
     const tempMap = new Map<string, string>() // tempId → 실제 id
     const pendingDialogueShrinks: WriterDialogueShrinkProposal[] = []
+    // #p4-understand: 침묵 no-op 제거 — 적용/건너뜀을 집계해 호출자(채팅)가 표면화한다.
+    let applied = 0
+    const skipped: Array<{ type: string; id?: string; reason: string }> = []
+    // 샷 id 관용 해석(A2): tempMap → 실재 → 레거시/위치형 폴백. 실패는 null.
+    const resolveShot = (rawId: string): string | null => {
+      const viaTemp = tempMap.get(rawId) ?? rawId
+      return resolveChatShotId(
+        get().shots.map((s) => ({ shotId: s.shotId, sceneId: s.sceneId })),
+        viaTemp,
+      )
+    }
     for (const u of updates) {
       try {
         if (u.type === 'addScene') {
@@ -559,6 +574,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           if (u.tempId) tempMap.set(u.tempId, newId)
           const fields = pickSceneFields(u)
           if (Object.keys(fields).length > 0) get().updateScene(newId, fields)
+          applied += 1
         } else if (u.type === 'addShot') {
           const realSceneId = tempMap.get(u.sceneId) ?? u.sceneId
           const newId = await get().addShot(realSceneId)
@@ -566,10 +582,16 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           if (u.tempId) tempMap.set(u.tempId, newId)
           const fields = pickShotFields(u)
           if (Object.keys(fields).length > 0) get().updateShot(newId, fields)
+          applied += 1
         } else if (u.type === 'updateScene') {
           get().updateScene(tempMap.get(u.id) ?? u.id, u.patch)
+          applied += 1
         } else if (u.type === 'updateShot') {
-          const shotId = tempMap.get(u.id) ?? u.id
+          const shotId = resolveShot(u.id)
+          if (!shotId) {
+            skipped.push({ type: u.type, id: u.id, reason: `샷 '${u.id}' 를 찾지 못했어요` })
+            continue
+          }
           const nextDialogueLines = u.patch.dialogueLines
           if (Array.isArray(nextDialogueLines)) {
             const currentShot = get().shots.find((shot) => shot.shotId === shotId)
@@ -591,16 +613,25 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           } else {
             get().updateShot(shotId, u.patch)
           }
+          applied += 1
         } else if (u.type === 'deleteShot') {
-          await get().deleteShot(tempMap.get(u.id) ?? u.id)
+          const delId = resolveShot(u.id)
+          if (!delId) {
+            skipped.push({ type: u.type, id: u.id, reason: `샷 '${u.id}' 를 찾지 못했어요` })
+            continue
+          }
+          await get().deleteShot(delId)
+          applied += 1
         } else if (u.type === 'deleteScene') {
           await get().deleteScene(tempMap.get(u.id) ?? u.id)
+          applied += 1
         }
       } catch (e) {
+        skipped.push({ type: u.type, reason: e instanceof Error ? e.message : 'chat update failed' })
         set({ error: e instanceof Error ? e.message : 'chat update failed' })
       }
     }
-    return { pendingDialogueShrinks }
+    return { pendingDialogueShrinks, applied, skipped }
   },
 
   reorderScenes: async (orderedIds) => {

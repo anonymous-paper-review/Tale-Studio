@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { toast } from 'sonner'
 import type { DialogueLine, StageId } from '@/types'
 import type { PendingProposal } from '@/lib/pending-proposal'
 import { createPendingProposal, isApprovalUtterance } from '@/lib/pending-proposal'
@@ -604,6 +605,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               '[global-chat-store] director updates skipped:',
               result.skipped,
             )
+            // #p4-understand B: director 쪽도 침묵 스킵 제거.
+            toast.warning(`수정 ${result.skipped.length}건을 반영하지 못했어요`)
           }
         }
       }
@@ -612,6 +615,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const result = await useWriterStore
           .getState()
           .applyChatUpdates(data.updates as WriterChatUpdate[])
+        // #p4-understand B: 침묵 no-op 제거 — 적용/건너뜀을 즉시 표면화.
+        if (result.skipped.length > 0) {
+          toast.warning(
+            `수정 ${result.skipped.length}건을 반영하지 못했어요 — ${result.skipped[0].reason}`,
+          )
+        } else if (result.applied > 0) {
+          toast.success(`수정 ${result.applied}건 반영 완료`)
+        }
         for (const shrink of result.pendingDialogueShrinks) {
           const proposal = createPendingProposal({
             stage: 'writer',

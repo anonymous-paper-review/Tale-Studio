@@ -173,6 +173,8 @@ export function serializeWriterScriptContext(
   const sceneIds = new Set(scenes.map((scene) => scene.sceneId))
   const lines: string[] = [
     '## 현재 씬/샷 (scene_id·shot_id 를 그대로 사용, [L#] = 스크립트 라인 번호)',
+    // #p4-understand A1: 위치형 지칭("씬2의 3번째 샷") 해석 근거 — 아래 나열 순서가 곧 위치다.
+    '위치 별칭: 사용자가 "씬N의 M번째 샷"처럼 위치로 지칭하면, 아래 씬 순서(### 표기의 씬N)와 그 씬 안 샷 나열 순서로 대응하는 shot_id 를 찾아 사용한다.',
   ]
   const roster = manifest?.characters ?? []
   if (roster.length > 0) {
@@ -182,12 +184,12 @@ export function serializeWriterScriptContext(
     )
   }
 
-  for (const scene of scenes) {
+  for (const [sceneIdx, scene] of scenes.entries()) {
     const present =
       (scene.charactersPresent ?? []).map((id) => characterRef(manifest, id)).join(', ') || '없음'
     const heading = byRef.get(`${scene.sceneId}.heading`)
     lines.push(
-      `\n### ${lineLabel(heading)}${scene.sceneId} — 장소:${scene.location || '?'} / ${scene.timeOfDay || '?'} / 분위기:${scene.mood || '?'} (등장: ${present})`,
+      `\n### ${lineLabel(heading)}${scene.sceneId} (씬${sceneIdx + 1}) — 장소:${scene.location || '?'} / ${scene.timeOfDay || '?'} / 분위기:${scene.mood || '?'} (등장: ${present})`,
     )
     if (scene.narrativeSummary) lines.push(`  요약: ${scene.narrativeSummary}`)
 
