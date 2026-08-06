@@ -217,6 +217,7 @@ function MentionableCard({
   variant = 'card',
   className,
   onClick,
+  containerRef,
   children,
 }: {
   refId: string
@@ -226,6 +227,8 @@ function MentionableCard({
   className?: string
   /** 일반 클릭 핸들러 — ⌘/Ctrl 클릭은 캡처 단계가 선점하므로 여기엔 오지 않는다. */
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void
+  /** 카드 루트 div ref — 바깥 클릭 감지(외부 클릭 닫기) 등 경계 판정용. */
+  containerRef?: React.Ref<HTMLDivElement>
   children: ReactNode
 }) {
   const mentioned = useChatUiStore((s) => s.mentionedRefs.includes(refId))
@@ -235,6 +238,7 @@ function MentionableCard({
   const tone: MentionTone = mentioned ? 'mentioned' : pulse ? 'pulse' : armed ? 'armed' : 'idle'
   return (
     <div
+      ref={containerRef}
       className={cn(MENTION_BASE[variant], MENTION_TONE[variant][tone], armed && 'cursor-copy', className)}
       onClick={onClick}
       // ⌘/Ctrl 클릭은 멘션 전용(#b5 2026-08-03) — 캡처 단계에서 기본 동작을 끊는다.
@@ -701,6 +705,21 @@ function CastRow({
   const [detailsOpen, setDetailsOpen] = useState(false)
   const detailIssueCount = [arcIssue, motivationIssue].filter(Boolean).length
 
+  // 바깥 클릭 닫기(2026-08-06) — 펼쳐진 상세는 팝오버처럼 "다른 곳을 누르면 닫힌다"가
+  //   대부분의 인지 모델이다. pointerdown 기준(안쪽에서 시작해 밖에서 끝나는 드래그에 오발동 없음),
+  //   카드 안쪽은 아래 onClick 토글이 담당하므로 여기는 카드 밖만 본다.
+  const rowRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!detailsOpen) return
+    const onDocPointerDown = (e: PointerEvent) => {
+      const el = rowRef.current
+      if (!el) return
+      if (e.target instanceof Node && !el.contains(e.target)) setDetailsOpen(false)
+    }
+    document.addEventListener('pointerdown', onDocPointerDown)
+    return () => document.removeEventListener('pointerdown', onDocPointerDown)
+  }, [detailsOpen])
+
   const patchArc = (p: Partial<CastArc>) =>
     onPatch(member.localId, {
       arc: { start_state: '', end_state: '', arc_type: '', ...member.arc, ...p },
@@ -716,13 +735,14 @@ function CastRow({
       refId={member.localId}
       label={mentionLabel}
       className={cn('px-2', isPerson && 'cursor-pointer')}
-      // 상세 토글은 줄의 빈 공간 클릭(#b3) — 카드 래퍼(py-3 패딩 포함)가 진입점이라 이름·묘사
-      //   위아래 여백 클릭도 동작한다(2026-08-03). 입력·버튼 등 상호작용 요소와 펼쳐진 상세
-      //   본문 위 클릭은 무시. ⌘/Ctrl 은 멘션 캡처가 선점해 여기 오지 않는다.
+      containerRef={rowRef}
+      // 상세 토글은 빈 공간 클릭(#b3, 2026-08-06 확장) — 카드 어디든 상호작용 요소(입력·버튼·
+      //   콤보박스)가 아닌 곳을 누르면 토글된다. 펼쳐진 상세 본문의 여백 클릭도 닫힘(바깥 클릭
+      //   닫기와 함께 "다른 데를 누르면 닫힌다" 인지 모델 완성). ⌘/Ctrl 은 멘션 캡처가 선점.
       onClick={(e) => {
         if (!isPerson) return
         const target = e.target as HTMLElement
-        if (target.closest('input,textarea,button,a,[role="combobox"],[data-cast-details]')) return
+        if (target.closest('input,textarea,button,a,[role="combobox"]')) return
         setDetailsOpen((v) => !v)
       }}
     >
@@ -837,9 +857,8 @@ function CastRow({
           )}
           aria-hidden={!detailsOpen}
         >
-          {/* 줄의 이름 칸(삭제 버튼 + 아이콘 폭)에 맞춰 들여쓴다 — 어느 줄에 딸린 상세인지 보이게.
-              data-cast-details: 빈 공간 클릭 토글(#b3)에서 제외 — 편집 중 오접힘 방지. */}
-          <div data-cast-details className="min-h-0 overflow-hidden pl-[4.5rem] pr-2">
+          {/* 줄의 이름 칸(삭제 버튼 + 아이콘 폭)에 맞춰 들여쓴다 — 어느 줄에 딸린 상세인지 보이게. */}
+          <div className="min-h-0 overflow-hidden pl-[4.5rem] pr-2">
             <div className="mt-2 space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">역할</label>
               <div className="flex gap-2">
