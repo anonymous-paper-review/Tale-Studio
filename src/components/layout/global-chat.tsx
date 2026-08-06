@@ -270,7 +270,9 @@ export function GlobalChat() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     // stageSettled: 1초 뒤 계단식으로 등장하는 제안/승인 카드(#chat-settle)가 스레드 끝에
     //   붙으므로, 나타나는 순간 끝까지 따라가야 화면 밖에서 조용히 뜨지 않는다.
-  }, [messages.length, loading, currentStage, stageSettled])
+    // suggestion/proposal id(2026-08-06): 핸드오프 등 제안은 messages 에 안 실려 이 effect 가
+    //   안 돌았다 — 위로 스크롤해 둔 상태에서 제안이 화면 밖(아래)에 조용히 떠 놓치는 문제.
+  }, [messages.length, loading, currentStage, stageSettled, suggestion?.id, pendingProposal?.id])
 
   // 입력창의 @멘션 ↔ 카드 하이라이트 동기화 (입력에서 지우면 자동 해제)
   useEffect(() => {
@@ -570,6 +572,9 @@ export function GlobalChat() {
                 className={cn(
                   'mr-4 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-foreground',
                   CASCADE_IN,
+                  // 다음 단계 핸드오프 제안(2026-08-06) — 링 펄스로 시선 유도(모션 축소 환경 제외).
+                  suggestion.action?.kind === 'handoff' &&
+                    'animate-handoff-ring motion-reduce:animate-none',
                 )}
                 style={cascadeStyle(suggestionSlot)}
               >

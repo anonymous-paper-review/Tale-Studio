@@ -37,6 +37,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { StageHelpBadge } from '@/components/stage-help-badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Select,
@@ -482,7 +483,7 @@ function StyleAnchorPicker({
         )}
       >
         <DialogHeader>
-          <DialogTitle>스타일 선택</DialogTitle>
+          <DialogTitle>영상 스타일 선택</DialogTitle>
           <DialogDescription>
             영상 전체에 적용할 시각 스타일을 골라 주세요.
           </DialogDescription>
@@ -805,6 +806,26 @@ function CastRow({
           label="프로듀서에게 채워달라"
           onClick={() => onAskProducer(castDraftPrompt(member, issues[0]))}
         />
+        {/* 상세 펼침/접힘 전용 버튼(2026-08-06) — 빈 공간 클릭 토글(#b3)은 줄이 입력창으로
+            가득 차 닫을 자리가 거의 없었다. 명시적 chevron 이 항상 열고 닫는다. */}
+        {isPerson ? (
+          <Tooltip delayDuration={150}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setDetailsOpen((v) => !v)}
+                aria-expanded={detailsOpen}
+                aria-label={detailsOpen ? '상세 접기' : '상세 펼치기 (역할·아크·동기)'}
+                className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <ChevronDown
+                  className={cn('size-4 transition-transform duration-200', detailsOpen && 'rotate-180')}
+                />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{detailsOpen ? '상세 접기' : '상세 펼치기'}</TooltipContent>
+          </Tooltip>
+        ) : null}
       </div>
 
       {/* 상세 본문 — 항상 마운트하고 grid-rows 0fr↔1fr 전환으로 펼침/접힘 애니메이션(#b1 2026-07-15). */}
@@ -1095,6 +1116,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold">Meeting Room</h1>
+            <StageHelpBadge text="스토리·설정·캐스트를 채우는 기획 회의실이에요. 프로듀서와 대화하면 보드가 함께 채워지고, 필수 항목이 모두 차면 Writer로 넘길 수 있어요." />
             {gate.canHandoff ? (
               <Badge variant="outline" className="gap-1 border-success/40 text-success">
                 <CheckCircle2 className="size-3" /> Writer 계약 준비 완료
@@ -1240,7 +1262,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </HoverBeam>
               </FieldRow>
 
-              <FieldRow icon={<Film className="size-4" />} label="장르" issue={hardByField.get('genre')} mentionRef="setting:genre" mentionLabel="장르">
+              <FieldRow icon={<Film className="size-4" />} label="스토리 장르" issue={hardByField.get('genre')} mentionRef="setting:genre" mentionLabel="스토리 장르">
                 <HoverBeam>
                   <Input
                     value={projectSettings.genre}
@@ -1253,7 +1275,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
 
               {/* 세부 장르 필드는 숨김(2026-07-13 — 데이터(settings.subGenre)는 유지) → 스타일&톤(style_anchors)으로 대체.
                   콤보 박스는 글자만, 클릭 시 그리드 팝업으로 선택(#b 2026-07-14). */}
-              <FieldRow icon={<Tag className="size-4" />} label="스타일" mentionRef="setting:styleAnchor" mentionLabel="스타일">
+              <FieldRow icon={<Tag className="size-4" />} label="영상 스타일" mentionRef="setting:styleAnchor" mentionLabel="영상 스타일">
                 <StyleAnchorPicker
                   anchors={styleAnchors}
                   value={styleAnchorKey}

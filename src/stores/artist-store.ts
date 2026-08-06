@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { displayNameOf } from '@/lib/display-name'
 import type { SceneManifest, CharacterAsset, WorldAsset } from '@/types'
 import { type CharacterViewKey } from '@/types/asset'
 import { candidateViewToViewKey, classifyImageStale, computeLookFingerprint, computeWorldImageSourceHash, type CandidateImage, type LookTokens } from '@/lib/image-provenance'
@@ -16,7 +17,13 @@ import { notifyGenerationComplete } from '@/lib/generation-notify'
 import { claimAction } from '@/lib/action-guard'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
-import type { ArtistLookSummary } from '@/lib/artist/onboarding-message'
+// 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
+//   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
+export interface ArtistLookSummary {
+  artStyle?: string | null
+  /** design_tokens.color_meaning(top-level) — 색→의미. 1-2개만 요약 노출. */
+  colorMeaning?: Record<string, string> | null
+}
 
 export type ImageProvider = 'fal' | 'gemini' | 'tailscale'
 
@@ -465,7 +472,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         }))
         const dbLocations = (dbLocs ?? []).map((l) => ({
           locationId: l.location_id,
-          name: l.name ?? l.location_id,
+          // 오픈캐스트 레거시 행의 slug 이름("location_1")은 표시 시점에 humanize(#opencast-name).
+          name: displayNameOf(l.name, l.location_id),
           visualDescription: l.visual_description ?? l.style_description ?? '',
           visualDescriptionNative: l.visual_description_native ?? l.visual_description ?? l.style_description ?? '',
           timeOfDay: l.time_of_day ?? '',
@@ -488,7 +496,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             scenes: dbScenes,
             characters: (dbChars ?? []).map((c) => ({
               characterId: c.character_id,
-              name: c.name,
+              name: displayNameOf(c.name, c.character_id),
               role: c.role as 'protagonist' | 'antagonist' | 'supporting',
               description: c.description ?? '',
               fixedPrompt: c.appearance ?? '',
@@ -498,7 +506,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           }
           const characterAssets: CharacterAsset[] = (dbChars ?? []).map((c) => ({
             characterId: c.character_id,
-            name: c.name,
+            name: displayNameOf(c.name, c.character_id),
             views: {
               main: c.view_main ?? null,
               back: c.view_back ?? null,

@@ -83,8 +83,9 @@ export function TagInput({
           title="추가"
           className={cn(
             'flex size-6 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100',
-            // group = MentionableCard 줄 래퍼 — 줄에 마우스가 올라와야 "+"가 드러난다.
-            values.length === 0 ? 'opacity-60' : 'opacity-0 group-hover:opacity-100',
+            // 상시 노출(2026-08-06) — hover 전 opacity-0 은 "톤을 어떻게 바꾸지?"로 읽혔다.
+            //   기본 은은하게, 줄 hover(group=MentionableCard)·자체 hover 에서 또렷하게.
+            'opacity-60 group-hover:opacity-100',
           )}
         >
           <Plus className="size-3.5" />
