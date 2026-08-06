@@ -26,6 +26,10 @@ export async function claudeChat(
   userMessage: string,
   temperature = 0.7,
   label = 'chat',
+  // #p4-websearch(2026-08-06): 서버 웹서치 툴 — 오마쥬/레퍼런스 요청("기생충 계단 씬처럼")을
+  //   실제 검색으로 접지. 서버 실행 툴이라 tool loop 불필요, 응답에 검색 블록이 끼어도
+  //   아래 텍스트 추출이 text 블록만 이어붙인다. 단계 확대 방침: produce 채팅부터.
+  opts?: { webSearch?: boolean },
 ): Promise<string> {
   const messages: { role: 'user' | 'assistant'; content: string }[] = [
     ...history.map((m) => ({
@@ -42,6 +46,9 @@ export async function claudeChat(
     system,
     messages,
     temperature,
+    ...(opts?.webSearch
+      ? { tools: [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 3 }] }
+      : {}),
     // 멀티턴 프롬프트 캐싱 (chat-context-management Phase 1) — top-level auto-cache가
     //   마지막 cacheable block(= 마지막 user 턴)에 breakpoint를 둔다. 다음 턴에는 그 이전
     //   prefix(system + 이전 히스토리)가 캐시 read 대상이 되어 2턴째부터 입력 비용/지연이 준다.
@@ -73,11 +80,14 @@ export async function claudeChat(
     `${label} model=${MODEL} in=${u.input_tokens} out=${u.output_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} ${(performance.now() - t0).toFixed(0)}ms`,
   )
 
-  // compaction이 켜지면 응답 content에 compaction 블록이 끼어 content[0]이 text가 아닐 수
-  //   있다 — text 블록을 찾아서 반환한다.
-  const textBlock = response.content.find((b) => b.type === 'text')
-  if (textBlock?.type !== 'text') throw new Error('Unexpected response type')
-  return textBlock.text
+  // compaction/웹서치가 켜지면 응답 content에 비텍스트 블록이 끼고, 검색 시엔 텍스트가
+  //   여러 블록으로 나뉠 수 있다(검색 전 서두 + 검색 후 본문) — 전 텍스트 블록을 이어붙인다.
+  const text = response.content
+    .filter((b): b is Extract<(typeof response.content)[number], { type: 'text' }> => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+  if (!text) throw new Error('Unexpected response type')
+  return text
 }
 
 /** Single-turn JSON generation — parses and returns typed result */

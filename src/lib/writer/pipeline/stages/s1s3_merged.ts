@@ -163,7 +163,7 @@ export async function runStructureScenesMerged(
   const user = buildUser(input, genre, characters, world);
 
   // 병합 1콜 — 구조와 씬이 한 응답에 같이 나온다(접합부 위반이 구조적으로 소멸).
-  const raw = await generateJson<MergedRaw>(user, axisConfig, { systemInstruction: system, temperature: 0.7 });
+  const raw = await generateJson<MergedRaw>(user, axisConfig, { systemInstruction: system, temperature: 0.7, webSearch: true }); // #p4-websearch
   await logger.saveLlmCall('structureScenesMerged', {
     prompt: user,
     response: JSON.stringify(raw, null, 2),

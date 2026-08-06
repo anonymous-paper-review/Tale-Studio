@@ -123,6 +123,9 @@ export async function POST(req: Request) {
       normalizedHistory,
       `${contextPrefix}${message}`,
       0.7,
+      'chat',
+      // #p4-websearch: producer 는 오마쥬/레퍼런스 요청의 진입점 — 실제 작품 검색으로 접지.
+      { webSearch: true },
     )
 
     const { reply, extractedSettings } = parseExtractedSettings(text)

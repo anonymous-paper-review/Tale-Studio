@@ -56,6 +56,7 @@ acts의 proportion 합은 1.0이어야 함.`;
   const result = await generateJson<NarrativeStructure>(userPrompt, axisConfig, {
     systemInstruction,
     temperature: 0.6,
+    webSearch: true, // #p4-websearch: 스토리 축 — 오마쥬/실존 레퍼런스 접지
   });
 
   await logger.saveLlmCall('narrativeStructure', {

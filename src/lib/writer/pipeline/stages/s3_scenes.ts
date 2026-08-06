@@ -237,6 +237,7 @@ new_characters에도 기존 캐스트와 같은 깊이의 서사 속성(personal
   const result = await generateJson<Scenes>(userPrompt, axisConfig, {
     systemInstruction,
     temperature: 0.7,
+    webSearch: true, // #p4-websearch: 스토리 축 — 오마쥬/실존 레퍼런스 접지
   });
 
   await logger.saveLlmCall('scenes', {

@@ -29,6 +29,9 @@ export interface DispatchOptions {
   systemInstruction?: string;
   temperature?: number;
   maxTokens?: number;
+  // #p4-websearch: 프로바이더별 웹 검색 접지 — gemini(googleSearch)/claude(web_search 툴).
+  //   openai 는 후속(추론 계열의 검색 파라미터 계약 미확정). 스토리 축(s1/s3)부터 단계 확대.
+  webSearch?: boolean;
 }
 
 export async function generateJson<T>(
@@ -68,6 +71,7 @@ async function dispatchOnce<T>(
         modelName: cfg.model,
         systemInstruction: opts.systemInstruction,
         temperature: opts.temperature,
+        webSearch: opts.webSearch,
       });
     case 'claude':
       return claudeGenerateJson<T>(prompt, {

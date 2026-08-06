@@ -44,6 +44,8 @@ export interface GeminiCallOptions {
   systemInstruction?: string;
   expectJson?: boolean;
   temperature?: number;
+  // #p4-websearch: googleSearch 그라운딩 — 스토리 축(s1/s3)의 오마쥬/레퍼런스 접지.
+  webSearch?: boolean;
 }
 
 export async function geminiGenerate(
@@ -63,6 +65,8 @@ export async function geminiGenerate(
       responseMimeType: mime,
     },
     safetySettings: SAFETY_SETTINGS,
+    // #p4-websearch: googleSearch 그라운딩 (SDK 타입에 미등재 계열 — 런타임 계약은 API 소관).
+    ...(opts.webSearch ? ({ tools: [{ googleSearch: {} }] } as never) : {}),
   });
 
   let text = '';
