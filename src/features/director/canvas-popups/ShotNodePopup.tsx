@@ -14,6 +14,7 @@ import { HoverBeam } from '@/components/hover-beam'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
+import { useDebugPrompts } from '@/lib/use-debug-prompts'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { usePresetStorageStore } from '@/stores/preset-storage-store'
 import {
@@ -43,6 +44,9 @@ const MODEL_ORDER: VideoModelKey[] = [
 
 export function ShotNodePopup({ nodeId, data }: Props) {
   const closePopup = useDirectorCanvasStore((s) => s.closePopup)
+  // #debug-prompts: 관리자 소유 프로젝트에서만 원본 생성 풀 프롬프트(shots.prompt) 노출.
+  const debugProjectId = useDirectorCanvasStore((s) => s.projectId)
+  const debugPrompts = useDebugPrompts(debugProjectId)
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
   const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
   const generateVideoForShot = useDirectorCanvasStore(
@@ -184,6 +188,17 @@ export function ShotNodePopup({ nodeId, data }: Props) {
               />
             </HoverBeam>
           </Field>
+
+          {/* #debug-prompts — 관리자 프로젝트 한정: 이미지/영상 생성에 들어가는 원본 풀 프롬프트(읽기 전용).
+              위의 편집용 프롬프트(override)와 달리 파이프라인이 저장한 rich 프롬프트 원문이다
+              (derivedPrompt = writer sync v2 파생, prompt = legacy 폴백). */}
+          {debugPrompts && (data.derivedPrompt || data.prompt) ? (
+            <Field label="원본 생성 프롬프트 (debug)">
+              <pre className="max-h-48 w-full select-text overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted p-3 font-mono text-[11px] leading-relaxed text-muted-foreground scrollbar-thin">
+                {data.derivedPrompt || data.prompt}
+              </pre>
+            </Field>
+          ) : null}
 
           {/* Reference images */}
           <Field label={`참고 이미지 (${data.referenceImages.length}장)`}>

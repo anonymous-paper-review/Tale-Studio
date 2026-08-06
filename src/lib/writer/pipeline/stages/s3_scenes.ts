@@ -1,4 +1,5 @@
 // S3: 씬 브레이크다운, 감정 비트, 정보 비대칭
+import { displayNameOf, humanizeSlug } from '@/lib/display-name';
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { computeSceneBudget, renderBudgetBlock, validateSceneBudget } from '@/lib/writer/pipeline/budget';
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
@@ -17,9 +18,10 @@ export function mergeOpenCast(prev: Characters, scenes: Scenes): Characters {
     if (!n.id || existing.has(n.id)) continue; // 빈 id / 기존 slug 충돌 → 기존 행 사용
     existing.add(n.id);
     // 서사 속성은 s3 반환값 우선(#opencast-arc 2026-07-21) — 미반환 필드만 빈 기본값.
+    // name: 모델이 이름을 비우거나 slug 를 되풀이하면(#opencast-name) 사람이 읽는 표기로 폴백.
     fresh.push({
       id: n.id,
-      name: n.name,
+      name: displayNameOf(n.name, n.id),
       role: n.role ?? 'supporting',
       personality: Array.isArray(n.personality) ? n.personality.filter((p) => typeof p === 'string') : [],
       arc: {
@@ -55,7 +57,9 @@ export function mergeOpenWorld(prev: BackgroundContract | undefined, scenes: Sce
     const key = loc.toLowerCase();
     if (known.has(key) || seen.has(key)) continue; // producer/이미추가분에 있음 → skip(불변)
     seen.add(key);
-    fresh.push({ id: loc, name: loc, description: '' }); // writer-added, 최소 필드
+    // writer-added, 최소 필드. name 은 표시용이라 slug 형이면 humanize(#opencast-name —
+    //   한국어 지명 등 비슬러그는 무변형. id 는 조인 키라 그대로 둔다).
+    fresh.push({ id: loc, name: humanizeSlug(loc), description: '' });
   }
   if (!fresh.length) return base;
   return { ...base, locations: [...base.locations, ...fresh] };
@@ -149,6 +153,8 @@ scene_actions:
 - 기존 캐스트만으로 스토리를 전개할 수 있으면 새 인물을 만들지 말 것 — new_characters는 빈 배열.
 - **스토리 전개상 꼭 필요한 새 인물만** new_characters에 추가하고, 그 새 slug를 등장 씬의
   characters_in_scene에도 쓴다. 새 slug는 기존 캐스트 slug와 절대 중복되지 않게 snake_case로 만든다.
+- 새 slug는 서술적으로 짓는다(예: masked_pursuer — char_1 같은 번호식 금지). name에는 slug가 아니라
+  **스토리와 같은 언어의 실제 표시 이름**을 채운다(예: "복면의 추적자". 화면에 그대로 노출된다).
 - 카드(기존 캐스트)에 자리가 없는 인물을 억지로 등장시키지 말 것. 등장은 스토리가 결정한다.
 
 오픈 로케이션 규칙 (중요 — 캐스트와 동일 원칙):

@@ -11,6 +11,7 @@
 //
 // id: scene/shot 은 main 포맷(sc_01 / sh_01_01)으로 정규화, character 는 writer snake_case 유지
 //     → shots.characters 와 characters.character_id 가 동일 id 공간(referential 정합).
+import { humanizeSlug } from '@/lib/display-name'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { writerSceneIdToMain, writerShotIdToMain } from '@/lib/writer/adapters'
 import { reallocateShotDurations } from '@/lib/writer/pipeline/util/duration_reallocation'
@@ -160,7 +161,8 @@ export async function persistAssetsToDb(
           return {
             project_id: projectId,
             location_id: loc.id,
-            name: loc.id,
+            // 표시 이름 — slug 형 id 는 humanize(#opencast-name 2026-08-06: "location_1" 노출 방지).
+            name: humanizeSlug(loc.id),
             time_of_day: '',
             style_description: en,
             lighting_sources: loc.lighting_sources ?? [],

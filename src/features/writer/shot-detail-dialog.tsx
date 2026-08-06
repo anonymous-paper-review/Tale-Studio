@@ -29,6 +29,8 @@ import {
   SelectTrigger,
 } from '@/components/ui/select'
 import { useWriterStore } from '@/stores/writer-store'
+import { useProjectStore } from '@/stores/project-store'
+import { useDebugPrompts } from '@/lib/use-debug-prompts'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import type { ShotType } from '@/types'
 
@@ -67,6 +69,9 @@ export function ShotDetailDialog({
 }: ShotDetailDialogProps) {
   const shot = useWriterStore((s) => s.shots.find((x) => x.shotId === shotId))
   const shots = useWriterStore((s) => s.shots)
+  // #debug-prompts: 관리자 소유 프로젝트에서만 생성 풀 프롬프트 노출(서버 판정).
+  const projectId = useProjectStore((s) => s.projectId)
+  const debugPrompts = useDebugPrompts(projectId)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const updateShot = useWriterStore((s) => s.updateShot)
   const deleteShot = useWriterStore((s) => s.deleteShot)
@@ -314,6 +319,21 @@ export function ShotDetailDialog({
               누르면 현재 편집 내용을 저장하고 그 느낌으로 패널을 다시 그립니다.
             </p>
           </div>
+
+          {/* #debug-prompts — 관리자 프로젝트 한정: 이미지 생성에 실제로 들어가는 풀 프롬프트. */}
+          {debugPrompts && shot.prompt ? (
+            <div className="space-y-1.5">
+              <label className="flex items-center gap-1.5 text-sm font-medium">
+                생성 프롬프트
+                <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-warning">
+                  debug
+                </Badge>
+              </label>
+              <pre className="max-h-48 select-text overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted p-3 font-mono text-[11px] leading-relaxed text-muted-foreground scrollbar-thin">
+                {shot.prompt}
+              </pre>
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter className="items-center">
