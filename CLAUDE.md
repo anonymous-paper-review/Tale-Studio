@@ -14,6 +14,7 @@
 
 - `.claude/vault/` — 세션별 실측·삽질·결정 기록 (포맷: `_TEMPLATE.md`). 같은 주제를 다시 팔 때 먼저 검색
 - `.claude/vault/2026-08-05-truth-source-cleanup.md` — "문서가 왜 다 없지?"·실험 규칙/대청소의 근거가 궁금하면 먼저
+- `.claude/vault/2026-08-06-previz-verifier.md` — previz 검증기/품질 채점을 다시 팔 때 먼저 (변별력 실측·판정 3원칙·보류 축의 이유)
 
 ## 실험
 
