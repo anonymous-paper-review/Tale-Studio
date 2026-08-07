@@ -109,6 +109,35 @@ treatment 프롬프트만 강화 —
 텍스트 금지 조항이 기술 라벨을 정식 허용하도록 정합화. 회귀 tests/writer-previz-enrich.test.ts
 (8 cases). 플래그 없이 상시 적용 — 러프 재생성은 사용자 트리거라 폭발 반경 통제됨.
 
+## 6c. ② END 명시 A/B → 진폭 감사 → 영상 모션 계약 피벗 (2026-08-07 오후)
+
+**② END A/B**(하네스, 모션 최다 청크 2개): dynamicSpec 을 "완료된 프레임의 모습"으로 컴파일해
+END 서술 교체. large 모션(PULLS·RAPPEL·카메라 전진)에선 완주가 뚜렷해졌으나 사용자 평가는
+"전후 차이 크지 않음" → 진폭 감사로 원인 확정: **19샷 중 large 보유 5샷(26%)**, 카메라
+14/19 정적·드리프트, 비정적 세기 minimal 10/14. 저진폭 샷의 END≈START 는 설계에 충실한 것.
+② 이관은 보류(효과가 large 샷에 국한 + end_state 데이터 부재가 상한). 기록: 상류 v4
+end_state 명시 산출이 근본 처방(후속 후보).
+
+**사용자 재정의된 진짜 문제**: 영상이 DIRECTION 을 안 지킴 — static 인데 움직임 / 화살표
+반대 / 샷 시간 대비 변화 부족. 코드 감사로 구조 원인 확정:
+- persist 가 모션을 전혀 운반 안 함(shots 에 dynamic 계열 컬럼 0)
+- 영상 프롬프트 = 첫 프레임 **정적** 묘사문(shots.prompt) — 모션 동사·방향·정지 계약 부재
+- camera_config 는 기본 0 → cameraToText 빈 문자열
+- START/END 수렴 지시문이 "one continuous camera and subject movement"를 **무조건 전제** —
+  정지 샷에 이동을 지어내게 부추김
+즉 previz DIRECTION 이 지시하는 대상(영상)이 DIRECTION 을 한 글자도 못 받고 있었다.
+
+**P0+P1 이관(#motion-contract, 사용자 승인)**:
+- DDL: shots.dynamic_spec jsonb (additive) + 어셈블러·분할(첫 자식만)·persist 대칭 운반.
+- compileMotionContract(dyn, duration): 결정론 계약문 — LOCKED/드리프트/이동별 화면 기준
+  양방향 명시(pan 중의성 제거), 세기·속도, "over the full Ns"+완주 조항, 금지절, 정지 샷의
+  미세 생명감 조항(얼어붙음 방지). buildVideoPrompt 맨 앞 주입(캡 500→950/1200/1400).
+- P0: 정지 계약 시 START/END 지시문 "hold this same composition" 분기.
+- 라우트: shots.dynamic_spec 우선, 구버전은 state.shotDesign design_ref 조인 폴백(공용 로더
+  lib/writer/shot-design-state.ts 로 추출). replay/recovery 는 스냅샷 재사용이라 스킵.
+- 레거시 불변: dynamicSpec 미해석 시 기존 프롬프트와 동일(스냅샷 테스트 유지).
+- 회귀: tests/motion-contract.test.ts 11 cases.
+
 ## 7. 다음 단계
 
 - **제품 배선 ON 은 보류 권고** — 파일럿이 방향은 긍정이나 N=4 로 underpowered.

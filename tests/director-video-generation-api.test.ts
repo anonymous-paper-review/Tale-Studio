@@ -30,8 +30,10 @@ function request(extra: Record<string, unknown> = {}) {
   return new Request('http://test/api/director/generate-video', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projectId: 'project-1', shotId: 'shot-1', prompt: 'A scene', idempotencyKey: key, ...extra }) })
 }
 function query(data: unknown) {
-  const value = { select: vi.fn(), eq: vi.fn(), is: vi.fn(), contains: vi.fn(), maybeSingle: vi.fn() }
+  // order/limit: #motion-contract state 폴백(writer_runs 조회)의 체인 지원 — await 시 data 없음 = 빈 결과.
+  const value = { select: vi.fn(), eq: vi.fn(), is: vi.fn(), contains: vi.fn(), maybeSingle: vi.fn(), order: vi.fn(), limit: vi.fn() }
   value.select.mockReturnValue(value); value.eq.mockReturnValue(value); value.is.mockReturnValue(value); value.contains.mockReturnValue(value)
+  value.order.mockReturnValue(value); value.limit.mockReturnValue(value)
   value.maybeSingle.mockResolvedValue({ data, error: null })
   return value
 }
@@ -355,6 +357,9 @@ describe('reserved replay recovery', () => {
     mocks.from
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
       .mockReturnValueOnce(query({ shot_id: 'shot-1' }))
+      .mockReturnValueOnce(query(null))
+      // #motion-contract: 신규 제출은 dynamic_spec 부재 시 writer_runs state 폴백을 1회 조회한다
+      //   (복구 POST 는 exactReplay 라 건너뜀 — 아래 2차 시퀀스엔 없음).
       .mockReturnValueOnce(query(null))
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
       .mockReturnValueOnce(query({ shot_id: 'shot-1' }))
