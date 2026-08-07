@@ -61,6 +61,33 @@ export interface RoughGridCell {
   end: string
 }
 
+// ── previz 정보 강화(#previz-enrich 2026-08-07 ①+③ — lab/viz-gap previz A/B 로 검증 후 이관) ──
+// previz↔viz 갭의 뿌리는 러프가 조명·초점·색 의도를 안 실어 viz 리페인트가 붙잡을 앵커가 없던 것.
+// ③ 스케치 자체에 빛(방향성 해칭)·초점(디테일 밀도)을 그리게 하고,
+// ① DIRECTION 행(유일한 텍스트 허용 행)에 손글씨 기술 라벨(KEY/카메라/FOCUS/색온도)을 얹는다.
+//   색온도는 흑백 previz 에 그림으로 못 실리므로 라벨이 유일한 운반 통로.
+// rich(staticSpec) 경로 전용 — fallback(DB) 은 재료가 없어 기존 그대로(실험과 동일 스코프).
+
+// key_direction → 그림자가 떨어지는 반대 방향(해칭 지시용)
+const SHADOW_OPPOSITE: Record<string, string> = {
+  left: 'the right', right: 'the left', top: 'below', bottom: 'above',
+  front: 'backward', back: 'forward',
+  top_left: 'the lower-right', top_right: 'the lower-left',
+  bottom_left: 'the upper-right', bottom_right: 'the upper-left',
+  side_left: 'the right', side_right: 'the left',
+  top_down: 'outward', overhead: 'outward', backlight: 'toward camera',
+}
+function shadowTarget(dir: string): string {
+  return SHADOW_OPPOSITE[dir.toLowerCase().trim().replace(/\s+/g, '_')] ?? 'the opposite side'
+}
+function colorTempWord(kelvin: unknown): string | null {
+  if (typeof kelvin !== 'number' || !Number.isFinite(kelvin)) return null
+  return kelvin < 4000 ? 'WARM' : kelvin <= 5500 ? 'NEUTRAL' : 'COOL'
+}
+function clipText(s: string, n: number): string {
+  return s.length > n ? `${s.slice(0, n)}…` : s
+}
+
 /** rich(shotDesign)/fallback(DB) 공용 — 기존 RoughStoryboardPromptInput 을 셀 서술로 요약. */
 export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: string): RoughGridCell {
   const s = input.spec?.staticSpec
@@ -107,6 +134,25 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
       ? 'the framed head is the blank egg-smooth wooden mannequin head with no face'
       : null
 
+  // ③ 스케치에 그릴 빛·초점(#previz-enrich) — 연필 해칭 = 그림자 방향, 디테일 밀도 = 초점/심도.
+  //   START 와 END 양쪽에 동일 적용(같은 조명 셋업) — viz 리페인트가 이 음영을 앵커로 보존한다.
+  const L = s?.lighting
+  const dof = s?.depth_of_field
+  const drawParts: string[] = []
+  if (L?.key_direction) {
+    drawParts.push(
+      `lit from ${words(L.key_direction)} — shade figures and ground with directional pencil hatching, cast shadows toward ${shadowTarget(L.key_direction)}${L.quality ? `, ${L.quality === 'hard' ? 'crisp hard-edged' : 'soft feathered'} shadow edges` : ''}`,
+    )
+  }
+  if (s?.framing?.focal_point) {
+    drawParts.push(
+      `draw ${clipText(focal, 60)} with the densest, sharpest line detail as the focal point${dof === 'shallow' ? '; keep the background loosely and vaguely indicated (shallow focus)' : dof === 'deep' ? '; keep foreground to background evenly detailed (deep focus)' : ''}`,
+    )
+  }
+  const drawLine = drawParts.length
+    ? `lighting and focus (draw these into the sketch): ${drawParts.join('; ')}`
+    : null
+
   const startParts = [
     `${size}, ${angle}, ${lens}mm, ${rule}`,
     figures || 'empty landscape, no figures',
@@ -114,6 +160,7 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
     layerLine || (setting ? `setting: ${setting}` : null),
     input.actionDescription ? `moment: ${stripColor(input.actionDescription)}` : null,
     `focal point: ${focal}`,
+    drawLine,
   ].filter(Boolean)
 
   // MOTION — DIRECTION 행의 화살표·라벨 재료 (camera + character motion).
@@ -134,13 +181,30 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   //   없으면 모델이 미세한 변화만 그리는 경향(실측). rich(intent) 우선, DB 폴백.
   const dur = input.spec?.intent?.duration_seconds ?? input.durationSeconds ?? null
   const durNote = typeof dur === 'number' && dur > 0 ? `${Math.round(dur)}` : null
-  const motion = motionParts.length
+  const motionBase = motionParts.length
     ? `${durNote ? `over this shot's full ${durNote}-second duration: ` : ''}${motionParts.join('; ')}`
     : 'static hold — no camera or figure movement'
 
-  const end = motionParts.length
+  // ① DIRECTION 여백의 손글씨 기술 라벨(#previz-enrich) — 조명 방향/질·카메라·초점·색온도.
+  //   DIRECTION 은 텍스트 허용 유일 행이라 의도의 "확인 표면"이자 색의 유일한 운반 통로.
+  const labels: string[] = []
+  if (L?.key_direction) labels.push(`KEY: ${words(L.key_direction)}${L.quality ? `, ${L.quality}` : ''}`)
+  const camLabel = [sizeCode, s?.lens_mm ? `${s.lens_mm}mm` : '', angle, dof ? `${dof} focus` : '']
+    .filter(Boolean)
+    .join(' ')
+  if (s && camLabel) labels.push(camLabel)
+  if (s?.framing?.focal_point) labels.push(`FOCUS: ${clipText(focal, 40)}`)
+  const kelvin = L?.color_temp_kelvin
+  const tempW = colorTempWord(kelvin)
+  if (tempW) labels.push(`${tempW} ${kelvin}K`)
+  const motion = labels.length
+    ? `${motionBase}. In addition to the motion arrows, letter these small handwritten technical labels in the DIRECTION frame's margins: ${labels.map((l) => `"${l}"`).join(', ')}`
+    : motionBase
+
+  const endBase = motionParts.length
     ? `the same shot after ${durNote ? `the full ${durNote} seconds of` : ''} the movement completes — ${motionParts.join('; ')} has fully finished. END must be clearly and visibly different from START: show how far ${durNote ? `${durNote} seconds` : 'the shot'} of this movement actually carries the figures and camera (changed poses, positions and framing), not a subtle variation`
     : 'nearly identical to START (static shot) — only a subtle natural settling'
+  const end = drawLine ? `${endBase}. Same ${drawLine}` : endBase
 
   return { shotId, start: startParts.join('. '), motion, end }
 }
@@ -210,5 +274,5 @@ ${GRID_STYLE}
 
 ${body}${empties}
 
-Within each column, the three frames depict the SAME camera setup, location, figures and props — continuity between START, DIRECTION and END must be obvious. START and DIRECTION are the same frozen instant (annotations are the only difference); motion progresses ONLY in END. Different columns are different shots and may differ. No text, captions or labels anywhere except the DIRECTION row's arrow labels.`
+Within each column, the three frames depict the SAME camera setup, location, figures and props — continuity between START, DIRECTION and END must be obvious. START and DIRECTION are the same frozen instant (annotations are the only difference); motion progresses ONLY in END. Different columns are different shots and may differ. No text, captions or labels anywhere except the DIRECTION row's annotations (motion arrow labels and the small handwritten technical margin labels requested per column).`
 }
