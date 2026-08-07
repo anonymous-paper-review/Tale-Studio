@@ -59,9 +59,39 @@ focal_point 393(샷별 자유서술). → 갭은 "데이터 미탑재"가 아니
 - 단위테스트: tests/facet-render.test.ts(renderRepaintCineLine), tests/storyboard-real-cineline.test.ts.
 - raw 판정 로그: lab/viz-gap/baseline-011fd4bd/results.json (gitignored).
 
-## 6. 다음 단계 (A/B — 비용/시간 발생, 사용자 승인 후)
+## 6. A/B 파일럿 (2026-08-07, 사용자 승인 후 실행)
 
-1. 측정 재설계: light_dir/color_temp/composition 오라클을 §3 대로 교체 + 재검증(음성대조).
-2. 011fd4bd 표본에 대해 treatment(시네 라인 주입) real 재생성(fal 과금) → 동일 rubric 채점.
-3. 판정: 신뢰 facet 4종 + 재설계 3종의 보존율이 주입 arm 에서 오르는가, 구도·포즈(시트 운반)
-   보존율이 안 떨어지는가(반증 축). 오르면 제품 배선 ON + 러프 카드에도 시네 뱃지 노출 검토.
+오라클 재설계(측정 §3 반영): 절대 판정 → **2AFC**(같은 샷의 baseline vs treatment 를 나란히 주고
+"어느 쪽이 이 의도를 더 실현?" A/B/tie, 위치는 샷별 결정론 무작위로 편향 상쇄) + **색온도는
+결정론 픽셀통계**(mean R−B, 의도 버킷 방향 근접도). 2AFC 는 절대 탐지보다 신뢰성이 높아, 측정
+검증에서 실패했던 light_dir 도 읽어낸다.
+
+생성: 011fd4bd, openai/gpt-image-2/edit, 러프 스트립 리페인트. 두 arm 은 프롬프트의 cine 라인
+유무만 다르고 레퍼런스·모델·크기 동일. **fal 이 ~3.5분/샷이라 15분 하네스 타임아웃에 걸려 6샷 중
+4샷만 완료(N=4)** — 이미지는 샷마다 디스크 저장돼 회수, manifest 재구성 후 채점.
+
+| facet | treat승 | base승 | tie | 판정 |
+|---|---|---|---|---|
+| depth_of_field | 3 | 0 | 1 | ✅ 주입 우세 |
+| light_direction | 3 | 0 | 1 | ✅ 주입 우세 (측정 검증서 절대판정 실패했던 채널 — 2AFC 가 읽음) |
+| light_quality | 3 | 1 | 0 | ✅ 주입 우세 |
+| color_temp (픽셀) | 3 | 1 | 0 | ✅ 주입 우세 (결정론 — 가장 견고) |
+| camera_angle | 1 | 0 | 3 | △ 대부분 tie (시트가 이미 운반) |
+| focal_point | 1 | 1 | 2 | = 평평 |
+| **composition (반증축)** | 1 | **0** | 3 | ✅ baseline 승 0 — 시네 라인이 시트 구도·포즈 안 망침 |
+
+**판정: 가설 방향적 지지.** 새던 채널(DoF·조명방향·조명질·색온도) 전부 주입 arm 우세이고,
+반증축(구도·포즈)에서 baseline 승 0 → 시트 보존 유지. 육안 확증: sh_02_11 treatment 는
+baseline 대비 뚜렷한 teal 그레이드 + 배경 소프트닝(얕은 DoF).
+
+**한계(과대해석 금지):** ① N=4 (타임아웃) — 방향성 신호지 통계적 결론 아님. ② us_cartoon
+스타일 프로젝트 — 실사 스타일은 다를 수 있음. ③ 2AFC 가 run 간 일부 불안정(composition 이
+tie↔treatment 진동). ④ focal·angle 은 효과 평평.
+
+## 7. 다음 단계
+
+- **제품 배선 ON 은 보류 권고** — 파일럿이 방향은 긍정이나 N=4 로 underpowered.
+  확정하려면 (a) 생성을 2~3샷 배치로 쪼개 타임아웃 회피, N=12~16 으로 재실행,
+  (b) 실사 스타일 프로젝트 1개 교차검증. 그 후 배선 ON + 러프 카드 시네 뱃지 노출 검토.
+- 산출물(배선)은 §5 그대로 OFF 유지 — 라이브 무변경. A/B 하네스만 lab/(gitignored).
+- 재설계된 2AFC+픽셀 오라클은 확정 배치에 재사용.
