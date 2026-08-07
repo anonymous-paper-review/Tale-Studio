@@ -156,7 +156,19 @@ export type VideoNodeData = {
   final: boolean
   /** 마더 변경 후 미재생성 상태 */
   stale: boolean
+  /** 모션 계약 준수 판정(#adherence P2) — 완료 후 첫/끝 프레임 검사 결과. null=미검사. */
+  adherence?: VideoAdherence | null
   [key: string]: unknown
+}
+
+/** 영상 모션 준수 판정(video_clips.adherence 와 동형). */
+export interface VideoAdherence {
+  status: 'ok' | 'over_motion' | 'under_motion' | 'direction_mismatch' | 'skipped'
+  reason?: string
+  observed?: string
+  meanDiff?: number
+  cameraStatic?: boolean
+  checkedAt?: string
 }
 
 // ─── Asset Node (파생 — Artist Asset Storage 시각화) ─────────────────────────

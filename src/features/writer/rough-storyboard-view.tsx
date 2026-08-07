@@ -260,6 +260,21 @@ export function RoughStoryboardView() {
             return next
           })
         }
+        // START 정합 검사(#adherence P2) — 잡의 샷들이 전부 안착하면 best-effort 로 판정 요청 후
+        //   결과(배지)를 리로드로 회수. 실패는 조용히 무시(검사가 생성 UX 를 막지 않는다).
+        const runAdherence = async (ids: string[]) => {
+          try {
+            const res = await fetch('/api/writer/rough-adherence', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ projectId, shotIds: ids }),
+            })
+            const body = (await res.json().catch(() => null)) as { checked?: number } | null
+            if (res.ok && (body?.checked ?? 0) > 0) await loadProject()
+          } catch {
+            /* best-effort */
+          }
+        }
         const convergeJob = async (jobId: string, jobShotIds: string[]) => {
           const pollOk = await pollGenerationJob(jobId)
             .then(() => true)
@@ -277,7 +292,10 @@ export function RoughStoryboardView() {
             await loadProject()
             const settled = jobShotIds.filter(isDone)
             clearShots(settled)
-            if (settled.length === jobShotIds.length) return
+            if (settled.length === jobShotIds.length) {
+              void runAdherence(jobShotIds) // 완료 배치 정합 검사 (fire-and-forget, 클라 생존 중)
+              return
+            }
             if (jobFailed) {
               // 잡 실패 확정 — 미완 샷을 실패 표기(재시도 버튼 노출)하고 종료.
               setPanelJobs((prev) => {
@@ -782,6 +800,16 @@ export function RoughStoryboardView() {
                             {shot.actionDescription}
                           </p>
                           {/* #8: 대사 표시 제거 — 파이프라인이 대사 슬롯에 상황 요약을 채워 실제 대사가 아님(2026-07-09). */}
+                          {/* #adherence P2: START↔설명 불일치 배지 — 팝업의 "저장 후 재생성"으로 유도. */}
+                          {shot.roughStoryboard?.adherence?.status === 'mismatch' ? (
+                            <p
+                              className="flex items-center gap-1 text-xs text-warning"
+                              title={shot.roughStoryboard.adherence.reason ?? undefined}
+                            >
+                              <AlertCircle className="size-3.5 shrink-0" />
+                              설명과 다른 그림일 수 있어요 — 카드를 눌러 재생성해 보세요
+                            </p>
+                          ) : null}
                         </div>
                       </article>
                     )

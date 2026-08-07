@@ -62,6 +62,14 @@ export interface RoughStoryboardImage {
   }
   /** 이 세트가 잘려 나온 원본 그리드/스트립 이미지 (디버그·재현용). */
   gridUrl?: string
+  /** START↔설명 정합 검사(#adherence P2) — 생성 완료 후 VLM 판정. mismatch = 카드 배지. */
+  adherence?: {
+    status: 'ok' | 'mismatch'
+    reason?: string
+    checkedAt: string
+    /** 판정 대상 generatedAt — 재생성 시 재검사 트리거의 기준 */
+    checkedFor: number
+  }
 }
 
 export interface Shot {
