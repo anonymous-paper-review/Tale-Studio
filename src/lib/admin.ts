@@ -1,3 +1,5 @@
+import { supabaseAdmin } from '@/lib/supabase/admin'
+
 // 관리자 판별 (서버 전용) — 디버그 표면(#debug-prompts 2026-08-06)의 노출 게이트.
 //   "관리자 계정이 만든 프로젝트"에서만 생성 풀 프롬프트 등 내부 정보를 팝업에 노출한다.
 //   판정은 항상 서버(route)에서 하고 클라이언트에는 boolean 플래그만 내려보낸다.
@@ -27,8 +29,6 @@ export async function isAdminOwnedProject(
   projectId: string,
 ): Promise<boolean> {
   if (!isAdminEmail(user.email)) return false
-  // 순환 의존 방지용 지연 import — admin.ts 는 판별 상수 모듈로도 쓰인다.
-  const { supabaseAdmin } = await import('@/lib/supabase/admin')
   const { data: project } = await supabaseAdmin
     .from('projects')
     .select('workspace_id')

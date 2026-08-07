@@ -321,17 +321,19 @@ export function ShotDetailDialog({
             </p>
           </div>
 
-          {/* #debug-prompts — 관리자 프로젝트 한정: 이미지 생성에 실제로 들어가는 풀 프롬프트. */}
-          {debugPrompts && shot.prompt ? (
+          {/* #debug-prompts — 관리자 프로젝트 한정: 이 샷의 소스(저장된 생성 프롬프트).
+              구버전/재생성 프로젝트는 shots.prompt 가 비어 액션 서술로 폴백(그때 라벨 명시).
+              모델에 실제 전송된 최종본은 아래 DebugPromptTrace 가 잡 스냅샷에서 보여준다. */}
+          {debugPrompts ? (
             <div className="space-y-1.5">
               <label className="flex items-center gap-1.5 text-sm font-medium">
-                소스 프롬프트
+                {shot.prompt ? '소스 프롬프트' : '소스 (액션 — 저장된 프롬프트 없음)'}
                 <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-warning">
                   debug
                 </Badge>
               </label>
               <pre className="max-h-48 select-text overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted p-3 font-mono text-[11px] leading-relaxed text-muted-foreground scrollbar-thin">
-                {shot.prompt}
+                {shot.prompt || shot.actionDescription || '(비어 있음)'}
               </pre>
             </div>
           ) : null}
