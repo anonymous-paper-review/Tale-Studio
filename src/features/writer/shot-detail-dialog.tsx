@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
+import { DebugPromptTrace } from '@/components/debug-prompt-trace'
 import { useDebugPrompts } from '@/lib/use-debug-prompts'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import type { ShotType } from '@/types'
@@ -324,7 +325,7 @@ export function ShotDetailDialog({
           {debugPrompts && shot.prompt ? (
             <div className="space-y-1.5">
               <label className="flex items-center gap-1.5 text-sm font-medium">
-                생성 프롬프트
+                소스 프롬프트
                 <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-warning">
                   debug
                 </Badge>
@@ -334,6 +335,9 @@ export function ShotDetailDialog({
               </pre>
             </div>
           ) : null}
+
+          {/* #debug-prompts 확장: 러프 그리드 잡에 실제 전송된 최종 프롬프트(시트 지시·해칭·라벨 포함). */}
+          <DebugPromptTrace projectId={projectId} shotId={shot.shotId} kinds={['shot_rough_storyboard']} />
         </div>
 
         <DialogFooter className="items-center">

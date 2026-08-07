@@ -14,6 +14,7 @@ import { HoverBeam } from '@/components/hover-beam'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
+import { DebugPromptTrace } from '@/components/debug-prompt-trace'
 import { useDebugPrompts } from '@/lib/use-debug-prompts'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { usePresetStorageStore } from '@/stores/preset-storage-store'
@@ -199,6 +200,13 @@ export function ShotNodePopup({ nodeId, data }: Props) {
               </pre>
             </Field>
           ) : null}
+
+          {/* #debug-prompts 확장: 실사 스토리보드 잡에 실제 전송된 최종 프롬프트(리페인트 지시·연속성 포함). */}
+          <DebugPromptTrace
+            projectId={debugProjectId}
+            shotId={data.writerShotId}
+            kinds={['shot_storyboard', 'storyboard_real_grid']}
+          />
 
           {/* Reference images */}
           <Field label={`참고 이미지 (${data.referenceImages.length}장)`}>

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { HoverBeam } from '@/components/hover-beam'
 import { Separator } from '@/components/ui/separator'
+import { DebugPromptTrace } from '@/components/debug-prompt-trace'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
@@ -435,6 +436,14 @@ export function VideoNodePopup({ nodeId, data }: Props) {
             삭제
           </Button>
         </div>
+
+        {/* #debug-prompts 확장: 이 샷의 영상 잡에 실제 전송된 최종 프롬프트(모션 계약 포함) —
+            관리자 소유 프로젝트에서만 렌더(컴포넌트 내부 게이트). */}
+        <DebugPromptTrace
+          projectId={projectId}
+          shotId={motherNode && isShotData(motherNode.data) ? motherNode.data.writerShotId : null}
+          kinds={['shot_video']}
+        />
       </DialogContent>
     </Dialog>
   )
