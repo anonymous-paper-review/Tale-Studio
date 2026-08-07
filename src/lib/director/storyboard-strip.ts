@@ -113,9 +113,15 @@ export async function composeRoughReferenceGrid(
 /** 4샷 그리드 일괄 리페인트 프롬프트 — strip 문안의 grid 일반화 (#real-grid 실험 문안 그대로). */
 export function buildRealGridPrompt(
   shotCount: number,
-  opts: { characterRefCount: number; hasStyleRef: boolean },
+  opts: {
+    characterRefCount: number
+    hasStyleRef: boolean
+    /** #viz-gap 실험 arm: 컬럼(=샷) 순서대로의 시네 라인. 연필이 못 옮기는 조명/초점/DoF/렌즈/색만.
+     *  생략(기본)이면 현행 프롬프트 그대로 — 라이브 라우트 무변경. renderRepaintCineLine 산출물. */
+    cineLines?: (string | null | undefined)[]
+  },
 ): string {
-  const { characterRefCount, hasStyleRef } = opts
+  const { characterRefCount, hasStyleRef, cineLines } = opts
   const target = hasStyleRef
     ? 'finished, final-quality film frames'
     : 'finished photorealistic live-action cinematic film frames'
@@ -138,8 +144,22 @@ export function buildRealGridPrompt(
           `- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.`,
         ]
       : []),
+    ...renderGridCineBlock(cineLines),
     `- No text anywhere except row 2's arrow labels.`,
   ].join('\n')
+}
+
+/** 컬럼별 시네 라인 블록(#viz-gap) — 연필 시트가 못 보여주는 빛/초점/렌즈/색만 실현하라고 지시.
+ *  구도·포즈는 위의 "레퍼런스 컬럼 그대로" 지시가 지배하므로 여기선 손대지 말라고 못박는다. */
+function renderGridCineBlock(cineLines?: (string | null | undefined)[]): string[] {
+  const entries = (cineLines ?? [])
+    .map((line, i) => ({ i, line: (line ?? '').trim() }))
+    .filter((e) => e.line.length > 0)
+  if (!entries.length) return []
+  return [
+    `- Per-column cinematography — realize these lighting, focus, lens and color intents that the pencil sheet cannot show. Apply ONLY light/shadow, depth-of-field, focus, lens perspective and color grade; do NOT change each column's framing, composition or figure poses:`,
+    ...entries.map((e) => `    · Column ${e.i + 1}: ${e.line}`),
+  ]
 }
 
 /**
@@ -148,9 +168,14 @@ export function buildRealGridPrompt(
  */
 export function buildRealStripPrompt(
   shotPrompt: string,
-  opts: { characterRefCount: number; hasStyleRef: boolean },
+  opts: {
+    characterRefCount: number
+    hasStyleRef: boolean
+    /** #viz-gap 실험 arm: 이 샷의 시네 라인(비운반 채널만). 생략 시 현행 프롬프트 그대로. */
+    cineLine?: string | null
+  },
 ): string {
-  const { characterRefCount, hasStyleRef } = opts
+  const { characterRefCount, hasStyleRef, cineLine } = opts
   const target = hasStyleRef
     ? 'finished, final-quality film frames'
     : 'finished photorealistic live-action cinematic film frames'
@@ -177,6 +202,11 @@ export function buildRealStripPrompt(
         ]
       : []),
     `- Shot description: ${shotPrompt}`,
+    ...(cineLine && cineLine.trim()
+      ? [
+          `- Cinematography — realize these lighting, focus, lens and color intents the pencil cannot show; apply them WITHOUT changing framing, composition or poses: ${cineLine.trim()}`,
+        ]
+      : []),
     `- No text anywhere except the middle panel's arrow labels.`,
   ]
   return lines.join('\n')
