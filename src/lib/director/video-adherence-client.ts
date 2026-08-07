@@ -2,6 +2,7 @@
 //   서버리스에 ffmpeg 이 없어 프레임 추출은 브라우저가 한다: 완료된 영상의 첫/끝 프레임을
 //   <video>+canvas 로 캡처해 서버 판정 라우트로 보낸다. 전 과정 best-effort —
 //   CORS taint/디코드 실패/판정 실패 어느 것도 생성 플로우를 막지 않는다(null 반환).
+import { fetchDebugPrompts } from '@/lib/use-debug-prompts'
 import type { VideoAdherence } from '@/types/director'
 
 const CAPTURE_WIDTH = 512
@@ -79,13 +80,16 @@ export async function captureVideoFrames(
   }
 }
 
-/** 캡처 → 서버 판정 → 판정 반환 (실패 null). 노드 반영은 호출부(store)가 한다. */
+/** 캡처 → 서버 판정 → 판정 반환 (실패 null). 노드 반영은 호출부(store)가 한다.
+ *  관리자 소유 프로젝트 한정(사용자 결정 2026-08-07) — 비관리자는 캡처 비용도 쓰지 않고 즉시 null
+ *  (서버 라우트에도 같은 권위 게이트가 있다 — 이건 헛작업 방지용). */
 export async function runVideoAdherence(input: {
   projectId: string
   writerShotId: string
   videoClipId: string
   videoUrl: string
 }): Promise<VideoAdherence | null> {
+  if (!(await fetchDebugPrompts(input.projectId))) return null
   const frames = await captureVideoFrames(input.videoUrl)
   if (!frames) return null
   try {

@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
+import { isAdminOwnedProject } from '@/lib/admin'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { directionExpectationText, judgeMotionByDiff, motionExpectation } from '@/lib/adherence/core'
 import { judgeDirection, meanFrameDiff } from '@/lib/adherence/vision'
@@ -39,6 +40,10 @@ export async function POST(req: Request) {
     const { projectId, writerShotId, videoClipId, firstFrame, lastFrame } = parsed.data
     if (!(await userOwnsProject(projectId, user.id))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    // 관리자 소유 프로젝트 한정(사용자 결정 2026-08-07) — 일반 사용자는 조용한 skip(200).
+    if (!(await isAdminOwnedProject(user, projectId))) {
+      return NextResponse.json({ status: 'skipped', reason: 'admin only' })
     }
 
     // 클립 소유 확인 (다른 샷/프로젝트의 클립에 기록 방지)

@@ -2,9 +2,8 @@
 //   debugPrompts: 요청자가 관리자이고 그 관리자가 이 프로젝트의 소유자(workspace owner)일 때만 true.
 //   판정 근거(이메일·소유 체인)는 서버에 남고 클라이언트는 boolean 만 받는다.
 import { NextResponse } from 'next/server'
-import { isAdminEmail } from '@/lib/admin'
+import { isAdminOwnedProject } from '@/lib/admin'
 import { getUser } from '@/lib/supabase/auth'
-import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -16,22 +15,9 @@ export async function GET(req: Request) {
       return NextResponse.json({ debugPrompts: false })
     }
     const user = await getUser()
-    if (!user || !isAdminEmail(user.email)) {
-      return NextResponse.json({ debugPrompts: false })
-    }
-    // 소유 체인: projects.workspace_id → workspaces.owner_id (projects 에 user 컬럼 없음).
-    const { data: project } = await supabaseAdmin
-      .from('projects')
-      .select('workspace_id')
-      .eq('id', projectId)
-      .maybeSingle()
-    if (!project?.workspace_id) return NextResponse.json({ debugPrompts: false })
-    const { data: ws } = await supabaseAdmin
-      .from('workspaces')
-      .select('owner_id')
-      .eq('id', project.workspace_id)
-      .maybeSingle()
-    return NextResponse.json({ debugPrompts: ws?.owner_id === user.id })
+    if (!user) return NextResponse.json({ debugPrompts: false })
+    // debugPrompts = "관리자 소유 프로젝트" 플래그 — 디버그 프롬프트 + 정합 검사(#adherence)가 공유.
+    return NextResponse.json({ debugPrompts: await isAdminOwnedProject(user, projectId) })
   } catch {
     return NextResponse.json({ debugPrompts: false })
   }

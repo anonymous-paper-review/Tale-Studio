@@ -16,3 +16,29 @@ export function isAdminEmail(email: string | null | undefined): boolean {
     .filter(Boolean)
   return new Set([...DEFAULT_ADMIN_EMAILS, ...fromEnv]).has(email.trim().toLowerCase())
 }
+
+/**
+ * "관리자 소유 프로젝트" 판별 — 관리자 이메일 && 프로젝트 워크스페이스 소유자가 본인.
+ * 디버그 프롬프트(#debug-prompts)와 정합 검사(#adherence P2)가 같은 게이트를 공유한다.
+ * 소유 체인: projects.workspace_id → workspaces.owner_id (projects 에 user 컬럼 없음).
+ */
+export async function isAdminOwnedProject(
+  user: { id: string; email?: string | null },
+  projectId: string,
+): Promise<boolean> {
+  if (!isAdminEmail(user.email)) return false
+  // 순환 의존 방지용 지연 import — admin.ts 는 판별 상수 모듈로도 쓰인다.
+  const { supabaseAdmin } = await import('@/lib/supabase/admin')
+  const { data: project } = await supabaseAdmin
+    .from('projects')
+    .select('workspace_id')
+    .eq('id', projectId)
+    .maybeSingle()
+  if (!project?.workspace_id) return false
+  const { data: ws } = await supabaseAdmin
+    .from('workspaces')
+    .select('owner_id')
+    .eq('id', project.workspace_id)
+    .maybeSingle()
+  return ws?.owner_id === user.id
+}

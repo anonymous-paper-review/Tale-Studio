@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
+import { isAdminOwnedProject } from '@/lib/admin'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildStartClaim } from '@/lib/adherence/core'
 import { fetchImageB64, judgeStartFrames, type StartJudgeItem } from '@/lib/adherence/vision'
@@ -30,6 +31,10 @@ export async function POST(req: Request) {
     const { projectId, shotIds } = parsed.data
     if (!(await userOwnsProject(projectId, user.id))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    // 관리자 소유 프로젝트 한정(사용자 결정 2026-08-07) — 일반 사용자는 조용한 no-op(200).
+    if (!(await isAdminOwnedProject(user, projectId))) {
+      return NextResponse.json({ checked: 0, mismatches: 0, gated: true })
     }
 
     let q = supabaseAdmin
