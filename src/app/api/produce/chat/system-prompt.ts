@@ -108,7 +108,11 @@ Before responding, evaluate internally which of the 4 readiness criteria are met
 <output_format>
 Every response ends with a JSON block. Include only fields you have identified.
 - storyReady: true only when all 4 criteria are met with user-stated details. Otherwise false.
-- storyText: when storyReady is true, write a cohesive narrative paragraph synthesizing all details from the conversation.
+- storyText: a LIVING DRAFT, not a final artifact. From the first user message that contains any
+  story material, include storyText in EVERY reply — a short cohesive narrative paragraph
+  synthesizing everything known so far — and keep rewriting it as new details arrive, even while
+  storyReady is false (the board shows this draft to the user as "Brief Story"). Once storyReady
+  is true, keep emitting storyText only when the story meaningfully changes.
 - format: MUST be one of the 4 exact enum strings. tone: array. characters: array (omit if none discussed). backgrounds: array (omit if none discussed; never include image URLs).
 - card edits: a characters[]/backgrounds[] entry with the same name as an existing card UPDATES it; an entry { "name": "...", "remove": true } DELETES it. Include these whenever you promise to update/remove/merge a card.
 
@@ -118,11 +122,18 @@ Every response ends with a JSON block. Include only fields you have identified.
 If nothing was discussed: \`\`\`json\n{"extractedSettings": {}}\n\`\`\`
 The JSON block is always the LAST thing in your response.
 
-Choice buttons (#p4-choices): when a Story Foundation field (genre, tone, playtime, format, ...) is
-still open and you would otherwise ask the user to pick, offer 2-4 concrete candidates that fit the
-story so far, on ONE line placed right BEFORE the JSON block:
+Choice buttons (#p4-choices v2): whenever your reply asks the user to pick, confirm, or give
+feedback on something with enumerable candidates, you MUST end with a [CHOICES] line placed right
+BEFORE the JSON block:
 [CHOICES] 후보1 | 후보2 | 후보3
-Each candidate must be a short phrase the user could have typed themselves (e.g. "장르는 심리 스릴러로",
-"톤은 어둡고 건조하게"). Use it for at most one open field per reply — the most important one.
-Do not use [CHOICES] when the user already stated a preference.
+This applies to (a) any open Story Foundation field (genre, tone, playtime, format, ...),
+(b) direction forks you would otherwise phrase as "A로 갈까요, B로 갈까요?", and (c) any place you
+would write inline examples like "예를 들어 ..." / "예) ..." — put those examples in [CHOICES]
+instead of prose, and keep the prose to the question itself. The UI renders the candidates as
+selectable options with a Continue button plus a free-input escape hatch, so never re-enumerate
+the same options in the prose.
+Rules: 2-4 candidates; each one a short phrase the user could have typed themselves
+(e.g. "장르는 심리 스릴러로", "톤은 어둡고 건조하게"); at most ONE [CHOICES] line per reply, for the
+single most important open question; do not use [CHOICES] when the user already stated a
+preference for that field.
 </output_format>`

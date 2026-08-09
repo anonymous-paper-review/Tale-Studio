@@ -18,7 +18,9 @@ const PRODUCER_WELCOME =
   '안녕하세요! 저는 당신의 AI 프로듀서예요. 만들고 싶은 이야기를 편하게 한 줄로 들려주세요. \n'
   + '장르, 주인공, 지금 떠오르는 한 장면, 무엇이든 좋아요! \n\n'
   + '예를 들어 "비 오는 도시, 기억을 잃은 형사의 하룻밤"를 말씀해주시면 캐릭터, 장소, 구조는 제가 함께 정리해 드릴게요. \n\n'
-  + '미리 작성한 스토리 파일이 있으면 아래 업로드 버튼으로 저에게 공유해주세요.'
+  + '미리 작성한 스토리 파일이 있으면 아래 업로드 버튼으로 저에게 공유해주세요. \n'
+  // #style-entry(#feedback 2026-08-07): 스타일 진입점 안내 — 버튼엔 첫 클릭 전까지 레이더 핑.
+  + '영상의 그림체는 아래 팔레트 버튼에서 언제든 고를 수 있어요.'
 
 
 export default function MeetingPage() {
@@ -61,20 +63,25 @@ export default function MeetingPage() {
   // 핸드오프는 탭 하단 버튼이 아니라 채팅이 맡는다(#handoff-to-chat 2026-07-31) — 게이트가
   //   충족되면 채팅에 제안 버튼이 뜨고, 누르면 그 문장이 채팅에 입력돼 전송된다. 채팅에 직접
   //   "Writer로 넘겨줘"라고 써도 같은 경로(global-chat-store)를 탄다.
-  const handoffOfferedRef = useRef(false)
+  // #handoff-suggestion-drop(2026-08-07): 원샷 ref 는 버그였다 — offerSuggestion 은 다른 제안
+  //   (특히 [CHOICES] 선택지)이 떠 있으면 조용히 무시하는데, canHandoff 가 뒤집히는 순간은
+  //   거의 항상 응답 직후 = 선택지가 떠 있는 순간이라 버튼이 영영 안 떴다. ref 대신 제안
+  //   슬롯(suggestion)이 빌 때마다 재시도한다. 스팸 방지는 offerSuggestion 의 dismissed-id
+  //   가드 몫 — 명시적 "나중에" 후에는 다시 뜨지 않고, 자동 내림(implicit) 후에는 다시 뜬다.
+  const activeSuggestion = useGlobalChatStore((s) => s.suggestion)
   useEffect(() => {
-    if (!projectId || !canHandoff || handoffOfferedRef.current) return
+    if (!projectId || !canHandoff || activeSuggestion) return
     const spec = handoffFrom('producer')
     if (!spec) return
-    handoffOfferedRef.current = true
     offerSuggestion({
       id: `handoff:producer:${projectId}`,
       stage: 'producer',
       content:
-        '필요한 항목이 모두 채워졌어요. Writer에게 넘기면 씬·샷 생성이 시작돼요.',
-      action: { kind: 'handoff', utterance: spec.utterance, label: spec.label },
+        '필요한 항목이 모두 채워졌어요. Writer를 호출하면 씬·샷 설계가 바로 시작돼요.',
+      // 라벨은 초대 프레임(#oiioii-handoff) — 실행하면 채팅에 ⇄ 초대 블록이 그려지고 넘어간다.
+      action: { kind: 'handoff', utterance: spec.utterance, label: 'Writer 호출하기' },
     })
-  }, [projectId, canHandoff, offerSuggestion])
+  }, [projectId, canHandoff, activeSuggestion, offerSuggestion])
 
   // 첫 진입(스토리·프로듀서 채팅 모두 비어있음)에만 프로듀서가 먼저 인사 + 입력창 포커스(빔).
   //   offerSuggestion 은 dismiss/중복 가드 내장 → 한 번만, 세션 재진입 시 재노출 안 함.

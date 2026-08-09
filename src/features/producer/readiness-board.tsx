@@ -14,23 +14,12 @@ import {
   AlertCircle,
   AtSign,
   Box,
-  Check,
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Film,
-  GalleryHorizontal,
-  ImageIcon,
-  Languages,
-  LayoutGrid,
-  Monitor,
   Mountain,
-  Palette,
+  Pencil,
   Trash2,
   Plus,
-  Tag,
   User,
   Wand2,
 } from 'lucide-react'
@@ -38,53 +27,23 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
-import { useProducerStore, type StyleAnchor } from '@/stores/producer-store'
+import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
-import type { BackgroundSource, CastArc, CastMember, CastMotivation, GateIssue, GateResult, EntityType } from '@/lib/producer-gate'
+import type { BackgroundSource, CastArc, CastMember, CastMotivation, GateIssue, GateResult } from '@/lib/producer-gate'
 import { isProducerBackgroundComplete } from '@/lib/producer-gate'
 import { depthLevelFromRuntime } from '@/lib/depth'
-import type { ProjectFormat } from '@/types'
 import { HOVER_RED_BORDER } from './interaction-styles'
 import { HoverBeam } from '@/components/hover-beam'
 import { cn } from '@/lib/utils'
 import { useModifierHeld } from '@/hooks/use-modifier-held'
-import { TagInput } from './tag-input'
 import { AgentFace } from '@/components/agent-face'
 import { STAGE_FACE_COLOR } from '@/lib/constants'
-
-const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [
-  { value: 'horizontal_16:9', label: '16:9 Horizontal' },
-  { value: 'vertical_9:16', label: '9:16 Vertical' },
-  { value: 'cinema_2.39:1', label: '2.39:1 Cinema' },
-  { value: 'square_1:1', label: '1:1 Square' },
-]
-
-const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
-  { value: 'ko', label: '한국어' },
-  { value: 'en', label: 'English' },
-  { value: 'ja', label: '日本語' },
-  { value: 'zh', label: '中文' },
-]
+import { ProducerQuestJournal, StoryFoundationBadges } from './quest-journal'
 
 // 카드 안 자동확장 textarea(외모/시각 설명)용 — 네이티브 스크롤바 대신 얇은 테마 스크롤바(#b5).
 //   max-h로 카드 폭주를 막고, 넘치면 얇은 썸만 보이게.
@@ -113,16 +72,12 @@ const ROLE_TOGGLE: [string, string][] = [
 // 카드 격자는 같은 행의 이웃과 높이가 동기화돼 짧은 항목 아래에 빈 공간이 남는다. 줄 목록은
 //   각 항목이 필요한 높이만 쓰고, 테두리는 목록 컨테이너가 한 번만 갖는다.
 const ROW_LIST = 'divide-y divide-border overflow-hidden rounded-xl border border-border bg-card/70'
-const ROW_LABEL =
-  'flex w-24 shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground'
 
 // 줄 안의 입력/선택 컨트롤 — 채워진 값은 테두리 없이 텍스트처럼 조용히 있고, hover·focus·열림
 //   이나 "아직 채워야 하는 필드"(FieldSlot needs)에서만 테두리·드롭다운 화살표가 드러난다.
 //   (#b2: 항상 떠 있는 선택 버튼이 유저에게 "골라야 한다"는 부담을 준다는 피드백)
 const QUIET_CONTROL =
   'border-transparent bg-transparent shadow-none dark:bg-transparent hover:border-input focus-visible:border-ring data-[state=open]:border-input group-data-[needs=true]/field:border-input'
-const QUIET_CHEVRON =
-  '[&>svg]:opacity-0 [&>svg]:transition-opacity hover:[&>svg]:opacity-60 focus-visible:[&>svg]:opacity-60 data-[state=open]:[&>svg]:opacity-60 group-data-[needs=true]/field:[&>svg]:opacity-60'
 
 /** 컨트롤 슬롯 — 아직 채워야 하는 필드면 조용한 컨트롤의 테두리를 드러낸다(group-data). */
 function FieldSlot({
@@ -192,13 +147,14 @@ const MENTION_BASE: Record<MentionVariant, string> = {
 }
 const MENTION_TONE: Record<MentionVariant, Record<MentionTone, string>> = {
   card: {
-    mentioned: 'border-sky-400/50 bg-sky-400/10 ring-2 ring-sky-400/70 shadow-lg shadow-sky-500/10',
+    // mention-flash: 점등 순간 1회 플래시(#feedback 2026-08-07) — @목록 선택·Ctrl+클릭·직접 타이핑 공통.
+    mentioned: 'mention-flash border-sky-400/50 bg-sky-400/10 ring-2 ring-sky-400/70 shadow-lg shadow-sky-500/10',
     pulse: 'animate-pulse border-success/50 bg-card/70 ring-2 ring-success/60',
     armed: 'cursor-copy border-sky-400/40 bg-card/70 ring-1 ring-sky-400/40',
     idle: 'border-border bg-card/70',
   },
   row: {
-    mentioned: 'bg-sky-400/10 ring-1 ring-inset ring-sky-400/60',
+    mentioned: 'mention-flash bg-sky-400/10 ring-1 ring-inset ring-sky-400/60',
     pulse: 'animate-pulse bg-success/10 ring-1 ring-inset ring-success/50',
     armed: 'cursor-copy ring-1 ring-inset ring-sky-400/30',
     idle: '',
@@ -269,389 +225,6 @@ function MentionableCard({
       {children}
     </div>
   )
-}
-
-/** 줄 오른쪽 끝 상태 표시 — 준비된 필드는 체크 하나로, 미완료면 사유를 그 자리에 적는다. */
-function RowStatus({
-  state,
-  issue,
-}: {
-  state: 'ready' | 'missing' | 'recommended'
-  issue?: GateIssue
-}) {
-  if (state === 'ready') {
-    return (
-      <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label="준비됨" />
-    )
-  }
-  const text = issue ? `${issue.label}${issue.detail ? ` · ${issue.detail}` : ''}` : '필요'
-  return (
-    <span
-      title={text}
-      className={cn(
-        'flex max-w-56 shrink-0 items-center gap-1 text-xs',
-        state === 'missing' ? 'text-destructive' : 'text-warning',
-      )}
-    >
-      <AlertCircle className="size-3.5 shrink-0" />
-      <span className="truncate">{text}</span>
-    </span>
-  )
-}
-
-/** Story Foundation 한 줄 — [아이콘+라벨] [컨트롤] [상태]. */
-function FieldRow({
-  icon,
-  label,
-  issue,
-  softIssue,
-  children,
-  mentionRef,
-  mentionLabel,
-}: {
-  icon: ReactNode
-  label: string
-  issue?: GateIssue
-  softIssue?: GateIssue
-  children: ReactNode
-  mentionRef: string
-  mentionLabel: string
-}) {
-  const state = issue ? 'missing' : softIssue ? 'recommended' : 'ready'
-  // C7: 필드가 채워져 'ready'로 전환되면 잠깐 펄스 하이라이트(채팅으로 채워질 때 시각 피드백).
-  //   상태 전환 감지는 set-state-in-render 패턴(권장)으로, 자동 해제만 effect 타이머로.
-  const [prevState, setPrevState] = useState(state)
-  const [justReady, setJustReady] = useState(false)
-  if (state !== prevState) {
-    if (prevState !== 'ready' && state === 'ready') setJustReady(true)
-    setPrevState(state)
-  }
-  useEffect(() => {
-    if (!justReady) return
-    const t = setTimeout(() => setJustReady(false), 1500)
-    return () => clearTimeout(t)
-  }, [justReady])
-
-  return (
-    <MentionableCard variant="row" refId={mentionRef} label={mentionLabel} pulse={justReady}>
-      <div className="flex items-center gap-3">
-        <span className={ROW_LABEL}>
-          <span className="text-muted-foreground/70">{icon}</span>
-          {label}
-        </span>
-        <FieldSlot needs={state !== 'ready'} className="flex-1">
-          {children}
-        </FieldSlot>
-        <RowStatus state={state} issue={issue ?? softIssue} />
-      </div>
-    </MentionableCard>
-  )
-}
-
-// 스타일&톤 선택기 — 콤보 박스(글자만 표기) → 클릭 시 그리드 팝업(#b 2026-07-14).
-//   실제 I2I 레퍼런스 이미지(anchor.imageUrl)는 노출하지 않는다. 예시 이미지 자리는 빈
-//   플레이스홀더 — 사용자가 추후 예시 이미지를 넣을 예정. 선택 표시는 라벨 텍스트로만.
-// medium 슬러그(2d_cartoon 등)를 표시용으로 정리 — 언더바 제거 + 단어별 대문자, 2d/3d는 통째 대문자.
-//   예) 2d_cartoon → "2D Cartoon", live_action → "Live Action", 3d → "3D".
-function prettyMedium(medium: string): string {
-  return medium
-    .split('_')
-    .map((w) => (/^\d+d$/i.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)))
-    .join(' ')
-}
-
-/** 예시 이미지 + 라벨 카드 내용(그리드·슬라이더 공용). */
-function StyleAnchorCardBody({ anchor, active }: { anchor: StyleAnchor; active: boolean }) {
-  return (
-    <>
-      {/* 예시 이미지(preview_url) — I2I 레퍼런스(anchor.imageUrl)와 분리된 표시 전용.
-          정사각 원본을 그대로 보여준다. 프리뷰 없으면 플레이스홀더 폴백. */}
-      <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted">
-        {anchor.previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={anchor.previewUrl}
-            alt={anchor.label}
-            loading="lazy"
-            className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-        ) : (
-          <ImageIcon className="size-6 text-muted-foreground opacity-40" />
-        )}
-        {active ? (
-          <span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-            <Check className="size-3" />
-          </span>
-        ) : null}
-      </div>
-      <div className="flex flex-col gap-0.5 px-3 py-2">
-        <span className="line-clamp-1 text-sm font-medium text-foreground">{anchor.label}</span>
-        {anchor.medium ? (
-          <span className="line-clamp-1 text-xs text-muted-foreground">
-            {anchor.subtitle ?? prettyMedium(anchor.medium)}
-          </span>
-        ) : null}
-      </div>
-    </>
-  )
-}
-
-// 스타일 선택기 — 콤보 박스(글자만) → 그리드/슬라이더 두 뷰 팝업(#b1 2026-07-18).
-//   헤더 우상단 토글 아이콘으로 grid ↔ sliding card 전환. 슬라이더는 한 장씩 크게 보여주며
-//   좌우 화살표/도트로 이동하고, 이동 시 트랙이 translateX 로 미끄러진다(카드 이동 애니메이션).
-type StyleView = 'grid' | 'slider'
-
-function StyleAnchorPicker({
-  anchors,
-  value,
-  onSelect,
-}: {
-  anchors: StyleAnchor[]
-  value: string | null
-  onSelect: (key: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  // stacked deck(slider)를 기본 뷰로(#b1 2026-07-18).
-  const [view, setView] = useState<StyleView>('slider')
-  const [slide, setSlide] = useState(0)
-  const selected = anchors.find((a) => a.key === value) ?? null
-  const selectedIdx = Math.max(0, anchors.findIndex((a) => a.key === value))
-
-  // 슬라이더로 전환하거나 팝업을 열 때 현재 선택 카드로 위치를 맞춘다.
-  const syncSlideToSelected = () => setSlide(selectedIdx)
-
-  // 뷰 전환 애니메이션(#b1):
-  //   - 팝업 크기: 뷰별 max-width(위 DialogContent) + 내용 높이를 측정해 래퍼 height 트랜지션.
-  //   - 카드 진입("딜"): 덱/그리드 카드가 각자 자리로 날아든다 — 위치 transform 은 바깥 래퍼가,
-  //     진입 애니메이션은 안쪽 버튼의 CSS animate-in 이 담당(둘이 곱해져 충돌 없음). 뷰를 바꾸면
-  //     카드가 새로 마운트돼 애니메이션이 다시 재생된다(별도 상태 불요).
-  // 내용 높이 측정 → 래퍼 height 트랜지션(뷰 전환 시 팝업 높이가 부드럽게 변함).
-  //   콜백 ref 로 ResizeObserver 를 붙인다 — 포털(radix Dialog) 콘텐츠가 부모 effect 보다
-  //   늦게 마운트돼도, 노드가 실제로 붙는 그 순간 관찰이 시작돼 측정이 누락되지 않는다.
-  //   (닫힘/재오픈 시 내용이 안 보이던 버그 수정, 2026-07-18)
-  const [bodyH, setBodyH] = useState<number>()
-  const roRef = useRef<ResizeObserver | null>(null)
-  const bodyRef = useCallback((el: HTMLDivElement | null) => {
-    roRef.current?.disconnect()
-    roRef.current = null
-    if (!el) return
-    const ro = new ResizeObserver(() => setBodyH(el.offsetHeight))
-    ro.observe(el)
-    roRef.current = ro
-  }, [])
-
-  const choose = (key: string) => {
-    onSelect(key)
-    setOpen(false)
-  }
-  const move = (dir: 1 | -1) =>
-    setSlide((i) => (i + dir + anchors.length) % anchors.length)
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o)
-        if (o) syncSlideToSelected()
-        // 닫을 때 측정 높이 리셋 → 재오픈 시 auto 로 시작해 stale 높이로 클리핑되지 않는다.
-        else setBodyH(undefined)
-      }}
-    >
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            'flex h-9 w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:hover:bg-input/50',
-            QUIET_CONTROL,
-            QUIET_CHEVRON,
-            HOVER_RED_BORDER,
-            !selected && 'text-muted-foreground',
-          )}
-        >
-          <span className="line-clamp-1 text-left">
-            {selected ? selected.label : '선택…'}
-          </span>
-          <ChevronDown className="size-4 shrink-0" />
-        </button>
-      </DialogTrigger>
-      <DialogContent
-        className={cn(
-          // 뷰별 팝업 폭 + 전환 애니메이션(#b1) — 덱은 좁게, 그리드는 넓게, max-width 를 트랜지션.
-          'transition-[max-width] duration-300 ease-out',
-          view === 'grid' ? 'sm:max-w-2xl' : 'sm:max-w-lg',
-        )}
-      >
-        <DialogHeader>
-          <DialogTitle>스타일 선택</DialogTitle>
-          <DialogDescription>
-            영상 전체에 적용할 시각 스타일을 골라 주세요.
-          </DialogDescription>
-          {/* 뷰 전환 토글 — 우상단(닫기 X 왼쪽). grid ↔ sliding card. */}
-          {anchors.length > 0 ? (
-            <div className="absolute right-12 top-4 inline-flex items-center gap-0.5 rounded-md border border-border bg-muted/50 p-0.5">
-              <button
-                type="button"
-                aria-label="그리드 보기"
-                aria-pressed={view === 'grid'}
-                onClick={() => setView('grid')}
-                className={cn(
-                  'flex size-6 items-center justify-center rounded transition-colors',
-                  view === 'grid' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <LayoutGrid className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                aria-label="슬라이드 보기"
-                aria-pressed={view === 'slider'}
-                onClick={() => {
-                  syncSlideToSelected()
-                  setView('slider')
-                }}
-                className={cn(
-                  'flex size-6 items-center justify-center rounded transition-colors',
-                  view === 'slider' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <GalleryHorizontal className="size-3.5" />
-              </button>
-            </div>
-          ) : null}
-        </DialogHeader>
-        {/* 뷰 전환 시 팝업 높이가 부드럽게 변하도록, 내용 높이를 측정해 래퍼 height 를 트랜지션. */}
-        <div
-          className="overflow-hidden transition-[height] duration-300 ease-out"
-          style={{ height: bodyH }}
-        >
-        <div ref={bodyRef}>
-        {anchors.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            아직 등록된 스타일이 없어요.
-          </p>
-        ) : view === 'grid' ? (
-          // 그리드 진입 시 카드가 아래에서 살짝 확대되며 순차로 날아든다(#b1).
-          <div
-            key="grid"
-            className="scrollbar-thin grid max-h-[60vh] grid-cols-2 gap-3 overflow-y-auto p-0.5 sm:grid-cols-3"
-          >
-            {anchors.map((anchor, i) => (
-              <button
-                key={anchor.key}
-                type="button"
-                onClick={() => choose(anchor.key)}
-                style={{ animationDelay: `${i * 35}ms`, animationFillMode: 'backwards' }}
-                className={cn(
-                  'group flex flex-col overflow-hidden rounded-lg border text-left transition-colors',
-                  'animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-300',
-                  anchor.key === value
-                    ? 'border-primary ring-2 ring-primary/50'
-                    : 'border-border hover:border-primary/60',
-                )}
-              >
-                <StyleAnchorCardBody anchor={anchor} active={anchor.key === value} />
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="p-0.5">
-            {/* Stacked sliding card(#b1 2026-07-18) — 활성 카드를 앞으로, 양옆은 뒤로 겹쳐 쌓는 덱.
-                각 카드 위치를 활성 인덱스와의 wrap-around 거리(offset)로 계산 → 마지막→첫 카드로
-                넘어가도 offset 이 1씩 밀릴 뿐이라 트랙 리셋 없는 자연스러운 무한 루프. */}
-            <div className="relative flex h-[19rem] items-center justify-center overflow-hidden">
-              {anchors.map((anchor, i) => {
-                const n = anchors.length
-                // 활성(slide)로부터의 최단 부호 거리 — 무한 루프의 핵심.
-                let off = i - slide
-                if (off > n / 2) off -= n
-                if (off < -n / 2) off += n
-                const abs = Math.abs(off)
-                const hidden = abs > 2
-                const isFront = off === 0
-                return (
-                  <div
-                    key={anchor.key}
-                    // 숨은 카드는 transition 없이 순간이동(opacity 0이라 안 보임) → 마지막↔첫 카드
-                    //   전환 시 반대편 카드가 화면을 가로질러 슬라이드하는 어색함을 없앤다(무한 루프).
-                    className={cn(
-                      'absolute',
-                      hidden ? 'transition-none' : 'transition-all duration-300 ease-out',
-                    )}
-                    style={{
-                      transform: `translateX(${off * 42}%) scale(${1 - abs * 0.16})`,
-                      opacity: hidden ? 0 : 1 - abs * 0.32,
-                      zIndex: 30 - abs,
-                      pointerEvents: hidden ? 'none' : 'auto',
-                    }}
-                    aria-hidden={hidden}
-                  >
-                    <button
-                      type="button"
-                      // 앞 카드 클릭 = 선택, 옆 카드 클릭 = 그 카드를 앞으로.
-                      onClick={() => (isFront ? choose(anchor.key) : setSlide(i))}
-                      tabIndex={hidden ? -1 : 0}
-                      // 진입 딜(#b1): 마운트 시 작게 튀어나오듯 확대+페이드, 바깥 카드일수록 늦게(cascade).
-                      //   위치는 래퍼가 잡으므로 여기선 scale/opacity만 → 스택 transform과 곱해져 충돌 없음.
-                      style={{ animationDelay: `${abs * 55}ms`, animationFillMode: 'backwards' }}
-                      className={cn(
-                        'group flex w-56 flex-col overflow-hidden rounded-xl border bg-card text-left shadow-lg transition-colors',
-                        'animate-in fade-in-0 zoom-in-50 duration-500',
-                        anchor.key === value
-                          ? 'border-primary ring-2 ring-primary/50'
-                          : isFront
-                            ? 'border-border hover:border-primary/60'
-                            : 'border-border',
-                      )}
-                    >
-                      <StyleAnchorCardBody anchor={anchor} active={anchor.key === value} />
-                    </button>
-                  </div>
-                )
-              })}
-              {/* 좌우 이동 화살표 — 덱 위(z 최상단) */}
-              <button
-                type="button"
-                aria-label="이전 스타일"
-                onClick={() => move(-1)}
-                className="absolute left-1 top-1/2 z-40 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background"
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-              <button
-                type="button"
-                aria-label="다음 스타일"
-                onClick={() => move(1)}
-                className="absolute right-1 top-1/2 z-40 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background"
-              >
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
-            {/* 도트 인디케이터 — 클릭 시 해당 카드로 이동 */}
-            <div className="mt-3 flex items-center justify-center gap-1.5">
-              {anchors.map((anchor, i) => (
-                <button
-                  key={anchor.key}
-                  type="button"
-                  aria-label={`${anchor.label}로 이동`}
-                  onClick={() => setSlide(i)}
-                  className={cn(
-                    'h-1.5 rounded-full transition-all',
-                    i === slide ? 'w-4 bg-primary' : 'w-1.5 bg-border hover:bg-muted-foreground',
-                  )}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-        </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function issueByField(issues: GateIssue[], field: string) {
-  return issues.find((i) => i.field === field)
 }
 
 function castIssuesFor(gate: GateResult, localId: string) {
@@ -993,7 +566,6 @@ function BackgroundRow({
 
 export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const projectSettings = useProducerStore((s) => s.projectSettings)
-  const updateSettings = useProducerStore((s) => s.updateSettings)
   const storyText = useProducerStore((s) => s.storyText)
   const cast = useProducerStore((s) => s.cast)
   const syncing = useProducerStore((s) => s.syncing)
@@ -1004,15 +576,21 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const addBackground = useProducerStore((s) => s.addBackground)
   const updateBackground = useProducerStore((s) => s.updateBackground)
   const removeBackground = useProducerStore((s) => s.removeBackground)
-  // 스타일&톤 (style_anchors 카탈로그 + projects.style_anchor_key) — 세부 장르 슬롯 대체.
-  const styleAnchors = useProducerStore((s) => s.styleAnchors)
-  const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
-  const loadStyleAnchors = useProducerStore((s) => s.loadStyleAnchors)
-  const setStyleAnchor = useProducerStore((s) => s.setStyleAnchor)
-  const projectId = useProjectStore((s) => s.projectId)
-  useEffect(() => {
-    if (projectId) void loadStyleAnchors()
-  }, [projectId, loadStyleAnchors])
+  // 히어로 제목(#feedback 2026-08-07 v2) — 프로젝트 제목이 곧 영화 제목. 기본값(Untitled)은
+  //   "아직 제목이 없는 이야기"로 흐리게 — 채워질 자리를 보여주는 목업 히어로의 빈 상태.
+  const projectTitle = useProjectStore((s) => s.projectTitle)
+  const untitled = !projectTitle?.trim() || projectTitle.trim().toLowerCase() === 'untitled'
+  const renameProject = useProjectStore((s) => s.renameProject)
+  // 인라인 제목 편집 상태 — null = 보기 모드. Esc 취소는 blur 커밋보다 먼저 ref 로 알린다
+  //   (Esc → setTitleDraft(null) → 인풋 언마운트 blur 가 stale 값으로 커밋하는 것 방지).
+  const [titleDraft, setTitleDraft] = useState<string | null>(null)
+  const titleCancelRef = useRef(false)
+  const commitTitle = (raw: string) => {
+    setTitleDraft(null)
+    const next = raw.trim()
+    if (!next || next === projectTitle) return
+    void renameProject(next)
+  }
 
   // Brief Story 전체보기 토글 — 길면 4줄로 클램프, "더 보기"로 스크롤 박스 펼침.
   const [storyExpanded, setStoryExpanded] = useState(false)
@@ -1045,10 +623,6 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
     () => new Map(gate.hardMissing.map((issue) => [issue.field, issue])),
     [gate.hardMissing],
   )
-  const softByField = useMemo(
-    () => new Map(gate.softMissing.map((issue) => [issue.field, issue])),
-    [gate.softMissing],
-  )
 
   // Brief Story 준비 전환 시 잠깐 펄스 — FieldShell 시절의 justReady 피드백을 섹션 승격(#b7)
   //   후에도 유지. 상태 전환 감지는 set-state-in-render 패턴, 자동 해제만 effect 타이머.
@@ -1079,8 +653,8 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
     )
     useChatUiStore.getState().requestChatFocus()
   }
-  const add = (entityType: EntityType) => {
-    addCastMember(entityType)
+  const addPerson = () => {
+    addCastMember('person')
   }
   const addBg = () => {
     addBackground()
@@ -1138,34 +712,70 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="mx-auto max-w-6xl space-y-5">
-          {/* Brief Story — Story Foundation과 같은 레벨의 메인 섹션(#b7). 게이트 배지는 제목 옆,
-              카드 본문은 스토리 텍스트만. 프로듀서 호출 버튼은 헤더로 이동(#b8). */}
-          <section className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-sm font-semibold">Brief Story</h2>
-              {storyIssue ? (
-                <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
-                  <AlertCircle className="size-3" /> 필요
-                </Badge>
+        {/* 좌 퀘스트 저널(제작 여정, 순수 뷰어) / 우 기존 리스트 (#quest-journal 2026-08-07).
+            옛 Story Foundation 폼 섹션은 Brief Story 아래 뱃지로 흡수 — 기본 동선은 채팅. */}
+        <div className="mx-auto grid max-w-6xl items-start gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
+          <ProducerQuestJournal gate={gate} />
+          <div className="min-w-0 space-y-5">
+          {/* Brief Story 히어로(#feedback 2026-08-07 v2) — 목업 타이틀 페이지 형태 차용
+              (research/ui-references/producer-viewer-mock.html .hero, 그라데이션만 제외):
+              kicker + 큰 제목 + 로그라인(살아있는 초안, 프롬프트 living draft) + 설정 뱃지가
+              한 카드 안에. "내 영화의 타이틀 페이지가 채워져 간다"가 이 화면의 심장. */}
+          <section>
+            <MentionableCard refId="story" label="스토리" pulse={storyPulse} className="rounded-2xl p-7">
+              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-stage-producer">
+                Now assembling
+              </div>
+              {/* 제목 인라인 편집(#feedback 2026-08-07 v3) — 히어로 제목 = 프로젝트 제목.
+                  클릭 → 인풋, Enter/blur 확정(renameProject), Esc 취소. */}
+              {titleDraft === null ? (
+                <button
+                  type="button"
+                  onClick={() => setTitleDraft(untitled ? '' : projectTitle)}
+                  title="제목 수정"
+                  className="group/title mt-2 flex max-w-full items-center gap-2 text-left"
+                >
+                  <h1
+                    className={cn(
+                      'truncate text-3xl font-extrabold tracking-tight',
+                      untitled && 'text-foreground/25',
+                    )}
+                  >
+                    {untitled ? '아직 제목이 없는 이야기' : projectTitle}
+                  </h1>
+                  <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/title:opacity-60" />
+                </button>
               ) : (
-                <Badge variant="outline" className="gap-1 border-success/40 text-success">
-                  <CheckCircle2 className="size-3" /> 준비됨
-                </Badge>
+                <input
+                  autoFocus
+                  value={titleDraft}
+                  placeholder="영화 제목"
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onBlur={(e) => {
+                    if (titleCancelRef.current) {
+                      titleCancelRef.current = false
+                      return
+                    }
+                    commitTitle(e.currentTarget.value)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                      e.preventDefault()
+                      e.currentTarget.blur() // blur 가 commit — 경로 하나로 수렴
+                    }
+                    if (e.key === 'Escape') {
+                      titleCancelRef.current = true
+                      setTitleDraft(null)
+                    }
+                  }}
+                  className="mt-2 w-full max-w-xl border-b border-border-strong bg-transparent text-3xl font-extrabold tracking-tight outline-none placeholder:text-foreground/25 focus:border-stage-producer"
+                />
               )}
-              {storyIssue ? (
-                <span className="text-xs text-destructive">
-                  {storyIssue.label}
-                  {storyIssue.detail ? ` · ${storyIssue.detail}` : ''}
-                </span>
-              ) : null}
-            </div>
-            <MentionableCard refId="story" label="스토리" pulse={storyPulse}>
-              <div className="rounded-lg border border-border bg-background/40 p-3">
+              <div className="mt-2 max-w-2xl">
                 {storyText ? (
                   <>
                     {storyExpanded ? (
-                      <p className="max-h-72 overflow-y-auto pr-1 text-sm italic whitespace-pre-wrap text-muted-foreground">
+                      <p className="max-h-72 overflow-y-auto pr-1 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
                         {storyText}
                       </p>
                     ) : (
@@ -1189,7 +799,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                                 : `${STORY_PEEK_RETURN_MS}ms`,
                             } as CSSProperties
                           }
-                          className="translate-y-[var(--peek-shift)] text-sm italic whitespace-pre-wrap text-muted-foreground transition-transform ease-linear motion-reduce:translate-y-0 motion-reduce:transition-none"
+                          className="translate-y-[var(--peek-shift)] text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground transition-transform ease-linear motion-reduce:translate-y-0 motion-reduce:transition-none"
                         >
                           {storyText}
                         </p>
@@ -1209,123 +819,34 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                     )}
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground italic">
-                    채팅으로 촬영 가능한 스토리를 정리해 주세요. 우상단의 Producer 버튼으로
-                    시작할 수 있어요.
+                  <p className="text-sm italic text-muted-foreground/70">
+                    채팅에 이야기를 던지면 Producer가 여기로 계속 정리해요 — 장면 하나,
+                    기분 하나면 충분해요.
                   </p>
                 )}
               </div>
+              {/* 설정 뱃지 — 히어로의 pills 자리(목업과 동일 위치). 편집은 popover 안에서만. */}
+              <div className="mt-5">
+                <StoryFoundationBadges />
+              </div>
             </MentionableCard>
-          </section>
-
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold">Story Foundation</h2>
-            </div>
-            {/* 카드 격자 → 줄 목록(#b-rows 2026-07-31). 여섯 필드는 서로 높이가 다를 이유가
-                없는데 카드 격자에선 같은 행끼리 높이가 맞춰져 빈 공간이 생겼다. */}
-            <div className={ROW_LIST}>
-              <FieldRow icon={<Clock className="size-4" />} label="러닝타임" issue={hardByField.get('playtime')} mentionRef="setting:playtime" mentionLabel="러닝타임">
-                <HoverBeam>
-                  <Input
-                    type="number"
-                    min={5}
-                    value={projectSettings.playtime || ''}
-                    placeholder="예: 120"
-                    onChange={(e) => updateSettings({ playtime: Number(e.target.value) || 0 })}
-                    // 네이티브 위아래 스피너 스타일(#b4 2026-08-03) — globals.css .number-spin.
-                    //   기본은 은은하게, hover 시 또렷하게 + 커서, dark 에선 invert(Chromium 계열).
-                    className={cn(QUIET_CONTROL, 'number-spin h-8 font-mono tabular-nums')}
-                  />
-                </HoverBeam>
-              </FieldRow>
-
-              <FieldRow icon={<Film className="size-4" />} label="장르" issue={hardByField.get('genre')} mentionRef="setting:genre" mentionLabel="장르">
-                <HoverBeam>
-                  <Input
-                    value={projectSettings.genre}
-                    placeholder="예: thriller"
-                    className={cn(QUIET_CONTROL, 'h-8')}
-                    onChange={(e) => updateSettings({ genre: e.target.value })}
-                  />
-                </HoverBeam>
-              </FieldRow>
-
-              {/* 세부 장르 필드는 숨김(2026-07-13 — 데이터(settings.subGenre)는 유지) → 스타일&톤(style_anchors)으로 대체.
-                  콤보 박스는 글자만, 클릭 시 그리드 팝업으로 선택(#b 2026-07-14). */}
-              <FieldRow icon={<Tag className="size-4" />} label="스타일" mentionRef="setting:styleAnchor" mentionLabel="스타일">
-                <StyleAnchorPicker
-                  anchors={styleAnchors}
-                  value={styleAnchorKey}
-                  onSelect={(k) => void setStyleAnchor(k)}
-                />
-              </FieldRow>
-
-              <FieldRow icon={<Monitor className="size-4" />} label="포맷" issue={hardByField.get('format')} mentionRef="setting:format" mentionLabel="포맷">
-                <Select
-                  value={projectSettings.format}
-                  onValueChange={(v) => updateSettings({ format: v as ProjectFormat })}
-                >
-                  <SelectTrigger size="sm" className={cn('w-full', QUIET_CONTROL, QUIET_CHEVRON, HOVER_RED_BORDER)}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FORMAT_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FieldRow>
-
-              <FieldRow icon={<Palette className="size-4" />} label="톤" softIssue={softByField.get('tone')} mentionRef="setting:tone" mentionLabel="톤">
-                <HoverBeam>
-                  <TagInput
-                    values={projectSettings.tone}
-                    onChange={(tone) => updateSettings({ tone })}
-                    placeholder="예: dark"
-                  />
-                </HoverBeam>
-              </FieldRow>
-
-              <FieldRow icon={<Languages className="size-4" />} label="대사 언어" issue={hardByField.get('dialogueLanguage')} mentionRef="setting:dialogueLanguage" mentionLabel="대사 언어">
-                <Select
-                  value={projectSettings.dialogueLanguage || ''}
-                  onValueChange={(v) => updateSettings({ dialogueLanguage: v })}
-                >
-                  <SelectTrigger size="sm" className={cn('w-full', QUIET_CONTROL, QUIET_CHEVRON, HOVER_RED_BORDER)}>
-                    <SelectValue placeholder="선택…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LANGUAGE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FieldRow>
-            </div>
           </section>
 
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold">Casting</h2>
-                <span className="text-xs text-muted-foreground">인물 {persons.length} · 사물 {objects.length}</span>
+                <span className="text-xs text-muted-foreground">
+                  인물 {persons.length}
+                  {objects.length > 0 ? ` · 사물 ${objects.length}` : ''}
+                </span>
               </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={() => add('person')}>
-                  <Plus className="size-4" /> 인물
-                </Button>
-                <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={() => add('object')}>
-                  <Plus className="size-4" /> 사물
-                </Button>
-              </div>
+              {/* 사물 추가 제거(#feedback 2026-08-07 v3) — producer 는 인물/배경만.
+                  기존 사물 카드(레거시/모델 추출)는 데이터 보존 차원에서 계속 표시된다. */}
+              <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={addPerson}>
+                <Plus className="size-4" /> 인물
+              </Button>
             </div>
-
-            {issueByField(gate.hardMissing, 'cast:minPerson') ? (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-                {issueByField(gate.hardMissing, 'cast:minPerson')?.label}
-              </div>
-            ) : null}
 
             {cast.length === 0 ? (
               <div className="flex min-h-56 flex-col items-center justify-center rounded-xl border border-dashed border-border p-8 text-center">
@@ -1365,14 +886,6 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               </Button>
             </div>
 
-            {issueByField(gate.hardMissing, 'background:minComplete') ? (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-                {issueByField(gate.hardMissing, 'background:minComplete')?.label}
-                <span className="ml-2 text-xs text-muted-foreground">
-                  {issueByField(gate.hardMissing, 'background:minComplete')?.detail}
-                </span>
-              </div>
-            ) : null}
 
             {backgrounds.length === 0 ? (
               <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-border p-8 text-center">
@@ -1397,6 +910,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               </div>
             )}
           </section>
+          </div>
         </div>
       </div>
 
