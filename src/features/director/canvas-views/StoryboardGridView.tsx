@@ -155,6 +155,10 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
   const [videoError, setVideoError] = useState<string | null>(null)
   // Grid always projects the newest successful take; Final is an editor/export decision.
   const directorNodes = useDirectorCanvasStore((s) => s.nodes)
+  // #real-grid-auto: 일괄 시트 생성 중엔 개별 생성/재생성 잠금 (스토어 가드와 이중 방어).
+  //   아래 isShotData early return 보다 위에 있어야 한다 — 훅의 조건부 호출은 렌더 간 훅 순서를
+  //   무너뜨린다(rules-of-hooks).
+  const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
   const takeRecords = useMemo(
     () =>
       directorNodes.flatMap((n) => {
@@ -208,8 +212,6 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
             ? { label: '이미지 생성 필요', cls: 'border-warning/50 text-warning', video: false }
             : null
 
-  // #real-grid-auto: 일괄 시트 생성 중엔 개별 생성/재생성 잠금 (스토어 가드와 이중 방어).
-  const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
   const runImage = async () => {
     if (realBatchBusy) {
       setVideoError('실사 일괄 생성 중이에요 — 완료 후 다시 시도해 주세요.')

@@ -42,16 +42,18 @@ export function RoughFrameCycle({
   const [idx, setIdx] = useState(0)
   const [hovering, setHovering] = useState(false)
   const [pinned, setPinned] = useState(false)
-  const [introDone, setIntroDone] = useState(!introPlay)
+  // reduced-motion 은 초기값에서 인트로를 건너뛴다 — effect 안 동기 setState 는 연쇄 렌더를
+  //   유발해 lint 가 막는다(react-hooks/set-state-in-effect). SSR 은 matchMedia 부재 → 가드.
+  const [introDone, setIntroDone] = useState(
+    () =>
+      !introPlay ||
+      (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches),
+  )
   const multi = urls.length > 1
 
-  // 인트로 1회 재생 — reduced-motion 은 건너뛰고, hover 가 시작되면 즉시 양보한다.
+  // 인트로 1회 재생 — hover 가 시작되면 즉시 양보한다.
   useEffect(() => {
     if (!multi || introDone) return
-    if (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setIntroDone(true)
-      return
-    }
     let step = 0
     const t = setInterval(() => {
       step += 1
