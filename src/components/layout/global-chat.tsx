@@ -29,7 +29,6 @@ import { useProducerStore } from '@/stores/producer-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useWriterStore } from '@/stores/writer-store'
-import { useDirectorCanvasWarmStarting } from '@/features/director/hooks/use-director-warm-starting'
 import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
 import { HoverBeam } from '@/components/hover-beam'
@@ -247,11 +246,6 @@ export function GlobalChat() {
     const t = setTimeout(() => setStageSettled(true), EPHEMERAL_SETTLE_MS)
     return () => clearTimeout(t)
   }, [stageSettled, settledStage])
-  // artist 정적 팁은 제거(#d1 2026-08-03 — 헤더 도움말과 중복인 상시 경고 바였다).
-  //   director 는 캔버스 워밍 상태를 알리는 동적 팁만 유지.
-  const directorWarmTip = useDirectorCanvasWarmStarting()
-  const warmStartingTip = currentStage === 'director' ? directorWarmTip : null
-
   // 폭 리사이즈 + 접기 (chat-ui-store, persist)
   const chatWidth = useChatUiStore((s) => s.chatWidth)
   const collapsed = useChatUiStore((s) => s.collapsed)
@@ -614,11 +608,9 @@ export function GlobalChat() {
   const showSuggestion =
     stageSettled && !!suggestion && suggestion.stage === currentStage && !choices
   const showProposal = stageSettled && !!pendingProposal && pendingProposal.stage === currentStage
-  const showWarmTip = stageSettled && currentStage === 'director' && !!warmStartingTip
   let cascadeSlots = 0
   const suggestionSlot = showSuggestion ? cascadeSlots++ : 0
   const proposalSlot = showProposal ? cascadeSlots++ : 0
-  const tipSlot = showWarmTip ? cascadeSlots++ : 0
   const cascadeStyle = (slot: number): React.CSSProperties => ({
     animationDelay: `${slot * CASCADE_STEP_MS}ms`,
     animationFillMode: 'backwards',
@@ -879,18 +871,6 @@ export function GlobalChat() {
           >
             {error}
           </button>
-        )}
-
-        {showWarmTip && (
-          <div
-            className={cn(
-              'shrink-0 border-t border-warning/30 bg-warning/10 px-4 py-1.5 text-[11px] text-warning',
-              CASCADE_IN,
-            )}
-            style={cascadeStyle(tipSlot)}
-          >
-            {warmStartingTip}
-          </div>
         )}
 
         {/* Input footer (#oiioii-chat) — 둥근(r24) 입력 컨테이너 안에 편집기 + 하단 툴바.
