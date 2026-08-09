@@ -228,6 +228,10 @@ export async function GET(
       pipeline_completed: boolean;
       pipeline_failed: boolean;
       progress_percent: number;
+      // 유닛 원값 노출(#chat-progress-pin 2026-08-07) — percent 축약으로 버려지던 DB 컬럼.
+      //   "몇 단계 중 몇 단계"를 클라가 그대로 표시할 수 있게 한다 (새 진실 아님).
+      completed_units: number;
+      total_units: number;
       current_stage: string | null;
       current_status: string | null;
       last_timestamp: string | null;
@@ -244,6 +248,8 @@ export async function GET(
       pipeline_completed: row?.status === 'completed',
       pipeline_failed: row?.status === 'failed',
       progress_percent: progressPercent,
+      completed_units: row?.completed_units ?? 0,
+      total_units: row?.total_units ?? 0,
       current_stage: row?.current_stage ?? null,
       current_status: row?.status ?? null,
       last_timestamp: row?.updated_at ?? null,

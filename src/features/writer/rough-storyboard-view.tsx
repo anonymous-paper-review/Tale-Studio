@@ -119,12 +119,14 @@ export function RoughStoryboardView() {
       stage: 'writer',
       dismissible: false,
       action: null,
+      // #feedback 2026-08-07: "작업 완료"로 시작 + @멘션·Ctrl+클릭 조작법을 온보딩에 명시
+      //   (진행도 핀이 풀린 직후 이 브리핑이 들어오는 흐름).
       content:
-        '스토리를 구체화할 수 있는 틀을 마련했어요.\n\n' +
+        '씬·샷 작업이 완료됐어요.\n\n' +
         `· 씬 ${sceneCount}개, 샷 ${shots.length}개로 나눴어요\n` +
         '· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n' +
-        '카드를 누르면 확인·수정·재생성할 수 있어요.\n' +
-        '바꾸고 싶은 부분이 있으면 편하게 말씀해 주세요.',
+        '수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n' +
+        '"@"를 누르면 씬·샷을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
     })
   }, [projectId, sceneManifest, shots.length, chatMessages, offerSuggestion])
 

@@ -9,6 +9,9 @@ export interface WriterStatus {
   pipeline_completed: boolean
   pipeline_failed: boolean
   progress_percent: number
+  // 유닛 원값(#chat-progress-pin) — "몇 단계 중 몇 단계" 표시용. 구버전 응답엔 없을 수 있다.
+  completed_units?: number
+  total_units?: number
   current_stage: string | null
   current_status: string | null
   last_timestamp: string | null

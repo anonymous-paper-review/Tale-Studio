@@ -95,6 +95,72 @@ export const STAGE_PLACEHOLDER: Record<StageId, string> = {
   editor: '아직 이 단계에서는 채팅을 쓸 수 없어요.',
 }
 
+// ── GlobalChat: 응답 대기 사고 흐름 (#oiioii-chat v2 2026-08-06) ──
+// "생각 중…" 정지 문구 대신 순환시켜 에이전트가 뭔가 굴리고 있음을 보여주는 문구들.
+//   각 stage 채팅이 실제로 거치는 처리 단계(컨텍스트 직렬화·카드 대조·수정 범위 판정)에서
+//   따온 표현만 — 존재하지 않는 작업명(가짜 툴콜)은 넣지 않는다.
+export const STAGE_THINKING_PHRASES: Record<StageId, readonly string[]> = {
+  producer: [
+    '이야기의 핵심을 짚어보는 중',
+    '설정에서 빈칸을 찾는 중',
+    '캐스트 카드를 살피는 중',
+    '장르와 톤을 저울질하는 중',
+    '다음 질문을 고르는 중',
+  ],
+  writer: [
+    '씬 구조를 되짚는 중',
+    '샷 리스트를 살피는 중',
+    '대사 리듬을 가늠하는 중',
+    '수정 범위를 정리하는 중',
+  ],
+  artist: [
+    '캐릭터 외형을 확인하는 중',
+    '비어 있는 뷰를 찾는 중',
+    '룩 일관성을 맞춰보는 중',
+    '생성 계획을 정리하는 중',
+  ],
+  director: [
+    '콘티 순서를 되짚는 중',
+    '카메라 동선을 그려보는 중',
+    '조명과 무드를 재는 중',
+    '샷 연결을 확인하는 중',
+  ],
+  editor: ['클립을 살피는 중'],
+}
+
+// 핸드오프 초대 연출(⇄ 블록)이 보인 뒤 스테이지 슬라이드로 넘어가기까지의 지연 (#oiioii-handoff).
+//   즉시 이동하면 블록이 그려지기도 전에 화면이 넘어가 "초대"가 안 보인다.
+export const HANDOFF_INVITE_NAVIGATE_MS = 1600
+
+// ── GlobalChat: 빠른 요청 프리셋 (#oiioii-chat 2026-08-06) ──
+// 입력창 툴바의 에이전트 필 popover 가 보여주는 stage별 대표 요청. 클릭 = 입력창에 **삽입**
+//   (자동 전송 금지 — 과금/전이가 걸린 발화를 원클릭으로 쏘지 않는다. 사용자가 다듬어 Enter).
+//   각 항목은 그 stage 채팅이 실제로 처리할 수 있는 능력 범위 안에서만 (모델에게 없는 일을
+//   시키는 프리셋은 실망 버튼이다). 핸드오프 문구는 handoff-intent.ts HANDOFFS 가 단일 source.
+export const STAGE_PROMPT_PRESETS: Record<StageId, readonly string[]> = {
+  producer: [
+    '장르와 톤을 먼저 정리해줘',
+    '주인공 캐릭터를 추가해줘',
+    '배경 장소를 추가해줘',
+  ],
+  writer: [
+    '마지막 씬에 클로즈업 샷 추가해줘',
+    '대사를 더 간결하게 다듬어줘',
+    '전체 분위기를 더 어둡게 바꿔줘',
+  ],
+  artist: [
+    '캐릭터를 만들어줘 — 이름과 외형을 알려줄게',
+    '비어 있는 캐릭터 뷰를 채워줘',
+    '배경 이미지를 다시 생성해줘',
+  ],
+  director: [
+    '이 샷의 카메라를 로우앵글로 바꿔줘',
+    '조명을 더 극적으로 바꿔줘',
+    '샷 설명을 더 구체적으로 써줘',
+  ],
+  editor: [],
+}
+
 // writer 채팅: 러프 스토리보드 검토 단계에서 씬/샷 CRUD (api/writer/chat + global-chat-store 'writer' case).
 //   editor 만 미지원 (라우트·case 없음).
 export const CHAT_SUPPORTED_STAGES: ReadonlySet<StageId> = new Set<StageId>([

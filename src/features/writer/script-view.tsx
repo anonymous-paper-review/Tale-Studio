@@ -70,7 +70,8 @@ function ScriptLineButton({
         'hover-red-beam flex w-full items-start gap-4 py-1.5 pr-6 text-left text-sm leading-7 transition-colors [content-visibility:auto] hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring/50',
         // 대사는 바로 위 샷에 딸린 줄 — 행 전체(라벨 열 포함)를 한 단 들여써서 종속 관계를 보이게 한다.
         line.kind === 'dialogue' ? 'pl-12' : 'pl-6',
-        mentioned && 'bg-sky-400/10 ring-1 ring-inset ring-sky-400/60 hover:bg-sky-400/15',
+        // mention-flash: 점등 순간 1회 플래시(#feedback 2026-08-07) — @목록 선택·라인 클릭 공통.
+        mentioned && 'mention-flash bg-sky-400/10 ring-1 ring-inset ring-sky-400/60 hover:bg-sky-400/15',
       )}
     >
       <span className="w-16 shrink-0 pt-px font-mono text-xs tabular-nums tracking-wide text-muted-foreground">

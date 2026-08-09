@@ -23,10 +23,12 @@ import { handoffToStage } from '@/lib/stage-nav'
 import { saveChatMessage } from '@/lib/chat-persistence'
 import { isDemoSession, getDemoSnapshot } from '@/lib/demo/context'
 import { cannedFor } from '@/lib/demo/canned'
+import { handoffMarker } from '@/lib/chat-blocks'
 import {
   STAGE_LABEL,
   CHAT_HISTORY_WINDOW,
   CHAT_HISTORY_CHAR_BUDGET,
+  HANDOFF_INVITE_NAVIGATE_MS,
 } from '@/lib/constants'
 
 export interface GlobalChatMessage {
@@ -77,8 +79,11 @@ interface GlobalChatState {
 
   loadMessages: (projectId: string) => Promise<void>
   sendMessage: (content: string) => Promise<void>
+  /** 진행 중인 LLM 응답 중단 (#oiioii-chat) — Stop 버튼. 대기 중이 아니면 no-op. */
+  stopGeneration: () => void
   offerSuggestion: (suggestion: ChatSuggestion) => void
-  dismissSuggestion: () => void
+  /** implicit: 유저가 다른 말을 해서 내려간 것 — id 를 기록하지 않아 나중에 다시 뜰 수 있다. */
+  dismissSuggestion: (opts?: { implicit?: boolean }) => void
   offerPendingProposal: (proposal: PendingProposal) => boolean
   dismissPendingProposal: (id?: string) => void
   approvePendingProposal: (id?: string) => Promise<boolean>
@@ -132,6 +137,9 @@ const COMPLETION_COALESCE_MS = 2500
 type PendingCompletion = { count: number; timer: ReturnType<typeof setTimeout> }
 const pendingCompletions: Record<string, PendingCompletion> = {}
 const completionKey = (stage: StageId, label: string) => `${stage}::${label}`
+
+// 진행 중인 LLM 응답의 abort 컨트롤러 (#oiioii-chat) — 한 번에 한 요청만 뜨므로(loading 가드) 단일 슬롯.
+let activeGeneration: AbortController | null = null
 
 function flushCompletion(stage: StageId, label: string): void {
   const key = completionKey(stage, label)
@@ -242,12 +250,23 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const trimmed = content.trim()
     if (!trimmed || get().loading) return
 
-    // 온보딩 인사 등 비-dismissible 제안은 유저가 말을 걸면 자동으로 치운다(넘김 버튼 없이).
-    if (get().suggestion?.dismissible === false) get().dismissSuggestion()
-
     const stage = useProjectStore.getState().currentStage
     const projectId = useProjectStore.getState().projectId
     const history = get().messages
+
+    // 유저가 말을 걸면 화면에 떠 있는 제안은 종류 불문 내린다(#suggestion-linger 2026-08-06) —
+    //   무시하고 딴 얘기를 시작한 넛지가 "나중에"를 누를 때까지 떠 있으면 대화가 아니라 팝업이다.
+    //   선택지 칩도 동일(자유 입력 = '기타' 답변). 다른 stage 의 제안은 화면에 없으므로 남기고,
+    //   승인 게이트(pendingProposal)는 비용 방어라 별개 — 명시 응답으로만 처리한다.
+    //   implicit(#handoff-suggestion-drop 2026-08-07): 자동 내림은 id 를 기록하지 않는다 —
+    //   기록하면 핸드오프 준비 완료 버튼이 "나중에"를 누른 적 없이도 세션 내내 사라진다.
+    const activeSuggestion = get().suggestion
+    if (
+      activeSuggestion &&
+      (activeSuggestion.stage === stage || activeSuggestion.dismissible === false)
+    ) {
+      get().dismissSuggestion({ implicit: true })
+    }
 
     const pendingProposal = get().pendingProposal
     if (pendingProposal && pendingProposal.stage === stage && isApprovalUtterance(trimmed)) {
@@ -297,19 +316,47 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       } else {
         const result = await runHandoff(handoffSpec)
         path = result.path
-        reply = result.ok
-          ? handoffSpec.from === 'producer'
-            ? `${STAGE_LABEL[handoffSpec.to]}에게 넘겼어요. 씬·샷 생성을 시작할게요 — 진행 상황은 ${STAGE_LABEL[handoffSpec.to]} 탭에서 볼 수 있어요.`
-            : `${STAGE_LABEL[handoffSpec.to]}로 넘어갈게요.`
-          : '핸드오프에 실패했어요. 잠시 후 다시 시도해 주세요.'
+        if (result.ok) {
+          reply =
+            handoffSpec.from === 'producer'
+              ? `${STAGE_LABEL[handoffSpec.to]}에게 넘겼어요. 씬·샷 생성을 시작할게요 — 진행 상황은 ${STAGE_LABEL[handoffSpec.to]} 탭에서 볼 수 있어요.`
+              : `${STAGE_LABEL[handoffSpec.to]}로 넘어갈게요.`
+        } else {
+          // 실패 사유 표면화 (#handoff-visibility 2026-08-06) — saveAndHandoff 는 사유를
+          //   producer-store.error 에만 남긴다. 채팅으로 요청한 사용자는 채팅에서 이유를
+          //   봐야 한다 — 일반 문구만 주면 "그냥 안 되는 기능"으로 읽힌다.
+          const detail =
+            handoffSpec.from === 'producer' ? useProducerStore.getState().error : null
+          reply = detail
+            ? `핸드오프에 실패했어요 — ${detail}`
+            : '핸드오프에 실패했어요. 잠시 후 다시 시도해 주세요.'
+        }
       }
 
+      // 성공 시 초대 블록(⇄, #oiioii-handoff) — 두 에이전트가 만나는 연출을 스레드에 남기고,
+      //   연출이 보일 시간을 준 뒤 스테이지 슬라이드로 이동한다. 마커는 일반 메시지로 영속화
+      //   되어 재로드 후에도 스레드에 전이 기록이 남는다 (ref spec §8).
+      const inviteMarker = path ? handoffMarker(handoffSpec.from, handoffSpec.to) : null
       set((state) => ({
         loading: false,
-        messages: [...state.messages, { id: makeId(), stage, role: 'model', content: reply }],
-        pendingNavigatePath: path,
+        messages: [
+          ...state.messages,
+          { id: makeId(), stage, role: 'model' as const, content: reply },
+          ...(inviteMarker
+            ? [{ id: makeId(), stage, role: 'model' as const, content: inviteMarker }]
+            : []),
+        ],
       }))
-      if (projectId) saveChatMessage(projectId, stage, 'model', reply)
+      if (projectId) {
+        saveChatMessage(projectId, stage, 'model', reply)
+        if (inviteMarker) saveChatMessage(projectId, stage, 'model', inviteMarker)
+      }
+      if (path) {
+        const target = path
+        setTimeout(() => {
+          set({ pendingNavigatePath: target })
+        }, HANDOFF_INVITE_NAVIGATE_MS)
+      }
       return
     }
 
@@ -475,8 +522,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
     if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
 
+    // 응답 중단 (#oiioii-chat) — Stop 버튼이 이 컨트롤러를 abort 한다. LLM 호출 경로에만
+    //   건다(핸드오프·승인 등 로컬 빠른 경로는 순식간이라 중단 대상이 아니다).
+    const controller = new AbortController()
+    activeGeneration = controller
     try {
       const res = await fetch(endpoint, {
+        signal: controller.signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -515,7 +567,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           id: `choices:${makeId()}`,
           stage: 'producer',
           dismissible: true,
-          content: '아래에서 골라 주세요 — 직접 입력하셔도 돼요.',
+          // 질문은 직전 reply 가 이미 물었다 — 칩 위 질문 라벨은 비운다(#p4-choices v2).
+          content: '',
           action: {
             kind: 'choices',
             options: (data.choices as string[]).slice(0, 4).map((c) => ({ label: c, utterance: c })),
@@ -663,11 +716,24 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
       }
     } catch (err) {
+      // 사용자가 Stop 을 눌렀다 — 에러가 아니라 의도. 조용히 대기 상태만 푼다.
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        set({ loading: false })
+        return
+      }
       set({
         loading: false,
         error: err instanceof Error ? err.message : 'Chat failed',
       })
+    } finally {
+      if (activeGeneration === controller) activeGeneration = null
     }
+  },
+
+  // Stop 버튼 (#oiioii-chat) — 진행 중인 LLM 응답을 중단. 응답 없는 경로(핸드오프 등)면 no-op.
+  stopGeneration: () => {
+    activeGeneration?.abort()
+    activeGeneration = null
   },
 
   // 프로액티브 제안 띄우기 — 한 번에 하나만(이미 떠 있으면 무시), 이미 dismiss/승인한 id 도 무시.
@@ -679,12 +745,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   },
 
   // dismiss(또는 승인) — 제안을 내리고 id 를 기록해 같은 세션 재진입 시 재발사 막는다.
-  dismissSuggestion: () =>
+  //   implicit dismiss(유저가 다른 말을 해서 자동으로 내려간 것)는 기록하지 않는다 —
+  //   명시적 거절("나중에"/선택 사용)만 재발사를 막을 자격이 있다(#handoff-suggestion-drop).
+  dismissSuggestion: (opts) =>
     set((state) => ({
       suggestion: null,
-      dismissedSuggestionIds: state.suggestion
-        ? [...state.dismissedSuggestionIds, state.suggestion.id]
-        : state.dismissedSuggestionIds,
+      dismissedSuggestionIds:
+        state.suggestion && !opts?.implicit
+          ? [...state.dismissedSuggestionIds, state.suggestion.id]
+          : state.dismissedSuggestionIds,
     })),
 
   offerPendingProposal: (proposal) => {
@@ -843,6 +912,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       clearTimeout(pendingCompletions[k].timer)
       delete pendingCompletions[k]
     }
+    // 진행 중인 응답도 끊는다 — 이전 프로젝트의 답이 새 프로젝트 스레드에 꽂히면 안 된다.
+    activeGeneration?.abort()
+    activeGeneration = null
     set({
       messages: [],
       loading: false,

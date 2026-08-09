@@ -336,8 +336,11 @@ export default function VisualPage() {
     const needsSync = refreshGap > 0 || failedCount > 0
     if (!needsSync && !firstBrief) return
 
+    // #feedback 2026-08-07: 온보딩 강화 — 무엇을 만들었는지 + @멘션·Ctrl+클릭 조작법 명시.
     const summary = firstBrief
-      ? `등장인물과 장소의 컨셉을 준비했어요.\n· 캐릭터 ${characterAssets.length}명 · 장소 ${worldAssets.length}곳\n\n`
+      ? `인물과 배경을 만들었어요.\n· 캐릭터 ${characterAssets.length}명 · 배경 ${worldAssets.length}곳\n\n` +
+        '수정하거나 추가하고 싶은 인물이나 배경을 알려주세요.\n' +
+        '"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).\n\n'
       : ''
 
     let content: string

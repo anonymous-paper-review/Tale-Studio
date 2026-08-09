@@ -82,6 +82,11 @@
   --color-stage-artist: var(--stage-artist);
   --color-stage-director: var(--stage-director);
   --color-stage-editor: var(--stage-editor);
+
+  /* GlobalChat 유저 말풍선 (#oiioii-chat v2) — primary(CTA red)보다 명도·채도를 낮춘 전용 톤.
+     "붉은 배경에 흰 글씨" 피로 완화: 버블은 콘텐츠지 CTA가 아니다. */
+  --color-chat-user-bubble: var(--chat-user-bubble);
+  --color-chat-user-bubble-foreground: var(--chat-user-bubble-foreground);
 }
 
 /*
@@ -150,6 +155,10 @@
   --stage-artist: oklch(0.666 0.179 58.318);     /* amber-600 */
   --stage-director: oklch(0.586 0.253 17.585);   /* rose-600 */
   --stage-editor: oklch(0.596 0.145 163.225);    /* emerald-600 */
+
+  /* GlobalChat 유저 말풍선 — light: 차분한 딥 뉴트럴 (붉은 CTA와 분리). */
+  --chat-user-bubble: oklch(0.32 0.015 30);
+  --chat-user-bubble-foreground: oklch(0.985 0 0);
 
   /* Z-index named ladder (design.md §11.1). Referenced by @utility z-* below. */
   --z-canvas: 0;
@@ -250,6 +259,11 @@
   --stage-artist: oklch(0.769 0.188 70.08);    /* amber-500 */
   --stage-director: oklch(0.645 0.246 16.439); /* rose-500 */
   --stage-editor: oklch(0.696 0.17 162.48);    /* emerald-500 */
+
+  /* GlobalChat 유저 말풍선 — dark: primary(0.537/0.234)에서 명도·채도를 눌러 소파에 깔린
+     와인/브릭 톤. 흰 글씨 대비는 유지(L 0.36 vs 0.96). */
+  --chat-user-bubble: oklch(0.36 0.09 29);
+  --chat-user-bubble-foreground: oklch(0.96 0.005 30);
 }
 
 @layer base {
@@ -384,6 +398,27 @@
   }
 }
 
+/* ── Mention flash (#feedback 2026-08-07) ──
+   @멘션이 점등되는 순간(입력창에 @라벨이 들어온 순간) 카드/라인이 시안 링을 한 번 퍼뜨린다.
+   클래스가 (재)추가될 때마다 애니메이션이 재생 → mentioned 토글마다 정확히 1회. 색은 멘션
+   시스템의 sky-400 (#38bdf8) — 칩·링과 같은 색 언어. */
+@keyframes mention-flash {
+  from {
+    box-shadow: 0 0 0 0 rgb(56 189 248 / 0.7);
+  }
+  to {
+    box-shadow: 0 0 0 10px rgb(56 189 248 / 0);
+  }
+}
+.mention-flash {
+  animation: mention-flash 0.45s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mention-flash {
+    animation: none;
+  }
+}
+
 /* ── Thin styled scrollbar ──
    네이티브 스크롤 컨테이너(overflow-auto)용 얇은 테마 스크롤바. Radix ScrollArea 는 Radix Select/Dialog 와
    중첩되면 콤보박스/휠 상호작용을 깨는 케이스가 있어(추가 팝업), 네이티브 스크롤 + 이 유틸로 스타일만 입힌다. */
@@ -406,6 +441,41 @@
 }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background-color: var(--muted-foreground);
+}
+
+/* ── GlobalChat thinking dots (#oiioii-chat 2026-08-06) ──
+   응답 대기 카드의 3점 점멸 — oiioii thought-pool 매핑. opacity-only라 리플로 없음. */
+.chat-thinking-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.chat-thinking-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: chat-thinking-dot 1.2s ease-in-out infinite;
+}
+.chat-thinking-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.chat-thinking-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes chat-thinking-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-thinking-dots span {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 /* ── Writer 생성 스트림 — 은은한 "문서가 스르륵" 연출(#story-stream 2026-07-21) ──
@@ -456,8 +526,10 @@
    다섯 탭을 세로로 이어 붙인 필름 스트립 연출 — 순방향(레일 아래쪽으로)이면 옛 화면이 위로
    빠지며 새 화면이 아래에서 이어져 들어온다(역방향은 반대). old/new 가 같은 거리(100%)·같은
    타이밍으로 움직여 두 화면이 한 장의 스트립으로 읽힌다.
-   본문 스크롤 컨테이너(studio layout)에만 view-transition-name 을 부여 — 레일·채팅은 root
-   크로스페이드(픽셀 동일 → 비가시). 방향은 startStageViewTransition(stage-transition.ts)이
+   본문 스크롤 컨테이너(studio layout)에 view-transition-name 을 부여 — 레일은 root
+   크로스페이드(픽셀 동일 → 비가시). 채팅 패널은 전환 중 내용이 변하므로(구간 구분선 추가·
+   스크롤·settle 재등장) root 에 남기면 old/new 가 반투명으로 겹친다 — 별도 이름으로 분리해
+   즉시 스왑(#chat-vt-ghost, 아래). 방향은 startStageViewTransition(stage-transition.ts)이
    <html data-stage-nav> 로 지정하고 종료 시 제거한다. reduced-motion 이면 JS 가 VT 자체를
    건너뛰지만, CSS 도 no-preference 로 이중 방어. */
 [data-stage-content] {
@@ -503,6 +575,21 @@
   from {
     transform: translateY(-100%);
   }
+}
+
+/* 채팅 패널 분리 (#chat-vt-ghost 2026-08-06) — 전환 중 채팅은 픽셀 동일하지 않다: 스레드 끝에
+   "지금" 구분선이 붙고, 긴 채팅은 그만큼 부드러운 스크롤로 전체 텍스트가 밀린다. root
+   크로스페이드에 남기면 520ms 동안 멈춘 옛 채팅 위에 움직이는 새 채팅이 겹쳐 "두 겹"으로
+   보인다. 자기 이름으로 분리하고 old 를 그리지 않아 즉시 스왑 — 패널 위치·크기가 전환 전후
+   동일해 스왑 자체는 비가시. */
+[data-chat-panel] {
+  view-transition-name: chat-panel;
+}
+html[data-stage-nav]::view-transition-old(chat-panel) {
+  display: none;
+}
+html[data-stage-nav]::view-transition-new(chat-panel) {
+  animation: none;
 }
 
 /* number 입력의 네이티브 위아래 스피너(#b4 2026-08-03, Chromium) — Tailwind arbitrary variant

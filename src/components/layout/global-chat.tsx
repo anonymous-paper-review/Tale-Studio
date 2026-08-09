@@ -3,17 +3,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
+  AlertTriangle,
+  ArrowUp,
   Check,
+  CheckCircle2,
+  ChevronDown,
   ChevronsLeft,
   ChevronsRight,
   Copy,
-  Loader2,
-  Send,
-  Upload,
+  LayoutGrid,
+  MoveRight,
+  Palette,
+  Plus,
+  Square,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AgentFace } from '@/components/agent-face'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -27,18 +35,24 @@ import { cn } from '@/lib/utils'
 import { HoverBeam } from '@/components/hover-beam'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
+import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
 import { castMentions, backgroundMentions, activeMentionRefs, toggleMentionToken, FOUNDATION_MENTIONS } from '@/lib/card-mention'
+import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
 import { buildScriptLines, scriptLineMentions } from '@/lib/script-lines'
+import { handoffFrom } from '@/lib/handoff-intent'
 import {
   STAGES,
   STAGE_LABEL,
   STAGE_BADGE_CLASS,
   STAGE_FACE_COLOR,
   STAGE_PLACEHOLDER,
+  STAGE_PROMPT_PRESETS,
+  STAGE_THINKING_PHRASES,
   CHAT_SUPPORTED_STAGES,
   SHELL_INSET,
 } from '@/lib/constants'
 import { buildChatSections } from '@/lib/chat-sections'
+import { buildChatBlocks, parseHandoffMarker } from '@/lib/chat-blocks'
 import {
   CASCADE_STEP_MS,
   EPHEMERAL_SETTLE_MS,
@@ -108,6 +122,60 @@ function StageDivider({ stage, current }: { stage: StageId; current: boolean }) 
   )
 }
 
+/**
+ * 화자 name plate (#oiioii-chat 2026-08-06) — 에이전트 턴의 첫 일반 메시지에만 1회 렌더
+ * (배치는 chat-blocks.ts buildChatBlocks 가 판정). 메시지마다 아바타+이름을 반복하는 대신
+ * stage 색이 좌→우로 사라지는 그라디언트 플레이트가 "여기서부터 이 에이전트의 턴"을 표시하고,
+ * 상단 여백(mt-5)이 턴 구분자 역할을 한다 (ref: oiioii-chat-ui-spec.md §4).
+ */
+function RolePlate({ stage }: { stage: StageId }) {
+  return (
+    <div
+      className="mb-1.5 mt-5 flex h-7 items-center gap-2 rounded-2xl pl-0.5 pr-9"
+      style={{
+        background: `linear-gradient(90deg, color-mix(in oklab, ${STAGE_FACE_COLOR[stage]} 28%, transparent) 0%, transparent 100%)`,
+      }}
+    >
+      <AgentFace color={STAGE_FACE_COLOR[stage]} size={24} animate={false} />
+      <span className="text-[13px] font-extrabold text-foreground">
+        {STAGE_LABEL[stage]}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * 응답 대기 연출 (#oiioii-chat v2) — 멎어 있는 "생각 중…" 한 줄 대신, 그 stage 채팅이 실제로
+ * 거치는 작업 단계(STAGE_THINKING_PHRASES)를 1.5초 간격으로 순환시켜 "지금 뭔가 굴리고 있다"를
+ * 보여준다. 존재하지 않는 작업명(가짜 툴콜)은 constants 쪽 규칙으로 금지.
+ */
+function ThinkingIndicator({ stage }: { stage: StageId }) {
+  const phrases = STAGE_THINKING_PHRASES[stage]
+  const [idx, setIdx] = useState(0)
+  useEffect(() => {
+    if (phrases.length <= 1) return
+    const t = setInterval(() => setIdx((i) => (i + 1) % phrases.length), 1500)
+    return () => clearInterval(t)
+  }, [phrases])
+  return (
+    <div className="mr-6 flex items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3.5 py-2.5 text-xs text-muted-foreground">
+      <AgentFace color={STAGE_FACE_COLOR[stage]} size={20} expression="thinking" />
+      {/* key=idx: 문구가 바뀔 때마다 아래에서 스르륵 올라오는 재등장 */}
+      <span
+        key={idx}
+        className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300 ease-out motion-reduce:animate-none"
+      >
+        {phrases[idx % phrases.length] ?? '생각 중'}
+      </span>
+      <span className="chat-thinking-dots" aria-hidden>
+        <span />
+        <span />
+        <span />
+      </span>
+    </div>
+  )
+}
+
 /** 말풍선 우상단 호버 복사 버튼. 클립보드 복사 후 1.5초간 체크 표시. */
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
@@ -142,6 +210,7 @@ export function GlobalChat() {
   const loading = useGlobalChatStore((s) => s.loading)
   const error = useGlobalChatStore((s) => s.error)
   const sendMessage = useGlobalChatStore((s) => s.sendMessage)
+  const stopGeneration = useGlobalChatStore((s) => s.stopGeneration)
   const clearError = useGlobalChatStore((s) => s.clearError)
   const loadMessages = useGlobalChatStore((s) => s.loadMessages)
   const suggestion = useGlobalChatStore((s) => s.suggestion)
@@ -243,11 +312,6 @@ export function GlobalChat() {
     () => buildChatSections(messages, currentStage),
     [messages, currentStage],
   )
-  // 위/아래 화살표로 호출할 전송 메시지 히스토리(유저 발화만, 오래된→최신).
-  const userHistory = useMemo(
-    () => messages.filter((m) => m.role === 'user').map((m) => m.content),
-    [messages],
-  )
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -299,8 +363,20 @@ export function GlobalChat() {
     consumeChatFocus()
   }, [focusRequest, consumeChatFocus])
 
+  // #p4-choices v3 (#choices-freeform 2026-08-07): 선택지는 입력창 바로 위에 앵커하고, 떠 있는
+  //   동안 채팅 입력은 잠근다 — 답하는 곳이 두 군데면 눈이 갈린다. 자유 입력("기타" 답변)은
+  //   선택지 안의 "직접 입력" 행이 담당한다(Claude AskUserQuestion 의 Type my own answer 대응).
+  const choices =
+    suggestion && suggestion.stage === currentStage && suggestion.action?.kind === 'choices'
+      ? {
+          stage: suggestion.stage,
+          question: suggestion.content,
+          options: suggestion.action.options,
+        }
+      : null
+
   const stageSupported = CHAT_SUPPORTED_STAGES.has(currentStage)
-  const inputDisabled = !stageSupported || loading
+  const inputDisabled = !stageSupported || loading || !!choices
 
   // 전송 후에도 연이어 입력할 수 있게 포커스 유지(#b3). 응답 대기 중 textarea가 disabled로
   //   바뀌며 포커스를 잃으므로, loading이 풀리는 시점(disabled 해제 직후)에 다시 포커스.
@@ -312,19 +388,35 @@ export function GlobalChat() {
     wasLoadingRef.current = loading
   }, [loading, stageSupported, collapsed])
 
-  // 입력이 길어져 textarea가 높아지면(4줄+) 업로드/전송 버튼을 세로로 쌓는다(#b2 2026-07-15).
-  //   가로 배치는 긴 입력에서 두 버튼이 겹쳐 보이는 문제가 있었음. 높이는 ResizeObserver로 추적.
-  const [inputTall, setInputTall] = useState(false)
+  // 입력창 하단 툴바 popover (#oiioii-chat) — 에이전트 필(빠른 요청) / four-dot(@멘션 팔레트).
+  const [presetOpen, setPresetOpen] = useState(false)
+  const [assetsOpen, setAssetsOpen] = useState(false)
+  // #style-entry(#feedback 2026-08-07): producer 에선 four-dot 자리가 스타일 픽커 버튼.
+  //   스타일 미선택 + 아직 안 눌러봤으면 레이더 핑(producer 보라 확산 링)으로 온보딩 유도 —
+  //   첫 클릭에 소등(세션 로컬. 미선택이면 다음 세션에 다시 유도가 온보딩상 맞다). 호버의
+  //   빨간 빔(회전)과 모션·색을 갈라 "안내"와 "호버 반응"이 섞이지 않게 한다(#feedback v2).
+  const styleAnchors = useProducerStore((s) => s.styleAnchors)
+  const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
+  const setStyleAnchor = useProducerStore((s) => s.setStyleAnchor)
+  const loadStyleAnchors = useProducerStore((s) => s.loadStyleAnchors)
+  const [stylePressed, setStylePressed] = useState(false)
   useEffect(() => {
-    const el = textareaRef.current
-    if (!el) return
-    const ro = new ResizeObserver(() => {
-      // 버튼 2개 세로(40×2+gap 8=88px)가 입력창 높이 안에 들어올 때만 전환.
-      setInputTall(el.offsetHeight >= 88)
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
+    if (currentStage !== 'producer' || !projectId) return
+    if (useProducerStore.getState().styleAnchors.length > 0) return
+    void loadStyleAnchors()
+  }, [currentStage, projectId, loadStyleAnchors])
+  const stylePingOn = !stylePressed && !styleAnchorKey
+  // 프리셋 클릭 = 입력창에 삽입(자동 전송 금지 — 과금/전이 발화를 원클릭으로 쏘지 않는다).
+  const insertPreset = (text: string) => {
+    setPresetOpen(false)
+    setInput((prev) => (prev.trim() ? `${prev.replace(/\s*$/, ' ')}${text}` : text))
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }
+  // 에셋 팔레트 클릭 = @멘션 토글(카드 Cmd+클릭과 같은 경로). 다중 선택하도록 popover 는 열어 둔다.
+  const toggleAssetMention = (label: string) => {
+    setInput((prev) => toggleMentionToken(prev, label))
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }
 
   // 첫 진입(프로듀서 발화 전) 동안 placeholder "스토리에 대해 말해주세요…"를 초록으로 점멸(#b2).
   const producerUntouched =
@@ -420,9 +512,105 @@ export function GlobalChat() {
     setDragging(false)
   }
 
+  // #oiioii-chat v2: 선택→계속하기 2단계 — 클릭 즉시 전송 대신 oiioii form 처럼 고른 항목을
+  //   하이라이트하고 [계속하기]로 확정한다. 선택지 세트가 바뀌면 선택 초기화(렌더 중 조정 패턴).
+  const [selectedChoice, setSelectedChoice] = useState<string | null>(null)
+  const [choiceSetId, setChoiceSetId] = useState<string | null>(null)
+  // #choices-freeform: '직접 입력' 행 — 선택지 마지막 행. 클릭 즉시(키보드는 Enter 확정) 인라인
+  //   인풋으로 펼쳐진다. 채팅 입력이 잠기는 동안 여기가 '기타' 답변의 유일한 통로.
+  const FREEFORM = '__freeform__'
+  const [freeformOpen, setFreeformOpen] = useState(false)
+  const [freeformText, setFreeformText] = useState('')
+  const freeformInputRef = useRef<HTMLInputElement>(null)
+  const activeChoiceSetId = choices ? suggestion!.id : null
+  if (activeChoiceSetId !== choiceSetId) {
+    setChoiceSetId(activeChoiceSetId)
+    setSelectedChoice(null)
+    setFreeformOpen(false)
+    setFreeformText('')
+  }
+  const openFreeform = () => {
+    setSelectedChoice(null)
+    setFreeformOpen(true)
+    requestAnimationFrame(() => freeformInputRef.current?.focus())
+  }
+  const handleChoiceContinue = () => {
+    if (!choices || !selectedChoice) return
+    if (selectedChoice === FREEFORM) {
+      openFreeform()
+      return
+    }
+    const opt = choices.options.find((o) => o.label === selectedChoice)
+    if (!opt) return
+    dismissSuggestion()
+    void sendMessage(opt.utterance)
+  }
+  const handleFreeformSend = () => {
+    const text = freeformText.trim()
+    if (!text || loading) return
+    dismissSuggestion()
+    void sendMessage(text)
+  }
+
+  // 선택지 키보드 조작 (#choices-keys 2026-08-07) — Claude Code CLI 의 AskUserQuestion 문법 차용:
+  //   ↑/↓ 이동, 숫자키 바로 선택, Enter 확정('직접 입력' 행이면 인풋 열기), Esc 닫기.
+  //   #choices-freeform: 채팅 입력이 잠기므로 타이핑 우선 규칙은 폐기 — 대신 캡처 단계에서 듣되,
+  //   다른 입력 요소(인라인 '직접 입력' 인풋·뱃지 popover 인풋 등)에 포커스가 있으면 양보한다.
+  useEffect(() => {
+    if (!choices || freeformOpen) return
+    const labels = [...choices.options.map((o) => o.label), FREEFORM]
+    const handler = (e: KeyboardEvent) => {
+      if (loading || e.isComposing) return
+      const target = e.target as HTMLElement | null
+      if (target) {
+        const tag = target.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return
+      }
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        e.stopPropagation()
+        const dir = e.key === 'ArrowDown' ? 1 : -1
+        setSelectedChoice((prev) => {
+          const idx = prev ? labels.indexOf(prev) : -1
+          const next =
+            idx === -1
+              ? dir === 1
+                ? 0
+                : labels.length - 1
+              : (idx + dir + labels.length) % labels.length
+          return labels[next]
+        })
+        return
+      }
+      if (/^[1-9]$/.test(e.key)) {
+        const idx = Number(e.key) - 1
+        if (idx < labels.length) {
+          e.preventDefault()
+          e.stopPropagation()
+          setSelectedChoice(labels[idx])
+        }
+        return
+      }
+      if (e.key === 'Enter' && !e.shiftKey && selectedChoice) {
+        e.preventDefault()
+        e.stopPropagation()
+        handleChoiceContinue()
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        dismissSuggestion()
+      }
+    }
+    window.addEventListener('keydown', handler, true)
+    return () => window.removeEventListener('keydown', handler, true)
+  })
+
   // 계단식 등장(#chat-settle) — settle 후 보이는 임시 블록이 위에서부터 CASCADE_STEP_MS 간격으로
   //   나타난다. fill-mode backwards: 자기 차례 전까지 첫 키프레임(투명)에 머문다.
-  const showSuggestion = stageSettled && !!suggestion && suggestion.stage === currentStage
+  const showSuggestion =
+    stageSettled && !!suggestion && suggestion.stage === currentStage && !choices
   const showProposal = stageSettled && !!pendingProposal && pendingProposal.stage === currentStage
   const showWarmTip = stageSettled && currentStage === 'director' && !!warmStartingTip
   let cascadeSlots = 0
@@ -500,6 +688,10 @@ export function GlobalChat() {
           </Button>
         </div>
 
+        {/* 진행도 핀 (#chat-progress-pin) — 백그라운드 파이프라인이 도는 동안 헤더 아래 고정.
+            도는 게 없으면 스스로 사라진다. */}
+        <ChatProgressPin stage={currentStage} />
+
         {/* Messages */}
         <ScrollArea className="min-h-0 flex-1 px-4 py-3">
           <div className="space-y-2">
@@ -510,45 +702,73 @@ export function GlobalChat() {
                 className={cn('space-y-2', si > 0 && 'pt-2')}
               >
                 <StageDivider stage={section.stage} current={section.current} />
-                {section.messages.map((msg) => {
-                  // 유저 메시지(#a1 2026-07-15) — 오른쪽 정렬 + "You" 이름 + 에이전트(bg-muted)
-                  //   보다 밝은 말풍선(bg-input, dark L 0.278 > muted 0.243)으로 구분.
-                  if (msg.role === 'user') {
+                {/* 렌더 분류 (#oiioii-chat) — 유저만 채운 말풍선, 에이전트는 flat 출력 +
+                    턴당 1회 role plate, ✓/⚠ 알림은 tool-row 스타일 (기준: chat-blocks.ts). */}
+                {buildChatBlocks(section.messages).map(({ msg, kind, showRolePlate }) => {
+                  if (kind === 'user') {
                     return (
-                      <div key={msg.id} className="ml-8 flex flex-col items-end">
-                        <span className="mb-0.5 text-[11px] font-medium text-muted-foreground">
-                          You
-                        </span>
-                        <div className="group relative w-fit max-w-full select-text whitespace-pre-wrap rounded-lg bg-input px-3 py-2 pr-8 text-xs text-foreground">
+                      <div key={msg.id} className="flex justify-end pl-7">
+                        <div className="group relative w-fit max-w-full select-text whitespace-pre-wrap rounded-3xl rounded-br-sm bg-chat-user-bubble px-4 py-2.5 pr-8 text-xs text-chat-user-bubble-foreground">
                           <MarkdownText text={msg.content} />
                           <CopyButton text={msg.content} />
                         </div>
                       </div>
                     )
                   }
-                  // AI 메시지 — 카톡 수신형: 아바타(말풍선 밖 왼쪽 상단) + 이름 + 말풍선.
-                  return (
-                    <div key={msg.id} className="mr-4 flex items-start gap-2">
+                  if (kind === 'status') {
+                    const failed = msg.content.trimStart().startsWith('⚠')
+                    return (
                       <div
-                        className={cn(
-                          'flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border',
-                          STAGE_BADGE_CLASS[msg.stage],
-                        )}
+                        key={msg.id}
+                        className="flex items-center gap-2.5 rounded-2xl border border-border bg-muted/40 px-3.5 py-2.5 text-xs text-foreground"
                       >
-                        <AgentFace
-                          color={STAGE_FACE_COLOR[msg.stage]}
-                          size={20}
-                          animate={false}
-                        />
-                      </div>
-                      <div className="flex min-w-0 flex-col">
-                        <span className="mb-0.5 text-[11px] font-medium text-muted-foreground">
-                          {STAGE_LABEL[msg.stage]}
+                        {failed ? (
+                          <AlertTriangle className="size-3.5 shrink-0 text-warning" />
+                        ) : (
+                          <CheckCircle2 className="size-3.5 shrink-0 text-success" />
+                        )}
+                        <span className="min-w-0">
+                          <MarkdownText text={msg.content.trimStart().replace(/^[✓⚠]\s*/, '')} />
                         </span>
-                        <div className="group relative select-text whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 pr-8 text-xs text-foreground">
-                          <MarkdownText text={msg.content} />
-                          <CopyButton text={msg.content} />
+                      </div>
+                    )
+                  }
+                  if (kind === 'handoff') {
+                    const invite = parseHandoffMarker(msg.content)
+                    if (invite) {
+                      // 핸드오프 초대 (#oiioii-handoff, ref spec §8) — 두 에이전트가 만나는 연출.
+                      return (
+                        <div
+                          key={msg.id}
+                          className="flex flex-col items-center gap-2 py-3 animate-in fade-in-0 zoom-in-95 duration-500 ease-out motion-reduce:animate-none"
+                        >
+                          <div className="flex items-center gap-3">
+                            <AgentFace color={STAGE_FACE_COLOR[invite.from]} size={26} animate={false} />
+                            <MoveRight className="size-4 text-muted-foreground" />
+                            <AgentFace color={STAGE_FACE_COLOR[invite.to]} size={34} />
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            <span className="font-semibold" style={{ color: STAGE_FACE_COLOR[invite.from] }}>
+                              @{STAGE_LABEL[invite.from]}
+                            </span>
+                            가{' '}
+                            <span className="font-semibold" style={{ color: STAGE_FACE_COLOR[invite.to] }}>
+                              @{STAGE_LABEL[invite.to]}
+                            </span>
+                            를 채팅에 초대했어요
+                          </p>
                         </div>
+                      )
+                    }
+                    // 마커 파싱 실패 — 원문 그대로 flat 출력 (데이터를 숨기지 않는다).
+                  }
+                  // 일반 에이전트 발화 — 배경 없는 flat 출력. 화자는 턴 첫 메시지의 plate 가 말한다.
+                  return (
+                    <div key={msg.id}>
+                      {showRolePlate && <RolePlate stage={msg.stage} />}
+                      <div className="group relative select-text whitespace-pre-wrap px-1 pr-8 text-xs leading-relaxed text-foreground">
+                        <MarkdownText text={msg.content} />
+                        <CopyButton text={msg.content} />
                       </div>
                     </div>
                   )
@@ -556,58 +776,32 @@ export function GlobalChat() {
               </section>
             ))}
 
-            {loading && (
-              <div className="mr-4 flex items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3 animate-spin" />
-                생각 중…
-              </div>
-            )}
+            {loading && <ThinkingIndicator stage={currentStage} />}
 
             {/* 프로액티브 제안 (chat-proactive-copilot Phase 1) — 시스템이 먼저 거는 actionable 넛지.
-                탭 전환 후 1초 정적을 두고 계단식 등장(#chat-settle). */}
+                탭 전환 후 1초 정적을 두고 계단식 등장(#chat-settle).
+                #oiioii-chat v2: 카드(붉은 테두리 박스)를 걷어내고 에이전트 턴과 같은 flat 출력 —
+                role plate + 타이핑 본문 + 캡슐 버튼. 온보딩 인사도 이 경로라 "말 걸어옴"으로 읽힌다. */}
             {showSuggestion && suggestion && (
-              <div
-                className={cn(
-                  'mr-4 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-foreground',
-                  CASCADE_IN,
-                )}
-                style={cascadeStyle(suggestionSlot)}
-              >
-                <div className="mb-1 flex items-center gap-1.5">
-                  <AgentFace color={STAGE_FACE_COLOR[suggestion.stage]} size={18} animate={false} />
-                  <span className="text-[11px] font-medium text-muted-foreground">
-                    {STAGE_LABEL[suggestion.stage]}
-                  </span>
+              <div className={cn('mr-6', CASCADE_IN)} style={cascadeStyle(suggestionSlot)}>
+                <RolePlate stage={suggestion.stage} />
+                <div className="px-1 text-xs leading-relaxed text-foreground">
+                  <TypewriterMarkdown
+                    key={suggestion.id}
+                    id={suggestion.id}
+                    text={suggestion.content}
+                  />
                 </div>
-                <TypewriterMarkdown
-                  key={suggestion.id}
-                  id={suggestion.id}
-                  text={suggestion.content}
-                />
                 {(suggestion.action || suggestion.dismissible !== false) && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {suggestion.action?.kind === 'choices' ? (
-                      // #p4-choices: 다중 선택지 — 클릭 = 그 문구를 채팅에 입력(타이핑과 동일 경로)
-                      suggestion.action.options.map((opt) => (
-                        <Button
-                          key={opt.label}
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            dismissSuggestion()
-                            void sendMessage(opt.utterance)
-                          }}
-                        >
-                          {opt.label}
-                        </Button>
-                      ))
-                    ) : suggestion.action ? (
-                      <Button size="sm" onClick={handleSuggestionAction}>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
+                    {/* kind: 'choices' 는 여기 오지 않는다 — 입력창 앵커 선택지(#p4-choices v2) */}
+                    {suggestion.action && suggestion.action.kind !== 'choices' ? (
+                      <Button size="sm" className="rounded-full" onClick={handleSuggestionAction}>
                         {suggestion.action.label}
                       </Button>
                     ) : null}
                     {suggestion.dismissible !== false && (
-                      <Button size="sm" variant="ghost" onClick={dismissSuggestion}>
+                      <Button size="sm" variant="ghost" className="rounded-full" onClick={() => dismissSuggestion()}>
                         나중에
                       </Button>
                     )}
@@ -619,7 +813,7 @@ export function GlobalChat() {
             {showProposal && pendingProposal && (
               <div
                 className={cn(
-                  'mr-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground',
+                  'mr-6 rounded-2xl border border-warning/40 bg-warning/10 px-3.5 py-2.5 text-xs text-foreground',
                   CASCADE_IN,
                 )}
                 style={cascadeStyle(proposalSlot)}
@@ -645,13 +839,15 @@ export function GlobalChat() {
                     )}
                   </div>
                 </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <Button size="sm" onClick={handlePendingProposalApprove}>
+                {/* CTA — oiioii form 카드의 캡슐 버튼 매핑(Confirm & Continue). 승인은 전폭 캡슐. */}
+                <div className="mt-3 flex flex-col gap-1.5">
+                  <Button size="sm" className="w-full rounded-full" onClick={handlePendingProposalApprove}>
                     승인
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
+                    className="w-full rounded-full"
                     onClick={() => dismissPendingProposal(pendingProposal.id)}
                   >
                     나중에
@@ -685,61 +881,344 @@ export function GlobalChat() {
           </div>
         )}
 
-        {/* Input footer — Textarea가 입력 길이에 따라 자동 확장 (한 줄 min-h-9 → 최대 10줄).
-            max-h = 10줄(leading-5 20px×10) + py-2(16px) + border(2px) = 218px. 그 이상은 내부
-            스크롤 — 네이티브 스크롤바는 숨기고 MentionTextarea의 ^/v 버튼으로 안내(#a3).
-            Enter 전송 / Shift+Enter 개행. 버튼은 items-end로 입력창 하단에 정렬. */}
-        <div className="shrink-0 border-t border-border p-4">
-          <div className="flex items-end gap-2">
-            <HoverBeam className="flex-1">
+        {/* Input footer (#oiioii-chat) — 둥근(r24) 입력 컨테이너 안에 편집기 + 하단 툴바.
+            Textarea 는 입력 길이 따라 자동 확장 (max-h = 10줄 + padding). 내부 스크롤은
+            MentionTextarea 의 ^/v 버튼으로 안내(#a3). Enter 전송 / Shift+Enter 개행.
+            툴바: + 업로드 · 에이전트 필(빠른 요청) · four-dot(@멘션) · 우측 원형 send→Stop. */}
+        <div className="shrink-0 p-3 pt-1">
+          {/* 선택지 (#p4-choices v3 + #oiioii-chat) — 입력창 위 앵커는 유지(고르는 곳 = 답하는
+              곳), 모양은 oiioii choice 행 리스트. 떠 있는 동안 채팅 입력은 잠기고(#choices-freeform),
+              자유 입력은 마지막 '직접 입력' 행이 담당한다. */}
+          {choices && (
+            <div
+              className={cn(
+                'mb-2 flex flex-col gap-1.5 px-1',
+                'animate-in fade-in-0 slide-in-from-bottom-1 duration-150 ease-out motion-reduce:animate-none',
+              )}
+            >
+              {choices.question && (
+                <div className="flex items-start gap-1.5">
+                  <AgentFace
+                    color={STAGE_FACE_COLOR[choices.stage]}
+                    size={16}
+                    animate={false}
+                  />
+                  <p className="min-w-0 text-xs text-foreground">{choices.question}</p>
+                </div>
+              )}
+              {choices.options.map((opt, oi) => {
+                const selected = selectedChoice === opt.label
+                return (
+                  <button
+                    key={opt.label}
+                    type="button"
+                    disabled={loading}
+                    aria-pressed={selected}
+                    onClick={() => {
+                      setFreeformOpen(false)
+                      setSelectedChoice(selected ? null : opt.label)
+                    }}
+                    className={cn(
+                      'relative w-full rounded-xl border-2 px-9 py-2 text-center text-xs text-foreground transition-colors duration-100 ease-out disabled:pointer-events-none disabled:opacity-50',
+                      selected
+                        ? 'border-border-strong bg-accent'
+                        : 'border-transparent bg-muted/60 hover:border-border-strong hover:bg-accent',
+                    )}
+                  >
+                    {/* 숫자키 바로 선택(#choices-keys) 안내 겸 단축키 라벨 */}
+                    <span
+                      className={cn(
+                        'absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[10px]',
+                        selected ? 'text-foreground/70' : 'text-muted-foreground/50',
+                      )}
+                    >
+                      {oi + 1}
+                    </span>
+                    {opt.label}
+                  </button>
+                )
+              })}
+              {/* 직접 입력 (#choices-freeform) — 마지막 행. 클릭 즉시(키보드는 선택 후 Enter)
+                  인라인 인풋으로 펼쳐진다. 잠긴 채팅 입력 대신 여기가 '기타' 답변 통로. */}
+              {freeformOpen ? (
+                <div className="relative w-full rounded-xl border-2 border-border-strong bg-accent px-9 py-2">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-foreground/70">
+                    {choices.options.length + 1}
+                  </span>
+                  <input
+                    ref={freeformInputRef}
+                    value={freeformText}
+                    onChange={(e) => setFreeformText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                        e.preventDefault()
+                        handleFreeformSend()
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault()
+                        setFreeformOpen(false)
+                      }
+                    }}
+                    placeholder="하고 싶은 말을 입력하고 Enter…"
+                    aria-label="직접 입력"
+                    className="w-full border-0 bg-transparent text-xs leading-4 text-foreground outline-none placeholder:text-muted-foreground/60"
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={loading}
+                  aria-pressed={selectedChoice === FREEFORM}
+                  onClick={openFreeform}
+                  className={cn(
+                    'relative w-full rounded-xl border-2 px-9 py-2 text-center text-xs transition-colors duration-100 ease-out disabled:pointer-events-none disabled:opacity-50',
+                    selectedChoice === FREEFORM
+                      ? 'border-border-strong bg-accent text-foreground'
+                      : 'border-transparent bg-muted/60 text-muted-foreground hover:border-border-strong hover:bg-accent hover:text-foreground',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[10px]',
+                      selectedChoice === FREEFORM
+                        ? 'text-foreground/70'
+                        : 'text-muted-foreground/50',
+                    )}
+                  >
+                    {choices.options.length + 1}
+                  </span>
+                  직접 입력…
+                </button>
+              )}
+              {/* 확정 CTA (#oiioii-chat v2) — 고르고 [계속하기]. '직접 입력' 행을 골랐으면 전송
+                  대신 인풋을 연다. */}
+              <Button
+                size="sm"
+                className="w-full rounded-full"
+                disabled={!selectedChoice || loading}
+                onClick={handleChoiceContinue}
+              >
+                계속하기
+              </Button>
+              <div className="flex items-center justify-center gap-1.5">
+                {/* 키 힌트(#choices-keys) — kbd 문법. 자유 입력은 '직접 입력' 행이 담당 */}
+                <p className="text-[10px] text-muted-foreground">
+                  <kbd className="rounded border border-border bg-muted px-1">↑↓</kbd>·
+                  <kbd className="rounded border border-border bg-muted px-1">1-{Math.min(choices.options.length + 1, 9)}</kbd> 선택 ·{' '}
+                  <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> 확정 ·{' '}
+                  <kbd className="rounded border border-border bg-muted px-1">Esc</kbd> 닫기
+                </p>
+                <button
+                  type="button"
+                  onClick={() => dismissSuggestion()}
+                  title="선택지 닫기"
+                  aria-label="선택지 닫기"
+                  className="rounded-full bg-muted p-1 text-muted-foreground transition-colors duration-100 ease-out hover:bg-accent hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            </div>
+          )}
+          <HoverBeam className="rounded-3xl">
+            <div className="rounded-3xl border border-border bg-background px-2 pb-1.5 pt-1">
               <MentionTextarea
                 ref={textareaRef}
                 value={input}
                 onChange={setInput}
                 onSubmit={handleSend}
                 items={mentionItems}
-                history={userHistory}
                 disabled={inputDisabled}
-                placeholder={STAGE_PLACEHOLDER[currentStage]}
+                placeholder={
+                  choices ? '위 선택지에서 답해 주세요' : STAGE_PLACEHOLDER[currentStage]
+                }
                 className={cn(
-                  'max-h-[13.625rem] min-h-9 w-full resize-none py-2 leading-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+                  'max-h-[13.625rem] min-h-9 w-full resize-none border-0 bg-transparent px-2 py-2 leading-5 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
                   producerUntouched &&
                     'placeholder:text-success placeholder:animate-pulse',
                 )}
               />
-            </HoverBeam>
-            {/* 버튼 그룹 — 입력창이 낮으면 가로(업로드|전송), 높아지면 세로(업로드 위/전송 아래).
-                긴 입력에서 버튼끼리 겹치던 문제의 우회(#b2 2026-07-15). */}
-            <div className={cn('flex shrink-0 gap-2', inputTall ? 'flex-col' : 'items-end')}>
-              {currentStage === 'producer' && (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".txt"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                  <Button
-                    size="icon-lg"
-                    variant="ghost"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={loading}
-                    title="스크립트 파일 업로드 (.txt)"
+              {/* 하단 툴바 (#oiioii-chat spec §10 매핑) */}
+              <div className="flex items-center gap-1">
+                {currentStage === 'producer' && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".txt"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="rounded-full"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={loading}
+                      title="스크립트 파일 업로드 (.txt)"
+                      aria-label="스크립트 파일 업로드 (.txt)"
+                    >
+                      <Plus className="size-4" />
+                    </Button>
+                    <span className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden />
+                  </>
+                )}
+                {/* 에이전트 필 — oiioii 의 스킬 필 자리. 클릭 = 이 에이전트의 빠른 요청 목록. */}
+                <Popover open={presetOpen} onOpenChange={setPresetOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      title="빠른 요청"
+                      className={cn(
+                        'flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-xs font-medium transition-colors',
+                        STAGE_BADGE_CLASS[currentStage],
+                      )}
+                    >
+                      <AgentFace
+                        color={STAGE_FACE_COLOR[currentStage]}
+                        size={16}
+                        animate={false}
+                      />
+                      {STAGE_LABEL[currentStage]}
+                      <ChevronDown className="size-3 opacity-60" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" side="top" sideOffset={8} className="w-64 p-1.5">
+                    <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      빠른 요청
+                    </div>
+                    {STAGE_PROMPT_PRESETS[currentStage].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => insertPreset(preset)}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-accent"
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                    {STAGE_PROMPT_PRESETS[currentStage].length === 0 && (
+                      <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                        이 단계에서는 채팅을 지원하지 않아요.
+                      </p>
+                    )}
+                    {(() => {
+                      const handoff = handoffFrom(currentStage)
+                      if (!handoff) return null
+                      return (
+                        <>
+                          <div className="mx-1 my-1 h-px bg-border" aria-hidden />
+                          <button
+                            type="button"
+                            onClick={() => insertPreset(handoff.utterance)}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-accent"
+                          >
+                            {handoff.label} →
+                          </button>
+                        </>
+                      )
+                    })()}
+                  </PopoverContent>
+                </Popover>
+                {/* 스타일 픽커 (#style-entry #feedback 2026-08-07) — producer 에선 four-dot 자리를
+                    스타일 버튼이 차지한다(에셋 멘션은 @ 타이핑·Ctrl+카드 클릭이 대체). 첫 클릭 전
+                    + 스타일 미선택이면 빔 상시 점등. 다른 스테이지는 기존 에셋 팔레트 유지. */}
+                {currentStage === 'producer' ? (
+                  <StyleAnchorPicker
+                    anchors={styleAnchors}
+                    value={styleAnchorKey}
+                    onSelect={(k) => void setStyleAnchor(k)}
                   >
-                    <Upload className="size-4" />
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="hover-red-beam rounded-full"
+                      title="스타일 선택"
+                      aria-label="스타일 선택"
+                      onClick={() => setStylePressed(true)}
+                    >
+                      {/* 레이더 핑 — agent-face 의 ping 과 같은 문법, producer 색. 2s 주기로
+                          느긋하게(기본 1s 는 다급해 보인다). reduced-motion 은 정적 보라 링. */}
+                      {stylePingOn && (
+                        <span
+                          aria-hidden
+                          className="absolute inset-0 animate-ping rounded-full bg-stage-producer opacity-30 [animation-duration:2s] motion-reduce:animate-none"
+                        />
+                      )}
+                      <Palette className="size-4" />
+                    </Button>
+                  </StyleAnchorPicker>
+                ) : (
+                <Popover open={assetsOpen} onOpenChange={setAssetsOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="rounded-full"
+                      title="에셋 멘션"
+                      aria-label="에셋 멘션"
+                    >
+                      <LayoutGrid className="size-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" side="top" sideOffset={8} className="max-h-64 w-64 overflow-y-auto p-1.5">
+                    <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      에셋 멘션
+                    </div>
+                    {mentionItems.map((item) => {
+                      const active = input.includes(`@${item.label}`)
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => toggleAssetMention(item.label)}
+                          className={cn(
+                            'flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent',
+                            active ? 'font-medium text-foreground' : 'text-foreground/80',
+                          )}
+                        >
+                          <span className="truncate">@{item.label}</span>
+                          <span className="flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground">
+                            {item.hint}
+                            {active && <Check className="size-3 text-success" />}
+                          </span>
+                        </button>
+                      )
+                    })}
+                    {mentionItems.length === 0 && (
+                      <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                        이 단계에서 멘션할 수 있는 항목이 없어요.
+                      </p>
+                    )}
+                  </PopoverContent>
+                </Popover>
+                )}
+                <div className="flex-1" />
+                {/* send ↑ → 응답 중이면 Stop ■ (abort, #oiioii-chat) */}
+                {loading ? (
+                  <Button
+                    size="icon-sm"
+                    className="rounded-full"
+                    onClick={stopGeneration}
+                    title="응답 생성 중단"
+                    aria-label="응답 생성 중단"
+                  >
+                    <Square className="size-3 fill-current" />
                   </Button>
-                </>
-              )}
-              <Button
-                size="icon-lg"
-                onClick={handleSend}
-                disabled={inputDisabled || !input.trim()}
-              >
-                <Send className="size-4" />
-              </Button>
+                ) : (
+                  <Button
+                    size="icon-sm"
+                    className="rounded-full"
+                    onClick={handleSend}
+                    disabled={inputDisabled || !input.trim()}
+                    title="보내기"
+                    aria-label="보내기"
+                  >
+                    <ArrowUp className="size-4" />
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
+          </HoverBeam>
         </div>
       </aside>
 
