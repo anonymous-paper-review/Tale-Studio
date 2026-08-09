@@ -266,6 +266,7 @@ export function buildSplitChildren(
     //   (실측 92948d6f: sol 이 design_ref 를 에코해 F2 를 우회 → 형제 중복 재발).
     design_ref: childIdx === 0 ? original.design_ref : undefined,
     static_spec: childIdx === 0 ? original.static_spec : undefined,
+    dynamic_spec: childIdx === 0 ? original.dynamic_spec : undefined,
     // 이슈 location(분할 전 id) 매칭용 임시 태그 — 리넘버에서 제거.
     _splitFrom: parentId,
   }));
@@ -397,6 +398,8 @@ function buildShotSequenceItemFromDesign(
     // #p2-wiring: 러프보드 rich spec 조인용 provenance + persist 가 운반할 static_spec 원본.
     design_ref: design.intent.shot_id,
     static_spec: st,
+    // #motion-contract: 영상 모션 계약 소스 — persist 가 shots.dynamic_spec 으로 운반.
+    dynamic_spec: dyn,
     S: {
       scene_id: design.intent.scene_id,
       scene_purpose: scene?.purpose ?? design.intent.dramatic_purpose,

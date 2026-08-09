@@ -222,6 +222,26 @@ export function renderDirectorPromptTemplate(spec: FacetRenderSpec): string {
   ])
 }
 
+/**
+ * REAL 리페인트용 시네 라인(#viz-gap 2026-08-07). 러프 연필 시트가 **못 옮기는 채널만** 렌더한다:
+ * 렌즈/앵글/피사계심도, 초점 지점, 조명(방향·질·색온도), 팔레트·색 그레이드.
+ *
+ * 블로킹·프레이밍 레이어·소품은 시트가 이미 운반하므로 **의도적으로 제외** — 리페인트의 "레퍼런스
+ * 컬럼과 같은 포즈·구도 유지" 지시와 충돌하면 리페인트 자체를 흔든다(가설의 반증 축). first-frame
+ * 생성용 renderDirectorPromptTemplate 과 달리 여기는 "이미 그려진 컷을 어떤 빛/초점/색으로
+ * 마감하나"만 말한다. 결정론(LLM 호출 없음) — 같은 spec → 같은 라인.
+ */
+export function renderRepaintCineLine(spec: FacetRenderSpec): string {
+  const focalPoint = cleanText(spec.framing?.focal_point)
+  const focus = focalPoint ? sentence('Focus', [`sharpest on ${focalPoint}`]) : null
+  return joinPrompt([
+    describeCamera(spec), // 렌즈·앵글·DoF — DoF 는 연필이 못 그리는 핵심 비운반 채널
+    focus, // 초점 지점(무엇이 선명한가) — framing.layers 는 빼고 focal_point 만
+    describeLighting(spec), // 조명 방향·질·색온도 — 그림자 기하
+    describeColor(spec), // 팔레트·그레이드·질감
+  ])
+}
+
 export async function renderDirectorPromptFromFacets(
   spec: FacetRenderSpec,
   opts: { llm?: FacetRenderLlm; flagOverride?: boolean } = {},

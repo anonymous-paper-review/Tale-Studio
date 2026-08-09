@@ -334,7 +334,9 @@ export function GlobalChat() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     // stageSettled: 1초 뒤 계단식으로 등장하는 제안/승인 카드(#chat-settle)가 스레드 끝에
     //   붙으므로, 나타나는 순간 끝까지 따라가야 화면 밖에서 조용히 뜨지 않는다.
-  }, [messages.length, loading, currentStage, stageSettled])
+    // suggestion/proposal id(2026-08-06): 핸드오프 등 제안은 messages 에 안 실려 이 effect 가
+    //   안 돌았다 — 위로 스크롤해 둔 상태에서 제안이 화면 밖(아래)에 조용히 떠 놓치는 문제.
+  }, [messages.length, loading, currentStage, stageSettled, suggestion?.id, pendingProposal?.id])
 
   // 입력창의 @멘션 ↔ 카드 하이라이트 동기화 (입력에서 지우면 자동 해제)
   useEffect(() => {
@@ -796,7 +798,17 @@ export function GlobalChat() {
                   <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
                     {/* kind: 'choices' 는 여기 오지 않는다 — 입력창 앵커 선택지(#p4-choices v2) */}
                     {suggestion.action && suggestion.action.kind !== 'choices' ? (
-                      <Button size="sm" className="rounded-full" onClick={handleSuggestionAction}>
+                      <Button
+                        size="sm"
+                        className={cn(
+                          'rounded-full',
+                          // 핸드오프 강조(#ux-batch-0806) — flat 재설계에선 카드가 없어 CTA 캡슐에
+                          //   링 3회 펄스를 얹는다(원격의 카드 링 의도 이식).
+                          suggestion.action.kind === 'handoff' &&
+                            'animate-handoff-ring motion-reduce:animate-none',
+                        )}
+                        onClick={handleSuggestionAction}
+                      >
                         {suggestion.action.label}
                       </Button>
                     ) : null}

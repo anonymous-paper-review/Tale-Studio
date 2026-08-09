@@ -11,6 +11,7 @@
 //
 // id: scene/shot 은 main 포맷(sc_01 / sh_01_01)으로 정규화, character 는 writer snake_case 유지
 //     → shots.characters 와 characters.character_id 가 동일 id 공간(referential 정합).
+import { humanizeSlug } from '@/lib/display-name'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { writerSceneIdToMain, writerShotIdToMain } from '@/lib/writer/adapters'
 import { reallocateShotDurations } from '@/lib/writer/pipeline/util/duration_reallocation'
@@ -35,6 +36,7 @@ import type {
   CharacterVisual,
   ShotSequence,
   ShotStaticSpec,
+  ShotDynamicSpec,
   ShotCheckNote,
   DialogueTrack,
   ShotDialogue,
@@ -160,7 +162,8 @@ export async function persistAssetsToDb(
           return {
             project_id: projectId,
             location_id: loc.id,
-            name: loc.id,
+            // 표시 이름 — slug 형 id 는 humanize(#opencast-name 2026-08-06: "location_1" 노출 방지).
+            name: humanizeSlug(loc.id),
             time_of_day: '',
             style_description: en,
             lighting_sources: loc.lighting_sources ?? [],
@@ -392,6 +395,8 @@ type PersistShotDraft = {
   actionNative: string
   composition: string
   staticSpec: FacetRenderSpec | null
+  // #motion-contract: v4 dynamic_spec 원본 — shots.dynamic_spec 운반(영상 모션 계약 소스).
+  dynamicSpec: ShotDynamicSpec | null
   promptSourceHash: string | null
   chars: string[]
   shotDialogue: ShotDialogue | null
@@ -591,6 +596,7 @@ export async function persistShotsToDb(
       const rich = it as typeof it & {
         first_frame_generation?: { composition_prompt?: string }
         static_spec?: Partial<ShotStaticSpec>
+        dynamic_spec?: ShotDynamicSpec
       }
       const composition = (
         rich.first_frame_generation?.composition_prompt ??
@@ -605,6 +611,7 @@ export async function persistShotsToDb(
         actionNative: it.S?.character_action ?? '',
         composition,
         staticSpec,
+        dynamicSpec: rich.dynamic_spec ?? null,
         promptSourceHash: safeFacetsHash(staticSpec),
         chars: Array.from(new Set(chars)),
         // #dialogue-v4: 대사 트랙(화자 명시)에서 조회 — it.shot_id는 decoupage 표준화 id 그대로.
@@ -654,6 +661,8 @@ export async function persistShotsToDb(
           // 생성 프롬프트: flag off 는 rich composition → action, flag on 은 static_spec facet 렌더(캐시 가능).
           prompt: promptValue,
           static_spec: r.staticSpec ?? null,
+          // #motion-contract: 영상 모션 계약 소스(생성-비디오 라우트가 컴파일해 프롬프트에 주입).
+          dynamic_spec: r.dynamicSpec ?? null,
           prompt_source_hash: r.promptSourceHash,
           // #p2-wiring: 러프보드 spec 조인 provenance + shotCheck 채널1 제약 운반.
           design_ref: r.designRef,

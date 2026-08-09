@@ -739,6 +739,9 @@ export interface ShotSequenceItem {
   design_ref?: string;
   // v4 static_spec 원본 — persist 가 shots.static_spec 으로 운반 (facet 렌더·prompt 캐시 소스).
   static_spec?: ShotStaticSpec;
+  // v4 dynamic_spec 원본(#motion-contract 2026-08-07) — persist 가 shots.dynamic_spec 으로 운반.
+  //   영상 생성의 모션 계약(카메라 static/방향/속도·인물 동사·시선 arc) 소스. static_spec 과 대칭.
+  dynamic_spec?: ShotDynamicSpec;
   // shotCheck 채널1: CRITICAL/WARNING 제약 — persist 가 shots.check_notes 로 운반, 생성 프롬프트에 첨부.
   check_notes?: ShotCheckNote[];
 }

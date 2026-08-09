@@ -26,6 +26,7 @@ import { Loader2, ImageIcon, X, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map a
 
 import { toast } from 'sonner'
 import { runRealBatch } from '@/lib/director/real-batch-client'
+import { StageHelpBadge } from '@/components/stage-help-badge'
 
 import { handoffFrom } from '@/lib/handoff-intent'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -878,12 +879,11 @@ export default function DirectorCanvasPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* 스테이지 헤더(#e1 2026-07-14) — 다른 탭(writer/artist)과 동일한 제목+설명 구조 */}
-      <div className="shrink-0 border-b border-border px-6 py-3">
+      {/* 스테이지 헤더(#e1 2026-07-14) — 다른 탭(writer/artist)과 동일 구조.
+          설명문은 "?" 뱃지 호버로 이관(2026-08-06). */}
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-6 py-3">
         <h1 className="text-lg font-semibold">The Set</h1>
-        <p className="mt-1 text-xs text-muted-foreground">
-          러프 스토리보드와 등장인물, 월드를 바탕으로 실제 이미지/영상으로 촬영을 시작하세요
-        </p>
+        <StageHelpBadge text="러프 스토리보드와 등장인물, 월드를 바탕으로 실제 이미지/영상으로 촬영을 시작하세요." />
       </div>
       <div className="flex flex-1 overflow-hidden">
         {/* Center: top Palette bar(#e1 — 하단→상단 이동) + Canvas (Node/Storyboard) */}

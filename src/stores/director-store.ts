@@ -35,6 +35,7 @@ import {
   type VideoNodeData,
   type PromptNodeData,
   type VideoOverride,
+  type VideoAdherence,
   type DirectorVideoStatus,
   type DirectorVideoProvider,
 } from '@/types/director'
@@ -43,6 +44,7 @@ import {
   type RegisteredCharacter,
 } from '@/stores/asset-storage-store'
 import { createClient } from '@/lib/supabase/client'
+import { runVideoAdherence } from '@/lib/director/video-adherence-client'
 import { isDemoSession } from '@/lib/demo/context'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { notifyGenerationComplete, notifyGenerationFailure } from '@/lib/generation-notify'
@@ -126,6 +128,8 @@ type HydratedVideoTake = {
   latestJobStatus: DirectorVideoStatus | null
   latestJobError: string | null
   latestAttemptAt: string | null
+  /** #adherence P2: 모션 준수 판정(video_clips.adherence — select * 로 흘러옴). 구행/미검사 = 없음. */
+  adherence?: VideoAdherence | null
 }
 type VideoGenerationResponse = {
   error?: string
@@ -227,6 +231,7 @@ function makeVideoData(
     errorMessage: null,
     final: false,
     stale: false,
+    adherence: null,
   }
 }
 
@@ -1287,6 +1292,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                       ? existingNode.data.lastAttemptAt
                       : row.latestAttemptAt ?? row.last_attempt_at ?? row.updated_at ?? null,
                     createdAt: row.created_at ?? existingNode.data.createdAt,
+                    // #adherence P2: DB 판정이 있으면 채택(재검사 결과 수렴), 없으면 로컬 유지
+                    adherence: (row.adherence as VideoAdherence | null) ?? existingNode.data.adherence ?? null,
                   },
                 } as DirectorNode
                 continue
@@ -1311,6 +1318,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               data.videoUrl = (row.url as string) ?? null
               data.thumbnailUrl = (row.thumbnail_url as string) ?? null
               data.status = hydratedVideoStatus(row)
+              data.adherence = (row.adherence as VideoAdherence | null) ?? null
               const id = newDirectorId('dn')
               nodes = [...nodes, {
                 id,
@@ -2497,7 +2505,28 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 console.error(`[director-store] ${message} for accepted job ${acceptedJobId}`)
               }
               if (!isCurrentAttempt()) return true
-              if (status === 'completed') notifyGenerationComplete('director', '영상')
+              if (status === 'completed') {
+                notifyGenerationComplete('director', '영상')
+                // #adherence P2: 모션 계약 준수 검사(fire-and-forget) — 브라우저가 첫/끝 프레임을
+                //   캡처해 서버 판정 후 배지 반영. 실패는 조용히 무시(생성 결과에 영향 없음).
+                const doneNode = get().nodes.find((n) => n.id === videoNodeId)
+                const clipId = doneNode && isVideoData(doneNode.data) ? doneNode.data.videoClipId : null
+                const doneUrl = doneNode && isVideoData(doneNode.data) ? doneNode.data.videoUrl : null
+                const parentShotId = doneNode && isVideoData(doneNode.data)
+                  ? (() => {
+                      const shot = get().nodes.find((n) => n.id === (doneNode.data as VideoNodeData).parentShotNodeId)
+                      return shot && isShotData(shot.data) ? shot.data.writerShotId : null
+                    })()
+                  : null
+                if (clipId && doneUrl && parentShotId) {
+                  void runVideoAdherence({ projectId, writerShotId: parentShotId, videoClipId: clipId, videoUrl: doneUrl })
+                    .then((verdict) => {
+                      if (!verdict || !isCurrentAttempt()) return
+                      get().updateNodeData<'video'>(videoNodeId, { adherence: verdict })
+                    })
+                    .catch(() => {})
+                }
+              }
               return true
             }
             await new Promise((resolve) => setTimeout(resolve, VIDEO_POLL_INTERVAL_MS))

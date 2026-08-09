@@ -606,3 +606,21 @@ html[data-stage-nav]::view-transition-new(chat-panel) {
 .dark .number-spin::-webkit-inner-spin-button {
   filter: invert(1);
 }
+
+/* 핸드오프 제안 링 펄스(2026-08-06) — 채팅의 "다음 단계로" 제안 카드가 등장할 때
+   primary 링을 3회 두드려 시선을 끈다. 카드 자체 강조라 hover 무관, 모션 축소는
+   마크업의 motion-reduce:animate-none 이 담당. */
+@keyframes handoff-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.animate-handoff-ring {
+  animation: handoff-ring 1.1s ease-out 0.35s 3;
+}

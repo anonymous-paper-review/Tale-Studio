@@ -7,6 +7,7 @@
 //     - 캐릭터 = state.characters(이름/역할, 이른 시점) + characters 테이블(네이티브 설명 + 초안 이미지 URL).
 //   폴링은 실행 중 한 프로젝트만 저빈도(≈4s)로 하므로 state 블롭 SELECT 비용은 감내한다.
 import { NextRequest, NextResponse } from 'next/server';
+import { displayNameOf } from '@/lib/display-name';
 import { getActiveRun } from '@/lib/writer/run-store';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isTargetScript } from '@/lib/writer/i18n/derive-en';
@@ -51,7 +52,8 @@ function pushRoster(
   for (const r of rows ?? []) {
     if (typeof r?.id === 'string' && typeof r?.name === 'string' && r.id && r.name && !seen.has(r.id)) {
       seen.add(r.id);
-      out.push({ slug: r.id, name: r.name });
+      // 오픈캐스트 레거시 행의 slug 이름("char_1")은 사람이 읽는 표기로 폴백(#opencast-name).
+      out.push({ slug: r.id, name: displayNameOf(r.name, r.id) });
     }
   }
 }
@@ -150,7 +152,7 @@ export async function GET(
         const db = dbCharById.get(c.id);
         return {
           id: c.id,
-          name: c.name ?? db?.name ?? c.id,
+          name: displayNameOf(c.name ?? db?.name, c.id),
           role: c.role ?? '',
           description: db?.description ?? '',
           portraitUrl: db?.portrait ?? null,
@@ -168,7 +170,7 @@ export async function GET(
       worlds = (locRows ?? [])
         .map((r) => ({
           id: (r.location_id as string) ?? '',
-          name: ((r.name as string) ?? '').trim(),
+          name: displayNameOf((r.name as string) ?? '', (r.location_id as string) ?? ''),
           description: ((r.visual_description as string) ?? '').trim(),
         }))
         .filter((w) => w.id && w.name);

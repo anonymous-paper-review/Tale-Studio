@@ -1,260 +1,722 @@
-import type { Metadata } from 'next'
-import Link from 'next/link'
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
-  ArrowRight,
-  Clapperboard,
+  Plus,
+  Loader2,
   Film,
-  Palette,
-  PenTool,
-  Share2,
+  Pencil,
+  Trash2,
+  Clock,
+  ArrowRight,
   Sparkles,
+  ChevronDown,
+  Video,
+  Camera,
   Users,
+  ShieldCheck,
+  LogOut,
 } from 'lucide-react'
-import { SiteHeader } from '@/components/marketing/site-header'
-import { SiteFooter } from '@/components/marketing/site-footer'
-import { SectionNav } from '@/components/marketing/section-nav'
-import { LANDING_SHOWCASE, type ShowcaseSlot } from '@/lib/landing-content'
-import { cn } from '@/lib/utils'
+import { useProjectStore } from '@/stores/project-store'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import type { StageId } from '@/types'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { createClient } from '@/lib/supabase/client'
+import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
+import { ContactPopover } from '@/components/contact-popover'
 
-// 랜딩 (#landing-v2 2026-08-03) — aistudio.google.com/models/veo 참고: 풀스크린 몰입 섹션들이
-//   한 기능씩 보여준다. 프로젝트 목록은 /projects 로 분리됐고, 로그인 상태는 middleware 가
-//   이 페이지 진입 자체를 /projects 로 돌린다.
-// 스크롤(#landing-v2c): 스냅(y-mandatory)은 트랙패드에서 뚝뚝 끊겨 제거 — 연속 스크롤 +
-//   우측 "-" 목차(SectionNav)로 섹션 점프. 섹션 id 는 아래 LANDING_SECTIONS 가 진실.
-
-export const metadata: Metadata = {
-  title: 'Tale Studio — 스토리 한 줄이 Previz 영상이 되기까지',
-  description:
-    '5명의 AI 프로덕션 팀(Producer·Writer·Artist·Director·Editor)과 함께 콘티부터 Previz 영상까지. 링크 하나로 공유하고 리뷰받으세요.',
-  openGraph: {
-    title: 'Tale Studio',
-    description: '스토리 한 줄이 Previz 영상이 되기까지 — AI 프리프로덕션 스튜디오',
-  },
+interface ProjectItem {
+  id: string
+  title: string
+  current_stage: string | null
+  updated_at: string | null
 }
 
-// 우측 "-" 목차의 진실 — 섹션 id·표시명 (SectionNav 와 아래 <section id> 가 함께 쓴다)
-const LANDING_SECTIONS = [
-  { id: 'hero', label: '홈' },
-  { id: 'pipeline', label: 'AI 팀' },
-  { id: 'previz', label: 'Previz' },
-  { id: 'collab', label: '공유·리뷰' },
-  { id: 'start', label: '시작하기' },
-] as const
+const STAGE_LABELS: Record<string, string> = {
+  producer: 'Producer',
+  writer: 'Writer',
+  artist: 'Concept Artist',
+  director: 'Director',
+  editor: 'Editor',
+}
 
-const STAGES_SHOWCASE = [
+const SERVICES = [
   {
-    label: 'Producer',
-    color: 'text-stage-producer',
-    border: 'border-stage-producer/40',
-    icon: Users,
-    desc: '스토리 한 줄을 받아 캐릭터·배경·구조를 함께 정리합니다',
+    icon: <Users className="size-6" />,
+    title: 'AI Production Team',
+    desc: 'Collaborate with specialized AI agents — Producer, Writer, Artist, Director, Editor.',
+    image:
+      'https://images.unsplash.com/photo-1770233621425-5d9ee7a0a700?auto=format&fit=crop&q=80&w=800',
   },
   {
-    label: 'Writer',
-    color: 'text-stage-writer',
-    border: 'border-stage-writer/40',
-    icon: PenTool,
-    desc: '씬과 샷을 나누고 러프 스토리보드를 그립니다',
+    icon: <Camera className="size-6" />,
+    title: 'AI Cinematography',
+    desc: 'Real-time AI adjustments for 6-axis camera angles and cinematic lighting.',
+    image:
+      'https://images.unsplash.com/photo-1642286941365-89da3e29c0a2?auto=format&fit=crop&q=80&w=800',
   },
   {
-    label: 'Artist',
-    color: 'text-stage-artist',
-    border: 'border-stage-artist/40',
-    icon: Palette,
-    desc: '캐릭터 턴어라운드 시트와 배경 컨셉을 만듭니다',
+    icon: <Video className="size-6" />,
+    title: 'T2V & I2V Generation',
+    desc: 'Text-to-Video and Image-to-Video powered by Kling, Hunyuan, and self-hosted models.',
+    image:
+      'https://images.unsplash.com/photo-1612180768015-56180b567352?auto=format&fit=crop&q=80&w=800',
   },
   {
-    label: 'Director',
-    color: 'text-stage-director',
-    border: 'border-stage-director/40',
-    icon: Clapperboard,
-    desc: '카메라·조명을 조정하고 실사 이미지와 영상을 촬영합니다',
+    icon: <ShieldCheck className="size-6" />,
+    title: 'Security Vault',
+    desc: 'Isolated environment. Your creativity and IP are never used for external AI training.',
+    image:
+      'https://images.unsplash.com/photo-1687715997916-4030568eda97?auto=format&fit=crop&q=80&w=800',
   },
-  {
-    label: 'Editor',
-    color: 'text-stage-editor',
-    border: 'border-stage-editor/40',
-    icon: Film,
-    desc: '테이크를 고르고 이어 붙여 한 편으로 완성합니다',
-  },
-] as const
+]
 
-/** 쇼케이스 영상 — URL 이 비어 있으면 시네마틱 그라디언트로 대체(빈 슬롯을 드러내지 않음). */
-function ShowcaseVideo({
-  slot,
-  className,
-  overlay = true,
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'just now'
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.floor(diffHr / 24)
+  if (diffDay < 7) return `${diffDay}d ago`
+  return d.toLocaleDateString()
+}
+
+function ProjectCard({
+  project,
+  onOpen,
+  onRenamed,
+  onDeleteRequest,
 }: {
-  slot: ShowcaseSlot
-  className?: string
-  overlay?: boolean
+  project: ProjectItem
+  onOpen: (p: ProjectItem) => void
+  onRenamed: (id: string, title: string) => void
+  onDeleteRequest: (p: ProjectItem) => void
 }) {
+  const [editing, setEditing] = useState(false)
+  const [title, setTitle] = useState(project.title || 'Untitled')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleSave = async () => {
+    setEditing(false)
+    const trimmed = title.trim() || 'Untitled'
+    setTitle(trimmed)
+    onRenamed(project.id, trimmed)
+    await fetch(`/api/project/${project.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: trimmed }),
+    })
+  }
+
   return (
-    <div className={cn('pointer-events-none absolute inset-0 overflow-hidden', className)}>
-      {slot.videoUrl ? (
-        <video
-          src={slot.videoUrl}
-          poster={slot.poster ?? undefined}
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="size-full object-cover"
-        />
-      ) : (
-        <div className="size-full bg-[radial-gradient(ellipse_at_top,rgba(229,9,20,0.14),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgba(70,130,180,0.10),transparent_60%)]" />
-      )}
-      {overlay && (
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/30 to-black/80" />
-      )}
+    <div
+      onClick={() => !editing && onOpen(project)}
+      className="group flex cursor-pointer flex-col rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:bg-white/10 hover:shadow-[0_10px_30px_rgba(229,9,20,0.1)]"
+    >
+      <div className="flex items-center justify-between">
+        {editing ? (
+          <Input
+            ref={inputRef}
+            // 랜딩 카드가 다크 배경이라 기본 글자색이 검정으로 떨어지면 안 보임(#a3) — 흰 글씨 강제.
+            className="h-9 text-lg font-semibold text-white caret-white placeholder:text-gray-500"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSave()
+              if (e.key === 'Escape') { setTitle(project.title || 'Untitled'); setEditing(false) }
+            }}
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <>
+            <h3 className="text-lg font-semibold text-white transition-colors group-hover:text-primary">
+              {title}
+            </h3>
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setEditing(true)
+                }}
+                title="이름 변경"
+                aria-label="프로젝트 이름 변경"
+                className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDeleteRequest(project)
+                }}
+                title="프로젝트 삭제"
+                aria-label="프로젝트 삭제"
+                className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+      <div className="mt-4 flex items-center gap-3 text-xs text-gray-400">
+        <span className="rounded-md bg-white/10 px-2.5 py-1 font-medium">
+          {STAGE_LABELS[project.current_stage ?? 'producer'] ?? 'Producer'}
+        </span>
+        {project.updated_at && (
+          <span className="flex items-center gap-1">
+            <Clock className="size-3" />
+            {formatDate(project.updated_at)}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
 
-export default function LandingPage() {
+export default function HomePage() {
+  const router = useRouter()
+  const switchProject = useProjectStore((s) => s.switchProject)
+  const createNewProject = useProjectStore((s) => s.createNewProject)
+
+  const [projects, setProjects] = useState<ProjectItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [userInfo, setUserInfo] = useState<{ name: string; avatar: string | null } | null>(null)
+  const [isAuthed, setIsAuthed] = useState<boolean | null>(null)
+  // 새 프로젝트 이름 지정 팝업(#a1) — 모든 생성 진입점(Get Started/New Project)이 이 팝업을 거친다.
+  const [nameOpen, setNameOpen] = useState(false)
+  const [nameValue, setNameValue] = useState('')
+  // 삭제 확인 팝업(#a2) — 타일 휴지통 클릭 시 대상 지정.
+  const [deleteTarget, setDeleteTarget] = useState<ProjectItem | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // 인증 먼저 확인 → 로그인한 경우에만 프로젝트 목록 요청(비로그인 헛요청 방지).
+    import('@/lib/supabase/client').then(({ createClient }) => {
+      const supabase = createClient()
+      supabase.auth
+        .getUser()
+        .then(({ data: { user } }) => {
+          setIsAuthed(!!user)
+          if (!user) {
+            // 비로그인: 프로젝트가 있을 수 없으므로 목록 요청 생략.
+            setLoading(false)
+            return
+          }
+          setUserInfo({
+            name: user.user_metadata?.full_name ?? user.email ?? '',
+            avatar: user.user_metadata?.avatar_url ?? null,
+          })
+          fetch('/api/project/list')
+            .then((r) => r.json())
+            .then((data) => setProjects(data.projects ?? []))
+            .catch(() => {})
+            .finally(() => setLoading(false))
+        })
+        .catch(() => setLoading(false))
+    })
+  }, [])
+
+  // 로그인 직후(#projects 로 착지) 프로젝트 목록이 렌더된 뒤 그 섹션으로 스크롤.
+  // 이메일/OAuth 로그인 모두 next 없으면 '/#projects' 로 보내므로 양쪽을 커버.
+  useEffect(() => {
+    if (loading) return
+    if (window.location.hash !== '#projects') return
+    document
+      .getElementById('projects')
+      ?.scrollIntoView({ behavior: 'smooth' })
+  }, [loading])
+
+  const handleOpen = (project: ProjectItem) => {
+    const stage = project.current_stage ?? 'producer'
+    switchProject(project.id, project.title, stage as StageId)
+    router.push(`/studio/${stage}?projectId=${project.id}`)
+  }
+
+  const handleNew = () => {
+    // 비로그인 → 로그인부터. 로그인 후 홈으로 복귀하면 다시 눌러 생성.
+    if (isAuthed === false) {
+      router.push('/login')
+      return
+    }
+    setNameValue('')
+    setNameOpen(true)
+  }
+
+  const handleCreate = async () => {
+    const name = nameValue.trim()
+    if (!name || creating) return
+    setCreating(true)
+    await createNewProject(name)
+    const newId = useProjectStore.getState().projectId
+    router.push(
+      newId ? `/studio/producer?projectId=${newId}` : '/studio/producer',
+    )
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget || deleting) return
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`/api/project/${deleteTarget.id}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error ?? res.statusText)
+      }
+      setProjects((prev) => prev.filter((p) => p.id !== deleteTarget.id))
+      // 세션 복원 힌트가 방금 지운 프로젝트를 가리키면 제거 (재진입 시 죽은 링크 방지).
+      if (readLastProjectId() === deleteTarget.id) clearLastProjectId()
+      setDeleteTarget(null)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : '삭제에 실패했어요')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const scrollToProjects = () => {
+    document
+      .getElementById('projects')
+      ?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const handleLogout = async () => {
+    // 공용 브라우저에서 다음 계정에게 마지막 프로젝트 힌트가 안 새도록 제거.
+    clearLastProjectId()
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    // 홈에 머무르므로(로그아웃 버튼이 홈에만 있음) 로그인 UI 상태를 즉시 초기화.
+    setUserInfo(null)
+    setIsAuthed(false)
+    setProjects([])
+    router.push('/')
+  }
+
   return (
-    <div className="bg-black text-white">
-      <SiteHeader />
-      <SectionNav sections={LANDING_SECTIONS} />
-
-      {/* ── 1. Hero — 무엇을 하는 곳인지 한 문장 + 대표 영상 ── */}
-      <section id="hero" className="relative flex min-h-svh flex-col items-center justify-center px-6">
-        <ShowcaseVideo slot={LANDING_SHOWCASE.hero} />
-        <div className="relative z-10 mx-auto max-w-4xl text-center">
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-medium tracking-wide text-gray-300 backdrop-blur-md">
-            <Sparkles className="size-3.5 text-primary" />
-            AI previz studio
-          </div>
-          <h1 className="mb-6 text-5xl font-semibold leading-[1.08] tracking-tighter md:text-7xl">
-            스토리 한 줄이
-            <br />
-            <span className="bg-gradient-to-r from-primary via-red-400 to-orange-400 bg-clip-text text-transparent">
-              Previz 영상
+    <div className="min-h-screen bg-white text-black selection:bg-primary selection:text-white">
+      {/* ── Navbar ── */}
+      <nav className="fixed top-0 z-50 w-full bg-gradient-to-b from-black/80 to-transparent px-6 py-6">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Film className="size-8 text-primary" />
+            <span className="text-2xl font-bold tracking-tight text-white">
+              Tale Studio
             </span>
-            이 되기까지
+          </div>
+          <div className="hidden items-center gap-10 text-sm font-medium md:flex">
+            <a
+              href="#services"
+              className="text-gray-300 transition-colors hover:text-primary"
+            >
+              Services
+            </a>
+            <a
+              href="#projects"
+              className="text-gray-300 transition-colors hover:text-primary"
+            >
+              Projects
+            </a>
+            <button
+              onClick={handleNew}
+              disabled={creating}
+              className="rounded-full bg-white px-6 py-2.5 font-semibold text-black transition-all duration-300 hover:bg-primary hover:text-white hover:shadow-lg hover:shadow-primary/20"
+            >
+              {creating ? 'Creating...' : 'Get Started'}
+            </button>
+            {userInfo && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 rounded-full focus:outline-none">
+                    {userInfo.avatar ? (
+                      <img
+                        src={userInfo.avatar}
+                        alt={userInfo.name}
+                        className="size-8 rounded-full border border-white/20 object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="flex size-8 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white">
+                        {userInfo.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="max-w-[120px] truncate text-xs text-gray-300">
+                      {userInfo.name}
+                    </span>
+                    <ChevronDown className="size-4 text-gray-300" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* ── Hero ── */}
+      <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-black">
+        {/* Background video */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-50 mix-blend-screen"
+          poster="https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&q=80&w=1080"
+        >
+          <source
+            src="https://assets.mixkit.co/videos/preview/mixkit-network-of-connections-in-a-dark-background-22204-large.mp4"
+            type="video/mp4"
+          />
+        </video>
+
+        {/* Overlays */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/80" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,black_100%)] opacity-60" />
+        <div className="pointer-events-none absolute bottom-0 left-0 h-48 w-full bg-gradient-to-t from-white via-white/80 to-transparent" />
+
+        <div className="relative z-10 mx-auto max-w-5xl px-6 pt-24 text-center">
+          {/* Badge */}
+          <div className="mb-10 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium tracking-wide text-white backdrop-blur-md">
+            <span className="relative flex size-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex size-2.5 rounded-full bg-primary" />
+            </span>
+            The Future of Filmmaking is Here
+          </div>
+
+          {/* Title */}
+          <h1 className="mb-8 text-6xl font-semibold leading-[1.05] tracking-tighter text-white md:text-[5.5rem] lg:text-9xl">
+            Create Beyond <br className="hidden md:block" />
+            <span className="relative inline-block">
+              <span className="relative z-10 bg-gradient-to-r from-primary via-red-500 to-orange-500 bg-clip-text text-transparent">
+                Human Limits
+              </span>
+              <span className="pointer-events-none absolute -inset-2 z-0 animate-pulse rounded-full bg-primary/20 opacity-50 blur-2xl" />
+            </span>
           </h1>
-          <p className="mx-auto mb-12 max-w-2xl text-lg font-light leading-relaxed text-gray-300 md:text-xl">
-            5명의 AI 프로덕션 팀과 함께 콘티부터 영상까지.
-            <br className="hidden md:block" />
-            만든 결과물은 링크 하나로 공유하고 리뷰받으세요.
+
+          {/* Subtitle */}
+          <p className="mx-auto mb-14 max-w-3xl text-xl font-light leading-relaxed tracking-wide text-gray-300 md:text-2xl">
+            Tale Studio redefines the production pipeline. Experience the
+            perfect synergy of cinematic artistry and AI precision.
           </p>
-          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link
-              href="/login"
-              className="group inline-flex items-center gap-2 rounded-full bg-primary px-8 py-4 text-base font-semibold text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-[0_0_40px_rgba(229,9,20,0.4)]"
+
+          {/* CTA */}
+          <div className="flex flex-col items-center justify-center gap-6 sm:flex-row">
+            <button
+              onClick={scrollToProjects}
+              className="group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-full bg-primary px-8 py-5 text-lg font-medium text-primary-foreground transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_40px_rgba(229,9,20,0.4)] sm:w-auto"
             >
-              무료로 시작하기
-              <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-            <Link
-              href="/playground"
-              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/30 px-8 py-4 text-base font-medium text-white backdrop-blur-sm transition-all hover:border-white hover:bg-white hover:text-black"
+              <span className="relative z-10 flex items-center gap-2">
+                View Projects
+                <ArrowRight className="size-5 transition-transform duration-300 group-hover:translate-x-1" />
+              </span>
+            </button>
+
+            <button
+              onClick={handleNew}
+              disabled={creating}
+              className="group inline-flex w-full items-center justify-center gap-3 rounded-full border border-white/20 bg-black/30 px-8 py-5 text-lg font-medium text-white backdrop-blur-sm transition-all duration-300 hover:border-white hover:bg-white hover:text-black hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] sm:w-auto"
             >
-              Playground 구경하기
-            </Link>
+              <Sparkles className="size-5 transition-transform duration-300 group-hover:scale-110" />
+              {creating ? 'Creating...' : 'Get Started'}
+            </button>
+          </div>
+        </div>
+
+        {/* Scroll indicator */}
+        <div
+          className="group absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 cursor-pointer flex-col items-center gap-3"
+          onClick={scrollToProjects}
+        >
+          <span className="text-xs font-bold uppercase tracking-[0.3em] text-gray-400 transition-colors duration-300 group-hover:text-black">
+            Scroll to explore
+          </span>
+          <div className="rounded-full border border-white/10 bg-white/10 p-2 backdrop-blur-sm transition-colors group-hover:border-black/10 group-hover:bg-black/5">
+            <ChevronDown className="size-6 text-primary" />
           </div>
         </div>
       </section>
 
-      {/* ── 2. 파이프라인 — 5명의 AI 팀이 이어달리는 과정 ── */}
-      <section id="pipeline" className="relative flex min-h-svh flex-col items-center justify-center px-6 py-20">
-        <div className="mx-auto w-full max-w-6xl">
-          <p className="mb-3 text-center text-xs font-bold uppercase tracking-[0.25em] text-gray-500">
-            How it works
-          </p>
-          <h2 className="mb-4 text-center text-4xl font-semibold tracking-tighter md:text-5xl">
-            다섯 명의 AI 팀이 이어달립니다
+      {/* ── Services ── */}
+      <section
+        id="services"
+        className="mx-auto max-w-7xl px-6 pb-32 pt-10 md:px-12"
+      >
+        <div className="mb-24 text-center">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-bold uppercase tracking-widest text-gray-600">
+            <Sparkles className="size-3 text-primary" />
+            Platform Capabilities
+          </div>
+          <h2 className="mb-8 text-5xl font-semibold tracking-tighter text-black md:text-6xl">
+            Our Services
           </h2>
-          <p className="mx-auto mb-14 max-w-2xl text-center text-base font-light text-gray-400">
-            각 단계의 에이전트가 앞 단계의 산출물을 이어받아 다음을 만듭니다 — 당신은
-            채팅으로 지시하고, 마음에 들 때 다음으로 넘깁니다.
+          <p className="mx-auto max-w-2xl text-lg font-light leading-relaxed text-gray-500 md:text-xl">
+            Tale Studio transforms the traditional filmmaking process into an
+            efficient, secure, and limitless AI-powered experience.
           </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {STAGES_SHOWCASE.map((stage, i) => (
-              <div
-                key={stage.label}
-                className={cn(
-                  'relative flex flex-col rounded-2xl border bg-white/[0.03] p-6 backdrop-blur-sm transition-colors hover:bg-white/[0.06]',
-                  stage.border,
-                )}
-              >
-                <span className="mb-4 font-mono text-xs text-gray-500">P{i + 1}</span>
-                <stage.icon className={cn('mb-3 size-6', stage.color)} />
-                <h3 className={cn('mb-2 text-lg font-semibold', stage.color)}>{stage.label}</h3>
-                <p className="text-sm font-light leading-relaxed text-gray-400">{stage.desc}</p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12">
+          {SERVICES.map((service) => (
+            <div
+              key={service.title}
+              className="group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[2rem] bg-black shadow-sm transition-all duration-500 hover:shadow-[0_20px_40px_rgba(229,9,20,0.15)]"
+            >
+              <img
+                src={service.image}
+                alt={service.title}
+                className="absolute inset-0 h-full w-full object-cover saturate-[1.2] transition-all duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent opacity-50" />
+              <div className="absolute inset-0 bg-primary/10 opacity-0 mix-blend-overlay transition-opacity duration-700 group-hover:opacity-100" />
+
+              {/* AI Active badge */}
+              <div className="absolute right-6 top-6 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 opacity-0 backdrop-blur-md transition-all duration-500 group-hover:opacity-100">
+                <div className="size-2 animate-pulse rounded-full bg-primary" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white">
+                  AI Active
+                </span>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* ── 3. Previz — 같은 샷의 3단 변신 ── */}
-      <section id="previz" className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-20">
-        <ShowcaseVideo slot={LANDING_SHOWCASE.previz} />
-        <div className="relative z-10 mx-auto w-full max-w-5xl text-center">
-          <p className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-gray-500">Previz</p>
-          <h2 className="mb-4 text-4xl font-semibold tracking-tighter md:text-5xl">
-            목각 콘티에서 실사 영상까지, 같은 샷으로
-          </h2>
-          <p className="mx-auto mb-12 max-w-2xl text-base font-light text-gray-400">
-            러프 스토리보드로 구도를 확정하고, 같은 샷을 실사 이미지로, 다시 영상으로
-            촬영합니다 — 촬영 전에 편집본을 미리 봅니다.
-          </p>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {(['목각 previz', '실사 이미지', '영상'] as const).map((step, i) => (
-              <div
-                key={step}
-                className="flex aspect-video flex-col items-center justify-center rounded-2xl border border-white/10 bg-black/50 backdrop-blur-sm"
-              >
-                <span className="mb-2 font-mono text-xs text-gray-500">{i + 1}</span>
-                <span className="text-lg font-medium text-gray-200">{step}</span>
+              {/* Content */}
+              <div className="absolute inset-0 z-20 flex flex-col justify-end p-8 text-white md:p-10">
+                <div className="flex items-center gap-3 mb-4 text-primary">
+                  <div className="rounded-lg border border-primary/30 bg-primary/20 p-2 backdrop-blur-sm">
+                    {service.icon}
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-widest">
+                    Tale AI
+                  </span>
+                </div>
+                <h3 className="mb-3 text-2xl font-bold tracking-tight text-white md:text-3xl">
+                  {service.title}
+                </h3>
+                <p className="line-clamp-2 text-sm font-light leading-relaxed text-gray-200 md:text-base">
+                  {service.desc}
+                </p>
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Projects ── */}
+      <section id="projects" className="bg-black px-6 py-24 md:px-12">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-12 flex items-center justify-between">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-widest text-gray-400">
+                <Film className="size-3 text-primary" />
+                Your Workspace
+              </div>
+              <h2 className="text-4xl font-semibold tracking-tighter text-white md:text-5xl">
+                Projects
+              </h2>
+            </div>
+            <button
+              onClick={handleNew}
+              disabled={creating}
+              className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_30px_rgba(229,9,20,0.3)]"
+            >
+              {creating ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Plus className="size-4" />
+              )}
+              New Project
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="size-6 animate-spin text-gray-500" />
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 py-20">
+              <Film className="size-10 text-gray-600" />
+              <p className="mt-4 text-sm text-gray-500">아직 프로젝트가 없어요</p>
+              <button
+                onClick={handleNew}
+                disabled={creating}
+                className="mt-6 flex items-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white transition-all hover:border-primary hover:text-primary"
+              >
+                <Plus className="size-4" />
+                첫 프로젝트 만들기
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onOpen={handleOpen}
+                  onRenamed={(id, title) =>
+                    setProjects((prev) =>
+                      prev.map((p) => (p.id === id ? { ...p, title } : p)),
+                    )
+                  }
+                  onDeleteRequest={(p) => {
+                    setDeleteError(null)
+                    setDeleteTarget(p)
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── 새 프로젝트 이름 지정 팝업 (#a1) ── */}
+      <Dialog open={nameOpen} onOpenChange={(o) => !creating && setNameOpen(o)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>새 프로젝트</DialogTitle>
+            <DialogDescription>
+              프로젝트 이름을 지어 주세요. 나중에 언제든 바꿀 수 있어요.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={nameValue}
+            onChange={(e) => setNameValue(e.target.value)}
+            placeholder="예: 비 오는 도시의 하룻밤"
+            autoFocus
+            maxLength={120}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault()
+                void handleCreate()
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={creating}
+              onClick={() => setNameOpen(false)}
+            >
+              취소
+            </Button>
+            <Button
+              disabled={creating || !nameValue.trim()}
+              onClick={() => void handleCreate()}
+            >
+              {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              만들기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 프로젝트 삭제 확인 팝업 (#a2) ── */}
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>프로젝트 삭제</DialogTitle>
+            <DialogDescription>
+              {`"${deleteTarget?.title || 'Untitled'}" 프로젝트와 모든 산출물(스토리·캐릭터·씬·샷·영상)이 삭제됩니다. 되돌릴 수 없어요.`}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError ? (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={deleting}
+              onClick={() => setDeleteTarget(null)}
+            >
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={() => void handleDelete()}
+            >
+              {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Footer ── */}
+      <footer className="bg-black px-6 pb-12 pt-24 text-white md:px-12">
+        <div className="mx-auto mb-20 grid max-w-7xl grid-cols-1 gap-12 md:grid-cols-3 md:gap-8">
+          <div className="col-span-1 md:col-span-2">
+            <div className="mb-6 flex items-center gap-2 text-white">
+              <Film className="size-8 text-primary" />
+              <span className="text-2xl font-medium tracking-tight">
+                Tale Studio
+              </span>
+            </div>
+            <p className="max-w-md font-light leading-relaxed text-gray-400">
+              Pioneering the next era of cinematic storytelling through advanced
+              artificial intelligence and human collaboration.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="mb-6 font-semibold text-gray-200">Studio</h4>
+            <ul className="space-y-4 font-light text-gray-400">
+              <li>
+                <ContactPopover />
+              </li>
+            </ul>
           </div>
         </div>
-      </section>
 
-      {/* ── 4. 공유·리뷰 ── */}
-      <section id="collab" className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-20">
-        <ShowcaseVideo slot={LANDING_SHOWCASE.collab} />
-        <div className="relative z-10 mx-auto max-w-3xl text-center">
-          <Share2 className="mx-auto mb-6 size-10 text-primary" />
-          <h2 className="mb-4 text-4xl font-semibold tracking-tighter md:text-5xl">
-            링크 하나로 공유하고 리뷰받으세요
-          </h2>
-          <p className="mx-auto mb-10 max-w-2xl text-base font-light leading-relaxed text-gray-400">
-            로그인 없이 열리는 읽기 전용 링크로 팀·클라이언트에게 작업 전체를
-            보여줄 수 있습니다. 완성작은 Playground 에 공개해 다른 창작자들과
-            나눠 보세요.
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 border-t border-gray-800 pt-8 md:flex-row">
+          <p className="text-sm font-light text-gray-500">
+            &copy; {new Date().getFullYear()} Tale Studio. All rights reserved.
           </p>
-          <Link
-            href="/playground"
-            className="group inline-flex items-center gap-2 rounded-full border border-white/20 px-8 py-4 text-base font-medium text-white transition-all hover:border-primary hover:text-primary"
-          >
-            공개 작품 보러 가기
-            <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-          </Link>
+          <div className="flex gap-6 text-sm font-light text-gray-500">
+            <a href="#" className="transition-colors hover:text-white">
+              Privacy Policy
+            </a>
+            <a href="#" className="transition-colors hover:text-white">
+              Terms of Service
+            </a>
+          </div>
         </div>
-      </section>
-
-      {/* ── 5. 마지막 CTA + 푸터 ── */}
-      <section id="start" className="relative flex min-h-svh flex-col justify-between">
-        <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-          <h2 className="mb-6 text-4xl font-semibold tracking-tighter md:text-6xl">
-            오늘의 아이디어를
-            <br />
-            내일의 영상으로
-          </h2>
-          <Link
-            href="/login"
-            className="group inline-flex items-center gap-2 rounded-full bg-primary px-10 py-5 text-lg font-semibold text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-[0_0_40px_rgba(229,9,20,0.4)]"
-          >
-            무료로 시작하기
-            <ArrowRight className="size-5 transition-transform group-hover:translate-x-1" />
-          </Link>
-        </div>
-        <SiteFooter />
-      </section>
+      </footer>
     </div>
   )
 }

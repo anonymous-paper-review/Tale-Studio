@@ -4,6 +4,8 @@ import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { fal } from '@fal-ai/client'
 import { buildVideoPrompt } from '@/lib/director/video-prompt'
+import { loadShotDesignByMainId } from '@/lib/writer/shot-design-state'
+import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { getGenerationJobById, userOwnsProject } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
@@ -402,7 +404,8 @@ export async function POST(req: Request) {
 
     const [{ data: project, error: projectError }, { data: shot, error: shotError }] = await Promise.all([
       supabaseAdmin.from('projects').select('workspace_id').eq('id', projectId).maybeSingle(),
-      supabaseAdmin.from('shots').select('shot_id').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
+      // #motion-contract: dynamic_spec(모션 계약 소스) + design_ref(구버전 state 폴백 조인 키) 동봉.
+      supabaseAdmin.from('shots').select('shot_id, dynamic_spec, design_ref').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
     ])
     if (projectError) throw projectError
     if (shotError) throw shotError
@@ -450,6 +453,24 @@ export async function POST(req: Request) {
     const modelKey: VideoModelKey = model != null ? normalizeProvider(model) : provider === 'local' ? 'local' : normalizeProvider('')
     const isLocal = modelKey === 'local'
     const dur = durationSeconds ?? 5
+
+    // #motion-contract: 모션 계약 소스 해석 — shots.dynamic_spec(신규 persist) 우선,
+    //   구버전 프로젝트는 writer_runs.state.shotDesign 을 design_ref 로 조인(러프보드와 동일 패턴).
+    //   둘 다 없으면 null → 계약 없는 레거시 프롬프트(기존 동작 그대로).
+    //   replay/recovery(exactReplay)는 스냅샷 프롬프트를 재사용하므로 state 폴백을 건너뛴다.
+    let dynamicSpec = (shot.dynamic_spec as ShotDynamicSpec | null) ?? null
+    if (!dynamicSpec && !exactReplay) {
+      try {
+        const designById = await loadShotDesignByMainId(projectId)
+        dynamicSpec =
+          designById.get((shot.design_ref as string) ?? '')?.dynamicSpec ??
+          designById.get(writerShotId)?.dynamicSpec ??
+          null
+      } catch {
+        dynamicSpec = null // best-effort — 계약 없이 진행
+      }
+    }
+
     const submitRefUrls = referenceImageUrl
       ? referenceImageUrlsV2?.length
         ? referenceImageUrlsV2
@@ -464,6 +485,7 @@ export async function POST(req: Request) {
       modelKey,
       durationSeconds: dur,
       startEndReference: (submitRefUrls?.length ?? 0) >= 2,
+      dynamicSpec,
     })
     const falSubmitRequest = isLocal
       ? null

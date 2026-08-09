@@ -14,6 +14,8 @@ import { handoffFrom } from '@/lib/handoff-intent'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 
 // 첫 프로젝트 진입 시 프로듀서가 먼저 거는 인사·시작 넛지 — 유저가 바로 한 줄로 시작할 수 있게.
+//   2026-08-07: 프로듀서 소개·예시·업로드/스타일 진입점 안내의 친근한 장문으로 재작성
+//   (#feedback — 8/6 의 2문장 축약판 대체).
 const PRODUCER_WELCOME =
   '안녕하세요! 저는 당신의 AI 프로듀서예요. 만들고 싶은 이야기를 편하게 한 줄로 들려주세요. \n'
   + '장르, 주인공, 지금 떠오르는 한 장면, 무엇이든 좋아요! \n\n'

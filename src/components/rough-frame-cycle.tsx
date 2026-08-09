@@ -3,6 +3,7 @@
 // 3프레임(START→DIRECTING→END) 순환 표시 — writer 러프 보드와 director 스토리보드(실사 3프레임,
 //   #real-strip 2026-07-22)가 공유. 원래 rough-storyboard-view.tsx 로컬이던 것을 공용화.
 import { useEffect, useState } from 'react'
+import { Pause } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import type { RoughStoryboardImage } from '@/types/shot'
@@ -16,9 +17,9 @@ export function withCacheBust(url: string, v?: number): string {
 
 // 3프레임 순환 라벨 — START → DIRECTING(연출 화살표/지시) → END (2026-07-22 라벨 영문 통일).
 const FRAME_LABELS = ['START', 'DIRECTING', 'END'] as const
-// 순환 간격 — 2026-07-31 요청으로 전환 속도 20% 상향(1200ms → 1000ms).
-//   writer 러프 보드와 director Previz 가 같은 컴포넌트를 쓰므로 두 화면이 함께 빨라진다.
-const FRAME_CYCLE_MS = 1000
+// 순환 간격 — 1200ms 원복(2026-08-06 요청. 1000ms 상향분이 두 화면 모두 너무 빨랐다).
+//   writer 러프 보드와 director Previz 가 같은 컴포넌트를 쓰므로 두 화면이 함께 느려진다.
+const FRAME_CYCLE_MS = 1200
 
 /** 3프레임 순환 표시(#rough-grid 2026-07-22) — 기본은 START 정지 프레임, hover 중에만 순환
  *  (전 카드 동시 재생은 정보 과다 — 2026-07-22 피드백). 점 클릭 = 그 프레임 고정(leave 시 리셋).
@@ -42,6 +43,9 @@ export function RoughFrameCycle({
   const [idx, setIdx] = useState(0)
   const [hovering, setHovering] = useState(false)
   const [pinned, setPinned] = useState(false)
+  // 클릭 = 현재 프레임 일시정지 잠금(중앙 ⏸) — director 영상 썸네일(HoverPlayVideo)과 같은 UX.
+  //   잠금 중엔 인트로·hover 순환 모두 멈추고, 카드를 떠나도 프레임이 유지된다.
+  const [pausedLock, setPausedLock] = useState(false)
   // reduced-motion 은 초기값에서 인트로를 건너뛴다 — effect 안 동기 setState 는 연쇄 렌더를
   //   유발해 lint 가 막는다(react-hooks/set-state-in-effect). SSR 은 matchMedia 부재 → 가드.
   const [introDone, setIntroDone] = useState(
@@ -53,7 +57,7 @@ export function RoughFrameCycle({
 
   // 인트로 1회 재생 — hover 가 시작되면 즉시 양보한다.
   useEffect(() => {
-    if (!multi || introDone) return
+    if (!multi || introDone || pausedLock) return
     let step = 0
     const t = setInterval(() => {
       step += 1
@@ -66,27 +70,38 @@ export function RoughFrameCycle({
       setIdx(step)
     }, FRAME_CYCLE_MS)
     return () => clearInterval(t)
-  }, [multi, introDone, urls.length])
+  }, [multi, introDone, pausedLock, urls.length])
 
   useEffect(() => {
-    if (!multi || !hovering || pinned) return
+    if (!multi || !hovering || pinned || pausedLock) return
     const t = setInterval(() => setIdx((i) => (i + 1) % urls.length), FRAME_CYCLE_MS)
     return () => clearInterval(t)
-  }, [multi, hovering, pinned, urls.length])
+  }, [multi, hovering, pinned, pausedLock, urls.length])
 
   const current = idx % urls.length
   return (
     <div
       className="absolute inset-0"
+      title={multi ? (pausedLock ? '클릭: 재생 재개' : '클릭: 일시정지') : undefined}
       onMouseEnter={() => {
         setIntroDone(true) // 인트로 중 hover 진입 → 인트로 중단, hover 순환이 이어받는다
         setHovering(true)
       }}
       onMouseLeave={() => {
         // 카드를 떠나면 START 정지 상태로 복귀 — 보드 전체가 조용해진다.
+        //   단 일시정지 잠금 중엔 프레임 유지(영상 썸네일 잠금과 동일).
         setHovering(false)
+        if (pausedLock) return
         setPinned(false)
         setIdx(0)
+      }}
+      onClick={(e) => {
+        // 이미지 클릭 = 일시정지 토글. 카드의 클릭 액션(팝업 열기 등)과 충돌하지 않게 전파 차단
+        //   — 단일 패널(순환 없음)은 개입하지 않고 카드 클릭으로 흘려보낸다.
+        if (!multi) return
+        e.stopPropagation()
+        setIntroDone(true)
+        setPausedLock((v) => !v)
       }}
     >
       {/* 프레임 전환 시 로딩 깜빡임 방지 — 3장을 모두 마운트하고 opacity 로 스위치 */}
@@ -105,6 +120,11 @@ export function RoughFrameCycle({
           draggable={false}
         />
       ))}
+      {pausedLock && (
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25">
+          <Pause className="size-6 fill-white text-white drop-shadow" />
+        </span>
+      )}
       {/* 인디케이터는 hover 중에만 — 기본 상태의 시각 노이즈 제거 */}
       {multi && hovering ? (
         <div className="absolute bottom-1.5 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-background/70 px-2 py-0.5 backdrop-blur-sm">

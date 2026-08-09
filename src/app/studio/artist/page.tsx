@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
+import { StageHelpBadge } from '@/components/stage-help-badge'
 import { handoffFrom } from '@/lib/handoff-intent'
 import { CharacterPanel } from '@/features/artist/character-panel'
 import { WorldPanel } from '@/features/artist/world-panel'
@@ -22,13 +23,7 @@ import {
   evaluateDirectorGate,
   type WriterGateStatus,
 } from '@/lib/lifecycle'
-import { classifyImageStale, lookVersionKey } from '@/lib/image-provenance'
 import { cn } from '@/lib/utils'
-import {
-  buildArtistRefreshMessage,
-  artistRefreshSuggestionKey,
-  type ArtistCharacterState,
-} from '@/lib/artist/onboarding-message'
 
 type ArtistTab = 'characters' | 'world' | 'inventory'
 
@@ -43,8 +38,6 @@ export default function VisualPage() {
     generatingLocations,
     error,
     loadData,
-    viewFailures,
-    lookSummary,
     autoGenerateBaseImages,
   } = useArtistStore()
 
@@ -116,8 +109,6 @@ export default function VisualPage() {
   const timingLoggedRef = useRef<string | null>(null)
   // 프로액티브 넛지 1회 가드 (프로젝트당) — chat-proactive-copilot Phase 1
   const nudgeOfferedRef = useRef<string | null>(null)
-  // refresh 온보딩 버블 1회 가드 — 시그니처(룩/갭/실패 델타) 바뀔 때만 재발사.
-  const refreshNudgeKeyRef = useRef<string | null>(null)
   // 첫 진입 브리핑(캐릭터·장소 요약) 1회 가드 — 프로젝트별.
   const artistBriefedRef = useRef<string | null>(null)
   // 진입 fallback: main 이 너무 오래 안 차도 일정 시간 뒤 진입 (이후 client 가 보강).
@@ -168,26 +159,6 @@ export default function VisualPage() {
   })
   const directorGate = evaluateDirectorGate({ writer: writerGateStatus, artist: artistGate })
   const writerReady = writerGateStatus.state === 'ready'
-
-  // 온보딩 상태(상태기반): 캐릭터별 look-pending(초안)/no-image(미생성)/failed(콘텐츠정책) 분류.
-  //   refreshGap = 일괄("최종 룩으로 정리") 대상(look-pending+no-image). failedCount = 카드별 우회 대상.
-  const lookVersion = lookVersionKey(characterAssets.map((c) => c.lookFingerprint ?? null))
-  const refreshChars = characterAssets
-    .map((c): { name: string; state: ArtistCharacterState } | null => {
-      if (viewFailures[c.characterId]?.main) return { name: c.name, state: 'failed' }
-      const sel = (c.viewCandidates.main ?? []).find((cand) => cand.isSelected)
-      const lookPending =
-        classifyImageStale(c.fixedPrompt, c.lookFingerprint ?? null, {
-          sourceHash: sel?.sourceHash ?? null,
-          appearanceHash: sel?.appearanceHash ?? null,
-        }) === 'look-pending'
-      if (lookPending) return { name: c.name, state: 'look-pending' }
-      if (c.origin === 'writer' && c.views.main == null) return { name: c.name, state: 'no-image' }
-      return null
-    })
-    .filter((x): x is { name: string; state: ArtistCharacterState } => x !== null)
-  const refreshGap = refreshChars.filter((c) => c.state !== 'failed').length
-  const failedCount = refreshChars.filter((c) => c.state === 'failed').length
 
   // Producer handoff 직후 characters가 먼저 들어오면 Writer가 계속 도는 동안에도 Artist 작업을 시작한다.
   const ready = charsLoaded || !!writerStatus?.pipeline_completed || enterFallback
@@ -287,8 +258,10 @@ export default function VisualPage() {
   const generatingCount = generatingViews.length + generatingLocations.length
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   useEffect(() => {
-    if (!projectId || !ready || !writerReady || !artistGate.ready || refreshGap > 0 || failedCount > 0)
-      return
+    // 2026-08-06: refreshGap/failedCount 게이트 제거 — 룩 미반영 초안이 남아 있으면 Director
+    //   핸드오프 제안이 영영 안 떠서 "다음 단계로 가는 길"이 채팅에서 사라졌다. 초안 여부와
+    //   무관하게 에셋이 준비되면 넘어갈 길을 제시한다(룩 동기화는 카드 배지가 알린다).
+    if (!projectId || !ready || !writerReady || !artistGate.ready) return
     if (nudgeOfferedRef.current === projectId) return
     if (characterAssets.length === 0 || generatingCount > 0) return
     const t = setTimeout(() => {
@@ -321,73 +294,35 @@ export default function VisualPage() {
     offerSuggestion,
     writerReady,
     artistGate.ready,
-    refreshGap,
-    failedCount,
   ])
 
-  // 온보딩(상태기반): look-pending/no-image/failed 가 있으면 상태별 카피의 버블 제안.
-  //   key = artistRefreshSuggestionKey(룩버전+갭+실패) → 델타마다 새 id. ref 가드로 같은 시그니처 재호출 차단,
-  //   offerSuggestion 의 dismissed/단일활성과 합쳐 핑퐁·스팸 방지. exit 넛지와 배타.
+  // 첫 진입 브리핑(2026-08-06 간소화) — "최종 룩으로 정리" 상태 온보딩 제안은 제거(피드백:
+  //   긴 버블이 채팅을 점유하고, 초안이 남아 있는 동안 Director 핸드오프 제안을 가렸다).
+  //   룩 미반영/실패는 카드 배지가 알리고, 일괄 정리는 채팅으로 요청할 수 있다.
   useEffect(() => {
     if (!projectId || !ready) return
-    // 첫 진입 여부 — artist 채팅 기록이 없고 아직 브리핑 안 했으면 "무엇을 준비했는지" 요약을 얹는다.
     const hasArtistChat = useGlobalChatStore.getState().messages.some((m) => m.stage === 'artist')
-    const firstBrief = !hasArtistChat && artistBriefedRef.current !== projectId
-    const needsSync = refreshGap > 0 || failedCount > 0
-    if (!needsSync && !firstBrief) return
+    if (hasArtistChat || artistBriefedRef.current === projectId) return
 
-    // #feedback 2026-08-07: 온보딩 강화 — 무엇을 만들었는지 + @멘션·Ctrl+클릭 조작법 명시.
-    const summary = firstBrief
-      ? `인물과 배경을 만들었어요.\n· 캐릭터 ${characterAssets.length}명 · 배경 ${worldAssets.length}곳\n\n` +
-        '수정하거나 추가하고 싶은 인물이나 배경을 알려주세요.\n' +
-        '"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).\n\n'
-      : ''
-
-    let content: string
-    let action: { kind: 'artist-refresh-look'; label: string } | null
-    if (needsSync) {
-      content = summary + buildArtistRefreshMessage({ characters: refreshChars, look: lookSummary })
-      action = refreshGap > 0 ? { kind: 'artist-refresh-look', label: '최종 룩으로 정리' } : null
-    } else {
-      // Case B — 이미 모두 최종 룩. 첫 진입 브리핑만 보여준다.
-      content =
-        summary +
-        'writer가 정한 최종 그림체로 이미지를 맞춰뒀어요.\n마음에 안 드는 카드는 "지아를 더 차갑게"처럼 말씀해 주세요.'
-      action = null
-    }
-    if (!content) return
-
-    const id =
-      firstBrief && !needsSync
-        ? `artist-brief:${projectId}`
-        : artistRefreshSuggestionKey({ projectId, lookVersion, refreshGap, failedCount })
-    if (refreshNudgeKeyRef.current === id) return
+    const id = `artist-brief:${projectId}`
     const dismissed = useGlobalChatStore.getState().dismissedSuggestionIds.includes(id)
     offerSuggestion({
       id,
       stage: 'artist',
-      content,
-      action,
-      dismissible: firstBrief ? false : undefined,
+      // #feedback 2026-08-07: 온보딩 강화 — 무엇을 만들었는지 + @멘션·Ctrl+클릭 조작법 명시
+      //   (8/6 간소화 유지 — 상태 분기 없이 첫 브리핑 한 종류만).
+      content:
+        `인물과 배경의 컨셉을 준비했어요 — 캐릭터 ${characterAssets.length}명 · 배경 ${worldAssets.length}곳.\n` +
+        '수정하거나 추가하고 싶은 인물이나 배경을 알려주세요.\n' +
+        '"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
+      action: null,
+      dismissible: false,
     })
     // 실제 표면화(같은 id 활성)됐거나 이미 dismiss 된 경우만 1회 가드 고정.
     if (dismissed || useGlobalChatStore.getState().suggestion?.id === id) {
-      refreshNudgeKeyRef.current = id
-      if (firstBrief) artistBriefedRef.current = projectId
+      artistBriefedRef.current = projectId
     }
-  }, [
-    projectId,
-    ready,
-    writerReady,
-    refreshGap,
-    failedCount,
-    lookVersion,
-    refreshChars,
-    lookSummary,
-    offerSuggestion,
-    characterAssets.length,
-    worldAssets.length,
-  ])
+  }, [projectId, ready, offerSuggestion, characterAssets.length, worldAssets.length])
 
   // 진입 전 = 백그라운드 생성/ main 준비 진행 중 → progress bar 블로킹.
   //   단, 한 번이라도 진입한 프로젝트면(gateOpen) 탭 전환 후에도 다시 막지 않는다.
@@ -421,14 +356,17 @@ export default function VisualPage() {
   //   오른쪽 New UI 버튼 = 실험 에셋·샷 보드 토글(#12). 두 모드가 같은 헤더를 공유한다.
   const headerRow = (
     <div className="mb-3 flex items-start justify-between gap-3">
-      <div>
-        {/* writer 헤더(Writers' Room)와 타이포 통일(#d7 2026-08-03) — semibold + mt-1 text-xs */}
+      <div className="flex items-center gap-1.5">
+        {/* writer 헤더(Writers' Room)와 타이포 통일(#d7 2026-08-03) — semibold.
+            설명문은 "?" 뱃지 호버로 이관(2026-08-06). */}
         <h1 className="text-lg font-semibold">The Visual Studio</h1>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {newUi
-            ? '샷마다 어떤 인물·배경이 쓰이는지 연결합니다 — 에셋을 드래그해 참조를 구성하세요.'
-            : '캐릭터·월드의 컨셉 이미지를 만들고 다듬어 다음 단계로 넘깁니다.'}
-        </p>
+        <StageHelpBadge
+          text={
+            newUi
+              ? '샷마다 어떤 인물·배경이 쓰이는지 연결합니다 — 에셋을 드래그해 참조를 구성하세요.'
+              : '캐릭터·월드의 컨셉 이미지를 만들고 다듬어 다음 단계로 넘깁니다.'
+          }
+        />
       </div>
       <Button
         size="sm"

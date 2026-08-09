@@ -253,6 +253,19 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         </span>
         {data.final && <span className="font-mono text-warning">★ FINAL</span>}
       </div>
+      {/* #adherence P2: 모션 계약 위반 배지 — 첫/끝 프레임 검사 결과. */}
+      {data.adherence && data.adherence.status !== 'ok' && data.adherence.status !== 'skipped' && (
+        <p
+          className="mt-1 text-[10px] text-warning"
+          title={[data.adherence.reason, data.adherence.observed].filter(Boolean).join(' / ')}
+        >
+          ⚠ {data.adherence.status === 'over_motion'
+            ? '정지 계약 위반 — 카메라가 움직였어요'
+            : data.adherence.status === 'under_motion'
+              ? '변화 부족 — 설계된 큰 동작이 안 보여요'
+              : '방향 불일치 — 화살표와 다르게 움직였어요'}
+        </p>
+      )}
       {finalError && <p className="mt-1 text-[10px] text-destructive">{finalError}</p>}
       {data.lastAttemptError && (
         <p className="mt-1 text-[10px] text-destructive">{data.lastAttemptError}</p>

@@ -54,7 +54,7 @@ export function backgroundMentions(backgrounds: BackgroundLike[]): CardMention[]
 export const FOUNDATION_MENTIONS: CardMention[] = [
   { ref: 'story', label: '스토리', hint: '설정' },
   { ref: 'setting:playtime', label: '러닝타임', hint: '설정' },
-  { ref: 'setting:genre', label: '장르', hint: '설정' },
+  { ref: 'setting:genre', label: '스토리 장르', hint: '설정' },
   { ref: 'setting:subGenre', label: '세부 장르', hint: '설정' },
   { ref: 'setting:format', label: '포맷', hint: '설정' },
   { ref: 'setting:tone', label: '톤', hint: '설정' },

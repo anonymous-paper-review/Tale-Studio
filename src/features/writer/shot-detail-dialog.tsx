@@ -29,6 +29,9 @@ import {
   SelectTrigger,
 } from '@/components/ui/select'
 import { useWriterStore } from '@/stores/writer-store'
+import { useProjectStore } from '@/stores/project-store'
+import { DebugPromptTrace } from '@/components/debug-prompt-trace'
+import { useDebugPrompts } from '@/lib/use-debug-prompts'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import type { ShotType } from '@/types'
 
@@ -67,6 +70,9 @@ export function ShotDetailDialog({
 }: ShotDetailDialogProps) {
   const shot = useWriterStore((s) => s.shots.find((x) => x.shotId === shotId))
   const shots = useWriterStore((s) => s.shots)
+  // #debug-prompts: 관리자 소유 프로젝트에서만 생성 풀 프롬프트 노출(서버 판정).
+  const projectId = useProjectStore((s) => s.projectId)
+  const debugPrompts = useDebugPrompts(projectId)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const updateShot = useWriterStore((s) => s.updateShot)
   const deleteShot = useWriterStore((s) => s.deleteShot)
@@ -314,6 +320,26 @@ export function ShotDetailDialog({
               누르면 현재 편집 내용을 저장하고 그 느낌으로 패널을 다시 그립니다.
             </p>
           </div>
+
+          {/* #debug-prompts — 관리자 프로젝트 한정: 이 샷의 소스(저장된 생성 프롬프트).
+              구버전/재생성 프로젝트는 shots.prompt 가 비어 액션 서술로 폴백(그때 라벨 명시).
+              모델에 실제 전송된 최종본은 아래 DebugPromptTrace 가 잡 스냅샷에서 보여준다. */}
+          {debugPrompts ? (
+            <div className="space-y-1.5">
+              <label className="flex items-center gap-1.5 text-sm font-medium">
+                {shot.prompt ? '소스 프롬프트' : '소스 (액션 — 저장된 프롬프트 없음)'}
+                <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-warning">
+                  debug
+                </Badge>
+              </label>
+              <pre className="max-h-48 select-text overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted p-3 font-mono text-[11px] leading-relaxed text-muted-foreground scrollbar-thin">
+                {shot.prompt || shot.actionDescription || '(비어 있음)'}
+              </pre>
+            </div>
+          ) : null}
+
+          {/* #debug-prompts 확장: 러프 그리드 잡에 실제 전송된 최종 프롬프트(시트 지시·해칭·라벨 포함). */}
+          <DebugPromptTrace projectId={projectId} shotId={shot.shotId} kinds={['shot_rough_storyboard']} />
         </div>
 
         <DialogFooter className="items-center">
