@@ -104,6 +104,17 @@ const GPT_IMAGE_2_EDIT_FIELDS = [
   'mask_url',
 ] as const
 
+// xai/grok-imagine-image/edit i2i schema (#arrow-layer). aspect_ratio 'auto' preserves input ratio;
+//   no image_size/negative_prompt/seed inputs.
+const GROK_IMAGINE_IMAGE_EDIT_FIELDS = [
+  'prompt',
+  'image_urls',
+  'aspect_ratio',
+  'resolution',
+  'output_format',
+  'num_images',
+] as const
+
 // fal-ai/flux-2/klein/9b schema. Known fact: distilled klein has no negative_prompt or CFG input.
 const FLUX_2_KLEIN_9B_FIELDS = [
   'prompt',
@@ -134,6 +145,7 @@ export const FAL_INPUT_ALLOWLIST: Record<string, Set<string>> = {
 
   'openai/gpt-image-2': fieldSet(GPT_IMAGE_2_FIELDS),
   'openai/gpt-image-2/edit': fieldSet(GPT_IMAGE_2_EDIT_FIELDS),
+  'xai/grok-imagine-image/edit': fieldSet(GROK_IMAGINE_IMAGE_EDIT_FIELDS),
   'fal-ai/flux-2/klein/9b': fieldSet(FLUX_2_KLEIN_9B_FIELDS),
 }
 

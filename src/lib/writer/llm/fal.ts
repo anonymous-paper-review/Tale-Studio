@@ -159,6 +159,13 @@ function resolveImageModel(opts: FalImageOptions): string {
 }
 
 function buildFalImageInput(opts: FalImageOptions, model: string): Record<string, unknown> {
+  // xai Grok Imagine(#arrow-layer 2026-08-09): aspect_ratio 기본 'auto'(입력 비율 유지)라 생략하고,
+  //   image_size·negative_prompt·seed 는 스키마에 없다 — 알려진 키만 보낸다(422 방어).
+  if (model.startsWith('xai/grok-imagine-image')) {
+    const grokInput: Record<string, unknown> = { prompt: opts.prompt };
+    if (opts.reference_image_urls?.length) grokInput.image_urls = opts.reference_image_urls;
+    return grokInput;
+  }
   const input: Record<string, unknown> = { prompt: opts.prompt };
   if (opts.negative_prompt) input.negative_prompt = opts.negative_prompt;
   if (typeof opts.seed === 'number') input.seed = opts.seed;

@@ -62,6 +62,9 @@ export interface RoughStoryboardImage {
   }
   /** 이 세트가 잘려 나온 원본 그리드/스트립 이미지 (디버그·재현용). */
   gridUrl?: string
+  /** 화살표 레이어 분리(#arrow-layer 실험 2026-08-09) — direction 프레임에서 화살표·지시문을
+   *  i2i 로 지운 클린 플레이트 캐시. for = 파생 원본 generatedAt (재생성되면 stale → 재분리). */
+  cleanDirection?: { url: string; for: number }
   /** START↔설명 정합 검사(#adherence P2) — 생성 완료 후 VLM 판정. mismatch = 카드 배지. */
   adherence?: {
     status: 'ok' | 'mismatch'

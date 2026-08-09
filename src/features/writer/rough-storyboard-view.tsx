@@ -37,7 +37,7 @@ import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
 import { cn } from '@/lib/utils'
-import { RoughFrameCycle, withCacheBust } from '@/components/rough-frame-cycle'
+import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import type { RoughStoryboardImage, Shot } from '@/types'
 
 type PanelJob = { status: 'generating' | 'failed'; error?: string }
@@ -828,14 +828,13 @@ export function RoughStoryboardView() {
         </div>
       </ScrollArea>
 
+      {/* #arrow-layer 실험(2026-08-09): 팝업 = 화살표 레이어 편집기 — panel 객체를 통째로 넘긴다. */}
       <ShotDetailDialog
         shotId={detailShotId}
-        panelUrl={detailPanel ? withCacheBust(detailPanel.url, detailPanel.generatedAt) : null}
-        generating={!!(detailShotId && panelJobs[detailShotId]?.status === 'generating')}
+        panel={detailPanel}
         onOpenChange={(open) => {
           if (!open) setDetailShotId(null)
         }}
-        onRegenerate={(id, hints) => void generate([id], true, false, hints)}
       />
 
       {addDialog && (
