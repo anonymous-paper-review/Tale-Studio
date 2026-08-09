@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource } from '@/types'
+import { toast } from 'sonner'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -1267,35 +1268,52 @@ const serverSaveTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const serverSaveGenerations = new Map<string, number>()
 const serverSaveSnapshots = new Map<string, PersistedEditor>()
 const serverSaveInFlight = new Map<string, boolean>()
+// fatal 실패를 사용자에게 알린 프로젝트 — 프로젝트당 1회만 토스트 (콘솔은 개발자용).
+const fatalSaveNotified = new Set<string>()
+
+// 저장 결과 3분류 — 'saved' 성공 / 'retry' 일시 장애(5초 뒤 재시도) / 'fatal' 재시도로
+//   달라지지 않는 실패(4xx: 인증 만료·삭제된 프로젝트 410 등 → 루프 중단, localStorage 만 유지).
+//   기존엔 모든 실패가 5초 무한 재시도라, 죽은 프로젝트/만료 세션에서 콘솔이 500 에러로 도배됐다.
+type ServerSaveResult = 'saved' | 'retry' | 'fatal'
 
 async function saveEditorStateToServer(
   projectId: string,
   snapshot: PersistedEditor,
   isCurrent: () => boolean,
-): Promise<boolean> {
+): Promise<ServerSaveResult> {
   let diagnostic = 'Unknown error'
+  let fatal = false
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (!isCurrent()) return false
+    if (!isCurrent()) return 'retry'
     try {
       const response = await fetch('/api/editor/state', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, state: snapshot }),
       })
-      if (response.ok) return true
-      diagnostic = `HTTP ${response.status}`
+      if (response.ok) return 'saved'
+      // 서버가 남긴 실제 사유를 진단에 붙인다 — "HTTP 500"만으로는 원인 추적이 안 된다.
+      const body = (await response.json().catch(() => null)) as { error?: string } | null
+      diagnostic = `HTTP ${response.status}${body?.error ? ` — ${body.error}` : ''}`
+      if (response.status >= 400 && response.status < 500) {
+        fatal = true
+        break
+      }
     } catch (error) {
       diagnostic = error instanceof Error ? error.message : 'Network error'
     }
-    if (!isCurrent()) return false
+    if (!isCurrent()) return 'retry'
     if (attempt < 2) {
       await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
     }
   }
   if (isCurrent()) {
-    console.error('[editor-store] server state save failed after retries:', diagnostic)
+    console.error(
+      `[editor-store] server state save failed ${fatal ? '(non-retryable, giving up)' : 'after retries'}:`,
+      diagnostic,
+    )
   }
-  return false
+  return fatal ? 'fatal' : 'retry'
 }
 
 export function scheduleServerSave(
@@ -1324,7 +1342,7 @@ export function scheduleServerSave(
       projectId,
       latestSnapshot,
       () => serverSaveGenerations.get(projectId) === generation,
-    ).then((saved) => {
+    ).then((result) => {
       serverSaveInFlight.delete(projectId)
       const latestGeneration = serverSaveGenerations.get(projectId)
       if (latestGeneration !== generation) {
@@ -1332,8 +1350,21 @@ export function scheduleServerSave(
         if (newestSnapshot) scheduleServerSave(projectId, newestSnapshot, 0, latestGeneration)
         return
       }
-      if (saved) {
+      if (result === 'saved') {
         serverSaveSnapshots.delete(projectId)
+        return
+      }
+      if (result === 'fatal') {
+        // 재시도로 달라지지 않는 실패(삭제된 프로젝트·만료 세션) — 루프를 멈춘다.
+        //   편집 내용은 localStorage(saveEditorState)에 그대로 남아 있고, 다음 편집이
+        //   새 generation 으로 다시 저장을 시도한다.
+        serverSaveSnapshots.delete(projectId)
+        if (!fatalSaveNotified.has(projectId)) {
+          fatalSaveNotified.add(projectId)
+          toast.error(
+            '편집 내용을 서버에 저장할 수 없어요 — 프로젝트가 삭제됐거나 세션이 만료됐을 수 있어요. 새로고침하면 최근 프로젝트로 복원돼요.',
+          )
+        }
         return
       }
       const retrySnapshot = serverSaveSnapshots.get(projectId)

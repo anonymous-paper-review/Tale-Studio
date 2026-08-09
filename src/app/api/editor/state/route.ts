@@ -52,7 +52,17 @@ export async function PUT(req: Request) {
         { onConflict: 'project_id' }
       )
 
-    if (error) throw error
+    if (error) {
+      // FK 위반(23503) = 프로젝트가 삭제된 뒤에도 열린 에디터가 자동저장을 계속 쏘는 경우 —
+      //   서버 장애가 아니라 만료된 클라이언트다. 410으로 구분해 클라이언트가 재시도를 멈추게 한다.
+      if ((error as { code?: string }).code === '23503') {
+        return NextResponse.json(
+          { error: 'project no longer exists' },
+          { status: 410 },
+        )
+      }
+      throw error
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
