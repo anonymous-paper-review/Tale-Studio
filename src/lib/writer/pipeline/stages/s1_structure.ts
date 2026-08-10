@@ -1,9 +1,16 @@
 // S1: 내러티브 구조, POV, 주제, CDQ
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
-import type { Genre, NarrativeStructure, PipelineInput } from '@/lib/writer/types/pipeline';
+import type { Genre, NarrativeStructure, PipelineInput, Dramaturgy } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
-export async function runNarrativeStructure(input: PipelineInput, genre: Genre, logger: PipelineLogger, axisConfig: LlmAxisConfig): Promise<NarrativeStructure> {
+export async function runNarrativeStructure(
+  input: PipelineInput,
+  genre: Genre,
+  logger: PipelineLogger,
+  axisConfig: LlmAxisConfig,
+  // s0.5 드라마투르그 진단 — *참고 재료*. 미전달(기본)이면 프롬프트는 배선 전과 완전히 동일하다.
+  dramaturgy?: Dramaturgy | null,
+): Promise<NarrativeStructure> {
   await logger.markStage('narrativeStructure', 'started');
 
   const systemInstruction = `당신은 영상 제작의 S1(내러티브 구조) 디자이너이다.
@@ -33,7 +40,21 @@ CDQ (Central Dramatic Question):
 - D7: 다층 구조 + 서브플롯 다수 + 에피소드 연속성 가능
 `;
 
-  const userPrompt = `[스토리]
+  // 드라마투르그 진단 블록 — 강제가 아니라 재료. CDQ 는 여전히 s1 이 정한다(후보 채택·개선·기각 자유).
+  const diag = dramaturgy?.dramatic_diagnosis;
+  const dramaturgyBlock = diag
+    ? `[드라마투르그 진단 — 참고 재료 (강제 아님)]
+구조를 잡기 전 드라마투르그가 이 스토리를 읽고 남긴 진단이다. 판단 재료로만 쓰고, 동의하지 않으면 무시해도 된다.
+- stakes(주인공이 잃을 것): ${diag.stakes || '(없음)'}
+- 얇은 전개 지점: ${diag.weak_beats.length ? diag.weak_beats.map((b) => `「${b}」`).join(' / ') : '(없음)'}
+- CDQ 후보: ${diag.cdq_candidates.length ? diag.cdq_candidates.map((q) => `「${q}」`).join(' / ') : '(없음)'}
+  → central_dramatic_question 은 네가 정한다. 후보가 좋으면 채택하거나 다듬어 쓰고, 아니면 새로 써라.
+- 결말 검산: ${diag.ending_check || '(없음)'}
+
+`
+    : '';
+
+  const userPrompt = `${dramaturgyBlock}[스토리]
 ${input.story}
 
 [genre]

@@ -15,6 +15,7 @@ import { humanizeSlug } from '@/lib/display-name'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { writerSceneIdToMain, writerShotIdToMain } from '@/lib/writer/adapters'
 import { reallocateShotDurations } from '@/lib/writer/pipeline/util/duration_reallocation'
+import { buildShotDialogueMap } from '@/lib/writer/pipeline/util/dialogue_join'
 import { isFlagOn } from '@/lib/flags'
 import {
   facetsHash,
@@ -551,11 +552,10 @@ export async function persistShotsToDb(
 
   const existingByShotId = await readShotCarryForwardById(projectId)
 
-  // shot_id → 대사 매핑 (화자 명시 — 옛 chars[0] 추정 제거)
-  const dialogueByShotId = new Map<string, ShotDialogue>()
-  for (const sc of dialogue?.scenes ?? []) {
-    for (const sh of sc.shots) dialogueByShotId.set(sh.shot_id, sh)
-  }
+  // shot_id → 대사 매핑 (화자 명시 — 옛 chars[0] 추정 제거).
+  //   #dialogue-join: 조인 키는 리넘버 전 id(source_shot_id) — 최종 id 로 조인하면 분할 지점
+  //   이후 전 샷의 대사가 밀린다. 형제는 첫 자식만 상속. (구 시퀀스는 직접 id 조인으로 폴백.)
+  const dialogueByShotId = buildShotDialogueMap(shotSequence.shots, dialogue)
 
   // 인지 부하 재배분(#p2-pacing): 대사가 확정된 유일한 시점이 여기다 — 발화·액션·신규 정보 기준
   //   필요 시간에 못 미치는 샷만 증액한다(단축 금지). 씬 길이는 아래 scene 수렴이 합으로 갱신.

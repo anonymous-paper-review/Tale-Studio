@@ -1,6 +1,7 @@
 // 파이프라인 오케스트레이터: 스토리 → 샷 시퀀스 JSON
 // resumeProjectId 전달 시 기존 stage 결과 로드해 중단 지점부터 재개
 import { PipelineLogger, makeProjectId } from '@/lib/writer/logger';
+import { runDramaturgySafe } from '@/lib/writer/pipeline/stages/s0_dramaturgy';
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure';
 import { runScenes, mergeOpenCast, mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
 import { castContractToCharacters } from '@/lib/writer/cast-contract';
@@ -31,6 +32,7 @@ import type {
   SceneCinematography,
   ValidationIssue,
   Genre,
+  Dramaturgy,
   NarrativeStructure,
   Characters,
   Scenes,
@@ -184,8 +186,18 @@ async function _runPipelineInner(
     : { characters: [], relationships: [], subtext_notes: [] };
   await logger.markStage('characters', 'completed', { seeded: true, count: characters.characters.length });
 
-  const narrativeStructure = (await loadOrRun<NarrativeStructure>(resume, '03_s1_narrativeStructure.json', () => runNarrativeStructure(input, genre, logger, models.S), 'narrativeStructure', logger)).value;
-  const scenes = (await loadOrRun<Scenes>(resume, '05_s3_scenes.json', () => runScenes(input, genre, narrativeStructure, characters, input.background, logger, models.S), 'scenes', logger)).value;
+  // s0.5 드라마투르그: s1 앞에서 "재료"(무대 후보 + 극적 진단)를 만든다. 스토리 원천은 불변 —
+  //   s1 은 CDQ 후보를 참고 재료로, s3 는 무대 후보를 선택지로 받는다(둘 다 강제 아님).
+  const dramaturgy = (await loadOrRun<Dramaturgy | null>(
+    resume,
+    '01_s0_dramaturgy.json',
+    () => runDramaturgySafe(input, genre, characters, logger, models.S),
+    'dramaturgy',
+    logger,
+  )).value;
+
+  const narrativeStructure = (await loadOrRun<NarrativeStructure>(resume, '03_s1_narrativeStructure.json', () => runNarrativeStructure(input, genre, logger, models.S, dramaturgy), 'narrativeStructure', logger)).value;
+  const scenes = (await loadOrRun<Scenes>(resume, '05_s3_scenes.json', () => runScenes(input, genre, narrativeStructure, characters, input.background, logger, models.S, undefined, dramaturgy), 'scenes', logger)).value;
   // 오픈 캐스트(§4): 전개상 추가된 new_characters 를 머지 → 하류 stage 와 persistAssetsToDb(origin='writer' insert)가 본다.
   characters = mergeOpenCast(characters, scenes);
 
@@ -225,7 +237,8 @@ async function _runPipelineInner(
   )).value;
 
   // s2 월드: producer background seed + 오픈캐스트(씬 로케이션 append-only). v2 입력.
-  const world = mergeOpenWorld(input.background, scenes);
+  // 채택된 무대 후보의 표시명·설명 보존 — 후보 미전달 시 humanizeSlug 폴백(종전 동작).
+  const world = mergeOpenWorld(input.background, scenes, dramaturgy?.world_inventory);
 
   // v2: 인물/월드 비주얼 직접 생성 (v0 + v1 + s2 chars/world). 옛 productionDesign+derive 대체.
   const { characterVisual, worldVisual } = (await loadOrRun<{ characterVisual: CharacterVisual; worldVisual: WorldVisual }>(
@@ -287,7 +300,8 @@ async function _runPipelineInner(
       await logger.markStage('sceneCinematography', 'completed', { skipped: true, reason: `Compact Mode (${genre.depth_level})` });
       sceneBudgetIssues = scenes.scenes.flatMap((sc) => analyzeSceneActionBudget(sc).issues);
     } else {
-      const planResult = await runSceneCinematography(genre, characters, scenes, visualIdentity, worldVisual, logger, models.V);
+      // E8 정식 배선(2026-08-10 act-arc-ablation 채택) — v1 막별 아크를 v3 로 전달.
+      const planResult = await runSceneCinematography(genre, characters, scenes, visualIdentity, worldVisual, logger, models.V, actVisualArc);
       await logger.flushRawLlm('sceneCinematography');
       sceneCinematography = planResult.scene_plans;
       sceneBudgetIssues = planResult.budget_issues;
@@ -299,82 +313,127 @@ async function _runPipelineInner(
   const decoupage = (await loadOrRun<DecoupagePlan>(
     resume,
     '10b_c_decoupage.json',
-    () => runDecoupage(genre, characters, scenes, worldVisual, compact ? null : sceneCinematography, logger, models.V),
+    () =>
+      runDecoupage(genre, characters, scenes, worldVisual, compact ? null : sceneCinematography, logger, models.V, {
+        // 로컬 러너는 예산 미지정 → 항상 완주(done=true). 동시성은 프로덕션 step 배선과 동일 env.
+        concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY ?? '1') || 1,
+      })
+        .then((r) => r.plan!),
     'decoupage',
     logger,
   )).value;
 
-  // shotDesign: 샷 단위 3분할 (intent + static + dynamic). 데쿠파주가 정한 샷에 spec을 붙인다.
-  const shotDesignResult = await loadOrRun<{ shots: ShotDesign[]; compact_mode: boolean }>(
-    resume,
-    '11_v4_shotDesign.json',
-    async () => {
-      // 로컬 전체 실행 — 시간 예산 없음(opts 생략 → 항상 done까지 완주).
-      const result = await runShotDesign(genre, characters, scenes, visualIdentity, worldVisual, characterVisual, compact ? null : sceneCinematography, decoupage, '', logger, models.V);
-      return { shots: result.shots, compact_mode: compact };
-    },
-    'shotDesign',
-    logger,
-  );
-  const shotDesign = shotDesignResult.value.shots;
-
-  // Compact mode 사후처리: shotDesign에서 sceneCinematography 역추론 (다운스트림 호환)
-  // resume에서 inferred 못 찾았고 + 방금 shotDesign 새로 만든 경우만 수행 (이미 inferred 있으면 위에서 로드됨)
-  if (compact && !sceneCinematographyLoaded) {
-    sceneCinematography = inferSceneCinematographyFromShots(shotDesign, scenes);
-    await logger.saveStage(sceneCinematographyFileInferred, {
-      scene_plans: sceneCinematography,
-      note: 'inferred from shotDesign (Compact Mode skipped sceneCinematography generation)',
-    });
-  }
-
-  // ===== shotCheck =====
-  // shotCheck는 두 파일(12_shotCheck.json + 13_shotSequence.json) 함께 저장됨
-  type ShotCheckShape = {
+  // ===== decoupage 후 2-레인 분기 (#2lane 2026-08-10) =====
+  //   Lane V: shotDesign → shotCheck → renderPrompts   (샷 축)
+  //   Lane D: voiceProfiles → dialogue                 (대사 축)
+  //   dialogue 의 입력은 scenes(s3) + decoupage 뿐이라(dialogue.ts 헤더) 레인 V 산출물을 읽지
+  //   않는다 — 순차로 붙어 있던 두 구간을 그대로 겹친다. 합류는 persistShots.
+  //   ⚠️ dialogue 내부의 씬 순차 + 글로벌 메모리 체인은 품질 메커니즘(블라인드 A/B 검증)이라
+  //   레인 분리만 하고 내부는 병렬화하지 않는다.
+  //   (raw LLM 로그 라벨은 두 레인이 겹치는 구간에서 섞일 수 있다 — FS 진단 전용이고
+  //    단계 시간/순서의 진실은 _progress.jsonl 의 markStage 다.)
+  type LaneVResult = {
+    shotDesign: ShotDesign[];
+    sceneCinematography: SceneCinematography[];
     shotSequence: PipelineResult['shotSequence'];
-    report: PipelineResult['shotCheck'];
+    shotCheck: PipelineResult['shotCheck'];
+    renderPrompts: RenderPromptsOutput;
   };
-  let shotCheckResult: ShotCheckShape;
-  if (resume) {
-    const cachedSeq = await logger.loadStage<PipelineResult['shotSequence']>('13_c2_shotSequence.json');
-    const cachedReport = await logger.loadStage<PipelineResult['shotCheck']>('12_c2_shotCheck.json');
+
+  const laneVisual = async (): Promise<LaneVResult> => {
+    // shotDesign: 샷 단위 3분할 (intent + static + dynamic). 데쿠파주가 정한 샷에 spec을 붙인다.
+    const shotDesignResult = await loadOrRun<{ shots: ShotDesign[]; compact_mode: boolean }>(
+      resume,
+      '11_v4_shotDesign.json',
+      async () => {
+        // 로컬 전체 실행 — 시간 예산 없음(softDeadlineMs 생략 → 항상 done까지 완주).
+        const result = await runShotDesign(genre, characters, scenes, visualIdentity, worldVisual, characterVisual, compact ? null : sceneCinematography, decoupage, '', logger, models.V, {
+          concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || undefined,
+        });
+        return { shots: result.shots, compact_mode: compact };
+      },
+      'shotDesign',
+      logger,
+    );
+    const shotDesign = shotDesignResult.value.shots;
+
+    // Compact mode 사후처리: shotDesign에서 sceneCinematography 역추론 (다운스트림 호환)
+    // resume에서 inferred 못 찾았고 + 방금 shotDesign 새로 만든 경우만 수행 (이미 inferred 있으면 위에서 로드됨)
+    let laneSceneCinematography = sceneCinematography;
+    if (compact && !sceneCinematographyLoaded) {
+      laneSceneCinematography = inferSceneCinematographyFromShots(shotDesign, scenes);
+      await logger.saveStage(sceneCinematographyFileInferred, {
+        scene_plans: laneSceneCinematography,
+        note: 'inferred from shotDesign (Compact Mode skipped sceneCinematography generation)',
+      });
+    }
+
+    // ===== shotCheck =====
+    // shotCheck는 두 파일(12_shotCheck.json + 13_shotSequence.json) 함께 저장됨
+    type ShotCheckShape = {
+      shotSequence: PipelineResult['shotSequence'];
+      report: PipelineResult['shotCheck'];
+    };
+    let shotCheckResult: ShotCheckShape;
+    const cachedSeq = resume ? await logger.loadStage<PipelineResult['shotSequence']>('13_c2_shotSequence.json') : null;
+    const cachedReport = resume ? await logger.loadStage<PipelineResult['shotCheck']>('12_c2_shotCheck.json') : null;
     if (cachedSeq && cachedReport) {
       shotCheckResult = { shotSequence: cachedSeq, report: cachedReport };
       await logger.markStage('shotCheck', 'completed', { resumed: true });
     } else {
-      shotCheckResult = await runShotCheck(projectId, genre, characters, scenes, worldVisual, shotDesign, decoupage, sceneBudgetIssues, logger, models.C);
+      // 씬 fan-out(#shotcheck-fanout). 로컬 러너는 예산 미지정 → 항상 완주(done=true).
+      const checked = await runShotCheck(projectId, genre, characters, scenes, worldVisual, shotDesign, decoupage, sceneBudgetIssues, logger, models.C, {
+        concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || 4,
+      });
       await logger.flushRawLlm('shotCheck');
+      if (!checked.done) {
+        // 예산을 안 줬는데 부분 반환이면 계약 위반 — 조용히 절반짜리 시퀀스를 흘리지 않는다.
+        throw new Error('shotCheck: 예산 미지정인데 부분 반환 — 씬 체크포인트 계약 위반');
+      }
+      shotCheckResult = { shotSequence: checked.shotSequence, report: checked.report };
     }
-  } else {
-    shotCheckResult = await runShotCheck(projectId, genre, characters, scenes, worldVisual, shotDesign, decoupage, sceneBudgetIssues, logger, models.C);
-    await logger.flushRawLlm('shotCheck');
-  }
 
-  const { shotSequence, report: shotCheck } = shotCheckResult;
+    // ===== renderPrompts: T2I + TI2V 최종 프롬프트 정리 =====
+    // 기존 샷의 first_frame_generation/video_generation을 추출.
+    // 없는 경우만 LLM(Visual 축)로 보충 생성.
+    const laneRenderPrompts = (await loadOrRun<RenderPromptsOutput>(
+      resume,
+      '14_v5_renderPrompts.json',
+      () => runRenderPrompts(shotCheckResult.shotSequence, visualIdentity, worldVisual, logger, models.V),
+      'renderPrompts',
+      logger,
+    )).value;
 
-  // ===== renderPrompts: T2I + TI2V 최종 프롬프트 정리 =====
-  // 기존 샷의 first_frame_generation/video_generation을 추출.
-  // 없는 경우만 LLM(Visual 축)로 보충 생성.
-  const renderPrompts = (await loadOrRun<RenderPromptsOutput>(
-    resume,
-    '14_v5_renderPrompts.json',
-    () => runRenderPrompts(shotSequence, visualIdentity, worldVisual, logger, models.V),
-    'renderPrompts',
-    logger,
-  )).value;
+    return {
+      shotDesign,
+      sceneCinematography: laneSceneCinematography,
+      shotSequence: shotCheckResult.shotSequence,
+      shotCheck: shotCheckResult.report,
+      renderPrompts: laneRenderPrompts,
+    };
+  };
 
   // ===== dialogue: 샷 단위 대사 후처리 (#dialogue-v4) =====
   // 샷 확정 후 V4 구성(보이스 프로파일 + 씬 순차 메모리 + 3규율)으로 대사를 저작한다.
-  const dialogueTrack = (await loadOrRun<DialogueTrack>(
-    resume,
-    '14b_dialogue.json',
-    async () => {
-      const result = await runDialogue(input.story, genre, characters, scenes, decoupage, logger, models.S);
-      return toDialogueTrack(result);
-    },
-    'dialogue',
-    logger,
-  )).value;
+  const laneDialogue = async (): Promise<DialogueTrack> =>
+    (await loadOrRun<DialogueTrack>(
+      resume,
+      '14b_dialogue.json',
+      async () => {
+        const result = await runDialogue(input.story, genre, characters, scenes, decoupage, logger, models.S);
+        return toDialogueTrack(result);
+      },
+      'dialogue',
+      logger,
+    )).value;
+
+  // WRITER_LANES=0 은 A/B 대조군 — 같은 레인 함수를 순서만 바꿔 부른다(코드 경로 동일).
+  const [laneV, dialogueTrack] =
+    process.env.WRITER_LANES === '0'
+      ? [await laneVisual(), await laneDialogue()]
+      : await Promise.all([laneVisual(), laneDialogue()]);
+  const { shotDesign, shotSequence, shotCheck, renderPrompts } = laneV;
+  sceneCinematography = laneV.sceneCinematography;
 
   // ★ Tier 2 persist (스토리보드/director): shots 를 마지막에 DB 기록.
   //   characters/locations/scenes 는 Tier 1(stage 09)이 이미 기록 — 여기선 건드리지 않음(artist 편집 보존).

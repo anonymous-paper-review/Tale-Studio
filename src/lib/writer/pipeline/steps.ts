@@ -8,6 +8,7 @@
 //
 // runPipeline(로컬, 파일 캐시 resume)과 별개 경로 — 그쪽 로직은 건드리지 않는다.
 import { PipelineLogger } from '@/lib/writer/logger';
+import { runDramaturgySafe } from '@/lib/writer/pipeline/stages/s0_dramaturgy';
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure';
 import { runScenes, mergeOpenCast, mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
 import { runStructureScenesMerged } from '@/lib/writer/pipeline/stages/s1s3_merged';
@@ -18,7 +19,7 @@ import { runV2Design } from '@/lib/writer/pipeline/stages/v2_design';
 import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan';
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
-import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
+import { runShotCheck, type ShotCheckProgress } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
 import { runDialogue, toDialogueTrack, type DialogueProgress } from '@/lib/writer/pipeline/stages/dialogue';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
@@ -38,12 +39,13 @@ import {
   type WriterRunStateBase,
   type WriterErrorDetail,
 } from '@/lib/writer/run-store';
-import { getPendingRawCalls } from '@/lib/writer/llm/raw_collector';
+import { getPendingRawCalls, getUsageTotals } from '@/lib/writer/llm/raw_collector';
 import type {
   PipelineInput,
   SceneCinematography,
   ValidationIssue,
   Genre,
+  Dramaturgy,
   NarrativeStructure,
   Characters,
   BackgroundContract,
@@ -55,6 +57,7 @@ import type {
   WorldVisual,
   ShotDesign,
   DecoupagePlan,
+  SceneDecoupage,
   ShotSequence,
   ShotCheckReport,
   RenderPromptsOutput,
@@ -73,6 +76,8 @@ export interface WriterRunState extends WriterRunStateBase {
 
   // Story 축
   genre?: Genre;
+  /** s0.5 드라마투르그 — s1(CDQ 후보)·s3(무대 후보) 의 참고 재료. 스토리 원천은 불변. */
+  dramaturgy?: Dramaturgy | null; // null = 실패 흡수(배지) — 재료 없이 진행 (s0_dramaturgy 흡수 래퍼)
   narrativeStructure?: NarrativeStructure;
   characters?: Characters;
   world?: BackgroundContract;        // s2 월드/세팅 seed (producer background) — V축 재설계
@@ -89,12 +94,18 @@ export interface WriterRunState extends WriterRunStateBase {
 
   // Shot 축
   decoupage?: DecoupagePlan;
+  /** decoupage 씬 단위 부분 진행(#scene-checkpoint 2026-08-09) — 씬 수 × 씬당 수십 초가 step
+   *  예산(240s)을 넘던 17씬 사고의 처방. 완료 씬을 체크포인트하고 다음 step 이 이어간다.
+   *  (doneSceneIds 는 scenes[].scene_id 로 파생 가능 — 별도 저장하지 않는다.) */
+  decoupagePartial?: SceneDecoupage[];
   shotDesign?: ShotDesign[];
   /** shotDesign 씬 단위 부분 진행(#long-writer-run 2026-07-15) — 긴 러닝타임 프로젝트에서
    *  한 step(240s 예산) 안에 전 씬을 못 끝낼 때 완료 씬을 체크포인트하고 다음 step이 이어간다. */
   shotDesignPartial?: { doneSceneIds: string[]; shots: ShotDesign[] };
   shotSequence?: ShotSequence;
   shotCheck?: ShotCheckReport;
+  /** shotCheck 씬 단위 부분 진행(#shotcheck-fanout 2026-08-10) — shotDesignPartial 과 동일 계약. */
+  shotCheckPartial?: ShotCheckProgress;
   renderPrompts?: RenderPromptsOutput;
 
   // 샷 단위 대사 트랙(#dialogue-v4 2026-07-23) — persistShots가 shots.dialogue_lines로 매핑.
@@ -128,6 +139,145 @@ interface WriterStep {
   key: string;
   has: (s: WriterRunState) => boolean;
   run: (s: WriterRunState, ctx: StepContext) => Promise<Partial<WriterRunState>>;
+  /** 이 step 이 차지하는 진행 유닛 수(기본 1). 합성 step 이 옛 다단계를 대체할 때 진행률
+   *  (total_units/completed_units) 을 하위호환으로 유지하기 위한 것 — 새 진실 아님. */
+  units?: number;
+}
+
+// shotCheck 씬 fan-out 동시성(#shotcheck-fanout 2026-08-10). WRITER_SCENE_CONCURRENCY 로 튜닝하되
+//   **기본값은 4** — 이 스테이지는 단일 대형 콜 하나를 씬 단위로 쪼갠 것이라, 동시성 1이면 콜 수만
+//   늘고 벽시계는 오히려 나빠진다(쪼개기의 이득이 병렬에서만 나온다). decoupage/v4 는 원래 씬 루프라
+//   1=순차가 의미 있지만 여기는 아니다.
+const SHOTCHECK_CONCURRENCY = Number(process.env.WRITER_SCENE_CONCURRENCY) || 4;
+
+// 레인 순차 실행 게이트(#2lane A/B) — WRITER_LANES=0 이면 Lane V→Lane D 순차. 그 외 코드 경로는 동일.
+const LANES_PARALLEL = process.env.WRITER_LANES !== '0';
+
+// =====================================================================
+// decoupage 후 2-레인(#2lane 2026-08-10).
+//   Lane V: shotDesign → shotCheck → renderPrompts / Lane D: voiceProfiles → dialogue.
+//   dialogue 의 입력은 scenes(s3)+decoupage 뿐(dialogue.ts 헤더)이라 레인 V 산출물을 읽지
+//   않는다 — 옛 4직렬 step 을 한 인보케이션 안에서 겹치는 합성 step 하나로 바꿨다.
+//   각 레인은 자기 산출물이 이미 state 에 있으면 건너뛰므로, 예산 초과로 한쪽만 부분
+//   체크포인트(shotDesignPartial / dialoguePartial)를 남겨도 다음 인보케이션이 양 레인을
+//   정확히 이어받는다(진행 중 run 하위호환: state 필드명·markStage 이벤트명 모두 불변).
+// =====================================================================
+async function runLaneVisual(
+  s: WriterRunState,
+  { logger, projectId, deadlineMs }: StepContext,
+): Promise<Partial<WriterRunState>> {
+  const models = resolveModels(s.input);
+  const compact = s.compact === true;
+  const patch: Partial<WriterRunState> = {};
+
+  let shotDesign = s.shotDesign;
+  if (shotDesign === undefined) {
+    const result = await runShotDesign(
+      s.genre!,
+      s.characters!,
+      s.scenes!,
+      s.visualIdentity!,   // v0 (전역 스타일)
+      s.worldVisual!,      // v2 (팔레트/로케이션)
+      s.characterVisual!,  // v2 (인물 의상) — character_blocking 생성용
+      compact ? null : s.sceneCinematography!,
+      s.decoupage!,
+      '', // bridge seed 제거(E6 삭제 채택) — shotDesign 시그니처 하위호환용 빈 값
+      logger,
+      models.V,
+      // 씬 단위 이어달리기(#long-writer-run): 이전 부분 진행 재개 + step 예산에서 양보.
+      //   동시성은 decoupage 와 같은 env 노브. 미설정이면 v4_shots 자체 기본값(SHOTDESIGN_CONCURRENCY).
+      {
+        resume: s.shotDesignPartial ?? null,
+        softDeadlineMs: deadlineMs,
+        concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || undefined,
+      },
+    );
+    await logger.flushRawLlm('shotDesign');
+
+    // 부분 진행 — 완료 씬 체크포인트만 남기고 레인 미완(has=false 유지).
+    if (!result.done) {
+      return { shotDesignPartial: { doneSceneIds: result.doneSceneIds, shots: result.shots } };
+    }
+    shotDesign = result.shots;
+    patch.shotDesign = shotDesign;
+    patch.shotDesignPartial = undefined; // 체크포인트 정리 (JSONB 직렬화에서 키 제거)
+    // Compact mode 사후처리: shotDesign 으로부터 sceneCinematography 역추론 (다운스트림 호환).
+    if (compact) patch.sceneCinematography = inferSceneCinematographyFromShots(shotDesign, s.scenes!);
+  }
+
+  let shotSequence = s.shotSequence;
+  if (shotSequence === undefined || s.shotCheck === undefined) {
+    const result = await runShotCheck(
+      projectId,
+      s.genre!,
+      s.characters!,
+      s.scenes!,
+      s.worldVisual!,      // v2 (palette/locations) — asset 정규화용
+      shotDesign,
+      s.decoupage ?? null, // #p2-wiring: 표시문 소스(beat_summary) — 구 state resume 이면 null 폴백
+      s.sceneBudgetIssues ?? [],
+      logger,
+      models.C,
+      // 씬 fan-out(#shotcheck-fanout): 씬 단위 이어달리기 + step 예산 양보 + 씬 병렬.
+      {
+        resume: s.shotCheckPartial ?? null,
+        softDeadlineMs: deadlineMs,
+        concurrency: SHOTCHECK_CONCURRENCY,
+      },
+    );
+    await logger.flushRawLlm('shotCheck');
+    // 부분 진행 — 여기까지의 레인 산출물 + 씬 체크포인트를 저장하고 양보(has=false 유지).
+    if (!result.done) return { ...patch, shotCheckPartial: result.progress };
+    shotSequence = result.shotSequence;
+    patch.shotSequence = result.shotSequence;
+    patch.shotCheck = result.report;
+    patch.shotCheckPartial = undefined; // 체크포인트 정리
+  }
+
+  if (s.renderPrompts === undefined) {
+    patch.renderPrompts = await runRenderPrompts(
+      shotSequence,
+      s.visualIdentity!, // v0 (format) — 옛 renderFormat
+      s.worldVisual!,    // v2 (palette/color_meaning) — 옛 productionDesign
+      logger,
+      models.V,
+    );
+    await logger.flushRawLlm('renderPrompts');
+  }
+  return patch;
+}
+
+async function runLaneDialogue(
+  s: WriterRunState,
+  { logger, deadlineMs }: StepContext,
+): Promise<Partial<WriterRunState>> {
+  if (s.dialogue !== undefined) return {};
+  const models = resolveModels(s.input);
+  // ⚠️ 씬 순차 + 글로벌 메모리 체인은 V4 품질 메커니즘(블라인드 A/B 검증) — 레인으로 분리만
+  //   하고 내부는 병렬화하지 않는다. 씬 실패는 빈 대사로 흡수(runDialogue 내부 계약).
+  const result = await runDialogue(
+    s.input.story,
+    s.genre!,
+    s.characters!,
+    s.scenes!,
+    s.decoupage!,
+    logger,
+    models.S,
+    { resume: s.dialoguePartial ?? null, softDeadlineMs: deadlineMs },
+  );
+  await logger.flushRawLlm('dialogue');
+
+  if (!result.done) {
+    return {
+      dialoguePartial: {
+        doneSceneIds: result.doneSceneIds,
+        scenes: result.scenes,
+        memory: result.memory,
+        profiles: result.profiles,
+      },
+    };
+  }
+  return { dialogue: toDialogueTrack(result), dialoguePartial: undefined };
 }
 
 // =====================================================================
@@ -139,6 +289,20 @@ interface WriterStep {
 //   createRun 이 state.genre/state.characters 로 seed 하므로 writer 는 s1(structure)부터 수행한다.
 //   (genre seed 가 없으면 narrativeStructure 의 s.genre! 에서 명시적으로 실패 — 핸드오프는 항상 seed.)
 export const WRITER_STEPS: WriterStep[] = [
+  {
+    // s0.5 드라마투르그 — s1 앞에서 "재료"(무대 후보 + 극적 진단)를 만든다.
+    //   has 에 narrativeStructure 를 함께 보는 이유(구 run 하위호환): 이 스텝이 도입되기 전에
+    //   시작돼 이미 s1 을 지난 run 은 지금 와서 재료를 만들어도 쓸 곳이 없다 — 웹서치 LLM 콜을
+    //   태우지 않고 조용히 건너뛴다. 새 run 은 narrativeStructure 가 비어 있으므로 정상 실행된다.
+    key: 'dramaturgy',
+    has: (s) => s.dramaturgy !== undefined || s.narrativeStructure !== undefined,
+    run: async (s, { logger }) => {
+      const models = resolveModels(s.input);
+      const dramaturgy = await runDramaturgySafe(s.input, s.genre!, s.characters!, logger, models.S);
+      await logger.flushRawLlm('dramaturgy');
+      return { dramaturgy };
+    },
+  },
   {
     key: 'narrativeStructure',
     has: (s) => s.narrativeStructure !== undefined,
@@ -160,13 +324,14 @@ export const WRITER_STEPS: WriterStep[] = [
         );
         await logger.flushRawLlm('structureScenesMerged');
         const characters = mergeOpenCast(s.characters!, scenes);
-        const world = mergeOpenWorld(s.world, scenes);
+        // 채택된 무대 후보의 표시명·설명 보존 — 후보 미전달 시 humanizeSlug 폴백(종전 동작).
+      const world = mergeOpenWorld(s.world, scenes, s.dramaturgy?.world_inventory);
         const patch: Partial<WriterRunState> = { narrativeStructure, scenes };
         if (characters !== s.characters) patch.characters = characters;
         if (world !== s.world) patch.world = world;
         return patch;
       }
-      const narrativeStructure = await runNarrativeStructure(s.input, s.genre!, logger, models.S);
+      const narrativeStructure = await runNarrativeStructure(s.input, s.genre!, logger, models.S, s.dramaturgy ?? null);
       await logger.flushRawLlm('narrativeStructure');
       return { narrativeStructure };
     },
@@ -176,12 +341,13 @@ export const WRITER_STEPS: WriterStep[] = [
     has: (s) => s.scenes !== undefined,
     run: async (s, { logger }) => {
       const models = resolveModels(s.input);
-      const scenes = await runScenes(s.input, s.genre!, s.narrativeStructure!, s.characters!, s.world, logger, models.S, s._sceneRevisionNotes);
+      const scenes = await runScenes(s.input, s.genre!, s.narrativeStructure!, s.characters!, s.world, logger, models.S, s._sceneRevisionNotes, s.dramaturgy ?? null);
       await logger.flushRawLlm('scenes');
       // 오픈 캐스트(§4 + V축 재설계): 전개상 필요한 인물/월드를 producer 베이스라인에 append.
       //   producer 전달값(원천)은 불변 — mergeOpen* 가 append-only(아키텍처 §5#2).
       const characters = mergeOpenCast(s.characters!, scenes);
-      const world = mergeOpenWorld(s.world, scenes);
+      // 채택된 무대 후보의 표시명·설명 보존 — 후보 미전달 시 humanizeSlug 폴백(종전 동작).
+      const world = mergeOpenWorld(s.world, scenes, s.dramaturgy?.world_inventory);
       const patch: Partial<WriterRunState> = { scenes };
       if (characters !== s.characters) patch.characters = characters;
       if (world !== s.world) patch.world = world;
@@ -288,6 +454,9 @@ export const WRITER_STEPS: WriterStep[] = [
         s.worldVisual!,    // v2 (월드 디자인: 팔레트/로케이션)
         logger,
         models.V,
+        // E8 정식 배선(2026-08-10 act-arc-ablation 채택): v1 막별 아크를 v3 로 전달 —
+        //   막 경계의 시각 대비를 살린다. 구 state resume 이면 null 폴백(배선 전과 동일).
+        s.actVisualArc ?? null,
       );
       await logger.flushRawLlm('sceneCinematography');
       return {
@@ -300,10 +469,10 @@ export const WRITER_STEPS: WriterStep[] = [
   {
     key: 'decoupage',
     has: (s) => s.decoupage !== undefined,
-    run: async (s, { logger }) => {
+    run: async (s, { logger, deadlineMs }) => {
       const models = resolveModels(s.input);
       const compact = s.compact === true;
-      const decoupage = await runDecoupage(
+      const result = await runDecoupage(
         s.genre!,
         s.characters!,
         s.scenes!,
@@ -311,121 +480,41 @@ export const WRITER_STEPS: WriterStep[] = [
         compact ? null : s.sceneCinematography!,
         logger,
         models.V,
+        // 씬 단위 이어달리기(#scene-checkpoint): 부분 진행 재개 + step 예산에서 양보 (shotDesign 계약).
+        //   동시성(#scene-parallel)은 env 로만 상향 — 전역 429 방어(설계문서 ② E) 전 기본 1.
+        {
+          resume: s.decoupagePartial ?? null,
+          softDeadlineMs: deadlineMs,
+          concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY ?? '1') || 1,
+        },
       );
       await logger.flushRawLlm('decoupage');
-      return { decoupage };
-    },
-  },
-  {
-    key: 'shotDesign',
-    has: (s) => s.shotDesign !== undefined,
-    run: async (s, { logger, deadlineMs }) => {
-      const models = resolveModels(s.input);
-      const compact = s.compact === true;
-      const result = await runShotDesign(
-        s.genre!,
-        s.characters!,
-        s.scenes!,
-        s.visualIdentity!,   // v0 (전역 스타일)
-        s.worldVisual!,      // v2 (팔레트/로케이션)
-        s.characterVisual!,  // v2 (인물 의상) — character_blocking 생성용
-        compact ? null : s.sceneCinematography!,
-        s.decoupage!,
-        '', // bridge seed 제거(E6 삭제 채택) — shotDesign 시그니처 하위호환용 빈 값
-        logger,
-        models.V,
-        // 씬 단위 이어달리기(#long-writer-run): 이전 부분 진행 재개 + step 예산에서 양보.
-        { resume: s.shotDesignPartial ?? null, softDeadlineMs: deadlineMs },
-      );
-      await logger.flushRawLlm('shotDesign');
 
       // 부분 진행 — 완료 씬 체크포인트만 남기고 스테이지 미완(has=false 유지).
-      //   runWriterSteps가 이를 감지해 attempt를 리셋하고 다음 step에서 이어간다.
+      //   runWriterSteps 가 이를 감지해 attempt 를 리셋하고 다음 step 에서 이어간다.
       if (!result.done) {
-        return {
-          shotDesignPartial: { doneSceneIds: result.doneSceneIds, shots: result.shots },
-        };
+        return { decoupagePartial: result.scenes };
       }
-
-      const patch: Partial<WriterRunState> = {
-        shotDesign: result.shots,
-        shotDesignPartial: undefined, // 체크포인트 정리 (JSONB 직렬화에서 키 제거)
-      };
-      // Compact mode 사후처리: shotDesign 으로부터 sceneCinematography 역추론 (다운스트림 호환).
-      if (compact) {
-        patch.sceneCinematography = inferSceneCinematographyFromShots(result.shots, s.scenes!);
-      }
-      return patch;
+      return { decoupage: result.plan, decoupagePartial: undefined };
     },
   },
   {
-    key: 'shotCheck',
-    has: (s) => s.shotSequence !== undefined && s.shotCheck !== undefined,
-    run: async (s, { logger, projectId }) => {
-      const models = resolveModels(s.input);
-      const result = await runShotCheck(
-        projectId,
-        s.genre!,
-        s.characters!,
-        s.scenes!,
-        s.worldVisual!,    // v2 (palette/locations) — asset 정규화용
-        s.shotDesign!,
-        s.decoupage ?? null, // #p2-wiring: 표시문 소스(beat_summary) — 구 state resume 이면 null 폴백
-        s.sceneBudgetIssues ?? [],
-        logger,
-        models.C,
-      );
-      await logger.flushRawLlm('shotCheck');
-      return { shotSequence: result.shotSequence, shotCheck: result.report };
-    },
-  },
-  {
-    key: 'renderPrompts',
-    has: (s) => s.renderPrompts !== undefined,
-    run: async (s, { logger, projectId }) => {
-      const models = resolveModels(s.input);
-      const renderPrompts = await runRenderPrompts(
-        s.shotSequence!,
-        s.visualIdentity!, // v0 (format) — 옛 renderFormat
-        s.worldVisual!,    // v2 (palette/color_meaning) — 옛 productionDesign
-        logger,
-        models.V,
-      );
-      await logger.flushRawLlm('renderPrompts');
-      return { renderPrompts };
-    },
-  },
-  {
-    // 샷 단위 대사(#dialogue-v4) — 샷 확정 후 후처리 저작. persistShots 직전에 두어
-    //   persist가 state.dialogue를 dialogue_lines로 매핑한다. 씬 순차(메모리 캐리)라
-    //   shotDesign과 같은 부분 진행 체크포인트를 쓴다. S축 모델(스토리 도메인).
-    key: 'dialogue',
-    has: (s) => s.dialogue !== undefined,
-    run: async (s, { logger, deadlineMs }) => {
-      const models = resolveModels(s.input);
-      const result = await runDialogue(
-        s.input.story,
-        s.genre!,
-        s.characters!,
-        s.scenes!,
-        s.decoupage!,
-        logger,
-        models.S,
-        { resume: s.dialoguePartial ?? null, softDeadlineMs: deadlineMs },
-      );
-      await logger.flushRawLlm('dialogue');
-
-      if (!result.done) {
-        return {
-          dialoguePartial: {
-            doneSceneIds: result.doneSceneIds,
-            scenes: result.scenes,
-            memory: result.memory,
-            profiles: result.profiles,
-          },
-        };
+    // 2-레인 합성 step(#2lane 2026-08-10) — 옛 shotDesign/shotCheck/renderPrompts/dialogue
+    //   4직렬 step 을 대체한다. 두 레인이 한 인보케이션 안에서 동시 진행하고, 예산 초과 시
+    //   양 레인의 부분 체크포인트를 함께 저장해 다음 인보케이션이 둘 다 재개한다.
+    //   대사 트랙은 여전히 persistShots 앞에서 확정되므로 persist 의 dialogue_lines 매핑 불변.
+    key: 'shotsAndDialogue',
+    units: 4, // 대체한 옛 step 수 — 진행률(total_units) 하위호환
+    has: (s) => s.renderPrompts !== undefined && s.dialogue !== undefined,
+    run: async (s, ctx) => {
+      // WRITER_LANES=0 은 A/B 대조군 — 같은 레인 함수를 순서만 바꿔 부른다(코드 경로 동일).
+      if (!LANES_PARALLEL) {
+        const visual = await runLaneVisual(s, ctx);
+        const dialogue = await runLaneDialogue(s, ctx);
+        return { ...visual, ...dialogue };
       }
-      return { dialogue: toDialogueTrack(result), dialoguePartial: undefined };
+      const [visual, dialogue] = await Promise.all([runLaneVisual(s, ctx), runLaneDialogue(s, ctx)]);
+      return { ...visual, ...dialogue };
     },
   },
   {
@@ -457,7 +546,7 @@ export const WRITER_STEPS: WriterStep[] = [
   },
 ];
 
-export const WRITER_TOTAL_UNITS = WRITER_STEPS.length;
+export const WRITER_TOTAL_UNITS = WRITER_STEPS.reduce((n, st) => n + (st.units ?? 1), 0);
 
 /**
  * 다음 step 을 self-trigger 한다 (start / step paused / watchdog 공용).
@@ -570,6 +659,9 @@ export async function runWriterSteps(
 
     // 단계 실행 (단계별 소요시간 측정 — timing pipeline).
     const stageStartedMs = Date.now();
+    // 쿼터 회계(#llm-quota 2026-08-10): 스테이지 전후 델타로 콜/토큰을 잰다. 한 런의
+    //   스테이지별 RPM·TPM 프로파일이 여기서 나오고, 그게 동시 실행 가능 수의 분모가 된다.
+    const usageBefore = getUsageTotals();
     let patch: Partial<WriterRunState>;
     try {
       patch = await step.run(state, { logger, projectId, deadlineMs: opts.deadlineMs });
@@ -612,10 +704,19 @@ export async function runWriterSteps(
       ...(state._timings ?? {}),
       [step.key]: { ms: stageMs, attempts: nextCount, endedAt: new Date().toISOString() },
     };
+    const usageAfter = getUsageTotals();
+    const stageCalls = usageAfter.calls - usageBefore.calls;
+    const stageInTok = usageAfter.inputTokens - usageBefore.inputTokens;
+    const stageOutTok = usageAfter.outputTokens - usageBefore.outputTokens;
+    const stage429 = usageAfter.rateLimitHits - usageBefore.rateLimitHits;
     console.log(
-      `[writer timing] ${projectId} · ${step.key} ${(stageMs / 1000).toFixed(1)}s (attempt ${nextCount})`,
+      `[writer timing] ${projectId} · ${step.key} ${(stageMs / 1000).toFixed(1)}s (attempt ${nextCount})` +
+        ` calls=${stageCalls} in_tok=${stageInTok} out_tok=${stageOutTok}` +
+        ` rpm=${stageMs > 0 ? ((stageCalls / stageMs) * 60_000).toFixed(1) : '0'}` +
+        ` in_tpm=${stageMs > 0 ? Math.round((stageInTok / stageMs) * 60_000) : 0}` +
+        (stage429 > 0 ? ` quota_retries=${stage429}` : ''),
     );
-    completedUnits += 1;
+    completedUnits += step.units ?? 1;
     try {
       const saved = await saveRunState(
         run.id,

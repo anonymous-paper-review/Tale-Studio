@@ -4,6 +4,7 @@
 //   key 목록은 src/lib/writer/pipeline/steps.ts 의 등록이 진실 (여기 없는 키는 fallback).
 
 const STAGE_LABELS: Record<string, string> = {
+  dramaturgy: 'Writer가 무대와 극적 재료를 찾고 있습니다',
   narrativeStructure: 'Writer가 이야기 구조를 짜고 있습니다',
   scenes: 'Writer가 씬과 배경, 인물을 만들고 있습니다',
   storyCheck: 'Writer가 스토리를 검토하고 있습니다',
@@ -12,6 +13,8 @@ const STAGE_LABELS: Record<string, string> = {
   v2Design: 'Artist가 배경과 인물을 디자인하고 있습니다',
   sceneCinematography: 'Director가 씬 촬영 방향을 잡고 있습니다',
   decoupage: 'Director가 씬을 샷으로 나누고 있습니다',
+  // 2-레인 합성 step(#2lane) — 옛 4키는 진행 중이던 run 의 표시를 위해 남겨 둔다.
+  shotsAndDialogue: 'Director가 샷을 다듬고 Writer가 대사를 쓰고 있습니다',
   shotDesign: 'Director가 샷들에 연출을 손보고 있습니다',
   shotCheck: 'Director가 샷 연출을 검증하고 있습니다',
   renderPrompts: 'Director가 촬영 지시서를 쓰고 있습니다',

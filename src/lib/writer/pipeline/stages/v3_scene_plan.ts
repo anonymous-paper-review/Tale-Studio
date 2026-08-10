@@ -41,8 +41,10 @@ export async function runSceneCinematography(
   worldVisual: WorldVisual,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
-  // E8 실험 (기록만 2026-07-21): v1 actVisualArc 배선 복원 후보. 미전달(기본) = 현행과 프롬프트 동일.
-  //   판정 후 정식 배선(호출부 전달) 또는 v1 제거와 함께 이 파라미터도 정리한다.
+  // E8 정식 배선 (2026-08-10 채택 — act-arc-ablation 사전 등록 조건 ③).
+  //   막 경계 시각 대비 A평균 3.00 vs B평균 1.08 (차이 > 팔 내 최대 편차)로 아크 전달이 유효.
+  //   steps.ts·index.ts 양 경로가 전달한다. 미전달(null)은 구 run resume 등 폴백 — 그때는
+  //   프롬프트에서 아크 블록과 act 표기가 빠져 배선 전과 동일하게 동작한다.
   actVisualArc?: ActVisualArc | null,
 ): Promise<L3Result> {
   await logger.markStage('sceneCinematography', 'started');

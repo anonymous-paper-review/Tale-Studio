@@ -205,6 +205,33 @@ export interface Genre {
   format: string; // "horizontal_16:9" | "vertical_9:16" | "cinema_2.39:1"
 }
 
+// S0.5 드라마투르그 (s0_dramaturgy.ts) — s1 앞에서 "재료"를 만든다.
+//   world_inventory 는 s3 프롬프트의 무대 *후보*로만 주입되고, 씬이 실제로 채택한 것만
+//   mergeOpenWorld 를 타고 월드에 들어온다 (미채택 후보는 v2 디자인 비용을 태우지 않는다).
+export interface DramaturgyStageCandidate {
+  /** snake_case 슬러그 — s3 가 채택하면 scene.location 에 이 id 그대로 쓴다 */
+  id: string;
+  /** 스토리와 같은 언어의 표시명 */
+  name: string;
+  description: string;
+  /** 어느 메커니즘에서 유도됐나 — 유도 사슬의 증거 */
+  derived_from: string;
+  /** 이 무대에서 가능한 씬 상황 1~3개 */
+  scene_potential: string[];
+}
+
+export interface Dramaturgy {
+  core_engine: string;
+  mechanism_notes: string[];
+  world_inventory: DramaturgyStageCandidate[];
+  dramatic_diagnosis: {
+    stakes: string;
+    weak_beats: string[];
+    cdq_candidates: string[];
+    ending_check: string;
+  };
+}
+
 export interface NarrativeStructure {
   structure_type: string; // "kishōtenketsu" | "3-act" | "hero's_journey" | "non-linear" 등
   acts: Array<{
@@ -737,6 +764,11 @@ export interface ShotSequenceItem {
   // 원본 v4 설계의 shot_id — shotCheck 분할·리넘버 뒤에도 러프보드가 state.shotDesign 의
   // rich spec 을 올바른 샷에 조인하기 위한 provenance 포인터 (분할 자식은 부모 설계 상속).
   design_ref?: string;
+  // #dialogue-join 2026-08-10: shotCheck 분할·리넘버 *전* 의 id (분할 자식 = 부모 id).
+  //   대사 트랙은 데쿠파주 id 공간에 키가 잡혀 있는데 최종 시퀀스는 위치 기준으로 리넘버되므로,
+  //   최종 shot_id 로 조인하면 대사가 엉뚱한 샷에 붙는다(f32b3f50 실측: 137샷 중 98샷 오배치).
+  //   이 필드가 유일한 정합 조인 키다. 미보유(구 state)면 소비자가 직접 id 조인으로 폴백.
+  source_shot_id?: string;
   // v4 static_spec 원본 — persist 가 shots.static_spec 으로 운반 (facet 렌더·prompt 캐시 소스).
   static_spec?: ShotStaticSpec;
   // v4 dynamic_spec 원본(#motion-contract 2026-08-07) — persist 가 shots.dynamic_spec 으로 운반.

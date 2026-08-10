@@ -3,7 +3,7 @@ import { displayNameOf, humanizeSlug } from '@/lib/display-name';
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { computeSceneBudget, renderBudgetBlock, validateSceneBudget } from '@/lib/writer/pipeline/budget';
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
-import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, StoryCharacter, BackgroundContract } from '@/lib/writer/types/pipeline';
+import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, StoryCharacter, BackgroundContract, Dramaturgy, DramaturgyStageCandidate } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
 // 오픈 캐스트 머지 (producer-story-gate §4): s3 가 반환한 new_characters 중 기존 slug 와 겹치지 않는
@@ -42,13 +42,22 @@ export function mergeOpenCast(prev: Characters, scenes: Scenes): Characters {
 //   ⚠️ producer 전달값(원천)은 수정·삭제하지 않는다: append-only 시멘틱으로 보장(보호 플래그 불필요, 아키텍처 §5#2).
 //   seed 가 없으면(coworker background 전) 빈 world 에 씬 로케이션을 채운다(별도 fallback 불필요).
 //   writer-added 의 origin 표기는 persist 단계에서(characters.origin='writer' 와 동일 — 후속 증분).
-export function mergeOpenWorld(prev: BackgroundContract | undefined, scenes: Scenes): BackgroundContract {
+export function mergeOpenWorld(
+  prev: BackgroundContract | undefined,
+  scenes: Scenes,
+  // s0.5 무대 후보 — 씬이 채택한 후보의 표시명/설명을 살린다. 미전달이면 종전 동작과 동일.
+  candidates?: DramaturgyStageCandidate[],
+): BackgroundContract {
   const base: BackgroundContract = prev ?? { locations: [] };
   const known = new Set<string>();
   for (const l of base.locations) {
     known.add(l.id.toLowerCase().trim());
     known.add(l.name.toLowerCase().trim());
   }
+  // 채택 후보의 메타 조회표 — 후보 id 로 씬이 location 을 쓴 경우 humanizeSlug 대신 후보의
+  //   한국어 표시명·설명을 보존한다 (예: tidal_monitoring_post → "무인 조위 관측소").
+  const candidateById = new Map<string, DramaturgyStageCandidate>();
+  for (const c of candidates ?? []) candidateById.set(c.id.toLowerCase().trim(), c);
   const fresh: BackgroundContract['locations'] = [];
   const seen = new Set<string>();
   for (const sc of scenes.scenes) {
@@ -59,7 +68,12 @@ export function mergeOpenWorld(prev: BackgroundContract | undefined, scenes: Sce
     seen.add(key);
     // writer-added, 최소 필드. name 은 표시용이라 slug 형이면 humanize(#opencast-name —
     //   한국어 지명 등 비슬러그는 무변형. id 는 조인 키라 그대로 둔다).
-    fresh.push({ id: loc, name: humanizeSlug(loc), description: '' });
+    const cand = candidateById.get(key);
+    fresh.push({
+      id: loc,
+      name: cand?.name || humanizeSlug(loc),
+      description: cand?.description ?? '',
+    });
   }
   if (!fresh.length) return base;
   return { ...base, locations: [...base.locations, ...fresh] };
@@ -106,6 +120,8 @@ export async function runScenes(
   axisConfig: LlmAxisConfig,
   // #s3-gate: 씬 게이트에서 유저가 남긴 수정 요청(누적) — 개정 실행 시 프롬프트에 주입.
   revisionNotes?: string[],
+  // s0.5 무대 후보 — *선택적 재료*. 미전달(기본)이면 프롬프트는 배선 전과 완전히 동일하다.
+  dramaturgy?: Dramaturgy | null,
 ): Promise<Scenes> {
   await logger.markStage('scenes', 'started');
 
@@ -173,7 +189,27 @@ ${revisionNotes.map((n, i) => `${i + 1}. ${n}`).join('\n')}
 `
     : '';
 
-  const userPrompt = `${revisionBlock}[스토리]
+  // 무대 후보 블록 — 오픈 로케이션 규칙(보수성)은 그대로 두고, 후보를 "이미 있는 재료"로 얹는다.
+  //   새 장소를 발명하라는 압력이 아니라, 이미 유도된 무대를 *골라 쓸 수 있게* 하는 선택지다.
+  const stageCandidates = dramaturgy?.world_inventory ?? [];
+  const stageCandidateBlock = stageCandidates.length
+    ? `[무대 후보 — 드라마투르그 유도 (선택적 사용)]
+드라마투르그가 이 스토리의 핵심 엔진에서 유도해 둔 무대 후보다. 이미 준비된 재료로 취급하라.
+- 이 후보 무대를 쓸 때는 scene.location 에 **후보의 id 를 글자 그대로** 쓴다 (번역·의역 금지).
+- 스토리 전개에 필요한 것만 선택하고, 필요 없으면 안 써도 된다 (전부 쓸 의무 없음).
+${stageCandidates
+        .map(
+          (c) =>
+            `- ${c.id} (${c.name}): ${c.description}\n    유도 근거: ${c.derived_from}${
+              c.scene_potential.length ? `\n    가능한 씬: ${c.scene_potential.join(' / ')}` : ''
+            }`,
+        )
+        .join('\n')}
+
+`
+    : '';
+
+  const userPrompt = `${revisionBlock}${stageCandidateBlock}[스토리]
 ${input.story}
 
 [genre]
