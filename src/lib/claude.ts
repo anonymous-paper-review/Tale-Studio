@@ -6,7 +6,12 @@ const MODEL = 'claude-sonnet-4-6'
 
 let _client: Anthropic | null = null
 function getClient(): Anthropic {
-  if (!_client) _client = new Anthropic()
+  // TALE_ 우선 — 표준 이름(ANTHROPIC_API_KEY)은 cwd에서 실행되는 Bun 기반 CLI(gjc 등)가
+  //   .env.local에서 크리덴셜로 오인 수집하므로 로컬은 TALE_ 이름만 둔다(프로덕션은 표준 이름 폴백).
+  if (!_client)
+    _client = new Anthropic({
+      apiKey: process.env.TALE_ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY,
+    })
   return _client
 }
 

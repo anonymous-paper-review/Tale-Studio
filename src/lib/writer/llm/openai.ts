@@ -3,7 +3,8 @@ import { recordRawCall } from './raw_collector';
 import { repairJson } from './json_repair';
 import { withLlmRetry } from './retry';
 
-const apiKey = process.env.OPENAI_API_KEY;
+// TALE_ 우선 — 표준 이름은 Bun 기반 CLI가 .env.local에서 크리덴셜로 오인 수집 (src/lib/claude.ts 참조)
+const apiKey = process.env.TALE_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
 
 let callCount = 0;
 export function getOpenAICallCount() {
@@ -33,6 +34,9 @@ export async function openaiGenerate(
   let text = '';
   let finishReason: string | undefined;
   let error: string | undefined;
+  // 쿼터 회계(#llm-quota 2026-08-10) — 프로바이더 보고 토큰(문자수 추정 대체).
+  let inputTokens: number | undefined;
+  let outputTokens: number | undefined;
 
   try {
     const messages: Array<{ role: string; content: string }> = [];
@@ -74,9 +78,12 @@ export async function openaiGenerate(
     }
     const data = (await r.json()) as {
       choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     text = data.choices?.[0]?.message?.content ?? '';
     finishReason = data.choices?.[0]?.finish_reason;
+    inputTokens = data.usage?.prompt_tokens;
+    outputTokens = data.usage?.completion_tokens;
     if (!text) throw new Error(`OpenAI returned empty content (finish_reason=${finishReason})`);
     return text;
   } catch (e) {
@@ -95,6 +102,8 @@ export async function openaiGenerate(
       error,
       input_chars: (opts.systemInstruction?.length ?? 0) + userPrompt.length,
       output_chars: text.length,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
     });
   }
 }

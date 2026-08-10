@@ -37,6 +37,9 @@ export async function claudeGenerate(
   let text = '';
   let stopReason: string | undefined;
   let error: string | undefined;
+  // 쿼터 회계(#llm-quota 2026-08-10) — 프로바이더 보고 토큰(문자수 추정 대체).
+  let inputTokens: number | undefined;
+  let outputTokens: number | undefined;
 
   // Claude 5 계열(opus-5/sonnet-5/fable-5 등) 차이 흡수(#p2-maxmodel 2026-08-05 실측):
   //   ① temperature deprecated — 전달 시 400. ② 기본으로 thinking 블록을 먼저 반환하며
@@ -62,6 +65,8 @@ export async function claudeGenerate(
     );
 
     stopReason = response.stop_reason ?? undefined;
+    inputTokens = response.usage?.input_tokens;
+    outputTokens = response.usage?.output_tokens;
     // thinking 등 비텍스트 블록을 건너뛰고 텍스트 블록 전체를 이어붙인다.
     text = response.content
       .filter((b): b is Extract<typeof b, { type: 'text' }> => b.type === 'text')
@@ -96,6 +101,8 @@ export async function claudeGenerate(
       error,
       input_chars: (opts.system?.length ?? 0) + userPrompt.length,
       output_chars: text.length,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
     });
   }
 }

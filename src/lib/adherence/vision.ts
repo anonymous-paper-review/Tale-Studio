@@ -7,7 +7,7 @@ const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent'
 
 function apiKey(): string | null {
-  return process.env.GEMINI_API_KEY?.trim() || null
+  return (process.env.TALE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY)?.trim() || null
 }
 
 async function geminiJson(parts: unknown[]): Promise<Record<string, unknown> | null> {

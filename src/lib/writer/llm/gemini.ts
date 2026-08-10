@@ -9,7 +9,8 @@ import { recordRawCall } from './raw_collector';
 import { repairJson } from './json_repair';
 import { withLlmRetry } from './retry';
 
-const apiKey = process.env.GEMINI_API_KEY;
+// TALE_ 우선 — 표준 이름은 Bun 기반 CLI가 .env.local에서 크리덴셜로 오인 수집 (src/lib/claude.ts 참조)
+const apiKey = process.env.TALE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
 if (!apiKey) {
   console.warn('GEMINI_API_KEY not set');
 }
@@ -72,12 +73,19 @@ export async function geminiGenerate(
   let text = '';
   let finishReason: string | undefined;
   let error: string | undefined;
+  // 쿼터 회계(#llm-quota 2026-08-10): Gemini 는 RPM/TPM/RPD 를 프로젝트 단위로 재므로
+  //   문자수 추정이 아니라 응답이 보고한 실제 토큰을 남긴다(TPM 은 입력 토큰 기준).
+  let inputTokens: number | undefined;
+  let outputTokens: number | undefined;
   try {
     const result = await withLlmRetry(
       () => model.generateContent(userPrompt, { timeout: GEMINI_REQUEST_TIMEOUT_MS }),
       'gemini',
     );
     finishReason = result.response.candidates?.[0]?.finishReason;
+    const usage = result.response.usageMetadata;
+    inputTokens = usage?.promptTokenCount;
+    outputTokens = usage?.candidatesTokenCount;
     text = result.response.text();
 
     if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
@@ -104,6 +112,8 @@ export async function geminiGenerate(
       error,
       input_chars: (opts.systemInstruction?.length ?? 0) + userPrompt.length,
       output_chars: text.length,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
     });
   }
 }
