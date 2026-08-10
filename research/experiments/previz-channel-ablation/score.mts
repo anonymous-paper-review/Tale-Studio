@@ -143,6 +143,18 @@ async function pool<T, R>(items: T[], n: number, fn: (t: T) => Promise<R>, tag =
   return out
 }
 
+/** 판정 1건 실패를 치명적으로 만들지 않는다. 단, **실패를 0점으로 세지 않는다** —
+ *  sentinel 을 남기고 집계에서 분모에서 빼며 flagged 로 올린다(실패를 불일치로 세면 결과가 편향된다). */
+async function safe(fn: () => Promise<any>): Promise<any> {
+  try {
+    return await fn()
+  } catch (e) {
+    return { judge_error: (e as Error).message, confidence: 'low' }
+  }
+}
+/** 판정이 유효한가(이진 응답이 실제로 왔는가) */
+const judged = (v: any, field = 'match') => v && (v[field] === 0 || v[field] === 1)
+
 async function judge() {
   const a1done = manifest.jobs.A1.filter((j: any) => j.done)
   const a2done = manifest.jobs.A2.filter((j: any) => j.done)
@@ -153,10 +165,10 @@ async function judge() {
     const rough = (k: string) => join(FRAMES, `${j.shot_id}__rough_${k}.png`)
     const panel = (k: string) => join(PANELS, `${j.key}_${k}.png`)
     const [bStart, bEnd, ann, hyg] = await Promise.all([
-      vlmJson<any>([{ text: PROMPTS.blocking('START') }, { text: 'IMAGE A:' }, await imgPart(rough('start')), { text: 'IMAGE B:' }, await imgPart(panel('start'))]),
-      vlmJson<any>([{ text: PROMPTS.blocking('END') }, { text: 'IMAGE A:' }, await imgPart(rough('end')), { text: 'IMAGE B:' }, await imgPart(panel('end'))]),
-      vlmJson<any>([{ text: PROMPTS.annotation }, { text: 'IMAGE A:' }, await imgPart(rough('direction')), { text: 'IMAGE B:' }, await imgPart(panel('direction'))]),
-      vlmJson<any>([{ text: PROMPTS.hygiene }, { text: 'IMAGE A:' }, await imgPart(panel('start')), { text: 'IMAGE B:' }, await imgPart(panel('end'))]),
+      safe(async () => vlmJson<any>([{ text: PROMPTS.blocking('START') }, { text: 'IMAGE A:' }, await imgPart(rough('start')), { text: 'IMAGE B:' }, await imgPart(panel('start'))])),
+      safe(async () => vlmJson<any>([{ text: PROMPTS.blocking('END') }, { text: 'IMAGE A:' }, await imgPart(rough('end')), { text: 'IMAGE B:' }, await imgPart(panel('end'))])),
+      safe(async () => vlmJson<any>([{ text: PROMPTS.annotation }, { text: 'IMAGE A:' }, await imgPart(rough('direction')), { text: 'IMAGE B:' }, await imgPart(panel('direction'))])),
+      safe(async () => vlmJson<any>([{ text: PROMPTS.hygiene }, { text: 'IMAGE A:' }, await imgPart(panel('start')), { text: 'IMAGE B:' }, await imgPart(panel('end'))])),
     ])
     return {
       key: j.key, arm: 'A1', shot_id: j.shot_id, klass: j.klass, rep: j.rep,
@@ -164,7 +176,8 @@ async function judge() {
       previzLabel: fx.label,
       blocking_start: bStart, blocking_end: bEnd, annotation: ann, hygiene: hyg,
       blockingMatch: bStart.match === 1 && bEnd.match === 1,
-      flagged: [bStart, bEnd, ann, hyg].some((v) => v?.confidence === 'low'),
+      blockingJudged: judged(bStart) && judged(bEnd),
+      flagged: [bStart, bEnd, ann, hyg].some((v) => v?.confidence === 'low' || v?.judge_error),
     }
   }, 'A1')
 
@@ -174,16 +187,16 @@ async function judge() {
     const vf = (k: string) => join(VFRAMES, `${j.key}_${k}.png`)
     const endRef = join(FRAMES, `${j.shot_id}__real_end.png`)
     const [arr, mot, leak] = await Promise.all([
-      vlmJson<any>([{ text: PROMPTS.arrival }, { text: 'IMAGE A:' }, await imgPart(endRef), { text: 'IMAGE B:' }, await imgPart(vf('last'))]),
-      vlmJson<any>([{ text: PROMPTS.motion }, { text: 'IMAGE A:' }, await imgPart(join(FRAMES, `${j.shot_id}__rough_direction.png`)), { text: 'IMAGE B:' }, await imgPart(vf('first')), { text: 'IMAGE C:' }, await imgPart(vf('last'))]),
-      vlmJson<any>([{ text: PROMPTS.leak }, await imgPart(vf('first')), await imgPart(vf('mid')), await imgPart(vf('last'))]),
+      safe(async () => vlmJson<any>([{ text: PROMPTS.arrival }, { text: 'IMAGE A:' }, await imgPart(endRef), { text: 'IMAGE B:' }, await imgPart(vf('last'))])),
+      safe(async () => vlmJson<any>([{ text: PROMPTS.motion }, { text: 'IMAGE A:' }, await imgPart(join(FRAMES, `${j.shot_id}__rough_direction.png`)), { text: 'IMAGE B:' }, await imgPart(vf('first')), { text: 'IMAGE C:' }, await imgPart(vf('last'))])),
+      safe(async () => vlmJson<any>([{ text: PROMPTS.leak }, await imgPart(vf('first')), await imgPart(vf('mid')), await imgPart(vf('last'))])),
     ])
     return {
       key: j.key, arm: j.arm, a2arm: j.a2arm, shot_id: j.shot_id, klass: j.klass, rep: j.rep,
       endpoint: j.endpoint, request_id: j.request_id, out: j.local,
       refs: j.refs, durationSeconds: j.durationSeconds, previzLabel: fx.label,
       arrival: arr, motion: mot, leak,
-      flagged: [arr, mot, leak].some((v) => v?.confidence === 'low'),
+      flagged: [arr, mot, leak].some((v) => v?.confidence === 'low' || v?.judge_error),
     }
   }, 'A2')
 
@@ -199,31 +212,45 @@ async function judge() {
   const afc = await pool(pairs, 6, async (p: any) => {
     const one = p.seFirst ? p.se : p.so
     const two = p.seFirst ? p.so : p.se
-    const r = await vlmJson<any>([
+    const r = await safe(async () => vlmJson<any>([
       { text: PROMPTS.twoafc },
       { text: 'IMAGE R:' }, await imgPart(join(FRAMES, `${p.shot_id}__real_end.png`)),
       { text: 'IMAGE 1:' }, await imgPart(join(VFRAMES, `${one.key}_last.png`)),
       { text: 'IMAGE 2:' }, await imgPart(join(VFRAMES, `${two.key}_last.png`)),
-    ])
-    const winner = r.pick === 0 ? 'tie' : (r.pick === 1 ? one : two).a2arm
-    return { shot_id: p.shot_id, rep: p.rep, seShownFirst: p.seFirst, pick: r.pick, winner, confidence: r.confidence, reason: r.reason }
+    ]))
+    const valid = r.pick === 0 || r.pick === 1 || r.pick === 2
+    const winner = !valid ? 'unjudged' : r.pick === 0 ? 'tie' : (r.pick === 1 ? one : two).a2arm
+    return { shot_id: p.shot_id, rep: p.rep, seShownFirst: p.seFirst, pick: r.pick ?? null, winner, confidence: r.confidence, reason: r.reason ?? r.judge_error }
   }, '2AFC')
 
   // ── 집계 ──
-  const rate = (n: number, d: number) => (d ? +((n / d) * 100).toFixed(1) : 0)
-  const a1Panels = a1.length * 2
+  // 규칙: **판정 실패(judge_error)는 분모에서 뺀다.** 0점으로 세면 불일치로 위장돼 결과가 편향된다.
+  //   빠진 건수는 unjudged 로 함께 보고한다.
+  const pct = (hit: number, n: number) => (n ? +((hit / n) * 100).toFixed(1) : null)
+  /** 여러 행에서 한 판정 필드를 뽑아 유효분만으로 비율 계산 */
+  const metric = (rows: any[], pick: (r: any) => any, field = 'match') => {
+    const vs = rows.map(pick).filter((v) => judged(v, field))
+    const hit = vs.filter((v) => v[field] === 1).length
+    return { rate: pct(hit, vs.length), n: `${hit}/${vs.length}`, unjudged: rows.length - vs.length }
+  }
+  const blockingPanels = (rows: any[]) => {
+    const vs = [...rows.map((r) => r.blocking_start), ...rows.map((r) => r.blocking_end)].filter((v) => judged(v))
+    const hit = vs.filter((v) => v.match === 1).length
+    return { rate: pct(hit, vs.length), n: `${hit}/${vs.length}`, unjudged: rows.length * 2 - vs.length }
+  }
+
+  const a1Blk = blockingPanels(a1)
   const a1Agg = {
     n_images: a1.length,
-    blockingMatch_panelRate: rate(a1.filter((r) => r.blocking_start.match === 1).length + a1.filter((r) => r.blocking_end.match === 1).length, a1Panels),
-    blockingMatch_panelN: `${a1.filter((r) => r.blocking_start.match === 1).length + a1.filter((r) => r.blocking_end.match === 1).length}/${a1Panels}`,
-    blockingMatch_imageRate: rate(a1.filter((r) => r.blockingMatch).length, a1.length),
-    annotationCarried_rate: rate(a1.filter((r) => r.annotation.match === 1).length, a1.length),
-    arrowContamination_rate: rate(a1.filter((r) => r.hygiene.contamination === 1).length, a1.length),
-    mannequinLeft_rate: rate(a1.filter((r) => r.hygiene.mannequin === 1).length, a1.length),
+    blockingMatch_panel: a1Blk,
+    blockingMatch_imageRate: pct(a1.filter((r) => r.blockingJudged && r.blockingMatch).length, a1.filter((r) => r.blockingJudged).length),
+    annotationCarried: metric(a1, (r) => r.annotation),
+    arrowContamination: metric(a1, (r) => r.hygiene, 'contamination'),
+    mannequinLeft: metric(a1, (r) => r.hygiene, 'mannequin'),
     flagged: a1.filter((r) => r.flagged).map((r) => r.key),
     byClass: Object.fromEntries(['static', 'single', 'double', 'camera'].map((k) => {
       const rows = a1.filter((r) => r.klass === k)
-      return [k, { n: rows.length, blockingPanelRate: rate(rows.filter((r) => r.blocking_start.match === 1).length + rows.filter((r) => r.blocking_end.match === 1).length, rows.length * 2), annotation: rate(rows.filter((r) => r.annotation.match === 1).length, rows.length) }]
+      return [k, { n: rows.length, blockingPanel: blockingPanels(rows), annotation: metric(rows, (r) => r.annotation) }]
     })),
   }
 
@@ -232,27 +259,29 @@ async function judge() {
     const rows = byArm(arm)
     return {
       n: rows.length,
-      arrivalMatch_rate: rate(rows.filter((r) => r.arrival.match === 1).length, rows.length),
-      arrivalMatch_n: `${rows.filter((r) => r.arrival.match === 1).length}/${rows.length}`,
-      motionMatch_rate: rate(rows.filter((r) => r.motion.match === 1).length, rows.length),
-      contamination_rate: rate(rows.filter((r) => r.leak.contamination === 1).length, rows.length),
+      arrivalMatch: metric(rows, (r) => r.arrival),
+      motionMatch: metric(rows, (r) => r.motion),
+      contamination: metric(rows, (r) => r.leak, 'contamination'),
       byClass: Object.fromEntries(['static', 'single', 'double', 'camera'].map((k) => {
         const rr = rows.filter((r) => r.klass === k)
-        return [k, { n: rr.length, arrival: rate(rr.filter((r) => r.arrival.match === 1).length, rr.length), motion: rate(rr.filter((r) => r.motion.match === 1).length, rr.length) }]
+        return [k, { n: rr.length, arrival: metric(rr, (r) => r.arrival), motion: metric(rr, (r) => r.motion) }]
       })),
     }
   }
   const so = armAgg('start_only')
   const se = armAgg('start_end')
-  const increment = +(se.arrivalMatch_rate - so.arrivalMatch_rate).toFixed(1)
+  const increment = +((se.arrivalMatch.rate ?? 0) - (so.arrivalMatch.rate ?? 0)).toFixed(1)
 
   // 사전 등록 기각 조건 대입
   const verdict = {
-    A1_blockingPanelRate: a1Agg.blockingMatch_panelRate,
-    A1_predictionMet_ge95: a1Agg.blockingMatch_panelRate >= 95,
-    A1_rejectTriggered_lt80: a1Agg.blockingMatch_panelRate < 80,
-    A1_arrowContamination: a1Agg.arrowContamination_rate,
-    A1_contaminationWithinBudget_le5: a1Agg.arrowContamination_rate <= 5,
+    A1_blockingPanelRate: a1Blk.rate,
+    A1_blockingPanelN: a1Blk.n,
+    A1_predictionMet_ge95: (a1Blk.rate ?? 0) >= 95,
+    A1_rejectTriggered_lt80: (a1Blk.rate ?? 0) < 80,
+    A1_arrowContamination: a1Agg.arrowContamination.rate,
+    A1_contaminationWithinBudget_le5: (a1Agg.arrowContamination.rate ?? 0) <= 5,
+    A2_arrival_start_only: so.arrivalMatch,
+    A2_arrival_start_end: se.arrivalMatch,
     A2_increment_pp: increment,
     A2_branch:
       increment >= 20 ? '④ 채널 유효 확정 — 축 B 는 프로덕션 구성(START+END)으로 측정'
@@ -260,8 +289,50 @@ async function judge() {
           : '③ 판정 유보 — n 증설 후 재판정',
   }
 
+  // ── 보충 분석 (사후·비사전등록 — 주 판정을 대체하지 않는다) ──
+  // 정지 대조군은 START≈END 라 두 팔이 원리적으로 구분 불가하고, 절대 도착 판정에서 항상 1점을 준다.
+  //   두 팔에 동일하게 +3 을 얹어 증분을 희석하므로, 판별력이 있는 비정지 샷만의 값을 함께 남긴다.
+  const nonStatic = (rows: any[]) => rows.filter((r) => r.klass !== 'static')
+  const afcValid = afc.filter((x: any) => x.winner !== 'unjudged')
+  const afcNS = afcValid.filter((x: any) => fxOf(x.shot_id).klass !== 'static')
+  const binomGE = (k: number, n: number) => {
+    const C = (n: number, r: number) => { let v = 1; for (let i = 0; i < r; i++) v = (v * (n - i)) / (i + 1); return v }
+    let s = 0
+    for (let i = k; i <= n; i++) s += C(n, i)
+    return +(s / 2 ** n).toFixed(4)
+  }
+  const seWinsNS = afcNS.filter((x: any) => x.winner === 'start_end').length
+  const supplementary = {
+    note: '사후 분석 — 사전 등록 지표 아님. 주 판정(verdict)을 대체하지 않으며, 측정 타당성 해석에만 쓴다.',
+    excludingStaticControl: {
+      why: '정지 샷은 START≈END 라 팔 간 구분이 원리적으로 불가하고 절대 도착 판정에서 두 팔 모두 만점 — 증분을 희석한다.',
+      start_only_arrival: metric(nonStatic(byArm('start_only')), (r) => r.arrival),
+      start_end_arrival: metric(nonStatic(byArm('start_end')), (r) => r.arrival),
+      increment_pp: +(((metric(nonStatic(byArm('start_end')), (r) => r.arrival).rate ?? 0) - (metric(nonStatic(byArm('start_only')), (r) => r.arrival).rate ?? 0))).toFixed(1),
+    },
+    twoAFC_nonStatic: {
+      start_end_wins: seWinsNS,
+      start_only_wins: afcNS.filter((x: any) => x.winner === 'start_only').length,
+      ties: afcNS.filter((x: any) => x.winner === 'tie').length,
+      n: afcNS.length,
+      onesided_p_binomial: binomGE(seWinsNS, afcNS.length),
+    },
+    floorEffect: {
+      note: '절대 도착 판정은 두 팔 모두 바닥에 붙어 있다 — 비정지 12건 중 도착 성공이 START-only 1건 / START+END 2건. 이 바닥에서는 이진 지표의 분해능이 증분을 잡아내지 못한다(선행 viz-gap 실험의 "절대 판정보다 짝지음이 신뢰성 있는 오라클" 결론과 동일 현상).',
+      arrivalHitsNonStatic: {
+        start_only: metric(nonStatic(byArm('start_only')), (r) => r.arrival).n,
+        start_end: metric(nonStatic(byArm('start_end')), (r) => r.arrival).n,
+      },
+    },
+    contaminationCaveat: {
+      note: 'A2 오염 수치는 과대평가로 보인다 — 육안 재확인 결과 (a) 프레임 최외곽의 얇은 세로선(인코딩/에지 아티팩트에 가깝다)과 (b) sh_08_64 세트에 실재하는 화이트보드·서류 벽면(디제틱 미술)을 "스토리보드 스케치/화살표"로 오독한 건이 섞여 있다. 손그림 화살표나 손글씨 라벨이 실제로 영상에 나타난 프레임은 확인되지 않았다. 사람 확인 필요.',
+      flaggedForHumanCheck: a2.filter((r) => r.leak?.contamination === 1).map((r) => ({ key: r.key, reason: r.leak.reason })),
+    },
+  }
+
   const results = {
     scoredAt: new Date().toISOString(),
+    supplementary,
     judge: { model: JUDGE_MODEL, temperature: 0, prompts: PROMPTS },
     coordinates: {
       project: frozen.project, styleAnchor: frozen.styleAnchor,

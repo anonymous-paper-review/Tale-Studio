@@ -36,7 +36,7 @@ async function runBatch(batch: any[]) {
   ].join('\n') }]
   for (const b of batch) {
     parts.push({ text: `ITEM ${b.shot_id}:` })
-    parts.push(imgPart(join(FR, `${b.shot_id}.png`)))
+    parts.push(await imgPart(join(FR, `${b.shot_id}.png`)))
   }
   const r = await vlmJson<Record<string, any>>(parts)
   return batch.map((b) => ({ shot_id: b.shot_id, action: b.action_description, ...(r[b.shot_id] ?? { labels: [], arrows: '', kind: '?' }) }))

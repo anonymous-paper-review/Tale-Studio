@@ -55,10 +55,12 @@ export async function vlmJson<T = Record<string, unknown>>(parts: Part[]): Promi
   let lastErr = ''
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
+      // 타임아웃 필수: 무기한 대기하는 요청 하나가 풀 워커를 영구 점유해 판정이 멈춘다(실측).
       const res = await fetch(`${URL_BASE}?key=${apiKey()}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(90_000),
       })
       if (!res.ok) {
         lastErr = `HTTP ${res.status} ${(await res.text()).slice(0, 200)}`
