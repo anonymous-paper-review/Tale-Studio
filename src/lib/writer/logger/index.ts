@@ -10,6 +10,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { flushRawCalls, type LlmProvider } from '@/lib/writer/llm/raw_collector';
+import { archiveRawCalls } from '@/lib/writer/llm/archive-calls';
 
 const LOGS_ROOT = path.resolve(process.cwd(), 'logs');
 
@@ -124,9 +125,13 @@ export class PipelineLogger {
 
   // LLM raw collector에서 미저장 호출을 꺼내 stageLabel과 함께 파일로 저장
   // stage 이름 기반으로 그룹화 저장
+  //
+  // (#llm-archive 2026-08-10) 파일 저장과 별개로 DB(llm_calls)에 전문을 남긴다 —
+  //   서버리스에선 FS 가 no-op 이라 이게 유일한 durable 기록이다. best-effort.
   async flushRawLlm(stageLabel: string): Promise<number> {
     const calls = flushRawCalls();
     if (calls.length === 0) return 0;
+    await archiveRawCalls(this.projectId, stageLabel, calls).catch(() => 0);
     if (fsDisabled) return calls.length;
     const safe = stageLabel.replace(/[^a-z0-9_-]/gi, '_');
     for (const c of calls) {
