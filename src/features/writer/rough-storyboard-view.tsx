@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Slider } from '@/components/ui/slider'
 import { fetchDebugPrompts } from '@/lib/use-debug-prompts'
+import { ADHERENCE_START_ENABLED } from '@/lib/adherence/core'
 import { handoffFrom } from '@/lib/handoff-intent'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
@@ -267,6 +268,7 @@ export function RoughStoryboardView() {
         //   결과(배지)를 리로드로 회수. 실패는 조용히 무시(검사가 생성 UX 를 막지 않는다).
         //   관리자 소유 프로젝트 한정(2026-08-07) — 서버 게이트와 별개로 헛호출 방지.
         const runAdherence = async (ids: string[]) => {
+          if (!ADHERENCE_START_ENABLED) return // #adherence 킬 스위치(2026-08-10)
           try {
             if (!(await fetchDebugPrompts(projectId))) return
             const res = await fetch('/api/writer/rough-adherence', {

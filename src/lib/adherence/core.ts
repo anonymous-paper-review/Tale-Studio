@@ -7,6 +7,14 @@
 //      static 인데 diff 큼 = 과잉 모션 / large 설계인데 diff 작음 = 변화 부족.
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 
+// ── 킬 스위치(#adherence 2026-08-10, 사용자 요청 "일단 비활성화") ──────────────
+// 코드 상수라 env 없이 토글 가능(서버·클라 공용, core.ts 는 순수 모듈). true 로만 바꾸면 즉시 부활.
+//   판정 로직·라우트·배지·DB 스키마는 그대로 두고 진입만 막는다(재활성 리스크 최소).
+/** ① 러프 START ↔ 설명 정합(VLM) */
+export const ADHERENCE_START_ENABLED = false
+/** ② 영상 모션 계약 준수(첫/끝 프레임 픽셀 diff + 방향 VLM) */
+export const ADHERENCE_MOTION_ENABLED = false
+
 // ── ① START claim ──────────────────────────────────────────────────────────
 export interface StartClaimInput {
   /** EN 액션 서술 (shots.action_description — EN base) */

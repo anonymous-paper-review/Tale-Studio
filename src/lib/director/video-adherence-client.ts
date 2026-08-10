@@ -3,6 +3,7 @@
 //   <video>+canvas 로 캡처해 서버 판정 라우트로 보낸다. 전 과정 best-effort —
 //   CORS taint/디코드 실패/판정 실패 어느 것도 생성 플로우를 막지 않는다(null 반환).
 import { fetchDebugPrompts } from '@/lib/use-debug-prompts'
+import { ADHERENCE_MOTION_ENABLED } from '@/lib/adherence/core'
 import type { VideoAdherence } from '@/types/director'
 
 const CAPTURE_WIDTH = 512
@@ -89,6 +90,7 @@ export async function runVideoAdherence(input: {
   videoClipId: string
   videoUrl: string
 }): Promise<VideoAdherence | null> {
+  if (!ADHERENCE_MOTION_ENABLED) return null // #adherence 킬 스위치(2026-08-10)
   if (!(await fetchDebugPrompts(input.projectId))) return null
   const frames = await captureVideoFrames(input.videoUrl)
   if (!frames) return null

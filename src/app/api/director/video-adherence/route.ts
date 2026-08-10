@@ -8,7 +8,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/supabase/auth'
 import { isAdminOwnedProject } from '@/lib/admin'
 import { userOwnsProject } from '@/lib/generation-jobs'
-import { directionExpectationText, judgeMotionByDiff, motionExpectation } from '@/lib/adherence/core'
+import { ADHERENCE_MOTION_ENABLED, directionExpectationText, judgeMotionByDiff, motionExpectation } from '@/lib/adherence/core'
 import { judgeDirection, meanFrameDiff } from '@/lib/adherence/vision'
 import { loadShotDesignByMainId } from '@/lib/writer/shot-design-state'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
@@ -37,6 +37,7 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const parsed = BodySchema.safeParse(await req.json())
     if (!parsed.success) return NextResponse.json({ error: 'invalid body' }, { status: 400 })
+    if (!ADHERENCE_MOTION_ENABLED) return NextResponse.json({ status: 'skipped', reason: 'disabled' })
     const { projectId, writerShotId, videoClipId, firstFrame, lastFrame } = parsed.data
     if (!(await userOwnsProject(projectId, user.id))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
