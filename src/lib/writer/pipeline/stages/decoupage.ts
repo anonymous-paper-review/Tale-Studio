@@ -56,6 +56,15 @@ const SYSTEM_INSTRUCTION = `당신은 영화 감독이다. 한 씬의 내러티�
 - 각 샷 intended_duration_seconds는 ${SHOT_SECONDS_RANGE} (짧고 스냅있게). 1개 주요 액션이 들어맞는 길이. 긴 침묵 등 예외만 최대 ${SHOT_SECONDS_HARD_MAX}.
 - 한 샷에 액션을 몰아넣지 마라. 액션이 크거나 여러 개면 split으로 나눠라.`;
 
+// 씬 동시성 기본값(#concurrency-gap 2026-08-10). 종전엔 호출부가 `Number(env ?? '1') || 1` 로
+//   넘겨 **프로덕션(env 미설정)에서 decoupage 가 동시성 1 = 순차**로 돌고 있었다(실측 ~262s).
+//   v4_shots 와 같은 형태로 통일한다: 내부 기본 4 + 호출부는 미지정(undefined) → env 가 오버라이드.
+const MAX_SCENE_CONCURRENCY = 12;
+const DEFAULT_SCENE_CONCURRENCY = (() => {
+  const raw = Number(process.env.WRITER_SCENE_CONCURRENCY);
+  return Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), MAX_SCENE_CONCURRENCY) : 4;
+})();
+
 interface SceneDecoupageResponse {
   shot_count?: number;
   rhythm_profile?: string;
@@ -279,7 +288,7 @@ export async function runDecoupage(
   //   씬 실패는 pass 를 죽이지 않는다: 성공분은 체크포인트로 보존되고 실패 씬은 다음 pass 가
   //   재시도한다. 진전이 0인 pass 에서만 throw — 무진전 반복은 attempt 상한(3)이 끊는다.
   const queue = scenes.scenes.filter((sc) => !doneById.has(sc.scene_id));
-  const concurrency = Math.max(1, Math.floor(opts?.concurrency ?? 1));
+  const concurrency = Math.max(1, Math.floor(opts?.concurrency ?? DEFAULT_SCENE_CONCURRENCY));
   let launchedAny = false;
   let progressed = 0;
   // 씬 예상 시간 — 착수 게이트용. 관측되면 이 pass 의 최대 실측 ×1.25 로 갱신(보수적).

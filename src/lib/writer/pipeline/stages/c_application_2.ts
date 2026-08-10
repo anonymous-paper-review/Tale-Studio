@@ -27,12 +27,9 @@ interface ClaudeC2ValidationResponse {
   semantic_issues: ValidationIssue[];
 }
 
-export type ShotSplitRequest = ClaudeC2ValidationResponse['shots_to_split'][number];
+type ShotSplitRequest = ClaudeC2ValidationResponse['shots_to_split'][number];
 
-/** 씬 단위 fan-out 게이트(#shotcheck-fanout 2026-08-10). **기본 off** — 실측 근거는 아래 Step 2 주석. */
-const SHOTCHECK_FANOUT = process.env.WRITER_SHOTCHECK_FANOUT === '1';
-
-/** 모델 응답 shape 보정 (array 래핑/필드 누락 대응) — 두 경로 공용. */
+/** 모델 응답 shape 보정 (array 래핑/필드 누락 대응). */
 function coerceValResponse(raw: unknown): ClaudeC2ValidationResponse {
   const v = (Array.isArray(raw) && raw.length === 1 ? raw[0] : raw) as Record<string, unknown> | null;
   return {
@@ -40,19 +37,6 @@ function coerceValResponse(raw: unknown): ClaudeC2ValidationResponse {
     semantic_issues: Array.isArray(v?.semantic_issues) ? (v!.semantic_issues as ValidationIssue[]) : [],
   };
 }
-
-/** 씬 단위 부분 진행 체크포인트(#shotcheck-fanout 2026-08-10) — shotDesign/decoupage 와 동일 계약. */
-export interface ShotCheckProgress {
-  doneSceneIds: string[];
-  /** 씬별 검증 결과 — 최종 조립에서 씬 등장 순서대로 평탄화(완료 순서 무관 = 결정론). */
-  sceneResults: Record<string, { splits: ShotSplitRequest[]; issues: ValidationIssue[] }>;
-  /** 검증 콜이 실패해 "분할 없이 진행"으로 흡수된 씬 — 배지 대상. */
-  absorbedSceneIds: string[];
-}
-
-export type RunShotCheckResult =
-  | { done: false; progress: ShotCheckProgress }
-  | { done: true; shotSequence: ShotSequence; report: ShotCheckReport };
 
 export async function runShotCheck(
   projectId: string,
@@ -67,19 +51,8 @@ export async function runShotCheck(
   sceneBudgetIssues: ValidationIssue[],
   logger: PipelineLogger,
   cAxisConfig: LlmAxisConfig,   // C축: 의미/액션 검증 (현재 Claude)
-  opts?: {
-    /** 이전 인보케이션의 씬 체크포인트 — 완료 씬은 건너뛰고 이어간다. */
-    resume?: ShotCheckProgress | null;
-    /** step 시간 예산 — 씬 착수 전에 검사. 미지정이면 전 씬 완주(로컬 러너). */
-    softDeadlineMs?: number;
-    /** 씬 동시성(#shotcheck-fanout). 기본 1(순차). */
-    concurrency?: number;
-  },
-): Promise<RunShotCheckResult> {
-  const resume = opts?.resume ?? null;
-  await logger.markStage('shotCheck', 'started', {
-    resumed_scenes: resume?.doneSceneIds.length ?? 0,
-  });
+): Promise<{ shotSequence: ShotSequence; report: ShotCheckReport }> {
+  await logger.markStage('shotCheck', 'started');
 
   // ===== Step 1: 결정론 조립 (L4 1개당 ShotSequenceItem 정확히 1개 — shot loss 원천 차단) =====
   if (shotDesigns.length === 0) {
@@ -123,9 +96,15 @@ CRITICAL/WARNING 이슈에는 constraint 필드를 반드시 포함하라 — �
 
 split 권장 시 new_shots 배열로 분할안 제시 (각각 1 주요 액션). 각 new_shot 에는 S 블록을
 반드시 포함하고, S.character_action 에는 그 반쪽이 담는 구체 행동을 써라 (부모 문장 복사 금지).`;
+// #output-diet 2026-08-10 (기각): new_shots 를 델타 전용으로 좁히는 실험을 했으나 벽시계 -2.2%
+//   (기준 ≥30%)로 기각했다. 근거 — 실측상 shots_to_split 은 출력의 23~24% 뿐이고(나머지 76%는
+//   semantic_issues), 모델은 이미 C/V/assets/continuity 를 안 내고 있었다(사실상 델타 상태).
+//   델타 스키마는 오히려 first_frame_generation 을 요구해 분할 페이로드를 +20% 키웠다.
+//   출력을 더 줄이려면 대상은 분할안이 아니라 semantic_issues 쪽이다.
+//   좌표: research/experiments/shotcheck-output-diet/results-{baseline,diet}.json
 
-  const buildValUser = (sceneShots: ShotSequenceItem[]) => `[샷 시퀀스]
-${JSON.stringify(sceneShots, null, 2)}
+  const valUser = `[샷 시퀀스]
+${JSON.stringify(assembledShots, null, 2)}
 
 [출력 형식 - JSON]
 {
@@ -148,130 +127,38 @@ ${JSON.stringify(sceneShots, null, 2)}
   ]
 }`;
 
-  // 씬 그룹 (등장 순서 보존). 검증 항목 5개가 전부 샷/씬 로컬이라 씬 단위로 잘라도 시야 손실이
-  //   없다 — 연속성도 같은 씬 인접 대조이고 씬 경계 전환은 원래 정상 취급이다.
-  const sceneOrder: string[] = [];
-  const shotsByScene = new Map<string, ShotSequenceItem[]>();
-  for (const s of assembledShots) {
-    const sid = s.S?.scene_id ?? '';
-    if (!shotsByScene.has(sid)) {
-      shotsByScene.set(sid, []);
-      sceneOrder.push(sid);
-    }
-    shotsByScene.get(sid)!.push(s);
-  }
-
-  const absorbedSceneIds = [...(resume?.absorbedSceneIds ?? [])];
+  // 단일 콜 (전 샷 한 번에). 씬 단위 fan-out 을 실험했다가 걷어냈다(#shotcheck-fanout 기각,
+  //   2026-08-10): 프롬프트를 한 글자도 안 바꿔도 컨텍스트를 씬으로 자르면 모델의 판정 분포가
+  //   바뀐다 — 벽시계 +70%(153.6→261.3s), 이슈 3배(57→170), 연속성 7.5배(13→97). 그 WARNING 이
+  //   check_notes 로 생성 프롬프트에 주입되므로 품질까지 함께 나빠진다.
+  //   "규칙이 씬 로컬이면 절단도 중립"은 규칙의 성질이지 모델 출력의 성질이 아니다.
   let valResult: ClaudeC2ValidationResponse;
-
-  if (!SHOTCHECK_FANOUT) {
-    // ── 기본 경로: 단일 콜 (전 샷 한 번에) ────────────────────────────────
-    // fan-out 은 실측에서 벽시계 +70%(153.6→261.3s)에 이슈 3배(연속성 7.5배) 인플레이션을
-    //   냈다 — 프롬프트를 안 바꿔도 컨텍스트를 자르면 모델의 판정 분포가 바뀐다. 기본은 이 경로.
-    const valUser = buildValUser(assembledShots);
-    try {
-      const valRaw = await generateJson<unknown>(valUser, cAxisConfig, {
-        systemInstruction: valSystem,
-        temperature: 0.3,
-        maxTokens: 16000,
-      });
-      await logger.saveLlmCall('shotCheck_validate', {
-        prompt: valUser,
-        response: JSON.stringify(valRaw, null, 2),
-        model: describeAxisConfig(cAxisConfig),
-        provider: cAxisConfig.provider,
-      });
-      valResult = coerceValResponse(valRaw);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      await logger.saveLlmCall('shotCheck_validate_FAILED', {
-        prompt: valUser,
-        response: `ERROR: ${msg}`,
-        model: describeAxisConfig(cAxisConfig),
-        provider: cAxisConfig.provider,
-      });
-      console.error('[C2_validate] 검증 실패, 분할 없이 진행:', msg);
-      // ★ 배지 (fan-out 과 무관한 위생 — 롤백에 딸려 나가면 안 된다): 흡수한 실패가 state 에
-      //   흔적을 남기게 한다. 감사 실측에서 이 경로의 실패가 콘솔에만 남고 state 흔적 0 이었다.
-      await logger.markStage('shotCheck', 'failed', { absorbed: true });
-      valResult = { shots_to_split: [], semantic_issues: [] };
-    }
-  } else {
-    // ── 실험 경로(WRITER_SHOTCHECK_FANOUT=1): 씬 단위 fan-out ─────────────
-    const doneSceneIds = new Set(resume?.doneSceneIds ?? []);
-    const sceneResults: ShotCheckProgress['sceneResults'] = { ...(resume?.sceneResults ?? {}) };
-
-    // 씬 하나 검증 — 실패는 그 씬만 "분할 없이 진행"으로 흡수하고 배지를 남긴다(무음 통과 금지).
-    const validateScene = async (sceneId: string): Promise<void> => {
-      const sceneShots = shotsByScene.get(sceneId) ?? [];
-      const valUser = buildValUser(sceneShots);
-      try {
-        const valRaw = await generateJson<unknown>(valUser, cAxisConfig, {
-          systemInstruction: valSystem,
-          temperature: 0.3,
-          maxTokens: 16000,
-        });
-        await logger.saveLlmCall(`shotCheck_validate_${sceneId}`, {
-          prompt: valUser,
-          response: JSON.stringify(valRaw, null, 2),
-          model: describeAxisConfig(cAxisConfig),
-          provider: cAxisConfig.provider,
-        });
-        const v = coerceValResponse(valRaw);
-        sceneResults[sceneId] = { splits: v.shots_to_split, issues: v.semantic_issues };
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        await logger.saveLlmCall(`shotCheck_validate_${sceneId}_FAILED`, {
-          prompt: valUser,
-          response: `ERROR: ${msg}`,
-          model: describeAxisConfig(cAxisConfig),
-          provider: cAxisConfig.provider,
-        });
-        console.error(`[C2_validate] ${sceneId} 검증 실패, 이 씬은 분할 없이 진행:`, msg);
-        await logger.markStage('shotCheck', 'failed', { scene_id: sceneId, absorbed: true });
-        sceneResults[sceneId] = { splits: [], issues: [] };
-        absorbedSceneIds.push(sceneId);
-      }
-      doneSceneIds.add(sceneId);
-    };
-
-    // 워커 풀 (decoupage 이디엄): 예측형 예산 게이트 + 패스당 최소 1씬 보장.
-    const queue = sceneOrder.filter((sid) => !doneSceneIds.has(sid));
-    const concurrency = Math.max(1, Math.floor(opts?.concurrency ?? 1));
-    const softDeadlineMs = opts?.softDeadlineMs;
-    let launchedAny = false;
-    let estSceneMs = 45_000;
-    const worker = async (): Promise<void> => {
-      for (;;) {
-        const overBudget =
-          softDeadlineMs != null && Date.now() + (launchedAny ? estSceneMs : 0) > softDeadlineMs;
-        if (overBudget && launchedAny) return;
-        const sceneId = queue.shift();
-        if (sceneId === undefined) return;
-        launchedAny = true;
-        const startedMs = Date.now();
-        await validateScene(sceneId);
-        estSceneMs = Math.max(estSceneMs, Math.round((Date.now() - startedMs) * 1.25));
-      }
-    };
-    await Promise.all(Array.from({ length: concurrency }, () => worker()));
-
-    // 남은 씬이 있으면 부분 반환 — 다음 인보케이션이 resume 으로 이어간다.
-    if (!sceneOrder.every((sid) => doneSceneIds.has(sid))) {
-      console.log(
-        `[shotCheck] checkpoint: ${doneSceneIds.size}/${sceneOrder.length} scenes done (concurrency=${concurrency}) — 다음 step에서 이어감`,
-      );
-      return {
-        done: false,
-        progress: { doneSceneIds: [...doneSceneIds], sceneResults, absorbedSceneIds },
-      };
-    }
-
-    // 씬 등장 순서로 평탄화 — 워커 완료 순서와 무관하게 결정론.
-    valResult = {
-      shots_to_split: sceneOrder.flatMap((sid) => sceneResults[sid]?.splits ?? []),
-      semantic_issues: sceneOrder.flatMap((sid) => sceneResults[sid]?.issues ?? []),
-    };
+  try {
+    const valRaw = await generateJson<unknown>(valUser, cAxisConfig, {
+      systemInstruction: valSystem,
+      temperature: 0.3,
+      maxTokens: 16000,
+    });
+    await logger.saveLlmCall('shotCheck_validate', {
+      prompt: valUser,
+      response: JSON.stringify(valRaw, null, 2),
+      model: describeAxisConfig(cAxisConfig),
+      provider: cAxisConfig.provider,
+    });
+    valResult = coerceValResponse(valRaw);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await logger.saveLlmCall('shotCheck_validate_FAILED', {
+      prompt: valUser,
+      response: `ERROR: ${msg}`,
+      model: describeAxisConfig(cAxisConfig),
+      provider: cAxisConfig.provider,
+    });
+    console.error('[C2_validate] 검증 실패, 분할 없이 진행:', msg);
+    // ★ 흡수 배지: 이 실패가 state 에 흔적을 남기게 한다. 감사 실측에서 이 경로의 실패가
+    //   콘솔에만 남고 state 흔적 0 이었다 — fan-out 과 무관한 위생이라 롤백에서 보존한다.
+    await logger.markStage('shotCheck', 'failed', { absorbed: true });
+    valResult = { shots_to_split: [], semantic_issues: [] };
   }
 
   // ===== Step 3: 분할 적용 + shot_id 재정렬 =====
@@ -361,15 +248,9 @@ ${JSON.stringify(sceneShots, null, 2)}
     final_shot_count: finalShots.length,
     split_count: splitCount,
     asset_refs_dropped: assetNorm.droppedCount,
-    scene_count: sceneOrder.length,
-    fanout: SHOTCHECK_FANOUT,
-    // 흡수된 씬(검증 콜 실패 → 분할 없이 진행) — 0 이 정상. 단일 콜 경로의 흡수는
-    //   markStage('shotCheck','failed',{absorbed:true}) 배지로 별도 기록된다.
-    absorbed_scenes: absorbedSceneIds.length,
-    absorbed_scene_ids: absorbedSceneIds,
   });
 
-  return { done: true, shotSequence, report };
+  return { shotSequence, report };
 }
 // 분할 처리 중 임시 태그를 얹은 작업용 샷 (저장 전 리넘버에서 태그 제거).
 type WorkingShot = ShotSequenceItem & { _splitFrom?: string };
@@ -388,9 +269,14 @@ export function buildSplitChildren(
 ): WorkingShot[] {
   return newShots.map((ns, childIdx) => ({
     ...ns,
-    S: ns.S ?? {
+    // #output-diet 2026-08-10: new_shots 는 이제 *델타*다 (부모와 달라지는 필드만).
+    //   블록 단위 치환(ns.X ?? original.X)이면 부분 S 가 와서 scene_id 가 사라진다 —
+    //   델타 병합으로 받는다. 통짜 블록이 와도 스프레드가 전부 덮으므로 구 응답과 호환.
+    S: {
       ...original.S,
+      ...(ns.S ?? {}),
       character_action:
+        ns.S?.character_action?.trim() ||
         ns.video_generation?.motion_prompt?.trim() ||
         ns.first_frame_generation?.composition_prompt?.trim() ||
         original.S.character_action,
@@ -398,8 +284,8 @@ export function buildSplitChildren(
     C: ns.C ?? original.C,
     V: ns.V ?? original.V,
     assets: ns.assets ?? original.assets,
-    first_frame_generation: ns.first_frame_generation ?? original.first_frame_generation,
-    video_generation: ns.video_generation ?? original.video_generation,
+    first_frame_generation: { ...original.first_frame_generation, ...(ns.first_frame_generation ?? {}) },
+    video_generation: { ...original.video_generation, ...(ns.video_generation ?? {}) },
     duration_seconds: ns.duration_seconds ?? original.duration_seconds,
     continuity: ns.continuity ?? original.continuity,
     action_budget: ns.action_budget ?? original.action_budget,

@@ -316,7 +316,8 @@ async function _runPipelineInner(
     () =>
       runDecoupage(genre, characters, scenes, worldVisual, compact ? null : sceneCinematography, logger, models.V, {
         // 로컬 러너는 예산 미지정 → 항상 완주(done=true). 동시성은 프로덕션 step 배선과 동일 env.
-        concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY ?? '1') || 1,
+        //   #concurrency-gap: 미지정이면 decoupage 자체 기본값(4).
+        concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || undefined,
       })
         .then((r) => r.plan!),
     'decoupage',
@@ -381,16 +382,8 @@ async function _runPipelineInner(
       shotCheckResult = { shotSequence: cachedSeq, report: cachedReport };
       await logger.markStage('shotCheck', 'completed', { resumed: true });
     } else {
-      // 씬 fan-out(#shotcheck-fanout). 로컬 러너는 예산 미지정 → 항상 완주(done=true).
-      const checked = await runShotCheck(projectId, genre, characters, scenes, worldVisual, shotDesign, decoupage, sceneBudgetIssues, logger, models.C, {
-        concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || 4,
-      });
+      shotCheckResult = await runShotCheck(projectId, genre, characters, scenes, worldVisual, shotDesign, decoupage, sceneBudgetIssues, logger, models.C);
       await logger.flushRawLlm('shotCheck');
-      if (!checked.done) {
-        // 예산을 안 줬는데 부분 반환이면 계약 위반 — 조용히 절반짜리 시퀀스를 흘리지 않는다.
-        throw new Error('shotCheck: 예산 미지정인데 부분 반환 — 씬 체크포인트 계약 위반');
-      }
-      shotCheckResult = { shotSequence: checked.shotSequence, report: checked.report };
     }
 
     // ===== renderPrompts: T2I + TI2V 최종 프롬프트 정리 =====

@@ -19,7 +19,7 @@ import { runV2Design } from '@/lib/writer/pipeline/stages/v2_design';
 import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan';
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
-import { runShotCheck, type ShotCheckProgress } from '@/lib/writer/pipeline/stages/c_application_2';
+import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
 import { runDialogue, toDialogueTrack, type DialogueProgress } from '@/lib/writer/pipeline/stages/dialogue';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
@@ -104,8 +104,6 @@ export interface WriterRunState extends WriterRunStateBase {
   shotDesignPartial?: { doneSceneIds: string[]; shots: ShotDesign[] };
   shotSequence?: ShotSequence;
   shotCheck?: ShotCheckReport;
-  /** shotCheck 씬 단위 부분 진행(#shotcheck-fanout 2026-08-10) — shotDesignPartial 과 동일 계약. */
-  shotCheckPartial?: ShotCheckProgress;
   renderPrompts?: RenderPromptsOutput;
 
   // 샷 단위 대사 트랙(#dialogue-v4 2026-07-23) — persistShots가 shots.dialogue_lines로 매핑.
@@ -143,12 +141,6 @@ interface WriterStep {
    *  (total_units/completed_units) 을 하위호환으로 유지하기 위한 것 — 새 진실 아님. */
   units?: number;
 }
-
-// shotCheck 씬 fan-out 동시성(#shotcheck-fanout 2026-08-10). WRITER_SCENE_CONCURRENCY 로 튜닝하되
-//   **기본값은 4** — 이 스테이지는 단일 대형 콜 하나를 씬 단위로 쪼갠 것이라, 동시성 1이면 콜 수만
-//   늘고 벽시계는 오히려 나빠진다(쪼개기의 이득이 병렬에서만 나온다). decoupage/v4 는 원래 씬 루프라
-//   1=순차가 의미 있지만 여기는 아니다.
-const SHOTCHECK_CONCURRENCY = Number(process.env.WRITER_SCENE_CONCURRENCY) || 4;
 
 // 레인 순차 실행 게이트(#2lane A/B) — WRITER_LANES=0 이면 Lane V→Lane D 순차. 그 외 코드 경로는 동일.
 const LANES_PARALLEL = process.env.WRITER_LANES !== '0';
@@ -218,20 +210,11 @@ async function runLaneVisual(
       s.sceneBudgetIssues ?? [],
       logger,
       models.C,
-      // 씬 fan-out(#shotcheck-fanout): 씬 단위 이어달리기 + step 예산 양보 + 씬 병렬.
-      {
-        resume: s.shotCheckPartial ?? null,
-        softDeadlineMs: deadlineMs,
-        concurrency: SHOTCHECK_CONCURRENCY,
-      },
     );
     await logger.flushRawLlm('shotCheck');
-    // 부분 진행 — 여기까지의 레인 산출물 + 씬 체크포인트를 저장하고 양보(has=false 유지).
-    if (!result.done) return { ...patch, shotCheckPartial: result.progress };
     shotSequence = result.shotSequence;
     patch.shotSequence = result.shotSequence;
     patch.shotCheck = result.report;
-    patch.shotCheckPartial = undefined; // 체크포인트 정리
   }
 
   if (s.renderPrompts === undefined) {
@@ -485,7 +468,8 @@ export const WRITER_STEPS: WriterStep[] = [
         {
           resume: s.decoupagePartial ?? null,
           softDeadlineMs: deadlineMs,
-          concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY ?? '1') || 1,
+          // #concurrency-gap: 미지정이면 decoupage 자체 기본값(4). env 는 여전히 오버라이드.
+          concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || undefined,
         },
       );
       await logger.flushRawLlm('decoupage');
