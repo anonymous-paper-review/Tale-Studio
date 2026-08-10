@@ -229,6 +229,15 @@ async function decoupageForScene(
   };
 }
 
+export interface DecoupageRunResult {
+  /** false = 시간 예산으로 일부 씬만 처리 — 다음 step 인보케이션이 resume 으로 이어간다. */
+  done: boolean;
+  /** 완료 씬 누적 (원래 씬 순서). done=false 면 이대로 decoupagePartial 체크포인트가 된다. */
+  scenes: SceneDecoupage[];
+  /** done=true 일 때만 — 전역 재인덱싱까지 끝난 최종 플랜. */
+  plan?: DecoupagePlan;
+}
+
 export async function runDecoupage(
   genre: Genre,
   characters: Characters,
@@ -237,8 +246,22 @@ export async function runDecoupage(
   sceneCinematographyPlans: SceneCinematography[] | null,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
-): Promise<DecoupagePlan> {
-  await logger.markStage('decoupage', 'started', { scene_count: scenes.scenes.length });
+  opts?: {
+    /** 이전 step 이 남긴 완료 씬 체크포인트 (#scene-checkpoint 2026-08-09, shotDesign 과 동일 계약). */
+    resume?: SceneDecoupage[] | null;
+    /** step 시간 예산 — 씬 하나를 끝낸 뒤 넘었으면 부분 반환. 미지정이면 전 씬 완주(로컬 러너). */
+    softDeadlineMs?: number;
+    /** 동시 처리 씬 수 (#scene-parallel 2026-08-09). 기본 1(순차). 씬들은 상호 독립이고
+     *  전역 재인덱싱이 조립 단계라 순서 무관 — 단 한도(429)와 트레이드라 전역 방어 없이 크게 올리지 말 것. */
+    concurrency?: number;
+  },
+): Promise<DecoupageRunResult> {
+  const doneById = new Map((opts?.resume ?? []).map((sd) => [sd.scene_id, sd]));
+  const softDeadlineMs = opts?.softDeadlineMs;
+  await logger.markStage('decoupage', 'started', {
+    scene_count: scenes.scenes.length,
+    resumed_scenes: doneById.size,
+  });
 
   // 대표 스토리보드 모드 (E3b): 장편(D6~D7)은 전역 샷 상한을 씬 수로 배분해 씬당 예산 힌트로 준다.
   //   scenes.coverage_mode가 있으면 그것이 진실(코드 설정값), 없으면(구버전 산출) depth로 판정.
@@ -249,14 +272,59 @@ export async function runDecoupage(
     ? Math.max(3, Math.round(REPRESENTATIVE_SHOT_CAP / Math.max(1, scenes.scenes.length)))
     : null;
 
-  const sceneDecoupages: SceneDecoupage[] = [];
-  for (const scene of scenes.scenes) {
-    const plan = sceneCinematographyPlans?.find((p) => p.scene_id === scene.scene_id) ?? null;
-    const sceneDec = await decoupageForScene(scene, plan, genre, characters, worldVisual, shotBudgetHint, logger, axisConfig);
-    sceneDecoupages.push(sceneDec);
+  // 씬 처리 워커 풀 (#scene-checkpoint + #scene-parallel) — concurrency=1 이면 순차와 동일.
+  //   예산 양보: 씬 수 × 씬당 수십 초가 한 인보케이션 예산을 구조적으로 초과해 재시도 3연속
+  //   강제 종료로 run 이 죽던 사고(2026-08-06, 17씬)의 직접 처방. 새 씬 "착수 전"에 예산을
+  //   검사하되 첫 착수는 무조건 허용한다 — 패스당 최소 1씬 진행 보장(v4_shots 관용구).
+  //   씬 실패는 pass 를 죽이지 않는다: 성공분은 체크포인트로 보존되고 실패 씬은 다음 pass 가
+  //   재시도한다. 진전이 0인 pass 에서만 throw — 무진전 반복은 attempt 상한(3)이 끊는다.
+  const queue = scenes.scenes.filter((sc) => !doneById.has(sc.scene_id));
+  const concurrency = Math.max(1, Math.floor(opts?.concurrency ?? 1));
+  let launchedAny = false;
+  let progressed = 0;
+  // 씬 예상 시간 — 착수 게이트용. 관측되면 이 pass 의 최대 실측 ×1.25 로 갱신(보수적).
+  //   v2x8 탐색 실측(2026-08-09): 사후 게이트만으론 동시성이 높을 때 큐가 데드라인 전에
+  //   비어버려 게이트가 한 번도 안 걸리고 328s(>300s 하드킬)까지 밀렸다 — 착수 시점에
+  //   "끝날 시간"을 예측해 막아야 in-flight 꼬리가 하드킬을 넘지 않는다.
+  let estSceneMs = 45_000;
+  const sceneErrors: unknown[] = [];
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const overBudget =
+        softDeadlineMs != null && Date.now() + (launchedAny ? estSceneMs : 0) > softDeadlineMs;
+      if (overBudget && launchedAny) return;
+      const scene = queue.shift();
+      if (!scene) return;
+      launchedAny = true;
+      const plan = sceneCinematographyPlans?.find((p) => p.scene_id === scene.scene_id) ?? null;
+      const sceneStartedMs = Date.now();
+      try {
+        const sceneDec = await decoupageForScene(scene, plan, genre, characters, worldVisual, shotBudgetHint, logger, axisConfig);
+        doneById.set(scene.scene_id, sceneDec);
+        progressed += 1;
+        estSceneMs = Math.max(estSceneMs, Math.round((Date.now() - sceneStartedMs) * 1.25));
+      } catch (e) {
+        sceneErrors.push(e);
+        console.error(
+          `[decoupage] scene ${scene.scene_id} failed (checkpointing ${progressed} successes):`,
+          e instanceof Error ? e.message : e,
+        );
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  if (sceneErrors.length > 0 && progressed === 0) throw sceneErrors[0];
+
+  const ordered = scenes.scenes
+    .map((sc) => doneById.get(sc.scene_id))
+    .filter((sd): sd is SceneDecoupage => sd !== undefined);
+  if (ordered.length < scenes.scenes.length) {
+    return { done: false, scenes: ordered };
   }
 
-  // 전역 shot_id 재인덱싱 (씬 경계 넘어 순번)
+  // 전역 shot_id 재인덱싱 (씬 경계 넘어 순번) — 체크포인트에 저장된 씬-로컬 id 를 최종 조립에서
+  //   통일한다. state 에 병합된 객체를 변형하지 않게 얕은 복제 후 재인덱싱.
+  const sceneDecoupages = ordered.map((sd) => ({ ...sd }));
   let globalIdx = 0;
   for (const sd of sceneDecoupages) {
     sd.shots = sd.shots.map((shot) => {
@@ -283,5 +351,5 @@ export async function runDecoupage(
     total_split: plan.total_split,
   });
 
-  return plan;
+  return { done: true, scenes: sceneDecoupages, plan };
 }

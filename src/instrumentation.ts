@@ -13,6 +13,18 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
 
+  // outbound fetch 병렬화(#fetch-pool 2026-08-09) — 기본 디스패처가 origin당 요청을 사실상
+  //   직렬화하던 실측(동시 4콜이 8→17→26→34s 계단, undici Agent 교체로 8~9s 완전 병렬)의 픽스.
+  //   씬 병렬(#scene-parallel)·이미지 제출 등 모든 외부 API 호출의 전제 조건. 64는 씬 동시
+  //   4~8 + 웹훅/폴링 트래픽에 충분하고 리소스 부담 미미. Vercel 런타임에서도 동일 적용되는지
+  //   배포 후 v2 재실측으로 검증할 것.
+  try {
+    const { Agent, setGlobalDispatcher } = await import('undici')
+    setGlobalDispatcher(new Agent({ connections: 64 }))
+  } catch (e) {
+    console.warn('[instrumentation] fetch dispatcher tuning failed:', e)
+  }
+
   // 중복 인터벌 방지(dev HMR / 다중 등록).
   const g = globalThis as typeof globalThis & { __writerKeepalive?: ReturnType<typeof setInterval> }
   if (g.__writerKeepalive) return

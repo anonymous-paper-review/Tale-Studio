@@ -120,13 +120,17 @@ export async function runShotDesign(
   let cursor = 0;
   let startedThisPass = 0;
   let firstError: unknown = null;
+  // 씬 예상 시간 — 착수 게이트용(decoupage 와 동일 관용구). 관측되면 이 패스의 최대 실측 ×1.25.
+  //   사후 게이트(Date.now() > deadline)만으로는 동시성이 높을 때 큐가 데드라인 전에 비어
+  //   게이트가 한 번도 안 걸리고, in-flight 웨이브 꼬리가 함수 하드킬을 넘겼다(decoupage 실측).
+  //   "끝날 시간"을 착수 시점에 예측해 막는다.
+  let estSceneMs = 45_000;
 
   // 동기 claim: 예산 초과 시 남은 씬을 다음 step으로 양보하되, 패스당 최소 1씬은 시작한다
   //   (정상 반환 = 진행 보장 계약). 여러 워커가 동시에 claim해도 JS 단일 스레드라 원자적.
   //   "started"(완료 아님) 기준 게이팅 — in-flight 웨이브가 있어도 예산을 정확히 지킨다.
   const claimNext = (): StoryScene | null => {
-    if (firstError !== null) return null;
-    if (startedThisPass > 0 && softDeadlineMs != null && Date.now() > softDeadlineMs) {
+    if (startedThisPass > 0 && softDeadlineMs != null && Date.now() + estSceneMs > softDeadlineMs) {
       return null;
     }
     if (cursor >= pending.length) return null;
@@ -139,11 +143,18 @@ export async function runShotDesign(
   const worker = async (): Promise<void> => {
     let scene: StoryScene | null;
     while ((scene = claimNext()) !== null) {
+      const sceneStartedMs = Date.now();
       try {
         resultsByScene.set(scene.scene_id, await processScene(scene));
+        estSceneMs = Math.max(estSceneMs, Math.round((Date.now() - sceneStartedMs) * 1.25));
       } catch (e) {
+        // 씬 실패는 패스를 죽이지 않는다(decoupage 계약): 성공분은 체크포인트로 보존되고
+        //   실패 씬은 다음 패스가 재시도한다. 진전 0 인 패스에서만 표면화.
         if (firstError === null) firstError = e;
-        return;
+        console.error(
+          `[shotDesign] scene ${scene.scene_id} failed (checkpointing ${resultsByScene.size} successes):`,
+          e instanceof Error ? e.message : e,
+        );
       }
     }
   };
@@ -151,7 +162,9 @@ export async function runShotDesign(
   await Promise.all(
     Array.from({ length: Math.min(concurrency, pending.length) }, () => worker()),
   );
-  if (firstError !== null) throw firstError; // 씬 실패는 스테이지 실패로 표면화(순차 때와 동일)
+  // 로컬 러너(softDeadlineMs 미지정)는 부분 반환 경로가 없다(index.ts 가 done 을 보지 않고
+  //   result.shots 를 그대로 확정한다) — 씬 실패를 조용히 누락시키지 않도록 종전대로 표면화한다.
+  if (firstError !== null && (resultsByScene.size === 0 || softDeadlineMs == null)) throw firstError;
 
   // 결정론적 병합: 씬 원래 순서로 이번 패스 완료 씬만 doneSceneIds/allShots에 확장.
   for (const scene of scenes.scenes) {
