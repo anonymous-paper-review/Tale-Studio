@@ -45,15 +45,16 @@
 
 - 질문: **캡 완화 방식** — decoupage.ts:52-53(A1) 완화 시 C1(예시)·D1(게이팅)·B1(동시 금지)·D3(Compact)을 동반 수정할지. 캡만 풀면 예시 편향이 분포를 계속 누를 공산 — 닫히는 조건: 오너 결정 + 완화 배선 후 A/B run으로 무빙 분포 재측정.
 - 질문: 완화 후 **G3 재측정** (뷰 경계 횡단 비율 — 3D 모션 논거의 최종 종결 조건). 현 1~5%는 계약 압축 후 수요였음.
-- 질문: **역전 발견의 처방** — 운동 함의 샷에서 LOCKED 미준수(3/3). adherence 트랙(START/END diff)으로 등록할지, static 계약문 강화로 갈지 — 닫히는 조건: 정적 콘텐츠 샷에서 LOCKED 준수율 실측(이번 실험 밖이었음).
+- 질문: **역전 발견의 처방** — (2호 `static-compliance-ab`로 부분 닫힘, 2026-08-10 같은 날) 강화 문구(고정 마운트+프레이밍 불변식+피사체 이탈 허용) A/B 결과: 완전 준수 1/3로 사전 등록 채택 기준(≥2/3) 미달 → **기각, 배선 안 함**. 단 실측: 피사체 추종 0/3 소멸(진단 적중), CU 완전 준수 전환, 질주 샷에서 피사체 프레임아웃 화면 최초 확보. 남은 고장 재정의: **"빈 시간 채우기 전진"**(피사체 퇴장 후 꼬리 push / 무인물 샷 크립). 남은 미결: 문구 v2(빈 프레임 유지 지시) 3호 vs 프롬프트 밖 해법(꼬리 트림·모델 교체) — 오너 선택 + 정적 콘텐츠 샷 준수율은 여전히 미측정.
 - 질문: 재검증 후보 실측 — ① C3 transition 분포(DB 1쿼리) ② C2 mounting 분포 ③ D3 숏폼 vs 장편 카메라 분포 대조 ④ D2 컷리듬 구간. 닫히는 조건: 각 1쿼리/1대조.
 - 질문: **SHOT_PHYSICS R1 배터리 복구** — "값 변경 시 배터리 재실행이 계약"인데 배터리 소실. 닫히는 조건: git 622e44e 이전/백업에서 복원 또는 계약 문구 개정.
 - 잔가지: dynamic_spec enum 무검증 통과(medium/small/shake/none — v4 산출층) — 검증기 추가 여부 / 다른 영상 모델(seedance/kling/veo) 일반화 프로브 / 판독 라벨 4지선다 재설계.
 
 ## 좌표
 
-- 실험: `research/experiments/ti2v-camera-cap-recheck/` (HYPOTHESIS.md·probe.mts·result.md·provenance.json·assets 9clips)
+- 실험 1호: `research/experiments/ti2v-camera-cap-recheck/` (HYPOTHESIS.md·probe.mts·result.md·provenance.json·assets 9clips)
+- 실험 2호: `research/experiments/static-compliance-ab/` (강화 문구 A/B — 기각·질적 개선 실측. 리포트: https://claude.ai/code/artifact/bc7c9609-3a22-4fc7-9c70-baabf8b3975c)
 - 카탈로그 아티팩트: https://claude.ai/code/artifact/e959e8e8-9135-41e7-8261-35e56b21f693
 - 둥둥 재검증 HTML 리포트(증거 프레임 포함): https://claude.ai/code/artifact/303af64d-0acc-42e6-881e-a61dd1dab814
 - G3 실측 스크립트: 세션 스크래치패드 bg-audit.mjs·motion-trace.mjs (일회성 — 재현은 result.md 좌표로)
-- 같은 날 병행 맥락(별건): 배경 뷰 시트 vs 3D 판정 기준 논의("실패 뷰에 걸린 샷 비율" bar 20% 제안) — 별도 세션 증류 대상
+- 같은 날 병행 맥락(별건): 배경 뷰 시트 vs 3D 판정 기준 → [[2026-08-10-background-view-3d]]로 증류됨 (판정 프레임 D-2026-08-10-b를 그쪽 승격 게이트가 공유)
