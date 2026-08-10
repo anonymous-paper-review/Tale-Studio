@@ -104,10 +104,15 @@ writer 1런의 실제 LLM 부하를 측정해 수용량을 확정했다: **동�
 
 ## 3. 미결
 
-- **질문: `gemini-3-flash-preview`가 대시보드의 `Gemini 3 Flash` 버킷과 같은 한도인가?** 대시보드에 preview 별도 행이 없고, 문서엔 "preview는 더 제한적"이라고만 쓰여 있다.
-  — 닫히는 조건: 첫 429 발생 시 로그에 남는 quota metric 문자열(이제 800자 보존)로 버킷 이름 확인.
-- **질문: S/V축을 Flash-Lite 계열로 내리면 품질이 버티는가?** 한도가 3~5배(RPM 10K/TPM 10M/RPD 350K), 단가가 3~18배 싸다. 축별 모델 교체는 `PipelineInput.models`로 이미 가능.
-  — 닫히는 조건: 같은 fixture로 S축·V축 각각 Lite 교체 A/B, 산출물 스키마 위반율과 이슈 수 비교.
+- **질문: `gemini-3-flash-preview`가 대시보드의 `Gemini 3 Flash` 버킷과 같은 한도인가?**
+  — **대체(2026-08-10 저녁)**: f6d8e58로 S/V 기본이 `gemini-3.6-flash`로 전환되어 질문이
+  "**3.6-flash의 버킷·한도 실측**"으로 바뀜. 본 문서의 수용량 수치(§1-2, §1-4)는 preview 기준이라
+  Gemini 축 분모 재산출 필요(Claude 축 병목 165K는 불변). — 닫히는 조건: 대시보드 재확인 또는
+  첫 429의 quota metric 문자열(800자 보존)로 버킷 확인.
+- ~~**질문: S/V축을 Flash-Lite 계열로 내리면 품질이 버티는가?**~~
+  — **닫힘(2026-08-10 저녁, flash-model-ab A/B): 기각.** lite는 strict JSON 0/3, repairJson 경유
+  **조용한 샷 소실**(8샷→2·3샷 회차) — 속도 0.67×로도 상쇄 불가. 대신 3.6-flash로 전환(f6d8e58,
+  파싱·샷보존 온전 +13%). 상세: `research/experiments/flash-model-ab/` + `2026-08-10-flash-ab-fanout-review.md`.
 - **질문: v1/v3/v5를 유지할 근거가 있는가?** v5는 프로덕션 하류 미연결, v1·v3는 다음 단계 프롬프트에만 쓰이고 DB/UI/export 어디에도 안 남는다. v5는 스텝 1개(체크포인트+DB쓰기+step 왕복)를 LLM 0콜로 소비한다.
   — 닫히는 조건: v6/v7을 DB 기반으로 재배선할지 결정되면 v5의 존폐가 자동으로 결정된다.
 - 잔가지: `shotCheck` 단일 콜이 실측 런에서 실패(`054_shotCheck_validate_FAILED`)했고 코드가 흡수해 "분할 없이 진행"했다. 단일 콜이라 **1회 실패 = 149샷 검증 전부 소실**. fan-out을 못 켜는 상황에서 이 취약성을 어떻게 다룰지 미정.

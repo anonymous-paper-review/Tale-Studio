@@ -62,3 +62,4 @@
 - 코드: `src/lib/writer/pipeline/stages/s0_dramaturgy.ts`(스테이지+흡수 래퍼, 헤더 주석에 설계 원칙), s1_structure.ts(진단 주입부), s3_scenes.ts(무대 후보 블록+mergeOpenWorld candidates), steps.ts/index.ts(배선). 커밋 3935e3c.
 - 실측: `research/experiments/dramaturgy-preview/`(프리뷰 원문), `research/experiments/writer-full-run/results-ab-{lanes,seq}.json`(A/B, 클론 e4da245a·5260d92d — logs/<클론id>/01_s0_dramaturgy.json·05_s3_scenes.json에 원자료), before 기준선은 logs/064631aa-…/05_s3_scenes.json.
 - 같은 날 병행 맥락(별건이지만 같은 커밋): 2-레인 분기, E8 아크 배선(ablation 채택 3.00 vs 1.08), 대사 조인 픽스(source_shot_id), shotCheck fan-out 기각("규칙의 씬-로컬성 ≠ 모델 판단의 규모 불변성").
+- 관련 기록: [[2026-08-10-writer-integrity-performance]](같은 날 성능·정합성 사이클 총정리) · [[2026-08-10-previz-motion-channel]](다음 사이클 — 생성기 실측·모션 채널 재설계 아젠다).

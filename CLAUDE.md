@@ -18,6 +18,9 @@
 - `.claude/vault/2026-08-10-dramaturgy-world-derivation.md` — 드라마투르그/유도 주무대/세계 개발을 다시 팔 때 먼저 (기원 통찰 원문·채택 실측·본질 미결 논제)
 - `.claude/vault/2026-08-10-llm-quota-capacity.md` — "몇 명까지 버티나"·429·모델 교체를 다시 팔 때 먼저 (한도 실측·1런 부하 프로파일·병목 축별 범인·V축 산출물 수명)
 - `.claude/vault/2026-08-10-prompt-contract-audit.md` — 프롬프트 억압/캡 완화/카메라 무빙을 다시 팔 때 먼저 (계약 43건 색인·둥둥 반증 실측·6겹 압력·재검증 미결)
+- `.claude/vault/2026-08-10-flash-ab-fanout-review.md` — 모델 교체/검수 가치/로그 열람 오탐을 다시 팔 때 먼저 (lite 기각의 진짜 사유=repairJson 무신호 손실·shotCheck 검수 분포 실측·증류 분류기 우회)
+- `.claude/vault/2026-08-10-writer-integrity-performance.md` — 2레인/대사 조인/검수 실험을 다시 팔 때 먼저 (오염 감사 18/22·fan-out과 다이어트 기각 교훈·재persist 보류·커밋 색인)
+- `.claude/vault/2026-08-10-previz-motion-channel.md` — **다음 세션 재개 지점** — previz/모션 채널/생성기 실측을 이어갈 때 먼저 (축 A 실측·계기 결함 진단·모션 채널 3중 약점·내일 아젠다 3질문·아티팩트 링크)
 
 ## 실험
 

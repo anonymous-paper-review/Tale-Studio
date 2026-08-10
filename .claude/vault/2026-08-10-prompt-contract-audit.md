@@ -54,5 +54,6 @@
 
 - 실험: `research/experiments/ti2v-camera-cap-recheck/` (HYPOTHESIS.md·probe.mts·result.md·provenance.json·assets 9clips)
 - 카탈로그 아티팩트: https://claude.ai/code/artifact/e959e8e8-9135-41e7-8261-35e56b21f693
+- 둥둥 재검증 HTML 리포트(증거 프레임 포함): https://claude.ai/code/artifact/303af64d-0acc-42e6-881e-a61dd1dab814
 - G3 실측 스크립트: 세션 스크래치패드 bg-audit.mjs·motion-trace.mjs (일회성 — 재현은 result.md 좌표로)
 - 같은 날 병행 맥락(별건): 배경 뷰 시트 vs 3D 판정 기준 논의("실패 뷰에 걸린 샷 비율" bar 20% 제안) — 별도 세션 증류 대상
