@@ -1,0 +1,1328 @@
+{
+  "finished_at": "2026-08-10T05:57:23.656Z",
+  "src_run": "5c5d0c96-64d9-45d1-b3ca-00e502271422",
+  "clone_project": "064631aa-f6b2-4f7c-800b-66b0517a2769",
+  "concurrency": 4,
+  "total_ms": 543523,
+  "run_error": null,
+  "stages": [
+    {
+      "stage": "PIPELINE",
+      "status": "started",
+      "timestamp": "2026-08-10T05:48:20.102Z",
+      "extra": {
+        "resumed": false,
+        "projectId": "064631aa-f6b2-4f7c-800b-66b0517a2769"
+      }
+    },
+    {
+      "stage": "genre",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:48:20.103Z",
+      "extra": {
+        "seeded": true
+      }
+    },
+    {
+      "stage": "characters",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:48:20.104Z",
+      "extra": {
+        "seeded": true,
+        "count": 3
+      }
+    },
+    {
+      "stage": "narrativeStructure",
+      "status": "started",
+      "timestamp": "2026-08-10T05:48:20.104Z"
+    },
+    {
+      "stage": "narrativeStructure",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:48:29.279Z"
+    },
+    {
+      "stage": "scenes",
+      "status": "started",
+      "timestamp": "2026-08-10T05:48:29.280Z"
+    },
+    {
+      "stage": "scenes",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:49:16.997Z",
+      "extra": {
+        "scene_count": 17,
+        "uncovered_acts": [],
+        "budget_mode": "honest",
+        "budget_violations": 0
+      }
+    },
+    {
+      "stage": "storyCheck",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:49:16.998Z",
+      "extra": {
+        "skipped": true
+      }
+    },
+    {
+      "stage": "visualIdentity",
+      "status": "started",
+      "timestamp": "2026-08-10T05:49:16.999Z"
+    },
+    {
+      "stage": "visualIdentity",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:49:20.629Z"
+    },
+    {
+      "stage": "actVisualArc",
+      "status": "started",
+      "timestamp": "2026-08-10T05:49:20.629Z"
+    },
+    {
+      "stage": "actVisualArc",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:49:28.412Z",
+      "extra": {
+        "act_count": 3
+      }
+    },
+    {
+      "stage": "v2Design",
+      "status": "started",
+      "timestamp": "2026-08-10T05:49:28.416Z"
+    },
+    {
+      "stage": "v2Design",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:49:43.969Z",
+      "extra": {
+        "character_count": 5,
+        "location_count": 6
+      }
+    },
+    {
+      "stage": "sceneCinematography",
+      "status": "started",
+      "timestamp": "2026-08-10T05:49:43.973Z"
+    },
+    {
+      "stage": "persistAssets",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:49:47.043Z"
+    },
+    {
+      "stage": "sceneCinematography",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:50:25.991Z",
+      "extra": {
+        "scene_count": 17,
+        "shot_count_total": 148,
+        "validation_passed": true,
+        "cinematography_issues": 0
+      }
+    },
+    {
+      "stage": "decoupage",
+      "status": "started",
+      "timestamp": "2026-08-10T05:50:25.992Z",
+      "extra": {
+        "scene_count": 17,
+        "resumed_scenes": 0
+      }
+    },
+    {
+      "stage": "decoupage",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:51:35.183Z",
+      "extra": {
+        "total_shots": 149,
+        "total_added": 24,
+        "total_merged": 21,
+        "total_split": 8
+      }
+    },
+    {
+      "stage": "shotDesign",
+      "status": "started",
+      "timestamp": "2026-08-10T05:51:35.192Z",
+      "extra": {
+        "compact_mode": false,
+        "decoupage_driven": true,
+        "resumed_scenes": 0,
+        "concurrency": 4
+      }
+    },
+    {
+      "stage": "shotDesign",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:54:33.709Z",
+      "extra": {
+        "shot_count": 149,
+        "compact_mode": false
+      }
+    },
+    {
+      "stage": "shotCheck",
+      "status": "started",
+      "timestamp": "2026-08-10T05:54:33.723Z"
+    },
+    {
+      "stage": "shotCheck",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:54:34.198Z",
+      "extra": {
+        "final_shot_count": 149,
+        "split_count": 0,
+        "asset_refs_dropped": 0
+      }
+    },
+    {
+      "stage": "renderPrompts",
+      "status": "started",
+      "timestamp": "2026-08-10T05:54:34.203Z",
+      "extra": {
+        "total_shots": 149
+      }
+    },
+    {
+      "stage": "renderPrompts",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:54:34.204Z",
+      "extra": {
+        "total": 149,
+        "t2i_fallback": 0,
+        "ti2v_fallback": 0
+      }
+    },
+    {
+      "stage": "dialogue",
+      "status": "started",
+      "timestamp": "2026-08-10T05:54:34.205Z",
+      "extra": {
+        "scene_count": 17,
+        "resumed_scenes": 0
+      }
+    },
+    {
+      "stage": "dialogue",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:57:23.604Z",
+      "extra": {
+        "scene_count": 17,
+        "line_count": 72
+      }
+    },
+    {
+      "stage": "PIPELINE",
+      "status": "completed",
+      "timestamp": "2026-08-10T05:57:23.623Z",
+      "extra": {
+        "total_ms": 543510,
+        "final_shots": 149,
+        "resumed": false
+      }
+    }
+  ],
+  "llm_calls": [
+    {
+      "file": "001_narrativeStructure.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "001_narrativeStructure_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 9173,
+      "input_chars": 2174,
+      "output_chars": 766,
+      "error": null
+    },
+    {
+      "file": "002_scenes.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "002_scenes_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 47713,
+      "input_chars": 5425,
+      "output_chars": 16900,
+      "error": null
+    },
+    {
+      "file": "003_visualIdentity.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "003_visualIdentity_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 3627,
+      "input_chars": 1780,
+      "output_chars": 393,
+      "error": null
+    },
+    {
+      "file": "004_actVisualArc.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "004_actVisualArc_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 7780,
+      "input_chars": 1999,
+      "output_chars": 1370,
+      "error": null
+    },
+    {
+      "file": "005_v2Design.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "005_v2Design_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 15550,
+      "input_chars": 4410,
+      "output_chars": 6837,
+      "error": null
+    },
+    {
+      "file": "006_sceneCinematography.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "006_sceneCinematography_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 22258,
+      "input_chars": 5457,
+      "output_chars": 11051,
+      "error": null
+    },
+    {
+      "file": "007_sceneCinematography_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 19752,
+      "input_chars": 5903,
+      "output_chars": 10987,
+      "error": null
+    },
+    {
+      "file": "007_sceneCinematography_repair.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "008_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 12985,
+      "input_chars": 4759,
+      "output_chars": 5435,
+      "error": null
+    },
+    {
+      "file": "008_decoupage_scene_2.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "009_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 13775,
+      "input_chars": 4299,
+      "output_chars": 4894,
+      "error": null
+    },
+    {
+      "file": "009_decoupage_scene_3.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "010_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 15420,
+      "input_chars": 4239,
+      "output_chars": 5256,
+      "error": null
+    },
+    {
+      "file": "010_decoupage_scene_1.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "011_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 19123,
+      "input_chars": 4662,
+      "output_chars": 5619,
+      "error": null
+    },
+    {
+      "file": "011_decoupage_scene_4.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "012_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 14470,
+      "input_chars": 4728,
+      "output_chars": 5303,
+      "error": null
+    },
+    {
+      "file": "012_decoupage_scene_5.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "013_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 15171,
+      "input_chars": 4374,
+      "output_chars": 5112,
+      "error": null
+    },
+    {
+      "file": "013_decoupage_scene_6.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "014_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 18465,
+      "input_chars": 4227,
+      "output_chars": 4490,
+      "error": null
+    },
+    {
+      "file": "014_decoupage_scene_7.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "015_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 17039,
+      "input_chars": 4537,
+      "output_chars": 5375,
+      "error": null
+    },
+    {
+      "file": "015_decoupage_scene_8.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "016_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 14507,
+      "input_chars": 4687,
+      "output_chars": 5018,
+      "error": null
+    },
+    {
+      "file": "016_decoupage_scene_9.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "017_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 16798,
+      "input_chars": 4202,
+      "output_chars": 4625,
+      "error": null
+    },
+    {
+      "file": "017_decoupage_scene_10.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "018_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 14757,
+      "input_chars": 4207,
+      "output_chars": 4610,
+      "error": null
+    },
+    {
+      "file": "018_decoupage_scene_11.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "019_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 13096,
+      "input_chars": 4137,
+      "output_chars": 4214,
+      "error": null
+    },
+    {
+      "file": "019_decoupage_scene_12.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "020_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 12782,
+      "input_chars": 4096,
+      "output_chars": 3952,
+      "error": null
+    },
+    {
+      "file": "020_decoupage_scene_13.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "021_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 13711,
+      "input_chars": 4160,
+      "output_chars": 4870,
+      "error": null
+    },
+    {
+      "file": "021_decoupage_scene_14.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "022_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 13475,
+      "input_chars": 4100,
+      "output_chars": 5249,
+      "error": null
+    },
+    {
+      "file": "022_decoupage_scene_16.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "023_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 17467,
+      "input_chars": 4176,
+      "output_chars": 4941,
+      "error": null
+    },
+    {
+      "file": "023_decoupage_scene_15.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "024_decoupage_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 14437,
+      "input_chars": 4234,
+      "output_chars": 5043,
+      "error": null
+    },
+    {
+      "file": "024_decoupage_scene_17.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "025_L4_shots_scene_4_shot_29.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "025_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 29884,
+      "input_chars": 10301,
+      "output_chars": 22910,
+      "error": null
+    },
+    {
+      "file": "026_L4_shots_scene_2_shot_10.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "026_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 30908,
+      "input_chars": 10831,
+      "output_chars": 23073,
+      "error": null
+    },
+    {
+      "file": "027_L4_shots_scene_3_shot_20.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "027_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 31257,
+      "input_chars": 10288,
+      "output_chars": 22294,
+      "error": null
+    },
+    {
+      "file": "028_L4_shots_scene_1_shot_1.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "028_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 36008,
+      "input_chars": 9955,
+      "output_chars": 23231,
+      "error": null
+    },
+    {
+      "file": "029_L4_shots_scene_4_shot_37.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "029_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 12082,
+      "input_chars": 9620,
+      "output_chars": 5631,
+      "error": null
+    },
+    {
+      "file": "030_L4_shots_scene_3_shot_28.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "030_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 11482,
+      "input_chars": 9615,
+      "output_chars": 4277,
+      "error": null
+    },
+    {
+      "file": "031_L4_shots_scene_2_shot_18.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "031_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 12801,
+      "input_chars": 10316,
+      "output_chars": 7109,
+      "error": null
+    },
+    {
+      "file": "032_L4_shots_scene_1_shot_9.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "032_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 10761,
+      "input_chars": 8954,
+      "output_chars": 3971,
+      "error": null
+    },
+    {
+      "file": "033_L4_shots_scene_5_shot_39.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "033_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 26111,
+      "input_chars": 10960,
+      "output_chars": 21674,
+      "error": null
+    },
+    {
+      "file": "034_L4_shots_scene_6_shot_48.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "034_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 29024,
+      "input_chars": 10609,
+      "output_chars": 22535,
+      "error": null
+    },
+    {
+      "file": "035_L4_shots_scene_8_shot_65.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "035_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 25625,
+      "input_chars": 10158,
+      "output_chars": 19770,
+      "error": null
+    },
+    {
+      "file": "036_L4_shots_scene_7.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "036_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 28874,
+      "input_chars": 9846,
+      "output_chars": 22253,
+      "error": null
+    },
+    {
+      "file": "037_L4_shots_scene_5_shot_47.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "037_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 8922,
+      "input_chars": 10053,
+      "output_chars": 4345,
+      "error": null
+    },
+    {
+      "file": "038_L4_shots_scene_6_shot_56.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "038_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 9477,
+      "input_chars": 9722,
+      "output_chars": 4097,
+      "error": null
+    },
+    {
+      "file": "039_L4_shots_scene_8_shot_73.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "039_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 10003,
+      "input_chars": 9146,
+      "output_chars": 3637,
+      "error": null
+    },
+    {
+      "file": "040_L4_shots_scene_9_shot_74.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "040_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 32722,
+      "input_chars": 10415,
+      "output_chars": 22100,
+      "error": null
+    },
+    {
+      "file": "041_L4_shots_scene_10.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "041_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 34898,
+      "input_chars": 10178,
+      "output_chars": 22005,
+      "error": null
+    },
+    {
+      "file": "042_L4_shots_scene_12.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "042_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 29755,
+      "input_chars": 9449,
+      "output_chars": 20680,
+      "error": null
+    },
+    {
+      "file": "043_L4_shots_scene_11.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "043_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 31689,
+      "input_chars": 9744,
+      "output_chars": 21809,
+      "error": null
+    },
+    {
+      "file": "044_L4_shots_scene_9_shot_82.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "044_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 10623,
+      "input_chars": 9463,
+      "output_chars": 3823,
+      "error": null
+    },
+    {
+      "file": "045_L4_shots_scene_13.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "045_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 27025,
+      "input_chars": 9389,
+      "output_chars": 20586,
+      "error": null
+    },
+    {
+      "file": "046_L4_shots_scene_16_shot_132.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "046_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 26248,
+      "input_chars": 9788,
+      "output_chars": 20300,
+      "error": null
+    },
+    {
+      "file": "047_L4_shots_scene_15_shot_123.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "047_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 30302,
+      "input_chars": 9694,
+      "output_chars": 23073,
+      "error": null
+    },
+    {
+      "file": "048_L4_shots_scene_14_shot_114.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "048_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 31494,
+      "input_chars": 9639,
+      "output_chars": 23627,
+      "error": null
+    },
+    {
+      "file": "049_L4_shots_scene_15_shot_131.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "049_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 8267,
+      "input_chars": 8908,
+      "output_chars": 3525,
+      "error": null
+    },
+    {
+      "file": "050_L4_shots_scene_14_shot_122.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "050_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 9725,
+      "input_chars": 8913,
+      "output_chars": 3567,
+      "error": null
+    },
+    {
+      "file": "051_L4_shots_scene_16_shot_140.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "051_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 11278,
+      "input_chars": 8920,
+      "output_chars": 3600,
+      "error": null
+    },
+    {
+      "file": "052_L4_shots_scene_17_shot_141.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "052_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 29600,
+      "input_chars": 9823,
+      "output_chars": 21909,
+      "error": null
+    },
+    {
+      "file": "053_L4_shots_scene_17_shot_149.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "053_shotDesign_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 9970,
+      "input_chars": 9030,
+      "output_chars": 3636,
+      "error": null
+    },
+    {
+      "file": "054_shotCheck_claude.json",
+      "provider": "claude",
+      "model": "claude-sonnet-4-6",
+      "duration_ms": 443,
+      "input_chars": 660891,
+      "output_chars": 0,
+      "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CdtYrrYPMjBVc8VT7ugyZ\"}"
+    },
+    {
+      "file": "054_shotCheck_validate_FAILED.json",
+      "provider": "claude",
+      "model": "claude/claude-sonnet-4-6",
+      "error": null
+    },
+    {
+      "file": "055_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 12563,
+      "input_chars": 3587,
+      "output_chars": 3040,
+      "error": null
+    },
+    {
+      "file": "055_voice_profiles.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "056_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 8472,
+      "input_chars": 4080,
+      "output_chars": 2431,
+      "error": null
+    },
+    {
+      "file": "056_dialogue_scene_1.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "057_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 10533,
+      "input_chars": 5045,
+      "output_chars": 2416,
+      "error": null
+    },
+    {
+      "file": "057_dialogue_scene_2.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "058_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 9456,
+      "input_chars": 5011,
+      "output_chars": 1879,
+      "error": null
+    },
+    {
+      "file": "058_dialogue_scene_3.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "059_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 9056,
+      "input_chars": 4471,
+      "output_chars": 1933,
+      "error": null
+    },
+    {
+      "file": "059_dialogue_scene_4.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "060_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 9170,
+      "input_chars": 5257,
+      "output_chars": 1859,
+      "error": null
+    },
+    {
+      "file": "060_dialogue_scene_5.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "061_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 10547,
+      "input_chars": 5485,
+      "output_chars": 2386,
+      "error": null
+    },
+    {
+      "file": "061_dialogue_scene_6.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "062_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 9775,
+      "input_chars": 4751,
+      "output_chars": 1725,
+      "error": null
+    },
+    {
+      "file": "062_dialogue_scene_7.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "063_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 8019,
+      "input_chars": 4616,
+      "output_chars": 2275,
+      "error": null
+    },
+    {
+      "file": "063_dialogue_scene_8.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "064_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 7696,
+      "input_chars": 4847,
+      "output_chars": 1817,
+      "error": null
+    },
+    {
+      "file": "064_dialogue_scene_9.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "065_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 12406,
+      "input_chars": 5368,
+      "output_chars": 1984,
+      "error": null
+    },
+    {
+      "file": "065_dialogue_scene_10.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "066_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 7024,
+      "input_chars": 4792,
+      "output_chars": 1209,
+      "error": null
+    },
+    {
+      "file": "066_dialogue_scene_11.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "067_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 6409,
+      "input_chars": 4629,
+      "output_chars": 1555,
+      "error": null
+    },
+    {
+      "file": "067_dialogue_scene_12.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "068_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 9985,
+      "input_chars": 4591,
+      "output_chars": 1424,
+      "error": null
+    },
+    {
+      "file": "068_dialogue_scene_13.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "069_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 7178,
+      "input_chars": 4630,
+      "output_chars": 1441,
+      "error": null
+    },
+    {
+      "file": "069_dialogue_scene_14.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "070_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 10009,
+      "input_chars": 4744,
+      "output_chars": 1480,
+      "error": null
+    },
+    {
+      "file": "070_dialogue_scene_15.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "071_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 13097,
+      "input_chars": 4766,
+      "output_chars": 1463,
+      "error": null
+    },
+    {
+      "file": "071_dialogue_scene_16.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    },
+    {
+      "file": "072_dialogue_gemini.json",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "duration_ms": 7979,
+      "input_chars": 4850,
+      "output_chars": 1676,
+      "error": null
+    },
+    {
+      "file": "072_dialogue_scene_17.json",
+      "provider": "gemini",
+      "model": "gemini/gemini-3-flash-preview",
+      "error": null
+    }
+  ],
+  "stage_files": [
+    "00_input.json",
+    "00_input_story.md",
+    "03_s1_narrativeStructure.json",
+    "05_s3_scenes.json",
+    "08_v0_visualIdentity.json",
+    "08b_v1_actVisualArc.json",
+    "09_v2_design.json",
+    "10_v3_sceneCinematography.json",
+    "10b_c_decoupage.json",
+    "11_v4_shotDesign.json",
+    "12_c2_shotCheck.json",
+    "13_c2_shotSequence.json",
+    "14_v5_renderPrompts.json",
+    "14b_dialogue.json",
+    "INTEGRATED.json"
+  ]
+}

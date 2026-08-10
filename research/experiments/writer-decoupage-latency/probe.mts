@@ -43,7 +43,8 @@ async function main() {
     const scene = state.scenes.scenes[idx]
     const oneScene = { ...state.scenes, scenes: [scene] }
     const t0 = Date.now()
-    const plan = await runDecoupage(
+    // #scene-checkpoint(2026-08-09) 이후 반환 계약: { done, scenes, plan } — 예산 미지정이라 항상 done.
+    const { plan } = await runDecoupage(
       state.genre,
       state.characters,
       oneScene,
@@ -55,7 +56,7 @@ async function main() {
     const ms = Date.now() - t0
     timings.push(ms)
     console.log(
-      `[실측] ${scene.scene_id}: ${(ms / 1000).toFixed(1)}s → shots=${plan.total_shots}`,
+      `[실측] ${scene.scene_id}: ${(ms / 1000).toFixed(1)}s → shots=${plan?.total_shots}`,
     )
   }
   const avg = timings.reduce((a, b) => a + b, 0) / timings.length

@@ -1,0 +1,1464 @@
+{
+  "finished_at": "2026-08-10T07:03:23.557Z",
+  "fixture": "/Users/xcape/projects/tale-studio/logs/064631aa-f6b2-4f7c-800b-66b0517a2769/INTEGRATED.json",
+  "model_axis_v": {
+    "provider": "gemini",
+    "model": "gemini-3-flash-preview"
+  },
+  "acts": [
+    "Act 1: The Unheeded Omen",
+    "Act 2: The Deaf World",
+    "Act 3: The Altered World"
+  ],
+  "turning_delta_index": 3,
+  "runs": [
+    {
+      "arm": "A",
+      "rep": 1,
+      "logger_id": "ablation-arc-A1",
+      "duration_ms": 64793,
+      "arc": {
+        "acts": [
+          {
+            "act_id": "Act 1: The Unheeded Omen",
+            "palette_shift": "Warm domestic ambers and deep night blues with sharp, clinical white highlights from the moon.",
+            "lighting_mood": "High contrast; cozy, low-key interior lighting clashing with harsh, directional moonlight.",
+            "energy": "rising",
+            "visual_note": "The visual contrast between the small, warm family unit and the cold, vast cosmic threat establishes the scale of the tragedy."
+          },
+          {
+            "act_id": "Act 2: The Deaf World",
+            "palette_shift": "Desaturated, sterile corporate grays and cold fluorescent cyans, gradually invaded by chaotic disaster oranges.",
+            "lighting_mood": "Flat, oppressive overhead lighting in bureaucratic spaces shifting to flickering, unstable emergency flares.",
+            "energy": "high",
+            "visual_note": "Visualizes the suffocating nature of bureaucracy and the escalating physical chaos as society begins to fracture."
+          },
+          {
+            "act_id": "Act 3: The Altered World",
+            "palette_shift": "Monochromatic ashen tones and eerie, alien violets reflected from the transformed lunar surface.",
+            "lighting_mood": "Dim, diffused, and ethereal; a permanent twilight state with no strong primary light source.",
+            "energy": "falling",
+            "visual_note": "The world is visually drained of human warmth, leaving only the haunting, alien glow of a broken moon over the ruins."
+          }
+        ],
+        "global_arc_intent": "A visual descent from intimate domestic warmth through sterile indifference to a haunting, alien-lit post-apocalyptic silence."
+      },
+      "scenes": [
+        {
+          "scene_id": "scene_1",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 4400,
+          "palette": [
+            "#1A1A1A",
+            "#E5E5E5"
+          ],
+          "energy": "static",
+          "intent": "가정의 온기와 달빛의 차가운 대조를 통해 다가올 재앙의 전조를 암시"
+        },
+        {
+          "scene_id": "scene_2",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 3000,
+          "palette": [
+            "#1A1A1A",
+            "#E5E5E5"
+          ],
+          "energy": "breathing",
+          "intent": "긴박한 대화를 통해 모녀 간의 갈등과 위기감을 고조"
+        },
+        {
+          "scene_id": "scene_3",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 2800,
+          "palette": [
+            "#1A1A1A",
+            "#E5E5E5"
+          ],
+          "energy": "static",
+          "intent": "정적인 구도로 부녀 간의 유대감과 일말의 희망을 시각화"
+        },
+        {
+          "scene_id": "scene_4",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 6050,
+          "palette": [
+            "#1A1A1A",
+            "#E5E5E5"
+          ],
+          "energy": "kinetic",
+          "intent": "점진적인 접근과 거친 조명으로 비극적인 클라이맥스의 긴장감을 극대화"
+        },
+        {
+          "scene_id": "scene_5",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 4000,
+          "palette": [
+            "#E5E5E5",
+            "#9400D3"
+          ],
+          "energy": "breathing",
+          "intent": "호흡이 느껴지는 롱테이크로 슬픔이 깨달음으로 변하는 과정을 관조"
+        },
+        {
+          "scene_id": "scene_6",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 6000,
+          "palette": [
+            "#E5E5E5",
+            "#1A1A1A"
+          ],
+          "energy": "static",
+          "intent": "관료주의의 차가운 조명 아래서 벌어지는 굴욕적인 대립을 포착"
+        },
+        {
+          "scene_id": "scene_7",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 4500,
+          "palette": [
+            "#1A1A1A",
+            "#E5E5E5"
+          ],
+          "energy": "kinetic",
+          "intent": "무너진 도시의 전경과 디테일을 통해 절망에서 공포로의 전이를 묘사"
+        },
+        {
+          "scene_id": "scene_8",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 2500,
+          "palette": [
+            "#1A1A1A",
+            "#E5E5E5"
+          ],
+          "energy": "kinetic",
+          "intent": "역동적인 핸드헬드로 재난의 혼돈과 군중의 패닉을 생생하게 전달"
+        },
+        {
+          "scene_id": "scene_9",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 3500,
+          "palette": [
+            "#1A1A1A",
+            "#E5E5E5"
+          ],
+          "energy": "breathing",
+          "intent": "불안정한 호흡의 카메라로 희생을 결심하는 인물의 내면적 갈등을 표현"
+        },
+        {
+          "scene_id": "scene_10",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 5000,
+          "palette": [
+            "#1A1A1A",
+            "#E5E5E5"
+          ],
+          "energy": "kinetic",
+          "intent": "파편화된 몽타주를 통해 도시의 붕괴와 공포의 확산을 압축적으로 제시"
+        },
+        {
+          "scene_id": "scene_11",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 6500,
+          "palette": [
+            "#1A1A1A",
+            "#E5E5E5"
+          ],
+          "energy": "static",
+          "intent": "고립된 인물을 망원 렌즈로 포착하여 극심한 외로움과 탈진 상태를 강조"
+        },
+        {
+          "scene_id": "scene_12",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 7000,
+          "palette": [
+            "#E5E5E5",
+            "#1A1A1A"
+          ],
+          "energy": "static",
+          "intent": "정적인 마스터 샷으로 충격 이후 찾아온 무감각한 군중의 모습을 조망"
+        },
+        {
+          "scene_id": "scene_13",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 4250,
+          "palette": [
+            "#1A1A1A",
+            "#E5E5E5"
+          ],
+          "energy": "breathing",
+          "intent": "미세한 카메라의 움직임으로 슬픔을 딛고 결의를 다지는 인물의 변화를 포착"
+        },
+        {
+          "scene_id": "scene_14",
+          "act_ref": "Act 3: The Altered World",
+          "K": 8000,
+          "palette": [
+            "#E5E5E5",
+            "#9400D3"
+          ],
+          "energy": "static",
+          "intent": "변해버린 세상의 풍경을 평면적이고 정적인 구도로 제시하여 멜랑콜리한 분위기 조성"
+        },
+        {
+          "scene_id": "scene_15",
+          "act_ref": "Act 3: The Altered World",
+          "K": 8500,
+          "palette": [
+            "#E5E5E5",
+            "#9400D3"
+          ],
+          "energy": "breathing",
+          "intent": "스테디캠의 부드러운 전진을 통해 망설임이 확신으로 변하는 심리적 과정을 표현"
+        },
+        {
+          "scene_id": "scene_16",
+          "act_ref": "Act 3: The Altered World",
+          "K": 9000,
+          "palette": [
+            "#E5E5E5",
+            "#9400D3"
+          ],
+          "energy": "breathing",
+          "intent": "엄숙한 분위기 속에서 다가올 진실에 대한 기대감을 시각적으로 구축"
+        },
+        {
+          "scene_id": "scene_17",
+          "act_ref": "Act 3: The Altered World",
+          "K": 10000,
+          "palette": [
+            "#9400D3",
+            "#1A1A1A"
+          ],
+          "energy": "static",
+          "intent": "외계의 빛으로 가득 찬 세상에서 경외감과 체념이 섞인 마지막 순간을 롱테이크로 포착"
+        }
+      ],
+      "deltas": [
+        {
+          "from": "scene_1",
+          "to": "scene_2",
+          "is_boundary": false,
+          "dK": 1400,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.4409448818897638
+        },
+        {
+          "from": "scene_2",
+          "to": "scene_3",
+          "is_boundary": false,
+          "dK": 200,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.06299212598425197
+        },
+        {
+          "from": "scene_3",
+          "to": "scene_4",
+          "is_boundary": false,
+          "dK": 3250,
+          "dPal": 0,
+          "dE": 2,
+          "combined": 1.0236220472440944
+        },
+        {
+          "from": "scene_4",
+          "to": "scene_5",
+          "is_boundary": true,
+          "dK": 2050,
+          "dPal": 111.56276260473295,
+          "dE": 1,
+          "combined": 2.6230225386913935
+        },
+        {
+          "from": "scene_5",
+          "to": "scene_6",
+          "is_boundary": false,
+          "dK": 2000,
+          "dPal": 111.56276260473295,
+          "dE": 1,
+          "combined": 2.6072745071953305
+        },
+        {
+          "from": "scene_6",
+          "to": "scene_7",
+          "is_boundary": false,
+          "dK": 1500,
+          "dPal": 0,
+          "dE": 2,
+          "combined": 0.47244094488188976
+        },
+        {
+          "from": "scene_7",
+          "to": "scene_8",
+          "is_boundary": false,
+          "dK": 2000,
+          "dPal": 0,
+          "dE": 0,
+          "combined": 0.6299212598425197
+        },
+        {
+          "from": "scene_8",
+          "to": "scene_9",
+          "is_boundary": false,
+          "dK": 1000,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.31496062992125984
+        },
+        {
+          "from": "scene_9",
+          "to": "scene_10",
+          "is_boundary": false,
+          "dK": 1500,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.47244094488188976
+        },
+        {
+          "from": "scene_10",
+          "to": "scene_11",
+          "is_boundary": false,
+          "dK": 1500,
+          "dPal": 0,
+          "dE": 2,
+          "combined": 0.47244094488188976
+        },
+        {
+          "from": "scene_11",
+          "to": "scene_12",
+          "is_boundary": false,
+          "dK": 500,
+          "dPal": 0,
+          "dE": 0,
+          "combined": 0.15748031496062992
+        },
+        {
+          "from": "scene_12",
+          "to": "scene_13",
+          "is_boundary": false,
+          "dK": 2750,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.8661417322834646
+        },
+        {
+          "from": "scene_13",
+          "to": "scene_14",
+          "is_boundary": true,
+          "dK": 3750,
+          "dPal": 111.56276260473295,
+          "dE": 1,
+          "combined": 3.158455609557535
+        },
+        {
+          "from": "scene_14",
+          "to": "scene_15",
+          "is_boundary": false,
+          "dK": 500,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.15748031496062992
+        },
+        {
+          "from": "scene_15",
+          "to": "scene_16",
+          "is_boundary": false,
+          "dK": 500,
+          "dPal": 0,
+          "dE": 0,
+          "combined": 0.15748031496062992
+        },
+        {
+          "from": "scene_16",
+          "to": "scene_17",
+          "is_boundary": false,
+          "dK": 1000,
+          "dPal": 116.6737042996048,
+          "dE": 1,
+          "combined": 2.3829008878628257
+        }
+      ],
+      "boundary": {
+        "ratio": 3.960489356961879,
+        "nBoundary": 2,
+        "nWithin": 14
+      },
+      "turning_rank": 2
+    },
+    {
+      "arm": "B",
+      "rep": 1,
+      "logger_id": "ablation-arc-B1",
+      "duration_ms": 34142,
+      "arc": null,
+      "scenes": [
+        {
+          "scene_id": "scene_1",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 3850,
+          "palette": [
+            "#0A0E1A",
+            "#4A4A4A"
+          ],
+          "energy": "breathing",
+          "intent": "관객이 세계관의 비극적 전조를 져니의 시선으로 천천히 발견하게 함"
+        },
+        {
+          "scene_id": "scene_2",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 3200,
+          "palette": [
+            "#4A4A4A",
+            "#FFB347"
+          ],
+          "energy": "breathing",
+          "intent": "모녀간의 절박한 대화를 통해 재난의 압박감을 인물 간의 텐션으로 표현"
+        },
+        {
+          "scene_id": "scene_3",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 3250,
+          "palette": [
+            "#FFB347",
+            "#0A0E1A"
+          ],
+          "energy": "static",
+          "intent": "부녀의 정적인 대화 속에서 희망의 불씨를 발견하는 과정을 관조적으로 포착"
+        },
+        {
+          "scene_id": "scene_4",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 3000,
+          "palette": [
+            "#0A0E1A",
+            "#FFB347"
+          ],
+          "energy": "kinetic",
+          "intent": "아버지의 비극적 클라이맥스를 향해 카메라가 점진적으로 압박하며 접근"
+        },
+        {
+          "scene_id": "scene_5",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 3400,
+          "palette": [
+            "#4A4A4A",
+            "#0A0E1A"
+          ],
+          "energy": "breathing",
+          "intent": "상실의 슬픔이 새로운 깨달음으로 변하는 과정을 긴 호흡의 인서트와 함께 묘사"
+        },
+        {
+          "scene_id": "scene_6",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 5500,
+          "palette": [
+            "#4A4A4A",
+            "#0A0E1A"
+          ],
+          "energy": "static",
+          "intent": "정부 위원회의 차가운 권위와 어머니의 굴욕을 극명한 렌즈 대비로 강조"
+        },
+        {
+          "scene_id": "scene_7",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 3500,
+          "palette": [
+            "#0A0E1A",
+            "#4A4A4A"
+          ],
+          "energy": "breathing",
+          "intent": "폐허가 된 도시를 걷는 어머니의 시선을 통해 절망이 공포로 변하는 과정을 추적"
+        },
+        {
+          "scene_id": "scene_8",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 2500,
+          "palette": [
+            "#FFB347",
+            "#0A0E1A"
+          ],
+          "energy": "kinetic",
+          "intent": "생존자들의 집단적 광기와 혼돈을 광각 렌즈의 거친 움직임으로 현장감 있게 전달"
+        },
+        {
+          "scene_id": "scene_9",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 3000,
+          "palette": [
+            "#4A4A4A",
+            "#FFB347"
+          ],
+          "energy": "breathing",
+          "intent": "희생을 결심하는 어머니의 고뇌를 클로즈업 위주로 심도 깊게 묘사"
+        },
+        {
+          "scene_id": "scene_10",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 2250,
+          "palette": [
+            "#0A0E1A",
+            "#4A4A4A"
+          ],
+          "energy": "kinetic",
+          "intent": "도시의 붕괴와 생존자들의 공포를 조각난 이미지들로 압축하여 전달"
+        },
+        {
+          "scene_id": "scene_11",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 4000,
+          "palette": [
+            "#0A0E1A",
+            "#4A4A4A"
+          ],
+          "energy": "static",
+          "intent": "홀로 남겨진 져니의 고독과 탈진을 극단적인 망원 렌즈로 고립시켜 표현"
+        },
+        {
+          "scene_id": "scene_12",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 5000,
+          "palette": [
+            "#4A4A4A",
+            "#0A0E1A"
+          ],
+          "energy": "static",
+          "intent": "충격 이후 찾아온 생존자들의 무감각한 상태를 건조한 구도로 포착"
+        },
+        {
+          "scene_id": "scene_13",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 4000,
+          "palette": [
+            "#FFB347",
+            "#4A4A4A"
+          ],
+          "energy": "breathing",
+          "intent": "슬픔을 딛고 결의를 다지는 져니의 내면 변화를 부드러운 전진 이동으로 강조"
+        },
+        {
+          "scene_id": "scene_14",
+          "act_ref": "Act 3: The Altered World",
+          "K": 4000,
+          "palette": [
+            "#0A0E1A",
+            "#4A4A4A"
+          ],
+          "energy": "static",
+          "intent": "폐허 속의 고요함과 멜랑콜리한 분위기를 정적인 풍경 샷들의 나열로 구축"
+        },
+        {
+          "scene_id": "scene_15",
+          "act_ref": "Act 3: The Altered World",
+          "K": 4250,
+          "palette": [
+            "#FFB347",
+            "#4A4A4A"
+          ],
+          "energy": "breathing",
+          "intent": "언덕 위에서 마지막 결정을 내리는 져니의 집중력을 렌즈의 점진적 압축으로 표현"
+        },
+        {
+          "scene_id": "scene_16",
+          "act_ref": "Act 3: The Altered World",
+          "K": 5250,
+          "palette": [
+            "#0A0E1A",
+            "#FFB347"
+          ],
+          "energy": "static",
+          "intent": "최후의 순간을 앞둔 엄숙한 대기 상태를 넓은 앵글과 긴 호흡으로 묘사"
+        },
+        {
+          "scene_id": "scene_17",
+          "act_ref": "Act 3: The Altered World",
+          "K": 4000,
+          "palette": [
+            "#FFB347",
+            "#0A0E1A"
+          ],
+          "energy": "breathing",
+          "intent": "경외감 섞인 진실의 폭로와 체념을 단일 롱테이크의 카메라 무브먼트로 완성"
+        }
+      ],
+      "deltas": [
+        {
+          "from": "scene_1",
+          "to": "scene_2",
+          "is_boundary": false,
+          "dK": 650,
+          "dPal": 77.31813739039264,
+          "dE": 0,
+          "combined": 1.2676108004837514
+        },
+        {
+          "from": "scene_2",
+          "to": "scene_3",
+          "is_boundary": false,
+          "dK": 50,
+          "dPal": 50,
+          "dE": 1,
+          "combined": 0.6073549661352848
+        },
+        {
+          "from": "scene_3",
+          "to": "scene_4",
+          "is_boundary": false,
+          "dK": 250,
+          "dPal": 0,
+          "dE": 2,
+          "combined": 0.14336917562724014
+        },
+        {
+          "from": "scene_4",
+          "to": "scene_5",
+          "is_boundary": true,
+          "dK": 400,
+          "dPal": 77.31813739039264,
+          "dE": 1,
+          "combined": 1.1242416248565112
+        },
+        {
+          "from": "scene_5",
+          "to": "scene_6",
+          "is_boundary": false,
+          "dK": 2100,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 1.2043010752688172
+        },
+        {
+          "from": "scene_6",
+          "to": "scene_7",
+          "is_boundary": false,
+          "dK": 2000,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 1.146953405017921
+        },
+        {
+          "from": "scene_7",
+          "to": "scene_8",
+          "is_boundary": false,
+          "dK": 1000,
+          "dPal": 77.31813739039264,
+          "dE": 1,
+          "combined": 1.4683276463618875
+        },
+        {
+          "from": "scene_8",
+          "to": "scene_9",
+          "is_boundary": false,
+          "dK": 500,
+          "dPal": 50,
+          "dE": 1,
+          "combined": 0.8654194822643171
+        },
+        {
+          "from": "scene_9",
+          "to": "scene_10",
+          "is_boundary": false,
+          "dK": 750,
+          "dPal": 77.31813739039264,
+          "dE": 1,
+          "combined": 1.3249584707346476
+        },
+        {
+          "from": "scene_10",
+          "to": "scene_11",
+          "is_boundary": false,
+          "dK": 1750,
+          "dPal": 0,
+          "dE": 2,
+          "combined": 1.003584229390681
+        },
+        {
+          "from": "scene_11",
+          "to": "scene_12",
+          "is_boundary": false,
+          "dK": 1000,
+          "dPal": 0,
+          "dE": 0,
+          "combined": 0.5734767025089605
+        },
+        {
+          "from": "scene_12",
+          "to": "scene_13",
+          "is_boundary": false,
+          "dK": 1000,
+          "dPal": 77.31813739039264,
+          "dE": 1,
+          "combined": 1.4683276463618875
+        },
+        {
+          "from": "scene_13",
+          "to": "scene_14",
+          "is_boundary": true,
+          "dK": 0,
+          "dPal": 77.31813739039264,
+          "dE": 1,
+          "combined": 0.8948509438529271
+        },
+        {
+          "from": "scene_14",
+          "to": "scene_15",
+          "is_boundary": false,
+          "dK": 250,
+          "dPal": 77.31813739039264,
+          "dE": 1,
+          "combined": 1.0382201194801672
+        },
+        {
+          "from": "scene_15",
+          "to": "scene_16",
+          "is_boundary": false,
+          "dK": 1000,
+          "dPal": 50,
+          "dE": 1,
+          "combined": 1.1521578335187974
+        },
+        {
+          "from": "scene_16",
+          "to": "scene_17",
+          "is_boundary": false,
+          "dK": 1250,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.7168458781362007
+        }
+      ],
+      "boundary": {
+        "ratio": 1.0109249382006247,
+        "nBoundary": 2,
+        "nWithin": 14
+      },
+      "turning_rank": 8
+    },
+    {
+      "arm": "A",
+      "rep": 2,
+      "logger_id": "ablation-arc-A2",
+      "duration_ms": 61836,
+      "arc": {
+        "acts": [
+          {
+            "act_id": "Act 1: The Unheeded Omen",
+            "palette_shift": "Warm domestic ambers clashing with cold, unnatural lunar silver.",
+            "lighting_mood": "High-contrast chiaroscuro with long, ominous shadows in a familiar home setting.",
+            "energy": "low",
+            "visual_note": "The visual contrast between the safe home interior and the eerie moon establishes the initial sense of dread and isolation."
+          },
+          {
+            "act_id": "Act 2: The Deaf World",
+            "palette_shift": "Sterile, desaturated blues and bureaucratic greys, gradually invaded by chaotic disaster oranges.",
+            "lighting_mood": "Harsh, clinical top-lighting in institutions transitioning to flickering, unstable emergency lighting.",
+            "energy": "rising",
+            "visual_note": "Visualizes the cold indifference of society through sterile tones, which are eventually shattered by the heat of escalating disasters."
+          },
+          {
+            "act_id": "Act 3: The Altered World",
+            "palette_shift": "Monochromatic ash-grey and deep indigo, dominated by a sickly, oversized lunar white.",
+            "lighting_mood": "Low-key, dim atmospheric lighting where the only source is the distorted moon reflecting off ruins.",
+            "energy": "falling",
+            "visual_note": "The loss of vibrant color and the dominance of the moon signify the finality of human defeat and the birth of a new, desolate reality."
+          }
+        ],
+        "global_arc_intent": "A visual descent from warm domesticity into sterile institutional coldness, ending in a monochromatic, lunar-lit post-apocalyptic silence."
+      },
+      "scenes": [
+        {
+          "scene_id": "scene_1",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 4400,
+          "palette": [
+            "#1A1A2E",
+            "#708090"
+          ],
+          "energy": "static",
+          "intent": "평화로운 가정의 온기와 창밖의 기이한 달빛을 대비시켜 불길한 징조를 시각화함"
+        },
+        {
+          "scene_id": "scene_2",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 3200,
+          "palette": [
+            "#1A1A2E",
+            "#708090"
+          ],
+          "energy": "breathing",
+          "intent": "모녀 간의 긴박한 대립을 핸드헬드의 미세한 흔들림과 타이트한 샷으로 표현"
+        },
+        {
+          "scene_id": "scene_3",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 3000,
+          "palette": [
+            "#1A1A2E",
+            "#708090"
+          ],
+          "energy": "static",
+          "intent": "아버지와의 정적인 교감을 통해 절망 속에서 피어나는 작은 희망을 포착"
+        },
+        {
+          "scene_id": "scene_4",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 6050,
+          "palette": [
+            "#1A1A2E",
+            "#FF4500"
+          ],
+          "energy": "kinetic",
+          "intent": "비극적 클라이맥스를 향해 서서히 압박해 들어가는 카메라 워킹으로 서스펜스 극대화"
+        },
+        {
+          "scene_id": "scene_5",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 4000,
+          "palette": [
+            "#708090",
+            "#1A1A2E"
+          ],
+          "energy": "breathing",
+          "intent": "상실의 고통과 깨달음을 끊김 없는 호흡으로 담아내어 인물의 내면 변화에 집중"
+        },
+        {
+          "scene_id": "scene_6",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 6000,
+          "palette": [
+            "#708090",
+            "#1A1A2E"
+          ],
+          "energy": "static",
+          "intent": "관료적 냉담함을 망원 렌즈의 압축감과 고정된 구도로 시각화하여 굴욕감을 강조"
+        },
+        {
+          "scene_id": "scene_7",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 5000,
+          "palette": [
+            "#708090",
+            "#1A1A2E"
+          ],
+          "energy": "breathing",
+          "intent": "폐허가 된 도시를 이동하며 절망적인 풍경을 객관적이고 공허하게 조망"
+        },
+        {
+          "scene_id": "scene_8",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 2000,
+          "palette": [
+            "#FF4500",
+            "#1A1A2E"
+          ],
+          "energy": "kinetic",
+          "intent": "재난의 혼란과 생존자들의 패닉을 거친 핸드헬드와 가속되는 리듬으로 표현"
+        },
+        {
+          "scene_id": "scene_9",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 3500,
+          "palette": [
+            "#1A1A2E",
+            "#FF4500"
+          ],
+          "energy": "static",
+          "intent": "희생을 결심하는 인물의 고뇌를 긴 호흡의 클로즈업으로 포착하여 무게감을 부여"
+        },
+        {
+          "scene_id": "scene_10",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 5500,
+          "palette": [
+            "#1A1A2E",
+            "#FF4500"
+          ],
+          "energy": "kinetic",
+          "intent": "공포가 절망으로 변하는 과정을 파편화된 이미지의 몽타주로 구성하여 심리적 붕괴 표현"
+        },
+        {
+          "scene_id": "scene_11",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 6500,
+          "palette": [
+            "#1A1A2E",
+            "#708090"
+          ],
+          "energy": "static",
+          "intent": "텅 빈 도시와 홀로 남겨진 인물을 통해 고독의 극치를 시각화"
+        },
+        {
+          "scene_id": "scene_12",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 7000,
+          "palette": [
+            "#1A1A2E",
+            "#708090"
+          ],
+          "energy": "static",
+          "intent": "충격적인 광경 앞의 무감각함을 고정된 광각 렌즈로 냉정하게 관찰"
+        },
+        {
+          "scene_id": "scene_13",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 4500,
+          "palette": [
+            "#1A1A2E",
+            "#708090"
+          ],
+          "energy": "breathing",
+          "intent": "슬픔을 딛고 결의를 다지는 과정을 인물에게 다가가는 부드러운 움직임으로 표현"
+        },
+        {
+          "scene_id": "scene_14",
+          "act_ref": "Act 3: The Altered World",
+          "K": 8000,
+          "palette": [
+            "#1A1A2E",
+            "#708090"
+          ],
+          "energy": "static",
+          "intent": "변해버린 세계의 정막함을 넓고 정적인 구도로 설명하여 종말의 분위기 조성"
+        },
+        {
+          "scene_id": "scene_15",
+          "act_ref": "Act 3: The Altered World",
+          "K": 9000,
+          "palette": [
+            "#1A1A2E",
+            "#708090"
+          ],
+          "energy": "breathing",
+          "intent": "마지막 결단을 앞둔 망설임과 집중을 부드러운 카메라 추적으로 심도 있게 포착"
+        },
+        {
+          "scene_id": "scene_16",
+          "act_ref": "Act 3: The Altered World",
+          "K": 10000,
+          "palette": [
+            "#1A1A2E",
+            "#708090"
+          ],
+          "energy": "static",
+          "intent": "장엄한 최후를 준비하는 과정을 점진적인 프레이밍 변화로 구축하여 경건함 유도"
+        },
+        {
+          "scene_id": "scene_17",
+          "act_ref": "Act 3: The Altered World",
+          "K": 12000,
+          "palette": [
+            "#1A1A2E",
+            "#708090"
+          ],
+          "energy": "static",
+          "intent": "거대한 달 아래 굴복하는 인류의 마지막을 긴 호흡의 정적 샷으로 마감하여 허무함 강조"
+        }
+      ],
+      "deltas": [
+        {
+          "from": "scene_1",
+          "to": "scene_2",
+          "is_boundary": false,
+          "dK": 1200,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.3490909090909091
+        },
+        {
+          "from": "scene_2",
+          "to": "scene_3",
+          "is_boundary": false,
+          "dK": 200,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.05818181818181818
+        },
+        {
+          "from": "scene_3",
+          "to": "scene_4",
+          "is_boundary": false,
+          "dK": 3050,
+          "dPal": 94.22121453885097,
+          "dE": 2,
+          "combined": 2.887272727272727
+        },
+        {
+          "from": "scene_4",
+          "to": "scene_5",
+          "is_boundary": true,
+          "dK": 2050,
+          "dPal": 94.22121453885097,
+          "dE": 1,
+          "combined": 2.596363636363636
+        },
+        {
+          "from": "scene_5",
+          "to": "scene_6",
+          "is_boundary": false,
+          "dK": 2000,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.5818181818181818
+        },
+        {
+          "from": "scene_6",
+          "to": "scene_7",
+          "is_boundary": false,
+          "dK": 1000,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.2909090909090909
+        },
+        {
+          "from": "scene_7",
+          "to": "scene_8",
+          "is_boundary": false,
+          "dK": 3000,
+          "dPal": 94.22121453885097,
+          "dE": 1,
+          "combined": 2.8727272727272726
+        },
+        {
+          "from": "scene_8",
+          "to": "scene_9",
+          "is_boundary": false,
+          "dK": 1500,
+          "dPal": 0,
+          "dE": 2,
+          "combined": 0.43636363636363634
+        },
+        {
+          "from": "scene_9",
+          "to": "scene_10",
+          "is_boundary": false,
+          "dK": 2000,
+          "dPal": 0,
+          "dE": 2,
+          "combined": 0.5818181818181818
+        },
+        {
+          "from": "scene_10",
+          "to": "scene_11",
+          "is_boundary": false,
+          "dK": 1000,
+          "dPal": 94.22121453885097,
+          "dE": 2,
+          "combined": 2.290909090909091
+        },
+        {
+          "from": "scene_11",
+          "to": "scene_12",
+          "is_boundary": false,
+          "dK": 500,
+          "dPal": 0,
+          "dE": 0,
+          "combined": 0.14545454545454545
+        },
+        {
+          "from": "scene_12",
+          "to": "scene_13",
+          "is_boundary": false,
+          "dK": 2500,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.7272727272727273
+        },
+        {
+          "from": "scene_13",
+          "to": "scene_14",
+          "is_boundary": true,
+          "dK": 3500,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 1.018181818181818
+        },
+        {
+          "from": "scene_14",
+          "to": "scene_15",
+          "is_boundary": false,
+          "dK": 1000,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.2909090909090909
+        },
+        {
+          "from": "scene_15",
+          "to": "scene_16",
+          "is_boundary": false,
+          "dK": 1000,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.2909090909090909
+        },
+        {
+          "from": "scene_16",
+          "to": "scene_17",
+          "is_boundary": false,
+          "dK": 2000,
+          "dPal": 0,
+          "dE": 0,
+          "combined": 0.5818181818181818
+        }
+      ],
+      "boundary": {
+        "ratio": 2.04286553141515,
+        "nBoundary": 2,
+        "nWithin": 14
+      },
+      "turning_rank": 3
+    },
+    {
+      "arm": "B",
+      "rep": 2,
+      "logger_id": "ablation-arc-B2",
+      "duration_ms": 62537,
+      "arc": null,
+      "scenes": [
+        {
+          "scene_id": "scene_1",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 3850,
+          "palette": [
+            "#0A192F",
+            "#4A4E54"
+          ],
+          "energy": "static",
+          "intent": "전체적인 상황 제시 후 인물의 충격을 85mm 클로즈업으로 포착"
+        },
+        {
+          "scene_id": "scene_2",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 3200,
+          "palette": [
+            "#4A4E54",
+            "#FFB400"
+          ],
+          "energy": "breathing",
+          "intent": "모녀간의 갈등과 긴박함을 핸드헬드의 미세한 흔들림으로 표현"
+        },
+        {
+          "scene_id": "scene_3",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 3500,
+          "palette": [
+            "#0A192F",
+            "#FFB400"
+          ],
+          "energy": "static",
+          "intent": "정적인 구도로 부녀 사이의 절망 속에서 피어나는 작은 희망을 관조"
+        },
+        {
+          "scene_id": "scene_4",
+          "act_ref": "Act 1: The Unheeded Omen",
+          "K": 4400,
+          "palette": [
+            "#0A192F",
+            "#4A4E54"
+          ],
+          "energy": "kinetic",
+          "intent": "아버지의 비극적 최후를 향해 점진적으로 다가가는 긴박한 카메라 워킹"
+        },
+        {
+          "scene_id": "scene_5",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 3200,
+          "palette": [
+            "#0A192F",
+            "#4A4E54"
+          ],
+          "energy": "breathing",
+          "intent": "슬픔이 깨달음으로 변하는 과정을 끊김 없는 호흡으로 담아냄"
+        },
+        {
+          "scene_id": "scene_6",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 5000,
+          "palette": [
+            "#4A4E54",
+            "#0A192F"
+          ],
+          "energy": "static",
+          "intent": "권위적인 위원회와 어머니의 대립을 망원 렌즈의 압축감으로 표현"
+        },
+        {
+          "scene_id": "scene_7",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 6050,
+          "palette": [
+            "#4A4E54",
+            "#0A192F"
+          ],
+          "energy": "breathing",
+          "intent": "폐허가 된 도시를 이동하며 점증하는 공포를 스테디캠으로 추적"
+        },
+        {
+          "scene_id": "scene_8",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 3500,
+          "palette": [
+            "#FFB400",
+            "#0A192F"
+          ],
+          "energy": "kinetic",
+          "intent": "생존자들의 패닉과 혼돈을 거친 핸드헬드와 빠른 리듬으로 묘사"
+        },
+        {
+          "scene_id": "scene_9",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 3000,
+          "palette": [
+            "#0A192F",
+            "#4A4E54"
+          ],
+          "energy": "breathing",
+          "intent": "희생을 결심하는 인물의 내면을 향해 서서히 다가가는 샷 구성"
+        },
+        {
+          "scene_id": "scene_10",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 6500,
+          "palette": [
+            "#4A4E54",
+            "#0A192F"
+          ],
+          "energy": "kinetic",
+          "intent": "공포가 절망으로 변하는 순간을 광각과 망원의 극단적 대비로 강조"
+        },
+        {
+          "scene_id": "scene_11",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 4500,
+          "palette": [
+            "#0A192F",
+            "#4A4E54"
+          ],
+          "energy": "static",
+          "intent": "탈진한 인물의 고독을 고정된 롱테이크로 길게 유지"
+        },
+        {
+          "scene_id": "scene_12",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 5000,
+          "palette": [
+            "#4A4E54",
+            "#0A192F"
+          ],
+          "energy": "static",
+          "intent": "생존자들의 무감각해진 상태를 단편적인 이미지들의 나열로 표현"
+        },
+        {
+          "scene_id": "scene_13",
+          "act_ref": "Act 2: The Deaf World",
+          "K": 3850,
+          "palette": [
+            "#0A192F",
+            "#FFB400"
+          ],
+          "energy": "breathing",
+          "intent": "슬픔 속에서 결의를 다지는 인물의 변화를 서서히 좁혀지는 프레임으로 묘사"
+        },
+        {
+          "scene_id": "scene_14",
+          "act_ref": "Act 3: The Altered World",
+          "K": 5600,
+          "palette": [
+            "#4A4E54",
+            "#0A192F"
+          ],
+          "energy": "static",
+          "intent": "폐허의 정막함과 인물의 우울감을 넓은 화각의 정적인 샷으로 전달"
+        },
+        {
+          "scene_id": "scene_15",
+          "act_ref": "Act 3: The Altered World",
+          "K": 4800,
+          "palette": [
+            "#FFB400",
+            "#0A192F"
+          ],
+          "energy": "breathing",
+          "intent": "망설임을 끝내고 목표에 집중하는 인물의 시선을 스테디캠으로 유연하게 추적"
+        },
+        {
+          "scene_id": "scene_16",
+          "act_ref": "Act 3: The Altered World",
+          "K": 5600,
+          "palette": [
+            "#0A192F",
+            "#FFB400"
+          ],
+          "energy": "static",
+          "intent": "언덕 위에서의 엄숙한 준비 과정을 정밀한 구도로 포착"
+        },
+        {
+          "scene_id": "scene_17",
+          "act_ref": "Act 3: The Altered World",
+          "K": 5250,
+          "palette": [
+            "#FFB400",
+            "#0A192F"
+          ],
+          "energy": "breathing",
+          "intent": "경외감과 체념이 교차하는 마지막 순간을 유려한 스테디캠 롱테이크로 완성"
+        }
+      ],
+      "deltas": [
+        {
+          "from": "scene_1",
+          "to": "scene_2",
+          "is_boundary": false,
+          "dK": 650,
+          "dPal": 78.76548856190686,
+          "dE": 1,
+          "combined": 1.3183945905575984
+        },
+        {
+          "from": "scene_2",
+          "to": "scene_3",
+          "is_boundary": false,
+          "dK": 300,
+          "dPal": 45.48076516506731,
+          "dE": 1,
+          "combined": 0.7308338256927719
+        },
+        {
+          "from": "scene_3",
+          "to": "scene_4",
+          "is_boundary": false,
+          "dK": 900,
+          "dPal": 78.76548856190686,
+          "dE": 2,
+          "combined": 1.4194046915676992
+        },
+        {
+          "from": "scene_4",
+          "to": "scene_5",
+          "is_boundary": true,
+          "dK": 1200,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.48484848484848486
+        },
+        {
+          "from": "scene_5",
+          "to": "scene_6",
+          "is_boundary": false,
+          "dK": 1800,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.7272727272727273
+        },
+        {
+          "from": "scene_6",
+          "to": "scene_7",
+          "is_boundary": false,
+          "dK": 1050,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.42424242424242425
+        },
+        {
+          "from": "scene_7",
+          "to": "scene_8",
+          "is_boundary": false,
+          "dK": 2550,
+          "dPal": 78.76548856190686,
+          "dE": 1,
+          "combined": 2.086071358234366
+        },
+        {
+          "from": "scene_8",
+          "to": "scene_9",
+          "is_boundary": false,
+          "dK": 500,
+          "dPal": 78.76548856190686,
+          "dE": 1,
+          "combined": 1.2577885299515377
+        },
+        {
+          "from": "scene_9",
+          "to": "scene_10",
+          "is_boundary": false,
+          "dK": 3500,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 1.4141414141414141
+        },
+        {
+          "from": "scene_10",
+          "to": "scene_11",
+          "is_boundary": false,
+          "dK": 2000,
+          "dPal": 0,
+          "dE": 2,
+          "combined": 0.8080808080808081
+        },
+        {
+          "from": "scene_11",
+          "to": "scene_12",
+          "is_boundary": false,
+          "dK": 500,
+          "dPal": 0,
+          "dE": 0,
+          "combined": 0.20202020202020202
+        },
+        {
+          "from": "scene_12",
+          "to": "scene_13",
+          "is_boundary": false,
+          "dK": 1150,
+          "dPal": 78.76548856190686,
+          "dE": 1,
+          "combined": 1.5204147925778004
+        },
+        {
+          "from": "scene_13",
+          "to": "scene_14",
+          "is_boundary": true,
+          "dK": 1750,
+          "dPal": 78.76548856190686,
+          "dE": 1,
+          "combined": 1.7628390350020426
+        },
+        {
+          "from": "scene_14",
+          "to": "scene_15",
+          "is_boundary": false,
+          "dK": 800,
+          "dPal": 78.76548856190686,
+          "dE": 1,
+          "combined": 1.379000651163659
+        },
+        {
+          "from": "scene_15",
+          "to": "scene_16",
+          "is_boundary": false,
+          "dK": 800,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.32323232323232326
+        },
+        {
+          "from": "scene_16",
+          "to": "scene_17",
+          "is_boundary": false,
+          "dK": 350,
+          "dPal": 0,
+          "dE": 1,
+          "combined": 0.1414141414141414
+        }
+      ],
+      "boundary": {
+        "ratio": 1.1440848702110558,
+        "nBoundary": 2,
+        "nWithin": 14
+      },
+      "turning_rank": 12
+    }
+  ],
+  "summary": {
+    "a_mean": 3.0016774441885143,
+    "b_mean": 1.0775049042058402,
+    "max_within_arm_spread": 1.917623825546729,
+    "verdict": "채택③ — 아크 유효, E8 정식 배선 권고"
+  }
+}
