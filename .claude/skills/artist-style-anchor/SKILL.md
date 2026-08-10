@@ -6,14 +6,14 @@ allowed-tools: Bash, Read, Write, Edit
 
 # artist-style-anchor — 작가 그림체 앵커화 파이프라인 (B안)
 
-레퍼런스 그림체 → 중립 앵커 보드 → 전이 검증까지. 이론 근거: `docs/neutral_style_analysis_workflow.md`(14-facet), 앵커 계약: `docs/style-anchor-injection.md` §2. 1회차 실행 견본: `dev/Image_Style/artist_style_test/style-card-refer1.md` (refer1, 2026-07-21).
+레퍼런스 그림체 → 중립 앵커 보드 → 전이 검증까지. 이론 문서 2종(neutral_style_analysis_workflow·style-anchor-injection)과 refer1 견본 카드는 2026-08-05 대청소로 삭제됨 — 문서 2종은 `~/tale-studio-backup-2026-08-05.tar.gz`에만 있고, refer1 카드는 백업에도 없음. 운영에 필요한 루브릭·실측 규칙은 이 파일에 자기완결로 담겨 있다.
 
-**산출 디렉토리**: `dev/Image_Style/<run_name>/` — `style-card-<run_name>.md` + `anchor_board.png` + `test_*.png`.
+**산출 디렉토리**: `dev/Image_Style/<run_name>/` (없으면 생성, gitignore — 로컬 전용) — `style-card-<run_name>.md` + `anchor_board.png` + `test_*.png`.
 
 ## 단계 0 — 입력 수집
 
 - 1~N장 (3장+ 권장, 6~12장 이상적 — 1장이면 콘텐츠/스타일 분리 신뢰도가 낮다고 카드에 명시).
-- 여러 장이면 워크플로 문서 3단계대로 Core / Variation / Outlier 분류. Core만 생성 레퍼런스로 사용(최대 4장 — Q4 실측 5-ref까지 희석 없음).
+- 여러 장이면 스타일 일관성 기준으로 Core(특징이 서로 일관된 대표 다수파) / Variation(부분 변형) / Outlier(이질적) 분류. Core만 생성 레퍼런스로 사용(최대 4장 — Q4 실측 5-ref까지 희석 없음).
 
 ## 단계 1 — 계산 통계 (결정론)
 
@@ -25,7 +25,7 @@ python3 .claude/skills/artist-style-anchor/bin/style_stats.py <img1> [img2 ...]
 
 ## 단계 2 — facet 분석 → Style Card (LLM = Claude 수행)
 
-레퍼런스 이미지를 Read로 보고 `docs/neutral_style_analysis_workflow.md` 5단계 14-facet 루브릭으로 분석. 출력 계약:
+레퍼런스 이미지를 Read로 보고 아래 1번의 14-facet 루브릭으로 분석. 출력 계약:
 
 1. **facet별 통제 서술** (매체/형태/선/명암/팔레트hex/조명/가장자리/재질규칙/질감/디테일밀도/카메라/구도/모티프/불완전성)
 2. **캡슐 2~3문장** — 앵커 보드 프롬프트용 rendering rules (재질 번역 규칙 포함: 금속/유리/천이 이 스타일에서 어떻게 그려지는가)
@@ -38,10 +38,15 @@ python3 .claude/skills/artist-style-anchor/bin/style_stats.py <img1> [img2 ...]
 
 ## 단계 3 — 중립 앵커 보드 생성
 
-`templates/anchor_board.txt`의 `{RENDERING_RULES}`에 캡슐(+hex 팔레트, 재질 규칙, 장식 모티프)을 채워 프롬프트 작성 후:
+`templates/anchor_board.txt`의 `{RENDERING_RULES}`에 캡슐(+hex 팔레트, 재질 규칙, 장식 모티프)을 채워 프롬프트 작성 후, higgsfield CLI로 I2I 생성 (구 `bin/hf_image.sh` 래퍼는 소실 — CLI 직결):
 
 ```bash
-.claude/skills/artist-style-anchor/bin/hf_image.sh <prompt.txt> <run_dir>/anchor_board.png <core_ref1> [core_ref2 ...]
+# 모델 선택: higgsfield model list --image → 파라미터 확인: higgsfield model get <job_type>
+higgsfield generate create <이미지_모델> \
+  --prompt "$(cat <run_dir>/prompt.txt)" \
+  --image-references <core_ref1> [--image-references <core_ref2> ...] \
+  --wait
+# 로컬 경로 ref는 자동 업로드. --wait 출력의 결과 URL을 <run_dir>/anchor_board.png 로 저장(curl -o)
 ```
 
 ## 단계 4 — 앵커 보드 QA (vision, Claude)
@@ -61,11 +66,11 @@ Read로 보드를 열어 facet 대조: ①핵심 facet 재현(선/명암/팔레�
 
 ## 단계 6 — 검수·기록
 
-워크플로 문서 12단계 루브릭(스타일 충실도/콘텐츠 중립성/재질 분리/구조 안정성/독립성, 1~5점)으로 각 장 채점. `style-card-<run_name>.md`에 통계·Style Card·잡 ID·QA·점수·비용 기록 (견본: refer1 카드).
+5축 루브릭(스타일 충실도/콘텐츠 중립성/재질 분리/구조 안정성/독립성, 1~5점)으로 각 장 채점. `style-card-<run_name>.md`에 통계·Style Card·잡 ID·QA·점수·비용 기록.
 
 ## 인물 방언 보강 — 실측 확정 규칙 (refer1 3안 비교, 2026-07-21)
 
-정물 보드 단독은 인물 방언(비율·이목구비·헤어 형태 언어)을 약하게만 나름 (T1 3/5). 3안 A/B 결과 (상세: `dev/Image_Style/artist_style_test/style-card-refer1.md`):
+정물 보드 단독은 인물 방언(비율·이목구비·헤어 형태 언어)을 약하게만 나름 (T1 3/5). 3안 A/B 결과 (원본 refer1 카드 소실 — 아래 수치가 남은 전부):
 
 - **A** 이중 레퍼런스 `[보드, 원작 Core 1장]` = 3.5~4/5 · **A+B** +방언 절 텍스트 = 4.5/5 · **A+B+C** +마네킹 보드 = 4.5~5/5. **결정적 기여는 B(텍스트)**.
 - **C(A' 마네킹 보드)의 실체 = 룩 변조기** (장면 ABC 라운드 실측): A' 보드의 각진 기하·좁은 팔레트가 인물뿐 아니라 장면·사물 전체에 전파. 보드 선택 = 룩 결정 행위. 스타일당 보드 2종(표준=색 풍부/부드러움, A'=각지고 절제된 그래픽)을 **룩 옵션**으로 제시 가능. 마네킹의 장면 누수는 n=1 미발현("Do NOT reproduce its subject" 절 방어)이나 게이트 유지.
@@ -76,7 +81,7 @@ Read로 보드를 열어 facet 대조: ①핵심 facet 재현(선/명암/팔레�
 
 ## 모작 방향 가드 (2026-07-22, ABCD 폐기 교훈)
 
-**목표는 "스타일을 담는 중립 이미지"이지 원작 재현이 아니다.** 방언 절·수정 사항은 **여러 작품에서 반복되는 불변량**에서만 도출한다. 단일 원작 1장에 정합시키는 미세 튜닝(비율 % 맞추기, 원작 배경 구성·장식 배치 재현, 특정 그림 채점 기준 역주입)은 중립 앵커가 아니라 few-shot 모작으로의 과적합 — **금지**. 워크플로 문서 4단계(콘텐츠/스타일 분리)·6단계(Content-bound 제거)가 판별 기준: "이 요소가 다른 인물·공간·시간대에서도 반복되는가?"에 예라고 답할 수 없으면 레시피에 넣지 않는다. (사례: refer1 ABCD 라운드 — 원작 포스터의 배경 색면 구성·별 장식을 D 레이어로 주입 → 유저 판정 폐기, `style-card-refer1.md` 참조.)
+**목표는 "스타일을 담는 중립 이미지"이지 원작 재현이 아니다.** 방언 절·수정 사항은 **여러 작품에서 반복되는 불변량**에서만 도출한다. 단일 원작 1장에 정합시키는 미세 튜닝(비율 % 맞추기, 원작 배경 구성·장식 배치 재현, 특정 그림 채점 기준 역주입)은 중립 앵커가 아니라 few-shot 모작으로의 과적합 — **금지**. 판별 기준은 콘텐츠/스타일 분리와 Content-bound 제거: "이 요소가 다른 인물·공간·시간대에서도 반복되는가?"에 예라고 답할 수 없으면 레시피에 넣지 않는다. (사례: refer1 ABCD 라운드 — 원작 포스터의 배경 색면 구성·별 장식을 D 레이어로 주입 → 유저 판정 폐기.)
 
 **단, 일반화를 거치면 복권 가능** (refer1 ABCDE 실증): 원작의 장식 시스템(색면 패널·패턴 바닥·스파클)을 **구조 문법으로만 추출하고 색·배치를 교체 팔레트로 실행**하면 콘텐츠 복제가 아니라 스타일 층이 됨 — "다른 팔레트·다른 대상에서도 반복 가능한가?"가 판별 질문.
 
