@@ -1,0 +1,325 @@
+{
+  "model": "alibaba/happy-horse/reference-to-video",
+  "project_id": "6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a",
+  "jobs": [
+    {
+      "key": "sh_04_16__T0",
+      "shot_id": "sh_04_16",
+      "tier": "T0",
+      "request_id": "019feb5e-9d6c-7a60-b930-db39c8e730b4",
+      "endpoint": "alibaba/happy-horse/reference-to-video",
+      "duration_seconds": 7,
+      "dynamic_spec": {
+        "shot_id": "sh_04_16",
+        "camera_motion": {
+          "type": "static",
+          "speed": "slow",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "character_id": "girl",
+            "verb": "sprints at full speed toward the ventilation shaft",
+            "magnitude": "large"
+          }
+        ],
+        "motion_prompt": ""
+      },
+      "motion_contract": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.",
+      "input": {
+        "prompt": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.",
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_start.png?v=1786191704774"
+        ],
+        "duration": 7,
+        "resolution": "720p"
+      },
+      "submitted_at": "2026-08-10T11:11:14.310Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5c50a/I2N_bVerlsVu5ZowLDtgD_d8NpvM91.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/ti2v-camera-cap-recheck/assets/sh_04_16__T0.mp4"
+    },
+    {
+      "key": "sh_04_16__T1",
+      "shot_id": "sh_04_16",
+      "tier": "T1",
+      "request_id": "019feb5e-9e2f-70e0-b45c-d855f6deb4b5",
+      "endpoint": "alibaba/happy-horse/reference-to-video",
+      "duration_seconds": 7,
+      "dynamic_spec": {
+        "shot_id": "sh_04_16",
+        "camera_motion": {
+          "type": "tracking",
+          "direction": "left_to_right",
+          "speed": "medium",
+          "magnitude": "moderate"
+        },
+        "character_motion": [
+          {
+            "character_id": "girl",
+            "verb": "sprints at full speed toward the ventilation shaft",
+            "magnitude": "large"
+          }
+        ],
+        "motion_prompt": ""
+      },
+      "motion_contract": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.",
+      "input": {
+        "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.",
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_start.png?v=1786191704774"
+        ],
+        "duration": 7,
+        "resolution": "720p"
+      },
+      "submitted_at": "2026-08-10T11:11:14.504Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5c50e/SSTb726ocnxlkod2_QLIj_xkUokqP5.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/ti2v-camera-cap-recheck/assets/sh_04_16__T1.mp4"
+    },
+    {
+      "key": "sh_04_16__T2",
+      "shot_id": "sh_04_16",
+      "tier": "T2",
+      "request_id": "019feb5e-9eeb-7383-a4a1-00c2b30b94cd",
+      "endpoint": "alibaba/happy-horse/reference-to-video",
+      "duration_seconds": 7,
+      "dynamic_spec": {
+        "shot_id": "sh_04_16",
+        "camera_motion": {
+          "type": "tracking",
+          "direction": "left_to_right",
+          "speed": "fast",
+          "magnitude": "large"
+        },
+        "character_motion": [
+          {
+            "character_id": "girl",
+            "verb": "sprints at full speed toward the ventilation shaft",
+            "magnitude": "large"
+          }
+        ],
+        "motion_prompt": ""
+      },
+      "motion_contract": "Motion contract: Camera: tracks fast with the subject toward screen right (background flows toward screen left). Large amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.",
+      "input": {
+        "prompt": "Motion contract: Camera: tracks fast with the subject toward screen right (background flows toward screen left). Large amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.",
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_start.png?v=1786191704774"
+        ],
+        "duration": 7,
+        "resolution": "720p"
+      },
+      "submitted_at": "2026-08-10T11:11:14.693Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5c509/VB5JWXiT6hRl2o-o7sZOe_UJBWdPTh.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/ti2v-camera-cap-recheck/assets/sh_04_16__T2.mp4"
+    },
+    {
+      "key": "sh_01_02__T0",
+      "shot_id": "sh_01_02",
+      "tier": "T0",
+      "request_id": "019feb5e-9fa9-7fa3-8a41-8143c8c294bc",
+      "endpoint": "alibaba/happy-horse/reference-to-video",
+      "duration_seconds": 5,
+      "dynamic_spec": {
+        "shot_id": "sh_01_02",
+        "camera_motion": {
+          "type": "static",
+          "speed": "slow",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "character_id": "girl",
+            "verb": "brushes dust off the tin can and exhales",
+            "magnitude": "small"
+          }
+        ],
+        "motion_prompt": ""
+      },
+      "motion_contract": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: subject 1: \"brushes dust off the tin can and exhales\" — a small, restrained movement. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.",
+      "input": {
+        "prompt": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: subject 1: \"brushes dust off the tin can and exhales\" — a small, restrained movement. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. After brushing off the dust, a dented tin can is revealed. The girl exhales a ragged breath mixed with exhausted disappointment.",
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-2e9decf4fc51c41a261229ce59d920d32056dcb1566d7ab7343d2e2db7d07f70_storyboard_start.png?v=1786116388143"
+        ],
+        "duration": 5,
+        "resolution": "720p"
+      },
+      "submitted_at": "2026-08-10T11:11:14.883Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5c509/V3GfRhP-eoPw9TwqLpaio_M4cEDtxb.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/ti2v-camera-cap-recheck/assets/sh_01_02__T0.mp4"
+    },
+    {
+      "key": "sh_01_02__T1",
+      "shot_id": "sh_01_02",
+      "tier": "T1",
+      "request_id": "019feb5e-a06c-7650-bdfd-d04122415ced",
+      "endpoint": "alibaba/happy-horse/reference-to-video",
+      "duration_seconds": 5,
+      "dynamic_spec": {
+        "shot_id": "sh_01_02",
+        "camera_motion": {
+          "type": "dolly_in",
+          "speed": "slow",
+          "magnitude": "moderate"
+        },
+        "character_motion": [
+          {
+            "character_id": "girl",
+            "verb": "brushes dust off the tin can and exhales",
+            "magnitude": "small"
+          }
+        ],
+        "motion_prompt": ""
+      },
+      "motion_contract": "Motion contract: Camera: dollies in slow — the framing grows steadily tighter on the subject. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"brushes dust off the tin can and exhales\" — a small, restrained movement. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.",
+      "input": {
+        "prompt": "Motion contract: Camera: dollies in slow — the framing grows steadily tighter on the subject. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"brushes dust off the tin can and exhales\" — a small, restrained movement. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. After brushing off the dust, a dented tin can is revealed. The girl exhales a ragged breath mixed with exhausted disappointment.",
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-2e9decf4fc51c41a261229ce59d920d32056dcb1566d7ab7343d2e2db7d07f70_storyboard_start.png?v=1786116388143"
+        ],
+        "duration": 5,
+        "resolution": "720p"
+      },
+      "submitted_at": "2026-08-10T11:11:15.078Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5c505/sSiyRIll5-scy01Oo2Ctn_GvS6DSKC.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/ti2v-camera-cap-recheck/assets/sh_01_02__T1.mp4"
+    },
+    {
+      "key": "sh_01_02__T2",
+      "shot_id": "sh_01_02",
+      "tier": "T2",
+      "request_id": "019feb5e-a12a-77b1-ab9d-2d2eccc86fa5",
+      "endpoint": "alibaba/happy-horse/reference-to-video",
+      "duration_seconds": 5,
+      "dynamic_spec": {
+        "shot_id": "sh_01_02",
+        "camera_motion": {
+          "type": "dolly_in",
+          "speed": "medium",
+          "magnitude": "large"
+        },
+        "character_motion": [
+          {
+            "character_id": "girl",
+            "verb": "brushes dust off the tin can and exhales",
+            "magnitude": "small"
+          }
+        ],
+        "motion_prompt": ""
+      },
+      "motion_contract": "Motion contract: Camera: dollies in steady — the framing grows steadily tighter on the subject. Large amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"brushes dust off the tin can and exhales\" — a small, restrained movement. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.",
+      "input": {
+        "prompt": "Motion contract: Camera: dollies in steady — the framing grows steadily tighter on the subject. Large amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"brushes dust off the tin can and exhales\" — a small, restrained movement. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. After brushing off the dust, a dented tin can is revealed. The girl exhales a ragged breath mixed with exhausted disappointment.",
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-2e9decf4fc51c41a261229ce59d920d32056dcb1566d7ab7343d2e2db7d07f70_storyboard_start.png?v=1786116388143"
+        ],
+        "duration": 5,
+        "resolution": "720p"
+      },
+      "submitted_at": "2026-08-10T11:11:15.268Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5c505/h_SIFvp4E_aMTjm1mtP4n_TvzvNBKe.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/ti2v-camera-cap-recheck/assets/sh_01_02__T2.mp4"
+    },
+    {
+      "key": "sh_02_05__T0",
+      "shot_id": "sh_02_05",
+      "tier": "T0",
+      "request_id": "019feb5e-a1e7-7f70-b536-4a92d39d2efa",
+      "endpoint": "alibaba/happy-horse/reference-to-video",
+      "duration_seconds": 5,
+      "dynamic_spec": {
+        "shot_id": "sh_02_05",
+        "camera_motion": {
+          "type": "static",
+          "speed": "slow",
+          "magnitude": "minimal"
+        },
+        "character_motion": [],
+        "motion_prompt": ""
+      },
+      "motion_contract": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: no scripted action — only subtle natural life (breathing, cloth, hair, atmosphere), never frozen. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.",
+      "input": {
+        "prompt": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: no scripted action — only subtle natural life (breathing, cloth, hair, atmosphere), never frozen. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A wide view of a vast, rust-covered underground facility where dust particles drift through shafts of light.",
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-5affbcae62ea53edb95508930a57182533246406bfc51ae3d6e0b3f74c1d44bd_storyboard_start.png?v=1786191535117"
+        ],
+        "duration": 5,
+        "resolution": "720p"
+      },
+      "submitted_at": "2026-08-10T11:11:15.457Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5c50b/S57C7ZL9A5IwbnwW1m_G8_kWLNYTNa.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/ti2v-camera-cap-recheck/assets/sh_02_05__T0.mp4"
+    },
+    {
+      "key": "sh_02_05__T1",
+      "shot_id": "sh_02_05",
+      "tier": "T1",
+      "request_id": "019feb5e-a2a8-7742-9705-6e382ada2e6c",
+      "endpoint": "alibaba/happy-horse/reference-to-video",
+      "duration_seconds": 5,
+      "dynamic_spec": {
+        "shot_id": "sh_02_05",
+        "camera_motion": {
+          "type": "pan",
+          "direction": "left_to_right",
+          "speed": "slow",
+          "magnitude": "moderate"
+        },
+        "character_motion": [],
+        "motion_prompt": ""
+      },
+      "motion_contract": "Motion contract: Camera: pans slow toward screen right — on-screen content flows toward screen left. Rotation only — the camera does not travel. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: no scripted action — only subtle natural life (breathing, cloth, hair, atmosphere), never frozen. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.",
+      "input": {
+        "prompt": "Motion contract: Camera: pans slow toward screen right — on-screen content flows toward screen left. Rotation only — the camera does not travel. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: no scripted action — only subtle natural life (breathing, cloth, hair, atmosphere), never frozen. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A wide view of a vast, rust-covered underground facility where dust particles drift through shafts of light.",
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-5affbcae62ea53edb95508930a57182533246406bfc51ae3d6e0b3f74c1d44bd_storyboard_start.png?v=1786191535117"
+        ],
+        "duration": 5,
+        "resolution": "720p"
+      },
+      "submitted_at": "2026-08-10T11:11:15.650Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5c50b/BYnOAuWwzPHtCrBep-ZLB_HEFQ6swF.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/ti2v-camera-cap-recheck/assets/sh_02_05__T1.mp4"
+    },
+    {
+      "key": "sh_02_05__T2",
+      "shot_id": "sh_02_05",
+      "tier": "T2",
+      "request_id": "019feb5e-a365-71d0-87d9-368c874b7941",
+      "endpoint": "alibaba/happy-horse/reference-to-video",
+      "duration_seconds": 5,
+      "dynamic_spec": {
+        "shot_id": "sh_02_05",
+        "camera_motion": {
+          "type": "pan",
+          "direction": "left_to_right",
+          "speed": "medium",
+          "magnitude": "large"
+        },
+        "character_motion": [],
+        "motion_prompt": ""
+      },
+      "motion_contract": "Motion contract: Camera: pans steady toward screen right — on-screen content flows toward screen left. Rotation only — the camera does not travel. Large amplitude, spread evenly over the full 5 seconds. Subjects: no scripted action — only subtle natural life (breathing, cloth, hair, atmosphere), never frozen. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.",
+      "input": {
+        "prompt": "Motion contract: Camera: pans steady toward screen right — on-screen content flows toward screen left. Rotation only — the camera does not travel. Large amplitude, spread evenly over the full 5 seconds. Subjects: no scripted action — only subtle natural life (breathing, cloth, hair, atmosphere), never frozen. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A wide view of a vast, rust-covered underground facility where dust particles drift through shafts of light.",
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-5affbcae62ea53edb95508930a57182533246406bfc51ae3d6e0b3f74c1d44bd_storyboard_start.png?v=1786191535117"
+        ],
+        "duration": 5,
+        "resolution": "720p"
+      },
+      "submitted_at": "2026-08-10T11:11:15.839Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5c51c/-S1MrtLC_ZQarWkNFnvG7_DRyqwfhW.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/ti2v-camera-cap-recheck/assets/sh_02_05__T2.mp4"
+    }
+  ]
+}
