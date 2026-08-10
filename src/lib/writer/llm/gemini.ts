@@ -54,7 +54,7 @@ export async function geminiGenerate(
   opts: GeminiCallOptions = {}
 ): Promise<string> {
   callCount++;
-  const modelName = opts.modelName ?? 'gemini-3-flash-preview';
+  const modelName = opts.modelName ?? 'gemini-3.6-flash';
   const started = Date.now();
   const mime = opts.expectJson ? 'application/json' : 'text/plain';
 

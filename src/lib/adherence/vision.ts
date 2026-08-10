@@ -1,10 +1,10 @@
 // 정합 검사 VLM 판정기 (서버 전용 IO — #adherence P2). 판정 로직/claim 조립은 core.ts.
-//   모델: gemini-3-flash-preview(제품 V축 기본 계열), temperature 0, JSON 강제.
+//   모델: gemini-3.6-flash(제품 V축 기본 계열), temperature 0, JSON 강제.
 //   GEMINI_API_KEY 부재/호출 실패 = null 반환 — 검사는 best-effort, 생성 플로우를 막지 않는다.
 import sharp from 'sharp'
 
 const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent'
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent'
 
 function apiKey(): string | null {
   return (process.env.TALE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY)?.trim() || null

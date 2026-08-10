@@ -20,8 +20,8 @@ export interface PipelineModelsConfig {
 }
 
 export const DEFAULT_MODELS: PipelineModelsConfig = {
-  S: { provider: 'gemini', model: 'gemini-3-flash-preview' },
-  V: { provider: 'gemini', model: 'gemini-3-flash-preview' },
+  S: { provider: 'gemini', model: 'gemini-3.6-flash' },
+  V: { provider: 'gemini', model: 'gemini-3.6-flash' },
   C: { provider: 'claude', model: 'claude-sonnet-4-6' },
 };
 
