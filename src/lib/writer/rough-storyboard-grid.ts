@@ -122,6 +122,17 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   ]
     .filter(Boolean)
     .join(' / ')
+
+  // #figure-dedup(2026-08-10, 실측 e1a9fd08 sh_03_17): blocking 은 "figure 1"(익명 목각)로,
+  //   레이어는 같은 대상을 "갑옷 추적자들"로 따로 서술 → 모델이 별개 존재로 해석해 맨몸 인형
+  //   1 + 무리를 이중으로 그렸다(맨몸 인형이 주인공으로 읽힘). 두 서술이 같은 대상임을 못박고,
+  //   moment 에만 언급되는 인물(예: "캐릭터를 향해")은 화면 밖임을 명시한다.
+  const figureGuard =
+    blocking.length && layerLine
+      ? 'the numbered figure(s) above and any people described in the fg/mg/bg layers are the SAME subjects — draw each subject only once (no plain duplicate mannequin alongside them); anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them'
+      : blocking.length
+        ? 'anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them'
+        : null
   const setting = [stripColor(input.location), input.timeOfDay].filter(Boolean).join(', ')
   const focal =
     stripColor(s?.framing?.focal_point) ||
@@ -161,6 +172,7 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
     cuGuard,
     layerLine || (setting ? `setting: ${setting}` : null),
     input.actionDescription ? `moment: ${stripColor(input.actionDescription)}` : null,
+    figureGuard,
     `focal point: ${focal}`,
     drawLine,
   ].filter(Boolean)

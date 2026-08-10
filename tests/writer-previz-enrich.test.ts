@@ -97,6 +97,24 @@ describe('previz 강화 ① — DIRECTION 기술 라벨', () => {
   })
 })
 
+describe('인물 이중 표현 가드(#figure-dedup)', () => {
+  it('blocking+레이어 셀은 동일 대상 명시 + moment 만 언급된 인물 off-screen 금지를 싣는다', () => {
+    // 실측 e1a9fd08 sh_03_17: "figure 1"(익명 목각)과 레이어 "갑옷 추적자들"을 별개로 해석해
+    //   맨몸 인형이 추가로 그려짐(주인공으로 오독). 같은 대상임을 못박아 이중 표현을 차단.
+    const cell = buildRoughGridCell(richInput(), 'sh_01_01')
+    expect(cell.start).toContain('SAME subjects')
+    expect(cell.start).toContain('no plain duplicate mannequin')
+    expect(cell.start).toContain('OFF-SCREEN')
+  })
+
+  it('스펙 없는 fallback 셀은 기존 인원수 고정 가드를 유지한다(#split-spec)', () => {
+    const cell = buildRoughGridCell(richInput({ spec: null }), 'sh_01_01')
+    expect(cell.start).toContain('exactly 1 figure')
+    expect(cell.start).toContain('do not draw any other people')
+    expect(cell.start).not.toContain('SAME subjects') // 레이어 없는 셀엔 불필요
+  })
+})
+
 describe('fallback(스펙 없음) 경로는 기존 그대로', () => {
   it('해칭·라벨 지시가 전혀 실리지 않는다', () => {
     const cell = buildRoughGridCell(richInput({ spec: null }), 'sh_01_01')
