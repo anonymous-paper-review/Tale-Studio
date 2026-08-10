@@ -18,7 +18,7 @@ import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl, resolveWebhookBaseUrl } from '@/lib/fal/webhook-url'
 import { type RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
 // L4(shotDesign) state 로더 — 공용 lib(#motion-contract): 비디오 라우트와 공유.
-import { loadShotDesignByMainId } from '@/lib/writer/shot-design-state'
+import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import {
   buildRoughGridCell,
   buildRoughGridPrompt,
@@ -307,12 +307,20 @@ export async function POST(req: Request) {
     }
 
     // #p2-wiring: 분할·리넘버를 겪은 샷은 design_ref(부모 v4 id)로 rich spec 을 조인.
-    //   구 행(design_ref 없음)은 기존 main id 직조인 폴백 — 분할이 없던 프로젝트에선 그대로 맞는다.
+    // #split-spec(2026-08-10): ref 체계 프로젝트에서 ref 없는 샷(분할 자식)은 main-id 폴백 금지 —
+    //   리넘버 뒤 옆 샷 설계를 훔쳐와 설명과 무관한 러프가 그려졌다(실측 e1a9fd08 sh_03_15:
+    //   "도면을 옷에 숨긴다" 셀에 원설계 shot_15(추적자 돌격) blocking/focal 이 조인됨).
+    //   그런 샷은 spec 없이 DB fallback 셀(빈약하지만 올바름)로 간다. 판정은 전 샷 기준.
+    const projectUsesDesignRefs = (shots ?? []).some(
+      (s) => typeof s.design_ref === 'string' && s.design_ref,
+    )
     const resolvedSpecByShotId = new Map<string, RoughStoryboardSpec>()
     for (const s of targets) {
       const sid = s.shot_id as string
-      const ref = typeof s.design_ref === 'string' && s.design_ref ? s.design_ref : null
-      const spec = (ref ? specByShotId.get(ref) : undefined) ?? specByShotId.get(sid)
+      const spec = resolveShotDesign(specByShotId, {
+        shotId: sid,
+        designRef: typeof s.design_ref === 'string' ? s.design_ref : null,
+      }, projectUsesDesignRefs)
       if (spec) resolvedSpecByShotId.set(sid, spec)
     }
     const [actionEnByShot, moodEnByScene, translatedSpecs, timeEnByScene, locEnByScene, nameEnById] =

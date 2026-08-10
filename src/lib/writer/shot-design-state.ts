@@ -8,6 +8,22 @@ import { writerShotIdToMain } from '@/lib/writer/adapters'
 import type { RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
 import type { ShotDesign } from '@/lib/writer/types/pipeline'
 
+/**
+ * 샷 → 설계 해석 규칙(#split-spec 2026-08-10, 실측 e1a9fd08 sh_03_15):
+ *   design_ref 체계가 살아있는 프로젝트에서 ref 없는 샷(분할 둘째 자식·수동 추가)은
+ *   "의도적으로 스펙 없음"이다 — main-id 숫자 폴백은 리넘버 뒤 **옆 샷의 설계를 훔쳐온다**
+ *   (분할 자식 sh_03_15 가 원설계 shot_15(추적자 돌격)를 조인해 설명과 정반대 러프가 그려짐).
+ *   main-id 직조인은 레거시 프로젝트(전 샷 ref 없음 — 리넘버 이력도 없음)에서만 안전하다.
+ */
+export function resolveShotDesign<T>(
+  byId: Map<string, T>,
+  shot: { shotId: string; designRef: string | null | undefined },
+  projectUsesDesignRefs: boolean,
+): T | null {
+  if (shot.designRef) return byId.get(shot.designRef) ?? null
+  return projectUsesDesignRefs ? null : (byId.get(shot.shotId) ?? null)
+}
+
 export async function loadShotDesignByMainId(
   projectId: string,
 ): Promise<Map<string, RoughStoryboardSpec>> {

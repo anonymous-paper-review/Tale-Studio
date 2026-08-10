@@ -109,7 +109,9 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
         )
         .join('; ')
     : figureCount
-      ? `${figureCount} figure${figureCount > 1 ? 's' : ''} placed naturally for the action`
+      // #split-spec: blocking 없는(스펙 미보유 — 분할 자식 등) 셀은 서술이 빈약해 이웃 셀의
+      //   인물(추적자 등)이 스며들기 쉽다 — 인원수를 못박고 추가 인물을 명시적으로 금지.
+      ? `exactly ${figureCount} figure${figureCount > 1 ? 's' : ''} placed naturally for the action — do not draw any other people in this panel`
       : ''
 
   const layers = s?.framing?.layers ?? {}

@@ -4,7 +4,7 @@ import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { fal } from '@fal-ai/client'
 import { buildVideoPrompt } from '@/lib/director/video-prompt'
-import { loadShotDesignByMainId } from '@/lib/writer/shot-design-state'
+import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { getGenerationJobById, userOwnsProject } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
@@ -461,11 +461,18 @@ export async function POST(req: Request) {
     let dynamicSpec = (shot.dynamic_spec as ShotDynamicSpec | null) ?? null
     if (!dynamicSpec && !exactReplay) {
       try {
+        // #split-spec: ref 체계 프로젝트에서 ref 없는 샷(분할 자식)은 main-id 폴백 금지 —
+        //   옆 샷 설계의 모션 계약이 잘못 붙는다. 그런 샷은 계약 없는 레거시 프롬프트로.
+        const designRef = (shot.design_ref as string | null) ?? null
+        const { count } = await supabaseAdmin
+          .from('shots')
+          .select('shot_id', { count: 'exact', head: true })
+          .eq('project_id', projectId)
+          .not('design_ref', 'is', null)
         const designById = await loadShotDesignByMainId(projectId)
         dynamicSpec =
-          designById.get((shot.design_ref as string) ?? '')?.dynamicSpec ??
-          designById.get(writerShotId)?.dynamicSpec ??
-          null
+          resolveShotDesign(designById, { shotId: writerShotId, designRef }, (count ?? 0) > 0)
+            ?.dynamicSpec ?? null
       } catch {
         dynamicSpec = null // best-effort — 계약 없이 진행
       }

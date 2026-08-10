@@ -10,7 +10,7 @@ import { isAdminOwnedProject } from '@/lib/admin'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { ADHERENCE_MOTION_ENABLED, directionExpectationText, judgeMotionByDiff, motionExpectation } from '@/lib/adherence/core'
 import { judgeDirection, meanFrameDiff } from '@/lib/adherence/vision'
-import { loadShotDesignByMainId } from '@/lib/writer/shot-design-state'
+import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 
 export const runtime = 'nodejs'
@@ -67,8 +67,18 @@ export async function POST(req: Request) {
       .maybeSingle()
     let dyn = (shot?.dynamic_spec as ShotDynamicSpec | null) ?? null
     if (!dyn) {
+      // #split-spec: ref 없는 샷(분할 자식)의 main-id 폴백 금지 — 옆 샷 설계 오조인 방지.
+      const { count } = await supabaseAdmin
+        .from('shots')
+        .select('shot_id', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+        .not('design_ref', 'is', null)
       const byId = await loadShotDesignByMainId(projectId)
-      dyn = byId.get((shot?.design_ref as string) ?? '')?.dynamicSpec ?? byId.get(writerShotId)?.dynamicSpec ?? null
+      dyn =
+        resolveShotDesign(byId, {
+          shotId: writerShotId,
+          designRef: (shot?.design_ref as string | null) ?? null,
+        }, (count ?? 0) > 0)?.dynamicSpec ?? null
     }
     const exp = motionExpectation(dyn)
     if (!exp) return NextResponse.json({ status: 'skipped', reason: 'no dynamic_spec' })
