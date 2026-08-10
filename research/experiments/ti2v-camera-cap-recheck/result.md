@@ -43,6 +43,7 @@
 - 프롬프트: 제품 `buildVideoPrompt`+`compileMotionContract` (복붙 없음). 요청 payload 전문·request_id: `provenance.json`.
 - 클립: `assets/*.mp4` (9개). 블라인드 배정: 스크래치패드 `judges/blind-map.json` — judge1{A=04_16 T1, B=01_02 T0, C=02_05 T2} / judge2{A=04_16 T0, B=01_02 T2, C=02_05 T1} / judge3{A=04_16 T2, B=01_02 T1, C=02_05 T0}.
 - 비용: ≈ $7 (51초 × ~$0.14/s).
+- HTML 리포트(증거 프레임 포함): https://claude.ai/code/artifact/303af64d-0acc-42e6-881e-a61dd1dab814
 
 ## 결정 대기 (오너)
 
