@@ -16,6 +16,7 @@
 - `.claude/vault/2026-08-05-truth-source-cleanup.md` — "문서가 왜 다 없지?"·실험 규칙/대청소의 근거가 궁금하면 먼저
 - `.claude/vault/2026-08-06-previz-verifier.md` — previz 검증기/품질 채점을 다시 팔 때 먼저 (변별력 실측·판정 3원칙·보류 축의 이유)
 - `.claude/vault/2026-08-10-dramaturgy-world-derivation.md` — 드라마투르그/유도 주무대/세계 개발을 다시 팔 때 먼저 (기원 통찰 원문·채택 실측·본질 미결 논제)
+- `.claude/vault/2026-08-10-llm-quota-capacity.md` — "몇 명까지 버티나"·429·모델 교체를 다시 팔 때 먼저 (한도 실측·1런 부하 프로파일·병목 축별 범인·V축 산출물 수명)
 
 ## 실험
 

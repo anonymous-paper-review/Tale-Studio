@@ -1,0 +1,146 @@
+{
+  "tag": "diet",
+  "finished_at": "2026-08-10T10:35:55.109Z",
+  "fixture": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+  "runs": [
+    {
+      "run": 1,
+      "wall_ms": 98029,
+      "error": null,
+      "calls": 1,
+      "call_ms": [
+        98009
+      ],
+      "input_chars": 704346,
+      "output_chars": 18812,
+      "issues_total": 43,
+      "issues_by_category": {
+        "continuity": 17,
+        "action_budget": 3,
+        "verisimilitude": 1,
+        "cinematography": 22
+      },
+      "issues_by_severity": {
+        "WARNING": 35,
+        "INFO": 7,
+        "CRITICAL": 1
+      },
+      "split_count": 4,
+      "total_shots": 161,
+      "sibling_groups": 4,
+      "sibling_dup_action": 0,
+      "sibling_blank_action": 0,
+      "sibling_dup_motion": 0,
+      "sibling_samples": [
+        {
+          "source": "shot_10",
+          "actions": [
+            "져니가 망원경을 세게 쳐서 쓰러뜨린다.",
+            "져니가 방문을 향해 전력으로 달려나가며 프레임을 벗어난다."
+          ],
+          "motions": [
+            "Journey shoves the telescope hard; it tips and crashes to the floor with a thud.",
+            "Journey sprints toward the door and exits the frame, leaving the room empty and still."
+          ]
+        },
+        {
+          "source": "shot_26",
+          "actions": [
+            "아빠가 침대에서 일어나 창가의 망원경 쪽으로 걸어간다.",
+            "아빠가 망원경에 손을 얹고 황동 경통을 천천히 어루만진다."
+          ],
+          "motions": [
+            "Dad rises from the bed and walks steadily toward the telescope by the moonlit window.",
+            "Dad runs his weathered hand slowly along the brass barrel of the telescope."
+          ]
+        },
+        {
+          "source": "shot_35",
+          "actions": [
+            "char_3가 머리를 긁적이며 장비를 살핀다.",
+            "char_3가 전선을 손으로 잡아당기며 이상 여부를 점검한다."
+          ],
+          "motions": [
+            "char_3 scratches his head slowly, eyes scanning the tangle of cables.",
+            "char_3 gently tugs a thick cable and traces it along the rack with his fingers."
+          ]
+        },
+        {
+          "source": "shot_74",
+          "actions": [
+            "엄마가 책상 위의 서류들을 한 번에 거칠게 밀어낸다.",
+            "엄마가 빈 책상 위에 커다란 지도를 펼친다."
+          ],
+          "motions": [
+            "She sweeps a pile of papers off the desk with a single forceful motion, scattering them to the floor.",
+            "She unfolds a large paper map and spreads it flat across the cleared desk."
+          ]
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "wall_ms": 97148,
+      "error": null,
+      "calls": 1,
+      "call_ms": [
+        97116
+      ],
+      "input_chars": 704346,
+      "output_chars": 16670,
+      "issues_total": 40,
+      "issues_by_category": {
+        "continuity": 15,
+        "action_budget": 2,
+        "verisimilitude": 1,
+        "cinematography": 22
+      },
+      "issues_by_severity": {
+        "CRITICAL": 3,
+        "WARNING": 31,
+        "INFO": 6
+      },
+      "split_count": 2,
+      "total_shots": 159,
+      "sibling_groups": 3,
+      "sibling_dup_action": 0,
+      "sibling_blank_action": 0,
+      "sibling_dup_motion": 0,
+      "sibling_samples": [
+        {
+          "source": "shot_10",
+          "actions": [
+            "져니가 망원경을 세게 쳐서 쓰러뜨린다.",
+            "져니가 방문을 향해 전력으로 달려나가 프레임 밖으로 사라진다."
+          ],
+          "motions": [
+            "Journey shoves the telescope hard; it tips and crashes to the floor with a thud.",
+            "Journey sprints toward the door and exits the frame, leaving the room empty and still."
+          ]
+        },
+        {
+          "source": "shot_26",
+          "actions": [
+            "아빠가 침대에서 일어나 창가의 망원경을 향해 천천히 걸어간다.",
+            "아빠가 망원경 앞에 멈춰 서서 황동 경통을 손으로 부드럽게 어루만진다."
+          ],
+          "motions": [
+            "Dad rises from the bed and walks slowly toward the telescope by the window.",
+            "Dad runs his hand slowly and gently over the brass barrel of the telescope."
+          ]
+        },
+        {
+          "source": "shot_74",
+          "actions": [
+            "엄마가 책상 위의 서류들을 한 번에 거칠게 쓸어 바닥으로 밀어낸다.",
+            "엄마가 빈 책상 위에 큰 지도를 펼쳐 놓는다."
+          ],
+          "motions": [
+            "She sweeps a pile of papers off the desk with a single forceful motion, sending them scattering.",
+            "She spreads a large paper map across the cleared desk, smoothing it flat with both hands."
+          ]
+        }
+      ]
+    }
+  ]
+}

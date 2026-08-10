@@ -1,0 +1,38 @@
+{
+  "finished_at": "2026-08-10T10:43:23.865Z",
+  "fixture": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+  "runs": [
+    {
+      "concurrency": 4,
+      "wall_ms": 166793,
+      "error": null,
+      "done": true,
+      "shots": 157,
+      "scenes_done": 15,
+      "calls": 27,
+      "call_errors": 0,
+      "call_error_samples": [],
+      "model_seconds": 632.3,
+      "call_min_s": 9.2,
+      "call_median_s": 26.7,
+      "call_max_s": 36.6,
+      "effective_parallelism": 3.79
+    },
+    {
+      "concurrency": 8,
+      "wall_ms": 90042,
+      "error": null,
+      "done": true,
+      "shots": 157,
+      "scenes_done": 15,
+      "calls": 27,
+      "call_errors": 0,
+      "call_error_samples": [],
+      "model_seconds": 615.3,
+      "call_min_s": 8.6,
+      "call_median_s": 26.7,
+      "call_max_s": 36.8,
+      "effective_parallelism": 6.83
+    }
+  ]
+}
