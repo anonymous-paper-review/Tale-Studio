@@ -1,0 +1,128 @@
+{
+  "experiment": "flash-model-ab",
+  "executed_at": "2026-08-10T11:30:52.116Z",
+  "fixture_source": {
+    "run_id": "5260d92d-2e7b-4991-8bff-00213b37ef77",
+    "file": "debug/llm_calls/036_shotDesign_gemini.json",
+    "seq": 36,
+    "timestamp": "2026-08-10T08:13:25.631Z",
+    "original_model": "gemini-3-flash-preview",
+    "original_duration_ms": 32454,
+    "original_input_tokens": 4260,
+    "original_output_tokens": 6603,
+    "stage": "shotDesign (v4_shots.ts)",
+    "temperature_from": "src/lib/writer/pipeline/stages/v4_shots.ts:501 (temperature: 0.6)"
+  },
+  "fixture_chars": {
+    "system": 2690,
+    "prompt": 7695
+  },
+  "params": {
+    "temperature": 0.6,
+    "response_mime": "application/json",
+    "safety": "BLOCK_NONE (제품 기본)",
+    "timeout_ms": 120000,
+    "retry": "withLlmRetry 4회 (제품 기본)",
+    "inter_call_ms": 2000,
+    "order": "rep 단위 라운드로빈 순차"
+  },
+  "models": [
+    "gemini-3-flash-preview",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite"
+  ],
+  "reps": 3,
+  "call_path": "geminiGenerate(fixture.prompt, {modelName, systemInstruction, temperature, expectJson}) — src/lib/writer/llm/gemini.ts",
+  "node": "v26.3.1",
+  "summary": [
+    {
+      "model": "gemini-3-flash-preview",
+      "wall_ms": [
+        30452,
+        29604,
+        32660
+      ],
+      "median_wall_ms": 30452,
+      "output_tokens": [
+        6350,
+        6905,
+        6816
+      ],
+      "parse": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "parse_ok": 3,
+      "rate_limit_hits": 0,
+      "errors": 0
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "wall_ms": [
+        32003,
+        34471,
+        53479
+      ],
+      "median_wall_ms": 34471,
+      "output_tokens": [
+        6842,
+        6905,
+        6955
+      ],
+      "parse": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "parse_ok": 3,
+      "rate_limit_hits": 0,
+      "errors": 0
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "wall_ms": [
+        46131,
+        37744,
+        33293
+      ],
+      "median_wall_ms": 37744,
+      "output_tokens": [
+        7345,
+        6777,
+        7070
+      ],
+      "parse": [
+        "strict",
+        "strict",
+        "strict"
+      ],
+      "parse_ok": 3,
+      "rate_limit_hits": 0,
+      "errors": 0
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "wall_ms": [
+        20381,
+        20277,
+        18427
+      ],
+      "median_wall_ms": 20277,
+      "output_tokens": [
+        7001,
+        7358,
+        6628
+      ],
+      "parse": [
+        "repaired",
+        "repaired",
+        "repaired"
+      ],
+      "parse_ok": 3,
+      "rate_limit_hits": 0,
+      "errors": 0
+    }
+  ]
+}
