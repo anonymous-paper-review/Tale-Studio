@@ -25,10 +25,141 @@ export interface PipelineModelsInput {
   C?: PipelineAxisModel;
 }
 
-// (#writer-overhaul 2026-08-10) 옛 V5/Assets/V6/V7 산출물 타입(T2IPrompt·TI2VPrompt·
-//   ShotGenerationPrompts·RenderPromptsOutput·AssetItem·AssetsManifest·ShotImage*·ShotVideo*)은
-//   그 스테이지·라우트와 함께 삭제됐다. 이미지/영상 생성의 진실은 generation_jobs 와
-//   shots/video_clips 테이블이며, writer 파이프라인은 텍스트·설계까지만 책임진다.
+// =====================================================================
+// V5: T2I / TI2V 최종 프롬프트 (마지막 stage 출력)
+// =====================================================================
+
+export interface T2IPrompt {
+  prompt: string;                  // 첫 프레임 생성용 (200~400자)
+  negative_prompt?: string;
+  aspect_ratio: string;            // V0.aspect_ratio
+  width?: number;
+  height?: number;
+  reference_assets: string[];      // 캐릭터/로케이션 ID (IP-Adapter 등)
+}
+
+export interface TI2VPrompt {
+  motion_prompt: string;           // 첫 프레임 + 모션 (50~100자, 동사 1~2)
+  negative_prompt?: string;
+  duration_seconds: number;
+  fps?: number;
+  camera_movement?: string;
+}
+
+export interface ShotGenerationPrompts {
+  shot_id: string;
+  scene_id: string;
+  duration_seconds: number;
+  t2i: T2IPrompt;
+  ti2v: TI2VPrompt;
+}
+
+export interface RenderPromptsOutput {
+  total_shots: number;
+  shots: ShotGenerationPrompts[];
+  l0_meta: {
+    aspect_ratio: string;
+    fps: number;
+    resolution: { width: number; height: number };
+  };
+  extraction_summary: {
+    t2i_extracted: number;
+    t2i_llm_generated: number;
+    ti2v_extracted: number;
+    ti2v_llm_generated: number;
+    llm_axis: string;  // LLM fallback 시 사용된 모델 라벨
+  };
+}
+
+// =====================================================================
+// Assets: 캐릭터/로케이션 reference 이미지 (V2 직후 생성, V6 input)
+//   - V0의 reference_assets ID와 1:1 매칭되는 실제 이미지 URL
+//   - V6 T2I는 이걸 reference_image_urls로 fal에 전달 (I2I)
+// =====================================================================
+
+export type AssetKind = 'character' | 'location';
+
+export interface AssetItem {
+  id: string;                // S2 character.id 또는 V2 location.id
+  kind: AssetKind;
+  name: string;
+  prompt_used: string;
+  image_url: string;
+  width?: number;
+  height?: number;
+  model: string;
+  status: 'success' | 'failed' | 'pending';
+  error?: string;
+  request_id?: string;
+  submitted_at?: string;
+}
+
+export interface AssetsManifest {
+  total: number;
+  success_count: number;
+  failed_count: number;
+  pending_count?: number;
+  model: string;
+  aspect_ratio: string;            // V0.aspect_ratio (reference 일관성 위해 동일)
+  characters: AssetItem[];
+  locations: AssetItem[];
+}
+
+// =====================================================================
+// V6: 첫 프레임 이미지 (fal.ai T2I 결과)
+// =====================================================================
+
+export interface ShotImageResult {
+  shot_id: string;
+  scene_id: string;
+  image_url: string;
+  width?: number;
+  height?: number;
+  prompt_used: string;
+  model: string;
+  // pending = submit 완료, fal 큐에서 생성 중. request_id로 결과 회수 가능.
+  status: 'success' | 'failed' | 'pending';
+  error?: string;
+  request_id?: string;       // fal queue id (pending 상태 회수에 필요)
+  submitted_at?: string;     // ISO. resume timeout 판단용
+}
+
+export interface ShotImagesOutput {
+  total_shots: number;
+  success_count: number;
+  failed_count: number;
+  pending_count?: number;
+  model: string;
+  shots: ShotImageResult[];
+}
+
+// =====================================================================
+// V7: 영상 클립 (fal.ai TI2V 결과)
+// =====================================================================
+
+export interface ShotVideoResult {
+  shot_id: string;
+  scene_id: string;
+  video_url: string;
+  duration_seconds: number;
+  prompt_used: string;
+  first_frame_url: string;
+  model: string;
+  status: 'success' | 'failed' | 'skipped' | 'pending';
+  error?: string;
+  request_id?: string;
+  submitted_at?: string;
+}
+
+export interface ShotVideosOutput {
+  total_shots: number;
+  success_count: number;
+  failed_count: number;
+  skipped_count: number;
+  pending_count?: number;
+  model: string;
+  shots: ShotVideoResult[];
+}
 
 export interface PipelineInput {
   story: string;          // 자유 텍스트 입력
@@ -673,4 +804,42 @@ export interface DialogueTrack {
   scenes: SceneShotDialogue[];
 }
 
+// Render Spec 타입(`RenderPromptsOutput`/`T2IPrompt`/`TI2VPrompt`/`ShotGenerationPrompts`)은
+// 본 파일 상단(50번대 줄)에 정의됨. l5_prompts.ts 참조.
+// 향후 provider-specific 확장(seed/cfg/asset path/IP-Adapter 등)은 그 위에서.
+
+// =====================================================================
+// 통합 결과 (모든 단계 + 최종 샷 시퀀스)
+// =====================================================================
+
+export interface PipelineResult {
+  project_id: string;
+  input: PipelineInput;
+  genre: Genre;
+  narrativeStructure: NarrativeStructure;
+  characters: Characters;
+  scenes: Scenes;
+  storyCheck: StoryCheckReport;
+  visualIdentity: VisualIdentity;        // v0 (format+style)
+  actVisualArc: ActVisualArc;            // v1 (막별 비주얼 아크)
+  characterVisual: CharacterVisual;      // v2 (인물 비주얼)
+  worldVisual: WorldVisual;              // v2 (월드 비주얼)
+  sceneCinematography: SceneCinematography[];   // 씬 단위 비주얼 플랜
+  decoupage: DecoupagePlan;              // 감독 beat→shot 분해 (#8 가시화)
+  shotDesign: ShotDesign[];              // 샷 단위 3분할 (intent + static + dynamic)
+  shotCheck: ShotCheckReport;
+  shotSequence: ShotSequence;
+  renderPrompts: RenderPromptsOutput;  // T2I + TI2V 최종 프롬프트
+  metadata: {
+    started_at: string;
+    completed_at: string;
+    total_duration_ms: number;
+    llm_calls: {
+      gemini: number;
+      claude: number;
+      openai: number;
+      local: number;
+    };
+  };
+}
 

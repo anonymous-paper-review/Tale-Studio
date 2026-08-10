@@ -1,5 +1,5 @@
 // Compact Mode 사후 처리: shotDesign 결과로부터 sceneCinematography (씬 비주얼 플랜) 역추론.
-// v3 스테이지를 건너뛴 Compact Mode 에서도 state.sceneCinematography 를 채워 다운스트림 호환 유지.
+// 호출은 안 했지만 PipelineResult.sceneCinematography 필드를 채우기 위함 (다운스트림 호환).
 import type { SceneCinematography, ShotDesign, Scenes, StoryScene } from '@/lib/writer/types/pipeline';
 
 export function inferSceneCinematographyFromShots(
