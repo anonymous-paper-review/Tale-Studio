@@ -1,0 +1,1047 @@
+==============================================================================
+A. shotSequence (C2 조립 + 분할 + check_notes)
+==============================================================================
+{
+  "project_id": "11111111-2222-4333-8444-555555555555",
+  "total_shots": 4,
+  "total_duration_seconds": 16,
+  "depth_level": "D3",
+  "shots": [
+    {
+      "shot_id": "shot_1",
+      "duration_seconds": 6,
+      "design_ref": "shot_1",
+      "static_spec": {
+        "shot_id": "shot_1",
+        "lens_mm": 35,
+        "shot_type": "WS",
+        "camera_angle": "eye_level",
+        "focal_distance_m": 6,
+        "depth_of_field": "deep",
+        "framing": {
+          "rule": "thirds",
+          "layers": {
+            "foreground": "a toppled crate at the left edge",
+            "midground": "Mira crouched among severed pipes",
+            "background": "the ochre dust sky over the yard"
+          },
+          "focal_point": "the folded blueprints against her chest"
+        },
+        "lighting": {
+          "key_fill_ratio": "4:1",
+          "color_temp_kelvin": 3200,
+          "quality": "hard",
+          "key_direction": "side_left"
+        },
+        "character_blocking": [
+          {
+            "character_id": "mira",
+            "position_in_frame": "left_third",
+            "pose": "crouching, coat pulled shut",
+            "gaze": "down at her own hands",
+            "asset_version": "v1"
+          }
+        ],
+        "prop_placement": [
+          {
+            "prop": "folded blueprints",
+            "position_in_frame": "centre of her chest",
+            "significance": "the archive"
+          },
+          {
+            "prop": "toppled crate",
+            "position_in_frame": "left foreground"
+          }
+        ],
+        "palette_emphasis": [
+          "#c8541f"
+        ],
+        "texture_notes": "dust film on every surface, scuffed metal",
+        "color_grading_intent": "warm sodium key against cold shadow",
+        "first_frame_prompt": "Wide 35mm eye-level shot of a scavenger crouched among severed pipes in a dust yard at dusk, folded blueprints pressed to her chest, hard low sun raking from the left, ochre haze sky behind."
+      },
+      "dynamic_spec": {
+        "shot_id": "shot_1",
+        "camera_motion": {
+          "type": "static",
+          "speed": "slow",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "character_id": "mira",
+            "verb": "tucks the blueprints into her coat",
+            "magnitude": "small"
+          }
+        ],
+        "transition_in": "cut",
+        "transition_out": "cut",
+        "motion_prompt": "She tucks the folded blueprints into her coat, locked-off wide."
+      },
+      "S": {
+        "scene_id": "scene_1",
+        "scene_purpose": "conflict",
+        "emotion_beat": {
+          "start": "wary",
+          "end": "cornered"
+        },
+        "character_action": "미라가 도면을 코트 안에 밀어 넣는다."
+      },
+      "C": {
+        "causal_link": {
+          "from": null,
+          "to": "shot_2"
+        },
+        "info_disclosure": "Establish the yard and what she is hiding"
+      },
+      "V": {
+        "camera": {
+          "type": "WS",
+          "angle": "eye_level",
+          "movement": "static"
+        },
+        "lighting": {
+          "key_fill_ratio": "4:1",
+          "color_temp": "3200K"
+        },
+        "composition": "the folded blueprints against her chest",
+        "mood": "warm sodium key against cold shadow"
+      },
+      "assets": {
+        "characters": [
+          {
+            "id": "mira",
+            "asset_version": "v1",
+            "visible_parts": [
+              "full"
+            ]
+          }
+        ],
+        "locations": [
+          {
+            "id": "dust_yard",
+            "asset_version": "a"
+          }
+        ],
+        "props": [
+          {
+            "id": "folded blueprints",
+            "asset_version": "v1"
+          },
+          {
+            "id": "toppled crate",
+            "asset_version": "v1"
+          }
+        ]
+      },
+      "first_frame_generation": {
+        "base_assets": [
+          "mira",
+          "dust_yard"
+        ],
+        "composition_prompt": "Wide 35mm eye-level shot of a scavenger crouched among severed pipes in a dust yard at dusk, folded blueprints pressed to her chest, hard low sun raking from the left, ochre haze sky behind."
+      },
+      "video_generation": {
+        "motion_prompt": "She tucks the folded blueprints into her coat, locked-off wide."
+      },
+      "action_budget": {
+        "primary_action_count": 1,
+        "secondary_action_count": 0,
+        "camera_movement_complexity": "none",
+        "environmental_changes": 0,
+        "passed_validation": true
+      },
+      "continuity": {
+        "carry_forward_from": null,
+        "consistent_elements": [],
+        "changes": [],
+        "is_scene_transition": true
+      }
+    },
+    {
+      "shot_id": "shot_2",
+      "duration_seconds": 5,
+      "design_ref": "shot_2",
+      "static_spec": {
+        "shot_id": "shot_2",
+        "lens_mm": 85,
+        "shot_type": "MS",
+        "camera_angle": "low",
+        "depth_of_field": "shallow",
+        "framing": {
+          "rule": "center",
+          "layers": {
+            "midground": "the Warden emerging from the dust haze",
+            "background": "blown-out haze and a sodium work lamp"
+          },
+          "focal_point": "the unlit visor"
+        },
+        "lighting": {
+          "key_fill_ratio": "8:1",
+          "color_temp_kelvin": 6500,
+          "quality": "soft",
+          "key_direction": "back"
+        },
+        "character_blocking": [
+          {
+            "character_id": "warden",
+            "position_in_frame": "center",
+            "pose": "walking forward, shoulders square",
+            "gaze": "toward_camera",
+            "asset_version": "v1"
+          }
+        ],
+        "prop_placement": [],
+        "palette_emphasis": [
+          "#2b2f33"
+        ],
+        "texture_notes": "segmented armour plate, haze bloom",
+        "color_grading_intent": "cold backlit silhouette",
+        "first_frame_prompt": "Low-angle 85mm medium shot of a tall armoured figure stepping out of dust haze, unlit visor centred, cold backlight blooming through the haze, shallow focus."
+      },
+      "dynamic_spec": {
+        "shot_id": "shot_2",
+        "camera_motion": {
+          "type": "dolly_in",
+          "direction": "forward",
+          "speed": "slow",
+          "magnitude": "moderate"
+        },
+        "character_motion": [
+          {
+            "character_id": "warden",
+            "verb": "strides out of the haze",
+            "magnitude": "medium"
+          }
+        ],
+        "gaze_arc": [
+          {
+            "character_id": "warden",
+            "from": "off_screen_left",
+            "to": "toward_camera"
+          }
+        ],
+        "environmental_change": [
+          {
+            "type": "dust_thins",
+            "magnitude": "subtle"
+          }
+        ],
+        "transition_in": "cut",
+        "transition_out": "cut",
+        "motion_prompt": "He strides out of the haze as the camera pushes slowly in."
+      },
+      "S": {
+        "scene_id": "scene_1",
+        "scene_purpose": "conflict",
+        "emotion_beat": {
+          "start": "wary",
+          "end": "cornered"
+        },
+        "character_action": "워든이 먼지 속에서 걸어 나온다."
+      },
+      "C": {
+        "causal_link": {
+          "from": "shot_1",
+          "to": "shot_3"
+        },
+        "info_disclosure": "Deliver the threat"
+      },
+      "V": {
+        "camera": {
+          "type": "MS",
+          "angle": "low",
+          "movement": "dolly_in"
+        },
+        "lighting": {
+          "key_fill_ratio": "8:1",
+          "color_temp": "6500K"
+        },
+        "composition": "the unlit visor",
+        "mood": "cold backlit silhouette"
+      },
+      "assets": {
+        "characters": [
+          {
+            "id": "warden",
+            "asset_version": "v1",
+            "visible_parts": [
+              "full"
+            ]
+          }
+        ],
+        "locations": [
+          {
+            "id": "dust_yard",
+            "asset_version": "a"
+          }
+        ],
+        "props": []
+      },
+      "first_frame_generation": {
+        "base_assets": [
+          "warden",
+          "dust_yard"
+        ],
+        "composition_prompt": "Low-angle 85mm medium shot of a tall armoured figure stepping out of dust haze, unlit visor centred, cold backlight blooming through the haze, shallow focus."
+      },
+      "video_generation": {
+        "motion_prompt": "He strides out of the haze as the camera pushes slowly in."
+      },
+      "action_budget": {
+        "primary_action_count": 1,
+        "secondary_action_count": 0,
+        "camera_movement_complexity": "simple",
+        "environmental_changes": 1,
+        "passed_validation": true
+      },
+      "continuity": {
+        "carry_forward_from": null,
+        "consistent_elements": [],
+        "changes": [],
+        "is_scene_transition": false
+      },
+      "check_notes": [
+        {
+          "category": "continuity",
+          "severity": "WARNING",
+          "constraint": "The wall of severed pipes stays visible behind the figure."
+        }
+      ]
+    },
+    {
+      "shot_id": "shot_3",
+      "duration_seconds": 3,
+      "S": {
+        "scene_id": "scene_1",
+        "scene_purpose": "conflict",
+        "emotion_beat": {
+          "start": "wary",
+          "end": "cornered"
+        },
+        "character_action": "Mira backs into the pipe wall."
+      },
+      "video_generation": {
+        "motion_prompt": "She backs into the pipes."
+      },
+      "C": {
+        "causal_link": {
+          "from": "shot_2",
+          "to": "shot_4"
+        },
+        "info_disclosure": "Corner her"
+      },
+      "V": {
+        "camera": {
+          "type": "MFS",
+          "angle": "eye_level",
+          "movement": "handheld_drift"
+        },
+        "lighting": {
+          "key_fill_ratio": "2:1",
+          "color_temp": "4500K"
+        },
+        "composition": "the gap between her back and the pipes",
+        "mood": "flat diffused dusk"
+      },
+      "assets": {
+        "characters": [
+          {
+            "id": "mira",
+            "asset_version": "v1",
+            "visible_parts": [
+              "full"
+            ]
+          },
+          {
+            "id": "warden",
+            "asset_version": "v1",
+            "visible_parts": [
+              "full"
+            ]
+          }
+        ],
+        "locations": [
+          {
+            "id": "dust_yard",
+            "asset_version": "a"
+          }
+        ],
+        "props": [
+          {
+            "id": "pipe wall",
+            "asset_version": "v1"
+          }
+        ]
+      },
+      "first_frame_generation": {
+        "base_assets": [
+          "mira",
+          "warden",
+          "dust_yard"
+        ],
+        "composition_prompt": "Medium-full 50mm eye-level shot on a diagonal: a scavenger backing toward a wall of rusted pipes while an armoured shoulder cuts the right edge of frame, diffused dusk light from upper right."
+      },
+      "continuity": {
+        "carry_forward_from": null,
+        "consistent_elements": [],
+        "changes": [],
+        "is_scene_transition": false
+      },
+      "action_budget": {
+        "primary_action_count": 1,
+        "secondary_action_count": 1,
+        "camera_movement_complexity": "simple",
+        "environmental_changes": 0,
+        "passed_validation": true
+      },
+      "design_ref": "shot_3",
+      "static_spec": {
+        "shot_id": "shot_3",
+        "lens_mm": 50,
+        "shot_type": "MFS",
+        "camera_angle": "eye_level",
+        "depth_of_field": "medium",
+        "framing": {
+          "rule": "diagonal",
+          "layers": {
+            "foreground": "the Warden’s shoulder cutting the right edge",
+            "midground": "Mira retreating",
+            "background": "the pipe wall"
+          },
+          "focal_point": "the gap between her back and the pipes"
+        },
+        "lighting": {
+          "key_fill_ratio": "2:1",
+          "color_temp_kelvin": 4500,
+          "quality": "diffused",
+          "key_direction": "top_right"
+        },
+        "character_blocking": [
+          {
+            "character_id": "mira",
+            "position_in_frame": "left_third",
+            "pose": "backing away, one hand behind her",
+            "gaze": "off_screen_right",
+            "asset_version": "v1"
+          },
+          {
+            "character_id": "warden",
+            "position_in_frame": "frame_edge_right",
+            "pose": "advancing, half out of frame",
+            "gaze": "toward Mira",
+            "asset_version": "v1"
+          }
+        ],
+        "prop_placement": [
+          {
+            "prop": "pipe wall",
+            "position_in_frame": "full background"
+          }
+        ],
+        "palette_emphasis": [
+          "#6b6155"
+        ],
+        "texture_notes": "rusted pipe joints, grit in the air",
+        "color_grading_intent": "flat diffused dusk",
+        "first_frame_prompt": "Medium-full 50mm eye-level shot on a diagonal: a scavenger backing toward a wall of rusted pipes while an armoured shoulder cuts the right edge of frame, diffused dusk light from upper right."
+      },
+      "dynamic_spec": {
+        "shot_id": "shot_3",
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "medium",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "character_id": "mira",
+            "verb": "backs into the pipes",
+            "magnitude": "medium"
+          },
+          {
+            "character_id": "warden",
+            "verb": "advances",
+            "magnitude": "small"
+          }
+        ],
+        "transition_in": "cut",
+        "transition_out": "cut",
+        "motion_prompt": "She backs into the pipes as he advances, handheld breathing."
+      }
+    },
+    {
+      "shot_id": "shot_4",
+      "duration_seconds": 2,
+      "video_generation": {
+        "motion_prompt": "He advances into the frame edge."
+      },
+      "S": {
+        "scene_id": "scene_1",
+        "scene_purpose": "conflict",
+        "emotion_beat": {
+          "start": "wary",
+          "end": "cornered"
+        },
+        "character_action": "He advances into the frame edge."
+      },
+      "C": {
+        "causal_link": {
+          "from": "shot_3",
+          "to": null
+        },
+        "info_disclosure": "Corner her"
+      },
+      "V": {
+        "camera": {
+          "type": "MFS",
+          "angle": "eye_level",
+          "movement": "handheld_drift"
+        },
+        "lighting": {
+          "key_fill_ratio": "2:1",
+          "color_temp": "4500K"
+        },
+        "composition": "the gap between her back and the pipes",
+        "mood": "flat diffused dusk"
+      },
+      "assets": {
+        "characters": [
+          {
+            "id": "mira",
+            "asset_version": "v1",
+            "visible_parts": [
+              "full"
+            ]
+          },
+          {
+            "id": "warden",
+            "asset_version": "v1",
+            "visible_parts": [
+              "full"
+            ]
+          }
+        ],
+        "locations": [
+          {
+            "id": "dust_yard",
+            "asset_version": "a"
+          }
+        ],
+        "props": [
+          {
+            "id": "pipe wall",
+            "asset_version": "v1"
+          }
+        ]
+      },
+      "first_frame_generation": {
+        "base_assets": [
+          "mira",
+          "warden",
+          "dust_yard"
+        ],
+        "composition_prompt": "Medium-full 50mm eye-level shot on a diagonal: a scavenger backing toward a wall of rusted pipes while an armoured shoulder cuts the right edge of frame, diffused dusk light from upper right."
+      },
+      "continuity": {
+        "carry_forward_from": null,
+        "consistent_elements": [],
+        "changes": [],
+        "is_scene_transition": false
+      },
+      "action_budget": {
+        "primary_action_count": 1,
+        "secondary_action_count": 1,
+        "camera_movement_complexity": "simple",
+        "environmental_changes": 0,
+        "passed_validation": true
+      }
+    }
+  ]
+}
+
+==============================================================================
+B. shots insert rows
+==============================================================================
+[
+  {
+    "project_id": "11111111-2222-4333-8444-555555555555",
+    "scene_id": "sc_01",
+    "shot_id": "sh_01_01",
+    "shot_type": "WS",
+    "action_description": "미라가 도면을 코트 안에 밀어 넣는다.",
+    "action_description_native": "미라가 도면을 코트 안에 밀어 넣는다.",
+    "i18n_provenance": {
+      "action_description": "h21"
+    },
+    "characters": [
+      "mira"
+    ],
+    "prompt": "Wide 35mm eye-level shot of a scavenger crouched among severed pipes in a dust yard at dusk, folded blueprints pressed to her chest, hard low sun raking from the left, ochre haze sky behind.",
+    "static_spec": {
+      "shot_id": "shot_1",
+      "lens_mm": 35,
+      "shot_type": "WS",
+      "camera_angle": "eye_level",
+      "focal_distance_m": 6,
+      "depth_of_field": "deep",
+      "framing": {
+        "rule": "thirds",
+        "layers": {
+          "foreground": "a toppled crate at the left edge",
+          "midground": "Mira crouched among severed pipes",
+          "background": "the ochre dust sky over the yard"
+        },
+        "focal_point": "the folded blueprints against her chest"
+      },
+      "lighting": {
+        "key_fill_ratio": "4:1",
+        "color_temp_kelvin": 3200,
+        "quality": "hard",
+        "key_direction": "side_left"
+      },
+      "character_blocking": [
+        {
+          "character_id": "mira",
+          "position_in_frame": "left_third",
+          "pose": "crouching, coat pulled shut",
+          "gaze": "down at her own hands",
+          "asset_version": "v1"
+        }
+      ],
+      "prop_placement": [
+        {
+          "prop": "folded blueprints",
+          "position_in_frame": "centre of her chest",
+          "significance": "the archive"
+        },
+        {
+          "prop": "toppled crate",
+          "position_in_frame": "left foreground"
+        }
+      ],
+      "palette_emphasis": [
+        "#c8541f"
+      ],
+      "texture_notes": "dust film on every surface, scuffed metal",
+      "color_grading_intent": "warm sodium key against cold shadow",
+      "first_frame_prompt": "Wide 35mm eye-level shot of a scavenger crouched among severed pipes in a dust yard at dusk, folded blueprints pressed to her chest, hard low sun raking from the left, ochre haze sky behind."
+    },
+    "dynamic_spec": {
+      "shot_id": "shot_1",
+      "camera_motion": {
+        "type": "static",
+        "speed": "slow",
+        "magnitude": "minimal"
+      },
+      "character_motion": [
+        {
+          "character_id": "mira",
+          "verb": "tucks the blueprints into her coat",
+          "magnitude": "small"
+        }
+      ],
+      "transition_in": "cut",
+      "transition_out": "cut",
+      "motion_prompt": "She tucks the folded blueprints into her coat, locked-off wide."
+    },
+    "prompt_source_hash": "fctv1_8afcdfed_ww",
+    "design_ref": "shot_1",
+    "check_notes": null,
+    "duration_seconds": 6,
+    "generation_method": "I2V",
+    "dialogue_lines": [],
+    "camera_config": {
+      "horizontal": 0,
+      "vertical": 0,
+      "pan": 0,
+      "tilt": 0,
+      "roll": 0,
+      "zoom": 0
+    },
+    "lighting_config": {
+      "position": "front",
+      "brightness": 50,
+      "colorTemp": 5000
+    },
+    "sort_order": 0
+  },
+  {
+    "project_id": "11111111-2222-4333-8444-555555555555",
+    "scene_id": "sc_01",
+    "shot_id": "sh_01_02",
+    "shot_type": "MS",
+    "action_description": "워든이 먼지 속에서 걸어 나온다.",
+    "action_description_native": "워든이 먼지 속에서 걸어 나온다.",
+    "i18n_provenance": {
+      "action_description": "h18"
+    },
+    "characters": [
+      "warden"
+    ],
+    "prompt": "Low-angle 85mm medium shot of a tall armoured figure stepping out of dust haze, unlit visor centred, cold backlight blooming through the haze, shallow focus.",
+    "static_spec": {
+      "shot_id": "shot_2",
+      "lens_mm": 85,
+      "shot_type": "MS",
+      "camera_angle": "low",
+      "depth_of_field": "shallow",
+      "framing": {
+        "rule": "center",
+        "layers": {
+          "midground": "the Warden emerging from the dust haze",
+          "background": "blown-out haze and a sodium work lamp"
+        },
+        "focal_point": "the unlit visor"
+      },
+      "lighting": {
+        "key_fill_ratio": "8:1",
+        "color_temp_kelvin": 6500,
+        "quality": "soft",
+        "key_direction": "back"
+      },
+      "character_blocking": [
+        {
+          "character_id": "warden",
+          "position_in_frame": "center",
+          "pose": "walking forward, shoulders square",
+          "gaze": "toward_camera",
+          "asset_version": "v1"
+        }
+      ],
+      "prop_placement": [],
+      "palette_emphasis": [
+        "#2b2f33"
+      ],
+      "texture_notes": "segmented armour plate, haze bloom",
+      "color_grading_intent": "cold backlit silhouette",
+      "first_frame_prompt": "Low-angle 85mm medium shot of a tall armoured figure stepping out of dust haze, unlit visor centred, cold backlight blooming through the haze, shallow focus."
+    },
+    "dynamic_spec": {
+      "shot_id": "shot_2",
+      "camera_motion": {
+        "type": "dolly_in",
+        "direction": "forward",
+        "speed": "slow",
+        "magnitude": "moderate"
+      },
+      "character_motion": [
+        {
+          "character_id": "warden",
+          "verb": "strides out of the haze",
+          "magnitude": "medium"
+        }
+      ],
+      "gaze_arc": [
+        {
+          "character_id": "warden",
+          "from": "off_screen_left",
+          "to": "toward_camera"
+        }
+      ],
+      "environmental_change": [
+        {
+          "type": "dust_thins",
+          "magnitude": "subtle"
+        }
+      ],
+      "transition_in": "cut",
+      "transition_out": "cut",
+      "motion_prompt": "He strides out of the haze as the camera pushes slowly in."
+    },
+    "prompt_source_hash": "fctv1_f5314c1d_ob",
+    "design_ref": "shot_2",
+    "check_notes": [
+      {
+        "category": "continuity",
+        "severity": "WARNING",
+        "constraint": "The wall of severed pipes stays visible behind the figure."
+      }
+    ],
+    "duration_seconds": 5,
+    "generation_method": "I2V",
+    "dialogue_lines": [],
+    "camera_config": {
+      "horizontal": 0,
+      "vertical": 0,
+      "pan": 0,
+      "tilt": 0,
+      "roll": 0,
+      "zoom": 0
+    },
+    "lighting_config": {
+      "position": "front",
+      "brightness": 50,
+      "colorTemp": 5000
+    },
+    "sort_order": 1
+  },
+  {
+    "project_id": "11111111-2222-4333-8444-555555555555",
+    "scene_id": "sc_01",
+    "shot_id": "sh_01_03",
+    "shot_type": "MFS",
+    "action_description": "Mira backs into the pipe wall.",
+    "action_description_native": "Mira backs into the pipe wall.",
+    "i18n_provenance": {
+      "action_description": "h30"
+    },
+    "characters": [
+      "mira",
+      "warden"
+    ],
+    "prompt": "Medium-full 50mm eye-level shot on a diagonal: a scavenger backing toward a wall of rusted pipes while an armoured shoulder cuts the right edge of frame, diffused dusk light from upper right.",
+    "static_spec": {
+      "shot_id": "shot_3",
+      "lens_mm": 50,
+      "shot_type": "MFS",
+      "camera_angle": "eye_level",
+      "depth_of_field": "medium",
+      "framing": {
+        "rule": "diagonal",
+        "layers": {
+          "foreground": "the Warden’s shoulder cutting the right edge",
+          "midground": "Mira retreating",
+          "background": "the pipe wall"
+        },
+        "focal_point": "the gap between her back and the pipes"
+      },
+      "lighting": {
+        "key_fill_ratio": "2:1",
+        "color_temp_kelvin": 4500,
+        "quality": "diffused",
+        "key_direction": "top_right"
+      },
+      "character_blocking": [
+        {
+          "character_id": "mira",
+          "position_in_frame": "left_third",
+          "pose": "backing away, one hand behind her",
+          "gaze": "off_screen_right",
+          "asset_version": "v1"
+        },
+        {
+          "character_id": "warden",
+          "position_in_frame": "frame_edge_right",
+          "pose": "advancing, half out of frame",
+          "gaze": "toward Mira",
+          "asset_version": "v1"
+        }
+      ],
+      "prop_placement": [
+        {
+          "prop": "pipe wall",
+          "position_in_frame": "full background"
+        }
+      ],
+      "palette_emphasis": [
+        "#6b6155"
+      ],
+      "texture_notes": "rusted pipe joints, grit in the air",
+      "color_grading_intent": "flat diffused dusk",
+      "first_frame_prompt": "Medium-full 50mm eye-level shot on a diagonal: a scavenger backing toward a wall of rusted pipes while an armoured shoulder cuts the right edge of frame, diffused dusk light from upper right."
+    },
+    "dynamic_spec": {
+      "shot_id": "shot_3",
+      "camera_motion": {
+        "type": "handheld_drift",
+        "speed": "medium",
+        "magnitude": "minimal"
+      },
+      "character_motion": [
+        {
+          "character_id": "mira",
+          "verb": "backs into the pipes",
+          "magnitude": "medium"
+        },
+        {
+          "character_id": "warden",
+          "verb": "advances",
+          "magnitude": "small"
+        }
+      ],
+      "transition_in": "cut",
+      "transition_out": "cut",
+      "motion_prompt": "She backs into the pipes as he advances, handheld breathing."
+    },
+    "prompt_source_hash": "fctv1_4a7b95b3_we",
+    "design_ref": "shot_3",
+    "check_notes": null,
+    "duration_seconds": 4,
+    "generation_method": "I2V",
+    "dialogue_lines": [],
+    "camera_config": {
+      "horizontal": 0,
+      "vertical": 0,
+      "pan": 0,
+      "tilt": 0,
+      "roll": 0,
+      "zoom": 0
+    },
+    "lighting_config": {
+      "position": "front",
+      "brightness": 50,
+      "colorTemp": 5000
+    },
+    "sort_order": 2
+  },
+  {
+    "project_id": "11111111-2222-4333-8444-555555555555",
+    "scene_id": "sc_01",
+    "shot_id": "sh_01_04",
+    "shot_type": "MFS",
+    "action_description": "He advances into the frame edge.",
+    "action_description_native": "He advances into the frame edge.",
+    "i18n_provenance": {
+      "action_description": "h32"
+    },
+    "characters": [
+      "mira",
+      "warden"
+    ],
+    "prompt": "Medium-full 50mm eye-level shot on a diagonal: a scavenger backing toward a wall of rusted pipes while an armoured shoulder cuts the right edge of frame, diffused dusk light from upper right.",
+    "static_spec": null,
+    "dynamic_spec": null,
+    "prompt_source_hash": null,
+    "design_ref": null,
+    "check_notes": null,
+    "duration_seconds": 4,
+    "generation_method": "I2V",
+    "dialogue_lines": [],
+    "camera_config": {
+      "horizontal": 0,
+      "vertical": 0,
+      "pan": 0,
+      "tilt": 0,
+      "roll": 0,
+      "zoom": 0
+    },
+    "lighting_config": {
+      "position": "front",
+      "brightness": 50,
+      "colorTemp": 5000
+    },
+    "sort_order": 3
+  }
+]
+
+==============================================================================
+C. 러프 그리드 프롬프트 (grid4)
+==============================================================================
+The reference image is a paper storyboard sheet with 12 empty panels in a 4-column × 3-row grid. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels, never across panel borders.
+
+Each COLUMN is one shot of a film, read top to bottom as three frames:
+- Row 1 (top) = START: the composition at the beginning of the shot.
+- Row 2 (middle) = DIRECTION: an EXACT identical copy of Row 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Row 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Row 1 and Row 2 is the arrows and labels drawn on top. Row 2 is the ONLY place where text is allowed.
+- Row 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Row 3 is the only frame where the motion has visibly progressed — and when a shot has movement, its END must differ clearly and unmistakably from its START (full extent of the motion over the shot's stated duration), never a barely-changed copy.
+
+Global style for every panel: loose rough monochrome pencil previz sketch, strictly black-and-white grayscale, quick gestural lines, light gray shading, ample white space, unfinished rough-board feel. Draw the entire sheet in the exact same hand — same line weight, same hatching and shading technique in every panel, as if one artist drew everything in one sitting.
+
+Every human figure — in every panel, every column, every frame — is the same classic wooden artist's drawing mannequin: a ball-jointed wooden pose doll with segmented limbs, visible sphere joints, mitten-like hands without fingers, and a completely smooth egg-shaped wooden head. The head is entirely blank — absolutely no face, no eyes, no nose, no mouth, no hair, no expression. No clothing. All figures are this one identical wooden mannequin; only pose, position and scale differ. Where a figure is looking is shown ONLY by the direction its blank head points. Props and objects as simple lines and geometric shapes. No color anywhere.
+
+Column 1:
+- START: wide shot, eye-level angle, 35mm, rule of thirds. figure 1 at left third, crouching, coat pulled shut, blank head facing down at her own hands. fg: a toppled crate at the left edge / mg: Mira crouched among severed pipes / bg: the dust sky over the yard. moment: She tucks the folded blueprints into her coat, locked-off wide.. the numbered figure(s) above and any people described in the fg/mg/bg layers are the SAME subjects — draw each subject only once (no plain duplicate mannequin alongside them); anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them. focal point: the folded blueprints against her chest. lighting and focus (draw these into the sketch): lit from side left — shade figures and ground with directional pencil hatching, cast shadows toward the right, crisp hard-edged shadow edges; draw the folded blueprints against her chest with the densest, sharpest line detail as the focal point; keep foreground to background evenly detailed (deep focus).
+- MOVEMENT to annotate with arrows in the DIRECTION frame: over this shot's full 6-second duration: figure 1: tucks the blueprints into her coat (small). In addition to the motion arrows, letter these small handwritten technical labels in the DIRECTION frame's margins: "KEY: side left, hard", "WS 35mm eye-level angle deep focus", "FOCUS: the folded blueprints against her chest", "WARM 3200K".
+- END: the same shot after the full 6 seconds of the movement completes — figure 1: tucks the blueprints into her coat (small) has fully finished. END must be clearly and visibly different from START: show how far 6 seconds of this movement actually carries the figures and camera (changed poses, positions and framing), not a subtle variation. Same lighting and focus (draw these into the sketch): lit from side left — shade figures and ground with directional pencil hatching, cast shadows toward the right, crisp hard-edged shadow edges; draw the folded blueprints against her chest with the densest, sharpest line detail as the focal point; keep foreground to background evenly detailed (deep focus).
+
+Column 2:
+- START: medium shot, low angle (camera looking up), 85mm, centered composition. figure 1 at center, walking forward, shoulders square, blank head facing toward camera. mg: the Warden emerging from the dust haze / bg: blown-out haze and a sodium work lamp. moment: He strides out of the haze as the camera pushes slowly in.. the numbered figure(s) above and any people described in the fg/mg/bg layers are the SAME subjects — draw each subject only once (no plain duplicate mannequin alongside them); anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them. focal point: the unlit visor. lighting and focus (draw these into the sketch): lit from back — shade figures and ground with directional pencil hatching, cast shadows toward forward, soft feathered shadow edges; draw the unlit visor with the densest, sharpest line detail as the focal point; keep the background loosely and vaguely indicated (shallow focus).
+- MOVEMENT to annotate with arrows in the DIRECTION frame: over this shot's full 5-second duration: camera dolly in forward, slow; figure 1: strides out of the haze (medium); blank head turns off screen left → toward camera. In addition to the motion arrows, letter these small handwritten technical labels in the DIRECTION frame's margins: "KEY: back, soft", "MS 85mm low angle (camera looking up) shallow focus", "FOCUS: the unlit visor", "COOL 6500K".
+- END: the same shot after the full 5 seconds of the movement completes — camera dolly in forward, slow; figure 1: strides out of the haze (medium); blank head turns off screen left → toward camera has fully finished. END must be clearly and visibly different from START: show how far 5 seconds of this movement actually carries the figures and camera (changed poses, positions and framing), not a subtle variation. Same lighting and focus (draw these into the sketch): lit from back — shade figures and ground with directional pencil hatching, cast shadows toward forward, soft feathered shadow edges; draw the unlit visor with the densest, sharpest line detail as the focal point; keep the background loosely and vaguely indicated (shallow focus).
+
+Column 3:
+- START: medium full shot, eye-level angle, 50mm, diagonal composition. figure 1 at left third, backing away, one hand behind her, blank head facing off screen right; figure 2 at frame edge right, advancing, half out of frame, blank head facing toward Mira. fg: the Warden’s shoulder cutting the right edge / mg: Mira retreating / bg: the pipe wall. moment: She backs into the pipes as he advances, handheld breathing.. the numbered figure(s) above and any people described in the fg/mg/bg layers are the SAME subjects — draw each subject only once (no plain duplicate mannequin alongside them); anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them. focal point: the gap between her back and the pipes. lighting and focus (draw these into the sketch): lit from top right — shade figures and ground with directional pencil hatching, cast shadows toward the lower-left, soft feathered shadow edges; draw the gap between her back and the pipes with the densest, sharpest line detail as the focal point.
+- MOVEMENT to annotate with arrows in the DIRECTION frame: over this shot's full 5-second duration: camera handheld drift, medium; figure 1: backs into the pipes (medium); figure 2: advances (small). In addition to the motion arrows, letter these small handwritten technical labels in the DIRECTION frame's margins: "KEY: top right, diffused", "MFS 50mm eye-level angle medium focus", "FOCUS: the gap between her back and the pipes", "NEUTRAL 4500K".
+- END: the same shot after the full 5 seconds of the movement completes — camera handheld drift, medium; figure 1: backs into the pipes (medium); figure 2: advances (small) has fully finished. END must be clearly and visibly different from START: show how far 5 seconds of this movement actually carries the figures and camera (changed poses, positions and framing), not a subtle variation. Same lighting and focus (draw these into the sketch): lit from top right — shade figures and ground with directional pencil hatching, cast shadows toward the lower-left, soft feathered shadow edges; draw the gap between her back and the pipes with the densest, sharpest line detail as the focal point.
+
+Columns 4–4 have no shot: leave those panels completely empty blank paper.
+
+Within each column, the three frames depict the SAME camera setup, location, figures and props — continuity between START, DIRECTION and END must be obvious. START and DIRECTION are the same frozen instant (annotations are the only difference); motion progresses ONLY in END. Different columns are different shots and may differ. No text, captions or labels anywhere except the DIRECTION row's annotations (motion arrow labels and the small handwritten technical margin labels requested per column).
+
+==============================================================================
+C2. 러프 셀 원본 (grid4 입력)
+==============================================================================
+[
+  {
+    "shotId": "shot_1",
+    "start": "wide shot, eye-level angle, 35mm, rule of thirds. figure 1 at left third, crouching, coat pulled shut, blank head facing down at her own hands. fg: a toppled crate at the left edge / mg: Mira crouched among severed pipes / bg: the dust sky over the yard. moment: She tucks the folded blueprints into her coat, locked-off wide.. the numbered figure(s) above and any people described in the fg/mg/bg layers are the SAME subjects — draw each subject only once (no plain duplicate mannequin alongside them); anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them. focal point: the folded blueprints against her chest. lighting and focus (draw these into the sketch): lit from side left — shade figures and ground with directional pencil hatching, cast shadows toward the right, crisp hard-edged shadow edges; draw the folded blueprints against her chest with the densest, sharpest line detail as the focal point; keep foreground to background evenly detailed (deep focus)",
+    "motion": "over this shot's full 6-second duration: figure 1: tucks the blueprints into her coat (small). In addition to the motion arrows, letter these small handwritten technical labels in the DIRECTION frame's margins: \"KEY: side left, hard\", \"WS 35mm eye-level angle deep focus\", \"FOCUS: the folded blueprints against her chest\", \"WARM 3200K\"",
+    "end": "the same shot after the full 6 seconds of the movement completes — figure 1: tucks the blueprints into her coat (small) has fully finished. END must be clearly and visibly different from START: show how far 6 seconds of this movement actually carries the figures and camera (changed poses, positions and framing), not a subtle variation. Same lighting and focus (draw these into the sketch): lit from side left — shade figures and ground with directional pencil hatching, cast shadows toward the right, crisp hard-edged shadow edges; draw the folded blueprints against her chest with the densest, sharpest line detail as the focal point; keep foreground to background evenly detailed (deep focus)"
+  },
+  {
+    "shotId": "shot_2",
+    "start": "medium shot, low angle (camera looking up), 85mm, centered composition. figure 1 at center, walking forward, shoulders square, blank head facing toward camera. mg: the Warden emerging from the dust haze / bg: blown-out haze and a sodium work lamp. moment: He strides out of the haze as the camera pushes slowly in.. the numbered figure(s) above and any people described in the fg/mg/bg layers are the SAME subjects — draw each subject only once (no plain duplicate mannequin alongside them); anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them. focal point: the unlit visor. lighting and focus (draw these into the sketch): lit from back — shade figures and ground with directional pencil hatching, cast shadows toward forward, soft feathered shadow edges; draw the unlit visor with the densest, sharpest line detail as the focal point; keep the background loosely and vaguely indicated (shallow focus)",
+    "motion": "over this shot's full 5-second duration: camera dolly in forward, slow; figure 1: strides out of the haze (medium); blank head turns off screen left → toward camera. In addition to the motion arrows, letter these small handwritten technical labels in the DIRECTION frame's margins: \"KEY: back, soft\", \"MS 85mm low angle (camera looking up) shallow focus\", \"FOCUS: the unlit visor\", \"COOL 6500K\"",
+    "end": "the same shot after the full 5 seconds of the movement completes — camera dolly in forward, slow; figure 1: strides out of the haze (medium); blank head turns off screen left → toward camera has fully finished. END must be clearly and visibly different from START: show how far 5 seconds of this movement actually carries the figures and camera (changed poses, positions and framing), not a subtle variation. Same lighting and focus (draw these into the sketch): lit from back — shade figures and ground with directional pencil hatching, cast shadows toward forward, soft feathered shadow edges; draw the unlit visor with the densest, sharpest line detail as the focal point; keep the background loosely and vaguely indicated (shallow focus)"
+  },
+  {
+    "shotId": "shot_3",
+    "start": "medium full shot, eye-level angle, 50mm, diagonal composition. figure 1 at left third, backing away, one hand behind her, blank head facing off screen right; figure 2 at frame edge right, advancing, half out of frame, blank head facing toward Mira. fg: the Warden’s shoulder cutting the right edge / mg: Mira retreating / bg: the pipe wall. moment: She backs into the pipes as he advances, handheld breathing.. the numbered figure(s) above and any people described in the fg/mg/bg layers are the SAME subjects — draw each subject only once (no plain duplicate mannequin alongside them); anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them. focal point: the gap between her back and the pipes. lighting and focus (draw these into the sketch): lit from top right — shade figures and ground with directional pencil hatching, cast shadows toward the lower-left, soft feathered shadow edges; draw the gap between her back and the pipes with the densest, sharpest line detail as the focal point",
+    "motion": "over this shot's full 5-second duration: camera handheld drift, medium; figure 1: backs into the pipes (medium); figure 2: advances (small). In addition to the motion arrows, letter these small handwritten technical labels in the DIRECTION frame's margins: \"KEY: top right, diffused\", \"MFS 50mm eye-level angle medium focus\", \"FOCUS: the gap between her back and the pipes\", \"NEUTRAL 4500K\"",
+    "end": "the same shot after the full 5 seconds of the movement completes — camera handheld drift, medium; figure 1: backs into the pipes (medium); figure 2: advances (small) has fully finished. END must be clearly and visibly different from START: show how far 5 seconds of this movement actually carries the figures and camera (changed poses, positions and framing), not a subtle variation. Same lighting and focus (draw these into the sketch): lit from top right — shade figures and ground with directional pencil hatching, cast shadows toward the lower-left, soft feathered shadow edges; draw the gap between her back and the pipes with the densest, sharpest line detail as the focal point"
+  }
+]
+
+==============================================================================
+D. 실사 그리드 리페인트 프롬프트
+==============================================================================
+The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins. Only the first 3 column(s) contain shots — keep the remaining column(s) as empty blank panels.
+
+Repaint this exact sheet as finished, final-quality film frames:
+- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.
+- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.
+- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit, consistent across all panels.
+- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.
+- No text anywhere except row 2's arrow labels.
+
+==============================================================================
+D2. 실사 스트립 리페인트 프롬프트
+==============================================================================
+The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.
+
+Repaint this exact strip as finished photorealistic live-action cinematic film frames:
+- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.
+- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.
+- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.
+- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.
+- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.
+- Replace every wooden mannequin with the corresponding character(s) from the remaining reference images (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.
+- Shot description: Wide 35mm eye-level shot of a scavenger crouched among severed pipes in a dust yard at dusk, folded blueprints pressed to her chest, hard low sun raking from the left, ochre haze sky behind.
+- No text anywhere except the middle panel's arrow labels.
+
+==============================================================================
+E. 영상 프롬프트 (정지 계약)
+==============================================================================
+Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: subject 1: "tucks the blueprints into her coat" — a small, restrained movement. Pace the motion across the full 6-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. Wide 35mm eye-level shot of a scavenger crouched among severed pipes in a dust yard at dusk, folded blueprints pressed to her chest, hard low sun raking from the left, ochre haze sky behind. The first reference image is the shot's START frame and the last reference image is its END frame — hold this same composition throughout: no camera travel between them, only the contracted subject motion.
+
+==============================================================================
+E2. 영상 프롬프트 (이동 계약)
+==============================================================================
+Motion contract: Camera: dollies in slow — the framing grows steadily tighter on the subject. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: "strides out of the haze" — a clear movement that completes; gaze turns from off screen left to toward camera; environment: dust thins (subtle). Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. Low-angle 85mm medium shot of a tall armoured figure stepping out of dust haze, unlit visor centred, cold backlight blooming through the haze, shallow focus. The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.
+
+==============================================================================
+F. export writer/shots.md
+==============================================================================
+# Writer Shots
+
+| Shot | Scene | Intent | Static Spec | Dynamic Spec |
+| --- | --- | --- | --- | --- |
+| shot\_1 | scene\_1 | Purpose: Establish the yard and what she is hiding / Focus: the folded blueprints against her chest / Position: opening / Duration: 6초 | Type: WS / Angle: eye\_level / Lens: 35mm / Focal: the folded blueprints against her chest / First frame: Wide 35mm eye-level shot of a scavenger crouched among severed pipes in a dust yard at dusk, folded blueprints pressed to her chest, hard low sun raking from the left, ochre haze sky behind. | Camera: static / slow / minimal / Character: mira: tucks the blueprints into her coat / Motion prompt: She tucks the folded blueprints into her coat, locked-off wide. |
+| shot\_2 | scene\_1 | Purpose: Deliver the threat / Focus: the unlit visor emerging from the haze / Position: developing / Duration: 5초 | Type: MS / Angle: low / Lens: 85mm / Focal: the unlit visor / First frame: Low-angle 85mm medium shot of a tall armoured figure stepping out of dust haze, unlit visor centred, cold backlight blooming through the haze, shallow focus. | Camera: dolly\_in / forward / slow / moderate / Character: warden: strides out of the haze / Motion prompt: He strides out of the haze as the camera pushes slowly in. |
+| shot\_3 | scene\_1 | Purpose: Corner her / Focus: the shrinking gap between her back and the pipes / Position: climax / Duration: 5초 | Type: MFS / Angle: eye\_level / Lens: 50mm / Focal: the gap between her back and the pipes / First frame: Medium-full 50mm eye-level shot on a diagonal: a scavenger backing toward a wall of rusted pipes while an armoured shoulder cuts the right edge of frame, diffused dusk light from upper right. | Camera: handheld\_drift / medium / minimal / Character: mira: backs into the pipes; warden: advances / Motion prompt: She backs into the pipes as he advances, handheld breathing. |
+
+
+
+==============================================================================
+F. export writer/prompts.md
+==============================================================================
+# Writer Render Prompts
+
+| Shot | Scene | T2I Prompt (EN) | TI2V Motion Prompt (EN) | Duration |
+| --- | --- | --- | --- | --- |
+| shot\_1 | scene\_1 | Wide 35mm eye-level shot of a scavenger crouched among severed pipes in a dust yard at dusk, folded blueprints pressed to her chest, hard low sun raking from the left, ochre haze sky behind. | She tucks the folded blueprints into her coat, locked-off wide. | 6초 |
+| shot\_2 | scene\_1 | Low-angle 85mm medium shot of a tall armoured figure stepping out of dust haze, unlit visor centred, cold backlight blooming through the haze, shallow focus. | He strides out of the haze as the camera pushes slowly in. | 5초 |
+| shot\_3 | scene\_1 | Medium-full 50mm eye-level shot on a diagonal: a scavenger backing toward a wall of rusted pipes while an armoured shoulder cuts the right edge of frame, diffused dusk light from upper right. | She backs into the pipes. | 3초 |
+| shot\_4 | scene\_1 | Medium-full 50mm eye-level shot on a diagonal: a scavenger backing toward a wall of rusted pipes while an armoured shoulder cuts the right edge of frame, diffused dusk light from upper right. | He advances into the frame edge. | 2초 |
+
+

@@ -21,10 +21,6 @@ const STAGE_LABELS: Record<string, string> = {
   shotDesign: '샷을 설계하는 중…',
   shotCheck: '샷을 한 컷씩 검수하는 중…',
   shotSequence: '샷 순서를 엮는 중…',
-  renderPrompts: '프롬프트를 빚는 중…',
-  assets: '소품을 챙기는 중…',
-  shotImages: '한 컷씩 그려내는 중…',
-  shotVideos: '카메라를 돌리는 중…',
   persistAssets: '캐릭터·배경을 정리하는 중…',
   persistShots: '콘티를 정리하는 중…',
 }

@@ -82,7 +82,7 @@ describe('assembleShotsFromDesigns (C2 결정론 조립)', () => {
     expect(shots.map((s) => s.S.scene_id)).toEqual(['scene_1', 'scene_1', 'scene_2', 'scene_2'])
   })
 
-  it('렌더 프롬프트(first_frame/motion)를 L4에서 그대로 확보한다 — v5_prompts가 최우선 소비', () => {
+  it('렌더 프롬프트(first_frame/motion)를 L4에서 그대로 확보한다 — persist·export 의 소스', () => {
     const d = design('shot_9', 'scene_2', {
       firstFrame: 'DETERMINISTIC first frame prompt long enough',
       motion: 'DET motion',

@@ -5,8 +5,8 @@
 //   → Vercel(process.env.VERCEL)에선 FS 쓰기를 아예 시도하지 않고 조용히 no-op 한다
 //     (진행/상태는 writer_runs DB 가 추적하므로 파일 로그는 불필요 + 경고 스팸 방지).
 //   → 로컬/self-host 는 정상적으로 파일을 쓴다. 예기치 못한 실패 시 한 번만 경고.
-//   이로써 (1) 로컬 runPipeline 이 그대로 동작하고 (2) serverless step 경로에서 stage runner
-//   내부의 logger 호출(markStage 등)이 파이프라인을 죽이지 않으며 (3) 로그가 시끄럽지 않다.
+//   이로써 (1) step 경로에서 stage runner 내부의 logger 호출(markStage 등)이 파이프라인을
+//   죽이지 않고 (2) 로그가 시끄럽지 않다. 프로덕션 진단의 진실원은 writer_runs(error_detail).
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { flushRawCalls, type LlmProvider } from '@/lib/writer/llm/raw_collector';

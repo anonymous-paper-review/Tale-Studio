@@ -1,12 +1,11 @@
-// Stepwise 파이프라인 엔진 (서버리스 웹훅 체이닝).
-//
-// pipeline/index.ts 의 _runPipelineInner 데이터 흐름을 그대로 미러링하되,
+// Stepwise 파이프라인 엔진 (서버리스 웹훅 체이닝) — writer 의 유일한 실행 경로.
 //   - 입력을 state(jsonb) 객체에서 읽고
 //   - 한 step 당 한 stage(시간 예산 내면 빠른 stage 몇 개)만 실행
 //   - 매 stage 후 state 를 writer_runs 에 체크포인트
-// 한다. 각 step 은 별도 서버리스 인스턴스라 메모리/파일이 공유되지 않으므로 state 가 유일한 캐리어.
+// 각 step 은 별도 서버리스 인스턴스라 메모리/파일이 공유되지 않으므로 state 가 유일한 캐리어.
 //
-// runPipeline(로컬, 파일 캐시 resume)과 별개 경로 — 그쪽 로직은 건드리지 않는다.
+// (#writer-overhaul 2026-08-10) 옛 로컬 일괄 실행기(runPipeline)를 미러링하던 관계는 끝났다 —
+//   그쪽이 삭제돼 여기가 원본이다. 스텝 목록의 순서·has 판정이 파이프라인 정의의 진실원.
 import { PipelineLogger } from '@/lib/writer/logger';
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure';
 import { runScenes, mergeOpenCast, mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
@@ -19,7 +18,6 @@ import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_pl
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
 import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
-import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
 import { runDialogue, toDialogueTrack, type DialogueProgress } from '@/lib/writer/pipeline/stages/dialogue';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
@@ -57,7 +55,6 @@ import type {
   DecoupagePlan,
   ShotSequence,
   ShotCheckReport,
-  RenderPromptsOutput,
   DialogueTrack,
 } from '@/lib/writer/types/pipeline';
 
@@ -95,7 +92,6 @@ export interface WriterRunState extends WriterRunStateBase {
   shotDesignPartial?: { doneSceneIds: string[]; shots: ShotDesign[] };
   shotSequence?: ShotSequence;
   shotCheck?: ShotCheckReport;
-  renderPrompts?: RenderPromptsOutput;
 
   // 샷 단위 대사 트랙(#dialogue-v4 2026-07-23) — persistShots가 shots.dialogue_lines로 매핑.
   dialogue?: DialogueTrack;
@@ -377,22 +373,6 @@ export const WRITER_STEPS: WriterStep[] = [
       );
       await logger.flushRawLlm('shotCheck');
       return { shotSequence: result.shotSequence, shotCheck: result.report };
-    },
-  },
-  {
-    key: 'renderPrompts',
-    has: (s) => s.renderPrompts !== undefined,
-    run: async (s, { logger, projectId }) => {
-      const models = resolveModels(s.input);
-      const renderPrompts = await runRenderPrompts(
-        s.shotSequence!,
-        s.visualIdentity!, // v0 (format) — 옛 renderFormat
-        s.worldVisual!,    // v2 (palette/color_meaning) — 옛 productionDesign
-        logger,
-        models.V,
-      );
-      await logger.flushRawLlm('renderPrompts');
-      return { renderPrompts };
     },
   },
   {
