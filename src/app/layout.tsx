@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import localFont from 'next/font/local'
+import { Analytics } from '@vercel/analytics/next'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
@@ -39,6 +40,10 @@ export default function RootLayout({
       >
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster />
+        {/* Vercel Web Analytics — 페이지뷰만. Hobby 플랜은 커스텀 이벤트 미지원이라
+            "뭘 눌렀나"는 여기서 안 나온다(Pro 승급 또는 별도 도구 필요).
+            대시보드에서 Analytics 를 Enable 해야 수집이 시작된다. */}
+        <Analytics />
       </body>
     </html>
   )

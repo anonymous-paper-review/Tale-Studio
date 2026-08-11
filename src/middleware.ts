@@ -128,6 +128,9 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // 정적 이미지 에셋은 미들웨어 자체를 건너뛴다 (public/ 은 공개 + getUser 왕복 절약).
-    '/((?!_next/static|_next/image|favicon.ico|auth/callback|api/|.*\\.(?:png|jpg|jpeg|gif|svg|webp|avif|ico)$).*)',
+    // `_vercel/` 도 제외: Web Analytics 수집 경로(/_vercel/insights/*)가 여기 산다. 미들웨어를
+    //   타면 비로그인 방문자의 비콘이 isPublicPath 에 안 걸려 /login 으로 리다이렉트되고,
+    //   하필 랜딩(익명) 트래픽이 통째로 유실된다. 플랫폼 경로라 인증 판정 대상도 아니다.
+    '/((?!_next/static|_next/image|_vercel/|favicon.ico|auth/callback|api/|.*\\.(?:png|jpg|jpeg|gif|svg|webp|avif|ico)$).*)',
   ],
 }
