@@ -199,6 +199,21 @@ async function runLaneVisual(
 
   let shotSequence = s.shotSequence;
   if (shotSequence === undefined || s.shotCheck === undefined) {
+    // 착수 게이트(#shotcheck-gate 2026-08-11). shotCheck 는 시간 예산을 모르는 단일 콜이다
+    //   (실측 87~154s, 관측 최대 278s — 씬 단위 분할은 이미 기각돼 쪼갤 수도 없다).
+    //   남은 예산으로 못 끝낼 것 같으면 **착수하지 않고** 방금 만든 shotDesign 을 저장한 뒤 양보한다.
+    //   고치는 사고: shotDesign 이 예산 끝에 완주 → 게이트 없이 shotCheck 착수 → 함수 수명(300s)에
+    //   잘림 → patch 가 로컬 변수인 채 통째로 소실 → 다음 인보케이션이 마지막 체크포인트부터 같은
+    //   유료 호출을 반복. shotDesign 은 c8 실측 134s(15씬)이고 긴 프로젝트에선 더 크다.
+    //   상수는 보수적으로 — 헛되이 양보하는 비용은 step 왕복 1회(수 초)뿐이고, 잘못 착수하는 비용은
+    //   수백 초의 유료 호출이다. 양보하면 다음 인보케이션이 예산 전체를 쥐고 shotCheck 를 시작한다.
+    const EST_SHOTCHECK_MS = 160_000;
+    if (deadlineMs != null && Date.now() + EST_SHOTCHECK_MS > deadlineMs) {
+      console.log(
+        `[writer] shotCheck 착수 보류 — 남은 예산 ${Math.round((deadlineMs - Date.now()) / 1000)}s < 예상 ${EST_SHOTCHECK_MS / 1000}s. shotDesign 체크포인트 후 다음 step 으로.`,
+      );
+      return patch;
+    }
     const result = await runShotCheck(
       projectId,
       s.genre!,
@@ -497,8 +512,23 @@ export const WRITER_STEPS: WriterStep[] = [
         const dialogue = await runLaneDialogue(s, ctx);
         return { ...visual, ...dialogue };
       }
-      const [visual, dialogue] = await Promise.all([runLaneVisual(s, ctx), runLaneDialogue(s, ctx)]);
-      return { ...visual, ...dialogue };
+      // allSettled(#lane-independent 2026-08-11): 한 레인이 실패해도 반대 레인의 완료분을 버리지 않는다.
+      //   Promise.all 은 한쪽이 reject 하는 순간 이미 끝나 있던 반대 레인 산출물까지 통째로 잃고 run 을
+      //   failed 로 보냈다 — 대사 레인의 일시적 실패가 shotDesign 수백 초를 날리던 경로.
+      const settled = await Promise.allSettled([runLaneVisual(s, ctx), runLaneDialogue(s, ctx)]);
+      const patch: Partial<WriterRunState> = {};
+      for (const r of settled) if (r.status === 'fulfilled') Object.assign(patch, r.value);
+      const rejected = settled.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      if (rejected.length > 0) {
+        // 진전이 있으면 그것만 체크포인트하고 양보 — 실패 레인은 다음 인보케이션이 이어받는다.
+        //   진전이 0 이면 흡수할 이유가 없다(양보해도 같은 자리) → 종전대로 표면화해 attempt 예산에 태운다.
+        if (Object.keys(patch).length === 0) throw rejected[0].reason;
+        console.error(
+          '[writer] shotsAndDialogue 레인 실패 — 반대 레인 진전만 체크포인트하고 양보:',
+          rejected[0].reason instanceof Error ? rejected[0].reason.message : rejected[0].reason,
+        );
+      }
+      return patch;
     },
   },
   {

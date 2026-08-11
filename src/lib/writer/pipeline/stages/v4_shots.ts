@@ -55,10 +55,18 @@ const SHOT_CHUNK_SIZE = 8;
 //   서로의 출력을 참조하지 않는 data-parallel 작업이라, 순차 실행이 유일 병목인 shotDesign의
 //   wall-clock을 워커 풀로 줄인다. Gemini 텍스트 호출이라 fal 쿼터와 무관 — rate-limit 여유 기준값.
 //   env(SHOTDESIGN_CONCURRENCY)로 무중단 튜닝, opts.concurrency로 테스트/실험 오버라이드. 1=순차.
+//
+// 기본값 4→8 (2026-08-11, shotdesign-concurrency HYPOTHESIS_v2 재측정으로 채택).
+//   3.6-flash·15씬/157샷 fixture·3팔×3런: c4 235.5s → c8 133.9s(**−43.1%**), 에러 0, 샷 157 불변,
+//   count_mismatches 0. 콜 최대 59.4s 로 긴 꼬리 없음 — 여기서는 큐 대기가 벽시계를 정한다
+//   (실효 병렬도 3.80 → 6.69, 동시성에 거의 선형).
+//   수용량 비용 0: 동시 런 병목은 Gemini 가 아니라 shotCheck 단일 콜의 Claude ITPM(165K) 이라
+//   K = min(RPM 2000/34, TPM 3M/75K, ITPM 5M/165K) = 30 으로 c4 와 동일하다. c12 는 −59.8% 로 더
+//   빠르지만 Gemini TPM 이 물려 K=26 이 되고 분산도 커져(87.9/89.4/106.8s) env 옵트인으로 남긴다.
 const MAX_SHOT_CONCURRENCY = 12;
 const DEFAULT_SHOT_CONCURRENCY = (() => {
   const raw = Number(process.env.SHOTDESIGN_CONCURRENCY);
-  return Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), MAX_SHOT_CONCURRENCY) : 4;
+  return Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), MAX_SHOT_CONCURRENCY) : 8;
 })();
 
 export async function runShotDesign(
