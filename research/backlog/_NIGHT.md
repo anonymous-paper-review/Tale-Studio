@@ -31,4 +31,5 @@
 
 ## 산출 계약 (밤 전체)
 
-- `research/backlog/reports/YYYY-MM-DD.md` — 티켓별 1줄(판정·발동한 기각 조건·지출) + 합계 + draft 제안 목록 + `_MORNING.md`에 새로 붙인 증거 목록.
+- `research/backlog/reports/YYYY-MM-DD.md` — 원장: 티켓별 1줄(판정·발동한 기각 조건·지출) + 합계 + draft 제안 목록 + `_MORNING.md`에 새로 붙인 증거 목록.
+- `research/backlog/reports/YYYY-MM-DD.html` — 사람용 리포트: `~/.claude/skills/readable-report/SKILL.md` 형식 (티켓마다 맥락→가설→확인→결과, 본문 개발 표기 금지, 상세는 접기). 가능하면 Artifact 발행 + URL을 md 원장에 기록.

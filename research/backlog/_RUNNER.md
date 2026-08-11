@@ -14,7 +14,7 @@ cd /Users/xcape/projects/tale-studio && claude -p "$(cat research/backlog/_RUNNE
 ## Goal (기계 검증 가능 — 아래 둘 다 충족될 때까지 멈추지 않는다)
 
 1. `research/backlog/`에 `status: ready` 티켓이 0개다 — 각 티켓이 `done`(산출 계약 이행) 또는 `blocked`(사유 추기)로 끝났다. 예산 소진 시엔 잔여 ready를 리포트에 "미소화"로 명시하는 것으로 갈음한다.
-2. `research/backlog/reports/<오늘 날짜>.md`가 존재하고, 티켓별 1줄(판정·발동한 기각 조건·지출) + 지출 합계 + blocked 사유 목록이 적혀 있다.
+2. `research/backlog/reports/<오늘 날짜>.md`(원장)와 `<오늘 날짜>.html`(사람용 리포트)이 존재한다 — md는 티켓별 1줄(판정·발동한 기각 조건·지출)+지출 합계+blocked 사유, html은 아래 절차 5의 형식.
 
 이 Goal이 안 찼는데 멈추려는 자신을 발견하면 다음 ready 티켓으로 돌아가라. 컨텍스트가 길어지면 진행 상태는 티켓 status가 원장이다 — 이어서 하면 된다.
 
@@ -24,7 +24,7 @@ cd /Users/xcape/projects/tale-studio && claude -p "$(cat research/backlog/_RUNNE
 2. ready 티켓을 priority(high 먼저) → T0 → T1 → T-fix 순으로 **하나씩**: 티켓 파일만 읽고 그대로 실행 → 산출 계약 이행 → status 갱신 → 다음.
 3. **티켓 밖 정보가 필요해지는 순간 = 그 티켓은 잘못 쓰인 것이다**: `status: blocked` + 막힌 지점을 티켓에 추기하고 다음 티켓으로. 추측으로 메우지 않는다(판정 3원칙 — 불확실은 NA).
 4. Phase 0(좌표 확정)가 티켓에 명시된 경우 그 범위의 탐색은 허용 — 단 측정·기각 조건은 불변.
-5. 전부 소진되면 리포트 작성 → `_MORNING.md`의 "밤 준비물" 링크 갱신 → 종료 선언.
+5. 전부 소진되면 마무리 3종: ① md 원장 리포트 작성 ② **사람용 HTML 리포트** — `~/.claude/skills/readable-report/SKILL.md` 형식을 따른다 (exemplar.html의 구조·CSS 계승, 티켓마다 맥락→가설→확인→결과 4단, **본문에 티켓 id·등급·계약 코드 등 개발 표기 금지** — 사람 언어 질문형 제목으로 다시 쓰고 경로·원어는 접기 안에. 티켓의 "맥락 (사람 언어)" 섹션을 그대로 인용). Artifact 도구가 쓰이면 발행하고 URL을 md 원장에 기록 ③ `_MORNING.md`의 "밤 준비물" 링크 갱신 → 종료 선언.
 
 ## 금지 (재확인 — 정본은 _NIGHT.md)
 
