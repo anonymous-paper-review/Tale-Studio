@@ -33,3 +33,14 @@ REST v1beta 직행, 동일 프롬프트 × 4조합 × 2모델 (probe-websearch-j
   우선해 `GROUNDING_MODEL='gemini-3-flash-preview'` 사용(접지 실동작 유일 확인 모델). 리그레션 해소 시 핀 제거.
 - **+ 접지 미발화 감시**: webSearch 요청인데 groundingMetadata 없으면 console.warn (무신호 기능 상실 표면화, throw 아님).
 - 검증: 제품 경로 그대로(S축 3.6-flash 해석) 브리지 재실행 → 핀 발동·스테이지 정상(17.2s, 후보 3) + vitest 973 통과.
+
+## 최종 처방 (2026-08-11 오후, 오너 결정: "claude랑 병합")
+
+- **채택 = (d) 접지 콜 프로바이더 이관**: `dispatch.generateJson`이 `webSearch && gemini`를 C축 기본
+  (claude-sonnet-4-6)으로 라우팅, `claude.ts`에 `web_search_20260209` 서버 툴 배선(max_uses 5) +
+  접지 미발화 warn(gemini와 대칭). gemini preview 핀은 직접 호출자용 2차 방어로 유지.
+- **배선 중 실측 2건**: ① 검색 동반 시 Claude 최종 텍스트가 "서술+```json 펜스"로 와서 파서 거부
+  → JSON 본체 슬라이스 복구 폴백 + webSearch 전용 지시 보강으로 해소. ② 제품 경로 검증에서
+  검색 실발화 확인(실존 뉴스 접지), 단 **그라운딩 콜 지연 큼**(재난물 픽스처 260s vs preview 15s —
+  검색 3회+대형 응답). 산출 후보 수도 6개로 gemini(3)와 다름 — 스타일 차는 후속 A/B 재료.
+- 검증: 직접 프로브 OK(23s) + 제품 경로 브리지 OK(260s, 라우팅 로그 확인) + vitest 973 통과.

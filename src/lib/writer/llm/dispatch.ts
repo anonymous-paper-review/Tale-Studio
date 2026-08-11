@@ -39,6 +39,17 @@ export async function generateJson<T>(
   cfg: LlmAxisConfig,
   opts: DispatchOptions = {},
 ): Promise<T> {
+  // #p4-websearch 그라운딩 라우팅(2026-08-11 오너 결정): gemini-3.6-flash 는 googleSearch 가
+  //   실동작하지 않는다 — JSON mime 동반 시 200+빈 candidates, 단독 시 검색 미발화(실측, Google
+  //   스태프 "Investigating" 리그레션). preview 핀은 모델 수명 리스크가 있어, 접지 콜은 web_search
+  //   실동작이 확인된 C축 기본(claude)으로 보낸다. gemini 리그레션 해소 확인 시 이 라우팅 제거 검토.
+  //   증거: research/experiments/t0-dramaturgy-36flash-outage/probe-result.md
+  if (opts.webSearch && cfg.provider === 'gemini') {
+    const g = DEFAULT_MODELS.C;
+    console.warn(`[dispatch] webSearch → ${g.provider}/${g.model} 라우팅 (gemini 그라운딩 불능 우회)`);
+    // s3 등 대형 JSON 응답 + 검색 결과 주입 감안 — claude 기본 max_tokens(4096) 바닥 확보.
+    return dispatchOnce<T>(prompt, g, { ...opts, maxTokens: Math.max(opts.maxTokens ?? 0, 16000) });
+  }
   try {
     return await dispatchOnce<T>(prompt, cfg, opts);
   } catch (e) {
@@ -79,6 +90,7 @@ async function dispatchOnce<T>(
         system: opts.systemInstruction,
         temperature: opts.temperature,
         maxTokens: opts.maxTokens,
+        webSearch: opts.webSearch,
       });
     case 'openai':
       return openaiGenerateJson<T>(prompt, {

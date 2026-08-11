@@ -54,6 +54,8 @@ export interface GeminiCallOptions {
 //   검색이 발화하지 않음(groundingMetadata 부재). preview 는 두 조합 모두 정상 접지(webSearchQueries 실존).
 //   Google 포럼 스태프 "Investigating" 상태의 리그레션 — 해소 확인 시 이 핀 제거.
 //   webSearch 요청 = 접지가 목적이므로 axisConfig 모델보다 우선한다.
+//   2026-08-11 오너 결정: 제품 경로(dispatch.generateJson)는 webSearch 를 claude web_search 로
+//   라우팅한다 — 이 핀은 geminiGenerate 를 직접 호출하는 실험/도구용 2차 방어로 유지.
 //   증거: research/experiments/t0-dramaturgy-36flash-outage/probe-result.md
 const GROUNDING_MODEL = 'gemini-3-flash-preview';
 
