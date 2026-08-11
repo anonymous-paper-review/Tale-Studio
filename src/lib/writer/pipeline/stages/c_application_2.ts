@@ -85,14 +85,23 @@ export async function runShotCheck(
 C.hook_type / motif_active 같은 메타 필드는 결정론 조립이 채우지 않는다. 이 필드가 비어 있다는 사실
 자체를 이슈로 만들지 마라. 연속성 판단은 항상 샷의 실제 프롬프트 내용끼리 대조해서만 한다.
 
+[제약의 전달 위치 — checknote-previz A/B 결과 반영]
+constraint는 이미지·영상 생성 모델이 직접 지켜야 하는 **화면에 보이는 사실**을 위한 필드다.
+모든 이슈에 constraint_target을 반드시 정한다.
+- visual: 한 프레임에서 보이는 상태·배치·행동이며, constraint에 명령형 영어 한 문장을 쓴다.
+- text: 대사·내레이션·문장·문법·대명사·화자 표기처럼 글 단계에서만 의미가 있는 문제다.
+  constraint는 생략하고 이슈의 message/suggestion에만 남긴다.
+- report_only: 생성 프롬프트로 고칠 수 없는 판정·연출 보고 문제다. constraint는 생략한다.
+
+text 또는 report_only 이슈를 시각적인 문장으로 위장하지 마라.
+특히 he/his/him, 이름·성별 대명사, 대사 문구, 철자·문법, "누가 말하는가"는 절대로
+이미지·영상 constraint가 아니다. 모델이 글 문제를 화면에 억지로 표현하게 만들지 말고 target=text로 둔다.
+유효한 visual constraint는 판독기가 화면의 어느 물체·인물·상태를 가리켜 확인할 수 있어야 한다.
+
 CRITICAL: 명백히 불가능한 샷 → split 권장
 WARNING: 약한 일관성, 모호한 프롬프트
 INFO: 미세 개선
-
-CRITICAL/WARNING 이슈에는 constraint 필드를 반드시 포함하라 — 그 샷의 이미지/영상 생성 모델에
-그대로 주입할 명령형 영어 한 문장으로, 샷이 지켜야 할 '시각적 사실'만 담는다
-(예: "The blueprints are tucked inside her vest, not held in her hands.").
-카메라 용어·연출 의도가 아니라 화면에 보여야 하는 상태를 서술한다. INFO 는 constraint 생략.
+CRITICAL/WARNING 이슈는 실제 결함이면 찾되, visual 이슈에만 constraint를 붙인다. INFO는 constraint를 생략한다.
 
 split 권장 시 new_shots 배열로 분할안 제시 (각각 1 주요 액션). 각 new_shot 에는 S 블록을
 반드시 포함하고, S.character_action 에는 그 반쪽이 담는 구체 행동을 써라 (부모 문장 복사 금지).`;
@@ -122,7 +131,8 @@ ${JSON.stringify(assembledShots, null, 2)}
       "location": "shot_id",
       "message": "string",
       "suggestion": "string (optional)",
-      "constraint": "string — imperative EN sentence of the visual fact this shot must keep (required for CRITICAL/WARNING)"
+      "constraint_target": "visual" | "text" | "report_only",
+      "constraint": "string — constraint_target=visual일 때만, 화면에 보이는 사실을 지키는 명령형 EN 한 문장"
     }
   ]
 }`;
@@ -345,9 +355,9 @@ export function detectLadderJumpIssues(shots: ShotSequenceItem[]): ValidationIss
 }
 
 /**
- * shotCheck 채널1(#p2-wiring): CRITICAL/WARNING + constraint 이슈를 해당 샷에 check_notes 로 부착.
- *   매칭은 분할 전 id 공간 — 샷의 shot_id 또는 _splitFrom(분할 자식의 부모 id)과 location 일치.
- *   INFO/constraint 부재는 부착하지 않는다 (오탐 노이즈가 생성 프롬프트를 오염시키지 않게).
+ * shotCheck 채널1(#p2-wiring): visual constraint 이슈만 해당 샷에 부착.
+ *   매칭은 분할 전 id 공간 — 샷의 shot_id 또는 _splitFrom(분할 자식)과 location 일치.
+ *   text/report_only 이슈와 constraint_target 누락은 판정 보고서에만 남기고 생성 프롬프트를 오염시키지 않는다.
  */
 export function attachCheckNotes<T extends ShotSequenceItem & { _splitFrom?: string }>(
   shots: T[],
@@ -356,10 +366,13 @@ export function attachCheckNotes<T extends ShotSequenceItem & { _splitFrom?: str
   const notesByPreId = new Map<string, ShotCheckNote[]>();
   for (const issue of issues) {
     if (issue.severity === 'INFO') continue;
+    // 실험에서 글 전용 지시(대명사 등)가 이미지 프롬프트로 새어 나왔다.
+    // 명시적으로 visual이라고 분류된 이슈만 생성 모델에 전달한다(fail closed).
+    if (issue.constraint_target !== 'visual') continue;
     const constraint = issue.constraint?.trim();
     if (!constraint) continue;
     const list = notesByPreId.get(issue.location) ?? [];
-    list.push({ category: issue.category, severity: issue.severity, constraint });
+    list.push({ constraint_target: 'visual', category: issue.category, severity: issue.severity, constraint });
     notesByPreId.set(issue.location, list);
   }
   if (notesByPreId.size === 0) return shots;

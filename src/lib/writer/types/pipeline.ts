@@ -347,6 +347,7 @@ export interface Scenes {
 // =====================================================================
 
 export type ValidationSeverity = 'CRITICAL' | 'WARNING' | 'INFO';
+export type ConstraintTarget = 'visual' | 'text' | 'report_only';
 
 export interface ValidationIssue {
   category: 'causality' | 'cdq' | 'verisimilitude' | 'cliche' | 'differentiator' | 'action_budget' | 'continuity' | 'theme' | 'cinematography';
@@ -354,7 +355,9 @@ export interface ValidationIssue {
   location: string; // "S3.scene_2" or "shot_5" etc
   message: string;
   suggestion?: string;
-  // 생성 모델에 그대로 주입할 명령형 EN 한 문장 — 샷이 지켜야 할 시각적 사실(#p2-wiring shotCheck 채널1).
+  // constraint_target='visual'일 때만 생성 모델에 그대로 주입할 명령형 EN 한 문장을 둔다.
+  // text/report_only 이슈는 판정 보고서에는 남기되 이미지·영상 프롬프트로 보내지 않는다.
+  constraint_target?: ConstraintTarget;
   constraint?: string;
 }
 
@@ -362,6 +365,7 @@ export interface ValidationIssue {
 export interface ShotCheckNote {
   category: ValidationIssue['category'];
   severity: ValidationSeverity;
+  constraint_target: 'visual';
   constraint: string;
 }
 

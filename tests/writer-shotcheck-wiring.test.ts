@@ -6,8 +6,8 @@
 //      카드 표시·생성 폴백을 차지하던 결함의 재발 방지.
 //   2. provenance(W1): 조립 아이템은 design_ref(=v4 shot_id)와 static_spec 원본을 지닌다 —
 //      분할·리넘버 뒤 러프보드 spec 조인의 근거 (id 오프셋 결함: scene_2 +1, scene_3 +2 실측).
-//   3. 채널1(W4): CRITICAL/WARNING+constraint 이슈만 check_notes 로 부착되고, 분할 자식은
-//      _splitFrom(부모 id)으로도 매칭된다. INFO·constraint 부재는 생성 프롬프트를 오염시키지 않는다.
+//   3. 채널1(W4): CRITICAL/WARNING+constraint_target=visual 이슈만 check_notes 로 부착되고, 분할 자식은
+//      _splitFrom(부모 id)으로도 매칭된다. INFO·text/report_only·target 누락은 생성 프롬프트를 오염시키지 않는다.
 import { describe, it, expect } from 'vitest'
 import {
   assembleShotsFromDesigns,
@@ -106,6 +106,7 @@ describe('attachCheckNotes — 채널1 부착 규칙 (W4)', () => {
       location: 'shot_1',
       message: '소품 상태 모순',
       constraint: 'The blueprints are tucked inside her vest, not held in her hands.',
+      constraint_target: 'visual',
     },
     {
       category: 'continuity',
@@ -113,6 +114,7 @@ describe('attachCheckNotes — 채널1 부착 규칙 (W4)', () => {
       location: 'shot_2',
       message: '공간 관계 모순',
       constraint: 'The hunters remain on the ground level, below the girl.',
+      constraint_target: 'visual',
     },
     { category: 'verisimilitude', severity: 'INFO', location: 'shot_1', message: '미세 개선', constraint: 'ignored' },
     { category: 'action_budget', severity: 'WARNING', location: 'shot_1', message: 'constraint 없음' },
@@ -122,6 +124,19 @@ describe('attachCheckNotes — 채널1 부착 규칙 (W4)', () => {
     const [a] = attachCheckNotes(baseShots(), issues)
     expect(a.check_notes).toHaveLength(1)
     expect(a.check_notes?.[0].constraint).toMatch(/tucked inside her vest/)
+  })
+  it('글 전용 constraint는 shotCheck 보고서에만 남고 check_notes에는 부착하지 않는다', () => {
+    const [a] = attachCheckNotes(baseShots(), [
+      {
+        category: 'verisimilitude',
+        severity: 'WARNING',
+        location: 'shot_1',
+        message: '대명사 표기 교정',
+        constraint_target: 'text',
+        constraint: 'Journey is male; all pronoun references in this shot must use he/his/him.',
+      },
+    ])
+    expect(a.check_notes).toBeUndefined()
   })
 
   it('분할 자식은 _splitFrom(부모 id)으로 부모의 제약을 상속한다', () => {
@@ -146,6 +161,7 @@ describe('attachCheckNotes — 채널1 부착 규칙 (W4)', () => {
         location: 'shot_9',
         message: '액션 2개',
         constraint: 'Show only one major action: either A or B.',
+        constraint_target: 'visual',
       },
       {
         category: 'continuity',
@@ -153,6 +169,7 @@ describe('attachCheckNotes — 채널1 부착 규칙 (W4)', () => {
         location: 'shot_9',
         message: '소품 상태',
         constraint: 'The canteen stays in her left hand.',
+        constraint_target: 'visual',
       },
     ])
     expect(out[0].check_notes).toHaveLength(1)
@@ -211,8 +228,9 @@ describe('writerShotIdToMain — id 체계 통일 (#id-unify)', () => {
 describe('parseCheckConstraints / appendCheckConstraints — DB jsonb 방어 파싱', () => {
   it('정상 배열에서 constraint 문자열만 추출한다', () => {
     const value = [
-      { category: 'continuity', severity: 'CRITICAL', constraint: 'Keep the vest closed.' },
-      { category: 'continuity', severity: 'WARNING', constraint: '  ' },
+      { category: 'continuity', severity: 'CRITICAL', constraint_target: 'visual', constraint: 'Keep the vest closed.' },
+      { category: 'continuity', severity: 'WARNING', constraint_target: 'visual', constraint: '  ' },
+      { category: 'continuity', severity: 'WARNING', constraint_target: 'text', constraint: 'Use he/him.' },
       { bogus: true },
       null,
     ]
@@ -227,8 +245,8 @@ describe('parseCheckConstraints / appendCheckConstraints — DB jsonb 방어 파
 
   it('제약이 있으면 프롬프트 꼬리에 한 줄로 첨부된다', () => {
     const out = appendCheckConstraints('base prompt', [
-      { category: 'continuity', severity: 'CRITICAL', constraint: 'A.' },
-      { category: 'continuity', severity: 'WARNING', constraint: 'B.' },
+      { category: 'continuity', severity: 'CRITICAL', constraint_target: 'visual', constraint: 'A.' },
+      { category: 'continuity', severity: 'WARNING', constraint_target: 'visual', constraint: 'B.' },
     ])
     expect(out).toBe('base prompt\nContinuity constraints: A.; B.')
   })
