@@ -9,8 +9,8 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
-import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
-import { parseFencedJsonReply, updatesFrom } from '@/lib/agentic-reply-guard'
+import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE } from '@/lib/chat-format'
+import { parseFencedUpdates } from '@/lib/agentic-reply-guard'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildArtistActivityContext } from '@/lib/artist/chat-context'
 import {
@@ -130,10 +130,9 @@ function parseUpdates(text: string): {
 } {
   // #p4-json-guard: 종전엔 이 라우트만 방어가 없어 파싱 실패 시 raw JSON 을 채팅에 그대로
   //   노출하고 updates 를 조용히 폐기했다(writer/director 는 안내 문구가 있었다). 공용 가드로 정렬.
-  const { reply, data } = parseFencedJsonReply(text, 'artist/chat')
-  const raw = updatesFrom(data)
-  // updates = 자동 실행(화이트리스트). proposals = 원천 외형 변경(승인 게이트 — F6).
-  return { reply, updates: validateUpdates(raw), proposals: extractAppearanceProposals(raw) }
+  const { reply, updates, raw } = parseFencedUpdates(text, 'artist/chat', validateUpdates)
+  // updates = 자동 실행(화이트리스트). proposals = 원천 외형 변경(승인 게이트 — F6, 원본 배열 기준).
+  return { reply, updates, proposals: extractAppearanceProposals(raw) }
 }
 
 export async function POST(req: Request) {
@@ -184,7 +183,7 @@ export async function POST(req: Request) {
     const normalizedHistory = normalizeHistory(history)
 
     const text = await llmChat(
-      ARTIST_SYSTEM + CHAT_OUTPUT_FORMAT_GUIDE,
+      ARTIST_SYSTEM + CHAT_OUTPUT_FORMAT_GUIDE + CHAT_UPDATES_BATCH_GUIDE,
       normalizedHistory,
       `${contextPrefix}${message}`,
       0.7,

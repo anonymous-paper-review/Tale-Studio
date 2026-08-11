@@ -2,8 +2,12 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
-import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
-import { parseFencedJsonReply, updatesFrom } from '@/lib/agentic-reply-guard'
+import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE } from '@/lib/chat-format'
+import {
+  NOTICE_PARTIAL,
+  parseFencedJsonReply,
+  parseFencedUpdates,
+} from '@/lib/agentic-reply-guard'
 import { normalizeProvider } from '@/lib/video-models'
 
 // ──────────────────────────────────────────────────────────────────────
@@ -86,11 +90,6 @@ JSON block must be the LAST element.
 {"updates":[ ... ]}
 \`\`\`
 </format>
-
-<batch-limit>
-Emit AT MOST 12 updates in a single response. This is a hard cap — a larger JSON block gets truncated mid-output and nothing applies.
-If the request needs more (e.g. "모든 샷", "전체 씬에 대해"), do only the first batch, then in the reply text say what you did and ask the user to say "계속" for the next batch. Never attempt dozens of updates at once.
-</batch-limit>
 
 <examples>
 <example>
@@ -377,9 +376,9 @@ function parseAgenticResponse(text: string): {
   reply: string
   updates: unknown[]
 } {
-  // 펜스 추출·복구·유출 방어·신호는 공용 가드가 담당(#p4-json-guard). 여기선 화이트리스트만.
-  const { reply, data } = parseFencedJsonReply(text, 'director/chat')
-  return { reply, updates: validateCanvasUpdates(updatesFrom(data)) }
+  // 펜스 추출·복구·유출 방어·신호·부분 적용 안내는 공용 가드가 담당(#p4-json-guard).
+  const { reply, updates } = parseFencedUpdates(text, 'director/chat', validateCanvasUpdates)
+  return { reply, updates }
 }
 
 function parseLegacyResponse(text: string): {
@@ -389,7 +388,9 @@ function parseLegacyResponse(text: string): {
   techniques?: string[]
 } {
   // agentic 경로와 같은 가드를 태운다 — 종전엔 실패 시 raw JSON 이 그대로 노출됐다(#p4-json-guard).
-  const { reply, data } = parseFencedJsonReply(text, 'director/chat:legacy')
+  //   이 경로의 산출은 배열이 아니라 제안 3종이라 "몇 건 적용" 을 셀 수 없다 — 일반 문구를 쓴다.
+  const { reply: head, data, status } = parseFencedJsonReply(text, 'director/chat:legacy')
+  const reply = status === 'recovered' ? (head ? `${head}\n\n${NOTICE_PARTIAL}` : NOTICE_PARTIAL) : head
   if (!data) return { reply }
   return {
     reply,
@@ -427,7 +428,7 @@ export async function POST(req: Request) {
     // 분기: canvasContext가 있으면 agentic 모드 (Director Canvas), 없으면 legacy 모드
     if (typeof canvasContext === 'string' && canvasContext.trim()) {
       const text = await llmChat(
-        DIRECTOR_CANVAS_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE,
+        DIRECTOR_CANVAS_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + CHAT_UPDATES_BATCH_GUIDE,
         normalizedHistory,
         `${canvasContext}\n\n---\n\n${message}`,
         0.7,

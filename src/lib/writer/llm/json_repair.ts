@@ -1,7 +1,17 @@
 // LLM JSON 응답 복구: 마크다운 fence / 미종료 문자열 / 잘린 배열-객체 처리
 // 사용 정책: 원본 parse 실패 시에만 호출. 성공 시 직접 반환.
 
+/** 어떤 전략으로 복구했는가 — 손실 성격이 전략마다 다르다(호출자의 후속 판단 재료).
+ *  clean: 펜스 제거만 / punch: 잉여 문자 삭제(비손실) /
+ *  close: **잘린 항목을 닫아서** 살림 — 마지막 항목의 값이 중간에 끊겨 있을 수 있다 /
+ *  trim:  마지막 유효 지점까지 절단 — 남은 항목은 온전하나 뒤가 통째로 사라졌다 */
+export type RepairStrategy = 'clean' | 'punch' | 'close' | 'trim'
+
 export function repairJson<T = unknown>(raw: string): T {
+  return repairJsonWithMeta<T>(raw).value
+}
+
+export function repairJsonWithMeta<T = unknown>(raw: string): { value: T; strategy: RepairStrategy } {
   const stripped = raw
     .replace(/^\uFEFF/, '')
     .replace(/^```json\s*/i, '')
@@ -10,7 +20,7 @@ export function repairJson<T = unknown>(raw: string): T {
     .trim();
 
   try {
-    return JSON.parse(stripped) as T;
+    return { value: JSON.parse(stripped) as T, strategy: 'clean' };
   } catch {}
 
   if (!stripped.startsWith('{') && !stripped.startsWith('[')) {
@@ -20,7 +30,7 @@ export function repairJson<T = unknown>(raw: string): T {
   // 전략 1: 에러 위치의 잉여 캐릭터 삭제 (stray quote/comma 등 모델 hallucination)
   //   비손실 계열 — 아이템을 버리지 않으므로 경고하지 않는다.
   const punched = tryRemoveErrorChars<T>(stripped);
-  if (punched !== undefined) return punched;
+  if (punched !== undefined) return { value: punched, strategy: 'punch' };
 
   // 전략 2·3 은 **손실 복구**다: 잘린 응답을 닫거나(2) 마지막 유효 지점까지 잘라내(3) 파싱을
   //   성립시킨다 — 즉 성공해도 뒤쪽 내용이 사라진 채 "정상"으로 통과한다. 이게 Q6 무신호 손실의
@@ -28,13 +38,13 @@ export function repairJson<T = unknown>(raw: string): T {
   const closed = tryCloseAndParse<T>(stripped);
   if (closed !== undefined) {
     warnLossyRepair('닫기(전략2)', stripped, closed);
-    return closed;
+    return { value: closed, strategy: 'close' };
   }
 
   const trimmed = tryTrimToLastValid<T>(stripped);
   if (trimmed !== undefined) {
     warnLossyRepair('절단(전략3)', stripped, trimmed);
-    return trimmed;
+    return { value: trimmed, strategy: 'trim' };
   }
 
   throw new Error('repairJson: all strategies failed');

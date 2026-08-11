@@ -47,7 +47,10 @@ export async function claudeChat(
   const t0 = performance.now()
   const response = await getClient().beta.messages.create({
     model: MODEL,
-    max_tokens: 4096,
+    // #p4-json-guard(2026-08-11): 4096 → 8192. 채팅은 답변 산문과 변경(updates) 블록이 이 한 장을
+    //   나눠 쓰는데, 변경 1건이 약 83tok(실측)이라 4096 에서는 48건 근처에서 잘렸다(76샷 일괄
+    //   요청 유실 사고의 원인). 한도는 상한일 뿐이라 짧은 답변의 비용·지연은 그대로다.
+    max_tokens: 8192,
     system,
     messages,
     temperature,

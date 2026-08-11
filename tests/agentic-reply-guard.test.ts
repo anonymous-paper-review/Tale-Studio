@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   parseFencedJsonReply,
+  parseFencedUpdates,
   stripLeakedUpdatesBlock,
   updatesFrom,
 } from '@/lib/agentic-reply-guard'
@@ -52,7 +53,7 @@ describe('parseFencedJsonReply', () => {
     expect(r.reply).not.toContain('```')
   })
 
-  it('잘린 펜스는 온전한 항목만 살리고 "일부만 적용" 을 알린다(종전: 전부 폐기)', () => {
+  it('잘린 펜스는 온전한 항목만 살린다(종전: 전부 폐기) — 안내 문구는 검증 후 붙는다', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     // 3번째 항목을 쓰다가 max_tokens 로 끊긴 형태 — 닫는 펜스 없음
     const text = `전체 76개 샷을 업데이트합니다.\n\n\`\`\`json\n{"updates":[${shot('a')},${shot('b')},{"type":"updateShot","id":"c","patch":{"note":"잘린`
@@ -60,7 +61,6 @@ describe('parseFencedJsonReply', () => {
     expect(r.status).toBe('recovered')
     expect(updatesFrom(r.data).length).toBeGreaterThan(0)
     expect(r.reply).toContain('전체 76개 샷을 업데이트합니다.')
-    expect(r.reply).toContain('일부만 적용')
     expect(r.reply).not.toContain('```') // raw 유출 없음
     expect(warn).toHaveBeenCalled() // 서버 신호
   })
@@ -81,5 +81,47 @@ describe('parseFencedJsonReply', () => {
     const r = parseFencedJsonReply(text, 'test')
     expect(r.status).toBe('ok')
     expect(updatesFrom(r.data)).toHaveLength(1)
+  })
+})
+
+// 부분 적용 안내는 "실제로 적용된 건수"여야 한다 — 화이트리스트가 떨어뜨린 항목까지 세면 과대 보고.
+describe('parseFencedUpdates — 부분 적용 안내', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  const shot = (id: string) => `{"type":"updateShot","id":"${id}","patch":{"note":"x"}}`
+  const passAll = (raw: unknown[]) => raw
+  const truncatedText = `전체 76개 샷을 업데이트합니다.\n\n\`\`\`json\n{"updates":[${shot('shot_001')},${shot('shot_002')},{"type":"updateShot","id":"shot_003","patch":{"note":"잘린`
+
+  it('잘리다 만 마지막 항목은 버린다 — 반쪽짜리 값이 커밋되면 안 된다', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const r = parseFencedUpdates(truncatedText, 'test', passAll)
+    // shot_003 은 patch.note 가 "잘린" 에서 끊겼다 — 구조는 닫히지만 내용이 반쪽이라 제외한다.
+    expect(r.updates).toHaveLength(2)
+    expect(JSON.stringify(r.updates)).not.toContain('shot_003')
+  })
+
+  it('복구 시 적용 건수와 재개 지점을 문구에 담는다', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const r = parseFencedUpdates(truncatedText, 'test', passAll)
+    expect(r.status).toBe('recovered')
+    expect(r.reply).toContain(`${r.updates.length}건만 적용`)
+    expect(r.reply).toContain('shot_002') // 마지막으로 반영된 항목 = 이어서 요청할 지점
+    expect(r.reply).toContain('전체 76개 샷을 업데이트합니다.')
+  })
+
+  it('건수는 화이트리스트 통과분 기준이다(과대 보고 금지)', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const dropAllButOne = (raw: unknown[]) => raw.slice(0, 1)
+    const r = parseFencedUpdates(truncatedText, 'test', dropAllButOne)
+    expect(r.updates).toHaveLength(1)
+    expect(r.reply).toContain('1건만 적용')
+    expect(r.raw.length).toBeGreaterThan(1) // 원본은 더 많았지만 보고는 적용분 기준
+  })
+
+  it('정상 응답에는 안내를 붙이지 않는다', () => {
+    const text = `2개 바꿨어요.\n\n\`\`\`json\n{"updates":[${shot('a')},${shot('b')}]}\n\`\`\``
+    const r = parseFencedUpdates(text, 'test', passAll)
+    expect(r.status).toBe('ok')
+    expect(r.reply).toBe('2개 바꿨어요.')
   })
 })

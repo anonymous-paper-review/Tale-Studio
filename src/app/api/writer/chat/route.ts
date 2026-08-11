@@ -7,9 +7,9 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
-import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
+import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE } from '@/lib/chat-format'
 import { sanitizeLineRefs, validateWriterUpdates } from '@/lib/writer-chat-updates'
-import { parseFencedJsonReply, updatesFrom } from '@/lib/agentic-reply-guard'
+import { parseFencedUpdates } from '@/lib/agentic-reply-guard'
 
 const WRITER_CHAT_SYSTEM = `You are the Writers' Room assistant in an AI video production pipeline called "The Set."
 The user is reviewing the rough storyboard (pre-concept previz) of a story already broken into Scenes and Shots.
@@ -70,11 +70,6 @@ Reply text in 1-3 sentences (Korean if the user wrote Korean), then — only if 
 {"updates":[ ... ]}
 \`\`\`
 </format>
-
-<batch-limit>
-Emit AT MOST 12 updates in a single response. This is a hard cap — a larger JSON block gets truncated mid-output and nothing applies.
-If the user's request needs more (e.g. "rewrite every shot", "모든 샷", "전체 씬"), do only the first batch (e.g. the current or first scene), then in the reply text say which part you did and ask them to say "계속" to continue with the next batch. Never attempt to emit dozens of updates at once.
-</batch-limit>
 
 <examples>
 <example>
@@ -153,9 +148,9 @@ function normalizeHistory(history: unknown): ChatMessage[] {
 }
 
 function parseAgenticResponse(text: string): { reply: string; updates: unknown[] } {
-  // 펜스 추출·복구·유출 방어·신호는 공용 가드가 담당(#p4-json-guard). 여기선 화이트리스트만.
-  const { reply, data } = parseFencedJsonReply(text, 'writer/chat')
-  return { reply, updates: validateWriterUpdates(updatesFrom(data)) }
+  // 펜스 추출·복구·유출 방어·신호·부분 적용 안내는 공용 가드가 담당(#p4-json-guard).
+  const { reply, updates } = parseFencedUpdates(text, 'writer/chat', validateWriterUpdates)
+  return { reply, updates }
 }
 
 export async function POST(req: Request) {
@@ -180,7 +175,7 @@ export async function POST(req: Request) {
     const ctx = contextSections.length > 0 ? `${contextSections.join('\n\n')}\n\n---\n\n` : ''
 
     const text = await llmChat(
-      WRITER_CHAT_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE,
+      WRITER_CHAT_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + CHAT_UPDATES_BATCH_GUIDE,
       normalizedHistory,
       `${ctx}${message}`,
       0.5,
