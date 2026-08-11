@@ -1,0 +1,5110 @@
+{
+  "ticket": "t0-dynamic-spec-enum-audit",
+  "date": "2026-08-11",
+  "enum_source": "src/lib/writer/types/pipeline.ts:649-687 (ShotDynamicSpec) — 원문 enum은 results 하단 enums 참조",
+  "enums": {
+    "camera_motion.type": [
+      "static",
+      "pan",
+      "tilt",
+      "dolly_in",
+      "dolly_out",
+      "tracking",
+      "crane",
+      "handheld_drift",
+      "rack_focus"
+    ],
+    "camera_motion.speed": [
+      "slow",
+      "medium",
+      "fast"
+    ],
+    "camera_motion.magnitude": [
+      "minimal",
+      "moderate",
+      "large"
+    ],
+    "character_motion[].magnitude": [
+      "micro",
+      "small",
+      "medium",
+      "large"
+    ],
+    "environmental_change[].magnitude": [
+      "subtle",
+      "moderate",
+      "strong"
+    ],
+    "transition_in": [
+      "cut",
+      "fade",
+      "dissolve",
+      "match_cut",
+      "pre_lap",
+      "l_cut"
+    ],
+    "transition_out": [
+      "cut",
+      "fade",
+      "dissolve",
+      "match_cut",
+      "j_cut"
+    ]
+  },
+  "audited_specs": 672,
+  "value_distribution": {
+    "camera_motion.type": {
+      "static": {
+        "n": 416
+      },
+      "panning": {
+        "n": 1
+      },
+      "handheld_drift": {
+        "n": 213
+      },
+      "tracking": {
+        "n": 41
+      },
+      "dolly_in": {
+        "n": 11
+      },
+      "dolly_out": {
+        "n": 8
+      },
+      "shake": {
+        "n": 1
+      },
+      "pan": {
+        "n": 1
+      }
+    },
+    "camera_motion.speed": {
+      "none": {
+        "n": 410
+      },
+      "medium": {
+        "n": 43
+      },
+      "slow": {
+        "n": 203
+      },
+      "fast": {
+        "n": 29
+      },
+      "null": {
+        "n": 5
+      },
+      "static": {
+        "n": 1
+      },
+      "normal": {
+        "n": 1
+      }
+    },
+    "camera_motion.magnitude": {
+      "none": {
+        "n": 365
+      },
+      "moderate": {
+        "n": 43
+      },
+      "minimal": {
+        "n": 246
+      },
+      "medium": {
+        "n": 9
+      },
+      "small": {
+        "n": 6
+      },
+      "high": {
+        "n": 3
+      },
+      "null": {
+        "n": 5
+      },
+      "large": {
+        "n": 11
+      },
+      "heavy": {
+        "n": 3
+      },
+      "static": {
+        "n": 1
+      }
+    },
+    "character_motion[].magnitude": {
+      "minimal": {
+        "n": 53
+      },
+      "small": {
+        "n": 229
+      },
+      "large": {
+        "n": 67
+      },
+      "medium": {
+        "n": 106
+      },
+      "moderate": {
+        "n": 13
+      },
+      "none": {
+        "n": 3
+      }
+    },
+    "transition_in": {
+      "cut": {
+        "n": 678
+      },
+      "fade_in": {
+        "n": 11
+      },
+      "fade": {
+        "n": 1
+      },
+      "fade_out": {
+        "n": 1
+      },
+      "fade_from_black": {
+        "n": 1
+      }
+    },
+    "transition_out": {
+      "cut": {
+        "n": 608
+      },
+      "fade_to_black": {
+        "n": 72
+      },
+      "fade_out": {
+        "n": 11
+      },
+      "none": {
+        "n": 1
+      }
+    },
+    "environmental_change[].magnitude": {
+      "minimal": {
+        "n": 2
+      },
+      "small": {
+        "n": 3
+      }
+    }
+  },
+  "violations_count": 982,
+  "violations": [
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_1"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_1"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_1"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_2"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_2"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_3"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_3"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_4"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_4"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_5"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_5"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_6"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_6"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_7"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_7"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_8"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_8"
+    },
+    {
+      "field": "camera_motion.type",
+      "value": "panning",
+      "where": "local:064631aa/shot_9"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_9"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_in",
+      "where": "local:064631aa/shot_10"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_12"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_14"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_14"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_19"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_20"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_20"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_20"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_21"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_21"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_22"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_22"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_23"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_23"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_24"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_24"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_25"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_25"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_26"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_26"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_27"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_27"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_28"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_28"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_28"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_31"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_31"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_33"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_33"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "medium",
+      "where": "local:064631aa/shot_34"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "medium",
+      "where": "local:064631aa/shot_35"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_36"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_36"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_36"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_37"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_37"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_38"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_38"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_38"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_in",
+      "where": "local:064631aa/shot_39"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_44"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_44"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "small",
+      "where": "local:064631aa/shot_45"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_47"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_48"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_48"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_49"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_49"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_49"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_50"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_50"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_51"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_51"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_52"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_52"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_53"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_53"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_54"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_54"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_55"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_55"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_55"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_56"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_56"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_56"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_56"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_60"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_64"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_64"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "high",
+      "where": "local:064631aa/shot_67"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "high",
+      "where": "local:064631aa/shot_71"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_73"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_73"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_73"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_73"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_74"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_74"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_75"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_75"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_76"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_76"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_77"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_77"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_78"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_78"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_79"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_79"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_80"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_80"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_81"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_81"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_82"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_82"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_83"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_83"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_85"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_85"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_86"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_86"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "local:064631aa/shot_86"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_87"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_87"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "local:064631aa/shot_87"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_88"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_88"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_89"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_89"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "local:064631aa/shot_90"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_90"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_91"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_91"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_in",
+      "where": "local:064631aa/shot_91"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_92"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_92"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_93"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_93"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_93"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_94"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_94"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_95"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_95"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_96"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_96"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_97"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_97"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_out",
+      "where": "local:064631aa/shot_98"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_99"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_99"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_100"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_100"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_101"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_101"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_102"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_102"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_103"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_103"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_103"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_104"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_104"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_105"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_105"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_106"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_106"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_106"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_107"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_107"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_108"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_108"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_109"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_109"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_110"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_110"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_111"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_111"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_112"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_112"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_113"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_113"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_113"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_114"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_114"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_115"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_115"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "local:064631aa/shot_115"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "local:064631aa/shot_116"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_117"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_117"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_118"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_118"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_119"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_119"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "local:064631aa/shot_119"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_120"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_120"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_121"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_121"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_121"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "null",
+      "where": "local:064631aa/shot_122"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "null",
+      "where": "local:064631aa/shot_122"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_122"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_122"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_123"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_123"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_124"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_125"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_126"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_127"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_128"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_129"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_130"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_131"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_132"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_132"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_133"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_133"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_134"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_134"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_134"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_135"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_135"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_135"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_136"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_136"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_137"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_137"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_138"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_138"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_139"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_139"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_140"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_140"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_140"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_140"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_143"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_143"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:064631aa/shot_144"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_145"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_145"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_148"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_148"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_148"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:064631aa/shot_149"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "none",
+      "where": "local:064631aa/shot_149"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:064631aa/shot_149"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_1"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_1"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_1"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_2"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_2"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_3"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_3"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_4"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_4"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "small",
+      "where": "local:5260d92d/shot_5"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_6"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_6"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_7"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_7"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_8"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_8"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_9"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_9"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_9"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_10"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_in",
+      "where": "local:5260d92d/shot_10"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_16"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_18"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_19"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_19"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_19"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_20"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_20"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_20"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_22"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_22"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_23"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_23"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_24"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_24"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_25"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_25"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_26"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_26"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_26"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_26"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_27"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_27"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_28"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_28"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_29"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_29"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_29"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_30"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_30"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_31"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_31"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_32"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_32"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_32"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "local:5260d92d/shot_37"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_38"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "local:5260d92d/shot_40"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_41"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_41"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_42"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_43"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_43"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_47"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_47"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_49"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_49"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_50"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_50"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_54"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_55"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_55"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_55"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_56"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_56"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_57"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_57"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_58"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_58"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_59"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_59"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_60"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_60"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_61"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_61"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_62"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_62"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "null",
+      "where": "local:5260d92d/shot_63"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "null",
+      "where": "local:5260d92d/shot_63"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_63"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_64"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_64"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_65"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_65"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_66"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_66"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_67"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_67"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_68"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_68"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_69"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_69"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_71"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_71"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_71"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_72"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_72"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_72"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_73"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_73"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_74"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_74"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_75"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_75"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_77"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_77"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_78"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_78"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_79"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_79"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "local:5260d92d/shot_79"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_80"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_80"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_80"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_81"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_81"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_81"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_82"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_82"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_82"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_83"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_83"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_84"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_84"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_85"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_85"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_86"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_86"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_87"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_87"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_88"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_88"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_89"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_89"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_90"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_90"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_90"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "heavy",
+      "where": "local:5260d92d/shot_99"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "heavy",
+      "where": "local:5260d92d/shot_100"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_100"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_101"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_101"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_102"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_102"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_103"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_103"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_104"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_104"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_106"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_106"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_107"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_107"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_108"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_108"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_109"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_109"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_109"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_111"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_111"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_113"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_113"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_114"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_114"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_115"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_115"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_116"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_116"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_118"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_122"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_122"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "small",
+      "where": "local:5260d92d/shot_125"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_127"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_128"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_128"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_in",
+      "where": "local:5260d92d/shot_128"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_129"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_129"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_130"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_130"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_131"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_131"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_131"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_132"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_132"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_133"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_133"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_134"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_134"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_135"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_135"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_out",
+      "where": "local:5260d92d/shot_135"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_136"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_136"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_136"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_136"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_139"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_139"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_141"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "small",
+      "where": "local:5260d92d/shot_142"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_143"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_143"
+    },
+    {
+      "field": "environmental_change[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_143"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_145"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_154"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_154"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_154"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_154"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_155"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_155"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_155"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_156"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_156"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_157"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_157"
+    },
+    {
+      "field": "environmental_change[].magnitude",
+      "value": "small",
+      "where": "local:5260d92d/shot_157"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_158"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_158"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_159"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_159"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_160"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_160"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:5260d92d/shot_160"
+    },
+    {
+      "field": "environmental_change[].magnitude",
+      "value": "small",
+      "where": "local:5260d92d/shot_160"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_161"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_161"
+    },
+    {
+      "field": "environmental_change[].magnitude",
+      "value": "small",
+      "where": "local:5260d92d/shot_161"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_162"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:5260d92d/shot_163"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:5260d92d/shot_163"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:5260d92d/shot_163"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:e4da245a/shot_1"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_in",
+      "where": "local:e4da245a/shot_1"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "null",
+      "where": "local:e4da245a/shot_3"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "null",
+      "where": "local:e4da245a/shot_3"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "null",
+      "where": "local:e4da245a/shot_4"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "null",
+      "where": "local:e4da245a/shot_4"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "small",
+      "where": "local:e4da245a/shot_7"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "null",
+      "where": "local:e4da245a/shot_8"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "null",
+      "where": "local:e4da245a/shot_8"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_10"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_in",
+      "where": "local:e4da245a/shot_11"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "medium",
+      "where": "local:e4da245a/shot_17"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_out",
+      "where": "local:e4da245a/shot_18"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_19"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:e4da245a/shot_19"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_20"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_20"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_27"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_27"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_28"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_28"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_30"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_31"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_31"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_32"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_32"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_33"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_33"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_35"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_35"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_36"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_36"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:e4da245a/shot_36"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_37"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_37"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_38"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_38"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_39"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_39"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_40"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_40"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_40"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:e4da245a/shot_41"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "local:e4da245a/shot_45"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_49"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_50"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_51"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_52"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_52"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_53"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_53"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "heavy",
+      "where": "local:e4da245a/shot_54"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_58"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_58"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_59"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_59"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_60"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_60"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_60"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_61"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_61"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_63"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_63"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_64"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_64"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_64"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_65"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_68"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_68"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_73"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_75"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:e4da245a/shot_75"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_75"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_76"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_76"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_77"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_77"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_78"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_78"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:e4da245a/shot_78"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_79"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_79"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_80"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_80"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_81"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_81"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_82"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_82"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_83"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_83"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_84"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_84"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_85"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_85"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_87"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_87"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_88"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_88"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_88"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_89"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_91"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "local:e4da245a/shot_93"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_94"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_96"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_97"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_97"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_99"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_99"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_100"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_100"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_100"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_101"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_101"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_102"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_102"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_104"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_104"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "local:e4da245a/shot_106"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_107"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_107"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "high",
+      "where": "local:e4da245a/shot_109"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_110"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_110"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_112"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_112"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_112"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_116"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_116"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:e4da245a/shot_116"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_117"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_117"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_120"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_124"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_125"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_125"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_126"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_126"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_127"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_127"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_128"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_128"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_129"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_129"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_130"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_130"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:e4da245a/shot_130"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_131"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_131"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_132"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_132"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_132"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:e4da245a/shot_133"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:e4da245a/shot_140"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_140"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_141"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_141"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_146"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_146"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_148"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_148"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "local:e4da245a/shot_149"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_150"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_150"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_151"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_151"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_152"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_152"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "local:e4da245a/shot_152"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_153"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_153"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_154"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_154"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_156"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_156"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "local:e4da245a/shot_157"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "local:e4da245a/shot_157"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_out",
+      "where": "local:e4da245a/shot_157"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_1"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_1"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "db:Sample1/shot_1"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_in",
+      "where": "db:Sample1/shot_1"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_2"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_2"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_3"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_3"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_4"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_4"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_6"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_6"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_7"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_7"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_8"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_8"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_out",
+      "where": "db:Sample1/shot_8"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_9"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_9"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_in",
+      "where": "db:Sample1/shot_9"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_10"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_10"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_11"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_11"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "db:Sample1/shot_12"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_13"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_13"
+    },
+    {
+      "field": "camera_motion.type",
+      "value": "shake",
+      "where": "db:Sample1/shot_14"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_15"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_15"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_16"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_16"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_out",
+      "where": "db:Sample1/shot_16"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_17"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_17"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_18"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_18"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_19"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_19"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_20"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_20"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_21"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_21"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_22"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_22"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_23"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_23"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Sample1/shot_23"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "db:Sample1/shot_24"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_in",
+      "where": "db:Sample1/shot_24"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "small",
+      "where": "db:Sample1/shot_26"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_28"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_28"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_30"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_30"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_out",
+      "where": "db:Sample1/shot_30"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_out",
+      "where": "db:Sample1/shot_37"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_38"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_38"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_39"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_39"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_40"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_40"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_41"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_41"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_43"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_43"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_44"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_44"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_45"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_45"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_46"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_46"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Sample1/shot_46"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_47"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_47"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_48"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_48"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_49"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_49"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_50"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_50"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_51"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_51"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_52"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_52"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_53"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_53"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "medium",
+      "where": "db:Sample1/shot_54"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_55"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_55"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Sample1/shot_55"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "static",
+      "where": "db:Sample1/shot_59"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "static",
+      "where": "db:Sample1/shot_59"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "db:Sample1/shot_59"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "db:Sample1/shot_62"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Sample1/shot_63"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_64"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_65"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "medium",
+      "where": "db:Sample1/shot_66"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_67"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_69"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_70"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_71"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_72"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_72"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Sample1/shot_72"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_73"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_73"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_76"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_76"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_77"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_77"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_80"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_80"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_81"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_81"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Sample1/shot_81"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_82"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_82"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_83"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_83"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_84"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_84"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_85"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_85"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_86"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_86"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_87"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_87"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_88"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_88"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_89"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_89"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Sample1/shot_89"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_90"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_90"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Sample1/shot_90"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_91"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_91"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_in",
+      "where": "db:Sample1/shot_91"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_92"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_92"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_93"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_93"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_94"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_94"
+    },
+    {
+      "field": "environmental_change[].magnitude",
+      "value": "minimal",
+      "where": "db:Sample1/shot_94"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_95"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_95"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_96"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_96"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_97"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_97"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_98"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_98"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_out",
+      "where": "db:Sample1/shot_98"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_99"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_99"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_100"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_100"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_101"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_101"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "db:Sample1/shot_101"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_102"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_102"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_104"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_104"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_105"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Sample1/shot_105"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Sample1/shot_105"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_106"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_107"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_108"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_109"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_110"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_111"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Sample1/shot_112"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Sample1/shot_113"
+    },
+    {
+      "field": "transition_in",
+      "value": "fade_from_black",
+      "where": "db:Sample1/shot_113"
+    },
+    {
+      "field": "transition_out",
+      "value": "none",
+      "where": "db:Sample1/shot_113"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_6"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_6"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_7"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_7"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_8"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_8"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_9"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_9"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "db:writer_test_260810/shot_9"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_10"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_10"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_11"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_11"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_12"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_12"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_14"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:writer_test_260810/shot_14"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "medium",
+      "where": "db:writer_test_260810/shot_15"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "medium",
+      "where": "db:writer_test_260810/shot_16"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:writer_test_260810/shot_16"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "db:writer_test_260810/shot_20"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_out",
+      "where": "db:writer_test_260810/shot_20"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_1"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_1"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_2"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_2"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_3"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_3"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_4"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_4"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_5"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_5"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_6"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_6"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_7"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_7"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_8"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_8"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_9"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_11"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_12"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_13"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_15"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Upload_test/shot_16"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_19"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_19"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "db:Upload_test/shot_26"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_27"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_27"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Upload_test/shot_34"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_35"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_35"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_36"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_36"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_37"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_37"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_38"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_38"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_39"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_39"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_41"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_41"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_42"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_42"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_43"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_43"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_44"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_44"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_45"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_45"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_46"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_46"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "db:Upload_test/shot_46"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_47"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_47"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_48"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_48"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_49"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_49"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_50"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_50"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "normal",
+      "where": "db:Upload_test/shot_51"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_52"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_52"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_54"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_54"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "moderate",
+      "where": "db:Upload_test/shot_54"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_55"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_55"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db:Upload_test/shot_55"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_56"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_56"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_57"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_57"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_58"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_58"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_59"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_59"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_60"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_60"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_61"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_61"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_62"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_62"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_63"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_63"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_64"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_64"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_65"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_65"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_67"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_67"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_68"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_68"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_69"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_69"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db:Upload_test/shot_70"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db:Upload_test/shot_70"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_out",
+      "where": "db:Upload_test/shot_70"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_02_06"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_02_06"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_02_07"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_02_07"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_02_09"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_02_09"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_02_11"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_02_11"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_02_12"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_02_12"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_02_10"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_02_10"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "db-shots:writer_test_260810/sh_02_10"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_03_16"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_03_16"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "medium",
+      "where": "db-shots:writer_test_260810/sh_03_18"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_to_black",
+      "where": "db-shots:writer_test_260810/sh_03_18"
+    },
+    {
+      "field": "camera_motion.speed",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_03_13"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "none",
+      "where": "db-shots:writer_test_260810/sh_03_13"
+    },
+    {
+      "field": "camera_motion.magnitude",
+      "value": "medium",
+      "where": "db-shots:writer_test_260810/sh_03_17"
+    },
+    {
+      "field": "character_motion[].magnitude",
+      "value": "minimal",
+      "where": "db-shots:writer_test_260810/sh_04_23"
+    },
+    {
+      "field": "transition_out",
+      "value": "fade_out",
+      "where": "db-shots:writer_test_260810/sh_04_23"
+    }
+  ]
+}

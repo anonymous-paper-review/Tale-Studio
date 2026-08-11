@@ -1,0 +1,886 @@
+{
+  "ticket": "t0-d2-cut-rhythm-band",
+  "date": "2026-08-11",
+  "contract": "src/lib/writer/pipeline/stages/v3_scene_plan.ts:102-111 — 고밀도(live_action 등) 6~9s / 중밀도(2d_anime 등) 5~7s / 저밀도(2d_cartoon 등) 3.5~5s",
+  "band_assignment_rule": "계약 문구에 명시된 art_style만 배정. cinematic_realism·gritty_industrial_noir는 NA(판정 제외)",
+  "per_scene": [
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_1",
+      "n_shots": 9,
+      "avg": 7.556
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_2",
+      "n_shots": 10,
+      "avg": 6.7
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_3",
+      "n_shots": 9,
+      "avg": 7.222
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_4",
+      "n_shots": 10,
+      "avg": 6.8
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_5",
+      "n_shots": 9,
+      "avg": 8
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_6",
+      "n_shots": 9,
+      "avg": 8
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_7",
+      "n_shots": 8,
+      "avg": 8
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_8",
+      "n_shots": 9,
+      "avg": 7.222
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_9",
+      "n_shots": 9,
+      "avg": 8
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_10",
+      "n_shots": 8,
+      "avg": 7.125
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_11",
+      "n_shots": 8,
+      "avg": 8
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_12",
+      "n_shots": 8,
+      "avg": 8
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_13",
+      "n_shots": 7,
+      "avg": 8.143
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_14",
+      "n_shots": 9,
+      "avg": 7.111
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_15",
+      "n_shots": 9,
+      "avg": 7.556
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_16",
+      "n_shots": 9,
+      "avg": 9
+    },
+    {
+      "source": "local:064631aa",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_17",
+      "n_shots": 9,
+      "avg": 9
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_1",
+      "n_shots": 9,
+      "avg": 8
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_2",
+      "n_shots": 9,
+      "avg": 5.889
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_3",
+      "n_shots": 8,
+      "avg": 7.875
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_4",
+      "n_shots": 6,
+      "avg": 9
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_5",
+      "n_shots": 10,
+      "avg": 6.3
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_6",
+      "n_shots": 12,
+      "avg": 5.167
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_7",
+      "n_shots": 9,
+      "avg": 6.444
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_8",
+      "n_shots": 9,
+      "avg": 8
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_9",
+      "n_shots": 9,
+      "avg": 6.444
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_10",
+      "n_shots": 9,
+      "avg": 7
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_11",
+      "n_shots": 10,
+      "avg": 5.4
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_12",
+      "n_shots": 9,
+      "avg": 6
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_13",
+      "n_shots": 9,
+      "avg": 7
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_14",
+      "n_shots": 9,
+      "avg": 7.222
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_15",
+      "n_shots": 9,
+      "avg": 7
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_16",
+      "n_shots": 9,
+      "avg": 8
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_17",
+      "n_shots": 9,
+      "avg": 8
+    },
+    {
+      "source": "local:5260d92d",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_18",
+      "n_shots": 9,
+      "avg": 9
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_1",
+      "n_shots": 10,
+      "avg": 6.5
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_2",
+      "n_shots": 10,
+      "avg": 7.3
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_3",
+      "n_shots": 10,
+      "avg": 7.5
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_4",
+      "n_shots": 10,
+      "avg": 7.1
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_5",
+      "n_shots": 12,
+      "avg": 6.5
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_6",
+      "n_shots": 12,
+      "avg": 7.167
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_7",
+      "n_shots": 11,
+      "avg": 8.545
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_8",
+      "n_shots": 13,
+      "avg": 7
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_9",
+      "n_shots": 12,
+      "avg": 6.75
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_10",
+      "n_shots": 12,
+      "avg": 7.833
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_11",
+      "n_shots": 12,
+      "avg": 7.917
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_12",
+      "n_shots": 8,
+      "avg": 7.5
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_13",
+      "n_shots": 9,
+      "avg": 6.667
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_14",
+      "n_shots": 8,
+      "avg": 6.25
+    },
+    {
+      "source": "local:e4da245a",
+      "art_style": "live_action",
+      "band": [
+        6,
+        9
+      ],
+      "scene": "scene_15",
+      "n_shots": 8,
+      "avg": 7.5
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_08",
+      "n_shots": 8,
+      "avg": 8.25
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_04",
+      "n_shots": 7,
+      "avg": 8
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_14",
+      "n_shots": 8,
+      "avg": 7.25
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_03",
+      "n_shots": 7,
+      "avg": 9.714
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_12",
+      "n_shots": 8,
+      "avg": 8.875
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_01",
+      "n_shots": 9,
+      "avg": 7
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_02",
+      "n_shots": 8,
+      "avg": 7.5
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_06",
+      "n_shots": 10,
+      "avg": 8.4
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_10",
+      "n_shots": 9,
+      "avg": 8
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_05",
+      "n_shots": 7,
+      "avg": 8.429
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_11",
+      "n_shots": 9,
+      "avg": 7.333
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_09",
+      "n_shots": 9,
+      "avg": 8.333
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_13",
+      "n_shots": 7,
+      "avg": 8.286
+    },
+    {
+      "source": "db:Sample1",
+      "art_style": "cinematic_realism",
+      "band": null,
+      "scene": "sc_07",
+      "n_shots": 10,
+      "avg": 8.5
+    },
+    {
+      "source": "db:writer_test_260810",
+      "art_style": "gritty_industrial_noir",
+      "band": null,
+      "scene": "sc_01",
+      "n_shots": 5,
+      "avg": 6
+    },
+    {
+      "source": "db:writer_test_260810",
+      "art_style": "gritty_industrial_noir",
+      "band": null,
+      "scene": "sc_02",
+      "n_shots": 7,
+      "avg": 5.143
+    },
+    {
+      "source": "db:writer_test_260810",
+      "art_style": "gritty_industrial_noir",
+      "band": null,
+      "scene": "sc_03",
+      "n_shots": 7,
+      "avg": 5
+    },
+    {
+      "source": "db:writer_test_260810",
+      "art_style": "gritty_industrial_noir",
+      "band": null,
+      "scene": "sc_04",
+      "n_shots": 4,
+      "avg": 6
+    },
+    {
+      "source": "db:Upload_test",
+      "art_style": "2d_cartoon",
+      "band": [
+        3.5,
+        5
+      ],
+      "scene": "sc_01",
+      "n_shots": 16,
+      "avg": 4.625
+    },
+    {
+      "source": "db:Upload_test",
+      "art_style": "2d_cartoon",
+      "band": [
+        3.5,
+        5
+      ],
+      "scene": "sc_02",
+      "n_shots": 18,
+      "avg": 4.722
+    },
+    {
+      "source": "db:Upload_test",
+      "art_style": "2d_cartoon",
+      "band": [
+        3.5,
+        5
+      ],
+      "scene": "sc_03",
+      "n_shots": 21,
+      "avg": 4.524
+    },
+    {
+      "source": "db:Upload_test",
+      "art_style": "2d_cartoon",
+      "band": [
+        3.5,
+        5
+      ],
+      "scene": "sc_04",
+      "n_shots": 15,
+      "avg": 4.8
+    }
+  ],
+  "analysis": {
+    "live_action": {
+      "label": "live_action(로컬 3런)",
+      "band": [
+        6,
+        9
+      ],
+      "n_scenes": 50,
+      "support": [
+        5.167,
+        9
+      ],
+      "interp_a_bandwidth10": {
+        "zones": [
+          [
+            5.7,
+            6.3
+          ],
+          [
+            8.7,
+            9.3
+          ]
+        ],
+        "observed": {
+          "inZone": 8,
+          "n": 50,
+          "share": 0.16
+        },
+        "uniform_share": 0.2348,
+        "overrep": 0.68
+      },
+      "interp_b_value10": {
+        "zones": [
+          [
+            5.4,
+            6.6000000000000005
+          ],
+          [
+            8.1,
+            9.9
+          ]
+        ],
+        "observed": {
+          "inZone": 15,
+          "n": 50,
+          "share": 0.3
+        },
+        "uniform_share": 0.5479,
+        "overrep": 0.55
+      },
+      "inside_band": {
+        "inZone": 47,
+        "n": 50,
+        "share": 0.94
+      },
+      "below_band": 3,
+      "above_band": 0,
+      "histogram_bins_0p5": {
+        "5.0": 2,
+        "5.5": 1,
+        "6.0": 5,
+        "6.5": 6,
+        "7.0": 12,
+        "7.5": 8,
+        "8.0": 11,
+        "8.5": 1,
+        "9.0": 4
+      }
+    },
+    "2d_cartoon": {
+      "label": "2d_cartoon(Upload_test)",
+      "band": [
+        3.5,
+        5
+      ],
+      "n_scenes": 4,
+      "support": [
+        4.524,
+        4.8
+      ],
+      "interp_a_bandwidth10": {
+        "zones": [
+          [
+            3.35,
+            3.65
+          ],
+          [
+            4.85,
+            5.15
+          ]
+        ],
+        "observed": {
+          "inZone": 0,
+          "n": 4,
+          "share": 0
+        },
+        "uniform_share": 0,
+        "overrep": null
+      },
+      "interp_b_value10": {
+        "zones": [
+          [
+            3.15,
+            3.8500000000000005
+          ],
+          [
+            4.5,
+            5.5
+          ]
+        ],
+        "observed": {
+          "inZone": 4,
+          "n": 4,
+          "share": 1
+        },
+        "uniform_share": 1,
+        "overrep": 1
+      },
+      "inside_band": {
+        "inZone": 4,
+        "n": 4,
+        "share": 1
+      },
+      "below_band": 0,
+      "above_band": 0,
+      "histogram_bins_0p5": {
+        "4.5": 4
+      }
+    },
+    "na_sources": {
+      "db:Sample1": {
+        "art_style": "cinematic_realism",
+        "scenes": 14
+      },
+      "db:writer_test_260810": {
+        "art_style": "gritty_industrial_noir",
+        "scenes": 4
+      }
+    }
+  }
+}
