@@ -3,7 +3,7 @@ import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
-import { stripLeakedUpdatesBlock } from '@/lib/agentic-reply-guard'
+import { parseFencedJsonReply, updatesFrom } from '@/lib/agentic-reply-guard'
 import { normalizeProvider } from '@/lib/video-models'
 
 // ──────────────────────────────────────────────────────────────────────
@@ -377,17 +377,9 @@ function parseAgenticResponse(text: string): {
   reply: string
   updates: unknown[]
 } {
-  const jsonMatch = text.match(/```json\s*\n?([\s\S]*?)\n?```\s*$/)
-  // 펜스 미완결(max_tokens 잘림)·파싱 실패 시 raw JSON 을 채팅에 노출하지 않는다(유출 방어, 임시 조치).
-  if (!jsonMatch) return { reply: stripLeakedUpdatesBlock(text), updates: [] }
-  const reply = text.slice(0, jsonMatch.index).trim()
-  try {
-    const parsed = JSON.parse(jsonMatch[1])
-    const raw = Array.isArray(parsed.updates) ? parsed.updates : []
-    return { reply, updates: validateCanvasUpdates(raw) }
-  } catch {
-    return { reply: stripLeakedUpdatesBlock(text), updates: [] }
-  }
+  // 펜스 추출·복구·유출 방어·신호는 공용 가드가 담당(#p4-json-guard). 여기선 화이트리스트만.
+  const { reply, data } = parseFencedJsonReply(text, 'director/chat')
+  return { reply, updates: validateCanvasUpdates(updatesFrom(data)) }
 }
 
 function parseLegacyResponse(text: string): {
@@ -396,22 +388,15 @@ function parseLegacyResponse(text: string): {
   suggestedLighting?: Record<string, unknown>
   techniques?: string[]
 } {
-  const jsonMatch = text.match(/```json\s*\n?([\s\S]*?)\n?```\s*$/)
-  if (jsonMatch) {
-    const reply = text.slice(0, jsonMatch.index).trim()
-    try {
-      const parsed = JSON.parse(jsonMatch[1])
-      return {
-        reply,
-        suggestedCamera: parsed.suggestedCamera,
-        suggestedLighting: parsed.suggestedLighting,
-        techniques: parsed.techniques,
-      }
-    } catch {
-      return { reply: text }
-    }
+  // agentic 경로와 같은 가드를 태운다 — 종전엔 실패 시 raw JSON 이 그대로 노출됐다(#p4-json-guard).
+  const { reply, data } = parseFencedJsonReply(text, 'director/chat:legacy')
+  if (!data) return { reply }
+  return {
+    reply,
+    suggestedCamera: data.suggestedCamera as Record<string, number> | undefined,
+    suggestedLighting: data.suggestedLighting as Record<string, unknown> | undefined,
+    techniques: data.techniques as string[] | undefined,
   }
-  return { reply: text }
 }
 
 export async function POST(req: Request) {

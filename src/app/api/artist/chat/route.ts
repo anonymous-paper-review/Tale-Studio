@@ -10,6 +10,7 @@ import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
+import { parseFencedJsonReply, updatesFrom } from '@/lib/agentic-reply-guard'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildArtistActivityContext } from '@/lib/artist/chat-context'
 import {
@@ -127,18 +128,12 @@ function parseUpdates(text: string): {
   updates: unknown[]
   proposals: AppearanceProposal[]
 } {
-  const jsonMatch = text.match(/```json\s*\n?([\s\S]*?)\n?```\s*$/)
-  if (!jsonMatch) return { reply: text, updates: [], proposals: [] }
-
-  const reply = text.slice(0, jsonMatch.index).trim()
-  try {
-    const parsed = JSON.parse(jsonMatch[1])
-    const raw = Array.isArray(parsed.updates) ? parsed.updates : []
-    // updates = 자동 실행(화이트리스트). proposals = 원천 외형 변경(승인 게이트 — F6).
-    return { reply, updates: validateUpdates(raw), proposals: extractAppearanceProposals(raw) }
-  } catch {
-    return { reply: text, updates: [], proposals: [] }
-  }
+  // #p4-json-guard: 종전엔 이 라우트만 방어가 없어 파싱 실패 시 raw JSON 을 채팅에 그대로
+  //   노출하고 updates 를 조용히 폐기했다(writer/director 는 안내 문구가 있었다). 공용 가드로 정렬.
+  const { reply, data } = parseFencedJsonReply(text, 'artist/chat')
+  const raw = updatesFrom(data)
+  // updates = 자동 실행(화이트리스트). proposals = 원천 외형 변경(승인 게이트 — F6).
+  return { reply, updates: validateUpdates(raw), proposals: extractAppearanceProposals(raw) }
 }
 
 export async function POST(req: Request) {

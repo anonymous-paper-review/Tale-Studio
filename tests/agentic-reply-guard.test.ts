@@ -1,6 +1,10 @@
 // 채팅 updates JSON 유출 방어 (임시 조치 2026-07-15) — 잘린/깨진 펜스가 raw 로 노출되지 않는 계약.
-import { describe, expect, it } from 'vitest'
-import { stripLeakedUpdatesBlock } from '@/lib/agentic-reply-guard'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  parseFencedJsonReply,
+  stripLeakedUpdatesBlock,
+  updatesFrom,
+} from '@/lib/agentic-reply-guard'
 
 describe('stripLeakedUpdatesBlock', () => {
   it('펜스가 없는 일반 응답은 그대로 통과한다', () => {
@@ -21,5 +25,61 @@ describe('stripLeakedUpdatesBlock', () => {
     const out = stripLeakedUpdatesBlock('```json\n{"updates":[')
     expect(out).toContain('나눠 다시 요청')
     expect(out).not.toContain('```')
+  })
+})
+
+// #p4-json-guard(2026-08-11) — 펜스 JSON 4상태 계약. 종전 갭: 복구 시도 없음 / artist 무방어 /
+//   서버 로그 없음 / "펜스 없음(정상 대화)"과 "펜스 깨짐(사고)"을 구분 못 함.
+describe('parseFencedJsonReply', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  const shot = (id: string) => `{"type":"updateShot","id":"${id}","patch":{"note":"x"}}`
+
+  it('펜스가 없으면 실패가 아니라 순수 대화 턴(none)이다', () => {
+    const r = parseFencedJsonReply('와이드샷은 공간의 규모를 담으려는 의도예요.', 'test')
+    expect(r.status).toBe('none')
+    expect(r.data).toBeNull()
+    expect(updatesFrom(r.data)).toEqual([])
+    expect(r.reply).toContain('와이드샷')
+  })
+
+  it('정상 펜스는 본문만 남기고 updates 를 넘긴다', () => {
+    const text = `3개 바꿨어요.\n\n\`\`\`json\n{"updates":[${shot('a')},${shot('b')},${shot('c')}]}\n\`\`\``
+    const r = parseFencedJsonReply(text, 'test')
+    expect(r.status).toBe('ok')
+    expect(updatesFrom(r.data)).toHaveLength(3)
+    expect(r.reply).toBe('3개 바꿨어요.')
+    expect(r.reply).not.toContain('```')
+  })
+
+  it('잘린 펜스는 온전한 항목만 살리고 "일부만 적용" 을 알린다(종전: 전부 폐기)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // 3번째 항목을 쓰다가 max_tokens 로 끊긴 형태 — 닫는 펜스 없음
+    const text = `전체 76개 샷을 업데이트합니다.\n\n\`\`\`json\n{"updates":[${shot('a')},${shot('b')},{"type":"updateShot","id":"c","patch":{"note":"잘린`
+    const r = parseFencedJsonReply(text, 'test')
+    expect(r.status).toBe('recovered')
+    expect(updatesFrom(r.data).length).toBeGreaterThan(0)
+    expect(r.reply).toContain('전체 76개 샷을 업데이트합니다.')
+    expect(r.reply).toContain('일부만 적용')
+    expect(r.reply).not.toContain('```') // raw 유출 없음
+    expect(warn).toHaveBeenCalled() // 서버 신호
+  })
+
+  it('복구 불가면 raw 를 노출하지 않고 미적용을 알린다', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const r = parseFencedJsonReply('설명입니다.\n\n```json\n이건 JSON 이 아니라 산문입니다\n```', 'test')
+    expect(r.status).toBe('failed')
+    expect(r.data).toBeNull()
+    expect(r.reply).toContain('설명입니다.')
+    expect(r.reply).not.toContain('```')
+    expect(r.reply).toMatch(/읽지 못했|잘렸어요/)
+    expect(warn).toHaveBeenCalled()
+  })
+
+  it('펜스 뒤에 후행 텍스트가 있어도 파싱한다(끝 고정 정규식의 사각)', () => {
+    const text = `바꿨어요.\n\n\`\`\`json\n{"updates":[${shot('a')}]}\n\`\`\`\n\n추가 설명입니다.`
+    const r = parseFencedJsonReply(text, 'test')
+    expect(r.status).toBe('ok')
+    expect(updatesFrom(r.data)).toHaveLength(1)
   })
 })
