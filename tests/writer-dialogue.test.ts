@@ -152,6 +152,34 @@ describe('normalizeSceneDialogue — 샷 집합 계약', () => {
   it('shots 없는 응답은 throw', () => {
     expect(() => normalizeSceneDialogue({ scene_id: 'x' }, 'x', shots)).toThrow(/unexpected shape/)
   })
+
+  // #p4-json-guard: 침묵으로 채우고 나면 "모델이 침묵을 골랐다"와 "답이 잘려 사라졌다"가
+  //   결과물에서 똑같이 생긴다. 응답에 아예 없던 샷만 여기서 구분할 수 있다.
+  it('응답에 없던 샷을 missing_shot_ids 로 표면화한다 (침묵 vs 소실 구분)', () => {
+    const out = normalizeSceneDialogue(
+      { scene_id: 'scene_1', shots: [{ shot_id: 'shot_1', dialogue: [], narration: null }] },
+      'scene_1',
+      shots,
+    )
+    expect(out.missing_shot_ids).toEqual(['shot_2'])
+    // shot_1 은 응답에 있었고 모델이 침묵을 골랐다 — 누락이 아니다.
+    expect(out.shots[0].dialogue).toEqual([])
+  })
+
+  it('전 샷이 응답에 있으면 missing_shot_ids 를 달지 않는다', () => {
+    const out = normalizeSceneDialogue(
+      {
+        scene_id: 'scene_1',
+        shots: [
+          { shot_id: 'shot_1', dialogue: [], narration: null },
+          { shot_id: 'shot_2', dialogue: [{ character_id: 'a', line: '말' }], narration: null },
+        ],
+      },
+      'scene_1',
+      shots,
+    )
+    expect(out.missing_shot_ids).toBeUndefined()
+  })
 })
 
 describe('applyMemoryUpdate — 전개 메모리', () => {

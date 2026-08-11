@@ -6,7 +6,7 @@ import {
   HarmBlockThreshold,
 } from '@google/generative-ai';
 import { recordRawCall } from './raw_collector';
-import { repairJson } from './json_repair';
+import { repairJsonStrict } from './json_repair';
 import { withLlmRetry } from './retry';
 
 // TALE_ 우선 — 표준 이름은 Bun 기반 CLI가 .env.local에서 크리덴셜로 오인 수집 (src/lib/claude.ts 참조)
@@ -144,7 +144,7 @@ export async function geminiGenerateJson<T>(
   } catch {
     // 마크다운 fence / 미종료 문자열 / 잘린 배열-객체 복구 시도
     try {
-      return repairJson<T>(text);
+      return repairJsonStrict<T>(text);
     } catch (repairErr) {
       const msg = repairErr instanceof Error ? repairErr.message : String(repairErr);
       throw new Error(`Gemini JSON parse failed: ${msg}`);

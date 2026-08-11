@@ -1,6 +1,6 @@
 // OpenAI 클라이언트 (S/V/C 어느 축이든 사용 가능)
 import { recordRawCall } from './raw_collector';
-import { repairJson } from './json_repair';
+import { repairJsonStrict } from './json_repair';
 import { withLlmRetry } from './retry';
 
 // TALE_ 우선 — 표준 이름은 Bun 기반 CLI가 .env.local에서 크리덴셜로 오인 수집 (src/lib/claude.ts 참조)
@@ -117,7 +117,7 @@ export async function openaiGenerateJson<T>(
     return JSON.parse(text) as T;
   } catch {
     try {
-      return repairJson<T>(text);
+      return repairJsonStrict<T>(text);
     } catch (repairErr) {
       const msg = repairErr instanceof Error ? repairErr.message : String(repairErr);
       throw new Error(`OpenAI JSON parse failed: ${msg}`);

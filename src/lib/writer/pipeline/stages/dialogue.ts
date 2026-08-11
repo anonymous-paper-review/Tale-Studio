@@ -157,6 +157,11 @@ function memorySection(memory: DialogueMemory): string {
 }
 
 interface SceneDialogueResponse extends SceneShotDialogue {
+  /** 응답에 **아예 없던** 샷 id (#p4-json-guard 2026-08-11). 프롬프트 계약은 "전부 포함"이라
+   *  누락은 계약 위반이다 — 손실 복구 절단이든 모델 누락이든. 이 구분이 중요한 이유:
+   *  누락 샷은 침묵으로 채워지는데, **침묵은 원래 정상**(행동이 말하는 샷)이라 결과물만 보면
+   *  "모델이 침묵을 골랐다"와 "답이 잘려 사라졌다"가 똑같이 생겼다. 여기서만 구분할 수 있다. */
+  missing_shot_ids?: string[];
   memory_update?: {
     new_facts?: string[];
     relationship_state?: string;
@@ -231,8 +236,10 @@ export function normalizeSceneDialogue(
     throw new Error(`dialogue unexpected shape (${sceneId}): ${JSON.stringify(raw).slice(0, 200)}`);
   }
   const byId = new Map(obj.shots.map((s) => [s.shot_id, s]));
+  const missing: string[] = [];
   const normalized: ShotDialogue[] = shots.map((s) => {
     const found = byId.get(s.shot_id);
+    if (!found) missing.push(s.shot_id);
     return found
       ? {
           shot_id: s.shot_id,
@@ -246,7 +253,12 @@ export function normalizeSceneDialogue(
         }
       : { shot_id: s.shot_id, dialogue: [], narration: null };
   });
-  return { scene_id: sceneId, shots: normalized, memory_update: obj.memory_update };
+  return {
+    scene_id: sceneId,
+    shots: normalized,
+    ...(missing.length ? { missing_shot_ids: missing } : {}),
+    memory_update: obj.memory_update,
+  };
 }
 
 export async function dialogueForScene(
@@ -319,6 +331,17 @@ ${JSON.stringify(
   });
 
   const normalized = normalizeSceneDialogue(raw, scene.scene_id, shots);
+  // 누락 샷 표면화(#p4-json-guard) — 침묵으로 채워지고 나면 정상 침묵과 구분 불가라 여기서만 보인다.
+  if (normalized.missing_shot_ids?.length) {
+    console.warn(
+      `[dialogue] ${scene.scene_id}: 응답에 없던 샷 ${normalized.missing_shot_ids.length}/${shots.length}개 — 침묵으로 채움 (${normalized.missing_shot_ids.join(', ')})`,
+    );
+    await logger.markStage('dialogue', 'started', {
+      scene_id: scene.scene_id,
+      missing_shots: normalized.missing_shot_ids.length,
+      missing_shot_ids: normalized.missing_shot_ids,
+    });
+  }
   return {
     scene: { scene_id: normalized.scene_id, shots: normalized.shots },
     memory: applyMemoryUpdate(memory, normalized.memory_update),

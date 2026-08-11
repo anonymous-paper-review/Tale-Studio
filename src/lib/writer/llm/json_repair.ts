@@ -11,6 +11,36 @@ export function repairJson<T = unknown>(raw: string): T {
   return repairJsonWithMeta<T>(raw).value
 }
 
+/** 손실 복구(전략2·3)를 **에러로 표면화**한다 — 호출자가 "한 번 더 물어볼지"를 결정할 수 있게.
+ *
+ *  왜 에러인가: 손실 복구는 데이터를 버리고도 파싱을 성립시켜 "정상"으로 통과한다(무신호 손실).
+ *  이 자리(문자열 복구기)는 프롬프트도 모델도 모르므로 스스로 재호출할 수 없다 — 그래서 신호만
+ *  올려보내고 판단은 dispatch 에 맡긴다. 재호출도 잘리면 그때 쓰라고 **살아남은 값을 error.value
+ *  에 실어 보낸다**(그 경우 종전과 동일한 최악치로 수렴한다 — 이 변경으로 잃는 것은 없다).
+ *
+ *  ⚠️ repairJson(비-strict)의 계약은 그대로다. 기존 호출자(agentic-reply-guard 등)는 영향 없음. */
+export class LossyRepairError extends Error {
+  constructor(
+    readonly value: unknown,
+    readonly strategy: RepairStrategy,
+    readonly rawLength: number,
+    readonly items: number | null,
+  ) {
+    super(
+      `repairJson: 손실 복구(${strategy}) — 원문 ${rawLength}자, 복구된 최상위 아이템 ${items ?? '미상'}개`,
+    )
+    this.name = 'LossyRepairError'
+  }
+}
+
+export function repairJsonStrict<T = unknown>(raw: string): T {
+  const { value, strategy } = repairJsonWithMeta<T>(raw)
+  if (strategy === 'close' || strategy === 'trim') {
+    throw new LossyRepairError(value, strategy, raw.length, countItems(value))
+  }
+  return value
+}
+
 export function repairJsonWithMeta<T = unknown>(raw: string): { value: T; strategy: RepairStrategy } {
   const stripped = raw
     .replace(/^\uFEFF/, '')

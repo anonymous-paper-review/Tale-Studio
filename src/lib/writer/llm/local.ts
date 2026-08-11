@@ -1,7 +1,7 @@
 // 로컬 모델 클라이언트 (vLLM/sglang/lmstudio 등 OpenAI 호환 엔드포인트)
 // 예: Pro6000 서버의 Qwen3.6 (포트 8000/8001)
 import { recordRawCall } from './raw_collector';
-import { repairJson } from './json_repair';
+import { repairJsonStrict } from './json_repair';
 
 let callCount = 0;
 export function getLocalCallCount() {
@@ -95,7 +95,7 @@ export async function localGenerateJson<T>(
     return JSON.parse(text) as T;
   } catch {
     try {
-      return repairJson<T>(text);
+      return repairJsonStrict<T>(text);
     } catch (repairErr) {
       const msg = repairErr instanceof Error ? repairErr.message : String(repairErr);
       throw new Error(`Local JSON parse failed: ${msg}`);

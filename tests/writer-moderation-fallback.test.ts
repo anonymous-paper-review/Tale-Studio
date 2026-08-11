@@ -20,6 +20,7 @@ vi.mock('@/lib/writer/llm/openai', () => ({ openaiGenerateJson: mocks.openai }))
 vi.mock('@/lib/writer/llm/local', () => ({ localGenerateJson: mocks.local }))
 
 import { generateJson, DEFAULT_MODELS } from '@/lib/writer/llm/dispatch'
+import { LossyRepairError, repairJsonStrict, repairJson } from '@/lib/writer/llm/json_repair'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -53,5 +54,70 @@ describe('generateJson 모더레이션 폴백', () => {
     ).rejects.toThrow()
     expect(mocks.claude).toHaveBeenCalledTimes(1)
     expect(mocks.gemini).not.toHaveBeenCalled()
+  })
+})
+
+// ── #p4-json-guard (2026-08-11) ────────────────────────────────────────────
+// 손실 복구는 데이터를 버리고도 파싱을 성립시켜 "정상"으로 통과한다(무신호 손실).
+//   실측: 2026-08-11 shotDesign 9런에서 238콜 중 5콜(약 2%)이 손실 복구로 통과했다.
+//   처방은 "복구기가 신호를 올리고 → dispatch 가 한 번 다시 묻는다".
+
+describe('repairJsonStrict — 손실 복구를 에러로 표면화', () => {
+  it('무손실 복구(펜스 제거·잉여 문자 삭제)는 종전대로 값을 돌려준다', () => {
+    expect(repairJsonStrict('```json\n{"a":1}\n```')).toEqual({ a: 1 })
+    expect(repairJsonStrict('{"a":1,,"b":2}')).toEqual({ a: 1, b: 2 }) // 잉여 콤마 = punch
+  })
+
+  it('잘린 응답은 LossyRepairError 로 던지되 살아남은 값을 실어 보낸다', () => {
+    let err: unknown
+    try {
+      repairJsonStrict('{"shots":[{"a":1},{"b":2},{"c":')
+    } catch (e) {
+      err = e
+    }
+    expect(err).toBeInstanceOf(LossyRepairError)
+    const lossy = err as LossyRepairError
+    expect(lossy.strategy).toBe('trim')
+    expect(lossy.items).toBe(2) // 3개를 만들려다 2개만 살아남았다
+    expect(lossy.value).toEqual({ shots: [{ a: 1 }, { b: 2 }] })
+  })
+
+  it('비-strict repairJson 의 계약은 그대로다 (기존 호출자 무영향)', () => {
+    expect(repairJson('{"shots":[{"a":1},{"b":2},{"c":')).toEqual({ shots: [{ a: 1 }, { b: 2 }] })
+  })
+})
+
+describe('generateJson — 손실 복구 재호출', () => {
+  const lossy = () => new LossyRepairError({ shots: [{ a: 1 }] }, 'trim', 6192, 1)
+
+  it('손실 복구가 감지되면 같은 질문을 한 번 다시 던진다', async () => {
+    mocks.gemini.mockRejectedValueOnce(lossy()).mockResolvedValueOnce({ shots: [1, 2, 3] })
+
+    const r = await generateJson('p', { provider: 'gemini' })
+    expect(r).toEqual({ shots: [1, 2, 3] }) // 재호출 결과를 쓴다
+    expect(mocks.gemini).toHaveBeenCalledTimes(2)
+    expect(mocks.claude).not.toHaveBeenCalled() // 모더레이션 폴백과 섞이지 않는다
+  })
+
+  it('재호출도 잘리면 살아남은 값으로 진행한다 (종전과 동일한 최악치)', async () => {
+    mocks.gemini.mockRejectedValueOnce(lossy()).mockRejectedValueOnce(lossy())
+
+    const r = await generateJson('p', { provider: 'gemini' })
+    expect(r).toEqual({ shots: [{ a: 1 }] })
+    expect(mocks.gemini).toHaveBeenCalledTimes(2) // 재호출은 딱 한 번 — 무한 반복 없음
+  })
+
+  it('재호출이 다른 오류로 죽으면 그 오류를 표면화한다', async () => {
+    mocks.gemini.mockRejectedValueOnce(lossy()).mockRejectedValueOnce(new Error('503 overloaded'))
+
+    await expect(generateJson('p', { provider: 'gemini' })).rejects.toThrow('503 overloaded')
+    expect(mocks.gemini).toHaveBeenCalledTimes(2)
+  })
+
+  it('손실 복구가 없으면 재호출하지 않는다', async () => {
+    mocks.gemini.mockResolvedValueOnce({ ok: true })
+
+    await generateJson('p', { provider: 'gemini' })
+    expect(mocks.gemini).toHaveBeenCalledTimes(1)
   })
 })

@@ -3,6 +3,7 @@ import { geminiGenerateJson } from './gemini';
 import { claudeGenerateJson } from './claude';
 import { openaiGenerateJson } from './openai';
 import { localGenerateJson } from './local';
+import { LossyRepairError } from './json_repair';
 import type { LlmProvider } from './raw_collector';
 import type { z } from 'zod';
 
@@ -81,6 +82,29 @@ async function generateJsonRaw<T>(
   try {
     return await dispatchOnce<T>(prompt, cfg, opts);
   } catch (e) {
+    // 손실 복구 재호출(#p4-json-guard 2026-08-11). 응답이 중간에 끊겨 복구기가 뒤를 잘라내면
+    //   데이터를 버리고도 파싱이 성립해 "정상"으로 통과한다(무신호 손실 — 8샷→2샷이 에러 0으로
+    //   통과한 실사고의 기제). 같은 질문을 **한 번만** 다시 던진다.
+    //   실측 빈도(2026-08-11 shotDesign 9런): 238콜 중 5콜 = 약 2% — 비용 증가는 그만큼이다.
+    //   두 번째도 잘리면 살아남은 값(err.value)으로 진행한다 = 종전과 동일한 최악치.
+    //   ⚠️ 이건 "왜 잘렸는지"를 고치지 않는다. 기대 개수를 아는 스테이지는 자체 개수 가드를
+    //      함께 둬야 한다(v4_shots 의 judgeShotCount 가 그 예).
+    if (e instanceof LossyRepairError) {
+      console.warn(
+        `[dispatch] 손실 복구 감지 → 재호출 1회 (${describeAxisConfig(cfg)}, ${e.message})`,
+      );
+      try {
+        return await dispatchOnce<T>(prompt, cfg, opts);
+      } catch (retryErr) {
+        if (retryErr instanceof LossyRepairError) {
+          console.error(
+            `[dispatch] 재호출도 손실 복구 — 살아남은 값으로 진행 (${retryErr.message})`,
+          );
+          return retryErr.value as T;
+        }
+        throw retryErr;
+      }
+    }
     // 모더레이션 폴백(#moderation-fallback 2026-08-05): gemini 의 PROHIBITED_CONTENT 는
     //   safetySettings(BLOCK_NONE)로도 못 끄는 하드 필터 층 — 픽션 previz 텍스트(10대 주인공+
     //   추격/무기)가 확률적으로 걸리고, 씬 병렬 콜 1개 실패 = 런 전체 사망이었다(실측 2d47b311).

@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type { z } from 'zod';
 import { recordRawCall } from './raw_collector';
-import { repairJson } from './json_repair';
+import { repairJsonStrict, LossyRepairError } from './json_repair';
 import { withLlmRetry } from './retry';
 
 const apiKey = process.env.CLAUDE_API_KEY;
@@ -153,16 +153,20 @@ export async function claudeGenerateJson<T>(
     return JSON.parse(text) as T;
   } catch {
     try {
-      return repairJson<T>(text);
+      return repairJsonStrict<T>(text);
     } catch (repairErr) {
+      // 손실 복구 신호는 **타입을 보존해** 올려보낸다(#p4-json-guard) — dispatch 가 재호출을 결정한다.
+      //   여기서 Error 로 감싸면 그 판단 재료도, 살아남은 값도 함께 사라진다.
+      if (repairErr instanceof LossyRepairError) throw repairErr;
       // 최종 방어(#p4-websearch 실측): 서술이 JSON 을 감싼 형태("…반영하여, {…} ```")는 repairJson 이
       //   "not JSON-shaped"로 거부 — JSON 본체 구간만 잘라 한 번 더 복구를 시도한다.
       const start = text.search(/[{[]/);
       const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
       if (start >= 0 && end > start) {
         try {
-          return repairJson<T>(text.slice(start, end + 1));
-        } catch {
+          return repairJsonStrict<T>(text.slice(start, end + 1));
+        } catch (sliceErr) {
+          if (sliceErr instanceof LossyRepairError) throw sliceErr;
           // 아래 원 오류로 표면화
         }
       }
