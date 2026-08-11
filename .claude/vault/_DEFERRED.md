@@ -124,14 +124,17 @@
 - **되살릴 좌표**: `c_application_2.ts` 의 semantic_issues → v4 재실행 경로, 채널 1 = `check_notes`.
 - 기록: 2026-08-11 (원 발화 2026-08-04)
 
-### D-011 · producer 스타일&톤 → 생성 프롬프트 반영 배선 (b1)   `상태: blocked (오너 주도)`
-- **무엇을**: 스타일 앵커 선택이 생성 프롬프트까지 반영되게 배선한다. 현재는 `projects.style_anchor_key`
-  저장과 앵커 이미지의 레퍼런스 주입까지만 되어 있다.
+### D-011 · producer 스타일&톤 → 생성 프롬프트 반영 배선 (b1)   `상태: 대부분 완료 — 잔여 확인 필요`
+- **무엇을**: 스타일 앵커 선택이 생성 프롬프트까지 반영되게 배선한다.
 - **왜 미뤘나**: 오너가 시점을 직접 정하겠다고 했다 — "b1은 나중에 할거라 내가 추후 말해줄게"(2026-07-13).
-  이후 작업 목록에도 "do NOT start" 항목으로 계속 실려 있었다.
-- **언제 꺼내나**: 오너가 지시할 때.
-- **되살릴 좌표**: `projects.style_anchor_key`, `style_anchors` 테이블, artist generate-sheet/generate-world 프롬프트.
+- **언제 꺼내나**: 아래 정정을 감안해, 남은 경로가 실제로 있는지 확인한 뒤 판단.
+- **되살릴 좌표**: `src/lib/style-anchor.ts`(`applyStyleAnchor`), 적용처 4곳 — artist generate-sheet,
+  artist world-submit, artist draft-trigger, director generate-storyboard.
 - 기록: 2026-08-11 (원 발화 2026-07-13)
+- ※ 2026-08-11 코드 대조 정정: 채굴 당시 "키 저장까지만"으로 적었으나 **이미 배선돼 있다** —
+  `generate-sheet/route.ts:138-149` 가 앵커를 resolve 해 적용하고 **앵커가 있으면 art_style 토큰을
+  억제**한다(2026-07-14 실측 근거 주석). 러프 previz 는 연필이라 애초에 대상이 아니므로,
+  남은 것이 있다면 영상 계열뿐이다. 오너 지시 대기 항목이라기보다 **잔여 범위 확인 건**으로 강등.
 
 ### D-012 · 스타일&톤 그리드 예시 이미지 투입   `상태: blocked (오너 입력 대기)`
 - **무엇을**: 스타일 선택 팝업 그리드에 보일 예시 이미지를 넣는다. 자리는 잡혀 있고 지금은 빈칸이다.
@@ -165,13 +168,15 @@
 - **되살릴 좌표**: 기능 자체가 아직 없음. 관련 리서치는 `.claude/vault/2026-08-11-blockout-previz-video-reference.md`.
 - 기록: 2026-08-11 (원 발화 2026-08-04)
 
-### D-016 · web search 전면 확대   `상태: blocked`
-- **무엇을**: 웹 검색 접지를 모든 LLM 호출로 넓힌다. 현재는 producer 채팅과 스토리 축 s1/s3 만 켜져 있다.
+### D-016 · web search 전면 확대   `상태: 대기`
+- **무엇을**: 웹 검색 접지를 남은 LLM 호출로 넓힌다. 현재 켜진 곳은 producer 채팅과 스토리 축 s1/s3.
 - **왜 미뤘나**: 지연·비용을 측정하지 않아 단계적으로 가기로 했다("전면 확대는 지연·비용 측정 후 단계적으로").
-- **언제 꺼내나**: 켜진 구간의 지연·비용을 측정한 뒤. 참고로 감사에서 **claude 프로바이더는 webSearch
-  인자를 아예 안 받는다**는 사실이 확인됐다(dispatch 가 gemini 에만 전달) — 확대 전에 이걸 먼저 고쳐야 한다.
-- **되살릴 좌표**: `dispatch.ts`(webSearch 옵션), `gemini.ts`(googleSearch), `claude.ts`(필드 부재), `openai.ts`(미배선).
+- **언제 꺼내나**: 켜진 구간의 지연·비용을 측정한 뒤.
+- **되살릴 좌표**: `dispatch.ts`(webSearch 옵션), `gemini.ts`(googleSearch), `claude.ts`, `openai.ts`(미배선).
 - 기록: 2026-08-11 (원 발화 2026-08-04/06)
+- ※ 2026-08-11 코드 대조 정정: 채굴 당시 "claude 는 webSearch 인자를 아예 안 받는다"고 적었으나
+  **현재 코드는 받는다** — `claude.ts:31,66` 이 옵션을 받아 web_search 툴을 붙이고 `:104-111` 에
+  접지 미발화 감시까지 있으며 `dispatch.ts:113,121` 이 전달한다. 미배선으로 남은 건 openai 뿐이다.
 
 ### D-017 · previz 상태 3중 사본 단일화   `상태: blocked`
 - **무엇을**: writer-store.shots / director ShotNodeData / DB 세 벌로 나뉜 샷 상태를 합성 구조로 정리한다.
