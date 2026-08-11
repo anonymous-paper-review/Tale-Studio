@@ -3,6 +3,7 @@
 //   (getRunStatusLight 가 경량 컬럼만 조회). 반환 shape 은 기존 WriterStatus 와 동일하게 유지.
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { requireProjectAccess } from '@/lib/api/guard';
 import { STALE_QUEUED_MS } from '@/lib/generation-jobs';
 import {
   estimateRunTotalMs,
@@ -191,9 +192,11 @@ export async function GET(
 ) {
   try {
     const { projectId } = await params;
-    if (!/^[A-Za-z0-9_-]+$/.test(projectId)) {
-      return NextResponse.json({ error: 'invalid projectId' }, { status: 400 });
-    }
+    // 소유자 또는 유효한 공유 티켓만 (2026-08-11 보안 감사).
+    //   클라 폴러(project-store·use-artist-lock-poll·use-writer-status)는 !r.ok 를
+    //   이미 정상 처리하므로 401/403 이 UI 를 깨지 않는다.
+    const access = await requireProjectAccess(req, projectId, { allowShare: true });
+    if (!access.ok) return access.response;
 
     const row = await getRunStatusLight(projectId);
 

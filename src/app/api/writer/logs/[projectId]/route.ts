@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { requireProjectAccess } from '@/lib/api/guard';
 
 export const runtime = 'nodejs';
 
@@ -13,9 +14,11 @@ export async function GET(
 ) {
   try {
     const { projectId } = await params;
-    if (!/^[A-Za-z0-9_-]+$/.test(projectId)) {
-      return NextResponse.json({ error: 'invalid projectId' }, { status: 400 });
-    }
+    // 소유자 전용 — 공유 티켓은 불가(서버 파일시스템 열람이라 열람권 범위 밖).
+    //   감사 전에는 무인증이었고 에러 응답에 서버 절대경로가 그대로 실려 나갔다(2026-08-11).
+    const access = await requireProjectAccess(req, projectId);
+    if (!access.ok) return access.response;
+
     const dir = path.resolve(process.cwd(), 'logs', projectId);
 
     const file = req.nextUrl.searchParams.get('file');
@@ -40,7 +43,8 @@ export async function GET(
     }
     return NextResponse.json({ text });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg }, { status: 404 });
+    // 원문에는 서버 절대경로(ENOENT … '/Users/…/logs/…')가 실린다 — 서버 로그에만 남긴다.
+    console.error('[writer/logs]', e instanceof Error ? e.message : e);
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
 }

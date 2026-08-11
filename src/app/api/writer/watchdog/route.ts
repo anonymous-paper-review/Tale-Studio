@@ -15,9 +15,17 @@ const STALE_MS = 180_000;
 
 export async function GET(req: NextRequest) {
   try {
-    // 선택적 보안: CRON_SECRET 설정 시 Authorization: Bearer 검사.
+    // Vercel Cron 전용. CRON_SECRET 이 설정돼 있으면 Vercel 이 Authorization: Bearer 로 실어준다.
+    //   ⚠️ 2026-08-11 감사: 예전엔 `if (cronSecret && …)` 라 env 미설정 시 가드가 통째로
+    //   건너뛰어졌다 — 실제로 미설정이라 누구나 파이프라인 재개를 트리거할 수 있었다. fail-closed 로 전환.
     const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret && req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+    if (!cronSecret) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[writer/watchdog] CRON_SECRET 미설정 — 프로덕션에서 요청 거부');
+        return NextResponse.json({ error: 'misconfigured' }, { status: 500 });
+      }
+      console.warn('[writer/watchdog] CRON_SECRET 미설정 — 개발 환경이라 통과시킴');
+    } else if (req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
 

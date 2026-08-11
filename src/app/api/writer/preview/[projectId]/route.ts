@@ -8,6 +8,7 @@
 //   폴링은 실행 중 한 프로젝트만 저빈도(≈4s)로 하므로 state 블롭 SELECT 비용은 감내한다.
 import { NextRequest, NextResponse } from 'next/server';
 import { displayNameOf } from '@/lib/display-name';
+import { requireProjectAccess } from '@/lib/api/guard';
 import { getActiveRun } from '@/lib/writer/run-store';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isTargetScript } from '@/lib/writer/i18n/derive-en';
@@ -59,14 +60,15 @@ function pushRoster(
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
     const { projectId } = await params;
-    if (!/^[A-Za-z0-9_-]+$/.test(projectId)) {
-      return NextResponse.json({ error: 'invalid projectId' }, { status: 400 });
-    }
+    // 소유자 또는 유효한 공유 티켓만 — 이 라우트는 supabaseAdmin(RLS 우회)으로
+    //   스토리 본문·캐릭터·이미지 URL 을 통째로 반환한다(2026-08-11 보안 감사).
+    const access = await requireProjectAccess(req, projectId, { allowShare: true });
+    if (!access.ok) return access.response;
 
     const run = await getActiveRun(projectId);
     if (!run) {

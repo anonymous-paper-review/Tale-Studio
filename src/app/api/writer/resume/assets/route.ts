@@ -1,6 +1,7 @@
 // Assets resume: 14b_assets.json의 status='pending' 항목 회수
 import { NextRequest, NextResponse } from 'next/server';
 import { PipelineLogger } from '@/lib/writer/logger';
+import { requireProjectAccess } from '@/lib/api/guard';
 import { falImageFetch } from '@/lib/writer/llm/fal';
 import type { AssetItem, AssetsManifest } from '@/lib/writer/types/pipeline';
 
@@ -10,9 +11,11 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   try {
     const { projectId } = (await req.json()) as { projectId?: string };
-    if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
+    // fal 회수 트리거 — 소유자만 (2026-08-11 보안 감사: 무인증이었다).
+    const access = await requireProjectAccess(req, projectId);
+    if (!access.ok) return access.response;
 
-    const logger = new PipelineLogger(projectId);
+    const logger = new PipelineLogger(access.projectId);
     await logger.init();
 
     const file = await logger.loadStage<AssetsManifest>('14b_assets.json');

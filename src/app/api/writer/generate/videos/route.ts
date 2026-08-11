@@ -1,6 +1,7 @@
 // V7: TI2V 영상 생성 (fal.ai Seedance)
 import { NextRequest, NextResponse } from 'next/server';
 import { PipelineLogger } from '@/lib/writer/logger';
+import { requireProjectAccess } from '@/lib/api/guard';
 import { runShotVideos } from '@/lib/writer/pipeline/stages/v7_videos';
 import type { RenderPromptsOutput, ShotImagesOutput } from '@/lib/writer/types/pipeline';
 
@@ -15,9 +16,11 @@ export async function POST(req: NextRequest) {
       concurrency?: number;
       force?: boolean;
     };
-    if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
+    // 유료 TI2V 생성 트리거 — 소유자만 (2026-08-11 보안 감사: 무인증이었다).
+    const access = await requireProjectAccess(req, projectId);
+    if (!access.ok) return access.response;
 
-    const logger = new PipelineLogger(projectId);
+    const logger = new PipelineLogger(access.projectId);
     await logger.init();
 
     const finalPrompts = await logger.loadStage<RenderPromptsOutput>('14_v5_renderPrompts.json');

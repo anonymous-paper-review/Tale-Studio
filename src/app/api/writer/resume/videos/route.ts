@@ -1,6 +1,7 @@
 // L7 resume: 16_shotVideos.json의 status='pending' 항목을 fal.queue로 회수
 import { NextRequest, NextResponse } from 'next/server';
 import { PipelineLogger } from '@/lib/writer/logger';
+import { requireProjectAccess } from '@/lib/api/guard';
 import { falVideoFetch } from '@/lib/writer/llm/fal';
 import type { ShotVideosOutput, ShotVideoResult } from '@/lib/writer/types/pipeline';
 
@@ -21,9 +22,11 @@ function naturalCompareShotId(a: string, b: string): number {
 export async function POST(req: NextRequest) {
   try {
     const { projectId } = (await req.json()) as { projectId?: string };
-    if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
+    // fal 회수 트리거 — 소유자만 (2026-08-11 보안 감사: 무인증이었다).
+    const access = await requireProjectAccess(req, projectId);
+    if (!access.ok) return access.response;
 
-    const logger = new PipelineLogger(projectId);
+    const logger = new PipelineLogger(access.projectId);
     await logger.init();
 
     const file = await logger.loadStage<ShotVideosOutput>('16_v7_shotVideos.json');

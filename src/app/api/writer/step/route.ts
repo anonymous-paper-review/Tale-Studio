@@ -13,9 +13,18 @@ const STEP_BUDGET_MS = 240_000;
 
 export async function POST(req: NextRequest) {
   try {
-    // 선택적 보안: WRITER_STEP_SECRET 설정 시 x-writer-secret 헤더 일치 요구.
+    // 서버-투-서버 전용 라우트. x-writer-secret 헤더 일치를 요구한다.
+    //   호출자(triggerWriterStep)가 같은 env 를 읽어 헤더를 실으므로 체이닝은 그대로 동작.
+    //   ⚠️ 2026-08-11 감사: 예전엔 `if (secret && …)` 라 env 미설정이면 가드가 통째로
+    //   건너뛰어졌다 — 실제로 .env.local 에 없어서 무인증으로 열려 있었다. fail-closed 로 전환.
     const secret = process.env.WRITER_STEP_SECRET;
-    if (secret && req.headers.get('x-writer-secret') !== secret) {
+    if (!secret) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[writer/step] WRITER_STEP_SECRET 미설정 — 프로덕션에서 요청 거부');
+        return NextResponse.json({ error: 'misconfigured' }, { status: 500 });
+      }
+      console.warn('[writer/step] WRITER_STEP_SECRET 미설정 — 개발 환경이라 통과시킴');
+    } else if (req.headers.get('x-writer-secret') !== secret) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
 

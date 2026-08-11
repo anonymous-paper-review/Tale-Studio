@@ -23,6 +23,18 @@ vi.mock('@/lib/writer/run-store', () => ({
 }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from } }))
 vi.mock('@/lib/generation-jobs', () => ({ STALE_QUEUED_MS }))
+// 접근 가드는 통과시킨다 — 이 파일의 관심사는 assets 집계 로직이다.
+//   가드 자체의 거부 동작(401/403·공유 티켓)은 tests/api-project-access-guard.test.ts 가 검증한다.
+//   (가드를 실물로 두면 getUser→cookies() 가 요청 컨텍스트 밖이라 던지고, 가드의 workspaces/projects
+//    조회가 mocks.from 을 호출해 아래 `not.toHaveBeenCalled()` 단언까지 무의미해진다.)
+vi.mock('@/lib/api/guard', () => ({
+  requireProjectAccess: vi.fn(async (_req: Request, projectId: string) => ({
+    ok: true as const,
+    projectId,
+    userId: 'test-user',
+    viaShare: false,
+  })),
+}))
 
 import { GET } from '@/app/api/writer/status/[projectId]/route'
 
