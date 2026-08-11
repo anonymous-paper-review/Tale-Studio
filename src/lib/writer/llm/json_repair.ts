@@ -18,16 +18,24 @@ export function repairJson<T = unknown>(raw: string): T {
   }
 
   // 전략 1: 에러 위치의 잉여 캐릭터 삭제 (stray quote/comma 등 모델 hallucination)
+  //   비손실 계열 — 아이템을 버리지 않으므로 경고하지 않는다.
   const punched = tryRemoveErrorChars<T>(stripped);
   if (punched !== undefined) return punched;
 
-  // 전략 2: 미종료 문자열 닫기 + 열린 괄호 스택 닫기
+  // 전략 2·3 은 **손실 복구**다: 잘린 응답을 닫거나(2) 마지막 유효 지점까지 잘라내(3) 파싱을
+  //   성립시킨다 — 즉 성공해도 뒤쪽 내용이 사라진 채 "정상"으로 통과한다. 이게 Q6 무신호 손실의
+  //   기제(8샷→2샷이 에러 0으로 통과). 호출자 배선 없이 여기서 바로 신호를 남긴다(병렬 안전).
   const closed = tryCloseAndParse<T>(stripped);
-  if (closed !== undefined) return closed;
+  if (closed !== undefined) {
+    warnLossyRepair('닫기(전략2)', stripped, closed);
+    return closed;
+  }
 
-  // 전략 3: 루트 depth의 마지막 쉼표까지 잘라 닫기
   const trimmed = tryTrimToLastValid<T>(stripped);
-  if (trimmed !== undefined) return trimmed;
+  if (trimmed !== undefined) {
+    warnLossyRepair('절단(전략3)', stripped, trimmed);
+    return trimmed;
+  }
 
   throw new Error('repairJson: all strategies failed');
 }
@@ -122,6 +130,27 @@ function tryTrimToLastValid<T>(s: string): T | undefined {
     try { return JSON.parse(repaired) as T; } catch {}
   }
   return undefined;
+}
+
+/** 손실 복구 신호(#p4-json-guard 2026-08-11) — 소실 규모를 숫자로 남긴다.
+ *  루트가 배열/배열 필드면 아이템 수까지 세어 "몇 개가 사라졌나"를 즉시 읽히게 한다. */
+function warnLossyRepair(strategy: string, raw: string, result: unknown): void {
+  const n = countItems(result);
+  console.warn(
+    `[repairJson] 손실 복구 ${strategy} — 응답이 잘려 뒤쪽 내용이 사라졌다` +
+      ` (원문 ${raw.length}자${n != null ? `, 복구된 최상위 아이템 ${n}개` : ''}).` +
+      ' 배열 산출 스테이지라면 개수 검증이 필요하다(#p4-json-guard).',
+  );
+}
+
+/** 최상위 배열 또는 배열을 담은 단일 필드의 아이템 수 (없으면 null) */
+function countItems(v: unknown): number | null {
+  if (Array.isArray(v)) return v.length;
+  if (v && typeof v === 'object') {
+    const arrays = Object.values(v as Record<string, unknown>).filter(Array.isArray);
+    if (arrays.length === 1) return (arrays[0] as unknown[]).length;
+  }
+  return null;
 }
 
 function stripTrailingPartialEscape(s: string): string {

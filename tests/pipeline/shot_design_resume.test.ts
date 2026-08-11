@@ -217,14 +217,33 @@ describe('generateL4ForScene 재시도(#shape-resilience)', () => {
     expect(generateJsonMock).toHaveBeenCalledTimes(2)
   })
 
-  it('데쿠파주 샷 수 불일치는 재시도로 교정을 시도하고, 최종 시도는 경고 후 수용한다', async () => {
+  // 개수 가드 계약 개정(#p4-json-guard 2026-08-11, Q6): 종전엔 최종 시도의 불일치를 규모와
+  //   무관하게 수용했다 — 8샷→2샷 같은 대량 소실이 에러 0으로 통과한 실사고의 마지막 관문이
+  //   여기였다. 이제 소실 규모로 갈린다: 절반 이하는 씬 실패로 표면화, 경미한 어긋남만 수용.
+  it('샷 수 대량 소실(기대 4 → 1)은 재시도 후에도 수용하지 않고 표면화한다', async () => {
     generateJsonMock.mockImplementation(async () => ({
-      shots: [makeShot('only_one')], // 항상 1개만 반환 (기대 4개)
+      shots: [makeShot('only_one')], // 항상 1개만 반환 (기대 4개 = 75% 소실)
+    }))
+    const inputs = makeInputs(1, 4)
+    await expect(run(inputs)).rejects.toThrow(/절반 이하|샷 수 불일치/)
+    expect(generateJsonMock).toHaveBeenCalledTimes(2) // 불일치 재시도 1회는 그대로
+  })
+
+  it('경미한 샷 수 어긋남(기대 4 → 3)은 재시도 후 수용하고 배지로 남긴다', async () => {
+    generateJsonMock.mockImplementation(async () => ({
+      shots: [makeShot('a'), makeShot('b'), makeShot('c')],
     }))
     const inputs = makeInputs(1, 4)
     const res = await run(inputs)
     expect(res.done).toBe(true)
-    expect(generateJsonMock).toHaveBeenCalledTimes(2) // 불일치 재시도 1회
-    expect(res.shots).toHaveLength(1) // 최종 시도 수용 (기존 동작 보존)
+    expect(generateJsonMock).toHaveBeenCalledTimes(2) // 불일치 재시도 1회 후 수용
+    expect(res.shots).toHaveLength(3)
+    // 수용은 흔적을 남긴다 — 스테이지 산출과 완료 마커 양쪽에 배지가 박힌다.
+    const saved = (logger.saveStage as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)
+    expect(saved?.[1]).toMatchObject({
+      count_badges: [{ scene_id: 'sc_1', expected: 4, got: 3, source: 'decoupage' }],
+    })
+    const marked = (logger.markStage as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)
+    expect(marked?.[2]).toMatchObject({ count_mismatches: 1 })
   })
 })

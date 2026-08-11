@@ -86,6 +86,9 @@ export async function runShotDesign(
     concurrency,
   });
 
+  // #p4-json-guard: 이번 패스에서 수용된 샷 수 불일치 — 스테이지 산출/마커로 노출한다.
+  const countBadges: ShotCountBadge[] = [];
+
   // 씬 하나 → 3분할 샷 배열. 씬끼리는 상류 산출물(plan·decoupage)만 읽고 서로의 출력을 참조하지
   //   않으므로 병렬 안전(#parallel-shotdesign). 청크는 씬 내부에서 순차 유지 — 청크 shot_id index
   //   매핑이 호출 내부에서 닫히기 때문. plan 없으면 빈 배열(스킵, 재방문 방지용으로 완료 처리됨).
@@ -103,12 +106,12 @@ export async function runShotDesign(
         const chunk = sceneDec.slice(i, i + SHOT_CHUNK_SIZE);
         const chunkNote = `(씬 전체 데쿠파주 ${sceneDec.length}개 중 ${i + 1}~${i + chunk.length}번째 묶음 — ${Math.floor(i / SHOT_CHUNK_SIZE) + 1}/${totalChunks}. 이 묶음의 샷들만 출력하라)`;
         // #n-1: 직전 청크의 확정 스펙 꼬리를 다음 청크에 계약으로 — 청크 경계 연속성.
-        const part = await generateL4ForScene(scene, plan, chunk, genre, characters, visualIdentity, worldVisual, characterVisual, seedV4, logger, axisConfig, chunkNote, sceneShots);
+        const part = await generateL4ForScene(scene, plan, chunk, genre, characters, visualIdentity, worldVisual, characterVisual, seedV4, logger, axisConfig, chunkNote, sceneShots, countBadges);
         sceneShots.push(...part);
       }
     } else {
       sceneShots.push(
-        ...(await generateL4ForScene(scene, plan, sceneDec, genre, characters, visualIdentity, worldVisual, characterVisual, seedV4, logger, axisConfig)),
+        ...(await generateL4ForScene(scene, plan, sceneDec, genre, characters, visualIdentity, worldVisual, characterVisual, seedV4, logger, axisConfig, undefined, undefined, countBadges)),
       );
     }
     return sceneShots;
@@ -182,8 +185,16 @@ export async function runShotDesign(
     return { done: false, doneSceneIds: [...doneSceneIds], shots: allShots };
   }
 
-  await logger.saveStage('11_v4_shotDesign.json', { shots: allShots, compact_mode: compactMode });
-  await logger.markStage('shotDesign', 'completed', { shot_count: allShots.length, compact_mode: compactMode });
+  await logger.saveStage('11_v4_shotDesign.json', {
+    shots: allShots,
+    compact_mode: compactMode,
+    ...(countBadges.length ? { count_badges: countBadges } : {}),
+  });
+  await logger.markStage('shotDesign', 'completed', {
+    shot_count: allShots.length,
+    compact_mode: compactMode,
+    ...(countBadges.length ? { count_mismatches: countBadges.length } : {}),
+  });
 
   return { done: true, doneSceneIds: [...doneSceneIds], shots: allShots };
 }
@@ -261,6 +272,49 @@ export function parseL4Shots(rawResult: unknown, sceneId: string): ShotDesign[] 
   return shots;
 }
 
+// ── 샷 개수 가드 (#p4-json-guard 2026-08-11 — Q6 원문 처방 "재시도/배지") ─────────────────────
+// 왜 필요한가: 아래 shot_id 표준화가 `sceneDec[i]` index 매핑이라 개수가 어긋나면 조용히 어긋난
+//   데이터가 확정된다 — 모자라면 뒤쪽 데쿠파주 샷이 통째로 소실되고, 넘치면 초과분이 fallback id
+//   를 받는다. 그런데 손실 복구(repairJson 전략2·3)는 아이템을 버리고도 파싱을 성립시키므로
+//   에러가 0 이다. 이 조합이 "8샷→2샷이 에러 없이 통과"한 실사고의 기제(flash-ab, Q6).
+// 기대치 출처: 데쿠파주 구동이면 sceneDec.length(정확 일치 요구) / 아니면 plan.shot_count_target
+//   (프롬프트 계약이 "±1 허용"이라 tolerance 1) / Compact Mode 는 프롬프트도 "자동 ±2"라 기대치가
+//   없다 — 이 경우 하한만 본다(빈 배열은 parseL4Shots 가 이미 거부).
+
+export interface ShotCountBadge {
+  scene_id: string;
+  expected: number;
+  got: number;
+  source: 'decoupage' | 'plan';
+  chunk?: string;
+}
+
+export type ShotCountVerdict =
+  | { kind: 'ok' }
+  | { kind: 'retry'; reason: string }
+  | { kind: 'fatal'; reason: string }
+  | { kind: 'accept'; reason: string };
+
+/** 재시도까지 했는데 기대의 절반 이하만 돌아오면 수용하지 않는다 — 씬 실패로 넘긴다.
+ *  씬 실패는 패스를 죽이지 않는다(성공분은 체크포인트로 보존, 실패 씬은 다음 패스가 재시도).
+ *  Q6 시나리오(8→2, 25%)가 여기 걸린다. 경미한 어긋남(예: 8→6)은 종전대로 수용 + 배지. */
+const CATASTROPHIC_LOSS_RATIO = 0.5;
+
+export function judgeShotCount(
+  got: number,
+  expected: number | null,
+  opts: { tolerance: number; isFinalAttempt: boolean },
+): ShotCountVerdict {
+  if (expected === null) return { kind: 'ok' };
+  if (Math.abs(got - expected) <= opts.tolerance) return { kind: 'ok' };
+  const reason = `샷 수 불일치 (got ${got}, expected ${expected}${opts.tolerance ? ` ±${opts.tolerance}` : ''})`;
+  if (!opts.isFinalAttempt) return { kind: 'retry', reason };
+  if (got < expected * CATASTROPHIC_LOSS_RATIO) {
+    return { kind: 'fatal', reason: `${reason} — 절반 이하만 반환됨(대량 소실 의심)` };
+  }
+  return { kind: 'accept', reason };
+}
+
 /**
  * 직전 확정 샷들의 연속성 계약 블록(#n-1 2026-08-05). 같은 씬의 앞선 청크가 설계를 마친
  * 샷 꼬리(K개)를 다음 청크 프롬프트에 주입한다 — 의상·소품·조명·공간이 청크 경계에서
@@ -297,6 +351,8 @@ async function generateL4ForScene(
   // #n-1 2026-08-05: 같은 씬의 직전 청크가 확정한 스펙 — 청크 경계의 연속성 단절 봉합.
   //   씬 간에는 전달하지 않는다(씬 병렬 처리 #parallel-shotdesign 보존).
   prevDesigned?: ShotDesign[],
+  // #p4-json-guard: 최종 시도에서 수용한 개수 불일치를 모으는 수집기(런 스코프 배열).
+  badges?: ShotCountBadge[],
 ): Promise<ShotDesign[]> {
   const compactMode = plan === null;
   const decoupageDriven = sceneDec !== null && sceneDec.length > 0;
@@ -514,17 +570,27 @@ ${compactMode ? `씬 길이(${scene.estimated_seconds}초)와 액션 수에 따�
 
     try {
       const parsed = parseL4Shots(rawResult, scene.scene_id);
-      // 데쿠파주 구동 시 개수 검증 — index 기반 shot_id 매핑이라 개수가 어긋나면 오귀속된다.
-      //   재시도로 교정 시도, 최종 시도는 기존 동작(경고 후 수용)으로 파이프라인을 살린다.
-      if (decoupageDriven && parsed.length !== sceneDec!.length) {
-        if (attempt < MAX_SCENE_TRIES) {
-          throw new Error(
-            `L4 shot count mismatch (scene=${scene.scene_id}: got ${parsed.length}, expected ${sceneDec!.length})`,
-          );
-        }
-        console.warn(
-          `[shotDesign] ${scene.scene_id}: 샷 수 불일치(got ${parsed.length}, expected ${sceneDec!.length}) — 최종 시도라 수용`,
-        );
+      // 개수 검증(#p4-json-guard) — 데쿠파주 구동뿐 아니라 plan 구동에도 건다(종전엔 후자가 무검증
+      //   이라 대량 소실이 그대로 통과했다). 판정 규칙은 judgeShotCount 참조.
+      const expected = decoupageDriven ? sceneDec!.length : plan?.shot_count_target ?? null;
+      const tolerance = decoupageDriven ? 0 : 1; // plan 은 프롬프트 계약이 "±1 허용"
+      const verdict = judgeShotCount(parsed.length, expected, {
+        tolerance,
+        isFinalAttempt: attempt === MAX_SCENE_TRIES,
+      });
+      if (verdict.kind === 'retry' || verdict.kind === 'fatal') {
+        throw new Error(`L4 ${verdict.reason} (scene=${scene.scene_id}${chunkNote ? ' 청크' : ''})`);
+      }
+      if (verdict.kind === 'accept') {
+        // 수용하되 흔적을 남긴다 — console.warn 은 흘러가므로 스테이지 산출/마커에도 배지로 박는다.
+        console.warn(`[shotDesign] ${scene.scene_id}: ${verdict.reason} — 최종 시도라 수용(배지 기록)`);
+        badges?.push({
+          scene_id: scene.scene_id,
+          expected: expected!,
+          got: parsed.length,
+          source: decoupageDriven ? 'decoupage' : 'plan',
+          ...(chunkNote ? { chunk: chunkNote } : {}),
+        });
       }
       shots = parsed;
     } catch (e) {
