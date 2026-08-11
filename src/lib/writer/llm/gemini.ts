@@ -49,12 +49,20 @@ export interface GeminiCallOptions {
   webSearch?: boolean;
 }
 
+// #p4-websearch 그라운딩 모델 핀(2026-08-11 실측): gemini-3.6-flash 는 googleSearch 가 실동작하지 않는다 —
+//   JSON mime 동반 시 200 + 빈 candidates(finishReason 없음), mime 해제·스키마 동반 우회 시엔 응답은 오나
+//   검색이 발화하지 않음(groundingMetadata 부재). preview 는 두 조합 모두 정상 접지(webSearchQueries 실존).
+//   Google 포럼 스태프 "Investigating" 상태의 리그레션 — 해소 확인 시 이 핀 제거.
+//   webSearch 요청 = 접지가 목적이므로 axisConfig 모델보다 우선한다.
+//   증거: research/experiments/t0-dramaturgy-36flash-outage/probe-result.md
+const GROUNDING_MODEL = 'gemini-3-flash-preview';
+
 export async function geminiGenerate(
   userPrompt: string,
   opts: GeminiCallOptions = {}
 ): Promise<string> {
   callCount++;
-  const modelName = opts.modelName ?? 'gemini-3.6-flash';
+  const modelName = opts.webSearch ? GROUNDING_MODEL : (opts.modelName ?? 'gemini-3.6-flash');
   const started = Date.now();
   const mime = opts.expectJson ? 'application/json' : 'text/plain';
 
@@ -93,6 +101,12 @@ export async function geminiGenerate(
     }
     if (!text || text.trim().length === 0) {
       throw new Error(`Gemini returned empty response (finishReason=${finishReason})`);
+    }
+    // 접지 미발화 감시: webSearch 요청인데 groundingMetadata 가 없으면 조용한 기능 상실이다
+    //   (3.6-flash 리그레션이 정확히 이 무신호 양상). throw 는 안 한다 — 모델이 검색 불요로
+    //   판단하는 정상 경로가 있을 수 있어, 경고로 표면화만 한다.
+    if (opts.webSearch && !(result.response.candidates?.[0] as { groundingMetadata?: unknown } | undefined)?.groundingMetadata) {
+      console.warn(`[gemini] webSearch 요청됐으나 접지 미발화 (model=${modelName}, groundingMetadata 부재)`);
     }
     return text;
   } catch (e) {
