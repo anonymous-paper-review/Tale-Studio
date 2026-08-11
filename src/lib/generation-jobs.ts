@@ -298,6 +298,8 @@ export interface ActiveGenerationJob {
   id: string
   kind: GenerationJobKind
   target: GenerationJobTarget
+  /** 제출 시각(epoch ms) — 경과시간 표시가 remount 에도 리셋되지 않게 하는 durable 기준점. */
+  startedAt: number | null
 }
 
 /**
@@ -313,16 +315,21 @@ export async function listActiveGenerationJobs(
 ): Promise<ActiveGenerationJob[]> {
   const { data, error } = await supabaseAdmin
     .from('generation_jobs')
-    .select('id, kind, target')
+    .select('id, kind, target, submitted_at, created_at')
     .eq('project_id', projectId)
     .eq('status', 'queued')
     .gte('created_at', new Date(Date.now() - STALE_QUEUED_MS).toISOString())
   if (error) throw error
-  return (data ?? []).map((row) => ({
-    id: row.id as string,
-    kind: row.kind as GenerationJobKind,
-    target: (row.target as GenerationJobTarget | null) ?? {},
-  }))
+  return (data ?? []).map((row) => {
+    const ts = (row.submitted_at ?? row.created_at) as string | null
+    const parsed = ts ? Date.parse(ts) : NaN
+    return {
+      id: row.id as string,
+      kind: row.kind as GenerationJobKind,
+      target: (row.target as GenerationJobTarget | null) ?? {},
+      startedAt: Number.isNaN(parsed) ? null : parsed,
+    }
+  })
 }
 
 /** queued 인 character_view main 잡 목록(클라가 [id] reconcile 로 마무리할 대상). */

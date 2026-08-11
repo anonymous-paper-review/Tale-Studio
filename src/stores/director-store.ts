@@ -3093,8 +3093,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           )
         })(),
         viewport: s.viewport,
-        viewMode: s.viewMode,
-        storyboardMediaMode: s.storyboardMediaMode,
+        // viewMode·storyboardMediaMode 는 영속하지 않는다(#node-first 2026-08-11) — director 는
+        //   항상 Node 뷰로 시작한다(오너 지정). 세션 안에서는 스토어 메모리가 유지하므로
+        //   탭을 오가는 동안엔 보던 뷰가 남고, 새로고침·재방문만 Node 로 돌아온다.
         projectId: s.projectId,
         lastSavedAt: s.lastSavedAt,
       }),

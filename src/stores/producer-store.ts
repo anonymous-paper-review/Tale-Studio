@@ -722,6 +722,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       storyReady: get().storyReady,
       cast,
       backgrounds,
+      styleAnchorKey: get().styleAnchorKey,
     })
     if (!gate.canHandoff) {
       set({

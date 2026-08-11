@@ -738,25 +738,19 @@ export function RoughStoryboardView() {
                       >
                         {/* 그림은 카드에 '담긴' 사각형이다(#card-inset 2026-08-11) — 카드 모서리에
                             물려 깎이지 않게 여백을 두르고, 그림 자체엔 라운드를 주지 않는다.
-                            object-contain: 러프는 연출을 확인하는 그림이라 잘리면 안 된다. */}
+                            sizeToImage(#fit-tight): 상자가 그림 비율을 따라가 좌우 띠 없이 전부 보인다. */}
+                        {panel?.url && job?.status !== 'generating' ? (
+                          // #p1-quickwin W3: 첫 진입 시 전 카드 1회 순환 후 hover 전용.
+                          //   W4: 카드 위 재생성 칩 제거 — 재생성은 카드 팝업·채팅으로 일원화.
+                          <RoughFrameCycle
+                            panel={panel}
+                            alt={`${shot.shotId} rough storyboard`}
+                            introPlay
+                            sizeToImage
+                          />
+                        ) : (
                         <div className="relative aspect-video overflow-hidden bg-muted">
-                          {panel?.url && job?.status !== 'generating' ? (
-                            <>
-                              {/* absolute inset-0: aspect-video 컨테이너 박스를 무조건 채운다. in-flow
-                                  size-full 은 일부 브라우저/배율에서 h-full(=%)이 aspect-ratio 높이로 안 풀려
-                                  이미지가 위쪽만 채우고 아래 bg-muted 회색이 남던 버그(2026-07-11).
-                                  3프레임 세트(#rough-grid)는 순환 재생 — 구버전 단일 패널은 정적 폴백. */}
-                              {/* #p1-quickwin W3: 첫 진입 시 전 카드 1회 순환 후 hover 전용.
-                                  W4: 카드 위 재생성 칩 제거 — 재생성은 카드 팝업·채팅으로 일원화
-                                  (실패 카드의 "다시 시도"와 빈 카드의 "패널 생성"은 복구/최초 경로라 유지). */}
-                              <RoughFrameCycle
-                                panel={panel}
-                                alt={`${shot.shotId} rough storyboard`}
-                                introPlay
-                                fit="contain"
-                              />
-                            </>
-                          ) : job?.status === 'generating' ? (
+                          {job?.status === 'generating' ? (
                             <div className="absolute inset-0" aria-busy="true">
                               <div className="size-full animate-pulse bg-muted-foreground/10" />
                               <Loader2 className="absolute left-1/2 top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
@@ -803,6 +797,7 @@ export function RoughStoryboardView() {
                             </div>
                           )}
                         </div>
+                        )}
 
                         <div className="space-y-2 px-1 pb-0.5 pt-3">
                           <div className="flex items-center gap-2">

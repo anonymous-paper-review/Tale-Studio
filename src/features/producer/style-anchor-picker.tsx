@@ -147,6 +147,21 @@ export function StyleAnchorPicker({
           'transition-[max-width] duration-300 ease-out',
           view === 'grid' ? 'sm:max-w-2xl' : 'sm:max-w-lg',
         )}
+        // 키보드 확정(#style-keys 2026-08-11) — ←/→ 로 덱을 넘기고 Enter 로 앞 카드를 확정한다.
+        //   자동 오픈된 팝업을 마우스 없이 닫을 수 있는 유일한 긍정 경로(Esc 는 취소).
+        onKeyDown={(e) => {
+          if (anchors.length === 0 || view !== 'slider') return
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            e.preventDefault()
+            move(e.key === 'ArrowRight' ? 1 : -1)
+            return
+          }
+          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+            e.preventDefault()
+            const front = anchors[((slide % anchors.length) + anchors.length) % anchors.length]
+            if (front) choose(front.key)
+          }
+        }}
       >
         <DialogHeader>
           <DialogTitle>스타일 선택</DialogTitle>

@@ -64,6 +64,8 @@ export interface GateInput {
   storyReady: boolean
   cast: CastMember[]
   backgrounds: BackgroundSource[]
+  /** 선택된 영상 스타일 앵커 키 — null/미지정이면 하드 게이트에 걸린다(#style-gate 2026-08-11). */
+  styleAnchorKey?: string | null
 }
 
 function isFilled(v: unknown): boolean {
@@ -120,13 +122,24 @@ export function isProducerBackgroundComplete(background: BackgroundSource): bool
   )
 }
 
-export function evaluateProducerGate({ settings, storyReady, cast, backgrounds }: GateInput): GateResult {
+export function evaluateProducerGate({
+  settings,
+  storyReady,
+  cast,
+  backgrounds,
+  styleAnchorKey,
+}: GateInput): GateResult {
   const hardMissing: GateIssue[] = []
   const softMissing: GateIssue[] = []
 
   // ── 게이트 A: Story Foundation ──────────────────────────────
   if (!isFilled(settings.genre))
     hardMissing.push({ field: 'genre', label: '장르 필요' })
+  // 영상 스타일(#style-gate 2026-08-11) — 앵커 없이 넘어가면 artist·director 의 모든 생성이
+  //   스타일 없이 나간다. 실측 사고: 스타일이 비었는데 핸드오프 제안이 떠서 스타일 픽커와 Enter 를
+  //   경합했다. 게이트에 넣으면 순서가 강제된다: 스타일을 골라야 핸드오프 제안이 뜬다.
+  if (!isFilled(styleAnchorKey))
+    hardMissing.push({ field: 'styleAnchor', label: '영상 스타일 필요' })
   if (!(typeof settings.playtime === 'number' && settings.playtime >= 5 && settings.playtime <= 1800 + 600))
     hardMissing.push({ field: 'playtime', label: '러닝타임 필요 (5초~30분+)' })
   if (!isFilled(settings.format))

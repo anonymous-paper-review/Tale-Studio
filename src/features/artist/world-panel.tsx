@@ -8,6 +8,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { WorldViewDialog } from '@/features/artist/world-view-dialog'
 import { useArtistStore, type WorldShotKey } from '@/stores/artist-store'
+import { useChatUiStore } from '@/stores/chat-ui-store'
+import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { cn } from '@/lib/utils'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
 
@@ -31,6 +33,12 @@ export function WorldPanel({
     locationId: string
     shot: WorldShotKey
   } | null>(null)
+
+  // 입력창에 @멘션돼 있는 카드 하이라이트(#artist-mention) — mentionItems 의 id = locationId.
+  const mentionedRefs = useChatUiStore((s) => s.mentionedRefs)
+  const mentionedLocationIds = new Set(
+    worldAssets.filter((w) => mentionedRefs.includes(w.locationId)).map((w) => w.locationId),
+  )
 
   // Ctrl+휠 → 축척(#a1). passive:false 네이티브 리스너로 브라우저 페이지 줌을 막는다.
   const wheelRef = useRef<HTMLDivElement>(null)
@@ -72,6 +80,26 @@ export function WorldPanel({
                 role="button"
                 tabIndex={0}
                 onClick={() => selectLocation(world.locationId)}
+                // ⌘/Ctrl+클릭 = 채팅 @멘션 토글 (#artist-mention 2026-08-11, 캐릭터 카드와 동일).
+                onPointerDownCapture={(e) => {
+                  if (e.metaKey || e.ctrlKey) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }
+                }}
+                onClickCapture={(e) => {
+                  if (!(e.metaKey || e.ctrlKey) || !world.name?.trim()) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const removing = chatInputHasMention(world.name)
+                  useChatUiStore.getState().requestMentionToggle(world.name)
+                  launchMentionFlight({
+                    label: world.name,
+                    clickX: e.clientX,
+                    clickY: e.clientY,
+                    toChat: !removing,
+                  })
+                }}
                 // 더블 클릭 = 사진 클릭과 동일(#d5 2026-08-03) — 프롬프트/재생성 팝업
                 onDoubleClick={() =>
                   setViewDialog({ locationId: world.locationId, shot: 'wideShot' })
@@ -85,6 +113,8 @@ export function WorldPanel({
                   isSelected
                     ? 'border-primary bg-accent'
                     : 'border-border hover:bg-accent/50',
+                  mentionedLocationIds.has(world.locationId) &&
+                    'mention-flash ring-2 ring-sky-400/70 border-sky-400/50 bg-sky-400/10',
                 )}
               >
                 <div className="mb-3 flex items-center justify-between">

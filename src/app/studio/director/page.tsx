@@ -25,7 +25,8 @@ import {
 import { Loader2, ImageIcon, X, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
 
 import { toast } from 'sonner'
-import { runRealBatch } from '@/lib/director/real-batch-client'
+import { runRealBatch, triggerRealBatchAutofill } from '@/lib/director/real-batch-client'
+import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { StageHelpBadge } from '@/components/stage-help-badge'
 
 import { handoffFrom } from '@/lib/handoff-intent'
@@ -652,11 +653,26 @@ function PresetStrip() {
 
 // ────────────────────────────────────────────────────────────────────────────
 
+// Alt+←/→ 순환 뷰 시퀀스(#keyboard-only 2026-08-11) — Node → Storyboard(Previz) → Storyboard(Real).
+const DIRECTOR_VIEW_CYCLE = ['node', 'previz', 'real'] as const
+type DirectorViewStep = (typeof DIRECTOR_VIEW_CYCLE)[number]
+
 function PaletteBar() {
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
   const setViewMode = useDirectorCanvasStore((s) => s.setViewMode)
   const storyboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
   const setStoryboardMediaMode = useDirectorCanvasStore((s) => s.setStoryboardMediaMode)
+  // 두 상태(viewMode, mediaMode)를 하나의 걸음으로 합쳐 순환한다.
+  const viewStep: DirectorViewStep =
+    viewMode === 'node' ? 'node' : storyboardMediaMode === 'real' ? 'real' : 'previz'
+  useAltArrowCycle(DIRECTOR_VIEW_CYCLE, viewStep, (next) => {
+    if (next === 'node') {
+      setViewMode('node')
+      return
+    }
+    setViewMode('storyboard')
+    setStoryboardMediaMode(next)
+  })
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   // #real-grid: 일괄 생성은 4샷 시트 러너(runRealBatch)로 통합 — 진행 플래그는 스토어 공유.
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
@@ -839,6 +855,15 @@ export default function DirectorCanvasPage() {
 
   // Writer Scene/Shot → Director 노드 자동 셋업 (프롬프트 + 에셋 바인딩, 스펙 §8)
   useWriterDirectorSync()
+
+  // 실사 보드 자율 채움을 진입 즉시 발사(#real-grid-auto 이관 2026-08-11) — 서버 라우트는 DB 만
+  //   읽으므로 캔버스 hydration 을 기다릴 이유가 없다. 옛 자리(sync 훅 Pass 2.7)는 안전망으로 유지.
+  //   가드(프로젝트당 1회)와 멱등(미생성만)이 이중이라 둘 다 불러도 1회만 나간다.
+  useEffect(() => {
+    if (guideProjectId && guideProjectId !== 'default' && stageReady) {
+      triggerRealBatchAutofill(guideProjectId)
+    }
+  }, [guideProjectId, stageReady])
 
   // 첫 진입 사용법 안내(#e3) — Node/Storyboard 탭 각각 프로젝트당 1회(localStorage 가드).
   //   제안 슬롯은 선점형: 갭 넛지가 점유 중이면 내리고 안내를 올리고, 그 외 제안이면 양보.

@@ -54,6 +54,7 @@ describe('saveAndHandoff producer gate enforcement', () => {
     useProducerStore.setState({
       storyText: '스토리',
       storyReady: true,
+      styleAnchorKey: 'style_a',
       projectSettings: readySettings,
       cast: [],
       backgrounds: [incompleteBackground],
@@ -74,6 +75,7 @@ describe('saveAndHandoff producer gate enforcement', () => {
     useProducerStore.setState({
       storyText: '스토리',
       storyReady: true,
+      styleAnchorKey: 'style_a',
       projectSettings: readySettings,
       cast: [],
       backgrounds: [completeBackground],

@@ -401,6 +401,41 @@ export function GlobalChat() {
     return () => cancelAnimationFrame(raf)
   }, [currentStage, collapsed])
 
+  // 어디서든 타이핑 = 채팅 (#type-to-focus 2026-08-11) — 포커스가 본문에 있어도 글자를 치면
+  //   입력창으로 끌어온다(브라우저 검색창들의 관례). 판정은 보수적으로: 수식키 없음 + 글자 키 +
+  //   다른 입력 요소/모달이 아닐 때만. preventDefault 는 안 한다 — 포커스만 옮기면 그 글자는
+  //   브라우저가 입력창에 꽂아 준다(IME 조합 시작도 새 포커스에서 열린다).
+  useEffect(() => {
+    if (collapsed || !CHAT_SUPPORTED_STAGES.has(currentStage)) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      // 글자 키만 — 화살표/펑션/Enter/Space(버튼 활성화 키) 제외. IME 첫 타(key='Process')는
+      //   물리 코드로 판정한다.
+      const printable =
+        e.key.length === 1 && e.key !== ' '
+          ? true
+          : (e.key === 'Process' || e.key === 'Unidentified') &&
+            /^(Key|Digit)/.test(e.code)
+      if (!printable) return
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+      // 모달·선택지가 떠 있으면 그쪽 몫(숫자키 선택 등).
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return
+      if (useGlobalChatStore.getState().suggestion?.action?.kind === 'choices') return
+      textareaRef.current?.focus()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [collapsed, currentStage])
+
   // #p4-choices v3 (#choices-freeform 2026-08-07): 선택지는 입력창 바로 위에 앵커하고, 떠 있는
   //   동안 채팅 입력은 잠근다 — 답하는 곳이 두 군데면 눈이 갈린다. 자유 입력("기타" 답변)은
   //   선택지 안의 "직접 입력" 행이 담당한다(Claude AskUserQuestion 의 Type my own answer 대응).
@@ -688,6 +723,10 @@ export function GlobalChat() {
       if (loading || e.isComposing) return
       if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key !== 'Enter' && e.key !== 'Escape') return
+      // 모달이 열려 있으면 전부 양보(#style-timing 실측 사고: 스타일 픽커가 떠 있는데 Enter 가
+      //   뒤의 핸드오프 수락을 먹어 스타일 없이 writer 로 넘어갔다). 포커스가 어디 있든
+      //   열린 다이얼로그의 존재 자체로 판정한다 — 모달 뒤의 조작은 없다.
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return
       const target = e.target as HTMLElement | null
       const inChatInput = !!target && target === textareaRef.current
       // 다른 입력 요소(인라인 '직접 입력', 이름 변경 등)에 있으면 그쪽 몫.

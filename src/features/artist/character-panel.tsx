@@ -15,6 +15,8 @@ import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
 import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle'
 import { useArtistStore, type CharacterRole } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useChatUiStore } from '@/stores/chat-ui-store'
+import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import {
   CHARACTER_VIEW_LABELS,
   type CharacterViewKey,
@@ -51,6 +53,14 @@ export function CharacterPanel({
   } = useArtistStore()
 
   const requiredCharacterIds = useProjectStore((s) => s.lifecycleStatus.artist?.requiredCharacterIds ?? EMPTY_REQUIRED_IDS)
+  // 입력창에 @멘션돼 있는 카드 하이라이트(#artist-mention) — producer 카드와 동일. artist 의
+  //   mentionItems 는 이름을 라벨로 쓰므로(id 아님) 이름 기준으로 대조한다.
+  const mentionedRefs = useChatUiStore((s) => s.mentionedRefs)
+  const mentionedNames = new Set(
+    characterAssets
+      .filter((c) => mentionedRefs.includes(c.characterId))
+      .map((c) => c.name),
+  )
   const [viewDialog, setViewDialog] = useState<{
     charId: string
     view: CharacterViewKey
@@ -161,6 +171,27 @@ export function CharacterPanel({
               role="button"
               tabIndex={0}
               onClick={() => selectCharacter(char.characterId)}
+              // ⌘/Ctrl+클릭 = 채팅 @멘션 토글 (#artist-mention 2026-08-11, producer 카드와 동일 문법).
+              //   캡처 단계에서 기본 동작(선택)을 끊는다 — 멘션하려던 클릭이 카드를 선택하면 안 된다.
+              onPointerDownCapture={(e) => {
+                if (e.metaKey || e.ctrlKey) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }
+              }}
+              onClickCapture={(e) => {
+                if (!(e.metaKey || e.ctrlKey) || !char.name?.trim()) return
+                e.preventDefault()
+                e.stopPropagation()
+                const removing = chatInputHasMention(char.name)
+                useChatUiStore.getState().requestMentionToggle(char.name)
+                launchMentionFlight({
+                  label: char.name,
+                  clickX: e.clientX,
+                  clickY: e.clientY,
+                  toChat: !removing,
+                })
+              }}
               // 더블 클릭 = 사진 클릭과 동일(#d5 2026-08-03) — 상세/재생성 팝업
               onDoubleClick={() =>
                 setViewDialog({ charId: char.characterId, view: 'main' })
@@ -174,6 +205,8 @@ export function CharacterPanel({
                 isSelected
                   ? 'border-primary bg-accent'
                   : 'border-border hover:bg-accent/50',
+                mentionedNames.has(char.name) &&
+                  'mention-flash ring-2 ring-sky-400/70 border-sky-400/50 bg-sky-400/10',
               )}
             >
               {/* Header: 편집 가능한 이름 + 역할 토글 + 배지 (인라인 편집 — 팝업 없음) */}

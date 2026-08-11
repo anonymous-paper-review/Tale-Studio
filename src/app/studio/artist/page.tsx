@@ -25,6 +25,8 @@ import {
 } from '@/lib/lifecycle'
 import { cn } from '@/lib/utils'
 
+import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
+
 type ArtistTab = 'characters' | 'world' | 'inventory'
 
 // 탭 순서 — 전환 슬라이드 방향의 기준 (#d3 2026-08-03, writer 탭과 동일 패턴).
@@ -43,6 +45,9 @@ export default function VisualPage() {
 
   const projectId = useProjectStore((s) => s.projectId)
   const [tab, setTab] = useState<ArtistTab>('characters')
+  // Alt+←/→ 로 인물 ↔ 배경 순환(#keyboard-only 2026-08-11) — 오너 지정 범위는 두 탭.
+  //   인벤토리에 있다가 누르면 인물로 복귀한다(두 탭 순환에 합류).
+  useAltArrowCycle(['characters', 'world'] as const, tab === 'inventory' ? 'world' : tab, setTab)
   // 탭 전환 슬라이드(#d3) — 방향은 탭 순서 기준(왼→오른쪽 = forward). set-state-in-render 패턴.
   const [prevTab, setPrevTab] = useState<ArtistTab>(tab)
   const [tabSlide, setTabSlide] = useState<'forward' | 'back' | 'none'>('none')
@@ -257,15 +262,17 @@ export default function VisualPage() {
   //   debounce 로 생성 시작 전 조기발사 + 생성 중 깜빡임을 방지. 비용 지출 없는 넛지(자동생성은 별도 진행).
   const generatingCount = generatingViews.length + generatingLocations.length
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
+  // #handoff-starved(2026-08-11, producer 와 동일 계열): 옛 코드는 offer 를 부르기 **전에**
+  //   원샷 ref 를 세팅했다 — 제안 슬롯이 차 있으면(특히 dismissible:false 브리핑) offer 가
+  //   조용히 버려지는데 ref 는 이미 소모돼 영영 재시도되지 않았다. 그래서 Director 핸드오프가
+  //   안 떴다. 처방: ① preempt 로 브리핑을 밀어내고 ② 실제로 표면화된 것을 확인한 뒤에만
+  //   ref 를 고정하며 ③ 슬롯이 바뀔 때마다(activeSuggestion dep) 재시도한다.
+  const activeSuggestion = useGlobalChatStore((s) => s.suggestion)
   useEffect(() => {
-    // 2026-08-06: refreshGap/failedCount 게이트 제거 — 룩 미반영 초안이 남아 있으면 Director
-    //   핸드오프 제안이 영영 안 떠서 "다음 단계로 가는 길"이 채팅에서 사라졌다. 초안 여부와
-    //   무관하게 에셋이 준비되면 넘어갈 길을 제시한다(룩 동기화는 카드 배지가 알린다).
     if (!projectId || !ready || !writerReady || !artistGate.ready) return
     if (nudgeOfferedRef.current === projectId) return
     if (characterAssets.length === 0 || generatingCount > 0) return
     const t = setTimeout(() => {
-      nudgeOfferedRef.current = projectId
       // 월드 유무에 따라 주어+조사를 자연스럽게 (명+이 / 개+가).
       const subject =
         worldAssets.length > 0
@@ -274,14 +281,22 @@ export default function VisualPage() {
       // 탭 하단의 'Approve & Direct' 버튼을 걷어내고 이 제안이 그 자리를 대신한다(#handoff-to-chat).
       //   버튼은 직접 이동하지 않고 문장을 채팅에 입력해 보낸다 — 직접 타이핑과 같은 경로.
       const spec = handoffFrom('artist')
-      offerSuggestion({
-        id: `artist-ready-${projectId}`,
-        stage: 'artist',
-        content: `${subject} 모두 준비됐어요. 마음에 들면 Director로 넘어가 콘티를 짜볼까요?`,
-        action: spec
-          ? { kind: 'handoff', utterance: spec.utterance, label: spec.label }
-          : null,
-      })
+      const id = `artist-ready-${projectId}`
+      offerSuggestion(
+        {
+          id,
+          stage: 'artist',
+          content: `${subject} 모두 준비됐어요. 마음에 들면 Director로 넘어가 콘티를 짜볼까요?`,
+          action: spec
+            ? { kind: 'handoff', utterance: spec.utterance, label: spec.label }
+            : null,
+        },
+        { preempt: true },
+      )
+      const chat = useGlobalChatStore.getState()
+      if (chat.suggestion?.id === id || chat.dismissedSuggestionIds.includes(id)) {
+        nudgeOfferedRef.current = projectId
+      }
     }, 1500)
     return () => clearTimeout(t)
   }, [
@@ -294,6 +309,7 @@ export default function VisualPage() {
     offerSuggestion,
     writerReady,
     artistGate.ready,
+    activeSuggestion,
   ])
 
   // 첫 진입 브리핑(2026-08-06 간소화) — "최종 룩으로 정리" 상태 온보딩 제안은 제거(피드백:
@@ -316,7 +332,9 @@ export default function VisualPage() {
         '수정하거나 추가하고 싶은 인물이나 배경을 알려주세요.\n' +
         '"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
       action: null,
-      dismissible: false,
+      // dismissible(2026-08-11): false → true. false 면 선점 불가라, 유저가 말을 안 걸고 에셋만
+      //   보다가 준비가 끝나면 Director 핸드오프 제안이 이 브리핑에 막혀 영영 못 떴다(#handoff-starved).
+      dismissible: true,
     })
     // 실제 표면화(같은 id 활성)됐거나 이미 dismiss 된 경우만 1회 가드 고정.
     if (dismissed || useGlobalChatStore.getState().suggestion?.id === id) {
@@ -483,35 +501,8 @@ export default function VisualPage() {
           {error}
         </div>
       )}
-      {/* 게이트 상태 푸터 — 평소엔 접힘, 미완료 항목이 있을 때만 표시(#d1 2026-07-13).
-          writerStatus === null 은 "아직 fetch 전"(판단 유보) — 이 프레임에 렌더하면 진입 직후
-          "Writer: unknown" 바가 떴다가 상태 도착과 함께 사라지는 깜빡임이 된다(#d6 2026-08-03).
-          run 이 정말 없으면 fetch 후 started:false 객체가 오므로 그때 정당하게 표시된다. */}
-      {writerStatus !== null &&
-        (!writerReady || !artistGate.ready || directorGate.blockers.length > 0) && (
-        <div className="border-t border-border bg-card px-6 py-3 text-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={writerReady ? 'text-success' : 'text-warning'}>
-              Writer: {writerReady ? 'ready' : writerGateStatus.state}
-            </span>
-            <span className={artistGate.ready ? 'text-success' : 'text-warning'}>
-              Artist: {artistGate.requiredCharacterIds.length - artistGate.blockers.length}/{artistGate.requiredCharacterIds.length} required ready
-            </span>
-          </div>
-          {directorGate.blockers.length > 0 && (
-            <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
-              {directorGate.blockers.slice(0, 4).map((issue) => (
-                <li key={issue.field}>{issue.label}</li>
-              ))}
-            </ul>
-          )}
-          {artistGate.warnings.length > 0 && (
-            <p className="mt-2 text-muted-foreground">
-              경고 {artistGate.warnings.length}개: object/world 이미지는 MVP 기본 경로에서 보조 자료입니다.
-            </p>
-          )}
-        </div>
-      )}
+      {/* 게이트 상태 푸터는 제거(#d5 2026-08-11 오너 지시) — 게이트 판정 자체는 그대로 살아
+          Director 핸드오프 제안(#handoff-starved)과 사이드바 잠금이 쓴다. 개발용 세부는 콘솔로. */}
     </>
   )
 }

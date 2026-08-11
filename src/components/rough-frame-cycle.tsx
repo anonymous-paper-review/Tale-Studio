@@ -30,6 +30,7 @@ export function RoughFrameCycle({
   alt,
   introPlay = false,
   fit = 'cover',
+  sizeToImage = false,
 }: {
   panel: Pick<RoughStoryboardImage, 'url' | 'generatedAt' | 'frames'>
   alt: string
@@ -39,6 +40,11 @@ export function RoughFrameCycle({
   /** contain: 그림을 자르지 않고 전부 보여준다(러프 카드 — 연출 확인이 목적이라 잘리면 안 된다).
    *  cover: 상자를 꽉 채운다(썸네일 성격). */
   fit?: 'cover' | 'contain'
+  /** 상자를 고정 16:9 로 두지 않고 **이미지 실제 비율**로 잡는다(#fit-tight 2026-08-11).
+   *  러프 프레임은 그리드에서 잘려 나와 정확한 16:9 가 아니라, 고정 비율 상자 + contain 은
+   *  좌우 띠를 남기고 cover 는 그림을 자른다 — 상자가 그림을 따라가면 둘 다 사라진다.
+   *  이 모드에선 루트가 in-flow(w-full) 이므로 부모의 absolute 배치 상자가 필요 없다. */
+  sizeToImage?: boolean
 }) {
   const f = panel.frames
   const urls = f
@@ -50,6 +56,9 @@ export function RoughFrameCycle({
   // 클릭 = 현재 프레임 일시정지 잠금(중앙 ⏸) — director 영상 썸네일(HoverPlayVideo)과 같은 UX.
   //   잠금 중엔 인트로·hover 순환 모두 멈추고, 카드를 떠나도 프레임이 유지된다.
   const [pausedLock, setPausedLock] = useState(false)
+  // sizeToImage: 첫 프레임 로드 시 실제 비율을 재서 상자에 반영. 로드 전엔 16:9 로 시작해
+  //   레이아웃 점프를 한 번으로 줄인다(같은 세트는 비율이 같아 이후 프레임 전환엔 점프 없음).
+  const [imageAr, setImageAr] = useState<number | null>(null)
   // reduced-motion 은 초기값에서 인트로를 건너뛴다 — effect 안 동기 setState 는 연쇄 렌더를
   //   유발해 lint 가 막는다(react-hooks/set-state-in-effect). SSR 은 matchMedia 부재 → 가드.
   const [introDone, setIntroDone] = useState(
@@ -85,7 +94,8 @@ export function RoughFrameCycle({
   const current = idx % urls.length
   return (
     <div
-      className="absolute inset-0"
+      className={sizeToImage ? 'relative w-full overflow-hidden bg-muted' : 'absolute inset-0'}
+      style={sizeToImage ? { aspectRatio: imageAr ?? 16 / 9 } : undefined}
       title={multi ? (pausedLock ? '클릭: 재생 재개' : '클릭: 일시정지') : undefined}
       onMouseEnter={() => {
         setIntroDone(true) // 인트로 중 hover 진입 → 인트로 중단, hover 순환이 이어받는다
@@ -116,9 +126,20 @@ export function RoughFrameCycle({
           src={u}
           alt={i === current ? alt : ''}
           aria-hidden={i !== current}
+          onLoad={
+            sizeToImage && i === 0
+              ? (e) => {
+                  const el = e.currentTarget
+                  if (el.naturalWidth && el.naturalHeight) {
+                    setImageAr(el.naturalWidth / el.naturalHeight)
+                  }
+                }
+              : undefined
+          }
           className={cn(
             'absolute inset-0 size-full transition-opacity duration-150',
-            fit === 'contain' ? 'object-contain' : 'object-cover',
+            // sizeToImage 는 상자가 이미지 비율이라 cover=contain — 띠도 크롭도 없다.
+            fit === 'contain' && !sizeToImage ? 'object-contain' : 'object-cover',
             i === current ? 'opacity-100' : 'opacity-0',
           )}
           loading="lazy"

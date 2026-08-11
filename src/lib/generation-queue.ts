@@ -15,6 +15,8 @@ export interface ActiveJob {
   id: string
   kind: GenerationJobKind
   target: GenerationJobTarget
+  /** 제출 시각(epoch ms) — 경과시간 표시의 durable 기준점(탭 왕복에도 리셋 없음). */
+  startedAt?: number | null
 }
 
 /** 도는 잡이 있을 때 / 없을 때의 폴링 간격. 없을 때 느리게 도는 이유는 "새로 시작된 잡"도
@@ -170,4 +172,30 @@ export function hasActiveKind(
 ): boolean {
   const wanted = new Set(kinds)
   return list.some((j) => wanted.has(j.kind))
+}
+
+/**
+ * 특정 샷을 겨냥한 잡의 시작 시각(가장 이른 것) — 경과시간 오버레이의 durable 기준점.
+ * shotId 를 생략하면 종류 전체에서 가장 이른 시작 시각.
+ */
+export function activeStartedAt(
+  list: readonly ActiveJob[],
+  kinds: readonly GenerationJobKind[],
+  shotId?: string,
+): number | undefined {
+  const wanted = new Set(kinds)
+  let earliest: number | undefined
+  for (const job of list) {
+    if (!wanted.has(job.kind)) continue
+    if (shotId) {
+      const t = job.target ?? {}
+      const hits =
+        t.writerShotId === shotId || t.shotId === shotId || (t.writerShotIds ?? []).includes(shotId)
+      if (!hits) continue
+    }
+    if (job.startedAt != null && (earliest === undefined || job.startedAt < earliest)) {
+      earliest = job.startedAt
+    }
+  }
+  return earliest
 }

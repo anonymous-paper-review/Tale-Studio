@@ -4,10 +4,15 @@
 
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useWriterUiStore, type WriterTab } from '@/stores/writer-ui-store'
+import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
+
+const TAB_ORDER: readonly WriterTab[] = ['storyboard', 'script', 'dialogue']
 
 export function WriterTabs() {
   const activeTab = useWriterUiStore((state) => state.activeTab)
   const setActiveTab = useWriterUiStore((state) => state.setActiveTab)
+  // Alt+←/→ 로 러프 스토리보드 ↔ 트리트먼트 ↔ 대사 순환(#keyboard-only)
+  useAltArrowCycle(TAB_ORDER, activeTab, setActiveTab)
 
   // artist 탭(Characters/World/Inventory)과 동일한 기본 TabsList 스타일(#c1 2026-07-13).
   return (

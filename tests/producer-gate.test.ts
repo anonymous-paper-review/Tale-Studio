@@ -35,6 +35,7 @@ describe('evaluateProducerGate — gate A (story foundation)', () => {
     const r = evaluateProducerGate({
       settings: { ...baseSettings, genre: '' },
       storyReady: true,
+      styleAnchorKey: 'style_a',
       cast: [fullPerson()],
       backgrounds: [fullBackground()],
     })
@@ -43,7 +44,8 @@ describe('evaluateProducerGate — gate A (story foundation)', () => {
   })
 
   it('blocks when story is not ready', () => {
-    const r = evaluateProducerGate({ settings: baseSettings, storyReady: false, cast: [fullPerson()], backgrounds: [fullBackground()] })
+    const r = evaluateProducerGate({ settings: baseSettings, storyReady: false,
+      styleAnchorKey: 'style_a', cast: [fullPerson()], backgrounds: [fullBackground()] })
     expect(r.canHandoff).toBe(false)
     expect(r.hardMissing.map((i) => i.field)).toContain('storyText')
   })
@@ -52,6 +54,7 @@ describe('evaluateProducerGate — gate A (story foundation)', () => {
     const r = evaluateProducerGate({
       settings: { ...baseSettings, tone: [], subGenre: '' },
       storyReady: true,
+      styleAnchorKey: 'style_a',
       cast: [fullPerson()],
       backgrounds: [fullBackground()],
     })
@@ -67,6 +70,7 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
     const r = evaluateProducerGate({
       settings: { ...baseSettings, playtime: 10 },
       storyReady: true,
+      styleAnchorKey: 'style_a',
       cast: [],
       backgrounds: [fullBackground()],
     })
@@ -74,7 +78,8 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
   })
 
   it('D3 (120s) requires at least one person', () => {
-    const r = evaluateProducerGate({ settings: baseSettings, storyReady: true, cast: [], backgrounds: [fullBackground()] })
+    const r = evaluateProducerGate({ settings: baseSettings, storyReady: true,
+      styleAnchorKey: 'style_a', cast: [], backgrounds: [fullBackground()] })
     expect(r.canHandoff).toBe(false)
     expect(r.hardMissing.map((i) => i.field)).toContain('cast:minPerson')
   })
@@ -83,6 +88,7 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
+      styleAnchorKey: 'style_a',
       cast: [fullPerson({ arc: undefined, motivation: undefined })],
       backgrounds: [fullBackground()],
     })
@@ -96,6 +102,7 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
+      styleAnchorKey: 'style_a',
       cast: [
         fullPerson(),
         { localId: 'o1', name: '반지', entityType: 'object', appearance: '은빛 고리' },
@@ -109,6 +116,7 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
     const r = evaluateProducerGate({
       settings: { ...baseSettings, playtime: 600 },
       storyReady: true,
+      styleAnchorKey: 'style_a',
       cast: [fullPerson()],
       backgrounds: [fullBackground()],
     })
@@ -120,6 +128,7 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
+      styleAnchorKey: 'style_a',
       cast: [fullPerson()],
       backgrounds: [{ ...fullBackground(), visualDescription: '' }],
     })
@@ -134,6 +143,7 @@ describe('evaluateProducerGate — writer-origin cards do not block handoff', ()
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
+      styleAnchorKey: 'style_a',
       cast: [
         fullPerson(),
         {
@@ -154,6 +164,7 @@ describe('evaluateProducerGate — writer-origin cards do not block handoff', ()
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
+      styleAnchorKey: 'style_a',
       cast: [fullPerson()],
       backgrounds: [
         fullBackground(), // producer-origin, complete
@@ -167,6 +178,7 @@ describe('evaluateProducerGate — writer-origin cards do not block handoff', ()
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
+      styleAnchorKey: 'style_a',
       cast: [fullPerson()],
       backgrounds: [
         { localId: 'wl', name: 'location', visualDescription: 'A gothic studio', purpose: '핵심 공간', origin: 'writer' },
@@ -174,5 +186,43 @@ describe('evaluateProducerGate — writer-origin cards do not block handoff', ()
     })
     expect(r.canHandoff).toBe(false)
     expect(r.hardMissing.map((i) => i.field)).toContain('background:minComplete')
+  })
+})
+
+// #style-gate 2026-08-11 — 실측 사고의 회귀: 스타일이 비었는데 핸드오프 제안이 떠서 스타일
+// 픽커의 Enter 와 수락 Enter 가 경합했다. 스타일은 하드 게이트다 — 골라야 핸드오프가 열린다.
+describe('evaluateProducerGate — 영상 스타일 하드 게이트', () => {
+  it('스타일 미선택이면 다른 항목이 다 차 있어도 막힌다', () => {
+    const r = evaluateProducerGate({
+      settings: baseSettings,
+      storyReady: true,
+      cast: [fullPerson()],
+      backgrounds: [fullBackground()],
+      styleAnchorKey: null,
+    })
+    expect(r.canHandoff).toBe(false)
+    expect(r.hardMissing.map((i) => i.field)).toContain('styleAnchor')
+  })
+
+  it('미지정(undefined)도 미선택과 같다', () => {
+    const r = evaluateProducerGate({
+      settings: baseSettings,
+      storyReady: true,
+      cast: [fullPerson()],
+      backgrounds: [fullBackground()],
+    })
+    expect(r.canHandoff).toBe(false)
+    expect(r.hardMissing.map((i) => i.field)).toContain('styleAnchor')
+  })
+
+  it('스타일이 선택되면 통과한다', () => {
+    const r = evaluateProducerGate({
+      settings: baseSettings,
+      storyReady: true,
+      cast: [fullPerson()],
+      backgrounds: [fullBackground()],
+      styleAnchorKey: 'style_a',
+    })
+    expect(r.hardMissing.map((i) => i.field)).not.toContain('styleAnchor')
   })
 })

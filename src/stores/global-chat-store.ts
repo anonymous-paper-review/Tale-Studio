@@ -171,6 +171,7 @@ function handoffBlockers(spec: HandoffSpec): string[] {
       storyReady: p.storyReady,
       cast: p.cast,
       backgrounds: p.backgrounds,
+      styleAnchorKey: p.styleAnchorKey,
     })
     return gate.canHandoff
       ? []
@@ -420,6 +421,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           storyReady: p.storyReady,
           cast: p.cast,
           backgrounds: p.backgrounds,
+          styleAnchorKey: p.styleAnchorKey,
         })
         body = {
           message: trimmed,
@@ -584,6 +586,20 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const immediateUpdates = updates.filter((u) => u.type === 'createCharacter')
 
         if (costUpdate) {
+          // 승인 카드의 target 은 사람이 읽는 제목 — id(char_2 등)가 아니라 이름으로(#d2 2026-08-11).
+          //   이름을 모르면 id 그대로(지어내지 않는다).
+          const artistState = useArtistStore.getState()
+          const characterName =
+            costUpdate.type === 'regenerateCharacter'
+              ? artistState.characterAssets.find(
+                  (c) => c.characterId === costUpdate.characterId,
+                )?.name || costUpdate.characterId
+              : null
+          const locationName =
+            costUpdate.type === 'regenerateWorldAsset'
+              ? artistState.worldAssets.find((w) => w.locationId === costUpdate.locationId)
+                  ?.name || costUpdate.locationId
+              : null
           const proposal = costUpdate.type === 'regenerateCharacter'
             ? createPendingProposal({
                 stage: 'artist',
@@ -592,7 +608,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                   : costUpdate.views && costUpdate.views.length > 1
                     ? 'artistRegenerateCharacterViews'
                     : 'artistRegenerateCharacterAllViews',
-                target: costUpdate.characterId,
+                target: characterName ?? costUpdate.characterId,
                 action: costUpdate.views?.length
                   ? `캐릭터 뷰 재생성: ${costUpdate.views.join(', ')}`
                   : '캐릭터 전체 뷰 재생성',
@@ -610,7 +626,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             : createPendingProposal({
                 stage: 'artist',
                 kind: 'artistRegenerateWorldAsset',
-                target: costUpdate.locationId,
+                target: locationName ?? costUpdate.locationId,
                 action: '월드/배경 이미지 재생성',
                 impact: [
                   '이미지 생성 비용이 발생합니다.',
@@ -632,11 +648,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const appearanceProposals = Array.isArray(data.proposals) ? data.proposals : []
         if (appearanceProposals.length > 0 && !get().pendingProposal) {
           const ap = appearanceProposals[0] as { characterId: string; appearance: string }
+          const apName =
+            useArtistStore.getState().characterAssets.find((c) => c.characterId === ap.characterId)
+              ?.name || ap.characterId
           get().offerPendingProposal(
             createPendingProposal({
               stage: 'artist',
               kind: 'artistSourceAppearancePatch',
-              target: ap.characterId,
+              target: apName,
               action: `캐릭터 기본 외형(원천) 변경: ${ap.appearance.slice(0, 60)}${ap.appearance.length > 60 ? '…' : ''}`,
               impact: [
                 '캐릭터의 canonical 외형(원천)이 바뀝니다.',
@@ -785,6 +804,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (!proposal) return false
     if (id && proposal.id !== id) return false
 
+    // 카드는 승인 즉시 내린다(#d2 2026-08-11) — 옛 코드는 실행이 다 끝나야 지웠는데, 뷰 3개
+    //   재생성이면 그게 수 분이라 "승인을 눌렀는데 안 사라진다"로 읽혔다. 진행은 상단 알림바가,
+    //   실패는 error 배너가 보고한다.
+    set({ pendingProposal: null })
     try {
       if (proposal.kind === 'producerSourcePatch') {
         useProducerStore
@@ -854,7 +877,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           .getState()
           .updateShot(shotId, { dialogueLines: dialogueLines as DialogueLine[] })
       }
-      set({ pendingProposal: null })
       return true
     } catch (err) {
       set({ error: err instanceof Error ? err.message : '제안 실행 실패' })

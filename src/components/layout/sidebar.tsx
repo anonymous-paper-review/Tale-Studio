@@ -21,11 +21,7 @@ import {
 } from '@/components/ui/hover-card'
 import { cn } from '@/lib/utils'
 import { STAGES, STAGE_LABEL, SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
-import {
-  STAGE_ACCESS_KEY,
-  accessModifierLabel,
-  stageForShortcut,
-} from '@/lib/stage-shortcuts'
+import { STAGE_ACCESS_KEY, stageForShortcut } from '@/lib/stage-shortcuts'
 import { navigateWithStageSlide } from '@/lib/stage-transition'
 import { UserMenu } from '@/components/layout/user-menu'
 import { ContactPopover } from '@/components/contact-popover'
@@ -311,13 +307,7 @@ export function Sidebar() {
                       : 'Complete previous step first'
                     : stage.agent}
                 </span>
-                {!isLocked && (
-                  <span className="mt-0.5 text-[10px] text-muted-foreground">
-                    <kbd className="rounded border border-border bg-muted px-1 font-mono">
-                      {accessModifierLabel()}+{STAGE_ACCESS_KEY[stage.id]}
-                    </kbd>
-                  </span>
-                )}
+                {/* 단축키 표기는 Alt 홀드 배지가 전담(#feedback 2026-08-11) — 툴팁에서 제거. */}
               </TooltipContent>
             </Tooltip>
           )
