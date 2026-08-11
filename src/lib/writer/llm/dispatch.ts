@@ -4,6 +4,7 @@ import { claudeGenerateJson } from './claude';
 import { openaiGenerateJson } from './openai';
 import { localGenerateJson } from './local';
 import type { LlmProvider } from './raw_collector';
+import type { z } from 'zod';
 
 export type { LlmProvider };
 
@@ -32,9 +33,36 @@ export interface DispatchOptions {
   // #p4-websearch: 프로바이더별 웹 검색 접지 — gemini(googleSearch)/claude(web_search 툴).
   //   openai 는 후속(추론 계열의 검색 파라미터 계약 미확정). 스토리 축(s1/s3)부터 단계 확대.
   webSearch?: boolean;
+  // #p4-json-guard(2026-08-11): 파싱 후 구조 단언(zod) — 실패는 throw 로 표면화(무신호 금지),
+  //   성공 시 산출물은 "원본 그대로" 반환한다(safeParse 는 게이트일 뿐, 변형/키 스트립 없음).
+  //   enum 값 제약은 스키마에 넣지 않는다(Q16 오너 미결). 스키마 정본: pipeline/schemas.ts
+  schema?: z.ZodType;
+  // enforceSchema: provider 가 지원하면(현재 claude) 생성 자체를 스키마로 강제
+  //   (output_config.format — gemini mime 등가물). 스키마가 프롬프트 필드 전집합일 때만 켠다
+  //   — 부분 스키마 강제는 스키마 밖 필드를 생성에서 억압해 하류 데이터를 소실시킨다.
+  enforceSchema?: boolean;
 }
 
 export async function generateJson<T>(
+  prompt: string,
+  cfg: LlmAxisConfig,
+  opts: DispatchOptions = {},
+): Promise<T> {
+  const result = await generateJsonRaw<T>(prompt, cfg, opts);
+  if (opts.schema) {
+    const v = opts.schema.safeParse(result);
+    if (!v.success) {
+      const issues = v.error.issues
+        .slice(0, 5)
+        .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+        .join(' | ');
+      throw new Error(`LLM 산출 스키마 위반 (${describeAxisConfig(cfg)}): ${issues}`);
+    }
+  }
+  return result;
+}
+
+async function generateJsonRaw<T>(
   prompt: string,
   cfg: LlmAxisConfig,
   opts: DispatchOptions = {},
@@ -91,6 +119,7 @@ async function dispatchOnce<T>(
         temperature: opts.temperature,
         maxTokens: opts.maxTokens,
         webSearch: opts.webSearch,
+        zodSchema: opts.enforceSchema ? opts.schema : undefined,
       });
     case 'openai':
       return openaiGenerateJson<T>(prompt, {

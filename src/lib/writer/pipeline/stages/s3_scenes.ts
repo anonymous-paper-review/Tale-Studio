@@ -1,6 +1,7 @@
 // S3: 씬 브레이크다운, 감정 비트, 정보 비대칭
 import { displayNameOf, humanizeSlug } from '@/lib/display-name';
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import { ScenesSchema } from '@/lib/writer/pipeline/schemas';
 import { computeSceneBudget, renderBudgetBlock, validateSceneBudget } from '@/lib/writer/pipeline/budget';
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
 import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, StoryCharacter, BackgroundContract, Dramaturgy, DramaturgyStageCandidate } from '@/lib/writer/types/pipeline';
@@ -280,6 +281,8 @@ new_characters에도 기존 캐스트와 같은 깊이의 서사 속성(personal
     systemInstruction,
     temperature: 0.7,
     webSearch: true, // #p4-websearch: 스토리 축 — 오마쥬/실존 레퍼런스 접지
+    // #p4-json-guard: validate 전용 — StoryScene 전 필드 스키마 확신 전까지 생성 강제는 안 켠다.
+    schema: ScenesSchema,
   });
 
   await logger.saveLlmCall('scenes', {

@@ -26,6 +26,7 @@ import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
 import { normalizeSceneLocations, uncoveredActs } from '@/lib/writer/pipeline/stages/s3_scenes';
 import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, BackgroundContract, StoryScene, NewCharacter } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
+import { MergedRawSchema } from '@/lib/writer/pipeline/schemas';
 
 // 병합 1콜의 원시 출력 형태 — 구조와 씬이 한 응답에 같이 나온다(E13 win: 접합부가 구조적으로 소멸).
 interface MergedRaw {
@@ -163,7 +164,8 @@ export async function runStructureScenesMerged(
   const user = buildUser(input, genre, characters, world);
 
   // 병합 1콜 — 구조와 씬이 한 응답에 같이 나온다(접합부 위반이 구조적으로 소멸).
-  const raw = await generateJson<MergedRaw>(user, axisConfig, { systemInstruction: system, temperature: 0.7, webSearch: true }); // #p4-websearch
+  // #p4-websearch · #p4-json-guard(validate 전용 — 씬 필드 전집합 확신 전까지 생성 강제 안 켬)
+  const raw = await generateJson<MergedRaw>(user, axisConfig, { systemInstruction: system, temperature: 0.7, webSearch: true, schema: MergedRawSchema });
   await logger.saveLlmCall('structureScenesMerged', {
     prompt: user,
     response: JSON.stringify(raw, null, 2),

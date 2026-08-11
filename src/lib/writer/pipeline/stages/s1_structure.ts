@@ -1,5 +1,6 @@
 // S1: 내러티브 구조, POV, 주제, CDQ
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import { NarrativeStructureSchema } from '@/lib/writer/pipeline/schemas';
 import type { Genre, NarrativeStructure, PipelineInput, Dramaturgy } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
@@ -78,6 +79,9 @@ acts의 proportion 합은 1.0이어야 함.`;
     systemInstruction,
     temperature: 0.6,
     webSearch: true, // #p4-websearch: 스토리 축 — 오마쥬/실존 레퍼런스 접지
+    // #p4-json-guard: 산출 스키마가 타입 전집합이라 생성 강제까지 켠다(schemas.ts 참조).
+    schema: NarrativeStructureSchema,
+    enforceSchema: true,
   });
 
   await logger.saveLlmCall('narrativeStructure', {

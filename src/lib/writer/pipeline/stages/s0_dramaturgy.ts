@@ -15,6 +15,7 @@
 //     주입하고, 씬이 실제로 채택한 무대만 mergeOpenWorld 를 타고 월드에 들어온다
 //     (미채택 후보는 v2 디자인·배경 생성 비용을 태우지 않는다).
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import { DramaturgySchema } from '@/lib/writer/pipeline/schemas';
 import type {
   Genre,
   Characters,
@@ -108,6 +109,9 @@ ${
     systemInstruction,
     temperature: 0.7,
     webSearch: true, // #p4-websearch: 메커니즘 조사 — 실존 절차/사례 접지
+    // #p4-json-guard: 산출 스키마가 프롬프트 전집합이라 생성 강제까지 켠다(schemas.ts 참조).
+    schema: DramaturgySchema,
+    enforceSchema: true,
   });
 
   await logger.saveLlmCall('dramaturgy', {

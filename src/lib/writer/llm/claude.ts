@@ -1,5 +1,7 @@
 // Claude 클라이언트 (검증 전용)
 import Anthropic from '@anthropic-ai/sdk';
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import type { z } from 'zod';
 import { recordRawCall } from './raw_collector';
 import { repairJson } from './json_repair';
 import { withLlmRetry } from './retry';
@@ -27,6 +29,10 @@ export interface ClaudeCallOptions {
   // #p4-websearch(2026-08-11): Anthropic web_search 서버 툴 — 검색 실행·결과 주입을 API 서버가
   //   수행(클라이언트 루프 불요). gemini 3.6-flash 그라운딩 불능 우회의 수신측 배선.
   webSearch?: boolean;
+  // #p4-json-guard(2026-08-11): 구조화 출력 — output_config.format 으로 생성을 스키마에 강제
+  //   (gemini responseMimeType 의 등가물+상위). web_search 와 병용 성립 실측(sonnet-4-6, 35.6s).
+  //   zodOutputFormat 이 zod→JSON 스키마 변환과 미지원 제약 정리를 담당한다.
+  zodSchema?: z.ZodType;
 }
 
 export async function claudeGenerate(
@@ -60,6 +66,7 @@ export async function claudeGenerate(
       ...(opts.webSearch
         ? { tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5 }] }
         : {}),
+      ...(opts.zodSchema ? { output_config: { format: zodOutputFormat(opts.zodSchema) } } : {}),
     };
     // Claude 5 는 max_tokens 바닥(32k) 때문에 SDK 가 비스트리밍을 거부("Streaming is required
     //   for operations that may take longer than 10 minutes") — 스트리밍 수집으로 동일 응답을 얻는다.
