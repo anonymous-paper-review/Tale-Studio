@@ -13,6 +13,8 @@
 ## 기록 (날짜 박힌 세션 증류 — 과거 사실)
 
 - `.claude/vault/` — 세션별 실측·삽질·결정 기록 (포맷: `_TEMPLATE.md`). 같은 주제를 다시 팔 때 먼저 검색
+- `.claude/vault/_DEFERRED.md` — **미뤄둔 작업 상시 원장** (날짜 파일 아님). "결정은 났는데 지금 안 하는 것"이 여기 모인다 — 새 작업을 고르기 전에 먼저 열어볼 것
+- `.claude/vault/_archive/` — 완료·폐기·무효화된 것 (원장과 인덱스는 열린 것만 보여야 한다)
 - `.claude/vault/2026-08-05-truth-source-cleanup.md` — "문서가 왜 다 없지?"·실험 규칙/대청소의 근거가 궁금하면 먼저
 - `.claude/vault/2026-08-06-previz-verifier.md` — previz 검증기/품질 채점을 다시 팔 때 먼저 (변별력 실측·판정 3원칙·보류 축의 이유)
 - `.claude/vault/2026-08-10-dramaturgy-world-derivation.md` — 드라마투르그/유도 주무대/세계 개발을 다시 팔 때 먼저 (기원 통찰 원문·채택 실측·본질 미결 논제)
@@ -28,9 +30,11 @@
 
 - 실험 시작 전 가설 폼: `research/experiments/_HYPOTHESIS.md` (5줄 — 가설/전제/예측/측정/기각 조건)
 - 실험 코드 규칙: `.claude/rules/experiments.md` — 복붙 금지·입력 고정·좌표 기록
-- 밤 실험 원장: `research/backlog/` — 미결을 밤 실행 티켓(_TEMPLATE.md)·아침 결정 카드(_MORNING.md)로 변환, 러너 규칙은 _NIGHT.md. /wrap 라우팅 5가 채움
+- 밤 실험 원장: `research/backlog/` — 미결을 밤 실행 티켓(_TEMPLATE.md)·아침 결정 카드(_MORNING.md)로 변환, 러너 규칙은 _NIGHT.md. /warp 라우팅 6이 채움
 
 ## 세션 리추얼
 
-- 세션 종료 시 `/wrap` — 코드로 귀결 안 된 것(결정·삽질·미결)을 vault로 증류
+- 세션 종료 시 `/warp` — 코드로 귀결 안 된 것(결정·삽질·미결·미뤄둔 작업)을 vault로 증류 (구 `/wrap`, 2026-08-11 개명)
 - 결정은 vault 파일의 `## 결정` 섹션에. 반복 참조되는 결정만 정본(rules/specs)으로 승격
+- **미결과 미뤄둔 작업은 다른 저장소** — 결론 없음은 vault `## 3. 미결`, 결정됐지만 지금 안 함은 `_DEFERRED.md`
+- 세션 중 닫힌 것은 그 자리에서 아카이브 — 완료된 미뤄둔 작업은 `_archive/_DEFERRED-done.md`로 이동
