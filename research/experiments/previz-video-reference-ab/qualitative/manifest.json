@@ -1,0 +1,117 @@
+{
+  "purpose": "움직임 전달 3방식 정성평가 1차 — 수집·관찰 전용 (판정 없음)",
+  "model": "bytedance/seedance-2.0/reference-to-video",
+  "project_id": "6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a",
+  "shot_id": "sh_04_16",
+  "frozen_prompt_source": "research/experiments/ti2v-camera-cap-recheck/provenance.json#sh_04_16__T1",
+  "blockout": {
+    "generator": "research/experiments/previz-video-reference-ab/blockout_sh_04_16.py (Blender 5.2.0 headless)",
+    "fal_url": "https://v3b.fal.media/files/b/0aa5db10/zpTJGS9QPJrkB2McLFGXf_blockout_sh_04_16.mp4",
+    "local": "qualitative/blockout.mp4"
+  },
+  "pricing_source": "fal.ai/models/bytedance/seedance-2.0/reference-to-video (2026-08-11 실측): 720p $0.3024/s, video input 시 $0.1814/s, 오디오 무료",
+  "jobs": [
+    {
+      "arm": "a",
+      "label": "동결 텍스트 프롬프트 + [START]",
+      "request_id": "019feeba-85b8-7dd1-aa2f-0119bfb229a9",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "model_key": "seedance",
+      "resolution": "720p",
+      "duration_seconds": 7,
+      "est_cost_usd": 2.1168,
+      "rate_per_sec_usd": 0.3024,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.",
+        "duration": 7,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_start.png?v=1786191704774"
+        ]
+      },
+      "submitted_at": "2026-08-11T02:50:29.195Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5db22/ffaqZx9uQwMIis3A4FA9J_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-video-reference-ab/qualitative/out_a.mp4",
+      "observed_output": {
+        "width": 1112,
+        "height": 834,
+        "duration_s": 7.059,
+        "bytes": 4222177,
+        "preview": "out_a_preview.mp4"
+      },
+      "confirmed_cost_usd": 2.1168
+    },
+    {
+      "arm": "b",
+      "label": "동결 텍스트 프롬프트 + [START, END]",
+      "request_id": "019feeba-867e-7231-9b75-702104f13d10",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "model_key": "seedance",
+      "resolution": "720p",
+      "duration_seconds": 7,
+      "est_cost_usd": 2.1168,
+      "rate_per_sec_usd": 0.3024,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.",
+        "duration": 7,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_start.png?v=1786191704774",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_end.png?v=1786191704348"
+        ]
+      },
+      "submitted_at": "2026-08-11T02:50:29.392Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5db1f/v4qjWpxfkLKEWiGdlllof_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-video-reference-ab/qualitative/out_b.mp4",
+      "observed_output": {
+        "width": 1112,
+        "height": 834,
+        "duration_s": 7.059,
+        "bytes": 3680686,
+        "preview": "out_b_preview.mp4"
+      },
+      "confirmed_cost_usd": 2.1168
+    },
+    {
+      "arm": "c",
+      "label": "(a) 구성 + video_urls=[블록아웃]",
+      "request_id": "019feeba-8747-7673-910a-04404defff6a",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "model_key": "seedance",
+      "resolution": "720p",
+      "duration_seconds": 7,
+      "est_cost_usd": 1.2698,
+      "rate_per_sec_usd": 0.1814,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.",
+        "duration": 7,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_start.png?v=1786191704774"
+        ],
+        "video_urls": [
+          "https://v3b.fal.media/files/b/0aa5db10/zpTJGS9QPJrkB2McLFGXf_blockout_sh_04_16.mp4"
+        ]
+      },
+      "submitted_at": "2026-08-11T02:50:29.594Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5db1f/4uo9XdHUWro6ZPSsOgiw5_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-video-reference-ab/qualitative/out_c.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "duration_s": 7.059,
+        "bytes": 4014942,
+        "preview": "out_c_preview.mp4"
+      },
+      "confirmed_cost_usd": 1.2698
+    }
+  ],
+  "total_cost_usd": 5.5034,
+  "cost_note": "단가는 fal 모델 페이지 2026-08-11 실측(720p $0.3024/s, video input 동반 $0.1814/s, 오디오 무료). fal에 요청별 청구 조회 API가 없어 비용 = 단가 × 발주 duration(7s)로 확정."
+}

@@ -109,6 +109,8 @@
   3. **Q1과 한 몸** — (iii) 병합 선택 시 이 카드 하나로 Q1도 닫힘.
 - **선택지**: bar 확정 + 등록 / 보류.
 - **밤 준비물**: [t1-a2-separated-oracle-prep](t1-a2-separated-oracle-prep.md)(판정기 재사용) — **✅ 완료(8/11 밤, Q1 카드 참조)** · [t0-spec-blender-compile-probe](t0-spec-blender-compile-probe.md)(Blender 설치 승인 시 — (c)암의 저작 자동화 전제) — **⛔ blocked 유지(owner-approval: Blender 설치)**.
+- **→ 결정 (2026-08-11 오너)**: 정량 사전등록에 앞서 **정성평가 선행** — 질주 샷 1개 × 3암 × 1회(모델 통일)로 각 암의 입력/출력 갤러리를 만들어 육안 1차. bar 등록·본실험은 갤러리 확인 후 재론. Q1도 이 결정에 묶임. **Blender 설치 승인됨**(정성평가 Phase 0 겸행 — blender 프로브 티켓의 blocker 해소).
+- **→ 실행됨 (같은 날 낮)**: 3암 전부 성공, $5.50 — [갤러리](https://claude.ai/code/artifact/cc685ec1-432a-4fd2-a381-502009867306). 관찰: (c)만 측면 트래킹 끝까지 유지·오염 0·16:9 유지 / (a) 5초 후 정면 이탈 / (b) END 구도 고착. 블록아웃 제작 수동 개입 0회, (c) 단가가 최저($1.27). **남은 것: 오너 육안 판정 → bar [N] 확정 시 본실험(27클립 ~$46) 등록.** 원자료 `previz-video-reference-ab/qualitative/`
 
 ## Q16. dynamic_spec enum 검증기 — 위반 982건 실측, 설계 선택 필요 (8/11 밤 러너 신규)
 
