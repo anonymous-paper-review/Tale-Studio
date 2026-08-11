@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // dev/: 독립 실험 하네스 (자체 tsconfig, node strip-types 실행 — 앱 빌드와 무관)
     "dev/**",
+    // .worktrees/: 링크된 git 워크트리 (같은 소스의 다른 브랜치 사본 — 중복 검사)
+    ".worktrees/**",
   ]),
 ]);
 

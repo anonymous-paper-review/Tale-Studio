@@ -55,6 +55,9 @@ PROGRESS.md
 BUGS.md
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+# 링크된 git 워크트리 — 같은 repo의 다른 브랜치 사본이라 추적 대상 아님
+# (루트 .worktrees/ 는 .git/info/exclude 가 이미 처리)
+.claude/worktrees/
 # docs/ 전체 로컬 전용(내부 노트) — 공개 repo 미추적. legacy는 로컬에서도 삭제함
 docs/
 
@@ -115,6 +118,15 @@ research/experiments/previz-channel-ablation/run/
 research/experiments/ti2v-camera-cap-recheck/assets/
 # 검수 노트 A/B: 러프 108장(138MB) — 좌표는 manifest.json/fixtures.json 이 보유
 research/experiments/checknote-previz-ab/assets/
+# 위 경로들을 실험마다 하나씩 추가해오다 일반화(2026-08-11):
+# 실험 산출물 미디어는 확장자로 일괄 로컬 전용. 좌표(HYPOTHESIS·manifest·provenance)만 추적한다.
+# 이미 추적 중인 파일(rough-background-ref-holds-room/assets/*.png 6장)은 영향 없음.
+research/experiments/**/*.mp4
+research/experiments/**/*.mov
+research/experiments/**/*.png
+research/experiments/**/*.jpg
+research/experiments/**/*.jpeg
+research/experiments/**/*.webp
 lab/
 
 # 실험 뷰어 생성물 (viewer.mjs가 만드는 로컬 전용 인덱스)
