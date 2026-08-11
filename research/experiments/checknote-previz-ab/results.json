@@ -1,0 +1,2143 @@
+{
+  "scoredAt": "2026-08-11T06:03:34.458Z",
+  "protocol": {
+    "source_projects": [
+      "5260d92d-2e7b-4991-8bff-00213b37ef77",
+      "e4da245a-8d89-44e5-8fde-131d016ef2e3"
+    ],
+    "reps": 3,
+    "model": "openai/gpt-image-2/edit",
+    "template": "public/rough-storyboard-strip.png → fal storage upload → product rough-grid strip1 path",
+    "manipulation": "두 팔의 유일한 차이는 제품 러프보드 경로가 cell.start에 붙이는 Continuity constraints 줄의 유무다.",
+    "branch_mapping": "A=action_budget, B=continuity, boundary=verisimilitude + 제안서의 pronoun 사례. 갈래별 결과는 6장씩의 지시적 신호로만 읽는다.",
+    "note": "현재 소스의 writer/rough-storyboard 경로는 appendCheckConstraints가 아니라 parseCheckConstraints + cell-local append를 사용한다. 사전 제안서의 좌표와 구현이 어긋나므로 결과에 방법 이탈로 기록한다. 조작 자체와 측정 기준은 변경하지 않는다."
+  },
+  "overall": {
+    "pairs_planned": 54,
+    "o1": {
+      "note_n": 51,
+      "note_rate": 0.5098,
+      "control_n": 52,
+      "control_rate": 0.2692,
+      "paired_n": 51,
+      "note_wins": 14,
+      "control_wins": 2,
+      "ties": 35,
+      "sign_p": 0.004180908203125,
+      "delta_pp": 24.06
+    },
+    "o2": {
+      "note_n": 54,
+      "note_rate": 0.6667,
+      "control_n": 51,
+      "control_rate": 0.6863,
+      "paired_n": 51,
+      "note_wins": 4,
+      "control_wins": 6,
+      "ties": 41,
+      "sign_p": 0.75390625,
+      "delta_pp": -1.96
+    },
+    "o3": {
+      "n": 54,
+      "note_wins": 27,
+      "control_wins": 27,
+      "ties": 0,
+      "sign_p": 1,
+      "note_win_rate_excluding_ties": 0.5
+    }
+  },
+  "by_branch": {
+    "A-mechanical": {
+      "n_pairs": 18,
+      "o1": {
+        "note_n": 18,
+        "note_rate": 0.5,
+        "control_n": 18,
+        "control_rate": 0.3333,
+        "paired_n": 18,
+        "note_wins": 4,
+        "control_wins": 1,
+        "ties": 13,
+        "sign_p": 0.375,
+        "delta_pp": 16.67
+      },
+      "o2": {
+        "note_n": 18,
+        "note_rate": 0.5556,
+        "control_n": 18,
+        "control_rate": 0.5556,
+        "paired_n": 18,
+        "note_wins": 2,
+        "control_wins": 2,
+        "ties": 14,
+        "sign_p": 1,
+        "delta_pp": 0
+      },
+      "o3": {
+        "n": 18,
+        "note_wins": 8,
+        "control_wins": 10,
+        "ties": 0,
+        "sign_p": 0.8145294189453125,
+        "note_win_rate_excluding_ties": 0.4444
+      }
+    },
+    "B-llm": {
+      "n_pairs": 18,
+      "o1": {
+        "note_n": 15,
+        "note_rate": 0.7333,
+        "control_n": 16,
+        "control_rate": 0.25,
+        "paired_n": 15,
+        "note_wins": 7,
+        "control_wins": 0,
+        "ties": 8,
+        "sign_p": 0.015625,
+        "delta_pp": 48.33
+      },
+      "o2": {
+        "note_n": 18,
+        "note_rate": 1,
+        "control_n": 16,
+        "control_rate": 0.9375,
+        "paired_n": 16,
+        "note_wins": 1,
+        "control_wins": 0,
+        "ties": 15,
+        "sign_p": 1,
+        "delta_pp": 6.25
+      },
+      "o3": {
+        "n": 18,
+        "note_wins": 11,
+        "control_wins": 7,
+        "ties": 0,
+        "sign_p": 0.480682373046875,
+        "note_win_rate_excluding_ties": 0.6111
+      }
+    },
+    "boundary": {
+      "n_pairs": 18,
+      "o1": {
+        "note_n": 18,
+        "note_rate": 0.3333,
+        "control_n": 18,
+        "control_rate": 0.2222,
+        "paired_n": 18,
+        "note_wins": 3,
+        "control_wins": 1,
+        "ties": 14,
+        "sign_p": 0.625,
+        "delta_pp": 11.11
+      },
+      "o2": {
+        "note_n": 18,
+        "note_rate": 0.4444,
+        "control_n": 17,
+        "control_rate": 0.5882,
+        "paired_n": 17,
+        "note_wins": 1,
+        "control_wins": 4,
+        "ties": 12,
+        "sign_p": 0.375,
+        "delta_pp": -14.38
+      },
+      "o3": {
+        "n": 18,
+        "note_wins": 8,
+        "control_wins": 10,
+        "ties": 0,
+        "sign_p": 0.8145294189453125,
+        "note_win_rate_excluding_ties": 0.4444
+      }
+    }
+  },
+  "na": {
+    "planned_judgments": 276,
+    "completed_judgments": 276,
+    "usable_judgments": 262,
+    "na_rate": 0.0507,
+    "by_axis": {
+      "o1": {
+        "planned": 114,
+        "usable": 103,
+        "na": 11,
+        "na_rate": 0.0965
+      },
+      "o2": {
+        "planned": 108,
+        "usable": 105,
+        "na": 3,
+        "na_rate": 0.0278
+      },
+      "o3": {
+        "planned": 54,
+        "usable": 54,
+        "na": 0,
+        "na_rate": 0
+      }
+    }
+  },
+  "preregistered_conditions": {
+    "main_hypothesis_rejected": false,
+    "pushback_confirmed": false,
+    "instrument_failed": false,
+    "note": "갈래별 N=6쌍은 지시적 신호로만 읽고 전체 54쌍을 주 판정으로 삼는다."
+  },
+  "pair_rows": [
+    {
+      "fixture_id": "fx_01",
+      "branch": "A-mechanical",
+      "pair_key": "fx_01__r1",
+      "note_key": "fx_01__r1__note",
+      "control_key": "fx_01__r1__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_01__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 better adheres to the 'MCU' framing and visually represents the 'Dolly In' camera movement.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:25:06.299Z"
+      }
+    },
+    {
+      "fixture_id": "fx_01",
+      "branch": "A-mechanical",
+      "pair_key": "fx_01__r2",
+      "note_key": "fx_01__r2__note",
+      "control_key": "fx_01__r2__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_01__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 better illustrates the 'slumped posture' and the specific 'radio to floor' action sequence across panels.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:51:00.844Z"
+      }
+    },
+    {
+      "fixture_id": "fx_01",
+      "branch": "A-mechanical",
+      "pair_key": "fx_01__r3",
+      "note_key": "fx_01__r3__note",
+      "control_key": "fx_01__r3__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_01__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 correctly depicts the 'TURNS RADIO' action in the final panel, whereas Image 2 does not.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:51:18.865Z"
+      }
+    },
+    {
+      "fixture_id": "fx_02",
+      "branch": "A-mechanical",
+      "pair_key": "fx_02__r1",
+      "note_key": "fx_02__r1__note",
+      "control_key": "fx_02__r1__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_02__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 provides a cleaner, more professional layout for technical specifications and clearer action indicators for the director.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:51:11.864Z"
+      }
+    },
+    {
+      "fixture_id": "fx_02",
+      "branch": "A-mechanical",
+      "pair_key": "fx_02__r2",
+      "note_key": "fx_02__r2__note",
+      "control_key": "fx_02__r2__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_02__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Clearer directional arrows for head movement and consistent technical notes without contradictory pan instructions.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:51:25.318Z"
+      }
+    },
+    {
+      "fixture_id": "fx_02",
+      "branch": "A-mechanical",
+      "pair_key": "fx_02__r3",
+      "note_key": "fx_02__r3__note",
+      "control_key": "fx_02__r3__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_02__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 uses more standard camera movement symbols and includes an extra performance note ('SHARPENS GAZE').",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:51:33.513Z"
+      }
+    },
+    {
+      "fixture_id": "fx_03",
+      "branch": "A-mechanical",
+      "pair_key": "fx_03__r1",
+      "note_key": "fx_03__r1__note",
+      "control_key": "fx_03__r1__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_03__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 features clearer character staging and more readable action arrows, better illustrating the camera movement and focus point.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:51:43.222Z"
+      }
+    },
+    {
+      "fixture_id": "fx_03",
+      "branch": "A-mechanical",
+      "pair_key": "fx_03__r2",
+      "note_key": "fx_03__r2__note",
+      "control_key": "fx_03__r2__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_03__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 offers superior annotation clarity and more intuitive directional arrows for camera and character movement.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:51:50.380Z"
+      }
+    },
+    {
+      "fixture_id": "fx_03",
+      "branch": "A-mechanical",
+      "pair_key": "fx_03__r3",
+      "note_key": "fx_03__r3__note",
+      "control_key": "fx_03__r3__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_03__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 includes clearer action labels like 'WALKS' and a more intuitive 'DOLLY IN' arrow for camera movement.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:51:57.283Z"
+      }
+    },
+    {
+      "fixture_id": "fx_04",
+      "branch": "A-mechanical",
+      "pair_key": "fx_04__r1",
+      "note_key": "fx_04__r1__note",
+      "control_key": "fx_04__r1__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_04__r1",
+        "pick": 2,
+        "confidence": "high",
+        "winner": "control",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 2's third panel effectively demonstrates the 'Dolly In' camera movement by showing the resulting closer framing.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:52:03.623Z"
+      }
+    },
+    {
+      "fixture_id": "fx_04",
+      "branch": "A-mechanical",
+      "pair_key": "fx_04__r2",
+      "note_key": "fx_04__r2__note",
+      "control_key": "fx_04__r2__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_04__r2",
+        "pick": 2,
+        "confidence": "high",
+        "winner": "note",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 2 uses more standard and readable arrows for the dolly-in camera movement and lens cap action.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:52:12.270Z"
+      }
+    },
+    {
+      "fixture_id": "fx_04",
+      "branch": "A-mechanical",
+      "pair_key": "fx_04__r3",
+      "note_key": "fx_04__r3__note",
+      "control_key": "fx_04__r3__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_04__r3",
+        "pick": 2,
+        "confidence": "high",
+        "winner": "control",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 2 effectively visualizes the 'dolly in' instruction by showing a clear change in framing in the final panel.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:52:17.751Z"
+      }
+    },
+    {
+      "fixture_id": "fx_05",
+      "branch": "A-mechanical",
+      "pair_key": "fx_05__r1",
+      "note_key": "fx_05__r1__note",
+      "control_key": "fx_05__r1__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_05__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 features more specific action labels and a clearer visual execution of the dolly-in camera movement.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:52:37.238Z"
+      }
+    },
+    {
+      "fixture_id": "fx_05",
+      "branch": "A-mechanical",
+      "pair_key": "fx_05__r2",
+      "note_key": "fx_05__r2__note",
+      "control_key": "fx_05__r2__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_05__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 better illustrates the lighting shift following the 'turns off light' action, providing clearer narrative and technical continuity.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:52:42.414Z"
+      }
+    },
+    {
+      "fixture_id": "fx_05",
+      "branch": "A-mechanical",
+      "pair_key": "fx_05__r3",
+      "note_key": "fx_05__r3__note",
+      "control_key": "fx_05__r3__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_05__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 provides more specific directional cues for character action and a cleaner layout of technical camera specifications.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:52:50.668Z"
+      }
+    },
+    {
+      "fixture_id": "fx_06",
+      "branch": "A-mechanical",
+      "pair_key": "fx_06__r1",
+      "note_key": "fx_06__r1__note",
+      "control_key": "fx_06__r1__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_06__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 provides more professional technical annotations, clearer character labeling, and consistent staging for a medium shot.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:52:57.190Z"
+      }
+    },
+    {
+      "fixture_id": "fx_06",
+      "branch": "A-mechanical",
+      "pair_key": "fx_06__r2",
+      "note_key": "fx_06__r2__note",
+      "control_key": "fx_06__r2__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_06__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 includes more detailed camera movement instructions like 'Dolly In Fast,' which is essential for previz.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:53:02.473Z"
+      }
+    },
+    {
+      "fixture_id": "fx_06",
+      "branch": "A-mechanical",
+      "pair_key": "fx_06__r3",
+      "note_key": "fx_06__r3__note",
+      "control_key": "fx_06__r3__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_06__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 includes more specific camera movement instructions (dolly, pan) and visually demonstrates the resulting perspective shift.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:53:09.284Z"
+      }
+    },
+    {
+      "fixture_id": "fx_07",
+      "branch": "B-llm",
+      "pair_key": "fx_07__r1",
+      "note_key": "fx_07__r1__note",
+      "control_key": "fx_07__r1__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_07__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 uses squiggly lines to clearly visualize the handheld camera movement, enhancing action readability for the director.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:53:15.723Z"
+      }
+    },
+    {
+      "fixture_id": "fx_07",
+      "branch": "B-llm",
+      "pair_key": "fx_07__r2",
+      "note_key": "fx_07__r2__note",
+      "control_key": "fx_07__r2__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_07__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 features more architectural detail (doors) to track movement and uses more intuitive arrows to indicate forward drift.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:53:22.840Z"
+      }
+    },
+    {
+      "fixture_id": "fx_07",
+      "branch": "B-llm",
+      "pair_key": "fx_07__r3",
+      "note_key": "fx_07__r3__note",
+      "control_key": "fx_07__r3__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_07__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 includes characters, providing essential context for staging, scale, and blocking within the environment.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:53:26.870Z"
+      }
+    },
+    {
+      "fixture_id": "fx_08",
+      "branch": "B-llm",
+      "pair_key": "fx_08__r1",
+      "note_key": "fx_08__r1__note",
+      "control_key": "fx_08__r1__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          null
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_08__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 provides better staging by showing the character's face, making the 'focus on eyes' note more actionable.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:53:35.453Z"
+      }
+    },
+    {
+      "fixture_id": "fx_08",
+      "branch": "B-llm",
+      "pair_key": "fx_08__r2",
+      "note_key": "fx_08__r2__note",
+      "control_key": "fx_08__r2__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          null
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_08__r2",
+        "pick": 2,
+        "confidence": "high",
+        "winner": "note",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 2 provides more detailed camera movement notes and better illustrates the 'speak' action with a mouth.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:53:41.518Z"
+      }
+    },
+    {
+      "fixture_id": "fx_08",
+      "branch": "B-llm",
+      "pair_key": "fx_08__r3",
+      "note_key": "fx_08__r3__note",
+      "control_key": "fx_08__r3__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_08__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 better aligns with the 'focus on eyes' note by showing the character's face more clearly.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:53:49.293Z"
+      }
+    },
+    {
+      "fixture_id": "fx_09",
+      "branch": "B-llm",
+      "pair_key": "fx_09__r1",
+      "note_key": "fx_09__r1__note",
+      "control_key": "fx_09__r1__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_09__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 demonstrates superior depth, clearer character separation, and a more complete progression of the action sequence.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:53:59.743Z"
+      }
+    },
+    {
+      "fixture_id": "fx_09",
+      "branch": "B-llm",
+      "pair_key": "fx_09__r2",
+      "note_key": "fx_09__r2__note",
+      "control_key": "fx_09__r2__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_09__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 features more dynamic posing and clearer environmental context, making the action and staging more readable.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:54:12.816Z"
+      }
+    },
+    {
+      "fixture_id": "fx_09",
+      "branch": "B-llm",
+      "pair_key": "fx_09__r3",
+      "note_key": "fx_09__r3__note",
+      "control_key": "fx_09__r3__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_09__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 better emphasizes the interlocking hands in the final panel, directly supporting the specific focus note.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:54:19.526Z"
+      }
+    },
+    {
+      "fixture_id": "fx_10",
+      "branch": "B-llm",
+      "pair_key": "fx_10__r1",
+      "note_key": "fx_10__r1__note",
+      "control_key": "fx_10__r1__control",
+      "o1": {
+        "note": [
+          null
+        ],
+        "control": [
+          null
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_10__r1",
+        "pick": 2,
+        "confidence": "high",
+        "winner": "control",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 2 offers cleaner staging with a better vanishing point and includes a specific 'STATIC HOLD' camera instruction.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:54:24.224Z"
+      }
+    },
+    {
+      "fixture_id": "fx_10",
+      "branch": "B-llm",
+      "pair_key": "fx_10__r2",
+      "note_key": "fx_10__r2__note",
+      "control_key": "fx_10__r2__control",
+      "o1": {
+        "note": [
+          null
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_10__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 has clearer, more precise annotations for static elements and better central framing of the traffic light.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:54:29.030Z"
+      }
+    },
+    {
+      "fixture_id": "fx_10",
+      "branch": "B-llm",
+      "pair_key": "fx_10__r3",
+      "note_key": "fx_10__r3__note",
+      "control_key": "fx_10__r3__control",
+      "o1": {
+        "note": [
+          null
+        ],
+        "control": [
+          null
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_10__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 features clearer technical annotations and more precise 'STATIC HOLD' labels that better emphasize the flickering light focus.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:54:34.123Z"
+      }
+    },
+    {
+      "fixture_id": "fx_11",
+      "branch": "B-llm",
+      "pair_key": "fx_11__r1",
+      "note_key": "fx_11__r1__note",
+      "control_key": "fx_11__r1__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_11__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 offers clearer spatial staging and more precise action notes, providing a better blueprint for previz construction.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:54:43.443Z"
+      }
+    },
+    {
+      "fixture_id": "fx_11",
+      "branch": "B-llm",
+      "pair_key": "fx_11__r2",
+      "note_key": "fx_11__r2__note",
+      "control_key": "fx_11__r2__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_11__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 features more dynamic posing and a third panel that better illustrates the 24mm low-angle perspective.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:54:50.351Z"
+      }
+    },
+    {
+      "fixture_id": "fx_11",
+      "branch": "B-llm",
+      "pair_key": "fx_11__r3",
+      "note_key": "fx_11__r3__note",
+      "control_key": "fx_11__r3__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_11__r3",
+        "pick": 2,
+        "confidence": "high",
+        "winner": "note",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 2 better illustrates the 24mm low-angle perspective and wide-shot staging requested in the technical notes.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:55:05.434Z"
+      }
+    },
+    {
+      "fixture_id": "fx_12",
+      "branch": "B-llm",
+      "pair_key": "fx_12__r1",
+      "note_key": "fx_12__r1__note",
+      "control_key": "fx_12__r1__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_12__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 provides clearer technical instructions with explicit 'NO CAMERA MOVEMENT' notes and precise frame corner markers.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:55:16.365Z"
+      }
+    },
+    {
+      "fixture_id": "fx_12",
+      "branch": "B-llm",
+      "pair_key": "fx_12__r2",
+      "note_key": "fx_12__r2__note",
+      "control_key": "fx_12__r2__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_12__r2",
+        "pick": 2,
+        "confidence": "high",
+        "winner": "note",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 2 uses clearer, unambiguous technical notation for camera movement and provides better background visibility for staging.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:55:19.725Z"
+      }
+    },
+    {
+      "fixture_id": "fx_12",
+      "branch": "B-llm",
+      "pair_key": "fx_12__r3",
+      "note_key": "fx_12__r3__note",
+      "control_key": "fx_12__r3__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_12__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 provides clearer staging and more consistent technical notation; Image 2's 'static hold' arrows are visually contradictory.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:55:17.327Z"
+      }
+    },
+    {
+      "fixture_id": "fx_13",
+      "branch": "boundary",
+      "pair_key": "fx_13__r1",
+      "note_key": "fx_13__r1__note",
+      "control_key": "fx_13__r1__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_13__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 provides superior technical clarity with specific directional arrows for lighting and focus, plus explicit movement instructions.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:55:25.568Z"
+      }
+    },
+    {
+      "fixture_id": "fx_13",
+      "branch": "boundary",
+      "pair_key": "fx_13__r2",
+      "note_key": "fx_13__r2__note",
+      "control_key": "fx_13__r2__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_13__r2",
+        "pick": 2,
+        "confidence": "high",
+        "winner": "control",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 2 provides more explicit technical instructions like 'NO CAMERA MOVE,' which is highly useful for previz accuracy.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:55:34.832Z"
+      }
+    },
+    {
+      "fixture_id": "fx_13",
+      "branch": "boundary",
+      "pair_key": "fx_13__r3",
+      "note_key": "fx_13__r3__note",
+      "control_key": "fx_13__r3__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_13__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 uses an internal frame to clearly define the ECU (Extreme Close Up) specified in the notes.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:55:40.840Z"
+      }
+    },
+    {
+      "fixture_id": "fx_14",
+      "branch": "boundary",
+      "pair_key": "fx_14__r1",
+      "note_key": "fx_14__r1__note",
+      "control_key": "fx_14__r1__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_14__r1",
+        "pick": 2,
+        "confidence": "high",
+        "winner": "control",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 2 provides clear visual staging, composition, and lighting reference, whereas Image 1 contains no visual information.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:55:51.992Z"
+      }
+    },
+    {
+      "fixture_id": "fx_14",
+      "branch": "boundary",
+      "pair_key": "fx_14__r2",
+      "note_key": "fx_14__r2__note",
+      "control_key": "fx_14__r2__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_14__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 provides clear visual context, composition, and staging, whereas Image 2's lack of detail makes it uninformative.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:56:04.157Z"
+      }
+    },
+    {
+      "fixture_id": "fx_14",
+      "branch": "boundary",
+      "pair_key": "fx_14__r3",
+      "note_key": "fx_14__r3__note",
+      "control_key": "fx_14__r3__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_14__r3",
+        "pick": 2,
+        "confidence": "high",
+        "winner": "control",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 2 provides essential visual context and composition, whereas Image 1 is just a black frame.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:56:08.107Z"
+      }
+    },
+    {
+      "fixture_id": "fx_15",
+      "branch": "boundary",
+      "pair_key": "fx_15__r1",
+      "note_key": "fx_15__r1__note",
+      "control_key": "fx_15__r1__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          null
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_15__r1",
+        "pick": 2,
+        "confidence": "high",
+        "winner": "note",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 2 uses clearer, more standard camera movement symbols and provides more descriptive performance notes like 'UPWARD SHOCK'.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:56:22.237Z"
+      }
+    },
+    {
+      "fixture_id": "fx_15",
+      "branch": "boundary",
+      "pair_key": "fx_15__r2",
+      "note_key": "fx_15__r2__note",
+      "control_key": "fx_15__r2__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_15__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 includes the father's face, which is explicitly mentioned as the focus point in the technical notes.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:56:32.896Z"
+      }
+    },
+    {
+      "fixture_id": "fx_15",
+      "branch": "boundary",
+      "pair_key": "fx_15__r3",
+      "note_key": "fx_15__r3__note",
+      "control_key": "fx_15__r3__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_15__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1's framing accurately reflects the 85mm lens specification and provides a clearer visual progression of the action.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:56:39.140Z"
+      }
+    },
+    {
+      "fixture_id": "fx_16",
+      "branch": "boundary",
+      "pair_key": "fx_16__r1",
+      "note_key": "fx_16__r1__note",
+      "control_key": "fx_16__r1__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_16__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 includes specific character movement and better staging for a dynamic shot compared to the static prop in Image 2.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:56:43.652Z"
+      }
+    },
+    {
+      "fixture_id": "fx_16",
+      "branch": "boundary",
+      "pair_key": "fx_16__r2",
+      "note_key": "fx_16__r2__note",
+      "control_key": "fx_16__r2__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_16__r2",
+        "pick": 2,
+        "confidence": "high",
+        "winner": "note",
+        "left": "control",
+        "right": "note",
+        "reason": "Includes a character for scale/blocking and explicitly notes parallax shift, providing better cinematic context for the director.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:56:50.081Z"
+      }
+    },
+    {
+      "fixture_id": "fx_16",
+      "branch": "boundary",
+      "pair_key": "fx_16__r3",
+      "note_key": "fx_16__r3__note",
+      "control_key": "fx_16__r3__control",
+      "o1": {
+        "note": [
+          1
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_16__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Includes a character for blocking and clearer movement annotations for both camera and subject.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:56:55.579Z"
+      }
+    },
+    {
+      "fixture_id": "fx_17",
+      "branch": "boundary",
+      "pair_key": "fx_17__r1",
+      "note_key": "fx_17__r1__note",
+      "control_key": "fx_17__r1__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_17__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 uses standard camera terms (Pan/Tilt) correctly, whereas Image 2's 'Static Hold' with movement arrows is contradictory.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:57:01.911Z"
+      }
+    },
+    {
+      "fixture_id": "fx_17",
+      "branch": "boundary",
+      "pair_key": "fx_17__r2",
+      "note_key": "fx_17__r2__note",
+      "control_key": "fx_17__r2__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_17__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 provides more explicit technical instructions (no pan/tilt) and clearer environmental detail for staging.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:57:06.429Z"
+      }
+    },
+    {
+      "fixture_id": "fx_17",
+      "branch": "boundary",
+      "pair_key": "fx_17__r3",
+      "note_key": "fx_17__r3__note",
+      "control_key": "fx_17__r3__control",
+      "o1": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o2": {
+        "note": [
+          0
+        ],
+        "control": [
+          0
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_17__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Clearer camera movement indication using an internal frame and standard storyboard arrows for a close-up transition.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:57:14.404Z"
+      }
+    },
+    {
+      "fixture_id": "fx_18",
+      "branch": "boundary",
+      "pair_key": "fx_18__r1",
+      "note_key": "fx_18__r1__note",
+      "control_key": "fx_18__r1__control",
+      "o1": {
+        "note": [
+          0,
+          null
+        ],
+        "control": [
+          0,
+          null
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_18__r1",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 provides clearer staging, more detailed action annotations, and a more readable progression of movement across panels.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:57:24.430Z"
+      }
+    },
+    {
+      "fixture_id": "fx_18",
+      "branch": "boundary",
+      "pair_key": "fx_18__r2",
+      "note_key": "fx_18__r2__note",
+      "control_key": "fx_18__r2__control",
+      "o1": {
+        "note": [
+          0,
+          null
+        ],
+        "control": [
+          1,
+          null
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_18__r2",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "control",
+        "left": "control",
+        "right": "note",
+        "reason": "Image 1 more effectively visualizes the 'Dolly In' instruction by noticeably changing the framing and scale in panel 3.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:57:29.391Z"
+      }
+    },
+    {
+      "fixture_id": "fx_18",
+      "branch": "boundary",
+      "pair_key": "fx_18__r3",
+      "note_key": "fx_18__r3__note",
+      "control_key": "fx_18__r3__control",
+      "o1": {
+        "note": [
+          0,
+          null
+        ],
+        "control": [
+          0,
+          null
+        ]
+      },
+      "o2": {
+        "note": [
+          1
+        ],
+        "control": [
+          1
+        ]
+      },
+      "o3": {
+        "pair_key": "fx_18__r3",
+        "pick": 1,
+        "confidence": "high",
+        "winner": "note",
+        "left": "note",
+        "right": "control",
+        "reason": "Image 1 offers clearer environmental staging, more detailed prop interaction notes, and maintains a consistent shot setup throughout.",
+        "prompt": "IMAGE 1 and IMAGE 2 are two blinded three-panel rough storyboard strips for the same shot.\nWhich strip is more useful as a previz panel for a director? Consider clear staging, readable action, and preservation of the original shot setup. Do not infer which one received an extra note.\nAnswer pick=1, pick=2, or pick=0 if genuinely indistinguishable. Return JSON only: {\"pick\":0 or 1 or 2,\"confidence\":\"high|low\",\"reason\":\"<=20 words\"}",
+        "judgedAt": "2026-08-11T05:57:40.428Z"
+      }
+    }
+  ],
+  "source_job_status": {
+    "fx_01__r1__note": "completed",
+    "fx_01__r1__control": "completed",
+    "fx_01__r2__note": "completed",
+    "fx_01__r2__control": "completed",
+    "fx_01__r3__note": "completed",
+    "fx_01__r3__control": "completed",
+    "fx_02__r1__note": "completed",
+    "fx_02__r1__control": "completed",
+    "fx_02__r2__note": "completed",
+    "fx_02__r2__control": "completed",
+    "fx_02__r3__note": "completed",
+    "fx_02__r3__control": "completed",
+    "fx_03__r1__note": "completed",
+    "fx_03__r1__control": "completed",
+    "fx_03__r2__note": "completed",
+    "fx_03__r2__control": "completed",
+    "fx_03__r3__note": "completed",
+    "fx_03__r3__control": "completed",
+    "fx_04__r1__note": "completed",
+    "fx_04__r1__control": "completed",
+    "fx_04__r2__note": "completed",
+    "fx_04__r2__control": "completed",
+    "fx_04__r3__note": "completed",
+    "fx_04__r3__control": "completed",
+    "fx_05__r1__note": "completed",
+    "fx_05__r1__control": "completed",
+    "fx_05__r2__note": "completed",
+    "fx_05__r2__control": "completed",
+    "fx_05__r3__note": "completed",
+    "fx_05__r3__control": "completed",
+    "fx_06__r1__note": "completed",
+    "fx_06__r1__control": "completed",
+    "fx_06__r2__note": "completed",
+    "fx_06__r2__control": "completed",
+    "fx_06__r3__note": "completed",
+    "fx_06__r3__control": "completed",
+    "fx_07__r1__note": "completed",
+    "fx_07__r1__control": "completed",
+    "fx_07__r2__note": "completed",
+    "fx_07__r2__control": "completed",
+    "fx_07__r3__note": "completed",
+    "fx_07__r3__control": "completed",
+    "fx_08__r1__note": "completed",
+    "fx_08__r1__control": "completed",
+    "fx_08__r2__note": "completed",
+    "fx_08__r2__control": "completed",
+    "fx_08__r3__note": "completed",
+    "fx_08__r3__control": "completed",
+    "fx_09__r1__note": "completed",
+    "fx_09__r1__control": "completed",
+    "fx_09__r2__note": "completed",
+    "fx_09__r2__control": "completed",
+    "fx_09__r3__note": "completed",
+    "fx_09__r3__control": "completed",
+    "fx_10__r1__note": "completed",
+    "fx_10__r1__control": "completed",
+    "fx_10__r2__note": "completed",
+    "fx_10__r2__control": "completed",
+    "fx_10__r3__note": "completed",
+    "fx_10__r3__control": "completed",
+    "fx_11__r1__note": "completed",
+    "fx_11__r1__control": "completed",
+    "fx_11__r2__note": "completed",
+    "fx_11__r2__control": "completed",
+    "fx_11__r3__note": "completed",
+    "fx_11__r3__control": "completed",
+    "fx_12__r1__note": "completed",
+    "fx_12__r1__control": "completed",
+    "fx_12__r2__note": "completed",
+    "fx_12__r2__control": "completed",
+    "fx_12__r3__note": "completed",
+    "fx_12__r3__control": "completed",
+    "fx_13__r1__note": "completed",
+    "fx_13__r1__control": "completed",
+    "fx_13__r2__note": "completed",
+    "fx_13__r2__control": "completed",
+    "fx_13__r3__note": "completed",
+    "fx_13__r3__control": "completed",
+    "fx_14__r1__note": "completed",
+    "fx_14__r1__control": "completed",
+    "fx_14__r2__note": "completed",
+    "fx_14__r2__control": "completed",
+    "fx_14__r3__note": "completed",
+    "fx_14__r3__control": "completed",
+    "fx_15__r1__note": "completed",
+    "fx_15__r1__control": "completed",
+    "fx_15__r2__note": "completed",
+    "fx_15__r2__control": "completed",
+    "fx_15__r3__note": "completed",
+    "fx_15__r3__control": "completed",
+    "fx_16__r1__note": "completed",
+    "fx_16__r1__control": "completed",
+    "fx_16__r2__note": "completed",
+    "fx_16__r2__control": "completed",
+    "fx_16__r3__note": "completed",
+    "fx_16__r3__control": "completed",
+    "fx_17__r1__note": "completed",
+    "fx_17__r1__control": "completed",
+    "fx_17__r2__note": "completed",
+    "fx_17__r2__control": "completed",
+    "fx_17__r3__note": "completed",
+    "fx_17__r3__control": "completed",
+    "fx_18__r1__note": "completed",
+    "fx_18__r1__control": "completed",
+    "fx_18__r2__note": "completed",
+    "fx_18__r2__control": "completed",
+    "fx_18__r3__note": "completed",
+    "fx_18__r3__control": "completed"
+  }
+}

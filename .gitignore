@@ -113,4 +113,9 @@ research/experiments/**/assets/clips/
 # 같은 규칙: 실측 미디어 산출물·입력 스트립은 로컬만 (좌표는 provenance/HYPOTHESIS가 보유)
 research/experiments/previz-channel-ablation/run/
 research/experiments/ti2v-camera-cap-recheck/assets/
+# 검수 노트 A/B: 러프 108장(138MB) — 좌표는 manifest.json/fixtures.json 이 보유
+research/experiments/checknote-previz-ab/assets/
 lab/
+
+# 실험 뷰어 생성물 (viewer.mjs가 만드는 로컬 전용 인덱스)
+research/experiments/_viewer.html
