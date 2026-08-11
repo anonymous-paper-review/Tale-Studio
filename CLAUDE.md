@@ -24,6 +24,7 @@
 - `.claude/vault/2026-08-10-flash-ab-fanout-review.md` — 모델 교체/검수 가치/로그 열람 오탐을 다시 팔 때 먼저 (lite 기각의 진짜 사유=repairJson 무신호 손실·shotCheck 검수 분포 실측·증류 분류기 우회)
 - `.claude/vault/2026-08-10-writer-integrity-performance.md` — 2레인/대사 조인/검수 실험을 다시 팔 때 먼저 (오염 감사 18/22·fan-out과 다이어트 기각 교훈·재persist 보류·커밋 색인)
 - `.claude/vault/2026-08-10-previz-motion-channel.md` — **다음 세션 재개 지점** — previz/모션 채널/생성기 실측을 이어갈 때 먼저 (축 A 실측·계기 결함 진단·모션 채널 3중 약점·내일 아젠다 3질문·아티팩트 링크)
+- `.claude/vault/2026-08-11-writer-entity-map-audit.md` — writer 엔티티가 어디까지 가는지·왜 끊겼는지를 다시 팔 때 먼저 (엔티티 60개 전수·끊긴 배선 14건·경로 쌍 3결정 미결·step 라우트 무인증 실측)
 - `.claude/vault/2026-08-11-blockout-previz-video-reference.md` — 프리비즈 영상 레퍼런스/3D 블록아웃/각색 연출 리서치를 다시 팔 때 먼저 (모션 전달 제3후보·Seedance video_urls 기배선 실측·3암 실험 스케치·리포트 아티팩트)
 
 ## 실험
