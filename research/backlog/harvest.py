@@ -45,6 +45,27 @@ INJECTED_PREFIXES = (
     "This session is being continued from a previous conversation",
 )
 
+# 기각 순간 — 대화에서 재사용 가치가 있는 유일한 고신호 구간.
+#
+# 원본 트랜스크립트 전체는 노이즈다("무엇을 했는가"만 남고 "왜 그걸 골랐는가"는 안 남는다).
+# 재사용되는 건 **사람이 제안을 되돌린 순간**이다 — 동의("ㅇㅇ 진행")엔 정보가 거의 없고,
+# 기각·되물음에 판단 기준이 압축돼 있다. 원자료 위에 얹는 정제된 중간 표현.
+#
+# 여기서는 **후보만 넓게 긁는다**(재현율 우선). 진짜 기각인지 판정은 LLM이 한다 —
+# 싸게 전수 열거하고 비싸게 판정하는 2층 구조.
+REJECT_MARKERS = re.compile(
+    r"아닌데|아니라|아니고|아니야|아니에|^아니|ㄴㄴ|말고|빼고|"
+    r"이해\s*못|이해못|모르겠|뭔\s*말|무슨\s*말|뭔소리|어렵|"
+    r"잘못|틀렸|틀린|이상한|이상함|구림|구린|별로|아쉬|부족|"
+    r"다시|재작성|재구성|고쳐|바꿔|"
+    r"맞음\?|맞나|맞아\?|이게\s*맞|왜\s|왜\?|"
+    r"미안한데|솔직히|근데\s",
+    re.M,
+)
+# 승인으로 시작하는 발화는 기각이 아니다. 실측(2026-08-11)에서 "좋은듯?", "오오오 내가원한게
+# 딱 이런표임" 같은 명백한 동의가 뒤에 붙은 "근데/?" 때문에 기각으로 잡혔다.
+APPROVE_HEAD = re.compile(r"^\s*(좋|오오|굿|ㅇㅇ|넵|넵넵|오케|오키|ok|OK|완벽|훌륭|나이스|짱)")
+
 
 def _iter_json(path):
     with open(path, encoding="utf-8", errors="ignore") as fh:
@@ -189,6 +210,24 @@ def digest(rec):
     return "\n".join(lines)
 
 
+def rejections(rec):
+    """(직전 제안, 사람의 기각) 쌍을 뽑는다.
+
+    기각 발화만 떼어놓으면 "무엇을 기각했는지"가 사라지므로 반드시 쌍으로 남긴다 —
+    재사용되는 최소 단위가 쌍이다."""
+    out, prev = [], None
+    for role, txt in rec["_turns"](rec["path"]):
+        if role == "user":
+            if txt.startswith("<") or txt.startswith(INJECTED_PREFIXES):
+                continue
+            if (len(txt) <= USER_CAP and REJECT_MARKERS.search(txt)
+                    and not APPROVE_HEAD.match(txt)):
+                out.append({"proposal": (prev or "")[:400], "rejection": txt[:800]})
+        else:
+            prev = txt
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--project", default=os.getcwd())
@@ -200,11 +239,28 @@ def main():
     a = ap.parse_args()
 
     now = dt.datetime.fromisoformat(a.now).timestamp() if a.now else dt.datetime.now().timestamp()
-    sessions = discover(a.project, a.since_hours, a.exclude_recent_min, now)
+
+    # Failsafe — 창을 "마지막 성공 이후"로 늘린다.
+    # 고정 24시간이면 스위퍼가 하루라도 못 뜬 날(맥북이 잠겼거나 실행이 죽었거나)
+    # 그 사이 세션이 영영 안 걸린다. 창이 다음 날 이미 지나가 버리기 때문.
+    # 마지막 성공 시각을 남겨두고 그 이후 전부를 훑으면 빠뜨림이 사라진다.
+    stamp = os.path.join(a.project, "research/backlog/sweep", ".last-success")
+    since_h = a.since_hours
+    if not a.now and os.path.exists(stamp):
+        try:
+            last = float(open(stamp, encoding="utf-8").read().strip())
+            gap_h = (now - last) / 3600
+            if gap_h > since_h:
+                since_h = min(gap_h + 1, 24 * 14)   # 상한 2주 — 그 이상은 사람이 볼 일
+                print(f"⚠ 마지막 성공이 {gap_h:.1f}시간 전 — 창을 {since_h:.1f}시간으로 넓힘 (건너뛴 날 복구)")
+        except Exception as e:
+            print(f"⚠ 마지막 성공 시각을 못 읽음({e}) — 기본 창 {since_h}시간으로 진행")
+
+    sessions = discover(a.project, since_h, a.exclude_recent_min, now)
     targets = [s for s in sessions if s["verdict"] == "TARGET"]
 
     print(f"기준시각 {dt.datetime.fromtimestamp(now):%Y-%m-%d %H:%M} · "
-          f"창 {a.since_hours}h · 최근 {a.exclude_recent_min}분 제외")
+          f"창 {since_h:g}h · 최근 {a.exclude_recent_min:g}분 제외")
     print(f"{'store':7} {'sid':10} {'수정':12} {'크기':>8}  판정")
     for s in sessions:
         print(f"{s['store']:7} {short_id(s['sid']):10} "
@@ -222,25 +278,49 @@ def main():
     date = dt.datetime.fromtimestamp(now).strftime("%Y-%m-%d")
     out = a.out or os.path.join(a.project, "research/backlog/sweep", date)
     os.makedirs(os.path.join(out, "digest"), exist_ok=True)
-    index = []
+    index, rej_all = [], []
     for s in targets:
         body = digest(s)
         name = f"{s['store']}-{short_id(s['sid'])}.md"
         with open(os.path.join(out, "digest", name), "w", encoding="utf-8") as fh:
             fh.write(body)
+        rj = rejections(s)
+        rej_all.append((s, rj))
         index.append({
             "store": s["store"], "sid": s["sid"], "digest": f"digest/{name}",
             "mtime": dt.datetime.fromtimestamp(s["mtime"]).isoformat(timespec="minutes"),
             "size_kb": s["size_kb"], "digest_bytes": len(body.encode()),
             "oversized": len(body.encode()) > DIGEST_CAP,
+            "rejections": len(rj),
             "first_user": s.get("first_user", ""),
         })
+
+    # 기각 순간 모음 — 후보만 긁은 것이라 진짜 기각인지는 LLM이 판정한다
+    lines = ["# 기각 순간 후보 — 사람이 제안을 되돌린 자리", "",
+             "> 어휘로 넓게 긁은 **후보**다(재현율 우선). 진짜 기각인지, 그 안에 담긴 판단 기준이",
+             "> 무엇인지는 읽는 쪽이 판정한다. 동의는 정보가 없고 기각에 기준이 압축돼 있다는 전제.", ""]
+    for s, rj in rej_all:
+        if not rj:
+            continue
+        lines.append(f"\n## {s['store']}:{short_id(s['sid'])}  ({len(rj)}건)")
+        for i, r in enumerate(rj, 1):
+            lines.append(f"\n**{i}. 직전 제안** — {r['proposal']}\n\n**→ 사람의 반응** — {r['rejection']}")
+    with open(os.path.join(out, "rejections.md"), "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines))
     with open(os.path.join(out, "index.json"), "w", encoding="utf-8") as fh:
         json.dump({"generated_for": date, "project": a.project,
                    "scanned": len(sessions), "targets": len(targets),
                    "sessions": index}, fh, ensure_ascii=False, indent=2)
     over = sum(1 for i in index if i["oversized"])
+    nrej = sum(i["rejections"] for i in index)
     print(f"\n다이제스트 {len(index)}개 → {out}/digest/   (50KB 초과 {over}개 = 서브에이전트 위임 대상)")
+    print(f"기각 순간 후보 {nrej}건 → {out}/rejections.md")
+
+    # 성공 도장은 맨 마지막에 찍는다 — 도중에 죽으면 안 찍히고, 다음 밤이 이번 창까지
+    # 다시 훑는다(위 failsafe). 시뮬레이션(--now)은 찍지 않는다.
+    if not a.now:
+        with open(stamp, "w", encoding="utf-8") as fh:
+            fh.write(str(now))
     return 0
 
 
