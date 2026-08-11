@@ -1,0 +1,314 @@
+{
+  "id": "gaze_off_frame",
+  "family": "시선",
+  "action": "그녀가 프레임 오른쪽 밖에서 들려온 금속음 쪽으로 시선을 돌리고 그 대상을 드러낸다.",
+  "vizPrompt": "A woman turns toward a metallic sound outside the right edge of the frame. Pan right to reveal what she sees; the reveal is the camera purpose.",
+  "expectedCamera": "move",
+  "expectedTypes": [
+    "pan",
+    "tracking"
+  ],
+  "expectedReason": "시선의 대상이 프레임 밖에 있어 리빌이 필요함",
+  "model": {
+    "provider": "gemini",
+    "model": "gemini-3.6-flash"
+  },
+  "scene_id": "camera_follow_gaze_off_frame",
+  "camera_intent": "motivated_move",
+  "camera_move_motivation": "Pans right following the character's turn of head and gaze to reveal the off-frame source of the metallic sound.",
+  "dynamic_spec": {
+    "shot_id": "shot_1",
+    "camera_motion": {
+      "type": "pan_right",
+      "direction": "right",
+      "speed": "medium",
+      "magnitude": "moderate"
+    },
+    "character_motion": [
+      {
+        "character_id": "char",
+        "verb": "turns head",
+        "magnitude": "moderate"
+      }
+    ],
+    "gaze_arc": [
+      {
+        "character_id": "char",
+        "from": "forward",
+        "to": "off_screen_right"
+      }
+    ],
+    "environmental_change": [],
+    "transition_in": "cut",
+    "transition_out": "cut",
+    "motion_prompt": "Character turns head right; camera pans right revealing a red lever."
+  },
+  "camera_type": "pan_right",
+  "shot_count": 1,
+  "selected_shot": {
+    "intent": {
+      "shot_id": "shot_1",
+      "scene_id": "camera_follow_gaze_off_frame",
+      "story_beat_ref": 0,
+      "dramatic_purpose": "An uninterrupted single take that organically connects the protagonist's reaction to the off-frame metallic sound, accentuating her focused emotional shift.",
+      "duration_seconds": 5,
+      "duration_justification": "Five seconds provides adequate time to establish the initial neutral stance, capture the sudden head movement toward the sound, and smoothly pan to reveal the object.",
+      "audience_focus": "The character's shift in gaze toward off-screen right and the camera pan that reveals the source of the metallic noise.",
+      "shot_position_in_scene": "opening",
+      "operation": "derived",
+      "source_beats": [
+        0
+      ],
+      "shot_function": "reveal",
+      "rhythm_role": "sustain"
+    },
+    "static_spec": {
+      "shot_id": "shot_1",
+      "lens_mm": 50,
+      "shot_type": "MCU",
+      "camera_angle": "eye_level",
+      "depth_of_field": "medium",
+      "framing": {
+        "rule": "rule_of_thirds",
+        "layers": {
+          "foreground": "Out of focus edge of the clear studio floor.",
+          "midground": "Protagonist framed on the left side of the frame in a matte blue studio suit.",
+          "background": "Minimalist neutral camera test room wall with subtle accent lighting."
+        },
+        "focal_point": "The protagonist's neutral face and eyes."
+      },
+      "lighting": {
+        "key_fill_ratio": "3:1",
+        "color_temp_kelvin": 4500,
+        "quality": "soft",
+        "key_direction": "front_left"
+      },
+      "character_blocking": [
+        {
+          "character_id": "char",
+          "position_in_frame": "left_third",
+          "pose": "Upright, calm posture standing in a matte blue studio suit.",
+          "gaze": "straight_ahead",
+          "asset_version": "v1"
+        }
+      ],
+      "prop_placement": [
+        {
+          "prop": "red lever",
+          "position_in_frame": "off_screen_right",
+          "significance": "Target object emitting off-screen metallic sound."
+        }
+      ],
+      "palette_emphasis": [
+        "#2E6FBB",
+        "#E85D3F",
+        "#38B56C"
+      ],
+      "texture_notes": "Clean studio surfaces, matte fabric of the blue suit, subtle metallic sheen on distant fixtures.",
+      "color_grading_intent": "Neutral daylight color balance with balanced contrast highlighting blue attire and red accent tones.",
+      "first_frame_prompt": "Medium close-up at eye level with a 50mm lens. An adult subject in a matte blue studio suit stands in a clean studio room under soft 4500K lighting. The subject is framed on the left, looking straight ahead with a neutral expression. In the background, neutral walls and clear studio floor span outward with soft shadows."
+    },
+    "dynamic_spec": {
+      "shot_id": "shot_1",
+      "camera_motion": {
+        "type": "pan_right",
+        "direction": "right",
+        "speed": "medium",
+        "magnitude": "moderate"
+      },
+      "character_motion": [
+        {
+          "character_id": "char",
+          "verb": "turns head",
+          "magnitude": "moderate"
+        }
+      ],
+      "gaze_arc": [
+        {
+          "character_id": "char",
+          "from": "forward",
+          "to": "off_screen_right"
+        }
+      ],
+      "environmental_change": [],
+      "transition_in": "cut",
+      "transition_out": "cut",
+      "motion_prompt": "Character turns head right; camera pans right revealing a red lever."
+    }
+  },
+  "decoupage": {
+    "done": true,
+    "scenes": [
+      {
+        "scene_id": "camera_follow_gaze_off_frame",
+        "beat_count": 1,
+        "shot_count": 1,
+        "coverage_ratio": 1,
+        "rhythm_profile": "A sustained single take following the character's shift of focus to build quiet tension.",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_1",
+            "operation": "derived",
+            "shot_function": "reveal",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "The character turns her gaze toward a metallic sound from off-screen right, and the camera pans to reveal the object.",
+            "beat_summary_native": "그녀가 프레임 오른쪽 밖에서 들려온 금속음 쪽으로 시선을 돌리고, 카메라는 시선을 따라 움직여 그 대상을 드러낸다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "sustain",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "Pans right following the character's turn of head and gaze to reveal the off-frame source of the metallic sound.",
+            "dramatic_purpose": "A uninterrupted single take that organically connects the protagonist's reaction to the off-frame cause, accentuating her focused emotional shift.",
+            "scene_id": "camera_follow_gaze_off_frame"
+          }
+        ]
+      }
+    ],
+    "plan": {
+      "scenes": [
+        {
+          "scene_id": "camera_follow_gaze_off_frame",
+          "beat_count": 1,
+          "shot_count": 1,
+          "coverage_ratio": 1,
+          "rhythm_profile": "A sustained single take following the character's shift of focus to build quiet tension.",
+          "uncovered_beats": [],
+          "shots": [
+            {
+              "shot_id": "shot_1",
+              "operation": "derived",
+              "shot_function": "reveal",
+              "source_beats": [
+                0
+              ],
+              "beat_summary": "The character turns her gaze toward a metallic sound from off-screen right, and the camera pans to reveal the object.",
+              "beat_summary_native": "그녀가 프레임 오른쪽 밖에서 들려온 금속음 쪽으로 시선을 돌리고, 카메라는 시선을 따라 움직여 그 대상을 드러낸다.",
+              "shot_size": "MCU",
+              "intended_duration_seconds": 5,
+              "rhythm_role": "sustain",
+              "camera_intent": "motivated_move",
+              "camera_move_motivation": "Pans right following the character's turn of head and gaze to reveal the off-frame source of the metallic sound.",
+              "dramatic_purpose": "A uninterrupted single take that organically connects the protagonist's reaction to the off-frame cause, accentuating her focused emotional shift.",
+              "scene_id": "camera_follow_gaze_off_frame"
+            }
+          ]
+        }
+      ],
+      "total_shots": 1,
+      "total_added": 0,
+      "total_merged": 0,
+      "total_split": 0,
+      "director_notes": "camera_follow_gaze_off_frame: 1beats→1shots (A sustained single take following the character's shift of focus to build quiet tension.)"
+    }
+  },
+  "shot_design": {
+    "done": true,
+    "doneSceneIds": [
+      "camera_follow_gaze_off_frame"
+    ],
+    "shots": [
+      {
+        "intent": {
+          "shot_id": "shot_1",
+          "scene_id": "camera_follow_gaze_off_frame",
+          "story_beat_ref": 0,
+          "dramatic_purpose": "An uninterrupted single take that organically connects the protagonist's reaction to the off-frame metallic sound, accentuating her focused emotional shift.",
+          "duration_seconds": 5,
+          "duration_justification": "Five seconds provides adequate time to establish the initial neutral stance, capture the sudden head movement toward the sound, and smoothly pan to reveal the object.",
+          "audience_focus": "The character's shift in gaze toward off-screen right and the camera pan that reveals the source of the metallic noise.",
+          "shot_position_in_scene": "opening",
+          "operation": "derived",
+          "source_beats": [
+            0
+          ],
+          "shot_function": "reveal",
+          "rhythm_role": "sustain"
+        },
+        "static_spec": {
+          "shot_id": "shot_1",
+          "lens_mm": 50,
+          "shot_type": "MCU",
+          "camera_angle": "eye_level",
+          "depth_of_field": "medium",
+          "framing": {
+            "rule": "rule_of_thirds",
+            "layers": {
+              "foreground": "Out of focus edge of the clear studio floor.",
+              "midground": "Protagonist framed on the left side of the frame in a matte blue studio suit.",
+              "background": "Minimalist neutral camera test room wall with subtle accent lighting."
+            },
+            "focal_point": "The protagonist's neutral face and eyes."
+          },
+          "lighting": {
+            "key_fill_ratio": "3:1",
+            "color_temp_kelvin": 4500,
+            "quality": "soft",
+            "key_direction": "front_left"
+          },
+          "character_blocking": [
+            {
+              "character_id": "char",
+              "position_in_frame": "left_third",
+              "pose": "Upright, calm posture standing in a matte blue studio suit.",
+              "gaze": "straight_ahead",
+              "asset_version": "v1"
+            }
+          ],
+          "prop_placement": [
+            {
+              "prop": "red lever",
+              "position_in_frame": "off_screen_right",
+              "significance": "Target object emitting off-screen metallic sound."
+            }
+          ],
+          "palette_emphasis": [
+            "#2E6FBB",
+            "#E85D3F",
+            "#38B56C"
+          ],
+          "texture_notes": "Clean studio surfaces, matte fabric of the blue suit, subtle metallic sheen on distant fixtures.",
+          "color_grading_intent": "Neutral daylight color balance with balanced contrast highlighting blue attire and red accent tones.",
+          "first_frame_prompt": "Medium close-up at eye level with a 50mm lens. An adult subject in a matte blue studio suit stands in a clean studio room under soft 4500K lighting. The subject is framed on the left, looking straight ahead with a neutral expression. In the background, neutral walls and clear studio floor span outward with soft shadows."
+        },
+        "dynamic_spec": {
+          "shot_id": "shot_1",
+          "camera_motion": {
+            "type": "pan_right",
+            "direction": "right",
+            "speed": "medium",
+            "magnitude": "moderate"
+          },
+          "character_motion": [
+            {
+              "character_id": "char",
+              "verb": "turns head",
+              "magnitude": "moderate"
+            }
+          ],
+          "gaze_arc": [
+            {
+              "character_id": "char",
+              "from": "forward",
+              "to": "off_screen_right"
+            }
+          ],
+          "environmental_change": [],
+          "transition_in": "cut",
+          "transition_out": "cut",
+          "motion_prompt": "Character turns head right; camera pans right revealing a red lever."
+        }
+      }
+    ]
+  },
+  "video_prompt": "Motion contract: Camera: pan right steady toward screen right — on-screen content flows toward screen left. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"turns head\" — a barely-perceptible micro movement; gaze turns from forward to off screen right. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A woman turns toward a metallic sound outside the right edge of the frame. Pan right to reveal what she sees; the reveal is the camera purpose.",
+  "video_prompt_parts": {
+    "prompt": "A woman turns toward a metallic sound outside the right edge of the frame. Pan right to reveal what she sees; the reveal is the camera purpose.",
+    "movement": "",
+    "gear": "",
+    "camera": "",
+    "motionContract": "Motion contract: Camera: pan right steady toward screen right — on-screen content flows toward screen left. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"turns head\" — a barely-perceptible micro movement; gaze turns from forward to off screen right. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract."
+  }
+}

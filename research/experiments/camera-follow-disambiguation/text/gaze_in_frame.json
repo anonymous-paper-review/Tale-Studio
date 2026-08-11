@@ -1,0 +1,299 @@
+{
+  "id": "gaze_in_frame",
+  "family": "시선",
+  "action": "그녀가 같은 프레임 안에 보이는 열린 출입구로 시선을 옮긴다.",
+  "vizPrompt": "A woman shifts her gaze toward an open doorway that is already visible inside the frame. Keep the camera locked and let the gaze change carry the moment.",
+  "expectedCamera": "static",
+  "expectedTypes": [
+    "static"
+  ],
+  "expectedReason": "시선의 대상이 이미 화면 안에 있음",
+  "model": {
+    "provider": "gemini",
+    "model": "gemini-3.6-flash"
+  },
+  "scene_id": "camera_follow_gaze_in_frame",
+  "camera_intent": "static",
+  "camera_move_motivation": null,
+  "dynamic_spec": {
+    "shot_id": "shot_1",
+    "camera_motion": {
+      "type": "static",
+      "direction": "none",
+      "speed": "static",
+      "magnitude": "zero"
+    },
+    "character_motion": [
+      {
+        "character_id": "char",
+        "verb": "turns gaze",
+        "magnitude": "small"
+      }
+    ],
+    "gaze_arc": [
+      {
+        "character_id": "char",
+        "from": "forward",
+        "to": "open doorway on the right"
+      }
+    ],
+    "environmental_change": [],
+    "transition_in": "cut",
+    "transition_out": "cut",
+    "motion_prompt": "The performer smoothly turns her eyes to look toward the open doorway on the right."
+  },
+  "camera_type": "static",
+  "shot_count": 1,
+  "selected_shot": {
+    "intent": {
+      "shot_id": "shot_1",
+      "scene_id": "camera_follow_gaze_in_frame",
+      "story_beat_ref": 0,
+      "dramatic_purpose": "Capture the subject's subtle gaze shift toward an open doorway in a single framed medium shot to build dramatic focus without distracting camera motion.",
+      "duration_seconds": 5,
+      "duration_justification": "A sustained 5-second duration gives the audience enough time to register the shift in eye line and follow the direction toward the open doorway.",
+      "audience_focus": "The character's eyes shifting from forward to the open doorway framed on the right.",
+      "shot_position_in_scene": "opening",
+      "operation": "derived",
+      "source_beats": [
+        0
+      ],
+      "shot_function": "master",
+      "rhythm_role": "sustain"
+    },
+    "static_spec": {
+      "shot_id": "shot_1",
+      "lens_mm": 50,
+      "shot_type": "MS",
+      "camera_angle": "eye_level",
+      "depth_of_field": "medium",
+      "framing": {
+        "rule": "rule_of_thirds",
+        "layers": {
+          "foreground": "Clean, neutral floor space of the test room",
+          "midground": "Subject standing in a matte blue studio suit positioned on the left third",
+          "background": "An open doorway visible on the right third of the frame leading to an adjacent neutral room"
+        },
+        "focal_point": "The performer's facial expression and eye direction"
+      },
+      "lighting": {
+        "key_fill_ratio": "3:1",
+        "color_temp_kelvin": 4500,
+        "quality": "soft",
+        "key_direction": "front_left"
+      },
+      "character_blocking": [
+        {
+          "character_id": "char",
+          "position_in_frame": "left_third",
+          "pose": "Standing still in a neutral pose wearing a matte blue studio suit",
+          "gaze": "forward",
+          "asset_version": "v1"
+        }
+      ],
+      "prop_placement": [],
+      "palette_emphasis": [
+        "#2E6FBB",
+        "#E85D3F",
+        "#38B56C"
+      ],
+      "texture_notes": "Photorealistic matte fabric texture on suit, smooth neutral wall finish inside the test room.",
+      "color_grading_intent": "Balanced daylight color temperature with subtle primary contrast emphasizing studio blue tones.",
+      "first_frame_prompt": "Medium shot at eye level using a 50mm lens. An adult performer in a matte blue studio suit stands motionless on the left side of a clean neutral studio room. On the right side of the frame, an open doorway is visible. Soft 4500K neutral key lighting creates clean, gentle shadows. Photorealistic quality, highly detailed fabric texture, sharp focus."
+    },
+    "dynamic_spec": {
+      "shot_id": "shot_1",
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "zero"
+      },
+      "character_motion": [
+        {
+          "character_id": "char",
+          "verb": "turns gaze",
+          "magnitude": "small"
+        }
+      ],
+      "gaze_arc": [
+        {
+          "character_id": "char",
+          "from": "forward",
+          "to": "open doorway on the right"
+        }
+      ],
+      "environmental_change": [],
+      "transition_in": "cut",
+      "transition_out": "cut",
+      "motion_prompt": "The performer smoothly turns her eyes to look toward the open doorway on the right."
+    }
+  },
+  "decoupage": {
+    "done": true,
+    "scenes": [
+      {
+        "scene_id": "camera_follow_gaze_in_frame",
+        "beat_count": 1,
+        "shot_count": 1,
+        "coverage_ratio": 1,
+        "rhythm_profile": "중립적인 상태에서 시선 집중으로 이어지는 호흡이 긴 정적인 연출",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_1",
+            "operation": "derived",
+            "shot_function": "master",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "She shifts her gaze to the open doorway visible within the same frame.",
+            "beat_summary_native": "그녀가 같은 프레임 안에 보이는 열린 출입구로 시선을 옮긴다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "인물의 시선 이동과 대상(출입구)을 한 프레임에 담아 추가적인 카메라 이동 없이 긴장감과 집중을 유도한다.",
+            "scene_id": "camera_follow_gaze_in_frame"
+          }
+        ]
+      }
+    ],
+    "plan": {
+      "scenes": [
+        {
+          "scene_id": "camera_follow_gaze_in_frame",
+          "beat_count": 1,
+          "shot_count": 1,
+          "coverage_ratio": 1,
+          "rhythm_profile": "중립적인 상태에서 시선 집중으로 이어지는 호흡이 긴 정적인 연출",
+          "uncovered_beats": [],
+          "shots": [
+            {
+              "shot_id": "shot_1",
+              "operation": "derived",
+              "shot_function": "master",
+              "source_beats": [
+                0
+              ],
+              "beat_summary": "She shifts her gaze to the open doorway visible within the same frame.",
+              "beat_summary_native": "그녀가 같은 프레임 안에 보이는 열린 출입구로 시선을 옮긴다.",
+              "shot_size": "MS",
+              "intended_duration_seconds": 5,
+              "rhythm_role": "sustain",
+              "camera_intent": "static",
+              "dramatic_purpose": "인물의 시선 이동과 대상(출입구)을 한 프레임에 담아 추가적인 카메라 이동 없이 긴장감과 집중을 유도한다.",
+              "scene_id": "camera_follow_gaze_in_frame"
+            }
+          ]
+        }
+      ],
+      "total_shots": 1,
+      "total_added": 0,
+      "total_merged": 0,
+      "total_split": 0,
+      "director_notes": "camera_follow_gaze_in_frame: 1beats→1shots (중립적인 상태에서 시선 집중으로 이어지는 호흡이 긴 정적인 연출)"
+    }
+  },
+  "shot_design": {
+    "done": true,
+    "doneSceneIds": [
+      "camera_follow_gaze_in_frame"
+    ],
+    "shots": [
+      {
+        "intent": {
+          "shot_id": "shot_1",
+          "scene_id": "camera_follow_gaze_in_frame",
+          "story_beat_ref": 0,
+          "dramatic_purpose": "Capture the subject's subtle gaze shift toward an open doorway in a single framed medium shot to build dramatic focus without distracting camera motion.",
+          "duration_seconds": 5,
+          "duration_justification": "A sustained 5-second duration gives the audience enough time to register the shift in eye line and follow the direction toward the open doorway.",
+          "audience_focus": "The character's eyes shifting from forward to the open doorway framed on the right.",
+          "shot_position_in_scene": "opening",
+          "operation": "derived",
+          "source_beats": [
+            0
+          ],
+          "shot_function": "master",
+          "rhythm_role": "sustain"
+        },
+        "static_spec": {
+          "shot_id": "shot_1",
+          "lens_mm": 50,
+          "shot_type": "MS",
+          "camera_angle": "eye_level",
+          "depth_of_field": "medium",
+          "framing": {
+            "rule": "rule_of_thirds",
+            "layers": {
+              "foreground": "Clean, neutral floor space of the test room",
+              "midground": "Subject standing in a matte blue studio suit positioned on the left third",
+              "background": "An open doorway visible on the right third of the frame leading to an adjacent neutral room"
+            },
+            "focal_point": "The performer's facial expression and eye direction"
+          },
+          "lighting": {
+            "key_fill_ratio": "3:1",
+            "color_temp_kelvin": 4500,
+            "quality": "soft",
+            "key_direction": "front_left"
+          },
+          "character_blocking": [
+            {
+              "character_id": "char",
+              "position_in_frame": "left_third",
+              "pose": "Standing still in a neutral pose wearing a matte blue studio suit",
+              "gaze": "forward",
+              "asset_version": "v1"
+            }
+          ],
+          "prop_placement": [],
+          "palette_emphasis": [
+            "#2E6FBB",
+            "#E85D3F",
+            "#38B56C"
+          ],
+          "texture_notes": "Photorealistic matte fabric texture on suit, smooth neutral wall finish inside the test room.",
+          "color_grading_intent": "Balanced daylight color temperature with subtle primary contrast emphasizing studio blue tones.",
+          "first_frame_prompt": "Medium shot at eye level using a 50mm lens. An adult performer in a matte blue studio suit stands motionless on the left side of a clean neutral studio room. On the right side of the frame, an open doorway is visible. Soft 4500K neutral key lighting creates clean, gentle shadows. Photorealistic quality, highly detailed fabric texture, sharp focus."
+        },
+        "dynamic_spec": {
+          "shot_id": "shot_1",
+          "camera_motion": {
+            "type": "static",
+            "direction": "none",
+            "speed": "static",
+            "magnitude": "zero"
+          },
+          "character_motion": [
+            {
+              "character_id": "char",
+              "verb": "turns gaze",
+              "magnitude": "small"
+            }
+          ],
+          "gaze_arc": [
+            {
+              "character_id": "char",
+              "from": "forward",
+              "to": "open doorway on the right"
+            }
+          ],
+          "environmental_change": [],
+          "transition_in": "cut",
+          "transition_out": "cut",
+          "motion_prompt": "The performer smoothly turns her eyes to look toward the open doorway on the right."
+        }
+      }
+    ]
+  },
+  "video_prompt": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: subject 1: \"turns gaze\" — a small, restrained movement; gaze turns from forward to open doorway on the right. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A woman shifts her gaze toward an open doorway that is already visible inside the frame. Keep the camera locked and let the gaze change carry the moment.",
+  "video_prompt_parts": {
+    "prompt": "A woman shifts her gaze toward an open doorway that is already visible inside the frame. Keep the camera locked and let the gaze change carry the moment.",
+    "movement": "",
+    "gear": "",
+    "camera": "",
+    "motionContract": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: subject 1: \"turns gaze\" — a small, restrained movement; gaze turns from forward to open doorway on the right. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract."
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "purpose": "probe-startframe — seedance 2.0 image_urls가 시간 앵커인가 구도 참조 세트인가 (qualitative 암(b) 발산 원인 판별)",
+  "model": "bytedance/seedance-2.0/reference-to-video",
+  "baseline": "qualitative/manifest.json#arm=b (입력 전문 회수, 프로브 축만 변이)",
+  "pricing_source": "fal.ai/models/bytedance/seedance-2.0/reference-to-video (2026-08-11 실측): 720p $0.3024/s",
+  "jobs": [
+    {
+      "probe": "p1",
+      "label": "(b) 구성 + image_urls 순서 반전 [END, START]",
+      "request_id": "019feedd-30a5-75c3-9871-c21aa0bcd9a3",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "model_key": "seedance",
+      "resolution": "720p",
+      "duration_seconds": 7,
+      "est_cost_usd": 2.1168,
+      "rate_per_sec_usd": 0.3024,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.",
+        "duration": 7,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_end.png?v=1786191704348",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_start.png?v=1786191704774"
+        ]
+      },
+      "submitted_at": "2026-08-11T03:28:21.200Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5dbf5/VWjv77D3JV-JSnk-5sN6j_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-video-reference-ab/probe-startframe/out_p1.mp4"
+    },
+    {
+      "probe": "p2",
+      "label": "(b) 구성 [START, END] + 첫 프레임 고정 명시 절 1문장",
+      "request_id": "019feee1-3659-7380-ae05-0240e4b5acd7",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "model_key": "seedance",
+      "resolution": "720p",
+      "duration_seconds": 7,
+      "est_cost_usd": 2.1168,
+      "rate_per_sec_usd": 0.3024,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage. The video must open exactly on the composition of the first reference image (@Image1).",
+        "duration": 7,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_start.png?v=1786191704774",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_end.png?v=1786191704348"
+        ]
+      },
+      "submitted_at": "2026-08-11T03:32:44.798Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5dc0f/D16CXPhbUi-okWzFmz4P9_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-video-reference-ab/probe-startframe/out_p2.mp4"
+    }
+  ]
+}

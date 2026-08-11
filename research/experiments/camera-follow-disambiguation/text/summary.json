@@ -1,0 +1,291 @@
+{
+  "experiment": "camera-follow-disambiguation",
+  "finished_at": "2026-08-11T07:07:55.500Z",
+  "contract": "relaxed-v3",
+  "fixture": "/Users/xcape/projects/tale-studio/logs/064631aa-f6b2-4f7c-800b-66b0517a2769/INTEGRATED.json",
+  "model": {
+    "provider": "gemini",
+    "model": "gemini-3.6-flash"
+  },
+  "case_count": 6,
+  "results": [
+    {
+      "id": "hand_in_frame",
+      "family": "손동작",
+      "action": "그녀가 프레임 안에 놓인 붉은 레버를 손으로 천천히 당긴다.",
+      "expectedCamera": "static",
+      "expectedTypes": [
+        "static"
+      ],
+      "camera_intent": "static",
+      "camera_type": "static",
+      "camera_move_motivation": null,
+      "dynamic_spec": {
+        "shot_id": "shot_1",
+        "camera_motion": {
+          "type": "static",
+          "direction": "none",
+          "speed": "static",
+          "magnitude": "none"
+        },
+        "character_motion": [
+          {
+            "character_id": "char",
+            "verb": "pulls",
+            "magnitude": "medium"
+          }
+        ],
+        "gaze_arc": [
+          {
+            "character_id": "char",
+            "from": "downward_at_lever",
+            "to": "downward_at_lever"
+          }
+        ],
+        "environmental_change": [],
+        "transition_in": "cut",
+        "transition_out": "cut",
+        "motion_prompt": "The character slowly pulls the red lever downward in a smooth motion."
+      },
+      "shot_count": 1,
+      "model": {
+        "provider": "gemini",
+        "model": "gemini-3.6-flash"
+      },
+      "text_path": "/Users/xcape/projects/tale-studio/research/experiments/camera-follow-disambiguation/text/hand_in_frame.json",
+      "video_prompt": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: subject 1: \"pulls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A woman slowly pulls a red lever that is fully visible inside the frame. Keep the entire hand and lever operation in view."
+    },
+    {
+      "id": "hand_off_frame",
+      "family": "손동작",
+      "action": "그녀가 프레임 오른쪽 밖에 있는 붉은 레버를 향해 손을 뻗어 당긴다.",
+      "expectedCamera": "move",
+      "expectedTypes": [
+        "pan",
+        "tracking"
+      ],
+      "camera_intent": "motivated_move",
+      "camera_type": "pan_right",
+      "camera_move_motivation": "프레임 우측 밖으로 향하는 인물의 손 움직임을 팬(Pan)하여 붉은 레버와 이를 당기는 전체 동작을 드러내기 위함",
+      "dynamic_spec": {
+        "shot_id": "shot_1",
+        "camera_motion": {
+          "type": "pan_right",
+          "direction": "right",
+          "speed": "slow",
+          "magnitude": "medium"
+        },
+        "character_motion": [
+          {
+            "character_id": "char",
+            "verb": "pulls",
+            "magnitude": "medium"
+          }
+        ],
+        "gaze_arc": [
+          {
+            "character_id": "char",
+            "from": "off_screen_right",
+            "to": "down_right"
+          }
+        ],
+        "environmental_change": [],
+        "transition_in": "cut",
+        "transition_out": "cut",
+        "motion_prompt": "Camera pans right following the extended hand to reveal a red lever, which the hand pulls downward."
+      },
+      "shot_count": 1,
+      "model": {
+        "provider": "gemini",
+        "model": "gemini-3.6-flash"
+      },
+      "text_path": "/Users/xcape/projects/tale-studio/research/experiments/camera-follow-disambiguation/text/hand_off_frame.json",
+      "video_prompt": "Motion contract: Camera: pan right slow toward screen right — on-screen content flows toward screen left. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"pulls\" — a clear movement that completes; gaze turns from off screen right to down right. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A woman reaches toward a red lever outside the right edge of the frame and pulls it. The camera must pan right to reveal and follow the lever."
+    },
+    {
+      "id": "gaze_in_frame",
+      "family": "시선",
+      "action": "그녀가 같은 프레임 안에 보이는 열린 출입구로 시선을 옮긴다.",
+      "expectedCamera": "static",
+      "expectedTypes": [
+        "static"
+      ],
+      "camera_intent": "static",
+      "camera_type": "static",
+      "camera_move_motivation": null,
+      "dynamic_spec": {
+        "shot_id": "shot_1",
+        "camera_motion": {
+          "type": "static",
+          "direction": "none",
+          "speed": "static",
+          "magnitude": "zero"
+        },
+        "character_motion": [
+          {
+            "character_id": "char",
+            "verb": "turns gaze",
+            "magnitude": "small"
+          }
+        ],
+        "gaze_arc": [
+          {
+            "character_id": "char",
+            "from": "forward",
+            "to": "open doorway on the right"
+          }
+        ],
+        "environmental_change": [],
+        "transition_in": "cut",
+        "transition_out": "cut",
+        "motion_prompt": "The performer smoothly turns her eyes to look toward the open doorway on the right."
+      },
+      "shot_count": 1,
+      "model": {
+        "provider": "gemini",
+        "model": "gemini-3.6-flash"
+      },
+      "text_path": "/Users/xcape/projects/tale-studio/research/experiments/camera-follow-disambiguation/text/gaze_in_frame.json",
+      "video_prompt": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: subject 1: \"turns gaze\" — a small, restrained movement; gaze turns from forward to open doorway on the right. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A woman shifts her gaze toward an open doorway that is already visible inside the frame. Keep the camera locked and let the gaze change carry the moment."
+    },
+    {
+      "id": "gaze_off_frame",
+      "family": "시선",
+      "action": "그녀가 프레임 오른쪽 밖에서 들려온 금속음 쪽으로 시선을 돌리고 그 대상을 드러낸다.",
+      "expectedCamera": "move",
+      "expectedTypes": [
+        "pan",
+        "tracking"
+      ],
+      "camera_intent": "motivated_move",
+      "camera_type": "pan_right",
+      "camera_move_motivation": "Pans right following the character's turn of head and gaze to reveal the off-frame source of the metallic sound.",
+      "dynamic_spec": {
+        "shot_id": "shot_1",
+        "camera_motion": {
+          "type": "pan_right",
+          "direction": "right",
+          "speed": "medium",
+          "magnitude": "moderate"
+        },
+        "character_motion": [
+          {
+            "character_id": "char",
+            "verb": "turns head",
+            "magnitude": "moderate"
+          }
+        ],
+        "gaze_arc": [
+          {
+            "character_id": "char",
+            "from": "forward",
+            "to": "off_screen_right"
+          }
+        ],
+        "environmental_change": [],
+        "transition_in": "cut",
+        "transition_out": "cut",
+        "motion_prompt": "Character turns head right; camera pans right revealing a red lever."
+      },
+      "shot_count": 1,
+      "model": {
+        "provider": "gemini",
+        "model": "gemini-3.6-flash"
+      },
+      "text_path": "/Users/xcape/projects/tale-studio/research/experiments/camera-follow-disambiguation/text/gaze_off_frame.json",
+      "video_prompt": "Motion contract: Camera: pan right steady toward screen right — on-screen content flows toward screen left. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"turns head\" — a barely-perceptible micro movement; gaze turns from forward to off screen right. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A woman turns toward a metallic sound outside the right edge of the frame. Pan right to reveal what she sees; the reveal is the camera purpose."
+    },
+    {
+      "id": "reaction_hold",
+      "family": "감정",
+      "action": "그녀가 충격을 받은 표정으로 프레임 안에서 숨을 멈춘다.",
+      "expectedCamera": "static",
+      "expectedTypes": [
+        "static"
+      ],
+      "camera_intent": "static",
+      "camera_type": "static",
+      "camera_move_motivation": null,
+      "dynamic_spec": {
+        "shot_id": "shot_1",
+        "camera_motion": {
+          "type": "static",
+          "direction": "none",
+          "speed": "static",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "character_id": "char",
+            "verb": "holds breath",
+            "magnitude": "minimal"
+          }
+        ],
+        "gaze_arc": [
+          {
+            "character_id": "char",
+            "from": "off_camera",
+            "to": "off_camera"
+          }
+        ],
+        "environmental_change": [],
+        "transition_in": "cut",
+        "transition_out": "cut",
+        "motion_prompt": "The character holds her breath in complete shock, maintaining a frozen expression with subtle micro-tremors."
+      },
+      "shot_count": 1,
+      "model": {
+        "provider": "gemini",
+        "model": "gemini-3.6-flash"
+      },
+      "text_path": "/Users/xcape/projects/tale-studio/research/experiments/camera-follow-disambiguation/text/reaction_hold.json",
+      "video_prompt": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: subject 1: \"holds breath\" — a barely-perceptible micro movement. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A woman freezes in shock and holds her breath. Keep the camera locked at the same framing; show the emotion through her face only."
+    },
+    {
+      "id": "reaction_push_in",
+      "family": "감정",
+      "action": "그녀의 충격을 얼굴이 점점 화면을 채우는 고립된 반응으로 보여준다.",
+      "expectedCamera": "move",
+      "expectedTypes": [
+        "dolly_in"
+      ],
+      "camera_intent": "motivated_move",
+      "camera_type": "dolly_in",
+      "camera_move_motivation": "Slow push-in toward her face to visually manifest her escalating internal shock and emotional isolation.",
+      "dynamic_spec": {
+        "shot_id": "shot_1",
+        "camera_motion": {
+          "type": "dolly_in",
+          "direction": "forward",
+          "speed": "slow",
+          "magnitude": "moderate"
+        },
+        "character_motion": [
+          {
+            "character_id": "char",
+            "verb": "trembles",
+            "magnitude": "small"
+          }
+        ],
+        "gaze_arc": [
+          {
+            "character_id": "char",
+            "from": "straight_ahead",
+            "to": "slightly_down"
+          }
+        ],
+        "environmental_change": [],
+        "transition_in": "cut",
+        "transition_out": "cut",
+        "motion_prompt": "Camera slowly dollies in on her face as she trembles in shock."
+      },
+      "shot_count": 1,
+      "model": {
+        "provider": "gemini",
+        "model": "gemini-3.6-flash"
+      },
+      "text_path": "/Users/xcape/projects/tale-studio/research/experiments/camera-follow-disambiguation/text/reaction_push_in.json",
+      "video_prompt": "Motion contract: Camera: dollies in slow — the framing grows steadily tighter on the subject. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"trembles\" — a small, restrained movement; gaze turns from straight ahead to slightly down. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A woman freezes in shock. Slowly dolly in so her isolated reaction grows to fill the frame; the changing facial scale is the camera purpose."
+    }
+  ]
+}

@@ -1,0 +1,1475 @@
+{
+  "selectedAt": "2026-08-11T10:51:38.869Z",
+  "method": "프로젝트별 후보 = 시작·끝 그림 보유 + 길이≥4s + 움직임 명세 존재(제품 폴백 경로) + 카메라 비정지 + 캐릭터 1명 이상. 순위 = 시작·끝 128×72 회색조 평균 절대차. 프로젝트당 최상위 1개, 프로젝트는 delta 상위 6개.",
+  "candidatesByProject": {
+    "e1a9fd08-fbe2-409d-92ed-b4b31b0efecf": [
+      {
+        "project_id": "e1a9fd08-fbe2-409d-92ed-b4b31b0efecf",
+        "project_title": "writer_test_260810",
+        "style_anchor_key": "jp_anime",
+        "shot_id": "sh_01_04",
+        "scene_id": "sc_01",
+        "duration_seconds": 7,
+        "action": "The girl crouches and digs into the sand with her hands; as the sand is cleared away, the surface of a massive iron hatch is revealed beneath.",
+        "prompt": "",
+        "delta": 47.06,
+        "camera_motion": {
+          "type": "tracking",
+          "speed": "slow",
+          "direction": "down",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "digs",
+            "magnitude": "large",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_start.png?v=1786445128027",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_end.png?v=1786445128623",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "e1a9fd08-fbe2-409d-92ed-b4b31b0efecf",
+        "project_title": "writer_test_260810",
+        "style_anchor_key": "jp_anime",
+        "shot_id": "sh_01_03",
+        "scene_id": "sc_01",
+        "duration_seconds": 5,
+        "action": "The girl adjusts her dust-caked goggles and scans the surrounding ruins with a sharp, piercing gaze.",
+        "prompt": "",
+        "delta": 45.1,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "none",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "adjusts goggles",
+            "magnitude": "small",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/shots/v1-04cf105dc2fc0e5790eed9d8fd0bbdc140583b55d1a9eb2694f3c92a95c871d2_storyboard_start.png?v=1786445126424",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/shots/v1-04cf105dc2fc0e5790eed9d8fd0bbdc140583b55d1a9eb2694f3c92a95c871d2_storyboard_end.png?v=1786445126752",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "e1a9fd08-fbe2-409d-92ed-b4b31b0efecf",
+        "project_title": "writer_test_260810",
+        "style_anchor_key": "jp_anime",
+        "shot_id": "sh_01_05",
+        "scene_id": "sc_01",
+        "duration_seconds": 5,
+        "action": "The girl grips the rusted hatch handle with both hands and pulls with all her strength, forcing open a narrow gap.",
+        "prompt": "",
+        "delta": 40.91,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "medium",
+          "direction": "none",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "pulls",
+            "magnitude": "large",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/shots/v1-29becf079dbedbc033f819cee1290a887e78e16f2d7e1f3688eb54b130f68680_storyboard_start.png?v=1786445114339",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/shots/v1-29becf079dbedbc033f819cee1290a887e78e16f2d7e1f3688eb54b130f68680_storyboard_end.png?v=1786445113798",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "e1a9fd08-fbe2-409d-92ed-b4b31b0efecf",
+        "project_title": "writer_test_260810",
+        "style_anchor_key": "jp_anime",
+        "shot_id": "sh_01_02",
+        "scene_id": "sc_01",
+        "duration_seconds": 6,
+        "action": "A full-body shot shows a girl staggering through the sandstorm, weaving between the massive wreckage of collapsed buildings.",
+        "prompt": "",
+        "delta": 35.85,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "forward",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "staggers",
+            "magnitude": "medium",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/shots/v1-2e9decf4fc51c41a261229ce59d920d32056dcb1566d7ab7343d2e2db7d07f70_storyboard_start.png?v=1786445123440",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/shots/v1-2e9decf4fc51c41a261229ce59d920d32056dcb1566d7ab7343d2e2db7d07f70_storyboard_end.png?v=1786445123491",
+        "characters": [
+          "char"
+        ]
+      }
+    ],
+    "6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a": [
+      {
+        "project_id": "6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a",
+        "project_title": "Sample2 (previz 재생성 2)",
+        "style_anchor_key": "real_jp_melo",
+        "shot_id": "sh_03_12",
+        "scene_id": "sc_03",
+        "duration_seconds": 10,
+        "action": "Intense searchlights pour down from the ceiling as armed pursuers rapidly rappel down into the facility.",
+        "prompt": "",
+        "delta": 47.62,
+        "camera_motion": {
+          "type": "tracking",
+          "speed": "medium",
+          "direction": "down",
+          "magnitude": "moderate"
+        },
+        "character_motion": [
+          {
+            "verb": "rappel down",
+            "magnitude": "large",
+            "character_id": "kingdom_pursuers"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-f4f52eee37e00d99efd3101273a838fb9e17333b57e1d9e0247020661a9718f2_storyboard_start.png?v=1786191557619",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-f4f52eee37e00d99efd3101273a838fb9e17333b57e1d9e0247020661a9718f2_storyboard_end.png?v=1786191557385",
+        "characters": [
+          "kingdom_pursuers"
+        ]
+      },
+      {
+        "project_id": "6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a",
+        "project_title": "Sample2 (previz 재생성 2)",
+        "style_anchor_key": "real_jp_melo",
+        "shot_id": "sh_01_04",
+        "scene_id": "sc_01",
+        "duration_seconds": 7,
+        "action": "Sand beneath her feet cascades away, exposing a massive structure; drawn by curiosity, the girl peers into its darkness.",
+        "prompt": "",
+        "delta": 47.37,
+        "camera_motion": {
+          "type": "tracking",
+          "speed": "slow",
+          "direction": "forward",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "leans",
+            "magnitude": "medium",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_start.png?v=1786116393009",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_end.png?v=1786116392362",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a",
+        "project_title": "Sample2 (previz 재생성 2)",
+        "style_anchor_key": "real_jp_melo",
+        "shot_id": "sh_03_13",
+        "scene_id": "sc_03",
+        "duration_seconds": 5,
+        "action": "The girl urgently tears out the key section of the blueprint and crumples it into her chest pocket.",
+        "prompt": "",
+        "delta": 44.97,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "fast",
+          "direction": "right",
+          "magnitude": "moderate"
+        },
+        "character_motion": [
+          {
+            "verb": "tears and dives",
+            "magnitude": "large",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-8599ee411983db016fa5f5cde59f3f94c3141ddc18680a2f7bf2baa10ea50dde_storyboard_start.png?v=1786191686225",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-8599ee411983db016fa5f5cde59f3f94c3141ddc18680a2f7bf2baa10ea50dde_storyboard_end.png?v=1786191687077",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a",
+        "project_title": "Sample2 (previz 재생성 2)",
+        "style_anchor_key": "real_jp_melo",
+        "shot_id": "sh_01_01",
+        "scene_id": "sc_01",
+        "duration_seconds": 7,
+        "action": "In a desolate ruin, a girl grips a metal object buried deep in the sand and pulls it with all her strength.",
+        "prompt": "",
+        "delta": 39.59,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "none",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "pulls",
+            "magnitude": "large",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-ddc8bf9bac189b90248a2fb6e0de875c96634ba5cf244ad77d8f0f9f4ce61db0_storyboard_start.png?v=1786116385908",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-ddc8bf9bac189b90248a2fb6e0de875c96634ba5cf244ad77d8f0f9f4ce61db0_storyboard_end.png?v=1786116385380",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a",
+        "project_title": "Sample2 (previz 재생성 2)",
+        "style_anchor_key": "real_jp_melo",
+        "shot_id": "sh_01_03",
+        "scene_id": "sc_01",
+        "duration_seconds": 7,
+        "action": "소녀가 몸을 일으켜 지평선 너머 아스라히 보이는 푸른 오아시스 왕국을 물끄러미 바라본다.",
+        "prompt": "",
+        "delta": 38.09,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "none",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "stands",
+            "magnitude": "minimal",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-04cf105dc2fc0e5790eed9d8fd0bbdc140583b55d1a9eb2694f3c92a95c871d2_storyboard_start.png?v=1786116390895",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-04cf105dc2fc0e5790eed9d8fd0bbdc140583b55d1a9eb2694f3c92a95c871d2_storyboard_end.png?v=1786116390056",
+        "characters": [
+          "char"
+        ]
+      }
+    ],
+    "f79546f6-77df-4331-8e31-0b425fc984a5": [
+      {
+        "project_id": "f79546f6-77df-4331-8e31-0b425fc984a5",
+        "project_title": "writer_test_260805_7 (viz 테스트)",
+        "style_anchor_key": "real_jp_melo",
+        "shot_id": "sh_01_04",
+        "scene_id": "sc_01",
+        "duration_seconds": 7,
+        "action": "Sand beneath her feet cascades away, exposing a massive structure; drawn by curiosity, the girl peers into its darkness.",
+        "prompt": "",
+        "delta": 57.74,
+        "camera_motion": {
+          "type": "tracking",
+          "speed": "slow",
+          "direction": "forward",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "leans",
+            "magnitude": "medium",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_start.png?v=1786069442154",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_end.png?v=1786069442135",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "f79546f6-77df-4331-8e31-0b425fc984a5",
+        "project_title": "writer_test_260805_7 (viz 테스트)",
+        "style_anchor_key": "real_jp_melo",
+        "shot_id": "sh_03_15",
+        "scene_id": "sc_03",
+        "duration_seconds": 7,
+        "action": "The landed pursuers fire their weapons toward the direction where the girl is hiding and close in aggressively.",
+        "prompt": "",
+        "delta": 39.49,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "medium",
+          "direction": "forward",
+          "magnitude": "moderate"
+        },
+        "character_motion": [
+          {
+            "verb": "fire weapons",
+            "magnitude": "medium",
+            "character_id": "kingdom_pursuers"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-a855d819ecf46f14b498c6dc4cc2e328047568d9be689caecfe58eb019913d40_storyboard_start.png?v=1786069656596",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-a855d819ecf46f14b498c6dc4cc2e328047568d9be689caecfe58eb019913d40_storyboard_end.png?v=1786069656794",
+        "characters": [
+          "kingdom_pursuers"
+        ]
+      },
+      {
+        "project_id": "f79546f6-77df-4331-8e31-0b425fc984a5",
+        "project_title": "writer_test_260805_7 (viz 테스트)",
+        "style_anchor_key": "real_jp_melo",
+        "shot_id": "sh_01_01",
+        "scene_id": "sc_01",
+        "duration_seconds": 7,
+        "action": "In a desolate ruin, a girl grips a metal object buried deep in the sand and pulls it with all her strength.",
+        "prompt": "",
+        "delta": 34.63,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "none",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "pulls",
+            "magnitude": "large",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-ddc8bf9bac189b90248a2fb6e0de875c96634ba5cf244ad77d8f0f9f4ce61db0_storyboard_start.png?v=1786069436330",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-ddc8bf9bac189b90248a2fb6e0de875c96634ba5cf244ad77d8f0f9f4ce61db0_storyboard_end.png?v=1786069435671",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "f79546f6-77df-4331-8e31-0b425fc984a5",
+        "project_title": "writer_test_260805_7 (viz 테스트)",
+        "style_anchor_key": "real_jp_melo",
+        "shot_id": "sh_03_09",
+        "scene_id": "sc_03",
+        "duration_seconds": 8,
+        "action": "Inside a facility packed with massive rusted pipes, the girl spreads open a large blueprint.",
+        "prompt": "",
+        "delta": 33.93,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "forward",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "unfolds map",
+            "magnitude": "small",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-e0d7f99ad99f693e4bd0144d862b60bde840925b8e61c2e284b7295d54c75ea9_storyboard_start.png?v=1786069649772",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-e0d7f99ad99f693e4bd0144d862b60bde840925b8e61c2e284b7295d54c75ea9_storyboard_end.png?v=1786069650631",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "f79546f6-77df-4331-8e31-0b425fc984a5",
+        "project_title": "writer_test_260805_7 (viz 테스트)",
+        "style_anchor_key": "real_jp_melo",
+        "shot_id": "sh_04_18",
+        "scene_id": "sc_04",
+        "duration_seconds": 4,
+        "action": "The girl desperately crawls upward toward sunlight streaming down through the dust.",
+        "prompt": "",
+        "delta": 33.47,
+        "camera_motion": {
+          "type": "tracking",
+          "speed": "medium",
+          "direction": "up",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "climbs",
+            "magnitude": "medium",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-08ee808735917563372674980cc77eb102f009509bb8990d0a198c34f2e40afd_storyboard_start.png?v=1786069897556",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-08ee808735917563372674980cc77eb102f009509bb8990d0a198c34f2e40afd_storyboard_end.png?v=1786069897512",
+        "characters": [
+          "char"
+        ]
+      }
+    ],
+    "9d6efa6d-3216-40b0-8a2c-184ab56f02ec": [
+      {
+        "project_id": "9d6efa6d-3216-40b0-8a2c-184ab56f02ec",
+        "project_title": "Sample1",
+        "style_anchor_key": "real",
+        "shot_id": "sh_04_30",
+        "scene_id": "sc_04",
+        "duration_seconds": 8,
+        "action": "With an air of resolve, she picks up the telephone and dials someone.",
+        "prompt": "",
+        "delta": 61.95,
+        "camera_motion": {
+          "type": "dolly_in",
+          "speed": "slow",
+          "direction": "forward",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "picks up phone",
+            "magnitude": "medium",
+            "character_id": "char_3"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-a253db253805c6ba396c7b0b8e3740c0ab6e957145eef3365f27b9b2b401fcea_storyboard_start.png?v=1786076716314",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-a253db253805c6ba396c7b0b8e3740c0ab6e957145eef3365f27b9b2b401fcea_storyboard_end.png?v=1786076716946",
+        "characters": [
+          "char_3"
+        ]
+      },
+      {
+        "project_id": "9d6efa6d-3216-40b0-8a2c-184ab56f02ec",
+        "project_title": "Sample1",
+        "style_anchor_key": "real",
+        "shot_id": "sh_01_05",
+        "scene_id": "sc_01",
+        "duration_seconds": 5,
+        "action": "Cho Seung-woo holds a transparent map overlay against the documents, aligns the figures, and realizes the truth.",
+        "prompt": "",
+        "delta": 54.02,
+        "camera_motion": {
+          "type": "dolly_in",
+          "speed": "slow",
+          "direction": "forward",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "tremble and drop",
+            "magnitude": "medium",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-29becf079dbedbc033f819cee1290a887e78e16f2d7e1f3688eb54b130f68680_storyboard_start.png?v=1786023814829",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-29becf079dbedbc033f819cee1290a887e78e16f2d7e1f3688eb54b130f68680_storyboard_end.png?v=1786023815625",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "9d6efa6d-3216-40b0-8a2c-184ab56f02ec",
+        "project_title": "Sample1",
+        "style_anchor_key": "real",
+        "shot_id": "sh_02_15",
+        "scene_id": "sc_02",
+        "duration_seconds": 6,
+        "action": "A massive explosion blast shatters the windows; shards and debris shower the interior.",
+        "prompt": "",
+        "delta": 49.55,
+        "camera_motion": {
+          "type": "shake",
+          "speed": "fast",
+          "direction": "none",
+          "magnitude": "large"
+        },
+        "character_motion": [
+          {
+            "verb": "thrown back",
+            "magnitude": "large",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-3f7efc8ab67f6db8d5d651dc273ca036f09cd482f48bc03a38e9f6790108c747_storyboard_start.png?v=1786072714573",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-3f7efc8ab67f6db8d5d651dc273ca036f09cd482f48bc03a38e9f6790108c747_storyboard_end.png?v=1786072714622",
+        "characters": [
+          "char",
+          "dead_colleague"
+        ]
+      },
+      {
+        "project_id": "9d6efa6d-3216-40b0-8a2c-184ab56f02ec",
+        "project_title": "Sample1",
+        "style_anchor_key": "real",
+        "shot_id": "sh_04_26",
+        "scene_id": "sc_04",
+        "duration_seconds": 8,
+        "action": "Jung Su-rim silently stares at a photograph of Lee Su-hyeon's personal effects placed on the desk.",
+        "prompt": "",
+        "delta": 49.49,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "none",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "blinks slowly",
+            "magnitude": "small",
+            "character_id": "char_3"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-3dfe18c39ef47e0054471e688509cf7d4cf39356f28c55969c809b382acf819d_storyboard_start.png?v=1786076700965",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-3dfe18c39ef47e0054471e688509cf7d4cf39356f28c55969c809b382acf819d_storyboard_end.png?v=1786076701668",
+        "characters": [
+          "char_3"
+        ]
+      },
+      {
+        "project_id": "9d6efa6d-3216-40b0-8a2c-184ab56f02ec",
+        "project_title": "Sample1",
+        "style_anchor_key": "real",
+        "shot_id": "sh_08_64",
+        "scene_id": "sc_08",
+        "duration_seconds": 10,
+        "action": "The two sit close together at a narrow desk, heads together, reviewing legal enforceability on a tablet in collaboration.",
+        "prompt": "",
+        "delta": 46.86,
+        "camera_motion": {
+          "type": "dolly_in",
+          "speed": "slow",
+          "direction": "forward",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "scrolls",
+            "magnitude": "small",
+            "character_id": "char_3"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-9c8779b9f2bdbc1decaf0d369196580a7c862acdd0a33b2884bcc640459d0842_storyboard_start.png?v=1786361898860",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-9c8779b9f2bdbc1decaf0d369196580a7c862acdd0a33b2884bcc640459d0842_storyboard_end.png?v=1786361898909",
+        "characters": [
+          "char",
+          "char_3"
+        ]
+      }
+    ],
+    "c86410d7-2e48-4e02-956d-c415e8e7f03b": [
+      {
+        "project_id": "c86410d7-2e48-4e02-956d-c415e8e7f03b",
+        "project_title": "writer_test_260805_6",
+        "style_anchor_key": "stop_motion",
+        "shot_id": "sh_04_19",
+        "scene_id": "sc_04",
+        "duration_seconds": 4,
+        "action": "She narrowly threads through collapsing concrete debris, shaking off the pursuit.",
+        "prompt": "",
+        "delta": 63.71,
+        "camera_motion": {
+          "type": "tracking",
+          "speed": "fast",
+          "direction": "forward",
+          "magnitude": "medium"
+        },
+        "character_motion": [
+          {
+            "verb": "leaps",
+            "magnitude": "large",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-64f97433ccd98f64c6e87fddaffb2f29548912e6d2e5634436f292f4b58e76e5_storyboard_start.png?v=1785938348311",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-64f97433ccd98f64c6e87fddaffb2f29548912e6d2e5634436f292f4b58e76e5_storyboard_end.png?v=1785938347464",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "c86410d7-2e48-4e02-956d-c415e8e7f03b",
+        "project_title": "writer_test_260805_6",
+        "style_anchor_key": "stop_motion",
+        "shot_id": "sh_02_08",
+        "scene_id": "sc_02",
+        "duration_seconds": 6,
+        "action": "She spots a bundle of old blueprints on a dust-covered control console and reaches out for them.",
+        "prompt": "",
+        "delta": 46.64,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "right",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "reaches",
+            "magnitude": "small",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-952c9728fcb4c9409f388e8da607cd40fbb7053ea06506122b65fd843e63a505_storyboard_start.png?v=1785935986552",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-952c9728fcb4c9409f388e8da607cd40fbb7053ea06506122b65fd843e63a505_storyboard_end.png?v=1785935986255",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "c86410d7-2e48-4e02-956d-c415e8e7f03b",
+        "project_title": "writer_test_260805_6",
+        "style_anchor_key": "stop_motion",
+        "shot_id": "sh_04_17",
+        "scene_id": "sc_04",
+        "duration_seconds": 6,
+        "action": "The girl sprints at full speed through a narrow gap between ruined buildings as sand swirls around her.",
+        "prompt": "",
+        "delta": 40.04,
+        "camera_motion": {
+          "type": "tracking",
+          "speed": "fast",
+          "direction": "backward",
+          "magnitude": "high"
+        },
+        "character_motion": [
+          {
+            "verb": "sprints",
+            "magnitude": "large",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-6ee8ab1c8159c0e4b9c1abaf4d7f0916a1b140a30193d906f9e5633c668e6c9a_storyboard_start.png?v=1785938343061",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-6ee8ab1c8159c0e4b9c1abaf4d7f0916a1b140a30193d906f9e5633c668e6c9a_storyboard_end.png?v=1785938343460",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "c86410d7-2e48-4e02-956d-c415e8e7f03b",
+        "project_title": "writer_test_260805_6",
+        "style_anchor_key": "stop_motion",
+        "shot_id": "sh_02_07",
+        "scene_id": "sc_02",
+        "duration_seconds": 7,
+        "action": "The girl arrives at the center of an underground facility where enormous rusty pipes interlock in a maze-like tangle.",
+        "prompt": "",
+        "delta": 38.27,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "forward",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "walks",
+            "magnitude": "small",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-76a0f305bb09ffb42c98bf9073e7591e3147f02b47890d0330e3fec013f1c77a_storyboard_start.png?v=1785935984743",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-76a0f305bb09ffb42c98bf9073e7591e3147f02b47890d0330e3fec013f1c77a_storyboard_end.png?v=1785935984665",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "c86410d7-2e48-4e02-956d-c415e8e7f03b",
+        "project_title": "writer_test_260805_6",
+        "style_anchor_key": "stop_motion",
+        "shot_id": "sh_02_11",
+        "scene_id": "sc_02",
+        "duration_seconds": 5,
+        "action": "With hands trembling in anger, she tears out one key blueprint page with force.",
+        "prompt": "",
+        "delta": 34.58,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "none",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "tears",
+            "magnitude": "medium",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-568a70a7203910934504888ce2b545cc0a006bb536f10ee4ab666fc6683a14f9_storyboard_start.png?v=1785936813459",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-568a70a7203910934504888ce2b545cc0a006bb536f10ee4ab666fc6683a14f9_storyboard_end.png?v=1785936812523",
+        "characters": [
+          "char"
+        ]
+      }
+    ],
+    "011fd4bd-9b0a-46fe-b978-35677a4f6ee6": [
+      {
+        "project_id": "011fd4bd-9b0a-46fe-b978-35677a4f6ee6",
+        "project_title": "writer_test_260805_5",
+        "style_anchor_key": "us_cartoon",
+        "shot_id": "sh_04_29",
+        "scene_id": "sc_04",
+        "duration_seconds": 6,
+        "action": "Covered in sand, the girl stops, looks up with a resolute expression, and says, 'It starts now. Everyone has to know.'",
+        "prompt": "",
+        "delta": 43.42,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "none",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "speaks",
+            "magnitude": "small",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-6a20ecee7b991569632e7c2a24e078202d184448a29312e0388399c6a68f5f67_storyboard_start.png?v=1785930983530",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-6a20ecee7b991569632e7c2a24e078202d184448a29312e0388399c6a68f5f67_storyboard_end.png?v=1785930982710",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "011fd4bd-9b0a-46fe-b978-35677a4f6ee6",
+        "project_title": "writer_test_260805_5",
+        "style_anchor_key": "us_cartoon",
+        "shot_id": "sh_03_23",
+        "scene_id": "sc_03",
+        "duration_seconds": 5,
+        "action": "She crouches low and slides her body into a dark drainage pipe, hiding herself.",
+        "prompt": "",
+        "delta": 37.88,
+        "camera_motion": {
+          "type": "tracking",
+          "speed": "moderate",
+          "direction": "forward",
+          "magnitude": "moderate"
+        },
+        "character_motion": [
+          {
+            "verb": "crawls",
+            "magnitude": "moderate",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-d9aad98787c8b7817dc4f54d2edee5f38dc7adf68fcb80c8705b934f56730ed0_storyboard_start.png?v=1785930619510",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-d9aad98787c8b7817dc4f54d2edee5f38dc7adf68fcb80c8705b934f56730ed0_storyboard_end.png?v=1785930620128",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "011fd4bd-9b0a-46fe-b978-35677a4f6ee6",
+        "project_title": "writer_test_260805_5",
+        "style_anchor_key": "us_cartoon",
+        "shot_id": "sh_04_26",
+        "scene_id": "sc_04",
+        "duration_seconds": 4,
+        "action": "The girl crawls out through the narrow ventilation shaft opening to the outside.",
+        "prompt": "",
+        "delta": 23.95,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "forward",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "crawls forward",
+            "magnitude": "medium",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-3dfe18c39ef47e0054471e688509cf7d4cf39356f28c55969c809b382acf819d_storyboard_start.png?v=1785930802291",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-3dfe18c39ef47e0054471e688509cf7d4cf39356f28c55969c809b382acf819d_storyboard_end.png?v=1785930802089",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "011fd4bd-9b0a-46fe-b978-35677a4f6ee6",
+        "project_title": "writer_test_260805_5",
+        "style_anchor_key": "us_cartoon",
+        "shot_id": "sh_03_19",
+        "scene_id": "sc_03",
+        "duration_seconds": 4,
+        "action": "The girl frantically tears a critical engineering blueprint off the wall.",
+        "prompt": "",
+        "delta": 19.97,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "fast",
+          "direction": "forward",
+          "magnitude": "moderate"
+        },
+        "character_motion": [
+          {
+            "verb": "tears paper",
+            "magnitude": "large",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-f82cf88d56a25d8288bd2efe3f340124d6fc96253cbd4cb8c998455e4ead7dbe_storyboard_start.png?v=1785930364277",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-f82cf88d56a25d8288bd2efe3f340124d6fc96253cbd4cb8c998455e4ead7dbe_storyboard_end.png?v=1785930364522",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "011fd4bd-9b0a-46fe-b978-35677a4f6ee6",
+        "project_title": "writer_test_260805_5",
+        "style_anchor_key": "us_cartoon",
+        "shot_id": "sh_02_16",
+        "scene_id": "sc_02",
+        "duration_seconds": 6,
+        "action": "She stares at the blueprint with shock-filled eyes and murmurs the truth quietly to herself.",
+        "prompt": "",
+        "delta": 7.71,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "none",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "whispers",
+            "magnitude": "small",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-ab584473e0f5862553bb6400474e7b805d9eaf4b45fce571c2c5d65a17797346_storyboard_start.png?v=1785930150436",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-ab584473e0f5862553bb6400474e7b805d9eaf4b45fce571c2c5d65a17797346_storyboard_end.png?v=1785930151170",
+        "characters": [
+          "char"
+        ]
+      }
+    ],
+    "a4a728df-a089-49ed-8598-af88cc990bd1": [
+      {
+        "project_id": "a4a728df-a089-49ed-8598-af88cc990bd1",
+        "project_title": "writer_test_260721",
+        "style_anchor_key": "us_cartoon",
+        "shot_id": "sh_03_23",
+        "scene_id": "sc_03",
+        "duration_seconds": 5,
+        "action": "Capture the character's emotional turning point at the closest possible distance to draw the audience in.",
+        "prompt": "",
+        "delta": 38.98,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "none",
+          "direction": "none",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "걸어 들어간다",
+            "magnitude": "medium",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/a4a728df-a089-49ed-8598-af88cc990bd1/shots/v1-d9aad98787c8b7817dc4f54d2edee5f38dc7adf68fcb80c8705b934f56730ed0_storyboard_start.png?v=1785028293398",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/a4a728df-a089-49ed-8598-af88cc990bd1/shots/v1-d9aad98787c8b7817dc4f54d2edee5f38dc7adf68fcb80c8705b934f56730ed0_storyboard_end.png?v=1785028293986",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "a4a728df-a089-49ed-8598-af88cc990bd1",
+        "project_title": "writer_test_260721",
+        "style_anchor_key": "us_cartoon",
+        "shot_id": "sh_02_14",
+        "scene_id": "sc_02",
+        "duration_seconds": 4,
+        "action": "Show the pursuers' strategic pressure and closing encirclement.",
+        "prompt": "",
+        "delta": 29.94,
+        "camera_motion": {
+          "type": "tracking",
+          "speed": "fast",
+          "direction": "forward",
+          "magnitude": "large"
+        },
+        "character_motion": [
+          {
+            "verb": "도약하여 통과한다",
+            "magnitude": "large",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/a4a728df-a089-49ed-8598-af88cc990bd1/shots/v1-327f0abd4addd97e76fe1c04d9174467bfd005fd09e15819e7d22b40a0532b1b_storyboard_start.png?v=1784889252041",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/a4a728df-a089-49ed-8598-af88cc990bd1/shots/v1-327f0abd4addd97e76fe1c04d9174467bfd005fd09e15819e7d22b40a0532b1b_storyboard_end.png?v=1784889251779",
+        "characters": [
+          "hunters"
+        ]
+      },
+      {
+        "project_id": "a4a728df-a089-49ed-8598-af88cc990bd1",
+        "project_title": "writer_test_260721",
+        "style_anchor_key": "us_cartoon",
+        "shot_id": "sh_03_21",
+        "scene_id": "sc_03",
+        "duration_seconds": 4,
+        "action": "Show the girl's physical exhaustion and her unbroken will in a full-body shot.",
+        "prompt": "",
+        "delta": 29.26,
+        "camera_motion": {
+          "type": "dolly_in",
+          "speed": "slow",
+          "direction": "forward",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "속삭인다",
+            "magnitude": "small",
+            "character_id": "char"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/a4a728df-a089-49ed-8598-af88cc990bd1/shots/v1-501ea32f3cfda7636677bdcafc7e825c412401abb70a36f173495ed7556ea0a7_storyboard_start.png?v=1784889687270",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/a4a728df-a089-49ed-8598-af88cc990bd1/shots/v1-501ea32f3cfda7636677bdcafc7e825c412401abb70a36f173495ed7556ea0a7_storyboard_end.png?v=1784889687085",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "a4a728df-a089-49ed-8598-af88cc990bd1",
+        "project_title": "writer_test_260721",
+        "style_anchor_key": "us_cartoon",
+        "shot_id": "sh_02_16",
+        "scene_id": "sc_02",
+        "duration_seconds": 4,
+        "action": "Provide a brief pause capturing the character's fear and the moment just before a decisive choice.",
+        "prompt": "",
+        "delta": 27.47,
+        "camera_motion": {
+          "type": "handheld_drift",
+          "speed": "slow",
+          "direction": "none",
+          "magnitude": "minimal"
+        },
+        "character_motion": [
+          {
+            "verb": "수신호를 보낸다",
+            "magnitude": "medium",
+            "character_id": "hunters"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/a4a728df-a089-49ed-8598-af88cc990bd1/shots/v1-ab584473e0f5862553bb6400474e7b805d9eaf4b45fce571c2c5d65a17797346_storyboard_start.png?v=1784889391918",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/a4a728df-a089-49ed-8598-af88cc990bd1/shots/v1-ab584473e0f5862553bb6400474e7b805d9eaf4b45fce571c2c5d65a17797346_storyboard_end.png?v=1784889391982",
+        "characters": [
+          "char"
+        ]
+      },
+      {
+        "project_id": "a4a728df-a089-49ed-8598-af88cc990bd1",
+        "project_title": "writer_test_260721",
+        "style_anchor_key": "us_cartoon",
+        "shot_id": "shot_9",
+        "scene_id": "sc_02",
+        "duration_seconds": 5,
+        "action": "Reveal the physical reality of the threat and build tension.",
+        "prompt": "",
+        "delta": 26.12,
+        "camera_motion": {
+          "type": "tracking",
+          "speed": "medium",
+          "direction": "forward",
+          "magnitude": "moderate"
+        },
+        "character_motion": [
+          {
+            "verb": "전진하며 겨눈다",
+            "magnitude": "moderate",
+            "character_id": "hunters"
+          }
+        ],
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/a4a728df-a089-49ed-8598-af88cc990bd1/shots/v1-4aad0b17789a97404d970c81193a0444c8dfdf83ebcfd7cb7a9fc5631c29ac03_storyboard_start.png?v=1784888874892",
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/a4a728df-a089-49ed-8598-af88cc990bd1/shots/v1-4aad0b17789a97404d970c81193a0444c8dfdf83ebcfd7cb7a9fc5631c29ac03_storyboard_end.png?v=1784888875037",
+        "characters": [
+          "hunters"
+        ]
+      }
+    ]
+  },
+  "picked": [
+    {
+      "project_id": "c86410d7-2e48-4e02-956d-c415e8e7f03b",
+      "project_title": "writer_test_260805_6",
+      "style_anchor_key": "stop_motion",
+      "shot_id": "sh_04_19",
+      "scene_id": "sc_04",
+      "duration_seconds": 4,
+      "action": "She narrowly threads through collapsing concrete debris, shaking off the pursuit.",
+      "prompt": "",
+      "delta": 63.71,
+      "camera_motion": {
+        "type": "tracking",
+        "speed": "fast",
+        "direction": "forward",
+        "magnitude": "medium"
+      },
+      "character_motion": [
+        {
+          "verb": "leaps",
+          "magnitude": "large",
+          "character_id": "char"
+        }
+      ],
+      "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-64f97433ccd98f64c6e87fddaffb2f29548912e6d2e5634436f292f4b58e76e5_storyboard_start.png?v=1785938348311",
+      "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-64f97433ccd98f64c6e87fddaffb2f29548912e6d2e5634436f292f4b58e76e5_storyboard_end.png?v=1785938347464",
+      "characters": [
+        "char"
+      ],
+      "tag": "writer_test__sh_04_19",
+      "files": {
+        "start": "writer_test__sh_04_19__start.png",
+        "end": "writer_test__sh_04_19__end.png"
+      },
+      "characterViews": [
+        {
+          "character_id": "char",
+          "name": "소녀",
+          "appearance": "teenager, stocky build, desert outfit made of wrapped cloth scraps",
+          "views": {
+            "view_main": "writer_test__sh_04_19__char_view_main.png",
+            "view_main__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1785933275390",
+            "view_side_left": null,
+            "view_side_right": null,
+            "view_back": null,
+            "portrait": "writer_test__sh_04_19__char_portrait.png",
+            "portrait__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_portrait.png?v=1785933279894"
+          }
+        }
+      ],
+      "locationViews": [
+        {
+          "location_id": "location",
+          "name": "폐허 도시",
+          "visual_description": "Skyscrapers more than half-buried in sand, sand blowing in the wind, rusted steel frames and shattered glass windows, remnants of a massive artificial drainage facility underground with rusted pipes",
+          "views": {
+            "wide_shot": "writer_test__sh_04_19__loc_location_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1785933272620",
+            "establishing_shot": null
+          }
+        },
+        {
+          "location_id": "location_2",
+          "name": "오아시스 왕국",
+          "visual_description": "A vast fortress built from tropical timber, lush dense greenery and water-flowing structures, an abundant and thriving exterior that stands in stark contrast to the desolate world outside",
+          "views": {
+            "wide_shot": "writer_test__sh_04_19__loc_location_2_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_wide_shot.png?v=1785933290956",
+            "establishing_shot": null
+          }
+        }
+      ]
+    },
+    {
+      "project_id": "9d6efa6d-3216-40b0-8a2c-184ab56f02ec",
+      "project_title": "Sample1",
+      "style_anchor_key": "real",
+      "shot_id": "sh_04_30",
+      "scene_id": "sc_04",
+      "duration_seconds": 8,
+      "action": "With an air of resolve, she picks up the telephone and dials someone.",
+      "prompt": "",
+      "delta": 61.95,
+      "camera_motion": {
+        "type": "dolly_in",
+        "speed": "slow",
+        "direction": "forward",
+        "magnitude": "minimal"
+      },
+      "character_motion": [
+        {
+          "verb": "picks up phone",
+          "magnitude": "medium",
+          "character_id": "char_3"
+        }
+      ],
+      "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-a253db253805c6ba396c7b0b8e3740c0ab6e957145eef3365f27b9b2b401fcea_storyboard_start.png?v=1786076716314",
+      "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-a253db253805c6ba396c7b0b8e3740c0ab6e957145eef3365f27b9b2b401fcea_storyboard_end.png?v=1786076716946",
+      "characters": [
+        "char_3"
+      ],
+      "tag": "Sample1_sh_04_30",
+      "files": {
+        "start": "Sample1_sh_04_30__start.png",
+        "end": "Sample1_sh_04_30__end.png"
+      },
+      "characterViews": [
+        {
+          "character_id": "char_3",
+          "name": "정수림",
+          "appearance": "Woman in her early 30s, neat and plainly pretty appearance, wearing a prosecutor's uniform",
+          "views": {
+            "view_main": "Sample1_sh_04_30__char_3_view_main.png",
+            "view_main__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-53045b217691e950565a213a4c9b3f2cd29284ab49a320fe55dc5dde6dda9436_view_main.png?v=1786014468639",
+            "view_side_left": null,
+            "view_side_right": null,
+            "view_back": null,
+            "portrait": "Sample1_sh_04_30__char_3_portrait.png",
+            "portrait__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-53045b217691e950565a213a4c9b3f2cd29284ab49a320fe55dc5dde6dda9436_portrait.png?v=1786014471529"
+          }
+        }
+      ],
+      "locationViews": [
+        {
+          "location_id": "location",
+          "name": "법정",
+          "visual_description": "Modern minimalist architecture, cold white marble and glass, clean straight-line structure with no excess, cool fluorescent lighting, a space that simultaneously conveys efficiency and authority",
+          "views": {
+            "wide_shot": "Sample1_sh_04_30__loc_location_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1786014459403",
+            "establishing_shot": null
+          }
+        },
+        {
+          "location_id": "location_2",
+          "name": "정수림 사무실",
+          "visual_description": "A cramped, worn personal office of a prosecutor, stacks of documents under fluorescent lights, night street visible through the window",
+          "views": {
+            "wide_shot": "Sample1_sh_04_30__loc_location_2_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_wide_shot.png?v=1786014465445",
+            "establishing_shot": null
+          }
+        },
+        {
+          "location_id": "location_3",
+          "name": "전쟁지역 현지 사무소",
+          "visual_description": "A defense contractor's local building in a conflict zone. Exterior walls covered in dust and cracks, interior a makeshift office space cluttered with tangled documents and equipment. Through the window, a horizon with rising smoke. A space bearing traces of a cherished person — suggested only by an empty chair, a toppled cup, and a silhouette disappearing beyond the door.",
+          "views": {
+            "wide_shot": "Sample1_sh_04_30__loc_location_3_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/locations/v1-9818da74a0a32167880f4d6fcc05d0a8aa9005b47205fe70de06a91c01b1a07b_wide_shot.png?v=1786014478854",
+            "establishing_shot": null
+          }
+        },
+        {
+          "location_id": "location_4",
+          "name": "회상 — 정수림의 과거",
+          "visual_description": "An old, aged courtroom. Walls paneled in dark wood, yellowed fluorescent lights, a wooden witness stand covered in scratches. A space that contrasts with today's cold and efficient courtrooms — traces of an era when justice was alive, yet already gathering dust.",
+          "views": {
+            "wide_shot": "Sample1_sh_04_30__loc_location_4_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/locations/v1-a9ea8a83a076d4bd42e8b802fc1f0de0b6a8ef6d81bdac86569aa8d491727a3c_wide_shot.png?v=1786014465393",
+            "establishing_shot": null
+          }
+        },
+        {
+          "location_id": "court_entrance",
+          "name": "Court Entrance",
+          "visual_description": "거대한 석조 기둥과 유리 외벽이 조화를 이루는 압도적인 규모의 입구.",
+          "views": {
+            "wide_shot": "Sample1_sh_04_30__loc_court_entrance_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/locations/v1-cfa47bf6a5ac9d273826aa3a84fe3846f6da8c7db5cd67ffa1cf307e8268d12d_wide_shot.png?v=1786014470273",
+            "establishing_shot": null
+          }
+        }
+      ]
+    },
+    {
+      "project_id": "f79546f6-77df-4331-8e31-0b425fc984a5",
+      "project_title": "writer_test_260805_7 (viz 테스트)",
+      "style_anchor_key": "real_jp_melo",
+      "shot_id": "sh_01_04",
+      "scene_id": "sc_01",
+      "duration_seconds": 7,
+      "action": "Sand beneath her feet cascades away, exposing a massive structure; drawn by curiosity, the girl peers into its darkness.",
+      "prompt": "",
+      "delta": 57.74,
+      "camera_motion": {
+        "type": "tracking",
+        "speed": "slow",
+        "direction": "forward",
+        "magnitude": "minimal"
+      },
+      "character_motion": [
+        {
+          "verb": "leans",
+          "magnitude": "medium",
+          "character_id": "char"
+        }
+      ],
+      "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_start.png?v=1786069442154",
+      "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_end.png?v=1786069442135",
+      "characters": [
+        "char"
+      ],
+      "tag": "writer_test__sh_01_04",
+      "files": {
+        "start": "writer_test__sh_01_04__start.png",
+        "end": "writer_test__sh_01_04__end.png"
+      },
+      "characterViews": [
+        {
+          "character_id": "char",
+          "name": "소녀",
+          "appearance": "teenager, stocky build, desert outfit made of wrapped cloth scraps",
+          "views": {
+            "view_main": "writer_test__sh_01_04__char_view_main.png",
+            "view_main__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/468651ca-4931-4b3b-8408-9853ab2a3f0f/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786012619971",
+            "view_side_left": null,
+            "view_side_right": null,
+            "view_back": null,
+            "portrait": "writer_test__sh_01_04__char_portrait.png",
+            "portrait__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/468651ca-4931-4b3b-8408-9853ab2a3f0f/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_portrait.png?v=1786012622999"
+          }
+        }
+      ],
+      "locationViews": [
+        {
+          "location_id": "location",
+          "name": "폐허 도시",
+          "visual_description": "Half-buried skyscrapers submerged in sand, dust blowing in the wind, rusted pipes and drainage infrastructure ruins underground",
+          "views": {
+            "wide_shot": "writer_test__sh_01_04__loc_location_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/468651ca-4931-4b3b-8408-9853ab2a3f0f/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1786012643225",
+            "establishing_shot": null
+          }
+        },
+        {
+          "location_id": "location_2",
+          "name": "오아시스 왕국",
+          "visual_description": "Massive fortress built from tropical timber, lush dense greenery and abundant water, a thriving center of power",
+          "views": {
+            "wide_shot": "writer_test__sh_01_04__loc_location_2_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/468651ca-4931-4b3b-8408-9853ab2a3f0f/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_wide_shot.png?v=1786012641205",
+            "establishing_shot": null
+          }
+        }
+      ]
+    },
+    {
+      "project_id": "6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a",
+      "project_title": "Sample2 (previz 재생성 2)",
+      "style_anchor_key": "real_jp_melo",
+      "shot_id": "sh_03_12",
+      "scene_id": "sc_03",
+      "duration_seconds": 10,
+      "action": "Intense searchlights pour down from the ceiling as armed pursuers rapidly rappel down into the facility.",
+      "prompt": "",
+      "delta": 47.62,
+      "camera_motion": {
+        "type": "tracking",
+        "speed": "medium",
+        "direction": "down",
+        "magnitude": "moderate"
+      },
+      "character_motion": [
+        {
+          "verb": "rappel down",
+          "magnitude": "large",
+          "character_id": "kingdom_pursuers"
+        }
+      ],
+      "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-f4f52eee37e00d99efd3101273a838fb9e17333b57e1d9e0247020661a9718f2_storyboard_start.png?v=1786191557619",
+      "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-f4f52eee37e00d99efd3101273a838fb9e17333b57e1d9e0247020661a9718f2_storyboard_end.png?v=1786191557385",
+      "characters": [
+        "kingdom_pursuers"
+      ],
+      "tag": "Sample2pre_sh_03_12",
+      "files": {
+        "start": "Sample2pre_sh_03_12__start.png",
+        "end": "Sample2pre_sh_03_12__end.png"
+      },
+      "characterViews": [
+        {
+          "character_id": "kingdom_pursuers",
+          "name": "왕국의 추적자들",
+          "appearance": "armed soldiers of the Oasis Kingdom, wearing black gas masks and mechanical gauntlets",
+          "views": {
+            "view_main": "Sample2pre_sh_03_12__kingdom_pursuers_view_main.png",
+            "view_main__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/468651ca-4931-4b3b-8408-9853ab2a3f0f/characters/v1-5fda21d19de01dfa5f0b6c79e1e3a7353a51431a12585447fd02cd536d0ff375_view_main.png?v=1786013030830",
+            "view_side_left": null,
+            "view_side_right": null,
+            "view_back": null,
+            "portrait": "Sample2pre_sh_03_12__kingdom_pursuers_portrait.png",
+            "portrait__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/468651ca-4931-4b3b-8408-9853ab2a3f0f/characters/v1-5fda21d19de01dfa5f0b6c79e1e3a7353a51431a12585447fd02cd536d0ff375_portrait.png?v=1786013034853"
+          }
+        }
+      ],
+      "locationViews": [
+        {
+          "location_id": "location",
+          "name": "폐허 도시",
+          "visual_description": "Half-buried skyscrapers submerged in sand, dust blowing in the wind, rusted pipes and drainage infrastructure ruins underground",
+          "views": {
+            "wide_shot": "Sample2pre_sh_03_12__loc_location_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/468651ca-4931-4b3b-8408-9853ab2a3f0f/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1786012643225",
+            "establishing_shot": null
+          }
+        },
+        {
+          "location_id": "location_2",
+          "name": "오아시스 왕국",
+          "visual_description": "Massive fortress built from tropical timber, lush dense greenery and abundant water, a thriving center of power",
+          "views": {
+            "wide_shot": "Sample2pre_sh_03_12__loc_location_2_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/468651ca-4931-4b3b-8408-9853ab2a3f0f/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_wide_shot.png?v=1786012641205",
+            "establishing_shot": null
+          }
+        }
+      ]
+    },
+    {
+      "project_id": "e1a9fd08-fbe2-409d-92ed-b4b31b0efecf",
+      "project_title": "writer_test_260810",
+      "style_anchor_key": "jp_anime",
+      "shot_id": "sh_01_04",
+      "scene_id": "sc_01",
+      "duration_seconds": 7,
+      "action": "The girl crouches and digs into the sand with her hands; as the sand is cleared away, the surface of a massive iron hatch is revealed beneath.",
+      "prompt": "",
+      "delta": 47.06,
+      "camera_motion": {
+        "type": "tracking",
+        "speed": "slow",
+        "direction": "down",
+        "magnitude": "minimal"
+      },
+      "character_motion": [
+        {
+          "verb": "digs",
+          "magnitude": "large",
+          "character_id": "char"
+        }
+      ],
+      "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_start.png?v=1786445128027",
+      "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_end.png?v=1786445128623",
+      "characters": [
+        "char"
+      ],
+      "tag": "writer_test__sh_01_04",
+      "files": {
+        "start": "writer_test__sh_01_04__start.png",
+        "end": "writer_test__sh_01_04__end.png"
+      },
+      "characterViews": [
+        {
+          "character_id": "char",
+          "name": "소녀",
+          "appearance": "teenager, stocky build, desert survivor outfit made of wrapped cloth scraps",
+          "views": {
+            "view_main": "writer_test__sh_01_04__char_view_main.png",
+            "view_main__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786344812284",
+            "view_side_left": "writer_test__sh_01_04__char_view_side_left.png",
+            "view_side_left__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_side_left.png?v=1786444826483",
+            "view_side_right": "writer_test__sh_01_04__char_view_side_right.png",
+            "view_side_right__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_side_right.png?v=1786444914763",
+            "view_back": "writer_test__sh_01_04__char_view_back.png",
+            "view_back__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_back.png?v=1786444819411",
+            "portrait": "writer_test__sh_01_04__char_portrait.png",
+            "portrait__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_portrait.png?v=1786344816094"
+          }
+        }
+      ],
+      "locationViews": [
+        {
+          "location_id": "location",
+          "name": "폐허 도시",
+          "visual_description": "A ruined cityscape of half-buried skyscrapers swallowed by sand, shattered glass windows through which sandstorms howl, underground levels filled with corroded pipes and collapsed artificial drainage infrastructure",
+          "views": {
+            "wide_shot": "writer_test__sh_01_04__loc_location_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1786344860668",
+            "establishing_shot": null
+          }
+        },
+        {
+          "location_id": "location_2",
+          "name": "오아시스 왕국",
+          "visual_description": "A massive fortress built from tropical trees and vines, a lush and abundant stronghold contrasted by dense green canopy and the sound of flowing water, outer walls interlaced with timber and enormous gnarled roots",
+          "views": {
+            "wide_shot": "writer_test__sh_01_04__loc_location_2_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/e1a9fd08-fbe2-409d-92ed-b4b31b0efecf/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_wide_shot.png?v=1786344864875",
+            "establishing_shot": null
+          }
+        }
+      ]
+    },
+    {
+      "project_id": "011fd4bd-9b0a-46fe-b978-35677a4f6ee6",
+      "project_title": "writer_test_260805_5",
+      "style_anchor_key": "us_cartoon",
+      "shot_id": "sh_04_29",
+      "scene_id": "sc_04",
+      "duration_seconds": 6,
+      "action": "Covered in sand, the girl stops, looks up with a resolute expression, and says, 'It starts now. Everyone has to know.'",
+      "prompt": "",
+      "delta": 43.42,
+      "camera_motion": {
+        "type": "handheld_drift",
+        "speed": "slow",
+        "direction": "none",
+        "magnitude": "minimal"
+      },
+      "character_motion": [
+        {
+          "verb": "speaks",
+          "magnitude": "small",
+          "character_id": "char"
+        }
+      ],
+      "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-6a20ecee7b991569632e7c2a24e078202d184448a29312e0388399c6a68f5f67_storyboard_start.png?v=1785930983530",
+      "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-6a20ecee7b991569632e7c2a24e078202d184448a29312e0388399c6a68f5f67_storyboard_end.png?v=1785930982710",
+      "characters": [
+        "char"
+      ],
+      "tag": "writer_test__sh_04_29",
+      "files": {
+        "start": "writer_test__sh_04_29__start.png",
+        "end": "writer_test__sh_04_29__end.png"
+      },
+      "characterViews": [
+        {
+          "character_id": "char",
+          "name": "소녀",
+          "appearance": "teenager, stocky build, desert-style outfit made of wrapped cloth scraps",
+          "views": {
+            "view_main": "writer_test__sh_04_29__char_view_main.png",
+            "view_main__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1785927467632",
+            "view_side_left": null,
+            "view_side_right": null,
+            "view_back": null,
+            "portrait": "writer_test__sh_04_29__char_portrait.png",
+            "portrait__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_portrait.png?v=1785927470579"
+          }
+        }
+      ],
+      "locationViews": [
+        {
+          "location_id": "location",
+          "name": "폐허 도시",
+          "visual_description": "Ruins of high-rise buildings half-buried in sand, rusted pipes and remnants of artificial drainage infrastructure underground, yellowish-brown sandy wind",
+          "views": {
+            "wide_shot": "writer_test__sh_04_29__loc_location_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1785927460867",
+            "establishing_shot": null
+          }
+        },
+        {
+          "location_id": "location_2",
+          "name": "오아시스 왕국",
+          "visual_description": "A massive fortress built from tropical timber and wood, dense lush greenery rising like an island in the middle of a desert",
+          "views": {
+            "wide_shot": "writer_test__sh_04_29__loc_location_2_wide_shot.png",
+            "wide_shot__url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_wide_shot.png?v=1785927461588",
+            "establishing_shot": null
+          }
+        }
+      ]
+    }
+  ]
+}

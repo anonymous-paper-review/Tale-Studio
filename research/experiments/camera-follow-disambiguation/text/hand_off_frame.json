@@ -1,0 +1,314 @@
+{
+  "id": "hand_off_frame",
+  "family": "손동작",
+  "action": "그녀가 프레임 오른쪽 밖에 있는 붉은 레버를 향해 손을 뻗어 당긴다.",
+  "vizPrompt": "A woman reaches toward a red lever outside the right edge of the frame and pulls it. The camera must pan right to reveal and follow the lever.",
+  "expectedCamera": "move",
+  "expectedTypes": [
+    "pan",
+    "tracking"
+  ],
+  "expectedReason": "대상과 손이 프레임 밖에 있어 오른쪽 재구성이 필요함",
+  "model": {
+    "provider": "gemini",
+    "model": "gemini-3.6-flash"
+  },
+  "scene_id": "camera_follow_hand_off_frame",
+  "camera_intent": "motivated_move",
+  "camera_move_motivation": "프레임 우측 밖으로 향하는 인물의 손 움직임을 팬(Pan)하여 붉은 레버와 이를 당기는 전체 동작을 드러내기 위함",
+  "dynamic_spec": {
+    "shot_id": "shot_1",
+    "camera_motion": {
+      "type": "pan_right",
+      "direction": "right",
+      "speed": "slow",
+      "magnitude": "medium"
+    },
+    "character_motion": [
+      {
+        "character_id": "char",
+        "verb": "pulls",
+        "magnitude": "medium"
+      }
+    ],
+    "gaze_arc": [
+      {
+        "character_id": "char",
+        "from": "off_screen_right",
+        "to": "down_right"
+      }
+    ],
+    "environmental_change": [],
+    "transition_in": "cut",
+    "transition_out": "cut",
+    "motion_prompt": "Camera pans right following the extended hand to reveal a red lever, which the hand pulls downward."
+  },
+  "camera_type": "pan_right",
+  "shot_count": 1,
+  "selected_shot": {
+    "intent": {
+      "shot_id": "shot_1",
+      "scene_id": "camera_follow_hand_off_frame",
+      "story_beat_ref": 0,
+      "dramatic_purpose": "Track the character's focused reach and action in a single continuous shot to reveal the off-frame red lever and maintain rhythmic tension.",
+      "duration_seconds": 5,
+      "duration_justification": "Allows precise timing for the arm extension, camera pan, lever grab, and pull sequence within a single take.",
+      "audience_focus": "The character's extended hand guiding visual focus toward the red lever on the right.",
+      "shot_position_in_scene": "climax",
+      "operation": "derived",
+      "source_beats": [
+        0
+      ],
+      "shot_function": "action",
+      "rhythm_role": "sustain"
+    },
+    "static_spec": {
+      "shot_id": "shot_1",
+      "lens_mm": 50,
+      "shot_type": "MS",
+      "camera_angle": "eye_level",
+      "depth_of_field": "medium",
+      "framing": {
+        "rule": "thirds",
+        "layers": {
+          "foreground": "Soft out-of-focus studio floor reflections",
+          "midground": "Subject in a matte blue studio suit positioned on the left third reaching toward the right",
+          "background": "Minimalist neutral camera test studio wall"
+        },
+        "focal_point": "Subject's right hand extending toward the right edge of the frame"
+      },
+      "lighting": {
+        "key_fill_ratio": "3:1",
+        "color_temp_kelvin": 4500,
+        "quality": "soft",
+        "key_direction": "side_left"
+      },
+      "character_blocking": [
+        {
+          "character_id": "char",
+          "position_in_frame": "left_third",
+          "pose": "Upper body angled right with right arm extended outward toward the frame edge",
+          "gaze": "off_screen_right",
+          "asset_version": "v1"
+        }
+      ],
+      "prop_placement": [
+        {
+          "prop": "red lever",
+          "position_in_frame": "far_right",
+          "significance": "Target mechanism to be revealed and activated"
+        }
+      ],
+      "palette_emphasis": [
+        "#2E6FBB",
+        "#E85D3F",
+        "#2C3E50"
+      ],
+      "texture_notes": "Matte fabric texture on blue studio suit and clean smooth metallic surface on the red lever",
+      "color_grading_intent": "Balanced neutral studio tone emphasizing contrast between blue attire and red lever accent",
+      "first_frame_prompt": "Medium shot at eye level of an adult performer in a matte blue studio suit on the left third of a clean neutral studio, reaching a hand off-screen to the right, soft neutral 4500K side light, photorealistic 16:9 image."
+    },
+    "dynamic_spec": {
+      "shot_id": "shot_1",
+      "camera_motion": {
+        "type": "pan_right",
+        "direction": "right",
+        "speed": "slow",
+        "magnitude": "medium"
+      },
+      "character_motion": [
+        {
+          "character_id": "char",
+          "verb": "pulls",
+          "magnitude": "medium"
+        }
+      ],
+      "gaze_arc": [
+        {
+          "character_id": "char",
+          "from": "off_screen_right",
+          "to": "down_right"
+        }
+      ],
+      "environmental_change": [],
+      "transition_in": "cut",
+      "transition_out": "cut",
+      "motion_prompt": "Camera pans right following the extended hand to reveal a red lever, which the hand pulls downward."
+    }
+  },
+  "decoupage": {
+    "done": true,
+    "scenes": [
+      {
+        "scene_id": "camera_follow_hand_off_frame",
+        "beat_count": 1,
+        "shot_count": 1,
+        "coverage_ratio": 1,
+        "rhythm_profile": "단일 테이크의 호흡을 따라 손의 움직임과 레버 작동을 연속적으로 담아내는 실시간 긴장 곡선",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_1",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "The character reaches her hand off-frame to the right toward a red lever and pulls it as the camera pans right.",
+            "beat_summary_native": "그녀가 프레임 우측 바깥의 붉은 레버를 향해 손을 뻗어 당긴다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "sustain",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "프레임 우측 밖으로 향하는 인물의 손 움직임을 팬(Pan)하여 붉은 레버와 이를 당기는 전체 동작을 드러내기 위함",
+            "dramatic_purpose": "단일 롱테이크로 시선을 손의 동선에 고정하여 프레임 밖의 레버를 자연스럽게 포착하고 긴장감을 이어간다.",
+            "scene_id": "camera_follow_hand_off_frame"
+          }
+        ]
+      }
+    ],
+    "plan": {
+      "scenes": [
+        {
+          "scene_id": "camera_follow_hand_off_frame",
+          "beat_count": 1,
+          "shot_count": 1,
+          "coverage_ratio": 1,
+          "rhythm_profile": "단일 테이크의 호흡을 따라 손의 움직임과 레버 작동을 연속적으로 담아내는 실시간 긴장 곡선",
+          "uncovered_beats": [],
+          "shots": [
+            {
+              "shot_id": "shot_1",
+              "operation": "derived",
+              "shot_function": "action",
+              "source_beats": [
+                0
+              ],
+              "beat_summary": "The character reaches her hand off-frame to the right toward a red lever and pulls it as the camera pans right.",
+              "beat_summary_native": "그녀가 프레임 우측 바깥의 붉은 레버를 향해 손을 뻗어 당긴다.",
+              "shot_size": "MS",
+              "intended_duration_seconds": 5,
+              "rhythm_role": "sustain",
+              "camera_intent": "motivated_move",
+              "camera_move_motivation": "프레임 우측 밖으로 향하는 인물의 손 움직임을 팬(Pan)하여 붉은 레버와 이를 당기는 전체 동작을 드러내기 위함",
+              "dramatic_purpose": "단일 롱테이크로 시선을 손의 동선에 고정하여 프레임 밖의 레버를 자연스럽게 포착하고 긴장감을 이어간다.",
+              "scene_id": "camera_follow_hand_off_frame"
+            }
+          ]
+        }
+      ],
+      "total_shots": 1,
+      "total_added": 0,
+      "total_merged": 0,
+      "total_split": 0,
+      "director_notes": "camera_follow_hand_off_frame: 1beats→1shots (단일 테이크의 호흡을 따라 손의 움직임과 레버 작동을 연속적으로 담아내는 실시간 긴장 곡선)"
+    }
+  },
+  "shot_design": {
+    "done": true,
+    "doneSceneIds": [
+      "camera_follow_hand_off_frame"
+    ],
+    "shots": [
+      {
+        "intent": {
+          "shot_id": "shot_1",
+          "scene_id": "camera_follow_hand_off_frame",
+          "story_beat_ref": 0,
+          "dramatic_purpose": "Track the character's focused reach and action in a single continuous shot to reveal the off-frame red lever and maintain rhythmic tension.",
+          "duration_seconds": 5,
+          "duration_justification": "Allows precise timing for the arm extension, camera pan, lever grab, and pull sequence within a single take.",
+          "audience_focus": "The character's extended hand guiding visual focus toward the red lever on the right.",
+          "shot_position_in_scene": "climax",
+          "operation": "derived",
+          "source_beats": [
+            0
+          ],
+          "shot_function": "action",
+          "rhythm_role": "sustain"
+        },
+        "static_spec": {
+          "shot_id": "shot_1",
+          "lens_mm": 50,
+          "shot_type": "MS",
+          "camera_angle": "eye_level",
+          "depth_of_field": "medium",
+          "framing": {
+            "rule": "thirds",
+            "layers": {
+              "foreground": "Soft out-of-focus studio floor reflections",
+              "midground": "Subject in a matte blue studio suit positioned on the left third reaching toward the right",
+              "background": "Minimalist neutral camera test studio wall"
+            },
+            "focal_point": "Subject's right hand extending toward the right edge of the frame"
+          },
+          "lighting": {
+            "key_fill_ratio": "3:1",
+            "color_temp_kelvin": 4500,
+            "quality": "soft",
+            "key_direction": "side_left"
+          },
+          "character_blocking": [
+            {
+              "character_id": "char",
+              "position_in_frame": "left_third",
+              "pose": "Upper body angled right with right arm extended outward toward the frame edge",
+              "gaze": "off_screen_right",
+              "asset_version": "v1"
+            }
+          ],
+          "prop_placement": [
+            {
+              "prop": "red lever",
+              "position_in_frame": "far_right",
+              "significance": "Target mechanism to be revealed and activated"
+            }
+          ],
+          "palette_emphasis": [
+            "#2E6FBB",
+            "#E85D3F",
+            "#2C3E50"
+          ],
+          "texture_notes": "Matte fabric texture on blue studio suit and clean smooth metallic surface on the red lever",
+          "color_grading_intent": "Balanced neutral studio tone emphasizing contrast between blue attire and red lever accent",
+          "first_frame_prompt": "Medium shot at eye level of an adult performer in a matte blue studio suit on the left third of a clean neutral studio, reaching a hand off-screen to the right, soft neutral 4500K side light, photorealistic 16:9 image."
+        },
+        "dynamic_spec": {
+          "shot_id": "shot_1",
+          "camera_motion": {
+            "type": "pan_right",
+            "direction": "right",
+            "speed": "slow",
+            "magnitude": "medium"
+          },
+          "character_motion": [
+            {
+              "character_id": "char",
+              "verb": "pulls",
+              "magnitude": "medium"
+            }
+          ],
+          "gaze_arc": [
+            {
+              "character_id": "char",
+              "from": "off_screen_right",
+              "to": "down_right"
+            }
+          ],
+          "environmental_change": [],
+          "transition_in": "cut",
+          "transition_out": "cut",
+          "motion_prompt": "Camera pans right following the extended hand to reveal a red lever, which the hand pulls downward."
+        }
+      }
+    ]
+  },
+  "video_prompt": "Motion contract: Camera: pan right slow toward screen right — on-screen content flows toward screen left. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"pulls\" — a clear movement that completes; gaze turns from off screen right to down right. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A woman reaches toward a red lever outside the right edge of the frame and pulls it. The camera must pan right to reveal and follow the lever.",
+  "video_prompt_parts": {
+    "prompt": "A woman reaches toward a red lever outside the right edge of the frame and pulls it. The camera must pan right to reveal and follow the lever.",
+    "movement": "",
+    "gear": "",
+    "camera": "",
+    "motionContract": "Motion contract: Camera: pan right slow toward screen right — on-screen content flows toward screen left. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"pulls\" — a clear movement that completes; gaze turns from off screen right to down right. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract."
+  }
+}

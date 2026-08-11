@@ -1,0 +1,311 @@
+{
+  "id": "hand_in_frame",
+  "family": "손동작",
+  "action": "그녀가 프레임 안에 놓인 붉은 레버를 손으로 천천히 당긴다.",
+  "vizPrompt": "A woman slowly pulls a red lever that is fully visible inside the frame. Keep the entire hand and lever operation in view.",
+  "expectedCamera": "static",
+  "expectedTypes": [
+    "static"
+  ],
+  "expectedReason": "손과 레버의 동작이 같은 프레임 안에서 끝남",
+  "model": {
+    "provider": "gemini",
+    "model": "gemini-3.6-flash"
+  },
+  "scene_id": "camera_follow_hand_in_frame",
+  "camera_intent": "static",
+  "camera_move_motivation": null,
+  "dynamic_spec": {
+    "shot_id": "shot_1",
+    "camera_motion": {
+      "type": "static",
+      "direction": "none",
+      "speed": "static",
+      "magnitude": "none"
+    },
+    "character_motion": [
+      {
+        "character_id": "char",
+        "verb": "pulls",
+        "magnitude": "medium"
+      }
+    ],
+    "gaze_arc": [
+      {
+        "character_id": "char",
+        "from": "downward_at_lever",
+        "to": "downward_at_lever"
+      }
+    ],
+    "environmental_change": [],
+    "transition_in": "cut",
+    "transition_out": "cut",
+    "motion_prompt": "The character slowly pulls the red lever downward in a smooth motion."
+  },
+  "camera_type": "static",
+  "shot_count": 1,
+  "selected_shot": {
+    "intent": {
+      "shot_id": "shot_1",
+      "scene_id": "camera_follow_hand_in_frame",
+      "story_beat_ref": 0,
+      "dramatic_purpose": "Capture the deliberate action of pulling the red lever within the frame to convey the character's focused emotion under static observation.",
+      "duration_seconds": 5,
+      "duration_justification": "5 seconds allows sufficient time for a smooth, deliberate hand motion pulling the lever from start to finish.",
+      "audience_focus": "The character's hand gripping and pulling the mechanical red lever.",
+      "shot_position_in_scene": "climax",
+      "operation": "derived",
+      "source_beats": [
+        0
+      ],
+      "shot_function": "action",
+      "rhythm_role": "sustain"
+    },
+    "static_spec": {
+      "shot_id": "shot_1",
+      "lens_mm": 50,
+      "shot_type": "CU",
+      "camera_angle": "eye_level",
+      "depth_of_field": "shallow",
+      "framing": {
+        "rule": "center",
+        "layers": {
+          "foreground": "Clean edge of the technical control surface",
+          "midground": "Character's hand gripping a bright red mechanical lever mounted on a neutral studio panel",
+          "background": "Softly blurred camera test room wall with cool blue studio accent tone"
+        },
+        "focal_point": "The hand gripping the red lever"
+      },
+      "lighting": {
+        "key_fill_ratio": "3:1",
+        "color_temp_kelvin": 4500,
+        "quality": "soft",
+        "key_direction": "top_left"
+      },
+      "character_blocking": [
+        {
+          "character_id": "char",
+          "position_in_frame": "center",
+          "pose": "Hand resting firmly on the top grip of the red lever, sleeve of matte blue studio suit visible",
+          "gaze": "downward_at_lever",
+          "asset_version": "v1"
+        }
+      ],
+      "prop_placement": [
+        {
+          "prop": "red_lever",
+          "position_in_frame": "center",
+          "significance": "Primary functional interaction target in the frame"
+        }
+      ],
+      "palette_emphasis": [
+        "#2E6FBB",
+        "#E85D3F",
+        "#38B56C"
+      ],
+      "texture_notes": "Clean painted metal finish on the red lever contrasted against the matte fabric sleeve of the blue studio costume.",
+      "color_grading_intent": "Neutral technical studio tone with vivid warm accent on the red lever and cool ambient backdrop.",
+      "first_frame_prompt": "A tight close-up shot of an adult performer's hand in a matte blue studio suit reaching for a vibrant red mechanical lever mounted on a clean neutral panel. Soft 4500K key light creates clear highlights on the lever surface, with a shallow depth of field rendering the camera test room background soft."
+    },
+    "dynamic_spec": {
+      "shot_id": "shot_1",
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "none"
+      },
+      "character_motion": [
+        {
+          "character_id": "char",
+          "verb": "pulls",
+          "magnitude": "medium"
+        }
+      ],
+      "gaze_arc": [
+        {
+          "character_id": "char",
+          "from": "downward_at_lever",
+          "to": "downward_at_lever"
+        }
+      ],
+      "environmental_change": [],
+      "transition_in": "cut",
+      "transition_out": "cut",
+      "motion_prompt": "The character slowly pulls the red lever downward in a smooth motion."
+    }
+  },
+  "decoupage": {
+    "done": true,
+    "scenes": [
+      {
+        "scene_id": "camera_follow_hand_in_frame",
+        "beat_count": 1,
+        "shot_count": 1,
+        "coverage_ratio": 1,
+        "rhythm_profile": "고요함 속에서 붉은 레버를 당기는 인물의 행동과 조용한 긴장감에 온전히 집중하는 지속적인 서스펜스",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_1",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "She slowly pulls the red lever placed in the frame with her hand.",
+            "beat_summary_native": "그녀가 프레임 안에 놓인 붉은 레버를 손으로 천천히 당긴다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "손과 붉은 레버의 움직임이 프레임 안에서 완결되는 조용한 동작을 고정 카메라로 밀도 있게 잡아내어 인물의 집중된 감정을 전달함.",
+            "scene_id": "camera_follow_hand_in_frame"
+          }
+        ]
+      }
+    ],
+    "plan": {
+      "scenes": [
+        {
+          "scene_id": "camera_follow_hand_in_frame",
+          "beat_count": 1,
+          "shot_count": 1,
+          "coverage_ratio": 1,
+          "rhythm_profile": "고요함 속에서 붉은 레버를 당기는 인물의 행동과 조용한 긴장감에 온전히 집중하는 지속적인 서스펜스",
+          "uncovered_beats": [],
+          "shots": [
+            {
+              "shot_id": "shot_1",
+              "operation": "derived",
+              "shot_function": "action",
+              "source_beats": [
+                0
+              ],
+              "beat_summary": "She slowly pulls the red lever placed in the frame with her hand.",
+              "beat_summary_native": "그녀가 프레임 안에 놓인 붉은 레버를 손으로 천천히 당긴다.",
+              "shot_size": "CU",
+              "intended_duration_seconds": 5,
+              "rhythm_role": "sustain",
+              "camera_intent": "static",
+              "dramatic_purpose": "손과 붉은 레버의 움직임이 프레임 안에서 완결되는 조용한 동작을 고정 카메라로 밀도 있게 잡아내어 인물의 집중된 감정을 전달함.",
+              "scene_id": "camera_follow_hand_in_frame"
+            }
+          ]
+        }
+      ],
+      "total_shots": 1,
+      "total_added": 0,
+      "total_merged": 0,
+      "total_split": 0,
+      "director_notes": "camera_follow_hand_in_frame: 1beats→1shots (고요함 속에서 붉은 레버를 당기는 인물의 행동과 조용한 긴장감에 온전히 집중하는 지속적인 서스펜스)"
+    }
+  },
+  "shot_design": {
+    "done": true,
+    "doneSceneIds": [
+      "camera_follow_hand_in_frame"
+    ],
+    "shots": [
+      {
+        "intent": {
+          "shot_id": "shot_1",
+          "scene_id": "camera_follow_hand_in_frame",
+          "story_beat_ref": 0,
+          "dramatic_purpose": "Capture the deliberate action of pulling the red lever within the frame to convey the character's focused emotion under static observation.",
+          "duration_seconds": 5,
+          "duration_justification": "5 seconds allows sufficient time for a smooth, deliberate hand motion pulling the lever from start to finish.",
+          "audience_focus": "The character's hand gripping and pulling the mechanical red lever.",
+          "shot_position_in_scene": "climax",
+          "operation": "derived",
+          "source_beats": [
+            0
+          ],
+          "shot_function": "action",
+          "rhythm_role": "sustain"
+        },
+        "static_spec": {
+          "shot_id": "shot_1",
+          "lens_mm": 50,
+          "shot_type": "CU",
+          "camera_angle": "eye_level",
+          "depth_of_field": "shallow",
+          "framing": {
+            "rule": "center",
+            "layers": {
+              "foreground": "Clean edge of the technical control surface",
+              "midground": "Character's hand gripping a bright red mechanical lever mounted on a neutral studio panel",
+              "background": "Softly blurred camera test room wall with cool blue studio accent tone"
+            },
+            "focal_point": "The hand gripping the red lever"
+          },
+          "lighting": {
+            "key_fill_ratio": "3:1",
+            "color_temp_kelvin": 4500,
+            "quality": "soft",
+            "key_direction": "top_left"
+          },
+          "character_blocking": [
+            {
+              "character_id": "char",
+              "position_in_frame": "center",
+              "pose": "Hand resting firmly on the top grip of the red lever, sleeve of matte blue studio suit visible",
+              "gaze": "downward_at_lever",
+              "asset_version": "v1"
+            }
+          ],
+          "prop_placement": [
+            {
+              "prop": "red_lever",
+              "position_in_frame": "center",
+              "significance": "Primary functional interaction target in the frame"
+            }
+          ],
+          "palette_emphasis": [
+            "#2E6FBB",
+            "#E85D3F",
+            "#38B56C"
+          ],
+          "texture_notes": "Clean painted metal finish on the red lever contrasted against the matte fabric sleeve of the blue studio costume.",
+          "color_grading_intent": "Neutral technical studio tone with vivid warm accent on the red lever and cool ambient backdrop.",
+          "first_frame_prompt": "A tight close-up shot of an adult performer's hand in a matte blue studio suit reaching for a vibrant red mechanical lever mounted on a clean neutral panel. Soft 4500K key light creates clear highlights on the lever surface, with a shallow depth of field rendering the camera test room background soft."
+        },
+        "dynamic_spec": {
+          "shot_id": "shot_1",
+          "camera_motion": {
+            "type": "static",
+            "direction": "none",
+            "speed": "static",
+            "magnitude": "none"
+          },
+          "character_motion": [
+            {
+              "character_id": "char",
+              "verb": "pulls",
+              "magnitude": "medium"
+            }
+          ],
+          "gaze_arc": [
+            {
+              "character_id": "char",
+              "from": "downward_at_lever",
+              "to": "downward_at_lever"
+            }
+          ],
+          "environmental_change": [],
+          "transition_in": "cut",
+          "transition_out": "cut",
+          "motion_prompt": "The character slowly pulls the red lever downward in a smooth motion."
+        }
+      }
+    ]
+  },
+  "video_prompt": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: subject 1: \"pulls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A woman slowly pulls a red lever that is fully visible inside the frame. Keep the entire hand and lever operation in view.",
+  "video_prompt_parts": {
+    "prompt": "A woman slowly pulls a red lever that is fully visible inside the frame. Keep the entire hand and lever operation in view.",
+    "movement": "",
+    "gear": "",
+    "camera": "",
+    "motionContract": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: subject 1: \"pulls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract."
+  }
+}

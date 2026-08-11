@@ -1,0 +1,42 @@
+{
+  "shot_id": "sh_04_29",
+  "character_id": "char",
+  "jobs": [
+    {
+      "view": "sideLeft",
+      "request_id": "019ff075-bdb5-7a23-8dc5-b78019c746bc",
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The same character as the reference image, 소녀. left-side profile view, the character facing left at 90 degrees. teenager, stocky build, desert-style outfit made of wrapped cloth scraps. identical character, identical outfit and proportions to the reference, full body, single character, neutral grey background, even studio lighting, no text, no logo",
+      "reference_image_urls": [
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1785927467632",
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/us_cartoon.png"
+      ],
+      "url": "https://v3b.fal.media/files/b/0aa5e658/4pSpzs_6ITiqxx013fjMa_8kLJX5sp.png",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/assets/generated_sh_04_29_char_sideLeft.png"
+    },
+    {
+      "view": "sideRight",
+      "request_id": "019ff075-be74-7793-b4b4-510f998fe1f5",
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The same character as the reference image, 소녀. right-side profile view, the character facing right at 90 degrees. teenager, stocky build, desert-style outfit made of wrapped cloth scraps. identical character, identical outfit and proportions to the reference, full body, single character, neutral grey background, even studio lighting, no text, no logo",
+      "reference_image_urls": [
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1785927467632",
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/us_cartoon.png"
+      ],
+      "url": "https://v3b.fal.media/files/b/0aa5e658/2bMurlV3yK3vLLROxb7s1_OBsVCh58.png",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/assets/generated_sh_04_29_char_sideRight.png"
+    },
+    {
+      "view": "back",
+      "request_id": "019ff075-bf2d-7523-af5a-6b2cce49150e",
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The same character as the reference image, 소녀. back view, the character seen from directly behind. teenager, stocky build, desert-style outfit made of wrapped cloth scraps. identical character, identical outfit and proportions to the reference, full body, single character, neutral grey background, even studio lighting, no text, no logo",
+      "reference_image_urls": [
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1785927467632",
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/us_cartoon.png"
+      ],
+      "url": "https://v3b.fal.media/files/b/0aa5e658/dkXM7g-jGkIDtDCSS42ju_MWP4tYtI.png",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/assets/generated_sh_04_29_char_back.png"
+    }
+  ]
+}

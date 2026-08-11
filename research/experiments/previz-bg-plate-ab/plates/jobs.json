@@ -1,0 +1,40 @@
+{
+  "jobs": [
+    {
+      "route": "i2i",
+      "request_id": "019ff08f-a731-7dc1-863d-7cdda6e42cc1",
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "Remove the person from this image completely, leaving the empty location behind. Keep everything else EXACTLY as it is: the same camera position and framing, the same tilted concrete slabs, the same scattered rubble, the same ruined buildings on the horizon, the same sky, the same light and the same drawing style. Fill the area where the person was with the ground and rubble that would naturally be behind her. Do not add any new object, figure, text or effect. This is a clean background plate of the same shot.",
+      "reference_image_urls": [
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-64f97433ccd98f64c6e87fddaffb2f29548912e6d2e5634436f292f4b58e76e5_storyboard_start.png?v=1785938348311"
+      ],
+      "url": "https://v3b.fal.media/files/b/0aa5e701/NsV_U38bYMbScsrVmjJPk_Crx9ghYI.png",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-bg-plate-ab/plates/plate_i2i.png"
+    },
+    {
+      "route": "i2i2",
+      "request_id": "019ff091-f898-7561-95fc-b3bcc9990ef2",
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "Remove the person from this image completely, leaving the empty location behind. Keep everything else EXACTLY as it is: the same camera position and framing, the same tilted concrete slabs, the same scattered rubble, the same ruined buildings on the horizon, the same sky, the same light and the same drawing style. Fill the area where the person was with the ground and rubble that would naturally be behind her. Do not add any new object, figure, text or effect. This is a clean background plate of the same shot. The last reference image sets the visual style ONLY — match its medium, its line quality, its shading and its colour grade exactly; do not reproduce its subject.",
+      "reference_image_urls": [
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-64f97433ccd98f64c6e87fddaffb2f29548912e6d2e5634436f292f4b58e76e5_storyboard_start.png?v=1785938348311",
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/stop_motion.png"
+      ],
+      "url": "https://v3b.fal.media/files/b/0aa5e711/ImzyCh2MBPMFyHrzZMzb6_ietb40aX.png",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-bg-plate-ab/plates/plate_i2i2.png"
+    },
+    {
+      "route": "repaint",
+      "request_id": "019ff0a3-fd32-7813-acd1-d9da24fc7078",
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a grey untextured 3D blockout of a location: it defines the geometry, the camera angle and the layout — keep every shape exactly where it is, do not move, add or remove anything. Repaint it as a finished background plate of a ruined, sand-swept city: give the blocks the material of broken concrete slabs and rubble, add the ground and the sky, and match the art style, the line quality, the palette and the lighting mood of the OTHER reference images. No people, no characters, no text, no logos — this is an empty background plate.",
+      "reference_image_urls": [
+        "https://v3b.fal.media/files/b/0aa5e786/0WDF62xBoIheFsQtaqr1S_blockout_grey.png",
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1785933272620",
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/stop_motion.png"
+      ],
+      "url": "https://v3b.fal.media/files/b/0aa5e787/uRB2lvSpQjfP7iOQAR91J_gwuqbDSk.png",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-bg-plate-ab/plates/plate_repaint.png"
+    }
+  ]
+}

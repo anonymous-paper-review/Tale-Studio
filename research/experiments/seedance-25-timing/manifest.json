@@ -1,0 +1,173 @@
+{
+  "purpose": "Seedance 2.5가 프롬프트의 초 단위 시간표를 지키는지 3암 관찰 — TC(타임코드) / SEQ(순서만) / CTL(시간표 없음). 판정·점수 없음",
+  "model": "bytedance/seedance-2.5/reference-to-video",
+  "model_note": "2.5는 제품 레지스트리 미등록(src/lib/video-models.ts는 2.0만). endpoint·duration 타입만 로컬 선언, 나머지 축은 제품 spec 추종.",
+  "shot_id": "sh_04_16",
+  "baseline_2_0": {
+    "clip": "research/experiments/previz-video-reference-ab/qual3-timed/out_t3d.mp4",
+    "note": "동일 START·동일 블록아웃·동일 기본 계약문 + 초 단위 안무(0.0-1.0/1.0-2.0/2.0-7.0s, 슬래시 표기). 실측 스윙 3.0→4.25~4.5s (지시 1.0~2.0s)",
+    "notes_file": "research/experiments/previz-video-reference-ab/qual3-timed/notes.md"
+  },
+  "prompt_sources": [
+    {
+      "arm": "TC",
+      "file": "research/experiments/seedance-25-timing/inputs/prompt_tc.txt",
+      "label": "타임코드 — [0-1s]/[1-2s]/[2-7s] (Runware 2.5 표기법)"
+    },
+    {
+      "arm": "SEQ",
+      "file": "research/experiments/seedance-25-timing/inputs/prompt_seq.txt",
+      "label": "순서형 — 초 없이 First/Then/Finally"
+    },
+    {
+      "arm": "CTL",
+      "file": "research/experiments/seedance-25-timing/inputs/prompt_ctl.txt",
+      "label": "대조 — 안무 블록 없음 (동결 기본 계약문 단독)"
+    }
+  ],
+  "prompt_invariant": "3암 모두 1문단(동결 기본 모션 계약문)이 ../previz-video-reference-ab/qualitative/inputs/prompt.txt 와 바이트 동일. 차이는 뒤에 붙는 안무 블록의 시간 표기법뿐.",
+  "timetable_source": "research/experiments/previz-video-reference-ab/qual2-fullmotion/blockout_v2.py — phase A t<1.0 정면(r 6.0→4.8) / phase B 1.0≤t<2.0 스윙(φ 0→-90°, smoothstep, r 4.8→6.0) / phase C t≥2.0 측면 동속 트래킹(φ=-90°, r=6.0)",
+  "start_ref_source": "research/experiments/previz-video-reference-ab/qualitative/manifest.json#jobs[arm=a].input.image_urls[0]",
+  "start_ref_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_start.png?v=1786191704774",
+  "blockout_reused": {
+    "source": "research/experiments/previz-video-reference-ab/qual2-fullmotion/manifest.json#blockout.fal_url",
+    "fal_url": "https://v3b.fal.media/files/b/0aa5dc04/Y3zKvOCZmpQSRU99pxnTn_blockout_v2_sh_04_16.mp4",
+    "note": "재사용 — Blender 실행·재업로드 없음. 2.0 베이스라인(T3D)과 동일 영상 참조라 2.0↔2.5 직접 비교 가능"
+  },
+  "pricing_source": "fal.ai/models/bytedance/seedance-2.5/reference-to-video (2026-08-11 실측): \"$0.0214 per 1000 tokens\", \"If any video references are provided, the price is multiplied by 0.6\" → 720p ~$0.4730/s(영상참조 없음) / ~$0.2838/s(영상참조 있음), 오디오 무료",
+  "budget_cap_usd": 12,
+  "max_retry_per_arm": 1,
+  "jobs": [
+    {
+      "arm": "TC",
+      "attempt": 1,
+      "label": "타임코드 — [0-1s]/[1-2s]/[2-7s] (Runware 2.5 표기법)",
+      "request_id": "019fef96-fa9c-7432-b505-be9dcb8708dd",
+      "endpoint": "bytedance/seedance-2.5/reference-to-video",
+      "duration_seconds": 7,
+      "est_cost_usd": 1.9866,
+      "rate_per_sec_usd": 0.2838,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nCamera choreography, timed:\n[0-1s] the camera is head-on in front of the girl at chest height, looking straight back down the corridor at her, with the doorway she has just cleared behind her shoulders; it retreats along the corridor slightly slower than she runs, so the gap between them closes from about 6 m to about 4.8 m and she grows larger in frame; its angle, its height and its roll do not change during this second.\n[1-2s] the camera arcs a smooth quarter circle around her, from head-on to a full side-on profile at her right, easing into and out of the arc so the swing is fastest around 1.5s; while it swings, its distance opens from about 4.8 m back out to about 6 m and its height stays the same, and it stays aimed at her for the whole swing, so she turns from facing the lens to running toward screen right.\n[2-7s] the camera holds that side-on profile: it stays a constant 6 m to her side and travels laterally at exactly her running speed, so she keeps the same size in the middle of the frame while the corridor walls and pillars stream from screen right to screen left; no further change of angle, distance, height or speed after 2.0s, and this lateral tracking continues unbroken through the final frame at 7.0s.",
+        "duration": "7",
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_start.png?v=1786191704774"
+        ],
+        "video_urls": [
+          "https://v3b.fal.media/files/b/0aa5dc04/Y3zKvOCZmpQSRU99pxnTn_blockout_v2_sh_04_16.mp4"
+        ]
+      },
+      "submitted_at": "2026-08-11T06:51:17.107Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e0ca/w7bQ-Ow19dokB5IHL5Aie_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/seedance-25-timing/out_tc.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "fps": "24/1",
+        "duration_s": 7.072,
+        "bytes": 3285500,
+        "preview": "preview/tc_preview.mp4",
+        "tile_1fps": "frames/tc_1fps.jpg",
+        "tiles_4fps": [
+          "frames/tc_0-3s_4fps.jpg",
+          "frames/tc_2.75-5.25s_4fps.jpg",
+          "frames/tc_5-7s_4fps.jpg"
+        ],
+        "first_frame": "frames/tc_f0.jpg",
+        "last_frame": "frames/tc_last.jpg"
+      },
+      "confirmed_cost_usd": 1.9866
+    },
+    {
+      "arm": "SEQ",
+      "attempt": 1,
+      "label": "순서형 — 초 없이 First/Then/Finally",
+      "request_id": "019fef96-fb5a-7660-bbb2-b996687bcbfc",
+      "endpoint": "bytedance/seedance-2.5/reference-to-video",
+      "duration_seconds": 7,
+      "est_cost_usd": 1.9866,
+      "rate_per_sec_usd": 0.2838,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nCamera choreography, in order:\nFirst, the camera is head-on in front of the girl at chest height, looking straight back down the corridor at her, with the doorway she has just cleared behind her shoulders; it retreats along the corridor slightly slower than she runs, so the gap between them closes from about 6 m to about 4.8 m and she grows larger in frame; its angle, its height and its roll do not change during this opening beat.\nThen, the camera arcs a smooth quarter circle around her, from head-on to a full side-on profile at her right, easing into and out of the arc so the swing is fastest at the midpoint of the arc; while it swings, its distance opens from about 4.8 m back out to about 6 m and its height stays the same, and it stays aimed at her for the whole swing, so she turns from facing the lens to running toward screen right.\nFinally, the camera holds that side-on profile: it stays a constant 6 m to her side and travels laterally at exactly her running speed, so she keeps the same size in the middle of the frame while the corridor walls and pillars stream from screen right to screen left; no further change of angle, distance, height or speed after the arc completes, and this lateral tracking continues unbroken through the final frame.",
+        "duration": "7",
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_start.png?v=1786191704774"
+        ],
+        "video_urls": [
+          "https://v3b.fal.media/files/b/0aa5dc04/Y3zKvOCZmpQSRU99pxnTn_blockout_v2_sh_04_16.mp4"
+        ]
+      },
+      "submitted_at": "2026-08-11T06:51:17.295Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e0c5/jLd7_vQH0rV05s2vAuO_h_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/seedance-25-timing/out_seq.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "fps": "24/1",
+        "duration_s": 7.072,
+        "bytes": 3285190,
+        "preview": "preview/seq_preview.mp4",
+        "tile_1fps": "frames/seq_1fps.jpg",
+        "tiles_4fps": [
+          "frames/seq_0-3s_4fps.jpg",
+          "frames/seq_2.75-5.25s_4fps.jpg",
+          "frames/seq_5-7s_4fps.jpg"
+        ],
+        "first_frame": "frames/seq_f0.jpg",
+        "last_frame": "frames/seq_last.jpg"
+      },
+      "confirmed_cost_usd": 1.9866
+    },
+    {
+      "arm": "CTL",
+      "attempt": 1,
+      "label": "대조 — 안무 블록 없음 (동결 기본 계약문 단독)",
+      "request_id": "019fef96-fc15-7c11-842a-9a359d0910d4",
+      "endpoint": "bytedance/seedance-2.5/reference-to-video",
+      "duration_seconds": 7,
+      "est_cost_usd": 1.9866,
+      "rate_per_sec_usd": 0.2838,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.",
+        "duration": "7",
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-28e3ec710eae6472856df0f255c89c5da500d5de7bcc2a780596f79df6ba1c2f_storyboard_start.png?v=1786191704774"
+        ],
+        "video_urls": [
+          "https://v3b.fal.media/files/b/0aa5dc04/Y3zKvOCZmpQSRU99pxnTn_blockout_v2_sh_04_16.mp4"
+        ]
+      },
+      "submitted_at": "2026-08-11T06:51:17.483Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e0da/VJaIG2SXRj5iZS2bxMyJq_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/seedance-25-timing/out_ctl.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "fps": "24/1",
+        "duration_s": 7.072,
+        "bytes": 3126303,
+        "preview": "preview/ctl_preview.mp4",
+        "tile_1fps": "frames/ctl_1fps.jpg",
+        "tiles_4fps": [
+          "frames/ctl_0-3s_4fps.jpg",
+          "frames/ctl_2.75-5.25s_4fps.jpg",
+          "frames/ctl_5-7s_4fps.jpg"
+        ],
+        "first_frame": "frames/ctl_f0.jpg",
+        "last_frame": "frames/ctl_last.jpg"
+      },
+      "confirmed_cost_usd": 1.9866
+    }
+  ],
+  "total_cost_usd": 5.9598,
+  "cost_note": "단가는 fal 2.5 모델 페이지 2026-08-11 실측(720p + video 참조 $0.2838/s, 오디오 무료). fal에 요청별 청구 조회 API가 없어 비용 = 단가 × 발주 duration(7s)로 확정."
+}

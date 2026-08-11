@@ -1,0 +1,313 @@
+{
+  "id": "reaction_push_in",
+  "family": "감정",
+  "action": "그녀의 충격을 얼굴이 점점 화면을 채우는 고립된 반응으로 보여준다.",
+  "vizPrompt": "A woman freezes in shock. Slowly dolly in so her isolated reaction grows to fill the frame; the changing facial scale is the camera purpose.",
+  "expectedCamera": "move",
+  "expectedTypes": [
+    "dolly_in"
+  ],
+  "expectedReason": "감정을 얼굴의 배율 변화로 보여주기 위해 돌리 인이 필요함",
+  "model": {
+    "provider": "gemini",
+    "model": "gemini-3.6-flash"
+  },
+  "scene_id": "camera_follow_reaction_push_in",
+  "camera_intent": "motivated_move",
+  "camera_move_motivation": "Slow push-in toward her face to visually manifest her escalating internal shock and emotional isolation.",
+  "dynamic_spec": {
+    "shot_id": "shot_1",
+    "camera_motion": {
+      "type": "dolly_in",
+      "direction": "forward",
+      "speed": "slow",
+      "magnitude": "moderate"
+    },
+    "character_motion": [
+      {
+        "character_id": "char",
+        "verb": "trembles",
+        "magnitude": "small"
+      }
+    ],
+    "gaze_arc": [
+      {
+        "character_id": "char",
+        "from": "straight_ahead",
+        "to": "slightly_down"
+      }
+    ],
+    "environmental_change": [],
+    "transition_in": "cut",
+    "transition_out": "cut",
+    "motion_prompt": "Camera slowly dollies in on her face as she trembles in shock."
+  },
+  "camera_type": "dolly_in",
+  "shot_count": 1,
+  "selected_shot": {
+    "intent": {
+      "shot_id": "shot_1",
+      "scene_id": "camera_follow_reaction_push_in",
+      "story_beat_ref": 0,
+      "dramatic_purpose": "Visually emphasize internal shock and isolation through a sustained single-take slow push in on her face.",
+      "duration_seconds": 5,
+      "duration_justification": "A 5-second duration provides sufficient time for the slow dolly movement to gradually frame her emotional state.",
+      "audience_focus": "Her eyes and subtle facial expression as intense shock sets in.",
+      "shot_position_in_scene": "opening",
+      "operation": "derived",
+      "source_beats": [
+        0
+      ],
+      "shot_function": "reaction",
+      "rhythm_role": "sustain"
+    },
+    "static_spec": {
+      "shot_id": "shot_1",
+      "lens_mm": 50,
+      "shot_type": "MCU",
+      "camera_angle": "eye_level",
+      "depth_of_field": "shallow",
+      "framing": {
+        "rule": "center_subject",
+        "layers": {
+          "foreground": "Edge of the clean studio floor and a green target marker",
+          "midground": "Subject standing motionless in a matte blue studio suit",
+          "background": "Minimalist neutral studio room background wall softly out of focus"
+        },
+        "focal_point": "Her eyes reflecting sudden emotional shock"
+      },
+      "lighting": {
+        "key_fill_ratio": "3:1",
+        "color_temp_kelvin": 4500,
+        "quality": "soft",
+        "key_direction": "front_left"
+      },
+      "character_blocking": [
+        {
+          "character_id": "char",
+          "position_in_frame": "center",
+          "pose": "Standing rigid with shoulders slightly tense in shock",
+          "gaze": "straight_ahead",
+          "asset_version": "v1"
+        }
+      ],
+      "prop_placement": [
+        {
+          "prop": "green target marker",
+          "position_in_frame": "lower_third",
+          "significance": "Provides spatial anchoring on the neutral studio floor"
+        }
+      ],
+      "palette_emphasis": [
+        "#2E6FBB",
+        "#E85D3F",
+        "#38B56C"
+      ],
+      "texture_notes": "Photorealistic fabric texture on matte blue studio suit and soft realistic skin grain.",
+      "color_grading_intent": "Cool neutral studio tones emphasizing saturated primary accents against clean slate background.",
+      "first_frame_prompt": "A medium close-up shot at eye level of an adult subject wearing a matte blue studio suit inside a neutral studio room. Soft 4500K lighting casts gentle shadows on her shocked face. In the foreground, a green target marker lies on the clean studio floor, while the neutral background dissolves into shallow depth of field shot on a 50mm lens."
+    },
+    "dynamic_spec": {
+      "shot_id": "shot_1",
+      "camera_motion": {
+        "type": "dolly_in",
+        "direction": "forward",
+        "speed": "slow",
+        "magnitude": "moderate"
+      },
+      "character_motion": [
+        {
+          "character_id": "char",
+          "verb": "trembles",
+          "magnitude": "small"
+        }
+      ],
+      "gaze_arc": [
+        {
+          "character_id": "char",
+          "from": "straight_ahead",
+          "to": "slightly_down"
+        }
+      ],
+      "environmental_change": [],
+      "transition_in": "cut",
+      "transition_out": "cut",
+      "motion_prompt": "Camera slowly dollies in on her face as she trembles in shock."
+    }
+  },
+  "decoupage": {
+    "done": true,
+    "scenes": [
+      {
+        "scene_id": "camera_follow_reaction_push_in",
+        "beat_count": 1,
+        "shot_count": 1,
+        "coverage_ratio": 1,
+        "rhythm_profile": "Sustained slow push-in deepening emotional isolation and focus",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_1",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "Slow push in on her face as she reacts with overwhelming shock, isolating her in space.",
+            "beat_summary_native": "그녀의 충격을 얼굴이 점점 화면을 채우는 고립된 반응으로 보여준다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "sustain",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "Slow push-in toward her face to visually manifest her escalating internal shock and emotional isolation.",
+            "dramatic_purpose": "단일 롱테이크 서서히 다가가는 카메라 움직임을 통해 인물의 내면적 충격과 고립감을 시각적으로 극대화한다.",
+            "scene_id": "camera_follow_reaction_push_in"
+          }
+        ]
+      }
+    ],
+    "plan": {
+      "scenes": [
+        {
+          "scene_id": "camera_follow_reaction_push_in",
+          "beat_count": 1,
+          "shot_count": 1,
+          "coverage_ratio": 1,
+          "rhythm_profile": "Sustained slow push-in deepening emotional isolation and focus",
+          "uncovered_beats": [],
+          "shots": [
+            {
+              "shot_id": "shot_1",
+              "operation": "derived",
+              "shot_function": "reaction",
+              "source_beats": [
+                0
+              ],
+              "beat_summary": "Slow push in on her face as she reacts with overwhelming shock, isolating her in space.",
+              "beat_summary_native": "그녀의 충격을 얼굴이 점점 화면을 채우는 고립된 반응으로 보여준다.",
+              "shot_size": "MCU",
+              "intended_duration_seconds": 5,
+              "rhythm_role": "sustain",
+              "camera_intent": "motivated_move",
+              "camera_move_motivation": "Slow push-in toward her face to visually manifest her escalating internal shock and emotional isolation.",
+              "dramatic_purpose": "단일 롱테이크 서서히 다가가는 카메라 움직임을 통해 인물의 내면적 충격과 고립감을 시각적으로 극대화한다.",
+              "scene_id": "camera_follow_reaction_push_in"
+            }
+          ]
+        }
+      ],
+      "total_shots": 1,
+      "total_added": 0,
+      "total_merged": 0,
+      "total_split": 0,
+      "director_notes": "camera_follow_reaction_push_in: 1beats→1shots (Sustained slow push-in deepening emotional isolation and focus)"
+    }
+  },
+  "shot_design": {
+    "done": true,
+    "doneSceneIds": [
+      "camera_follow_reaction_push_in"
+    ],
+    "shots": [
+      {
+        "intent": {
+          "shot_id": "shot_1",
+          "scene_id": "camera_follow_reaction_push_in",
+          "story_beat_ref": 0,
+          "dramatic_purpose": "Visually emphasize internal shock and isolation through a sustained single-take slow push in on her face.",
+          "duration_seconds": 5,
+          "duration_justification": "A 5-second duration provides sufficient time for the slow dolly movement to gradually frame her emotional state.",
+          "audience_focus": "Her eyes and subtle facial expression as intense shock sets in.",
+          "shot_position_in_scene": "opening",
+          "operation": "derived",
+          "source_beats": [
+            0
+          ],
+          "shot_function": "reaction",
+          "rhythm_role": "sustain"
+        },
+        "static_spec": {
+          "shot_id": "shot_1",
+          "lens_mm": 50,
+          "shot_type": "MCU",
+          "camera_angle": "eye_level",
+          "depth_of_field": "shallow",
+          "framing": {
+            "rule": "center_subject",
+            "layers": {
+              "foreground": "Edge of the clean studio floor and a green target marker",
+              "midground": "Subject standing motionless in a matte blue studio suit",
+              "background": "Minimalist neutral studio room background wall softly out of focus"
+            },
+            "focal_point": "Her eyes reflecting sudden emotional shock"
+          },
+          "lighting": {
+            "key_fill_ratio": "3:1",
+            "color_temp_kelvin": 4500,
+            "quality": "soft",
+            "key_direction": "front_left"
+          },
+          "character_blocking": [
+            {
+              "character_id": "char",
+              "position_in_frame": "center",
+              "pose": "Standing rigid with shoulders slightly tense in shock",
+              "gaze": "straight_ahead",
+              "asset_version": "v1"
+            }
+          ],
+          "prop_placement": [
+            {
+              "prop": "green target marker",
+              "position_in_frame": "lower_third",
+              "significance": "Provides spatial anchoring on the neutral studio floor"
+            }
+          ],
+          "palette_emphasis": [
+            "#2E6FBB",
+            "#E85D3F",
+            "#38B56C"
+          ],
+          "texture_notes": "Photorealistic fabric texture on matte blue studio suit and soft realistic skin grain.",
+          "color_grading_intent": "Cool neutral studio tones emphasizing saturated primary accents against clean slate background.",
+          "first_frame_prompt": "A medium close-up shot at eye level of an adult subject wearing a matte blue studio suit inside a neutral studio room. Soft 4500K lighting casts gentle shadows on her shocked face. In the foreground, a green target marker lies on the clean studio floor, while the neutral background dissolves into shallow depth of field shot on a 50mm lens."
+        },
+        "dynamic_spec": {
+          "shot_id": "shot_1",
+          "camera_motion": {
+            "type": "dolly_in",
+            "direction": "forward",
+            "speed": "slow",
+            "magnitude": "moderate"
+          },
+          "character_motion": [
+            {
+              "character_id": "char",
+              "verb": "trembles",
+              "magnitude": "small"
+            }
+          ],
+          "gaze_arc": [
+            {
+              "character_id": "char",
+              "from": "straight_ahead",
+              "to": "slightly_down"
+            }
+          ],
+          "environmental_change": [],
+          "transition_in": "cut",
+          "transition_out": "cut",
+          "motion_prompt": "Camera slowly dollies in on her face as she trembles in shock."
+        }
+      }
+    ]
+  },
+  "video_prompt": "Motion contract: Camera: dollies in slow — the framing grows steadily tighter on the subject. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"trembles\" — a small, restrained movement; gaze turns from straight ahead to slightly down. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. A woman freezes in shock. Slowly dolly in so her isolated reaction grows to fill the frame; the changing facial scale is the camera purpose.",
+  "video_prompt_parts": {
+    "prompt": "A woman freezes in shock. Slowly dolly in so her isolated reaction grows to fill the frame; the changing facial scale is the camera purpose.",
+    "movement": "",
+    "gear": "",
+    "camera": "",
+    "motionContract": "Motion contract: Camera: dollies in slow — the framing grows steadily tighter on the subject. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"trembles\" — a small, restrained movement; gaze turns from straight ahead to slightly down. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract."
+  }
+}

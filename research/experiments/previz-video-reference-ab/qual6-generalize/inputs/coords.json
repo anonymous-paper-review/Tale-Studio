@@ -1,0 +1,122 @@
+[
+  {
+    "id": "S1",
+    "axis": "다른 이야기 — 이동 계열(러프 라벨 TRACKING FORWARD)",
+    "shot_id": "sh_05_38",
+    "project_id": "9d6efa6d-3216-40b0-8a2c-184ab56f02ec",
+    "duration": 5,
+    "source": "previz-channel-ablation/run/label_scan.json(러프 DIRECTION 실판독 kind=both, labels=[\"TRACKING FORWARD (MEDIUM)\", …]) + live DB shots/writer_runs(design_ref 조인)",
+    "scene_text": "Jung Su-rim fixes Kim Yo-han with an icy stare, then steers Cho Seung-woo swiftly into the courthouse.",
+    "dynamic_spec": {
+      "shot_id": "shot_37",
+      "gaze_arc": [
+        {
+          "to": "forward",
+          "from": "char_2",
+          "character_id": "char_3"
+        }
+      ],
+      "camera_motion": {
+        "type": "tracking",
+        "speed": "medium",
+        "direction": "forward",
+        "magnitude": "moderate"
+      },
+      "motion_prompt": "The camera tracks forward as Jung and Cho walk away into the building.",
+      "transition_in": "cut",
+      "transition_out": "fade_out",
+      "character_motion": [
+        {
+          "verb": "walks away",
+          "magnitude": "large",
+          "character_id": "char_3"
+        }
+      ],
+      "environmental_change": []
+    },
+    "start_ref_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-daf4692c7119076d0032b1315a2a5134d231ad12c549d6907637f869ca9c146e_storyboard_start.png?v=1786076950527",
+    "start_local": "inputs/S1_start.jpg",
+    "frozen_prompt": null,
+    "checks": {
+      "shot_duration_seconds_db": 10,
+      "duration_used": 5,
+      "duration_note": "예산 하드캡 $14 안에 팔당 재시도 1회분을 남기려 10s → 5s 로 축소(계약문은 축소된 초로 재컴파일)"
+    }
+  },
+  {
+    "id": "S2",
+    "axis": "다른 움직임 — dolly_in(발견 인서트)",
+    "shot_id": "sh_01_02",
+    "project_id": "6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a",
+    "duration": 5,
+    "source": "ti2v-camera-cap-recheck/provenance.json#jobs[key=sh_01_02__T1]",
+    "scene_text": "After brushing off the dust, a dented tin can is revealed. The girl exhales a ragged breath mixed with exhausted disappointment.",
+    "dynamic_spec": {
+      "shot_id": "sh_01_02",
+      "camera_motion": {
+        "type": "dolly_in",
+        "speed": "slow",
+        "magnitude": "moderate"
+      },
+      "character_motion": [
+        {
+          "character_id": "girl",
+          "verb": "brushes dust off the tin can and exhales",
+          "magnitude": "small"
+        }
+      ],
+      "motion_prompt": ""
+    },
+    "start_ref_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/6d66cacd-7f10-47c8-9c0e-b7f5bc6faa2a/shots/v1-2e9decf4fc51c41a261229ce59d920d32056dcb1566d7ab7343d2e2db7d07f70_storyboard_start.png?v=1786116388143",
+    "start_local": "inputs/S2_start.jpg",
+    "frozen_prompt": "Motion contract: Camera: dollies in slow — the framing grows steadily tighter on the subject. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"brushes dust off the tin can and exhales\" — a small, restrained movement. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. After brushing off the dust, a dented tin can is revealed. The girl exhales a ragged breath mixed with exhausted disappointment.",
+    "checks": {
+      "shot_duration_seconds_db": 5,
+      "duration_used": 5,
+      "duration_note": "샷 duration 그대로",
+      "recompiled_matches_frozen": true,
+      "frozen_tail_dropped": "",
+      "note": "재컴파일 계약문이 동결 프롬프트의 머리와 문자열 일치 — 좌표 검산 통과"
+    }
+  },
+  {
+    "id": "S3",
+    "axis": "다른 연출 — STATIC HOLD(정지 유지)",
+    "shot_id": "sh_02_10",
+    "project_id": "9d6efa6d-3216-40b0-8a2c-184ab56f02ec",
+    "duration": 8,
+    "source": "previz-channel-ablation/run/manifest.json#jobs.A2[sh_02_10/start_only/r1]",
+    "scene_text": "Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.. shot on Arri Alexa, 35mm, f/2.8, white balance 5600K",
+    "dynamic_spec": {
+      "shot_id": "shot_9",
+      "gaze_arc": [],
+      "camera_motion": {
+        "type": "static",
+        "speed": "none",
+        "direction": "none",
+        "magnitude": "none"
+      },
+      "motion_prompt": "Dust motes drift slowly in the light.",
+      "transition_in": "fade_in",
+      "transition_out": "cut",
+      "character_motion": [],
+      "environmental_change": [
+        {
+          "type": "lighting_flicker",
+          "description": "Subtle movement of dust motes in the light."
+        }
+      ]
+    },
+    "start_ref_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_storyboard_start.png?v=1786023978615",
+    "start_local": "inputs/S3_start.jpg",
+    "frozen_prompt": "Motion contract: Camera: LOCKED tripod shot — absolutely zero camera movement for the entire clip: no pan, no drift, no zoom, no push-in. Subjects: environment: lighting flicker (moderate). Pace the motion across the full 8-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.. shot on Arri Alexa, 35mm, f/2.8, white balance 5600K",
+    "checks": {
+      "shot_duration_seconds_db": 8,
+      "duration_used": 8,
+      "duration_note": "샷 duration 그대로",
+      "recompiled_matches_frozen": true,
+      "frozen_tail_dropped": "",
+      "note": "재컴파일 계약문이 동결 프롬프트의 머리와 문자열 일치 — 좌표 검산 통과"
+    }
+  }
+]

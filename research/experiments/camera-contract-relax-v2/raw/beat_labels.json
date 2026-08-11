@@ -1,0 +1,1203 @@
+{
+  "judge": {
+    "provider": "gemini",
+    "model": "gemini-3.6-flash",
+    "temperature": 0
+  },
+  "system_prompt": "당신은 영상 연출 분석가다. 아래는 어떤 이야기의 \"내러티브 비트\" 목록이다 — 각 비트는 한 문장으로 쓰인 사건이다.\n각 비트에 대해 **이 사건을 화면에 담으려면 카메라가 움직여야 하는가**를 판정하라.\n\n판정 기준:\n- \"모션 요구\"(needs_motion=true): 피사체가 공간을 가로지르거나(달리기·추격·퇴장·진입·낙하·비산), 사건이 한 프레임에 안 담겨 카메라가 따라가거나 드러내야 하거나(리빌·발견·공간 확장), 물리적 규모/힘이 밀려오는 사건.\n- \"정적\"(needs_motion=false): 사건이 프레임 안에서 완결되는 것 — 표정·시선·대사·대치·응시·소품 클로즈업·미세한 반응.\n\n주의: 감정이 강한지 여부가 아니라 **공간적 이동/전개가 있는지**로 판정한다. 판단이 애매하면 false 로 한다.\n각 비트를 독립적으로 판정하라. 출력은 입력에 준 모든 인덱스를 빠짐없이 포함해야 한다.\n\n[출력 형식 - JSON]\n{\"labels\":[{\"i\":<입력 인덱스>,\"needs_motion\":true|false,\"reason\":\"10자 내외 근거\"}]}",
+  "user_prompts": [
+    "[비트 목록]\n[0] 져니가 망원경 렌즈에 눈을 밀착한다\n[1] 노트에 달의 위상을 정교하게 그린다\n[2] 망원경 너머 달 표면에서 밝은 섬광이 폭발한다\n[3] 져니가 깜짝 놀라 뒤로 물러난다\n[4] 다시 눈을 비비고 렌즈를 들여다본다\n[5] 달의 일부분이 떨어져 나가며 파편이 비산한다\n[6] 져니의 눈동자가 공포로 커진다\n[7] 망원경에서 떨어져 방 문으로 달려간다\n[8] 방 안의 천체 포스터들이 미세하게 흔들린다\n[9] 져니가 숨을 헐떡이며 연구실 문을 벌컥 연다\n[10] 어머니가 태블릿 화면에서 눈을 떼지 않는다\n[11] 져니가 어머니의 소매를 붙잡고 창밖을 가리킨다\n[12] 어머니가 귀찮은 듯 안경을 고쳐 쓴다\n[13] 책상 위에 쌓인 서류 더미를 정리하며 한숨을 쉰다\n[14] 져니가 횡설수설하며 달의 파괴를 설명한다\n[15] 어머니가 져니의 어깨를 밀어내며 다시 화면을 본다\n[16] 식어버린 커피잔을 한 모금 마신다\n[17] 져니가 절망적인 표정으로 연구실을 나간다\n[18] 져니가 침대에 걸터앉아 고개를 숙이고 있다\n[19] 아버지가 플란넬 셔츠 소매를 걷으며 들어온다\n[20] 거친 손으로 져니의 머리를 쓰다듬는다\n[21] 져니가 그린 달의 파괴 스케치를 유심히 본다\n[22] 아버지가 창밖의 밤하늘을 진지하게 응시한다\n[23] 부츠 소리를 내며 망원경 앞으로 다가간다\n[24] 져니에게 미소를 지으며 엄지를 치켜세운다\n[25] 져니의 표정이 조금 밝아진다\n[26] 아버지가 방 불을 끄고 나간다\n[27] 아버지가 부두 끝에서 바다를 바라본다\n[28] 바닷물이 비정상적으로 빠르게 빠져나간다\n[29] 드러난 갯벌 위로 물고기들이 파닥거린다\n[30] 아버지가 무전기를 꺼내 다급하게 외친다\n[31] 멀리 수평선에서 거대한 흰 벽 같은 파도가 나타난다\n[32] 부두의 컨테이너들이 삐걱거리며 흔들린다\n[33] 아버지가 뒤를 돌아 달려가려 하지만 발이 엉킨다\n[34] 거대한 물보라가 부두 전체를 덮친다\n[35] 아버지가 들고 있던 무전기가 바닥에 떨어져 침수된다\n[36] 화면이 물거품으로 가득 차며 암전된다\n[37] 어머니가 텅 빈 연구실에서 남편의 유품을 정리한다\n[38] 져니가 두고 간 낡은 관측 노트를 발견한다\n[39] 노트 속 수치와 자신의 태블릿 데이터를 대조한다\n\n위 40개 비트 전부를 판정해 JSON 으로 출력하라.",
+    "[비트 목록]\n[40] 어머니의 손이 떨리며 안경을 벗는다\n[41] 화이트보드에 급하게 새로운 수식을 적어 내려간다\n[42] 계산 결과가 절망적인 파멸을 가리킨다\n[43] 어머니가 입을 막고 주저앉는다\n[44] 져니가 문가에서 어머니를 슬프게 바라본다\n[45] 어머니가 져니를 끌어안고 오열한다\n[46] 어머니가 화려한 회의실 연단에 선다\n[47] 달의 질량 변화와 중력 이상 그래프를 화면에 띄운다\n[48] 정장 차림의 관리들이 서로 귓속말을 하며 비웃는다\n[49] 어머니가 다급하게 다음 슬라이드를 넘긴다\n[50] 중앙의 관리가 손을 들어 어머니의 말을 끊는다\n[51] 회의실 문이 열리고 보안 요원들이 들어온다\n[52] 어머니가 서류 뭉치를 꽉 쥐며 항변한다\n[53] 관리들이 하나둘 자리에서 일어나 나간다\n[54] 텅 빈 회의실에 어머니 혼자 남겨진다\n[55] 어머니가 회의장 건물 밖으로 걸어 나온다\n[56] 하늘이 기이한 보랏빛과 붉은빛으로 뒤섞여 있다\n[57] 갑자기 차가운 돌풍이 불어와 서류들이 날아간다\n[58] 사람들이 하늘을 보며 웅성거리기 시작한다\n[59] 어머니가 휴대폰을 꺼내 져니에게 전화를 건다\n[60] 신호음만 가고 연결되지 않는다\n[61] 멀리서 사이렌 소리가 울려 퍼진다\n[62] 어머니가 불안한 눈빛으로 주위를 두리번거린다\n[63] 부두의 거대 크레인이 종잇장처럼 꺾인다\n[64] 사람들이 비명을 지르며 높은 곳으로 달려간다\n[65] 수십 미터 높이의 파도가 방파제를 넘어온다\n[66] 주차된 차량들이 파도에 휩쓸려 장난감처럼 떠다닌다\n[67] 컨테이너들이 부딪히며 굉음을 낸다\n[68] 항만 관제탑이 힘없이 무너져 내린다\n[69] 바닷물이 도심 깊숙이 밀려 들어간다\n[70] 검은 연기가 여기저기서 피어오른다\n[71] 모든 소리가 거대한 물소리에 묻힌다\n[72] 연구실 천장에서 먼지와 파편이 떨어진다\n[73] 어머니가 흔들리는 책상을 붙잡고 타이핑한다\n[74] 컴퓨터 모니터가 지지직거리며 꺼지려 한다\n[75] 어머니가 외장 하드를 서버에 연결한다\n[76] 진동이 심해지며 책꽂이가 뒤로 넘어진다\n[77] 전송 바가 천천히 올라가는 것을 응시한다\n[78] 어머니가 마지막으로 남편의 사진을 손에 쥔다\n[79] 전송 완료 메시지가 뜨자 안도의 미소를 짓는다\n\n위 40개 비트 전부를 판정해 JSON 으로 출력하라.",
+    "[비트 목록]\n[80] 큰 굉음과 함께 연구실 천장이 무너져 내린다\n[81] 져니가 젖은 후드티 차림으로 빗속을 달린다\n[82] 옆 건물 유리가 깨지며 파편이 비처럼 쏟아진다\n[83] 사람들이 서로를 밀치며 지하도로 대피한다\n[84] 져니가 넘어졌다가 다시 일어나 가방을 챙긴다\n[85] 가방 속에서 망원경 부품이 부딪히는 소리가 난다\n[86] 거대한 지진운이 밤하늘을 가로지른다\n[87] 땅이 갈라지며 가로등이 쓰러진다\n[88] 져니가 어둠 속으로 몸을 숨긴다\n[89] 안개 낀 새벽, 져니가 무너진 벽 뒤에서 깨어난다\n[90] 온몸이 진흙과 먼지로 뒤덮여 있다\n[91] 주변은 기분 나쁠 정도로 조용하다\n[92] 져니가 주머니에서 부서진 안경을 꺼내본다\n[93] 어머니의 연구소 방향을 바라보지만 연기만 가득하다\n[94] 져니가 마른침을 삼키며 배낭 끈을 조인다\n[95] 멀리서 개 짖는 소리만 공허하게 들린다\n[96] 져니가 힘겹게 한 걸음을 내딛는다\n[97] 파괴된 파리의 에펠탑이 반쯤 기울어져 있다\n[98] 뉴욕의 마천루들이 침수되어 꼭대기만 보인다\n[99] 사막에 폭설이 내리는 기이한 광경이 펼쳐진다\n[100] 사람들이 식량을 찾아 폐허를 뒤진다\n[101] 군인들이 버려진 탱크 옆에서 망연자실해 있다\n[102] 라디오에서 지직거리는 잡음만 흘러나온다\n[103] 지구의 자전축이 뒤틀리며 태양 위치가 바뀐다\n[104] 인류의 찬란했던 불빛들이 하나둘 꺼진다\n[105] 져니가 벽이 날아간 자신의 방으로 들어선다\n[106] 바닥에 흩어진 별자리 포스터들을 밟는다\n[107] 침대 밑에 숨겨두었던 망원경 가방을 찾아낸다\n[108] 어머니와 찍은 가족사진 액자를 가슴에 품는다\n[109] 창틀에 걸린 아버지의 플란넬 셔츠를 챙긴다\n[110] 져니가 마지막으로 방을 둘러보고 뒤돌아선다\n[111] 노을이 지는 지평선은 이전보다 훨씬 붉다\n[112] 져니가 텅 빈 고속도로 위를 혼자 걷는다\n[113] 버려진 차들이 끝없이 늘어서 있다\n[114] 가로등 대신 밤하늘의 별들이 비정상적으로 밝게 빛난다\n[115] 져니가 잠시 멈춰 서서 물 한 모금을 마신다\n[116] 발소리가 고요한 폐허 속에 크게 울린다\n[117] 무너진 전광판에는 '대피 요망'이라는 글자만 박혀 있다\n[118] 져니가 높은 언덕을 향해 묵묵히 올라간다\n[119] 밤바람이 져니의 헝클어진 머리카락을 흩뜨린다\n\n위 40개 비트 전부를 판정해 JSON 으로 출력하라.",
+    "[비트 목록]\n[120] 그의 눈은 오직 저 높은 곳만을 향해 있다\n[121] 져니가 언덕 정상의 평평한 바위 위에 짐을 푼다\n[122] 떨리는 손으로 망원경 삼각대를 세운다\n[123] 망원경 경통을 조심스럽게 결합한다\n[124] 렌즈에 묻은 먼지를 소매로 정성껏 닦아낸다\n[125] 아래로 보이는 도시는 불빛 하나 없이 어둡다\n[126] 져니가 심호흡을 하며 마음을 가다듬는다\n[127] 아버지의 셔츠를 어깨에 걸쳐 추위를 견딘다\n[128] 망원경의 각도를 하늘 높이 조절한다\n[129] 나사 하나하나를 꽉 조여 고정한다\n[130] 져니가 접안렌즈에 천천히 눈을 가져다 댄다\n[131] 초점을 맞추기 위해 다이얼을 미세하게 돌린다\n[132] 그의 눈동자에 차가운 달빛이 반사된다\n[133] 져니의 손가락이 미세하게 떨린다\n[134] 주변의 풀벌레 소리조차 들리지 않는 정적이 흐른다\n[135] 져니가 눈을 감았다가 다시 크게 뜬다\n[136] 망원경 너머의 풍경이 선명해지기 시작한다\n[137] 져니의 입술이 경련하듯 파르르 떨린다\n[138] 그는 이제 도망치지 않고 진실을 응시한다\n[139] 망원경 뷰파인더에 비친 달은 더 이상 둥글지 않다\n[140] 거대한 조각이 떨어져 나가 흉측하게 일그러진 달의 형상\n[141] 달 주위를 띠처럼 두르고 있는 수많은 파편 고리\n[142] 져니의 뺨을 타고 눈물 한 방울이 흘러내린다\n[143] 카메라가 져니의 눈에서 점점 멀어지며 하늘로 향한다\n[144] 밤하늘 전체가 파괴된 달의 잔해로 가득 차 있다\n[145] 져니는 미동도 없이 그 풍경을 지켜본다\n[146] 어둠 속에 잠긴 지구 위로 일그러진 달빛이 쏟아진다\n[147] 화면이 서서히 암전되며 정적만 남는다\n\n위 28개 비트 전부를 판정해 JSON 으로 출력하라."
+  ],
+  "batch_size": 40,
+  "beat_count": 148,
+  "missing_indices": [],
+  "beats": [
+    {
+      "gi": 0,
+      "scene_id": "scene_1",
+      "li": 0,
+      "text": "져니가 망원경 렌즈에 눈을 밀착한다",
+      "needs_motion": false,
+      "reason": "제자리에서 눈 밀착"
+    },
+    {
+      "gi": 1,
+      "scene_id": "scene_1",
+      "li": 1,
+      "text": "노트에 달의 위상을 정교하게 그린다",
+      "needs_motion": false,
+      "reason": "노트 작성 클로즈업"
+    },
+    {
+      "gi": 2,
+      "scene_id": "scene_1",
+      "li": 2,
+      "text": "망원경 너머 달 표면에서 밝은 섬광이 폭발한다",
+      "needs_motion": true,
+      "reason": "달 표면 폭발 발생"
+    },
+    {
+      "gi": 3,
+      "scene_id": "scene_1",
+      "li": 3,
+      "text": "져니가 깜짝 놀라 뒤로 물러난다",
+      "needs_motion": true,
+      "reason": "놀라서 뒤로 물러남"
+    },
+    {
+      "gi": 4,
+      "scene_id": "scene_1",
+      "li": 4,
+      "text": "다시 눈을 비비고 렌즈를 들여다본다",
+      "needs_motion": false,
+      "reason": "제자리에서 렌즈 관찰"
+    },
+    {
+      "gi": 5,
+      "scene_id": "scene_1",
+      "li": 5,
+      "text": "달의 일부분이 떨어져 나가며 파편이 비산한다",
+      "needs_motion": true,
+      "reason": "달 파편 비산"
+    },
+    {
+      "gi": 6,
+      "scene_id": "scene_1",
+      "li": 6,
+      "text": "져니의 눈동자가 공포로 커진다",
+      "needs_motion": false,
+      "reason": "눈동자 표정 클로즈업"
+    },
+    {
+      "gi": 7,
+      "scene_id": "scene_1",
+      "li": 7,
+      "text": "망원경에서 떨어져 방 문으로 달려간다",
+      "needs_motion": true,
+      "reason": "방 문으로 달려감"
+    },
+    {
+      "gi": 8,
+      "scene_id": "scene_1",
+      "li": 8,
+      "text": "방 안의 천체 포스터들이 미세하게 흔들린다",
+      "needs_motion": false,
+      "reason": "포스터의 미세한 흔들림"
+    },
+    {
+      "gi": 9,
+      "scene_id": "scene_2",
+      "li": 0,
+      "text": "져니가 숨을 헐떡이며 연구실 문을 벌컥 연다",
+      "needs_motion": true,
+      "reason": "문을 열고 공간 진입"
+    },
+    {
+      "gi": 10,
+      "scene_id": "scene_2",
+      "li": 1,
+      "text": "어머니가 태블릿 화면에서 눈을 떼지 않는다",
+      "needs_motion": false,
+      "reason": "태블릿 시선 고정"
+    },
+    {
+      "gi": 11,
+      "scene_id": "scene_2",
+      "li": 2,
+      "text": "져니가 어머니의 소매를 붙잡고 창밖을 가리킨다",
+      "needs_motion": false,
+      "reason": "제자리에서 창밖 가리킴"
+    },
+    {
+      "gi": 12,
+      "scene_id": "scene_2",
+      "li": 3,
+      "text": "어머니가 귀찮은 듯 안경을 고쳐 쓴다",
+      "needs_motion": false,
+      "reason": "안경 고쳐 쓰는 정적 동작"
+    },
+    {
+      "gi": 13,
+      "scene_id": "scene_2",
+      "li": 4,
+      "text": "책상 위에 쌓인 서류 더미를 정리하며 한숨을 쉰다",
+      "needs_motion": false,
+      "reason": "책상 위 서류 정리"
+    },
+    {
+      "gi": 14,
+      "scene_id": "scene_2",
+      "li": 5,
+      "text": "져니가 횡설수설하며 달의 파괴를 설명한다",
+      "needs_motion": false,
+      "reason": "제자리 대사 전달"
+    },
+    {
+      "gi": 15,
+      "scene_id": "scene_2",
+      "li": 6,
+      "text": "어머니가 져니의 어깨를 밀어내며 다시 화면을 본다",
+      "needs_motion": false,
+      "reason": "어깨 밀어내는 소폭 동작"
+    },
+    {
+      "gi": 16,
+      "scene_id": "scene_2",
+      "li": 7,
+      "text": "식어버린 커피잔을 한 모금 마신다",
+      "needs_motion": false,
+      "reason": "커피 마시는 정적 동작"
+    },
+    {
+      "gi": 17,
+      "scene_id": "scene_2",
+      "li": 8,
+      "text": "져니가 절망적인 표정으로 연구실을 나간다",
+      "needs_motion": true,
+      "reason": "연구실 밖으로 퇴장"
+    },
+    {
+      "gi": 18,
+      "scene_id": "scene_3",
+      "li": 0,
+      "text": "져니가 침대에 걸터앉아 고개를 숙이고 있다",
+      "needs_motion": false,
+      "reason": "침대에 앉아있는 정적 자세"
+    },
+    {
+      "gi": 19,
+      "scene_id": "scene_3",
+      "li": 1,
+      "text": "아버지가 플란넬 셔츠 소매를 걷으며 들어온다",
+      "needs_motion": true,
+      "reason": "방 안으로 들어옴"
+    },
+    {
+      "gi": 20,
+      "scene_id": "scene_3",
+      "li": 2,
+      "text": "거친 손으로 져니의 머리를 쓰다듬는다",
+      "needs_motion": false,
+      "reason": "머리 쓰다듬는 정적 동작"
+    },
+    {
+      "gi": 21,
+      "scene_id": "scene_3",
+      "li": 3,
+      "text": "져니가 그린 달의 파괴 스케치를 유심히 본다",
+      "needs_motion": false,
+      "reason": "스케치 소품 응시"
+    },
+    {
+      "gi": 22,
+      "scene_id": "scene_3",
+      "li": 4,
+      "text": "아버지가 창밖의 밤하늘을 진지하게 응시한다",
+      "needs_motion": false,
+      "reason": "밤하늘 시선 응시"
+    },
+    {
+      "gi": 23,
+      "scene_id": "scene_3",
+      "li": 5,
+      "text": "부츠 소리를 내며 망원경 앞으로 다가간다",
+      "needs_motion": true,
+      "reason": "망원경 앞으로 다가감"
+    },
+    {
+      "gi": 24,
+      "scene_id": "scene_3",
+      "li": 6,
+      "text": "져니에게 미소를 지으며 엄지를 치켜세운다",
+      "needs_motion": false,
+      "reason": "미소 및 제스처"
+    },
+    {
+      "gi": 25,
+      "scene_id": "scene_3",
+      "li": 7,
+      "text": "져니의 표정이 조금 밝아진다",
+      "needs_motion": false,
+      "reason": "표정 변화 클로즈업"
+    },
+    {
+      "gi": 26,
+      "scene_id": "scene_3",
+      "li": 8,
+      "text": "아버지가 방 불을 끄고 나간다",
+      "needs_motion": true,
+      "reason": "불 끄고 공간 퇴장"
+    },
+    {
+      "gi": 27,
+      "scene_id": "scene_4",
+      "li": 0,
+      "text": "아버지가 부두 끝에서 바다를 바라본다",
+      "needs_motion": false,
+      "reason": "바다 응시 자세"
+    },
+    {
+      "gi": 28,
+      "scene_id": "scene_4",
+      "li": 1,
+      "text": "바닷물이 비정상적으로 빠르게 빠져나간다",
+      "needs_motion": true,
+      "reason": "바닷물의 대규모 이동"
+    },
+    {
+      "gi": 29,
+      "scene_id": "scene_4",
+      "li": 2,
+      "text": "드러난 갯벌 위로 물고기들이 파닥거린다",
+      "needs_motion": false,
+      "reason": "갯벌 위 물고기 움직임"
+    },
+    {
+      "gi": 30,
+      "scene_id": "scene_4",
+      "li": 3,
+      "text": "아버지가 무전기를 꺼내 다급하게 외친다",
+      "needs_motion": false,
+      "reason": "제자리에서 무전 외침"
+    },
+    {
+      "gi": 31,
+      "scene_id": "scene_4",
+      "li": 4,
+      "text": "멀리 수평선에서 거대한 흰 벽 같은 파도가 나타난다",
+      "needs_motion": true,
+      "reason": "거대한 파도 등장"
+    },
+    {
+      "gi": 32,
+      "scene_id": "scene_4",
+      "li": 5,
+      "text": "부두의 컨테이너들이 삐걱거리며 흔들린다",
+      "needs_motion": false,
+      "reason": "컨테이너의 미세 흔들림"
+    },
+    {
+      "gi": 33,
+      "scene_id": "scene_4",
+      "li": 6,
+      "text": "아버지가 뒤를 돌아 달려가려 하지만 발이 엉킨다",
+      "needs_motion": true,
+      "reason": "뒤로 달려가는 이동"
+    },
+    {
+      "gi": 34,
+      "scene_id": "scene_4",
+      "li": 7,
+      "text": "거대한 물보라가 부두 전체를 덮친다",
+      "needs_motion": true,
+      "reason": "거대한 물보라의 덮침"
+    },
+    {
+      "gi": 35,
+      "scene_id": "scene_4",
+      "li": 8,
+      "text": "아버지가 들고 있던 무전기가 바닥에 떨어져 침수된다",
+      "needs_motion": true,
+      "reason": "무전기 바닥 낙하"
+    },
+    {
+      "gi": 36,
+      "scene_id": "scene_4",
+      "li": 9,
+      "text": "화면이 물거품으로 가득 차며 암전된다",
+      "needs_motion": true,
+      "reason": "물거품의 화면 확장"
+    },
+    {
+      "gi": 37,
+      "scene_id": "scene_5",
+      "li": 0,
+      "text": "어머니가 텅 빈 연구실에서 남편의 유품을 정리한다",
+      "needs_motion": false,
+      "reason": "제자리에서 유품 정리"
+    },
+    {
+      "gi": 38,
+      "scene_id": "scene_5",
+      "li": 1,
+      "text": "져니가 두고 간 낡은 관측 노트를 발견한다",
+      "needs_motion": true,
+      "reason": "노트 발견 및 리빌"
+    },
+    {
+      "gi": 39,
+      "scene_id": "scene_5",
+      "li": 2,
+      "text": "노트 속 수치와 자신의 태블릿 데이터를 대조한다",
+      "needs_motion": false,
+      "reason": "데이터 대조 및 응시"
+    },
+    {
+      "gi": 40,
+      "scene_id": "scene_5",
+      "li": 3,
+      "text": "어머니의 손이 떨리며 안경을 벗는다",
+      "needs_motion": false,
+      "reason": "인물의 제스처 클로즈업"
+    },
+    {
+      "gi": 41,
+      "scene_id": "scene_5",
+      "li": 4,
+      "text": "화이트보드에 급하게 새로운 수식을 적어 내려간다",
+      "needs_motion": false,
+      "reason": "화이트보드 필기 동작"
+    },
+    {
+      "gi": 42,
+      "scene_id": "scene_5",
+      "li": 5,
+      "text": "계산 결과가 절망적인 파멸을 가리킨다",
+      "needs_motion": false,
+      "reason": "계산 결과 화면 정지"
+    },
+    {
+      "gi": 43,
+      "scene_id": "scene_5",
+      "li": 6,
+      "text": "어머니가 입을 막고 주저앉는다",
+      "needs_motion": true,
+      "reason": "바닥으로 주저앉는 하강"
+    },
+    {
+      "gi": 44,
+      "scene_id": "scene_5",
+      "li": 7,
+      "text": "져니가 문가에서 어머니를 슬프게 바라본다",
+      "needs_motion": false,
+      "reason": "인물의 시선과 표정"
+    },
+    {
+      "gi": 45,
+      "scene_id": "scene_5",
+      "li": 8,
+      "text": "어머니가 져니를 끌어안고 오열한다",
+      "needs_motion": false,
+      "reason": "두 인물의 정적 포옹"
+    },
+    {
+      "gi": 46,
+      "scene_id": "scene_6",
+      "li": 0,
+      "text": "어머니가 화려한 회의실 연단에 선다",
+      "needs_motion": false,
+      "reason": "연단에 선 상태"
+    },
+    {
+      "gi": 47,
+      "scene_id": "scene_6",
+      "li": 1,
+      "text": "달의 질량 변화와 중력 이상 그래프를 화면에 띄운다",
+      "needs_motion": false,
+      "reason": "화면 그래픽 제시"
+    },
+    {
+      "gi": 48,
+      "scene_id": "scene_6",
+      "li": 2,
+      "text": "정장 차림의 관리들이 서로 귓속말을 하며 비웃는다",
+      "needs_motion": false,
+      "reason": "인물들의 표정 반응"
+    },
+    {
+      "gi": 49,
+      "scene_id": "scene_6",
+      "li": 3,
+      "text": "어머니가 다급하게 다음 슬라이드를 넘긴다",
+      "needs_motion": false,
+      "reason": "슬라이드 조작 동작"
+    },
+    {
+      "gi": 50,
+      "scene_id": "scene_6",
+      "li": 4,
+      "text": "중앙의 관리가 손을 들어 어머니의 말을 끊는다",
+      "needs_motion": false,
+      "reason": "손을 드는 제스처"
+    },
+    {
+      "gi": 51,
+      "scene_id": "scene_6",
+      "li": 5,
+      "text": "회의실 문이 열리고 보안 요원들이 들어온다",
+      "needs_motion": true,
+      "reason": "보안 요원의 공간 진입"
+    },
+    {
+      "gi": 52,
+      "scene_id": "scene_6",
+      "li": 6,
+      "text": "어머니가 서류 뭉치를 꽉 쥐며 항변한다",
+      "needs_motion": false,
+      "reason": "서류를 쥐는 제스처"
+    },
+    {
+      "gi": 53,
+      "scene_id": "scene_6",
+      "li": 7,
+      "text": "관리들이 하나둘 자리에서 일어나 나간다",
+      "needs_motion": true,
+      "reason": "인물들의 퇴장 이동"
+    },
+    {
+      "gi": 54,
+      "scene_id": "scene_6",
+      "li": 8,
+      "text": "텅 빈 회의실에 어머니 혼자 남겨진다",
+      "needs_motion": false,
+      "reason": "혼자 남은 정적 상태"
+    },
+    {
+      "gi": 55,
+      "scene_id": "scene_7",
+      "li": 0,
+      "text": "어머니가 회의장 건물 밖으로 걸어 나온다",
+      "needs_motion": true,
+      "reason": "건물 밖으로 걸어 나옴"
+    },
+    {
+      "gi": 56,
+      "scene_id": "scene_7",
+      "li": 1,
+      "text": "하늘이 기이한 보랏빛과 붉은빛으로 뒤섞여 있다",
+      "needs_motion": false,
+      "reason": "하늘 전경 정지"
+    },
+    {
+      "gi": 57,
+      "scene_id": "scene_7",
+      "li": 2,
+      "text": "갑자기 차가운 돌풍이 불어와 서류들이 날아간다",
+      "needs_motion": true,
+      "reason": "돌풍에 서류 비산"
+    },
+    {
+      "gi": 58,
+      "scene_id": "scene_7",
+      "li": 3,
+      "text": "사람들이 하늘을 보며 웅성거리기 시작한다",
+      "needs_motion": false,
+      "reason": "사람들의 시선과 반응"
+    },
+    {
+      "gi": 59,
+      "scene_id": "scene_7",
+      "li": 4,
+      "text": "어머니가 휴대폰을 꺼내 져니에게 전화를 건다",
+      "needs_motion": false,
+      "reason": "휴대폰 조작 동작"
+    },
+    {
+      "gi": 60,
+      "scene_id": "scene_7",
+      "li": 5,
+      "text": "신호음만 가고 연결되지 않는다",
+      "needs_motion": false,
+      "reason": "통화 대기 상태"
+    },
+    {
+      "gi": 61,
+      "scene_id": "scene_7",
+      "li": 6,
+      "text": "멀리서 사이렌 소리가 울려 퍼진다",
+      "needs_motion": false,
+      "reason": "사이렌 소리 청각 효과"
+    },
+    {
+      "gi": 62,
+      "scene_id": "scene_7",
+      "li": 7,
+      "text": "어머니가 불안한 눈빛으로 주위를 두리번거린다",
+      "needs_motion": false,
+      "reason": "두리번거리는 시선"
+    },
+    {
+      "gi": 63,
+      "scene_id": "scene_8",
+      "li": 0,
+      "text": "부두의 거대 크레인이 종잇장처럼 꺾인다",
+      "needs_motion": true,
+      "reason": "거대 크레인의 꺾임"
+    },
+    {
+      "gi": 64,
+      "scene_id": "scene_8",
+      "li": 1,
+      "text": "사람들이 비명을 지르며 높은 곳으로 달려간다",
+      "needs_motion": true,
+      "reason": "사람들의 대피 달리기"
+    },
+    {
+      "gi": 65,
+      "scene_id": "scene_8",
+      "li": 2,
+      "text": "수십 미터 높이의 파도가 방파제를 넘어온다",
+      "needs_motion": true,
+      "reason": "거대 파도의 넘어옴"
+    },
+    {
+      "gi": 66,
+      "scene_id": "scene_8",
+      "li": 3,
+      "text": "주차된 차량들이 파도에 휩쓸려 장난감처럼 떠다닌다",
+      "needs_motion": true,
+      "reason": "차량들의 휩쓸림과 부유"
+    },
+    {
+      "gi": 67,
+      "scene_id": "scene_8",
+      "li": 4,
+      "text": "컨테이너들이 부딪히며 굉음을 낸다",
+      "needs_motion": true,
+      "reason": "컨테이너의 충돌 이동"
+    },
+    {
+      "gi": 68,
+      "scene_id": "scene_8",
+      "li": 5,
+      "text": "항만 관제탑이 힘없이 무너져 내린다",
+      "needs_motion": true,
+      "reason": "관제탑의 무너짐"
+    },
+    {
+      "gi": 69,
+      "scene_id": "scene_8",
+      "li": 6,
+      "text": "바닷물이 도심 깊숙이 밀려 들어간다",
+      "needs_motion": true,
+      "reason": "바닷물의 도심 침투"
+    },
+    {
+      "gi": 70,
+      "scene_id": "scene_8",
+      "li": 7,
+      "text": "검은 연기가 여기저기서 피어오른다",
+      "needs_motion": true,
+      "reason": "연기의 확산과 피어오름"
+    },
+    {
+      "gi": 71,
+      "scene_id": "scene_8",
+      "li": 8,
+      "text": "모든 소리가 거대한 물소리에 묻힌다",
+      "needs_motion": false,
+      "reason": "음향 강조 연출"
+    },
+    {
+      "gi": 72,
+      "scene_id": "scene_9",
+      "li": 0,
+      "text": "연구실 천장에서 먼지와 파편이 떨어진다",
+      "needs_motion": true,
+      "reason": "천장 파편의 낙하"
+    },
+    {
+      "gi": 73,
+      "scene_id": "scene_9",
+      "li": 1,
+      "text": "어머니가 흔들리는 책상을 붙잡고 타이핑한다",
+      "needs_motion": false,
+      "reason": "책상을 잡고 타이핑"
+    },
+    {
+      "gi": 74,
+      "scene_id": "scene_9",
+      "li": 2,
+      "text": "컴퓨터 모니터가 지지직거리며 꺼지려 한다",
+      "needs_motion": false,
+      "reason": "모니터 깜빡임"
+    },
+    {
+      "gi": 75,
+      "scene_id": "scene_9",
+      "li": 3,
+      "text": "어머니가 외장 하드를 서버에 연결한다",
+      "needs_motion": false,
+      "reason": "외장하드 연결 동작"
+    },
+    {
+      "gi": 76,
+      "scene_id": "scene_9",
+      "li": 4,
+      "text": "진동이 심해지며 책꽂이가 뒤로 넘어진다",
+      "needs_motion": true,
+      "reason": "책꽂이의 넘어짐"
+    },
+    {
+      "gi": 77,
+      "scene_id": "scene_9",
+      "li": 5,
+      "text": "전송 바가 천천히 올라가는 것을 응시한다",
+      "needs_motion": false,
+      "reason": "전송 화면 응시"
+    },
+    {
+      "gi": 78,
+      "scene_id": "scene_9",
+      "li": 6,
+      "text": "어머니가 마지막으로 남편의 사진을 손에 쥔다",
+      "needs_motion": false,
+      "reason": "사진을 손에 긤"
+    },
+    {
+      "gi": 79,
+      "scene_id": "scene_9",
+      "li": 7,
+      "text": "전송 완료 메시지가 뜨자 안도의 미소를 짓는다",
+      "needs_motion": false,
+      "reason": "인물의 미소 표정"
+    },
+    {
+      "gi": 80,
+      "scene_id": "scene_9",
+      "li": 8,
+      "text": "큰 굉음과 함께 연구실 천장이 무너져 내린다",
+      "needs_motion": true,
+      "reason": "천장 붕괴 및 낙하"
+    },
+    {
+      "gi": 81,
+      "scene_id": "scene_10",
+      "li": 0,
+      "text": "져니가 젖은 후드티 차림으로 빗속을 달린다",
+      "needs_motion": true,
+      "reason": "빗속을 달리는 이동"
+    },
+    {
+      "gi": 82,
+      "scene_id": "scene_10",
+      "li": 1,
+      "text": "옆 건물 유리가 깨지며 파편이 비처럼 쏟아진다",
+      "needs_motion": true,
+      "reason": "유리 파편 비산"
+    },
+    {
+      "gi": 83,
+      "scene_id": "scene_10",
+      "li": 2,
+      "text": "사람들이 서로를 밀치며 지하도로 대피한다",
+      "needs_motion": true,
+      "reason": "군중의 대피 이동"
+    },
+    {
+      "gi": 84,
+      "scene_id": "scene_10",
+      "li": 3,
+      "text": "져니가 넘어졌다가 다시 일어나 가방을 챙긴다",
+      "needs_motion": true,
+      "reason": "넘어지고 일어나는 움직임"
+    },
+    {
+      "gi": 85,
+      "scene_id": "scene_10",
+      "li": 4,
+      "text": "가방 속에서 망원경 부품이 부딪히는 소리가 난다",
+      "needs_motion": false,
+      "reason": "가방 속 소품 및 음향"
+    },
+    {
+      "gi": 86,
+      "scene_id": "scene_10",
+      "li": 5,
+      "text": "거대한 지진운이 밤하늘을 가로지른다",
+      "needs_motion": true,
+      "reason": "하늘을 가로지르는 구름"
+    },
+    {
+      "gi": 87,
+      "scene_id": "scene_10",
+      "li": 6,
+      "text": "땅이 갈라지며 가로등이 쓰러진다",
+      "needs_motion": true,
+      "reason": "땅 갈라짐과 가로등 붕괴"
+    },
+    {
+      "gi": 88,
+      "scene_id": "scene_10",
+      "li": 7,
+      "text": "져니가 어둠 속으로 몸을 숨긴다",
+      "needs_motion": true,
+      "reason": "어둠 속으로 은신 이동"
+    },
+    {
+      "gi": 89,
+      "scene_id": "scene_11",
+      "li": 0,
+      "text": "안개 낀 새벽, 져니가 무너진 벽 뒤에서 깨어난다",
+      "needs_motion": false,
+      "reason": "깨어나는 정적 상태"
+    },
+    {
+      "gi": 90,
+      "scene_id": "scene_11",
+      "li": 1,
+      "text": "온몸이 진흙과 먼지로 뒤덮여 있다",
+      "needs_motion": false,
+      "reason": "피사체의 상태 묘사"
+    },
+    {
+      "gi": 91,
+      "scene_id": "scene_11",
+      "li": 2,
+      "text": "주변은 기분 나쁠 정도로 조용하다",
+      "needs_motion": false,
+      "reason": "정적인 분위기 묘사"
+    },
+    {
+      "gi": 92,
+      "scene_id": "scene_11",
+      "li": 3,
+      "text": "져니가 주머니에서 부서진 안경을 꺼내본다",
+      "needs_motion": false,
+      "reason": "안경을 꺼내는 소동작"
+    },
+    {
+      "gi": 93,
+      "scene_id": "scene_11",
+      "li": 4,
+      "text": "어머니의 연구소 방향을 바라보지만 연기만 가득하다",
+      "needs_motion": false,
+      "reason": "먼 곳을 바라보는 시선"
+    },
+    {
+      "gi": 94,
+      "scene_id": "scene_11",
+      "li": 5,
+      "text": "져니가 마른침을 삼키며 배낭 끈을 조인다",
+      "needs_motion": false,
+      "reason": "배낭 끈을 조이는 소동작"
+    },
+    {
+      "gi": 95,
+      "scene_id": "scene_11",
+      "li": 6,
+      "text": "멀리서 개 짖는 소리만 공허하게 들린다",
+      "needs_motion": false,
+      "reason": "원경 음향 묘사"
+    },
+    {
+      "gi": 96,
+      "scene_id": "scene_11",
+      "li": 7,
+      "text": "져니가 힘겹게 한 걸음을 내딛는다",
+      "needs_motion": false,
+      "reason": "한 걸음 내딛는 소동작"
+    },
+    {
+      "gi": 97,
+      "scene_id": "scene_12",
+      "li": 0,
+      "text": "파괴된 파리의 에펠탑이 반쯤 기울어져 있다",
+      "needs_motion": false,
+      "reason": "에펠탑 전경 묘사"
+    },
+    {
+      "gi": 98,
+      "scene_id": "scene_12",
+      "li": 1,
+      "text": "뉴욕의 마천루들이 침수되어 꼭대기만 보인다",
+      "needs_motion": false,
+      "reason": "침수된 마천루 전경"
+    },
+    {
+      "gi": 99,
+      "scene_id": "scene_12",
+      "li": 2,
+      "text": "사막에 폭설이 내리는 기이한 광경이 펼쳐진다",
+      "needs_motion": true,
+      "reason": "폭설이 내리는 기상 변화"
+    },
+    {
+      "gi": 100,
+      "scene_id": "scene_12",
+      "li": 3,
+      "text": "사람들이 식량을 찾아 폐허를 뒤진다",
+      "needs_motion": true,
+      "reason": "폐허를 뒤지는 수색 활동"
+    },
+    {
+      "gi": 101,
+      "scene_id": "scene_12",
+      "li": 4,
+      "text": "군인들이 버려진 탱크 옆에서 망연자실해 있다",
+      "needs_motion": false,
+      "reason": "군인들의 정적인 상태"
+    },
+    {
+      "gi": 102,
+      "scene_id": "scene_12",
+      "li": 5,
+      "text": "라디오에서 지직거리는 잡음만 흘러나온다",
+      "needs_motion": false,
+      "reason": "라디오 잡음 묘사"
+    },
+    {
+      "gi": 103,
+      "scene_id": "scene_12",
+      "li": 6,
+      "text": "지구의 자전축이 뒤틀리며 태양 위치가 바뀐다",
+      "needs_motion": true,
+      "reason": "태양 위치와 자전축 변화"
+    },
+    {
+      "gi": 104,
+      "scene_id": "scene_12",
+      "li": 7,
+      "text": "인류의 찬란했던 불빛들이 하나둘 꺼진다",
+      "needs_motion": true,
+      "reason": "불빛이 순차적으로 꺼짐"
+    },
+    {
+      "gi": 105,
+      "scene_id": "scene_13",
+      "li": 0,
+      "text": "져니가 벽이 날아간 자신의 방으로 들어선다",
+      "needs_motion": true,
+      "reason": "공간 내부로 진입"
+    },
+    {
+      "gi": 106,
+      "scene_id": "scene_13",
+      "li": 1,
+      "text": "바닥에 흩어진 별자리 포스터들을 밟는다",
+      "needs_motion": true,
+      "reason": "바닥을 밟으며 이동"
+    },
+    {
+      "gi": 107,
+      "scene_id": "scene_13",
+      "li": 2,
+      "text": "침대 밑에 숨겨두었던 망원경 가방을 찾아낸다",
+      "needs_motion": false,
+      "reason": "가방을 꺼내는 소동작"
+    },
+    {
+      "gi": 108,
+      "scene_id": "scene_13",
+      "li": 3,
+      "text": "어머니와 찍은 가족사진 액자를 가슴에 품는다",
+      "needs_motion": false,
+      "reason": "액자를 품는 소동작"
+    },
+    {
+      "gi": 109,
+      "scene_id": "scene_13",
+      "li": 4,
+      "text": "창틀에 걸린 아버지의 플란넬 셔츠를 챙긴다",
+      "needs_motion": false,
+      "reason": "셔츠를 챙기는 소동작"
+    },
+    {
+      "gi": 110,
+      "scene_id": "scene_13",
+      "li": 5,
+      "text": "져니가 마지막으로 방을 둘러보고 뒤돌아선다",
+      "needs_motion": false,
+      "reason": "시선 이동 및 턴"
+    },
+    {
+      "gi": 111,
+      "scene_id": "scene_13",
+      "li": 6,
+      "text": "노을이 지는 지평선은 이전보다 훨씬 붉다",
+      "needs_motion": false,
+      "reason": "노을 지평선 전경"
+    },
+    {
+      "gi": 112,
+      "scene_id": "scene_14",
+      "li": 0,
+      "text": "져니가 텅 빈 고속도로 위를 혼자 걷는다",
+      "needs_motion": true,
+      "reason": "고속도로를 따라 이동"
+    },
+    {
+      "gi": 113,
+      "scene_id": "scene_14",
+      "li": 1,
+      "text": "버려진 차들이 끝없이 늘어서 있다",
+      "needs_motion": true,
+      "reason": "끝없이 늘어선 차의 연출"
+    },
+    {
+      "gi": 114,
+      "scene_id": "scene_14",
+      "li": 2,
+      "text": "가로등 대신 밤하늘의 별들이 비정상적으로 밝게 빛난다",
+      "needs_motion": false,
+      "reason": "밤하늘 별 전경"
+    },
+    {
+      "gi": 115,
+      "scene_id": "scene_14",
+      "li": 3,
+      "text": "져니가 잠시 멈춰 서서 물 한 모금을 마신다",
+      "needs_motion": false,
+      "reason": "제자리에서 물 마심"
+    },
+    {
+      "gi": 116,
+      "scene_id": "scene_14",
+      "li": 4,
+      "text": "발소리가 고요한 폐허 속에 크게 울린다",
+      "needs_motion": false,
+      "reason": "발소리 음향 강조"
+    },
+    {
+      "gi": 117,
+      "scene_id": "scene_14",
+      "li": 5,
+      "text": "무너진 전광판에는 '대피 요망'이라는 글자만 박혀 있다",
+      "needs_motion": false,
+      "reason": "전광판 문구 클로즈업"
+    },
+    {
+      "gi": 118,
+      "scene_id": "scene_14",
+      "li": 6,
+      "text": "져니가 높은 언덕을 향해 묵묵히 올라간다",
+      "needs_motion": true,
+      "reason": "언덕을 올라가는 이동"
+    },
+    {
+      "gi": 119,
+      "scene_id": "scene_14",
+      "li": 7,
+      "text": "밤바람이 져니의 헝클어진 머리카락을 흩뜨린다",
+      "needs_motion": false,
+      "reason": "바람에 흔들리는 머릿결"
+    },
+    {
+      "gi": 120,
+      "scene_id": "scene_14",
+      "li": 8,
+      "text": "그의 눈은 오직 저 높은 곳만을 향해 있다",
+      "needs_motion": false,
+      "reason": "시선 고정 및 응시"
+    },
+    {
+      "gi": 121,
+      "scene_id": "scene_15",
+      "li": 0,
+      "text": "져니가 언덕 정상의 평평한 바위 위에 짐을 푼다",
+      "needs_motion": false,
+      "reason": "바위 위 짐 풀기"
+    },
+    {
+      "gi": 122,
+      "scene_id": "scene_15",
+      "li": 1,
+      "text": "떨리는 손으로 망원경 삼각대를 세운다",
+      "needs_motion": false,
+      "reason": "삼각대 세우기"
+    },
+    {
+      "gi": 123,
+      "scene_id": "scene_15",
+      "li": 2,
+      "text": "망원경 경통을 조심스럽게 결합한다",
+      "needs_motion": false,
+      "reason": "경통 결합 동작"
+    },
+    {
+      "gi": 124,
+      "scene_id": "scene_15",
+      "li": 3,
+      "text": "렌즈에 묻은 먼지를 소매로 정성껏 닦아낸다",
+      "needs_motion": false,
+      "reason": "렌즈 닦는 동작"
+    },
+    {
+      "gi": 125,
+      "scene_id": "scene_15",
+      "li": 4,
+      "text": "아래로 보이는 도시는 불빛 하나 없이 어둡다",
+      "needs_motion": true,
+      "reason": "아래 도시 전경 리빌"
+    },
+    {
+      "gi": 126,
+      "scene_id": "scene_15",
+      "li": 5,
+      "text": "져니가 심호흡을 하며 마음을 가다듬는다",
+      "needs_motion": false,
+      "reason": "인물 심호흡 및 표정"
+    },
+    {
+      "gi": 127,
+      "scene_id": "scene_15",
+      "li": 6,
+      "text": "아버지의 셔츠를 어깨에 걸쳐 추위를 견딘다",
+      "needs_motion": false,
+      "reason": "셔츠 걸치는 동작"
+    },
+    {
+      "gi": 128,
+      "scene_id": "scene_15",
+      "li": 7,
+      "text": "망원경의 각도를 하늘 높이 조절한다",
+      "needs_motion": true,
+      "reason": "망원경 틸트업 조절"
+    },
+    {
+      "gi": 129,
+      "scene_id": "scene_15",
+      "li": 8,
+      "text": "나사 하나하나를 꽉 조여 고정한다",
+      "needs_motion": false,
+      "reason": "나사 고정 클로즈업"
+    },
+    {
+      "gi": 130,
+      "scene_id": "scene_16",
+      "li": 0,
+      "text": "져니가 접안렌즈에 천천히 눈을 가져다 댄다",
+      "needs_motion": false,
+      "reason": "렌즈 접근 미세동작"
+    },
+    {
+      "gi": 131,
+      "scene_id": "scene_16",
+      "li": 1,
+      "text": "초점을 맞추기 위해 다이얼을 미세하게 돌린다",
+      "needs_motion": false,
+      "reason": "다이얼 미세 조작"
+    },
+    {
+      "gi": 132,
+      "scene_id": "scene_16",
+      "li": 2,
+      "text": "그의 눈동자에 차가운 달빛이 반사된다",
+      "needs_motion": false,
+      "reason": "눈동자 클로즈업"
+    },
+    {
+      "gi": 133,
+      "scene_id": "scene_16",
+      "li": 3,
+      "text": "져니의 손가락이 미세하게 떨린다",
+      "needs_motion": false,
+      "reason": "손가락 미세 떨림"
+    },
+    {
+      "gi": 134,
+      "scene_id": "scene_16",
+      "li": 4,
+      "text": "주변의 풀벌레 소리조차 들리지 않는 정적이 흐른다",
+      "needs_motion": false,
+      "reason": "정적인 분위기 연출"
+    },
+    {
+      "gi": 135,
+      "scene_id": "scene_16",
+      "li": 5,
+      "text": "져니가 눈을 감았다가 다시 크게 뜬다",
+      "needs_motion": false,
+      "reason": "눈 감고 뜨는 표정"
+    },
+    {
+      "gi": 136,
+      "scene_id": "scene_16",
+      "li": 6,
+      "text": "망원경 너머의 풍경이 선명해지기 시작한다",
+      "needs_motion": false,
+      "reason": "렌즈 초점 변화"
+    },
+    {
+      "gi": 137,
+      "scene_id": "scene_16",
+      "li": 7,
+      "text": "져니의 입술이 경련하듯 파르르 떨린다",
+      "needs_motion": false,
+      "reason": "입술 떨림 클로즈업"
+    },
+    {
+      "gi": 138,
+      "scene_id": "scene_16",
+      "li": 8,
+      "text": "그는 이제 도망치지 않고 진실을 응시한다",
+      "needs_motion": false,
+      "reason": "인물의 응시 상태"
+    },
+    {
+      "gi": 139,
+      "scene_id": "scene_17",
+      "li": 0,
+      "text": "망원경 뷰파인더에 비친 달은 더 이상 둥글지 않다",
+      "needs_motion": false,
+      "reason": "뷰파인더 화면 고정"
+    },
+    {
+      "gi": 140,
+      "scene_id": "scene_17",
+      "li": 1,
+      "text": "거대한 조각이 떨어져 나가 흉측하게 일그러진 달의 형상",
+      "needs_motion": false,
+      "reason": "일그러진 달 형상"
+    },
+    {
+      "gi": 141,
+      "scene_id": "scene_17",
+      "li": 2,
+      "text": "달 주위를 띠처럼 두르고 있는 수많은 파편 고리",
+      "needs_motion": true,
+      "reason": "파편 고리 공간 확충"
+    },
+    {
+      "gi": 142,
+      "scene_id": "scene_17",
+      "li": 3,
+      "text": "져니의 뺨을 타고 눈물 한 방울이 흘러내린다",
+      "needs_motion": false,
+      "reason": "눈물 흐르는 표정"
+    },
+    {
+      "gi": 143,
+      "scene_id": "scene_17",
+      "li": 4,
+      "text": "카메라가 져니의 눈에서 점점 멀어지며 하늘로 향한다",
+      "needs_motion": true,
+      "reason": "카메라 풀백 및 이동"
+    },
+    {
+      "gi": 144,
+      "scene_id": "scene_17",
+      "li": 5,
+      "text": "밤하늘 전체가 파괴된 달의 잔해로 가득 차 있다",
+      "needs_motion": true,
+      "reason": "전체 밤하늘 파노라마"
+    },
+    {
+      "gi": 145,
+      "scene_id": "scene_17",
+      "li": 6,
+      "text": "져니는 미동도 없이 그 풍경을 지켜본다",
+      "needs_motion": false,
+      "reason": "미동 없는 인물 응시"
+    },
+    {
+      "gi": 146,
+      "scene_id": "scene_17",
+      "li": 7,
+      "text": "어둠 속에 잠긴 지구 위로 일그러진 달빛이 쏟아진다",
+      "needs_motion": true,
+      "reason": "달빛의 쏟아짐과 규모"
+    },
+    {
+      "gi": 147,
+      "scene_id": "scene_17",
+      "li": 8,
+      "text": "화면이 서서히 암전되며 정적만 남는다",
+      "needs_motion": false,
+      "reason": "서서히 진행되는 암전"
+    }
+  ]
+}

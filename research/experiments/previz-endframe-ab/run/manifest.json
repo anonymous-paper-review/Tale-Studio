@@ -1,0 +1,456 @@
+{
+  "jobs": [
+    {
+      "key": "writer_test__sh_04_19__A",
+      "shot": "sh_04_19",
+      "project": "writer_test_260805_6",
+      "arm": "A",
+      "label": "시작 그림만",
+      "request_id": "019ff06f-844f-7820-b246-223b8f3692c7",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 4,
+      "est_cost_usd": 1.2096,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks fast with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 4 seconds. Subjects: subject 1: \"leaps\" — a large, clearly visible movement that completes fully. Pace the motion across the full 4-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She narrowly threads through collapsing concrete debris, shaking off the pursuit.",
+        "duration": 4,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-64f97433ccd98f64c6e87fddaffb2f29548912e6d2e5634436f292f4b58e76e5_storyboard_start.png?v=1785938348311"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:47:48.154Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e63c/mNfpu4WWBwWgvmJKg304P_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/out_writer_test__sh_04_19__A.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "duration_s": 4.063,
+        "bytes": 3186993
+      }
+    },
+    {
+      "key": "writer_test__sh_04_19__B",
+      "shot": "sh_04_19",
+      "project": "writer_test_260805_6",
+      "arm": "B",
+      "label": "시작+끝 (제품 그대로)",
+      "request_id": "019ff06f-8513-7a32-b6fe-f5a267de1912",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 4,
+      "est_cost_usd": 1.2096,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks fast with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 4 seconds. Subjects: subject 1: \"leaps\" — a large, clearly visible movement that completes fully. Pace the motion across the full 4-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She narrowly threads through collapsing concrete debris, shaking off the pursuit. The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.",
+        "duration": 4,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-64f97433ccd98f64c6e87fddaffb2f29548912e6d2e5634436f292f4b58e76e5_storyboard_start.png?v=1785938348311",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-64f97433ccd98f64c6e87fddaffb2f29548912e6d2e5634436f292f4b58e76e5_storyboard_end.png?v=1785938347464"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:47:48.342Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e63e/jGEmtMP1oLtBJ9e1ylru3_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/out_writer_test__sh_04_19__B.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "duration_s": 4.063,
+        "bytes": 2700031
+      }
+    },
+    {
+      "key": "writer_test__sh_04_19__C",
+      "shot": "sh_04_19",
+      "project": "writer_test_260805_6",
+      "arm": "C",
+      "label": "시작 + 정체성 참조(캐릭터 정면·얼굴 + 장소 와이드)",
+      "request_id": "019ff06f-85cf-7360-b064-45a49dfd135a",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 4,
+      "est_cost_usd": 1.2096,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks fast with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 4 seconds. Subjects: subject 1: \"leaps\" — a large, clearly visible movement that completes fully. Pace the motion across the full 4-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She narrowly threads through collapsing concrete debris, shaking off the pursuit. Reference roles: @Image1 is this shot's START frame — it defines the first frame, the framing and the set dressing. Every other reference image is an identity reference only: it shows how the character and the location look, not a moment of this shot. Never cut to them and never reproduce their poses or their backgrounds as frames.",
+        "duration": 4,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-64f97433ccd98f64c6e87fddaffb2f29548912e6d2e5634436f292f4b58e76e5_storyboard_start.png?v=1785938348311",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1785933275390",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_portrait.png?v=1785933279894",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1785933272620"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:47:48.527Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e63f/wpejwQPANL9IY_4QdVK2l_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/out_writer_test__sh_04_19__C.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "duration_s": 4.063,
+        "bytes": 2235353
+      }
+    },
+    {
+      "key": "writer_test__sh_04_19__D",
+      "shot": "sh_04_19",
+      "project": "writer_test_260805_6",
+      "arm": "D",
+      "label": "시작 + 캐릭터 다각도(정면·좌·우·후) + 장소 와이드",
+      "request_id": "019ff06f-8688-7e82-b14b-3824872869a6",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 4,
+      "est_cost_usd": 1.2096,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks fast with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 4 seconds. Subjects: subject 1: \"leaps\" — a large, clearly visible movement that completes fully. Pace the motion across the full 4-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She narrowly threads through collapsing concrete debris, shaking off the pursuit. Reference roles: @Image1 is this shot's START frame — it defines the first frame, the framing and the set dressing. Every other reference image is an identity reference only: it shows how the character and the location look, not a moment of this shot. Never cut to them and never reproduce their poses or their backgrounds as frames.",
+        "duration": 4,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/shots/v1-64f97433ccd98f64c6e87fddaffb2f29548912e6d2e5634436f292f4b58e76e5_storyboard_start.png?v=1785938348311",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1785933275390",
+          "https://v3b.fal.media/files/b/0aa5e634/atVIsyX3_wUXrRDgO2UYi_qj8m6a0E.png",
+          "https://v3b.fal.media/files/b/0aa5e634/CMJxQ7mBY042wYsz0YadG_G16FXLJ0.png",
+          "https://v3b.fal.media/files/b/0aa5e622/Em1vdvBJjjvQwfDExYCuf_thArpbLn.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/c86410d7-2e48-4e02-956d-c415e8e7f03b/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1785933272620"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:47:48.714Z",
+      "failed": true,
+      "error": ""
+    },
+    {
+      "key": "Sample1_sh_04_30__A",
+      "shot": "sh_04_30",
+      "project": "Sample1",
+      "arm": "A",
+      "label": "시작 그림만",
+      "request_id": "019ff06f-8744-7ec2-be3b-dbf4f7fccd0e",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 8,
+      "est_cost_usd": 2.4192,
+      "input": {
+        "prompt": "Motion contract: Camera: dollies in slow — the framing grows steadily tighter on the subject. Small amplitude, spread evenly over the full 8 seconds. Subjects: subject 1: \"picks up phone\" — a clear movement that completes. Pace the motion across the full 8-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. With an air of resolve, she picks up the telephone and dials someone.",
+        "duration": 8,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-a253db253805c6ba396c7b0b8e3740c0ab6e957145eef3365f27b9b2b401fcea_storyboard_start.png?v=1786076716314"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:47:48.901Z",
+      "failed": true,
+      "error": ""
+    },
+    {
+      "key": "Sample1_sh_04_30__B",
+      "shot": "sh_04_30",
+      "project": "Sample1",
+      "arm": "B",
+      "label": "시작+끝 (제품 그대로)",
+      "request_id": "019ff06f-8800-7a43-8b21-9e506c830b6a",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 8,
+      "est_cost_usd": 2.4192,
+      "input": {
+        "prompt": "Motion contract: Camera: dollies in slow — the framing grows steadily tighter on the subject. Small amplitude, spread evenly over the full 8 seconds. Subjects: subject 1: \"picks up phone\" — a clear movement that completes. Pace the motion across the full 8-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. With an air of resolve, she picks up the telephone and dials someone. The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.",
+        "duration": 8,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-a253db253805c6ba396c7b0b8e3740c0ab6e957145eef3365f27b9b2b401fcea_storyboard_start.png?v=1786076716314",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-a253db253805c6ba396c7b0b8e3740c0ab6e957145eef3365f27b9b2b401fcea_storyboard_end.png?v=1786076716946"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:47:49.089Z",
+      "failed": true,
+      "error": ""
+    },
+    {
+      "key": "Sample1_sh_04_30__C",
+      "shot": "sh_04_30",
+      "project": "Sample1",
+      "arm": "C",
+      "label": "시작 + 정체성 참조(캐릭터 정면·얼굴 + 장소 와이드)",
+      "request_id": "019ff06f-88bb-7223-ac1e-6703c351c2c9",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 8,
+      "est_cost_usd": 2.4192,
+      "input": {
+        "prompt": "Motion contract: Camera: dollies in slow — the framing grows steadily tighter on the subject. Small amplitude, spread evenly over the full 8 seconds. Subjects: subject 1: \"picks up phone\" — a clear movement that completes. Pace the motion across the full 8-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. With an air of resolve, she picks up the telephone and dials someone. Reference roles: @Image1 is this shot's START frame — it defines the first frame, the framing and the set dressing. Every other reference image is an identity reference only: it shows how the character and the location look, not a moment of this shot. Never cut to them and never reproduce their poses or their backgrounds as frames.",
+        "duration": 8,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-a253db253805c6ba396c7b0b8e3740c0ab6e957145eef3365f27b9b2b401fcea_storyboard_start.png?v=1786076716314",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-53045b217691e950565a213a4c9b3f2cd29284ab49a320fe55dc5dde6dda9436_view_main.png?v=1786014468639",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-53045b217691e950565a213a4c9b3f2cd29284ab49a320fe55dc5dde6dda9436_portrait.png?v=1786014471529",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1786014459403"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:47:49.276Z",
+      "failed": true,
+      "error": ""
+    },
+    {
+      "key": "writer_test__sh_01_04__A",
+      "shot": "sh_01_04",
+      "project": "writer_test_260805_7 (viz 테스트)",
+      "arm": "A",
+      "label": "시작 그림만",
+      "request_id": "019ff06f-8976-7931-86a9-6ec1a3f5b77f",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 7,
+      "est_cost_usd": 2.1168,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks slow with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Small amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"leans\" — a clear movement that completes. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. Sand beneath her feet cascades away, exposing a massive structure; drawn by curiosity, the girl peers into its darkness.",
+        "duration": 7,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_start.png?v=1786069442154"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:47:49.463Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e653/llA836WdqeAjoieDSd0AN_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/out_writer_test__sh_01_04__A.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "duration_s": 7.059,
+        "bytes": 2810731
+      }
+    },
+    {
+      "key": "writer_test__sh_01_04__B",
+      "shot": "sh_01_04",
+      "project": "writer_test_260805_7 (viz 테스트)",
+      "arm": "B",
+      "label": "시작+끝 (제품 그대로)",
+      "request_id": "019ff06f-8a31-7860-a66b-7edf96e9a5e1",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 7,
+      "est_cost_usd": 2.1168,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks slow with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Small amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"leans\" — a clear movement that completes. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. Sand beneath her feet cascades away, exposing a massive structure; drawn by curiosity, the girl peers into its darkness. The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.",
+        "duration": 7,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_start.png?v=1786069442154",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_end.png?v=1786069442135"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:47:49.650Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e641/sUAPJgjDHPMEvNWjtTXdz_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/out_writer_test__sh_01_04__B.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "duration_s": 7.059,
+        "bytes": 1888288
+      }
+    },
+    {
+      "key": "writer_test__sh_01_04__C",
+      "shot": "sh_01_04",
+      "project": "writer_test_260805_7 (viz 테스트)",
+      "arm": "C",
+      "label": "시작 + 정체성 참조(캐릭터 정면·얼굴 + 장소 와이드)",
+      "request_id": "019ff06f-8aef-70c1-a5dd-034b16953f7f",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 7,
+      "est_cost_usd": 2.1168,
+      "input": {
+        "prompt": "Motion contract: Camera: tracks slow with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Small amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"leans\" — a clear movement that completes. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. Sand beneath her feet cascades away, exposing a massive structure; drawn by curiosity, the girl peers into its darkness. Reference roles: @Image1 is this shot's START frame — it defines the first frame, the framing and the set dressing. Every other reference image is an identity reference only: it shows how the character and the location look, not a moment of this shot. Never cut to them and never reproduce their poses or their backgrounds as frames.",
+        "duration": 7,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/f79546f6-77df-4331-8e31-0b425fc984a5/shots/v1-7d46d9737719b449501b73cb577c4ae3067f3e40ed39b15b2c14d364e77def96_storyboard_start.png?v=1786069442154",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/468651ca-4931-4b3b-8408-9853ab2a3f0f/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786012619971",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/468651ca-4931-4b3b-8408-9853ab2a3f0f/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_portrait.png?v=1786012622999",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/468651ca-4931-4b3b-8408-9853ab2a3f0f/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1786012643225"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:47:49.840Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e656/JhAgdb6NrZIKVSl1vkgBg_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/out_writer_test__sh_01_04__C.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "duration_s": 7.059,
+        "bytes": 2971738
+      }
+    },
+    {
+      "key": "Sample1_sh_04_30__C2",
+      "shot": "sh_04_30",
+      "project": "Sample1",
+      "arm": "C",
+      "label": "시작 + 정체성 참조 (장소를 씬이 지목한 곳으로 교정)",
+      "request_id": "019ff071-3b2f-76d3-827e-f360f9452448",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 8,
+      "est_cost_usd": 2.4192,
+      "input": {
+        "prompt": "Motion contract: Camera: dollies in slow — the framing grows steadily tighter on the subject. Small amplitude, spread evenly over the full 8 seconds. Subjects: subject 1: \"picks up phone\" — a clear movement that completes. Pace the motion across the full 8-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. With an air of resolve, she picks up the telephone and dials someone. Reference roles: @Image1 is this shot's START frame — it defines the first frame, the framing and the set dressing. Every other reference image is an identity reference only: it shows how the character and the location look, not a moment of this shot. Never cut to them and never reproduce their poses or their backgrounds as frames.",
+        "duration": 8,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-a253db253805c6ba396c7b0b8e3740c0ab6e957145eef3365f27b9b2b401fcea_storyboard_start.png?v=1786076716314",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-53045b217691e950565a213a4c9b3f2cd29284ab49a320fe55dc5dde6dda9436_view_main.png?v=1786014468639",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-53045b217691e950565a213a4c9b3f2cd29284ab49a320fe55dc5dde6dda9436_portrait.png?v=1786014471529",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1786014459403"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:47:49.276Z",
+      "note": "병렬 collect 와의 경합으로 manifest 에서 유실됐다가 복원됨",
+      "failed": true,
+      "error": ""
+    },
+    {
+      "key": "writer_test__sh_04_29__A",
+      "shot": "sh_04_29",
+      "project": "writer_test_260805_5",
+      "arm": "A",
+      "label": "시작 그림만",
+      "request_id": "019ff073-9222-7280-b7ac-c53c90928609",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 6,
+      "est_cost_usd": 1.8144,
+      "input": {
+        "prompt": "Motion contract: Camera: handheld micro-drift only — the framing breathes subtly in place but never travels, never pans, never zooms. Subjects: subject 1: \"speaks\" — a small, restrained movement. Pace the motion across the full 6-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. Covered in sand, the girl stops, looks up with a resolute expression, and says, 'It starts now. Everyone has to know.'",
+        "duration": 6,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-6a20ecee7b991569632e7c2a24e078202d184448a29312e0388399c6a68f5f67_storyboard_start.png?v=1785930983530"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:52:13.825Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e658/k40Vg8OODTcOqhlnys2YF_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/out_writer_test__sh_04_29__A.mp4",
+      "observed_output": {
+        "width": 1112,
+        "height": 834,
+        "duration_s": 6.06,
+        "bytes": 2818956
+      }
+    },
+    {
+      "key": "writer_test__sh_04_29__B",
+      "shot": "sh_04_29",
+      "project": "writer_test_260805_5",
+      "arm": "B",
+      "label": "시작+끝 (제품 그대로)",
+      "request_id": "019ff073-92df-79b2-9bb7-ece0f21ce92c",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 6,
+      "est_cost_usd": 1.8144,
+      "input": {
+        "prompt": "Motion contract: Camera: handheld micro-drift only — the framing breathes subtly in place but never travels, never pans, never zooms. Subjects: subject 1: \"speaks\" — a small, restrained movement. Pace the motion across the full 6-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. Covered in sand, the girl stops, looks up with a resolute expression, and says, 'It starts now. Everyone has to know.' The first reference image is the shot's START frame and the last reference image is its END frame — hold this same composition throughout: no camera travel between them, only the contracted subject motion.",
+        "duration": 6,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-6a20ecee7b991569632e7c2a24e078202d184448a29312e0388399c6a68f5f67_storyboard_start.png?v=1785930983530",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-6a20ecee7b991569632e7c2a24e078202d184448a29312e0388399c6a68f5f67_storyboard_end.png?v=1785930982710"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:52:14.014Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e65a/L9G0kGF_b4fxMFgXTceTz_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/out_writer_test__sh_04_29__B.mp4",
+      "observed_output": {
+        "width": 1112,
+        "height": 834,
+        "duration_s": 6.06,
+        "bytes": 3038641
+      }
+    },
+    {
+      "key": "writer_test__sh_04_29__C",
+      "shot": "sh_04_29",
+      "project": "writer_test_260805_5",
+      "arm": "C",
+      "label": "시작 + 정체성 참조(캐릭터 정면·얼굴 + 장소 와이드)",
+      "request_id": "019ff073-939e-72c0-9898-99938178d96a",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 6,
+      "est_cost_usd": 1.8144,
+      "input": {
+        "prompt": "Motion contract: Camera: handheld micro-drift only — the framing breathes subtly in place but never travels, never pans, never zooms. Subjects: subject 1: \"speaks\" — a small, restrained movement. Pace the motion across the full 6-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. Covered in sand, the girl stops, looks up with a resolute expression, and says, 'It starts now. Everyone has to know.' Reference roles: @Image1 is this shot's START frame — it defines the first frame, the framing and the set dressing. Every other reference image is an identity reference only: it shows how the character and the location look, not a moment of this shot. Never cut to them and never reproduce their poses or their backgrounds as frames.",
+        "duration": 6,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-6a20ecee7b991569632e7c2a24e078202d184448a29312e0388399c6a68f5f67_storyboard_start.png?v=1785930983530",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1785927467632",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_portrait.png?v=1785927470579",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1785927460867"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:52:14.206Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e65a/BYNoYTRjDxQ7AzOqwXYZP_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/out_writer_test__sh_04_29__C.mp4",
+      "observed_output": {
+        "width": 1112,
+        "height": 834,
+        "duration_s": 6.06,
+        "bytes": 3097980
+      }
+    },
+    {
+      "key": "writer_test__sh_04_29__D",
+      "shot": "sh_04_29",
+      "project": "writer_test_260805_5",
+      "arm": "D",
+      "label": "시작 + 캐릭터 다각도(정면·좌·우·후) + 장소 와이드",
+      "request_id": "019ff078-2c3d-7f60-8ec3-9b2becbf4d5e",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "duration_seconds": 6,
+      "est_cost_usd": 1.8144,
+      "input": {
+        "prompt": "Motion contract: Camera: handheld micro-drift only — the framing breathes subtly in place but never travels, never pans, never zooms. Subjects: subject 1: \"speaks\" — a small, restrained movement. Pace the motion across the full 6-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. Covered in sand, the girl stops, looks up with a resolute expression, and says, 'It starts now. Everyone has to know.' Reference roles: @Image1 is this shot's START frame — it defines the first frame, the framing and the set dressing. Every other reference image is an identity reference only: it shows how the character and the location look, not a moment of this shot. Never cut to them and never reproduce their poses or their backgrounds as frames.",
+        "duration": 6,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-6a20ecee7b991569632e7c2a24e078202d184448a29312e0388399c6a68f5f67_storyboard_start.png?v=1785930983530",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1785927467632",
+          "https://v3b.fal.media/files/b/0aa5e658/4pSpzs_6ITiqxx013fjMa_8kLJX5sp.png",
+          "https://v3b.fal.media/files/b/0aa5e658/2bMurlV3yK3vLLROxb7s1_OBsVCh58.png",
+          "https://v3b.fal.media/files/b/0aa5e658/dkXM7g-jGkIDtDCSS42ju_MWP4tYtI.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1785927460867"
+        ]
+      },
+      "submitted_at": "2026-08-11T10:57:15.416Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5e67f/3daKNJQjgr_ycdK5PHRtr_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/previz-endframe-ab/run/out_writer_test__sh_04_29__D.mp4",
+      "observed_output": {
+        "width": 1112,
+        "height": 834,
+        "duration_s": 6.06,
+        "bytes": 2728299
+      }
+    }
+  ],
+  "purpose": "끝 그림 유무 A/B + 정체성 참조 팔 — 서로 다른 3개 프로젝트의 \"시작↔끝 변화가 큰\" 샷. 변인은 참조 이미지 구성뿐, 문장은 제품 buildVideoPrompt 산출 그대로",
+  "model": "bytedance/seedance-2.0/reference-to-video",
+  "pricing_source": "fal 모델 페이지 2026-08-11 실측: 720p 이미지참조만 $0.3024/s (영상참조 동반 시 $0.1814/s)",
+  "model_limits": "image_urls 최대 9장 / video_urls 최대 3개 (fal 모델 페이지 2026-08-11). 제품 라우트는 자체적으로 4장으로 자른다",
+  "selection": "run/selection.json — 코드가 계산한 시작·끝 차이 순. 사람 눈 개입 없음",
+  "budget_cap_usd": 22,
+  "total_cost_usd": 17.2368
+}
