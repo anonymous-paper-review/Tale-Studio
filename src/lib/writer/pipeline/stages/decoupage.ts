@@ -25,7 +25,7 @@ import type { PipelineLogger } from '@/lib/writer/logger';
 
 // == 카메라 규율 == 계약의 A/B 분기 (#camera-contract-relax 2026-08-11).
 //   기본(env 미설정/기타 값) = 현행 문구 그대로 = 프로덕션 = 실험의 대조군.
-//   WRITER_CAMERA_CONTRACT=relaxed 일 때만 "내용 요구 기반" 완화 문구로 교체한다.
+//   WRITER_CAMERA_CONTRACT=relaxed, relaxed-v2 또는 relaxed-v3 일 때만 실험 문구로 교체한다.
 //   env 는 호출 시점에 읽는다(모듈 로드 시점 캡처 금지) — 팔 전환이 모듈 캐시에 갇히지 않게.
 const CAMERA_CONTRACT_DEFAULT = `== 카메라 규율 ==
 - camera_intent는 'static'이 기본. 'motivated_move'는 *감정적 동기*가 명확할 때만 쓰고 camera_move_motivation에 그 동기를 적는다.
@@ -39,9 +39,41 @@ const CAMERA_CONTRACT_RELAXED = `== 카메라 규율 ==
 - 금지되는 것은 무빙 자체가 아니라 **동기 없는 무빙**이다 — 내용과 무관하게 떠다니는 카메라를 쓰지 마라.
 - 동기가 있으면 크기도 그 동기에 맞춰라: 질주를 최소 움직임으로 축소하지 마라.`;
 
+const CAMERA_CONTRACT_RELAXED_V2 = `== 카메라 규율 ==
+- camera_intent는 카메라가 실제로 움직여야 하는지로 정한다. 피사체가 움직이는 것과 카메라가 움직이는 것은 다르다.
+  · 피사체가 고정 프레임을 가로질러 들어오거나 나가서 카메라가 따라가야 하거나,
+    현재 프레임 밖의 공간을 보여주기 위해 구도를 다시 잡아야 하거나,
+    물리적 규모·힘이 현재 프레임을 넘어올 때만 → 'motivated_move'.
+    그 동기를 camera_move_motivation에 **카메라가 왜 움직여야 하는지**로 적는다.
+  · 사건이 고정된 프레임 안에서 완결되면 → 'static'.
+- 손발·시선·고개·표정·소품 조작·한두 걸음·대사·감정적 긴장·급한 행동만으로는 카메라를 움직이지 마라.
+- 감정이 강하거나 인물이 서두른다는 이유만으로 push-in하지 마라.
+- motion 비트와 static 비트를 하나의 샷에 합칠 때 static 비트는 카메라 이동의 근거가 아니다. 가능하면 split하라.
+- 동기가 있으면 크기도 그 동기에 맞춰라: 질주를 최소 움직임으로 축소하지 마라.`;
+const CAMERA_CONTRACT_RELAXED_V3 = `== 카메라 규율 ==
+- 먼저 이 사건을 하나의 고정 프레임 안에서 완결할 수 있는지 판단한다. 피사체가 움직이는 것과 카메라가 움직이는 것은 다르다.
+  · 손발·시선·고개·표정·소품 조작·대사·감정적 긴장·급한 행동·한두 걸음처럼
+    중요한 사건이 같은 프레임 안에서 끝나면 → 'static'.
+  · 피사체나 사건이 공간을 가로질러 진행되어 카메라가 따라가야 하거나,
+    프레임 밖의 공간을 드러내거나, 움직임의 범위·규모·힘을 보여주려면 → 'motivated_move'.
+    질주·추격·진입·퇴장·낙하·비산·군중·차량·파도·공간 리빌·긴장감 있는 돌리 인을 포함한다.
+    그 동기를 camera_move_motivation에 **카메라가 왜 움직여야 하는지**로 적는다.
+- 단 한 걸음·몸 돌림·손 뻗기·급한 행동은 전체 사건이 고정 프레임 안에 있으면 static이다.
+- 감정이 강하거나 인물이 서두른다는 이유만으로 push-in하지 마라.
+- motion 비트와 static 비트를 한 샷에 합칠 때 static 비트는 이동의 추가 근거가 아니다.
+  두 비트의 카메라 처리가 다르면 가능하면 split하라.
+- 동기가 있으면 크기도 그 동기에 맞춰라: 질주를 최소 움직임으로 축소하지 마라.`;
+
 export function buildSystemInstruction(): string {
+  const contract = process.env.WRITER_CAMERA_CONTRACT;
   const cameraContract =
-    process.env.WRITER_CAMERA_CONTRACT === 'relaxed' ? CAMERA_CONTRACT_RELAXED : CAMERA_CONTRACT_DEFAULT;
+    contract === 'relaxed-v3'
+      ? CAMERA_CONTRACT_RELAXED_V3
+      : contract === 'relaxed-v2'
+        ? CAMERA_CONTRACT_RELAXED_V2
+        : contract === 'relaxed'
+          ? CAMERA_CONTRACT_RELAXED
+          : CAMERA_CONTRACT_DEFAULT;
   return `당신은 영화 감독이다. 한 씬의 내러티브 비트(scene_actions)를 받아 *데쿠파주(découpage)* — 샷 분해 — 를 저작한다.
 
 == 핵심 원칙 ==
