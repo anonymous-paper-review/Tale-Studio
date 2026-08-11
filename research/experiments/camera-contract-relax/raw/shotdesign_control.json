@@ -1,0 +1,1199 @@
+{
+  "arm": "control",
+  "source": "decoupage_control_r1.json",
+  "env_WRITER_CAMERA_CONTRACT": null,
+  "model_axis_V": {
+    "provider": "gemini",
+    "model": "gemini-3.6-flash"
+  },
+  "wall_ms": 228693,
+  "error": null,
+  "done": true,
+  "llm_calls": 28,
+  "llm_call_errors": 0,
+  "usage_delta": {
+    "calls": 28,
+    "inputTokens": 107128,
+    "outputTokens": 122588,
+    "rateLimitHits": 0
+  },
+  "shot_count": 147,
+  "camera_motion_raw": [
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "pan",
+        "direction": "right",
+        "speed": "medium",
+        "magnitude": "small"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "pan",
+        "direction": "right",
+        "speed": "fast",
+        "magnitude": "medium"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "handheld_drift",
+        "direction": "forward",
+        "speed": "slow",
+        "magnitude": "low"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "handheld_drift",
+        "direction": "forward",
+        "speed": "slow",
+        "magnitude": "low"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "handheld_drift",
+        "direction": "forward",
+        "speed": "slow",
+        "magnitude": "medium"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "handheld_drift",
+        "direction": "downward",
+        "speed": "fast",
+        "magnitude": "medium"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "handheld_drift",
+        "direction": "right",
+        "speed": "slow",
+        "magnitude": "small"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "tilt_down",
+        "direction": "down",
+        "speed": "slow",
+        "magnitude": "medium"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "handheld_drift",
+        "direction": "right",
+        "speed": "slow",
+        "magnitude": "small"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "tracking",
+        "direction": "upward",
+        "speed": "fast",
+        "magnitude": "moderate"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "handheld_drift",
+        "direction": "downward",
+        "speed": "medium",
+        "magnitude": "moderate"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "tracking",
+        "direction": "backward",
+        "speed": "fast",
+        "magnitude": "large"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "handheld_drift",
+        "direction": "stationary",
+        "speed": "slow",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "tracking",
+        "direction": "right",
+        "speed": "fast",
+        "magnitude": "large"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "tracking",
+        "direction": "downward",
+        "speed": "medium",
+        "magnitude": "moderate"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "tracking",
+        "direction": "forward",
+        "speed": "fast",
+        "magnitude": "large"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "stationary",
+        "speed": "slow",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "tracking",
+        "direction": "backward",
+        "speed": "fast",
+        "magnitude": "medium"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "tracking",
+        "direction": "forward",
+        "speed": "medium",
+        "magnitude": "medium"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "tracking",
+        "direction": "forward",
+        "speed": "slow",
+        "magnitude": "small"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "dolly_in",
+        "direction": "forward",
+        "speed": "slow",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "handheld_drift",
+        "direction": "right",
+        "speed": "slow",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "tracking",
+        "direction": "forward",
+        "speed": "slow",
+        "magnitude": "moderate"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "dolly_in",
+        "direction": "forward",
+        "speed": "slow",
+        "magnitude": "moderate"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "none",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "none"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "handheld_drift",
+        "direction": "none",
+        "speed": "slow",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "slow",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "handheld_drift",
+        "direction": "none",
+        "speed": "slow",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "slow",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "dolly_out",
+        "direction": "backward",
+        "speed": "slow",
+        "magnitude": "medium"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "slow",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "handheld_drift",
+        "direction": "none",
+        "speed": "slow",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "slow",
+        "magnitude": "minimal"
+      }
+    },
+    {
+      "camera_motion": {
+        "type": "static",
+        "direction": "none",
+        "speed": "static",
+        "magnitude": "none"
+      }
+    }
+  ]
+}

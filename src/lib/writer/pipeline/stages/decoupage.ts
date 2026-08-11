@@ -23,7 +23,26 @@ import type {
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
-const SYSTEM_INSTRUCTION = `당신은 영화 감독이다. 한 씬의 내러티브 비트(scene_actions)를 받아 *데쿠파주(découpage)* — 샷 분해 — 를 저작한다.
+// == 카메라 규율 == 계약의 A/B 분기 (#camera-contract-relax 2026-08-11).
+//   기본(env 미설정/기타 값) = 현행 문구 그대로 = 프로덕션 = 실험의 대조군.
+//   WRITER_CAMERA_CONTRACT=relaxed 일 때만 "내용 요구 기반" 완화 문구로 교체한다.
+//   env 는 호출 시점에 읽는다(모듈 로드 시점 캡처 금지) — 팔 전환이 모듈 캐시에 갇히지 않게.
+const CAMERA_CONTRACT_DEFAULT = `== 카메라 규율 ==
+- camera_intent는 'static'이 기본. 'motivated_move'는 *감정적 동기*가 명확할 때만 쓰고 camera_move_motivation에 그 동기를 적는다.
+- 이유 없는 카메라 무빙은 금지 (생성 영상이 "둥둥 떠다니며 집중 안 되는" 가장 큰 원인).`;
+
+const CAMERA_CONTRACT_RELAXED = `== 카메라 규율 ==
+- camera_intent는 기본값 없이 **이 샷의 내용이 요구하는가**로 정한다.
+  · 피사체가 공간을 가로지르거나(질주·추격·퇴장·진입), 카메라가 무언가를 드러내야 하거나(발견·리빌),
+    긴장이 물리적으로 조여야 할 때(push-in) → 'motivated_move'. 그 동기를 camera_move_motivation에 적는다.
+  · 사건이 프레임 안에서 완결되는 샷(관조·대치·인서트·리액션) → 'static'.
+- 금지되는 것은 무빙 자체가 아니라 **동기 없는 무빙**이다 — 내용과 무관하게 떠다니는 카메라를 쓰지 마라.
+- 동기가 있으면 크기도 그 동기에 맞춰라: 질주를 최소 움직임으로 축소하지 마라.`;
+
+export function buildSystemInstruction(): string {
+  const cameraContract =
+    process.env.WRITER_CAMERA_CONTRACT === 'relaxed' ? CAMERA_CONTRACT_RELAXED : CAMERA_CONTRACT_DEFAULT;
+  return `당신은 영화 감독이다. 한 씬의 내러티브 비트(scene_actions)를 받아 *데쿠파주(découpage)* — 샷 분해 — 를 저작한다.
 
 == 핵심 원칙 ==
 1. 비트 ≠ 샷. 비트는 "무슨 일이 일어나는가"(내러티브), 샷은 "어떻게 찍는가"(카메라). 한 비트를 여러 샷으로, 여러 비트를 한 샷으로 자유롭게 매핑한다.
@@ -48,13 +67,12 @@ const SYSTEM_INSTRUCTION = `당신은 영화 감독이다. 한 씬의 내러티�
 == 쇼트 사이즈 문법 ==
 - establishing(EWS/WS) → 전개(MS/MFS) → 강조(CU/ECU)의 흐름. 같은 사이즈를 연속 배치하지 마라(시각 단조 = 집중 저하).
 
-== 카메라 규율 ==
-- camera_intent는 'static'이 기본. 'motivated_move'는 *감정적 동기*가 명확할 때만 쓰고 camera_move_motivation에 그 동기를 적는다.
-- 이유 없는 카메라 무빙은 금지 (생성 영상이 "둥둥 떠다니며 집중 안 되는" 가장 큰 원인).
+${cameraContract}
 
 == 시간 제약 (validator) ==
 - 각 샷 intended_duration_seconds는 ${SHOT_SECONDS_RANGE} (짧고 스냅있게). 1개 주요 액션이 들어맞는 길이. 긴 침묵 등 예외만 최대 ${SHOT_SECONDS_HARD_MAX}.
 - 한 샷에 액션을 몰아넣지 마라. 액션이 크거나 여러 개면 split으로 나눠라.`;
+}
 
 // 씬 동시성 기본값(#concurrency-gap 2026-08-10). 종전엔 호출부가 `Number(env ?? '1') || 1` 로
 //   넘겨 **프로덕션(env 미설정)에서 decoupage 가 동시성 1 = 순차**로 돌고 있었다(실측 ~262s).
@@ -198,7 +216,7 @@ async function decoupageForScene(
   const userPrompt = buildUserPrompt(scene, plan, genre, characters, worldVisual, shotBudgetHint);
 
   const raw = await generateJson<unknown>(userPrompt, axisConfig, {
-    systemInstruction: SYSTEM_INSTRUCTION,
+    systemInstruction: buildSystemInstruction(),
     temperature: 0.7, // 연출 창의성 (V4보다 약간 높게)
   });
 

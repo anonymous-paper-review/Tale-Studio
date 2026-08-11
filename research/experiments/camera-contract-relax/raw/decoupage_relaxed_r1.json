@@ -1,0 +1,2597 @@
+{
+  "arm": "relaxed",
+  "rep": 1,
+  "env_WRITER_CAMERA_CONTRACT": "relaxed",
+  "system_instruction_sha256": "1d3032a5aacf4fbf8994fb3bf819b5ac5aa79cb4998835377f57831ad53c15cb",
+  "system_instruction_len": 1725,
+  "camera_block": "== 카메라 규율 ==\n- camera_intent는 기본값 없이 **이 샷의 내용이 요구하는가**로 정한다.\n  · 피사체가 공간을 가로지르거나(질주·추격·퇴장·진입), 카메라가 무언가를 드러내야 하거나(발견·리빌),\n    긴장이 물리적으로 조여야 할 때(push-in) → 'motivated_move'. 그 동기를 camera_move_motivation에 적는다.\n  · 사건이 프레임 안에서 완결되는 샷(관조·대치·인서트·리액션) → 'static'.\n- 금지되는 것은 무빙 자체가 아니라 **동기 없는 무빙**이다 — 내용과 무관하게 떠다니는 카메라를 쓰지 마라.\n- 동기가 있으면 크기도 그 동기에 맞춰라: 질주를 최소 움직임으로 축소하지 마라.",
+  "camera_block_sha256": "fe1ae6e3a18b9263e1906e4bb5087d561b88bcde816756e805f9fad3db697c12",
+  "observed_call_system_instruction_sha256": [
+    "1d3032a5aacf4fbf8994fb3bf819b5ac5aa79cb4998835377f57831ad53c15cb"
+  ],
+  "model_axis_V": {
+    "provider": "gemini",
+    "model": "gemini-3.6-flash"
+  },
+  "scene_concurrency": 4,
+  "wall_ms": 90161,
+  "error": null,
+  "done": true,
+  "llm_calls": 17,
+  "llm_call_errors": 0,
+  "usage_delta": {
+    "calls": 17,
+    "inputTokens": 35007,
+    "outputTokens": 31778,
+    "rateLimitHits": 0
+  },
+  "plan": {
+    "scenes": [
+      {
+        "scene_id": "scene_1",
+        "beat_count": 9,
+        "shot_count": 9,
+        "coverage_ratio": 1,
+        "rhythm_profile": "정적인 천체 관측의 정적에서 시작하여 비현실적 충격과 함께 점진적으로 긴장이 고조되는 서스펜스 곡선",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_1",
+            "operation": "added",
+            "shot_function": "establishing",
+            "source_beats": [],
+            "added_rationale": "어두운 방 안의 어지러운 천체 도구들과 렌즈 너머의 정적 분위기를 구축하여 씬의 음산하고 서늘한 기류를 먼저 형성함",
+            "beat_summary": "A wide establishing shot of Journey's dark, cluttered bedroom illuminated by a warm lamp and cold moonlight.",
+            "beat_summary_native": "스탠드 조명과 푸른 달빛만 비추는 어둡고 어지러운 방 안, 망원경 옆에 앉아 있는 져니의 모습을 보여준다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "establish",
+            "camera_intent": "static",
+            "dramatic_purpose": "관측이 진행되는 고요하고 고립된 공간의 물리적 환경과 기류를 오리엔테이션함.",
+            "scene_id": "scene_1"
+          },
+          {
+            "shot_id": "shot_2",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "Journey presses her eye closely against the eyepiece of the brass telescope.",
+            "beat_summary_native": "져니가 망원경 렌즈에 눈을 바짝 밀착하며 달을 유심히 관찰한다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "져니가 망원경 렌즈로 서서히 상체를 기울여 밀착하는 동작을 따라 천천히 접근",
+            "dramatic_purpose": "관찰 대상에 대한 인물의 깊은 몰입과 집중 상태를 시각화.",
+            "scene_id": "scene_1"
+          },
+          {
+            "shot_id": "shot_3",
+            "operation": "derived",
+            "shot_function": "detail",
+            "source_beats": [
+              1
+            ],
+            "beat_summary": "An extreme close-up of Journey's hand meticulously sketching the moon phase in her notebook.",
+            "beat_summary_native": "져니가 노트 위에 연필로 달의 정교한 위상을 정성껏 그려 넣는다.",
+            "shot_size": "ECU",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "학구적이고 일상적인 정적 비트를 극대화하여 이후 벌어질 사건과의 대비감을 강화함.",
+            "scene_id": "scene_1"
+          },
+          {
+            "shot_id": "shot_4",
+            "operation": "derived",
+            "shot_function": "pov",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "Through the telescope lens, a blinding flash of light erupts on the lunar surface.",
+            "beat_summary_native": "망원경 렌즈 시야 너머, 평화롭던 달 표면에서 갑자기 눈부신 섬광이 폭발한다.",
+            "shot_size": "POV",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "관객에게 인물과 동일한 정보 시점을 제공하며 서사적 충격의 시작점을 도발함.",
+            "scene_id": "scene_1"
+          },
+          {
+            "shot_id": "shot_5",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Startled by the flash, Journey staggers back from the telescope in shock.",
+            "beat_summary_native": "갑작스러운 섬광에 깜짝 놀란 져니가 비틀거리며 망원경에서 뒤로 물러선다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 4,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "깜짝 놀라 상체를 뒤로 젖히는 져니의 반사적인 움직임을 따라 뒤로 빠르게 백킹",
+            "dramatic_purpose": "갑작스러운 시각적 자극에 대한 인물의 신체적 충격과 1차적 놀람을 포착.",
+            "scene_id": "scene_1"
+          },
+          {
+            "shot_id": "shot_6",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "Journey rubs her eyes in disbelief and leans back in to look through the eyepiece again.",
+            "beat_summary_native": "자신의 눈을 믿지 못해 손으로 비비고는 다시 망원경 렌즈로 바짝 다가가 들여다본다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "현실 의구심과 확인 호기심 사이의 의심스러운 서스펜스를 유지.",
+            "scene_id": "scene_1"
+          },
+          {
+            "shot_id": "shot_7",
+            "operation": "derived",
+            "shot_function": "pov",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "Through the lens, a huge chunk of the moon breaks off and debris scatters into space.",
+            "beat_summary_native": "망원경 너머, 달의 거대한 일부분이 깨져 나가며 수많은 파편들이 우주 속으로 비산한다.",
+            "shot_size": "POV",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "달의 붕괴라는 비현실적인 파국 현상을 직관적으로 확정하며 충격을 선사.",
+            "scene_id": "scene_1"
+          },
+          {
+            "shot_id": "shot_8",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "Extreme close-up of Journey's eye expanding with terror as she whispers in disbelief.",
+            "beat_summary_native": "공포로 경악한 져니의 눈동자가 크게 확대되며 속삭이듯 말한다: '방금... 달이 부서진 거야?'",
+            "shot_size": "ECU",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "accelerate",
+            "camera_intent": "static",
+            "dramatic_purpose": "인물의 거대한 공포와 핵심 대사를 초밀착 시선으로 포착하여 감정 곡선의 정점(shock) 달성.",
+            "scene_id": "scene_1"
+          },
+          {
+            "shot_id": "shot_9",
+            "operation": "merged",
+            "shot_function": "action",
+            "source_beats": [
+              7,
+              8
+            ],
+            "beat_summary": "Journey jumps away from the telescope and bolts for the door as star posters on the wall subtly shake.",
+            "beat_summary_native": "망원경에서 뒤쳐져 나온 져니가 방 문으로 허둥지둥 달려가고, 그 여파로 벽에 걸린 천체 포스터들이 미세하게 흔들린다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "망원경에서 방 문으로 패닉 상태로 질주하는 져니의 도주 동선을 따라 펜 및 트래킹",
+            "dramatic_purpose": "개인적 경악이 공간적 이상 진동으로 이어지는 혼란과 긴급한 패닉 상태를 한 컷으로 결합.",
+            "scene_id": "scene_1"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_2",
+        "beat_count": 9,
+        "shot_count": 9,
+        "coverage_ratio": 1,
+        "rhythm_profile": "긴급한 침입에서 어머니의 차가운 무관심을 거쳐 절망적 퇴장으로 이어지는 가속 및 여운의 곡선",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_10",
+            "operation": "added",
+            "shot_function": "establishing",
+            "source_beats": [],
+            "added_rationale": "차가운 모니터 빛과 형광등 아래 고요하고 삭막한 연구실 공간을 먼저 보여주어 져니의 급박한 난입과 대비시킴",
+            "beat_summary": "Establishing shot of the sterile, silent university lab illuminated by harsh blue monitor glows at night.",
+            "beat_summary_native": "밤의 정적 속에 차가운 모니터 빛과 형광등만이 번지는 삭막한 연구실 전경.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "establish",
+            "camera_intent": "static",
+            "dramatic_purpose": "인물의 감정과 대비되는 정적이고 냉담한 로케이션의 공간감을 관객에게 오리엔트함",
+            "scene_id": "scene_2"
+          },
+          {
+            "shot_id": "shot_11",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "Journey bursts open the lab door panting heavily.",
+            "beat_summary_native": "져니가 헐떡거리는 숨을 참지 못하고 연구실 문을 문득 거칠게 열고 들어온다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "문이 열리며 뛰어들어오는 져니의 빠른 움직임을 따라가기 위해 카메라는 트래킹한다.",
+            "dramatic_purpose": "씬의 초반 긴박감(urgency)을 물리적 동선과 함게 강력하게 전달",
+            "scene_id": "scene_2"
+          },
+          {
+            "shot_id": "shot_12",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              1
+            ],
+            "beat_summary": "Mother stays fixated on her tablet screen, completely ignoring the intrusion.",
+            "beat_summary_native": "어머니는 아들의 거친 난입에도 시선을 태블릿 화면에 고정한 채 눈길조차 주지 않는다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "아들의 긴박함과 대비되는 어머니의 집착적이고 차가운 무관심을 명확히 대치",
+            "scene_id": "scene_2"
+          },
+          {
+            "shot_id": "shot_13",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "Journey grabs his mother's sleeve and desperately points out the window.",
+            "beat_summary_native": "져니가 어머니의 옷소매를 잡고 안절부절못하며 창밖을 가리킨다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "져니가 창밖을 가리키는 절박한 손짓의 방향을 강조하기 위해 살짝 팬한다.",
+            "dramatic_purpose": "물리적 접촉을 통해 전달하려는 절박함과 외부의 이상징후를 인지시키려는 시도",
+            "scene_id": "scene_2"
+          },
+          {
+            "shot_id": "shot_14",
+            "operation": "merged",
+            "shot_function": "action",
+            "source_beats": [
+              3,
+              4
+            ],
+            "beat_summary": "Mother annoyedly adjusts her glasses and sighs while tidying research papers.",
+            "beat_summary_native": "어머니는 귀찮다는 듯 안경을 고쳐 쓰고 한숨을 쉬며 책상의 서류 더미를 정돈한다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "아들의 행동을 유난스럽게 여기며 일상의 번거로움 정도로 치부하는 어머니의 냉담한 대처를 원테이크로 강조",
+            "scene_id": "scene_2"
+          },
+          {
+            "shot_id": "shot_15",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "Journey incoherently stammers, trying to explain the moon's destruction.",
+            "beat_summary_native": "져니가 공포에 질려 두서없이 달이 무너져 내리고 있음을 설명한다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "accelerate",
+            "camera_intent": "static",
+            "dramatic_purpose": "져니의 감정이 극에 달하는 정점(frustration/panic)을 미세한 얼굴 근육 떨림과 클로즈업으로 정서적 전달",
+            "scene_id": "scene_2"
+          },
+          {
+            "shot_id": "shot_16",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "Mother pushes Journey's shoulder away and buries her eyes back into the monitor screen.",
+            "beat_summary_native": "어머니가 져니의 어깨를 단호하게 밀쳐내고는 다시 화면으로 눈을 돌린다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "밀쳐내는 신체적 거절의 순간, 관계의 단절을 단단하게 조이기 위해 미세하게 줌인(push-in)한다.",
+            "dramatic_purpose": "소통의 완전한 거절과 인물 간의 극단적인 온도 차이를 명확히 입증",
+            "scene_id": "scene_2"
+          },
+          {
+            "shot_id": "shot_17",
+            "operation": "derived",
+            "shot_function": "insert",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "Mother takes a sip from a cold, forgotten cup of coffee.",
+            "beat_summary_native": "어머니가 이미 차갑게 식어버린 커피잔을 들어 한 모금 머금는다.",
+            "shot_size": "ECU",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "식어버린 커피라는 디테일 소품을 통해 감정이 결여된 연구실의 시선과 시각적 호흡의 쉼표(breath) 제공",
+            "scene_id": "scene_2"
+          },
+          {
+            "shot_id": "shot_18",
+            "operation": "derived",
+            "shot_function": "transition",
+            "source_beats": [
+              8
+            ],
+            "beat_summary": "Journey leaves the lab in total despair, exiting into the dark corridor.",
+            "beat_summary_native": "져니가 완전히 무너진 절망적인 표정으로 차가운 연구실을 빠져나간다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "좌절(frustration)에 도달한 씬의 감정적 결말을 외롭게 떠나는 아들의 뒷모습으로 여운 있게 여닫음",
+            "scene_id": "scene_2"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_3",
+        "beat_count": 9,
+        "shot_count": 9,
+        "coverage_ratio": 1,
+        "rhythm_profile": "낙담한 정적 상태에서 아버지의 따뜻한 개입으로 서서히 온기와 희망이 차오르는 지속적(sustained) 템포",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_19",
+            "operation": "derived",
+            "shot_function": "establishing",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "Journey sits dejectedly on the edge of his bed with his head bowed in his dark room.",
+            "beat_summary_native": "어두운 방 안, 져니가 침대에 걸터앉아 고개를 숙인 채 실의에 빠져 있다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "establish",
+            "camera_intent": "static",
+            "dramatic_purpose": "방 안의 차가운 푸른 달빛과 고립된 져니의 낙담한 분위기를 공간 전체로 전달한다.",
+            "scene_id": "scene_3"
+          },
+          {
+            "shot_id": "shot_20",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              1
+            ],
+            "beat_summary": "Father enters the bedroom while rolling up the sleeves of his flannel shirt.",
+            "beat_summary_native": "아버지가 플란넬 셔츠 소매를 걷어붙이며 침실 안으로 걸어 들어온다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "문에서 들어오는 아버지의 이동을 따라 팬하며 인물의 동선을 고정한다.",
+            "dramatic_purpose": "아버지의 등장을 통해 씬의 온도를 바꾸고 인물 간 물리적 거리를 좁히기 시작한다.",
+            "scene_id": "scene_3"
+          },
+          {
+            "shot_id": "shot_21",
+            "operation": "derived",
+            "shot_function": "master",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "Father gently strokes Journey's head with his rough, weathered hand.",
+            "beat_summary_native": "아버지가 다가와 거친 손길로 져니의 머리를 따뜻하게 쓰다듬어 준다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "두 사람 사이의 신체적 접촉을 통해 부성애와 안도감을 정서적으로 강조한다.",
+            "scene_id": "scene_3"
+          },
+          {
+            "shot_id": "shot_22",
+            "operation": "derived",
+            "shot_function": "insert",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Father carefully examines Journey's sketch depicting the destruction of the moon.",
+            "beat_summary_native": "아버지가 져니가 그려놓은 달의 파괴 스케치를 유심히 들여다본다.",
+            "shot_size": "ECU",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "이야기의 핵심 소재인 '달의 파괴 스케치'를 클로즈업하여 시각적 정보를 명확히 각인시킨다.",
+            "scene_id": "scene_3"
+          },
+          {
+            "shot_id": "shot_23",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "Father gazes thoughtfully out the window at the dark night sky.",
+            "beat_summary_native": "아버지가 창문 쪽을 향해 서서 창밖의 검은 밤하늘을 진지한 눈빛으로 바라본다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "아들의 말을 그저 어린아이의 장난으로 치부하지 않고 진심으로 고민하는 아버지의 내면을 보여준다.",
+            "scene_id": "scene_3"
+          },
+          {
+            "shot_id": "shot_24",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "Father walks toward the brass telescope with heavy, reassuring footsteps.",
+            "beat_summary_native": "아버지가 묵직한 부츠 소리를 내며 방 한구석의 황동 망원경 앞으로 걸어간다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "망원경으로 이동하는 아버지의 발걸음과 인물의 움직임을 따라 트래킹한다.",
+            "dramatic_purpose": "말뿐이 아닌 직접 확인하겠다는 행동적 의지를 공간 내 이동으로 표현한다.",
+            "scene_id": "scene_3"
+          },
+          {
+            "shot_id": "shot_25",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "Father turns to Journey with a warm smile, giving a reassuring thumbs-up and delivering key dialogue.",
+            "beat_summary_native": "아버지가 져니를 돌아보며 따뜻하게 미소 짓고 엄지를 치켜세우며 내일 같이 확인해보자고 말한다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "핵심 대사와 표정을 통해 아들에 대한 전폭적인 믿음과 확신을 전달한다.",
+            "scene_id": "scene_3"
+          },
+          {
+            "shot_id": "shot_26",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "Journey's expression slightly brightens as a faint ray of hope replaces his dejection.",
+            "beat_summary_native": "아버지의 말을 들은 져니의 수심 가득했던 표정이 조금씩 밝아진다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "dejection에서 hope로 전환되는 씬의 감정 곡선 클라이맥스를 인물의 미세한 표정 변화로 포착한다.",
+            "scene_id": "scene_3"
+          },
+          {
+            "shot_id": "shot_27",
+            "operation": "derived",
+            "shot_function": "transition",
+            "source_beats": [
+              8
+            ],
+            "beat_summary": "Father switches off the main bedroom light and steps out, leaving the room in soft moonlight.",
+            "beat_summary_native": "아버지가 방 불을 끄고 밖으로 나가고, 져니의 방은 은은한 달빛 속으로 빠져든다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "씬을 여운 있게 마무리하며 다음 날 펼쳐질 사건에 대한 기대를 형성한다.",
+            "scene_id": "scene_3"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_4",
+        "beat_count": 10,
+        "shot_count": 10,
+        "coverage_ratio": 1,
+        "rhythm_profile": "고요한 주시에서 시작하여 위기의 고조에 따라 컷 템포를 가속하고 파국 이후 정적으로 수렴하는 구조",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_28",
+            "operation": "added",
+            "shot_function": "establishing",
+            "source_beats": [],
+            "added_rationale": "재앙 발생 전 어두운 산업 부두의 광활함과 인물의 외로운 고립감을 시각적으로 설정하기 위해 엑스트라 샷 추가.",
+            "beat_summary": "An extreme wide view of the quiet industrial harbor with the father standing alone at the edge of the pier.",
+            "beat_summary_native": "어두운 산업 부두 끝에 홀로 서 있는 아버지의 모습을 넓게 보여준다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "establish",
+            "camera_intent": "static",
+            "dramatic_purpose": "거대한 환경 대비 인물의 미약함을 보여주어 앞으로 닥칠 재앙의 압도적 스케일을 대비함.",
+            "scene_id": "scene_4"
+          },
+          {
+            "shot_id": "shot_29",
+            "operation": "derived",
+            "shot_function": "master",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "Father stands at the edge of the pier, looking out nervously toward the sea.",
+            "beat_summary_native": "아버지가 부두 끝에서 바다를 바라본다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "Slow push-in as father notices an abnormal change in the sea.",
+            "dramatic_purpose": "이상 징후를 서서히 감지하는 인물의 불안감을 카메라이동으로 밀착 고조함.",
+            "scene_id": "scene_4"
+          },
+          {
+            "shot_id": "shot_30",
+            "operation": "merged",
+            "shot_function": "action",
+            "source_beats": [
+              1,
+              2
+            ],
+            "beat_summary": "Seawater rapidly recedes, exposing mudflats where fish flop helplessly.",
+            "beat_summary_native": "바닷물이 빠르게 빠져나가며 드러난 갯벌 위에서 물고기들이 파닥거린다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "Pan following the receding waterline across the exposed seabed.",
+            "dramatic_purpose": "해일 직전 전형적인 물 빠짐 현상과 질식하는 생명들을 통해 초현실적 기괴함 표현.",
+            "scene_id": "scene_4"
+          },
+          {
+            "shot_id": "shot_31",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Father pulls out his radio and screams urgently into it.",
+            "beat_summary_native": "아버지가 무전기를 꺼내 다급하게 대피 경고를 외친다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "accelerate",
+            "camera_intent": "static",
+            "dramatic_purpose": "인물의 절박한 표정과 대사를 명확히 포착하여 사건의 긴급도를 급격히 상승시킴.",
+            "scene_id": "scene_4"
+          },
+          {
+            "shot_id": "shot_32",
+            "operation": "derived",
+            "shot_function": "reveal",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "A colossal white wall of water rises on the distant horizon.",
+            "beat_summary_native": "수평선 멀리서 거대한 흰 벽 같은 쓰나미 파도가 솟아오른다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "위협의 실체를 명확히 드러내어 서스펜스를 순식간에 실체적 공포로 변환.",
+            "scene_id": "scene_4"
+          },
+          {
+            "shot_id": "shot_33",
+            "operation": "derived",
+            "shot_function": "cutaway",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "Rusty shipping containers on the pier creak and vibrate unnaturally.",
+            "beat_summary_native": "부두의 거대한 컨테이너들이 진동하며 삐걱거린다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 4,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "Tilt up following the swaying structure of the container stacks.",
+            "dramatic_purpose": "충격파와 진동을 시각적·청각적 주변 징후로 짧게 보여주어 편집 템포 가속.",
+            "scene_id": "scene_4"
+          },
+          {
+            "shot_id": "shot_34",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "Father turns to escape but stumbles and tangles his feet in terror.",
+            "beat_summary_native": "아버지가 도망치려 뒤돌아서지만 발이 엉켜 넘어지려 한다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 4,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "Tracking backward along father's panicked stumble.",
+            "dramatic_purpose": "도망칠 수 없는 재앙 앞에서의 무력함과 신체적 비극을 인접 샷으로 강조.",
+            "scene_id": "scene_4"
+          },
+          {
+            "shot_id": "shot_35",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "A massive wave crashes down, swallowing the entire pier in roaring foam.",
+            "beat_summary_native": "거대한 물보라가 부두 전체를 집어삼키며 덮친다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "파국의 정점을 와이드로 담아내어 자연의 압도적 파괴력을 완성함.",
+            "scene_id": "scene_4"
+          },
+          {
+            "shot_id": "shot_36",
+            "operation": "derived",
+            "shot_function": "insert",
+            "source_beats": [
+              8
+            ],
+            "beat_summary": "The dropped radio sinks into rushing water and gets submerged.",
+            "beat_summary_native": "아버지가 놓친 무전기가 바닥에 떨어져 순식간에 물에 잠긴다.",
+            "shot_size": "ECU",
+            "intended_duration_seconds": 4,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "외부와의 유일한 연락 수단이 끊어지는 상징적 소품 디테일을 인서트하여 정적 속 비극 전달.",
+            "scene_id": "scene_4"
+          },
+          {
+            "shot_id": "shot_37",
+            "operation": "derived",
+            "shot_function": "transition",
+            "source_beats": [
+              9
+            ],
+            "beat_summary": "Churning water foam completely engulfs the lens, fading into total blackout.",
+            "beat_summary_native": "격렬한 물거품이 화면 전체를 덮으며 암전으로 이어진다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "시각적 블라인드 효과를 통해 주인공의 비극적 상실과 씬의 종료를 묵직한 여운으로 마감.",
+            "scene_id": "scene_4"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_5",
+        "beat_count": 9,
+        "shot_count": 9,
+        "coverage_ratio": 1,
+        "rhythm_profile": "고요한 비탄으로 시작해 냉혹한 진실의 규명으로 긴장이 지속 고조된 후 포옹의 오열로 귀결되는 호흡",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_38",
+            "operation": "added",
+            "shot_function": "establishing",
+            "source_beats": [],
+            "added_rationale": "남편을 잃은 슬픔과 차가운 과학적 공간의 대비를 보여주어 씬의 무거운 분위기를 먼저 형성함",
+            "beat_summary": "A wide view of the cold, quiet university lab late at night.",
+            "beat_summary_native": "어두운 밤, 차갑고 적막한 대학 연구실 전경이 펼쳐진다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "establish",
+            "camera_intent": "static",
+            "dramatic_purpose": "공간의 상실감과 고독한 분위기를 확립",
+            "scene_id": "scene_5"
+          },
+          {
+            "shot_id": "shot_39",
+            "operation": "derived",
+            "shot_function": "master",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "The mother packs away her late husband's personal belongings in the lab.",
+            "beat_summary_native": "어머니가 텅 빈 연구실에서 남편의 유품을 상자에 정돈한다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "sustain",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "유품을 정리하며 무거운 발걸음으로 움직이는 어머니를 따라 팬",
+            "dramatic_purpose": "남편의 부재가 주는 비탄의 호흡을 길게 포착",
+            "scene_id": "scene_5"
+          },
+          {
+            "shot_id": "shot_40",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              1
+            ],
+            "beat_summary": "The mother finds Journey's old observation notebook hidden under papers.",
+            "beat_summary_native": "어머니가 서류 더미 속에서 져니가 두고 간 낡은 관측 노트를 발견한다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "노트를 멈칫거리며집어드는 어머니의 손과 인물로 다가감",
+            "dramatic_purpose": "새로운 서사적 계기(노트)의 발견에 집중",
+            "scene_id": "scene_5"
+          },
+          {
+            "shot_id": "shot_41",
+            "operation": "derived",
+            "shot_function": "detail",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "The mother compares the handwritten figures in the notebook with her tablet screen.",
+            "beat_summary_native": "어머니가 노트 속 수치와 자신의 태블릿 데이터를 번갈아 보며 대조한다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "이상 징후를 감지하고 의구심을 갖는 지적 긴장감 조성",
+            "scene_id": "scene_5"
+          },
+          {
+            "shot_id": "shot_42",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Her trembling hands remove her glasses as shock begins to set in.",
+            "beat_summary_native": "어머니의 손이 떨리며 안경을 벗어 던진다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "신체적 반응을 통해 충격과 예감의 일차적 감정 전달",
+            "scene_id": "scene_5"
+          },
+          {
+            "shot_id": "shot_43",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "The mother frantically writes down a new mathematical formula on the whiteboard.",
+            "beat_summary_native": "어머니가 화이트보드로 다가가 급하게 새로운 수식을 적어 내려간다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "보드로 급박하게 다가가는 어머니의 행위를 트래킹",
+            "dramatic_purpose": "진실 검증을 향한 절박한 움직임과 페이스 상승",
+            "scene_id": "scene_5"
+          },
+          {
+            "shot_id": "shot_44",
+            "operation": "merged",
+            "shot_function": "reveal",
+            "source_beats": [
+              5,
+              6
+            ],
+            "beat_summary": "The completed formula reveals catastrophic doom; the mother covers her mouth and collapses.",
+            "beat_summary_native": "계산 결과가 절망적인 파멸을 가리키자, 어머니가 입을 막고 주저앉는다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 10,
+            "rhythm_role": "sustain",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "주저앉는 어머니의 신체 하강에 맞춰 틸트 다운",
+            "dramatic_purpose": "깨달음의 순간(revelation)과 거대한 절망을 원테이크의 호흡으로 포착",
+            "scene_id": "scene_5"
+          },
+          {
+            "shot_id": "shot_45",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "Journey stands in the doorway, watching her mother with deep sorrow.",
+            "beat_summary_native": "져니가 문가에서 어머니를 슬프게 바라본다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "감정이 폭발한 직후 짧은 숨고르기와 시선의 고요함 부여",
+            "scene_id": "scene_5"
+          },
+          {
+            "shot_id": "shot_46",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              8
+            ],
+            "beat_summary": "The mother pulls Journey into a tight embrace and sobs uncontrollably.",
+            "beat_summary_native": "어머니가 져니를 끌어안고 오열한다.",
+            "shot_size": "2S",
+            "intended_duration_seconds": 10,
+            "rhythm_role": "sustain",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "서로를 안은 두 인물에게로 매우 천천히 다가가는 느린 푸시인",
+            "dramatic_purpose": "비극적 깨달음 끝에 이어지는 오열과 감정의 서사적 클라이맥스 완성",
+            "scene_id": "scene_5"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_6",
+        "beat_count": 9,
+        "shot_count": 9,
+        "coverage_ratio": 1,
+        "rhythm_profile": "권력의 냉담함에 짓눌리며 단호함에서 완전한 고립과 수치심으로 쇠퇴하는 곡선",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_47",
+            "operation": "derived",
+            "shot_function": "establishing",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "The mother stands alone at the podium inside a vast, brutalist conference hall.",
+            "beat_summary_native": "압도적인 위용의 회의실 연단 위에서 어머니가 홀로 발언을 준비한다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "establish",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "거대한 브루탈리즘 건축 공간에 비해 기에 눌린 인물의 미약함을 보여주기 위한 서서히 좁혀드는 트랙 인",
+            "dramatic_purpose": "공간의 위압감과 홀로 선 어머니의 거대한 내면적 부담감을 대비",
+            "scene_id": "scene_6"
+          },
+          {
+            "shot_id": "shot_48",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              1
+            ],
+            "beat_summary": "She project lunar mass variations and gravitational anomaly graphs onto the large screen.",
+            "beat_summary_native": "어머니는 붉은 경고 표시가 뜬 달의 질량 변화와 중력 이상 그래프 화면을 스크린에 띄운다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "경고 데이터의 엄중함과 어머니의 결연한 과학적 의지를 전달",
+            "scene_id": "scene_6"
+          },
+          {
+            "shot_id": "shot_49",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "Suit-clad officials whisper to each other and smirk disdainfully across the long table.",
+            "beat_summary_native": "긴 칠흑빛 테이블에 앉은 정장 차림의 관리들이 서로 얼굴을 맞대고 비웃음을 나눈다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "기득권 관리들의 냉소와 비과학적 태도를 선명히 부각",
+            "scene_id": "scene_6"
+          },
+          {
+            "shot_id": "shot_50",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Anxious, the mother urgently switches to the next presentation slide.",
+            "beat_summary_native": "상황의 급박함을 느낀 어머니가 떨리는 손으로 다급히 다음 슬라이드를 넘긴다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "어머니의 불안과 조급한 호흡을 담아내기 위한 미세한 핸드헬드 움직임",
+            "dramatic_purpose": "심화되는 긴장감과 어머니의 다급한 심리를 감정적으로 밀착 전파",
+            "scene_id": "scene_6"
+          },
+          {
+            "shot_id": "shot_51",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "The lead official raises a hand, coldly interrupting her with dismissive dialogue.",
+            "beat_summary_native": "중앙에 앉은 대표 관리가 손을 들어 어머니의 대사를 오만하게 끊어버린다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "핵심 대사를 통해 관료적 오만함의 정점을 찍고 갈등을 극대화",
+            "scene_id": "scene_6"
+          },
+          {
+            "shot_id": "shot_52",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "The heavy hall doors swing open, and security guards step into the room.",
+            "beat_summary_native": "육중한 회의실 문이 열리고 제복을 입은 보안 요원들이 무거운 발걸음으로 들어온다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "문이 열리며 퇴거 압박을 가하는 보안 요원들의 진입 동선을 팬으로 추적",
+            "dramatic_purpose": "물리적 압박과 모욕의 시작을 가시화",
+            "scene_id": "scene_6"
+          },
+          {
+            "shot_id": "shot_53",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "Clutching her stack of paper files tightly, the mother desperately protests.",
+            "beat_summary_native": "어머니는 손에 쥔 서류 뭉치를 하얗게 질리도록 꼭 쥐며 마지막까지 절박하게 항변한다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "굴욕 앞에서도 무너지지 않으려는 절박한 항변과 감정적 클라이맥스",
+            "scene_id": "scene_6"
+          },
+          {
+            "shot_id": "shot_54",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "The officials stand up one by one and coldly walk out of the hall.",
+            "beat_summary_native": "관리들이 그녀의 말을 외면한 채 하나둘 자리에서 일어나 미련 없이 퇴장한다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "어머니를 등지고 나가는 관리들의 차가운 뒤모습을 물러서며 쫓는 줌 아웃/트랙 백",
+            "dramatic_purpose": "철저한 무시와 버림받는 상황을 시각적으로 연출",
+            "scene_id": "scene_6"
+          },
+          {
+            "shot_id": "shot_55",
+            "operation": "derived",
+            "shot_function": "transition",
+            "source_beats": [
+              8
+            ],
+            "beat_summary": "The mother is left completely alone in the echoing, vacant hall.",
+            "beat_summary_native": "침묵만이 감도는 넓고 텅 빈 회의실에 어머니 홀로 덩그러니 남겨진다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 10,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "완전한 수치심과 고립감의 여운을 긴 정적으로 관객에게 전달",
+            "scene_id": "scene_6"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_7",
+        "beat_count": 8,
+        "shot_count": 7,
+        "coverage_ratio": 0.88,
+        "rhythm_profile": "절망의 무거운 정적에서 호흡을 유지하며 서서히 공포로 고조되는 호흡",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_56",
+            "operation": "derived",
+            "shot_function": "master",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "The mother walks out of the council building into the desolate ruined city.",
+            "beat_summary_native": "어머니가 회의장 건물 밖으로 걸어 나온다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "establish",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "Tracking the mother as she steps from the dark threshold into the vast grey ash-covered street.",
+            "dramatic_purpose": "회의장에서 거절당하고 쫓겨난 어머니의 고립감과 거대한 폐허 도시의 비참함을 대비하여 보여준다.",
+            "scene_id": "scene_7"
+          },
+          {
+            "shot_id": "shot_57",
+            "operation": "derived",
+            "shot_function": "reveal",
+            "source_beats": [
+              1
+            ],
+            "beat_summary": "The mother tilts her head up as the sky mutates into grotesque purple and crimson hues.",
+            "beat_summary_native": "하늘이 기이한 보랏빛과 붉은빛으로 뒤섞여 있는 모습을 바라본다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "대기 붕괴의 초현실적이고 압도적인 스케일을 보여주며 무력감의 감정을 전면으로 끌어올린다.",
+            "scene_id": "scene_7"
+          },
+          {
+            "shot_id": "shot_58",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "A sudden freezing gust of wind sweeps across, scattering papers around her feet.",
+            "beat_summary_native": "갑자기 차가운 돌풍이 불어와 서류들이 날아간다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "punctuate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "Pan following the sharp movement of wind and fluttering papers blowing past her.",
+            "dramatic_purpose": "갑작스러운 환경적 변화와 이상 기후의 촉각적 위협을 시각화하여 긴장감을 불어넣는다.",
+            "scene_id": "scene_7"
+          },
+          {
+            "shot_id": "shot_59",
+            "operation": "derived",
+            "shot_function": "cutaway",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Surrounding citizens stop and point up at the sky, muttering in growing confusion.",
+            "beat_summary_native": "사람들이 하늘을 보며 웅성거리기 시작한다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "개인의 절망이 집단적 동요와 불안으로 확산되는 과정을 군중의 반응을 통해 전달한다.",
+            "scene_id": "scene_7"
+          },
+          {
+            "shot_id": "shot_60",
+            "operation": "merged",
+            "shot_function": "action",
+            "source_beats": [
+              4,
+              5
+            ],
+            "beat_summary": "Mother nervously dials Journey on her phone, but hears only endless ringing before muttering to herself.",
+            "beat_summary_native": "어머니가 떨리는 손으로 휴대폰을 꺼내 져니에게 전화를 걸지만 연결되지 않자 '이미 늦었어... 대기가 무너지고 있어'라고 중얼거린다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 11,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "연락두절로 인한 단절감과 함께 대사가 가지는 비극적 직언을 감정적으로 롱테이크 처리하여 몰입감을 극대화한다.",
+            "scene_id": "scene_7"
+          },
+          {
+            "shot_id": "shot_61",
+            "operation": "added",
+            "shot_function": "insert",
+            "source_beats": [],
+            "added_rationale": "insert — 소통 체계의 마비와 기술의 무용성을 시각적으로 강조하기 위해 끊어진 전화 화면 인서트 추가.",
+            "beat_summary": "Close-up of the phone screen showing 'Call Failed' as the signal bar drops to zero.",
+            "beat_summary_native": "신호가 끊어지며 통화 실패 문구가 떠오르는 휴대폰 화면.",
+            "shot_size": "ECU",
+            "intended_duration_seconds": 4,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "외부 세계와의 소통이 완전히 차단되었음을 직관적으로 알리는 정적 비트.",
+            "scene_id": "scene_7"
+          },
+          {
+            "shot_id": "shot_62",
+            "operation": "merged",
+            "shot_function": "reaction",
+            "source_beats": [
+              6,
+              7
+            ],
+            "beat_summary": "Distant wailing sirens echo through the air as the mother looks around with terror in her eyes.",
+            "beat_summary_native": "멀리서 사이렌 소리가 울려 퍼지자 어머니가 불안한 눈빛으로 주위를 두리번거린다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 10,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "Slow push-in into her eyes as the distant sirens trigger rising panic.",
+            "dramatic_purpose": "청각적 위기 신호와 인물의 눈빛을 밀착 포착하여 감정을 절망에서 극심한 공포로 전환시킨다.",
+            "scene_id": "scene_7"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_8",
+        "beat_count": 9,
+        "shot_count": 9,
+        "coverage_ratio": 1,
+        "rhythm_profile": "고요한 경보음 속 서막에서 시작되어 파도와 붕괴의 연속으로 템포가 가속되고, 마침내 거대한 물소리로 소음이 묻히는 정적/절망의 여운으로 마무리되는 곡선",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_63",
+            "operation": "added",
+            "shot_function": "establishing",
+            "source_beats": [],
+            "added_rationale": "재앙이 들이닥치기 직전, 거대한 항만의 전경과 스케일을 보여주어 관객의 공간적 인지를 확보함.",
+            "beat_summary": "Establishing shot of the quiet before the storm at the industrial harbor with sweeping searchlights.",
+            "beat_summary_native": "사이렌 소리와 비상등이 깜빡이는 가운데 대재앙 직전 부두의 웅장한 전경.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "establish",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "공간의 거대함과 조여오는 위기감을 대비시키기 위해 부두 전역을 천천히 훑음.",
+            "dramatic_purpose": "관객에게 공간적 배경을 인지시키고 폭풍전야의 중압감을 전달한다.",
+            "scene_id": "scene_8"
+          },
+          {
+            "shot_id": "shot_64",
+            "operation": "derived",
+            "shot_function": "reveal",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "A colossal wave surges over the breakwater, threatening the entire harbor.",
+            "beat_summary_native": "수십 미터 높이의 거대한 파도가 방파제를 넘어서며 부두로 덮쳐온다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "방파제를 삼키며 치솟는 해일의 엄청난 높이를 따라 수직으로 틸트업.",
+            "dramatic_purpose": "대재앙의 본래 형태를 드러내며 압도적인 시각적 공포를 선사한다.",
+            "scene_id": "scene_8"
+          },
+          {
+            "shot_id": "shot_65",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              1
+            ],
+            "beat_summary": "Panicked people scream and run desperately toward higher ground.",
+            "beat_summary_native": "비명을 지르는 사람들이 살기 위해 조금이라도 높은 곳을 향해 질주한다.",
+            "shot_size": "FS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "도망치는 군중의 미친듯한 움직임과 혼란에 맞춘 핸드헬드 트래킹.",
+            "dramatic_purpose": "인간의 처절한 생존 본능과 현장의 극심한 패닉을 긴박하게 전달한다.",
+            "scene_id": "scene_8"
+          },
+          {
+            "shot_id": "shot_66",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "A giant harbor crane snaps and buckles helpless like paper.",
+            "beat_summary_native": "부두의 거대한 철제 크레인이 파도의 충격을 견디지 못하고 종잇장처럼 꺾인다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "크레인 구조물이 꺾여 무너져 내리는 궤적을 쫓아 내리찍듯 패닝.",
+            "dramatic_purpose": "거대 인프라의 무기력한 파괴를 통해 거대 해일의 파괴력을 실감케 한다.",
+            "scene_id": "scene_8"
+          },
+          {
+            "shot_id": "shot_67",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "Shipping containers violently smash together with thunderous metallic force.",
+            "beat_summary_native": "수많은 컨테이너들이 수압에 휩쓸려 서로 부딪치며 파괴적인 굉음을 낸다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "컨테이너들이 부딪히는 순간의 충격에 맞춰 미세하고 거친 핸드헬드 셰이크.",
+            "dramatic_purpose": "충돌하는 금속의 타격감과 시청각적 압박감을 극대화한다.",
+            "scene_id": "scene_8"
+          },
+          {
+            "shot_id": "shot_68",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Parked cars are swept away like floating toys in the violent current.",
+            "beat_summary_native": "주차장에 멈춰 있던 차량들이 파도에 휩쓸려 장난감처럼 사방으로 떠다닌다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 4,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "일상적인 물건들이 순식간에 쓰레기처럼 떠다니는 비현실적 디스토피아 감각을 강조한다.",
+            "scene_id": "scene_8"
+          },
+          {
+            "shot_id": "shot_69",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "The harbor control tower weakens and collapses into the rising sea.",
+            "beat_summary_native": "항만을 통제하던 중앙 관제탑마저 힘없이 무너져 바다 속으로 침몰한다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "관제탑이 사선으로 기울며 수면으로 처박히는 빠른 추락을 내리쫓음.",
+            "dramatic_purpose": "시스템의 완벽한 붕괴와 지휘 통제의 불능 상태를 시각화한다.",
+            "scene_id": "scene_8"
+          },
+          {
+            "shot_id": "shot_70",
+            "operation": "merged",
+            "shot_function": "master",
+            "source_beats": [
+              6,
+              7
+            ],
+            "beat_summary": "Turbulent sea water surges deep into the city streets as dark smoke billows everywhere.",
+            "beat_summary_native": "검은 연기가 피어오르는 가운데 바닷물이 이미 도심 한복판 깊숙한 곳까지 거침없이 밀고 들어간다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "sustain",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "도심 내로 거세게 진입하는 유속을 따라 수평으로 유연하게 모션 트래킹.",
+            "dramatic_purpose": "재앙이 항만에 국한되지 않고 삶의 공간 전체를 침식해 들어가는 파국을 보여준다.",
+            "scene_id": "scene_8"
+          },
+          {
+            "shot_id": "shot_71",
+            "operation": "derived",
+            "shot_function": "transition",
+            "source_beats": [
+              8
+            ],
+            "beat_summary": "All chaotic screaming and crashing noises are consumed by the roaring sound of the ocean water.",
+            "beat_summary_native": "모든 인간의 비명과 굉음이 거대한 물소리 하나로 통일되며 완벽한 절망 속에 묻힌다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "아비규환의 클라이맥스 후 소음이 물소리로 일체화되는 정적을 통해 고요하고 압도적인 감정적 잔상을 전달한다.",
+            "scene_id": "scene_8"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_9",
+        "beat_count": 9,
+        "shot_count": 9,
+        "coverage_ratio": 1,
+        "rhythm_profile": "절박함 속에서 묵직한 호흡으로 정점을 향해 느리지만 확실하게 고조되는 숭고한 정체감",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_72",
+            "operation": "derived",
+            "shot_function": "establishing",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "Dust and concrete debris shower down from the flickering lab ceiling.",
+            "beat_summary_native": "연구실 천장에서 먼지와 콘크리트 파편이 위태롭게 떨어져 내린다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "establish",
+            "camera_intent": "static",
+            "dramatic_purpose": "붕괴 직전인 연구실의 물리적 위기감과 비장한 공간 분위기를 형성한다.",
+            "scene_id": "scene_9"
+          },
+          {
+            "shot_id": "shot_73",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              1
+            ],
+            "beat_summary": "Mother grips the violently shaking desk and continues typing on the keyboard.",
+            "beat_summary_native": "어머니가 진동으로 들썩이는 책상을 한 손으로 그러쥐며 멈추지 않고 키보드를 두드린다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "진동으로 흔들리는 어머니의 몸과 책상으로 미세하게 밀고 들어가 집중도를 높인다.",
+            "dramatic_purpose": "재앙의 충격 속에서도 데이터 전송을 포기하지 않는 어머니의 집념을 보여준다.",
+            "scene_id": "scene_9"
+          },
+          {
+            "shot_id": "shot_74",
+            "operation": "derived",
+            "shot_function": "detail",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "The computer monitor flickers wildly with static, threatening to shut down completely.",
+            "beat_summary_native": "컴퓨터 모니터가 노이즈를 내뿜으며 지지직거리고 순식간에 꺼질 듯 위태롭게 불빛이 흔들린다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "전력 손실 및 기기 파손으로 인한 시간 지연의 긴박함을 극대화한다.",
+            "scene_id": "scene_9"
+          },
+          {
+            "shot_id": "shot_75",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "With steady determination, mother plugs the external hard drive into the main server chassis.",
+            "beat_summary_native": "어머니가 떨리는 손으로 외장 하드 케이블을 서버 본체 포트에 단단히 밀어 넣는다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "사건의 핵심 목표인 데이터 연결 행위를 명확히 포착하여 서사적 당위성을 부여한다.",
+            "scene_id": "scene_9"
+          },
+          {
+            "shot_id": "shot_76",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "A sudden violent quake causes the heavy metallic bookshelf to crash down behind her.",
+            "beat_summary_native": "강한 충격과 함께 어머니 뒷편의 육중한 금속 책꽂이가 힘없이 무너져 내린다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "붕괴의 위협이 어머니의 바로 턱밑까지 육박했음을 강렬한 시각적 타격으로 전달한다.",
+            "scene_id": "scene_9"
+          },
+          {
+            "shot_id": "shot_77",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "Mother fixes her desperate gaze on the transfer progress bar creeping slowly across the screen.",
+            "beat_summary_native": "어머니가 화면 속 천천히 차오르는 전송 진행 바를 숨을 죽인 채 응시한다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "절체절명의 순간 속에서 피말리는 기다림의 심리적 고조를 롱테이크 호흡으로 전달한다.",
+            "scene_id": "scene_9"
+          },
+          {
+            "shot_id": "shot_78",
+            "operation": "derived",
+            "shot_function": "insert",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "Her trembling hand clutches a framed photo of her husband resting beside the server.",
+            "beat_summary_native": "어머니의 떨리는 손이 책상 위 남편의 사진이 담긴 액자를 가만히 꼭 쥔다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "죽음의 공포를 이겨내는 동기가 가족에 대한 사랑과 희생정신임을 조용히 드러낸다.",
+            "scene_id": "scene_9"
+          },
+          {
+            "shot_id": "shot_79",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "As 'Transfer Complete' flashes on screen, mother lets out a relieved smile through tears.",
+            "beat_summary_native": "전송 완료 팝업창이 뜨자 어머니는 눈물을 흘리며 안도의 미소를 짓고 결연히 대사를 읊는다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 10,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "임무를 완수한 안도감과 자신의 운명을 수용하는 숭고한 감정적 클라이맥스를 담아낸다.",
+            "scene_id": "scene_9"
+          },
+          {
+            "shot_id": "shot_80",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              8
+            ],
+            "beat_summary": "With a deafening roar, the entire laboratory ceiling collapses down over the space.",
+            "beat_summary_native": "시끄러운 굉음과 함께 연구실 천장 전체가 완전히 무너져 내리며 공간을 삼킨다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "희생의 순간을 비극적이면서도 엄숙하게 마무리하며 씬에 강렬한 종결감을 부여한다.",
+            "scene_id": "scene_9"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_10",
+        "beat_count": 8,
+        "shot_count": 8,
+        "coverage_ratio": 1,
+        "rhythm_profile": "공포스러운 도심 질주에서 시작하여 대재앙의 압도적 절망감으로 진입하는 가속 및 정적 곡선",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_81",
+            "operation": "derived",
+            "shot_function": "establishing",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "Journey runs through the torrential rain wearing a wet hoodie in a chaotic ruined city street.",
+            "beat_summary_native": "져니가 젖은 후드티를 눌러쓴 채 쏟아지는 빗속의 폐허가 된 거리를 질주한다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "establish",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "져니의 질주 속도에 맞춰 폐허가 된 도심의 거대함을 함께 드러내는 트래킹",
+            "dramatic_purpose": "아수라장이 된 도시 공간의 스케일과 공포스러운 재앙의 상황을 구축하고 져니의 도주를 개시한다.",
+            "scene_id": "scene_10"
+          },
+          {
+            "shot_id": "shot_82",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              1
+            ],
+            "beat_summary": "Glass from an adjacent building shatters, raining sharp shards down into the street.",
+            "beat_summary_native": "건물의 거대한 유리가 깨지며 져니 근처 거리로 날카로운 파편들이 비처럼 쏟아져 내린다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "파편이 낙하하는 궤적과 져니의 회피 동작을 동시에 담기 위한 급격한 하향 패닝",
+            "dramatic_purpose": "도심 파괴의 직접적인 위협과 충격을 시각적으로 전달하여 공포감을 고조시킨다.",
+            "scene_id": "scene_10"
+          },
+          {
+            "shot_id": "shot_83",
+            "operation": "derived",
+            "shot_function": "master",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "Desperate people push each other to flee down into an underground passage.",
+            "beat_summary_native": "절망에 빠진 군중이 서로를 밀쳐내며 아수라장 속 지하도로 밀려 들어간다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "지하도로 몰려드는 이기적인 군중의 거친 흐름을 따라가는 핸드헬드 이동",
+            "dramatic_purpose": "질서가 무너진 아수라장의 이기심과 집단적 공포를 극대화한다.",
+            "scene_id": "scene_10"
+          },
+          {
+            "shot_id": "shot_84",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Journey trips and falls to the ground, then desperately scrambles back up to grab her backpack.",
+            "beat_summary_native": "충격에 넘어진 져니가 빗물 속에서 허덕이다가 가까스로 일어나 가방을 끌어안는다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "sustain",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "바닥으로 추락하는 져니의 몸을 따라 빠르게 하강 후 고정",
+            "dramatic_purpose": "주인공의 신체적 위기 상황과 가방에 대한 절박한 집착을 강조한다.",
+            "scene_id": "scene_10"
+          },
+          {
+            "shot_id": "shot_85",
+            "operation": "derived",
+            "shot_function": "insert",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "Inside the open backpack, metallic telescope parts clatter sharply against each other.",
+            "beat_summary_native": "끌어안은 가방의 벌어진 틈 사이로 금속 망원경 부품들이 덜컹거리며 부딪힌다.",
+            "shot_size": "ECU",
+            "intended_duration_seconds": 4,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "가방 속 망원경 소품의 서사적 중요성과 인물의 집착 원인을 청각·시각적으로 클로즈업한다.",
+            "scene_id": "scene_10"
+          },
+          {
+            "shot_id": "shot_86",
+            "operation": "derived",
+            "shot_function": "reveal",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "A massive, ominous earthquake cloud traverses across the pitch-black night sky.",
+            "beat_summary_native": "먹구름을 가르며 불길하고 거대한 지진운이 밤하늘을 기괴하게 가로지른다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "개인의 도주를 초월한 거대한 초자연적 재앙의 압도적 절망감을 시각화하고 컷 템포에 휴식을 제공한다.",
+            "scene_id": "scene_10"
+          },
+          {
+            "shot_id": "shot_87",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "The ground cracks open with a roar and streetlights collapse into the fissures.",
+            "beat_summary_native": "대지가 굉음과 함께 갈라지고 가로등들이 도미노처럼 기우러지며 쓰러진다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "균열이 퍼져나가는 지면의 방향을 따라 틸트 및 횡방향 주행",
+            "dramatic_purpose": "도시 공간의 물리적 파괴가 치달아 도망칠 곳이 없다는絶望을 구축한다.",
+            "scene_id": "scene_10"
+          },
+          {
+            "shot_id": "shot_88",
+            "operation": "derived",
+            "shot_function": "transition",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "Journey pulls her hood tight and vanishes into the dark shadow of a ruined alley.",
+            "beat_summary_native": "져니가 젖은 후드를 눌러쓰고 무너진 건물의 어두운 그림자 속으로 몸을 숨긴다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "sustain",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "어둠 속으로 스며드는 져니의 몸짓을 따라 서서히 줌인하며 여운을 남기는 이동",
+            "dramatic_purpose": "terror에서 despair로 감정이 마감되며 살아남기 위한 고독한 은신으로 씬을 종료한다.",
+            "scene_id": "scene_10"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_11",
+        "beat_count": 8,
+        "shot_count": 8,
+        "coverage_ratio": 1,
+        "rhythm_profile": "decaying pattern with lingering static takes reflecting physical exhaustion and heavy isolation",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_89",
+            "operation": "added",
+            "shot_function": "establishing",
+            "source_beats": [],
+            "added_rationale": "Establish the desolate scale of the ruined city and misty dawn before focusing on Journey.",
+            "beat_summary": "An expansive view of the ruined city choked in dawn mist, showing utter destruction.",
+            "beat_summary_native": "안개 낀 새벽, 폐허가 된 도시의 황량하고 거대한 전경이 정적 속에 펼쳐진다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "establish",
+            "camera_intent": "static",
+            "dramatic_purpose": "거대한 재난의 흔적과 압도적인 고독의 분위기를 공간적으로 먼저 각인시킨다.",
+            "scene_id": "scene_11"
+          },
+          {
+            "shot_id": "shot_90",
+            "operation": "merged",
+            "shot_function": "master",
+            "source_beats": [
+              0,
+              1
+            ],
+            "beat_summary": "Journey wakes up behind a collapsed wall, covered in mud and ash.",
+            "beat_summary_native": "무너진 벽 뒤에서 진흙과 먼지로 뒤덮인 져니가 겨우 정신을 차리며 깨어난다.",
+            "shot_size": "FS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "재난 직후 주인공이 처한 참혹한 신체적 상태와 처절한 생존 순간을 보여준다.",
+            "scene_id": "scene_11"
+          },
+          {
+            "shot_id": "shot_91",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "Journey sits in the unnatural, eerie silence of the ruined landscape.",
+            "beat_summary_native": "숨소리조차 크게 들릴 만큼 기분 나쁜 정적 속에서 져니가 멍하니 허공을 바라본다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "폭풍이 지나간 직후의 절망적인 적막감을 관객이 함께 체감하도록 긴 정적의 쉼표를 준다.",
+            "scene_id": "scene_11"
+          },
+          {
+            "shot_id": "shot_92",
+            "operation": "derived",
+            "shot_function": "insert",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Journey pulls out a pair of broken glasses from her pocket.",
+            "beat_summary_native": "져니가 주머니에서 금이 가고 부서진 안경을 떨리는 손으로 꺼내어 본다.",
+            "shot_size": "ECU",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "부서진 상징 소품의 디테일을 통해 상실된 일상과 감정적 파탄을 극명히 보여준다.",
+            "scene_id": "scene_11"
+          },
+          {
+            "shot_id": "shot_93",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "Journey looks towards her mother's lab, but sees only thick smoke.",
+            "beat_summary_native": "어머니의 연구소가 있던 방향으로 시선을 돌리지만, 자욱한 연기 외에는 아무것도 보이지 않는다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "져니의 응시와 함께 연기로 가득 찬 시선 방향으로 미세하게 줌인하며 절망감을 조인다.",
+            "dramatic_purpose": "희망을 품고 바라본 장소에 남은 것이 연기뿐임을 확인하며 미세한 기대마저 꺾이는 순간을 담는다.",
+            "scene_id": "scene_11"
+          },
+          {
+            "shot_id": "shot_94",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "Journey swallows hard and tightens the strap of her backpack.",
+            "beat_summary_native": "져니가 마른침을 삼키며 흘러내린 배낭 끈을 지친 기색으로 바짝 조여 맨다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "살아가기 위해 몸을 추스르는 주인공의 본능적인 신체 행동과 무게감을 포착한다.",
+            "scene_id": "scene_11"
+          },
+          {
+            "shot_id": "shot_95",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "A distant dog barks in the empty city as Journey softly whispers for her parents.",
+            "beat_summary_native": "아득히 들려오는 개 짓는 소리에 져니가 희미하게 입술을 떼어 부모님을 부른다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "공허한 소음 속 나지막한 대사('엄마... 아빠...')를 통해 홀로 남겨졌다는 참담한 외로움을 극대화한다.",
+            "scene_id": "scene_11"
+          },
+          {
+            "shot_id": "shot_96",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "Journey takes a heavy, agonizing first step into the ash-covered wasteland.",
+            "beat_summary_native": "져니가 잿더미가 된 거리를 향해 힘겹게 첫 발걸음을 내딛기 시작한다.",
+            "shot_size": "FS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "sustain",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "앞으로 내딛는 져니의 동선에 맞추어 인물과의 거리를 유지하며 느리게 트래킹 후퇴한다.",
+            "dramatic_purpose": "홀로 황폐한 세계로 발을 내딛는 인물의 고독한 뒷모습과 아득한 미래를 긴 여운으로 마감한다.",
+            "scene_id": "scene_11"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_12",
+        "beat_count": 8,
+        "shot_count": 8,
+        "coverage_ratio": 1,
+        "rhythm_profile": "문명의 거대한 파괴에서 인간의 소멸로 이어지는 중후하고 관조적인 단조적 정적 곡선",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_97",
+            "operation": "derived",
+            "shot_function": "establishing",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "Half-collapsed Eiffel Tower standing as a silent monument in the ruined landscape.",
+            "beat_summary_native": "파괴된 파리의 에펠탑이 반쯤 기울어진 채 정적 속에 서 있다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "establish",
+            "camera_intent": "static",
+            "dramatic_purpose": "문명의 상징이 무너진 종말의 스케일을 압도적인 시각적 충격으로 보여주며 씬을 연다.",
+            "scene_id": "scene_12"
+          },
+          {
+            "shot_id": "shot_98",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              1
+            ],
+            "beat_summary": "Submerged skyscrapers of New York with only their roofs visible above murky waters.",
+            "beat_summary_native": "뉴욕의 마천루들이 침수되어 거대한 건물 꼭대기들만 물 위로 쓸쓸히 떠 있다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "해수면 상승으로 수중 도시가 된 현대 문명의 절망적인 상태를 정적으로 고찰한다.",
+            "scene_id": "scene_12"
+          },
+          {
+            "shot_id": "shot_99",
+            "operation": "derived",
+            "shot_function": "detail",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "Unnatural heavy snowfall blanketing a vast, arid desert.",
+            "beat_summary_native": "메마른 사막 위로 붉은 흙을 덮으며 기이하게 굵은 눈발이 쏟아진다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "지구 환경 시스템의 완전히 무너진 기후 이형성을 서늘하게 전달한다.",
+            "scene_id": "scene_12"
+          },
+          {
+            "shot_id": "shot_100",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Desperate survivors crawling through ash-covered rubble searching for food.",
+            "beat_summary_native": "재로 덮인 폐허 속에서 살아남은 이들이 통조림 하나를 찾아 허겁지겁 흙을 파헤친다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "폐허 속을 처절하게 기어다니는 생존자들의 이동 동선을 카메라가 낮게 따라간다.",
+            "dramatic_purpose": "거시적 재앙에서 미시적인 인간의 처절한 생존 투쟁으로 시선을 인접시킨다.",
+            "scene_id": "scene_12"
+          },
+          {
+            "shot_id": "shot_101",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "Helpless soldiers sitting in stupor beside an abandoned military tank.",
+            "beat_summary_native": "무기력하게 버려진 탱크 궤도 옆에 군인들이 총을 놓아둔 채 망연자실 앉아 있다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "인류의 무력과 통제권이 무의미해졌음을 군인들의 멍한 표정으로 보여준다.",
+            "scene_id": "scene_12"
+          },
+          {
+            "shot_id": "shot_102",
+            "operation": "derived",
+            "shot_function": "insert",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "Close-up of a battered analog radio emitting flickering noise and static.",
+            "beat_summary_native": "부서진 아날로그 라디오 주파수 노브 위로 지직거리는 정전기 잡음만 흘러나온다.",
+            "shot_size": "ECU",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "외부 세계와의 소통이 완벽히 단절된 침묵과 고립을 촉각적으로 강조한다.",
+            "scene_id": "scene_12"
+          },
+          {
+            "shot_id": "shot_103",
+            "operation": "derived",
+            "shot_function": "reveal",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "The sun shifting erratically across a pale sky as the Earth's axis tilts.",
+            "beat_summary_native": "자전축이 비틀어지며 창백한 하늘 속 태양이 비정상적인 궤적으로 급격히 이동한다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "하늘 전체를 가로지르며 이동하는 태양의 비정상적 일식/궤적을 따라 천천히 틸트 업한다.",
+            "dramatic_purpose": "종말의 원인이 지구 행성 자체의 물리적 붕괴임을 묵시록적으로 보여준다.",
+            "scene_id": "scene_12"
+          },
+          {
+            "shot_id": "shot_104",
+            "operation": "derived",
+            "shot_function": "transition",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "Distant city lights extinguishing one by one into complete pitch darkness.",
+            "beat_summary_native": "지평선 넘어 남아있던 인류의 마지막 도시 불빛들이 하나씩 꺼지며 완전한 어둠이 찾아온다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 10,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "충격에서 허무와 무기력(apathy)으로 감정이 이행하며 씬 전체의 침묵을 완성한다.",
+            "scene_id": "scene_12"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_13",
+        "beat_count": 7,
+        "shot_count": 7,
+        "coverage_ratio": 1,
+        "rhythm_profile": "고요하고 무거운 템포 속에서 슬픔이 결의로 변해가는 정적인 호흡",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_105",
+            "operation": "derived",
+            "shot_function": "establishing",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "Journey steps into her ruined bedroom where one wall has completely collapsed at sunset.",
+            "beat_summary_native": "져니가 벽이 날아간 자신의 방 안으로 천천히 들어선다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "establish",
+            "camera_intent": "static",
+            "dramatic_purpose": "반파된 개인적 공간과 붉은 노을을 한 프레임에 담아 비극적 분위기와 상실감을 강조한다.",
+            "scene_id": "scene_13"
+          },
+          {
+            "shot_id": "shot_106",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              1
+            ],
+            "beat_summary": "Journey steps over scattered star maps and celestial posters covering the floor.",
+            "beat_summary_native": "져니가 바닥에 어지럽게 흩어진 별자리 포스터들을 밟으며 이동한다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "발밑의 포스터와 져니의 이동 동선을 따라 아래로 천천히 패닝",
+            "dramatic_purpose": "짓밟힌 별자리 포스터를 통해 무너져 버린 그녀의 꿈과 현실을 시각화한다.",
+            "scene_id": "scene_13"
+          },
+          {
+            "shot_id": "shot_107",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "Journey kneels down and pulls out the hidden telescope bag from underneath the bed.",
+            "beat_summary_native": "져니가 무릎을 꿇고 침대 밑에 숨겨둔 망원경 가방을 찾아 꺼낸다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "자신에게 가장 소중한 망원경을 회수하며 과거와의 연결고리를 챙긴다.",
+            "scene_id": "scene_13"
+          },
+          {
+            "shot_id": "shot_108",
+            "operation": "derived",
+            "shot_function": "detail",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Journey tightly clutches the framed family picture with her mother to her chest.",
+            "beat_summary_native": "져니가 어머니와 함께 찍은 가족사진 액자를 집어 들어 가슴에 품는다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "어머니에 대한 그리움과 슬픔(sorrow)을 극대화하여 보여준다.",
+            "scene_id": "scene_13"
+          },
+          {
+            "shot_id": "shot_109",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "Journey grabs her father's flannel shirt hanging on the shattered window frame.",
+            "beat_summary_native": "져니가 부서진 창틀에 걸려 있던 아버지의 플란넬 셔츠를 집어 든다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "셔츠를 집어 들고 챙기는 져니의 손길과 얼굴 표정에 맞춰 살짝 티트 업",
+            "dramatic_purpose": "부모님의 흔적을 모두 거두어들이며 떠날 준비를 마친다.",
+            "scene_id": "scene_13"
+          },
+          {
+            "shot_id": "shot_110",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "Journey takes a last look around her room and turns away with quiet determination.",
+            "beat_summary_native": "져니가 마지막으로 방 안을 둘러보고 뒤돌아선다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "슬픔을 뒤로하고 결의(resolution)를 다지며 방을 떠나는 인물의 내면적 변화를 정적으로 담아낸다.",
+            "scene_id": "scene_13"
+          },
+          {
+            "shot_id": "shot_111",
+            "operation": "derived",
+            "shot_function": "reveal",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "The horizon outside the open wall glows intensely red under the setting sun.",
+            "beat_summary_native": "벽이 터진 방 너머로 붉게 물든 지평선이 펼쳐진다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "이전보다 더 붉어진 지평선을 통해 앞으로 져니가 맞닥뜨릴 가혹하고 비장한 여정을 암시하며 씬을 마무리한다.",
+            "scene_id": "scene_13"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_14",
+        "beat_count": 9,
+        "shot_count": 8,
+        "coverage_ratio": 0.89,
+        "rhythm_profile": "고요하고 정막한 분위기 속에서 인물의 고독과 의지를 서서히 드러내는 지속적이고 묵직한 템포",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_112",
+            "operation": "merged",
+            "shot_function": "establishing",
+            "source_beats": [
+              0,
+              1
+            ],
+            "beat_summary": "Journey walks alone down an empty highway lined with endless abandoned cars.",
+            "beat_summary_native": "끝없이 늘어선 버려진 차들 사이로 텅 빈 고속도로를 져니가 혼자 걸어간다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "establish",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "고속도로를 따라 이동하는 져니의 움직임을 천천히 트래킹하여 도시 전체의 막막한 황량함을 드러낸다.",
+            "dramatic_purpose": "문명이 파괴된 세계관과 그 속에 홀로 남겨진 주인공의 압도적인 고독감을 관객에게 인지시킨다.",
+            "scene_id": "scene_14"
+          },
+          {
+            "shot_id": "shot_113",
+            "operation": "derived",
+            "shot_function": "cutaway",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "In place of streetlights, abnormally bright stars illuminate the night sky.",
+            "beat_summary_native": "가로등이 꺼진 밤하늘 위로 비정상적으로 밝은 별들이 칠흑 같은 어둠을 비춘다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "죽어버린 지상의 폐허와 대비되는 이질적이고 아름다운 밤하늘을 보여주어 쓸쓸하고 비현실적인 분위기를 고조시킨다.",
+            "scene_id": "scene_14"
+          },
+          {
+            "shot_id": "shot_114",
+            "operation": "derived",
+            "shot_function": "insert",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "A collapsed electronic billboard displays only the words 'Evacuation Required'.",
+            "beat_summary_native": "무너져 내린 전광판에 '대피 요망'이라는 글자만이 번쩍임 없이 멈춰 서 있다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "과거 도시를 덮쳤던 재앙의 멸망 흔적을 단편적으로 전달하여 서사적 정보를 제공한다.",
+            "scene_id": "scene_14"
+          },
+          {
+            "shot_id": "shot_115",
+            "operation": "merged",
+            "shot_function": "action",
+            "source_beats": [
+              3,
+              4
+            ],
+            "beat_summary": "Journey pauses to drink water as his footsteps echo loudly through the silent ruins.",
+            "beat_summary_native": "폐허의 적막 속에 발소리가 크게 울리고, 져니가 잠시 발걸음을 멈춰 물 한 모금을 마신다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "침묵 속 생존의 행위에 집중함으로써 인물의 육체적 피로감과 주변 공간의 지독한 정적을 느끼게 한다.",
+            "scene_id": "scene_14"
+          },
+          {
+            "shot_id": "shot_116",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "Journey silently treks up a steep hill among the debris.",
+            "beat_summary_native": "져니가 잔해를 헤치며 높은 언덕을 향해 묵묵히 발걸음을 옮긴다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "언덕을 오르는 져니의 하체와 몸짓을 로우 앵글로 틸트업하며 묵직한 이동감을 따라간다.",
+            "dramatic_purpose": "목적지를 향해 나아가는 져니의 신체적 노고와 단호한 이동을 묘사한다.",
+            "scene_id": "scene_14"
+          },
+          {
+            "shot_id": "shot_117",
+            "operation": "derived",
+            "shot_function": "detail",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "The night wind ruffles Journey's messy hair.",
+            "beat_summary_native": "차가운 밤바람이 져니의 헝클어진 머리카락을 힘없이 흩뜨린다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "인물의 감각적 촉감을 근접 포착하여 고독 속에서 느끼는 씁쓸함과 멜랑콜리한 감정을 극대화한다.",
+            "scene_id": "scene_14"
+          },
+          {
+            "shot_id": "shot_118",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              8
+            ],
+            "beat_summary": "His eyes are fixed intensely toward the high summit ahead.",
+            "beat_summary_native": "흔들리는 머리칼 사이로 그의 눈동자는 오직 저 높은 곳만을 향해 굳건히 고정되어 있다.",
+            "shot_size": "ECU",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "절망적인 상황에서도 꺾이지 않는 인물의 강렬한 눈빛과 내면의 집념을 클로즈업으로 정점화한다.",
+            "scene_id": "scene_14"
+          },
+          {
+            "shot_id": "shot_119",
+            "operation": "added",
+            "shot_function": "reveal",
+            "source_beats": [],
+            "added_rationale": "언덕 위를 향해 오르는 져니의 뒷모습과 폐허 전체를 다시 넓게 담아 씬의 우울한 여운을 완성하기 위한 종결 숏",
+            "beat_summary": "Journey continues ascending into the distance under the starlight, leaving the silent ruined city behind.",
+            "beat_summary_native": "별빛 아래 침묵하는 폐허를 뒤로한 채, 져니는 언덕 너머 어둠 속으로 계속 걸어 올라간다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 10,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "목표를 향해 거대한 폐허 속으로 사라져가는 인물의 뒷모습을 관조하며 잔잔하고 깊은 멜랑콜리적 여운을 남긴다.",
+            "scene_id": "scene_14"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_15",
+        "beat_count": 9,
+        "shot_count": 9,
+        "coverage_ratio": 1,
+        "rhythm_profile": "고요한 주저함에서 시작해 정교한 망원경 조립과 대사를 통해 확고한 결의로 고조되는 구조",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_120",
+            "operation": "added",
+            "shot_function": "establishing",
+            "source_beats": [],
+            "added_rationale": "달빛 아래 쓸쓸하게 솟은 언덕과 어둠에 휩싸인 배경의 전경을 보여주어 무겁고 절망적인 분위기를 정립함.",
+            "beat_summary": "An extreme wide shot of the desolate hilltop under the unnatural lunar glow as Journey arrives.",
+            "beat_summary_native": "달빛만 비추는 캄캄하고 쓸쓸한 언덕 정상의 전경이 드러난다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "establish",
+            "camera_intent": "static",
+            "dramatic_purpose": "공간의 고립감과 비관적인 톤을 시각적으로 먼저 제시하여 시청자에게 공간감을 오리엔트함.",
+            "scene_id": "scene_15"
+          },
+          {
+            "shot_id": "shot_121",
+            "operation": "derived",
+            "shot_function": "master",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "Journey sets down gear on a flat rock at the peak of the hill.",
+            "beat_summary_native": "져니가 언덕 정상의 평평한 바위 위에 짐을 푼다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "짐을 내려놓기 위해 바위 앞으로 무겁게 다가서는 져니의 동선을 따라 약간 하강 틸트.",
+            "dramatic_purpose": "인물이 목적을 가지고 행동을 시작함을 보여주며 서사를 개시함.",
+            "scene_id": "scene_15"
+          },
+          {
+            "shot_id": "shot_122",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              1
+            ],
+            "beat_summary": "With trembling hands, Journey sets up the telescope tripod.",
+            "beat_summary_native": "떨리는 손으로 망원경 삼각대를 세운다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "삼각대를 세우는 과정에서 손의 떨림을 가감 없이 담아 인물의 불안과 망설임을 드러냄.",
+            "scene_id": "scene_15"
+          },
+          {
+            "shot_id": "shot_123",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "Journey carefully attaches the telescope main tube.",
+            "beat_summary_native": "망원경 경통을 조심스럽게 결합한다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "경통을 맞추는 집중된 표정과 정교한 동작으로 몰입감을 유도함.",
+            "scene_id": "scene_15"
+          },
+          {
+            "shot_id": "shot_124",
+            "operation": "derived",
+            "shot_function": "insert",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "An extreme close-up of Journey's sleeve carefully wiping dust off the glass lens.",
+            "beat_summary_native": "렌즈에 묻은 먼지를 소매로 정성껏 닦아낸다.",
+            "shot_size": "ECU",
+            "intended_duration_seconds": 4,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "렌즈의 정성스러운 케어를 밀착 강조하여 관측 도구에 담긴 인물의 각별한 애정과 서사적 의미를 각인시킴.",
+            "scene_id": "scene_15"
+          },
+          {
+            "shot_id": "shot_125",
+            "operation": "derived",
+            "shot_function": "pov",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "Journey's POV looking down at the pitch-black city below with no lights.",
+            "beat_summary_native": "아래로 보이는 도시는 불빛 하나 없이 어둡다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 6,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "칠흑 같은 도시의 시선을 보여주며 감정적 쉼표를 제공하고 침묵 속의 거대한 절망감을 대변함.",
+            "scene_id": "scene_15"
+          },
+          {
+            "shot_id": "shot_126",
+            "operation": "merged",
+            "shot_function": "reaction",
+            "source_beats": [
+              5,
+              6
+            ],
+            "beat_summary": "Journey takes a deep breath, drapes her father's shirt over her shoulders against the cold, and mutters her line firmly.",
+            "beat_summary_native": "져니가 심호흡을 하며 마음을 가다듬고, 아버지의 셔츠를 어깨에 걸쳐 추위를 견디며 굳은 표정으로 '이제 다들 알게 되겠지.'라고 말한다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "아버지의 유품(셔츠)을 걸치는 감정적 계기와 대사를 한 호흡의 클로즈업으로 엮어 주저함에서 확신으로 넘어가는 핵심 결정 모멘트를 포착함.",
+            "scene_id": "scene_15"
+          },
+          {
+            "shot_id": "shot_127",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "Journey adjusts the angle of the telescope high into the sky.",
+            "beat_summary_native": "망원경의 각도를 하늘 높이 조절한다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "accelerate",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "하늘을 향해 높게 올라가는 망원경 경통의 매끄러운 수직 이동을 따라 틸트 업.",
+            "dramatic_purpose": "어두운 지상에서 높은 하늘로 시선을 전환하며 결의와 템포 상승의 리듬을 부여함.",
+            "scene_id": "scene_15"
+          },
+          {
+            "shot_id": "shot_128",
+            "operation": "derived",
+            "shot_function": "detail",
+            "source_beats": [
+              8
+            ],
+            "beat_summary": "Journey tightly turns and locks every single screw into place.",
+            "beat_summary_native": "나사 하나하나를 꽉 조여 고정한다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 5,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "나사를 조이는 단호한 손놀림으로 준비가 완료되었음을 매듭짓고 결심의 완결을 강렬히 매듭짓는다.",
+            "scene_id": "scene_15"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_16",
+        "beat_count": 9,
+        "shot_count": 9,
+        "coverage_ratio": 1,
+        "rhythm_profile": "정적 속에서 팽팽해지는 고요한 롱테이크 호흡과 서늘한 감정 고조",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_129",
+            "operation": "added",
+            "shot_function": "establishing",
+            "source_beats": [],
+            "added_rationale": "Establishing the eerie, desolate hilltop with unnatural lunar rim light to set the solemn tone before focusing on Journey.",
+            "beat_summary": "Wide shot of the desolate hilltop dominated by the sickly lunar glow and the silhouette of Journey at his telescope.",
+            "beat_summary_native": "병든 듯한 달빛과 고사목 실루엣이 감도는 황량한 언덕 위, 망원경 곁에 서 있는 져니의 전체 전경.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "establish",
+            "camera_intent": "static",
+            "dramatic_purpose": "고독하고 압도적인 밤의 공간감을 확립하여 씬의 서늘한 정조를 시작한다.",
+            "scene_id": "scene_16"
+          },
+          {
+            "shot_id": "shot_130",
+            "operation": "merged",
+            "shot_function": "master",
+            "source_beats": [
+              0,
+              1
+            ],
+            "beat_summary": "Journey slowly lowers his eye to the telescope eyepiece and carefully turns the focus dial.",
+            "beat_summary_native": "져니가 접안렌즈에 천천히 눈을 가져다 대며 초점 다이얼을 미세하게 조절한다.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 10,
+            "rhythm_role": "sustain",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "Slow, subtle push-in to capture Journey's cautious approach to the eyepiece.",
+            "dramatic_purpose": "진실을 확인하기 직전의 신중하고 긴장된 행위를 롱테이크로 담아 집중도를 끌어올린다.",
+            "scene_id": "scene_16"
+          },
+          {
+            "shot_id": "shot_131",
+            "operation": "derived",
+            "shot_function": "detail",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Journey's fingers quiver slightly as they grip the metallic focus ring.",
+            "beat_summary_native": "금속 다이얼을 잡은 져니의 손가락이 미세하게 떨린다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "내면의 두려움과 불안을 손가락의 미세한 신체 반응으로 시각화한다.",
+            "scene_id": "scene_16"
+          },
+          {
+            "shot_id": "shot_132",
+            "operation": "derived",
+            "shot_function": "insert",
+            "source_beats": [
+              2
+            ],
+            "beat_summary": "Extreme close-up of Journey's eye, reflecting the cold and unnatural lunar glow.",
+            "beat_summary_native": "져니의 눈동자에 차가운 달빛이 비치는 모습의 극근접 샷.",
+            "shot_size": "ECU",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "눈동자에 반사된 기이한 달빛을 강조하여 비극적인 정서를 극대화한다.",
+            "scene_id": "scene_16"
+          },
+          {
+            "shot_id": "shot_133",
+            "operation": "derived",
+            "shot_function": "transition",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "A static shot capturing the eerie silence of the surroundings where even crickets are mute.",
+            "beat_summary_native": "풀벌레조차 울지 않는 무거운 적막 속, 정지된 인물과 언덕의 공간.",
+            "shot_size": "MS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "관객에게 정적의 숨을 불어넣어 직후 다가올 진실의 무게를 강조한다.",
+            "scene_id": "scene_16"
+          },
+          {
+            "shot_id": "shot_134",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "Journey closes his eyes tightly for a moment before reopening them wide.",
+            "beat_summary_native": "져니가 잠시 눈을 감았다가 마음을 가다듬고 다시 눈을 크게 뜬다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "진실을 직면하기 직전 인물의 내면적 결의와 감정 가다듬기를 포착한다.",
+            "scene_id": "scene_16"
+          },
+          {
+            "shot_id": "shot_135",
+            "operation": "derived",
+            "shot_function": "pov",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "POV through the lens as the altered landscape and sky blurriness resolves into sharp focus.",
+            "beat_summary_native": "망원경 렌즈 너머로 변해버린 우주의 풍경이 흐릿함에서 또렷하게 선명해진다.",
+            "shot_size": "POV",
+            "intended_duration_seconds": 11,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "Optical racking focus mimicking the telescope lens adjustment to reveal the altered cosmos.",
+            "dramatic_purpose": "인물의 시선을 주관적으로 공유하여 변해버린 우주의 충격을 가시화한다.",
+            "scene_id": "scene_16"
+          },
+          {
+            "shot_id": "shot_136",
+            "operation": "derived",
+            "shot_function": "detail",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "Journey's lips quiver convulsively in reaction to what he sees.",
+            "beat_summary_native": "목격한 진실에 대한 충격으로 져니의 입술이 파르르 경련하듯 떨린다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "시각적 디테일 공개 직후 인물의 미세한 신체 반응을 통해 충격의 깊이를 전달한다.",
+            "scene_id": "scene_16"
+          },
+          {
+            "shot_id": "shot_137",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              8
+            ],
+            "beat_summary": "Journey refrains from turning away, fixing his posture to gaze unflinchingly into the truth.",
+            "beat_summary_native": "져니가 도망치지 않고 차갑고 엄숙하게 진실을 계속 응시한다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 10,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "도피 대신 엄숙하게 진실을 수용하는 인물의 최종 감정적 도착점을 정적으로 완성한다.",
+            "scene_id": "scene_16"
+          }
+        ]
+      },
+      {
+        "scene_id": "scene_17",
+        "beat_count": 9,
+        "shot_count": 9,
+        "coverage_ratio": 1,
+        "rhythm_profile": "점진적으로 감정이 가라앉으며(decaying) 웅장한 여운과 정적을 남기는 긴 호흡의 연출",
+        "uncovered_beats": [],
+        "shots": [
+          {
+            "shot_id": "shot_138",
+            "operation": "added",
+            "shot_function": "establishing",
+            "source_beats": [],
+            "added_rationale": "황량한 언덕 위 망원경과 져니의 실루엣을 먼저 보여주어 분위기와 공간적 오리엔테이션을 형성한다.",
+            "beat_summary": "A wide shot of the desolate hilltop under a strange, sickly moonlight with Journey silhouetted beside her telescope.",
+            "beat_summary_native": "황량한 언덕 위, 기묘한 달빛 아래 망원경 곁에 홀로 서 있는 져니의 실루엣이 보인다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 8,
+            "rhythm_role": "establish",
+            "camera_intent": "static",
+            "dramatic_purpose": "공간의 고독함과 기묘한 달빛의 분위기를 시각적으로 개시한다.",
+            "scene_id": "scene_17"
+          },
+          {
+            "shot_id": "shot_139",
+            "operation": "derived",
+            "shot_function": "pov",
+            "source_beats": [
+              0
+            ],
+            "beat_summary": "Through the telescope viewfinder, the moon is revealed to be no longer round.",
+            "beat_summary_native": "망원경 뷰파인더 너머로 더 이상 둥글지 않은 일그러진 달이 보인다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 7,
+            "rhythm_role": "develop",
+            "camera_intent": "static",
+            "dramatic_purpose": "망원경을 통해 처음으로 달의 파괴된 상태를 발견하는 충격을 제시한다.",
+            "scene_id": "scene_17"
+          },
+          {
+            "shot_id": "shot_140",
+            "operation": "merged",
+            "shot_function": "reveal",
+            "source_beats": [
+              1,
+              2
+            ],
+            "beat_summary": "The camera slowly pans across the shattered moon, showing the missing chunk and the ring of debris.",
+            "beat_summary_native": "달의 거대한 조각이 떨어져 나간 흉측한 형상과 그 주변을 두른 파편 고리가 서서히 드러난다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 10,
+            "rhythm_role": "sustain",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "파괴된 달의 일그러진 단면과 파편 고리를 따라 서서히 훑기 위한 탐색적 무빙",
+            "dramatic_purpose": "파괴된 달의 비극적이고 웅장한 디테일을 시각적으로 극대화한다.",
+            "scene_id": "scene_17"
+          },
+          {
+            "shot_id": "shot_141",
+            "operation": "derived",
+            "shot_function": "reaction",
+            "source_beats": [
+              3
+            ],
+            "beat_summary": "Close-up on Journey's face as a single tear falls down her cheek while delivering her key line.",
+            "beat_summary_native": "져니의 뺨을 타고 눈물 한 방울이 흘러내리며 허망한 목소리로 대사를 읊조린다.",
+            "shot_size": "CU",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "punctuate",
+            "camera_intent": "static",
+            "dramatic_purpose": "경외감에서 체념으로 넘어가는 져니의 내면 감정과 대사를 정밀하게 포착한다.",
+            "scene_id": "scene_17"
+          },
+          {
+            "shot_id": "shot_142",
+            "operation": "derived",
+            "shot_function": "transition",
+            "source_beats": [
+              4
+            ],
+            "beat_summary": "The camera slowly tilts up and pulls away from Journey's eye toward the vast sky.",
+            "beat_summary_native": "카메라가 져니의 눈가에서 천천히 멀어지며 밤하늘을 향해 올라간다.",
+            "shot_size": "MCU",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "develop",
+            "camera_intent": "motivated_move",
+            "camera_move_motivation": "져니의 개인적 비극에서 우주적 스케일의 종말적 풍경으로 시선을 확장하기 위한 후퇴 및 틸트 무빙",
+            "dramatic_purpose": "개인의 감정선에서 무한한 밤하늘 스케일로 시점을 자연스럽게 전환한다.",
+            "scene_id": "scene_17"
+          },
+          {
+            "shot_id": "shot_143",
+            "operation": "derived",
+            "shot_function": "detail",
+            "source_beats": [
+              5
+            ],
+            "beat_summary": "The vast night sky is completely filled with glowing debris from the shattered moon.",
+            "beat_summary_native": "밤하늘 전체가 파괴된 달의 잔해와 빛나는 고리로 가득 차 있다.",
+            "shot_size": "MFS",
+            "intended_duration_seconds": 10,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "압도적인 우주적 종말의 비경을 보여주며 멸망의 비극적 아름다움을 강조한다.",
+            "scene_id": "scene_17"
+          },
+          {
+            "shot_id": "shot_144",
+            "operation": "derived",
+            "shot_function": "action",
+            "source_beats": [
+              6
+            ],
+            "beat_summary": "Journey stands motionless, gazing at the catastrophic sky in complete acceptance.",
+            "beat_summary_native": "져니는 미동도 없이 가만히 서서 그 풍경을 지켜본다.",
+            "shot_size": "WS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "거대한 비극 앞에서 모든 포기와 수용을 마친 인물의 완전한 침묵을 담는다.",
+            "scene_id": "scene_17"
+          },
+          {
+            "shot_id": "shot_145",
+            "operation": "derived",
+            "shot_function": "master",
+            "source_beats": [
+              7
+            ],
+            "beat_summary": "Distorted moonlight pours over the pitch-black Earth beneath the ruined sky.",
+            "beat_summary_native": "어둠 속에 잠긴 지구 위로 일그러진 달빛이 쏟아져 내린다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 10,
+            "rhythm_role": "sustain",
+            "camera_intent": "static",
+            "dramatic_purpose": "지구 전체를 감싸는 달빛의 음울한 장엄함과 스케일을 관조한다.",
+            "scene_id": "scene_17"
+          },
+          {
+            "shot_id": "shot_146",
+            "operation": "derived",
+            "shot_function": "transition",
+            "source_beats": [
+              8
+            ],
+            "beat_summary": "The frame slowly fades into darkness, leaving only complete silence.",
+            "beat_summary_native": "화면이 서서히 암전되며 정적만 남는다.",
+            "shot_size": "EWS",
+            "intended_duration_seconds": 9,
+            "rhythm_role": "breath",
+            "camera_intent": "static",
+            "dramatic_purpose": "씬의 여운을 극대화하며 체념적인 잔상을 완성한다.",
+            "scene_id": "scene_17"
+          }
+        ]
+      }
+    ],
+    "total_shots": 146,
+    "total_added": 11,
+    "total_merged": 13,
+    "total_split": 0,
+    "director_notes": "scene_1: 9beats→9shots (정적인 천체 관측의 정적에서 시작하여 비현실적 충격과 함께 점진적으로 긴장이 고조되는 서스펜스 곡선) | scene_2: 9beats→9shots (긴급한 침입에서 어머니의 차가운 무관심을 거쳐 절망적 퇴장으로 이어지는 가속 및 여운의 곡선) | scene_3: 9beats→9shots (낙담한 정적 상태에서 아버지의 따뜻한 개입으로 서서히 온기와 희망이 차오르는 지속적(sustained) 템포) | scene_4: 10beats→10shots (고요한 주시에서 시작하여 위기의 고조에 따라 컷 템포를 가속하고 파국 이후 정적으로 수렴하는 구조) | scene_5: 9beats→9shots (고요한 비탄으로 시작해 냉혹한 진실의 규명으로 긴장이 지속 고조된 후 포옹의 오열로 귀결되는 호흡) | scene_6: 9beats→9shots (권력의 냉담함에 짓눌리며 단호함에서 완전한 고립과 수치심으로 쇠퇴하는 곡선) | scene_7: 8beats→7shots (절망의 무거운 정적에서 호흡을 유지하며 서서히 공포로 고조되는 호흡) | scene_8: 9beats→9shots (고요한 경보음 속 서막에서 시작되어 파도와 붕괴의 연속으로 템포가 가속되고, 마침내 거대한 물소리로 소음이 묻히는 정적/절망의 여운으로 마무리되는 곡선) | scene_9: 9beats→9shots (절박함 속에서 묵직한 호흡으로 정점을 향해 느리지만 확실하게 고조되는 숭고한 정체감) | scene_10: 8beats→8shots (공포스러운 도심 질주에서 시작하여 대재앙의 압도적 절망감으로 진입하는 가속 및 정적 곡선) | scene_11: 8beats→8shots (decaying pattern with lingering static takes reflecting physical exhaustion and heavy isolation) | scene_12: 8beats→8shots (문명의 거대한 파괴에서 인간의 소멸로 이어지는 중후하고 관조적인 단조적 정적 곡선) | scene_13: 7beats→7shots (고요하고 무거운 템포 속에서 슬픔이 결의로 변해가는 정적인 호흡) | scene_14: 9beats→8shots (고요하고 정막한 분위기 속에서 인물의 고독과 의지를 서서히 드러내는 지속적이고 묵직한 템포) | scene_15: 9beats→9shots (고요한 주저함에서 시작해 정교한 망원경 조립과 대사를 통해 확고한 결의로 고조되는 구조) | scene_16: 9beats→9shots (정적 속에서 팽팽해지는 고요한 롱테이크 호흡과 서늘한 감정 고조) | scene_17: 9beats→9shots (점진적으로 감정이 가라앉으며(decaying) 웅장한 여운과 정적을 남기는 긴 호흡의 연출)"
+  }
+}
