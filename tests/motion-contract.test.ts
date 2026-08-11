@@ -70,8 +70,14 @@ describe('compileMotionContract', () => {
     expect(c.text).toContain('rain intensifies')
   })
 
-  it('금지절(계약 외 카메라·인물·액션 추가 금지)이 항상 붙는다', () => {
-    expect(compileMotionContract(dyn(), 5).text).toContain('Do NOT add any camera movement')
+  it('금지절(계약 외 카메라·인물·액션 지어내기 금지)이 항상 붙는다', () => {
+    const text = compileMotionContract(dyn(), 5).text
+    expect(text).toContain('Do NOT invent camera movement')
+    // #motion-vocab 2026-08-11: 금지 범위에 "뒤따르는 장면 묘사문"을 명시적으로 포함시킨다.
+    //   옛 문구("beyond this contract")는 이 계약문을 프롬프트의 유일한 권위로 선언해,
+    //   뒤에 붙는 모델의 장면 묘사문(motion_prompt — "레버를 드러낸다" 같은 연출 목적이
+    //   거기에만 있다)까지 계약 위반처럼 읽히게 했다.
+    expect(text).toContain('and the scene description that follows')
   })
 
   it('dyn 미전달 → 빈 계약 (레거시 경로 불변)', () => {

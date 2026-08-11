@@ -4,6 +4,7 @@
 //   범주형 angle/motion → 6축 수치는 근사다(완전 가역 아님). 사용자는 이후 수동 편집한다.
 import type { CameraConfig, LightingConfig } from '@/types/shot'
 import type { ShotDesign } from '@/lib/writer/types/pipeline'
+import { normalizeCameraMotion } from '@/lib/writer/motion-vocabulary'
 
 // persist DEFAULT 센티넬 (persist_manifest.ts 와 동일) — "미설정(빈칸)" 판정용.
 export const SENTINEL_CAMERA: CameraConfig = {
@@ -72,10 +73,14 @@ export function cameraConfigFromShotDesign(d: ShotDesign): CameraConfig {
   cam.roll = roll
 
   // 2) 동적 motion → 해당 축 (kling.ts 6축 의미론: pan=pitch, tilt=yaw)
-  const mo = d.dynamic_spec?.camera_motion
-  if (mo && mo.type && mo.type !== 'static') {
+  //   교정기 경유(#motion-vocab 2026-08-11): 어휘 밖 유형은 아래 switch 의 default 로 떨어져
+  //   **6축이 전부 0** 으로 남았다(실측: `pan_right`). 프롬프트는 "오른쪽으로 팬", 6축은 "정지" —
+  //   같은 샷에 모순된 두 지시가 나갔다. 정규화하면 pan_right → type:'pan' + direction:'right' 로
+  //   풀려 아래 case 에 정상 진입한다.
+  const { motion: mo } = normalizeCameraMotion(d.dynamic_spec?.camera_motion)
+  if (mo.type && mo.type !== 'static') {
     const v = intensity(mo.magnitude, mo.speed)
-    const dir = (mo.direction ?? '').toLowerCase()
+    const dir = mo.direction
     switch (mo.type) {
       case 'pan': // yaw 좌우
         cam.tilt = clamp(v * (dir.includes('left') ? -1 : 1))
@@ -101,6 +106,9 @@ export function cameraConfigFromShotDesign(d: ShotDesign): CameraConfig {
       case 'rack_focus':
         break // 초점 변화 — 6축 무관
       default:
+        // 정규화 후에도 안 걸리는 값 = 교정기가 못 알아본 유형(mapped:false).
+        //   6축은 근사 수치라 모르는 움직임을 지어내는 것보다 0(미설정)이 안전하다.
+        //   이 경로로 새는 건 계약문 쪽에서 원문 그대로 영상 모델에 전달된다.
         break
     }
   }

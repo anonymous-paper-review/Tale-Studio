@@ -1,6 +1,7 @@
 // Compact Mode 사후 처리: shotDesign 결과로부터 sceneCinematography (씬 비주얼 플랜) 역추론.
 // 호출은 안 했지만 PipelineResult.sceneCinematography 필드를 채우기 위함 (다운스트림 호환).
 import type { SceneCinematography, ShotDesign, Scenes, StoryScene } from '@/lib/writer/types/pipeline';
+import { normalizeCameraMotion } from '@/lib/writer/motion-vocabulary';
 
 export function inferSceneCinematographyFromShots(
   shotDesigns: ShotDesign[],
@@ -20,7 +21,11 @@ function inferOneScenePlan(scene: StoryScene, allShots: ShotDesign[]): SceneCine
   const lensUnique = uniqueNumbers(shotsInScene.map((s) => s.static_spec.lens_mm).filter(Number.isFinite));
 
   // camera mounting + energy (motion type 분포로 역추론)
-  const motionTypes = shotsInScene.map((s) => s.dynamic_spec.camera_motion?.type ?? 'static');
+  //   교정기 경유(#motion-vocab 2026-08-11): 어휘 밖 유형이 kinetic 집계에서 빠져
+  //   카메라가 계속 도는 씬이 tripod/static 으로 기록됐다(실측: `pan_right`).
+  const motionTypes = shotsInScene.map(
+    (s) => normalizeCameraMotion(s.dynamic_spec.camera_motion).motion.type
+  );
   const staticRatio = motionTypes.filter((t) => t === 'static').length / motionTypes.length;
   const handheldRatio = motionTypes.filter((t) => t === 'handheld_drift').length / motionTypes.length;
   const kineticRatio = motionTypes.filter((t) =>

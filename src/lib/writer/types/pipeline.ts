@@ -1,6 +1,15 @@
 // S, V, C, Shot Sequence 데이터 모델
 // linear_pipeline.md 기준
 
+// 모션 어휘는 motion-vocabulary.ts 가 정본이다(#motion-vocab 2026-08-11).
+//   여기에 낱말을 다시 적으면 지시서·교정기와 갈라진다 — 그 갈라짐이 실제 사고였다(그 파일 주석 참조).
+import type {
+  CameraMotionType,
+  CameraMagnitude,
+  CharacterMagnitude,
+  MotionSpeed,
+} from '@/lib/writer/motion-vocabulary';
+
 export type DepthLevel = 'D1' | 'D2' | 'D3' | 'D4' | 'D5' | 'D6' | 'D7';
 
 // Compact Mode 트리거: 어떤 depth도 V3를 스킵하지 않음 — 짧은 영상(D1~D3)도 풀 파이프라인.
@@ -654,19 +663,21 @@ export interface ShotDynamicSpec {
   shot_id: string;
 
   // 카메라 모션 (5~15초 동안)
+  //   낱말은 motion-vocabulary.ts 정본. 단 이 타입은 **계약이지 보증이 아니다** — 값의 출처가
+  //   LLM 출력이라 어휘를 벗어난 문자열이 그대로 실릴 수 있다(실측: `pan_right`).
+  //   그래서 읽는 쪽은 normalizeCameraMotion() 을 한 번 통과시킨다.
   camera_motion: {
-    type: 'static' | 'pan' | 'tilt' | 'dolly_in' | 'dolly_out'
-        | 'tracking' | 'crane' | 'handheld_drift' | 'rack_focus';
-    direction?: string;              // left_to_right, forward, etc.
-    speed: 'slow' | 'medium' | 'fast';
-    magnitude: 'minimal' | 'moderate' | 'large';
+    type: CameraMotionType;
+    direction?: string;              // left/right/up/down/forward/backward/none
+    speed: MotionSpeed;
+    magnitude: CameraMagnitude;      // 카메라는 가운데가 'moderate'
   };
 
   // 캐릭터 모션 (1~2개 동사로 압축)
   character_motion: Array<{
     character_id: string;
     verb: string;                    // 동사 1~2개
-    magnitude: 'micro' | 'small' | 'medium' | 'large';
+    magnitude: CharacterMagnitude;   // 인물은 가운데가 'medium' (카메라와 다르다 — 혼동이 잦다)
   }>;
 
   // 시선 arc (선택)
