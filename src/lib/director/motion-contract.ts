@@ -12,7 +12,20 @@
 //   - 시간 스케일: "over the full Ns" — 진폭을 샷 길이에 묶는다.
 //   - 정지도 계약: static 은 "무브 금지 + 미세 생명감(호흡·옷자락)만" — 얼어붙은 프레임도,
 //     지어낸 카메라 무브도 둘 다 위반이다.
+//
+// 개정(#motion-vocab 2026-08-11): 어휘 밖 값을 여기서 조용히 삼키지 않는다.
+//   실측(camera-follow-disambiguation)에서 모델이 `pan_right` 를 냈고, 이 파일이 byType 조회에
+//   실패해 폴백 문장으로 떨어지면서 pan 전용 절 "Rotation only — the camera does not travel." 가
+//   사라졌다 — 회전(pan)과 이동(tracking)의 차이가 영상 모델에 전달되지 않은 것이다.
+//   같은 사고로 인물 magnitude `moderate`(어휘 밖)가 최소값으로 떨어져 "보통 크기 고갯짓"이
+//   "a barely-perceptible micro movement"로 뒤집혀 발주됐다.
+//   이제 motion-vocabulary 교정기를 먼저 통과시켜 정본 낱말로 만든 뒤 조회한다.
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
+import {
+  normalizeCameraMotion,
+  normalizeCharacterMagnitude,
+  type NormalizedCameraMotion,
+} from '@/lib/writer/motion-vocabulary'
 
 export interface MotionContract {
   /** 프롬프트 주입용 계약문 (영어). 빈 문자열 = 계약 없음(레거시 폴백). */
@@ -48,9 +61,11 @@ function magnitudeWord(m: unknown): string {
   return m === 'large' || m === 'high' ? 'large' : m === 'moderate' || m === 'medium' ? 'moderate' : 'small'
 }
 
-function cameraClause(dyn: ShotDynamicSpec, durationSeconds: number): { clause: string; isStatic: boolean } {
-  const cam = dyn.camera_motion
-  const type = cam?.type
+function cameraClause(
+  cam: NormalizedCameraMotion,
+  durationSeconds: number,
+): { clause: string; isStatic: boolean } {
+  const type = cam.type
   if (!type || type === 'static') {
     return {
       clause:
@@ -71,15 +86,28 @@ function cameraClause(dyn: ShotDynamicSpec, durationSeconds: number): { clause: 
   const dirText = dirs
     ? ` toward ${dirs.view} — on-screen content flows toward ${dirs.content}`
     : ''
+  // 교정기가 못 알아본 유형(mapped:false)은 낱말을 지어내 단정하지 않는다 —
+  //   "이 속도·진폭으로 움직인다"까지만 말하고, 구체는 뒤따르는 장면 묘사문(모델의 motion_prompt)에 맡긴다.
+  //   여기서 static 으로 접으면 같은 프롬프트 안의 묘사문과 정면 모순이 된다.
+  if (!cam.mapped) {
+    return {
+      clause: `Camera: ${w(type)} ${speed}${dirText}. ${mag === 'large' ? 'Large' : mag === 'moderate' ? 'Moderate' : 'Small'} amplitude, spread evenly over the full ${durationSeconds} seconds.`,
+      isStatic: false,
+    }
+  }
   const byType: Record<string, string> = {
     pan: `Camera: pans ${speed}${dirText}. Rotation only — the camera does not travel.`,
-    tilt: `Camera: tilts ${speed}${dirText}.`,
+    tilt: `Camera: tilts ${speed}${dirText}. Rotation only — the camera does not travel.`,
     dolly_in: `Camera: dollies in ${speed} — the framing grows steadily tighter on the subject.`,
     dolly_out: `Camera: dollies out ${speed} — the framing grows steadily wider, revealing more environment.`,
-    tracking: `Camera: tracks ${speed} with the subject${dirs ? ` toward ${dirs.view} (background flows toward ${dirs.content})` : ''}.`,
-    crane: `Camera: cranes ${speed}${dirText}.`,
+    // pan/tilt 와 짝을 이루는 반대 극 — "제자리 회전"(pan) vs "실제로 이동"(tracking).
+    //   이 대비가 실측에서 무너졌던 축이라 양쪽 문장에 모두 못박는다.
+    tracking: `Camera: tracks ${speed} with the subject${dirs ? ` toward ${dirs.view} (background flows toward ${dirs.content})` : ''}. The camera itself travels — this is not a rotation in place.`,
+    crane: `Camera: cranes ${speed}${dirText}. The camera itself travels vertically.`,
     rack_focus: 'Camera: holds position while focus racks to a different plane — no camera travel.',
   }
+  // 정본 9종 중 static/handheld_drift 는 위에서 반환됐으므로 나머지 7종이 byType 에 모두 있다.
+  //   즉 이 `??` 는 어휘를 늘리고 문장을 안 붙인 경우에만 걸린다 — 그때도 침묵하지 않게 남겨둔다.
   const base = byType[type] ?? `Camera: ${w(type)} ${speed}${dirText}.`
   return {
     clause: `${base} ${mag === 'large' ? 'Large' : mag === 'moderate' ? 'Moderate' : 'Small'} amplitude, spread evenly over the full ${durationSeconds} seconds.`,
@@ -91,7 +119,10 @@ function subjectClauses(dyn: ShotDynamicSpec): string[] {
   const out: string[] = []
   ;(dyn.character_motion ?? []).forEach((m, i) => {
     if (!m?.verb?.trim()) return
-    const mag = m.magnitude
+    // 교정기 경유(#motion-vocab): 옛 코드는 어휘 밖 값을 else 로 흘려 최소값으로 떨궜다.
+    //   그래서 인물 magnitude `moderate`(카메라 어휘와 혼동) 가 "micro" 로 뒤집혀 나갔다(실측).
+    //   normalizeCharacterMagnitude 는 moderate→medium 으로 맞바꿔 받고, 미상은 medium 으로 둔다.
+    const mag = normalizeCharacterMagnitude(m.magnitude)
     const scale =
       mag === 'large'
         ? 'a large, clearly visible movement that completes fully'
@@ -120,14 +151,20 @@ export function compileMotionContract(
   durationSeconds: number,
 ): MotionContract {
   if (!dyn) return { text: '', cameraStatic: false }
-  const cam = cameraClause(dyn, durationSeconds)
+  const { motion } = normalizeCameraMotion(dyn.camera_motion)
+  const cam = cameraClause(motion, durationSeconds)
   const subjects = subjectClauses(dyn)
   const subjectText = subjects.length
     ? `Subjects: ${subjects.join('; ')}.`
     : 'Subjects: no scripted action — only subtle natural life (breathing, cloth, hair, atmosphere), never frozen.'
   const pace = `Pace the motion across the full ${durationSeconds}-second duration — by the final frame every scripted movement has fully completed.`
+  // 금지절의 범위(#motion-vocab 2026-08-11): 옛 문구는 "beyond this contract" 로 끝나
+  //   이 계약문을 프롬프트의 **유일한** 권위로 선언했다. 그런데 계약문 뒤에는 모델이 쓴 장면
+  //   묘사문(motion_prompt)이 이어 붙고, 거기에만 있는 연출 정보가 있다 — 실측에서 계약문은
+  //   "pan right" 까지만 말했고 "레버를 드러낸다"는 목적은 묘사문에만 있었다.
+  //   그래서 금지 대상을 "지어내기"로 좁히고, 뒤따르는 묘사문을 명시적으로 계약 안에 포함시킨다.
   const ban =
-    'Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.'
+    'Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.'
   return {
     text: `Motion contract: ${cam.clause} ${subjectText} ${pace} ${ban}`,
     cameraStatic: cam.isStatic,

@@ -7,6 +7,19 @@
 //        각 샷은 V3 vocabulary 안에서만 결정.
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { SHOT_PHYSICS, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/writer/pipeline/physics';
+// 모션 어휘(#motion-vocab 2026-08-11) — 지시서의 낱말 목록은 여기서만 온다.
+//   손으로 다시 적으면 교정기와 갈라진다. 갈라짐이 실제 사고였다: 옛 지시서는 카메라 유형 9종 중
+//   3종만 보이고 `...` 로 끝나 있었고, 모델은 못 본 어휘를 지어냈다(`pan_right`).
+import {
+  MOTION_VOCABULARY_GUIDE,
+  CAMERA_MOTION_TYPE_ENUM_TEXT,
+  CAMERA_DIRECTION_ENUM_TEXT,
+  MOTION_SPEED_ENUM_TEXT,
+  CAMERA_MAGNITUDE_ENUM_TEXT,
+  CHARACTER_MAGNITUDE_ENUM_TEXT,
+  normalizeCameraMotion,
+  normalizeCharacterMagnitude,
+} from '@/lib/writer/motion-vocabulary';
 import type {
   DecoupagePlan,
   DecoupageShot,
@@ -412,6 +425,8 @@ V4는 3분할:
 (shot_type/camera_angle/depth_of_field/camera_motion.type/transition_in/out 등 고정 enum 필드는
  원래부터 영어 vocabulary라 이 지시의 대상이 아님 — 그대로 유지)
 
+${MOTION_VOCABULARY_GUIDE}
+
 ${disciplineSection}
 
 샷 분배 원칙:
@@ -526,13 +541,13 @@ ${compactMode ? `씬 길이(${scene.estimated_seconds}초)와 액션 수에 따�
       "dynamic_spec": {
         "shot_id": "shot_<scene>_<NNN>",
         "camera_motion": {
-          "type": "static" | "handheld_drift" | "dolly_in" | ...,
-          "direction": "forward",
-          "speed": "slow",
-          "magnitude": "minimal"
+          "type": ${CAMERA_MOTION_TYPE_ENUM_TEXT},
+          "direction": ${CAMERA_DIRECTION_ENUM_TEXT},
+          "speed": ${MOTION_SPEED_ENUM_TEXT},
+          "magnitude": ${CAMERA_MAGNITUDE_ENUM_TEXT}
         },
         "character_motion": [
-          { "character_id": "...", "verb": "고개를 든다", "magnitude": "small" }
+          { "character_id": "...", "verb": "고개를 든다", "magnitude": ${CHARACTER_MAGNITUDE_ENUM_TEXT} }
         ],
         "gaze_arc": [
           { "character_id": "...", "from": "down", "to": "toward_camera" }
@@ -607,8 +622,54 @@ ${compactMode ? `씬 길이(${scene.estimated_seconds}초)와 액션 수에 따�
       : new Error(`L4 parse failed (scene=${scene.scene_id})`);
   }
 
+  // 모션 어휘 교정(#motion-vocab 2026-08-11) — **여기가 유일한 강제 지점**이다.
+  //   architecture.md §3: "모델은 제안만 한다 / 검증은 제품 레이어(화이트리스트 → 명시적 apply).
+  //   프롬프트의 가드는 보조 방어일 뿐 최종 방어가 아니다."
+  //   위 지시서 개정이 1차 방어(어휘를 전부 보여준다)이고, 이 교정이 2차 방어다.
+  //   여기서 정본 낱말로 만들어 저장하므로 하류 소비처(계약문·6축·검수·씬 역추론)는
+  //   깨끗한 값을 받는다. 소비처의 개별 정규화는 이미 저장된 옛 행을 위한 안전망으로 남긴다.
+  const vocabRepairs: string[] = [];
+  const normalized = shots.map((shot) => {
+    const dyn = shot.dynamic_spec;
+    if (!dyn) return shot;
+    const { motion, repairs } = normalizeCameraMotion(dyn.camera_motion);
+    const characterMotion = (dyn.character_motion ?? []).map((m) => {
+      const magnitude = normalizeCharacterMagnitude(m?.magnitude);
+      if (m?.magnitude && m.magnitude !== magnitude) {
+        repairs.push(`character_motion["${m.verb}"].magnitude "${m.magnitude}" → "${magnitude}"`);
+      }
+      return { ...m, magnitude };
+    });
+    if (repairs.length) {
+      vocabRepairs.push(`${shot.intent?.shot_id ?? '(id 없음)'}: ${repairs.join(' / ')}`);
+    }
+    return {
+      ...shot,
+      dynamic_spec: {
+        ...dyn,
+        // 매핑 실패(mapped:false)는 원문이 그대로 남는다 — 조용히 static 으로 접지 않는다.
+        camera_motion: {
+          type: motion.type,
+          direction: motion.direction,
+          speed: motion.speed,
+          magnitude: motion.magnitude,
+        },
+        character_motion: characterMotion,
+      },
+    } as ShotDesign;
+  });
+  // 교정은 조용히 하지 않는다 — 조용한 열화가 이번 사고의 본체였다.
+  //   이 파일이 계속 쌓이면 지시서(1차 방어)가 아직 새고 있다는 신호로 읽는다.
+  //   saveLlmCall 이 아니라 saveText 인 이유: LLM 호출이 아니라 결정론 후처리 기록이다.
+  if (vocabRepairs.length) {
+    await logger.saveText(
+      `L4_vocab_repair_${scene.scene_id}.txt`,
+      vocabRepairs.join('\n'),
+    );
+  }
+
   // shot_id 표준화. 데쿠파주 구동 시 감독이 정한 shot_id를 index로 정렬해 보존.
-  return shots.map((shot, i) => {
+  return normalized.map((shot, i) => {
     const dec = decoupageDriven && sceneDec![i] ? sceneDec![i] : null;
     const sid = dec
       ? dec.shot_id

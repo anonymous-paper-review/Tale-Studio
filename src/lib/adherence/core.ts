@@ -6,6 +6,11 @@
 //   ② 영상 모션 준수: 영상 첫/끝 프레임의 픽셀 차이가 모션 계약과 맞는가 — 결정론 판정.
 //      static 인데 diff 큼 = 과잉 모션 / large 설계인데 diff 작음 = 변화 부족.
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
+import {
+  normalizeCameraMotion,
+  normalizeCharacterMagnitude,
+  isCameraStatic,
+} from '@/lib/writer/motion-vocabulary'
 
 // ── 킬 스위치(#adherence 2026-08-10, 사용자 요청 "일단 비활성화") ──────────────
 // 코드 상수라 env 없이 토글 가능(서버·클라 공용, core.ts 는 순수 모듈). true 로만 바꾸면 즉시 부활.
@@ -56,17 +61,24 @@ export interface MotionExpectation {
   directional: { type: string; direction: string } | null
 }
 
-/** dynamic_spec → 판정 기대치. dyn 없으면 null(검사 불가). */
+/** dynamic_spec → 판정 기대치. dyn 없으면 null(검사 불가).
+ *
+ *  교정기 경유(#motion-vocab 2026-08-11): 어휘 밖 유형은 이 함수의 `directional` 화이트리스트에
+ *  걸리지 않아 **방향 검사 자체가 스킵**됐다(실측: `pan_right`). 검수기가 눈을 감으면 이 계열
+ *  사고는 자동으로는 영영 안 잡힌다 — 그래서 판정 전에 정본 낱말로 정규화한다.
+ */
 export function motionExpectation(dyn: ShotDynamicSpec | null | undefined): MotionExpectation | null {
   if (!dyn) return null
-  const cam = dyn.camera_motion
-  const type = cam?.type ?? 'static'
-  const cameraStatic = !cam?.type || type === 'static' || type === 'handheld_drift' || type === 'rack_focus'
-  const camLarge = cam?.magnitude === 'large' || (cam?.magnitude as string) === 'high'
-  const charLarge = (dyn.character_motion ?? []).some((m) => m?.magnitude === 'large')
+  const { motion } = normalizeCameraMotion(dyn.camera_motion)
+  const type = motion.type
+  const cameraStatic = isCameraStatic(motion)
+  const camLarge = motion.magnitude === 'large'
+  const charLarge = (dyn.character_motion ?? []).some(
+    (m) => normalizeCharacterMagnitude(m?.magnitude) === 'large',
+  )
   const directional =
-    !cameraStatic && cam?.direction && cam.direction !== 'none' && ['pan', 'tilt', 'tracking', 'crane'].includes(type)
-      ? { type, direction: cam.direction }
+    !cameraStatic && motion.direction !== 'none' && ['pan', 'tilt', 'tracking', 'crane'].includes(type)
+      ? { type, direction: motion.direction }
       : null
   return { cameraStatic, hasLargeMotion: camLarge || charLarge, directional }
 }
