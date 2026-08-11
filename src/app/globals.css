@@ -320,7 +320,8 @@
 /* --beam-color 로 빛 색을 파라미터화(#e13 2026-07-14) — 기본은 기존과 동일한 accent(red).
    이미지 생성=success(초록), 영상 생성=primary(빨강) 구분에 사용. 새 토큰이 아니라
    기존 토큰을 골라 쓰는 스위치다. */
-.tale-beam {
+.tale-beam,
+.tale-beam-once {
   padding: 1.5px;
   background: conic-gradient(
     from var(--beam-angle),
@@ -337,7 +338,16 @@
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
   mask-composite: exclude;
+}
+
+.tale-beam {
   animation: beam-spin 1.8s linear infinite;
+}
+
+/* 한 바퀴만 도는 빛 테두리 (#handoff-beam 2026-08-11) — "여기 새 문구가 떴다"는 등장 신호라
+   상시 표시(생성 중)와 달리 1회로 끝나야 한다. 끝나면 흔적을 남기지 않게 forwards 없이 둔다. */
+.tale-beam-once {
+  animation: beam-spin 1.5s linear 1;
 }
 
 /* 모션 최소화 선호 시 회전 대신 정적 accent ring */
@@ -346,6 +356,11 @@
     animation: none;
     background: var(--beam-color, var(--primary));
     opacity: 0.55;
+  }
+  /* 등장 신호는 모션이 본체라, 축소 선호에선 아예 보이지 않게 한다(정적 링이 남으면 오해). */
+  .tale-beam-once {
+    animation: none;
+    background: transparent;
   }
 }
 

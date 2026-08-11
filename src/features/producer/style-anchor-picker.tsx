@@ -77,14 +77,24 @@ export function StyleAnchorPicker({
   value,
   onSelect,
   children,
+  open: openProp,
+  onOpenChange,
 }: {
   anchors: StyleAnchor[]
   value: string | null
   onSelect: (key: string) => void
   /** 팝업을 여는 트리거 — 호출자가 모양을 정한다 (퀘스트 저널에선 설정 뱃지). */
   children: ReactNode
+  /** 제어 모드 — 호출자가 열림을 소유한다(스토리 확정 시 자동 오픈, #style-timing). 미지정이면 내부 상태. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const open = openProp ?? uncontrolledOpen
+  const setOpen = (o: boolean) => {
+    setUncontrolledOpen(o)
+    onOpenChange?.(o)
+  }
   // stacked deck(slider)를 기본 뷰로(#b1 2026-07-18).
   const [view, setView] = useState<StyleView>('slider')
   const [slide, setSlide] = useState(0)

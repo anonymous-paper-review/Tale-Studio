@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
-import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
+import { ImageIcon, MapPin, Clock, Pause, Play, Wand2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -18,7 +18,10 @@ import {
   useDirectorCanvasStore,
 } from '@/stores/director-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
+import { useActiveGenerationJobs, activeShotIds } from '@/lib/generation-queue'
 import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
+import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
+import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { replaceSlugs, type SlugEntry } from '@/lib/script-lines'
 import {
   isSceneData,
@@ -139,7 +142,20 @@ function HoverPlayVideo({ src, label }: { src: string; label: string }) {
 
 type StoryboardMediaMode = 'previz' | 'real'
 
-function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: SlugEntry[]; mediaMode: StoryboardMediaMode }) {
+function ShotCell({
+  node,
+  roster,
+  mediaMode,
+  queuedImageShots,
+  queuedVideoShots,
+}: {
+  node: DirectorNode
+  roster: SlugEntry[]
+  mediaMode: StoryboardMediaMode
+  /** 지금 큐에 떠 있는 잡의 대상 샷들(#queue-restore) — 탭을 떠났다 와도 진행 표시를 되살린다. */
+  queuedImageShots: ReadonlySet<string>
+  queuedVideoShots: ReadonlySet<string>
+}) {
   const generateStoryboardImage = useDirectorCanvasStore(
     (s) => s.generateStoryboardImage,
   )
@@ -153,6 +169,9 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
   // 영상 생성(이미지→영상 체인 포함) 진행 플래그 — 버튼 잠금 + 오버레이(#e12)
   const [videoBusy, setVideoBusy] = useState(false)
   const [videoError, setVideoError] = useState<string | null>(null)
+  // 재생성 확인 팝업(#regen-confirm) / Previz 편집 팝업(#e6)
+  const [confirm, setConfirm] = useState<null | 'image' | 'video'>(null)
+  const [previzOpen, setPrevizOpen] = useState(false)
   // Grid always projects the newest successful take; Final is an editor/export decision.
   const directorNodes = useDirectorCanvasStore((s) => s.nodes)
   // #real-grid-auto: 일괄 시트 생성 중엔 개별 생성/재생성 잠금 (스토어 가드와 이중 방어).
@@ -196,21 +215,20 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
   const roughStartUrl = rough?.frames?.start ?? roughUrl
   const prompt = effectivePrompt(data)
 
-  // 파이프라인 단계 배지(#e2 2026-07-18) — 이 샷이 어느 단계인지 한눈에: 영상 완료 / 이미지 완료
-  //   (영상 대기) / 이미지 생성 필요(러프만). 색으로도 구분: 영상=빨강(primary), 이미지=하늘, 러프=경고.
-  //   Previz 뷰(2026-07-27): 영상 단계가 사라져 러프 보드 유무만 표시한다.
+  // 파이프라인 단계 배지(#e2 2026-07-18) — 이 샷이 어느 단계인지 한눈에: 영상 / 이미지 / Previz.
+  //   색으로도 구분: 영상=빨강(primary), 이미지=하늘, 미생성=경고.
+  //   2026-08-11: 라벨에서 "단계"를 걷어내고(중복어) 호버 없이 처음부터 문구까지 보이게 했다 —
+  //   한눈에 읽으라고 만든 배지가 호버해야 읽히면 배지가 아니라 툴팁이다.
   const stageBadge =
     mediaMode === 'previz'
       ? roughStartUrl
-        ? { label: 'Previz 보드', cls: 'border-sky-400/50 text-sky-300', video: false }
+        ? { label: 'Previz', cls: 'border-sky-400/50 text-sky-300', video: false }
         : { label: '러프 생성 필요', cls: 'border-warning/50 text-warning', video: false }
       : completedVideoUrl
-        ? { label: '영상 단계', cls: 'border-primary/50 text-primary', video: true }
+        ? { label: '영상', cls: 'border-primary/50 text-primary', video: true }
         : hasImage
-          ? { label: '이미지 단계', cls: 'border-sky-400/50 text-sky-300', video: false }
-          : roughUrl
-            ? { label: '이미지 생성 필요', cls: 'border-warning/50 text-warning', video: false }
-            : null
+          ? { label: '이미지', cls: 'border-sky-400/50 text-sky-300', video: false }
+          : { label: '이미지 생성 필요', cls: 'border-warning/50 text-warning', video: false }
 
   const runImage = async () => {
     if (realBatchBusy) {
@@ -252,8 +270,72 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
     }
   }
 
-  const imageGenerating = status === 'generating'
-  const generating = imageGenerating || videoBusy || childVideoGenerating
+  // 큐가 진행 판정의 바닥이다(#queue-restore 2026-08-11) — 노드의 storyboardImage.status 는
+  //   탭 재진입 시 DB 재수화로 덮이므로, 잡이 떠 있으면 그쪽이 맞다.
+  const queuedImage = !!writerShotId && queuedImageShots.has(writerShotId)
+  const queuedVideo = !!writerShotId && queuedVideoShots.has(writerShotId)
+  const imageGenerating = status === 'generating' || queuedImage
+  const generating = imageGenerating || videoBusy || childVideoGenerating || queuedVideo
+
+  /**
+   * 카드 액션 목록 — 단계에 따라 **문구만** 바뀌고 항목 수는 고정이다(#e4 2026-08-11).
+   *   이미지 단계 → [이미지 재생성, 영상 생성] · 영상 단계 → [이미지 재생성, 영상 재생성].
+   *   이미 있는 것을 갈아치우는 항목만 확인 팝업을 거친다 — 빈칸 채우기는 바로 실행.
+   */
+  const actions: Array<{
+    key: string
+    icon: typeof ImageIcon
+    label: string
+    title: string
+    primary: boolean
+    filled?: boolean
+    disabled?: boolean
+    onClick: () => void
+  }> =
+    mediaMode === 'previz'
+      ? [
+          {
+            key: 'previz',
+            icon: Wand2,
+            label: 'Previz 재생성',
+            title: writerShotId
+              ? '연출 화살표 편집기 — writer 탭 카드와 같은 팝업이에요'
+              : 'writer 샷과 연결되지 않은 노드예요',
+            primary: true,
+            disabled: !writerShotId,
+            onClick: () => setPrevizOpen(true),
+          },
+        ]
+      : [
+          {
+            key: 'image',
+            icon: ImageIcon,
+            label: hasImage ? '이미지 재생성' : '이미지 생성',
+            title:
+              status === 'failed' && img?.errorMessage
+                ? img.errorMessage
+                : hasImage
+                  ? '촬영용 이미지를 새로 만들어요 (기존 이미지 교체)'
+                  : '촬영용 이미지만 생성해요',
+            primary: false,
+            onClick: () => {
+              if (hasImage) setConfirm('image')
+              else void runImage()
+            },
+          },
+          {
+            key: 'video',
+            icon: Play,
+            label: completedVideoUrl ? '영상 재생성' : '영상 생성',
+            title: '영상 생성 — 촬영 이미지가 없으면 먼저 생성한 뒤 영상을 만들어요',
+            primary: true,
+            filled: true,
+            onClick: () => {
+              if (completedVideoUrl) setConfirm('video')
+              else void runVideo()
+            },
+          },
+        ]
 
   return (
     <div
@@ -298,24 +380,34 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
             )}
           </div>
         ) : roughUrl ? (
-          // 실사 이미지 미생성 → 러프 스토리보드 표시(안내 배지는 아래 통일 단계 배지가 담당, #e2)
-          <GeneratedImage
-            src={roughUrl}
-            alt={`${data.label} (rough)`}
-            className="size-full object-cover"
-          />
+          // 실사 이미지 미생성 → 러프 스토리보드를 대신 보여준다. 그런데 그대로 깔면 "실사가
+          //   나왔다"로 읽힌다(#e1 2026-08-11 오너 지적) — 흐리게 깔고 무엇이 필요한지 얹는다.
+          <>
+            <GeneratedImage
+              src={roughUrl}
+              alt={`${data.label} (rough)`}
+              className="size-full object-cover opacity-40 grayscale"
+            />
+            <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 px-2 text-center">
+              <ImageIcon className="size-6 text-muted-foreground" />
+              <span className="text-xs font-medium text-foreground">생성이 필요합니다</span>
+              <span className="text-[10px] text-muted-foreground">
+                지금 보이는 건 Previz 그림이에요
+              </span>
+            </span>
+          </>
         ) : (
           <div className="flex size-full items-center justify-center">
             <ImageIcon className="size-8 text-muted-foreground opacity-50" />
           </div>
         )}
 
-        {/* 단계 배지(#e2) — 좌상단. 기본은 아이콘만, 호버 시 문구가 확장(2026-07-22 축소).
+        {/* 단계 배지(#e2) — 좌상단. 아이콘 + 문구를 처음부터 함께 보여준다(2026-08-11).
             생성 중엔 오버레이가 덮으므로 숨긴다. */}
         {!generating && stageBadge && (
           <span
             className={cn(
-              'group/badge absolute left-2 top-2 z-10 inline-flex items-center rounded-md border bg-background/85 px-1.5 py-1 text-[10px] font-medium',
+              'absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-md border bg-background/85 px-1.5 py-1 text-[10px] font-medium',
               stageBadge.cls,
             )}
           >
@@ -324,9 +416,7 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
             ) : (
               <ImageIcon className="size-3 shrink-0" />
             )}
-            <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/badge:ml-1 group-hover/badge:max-w-40 group-hover/badge:opacity-100">
-              {stageBadge.label}
-            </span>
+            <span className="whitespace-nowrap">{stageBadge.label}</span>
           </span>
         )}
 
@@ -351,58 +441,72 @@ function ShotCell({ node, roster, mediaMode }: { node: DirectorNode; roster: Slu
           </span>
         )}
 
-        {/* 우하단 생성 스택(#e12→#e6 2026-07-15, 2026-07-22 축소) — 기본은 ▶ 아이콘만,
-            호버 시 문구가 확장되고 이미지 버튼이 위로 올라온다. 생성 중엔 숨김. */}
+        {/* 우하단 액션 목록(#e12 → 2026-08-11 개편) — 배지가 상시 표시로 바뀐 대신 이쪽이
+            호버 전용이 됐다. 항목 수와 폭이 고정이라 카드 사이에서 목록이 흔들리지 않는다.
+            생성 중엔 숨김(오버레이가 덮는다). */}
         {!generating && (
-          <div className="group/gen absolute bottom-2 right-2 flex flex-col items-end">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                void runImage()
-              }}
-              title={
-                status === 'failed' && img?.errorMessage
-                  ? img.errorMessage
-                  : hasImage
-                    ? '이미지 리터칭 (재생성)'
-                    : '이미지만 생성'
-              }
-              className={cn(
-                // bottom-full 로 영상 버튼 바로 위에 붙인다 — mb 갭을 없애 두 버튼 사이 죽은 영역을
-                //   제거(#e1 2026-07-18). 갭이 있으면 마우스가 그 틈을 지날 때 group-hover가 풀려
-                //   이미지 버튼이 다시 내려가버렸다.
-                'pointer-events-none absolute bottom-full right-0 flex h-7 translate-y-2 items-center gap-1 whitespace-nowrap rounded-md px-2 text-[11px] font-medium text-primary-foreground opacity-0 shadow-sm transition-all duration-200',
-                // 살짝 밝은 빨강 — primary에 흰색 18% 혼합(토큰 파생 셰이드)
-                'bg-[color-mix(in_srgb,var(--primary)_82%,white)]',
-                'group-hover/gen:pointer-events-auto group-hover/gen:translate-y-0 group-hover/gen:opacity-100',
-                'hover:bg-[color-mix(in_srgb,var(--primary)_70%,white)]',
-              )}
-            >
-              <ImageIcon className="size-3.5 shrink-0" />
-              {hasImage ? '이미지 리터칭' : '이미지 생성'}
-            </button>
-            {/* 영상 생성 진입점은 SHOT VIDEO 하나(2026-07-27) — Previz 뷰에서도 같은 실사 영상을 만든다. */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                void runVideo()
-              }}
-              title="영상 생성 — 촬영 이미지가 없으면 먼저 생성한 뒤 영상을 만들어요"
-              className={cn(
-                'flex h-7 items-center rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground shadow-sm',
-                'transition-colors duration-100 hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-50',
-              )}
-            >
-              <Play className="size-3.5 shrink-0 fill-current" />
-              <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/gen:ml-1 group-hover/gen:max-w-40 group-hover/gen:opacity-100">
-                영상 생성
-              </span>
-            </button>
+          <div className="pointer-events-none absolute bottom-2 right-2 flex w-40 flex-col items-stretch gap-1 opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
+            {actions.map((a) => {
+              const Icon = a.icon
+              return (
+                <button
+                  key={a.key}
+                  type="button"
+                  disabled={a.disabled}
+                  title={a.title}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    a.onClick()
+                  }}
+                  className={cn(
+                    'flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-[11px] font-medium shadow-sm transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-50',
+                    a.primary
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/85'
+                      : 'bg-background/90 text-foreground backdrop-blur hover:bg-accent',
+                  )}
+                >
+                  <Icon className={cn('size-3.5 shrink-0', a.filled && 'fill-current')} />
+                  <span className="truncate">{a.label}</span>
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
+
+      {/* 재생성 확인(#regen-confirm) — 최초 생성은 바로, **교체**만 팝업을 거친다. */}
+      <RegenerateConfirmDialog
+        open={confirm !== null}
+        onOpenChange={(o) => {
+          if (!o) setConfirm(null)
+        }}
+        title={confirm === 'video' ? '영상을 다시 만들까요?' : '이미지를 다시 만들까요?'}
+        description={
+          confirm === 'video'
+            ? '지금 촬영 이미지를 기준으로 새 테이크를 만들어요.'
+            : '이 샷의 촬영용 이미지를 새로 생성해요.'
+        }
+        impact={
+          confirm === 'video'
+            ? ['영상 생성 비용이 발생합니다.', '새 테이크가 추가되고 카드에는 최신 성공본이 보입니다.']
+            : ['이미지 생성 비용이 발생합니다.', '기존 촬영용 이미지가 새 결과로 교체됩니다.']
+        }
+        confirmLabel="재생성"
+        onConfirm={() => {
+          const which = confirm
+          setConfirm(null)
+          if (which === 'video') void runVideo()
+          else void runImage()
+        }}
+      />
+
+      {/* Previz 재생성(#e6) — writer 탭 카드와 **같은 팝업**(연출 화살표 편집기)을 띄운다.
+          같은 대상(러프 3프레임)을 두 탭에서 다른 도구로 고치게 두면 결과가 갈린다. */}
+      <ShotDetailDialog
+        shotId={previzOpen ? writerShotId : null}
+        panel={rough}
+        onOpenChange={setPrevizOpen}
+      />
 
       <div className="flex flex-col gap-1 p-3">
         <span className="truncate text-sm font-medium text-foreground">
@@ -442,6 +546,18 @@ export function StoryboardGridView() {
         .map((w) => ({ slug: w.id, name: w.name })),
     ],
     [registeredCharacters, registeredWorlds, projectId],
+  )
+
+  // 진행 중 잡 (#queue-restore) — 셀마다 훅을 걸면 폴링은 공유돼도 리렌더가 카드 수만큼 늘어난다.
+  //   여기서 한 번 읽어 집합으로 내려보낸다.
+  const activeJobs = useActiveGenerationJobs(projectId)
+  const queuedImageShots = useMemo(
+    () => activeShotIds(activeJobs, ['shot_storyboard', 'storyboard_real_grid']),
+    [activeJobs],
+  )
+  const queuedVideoShots = useMemo(
+    () => activeShotIds(activeJobs, ['shot_video']),
+    [activeJobs],
   )
 
   const scenes = nodes.filter((n) => isSceneData(n.data))
@@ -530,7 +646,14 @@ export function StoryboardGridView() {
             {group.shots.length > 0 ? (
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
                 {group.shots.map((shot) => (
-                  <ShotCell key={shot.id} node={shot} roster={roster} mediaMode={mediaMode} />
+                  <ShotCell
+                    key={shot.id}
+                    node={shot}
+                    roster={roster}
+                    mediaMode={mediaMode}
+                    queuedImageShots={queuedImageShots}
+                    queuedVideoShots={queuedVideoShots}
+                  />
                 ))}
               </div>
             ) : (

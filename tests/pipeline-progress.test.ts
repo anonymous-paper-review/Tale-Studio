@@ -4,6 +4,7 @@ import {
   artistImageWork,
   directorShotImageWork,
   directorVideoWork,
+  queueWorks,
 } from '@/lib/pipeline-progress'
 import type { DirectorNode } from '@/types/director'
 
@@ -104,5 +105,68 @@ describe('directorVideoWork', () => {
       node({ kind: 'shot', storyboardImage: { status: 'generating' } }),
     ])
     expect(work).toMatchObject({ done: 1, total: 3, failed: 1 })
+  })
+})
+
+// #queue-restore 2026-08-11 — 탭을 떠났다 오면 화면 상태(컴포넌트 로컬 panelJobs, DB 재수화로
+//   덮이는 director storyboardImage)는 "생성 중"을 잊는다. 큐(queued 잡)가 판정의 바닥이라는 계약.
+
+describe('큐 기반 진행 복원', () => {
+  it('러프: 화면 상태가 전부 미생성이어도 큐에 잡이 있으면 진행 중으로 뜬다', () => {
+    const shots = [
+      { shotId: 'sh_01', actionDescription: '달린다', roughStoryboard: null },
+      { shotId: 'sh_02', actionDescription: '멈춘다', roughStoryboard: null },
+    ]
+    expect(writerRoughWork(shots)).toBeNull()
+    const work = writerRoughWork(shots, new Set(['sh_01']))
+    expect(work).toMatchObject({ done: 0, total: 2 })
+  })
+
+  it('러프: 큐가 비면 다시 null (완료 후 알림바가 스스로 사라진다)', () => {
+    const shots = [
+      { shotId: 'sh_01', actionDescription: '달린다', roughStoryboard: { status: 'completed' } },
+    ]
+    expect(writerRoughWork(shots, new Set())).toBeNull()
+  })
+
+  it('director 실사: 큐의 writerShotId 로 생성 중을 복원한다', () => {
+    const nodes = [
+      node({ kind: 'shot', writerShotId: 'sh_01', storyboardImage: null }),
+      node({ kind: 'shot', writerShotId: 'sh_02', storyboardImage: { status: 'completed' } }),
+    ]
+    expect(directorShotImageWork(nodes)).toBeNull()
+    expect(directorShotImageWork(nodes, new Set(['sh_01']))).toMatchObject({ done: 1, total: 2 })
+  })
+
+  it('director 영상: 노드가 아직 없어도 큐 개수만으로 알림바를 세운다', () => {
+    expect(directorVideoWork([], 0)).toBeNull()
+    expect(directorVideoWork([], 2)).toMatchObject({ done: 0, total: 2 })
+  })
+
+  it('artist: store in-flight 가 비어도 큐 개수가 있으면 진행 중', () => {
+    const base = {
+      imagesReady: true,
+      stalled: false,
+      failed: false,
+      progress: null,
+      generatingCount: 0,
+    }
+    expect(artistImageWork(base)).toBeNull()
+    expect(artistImageWork({ ...base, activeCount: 2 })?.label).toContain('2건')
+  })
+})
+
+describe('queueWorks — 전용 화면이 없는 탭의 알림바', () => {
+  it('0건인 종류는 줄을 만들지 않는다', () => {
+    expect(queueWorks({ shot_video: 0, character_view: 0 })).toEqual([])
+  })
+
+  it('종류별로 담당 에이전트 이름과 색(stage)을 붙여 세운다', () => {
+    const works = queueWorks({ character_view: 2, shot_video: 1 })
+    expect(works).toHaveLength(2)
+    expect(works[0]).toMatchObject({ stage: 'artist', total: 2 })
+    expect(works[0].label).toContain('Concept Artist')
+    expect(works[1]).toMatchObject({ stage: 'director', total: 1 })
+    expect(works[1].label).toContain('Director')
   })
 })

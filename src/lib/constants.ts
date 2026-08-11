@@ -69,6 +69,19 @@ export const STAGE_LABEL: Record<StageId, string> = {
   editor: 'Editor',
 }
 
+/**
+ * 에이전트 정식 표기 — STAGES[].agent 와 같은 이름(artist 는 'Concept Artist').
+ * STAGE_LABEL 은 좁은 배지·레일용 축약이고, 이건 문장 안에서 "누가 하고 있는지"를 말할 때 쓴다
+ * (진행 알림바: "Concept Artist가 캐릭터 이미지를 생성하고 있습니다").
+ */
+export const STAGE_AGENT_NAME: Record<StageId, string> = {
+  producer: 'Producer',
+  writer: 'Writer',
+  artist: 'Concept Artist',
+  director: 'Director',
+  editor: 'Editor',
+}
+
 /** stage 색 badge 클래스 — design.md §2.9 토큰. JIT-safe literal (face와 동일 색). */
 export const STAGE_BADGE_CLASS: Record<StageId, string> = {
   producer: 'bg-stage-producer/15 text-stage-producer border-stage-producer/30',

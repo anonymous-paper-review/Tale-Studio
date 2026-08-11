@@ -29,12 +29,16 @@ export function RoughFrameCycle({
   panel,
   alt,
   introPlay = false,
+  fit = 'cover',
 }: {
   panel: Pick<RoughStoryboardImage, 'url' | 'generatedAt' | 'frames'>
   alt: string
   /** 마운트 시 1회 전체 순환(START→DIRECTING→END→START) 후 정지 — writer 러프 보드 첫 진입용
    *  (#p1-quickwin W3 2026-08-05: "처음 탭 들어왔을 때 한 번에 모두 움직이고 그 다음은 호버만"). */
   introPlay?: boolean
+  /** contain: 그림을 자르지 않고 전부 보여준다(러프 카드 — 연출 확인이 목적이라 잘리면 안 된다).
+   *  cover: 상자를 꽉 채운다(썸네일 성격). */
+  fit?: 'cover' | 'contain'
 }) {
   const f = panel.frames
   const urls = f
@@ -113,7 +117,8 @@ export function RoughFrameCycle({
           alt={i === current ? alt : ''}
           aria-hidden={i !== current}
           className={cn(
-            'absolute inset-0 size-full object-cover transition-opacity duration-150',
+            'absolute inset-0 size-full transition-opacity duration-150',
+            fit === 'contain' ? 'object-contain' : 'object-cover',
             i === current ? 'opacity-100' : 'opacity-0',
           )}
           loading="lazy"

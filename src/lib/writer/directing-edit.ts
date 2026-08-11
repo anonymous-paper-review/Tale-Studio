@@ -103,6 +103,72 @@ export async function separateArrowLayer(
   return { cleanUrl, cached: false }
 }
 
+// END 프레임을 편집된 DIRECTING 프레임에서 다시 그린다 (#end-from-direction 2026-08-11).
+//   화살표를 고쳤으면 "그 화살표가 끝난 뒤의 그림"인 END 도 따라가야 한다 — 안 그러면 편집이
+//   DIRECTING 한 장에만 남고 세트가 서로 다른 이야기를 한다.
+//   3프레임 통째 재생성이 아니라 i2i 한 장인 이유: 통째로 다시 그리면 방금 편집한 DIRECTING 이
+//   버려진다(그게 이 기능의 출발점이다).
+const END_FROM_DIRECTION_PROMPT =
+  'This pencil storyboard sketch marks the intended movement of a shot with arrows, motion lines ' +
+  'and handwritten annotations. Draw the END frame: the same scene after that movement has fully ' +
+  'completed. Move the figures, objects and framing all the way to where the arrows point — the ' +
+  'full extent of the indicated motion, not a barely-changed copy. Remove every arrow, motion ' +
+  'line, dashed path and handwritten annotation. Keep the same characters, costumes, background ' +
+  'and monochrome pencil style. Return only the cleaned drawing.'
+
+/**
+ * DIRECTING 프레임을 참조로 END 프레임을 재생성한다.
+ * 과금: fal i2i 1회 — 사람이 "저장 후 재생성"을 명시적으로 누를 때만 호출된다(자동 경로 없음).
+ */
+export async function regenerateEndFrame(
+  projectId: string,
+  shotId: string,
+): Promise<{ url: string; generatedAt: number }> {
+  const rb = await loadRough(projectId, shotId)
+  if (rb?.status !== 'completed' || !rb.frames?.direction || !rb.frames?.end) {
+    throw new Error('3프레임 러프 세트가 있어야 END 를 다시 그릴 수 있어요')
+  }
+
+  const result = await falImageGenerate({
+    model: GROK_EDIT_MODEL,
+    prompt: END_FROM_DIRECTION_PROMPT,
+    reference_image_urls: [rb.frames.direction],
+  })
+  const res = await fetch(result.url)
+  if (!res.ok) throw new Error(`END 프레임 다운로드 실패: HTTP ${res.status}`)
+  const buf = Buffer.from(await res.arrayBuffer())
+  if (buf.length < 10_000) {
+    throw new Error(`END 프레임이 비정상적으로 작아요 (${buf.length}b)`)
+  }
+  const contentType = res.headers.get('content-type') ?? 'image/jpeg'
+  const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
+  const endPath = `${storagePathFromPublicUrl(rb.frames.end).replace(/\.[a-z]+$/i, '')}.${ext}`
+  const newUrl = await uploadToMedia(endPath, buf, contentType)
+
+  // 생성 중에 러프가 재생성됐으면(다른 generatedAt) 덮어쓰지 않는다 — 낡은 END 로 새 세트를
+  //   오염시키는 것을 막는다(separateArrowLayer 와 같은 방어).
+  const latest = await loadRough(projectId, shotId)
+  if (!latest || (latest.generatedAt ?? 0) !== (rb.generatedAt ?? 0)) {
+    throw new Error('그 사이 러프가 재생성됐어요 — 다시 시도해 주세요')
+  }
+  const now = Date.now()
+  const { error } = await supabaseAdmin
+    .from('shots')
+    .update({
+      rough_storyboard: {
+        ...latest,
+        frames: { ...latest.frames, end: newUrl },
+        generatedAt: now,
+        // DIRECTING 은 그대로이므로 클린 플레이트 캐시는 유효 — for 를 함께 올려 재과금을 막는다.
+        ...(latest.cleanDirection ? { cleanDirection: { ...latest.cleanDirection, for: now } } : {}),
+      },
+    })
+    .eq('project_id', projectId)
+    .eq('shot_id', shotId)
+  if (error) throw error
+  return { url: newUrl, generatedAt: now }
+}
+
 /** 편집기가 평탄화한 direction 프레임(PNG data URL)을 기존 경로에 upsert + 캐시버스트. */
 export async function saveDirectingFrame(
   projectId: string,

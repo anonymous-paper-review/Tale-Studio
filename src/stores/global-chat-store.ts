@@ -81,7 +81,8 @@ interface GlobalChatState {
   sendMessage: (content: string) => Promise<void>
   /** 진행 중인 LLM 응답 중단 (#oiioii-chat) — Stop 버튼. 대기 중이 아니면 no-op. */
   stopGeneration: () => void
-  offerSuggestion: (suggestion: ChatSuggestion) => void
+  /** preempt: 떠 있는 제안(선택지 등)을 밀어내고 이 제안을 세운다 — 핸드오프처럼 "지금이 그 순간"인 것만. */
+  offerSuggestion: (suggestion: ChatSuggestion, opts?: { preempt?: boolean }) => void
   /** implicit: 유저가 다른 말을 해서 내려간 것 — id 를 기록하지 않아 나중에 다시 뜰 수 있다. */
   dismissSuggestion: (opts?: { implicit?: boolean }) => void
   offerPendingProposal: (proposal: PendingProposal) => boolean
@@ -737,10 +738,20 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   },
 
   // 프로액티브 제안 띄우기 — 한 번에 하나만(이미 떠 있으면 무시), 이미 dismiss/승인한 id 도 무시.
-  offerSuggestion: (suggestion) => {
+  offerSuggestion: (suggestion, opts) => {
     const { suggestion: current, dismissedSuggestionIds } = get()
-    if (current) return
     if (dismissedSuggestionIds.includes(suggestion.id)) return
+    if (current) {
+      if (current.id === suggestion.id) return // 이미 그 제안이 떠 있다
+      // 선점 (#handoff-starved 2026-08-11) — 슬롯이 비기를 기다리기만 하면 영영 못 뜨는 제안이 있다.
+      //   producer 채팅은 시스템 프롬프트상 되물을 거리가 있으면 거의 매 응답마다 [CHOICES] 를 내고,
+      //   선택지도 같은 제안 슬롯을 쓴다. 그래서 게이트가 충족되는 순간에도 슬롯이 이미 차 있어
+      //   "Writer 호출하기" 가 나타나지 못했다. 명시적으로 선점을 요청한 제안만 기존 것을 밀어낸다
+      //   (암묵 교체는 금지 — 사용자가 답하려던 질문이 소리 없이 사라지면 안 된다).
+      if (!opts?.preempt) return
+      // 내릴 수 없는 제안(웰컴 등)은 못 민다.
+      if (current.dismissible === false) return
+    }
     set({ suggestion })
   },
 

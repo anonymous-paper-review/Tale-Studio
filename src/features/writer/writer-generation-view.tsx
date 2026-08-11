@@ -8,7 +8,6 @@
 import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { WriterStoryStream } from '@/features/writer/writer-story-stream'
-import { SceneGatePanel } from '@/features/writer/scene-gate-panel'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { WriterCharacterPanel } from '@/features/writer/writer-character-panel'
 import type { WriterStatus } from '@/lib/writer/use-writer-status'
@@ -47,17 +46,23 @@ export function WriterGenerationView({
   // #s3-gate: storyCheck 후 씬 확정 대기 — 진행 바 대신 게이트 패널.
   const awaiting = status?.current_status === 'awaiting_confirmation'
 
-  // #s3-gate P3b: 게이트 진입 시 채팅에도 확정 제안 버튼 — #handoff-to-chat 문법 정합.
+  // #s3-gate P3b → #gate-to-chat(2026-08-11): 확정/수정은 채팅 제안 블록이 **유일한** 자리다.
+  //   화면 하단 바에도 같은 버튼을 두면 답할 곳이 둘로 갈린다. 다른 단계의 "다음으로 넘어갈까요"가
+  //   전부 채팅에 있으므로 여기도 채팅으로 모았다(하단 바는 진행률 전용). 선점(preempt): 러프보드
+  //   브리핑 등 다른 제안이 떠 있어도 게이트는 사용자를 기다리게 하는 결정이라 먼저 보여야 한다.
   useEffect(() => {
     if (!awaiting || !projectId) return
-    useGlobalChatStore.getState().offerSuggestion({
-      id: `scene-gate:${projectId}`,
-      stage: 'writer',
-      dismissible: true,
-      content:
-        '씬 스토리 초안이 준비됐어요. 화면에서 검토하고 마음에 들면 확정해 주세요 —\n수정하고 싶은 부분은 아래 게이트 패널에 적으면 다시 써 드려요.',
-      action: { kind: 'confirmScenes', label: '이대로 확정' },
-    })
+    useGlobalChatStore.getState().offerSuggestion(
+      {
+        id: `scene-gate:${projectId}`,
+        stage: 'writer',
+        dismissible: true,
+        content:
+          '씬 스토리 초안이 준비됐어요. 화면에서 검토하고 마음에 들면 확정해 주세요 —\n고치고 싶은 부분이 있으면 아래에 적고 [수정 요청]을 눌러 주세요.',
+        action: { kind: 'confirmScenes', label: '이대로 확정' },
+      },
+      { preempt: true },
+    )
   }, [awaiting, projectId])
 
   return (
@@ -93,10 +98,8 @@ export function WriterGenerationView({
         />
       </div>
 
-      {/* 하단 바 — 게이트 대기 중엔 확정/수정 패널(#s3-gate), 그 외엔 진행바 */}
-      {awaiting ? (
-        <SceneGatePanel />
-      ) : (
+      {/* 하단 바 — 진행률 전용. 게이트 대기 중엔 조작이 채팅에 있으므로(#gate-to-chat) 감춘다. */}
+      {awaiting ? null : (
       <div className="shrink-0 border-t border-border bg-background/95 px-6 py-3 backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-4">
           <div className="flex min-w-0 items-center gap-2">

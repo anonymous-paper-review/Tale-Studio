@@ -70,19 +70,27 @@ export default function MeetingPage() {
   //   거의 항상 응답 직후 = 선택지가 떠 있는 순간이라 버튼이 영영 안 떴다. ref 대신 제안
   //   슬롯(suggestion)이 빌 때마다 재시도한다. 스팸 방지는 offerSuggestion 의 dismissed-id
   //   가드 몫 — 명시적 "나중에" 후에는 다시 뜨지 않고, 자동 내림(implicit) 후에는 다시 뜬다.
+  // #handoff-starved(2026-08-11): 슬롯이 비기를 기다리는 것으로는 부족했다 — producer 채팅은
+  //   되물을 거리가 있으면 거의 매 응답마다 [CHOICES] 를 내고 선택지도 같은 제안 슬롯을 쓴다.
+  //   그래서 게이트가 충족돼도 슬롯이 늘 차 있어 "Writer 호출하기"가 나타나지 못했다. 이제 이
+  //   제안만 선점(preempt)한다 — 게이트가 다 찼다면 남은 질문보다 이게 먼저다.
   const activeSuggestion = useGlobalChatStore((s) => s.suggestion)
   useEffect(() => {
-    if (!projectId || !canHandoff || activeSuggestion) return
+    if (!projectId || !canHandoff) return
     const spec = handoffFrom('producer')
     if (!spec) return
-    offerSuggestion({
-      id: `handoff:producer:${projectId}`,
-      stage: 'producer',
-      content:
-        '필요한 항목이 모두 채워졌어요. Writer를 호출하면 씬·샷 설계가 바로 시작돼요.',
-      // 라벨은 초대 프레임(#oiioii-handoff) — 실행하면 채팅에 ⇄ 초대 블록이 그려지고 넘어간다.
-      action: { kind: 'handoff', utterance: spec.utterance, label: 'Writer 호출하기' },
-    })
+    offerSuggestion(
+      {
+        id: `handoff:producer:${projectId}`,
+        stage: 'producer',
+        content:
+          '필요한 항목이 모두 채워졌어요. Writer를 호출하면 씬·샷 설계가 바로 시작돼요.',
+        // 라벨은 초대 프레임(#oiioii-handoff) — 실행하면 채팅에 ⇄ 초대 블록이 그려지고 넘어간다.
+        action: { kind: 'handoff', utterance: spec.utterance, label: 'Writer 호출하기' },
+      },
+      { preempt: true },
+    )
+    // activeSuggestion: 슬롯이 바뀔 때마다 재시도(선점이 막힌 경우 — 예: 내릴 수 없는 웰컴).
   }, [projectId, canHandoff, activeSuggestion, offerSuggestion])
 
   // 첫 진입(스토리·프로듀서 채팅 모두 비어있음)에만 프로듀서가 먼저 인사 + 입력창 포커스(빔).

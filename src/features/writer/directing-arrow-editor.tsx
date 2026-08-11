@@ -8,7 +8,7 @@
 // 지우개(destination-out)로 위층을 긁으면 밑층이 드러난다 = 기존 화살표 삭제.
 // 펜으로 위층에 새 화살표를 그리고, 저장 시 두 층을 평탄화해 direction 프레임에 upsert.
 import { useEffect, useRef, useState } from 'react'
-import { Eraser, Layers, Loader2, Pen, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
+import { Eraser, Layers, Loader2, Pen, RotateCcw, Save, Trash2, Undo2, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
@@ -70,6 +70,11 @@ export function DirectingArrowEditor({
   const [penWidth, setPenWidth] = useState(6)
   const [separating, setSeparating] = useState(false)
   const [saving, setSaving] = useState(false)
+  // 브러시 커서(#brush-cursor 2026-08-11) — 어느 굵기로 칠해지는지는 그어 보기 전엔 알 수 없다.
+  //   화살표 커서 대신 **실제 크기의 원**을 따라다니게 해 "이만큼 칠해진다"를 미리 보여준다.
+  //   좌표는 표시 크기(CSS px), 굵기는 캔버스 내부 픽셀이라 배율(displayScale)로 환산한다.
+  const [hoverPt, setHoverPt] = useState<Pt | null>(null)
+  const [displayScale, setDisplayScale] = useState(1)
 
   // 원본 DIRECTING 프레임 → 위층 캔버스. directionUrl 은 generatedAt 캐시버스트를 포함하므로
   //   저장 후(loadProject 로 generatedAt 갱신) 이 effect 가 저장본을 새 "원본"으로 다시 깐다.
@@ -98,6 +103,17 @@ export function DirectingArrowEditor({
 
   const busy = separating || saving
   const ready = !!dims
+  // 지우개는 밑층이 있어야 의미가 있다 — 못 그리는 상태에선 원도 띄우지 않는다(거짓 신호 금지).
+  const canDraw = ready && !busy && !(tool === 'eraser' && !effectiveClean)
+  const brushWidth = tool === 'eraser' ? penWidth * ERASER_WIDTH_MULT : penWidth
+  const cursorDiameter = Math.max(6, brushWidth * displayScale)
+
+  const trackCursor = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = e.currentTarget
+    const rect = canvas.getBoundingClientRect()
+    if (canvas.width > 0) setDisplayScale(rect.width / canvas.width)
+    setHoverPt({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+  }
 
   const toCanvasPoint = (e: React.PointerEvent<HTMLCanvasElement>): Pt => {
     const canvas = e.currentTarget
@@ -222,7 +238,13 @@ export function DirectingArrowEditor({
     }
   }
 
-  const handleSave = async () => {
+  /**
+   * 저장 (+ 선택적으로 END 재생성).
+   * regenerateEnd: 화살표를 고쳤으면 "그 화살표가 끝난 뒤의 그림"인 END 도 따라가야 한다 —
+   *   안 그러면 편집이 DIRECTING 한 장에만 남고 3프레임 세트가 서로 다른 이야기를 한다.
+   *   과금이 걸리므로 기본 [저장]과 갈라 놓고, 누른 사람만 i2i 를 태운다.
+   */
+  const handleSave = async (regenerateEnd = false) => {
     const top = topCanvasRef.current
     if (!top || !ready) return
     setSaving(true)
@@ -250,7 +272,21 @@ export function DirectingArrowEditor({
       })
       const j = await res.json().catch(() => null)
       if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
-      toast.success('DIRECTING 프레임을 저장했어요')
+      if (!regenerateEnd) {
+        toast.success('DIRECTING 프레임을 저장했어요')
+        onSaved()
+        return
+      }
+      // 저장이 끝난 뒤(= 서버가 새 DIRECTING 을 갖고 있는 상태) END 를 그 그림 기준으로 다시 그린다.
+      toast.info('END 프레임을 다시 그리는 중이에요 — 30초쯤 걸려요')
+      const endRes = await fetch('/api/writer/rough-directing-edit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'regenerate-end', projectId, shotId }),
+      })
+      const endJson = await endRes.json().catch(() => null)
+      if (!endRes.ok) throw new Error(endJson?.error ?? `HTTP ${endRes.status}`)
+      toast.success('DIRECTING 저장 + END 프레임 재생성 완료')
       onSaved()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '저장 실패')
@@ -333,6 +369,10 @@ export function DirectingArrowEditor({
           onValueChange={([v]) => setPenWidth(v)}
           aria-label="굵기"
         />
+        {/* 실제 칠해지는 굵기 — 지우개는 배율이 붙으므로 슬라이더 값과 다르다. 그 값을 그대로 보여준다. */}
+        <span className="w-10 shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+          {brushWidth}px
+        </span>
 
         <div className="ml-auto flex items-center gap-1">
           <Button
@@ -390,13 +430,33 @@ export function DirectingArrowEditor({
           ref={topCanvasRef}
           className={cn(
             'absolute inset-0 size-full touch-none',
-            ready && !busy ? 'cursor-crosshair' : 'cursor-wait',
+            // 그릴 수 있을 땐 네이티브 커서를 감춘다 — 아래 원이 커서 역할을 대신한다.
+            !ready || busy ? 'cursor-wait' : canDraw ? 'cursor-none' : 'cursor-not-allowed',
           )}
           onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
+          onPointerMove={(e) => {
+            trackCursor(e)
+            handlePointerMove(e)
+          }}
+          onPointerEnter={trackCursor}
+          onPointerLeave={() => setHoverPt(null)}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
         />
+        {/* 브러시 미리보기 원 — 실제 칠해지는 지름. 밝은 그림 위에서도 보이게 안팎 두 겹 테두리. */}
+        {canDraw && hoverPt && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute z-10 rounded-full border border-foreground/80 ring-1 ring-background/90"
+            style={{
+              width: cursorDiameter,
+              height: cursorDiameter,
+              left: hoverPt.x,
+              top: hoverPt.y,
+              transform: 'translate(-50%, -50%)',
+            }}
+          />
+        )}
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center" aria-busy="true">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -410,9 +470,29 @@ export function DirectingArrowEditor({
             ? '지우개로 위층을 긁으면 화살표 없는 밑층이 드러나요. 펜으로 새 화살표를 그려요.'
             : '펜은 바로 쓸 수 있어요. 기존 화살표를 지우려면 먼저 레이어 분리를 눌러주세요.'}
         </p>
-        <Button size="sm" disabled={busy || !ready} onClick={() => void handleSave()}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy || !ready}
+          onClick={() => void handleSave()}
+        >
           {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
           저장
+        </Button>
+        {/* 화살표를 고쳤으면 END 도 그 화살표를 따라가야 한다(#end-from-direction). 이미지 생성이
+            한 번 걸리므로 기본 저장과 갈라 두고, 누른 사람만 과금을 태운다. */}
+        <Button
+          size="sm"
+          disabled={busy || !ready}
+          onClick={() => void handleSave(true)}
+          title="저장한 DIRECTING 프레임을 기준으로 END 프레임을 다시 그려요 (이미지 생성 1회)"
+        >
+          {saving ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Wand2 className="size-3.5" />
+          )}
+          저장 후 END 재생성
         </Button>
       </div>
     </div>

@@ -6,7 +6,11 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getUser } from '@/lib/supabase/auth'
 import { userOwnsProject } from '@/lib/generation-jobs'
-import { separateArrowLayer, saveDirectingFrame } from '@/lib/writer/directing-edit'
+import {
+  separateArrowLayer,
+  saveDirectingFrame,
+  regenerateEndFrame,
+} from '@/lib/writer/directing-edit'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120 // Grok i2i 동기 생성(수십 초) 대기
@@ -24,6 +28,12 @@ const BodySchema = z.discriminatedUnion('action', [
     // PNG data URL — base64 오버헤드 포함 상한(디코드 후 15MB 는 lib 이 재검증)
     image: z.string().max(21_000_000),
   }),
+  z.object({
+    // 편집한 DIRECTING 을 참조로 END 프레임만 다시 그린다(#end-from-direction).
+    action: z.literal('regenerate-end'),
+    projectId: z.string().uuid(),
+    shotId: z.string().min(1),
+  }),
 ])
 
 export async function POST(req: Request) {
@@ -39,6 +49,10 @@ export async function POST(req: Request) {
 
     if (body.action === 'separate') {
       const data = await separateArrowLayer(body.projectId, body.shotId)
+      return NextResponse.json({ data })
+    }
+    if (body.action === 'regenerate-end') {
+      const data = await regenerateEndFrame(body.projectId, body.shotId)
       return NextResponse.json({ data })
     }
     const data = await saveDirectingFrame(body.projectId, body.shotId, body.image)

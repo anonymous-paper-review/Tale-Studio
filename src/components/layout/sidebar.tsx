@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Users,
   PenTool,
@@ -21,6 +21,11 @@ import {
 } from '@/components/ui/hover-card'
 import { cn } from '@/lib/utils'
 import { STAGES, STAGE_LABEL, SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
+import {
+  STAGE_ACCESS_KEY,
+  accessModifierLabel,
+  stageForShortcut,
+} from '@/lib/stage-shortcuts'
 import { navigateWithStageSlide } from '@/lib/stage-transition'
 import { UserMenu } from '@/components/layout/user-menu'
 import { ContactPopover } from '@/components/contact-popover'
@@ -72,6 +77,49 @@ export function Sidebar() {
     setPrevPathname(pathname)
     setPendingStage(null)
   }
+
+  // 스테이지 이동 한 곳 (#keyboard-only) — 클릭과 단축키가 같은 경로를 타야 잠금·전환 연출이 갈리지 않는다.
+  //   canNavigateTo 는 getState() 로 읽는다: 리스너가 오래 살아 있어도 잠금 판정이 낡지 않게.
+  const goToStage = useCallback(
+    (stageId: StageId) => {
+      const stage = STAGES.find((s) => s.id === stageId)
+      if (!stage || pathname.startsWith(stage.path)) return
+      if (!useProjectStore.getState().canNavigateTo(stageId)) return
+      setPendingStage(stageId)
+      navigateWithStageSlide(pathname, stage.path, () =>
+        router.push(withDemoShare(stage.path)),
+      )
+    },
+    [pathname, router],
+  )
+
+  // Alt(Option) + Q/W/E/R/T 로 전환하고, Alt 를 누르고 있는 동안 각 셀에 키 배지를 띄운다.
+  //   Ctrl/Cmd 가 아닌 이유는 stage-shortcuts.ts 주석 참조(예약 가속키 — Cmd+W 는 탭을 닫는다).
+  //   입력창에 포커스가 있어도 가로챈다: 앱 메뉴 성격의 전역 단축키라 텍스트 입력과 경쟁하지 않는다.
+  const [accessKeysVisible, setAccessKeysVisible] = useState(false)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') setAccessKeysVisible(true)
+      const target = stageForShortcut(e)
+      if (!target) return
+      e.preventDefault() // Windows 의 Alt+문자 메뉴 활성화 차단
+      setAccessKeysVisible(false)
+      goToStage(target)
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') setAccessKeysVisible(false)
+    }
+    // Alt+Tab 으로 창을 떠나면 keyup 이 오지 않아 배지가 남는다 — 포커스 상실에 함께 내린다.
+    const clear = () => setAccessKeysVisible(false)
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', clear)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', clear)
+    }
+  }, [goToStage])
 
   const reachedStageIndex = STAGES.findIndex((stage) => stage.id === reachedStage)
   const artistImageLockCopy =
@@ -210,13 +258,8 @@ export function Sidebar() {
                   onClick={() => {
                     if (isArtistRetryable) void retryArtistDrafts()
                     // 데모(URL 티켓): share 쿼리 유지 — 쿠키 차단 브라우저에서도 스테이지 이동 생존
-                    else if (!isLocked && !isCommitted) {
-                      setPendingStage(stage.id)
-                      // 세로 연속 스트립 전환(#tab-slide-v2) — 방향은 현재 경로 ↔ 목적지로 계산.
-                      navigateWithStageSlide(pathname, stage.path, () =>
-                        router.push(withDemoShare(stage.path)),
-                      )
-                    }
+                    //   이동 자체는 goToStage 한 곳(단축키와 공유. 세로 스트립 전환 포함).
+                    else if (!isLocked && !isCommitted) goToStage(stage.id)
                   }}
                   disabled={isLocked && !isArtistRetryable}
                   className={cn(
@@ -242,6 +285,12 @@ export function Sidebar() {
                       {badge > 9 ? '9+' : badge}
                     </span>
                   )}
+                  {/* 액세스 키 배지 — Alt(Option) 를 누르고 있는 동안만. 잠긴 탭은 갈 수 없으니 안 보인다. */}
+                  {accessKeysVisible && !isLocked && (
+                    <span className="absolute left-0.5 top-0.5 rounded border border-border bg-card px-1 font-mono text-[9px] font-semibold leading-[1.35] text-foreground shadow-sm">
+                      {STAGE_ACCESS_KEY[stage.id]}
+                    </span>
+                  )}
                   {/* 이동 중 스피너 — 150ms 안에 커밋되면 안 보인다(fill-mode backwards 로 지연). */}
                   {isPending && (
                     <span
@@ -262,6 +311,13 @@ export function Sidebar() {
                       : 'Complete previous step first'
                     : stage.agent}
                 </span>
+                {!isLocked && (
+                  <span className="mt-0.5 text-[10px] text-muted-foreground">
+                    <kbd className="rounded border border-border bg-muted px-1 font-mono">
+                      {accessModifierLabel()}+{STAGE_ACCESS_KEY[stage.id]}
+                    </kbd>
+                  </span>
+                )}
               </TooltipContent>
             </Tooltip>
           )

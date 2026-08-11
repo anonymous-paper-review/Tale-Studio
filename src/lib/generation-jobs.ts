@@ -293,6 +293,38 @@ export async function listFailedCharacterViewJobs(projectId: string): Promise<Ch
     })
 }
 
+/** 진행 중 잡 1건 — 클라가 "무엇이 도는 중인지"를 복원하는 데 필요한 최소 필드. */
+export interface ActiveGenerationJob {
+  id: string
+  kind: GenerationJobKind
+  target: GenerationJobTarget
+}
+
+/**
+ * 프로젝트의 진행 중(queued) 잡 전량 (#queue-restore).
+ *
+ * "생성 중"은 별도 플래그가 아니라 queued 잡의 존재로 도출한다(architecture §0). 컴포넌트 로컬
+ *   상태(러프보드 panelJobs 등)는 탭을 떠나면 증발하므로, 돌아왔을 때 진행 애니메이션을 되살리는
+ *   유일한 근거가 이 목록이다. STALE_QUEUED_MS 를 넘긴 잡은 웹훅이 유실된 유령이라 제외한다 —
+ *   그걸 세면 영원히 도는 스피너가 된다.
+ */
+export async function listActiveGenerationJobs(
+  projectId: string,
+): Promise<ActiveGenerationJob[]> {
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id, kind, target')
+    .eq('project_id', projectId)
+    .eq('status', 'queued')
+    .gte('created_at', new Date(Date.now() - STALE_QUEUED_MS).toISOString())
+  if (error) throw error
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    kind: row.kind as GenerationJobKind,
+    target: (row.target as GenerationJobTarget | null) ?? {},
+  }))
+}
+
 /** queued 인 character_view main 잡 목록(클라가 [id] reconcile 로 마무리할 대상). */
 export async function listQueuedMainJobs(
   projectId: string,

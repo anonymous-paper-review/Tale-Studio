@@ -36,6 +36,12 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
+import { resolveEntityNames, manifestEntities } from '@/lib/writer/resolve-entity-names'
+import {
+  useActiveGenerationJobs,
+  activeShotIds,
+  refreshGenerationQueue,
+} from '@/lib/generation-queue'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
 import { cn } from '@/lib/utils'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
@@ -61,6 +67,10 @@ export function RoughStoryboardView() {
   const shots = useWriterStore((s) => s.shots)
   const loadProject = useWriterStore((s) => s.loadProject)
   const { status } = useWriterStatus(projectId)
+  // 진행 중 판정의 바닥 (#queue-restore 2026-08-11) — 아래 panelJobs 는 컴포넌트 로컬이라 탭을
+  //   떠나면 증발하는데 잡은 fal 에서 계속 돈다. 돌아왔을 때 스피너를 되살리는 유일한 근거가 큐다.
+  const activeJobs = useActiveGenerationJobs(projectId)
+  const queuedRoughIds = activeShotIds(activeJobs, ['shot_rough_storyboard'])
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   const chatMessages = useGlobalChatStore((s) => s.messages)
   const briefedRef = useRef(false)
@@ -218,6 +228,8 @@ export function RoughStoryboardView() {
             submitted.map((s) => [s.shotId, { status: 'generating' } as PanelJob]),
           ),
         }))
+        // 채팅 진행 알림바 등 다른 구독자도 즉시 켜지게 — 다음 폴링 틱(4s)을 기다리지 않는다.
+        if (submitted.length) refreshGenerationQueue()
         // 서버가 정보 없음(no_info)으로 건너뛴 샷은 낙관적 'generating' 을 지운다 — 안 지우면 제출 안 된
         //   샷의 스피너가 영구히 돈다(in_flight 등 '실제 생성 중' 사유는 그대로 두어야 하므로 no_info 만).
         const noInfoSkipped = (
@@ -402,12 +414,18 @@ export function RoughStoryboardView() {
   const hasShots = shots.length > 0
   const panelOf = (shot: Shot): RoughStoryboardImage | null =>
     overrides[shot.shotId] ?? shot.roughStoryboard ?? null
+  // 설명문에 새어 나온 char_3 / location_2 를 이름으로 (#id-leak) — 표시만 바꾼다(저장값 불변).
+  const entityNames = manifestEntities(sceneManifest)
+  // 큐가 로컬 상태를 이긴다(#queue-restore) — 잡이 실제로 떠 있으면 그게 진행 중의 진실이다.
+  //   (탭 왕복으로 panelJobs 를 잃었거나, 옛 'failed' 표기가 남아 있어도 큐가 맞다.)
+  const jobOf = (shotId: string): PanelJob | undefined =>
+    queuedRoughIds.has(shotId) ? { status: 'generating' } : panelJobs[shotId]
   // #5: 정보(액션)가 없는 샷은 자동 생성 대상에서 제외 — 근거 없는 빈 패널 생성 방지.
   const missingIds = shots
-    .filter((s) => !panelOf(s) && !panelJobs[s.shotId] && shotHasInfo(s.actionDescription))
+    .filter((s) => !panelOf(s) && !jobOf(s.shotId) && shotHasInfo(s.actionDescription))
     .map((s) => s.shotId)
-  const generatingCount = Object.values(panelJobs).filter(
-    (j) => j.status === 'generating',
+  const generatingCount = shots.filter(
+    (s) => jobOf(s.shotId)?.status === 'generating',
   ).length
   // 제목 아래 설명문은 제거(#c2 2026-07-14) — 카드 사용법은 첫 진입 브리핑 채팅이 안내한다.
   // 트리트먼트·대사 탭과 같은 자리의 도움말(#c4 2026-08-03) — 헤더 아래 한 줄.
@@ -703,7 +721,7 @@ export function RoughStoryboardView() {
                   )}
                   {sceneShots.map((shot, shotIdx) => {
                     const panel = panelOf(shot)
-                    const job = panelJobs[shot.shotId]
+                    const job = jobOf(shot.shotId)
                     return (
                       <article
                         key={shot.shotId}
@@ -716,9 +734,12 @@ export function RoughStoryboardView() {
                             openDetail(shot.shotId)
                           }
                         }}
-                        className="group cursor-pointer overflow-hidden rounded-xl border bg-card transition-colors duration-100 hover:bg-accent/40 hover-red-beam focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
+                        className="group cursor-pointer rounded-xl border bg-card p-2.5 transition-colors duration-100 hover:bg-accent/40 hover-red-beam focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
                       >
-                        <div className="relative aspect-video bg-muted">
+                        {/* 그림은 카드에 '담긴' 사각형이다(#card-inset 2026-08-11) — 카드 모서리에
+                            물려 깎이지 않게 여백을 두르고, 그림 자체엔 라운드를 주지 않는다.
+                            object-contain: 러프는 연출을 확인하는 그림이라 잘리면 안 된다. */}
+                        <div className="relative aspect-video overflow-hidden bg-muted">
                           {panel?.url && job?.status !== 'generating' ? (
                             <>
                               {/* absolute inset-0: aspect-video 컨테이너 박스를 무조건 채운다. in-flow
@@ -732,6 +753,7 @@ export function RoughStoryboardView() {
                                 panel={panel}
                                 alt={`${shot.shotId} rough storyboard`}
                                 introPlay
+                                fit="contain"
                               />
                             </>
                           ) : job?.status === 'generating' ? (
@@ -782,7 +804,7 @@ export function RoughStoryboardView() {
                           )}
                         </div>
 
-                        <div className="space-y-2 p-4">
+                        <div className="space-y-2 px-1 pb-0.5 pt-3">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-muted-foreground">
                               Scene {sceneIdx + 1} · Shot {shotIdx + 1}
@@ -804,7 +826,7 @@ export function RoughStoryboardView() {
                             </span>
                           </div>
                           <p className="line-clamp-3 text-sm leading-relaxed">
-                            {shot.actionDescription}
+                            {resolveEntityNames(shot.actionDescription, entityNames)}
                           </p>
                           {/* #8: 대사 표시 제거 — 파이프라인이 대사 슬롯에 상황 요약을 채워 실제 대사가 아님(2026-07-09). */}
                           {/* #adherence P2: START↔설명 불일치 배지 — 팝업의 "저장 후 재생성"으로 유도. */}

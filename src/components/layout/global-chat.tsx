@@ -37,6 +37,7 @@ import { MentionTextarea, type MentionItem } from '@/components/layout/mention-t
 import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
 import { castMentions, backgroundMentions, activeMentionRefs, toggleMentionToken, FOUNDATION_MENTIONS } from '@/lib/card-mention'
 import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
+import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { buildScriptLines, scriptLineMentions } from '@/lib/script-lines'
 import { handoffFrom } from '@/lib/handoff-intent'
 import {
@@ -325,12 +326,44 @@ export function GlobalChat() {
   // 새 메시지·stage 이동 시 스레드 끝으로. stage 를 넣는 이유는 이동하면 끝에 "지금" 구간
   //   구분선이 새로 붙기 때문 — 같은 방이 이어졌다는 표식이 화면 안에 들어와야 의미가 있다.
   useEffect(() => {
+    // 에이전트가 말을 걸었으면 사용자가 위로 올려 읽던 중이어도 끝으로 다시 붙인다(아래 stick 참조).
+    stickRef.current = true
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     // stageSettled: 1초 뒤 계단식으로 등장하는 제안/승인 카드(#chat-settle)가 스레드 끝에
     //   붙으므로, 나타나는 순간 끝까지 따라가야 화면 밖에서 조용히 뜨지 않는다.
     // suggestion/proposal id(2026-08-06): 핸드오프 등 제안은 messages 에 안 실려 이 effect 가
     //   안 돌았다 — 위로 스크롤해 둔 상태에서 제안이 화면 밖(아래)에 조용히 떠 놓치는 문제.
   }, [messages.length, loading, currentStage, stageSettled, suggestion?.id, pendingProposal?.id])
+
+  // 끝에 붙어 따라가기 (#chat-autoscroll 2026-08-11).
+  //   위 effect 는 "블록이 추가된 순간" 한 번만 스크롤한다. 그런데 핸드오프·제안 말풍선은
+  //   TypewriterMarkdown 이 최대 4.5초에 걸쳐 글자를 늘리므로, 그 뒤에 자라난 부분이 화면
+  //   아래로 밀려 "넘기기 문구가 떴는지 모르겠다"가 된다. 크기 변화를 따라가야 끝이 보인다.
+  //   단 사용자가 위로 올려 과거를 읽는 중이면 끌어내리지 않는다 — stick 은 스크롤로 갱신된다.
+  const stickRef = useRef(true)
+  useEffect(() => {
+    const end = chatEndRef.current
+    const content = end?.parentElement
+    if (!content) return
+    const viewport = content.closest(
+      '[data-slot="scroll-area-viewport"]',
+    ) as HTMLElement | null
+    if (!viewport) return
+    const nearBottom = () =>
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 120
+    const onScroll = () => {
+      stickRef.current = nearBottom()
+    }
+    const ro = new ResizeObserver(() => {
+      if (stickRef.current) viewport.scrollTop = viewport.scrollHeight
+    })
+    ro.observe(content)
+    viewport.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      ro.disconnect()
+      viewport.removeEventListener('scroll', onScroll)
+    }
+  }, [])
 
   // 입력창의 @멘션 ↔ 카드 하이라이트 동기화 (입력에서 지우면 자동 해제)
   useEffect(() => {
@@ -359,6 +392,15 @@ export function GlobalChat() {
     consumeChatFocus()
   }, [focusRequest, consumeChatFocus])
 
+  // 탭을 옮기면 입력창에 포커스 (#keyboard-only 2026-08-11) — 도착하자마자 바로 말을 걸 수 있게.
+  //   마우스 없이 Alt+QWERT 로 돌아다니는 흐름의 나머지 절반이다. 접혀 있거나 채팅을 지원하지
+  //   않는 단계(editor)에서는 건드리지 않는다 — 갈 곳 없는 포커스는 스크린리더에 소음이다.
+  useEffect(() => {
+    if (collapsed || !CHAT_SUPPORTED_STAGES.has(currentStage)) return
+    const raf = requestAnimationFrame(() => textareaRef.current?.focus())
+    return () => cancelAnimationFrame(raf)
+  }, [currentStage, collapsed])
+
   // #p4-choices v3 (#choices-freeform 2026-08-07): 선택지는 입력창 바로 위에 앵커하고, 떠 있는
   //   동안 채팅 입력은 잠근다 — 답하는 곳이 두 군데면 눈이 갈린다. 자유 입력("기타" 답변)은
   //   선택지 안의 "직접 입력" 행이 담당한다(Claude AskUserQuestion 의 Type my own answer 대응).
@@ -372,17 +414,15 @@ export function GlobalChat() {
       : null
 
   const stageSupported = CHAT_SUPPORTED_STAGES.has(currentStage)
-  const inputDisabled = !stageSupported || loading || !!choices
-
-  // 전송 후에도 연이어 입력할 수 있게 포커스 유지(#b3). 응답 대기 중 textarea가 disabled로
-  //   바뀌며 포커스를 잃으므로, loading이 풀리는 시점(disabled 해제 직후)에 다시 포커스.
-  const wasLoadingRef = useRef(false)
-  useEffect(() => {
-    if (wasLoadingRef.current && !loading && stageSupported && !collapsed) {
-      requestAnimationFrame(() => textareaRef.current?.focus())
-    }
-    wasLoadingRef.current = loading
-  }, [loading, stageSupported, collapsed])
+  // 타이핑 잠금과 전송 잠금을 가른다 (#type-while-thinking 2026-08-11).
+  //   응답을 기다리는 동안 입력창까지 잠그면 "다음에 할 말"을 미리 적어둘 수 없다 — 생각은
+  //   기다리는 동안 하는 것이라 그게 제일 자연스러운 타이밍이다. 그래서 loading 은 **제출만**
+  //   막는다. 선택지가 떠 있을 때(choices)는 여전히 타이핑도 잠근다 — 답하는 곳이 두 군데면
+  //   눈이 갈리기 때문(#choices-freeform 의 원래 판단). 미지원 단계(editor)도 그대로 잠금.
+  const inputLocked = !stageSupported || !!choices
+  const sendDisabled = inputLocked || loading
+  // (loading 중 disabled 해제 시 재포커스하던 #b3 effect 제거 — 이제 입력창이 잠기지 않아
+  //  포커스를 잃을 일이 없다. 남겨두면 다른 곳으로 옮긴 포커스를 도로 뺏는다.)
 
   // 입력창 하단 툴바 popover (#oiioii-chat) — 에이전트 필(빠른 요청) / four-dot(@멘션 팔레트).
   const [presetOpen, setPresetOpen] = useState(false)
@@ -402,6 +442,22 @@ export function GlobalChat() {
     void loadStyleAnchors()
   }, [currentStage, projectId, loadStyleAnchors])
   const stylePingOn = !stylePressed && !styleAnchorKey
+
+  // 스타일을 정할 타이밍에 팝업을 연다 (#style-timing 2026-08-11).
+  //   스토리가 확정되면(storyReady) 다음 결정은 "어떤 그림으로 만들 것인가"다. 그런데 스타일은
+  //   문장으로 답하는 질문이 아니라 **고르는 폼**이라, 채팅이 물어도 답할 곳이 없었다 — 그 순간
+  //   이미 만들어져 있는 픽커를 한 번 자동으로 연다. 세션당 1회(닫으면 팔레트 버튼의 레이더 핑이
+  //   이어받는다). 응답 대기 중에는 열지 않는다 — 읽고 있던 답을 모달이 덮는다.
+  const storyReady = useProducerStore((s) => s.storyReady)
+  const [stylePickerOpen, setStylePickerOpen] = useState(false)
+  const styleAutoOpenedRef = useRef(false)
+  useEffect(() => {
+    if (currentStage !== 'producer' || styleAutoOpenedRef.current) return
+    if (loading || !storyReady || styleAnchorKey || styleAnchors.length === 0) return
+    styleAutoOpenedRef.current = true
+    setStylePickerOpen(true)
+    setStylePressed(true) // 자동으로 보여줬으니 온보딩 핑은 소등
+  }, [currentStage, loading, storyReady, styleAnchorKey, styleAnchors.length])
   // 프리셋 클릭 = 입력창에 삽입(자동 전송 금지 — 과금/전이 발화를 원클릭으로 쏘지 않는다).
   const insertPreset = (text: string) => {
     setPresetOpen(false)
@@ -420,7 +476,7 @@ export function GlobalChat() {
     !messages.some((m) => m.stage === 'producer' && m.role === 'user')
 
   const handleSend = async () => {
-    if (!input.trim() || inputDisabled) return
+    if (!input.trim() || sendDisabled) return
     const msg = input
     setInput('')
     await sendMessage(msg)
@@ -618,6 +674,60 @@ export function GlobalChat() {
   const CASCADE_IN =
     'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out motion-reduce:animate-none'
 
+  // 수락/승인 버튼을 키보드로 (#keyboard-only 2026-08-11).
+  //   탭 전환마다 입력창이 포커스를 가져가므로, 버튼까지 Tab 으로 걸어가게 두면 "다음 에이전트로
+  //   넘기기"가 사실상 마우스 전용이 된다. 그래서 Enter 를 빌려준다 — 단 입력창에 쓰던 글이
+  //   있으면 그건 전송이 먼저다(양보). 선택지(kind:'choices')는 자체 핸들러가 있고 showSuggestion
+  //   이 이미 배제한다. 캡처 단계에서 듣고 stopPropagation 하므로 textarea 의 Enter 와 겹치지 않는다.
+  const proposalOpen = showProposal && !!pendingProposal
+  const suggestionOpen =
+    showSuggestion && !!suggestion?.action && suggestion.action.kind !== 'choices'
+  useEffect(() => {
+    if (!proposalOpen && !suggestionOpen) return
+    const handler = (e: KeyboardEvent) => {
+      if (loading || e.isComposing) return
+      if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key !== 'Enter' && e.key !== 'Escape') return
+      const target = e.target as HTMLElement | null
+      const inChatInput = !!target && target === textareaRef.current
+      // 다른 입력 요소(인라인 '직접 입력', 이름 변경 등)에 있으면 그쪽 몫.
+      if (
+        !inChatInput &&
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+      if (inChatInput && e.key === 'Enter' && input.trim()) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.key === 'Escape') {
+        if (proposalOpen && pendingProposal) dismissPendingProposal(pendingProposal.id)
+        else if (suggestion?.dismissible !== false) dismissSuggestion()
+        return
+      }
+      if (proposalOpen) void handlePendingProposalApprove()
+      else void handleSuggestionAction()
+    }
+    window.addEventListener('keydown', handler, true)
+    return () => window.removeEventListener('keydown', handler, true)
+  })
+
+  /** 캡슐 버튼 옆 키 안내 — 있는 키만 적는다(없는 단축키를 광고하지 않는다). */
+  const KeyHint = ({ dismissible }: { dismissible: boolean }) => (
+    <span className="text-[10px] text-muted-foreground">
+      <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> 수락
+      {dismissible && (
+        <>
+          {' · '}
+          <kbd className="rounded border border-border bg-muted px-1">Esc</kbd> 나중에
+        </>
+      )}
+    </span>
+  )
+
   return (
     <>
       {/* 좌측 레일과 짝을 이루는 둥근 부유 패널 (#shell-lift 2026-07-31).
@@ -734,8 +844,13 @@ export function GlobalChat() {
                       return (
                         <div
                           key={msg.id}
-                          className="flex flex-col items-center gap-2 py-3 animate-in fade-in-0 zoom-in-95 duration-500 ease-out motion-reduce:animate-none"
+                          className="relative flex flex-col items-center gap-2 rounded-2xl py-3 animate-in fade-in-0 zoom-in-95 duration-500 ease-out motion-reduce:animate-none"
                         >
+                          {/* 등장 신호 (#handoff-beam) — 테두리를 빛이 한 바퀴 돈다. 마운트 시 1회. */}
+                          <span
+                            aria-hidden
+                            className="tale-beam-once pointer-events-none absolute inset-0 rounded-2xl"
+                          />
                           <div className="flex items-center gap-3">
                             <AgentFace color={STAGE_FACE_COLOR[invite.from]} size={26} animate={false} />
                             <MoveRight className="size-4 text-muted-foreground" />
@@ -777,7 +892,19 @@ export function GlobalChat() {
                 #oiioii-chat v2: 카드(붉은 테두리 박스)를 걷어내고 에이전트 턴과 같은 flat 출력 —
                 role plate + 타이핑 본문 + 캡슐 버튼. 온보딩 인사도 이 경로라 "말 걸어옴"으로 읽힌다. */}
             {showSuggestion && suggestion && (
-              <div className={cn('mr-6', CASCADE_IN)} style={cascadeStyle(suggestionSlot)}>
+              <div
+                className={cn('relative rounded-2xl', 'mr-6', CASCADE_IN)}
+                style={cascadeStyle(suggestionSlot)}
+              >
+                {/* 등장 신호 (#handoff-beam) — 다음 단계로 넘기는 제안은 놓치면 흐름이 멈춘다.
+                    key=suggestion.id: 새 제안마다 애니메이션이 다시 한 바퀴 돈다. */}
+                {suggestion.action && (
+                  <span
+                    key={suggestion.id}
+                    aria-hidden
+                    className="tale-beam-once pointer-events-none absolute inset-0 rounded-2xl"
+                  />
+                )}
                 <RolePlate stage={suggestion.stage} />
                 <div className="px-1 text-xs leading-relaxed text-foreground">
                   <TypewriterMarkdown
@@ -786,7 +913,11 @@ export function GlobalChat() {
                     text={suggestion.content}
                   />
                 </div>
-                {(suggestion.action || suggestion.dismissible !== false) && (
+                {/* 씬 게이트(#gate-to-chat) — 확정 한 번으로 안 끝나는 결정이라 캡슐 버튼 대신
+                    피드백 입력 + 확정/수정 두 갈래를 여기서 렌더한다(생성 화면 하단 바에서 이사). */}
+                {suggestion.action?.kind === 'confirmScenes' ? (
+                  <SceneGateControls />
+                ) : (suggestion.action || suggestion.dismissible !== false) && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
                     {/* kind: 'choices' 는 여기 오지 않는다 — 입력창 앵커 선택지(#p4-choices v2) */}
                     {suggestion.action && suggestion.action.kind !== 'choices' ? (
@@ -808,6 +939,9 @@ export function GlobalChat() {
                       <Button size="sm" variant="ghost" className="rounded-full" onClick={() => dismissSuggestion()}>
                         나중에
                       </Button>
+                    )}
+                    {suggestionOpen && (
+                      <KeyHint dismissible={suggestion.dismissible !== false} />
                     )}
                   </div>
                 )}
@@ -856,6 +990,9 @@ export function GlobalChat() {
                   >
                     나중에
                   </Button>
+                  <div className="flex justify-center">
+                    <KeyHint dismissible />
+                  </div>
                 </div>
               </div>
             )}
@@ -1019,7 +1156,7 @@ export function GlobalChat() {
                 onChange={setInput}
                 onSubmit={handleSend}
                 items={mentionItems}
-                disabled={inputDisabled}
+                disabled={inputLocked}
                 placeholder={
                   choices ? '위 선택지에서 답해 주세요' : STAGE_PLACEHOLDER[currentStage]
                 }
@@ -1119,6 +1256,8 @@ export function GlobalChat() {
                     anchors={styleAnchors}
                     value={styleAnchorKey}
                     onSelect={(k) => void setStyleAnchor(k)}
+                    open={stylePickerOpen}
+                    onOpenChange={setStylePickerOpen}
                   >
                     <Button
                       size="icon-sm"
@@ -1201,7 +1340,7 @@ export function GlobalChat() {
                     size="icon-sm"
                     className="rounded-full"
                     onClick={handleSend}
-                    disabled={inputDisabled || !input.trim()}
+                    disabled={sendDisabled || !input.trim()}
                     title="보내기"
                     aria-label="보내기"
                   >
