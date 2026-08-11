@@ -18,9 +18,11 @@ import path from 'node:path'
 config({ path: '.env.local' })
 
 const FIXTURE = path.resolve('logs/064631aa-f6b2-4f7c-800b-66b0517a2769/INTEGRATED.json')
-const OUTDIR = path.resolve('research/experiments/camera-contract-relax')
+const DEFAULT_OUTDIR = path.resolve('research/experiments/camera-contract-relax')
+const OUTDIR = path.resolve(process.env.CAMERA_EXPERIMENT_OUTDIR ?? DEFAULT_OUTDIR)
 const RAWDIR = path.join(OUTDIR, 'raw')
 const SELF = path.resolve('research/experiments/camera-contract-relax/probe.mts')
+const TREATMENT_CONTRACT = process.env.CAMERA_TREATMENT_CONTRACT ?? 'relaxed'
 const REPS = [1, 2, 3]
 const ARMS = ['control', 'relaxed'] as const
 type Arm = (typeof ARMS)[number]
@@ -460,7 +462,7 @@ function aggregate() {
   }
 
   const results = {
-    experiment: 'camera-contract-relax',
+    experiment: path.basename(OUTDIR),
     finished_at: new Date().toISOString(),
     coordinates: {
       fixture: path.relative(process.cwd(), FIXTURE),
@@ -661,21 +663,27 @@ function run(args: string[], env: Record<string, string | undefined>): Promise<v
     child.on('error', reject)
   })
 }
-const armEnv = (arm: Arm) => ({ WRITER_CAMERA_CONTRACT: arm === 'relaxed' ? 'relaxed' : undefined })
+const armEnv = (arm: Arm) => ({
+  WRITER_CAMERA_CONTRACT: arm === 'relaxed' ? TREATMENT_CONTRACT : undefined,
+})
 
 async function orchestrate() {
   mkdirSync(RAWDIR, { recursive: true })
   // A: 팔 2 × 3회 = 6패스. 회차마다 양 팔을 **같은 시간대에 나란히** 돌려 모델 상태 변동을 공유시킨다.
   for (const rep of REPS) {
-    console.log(`\n──── A rep${rep} (control ∥ relaxed) ────`)
+    console.log(`\n──── A rep${rep} (control ∥ treatment) ────`)
     await Promise.all(ARMS.map((arm) => run(['--mode', 'decoupage', '--arm', arm, '--rep', String(rep)], armEnv(arm))))
   }
   // B: 팔당 1회 — A rep1 산출물을 v4 까지 통과. v4 문구는 무변경(계약 분기는 decoupage 에만 존재).
-  console.log('\n──── B: v4 전파 (control ∥ relaxed) ────')
+  console.log('\n──── B: v4 전파 (control ∥ treatment) ────')
   await Promise.all(ARMS.map((arm) => run(['--mode', 'shotdesign', '--arm', arm], armEnv(arm))))
-  // 라벨링: 팔·샷 정보 없이 비트 텍스트만 — 1회 산출해 양 팔이 공유.
-  console.log('\n──── 눈가림 비트 라벨링 ────')
-  await run(['--mode', 'label'], {})
+  // 라벨링: 팔·샷 정보 없이 비트 텍스트만 — 기존 라벨이 있으면 고정 재사용한다.
+  if (existsSync(rawPath('beat_labels.json'))) {
+    console.log('──── 눈가림 비트 라벨링: 기존 라벨 고정 재사용 ────')
+  } else {
+    console.log('──── 눈가림 비트 라벨링 ────')
+    await run(['--mode', 'label'], {})
+  }
   aggregate()
 }
 
