@@ -10,6 +10,7 @@ vi.mock('@/lib/writer/llm/dispatch', () => ({
 
 import {
   applyMemoryUpdate,
+  deriveLedger,
   normalizeSceneDialogue,
   runDialogue,
 } from '@/lib/writer/pipeline/stages/dialogue'
@@ -178,7 +179,9 @@ describe('applyMemoryUpdate — 전개 메모리', () => {
   })
 })
 
-describe('runDialogue — 씬 순차 러너', () => {
+// 기본값은 2026-08-11부터 'parallel' — 이 블록은 킬스위치(WRITER_DIALOGUE_PARALLEL=0) 경로의
+//   계약을 계속 지킨다. 그래서 mode 를 명시 고정한다(기본값 변화에 흔들리지 않게).
+describe('runDialogue — 씬 순차 러너 (킬스위치 경로)', () => {
   it('프로파일 1회 + 씬별 호출, 메모리가 다음 씬 프롬프트에 반영된다', async () => {
     const scenes = makeScenes(['scene_1', 'scene_2'])
     const dec = makeDecoupage(['scene_1', 'scene_2'])
@@ -200,7 +203,9 @@ describe('runDialogue — 씬 순차 러너', () => {
         ],
       })
 
-    const result = await runDialogue('스토리', genre, characters, scenes, dec, stubLogger, S)
+    const result = await runDialogue('스토리', genre, characters, scenes, dec, stubLogger, S, {
+      mode: 'sequential',
+    })
     expect(result.done).toBe(true)
     expect(result.scenes).toHaveLength(2)
     expect(generateJsonMock).toHaveBeenCalledTimes(3) // profiles + 씬 2
@@ -225,7 +230,9 @@ describe('runDialogue — 씬 순차 러너', () => {
         ],
       })
 
-    const result = await runDialogue('스토리', genre, characters, scenes, dec, stubLogger, S)
+    const result = await runDialogue('스토리', genre, characters, scenes, dec, stubLogger, S, {
+      mode: 'sequential',
+    })
     expect(result.done).toBe(true)
     const s1 = result.scenes.find((s) => s.scene_id === 'scene_1')!
     expect(s1.shots.every((sh) => sh.dialogue.length === 0)).toBe(true)
@@ -245,6 +252,7 @@ describe('runDialogue — 씬 순차 러너', () => {
       .mockResolvedValueOnce(sceneResponse('scene_1', ['shot_1', 'shot_2']))
 
     const first = await runDialogue('스토리', genre, characters, scenes, dec, stubLogger, S, {
+      mode: 'sequential',
       softDeadlineMs: Date.now() - 1, // 이미 지난 예산 — 1씬 처리 후 양보
     })
     expect(first.done).toBe(false)
@@ -252,11 +260,173 @@ describe('runDialogue — 씬 순차 러너', () => {
 
     generateJsonMock.mockResolvedValueOnce(sceneResponse('scene_2', ['shot_3', 'shot_4']))
     const second = await runDialogue('스토리', genre, characters, scenes, dec, stubLogger, S, {
+      mode: 'sequential',
       resume: first,
     })
     expect(second.done).toBe(true)
     expect(second.scenes).toHaveLength(2)
     // resume 경로는 프로파일 호출 없이 씬 1회만 — 총 호출 = 1(profiles)+1(scene1)+1(scene2)
     expect(generateJsonMock).toHaveBeenCalledTimes(3)
+  })
+})
+
+// ── #dialogue-parallel (2026-08-11) ────────────────────────────────────────
+// 씬 순차 사슬의 실제 의존이 notable_lines 하나뿐이라는 가설의 코드측 계약.
+
+/** dialogue_summary·emotion_beat·info_asymmetry 가 실제로 채워진 씬 (원장 유도 재료). */
+function richScenes(n: number): Scenes {
+  const base = makeScenes(Array.from({ length: n }, (_, i) => `scene_${i + 1}`))
+  base.scenes.forEach((s, i) => {
+    Object.assign(s, {
+      dialogue_summary: `${i + 1}번째 씬 요약`,
+      emotion_beat: { start: `start${i + 1}`, end: `end${i + 1}` },
+      info_asymmetry: i % 2 === 0 ? 'audience=character' : 'audience>character',
+    })
+  })
+  return base
+}
+
+describe('deriveLedger — 사전유도 원장', () => {
+  it('첫 씬은 빈 메모리 (선행 씬이 없으므로 유도할 것도 없다)', () => {
+    const out = deriveLedger(richScenes(3).scenes, 0)
+    expect(out.established_facts).toEqual([])
+    expect(out.notable_lines).toEqual([])
+  })
+
+  it('선행 씬들의 dialogue_summary 를 확립 사실로, 직전 씬 감정 끝을 관계 상태로 유도한다', () => {
+    const out = deriveLedger(richScenes(4).scenes, 2)
+    expect(out.established_facts).toEqual(['[scene_1] 1번째 씬 요약', '[scene_2] 2번째 씬 요약'])
+    expect(out.relationship_state).toBe('end2')
+    expect(out.tone_notes).toContain('end2 → start3')
+    expect(out.tone_notes).toContain('audience=character') // scene_3 의 info_asymmetry
+  })
+
+  it('notable_lines 는 항상 비어 있다 — 사전 유도 불가가 병렬화의 유일한 대가', () => {
+    for (const i of [0, 1, 5]) {
+      expect(deriveLedger(richScenes(8).scenes, i).notable_lines).toEqual([])
+    }
+  })
+
+  it('확립 사실은 순차 체인과 같은 유계 계약(최근 12개)을 지킨다', () => {
+    const out = deriveLedger(richScenes(20).scenes, 19)
+    expect(out.established_facts).toHaveLength(12)
+    expect(out.established_facts[11]).toBe('[scene_19] 19번째 씬 요약')
+  })
+})
+
+describe('runDialogue — 병렬 모드', () => {
+  /** 씬 프롬프트를 scene_id 로 식별해 응답 — 병렬이라 호출 순서를 가정할 수 없다. */
+  function mockByScene(dec: DecoupagePlan) {
+    generateJsonMock.mockImplementation(async (prompt: string) => {
+      const m = /scene_id=([a-z0-9_]+),/.exec(prompt)
+      if (!m) return PROFILES_RESPONSE
+      const sid = m[1]
+      const shots = dec.scenes.find((s) => s.scene_id === sid)?.shots ?? []
+      return {
+        scene_id: sid,
+        shots: shots.map((s) => ({
+          shot_id: s.shot_id,
+          dialogue: [{ character_id: 'a', line: `${sid} 대사` }],
+          narration: null,
+        })),
+      }
+    })
+  }
+
+  it('전 씬을 호출하고 출력은 원래 씬 순서로 병합된다 (결정론 병합)', async () => {
+    const scenes = richScenes(4)
+    const dec = makeDecoupage(['scene_1', 'scene_2', 'scene_3', 'scene_4'])
+    mockByScene(dec)
+
+    const result = await runDialogue('스토리', genre, characters, scenes, dec, stubLogger, S, {
+      mode: 'parallel',
+      concurrency: 4,
+    })
+    expect(result.done).toBe(true)
+    expect(result.scenes.map((s) => s.scene_id)).toEqual([
+      'scene_1',
+      'scene_2',
+      'scene_3',
+      'scene_4',
+    ])
+    expect(generateJsonMock).toHaveBeenCalledTimes(5) // profiles + 씬 4
+  })
+
+  it('기본값이 병렬+원장이다 (2026-08-11 채택 — opts 없이 호출해도 원장이 주입된다)', async () => {
+    const scenes = richScenes(3)
+    const dec = makeDecoupage(['scene_1', 'scene_2', 'scene_3'])
+    mockByScene(dec)
+
+    const result = await runDialogue('스토리', genre, characters, scenes, dec, stubLogger, S)
+    expect(result.done).toBe(true)
+    const prompts = generateJsonMock.mock.calls.map((c) => c[0] as string)
+    const scene3 = prompts.find((p) => p.includes('scene_id=scene_3,'))!
+    // `[scene_N] ` 접두는 deriveLedger 만 만든다 — 순차 메모리(모델 자기보고)엔 없다.
+    expect(scene3).toContain('[scene_1] 1번째 씬 요약')
+    // 원장은 기출 대사를 넘기지 못한다 — 병렬화의 유일한 대가가 여기 보인다.
+    expect(scene3).toContain('이미 나온 주요 대사(반복 금지, 콜백 재료): (없음)')
+  })
+
+  it('ledger=true 면 선행 씬 요약이 프롬프트에 들어간다 (순차 메모리의 대체재)', async () => {
+    const scenes = richScenes(3)
+    const dec = makeDecoupage(['scene_1', 'scene_2', 'scene_3'])
+    mockByScene(dec)
+
+    await runDialogue('스토리', genre, characters, scenes, dec, stubLogger, S, {
+      mode: 'parallel',
+      ledger: true,
+      concurrency: 3,
+    })
+    const prompts = generateJsonMock.mock.calls.map((c) => c[0] as string)
+    const scene3 = prompts.find((p) => p.includes('scene_id=scene_3,'))!
+    expect(scene3).toContain('[scene_1] 1번째 씬 요약')
+    expect(scene3).toContain('[scene_2] 2번째 씬 요약')
+  })
+
+  it('ledger=false 면 확립 사실이 비어 프롬프트에 선행 씬이 없다 (바닥 대조군)', async () => {
+    const scenes = richScenes(3)
+    const dec = makeDecoupage(['scene_1', 'scene_2', 'scene_3'])
+    mockByScene(dec)
+
+    await runDialogue('스토리', genre, characters, scenes, dec, stubLogger, S, {
+      mode: 'parallel',
+      ledger: false,
+      concurrency: 3,
+    })
+    const prompts = generateJsonMock.mock.calls.map((c) => c[0] as string)
+    const scene3 = prompts.find((p) => p.includes('scene_id=scene_3,'))!
+    expect(scene3).not.toContain('1번째 씬 요약')
+    expect(scene3).toContain('확립된 사실: (없음)')
+  })
+
+  it('병렬에서도 씬 실패는 그 씬만 침묵 흡수 (순차와 같은 계약)', async () => {
+    const scenes = richScenes(3)
+    const dec = makeDecoupage(['scene_1', 'scene_2', 'scene_3'])
+    generateJsonMock.mockImplementation(async (prompt: string) => {
+      const m = /scene_id=([a-z0-9_]+),/.exec(prompt)
+      if (!m) return PROFILES_RESPONSE
+      const sid = m[1]
+      if (sid === 'scene_2') throw new Error('llm down')
+      const shots = dec.scenes.find((s) => s.scene_id === sid)?.shots ?? []
+      return {
+        scene_id: sid,
+        shots: shots.map((s) => ({
+          shot_id: s.shot_id,
+          dialogue: [{ character_id: 'a', line: `${sid} 대사` }],
+          narration: null,
+        })),
+      }
+    })
+
+    const result = await runDialogue('스토리', genre, characters, scenes, dec, stubLogger, S, {
+      mode: 'parallel',
+      concurrency: 3,
+    })
+    expect(result.done).toBe(true)
+    expect(result.scenes).toHaveLength(3)
+    const s2 = result.scenes.find((s) => s.scene_id === 'scene_2')!
+    expect(s2.shots.every((sh) => sh.dialogue.length === 0)).toBe(true)
+    const s3 = result.scenes.find((s) => s.scene_id === 'scene_3')!
+    expect(s3.shots[0].dialogue[0].line).toBe('scene_3 대사')
   })
 })

@@ -186,3 +186,29 @@
   추가돼 구조가 더 커졌으므로, 미루는 비용이 계속 오르고 있다.
 - **되살릴 좌표**: `features/director/hooks/use-writer-director-sync.ts`, `stores/writer-store.ts`, `stores/director-store.ts`.
 - 기록: 2026-08-11 (원 발화 2026-08-04)
+
+### D-018 · 대사 병렬 전환의 블라인드 심판 라운드   `상태: 대기`
+- **무엇을**: 이미 생성된 6런 산출물로 A(순차) vs B(병렬+원장)를 **라벨 제거·순서 섞어** 심판에게 읽혀
+  ① 정보 누설(인물이 아직 모르는 걸 말하는가 — 규율 B) ② 톤 표류(보이스 프로파일 이탈)
+  ③ 명대사 인플레(규율 C 위반 선언문) 세 축으로 판정한다. **새 대사 생성 불필요 — 심판 콜만.**
+- **왜 미뤘나**: 오너가 속도 이득(−69.2%)과 결정론 지표 무손상을 근거로 심판 전 전환을 결정(2026-08-11).
+  결함이 아니라 순서 문제 — 검증은 여전히 필요하고 감수 범위가 명시돼 있다. 결정론 패널은
+  정보 누설·톤·명대사를 **원리적으로 못 재므로**, 그 축은 지금 무검증 상태로 프로덕션에 실려 있다.
+- **언제 꺼내나**: 대사 품질 이상이 눈에 띄거나, 다음 writer 품질 라운드를 열 때. 둘 중 먼저.
+  D-008(대사 품질 업그레이드)을 착수한다면 그 안에 흡수해도 된다.
+- **되살릴 좌표**: 산출물 `logs/probe-dlg-{a-seq,b-ledger,c-blind}-r{1,2}/14b_dialogue.json`,
+  채점기 `research/experiments/dialogue-parallel-ledger/score.mts`,
+  판정 기록 `research/experiments/dialogue-parallel-ledger/HYPOTHESIS.md`.
+  **회수 스위치: `WRITER_DIALOGUE_PARALLEL=0`** (재배포 없이 순차 복귀 — 코드 경로는 살아 있다).
+- 기록: 2026-08-11
+
+### D-019 · 사전유도 원장의 관계·톤 축 고도화   `상태: 대기`
+- **무엇을**: `deriveLedger`가 관계 상태를 `emotion_beat.end` 한 단어로만 뽑는 것을 고친다
+  (실측 대조: 같은 씬에서 순차 메모리는 "연관성을 의심하기 시작함", 원장은 `suspicion`).
+  `scene_actions`·`dialogue_summary`에서 관계 변화와 톤 전이를 문장으로 유도하는 방향.
+  **사실 축은 이미 순차와 대등**하므로(오히려 씬 저작이 확정한 사실이라 더 직접적) 건드리지 않는다.
+- **왜 미뤘나**: 속도 전환을 먼저 태우기로 함(오너 결정). 빈약함은 알려져 있으나 결정론 지표에서 손상이 안 났다.
+- **언제 꺼내나**: D-018 심판에서 B가 A에 밀리면 즉시 — 그때 이게 1순위 처방이다. 밀리지 않으면 저순위.
+- **되살릴 좌표**: `src/lib/writer/pipeline/stages/dialogue.ts`의 `deriveLedger`,
+  대조표는 `research/experiments/dialogue-parallel-ledger/HYPOTHESIS.md` 부록.
+- 기록: 2026-08-11

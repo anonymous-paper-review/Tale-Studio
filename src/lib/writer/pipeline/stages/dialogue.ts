@@ -24,6 +24,22 @@ import type {
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
+// 씬 실행 기본 모드(#dialogue-parallel 2026-08-11 오너 채택) — 병렬 + 사전유도 원장.
+//   실측(research/experiments/dialogue-parallel-ledger): 15씬 fixture 벽시계 169.8s → 52.3s(−69.2%),
+//   씬간 중복 대사 1.0 vs 1.0(순차와 동률)·침묵 예산·화자·샷 계약 전부 동률, 씬 실패 0.
+//   임계경로가 max(Visual, Dialogue) 라 순차 사슬이 전체 하한이었다 — 그 하한을 걷어낸다.
+//   ⚠️ 결정론 지표만 통과했다. 정보 누설·톤 표류·명대사는 블라인드 심판 미실시(_DEFERRED D-018).
+//   되돌리기: WRITER_DIALOGUE_PARALLEL=0 (재배포 없이 순차 복귀 — 코드 경로는 그대로 남는다).
+const DEFAULT_DIALOGUE_MODE: 'sequential' | 'parallel' =
+  process.env.WRITER_DIALOGUE_PARALLEL === '0' ? 'sequential' : 'parallel';
+
+// 씬 동시성. 실측 팔은 5(병렬도 3.14×). env 로 무중단 튜닝, opts 로 테스트/실험 오버라이드.
+const MAX_DIALOGUE_CONCURRENCY = 12;
+const DEFAULT_DIALOGUE_CONCURRENCY = (() => {
+  const raw = Number(process.env.WRITER_DIALOGUE_CONCURRENCY);
+  return Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), MAX_DIALOGUE_CONCURRENCY) : 5;
+})();
+
 const EMPTY_MEMORY: DialogueMemory = {
   established_facts: [],
   relationship_state: '(첫 씬 — 아직 관계가 화면에 드러나지 않음)',
@@ -167,6 +183,43 @@ export function applyMemoryUpdate(
   };
 }
 
+/**
+ * 사전유도 원장 (#dialogue-parallel 2026-08-11) — 씬 index 시점의 메모리를 s3 scenes 에서
+ * 결정론으로 유도한다. LLM 0콜, 순수 함수(테스트 대상).
+ *
+ * 순차 체인이 씬→씬으로 넘기던 4필드 중 셋은 대사 생성 *이전에* 이미 확정돼 있다:
+ *   established_facts  ← 선행 씬들의 dialogue_summary ("이 씬에서 대사로 오간 것" 한 줄 요약)
+ *   relationship_state ← 직전 씬 emotion_beat.end
+ *   tone_notes         ← 직전 씬 end → 이 씬 start 전이 + 이 씬의 info_asymmetry
+ * 규율 B("인물은 이 씬 시점까지 화면에 공개된 것만 안다")의 원천이 대사가 아니라 씬 구조라는 것이
+ * 이 유도의 근거다 — 오히려 LLM 자기보고(memory_update)보다 직접적이다.
+ *
+ * 넘길 수 없는 것은 notable_lines 뿐이다(실제 생성된 대사라 사전 유도 불가) — 빈 배열로 둔다.
+ * 즉 병렬화의 대가는 "기출 대사 반복 금지 가드 상실" 하나로 좁혀진다.
+ */
+export function deriveLedger(scenes: StoryScene[], index: number): DialogueMemory {
+  if (index <= 0) return { ...EMPTY_MEMORY };
+  const prior = scenes.slice(0, index);
+  const prev = prior[prior.length - 1];
+  const cur = scenes[index];
+  const facts = prior
+    .map((s) => (s.dialogue_summary?.trim() ? `[${s.scene_id}] ${s.dialogue_summary.trim()}` : null))
+    .filter((f): f is string => f !== null);
+  const transition = `${prev.emotion_beat?.end ?? ''} → ${cur?.emotion_beat?.start ?? ''}`;
+  return {
+    // 순차 체인과 같은 유계 계약(최근 12개) — 프롬프트 분량을 맞춰 비교 가능하게 한다.
+    established_facts: facts.slice(-12),
+    relationship_state: prev.emotion_beat?.end || EMPTY_MEMORY.relationship_state,
+    tone_notes: [
+      transition.trim() === '→' ? '' : `직전 씬 감정 → 이 씬 시작: ${transition}`,
+      cur?.info_asymmetry ? `정보 비대칭: ${cur.info_asymmetry}` : '',
+    ]
+      .filter(Boolean)
+      .join(' / '),
+    notable_lines: [],
+  };
+}
+
 /** 샷 집합 계약 강제 — 응답을 decoupage 샷 목록 순서로 정규화(누락 샷은 침묵, 여분 샷은 폐기). */
 export function normalizeSceneDialogue(
   raw: unknown,
@@ -299,45 +352,48 @@ export async function runDialogue(
   opts?: {
     resume?: DialogueProgress | null;
     softDeadlineMs?: number;
+    /** 씬 실행 모드(#dialogue-parallel). 미지정 시 DEFAULT_DIALOGUE_MODE(env, 기본 'parallel').
+     *  'parallel' 은 씬→씬 메모리 체인을 끊고 사전유도 원장(deriveLedger)으로 대체한다 —
+     *  순차의 실제 의존은 notable_lines 하나뿐이고, 그 대가(씬간 대사 반복)는 실측에서 안 늘었다. */
+    mode?: 'sequential' | 'parallel';
+    /** parallel 전용: false 면 원장 없이 빈 메모리로 간다(실험 바닥 대조군 — 원장 기여 분리용). */
+    ledger?: boolean;
+    /** parallel 전용: 씬 동시성. 미지정 시 DEFAULT_DIALOGUE_CONCURRENCY(env, 기본 5). */
+    concurrency?: number;
   },
 ): Promise<RunDialogueResult> {
   const resume = opts?.resume ?? null;
+  const mode = opts?.mode ?? DEFAULT_DIALOGUE_MODE;
+  const useLedger = opts?.ledger !== false;
   const doneSceneIds = new Set(resume?.doneSceneIds ?? []);
   const out: SceneShotDialogue[] = [...(resume?.scenes ?? [])];
   let memory: DialogueMemory = resume?.memory ?? { ...EMPTY_MEMORY };
   await logger.markStage('dialogue', 'started', {
     scene_count: scenes.scenes.length,
     resumed_scenes: doneSceneIds.size,
+    mode,
   });
 
   // 프로파일은 스테이지 1회 — resume이 이미 갖고 있으면 재사용.
-  let profiles = resume?.profiles ?? null;
-  if (!profiles) {
-    profiles = await runVoiceProfiles(story, characters, genre, logger, axisConfig);
-  }
+  //   (const 로 고정해야 아래 워커 클로저에서 타입이 좁혀진 채 잡힌다.)
+  const profiles =
+    resume?.profiles ?? (await runVoiceProfiles(story, characters, genre, logger, axisConfig));
 
-  let processedThisPass = 0;
-  for (const scene of scenes.scenes) {
-    if (doneSceneIds.has(scene.scene_id)) continue;
-    // 시간 예산 체크는 씬 "사이"에서만 — 패스당 최소 1씬은 처리 (진행 보장 계약).
-    if (processedThisPass > 0 && opts?.softDeadlineMs != null && Date.now() > opts.softDeadlineMs) {
-      console.log(
-        `[dialogue] checkpoint: ${doneSceneIds.size}/${scenes.scenes.length} scenes done — 다음 step에서 이어감`,
-      );
-      return { done: false, doneSceneIds: [...doneSceneIds], scenes: out, memory, profiles };
-    }
-
-    const shots = decoupage.scenes.find((d) => d.scene_id === scene.scene_id)?.shots ?? [];
-    if (shots.length === 0) {
-      doneSceneIds.add(scene.scene_id);
-      continue;
-    }
-
-    // 씬 단위 1회 재시도 후 실패 흡수 — 대사는 향상 기능, 파이프라인을 죽이지 않는다.
-    let result: SceneDialogueResult | null = null;
-    for (let attempt = 1; attempt <= 2 && !result; attempt++) {
+  const shotsOf = (scene: StoryScene): DecoupageShot[] =>
+    decoupage.scenes.find((d) => d.scene_id === scene.scene_id)?.shots ?? [];
+  const silent = (scene: StoryScene, shots: DecoupageShot[]): SceneShotDialogue => ({
+    scene_id: scene.scene_id,
+    shots: shots.map((s) => ({ shot_id: s.shot_id, dialogue: [], narration: null })),
+  });
+  /** 씬 1회 처리 — 2회 시도 후 실패는 null. 흡수 판단은 호출자가 한다. */
+  const attemptScene = async (
+    scene: StoryScene,
+    shots: DecoupageShot[],
+    mem: DialogueMemory,
+  ): Promise<SceneDialogueResult | null> => {
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        result = await dialogueForScene(story, scene, shots, characters, profiles, memory, logger, axisConfig);
+        return await dialogueForScene(story, scene, shots, characters, profiles, mem, logger, axisConfig);
       } catch (e) {
         console.warn(
           `[dialogue] ${scene.scene_id} 실패 (try ${attempt}/2):`,
@@ -345,16 +401,107 @@ export async function runDialogue(
         );
       }
     }
-    if (result) {
-      out.push(result.scene);
-      memory = result.memory;
-    } else {
-      // 흡수: 이 씬은 침묵으로 (오늘의 최악치와 동일) — 진행은 계속.
-      out.push({ scene_id: scene.scene_id, shots: shots.map((s) => ({ shot_id: s.shot_id, dialogue: [], narration: null })) });
-      await logger.markStage('dialogue', 'failed', { scene_id: scene.scene_id, absorbed: true });
+    return null;
+  };
+
+  if (mode === 'parallel') {
+    // 씬 워커풀 — v4_shots #parallel-shotdesign 관용구 그대로(착수 게이트 + 결정론 병합).
+    //   메모리 체인이 없으므로 씬끼리 서로의 출력을 안 읽는다 = 병렬 안전.
+    const pending = scenes.scenes.filter((s) => !doneSceneIds.has(s.scene_id));
+    const resultsByScene = new Map<string, SceneShotDialogue>();
+    const concurrency = Math.max(
+      1,
+      Math.min(opts?.concurrency ?? DEFAULT_DIALOGUE_CONCURRENCY, MAX_DIALOGUE_CONCURRENCY),
+    );
+    let cursor = 0;
+    let startedThisPass = 0;
+    let estSceneMs = 45_000;
+
+    // 착수 게이트: 예산 초과면 남은 씬을 다음 step 으로 양보하되 패스당 최소 1씬(진행 보장 계약).
+    const claimNext = (): StoryScene | null => {
+      if (
+        startedThisPass > 0 &&
+        opts?.softDeadlineMs != null &&
+        Date.now() + estSceneMs > opts.softDeadlineMs
+      ) {
+        return null;
+      }
+      if (cursor >= pending.length) return null;
+      const scene = pending[cursor];
+      cursor += 1;
+      startedThisPass += 1;
+      return scene;
+    };
+
+    const worker = async (): Promise<void> => {
+      let scene: StoryScene | null;
+      while ((scene = claimNext()) !== null) {
+        const shots = shotsOf(scene);
+        if (shots.length === 0) {
+          resultsByScene.set(scene.scene_id, { scene_id: scene.scene_id, shots: [] });
+          continue;
+        }
+        const index = scenes.scenes.findIndex((s) => s.scene_id === scene!.scene_id);
+        const mem = useLedger ? deriveLedger(scenes.scenes, index) : { ...EMPTY_MEMORY };
+        const startedMs = Date.now();
+        const result = await attemptScene(scene, shots, mem);
+        estSceneMs = Math.max(estSceneMs, Math.round((Date.now() - startedMs) * 1.25));
+        if (result) {
+          resultsByScene.set(scene.scene_id, result.scene);
+        } else {
+          resultsByScene.set(scene.scene_id, silent(scene, shots));
+          await logger.markStage('dialogue', 'failed', { scene_id: scene.scene_id, absorbed: true });
+        }
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(concurrency, Math.max(pending.length, 1)) }, () => worker()),
+    );
+
+    // 결정론 병합 — 원래 씬 순서로만 확장(완료 판정과 하류 조인이 순차 경로와 동일해진다).
+    for (const scene of scenes.scenes) {
+      const got = resultsByScene.get(scene.scene_id);
+      if (got === undefined) continue;
+      out.push(got);
+      doneSceneIds.add(scene.scene_id);
     }
-    doneSceneIds.add(scene.scene_id);
-    processedThisPass += 1;
+    if (scenes.scenes.some((s) => !doneSceneIds.has(s.scene_id))) {
+      console.log(
+        `[dialogue] checkpoint(parallel): ${doneSceneIds.size}/${scenes.scenes.length} scenes done — 다음 step에서 이어감`,
+      );
+      return { done: false, doneSceneIds: [...doneSceneIds], scenes: out, memory, profiles };
+    }
+  } else {
+    let processedThisPass = 0;
+    for (const scene of scenes.scenes) {
+      if (doneSceneIds.has(scene.scene_id)) continue;
+      // 시간 예산 체크는 씬 "사이"에서만 — 패스당 최소 1씬은 처리 (진행 보장 계약).
+      if (processedThisPass > 0 && opts?.softDeadlineMs != null && Date.now() > opts.softDeadlineMs) {
+        console.log(
+          `[dialogue] checkpoint: ${doneSceneIds.size}/${scenes.scenes.length} scenes done — 다음 step에서 이어감`,
+        );
+        return { done: false, doneSceneIds: [...doneSceneIds], scenes: out, memory, profiles };
+      }
+
+      const shots = shotsOf(scene);
+      if (shots.length === 0) {
+        doneSceneIds.add(scene.scene_id);
+        continue;
+      }
+
+      // 씬 단위 1회 재시도 후 실패 흡수 — 대사는 향상 기능, 파이프라인을 죽이지 않는다.
+      const result = await attemptScene(scene, shots, memory);
+      if (result) {
+        out.push(result.scene);
+        memory = result.memory;
+      } else {
+        // 흡수: 이 씬은 침묵으로 (오늘의 최악치와 동일) — 진행은 계속.
+        out.push(silent(scene, shots));
+        await logger.markStage('dialogue', 'failed', { scene_id: scene.scene_id, absorbed: true });
+      }
+      doneSceneIds.add(scene.scene_id);
+      processedThisPass += 1;
+    }
   }
 
   await logger.saveStage('14b_dialogue.json', { profiles, scenes: out });

@@ -1,0 +1,363 @@
+{
+  "arm": "c-blind",
+  "finished_at": "2026-08-11T08:06:41.338Z",
+  "fixture": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+  "model": "gemini-3.6-flash",
+  "concurrency": 5,
+  "runs": [
+    {
+      "run": 1,
+      "arm": "c-blind",
+      "opts": {
+        "mode": "parallel",
+        "ledger": false,
+        "concurrency": 5
+      },
+      "wall_ms": 45834,
+      "error": null,
+      "done": true,
+      "calls": 16,
+      "call_ms": [
+        13004,
+        8540,
+        8935,
+        10092,
+        10464,
+        11703,
+        9004,
+        7557,
+        11012,
+        11577,
+        10161,
+        6909,
+        7018,
+        7529,
+        7566,
+        10958
+      ],
+      "call_ms_sum": 152029,
+      "input_tokens": 62221,
+      "output_tokens": 13438,
+      "call_errors": 0,
+      "scene_count": 15,
+      "total_lines": 59,
+      "lines_by_scene": {
+        "scene_1": 5,
+        "scene_2": 7,
+        "scene_3": 7,
+        "scene_4": 4,
+        "scene_5": 4,
+        "scene_6": 2,
+        "scene_7": 7,
+        "scene_8": 8,
+        "scene_9": 3,
+        "scene_10": 4,
+        "scene_11": 2,
+        "scene_12": 1,
+        "scene_13": 1,
+        "scene_14": 3,
+        "scene_15": 1
+      },
+      "fully_silent_scenes": [],
+      "cross_scene_exact_dup": 1,
+      "cross_scene_near_dup": 0,
+      "dup_samples": [
+        {
+          "kind": "exact",
+          "a": {
+            "scene_id": "scene_5",
+            "shot_id": "shot_51",
+            "character_id": "char_3",
+            "line": "져니야...",
+            "n": "져니야",
+            "g": {}
+          },
+          "b": {
+            "scene_id": "scene_6",
+            "shot_id": "shot_57",
+            "character_id": "char_3",
+            "line": "져니야...!",
+            "n": "져니야",
+            "g": {}
+          }
+        }
+      ],
+      "silence_budget_violations": 0,
+      "silence_budget_detail": [],
+      "invalid_speakers": [],
+      "lines_sample": [
+        {
+          "scene_id": "scene_1",
+          "shot_id": "shot_2",
+          "character_id": "char",
+          "line": "오늘따라 진짜 맑네."
+        },
+        {
+          "scene_id": "scene_1",
+          "shot_id": "shot_5",
+          "character_id": "char",
+          "line": "어...? 방금 뭐야?"
+        },
+        {
+          "scene_id": "scene_1",
+          "shot_id": "shot_7",
+          "character_id": "char",
+          "line": "잘못 본 거겠지..."
+        },
+        {
+          "scene_id": "scene_1",
+          "shot_id": "shot_8",
+          "character_id": "char",
+          "line": "진짜... 부서졌어..."
+        },
+        {
+          "scene_id": "scene_1",
+          "shot_id": "shot_10",
+          "character_id": "char",
+          "line": "엄마! 엄마!"
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_12",
+          "character_id": "char",
+          "line": "엄마! 엄마, 제발요!"
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_13",
+          "character_id": "char",
+          "line": "달이... 달에서 진짜 조각이 떨어져 나갔어요! 내가 봤다고요!"
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_14",
+          "character_id": "char_2",
+          "line": "져니, 엄마 지금 중요한 논문 마감이라 바빠."
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_15",
+          "character_id": "char",
+          "line": "장난 아니에요! 망원경으로 보면 그 자리가 푹 파여 있다고요!"
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_16",
+          "character_id": "char_2",
+          "line": "그건 환굴절 현상일 뿐이야. 나중에 얘기하자."
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_17",
+          "character_id": "char",
+          "line": "진짜예요! 제발 한 번만 봐줘요!"
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_18",
+          "character_id": "char_2",
+          "line": "방에 가서 자. 더 이상 떼쓰지 마."
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "arm": "c-blind",
+      "opts": {
+        "mode": "parallel",
+        "ledger": false,
+        "concurrency": 5
+      },
+      "wall_ms": 49304,
+      "error": null,
+      "done": true,
+      "calls": 16,
+      "call_ms": [
+        20011,
+        8071,
+        8645,
+        9509,
+        9988,
+        12236,
+        7746,
+        7951,
+        10657,
+        11997,
+        10128,
+        6551,
+        8173,
+        12084,
+        6766,
+        7779
+      ],
+      "call_ms_sum": 158292,
+      "input_tokens": 62225,
+      "output_tokens": 13735,
+      "call_errors": 0,
+      "scene_count": 15,
+      "total_lines": 67,
+      "lines_by_scene": {
+        "scene_1": 5,
+        "scene_2": 9,
+        "scene_3": 7,
+        "scene_4": 5,
+        "scene_5": 4,
+        "scene_6": 1,
+        "scene_7": 6,
+        "scene_8": 10,
+        "scene_9": 4,
+        "scene_10": 4,
+        "scene_11": 3,
+        "scene_12": 2,
+        "scene_13": 1,
+        "scene_14": 4,
+        "scene_15": 2
+      },
+      "fully_silent_scenes": [],
+      "cross_scene_exact_dup": 3,
+      "cross_scene_near_dup": 0,
+      "dup_samples": [
+        {
+          "kind": "exact",
+          "a": {
+            "scene_id": "scene_1",
+            "shot_id": "shot_2",
+            "character_id": "char",
+            "line": "조금만 더...",
+            "n": "조금만더",
+            "g": {}
+          },
+          "b": {
+            "scene_id": "scene_12",
+            "shot_id": "shot_129",
+            "character_id": "char",
+            "line": "조금만 더...",
+            "n": "조금만더",
+            "g": {}
+          }
+        },
+        {
+          "kind": "exact",
+          "a": {
+            "scene_id": "scene_5",
+            "shot_id": "shot_51",
+            "character_id": "char_3",
+            "line": "져니...",
+            "n": "져니",
+            "g": {}
+          },
+          "b": {
+            "scene_id": "scene_14",
+            "shot_id": "shot_143",
+            "character_id": "char_2",
+            "line": "져니...",
+            "n": "져니",
+            "g": {}
+          }
+        },
+        {
+          "kind": "exact",
+          "a": {
+            "scene_id": "scene_7",
+            "shot_id": "shot_72",
+            "character_id": "char",
+            "line": "엄마...",
+            "n": "엄마",
+            "g": {}
+          },
+          "b": {
+            "scene_id": "scene_14",
+            "shot_id": "shot_144",
+            "character_id": "char",
+            "line": "엄마...",
+            "n": "엄마",
+            "g": {}
+          }
+        }
+      ],
+      "silence_budget_violations": 1,
+      "silence_budget_detail": [
+        {
+          "scene_id": "scene_2",
+          "lines": 9,
+          "cap": 8
+        }
+      ],
+      "invalid_speakers": [],
+      "lines_sample": [
+        {
+          "scene_id": "scene_1",
+          "shot_id": "shot_1",
+          "character_id": "char",
+          "line": "오늘 밤은 진짜 잘 보인다..."
+        },
+        {
+          "scene_id": "scene_1",
+          "shot_id": "shot_2",
+          "character_id": "char",
+          "line": "조금만 더..."
+        },
+        {
+          "scene_id": "scene_1",
+          "shot_id": "shot_5",
+          "character_id": "char",
+          "line": "방금... 뭐야?"
+        },
+        {
+          "scene_id": "scene_1",
+          "shot_id": "shot_7",
+          "character_id": "char",
+          "line": "아니야, 잘못 본 걸 거야..."
+        },
+        {
+          "scene_id": "scene_1",
+          "shot_id": "shot_8",
+          "character_id": "char",
+          "line": "진짜로... 달이 쪼개진 거야?"
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_12",
+          "character_id": "char",
+          "line": "엄마! 엄마, 지금 당장 나와봐요!"
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_13",
+          "character_id": "char_2",
+          "line": "져니, 엄마 지금 화면 보고 있잖아. 잠깐만."
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_13",
+          "character_id": "char",
+          "line": "아니요, 지금 당장요! 달이... 달이 이상해요!"
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_14",
+          "character_id": "char_2",
+          "line": "또 무슨 엉뚱한 소리를 하려고 그러니."
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_15",
+          "character_id": "char",
+          "line": "진짜라니까요! 망원경으로 보는데 달 부스러기가 튕겨 나갔다고요!"
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_16",
+          "character_id": "char_2",
+          "line": "엄마 제출 기한이 한 시간밖에 안 남았어. 나중에 얘기해."
+        },
+        {
+          "scene_id": "scene_2",
+          "shot_id": "shot_17",
+          "character_id": "char_2",
+          "line": "손 치워, 져니. 장난 받아줄 기분 아니다."
+        }
+      ]
+    }
+  ]
+}
