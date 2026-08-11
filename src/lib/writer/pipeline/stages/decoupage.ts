@@ -23,11 +23,30 @@ import type {
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
-// == 카메라 규율 == 계약의 A/B 분기 (#camera-contract-relax 2026-08-11).
-//   기본(env 미설정/기타 값) = 현행 문구 그대로 = 프로덕션 = 실험의 대조군.
-//   WRITER_CAMERA_CONTRACT=relaxed, relaxed-v2 또는 relaxed-v3 일 때만 실험 문구로 교체한다.
-//   env 는 호출 시점에 읽는다(모듈 로드 시점 캡처 금지) — 팔 전환이 모듈 캐시에 갇히지 않게.
-const CAMERA_CONTRACT_DEFAULT = `== 카메라 규율 ==
+// == 카메라 규율 == 계약 (#camera-contract-relax 2026-08-11).
+//
+// **기본값이 relaxed-v3 로 승격됐다 (2026-08-11, 오너 결정).** 종전 기본(아래 LEGACY)은
+//   `WRITER_CAMERA_CONTRACT=legacy` 로만 나온다. env 는 호출 시점에 읽는다(모듈 로드 시점 캡처
+//   금지) — 팔 전환이 모듈 캐시에 갇히지 않게.
+//
+// 승격 근거 (실측, [[2026-08-10-prompt-contract-audit]]):
+//   ① LEGACY 문구의 사유였던 "둥둥 떠다님"이 blind 9클립 재검증에서 **0/9 로 반증**됐다.
+//      게다가 그 원관측(2026-06-04)은 motion-contract 배선(8/7) **이전** — 무빙 의도가 영상
+//      모델에 전달되지도 않던 시절의 관측이라 사유 자체가 무효.
+//   ② 역전 실측: LOCKED static 계약이 3/3 위반됐다(모델이 콘텐츠 동기화 무빙을 스스로 추가).
+//      통제가 안 되는 쪽은 "무빙 개방"이 아니라 "고정 준수"다.
+//   ③ 억압의 비대칭: 203샷에서 카메라 magnitude 'large' 2건(1%) vs **같은 프롬프트**의 캐릭터
+//      'large' 13건 — 모델 능력이 아니라 카메라 어휘만 눌려 있었다.
+//   ④ A/B 실측(camera-contract-relax-v3, 3회 비중첩): 모션 요구 비트 적중 28.4%→53.1%(+24.7%p),
+//      **정적 비트 오발은 오히려 6.03%→4.63%(−1.4%p)**. "풀면 아무 데서나 움직인다"는 저점 보장
+//      논리가 여기서 깨진다. 부작용 없음(샷 수 145→146.3, 길이 7.62→7.49s). 하류 v4 전달 100%.
+//      사전 등록 기각①(무빙 총량 ≥1.5배)만 ×1.47 로 0.03 차 미발동 — 완화는 *양*이 아니라
+//      *정확도*를 올렸고, 채택 근거는 후자다.
+//
+// ⚠️ 재현 주의: camera-contract-relax(-v2/-v3) 실험은 **대조군을 "env 미설정"으로 정의**했다.
+//   기본값이 바뀌었으므로 그 실험을 재현하려면 대조군에 `WRITER_CAMERA_CONTRACT=legacy` 를
+//   명시해야 한다. 미설정으로 돌리면 대조군이 아니라 완화군이 나온다.
+const CAMERA_CONTRACT_LEGACY = `== 카메라 규율 ==
 - camera_intent는 'static'이 기본. 'motivated_move'는 *감정적 동기*가 명확할 때만 쓰고 camera_move_motivation에 그 동기를 적는다.
 - 이유 없는 카메라 무빙은 금지 (생성 영상이 "둥둥 떠다니며 집중 안 되는" 가장 큰 원인).`;
 
@@ -66,14 +85,17 @@ const CAMERA_CONTRACT_RELAXED_V3 = `== 카메라 규율 ==
 
 export function buildSystemInstruction(): string {
   const contract = process.env.WRITER_CAMERA_CONTRACT;
+  // 기본 = relaxed-v3(채택본). 'legacy' 만 옛 문구로 되돌린다 — 되돌림 스위치는 남겨둔다
+  //   (연출 방침 변경이라 관측이 나쁘면 즉시 원복할 수 있어야 한다).
+  //   'relaxed'/'relaxed-v2' 는 과거 실험 팔 재현용으로 유지.
   const cameraContract =
-    contract === 'relaxed-v3'
-      ? CAMERA_CONTRACT_RELAXED_V3
+    contract === 'legacy'
+      ? CAMERA_CONTRACT_LEGACY
       : contract === 'relaxed-v2'
         ? CAMERA_CONTRACT_RELAXED_V2
         : contract === 'relaxed'
           ? CAMERA_CONTRACT_RELAXED
-          : CAMERA_CONTRACT_DEFAULT;
+          : CAMERA_CONTRACT_RELAXED_V3;
   return `당신은 영화 감독이다. 한 씬의 내러티브 비트(scene_actions)를 받아 *데쿠파주(découpage)* — 샷 분해 — 를 저작한다.
 
 == 핵심 원칙 ==
