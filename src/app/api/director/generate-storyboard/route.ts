@@ -106,7 +106,19 @@ export async function POST(req: Request) {
 
     let finalOpts: AnchorableSubmit
     let stripRefUrl: string | null = null
+    let sceneLighting: string | null = null
     if (stripFrames) {
+      // #F-006: 씬 시간대를 스트립 리페인트에 배선 — 샷 산문의 시간대 단어는 확률적이라(실측
+      //   1e166e55 sc_04: 7샷 중 4샷에만 존재) scenes.time_of_day 진실로 고정한다.
+      if (shotMeta?.scene_id) {
+        const { data: scene } = await supabaseAdmin
+          .from('scenes')
+          .select('time_of_day')
+          .eq('project_id', projectId)
+          .eq('scene_id', shotMeta.scene_id)
+          .maybeSingle()
+        sceneLighting = (((scene?.time_of_day as string) ?? '').trim() || null)
+      }
       // 합성 스트립 업로드 — 결정적 경로 upsert (재생성마다 교체, 잔재 누적 없음).
       const stripBuf = await composeRoughReferenceStrip(stripFrames)
       const refPath = `${project.workspace_id}/${projectId}/shots/${storageKeySegment(writerShotId)}_storyboard_ref_strip.png`
@@ -122,6 +134,7 @@ export async function POST(req: Request) {
         prompt: buildRealStripPrompt(guardedPrompt, {
           characterRefCount: callerRefs?.length ?? 0,
           hasStyleRef: !!anchor,
+          sceneLighting,
         }),
         // #real-strip-guard(2026-08-06): 'auto' 위임이 가로 단일컷 반환을 허용했다(실측 011fd4bd —
         //   액자 테두리 단일컷을 고정 크롭이 액자째 3분할). 세로 캔버스를 강제해 시트 계약 준수를 유도.
@@ -162,6 +175,7 @@ export async function POST(req: Request) {
         reference_image_urls: finalOpts.reference_image_urls,
         ...(finalOpts.model ? { model: finalOpts.model } : {}),
         style_anchor_key: anchor?.key ?? null,
+        scene_time_of_day: sceneLighting,
         ...(stripRefUrl ? { strip_ref_url: stripRefUrl } : {}),
         ...falCapture,
       },

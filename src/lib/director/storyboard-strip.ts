@@ -126,9 +126,16 @@ export function buildRealGridPrompt(
      *  columnCharacters 는 칸(그룹) 순서대로 그 칸에 나오는 인물 표시명들. */
     characterRefs?: { name: string }[]
     columnCharacters?: string[][]
+    /** #F-006(2026-08-13, 실측 1e166e55 sc_04): 시트 프롬프트에 씬 정보가 전무해 시트(=생성 콜)마다
+     *  시간대를 지어냈다 — Night 씬이 시트 경계(21~24/25~27)에서 갈라진 실측. scenes.time_of_day 가
+     *  진실인데 이 경로로 배선된 적이 없었다. 시트는 1콜 1이미지라 그레이드는 시트 전역 속성이고,
+     *  같은 씬의 모든 시트가 같은 문장을 받아야 시트 간 일관성이 생긴다. 값이 오면 앵커 절에서
+     *  조명·그레이드 문구를 빼고 이 줄이 지배한다(§6D 실측: 텍스트 그레이드 권위 > 앵커 이미지). */
+    sceneLighting?: string | null
   },
 ): string {
   const { characterRefCount, hasStyleRef, cineLines, characterRefs, columnCharacters } = opts
+  const sceneLine = (opts.sceneLighting ?? '').trim()
   const target = hasStyleRef
     ? 'finished, final-quality film frames'
     : 'finished photorealistic live-action cinematic film frames'
@@ -165,7 +172,14 @@ export function buildRealGridPrompt(
     ...identityBlock,
     ...(hasStyleRef
       ? [
-          `- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.`,
+          sceneLine
+            ? `- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.`
+            : `- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.`,
+        ]
+      : []),
+    ...(sceneLine
+      ? [
+          `- Scene lighting — the whole sheet is ONE scene, time of day: ${sceneLine}. Render that time of day's light and color grade in every panel, identical across all columns; never drift to a different time of day in any column.`,
         ]
       : []),
     ...renderGridCineBlock(cineLines),
@@ -197,9 +211,13 @@ export function buildRealStripPrompt(
     hasStyleRef: boolean
     /** #viz-gap 실험 arm: 이 샷의 시네 라인(비운반 채널만). 생략 시 현행 프롬프트 그대로. */
     cineLine?: string | null
+    /** #F-006: 씬 시간대(scenes.time_of_day). 샷 산문의 시간대 단어는 확률적(실측 4/7 샷에만
+     *  존재)이라 씬 진실로 고정한다. 그리드 쪽 주석 참조 — 앵커 절과의 권위 관계 동일. */
+    sceneLighting?: string | null
   },
 ): string {
   const { characterRefCount, hasStyleRef, cineLine } = opts
+  const sceneLine = (opts.sceneLighting ?? '').trim()
   const target = hasStyleRef
     ? 'finished, final-quality film frames'
     : 'finished photorealistic live-action cinematic film frames'
@@ -222,7 +240,14 @@ export function buildRealStripPrompt(
       : []),
     ...(hasStyleRef
       ? [
-          `- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.`,
+          sceneLine
+            ? `- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique and linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.`
+            : `- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.`,
+        ]
+      : []),
+    ...(sceneLine
+      ? [
+          `- Scene lighting — time of day: ${sceneLine}. Render that time of day's light and color grade consistently in all three panels.`,
         ]
       : []),
     `- Shot description: ${shotPrompt}`,

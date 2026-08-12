@@ -412,6 +412,7 @@ describe('style-anchor route integration', () => {
       reference_image_urls: [ANCHOR_URL, 'a', 'b'],
       model: DEFAULT_EDIT_IMAGE_MODEL,
       style_anchor_key: ANCHOR_KEY,
+      scene_time_of_day: null, // #F-006 — 스트립 아닌 폴백 경로는 씬 조명 미주입(null 기록)
       fal_request: {},
       ignored_fields: [],
     })

@@ -77,6 +77,18 @@ export async function POST(req: NextRequest) {
     }
 
     const anchor = await resolveStyleAnchorByKey(project.style_anchor_key as string | null)
+    // #F-006(2026-08-13): 시트 프롬프트에 씬 정보가 전무해 시트마다 시간대를 지어냈다(실측 1e166e55
+    //   sc_04 Night — 21~24/25~27 시트가 서로 다른 시간대로 갈라짐). scenes.time_of_day 를 시트 전역
+    //   조명 한 줄로 배선한다. 그룹은 씬 경계에서 끊기므로(위 그룹핑) 시트당 씬은 정확히 1개.
+    const sceneIds = [...new Set(planned.map((g) => g[0].scene_id))]
+    const { data: sceneRows } = await supabaseAdmin
+      .from('scenes')
+      .select('scene_id, time_of_day')
+      .eq('project_id', projectId)
+      .in('scene_id', sceneIds)
+    const todByScene = new Map(
+      (sceneRows ?? []).map((s) => [s.scene_id as string, ((s.time_of_day as string) ?? '').trim()]),
+    )
     // 인물 조회는 호출 전체 1회(쿼리 절약)로 두되 맵으로 보관 — 레퍼런스는 **시트별로** 꺼낸다
     //   (#real-grid-identity 2026-08-12): 옛 코드는 호출 전체(최대 2시트)의 합집합을 익명 URL
     //   배열로 모든 시트에 실었다. 그 시트에 안 나오는 인물의 레퍼런스가 오염원으로 첨부되고,
@@ -123,11 +135,13 @@ export async function POST(req: NextRequest) {
         s.characters.map((id) => nameById.get(id)).filter((n): n is string => !!n),
       )
 
+      const sceneLighting = todByScene.get(group[0].scene_id) || null
       const prompt = buildRealGridPrompt(group.length, {
         characterRefCount: groupRefs.length,
         hasStyleRef: !!anchor,
         characterRefs: groupRefs.map((r) => ({ name: r.name })),
         columnCharacters,
+        sceneLighting,
       })
       const referenceImageUrls = [
         refUrl,
@@ -161,6 +175,7 @@ export async function POST(req: NextRequest) {
           prompt,
           reference_image_urls: referenceImageUrls,
           column_characters: columnCharacters,
+          scene_time_of_day: sceneLighting,
         },
         target: {
           workspaceId: project.workspace_id as string,
