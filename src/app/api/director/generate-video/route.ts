@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
+import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { fal } from '@fal-ai/client'
@@ -403,7 +404,7 @@ export async function POST(req: Request) {
     if (!(await userOwnsProject(projectId, user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const [{ data: project, error: projectError }, { data: shot, error: shotError }] = await Promise.all([
-      supabaseAdmin.from('projects').select('workspace_id').eq('id', projectId).maybeSingle(),
+      supabaseAdmin.from('projects').select('workspace_id, style_anchor_key').eq('id', projectId).maybeSingle(),
       // #motion-contract: dynamic_spec(모션 계약 소스) + design_ref(구버전 state 폴백 조인 키) 동봉.
       supabaseAdmin.from('shots').select('shot_id, dynamic_spec, design_ref').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
     ])
@@ -483,11 +484,19 @@ export async function POST(req: Request) {
         ? referenceImageUrlsV2
         : [referenceImageUrl]
       : null
+    // 영상 카메라 기재 억제(#F-004 B7 2026-08-12) — 앵커 매체가 실사(live_action)가 아니면
+    //   "shot on Arri Alexa, 35mm…" 기재 문구를 뺀다. 실측(dc531572, 3D 애니메이션 프로젝트):
+    //   영상 프롬프트가 실사 카메라 촬영을 지시해 앵커 룩과 정면 충돌했다. 앵커가 없거나
+    //   medium 미상은 기존 그대로(실사 프로젝트 동작 불변).
+    const videoAnchor = await resolveStyleAnchorByKey(
+      (project as { style_anchor_key?: string | null }).style_anchor_key ?? null,
+    ).catch(() => null)
+    const suppressGear = !!(videoAnchor?.medium && videoAnchor.medium !== 'live_action')
     const { fullPrompt, prompt_parts: promptParts } = buildVideoPrompt({
       prompt,
       camera,
       movementPreset,
-      cameraPreset,
+      cameraPreset: suppressGear ? null : cameraPreset,
       generationMethod,
       modelKey,
       durationSeconds: dur,

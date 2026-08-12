@@ -560,6 +560,43 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     // #p4-understand: 침묵 no-op 제거 — 적용/건너뜀을 집계해 호출자(채팅)가 표면화한다.
     let applied = 0
     const skipped: Array<{ type: string; id?: string; reason: string }> = []
+
+    // 활성 런 가드(#F-003 R2 2026-08-12) — 런이 도는 동안(씬 게이트 대기 포함) 채팅 CRUD 를
+    //   막는다. 실측(dc531572): 런 중 채팅이 씬 4개·샷 16개를 병행 생성했다. persistShots 는
+    //   프로젝트 전체 shots 를 DELETE 후 재삽입하므로, 순서가 반대였다면(채팅 먼저 → persist)
+    //   유저 작업물이 소리 없이 사라졌다. UI 게이트(#run-chat-gate)는 1선 방어일 뿐 — 씬 게이트
+    //   대기 창은 UI 가 열어두므로(피드백 채널) 최종 방어는 여기다. 상태는 writer_runs 가 진실
+    //   (architecture §0 — 새 플래그 없이 기존 status 라우트를 pull). 상태 확인 실패 시엔 막지
+    //   않는다 — 네트워크 블립으로 편집이 잠기는 것이 더 나쁘고, 이 가드는 심층 방어다.
+    const mutating = updates.some((u) => u.type !== 'clarify')
+    const guardProjectId = useProjectStore.getState().projectId
+    if (mutating && guardProjectId) {
+      try {
+        const r = await fetch(`/api/writer/status/${guardProjectId}`)
+        if (r.ok) {
+          const st = (await r.json()) as {
+            started?: boolean
+            pipeline_completed?: boolean
+            pipeline_failed?: boolean
+          }
+          if (st.started && !st.pipeline_completed && !st.pipeline_failed) {
+            return {
+              applied: 0,
+              skipped: [
+                {
+                  type: 'all',
+                  reason:
+                    '초안 생성이 진행 중이에요 — 씬 확정과 생성이 끝난 뒤에 수정할 수 있어요',
+                },
+              ],
+              pendingDialogueShrinks: [],
+            }
+          }
+        }
+      } catch {
+        /* 상태 확인 불가 — 가드 없이 진행(심층 방어) */
+      }
+    }
     // 샷 id 관용 해석(A2): tempMap → 실재 → 레거시/위치형 폴백. 실패는 null.
     const resolveShot = (rawId: string): string | null => {
       const viaTemp = tempMap.get(rawId) ?? rawId

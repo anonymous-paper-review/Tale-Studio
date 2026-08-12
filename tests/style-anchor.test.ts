@@ -179,10 +179,11 @@ describe('resolveStyleAnchorByKey', () => {
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
       key: 'jp_anime',
       imageUrl: 'https://cdn.test/style/jp-anime.png',
+      medium: null, // #F-004 B7 — 영상 카메라 기재 억제 판정용으로 resolver 가 함께 나른다
     })
 
     expect(mocks.from).toHaveBeenCalledWith('style_anchors')
-    expect(mocks.select).toHaveBeenCalledWith('key, image_url, is_active')
+    expect(mocks.select).toHaveBeenCalledWith('key, image_url, is_active, medium')
     expect(mocks.eq).toHaveBeenCalledWith('key', 'jp_anime')
   })
 
@@ -220,10 +221,12 @@ describe('resolveStyleAnchorByKey', () => {
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
       key: 'jp_anime',
       imageUrl: 'https://cdn.test/style/jp-anime.png',
+      medium: null, // #F-004 B7 — 영상 카메라 기재 억제 판정용으로 resolver 가 함께 나른다
     })
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
       key: 'jp_anime',
       imageUrl: 'https://cdn.test/style/jp-anime.png',
+      medium: null, // #F-004 B7 — 영상 카메라 기재 억제 판정용으로 resolver 가 함께 나른다
     })
 
     expect(mocks.from).toHaveBeenCalledTimes(1)
@@ -243,6 +246,7 @@ describe('resolveStyleAnchorByKey', () => {
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
       key: 'jp_anime',
       imageUrl: 'https://cdn.test/style/jp-anime.png',
+      medium: null, // #F-004 B7 — 영상 카메라 기재 억제 판정용으로 resolver 가 함께 나른다
     })
 
     vi.advanceTimersByTime(5 * 60 * 1000 + 1)
@@ -250,6 +254,7 @@ describe('resolveStyleAnchorByKey', () => {
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
       key: 'jp_anime',
       imageUrl: 'https://cdn.test/style/refreshed.png',
+      medium: null,
     })
     expect(mocks.from).toHaveBeenCalledTimes(2)
   })
@@ -266,6 +271,7 @@ describe('resolveStyleAnchorByKey', () => {
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
       key: 'jp_anime',
       imageUrl: 'https://cdn.test/style/jp-anime.png',
+      medium: null, // #F-004 B7 — 영상 카메라 기재 억제 판정용으로 resolver 가 함께 나른다
     })
 
     expect(mocks.from).toHaveBeenCalledTimes(2)

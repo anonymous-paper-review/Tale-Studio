@@ -5,6 +5,8 @@
 // 적용(DB 반영)은 클라(writer-store.applyChatUpdates)가 한다 — writer-store 가 shots/scenes 의 단일 진실.
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { userOwnsProject } from '@/lib/generation-jobs'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE } from '@/lib/chat-format'
@@ -147,10 +149,16 @@ function normalizeHistory(history: unknown): ChatMessage[] {
   })
 }
 
-function parseAgenticResponse(text: string): { reply: string; updates: unknown[] } {
+function parseAgenticResponse(
+  text: string,
+  allowedCharacterIds?: ReadonlySet<string>,
+): { reply: string; updates: unknown[]; droppedCharacterIds: string[] } {
   // 펜스 추출·복구·유출 방어·신호·부분 적용 안내는 공용 가드가 담당(#p4-json-guard).
-  const { reply, updates } = parseFencedUpdates(text, 'writer/chat', validateWriterUpdates)
-  return { reply, updates }
+  const dropped: string[] = []
+  const { reply, updates } = parseFencedUpdates(text, 'writer/chat', (raw) =>
+    validateWriterUpdates(raw, allowedCharacterIds, dropped),
+  )
+  return { reply, updates, droppedCharacterIds: dropped }
 }
 
 export async function POST(req: Request) {
@@ -160,9 +168,28 @@ export async function POST(req: Request) {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { message, history, writerContext, lineRefs } = await req.json()
+    const { message, history, writerContext, lineRefs, projectId } = await req.json()
     if (!message || typeof message !== 'string')
       return NextResponse.json({ error: 'message is required' }, { status: 400 })
+
+    // 인물 id 정본 로스터(#F-003 R1) — DB 가 진실. 클라가 보내는 writerContext 의 로스터는
+    //   프롬프트용 표시일 뿐 검증 근거가 아니다. 프롬프트("Never invent new IDs")는 보조 방어 —
+    //   실측(dc531572): 모델이 girl/tracker 를 발명해 그대로 저장됐고 하류 에셋 조인이 전부
+    //   끊겼다(architecture §3 "모델 출력의 무검증 실행 금지" 위반). projectId 미전달(구 클라)이면
+    //   무필터로 종전 동작.
+    let allowedCharacterIds: ReadonlySet<string> | undefined
+    if (typeof projectId === 'string' && projectId) {
+      if (!(await userOwnsProject(projectId, user.id))) {
+        return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+      }
+      const { data: roster } = await supabaseAdmin
+        .from('characters')
+        .select('character_id')
+        .eq('project_id', projectId)
+      allowedCharacterIds = new Set(
+        (roster ?? []).map((r) => r.character_id as string).filter(Boolean),
+      )
+    }
 
     const normalizedHistory = normalizeHistory(history)
     const crossStageNote = normalizedHistory.some((m) => /^\[P[1-5]\]/.test(m.content))
@@ -180,8 +207,15 @@ export async function POST(req: Request) {
       `${ctx}${message}`,
       0.5,
     )
-    const { reply, updates } = parseAgenticResponse(text)
-    return NextResponse.json({ reply, updates })
+    const { reply, updates, droppedCharacterIds } = parseAgenticResponse(text, allowedCharacterIds)
+    // 드롭 표면화 — 침묵 드롭은 이 사고(무검증 저장)와 같은 함정을 반대 방향으로 판다.
+    const dropped = [...new Set(droppedCharacterIds)]
+    const replyOut = dropped.length
+      ? `${reply}
+
+(등장인물 목록에 없는 인물 ${dropped.map((d) => `\`${d}\``).join(', ')} 은(는) 반영하지 않았어요 — 새 인물이 필요하면 Producer 단계에서 추가해 주세요.)`
+      : reply
+    return NextResponse.json({ reply: replyOut, updates })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[writer/chat]', errMsg)

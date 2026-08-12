@@ -496,6 +496,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         body = {
           message: trimmed,
           history: historyPayload,
+          // 인물 id 화이트리스트(#F-003 R1) — 서버가 DB 로스터로 모델 출력을 거른다.
+          projectId,
           writerContext: serializeWriterScriptContext(
             writerState.sceneManifest,
             writerState.shots,

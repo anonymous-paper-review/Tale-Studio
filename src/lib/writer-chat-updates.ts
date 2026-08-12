@@ -47,21 +47,47 @@ export function asInt(x: unknown, min: number, max: number): number | undefined 
   return Math.max(min, Math.min(max, Math.round(x)))
 }
 
+/** 인물 id 화이트리스트 필터(#F-003 R1). allowed 미지정 = 종전 동작(무필터).
+ *  전부 탈락하면 필드 자체를 뺀다 — 씬 상속/빈 기본값 폴백이 받는다. 탈락 id 는 dropped 에 수집. */
+function filterCharacterIds(
+  ids: string[] | undefined,
+  allowed: ReadonlySet<string> | undefined,
+  dropped?: string[],
+): string[] | undefined {
+  if (!ids) return undefined
+  if (!allowed) return ids
+  const kept = ids.filter((id) => allowed.has(id))
+  if (dropped) dropped.push(...ids.filter((id) => !allowed.has(id)))
+  return kept.length > 0 ? kept : undefined
+}
+
 // scene 자유 텍스트/배열 필드 (addScene 와 updateScene.patch 공용)
-export function pickSceneFields(src: Record<string, unknown>): Record<string, unknown> {
+export function pickSceneFields(
+  src: Record<string, unknown>,
+  allowedCharacterIds?: ReadonlySet<string>,
+  droppedCharacterIds?: string[],
+): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const k of ['location', 'timeOfDay', 'mood', 'narrativeSummary', 'originalTextQuote']) {
     const v = asString(src[k])
     if (v !== undefined) out[k] = v
   }
-  const cp = asStringArray(src.charactersPresent)
+  const cp = filterCharacterIds(
+    asStringArray(src.charactersPresent),
+    allowedCharacterIds,
+    droppedCharacterIds,
+  )
   if (cp) out.charactersPresent = cp
   const dur = asInt(src.estimatedDurationSeconds, 1, 600)
   if (dur !== undefined) out.estimatedDurationSeconds = dur
   return out
 }
 
-function pickDialogueLines(src: unknown): Array<Pick<DialogueLine, 'characterId' | 'text'>> | undefined {
+function pickDialogueLines(
+  src: unknown,
+  allowedCharacterIds?: ReadonlySet<string>,
+  droppedCharacterIds?: string[],
+): Array<Pick<DialogueLine, 'characterId' | 'text'>> | undefined {
   if (!Array.isArray(src)) return undefined
   const entries = src
     .filter(
@@ -71,6 +97,13 @@ function pickDialogueLines(src: unknown): Array<Pick<DialogueLine, 'characterId'
         typeof (line as { characterId?: unknown }).characterId === 'string' &&
         typeof (line as { text?: unknown }).text === 'string',
     )
+    // 화자 화이트리스트(#F-003 R1) — 발명된 화자의 대사는 대사째 드롭(화자만 바꿔치기하면
+    //   남의 입에 대사를 넣는다). 명시적 [] 의 "전체 삭제" 의미는 아래 기존 규칙이 보존.
+    .filter((line) => {
+      if (!allowedCharacterIds || allowedCharacterIds.has(line.characterId)) return true
+      droppedCharacterIds?.push(line.characterId)
+      return false
+    })
     .map((line) => ({ characterId: line.characterId, text: line.text }))
   // 전량 불량 배열이 빈 patch 로 통과하면 "대사 전체 삭제"로 위장한다 —
   // 명시적 [] 만 빈 배열로 인정하고, 불량 엔트리만 있던 배열은 필드 자체를 drop.
@@ -79,22 +112,41 @@ function pickDialogueLines(src: unknown): Array<Pick<DialogueLine, 'characterId'
 }
 
 // shot 필드 (addShot 와 updateShot.patch 공용 — sceneId/tempId 제외)
-export function pickShotFields(src: Record<string, unknown>): Record<string, unknown> {
+export function pickShotFields(
+  src: Record<string, unknown>,
+  allowedCharacterIds?: ReadonlySet<string>,
+  droppedCharacterIds?: string[],
+): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   if (typeof src.shotType === 'string' && SHOT_TYPES.has(src.shotType))
     out.shotType = src.shotType
   const ad = asString(src.actionDescription)
   if (ad !== undefined) out.actionDescription = ad
-  const ch = asStringArray(src.characters)
+  const ch = filterCharacterIds(
+    asStringArray(src.characters),
+    allowedCharacterIds,
+    droppedCharacterIds,
+  )
   if (ch) out.characters = ch
   const dur = asInt(src.durationSeconds, 1, 60)
   if (dur !== undefined) out.durationSeconds = dur
-  const dialogueLines = pickDialogueLines(src.dialogueLines)
+  const dialogueLines = pickDialogueLines(src.dialogueLines, allowedCharacterIds, droppedCharacterIds)
   if (dialogueLines !== undefined) out.dialogueLines = dialogueLines
   return out
 }
 
-export function validateWriterUpdates(raw: unknown[]): unknown[] {
+/**
+ * allowedCharacterIds(#F-003 R1): DB 정본 인물 id 집합. 주면 charactersPresent/characters/
+ *   dialogueLines[].characterId 를 화이트리스트로 거른다 — 모델이 발명한 id(girl/tracker,
+ *   실측 dc531572)가 무검증 저장되면 하류 에셋 조인이 전부 끊긴다(architecture §3·§4 위반).
+ *   프롬프트("Never invent new IDs")는 보조 방어일 뿐 — 최종 방어는 여기다.
+ * droppedCharacterIds: 탈락 id 수집(호출자가 표면화 — 침묵 드롭 금지).
+ */
+export function validateWriterUpdates(
+  raw: unknown[],
+  allowedCharacterIds?: ReadonlySet<string>,
+  droppedCharacterIds?: string[],
+): unknown[] {
   const out: unknown[] = []
   for (const u of raw) {
     const rec = asObj(u)
@@ -105,7 +157,7 @@ export function validateWriterUpdates(raw: unknown[]): unknown[] {
       case 'addScene': {
         out.push({
           type: 'addScene',
-          ...pickSceneFields(rec),
+          ...pickSceneFields(rec, allowedCharacterIds, droppedCharacterIds),
           ...(asString(rec.tempId) ? { tempId: rec.tempId } : {}),
         })
         break
@@ -115,21 +167,21 @@ export function validateWriterUpdates(raw: unknown[]): unknown[] {
         out.push({
           type: 'addShot',
           sceneId: rec.sceneId,
-          ...pickShotFields(rec),
+          ...pickShotFields(rec, allowedCharacterIds, droppedCharacterIds),
           ...(asString(rec.tempId) ? { tempId: rec.tempId } : {}),
         })
         break
       }
       case 'updateScene': {
         if (!asString(rec.id)) break
-        const patch = pickSceneFields(asObj(rec.patch) ?? {})
+        const patch = pickSceneFields(asObj(rec.patch) ?? {}, allowedCharacterIds, droppedCharacterIds)
         if (Object.keys(patch).length > 0)
           out.push({ type: 'updateScene', id: rec.id, patch })
         break
       }
       case 'updateShot': {
         if (!asString(rec.id)) break
-        const patch = pickShotFields(asObj(rec.patch) ?? {})
+        const patch = pickShotFields(asObj(rec.patch) ?? {}, allowedCharacterIds, droppedCharacterIds)
         if (Object.keys(patch).length > 0)
           out.push({ type: 'updateShot', id: rec.id, patch })
         break
