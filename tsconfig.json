@@ -31,5 +31,13 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "dev", "lab"]
+  "exclude": [
+    "node_modules",
+    "dev",
+    "lab",
+    // scripts/ 는 .gitignore 대상('Experimental/debug scripts')이라 다른 체크아웃에는 없다.
+    //   이 테스트만 그 폴더를 import 해서, 저자 머신 밖에서는 항상 타입체크·테스트가 깨진다.
+    //   제품 코드가 아니므로 검사 대상에서 뺀다 (2026-08-12 오너 지시).
+    "tests/seed-test-accounts.test.ts"
+  ]
 }
