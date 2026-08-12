@@ -4,7 +4,7 @@ source: qual7-rewrite 실측 2026-08-11 (sh_04_16 — 보드 손글씨 "TRACK BA
 tier: T0
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: ready
+status: done   # 2026-08-12 밤 러너 — 측정 불가·모집단 부재(기각 아님, t0-d3 선례). ① 티켓 표기 left_to_right/right_to_left 는 DB에 0건(실제 어휘는 left/right) ② tracking+좌우 3샷 전부 시작·끝 그림 없음 ③ 시드 sh_04_16 은 DB에 camera_motion 부재. 잣대 수정 제안은 result.md 말미(실행 안 함). 결과: research/experiments/t0-camera-spec-vs-board-mismatch/
 priority: high
 ```
 

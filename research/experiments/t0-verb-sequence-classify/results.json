@@ -1,0 +1,1465 @@
+{
+  "ticket": "t0-verb-sequence-classify",
+  "date": "2026-08-12",
+  "method": "지각(순차/동시)만 모델 1콜, 집계·판정은 코드. 분류는 고유 문자열 단위, 비율은 건수 단위로 환산.",
+  "model": "claude (제품 기본 축 설정 — claudeGenerateJson)",
+  "corpus": {
+    "v4_files": 26,
+    "verbs_total": 1956,
+    "compound_total": 90,
+    "compound_ratio": 0.046,
+    "unique_strings": 78
+  },
+  "tally_types": {
+    "sequential": 51,
+    "simultaneous": 27,
+    "unknown": 0
+  },
+  "tally_instances": {
+    "sequential": 61,
+    "simultaneous": 29,
+    "unknown": 0
+  },
+  "sequential_share_all": 0.6778,
+  "sequential_share_decided": 0.6778,
+  "verdict_on_all": "50~70% — 유보(표본 확대)",
+  "verdict_on_decided": "50~70% — 유보(표본 확대)",
+  "classified": [
+    {
+      "idx": 0,
+      "verb": "flips switch and exits",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "스위치 후 퇴장"
+    },
+    {
+      "idx": 1,
+      "verb": "clutches and sobs",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "감정 표현 두 면"
+    },
+    {
+      "idx": 2,
+      "verb": "stirs and lifts head",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "뒤척인 후 고개 듦"
+    },
+    {
+      "idx": 3,
+      "verb": "whispers and pulls straps",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "속삭이며 동시에 당김"
+    },
+    {
+      "idx": 4,
+      "verb": "sprints and embraces",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "달려가서 포옹"
+    },
+    {
+      "idx": 5,
+      "verb": "approaches and proclaims",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "다가간 후 선언"
+    },
+    {
+      "idx": 6,
+      "verb": "turns and absorbs",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "돌아선 후 흡수"
+    },
+    {
+      "idx": 7,
+      "verb": "bows then grasps",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "then 명시적 순서"
+    },
+    {
+      "idx": 8,
+      "verb": "walks and sits",
+      "count": 7,
+      "context": "",
+      "label": "sequential",
+      "why": "걸어가서 앉음"
+    },
+    {
+      "idx": 9,
+      "verb": "walks and taps",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "걸으며 두드림"
+    },
+    {
+      "idx": 10,
+      "verb": "enters and lunges",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "들어온 후 달려듦"
+    },
+    {
+      "idx": 11,
+      "verb": "shouts and listens",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "외친 후 경청"
+    },
+    {
+      "idx": 12,
+      "verb": "collapses and covers face",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "쓰러진 후 얼굴 가림"
+    },
+    {
+      "idx": 13,
+      "verb": "knocks over telescope and sprints",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "망원경 넘어뜨린 후 질주"
+    },
+    {
+      "idx": 14,
+      "verb": "sits and touches",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "앉은 후 만짐"
+    },
+    {
+      "idx": 15,
+      "verb": "walks and touches",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "걸으며 동시에 만짐"
+    },
+    {
+      "idx": 16,
+      "verb": "winks and exits",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "윙크 후 퇴장"
+    },
+    {
+      "idx": 17,
+      "verb": "waves and shouts",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "손 흔들며 외침"
+    },
+    {
+      "idx": 18,
+      "verb": "trembles and reaches",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "떨면서 손 뻗음"
+    },
+    {
+      "idx": 19,
+      "verb": "wipes tears and exhales",
+      "count": 2,
+      "context": "",
+      "label": "sequential",
+      "why": "눈물 닦은 후 숨 내쉼"
+    },
+    {
+      "idx": 20,
+      "verb": "sweeps papers and unfolds map",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "서류 쓸고 지도 펼침"
+    },
+    {
+      "idx": 21,
+      "verb": "approaches and wraps",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "다가간 후 감쌈"
+    },
+    {
+      "idx": 22,
+      "verb": "pulls away and buries",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "물러난 후 묻음"
+    },
+    {
+      "idx": 23,
+      "verb": "adjusts and leans",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "조정 후 기댐"
+    },
+    {
+      "idx": 24,
+      "verb": "traces and writes",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "따라 그린 후 씀"
+    },
+    {
+      "idx": 25,
+      "verb": "grabs and turns",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "잡은 후 돌림"
+    },
+    {
+      "idx": 26,
+      "verb": "gasps and stumbles",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "놀라 비틀거림 동시"
+    },
+    {
+      "idx": 27,
+      "verb": "shouts and shakes",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "외치며 흔듦"
+    },
+    {
+      "idx": 28,
+      "verb": "sips and flips",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "마시며 넘김"
+    },
+    {
+      "idx": 29,
+      "verb": "walks and rolls sleeves",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "걸으며 소매 걷음"
+    },
+    {
+      "idx": 30,
+      "verb": "leans and stares",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "기대며 응시"
+    },
+    {
+      "idx": 31,
+      "verb": "mutters and grips radio",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "중얼거리며 라디오 쥠"
+    },
+    {
+      "idx": 32,
+      "verb": "freezes and tilts head",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "멈춘 후 고개 기울임"
+    },
+    {
+      "idx": 33,
+      "verb": "steps and splashes",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "발 딛고 물 튐"
+    },
+    {
+      "idx": 34,
+      "verb": "slips and stumbles",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "미끄러져 비틀거림"
+    },
+    {
+      "idx": 35,
+      "verb": "clings and shakes",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "매달리며 흔들림"
+    },
+    {
+      "idx": 36,
+      "verb": "yawns and adjusts glasses",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "하품하며 안경 고침"
+    },
+    {
+      "idx": 37,
+      "verb": "struggles and is dragged",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "버티며 끌려감"
+    },
+    {
+      "idx": 38,
+      "verb": "stands and walks",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "일어선 후 걸음"
+    },
+    {
+      "idx": 39,
+      "verb": "screams and gasps",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "비명과 헐떡임 동시"
+    },
+    {
+      "idx": 40,
+      "verb": "Pulls away and writes",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "물러난 후 씀"
+    },
+    {
+      "idx": 41,
+      "verb": "switches off light and exits",
+      "count": 2,
+      "context": "",
+      "label": "sequential",
+      "why": "불 끈 후 퇴장"
+    },
+    {
+      "idx": 42,
+      "verb": "rubs eye and leans",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "눈 비빈 후 기댐"
+    },
+    {
+      "idx": 43,
+      "verb": "turns and walks out",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "돌아선 후 나감"
+    },
+    {
+      "idx": 44,
+      "verb": "rolls sleeves and steps forward",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "소매 걷고 앞으로"
+    },
+    {
+      "idx": 45,
+      "verb": "kneels and pulls",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "무릎 꿇고 당김"
+    },
+    {
+      "idx": 46,
+      "verb": "reaches and grabs",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "뻗은 후 잡음"
+    },
+    {
+      "idx": 47,
+      "verb": "turns and walks",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "돌아선 후 걸음"
+    },
+    {
+      "idx": 48,
+      "verb": "breathes, speaks",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "숨 고른 후 말함"
+    },
+    {
+      "idx": 49,
+      "verb": "sits and touches shoulder",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "앉은 후 어깨 만짐"
+    },
+    {
+      "idx": 50,
+      "verb": "speaks and weeps",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "말하며 동시에 욺"
+    },
+    {
+      "idx": 51,
+      "verb": "waves arms and shouts",
+      "count": 2,
+      "context": "",
+      "label": "simultaneous",
+      "why": "팔 흔들며 외침"
+    },
+    {
+      "idx": 52,
+      "verb": "run and scatter",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "달리며 흩어짐"
+    },
+    {
+      "idx": 53,
+      "verb": "stares and trembles",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "응시하며 떨림"
+    },
+    {
+      "idx": 54,
+      "verb": "reaches and trembles",
+      "count": 2,
+      "context": "",
+      "label": "simultaneous",
+      "why": "떨며 손 뻗음"
+    },
+    {
+      "idx": 55,
+      "verb": "trembles and bows head",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "떨며 고개 숙임"
+    },
+    {
+      "idx": 56,
+      "verb": "speaks and trembles",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "말하며 떨림"
+    },
+    {
+      "idx": 57,
+      "verb": "knocks and runs",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "두드린 후 달림"
+    },
+    {
+      "idx": 58,
+      "verb": "sweeps and spreads",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "쓸고 펼침"
+    },
+    {
+      "idx": 59,
+      "verb": "tremble and speak",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "떨며 말함"
+    },
+    {
+      "idx": 60,
+      "verb": "turns and runs",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "돌아선 후 달림"
+    },
+    {
+      "idx": 61,
+      "verb": "shouts and pulls",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "외치며 당김"
+    },
+    {
+      "idx": 62,
+      "verb": "approaches and embraces",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "다가간 후 포옹"
+    },
+    {
+      "idx": 63,
+      "verb": "leans and buries face",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "기댄 후 얼굴 묻음"
+    },
+    {
+      "idx": 64,
+      "verb": "pulls and rushes",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "당긴 후 달려감"
+    },
+    {
+      "idx": 65,
+      "verb": "lifts head and smiles",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "고개 든 후 미소"
+    },
+    {
+      "idx": 66,
+      "verb": "shoves and runs",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "밀친 후 달림"
+    },
+    {
+      "idx": 67,
+      "verb": "stumbles and runs",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "비틀거린 후 달림"
+    },
+    {
+      "idx": 68,
+      "verb": "wave arms and shout",
+      "count": 1,
+      "context": "",
+      "label": "simultaneous",
+      "why": "팔 흔들며 외침"
+    },
+    {
+      "idx": 69,
+      "verb": "turn head and freeze",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "고개 돌린 후 멈춤"
+    },
+    {
+      "idx": 70,
+      "verb": "walks over and sits",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "걸어가서 앉음"
+    },
+    {
+      "idx": 71,
+      "verb": "winks and steps out",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "윙크 후 나감"
+    },
+    {
+      "idx": 72,
+      "verb": "wipes tears and lifts chin",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "눈물 닦고 턱 듦"
+    },
+    {
+      "idx": 73,
+      "verb": "sweeps papers and spreads map",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "서류 쓸고 지도 펼침"
+    },
+    {
+      "idx": 74,
+      "verb": "walks and drops bag",
+      "count": 2,
+      "context": "",
+      "label": "sequential",
+      "why": "걷다가 가방 떨굼"
+    },
+    {
+      "idx": 75,
+      "verb": "blinks and focuses",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "깜빡인 후 초점 맞춤"
+    },
+    {
+      "idx": 76,
+      "verb": "inserts eyepiece and aims",
+      "count": 2,
+      "context": "",
+      "label": "sequential",
+      "why": "접안렌즈 끼운 후 조준"
+    },
+    {
+      "idx": 77,
+      "verb": "unfolds tripod and places stone",
+      "count": 1,
+      "context": "",
+      "label": "sequential",
+      "why": "삼각대 펼친 후 돌 놓음"
+    }
+  ],
+  "instances_detail": [
+    {
+      "run": "064631aa-f6b2-4f7c-800b-66b0517a2769",
+      "shot_id": "shot_28",
+      "character_id": "char_3",
+      "verb": "flips switch and exits",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "064631aa-f6b2-4f7c-800b-66b0517a2769",
+      "shot_id": "shot_47",
+      "character_id": "char_2",
+      "verb": "clutches and sobs",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "064631aa-f6b2-4f7c-800b-66b0517a2769",
+      "shot_id": "shot_92",
+      "character_id": "char",
+      "verb": "stirs and lifts head",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "064631aa-f6b2-4f7c-800b-66b0517a2769",
+      "shot_id": "shot_96",
+      "character_id": "char",
+      "verb": "whispers and pulls straps",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "0e337d5d-2c09-4a4a-b708-a356a15bca2c",
+      "shot_id": "shot_53",
+      "character_id": "char",
+      "verb": "sprints and embraces",
+      "magnitude": "large",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "0e337d5d-2c09-4a4a-b708-a356a15bca2c",
+      "shot_id": "shot_55",
+      "character_id": "royal_inspector",
+      "verb": "approaches and proclaims",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "0e337d5d-2c09-4a4a-b708-a356a15bca2c",
+      "shot_id": "shot_56",
+      "character_id": "char",
+      "verb": "turns and absorbs",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "0e337d5d-2c09-4a4a-b708-a356a15bca2c",
+      "shot_id": "shot_57",
+      "character_id": "char",
+      "verb": "bows then grasps",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "0f8d1025-79be-4df8-a45d-26f2ca2bcf7f",
+      "shot_id": "shot_60",
+      "character_id": "char_2",
+      "verb": "walks and sits",
+      "magnitude": "large",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "5260d92d-2e7b-4991-8bff-00213b37ef77",
+      "shot_id": "shot_21",
+      "character_id": "char_3",
+      "verb": "walks and taps",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "5260d92d-2e7b-4991-8bff-00213b37ef77",
+      "shot_id": "shot_34",
+      "character_id": "char_3",
+      "verb": "enters and lunges",
+      "magnitude": "large",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "5260d92d-2e7b-4991-8bff-00213b37ef77",
+      "shot_id": "shot_40",
+      "character_id": "char_3",
+      "verb": "shouts and listens",
+      "magnitude": "moderate",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "5260d92d-2e7b-4991-8bff-00213b37ef77",
+      "shot_id": "shot_90",
+      "character_id": "chief_official",
+      "verb": "collapses and covers face",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+      "shot_id": "shot_10",
+      "character_id": "char",
+      "verb": "knocks over telescope and sprints",
+      "magnitude": "large",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+      "shot_id": "shot_23",
+      "character_id": "char_3",
+      "verb": "sits and touches",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+      "shot_id": "shot_26",
+      "character_id": "char_3",
+      "verb": "walks and touches",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+      "shot_id": "shot_30",
+      "character_id": "char_3",
+      "verb": "winks and exits",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+      "shot_id": "shot_49",
+      "character_id": "char_3",
+      "verb": "waves and shouts",
+      "magnitude": "large",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+      "shot_id": "shot_67",
+      "character_id": "char_2",
+      "verb": "trembles and reaches",
+      "magnitude": "small",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+      "shot_id": "shot_73",
+      "character_id": "char_2",
+      "verb": "wipes tears and exhales",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+      "shot_id": "shot_74",
+      "character_id": "char_2",
+      "verb": "sweeps papers and unfolds map",
+      "magnitude": "large",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+      "shot_id": "shot_143",
+      "character_id": "char_2",
+      "verb": "approaches and wraps",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "e4da245a-8d89-44e5-8fde-131d016ef2e3",
+      "shot_id": "shot_144",
+      "character_id": "char",
+      "verb": "pulls away and buries",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_3",
+      "character_id": "char",
+      "verb": "adjusts and leans",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_5",
+      "character_id": "char",
+      "verb": "traces and writes",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_16",
+      "character_id": "char",
+      "verb": "grabs and turns",
+      "magnitude": "large",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_20",
+      "character_id": "char",
+      "verb": "gasps and stumbles",
+      "magnitude": "large",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_23",
+      "character_id": "char",
+      "verb": "shouts and shakes",
+      "magnitude": "moderate",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_24",
+      "character_id": "char_2",
+      "verb": "sips and flips",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_38",
+      "character_id": "char_3",
+      "verb": "walks and rolls sleeves",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_39",
+      "character_id": "char_3",
+      "verb": "leans and stares",
+      "magnitude": "small",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_40",
+      "character_id": "char_3",
+      "verb": "mutters and grips radio",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_41",
+      "character_id": "char_3",
+      "verb": "freezes and tilts head",
+      "magnitude": "minimal",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_43",
+      "character_id": "char_3",
+      "verb": "steps and splashes",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_58",
+      "character_id": "char_3",
+      "verb": "slips and stumbles",
+      "magnitude": "large",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_60",
+      "character_id": "char_3",
+      "verb": "clings and shakes",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_80",
+      "character_id": "government_official",
+      "verb": "yawns and adjusts glasses",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_84",
+      "character_id": "char_2",
+      "verb": "struggles and is dragged",
+      "magnitude": "large",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_87",
+      "character_id": "char_2",
+      "verb": "stands and walks",
+      "magnitude": "large",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_96",
+      "character_id": "char",
+      "verb": "screams and gasps",
+      "magnitude": "large",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "f32b3f50-c02d-4a0c-a605-9128d7c30eb5",
+      "shot_id": "shot_137",
+      "character_id": "char",
+      "verb": "Pulls away and writes",
+      "magnitude": "small",
+      "action": null,
+      "camera": "dolly_out"
+    },
+    {
+      "run": "probe-camrelax-v4-control",
+      "shot_id": "shot_27",
+      "character_id": "char_3",
+      "verb": "switches off light and exits",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-camrelax-v4-relaxed",
+      "shot_id": "shot_5",
+      "character_id": "char",
+      "verb": "rubs eye and leans",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-camrelax-v4-relaxed",
+      "shot_id": "shot_18",
+      "character_id": "char",
+      "verb": "turns and walks out",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-camrelax-v4-relaxed",
+      "shot_id": "shot_21",
+      "character_id": "char_3",
+      "verb": "rolls sleeves and steps forward",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "panning"
+    },
+    {
+      "run": "probe-camrelax-v4-relaxed",
+      "shot_id": "shot_27",
+      "character_id": "char_3",
+      "verb": "switches off light and exits",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-camrelax-v4-relaxed",
+      "shot_id": "shot_107",
+      "character_id": "char",
+      "verb": "kneels and pulls",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-camrelax-v4-relaxed",
+      "shot_id": "shot_109",
+      "character_id": "char",
+      "verb": "reaches and grabs",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-camrelax-v4-relaxed",
+      "shot_id": "shot_110",
+      "character_id": "char",
+      "verb": "turns and walks",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-camrelax-v4-relaxed",
+      "shot_id": "shot_127",
+      "character_id": "char",
+      "verb": "breathes, speaks",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-c4",
+      "shot_id": "shot_23",
+      "character_id": "char_3",
+      "verb": "sits and touches shoulder",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "probe-shotdesign-c4",
+      "shot_id": "shot_24",
+      "character_id": "char",
+      "verb": "speaks and weeps",
+      "magnitude": "small",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c4",
+      "shot_id": "shot_49",
+      "character_id": "char_3",
+      "verb": "waves arms and shouts",
+      "magnitude": "large",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c4",
+      "shot_id": "shot_50",
+      "character_id": "multiple_extras",
+      "verb": "run and scatter",
+      "magnitude": "large",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c4",
+      "shot_id": "shot_51",
+      "character_id": "char_3",
+      "verb": "stares and trembles",
+      "magnitude": "minimal",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c4",
+      "shot_id": "shot_67",
+      "character_id": "char_2",
+      "verb": "reaches and trembles",
+      "magnitude": "small",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c4",
+      "shot_id": "shot_71",
+      "character_id": "char_2",
+      "verb": "trembles and bows head",
+      "magnitude": "small",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c4",
+      "shot_id": "shot_95",
+      "character_id": "char",
+      "verb": "speaks and trembles",
+      "magnitude": "small",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c8",
+      "shot_id": "shot_10",
+      "character_id": "char",
+      "verb": "knocks and runs",
+      "magnitude": "large",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c8",
+      "shot_id": "shot_49",
+      "character_id": "char_3",
+      "verb": "waves arms and shouts",
+      "magnitude": "large",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c8",
+      "shot_id": "shot_67",
+      "character_id": "char_2",
+      "verb": "reaches and trembles",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-c8",
+      "shot_id": "shot_73",
+      "character_id": "char_2",
+      "verb": "wipes tears and exhales",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-c8",
+      "shot_id": "shot_74",
+      "character_id": "char_2",
+      "verb": "sweeps and spreads",
+      "magnitude": "large",
+      "action": null,
+      "camera": "dolly_out"
+    },
+    {
+      "run": "probe-shotdesign-c8",
+      "shot_id": "shot_95",
+      "character_id": "char",
+      "verb": "tremble and speak",
+      "magnitude": "small",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c8",
+      "shot_id": "shot_109",
+      "character_id": "char",
+      "verb": "turns and runs",
+      "magnitude": "large",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c8",
+      "shot_id": "shot_111",
+      "character_id": "char_2",
+      "verb": "shouts and pulls",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c8",
+      "shot_id": "shot_143",
+      "character_id": "char_2",
+      "verb": "approaches and embraces",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-c8",
+      "shot_id": "shot_144",
+      "character_id": "char",
+      "verb": "leans and buries face",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "handheld_drift"
+    },
+    {
+      "run": "probe-shotdesign-v2-c12-r1",
+      "shot_id": "shot_23",
+      "character_id": "char_3",
+      "verb": "walks and sits",
+      "magnitude": "large",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "probe-shotdesign-v2-c12-r1",
+      "shot_id": "shot_98",
+      "character_id": "char_2",
+      "verb": "pulls and rushes",
+      "magnitude": "large",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "probe-shotdesign-v2-c12-r1",
+      "shot_id": "shot_152",
+      "character_id": "char",
+      "verb": "lifts head and smiles",
+      "magnitude": "micro",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-v2-c12-r2",
+      "shot_id": "shot_10",
+      "character_id": "char",
+      "verb": "shoves and runs",
+      "magnitude": "large",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-v2-c12-r3",
+      "shot_id": "shot_105",
+      "character_id": "char",
+      "verb": "stumbles and runs",
+      "magnitude": "large",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "probe-shotdesign-v2-c4-r1",
+      "shot_id": "shot_23",
+      "character_id": "char_3",
+      "verb": "walks and sits",
+      "magnitude": "large",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "probe-shotdesign-v2-c4-r1",
+      "shot_id": "shot_49",
+      "character_id": "char_3",
+      "verb": "wave arms and shout",
+      "magnitude": "large",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-v2-c4-r1",
+      "shot_id": "shot_51",
+      "character_id": "char_3",
+      "verb": "turn head and freeze",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-v2-c4-r2",
+      "shot_id": "shot_23",
+      "character_id": "char_3",
+      "verb": "walks and sits",
+      "magnitude": "large",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "probe-shotdesign-v2-c4-r3",
+      "shot_id": "shot_23",
+      "character_id": "char_3",
+      "verb": "walks and sits",
+      "magnitude": "large",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "probe-shotdesign-v2-c8-r1",
+      "shot_id": "shot_23",
+      "character_id": "char_3",
+      "verb": "walks over and sits",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "probe-shotdesign-v2-c8-r1",
+      "shot_id": "shot_30",
+      "character_id": "char_3",
+      "verb": "winks and steps out",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-v2-c8-r1",
+      "shot_id": "shot_73",
+      "character_id": "char_2",
+      "verb": "wipes tears and lifts chin",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-v2-c8-r1",
+      "shot_id": "shot_74",
+      "character_id": "char_2",
+      "verb": "sweeps papers and spreads map",
+      "magnitude": "large",
+      "action": null,
+      "camera": "dolly_in"
+    },
+    {
+      "run": "probe-shotdesign-v2-c8-r2",
+      "shot_id": "shot_23",
+      "character_id": "char_3",
+      "verb": "walks and sits",
+      "magnitude": "large",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "probe-shotdesign-v2-c8-r2",
+      "shot_id": "shot_126",
+      "character_id": "char",
+      "verb": "walks and drops bag",
+      "magnitude": "large",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-v2-c8-r2",
+      "shot_id": "shot_130",
+      "character_id": "char",
+      "verb": "blinks and focuses",
+      "magnitude": "micro",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-v2-c8-r2",
+      "shot_id": "shot_132",
+      "character_id": "char",
+      "verb": "inserts eyepiece and aims",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-v2-c8-r3",
+      "shot_id": "shot_23",
+      "character_id": "char_3",
+      "verb": "walks and sits",
+      "magnitude": "large",
+      "action": null,
+      "camera": "tracking"
+    },
+    {
+      "run": "probe-shotdesign-v2-c8-r3",
+      "shot_id": "shot_126",
+      "character_id": "char",
+      "verb": "walks and drops bag",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-v2-c8-r3",
+      "shot_id": "shot_127",
+      "character_id": "char",
+      "verb": "unfolds tripod and places stone",
+      "magnitude": "medium",
+      "action": null,
+      "camera": "static"
+    },
+    {
+      "run": "probe-shotdesign-v2-c8-r3",
+      "shot_id": "shot_132",
+      "character_id": "char",
+      "verb": "inserts eyepiece and aims",
+      "magnitude": "small",
+      "action": null,
+      "camera": "static"
+    }
+  ]
+}

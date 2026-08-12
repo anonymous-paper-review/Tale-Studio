@@ -1,0 +1,51 @@
+{
+  "ticket": "t0-analytics-collection-path",
+  "date": "2026-08-12",
+  "method": "쿠키 없는 GET 1회씩, redirect: manual. 상태 코드·Location 만 기록(본문 미기록). 쓰기 없음.",
+  "host": "https://talestudio.art",
+  "probes": [
+    {
+      "key": "analytics",
+      "path": "/_vercel/insights/view",
+      "why": "통계 수집 경로 — 미들웨어 제외 대상",
+      "url": "https://talestudio.art/_vercel/insights/view",
+      "status": 404,
+      "location": null,
+      "redirects_to_login": false,
+      "content_type": "application/json; charset=utf-8"
+    },
+    {
+      "key": "protected",
+      "path": "/studio",
+      "why": "대조군 — 보호된 페이지(정상이면 로그인으로 튕겨야 함)",
+      "url": "https://talestudio.art/studio",
+      "status": 307,
+      "location": "/login?next=%2Fstudio",
+      "redirects_to_login": true,
+      "content_type": "text/plain"
+    },
+    {
+      "key": "public",
+      "path": "/",
+      "why": "대조군 — 공개 랜딩",
+      "url": "https://talestudio.art/",
+      "status": 200,
+      "location": null,
+      "redirects_to_login": false,
+      "content_type": "text/html; charset=utf-8"
+    },
+    {
+      "key": "beacon_script",
+      "path": "/_vercel/insights/script.js",
+      "why": "계측 스크립트 자산 — 배포·미들웨어 통과 여부의 방증",
+      "url": "https://talestudio.art/_vercel/insights/script.js",
+      "status": 200,
+      "location": null,
+      "redirects_to_login": false,
+      "content_type": "application/javascript; charset=utf-8"
+    }
+  ],
+  "landing_references_beacon": false,
+  "no_login_redirect_on_analytics": true,
+  "verdict": "NA — 404(배포 미반영 또는 경로 상이). 기각으로 세지 않음"
+}

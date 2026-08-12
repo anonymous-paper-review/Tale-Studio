@@ -1,0 +1,173 @@
+{
+  "ticket": "t0-serverless-path-parity",
+  "date": "2026-08-12",
+  "method": "코드 추적만 — 프로덕션 런 미실행(티켓 금지 준수)",
+  "entry_paths": {
+    "local": {
+      "file": "research/experiments/writer-full-run/run.mts",
+      "calls": [
+        "runPipeline",
+        "runPipeline",
+        "runPipeline"
+      ],
+      "orchestrator": "src/lib/writer/pipeline/index.ts"
+    },
+    "serverless": {
+      "file": "src/app/api/writer/step/route.ts",
+      "calls": [
+        "runWriterSteps",
+        "runWriterSteps"
+      ],
+      "orchestrator": "src/lib/writer/pipeline/steps.ts"
+    }
+  },
+  "orchestrators_diverge": true,
+  "stage_modules": {
+    "local_orchestrator": [
+      "c_application_2",
+      "c_validation_1",
+      "decoupage",
+      "dialogue",
+      "s0_dramaturgy",
+      "s1_structure",
+      "s3_scenes",
+      "v0_visual",
+      "v1_act_arc",
+      "v2_design",
+      "v3_scene_plan",
+      "v4_shots",
+      "v5_prompts"
+    ],
+    "serverless_orchestrator": [
+      "c_application_2",
+      "c_validation_1",
+      "decoupage",
+      "dialogue",
+      "s0_dramaturgy",
+      "s1_structure",
+      "s1s3_merged",
+      "s3_scenes",
+      "v0_visual",
+      "v1_act_arc",
+      "v2_design",
+      "v3_scene_plan",
+      "v4_shots",
+      "v5_prompts"
+    ],
+    "shared": [
+      "c_application_2",
+      "c_validation_1",
+      "decoupage",
+      "dialogue",
+      "s0_dramaturgy",
+      "s1_structure",
+      "s3_scenes",
+      "v0_visual",
+      "v1_act_arc",
+      "v2_design",
+      "v3_scene_plan",
+      "v4_shots",
+      "v5_prompts"
+    ],
+    "only_in_serverless": [
+      "s1s3_merged"
+    ],
+    "only_in_local": []
+  },
+  "tuning_knobs": {
+    "WRITER_SCENE_CONCURRENCY": [
+      {
+        "file": "src/lib/writer/pipeline/index.ts",
+        "lines": [
+          320,
+          352
+        ]
+      },
+      {
+        "file": "src/lib/writer/pipeline/steps.ts",
+        "lines": [
+          184,
+          487
+        ]
+      },
+      {
+        "file": "src/lib/writer/pipeline/stages/decoupage.ts",
+        "lines": [
+          136
+        ]
+      },
+      {
+        "file": "research/experiments/writer-full-run/run.mts",
+        "lines": [
+          14,
+          161
+        ]
+      }
+    ],
+    "SHOTDESIGN_CONCURRENCY": [
+      {
+        "file": "src/lib/writer/pipeline/steps.ts",
+        "lines": [
+          180
+        ]
+      },
+      {
+        "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+        "lines": [
+          57,
+          68
+        ]
+      }
+    ],
+    "WRITER_DIALOGUE_CONCURRENCY": [
+      {
+        "file": "src/lib/writer/pipeline/stages/dialogue.ts",
+        "lines": [
+          39
+        ]
+      }
+    ],
+    "WRITER_LANES": [
+      {
+        "file": "src/lib/writer/pipeline/index.ts",
+        "lines": [
+          423,
+          425
+        ]
+      },
+      {
+        "file": "src/lib/writer/pipeline/steps.ts",
+        "lines": [
+          145,
+          146,
+          509
+        ]
+      }
+    ],
+    "WRITER_MERGE_S1S3": [
+      {
+        "file": "src/lib/writer/pipeline/steps.ts",
+        "lines": [
+          314
+        ]
+      }
+    ]
+  },
+  "transport_tuning": {
+    "sites": [
+      {
+        "file": "src/instrumentation.ts",
+        "line": 22,
+        "connections": "64",
+        "guard": "NEXT_RUNTIME==='nodejs' 일 때만"
+      },
+      {
+        "file": "research/experiments/writer-full-run/run.mts",
+        "line": 28,
+        "connections": "64",
+        "guard": "조건 없음"
+      }
+    ],
+    "serverless_route_runtime": "nodejs"
+  }
+}

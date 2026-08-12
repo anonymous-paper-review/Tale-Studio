@@ -1,0 +1,499 @@
+{
+  "ticket": "t0-remaining-open-api-routes",
+  "date": "2026-08-12",
+  "method": "코드 추적만(HTTP 0). 사용자 인증 가드 유무로 무인증 목록 추출 → 그 목록만 import 1단계까지 위험 동사 추적.",
+  "routes_total": 66,
+  "unauthenticated_total": 9,
+  "no_guard_at_all": [
+    "/api/generate/health",
+    "/api/generate/video-health",
+    "/api/knowledge/cameras",
+    "/api/knowledge/movements",
+    "/api/playground"
+  ],
+  "other_guard_only": [
+    {
+      "route": "/api/fal/webhook",
+      "guard": [
+        "signature"
+      ]
+    },
+    {
+      "route": "/api/share/[token]",
+      "guard": [
+        "share_token"
+      ]
+    },
+    {
+      "route": "/api/writer/step",
+      "guard": [
+        "shared_secret"
+      ]
+    },
+    {
+      "route": "/api/writer/watchdog",
+      "guard": [
+        "shared_secret"
+      ]
+    }
+  ],
+  "red_routes": [
+    {
+      "route": "/api/fal/webhook",
+      "other_guard": [
+        "signature"
+      ],
+      "paid_sample": [],
+      "write_sample": [
+        {
+          "file": "src/lib/fal/verify-webhook.ts",
+          "line": 89,
+          "code": ".update(rawBody, 'utf8')"
+        },
+        {
+          "file": "src/lib/generation-jobs.ts",
+          "line": 155,
+          "code": ".insert({"
+        },
+        {
+          "file": "src/lib/generation-jobs.ts",
+          "line": 407,
+          "code": "const { error } = await supabaseAdmin.rpc('patch_generation_job_response_snapshot', {"
+        },
+        {
+          "file": "src/lib/generation-jobs.ts",
+          "line": 476,
+          "code": ".update({"
+        }
+      ],
+      "owned_tables": [
+        "projects",
+        "workspaces",
+        "generation_jobs",
+        "shots",
+        "characters",
+        "locations"
+      ]
+    },
+    {
+      "route": "/api/writer/step",
+      "other_guard": [
+        "shared_secret"
+      ],
+      "paid_sample": [
+        {
+          "file": "src/app/api/writer/step/route.ts",
+          "line": 6,
+          "code": "import { runWriterSteps, triggerWriterStep } from '@/lib/writer/pipeline/steps';"
+        },
+        {
+          "file": "src/app/api/writer/step/route.ts",
+          "line": 37,
+          "code": "const result = await runWriterSteps(projectId, { deadlineMs });"
+        },
+        {
+          "file": "src/app/api/writer/step/route.ts",
+          "line": 42,
+          "code": "await triggerWriterStep(req.nextUrl.origin, projectId);"
+        },
+        {
+          "file": "src/lib/writer/pipeline/steps.ts",
+          "line": 570,
+          "code": "export async function triggerWriterStep(origin: string, projectId: string): Promise<void> {"
+        }
+      ],
+      "write_sample": [],
+      "owned_tables": []
+    },
+    {
+      "route": "/api/writer/watchdog",
+      "other_guard": [
+        "shared_secret"
+      ],
+      "paid_sample": [
+        {
+          "file": "src/app/api/writer/watchdog/route.ts",
+          "line": 7,
+          "code": "import { triggerWriterStep } from '@/lib/writer/pipeline/steps';"
+        },
+        {
+          "file": "src/app/api/writer/watchdog/route.ts",
+          "line": 47,
+          "code": "await Promise.all(projectIds.map((pid) => triggerWriterStep(req.nextUrl.origin, pid)));"
+        },
+        {
+          "file": "src/lib/writer/pipeline/steps.ts",
+          "line": 570,
+          "code": "export async function triggerWriterStep(origin: string, projectId: string): Promise<void> {"
+        },
+        {
+          "file": "src/lib/writer/pipeline/steps.ts",
+          "line": 614,
+          "code": "export async function runWriterSteps("
+        }
+      ],
+      "write_sample": [],
+      "owned_tables": [
+        "writer_runs"
+      ]
+    }
+  ],
+  "open_routes": [
+    {
+      "route": "/api/fal/webhook",
+      "file": "src/app/api/fal/webhook/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": {
+        "signature": [
+          "verifyFalWebhook"
+        ]
+      },
+      "unauthenticated": true,
+      "other_guard": [
+        "signature"
+      ],
+      "paid_sites": [],
+      "write_sites": [
+        {
+          "file": "src/lib/fal/verify-webhook.ts",
+          "line": 89,
+          "code": ".update(rawBody, 'utf8')"
+        },
+        {
+          "file": "src/lib/generation-jobs.ts",
+          "line": 155,
+          "code": ".insert({"
+        },
+        {
+          "file": "src/lib/generation-jobs.ts",
+          "line": 407,
+          "code": "const { error } = await supabaseAdmin.rpc('patch_generation_job_response_snapshot', {"
+        },
+        {
+          "file": "src/lib/generation-jobs.ts",
+          "line": 476,
+          "code": ".update({"
+        },
+        {
+          "file": "src/lib/generation-jobs.ts",
+          "line": 500,
+          "code": ".update({"
+        },
+        {
+          "file": "src/lib/director-video-takes.ts",
+          "line": 52,
+          "code": "const { data, error } = await supabaseAdmin.rpc(name, args)"
+        },
+        {
+          "file": "src/lib/director-video-takes.ts",
+          "line": 93,
+          "code": "const { error } = await supabaseAdmin.rpc('refresh_director_video_projection', { p_project_id: projectId, p_shot_id: shotId })"
+        },
+        {
+          "file": "src/lib/director-video-takes.ts",
+          "line": 98,
+          "code": "const { error } = await supabaseAdmin.rpc('set_director_video_final', { p_project_id: projectId, p_video_clip_id: videoClipId, p_final: fina"
+        },
+        {
+          "file": "src/lib/director-video-takes.ts",
+          "line": 103,
+          "code": "const { error } = await supabaseAdmin.rpc('soft_delete_director_video_take', { p_project_id: projectId, p_video_clip_id: videoClipId })"
+        },
+        {
+          "file": "src/lib/director-video-takes.ts",
+          "line": 114,
+          "code": ".update({"
+        },
+        {
+          "file": "src/lib/director-video-takes.ts",
+          "line": 149,
+          "code": "const { error } = await supabaseAdmin.rpc('attach_director_video_provider_request', {"
+        },
+        {
+          "file": "src/lib/director-video-takes.ts",
+          "line": 168,
+          "code": "const { error } = await supabaseAdmin.rpc('complete_director_video_attempt', {"
+        },
+        {
+          "file": "src/lib/director-video-takes.ts",
+          "line": 181,
+          "code": "const { error } = await supabaseAdmin.rpc('fail_director_video_attempt', {"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 594,
+          "code": ".update({ [column]: publicUrl })"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 653,
+          "code": ".update({ portrait: portraitUrl })"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 691,
+          "code": ".update({ is_selected: false })"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 698,
+          "code": "const { error: insErr } = await supabaseAdmin.from('character_image_candidates').insert({"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 714,
+          "code": ".delete()"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 765,
+          "code": ".update({ is_selected: false })"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 769,
+          "code": "const ins = await supabaseAdmin.from('location_image_candidates').insert({"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 783,
+          "code": ".delete()"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 804,
+          "code": ".update({ [column]: publicUrl })"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 878,
+          "code": ".update({"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 917,
+          "code": ".update({"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 984,
+          "code": ".update({"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 1052,
+          "code": ".update({"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 1094,
+          "code": ".update({"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 1137,
+          "code": ".update({"
+        },
+        {
+          "file": "src/lib/fal/finalize.ts",
+          "line": 1191,
+          "code": ".update({ video_url: videoUrl, updated_at: new Date().toISOString() })"
+        }
+      ],
+      "owned_tables": [
+        "projects",
+        "workspaces",
+        "generation_jobs",
+        "shots",
+        "characters",
+        "locations"
+      ],
+      "risk_flag": "RED"
+    },
+    {
+      "route": "/api/generate/health",
+      "file": "src/app/api/generate/health/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": {},
+      "unauthenticated": true,
+      "other_guard": [],
+      "paid_sites": [],
+      "write_sites": [],
+      "owned_tables": [],
+      "risk_flag": "read-only"
+    },
+    {
+      "route": "/api/generate/video-health",
+      "file": "src/app/api/generate/video-health/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": {},
+      "unauthenticated": true,
+      "other_guard": [],
+      "paid_sites": [],
+      "write_sites": [],
+      "owned_tables": [],
+      "risk_flag": "read-only"
+    },
+    {
+      "route": "/api/knowledge/cameras",
+      "file": "src/app/api/knowledge/cameras/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": {},
+      "unauthenticated": true,
+      "other_guard": [],
+      "paid_sites": [],
+      "write_sites": [],
+      "owned_tables": [],
+      "risk_flag": "read-only"
+    },
+    {
+      "route": "/api/knowledge/movements",
+      "file": "src/app/api/knowledge/movements/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": {},
+      "unauthenticated": true,
+      "other_guard": [],
+      "paid_sites": [],
+      "write_sites": [],
+      "owned_tables": [],
+      "risk_flag": "read-only"
+    },
+    {
+      "route": "/api/playground",
+      "file": "src/app/api/playground/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": {},
+      "unauthenticated": true,
+      "other_guard": [],
+      "paid_sites": [],
+      "write_sites": [],
+      "owned_tables": [],
+      "risk_flag": "read-only"
+    },
+    {
+      "route": "/api/share/[token]",
+      "file": "src/app/api/share/[token]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": {
+        "share_token": [
+          "project_shares"
+        ]
+      },
+      "unauthenticated": true,
+      "other_guard": [
+        "share_token"
+      ],
+      "paid_sites": [],
+      "write_sites": [],
+      "owned_tables": [
+        "project_shares",
+        "projects"
+      ],
+      "risk_flag": "read-only"
+    },
+    {
+      "route": "/api/writer/step",
+      "file": "src/app/api/writer/step/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": {
+        "shared_secret": [
+          "WRITER_STEP_SECRET",
+          "x-writer-secret"
+        ]
+      },
+      "unauthenticated": true,
+      "other_guard": [
+        "shared_secret"
+      ],
+      "paid_sites": [
+        {
+          "file": "src/app/api/writer/step/route.ts",
+          "line": 6,
+          "code": "import { runWriterSteps, triggerWriterStep } from '@/lib/writer/pipeline/steps';"
+        },
+        {
+          "file": "src/app/api/writer/step/route.ts",
+          "line": 37,
+          "code": "const result = await runWriterSteps(projectId, { deadlineMs });"
+        },
+        {
+          "file": "src/app/api/writer/step/route.ts",
+          "line": 42,
+          "code": "await triggerWriterStep(req.nextUrl.origin, projectId);"
+        },
+        {
+          "file": "src/lib/writer/pipeline/steps.ts",
+          "line": 570,
+          "code": "export async function triggerWriterStep(origin: string, projectId: string): Promise<void> {"
+        },
+        {
+          "file": "src/lib/writer/pipeline/steps.ts",
+          "line": 614,
+          "code": "export async function runWriterSteps("
+        }
+      ],
+      "write_sites": [],
+      "owned_tables": [],
+      "risk_flag": "RED"
+    },
+    {
+      "route": "/api/writer/watchdog",
+      "file": "src/app/api/writer/watchdog/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": {
+        "shared_secret": [
+          "CRON_SECRET"
+        ]
+      },
+      "unauthenticated": true,
+      "other_guard": [
+        "shared_secret"
+      ],
+      "paid_sites": [
+        {
+          "file": "src/app/api/writer/watchdog/route.ts",
+          "line": 7,
+          "code": "import { triggerWriterStep } from '@/lib/writer/pipeline/steps';"
+        },
+        {
+          "file": "src/app/api/writer/watchdog/route.ts",
+          "line": 47,
+          "code": "await Promise.all(projectIds.map((pid) => triggerWriterStep(req.nextUrl.origin, pid)));"
+        },
+        {
+          "file": "src/lib/writer/pipeline/steps.ts",
+          "line": 570,
+          "code": "export async function triggerWriterStep(origin: string, projectId: string): Promise<void> {"
+        },
+        {
+          "file": "src/lib/writer/pipeline/steps.ts",
+          "line": 614,
+          "code": "export async function runWriterSteps("
+        }
+      ],
+      "write_sites": [],
+      "owned_tables": [
+        "writer_runs"
+      ],
+      "risk_flag": "RED"
+    }
+  ]
+}

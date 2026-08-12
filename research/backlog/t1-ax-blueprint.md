@@ -6,7 +6,7 @@ source: 오너 지시 (2026-08-11 밤 세션) — "ax기반의 설계도가 완�
 tier: T1
 budget: { usd: 2, runs: 1, wall_min: 90 }
 blockers: []
-status: ready
+status: done   # 2026-08-12 밤 러너 — 설계도 완성·발행. 아티팩트 https://claude.ai/code/artifact/2cfd5299-de7d-4ae6-9140-55324665c5ee · 파일 research/backlog/reports/2026-08-12-ax-blueprint.html. 산출 계약 전 항목 이행(4축 현재위치+다음 한 수 / 저장소 분화표 / 슬랙 입구 5단계 / 병목·자동화 불가 / 최소 vs 고도화 / 결정 필요 4칸 명시). 지출: 외부 검색 6건(생성 발주 0)
 # tier 근거: 외부 조사 + 문서 작성. 생성 발주 없음.
 # status 근거: 오너 지시 ("레퍼런스조사에서 이런것도 좀 찾아와놔주셈 2:00 run때")
 priority: high

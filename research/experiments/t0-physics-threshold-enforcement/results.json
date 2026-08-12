@@ -1,0 +1,550 @@
+{
+  "ticket": "t0-physics-threshold-enforcement",
+  "date": "2026-08-12",
+  "method": "임계값 전수 → 산문 등장 / 코드 강제 대조. 강제 = 값을 읽어 비교·클램프로 결과를 바꾸는 자리. 자동 탐지 2패스 후 전건 사람 대조(오탐 제거 + 누락 보강), 검증 목록을 스크립트에 고정.",
+  "source": "src/lib/writer/pipeline/physics.ts SHOT_PHYSICS",
+  "scanned_files": 63,
+  "thresholds_total": 8,
+  "enforced_count": 1,
+  "enforced_via_canonical_constant_count": 0,
+  "enforced_ratio": 0.125,
+  "verdict": "코드 강제 50% 미만 — 가설 유지",
+  "rows": [
+    {
+      "key": "shotSecondsMin",
+      "value": 2,
+      "what": "샷 최소 초",
+      "prose_sites": 6,
+      "prose_detail": [
+        {
+          "file": "src/lib/writer/pipeline/physics.ts",
+          "line": 23,
+          "code": "export const SHOT_SECONDS_RANGE = `${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초`;"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/decoupage.ts",
+          "line": 11,
+          "code": "import { SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX } from '@/lib/writer/pipeline/physics';"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/decoupage.ts",
+          "line": 127,
+          "code": "- 각 샷 intended_duration_seconds는 ${SHOT_SECONDS_RANGE} (짧고 스냅있게). 1개 주요 액션이 들어맞는 길이. 긴 침묵 등 예외만 최대 ${SHOT_SECONDS_HARD_M"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 9,
+          "code": "import { SHOT_PHYSICS, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/w"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 415,
+          "code": "V4c (Dynamic): Video 생성기 입력. 샷 길이(${SHOT_SECONDS_RANGE}) 안의 동적 변화. 압축 필수."
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 441,
+          "code": "- 1 샷 = ${SHOT_SECONDS_RANGE} (짧고 스냅있게)${compactMode ? '' : ' (V3.avg_shot_seconds 기준 ±2)'}. 긴 침묵 등 예외만 최대 ${SHOT_SECOND"
+        }
+      ],
+      "enforced": false,
+      "enforced_via_canonical_constant": false,
+      "enforce_sites": [],
+      "verified_enforce_sites": [],
+      "literal_candidates": [
+        {
+          "file": "src/lib/writer/pipeline/budget.ts",
+          "line": 55,
+          "code": "const avgSceneSeconds = totalSeconds / Math.max(1, Math.round((sceneCountMin + sceneCountMax) / 2));"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/decoupage.ts",
+          "line": 306,
+          "code": "coverage_ratio: beatCount > 0 ? Number((shots.length / beatCount).toFixed(2)) : 0,"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 499,
+          "code": "${compactMode ? `씬 길이(${scene.estimated_seconds}초)와 액션 수에 따라 자동 결정 (보통 ${Math.max(1, Math.round((scene.estimated_seconds ?? 30) / 8))}개 ±2)`"
+        },
+        {
+          "file": "src/lib/writer/rough-grid-crop.ts",
+          "line": 148,
+          "code": "if (bounds.length < 2) return bounds"
+        },
+        {
+          "file": "src/lib/writer/rough-grid-crop.ts",
+          "line": 168,
+          "code": "if (rowsPx.length < 2) return rowsPx"
+        }
+      ],
+      "literal_candidates_verdict": "전건 오탐(사람 대조) — 해당 임계값을 강제하지 않음",
+      "na_sites": [
+        {
+          "file": "src/lib/writer/pipeline/budget.ts",
+          "line": 53,
+          "why": "값 참조(비교 아님)",
+          "code": "const secondsPerAction = (SHOT_PHYSICS.shotSecondsMin + SHOT_PHYSICS.shotSecondsMax) / 2 + 1.5; // 6.5"
+        },
+        {
+          "file": "src/lib/writer/pipeline/budget.ts",
+          "line": 79,
+          "why": "값 참조(비교 아님)",
+          "code": "- 씬당 scene_actions ${b.actionsPerSceneMin}~${b.actionsPerSceneMax}개, 씬의 estimated_seconds ≈ 액션 수 × ${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHY"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/s1s3_merged.ts",
+          "line": 105,
+          "why": "값 참조(비교 아님)",
+          "code": "- 씬에서 일어나는 주요 액션을 텍스트로. 한 액션 = 한 샷(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초)에 들어가도록 분리해서 작성."
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/s3_scenes.ts",
+          "line": 164,
+          "why": "값 참조(비교 아님)",
+          "code": "- 한 액션 = 한 샷(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초)에 들어가도록 분리해서 작성"
+        }
+      ]
+    },
+    {
+      "key": "shotSecondsMax",
+      "value": 8,
+      "what": "샷 최대 초",
+      "prose_sites": 6,
+      "prose_detail": [
+        {
+          "file": "src/lib/writer/pipeline/physics.ts",
+          "line": 23,
+          "code": "export const SHOT_SECONDS_RANGE = `${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초`;"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/decoupage.ts",
+          "line": 11,
+          "code": "import { SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX } from '@/lib/writer/pipeline/physics';"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/decoupage.ts",
+          "line": 127,
+          "code": "- 각 샷 intended_duration_seconds는 ${SHOT_SECONDS_RANGE} (짧고 스냅있게). 1개 주요 액션이 들어맞는 길이. 긴 침묵 등 예외만 최대 ${SHOT_SECONDS_HARD_M"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 9,
+          "code": "import { SHOT_PHYSICS, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/w"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 415,
+          "code": "V4c (Dynamic): Video 생성기 입력. 샷 길이(${SHOT_SECONDS_RANGE}) 안의 동적 변화. 압축 필수."
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 441,
+          "code": "- 1 샷 = ${SHOT_SECONDS_RANGE} (짧고 스냅있게)${compactMode ? '' : ' (V3.avg_shot_seconds 기준 ±2)'}. 긴 침묵 등 예외만 최대 ${SHOT_SECOND"
+        }
+      ],
+      "enforced": false,
+      "enforced_via_canonical_constant": false,
+      "enforce_sites": [],
+      "verified_enforce_sites": [],
+      "literal_candidates": [
+        {
+          "file": "src/lib/writer/llm/json_repair.ts",
+          "line": 85,
+          "code": "function tryRemoveErrorChars<T>(s: string, maxRemove = 8): T | undefined {"
+        },
+        {
+          "file": "src/lib/writer/pipeline/budget.ts",
+          "line": 61,
+          "code": "const a = Math.max(1, Math.min(8, Math.round(avgSceneSeconds / secondsPerAction)));"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 499,
+          "code": "${compactMode ? `씬 길이(${scene.estimated_seconds}초)와 액션 수에 따라 자동 결정 (보통 ${Math.max(1, Math.round((scene.estimated_seconds ?? 30) / 8))}개 ±2)`"
+        },
+        {
+          "file": "src/lib/writer/pipeline/util/infer_v3.ts",
+          "line": 56,
+          "code": "const avg_shot_seconds = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 8;"
+        }
+      ],
+      "literal_candidates_verdict": "전건 오탐(사람 대조) — 해당 임계값을 강제하지 않음",
+      "na_sites": [
+        {
+          "file": "src/lib/writer/pipeline/budget.ts",
+          "line": 53,
+          "why": "값 참조(비교 아님)",
+          "code": "const secondsPerAction = (SHOT_PHYSICS.shotSecondsMin + SHOT_PHYSICS.shotSecondsMax) / 2 + 1.5; // 6.5"
+        },
+        {
+          "file": "src/lib/writer/pipeline/budget.ts",
+          "line": 79,
+          "why": "값 참조(비교 아님)",
+          "code": "- 씬당 scene_actions ${b.actionsPerSceneMin}~${b.actionsPerSceneMax}개, 씬의 estimated_seconds ≈ 액션 수 × ${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHY"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/s1s3_merged.ts",
+          "line": 105,
+          "why": "값 참조(비교 아님)",
+          "code": "- 씬에서 일어나는 주요 액션을 텍스트로. 한 액션 = 한 샷(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초)에 들어가도록 분리해서 작성."
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/s3_scenes.ts",
+          "line": 164,
+          "why": "값 참조(비교 아님)",
+          "code": "- 한 액션 = 한 샷(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초)에 들어가도록 분리해서 작성"
+        }
+      ]
+    },
+    {
+      "key": "shotSecondsHardMax",
+      "value": 10,
+      "what": "샷 절대 상한 초",
+      "prose_sites": 5,
+      "prose_detail": [
+        {
+          "file": "src/lib/writer/pipeline/physics.ts",
+          "line": 24,
+          "code": "export const SHOT_SECONDS_HARD_MAX = `${SHOT_PHYSICS.shotSecondsHardMax}초`;"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/decoupage.ts",
+          "line": 11,
+          "code": "import { SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX } from '@/lib/writer/pipeline/physics';"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/decoupage.ts",
+          "line": 127,
+          "code": "- 각 샷 intended_duration_seconds는 ${SHOT_SECONDS_RANGE} (짧고 스냅있게). 1개 주요 액션이 들어맞는 길이. 긴 침묵 등 예외만 최대 ${SHOT_SECONDS_HARD_M"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 9,
+          "code": "import { SHOT_PHYSICS, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/w"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 441,
+          "code": "- 1 샷 = ${SHOT_SECONDS_RANGE} (짧고 스냅있게)${compactMode ? '' : ' (V3.avg_shot_seconds 기준 ±2)'}. 긴 침묵 등 예외만 최대 ${SHOT_SECOND"
+        }
+      ],
+      "enforced": true,
+      "enforced_via_canonical_constant": false,
+      "enforce_sites": [],
+      "verified_enforce_sites": [
+        {
+          "file": "src/lib/writer/pipeline/util/persist_manifest.ts",
+          "line": 63,
+          "code": "const MAX_SHOT_SECONDS = 10  →  clampShotSeconds(): Math.min(MAX_SHOT_SECONDS, Math.max(1, …))",
+          "applied_at": [
+            "persist_manifest.ts:619 (샷 저장)",
+            "persist_manifest.ts:709 (씬 합계)"
+          ],
+          "why": "저장 직전 샷 길이를 10초로 잘라낸다 — 결과가 실제로 바뀐다",
+          "references_canonical_constant": false
+        },
+        {
+          "file": "src/lib/writer/pipeline/util/duration_reallocation.ts",
+          "line": 19,
+          "code": "export const REALLOC_MAX_SHOT_SECONDS = 10  →  Math.min(max, …) (76행)",
+          "applied_at": [
+            "duration_reallocation.ts:103"
+          ],
+          "why": "인지 부하 재배분에서 증액 상한으로 실제 적용",
+          "references_canonical_constant": false
+        }
+      ],
+      "literal_candidates": [
+        {
+          "file": "src/lib/writer/llm/fal.ts",
+          "line": 353,
+          "code": "const dur = opts.duration && opts.duration >= 10 ? 10 : 5;"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 126,
+          "code": "if (S && typeof S.subject === 'string' && S.subject.trim().length > 10) {"
+        },
+        {
+          "file": "src/lib/writer/pipeline/util/infer_v3.ts",
+          "line": 58,
+          "code": "avg_shot_seconds < 5 ? 'rapid' : avg_shot_seconds > 10 ? 'long_takes' : 'medium';"
+        }
+      ],
+      "literal_candidates_verdict": "전건 오탐(사람 대조) — 해당 임계값을 강제하지 않음",
+      "na_sites": []
+    },
+    {
+      "key": "verbsPerShotMax",
+      "value": 2,
+      "what": "샷당 동사 수 상한",
+      "prose_sites": 0,
+      "prose_detail": [],
+      "enforced": false,
+      "enforced_via_canonical_constant": false,
+      "enforce_sites": [],
+      "verified_enforce_sites": [],
+      "literal_candidates": [
+        {
+          "file": "src/lib/writer/pipeline/budget.ts",
+          "line": 55,
+          "code": "const avgSceneSeconds = totalSeconds / Math.max(1, Math.round((sceneCountMin + sceneCountMax) / 2));"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/decoupage.ts",
+          "line": 306,
+          "code": "coverage_ratio: beatCount > 0 ? Number((shots.length / beatCount).toFixed(2)) : 0,"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 499,
+          "code": "${compactMode ? `씬 길이(${scene.estimated_seconds}초)와 액션 수에 따라 자동 결정 (보통 ${Math.max(1, Math.round((scene.estimated_seconds ?? 30) / 8))}개 ±2)`"
+        },
+        {
+          "file": "src/lib/writer/rough-grid-crop.ts",
+          "line": 148,
+          "code": "if (bounds.length < 2) return bounds"
+        },
+        {
+          "file": "src/lib/writer/rough-grid-crop.ts",
+          "line": 168,
+          "code": "if (rowsPx.length < 2) return rowsPx"
+        }
+      ],
+      "literal_candidates_verdict": "전건 오탐(사람 대조) — 해당 임계값을 강제하지 않음",
+      "na_sites": [
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 445,
+          "why": "값 참조(비교 아님)",
+          "code": "- character_motion.verb: 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개 이내, 순차 표현 금지"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 447,
+          "why": "값 참조(비교 아님)",
+          "code": "- motion_prompt (최종 출력): ${MOTION_PROMPT_CHARS}, 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 566,
+          "why": "값 참조(비교 아님)",
+          "code": "\"motion_prompt\": \"${MOTION_PROMPT_CHARS}, 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개\""
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 254,
+          "why": "값 참조(비교 아님)",
+          "code": "- 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개 이내"
+        }
+      ]
+    },
+    {
+      "key": "motionPromptCharsMin",
+      "value": 50,
+      "what": "모션 프롬프트 최소 자수",
+      "prose_sites": 7,
+      "prose_detail": [
+        {
+          "file": "src/lib/writer/pipeline/physics.ts",
+          "line": 25,
+          "code": "export const MOTION_PROMPT_CHARS = `${SHOT_PHYSICS.motionPromptCharsMin}~${SHOT_PHYSICS.motionPromptCharsMax}자`;"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 9,
+          "code": "import { SHOT_PHYSICS, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/w"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 447,
+          "code": "- motion_prompt (최종 출력): ${MOTION_PROMPT_CHARS}, 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 566,
+          "code": "\"motion_prompt\": \"${MOTION_PROMPT_CHARS}, 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개\""
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 7,
+          "code": "import { SHOT_PHYSICS, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/writer/pipeline/physics';"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 253,
+          "code": "- ${MOTION_PROMPT_CHARS}"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 266,
+          "code": "{ \"motion_prompt\": \"동적 영상 묘사 (English, ${MOTION_PROMPT_CHARS})\" }`;"
+        }
+      ],
+      "enforced": false,
+      "enforced_via_canonical_constant": false,
+      "enforce_sites": [],
+      "verified_enforce_sites": [],
+      "literal_candidates": [
+        {
+          "file": "src/lib/writer/pipeline/util/infer_v3.ts",
+          "line": 88,
+          "code": "lens_vocabulary: lensUnique.length > 0 ? lensUnique : [50],"
+        }
+      ],
+      "literal_candidates_verdict": "전건 오탐(사람 대조) — 해당 임계값을 강제하지 않음",
+      "na_sites": []
+    },
+    {
+      "key": "motionPromptCharsMax",
+      "value": 80,
+      "what": "모션 프롬프트 최대 자수",
+      "prose_sites": 7,
+      "prose_detail": [
+        {
+          "file": "src/lib/writer/pipeline/physics.ts",
+          "line": 25,
+          "code": "export const MOTION_PROMPT_CHARS = `${SHOT_PHYSICS.motionPromptCharsMin}~${SHOT_PHYSICS.motionPromptCharsMax}자`;"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 9,
+          "code": "import { SHOT_PHYSICS, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/w"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 447,
+          "code": "- motion_prompt (최종 출력): ${MOTION_PROMPT_CHARS}, 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 566,
+          "code": "\"motion_prompt\": \"${MOTION_PROMPT_CHARS}, 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개\""
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 7,
+          "code": "import { SHOT_PHYSICS, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/writer/pipeline/physics';"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 253,
+          "code": "- ${MOTION_PROMPT_CHARS}"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 266,
+          "code": "{ \"motion_prompt\": \"동적 영상 묘사 (English, ${MOTION_PROMPT_CHARS})\" }`;"
+        }
+      ],
+      "enforced": false,
+      "enforced_via_canonical_constant": false,
+      "enforce_sites": [],
+      "verified_enforce_sites": [],
+      "literal_candidates": [],
+      "literal_candidates_verdict": null,
+      "na_sites": []
+    },
+    {
+      "key": "firstFramePromptCharsMin",
+      "value": 200,
+      "what": "첫 프레임 프롬프트 최소 자수",
+      "prose_sites": 7,
+      "prose_detail": [
+        {
+          "file": "src/lib/writer/pipeline/physics.ts",
+          "line": 26,
+          "code": "export const FIRST_FRAME_CHARS = `${SHOT_PHYSICS.firstFramePromptCharsMin}~${SHOT_PHYSICS.firstFramePromptCharsMax}자`;"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 9,
+          "code": "import { SHOT_PHYSICS, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/w"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 450,
+          "code": "- first_frame_prompt: ${FIRST_FRAME_CHARS} OK. 정적 묘사 풍부하게"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 547,
+          "code": "\"first_frame_prompt\": \"${FIRST_FRAME_CHARS} 정적 묘사\""
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 7,
+          "code": "import { SHOT_PHYSICS, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/writer/pipeline/physics';"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 214,
+          "code": "- ${FIRST_FRAME_CHARS}"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 229,
+          "code": "{ \"prompt\": \"정적 첫 프레임 묘사 (English, ${FIRST_FRAME_CHARS})\" }`;"
+        }
+      ],
+      "enforced": false,
+      "enforced_via_canonical_constant": false,
+      "enforce_sites": [],
+      "verified_enforce_sites": [],
+      "literal_candidates": [],
+      "literal_candidates_verdict": null,
+      "na_sites": []
+    },
+    {
+      "key": "firstFramePromptCharsMax",
+      "value": 400,
+      "what": "첫 프레임 프롬프트 최대 자수",
+      "prose_sites": 7,
+      "prose_detail": [
+        {
+          "file": "src/lib/writer/pipeline/physics.ts",
+          "line": 26,
+          "code": "export const FIRST_FRAME_CHARS = `${SHOT_PHYSICS.firstFramePromptCharsMin}~${SHOT_PHYSICS.firstFramePromptCharsMax}자`;"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 9,
+          "code": "import { SHOT_PHYSICS, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/w"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 450,
+          "code": "- first_frame_prompt: ${FIRST_FRAME_CHARS} OK. 정적 묘사 풍부하게"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v4_shots.ts",
+          "line": 547,
+          "code": "\"first_frame_prompt\": \"${FIRST_FRAME_CHARS} 정적 묘사\""
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 7,
+          "code": "import { SHOT_PHYSICS, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/writer/pipeline/physics';"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 214,
+          "code": "- ${FIRST_FRAME_CHARS}"
+        },
+        {
+          "file": "src/lib/writer/pipeline/stages/v5_prompts.ts",
+          "line": 229,
+          "code": "{ \"prompt\": \"정적 첫 프레임 묘사 (English, ${FIRST_FRAME_CHARS})\" }`;"
+        }
+      ],
+      "enforced": false,
+      "enforced_via_canonical_constant": false,
+      "enforce_sites": [],
+      "verified_enforce_sites": [],
+      "literal_candidates": [],
+      "literal_candidates_verdict": null,
+      "na_sites": []
+    }
+  ]
+}

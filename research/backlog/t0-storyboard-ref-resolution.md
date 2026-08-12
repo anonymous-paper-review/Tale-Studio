@@ -4,7 +4,7 @@ source: qual7-rewrite 덤 발견 2026-08-11 (영상 발주에 들어가는 START
 tier: T0
 budget: { usd: 0, runs: 1, wall_min: 30 }
 blockers: []
-status: ready
+status: done   # 2026-08-12 밤 러너 — 가설 유지(표본 48/48이 짧은 변 <720, 전 프로젝트 공통). 기각 조건 미발동. 원인 규명: 시트 원본은 1664x928/592x1136인데 칸으로 자르며 374x242로 축소. T2 승격 제안(3팔: 현행/단순확대/큰시트 재크롭)은 result.md 말미 — 실행 안 함. 결과: research/experiments/t0-storyboard-ref-resolution/
 priority: normal
 ```
 

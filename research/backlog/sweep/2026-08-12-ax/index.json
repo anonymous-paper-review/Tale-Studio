@@ -1,0 +1,195 @@
+{
+  "generated_for": "2026-08-12",
+  "project": "/Users/xcape/projects/tale-studio",
+  "scanned": 40,
+  "targets": 17,
+  "sessions": [
+    {
+      "store": "claude",
+      "sid": "0897af55-d557-4b5a-8928-990db6e6b599",
+      "digest": "digest/claude-0897af55.md",
+      "mtime": "2026-08-12T02:14",
+      "size_kb": 3647,
+      "digest_bytes": 45552,
+      "oversized": false,
+      "rejections": 3,
+      "first_user": "gajae\n Drafting detailed architecture summary\n\n Evaluating reliability improvements and workflow options\n                                                                                               "
+    },
+    {
+      "store": "claude",
+      "sid": "c0438f2a-6076-4ad9-aa80-59506c6ccb92",
+      "digest": "digest/claude-c0438f2a.md",
+      "mtime": "2026-08-12T02:04",
+      "size_kb": 2516,
+      "digest_bytes": 27696,
+      "oversized": false,
+      "rejections": 1,
+      "first_user": "지금까지 쌓인거 커밋-푸시해주고 원격이랑 pull해서 상태맞춰줘"
+    },
+    {
+      "store": "claude",
+      "sid": "f1021d8e-ff42-4fe7-a685-c9508e4e1a28",
+      "digest": "digest/claude-f1021d8e.md",
+      "mtime": "2026-08-12T01:53",
+      "size_kb": 31006,
+      "digest_bytes": 93750,
+      "oversized": true,
+      "rejections": 17,
+      "first_user": "내가 이 계정에서만든 클러드 아티팩트, 했던 실험, 열린 논의(vault)등이 점점쌓여가는데 자는동안 내 goal을위해 다양한 가설세우고 실험하는 워크플로우 세우는게 효과적일까? 최근 omc세션들 확인해서 내가 하려는 목적이 뭔지 파악하고 이런것들이 쌓였을떄 프로젝트 목적성에맞게 가설 여러개세워서 자동으로 돌리고 판단하고 피드백해서 아예 그냥 goal만족할"
+    },
+    {
+      "store": "claude",
+      "sid": "af1fb40f-d9c7-40b0-9eef-f633b368efd9",
+      "digest": "digest/claude-af1fb40f.md",
+      "mtime": "2026-08-12T01:32",
+      "size_kb": 2376,
+      "digest_bytes": 27005,
+      "oversized": false,
+      "rejections": 4,
+      "first_user": "### 실험 결과\n\n 격리된 6개 케이스를 제품 경로에 통과시켰습니다.\n\n - 손동작: 프레임 안 static / 프레임 밖 pan_right\n - 시선: 프레임 안 static / 프레임 밖 pan_right\n - 감정: 정적 반응 static / 배율 변화 dolly_in\n - 텍스트 단계 구분: 6/6\n - 프리비즈 블록아웃: 6개 생성\n - 실제 영"
+    },
+    {
+      "store": "claude",
+      "sid": "e3519ae6-156b-4689-9191-94756e6c03b7",
+      "digest": "digest/claude-e3519ae6.md",
+      "mtime": "2026-08-11T22:03",
+      "size_kb": 606,
+      "digest_bytes": 6517,
+      "oversized": false,
+      "rejections": 1,
+      "first_user": "보통 방문자 통계나 뭐 확인하기위해 GA엿나? 트래픽이나 뭐눌렀는지 어디서 멈췄는지? 최소한 해두는것들? 어떤게있어?"
+    },
+    {
+      "store": "claude",
+      "sid": "70378c3d-0c0d-4779-94f8-6f820db3bfda",
+      "digest": "digest/claude-70378c3d.md",
+      "mtime": "2026-08-11T21:40",
+      "size_kb": 1927,
+      "digest_bytes": 16273,
+      "oversized": false,
+      "rejections": 1,
+      "first_user": "지금까지 만든 API 목록 뽑아서\n인증 없이 호출 가능한곳 있음?\n\n추가로 db에도 접근가능하거나 rls적용안된거 \n\n에러메시지에 변수이름 직접 뜨는지\n\n내 서비스 API 하나 골라서\n로그인 없이 호출해보세요\n401, 403 나오면 잘 하고 있는 겁니다\n200 나오면 오늘 고쳐야 합니다\n\n왜 OAuth 토큰을\n로컬스토리지에 저장하면 안 되는가\n로컬스토리지는"
+    },
+    {
+      "store": "claude",
+      "sid": "05f8aa2f-aa35-4914-ab4b-ce27421696cc",
+      "digest": "digest/claude-05f8aa2f.md",
+      "mtime": "2026-08-11T16:42",
+      "size_kb": 234,
+      "digest_bytes": 1869,
+      "oversized": false,
+      "rejections": 0,
+      "first_user": "build랑 lint가 각각 뭘의미함? pnpm에서"
+    },
+    {
+      "store": "gjc",
+      "sid": "2026-08-11T05-28-01-283Z_019fef4a-c003-7000-9b9e-12c2d3179c06",
+      "digest": "digest/gjc-019fef4a.md",
+      "mtime": "2026-08-11T16:23",
+      "size_kb": 3493,
+      "digest_bytes": 5976,
+      "oversized": false,
+      "rejections": 0,
+      "first_user": "https://claude.ai/code/artifact/81449dc7-1399-46b2-9f4c-44664a751a68?via=auto_preview 이거 읽고 다음 실험 제안해주셈 관련된 코드나 vault는 알아서 읽어보셈"
+    },
+    {
+      "store": "gjc",
+      "sid": "2026-08-11T05-36-49-981Z_019fef52-d13d-7000-ba4c-7f9b73d36be3",
+      "digest": "digest/gjc-019fef52.md",
+      "mtime": "2026-08-11T15:52",
+      "size_kb": 3520,
+      "digest_bytes": 3924,
+      "oversized": false,
+      "rejections": 2,
+      "first_user": "test-223bdf01@tale.studio 이거 supabase들어가서 writer 생성 어디서 문제가됐는지 확인할수있음?"
+    },
+    {
+      "store": "claude",
+      "sid": "914a5c49-6667-4ff8-9a84-b56e8c3057c7",
+      "digest": "digest/claude-914a5c49.md",
+      "mtime": "2026-08-11T15:51",
+      "size_kb": 376,
+      "digest_bytes": 2029,
+      "oversized": false,
+      "rejections": 0,
+      "first_user": "dev 브랜치 생성해서 메인서버와 dev서버 구분하도록 해줘 원격에도 등록해주고 항상 dev에서 작업하되 진짜 급한거아니면 main 다이렉트 수정은 경고 할수있도록 훅이든 뭐든 걸어줘(개발자가 main브랜치에서 작업하면 경고문구 하나만 띄우면될듯? 어차피 claude같은걸로 작업하니까)\n\n추가로 dev에서 main으로 배포할떄 어떤과정을 걸어둬야할지 제안해"
+    },
+    {
+      "store": "claude",
+      "sid": "b3eda43f-d6a1-4d11-b312-dccbcc11a64a",
+      "digest": "digest/claude-b3eda43f.md",
+      "mtime": "2026-08-11T15:37",
+      "size_kb": 330,
+      "digest_bytes": 2288,
+      "oversized": false,
+      "rejections": 0,
+      "first_user": "https://www.talestudio.art/studio/writer?projectId=0e337d5d-2c09-4a4a-b708-a356a15bca2c 이 프로젝트 wrtier 타임아웃때문에 스크립트로 재생성돌린건데 writer의previz이미지는 지금 돌고있는상태인거임? 아니면 생성안한거임?"
+    },
+    {
+      "store": "claude",
+      "sid": "5854dffc-b944-4efa-9098-b9ff7fd6ba85",
+      "digest": "digest/claude-5854dffc.md",
+      "mtime": "2026-08-11T15:28",
+      "size_kb": 159,
+      "digest_bytes": 1438,
+      "oversized": false,
+      "rejections": 1,
+      "first_user": "현재 로컬에 미커밋사항들있으면 다 그룹별로 묶어서 커밋하고 푸시해줘\nresearch같이 큰 폴더는 일단 무시하고 코드위주로 판단하면 될듯"
+    },
+    {
+      "store": "gjc",
+      "sid": "2026-08-11T04-26-04-735Z_019fef12-0a3f-7000-bc8a-840e158f0cff",
+      "digest": "digest/gjc-019fef12.md",
+      "mtime": "2026-08-11T15:23",
+      "size_kb": 4019,
+      "digest_bytes": 5613,
+      "oversized": false,
+      "rejections": 0,
+      "first_user": "[Compacted history content evicted to durable cold storage]"
+    },
+    {
+      "store": "claude",
+      "sid": "62428d65-fd84-4e43-9fd9-e2fc2ca9e34c",
+      "digest": "digest/claude-62428d65.md",
+      "mtime": "2026-08-11T14:47",
+      "size_kb": 11169,
+      "digest_bytes": 98209,
+      "oversized": true,
+      "rejections": 17,
+      "first_user": "git pull 해줘"
+    },
+    {
+      "store": "claude",
+      "sid": "83da54e9-c01e-4e1d-abfb-d8d0ddd9234f",
+      "digest": "digest/claude-83da54e9.md",
+      "mtime": "2026-08-11T12:06",
+      "size_kb": 225,
+      "digest_bytes": 1510,
+      "oversized": false,
+      "rejections": 0,
+      "first_user": "변경사항 커밋푸시하고 원격이랑 상태 맞춰줘"
+    },
+    {
+      "store": "claude",
+      "sid": "81bc90ed-1330-489b-b228-60cfafd576a4",
+      "digest": "digest/claude-81bc90ed.md",
+      "mtime": "2026-08-11T11:18",
+      "size_kb": 60,
+      "digest_bytes": 2285,
+      "oversized": false,
+      "rejections": 0,
+      "first_user": "친구 ssh경로로 어케접속함?"
+    },
+    {
+      "store": "claude",
+      "sid": "4f1ad621-70eb-4b85-b8dc-b303c5e8aa41",
+      "digest": "digest/claude-4f1ad621.md",
+      "mtime": "2026-08-11T11:00",
+      "size_kb": 1846,
+      "digest_bytes": 15930,
+      "oversized": false,
+      "rejections": 4,
+      "first_user": "https://youtu.be/LomMGF7kcBU?si\n\n이 방식은 사실 일본 2D에니메이션에서 하는 방식인데,\n동영상의 방법은 약간 반쯤 야매긴 한데 원리는 같습니다.\n\n최대한 단수화한 오브젝트로, 큰 블로킹만 주고,\n카메라 무빙, 사이즈를 우리가 흔히 말하는 프리비주얼로 뽑습니다.\n(영화 쪽에선 프리 단계에서 많이 하죠)\n그 프리비주얼 자체를 AI ("
+    }
+  ]
+}
