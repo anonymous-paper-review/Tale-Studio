@@ -1,0 +1,570 @@
+{
+  "plannedAt": "2026-08-12T05:12:43.271Z",
+  "fixturesFrozenAt": "2026-08-10T12:23:32.678Z",
+  "project": {
+    "id": "9d6efa6d-3216-40b0-8a2c-184ab56f02ec",
+    "title": "Sample1",
+    "workspace_id": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+    "style_anchor_key": "real"
+  },
+  "styleAnchor": {
+    "key": "real",
+    "imageUrl": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+  },
+  "design": {
+    "reps": 3,
+    "arms": {
+      "A": "현행 지시문 (buildRealStripPrompt 그대로)",
+      "B": "현행 + 제안 2문장 (화살표칸 발명금지 / 끝칸 도착상태)"
+    },
+    "shots": [
+      {
+        "shot_id": "sh_02_10",
+        "klass": "static",
+        "label": "STATIC HOLD",
+        "why": "정지 대조군 — 인물 0, START≈END(팔 간 구분 불가가 정상)"
+      },
+      {
+        "shot_id": "sh_01_09",
+        "klass": "double",
+        "label": "TURNS",
+        "why": "2동작 순차(\"photographs ... then freezes\") — shotCheck 분할 대상 형태"
+      }
+    ],
+    "bPatches": [
+      {
+        "id": "middle-no-invent",
+        "anchor": "This is the only panel with text.",
+        "add": " Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation."
+      },
+      {
+        "id": "bottom-arrived-state",
+        "anchor": "matching reference panel 3's composition exactly.",
+        "add": " Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state."
+      }
+    ]
+  },
+  "cost": {
+    "calls": 12,
+    "model": "openai/gpt-image-2/edit",
+    "quality": "high (엔드포인트 기본 — 코드가 quality 를 안 보냄)",
+    "imageSizeSent": "auto (라우트가 준 image_size '1024x1536' 은 FalImageOptions 에 없어 버려지고 arToImageSize(undefined)='auto' 가 나간다 — 프로덕션 실동작 그대로)",
+    "unitUsdList": 0.2,
+    "estUsd": 2.4,
+    "ceilUsd": 4.96,
+    "basis": [
+      "https://fal.ai/models/openai/gpt-image-2/edit — 1024x1536 high $0.178 (모델 페이지 표)",
+      "https://fal.ai/learn/tools/gpt-image-2-review — edit high 1024x1536 $0.200, 기본 quality=high, 요청마다 토큰 과금 가산",
+      "두 출처 중 큰 값 $0.20 을 단가로 채택. ceilUsd 는 표 최댓값(4K high $0.413) 기준 상한."
+    ]
+  },
+  "sanity": {
+    "ok": true
+  },
+  "jobs": [
+    {
+      "key": "sh_02_10__A__r1",
+      "arm": "A",
+      "shot_id": "sh_02_10",
+      "klass": "static",
+      "label": "STATIC HOLD",
+      "rep": 1,
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.\n- No text anywhere except the middle panel's arrow labels.",
+      "guardedPrompt": "Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.",
+      "stripLocal": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/strips/sh_02_10_ref_strip.png",
+      "stripSha": "517399b4fb6bc16c",
+      "refOrder": [
+        "<rough_strip>",
+        "style:real"
+      ],
+      "charRefs": [],
+      "anchorRef": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+      "image_size_requested": "1024x1536",
+      "stripUrl": "https://v3b.fal.media/files/b/0aa60016/_lsmmORTWqWXf30_xHnLS_1786511587197.png",
+      "request_id": "019ff463-812e-76f0-acb8-6cfeb6fae473",
+      "model_actual": "openai/gpt-image-2/edit",
+      "fal_request": {
+        "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.\n- No text anywhere except the middle panel's arrow labels.",
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa60016/_lsmmORTWqWXf30_xHnLS_1786511587197.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+        ],
+        "image_size": "auto"
+      },
+      "submitted_at": "2026-08-12T05:13:09.795Z",
+      "done": true,
+      "out_url": "https://v3b.fal.media/files/b/0aa60029/usDMPWN0pFt1umctlEi1O_KARzGJrd.png",
+      "out_size": {
+        "width": null,
+        "height": null
+      },
+      "local": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/assets/sh_02_10__A__r1.png",
+      "collected_at": "2026-08-12T05:14:48.725Z"
+    },
+    {
+      "key": "sh_02_10__A__r2",
+      "arm": "A",
+      "shot_id": "sh_02_10",
+      "klass": "static",
+      "label": "STATIC HOLD",
+      "rep": 2,
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.\n- No text anywhere except the middle panel's arrow labels.",
+      "guardedPrompt": "Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.",
+      "stripLocal": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/strips/sh_02_10_ref_strip.png",
+      "stripSha": "517399b4fb6bc16c",
+      "refOrder": [
+        "<rough_strip>",
+        "style:real"
+      ],
+      "charRefs": [],
+      "anchorRef": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+      "image_size_requested": "1024x1536",
+      "stripUrl": "https://v3b.fal.media/files/b/0aa60016/_lsmmORTWqWXf30_xHnLS_1786511587197.png",
+      "request_id": "019ff465-2d07-7b33-84d5-b7e38b3bb4ab",
+      "model_actual": "openai/gpt-image-2/edit",
+      "fal_request": {
+        "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.\n- No text anywhere except the middle panel's arrow labels.",
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa60016/_lsmmORTWqWXf30_xHnLS_1786511587197.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+        ],
+        "image_size": "auto"
+      },
+      "submitted_at": "2026-08-12T05:14:59.330Z",
+      "done": true,
+      "out_url": "https://v3b.fal.media/files/b/0aa60034/vL10xrpH9HfHPVV0Qo9Eo_LiZkfYtZ.png",
+      "out_size": {
+        "width": null,
+        "height": null
+      },
+      "local": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/assets/sh_02_10__A__r2.png",
+      "collected_at": "2026-08-12T05:16:26.657Z"
+    },
+    {
+      "key": "sh_02_10__A__r3",
+      "arm": "A",
+      "shot_id": "sh_02_10",
+      "klass": "static",
+      "label": "STATIC HOLD",
+      "rep": 3,
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.\n- No text anywhere except the middle panel's arrow labels.",
+      "guardedPrompt": "Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.",
+      "stripLocal": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/strips/sh_02_10_ref_strip.png",
+      "stripSha": "517399b4fb6bc16c",
+      "refOrder": [
+        "<rough_strip>",
+        "style:real"
+      ],
+      "charRefs": [],
+      "anchorRef": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+      "image_size_requested": "1024x1536",
+      "stripUrl": "https://v3b.fal.media/files/b/0aa60016/_lsmmORTWqWXf30_xHnLS_1786511587197.png",
+      "request_id": "019ff465-2dd2-7170-b4c2-ab34b9bcc639",
+      "model_actual": "openai/gpt-image-2/edit",
+      "fal_request": {
+        "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.\n- No text anywhere except the middle panel's arrow labels.",
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa60016/_lsmmORTWqWXf30_xHnLS_1786511587197.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+        ],
+        "image_size": "auto"
+      },
+      "submitted_at": "2026-08-12T05:14:59.524Z",
+      "done": true,
+      "out_url": "https://v3b.fal.media/files/b/0aa60034/QYF-fT0hIrUYISWenMATi_C2ry7cTx.png",
+      "out_size": {
+        "width": null,
+        "height": null
+      },
+      "local": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/assets/sh_02_10__A__r3.png",
+      "collected_at": "2026-08-12T05:16:28.169Z"
+    },
+    {
+      "key": "sh_02_10__B__r1",
+      "arm": "B",
+      "shot_id": "sh_02_10",
+      "klass": "static",
+      "label": "STATIC HOLD",
+      "rep": 1,
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.\n- No text anywhere except the middle panel's arrow labels.",
+      "guardedPrompt": "Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.",
+      "stripLocal": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/strips/sh_02_10_ref_strip.png",
+      "stripSha": "517399b4fb6bc16c",
+      "refOrder": [
+        "<rough_strip>",
+        "style:real"
+      ],
+      "charRefs": [],
+      "anchorRef": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+      "image_size_requested": "1024x1536",
+      "stripUrl": "https://v3b.fal.media/files/b/0aa60016/_lsmmORTWqWXf30_xHnLS_1786511587197.png",
+      "request_id": "019ff465-2e97-7861-b0e5-b25599c222d2",
+      "model_actual": "openai/gpt-image-2/edit",
+      "fal_request": {
+        "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.\n- No text anywhere except the middle panel's arrow labels.",
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa60016/_lsmmORTWqWXf30_xHnLS_1786511587197.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+        ],
+        "image_size": "auto"
+      },
+      "submitted_at": "2026-08-12T05:14:59.722Z",
+      "done": true,
+      "out_url": "https://v3b.fal.media/files/b/0aa60022/Rfd9x2QA7TBrrpOrTcK9N_NoTzQN31.png",
+      "out_size": {
+        "width": null,
+        "height": null
+      },
+      "local": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/assets/sh_02_10__B__r1.png",
+      "collected_at": "2026-08-12T05:16:29.840Z"
+    },
+    {
+      "key": "sh_02_10__B__r2",
+      "arm": "B",
+      "shot_id": "sh_02_10",
+      "klass": "static",
+      "label": "STATIC HOLD",
+      "rep": 2,
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.\n- No text anywhere except the middle panel's arrow labels.",
+      "guardedPrompt": "Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.",
+      "stripLocal": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/strips/sh_02_10_ref_strip.png",
+      "stripSha": "517399b4fb6bc16c",
+      "refOrder": [
+        "<rough_strip>",
+        "style:real"
+      ],
+      "charRefs": [],
+      "anchorRef": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+      "image_size_requested": "1024x1536",
+      "stripUrl": "https://v3b.fal.media/files/b/0aa60016/_lsmmORTWqWXf30_xHnLS_1786511587197.png",
+      "request_id": "019ff465-2f6a-7ea2-be00-11eec1641a87",
+      "model_actual": "openai/gpt-image-2/edit",
+      "fal_request": {
+        "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.\n- No text anywhere except the middle panel's arrow labels.",
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa60016/_lsmmORTWqWXf30_xHnLS_1786511587197.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+        ],
+        "image_size": "auto"
+      },
+      "submitted_at": "2026-08-12T05:14:59.934Z",
+      "done": true,
+      "out_url": "https://v3b.fal.media/files/b/0aa60022/wXJ_3rFGfssp3DmvKJNbg_RxCwGyao.png",
+      "out_size": {
+        "width": null,
+        "height": null
+      },
+      "local": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/assets/sh_02_10__B__r2.png",
+      "collected_at": "2026-08-12T05:16:31.438Z"
+    },
+    {
+      "key": "sh_02_10__B__r3",
+      "arm": "B",
+      "shot_id": "sh_02_10",
+      "klass": "static",
+      "label": "STATIC HOLD",
+      "rep": 3,
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.\n- No text anywhere except the middle panel's arrow labels.",
+      "guardedPrompt": "Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.",
+      "stripLocal": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/strips/sh_02_10_ref_strip.png",
+      "stripSha": "517399b4fb6bc16c",
+      "refOrder": [
+        "<rough_strip>",
+        "style:real"
+      ],
+      "charRefs": [],
+      "anchorRef": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+      "image_size_requested": "1024x1536",
+      "stripUrl": "https://v3b.fal.media/files/b/0aa60016/_lsmmORTWqWXf30_xHnLS_1786511587197.png",
+      "request_id": "019ff465-3036-70c0-8fd7-2ba1c5b7a03a",
+      "model_actual": "openai/gpt-image-2/edit",
+      "fal_request": {
+        "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.\n- No text anywhere except the middle panel's arrow labels.",
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa60016/_lsmmORTWqWXf30_xHnLS_1786511587197.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+        ],
+        "image_size": "auto"
+      },
+      "submitted_at": "2026-08-12T05:15:00.137Z",
+      "done": true,
+      "out_url": "https://v3b.fal.media/files/b/0aa60022/exkG1rTDGU3lIDeOV9byQ_H7RmOhZf.png",
+      "out_size": {
+        "width": null,
+        "height": null
+      },
+      "local": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/assets/sh_02_10__B__r3.png",
+      "collected_at": "2026-08-12T05:16:33.070Z"
+    },
+    {
+      "key": "sh_01_09__A__r1",
+      "arm": "A",
+      "shot_id": "sh_01_09",
+      "klass": "double",
+      "label": "TURNS",
+      "rep": 1,
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.\n- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.\n- No text anywhere except the middle panel's arrow labels.",
+      "guardedPrompt": "Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.",
+      "stripLocal": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/strips/sh_01_09_ref_strip.png",
+      "stripSha": "782f8fcf337ad9f1",
+      "refOrder": [
+        "<rough_strip>",
+        "조승우",
+        "style:real"
+      ],
+      "charRefs": [
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820"
+      ],
+      "anchorRef": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+      "image_size_requested": "1024x1536",
+      "stripUrl": "https://v3b.fal.media/files/b/0aa60034/O5tg12gCbsV1JRe2FzO7Y_1786511700143.png",
+      "request_id": "019ff465-3cb6-7c92-aac1-fdb6e2465a06",
+      "model_actual": "openai/gpt-image-2/edit",
+      "fal_request": {
+        "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.\n- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.\n- No text anywhere except the middle panel's arrow labels.",
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa60034/O5tg12gCbsV1JRe2FzO7Y_1786511700143.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+        ],
+        "image_size": "auto"
+      },
+      "submitted_at": "2026-08-12T05:15:03.338Z",
+      "done": true,
+      "out_url": "https://v3b.fal.media/files/b/0aa60022/m3n0TEXVe0h3Jrfrz2MHa_P5dEklyW.png",
+      "out_size": {
+        "width": null,
+        "height": null
+      },
+      "local": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/assets/sh_01_09__A__r1.png",
+      "collected_at": "2026-08-12T05:16:34.581Z"
+    },
+    {
+      "key": "sh_01_09__A__r2",
+      "arm": "A",
+      "shot_id": "sh_01_09",
+      "klass": "double",
+      "label": "TURNS",
+      "rep": 2,
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.\n- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.\n- No text anywhere except the middle panel's arrow labels.",
+      "guardedPrompt": "Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.",
+      "stripLocal": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/strips/sh_01_09_ref_strip.png",
+      "stripSha": "782f8fcf337ad9f1",
+      "refOrder": [
+        "<rough_strip>",
+        "조승우",
+        "style:real"
+      ],
+      "charRefs": [
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820"
+      ],
+      "anchorRef": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+      "image_size_requested": "1024x1536",
+      "stripUrl": "https://v3b.fal.media/files/b/0aa60034/O5tg12gCbsV1JRe2FzO7Y_1786511700143.png",
+      "request_id": "019ff465-3d77-70d3-a490-8862bc322b82",
+      "model_actual": "openai/gpt-image-2/edit",
+      "fal_request": {
+        "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.\n- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.\n- No text anywhere except the middle panel's arrow labels.",
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa60034/O5tg12gCbsV1JRe2FzO7Y_1786511700143.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+        ],
+        "image_size": "auto"
+      },
+      "submitted_at": "2026-08-12T05:15:03.531Z",
+      "done": true,
+      "out_url": "https://v3b.fal.media/files/b/0aa60034/BTEJcT1OWUvBmlCXAtHky_m5zKkeaL.png",
+      "out_size": {
+        "width": null,
+        "height": null
+      },
+      "local": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/assets/sh_01_09__A__r2.png",
+      "collected_at": "2026-08-12T05:16:36.169Z"
+    },
+    {
+      "key": "sh_01_09__A__r3",
+      "arm": "A",
+      "shot_id": "sh_01_09",
+      "klass": "double",
+      "label": "TURNS",
+      "rep": 3,
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.\n- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.\n- No text anywhere except the middle panel's arrow labels.",
+      "guardedPrompt": "Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.",
+      "stripLocal": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/strips/sh_01_09_ref_strip.png",
+      "stripSha": "782f8fcf337ad9f1",
+      "refOrder": [
+        "<rough_strip>",
+        "조승우",
+        "style:real"
+      ],
+      "charRefs": [
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820"
+      ],
+      "anchorRef": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+      "image_size_requested": "1024x1536",
+      "stripUrl": "https://v3b.fal.media/files/b/0aa60034/O5tg12gCbsV1JRe2FzO7Y_1786511700143.png",
+      "request_id": "019ff465-3e43-79e2-936a-0b36f4981f1c",
+      "model_actual": "openai/gpt-image-2/edit",
+      "fal_request": {
+        "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.\n- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.\n- No text anywhere except the middle panel's arrow labels.",
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa60034/O5tg12gCbsV1JRe2FzO7Y_1786511700143.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+        ],
+        "image_size": "auto"
+      },
+      "submitted_at": "2026-08-12T05:15:03.731Z",
+      "done": true,
+      "out_url": "https://v3b.fal.media/files/b/0aa60022/7vBCtJreXXBljaRf74W7Z_5bOX82kX.png",
+      "out_size": {
+        "width": null,
+        "height": null
+      },
+      "local": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/assets/sh_01_09__A__r3.png",
+      "collected_at": "2026-08-12T05:16:37.727Z"
+    },
+    {
+      "key": "sh_01_09__B__r1",
+      "arm": "B",
+      "shot_id": "sh_01_09",
+      "klass": "double",
+      "label": "TURNS",
+      "rep": 1,
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.\n- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.\n- No text anywhere except the middle panel's arrow labels.",
+      "guardedPrompt": "Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.",
+      "stripLocal": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/strips/sh_01_09_ref_strip.png",
+      "stripSha": "782f8fcf337ad9f1",
+      "refOrder": [
+        "<rough_strip>",
+        "조승우",
+        "style:real"
+      ],
+      "charRefs": [
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820"
+      ],
+      "anchorRef": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+      "image_size_requested": "1024x1536",
+      "stripUrl": "https://v3b.fal.media/files/b/0aa60034/O5tg12gCbsV1JRe2FzO7Y_1786511700143.png",
+      "request_id": "019ff465-3efd-7e11-8a0c-48ee907eaabd",
+      "model_actual": "openai/gpt-image-2/edit",
+      "fal_request": {
+        "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.\n- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.\n- No text anywhere except the middle panel's arrow labels.",
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa60034/O5tg12gCbsV1JRe2FzO7Y_1786511700143.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+        ],
+        "image_size": "auto"
+      },
+      "submitted_at": "2026-08-12T05:15:03.919Z",
+      "done": true,
+      "out_url": "https://v3b.fal.media/files/b/0aa60034/qpiTX0ldFDYtPUco2P1UW_Xb4TH4pG.png",
+      "out_size": {
+        "width": null,
+        "height": null
+      },
+      "local": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/assets/sh_01_09__B__r1.png",
+      "collected_at": "2026-08-12T05:16:39.306Z"
+    },
+    {
+      "key": "sh_01_09__B__r2",
+      "arm": "B",
+      "shot_id": "sh_01_09",
+      "klass": "double",
+      "label": "TURNS",
+      "rep": 2,
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.\n- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.\n- No text anywhere except the middle panel's arrow labels.",
+      "guardedPrompt": "Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.",
+      "stripLocal": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/strips/sh_01_09_ref_strip.png",
+      "stripSha": "782f8fcf337ad9f1",
+      "refOrder": [
+        "<rough_strip>",
+        "조승우",
+        "style:real"
+      ],
+      "charRefs": [
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820"
+      ],
+      "anchorRef": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+      "image_size_requested": "1024x1536",
+      "stripUrl": "https://v3b.fal.media/files/b/0aa60034/O5tg12gCbsV1JRe2FzO7Y_1786511700143.png",
+      "request_id": "019ff465-3fbb-7b03-95fb-d646e2c98e6a",
+      "model_actual": "openai/gpt-image-2/edit",
+      "fal_request": {
+        "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.\n- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.\n- No text anywhere except the middle panel's arrow labels.",
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa60034/O5tg12gCbsV1JRe2FzO7Y_1786511700143.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+        ],
+        "image_size": "auto"
+      },
+      "submitted_at": "2026-08-12T05:15:04.109Z",
+      "done": true,
+      "out_url": "https://v3b.fal.media/files/b/0aa60034/eamnh6hohNWwx00undB40_VxCdFJJP.png",
+      "out_size": {
+        "width": null,
+        "height": null
+      },
+      "local": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/assets/sh_01_09__B__r2.png",
+      "collected_at": "2026-08-12T05:16:40.825Z"
+    },
+    {
+      "key": "sh_01_09__B__r3",
+      "arm": "B",
+      "shot_id": "sh_01_09",
+      "klass": "double",
+      "label": "TURNS",
+      "rep": 3,
+      "model": "openai/gpt-image-2/edit",
+      "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.\n- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.\n- No text anywhere except the middle panel's arrow labels.",
+      "guardedPrompt": "Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.",
+      "stripLocal": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/strips/sh_01_09_ref_strip.png",
+      "stripSha": "782f8fcf337ad9f1",
+      "refOrder": [
+        "<rough_strip>",
+        "조승우",
+        "style:real"
+      ],
+      "charRefs": [
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820"
+      ],
+      "anchorRef": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+      "image_size_requested": "1024x1536",
+      "stripUrl": "https://v3b.fal.media/files/b/0aa60034/O5tg12gCbsV1JRe2FzO7Y_1786511700143.png",
+      "request_id": "019ff465-407b-7c43-9f7c-31014fa125bf",
+      "model_actual": "openai/gpt-image-2/edit",
+      "fal_request": {
+        "prompt": "The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.\n\nRepaint this exact strip as finished, final-quality film frames:\n- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.\n- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.\n- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.\n- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.\n- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.\n- Replace every wooden mannequin with the corresponding character(s) from the reference images between the first and the last (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.\n- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- Shot description: Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.\nContinuity: moments earlier the previous shot showed \"A smoke-hazed horizon viewed through a broken window frame.\". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.\n- No text anywhere except the middle panel's arrow labels.",
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa60034/O5tg12gCbsV1JRe2FzO7Y_1786511700143.png",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820",
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+        ],
+        "image_size": "auto"
+      },
+      "submitted_at": "2026-08-12T05:15:04.300Z",
+      "done": true,
+      "out_url": "https://v3b.fal.media/files/b/0aa60022/mI5_DfYv88X4tj6cv4I2t_uYKeeqVY.png",
+      "out_size": {
+        "width": null,
+        "height": null
+      },
+      "local": "/Users/xcape/orca/workspaces/tale-studio/product-open/research/experiments/repaint-strip-prompt-v2/run/assets/sh_01_09__B__r3.png",
+      "collected_at": "2026-08-12T05:16:42.647Z"
+    }
+  ]
+}

@@ -1,0 +1,272 @@
+{
+  "_provenance": {
+    "copiedFrom": "/Users/xcape/projects/tale-studio/research/experiments/previz-channel-ablation/run/fixtures.json",
+    "collectedAt": "2026-08-10T12:23:32.678Z",
+    "note": "previz-channel-ablation 이 2026-08-10 live DB 에서 동결한 픽스처의 부분집합(대상 2샷). 이 실험은 DB 를 다시 보지 않는다."
+  },
+  "collectedAt": "2026-08-10T12:23:32.678Z",
+  "project": {
+    "id": "9d6efa6d-3216-40b0-8a2c-184ab56f02ec",
+    "title": "Sample1",
+    "workspace_id": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+    "style_anchor_key": "real"
+  },
+  "styleAnchor": {
+    "key": "real",
+    "imageUrl": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png"
+  },
+  "fixtures": [
+    {
+      "shot_id": "sh_02_10",
+      "klass": "static",
+      "label": "STATIC HOLD",
+      "why": "정지 대조군 — 인물 0, START≈END(팔 간 구분 불가가 정상)",
+      "shot": {
+        "shot_id": "sh_02_10",
+        "scene_id": "sc_02",
+        "sort_order": 9,
+        "shot_type": "WS",
+        "action_description": "Static wide shot of the office before the intrusion; dust particles drift through shafts of sunlight.",
+        "action_description_native": "침입 전, 먼지 입자가 햇빛 속에 떠다니는 정적인 사무실 전경.",
+        "characters": [],
+        "location_ids": null,
+        "duration_seconds": 8,
+        "generation_method": "I2V",
+        "prompt": "",
+        "check_notes": [
+          {
+            "category": "continuity",
+            "severity": "WARNING",
+            "constraint": "This minimalist office with marble floors and white walls is a distinct location from the ruined, debris-filled office seen previously; no broken windows, rusted cabinets, or concrete rubble are present."
+          }
+        ],
+        "dynamic_spec": null,
+        "static_spec": {
+          "framing": {
+            "rule": "thirds",
+            "layers": {
+              "midground": "An empty office space with dust motes dancing in shafts of light.",
+              "background": "A large window overlooking a calm, yet hazy city skyline.",
+              "foreground": "A clean, dark navy office desk edge."
+            },
+            "focal_point": "The center of the frame where dust particles catch the light."
+          },
+          "lens_mm": 50,
+          "shot_id": "shot_9",
+          "lighting": {
+            "quality": "soft",
+            "key_direction": "top_right",
+            "key_fill_ratio": "5:1",
+            "color_temp_kelvin": 3200
+          },
+          "shot_type": "WS",
+          "camera_angle": "eye_level",
+          "texture_notes": "Smooth marble floors and fine dust particles visible in the air.",
+          "depth_of_field": "deep",
+          "prop_placement": [
+            {
+              "prop": "minimalist desk lamp",
+              "significance": "Represents the order and professional life of the characters.",
+              "position_in_frame": "left_third"
+            }
+          ],
+          "palette_emphasis": [
+            "#1B263B",
+            "#F0F0F0"
+          ],
+          "character_blocking": [],
+          "first_frame_prompt": "A wide shot of a minimalist office, cinematic realism. Dark navy furniture against white walls. Sunlight streams through a large window, illuminating fine dust motes in the air. The room is quiet and orderly, with a polished marble floor reflecting the light. High detail, 8k resolution.",
+          "color_grading_intent": "Clean and clinical with a slight warm tint from the sunlight."
+        },
+        "design_ref": "shot_9",
+        "camera_brand": "arri",
+        "focal_length": 35,
+        "aperture": 2.8,
+        "white_balance": 5600,
+        "movement_preset": null,
+        "camera_config": {
+          "pan": 0,
+          "roll": 0,
+          "tilt": 0,
+          "zoom": 0,
+          "vertical": 0,
+          "horizontal": 0
+        },
+        "rough_storyboard": {
+          "url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_rough_start.png?v=1786015798675",
+          "frames": {
+            "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_rough_end.png?v=1786015798898",
+            "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_rough_start.png?v=1786015798675",
+            "direction": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_rough_direction.png?v=1786015798891"
+          },
+          "status": "completed",
+          "gridUrl": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/rough_grid_5ad17a7e-bce9-49b7-904b-e77828728bca.png?v=1786015796851",
+          "generatedAt": 1786015799297,
+          "errorMessage": null
+        },
+        "storyboard_image": {
+          "url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_storyboard_start.png?v=1786023978615",
+          "frames": {
+            "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_storyboard_end.png?v=1786023977979",
+            "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_storyboard_start.png?v=1786023978615",
+            "direction": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_storyboard_direction.png?v=1786023978060"
+          },
+          "status": "completed",
+          "stripUrl": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/real_grid_a9c3a9f0-e51c-46f5-bfc1-564fd8dd9030.png?v=1786023976728",
+          "generatedAt": 1786023979553,
+          "errorMessage": null
+        }
+      },
+      "prevShot": {
+        "scene_id": "sc_01",
+        "prompt": "",
+        "action_description": "Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor."
+      },
+      "charRefs": [],
+      "charNames": [],
+      "roughFrames": {
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_rough_end.png?v=1786015798898",
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_rough_start.png?v=1786015798675",
+        "direction": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_rough_direction.png?v=1786015798891"
+      },
+      "realFrames": {
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_storyboard_end.png?v=1786023977979",
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_storyboard_start.png?v=1786023978615",
+        "direction": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-04248be909ba70065534b4e7483783e8d4e2f25840ca8f04902a51305bc7fe6c_storyboard_direction.png?v=1786023978060"
+      }
+    },
+    {
+      "shot_id": "sh_01_09",
+      "klass": "double",
+      "label": "TURNS",
+      "why": "2동작 순차(\"photographs ... then freezes\") — shotCheck 분할 대상 형태",
+      "shot": {
+        "shot_id": "sh_01_09",
+        "scene_id": "sc_01",
+        "sort_order": 8,
+        "shot_type": "MS",
+        "action_description": "Cho Seung-woo urgently photographs documents, then freezes as footsteps echo from the corridor.",
+        "action_description_native": "다급하게 서류를 촬영하다 복도에서 들리는 발소리에 동작을 멈춘다.",
+        "characters": [
+          "char"
+        ],
+        "location_ids": null,
+        "duration_seconds": 9,
+        "generation_method": "I2V",
+        "prompt": "",
+        "check_notes": [
+          {
+            "category": "continuity",
+            "severity": "WARNING",
+            "constraint": "The documents Cho is photographing in shot_8 are spread on the desk surface; they have been retrieved from the floor after being dropped in shot_5."
+          }
+        ],
+        "dynamic_spec": null,
+        "static_spec": {
+          "framing": {
+            "rule": "thirds",
+            "layers": {
+              "midground": "Cho Seung-woo holding a camera/phone, looking toward the door.",
+              "background": "The dark corridor visible through the office door.",
+              "foreground": "The documents scattered on the desk."
+            },
+            "focal_point": "Cho's alert expression."
+          },
+          "lens_mm": 35,
+          "shot_id": "shot_8",
+          "lighting": {
+            "quality": "hard",
+            "key_direction": "top_right",
+            "key_fill_ratio": "3:1",
+            "color_temp_kelvin": 4500
+          },
+          "shot_type": "MS",
+          "camera_angle": "eye_level",
+          "texture_notes": "Glint of the camera lens, shadows in the corridor.",
+          "depth_of_field": "medium",
+          "prop_placement": [
+            {
+              "prop": "Camera/Phone",
+              "significance": "Tool for securing the evidence.",
+              "position_in_frame": "center"
+            }
+          ],
+          "palette_emphasis": [
+            "#1B263B",
+            "#415A77"
+          ],
+          "character_blocking": [
+            {
+              "gaze": "toward_background",
+              "pose": "Frozen in mid-action, head turned toward the background.",
+              "character_id": "char",
+              "asset_version": "v1",
+              "position_in_frame": "left_third"
+            }
+          ],
+          "first_frame_prompt": "Medium shot of Cho Seung-woo holding a small camera over documents. He is positioned on the left, but his head is snapped toward the open office door in the background. The lighting is harsh, casting long shadows into the dark corridor. Tense atmosphere.",
+          "color_grading_intent": "Deepen the shadows to increase the sense of threat."
+        },
+        "design_ref": "shot_8",
+        "camera_brand": "arri",
+        "focal_length": 35,
+        "aperture": 2.8,
+        "white_balance": 5600,
+        "movement_preset": null,
+        "camera_config": {
+          "pan": 0,
+          "roll": 0,
+          "tilt": 0,
+          "zoom": 0,
+          "vertical": 0,
+          "horizontal": 0
+        },
+        "rough_storyboard": {
+          "url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_rough_start.png?v=1786015784439",
+          "frames": {
+            "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_rough_end.png?v=1786015783840",
+            "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_rough_start.png?v=1786015784439",
+            "direction": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_rough_direction.png?v=1786015784295"
+          },
+          "status": "completed",
+          "gridUrl": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/rough_grid_423b3d13-2392-4d20-94c2-bbb1bd6ec128.png?v=1786015782796",
+          "generatedAt": 1786015784826,
+          "errorMessage": null
+        },
+        "storyboard_image": {
+          "url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_storyboard_start.png?v=1786023802386",
+          "frames": {
+            "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_storyboard_end.png?v=1786023802380",
+            "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_storyboard_start.png?v=1786023802386",
+            "direction": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_storyboard_direction.png?v=1786023803138"
+          },
+          "status": "completed",
+          "stripUrl": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/real_grid_0458fb47-9bfc-4aeb-ba99-1b56ab2d9bc3.png?v=1786023801273",
+          "generatedAt": 1786023803527,
+          "errorMessage": null
+        }
+      },
+      "prevShot": {
+        "scene_id": "sc_01",
+        "prompt": "",
+        "action_description": "A smoke-hazed horizon viewed through a broken window frame."
+      },
+      "charRefs": [
+        "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786076306820"
+      ],
+      "charNames": [
+        "조승우"
+      ],
+      "roughFrames": {
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_rough_end.png?v=1786015783840",
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_rough_start.png?v=1786015784439",
+        "direction": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_rough_direction.png?v=1786015784295"
+      },
+      "realFrames": {
+        "end": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_storyboard_end.png?v=1786023802380",
+        "start": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_storyboard_start.png?v=1786023802386",
+        "direction": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/shots/v1-8afc65b9fe6fa92bb0b3974c86ab46be90013d7fb295abcf0682e7f72c88cc7d_storyboard_direction.png?v=1786023803138"
+      }
+    }
+  ]
+}
