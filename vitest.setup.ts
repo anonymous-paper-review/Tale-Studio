@@ -34,3 +34,7 @@ Object.defineProperty(globalThis, 'localStorage', {
 process.env.NEXT_PUBLIC_SUPABASE_URL ??= 'http://supabase.invalid'
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= 'test-anon-key'
 process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'test-service-role-key'
+
+// fal.ts 도 동일하게 모듈 스코프에서 FAL_KEY 를 읽는다 — 미설정이면 falImageSubmit 등이
+// 'FAL_KEY not set' 로 즉시 throw 해 실제 호출은 목으로 대체하는 테스트조차 막힌다.
+process.env.FAL_KEY ??= 'test-fal-key'

@@ -91,6 +91,10 @@ export interface FalImageOptions {
   negative_prompt?: string;
   /** 고정 시 diffusion 노이즈 초기값 고정 → 스타일 베이스라인 일관성 + 재생성 재현성 (flux 계열 지원). */
   seed?: number;
+  /** gpt-image 계열 캔버스 크기 직접 지정(예: '1024x1536'). 명시 시 aspect_ratio 기반 preset 매핑보다
+   *  우선한다(#real-strip-guard 2026-08-06 가드가 이 필드가 없어 무시되던 결함 수정 — 2026-08-12).
+   *  AnchorableSubmit(style-anchor.ts)과 동일 필드명으로 정렬. */
+  image_size?: string;
   webhookUrl?: string;        // 설정 시 fal 큐가 완료를 이 URL로 POST (비동기 webhook 전환)
 }
 
@@ -172,9 +176,12 @@ function buildFalImageInput(opts: FalImageOptions, model: string): Record<string
   if (typeof opts.seed === 'number') input.seed = opts.seed;
 
   if (isImageEditModel(model)) {
-    // edit 모델: image_urls 필수 + image_size preset
+    // edit 모델: image_urls 필수 + image_size preset. 호출자 명시값 우선(#real-strip-guard
+    //   2026-08-06 가드가 FalImageOptions 에 image_size 필드가 없어 계속 버려지고 있었다 —
+    //   generate-storyboard/route.ts 의 '1024x1536' 지정이 여기 닿은 적이 없었다는 뜻.
+    //   2026-08-12: 필드 추가로 이 가드가 이제야 실제로 걸린다. 없으면 기존 aspect_ratio 폴백.
     input.image_urls = opts.reference_image_urls ?? [];
-    input.image_size = arToImageSize(opts.aspect_ratio);
+    input.image_size = opts.image_size ?? arToImageSize(opts.aspect_ratio);
   } else if (isFluxFamilyModel(model)) {
     // flux 계열: aspect_ratio 파라미터가 없고 image_size preset 사용 ('auto' 미지원 → 16:9 fallback)
     const size = arToImageSize(opts.aspect_ratio);

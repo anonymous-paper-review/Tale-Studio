@@ -107,9 +107,11 @@ export async function POST(req: NextRequest) {
           hasStyleRef: !!anchor,
         }),
         reference_image_urls: [refUrl, ...charRefs, ...(anchor ? [anchor.imageUrl] : [])],
-        image_size: '1536x1024', // 가로 시트 강제 — finalize 가드(세로=계약 위반 실패)와 짝
+        // 가로 시트 강제 — finalize 가드(세로=계약 위반 실패)와 짝. FalImageOptions.image_size
+        //   추가로 이 값이 이제 실제로 fal 요청에 실린다(2026-08-12, #real-strip-guard).
+        image_size: '1536x1024',
         webhookUrl,
-      } as never)
+      })
 
       const job = await createGenerationJob({
         projectId,
