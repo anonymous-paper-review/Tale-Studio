@@ -281,8 +281,13 @@ new_characters에도 기존 캐스트와 같은 깊이의 서사 속성(personal
     systemInstruction,
     temperature: 0.7,
     webSearch: true, // #p4-websearch: 스토리 축 — 오마쥬/실존 레퍼런스 접지
-    // #p4-json-guard: validate 전용 — StoryScene 전 필드 스키마 확신 전까지 생성 강제는 안 켠다.
+    // #p4-json-guard(2026-08-12): ScenesSchema 가 StoryScene 전집합이 됐으므로 생성 자체를 강제한다
+    //   (schemas.ts 상단 enforce 계약 참조). webSearch:true 라 gemini 설정이어도 dispatch.ts 의
+    //   그라운딩 라우팅으로 실제 호출은 claude 로 간다 — enforceSchema 는 claude 경로에서만 유효
+    //   (output_config.format), 다른 provider 는 무시하고 validate(schema:)만 적용된다.
+    //   되돌리려면 enforceSchema: true 줄만 지운다(schema: 는 남겨도 무방 — validate 만 계속 동작).
     schema: ScenesSchema,
+    enforceSchema: true,
   });
 
   await logger.saveLlmCall('scenes', {
@@ -304,6 +309,13 @@ new_characters에도 기존 캐스트와 같은 깊이의 서사 속성(personal
     const repaired = await generateJson<Scenes>(repairPrompt, axisConfig, {
       systemInstruction,
       temperature: 0.6,
+      // #p4-json-guard(2026-08-12): validate 만(enforceSchema 는 안 켠다) — 이 재요청 콜은
+      //   webSearch 를 안 보내 gemini 기본 설정에선 그라운딩 라우팅이 안 타 실제로 gemini 로
+      //   가고(enforceSchema 는 claude 경로 전용이라 여기선 어차피 무효), claude 로 가는
+      //   구성이라도 자유서술 교정 지시("다음 막에 씬이 없음: …") 위에 생성 강제까지 얹으면
+      //   실패 모드가 하나 늘 뿐이라 보수적으로 뺐다. 위반 시 여기서 throw 되는 것 자체가 목적
+      //   (무신호 금지) — "더 나아졌을 때만 채택" 비교 로직은 그대로 둔다.
+      schema: ScenesSchema,
     });
     await logger.saveLlmCall('scenes_repair', {
       prompt: repairPrompt,
@@ -330,6 +342,8 @@ ${budgetViolations.map((x) => `- ${x.scene_id ?? '(전체)'}: ${x.message}`).joi
     const budgetRepaired = await generateJson<Scenes>(budgetRepairPrompt, axisConfig, {
       systemInstruction,
       temperature: 0.5,
+      // #p4-json-guard(2026-08-12): validate 만 — 위 act 커버리지 repair 와 동일 이유(엔포스 안 켬).
+      schema: ScenesSchema,
     });
     await logger.saveLlmCall('scenes_budget_repair', {
       prompt: budgetRepairPrompt,

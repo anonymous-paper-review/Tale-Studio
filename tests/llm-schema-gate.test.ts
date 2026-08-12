@@ -37,12 +37,26 @@ describe('스키마 게이트 — 결손을 잡는다 (Q6 계열 방어)', () =>
   it('Scenes: 미지 필드는 거부하지 않는다(원본 반환 원칙과 합)', () => {
     const r = ScenesSchema.safeParse({
       scenes: [
-        { scene_id: 'sc_1', location: 'loc', scene_actions: ['a'], weather: 'rain', extra: 1 },
+        {
+          scene_id: 'sc_1',
+          act_ref: 'act_1',
+          location: 'loc',
+          time_of_day: 'day',
+          weather: 'rain',
+          characters_in_scene: ['char_1'],
+          purpose: 'conflict',
+          emotion_beat: { start: 'calm', end: 'tense' },
+          dialogue_summary: 'they argue',
+          info_asymmetry: 'audience=character',
+          estimated_seconds: 12,
+          scene_actions: ['a'],
+          extra: 1, // 미지 필드
+        },
       ],
       total_estimated_seconds: 10,
       unknown_root_field: true,
     })
-    expect(r.success).toBe(true)
+    expect(r.success, JSON.stringify(!r.success && r.error.issues.slice(0, 5))).toBe(true)
   })
 
   it('NarrativeStructure: acts 빈 배열을 거부한다', () => {
@@ -55,6 +69,65 @@ describe('스키마 게이트 — 결손을 잡는다 (Q6 계열 방어)', () =>
       turning_point_position: 0.5,
     })
     expect(r.success).toBe(false)
+  })
+})
+
+// ── StorySceneLooseSchema — 2026-08-12 13필드 전집합 확장 게이트 ──
+//   #p4-json-guard 후속: 3필드(scene_id/location/scene_actions)만 강제하던 구멍으로
+//   key_dialouge 오타(2026-08-04)·characters_id 오타(2026-07-27)가 무신호로 통과했다.
+//   StoryScene(pipeline.ts) 전 필드를 옮긴 뒤에도 결손·형태 위반이 실제로 잡히는지 검산한다.
+describe('StorySceneLooseSchema — 씬 전 필드 게이트', () => {
+  // 필수 11필드만 채운 최소 유효 씬 — weather/key_dialogue(optional)는 의도적으로 비움.
+  const validScene = () => ({
+    scene_id: 'sc_1',
+    act_ref: 'act_1',
+    location: 'loc_1',
+    time_of_day: 'day',
+    characters_in_scene: ['char_1'],
+    purpose: 'conflict',
+    emotion_beat: { start: 'calm', end: 'tense' },
+    dialogue_summary: 'they argue',
+    info_asymmetry: 'audience=character',
+    estimated_seconds: 12,
+    scene_actions: ['a walks in'],
+  })
+
+  it('characters_in_scene 결손을 거부한다(2026-07-27 characters_id 오타 사고 재현)', () => {
+    const scene = validScene() as Record<string, unknown>
+    delete scene.characters_in_scene
+    const r = ScenesSchema.safeParse({ scenes: [scene] })
+    expect(r.success).toBe(false)
+  })
+
+  it('emotion_beat 결손을 거부한다', () => {
+    const scene = validScene() as Record<string, unknown>
+    delete scene.emotion_beat
+    const r = ScenesSchema.safeParse({ scenes: [scene] })
+    expect(r.success).toBe(false)
+  })
+
+  it('emotion_beat 형태 위반({start,end} 아님)을 거부한다', () => {
+    const scene = { ...validScene(), emotion_beat: { start: 'calm' } } // end 없음
+    const r = ScenesSchema.safeParse({ scenes: [scene] })
+    expect(r.success).toBe(false)
+  })
+
+  it('optional 필드(weather, key_dialogue) 부재는 통과한다(오탐 0 확인)', () => {
+    const r = ScenesSchema.safeParse({ scenes: [validScene()] })
+    expect(r.success, JSON.stringify(!r.success && r.error.issues.slice(0, 5))).toBe(true)
+  })
+
+  // 알려진 사각지대(characterization test) — key_dialogue 는 StoryScene 타입에서 optional 이다
+  // (item 1 규칙: optional 을 required 로 승격 금지 — 실패율만 올린다). 그래서 "필드가 아예
+  // 없음"과 "오타 이름(key_dialouge)으로 대신 있음"을 스키마가 구분하지 못한다 — 둘 다 정본
+  // key_dialogue 부재로 보여 통과한다. z.looseObject 는 미지 필드를 허용하므로 key_dialouge
+  // 자체도 거부 사유가 안 된다. 오타 방어를 원하면 key_dialogue 를 required 로 올리는
+  // 트레이드오프(실패율 상승)를 오너가 별도로 결정해야 한다 — 여기선 현재 동작을 고정만 한다.
+  it('key_dialogue 오타(key_dialouge)는 optional 필드라 스키마 레벨에서 못 잡는다(알려진 한계)', () => {
+    const scene = validScene() as Record<string, unknown>
+    scene.key_dialouge = [{ character_id: 'char_1', line: 'hi', delivery: 'soft' }]
+    const r = ScenesSchema.safeParse({ scenes: [scene] })
+    expect(r.success).toBe(true)
   })
 })
 
