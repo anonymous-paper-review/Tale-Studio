@@ -15,6 +15,7 @@ import { humanizeSlug } from '@/lib/display-name'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { writerSceneIdToMain, writerShotIdToMain } from '@/lib/writer/adapters'
 import { reallocateShotDurations } from '@/lib/writer/pipeline/util/duration_reallocation'
+import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics'
 import { buildShotDialogueMap } from '@/lib/writer/pipeline/util/dialogue_join'
 import { isFlagOn } from '@/lib/flags'
 import {
@@ -60,7 +61,9 @@ const DEFAULT_LIGHTING = { position: 'front', brightness: 50, colorTemp: 5000 }
 
 // 샷 길이 상한 — 파이프라인이 과다 산정한 길이(예: 18s)의 백스톱(#9, 2026-07-09). 가이드는 2~8초
 //   (decoupage/v4 프롬프트), 이 클램프는 LLM 초과분만 막는다. 수동 편집은 상세 팝업에서 최대 60s 허용.
-const MAX_SHOT_SECONDS = 10
+//   정본에서 읽는다 — 종전엔 리터럴 10 을 여기 따로 적어둬, 프롬프트가 선언하는 숫자와
+//   실제로 자르는 숫자의 출처가 갈려 있었다 (2026-08-12 오너 지시).
+const MAX_SHOT_SECONDS = SHOT_PHYSICS.shotSecondsHardMax
 function clampShotSeconds(s: number | null | undefined): number {
   return Math.min(MAX_SHOT_SECONDS, Math.max(1, Math.round(s ?? 5)))
 }

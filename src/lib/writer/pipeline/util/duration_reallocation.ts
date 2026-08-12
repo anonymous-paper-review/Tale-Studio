@@ -14,9 +14,13 @@
 //   needed  = max(바닥 2.5s, action+newInfo, speech+1.0)  — 발화와 액션은 병행되므로 max 합성
 //   to      = min(상한, max(현행, ceil(needed)))          — 상한은 persist 클램프(10s)와 정합
 import type { ShotSequenceItem, ShotDialogue } from '@/lib/writer/types/pipeline'
+import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics'
 
-export const REALLOC_MIN_SHOT_SECONDS = 2.5
-export const REALLOC_MAX_SHOT_SECONDS = 10 // persist_manifest MAX_SHOT_SECONDS(#9)와 동일 값 유지
+// 정본에서 읽는다 — 종전엔 리터럴 2.5·10 을 여기 따로 적어두고 주석으로 "동일 값 유지"를
+//   사람에게 부탁했다. 프롬프트에 주입되는 숫자와 코드가 자르는 숫자가 같은 출처여야 한다
+//   (physics.ts 헤더의 선언 목적 그 자체 — 2026-08-12 오너 지시).
+export const REALLOC_MIN_SHOT_SECONDS = SHOT_PHYSICS.shotSecondsReallocFloor
+export const REALLOC_MAX_SHOT_SECONDS = SHOT_PHYSICS.shotSecondsHardMax
 
 const KO_CHARS_PER_SEC = 4.5
 const LATIN_CHARS_PER_SEC = 13
