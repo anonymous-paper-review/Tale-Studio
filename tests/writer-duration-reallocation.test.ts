@@ -79,15 +79,25 @@ describe('reallocateShotDurations — 인지 부하 규칙', () => {
     expect(changed).toHaveLength(0)
   })
 
-  it('신규 인물 첫 등장 샷은 가산받고, 재등장은 가산 없다', () => {
+  it('신규 인물 첫 등장 샷은 가산받고, 재등장(+내용 없음)은 원본 그대로 통과한다', () => {
     const shots = [
       makeShot({ id: 'shot_1', dur: 5, chars: ['girl'] }),
       makeShot({ id: 'shot_2', dur: 2, chars: ['girl', 'hunter'] }), // hunter 첫 등장 → 2.0+1.0=3.0
-      makeShot({ id: 'shot_3', dur: 2, chars: ['hunter'] }), // 재등장 → 2.5 바닥
+      makeShot({ id: 'shot_3', dur: 2, chars: ['hunter'] }), // 재등장 + 대사·보조액션·카메라무브·씬오프닝 전무 → 내용 없음, 재배분 제외
     ]
     const { shots: out } = reallocateShotDurations(shots, new Map())
     expect(out[1].duration_seconds).toBe(3)
-    expect(out[2].duration_seconds).toBe(3) // ceil(2.5)
+    expect(out[2].duration_seconds).toBe(2) // 내용 없음 — 원본 그대로(2026-08-12: 옛 2.5 바닥 미적용)
+  })
+
+  it('내용 없는 순수 인서트(대사·액션·카메라·신규인물·씬오프닝 전무)는 1초로 들어오면 1초 그대로 나온다', () => {
+    const shots = [
+      makeShot({ id: 'shot_1', dur: 5, chars: ['girl'] }), // 씬 오프닝이라 내용 있음 — 재배분 대상
+      makeShot({ id: 'shot_2', dur: 1, chars: ['girl'] }), // 재등장만, 그 외 전무 → 내용 없음
+    ]
+    const { shots: out, changed } = reallocateShotDurations(shots, new Map())
+    expect(out[1].duration_seconds).toBe(1)
+    expect(changed.find((c) => c.shot_id === 'shot_2')).toBeUndefined()
   })
 
   it('초장문 대사도 상한(10s)을 넘지 않는다', () => {

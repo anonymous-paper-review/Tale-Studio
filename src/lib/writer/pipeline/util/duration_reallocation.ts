@@ -7,7 +7,12 @@
 //   **증액만** 한다(단축 금지 — long take 는 연출 의도일 수 있음). 씬 길이는 합으로 늘어나고
 //   persist 가 scenes.estimated_duration_seconds 를 그 합으로 수렴시킨다 (est 는 참고치로 강등).
 //
-// needed 규칙 (결정론, LLM 없음):
+// 재배분의 목적은 "짧은 컷 금지"가 아니라 "대사·액션이 안 들어가는 사고 방지"다(2026-08-12 오너 결정).
+//   대사 0 + 보조동작 0 + 카메라무브 none + 신규 인물 0 + 씬 오프닝 아님 = 순수 인서트/컷어웨이는
+//   내용이 없어 인지 과부하가 원천적으로 불가능하므로 재배분 대상에서 제외한다 — 모델이 정한 값
+//   그대로 통과한다(1초도 가능). isContentlessShot() 이 그 판별.
+//
+// needed 규칙 (결정론, LLM 없음, 내용 있는 샷에만 적용):
 //   speech  = 대사·내레이션 발화 시간 — 한글 ~4.5자/초, 라틴 ~13자/초 + 호흡 0.5s
 //   action  = 2.0 + 0.8×보조액션 + 카메라 무브(simple 0.5 / complex 1.0)
 //   newInfo = 신규 인물 첫 등장 ×1.0 + 씬 오프닝(공간 리딩) 1.0
@@ -55,6 +60,31 @@ function actionSeconds(shot: ShotSequenceItem): number {
   return 2.0 + 0.8 * (budget?.secondary_action_count ?? 0) + camera
 }
 
+/** isContentlessShot 판별 입력 — 루프 안에서 이미 계산된 값을 그대로 넘긴다(중복 계산 금지). */
+interface ContentSignals {
+  speechSeconds: number
+  secondaryActionCount: number
+  cameraMovementComplexity: 'none' | 'simple' | 'complex' | undefined
+  newCharacterCount: number
+  sceneOpening: boolean
+}
+
+/**
+ * "내용 없는 샷"(순수 인서트/컷어웨이) 판별 — 대사 발화·보조동작·카메라무브·신규 인물·씬 오프닝이
+ *   전부 없으면 인지 과부하가 원천적으로 불가능하다. 재배분 목적이 "짧은 컷 금지"가 아니라
+ *   "대사·액션이 안 들어가는 사고 방지"이므로(파일 헤더), 이 경우는 재배분 대상에서 제외한다
+ *   (2026-08-12 오너 결정 — 모델이 정한 값 그대로 통과, 1초도 가능).
+ */
+export function isContentlessShot(signals: ContentSignals): boolean {
+  return (
+    signals.speechSeconds === 0 &&
+    signals.secondaryActionCount === 0 &&
+    (signals.cameraMovementComplexity ?? 'none') === 'none' &&
+    signals.newCharacterCount === 0 &&
+    !signals.sceneOpening
+  )
+}
+
 export interface DurationChange {
   shot_id: string
   from: number
@@ -97,6 +127,19 @@ export function reallocateShotDurations(
     }
 
     const speech = speechSeconds(dialogueByShotId.get(shot.shot_id))
+
+    if (
+      isContentlessShot({
+        speechSeconds: speech,
+        secondaryActionCount: shot.action_budget?.secondary_action_count ?? 0,
+        cameraMovementComplexity: shot.action_budget?.camera_movement_complexity,
+        newCharacterCount: newCharacters,
+        sceneOpening,
+      })
+    ) {
+      return shot // 내용 없음 — 재배분 대상 제외, 원본 값 그대로(changed 미등재)
+    }
+
     const needed = Math.max(
       min,
       actionSeconds(shot) + newCharacters * 1.0 + (sceneOpening ? 1.0 : 0),
