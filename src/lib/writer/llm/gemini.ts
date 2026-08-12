@@ -4,10 +4,13 @@ import {
   GenerativeModel,
   HarmCategory,
   HarmBlockThreshold,
+  type Schema as GeminiResponseSchema,
 } from '@google/generative-ai';
+import type { z } from 'zod';
 import { recordRawCall } from './raw_collector';
 import { repairJsonStrict } from './json_repair';
 import { withLlmRetry } from './retry';
+import { zodToGeminiSchema } from './gemini-schema';
 
 // TALE_ 우선 — 표준 이름은 Bun 기반 CLI가 .env.local에서 크리덴셜로 오인 수집 (src/lib/claude.ts 참조)
 const apiKey = process.env.TALE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
@@ -47,6 +50,11 @@ export interface GeminiCallOptions {
   temperature?: number;
   // #p4-websearch: googleSearch 그라운딩 — 스토리 축(s1/s3)의 오마쥬/레퍼런스 접지.
   webSearch?: boolean;
+  // #p4-json-guard 후속(2026-08-12): 생성 자체를 스키마로 강제(claude 의 zodSchema 와 대칭 —
+  //   단 여기는 "등가물"이 아니라 진짜 구조 강제, mimeType 은 형식 강제일 뿐이었다). zodToGeminiSchema
+  //   가 못 옮기는 노드(유니온·$ref 재사용 등)를 만나면 unsupported 사유만 경고로 남기고 스키마
+  //   강제 없이 진행한다(mimeType 의 JSON 강제는 유지) — 변환 실패로 호출 자체를 죽이지 않는다.
+  zodSchema?: z.ZodTypeAny;
 }
 
 // #p4-websearch 그라운딩 모델 핀(2026-08-11 실측): gemini-3.6-flash 는 googleSearch 가 실동작하지 않는다 —
@@ -68,12 +76,30 @@ export async function geminiGenerate(
   const started = Date.now();
   const mime = opts.expectJson ? 'application/json' : 'text/plain';
 
+  // #p4-json-guard 후속: responseSchema 는 JSON 모드에서만 의미가 있다(구조 강제가 형식 강제 위에
+  //   얹히는 것). 변환 불가 노드를 만나면 경고만 남기고 스키마 강제 없이 진행한다(무신호 금지지만
+  //   실패로 죽이지도 않는다 — mimeType 의 JSON 강제는 그대로 유지).
+  let responseSchema: GeminiResponseSchema | undefined;
+  if (opts.zodSchema) {
+    if (mime !== 'application/json') {
+      console.warn('[gemini] zodSchema 지정됐으나 JSON 모드가 아니라 무시(expectJson=false)');
+    } else {
+      const conv = zodToGeminiSchema(opts.zodSchema);
+      if (conv.schema) {
+        responseSchema = conv.schema;
+      } else {
+        console.warn(`[gemini] responseSchema 변환 불가 — 스키마 강제 없이 진행 (${conv.unsupported})`);
+      }
+    }
+  }
+
   const model: GenerativeModel = client.getGenerativeModel({
     model: modelName,
     systemInstruction: opts.systemInstruction,
     generationConfig: {
       temperature: opts.temperature ?? 0.7,
       responseMimeType: mime,
+      ...(responseSchema ? { responseSchema } : {}),
     },
     safetySettings: SAFETY_SETTINGS,
     // #p4-websearch: googleSearch 그라운딩 (SDK 타입에 미등재 계열 — 런타임 계약은 API 소관).

@@ -10,6 +10,7 @@ import {
   MergedRawSchema,
   NarrativeStructureSchema,
   ScenesSchema,
+  findUnknownFields,
 } from '@/lib/writer/pipeline/schemas'
 
 describe('스키마 게이트 — 결손을 잡는다 (Q6 계열 방어)', () => {
@@ -128,6 +129,51 @@ describe('StorySceneLooseSchema — 씬 전 필드 게이트', () => {
     scene.key_dialouge = [{ character_id: 'char_1', line: 'hi', delivery: 'soft' }]
     const r = ScenesSchema.safeParse({ scenes: [scene] })
     expect(r.success).toBe(true)
+  })
+})
+
+// ── 미지 필드 기록(#p4-json-guard 후속 2026-08-12) — 거부 대신 기록. key_dialouge 는 스키마
+//   레벨에서 통과하지만(위 characterization test), findUnknownFields 로는 잡혀야 무신호가 없어진다.
+describe('findUnknownFields — 미지 필드는 거부하지 않고 기록만 한다', () => {
+  const validScene = () => ({
+    scene_id: 'sc_1',
+    act_ref: 'act_1',
+    location: 'loc_1',
+    time_of_day: 'day',
+    characters_in_scene: ['char_1'],
+    purpose: 'conflict',
+    emotion_beat: { start: 'calm', end: 'tense' },
+    dialogue_summary: 'they argue',
+    info_asymmetry: 'audience=character',
+    estimated_seconds: 12,
+    scene_actions: ['a walks in'],
+  })
+
+  it('key_dialouge 오타가 섞이면 스키마는 통과하되 미지 필드로 기록된다', () => {
+    const scene = validScene() as Record<string, unknown>
+    scene.key_dialouge = [{ character_id: 'char_1', line: 'hi', delivery: 'soft' }]
+    const payload = { scenes: [scene] }
+    const parsed = ScenesSchema.safeParse(payload)
+    expect(parsed.success).toBe(true) // 통과는 시킨다(거부 아님)
+
+    const report = findUnknownFields(ScenesSchema, payload)
+    expect(report.size).toBeGreaterThan(0)
+    const sceneLevel = report.get('scenes')
+    expect(sceneLevel?.get('key_dialouge')).toEqual(['sc_1']) // 값은 안 담고 scene_id 라벨만
+  })
+
+  it('정상 산출(미지 필드 없음)은 경고 0 — 오탐 없음', () => {
+    const payload = { scenes: [validScene()], total_estimated_seconds: 12 }
+    const report = findUnknownFields(ScenesSchema, payload)
+    expect(report.size).toBe(0)
+  })
+
+  it('모델 산출 값은 로그에 담기지 않는다 — 라벨은 키 이름/식별자뿐, 필드 값 문자열은 안 실린다', () => {
+    const scene = validScene() as Record<string, unknown>
+    scene.secret_note = 'this is sensitive model output text'
+    const report = findUnknownFields(ScenesSchema, { scenes: [scene] })
+    const labels = report.get('scenes')?.get('secret_note') ?? []
+    expect(labels).toEqual(['sc_1']) // scene_id(식별자)만 — 필드 값('this is sensitive...')은 없음
   })
 })
 

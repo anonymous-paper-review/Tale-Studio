@@ -288,6 +288,7 @@ new_characters에도 기존 캐스트와 같은 깊이의 서사 속성(personal
     //   되돌리려면 enforceSchema: true 줄만 지운다(schema: 는 남겨도 무방 — validate 만 계속 동작).
     schema: ScenesSchema,
     enforceSchema: true,
+    auditUnknownFields: true, // #p4-json-guard 후속: 스키마 밖 키(key_dialouge 류 오타)를 기록만(거부 아님)
   });
 
   await logger.saveLlmCall('scenes', {
@@ -316,6 +317,7 @@ new_characters에도 기존 캐스트와 같은 깊이의 서사 속성(personal
       //   실패 모드가 하나 늘 뿐이라 보수적으로 뺐다. 위반 시 여기서 throw 되는 것 자체가 목적
       //   (무신호 금지) — "더 나아졌을 때만 채택" 비교 로직은 그대로 둔다.
       schema: ScenesSchema,
+      auditUnknownFields: true,
     });
     await logger.saveLlmCall('scenes_repair', {
       prompt: repairPrompt,
@@ -344,6 +346,7 @@ ${budgetViolations.map((x) => `- ${x.scene_id ?? '(전체)'}: ${x.message}`).joi
       temperature: 0.5,
       // #p4-json-guard(2026-08-12): validate 만 — 위 act 커버리지 repair 와 동일 이유(엔포스 안 켬).
       schema: ScenesSchema,
+      auditUnknownFields: true,
     });
     await logger.saveLlmCall('scenes_budget_repair', {
       prompt: budgetRepairPrompt,

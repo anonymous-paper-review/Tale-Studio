@@ -168,7 +168,7 @@ export async function runStructureScenesMerged(
   //   전집합이 됐으므로 생성 강제(enforceSchema)를 켠다 — s3_scenes.ts 최초 생성 호출과 동일 판단
   //   (schemas.ts 상단 계약 참조). webSearch:true 라 gemini 설정이어도 그라운딩 라우팅으로 실제
   //   호출은 claude 로 간다(enforceSchema 는 claude 경로 전용). 되돌리려면 enforceSchema: true 만 지운다.
-  const raw = await generateJson<MergedRaw>(user, axisConfig, { systemInstruction: system, temperature: 0.7, webSearch: true, schema: MergedRawSchema, enforceSchema: true });
+  const raw = await generateJson<MergedRaw>(user, axisConfig, { systemInstruction: system, temperature: 0.7, webSearch: true, schema: MergedRawSchema, enforceSchema: true, auditUnknownFields: true });
   await logger.saveLlmCall('structureScenesMerged', {
     prompt: user,
     response: JSON.stringify(raw, null, 2),
@@ -192,7 +192,7 @@ ${JSON.stringify(narrativeStructure, null, 2)}`;
     // #p4-json-guard(2026-08-12): validate 만(enforceSchema 는 안 켠다) — s3_scenes.ts 의 act
     //   커버리지 repair 와 동일 이유(webSearch 미동반 → gemini 기본에선 그라운딩 라우팅 안 타
     //   enforceSchema 자체가 무효 + claude 경로라도 교정 지시 위 생성강제 중첩은 보수적으로 뺌).
-    const repaired = await generateJson<MergedRaw>(repairUser, axisConfig, { systemInstruction: system, temperature: 0.6, schema: MergedRawSchema });
+    const repaired = await generateJson<MergedRaw>(repairUser, axisConfig, { systemInstruction: system, temperature: 0.6, schema: MergedRawSchema, auditUnknownFields: true });
     await logger.saveLlmCall('structureScenesMerged_coverage_repair', {
       prompt: repairUser,
       response: JSON.stringify(repaired, null, 2),
@@ -218,7 +218,7 @@ ${budgetViolations.map((x) => `- ${x.scene_id ?? '(전체)'}: ${x.message}`).joi
 [고정 구조]
 ${JSON.stringify(narrativeStructure, null, 2)}`;
     // #p4-json-guard(2026-08-12): validate 만 — 위 coverage repair 와 동일 이유(엔포스 안 켬).
-    const budgetRepaired = await generateJson<MergedRaw>(budgetRepairUser, axisConfig, { systemInstruction: system, temperature: 0.5, schema: MergedRawSchema });
+    const budgetRepaired = await generateJson<MergedRaw>(budgetRepairUser, axisConfig, { systemInstruction: system, temperature: 0.5, schema: MergedRawSchema, auditUnknownFields: true });
     await logger.saveLlmCall('structureScenesMerged_budget_repair', {
       prompt: budgetRepairUser,
       response: JSON.stringify(budgetRepaired, null, 2),

@@ -5,12 +5,18 @@
 //    실사고(flash-ab 8샷→2샷, Q6) 계열의 방어. 파싱 직후 구조를 코드로 단언하고, 실패는 throw 로
 //    표면화한다(무신호 금지). 단언만 한다 — 산출물은 원본 그대로 반환(키 스트립/변형 없음)이고,
 //    enum "값" 제약은 넣지 않는다(실분포의 enum 밖 값 982건 실측 — 처방은 Q16 오너 미결).
-//  - enforce (enforceSchema:true): claude 경로에서 output_config.format 으로 생성 자체를 스키마에
-//    강제 — gemini responseMimeType 의 등가물. ⚠ enforce 스키마는 프롬프트가 요구하는 필드의
-//    "전집합"이어야 한다: 부분 스키마로 강제하면 스키마 밖 필드가 생성에서 억압돼 하류 데이터가
-//    소실된다. 전집합 확신이 없는 스테이지는 validate 만 건다.
-//    s3/merged 는 2026-08-12 StorySceneLooseSchema 전집합화로 이 조건을 충족해 최초 생성 호출에
-//    enforce 를 켰다(s3_scenes.ts/s1s3_merged.ts 참조) — 교정 재요청 4곳은 validate 만(이유는 그 파일 참조).
+//  - enforce (enforceSchema:true): 생성 자체를 스키마에 강제 — claude 는 output_config.format,
+//    gemini 는 generationConfig.responseSchema(gemini-schema.ts 가 zod→변환, 2026-08-12 배선).
+//    ⚠ 2026-08-12 이전엔 "gemini responseMimeType 의 등가물"이라 적었는데 오해였다 — mimeType 은
+//    "JSON 으로 답해라"(형식) 강제일 뿐 "이 모양으로 답해라"(구조) 강제가 아니다. 그래서 gemini 는
+//    실제론 이 자리가 늘 비어 있었고(dispatch.dispatchOnce 가 스키마 인자를 아예 안 넘김), s3/merged
+//    가 claude 로 간 건 webSearch 그라운딩 우회 라우팅 때문이지 enforce 설계가 아니었다.
+//    openai/local 은 여전히 배선 없음(범위 밖, 필요해지면 각 클라이언트에 동일 패턴 추가).
+//    ⚠ enforce 스키마는 프롬프트가 요구하는 필드의 "전집합"이어야 한다: 부분 스키마로 강제하면
+//    스키마 밖 필드가 생성에서 억압돼 하류 데이터가 소실된다. 전집합 확신이 없는 스테이지는
+//    validate 만 건다. s3/merged 는 2026-08-12 StorySceneLooseSchema 전집합화로 이 조건을 충족해
+//    최초 생성 호출에 enforce 를 켰다(s3_scenes.ts/s1s3_merged.ts 참조) — 교정 재요청 4곳은
+//    validate 만(이유는 그 파일 참조).
 //
 // 스키마는 z.object(비-strict) 기본 — zod 는 알 수 없는 키를 "거부"하지 않으므로(strip 시멘틱)
 // 모델이 여분 필드를 내도 검증은 통과하고, 원본 반환 원칙 덕에 여분 필드도 하류에 그대로 산다.
@@ -123,3 +129,86 @@ export const MergedRawSchema = z.looseObject({
   scenes: z.array(StorySceneLooseSchema).min(1),
   total_estimated_seconds: z.number().optional(),
 });
+
+// ── 미지 필드 기록 (거부 아님, #p4-json-guard 후속 2026-08-12) ──────────────────────────────
+//   오너 결정: key_dialouge 류 오타는 optional 필드라 스키마가 원리적으로 못 잡는다(위 주석).
+//   거부하면 진짜 여분 필드까지 죽으므로, 대신 스키마 밖 키가 왔을 때 서버 로그에만 남긴다(통과는
+//   시킨다) — 이 사고의 본질은 "오타가 났다"가 아니라 "오타가 넉 달 동안 아무도 몰랐다"(무신호)다.
+//   z.object/looseObject·array·optional/nullable/default 래퍼만 재귀한다(그 외 타입은 리프 취급 —
+//   현재 스키마 트리에 union 등 더 복잡한 노드가 없어 충분. 재사용 시 필요하면 분기 추가).
+//   scene_id/id 등 식별자"값"은 위치 표시용으로만 남기고(모델이 지정하는 slug — 대사·서술 같은
+//   저작물성 content 는 아니다), 그 외 모델 산출 "값"은 절대 담지 않는다(키 이름만 로그).
+export type UnknownFieldsByPath = Map<string, Map<string, string[]>>; // path -> 키이름 -> 등장 항목 라벨들
+
+const ID_LIKE_KEYS = ['scene_id', 'id', 'act_id'] as const;
+
+function idLabelOf(obj: Record<string, unknown>): string | undefined {
+  for (const k of ID_LIKE_KEYS) {
+    const v = obj[k];
+    if (typeof v === 'string' && v) return v;
+  }
+  return undefined;
+}
+
+export function findUnknownFields(
+  schema: z.ZodTypeAny,
+  data: unknown,
+  path = '',
+  out: UnknownFieldsByPath = new Map(),
+  itemLabel?: string,
+): UnknownFieldsByPath {
+  if (schema instanceof z.ZodOptional || schema instanceof z.ZodNullable || schema instanceof z.ZodDefault) {
+    return findUnknownFields(schema.unwrap() as z.ZodTypeAny, data, path, out, itemLabel);
+  }
+  if (schema instanceof z.ZodArray) {
+    if (Array.isArray(data)) {
+      const element = schema.element as z.ZodTypeAny;
+      data.forEach((item, i) => {
+        const label =
+          item && typeof item === 'object' && !Array.isArray(item)
+            ? (idLabelOf(item as Record<string, unknown>) ?? `#${i}`)
+            : `#${i}`;
+        findUnknownFields(element, item, path, out, label);
+      });
+    }
+    return out;
+  }
+  if (schema instanceof z.ZodObject) {
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      const obj = data as Record<string, unknown>;
+      const known = new Set(Object.keys(schema.shape));
+      const extras = Object.keys(obj).filter((k) => !known.has(k));
+      if (extras.length) {
+        const byKey = out.get(path) ?? new Map<string, string[]>();
+        for (const k of extras) {
+          const labels = byKey.get(k) ?? [];
+          labels.push(itemLabel ?? '(root)');
+          byKey.set(k, labels);
+        }
+        out.set(path, byKey);
+      }
+      for (const [key, sub] of Object.entries(schema.shape)) {
+        if (key in obj) {
+          findUnknownFields(sub as z.ZodTypeAny, obj[key], path ? `${path}.${key}` : key, out, itemLabel);
+        }
+      }
+    }
+    return out;
+  }
+  return out;
+}
+
+const MAX_LABELS_SHOWN = 5;
+
+// 런/스테이지 콜 1회당 한 줄 요약(씬마다 찍으면 시끄럽다 — path.key(N건: 라벨,…) 형태로 압축).
+export function summarizeUnknownFields(report: UnknownFieldsByPath): string {
+  const parts: string[] = [];
+  for (const [path, byKey] of report) {
+    for (const [key, labels] of byKey) {
+      const shown = labels.slice(0, MAX_LABELS_SHOWN).join(',');
+      const more = labels.length > MAX_LABELS_SHOWN ? `+${labels.length - MAX_LABELS_SHOWN}` : '';
+      parts.push(`${path || '(root)'}.${key}(${labels.length}건: ${shown}${more})`);
+    }
+  }
+  return parts.join(' | ');
+}

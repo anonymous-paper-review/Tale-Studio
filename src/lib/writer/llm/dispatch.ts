@@ -4,6 +4,7 @@ import { claudeGenerateJson } from './claude';
 import { openaiGenerateJson } from './openai';
 import { localGenerateJson } from './local';
 import { LossyRepairError } from './json_repair';
+import { findUnknownFields, summarizeUnknownFields } from '@/lib/writer/pipeline/schemas';
 import type { LlmProvider } from './raw_collector';
 import type { z } from 'zod';
 
@@ -38,10 +39,16 @@ export interface DispatchOptions {
   //   성공 시 산출물은 "원본 그대로" 반환한다(safeParse 는 게이트일 뿐, 변형/키 스트립 없음).
   //   enum 값 제약은 스키마에 넣지 않는다(Q16 오너 미결). 스키마 정본: pipeline/schemas.ts
   schema?: z.ZodType;
-  // enforceSchema: provider 가 지원하면(현재 claude) 생성 자체를 스키마로 강제
-  //   (output_config.format — gemini mime 등가물). 스키마가 프롬프트 필드 전집합일 때만 켠다
-  //   — 부분 스키마 강제는 스키마 밖 필드를 생성에서 억압해 하류 데이터를 소실시킨다.
+  // enforceSchema: provider 가 지원하면(현재 claude, gemini) 생성 자체를 스키마로 강제
+  //   (claude output_config.format / gemini generationConfig.responseSchema). 스키마가 프롬프트
+  //   필드 전집합일 때만 켠다 — 부분 스키마 강제는 스키마 밖 필드를 생성에서 억압해 하류 데이터를
+  //   소실시킨다.
   enforceSchema?: boolean;
+  // 미지 필드 기록(거부 아님, #p4-json-guard 후속 2026-08-12): schema 가 놓치는 optional 필드
+  //   오타(key_dialouge 류)를 무신호로 두지 않기 위해 스키마 밖 키를 서버 로그에 남긴다(통과는
+  //   시킨다 — schemas.ts 의 findUnknownFields 참조). 이번엔 씬 축(ScenesSchema/MergedRawSchema)
+  //   에만 연결 — 다른 스테이지 스키마로 확대하려면 호출부에서 opt-in만 추가하면 된다.
+  auditUnknownFields?: boolean;
 }
 
 export async function generateJson<T>(
@@ -58,6 +65,12 @@ export async function generateJson<T>(
         .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
         .join(' | ');
       throw new Error(`LLM 산출 스키마 위반 (${describeAxisConfig(cfg)}): ${issues}`);
+    }
+    if (opts.auditUnknownFields) {
+      const report = findUnknownFields(opts.schema, result);
+      if (report.size > 0) {
+        console.warn(`[dispatch] 미지 필드 감지 (${describeAxisConfig(cfg)}) — ${summarizeUnknownFields(report)}`);
+      }
     }
   }
   return result;
@@ -135,6 +148,9 @@ async function dispatchOnce<T>(
         systemInstruction: opts.systemInstruction,
         temperature: opts.temperature,
         webSearch: opts.webSearch,
+        // #p4-json-guard 후속(2026-08-12): claude 와 대칭 배선 — 전엔 여기서 스키마 인자를 아예
+        //   안 넘겨 gemini.ts 의 responseSchema 자리가 항상 비어 있었다(claude 에서만 강제 실동작).
+        zodSchema: opts.enforceSchema ? opts.schema : undefined,
       });
     case 'claude':
       return claudeGenerateJson<T>(prompt, {
@@ -146,6 +162,9 @@ async function dispatchOnce<T>(
         zodSchema: opts.enforceSchema ? opts.schema : undefined,
       });
     case 'openai':
+      // #p4-json-guard 후속(2026-08-12): claude/gemini 와 같은 enforceSchema 누락이 여기도 있다
+      //   — opts.schema 를 안 넘겨 openaiGenerateJson 이 구조 강제를 못 건다. 이번 범위 밖(오너
+      //   지시) — 필요해지면 openai Structured Outputs(response_format json_schema)로 동일 패턴.
       return openaiGenerateJson<T>(prompt, {
         model: cfg.model,
         systemInstruction: opts.systemInstruction,
@@ -153,6 +172,8 @@ async function dispatchOnce<T>(
         maxTokens: opts.maxTokens,
       });
     case 'local':
+      // #p4-json-guard 후속: local 도 동일 누락(범위 밖) — 백엔드(vLLM/llama.cpp 등)마다 구조
+      //   강제 계약이 달라 일반화 전에 대상 서버 확정이 먼저 필요하다.
       if (!cfg.baseUrl) throw new Error('local provider requires baseUrl');
       return localGenerateJson<T>(prompt, {
         baseUrl: cfg.baseUrl,

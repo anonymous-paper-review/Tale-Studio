@@ -29,9 +29,13 @@ export interface ClaudeCallOptions {
   // #p4-websearch(2026-08-11): Anthropic web_search 서버 툴 — 검색 실행·결과 주입을 API 서버가
   //   수행(클라이언트 루프 불요). gemini 3.6-flash 그라운딩 불능 우회의 수신측 배선.
   webSearch?: boolean;
-  // #p4-json-guard(2026-08-11): 구조화 출력 — output_config.format 으로 생성을 스키마에 강제
-  //   (gemini responseMimeType 의 등가물+상위). web_search 와 병용 성립 실측(sonnet-4-6, 35.6s).
-  //   zodOutputFormat 이 zod→JSON 스키마 변환과 미지원 제약 정리를 담당한다.
+  // #p4-json-guard(2026-08-11): 구조화 출력 — output_config.format 으로 생성을 스키마에 강제.
+  //   ⚠️ 2026-08-12 정정: 예전엔 이 자리를 "gemini responseMimeType 의 등가물"이라 적었는데
+  //   틀렸다 — responseMimeType 은 "JSON 으로 답해라"(형식) 강제일 뿐이고, 여기서 하는 건
+  //   "이 모양으로 답해라"(구조) 강제다. gemini 쪽 진짜 등가물은 responseSchema
+  //   (gemini.ts GeminiCallOptions.zodSchema, gemini-schema.ts 가 변환 담당 — 이번에 배선함).
+  //   web_search 와 병용 성립 실측(sonnet-4-6, 35.6s). zodOutputFormat 이 zod→JSON 스키마 변환과
+  //   미지원 제약 정리를 담당한다.
   zodSchema?: z.ZodType;
 }
 
