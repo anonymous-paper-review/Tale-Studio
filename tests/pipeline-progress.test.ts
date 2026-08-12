@@ -64,8 +64,9 @@ describe('artistImageWork', () => {
   it('잠금 해제 후엔 in-flight 재생성 개수로만 뜬다', () => {
     expect(artistImageWork({ ...base, imagesReady: true })).toBeNull()
     const work = artistImageWork({ ...base, imagesReady: true, generatingCount: 3 })
-    expect(work?.label).toContain('3건')
-    expect(work?.total).toBeUndefined()
+    // 문구 형식 통일(2026-08-12): "…가 이미지를 생성하고 있습니다 0/N"
+    expect(work?.label).toContain('이미지를 생성하고 있습니다')
+    expect(work).toMatchObject({ done: 0, total: 3 })
   })
 })
 
@@ -152,7 +153,7 @@ describe('큐 기반 진행 복원', () => {
       generatingCount: 0,
     }
     expect(artistImageWork(base)).toBeNull()
-    expect(artistImageWork({ ...base, activeCount: 2 })?.label).toContain('2건')
+    expect(artistImageWork({ ...base, activeCount: 2 })).toMatchObject({ done: 0, total: 2 })
   })
 })
 

@@ -27,6 +27,7 @@ import {
 import { cn } from '@/lib/utils'
 
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
+import { AltArrowHint } from '@/components/alt-arrow-hint'
 
 type ArtistTab = 'characters' | 'world' | 'inventory'
 
@@ -419,6 +420,7 @@ export default function VisualPage() {
           <div className="border-b border-border px-6 py-3">
             {headerRow}
             <div className="flex items-center justify-between gap-4">
+              <AltArrowHint>
               <TabsList>
                 {/* 탭 한글화(#d3 2026-08-03) — writer 탭(러프 스토리보드…)과 표기 통일 */}
                 <TabsTrigger value="characters">인물</TabsTrigger>
@@ -431,6 +433,7 @@ export default function VisualPage() {
                   </Badge>
                 </TabsTrigger>
               </TabsList>
+              </AltArrowHint>
               {/* 보드 축척(#d1) — writer 러프 보드와 동일 UI, 인물/배경 탭별 저장 */}
               {(tab === 'characters' || tab === 'world') && (
                 <div className="flex shrink-0 items-center gap-1.5">

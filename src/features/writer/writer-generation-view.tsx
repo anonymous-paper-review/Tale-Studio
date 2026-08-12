@@ -58,7 +58,8 @@ export function WriterGenerationView({
         stage: 'writer',
         dismissible: true,
         content:
-          '씬 스토리 초안이 준비됐어요. 화면에서 검토하고 마음에 들면 확정해 주세요 —\n고치고 싶은 부분이 있으면 아래에 적고 [수정 요청]을 눌러 주세요.',
+          '씬 스토리 초안이 준비됐어요. 화면에서 검토해 주세요.\n' +
+          '고치고 싶은 부분이 있으면 아래 입력창에 적어 주시고, 없으시면 비어있는 상태로 Enter를 입력해주세요 — 바로 확정하고 다음 단계로 넘어갈게요.',
         action: { kind: 'confirmScenes', label: '이대로 확정' },
       },
       { preempt: true },

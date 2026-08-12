@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -24,7 +24,7 @@ import {
   activeStartedAt,
   type ActiveJob,
 } from '@/lib/generation-queue'
-import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
+import { useRoughStoryboard, useShotActionDescription } from '@/features/director/hooks/use-rough-storyboard'
 import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { replaceSlugs, type SlugEntry } from '@/lib/script-lines'
@@ -177,6 +177,9 @@ function ShotCell({
   // 실사 이미지가 없을 때 러프 스토리보드 폴백 표시(#e11) — writer-store 스코프 구독
   const writerShotId = isShotData(node.data) ? node.data.writerShotId : null
   const rough = useRoughStoryboard(writerShotId)
+  // 카드 설명문(#e5 2026-08-12) — EN 렌더 프롬프트가 아니라 writer 의 유저 언어 산출
+  //   (shots.action_description_native → writer-store actionDescription)을 그대로 쓴다.
+  const nativeDescription = useShotActionDescription(writerShotId)
   // 영상 생성(이미지→영상 체인 포함) 진행 플래그 — 버튼 잠금 + 오버레이(#e12)
   const [videoBusy, setVideoBusy] = useState(false)
   const [videoError, setVideoError] = useState<string | null>(null)
@@ -292,6 +295,10 @@ function ShotCell({
     mediaMode === 'real' && realBatchBusy && !hasImage && status !== 'failed' && !!roughUrl
   const imageGenerating = status === 'generating' || queuedImage || autoFillPending
   const generating = imageGenerating || videoBusy || childVideoGenerating || queuedVideo
+  // 대기 vs 실작업(#e4 2026-08-12) — DB 큐(generation_jobs queued)에 앉았으면 fal 이 실제로
+  //   돌리는 중이라 타이머가 의미 있고, 아직 큐에 없으면(일괄 러너가 순번 대기) 시간은
+  //   거짓말이다 — 문구만 '대기 중'으로 바꾸고 초는 지운다.
+  const imageWaitingOnly = autoFillPending && !queuedImage && status !== 'generating'
 
   /**
    * 카드 액션 목록 — 단계에 따라 **문구만** 바뀌고 항목 수는 고정이다(#e4 2026-08-11).
@@ -363,19 +370,15 @@ function ShotCell({
       className="group flex flex-col rounded-md border border-border bg-card p-2.5"
       onDoubleClick={() => openPopup(node.id)}
     >
-      {/* 그림은 카드에 '담긴' 사각형(#card-inset 2026-08-11, writer 러프 보드와 동일) —
-          여백을 두르고 그림 자체엔 라운드 없음. */}
-      <div
-        className={cn(
-          'relative overflow-hidden bg-muted',
-          !(framePanel && !generating) && 'aspect-video',
-        )}
-      >
+      {/* 그림은 카드에 '담긴' 사각형(#card-inset 2026-08-11). 상자 높이는 **항상 16:9 고정**
+          (#e2 2026-08-12) — 영상과 이미지 카드의 높이가 갈리면 아래 글줄이 어긋난다. 비율이
+          다른 3프레임은 투명 레터박스(contain) 로 담는다. */}
+      <div className="relative aspect-video overflow-hidden">
         {framePanel && !generating ? (
           <RoughFrameCycle
             panel={framePanel}
             alt={mediaMode === 'previz' ? `${data.label} (previz)` : data.label}
-            sizeToImage
+            fit="contain"
           />
         ) : mediaMode === 'previz' && roughStartUrl ? (
           // 구형 단일 패널 러프(3프레임 이전 데이터) → 대표 프레임 표시
@@ -410,25 +413,17 @@ function ShotCell({
               </span>
             )}
           </div>
-        ) : roughUrl ? (
-          // 실사 이미지 미생성 → 러프 스토리보드를 대신 보여준다. 그런데 그대로 깔면 "실사가
-          //   나왔다"로 읽힌다(#e1 2026-08-11 오너 지적) — 흐리게 깔고 무엇이 필요한지 얹는다.
-          <>
-            <GeneratedImage
-              src={roughUrl}
-              alt={`${data.label} (rough)`}
-              className="size-full object-cover opacity-40 grayscale"
+        ) : mediaMode === 'real' ? (
+          // 실사 미생성(#e3 2026-08-12) — previz 를 깔면(흐려도) "뭔가 나왔다/해야 한다"로
+          //   읽힌다. 진입 자동 생성이 곧 채울 자리이므로 검은 바탕 + 회전 링으로 "준비 중"만 말한다.
+          <div className="absolute inset-0 flex items-center justify-center bg-black">
+            <span
+              aria-hidden
+              className="size-8 animate-spin rounded-full border-2 border-white/15 border-t-white/70 motion-reduce:animate-none"
             />
-            <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 px-2 text-center">
-              <ImageIcon className="size-6 text-muted-foreground" />
-              <span className="text-xs font-medium text-foreground">생성이 필요합니다</span>
-              <span className="text-[10px] text-muted-foreground">
-                지금 보이는 건 Previz 그림이에요
-              </span>
-            </span>
-          </>
+          </div>
         ) : (
-          <div className="flex size-full items-center justify-center">
+          <div className="flex size-full items-center justify-center bg-muted">
             <ImageIcon className="size-8 text-muted-foreground opacity-50" />
           </div>
         )}
@@ -485,7 +480,10 @@ function ShotCell({
             리셋되지 않는다(없으면 mount 시점 폴백). */}
         <GeneratingOverlay
           active={generating}
-          label={imageGenerating ? '이미지 생성 중' : '영상 생성 중'}
+          label={
+            imageWaitingOnly ? '이미지 생성 대기 중' : imageGenerating ? '이미지 생성 중' : '영상 생성 중'
+          }
+          showElapsed={!imageWaitingOnly}
           beamColor={imageGenerating ? 'success' : 'primary'}
           startedAt={
             writerShotId
@@ -555,10 +553,10 @@ function ShotCell({
           {sceneLabel ? `${sceneLabel} · ` : ''}
           {prettyNodeLabel(data.label)}
         </span>
-        {prompt && (
+        {(nativeDescription || prompt) && (
           <p className="line-clamp-2 text-xs text-muted-foreground">
-            {/* 프롬프트 속 char_2·location_2 등 슬러그 → @실제 이름 (표시 전용, #e6) */}
-            {replaceSlugs(prompt, roster)}
+            {/* writer 유저 언어 설명 우선(#e5) — 폴백은 프롬프트(슬러그 → @이름 치환, #e6) */}
+            {nativeDescription || replaceSlugs(prompt, roster)}
           </p>
         )}
       </div>
@@ -603,25 +601,8 @@ export function StoryboardGridView() {
     [activeJobs],
   )
 
-  // 완료 즉시 반영(#live-refresh 2026-08-11) — 어떤 샷이 큐에서 빠지면(웹훅 완료) DB 진실을
-  //   재수화한다. runRealBatch 의 시트별 재수화가 1차 경로지만, 그 루프가 죽었거나(탭 이탈 후
-  //   복귀) 다른 화면에서 시작된 잡은 이 감시가 잡는다 — 새로고침 없이 새 이미지가 보인다.
-  const hydrateFromDb = useDirectorCanvasStore((s) => s.hydrateFromDb)
-  const prevQueuedRef = useRef<ReadonlySet<string>>(new Set())
-  useEffect(() => {
-    const prev = prevQueuedRef.current
-    const nowSet = new Set([...queuedImageShots, ...queuedVideoShots])
-    prevQueuedRef.current = nowSet
-    if (!projectId) return
-    let finished = false
-    for (const id of prev) {
-      if (!nowSet.has(id)) {
-        finished = true
-        break
-      }
-    }
-    if (finished) void hydrateFromDb(projectId).catch(() => {})
-  }, [queuedImageShots, queuedVideoShots, projectId, hydrateFromDb])
+  // 완료 즉시 반영(#live-refresh) — 페이지 레벨 훅(use-queue-rehydrate)으로 승격돼 Node 뷰와
+  //   공유한다(2026-08-12). 여기서 중복 구독하지 않는다.
 
   const scenes = nodes.filter((n) => isSceneData(n.data))
   const orphanShots = nodes.filter(

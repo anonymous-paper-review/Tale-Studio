@@ -44,3 +44,12 @@ export function usePrevizVideo(
     return shot?.previzVideo ?? null
   })
 }
+
+/** Shot 의 유저 언어 설명문(actionDescription) — writerShotId 스코프 구독(#e5 2026-08-12). */
+export function useShotActionDescription(writerShotId: string | null): string | null {
+  return useWriterStore((s) => {
+    if (!writerShotId) return null
+    const shot = s.shots.find((x) => x.shotId === writerShotId)
+    return shot?.actionDescription?.trim() || null
+  })
+}
