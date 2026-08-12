@@ -57,6 +57,56 @@ describe('generateJson 모더레이션 폴백', () => {
   })
 })
 
+// ── #p4-websearch 접지 경로 (2026-08-12 개정) ──────────────────────────────
+// 종전: 접지 콜을 무조건 claude 로 보냈다(early return).
+// 현재: 접지 모델(gemini.ts 의 GROUNDING_MODEL 핀)이 1차, claude 는 그게 죽었을 때의 폴백.
+//   근거 — 제품 조합에서 접지가 실제로 발화한 모델은 preview 하나뿐이고(3.5-flash·3.1-lite 는
+//   무신호, 2.5-flash 는 API 거부), preview 18.7s vs claude 경유 154.6s·144.2s(접지 미발화).
+
+describe('generateJson 접지 경로', () => {
+  it('접지 콜은 gemini(접지 모델 핀)로 먼저 간다 — claude 를 거치지 않는다', async () => {
+    mocks.gemini.mockResolvedValueOnce({ ok: true })
+
+    const r = await generateJson('p', { provider: 'gemini' }, { webSearch: true })
+    expect(r).toEqual({ ok: true })
+    expect(mocks.gemini).toHaveBeenCalledTimes(1)
+    expect(mocks.claude).not.toHaveBeenCalled()
+    // webSearch 플래그는 프로바이더까지 전달돼야 한다(gemini.ts 가 이걸 보고 모델을 핀한다).
+    expect(mocks.gemini.mock.calls[0][1].webSearch).toBe(true)
+  })
+
+  it('접지 모델이 죽으면(예: preview 소멸 404) claude 로 폴백한다', async () => {
+    mocks.gemini.mockRejectedValueOnce(new Error('404 models/gemini-3-flash-preview is not found'))
+    mocks.claude.mockResolvedValueOnce({ ok: 'fallback' })
+
+    const r = await generateJson('p', { provider: 'gemini' }, { webSearch: true, maxTokens: 4096 })
+    expect(r).toEqual({ ok: 'fallback' })
+    expect(mocks.claude).toHaveBeenCalledTimes(1)
+    const o = mocks.claude.mock.calls[0][1]
+    expect(o.model).toBe(DEFAULT_MODELS.C.model)
+    expect(o.webSearch).toBe(true) // 폴백도 접지가 목적이다
+    expect(o.maxTokens).toBe(16000) // 검색 결과 주입분 바닥 확보
+  })
+
+  it('접지 콜이 아니면 gemini 실패에 claude 폴백하지 않는다', async () => {
+    mocks.gemini.mockRejectedValueOnce(new Error('500 internal'))
+
+    await expect(generateJson('p', { provider: 'gemini' })).rejects.toThrow('500 internal')
+    expect(mocks.claude).not.toHaveBeenCalled()
+  })
+
+  it('접지 콜도 손실 복구 재호출 보호를 받는다 (종전엔 early return 이라 건너뛰었다)', async () => {
+    mocks.gemini
+      .mockRejectedValueOnce(new LossyRepairError({ partial: true }, 'trim', 1000, 1))
+      .mockResolvedValueOnce({ ok: true })
+
+    const r = await generateJson('p', { provider: 'gemini' }, { webSearch: true })
+    expect(r).toEqual({ ok: true })
+    expect(mocks.gemini).toHaveBeenCalledTimes(2)
+    expect(mocks.claude).not.toHaveBeenCalled()
+  })
+})
+
 // ── #p4-json-guard (2026-08-11) ────────────────────────────────────────────
 // 손실 복구는 데이터를 버리고도 파싱을 성립시켜 "정상"으로 통과한다(무신호 손실).
 //   실측: 2026-08-11 shotDesign 9런에서 238콜 중 5콜(약 2%)이 손실 복구로 통과했다.

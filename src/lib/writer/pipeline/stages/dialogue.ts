@@ -336,7 +336,9 @@ ${JSON.stringify(
     console.warn(
       `[dialogue] ${scene.scene_id}: 응답에 없던 샷 ${normalized.missing_shot_ids.length}/${shots.length}개 — 침묵으로 채움 (${normalized.missing_shot_ids.join(', ')})`,
     );
-    await logger.markStage('dialogue', 'started', {
+    // 'failed' = 흡수된 계약 위반(씬 실패 마킹과 같은 관용구) — 스테이지 자체의 실패가 아니다.
+    //   'started' 로 찍으면 단계 시작/완료 페어링을 오염시킨다.
+    await logger.markStage('dialogue', 'failed', {
       scene_id: scene.scene_id,
       missing_shots: normalized.missing_shot_ids.length,
       missing_shot_ids: normalized.missing_shot_ids,

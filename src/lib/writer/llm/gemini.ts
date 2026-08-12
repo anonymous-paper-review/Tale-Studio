@@ -54,9 +54,15 @@ export interface GeminiCallOptions {
 //   검색이 발화하지 않음(groundingMetadata 부재). preview 는 두 조합 모두 정상 접지(webSearchQueries 실존).
 //   Google 포럼 스태프 "Investigating" 상태의 리그레션 — 해소 확인 시 이 핀 제거.
 //   webSearch 요청 = 접지가 목적이므로 axisConfig 모델보다 우선한다.
-//   2026-08-11 오너 결정: 제품 경로(dispatch.generateJson)는 webSearch 를 claude web_search 로
-//   라우팅한다 — 이 핀은 geminiGenerate 를 직접 호출하는 실험/도구용 2차 방어로 유지.
-//   증거: research/experiments/t0-dramaturgy-36flash-outage/probe-result.md
+//
+//   2026-08-12: 이 핀이 **제품 경로의 1차**다(종전엔 dispatch 가 claude 로 먼저 보내고 이건 2차 방어였다).
+//   flash 5종 × 2조합 재측정(probe-grounding-models.mjs): 제품 조합(googleSearch+JSON mime)에서
+//   접지가 실제로 발화한 모델은 **preview 하나뿐** — 3.5-flash·3.1-flash-lite 는 3.6 과 같은 무신호
+//   양상(에러 없이 groundingMetadata 부재), 2.5-flash 는 조합 자체를 API 가 거부한다
+//   ("Tool use with a response mime type: 'application/json' is unsupported").
+//   preview 18.7s vs claude 경유 154.6s·144.2s(풀런 실측, 게다가 그 둘은 접지도 안 붙었다).
+//   preview 소멸 리스크는 dispatch 의 claude 폴백이 흡수한다.
+//   증거: research/experiments/t0-dramaturgy-36flash-outage/probe-result.md · probe-grounding-models.mjs
 const GROUNDING_MODEL = 'gemini-3-flash-preview';
 
 export async function geminiGenerate(

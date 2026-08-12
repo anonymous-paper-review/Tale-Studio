@@ -68,17 +68,20 @@ async function generateJsonRaw<T>(
   cfg: LlmAxisConfig,
   opts: DispatchOptions = {},
 ): Promise<T> {
-  // #p4-websearch 그라운딩 라우팅(2026-08-11 오너 결정): gemini-3.6-flash 는 googleSearch 가
-  //   실동작하지 않는다 — JSON mime 동반 시 200+빈 candidates, 단독 시 검색 미발화(실측, Google
-  //   스태프 "Investigating" 리그레션). preview 핀은 모델 수명 리스크가 있어, 접지 콜은 web_search
-  //   실동작이 확인된 C축 기본(claude)으로 보낸다. gemini 리그레션 해소 확인 시 이 라우팅 제거 검토.
-  //   증거: research/experiments/t0-dramaturgy-36flash-outage/probe-result.md
-  if (opts.webSearch && cfg.provider === 'gemini') {
-    const g = DEFAULT_MODELS.C;
-    console.warn(`[dispatch] webSearch → ${g.provider}/${g.model} 라우팅 (gemini 그라운딩 불능 우회)`);
-    // s3 등 대형 JSON 응답 + 검색 결과 주입 감안 — claude 기본 max_tokens(4096) 바닥 확보.
-    return dispatchOnce<T>(prompt, g, { ...opts, maxTokens: Math.max(opts.maxTokens ?? 0, 16000) });
-  }
+  // #p4-websearch 그라운딩 경로(2026-08-12 개정 — 접지 모델 우선, claude 는 폴백).
+  //   접지 콜의 모델 선택은 gemini.ts 의 GROUNDING_MODEL 핀이 한다. 여기서 하는 일은 그게 실패했을
+  //   때 claude 로 떨어뜨리는 것뿐이다(아래 catch).
+  //
+  //   왜 뒤집었나(실측 probe-grounding-models.mjs, flash 5종 × 2조합):
+  //     제품 경로(googleSearch + JSON mime)에서 접지가 **실제로 발화한 모델은 preview 하나**다 —
+  //     3.5-flash·3.1-flash-lite 는 3.6 과 같은 무신호 양상(에러 없이 groundingMetadata 부재),
+  //     2.5-flash 는 조합 자체를 API 가 거부한다. 그런데 preview 는 18.7s 인데 claude 경유는
+  //     풀런 실측에서 154.6s·144.2s 였고 **그 두 콜 다 접지가 안 붙었다**(web_search_tool_result 부재).
+  //     즉 종전 라우팅은 8배 비싼 값을 내고 목적(접지)은 3콜 중 1콜만 달성하고 있었다.
+  //   preview 의 모델 수명 리스크는 실재하지만, 그 처방은 "사라지기 전부터 느린 길로 다니기"가
+  //     아니라 "사라지면 그때 떨어지기"다 — 404/에러 시 claude 폴백이 그 역할을 한다.
+  //   부수 효과: 접지 콜이 early-return 을 타지 않게 되어 손실 복구 재호출·모더레이션 폴백의
+  //     보호를 함께 받는다(종전엔 둘 다 건너뛰었다).
   try {
     return await dispatchOnce<T>(prompt, cfg, opts);
   } catch (e) {
@@ -110,11 +113,18 @@ async function generateJsonRaw<T>(
     //   추격/무기)가 확률적으로 걸리고, 씬 병렬 콜 1개 실패 = 런 전체 사망이었다(실측 2d47b311).
     //   동일 콜을 검열 층이 다른 C축 기본(claude)으로 1회 재시도. 실증: 같은 스토리를
     //   claude(opus-5/sonnet)가 정상 처리(#p2-maxmodel). 폴백도 실패하면 원 오류 의미로 표면화.
+    //
+    // 접지 폴백(2026-08-12): GROUNDING_MODEL(preview)이 소멸(404)하거나 죽으면 접지 콜이 통째로
+    //   실패한다. 그때만 claude 로 떨어진다 — 평시엔 8배 빠른 preview 를 쓰고, 수명 리스크는
+    //   여기서 흡수한다. 두 폴백이 같은 처방(=claude 재시도)이라 한 갈래로 합친다.
     const msg = e instanceof Error ? e.message : String(e);
-    if (cfg.provider === 'gemini' && msg.includes('PROHIBITED_CONTENT')) {
+    const moderationBlocked = cfg.provider === 'gemini' && msg.includes('PROHIBITED_CONTENT');
+    const groundingFailed = cfg.provider === 'gemini' && opts.webSearch === true;
+    if (moderationBlocked || groundingFailed) {
       const fb = DEFAULT_MODELS.C;
       console.warn(
-        `[dispatch] gemini PROHIBITED_CONTENT → ${fb.provider}/${fb.model} 폴백 재시도 (프롬프트 ${prompt.length}자)`,
+        `[dispatch] ${moderationBlocked ? 'gemini PROHIBITED_CONTENT' : '접지 모델 실패'} → ` +
+          `${fb.provider}/${fb.model} 폴백 재시도 (프롬프트 ${prompt.length}자): ${msg.slice(0, 140)}`,
       );
       // v4 등 대형 JSON 응답이 claude 기본 max_tokens(4096)에 절단되지 않게 바닥 확보.
       return dispatchOnce<T>(prompt, fb, { ...opts, maxTokens: Math.max(opts.maxTokens ?? 0, 16000) });

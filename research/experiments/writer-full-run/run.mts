@@ -8,8 +8,11 @@ import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 
 config({ path: '.env.local' })
-// 프로덕션과 동일 조건: 전송 튠 + 씬 병렬 4 (instrumentation.ts / steps.ts env 배선과 동일)
-process.env.WRITER_SCENE_CONCURRENCY = '4'
+// 동시성 env 를 **박지 않는다**(2026-08-11 개정). 예전엔 씬 병렬 4 를 강제했는데, 그 값이 곧
+//   프로덕션 기본값이었기 때문이다. 지금은 기본값이 라이브러리 안에 있고(shotDesign 8·dialogue 5)
+//   env 미설정이 곧 프로덕션 조건이다 — 박으면 오히려 현행과 다른 걸 재게 된다.
+//   (로컬 러너는 WRITER_SCENE_CONCURRENCY 를 shotDesign·decoupage 에 넘기고, 미설정이면
+//    각 스테이지 자체 기본값으로 떨어진다.)
 
 const SRC_PROJECT = '3ed26543-6640-4864-9958-02d1fc733cb7'
 // --out: 파일명만 주면 이 실험 디렉토리 기준, 경로를 주면 그대로 (기본값 = 기존 경로 유지).
@@ -116,6 +119,37 @@ async function main() {
     ? readdirSync(logDir).filter((f) => f.endsWith('.json') || f.endsWith('.md'))
     : []
 
+  // 단계별 소요시간 — 최초 started → 최종 completed 로 짝짓는다.
+  //   같은 스테이지가 씬 단위 'failed'(흡수된 계약 위반) 이벤트를 여러 번 낼 수 있어 그건 세기만 한다.
+  //   ⚠️ 2-레인 구간(shotDesign‖dialogue)은 벽시계가 겹친다 — 단계 합계 ≠ 총시간.
+  const byStage = new Map<string, { started?: number; completed?: number; absorbed: number }>()
+  for (const e of stages) {
+    const t = Date.parse(e.timestamp)
+    if (!Number.isFinite(t)) continue
+    const cur = byStage.get(e.stage) ?? { absorbed: 0 }
+    if (e.status === 'started') cur.started = Math.min(cur.started ?? t, t)
+    else if (e.status === 'completed') cur.completed = Math.max(cur.completed ?? t, t)
+    else if (e.status === 'failed') cur.absorbed += 1
+    byStage.set(e.stage, cur)
+  }
+  const stageTimings = [...byStage.entries()]
+    .map(([stage, v]) => ({
+      stage,
+      started_at: v.started ? new Date(v.started).toISOString() : null,
+      seconds: v.started && v.completed ? +((v.completed - v.started) / 1000).toFixed(1) : null,
+      absorbed_events: v.absorbed,
+    }))
+    .sort((a, b) => (a.started_at ?? '').localeCompare(b.started_at ?? ''))
+
+  const callsByStage = new Map<string, { n: number; ms: number }>()
+  for (const c of llmCalls) {
+    const key = /^\d+_([a-zA-Z0-9]+)/.exec(c.file)?.[1] ?? '(미상)'
+    const cur = callsByStage.get(key) ?? { n: 0, ms: 0 }
+    cur.n += 1
+    cur.ms += c.duration_ms ?? 0
+    callsByStage.set(key, cur)
+  }
+
   writeFileSync(
     OUT,
     JSON.stringify(
@@ -123,9 +157,11 @@ async function main() {
         finished_at: new Date().toISOString(),
         src_run: srcRun.id,
         clone_project: newId,
-        concurrency: 4,
+        // env 미설정 = 라이브러리 기본값 그대로(=프로덕션 조건). 실제 값은 stages[].extra.concurrency 에 남는다.
+        concurrency_env: process.env.WRITER_SCENE_CONCURRENCY ?? null,
         total_ms: totalMs,
         run_error: runError,
+        stage_timings: stageTimings,
         stages,
         llm_calls: llmCalls,
         stage_files: stageFiles,
@@ -134,8 +170,19 @@ async function main() {
       2,
     ),
   )
+
+  console.log(`\n[단계별 소요시간] 총 ${(totalMs / 1000).toFixed(1)}s (${(totalMs / 60000).toFixed(1)}분)`)
+  console.log('  ※ shotDesign‖dialogue 는 2-레인 동시 실행이라 합계 ≠ 총시간')
+  for (const s of stageTimings) {
+    const c = callsByStage.get(s.stage)
+    console.log(
+      `  ${s.stage.padEnd(22)} ${s.seconds === null ? '(미완)'.padStart(8) : (s.seconds + 's').padStart(8)}` +
+        (c ? `  콜 ${String(c.n).padStart(3)} · 모델시간 ${(c.ms / 1000).toFixed(1)}s` : '') +
+        (s.absorbed_events ? `  ⚠ 흡수 ${s.absorbed_events}` : ''),
+    )
+  }
   console.log(
-    `[완료] 총 ${(totalMs / 60000).toFixed(1)}분 · 단계 이벤트 ${stages.length} · LLM 콜 ${llmCalls.length} · ${path.basename(OUT)} 기록`,
+    `[완료] 단계 이벤트 ${stages.length} · LLM 콜 ${llmCalls.length} · ${path.basename(OUT)} 기록`,
   )
 }
 
