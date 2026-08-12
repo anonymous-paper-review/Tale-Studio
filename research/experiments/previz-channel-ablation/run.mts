@@ -11,7 +11,7 @@
 //        ti2v-camera-cap-recheck/probe.mts 선례대로 레지스트리 spec 필드로 input 을 구성한다
 //        (모델 카탈로그가 바뀌면 레지스트리가 따라오므로 하드코딩이 남지 않는다).
 import { config } from 'dotenv'
-config({ path: '.env.local' })
+config({ path: process.env.TALE_ENV_FILE ?? '.env.local' })
 
 import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
