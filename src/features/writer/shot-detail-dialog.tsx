@@ -32,14 +32,21 @@ export function ShotDetailDialog({ shotId, panel, onOpenChange }: ShotDetailDial
 
   if (!shot || !projectId) return null
 
-  // 표시 번호 = 순서(위치) 기준. store 의 scenes/shots 는 sort_order 로 정렬돼 있어 index 가 곧 위치.
+  // 표시 번호 = 순서(위치) 기준. 샷 번호는 씬별 리셋이 아니라 전역 연속(#shot-global-no 2026-08-12)
+  //   — 보드 카드와 같은 번호가 떠야 "그 샷"을 부를 수 있다.
   const sceneOrder = sceneManifest?.scenes.findIndex((s) => s.sceneId === shot.sceneId) ?? -1
-  const shotOrder = shots
-    .filter((s) => s.sceneId === shot.sceneId)
-    .findIndex((s) => s.shotId === shot.shotId)
+  let globalNo = 0
+  let found = false
+  for (const scene of sceneManifest?.scenes ?? []) {
+    for (const s of shots.filter((x) => x.sceneId === scene.sceneId)) {
+      globalNo += 1
+      if (s.shotId === shot.shotId) { found = true; break }
+    }
+    if (found) break
+  }
   const positionLabel =
     (sceneOrder >= 0 ? `Scene ${sceneOrder + 1} · ` : '') +
-    `Shot ${shotOrder >= 0 ? shotOrder + 1 : '?'}`
+    `Shot ${found ? globalNo : '?'}`
 
   return (
     <Dialog open={!!shotId} onOpenChange={onOpenChange}>

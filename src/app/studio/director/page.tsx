@@ -30,6 +30,7 @@ import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { StageHelpBadge } from '@/components/stage-help-badge'
 
 import { handoffFrom } from '@/lib/handoff-intent'
+import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
@@ -308,8 +309,11 @@ function CanvasInner() {
   //   (채팅에 직접 "Editor로 넘겨줘"라고 쓰면 이 조건과 무관하게 언제든 넘어간다.)
   const editorNudgeRef = useRef<string | null>(null)
   const hasRenderedVideo = nodes.some((n) => isVideoData(n.data) && !!n.data.videoUrl)
+  // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once) — 진실은 DB 의 reachedStage.
+  const reachedStageForNudge = useProjectStore((s) => s.reachedStage)
   useEffect(() => {
     if (!directorProjectId || !hasRenderedVideo) return
+    if (!shouldOfferHandoffNudge('director', reachedStageForNudge)) return
     if (editorNudgeRef.current === directorProjectId) return
     editorNudgeRef.current = directorProjectId
     const spec = handoffFrom('director')
@@ -320,7 +324,7 @@ function CanvasInner() {
       content: '완성된 영상이 있어요. Editor로 넘어가 이어 붙여볼까요?',
       action: { kind: 'handoff', utterance: spec.utterance, label: spec.label },
     })
-  }, [directorProjectId, hasRenderedVideo, offerSuggestion])
+  }, [directorProjectId, hasRenderedVideo, offerSuggestion, reachedStageForNudge])
 
   const {
     screenToFlowPosition,

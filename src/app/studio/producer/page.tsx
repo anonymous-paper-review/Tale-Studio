@@ -11,6 +11,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { evaluateProducerGate } from '@/lib/producer-gate'
 import { createPendingProposal } from '@/lib/pending-proposal'
 import { handoffFrom } from '@/lib/handoff-intent'
+import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 
 // 첫 프로젝트 진입 시 프로듀서가 먼저 거는 인사·시작 넛지 — 유저가 바로 한 줄로 시작할 수 있게.
@@ -82,8 +83,11 @@ export default function MeetingPage() {
   //   그래서 게이트가 충족돼도 슬롯이 늘 차 있어 "Writer 호출하기"가 나타나지 못했다. 이제 이
   //   제안만 선점(preempt)한다 — 게이트가 다 찼다면 남은 질문보다 이게 먼저다.
   const activeSuggestion = useGlobalChatStore((s) => s.suggestion)
+  // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once) — 진실은 DB 의 reachedStage.
+  const reachedStage = useProjectStore((s) => s.reachedStage)
   useEffect(() => {
     if (!projectId || !canHandoff) return
+    if (!shouldOfferHandoffNudge('producer', reachedStage)) return
     const spec = handoffFrom('producer')
     if (!spec) return
     offerSuggestion(
@@ -98,7 +102,7 @@ export default function MeetingPage() {
       { preempt: true },
     )
     // activeSuggestion: 슬롯이 바뀔 때마다 재시도(선점이 막힌 경우 — 예: 내릴 수 없는 웰컴).
-  }, [projectId, canHandoff, activeSuggestion, offerSuggestion])
+  }, [projectId, canHandoff, activeSuggestion, offerSuggestion, reachedStage])
 
   // 첫 진입(스토리·프로듀서 채팅 모두 비어있음)에만 프로듀서가 먼저 인사 + 입력창 포커스(빔).
   //   offerSuggestion 은 dismiss/중복 가드 내장 → 한 번만, 세션 재진입 시 재노출 안 함.

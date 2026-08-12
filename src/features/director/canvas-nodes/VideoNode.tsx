@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import { BaseNode } from './BaseNode'
 import { useDirectorCanvasStore } from '@/stores/director-store'
+import { useActiveGenerationJobs, activeStartedAt } from '@/lib/generation-queue'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +23,15 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   )
   // Any generating sibling locks retakes for this shot.
   const parentShotId = isVideoData(data) ? data.parentShotNodeId : null
+  // 경과시간 durable 기준점(#elapsed-durable 2026-08-12) — 큐의 submitted_at. 부모 Shot 의
+  //   writerShotId 로 이 노드 몫의 영상 잡을 찾는다(탭 왕복에도 타이머 유지).
+  const parentWriterShotId = useDirectorCanvasStore((s) => {
+    if (!parentShotId) return null
+    const n = s.nodes.find((x) => x.id === parentShotId)
+    return n && isShotData(n.data) ? n.data.writerShotId : null
+  })
+  const videoProjectId = useDirectorCanvasStore((s) => s.projectId)
+  const activeVideoJobs = useActiveGenerationJobs(videoProjectId || null)
   const parentGenerating = useDirectorCanvasStore((s) =>
     !!parentShotId &&
     s.nodes.some(
@@ -230,6 +240,11 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         <GeneratingOverlay
           active={data.lastAttemptStatus === 'generating'}
           label="영상 생성 중"
+          startedAt={
+            parentWriterShotId
+              ? activeStartedAt(activeVideoJobs, ['shot_video'], parentWriterShotId)
+              : undefined
+          }
         />
       </div>
 

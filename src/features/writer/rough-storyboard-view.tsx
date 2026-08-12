@@ -26,11 +26,13 @@ import { Slider } from '@/components/ui/slider'
 import { fetchDebugPrompts } from '@/lib/use-debug-prompts'
 import { ADHERENCE_START_ENABLED } from '@/lib/adherence/core'
 import { handoffFrom } from '@/lib/handoff-intent'
+import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
 import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { WriterHeader } from '@/features/writer/writer-header'
 import { useProjectStore } from '@/stores/project-store'
+import { useArtistStore } from '@/stores/artist-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
@@ -48,6 +50,9 @@ import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import type { RoughStoryboardImage, Shot } from '@/types'
 
 type PanelJob = { status: 'generating' | 'failed'; error?: string }
+
+// artist 백필(#writer-to-artist-backfill) 프로젝트당 1회 가드 — 탭 왕복 remount 에도 유지.
+const artistBackfillTriggered = new Set<string>()
 
 // 진실 리로드 수렴 상한(#rough-refresh 2026-07-24) — previz(5분) 대응. 정상 경로는 폴링 성공 후
 //   첫 리로드(2s 간격)에 끝나고, 이 상한은 어떤 실패 경로에서도 UI 가 스피너에 갇히지 않게 하는 백스톱.
@@ -148,8 +153,38 @@ export function RoughStoryboardView() {
   const artistNudgeRef = useRef<string | null>(null)
   const roughAllReady =
     shots.length > 0 && shots.every((s) => s.roughStoryboard?.status === 'completed')
+  // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once 2026-08-12) — 진실은 DB 의
+  //   reachedStage(projects.current_stage). 탭 왕복·새로고침마다 "다음 단계" 문구가 반복되던 문제.
+  const reachedStage = useProjectStore((s) => s.reachedStage)
+
+  // 러프보드 완주 → artist 빈 인물(오픈캐스트)·배경 이미지를 백그라운드로 채운다
+  //   (#writer-to-artist-backfill 2026-08-12). 유저가 artist 탭에 도착했을 때 이미 그림이
+  //   있도록. autoGenerateBaseImages 는 원래 artist 진입 시 도는 것과 같은 함수 —
+  //   동시성 1(ARTIST_GENERATION_CONCURRENCY)이라 큐를 1슬롯만 점유하고, 나머지 슬롯은
+  //   유저가 writer 에서 수정·재생성할 때를 위해 비워 둔다. 멱등: 채워진 칸 skip + 서버 dedupe.
   useEffect(() => {
     if (!projectId || !roughAllReady) return
+    if (artistBackfillTriggered.has(projectId)) return
+    artistBackfillTriggered.add(projectId)
+    void (async () => {
+      const artist = useArtistStore.getState()
+      // artist store 가 아직 비어 있으면(다른 탭 미방문) 먼저 하이드레이트.
+      //   loadData 선언 타입이 void 라 완료를 기다릴 수 없다 — 폴링으로 도착을 확인한다
+      //   (layout 워밍이 이미 불렀을 수도 있어 두 경로 모두 이 대기에 수렴).
+      if (artist.characterAssets.length === 0 && artist.worldAssets.length === 0) {
+        artist.loadData()
+        for (let i = 0; i < 20; i++) {
+          await new Promise((r) => setTimeout(r, 500))
+          const s = useArtistStore.getState()
+          if (s.characterAssets.length > 0 || s.worldAssets.length > 0) break
+        }
+      }
+      await useArtistStore.getState().autoGenerateBaseImages().catch(() => {})
+    })()
+  }, [projectId, roughAllReady])
+  useEffect(() => {
+    if (!projectId || !roughAllReady) return
+    if (!shouldOfferHandoffNudge('writer', reachedStage)) return
     if (artistNudgeRef.current === projectId) return
     artistNudgeRef.current = projectId
     const spec = handoffFrom('writer')
@@ -161,7 +196,7 @@ export function RoughStoryboardView() {
         '러프 스토리보드가 모두 준비됐어요. Artist로 넘어가 캐릭터·배경 컨셉을 잡아볼까요?',
       action: { kind: 'handoff', utterance: spec.utterance, label: spec.label },
     })
-  }, [projectId, roughAllReady, offerSuggestion])
+  }, [projectId, roughAllReady, offerSuggestion, reachedStage])
 
   // 파이프라인이 이 화면을 보는 중에 완료되면 씬/샷을 1회 재로드.
   useEffect(() => {
@@ -643,6 +678,20 @@ export function RoughStoryboardView() {
   const detailShot = detailShotId ? shots.find((s) => s.shotId === detailShotId) : undefined
   const detailPanel = detailShot ? panelOf(detailShot) : null
   const cols = 7 - zoomLevel // zoomLevel 1~6 → 6~1열
+  // 전역 샷 번호(#shot-global-no 2026-08-12) — 씬별 1부터 리셋하지 않고 씬 순서대로 이어 센다.
+  //   샷 각각의 고유 호출 번호가 목적(오너). 위치 기준(불변 id 아님)은 기존 결정 유지.
+  const globalShotNo = new Map<string, number>()
+  {
+    let n = 0
+    for (const scene of sceneManifest?.scenes ?? []) {
+      for (const s of shots.filter((x) => x.sceneId === scene.sceneId)) {
+        globalShotNo.set(s.shotId, ++n)
+      }
+    }
+  }
+  // 설명문 폰트(#zoom-desc) — 열이 늘수록(축소) 글자도 줄여 전문이 들어가게. 클램프는 제거.
+  const DESC_FS: Record<number, string> = { 1: '14px', 2: '13px', 3: '12px', 4: '11px', 5: '10.5px', 6: '10px' }
+  const descFontSize = DESC_FS[cols] ?? '12px'
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -802,7 +851,7 @@ export function RoughStoryboardView() {
                         <div className="space-y-2 px-1 pb-0.5 pt-3">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-muted-foreground">
-                              Scene {sceneIdx + 1} · Shot {shotIdx + 1}
+                              Scene {sceneIdx + 1} · Shot {globalShotNo.get(shot.shotId) ?? shotIdx + 1}
                             </span>
                             <TooltipProvider>
                               <Tooltip>
@@ -820,7 +869,8 @@ export function RoughStoryboardView() {
                               {shot.durationSeconds}s
                             </span>
                           </div>
-                          <p className="line-clamp-3 text-sm leading-relaxed">
+                          {/* 전문 표시(#zoom-desc) — 잘라내지 않는다. 축소 시 폰트가 함께 줄어든다. */}
+                          <p className="leading-relaxed" style={{ fontSize: descFontSize }}>
                             {resolveEntityNames(shot.actionDescription, entityNames)}
                           </p>
                           {/* #8: 대사 표시 제거 — 파이프라인이 대사 슬롯에 상황 요약을 채워 실제 대사가 아님(2026-07-09). */}

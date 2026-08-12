@@ -106,6 +106,10 @@ export async function persistAssetsToDb(
   scenes: Scenes,
   worldVisual: WorldVisual,
   characterVisual: CharacterVisual,
+  // 오픈캐스트 로케이션의 표시명 원천(#opencast-name-locale 2026-08-12) — mergeOpenWorld 가
+  //   드라마투르그 후보의 한국어 표시명을 world.locations[].name 에 보존하는데, 여기서 안 받으면
+  //   아래 insert 가 humanizeSlug(id)로 영어 이름을 만들어 그 보존을 무효화한다(리프 채굴 실측).
+  world?: { locations: Array<{ id: string; name: string }> },
 ): Promise<void> {
   if (!UUID_RE.test(projectId)) return // 핸드오프 외 run — DB project 없음
 
@@ -143,7 +147,10 @@ export async function persistAssetsToDb(
   //   누락될 수 있다. 그래서 locations → scenes 를 먼저 넣고 characters 를 마지막에 넣어,
   //   characters 가 보이는 순간 나머지가 보장되도록 한다.
 
-  // locations (writer worldVisual.locations — 신규 행 name 은 id 기반, time_of_day 는 미보유)
+  // locations (writer worldVisual.locations — 신규 행 name 은 계약 표시명 우선, time_of_day 는 미보유)
+  const worldNameById = new Map(
+    (world?.locations ?? []).map((l) => [l.id, l.name] as const),
+  )
   if (worldVisual.locations?.length) {
     const freshLocs = worldVisual.locations.filter((loc) => !producerLocIds.has(loc.id))
     const producerLocs = worldVisual.locations.filter((loc) => producerLocIds.has(loc.id))
@@ -163,8 +170,10 @@ export async function persistAssetsToDb(
           return {
             project_id: projectId,
             location_id: loc.id,
-            // 표시 이름 — slug 형 id 는 humanize(#opencast-name 2026-08-06: "location_1" 노출 방지).
-            name: humanizeSlug(loc.id),
+            // 표시 이름 — 1순위는 계약(world.locations)의 표시명: mergeOpenWorld 가 유저 언어
+            //   표시명("무인 조위 관측소")을 여기 보존한다. 없을 때만 slug humanize 폴백
+            //   (#opencast-name 2026-08-06: "location_1" 노출 방지 / #opencast-name-locale 2026-08-12).
+            name: worldNameById.get(loc.id)?.trim() || humanizeSlug(loc.id),
             time_of_day: '',
             style_description: en,
             lighting_sources: loc.lighting_sources ?? [],

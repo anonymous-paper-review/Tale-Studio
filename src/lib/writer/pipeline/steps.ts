@@ -416,7 +416,7 @@ export const WRITER_STEPS: WriterStep[] = [
       //   assets persist 는 기존처럼 best-effort, 이후 writer 가 v2Design 확인점에서 producer-origin drafts 를 submit 한다.
       await persistDesignTokens(projectId, s.visualIdentity!, worldVisual);
       // best-effort 유지하되 침묵 금지(#persist-guard) — 실패를 로그로 드러낸다(shots 0행 사고 교훈).
-      await persistAssetsToDb(projectId, s.characters!, s.scenes!, worldVisual, characterVisual).catch((e) => {
+      await persistAssetsToDb(projectId, s.characters!, s.scenes!, worldVisual, characterVisual, s.world).catch((e) => {
         console.error('[writer] persistAssetsToDb 실패 (best-effort 계속):', e instanceof Error ? e.message : e);
       });
       await triggerAssetDrafts(projectId).catch(() => {});

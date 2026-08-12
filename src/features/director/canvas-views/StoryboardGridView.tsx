@@ -151,6 +151,7 @@ function ShotCell({
   node,
   roster,
   mediaMode,
+  sceneLabel,
   queuedImageShots,
   queuedVideoShots,
   activeJobs,
@@ -158,6 +159,8 @@ function ShotCell({
   node: DirectorNode
   roster: SlugEntry[]
   mediaMode: StoryboardMediaMode
+  /** 카드 제목 앞에 붙는 씬 표기(#e5 2026-08-12) — 예: "Scene 4". 미배정 그룹은 null. */
+  sceneLabel: string | null
   /** 지금 큐에 떠 있는 잡의 대상 샷들(#queue-restore) — 탭을 떠났다 와도 진행 표시를 되살린다. */
   queuedImageShots: ReadonlySet<string>
   queuedVideoShots: ReadonlySet<string>
@@ -346,8 +349,14 @@ function ShotCell({
 
   // 3프레임 세트(previz/실사 스트립)는 상자가 그림 비율을 따라간다(#fit-tight) — 띠도 크롭도
   //   없다. 그 외(영상·단일 이미지·플레이스홀더)는 16:9 고정. 배지·오버레이·액션은 이 상자에 앵커.
+  //   real 뷰에서 완성 영상이 있으면 영상이 우선(#e3 2026-08-12 회귀 수정 — 지난 개편이 3프레임을
+  //   영상 위로 올려, 영상 단계 카드가 스트립 순환으로 보였다). 호버 재생·클릭 일시정지는 HoverPlayVideo.
   const framePanel =
-    mediaMode === 'previz' && rough?.frames ? rough : hasImage && img!.frames ? img! : null
+    mediaMode === 'previz' && rough?.frames
+      ? rough
+      : mediaMode === 'real' && !completedVideoUrl && hasImage && img!.frames
+        ? img!
+        : null
 
   return (
     <div
@@ -428,7 +437,7 @@ function ShotCell({
             펼쳐진다(#e4 2026-08-11) — 우하단 스택에서 이사. 글자만, 폭 통일(w-28).
             생성 중엔 오버레이가 덮으므로 숨긴다. */}
         {!generating && stageBadge && (
-          <div className="group/badge absolute left-2 top-2 z-10 flex w-28 flex-col items-start">
+          <div className="group/badge absolute left-2 top-2 z-10">
             <span
               className={cn(
                 'inline-flex items-center gap-1 rounded-md border bg-background/85 px-1.5 py-1 text-[10px] font-medium',
@@ -442,7 +451,10 @@ function ShotCell({
               )}
               <span className="whitespace-nowrap">{stageBadge.label}</span>
             </span>
-            <div className="pointer-events-none mt-1 flex w-full flex-col gap-1 opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/badge:pointer-events-auto group-hover/badge:opacity-100">
+            {/* 액션 목록(#e1 2026-08-12) — absolute 라 자리를 차지하지 않는다: 리스트가 투명한
+                동안(pointer-events-none) 그 영역 호버는 통과되므로 **배지 위에서만** 열린다.
+                열린 뒤에는 pt-1 브리지가 배지→리스트 이동 중 호버 이탈을 막는다. w-24 로 축소. */}
+            <div className="pointer-events-none absolute left-0 top-full flex w-24 flex-col gap-1 pt-1 opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/badge:pointer-events-auto group-hover/badge:opacity-100">
               {actions.map((a) => (
                 <button
                   key={a.key}
@@ -540,6 +552,7 @@ function ShotCell({
 
       <div className="flex flex-col gap-1 px-1 pb-0.5 pt-2.5">
         <span className="truncate text-sm font-medium text-foreground">
+          {sceneLabel ? `${sceneLabel} · ` : ''}
           {prettyNodeLabel(data.label)}
         </span>
         {prompt && (
@@ -701,6 +714,7 @@ export function StoryboardGridView() {
                     node={shot}
                     roster={roster}
                     mediaMode={mediaMode}
+                    sceneLabel={group.key === '__orphan__' ? null : prettyNodeLabel(group.label)}
                     queuedImageShots={queuedImageShots}
                     queuedVideoShots={queuedVideoShots}
                     activeJobs={activeJobs}

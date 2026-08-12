@@ -96,7 +96,6 @@ export function RoughFrameCycle({
     <div
       className={sizeToImage ? 'relative w-full overflow-hidden bg-muted' : 'absolute inset-0'}
       style={sizeToImage ? { aspectRatio: imageAr ?? 16 / 9 } : undefined}
-      title={multi ? (pausedLock ? '클릭: 재생 재개' : '클릭: 일시정지') : undefined}
       onMouseEnter={() => {
         setIntroDone(true) // 인트로 중 hover 진입 → 인트로 중단, hover 순환이 이어받는다
         setHovering(true)

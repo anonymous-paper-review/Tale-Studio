@@ -86,6 +86,25 @@ export default function StudioLayout({
     window.history.replaceState(null, '', `${pathname}?${params.toString()}`)
   }, [projectId, pathname])
 
+  // Alt(Option)+↑/↓ = 메인 섹션 스크롤 (#keyboard-only 2026-08-12).
+  //   탭 전환마다 채팅 입력창이 포커스를 가져가므로(전 스테이지 공통) 키보드로 본문을 내리는
+  //   길이 없어졌다 — 입력창 포커스 여부와 무관하게 Alt+상하로 본문 스크롤러를 움직인다.
+  //   Alt+좌우(뷰 순환)·Alt+QWERT(스테이지 전환)와 같은 모디파이어 가족.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
+      if (e.code !== 'ArrowUp' && e.code !== 'ArrowDown') return
+      const el = document.querySelector('[data-stage-content]')
+      if (!el) return
+      e.preventDefault()
+      e.stopPropagation()
+      const dir = e.code === 'ArrowDown' ? 1 : -1
+      el.scrollBy({ top: dir * Math.round(window.innerHeight * 0.6), behavior: 'smooth' })
+    }
+    window.addEventListener('keydown', handler, true)
+    return () => window.removeEventListener('keydown', handler, true)
+  }, [])
+
   // 스테이지 데이터 워밍(#tab-slide 2026-08-03) — 탭 최초 진입의 "빈 화면 + 스피너" 구간 축소.
   //   다섯 뷰를 동시에 마운트하는 대신(저사양에서 부담) 각 store 의 데이터만 미리 채운다:
   //   뷰 마운트는 클릭 시점 그대로지만 렌더에 필요한 진실이 이미 store 에 있어 첫 프레임부터

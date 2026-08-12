@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { StageHelpBadge } from '@/components/stage-help-badge'
 import { handoffFrom } from '@/lib/handoff-intent'
+import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { CharacterPanel } from '@/features/artist/character-panel'
 import { WorldPanel } from '@/features/artist/world-panel'
 import { InventoryGrid } from '@/features/artist/inventory-grid'
@@ -268,8 +269,11 @@ export default function VisualPage() {
   //   안 떴다. 처방: ① preempt 로 브리핑을 밀어내고 ② 실제로 표면화된 것을 확인한 뒤에만
   //   ref 를 고정하며 ③ 슬롯이 바뀔 때마다(activeSuggestion dep) 재시도한다.
   const activeSuggestion = useGlobalChatStore((s) => s.suggestion)
+  // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once) — 진실은 DB 의 reachedStage.
+  const reachedStageForNudge = useProjectStore((s) => s.reachedStage)
   useEffect(() => {
     if (!projectId || !ready || !writerReady || !artistGate.ready) return
+    if (!shouldOfferHandoffNudge('artist', reachedStageForNudge)) return
     if (nudgeOfferedRef.current === projectId) return
     if (characterAssets.length === 0 || generatingCount > 0) return
     const t = setTimeout(() => {
@@ -310,6 +314,7 @@ export default function VisualPage() {
     writerReady,
     artistGate.ready,
     activeSuggestion,
+    reachedStageForNudge,
   ])
 
   // 첫 진입 브리핑(2026-08-06 간소화) — "최종 룩으로 정리" 상태 온보딩 제안은 제거(피드백:

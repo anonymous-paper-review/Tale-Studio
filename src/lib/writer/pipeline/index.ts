@@ -260,7 +260,7 @@ async function _runPipelineInner(
   //   ⚠️ 이미지(view_main/wide_shot)는 writer 가 만들지 않는다 (producer-story-gate 결정 8):
   //   캐릭터/로케이션 이미지는 artist 전담 — artist 진입 시 autoGenerateBaseImages 가 빈칸을 자동 생성.
   //   non-blocking — 실패해도 파이프라인 계속(끝의 persistShots 와 무관).
-  persistAssetsToDb(projectId, characters, scenes, worldVisual, characterVisual)
+  persistAssetsToDb(projectId, characters, scenes, worldVisual, characterVisual, world)
     .then(() => logger.markStage('persistAssets', 'completed'))
     .catch((e) => {
       console.warn('[writer] Tier1 assets persist failed (pipeline continues):', e);

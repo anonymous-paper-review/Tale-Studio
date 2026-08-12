@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { useDirectorCanvasStore } from '@/stores/director-store'
+import { useActiveGenerationJobs, activeStartedAt } from '@/lib/generation-queue'
 import { isShotData, isShotImageData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
 
@@ -25,10 +26,19 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
     const n = s.nodes.find((x) => x.id === parentShotNodeId)
     return n && isShotData(n.data) ? n.data.storyboardImage : null
   })
+  const parentWriterShotId = useDirectorCanvasStore((s) => {
+    if (!parentShotNodeId) return null
+    const n = s.nodes.find((x) => x.id === parentShotNodeId)
+    return n && isShotData(n.data) ? n.data.writerShotId : null
+  })
   const parentGenerating = useDirectorCanvasStore(
     (s) => !!parentShotNodeId && !!s.generatingNodeIds[parentShotNodeId],
   )
-  const generateStoryboardImage = useDirectorCanvasStore((s) => s.generateStoryboardImage)
+  const openPopup = useDirectorCanvasStore((s) => s.openPopup)
+  // 경과시간 durable 기준점(#elapsed-durable 2026-08-12) — 그리드와 동일: 큐의 submitted_at.
+  //   탭을 떠났다 와도(remount) 타이머가 0으로 돌아가지 않는다.
+  const projectId = useDirectorCanvasStore((s) => s.projectId)
+  const activeJobs = useActiveGenerationJobs(projectId || null)
 
   if (!isShotImageData(data)) return null
 
@@ -129,14 +139,29 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
               <span className="text-[10px] text-muted-foreground/70">아직 이미지가 없어요</span>
             </span>
           )}
-          <GeneratingOverlay active={!!generating} label="이미지 생성 중" beamColor="success" />
+          <GeneratingOverlay
+            active={!!generating}
+            label="이미지 생성 중"
+            beamColor="success"
+            startedAt={
+              parentWriterShotId
+                ? activeStartedAt(
+                    activeJobs,
+                    ['shot_storyboard', 'storyboard_real_grid'],
+                    parentWriterShotId,
+                  )
+                : undefined
+            }
+          />
         </div>
 
+        {/* 버튼 = 팝업 열기(#e4 2026-08-12) — 즉시 재생성이 아니라 더블클릭과 같은 부모 Shot
+            모달을 연다(프롬프트 확인·조정 후 사람이 실행). 즉시 실행은 교체+과금이라 원클릭 금지. */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation()
-            if (parentShotNodeId) void generateStoryboardImage(parentShotNodeId)
+            if (parentShotNodeId) openPopup(parentShotNodeId)
           }}
           disabled={!parentShotNodeId || !!generating}
           className={cn(
@@ -145,7 +170,7 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
           )}
         >
           <ImageIcon className="size-3" />
-          {hasImage ? '이미지 리터칭' : '이미지 생성'}
+          {hasImage ? '이미지 재생성' : '이미지 생성'}
         </button>
       </div>
     </div>
