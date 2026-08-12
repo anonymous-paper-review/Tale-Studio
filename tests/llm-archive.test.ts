@@ -85,4 +85,18 @@ describe('archiveRawCalls', () => {
     expect(await archiveRawCalls(PROJECT, 'scenes', [])).toBe(0)
     expect(mocks.from).not.toHaveBeenCalled()
   })
+
+  // #run-id 2026-08-12: 같은 프로젝트를 두 번 돌려도 기록이 안 섞이도록 run_id 를 싣는다.
+  it('runId 를 넘기면 행에 run_id 로 실린다', async () => {
+    const RUN_ID = '11111111-2222-3333-4444-555555555555'
+    await archiveRawCalls(PROJECT, 'scenes', [call()], RUN_ID)
+    const [rows] = mocks.insert.mock.calls[0]
+    expect(rows[0]).toMatchObject({ run_id: RUN_ID })
+  })
+
+  it('runId 를 안 넘기면(로컬 하네스 run) run_id 는 null 로 실린다', async () => {
+    await archiveRawCalls(PROJECT, 'scenes', [call()])
+    const [rows] = mocks.insert.mock.calls[0]
+    expect(rows[0].run_id).toBeNull()
+  })
 })

@@ -29,12 +29,15 @@ export function llmArchiveEnabled(): boolean {
 
 /**
  * flush 된 raw 콜들을 llm_calls 에 기록한다. 호출자는 await 하되 실패를 흡수한다.
+ * @param runId writer_runs.id (#run-id 2026-08-12) — 어느 런의 기록인지 구분. 로컬 하네스
+ *   run(writer_runs 행 없음)은 null. 기존 행(이 컬럼 도입 전 기록)도 null — backfill 안 함.
  * @returns 기록한 행 수 (skip/실패 시 0)
  */
 export async function archiveRawCalls(
   projectId: string,
   stage: string,
   calls: RawLlmCall[],
+  runId: string | null = null,
 ): Promise<number> {
   if (!llmArchiveEnabled()) return 0
   if (!UUID_RE.test(projectId)) return 0   // 핸드오프 외 run — DB project 없음
@@ -42,6 +45,7 @@ export async function archiveRawCalls(
 
   const rows = calls.map((c) => ({
     project_id: projectId,
+    run_id: runId,
     stage,
     seq: c.seq,
     provider: c.provider,

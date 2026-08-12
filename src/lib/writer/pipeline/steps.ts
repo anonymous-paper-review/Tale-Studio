@@ -619,8 +619,9 @@ export async function runWriterSteps(
   if (!run || run.status !== 'running') return { done: true };
 
   const state = run.state as WriterRunState;
-  // best-effort logger (FS 쓰기는 no-op-safe). raw_collector 그룹화에만 쓰인다.
-  const logger = new PipelineLogger(projectId);
+  // best-effort logger (FS 쓰기는 no-op-safe). raw_collector 그룹화 + llm_calls 아카이브의
+  //   run_id(#run-id 2026-08-12)에 쓰인다 — 같은 프로젝트를 두 번 돌려도 기록이 안 섞이게.
+  const logger = new PipelineLogger(projectId, run.id);
   await logger.init();
 
   let completedUnits = run.completed_units;
@@ -681,7 +682,17 @@ export async function runWriterSteps(
       patch = await step.run(state, { logger, projectId, deadlineMs: opts.deadlineMs });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      await markFailed(run.id, message, captureErrorDetail(step.key, message));
+      // 문제 1 처방(#llm-archive-failure 2026-08-12): 이 단계가 여기서 죽으면 성공 시와 달리
+      //   step.run() 내부의 flushRawLlm 이 한 번도 안 불렸을 수 있어 raw_collector 에 이번 단계
+      //   호출들이 그대로 쌓여 있다 — captureErrorDetail 로 먼저 스냅샷을 뜬 뒤(pending 을
+      //   읽기만 하고 안 비움) flush 한다. 순서를 바꾸면 flush 가 컬렉터를 비워 error_detail 도
+      //   llm_calls 아카이브도 둘 다 빈 채로 남는다(지금까지의 실패 런 3/3 스냅샷 0건 사고).
+      //   (다른 두 markFailed 지점은 대상이 아니다: attempt 예산 초과는 이 인보케이션이 step.run
+      //   을 돌기도 전에 평가되어 pending 이 구조적으로 항상 비어 있고, 최종 saveRunState 실패는
+      //   성공한 step.run() 뒤라 이미 자체 flushRawLlm 으로 비워진 뒤다.)
+      const detail = captureErrorDetail(step.key, message);
+      await logger.flushRawLlm(`${step.key}_failed`).catch(() => {});
+      await markFailed(run.id, message, detail);
       return { failed: true };
     }
     const stageMs = Date.now() - stageStartedMs;

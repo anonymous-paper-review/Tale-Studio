@@ -31,7 +31,9 @@ export class PipelineLogger {
   private debugDir: string;
   private llmDir: string;
 
-  constructor(public projectId: string) {
+  // runId(writer_runs.id, #run-id 2026-08-12): flushRawLlm 이 llm_calls 아카이브에 실어
+  //   "어느 런의 기록인지" 남긴다. 로컬 runPipeline 은 writer_runs 행이 없으므로 null 유지.
+  constructor(public projectId: string, private runId: string | null = null) {
     this.projectDir = path.join(LOGS_ROOT, projectId);
     this.debugDir = path.join(this.projectDir, 'debug');
     this.llmDir = path.join(this.debugDir, 'llm_calls');
@@ -131,7 +133,7 @@ export class PipelineLogger {
   async flushRawLlm(stageLabel: string): Promise<number> {
     const calls = flushRawCalls();
     if (calls.length === 0) return 0;
-    await archiveRawCalls(this.projectId, stageLabel, calls).catch(() => 0);
+    await archiveRawCalls(this.projectId, stageLabel, calls, this.runId).catch(() => 0);
     if (fsDisabled) return calls.length;
     const safe = stageLabel.replace(/[^a-z0-9_-]/gi, '_');
     for (const c of calls) {
