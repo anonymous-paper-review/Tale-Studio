@@ -119,26 +119,50 @@ export function buildRealGridPrompt(
     /** #viz-gap 실험 arm: 컬럼(=샷) 순서대로의 시네 라인. 연필이 못 옮기는 조명/초점/DoF/렌즈/색만.
      *  생략(기본)이면 현행 프롬프트 그대로 — 라이브 라우트 무변경. renderRepaintCineLine 산출물. */
     cineLines?: (string | null | undefined)[]
+    /** #real-grid-identity(2026-08-12, 실측 a5cb2cae sh_04_18): 레퍼런스 순서와 칸별 배정.
+     *  옛 프롬프트의 "corresponding character(s)"는 대응 관계가 어디에도 정의돼 있지 않아
+     *  모델이 자유 추측했고, 소수 인물이 다수 인물에 흡수되는 바꿔치기가 실측됐다.
+     *  characterRefs 는 reference_image_urls[1..] 과 같은 순서의 표시명,
+     *  columnCharacters 는 칸(그룹) 순서대로 그 칸에 나오는 인물 표시명들. */
+    characterRefs?: { name: string }[]
+    columnCharacters?: string[][]
   },
 ): string {
-  const { characterRefCount, hasStyleRef, cineLines } = opts
+  const { characterRefCount, hasStyleRef, cineLines, characterRefs, columnCharacters } = opts
   const target = hasStyleRef
     ? 'finished, final-quality film frames'
     : 'finished photorealistic live-action cinematic film frames'
   const charLocation = hasStyleRef
     ? 'the reference images between the first and the last'
     : 'the remaining reference images'
+  // 칸별 배정 블록 — characterRefs 가 오면 익명 "corresponding" 문장을 대체한다.
+  const identityBlock =
+    characterRefs && characterRefs.length > 0
+      ? [
+          `- Character references, in order after the first image: ${characterRefs
+            .map((c, i) => `reference image ${i + 2} = ${c.name}`)
+            .join('; ')}.`,
+          `- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:`,
+          ...(columnCharacters ?? []).map(
+            (names, i) =>
+              `    * Column ${i + 1}: ${
+                names.length ? names.join(' and ') : 'no character — keep this column free of people'
+              }`,
+          ),
+          `- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.`,
+        ]
+      : characterRefCount > 0
+        ? [
+            `- Replace every wooden mannequin with the corresponding character(s) from ${charLocation} (character/world references): keep their identity, design and outfit, consistent across all panels.`,
+          ]
+        : []
   return [
     `The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.${shotCount < 4 ? ` Only the first ${shotCount} column(s) contain shots — keep the remaining column(s) as empty blank panels.` : ''}`,
     '',
     `Repaint this exact sheet as ${target}:`,
     `- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.`,
     `- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.`,
-    ...(characterRefCount > 0
-      ? [
-          `- Replace every wooden mannequin with the corresponding character(s) from ${charLocation} (character/world references): keep their identity, design and outfit, consistent across all panels.`,
-        ]
-      : []),
+    ...identityBlock,
     ...(hasStyleRef
       ? [
           `- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.`,
