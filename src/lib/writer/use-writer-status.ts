@@ -61,7 +61,9 @@ export function useWriterStatus(
     let cancelled = false
 
     // 멈춘 run 자가복구: started && 미완료/미실패인데 last_timestamp 가 ~90s 이상 오래되면
-    //   /api/writer/step 을 POST 해 끊긴 서버리스 체인을 재개한다 (fire-and-forget, cron 비의존).
+    //   /api/writer/keepalive 를 POST 해 끊긴 서버리스 체인을 재개한다 (fire-and-forget, cron 비의존).
+    //   /api/writer/step 은 서버-투-서버 시크릿 게이트라 브라우저가 직접 부를 수 없다 — keepalive
+    //   라우트가 로그인 세션으로 신원을 확인한 뒤 서버 안에서 step 을 대신 트리거한다.
     // fan-out 단계(shotCheck/renderPrompts)는 샷 수에 비례해 100s+ 걸릴 수 있으므로
     //   stale 임계를 그보다 넉넉히 잡아 진행 중 단계를 "멈춤"으로 오판하지 않게 한다.
     //   (근본 해결은 fan-out 단계의 per-item 체크포인트 = Phase 2.)
@@ -75,11 +77,17 @@ export function useWriterStatus(
       const now = Date.now()
       if (now - lastKeepaliveRef.current < KEEPALIVE_THROTTLE_MS) return
       lastKeepaliveRef.current = now
-      fetch('/api/writer/step', {
+      // 실패를 삼키지 않는다 — 이전엔 .catch(() => {}) 로 401 이 무신호로 사라져 복구 안전망이
+      //   죽어 있는 걸 아무도 몰랐다(#writer-keepalive-401 사고). 최소한 console.warn 으로 남긴다.
+      fetch('/api/writer/keepalive', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ projectId }),
-      }).catch(() => {})
+      })
+        .then((r) => {
+          if (!r.ok) console.warn(`[writer keepalive] ${projectId} 트리거 실패: ${r.status}`)
+        })
+        .catch((e) => console.warn(`[writer keepalive] ${projectId} 트리거 에러:`, e))
     }
 
     const tick = async () => {
