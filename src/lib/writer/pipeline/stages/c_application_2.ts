@@ -15,6 +15,8 @@ import type {
   ShotSequence,
   ShotSequenceItem,
   ShotCheckNote,
+  ShotStaticSpec,
+  ShotDynamicSpec,
   StoryScene,
   ValidationIssue,
   DecoupagePlan,
@@ -277,36 +279,128 @@ export function buildSplitChildren(
   parentId: string,
   newShots: ShotSequenceItem[],
 ): WorkingShot[] {
-  return newShots.map((ns, childIdx) => ({
-    ...ns,
-    // #output-diet 2026-08-10: new_shots 는 이제 *델타*다 (부모와 달라지는 필드만).
-    //   블록 단위 치환(ns.X ?? original.X)이면 부분 S 가 와서 scene_id 가 사라진다 —
-    //   델타 병합으로 받는다. 통짜 블록이 와도 스프레드가 전부 덮으므로 구 응답과 호환.
-    S: {
-      ...original.S,
-      ...(ns.S ?? {}),
-      character_action:
-        ns.S?.character_action?.trim() ||
-        ns.video_generation?.motion_prompt?.trim() ||
-        ns.first_frame_generation?.composition_prompt?.trim() ||
-        original.S.character_action,
-    },
-    C: ns.C ?? original.C,
-    V: ns.V ?? original.V,
-    assets: ns.assets ?? original.assets,
-    first_frame_generation: { ...original.first_frame_generation, ...(ns.first_frame_generation ?? {}) },
-    video_generation: { ...original.video_generation, ...(ns.video_generation ?? {}) },
-    duration_seconds: ns.duration_seconds ?? original.duration_seconds,
-    continuity: ns.continuity ?? original.continuity,
-    action_budget: ns.action_budget ?? original.action_budget,
-    // provenance 는 시스템 소유 필드 — 모델이 new_shots 에 부모 값을 복사해 와도 무시한다
-    //   (실측 92948d6f: sol 이 design_ref 를 에코해 F2 를 우회 → 형제 중복 재발).
-    design_ref: childIdx === 0 ? original.design_ref : undefined,
-    static_spec: childIdx === 0 ? original.static_spec : undefined,
-    dynamic_spec: childIdx === 0 ? original.dynamic_spec : undefined,
-    // 이슈 location(분할 전 id) 매칭용 임시 태그 — 리넘버에서 제거.
-    _splitFrom: parentId,
-  }));
+  const lastIdx = newShots.length - 1;
+  return newShots.map((ns, childIdx) => {
+    const ownAction =
+      ns.S?.character_action?.trim() ||
+      ns.video_generation?.motion_prompt?.trim() ||
+      ns.first_frame_generation?.composition_prompt?.trim() ||
+      original.S.character_action;
+    return {
+      ...ns,
+      // #output-diet 2026-08-10: new_shots 는 이제 *델타*다 (부모와 달라지는 필드만).
+      //   블록 단위 치환(ns.X ?? original.X)이면 부분 S 가 와서 scene_id 가 사라진다 —
+      //   델타 병합으로 받는다. 통짜 블록이 와도 스프레드가 전부 덮으므로 구 응답과 호환.
+      S: {
+        ...original.S,
+        ...(ns.S ?? {}),
+        character_action: ownAction,
+      },
+      C: ns.C ?? original.C,
+      V: ns.V ?? original.V,
+      assets: ns.assets ?? original.assets,
+      // 산문 채널(#split-inherit S2 2026-08-12): 둘째부터는 부모 통짜 상속 금지 — 부모의
+      //   composition_prompt 는 부모의 START(자식 시점엔 거짓), motion_prompt 는 샷 전체 모션
+      //   (자식 몫은 절반)이다. 델타가 안 주면 비운다 — 틀린 산문보다 빈 산문이 낫다
+      //   (하류 폴백 사슬이 자기 액션 텍스트로 내려간다). base_assets(정체성)는 상속 유지.
+      first_frame_generation:
+        childIdx === 0
+          ? { ...original.first_frame_generation, ...(ns.first_frame_generation ?? {}) }
+          : {
+              base_assets:
+                ns.first_frame_generation?.base_assets ?? original.first_frame_generation.base_assets,
+              composition_prompt: ns.first_frame_generation?.composition_prompt?.trim() ?? '',
+            },
+      video_generation:
+        childIdx === 0
+          ? { ...original.video_generation, ...(ns.video_generation ?? {}) }
+          : { motion_prompt: ns.video_generation?.motion_prompt?.trim() ?? '' },
+      duration_seconds: ns.duration_seconds ?? original.duration_seconds,
+      continuity: ns.continuity ?? original.continuity,
+      action_budget: ns.action_budget ?? original.action_budget,
+      // provenance 는 시스템 소유 필드 — 모델이 new_shots 에 부모 값을 복사해 와도 무시한다
+      //   (실측 92948d6f: sol 이 design_ref 를 에코해 F2 를 우회 → 형제 중복 재발).
+      design_ref: childIdx === 0 ? original.design_ref : undefined,
+      // 구조화 스펙(#split-inherit S1/S3 2026-08-12): 옛 동작은 둘째부터 전면 기아(undefined)
+      //   — "훔치지 않기"(#split-spec)의 과잉 처방이었다. 같은-그림 우려(F2)는 시간 의존 필드
+      //   (first_frame_prompt·pose)에만 해당하고, 조명·렌즈·레이어·소품은 분할 경계를 넘어
+      //   연속이다. 시간 의존만 걷어낸 부분 상속으로 "훔치지도 굶기지도 않는다".
+      static_spec:
+        childIdx === 0
+          ? original.static_spec
+          : inheritStaticSpecForSplitChild(original.static_spec, ownAction),
+      dynamic_spec: adjustDynamicSpecForSplitChild(
+        childIdx === 0
+          ? original.dynamic_spec
+          : reduceDynamicSpecForSplitChild(original.dynamic_spec, ns, ownAction),
+        childIdx,
+        lastIdx,
+      ),
+      // 이슈 location(분할 전 id) 매칭용 임시 태그 — 리넘버에서 제거.
+      _splitFrom: parentId,
+    };
+  });
+}
+
+/**
+ * 분할 둘째+ 자식의 static_spec 부분 상속 (#split-inherit S1).
+ * 유지: 카메라 셋업(렌즈·앵글·DoF)·framing 레이어·조명·소품·팔레트 — 분할 경계를 넘어 연속인 것.
+ * 걷음: first_frame_prompt(부모의 START 산문 — 자식 시점엔 거짓) · focal_point(액션 순간에 묶임 —
+ *   비우면 러프 셀 빌더의 폴백 사슬이 받는다) · blocking pose(부모의 순간 자세 → 자식 자신의
+ *   액션 텍스트로 대체 — db_fallback 이 쓰던 바로 그 텍스트를 rich 채널 안에 앉힌다).
+ */
+export function inheritStaticSpecForSplitChild(
+  parent: ShotStaticSpec | undefined,
+  ownAction: string,
+): ShotStaticSpec | undefined {
+  if (!parent) return undefined;
+  return {
+    ...parent,
+    framing: { ...parent.framing, focal_point: '' },
+    character_blocking: (parent.character_blocking ?? []).map((b) => ({
+      ...b,
+      pose: ownAction,
+    })),
+    first_frame_prompt: '',
+  };
+}
+
+/**
+ * 분할 둘째+ 자식의 dynamic_spec 축소 계약 (#split-inherit S3).
+ * 유지: camera_motion(분할 경계를 넘는 연속 무빙) · environmental_change(환경은 샷 경계 무관).
+ * 걷음: character_motion(부모의 동사 = 샷 전체 모션 — 자식 몫이 아님) · gaze_arc(시간 의존).
+ * motion_prompt 는 델타가 주면 그것, 아니면 자식 자신의 액션 산문 — 부모 전체 모션 산문 금지.
+ */
+export function reduceDynamicSpecForSplitChild(
+  parent: ShotDynamicSpec | undefined,
+  ns: ShotSequenceItem,
+  ownAction: string,
+): ShotDynamicSpec | undefined {
+  if (!parent) return undefined;
+  return {
+    ...parent,
+    character_motion: [],
+    gaze_arc: undefined,
+    motion_prompt: ns.video_generation?.motion_prompt?.trim() || ownAction,
+  };
+}
+
+/**
+ * 분할 형제의 전환(transition) 재배치 (#split-inherit S3) — 부모의 transition_in 은 첫째의
+ * 진입이고 transition_out 은 막내의 퇴장이다. 전면 상속(옛 동작)은 중간 형제에게 둘 다
+ * 잘못 부여했다. 소비처 0(리프맵 실측 dead)이라 하류 위험 없는 정합화.
+ */
+export function adjustDynamicSpecForSplitChild(
+  spec: ShotDynamicSpec | undefined,
+  childIdx: number,
+  lastIdx: number,
+): ShotDynamicSpec | undefined {
+  if (!spec) return undefined;
+  return {
+    ...spec,
+    transition_in: childIdx === 0 ? spec.transition_in : undefined,
+    transition_out: childIdx === lastIdx ? spec.transition_out : undefined,
+  };
 }
 
 // 사이즈 사다리 — decoupage 프롬프트의 규칙과 같은 표. 비거리형(OTS/POV/2S)은 중간값 취급.
