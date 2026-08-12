@@ -14,6 +14,7 @@
 
 - `.claude/vault/` — 세션별 실측·삽질·결정 기록 (포맷: `_TEMPLATE.md`). 같은 주제를 다시 팔 때 먼저 검색
 - `.claude/vault/_DEFERRED.md` — **미뤄둔 작업 상시 원장** (날짜 파일 아님). "결정은 났는데 지금 안 하는 것"이 여기 모인다 — 새 작업을 고르기 전에 먼저 열어볼 것
+- `.claude/vault/_FIXLOG.md` — 프로덕션 사고 수리 원장 (사고→원인→수리→검증 상태. 커밋이 못 담는 진행 상태만)
 - `.claude/vault/_archive/` — 완료·폐기·무효화된 것 (원장과 인덱스는 열린 것만 보여야 한다)
 - `.claude/vault/2026-08-05-truth-source-cleanup.md` — "문서가 왜 다 없지?"·실험 규칙/대청소의 근거가 궁금하면 먼저
 - `.claude/vault/2026-08-06-previz-verifier.md` — previz 검증기/품질 채점을 다시 팔 때 먼저 (변별력 실측·판정 3원칙·보류 축의 이유)
