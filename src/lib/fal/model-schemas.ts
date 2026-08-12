@@ -163,3 +163,21 @@ export function computeIgnoredFields(
   if (!allowed) return []
   return Object.keys(sentBody).filter((field) => !allowed.has(field))
 }
+
+// 모델이 안 받는 필드(예: negative_prompt)를 보내면 fal이 조용히 무시하고 흔적이 관측 로그
+// (computeIgnoredFields → ignored_fields)에만 남는다 — 응답을 받고서야 알 수 있는 늦은 신호다.
+// pickAllowedFields는 같은 표(getAllowedFields)로 "보내기 직전에" 걸러 애초에 안 보낸다.
+// 미등록 모델은 표가 없으므로 입력을 그대로 통과시킨다 — computeIgnoredFields가 미등록 모델에
+// 빈 배열(= 아무것도 무시되지 않음)을 반환하는 계약과 대칭. 모르는 모델의 입력을 임의로 깎지 않는다.
+export function pickAllowedFields<T extends Record<string, unknown>>(
+  input: T,
+  modelKey: string | null | undefined,
+): T {
+  const allowed = getAllowedFields(modelKey)
+  if (!allowed) return input
+  const filtered = {} as T
+  for (const key of Object.keys(input) as Array<keyof T>) {
+    if (allowed.has(key as string)) filtered[key] = input[key]
+  }
+  return filtered
+}

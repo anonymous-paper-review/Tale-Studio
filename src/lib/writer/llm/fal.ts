@@ -7,6 +7,7 @@
 import { fal } from '@fal-ai/client';
 import { recordRawCall } from './raw_collector';
 import { withLlmRetry } from './retry';
+import { getAllowedFields } from '@/lib/fal/model-schemas';
 
 const apiKey = process.env.FAL_KEY;
 fal.config({ credentials: () => apiKey ?? '' });
@@ -308,10 +309,15 @@ export interface FalVideoResult {
 
 const DEFAULT_VIDEO_MODEL = 'alibaba/happy-horse/reference-to-video';
 
-// happy-horse는 negative_prompt 미지원 → 보내면 에러 가능
-const MODELS_WITHOUT_NEGATIVE_PROMPT = new Set([
-  'alibaba/happy-horse/reference-to-video',
-]);
+// 모델별 negative_prompt 지원 여부의 진실원은 src/lib/fal/model-schemas.ts의 FAL_INPUT_ALLOWLIST
+// 하나다(과거엔 happy-horse 한 종만 적힌 별도 목록이 여기 있었는데, R2V 4모델 전체를 다루는 그 표와
+// 따로 놀았다). 여기 쓰는 엔드포인트 문자열(예: 'alibaba/happy-horse/reference-to-video')은
+// model-schemas.ts가 FAL_VIDEO_MODEL_ENDPOINTS로 등록해둔 것과 동일한 키라 바로 조회된다.
+// 미등록 모델(getAllowedFields가 undefined)은 기존 동작대로 negative_prompt를 보낸다.
+function modelAcceptsNegativePrompt(model: string): boolean {
+  const allowed = getAllowedFields(model);
+  return !allowed || allowed.has('negative_prompt');
+}
 
 // fal 비디오 모델이 받아들이는 표준 aspect ratio
 const VALID_VIDEO_AR = new Set(['16:9', '9:16', '1:1', '4:3', '3:4', '21:9']);
@@ -357,7 +363,7 @@ function buildFalVideoInput(opts: FalVideoOptions, model: string): Record<string
   const ar = normalizeVideoAspectRatio(opts.aspect_ratio);
   if (ar) input.aspect_ratio = ar;
 
-  if (opts.negative_prompt && !MODELS_WITHOUT_NEGATIVE_PROMPT.has(model)) {
+  if (opts.negative_prompt && modelAcceptsNegativePrompt(model)) {
     input.negative_prompt = opts.negative_prompt;
   }
   return input;

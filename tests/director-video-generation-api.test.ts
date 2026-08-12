@@ -231,6 +231,63 @@ describe('director video generation reservation', () => {
     expect(mocks.submit).not.toHaveBeenCalled()
 })
 })
+describe('reference-to-video request filtering (#fal-schema-truth)', () => {
+  // src/lib/fal/model-schemas.ts의 FAL_INPUT_ALLOWLIST가 유일한 진실 — 모델이 안 받는 필드를 보내면
+  // fal이 조용히 무시하고 관측 로그에만 흔적이 남는다. buildFalReferenceToVideoRequest가 제출 직전에
+  // 그 표로 걸러 애초에 안 보내는지 검증한다. status 200 자체가 증거: snapshotValueMatches가 방금
+  // 계산된 fal_request와 아래 expectedInput을 정확히 비교하므로, 걸러진 결과가 다르면 409로 실패한다.
+  // (kling v2.1 T2V fallback이 negative_prompt를 그대로 유지하는 것은 위
+  //  "submits a fresh reservation from its immutable FAL snapshot" 테스트가 이미 확인한다.)
+  it.each([
+    ['happy-horse', 'alibaba/happy-horse/reference-to-video', {
+      prompt: 'prompt',
+      image_urls: ['https://example.com/ref.png'],
+      duration: 5,
+      resolution: '720p',
+      aspect_ratio: '16:9',
+    }],
+    ['seedance', 'bytedance/seedance-2.0/reference-to-video', {
+      prompt: 'prompt',
+      image_urls: ['https://example.com/ref.png'],
+      duration: 5,
+      generate_audio: true,
+      resolution: '720p',
+      aspect_ratio: '16:9',
+    }],
+    ['kling-o3', 'fal-ai/kling-video/o3/pro/reference-to-video', {
+      prompt: 'prompt',
+      image_urls: ['https://example.com/ref.png'],
+      duration: 5,
+    }],
+    ['veo', 'fal-ai/veo3.1/reference-to-video', {
+      prompt: 'prompt',
+      image_urls: ['https://example.com/ref.png'],
+      duration: '8s',
+      generate_audio: true,
+      resolution: '720p',
+      aspect_ratio: '16:9',
+    }],
+  ])('drops negative_prompt (and any field the schema does not list) for %s', async (modelKey, endpoint, expectedInput) => {
+    mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
+    const base = reservedFalJob()
+    mocks.getJob.mockResolvedValueOnce({
+      ...base,
+      input_snapshot: {
+        ...base.input_snapshot,
+        model: modelKey,
+        resolved_model_key: modelKey,
+        reference_image_url: 'https://example.com/ref.png',
+        fal_request: { model: endpoint, input: expectedInput },
+      },
+    })
+    mocks.submit.mockResolvedValue({ request_id: 'fal-1' })
+
+    const response = await POST(request({ model: modelKey, referenceImageUrl: 'https://example.com/ref.png' }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.submit).toHaveBeenCalledWith(endpoint, expect.objectContaining({ input: expectedInput }))
+  })
+})
 describe('reserved replay recovery', () => {
   it('does not resubmit a replayed reservation whose provider state is unknown', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: true })

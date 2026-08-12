@@ -10,6 +10,7 @@ import { getGenerationJobById, userOwnsProject } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
+import { pickAllowedFields } from '@/lib/fal/model-schemas'
 import {
   VIDEO_MODELS,
   clampDuration,
@@ -128,15 +129,15 @@ function buildFalT2VFallbackRequest(
   durationSeconds: number,
   aspectRatio: string,
 ): FalVideoSubmitRequest {
-  return {
-    model: FAL_T2V_FALLBACK_MODEL,
-    input: {
-      prompt,
-      negative_prompt: 'blurry, low quality, distorted, deformed',
-      duration: durationSeconds >= 10 ? '10' : '5',
-      aspect_ratio: aspectRatio ?? '16:9',
-    },
+  const input: Record<string, unknown> = {
+    prompt,
+    negative_prompt: 'blurry, low quality, distorted, deformed',
+    duration: durationSeconds >= 10 ? '10' : '5',
+    aspect_ratio: aspectRatio ?? '16:9',
   }
+  // kling v2.1 T2V는 negative_prompt를 실제로 받으므로 아래 필터를 통과해도 그대로 남는다 —
+  // 표(src/lib/fal/model-schemas.ts)가 모델별로 다르게 걸러주는 걸 R2V와 같은 경로로 확인.
+  return { model: FAL_T2V_FALLBACK_MODEL, input: pickAllowedFields(input, FAL_T2V_FALLBACK_MODEL) }
 }
 
 /* ── FAL.ai reference-to-video (레지스트리 기반, #5) ──
@@ -179,7 +180,13 @@ function buildFalReferenceToVideoRequest(
     input.aspect_ratio = aspectRatio ?? '16:9'
   }
 
-  return { model: spec.endpoint, input }
+  // 모델이 안 받는 필드(예: negative_prompt — happy-horse/seedance/kling-o3/veo 넷 다 미지원. veo는
+  // 스키마에 "negative_prompt is not an accepted input"이라고 명시돼 있다)를 보내면 fal이 조용히
+  // 무시하고 관측 로그(ignored_fields)에만 흔적이 남는다. 보내기 직전에
+  // src/lib/fal/model-schemas.ts의 FAL_INPUT_ALLOWLIST(유일한 진실)로 걸러서 애초에 안 보낸다.
+  // 새 R2V 모델을 추가할 때는 model-schemas.ts의 표만 고치면 여기(그리고 fal.ts의
+  // buildFalVideoInput)에 자동 반영된다 — 모델명으로 분기하는 코드를 여기 새로 추가하지 말 것.
+  return { model: spec.endpoint, input: pickAllowedFields(input, modelKey) }
 }
 
 async function submitFalReferenceToVideo(
