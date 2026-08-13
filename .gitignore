@@ -106,7 +106,10 @@ docs/*.html
 
 # 
 dev/Skill_Test/*
-dev/Image_Style/
+# dev/Image_Style: 문서(md)만 추적 — 이미지·프롬프트 txt 등 나머지는 로컬 전용 (2026-08-13 예외 등록)
+dev/Image_Style/**
+!dev/Image_Style/**/
+!dev/Image_Style/**/*.md
 dev/db-backups/
 # 테스트 계정 평문 비번 (커밋 금지)
 docs/test-accounts.md

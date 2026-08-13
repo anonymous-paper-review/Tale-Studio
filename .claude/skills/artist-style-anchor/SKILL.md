@@ -38,15 +38,13 @@ python3 .claude/skills/artist-style-anchor/bin/style_stats.py <img1> [img2 ...]
 
 ## 단계 3 — 중립 앵커 보드 생성
 
-`templates/anchor_board.txt`의 `{RENDERING_RULES}`에 캡슐(+hex 팔레트, 재질 규칙, 장식 모티프)을 채워 프롬프트 작성 후, higgsfield CLI로 I2I 생성 (구 `bin/hf_image.sh` 래퍼는 소실 — CLI 직결):
+`templates/anchor_board.txt`의 `{RENDERING_RULES}`에 캡슐(+hex 팔레트, 재질 규칙, 장식 모티프)을 채워 프롬프트 작성 후, `bin/hf_image.sh`로 I2I 생성 (제출→대기→다운로드 일체. 2026-08-13 정정: 래퍼는 소실이 아니라 **현존·git 추적 중** — bare 배열 응답 방어 포함):
 
 ```bash
-# 모델 선택: higgsfield model list --image → 파라미터 확인: higgsfield model get <job_type>
-higgsfield generate create <이미지_모델> \
-  --prompt "$(cat <run_dir>/prompt.txt)" \
-  --image-references <core_ref1> [--image-references <core_ref2> ...] \
-  --wait
-# 로컬 경로 ref는 자동 업로드. --wait 출력의 결과 URL을 <run_dir>/anchor_board.png 로 저장(curl -o)
+# HF_AR 기본 1:1. 로컬 경로 ref는 자동 업로드.
+.claude/skills/artist-style-anchor/bin/hf_image.sh <run_dir>/prompt.txt <run_dir>/anchor_board.png <core_ref1> [core_ref2 ...]
+# CLI 직결이 필요하면: higgsfield generate create gpt_image_2 --prompt ... --image-references ... --aspect_ratio 1:1 --json
+#   → 응답은 bare 배열 ["uuid"] → higgsfield generate wait <id> → 결과 URL curl -o
 ```
 
 ## 단계 4 — 앵커 보드 QA (vision, Claude)
@@ -55,7 +53,7 @@ Read로 보드를 열어 facet 대조: ①핵심 facet 재현(선/명암/팔레�
 
 ## 단계 5 — 전이 프로브 4장
 
-`templates/probe.txt`의 `{CONTENT}`에 아래 표준 4종(오리지널 콘텐츠, 매 실행 동일 권장 — 런 간 비교 가능)을 채우고, **refs=[anchor_board.png]만** 물려 생성:
+`templates/probe.txt`의 `{CONTENT}`에 아래 표준 4종(오리지널 콘텐츠, 매 실행 동일 권장 — 런 간 비교 가능)을 채우고, **아래 「확정 레시피 매트릭스」대로 생성** — 장면(카페·스쿠터) = `[보드, 원작 Core]` + 장면 절, 인물(캐릭터·액션) = `[보드, 원작 Core]` + 인물 절 + 방언 절 (refer2 런 실행례와 동일. 보드 단독 refs는 T 기준선 비교 실험용):
 
 | 프로브 | 표준 콘텐츠 | 검증 축 |
 |---|---|---|
