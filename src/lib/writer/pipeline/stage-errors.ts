@@ -9,10 +9,24 @@
 // 끼는 프로바이더(rate limit 의미)가 있어 quota 단어 자체는 permanent 로 취급하지 않는다 —
 // 결제/크레딧 소진만 명시적으로 잡는다.
 
-export type StageErrorClass = 'transient' | 'permanent'
+export type StageErrorClass = 'network' | 'transient' | 'permanent'
 
 /** 오너 정책(2026-08-13): 스테이지당 자동 재시도 횟수. 이 예산이 소진되면 markFailed → resume 버튼. */
 export const AUTO_RETRY_PER_STAGE = 1
+
+/** 오너 정책(2026-08-13 확장): network(프로바이더/우리 서버 일시 장애)는 **예산 차감 없이**
+ *  백그라운드 재시도. 이 캡은 정책이 아니라 무한 루프 안전핀 — 실제 장애는 그 전에 풀리거나
+ *  캡 소진 후 resume 버튼으로 표면화된다. */
+export const NET_RETRY_CAP = 8
+
+/** network 재시도 n회차(1부터) 전 대기 — 429 폭주 완화. 지수 백오프, 15s 상한. */
+export function netBackoffMs(count: number): number {
+  return Math.min(2_000 * 2 ** Math.max(0, count - 1), 15_000)
+}
+
+// 프로바이더/네트워크/우리 서버의 일시 장애 — 같은 입력 그대로 다시 보내면 되는 부류.
+const NETWORK_PATTERNS =
+  /\b(429|500|502|503|504|529)\b|rate.?limit|resource has been exhausted|timeout|timed out|overloaded|unavailable|ECONN|EAI_AGAIN|socket hang up|fetch failed|network error|aborted/i
 
 const PERMANENT_PATTERNS: RegExp[] = [
   // DB 결정 실패 — 제약/중복/스키마. F5-R2(shots_prompt_not_blanked) 위반이 여기로 온다.
@@ -25,10 +39,13 @@ const PERMANENT_PATTERNS: RegExp[] = [
   /moderation|content.?policy|safety (system|setting)/i,
 ]
 
-/** 스테이지 예외를 일시/결정으로 분류한다. 모르는 오류는 transient(1회 재시도 후 표면화). */
+/** 스테이지 예외 분류. permanent > network > transient 순으로 판정 — 모르는 오류는
+ *  transient(1회 재시도 후 표면화). network 는 예산 무차감 재시도(NET_RETRY_CAP 안전핀). */
 export function classifyStageError(e: unknown): StageErrorClass {
   const message = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
-  return PERMANENT_PATTERNS.some((re) => re.test(message)) ? 'permanent' : 'transient'
+  if (PERMANENT_PATTERNS.some((re) => re.test(message))) return 'permanent'
+  if (NETWORK_PATTERNS.test(message)) return 'network'
+  return 'transient'
 }
 
 /**

@@ -3,6 +3,8 @@ import {
   classifyStageError,
   shouldAutoRetry,
   AUTO_RETRY_PER_STAGE,
+  NET_RETRY_CAP,
+  netBackoffMs,
 } from '@/lib/writer/pipeline/stage-errors'
 
 // #stage-retry (2026-08-13, 오너 정책) — 계약: 일시 오류는 자동 1회 재시도 후 표면화('이어서
@@ -10,7 +12,7 @@ import {
 // 대가가 "1회 낭비"로 상한이 있는 쪽으로 기운다.
 
 describe('classifyStageError', () => {
-  it('일시 오류 — 429/타임아웃/네트워크/5xx 는 transient', () => {
+  it('network — 429/타임아웃/네트워크/5xx 는 예산 무차감 재시도 클래스 (오너 정책 확장)', () => {
     for (const msg of [
       '429 Too Many Requests',
       'Resource has been exhausted (e.g. check quota).', // 프로바이더 rate limit — quota 단어에 낚이면 안 된다
@@ -21,7 +23,7 @@ describe('classifyStageError', () => {
       '503 Service Unavailable',
       'model is overloaded',
     ]) {
-      expect(classifyStageError(new Error(msg)), msg).toBe('transient')
+      expect(classifyStageError(new Error(msg)), msg).toBe('network')
     }
   })
 
@@ -53,11 +55,12 @@ describe('classifyStageError', () => {
   })
 })
 
-describe('shouldAutoRetry — 오너 정책: 자동 1회', () => {
-  const transient = new Error('fetch failed')
+describe('shouldAutoRetry — 오너 정책: transient 만 예산 1회 (network 는 별도 무차감 경로)', () => {
+  const transient = new Error('Unexpected token < in JSON')
+  const network = new Error('fetch failed')
   const permanent = new Error('violates check constraint')
 
-  it('첫 시도(count=1) 실패는 자동 재시도한다', () => {
+  it('transient 첫 시도(count=1) 실패는 자동 재시도한다', () => {
     expect(shouldAutoRetry(transient, 1)).toBe(true)
   })
 
@@ -67,5 +70,19 @@ describe('shouldAutoRetry — 오너 정책: 자동 1회', () => {
 
   it('permanent 는 첫 시도도 재시도하지 않는다', () => {
     expect(shouldAutoRetry(permanent, 1)).toBe(false)
+  })
+
+  it('network 는 이 예산 경로가 아니다 — 러너의 무차감 경로(캡 소진 후엔 즉시 표면화)', () => {
+    expect(shouldAutoRetry(network, 1)).toBe(false)
+  })
+})
+
+describe('network 무차감 재시도 파라미터', () => {
+  it('안전핀 캡은 양수, 백오프는 지수 증가 후 15s 상한', () => {
+    expect(NET_RETRY_CAP).toBeGreaterThan(0)
+    expect(netBackoffMs(1)).toBe(2_000)
+    expect(netBackoffMs(2)).toBe(4_000)
+    expect(netBackoffMs(4)).toBe(15_000) // 16s → 상한 클램프
+    expect(netBackoffMs(NET_RETRY_CAP)).toBe(15_000)
   })
 })

@@ -40,7 +40,13 @@ import {
   type WriterErrorDetail,
 } from '@/lib/writer/run-store';
 import { getPendingRawCalls, getUsageTotals } from '@/lib/writer/llm/raw_collector';
-import { shouldAutoRetry, AUTO_RETRY_PER_STAGE } from '@/lib/writer/pipeline/stage-errors';
+import {
+  classifyStageError,
+  shouldAutoRetry,
+  AUTO_RETRY_PER_STAGE,
+  NET_RETRY_CAP,
+  netBackoffMs,
+} from '@/lib/writer/pipeline/stage-errors';
 import type {
   PipelineInput,
   SceneCinematography,
@@ -125,6 +131,8 @@ export interface WriterRunState extends WriterRunStateBase {
   _attempt?: { stage: string; count: number };
   // #stage-retry: 자동 재시도·수동 resume 기록 — 조용한 치유 금지(F-005 교훈), 관측 가능해야 한다.
   _repairs?: Array<{ stage: string; at: string; message: string }>;
+  // #error-class(오너 정책): network 무차감 재시도의 안전핀 카운터 (스테이지 완료 시 리셋).
+  _netRetry?: { stage: string; count: number };
   // 단계별 소요시간 (timing pipeline). key=stage → 마지막 성공 실행의 wall-clock(ms).
   _timings?: Record<string, { ms: number; attempts: number; endedAt: string }>;
 }
@@ -684,6 +692,47 @@ export async function runWriterSteps(
       patch = await step.run(state, { logger, projectId, deadlineMs: opts.deadlineMs });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      // #error-class(2026-08-13, 오너 정책 확장): network(프로바이더/우리 서버 일시 장애)는
+      //   **예산 차감 없이** 백그라운드 재시도 — 진입 마킹으로 오른 attempt 를 원복하고 별도
+      //   안전핀 카운터(_netRetry, 캡 소진 시 표면화)만 올린다. 지수 백오프로 429 폭주 완화.
+      if (classifyStageError(e) === 'network') {
+        const netCount = (state._netRetry?.stage === step.key ? state._netRetry.count : 0) + 1;
+        if (netCount <= NET_RETRY_CAP) {
+          state._attempt = undefined; // 무차감 — kill 가드 예산은 kill 에만 쓴다
+          state._netRetry = { stage: step.key, count: netCount };
+          state._repairs = [
+            ...(state._repairs ?? []),
+            {
+              stage: step.key,
+              at: new Date().toISOString(),
+              message: `[network ${netCount}/${NET_RETRY_CAP}] ${message.slice(0, 180)}`,
+            },
+          ];
+          try {
+            const saved = await saveRunState(
+              run.id,
+              state,
+              { completed_units: completedUnits, current_stage: step.key },
+              version,
+            );
+            if (saved === null) return { paused: true };
+            version = saved;
+          } catch {
+            // 기록 실패는 재시도를 막지 않는다.
+          }
+          console.warn(
+            `[writer steps] ${projectId} · ${step.key} network 오류 — 무차감 재시도 ${netCount}/${NET_RETRY_CAP}: ${message}`,
+          );
+          // 백오프 — 남은 시간 예산 안에서만 잔다(체크포인트+트리거 마진 5s 보존).
+          const sleepMs = Math.min(
+            netBackoffMs(netCount),
+            Math.max(0, opts.deadlineMs - Date.now() - 5_000),
+          );
+          if (sleepMs > 0) await new Promise((r) => setTimeout(r, sleepMs));
+          return { paused: true };
+        }
+        // 캡 소진 — 진짜 장기 장애다. 아래 표면화 경로로 떨어져 resume 버튼이 사람 방아쇠가 된다.
+      }
       // #stage-retry(2026-08-13, 오너 정책): 일시 오류는 **자동 1회 재시도** — paused 로 양보하면
       //   step 라우트의 self-trigger 가 같은 스테이지에 재진입한다(진입 마킹이 이미 attempt 를
       //   올려놨으므로 별도 카운터 불요). 소진되거나 결정 오류(계약/제약/권한/결제)면 표면화
@@ -743,6 +792,7 @@ export async function runWriterSteps(
     }
 
     state._attempt = undefined;
+    state._netRetry = undefined; // 스테이지 완료 — network 안전핀 카운터 리셋
     state._timings = {
       ...(state._timings ?? {}),
       [step.key]: { ms: stageMs, attempts: nextCount, endedAt: new Date().toISOString() },

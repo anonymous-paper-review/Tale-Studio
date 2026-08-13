@@ -556,26 +556,38 @@ export async function failGenerationJob(
 export const AUTO_GENERATION_GIVE_UP_THRESHOLD = 2
 
 /**
+ * #error-class(2026-08-13, 오너 정책): give-up 예산을 소모하지 않는 클래스 — 일시 인프라 실패
+ * (프로바이더 5xx/결과 결함, webhook 유실 정리)는 빈칸 자율 채움이 백그라운드에서 계속 다시
+ * 시도한다. 게이트가 세는 것은 "내용적 실패"(모더레이션·잘못된 입력·불명 400·미태깅)뿐.
+ * moderation 은 면제하지 않는다 — 같은 프롬프트는 같은 거부라 재시도가 아니라 사람의 수정이 답.
+ */
+export const GIVE_UP_EXEMPT_CLASSES: ReadonlySet<string> = new Set(['provider', 'infra'])
+
+/**
  * 같은 target 으로 누적된 실패 잡 수 (give-up 게이트용). target 부분일치(JSONB @>):
  *   world_shot={locationId,column} / character_view={characterId,column} / 러프보드={writerShotId} 등.
  *   별도 상태 저장 없이 '실패 잡의 존재가 진실'(architecture §0)을 그대로 집계한다.
  *   게이트는 비용 방어 — 조회 실패 시 생성이 진행되지 않도록 실패를 호출자에게 전파한다.
+ *   면제 클래스는 JS 로 거른다(슬롯당 실패는 소수 — postgrest or/not.in 문법 리스크 회피).
+ *   미태깅(null)은 보수적으로 센다(게이트가 약해지는 방향의 실수 방지).
  */
 export async function countFailedJobsForTarget(
   projectId: string,
   kind: GenerationJobKind,
   target: Partial<GenerationJobTarget>,
 ): Promise<number> {
-  const { count, error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('generation_jobs')
-    .select('id', { count: 'exact', head: true })
+    .select('error_class')
     .eq('project_id', projectId)
     .eq('kind', kind)
     .eq('status', 'failed')
     .contains('target', target)
   if (error) throw error
-  if (count === null) throw new Error('generation job failed-target count returned no count')
-  return count
+  if (!data) throw new Error('generation job failed-target count returned no data')
+  return data.filter(
+    (r) => !GIVE_UP_EXEMPT_CLASSES.has(((r as { error_class?: string | null }).error_class) ?? ''),
+  ).length
 }
 
 /**
