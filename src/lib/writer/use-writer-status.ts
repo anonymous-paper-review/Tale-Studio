@@ -44,13 +44,15 @@ interface Options {
 export function useWriterStatus(
   projectId: string | null | undefined,
   opts: Options = {},
-): { status: WriterStatus | null; loading: boolean; error: string | null } {
+): { status: WriterStatus | null; loading: boolean; error: string | null; restart: () => void } {
   const interval = opts.intervalMs ?? 3000
   const stopWhenCompleted = opts.stopWhenCompleted ?? true
 
   const [status, setStatus] = useState<WriterStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // #stage-retry: resume 후 폴링 재개용 논스 — 완료/실패로 멈춘 루프를 다시 돌린다.
+  const [nonce, setNonce] = useState(0)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // keepalive: 멈춘 체인을 ~60s 에 한 번만 재트리거 (스팸 방지)
   const lastKeepaliveRef = useRef(0)
@@ -75,7 +77,10 @@ export function useWriterStatus(
       const now = Date.now()
       if (now - lastKeepaliveRef.current < KEEPALIVE_THROTTLE_MS) return
       lastKeepaliveRef.current = now
-      fetch('/api/writer/step', {
+      // #stage-retry: /api/writer/step 은 서버-투-서버 전용(x-writer-secret, 8/11 fail-closed)이라
+      //   브라우저 직접 호출은 프로덕션에서 401 로 조용히 죽고 있었다. 유저 세션으로 인증되는
+      //   resume 라우트가 running run 에는 킥(step 재트리거)으로 동작한다.
+      fetch('/api/writer/resume', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ projectId }),
@@ -115,7 +120,7 @@ export function useWriterStatus(
       cancelled = true
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [projectId, interval, stopWhenCompleted])
+  }, [projectId, interval, stopWhenCompleted, nonce])
 
-  return { status, loading, error }
+  return { status, loading, error, restart: () => setNonce((n) => n + 1) }
 }

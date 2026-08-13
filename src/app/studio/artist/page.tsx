@@ -107,8 +107,24 @@ export default function VisualPage() {
   const toggleNewUi = () => setBoardMode(!newUi)
 
   // writer-pipeline 진행상황 (producer→artist 직행 시 백그라운드 생성 진행 표시용, decisions #37)
-  const { status: writerStatus } = useWriterStatus(projectId)
+  const { status: writerStatus, restart: restartWriterStatus } = useWriterStatus(projectId)
   const setLifecycleStatus = useProjectStore((s) => s.setLifecycleStatus)
+  // #stage-retry '이어서 재시도': failed run 을 실패 스테이지부터 재개 (자동 1회 재시도 소진 후 사람 방아쇠)
+  const [resuming, setResuming] = useState(false)
+  const resumeWriterRun = async () => {
+    if (!projectId || resuming) return
+    setResuming(true)
+    try {
+      const res = await fetch('/api/writer/resume', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      })
+      if (res.ok) restartWriterStatus() // 멈춘 폴링 재개 — 진행 화면으로 복귀
+    } finally {
+      setResuming(false)
+    }
+  }
 
   // 프로젝트당 1회만 자동생성 트리거 (마운트/재진입 중복 방지)
   const autoGenTriggeredRef = useRef<string | null>(null)
@@ -354,12 +370,18 @@ export default function VisualPage() {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
         {writerStatus?.pipeline_failed ? (
-          <div className="mx-auto w-full max-w-md text-center">
+          <div className="mx-auto w-full max-w-md space-y-4 text-center">
             <h1 className="text-xl font-bold text-destructive">
-              AI 자동 생성 실패
+              AI 자동 생성이 중단됐어요
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {writerStatus.error ?? '백그라운드 생성에 실패했습니다. Producer로 돌아가 다시 시도하세요.'}
+            <p className="text-sm text-muted-foreground">
+              {writerStatus.error ?? '백그라운드 생성이 중단됐습니다.'}
+            </p>
+            <Button onClick={resumeWriterRun} disabled={resuming}>
+              {resuming ? '재개하는 중…' : '이어서 재시도'}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              중단된 단계부터 다시 시작해요 — 처음부터 다시 만들지 않아요.
             </p>
           </div>
         ) : (

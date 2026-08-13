@@ -40,6 +40,7 @@ import {
   type WriterErrorDetail,
 } from '@/lib/writer/run-store';
 import { getPendingRawCalls, getUsageTotals } from '@/lib/writer/llm/raw_collector';
+import { shouldAutoRetry, AUTO_RETRY_PER_STAGE } from '@/lib/writer/pipeline/stage-errors';
 import type {
   PipelineInput,
   SceneCinematography,
@@ -122,6 +123,8 @@ export interface WriterRunState extends WriterRunStateBase {
 
   // 재시도/타임아웃 가드 (중도 kill 시 attempt 증가분이 남는다)
   _attempt?: { stage: string; count: number };
+  // #stage-retry: 자동 재시도·수동 resume 기록 — 조용한 치유 금지(F-005 교훈), 관측 가능해야 한다.
+  _repairs?: Array<{ stage: string; at: string; message: string }>;
   // 단계별 소요시간 (timing pipeline). key=stage → 마지막 성공 실행의 wall-clock(ms).
   _timings?: Record<string, { ms: number; attempts: number; endedAt: string }>;
 }
@@ -681,6 +684,32 @@ export async function runWriterSteps(
       patch = await step.run(state, { logger, projectId, deadlineMs: opts.deadlineMs });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      // #stage-retry(2026-08-13, 오너 정책): 일시 오류는 **자동 1회 재시도** — paused 로 양보하면
+      //   step 라우트의 self-trigger 가 같은 스테이지에 재진입한다(진입 마킹이 이미 attempt 를
+      //   올려놨으므로 별도 카운터 불요). 소진되거나 결정 오류(계약/제약/권한/결제)면 표면화
+      //   → UI 의 '이어서 재시도'(resume)가 사람 방아쇠. 치유는 _repairs 에 기록해 관측 가능하게.
+      if (shouldAutoRetry(e, nextCount)) {
+        state._repairs = [
+          ...(state._repairs ?? []),
+          { stage: step.key, at: new Date().toISOString(), message: message.slice(0, 200) },
+        ];
+        try {
+          const saved = await saveRunState(
+            run.id,
+            state,
+            { completed_units: completedUnits, current_stage: step.key },
+            version,
+          );
+          if (saved === null) return { paused: true }; // CAS 패배 — 다른 인보케이션에 양보
+          version = saved;
+        } catch {
+          // 기록 실패는 재시도를 막지 않는다 — 다음 진입 마킹이 어차피 체크포인트를 쓴다.
+        }
+        console.warn(
+          `[writer steps] ${projectId} · ${step.key} 일시 오류 — 자동 재시도 (${nextCount}/${1 + AUTO_RETRY_PER_STAGE}): ${message}`,
+        );
+        return { paused: true };
+      }
       await markFailed(run.id, message, captureErrorDetail(step.key, message));
       return { failed: true };
     }
