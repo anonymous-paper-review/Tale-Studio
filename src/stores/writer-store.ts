@@ -336,6 +336,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       project_id: projectId,
       scene_id: sceneId,
       shot_id: shotId,
+      source: 'manual', // #F-003 R3 — 사람의 글: 파이프라인 재런의 DELETE 에서 살아남는다
       shot_type: newShot.shotType,
       action_description: newShot.actionDescription,
       action_description_native: newShot.actionDescription,
@@ -470,6 +471,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     const { error } = await supabase.from('scenes').insert({
       project_id: projectId,
       scene_id: sceneId,
+      source: 'manual', // #F-003 R3 — 사람의 글: 파이프라인 재런의 DELETE 에서 살아남는다
       narrative_summary: newScene.narrativeSummary,
       narrative_summary_native: newScene.narrativeSummary,
       original_text_quote: newScene.originalTextQuote,
@@ -752,6 +754,9 @@ export const useWriterStore = create<WriterState>((set, get) => ({
             project_id: projectId,
             scene_id: sceneId,
             shot_id: s.shotId,
+            // #F-003 R3 — 씬 재생성은 사람이 지시한 그 씬의 교체이고 산출은 사람이 선별한 판본:
+            //   'manual'. 이후 전체 재런이 이 씬을 다시 만들면 충돌 스킵(수동 우선)으로 보존된다.
+            source: 'manual',
             shot_type: s.shotType,
             action_description: s.actionDescription,
             characters: s.characters,

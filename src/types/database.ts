@@ -491,6 +491,7 @@ export type Database = {
           original_text_quote: string | null
           location: string | null
           time_of_day: string | null
+          source: string
           mood: string | null
           characters_present: string[] | null
           estimated_duration_seconds: number | null
@@ -507,6 +508,7 @@ export type Database = {
           original_text_quote?: string | null
           location?: string | null
           time_of_day?: string | null
+          source?: string
           mood?: string | null
           characters_present?: string[] | null
           estimated_duration_seconds?: number | null
@@ -523,6 +525,7 @@ export type Database = {
           original_text_quote?: string | null
           location?: string | null
           time_of_day?: string | null
+          source?: string
           mood?: string | null
           characters_present?: string[] | null
           estimated_duration_seconds?: number | null
@@ -554,6 +557,7 @@ export type Database = {
           location_ids: string[] | null
           duration_seconds: number | null
           generation_method: string | null
+          source: string
           dialogue_lines: Json | null
           camera_config: Json | null
           lighting_config: Json | null
@@ -587,6 +591,7 @@ export type Database = {
           location_ids?: string[] | null
           duration_seconds?: number | null
           generation_method?: string | null
+          source?: string
           dialogue_lines?: Json | null
           camera_config?: Json | null
           lighting_config?: Json | null
@@ -620,6 +625,7 @@ export type Database = {
           location_ids?: string[] | null
           duration_seconds?: number | null
           generation_method?: string | null
+          source?: string
           dialogue_lines?: Json | null
           camera_config?: Json | null
           lighting_config?: Json | null

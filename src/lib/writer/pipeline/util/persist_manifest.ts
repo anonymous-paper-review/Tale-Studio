@@ -137,7 +137,13 @@ export async function persistAssetsToDb(
       assertDbOk('locations delete', error)
     })(),
     (async () => {
-      const { error } = await supabaseAdmin.from('scenes').delete().eq('project_id', projectId)
+      // #F-003 R3(2026-08-13): 파이프라인 소유 행만 갈아엎는다 — 채팅/수동 씬(source='manual')은
+      //   재런에서 살아남는다 (위 locations 의 origin='producer' 보존과 같은 소유권 시멘틱).
+      const { error } = await supabaseAdmin
+        .from('scenes')
+        .delete()
+        .eq('project_id', projectId)
+        .eq('source', 'pipeline')
       assertDbOk('scenes delete', error)
     })(),
   ])
@@ -212,8 +218,17 @@ export async function persistAssetsToDb(
 
   // scenes (world 이미지 생성이 scene.mood 에 의존 → Tier 1 에 포함)
   if (scenes.scenes.length) {
+    // #F-003 R3: 생존한 수동 씬과 scene_id 가 겹치면 **수동이 이긴다** — 파이프라인 산출은
+    //   재생성 가능하고 사람의 글은 아니므로. UNIQUE(project_id, scene_id) 에러로 런을 죽이는
+    //   대신 충돌 행만 빼고 경고로 표면화한다.
+    const { data: survivorScenes, error: survScErr } = await supabaseAdmin
+      .from('scenes')
+      .select('scene_id')
+      .eq('project_id', projectId)
+    assertDbOk('scenes survivors', survScErr)
+    const takenSceneIds = new Set((survivorScenes ?? []).map((s) => s.scene_id as string))
     // 언어 경계(S3): 파이프라인 산출 자유서술(narrative/mood) → EN base 파생(이미 영어면 skip). 표시는 _native.
-    const sRows = scenes.scenes.map((sc, i) => ({
+    const sRowsAll = scenes.scenes.map((sc, i) => ({
       id: writerSceneIdToMain(sc.scene_id),
       narrativeNative: sc.dialogue_summary ?? sc.purpose ?? '',
       moodNative: `${sc.emotion_beat?.start ?? ''} → ${sc.emotion_beat?.end ?? ''}`,
@@ -224,6 +239,16 @@ export async function persistAssetsToDb(
       seconds: sc.estimated_seconds ?? 0,
       i,
     }))
+    const collidedScenes = sRowsAll.filter((r) => takenSceneIds.has(r.id))
+    if (collidedScenes.length) {
+      console.warn(
+        `[persistAssetsToDb] 수동 씬과 scene_id 충돌 — 파이프라인 씬 ${collidedScenes.length}건 스킵(수동 우선): ` +
+          collidedScenes.map((r) => r.id).join(', '),
+      )
+    }
+    const sRows = collidedScenes.length
+      ? sRowsAll.filter((r) => !takenSceneIds.has(r.id))
+      : sRowsAll
     const [narrEn, moodEn] = await Promise.all([
       deriveEnBatch(sRows.map((r) => ({ id: r.id, native: r.narrativeNative })), 'scene narrative summary'),
       deriveEnBatch(sRows.map((r) => ({ id: r.id, native: r.moodNative })), 'scene mood'),
@@ -251,6 +276,7 @@ export async function persistAssetsToDb(
         return {
           project_id: projectId,
           scene_id: r.id,
+          source: 'pipeline', // #F-003 R3 — 이 행은 재런 시 파이프라인이 갈아엎는다
           narrative_summary: narrEn.get(r.id) ?? r.narrativeNative,
           narrative_summary_native: narrKo.get(r.id) ?? r.narrativeNative,
           original_text_quote: r.quote,
@@ -578,11 +604,22 @@ export async function persistShotsToDb(
   const seqShots = realloc.shots
 
   // 자신이 채우는 테이블만 정리 (shots). characters/locations/scenes 는 Tier 1 소관.
+  // #F-003 R3(2026-08-13): DELETE 를 파이프라인 소유 행으로 좁힌다 — 채팅/수동 샷(source='manual')은
+  //   재런에서 살아남는다. 사고(dc531572)에선 persist(07:14:33)가 채팅(07:14:58)보다 먼저라 16샷이
+  //   살았을 뿐, 순서가 반대였다면 통째로 조용히 사라졌다 (architecture §5 원칙 2).
   const { error: shotDeleteErr } = await supabaseAdmin
     .from('shots')
     .delete()
     .eq('project_id', projectId)
+    .eq('source', 'pipeline')
   assertDbOk('shots delete', shotDeleteErr)
+  // 생존(수동) 행의 shot_id — UNIQUE(project_id, shot_id) 충돌 시 수동이 이긴다(씬 쪽과 동일 정책).
+  const { data: survivorShots, error: survShErr } = await supabaseAdmin
+    .from('shots')
+    .select('shot_id')
+    .eq('project_id', projectId)
+  assertDbOk('shots survivors', survShErr)
+  const takenShotIds = new Set((survivorShots ?? []).map((s) => s.shot_id as string))
 
   // shots (shot_sequence — 대사 보유)
   if (seqShots.length) {
@@ -591,7 +628,7 @@ export async function persistShotsToDb(
     //   귀속시킨다(분할은 원본 위치 삽입이라 이웃과 같은 씬) — 한 샷 결손이 전체 persist를
     //   죽이던 것(47a62d1d: shots 0행) 방지. 스테이지 쪽 보정과 이중 방어.
     let lastSceneId = ''
-    const shRows: PersistShotDraft[] = seqShots.map((it, i) => {
+    const shRowsAll: PersistShotDraft[] = seqShots.map((it, i) => {
       const sceneId = it.S?.scene_id ?? lastSceneId
       if (!it.S?.scene_id) {
         console.warn(`[persistShotsToDb] shot ${it.shot_id}: S.scene_id 누락 → 직전 씬(${sceneId})으로 귀속`)
@@ -631,6 +668,17 @@ export async function persistShotsToDb(
         checkNotes: it.check_notes?.length ? it.check_notes : null,
       }
     })
+    // #F-003 R3: 생존한 수동 샷과 shot_id 충돌 — 수동 우선 스킵(정책 근거는 위 delete 주석).
+    const collidedShots = shRowsAll.filter((r) => takenShotIds.has(r.shotMainId))
+    if (collidedShots.length) {
+      console.warn(
+        `[persistShotsToDb] 수동 샷과 shot_id 충돌 — 파이프라인 행 ${collidedShots.length}건 스킵(수동 우선): ` +
+          collidedShots.map((r) => r.shotMainId).join(', '),
+      )
+    }
+    const shRows = collidedShots.length
+      ? shRowsAll.filter((r) => !takenShotIds.has(r.shotMainId))
+      : shRowsAll
     const actionEn = await deriveEnBatch(
       shRows.map((r) => ({ id: r.shotMainId, native: r.actionNative })),
       'shot action description',
@@ -659,6 +707,7 @@ export async function persistShotsToDb(
           project_id: projectId,
           scene_id: r.sceneMainId,
           shot_id: r.shotMainId,
+          source: 'pipeline', // #F-003 R3 — 이 행은 재런 시 파이프라인이 갈아엎는다
           shot_type: r.shotType,
           action_description: actionEn.get(r.shotMainId) ?? r.actionNative,
           action_description_native: actionKo.get(r.shotMainId) ?? r.actionNative,

@@ -91,10 +91,22 @@ function sequence(shots: Array<Record<string, unknown>>): ShotSequence {
 
 function shotQuery() {
   return {
-    select: vi.fn(() => ({
-      eq: vi.fn(async () => ({ data: mocks.existingShots, error: null })),
+    // #F-003 R3: select('shot_id') 는 스코프 delete 뒤의 생존(수동) 행 조회다 — 이 픽스처의
+    //   기존 행은 전부 파이프라인 소유(캐리포워드 대상)라 delete 후 생존자는 없다([]).
+    //   캐리포워드 조회(컬럼 목록 select)는 종전대로 existingShots 를 돌려준다.
+    select: vi.fn((cols?: string) => ({
+      eq: vi.fn(async () => ({
+        data: cols === 'shot_id' ? [] : mocks.existingShots,
+        error: null,
+      })),
     })),
-    delete: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
+    // #F-003 R3: delete 가 .eq('project_id').eq('source') 로 체이닝된 뒤 await 되므로 thenable 체인.
+    delete: vi.fn(() => {
+      const chain: Record<string, unknown> = {}
+      chain.eq = vi.fn(() => chain)
+      chain.then = (ok: (v: { error: null }) => unknown) => Promise.resolve({ error: null }).then(ok)
+      return chain
+    }),
     insert: vi.fn(async (rows: Record<string, unknown>[]) => {
       mocks.insertedShots = rows
       return { error: null }
