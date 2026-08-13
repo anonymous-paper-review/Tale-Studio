@@ -104,6 +104,14 @@ export async function GET(
           characters: [],
           worlds: [],
           v2Package: state.v2Package ?? null,
+          v2Apply: {
+            available:
+              run.status === 'completed' &&
+              state.v2Package?.status === 'ready' &&
+              (!state.v2Package.user_review.required ||
+                state.v2Package.user_review.status === 'accepted') &&
+              Boolean(state.v2Package.units?.length),
+          },
         },
         { headers: { 'cache-control': 'no-store' } },
       );
@@ -213,6 +221,7 @@ export async function GET(
         characters,
         worlds,
         v2Package: null,
+        v2Apply: null,
       },
       { headers: { 'cache-control': 'no-store' } },
     );

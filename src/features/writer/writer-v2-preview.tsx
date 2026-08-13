@@ -1,6 +1,9 @@
 'use client'
 
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { WriterHeader } from '@/features/writer/writer-header'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
@@ -8,6 +11,55 @@ import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 export function WriterV2Preview({ projectId }: { projectId: string }) {
   const { preview, loading } = useWriterPreview(projectId)
   const pkg = preview?.v2Package
+  const router = useRouter()
+  const [applying, setApplying] = useState(false)
+  const [applyMessage, setApplyMessage] = useState<string | null>(null)
+  const [reviewing, setReviewing] = useState(false)
+
+  const applyDownstream = async () => {
+    setApplying(true)
+    setApplyMessage(null)
+    try {
+      const response = await fetch('/api/writer/v2/apply', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      })
+      const body = (await response.json()) as {
+        error?: string
+        scenes?: number
+        shots?: number
+      }
+      if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`)
+      setApplyMessage(
+        `기존 downstream 계약에 반영했습니다. 씬 ${body.scenes ?? 0}개 · Shot ${body.shots ?? 0}개`,
+      )
+      router.push(`/studio/artist?projectId=${encodeURIComponent(projectId)}`)
+    } catch (error) {
+      setApplyMessage(error instanceof Error ? error.message : '반영에 실패했습니다.')
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  const resolveReview = async (action: 'accept' | 'hold') => {
+    setReviewing(true)
+    setApplyMessage(null)
+    try {
+      const response = await fetch('/api/writer/v2/review', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId, action }),
+      })
+      const body = (await response.json()) as { error?: string }
+      if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`)
+      window.location.reload()
+    } catch (error) {
+      setApplyMessage(error instanceof Error ? error.message : '검토 결과 저장에 실패했습니다.')
+    } finally {
+      setReviewing(false)
+    }
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -46,6 +98,41 @@ export function WriterV2Preview({ projectId }: { projectId: string }) {
                     {pkg.status === 'ready' ? 'Writer 후보' : 'User Review 필요'}
                   </Badge>
                 </div>
+                {pkg.status === 'ready' && preview?.v2Apply?.available ? (
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <Button type="button" onClick={applyDownstream} disabled={applying}>
+                      {applying ? 'Artist·Director 연결 중…' : '선택한 V2 결과를 downstream에 적용'}
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      적용 후 Artist가 캐릭터·배경을 읽고 Director가 씬·Shot을 읽습니다.
+                    </span>
+                  </div>
+                ) : null}
+                {pkg.status === 'review' && pkg.user_review.required ? (
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <Button
+                      type="button"
+                      onClick={() => void resolveReview('accept')}
+                      disabled={reviewing}
+                    >
+                      {reviewing ? '검토 저장 중…' : '현재 결과를 후보로 선택'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void resolveReview('hold')}
+                      disabled={reviewing}
+                    >
+                      보류
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      선택은 Writer 검토 기록이며 최종 제작 판단은 downstream에서 합니다.
+                    </span>
+                  </div>
+                ) : null}
+                {applyMessage ? (
+                  <p className="mt-3 text-sm text-muted-foreground">{applyMessage}</p>
+                ) : null}
                 {pkg.user_review.required ? (
                   <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">
                     {pkg.user_review.reason}

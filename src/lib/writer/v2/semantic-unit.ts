@@ -93,7 +93,9 @@ export interface WriterV2Package {
   attempts: WriterV2Attempt[]
   user_review: {
     required: boolean
-    status: 'not_required' | 'pending'
+    status: 'not_required' | 'pending' | 'accepted' | 'held'
+    selected_attempt?: number
+    decided_at?: string
     reason?: string
   }
 }

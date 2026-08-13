@@ -44,6 +44,7 @@ export interface WriterPreview {
   characters: PreviewCharacter[]
   worlds?: PreviewWorld[]
   v2Package?: WriterV2Package | null
+  v2Apply?: { available: boolean } | null
 }
 
 interface Options {
