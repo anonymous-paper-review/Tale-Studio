@@ -212,3 +212,20 @@
 - **되살릴 좌표**: `src/lib/writer/pipeline/stages/dialogue.ts`의 `deriveLedger`,
   대조표는 `research/experiments/dialogue-parallel-ledger/HYPOTHESIS.md` 부록.
 - 기록: 2026-08-11
+
+### D-020 · 산문 인물 id 노출 수리 — i18n 전면 개편에 병합   `상태: blocked`
+- **무엇을**: 두 층 + 데이터 1건.
+  ① 데쿠파주 스키마 `beat_summary_native` 지시에 "인물은 이야기 속 이름/호칭만, id(char 등) 금지" 조항.
+  ② persist 직전 결정론적 id→이름 새니타이저(로스터 기반 word-boundary 치환 — LLM 드리프트와
+  무관하게 잡는 최종 방어, architecture §3).
+  ③ `3036b333` 데이터 수리: 표시문 26행 + 생성 프롬프트 오염 7행 치환 UPDATE.
+- **왜 미뤘나**: 오너 결정(2026-08-13) — 홈페이지 전체를 **EN default + 버튼 언어 전환**(한국어
+  포함 다국어 확장)으로 개편한 뒤 언어 경계를 한 번에 교통 정리하기로. 지금 native 축에 수리를
+  넣으면 개편 때 다시 뒤집는다. (배경: 이 산문은 번역문이 아니라 데쿠파주 **원산출 한국어**가
+  round-trip 회피 조항으로 원문 보존된 것 — EN 컬럼이 오히려 그 번역본. 교통 정리의 대상이다.)
+- **언제 꺼내나**: i18n 개편(EN default + 전환 버튼) 착수 시 — 그 설계에 ①②를 포함시킨다.
+  개편 전에 id 노출 신고가 또 오면 ③(데이터 치환)만 선집행 가능.
+- **되살릴 좌표**: 진단 전문은 세션 2026-08-13 조사(기전: W3 폴백 `beat.native` 1순위 +
+  persist S3 원문 보존 — `persist_manifest.ts` 언어 경계 주석, `c_application_2.ts` W3 랭킹,
+  `decoupage.ts:224` 스키마). 오염 판별 쿼리: `action_description ~* '\mchar(_\d+)?\M'`.
+- 기록: 2026-08-13
