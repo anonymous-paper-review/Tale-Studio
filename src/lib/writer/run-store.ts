@@ -9,6 +9,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import type { PipelineInput } from '@/lib/writer/types/pipeline';
 import type { Json } from '@/types/database';
 import { castContractToCharacters } from '@/lib/writer/cast-contract';
+import type { WriterEngine } from '@/lib/writer/engine';
 
 export type WriterRunStatus = 'running' | 'completed' | 'failed' | 'awaiting_confirmation';
 
@@ -43,6 +44,7 @@ export interface StageTiming {
 }
 
 export interface WriterRunStatusLight {
+  engine: WriterEngine;
   status: WriterRunStatus;
   current_stage: string | null;
   completed_units: number;
@@ -55,7 +57,7 @@ export interface WriterRunStatusLight {
 }
 
 const STATUS_LIGHT_COLUMNS =
-  'status,current_stage,completed_units,total_units,error,updated_at,created_at,timings:state->_timings';
+  'status,current_stage,completed_units,total_units,error,updated_at,created_at,engine:state->input->>writerEngine,timings:state->_timings';
 
 /**
  * 새 run 행 삽입 (status 'running', state={input}, completed_units 0).
@@ -283,7 +285,11 @@ export async function getRunStatusLight(
     .maybeSingle();
 
   if (error) throw new Error(`getRunStatusLight failed: ${error.message}`);
-  return (data as WriterRunStatusLight | null) ?? null;
+  if (!data) return null;
+  return {
+    ...(data as WriterRunStatusLight),
+    engine: (data as { engine?: unknown }).engine === 'v2' ? 'v2' : 'v1',
+  };
 }
 
 // ── 예상 총 소요시간 추정(#c4 2026-07-14) ───────────────────────────────────

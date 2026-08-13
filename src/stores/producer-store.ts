@@ -11,6 +11,7 @@ import { claimAction } from '@/lib/action-guard'
 import { computeProducerSourceHash } from '@/lib/lifecycle'
 import { createPendingProposal } from '@/lib/pending-proposal'
 import { evaluateProducerGate } from '@/lib/producer-gate'
+import { getWriterEnginePreference } from '@/lib/writer/engine'
 import type {
   CastMember,
   CastArc,
@@ -815,6 +816,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           body: JSON.stringify({
             projectId,
             story: storyText,
+            writerEngine: getWriterEnginePreference(projectId),
             runtimeSeconds,
             genre,
             cast: castContract,

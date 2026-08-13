@@ -40,6 +40,10 @@ import {
   type WriterErrorDetail,
 } from '@/lib/writer/run-store';
 import { getPendingRawCalls, getUsageTotals } from '@/lib/writer/llm/raw_collector';
+import {
+  runWriterV2Preview,
+  type WriterV2Package,
+} from '@/lib/writer/v2/semantic-unit';
 import type {
   PipelineInput,
   SceneCinematography,
@@ -69,6 +73,9 @@ import type {
 // =====================================================================
 export interface WriterRunState extends WriterRunStateBase {
   input: PipelineInput;
+
+  // V2 semantic-unit previz package. V1 state remains unchanged.
+  v2Package?: WriterV2Package;
 
   // #s3-gate: 씬 게이트 확정 플래그 + 수정 요청 누적(개정 시 scenes/storyCheck 를 지워 s3 재실행).
   _gateConfirmed?: boolean;
@@ -560,7 +567,23 @@ export const WRITER_STEPS: WriterStep[] = [
   },
 ];
 
+export const WRITER_V2_STEPS: WriterStep[] = [
+  {
+    key: 'v2SemanticUnits',
+    has: (s) => s.v2Package !== undefined,
+    run: async (s, { logger }) => {
+      const models = resolveModels(s.input);
+      const v2Package = await runWriterV2Preview(s.input, logger, models.S);
+      return { v2Package };
+    },
+  },
+];
+
 export const WRITER_TOTAL_UNITS = WRITER_STEPS.reduce((n, st) => n + (st.units ?? 1), 0);
+export const WRITER_V2_TOTAL_UNITS = WRITER_V2_STEPS.reduce(
+  (n, st) => n + (st.units ?? 1),
+  0,
+);
 
 /**
  * 다음 step 을 self-trigger 한다 (start / step paused / watchdog 공용).
@@ -619,6 +642,7 @@ export async function runWriterSteps(
   if (!run || run.status !== 'running') return { done: true };
 
   const state = run.state as WriterRunState;
+  const steps = state.input.writerEngine === 'v2' ? WRITER_V2_STEPS : WRITER_STEPS;
   // best-effort logger (FS 쓰기는 no-op-safe). raw_collector 그룹화에만 쓰인다.
   const logger = new PipelineLogger(projectId);
   await logger.init();
@@ -629,7 +653,7 @@ export async function runWriterSteps(
   let version = run.state_version ?? 0;
 
   for (;;) {
-    const step = WRITER_STEPS.find((st) => !st.has(state));
+    const step = steps.find((st) => !st.has(state));
 
     // 남은 단계 없음 → 완료.
     if (!step) {
@@ -759,7 +783,7 @@ export async function runWriterSteps(
   }
 
   // 루프 탈출: 남은 단계 있으면 paused, 없으면 완료.
-  const remaining = WRITER_STEPS.find((st) => !st.has(state));
+  const remaining = steps.find((st) => !st.has(state));
   if (remaining) return { paused: true };
   await markCompleted(run.id);
   await advanceProjectStageAfterWriter(projectId);

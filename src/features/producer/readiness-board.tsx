@@ -45,6 +45,7 @@ import { useModifierHeld } from '@/hooks/use-modifier-held'
 import { AgentFace } from '@/components/agent-face'
 import { STAGE_FACE_COLOR } from '@/lib/constants'
 import { ProducerQuestJournal, StoryFoundationBadges } from './quest-journal'
+import { WriterEnginePicker } from '@/features/writer/writer-engine-picker'
 
 // 카드 안 자동확장 textarea(외모/시각 설명)용 — 네이티브 스크롤바 대신 얇은 테마 스크롤바(#b5).
 //   max-h로 카드 폭주를 막고, 넘치면 얇은 썸만 보이게.
@@ -619,6 +620,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   // 히어로 제목(#feedback 2026-08-07 v2) — 프로젝트 제목이 곧 영화 제목. 기본값(Untitled)은
   //   "아직 제목이 없는 이야기"로 흐리게 — 채워질 자리를 보여주는 목업 히어로의 빈 상태.
   const projectTitle = useProjectStore((s) => s.projectTitle)
+  const projectId = useProjectStore((s) => s.projectId)
   const untitled = !projectTitle?.trim() || projectTitle.trim().toLowerCase() === 'untitled'
   const renameProject = useProjectStore((s) => s.renameProject)
   // 인라인 제목 편집 상태 — null = 보기 모드. Esc 취소는 blur 커밋보다 먼저 ref 로 알린다
@@ -719,6 +721,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {syncing ? <Badge variant="outline">저장 중</Badge> : null}
+          <WriterEnginePicker projectId={projectId} />
           {/* Producer 호출 CTA(#b8) — 얼굴 + 이름 병기, 헤더 맨오른쪽.
               호버 시 얼굴이 활짝 웃으며 깜빡이고(#b1) 살짝 커진다 + 툴팁 안내. */}
           <Tooltip delayDuration={150}>

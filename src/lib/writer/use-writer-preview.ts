@@ -4,6 +4,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import type { WriterEngine } from '@/lib/writer/engine'
+import type { WriterV2Package } from '@/lib/writer/v2/semantic-unit'
 
 export interface PreviewScene {
   sceneId: string
@@ -32,6 +34,7 @@ export interface PreviewWorld {
 }
 
 export interface WriterPreview {
+  engine?: WriterEngine
   started: boolean
   running: boolean
   completed: boolean
@@ -40,6 +43,7 @@ export interface WriterPreview {
   scenes: PreviewScene[]
   characters: PreviewCharacter[]
   worlds?: PreviewWorld[]
+  v2Package?: WriterV2Package | null
 }
 
 interface Options {

@@ -9,6 +9,7 @@ import type {
   CharacterMagnitude,
   MotionSpeed,
 } from '@/lib/writer/motion-vocabulary';
+import type { WriterEngine } from '@/lib/writer/engine';
 
 export type DepthLevel = 'D1' | 'D2' | 'D3' | 'D4' | 'D5' | 'D6' | 'D7';
 
@@ -172,6 +173,8 @@ export interface ShotVideosOutput {
 
 export interface PipelineInput {
   story: string;          // 자유 텍스트 입력
+  /** 실행 시 고정되는 Writer 엔진. 누락된 구형 run은 V1로 해석한다. */
+  writerEngine?: WriterEngine;
   presetId?: string;      // 선택적 장르 프리셋
   runtimeSeconds?: number; // 사용자 명시 러닝타임 (없으면 자동 결정)
   // #s3-gate 2026-08-05: true 면 storyCheck 후 일시정지(awaiting_confirmation) — 씬 스토리를
