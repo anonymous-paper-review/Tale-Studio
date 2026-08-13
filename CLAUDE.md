@@ -27,6 +27,7 @@
 - `.claude/vault/2026-08-10-previz-motion-channel.md` — **다음 세션 재개 지점** — previz/모션 채널/생성기 실측을 이어갈 때 먼저 (축 A 실측·계기 결함 진단·모션 채널 3중 약점·내일 아젠다 3질문·아티팩트 링크)
 - `.claude/vault/2026-08-11-writer-entity-map-audit.md` — writer 엔티티가 어디까지 가는지·왜 끊겼는지를 다시 팔 때 먼저 (엔티티 60개 전수·끊긴 배선 14건·경로 쌍 3결정 미결·step 라우트 무인증 실측)
 - `.claude/vault/2026-08-11-blockout-previz-video-reference.md` — 프리비즈 영상 레퍼런스/3D 블록아웃/각색 연출 리서치를 다시 팔 때 먼저 (모션 전달 제3후보·Seedance video_urls 기배선 실측·3암 실험 스케치·리포트 아티팩트)
+- `.claude/vault/2026-08-13-failure-taxonomy.md` — 생성 실패 재시도 정책/error_class/P2·P3를 다시 팔 때 먼저 (실패 51건 전수 분류·Bad Request 가설 기각 2건·오너 결정 5건 대기)
 
 ## 실험
 

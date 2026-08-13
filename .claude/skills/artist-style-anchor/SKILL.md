@@ -6,7 +6,7 @@ allowed-tools: Bash, Read, Write, Edit
 
 # artist-style-anchor — 작가 그림체 앵커화 파이프라인 (B안)
 
-레퍼런스 그림체 → 중립 앵커 보드 → 전이 검증까지. 이론 문서 2종(neutral_style_analysis_workflow·style-anchor-injection)과 refer1 견본 카드는 2026-08-05 대청소로 삭제됨 — 문서 2종은 `~/tale-studio-backup-2026-08-05.tar.gz`에만 있고, refer1 카드는 백업에도 없음. 운영에 필요한 루브릭·실측 규칙은 이 파일에 자기완결로 담겨 있다.
+레퍼런스 그림체 → 중립 앵커 보드 → 전이 검증까지. 이론 문서 2종(neutral_style_analysis_workflow·style-anchor-injection)은 2026-08-05 대청소로 삭제 — **git 히스토리(각 2~3커밋)와 `~/tale-studio-backup-2026-08-05.tar.gz`에서 복구 가능**. refer1/refer2 견본 카드와 전 산출물·프롬프트 원문은 `dev/Image_Style/`에 현존하나 **폴더 전체가 gitignore(로컬 전용)** — 리뷰 패키지 인덱스는 `dev/Image_Style/README.md` (2026-08-13 정리). 운영에 필요한 루브릭·실측 규칙은 이 파일에 자기완결로 담겨 있다.
 
 **산출 디렉토리**: `dev/Image_Style/<run_name>/` (없으면 생성, gitignore — 로컬 전용) — `style-card-<run_name>.md` + `anchor_board.png` + `test_*.png`.
 

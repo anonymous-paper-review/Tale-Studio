@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { classifyJobError } from '@/lib/generation-jobs'
 import type { Json, Tables } from '@/types/database'
 export {
   compareDirectorVideoTakeOrder,
@@ -184,4 +185,10 @@ export async function markDirectorVideoAttemptFailed(projectId: string, jobId: s
     p_error: errorMessage,
   })
   if (error) throw error
+  // #error-class: RPC 는 error_class 를 모른다 — 종결 후 보강 태깅(best-effort, 집계 전용 필드).
+  await supabaseAdmin
+    .from('generation_jobs')
+    .update({ error_class: classifyJobError(errorMessage) })
+    .eq('id', jobId)
+    .eq('status', 'failed')
 }

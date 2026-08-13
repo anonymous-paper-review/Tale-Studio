@@ -223,8 +223,42 @@ export async function hasQueuedWorldShotJob(
 const MODERATION_KEYWORDS =
   /moderation|safety|content[ _-]?policy|content_policy|\bblocked\b|nsfw|prohibited|flagged|violat|disallow/i
 
+// #error-class(2026-08-13): 실패 원인 분류 — 클래스별 재시도 정책(P2/P3)의 측정 기반.
+//   프로덕션 실패 51건 전수 집계에서 도출한 분류이고, 규칙의 예문은 전부 실측 메시지다.
+//   순서가 곧 우선순위 — 구체 클래스가 먼저 먹는다(soft 가 moderation 키워드보다 앞 등).
+//   'unknown' 은 분류 실패가 아니라 "아직 패턴을 모르는 실패"라는 축적 대상 데이터다.
+export type JobErrorClass =
+  | 'billing' // 잔액/결제 — 재시도 무의미, 오너 행동 필요 ("fal 잔액 소진")
+  | 'data_ref' // 참조 이미지 접근 불가 — 우리 데이터 결함 ("image URL is not accessible")
+  | 'moderation_soft' // 빈/검은 산출 — 비결정적, 재시도 가치 ("image too small — blank/moderated")
+  | 'moderation' // 명시 콘텐츠 정책 — 프롬프트 수정 필요 (fal content_policy_violation)
+  | 'infra' // 우리 인프라 정리 — webhook 유실 좀비, superseded ("stale queued reaped")
+  | 'provider' // 프로바이더 일시 장애 — 재시도 가치 (5xx/429/타임아웃/결과 결함)
+  | 'bad_request' // 불투명 400 — fal 이 본문을 버려 재시도성 미확정, 데이터 축적 중 (실측 14건)
+  | 'unknown'
+
+const JOB_ERROR_CLASS_RULES: Array<[JobErrorClass, RegExp]> = [
+  ['billing', /잔액|balance|billing|insufficient.{0,12}(credit|fund)/i],
+  ['data_ref', /image url is not accessible|failed to load the image|input\.image_urls/i],
+  ['moderation_soft', /image too small|blank\/moderated/i],
+  ['moderation', MODERATION_KEYWORDS],
+  ['infra', /stale queued reaped|superseded|좀비/i],
+  [
+    'provider',
+    /\b(429|500|502|503|504|529)\b|rate.?limit|timeout|timed out|overloaded|ECONN|no (image|video) url in webhook payload|invalid video url|unavailable/i,
+  ],
+  ['bad_request', /^bad request$|status=400\b/i],
+]
+
+export function classifyJobError(message: string | null | undefined): JobErrorClass {
+  const m = (message ?? '').trim()
+  if (!m) return 'unknown'
+  for (const [cls, re] of JOB_ERROR_CLASS_RULES) if (re.test(m)) return cls
+  return 'unknown'
+}
+
 export function classifyFalFailure(message: string | null | undefined): 'moderation' | 'generic' {
-  return message && MODERATION_KEYWORDS.test(message) ? 'moderation' : 'generic'
+  return classifyJobError(message) === 'moderation' ? 'moderation' : 'generic'
 }
 
 export interface CharacterViewFailure {
@@ -501,6 +535,7 @@ export async function failGenerationJob(
       status: 'failed',
       error: errorMessage,
       last_error: errorMessage,
+      error_class: classifyJobError(errorMessage), // #error-class — 클래스별 재시도 정책의 측정 기반
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })

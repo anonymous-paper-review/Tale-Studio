@@ -191,6 +191,7 @@ export type Database = {
           completed_at: string | null
           attempts: number
           last_error: string | null
+          error_class: string | null
         }
         Insert: {
           id?: string
@@ -216,6 +217,7 @@ export type Database = {
           completed_at?: string | null
           attempts?: number
           last_error?: string | null
+          error_class?: string | null
         }
         Update: {
           id?: string
@@ -241,6 +243,7 @@ export type Database = {
           completed_at?: string | null
           attempts?: number
           last_error?: string | null
+          error_class?: string | null
         }
         Relationships: [
           {
