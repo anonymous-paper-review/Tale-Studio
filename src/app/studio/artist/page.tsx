@@ -18,6 +18,7 @@ import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { WriterProgress } from '@/components/layout/writer-progress'
+import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import {
   evaluateArtistGate,
@@ -109,22 +110,6 @@ export default function VisualPage() {
   // writer-pipeline 진행상황 (producer→artist 직행 시 백그라운드 생성 진행 표시용, decisions #37)
   const { status: writerStatus, restart: restartWriterStatus } = useWriterStatus(projectId)
   const setLifecycleStatus = useProjectStore((s) => s.setLifecycleStatus)
-  // #stage-retry '이어서 재시도': failed run 을 실패 스테이지부터 재개 (자동 1회 재시도 소진 후 사람 방아쇠)
-  const [resuming, setResuming] = useState(false)
-  const resumeWriterRun = async () => {
-    if (!projectId || resuming) return
-    setResuming(true)
-    try {
-      const res = await fetch('/api/writer/resume', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ projectId }),
-      })
-      if (res.ok) restartWriterStatus() // 멈춘 폴링 재개 — 진행 화면으로 복귀
-    } finally {
-      setResuming(false)
-    }
-  }
 
   // 프로젝트당 1회만 자동생성 트리거 (마운트/재진입 중복 방지)
   const autoGenTriggeredRef = useRef<string | null>(null)
@@ -377,12 +362,7 @@ export default function VisualPage() {
             <p className="text-sm text-muted-foreground">
               {writerStatus.error ?? '백그라운드 생성이 중단됐습니다.'}
             </p>
-            <Button onClick={resumeWriterRun} disabled={resuming}>
-              {resuming ? '재개하는 중…' : '이어서 재시도'}
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              중단된 단계부터 다시 시작해요 — 처음부터 다시 만들지 않아요.
-            </p>
+            <WriterResumeButton projectId={projectId} onResumed={restartWriterStatus} />
           </div>
         ) : (
           <WriterProgress

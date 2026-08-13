@@ -36,6 +36,7 @@ import { useArtistStore } from '@/stores/artist-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
+import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { resolveEntityNames, manifestEntities } from '@/lib/writer/resolve-entity-names'
@@ -71,7 +72,7 @@ export function RoughStoryboardView() {
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
   const loadProject = useWriterStore((s) => s.loadProject)
-  const { status } = useWriterStatus(projectId)
+  const { status, restart } = useWriterStatus(projectId)
   // 진행 중 판정의 바닥 (#queue-restore 2026-08-11) — 아래 panelJobs 는 컴포넌트 로컬이라 탭을
   //   떠나면 증발하는데 잡은 fal 에서 계속 돈다. 돌아왔을 때 스피너를 되살리는 유일한 근거가 큐다.
   const activeJobs = useActiveGenerationJobs(projectId)
@@ -664,11 +665,18 @@ export function RoughStoryboardView() {
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
           <ImageIcon className="size-12 text-muted-foreground" />
           <p className="text-base font-medium">아직 생성된 씬·샷이 없어요</p>
-          <p className="text-sm text-muted-foreground">
-            {status?.pipeline_failed
-              ? 'Writer 실행이 실패했어요. Producer에서 다시 실행해주세요.'
-              : 'Producer에서 스토리를 핸드오프하면 씬·샷이 생성됩니다.'}
-          </p>
+          {status?.pipeline_failed ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                생성이 중단됐어요{status.error ? ` — ${status.error}` : ''}
+              </p>
+              <WriterResumeButton projectId={projectId} onResumed={restart} />
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Producer에서 스토리를 핸드오프하면 씬·샷이 생성됩니다.
+            </p>
+          )}
         </div>
       </div>
     )
