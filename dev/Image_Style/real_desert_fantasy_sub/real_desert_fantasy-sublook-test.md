@@ -150,12 +150,12 @@ HSV 채도는 밝기 불변이라 **짙은 갈색을 '진한 색'으로 부풀�
 > 사유는 "서브룩에서는 그레이드 누수가 곧 스펙 전달이라 A 기각 근거가 이식되지 않고, 이 건은 A 가
 > 정합 파탄을 고칠 후보"라는 것이었다. 결과는 §9.1 에서 **기각**.
 
-| | **T (베이스라인)** | **B (룩 절 텍스트)** | (판별 추가) **BN** |
-|---|---|---|---|
-| refs | 앵커 보드 1장 | 앵커 보드 1장 (동일) | 앵커 보드 1장 (동일) |
-| 절 | 표준 프로브 헤더만 | 표준 헤더 + **룩 절** | 표준 헤더 + **순진 판본 룩 절** |
-| 콘텐츠 | `real_3d_v2/probe_*.txt` **원문** | 동일 | 동일 (scooter) |
-| 장수 | 4 | 4 | 1 |
+| | **T (베이스라인)** | **B (룩 절 텍스트)** | **A (2-ref, §9)** | (판별) **BN** | (판별) **BR** |
+|---|---|---|---|---|---|
+| refs | 보드 1장 | 보드 1장 (동일) | **보드 + preview 2장** (보드 1번) | 보드 1장 | 보드 1장 |
+| 절 | 표준 헤더만 | 표준 헤더 + **룩 절** | 표준 헤더 + **스킬 2-ref 절**(장면용/인물용) | 헤더 + **순진 판본 룩 절** | 헤더 + 룩 절 + **노출 명시 1문장** |
+| 콘텐츠 | `real_3d_v2/probe_*.txt` **원문** | 동일 | 동일 | 동일 (scooter) | 동일 (cafe) |
+| 장수 | 4 | 4 | 4 | 1 | 1 |
 
 - 콘텐츠 문장은 `real_3d_v2/probe_*.txt` 를 `cmp` 로 **바이트 동일** 확인하고 복사했다
   (md5 `2606…`/`53a4…`/`37fc…`/`0b83…` — 런 간 비교 가능).
@@ -389,84 +389,6 @@ B cafe 프롬프트에 **노출을 명시하는 문장 1개만** 추가했다(1�
 
 ---
 
-## 9. 이 실험의 한계
-
-1. **표본 각 1장.** 프로브당 n=1. 게이트 통과/실패 모두 확률적 요동을 배제 못 한다.
-2. **BR(노출 절)은 cafe 1장뿐이고 주광 전용이다.** 야간·인물에서 같은 문장이 어떻게 작동하는지 미검증.
-3. **BN(순진 판본)도 scooter 1장뿐이다.** "룩 절이 시간대를 못 이긴다"는 야간 1샘플 결론이다.
-   반대 방향(주광 씬에 야간 룩 절)은 시험하지 않았다.
-4. **§2.3 의 6종 횡단 비교는 계측 대조이지 전이 실험이 아니다.** 나머지 5종은 프로브를 돌리지 않았으므로
-   "정합 양호 → 전이도 양호"는 **추론**이다.
-5. **G-skeleton 의 S1 판정(누수 아닌 룩)은 해석 판단이다.** 다른 판정자는 "석조 강제"를 결함으로 셀 수 있다.
-   수치가 아니라 판단이라는 점을 명시해 둔다.
-6. **higgsfield / `gpt_image_2` 결과다.** 프로덕션(fal) 재현 보장 없음.
-
----
-
-## 10. 산출물
-
-전부 `/home/user/Downloads/Tale-Studio/dev/Image_Style/real_desert_fantasy_sub/` 하위.
-
-| 파일 | 내용 |
-|---|---|
-| **`desert_contact_sheet.png`** | **T(위) vs B(아래) 8장 + 보드·preview — 오너 육안 판정용** |
-| **`key_control.png`** | **§6.1 키 축 판별 — board \| T \| B \| BR \| preview** |
-| **`time_control.png`** | §5 G-time — T \| B \| BN scooter |
-| **`tba_cafe_sheet.png`** | **§9 T \| B \| A 나란형 시트(카페 프로브) — 보드·preview 를 양 끝에 둔 키 축 대조** |
-| **`peer_alignment.png`** | §2.3 서브룩 6종 anchor↔preview 정합 대조 |
-| `s5_sphere_leak.png` | §9.4 A 정물 구(球) 등장 증거 (좌=보드 / 우=a_cafe) |
-| `crop_preview_figures.png` | §9.6 IP 평가 — preview 인물 2인 확대 (원본 약 30px) |
-| `align_audit.png` | §2 보드 vs preview 2-up |
-| `crop_window.png` `crop_stilllife.png` | §2.4 보드 디테일(창+메사 / 정물 7요소 재질) |
-| `prereg.md` | **생성 전 작성한 Content-bound 목록·예측·문안 판단 + 계기 정정(§F)** |
-| `board_1024.png` `preview_1024.png` | DB 취득 실물 (`anchor_raw.png` 2048 / `preview_raw.jpg` = 원본) |
-| `peers/` | 서브룩 6종 배포본 anchor·preview 12장 (§2.3 계측용) |
-| `t_*_v.png` `b_*_v.png` `a_*_v.png` `bn_scooter_v.png` `br_cafe_v.png` | 산출 **14장** (재인코딩 1024 PNG) |
-| 접미사 없는 `*.png` | 원본 2048 — **14/14 실제로 WebP**. 업로드 금지 |
-| `probe_*.txt` | T 프롬프트 4종 (`real_3d_v2` 원문 md5 동일) |
-| `probeB_*.txt` `look_clause.txt` | B 프롬프트 4종 + 룩 절 payload |
-| `probeBN_scooter.txt` `look_clause_naive.txt` | BN 판별 |
-| `probeBR_cafe.txt` `bright_extra.txt` | BR 판별 |
-| `probe2_*.txt` | **A arm 프롬프트 4종** (`real_2ref/probe2_*.txt` 원문 동일 — cmp 확인) |
-| `metrics.py` | **통합 계기** — LAB L\*/C\* + dark + HSV/hue 축 한 표 |
-| `hue_spread.py` `amber_metrics.py` `fg_metrics.py` | 선례에서 복사한 계기 |
-| `make_sheets.py` `reencode.py` | 시트·WebP 재인코딩 |
-| `run_serial.sh` `run_serial_a.sh` `run_one.sh` `analyze.sh` | 직렬 실행(429 대응)·분석 파이프라인 |
-| `make_tba_sheet.py` | §9 T\|B\|A 시트 (한글 = NotoSansCJK-Bold.ttc index 1 = KR) |
-| `log_*.txt` `run_serial.out` `run_extra.out` | 잡 ID·실행 로그 |
-
-### 잡 ID
-
-| 산출 | 잡 |
-|---|---|
-| t_character | `00d9ca93-15c8-4e8b-ad60-754837bb73f3` |
-| t_cafe | `3963e0e7-7386-4b55-a55e-3787e19f5623` |
-| t_scooter | `67a3e0e2-ee5a-40f8-901b-2f5ed8668768` |
-| t_action | `4037f8f3-7fe0-4f76-bc08-ab9515e7f886` |
-| b_character | `a41f4688-9977-411b-9842-cb979ca6ebae` |
-| b_cafe | `939b37d7-246d-4c4a-84bb-53d83c8a14a9` |
-| b_scooter | `90d4bb46-8c99-42d8-87dc-64772c875f95` |
-| b_action | `6d19307a-215b-4732-885f-5ae915563452` |
-| bn_scooter | `5c0a1823-cfb2-47d3-a148-8e31aa736118` |
-| br_cafe | `cce4e1b7-0fd4-452c-a1d0-1a155951b82f` |
-| a_character | `7d5758fb-ee58-433e-a70f-1771a5f39844` |
-| a_cafe | `3009b68b-c86f-47de-b788-1e0ede4654b3` |
-| a_scooter | `33da842d-1c86-4ace-9816-07a1076bce81` |
-| a_action | `9b77d54a-7715-41b9-9e97-5134dc114c62` |
-
-**비용**: 본 배터리 10장 + **A arm 4장** = 성공 **14장 × 7 = 98크레딧**
-(429 실패 잡은 0 — 초기 동시 제출 4건이 전멸했으나 과금 없음). 워크스페이스 잔액은 3698.99 → 3327.99 로
-371 감소했으나 **이 델타에는 동시 실행 중인 형제 앵커 에이전트들의 소비가 섞여 있다.** 이 런의 몫은 98이다.
-(1차 배터리 70 + A arm 28 — 각각 오너 승인 한도 ~70 / ~28 내.)
-
-### 실행 노트 — 429
-
-첫 시도에서 T 4장을 **동시 제출**했다가 4/4 전멸했다(`concurrent_jobs_limit: 8`, 형제 앵커 에이전트들과 경합).
-**직렬 제출로 바꾸자 10/10 이 전부 1차 시도에 통과했다** — 한 번에 슬롯 1개만 요구하면 포화 큐에서도 들어간다.
-`real_2ref` §7.1 의 60초 백오프보다 **직렬화가 근본 대책**이다(`run_serial.sh`).
-
----
-
 ## 9. A arm 추가 집행 (2026-08-14, 오너 요청)
 
 **동기(오너 가설)**: 서브룩에서는 그레이드 누수가 곧 스펙 전달이므로 매체 배터리의 A 기각 근거가 이식되지 않고,
@@ -596,3 +518,93 @@ A 를 넣을 유일한 근거였던 "정합 파탄을 A 가 닫는다"가 **정�
 **줄 수 있는 것도 없다** — 모래와 하늘뿐인 이미지에서 가져올 스타일 정보가 보드에 이미 다 있다.
 
 **정합 파탄의 처방은 §8-2 그대로다**: 보드 재제작(본선) 또는 노출 명시 절(즉시 완화책).
+
+---
+
+## 10. 이 실험의 한계
+
+1. **표본 각 1장.** 프로브당 n=1. 게이트 통과/실패 모두 확률적 요동을 배제 못 한다.
+2. **BR(노출 절)은 cafe 1장뿐이고 주광 전용이다.** 야간·인물에서 같은 문장이 어떻게 작동하는지 미검증.
+3. **BN(순진 판본)도 scooter 1장뿐이다.** "룩 절이 시간대를 못 이긴다"는 야간 1샘플 결론이다.
+   반대 방향(주광 씬에 야간 룩 절)은 시험하지 않았다.
+4. **§2.3 의 6종 횡단 비교는 계측 대조이지 전이 실험이 아니다.** 나머지 5종은 프로브를 돌리지 않았으므로
+   "정합 양호 → 전이도 양호"는 **추론**이다.
+5. **G-skeleton 의 S1 판정(누수 아닌 룩)은 해석 판단이다.** 다른 판정자는 "석조 강제"를 결함으로 셀 수 있다.
+   수치가 아니라 판단이라는 점을 명시해 둔다.
+6. **higgsfield / `gpt_image_2` 결과다.** 프로덕션(fal) 재현 보장 없음.
+
+### 10.1 A arm (§9) 고유 한계
+
+7. **A 도 프로브당 n=1.** 특히 §9.4 의 **S5 정물 구 등장은 1장 관측**이다. 카페 카운터의 석재 장식 구는
+   그 자체로 개연성 있는 소품이라, 재현 없이 "A 가 정물 누수를 키운다"로 일반화하면 안 된다.
+8. **A 는 T 대비 2변인이다** (preview 이미지 + 2-ref 절 텍스트). 이 런에는 "2-ref 절 텍스트만" 팔이 없으므로,
+   §9.3 의 구도 누수(a_scooter 파노라마)가 **preview 이미지 때문인지 절의 `the way it stages depth` 문구
+   때문인지 가르지 못한다.** 형제 런들도 같은 혼입을 안고 있다(`real_2ref` §7-5).
+9. **인물 방언 절을 뺐다**(§9 문안 판단). 스킬 매트릭스의 인물 레시피를 온전히 시험한 것이 아니므로,
+   "인물 축에서 A 가 무이득"은 **방언 절 없는 조건에서의 결론**이다.
+10. **§9.6 의 IP 평가는 모티프 겹침 관측이지 법적 판단이 아니다** (`watercolor` §7-5 와 동일한 유보).
+    "watercolor 기각선에 안 닿는다"는 두 사례의 **상대 비교**이고, 절대적 안전 판정이 아니다.
+
+---
+
+## 11. 산출물
+
+전부 `/home/user/Downloads/Tale-Studio/dev/Image_Style/real_desert_fantasy_sub/` 하위.
+
+| 파일 | 내용 |
+|---|---|
+| **`desert_contact_sheet.png`** | **T(위) vs B(아래) 8장 + 보드·preview — 오너 육안 판정용** |
+| **`key_control.png`** | **§6.1 키 축 판별 — board \| T \| B \| BR \| preview** |
+| **`time_control.png`** | §5 G-time — T \| B \| BN scooter |
+| **`tba_cafe_sheet.png`** | **§9 T \| B \| A 나란형 시트(카페 프로브) — 보드·preview 를 양 끝에 둔 키 축 대조** |
+| **`peer_alignment.png`** | §2.3 서브룩 6종 anchor↔preview 정합 대조 |
+| `s5_sphere_leak.png` | §9.4 A 정물 구(球) 등장 증거 (좌=보드 / 우=a_cafe) |
+| `crop_preview_figures.png` | §9.6 IP 평가 — preview 인물 2인 확대 (원본 약 30px) |
+| `align_audit.png` | §2 보드 vs preview 2-up |
+| `crop_window.png` `crop_stilllife.png` | §2.4 보드 디테일(창+메사 / 정물 7요소 재질) |
+| `prereg.md` | **생성 전 작성한 Content-bound 목록·예측·문안 판단 + 계기 정정(§F)** |
+| `board_1024.png` `preview_1024.png` | DB 취득 실물 (`anchor_raw.png` 2048 / `preview_raw.jpg` = 원본) |
+| `peers/` | 서브룩 6종 배포본 anchor·preview 12장 (§2.3 계측용) |
+| `t_*_v.png` `b_*_v.png` `a_*_v.png` `bn_scooter_v.png` `br_cafe_v.png` | 산출 **14장** (재인코딩 1024 PNG) |
+| 접미사 없는 `*.png` | 원본 2048 — **14/14 실제로 WebP**. 업로드 금지 |
+| `probe_*.txt` | T 프롬프트 4종 (`real_3d_v2` 원문 md5 동일) |
+| `probeB_*.txt` `look_clause.txt` | B 프롬프트 4종 + 룩 절 payload |
+| `probeBN_scooter.txt` `look_clause_naive.txt` | BN 판별 |
+| `probeBR_cafe.txt` `bright_extra.txt` | BR 판별 |
+| `probe2_*.txt` | **A arm 프롬프트 4종** (`real_2ref/probe2_*.txt` 원문 동일 — cmp 확인) |
+| `metrics.py` | **통합 계기** — LAB L\*/C\* + dark + HSV/hue 축 한 표 |
+| `hue_spread.py` `amber_metrics.py` `fg_metrics.py` | 선례에서 복사한 계기 |
+| `make_sheets.py` `reencode.py` | 시트·WebP 재인코딩 |
+| `run_serial.sh` `run_serial_a.sh` `run_one.sh` `analyze.sh` | 직렬 실행(429 대응)·분석 파이프라인 |
+| `make_tba_sheet.py` | §9 T\|B\|A 시트 (한글 = NotoSansCJK-Bold.ttc index 1 = KR) |
+| `log_*.txt` `run_serial.out` `run_extra.out` | 잡 ID·실행 로그 |
+
+### 잡 ID
+
+| 산출 | 잡 |
+|---|---|
+| t_character | `00d9ca93-15c8-4e8b-ad60-754837bb73f3` |
+| t_cafe | `3963e0e7-7386-4b55-a55e-3787e19f5623` |
+| t_scooter | `67a3e0e2-ee5a-40f8-901b-2f5ed8668768` |
+| t_action | `4037f8f3-7fe0-4f76-bc08-ab9515e7f886` |
+| b_character | `a41f4688-9977-411b-9842-cb979ca6ebae` |
+| b_cafe | `939b37d7-246d-4c4a-84bb-53d83c8a14a9` |
+| b_scooter | `90d4bb46-8c99-42d8-87dc-64772c875f95` |
+| b_action | `6d19307a-215b-4732-885f-5ae915563452` |
+| bn_scooter | `5c0a1823-cfb2-47d3-a148-8e31aa736118` |
+| br_cafe | `cce4e1b7-0fd4-452c-a1d0-1a155951b82f` |
+| a_character | `7d5758fb-ee58-433e-a70f-1771a5f39844` |
+| a_cafe | `3009b68b-c86f-47de-b788-1e0ede4654b3` |
+| a_scooter | `33da842d-1c86-4ace-9816-07a1076bce81` |
+| a_action | `9b77d54a-7715-41b9-9e97-5134dc114c62` |
+
+**비용**: 본 배터리 10장 + **A arm 4장** = 성공 **14장 × 7 = 98크레딧**
+(429 실패 잡은 0 — 초기 동시 제출 4건이 전멸했으나 과금 없음). 워크스페이스 잔액은 3698.99 → 3327.99 로
+371 감소했으나 **이 델타에는 동시 실행 중인 형제 앵커 에이전트들의 소비가 섞여 있다.** 이 런의 몫은 98이다.
+(1차 배터리 70 + A arm 28 — 각각 오너 승인 한도 ~70 / ~28 내.)
+
+### 실행 노트 — 429
+
+첫 시도에서 T 4장을 **동시 제출**했다가 4/4 전멸했다(`concurrent_jobs_limit: 8`, 형제 앵커 에이전트들과 경합).
+**직렬 제출로 바꾸자 10/10 이 전부 1차 시도에 통과했다** — 한 번에 슬롯 1개만 요구하면 포화 큐에서도 들어간다.
+`real_2ref` §7.1 의 60초 백오프보다 **직렬화가 근본 대책**이다(`run_serial.sh`).
