@@ -188,14 +188,22 @@ Content-bound로 빼는 게 원칙이지만, 서브룩은 **그레이드·소품
    서브룩을 훼손 중). 배선 시: 매체 = 시간대·그레이드 모두 씬 / 서브룩 = 시간대만 씬,
    그레이드·팔레트는 앵커.
 
-### 프로덕션 배선 후보 (오너 결정 대기 — 서브룩 반영 개정)
+### 프로덕션 배선 — ✅ 확정·집행 (2026-08-14 오너 결정, 커밋 5d686a1)
 
-- 절 4종(장면 밀도 / 매체 / 인물 방언 / 서브룩 룩·노출)을 **앵커별 결손 프로필에 따라 선택 주입**
-  (F-006 씬 조명 절과 같은 자리). 절 문안은 오브젝트 명사 금지(규칙 5). preview 이미지는 어떤
-  형태로도 넣지 않는다. fal 재검증 1샷 후 각 절을 켠다.
-- **STYLE_ANCHOR_CLAUSE / 씬 조명 절에 앵커 종류 분기 추가** (규칙 6 — 서브룩 훼손 중단).
-- 보드 재제작 큐: stop_motion(매체 상실) > watercolor(인물 레지스터) > urban_hero(그림자 정책)
-  > desert_fantasy(정합 — 주광 하이키 재생성).
+오너 확정: **전 앵커 B(검증 절) / watercolor 만 A(preview 병행) / jp_melo 는 C(룩+매체 절 세트,
+테스트 원문 그대로) / euro_period·psy_horror 는 절 NULL = T 유지(B 실측 해악 — 켜려면
+style_clause 1칸)**. 집행 내역:
+- DB: `style_anchors.style_clause`(절 정본)·`use_preview_ref`·`anchor_kind` — 마이그레이션
+  `20260814010000_style_anchor_clause_wiring.sql` (2026-08-14 적용 완료, 절 전문 포함).
+- 코드: `applyStyleAnchor`(절 주입 + watercolor 2-ref, turnaround 제외) · 그리드/스트립
+  (절 항목 + Rule 6 서브룩 그레이드 권위 분기 + 2-ref 위치 문구).
+- 절 편집 이력: sf 는 승격 권고대로 emissive 허가 문구 제거+스카이라인 부정문. 인물 방언 절
+  2종과 stop_motion 매체 절은 프로브 주어를 일반형("Any figures…")으로 치환. melo 는 C 테스트
+  원문 유지(bloom 포함 — 그 조합의 누수 복원이 실측된 구성). watercolor preview 는 IP 오마주
+  유보를 오너 인지 하에 채택.
+- **fal 재검증 대기** — 전 실측이 higgsfield 방향성. 신규 프로젝트 실측 전 성공 주장 금지.
+  앵커 캐시 5분 TTL.
+- 보드 재제작 큐(별건 유지): stop_motion > watercolor > urban_hero > desert_fantasy.
 
 ## 8. 좌표
 
