@@ -132,10 +132,24 @@ export function buildRealGridPrompt(
      *  같은 씬의 모든 시트가 같은 문장을 받아야 시트 간 일관성이 생긴다. 값이 오면 앵커 절에서
      *  조명·그레이드 문구를 빼고 이 줄이 지배한다(§6D 실측: 텍스트 그레이드 권위 > 앵커 이미지). */
     sceneLighting?: string | null
+    /** #anchor-wiring(2026-08-14, 오너 확정): 앵커별 실측 검증 절 — 스타일 절 바로 뒤에 얹는다. */
+    styleClause?: string | null
+    /** #anchor-wiring Rule 6: 서브룩(그레이드=상품)은 씬 조명이 있어도 그레이드·팔레트 권위를
+     *  앵커에 남긴다 — 종전 문구("do NOT copy its ... lighting")가 서브룩 상품을 지우던 실측
+     *  (psy_horror §8.2·desert §8-3 독립 2건). true = 서브룩. */
+    anchorKeepsGrade?: boolean
+    /** #anchor-wiring watercolor A안: 스타일 레퍼런스가 마지막 1장인가 2장인가. 기본 1. */
+    styleRefCount?: 1 | 2
   },
 ): string {
   const { characterRefCount, hasStyleRef, cineLines, characterRefs, columnCharacters } = opts
   const sceneLine = (opts.sceneLighting ?? '').trim()
+  const styleClause = (opts.styleClause ?? '').trim()
+  const twoStyleRefs = opts.styleRefCount === 2
+  const styleRefName = twoStyleRefs
+    ? 'the LAST TWO reference images (style references)'
+    : 'the LAST reference image (style reference)'
+  const styleRefPronoun = twoStyleRefs ? 'their' : 'its'
   const target = hasStyleRef
     ? 'finished, final-quality film frames'
     : 'finished photorealistic live-action cinematic film frames'
@@ -173,13 +187,16 @@ export function buildRealGridPrompt(
     ...(hasStyleRef
       ? [
           sceneLine
-            ? `- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.`
-            : `- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.`,
+            ? opts.anchorKeepsGrade
+              ? `- Match the exact visual style of ${styleRefName}: art medium, rendering technique, linework, color grade and palette. Do NOT reproduce ${styleRefPronoun} subjects or objects. Take the time of day from the scene lighting line below, but KEEP the style reference's color grade and palette on top of it.`
+              : `- Match the exact visual style of ${styleRefName}: art medium, rendering technique, linework. Do NOT reproduce ${styleRefPronoun} subjects or objects, and do NOT copy ${styleRefPronoun} time of day or lighting — the scene lighting line below governs those.`
+            : `- Match the exact visual style of ${styleRefName}: art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce ${styleRefPronoun} subjects or objects.`,
         ]
       : []),
+    ...(hasStyleRef && styleClause ? [`- ${styleClause}`] : []),
     ...(sceneLine
       ? [
-          `- Scene lighting — the whole sheet is ONE scene, time of day: ${sceneLine}. Render that time of day's light and color grade in every panel, identical across all columns; never drift to a different time of day in any column.`,
+          `- Scene lighting — the whole sheet is ONE scene, time of day: ${sceneLine}. Render that time of day's light${opts.anchorKeepsGrade ? '' : ' and color grade'} in every panel, identical across all columns; never drift to a different time of day in any column.`,
         ]
       : []),
     ...renderGridCineBlock(cineLines),
@@ -214,15 +231,29 @@ export function buildRealStripPrompt(
     /** #F-006: 씬 시간대(scenes.time_of_day). 샷 산문의 시간대 단어는 확률적(실측 4/7 샷에만
      *  존재)이라 씬 진실로 고정한다. 그리드 쪽 주석 참조 — 앵커 절과의 권위 관계 동일. */
     sceneLighting?: string | null
+    /** #anchor-wiring — 그리드 쪽과 동일 계약 3종. */
+    styleClause?: string | null
+    anchorKeepsGrade?: boolean
+    styleRefCount?: 1 | 2
   },
 ): string {
   const { characterRefCount, hasStyleRef, cineLine } = opts
   const sceneLine = (opts.sceneLighting ?? '').trim()
+  const styleClause = (opts.styleClause ?? '').trim()
+  const twoStyleRefs = opts.styleRefCount === 2
+  const styleRefName = twoStyleRefs
+    ? 'the LAST TWO reference images (style references)'
+    : 'the LAST reference image (style reference)'
+  const styleRefPronoun = twoStyleRefs ? 'their' : 'its'
   const target = hasStyleRef
     ? 'finished, final-quality film frames'
     : 'finished photorealistic live-action cinematic film frames'
+  // #anchor-wiring: 2-ref 시 캐릭터 구간이 "first~last" 그대로면 preview 가 캐릭터로 오인된다
+  //   (2ref-test §5.3 실측 경고) — 위치 문구를 함께 옮긴다.
   const charLocation = hasStyleRef
-    ? 'the reference images between the first and the last'
+    ? twoStyleRefs
+      ? 'the reference images between the first and the last two'
+      : 'the reference images between the first and the last'
     : 'the remaining reference images'
   const lines = [
     `The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.`,
@@ -241,13 +272,16 @@ export function buildRealStripPrompt(
     ...(hasStyleRef
       ? [
           sceneLine
-            ? `- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique and linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.`
-            : `- Match the exact visual style of the LAST reference image (style reference): match its art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.`,
+            ? opts.anchorKeepsGrade
+              ? `- Match the exact visual style of ${styleRefName}: match ${styleRefPronoun} art medium, rendering technique, linework, color grade and palette. Do NOT reproduce ${styleRefPronoun} subjects or objects. Take the time of day from the scene lighting line below, but KEEP the style reference's color grade and palette on top of it.`
+              : `- Match the exact visual style of ${styleRefName}: match ${styleRefPronoun} art medium, rendering technique and linework. Do NOT reproduce ${styleRefPronoun} subjects or objects, and do NOT copy ${styleRefPronoun} time of day or lighting — the scene lighting line below governs those.`
+            : `- Match the exact visual style of ${styleRefName}: match ${styleRefPronoun} art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce ${styleRefPronoun} subjects or objects.`,
         ]
       : []),
+    ...(hasStyleRef && styleClause ? [`- ${styleClause}`] : []),
     ...(sceneLine
       ? [
-          `- Scene lighting — time of day: ${sceneLine}. Render that time of day's light and color grade consistently in all three panels.`,
+          `- Scene lighting — time of day: ${sceneLine}. Render that time of day's light${opts.anchorKeepsGrade ? '' : ' and color grade'} consistently in all three panels.`,
         ]
       : []),
     `- Shot description: ${shotPrompt}`,

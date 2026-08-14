@@ -136,17 +136,24 @@ export async function POST(req: NextRequest) {
       )
 
       const sceneLighting = todByScene.get(group[0].scene_id) || null
+      // #anchor-wiring(2026-08-14 오너 확정): 앵커별 검증 절 + 서브룩 그레이드 권위 + watercolor
+      //   A안(preview 2번 스타일 레퍼런스). 전부 DB(style_anchors)가 진실.
+      const anchorTwoRef = !!(anchor?.usePreviewRef && anchor.previewUrl)
       const prompt = buildRealGridPrompt(group.length, {
         characterRefCount: groupRefs.length,
         hasStyleRef: !!anchor,
         characterRefs: groupRefs.map((r) => ({ name: r.name })),
         columnCharacters,
         sceneLighting,
+        styleClause: anchor?.styleClause ?? null,
+        anchorKeepsGrade: anchor?.anchorKind === 'sublook',
+        styleRefCount: anchorTwoRef ? 2 : 1,
       })
       const referenceImageUrls = [
         refUrl,
         ...groupRefs.map((r) => r.url),
         ...(anchor ? [anchor.imageUrl] : []),
+        ...(anchorTwoRef ? [anchor!.previewUrl as string] : []),
       ]
 
       const { request_id, model } = await falImageSubmit({

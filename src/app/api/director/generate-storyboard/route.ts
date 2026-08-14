@@ -135,6 +135,10 @@ export async function POST(req: Request) {
           characterRefCount: callerRefs?.length ?? 0,
           hasStyleRef: !!anchor,
           sceneLighting,
+          // #anchor-wiring(2026-08-14 오너 확정): 검증 절 + 서브룩 그레이드 권위 + watercolor A안.
+          styleClause: anchor?.styleClause ?? null,
+          anchorKeepsGrade: anchor?.anchorKind === 'sublook',
+          styleRefCount: anchor?.usePreviewRef && anchor.previewUrl ? 2 : 1,
         }),
         // #real-strip-guard(2026-08-06): 'auto' 위임이 가로 단일컷 반환을 허용했다(실측 011fd4bd —
         //   액자 테두리 단일컷을 고정 크롭이 액자째 3분할). 세로 캔버스를 강제해 시트 계약 준수를 유도.
@@ -143,6 +147,7 @@ export async function POST(req: Request) {
           stripRefUrl,
           ...(callerRefs ?? []),
           ...(anchor ? [anchor.imageUrl] : []),
+          ...(anchor?.usePreviewRef && anchor.previewUrl ? [anchor.previewUrl] : []),
         ],
       }
     } else {
