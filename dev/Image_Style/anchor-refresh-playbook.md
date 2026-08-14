@@ -190,9 +190,11 @@ Content-bound로 빼는 게 원칙이지만, 서브룩은 **그레이드·소품
 
 ### 프로덕션 배선 — ✅ 확정·집행 (2026-08-14 오너 결정, 커밋 5d686a1)
 
-오너 확정: **전 앵커 B(검증 절) / watercolor 만 A(preview 병행) / jp_melo 는 C(룩+매체 절 세트,
-테스트 원문 그대로) / euro_period·psy_horror 는 절 NULL = T 유지(B 실측 해악 — 켜려면
-style_clause 1칸)**. 집행 내역:
+오너 확정: **전 앵커 B(검증 절) / watercolor·psy_horror 는 A(preview 병행) / jp_melo 는 C(룩+매체
+절 세트, 테스트 원문 그대로)**. (개정 2026-08-14 2차: 최초 배선에서 NULL 로 뒀던 euro_period 는
+오너 재확정으로 **B 켬** — 실측 부작용(촛대 삽입 2/4)을 인지 채택. psy_horror 는 **A 켬** — 실측
+무해(주간 보존), 절은 A 팔이 테스트한 generic 2-ref carry 문안(어둠 명시 없음 — B 절의 주간 파괴
+회피). 마이그레이션 `20260814020000_euro_b_horror_a.sql`.) 집행 내역:
 - DB: `style_anchors.style_clause`(절 정본)·`use_preview_ref`·`anchor_kind` — 마이그레이션
   `20260814010000_style_anchor_clause_wiring.sql` (2026-08-14 적용 완료, 절 전문 포함).
 - 코드: `applyStyleAnchor`(절 주입 + watercolor 2-ref, turnaround 제외) · 그리드/스트립
