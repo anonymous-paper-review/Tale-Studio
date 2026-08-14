@@ -205,7 +205,7 @@ Content-bound로 빼는 게 원칙이지만, 서브룩은 **그레이드·소품
   유보를 오너 인지 하에 채택.
 - **fal 재검증 대기** — 전 실측이 higgsfield 방향성. 신규 프로젝트 실측 전 성공 주장 금지.
   앵커 캐시 5분 TTL.
-- 보드 재제작 큐(별건 유지): stop_motion > watercolor > urban_hero > desert_fantasy.
+- 보드 재제작 큐: **D-021 로 이관(2026-08-14 오너 판정 "어느 정도 해결" — 이미지 스타일 고도화 시 재론)**. `.claude/vault/_DEFERRED.md` 참조.
 
 ## 8. 좌표
 

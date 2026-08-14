@@ -229,3 +229,23 @@
   persist S3 원문 보존 — `persist_manifest.ts` 언어 경계 주석, `c_application_2.ts` W3 랭킹,
   `decoupage.ts:224` 스키마). 오염 판별 쿼리: `action_description ~* '\mchar(_\d+)?\M'`.
 - 기록: 2026-08-13
+
+### D-021 · 앵커 보드 재제작 큐 4종 — 이미지 스타일 고도화 시 재론   `상태: 대기`
+- **무엇을**: 12종 배터리가 "보드 자체 결함"으로 판정한 4종의 앵커 이미지(`image_url`) 재생성.
+  우선순위와 결함: ① `stop_motion` — 매체 미운반(보드 단독 4/4 실사 이탈, 현재 매체 절 텍스트가
+  떠받침) ② `watercolor` — 인물 레지스터를 텍스트로 못 사는 유일 축(B=T 실측), 현재 **IP 오마주
+  preview 병행(A)으로 때우는 중 — 재제작하면 이 리스크 의존을 끊는다(가장 강한 재론 사유)**
+  ③ `real_urban_hero` — 1샷 무선별 제작, 그림자 정책이 스펙 정반대(야간 43% 순검), 룩 절과 보드가
+  싸우는 구조 ④ `real_desert_fantasy` — 자기 preview와 ΔL* +28.6 정합 파탄, 원인 문장 특정됨
+  (원본 프롬프트의 "좁은 창 챔버" 공간 문장이 sun-bleached 팔레트를 이김 → 개방 테라스로 교체).
+  방법론: real_3d C2 방식(익명 인물 스터디 + 익명성 락 4겹 + 프로브 게이트 + 오너 육안 승인),
+  1종당 ~60~70크레딧.
+- **왜 미뤘나**: 오너 육안 판정(2026-08-14) — 절 배선(#anchor-wiring) 후 "어느 정도 해결된 것
+  같다". 절이 반창고로 충분히 작동 중이라 근본 수리는 비용 대비 급하지 않음. 순서 문제.
+- **언제 꺼내나**: **이미지 스타일 고도화 착수 시** (오너 지정). 그 전에라도 watercolor preview 의
+  IP 리스크를 정리하고 싶어지면 ②만 선행 가능. 재제작 완료 앵커는 대응 절의 은퇴 검토
+  (stop_motion 매체 절 등 — 절은 style_anchors.style_clause 1칸 비우면 꺼짐).
+- **되살릴 좌표**: 종합 `dev/Image_Style/anchor-refresh-playbook.md` §7 / 스타일별 실측
+  `dev/Image_Style/<key>_2ref|_sub/<key>-*-test.md` / 방법론 `real_3d_v2/anchor-B1.md` +
+  `.claude/skills/artist-style-anchor/SKILL.md` / 현행 배선 `supabase/migrations/2026081401·02*.sql`.
+- 기록: 2026-08-14
