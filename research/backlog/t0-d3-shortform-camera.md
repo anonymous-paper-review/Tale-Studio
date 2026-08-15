@@ -1,10 +1,10 @@
 ```yaml
 id: t0-d3-shortform-camera
 source: .claude/vault/2026-08-10-prompt-contract-audit.md §3 재검증③ · 계약 카탈로그 D3❌
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done  # 2026-08-11 밤 러너 — 측정 불가·모집단 부재(전 26런 compact=false, D3는 미실행 잠재 계약), 결과: research/experiments/t0-d3-shortform-camera/
+status: 완료  # 2026-08-11 밤 러너 — 측정 불가·모집단 부재(전 26런 compact=false, D3는 미실행 잠재 계약), 결과: research/experiments/t0-d3-shortform-camera/
 priority: high  # Q2(캡 완화)의 증거
 ```
 

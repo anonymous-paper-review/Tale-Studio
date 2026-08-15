@@ -3,10 +3,10 @@
 ```yaml
 id: t0-scene-schema-typo-prevalence
 source: sweep:gjc:019fef52 (1/2)   # 형제: t0-loose-schema-unguarded-fields
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — 가설 유지(위반 2씬/2런, 서로 다른 프로젝트·날짜). 기각 조건 미발동. 2건 중 1건은 완료 런에서 조용히 데이터 유실(key_dialouge 오타). 결과: research/experiments/t0-scene-schema-typo-prevalence/
+status: 완료  # 2026-08-12 밤 러너 — 가설 유지(위반 2씬/2런, 서로 다른 프로젝트·날짜). 기각 조건 미발동. 2건 중 1건은 완료 런에서 조용히 데이터 유실(key_dialouge 오타). 결과: research/experiments/t0-scene-schema-typo-prevalence/
 priority: high
 ```
 

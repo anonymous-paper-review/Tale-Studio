@@ -1,10 +1,10 @@
 ```yaml
 id: t2-checknote-previz-ab
 source: .claude/vault/2026-08-10-flash-ab-fanout-review.md §1-2 + 2026-08-11 세션(검수 이슈 272건 3분류 — 경계 40건이 텍스트로 안 닫힘)
-tier: T2
+종류: 발주실험
 budget: { usd: 25, runs: 3, wall_min: 90 }
 blockers: []
-status: done
+status: 완료
 priority: high
 ```
 

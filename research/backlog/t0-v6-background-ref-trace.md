@@ -1,10 +1,10 @@
 ```yaml
 id: t0-v6-background-ref-trace
 source: .claude/vault/2026-08-10-background-view-3d.md §3 (최종 생성 V6의 배경 ref 흐름 — 미검증)
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done  # 2026-08-11 밤 러너 — 가설 참(최종 경로도 배경 무방어: wide_shot 1장 고정·뷰 분기 없음). 결과: research/experiments/t0-v6-background-ref-trace/
+status: 완료  # 2026-08-11 밤 러너 — 가설 참(최종 경로도 배경 무방어: wide_shot 1장 고정·뷰 분기 없음). 결과: research/experiments/t0-v6-background-ref-trace/
 priority: normal
 ```
 

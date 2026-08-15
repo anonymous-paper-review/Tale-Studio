@@ -131,6 +131,30 @@ def _gjc_cwd(path, limit=300):
     return None
 
 
+def read_stamp(path):
+    """성공 도장을 읽는다. 첫 토큰만 본다 — 뒤에 사람이 읽는 주석이 붙어 있어도 되고,
+    손으로 고치다 날짜 글자를 넣었어도(2026-08-14 실사고) 살려서 읽는다."""
+    raw = open(path, encoding="utf-8").read().strip()
+    if not raw:
+        raise ValueError("도장 파일이 비어 있다")
+    head = raw.split()[0]
+    try:
+        return float(head)
+    except ValueError:
+        pass
+    # 사람이 손으로 날짜 글자를 넣은 경우 — 형식이 어긋나도 값은 살린다
+    return dt.datetime.fromisoformat(head.replace("Z", "+00:00")).timestamp()
+
+
+def write_stamp(path, epoch):
+    """도장을 쓴다. 숫자 뒤에 사람이 읽는 날짜를 주석으로 붙여
+    '이게 무슨 파일인지 몰라서 날짜 글자로 덮어쓰는' 사고를 막는다."""
+    when = dt.datetime.fromtimestamp(epoch)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(f"{epoch}  # {when:%Y-%m-%d %H:%M:%S} — 첫 숫자만 읽는다. "
+                 f"손으로 고칠 때 숫자를 날짜 글자로 바꾸지 마라(2026-08-14 실사고)\n")
+
+
 def discover(project, since_h, exclude_recent_min, now):
     """저장소별로 후보 세션을 모은다. 반환: dict 리스트."""
     win_start = now - since_h * 3600
@@ -236,9 +260,27 @@ def main():
     ap.add_argument("--out", default=None, help="기본: research/backlog/sweep/<오늘>")
     ap.add_argument("--now", default=None, help="기준 시각 YYYY-MM-DDTHH:MM (드라이런 시뮬레이션용)")
     ap.add_argument("--dry-run", action="store_true", help="표만 출력, 파일 안 씀")
+    ap.add_argument("--commit-success", action="store_true",
+                    help="오늘 수확이 남긴 도장 후보를 실제 성공 도장으로 확정한다. "
+                         "리포트까지 다 낸 뒤에만 부를 것 — 이걸 안 부르면 다음 밤이 이번 창을 다시 훑는다")
     a = ap.parse_args()
 
     now = dt.datetime.fromisoformat(a.now).timestamp() if a.now else dt.datetime.now().timestamp()
+
+    if a.commit_success:
+        stamp = os.path.join(a.project, "research/backlog/sweep", ".last-success")
+        out = a.out or os.path.join(a.project, "research/backlog/sweep",
+                                    dt.datetime.fromtimestamp(now).strftime("%Y-%m-%d"))
+        cand = os.path.join(out, ".stamp-candidate")
+        if not os.path.exists(cand):
+            print(f"✗ 도장 후보가 없다: {cand}")
+            print("  수확이 안 돌았거나 도중에 죽었다는 뜻이다. 도장을 찍지 않는다 — "
+                  "다음 밤이 이번 창을 다시 훑는 게 맞다.")
+            return 1
+        epoch = read_stamp(cand)
+        write_stamp(stamp, epoch)
+        print(f"✓ 성공 도장 확정 {dt.datetime.fromtimestamp(epoch):%Y-%m-%d %H:%M:%S} → {stamp}")
+        return 0
 
     # Failsafe — 창을 "마지막 성공 이후"로 늘린다.
     # 고정 24시간이면 스위퍼가 하루라도 못 뜬 날(맥북이 잠겼거나 실행이 죽었거나)
@@ -248,7 +290,7 @@ def main():
     since_h = a.since_hours
     if not a.now and os.path.exists(stamp):
         try:
-            last = float(open(stamp, encoding="utf-8").read().strip())
+            last = read_stamp(stamp)
             gap_h = (now - last) / 3600
             if gap_h > since_h:
                 since_h = min(gap_h + 1, 24 * 14)   # 상한 2주 — 그 이상은 사람이 볼 일
@@ -256,6 +298,8 @@ def main():
         except Exception as e:
             print(f"⚠ 마지막 성공 시각을 못 읽음({e}) — 기본 창 {since_h}시간으로 진행")
 
+    # 건너뛰기 경계 — discover() 안의 것과 같은 값. 도장 후보로 쓴다(맨 아래 주석 참조).
+    cutoff = now - a.exclude_recent_min * 60
     sessions = discover(a.project, since_h, a.exclude_recent_min, now)
     targets = [s for s in sessions if s["verdict"] == "TARGET"]
 
@@ -316,11 +360,25 @@ def main():
     print(f"\n다이제스트 {len(index)}개 → {out}/digest/   (50KB 초과 {over}개 = 서브에이전트 위임 대상)")
     print(f"기각 순간 후보 {nrej}건 → {out}/rejections.md")
 
-    # 성공 도장은 맨 마지막에 찍는다 — 도중에 죽으면 안 찍히고, 다음 밤이 이번 창까지
-    # 다시 훑는다(위 failsafe). 시뮬레이션(--now)은 찍지 않는다.
+    # 성공 도장은 여기서 찍지 않는다.
+    #
+    # 옛 동작: 수확이 끝나는 즉시 도장에 `now`(수확 시작 시각)를 찍었다. 두 가지가 고장나 있었다.
+    #   ① 수확만 끝나고 노트·일감·리포트가 하나도 없는 시점인데 "성공"으로 세어졌다.
+    #      그래서 뒤 단계에서 죽으면 그 창의 대화가 통째로 사라졌다.
+    #   ② 도장이 `now` 였는데 최근 N분은 "작업 중일 수 있다"고 건너뛴다. 즉 건너뛴 구간
+    #      [now-N분, now] 는 다음 밤 창(= now 부터)에 안 들어간다. 매일 N분짜리 사각지대가
+    #      생기고, 창을 넓히는 안전장치는 간격이 24시간을 못 넘어 영영 안 켜진다.
+    #      2026-08-15 실사고 — 진짜 대화 5편(31MB)이 이 구멍에 빠질 뻔했다.
+    #
+    # 새 동작: 여기서는 **후보 시각만** 적어두고, 밤 루프가 리포트까지 다 낸 뒤
+    # `--commit-success` 로 실제 도장을 찍는다. 후보 값은 `now` 가 아니라 **건너뛰기 경계**라,
+    # 다음 밤 창이 이번에 건너뛴 지점에서 정확히 이어진다.
     if not a.now:
-        with open(stamp, "w", encoding="utf-8") as fh:
-            fh.write(str(now))
+        with open(os.path.join(out, ".stamp-candidate"), "w", encoding="utf-8") as fh:
+            fh.write(f"{cutoff}  # {dt.datetime.fromtimestamp(cutoff):%Y-%m-%d %H:%M:%S} "
+                     f"= 이번 수확의 건너뛰기 경계. 리포트까지 끝나면 --commit-success 로 확정한다\n")
+        print(f"\n도장 후보 {dt.datetime.fromtimestamp(cutoff):%Y-%m-%d %H:%M:%S} → {out}/.stamp-candidate")
+        print("   (아직 확정 아님 — 리포트까지 끝낸 뒤 `harvest.py --commit-success` 를 부를 것)")
     return 0
 
 

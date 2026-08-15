@@ -13,7 +13,11 @@ import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
-import { notifyGenerationComplete } from '@/lib/generation-notify'
+import {
+  notifyGenerationComplete,
+  notifyGenerationFailed,
+  notifyGenerationGaveUp,
+} from '@/lib/generation-notify'
 import { claimAction } from '@/lib/action-guard'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
@@ -823,9 +827,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         alog(`[autogen] char ${key} — 이미 큐에 있음(서버 dedupe), 제출 생략`)
         return
       }
-      // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음. 에러 아님: 조용히 종료.
+      // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음.
+      //   에러는 아니지만 **조용히 끝내면 안 된다** — 화면상 아무 일도 안 일어난 것과 구분이 안 되고,
+      //   원인이 고쳐져도 자동으로는 복구되지 않아 사람이 눌러야 한다(2026-08-13 실사용에서 막힌 지점).
       if (body.skipped || !body.jobId) {
         alog(`[autogen] char ${key} — give-up 게이트로 자동 생성 skip`)
+        notifyGenerationGaveUp('artist', '캐릭터 이미지')
         return
       }
       const jobId = body.jobId
@@ -859,10 +866,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         `[autogen] char ${key} ✗ failed in ${((Date.now() - t0) / 1000).toFixed(1)}s:`,
         err instanceof Error ? err.message : err,
       )
-      set({
-        error:
-          err instanceof Error ? err.message : 'Character view generation failed',
-      })
+      const raw = err instanceof Error ? err.message : String(err)
+      set({ error: raw || 'Character view generation failed' })
+      // 카드의 작은 배지는 스크롤하면 사라진다 — 채팅은 stage 를 옮겨도 남는 기록이다.
+      notifyGenerationFailed('artist', '캐릭터 이미지', raw)
     } finally {
       set((state) => ({
         generatingViews: state.generatingViews.filter((k) => k !== key),
@@ -973,10 +980,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       }
       notifyGenerationComplete('artist', '배경 이미지') // 다른 stage에 있을 때만 알림(store가 판단)
     } catch (err) {
-      set({
-        error:
-          err instanceof Error ? err.message : 'World generation failed',
-      })
+      const raw = err instanceof Error ? err.message : String(err)
+      set({ error: raw || 'World generation failed' })
+      notifyGenerationFailed('artist', '배경 이미지', raw)
     } finally {
       set((state) => ({
         generatingLocations: state.generatingLocations.filter(
@@ -1042,8 +1048,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         actor,
       )
       if (!url) {
-        // 서버 give-up 게이트로 자동 생성 skip — 에러 아님(finally 가 generatingLocations 정리).
+        // 서버 give-up 게이트로 자동 생성 skip — 에러는 아니지만 사용자에게는 알려야 한다(캐릭터 경로와 동일 이유).
         alog(`[autogen] world ${locationId}:${shot} — give-up 게이트로 자동 생성 skip`)
+        notifyGenerationGaveUp('artist', '배경 이미지')
         return
       }
       alog(`[autogen] world ${locationId}:${shot} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
@@ -1059,10 +1066,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         `[autogen] world ${locationId}:${shot} ✗ failed in ${((Date.now() - t0) / 1000).toFixed(1)}s:`,
         err instanceof Error ? err.message : err,
       )
-      set({
-        error:
-          err instanceof Error ? err.message : 'World generation failed',
-      })
+      const raw = err instanceof Error ? err.message : String(err)
+      set({ error: raw || 'World generation failed' })
+      notifyGenerationFailed('artist', '배경 이미지', raw)
     } finally {
       // 같은 locationId 가 중복될 수 있으므로 한 건만 제거. startedAt 은 마지막 작업이 끝날 때만 정리.
       set((state) => {

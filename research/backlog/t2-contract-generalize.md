@@ -1,10 +1,10 @@
 ```yaml
 id: t2-contract-generalize
 source: 오너 지시 2026-08-11 ("다른 시나리오에서 점검해줘") · qual4-grammar 실측(참조 역할 계약이 최우수) · 기존 확장 3티켓(stories/moves/directing)의 통합 실행판
-tier: T2
+종류: 발주실험
 budget: { usd: 14, runs: 1, wall_min: 150 }
 blockers: []
-status: done  # 2026-08-11 실행 완료 — 6/6 클립, 청구 예상 $10.89/$14. 기각 조건 미발동(3/3에서 ⓨ가 나음, 시나리오당 1편이라 잠정)
+status: 완료  # 2026-08-11 실행 완료 — 6/6 클립, 청구 예상 $10.89/$14. 기각 조건 미발동(3/3에서 ⓨ가 나음, 시나리오당 1편이라 잠정)
 priority: high
 ```
 

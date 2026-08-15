@@ -11,7 +11,10 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Copy,
+  FileImage,
+  FileText,
   LayoutGrid,
+  Loader2,
   MoveRight,
   Palette,
   Plus,
@@ -41,6 +44,12 @@ import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { buildScriptLines, scriptLineMentions } from '@/lib/script-lines'
 import { handoffFrom } from '@/lib/handoff-intent'
 import {
+  IMAGE_MAX_COUNT,
+  UPLOAD_ACCEPT,
+  kindOf,
+  rejectReason,
+} from '@/lib/upload/limits'
+import {
   STAGES,
   STAGE_LABEL,
   STAGE_BADGE_CLASS,
@@ -52,13 +61,47 @@ import {
   SHELL_INSET,
 } from '@/lib/constants'
 import { buildChatSections } from '@/lib/chat-sections'
-import { buildChatBlocks, parseHandoffMarker } from '@/lib/chat-blocks'
+import { buildChatBlocks, parseAttachmentMarker, parseHandoffMarker } from '@/lib/chat-blocks'
 import {
   CASCADE_STEP_MS,
   EPHEMERAL_SETTLE_MS,
   navigateWithStageSlide,
 } from '@/lib/stage-transition'
 import type { StageId } from '@/types'
+
+/** 입력창에 얹혀 있는 첨부 하나. 전송되면 비워진다(이번 턴 한정). */
+interface Attachment {
+  id: string
+  name: string
+  kind: 'text' | 'image'
+  status: 'uploading' | 'ready' | 'error'
+  error?: string
+  /** kind: 'text' — 추출된 본문. 전송 시 storyText 가 된다. */
+  text?: string
+  /** kind: 'image' — 판독용 슬라이스 URL(위→아래 순서). */
+  sliceUrls?: string[]
+  /** kind: 'image' — 칩 썸네일용 원본 URL. */
+  thumbUrl?: string
+  /** 상한에 걸려 잘렸는지 — 조용히 자르면 사용자는 이유를 영영 모른다. */
+  truncated?: boolean
+}
+
+/**
+ * 사용자가 아무 말 없이 첨부만 보냈을 때 대신 실어 보내는 문장.
+ * 빈 메시지를 보내면 스레드에 "왜 이걸 했는지"가 남지 않는다 — 기록으로도 남을 문장을 만든다.
+ */
+function defaultUtterance(texts: Attachment[], images: Attachment[]): string {
+  const parts: string[] = []
+  if (texts.length > 0) {
+    parts.push(`${texts.map((t) => t.name).join(', ')} 을(를) 스토리로 올렸어요.`)
+  }
+  if (images.length > 0) {
+    parts.push(
+      `${images.map((i) => i.name).join(', ')} 을(를) 올렸어요. 읽고 스토리로 정리해 주세요.`,
+    )
+  }
+  return parts.join(' ') || '첨부한 파일을 확인해 주세요.'
+}
 
 // 이 세션에서 이미 타이핑 연출을 재생한 suggestion id — 재렌더/스테이지 왕복 시 재생 방지(#b1).
 const typedSuggestionIds = new Set<string>()
@@ -510,11 +553,46 @@ export function GlobalChat() {
     currentStage === 'producer' &&
     !messages.some((m) => m.stage === 'producer' && m.role === 'user')
 
+  // #p1-attach(2026-08-13): 첨부는 "무엇으로 쓸지"를 폼으로 묻지 않는다 — 파일을 얹어 두고
+  //   의도는 채팅으로 말하게 한다. 아무 말 없이 보내면 기본 동작(각색 소재로 판독)이 돈다.
+  //   전처리(docx 파싱·이미지 슬라이싱·스토리지 업로드)는 서버(api/produce/ingest)가 하고
+  //   여기는 진행 상태만 들고 있는다.
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const uploading = attachments.some((a) => a.status === 'uploading')
+  const readyAttachments = attachments.filter((a) => a.status === 'ready')
+  const canSendAttachments = readyAttachments.length > 0 && !uploading
+
   const handleSend = async () => {
-    if (!input.trim() || sendDisabled) return
-    const msg = input
+    if (sendDisabled || uploading) return
+    if (!input.trim() && !canSendAttachments) return
+
+    const typed = input.trim()
+    const texts = readyAttachments.filter((a) => a.kind === 'text')
+    const images = readyAttachments.filter((a) => a.kind === 'image')
+
+    // 텍스트 원고는 모델을 거치지 않고 그대로 storyText 가 된다. 모델을 태우면 시스템
+    //   프롬프트상 "short cohesive paragraph"로 압축되어 업로드한 원고가 사라진다.
+    //   업로드는 사람의 명시적 행동이라 덮어쓰기가 허용된다(architecture §5-2).
+    if (texts.length > 0) {
+      const merged = texts
+        .map((t) => (texts.length > 1 ? `# ${t.name}\n\n${t.text ?? ''}` : (t.text ?? '')))
+        .join('\n\n')
+        .trim()
+      if (merged) useProducerStore.getState().setStoryText(merged)
+    }
+
+    // 판독용 슬라이스는 이번 턴에만, 원본 썸네일은 스레드에 남는다.
+    const imageUrls = images.flatMap((a) => a.sliceUrls ?? [])
+    const thumbUrls = images.map((a) => a.thumbUrl).filter((u): u is string => !!u)
+
+    const msg = typed || defaultUtterance(texts, images)
+
     setInput('')
-    await sendMessage(msg)
+    setAttachments([])
+    await sendMessage(msg, {
+      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      thumbUrls,
+    })
   }
 
   // 프로액티브 제안 승인 — 'navigate'(stage 이동) / 'artist-refresh-look'(초안 일괄 재생성, 유저 클릭).
@@ -567,17 +645,99 @@ export function GlobalChat() {
     await approvePendingProposal(pendingProposal.id)
   }
 
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id))
+  }
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    try {
-      const text = await file.text()
-      useProducerStore.getState().setStoryText(text)
-      await sendMessage(
-        `스크립트 파일을 업로드했어요. 내용은 다음과 같아요:\n\n${text}`,
-      )
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = ''
+    const picked = Array.from(e.target.files ?? [])
+    // 같은 파일을 다시 고를 수 있게 즉시 비운다.
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    if (picked.length === 0) return
+
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) {
+      toast.error('프로젝트를 먼저 열어 주세요.')
+      return
+    }
+
+    // 1) 클라이언트 1차 검사 — 즉각 피드백용이다. 진짜 방어선은 서버다(우회 가능).
+    const accepted: File[] = []
+    let imageBudget = IMAGE_MAX_COUNT - attachments.filter((a) => a.kind === 'image').length
+    for (const file of picked) {
+      const denied = rejectReason(file.name, file.size)
+      if (denied) {
+        toast.error(denied)
+        continue
+      }
+      if (kindOf(file.name) === 'image') {
+        if (imageBudget <= 0) {
+          toast.error(`이미지는 한 번에 ${IMAGE_MAX_COUNT}장까지 올릴 수 있어요.`)
+          continue
+        }
+        imageBudget--
+      }
+      accepted.push(file)
+    }
+    if (accepted.length === 0) return
+
+    // 2) 칩을 먼저 세우고 한 장씩 올린다 — 진행이 눈에 보여야 하고, 요청 하나당 파일 하나여야
+    //    본문 크기 한도에 안 걸린다(기존 assets/upload-image 와 같은 패턴).
+    const entries = accepted.map((file) => ({
+      file,
+      id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    }))
+    setAttachments((prev) => [
+      ...prev,
+      ...entries.map(({ file, id }) => ({
+        id,
+        name: file.name,
+        kind: (kindOf(file.name) === 'image' ? 'image' : 'text') as 'image' | 'text',
+        status: 'uploading' as const,
+      })),
+    ])
+
+    for (const { file, id } of entries) {
+      try {
+        const form = new FormData()
+        form.append('projectId', projectId)
+        form.append('file', file)
+        const res = await fetch('/api/produce/ingest', { method: 'POST', body: form })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
+
+        setAttachments((prev) =>
+          prev.map((a) => {
+            if (a.id !== id) return a
+            if (data.kind === 'image') {
+              return {
+                ...a,
+                kind: 'image' as const,
+                status: 'ready' as const,
+                thumbUrl: data.originalUrl as string,
+                sliceUrls: (data.slices ?? []).map((s: { url: string }) => s.url),
+                truncated: !!data.truncated,
+              }
+            }
+            return {
+              ...a,
+              kind: 'text' as const,
+              status: 'ready' as const,
+              text: data.text as string,
+              truncated: !!data.truncated,
+            }
+          }),
+        )
+        if (data.truncated) {
+          toast.warning(`${file.name} 이(가) 상한을 넘어 뒷부분이 잘렸어요.`)
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '업로드에 실패했어요.'
+        setAttachments((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, status: 'error' as const, error: message } : a)),
+        )
+        toast.error(`${file.name}: ${message}`)
+      }
     }
   }
 
@@ -739,7 +899,8 @@ export function GlobalChat() {
       ) {
         return
       }
-      if (inChatInput && e.key === 'Enter' && input.trim()) return
+      // 첨부만 얹고 아무 말 없이 Enter 를 쳐도 전송이어야 한다 — 제안 수락으로 새면 안 된다.
+      if (inChatInput && e.key === 'Enter' && (input.trim() || canSendAttachments)) return
       e.preventDefault()
       e.stopPropagation()
       if (e.key === 'Escape') {
@@ -849,11 +1010,27 @@ export function GlobalChat() {
                     턴당 1회 role plate, ✓/⚠ 알림은 tool-row 스타일 (기준: chat-blocks.ts). */}
                 {buildChatBlocks(section.messages).map(({ msg, kind, showRolePlate }) => {
                   if (kind === 'user') {
+                    // 첨부 마커 분리 — 본문은 말풍선에, 원본 URL 은 썸네일로.
+                    const { text, urls } = parseAttachmentMarker(msg.content)
                     return (
                       <div key={msg.id} className="flex justify-end pl-7">
                         <div className="group relative w-fit max-w-full select-text whitespace-pre-wrap rounded-3xl rounded-br-sm bg-chat-user-bubble px-4 py-2.5 pr-8 text-xs text-chat-user-bubble-foreground">
-                          <MarkdownText text={msg.content} />
-                          <CopyButton text={msg.content} />
+                          {urls.length > 0 && (
+                            <div className="mb-1.5 flex flex-wrap justify-end gap-1">
+                              {urls.map((url) => (
+                                <img
+                                  key={url}
+                                  src={url}
+                                  alt="첨부 이미지"
+                                  loading="lazy"
+                                  // 세로로 긴 웹툰이 말풍선을 밀어내지 않도록 정사각 크롭.
+                                  className="size-10 rounded-md border border-chat-user-bubble-foreground/15 object-cover"
+                                />
+                              ))}
+                            </div>
+                          )}
+                          <MarkdownText text={text} />
+                          <CopyButton text={text} />
                         </div>
                       </div>
                     )
@@ -1189,6 +1366,55 @@ export function GlobalChat() {
           )}
           <HoverBeam className="rounded-3xl">
             <div className="rounded-3xl border border-border bg-background px-2 pb-1.5 pt-1">
+              {/* 첨부 칩 — 파일은 얹혀만 있고, 무엇으로 쓸지는 아래 입력창에 말로 적는다. */}
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 px-1 pb-1.5 pt-1">
+                  {attachments.map((a) => (
+                    <span
+                      key={a.id}
+                      title={a.error ?? a.name}
+                      className={cn(
+                        'flex items-center gap-1.5 rounded-lg border py-1 pl-1.5 pr-1 text-xs',
+                        a.status === 'error'
+                          ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                          : 'border-border bg-muted text-muted-foreground',
+                      )}
+                    >
+                      {a.status === 'uploading' ? (
+                        <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                      ) : a.kind === 'image' && a.thumbUrl ? (
+                        <img
+                          src={a.thumbUrl}
+                          alt=""
+                          className="size-5 shrink-0 rounded object-cover"
+                        />
+                      ) : a.kind === 'image' ? (
+                        <FileImage className="size-3.5 shrink-0" />
+                      ) : (
+                        <FileText className="size-3.5 shrink-0" />
+                      )}
+                      <span className="max-w-40 truncate">{a.name}</span>
+                      {a.status === 'ready' &&
+                        a.kind === 'image' &&
+                        (a.sliceUrls?.length ?? 0) > 1 && (
+                          <span className="shrink-0 tabular-nums opacity-70">
+                            {a.sliceUrls?.length}조각
+                          </span>
+                        )}
+                      {a.truncated && <span className="shrink-0 text-warning">잘림</span>}
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(a.id)}
+                        title="첨부 제거"
+                        aria-label={`${a.name} 첨부 제거`}
+                        className="shrink-0 rounded p-0.5 transition-colors duration-100 ease-out hover:bg-accent hover:text-foreground"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
               <MentionTextarea
                 ref={textareaRef}
                 value={input}
@@ -1197,7 +1423,11 @@ export function GlobalChat() {
                 items={mentionItems}
                 disabled={inputLocked}
                 placeholder={
-                  choices ? '위 선택지에서 답해 주세요' : STAGE_PLACEHOLDER[currentStage]
+                  choices
+                    ? '위 선택지에서 답해 주세요'
+                    : canSendAttachments
+                      ? '어떻게 쓸지 적어 주세요 — 비워 두면 스토리로 정리해요'
+                      : STAGE_PLACEHOLDER[currentStage]
                 }
                 className={cn(
                   'max-h-[13.625rem] min-h-9 w-full resize-none border-0 bg-transparent px-2 py-2 leading-5 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
@@ -1212,7 +1442,8 @@ export function GlobalChat() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".txt"
+                      accept={UPLOAD_ACCEPT}
+                      multiple
                       className="hidden"
                       onChange={handleFileChange}
                     />
@@ -1221,9 +1452,9 @@ export function GlobalChat() {
                       variant="ghost"
                       className="rounded-full"
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={loading}
-                      title="스크립트 파일 업로드 (.txt)"
-                      aria-label="스크립트 파일 업로드 (.txt)"
+                      disabled={loading || uploading}
+                      title="파일 첨부 — 원고(txt·md·docx)나 이미지(jpg·png·webp)"
+                      aria-label="파일 첨부"
                     >
                       <Plus className="size-4" />
                     </Button>
@@ -1379,7 +1610,7 @@ export function GlobalChat() {
                     size="icon-sm"
                     className="rounded-full"
                     onClick={handleSend}
-                    disabled={sendDisabled || !input.trim()}
+                    disabled={sendDisabled || uploading || (!input.trim() && !canSendAttachments)}
                     title="보내기"
                     aria-label="보내기"
                   >

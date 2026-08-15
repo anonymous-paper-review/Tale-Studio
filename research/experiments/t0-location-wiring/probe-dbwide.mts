@@ -1,0 +1,10 @@
+import { config } from 'dotenv'
+config({ path: '.env.local' })
+const { supabaseAdmin } = await import('@/lib/supabase/admin')
+const { count: est } = await supabaseAdmin.from('locations').select('*', { count: 'exact', head: true }).not('establishing_shot','is',null)
+const { count: wide } = await supabaseAdmin.from('locations').select('*', { count: 'exact', head: true }).not('wide_shot','is',null)
+const { count: all } = await supabaseAdmin.from('locations').select('*', { count: 'exact', head: true })
+const { count: shotsAll } = await supabaseAdmin.from('shots').select('*', { count: 'exact', head: true })
+const { count: shotsLoc } = await supabaseAdmin.from('shots').select('*', { count: 'exact', head: true }).not('location_ids','is',null)
+const { count: locScene } = await supabaseAdmin.from('locations').select('*', { count: 'exact', head: true }).not('scene_id','is',null)
+console.log(JSON.stringify({ locations_all: all, with_wide_shot: wide, with_establishing_shot: est, locations_with_scene_id: locScene, shots_all: shotsAll, shots_with_non_null_location_ids: shotsLoc }, null, 2))

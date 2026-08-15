@@ -227,6 +227,7 @@ export async function GET(
 
     const body: {
       projectId: string;
+      engine: 'v1' | 'v2';
       started: boolean;
       pipeline_completed: boolean;
       pipeline_failed: boolean;
@@ -247,6 +248,7 @@ export async function GET(
       assets?: WriterStatusAssets;
     } = {
       projectId,
+      engine: row?.engine ?? 'v1',
       started: !!row,
       pipeline_completed: row?.status === 'completed',
       pipeline_failed: row?.status === 'failed',

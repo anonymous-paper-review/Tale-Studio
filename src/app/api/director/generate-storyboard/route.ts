@@ -16,7 +16,7 @@ import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { createGenerationJob } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
-import { applyStyleAnchor, resolveStyleAnchorByKey, type AnchorableSubmit } from '@/lib/style-anchor'
+import { applyStyleAnchor, resolveStyleAnchor, type AnchorableSubmit } from '@/lib/style-anchor'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import { appendCheckConstraints } from '@/lib/writer/check-notes'
 import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
     const [{ data: project }, { data: shot }] = await Promise.all([
       supabaseAdmin
         .from('projects')
-        .select('workspace_id, style_anchor_key')
+        .select('workspace_id, style_anchor_key, custom_style_anchor')
         .eq('id', projectId)
         .maybeSingle(),
       supabaseAdmin
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
         .maybeSingle(),
     ])
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
-    const anchor = await resolveStyleAnchorByKey(project.style_anchor_key)
+    const anchor = await resolveStyleAnchor(project)
 
     const callerRefs = referenceImageUrls?.length ? referenceImageUrls : undefined
 

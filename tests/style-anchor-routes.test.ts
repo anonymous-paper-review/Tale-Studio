@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   falImageSubmit: vi.fn(),
   resolveWebhookUrl: vi.fn(),
   resolveWebhookBaseUrl: vi.fn(),
+  templateAssetUrl: vi.fn(),
   from: vi.fn(),
   webhookBaseUrl: 'https://base.test' as string | null,
   DEFAULT_IMAGE_MODEL: 'openai/gpt-image-2',
@@ -43,6 +44,9 @@ vi.mock('@/lib/fal/webhook-url', () => ({
   resolveWebhookBaseUrl: mocks.resolveWebhookBaseUrl,
 }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from } }))
+// 템플릿 URL 출처가 앱 public URL → 스토리지로 바뀌었다(2026-08-13). 기존 케이스가 쓰던
+//   webhookBaseUrl 노브를 그대로 위임해 읽어 호출 순서·횟수를 보존한다.
+vi.mock('@/lib/storage/template-asset', () => ({ templateAssetUrl: mocks.templateAssetUrl }))
 
 import { POST as generateSheetPOST } from '@/app/api/artist/generate-sheet/route'
 import { POST as generateWorldPOST } from '@/app/api/artist/generate-world/route'
@@ -183,6 +187,11 @@ beforeEach(() => {
   mocks.resolveWebhookUrl.mockReturnValue(WEBHOOK_URL)
   mocks.resolveWebhookBaseUrl.mockReset()
   mocks.resolveWebhookBaseUrl.mockImplementation(() => mocks.webhookBaseUrl)
+  mocks.templateAssetUrl.mockReset()
+  mocks.templateAssetUrl.mockImplementation(async (name: string) => {
+    const base = mocks.resolveWebhookBaseUrl()
+    return base ? `${base}/${name}` : null
+  })
 
   mocks.from.mockReset()
   mocks.from.mockImplementation((table: string) => queryFor(table))

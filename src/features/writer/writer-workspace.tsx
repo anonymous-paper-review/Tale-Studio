@@ -7,6 +7,7 @@ import { DialogueView } from '@/features/writer/dialogue-view'
 import { RoughStoryboardView } from '@/features/writer/rough-storyboard-view'
 import { ScriptView } from '@/features/writer/script-view'
 import { WriterGenerationView } from '@/features/writer/writer-generation-view'
+import { WriterV2Preview } from '@/features/writer/writer-v2-preview'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
@@ -85,6 +86,10 @@ export function WriterWorkspace() {
         debug={debugGeneration && !running}
       />
     )
+  }
+
+  if (status?.engine === 'v2' && projectId) {
+    return <WriterV2Preview projectId={projectId} />
   }
 
   return (

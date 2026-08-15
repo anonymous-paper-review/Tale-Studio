@@ -1,10 +1,10 @@
 ```yaml
 id: t2-motion-qual-directing
 source: 오너 지시 2026-08-11 낮 ("연출별로 돌려보기") · Q14 정성평가 1차 후속
-tier: T2
+종류: 발주실험
 budget: { usd: 12, runs: 1, wall_min: 120 }
 blockers: []
-status: superseded  # 2026-08-11 t2-contract-generalize로 통합 — 변인을 '참조 역할 계약 유무'로 좁혀 3시나리오 6클립으로 재설계(원 설계는 3암×3세트=$32). 원 관심사(스토리별·움직임별·연출별)는 그 티켓의 S1·S2·S3가 승계
+status: 대체됨  # 2026-08-11 t2-contract-generalize로 통합 — 변인을 '참조 역할 계약 유무'로 좁혀 3시나리오 6클립으로 재설계(원 설계는 3암×3세트=$32). 원 관심사(스토리별·움직임별·연출별)는 그 티켓의 S1·S2·S3가 승계
 priority: normal
 ```
 

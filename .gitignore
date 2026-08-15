@@ -80,6 +80,8 @@ parallel_dev/
 !.claude/hooks/*.sh
 # 스킬 부속 스크립트도 추적 (SKILL.md가 참조하는 bin/*.sh 등이 *.sh 전역 규칙에 삼켜지지 않게)
 !.claude/skills/**/*.sh
+# 야간 automation 부속도 추적 (orca --precheck 가 참조 — 사라지면 밤이 조용히 깨진다)
+!research/backlog/*.sh
 docs/homepage_legacy/
 
 

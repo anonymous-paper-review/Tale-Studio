@@ -2,9 +2,11 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import type { WriterEngine } from '@/lib/writer/engine'
 
 export interface WriterStatus {
   projectId: string
+  engine?: WriterEngine
   started: boolean
   pipeline_completed: boolean
   pipeline_failed: boolean

@@ -7,11 +7,18 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getUser } from '@/lib/supabase/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { createRun, getActiveRun } from '@/lib/writer/run-store';
-import { WRITER_TOTAL_UNITS, triggerWriterStep } from '@/lib/writer/pipeline/steps';
+import {
+  WRITER_TOTAL_UNITS,
+  WRITER_V2_TOTAL_UNITS,
+  triggerWriterStep,
+} from '@/lib/writer/pipeline/steps';
 import type { PipelineInput, Genre, CastContract } from '@/lib/writer/types/pipeline';
+import { isAdminOwnedProject } from '@/lib/admin';
+import { isWriterEngine, type WriterEngine } from '@/lib/writer/engine';
 import { applyProducerI18n } from '@/lib/writer/i18n/derive-en';
 import { detectLocaleFromText } from '@/lib/locale';
 import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
+import { parseCustomStyleAnchor } from '@/lib/style-anchor';
 
 // producer 핸드오프 배경 페이로드(원천 rich shape). writer 내부 BackgroundContract 와 분리 —
 //   locations 테이블엔 full 필드로 즉시 upsert 하고, 파이프라인엔 BackgroundContract 로 매핑해 전달한다.
@@ -100,6 +107,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       projectId: string;
       story: string;
+      writerEngine?: unknown;
       runtimeSeconds?: number;
       models?: PipelineInput['models'];
       genre?: Genre;
@@ -113,6 +121,13 @@ export async function POST(req: NextRequest) {
     }
     if (!story || typeof story !== 'string') {
       return NextResponse.json({ error: 'story required' }, { status: 400 });
+    }
+
+    const writerEngine: WriterEngine = isWriterEngine(body.writerEngine)
+      ? body.writerEngine
+      : 'v1';
+    if (writerEngine === 'v2' && !(await isAdminOwnedProject(user, projectId))) {
+      return NextResponse.json({ error: 'Writer V2 is admin-only' }, { status: 403 });
     }
 
     // 0.5 콘텐츠 안전 힌트(인지용, 비차단): 미성년+위해(피·폭력) 조합은 Gemini PROHIBITED_CONTENT
@@ -188,10 +203,20 @@ export async function POST(req: NextRequest) {
     try {
       const { data: proj } = await supabaseAdmin
         .from('projects')
-        .select('style_anchor_key')
+        .select('style_anchor_key, custom_style_anchor')
         .eq('id', projectId)
         .maybeSingle();
-      if (proj?.style_anchor_key) {
+      // 유저 업로드 앵커는 style_anchors 에 행이 없다 — label/medium 을 프로젝트 행이 들고 있다.
+      //   여기서 medium 을 안 채우면 v0 가 장르에서 매체를 발명해(dark_cinematic_realism 등)
+      //   이미지 쪽 앵커와 충돌한다. 이 분기가 있는 이유가 그것이다.
+      const custom = parseCustomStyleAnchor(proj?.custom_style_anchor);
+      if (custom) {
+        styleAnchor = {
+          key: proj?.style_anchor_key ?? 'custom',
+          label: custom.label ?? undefined,
+          medium: custom.medium ?? undefined,
+        };
+      } else if (proj?.style_anchor_key) {
         const { data: row } = await supabaseAdmin
           .from('style_anchors')
           .select('key, label, medium, is_active')
@@ -208,11 +233,14 @@ export async function POST(req: NextRequest) {
     // 2. run 시작 (genre/cast seed → s0/s2 생략).
     const input: PipelineInput = {
       story,
+      writerEngine,
       runtimeSeconds,
       styleAnchor,
       models,
       // #s3-gate: UI 핸드오프는 씬 스토리 확정 게이트를 켠다 — storyCheck 후 유저 검토·확정.
-      sceneGate: true,
+      // V2는 의미 단위 결과와 자체 검토 메타를 한 번에 만들므로 기존 씬 확인 게이트를
+      // 중복 적용하지 않는다. V1은 기존 사용자 씬 검토 흐름을 그대로 유지한다.
+      sceneGate: writerEngine === 'v1',
       genre,
       cast,
       background: backgrounds?.locations?.length
@@ -225,7 +253,11 @@ export async function POST(req: NextRequest) {
           }
         : undefined,
     };
-    const run = await createRun(projectId, input, WRITER_TOTAL_UNITS);
+    const run = await createRun(
+      projectId,
+      input,
+      writerEngine === 'v2' ? WRITER_V2_TOTAL_UNITS : WRITER_TOTAL_UNITS,
+    );
 
     // 응답 후 별도 서버리스 인스턴스에서 첫 writer step 실행.
     //   Artist 이미지 초안은 writer v2Design post-persist hook 에서 look+anchor 확정 후 submit 한다.

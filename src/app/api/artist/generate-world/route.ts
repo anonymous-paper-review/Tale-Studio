@@ -13,7 +13,7 @@ import {
   type GenerationJobActor,
 } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
-import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
+import { resolveStyleAnchor } from '@/lib/style-anchor'
 import { submitWorldShotJob } from '@/lib/artist/world-submit'
 
 export const runtime = 'nodejs'
@@ -72,11 +72,11 @@ export async function POST(req: Request) {
 
     const { data: project } = await supabaseAdmin
       .from('projects')
-      .select('workspace_id, style_anchor_key')
+      .select('workspace_id, style_anchor_key, custom_style_anchor')
       .eq('id', projectId)
       .maybeSingle()
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
-    const anchor = await resolveStyleAnchorByKey(project.style_anchor_key)
+    const anchor = await resolveStyleAnchor(project)
 
     const job = await submitWorldShotJob({
       projectId,

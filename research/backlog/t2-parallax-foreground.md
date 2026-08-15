@@ -1,10 +1,10 @@
 ```yaml
 id: t2-parallax-foreground
 source: 오너 관찰 2026-08-11 ("달려오는데 배경이랑 피사체랑 오브젝트랑 따로 노는 느낌") · 조사 리포트 §질문2(static motion bias·전경 오클루전) · qual3-timed 실측
-tier: T2
+종류: 발주실험
 budget: { usd: 6, runs: 1, wall_min: 120 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — 2암 수집 완료(ⓞ는 재사용, 재생성 안 함). 지출 $2.73/$6. 판정·점수 없음(티켓 지시) — 관찰 4항목은 qual5-parallax/notes.md. 정직 보고: ⓑ 변형 시작 그림이 해상도까지 달라져(379x257→1088x608) 전경 제거 효과와 해상도 효과가 교락. 결과: research/experiments/previz-video-reference-ab/qual5-parallax/
+status: 완료  # 2026-08-12 밤 러너 — 2암 수집 완료(ⓞ는 재사용, 재생성 안 함). 지출 $2.73/$6. 판정·점수 없음(티켓 지시) — 관찰 4항목은 qual5-parallax/notes.md. 정직 보고: ⓑ 변형 시작 그림이 해상도까지 달라져(379x257→1088x608) 전경 제거 효과와 해상도 효과가 교락. 결과: research/experiments/previz-video-reference-ab/qual5-parallax/
 priority: high
 ```
 

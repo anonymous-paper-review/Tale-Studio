@@ -1,10 +1,10 @@
 ```yaml
 id: t2-locked-compliance-static
 source: .claude/vault/2026-08-10-prompt-contract-audit.md §3 (역전 발견의 처방 — 닫히는 조건: 정적 콘텐츠 LOCKED 준수율 실측)
-tier: T2
+종류: 발주실험
 budget: { usd: 7, runs: 1, wall_min: 120 }  # 9클립 — 1호(ti2v-camera-cap-recheck) 실측 단가
 blockers: [ "owner-approval:$7 (_MORNING.md Q3)" ]
-status: blocked
+status: 막힘
 priority: high
 ```
 

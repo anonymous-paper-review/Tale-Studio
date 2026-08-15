@@ -11,19 +11,21 @@ import { displayNameOf } from '@/lib/display-name';
 import { requireProjectAccess } from '@/lib/api/guard';
 import { getActiveRun } from '@/lib/writer/run-store';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { isTargetScript } from '@/lib/writer/i18n/derive-en';
 import type { StoryScene, DecoupagePlan } from '@/lib/writer/types/pipeline';
+import type { WriterV2Package } from '@/lib/writer/v2/semantic-unit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // state 에서 필요한 필드만 구조적으로 읽는다(steps.ts 의 무거운 import 회피).
 interface PreviewState {
+  input?: { writerEngine?: unknown };
   scenes?: { scenes?: StoryScene[] };
   decoupage?: DecoupagePlan;
   characters?: { characters?: Array<{ id?: string; name?: string; role?: string }> };
   world?: { locations?: Array<{ id?: string; name?: string }> };
   worldVisual?: { locations?: Array<{ id?: string; name?: string }> };
+  v2Package?: WriterV2Package;
 }
 
 interface PreviewScene {
@@ -87,6 +89,33 @@ export async function GET(
     const running = run.status === 'running';
     const completed = run.status === 'completed';
     const failed = run.status === 'failed';
+    const engine = state.input?.writerEngine === 'v2' ? 'v2' : 'v1';
+
+    if (engine === 'v2') {
+      return NextResponse.json(
+        {
+          engine,
+          started: true,
+          running,
+          completed,
+          failed,
+          roster: [],
+          scenes: [],
+          characters: [],
+          worlds: [],
+          v2Package: state.v2Package ?? null,
+          v2Apply: {
+            available:
+              run.status === 'completed' &&
+              state.v2Package?.status === 'ready' &&
+              (!state.v2Package.user_review.required ||
+                state.v2Package.user_review.status === 'accepted') &&
+              Boolean(state.v2Package.units?.length),
+          },
+        },
+        { headers: { 'cache-control': 'no-store' } },
+      );
+    }
 
     // 이름 로스터 (슬러그 → 표시 이름). scene_actions 본문의 'char' 등 슬러그를 이름으로 치환하는 데 쓴다.
     const roster: Array<{ slug: string; name: string }> = [];
@@ -182,6 +211,7 @@ export async function GET(
 
     return NextResponse.json(
       {
+        engine,
         started: true,
         running,
         completed,
@@ -190,6 +220,8 @@ export async function GET(
         scenes,
         characters,
         worlds,
+        v2Package: null,
+        v2Apply: null,
       },
       { headers: { 'cache-control': 'no-store' } },
     );

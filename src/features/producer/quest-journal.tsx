@@ -119,13 +119,16 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
   const updateSettings = useProducerStore((s) => s.updateSettings)
   const styleAnchors = useProducerStore((s) => s.styleAnchors)
   const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
+  const customStyleAnchor = useProducerStore((s) => s.customStyleAnchor)
   const loadStyleAnchors = useProducerStore((s) => s.loadStyleAnchors)
   const projectId = useProjectStore((s) => s.projectId)
   useEffect(() => {
     if (projectId) void loadStyleAnchors()
   }, [projectId, loadStyleAnchors])
 
-  const styleLabel = styleAnchors.find((a) => a.key === styleAnchorKey)?.label ?? null
+  // 커스텀 앵커(custom_<uuid>)는 카탈로그에 행이 없어 위 조회가 비어 온다 — 라벨은 store 가 든다.
+  const styleLabel =
+    styleAnchors.find((a) => a.key === styleAnchorKey)?.label ?? customStyleAnchor?.label ?? null
   const formatLabel = FORMAT_OPTIONS.find((o) => o.value === settings.format)?.label ?? null
   const langLabel = LANGUAGE_OPTIONS.find((o) => o.value === settings.dialogueLanguage)?.label ?? null
 

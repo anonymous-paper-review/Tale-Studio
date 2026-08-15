@@ -1,10 +1,10 @@
 ```yaml
 id: t0-spec-blender-compile-probe
 source: .claude/vault/2026-08-11-blockout-previz-video-reference.md §3 (spec→Blender 컴파일 프로브)
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 90 }  # 생성 AI 크레딧 0 — 에이전트 노동만
 blockers: [ "owner-approval: 로컬 Blender 설치 (머신 상태 변경 — _MORNING.md Q14)" ]
-status: blocked
+status: 막힘
 priority: normal
 ```
 

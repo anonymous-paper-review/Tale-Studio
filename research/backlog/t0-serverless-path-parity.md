@@ -3,10 +3,10 @@
 ```yaml
 id: t0-serverless-path-parity
 source: sweep:claude:62428d65
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 50 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — 가설 기각(기각선 1절 발동: 진입점이 runPipeline vs runWriterSteps 로 갈라짐). 단 2절(튜닝 누락)은 미발동 — 동시성 3노브·전송 튜닝(instrumentation.ts:22, connections 64, NEXT_RUNTIME nodejs)이 서버리스에도 적용. 스테이지 모듈 13개 일치, 서버리스 전용 s1s3_merged는 기본 off. 결과: research/experiments/t0-serverless-path-parity/
+status: 완료  # 2026-08-12 밤 러너 — 가설 기각(기각선 1절 발동: 진입점이 runPipeline vs runWriterSteps 로 갈라짐). 단 2절(튜닝 누락)은 미발동 — 동시성 3노브·전송 튜닝(instrumentation.ts:22, connections 64, NEXT_RUNTIME nodejs)이 서버리스에도 적용. 스테이지 모듈 13개 일치, 서버리스 전용 s1s3_merged는 기본 off. 결과: research/experiments/t0-serverless-path-parity/
 priority: high
 ```
 

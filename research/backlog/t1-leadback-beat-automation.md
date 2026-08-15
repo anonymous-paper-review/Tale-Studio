@@ -1,10 +1,10 @@
 ```yaml
 id: t1-leadback-beat-automation
 source: .claude/vault/2026-08-06-previz-verifier.md §3 (리드백 beat 대조 자동화)
-tier: T1
+종류: 모델실험
 budget: { usd: 1, runs: 1, wall_min: 60 }
 blockers: []
-status: blocked  # 2026-08-11 밤 러너 — 막힌 지점: (리드백 서술, beat, 수동 판정) 트리플이 로컬 디스크에 부재. collect.mjs는 <outDir> 인자 산출인데 해당 디렉토리가 repo·홈 전역 수색(find /Users/xcape)에서 미발견. vault 원문 "실행 산출은 리포트 아티팩트"(2026-08-06-previz-verifier.md:4) — 데이터가 claude.ai 아티팩트(run1 3431b72e·run2 f7f37f25) HTML에만 존재하고 티켓은 이를 "참조용"으로 규정. HTML에서 트리플 재구성은 티켓 좌표 밖 + 충실도 불확실(판정 3원칙). 해제 조건: 오너가 아티팩트→기계가독 트리플 추출을 승인하거나 원본 outDir 위치를 지정.
+status: 막힘  # 2026-08-11 밤 러너 — 막힌 지점: (리드백 서술, beat, 수동 판정) 트리플이 로컬 디스크에 부재. collect.mjs는 <outDir> 인자 산출인데 해당 디렉토리가 repo·홈 전역 수색(find /Users/xcape)에서 미발견. vault 원문 "실행 산출은 리포트 아티팩트"(2026-08-06-previz-verifier.md:4) — 데이터가 claude.ai 아티팩트(run1 3431b72e·run2 f7f37f25) HTML에만 존재하고 티켓은 이를 "참조용"으로 규정. HTML에서 트리플 재구성은 티켓 좌표 밖 + 충실도 불확실(판정 3원칙). 해제 조건: 오너가 아티팩트→기계가독 트리플 추출을 승인하거나 원본 outDir 위치를 지정.
 priority: normal
 ```
 

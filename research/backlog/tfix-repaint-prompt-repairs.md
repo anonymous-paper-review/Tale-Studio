@@ -1,10 +1,10 @@
 ```yaml
 id: tfix-repaint-prompt-repairs
 source: .claude/vault/2026-08-10-previz-motion-channel.md §3 "실험 불요 확정 수리 안건 4" 중 ③④ (A1 체계적 결함 2건)
-tier: T-fix
+종류: 수리
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done  # 2026-08-11 밤 러너 — fix/fal-wiring 브랜치(워크트리 .worktrees/fix-fal-wiring/)에 같이 적용, 커밋 없음. ③ END 패널 도착 상태 전건 완료 재현 지시 ④ 원본에 없는 화살표 발명 금지(정지 샷 클린 유지). pnpm test 973 통과 유지. 전/후 프롬프트 원문 대조는 reports/2026-08-11.md. 효과 검증(리페인트 재생성)은 티켓 규정대로 다음 리페인트 실험에 편승 — "검증 대기"
+status: 완료  # 2026-08-11 밤 러너 — fix/fal-wiring 브랜치(워크트리 .worktrees/fix-fal-wiring/)에 같이 적용, 커밋 없음. ③ END 패널 도착 상태 전건 완료 재현 지시 ④ 원본에 없는 화살표 발명 금지(정지 샷 클린 유지). pnpm test 973 통과 유지. 전/후 프롬프트 원문 대조는 reports/2026-08-11.md. 효과 검증(리페인트 재생성)은 티켓 규정대로 다음 리페인트 실험에 편승 — "검증 대기"
 priority: normal
 ```
 

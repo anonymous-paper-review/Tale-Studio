@@ -21,6 +21,7 @@ import {
 import { matchHandoffIntent, type HandoffSpec } from '@/lib/handoff-intent'
 import { handoffToStage } from '@/lib/stage-nav'
 import { saveChatMessage } from '@/lib/chat-persistence'
+import { parseAttachmentMarker, withAttachmentMarker } from '@/lib/chat-blocks'
 import { isDemoSession, getDemoSnapshot } from '@/lib/demo/context'
 import { cannedFor } from '@/lib/demo/canned'
 import { handoffMarker } from '@/lib/chat-blocks'
@@ -78,7 +79,16 @@ interface GlobalChatState {
   pendingNavigatePath: string | null
 
   loadMessages: (projectId: string) => Promise<void>
-  sendMessage: (content: string) => Promise<void>
+  /**
+   * attachments.imageUrls: 판독용 슬라이스 URL — 이번 턴 LLM 호출에만 실린다.
+   *   히스토리는 DB 에서 텍스트로 재조립되므로 다음 턴에 자연히 빠진다.
+   * attachments.thumbUrls: 스레드에 남길 원본 URL — 본문 마커로 영속화되어 새로고침 후에도
+   *   "이 턴에 뭘 올렸는지"가 보인다. LLM 히스토리에서는 제거된다(URL 은 모델에 무의미).
+   */
+  sendMessage: (
+    content: string,
+    attachments?: { imageUrls?: string[]; thumbUrls?: string[] },
+  ) => Promise<void>
   /** 진행 중인 LLM 응답 중단 (#oiioii-chat) — Stop 버튼. 대기 중이 아니면 no-op. */
   stopGeneration: () => void
   /** preempt: 떠 있는 제안(선택지 등)을 밀어내고 이 제안을 세운다 — 핸드오프처럼 "지금이 그 순간"인 것만. */
@@ -92,6 +102,8 @@ interface GlobalChatState {
   notifyCompletion: (stage: StageId, label: string) => void
   /** 생성 트리거 실패 통지 — 사유를 채팅에 남긴다 (#double-fire). 완료와 달리 즉시. */
   notifyActionError: (stage: StageId, label: string, message: string) => void
+  /** 완성된 상태 행(⚠/✓ prefix 포함)을 그대로 채팅에 남긴다 — 문구를 호출부가 정할 때. */
+  notifyIssue: (stage: StageId, content: string) => void
   clearStageBadge: (stage: StageId) => void
   clearError: () => void
   reset: () => void
@@ -163,6 +175,52 @@ function flushCompletion(stage: StageId, label: string): void {
 //   버튼과 타이핑이 아래 같은 함수로 수렴한다(경로가 갈리지 않는다).
 
 /** 핸드오프 가부 — 코드 게이트가 판정한다(모델 아님, architecture §3). 막혔으면 사유 목록. */
+/**
+ * 채팅이 해석한 "이 그림체로 가줘" 의도를 프로젝트 스타일 앵커로 확정한다.
+ *
+ * 모델은 imageIndex 만 준다 — 이번 턴에 붙인 이미지 목록에서 URL 을 꺼내는 건 우리 몫이다.
+ * 실제 저장·검증(우리 스토리지 경로인지, medium 이 카탈로그에 있는지)은 서버가 한다.
+ *
+ * 반환: 실패 사유(사용자에게 보일 문장) 또는 null(적용했거나 의도가 없었음).
+ */
+async function applyStyleAnchorIntent(
+  intent: unknown,
+  attachmentImageUrls: string[],
+  projectId: string | null,
+): Promise<string | null> {
+  if (!intent || typeof intent !== 'object') return null
+  if (!projectId) return null
+
+  const { imageIndex, label, medium } = intent as Record<string, unknown>
+  if (typeof imageIndex !== 'number' || !Number.isInteger(imageIndex)) return null
+
+  const imageUrl = attachmentImageUrls[imageIndex]
+  if (!imageUrl) {
+    // 모델이 없는 인덱스를 짚었다. 조용히 넘기면 "화풍 잡았어요"만 남는다.
+    return '어떤 이미지를 말하는지 못 찾았어요. 다시 한 번 말씀해 주세요.'
+  }
+
+  try {
+    const res = await fetch('/api/produce/style-anchor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, imageUrl, label, medium }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return typeof body.error === 'string' ? body.error : `HTTP ${res.status}`
+
+    useProducerStore.getState().applyCustomStyleAnchor({
+      key: body.key,
+      url: body.imageUrl,
+      label: body.label,
+      medium: body.medium ?? null,
+    })
+    return null
+  } catch (error) {
+    return error instanceof Error ? error.message : '알 수 없는 오류'
+  }
+}
+
 function handoffBlockers(spec: HandoffSpec): string[] {
   if (spec.from === 'producer') {
     const p = useProducerStore.getState()
@@ -248,9 +306,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (content) => {
+  sendMessage: async (content, attachments) => {
     const trimmed = content.trim()
     if (!trimmed || get().loading) return
+    const attachmentImageUrls = attachments?.imageUrls
+    const thumbUrls = attachments?.thumbUrls ?? []
 
     const stage = useProjectStore.getState().currentStage
     const projectId = useProjectStore.getState().projectId
@@ -379,7 +439,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const historyPayload = windowed.map((m) => ({
       stage: m.stage,
       role: m.role,
-      content: m.content,
+      // 첨부 마커는 렌더링 전용이다 — URL 문자열을 모델에 다시 보내봐야 의미가 없고
+      //   턴마다 히스토리 예산만 갉아먹는다.
+      content: m.role === 'user' ? parseAttachmentMarker(m.content).text : m.content,
     }))
 
     // 데모(공유) 세션: 서버 LLM 호출 없이 canned 응답으로 "척"(typing 후 고정 답변).
@@ -426,6 +488,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         body = {
           message: trimmed,
           history: historyPayload,
+          attachmentImageUrls: attachmentImageUrls ?? [],
           currentSettings: p.projectSettings,
           storyText: p.storyText,
           currentCast: p.cast,
@@ -510,11 +573,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         return
     }
 
+    // 스레드에 남는 본문에는 첨부 마커를 붙이고, LLM 에는 아래에서 trimmed(순수 텍스트)만 보낸다.
+    const displayContent = withAttachmentMarker(trimmed, thumbUrls)
     const userMsg: GlobalChatMessage = {
       id: makeId(),
       stage,
       role: 'user',
-      content: trimmed,
+      content: displayContent,
     }
 
     set((state) => ({
@@ -523,7 +588,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       error: null,
     }))
 
-    if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+    if (projectId) saveChatMessage(projectId, stage, 'user', displayContent)
 
     // 응답 중단 (#oiioii-chat) — Stop 버튼이 이 컨트롤러를 abort 한다. LLM 호출 경로에만
     //   건다(핸드오프·승인 등 로컬 빠른 경로는 순식간이라 중단 대상이 아니다).
@@ -563,6 +628,23 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         useProducerStore
           .getState()
           .applyExtractedSettings(data.extractedSettings)
+
+        // #p1-attach: 채팅이 "이 그림체로" 의도를 읽었으면 앵커로 확정한다.
+        //   모델은 인덱스만 주고 URL 은 우리가 이번 턴 첨부에서 꺼낸다 — 모델이 뱉은 URL 은
+        //   나중에 이미지 생성 프로바이더가 직접 가져가므로 신뢰하면 안 된다.
+        const anchorError = await applyStyleAnchorIntent(
+          data.extractedSettings.styleAnchorFromAttachment,
+          attachmentImageUrls ?? [],
+          projectId,
+        )
+        if (anchorError) {
+          // 모델은 이미 "이 화풍으로 잡았어요"라고 답했다. 저장이 실패했는데 조용하면 거짓말이 된다.
+          const failure = `화풍을 저장하지 못했어요 — ${anchorError}`
+          set((state) => ({
+            messages: [...state.messages, { id: makeId(), stage, role: 'model', content: failure }],
+          }))
+          if (projectId) saveChatMessage(projectId, stage, 'model', failure)
+        }
       }
       // #p4-choices: 에이전트가 낸 선택지를 버튼 제안으로 — 클릭 = 채팅 입력.
       if (stage === 'producer' && Array.isArray(data.choices) && data.choices.length >= 2) {
@@ -918,7 +1000,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   //   채팅이 같은 줄로 도배되는 것을 피한다.
   notifyActionError: (stage, label, message) => {
     const trimmed = message.trim()
-    const content = `⚠ ${label} 생성을 시작하지 못했어요 — ${trimmed || '알 수 없는 오류'}`
+    get().notifyIssue(stage, `⚠ ${label} 생성을 시작하지 못했어요 — ${trimmed || '알 수 없는 오류'}`)
+  },
+
+  notifyIssue: (stage, content) => {
+    // 같은 문구 연속 중복 방지 — 병렬 생성이 같은 사유로 무더기 실패하면 스레드가 도배된다.
     const last = get().messages[get().messages.length - 1]
     if (last && last.role === 'model' && last.content === content) return
     set((state) => ({

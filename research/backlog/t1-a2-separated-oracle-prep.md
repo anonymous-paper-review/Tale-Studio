@@ -1,10 +1,10 @@
 ```yaml
 id: t1-a2-separated-oracle-prep
 source: .claude/vault/2026-08-10-previz-motion-channel.md §3 대기 결정 (A2′ 재등록 — (ii) 대비 준비)
-tier: T1
+종류: 모델실험
 budget: { usd: 0.5, runs: 1, wall_min: 60 }
 blockers: []  # 준비 티켓 — 본실행은 owner-decision:Q1에 종속, 준비 범위는 아래에 명시
-status: done  # 2026-08-11 밤 러너 — 준비 성공: 스모크가 육안 실측 재현(상태 SE1/SO0·상태2AFC=SE·양팔 드리프트). judge2.mts + run/results2-smoke.json. 지출 ~$0.02
+status: 완료  # 2026-08-11 밤 러너 — 준비 성공: 스모크가 육안 실측 재현(상태 SE1/SO0·상태2AFC=SE·양팔 드리프트). judge2.mts + run/results2-smoke.json. 지출 ~$0.02
 priority: high  # 재개 지점(Q1) 직결
 ```
 

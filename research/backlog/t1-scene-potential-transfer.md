@@ -1,10 +1,10 @@
 ```yaml
 id: t1-scene-potential-transfer
 source: .claude/vault/2026-08-10-dramaturgy-world-derivation.md §3 (scene_potential → 씬 상황 전이 미측정)
-tier: T1
+종류: 모델실험
 budget: { usd: 2, runs: 1, wall_min: 60 }
 blockers: []
-status: done  # 2026-08-11 밤 러너 — 가설 참(14/14=100%, Δ+66.7%p ≥ +20%p). 결과: research/experiments/t1-scene-potential-transfer/ 지출 ~$0.05
+status: 완료  # 2026-08-11 밤 러너 — 가설 참(14/14=100%, Δ+66.7%p ≥ +20%p). 결과: research/experiments/t1-scene-potential-transfer/ 지출 ~$0.05
 priority: normal
 ```
 

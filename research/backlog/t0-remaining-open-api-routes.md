@@ -3,10 +3,10 @@
 ```yaml
 id: t0-remaining-open-api-routes
 source: sweep:claude:70378c3d   # 스위퍼 분해 — 사람 심사 미경유
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — 🔴 가설 기각(기각 조건 발동: 무인증 9개 중 3개가 유료 호출/DB 쓰기 — fal/webhook·writer/step·writer/watchdog). 단, 3개 모두 비-로그인 문지기 보유(서명·서버 비밀, fail-closed). 부수 발견: 어제 선언 목록에 없던 generate/health·video-health가 내부 주소 노출. 결과: research/experiments/t0-remaining-open-api-routes/
+status: 완료  # 2026-08-12 밤 러너 — 🔴 가설 기각(기각 조건 발동: 무인증 9개 중 3개가 유료 호출/DB 쓰기 — fal/webhook·writer/step·writer/watchdog). 단, 3개 모두 비-로그인 문지기 보유(서명·서버 비밀, fail-closed). 부수 발견: 어제 선언 목록에 없던 generate/health·video-health가 내부 주소 노출. 결과: research/experiments/t0-remaining-open-api-routes/
 priority: high
 ```
 

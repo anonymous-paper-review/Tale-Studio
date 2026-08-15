@@ -1,10 +1,10 @@
 ```yaml
 id: t0-dramaturgy-36flash-outage
 source: research/experiments/t1-dramaturgy-procedural-probe/result.md §모델 전환 발견 (2026-08-11 밤 러너 부수 발견)
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done  # 8/11 낮 감사: 전면 불능 참(기본 3.6-flash 정상 산출 0/7, 기각 불성립) — 단 f6d8e58~수리 12.5h 창에 실런 0건(DB 0행·로컬 풀런 0)이라 실피해 0. 증거: research/experiments/t0-dramaturgy-36flash-outage/result.md. 남은 실행: gemini.ts 핀 커밋
+status: 완료  # 8/11 낮 감사: 전면 불능 참(기본 3.6-flash 정상 산출 0/7, 기각 불성립) — 단 f6d8e58~수리 12.5h 창에 실런 0건(DB 0행·로컬 풀런 0)이라 실피해 0. 증거: research/experiments/t0-dramaturgy-36flash-outage/result.md. 남은 실행: gemini.ts 핀 커밋
 priority: high  # 프로덕션 스테이지 무신호 사망 의심
 ```
 

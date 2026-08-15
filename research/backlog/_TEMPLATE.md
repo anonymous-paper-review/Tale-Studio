@@ -1,20 +1,28 @@
 # 티켓 폼 — 밤 실행 단위 (미결 1개 = 티켓 1개)
 
 > 알바생 원칙: 밤 러너는 맥락 제로다. 이 파일만 읽고 실행 가능해야 한다.
+
+> **말 규칙 (불변규칙 10)** — 설명이 필요한 줄임말은 쓰레기다. 티켓 본문·측정·판정선 어디에도
+> 쓰지 마라. 금지어 표와 판별 질문은 `_NIGHT.md` 불변규칙 10.
 > 가설 5줄은 `research/experiments/_HYPOTHESIS.md` 정본을 그대로 따른다.
 > 자격 심사 규칙: `.claude/rules/experiments.md` (반증 조건 없으면 반려).
 
 ```yaml
 id: <slug — 파일명과 동일>
 source: <vault 파일 §섹션 — 원문 역링크, 무손실 보존은 vault가 담당>
-tier: T0 | T1 | T2 | T-fix
-# T0 관측: $0, read-only (DB 쿼리·grep·git·코드 추적)
-# T1 텍스트: ~$2 (LLM 콜 있음, 생성 없음)
-# T2 생성: fal $ — 티켓에 오너 승인 금액 명시 없으면 blocked
-# T-fix 수리: 브랜치+테스트 준비까지만, 머지·커밋 금지
-budget: { usd: 0, runs: 1, wall_min: 30 }  # 고분산 지표(벽시계 등)는 runs ≥3
-blockers: []  # owner-decision:<질문id> | owner-approval:<금액> | human:<노동> | depends:<티켓id> | trigger:<대기 조건>
-status: ready | blocked | running | done | draft  # draft = 밤 러너가 제안만 한 티켓(실행 금지, 아침 심사행)
+종류: 조사 | 모델실험 | 발주실험 | 수리
+# 조사     — 이미 있는 것을 읽고 센다. DB 쿼리·grep·git·코드 추적. 돈 0원, 쓰기 금지.
+# 모델실험 — 모델을 부른다. 글만 뽑고 그림·영상은 안 만든다. 대략 $2.
+# 발주실험 — 그림이나 영상을 실제로 만든다. 진짜 결제가 일어난다.
+#            티켓에 오너 승인 금액이 안 적혀 있으면 실행하지 않고 막힘 처리.
+# 수리     — 코드를 고친다. 브랜치와 테스트 준비까지만, 머지·커밋 금지.
+budget: { usd: 0, runs: 1, wall_min: 30 }  # 벽시계처럼 들쭉날쭉한 지표는 runs 3회 이상
+blockers: []  # 오너결정:<질문id> | 금액승인:<금액> | 사람노동:<무엇> | 선행:<티켓id> | 대기:<조건>
+status: 초안 | 실행대기 | 진행중 | 완료 | 막힘 | 대체됨
+# 초안     — 존재만 한다. 아무도 실행하지 않는다. 스위퍼가 만든 티켓은 전부 여기서 시작.
+# 실행대기 — 밤 러너가 이걸 집어 그대로 실행한다. 발주가 걸려 있으면 돈이 나간다.
+#            여기로 올리는 것은 오너만 한다 (`_SWEEP.md` §5).
+# 막힘     — 실행하려다 티켓 밖 정보가 필요해져서 멈춤. 막힌 지점을 본문에 추기한다.
 priority: high | normal
 ```
 
@@ -35,4 +43,4 @@ priority: high | normal
 
 - `research/experiments/<id>/{result.md, results.json}` — result.md는 사람 언어 + 실제 입출력 원문 인용 (E0a 표준)
 - 이 티켓 status 갱신 + `research/backlog/reports/YYYY-MM-DD.md`에 1줄 (발동한 기각 조건 포함)
-- 기각도 산출이다 — "기각됨"이 남으면 티켓은 done
+- 기각도 산출이다 — "기각됨"이 남으면 티켓은 `완료`

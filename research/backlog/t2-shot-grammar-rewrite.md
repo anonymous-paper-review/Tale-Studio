@@ -1,10 +1,10 @@
 ```yaml
 id: t2-shot-grammar-rewrite
 source: research/experiments/_research/short-video-timing-and-rampup.md §우리에게 적용 가능한 것 (조치 1·2·4 배치 권고) · 실측 qual3-timed(초 단위 미이행)
-tier: T2
+종류: 발주실험
 budget: { usd: 8, runs: 1, wall_min: 120 }
 blockers: []
-status: done
+status: 완료
 priority: high
 result: research/experiments/previz-video-reference-ab/qual4-grammar/ (notes.md · manifest.json), 지출 $3.8094/$8, ⓑⓒⓓ 3/3 성공 · ⓐ 재사용
 ```
