@@ -966,11 +966,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const newOrder = { ...state.clipOrder, [sceneId]: order }
 
       // Persist to DB (fire-and-forget)
-      fetch('/api/editor/reorder', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sceneId, clipOrder: order }),
-      }).catch((err) => console.error('[editor-store] reorder persist failed:', err))
+      const reorderProjectId = useProjectStore.getState().projectId
+      if (reorderProjectId) {
+        fetch('/api/editor/reorder', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: reorderProjectId, sceneId, clipOrder: order }),
+        }).catch((err) => console.error('[editor-store] reorder persist failed:', err))
+      }
 
       return {
         clipOrder: newOrder,
@@ -990,11 +993,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }))
 
     // Persist to DB (fire-and-forget)
-    fetch('/api/editor/trim', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shotId, trimStart, trimEnd }),
-    }).catch((err) => console.error('[editor-store] trim persist failed:', err))
+    const trimProjectId = useProjectStore.getState().projectId
+    if (trimProjectId) {
+      fetch('/api/editor/trim', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: trimProjectId, shotId, trimStart, trimEnd }),
+      }).catch((err) => console.error('[editor-store] trim persist failed:', err))
+    }
   },
 
   setSpeed: (shotId, speed) => {
@@ -1011,11 +1017,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (existing) clearTimeout(existing)
     const timer = setTimeout(() => {
       speedPersistTimers.delete(shotId)
-      fetch('/api/editor/speed', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shotId, speed: clamped }),
-      }).catch((err) => console.error('[editor-store] speed persist failed:', err))
+      const speedProjectId = useProjectStore.getState().projectId
+      if (speedProjectId) {
+        fetch('/api/editor/speed', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: speedProjectId, shotId, speed: clamped }),
+        }).catch((err) => console.error('[editor-store] speed persist failed:', err))
+      }
     }, 300)
     speedPersistTimers.set(shotId, timer)
   },
@@ -1233,11 +1242,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     try {
       const { clipOrder, selectedSceneId, videoClips, audioClips, audioTracks } = get()
+      const projectId = useProjectStore.getState().projectId
 
       const res = await fetch('/api/editor/render-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          projectId,
           clipOrder,
           sceneId: selectedSceneId,
           // draft 에 트림/속도/오디오 음량 반영되도록 편집 데이터 동봉 (요청 1: 음량 draft 반영)

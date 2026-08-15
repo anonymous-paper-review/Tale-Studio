@@ -5,8 +5,8 @@
 // fal 전용 — gemini/tailscale provider는 webhook 미지원이라 호출자가 기존 동기 경로를 쓴다.
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
+import { requireProjectAccess } from '@/lib/api/guard'
 import {
   countFailedJobsForTarget,
   AUTO_GENERATION_GIVE_UP_THRESHOLD,
@@ -25,13 +25,6 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const user = await getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    // 멀티유저 쿼터 (Phase 3): 유저 in-flight 작업이 상한이면 429.
-    const quota = await checkUserQuota(user.id)
-    if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
-
     const { projectId, locationId, column, prompt, aspectRatio, actor, sourceHash } =
       (await req.json()) as {
         projectId?: string
@@ -42,8 +35,6 @@ export async function POST(req: Request) {
         actor?: string
         sourceHash?: string // F2: 호출자가 computeWorldImageSourceHash(prompt)로 계산해 동반 — 라우트는 DB 재조립 안 함.
       }
-    // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
-    const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
 
     if (!projectId || !locationId || !column || !prompt) {
       return NextResponse.json(
@@ -51,6 +42,16 @@ export async function POST(req: Request) {
         { status: 400 },
       )
     }
+    // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
+
+    // 멀티유저 쿼터 (Phase 3): 유저 in-flight 작업이 상한이면 429.
+    const quota = await checkUserQuota(access.userId!)
+    if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
+
+    // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
+    const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
     if (!VALID_COLUMNS.has(column)) {
       return NextResponse.json({ error: `invalid column: ${column}` }, { status: 400 })
     }
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
       prompt,
       aspectRatio: aspectRatio ?? '16:9',
       actor: jobActor,
-      userId: user.id,
+      userId: access.userId!,
       workspaceId: project.workspace_id,
       sourceHash: sourceHash ?? null,
       anchor,

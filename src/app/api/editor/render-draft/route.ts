@@ -1,14 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/supabase/auth'
+import { requireProjectAccess } from '@/lib/api/guard'
 
 export async function POST(req: Request) {
   try {
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { clipOrder, sceneId, videoClips, audioClips, audioTracks } = await req.json()
+    const { projectId, clipOrder, sceneId, videoClips, audioClips, audioTracks } = await req.json()
 
     if (!clipOrder) {
       return NextResponse.json(
@@ -16,6 +11,10 @@ export async function POST(req: Request) {
         { status: 400 },
       )
     }
+
+    // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
 
     // MVP: Return playlist metadata for client-side sequential playback
     // Real video concatenation (FFmpeg) is post-MVP

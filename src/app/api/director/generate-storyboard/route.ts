@@ -10,8 +10,8 @@
 //   러프 프레임이 없는 샷/구버전은 기존 단일 이미지 경로 그대로.
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
+import { requireProjectAccess } from '@/lib/api/guard'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { createGenerationJob } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
@@ -29,13 +29,6 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const user = await getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    // 멀티유저 쿼터 (Phase 3): 유저 in-flight 작업이 상한이면 429.
-    const quota = await checkUserQuota(user.id)
-    if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
-
     const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio } =
       (await req.json()) as {
         projectId?: string
@@ -51,6 +44,13 @@ export async function POST(req: Request) {
         { status: 400 },
       )
     }
+    // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
+
+    // 멀티유저 쿼터 (Phase 3): 유저 in-flight 작업이 상한이면 429.
+    const quota = await checkUserQuota(access.userId!)
+    if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
 
     const [{ data: project }, { data: shot }] = await Promise.all([
       supabaseAdmin
@@ -171,7 +171,7 @@ export async function POST(req: Request) {
       requestId: request_id,
       model,
       kind: 'shot_storyboard',
-      userId: user.id,
+      userId: access.userId!,
       workspaceId: project.workspace_id,
       provider: 'fal',
       inputSnapshot: {

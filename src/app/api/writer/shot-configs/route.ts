@@ -5,7 +5,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { getUser } from '@/lib/supabase/auth'
+import { requireProjectAccess } from '@/lib/api/guard'
 import { writerShotIdToMain } from '@/lib/writer/adapters'
 import {
   cameraConfigFromShotDesign,
@@ -19,9 +19,6 @@ export const runtime = 'nodejs'
 const BodySchema = z.object({ projectId: z.string().uuid() })
 
 export async function POST(req: Request) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-
   let body: unknown
   try {
     body = await req.json()
@@ -30,15 +27,11 @@ export async function POST(req: Request) {
   }
   const parsed = BodySchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'invalid body' }, { status: 400 })
-  const { projectId } = parsed.data
 
-  // 프로젝트 존재 확인 (service-role read — rough-storyboard 와 동일 게이트).
-  const { data: project } = await supabaseAdmin
-    .from('projects')
-    .select('id')
-    .eq('id', projectId)
-    .maybeSingle()
-  if (!project) return NextResponse.json({ error: 'not found' }, { status: 404 })
+  // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+  const access = await requireProjectAccess(req, parsed.data.projectId)
+  if (!access.ok) return access.response
+  const { projectId } = access
 
   const configs: Record<
     string,

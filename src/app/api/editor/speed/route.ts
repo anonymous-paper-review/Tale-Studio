@@ -1,15 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/supabase/auth'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { requireProjectAccess } from '@/lib/api/guard'
 
 export async function PATCH(req: Request) {
   try {
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { shotId, speed } = await req.json()
+    const { projectId, shotId, speed } = await req.json()
 
     if (!shotId) {
       return NextResponse.json({ error: 'shotId is required' }, { status: 400 })
@@ -22,10 +17,15 @@ export async function PATCH(req: Request) {
       )
     }
 
+    // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
+
     const { error } = await supabaseAdmin
       .from('shots')
       .update({ speed })
       .eq('shot_id', shotId)
+      .eq('project_id', access.projectId)
 
     if (error) throw error
 

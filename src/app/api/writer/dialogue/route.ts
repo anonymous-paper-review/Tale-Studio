@@ -9,7 +9,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { getUser } from '@/lib/supabase/auth'
+import { requireProjectAccess } from '@/lib/api/guard'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { getActiveRun } from '@/lib/writer/run-store'
 import { runDialogue } from '@/lib/writer/pipeline/stages/dialogue'
@@ -30,31 +30,18 @@ export async function POST(req: Request) {
     const demoBlocked = demoWriteBlock(req)
     if (demoBlocked) return demoBlocked
 
-    const user = await getUser()
-    if (!user)
-      return NextResponse.json(
-        { ok: false, error: { code: 'unauthorized', message: 'Unauthorized' } },
-        { status: 401 },
-      )
-
     const parsed = BodySchema.safeParse(await req.json().catch(() => null))
     if (!parsed.success)
       return NextResponse.json(
         { ok: false, error: { code: 'bad_request', message: parsed.error.message } },
         { status: 400 },
       )
-    const { projectId } = parsed.data
+    const { projectId: rawProjectId } = parsed.data
 
-    const { data: project } = await supabaseAdmin
-      .from('projects')
-      .select('id')
-      .eq('id', projectId)
-      .maybeSingle()
-    if (!project)
-      return NextResponse.json(
-        { ok: false, error: { code: 'not_found', message: 'project not found' } },
-        { status: 404 },
-      )
+    // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+    const access = await requireProjectAccess(req, rawProjectId)
+    if (!access.ok) return access.response
+    const { projectId } = access
 
     // 완료된 run 의 state 가 대사 입력의 진실 (scenes 감정/목적 + decoupage 샷 스토리·duration).
     const run = await getActiveRun(projectId)

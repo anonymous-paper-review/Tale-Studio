@@ -3,8 +3,8 @@
 //   수정 요청은 state._sceneRevisionNotes 에 누적돼 s3 프롬프트에 최우선 반영된다.
 import { NextResponse, after } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getUser } from '@/lib/supabase/auth'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { requireProjectAccess } from '@/lib/api/guard'
 import { getActiveRun } from '@/lib/writer/run-store'
 import { triggerWriterStep } from '@/lib/writer/pipeline/steps'
 import type { WriterRunState } from '@/lib/writer/pipeline/steps'
@@ -13,9 +13,6 @@ export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
     const body = (await req.json()) as {
       projectId?: string
       action?: 'confirm' | 'revise'
@@ -29,7 +26,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '수정 요청 내용을 입력해 주세요' }, { status: 400 })
     }
 
-    const run = await getActiveRun(projectId)
+    // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
+
+    const run = await getActiveRun(access.projectId)
     if (!run || run.status !== 'awaiting_confirmation') {
       return NextResponse.json({ error: 'no awaiting run', status: run?.status ?? null }, { status: 409 })
     }
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
     }
 
     after(async () => {
-      await triggerWriterStep(req.nextUrl.origin, projectId)
+      await triggerWriterStep(req.nextUrl.origin, access.projectId)
     })
     return NextResponse.json({ ok: true, action })
   } catch (e) {

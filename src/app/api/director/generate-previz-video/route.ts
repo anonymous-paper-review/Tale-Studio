@@ -5,7 +5,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { getUser } from '@/lib/supabase/auth'
+import { demoWriteBlock } from '@/lib/demo/guard-server'
+import { requireProjectAccess } from '@/lib/api/guard'
 import { falVideoSubmit } from '@/lib/writer/llm/fal'
 import { createGenerationJob, STALE_QUEUED_MS } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
@@ -31,19 +32,19 @@ Slow, deliberate, readable movement — this is a previsualization for judging c
 }
 
 export async function POST(req: Request) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
   try {
-    const user = await getUser()
-    if (!user)
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 },
-      )
     const parsed = BodySchema.safeParse(await req.json().catch(() => null))
     if (!parsed.success)
       return NextResponse.json({ error: parsed.error.message }, { status: 400 })
     const { projectId, writerShotId } = parsed.data
 
-    const quota = await checkUserQuota(user.id)
+    // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
+
+    const quota = await checkUserQuota(access.userId!)
     if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
 
     const [{ data: project }, { data: shot }, { data: queued }] = await Promise.all([

@@ -21,6 +21,15 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/supabase/auth', () => ({ getUser: mocks.getUser }))
+// 접근 가드는 이 파일의 관심사 아님 — 소유자 통과로 고정 (가드 자체 검증은 api-project-access-guard.test.ts 전담, #access-audit 2026-08-15)
+vi.mock('@/lib/api/guard', () => ({
+  requireProjectAccess: vi.fn(async (_req: Request, projectId: string) => ({
+    ok: true as const,
+    projectId,
+    userId: 'user-1',
+    viaShare: false,
+  })),
+}))
 vi.mock('@/lib/generation-quota', () => ({
   checkUserQuota: mocks.checkUserQuota,
   quotaExceededBody: mocks.quotaExceededBody,

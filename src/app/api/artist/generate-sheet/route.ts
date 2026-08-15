@@ -7,8 +7,8 @@
 // DB 디자인 토큰(characters.appearance/costume + projects.design_tokens)으로 프롬프트 조립.
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
+import { requireProjectAccess } from '@/lib/api/guard'
 import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
 import {
   createGenerationJob,
@@ -57,13 +57,6 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const user = await getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    // 멀티유저 쿼터 (Phase 3): 유저 in-flight 작업이 상한이면 429.
-    const quota = await checkUserQuota(user.id)
-    if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
-
     const { projectId, characterId, view, actor, instruction, safeMode } = (await req.json()) as {
       projectId?: string
       characterId?: string
@@ -72,14 +65,22 @@ export async function POST(req: Request) {
       instruction?: string // 재생성 시 유저 델타(merge) — 룩 토대 위에 덮음(AC13).
       safeMode?: boolean // 모더레이션 우회 재시도(#A) — 직전 실패가 moderation-class 인 슬롯에만 적용.
     }
-    // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
-    const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
     if (!projectId || !characterId || !view) {
       return NextResponse.json(
         { error: 'projectId, characterId, view required' },
         { status: 400 },
       )
     }
+    // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
+
+    // 멀티유저 쿼터 (Phase 3): 유저 in-flight 작업이 상한이면 429.
+    const quota = await checkUserQuota(access.userId!)
+    if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
+
+    // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
+    const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
     if (!CHARACTER_VIEW_KEYS.includes(view)) {
       return NextResponse.json({ error: `invalid view: ${view}` }, { status: 400 })
     }
@@ -253,7 +254,7 @@ export async function POST(req: Request) {
       model,
       kind: 'character_view',
       actor: jobActor,
-      userId: user.id,
+      userId: access.userId!,
       workspaceId: project.workspace_id,
       provider: 'fal',
       inputSnapshot,

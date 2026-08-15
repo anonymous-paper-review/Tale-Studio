@@ -4,8 +4,9 @@
 //   architecture §5: 차 있는 것 교체는 사람의 개별 재생성=단일 스트립). 검증: 실험 시트 통과(011fd4bd).
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getUser } from '@/lib/supabase/auth'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { demoWriteBlock } from '@/lib/demo/guard-server'
+import { requireProjectAccess } from '@/lib/api/guard'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { createGenerationJob } from '@/lib/generation-jobs'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
@@ -26,13 +27,17 @@ interface EligibleShot {
 }
 
 export async function POST(req: NextRequest) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
   try {
-    const user = await getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { projectId } = (await req.json()) as { projectId?: string }
     if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 })
 
-    const quota = await checkUserQuota(user.id)
+    // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
+
+    const quota = await checkUserQuota(access.userId!)
     if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
 
     const { data: project } = await supabaseAdmin
@@ -169,7 +174,7 @@ export async function POST(req: NextRequest) {
         requestId: request_id,
         model,
         kind: 'storyboard_real_grid',
-        userId: user.id,
+        userId: access.userId!,
         workspaceId: project.workspace_id as string,
         provider: 'fal',
         // #B9(2026-08-12): 이 경로가 최종 프레임 전량을 만드는데도 프롬프트가 어디에도 안 남아

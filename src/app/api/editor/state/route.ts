@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/supabase/auth'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { requireProjectAccess } from '@/lib/api/guard'
 
 export async function GET(req: Request) {
   try {
@@ -11,10 +11,9 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
     }
 
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
 
     const { data, error } = await supabaseAdmin
       .from('editor_states')
@@ -40,10 +39,9 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
     }
 
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
 
     const { error } = await supabaseAdmin
       .from('editor_states')

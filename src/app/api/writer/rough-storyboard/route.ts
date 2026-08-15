@@ -7,7 +7,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { getUser } from '@/lib/supabase/auth'
+import { demoWriteBlock } from '@/lib/demo/guard-server'
+import { requireProjectAccess } from '@/lib/api/guard'
 import { falImageSubmit, DEFAULT_EDIT_IMAGE_MODEL, DEFAULT_IMAGE_MODEL } from '@/lib/writer/llm/fal'
 import {
   createGenerationJob,
@@ -123,14 +124,9 @@ async function translateRoughSpecsEn(
 }
 
 export async function POST(req: Request) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
   try {
-    const user = await getUser()
-    if (!user)
-      return NextResponse.json(
-        { ok: false, error: { code: 'unauthorized', message: 'Unauthorized' } },
-        { status: 401 },
-      )
-
     const parsed = BodySchema.safeParse(await req.json().catch(() => null))
     if (!parsed.success)
       return NextResponse.json(
@@ -139,7 +135,11 @@ export async function POST(req: Request) {
       )
     const { projectId, shotIds, force, styleHints } = parsed.data
 
-    const quota = await checkUserQuota(user.id)
+    // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
+
+    const quota = await checkUserQuota(access.userId!)
     if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
 
     const { data: project } = await supabaseAdmin
