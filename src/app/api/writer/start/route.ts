@@ -13,11 +13,12 @@ import {
   triggerWriterStep,
 } from '@/lib/writer/pipeline/steps';
 import type { PipelineInput, Genre, CastContract } from '@/lib/writer/types/pipeline';
+import { isAdminOwnedProject } from '@/lib/admin';
+import { isWriterEngine, type WriterEngine } from '@/lib/writer/engine';
 import { applyProducerI18n } from '@/lib/writer/i18n/derive-en';
 import { detectLocaleFromText } from '@/lib/locale';
 import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
-import { isAdminOwnedProject } from '@/lib/admin';
-import { isWriterEngine, type WriterEngine } from '@/lib/writer/engine';
+import { parseCustomStyleAnchor } from '@/lib/style-anchor';
 
 // producer 핸드오프 배경 페이로드(원천 rich shape). writer 내부 BackgroundContract 와 분리 —
 //   locations 테이블엔 full 필드로 즉시 upsert 하고, 파이프라인엔 BackgroundContract 로 매핑해 전달한다.
@@ -202,10 +203,20 @@ export async function POST(req: NextRequest) {
     try {
       const { data: proj } = await supabaseAdmin
         .from('projects')
-        .select('style_anchor_key')
+        .select('style_anchor_key, custom_style_anchor')
         .eq('id', projectId)
         .maybeSingle();
-      if (proj?.style_anchor_key) {
+      // 유저 업로드 앵커는 style_anchors 에 행이 없다 — label/medium 을 프로젝트 행이 들고 있다.
+      //   여기서 medium 을 안 채우면 v0 가 장르에서 매체를 발명해(dark_cinematic_realism 등)
+      //   이미지 쪽 앵커와 충돌한다. 이 분기가 있는 이유가 그것이다.
+      const custom = parseCustomStyleAnchor(proj?.custom_style_anchor);
+      if (custom) {
+        styleAnchor = {
+          key: proj?.style_anchor_key ?? 'custom',
+          label: custom.label ?? undefined,
+          medium: custom.medium ?? undefined,
+        };
+      } else if (proj?.style_anchor_key) {
         const { data: row } = await supabaseAdmin
           .from('style_anchors')
           .select('key, label, medium, is_active')

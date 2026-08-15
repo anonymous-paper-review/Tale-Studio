@@ -1,0 +1,209 @@
+{
+  "purpose": "배경 참조를 3D 각도별 스냅샷 N장으로 줄 때 재방문 일관성이 사진 1장보다 서는가 — 관찰 수집(판정 없음)",
+  "ticket": "t2-bg-viewsheet-from-3d",
+  "model": "bytedance/seedance-2.0/reference-to-video",
+  "project": {
+    "id": "9d6efa6d-3216-40b0-8a2c-184ab56f02ec",
+    "title": "Sample1"
+  },
+  "location": {
+    "location_id": "location",
+    "name": "법정",
+    "wide_shot": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1786014459403"
+  },
+  "shots": [
+    {
+      "key": "sh_11_93",
+      "why": "WS · low_angle · 씬 11"
+    },
+    {
+      "key": "sh_10_76",
+      "why": "EWS · eye_level · 씬 10"
+    }
+  ],
+  "shot_selection_note": "티켓의 \"카메라가 공간을 훑는 샷 2개\" 를 그대로 적용할 수 없었다 — 이 로케이션 54샷 중 dynamic_spec(카메라 모션 계약) 보유가 0건이라 \"훑는지\" 를 판정할 데이터가 없다. 티켓이 좌표로 지목한 배경 수요 실측(\"실수요는 wide+mid, 타이트샷 제외\")에 따라 와이드 계열 11샷 중 각도가 갈리는 둘(WS/low_angle, EWS/eye_level)을 서로 다른 씬에서 골랐다. 이 대체를 결과에 명시한다.",
+  "angle_demand_source": {
+    "low_angle": 10,
+    "eye_level": 39,
+    "(없음)": 2,
+    "high_angle": 3
+  },
+  "start_clause_source": "src/lib/director/video-prompt.ts:52-57 (전제 ④ — 다장 참조 시 여는 구도 고정)",
+  "pricing_source": "fal.ai/models/bytedance/seedance-2.0 (2026-08-11 실측): 720p $0.3024/s (video input 없음)",
+  "duration_note": "클립당 5초 — 4클립을 캡 $8 안에서 뽑기 위한 선택(7초면 $8.47로 초과). 두 팔 동일.",
+  "budget_cap_usd": 8,
+  "viewsheet": {
+    "local_dir": "views_frozen/ (views/ 의 동결 사본 — 발주 중 재렌더 경합 방지)",
+    "files": [
+      "view_bench_eye.png",
+      "view_gallery_eye.png",
+      "view_room_high.png",
+      "view_wall_eye.png",
+      "view_witness_low.png"
+    ],
+    "fal_urls": [
+      "https://v3b.fal.media/files/b/0aa5f101/8wReb5ws9FpyKFfrLeI_j_view_bench_eye.png",
+      "https://v3b.fal.media/files/b/0aa5f101/r4YVdaThEl0u-HxTfB8F-_view_gallery_eye.png",
+      "https://v3b.fal.media/files/b/0aa5f102/WAU81U1m1p80HFYo61ztr_view_room_high.png",
+      "https://v3b.fal.media/files/b/0aa5f102/SU3cpeB7z-QiGf2RW_fEE_view_wall_eye.png",
+      "https://v3b.fal.media/files/b/0aa5f102/9M2xxtws7Gipv1ZeJLOWI_view_witness_low.png"
+    ],
+    "uploaded_at": "2026-08-11T18:29:41.145Z"
+  },
+  "jobs": [
+    {
+      "arm": "VIEWSHEET",
+      "shot": "sh_11_93",
+      "attempt": 1,
+      "label": "3D 각도별 스냅샷 5장",
+      "request_id": "019ff217-2fee-7e70-ac04-ed2e053bf2d8",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "model_key": "seedance",
+      "duration_seconds": 5,
+      "est_cost_usd": 1.512,
+      "rate_per_sec_usd": 0.3024,
+      "input": {
+        "prompt": "Silence reflected on a metal nameplate in the cold, emptying courtroom as people file out. The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.",
+        "duration": 5,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa5f101/8wReb5ws9FpyKFfrLeI_j_view_bench_eye.png",
+          "https://v3b.fal.media/files/b/0aa5f101/r4YVdaThEl0u-HxTfB8F-_view_gallery_eye.png",
+          "https://v3b.fal.media/files/b/0aa5f102/WAU81U1m1p80HFYo61ztr_view_room_high.png",
+          "https://v3b.fal.media/files/b/0aa5f102/SU3cpeB7z-QiGf2RW_fEE_view_wall_eye.png",
+          "https://v3b.fal.media/files/b/0aa5f102/9M2xxtws7Gipv1ZeJLOWI_view_witness_low.png"
+        ]
+      },
+      "submitted_at": "2026-08-11T18:30:29.776Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5f11b/J9lHHvQLdaFQfswfUAfL3_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/bg-viewsheet-from-3d/out_sh_11_93_viewsheet.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "duration_s": 5.062,
+        "bytes": 1857561,
+        "preview": "out_sh_11_93_viewsheet_preview.mp4",
+        "frames_tile": "frames/sh_11_93_viewsheet_tile.jpg",
+        "first_frame": "frames/sh_11_93_viewsheet_f0.jpg"
+      },
+      "confirmed_cost_usd": 1.512
+    },
+    {
+      "arm": "PHOTO1",
+      "shot": "sh_11_93",
+      "attempt": 1,
+      "label": "현행 장소 사진 1장",
+      "request_id": "019ff217-30b1-7bc3-81cd-4f67c85cffa3",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "model_key": "seedance",
+      "duration_seconds": 5,
+      "est_cost_usd": 1.512,
+      "rate_per_sec_usd": 0.3024,
+      "input": {
+        "prompt": "Silence reflected on a metal nameplate in the cold, emptying courtroom as people file out. The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.",
+        "duration": 5,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1786014459403"
+        ]
+      },
+      "submitted_at": "2026-08-11T18:30:29.971Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5f143/jnfmxsuzCBZY8p_IDOEW5_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/bg-viewsheet-from-3d/out_sh_11_93_photo1.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "duration_s": 5.062,
+        "bytes": 2021861,
+        "preview": "out_sh_11_93_photo1_preview.mp4",
+        "frames_tile": "frames/sh_11_93_photo1_tile.jpg",
+        "first_frame": "frames/sh_11_93_photo1_f0.jpg"
+      },
+      "confirmed_cost_usd": 1.512
+    },
+    {
+      "arm": "VIEWSHEET",
+      "shot": "sh_10_76",
+      "attempt": 1,
+      "label": "3D 각도별 스냅샷 5장",
+      "request_id": "019ff217-317a-77c1-99c3-7ce38cf686a1",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "model_key": "seedance",
+      "duration_seconds": 5,
+      "est_cost_usd": 1.512,
+      "rate_per_sec_usd": 0.3024,
+      "input": {
+        "prompt": "Wide shot of the extremely minimalist, cold courtroom reflected in mirror-like marble floors, creating an overwhelming atmosphere. The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.",
+        "duration": 5,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://v3b.fal.media/files/b/0aa5f101/8wReb5ws9FpyKFfrLeI_j_view_bench_eye.png",
+          "https://v3b.fal.media/files/b/0aa5f101/r4YVdaThEl0u-HxTfB8F-_view_gallery_eye.png",
+          "https://v3b.fal.media/files/b/0aa5f102/WAU81U1m1p80HFYo61ztr_view_room_high.png",
+          "https://v3b.fal.media/files/b/0aa5f102/SU3cpeB7z-QiGf2RW_fEE_view_wall_eye.png",
+          "https://v3b.fal.media/files/b/0aa5f102/9M2xxtws7Gipv1ZeJLOWI_view_witness_low.png"
+        ]
+      },
+      "submitted_at": "2026-08-11T18:30:30.173Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5f116/cQOo3TH6_KdveojPEGpga_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/bg-viewsheet-from-3d/out_sh_10_76_viewsheet.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "duration_s": 5.062,
+        "bytes": 845120,
+        "preview": "out_sh_10_76_viewsheet_preview.mp4",
+        "frames_tile": "frames/sh_10_76_viewsheet_tile.jpg",
+        "first_frame": "frames/sh_10_76_viewsheet_f0.jpg"
+      },
+      "confirmed_cost_usd": 1.512
+    },
+    {
+      "arm": "PHOTO1",
+      "shot": "sh_10_76",
+      "attempt": 1,
+      "label": "현행 장소 사진 1장",
+      "request_id": "019ff217-3243-7471-bc32-2c7e4ed9b5db",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "model_key": "seedance",
+      "duration_seconds": 5,
+      "est_cost_usd": 1.512,
+      "rate_per_sec_usd": 0.3024,
+      "input": {
+        "prompt": "Wide shot of the extremely minimalist, cold courtroom reflected in mirror-like marble floors, creating an overwhelming atmosphere. The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.",
+        "duration": 5,
+        "resolution": "720p",
+        "generate_audio": true,
+        "image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1786014459403"
+        ]
+      },
+      "submitted_at": "2026-08-11T18:30:30.372Z",
+      "done": true,
+      "video_url": "https://v3b.fal.media/files/b/0aa5f12c/Xnof3DtYtQ-mZPUT4UOj7_video.mp4",
+      "local": "/Users/xcape/projects/tale-studio/research/experiments/bg-viewsheet-from-3d/out_sh_10_76_photo1.mp4",
+      "observed_output": {
+        "width": 1280,
+        "height": 720,
+        "duration_s": 5.062,
+        "bytes": 1734925,
+        "preview": "out_sh_10_76_photo1_preview.mp4",
+        "frames_tile": "frames/sh_10_76_photo1_tile.jpg",
+        "first_frame": "frames/sh_10_76_photo1_f0.jpg"
+      },
+      "confirmed_cost_usd": 1.512
+    }
+  ],
+  "prompt_source": {
+    "sh_11_93": "shots.action_description (shots.prompt 가 비어 있음)",
+    "sh_10_76": "shots.action_description (shots.prompt 가 비어 있음)"
+  },
+  "total_cost_usd": 6.048,
+  "cost_note": "단가 = fal 모델 페이지 2026-08-11 실측(720p $0.3024/s). 요청별 청구 조회 API가 없어 비용 = 단가 × duration."
+}

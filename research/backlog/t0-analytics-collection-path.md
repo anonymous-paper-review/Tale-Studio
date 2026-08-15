@@ -3,10 +3,10 @@
 ```yaml
 id: t0-analytics-collection-path
 source: sweep:claude:e3519ae6
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 20 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — NA(수집 경로 404 → 사전 등록대로 기각 아님). 기각 조건 미발동. 핵심 걱정은 해소: 같은 구역 script.js가 200으로 통과(문턱 예외 작동), 대조 /studio는 307→/login 정상. 미확인: 실제 기록 적재(대시보드 확인은 오너 영역). 결과: research/experiments/t0-analytics-collection-path/
+status: 완료  # 2026-08-12 밤 러너 — NA(수집 경로 404 → 사전 등록대로 기각 아님). 기각 조건 미발동. 핵심 걱정은 해소: 같은 구역 script.js가 200으로 통과(문턱 예외 작동), 대조 /studio는 307→/login 정상. 미확인: 실제 기록 적재(대시보드 확인은 오너 영역). 결과: research/experiments/t0-analytics-collection-path/
 priority: normal
 ```
 

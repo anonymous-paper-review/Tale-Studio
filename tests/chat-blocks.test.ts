@@ -4,6 +4,8 @@ import {
   buildChatBlocks,
   handoffMarker,
   parseHandoffMarker,
+  parseAttachmentMarker,
+  withAttachmentMarker,
 } from '@/lib/chat-blocks'
 
 // #oiioii-chat — 채팅 렌더 분류 기준.
@@ -98,5 +100,45 @@ describe('handoff 마커 (⇄, #oiioii-handoff)', () => {
     ])
     expect(blocks.map((b) => b.kind)).toEqual(['handoff', 'text'])
     expect(blocks.map((b) => b.showRolePlate)).toEqual([false, true])
+  })
+})
+
+describe('첨부 마커', () => {
+  const A = 'https://cdn.test/media/a.jpg'
+  const B = 'https://cdn.test/media/b.png'
+
+  it('왕복해도 본문이 보존된다', () => {
+    const marked = withAttachmentMarker('이 그림체로 가줘', [A, B])
+    expect(parseAttachmentMarker(marked)).toEqual({ text: '이 그림체로 가줘', urls: [A, B] })
+  })
+
+  it('첨부가 없으면 본문을 건드리지 않는다', () => {
+    expect(withAttachmentMarker('그냥 텍스트', [])).toBe('그냥 텍스트')
+    expect(parseAttachmentMarker('그냥 텍스트')).toEqual({ text: '그냥 텍스트', urls: [] })
+  })
+
+  it('본문 없이 첨부만 보낸 경우도 처리한다', () => {
+    const marked = withAttachmentMarker('', [A])
+    expect(parseAttachmentMarker(marked)).toEqual({ text: '', urls: [A] })
+  })
+
+  it('여러 줄 본문의 마지막 줄만 마커로 본다', () => {
+    const marked = withAttachmentMarker('첫 줄\n둘째 줄', [A])
+    expect(parseAttachmentMarker(marked).text).toBe('첫 줄\n둘째 줄')
+  })
+
+  it('사용자가 직접 친 📎 는 마커로 오인하지 않는다', () => {
+    const typed = '📎 이거 첨부 아이콘이야'
+    expect(parseAttachmentMarker(typed)).toEqual({ text: typed, urls: [] })
+  })
+
+  it('URL 이 아닌 토큰이 섞이면 마커가 아니다', () => {
+    const bogus = `본문\n\n📎 ${A} 그리고뭔가`
+    expect(parseAttachmentMarker(bogus).urls).toEqual([])
+  })
+
+  it('마커가 붙어도 user 로 분류된다 (상태 행으로 새지 않는다)', () => {
+    const marked = withAttachmentMarker('웹툰 올렸어', [A])
+    expect(classifyChatMessage({ role: 'user', content: marked })).toBe('user')
   })
 })

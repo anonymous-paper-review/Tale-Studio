@@ -19,7 +19,7 @@ import {
   type GenerationJobActor,
 } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
-import { resolveWebhookUrl, resolveWebhookBaseUrl } from '@/lib/fal/webhook-url'
+import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import {
   buildCharacterMainPrompt,
   buildCharacterTurnaroundPrompt,
@@ -34,7 +34,8 @@ import {
 } from '@/types/asset'
 import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
-import { applyStyleAnchor, resolveStyleAnchorByKey } from '@/lib/style-anchor'
+import { applyStyleAnchor, resolveStyleAnchor } from '@/lib/style-anchor'
+import { templateAssetUrl } from '@/lib/storage/template-asset'
 
 export const runtime = 'nodejs'
 // submit만 하고 끝 — 실제 생성은 fal 큐에서 진행, 완료는 webhook(/poll reconcile)이 처리.
@@ -123,7 +124,7 @@ export async function POST(req: Request) {
     const [{ data: project }, { data: character }] = await Promise.all([
       supabaseAdmin
         .from('projects')
-        .select('workspace_id, design_tokens, style_anchor_key')
+        .select('workspace_id, design_tokens, style_anchor_key, custom_style_anchor')
         .eq('id', projectId)
         .single(),
       supabaseAdmin
@@ -135,7 +136,7 @@ export async function POST(req: Request) {
     ])
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
     if (!character) return NextResponse.json({ error: 'character not found' }, { status: 404 })
-    const anchor = await resolveStyleAnchorByKey(project.style_anchor_key)
+    const anchor = await resolveStyleAnchor(project)
 
     const dt = (project.design_tokens ?? {}) as DesignTokens
     const palette = [dt.palette?.primary, dt.palette?.secondary, dt.palette?.accent].filter(
@@ -169,10 +170,10 @@ export async function POST(req: Request) {
     if (view === 'main') {
       const isPerson = character.entity_type !== 'object'
       if (isPerson) {
-        // 사람 = 턴어라운드 시트: 캐릭터 모델시트 템플릿(public asset)을 reference 로 넣어 그 레이아웃에
-        //   캐릭터를 채우는 I2I(edit). fal 이 fetch 가능한 public URL 필요 → base 없으면(로컬) T2I 폴백. (#7)
-        const base = resolveWebhookBaseUrl()
-        const templateUrl = base ? `${base}/character-template.png` : null
+        // 사람 = 턴어라운드 시트: 캐릭터 모델시트 템플릿을 reference 로 넣어 그 레이아웃에
+        //   캐릭터를 채우는 I2I(edit). 템플릿은 스토리지에서 온다 — 앱 public URL(터널)에 걸면
+        //   터널이 죽을 때 fal 이 못 받아 전량 실패한다(template-asset.ts). 업로드 실패 시만 T2I 폴백.
+        const templateUrl = await templateAssetUrl('character-template.png')
         if (templateUrl) {
           styleAnchorMode = 'turnaround'
           submitOpts = {

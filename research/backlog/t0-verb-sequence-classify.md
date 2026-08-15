@@ -1,10 +1,10 @@
 ```yaml
 id: t0-verb-sequence-classify
 source: 2026-08-11 낮 세션 실측 (v4 산출 16런 전수 — 동사 문자열 917개 중 복합 표현 67개=7%) · 오너 질문 "writer에 순서를 넣을 수 있나"
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — 유보(순차 67.8% = 사전 등록 50~70% 구간). 기각도 승격도 아님. 코퍼스 확대됨(26파일/동사1956/복합90). 단서: 분류기가 unknown을 0건 써서 순차 쪽 과대 가능 — 처방은 "표본 확대"가 아니라 "분류 방식 개선". 지출 모델 1콜(~$0.02). 결과: research/experiments/t0-verb-sequence-classify/
+status: 완료  # 2026-08-12 밤 러너 — 유보(순차 67.8% = 사전 등록 50~70% 구간). 기각도 승격도 아님. 코퍼스 확대됨(26파일/동사1956/복합90). 단서: 분류기가 unknown을 0건 써서 순차 쪽 과대 가능 — 처방은 "표본 확대"가 아니라 "분류 방식 개선". 지출 모델 1콜(~$0.02). 결과: research/experiments/t0-verb-sequence-classify/
 priority: normal
 ```
 

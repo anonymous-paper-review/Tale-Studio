@@ -1,0 +1,242 @@
+[
+  {
+    "작업": "writer_test_260811",
+    "갱신": "2026-08-11",
+    "컷": "sh_01_01",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "The girl descends into a dust-filled underground borehole cluster zone, beams of light falling from above illuminating her.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Japanese anime style wide shot, angular lineart, 7.5:1 body ratio. A teenage girl in a weathered tan face wrap, burlap vest, and cargo pants descends into a dark underground wellfield shaft cluster. Vertical beams of dusty sunlight pierce through industrial grates, illuminating a geometric grid of giant rusted steel pipes, crusted white salt crystals, and dry cracked mud floor. Desaturated brown #A67C52 and cold slate gray #2D3748 palette, high contrast hard shadows."
+  },
+  {
+    "작업": "writer_test_260811",
+    "갱신": "2026-08-11",
+    "컷": "sh_01_02",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "The girl kneels and runs her fingertips across white salt crystals and dried mud caked on the surface of a rusted steel pipe floor.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Japanese anime style medium shot. The girl in tan desert wraps and leather armguards kneels on one knee on a cracked mud floor. She extends her hand toward white salt crystals caked on the base of a massive rusted steel well casing. Dusty underground ambient light from above, crisp angular shadows, dry brownish earth tones #A67C52 and deep slate blue background #2D3748."
+  },
+  {
+    "작업": "writer_test_260811",
+    "갱신": "2026-08-11",
+    "컷": "sh_01_03",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "The girl presses her ear against a pipe still faintly vibrating, focusing all her senses on the sound of groundwater flowing within.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Japanese anime style medium close-up shot. Profile view of the girl leaning her head sideways, resting her ear firmly against a heavy rusted iron pipe. Her expression is focused and tense, face cowl pulled slightly down. Hard dramatic side light accentuates her sharp facial features and the rough iron texture. Cool metallic tones #2D3748 contrasting with earth warm tan #A67C52."
+  },
+  {
+    "작업": "writer_test_260810",
+    "갱신": "2026-08-10",
+    "컷": "sh_01_01",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "A wide, distant shot reveals a vast forest of enormous buildings engulfed in a sandstorm, with a panoramic view of a desolate, ruined city stretching across the frame.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "An extreme wide shot of a skeletal urban landscape. Massive angular skyscrapers pierce a thick sepia dust cloud. The ground is covered in deep sand dunes with rusted iron rebar and concrete debris in the foreground. Harsh vertical sunlight creates deep, sharp shadows. Gritty industrial noir style with weathered photorealistic textures."
+  },
+  {
+    "작업": "writer_test_260810",
+    "갱신": "2026-08-10",
+    "컷": "sh_01_02",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "A full-body shot shows a girl staggering through the sandstorm, weaving between the massive wreckage of collapsed buildings.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "A wide shot of a girl in layered burlap rags staggering through a debris-filled wasteland. She is small against the backdrop of a massive rusted drainage turbine. Sand swirls around her feet. Low angle shot emphasizing the oppressive environment. Gritty textures on her weathered leather harness."
+  },
+  {
+    "작업": "writer_test_260810",
+    "갱신": "2026-08-10",
+    "컷": "sh_01_03",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "The girl adjusts her dust-caked goggles and scans the surrounding ruins with a sharp, piercing gaze.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Medium close-up of a young girl's face covered in fine dust. She wears scavenged industrial goggles with a cracked lens. Her eyes scan the environment with sharp focus. Shallow depth of field with a blurred industrial background. Hard side lighting creates strong highlights on her weathered skin."
+  },
+  {
+    "작업": "Sample2 (previz 재생성 2)",
+    "갱신": "2026-08-09",
+    "컷": "sh_01_01",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "In a desolate ruin, a girl grips a metal object buried deep in the sand and pulls it with all her strength.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "A wide shot of a post-apocalyptic desert graveyard. A teenage girl in layered burlap wraps strains to pull a rusted metal piece from a massive sand dune. In the background, skeletal high-rise remains are visible through a thick sandstorm haze. Photorealistic textures of rust and fine grit, soft 3500K lighting, 16:9 format."
+  },
+  {
+    "작업": "Sample2 (previz 재생성 2)",
+    "갱신": "2026-08-09",
+    "컷": "sh_01_02",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "After brushing off the dust, a dented tin can is revealed. The girl exhales a ragged breath mixed with exhausted disappointment.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Close-up of a dented, rusted tin can held by dirty, weathered hands. The girl's thumbs are poised to wipe away the thick layer of silt. The background is a soft-focus blur of golden-brown sand. Detailed skin textures and flaking rust, soft natural lighting."
+  },
+  {
+    "작업": "Sample2 (previz 재생성 2)",
+    "갱신": "2026-08-09",
+    "컷": "sh_01_03",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "소녀가 몸을 일으켜 지평선 너머 아스라히 보이는 푸른 오아시스 왕국을 물끄러미 바라본다.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Medium full shot from behind the girl as she stands on a sand dune. Her silhouette is framed against a vast horizon where a shimmering, lush green oasis kingdom is visible in the far distance. The desert ruins from previous shots are visible in the midground. Heat waves distort the air."
+  },
+  {
+    "작업": "Sample1",
+    "갱신": "2026-08-09",
+    "컷": "sh_01_01",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "Wide shot of a dust-filled office interior; light streams through broken windows across the space.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Cinematic wide shot of a desolate, dusty office. Hard sunlight streams through a broken window, creating sharp shadows and illuminating thick dust motes. Cho Seung-woo, a 30s male in a dark navy suit, stands small in the center. The room is filled with concrete debris and rusted metal cabinets. Deep blue and gray color palette."
+  },
+  {
+    "작업": "Sample1",
+    "갱신": "2026-08-09",
+    "컷": "sh_01_02",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "Cho Seung-woo wrenches open a dust-coated filing cabinet.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Medium shot of Cho Seung-woo in a dark navy suit reaching for a rusted metal filing cabinet. His hand is close to the handle, leaving fingerprints in the thick dust. The background shows a cold concrete wall with hard shadows. Cinematic lighting with a 3:1 ratio."
+  },
+  {
+    "작업": "Sample1",
+    "갱신": "2026-08-09",
+    "컷": "sh_01_03",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "Close on Cho Seung-woo's focused eyes as he flips through a stack of documents, cross-referencing numbers.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Medium close-up of Cho Seung-woo's face. His sharp eyes are focused intensely on documents below the frame. Hard side lighting emphasizes his furrowed brow and serious expression. The background is a dark, out-of-focus office space. Cinematic realism."
+  },
+  {
+    "작업": "writer_test_260805_7 (previz 재생성)",
+    "갱신": "2026-08-07",
+    "컷": "sh_01_01",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "In a desolate ruin, a girl grips a metal object buried deep in the sand and pulls it with all her strength.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "A wide shot of a post-apocalyptic desert graveyard. A teenage girl in layered burlap wraps strains to pull a rusted metal piece from a massive sand dune. In the background, skeletal high-rise remains are visible through a thick sandstorm haze. Photorealistic textures of rust and fine grit, soft 3500K lighting, 16:9 format."
+  },
+  {
+    "작업": "writer_test_260805_7 (previz 재생성)",
+    "갱신": "2026-08-07",
+    "컷": "sh_01_02",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "After brushing off the dust, a dented tin can is revealed. The girl exhales a ragged breath mixed with exhausted disappointment.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Close-up of a dented, rusted tin can held by dirty, weathered hands. The girl's thumbs are poised to wipe away the thick layer of silt. The background is a soft-focus blur of golden-brown sand. Detailed skin textures and flaking rust, soft natural lighting."
+  },
+  {
+    "작업": "writer_test_260805_7 (previz 재생성)",
+    "갱신": "2026-08-07",
+    "컷": "sh_01_03",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "The girl rises to her feet and stares silently at a faint blue oasis kingdom barely visible beyond the horizon.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Medium full shot from behind the girl as she stands on a sand dune. Her silhouette is framed against a vast horizon where a shimmering, lush green oasis kingdom is visible in the far distance. The desert ruins from previous shots are visible in the midground. Heat waves distort the air."
+  },
+  {
+    "작업": "Upload_test",
+    "갱신": "2026-08-07",
+    "컷": "sh_01_01",
+    "shots.prompt(생성 프롬프트)": "A wide shot of a minimalist meeting room with stark white walls and sharp 90-degree angles. Fluorescent panels on the high ceiling cast hard, cool light. Three characters are seated around a sleek table. The atmosphere is professional and cold, with a palette of whites and deep charcoals. Laptops are open on the table.",
+    "폴백으로 대신 쓰이는 값(action_description)": "Wide shot of a cold, sharp-edged white conference room bathed in harsh fluorescent light.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "A wide shot of a minimalist meeting room with stark white walls and sharp 90-degree angles. Fluorescent panels on the high ceiling cast hard, cool light. Three characters are seated around a sleek table. The atmosphere is professional and cold, with a palette of whites and deep charcoals. Laptops are open on the table."
+  },
+  {
+    "작업": "Upload_test",
+    "갱신": "2026-08-07",
+    "컷": "sh_01_02",
+    "shots.prompt(생성 프롬프트)": "A medium shot of three ultra-slim laptops lined up on a white, angular table. The screens are glowing with digital interfaces, casting a subtle blue light. The background is a minimalist, white-walled room. The composition is clean and symmetrical, emphasizing a rigid grid-based layout.",
+    "폴백으로 대신 쓰이는 값(action_description)": "Camera pans across three laptops placed side by side on the table, their screens glowing.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "A medium shot of three ultra-slim laptops lined up on a white, angular table. The screens are glowing with digital interfaces, casting a subtle blue light. The background is a minimalist, white-walled room. The composition is clean and symmetrical, emphasizing a rigid grid-based layout."
+  },
+  {
+    "작업": "Upload_test",
+    "갱신": "2026-08-07",
+    "컷": "sh_01_03",
+    "shots.prompt(생성 프롬프트)": "A medium close-up of Dae-won, a 50-year-old man with silver glasses and a crisp white shirt. He is staring intensely at a screen just out of frame. The lighting is hard and cool, coming from above. The background is a plain, flat-textured white wall. He is leaning forward with a serious expression.",
+    "폴백으로 대신 쓰이는 값(action_description)": "Daewon adjusts his glasses and stares intently at a Notion document on his screen.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "A medium close-up of Dae-won, a 50-year-old man with silver glasses and a crisp white shirt. He is staring intensely at a screen just out of frame. The lighting is hard and cool, coming from above. The background is a plain, flat-textured white wall. He is leaning forward with a serious expression."
+  },
+  {
+    "작업": "writer_test_260805_7 (viz 테스트)",
+    "갱신": "2026-08-07",
+    "컷": "sh_01_01",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "In a desolate ruin, a girl grips a metal object buried deep in the sand and pulls it with all her strength.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "A wide shot of a post-apocalyptic desert graveyard. A teenage girl in layered burlap wraps strains to pull a rusted metal piece from a massive sand dune. In the background, skeletal high-rise remains are visible through a thick sandstorm haze. Photorealistic textures of rust and fine grit, soft 3500K lighting, 16:9 format."
+  },
+  {
+    "작업": "writer_test_260805_7 (viz 테스트)",
+    "갱신": "2026-08-07",
+    "컷": "sh_01_02",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "After brushing off the dust, a dented tin can is revealed. The girl exhales a ragged breath mixed with exhausted disappointment.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Close-up of a dented, rusted tin can held by dirty, weathered hands. The girl's thumbs are poised to wipe away the thick layer of silt. The background is a soft-focus blur of golden-brown sand. Detailed skin textures and flaking rust, soft natural lighting."
+  },
+  {
+    "작업": "writer_test_260805_7 (viz 테스트)",
+    "갱신": "2026-08-07",
+    "컷": "sh_01_03",
+    "shots.prompt(생성 프롬프트)": "(빈 문자열)",
+    "폴백으로 대신 쓰이는 값(action_description)": "The girl rises to her feet and stares silently at a faint blue oasis kingdom barely visible beyond the horizon.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Medium full shot from behind the girl as she stands on a sand dune. Her silhouette is framed against a vast horizon where a shimmering, lush green oasis kingdom is visible in the far distance. The desert ruins from previous shots are visible in the midground. Heat waves distort the air."
+  },
+  {
+    "작업": "[실험] 풀런 프로파일 2026-08-11",
+    "갱신": "2026-08-06",
+    "컷": "sh_01_01",
+    "shots.prompt(생성 프롬프트)": "A wide shot of a dark boy's bedroom at midnight, bathed in crisp silver moonlight from a large window. A teenage boy in a dark indigo hoodie stands motionless next to a heavy metal telescope on a tripod. Photorealistic live action style, clean lines, high contrast dark lighting.",
+    "폴백으로 대신 쓰이는 값(action_description)": "In a quiet room filled with cold moonlight, Jerni stands beside a telescope at the window.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "A wide shot of a dark boy's bedroom at midnight, bathed in crisp silver moonlight from a large window. A teenage boy in a dark indigo hoodie stands motionless next to a heavy metal telescope on a tripod. Photorealistic live action style, clean lines, high contrast dark lighting."
+  },
+  {
+    "작업": "[실험] 풀런 프로파일 2026-08-11",
+    "갱신": "2026-08-06",
+    "컷": "sh_01_02",
+    "shots.prompt(생성 프롬프트)": "A medium close-up profile shot of Journey, a teenage boy in a dark indigo hoodie, leaning his head forward toward the metallic eyepiece of a heavy telescope. Cold silver moonlight catches his profile in a dark bedroom setting.",
+    "폴백으로 대신 쓰이는 값(action_description)": "Jerni bends down and presses her eye to the telescope eyepiece.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "A medium close-up profile shot of Journey, a teenage boy in a dark indigo hoodie, leaning his head forward toward the metallic eyepiece of a heavy telescope. Cold silver moonlight catches his profile in a dark bedroom setting."
+  },
+  {
+    "작업": "[실험] 풀런 프로파일 2026-08-11",
+    "갱신": "2026-08-06",
+    "컷": "sh_01_03",
+    "shots.prompt(생성 프롬프트)": "A point-of-view circular frame through a high-powered telescope lens displaying the bright silver lunar surface, featuring highly detailed craters and dark plains against black space.",
+    "폴백으로 대신 쓰이는 값(action_description)": "Through the telescope lens, the craters on the lunar surface sharpen as the focus is finely adjusted.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "A point-of-view circular frame through a high-powered telescope lens displaying the bright silver lunar surface, featuring highly detailed craters and dark plains against black space."
+  },
+  {
+    "작업": "[실험] 풀런 프로파일 2026-08-10",
+    "갱신": "2026-08-06",
+    "컷": "sh_01_01",
+    "shots.prompt(생성 프롬프트)": "A wide shot of a cluttered, angular bedroom at night. A young boy in a hoodie stands as a silhouette against a massive brass telescope. Cold blue moonlight streams through a window on the right, while a warm amber lamp glows on the left. Star charts are scattered across the floor and walls.",
+    "폴백으로 대신 쓰이는 값(action_description)": "밤의 침실 전경. 거대한 망원경 옆에 실루엣으로 서 있는 져니의 모습이 보인다.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "A wide shot of a cluttered, angular bedroom at night. A young boy in a hoodie stands as a silhouette against a massive brass telescope. Cold blue moonlight streams through a window on the right, while a warm amber lamp glows on the left. Star charts are scattered across the floor and walls."
+  },
+  {
+    "작업": "[실험] 풀런 프로파일 2026-08-10",
+    "갱신": "2026-08-06",
+    "컷": "sh_01_02",
+    "shots.prompt(생성 프롬프트)": "Medium shot of Journey in his amber hoodie, leaning into a brass telescope. His eye is pressed to the eyepiece. The background shows the sharp lines of a bookshelf filled with star charts. Cold blue light hits his face from the side.",
+    "폴백으로 대신 쓰이는 값(action_description)": "져니가 집중한 표정으로 망원경 렌즈에 눈을 바짝 밀착한다.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Medium shot of Journey in his amber hoodie, leaning into a brass telescope. His eye is pressed to the eyepiece. The background shows the sharp lines of a bookshelf filled with star charts. Cold blue light hits his face from the side."
+  },
+  {
+    "작업": "[실험] 풀런 프로파일 2026-08-10",
+    "갱신": "2026-08-06",
+    "컷": "sh_01_03",
+    "shots.prompt(생성 프롬프트)": "Extreme close-up of a hand drawing a meticulous lunar map on a notepad. The pencil lead creates sharp, dark lines of craters. The paper texture is visible under a warm lamp light. The background is a blurred desk surface.",
+    "폴백으로 대신 쓰이는 값(action_description)": "노트 위에 달의 위상을 정교하게 그려나가는 연필 끝의 움직임.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Extreme close-up of a hand drawing a meticulous lunar map on a notepad. The pencil lead creates sharp, dark lines of craters. The paper texture is visible under a warm lamp light. The background is a blurred desk surface."
+  },
+  {
+    "작업": "[실험] 풀런 프로파일 2026-08-10",
+    "갱신": "2026-08-06",
+    "컷": "sh_01_01",
+    "shots.prompt(생성 프롬프트)": "A wide shot of a dark room at night. A large angular telescope is silhouetted against a window with cold blue moonlight. On the left, a desk lamp casts a soft orange glow. A boy in a navy hoodie stands by the telescope, his eye pressed to the lens. Photorealistic, cinematic lighting, high contrast.",
+    "폴백으로 대신 쓰이는 값(action_description)": "A massive telescope silhouette stands motionless in a room where sharp blue moonlight contrasts with the warm glow of a desk lamp.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "A wide shot of a dark room at night. A large angular telescope is silhouetted against a window with cold blue moonlight. On the left, a desk lamp casts a soft orange glow. A boy in a navy hoodie stands by the telescope, his eye pressed to the lens. Photorealistic, cinematic lighting, high contrast."
+  },
+  {
+    "작업": "[실험] 풀런 프로파일 2026-08-10",
+    "갱신": "2026-08-06",
+    "컷": "sh_01_02",
+    "shots.prompt(생성 프롬프트)": "Medium close-up of a boy's face, Journey, with his eye pressed tightly against a telescope eyepiece. The lighting is dim, with a cool highlight on his cheek. His expression is one of deep concentration. Photorealistic, shallow depth of field.",
+    "폴백으로 대신 쓰이는 값(action_description)": "Journey carefully presses her eye close against the telescope eyepiece.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Medium close-up of a boy's face, Journey, with his eye pressed tightly against a telescope eyepiece. The lighting is dim, with a cool highlight on his cheek. His expression is one of deep concentration. Photorealistic, shallow depth of field."
+  },
+  {
+    "작업": "[실험] 풀런 프로파일 2026-08-10",
+    "갱신": "2026-08-06",
+    "컷": "sh_01_03",
+    "shots.prompt(생성 프롬프트)": "Extreme close-up of the moon's surface as seen through a telescope. The lunar craters are sharp and detailed against the black void of space. The lighting is harsh and direct, creating deep shadows in the craters. Cinematic, photorealistic.",
+    "폴백으로 대신 쓰이는 값(action_description)": "Through the telescope lens, the quiet, desolate surface of the moon fills the frame with craters.",
+    "static_spec.first_frame_prompt(같은 자리 원재료)": "Extreme close-up of the moon's surface as seen through a telescope. The lunar craters are sharp and detailed against the black void of space. The lighting is harsh and direct, creating deep shadows in the craters. Cinematic, photorealistic."
+  }
+]

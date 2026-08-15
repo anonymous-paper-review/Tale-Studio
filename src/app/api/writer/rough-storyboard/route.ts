@@ -15,7 +15,7 @@ import {
   STALE_QUEUED_MS,
 } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
-import { resolveWebhookUrl, resolveWebhookBaseUrl } from '@/lib/fal/webhook-url'
+import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { type RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
 // L4(shotDesign) state 로더 — 공용 lib(#motion-contract): 비디오 라우트와 공유.
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
@@ -28,6 +28,7 @@ import {
   STRIP_TEMPLATE_PATH,
   type RoughGridVariant,
 } from '@/lib/writer/rough-storyboard-grid'
+import { templateAssetUrl } from '@/lib/storage/template-asset'
 import { parseCheckConstraints } from '@/lib/writer/check-notes'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 
@@ -361,9 +362,10 @@ export async function POST(req: Request) {
     //   (모델이 시트째 그림 — crop 비례 좌표가 근사라 dev 전용 저품질 경로. 프로덕션은 항상 edit).
     //   klein 전용 장치(seed 톤 고정·safeMode 프롬프트 축약·llm_rewrite)는 폐기 — instruction 모델이라
     //   불필요. give-up 게이트(반복 실패 자율 재생성 중단)는 위 선별에서 그대로 작동.
-    const baseUrl = resolveWebhookBaseUrl()
+    // 템플릿은 앱 public URL(터널)이 아니라 스토리지에서 제공한다 — 터널이 죽으면 fal 이
+    //   422 file_download_error 로 전량 실패하던 경로(2026-08-13). 자세한 이유는 template-asset.ts.
     const templatePath = gridVariant === 'grid4' ? GRID_TEMPLATE_PATH : STRIP_TEMPLATE_PATH
-    const templateUrl = baseUrl ? `${baseUrl}${templatePath}` : null
+    const templateUrl = await templateAssetUrl(templatePath.replace(/^\//, ''))
     const webhookUrl = resolveWebhookUrl()
 
     for (const chunk of cappedChunks) {

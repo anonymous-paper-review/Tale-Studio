@@ -3,10 +3,10 @@
 ```yaml
 id: t0-constraint-target-routing-effect
 source: sweep:gjc:019fef12
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — 가설 유지(커밋 이후 런 1건, 노트 12건 전부 visual·게이트 누출 0·프롬프트 누출 0). 기각 조건 미발동. 반쪽 확인: 그 런에 text/report_only 분류가 0건이라 "골라내는 동작" 자체는 미목격. 정직 보고: 1차 키워드 판별이 전건 오탐(시각 제약의 영어 대명사) → 분류 필드 대조로 교체. 결과: research/experiments/t0-constraint-target-routing-effect/
+status: 완료  # 2026-08-12 밤 러너 — 가설 유지(커밋 이후 런 1건, 노트 12건 전부 visual·게이트 누출 0·프롬프트 누출 0). 기각 조건 미발동. 반쪽 확인: 그 런에 text/report_only 분류가 0건이라 "골라내는 동작" 자체는 미목격. 정직 보고: 1차 키워드 판별이 전건 오탐(시각 제약의 영어 대명사) → 분류 필드 대조로 교체. 결과: research/experiments/t0-constraint-target-routing-effect/
 priority: normal
 ```
 

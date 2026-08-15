@@ -7,6 +7,8 @@ import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 import { parseChatChoices } from '@/lib/chat-choices'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
+import { sanitizeAttachmentUrls } from '@/lib/upload/attachment'
+import { listStyleAnchorMediums } from '@/lib/style-anchor'
 
 interface ChatMessage {
   role: 'user' | 'model'
@@ -46,7 +48,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { message, history, currentSettings, currentCast, currentBackgrounds, storyText, gate } = await req.json()
+    const {
+      message,
+      history,
+      currentSettings,
+      currentCast,
+      currentBackgrounds,
+      storyText,
+      gate,
+      attachmentImageUrls,
+    } = await req.json()
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -55,9 +66,29 @@ export async function POST(req: Request) {
       )
     }
 
+    // #p1-attach: 첨부 이미지는 URL 로 넘어간다 — Anthropic 이 직접 가져가므로 화이트리스트
+    //   검증이 필수다(임의 주소를 대신 가져오게 시키는 걸 막는다).
+    const attachments = sanitizeAttachmentUrls(attachmentImageUrls)
+
     const contextParts: string[] = []
     if (storyText) {
       contextParts.push(`[Current Story Text]\n${storyText}`)
+    }
+    if (attachments.urls.length > 0) {
+      // 모델이 고를 medium 후보 — 저장 라우트가 검증에 쓰는 목록과 같은 출처여야 한다.
+      //   이미지가 붙은 턴에서만 조회한다(평소 채팅에 DB 왕복을 더하지 않는다).
+      const mediums = await listStyleAnchorMediums()
+      if (mediums.length > 0) {
+        contextParts.push(`[Allowed Style Mediums]\n${mediums.join(', ')}`)
+      }
+      // 슬라이스는 위→아래 순서로 붙는다. 이 순서를 모르면 모델이 컷 순서를 뒤섞는다.
+      contextParts.push(
+        `[Attached Images]\n${attachments.urls.length} image(s) are attached to this message, in reading order (top to bottom for sliced vertical strips such as webtoon episodes). Read any speech bubbles, captions and on-image text as part of the content.${
+          attachments.truncated
+            ? ' NOTE: the attachment list was truncated — later parts of the material are missing, so do not claim the story is complete.'
+            : ''
+        }`,
+      )
     }
     if (currentSettings) {
       contextParts.push(
@@ -126,7 +157,7 @@ export async function POST(req: Request) {
       0.7,
       'chat',
       // #p4-websearch: producer 는 오마쥬/레퍼런스 요청의 진입점 — 실제 작품 검색으로 접지.
-      { webSearch: true },
+      { webSearch: true, imageUrls: attachments.urls },
     )
 
     const { reply: replyRaw, extractedSettings } = parseExtractedSettings(text)

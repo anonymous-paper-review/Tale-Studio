@@ -3,10 +3,10 @@
 ```yaml
 id: t0-shotcheck-issue-volume-correlation
 source: sweep:claude:62428d65
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 50 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — 가설 유지(잠정). 유효 n=10, 피어슨 지적 0.946/0.918 > 샷수 0.561. 기각 조건 미발동. 흠: 강한 두 점이 씬별 팬아웃 실행(호출 수 교락), 제외 시 n=7로 하한 미달. 결과: research/experiments/t0-shotcheck-issue-volume-correlation/
+status: 완료  # 2026-08-12 밤 러너 — 가설 유지(잠정). 유효 n=10, 피어슨 지적 0.946/0.918 > 샷수 0.561. 기각 조건 미발동. 흠: 강한 두 점이 씬별 팬아웃 실행(호출 수 교락), 제외 시 n=7로 하한 미달. 결과: research/experiments/t0-shotcheck-issue-volume-correlation/
 priority: high
 ```
 

@@ -70,7 +70,7 @@ export function WriterV2Preview({ projectId }: { projectId: string }) {
             <Badge variant="outline">V2 의미 단위 실험</Badge>
             <Badge variant="secondary">관리자 전용</Badge>
             <span className="text-sm text-muted-foreground">
-              현재는 프리비즈 비교용 결과이며, 기존 에셋·영상 파이프라인에는 자동 반영하지 않습니다.
+              자동 반영하지 않으며, User Review 승인 후 적용하면 Artist·Director가 이 결과를 읽습니다.
             </span>
           </div>
 

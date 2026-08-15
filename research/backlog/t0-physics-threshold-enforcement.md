@@ -3,10 +3,10 @@
 ```yaml
 id: t0-physics-threshold-enforcement
 source: sweep:claude:62428d65
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — 가설 유지(코드 강제 1/8 = 12.5% < 기각선 50%). 기각 조건 미발동. 유일한 강제(10초 상한)마저 정본 상수를 안 읽고 숫자를 복제(persist_manifest:63 / duration_reallocation:19). 정직 보고: 자동 탐지 2패스가 각각 과소·과대(전건 오탐)라 사람 대조로 확정. 결과: research/experiments/t0-physics-threshold-enforcement/
+status: 완료  # 2026-08-12 밤 러너 — 가설 유지(코드 강제 1/8 = 12.5% < 기각선 50%). 기각 조건 미발동. 유일한 강제(10초 상한)마저 정본 상수를 안 읽고 숫자를 복제(persist_manifest:63 / duration_reallocation:19). 정직 보고: 자동 탐지 2패스가 각각 과소·과대(전건 오탐)라 사람 대조로 확정. 결과: research/experiments/t0-physics-threshold-enforcement/
 priority: normal
 ```
 

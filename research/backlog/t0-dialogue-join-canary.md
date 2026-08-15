@@ -3,10 +3,10 @@
 ```yaml
 id: t0-dialogue-join-canary
 source: sweep:claude:62428d65   # 스위퍼 분해 — 사람 심사 미경유
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — 가설 유지(픽스 이후 런 3건 중 분할 2건, 불일치 라인 0 / 저장 대조도 0). 기각 조건 미발동. 모집단은 전부 개발용 프로젝트라 사거리 제한 명시. 결과: research/experiments/t0-dialogue-join-canary/
+status: 완료  # 2026-08-12 밤 러너 — 가설 유지(픽스 이후 런 3건 중 분할 2건, 불일치 라인 0 / 저장 대조도 0). 기각 조건 미발동. 모집단은 전부 개발용 프로젝트라 사거리 제한 명시. 결과: research/experiments/t0-dialogue-join-canary/
 priority: high
 ```
 

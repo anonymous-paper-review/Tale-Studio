@@ -1,10 +1,10 @@
 ```yaml
 id: t0-dynamic-spec-enum-audit
 source: .claude/vault/2026-08-10-prompt-contract-audit.md §3 잔가지 (dynamic_spec enum 무검증 통과)
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 30 }
 blockers: []
-status: done  # 2026-08-11 밤 러너 — 가설 참(672스펙 위반 982건·7필드 전부), Q16 카드 추가. 결과: research/experiments/t0-dynamic-spec-enum-audit/
+status: 완료  # 2026-08-11 밤 러너 — 가설 참(672스펙 위반 982건·7필드 전부), Q16 카드 추가. 결과: research/experiments/t0-dynamic-spec-enum-audit/
 priority: normal
 ```
 

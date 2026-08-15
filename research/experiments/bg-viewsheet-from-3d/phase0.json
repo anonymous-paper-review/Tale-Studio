@@ -1,0 +1,75 @@
+{
+  "ticket": "t2-bg-viewsheet-from-3d",
+  "date": "2026-08-12",
+  "phase": "0 — 좌표 확정(read-only)",
+  "project": {
+    "id": "9d6efa6d-3216-40b0-8a2c-184ab56f02ec",
+    "title": "Sample1"
+  },
+  "location": {
+    "location_id": "location",
+    "name": "법정",
+    "wide_shot": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/9d6efa6d-3216-40b0-8a2c-184ab56f02ec/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1786014459403",
+    "visual_description": "Modern minimalist architecture, cold white marble and glass, clean straight-line structure with no excess, cool fluorescent lighting, a space that simultaneously conveys efficiency and authority",
+    "props": [
+      "유리 소재의 증인석",
+      "금속제 명패",
+      "기하학적 구조의 벤치"
+    ],
+    "lighting_sources": [
+      "천장의 매립형 백색 LED",
+      "벽면을 타고 흐르는 간접 조명"
+    ]
+  },
+  "scene_location_column": "location",
+  "court_scenes": [
+    {
+      "scene_id": "sc_13",
+      "location": "location",
+      "title": null
+    },
+    {
+      "scene_id": "sc_06",
+      "location": "location",
+      "title": null
+    },
+    {
+      "scene_id": "sc_09",
+      "location": "location",
+      "title": null
+    },
+    {
+      "scene_id": "sc_10",
+      "location": "location",
+      "title": null
+    },
+    {
+      "scene_id": "sc_11",
+      "location": "location",
+      "title": null
+    },
+    {
+      "scene_id": "sc_07",
+      "location": "location",
+      "title": null
+    }
+  ],
+  "shots_in_location": 54,
+  "angle_demand": {
+    "low_angle": 10,
+    "eye_level": 39,
+    "(없음)": 2,
+    "high_angle": 3
+  },
+  "shot_type_demand": {
+    "CU": 14,
+    "MS": 15,
+    "ECU": 6,
+    "MCU": 8,
+    "MFS": 2,
+    "WS": 7,
+    "FS": 1,
+    "EWS": 1
+  },
+  "sweeping_candidates": []
+}

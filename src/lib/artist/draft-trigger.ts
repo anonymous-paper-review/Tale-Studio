@@ -6,7 +6,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
 import { createGenerationJob, hasQueuedCharacterViewJob, hasQueuedWorldShotJob } from '@/lib/generation-jobs'
-import { resolveWebhookUrl, resolveWebhookBaseUrl } from '@/lib/fal/webhook-url'
+import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildCharacterMainPrompt, buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
 import { CHARACTER_VIEW_COLUMNS } from '@/types/asset'
 import {
@@ -15,7 +15,8 @@ import {
   computeWorldImageSourceHash,
   type LookTokens,
 } from '@/lib/image-provenance'
-import { applyStyleAnchor, resolveStyleAnchorByKey } from '@/lib/style-anchor'
+import { applyStyleAnchor, resolveStyleAnchor } from '@/lib/style-anchor'
+import { templateAssetUrl } from '@/lib/storage/template-asset'
 import {
   buildWorldShotPromptForLocation,
   mapLocationRowToManifestLocation,
@@ -81,7 +82,7 @@ export async function triggerCharacterDrafts(
         .eq('origin', 'producer'),
       supabaseAdmin
         .from('projects')
-        .select('design_tokens, workspace_id, style_anchor_key')
+        .select('design_tokens, workspace_id, style_anchor_key, custom_style_anchor')
         .eq('id', projectId)
         .maybeSingle(),
     ])
@@ -97,7 +98,7 @@ export async function triggerCharacterDrafts(
       return { submitted: 0, skipped: chars.length, failed: 0 }
     }
     const webhookUrl = resolveWebhookUrl()
-    const anchor = await resolveStyleAnchorByKey(project?.style_anchor_key)
+    const anchor = await resolveStyleAnchor(project)
 
     for (const c of chars as DraftCharacterRow[]) {
       // (a) 대표 이미지 이미 있음
@@ -136,8 +137,8 @@ export async function triggerCharacterDrafts(
         const prompt = isPerson
           ? buildCharacterTurnaroundPrompt(promptInput)
           : buildCharacterMainPrompt(promptInput)
-        const base = resolveWebhookBaseUrl()
-        const templateUrl = isPerson && base ? `${base}/character-template.png` : null
+        // 템플릿은 스토리지에서 (template-asset.ts 주석 참고).
+        const templateUrl = isPerson ? await templateAssetUrl('character-template.png') : null
         let submitOpts: FalImageOptions = templateUrl
           ? { model: 'openai/gpt-image-2/edit', prompt, reference_image_urls: [templateUrl], webhookUrl }
           : { model: DRAFT_MODEL, prompt, aspect_ratio: isPerson ? '3:2' : '1:1', webhookUrl }
@@ -219,13 +220,13 @@ export async function triggerWorldDrafts(
         .is('wide_shot', null),
       supabaseAdmin
         .from('projects')
-        .select('workspace_id, style_anchor_key')
+        .select('workspace_id, style_anchor_key, custom_style_anchor')
         .eq('id', projectId)
         .maybeSingle(),
     ])
     if (!locations?.length) return result
 
-    const anchor = await resolveStyleAnchorByKey(project?.style_anchor_key)
+    const anchor = await resolveStyleAnchor(project)
 
     for (const location of locations as DraftLocationRow[]) {
       if (location.wide_shot) {

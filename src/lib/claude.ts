@@ -20,6 +20,18 @@ interface HistoryMessage {
   content: string
 }
 
+/**
+ * 마지막 user 턴에만 실리는 이미지 블록. 히스토리는 DB 에서 텍스트로 재조립되므로
+ * 이미지는 다음 턴에 자연히 빠진다 — 매 턴 재전송으로 비용이 붇는 일이 없다.
+ * base64 가 아니라 URL 소스를 쓰므로 요청 본문 크기 한도와도 무관하다.
+ */
+type UserContent =
+  | string
+  | Array<
+      | { type: 'image'; source: { type: 'url'; url: string } }
+      | { type: 'text'; text: string }
+    >
+
 function toClaudeRole(role: string): 'user' | 'assistant' {
   return role === 'user' ? 'user' : 'assistant'
 }
@@ -34,14 +46,28 @@ export async function claudeChat(
   // #p4-websearch(2026-08-06): 서버 웹서치 툴 — 오마쥬/레퍼런스 요청("기생충 계단 씬처럼")을
   //   실제 검색으로 접지. 서버 실행 툴이라 tool loop 불필요, 응답에 검색 블록이 끼어도
   //   아래 텍스트 추출이 text 블록만 이어붙인다. 단계 확대 방침: produce 채팅부터.
-  opts?: { webSearch?: boolean },
+  // #p1-attach(2026-08-13): imageUrls — 프로듀서 첨부(웹툰·레퍼런스) 판독 경로.
+  //   전처리(슬라이싱·스토리지 업로드)는 api/produce/ingest 가 끝내고 URL 만 넘어온다.
+  //   "이미지 먼저, 텍스트 나중" 배치는 Anthropic 권장 순서다.
+  opts?: { webSearch?: boolean; imageUrls?: string[] },
 ): Promise<string> {
-  const messages: { role: 'user' | 'assistant'; content: string }[] = [
+  const imageUrls = opts?.imageUrls ?? []
+  const userContent: UserContent = imageUrls.length
+    ? [
+        ...imageUrls.map((url) => ({
+          type: 'image' as const,
+          source: { type: 'url' as const, url },
+        })),
+        { type: 'text' as const, text: userMessage },
+      ]
+    : userMessage
+
+  const messages: { role: 'user' | 'assistant'; content: UserContent }[] = [
     ...history.map((m) => ({
       role: toClaudeRole(m.role),
       content: m.content,
     })),
-    { role: 'user', content: userMessage },
+    { role: 'user', content: userContent },
   ]
 
   const t0 = performance.now()
@@ -85,7 +111,7 @@ export async function claudeChat(
   const u = response.usage
   logTiming(
     'llm',
-    `${label} model=${MODEL} in=${u.input_tokens} out=${u.output_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} ${(performance.now() - t0).toFixed(0)}ms`,
+    `${label} model=${MODEL} in=${u.input_tokens} out=${u.output_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0}${imageUrls.length ? ` img=${imageUrls.length}` : ''} ${(performance.now() - t0).toFixed(0)}ms`,
   )
 
   // compaction/웹서치가 켜지면 응답 content에 비텍스트 블록이 끼고, 검색 시엔 텍스트가

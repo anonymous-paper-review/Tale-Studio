@@ -1,10 +1,10 @@
 ```yaml
 id: tfix-fal-wiring-repairs
 source: .claude/vault/2026-08-10-previz-motion-channel.md §3 "실험 불요 확정 수리 안건 4" 중 ①② (부수 발견 — 프로덕션 버그 2)
-tier: T-fix
+종류: 수리
 budget: { usd: 0, runs: 1, wall_min: 60 }
 blockers: []
-status: done  # 2026-08-11 밤 러너 — 브랜치 fix/fal-wiring 준비 완료(커밋 없음 — 워크트리 .worktrees/fix-fal-wiring/, 로컬 exclude 처리). ① FalImageOptions.image_size 타입 추가+명시 우선 전송 ② happy-horse negative_prompt 게이트. pnpm test 973 통과(실패 1건은 gitignored seed 스크립트 부재 — 수리 무관, 복사 후 전체 통과). payload 전/후 실캡처: image_size "auto"→"1024x1536" (fal.queue.submit 모킹, 발주 0). 상세는 reports/2026-08-11.md
+status: 완료  # 2026-08-11 밤 러너 — 브랜치 fix/fal-wiring 준비 완료(커밋 없음 — 워크트리 .worktrees/fix-fal-wiring/, 로컬 exclude 처리). ① FalImageOptions.image_size 타입 추가+명시 우선 전송 ② happy-horse negative_prompt 게이트. pnpm test 973 통과(실패 1건은 gitignored seed 스크립트 부재 — 수리 무관, 복사 후 전체 통과). payload 전/후 실캡처: image_size "auto"→"1024x1536" (fal.queue.submit 모킹, 발주 0). 상세는 reports/2026-08-11.md
 priority: normal
 ```
 

@@ -1,0 +1,321 @@
+{
+  "purpose": "앵커 밀도 — 시작·끝 사이 중간 프레임을 몇 장 주는 것이 유의미한 앵커이고 어디부터 과잉 맥락인가",
+  "owner_hypothesis": "이미지 생성기가 가진 맥락을 단 한 개의 이미지로만 영상 생성기에게 설명하는 게 병목이다 (오너 2026-08-12)",
+  "model": {
+    "video": "higgsfield seedance_2_0",
+    "image": "higgsfield gpt_image_2",
+    "depth": "fal-ai/imageutils/depth (MiDaS)"
+  },
+  "frozen_prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.",
+  "duration": 7,
+  "resolution": "720p",
+  "aspect_ratio": "4:3",
+  "anchor_size": "379x257 — 모든 앵커를 시작·끝 그림과 같은 크기로 맞춤(크기 교란 제거)",
+  "mid_frames": [
+    {
+      "t": 1,
+      "file": "inputs/anchor_1.jpg",
+      "prompt": "This is frame 1.0 seconds into a 7-second continuous shot.\n@Image1 is the FIRST frame of that shot (time 0.0s). @Image2 is the LAST frame (time 7.0s).\nDraw the single intermediate frame at the stated time, as if pausing the video there.\n\nWhat happens across the shot: Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nKeep the SAME character, the SAME clothing, the SAME corridor, the SAME art style, the SAME line quality\nand the SAME colour treatment as the two reference frames — this is one continuous shot, not a new drawing.\nOnly her position, her pose and the camera framing progress toward the last frame by the stated amount.\nDo not add text, captions, timestamps, borders or panel dividers.",
+      "credits": 7
+    },
+    {
+      "t": 2,
+      "file": "inputs/anchor_2.jpg",
+      "prompt": "This is frame 2.0 seconds into a 7-second continuous shot.\n@Image1 is the FIRST frame of that shot (time 0.0s). @Image2 is the LAST frame (time 7.0s).\nDraw the single intermediate frame at the stated time, as if pausing the video there.\n\nWhat happens across the shot: Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nKeep the SAME character, the SAME clothing, the SAME corridor, the SAME art style, the SAME line quality\nand the SAME colour treatment as the two reference frames — this is one continuous shot, not a new drawing.\nOnly her position, her pose and the camera framing progress toward the last frame by the stated amount.\nDo not add text, captions, timestamps, borders or panel dividers.",
+      "credits": 7
+    },
+    {
+      "t": 3,
+      "file": "inputs/anchor_3.jpg",
+      "prompt": "This is frame 3.0 seconds into a 7-second continuous shot.\n@Image1 is the FIRST frame of that shot (time 0.0s). @Image2 is the LAST frame (time 7.0s).\nDraw the single intermediate frame at the stated time, as if pausing the video there.\n\nWhat happens across the shot: Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nKeep the SAME character, the SAME clothing, the SAME corridor, the SAME art style, the SAME line quality\nand the SAME colour treatment as the two reference frames — this is one continuous shot, not a new drawing.\nOnly her position, her pose and the camera framing progress toward the last frame by the stated amount.\nDo not add text, captions, timestamps, borders or panel dividers.",
+      "credits": 7
+    },
+    {
+      "t": 4,
+      "file": "inputs/anchor_4.jpg",
+      "prompt": "This is frame 4.0 seconds into a 7-second continuous shot.\n@Image1 is the FIRST frame of that shot (time 0.0s). @Image2 is the LAST frame (time 7.0s).\nDraw the single intermediate frame at the stated time, as if pausing the video there.\n\nWhat happens across the shot: Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nKeep the SAME character, the SAME clothing, the SAME corridor, the SAME art style, the SAME line quality\nand the SAME colour treatment as the two reference frames — this is one continuous shot, not a new drawing.\nOnly her position, her pose and the camera framing progress toward the last frame by the stated amount.\nDo not add text, captions, timestamps, borders or panel dividers.",
+      "credits": 7
+    },
+    {
+      "t": 5,
+      "file": "inputs/anchor_5.jpg",
+      "prompt": "This is frame 5.0 seconds into a 7-second continuous shot.\n@Image1 is the FIRST frame of that shot (time 0.0s). @Image2 is the LAST frame (time 7.0s).\nDraw the single intermediate frame at the stated time, as if pausing the video there.\n\nWhat happens across the shot: Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nKeep the SAME character, the SAME clothing, the SAME corridor, the SAME art style, the SAME line quality\nand the SAME colour treatment as the two reference frames — this is one continuous shot, not a new drawing.\nOnly her position, her pose and the camera framing progress toward the last frame by the stated amount.\nDo not add text, captions, timestamps, borders or panel dividers.",
+      "credits": 7
+    },
+    {
+      "t": 6,
+      "file": "inputs/anchor_6.jpg",
+      "prompt": "This is frame 6.0 seconds into a 7-second continuous shot.\n@Image1 is the FIRST frame of that shot (time 0.0s). @Image2 is the LAST frame (time 7.0s).\nDraw the single intermediate frame at the stated time, as if pausing the video there.\n\nWhat happens across the shot: Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nKeep the SAME character, the SAME clothing, the SAME corridor, the SAME art style, the SAME line quality\nand the SAME colour treatment as the two reference frames — this is one continuous shot, not a new drawing.\nOnly her position, her pose and the camera framing progress toward the last frame by the stated amount.\nDo not add text, captions, timestamps, borders or panel dividers.",
+      "credits": 7
+    }
+  ],
+  "jobs": [
+    {
+      "key": "a1",
+      "label": "시작 1장 (현행)",
+      "depth": false,
+      "anchors": [
+        "inputs/anchor_0.jpg"
+      ],
+      "anchor_times": [
+        0
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\n@Image1 is the first frame of the shot.",
+      "job_id": "5ff109cf-5c0d-4d8a-adec-b182f1e9c097",
+      "credits": 31.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_072524_5ff109cf-5c0d-4d8a-adec-b182f1e9c097.mp4",
+      "file": "out/a1.mp4"
+    },
+    {
+      "key": "a1_d",
+      "label": "시작 1장 (현행) + depth",
+      "depth": true,
+      "anchors": [
+        "inputs/anchor_0.jpg"
+      ],
+      "anchor_times": [
+        0
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\n@Image1 is the first frame of the shot.\n- @Image2 is a DEPTH MAP of the first frame: bright = near the camera, dark = far away.\nIt describes the 3D layout only. Use it to keep the spatial structure and the relative distances consistent.\nNever render it, never show grayscale, never copy its colours into the picture.",
+      "job_id": "d4e410df-cf6a-4570-b799-5c89ccba85b8",
+      "credits": 31.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_072530_d4e410df-cf6a-4570-b799-5c89ccba85b8.mp4",
+      "file": "out/a1_d.mp4"
+    },
+    {
+      "key": "b2",
+      "label": "시작+끝 2장",
+      "depth": false,
+      "anchors": [
+        "inputs/anchor_0.jpg",
+        "inputs/anchor_7.jpg"
+      ],
+      "anchor_times": [
+        0,
+        7
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nThe shot is 7 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the last frame (time 7.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.",
+      "job_id": "7068c56b-af15-4caa-9261-902cb2665edb",
+      "credits": 31.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_072536_7068c56b-af15-4caa-9261-902cb2665edb.mp4",
+      "file": "out/b2.mp4"
+    },
+    {
+      "key": "b2_d",
+      "label": "시작+끝 2장 + depth",
+      "depth": true,
+      "anchors": [
+        "inputs/anchor_0.jpg",
+        "inputs/anchor_7.jpg"
+      ],
+      "anchor_times": [
+        0,
+        7
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nThe shot is 7 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the last frame (time 7.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.\n- @Image3 is a DEPTH MAP of the first frame: bright = near the camera, dark = far away.\nIt describes the 3D layout only. Use it to keep the spatial structure and the relative distances consistent.\nNever render it, never show grayscale, never copy its colours into the picture.",
+      "job_id": "e340d284-fe37-4cb0-9857-825a3bf0bb1c",
+      "credits": 31.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_072544_e340d284-fe37-4cb0-9857-825a3bf0bb1c.mp4",
+      "file": "out/b2_d.mp4"
+    },
+    {
+      "key": "c3",
+      "label": "3장 (중간 4초)",
+      "depth": false,
+      "anchors": [
+        "inputs/anchor_0.jpg",
+        "inputs/anchor_4.jpg",
+        "inputs/anchor_7.jpg"
+      ],
+      "anchor_times": [
+        0,
+        4,
+        7
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nThe shot is 7 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 4.0 seconds (time 4.0s).\n- @Image3 is the last frame (time 7.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.",
+      "job_id": "ea58fe0d-e8ee-49ee-8b78-eb38ba6e83db",
+      "credits": 31.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_072552_ea58fe0d-e8ee-49ee-8b78-eb38ba6e83db.mp4",
+      "file": "out/c3.mp4"
+    },
+    {
+      "key": "c3_d",
+      "label": "3장 (중간 4초) + depth",
+      "depth": true,
+      "anchors": [
+        "inputs/anchor_0.jpg",
+        "inputs/anchor_4.jpg",
+        "inputs/anchor_7.jpg"
+      ],
+      "anchor_times": [
+        0,
+        4,
+        7
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nThe shot is 7 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 4.0 seconds (time 4.0s).\n- @Image3 is the last frame (time 7.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.\n- @Image4 is a DEPTH MAP of the first frame: bright = near the camera, dark = far away.\nIt describes the 3D layout only. Use it to keep the spatial structure and the relative distances consistent.\nNever render it, never show grayscale, never copy its colours into the picture.",
+      "job_id": "23245955-6b89-40e0-b737-b60391b6ec4d",
+      "credits": 31.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_072601_23245955-6b89-40e0-b737-b60391b6ec4d.mp4",
+      "file": "out/c3_d.mp4"
+    },
+    {
+      "key": "d4",
+      "label": "4장 (중간 2·5초)",
+      "depth": false,
+      "anchors": [
+        "inputs/anchor_0.jpg",
+        "inputs/anchor_2.jpg",
+        "inputs/anchor_5.jpg",
+        "inputs/anchor_7.jpg"
+      ],
+      "anchor_times": [
+        0,
+        2,
+        5,
+        7
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nThe shot is 7 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 2.0 seconds (time 2.0s).\n- @Image3 is the frame at 5.0 seconds (time 5.0s).\n- @Image4 is the last frame (time 7.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.",
+      "job_id": "68f28d2f-f962-4a29-9633-89097aaf3105",
+      "credits": 31.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_072612_68f28d2f-f962-4a29-9633-89097aaf3105.mp4",
+      "file": "out/d4.mp4"
+    },
+    {
+      "key": "d4_d",
+      "label": "4장 (중간 2·5초) + depth",
+      "depth": true,
+      "anchors": [
+        "inputs/anchor_0.jpg",
+        "inputs/anchor_2.jpg",
+        "inputs/anchor_5.jpg",
+        "inputs/anchor_7.jpg"
+      ],
+      "anchor_times": [
+        0,
+        2,
+        5,
+        7
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nThe shot is 7 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 2.0 seconds (time 2.0s).\n- @Image3 is the frame at 5.0 seconds (time 5.0s).\n- @Image4 is the last frame (time 7.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.\n- @Image5 is a DEPTH MAP of the first frame: bright = near the camera, dark = far away.\nIt describes the 3D layout only. Use it to keep the spatial structure and the relative distances consistent.\nNever render it, never show grayscale, never copy its colours into the picture.",
+      "job_id": "2a933df5-4fdd-41cc-902b-ff238086ab1c",
+      "credits": 31.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_072625_2a933df5-4fdd-41cc-902b-ff238086ab1c.mp4",
+      "file": "out/d4_d.mp4"
+    },
+    {
+      "key": "e5",
+      "label": "5장 (중간 2·4·5초)",
+      "depth": false,
+      "anchors": [
+        "inputs/anchor_0.jpg",
+        "inputs/anchor_2.jpg",
+        "inputs/anchor_4.jpg",
+        "inputs/anchor_5.jpg",
+        "inputs/anchor_7.jpg"
+      ],
+      "anchor_times": [
+        0,
+        2,
+        4,
+        5,
+        7
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nThe shot is 7 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 2.0 seconds (time 2.0s).\n- @Image3 is the frame at 4.0 seconds (time 4.0s).\n- @Image4 is the frame at 5.0 seconds (time 5.0s).\n- @Image5 is the last frame (time 7.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.",
+      "job_id": "9eea57af-7987-42a1-91a0-647a0d707135",
+      "credits": 31.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_073358_9eea57af-7987-42a1-91a0-647a0d707135.mp4",
+      "file": "out/e5.mp4"
+    },
+    {
+      "key": "e5_d",
+      "label": "5장 (중간 2·4·5초) + depth",
+      "depth": true,
+      "anchors": [
+        "inputs/anchor_0.jpg",
+        "inputs/anchor_2.jpg",
+        "inputs/anchor_4.jpg",
+        "inputs/anchor_5.jpg",
+        "inputs/anchor_7.jpg"
+      ],
+      "anchor_times": [
+        0,
+        2,
+        4,
+        5,
+        7
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nThe shot is 7 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 2.0 seconds (time 2.0s).\n- @Image3 is the frame at 4.0 seconds (time 4.0s).\n- @Image4 is the frame at 5.0 seconds (time 5.0s).\n- @Image5 is the last frame (time 7.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.\n- @Image6 is a DEPTH MAP of the first frame: bright = near the camera, dark = far away.\nIt describes the 3D layout only. Use it to keep the spatial structure and the relative distances consistent.\nNever render it, never show grayscale, never copy its colours into the picture.",
+      "job_id": "d7ff5c78-078d-41b9-a044-2ab914a45c2d",
+      "credits": 31.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_073414_d7ff5c78-078d-41b9-a044-2ab914a45c2d.mp4",
+      "file": "out/e5_d.mp4"
+    },
+    {
+      "key": "f8",
+      "label": "8장 (1초마다 전부)",
+      "depth": false,
+      "anchors": [
+        "inputs/anchor_0.jpg",
+        "inputs/anchor_1.jpg",
+        "inputs/anchor_2.jpg",
+        "inputs/anchor_3.jpg",
+        "inputs/anchor_4.jpg",
+        "inputs/anchor_5.jpg",
+        "inputs/anchor_6.jpg",
+        "inputs/anchor_7.jpg"
+      ],
+      "anchor_times": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nThe shot is 7 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 1.0 seconds (time 1.0s).\n- @Image3 is the frame at 2.0 seconds (time 2.0s).\n- @Image4 is the frame at 3.0 seconds (time 3.0s).\n- @Image5 is the frame at 4.0 seconds (time 4.0s).\n- @Image6 is the frame at 5.0 seconds (time 5.0s).\n- @Image7 is the frame at 6.0 seconds (time 6.0s).\n- @Image8 is the last frame (time 7.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.",
+      "job_id": "91f6fbc6-65c1-4938-9171-50c712238c9b",
+      "credits": 31.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_073436_91f6fbc6-65c1-4938-9171-50c712238c9b.mp4",
+      "file": "out/f8.mp4"
+    },
+    {
+      "key": "f8_d",
+      "label": "8장 (1초마다 전부) + depth",
+      "depth": true,
+      "anchors": [
+        "inputs/anchor_0.jpg",
+        "inputs/anchor_1.jpg",
+        "inputs/anchor_2.jpg",
+        "inputs/anchor_3.jpg",
+        "inputs/anchor_4.jpg",
+        "inputs/anchor_5.jpg",
+        "inputs/anchor_6.jpg",
+        "inputs/anchor_7.jpg"
+      ],
+      "anchor_times": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward screen right (background flows toward screen left). Moderate amplitude, spread evenly over the full 7 seconds. Subjects: subject 1: \"sprints at full speed toward the ventilation shaft\" — a large, clearly visible movement that completes fully. Pace the motion across the full 7-second duration — by the final frame every scripted movement has fully completed. Do NOT add any camera movement, framing change, new character, new prop or extra action beyond this contract.. The girl sprints at full speed toward a narrow, rust-covered ventilation shaft passage.\n\nThe shot is 7 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 1.0 seconds (time 1.0s).\n- @Image3 is the frame at 2.0 seconds (time 2.0s).\n- @Image4 is the frame at 3.0 seconds (time 3.0s).\n- @Image5 is the frame at 4.0 seconds (time 4.0s).\n- @Image6 is the frame at 5.0 seconds (time 5.0s).\n- @Image7 is the frame at 6.0 seconds (time 6.0s).\n- @Image8 is the last frame (time 7.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.\n- @Image9 is a DEPTH MAP of the first frame: bright = near the camera, dark = far away.\nIt describes the 3D layout only. Use it to keep the spatial structure and the relative distances consistent.\nNever render it, never show grayscale, never copy its colours into the picture.",
+      "job_id": "8a74f7f2-7f9c-48ee-9481-8738f23b3518",
+      "credits": 31.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_073509_8a74f7f2-7f9c-48ee-9481-8738f23b3518.mp4",
+      "file": "out/f8_d.mp4"
+    }
+  ],
+  "credits_spent": 420,
+  "depth": {
+    "url": "https://v3b.fal.media/files/b/0aa60285/NL_g4UGF3ly8smc9h_fw0_dd3862091bd04fa9b5393ee2ee283a04.png",
+    "file": "inputs/depth_start.png",
+    "source": "fal-ai/imageutils/depth (MiDaS) — 입력은 시작 그림 anchor_0.jpg",
+    "cost_note": "higgsfield 에 깊이 추정기가 없어 이 한 장만 fal. 앵커와 같은 크기로 리사이즈."
+  }
+}

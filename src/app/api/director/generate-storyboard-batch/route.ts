@@ -10,7 +10,7 @@ import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { createGenerationJob } from '@/lib/generation-jobs'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
-import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
+import { resolveStyleAnchor } from '@/lib/style-anchor'
 import { composeRoughReferenceGrid, buildRealGridPrompt } from '@/lib/director/storyboard-strip'
 
 export const runtime = 'nodejs'
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
     const { data: project } = await supabaseAdmin
       .from('projects')
-      .select('workspace_id, style_anchor_key')
+      .select('workspace_id, style_anchor_key, custom_style_anchor')
       .eq('id', projectId)
       .maybeSingle()
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, data: { submitted: [], remaining: 0 } })
     }
 
-    const anchor = await resolveStyleAnchorByKey(project.style_anchor_key as string | null)
+    const anchor = await resolveStyleAnchor(project)
     const charIds = [...new Set(planned.flatMap((g) => g.flatMap((s) => s.characters)))]
     const { data: chars } = charIds.length
       ? await supabaseAdmin

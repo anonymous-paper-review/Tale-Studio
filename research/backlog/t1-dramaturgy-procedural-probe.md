@@ -1,10 +1,10 @@
 ```yaml
 id: t1-dramaturgy-procedural-probe
 source: .claude/vault/2026-08-10-dramaturgy-world-derivation.md §3 (유도 깊이 × 전제 유형 — 법정물 실측)
-tier: T1
+종류: 모델실험
 budget: { usd: 3, runs: 4, wall_min: 60 }  # 법정물 3회 + 재난물 브리지 1회
 blockers: []
-status: done  # 2026-08-11 밤 러너 — 가설 기각(법정 3/3/3 중앙값 3≤3). 부수 발견: 3.6-flash에서 s0.5 전면 불능 → draft t0-dramaturgy-36flash-outage. 결과: research/experiments/t1-dramaturgy-procedural-probe/ 지출 ~$0.3
+status: 완료  # 2026-08-11 밤 러너 — 가설 기각(법정 3/3/3 중앙값 3≤3). 부수 발견: 3.6-flash에서 s0.5 전면 불능 → draft t0-dramaturgy-36flash-outage. 결과: research/experiments/t1-dramaturgy-procedural-probe/ 지출 ~$0.3
 priority: normal
 ```
 

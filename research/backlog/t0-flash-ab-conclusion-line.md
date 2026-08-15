@@ -1,10 +1,10 @@
 ```yaml
 id: t0-flash-ab-conclusion-line
 source: .claude/vault/2026-08-10-flash-ab-fanout-review.md §3 잔가지 (HYPOTHESIS.md 결론 1줄 미기입)
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 10 }
 blockers: []
-status: done  # 2026-08-11 밤 러너 — 결론 1줄 기입 완료(flash-model-ab/HYPOTHESIS.md 말미)
+status: 완료  # 2026-08-11 밤 러너 — 결론 1줄 기입 완료(flash-model-ab/HYPOTHESIS.md 말미)
 priority: normal
 ```
 

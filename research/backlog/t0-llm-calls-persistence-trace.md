@@ -3,10 +3,10 @@
 ```yaml
 id: t0-llm-calls-persistence-trace
 source: sweep:claude:62428d65
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — 가설 기각(기각 조건 발동: 예외 경로 저장 4곳 — index.ts:140 + steps.ts:652/684/746). 단 실패 런 3/3에서 스냅샷 호출수 0(사망 다수가 "예산 초과"라 담을 호출이 없음), 예산 초과 경로 저장은 0곳. 덤: llm_calls 에 run 식별자 칸 부재 → 런 귀속 불가(NA). 결과: research/experiments/t0-llm-calls-persistence-trace/
+status: 완료  # 2026-08-12 밤 러너 — 가설 기각(기각 조건 발동: 예외 경로 저장 4곳 — index.ts:140 + steps.ts:652/684/746). 단 실패 런 3/3에서 스냅샷 호출수 0(사망 다수가 "예산 초과"라 담을 호출이 없음), 예산 초과 경로 저장은 0곳. 덤: llm_calls 에 run 식별자 칸 부재 → 런 귀속 불가(NA). 결과: research/experiments/t0-llm-calls-persistence-trace/
 priority: normal
 ```
 

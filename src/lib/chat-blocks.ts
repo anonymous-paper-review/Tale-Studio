@@ -32,6 +32,41 @@ export function handoffMarker(from: StageId, to: StageId): string {
   return `${HANDOFF_PREFIX} ${from}→${to}`
 }
 
+const ATTACHMENT_PREFIX = '📎'
+
+/**
+ * 첨부 이미지 마커 — 유저 메시지 본문 마지막 줄에 원본 이미지 URL 을 실어 영속화한다.
+ *
+ * messages 테이블에는 content(text) 하나뿐이라 별도 컬럼이 없다. 핸드오프 마커(⇄)와 같은
+ * 방식으로 본문에 실어 두면 새로고침 후에도 "이 턴에 뭘 올렸는지"가 스레드에 남는다.
+ *
+ * 슬라이스가 아니라 원본 URL 만 담는다 — 사용자가 알아보는 건 자기가 올린 그 파일이고,
+ * 슬라이스까지 넣으면 본문이 URL 로 뒤덮인다.
+ */
+export function withAttachmentMarker(text: string, imageUrls: string[]): string {
+  if (imageUrls.length === 0) return text
+  const marker = `${ATTACHMENT_PREFIX} ${imageUrls.join(' ')}`
+  return text ? `${text}\n\n${marker}` : marker
+}
+
+/**
+ * 마커 분리 — 렌더러는 text 를 말풍선에, urls 를 썸네일로 쓴다.
+ * 형태가 어긋나면 원문 그대로 돌려준다(사용자가 직접 📎 를 친 경우 등).
+ */
+export function parseAttachmentMarker(content: string): { text: string; urls: string[] } {
+  const lines = content.split('\n')
+  const last = lines[lines.length - 1]?.trim() ?? ''
+  if (!last.startsWith(ATTACHMENT_PREFIX)) return { text: content, urls: [] }
+
+  const tokens = last.slice(ATTACHMENT_PREFIX.length).trim().split(/\s+/).filter(Boolean)
+  // 전부 http(s) URL 일 때만 마커로 인정한다.
+  if (tokens.length === 0 || !tokens.every((t) => /^https?:\/\/\S+$/.test(t))) {
+    return { text: content, urls: [] }
+  }
+
+  return { text: lines.slice(0, -1).join('\n').trimEnd(), urls: tokens }
+}
+
 const STAGE_IDS: ReadonlySet<string> = new Set([
   'producer',
   'writer',

@@ -3,10 +3,10 @@
 ```yaml
 id: t0-lint-residual-scope
 source: sweep:claude:05f8aa2f
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 20 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — 가설 유지(src/ 에러 0, 규칙도 no-explicit-any 하나로 수렴). 기각 조건 미발동. 단 총량 213 vs 기준선 104(+105%, ±20% 밖)를 먼저 보고: 제외 규칙이 `.worktrees/**`인데 실제 중복 사본은 `.claude/worktrees/**`라 70건이 재검사됨 + 오늘 밤 러너 스크립트가 39건 기여. 결과: research/experiments/t0-lint-residual-scope/
+status: 완료  # 2026-08-12 밤 러너 — 가설 유지(src/ 에러 0, 규칙도 no-explicit-any 하나로 수렴). 기각 조건 미발동. 단 총량 213 vs 기준선 104(+105%, ±20% 밖)를 먼저 보고: 제외 규칙이 `.worktrees/**`인데 실제 중복 사본은 `.claude/worktrees/**`라 70건이 재검사됨 + 오늘 밤 러너 스크립트가 39건 기여. 결과: research/experiments/t0-lint-residual-scope/
 priority: normal
 ```
 

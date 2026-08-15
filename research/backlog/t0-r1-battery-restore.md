@@ -1,10 +1,10 @@
 ```yaml
 id: t0-r1-battery-restore
 source: .claude/vault/2026-08-10-prompt-contract-audit.md §3 (SHOT_PHYSICS R1 배터리 복구) · 카탈로그 B2🕳
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 60 }
 blockers: []
-status: done  # 2026-08-11 밤 러너 — 가설 참·복원 완료(git 622e44e^ + tar 양쪽 실존, 실행은 안 함). 결과: research/experiments/r1-battery-restored/
+status: 완료  # 2026-08-11 밤 러너 — 가설 참·복원 완료(git 622e44e^ + tar 양쪽 실존, 실행은 안 함). 결과: research/experiments/r1-battery-restored/
 priority: normal
 ```
 

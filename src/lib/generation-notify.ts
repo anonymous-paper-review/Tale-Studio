@@ -1,4 +1,5 @@
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { generationFailureMessage, generationGaveUpMessage } from '@/lib/generation-failure'
 import type { StageId } from '@/types'
 
 /**
@@ -26,4 +27,22 @@ export function notifyGenerationFailure(
   message: string,
 ): void {
   useGlobalChatStore.getState().notifyActionError(stage, label, message)
+}
+
+/**
+ * 생성 잡이 실패했을 때 — 프로바이더 원문을 사용자 언어("무엇이 있었나 + 뭘 하면 되나")로 옮겨 남긴다.
+ *   notifyGenerationFailure 와 구분: 저쪽은 *제출조차 못 한* 경우, 이쪽은 제출 후 실패한 경우다.
+ *   문구가 다르면 사용자가 다른 행동을 하게 되므로 섞지 않는다.
+ */
+export function notifyGenerationFailed(stage: StageId, label: string, raw: string): void {
+  useGlobalChatStore.getState().notifyIssue(stage, generationFailureMessage(label, raw))
+}
+
+/**
+ * give-up 게이트로 자동 생성이 멈췄을 때.
+ *   이걸 안 알리면 화면상 아무 일도 안 일어난 것과 구분되지 않는다 — 그리고 원인이 고쳐져도
+ *   자동으로는 복구되지 않으므로 "사람이 눌러야 한다"를 반드시 전달해야 한다.
+ */
+export function notifyGenerationGaveUp(stage: StageId, label: string): void {
+  useGlobalChatStore.getState().notifyIssue(stage, generationGaveUpMessage(label))
 }

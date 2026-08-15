@@ -1,0 +1,520 @@
+<title>판정기 시험 성적표</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .standfirst{font-size:17.5px;color:var(--ink-2);margin:0 0 14px;max-width:60ch}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.fail{border-left:3px solid var(--fail)}
+  .card.pass{border-left:3px solid var(--pass)}
+  .card.note{border-left:3px solid var(--accent)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:16px}
+  .card-head h3{flex:1 1 240px;margin:0}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+
+  .frames{display:grid;gap:14px;margin:8px 0 22px}
+  .frames.three{grid-template-columns:repeat(3,1fr)}
+  .frames.two{grid-template-columns:repeat(2,1fr)}
+  @media (max-width:640px){.frames.three,.frames.two{grid-template-columns:1fr}}
+  .fr img{width:100%;height:auto;display:block;border-radius:7px 7px 0 0;
+    border:1px solid var(--line-2);border-bottom:none;background:var(--surface-2)}
+  .fr .cap{border:1px solid var(--line-2);border-radius:0 0 7px 7px;padding:10px 12px;
+    background:var(--surface);font-size:13px;line-height:1.6}
+  .fr .cap b{display:block;font-size:13.5px;font-weight:750;margin-bottom:3px}
+  .fr.is-ref img,.fr.is-ref .cap{border-color:var(--accent)}
+  .fr.is-ref .cap{background:var(--accent-soft)}
+
+  .mark{display:inline-block;font-weight:750;font-size:13px;border-radius:4px;
+    padding:2px 9px;margin-top:8px}
+  .m-yes{background:var(--pass-soft);color:var(--pass)}
+  .m-no{background:var(--fail-soft);color:var(--fail)}
+
+  blockquote{margin:14px 0;padding:14px 18px;background:var(--surface-2);
+    border-left:3px solid var(--line-2);border-radius:0 7px 7px 0;font-size:15px}
+  blockquote p{margin:0 0 8px}
+  blockquote p:last-child{margin:0}
+  blockquote .orig{font-family:var(--mono);font-size:12.5px;color:var(--muted);
+    display:block;margin-top:6px;line-height:1.6}
+
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:12px 0;color:var(--ink-2);
+    white-space:pre-wrap;word-break:break-word}
+  pre b{color:var(--ink)}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:500px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .say{color:var(--muted);font-size:12.5px;display:block;margin-top:4px;line-height:1.55}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+
+  .banner{border:2px solid var(--ink);border-radius:10px;padding:22px 26px;margin:26px 0;
+    background:var(--surface)}
+  .banner h3{margin:0 0 10px;font-size:18px}
+  .banner p:last-child{margin-bottom:0}
+
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+</style>
+
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">야간 루프 설계 · 근거 검증 · 2026-08-13</p>
+  <h1>기계가 사람 대신 "이거 됐다"를 판정할 수 있나 — 시험을 쳐봤고, 절반만 통과했습니다</h1>
+  <p class="standfirst">앞 문서는 기계가 <b>뭐라고 답했는지</b>만 보여줬지 <b>그 답이 맞는지</b>는 증명하지 않았습니다. 다시 씁니다. 무엇을 알고 싶었고, 사람은 뭐라고 봤고, 기계는 뭐라고 답했고, 그래서 이 기계를 믿어도 되는지까지.</p>
+  <p class="asof">결론 먼저 — <b>믿을 근거는 아직 부족합니다.</b> 시험 문제가 두 개뿐이었습니다. 다만 무엇이 고장났었고 그게 고쳐졌다는 것까지는 확실합니다.</p>
+</header>
+
+<!-- ═══ 0. 말 규칙 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">0</span><h2>이 문서의 말 규칙</h2></div>
+  <p><b>설명이 필요한 줄임말은 쓰레기입니다.</b> 읽는 사람이 "그게 뭐였더라" 하고 되짚어야 하는 순간, 그 단어는 정보를 전달한 게 아니라 숨긴 겁니다. 이 문서에는 그런 말을 하나도 쓰지 않습니다. 앞으로 밤 작업 문서와 계약서 전부 이 규칙을 따릅니다.</p>
+  <p>앞 문서에서 제가 쓴 나쁜 말들과, 이제부터 쓸 말입니다:</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:34%">쓰지 않는 말</th><th>대신 쓰는 말</th></tr></thead>
+      <tbody>
+        <tr><td><s>오라클</s></td><td>판정기 — 잘 됐는지 대신 봐주는 프로그램</td></tr>
+        <tr><td><s>계기 / 계기 결함</s></td><td>재는 도구 / 재는 도구가 고장났다</td></tr>
+        <tr><td><s>변별력</s></td><td>둘을 구분해내는 힘</td></tr>
+        <tr><td><s>2AFC / 쌍대 비교</s></td><td>둘을 나란히 놓고 하나 고르게 하기</td></tr>
+        <tr><td><s>축 분리</s></td><td>질문을 두 개로 쪼개서 따로 묻기</td></tr>
+        <tr><td><s>스모크</s></td><td>예비 시험 — 본격적으로 하기 전에 두어 개만</td></tr>
+        <tr><td><s>모집단 / 모집단 부재</s></td><td>잴 대상 / 잴 대상이 아예 없었다</td></tr>
+        <tr><td><s>기각 조건</s></td><td>미리 정해둔 판정선 — "이러면 틀린 걸로 친다"</td></tr>
+        <tr><td><s>판독 세트</s></td><td>사람이 보고 고를 수 있게 정리해둔 비교표</td></tr>
+        <tr><td><s>n</s></td><td>몇 건인지 실제 숫자</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ 1. 알고 싶었던 것 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>애초에 무엇을 알고 싶었나</h2></div>
+  <p>영상을 만들 때 우리는 "이렇게 시작해서 이렇게 끝나라"고 그림 두 장을 줄 수 있습니다. 그런데 <b>끝 그림을 주는 게 실제로 효과가 있는지</b>가 확실하지 않았습니다. 안 주면 영상이 중간에서 흐지부지 멈추는 것 같았거든요.</p>
+  <p>그래서 같은 장면을 두 가지 방식으로 만들었습니다.</p>
+  <ul class="plain">
+    <li><b>ⓐ 시작 그림만 주고</b> 만든 영상</li>
+    <li><b>ⓑ 시작 그림과 끝 그림을 둘 다 주고</b> 만든 영상</li>
+  </ul>
+  <p>장면은 <b>남자가 먼지 쌓인 서류함 서랍을 열어젖히는 7초</b>입니다. 서랍이 닫힘에서 열림으로 확 바뀌니까, 끝까지 갔는지 안 갔는지가 눈에 딱 보이는 장면을 고른 겁니다.</p>
+</section>
+
+<!-- ═══ 2. 정답지 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>목표 그림이 요구하는 것은 두 가지다</h2></div>
+  <p class="sec-lede">기계를 시험하려면 정답을 먼저 알아야 합니다. 그런데 정답이 하나가 아니라 <b>두 가지 조건</b>이라는 게 이 실험 전체의 열쇠입니다.</p>
+
+  <div class="frames three">
+    <div class="fr is-ref">
+      <img src="{{REF_END}}" alt="목표로 삼은 끝 그림. 서랍이 열려 있고 남자의 머리와 상반신이 모두 화면 안에 들어와 있는 중간 거리 촬영.">
+      <div class="cap"><b>목표로 삼은 끝 그림</b>
+        ① 서랍이 <b style="display:inline">열려</b> 있을 것<br>
+        ② 남자의 <b style="display:inline">머리까지 보이는 중간 거리</b>로 잡을 것</div>
+    </div>
+    <div class="fr">
+      <img src="{{SO_LAST}}" alt="시작 그림만 주고 만든 영상의 마지막 장면. 화면 구도는 목표와 비슷하지만 서랍이 여전히 닫혀 있다.">
+      <div class="cap"><b>ⓐ 시작만 준 영상</b>
+        화면은 목표대로 잡혔습니다. 그런데 <b style="display:inline">서랍이 안 열렸습니다.</b>
+        <span class="mark m-no">실패 — 동작이 안 일어남</span></div>
+    </div>
+    <div class="fr">
+      <img src="{{SE_LAST}}" alt="시작과 끝 그림을 모두 주고 만든 영상의 마지막 장면. 서랍은 열렸으나 카메라가 크게 확대되어 남자의 머리가 화면 밖으로 잘렸고, 손잡이를 쥔 손 옆에 팔이 하나 더 보인다.">
+      <div class="cap"><b>ⓑ 끝까지 준 영상</b>
+        서랍은 열렸습니다. 그런데 카메라가 밀고 들어와 <b style="display:inline">머리가 완전히 잘렸고</b>, 손잡이를 쥔 손 옆에 <b style="display:inline">팔이 하나 더</b> 있습니다.
+        <span class="mark m-no">실패 — 카메라가 망침 + 팔 결함</span></div>
+    </div>
+  </div>
+
+  <div class="banner" style="border-color:var(--fail)">
+    <h3 style="color:var(--fail)">정답지 — 둘 다 실패입니다</h3>
+    <p>목표는 "머리까지 보이는 거리에서 서랍이 열린다"입니다. <b>이 기준으로는 쓸 수 있는 영상이 하나도 없습니다.</b> ⓐ는 동작이 안 일어났고, ⓑ는 동작은 일어났는데 카메라가 손 클로즈업으로 밀고 들어가 버렸습니다. 게다가 ⓑ는 팔이 두 개로 보이는 결함까지 있습니다.</p>
+    <p style="margin-top:12px"><b>그런데 여기가 이 문서의 핵심입니다 — 실패 이유가 서로 완전히 다릅니다.</b></p>
+    <div class="tbl" style="margin:14px 0 0">
+      <table>
+        <thead><tr><th style="width:22%"></th><th>① 서랍이 열렸나</th><th>② 머리까지 보이게 잡혔나</th><th style="width:16%">종합</th></tr></thead>
+        <tbody>
+          <tr><td><b>ⓐ 시작만</b></td><td><span class="mark m-no">아니오</span></td><td><span class="mark m-yes">예</span></td><td><b>실패</b></td></tr>
+          <tr><td><b>ⓑ 끝까지</b></td><td><span class="mark m-yes">예</span></td><td><span class="mark m-no">아니오</span></td><td><b>실패</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px">우리가 원래 알고 싶었던 건 <b>"끝 그림을 주는 게 효과가 있나"</b>였습니다. 위 표를 보면 답이 보입니다 — <b>효과가 있었습니다(서랍이 열림). 대신 다른 걸 망가뜨렸습니다(카메라가 밀고 들어옴).</b></p>
+    <p style="margin-top:10px;color:var(--muted);font-size:14.5px">그리고 이 답은 <b>두 조건을 따로 봐야만</b> 나옵니다. "둘 다 실패"라고만 하면 원래 질문에 아무 답도 못 합니다. 다음 절이 정확히 그 이야기입니다.</p>
+  </div>
+</section>
+
+<!-- ═══ 3. 1차 시도 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>1차 시도 — 답은 맞았는데 아무 쓸모가 없었다</h2></div>
+  <p class="sec-lede">기계는 "둘 다 실패"라고 답했습니다. 그건 <b>맞는 말입니다.</b> 그런데 실험은 아무것도 알아내지 못했습니다. 왜 그런지가 이 문서에서 제일 중요한 대목입니다.</p>
+
+  <div class="card fail">
+    <div class="card-head"><h3>물어본 방식</h3><span class="chip c-fail">여기가 고장 지점</span></div>
+    <p>기계에게 목표 그림과 영상의 마지막 장면을 나란히 보여주고 이렇게 물었습니다:</p>
+    <blockquote><p><b>"이 마지막 장면이 목표 그림과 같습니까?"</b> — 한 번에, 한 가지 답으로.</p></blockquote>
+    <p>ⓑ 영상(서랍이 실제로 열린 쪽)에 대한 기계의 답:</p>
+    <blockquote>
+      <p><b>답: 아니오</b></p>
+      <p>이유: "화면이 확대돼서 남자의 머리가 잘렸고 구도가 바뀌었다"
+        <span class="orig">원문 — "Image B is zoomed in, cutting off the man's head and changing the framing."</span></p>
+    </blockquote>
+    <p>ⓐ 영상도 마찬가지로 "아니오"였습니다. <b>두 영상 모두 바닥 점수를 받았습니다</b> — 12점 만점에 각각 1점과 2점. 사실상 구분이 안 됐습니다.</p>
+    <p>그런데 <b>같은 기계가 바로 앞 단계에서 ⓑ에 대해 이렇게 관찰해 놨습니다:</b></p>
+    <blockquote>
+      <p>"서랍이 당겨져 열리면서, <b>서랍 자체가</b> 오른쪽 남자 쪽으로 빠져나오고 있다"
+        <span class="orig">원문 — "The drawer is pulled open, moving right towards the man."
+        (움직이는 주체는 카메라가 아니라 서랍입니다. 원문이 이 점에서 모호해 번역에 주체를 명시했습니다.)</span></p>
+    </blockquote>
+  </div>
+
+  <div class="banner" style="border-color:var(--fail)">
+    <h3 style="color:var(--fail)">"둘 다 실패"는 맞는 말이지만, 그걸로는 아무것도 결정할 수 없습니다</h3>
+    <p>기계가 눈이 나빠서가 아닙니다. 서랍이 열린 것도 정확히 봤습니다. 문제는 <b>질문이 두 가지를 한 답으로 뭉쳐서 물었다</b>는 것입니다. "목표 그림과 같습니까?"는 사실 이 두 질문을 합친 것입니다:</p>
+    <ul class="plain" style="margin-top:12px">
+      <li>동작이 끝까지 갔습니까?</li>
+      <li>화면이 목표와 같은 거리로 잡혔습니까?</li>
+    </ul>
+    <p>둘 중 하나만 어긋나도 전체가 "아니오"가 됩니다. 그래서 <b>ⓐ와 ⓑ가 똑같이 "아니오"로 뭉개졌습니다.</b></p>
+    <p style="margin-top:12px">우리가 알고 싶었던 건 "둘 다 좋은가"가 아니라 <b>"끝 그림을 주는 게 효과가 있나"</b>였습니다. 뭉친 답은 이 질문에 <b>구조적으로 답할 수가 없습니다</b> — 둘 다 0점이면 "차이 없음"으로 읽히고, 실제로는 큰 차이가 있는데도 그렇습니다.</p>
+    <p style="margin-top:12px;color:var(--muted);font-size:14.5px">사람도 똑같습니다. "이 영상 몇 점이야?"라고 물으면 머릿속에서 여러 가지를 뭉쳐 하나의 숫자를 내놓고, 그 숫자로는 뭘 고쳐야 하는지 알 수 없습니다. <b>"별로다"는 맞는 말이지만 아무 행동도 유발하지 못합니다.</b></p>
+  </div>
+</section>
+
+<!-- ═══ 4. 2차 시도 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>2차 시도 — 질문을 두 개로 쪼갰다</h2></div>
+  <p class="sec-lede">영상도 그대로, 기계도 그대로, 설정도 그대로. <b>질문만 바꿨습니다.</b></p>
+
+  <h3>질문 1 — 동작만 물었다</h3>
+  <p>"화면이 어떻게 잡혔든 <b>완전히 무시하고</b>, 서랍이 열렸는지만 보세요." 실제로 기계에게 준 지시문에 이렇게 대문자로 못 박아 뒀습니다:</p>
+  <pre><b>You MUST IGNORE camera framing, shot size, camera angle, cropping
+and composition entirely</b> — even if IMAGE B is zoomed, re-framed or
+crops the subject, judge only whether the action reached the same state.
+
+(화면 잡기·크기·각도·잘림·구도는 <b>전부 무시하라</b>. 확대됐든 다시 잡혔든
+잘렸든, 오직 동작이 그 상태에 도달했는지만 판정하라.)</pre>
+
+  <h3>질문 2 — 화면만 따로 물었다</h3>
+  <p>"이번엔 반대로, 화면이 목표와 같은 크기·각도로 잡혔는지만 보세요."</p>
+
+  <h3>결과</h3>
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:20%"></th><th>질문 1 — 서랍이 열렸나</th><th>질문 2 — 화면이 잘 잡혔나</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>ⓐ 시작만</b></td>
+          <td><span class="mark m-no">아니오</span><span class="say">"서랍이 여전히 닫혀 있어 목표의 열린 상태에 도달하지 못했다"</span></td>
+          <td><span class="mark m-yes">예</span><span class="say">"크기, 옆모습 각도, 인물 위치가 목표와 맞는다"</span></td>
+        </tr>
+        <tr>
+          <td><b>ⓑ 끝까지</b></td>
+          <td><span class="mark m-yes">예</span><span class="say">"서랍이 열려 있고 남자 손이 손잡이에 있다 — 둘 다"</span></td>
+          <td><span class="mark m-no">아니오</span><span class="say">"확대돼서 인물의 머리가 잘렸고 화면 크기가 달라졌다"</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p><b>같은 기계가 두 질문에 정반대로 답했습니다.</b> 1차 시도에서는 이 둘이 서로 상쇄돼 아무 신호도 안 남았던 자리입니다.</p>
+
+  <h3>한 번 더 — 둘을 나란히 놓고 고르게 했다</h3>
+  <p>점수를 매기게 하는 대신, 두 영상을 나란히 보여주고 "어느 쪽이 목표에 가깝냐"고 고르게 했습니다. 사람도 절대 점수보다 둘 중 고르는 걸 훨씬 잘하니까요.</p>
+  <ul class="plain">
+    <li><b>동작으로 고르라니 → ⓑ를 골랐습니다.</b> "2번 그림이 서랍이 열려 있어 목표의 동작 상태와 맞는다"</li>
+    <li><b>화면으로 고르라니 → ⓐ를 골랐습니다.</b> "1번 그림이 인물 전체와 배경을 유지해 목표 화면과 맞는다"</li>
+  </ul>
+
+  <div class="banner" style="border-color:var(--pass)">
+    <h3 style="color:var(--pass)">2절의 정답지와 맞춰보면</h3>
+    <div class="tbl" style="margin-top:6px">
+      <table>
+        <thead><tr><th>항목</th><th>사람이 본 것</th><th>기계가 답한 것</th><th style="width:70px">일치</th></tr></thead>
+        <tbody>
+          <tr><td>ⓐ — 서랍이 열렸나</td><td>안 열림</td><td>안 열림</td><td><span class="mark m-yes">일치</span></td></tr>
+          <tr><td>ⓐ — 화면이 맞게 잡혔나</td><td>맞게 잡힘</td><td>맞게 잡힘</td><td><span class="mark m-yes">일치</span></td></tr>
+          <tr><td>ⓑ — 서랍이 열렸나</td><td>열림</td><td>열림</td><td><span class="mark m-yes">일치</span></td></tr>
+          <tr><td>ⓑ — 화면이 맞게 잡혔나</td><td>머리 잘림</td><td>머리 잘림</td><td><span class="mark m-yes">일치</span></td></tr>
+          <tr><td>둘 중 동작으로 고르기</td><td>ⓑ</td><td>ⓑ</td><td><span class="mark m-yes">일치</span></td></tr>
+          <tr><td>둘 중 화면으로 고르기</td><td>ⓐ</td><td>ⓐ</td><td><span class="mark m-yes">일치</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px">여섯 항목 모두 사람과 같은 답입니다. 기계 한 번 돌리는 데 든 돈은 <b>약 $0.02</b>입니다.</p>
+    <p style="margin-top:12px;font-size:17px"><b>그리고 이제야 원래 질문에 답할 수 있습니다: 끝 그림을 주면 동작은 끝까지 갑니다. 대신 카메라가 제멋대로 밀고 들어옵니다.</b></p>
+    <p style="margin-top:8px;color:var(--muted);font-size:14.5px">1차 시도로는 절대 나올 수 없던 문장입니다. 거기서는 "둘 다 별로"까지가 전부였습니다. 이 문장이 있어야 다음에 뭘 고칠지가 정해집니다 — 끝 그림은 계속 주고, 카메라를 붙잡는 방법을 따로 찾아야 합니다.</p>
+  </div>
+
+  <h3>덤 — "화면이 흘렀다"도 기계가 잡았다</h3>
+  <p>사람이 봐야만 알 것 같은 "촬영 중에 화면이 슬금슬금 밀려 들어갔다"도, <b>같은 영상의 첫 장면과 마지막 장면을 맞대는 것</b>만으로 기계가 잡아냅니다.</p>
+  <div class="frames two">
+    <div class="fr">
+      <img src="{{SE_FIRST}}" alt="ⓑ 영상의 첫 장면. 남자의 상반신 전체가 화면에 들어와 있다.">
+      <div class="cap"><b>ⓑ 첫 장면</b>인물 전체가 들어옵니다.</div>
+    </div>
+    <div class="fr">
+      <img src="{{SE_LAST}}" alt="ⓑ 영상의 마지막 장면. 화면이 확대되어 남자의 머리가 화면 밖으로 잘려나갔다.">
+      <div class="cap"><b>ⓑ 마지막 장면</b>7초 사이에 카메라가 밀고 들어와 머리가 잘렸습니다.
+        <span class="mark m-no">기계도 "많이 확대됐다"고 잡음</span></div>
+    </div>
+  </div>
+  <p>두 영상 모두에서 이 밀림이 검출됐습니다.</p>
+
+  <div class="card fail">
+    <div class="card-head"><h3>그런데 세 번째 결함은 아무도 못 잡았습니다</h3><span class="chip c-fail">놓침</span></div>
+    <p>ⓑ 영상의 마지막 장면을 다시 보면, 손잡이를 쥔 손 옆에 <b>팔이 하나 더</b> 있습니다. 사람이 보면 1초 만에 이상하다고 느끼는 결함입니다.</p>
+    <p><b>기계는 이걸 한 번도 언급하지 않았습니다.</b> 질문 1은 "서랍이 열렸나"만 물었고, 질문 2는 "화면이 맞게 잡혔나"만 물었기 때문입니다. <b>아무도 "몸이 정상인가"를 묻지 않았습니다.</b></p>
+    <div class="banner" style="border-color:var(--fail);margin:16px 0 0">
+      <h3 style="color:var(--fail)">기계는 물어본 것만 봅니다</h3>
+      <p>이건 이 방식의 <b>본질적인 한계</b>입니다. 질문을 쪼개면 각 질문에 대해서는 정확해지지만, <b>질문 목록에 없는 결함은 통째로 사라집니다.</b> 1차 시도의 뭉친 질문은 최소한 "뭔가 이상하다"는 신호는 냈습니다 — 쪼갠 질문은 그것마저 안 냅니다.</p>
+      <p style="margin-top:12px">그래서 <b>아침에 사람이 한 번 훑어보는 단계는 없앨 수 없습니다.</b> 기계가 각 항목을 채점하더라도, "목록에 없던 이상한 것"을 발견하는 건 사람 몫으로 남습니다. 밤이 자동으로 결론을 내는 범위를 정할 때 이 사실을 계산에 넣어야 합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 5. 정직한 한계 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>당신 의심이 맞습니다 — 이건 아직 증명이 아닙니다</h2></div>
+  <p class="sec-lede">"저것만 보고 이 판정기가 쓸 만한지 모르겠다"는 말이 정확합니다. 여기서 제가 과장하면 안 되는 지점입니다.</p>
+
+  <p><b>시험 문제가 두 개였습니다.</b> 영상 두 편. 동전을 던져서 찍어도 두 문제 정도는 맞출 수 있습니다. 그러니 이 결과가 말해주는 것과 말해주지 않는 것을 갈라놓겠습니다.</p>
+
+  <div class="split">
+    <div class="yes">
+      <h4>이건 확실합니다</h4>
+      <ul>
+        <li>1차 시도가 <b>왜</b> 고장났는지 — 두 가지를 한 질문에 뭉쳐서</li>
+        <li>질문을 쪼개니 그 고장이 <b>실제로 사라졌다</b> — 같은 영상에서 정반대 답이 따로 나왔음</li>
+        <li>사람이 "화면이 흘렀다"고 느낀 것도 <b>기계가 잡을 수 있다</b></li>
+        <li>비용이 무시할 수준이다 — 영상 한 편 판정에 <b>$0.02</b></li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>이건 전혀 모릅니다</h4>
+      <ul>
+        <li>이 판정기가 <b>다른 영상에서도</b> 사람과 같은 답을 낼지</li>
+        <li>열 번 물으면 <b>몇 번이나</b> 사람과 맞을지</li>
+        <li>서랍처럼 눈에 확 띄는 동작이 아니라 <b>미묘한 동작</b>에서도 되는지</li>
+        <li>그림(정지 이미지)에서도 통하는지 — <b>아직 한 번도 안 해봤습니다</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="banner">
+    <h3>그래서 지금 할 수 있는 말은 딱 이겁니다</h3>
+    <p>"판정기를 만들 수 있다"가 <b>증명된 건 아니고</b>, "판정기가 왜 안 됐는지 알아냈고 그 원인을 없앴다"까지가 <b>확인된 것</b>입니다. 다음 단계를 밟기 전에는 믿으면 안 됩니다.</p>
+  </div>
+</section>
+
+<!-- ═══ 6. 믿으려면 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">6</span><h2>믿으려면 무엇이 더 필요한가</h2></div>
+  <p class="sec-lede">방법은 단순합니다. <b>사람이 이미 답을 아는 문제를 더 많이 풀려보면 됩니다.</b></p>
+
+  <div class="card note">
+    <h3>이미 재료가 다 있습니다</h3>
+    <ul class="plain">
+      <li>같은 실험에서 만들어둔 <b>영상 30편</b>이 이미 디스크에 있습니다. 새로 만들 필요가 없습니다.</li>
+      <li>사람이 눈으로 보고 판단한 기록도 일부 남아 있습니다.</li>
+      <li>기계에게 30편을 다 풀리고, <b>사람 답과 몇 개나 맞는지 세면</b> 됩니다.</li>
+    </ul>
+    <h3>비용</h3>
+    <p>영상 한 편 판정에 약 $0.02이므로 <b>30편이면 약 $0.6</b>입니다. 영상을 새로 만드는 게 아니라 <b>이미 있는 걸 보게만</b> 하는 거라 이 정도입니다. 참고로 영상 한 편을 새로 만드는 데는 약 $1이 듭니다.</p>
+    <h3>그러면 이렇게 말할 수 있게 됩니다</h3>
+    <p style="font-size:17px"><b>"이 판정기는 사람과 열 번 중 여덟 번 같은 답을 낸다."</b> 이 숫자가 나오기 전까지는 밤에 이 판정기로 결론을 내면 안 됩니다.</p>
+  </div>
+</section>
+
+<!-- ═══ 7. 그림 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">7</span><h2>그림(정지 이미지)은 어떻게 되나</h2></div>
+  <p><b>아직 아무것도 해본 적 없습니다.</b> 같은 방법이 통할 것 같지만 그건 제 짐작이고, 위 영상 실험처럼 시험을 쳐봐야 압니다. 다만 <b>쪼갤 수 있는 질문</b>과 <b>쪼갤 수 없는 질문</b>은 지금도 구분됩니다.</p>
+
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:36%">질문</th><th>쪼갤 수 있나</th></tr></thead>
+      <tbody>
+        <tr><td><b>이 두 장이 같은 방으로 보입니까?</b></td><td><span class="mark m-yes">가능</span><span class="say">둘을 나란히 놓고 "같은 장소냐"만 물으면 됩니다. 배경 실험에서 이미 이 질문을 쓰고 있었습니다.</span></td></tr>
+        <tr><td><b>이 두 장의 사람이 같은 사람으로 보입니까?</b></td><td><span class="mark m-yes">가능</span><span class="say">얼굴·복장만 보고 답하게 하면 됩니다.</span></td></tr>
+        <tr><td><b>옆에서 보라고 시켰는데 옆에서 본 그림이 나왔습니까?</b></td><td><span class="mark m-yes">가능</span><span class="say">지시한 각도와 나온 각도를 대조하는 것뿐입니다.</span></td></tr>
+        <tr><td><b>화면 구도가 지시대로 잡혔습니까?</b></td><td><span class="mark m-yes">가능</span><span class="say">위 영상 실험에서 이미 성립했습니다.</span></td></tr>
+        <tr style="background:var(--gate-soft)"><td><b>이 그림이 좋습니까?</b></td><td><span class="mark m-no">불가능</span><span class="say"><b>이건 당신이 봐야 합니다.</b> 아무리 쪼개도 "좋다"는 안 쪼개집니다. 밤은 여기 손대지 않습니다.</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card warn">
+    <h3>참고 — 8월 12일 밤에 이미 이 문제로 돈이 샜습니다</h3>
+    <p>배경 실험 두 건에 <b>$8.78</b>을 썼는데 <b>둘 다 결론이 안 났습니다.</b> 위 질문들(같은 방인가, 각도가 맞나)을 이미 쓰고 있었는데, <b>사람이 보고 고를 수 있게 정리한 비교표를 아무도 만들지 않아서</b> 영상만 뽑아두고 멈춘 겁니다. 축이 없어서가 아니라 <b>마지막 정리 단계를 아무도 안 맡아서</b> 생긴 일입니다.</p>
+  </div>
+</section>
+
+<!-- ═══ 8. 코드 쪽 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">8</span><h2>코드 쪽은 어떤가 — 밤이 사람 없이 결론을 낸 실제 사례</h2></div>
+  <p class="sec-lede">영상은 아직 반쪽이지만, 코드와 데이터를 보는 일은 이미 밤에 사람 없이 결론까지 갔습니다. 세 건을 그대로 보여드립니다 — 잘된 것 둘, 안 된 것 하나.</p>
+
+  <div class="card pass">
+    <div class="card-head"><h3>사례 1 — 미리 정해둔 선에 걸려서 결론이 뒤집혔다</h3><span class="chip c-pass">자동으로 결론 남</span></div>
+    <p><b>밤에 확인하려던 것:</b> 로그인 없이도 들어갈 수 있는 통로들이 전부 구경만 하는 통로인가? 돈을 쓰거나 데이터를 고치는 통로는 하나도 없는가?</p>
+    <p><b>밤이 시작되기 전에 미리 적어둔 판정선:</b></p>
+    <blockquote><p>"로그인 없이 열린 통로 중에 <b>돈을 쓰는 통로나 데이터를 고치는 통로가 하나라도</b> 있으면, 이 확인은 틀린 것으로 친다. 그런 통로의 위치와 코드 줄 번호를 그대로 남긴다."</p></blockquote>
+    <p><b>밤이 한 일:</b> 통로를 하나도 빠짐없이 열거하고, 각 통로가 로그인 검사를 하는지 코드에서 확인하고, 로그인 없이 열린 것들만 골라 각각 돈을 쓰는지 데이터를 고치는지 다시 확인했습니다. 기계의 주관적 판단은 한 번도 안 썼습니다 — 전부 코드를 읽어서 세는 방식입니다.</p>
+    <p><b>결과:</b> 로그인 없이 열린 통로가 9개였고, 그중 <b>3개가 돈을 쓰거나 데이터를 고쳤습니다.</b> 미리 적어둔 선에 그대로 걸려서 <b>"틀렸다"로 결론</b>났습니다. 사람은 한 번도 개입하지 않았습니다. 덤으로 목록에 없던 통로 두 개가 내부 주소를 노출하는 것까지 잡혔습니다.</p>
+    <p style="color:var(--muted);font-size:14.5px"><b>여기서 배울 것:</b> "하나라도 있으면"이라는 선이 <b>밤이 시작되기 전에</b> 적혀 있었습니다. 그래서 결론이 논쟁 없이 자동으로 났습니다. 만약 "적당히 많으면 문제"라고 적었으면 밤은 결론을 못 냈을 겁니다.</p>
+  </div>
+
+  <div class="card pass">
+    <div class="card-head"><h3>사례 2 — 애매한 경우까지 미리 정해둬서 멈추지 않았다</h3><span class="chip c-pass">자동으로 결론 남</span><span class="chip c-warn">사람 손 한 번</span></div>
+    <p><b>밤에 확인하려던 것:</b> 우리가 정해둔 규칙 수치들이 글로만 적혀 있고 코드로는 절반도 안 지켜지는가?</p>
+    <p><b>미리 적어둔 판정선 — 세 갈래로 적어뒀습니다:</b></p>
+    <blockquote>
+      <p>① 코드로 지켜지는 비율이 <b>절반을 넘으면</b> 이 확인은 틀린 것으로 친다.</p>
+      <p>② 규칙 수치가 <b>세 개도 안 되면</b> "잴 대상이 너무 적다"로 끝낸다(비율을 따질 수 없으므로).</p>
+      <p>③ 지키는 건지 애매한 것(기록만 남기고 그냥 통과시키는 경우 등)은 <b>계산에서 빼고, 뺐다는 사실을 결과에 적는다.</b></p>
+    </blockquote>
+    <p><b>결과:</b> 8개 중 1개만 코드로 지켜졌습니다. 12.5%로 절반보다 훨씬 아래라 <b>"맞다"로 결론</b>났습니다. 게다가 유일하게 지켜지던 그 하나조차 정본 숫자를 읽어오지 않고 숫자를 그대로 베껴 쓴 것까지 파일과 줄 번호로 잡혔습니다.</p>
+    <div class="banner" style="border-color:var(--warn);margin-top:18px">
+      <h3 style="color:var(--warn)">그런데 이 한 줄이 중요합니다</h3>
+      <p>밤이 스스로 남긴 정직한 보고: <b>"자동으로 찾는 도구가 두 번 다 틀렸다 — 한 번은 너무 적게, 한 번은 너무 많이 잡았다. 그래서 사람이 대조해서 확정했다."</b></p>
+      <p style="margin-top:10px">즉 <b>판정선은 잘 작동했는데 세는 도구가 못 미더웠습니다.</b> 야간 루프를 짜면 이 지점이 반복해서 터집니다 — 판정 기준보다 <b>재는 도구가 먼저 무너집니다.</b> 밤에 새 도구를 쓸 때는 그 도구가 맞는지 검산하는 것까지 일감에 넣어야 합니다.</p>
+    </div>
+  </div>
+
+  <div class="card fail">
+    <div class="card-head"><h3>사례 3 — 판정선은 완벽했는데 잴 대상이 아예 없었다</h3><span class="chip c-fail">결론 못 냄</span></div>
+    <p><b>밤에 확인하려던 것:</b> 카메라를 어떻게 움직이라고 지시한 것과 실제로 그려진 그림이 어긋나는 일이 흔한가?</p>
+    <p>판정선은 잘 적혀 있었습니다. 문제는 <b>그 선을 발동시킬 데이터가 없었다는 것</b>입니다. 밤에 가서 보니:</p>
+    <ul class="plain">
+      <li>티켓에 적힌 단어가 <b>데이터에 아예 없었습니다.</b> 티켓은 <code>left_to_right</code>(왼쪽에서 오른쪽으로)라고 적었는데, 실제 데이터에는 <code>left</code>라고만 적혀 있었습니다. 티켓에 적힌 단어로 찾으니 <b>한 건도 안 나왔습니다.</b></li>
+      <li>비교하려던 시작 그림과 끝 그림도 <b>없었습니다.</b> 조건에 맞는 장면 세 개가 전부 그림이 안 만들어진 상태였습니다.</li>
+      <li>기준으로 삼은 장면에는 <b>카메라 항목 자체가 없었습니다.</b></li>
+    </ul>
+    <p><b>결과:</b> 맞다도 틀리다도 아닌 채로 끝났습니다.</p>
+    <div class="banner" style="border-color:var(--fail);margin-top:18px">
+      <h3 style="color:var(--fail)">원인은 한 줄입니다</h3>
+      <p>티켓을 쓴 쪽이 <b>대화에서 들은 단어를 그대로 옮겨 적었고, 그 단어가 데이터에 진짜 있는지 한 번도 찾아보지 않았습니다.</b></p>
+      <p style="margin-top:10px">찾아보는 건 <b>공짜</b>였습니다. 명령어 한 줄이면 "0건"이 나왔을 것이고, 그러면 이 티켓은 애초에 만들어지지 않았을 겁니다. 끝난 일 <b>36건 중 7건</b>이 이런 식으로 끝났습니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 9. 결론 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">9</span><h2>여기서 나오는 것</h2></div>
+
+  <div class="card note">
+    <h3>1. 영상 판정기는 "될 것 같다"까지다. 아직 쓰면 안 된다.</h3>
+    <p>고장 원인은 확실히 잡았고 고쳤습니다. 하지만 시험 문제 두 개로는 믿을 수 없습니다. <b>$0.6짜리 시험</b>을 한 번 더 쳐서 "열 번 중 몇 번 맞는지"를 숫자로 만든 다음에 쓰는 게 맞습니다.</p>
+
+    <h3>2. 질문은 반드시 쪼개서 물어야 한다.</h3>
+    <p>"잘 됐어?"라고 뭉쳐 물으면 기계도 사람도 쓸모없는 답을 냅니다. "동작이 끝났어?"와 "화면이 맞아?"를 따로 물어야 합니다. 이건 영상뿐 아니라 <b>모든 판정에 적용되는 규칙</b>입니다.</p>
+
+    <h3>3. 기계는 물어본 것만 본다 — 그래서 사람이 훑어보는 단계는 없앨 수 없다.</h3>
+    <p>ⓑ 영상의 <b>팔이 두 개로 보이는 결함</b>을 기계는 한 번도 언급하지 않았습니다. 아무도 "몸이 정상인가"를 안 물었기 때문입니다. 질문을 쪼개면 각 항목은 정확해지지만 <b>목록에 없는 결함은 통째로 사라집니다.</b> 밤이 채점표를 다 채우더라도 아침에 사람이 한 번 훑는 단계는 남아야 합니다.</p>
+
+    <h3>4. "좋은가"는 영원히 사람 몫이다.</h3>
+    <p>같은 방인가 · 같은 사람인가 · 지시한 각도인가 · 구도를 지켰나 — 이건 전부 기계가 볼 수 있습니다. <b>"이게 좋은가"만</b> 아침에 당신이 봅니다. 밤이 여기 손대려 하면 그때부터 결과를 믿을 수 없게 됩니다.</p>
+
+    <h3>5. 밤이 스스로 결론 내려면, 판정선이 밤 시작 전에 적혀 있어야 한다.</h3>
+    <p>사례 1과 2가 자동으로 끝난 이유가 이것뿐입니다. "하나라도 있으면 틀린 것" 같은 선이 미리 있으면 밤은 논쟁 없이 결론을 냅니다. 애매한 경우까지 미리 적어두면 더 좋습니다.</p>
+
+    <h3>6. 그런데 판정선만으로는 부족하다 — 잴 대상이 진짜 있는지도 확인해야 한다.</h3>
+    <p>사례 3이 정확히 그래서 무너졌습니다. 티켓을 만들 때 <b>그 단어가 데이터에 실제로 몇 건 있는지 한 번 찾아보고, 그 숫자를 티켓에 적어두면</b> 이런 티켓은 아예 안 만들어집니다. 공짜입니다.</p>
+
+    <h3>7. 판정 기준보다 재는 도구가 먼저 무너진다.</h3>
+    <p>사례 2에서 자동으로 세는 도구가 양쪽으로 다 틀렸습니다. 밤에 새 도구를 쓴다면 <b>그 도구가 맞는지 검산하는 것까지</b> 일감에 포함시켜야 합니다.</p>
+  </div>
+</section>
+
+<footer>
+  <p><b>이 문서가 근거로 쓴 것</b> — 영상 판정 프로그램과 그 실행 결과 파일(2026년 8월 11일 새벽 1시 15분 기록), 실험에 실제로 쓰인 영상 프레임 원본, 그리고 티켓 원장 세 장. 모든 인용문은 기록에 있는 그대로이고, 영어 원문은 회색 글씨로 함께 붙였습니다.</p>
+  <p><b>이 문서가 하지 않는 것</b> — 영상 30편 전체 판정 결과는 여기 없습니다(아직 안 돌렸습니다). 그림 판정은 <b>제안일 뿐 한 번도 시험한 적 없습니다.</b> 이 둘을 이미 검증된 것처럼 읽으면 안 됩니다.</p>
+</footer>
+
+</div>

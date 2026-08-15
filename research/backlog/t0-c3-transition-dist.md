@@ -1,10 +1,10 @@
 ```yaml
 id: t0-c3-transition-dist
 source: .claude/vault/2026-08-10-prompt-contract-audit.md §3 재검증① · 계약 카탈로그 C3❌
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 30 }
 blockers: []
-status: done  # 2026-08-11 밤 러너 — 유보(합산 93.3%, 80~95% 사전등록 유보구간; in 97.5%/out 89.2%), 결과: research/experiments/t0-c3-transition-dist/
+status: 완료  # 2026-08-11 밤 러너 — 유보(합산 93.3%, 80~95% 사전등록 유보구간; in 97.5%/out 89.2%), 결과: research/experiments/t0-c3-transition-dist/
 priority: high  # Q2(캡 완화)의 증거
 ```
 

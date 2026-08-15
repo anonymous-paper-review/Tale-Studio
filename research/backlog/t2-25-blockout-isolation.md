@@ -1,10 +1,10 @@
 ```yaml
 id: t2-25-blockout-isolation
 source: research/experiments/seedance-25-timing/notes.md (3암 전부 블록아웃 동반 — 교란 미제거) · 에이전트 권고 "다음 1순위"
-tier: T2
+종류: 발주실험
 budget: { usd: 6, runs: 1, wall_min: 90 }
 blockers: []
-status: done  # 2026-08-11 밤 — 기각 조건 대입 "3D가 공로자"(TC 블록아웃 없음 완료 ~3.25s, 허용 1.5~2.5s 밖). 잠정(n=1·시드 없음). 2암만 실행($6.4714/$6.5 — 영상참조 제거로 0.6 할인 소멸, 3암 $9.71은 캡 초과). 결과: research/experiments/seedance-25-timing/no-blockout/
+status: 완료  # 2026-08-11 밤 — 기각 조건 대입 "3D가 공로자"(TC 블록아웃 없음 완료 ~3.25s, 허용 1.5~2.5s 밖). 잠정(n=1·시드 없음). 2암만 실행($6.4714/$6.5 — 영상참조 제거로 0.6 할인 소멸, 3암 $9.71은 캡 초과). 결과: research/experiments/seedance-25-timing/no-blockout/
 priority: high
 ```
 

@@ -30,6 +30,10 @@ import { isCompactDepth } from '@/lib/writer/types/pipeline';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
 import { resolveModels, resolveSkip, emptyC1Report } from '@/lib/writer/pipeline';
 import {
+  runWriterV2Preview,
+  type WriterV2Package,
+} from '@/lib/writer/v2/semantic-unit';
+import {
   getActiveRun,
   saveRunState,
   markCompleted,
@@ -40,10 +44,6 @@ import {
   type WriterErrorDetail,
 } from '@/lib/writer/run-store';
 import { getPendingRawCalls, getUsageTotals } from '@/lib/writer/llm/raw_collector';
-import {
-  runWriterV2Preview,
-  type WriterV2Package,
-} from '@/lib/writer/v2/semantic-unit';
 import type {
   PipelineInput,
   SceneCinematography,

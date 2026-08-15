@@ -15,7 +15,9 @@
     "seed:producer:clone": "node scripts/producer-seed.mjs clone",
     "seed:producer:reset": "node scripts/producer-seed.mjs reset",
     "seed:producer:prune": "node scripts/producer-seed.mjs prune",
-    "seed:producer:status": "node scripts/producer-seed.mjs status"
+    "seed:producer:status": "node scripts/producer-seed.mjs status",
+    "map:dev": "node research/tools/writer-map/serve.mjs",
+    "map:build": "node research/tools/writer-map/build.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -32,6 +34,7 @@
     "jsonwebtoken": "^9.0.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.576.0",
+    "mammoth": "^1.12.1",
     "modern-screenshot": "^4.7.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",

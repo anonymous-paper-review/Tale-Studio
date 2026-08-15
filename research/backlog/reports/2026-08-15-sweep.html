@@ -1,0 +1,399 @@
+<title>밤사이 그물 — 2026년 8월 15일</title>
+<style>
+  :root {
+    --bg: #F7F5F0;
+    --surface: #FFFFFF;
+    --surface-2: #F1EEE6;
+    --ink: #22242A;
+    --muted: #6E7077;
+    --line: #E3E0D8;
+    --accent: #A64F2A;
+    --accent-ink: #8A3F1E;
+    --accent-soft: #F3E4DB;
+    --ok: #2F7D4E;
+    --ok-soft: #E2F0E7;
+    --warn: #96690A;
+    --warn-soft: #F5EBD4;
+    --info: #3A6EA5;
+    --info-soft: #E3ECF5;
+    --violet: #7A5CA8;
+    --violet-soft: #ECE5F5;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15171B; --surface: #1D2026; --surface-2: #23262D;
+      --ink: #E9E7E2; --muted: #9C9EA6; --line: #2C2F36;
+      --accent: #E0824F; --accent-ink: #E8956A; --accent-soft: #3A2A20;
+      --ok: #5FBE8A; --ok-soft: #1E3328;
+      --warn: #D9A94A; --warn-soft: #362C16;
+      --info: #7FA9D9; --info-soft: #1E2A38;
+      --violet: #A78BD0; --violet-soft: #2B2438;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15171B; --surface: #1D2026; --surface-2: #23262D;
+    --ink: #E9E7E2; --muted: #9C9EA6; --line: #2C2F36;
+    --accent: #E0824F; --accent-ink: #E8956A; --accent-soft: #3A2A20;
+    --ok: #5FBE8A; --ok-soft: #1E3328;
+    --warn: #D9A94A; --warn-soft: #362C16;
+    --info: #7FA9D9; --info-soft: #1E2A38;
+    --violet: #A78BD0; --violet-soft: #2B2438;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", sans-serif;
+    font-size: 15.5px; line-height: 1.7; margin: 0; padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  header.page { padding: 54px 0 10px; border-bottom: 2px solid var(--ink); margin-bottom: 20px; }
+  .kicker { color: var(--accent); font-weight: 700; font-size: 13px; margin: 0 0 10px; }
+  h1 { font-size: clamp(25px, 4.5vw, 34px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.28; margin: 0 0 10px; text-wrap: balance; }
+  .standfirst { font-size: 16px; color: var(--ink); margin: 0 0 6px; }
+  .asof { color: var(--muted); font-size: 13px; margin: 0; }
+  h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+  section.block { margin: 42px 0 0; }
+  .sec-head { border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 16px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .sec-head .lede { color: var(--muted); font-size: 14px; }
+  p { margin: 0 0 12px; }
+
+  .chip { display: inline-block; font-size: 12px; font-weight: 750; border-radius: 4px; padding: 1px 8px; white-space: nowrap; vertical-align: 1px; }
+  .c-ok { background: var(--ok-soft); color: var(--ok); }
+  .c-no { background: var(--info-soft); color: var(--info); }
+  .c-hold { background: var(--warn-soft); color: var(--warn); }
+  .c-fix { background: var(--accent-soft); color: var(--accent-ink); }
+  .c-stop { background: var(--violet-soft); color: var(--violet); }
+
+  .lead-list { margin: 0; padding-left: 0; list-style: none; counter-reset: n; }
+  .lead-list > li { position: relative; padding: 10px 0 10px 36px; border-bottom: 1px dashed var(--line); }
+  .lead-list > li:last-child { border-bottom: none; }
+  .lead-list > li::before { counter-increment: n; content: counter(n); position: absolute; left: 0; top: 12px; width: 22px; height: 22px; border: 1.5px solid var(--accent); color: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 750; font-family: var(--mono); }
+  .lead-list b { font-weight: 750; }
+  .lead-list .d { color: var(--muted); font-size: 13.5px; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px 14px; margin: 0 0 14px; }
+  .card .head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 12px; }
+  .card .head h3 { font-size: 16.5px; font-weight: 750; margin: 0; line-height: 1.45; text-wrap: balance; flex: 1 1 300px; }
+  .steps { display: grid; gap: 8px; margin: 0; }
+  .steps .row { display: grid; grid-template-columns: 74px 1fr; gap: 12px; align-items: baseline; }
+  .steps .k { font-size: 12px; font-weight: 750; color: var(--accent); letter-spacing: .02em; }
+  .steps .v { font-size: 14.5px; }
+  .steps .v b { font-weight: 750; }
+  @media (max-width: 520px) { .steps .row { grid-template-columns: 1fr; gap: 2px; } }
+  .left { border-top: 1px dashed var(--line); margin-top: 12px; padding-top: 9px; font-size: 13.5px; color: var(--muted); }
+  .left b { color: var(--ink); font-weight: 700; }
+
+  details { margin-top: 10px; border-top: 1px dashed var(--line); }
+  details summary { cursor: pointer; padding: 8px 0 4px; font-size: 13px; font-weight: 700; color: var(--info); list-style: none; }
+  details summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details summary::-webkit-details-marker { display: none; }
+  details .body { padding: 4px 0 8px; font-size: 13.5px; color: var(--ink); }
+  details .body p { margin: 0 0 8px; }
+  .mono, code { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  .quote { border-left: 3px solid var(--accent); padding: 1px 0 1px 12px; margin: 8px 0; font-size: 13.5px; }
+
+  .tbl-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 700; font-size: 12px; padding: 6px 10px; border-bottom: 2px solid var(--line); white-space: nowrap; }
+  td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  pre.flow { background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; overflow-x: auto; font-family: var(--mono); font-size: 12px; line-height: 1.65; margin: 10px 0; }
+
+  footer { margin-top: 56px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 14px; }
+  a { color: var(--info); text-decoration: none; }
+  a:hover, a:focus-visible { text-decoration: underline; }
+  a:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; border-radius: 2px; }
+</style>
+
+<div class="wrap">
+
+<header class="page">
+  <p class="kicker">밤사이 그물</p>
+  <h1>어젯밤 대화 다섯 편을 건졌습니다 — 규칙대로였다면 한 편도 못 건질 뻔했습니다</h1>
+  <p class="standfirst">지출 0원. 잠든 사이 끝난 대화 여섯 편에서 열린 것을 골라 확인 계획 네 장으로 쪼갰습니다. 그런데 그 과정에서 <b>그물 자체의 결함 두 개</b>가 드러났고, 그게 오늘의 가장 큰 소식입니다.</p>
+  <p class="asof">2026년 8월 15일 새벽 1시 31분 실행 · 상세 원장: <code>research/backlog/reports/2026-08-15-sweep.md</code></p>
+</header>
+
+<section class="block">
+  <div class="sec-head"><h2>3분 요약</h2><span class="lede">먼저 알아야 할 세 가지</span></div>
+  <ol class="lead-list">
+    <li>
+      <b>그물이 어젯밤 대화 다섯 편을 놓칠 뻔했습니다.</b> 규칙대로 돌렸을 때 걸린 건 딱 한 편이었고, 그 한 편은 본문이 “오케이만 답해라” 한 줄인 빈 대화였습니다. 진짜 내용이 있는 다섯 편은 “아직 작업 중일지 모른다”는 이유로 제외됐는데, <b>다음 날에도 그 시간대는 다시 안 훑습니다.</b> 오늘은 알아채고 따로 건졌습니다.
+      <div class="d">그물은 어제 성공한 시각부터 다시 훑도록 만들어져 있지만, 그 시각이 <i>훑기가 끝난 때</i>에 찍히고 범위는 <i>시작한 때</i>부터 재기 때문에 간격이 늘 스물네 시간보다 아슬하게 짧습니다. 그래서 범위를 넓히는 장치가 이 구멍에는 영원히 안 켜집니다.</div>
+    </li>
+    <li>
+      <b>범위를 넓히는 안전장치가 오늘 죽어 있었습니다.</b> 마지막 성공 시각을 적어두는 자리에 숫자 대신 날짜 글자가 들어가 있어서, 그물이 읽다 실패하고 조용히 기본값으로 되돌아갔습니다. 어젯밤 사람 손으로 도장을 찍으면서 <b>다른 도장과 형식을 헷갈린 것</b>으로 보입니다.
+      <div class="d">오늘은 마침 간격이 짧아 실제 손실은 없었고, 오늘 밤 그물이 다시 숫자로 덮어써 형식은 복구됐습니다. 다만 하루라도 건너뛴 밤이 있었다면 그날 대화는 통째로 사라졌을 것이고, 경고 한 줄 말고는 아무도 몰랐을 겁니다.</div>
+    </li>
+    <li>
+      <b>어젯밤 가장 큰 조사가 사용 한도에 걸려 끊겼는데, 결과물이 지워질 자리에 있습니다.</b> 이백 개가 넘는 조수를 붙여 만든 문제 목록(원문 1,049건을 150건으로 묶고 하나씩 코드와 대조한 것)이 <b>임시 폴더</b>에 남아 있습니다. 쓰려던 문서는 안 써졌습니다.
+      <div class="d">스위퍼가 파일이 살아 있는 것까지 확인해 정확한 경로를 노트에 적어뒀습니다. 옮기거나 정리하지 않으면 사라집니다.</div>
+    </li>
+  </ol>
+
+  <details>
+    <summary>오늘 당신이 결정할 것 — 다섯 가지</summary>
+    <div class="body">
+      <p><b>1. 지워질 자리에 있는 조사 결과를 어떻게 할지.</b> 그대로 두면 사라집니다. 옮기거나, 그 대화를 되살려 마무리하거나.</p>
+      <p><b>2. 로그인한 아무나가 남의 작품에 돈 나가는 생성을 걸 수 있는 문제.</b> 유료 경로 여덟 곳 중 여섯 곳이 “로그인했는가”만 보고 “네 작품인가”는 안 봅니다. 어젯밤 조사가 직접 표로 확인했습니다. 관측은 끝났고 남은 건 고치는 일입니다.</p>
+      <p><b>3. 커밋되지 않은 큰 작업 하나.</b> 첨부 기능 작업이 한도에 걸려 멈췄는데, 그 사이 <b>운영 데이터는 이미 새 모양으로 바뀌었습니다.</b> 코드만 버리면 데이터가 앞서간 상태로 남습니다.</p>
+      <p><b>4. 확인 계획 네 장을 실행할지.</b> 둘은 공짜(읽고 세기만 함), 둘은 각 6달러입니다. 전부 <b>초안</b>이라 당신이 올리기 전에는 아무도 실행하지 않습니다.</p>
+      <p><b>5. 디자인 주제를 어디서 이어갈지.</b> 두 대화에 갈라져 있습니다 — 색과 여백 체계를 처음부터 다시 잡는 이야기, 그리고 담당자 다섯의 캐릭터 후보 고르기.</p>
+    </div>
+  </details>
+</section>
+
+<section class="block">
+  <div class="sec-head"><h2>설계와 확인의 연결</h2><span class="lede">큰 논의 발밑에 깔린 사실만 뽑았습니다</span></div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>어젯밤의 큰 논의</th><th>그 발밑에 깔려 있던 사실 전제</th><th>실제 한 일</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>글쓰기 한 바퀴가 너무 오래 걸려 중간에 잘린다 — 어디를 더 손봐야 하나</td>
+          <td>“어제 네 군데를 고쳤는데, 지금 한 바퀴가 몇 초인지 아무도 모른다”</td>
+          <td>확인 계획 두 장으로 쪼갬 — 먼저 공짜로 코드를 읽어 어느 단계가 새 설정을 타는지 세고, 그 다음에 실제로 재기</td>
+        </tr>
+        <tr>
+          <td>품질을 위해 바꾼 모델이 속도에 얼마를 물렸나</td>
+          <td>“같은 입력·같은 횟수인데 모델이 쓴 시간이 3분의 1 늘었다. 대신 얻은 품질은 아무도 안 쟀다”</td>
+          <td>확인 계획 한 장 — 같은 조건에서 나란히 세 번씩 재기</td>
+        </tr>
+        <tr>
+          <td>바깥 업체에 맡긴 작업이 왜 조용히 실패하나</td>
+          <td>“완료 소식이 돌아올 주소가 오너 컴퓨터의 임시 통로다. 주소가 바뀌면 소식은 갈 곳을 잃는다”</td>
+          <td>확인 계획 한 장 — 소식을 못 받아 굳은 작업이 실제로 남아 있는지 세기(공짜)</td>
+        </tr>
+        <tr>
+          <td>글쓰기 단계의 문제를 전부 한자리에 모으기</td>
+          <td>“이백 개 넘는 조수가 만든 결과가 어디 있나 — 살아 있나”</td>
+          <td>스위퍼가 직접 확인 — <b>살아 있다.</b> 단 임시 폴더라 사라질 수 있음</td>
+        </tr>
+        <tr>
+          <td>담당자 다섯의 캐릭터를 어떤 모습으로</td>
+          <td>없음 — 사실 축이었던 색 대비는 그 대화가 이미 숫자로 닫았다</td>
+          <td><b>확인 계획 0장이 정상.</b> 남은 건 전부 취향 판단이라 아침 카드로만</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="asof" style="margin-top:10px">설계 판단 자체는 하지 않았습니다. 그물은 논의에 필요한 사실만 모아두고, 논의는 아침에 사람이 합니다.</p>
+</section>
+
+<section class="block">
+  <div class="sec-head"><h2>그물 자체의 결함 둘</h2><span class="lede">오늘의 가장 큰 소식</span></div>
+
+  <div class="card">
+    <div class="head"><h3>“작업 중이라 나중에”가 “영영 안 봄”이 되고 있었다</h3><span class="chip c-fix">사실이었다</span></div>
+    <div class="steps">
+      <div class="row"><div class="k">맥락</div><div class="v">그물은 방금까지 움직인 대화를 “아직 쓰는 중일 수 있다”며 한 시간 동안 건너뜁니다. 합리적인 규칙이고, 다음 날 다시 보면 된다는 전제였습니다.</div></div>
+      <div class="row"><div class="k">가설</div><div class="v">그 전제가 틀렸다면 — 다음 날 훑는 범위가 그 한 시간을 안 덮는다면 — 매일 밤 한 시간짜리 사각지대가 생긴다.</div></div>
+      <div class="row"><div class="k">확인</div><div class="v">건너뛰기를 끄고 같은 시각으로 다시 돌려봤습니다. <b>제외된 일곱 중 다섯이 진짜 작업 대화였습니다</b>(합쳐서 31메가바이트). 자동화가 돌린 대화 둘은 그물이 알아서 걸러냈습니다.</div></div>
+      <div class="row"><div class="k">결과</div><div class="v">사각지대가 실재합니다. 게다가 범위를 넓히는 안전장치는 <b>이 구멍에는 원리적으로 안 켜집니다</b> — 성공 도장이 훑기가 끝난 때 찍히는데 범위는 시작한 때부터 재서, 간격이 늘 스물네 시간을 아슬하게 못 넘기기 때문입니다.</div></div>
+    </div>
+    <div class="left"><b>남긴 것:</b> 구제한 수확물 여섯 편과 사람이 제안을 되돌린 자리 열여섯 건 — <code>research/backlog/sweep/2026-08-15-recent/</code>. 기본 규칙대로의 수확물은 <code>sweep/2026-08-15/</code>에 그대로 뒀습니다(대조용).</div>
+    <details>
+      <summary>이미 올라와 있는 비슷한 카드와 무엇이 다른가</summary>
+      <div class="body">
+        <p>아침 카드에 이미 “도장을 너무 일찍 찍는다”는 항목이 있습니다(8월 13일 등록). 그건 <b>도장을 찍는 시점</b> 문제입니다 — 훑기 직후에 찍혀서, 그 뒤 단계에서 죽으면 그 범위가 통째로 날아간다는 것.</p>
+        <p>오늘 것은 <b>건너뛰기 규칙과 범위 계산이 서로 안 맞물리는</b> 문제입니다. 도장을 제때 찍어도 이 구멍은 남습니다. 둘 다 고쳐야 하나가 안 남습니다.</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>안전장치가 조용히 꺼져 있었다 — 도장 형식이 어긋나서</h3><span class="chip c-fix">사실이었다</span></div>
+    <div class="steps">
+      <div class="row"><div class="k">맥락</div><div class="v">그물이 하루 못 뜨더라도 다음 밤이 그 공백까지 넓혀 훑도록 만들어져 있습니다. 그러려면 “마지막으로 성공한 시각”을 읽을 수 있어야 합니다.</div></div>
+      <div class="row"><div class="k">가설</div><div class="v">그 시각을 못 읽으면 안전장치는 조용히 꺼지고, 건너뛴 밤의 대화가 영영 사라진다.</div></div>
+      <div class="row"><div class="k">확인</div><div class="v">오늘 첫 줄에 경고가 떴습니다. 그 자리에 숫자가 아니라 <b>날짜 글자</b>가 적혀 있었습니다. 형상 관리 기록을 보니 직전 값은 숫자였습니다 — 어젯밤 사람 손으로 찍으면서 바뀐 겁니다.</div></div>
+      <div class="row"><div class="k">결과</div><div class="v">오늘은 간격이 스물네 시간보다 짧아 어차피 안 넓어졌을 상황이라 <b>실제 손실은 없었습니다.</b> 오늘 밤 그물이 숫자로 다시 덮어써 형식도 복구됐습니다. 하지만 하루 건너뛴 밤이 있었다면 그날은 통째로 증발했을 겁니다.</div></div>
+    </div>
+    <div class="left"><b>남긴 것:</b> 원인 진단만. 그물 코드는 고치지 않았습니다 — 산출물이 “판정”이 아니라 “동작하는 물건”이면 밤 작업 대상이 아니라는 규칙에 따라 아침으로 넘깁니다.</div>
+    <details>
+      <summary>실제 경고 문구와 두 도장의 차이</summary>
+      <div class="body">
+        <pre class="flow">⚠ 마지막 성공 시각을 못 읽음(could not convert string to float:
+  '2026-08-14T01:48:44+0900') — 기본 창 24시간으로 진행</pre>
+        <p><code>sweep/.last-launch</code> — 기동 도장. 사람이 읽을 날짜 글자로 적습니다. 이게 없으면 “아예 안 떴다”는 뜻.</p>
+        <p><code>sweep/.last-success</code> — 성공 도장. <b>숫자(초 단위 시각)</b>로 적어야 프로그램이 읽습니다. 직전 값은 <code>1786469127.283189</code>였습니다.</p>
+        <p>둘을 헷갈리지 말라는 경고가 규칙 문서 맨 앞에 이미 있습니다. 그 경고가 가리키던 사고가 실제로 났습니다.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="block">
+  <div class="sec-head"><h2>어젯밤 대화에서 건진 것</h2><span class="lede">확인 계획 네 장 — 전부 초안</span></div>
+
+  <div class="card">
+    <div class="head"><h3>어제 네 군데를 고쳤는데, 지금 한 바퀴가 몇 초인지 아무도 모른다</h3><span class="chip c-hold">확인 대기</span></div>
+    <div class="steps">
+      <div class="row"><div class="k">맥락</div><div class="v">어제 하루에 네 군데를 고쳤습니다 — 대사를 동시에 쓰게 하고, 샷 설계를 두 배로 겹쳐 돌리고, 잘린 답을 다시 묻게 하고, 마지막에 웹으로 사실을 확인하는 호출의 모델을 바꿨습니다. <b>전체 시간을 잰 것은 마지막 수리 직전이 마지막입니다</b>(731초).</div></div>
+      <div class="row"><div class="k">가설</div><div class="v">두 장으로 쪼갰습니다. 먼저 <b>공짜</b>로 — 웹 확인 도구를 쥐는 단계가 세 곳인데 전부 새 모델로 가는가, 하나만 가는가. 그 다음 <b>6달러</b>로 — 지금 한 바퀴가 600초 아래로 떨어졌는가.</div></div>
+      <div class="row"><div class="k">확인</div><div class="v">앞의 것은 코드를 읽고 저장된 호출 기록에서 모델 이름을 세면 끝납니다. 뒤의 것은 같은 작품을 기본 설정 그대로 세 번 돌려 단계별 시간표를 뽑습니다.</div></div>
+      <div class="row"><div class="k">결과</div><div class="v">아직 안 했습니다. <b>싼 것이 먼저</b>이고, 뒤의 것은 앞의 것을 선행 조건으로 물고 있습니다 — 세 단계 중 일부만 새 모델을 탄다면 기대 절감폭 자체가 달라지기 때문입니다.</div></div>
+    </div>
+    <div class="left"><b>남긴 것:</b> 확인 계획 두 장 — <code>t0-grounding-pin-stage-coverage</code>(0달러), <code>t1-pipeline-wallclock-after-pin</code>(6달러). 둘 다 <b>초안</b>.</div>
+    <details>
+      <summary>왜 마지막 수리가 이렇게 중요한가 — 단계별 시간표</summary>
+      <div class="body">
+        <p>마지막 수리 직전에 잰 표입니다. 웹 확인 도구를 쥐는 단계에 표시했습니다.</p>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>단계</th><th class="num">시간</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td>드라마투르그 ★</td><td class="num">154.6초</td><td>호출 하나 — 수리 후 실물 확인에서 <b>8.1초</b></td></tr>
+            <tr><td>장면 ★</td><td class="num">205.7초</td><td>가장 큰 덩어리 — <b>재측정 안 됨</b></td></tr>
+            <tr><td>이야기 축 ★</td><td class="num">19.9초</td><td>재측정 안 됨</td></tr>
+            <tr><td>장면 촬영계획</td><td class="num">61.8초</td><td></td></tr>
+            <tr><td>설계</td><td class="num">26.4초</td><td></td></tr>
+            <tr><td>막 시각 흐름</td><td class="num">10.6초</td><td></td></tr>
+            <tr><td>그림 정체성</td><td class="num">6.1초</td><td></td></tr>
+          </tbody>
+        </table></div>
+        <p>★ 표시가 웹 확인 도구를 쥐는 세 단계입니다. 그중 확인된 건 첫 줄 하나뿐이고, 가장 큰 덩어리는 안 봤습니다.</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>완료 소식이 돌아올 주소가 당신 컴퓨터의 임시 통로다</h3><span class="chip c-hold">확인 대기</span></div>
+    <div class="steps">
+      <div class="row"><div class="k">맥락</div><div class="v">그림과 영상은 바깥 업체가 만들고, 다 되면 우리 쪽 주소로 “끝났다”고 알려줍니다. 그 주소가 당신 컴퓨터에서 띄우는 임시 통로를 가리킵니다. 당신이 어젯밤 못 박은 말이 있습니다.</div></div>
+      <div class="row"><div class="k">가설</div><div class="v">주소가 바뀐 뒤 주문된 작업들은 완료 소식을 영영 못 받고 “진행 중”인 채로 굳어 있다.</div></div>
+      <div class="row"><div class="k">확인</div><div class="v">데이터를 <b>읽기만</b> 하면 됩니다 — 완료도 실패도 아닌 채 열두 시간 넘게 있는 작업을 세고, 주문 시각이 특정 구간에 몰리는지 봅니다. 몰린다면 그 구간이 곧 주소가 바뀐 때입니다.</div></div>
+      <div class="row"><div class="k">결과</div><div class="v">아직 안 했습니다. 다만 스위퍼가 <b>주소를 만드는 코드가 실재하고 지금도 임시 통로를 가리킨다</b>는 것까지는 확인했습니다.</div></div>
+    </div>
+    <div class="left"><b>남긴 것:</b> 확인 계획 한 장 — <code>t0-stuck-jobs-webhook-loss</code>(0달러), <b>초안</b>. 굳은 작업이 나와도 <b>정리하지 말고 목록만</b> 남기도록 못 박아뒀습니다.</div>
+    <details>
+      <summary>세 대화가 각각 이 문제의 조각을 들고 있었다</summary>
+      <div class="body">
+        <p class="quote">“뭔소리임 뭘하라는거임 내가 ngrok은 재실행못해; 하면 주소지바뀌잖아”</p>
+        <p>같은 밤, 다른 대화에서 실제 사고가 났습니다 — 통로가 죽어서 업체가 우리 템플릿 그림을 못 받아 <b>80건이 실패</b>했습니다. 템플릿 세 개는 정식 저장소로 옮겨 해결했지만, <b>완료 소식이 돌아오는 주소는 그대로</b>입니다.</p>
+        <p>또 다른 대화는 검증 전 발견으로 이렇게 적어뒀습니다: “완료 알림이 유실되면 그 작업은 영원히 진행 중으로 남는다.” 셋 다 확인 없이 끝났습니다.</p>
+        <p>이미 지워진 증거가 있습니다 — 어젯밤 작업 기록 86건(실패 83, 대기 3)이 삭제됐습니다. 이 조사는 삭제 이후에 남은 것만 봅니다.</p>
+        <p class="mono">주소 생성: src/lib/fal/webhook-url.ts · 설정값: NEXT_PUBLIC_APP_URL</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>품질을 위해 바꾼 모델이 속도에 3분의 1을 물렸다 — 대신 얻은 품질은 안 쟀다</h3><span class="chip c-hold">확인 대기</span></div>
+    <div class="steps">
+      <div class="row"><div class="k">맥락</div><div class="v">8월 10일에 기본 모델을 바꿨습니다. 품질을 위한 결정이었습니다. 어제 다른 실험을 하다 옆에서 숫자가 하나 나왔습니다 — 같은 입력, 같은 27번의 호출인데 모델이 쓴 시간이 <b>632초에서 844초</b>로 늘었습니다.</div></div>
+      <div class="row"><div class="k">가설</div><div class="v">샷 설계 단계만 예전 모델로 되돌리면 시간이 눈에 띄게 줄고, 코드가 셀 수 있는 품질 지표는 지금과 같게 유지된다.</div></div>
+      <div class="row"><div class="k">확인</div><div class="v">같은 입력으로 두 갈래를 각 세 번씩, 겹치지 않게 차례로 돌립니다. 셀 수 있는 것만 봅니다 — 샷 개수 약속을 지켰는가, 개수가 어긋난 건이 있는가, 빈 지시문이 있는가. <b>글의 좋고 나쁨은 재지 않습니다</b>(사람이 봐야 하는 것이라).</div></div>
+      <div class="row"><div class="k">결과</div><div class="v">아직 안 했습니다. 참이면 “시간은 되찾을 수 있는데 그 모델이 언제 사라질지 모른다”는 순수 맞바꿈으로 정리돼 당신이 고를 수 있게 됩니다.</div></div>
+    </div>
+    <div class="left"><b>남긴 것:</b> 확인 계획 한 장 — <code>t1-shotdesign-model-rollback</code>(6달러), <b>초안</b>. 당신 승인이 필요한 항목을 막힘 조건으로 걸어뒀습니다.</div>
+    <details>
+      <summary>왜 지금 있는 숫자로는 판정할 수 없나</summary>
+      <div class="body">
+        <p>632초와 844초는 <b>서로 다른 날, 다른 실행</b>에서 나왔습니다. 같은 조건에서 나란히 비교한 적은 한 번도 없습니다. 그래서 “33% 느려졌다”는 것도 아직 정확히는 추정입니다.</p>
+        <p>어제 대화가 남긴 문장: “모델 전환이 품질을 위한 결정이었는데 shotDesign 시간에는 비용이 붙었습니다.”</p>
+        <p>이미 올라와 있는 같은 모델 전환 관련 조사와는 다른 것을 봅니다 — 그건 <b>웹 검색이 실제로 발화하는가</b>를 봤고, 이건 <b>샷 설계 단계의 시간과 개수</b>를 봅니다.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="block">
+  <div class="sec-head"><h2>확인 계획으로 만들지 않은 것</h2><span class="lede">관측이 이미 끝났거나, 취향이거나, 닫히는 조건을 못 쓰겠는 것</span></div>
+
+  <div class="card">
+    <div class="head"><h3>이백 개 넘는 조수가 만든 문제 목록이 지워질 자리에 있다</h3><span class="chip c-ok">살아 있다</span></div>
+    <div class="steps">
+      <div class="row"><div class="k">맥락</div><div class="v">어젯밤 가장 큰 조사였습니다. 기록 일곱 군데를 훑어 “문제”라고 적힌 문장 <b>1,049건</b>을 원문 그대로 모으고, <b>150건</b>으로 묶고, 하나씩 코드와 대조해 “지금도 살아있는지” 판정하는 데까지 갔습니다.</div></div>
+      <div class="row"><div class="k">가설</div><div class="v">사용 한도로 끊겼으니 그 노동이 통째로 사라졌을 수 있다 — 아니면 중간 결과가 어딘가 남아 있을 수 있다.</div></div>
+      <div class="row"><div class="k">확인</div><div class="v">스위퍼가 직접 찾아봤습니다. 쓰려던 문서는 <b>없습니다.</b> 하지만 중간 결과는 <b>전부 살아 있습니다</b> — 묶음, 판정 본체, 본선 기준 재검증, 새 발견 103건까지.</div></div>
+      <div class="row"><div class="k">결과</div><div class="v">복구 가능합니다. 다만 그 자리가 <b>대화별 임시 폴더</b>라 사라질 수 있습니다. 확인 계획을 새로 만드는 대신 정확한 경로를 노트에 박아뒀습니다 — 이건 세는 문제가 아니라 옮기는 문제입니다.</div></div>
+    </div>
+    <div class="left"><b>남긴 것:</b> 경로 목록 — <code>research/backlog/sweep/2026-08-15/note-claude-cc9e03b1.md</code></div>
+    <details>
+      <summary>그 조사가 도중에 스스로 잡은 큰 사고 하나</summary>
+      <div class="body">
+        <p>판정을 돌리던 작업 자리가 본선보다 <b>26커밋 뒤처져 있었고</b>, 그 커밋 상당수가 목록에 올라 있는 문제를 이미 고친 것이었습니다. 104개 판정을 버리고 본선 기준으로 다시 돌렸습니다.</p>
+        <p>그 과정에서 “아무도 안 읽은 출처”를 하나 더 찾았습니다 — 실제 서비스 사고를 증상·원인·수리·데이터 상태·닫는 조건으로 잇는 수리 원장. 첫 줄이 이렇습니다: <i>“코드가 고쳐졌다는 것만으로는 닫히지 않는다. 대부분의 수리는 향후 생성만 보호한다.”</i></p>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>로그인한 아무나가 남의 작품에 돈 나가는 생성을 걸 수 있다</h3><span class="chip c-fix">사실이었다</span></div>
+    <div class="steps">
+      <div class="row"><div class="k">맥락</div><div class="v">같은 조사가 조수 보고를 믿지 않고 직접 감사했습니다. 유료 생성 경로 여덟 곳을 하나씩 열어봤습니다.</div></div>
+      <div class="row"><div class="k">가설</div><div class="v">경로들이 “로그인했는가”와 “네 작품인가”를 둘 다 보는가.</div></div>
+      <div class="row"><div class="k">확인</div><div class="v"><b>여섯 곳이 소유권을 안 봅니다</b> — 그림 시트, 세계 그림, 미리보기 영상, 스토리보드 일괄과 단건, 러프 보드. 문지기가 이 경로들을 아예 안 거치는 구조라 각자 막아야 하는데 안 막습니다.</div></div>
+      <div class="row"><div class="k">결과</div><div class="v">관측이 <b>이미 끝났습니다.</b> 남은 건 고치는 일이라 확인 계획을 만들지 않았습니다 — 밤에는 제품 코드를 고치지 않는다는 규칙에 따라 아침 카드로 올렸습니다.</div></div>
+    </div>
+    <div class="left"><b>남긴 것:</b> 아침 카드 항목 ④. 이미 올라와 있는 “로그인 없이 열린 창구” 카드와는 <b>다른 문제</b>입니다 — 그건 로그인 자체가 없는 곳, 이건 로그인은 되고 소유권만 없는 곳.</div>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>담당자 다섯의 캐릭터 — 확인 계획 0장이 정상이다</h3><span class="chip c-no">전부 취향</span></div>
+    <div class="steps">
+      <div class="row"><div class="k">맥락</div><div class="v">어젯밤 가장 큰 대화였습니다. 사람 다섯에서 출발했다가 “채팅창 위에 사는 애들”로 방향을 틀어, 말풍선·커서·프레임·클립처럼 화면 부품이 살아난 모습으로 다시 잡았습니다.</div></div>
+      <div class="row"><div class="k">가설</div><div class="v">여기서 밤에 세어서 답이 나오는 사실 조각이 하나라도 있는가.</div></div>
+      <div class="row"><div class="k">확인</div><div class="v">열린 것 셋을 전부 검사했습니다. 후보 여섯씩 중 고르기 → 취향. 연출 담당 몸 색이 규칙과 부딪히는 것 → 사실 축인 화면 대비는 <b>그 대화가 이미 숫자로 닫았습니다</b>(어두운 배경이 너무 어두워 검정 몸은 기준 미달). 작은 크기에서 아바타를 다시 그리는 것 → 동작하는 물건이라 밤 대상 아님.</div></div>
+      <div class="row"><div class="k">결과</div><div class="v"><b>확인 계획 0장.</b> 강제로 만들지 않았습니다 — 반증 조건을 못 쓰는 가설은 버리라는 규칙대로입니다.</div></div>
+    </div>
+    <div class="left"><b>남긴 것:</b> 그 대화가 스스로 뽑아낸 규칙 셋은 기록해뒀습니다 — 다리는 움직이는 애만, 소품은 지어내지 말고 그 담당자가 실제로 쥐는 물건에서, 도형이 아니라 성격.</div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="sec-head"><h2>새로 판 게 아니라 이어붙인 것</h2><span class="lede">그물의 값어치는 목록 늘리기가 아니라 여기입니다</span></div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>이미 올라와 있던 질문</th><th>어젯밤 무슨 일이 있었나</th><th>처리</th></tr></thead>
+      <tbody>
+        <tr><td>잘린 답 손실 가드를 지금 넣을까</td><td><b>들어갔습니다.</b> 네 곳 배선과 한 번의 되묻기까지. 조사해보니 실제 피해는 0이었는데, 문제는 피해가 아니라 <i>신호가 없던 것</i>이었습니다</td><td>사실상 닫힘</td></tr>
+        <tr><td>중간에 죽었다 살아나는 경로를 언제 실검증할까</td><td>어젯밤 436초 사고가 그 경로에 실패 판정을 줬다는 게 조사의 주장</td><td>재료 연결</td></tr>
+        <tr><td>샷 검수가 한 번에 몰려 있어 한 번 실패하면 전부 날아가는 문제</td><td>“검수 호출이 시간 예산을 모른다 / 재시도 총 예산이 없다 / 한 업체는 시간제한 자체가 없다”가 실측으로 붙음</td><td>재료 연결, 새 계획 안 만듦</td></tr>
+        <tr><td>쓰이지 않는 두 단계를 어떻게 다시 물릴까</td><td>배선도 작업이 “주 흐름이 이 둘을 안 물고 있다”를 재확인</td><td>재료 연결</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="margin-top:12px">그리고 <b>중복을 하나 막았습니다.</b> 배선도 작업이 낸 발견 11건과, 문제 목록 작업이 낸 150건은 같은 흐름을 같은 시간대에 훑은 것이라 겹칠 가능성이 매우 높습니다. 중복 생산이 이 그물의 최대 실패 모드라 새로 만들지 않고 <b>아침에 나란히 놓고 대조하도록</b> 넘겼습니다.</p>
+</section>
+
+<section class="block">
+  <div class="sec-head"><h2>버린 것과 그 사유</h2><span class="lede">그물이 뭘 흘렸는지가 다음 개정의 입력입니다</span></div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>버린 것</th><th>왜</th></tr></thead>
+      <tbody>
+        <tr><td>“오케이만 답해라” 한 줄짜리 대화</td><td>열린 것 없음. 오늘 규칙대로 걸린 유일한 대화가 이것이었습니다</td></tr>
+        <tr><td>첨부 허용 형식에서 두 가지가 말없이 사라진 것</td><td>기각인지 누락인지 발화에 없어 <b>닫히는 조건을 못 씁니다</b>. 노트에만</td></tr>
+        <tr><td>원본 그림이 바뀌면 뒤따르는 것들이 낡는가</td><td>화제가 돌아가며 답 없이 끝남. 닫히는 조건 불명. 노트에만</td></tr>
+        <tr><td>작은 크기 아바타 다시 그리기</td><td>산출물이 판정이 아니라 동작하는 물건</td></tr>
+        <tr><td>색과 여백 체계 재정립</td><td>당신이 “다른 세션에서 진행하고 싶다”고 명시 이월 — 결론 난 보류</td></tr>
+        <tr><td>겹쳐 돌리는 수를 열둘까지 올리는 것</td><td>실측도 계산도 끝났습니다. 남은 건 동시 인원 26명 대 30명 맞바꿈 — 당신 몫</td></tr>
+        <tr><td>커밋되지 않은 큰 작업</td><td>판별 규칙상 “코드로 귀결”. 다만 데이터가 앞서간 비대칭이라 아침 카드로는 올렸습니다</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="sec-head"><h2>정직 보고</h2><span class="lede">규칙에서 벗어난 것과 그 이유</span></div>
+  <div class="card">
+    <div class="head"><h3>오늘 그물은 규칙에 없는 두 번째 패스를 돌렸습니다</h3><span class="chip c-stop">방법 이탈</span></div>
+    <p>규칙은 “직접 훑지 말고 도구에 맡겨라”이고, 그 도구의 기본 설정은 최근 한 시간을 건너뜁니다. 오늘 그대로 따랐다면 <b>산출은 빈 대화 한 편이 전부</b>였을 것이고, 진짜 다섯 편은 오늘도 내일도 안 걸렸을 것입니다.</p>
+    <p>그래서 기본 패스를 규칙대로 먼저 돌려 그대로 남기고, <b>건너뛰기만 끈 두 번째 패스를 따로 냈습니다.</b> 도구의 판별 규칙 자체는 손대지 않았고(자동화가 돌린 대화는 여전히 도구가 걸러냈습니다), 바꾼 것은 노출된 설정값 하나뿐입니다. 두 산출은 폴더가 분리돼 있어 무엇이 규칙대로였고 무엇이 구제분인지 나중에도 갈립니다.</p>
+    <p><b>승격은 하지 않았습니다.</b> 오늘 실행 지시에도 “읽기만 하는 것은 자동으로 올려도 된다”는 예외가 들어 있었지만, 규칙 문서가 “실행 지시와 문서가 다르면 문서가 이긴다”고 못 박고 있어 <b>네 장 전부 초안</b>으로 뒀습니다. 이 어긋남은 이미 올라와 있는 “누가 승격시키는가” 질문의 판정 재료입니다.</p>
+  </div>
+</section>
+
+<footer>
+  <p><b>집행 요약</b> — 훑은 대화 51편 · 정리 안 된 채 끝난 것 6편 · 세션 노트 5장 · 확인 계획 초안 4장(공짜 2, 6달러짜리 2) · 아침 카드 1장 · <b>지출 0원</b> · 자동 승격 0건.</p>
+  <p><b>정본 경로</b> — 원장 <code>research/backlog/reports/2026-08-15-sweep.md</code> · 노트 <code>research/backlog/sweep/2026-08-15/</code> · 구제 수확물 <code>research/backlog/sweep/2026-08-15-recent/</code> · 아침 카드 <code>research/backlog/_MORNING.md</code> 최상단.</p>
+  <p>정식 정리는 해당 대화를 다시 열어 마무리 절차를 돌리는 쪽을 권합니다. 그물은 사후에 던지는 것이라 그때만큼 촘촘하지 않습니다.</p>
+</footer>
+
+</div>

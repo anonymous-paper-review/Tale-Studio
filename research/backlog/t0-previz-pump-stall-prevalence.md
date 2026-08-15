@@ -3,10 +3,10 @@
 ```yaml
 id: t0-previz-pump-stall-prevalence
 source: sweep:claude:b3eda43f
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done   # 2026-08-12 밤 러너 — 형식상 가설 유지(완주 1.0이 81.5% < 기각선 90%)이나 기제는 미지지: 부분 완성 0건, 0%인 5건은 주문 자체가 0(전부 개발용·그림 단계 미도달). 시드 프로젝트 0e337d5d는 69/69 완주. 결과: research/experiments/t0-previz-pump-stall-prevalence/
+status: 완료  # 2026-08-12 밤 러너 — 형식상 가설 유지(완주 1.0이 81.5% < 기각선 90%)이나 기제는 미지지: 부분 완성 0건, 0%인 5건은 주문 자체가 0(전부 개발용·그림 단계 미도달). 시드 프로젝트 0e337d5d는 69/69 완주. 결과: research/experiments/t0-previz-pump-stall-prevalence/
 priority: high
 ```
 

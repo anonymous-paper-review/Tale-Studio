@@ -1,10 +1,10 @@
 ```yaml
 id: t0-c2-mounting-dist
 source: .claude/vault/2026-08-10-prompt-contract-audit.md §3 재검증② · 계약 카탈로그 C2❌
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done  # 2026-08-11 밤 러너 — 가설 기각(handheld 32%<60%), 결과: research/experiments/t0-c2-mounting-dist/
+status: 완료  # 2026-08-11 밤 러너 — 가설 기각(handheld 32%<60%), 결과: research/experiments/t0-c2-mounting-dist/
 priority: high  # Q2(캡 완화)의 증거
 ```
 

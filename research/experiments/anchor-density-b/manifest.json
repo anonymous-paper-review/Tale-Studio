@@ -1,0 +1,326 @@
+{
+  "purpose": "앵커 밀도 2판 — 다른 그림체(us_cartoon)에서 1판과 같은 포맷으로 재현",
+  "owner_hypothesis": "이미지 생성기가 가진 맥락을 단 한 개의 이미지로만 영상 생성기에게 설명하는 게 병목이다",
+  "fixture_note": "프로젝트 writer_test_260805_5 (2026-08-05 작업) — 현행보다 한 세대 앞. dynamic_spec 전건 null(예비 경로 복구) · prompt 전건 빈 문자열(제품과 같은 폴백) · previz_video 0건. 결론 유효 범위는 이 세대로 한정.",
+  "project": {
+    "id": "011fd4bd-9b0a-46fe-b978-35677a4f6ee6",
+    "title": "writer_test_260805_5",
+    "style_anchor": "us_cartoon"
+  },
+  "shot": {
+    "id": "sh_03_23",
+    "duration": 5,
+    "action": "She crouches low and slides her body into a dark drainage pipe, hiding herself.",
+    "camera_motion": {
+      "type": "tracking",
+      "speed": "moderate",
+      "direction": "forward",
+      "magnitude": "moderate"
+    },
+    "spec_via": "예비 경로 복구"
+  },
+  "model": {
+    "video": "higgsfield seedance_2_0",
+    "image": "higgsfield gpt_image_2",
+    "depth": "fal-ai/imageutils/depth (MiDaS)"
+  },
+  "frozen_prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.. Camera tracks steadily to the right. Camera pitches steadily up",
+  "prompt_source": "제품 buildVideoPrompt(dynamic_spec 복구본 + action_description) — 실험이 프롬프트를 손으로 쓰지 않는다",
+  "duration": 5,
+  "resolution": "720p",
+  "aspect_ratio": "4:3",
+  "anchor_size": "496x341 — 시작 그림 원본 크기로 모든 앵커 통일(크기 교란 제거)",
+  "mid_frames": [
+    {
+      "t": 1,
+      "file": "inputs/anchor_1.png",
+      "prompt": "This is frame 1.0 seconds into a 5-second continuous shot.\n@Image1 is the FIRST frame of that shot (time 0.0s). @Image2 is the LAST frame (time 5.0s).\nDraw the single intermediate frame at the stated time, as if pausing the video there.\n\nWhat happens across the shot: She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nKeep the SAME character, the SAME clothing, the SAME location, the SAME art style, the SAME line quality\nand the SAME colour treatment as the two reference frames — this is one continuous shot, not a new drawing.\nOnly her position, her pose and the camera framing progress toward the last frame by the stated amount.\nDo not add text, captions, timestamps, borders or panel dividers.",
+      "credits": 7
+    },
+    {
+      "t": 2,
+      "file": "inputs/anchor_2.png",
+      "prompt": "This is frame 2.0 seconds into a 5-second continuous shot.\n@Image1 is the FIRST frame of that shot (time 0.0s). @Image2 is the LAST frame (time 5.0s).\nDraw the single intermediate frame at the stated time, as if pausing the video there.\n\nWhat happens across the shot: She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nKeep the SAME character, the SAME clothing, the SAME location, the SAME art style, the SAME line quality\nand the SAME colour treatment as the two reference frames — this is one continuous shot, not a new drawing.\nOnly her position, her pose and the camera framing progress toward the last frame by the stated amount.\nDo not add text, captions, timestamps, borders or panel dividers.",
+      "credits": 7
+    },
+    {
+      "t": 3,
+      "file": "inputs/anchor_3.png",
+      "prompt": "This is frame 3.0 seconds into a 5-second continuous shot.\n@Image1 is the FIRST frame of that shot (time 0.0s). @Image2 is the LAST frame (time 5.0s).\nDraw the single intermediate frame at the stated time, as if pausing the video there.\n\nWhat happens across the shot: She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nKeep the SAME character, the SAME clothing, the SAME location, the SAME art style, the SAME line quality\nand the SAME colour treatment as the two reference frames — this is one continuous shot, not a new drawing.\nOnly her position, her pose and the camera framing progress toward the last frame by the stated amount.\nDo not add text, captions, timestamps, borders or panel dividers.",
+      "credits": 7
+    },
+    {
+      "t": 4,
+      "file": "inputs/anchor_4.png",
+      "prompt": "This is frame 4.0 seconds into a 5-second continuous shot.\n@Image1 is the FIRST frame of that shot (time 0.0s). @Image2 is the LAST frame (time 5.0s).\nDraw the single intermediate frame at the stated time, as if pausing the video there.\n\nWhat happens across the shot: She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nKeep the SAME character, the SAME clothing, the SAME location, the SAME art style, the SAME line quality\nand the SAME colour treatment as the two reference frames — this is one continuous shot, not a new drawing.\nOnly her position, her pose and the camera framing progress toward the last frame by the stated amount.\nDo not add text, captions, timestamps, borders or panel dividers.",
+      "credits": 7
+    }
+  ],
+  "jobs": [
+    {
+      "key": "a1",
+      "label": "시작 1장 (현행)",
+      "depth": false,
+      "anchors": [
+        "inputs/anchor_0.png"
+      ],
+      "anchor_times": [
+        0
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\n@Image1 is the first frame of the shot.",
+      "job_id": "bb1e5c6a-7af3-4133-9ed6-3d89738738ed",
+      "credits": 22.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_082602_bb1e5c6a-7af3-4133-9ed6-3d89738738ed.mp4",
+      "file": "out/a1.mp4"
+    },
+    {
+      "key": "a1_d",
+      "label": "시작 1장 (현행) + depth",
+      "depth": true,
+      "anchors": [
+        "inputs/anchor_0.png"
+      ],
+      "anchor_times": [
+        0
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\n@Image1 is the first frame of the shot.\n- @Image2 is a DEPTH MAP of the first frame: bright = near the camera, dark = far away.\nIt describes the 3D layout only. Use it to keep the spatial structure and the relative distances consistent.\nNever render it, never show grayscale, never copy its colours into the picture.",
+      "job_id": "7a8aad6f-286e-42cf-b315-1909e4a1a28c",
+      "credits": 22.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_082608_7a8aad6f-286e-42cf-b315-1909e4a1a28c.mp4",
+      "file": "out/a1_d.mp4"
+    },
+    {
+      "key": "b2",
+      "label": "시작+끝 2장",
+      "depth": false,
+      "anchors": [
+        "inputs/anchor_0.png",
+        "inputs/anchor_5.png"
+      ],
+      "anchor_times": [
+        0,
+        5
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nThe shot is 5 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the last frame (time 5.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.",
+      "job_id": "154c8a40-2839-4ff1-98f5-49c9115ae95b",
+      "credits": 22.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_082616_154c8a40-2839-4ff1-98f5-49c9115ae95b.mp4",
+      "file": "out/b2.mp4"
+    },
+    {
+      "key": "b2_d",
+      "label": "시작+끝 2장 + depth",
+      "depth": true,
+      "anchors": [
+        "inputs/anchor_0.png",
+        "inputs/anchor_5.png"
+      ],
+      "anchor_times": [
+        0,
+        5
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nThe shot is 5 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the last frame (time 5.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.\n- @Image3 is a DEPTH MAP of the first frame: bright = near the camera, dark = far away.\nIt describes the 3D layout only. Use it to keep the spatial structure and the relative distances consistent.\nNever render it, never show grayscale, never copy its colours into the picture.",
+      "job_id": "8a6787d5-b20f-4f8e-8169-a98964473cf7",
+      "credits": 22.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_082626_8a6787d5-b20f-4f8e-8169-a98964473cf7.mp4",
+      "file": "out/b2_d.mp4"
+    },
+    {
+      "key": "c3",
+      "label": "3장 (중간 3초)",
+      "depth": false,
+      "anchors": [
+        "inputs/anchor_0.png",
+        "inputs/anchor_3.png",
+        "inputs/anchor_5.png"
+      ],
+      "anchor_times": [
+        0,
+        3,
+        5
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nThe shot is 5 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 3.0 seconds (time 3.0s).\n- @Image3 is the last frame (time 5.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.",
+      "job_id": "f9042d78-eced-45f0-a357-0ad178500ed0",
+      "credits": 22.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_082638_f9042d78-eced-45f0-a357-0ad178500ed0.mp4",
+      "file": "out/c3.mp4"
+    },
+    {
+      "key": "c3_d",
+      "label": "3장 (중간 3초) + depth",
+      "depth": true,
+      "anchors": [
+        "inputs/anchor_0.png",
+        "inputs/anchor_3.png",
+        "inputs/anchor_5.png"
+      ],
+      "anchor_times": [
+        0,
+        3,
+        5
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nThe shot is 5 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 3.0 seconds (time 3.0s).\n- @Image3 is the last frame (time 5.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.\n- @Image4 is a DEPTH MAP of the first frame: bright = near the camera, dark = far away.\nIt describes the 3D layout only. Use it to keep the spatial structure and the relative distances consistent.\nNever render it, never show grayscale, never copy its colours into the picture.",
+      "job_id": "f4a20a7b-db23-43cb-9573-8ef0d5232adf",
+      "credits": 22.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_082651_f4a20a7b-db23-43cb-9573-8ef0d5232adf.mp4",
+      "file": "out/c3_d.mp4"
+    },
+    {
+      "key": "d4",
+      "label": "4장 (중간 2·3초)",
+      "depth": false,
+      "anchors": [
+        "inputs/anchor_0.png",
+        "inputs/anchor_2.png",
+        "inputs/anchor_3.png",
+        "inputs/anchor_5.png"
+      ],
+      "anchor_times": [
+        0,
+        2,
+        3,
+        5
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nThe shot is 5 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 2.0 seconds (time 2.0s).\n- @Image3 is the frame at 3.0 seconds (time 3.0s).\n- @Image4 is the last frame (time 5.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.",
+      "job_id": "83a3cce6-9698-4ff9-a49d-269a9c434ecc",
+      "credits": 22.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_082704_83a3cce6-9698-4ff9-a49d-269a9c434ecc.mp4",
+      "file": "out/d4.mp4"
+    },
+    {
+      "key": "d4_d",
+      "label": "4장 (중간 2·3초) + depth",
+      "depth": true,
+      "anchors": [
+        "inputs/anchor_0.png",
+        "inputs/anchor_2.png",
+        "inputs/anchor_3.png",
+        "inputs/anchor_5.png"
+      ],
+      "anchor_times": [
+        0,
+        2,
+        3,
+        5
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nThe shot is 5 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 2.0 seconds (time 2.0s).\n- @Image3 is the frame at 3.0 seconds (time 3.0s).\n- @Image4 is the last frame (time 5.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.\n- @Image5 is a DEPTH MAP of the first frame: bright = near the camera, dark = far away.\nIt describes the 3D layout only. Use it to keep the spatial structure and the relative distances consistent.\nNever render it, never show grayscale, never copy its colours into the picture.",
+      "job_id": "b40ede4e-4d46-4be0-b181-2a5c4b1b02d8",
+      "credits": 22.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_082721_b40ede4e-4d46-4be0-b181-2a5c4b1b02d8.mp4",
+      "file": "out/d4_d.mp4"
+    },
+    {
+      "key": "e5",
+      "label": "5장 (중간 1·3·4초)",
+      "depth": false,
+      "anchors": [
+        "inputs/anchor_0.png",
+        "inputs/anchor_1.png",
+        "inputs/anchor_3.png",
+        "inputs/anchor_4.png",
+        "inputs/anchor_5.png"
+      ],
+      "anchor_times": [
+        0,
+        1,
+        3,
+        4,
+        5
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nThe shot is 5 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 1.0 seconds (time 1.0s).\n- @Image3 is the frame at 3.0 seconds (time 3.0s).\n- @Image4 is the frame at 4.0 seconds (time 4.0s).\n- @Image5 is the last frame (time 5.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.",
+      "job_id": "4ca34250-8470-4a0e-8c28-32029b730ef7",
+      "credits": 22.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_083150_4ca34250-8470-4a0e-8c28-32029b730ef7.mp4",
+      "file": "out/e5.mp4"
+    },
+    {
+      "key": "e5_d",
+      "label": "5장 (중간 1·3·4초) + depth",
+      "depth": true,
+      "anchors": [
+        "inputs/anchor_0.png",
+        "inputs/anchor_1.png",
+        "inputs/anchor_3.png",
+        "inputs/anchor_4.png",
+        "inputs/anchor_5.png"
+      ],
+      "anchor_times": [
+        0,
+        1,
+        3,
+        4,
+        5
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nThe shot is 5 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 1.0 seconds (time 1.0s).\n- @Image3 is the frame at 3.0 seconds (time 3.0s).\n- @Image4 is the frame at 4.0 seconds (time 4.0s).\n- @Image5 is the last frame (time 5.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.\n- @Image6 is a DEPTH MAP of the first frame: bright = near the camera, dark = far away.\nIt describes the 3D layout only. Use it to keep the spatial structure and the relative distances consistent.\nNever render it, never show grayscale, never copy its colours into the picture.",
+      "job_id": "b49f5c71-eae4-42b7-913f-94361daa2966",
+      "credits": 22.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_083210_b49f5c71-eae4-42b7-913f-94361daa2966.mp4",
+      "file": "out/e5_d.mp4"
+    },
+    {
+      "key": "f6",
+      "label": "6장 (1초마다 전부)",
+      "depth": false,
+      "anchors": [
+        "inputs/anchor_0.png",
+        "inputs/anchor_1.png",
+        "inputs/anchor_2.png",
+        "inputs/anchor_3.png",
+        "inputs/anchor_4.png",
+        "inputs/anchor_5.png"
+      ],
+      "anchor_times": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nThe shot is 5 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 1.0 seconds (time 1.0s).\n- @Image3 is the frame at 2.0 seconds (time 2.0s).\n- @Image4 is the frame at 3.0 seconds (time 3.0s).\n- @Image5 is the frame at 4.0 seconds (time 4.0s).\n- @Image6 is the last frame (time 5.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.",
+      "job_id": "cd8254c8-a990-4ec9-b3fd-4f374fb98df6",
+      "credits": 22.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_083227_cd8254c8-a990-4ec9-b3fd-4f374fb98df6.mp4",
+      "file": "out/f6.mp4"
+    },
+    {
+      "key": "f6_d",
+      "label": "6장 (1초마다 전부) + depth",
+      "depth": true,
+      "anchors": [
+        "inputs/anchor_0.png",
+        "inputs/anchor_1.png",
+        "inputs/anchor_2.png",
+        "inputs/anchor_3.png",
+        "inputs/anchor_4.png",
+        "inputs/anchor_5.png"
+      ],
+      "anchor_times": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "prompt": "Motion contract: Camera: tracks steady with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"crawls\" — a clear movement that completes. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. She crouches low and slides her body into a dark drainage pipe, hiding herself.\n\nThe shot is 5 seconds long. The reference frames are timed keyframes of THIS SAME shot:\n- @Image1 is the first frame (time 0.0s).\n- @Image2 is the frame at 1.0 seconds (time 1.0s).\n- @Image3 is the frame at 2.0 seconds (time 2.0s).\n- @Image4 is the frame at 3.0 seconds (time 3.0s).\n- @Image5 is the frame at 4.0 seconds (time 4.0s).\n- @Image6 is the last frame (time 5.0s).\nMove through these frames in that exact order at those exact times. Between them, interpolate smoothly.\n- @Image7 is a DEPTH MAP of the first frame: bright = near the camera, dark = far away.\nIt describes the 3D layout only. Use it to keep the spatial structure and the relative distances consistent.\nNever render it, never show grayscale, never copy its colours into the picture.",
+      "job_id": "7092bf5b-a1c7-4432-918b-91dc057b6ff1",
+      "credits": 22.5,
+      "video_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260812_083252_7092bf5b-a1c7-4432-918b-91dc057b6ff1.mp4",
+      "file": "out/f6_d.mp4"
+    }
+  ],
+  "credits_spent": 298,
+  "inputs": {
+    "start_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-d9aad98787c8b7817dc4f54d2edee5f38dc7adf68fcb80c8705b934f56730ed0_storyboard_start.png?v=1785930619510",
+    "end_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/011fd4bd-9b0a-46fe-b978-35677a4f6ee6/shots/v1-d9aad98787c8b7817dc4f54d2edee5f38dc7adf68fcb80c8705b934f56730ed0_storyboard_end.png?v=1785930620128"
+  },
+  "depth": {
+    "url": "https://v3b.fal.media/files/b/0aa60417/_NGA6LDnhfciL2uWuQhc7_15af382954104135830ae5cd4ae33266.png",
+    "file": "inputs/depth_start.png",
+    "source": "fal-ai/imageutils/depth (MiDaS) — 입력은 시작 그림",
+    "cost_note": "higgsfield 에 깊이 추정기가 없어 이 한 장만 fal"
+  },
+  "camera_config_note": "제품 buildVideoPrompt 에 camera_config 를 넘기지 않았다. 넘기면 구세대 숫자 축(pan/tilt)이 문장으로 붙는데 이 샷에서는 계약문과 정반대였다(계약: deeper into the scene / 꼬리: tracks to the right, pitches up). 1판에는 그 꼬리가 없어 조건을 맞췄다. 원래 붙던 꼬리 원문: \"Camera tracks steadily to the right. Camera pitches steadily up\"",
+  "camera_config_raw": null
+}

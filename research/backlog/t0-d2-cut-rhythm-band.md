@@ -1,10 +1,10 @@
 ```yaml
 id: t0-d2-cut-rhythm-band
 source: .claude/vault/2026-08-10-prompt-contract-audit.md §3 재검증④ · 계약 카탈로그 D2🕳
-tier: T0
+종류: 조사
 budget: { usd: 0, runs: 1, wall_min: 40 }
 blockers: []
-status: done  # 2026-08-11 밤 러너 — 가설 기각(경계 과점유 0.68×/0.55× <1.5×, 중앙 자연 분포), 결과: research/experiments/t0-d2-cut-rhythm-band/
+status: 완료  # 2026-08-11 밤 러너 — 가설 기각(경계 과점유 0.68×/0.55× <1.5×, 중앙 자연 분포), 결과: research/experiments/t0-d2-cut-rhythm-band/
 priority: normal
 ```
 

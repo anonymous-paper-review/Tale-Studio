@@ -161,6 +161,22 @@ export interface StyleAnchor {
   subtitle: string | null
 }
 
+/** projects.custom_style_anchor(jsonb) → 상태. url 이 문자열일 때만 앵커로 인정한다.
+ *  lib/style-anchor.ts 의 동명 파서와 같은 규칙이지만, 그쪽은 supabaseAdmin 을 임포트해서
+ *  클라 번들에 들일 수 없다 — 그래서 여기 별도로 둔다. */
+function parseCustomAnchorRow(
+  raw: unknown,
+): { url: string; label: string; medium: string | null } | null {
+  if (!raw || typeof raw !== 'object') return null
+  const record = raw as Record<string, unknown>
+  if (typeof record.url !== 'string' || !record.url) return null
+  return {
+    url: record.url,
+    label: typeof record.label === 'string' && record.label ? record.label : '내 레퍼런스',
+    medium: typeof record.medium === 'string' ? record.medium : null,
+  }
+}
+
 interface ProducerState {
   storyText: string
   storyReady: boolean
@@ -170,6 +186,9 @@ interface ProducerState {
   /** 스타일&톤 앵커 카탈로그(style_anchors) + 이 프로젝트의 선택 키(projects.style_anchor_key). */
   styleAnchors: StyleAnchor[]
   styleAnchorKey: string | null
+  /** 유저가 올린 이미지로 만든 앵커(projects.custom_style_anchor). 있으면 카탈로그보다 우선한다.
+   *  styleAnchorKey 는 custom_<uuid> 라 카탈로그에서 라벨을 못 찾는다 — 표시는 여기서 온다. */
+  customStyleAnchor: { url: string; label: string; medium: string | null } | null
   syncing: boolean
   error: string | null
 
@@ -178,6 +197,13 @@ interface ProducerState {
   loadStyleAnchors: () => Promise<void>
   /** 스타일 앵커 선택 — 낙관적 반영 + projects.style_anchor_key 저장. */
   setStyleAnchor: (key: string | null) => Promise<void>
+  /** 채팅이 해석한 화풍 의도를 반영 — 저장은 서버(api/produce/style-anchor)가 검증 후 한다. */
+  applyCustomStyleAnchor: (anchor: {
+    key: string
+    url: string
+    label: string
+    medium: string | null
+  }) => void
   updateSettings: (partial: Partial<ProjectSettings>) => void
   applyExtractedSettings: (extracted: ExtractedSettings) => void
   applyProducerSourcePatch: (patch: ExtractedSettings) => void
@@ -515,6 +541,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   backgrounds: [],
   styleAnchors: [],
   styleAnchorKey: null,
+  customStyleAnchor: null,
   syncing: false,
   error: null,
 
@@ -538,7 +565,11 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           .eq('is_active', true)
           .order('sort_order'),
         projectId
-          ? supabase.from('projects').select('style_anchor_key').eq('id', projectId).maybeSingle()
+          ? supabase
+              .from('projects')
+              .select('style_anchor_key, custom_style_anchor')
+              .eq('id', projectId)
+              .maybeSingle()
           : Promise.resolve({ data: null }),
       ])
       set({
@@ -552,6 +583,9 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         })),
         styleAnchorKey:
           (projRes.data as { style_anchor_key?: string | null } | null)?.style_anchor_key || null,
+        customStyleAnchor: parseCustomAnchorRow(
+          (projRes.data as { custom_style_anchor?: unknown } | null)?.custom_style_anchor,
+        ),
       })
     } catch (err) {
       console.error('[producer-store] style anchors load failed:', err)
@@ -562,15 +596,26 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     if (isDemoSession()) return
     const projectId = useProjectStore.getState().projectId
     const prev = get().styleAnchorKey
-    set({ styleAnchorKey: key })
+    const prevCustom = get().customStyleAnchor
+    // 프리셋을 고르면 커스텀 앵커는 반드시 비운다 — 남겨 두면 resolveStyleAnchor 가 커스텀을
+    //   우선해서, 카드를 바꿨는데 화풍이 안 바뀌는 조용한 고장이 된다.
+    set({ styleAnchorKey: key, customStyleAnchor: null })
     if (!projectId) return
     const { error } = await createClient()
       .from('projects')
-      .update({ style_anchor_key: key ?? '' })
+      .update({ style_anchor_key: key ?? '', custom_style_anchor: null })
       .eq('id', projectId)
     if (error) {
-      set({ styleAnchorKey: prev, error: `스타일 저장 실패: ${error.message}` })
+      set({
+        styleAnchorKey: prev,
+        customStyleAnchor: prevCustom,
+        error: `스타일 저장 실패: ${error.message}`,
+      })
     }
+  },
+
+  applyCustomStyleAnchor: ({ key, url, label, medium }) => {
+    set({ styleAnchorKey: key, customStyleAnchor: { url, label, medium } })
   },
 
   updateSettings: (partial) => {
@@ -955,6 +1000,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       cast: [],
       backgrounds: [],
       styleAnchorKey: null, // 카탈로그(styleAnchors)는 프로젝트 무관 — 유지
+      customStyleAnchor: null, // 프로젝트 소속 — 반드시 비운다
       syncing: false,
       error: null,
     })
