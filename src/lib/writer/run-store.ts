@@ -247,6 +247,36 @@ export async function markFailed(
 }
 
 /**
+ * failed run 을 running 으로 되돌린다 (#stage-retry '이어서 재시도').
+ *   failed 일 때만 전이(역방향 CAS — 종결 상태 경쟁과 이중 클릭을 걸러낸다). error 는 비우고
+ *   state 는 호출자가 _attempt 를 리셋해 넘긴다 — state 가 마지막 체크포인트를 담고 있으므로
+ *   재진입은 실패한 스테이지부터 이어진다(처음부터 다시 돌지 않는다).
+ * 반환: 전이 성공 여부 (false = 이미 failed 가 아님 — 경쟁 resume 이 먼저 잡았거나 상태 변화).
+ */
+export async function resumeFailedRun(
+  id: string,
+  state: WriterRunStateBase,
+  currentVersion: number,
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from('writer_runs')
+    .update({
+      status: 'running',
+      error: null,
+      error_detail: null,
+      state,
+      // 버전 위생: 실패 시점의 낡은 인보케이션이 남아 있어도 CAS 에서 지도록 한 칸 올린다.
+      state_version: currentVersion + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('status', 'failed')
+    .select('id');
+  if (error) throw new Error(`resumeFailedRun failed: ${error.message}`);
+  return !!data?.length;
+}
+
+/**
  * writer 파이프라인이 실제로 완료됐을 때만 projects.current_stage 를 producer→writer 로 전진.
  *   - 정상 경로는 핸드오프(saveAndHandoff)가 이미 낙관적으로 writer 로 올린다 — 여기는
  *     게이트백으로 producer 에 묶였던 프로젝트의 재실행 완료를 풀어주는 보강 경로.

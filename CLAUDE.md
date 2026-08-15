@@ -14,6 +14,7 @@
 
 - `.claude/vault/` — 세션별 실측·삽질·결정 기록 (포맷: `_TEMPLATE.md`). 같은 주제를 다시 팔 때 먼저 검색
 - `.claude/vault/_DEFERRED.md` — **미뤄둔 작업 상시 원장** (날짜 파일 아님). "결정은 났는데 지금 안 하는 것"이 여기 모인다 — 새 작업을 고르기 전에 먼저 열어볼 것
+- `.claude/vault/_FIXLOG.md` — 프로덕션 사고 수리 원장 (사고→원인→수리→검증 상태. 커밋이 못 담는 진행 상태만)
 - `.claude/vault/_archive/` — 완료·폐기·무효화된 것 (원장과 인덱스는 열린 것만 보여야 한다)
 - `.claude/vault/2026-08-05-truth-source-cleanup.md` — "문서가 왜 다 없지?"·실험 규칙/대청소의 근거가 궁금하면 먼저
 - `.claude/vault/2026-08-06-previz-verifier.md` — previz 검증기/품질 채점을 다시 팔 때 먼저 (변별력 실측·판정 3원칙·보류 축의 이유)
@@ -26,6 +27,7 @@
 - `.claude/vault/2026-08-10-previz-motion-channel.md` — **다음 세션 재개 지점** — previz/모션 채널/생성기 실측을 이어갈 때 먼저 (축 A 실측·계기 결함 진단·모션 채널 3중 약점·내일 아젠다 3질문·아티팩트 링크)
 - `.claude/vault/2026-08-11-writer-entity-map-audit.md` — writer 엔티티가 어디까지 가는지·왜 끊겼는지를 다시 팔 때 먼저 (엔티티 60개 전수·끊긴 배선 14건·경로 쌍 3결정 미결·step 라우트 무인증 실측)
 - `.claude/vault/2026-08-11-blockout-previz-video-reference.md` — 프리비즈 영상 레퍼런스/3D 블록아웃/각색 연출 리서치를 다시 팔 때 먼저 (모션 전달 제3후보·Seedance video_urls 기배선 실측·3암 실험 스케치·리포트 아티팩트)
+- `.claude/vault/2026-08-13-failure-taxonomy.md` — 생성 실패 재시도 정책/error_class/P2·P3를 다시 팔 때 먼저 (실패 51건 전수 분류·Bad Request 가설 기각 2건·오너 결정 5건 대기)
 
 ## 실험
 

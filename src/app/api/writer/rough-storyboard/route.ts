@@ -165,7 +165,7 @@ export async function POST(req: Request) {
         supabaseAdmin
           .from('shots')
           .select(
-            'shot_id, scene_id, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, duration_seconds, rough_storyboard, design_ref, check_notes, prompt',
+            'shot_id, scene_id, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, duration_seconds, rough_storyboard, design_ref, check_notes, prompt, static_spec, dynamic_spec',
           )
           .eq('project_id', projectId)
           .order('sort_order'),
@@ -322,7 +322,23 @@ export async function POST(req: Request) {
         shotId: sid,
         designRef: typeof s.design_ref === 'string' ? s.design_ref : null,
       }, projectUsesDesignRefs)
-      if (spec) resolvedSpecByShotId.set(sid, spec)
+      if (spec) {
+        resolvedSpecByShotId.set(sid, spec)
+        continue
+      }
+      // state 조인 미스 → shots 컬럼 폴백 (#split-inherit 2026-08-12). 분할 둘째+ 자식은
+      //   design_ref 가 의도적으로 없지만(#split-spec — 옆 설계 훔침 방지), persist 가 부분
+      //   상속 스펙을 컬럼에 남긴다. 컬럼은 그 샷 자신의 값이라 훔침 위험이 없다 — 영상
+      //   라우트의 "shots.dynamic_spec 우선" 선례와 같은 원칙. 레거시/수동 샷은 컬럼이
+      //   없으므로 기존 db_fallback 그대로.
+      const colStatic = s.static_spec as RoughStoryboardSpec['staticSpec'] | null
+      if (colStatic) {
+        resolvedSpecByShotId.set(sid, {
+          staticSpec: colStatic,
+          dynamicSpec:
+            (s.dynamic_spec as RoughStoryboardSpec['dynamicSpec'] | null) ?? undefined,
+        })
+      }
     }
     const [actionEnByShot, moodEnByScene, translatedSpecs, timeEnByScene, locEnByScene, nameEnById] =
       await Promise.all([

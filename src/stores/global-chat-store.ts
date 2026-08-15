@@ -91,6 +91,8 @@ interface GlobalChatState {
   ) => Promise<void>
   /** 진행 중인 LLM 응답 중단 (#oiioii-chat) — Stop 버튼. 대기 중이 아니면 no-op. */
   stopGeneration: () => void
+  /** LLM 을 태우지 않는 로컬 문답 한 쌍 — 실행 중 가드 등 결정론 즉답(#run-chat-gate). DB 에도 남긴다. */
+  appendLocalExchange: (stage: StageId, userText: string, modelText: string) => void
   /** preempt: 떠 있는 제안(선택지 등)을 밀어내고 이 제안을 세운다 — 핸드오프처럼 "지금이 그 순간"인 것만. */
   offerSuggestion: (suggestion: ChatSuggestion, opts?: { preempt?: boolean }) => void
   /** implicit: 유저가 다른 말을 해서 내려간 것 — id 를 기록하지 않아 나중에 다시 뜰 수 있다. */
@@ -557,6 +559,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         body = {
           message: trimmed,
           history: historyPayload,
+          // 인물 id 화이트리스트(#F-003 R1) — 서버가 DB 로스터로 모델 출력을 거른다.
+          projectId,
           writerContext: serializeWriterScriptContext(
             writerState.sceneManifest,
             writerState.shots,
@@ -836,6 +840,21 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   stopGeneration: () => {
     activeGeneration?.abort()
     activeGeneration = null
+  },
+
+  appendLocalExchange: (stage, userText, modelText) => {
+    const projectId = useProjectStore.getState().projectId
+    set((state) => ({
+      messages: [
+        ...state.messages,
+        { id: makeId(), stage, role: 'user', content: userText },
+        { id: makeId(), stage, role: 'model', content: modelText },
+      ],
+    }))
+    if (projectId) {
+      saveChatMessage(projectId, stage, 'user', userText)
+      saveChatMessage(projectId, stage, 'model', modelText)
+    }
   },
 
   // 프로액티브 제안 띄우기 — 한 번에 하나만(이미 떠 있으면 무시), 이미 dismiss/승인한 id 도 무시.

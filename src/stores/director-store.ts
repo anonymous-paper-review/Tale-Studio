@@ -417,7 +417,13 @@ function debouncedShotSaveToDb(
             focal_length: data.cameraPreset?.focalLength ?? null,
             aperture: data.cameraPreset?.aperture ?? null,
             white_balance: data.cameraPreset?.whiteBalance ?? null,
-            prompt: data.prompt,
+            // prompt 는 쓰지 않는다(#F-005 2026-08-12). data.prompt 는 legacy 폴백 필드로,
+            //   2eb25ea(07-21)가 sync 를 derivedPrompt 로 이관한 뒤 항상 '' 다 — 이 write-through
+            //   가 writer 의 rich 프롬프트(shots.prompt)를 프로젝트 단위로 전량 지워 왔다
+            //   (실측: director 도달 9/9 프로젝트 채움률 0% vs 미도달 19/19 100%).
+            //   architecture §5 원칙1: 스테이지는 다른 스테이지의 생성물을 고치지 않는다 —
+            //   shots.prompt 는 writer 파생물이고 director 의 사람 편집은 promptOverride
+            //   (아직 DB 미영속, persist_manifest TODO(P4) 예약석) 소관이다.
           })
           .eq('project_id', projectId)
           .eq('shot_id', writerShotId)
@@ -1541,13 +1547,13 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           get().propagateStaleFromShot(id)
         }
 
-        // Step 0 (unify-director-store-db): camera/lighting/cameraPreset/prompt 변경을
+        // Step 0 (unify-director-store-db): camera/lighting/cameraPreset 변경을
         // DB shots로 write-through (캐넌 일원화). writerShotId 있는 노드만 — 수동생성 노드는 Step 2까지 skip.
+        //   'prompt' 는 제외(#F-005) — legacy 필드('' 고정)가 writer 산출 컬럼을 지우던 회귀.
         const dbCols: (keyof ShotNodeData)[] = [
           'camera',
           'lighting',
           'cameraPreset',
-          'prompt',
         ]
         if (isShotData(prev.data) && dbCols.some((k) => k in patch)) {
           const node = get().nodes.find((n) => n.id === id)

@@ -94,9 +94,13 @@ export function artistImageWork(opts: {
   }
   const inFlight = Math.max(opts.generatingCount, opts.activeCount ?? 0)
   if (inFlight > 0) {
+    // 문구 형식 통일(#feedback 2026-08-12) — 다른 에이전트 줄과 같은 "…하고 있습니다 n/N" 꼴.
+    //   이 배치의 완료 수는 추적하지 않으므로 done=0/total=남은 건수 (남은 작업 분모).
     return {
       key: 'artist-regen',
-      label: `${agent}가 이미지 ${inFlight}건을 생성하고 있습니다`,
+      label: `${agent}가 이미지를 생성하고 있습니다`,
+      done: 0,
+      total: inFlight,
       stage: 'artist',
     }
   }

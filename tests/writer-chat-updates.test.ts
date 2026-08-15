@@ -197,3 +197,79 @@ describe('sanitizeLineRefs', () => {
     expect(out[199]).toEqual({ label: 'L200', ref: 'ref_200', kind: 'action' })
   })
 })
+
+// #F-003 R1 (2026-08-12) — 인물 id 화이트리스트. 실측 dc531572: 모델이 발명한 girl/tracker 가
+// 무검증 저장돼 하류 에셋 조인이 전부 끊겼다. 계약: 정본 집합 밖 id 는 드롭 + dropped 로 수집,
+// 전부 탈락한 필드는 필드째 뺀다(씬 상속 폴백), 발명 화자의 대사는 대사째 드롭.
+
+describe('validateWriterUpdates — 인물 id 화이트리스트 (R1)', () => {
+  const allowed = new Set(['char', 'kingdom_pursuer'])
+
+  it('발명 id 는 걸러지고 정본만 남는다 + dropped 수집', () => {
+    const dropped: string[] = []
+    const out = validateWriterUpdates(
+      [
+        {
+          type: 'addShot',
+          sceneId: 'sc_01',
+          actionDescription: '달린다',
+          characters: ['girl', 'char', 'tracker'],
+        },
+      ],
+      allowed,
+      dropped,
+    ) as Array<{ characters?: string[] }>
+    expect(out[0].characters).toEqual(['char'])
+    expect(dropped.sort()).toEqual(['girl', 'tracker'])
+  })
+
+  it('전부 발명 id 면 characters 필드 자체가 빠진다 (씬 상속 폴백)', () => {
+    const out = validateWriterUpdates(
+      [{ type: 'addShot', sceneId: 'sc_01', actionDescription: 'a', characters: ['girl'] }],
+      allowed,
+    ) as Array<{ characters?: string[] }>
+    expect(out[0].characters).toBeUndefined()
+  })
+
+  it('charactersPresent(씬)와 dialogueLines 화자도 같은 집합으로 거른다', () => {
+    const dropped: string[] = []
+    const out = validateWriterUpdates(
+      [
+        { type: 'addScene', charactersPresent: ['tracker', 'kingdom_pursuer'] },
+        {
+          type: 'updateShot',
+          id: 'sh_01_01',
+          patch: {
+            dialogueLines: [
+              { characterId: 'girl', text: '발명 화자 대사' },
+              { characterId: 'char', text: '정본 화자 대사' },
+            ],
+          },
+        },
+      ],
+      allowed,
+      dropped,
+    ) as Array<Record<string, unknown>>
+    expect(out[0].charactersPresent).toEqual(['kingdom_pursuer'])
+    const patch = out[1].patch as { dialogueLines: Array<{ characterId: string }> }
+    expect(patch.dialogueLines).toHaveLength(1)
+    expect(patch.dialogueLines[0].characterId).toBe('char')
+    expect(dropped).toContain('girl')
+    expect(dropped).toContain('tracker')
+  })
+
+  it('allowed 미지정이면 종전 동작 — 무필터 (구 클라 하위 호환)', () => {
+    const out = validateWriterUpdates([
+      { type: 'addShot', sceneId: 'sc_01', actionDescription: 'a', characters: ['girl'] },
+    ]) as Array<{ characters?: string[] }>
+    expect(out[0].characters).toEqual(['girl'])
+  })
+
+  it('명시적 빈 대사 배열([])의 "전체 삭제" 의미는 필터와 무관하게 보존된다', () => {
+    const out = validateWriterUpdates(
+      [{ type: 'updateShot', id: 'sh_01_01', patch: { dialogueLines: [] } }],
+      allowed,
+    ) as Array<{ patch: { dialogueLines?: unknown[] } }>
+    expect(out[0].patch.dialogueLines).toEqual([])
+  })
+})

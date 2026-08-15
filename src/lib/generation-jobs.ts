@@ -223,8 +223,42 @@ export async function hasQueuedWorldShotJob(
 const MODERATION_KEYWORDS =
   /moderation|safety|content[ _-]?policy|content_policy|\bblocked\b|nsfw|prohibited|flagged|violat|disallow/i
 
+// #error-class(2026-08-13): 실패 원인 분류 — 클래스별 재시도 정책(P2/P3)의 측정 기반.
+//   프로덕션 실패 51건 전수 집계에서 도출한 분류이고, 규칙의 예문은 전부 실측 메시지다.
+//   순서가 곧 우선순위 — 구체 클래스가 먼저 먹는다(soft 가 moderation 키워드보다 앞 등).
+//   'unknown' 은 분류 실패가 아니라 "아직 패턴을 모르는 실패"라는 축적 대상 데이터다.
+export type JobErrorClass =
+  | 'billing' // 잔액/결제 — 재시도 무의미, 오너 행동 필요 ("fal 잔액 소진")
+  | 'data_ref' // 참조 이미지 접근 불가 — 우리 데이터 결함 ("image URL is not accessible")
+  | 'moderation_soft' // 빈/검은 산출 — 비결정적, 재시도 가치 ("image too small — blank/moderated")
+  | 'moderation' // 명시 콘텐츠 정책 — 프롬프트 수정 필요 (fal content_policy_violation)
+  | 'infra' // 우리 인프라 정리 — webhook 유실 좀비, superseded ("stale queued reaped")
+  | 'provider' // 프로바이더 일시 장애 — 재시도 가치 (5xx/429/타임아웃/결과 결함)
+  | 'bad_request' // 불투명 400 — fal 이 본문을 버려 재시도성 미확정, 데이터 축적 중 (실측 14건)
+  | 'unknown'
+
+const JOB_ERROR_CLASS_RULES: Array<[JobErrorClass, RegExp]> = [
+  ['billing', /잔액|balance|billing|insufficient.{0,12}(credit|fund)/i],
+  ['data_ref', /image url is not accessible|failed to load the image|input\.image_urls/i],
+  ['moderation_soft', /image too small|blank\/moderated/i],
+  ['moderation', MODERATION_KEYWORDS],
+  ['infra', /stale queued reaped|superseded|좀비/i],
+  [
+    'provider',
+    /\b(429|500|502|503|504|529)\b|rate.?limit|timeout|timed out|overloaded|ECONN|no (image|video) url in webhook payload|invalid video url|unavailable/i,
+  ],
+  ['bad_request', /^bad request$|status=400\b/i],
+]
+
+export function classifyJobError(message: string | null | undefined): JobErrorClass {
+  const m = (message ?? '').trim()
+  if (!m) return 'unknown'
+  for (const [cls, re] of JOB_ERROR_CLASS_RULES) if (re.test(m)) return cls
+  return 'unknown'
+}
+
 export function classifyFalFailure(message: string | null | undefined): 'moderation' | 'generic' {
-  return message && MODERATION_KEYWORDS.test(message) ? 'moderation' : 'generic'
+  return classifyJobError(message) === 'moderation' ? 'moderation' : 'generic'
 }
 
 export interface CharacterViewFailure {
@@ -501,6 +535,7 @@ export async function failGenerationJob(
       status: 'failed',
       error: errorMessage,
       last_error: errorMessage,
+      error_class: classifyJobError(errorMessage), // #error-class — 클래스별 재시도 정책의 측정 기반
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -521,26 +556,38 @@ export async function failGenerationJob(
 export const AUTO_GENERATION_GIVE_UP_THRESHOLD = 2
 
 /**
+ * #error-class(2026-08-13, 오너 정책): give-up 예산을 소모하지 않는 클래스 — 일시 인프라 실패
+ * (프로바이더 5xx/결과 결함, webhook 유실 정리)는 빈칸 자율 채움이 백그라운드에서 계속 다시
+ * 시도한다. 게이트가 세는 것은 "내용적 실패"(모더레이션·잘못된 입력·불명 400·미태깅)뿐.
+ * moderation 은 면제하지 않는다 — 같은 프롬프트는 같은 거부라 재시도가 아니라 사람의 수정이 답.
+ */
+export const GIVE_UP_EXEMPT_CLASSES: ReadonlySet<string> = new Set(['provider', 'infra'])
+
+/**
  * 같은 target 으로 누적된 실패 잡 수 (give-up 게이트용). target 부분일치(JSONB @>):
  *   world_shot={locationId,column} / character_view={characterId,column} / 러프보드={writerShotId} 등.
  *   별도 상태 저장 없이 '실패 잡의 존재가 진실'(architecture §0)을 그대로 집계한다.
  *   게이트는 비용 방어 — 조회 실패 시 생성이 진행되지 않도록 실패를 호출자에게 전파한다.
+ *   면제 클래스는 JS 로 거른다(슬롯당 실패는 소수 — postgrest or/not.in 문법 리스크 회피).
+ *   미태깅(null)은 보수적으로 센다(게이트가 약해지는 방향의 실수 방지).
  */
 export async function countFailedJobsForTarget(
   projectId: string,
   kind: GenerationJobKind,
   target: Partial<GenerationJobTarget>,
 ): Promise<number> {
-  const { count, error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('generation_jobs')
-    .select('id', { count: 'exact', head: true })
+    .select('error_class')
     .eq('project_id', projectId)
     .eq('kind', kind)
     .eq('status', 'failed')
     .contains('target', target)
   if (error) throw error
-  if (count === null) throw new Error('generation job failed-target count returned no count')
-  return count
+  if (!data) throw new Error('generation job failed-target count returned no data')
+  return data.filter(
+    (r) => !GIVE_UP_EXEMPT_CLASSES.has(((r as { error_class?: string | null }).error_class) ?? ''),
+  ).length
 }
 
 /**

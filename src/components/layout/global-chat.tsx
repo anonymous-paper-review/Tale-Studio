@@ -40,7 +40,8 @@ import { MentionTextarea, type MentionItem } from '@/components/layout/mention-t
 import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
 import { castMentions, backgroundMentions, activeMentionRefs, toggleMentionToken, FOUNDATION_MENTIONS } from '@/lib/card-mention'
 import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
-import { SceneGateControls } from '@/features/writer/scene-gate-panel'
+import { SceneGateControls, sendSceneGate } from '@/features/writer/scene-gate-panel'
+import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { buildScriptLines, scriptLineMentions } from '@/lib/script-lines'
 import { handoffFrom } from '@/lib/handoff-intent'
 import {
@@ -561,6 +562,24 @@ export function GlobalChat() {
   const uploading = attachments.some((a) => a.status === 'uploading')
   const readyAttachments = attachments.filter((a) => a.status === 'ready')
   const canSendAttachments = readyAttachments.length > 0 && !uploading
+  // 씬 게이트 활성 여부(#gate-main-input 2026-08-12) — 피드백은 별도 텍스트박스가 아니라
+  //   이 입력창으로 받는다. 비어 있는 Enter = 확정(전역 Enter 핸들러가 처리).
+  const sceneGateActive =
+    suggestion?.action?.kind === 'confirmScenes' && suggestion.stage === currentStage
+
+  // writer 파이프라인이 도는 동안(게이트 대기 제외)의 채팅 (#run-chat-gate 2026-08-12) —
+  //   씬·샷이 아직 없어서 수정 요청을 실행할 수 없고, 실측 사고로 "초안 만들어줘" 발화가
+  //   빈 컨텍스트 위에서 헛돌았다. LLM 을 태우지 않고 즉답으로 안내한다.
+  const { status: writerRunStatus } = useWriterStatus(
+    currentStage === 'writer' ? projectId : null,
+  )
+  const writerRunning = !!(
+    currentStage === 'writer' &&
+    writerRunStatus?.started &&
+    !writerRunStatus.pipeline_completed &&
+    !writerRunStatus.pipeline_failed &&
+    writerRunStatus.current_status !== 'awaiting_confirmation'
+  )
 
   const handleSend = async () => {
     if (sendDisabled || uploading) return
@@ -588,6 +607,22 @@ export function GlobalChat() {
     const msg = typed || defaultUtterance(texts, images)
 
     setInput('')
+    // 씬 게이트 중의 입력 = 수정 피드백 (#gate-main-input) — 일반 채팅이 아니라 revise 로 간다.
+    if (sceneGateActive) {
+      dismissSuggestion()
+      await sendSceneGate('revise', msg)
+      return
+    }
+    // 실행 중 가드(#run-chat-gate) — 유저 발화는 남기고, 로컬 즉답으로 상황을 알린다.
+    if (writerRunning) {
+      useGlobalChatStore.getState().appendLocalExchange(
+        'writer',
+        msg,
+        '지금은 씬·샷을 만드는 중이라 수정 요청을 접수할 수 없어요. 초안이 완성되면 다시 말씀해 주세요 — 그때 바로 반영할게요.',
+      )
+      return
+    }
+    // 첨부 정리는 실제 전송 경로에서만 — 게이트/가드에 걸렸을 때 올린 파일이 사라지면 안 된다.
     setAttachments([])
     await sendMessage(msg, {
       imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
@@ -835,6 +870,12 @@ export function GlobalChat() {
         if (idx < labels.length) {
           e.preventDefault()
           e.stopPropagation()
+          // 같은 번호 2회 = 확정 (#choices-double-tap 2026-08-12) — 숫자로 골랐다면 Enter 로
+          //   손을 옮기지 않고 같은 키를 한 번 더 눌러 끝낸다.
+          if (selectedChoice === labels[idx]) {
+            handleChoiceContinue()
+            return
+          }
           setSelectedChoice(labels[idx])
         }
         return
@@ -1348,7 +1389,7 @@ export function GlobalChat() {
                 {/* 키 힌트(#choices-keys) — kbd 문법. 자유 입력은 '직접 입력' 행이 담당 */}
                 <p className="text-[10px] text-muted-foreground">
                   <kbd className="rounded border border-border bg-muted px-1">↑↓</kbd>·
-                  <kbd className="rounded border border-border bg-muted px-1">1-{Math.min(choices.options.length + 1, 9)}</kbd> 선택 ·{' '}
+                  <kbd className="rounded border border-border bg-muted px-1">1-{Math.min(choices.options.length + 1, 9)}</kbd> 선택 (2회=확정) ·{' '}
                   <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> 확정 ·{' '}
                   <kbd className="rounded border border-border bg-muted px-1">Esc</kbd> 닫기
                 </p>
@@ -1425,9 +1466,11 @@ export function GlobalChat() {
                 placeholder={
                   choices
                     ? '위 선택지에서 답해 주세요'
-                    : canSendAttachments
-                      ? '어떻게 쓸지 적어 주세요 — 비워 두면 스토리로 정리해요'
-                      : STAGE_PLACEHOLDER[currentStage]
+                    : sceneGateActive
+                      ? '수정할 내용을 입력하세요 — 없으면 그대로 Enter (씬 확정)'
+                      : canSendAttachments
+                        ? '어떻게 쓸지 적어 주세요 — 비워 두면 스토리로 정리해요'
+                        : STAGE_PLACEHOLDER[currentStage]
                 }
                 className={cn(
                   'max-h-[13.625rem] min-h-9 w-full resize-none border-0 bg-transparent px-2 py-2 leading-5 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',

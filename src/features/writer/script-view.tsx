@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { WriterHeader } from '@/features/writer/writer-header'
 import { buildScriptLines, replaceSlugs, type ScriptLine, type SlugEntry } from '@/lib/script-lines'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
+import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { friendlyStageLabel } from '@/lib/writer/stage-labels'
 import { cn } from '@/lib/utils'
 import type { Scene } from '@/types'
@@ -182,7 +183,7 @@ export function ScriptView() {
   const sceneManifest = useWriterStore((state) => state.sceneManifest)
   const shots = useWriterStore((state) => state.shots)
   const mentionedRefs = useChatUiStore((state) => state.mentionedRefs)
-  const { status } = useWriterStatus(projectId)
+  const { status, restart } = useWriterStatus(projectId)
   const lines = useMemo(() => buildScriptLines(sceneManifest, shots), [sceneManifest, shots])
 
   const onToggle = (lineNo: number) =>
@@ -329,11 +330,18 @@ export function ScriptView() {
             <>
               <FileText className="size-12 text-muted-foreground" />
               <p className="text-base font-medium">아직 대본이 없어요</p>
-              <p className="text-sm text-muted-foreground">
-                {status?.pipeline_failed
-                  ? 'Writer 실행이 실패했어요. Producer에서 다시 실행해주세요.'
-                  : 'Producer에서 스토리를 핸드오프하면 대본이 생성됩니다.'}
-              </p>
+              {status?.pipeline_failed ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    생성이 중단됐어요{status.error ? ` — ${status.error}` : ''}
+                  </p>
+                  <WriterResumeButton projectId={projectId} onResumed={restart} />
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Producer에서 스토리를 핸드오프하면 대본이 생성됩니다.
+                </p>
+              )}
             </>
           )}
         </div>

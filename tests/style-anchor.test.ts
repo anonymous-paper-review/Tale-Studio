@@ -179,10 +179,16 @@ describe('resolveStyleAnchorByKey', () => {
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
       key: 'jp_anime',
       imageUrl: 'https://cdn.test/style/jp-anime.png',
+      medium: null, // #F-004 B7 — 영상 카메라 기재 억제 판정용으로 resolver 가 함께 나른다
+      // #anchor-wiring(2026-08-14): 검증 절·preview 병행·앵커 종류 — DB 미설정 시 기본값
+      styleClause: null,
+      usePreviewRef: false,
+      previewUrl: null,
+      anchorKind: 'media',
     })
 
     expect(mocks.from).toHaveBeenCalledWith('style_anchors')
-    expect(mocks.select).toHaveBeenCalledWith('key, image_url, is_active')
+    expect(mocks.select).toHaveBeenCalledWith('key, image_url, is_active, medium, style_clause, use_preview_ref, preview_url, anchor_kind')
     expect(mocks.eq).toHaveBeenCalledWith('key', 'jp_anime')
   })
 
@@ -220,10 +226,22 @@ describe('resolveStyleAnchorByKey', () => {
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
       key: 'jp_anime',
       imageUrl: 'https://cdn.test/style/jp-anime.png',
+      medium: null, // #F-004 B7 — 영상 카메라 기재 억제 판정용으로 resolver 가 함께 나른다
+      // #anchor-wiring(2026-08-14): 검증 절·preview 병행·앵커 종류 — DB 미설정 시 기본값
+      styleClause: null,
+      usePreviewRef: false,
+      previewUrl: null,
+      anchorKind: 'media',
     })
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
       key: 'jp_anime',
       imageUrl: 'https://cdn.test/style/jp-anime.png',
+      medium: null, // #F-004 B7 — 영상 카메라 기재 억제 판정용으로 resolver 가 함께 나른다
+      // #anchor-wiring(2026-08-14): 검증 절·preview 병행·앵커 종류 — DB 미설정 시 기본값
+      styleClause: null,
+      usePreviewRef: false,
+      previewUrl: null,
+      anchorKind: 'media',
     })
 
     expect(mocks.from).toHaveBeenCalledTimes(1)
@@ -243,6 +261,12 @@ describe('resolveStyleAnchorByKey', () => {
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
       key: 'jp_anime',
       imageUrl: 'https://cdn.test/style/jp-anime.png',
+      medium: null, // #F-004 B7 — 영상 카메라 기재 억제 판정용으로 resolver 가 함께 나른다
+      // #anchor-wiring(2026-08-14): 검증 절·preview 병행·앵커 종류 — DB 미설정 시 기본값
+      styleClause: null,
+      usePreviewRef: false,
+      previewUrl: null,
+      anchorKind: 'media',
     })
 
     vi.advanceTimersByTime(5 * 60 * 1000 + 1)
@@ -250,6 +274,11 @@ describe('resolveStyleAnchorByKey', () => {
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
       key: 'jp_anime',
       imageUrl: 'https://cdn.test/style/refreshed.png',
+      medium: null,
+      styleClause: null,
+      usePreviewRef: false,
+      previewUrl: null,
+      anchorKind: 'media',
     })
     expect(mocks.from).toHaveBeenCalledTimes(2)
   })
@@ -266,6 +295,12 @@ describe('resolveStyleAnchorByKey', () => {
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
       key: 'jp_anime',
       imageUrl: 'https://cdn.test/style/jp-anime.png',
+      medium: null, // #F-004 B7 — 영상 카메라 기재 억제 판정용으로 resolver 가 함께 나른다
+      // #anchor-wiring(2026-08-14): 검증 절·preview 병행·앵커 종류 — DB 미설정 시 기본값
+      styleClause: null,
+      usePreviewRef: false,
+      previewUrl: null,
+      anchorKind: 'media',
     })
 
     expect(mocks.from).toHaveBeenCalledTimes(2)

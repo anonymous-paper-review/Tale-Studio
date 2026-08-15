@@ -209,6 +209,23 @@ describe('generation job terminal CAS helpers', () => {
     await expect(countFailedJobsForTarget('project-1', 'shot_video', {})).rejects.toBe(countError)
   })
 
+  it('give-up 게이트는 provider/infra 실패를 세지 않는다 (#error-class 오너 정책 2026-08-13)', async () => {
+    // 일시 인프라 실패는 예산 무차감 — 빈칸 자율 채움이 백그라운드에서 계속 재시도한다.
+    // 미태깅(null)은 보수적으로 센다(게이트가 약해지는 방향의 실수 방지).
+    mocks.from.mockReturnValueOnce(
+      query({
+        data: [
+          { error_class: 'provider' },
+          { error_class: 'infra' },
+          { error_class: 'bad_request' },
+          { error_class: null },
+        ],
+        error: null,
+      }),
+    )
+    await expect(countFailedJobsForTarget('project-1', 'shot_video', {})).resolves.toBe(2)
+  })
+
   it('uses the quota fallback only for the exact legacy schema-cache error', async () => {
     const legacyError = { code: 'PGRST204', message: "Could not find the 'user_id' column of 'generation_jobs' in the schema cache" }
     mocks.from

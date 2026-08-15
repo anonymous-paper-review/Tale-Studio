@@ -6,9 +6,9 @@ import {
 } from '@/lib/stage-shortcuts'
 import { STAGES } from '@/lib/constants'
 
-// #keyboard-only — 스테이지 전환 단축키의 계약.
-// 핵심: 모디파이어는 Alt 단독일 때만 발화한다. Ctrl/Cmd 조합을 먹으면 브라우저 예약 가속키
-// (Cmd+W=탭 닫기 등)와 경쟁하는 것처럼 보이는데, 실제로는 못 막으면서 오동작만 남는다.
+// #keyboard-only — 스테이지 전환 단축키의 계약 (2026-08-12 Alt+숫자로 이관).
+// 핵심: 모디파이어는 Alt 단독일 때만 발화한다. Ctrl/Cmd+숫자는 브라우저 탭 전환 예약키라
+// 확실히 못 가로챈다 — Alt 가 유일하게 안전한 모디파이어다.
 
 const ev = (code: string, mods: Partial<Record<'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey', boolean>> = {}) => ({
   code,
@@ -20,31 +20,34 @@ const ev = (code: string, mods: Partial<Record<'altKey' | 'ctrlKey' | 'metaKey' 
 })
 
 describe('stageForShortcut', () => {
-  it('Alt + Q/W/E/R/T 가 STAGES 순서와 1:1 로 대응한다', () => {
-    const got = STAGES.map((s) => stageForShortcut(ev(`Key${STAGE_ACCESS_KEY[s.id]}`, { altKey: true })))
+  it('Alt + 1~5 가 STAGES 순서와 1:1 로 대응한다 (넘패드 포함)', () => {
+    const got = STAGES.map((s) => stageForShortcut(ev(`Digit${STAGE_ACCESS_KEY[s.id]}`, { altKey: true })))
     expect(got).toEqual(STAGES.map((s) => s.id))
+    const numpad = STAGES.map((s) => stageForShortcut(ev(`Numpad${STAGE_ACCESS_KEY[s.id]}`, { altKey: true })))
+    expect(numpad).toEqual(STAGES.map((s) => s.id))
   })
 
   it('모디파이어가 없으면 발화하지 않는다 (그냥 타이핑)', () => {
-    expect(stageForShortcut(ev('KeyW'))).toBeNull()
+    expect(stageForShortcut(ev('Digit2'))).toBeNull()
   })
 
   it('Ctrl/Cmd/Shift 가 섞이면 양보한다 — 브라우저·선택 조작의 몫', () => {
-    expect(stageForShortcut(ev('KeyW', { altKey: true, ctrlKey: true }))).toBeNull()
-    expect(stageForShortcut(ev('KeyW', { altKey: true, metaKey: true }))).toBeNull()
-    expect(stageForShortcut(ev('KeyW', { altKey: true, shiftKey: true }))).toBeNull()
-    expect(stageForShortcut(ev('KeyW', { metaKey: true }))).toBeNull()
+    expect(stageForShortcut(ev('Digit2', { altKey: true, ctrlKey: true }))).toBeNull()
+    expect(stageForShortcut(ev('Digit2', { altKey: true, metaKey: true }))).toBeNull()
+    expect(stageForShortcut(ev('Digit2', { altKey: true, shiftKey: true }))).toBeNull()
+    expect(stageForShortcut(ev('Digit2', { metaKey: true }))).toBeNull()
   })
 
   it('할당되지 않은 키는 무시한다', () => {
     expect(stageForShortcut(ev('KeyA', { altKey: true }))).toBeNull()
-    expect(stageForShortcut(ev('Digit1', { altKey: true }))).toBeNull()
+    expect(stageForShortcut(ev('KeyQ', { altKey: true }))).toBeNull() // 구 배열 폐기 확인
+    expect(stageForShortcut(ev('Digit6', { altKey: true }))).toBeNull()
   })
 
-  it('e.key 가 아니라 code 로 판정 — macOS 의 Option+Q(œ)·Option+E(죽은 키)도 잡힌다', () => {
-    // 실제 이벤트에서 key 는 'œ'/'´' 로 오지만 code 는 물리 위치라 변하지 않는다.
-    expect(stageForShortcut(ev('KeyQ', { altKey: true }))).toBe('producer')
-    expect(stageForShortcut(ev('KeyE', { altKey: true }))).toBe('artist')
+  it('e.key 가 아니라 code 로 판정 — macOS 의 Option+숫자(¡™£…)도 잡힌다', () => {
+    // 실제 이벤트에서 key 는 '¡' 등으로 오지만 code 는 물리 위치라 변하지 않는다.
+    expect(stageForShortcut(ev('Digit1', { altKey: true }))).toBe('producer')
+    expect(stageForShortcut(ev('Digit3', { altKey: true }))).toBe('artist')
   })
 })
 

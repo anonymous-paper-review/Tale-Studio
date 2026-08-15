@@ -18,6 +18,7 @@ import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { WriterProgress } from '@/components/layout/writer-progress'
+import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import {
   evaluateArtistGate,
@@ -27,6 +28,7 @@ import {
 import { cn } from '@/lib/utils'
 
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
+import { AltArrowHint } from '@/components/alt-arrow-hint'
 
 type ArtistTab = 'characters' | 'world' | 'inventory'
 
@@ -106,7 +108,7 @@ export default function VisualPage() {
   const toggleNewUi = () => setBoardMode(!newUi)
 
   // writer-pipeline 진행상황 (producer→artist 직행 시 백그라운드 생성 진행 표시용, decisions #37)
-  const { status: writerStatus } = useWriterStatus(projectId)
+  const { status: writerStatus, restart: restartWriterStatus } = useWriterStatus(projectId)
   const setLifecycleStatus = useProjectStore((s) => s.setLifecycleStatus)
 
   // 프로젝트당 1회만 자동생성 트리거 (마운트/재진입 중복 방지)
@@ -353,13 +355,14 @@ export default function VisualPage() {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
         {writerStatus?.pipeline_failed ? (
-          <div className="mx-auto w-full max-w-md text-center">
+          <div className="mx-auto w-full max-w-md space-y-4 text-center">
             <h1 className="text-xl font-bold text-destructive">
-              AI 자동 생성 실패
+              AI 자동 생성이 중단됐어요
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {writerStatus.error ?? '백그라운드 생성에 실패했습니다. Producer로 돌아가 다시 시도하세요.'}
+            <p className="text-sm text-muted-foreground">
+              {writerStatus.error ?? '백그라운드 생성이 중단됐습니다.'}
             </p>
+            <WriterResumeButton projectId={projectId} onResumed={restartWriterStatus} />
           </div>
         ) : (
           <WriterProgress
@@ -419,6 +422,7 @@ export default function VisualPage() {
           <div className="border-b border-border px-6 py-3">
             {headerRow}
             <div className="flex items-center justify-between gap-4">
+              <AltArrowHint>
               <TabsList>
                 {/* 탭 한글화(#d3 2026-08-03) — writer 탭(러프 스토리보드…)과 표기 통일 */}
                 <TabsTrigger value="characters">인물</TabsTrigger>
@@ -431,6 +435,7 @@ export default function VisualPage() {
                   </Badge>
                 </TabsTrigger>
               </TabsList>
+              </AltArrowHint>
               {/* 보드 축척(#d1) — writer 러프 보드와 동일 UI, 인물/배경 탭별 저장 */}
               {(tab === 'characters' || tab === 'world') && (
                 <div className="flex shrink-0 items-center gap-1.5">

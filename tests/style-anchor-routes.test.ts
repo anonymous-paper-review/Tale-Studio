@@ -63,7 +63,7 @@ import {
   STYLE_ANCHOR_MULTIREF_CLAUSE,
   STYLE_ANCHOR_TEMPLATE_CLAUSE,
   _clearStyleAnchorCacheForTest,
-} from '@/lib/style-anchor'
+ tokenUnlessMediaWord } from '@/lib/style-anchor'
 import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-provenance'
 
 const USER = { id: 'user-1' }
@@ -232,7 +232,10 @@ describe('style-anchor route integration', () => {
   //   - texture/line/shape/palette 토큰은 앵커와 공존해도 앵커가 매체를 이긴다(실측) → 그대로 나간다.
   //   - art_style 토큰은 값에 매체어가 실리면(dark_cinematic_realism) 앵커를 이겨버린다(실측, d6208bba
   //     거인 실사화) → 앵커 존재 시 무조건 억제. 이 특성을 고정한다 — 되돌리려면 실 A/B 재판정 선행.
-  it('AC1b generate-sheet with anchor suppresses the art_style token but keeps texture/line/palette (judged behavior)', async () => {
+  it('AC1b generate-sheet with anchor drops only media-word tokens — benign art_style survives (#F-004 B4, 2026-07-14 판정의 명시적 번복)', async () => {
+    // 번복 근거(2026-08-12 실측 dc531572): 통짜 억제는 앵커에 부합하는 유일한 토큰(3d_animation)을
+    //   지우고 매체어(texture: photorealistic)를 살리는, 취지가 뒤집힌 배치였다. 새 계약:
+    //   매체어를 품은 토큰만 드롭(2026-07-14 의 dark_cinematic_realism 교훈은 보존), 무해 토큰 유지.
     const character = characterFixture({ view_main: null, entity_type: 'person' })
     dbState.characters = [character]
 
@@ -247,9 +250,10 @@ describe('style-anchor route integration', () => {
     expect(response.status).toBe(200)
     const prompt = firstFalOpts().prompt
     expect(prompt).toContain(STYLE_ANCHOR_CLAUSE)
-    // art_style 토큰만 억제 — 매체어 값이 앵커를 override 하는 실측 사고 차단.
-    expect(prompt).not.toContain('art style:')
-    // 나머지 재료/색 토큰은 앵커와 함께 그대로 나간다 (실측 무해 = 판정된 현행).
+    // 무해한 art_style(ink-and-wash…)은 이제 앵커와 공존한다 — turnaround.ts 말미의
+    //   "declared art style" 조항이 참조할 선언이 다시 생겼다.
+    expect(prompt).toContain('art style: ink-and-wash adventure illustration')
+    // 나머지 재료/색 토큰은 앵커와 함께 그대로 나간다.
     expect(prompt).toContain('line quality: crisp confident contour lines')
     expect(prompt).toContain('texture: matte paper grain')
     expect(prompt).toContain('palette: deep cobalt, warm ochre, signal red')
@@ -417,6 +421,7 @@ describe('style-anchor route integration', () => {
       reference_image_urls: [ANCHOR_URL, 'a', 'b'],
       model: DEFAULT_EDIT_IMAGE_MODEL,
       style_anchor_key: ANCHOR_KEY,
+      scene_time_of_day: null, // #F-006 — 스트립 아닌 폴백 경로는 씬 조명 미주입(null 기록)
       fal_request: {},
       ignored_fields: [],
     })
@@ -692,13 +697,13 @@ function sheetPromptInput(character: CharacterRow, dt: DesignTokens): CharacterP
     appearance: character.appearance ?? character.name,
     role: character.role ?? undefined,
     costumes: (character.costume ?? undefined) as string[] | undefined,
-    // 앵커 존재 시 route 가 artStyle 토큰을 억제한다 (2026-07-14 exp4 실측 — authority doc §9-2).
-    //   이 파일의 sheet 테스트는 전부 활성 앵커 fixture 를 쓰므로 undefined 미러.
-    artStyle: undefined,
-    shapeLanguage: dt.l1?.shape_language,
-    lineQuality: dt.l1?.line_quality,
-    texturePhilosophy: dt.l1?.texture_philosophy,
-    characterProportion: dt.l1?.character_proportion,
+    // #F-004 B4(2026-08-12, 2026-07-14 통짜 억제의 명시적 번복): 앵커 존재 시 매체어 토큰만
+    //   드롭한다. 이 파일의 sheet 테스트는 전부 활성 앵커 fixture — 새 정책 미러.
+    artStyle: tokenUnlessMediaWord(dt.l1?.art_style),
+    shapeLanguage: tokenUnlessMediaWord(dt.l1?.shape_language),
+    lineQuality: tokenUnlessMediaWord(dt.l1?.line_quality),
+    texturePhilosophy: tokenUnlessMediaWord(dt.l1?.texture_philosophy),
+    characterProportion: tokenUnlessMediaWord(dt.l1?.character_proportion),
     palette,
     safeMode: false,
   }

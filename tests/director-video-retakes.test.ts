@@ -1,8 +1,27 @@
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn() }))
-vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { rpc: mocks.rpc } }))
+const mocks = vi.hoisted(() => {
+  // #error-class: markDirectorVideoAttemptFailed 가 RPC 뒤 보강 태깅으로
+  //   from('generation_jobs').update({error_class}).eq().eq() 를 await 하므로 thenable 체인 제공.
+  const updateCalls: Array<Record<string, unknown>> = []
+  const chain: Record<string, unknown> = {}
+  chain.eq = () => chain
+  chain.then = (ok: (v: { error: null }) => unknown) => Promise.resolve({ error: null }).then(ok)
+  return {
+    rpc: vi.fn(),
+    updateCalls,
+    from: vi.fn(() => ({
+      update: (patch: Record<string, unknown>) => {
+        updateCalls.push(patch)
+        return chain
+      },
+    })),
+  }
+})
+vi.mock('@/lib/supabase/admin', () => ({
+  supabaseAdmin: { rpc: mocks.rpc, from: mocks.from },
+}))
 
 import {
   compareDirectorVideoTakeOrder,

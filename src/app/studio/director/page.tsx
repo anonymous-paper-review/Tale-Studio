@@ -27,6 +27,7 @@ import { Loader2, ImageIcon, X, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map a
 import { toast } from 'sonner'
 import { runRealBatch, triggerRealBatchAutofill } from '@/lib/director/real-batch-client'
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
+import { AltArrowHint } from '@/components/alt-arrow-hint'
 import { StageHelpBadge } from '@/components/stage-help-badge'
 
 import { handoffFrom } from '@/lib/handoff-intent'
@@ -50,6 +51,7 @@ import {
 } from '@/types/director'
 import { StoryboardGridView } from '@/features/director/canvas-views/StoryboardGridView'
 import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
+import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
 
 import { SceneNode } from '@/features/director/canvas-nodes/SceneNode'
 import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
@@ -702,12 +704,14 @@ function PaletteBar() {
     <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
       <div className="flex items-center gap-3">
         {/* Node / Storyboard 토글 */}
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'node' | 'storyboard')}>
-          <TabsList>
-            <TabsTrigger value="node">Node</TabsTrigger>
-            <TabsTrigger value="storyboard">Storyboard</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <AltArrowHint>
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'node' | 'storyboard')}>
+            <TabsList>
+              <TabsTrigger value="node">Node</TabsTrigger>
+              <TabsTrigger value="storyboard">Storyboard</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </AltArrowHint>
 
         {/* Previz | Real 미디어 토글(#previz-video) — Storyboard 뷰 전용, 상단바 상주(2026-07-22). */}
         {viewMode === 'storyboard' && (
@@ -859,6 +863,24 @@ export default function DirectorCanvasPage() {
 
   // Writer Scene/Shot → Director 노드 자동 셋업 (프롬프트 + 에셋 바인딩, 스펙 §8)
   useWriterDirectorSync()
+
+  // 큐 축소 → 재수화(#live-refresh) — Node/Storyboard 어느 뷰든 생성 완료가 즉시 보인다.
+  useQueueRehydrate(guideProjectId && guideProjectId !== 'default' ? guideProjectId : null)
+
+  // SHOT VIDEO 재생 상태(#video-pause 2026-08-12) — playingNodeId 가 스토어에 남아 탭을
+  //   떠났다 오면 <video autoPlay> 가 재마운트되며 저절로 재생됐다. 떠날 때(unmount)와
+  //   브라우저 탭이 가려질 때(visibilitychange) 재생 지정을 내린다 — 돌아오면 썸네일 정지 상태.
+  const setPlayingNodeForPause = useDirectorCanvasStore((s) => s.setPlayingNode)
+  useEffect(() => {
+    const onHide = () => {
+      if (document.hidden) setPlayingNodeForPause(null)
+    }
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      setPlayingNodeForPause(null)
+    }
+  }, [setPlayingNodeForPause])
 
   // 실사 보드 자율 채움을 진입 즉시 발사(#real-grid-auto 이관 2026-08-11) — 서버 라우트는 DB 만
   //   읽으므로 캔버스 hydration 을 기다릴 이유가 없다. 옛 자리(sync 훅 Pass 2.7)는 안전망으로 유지.

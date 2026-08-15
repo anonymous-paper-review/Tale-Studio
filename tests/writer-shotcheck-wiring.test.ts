@@ -188,12 +188,18 @@ describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
       { shot_id: 'shot_3b', video_generation: { motion_prompt: 'She reaches into the broken window.' } },
     ] as never[]
 
-  it('design_ref/static_spec 은 첫 자식만 상속한다 — 형제가 같은 스펙으로 같은 그림을 그리는 결함 방지', () => {
+  it('design_ref 는 첫 자식만 — 둘째는 부분 상속 스펙을 받는다 (#split-inherit: 훔치지도 굶기지도 않는다)', () => {
     const [c1, c2] = buildSplitChildren(parent(), 'shot_3', newShots())
     expect(c1.design_ref).toBe('shot_3')
     expect(c1.static_spec).toBeTruthy()
-    expect(c2.design_ref).toBeUndefined()
-    expect(c2.static_spec).toBeUndefined()
+    expect(c1.static_spec?.first_frame_prompt).toBe('first frame of shot_3') // 첫째 = 부모 START 그대로
+    expect(c2.design_ref).toBeUndefined() // provenance 는 여전히 첫째 전속 — 조인 훔침 방지 유지
+    // 둘째: 시간 무관 채널은 상속, 시간 의존 채널은 걷힘 — 같은-그림(F2) 우려 필드만 정확히 비운다.
+    expect(c2.static_spec).toBeTruthy()
+    expect(c2.static_spec?.shot_type).toBe('MS')
+    expect(c2.static_spec?.camera_angle).toBe('eye_level')
+    expect(c2.static_spec?.first_frame_prompt).toBe('')
+    expect(c2.static_spec?.framing?.focal_point).toBe('')
   })
 
   it('모델이 new_shots 에 design_ref 를 에코해도 무시된다 — provenance 는 시스템 소유 (실측 92948d6f)', () => {
@@ -205,7 +211,9 @@ describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
     const [c1, c2] = buildSplitChildren(parent(), 'shot_3', echoed)
     expect(c1.design_ref).toBe('shot_3')
     expect(c2.design_ref).toBeUndefined()
-    expect(c2.static_spec).toBeUndefined()
+    // 에코된 static_spec 은 무시되고, 시스템이 파생한 부분 상속본이 앉는다(부모 값 기반).
+    expect(c2.static_spec?.camera_angle).toBe('eye_level')
+    expect(c2.static_spec?.first_frame_prompt).toBe('')
   })
 
   it('S 누락 자식은 자기 모션 서술로 표시문이 개별화된다 (T4)', () => {
@@ -213,6 +221,63 @@ describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
     expect(c1.S.character_action).toBe('She shakes the canteen at her ear.')
     expect(c2.S.character_action).toBe('She reaches into the broken window.')
     expect(c1._splitFrom).toBe('shot_3')
+  })
+
+  it('S2: 둘째의 산문 채널은 부모 통짜 상속 금지 — 델타 없으면 빈다 (부모 START/전체모션은 자식에 거짓)', () => {
+    const noDelta = [{ shot_id: 'shot_3a' }, { shot_id: 'shot_3b' }] as never[]
+    const [c1, c2] = buildSplitChildren(parent(), 'shot_3', noDelta)
+    // 첫째는 종전대로 부모 병합(부모의 START = 첫째의 START — 참)
+    expect(c1.first_frame_generation.composition_prompt).toBe(
+      parent().first_frame_generation.composition_prompt,
+    )
+    // 둘째는 비움 + 정체성(base_assets)만 유지
+    expect(c2.first_frame_generation.composition_prompt).toBe('')
+    expect(c2.first_frame_generation.base_assets).toEqual(
+      parent().first_frame_generation.base_assets,
+    )
+    expect(c2.video_generation.motion_prompt).toBe('')
+  })
+
+  it('S3: 둘째의 dynamic_spec 은 축소 계약 — 카메라·환경 유지, 인물 동사·시선 아크 제거, 모션 산문은 자기 것', () => {
+    const [, c2] = buildSplitChildren(parent(), 'shot_3', newShots())
+    expect(c2.dynamic_spec).toBeTruthy()
+    expect(c2.dynamic_spec?.camera_motion?.type).toBe('static') // 분할 경계를 넘는 연속 무빙 유지
+    expect(c2.dynamic_spec?.character_motion).toEqual([]) // 부모 동사(샷 전체 모션)는 자식 몫 아님
+    expect(c2.dynamic_spec?.gaze_arc).toBeUndefined()
+    expect(c2.dynamic_spec?.motion_prompt).toBe('She reaches into the broken window.')
+  })
+
+  it('S3: 전환 재배치 — transition_in 은 첫째만, transition_out 은 막내만', () => {
+    const p = parent()
+    p.dynamic_spec = {
+      ...(p.dynamic_spec as object),
+      transition_in: 'fade',
+      transition_out: 'dissolve',
+    } as typeof p.dynamic_spec
+    const three = [
+      { shot_id: 'a' }, { shot_id: 'b' }, { shot_id: 'c' },
+    ] as never[]
+    const [c1, c2, c3] = buildSplitChildren(p, 'shot_3', three)
+    expect(c1.dynamic_spec?.transition_in).toBe('fade')
+    expect(c1.dynamic_spec?.transition_out).toBeUndefined() // 부모의 퇴장은 막내 몫
+    expect(c2.dynamic_spec?.transition_in).toBeUndefined()
+    expect(c2.dynamic_spec?.transition_out).toBeUndefined()
+    expect(c3.dynamic_spec?.transition_in).toBeUndefined()
+    expect(c3.dynamic_spec?.transition_out).toBe('dissolve')
+  })
+
+  it('S1: 둘째의 blocking pose 는 자기 액션 텍스트로 — 부모의 순간 자세를 물려받지 않는다', () => {
+    const p = parent()
+    p.static_spec = {
+      ...(p.static_spec as object),
+      character_blocking: [
+        { character_id: 'char', position_in_frame: 'center', pose: 'kneeling over blueprint', gaze: 'down', asset_version: 'v1' },
+      ],
+    } as typeof p.static_spec
+    const [, c2] = buildSplitChildren(p, 'shot_3', newShots())
+    expect(c2.static_spec?.character_blocking?.[0].character_id).toBe('char')
+    expect(c2.static_spec?.character_blocking?.[0].position_in_frame).toBe('center')
+    expect(c2.static_spec?.character_blocking?.[0].pose).toBe('She reaches into the broken window.')
   })
 })
 

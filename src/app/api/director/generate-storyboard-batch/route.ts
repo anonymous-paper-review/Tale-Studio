@@ -77,17 +77,32 @@ export async function POST(req: NextRequest) {
     }
 
     const anchor = await resolveStyleAnchor(project)
-    const charIds = [...new Set(planned.flatMap((g) => g.flatMap((s) => s.characters)))]
-    const { data: chars } = charIds.length
+    // #F-006(2026-08-13): 시트 프롬프트에 씬 정보가 전무해 시트마다 시간대를 지어냈다(실측 1e166e55
+    //   sc_04 Night — 21~24/25~27 시트가 서로 다른 시간대로 갈라짐). scenes.time_of_day 를 시트 전역
+    //   조명 한 줄로 배선한다. 그룹은 씬 경계에서 끊기므로(위 그룹핑) 시트당 씬은 정확히 1개.
+    const sceneIds = [...new Set(planned.map((g) => g[0].scene_id))]
+    const { data: sceneRows } = await supabaseAdmin
+      .from('scenes')
+      .select('scene_id, time_of_day')
+      .eq('project_id', projectId)
+      .in('scene_id', sceneIds)
+    const todByScene = new Map(
+      (sceneRows ?? []).map((s) => [s.scene_id as string, ((s.time_of_day as string) ?? '').trim()]),
+    )
+    // 인물 조회는 호출 전체 1회(쿼리 절약)로 두되 맵으로 보관 — 레퍼런스는 **시트별로** 꺼낸다
+    //   (#real-grid-identity 2026-08-12): 옛 코드는 호출 전체(최대 2시트)의 합집합을 익명 URL
+    //   배열로 모든 시트에 실었다. 그 시트에 안 나오는 인물의 레퍼런스가 오염원으로 첨부되고,
+    //   어느 URL 이 누구인지도 잃어버려 프롬프트가 대응을 지시할 수 없었다 — 실측 a5cb2cae
+    //   sh_04_18: 추적자 단독 칸이 소녀로 바꿔치기된 시트가 그대로 저장됐다.
+    const allCharIds = [...new Set(planned.flatMap((g) => g.flatMap((s) => s.characters)))]
+    const { data: chars } = allCharIds.length
       ? await supabaseAdmin
           .from('characters')
-          .select('character_id, portrait, view_main')
+          .select('character_id, name, portrait, view_main')
           .eq('project_id', projectId)
-          .in('character_id', charIds)
+          .in('character_id', allCharIds)
       : { data: [] as Array<Record<string, unknown>> }
-    const charRefs = (chars ?? [])
-      .map((c) => ((c.view_main as string) ?? (c.portrait as string)) || null)
-      .filter((u): u is string => !!u)
+    const charById = new Map((chars ?? []).map((c) => [c.character_id as string, c]))
 
     const webhookUrl = resolveWebhookUrl()
     const submitted: Array<{ jobId: string; shotIds: string[] }> = []
@@ -100,13 +115,51 @@ export async function POST(req: NextRequest) {
       if (upErr) throw upErr
       const refUrl = supabaseAdmin.storage.from('media').getPublicUrl(refPath).data.publicUrl
 
+      // #real-grid-identity: 이 시트에 실제로 나오는 인물만, 결정적 순서(sort)로 —
+      //   "reference image N = 이름" 규약이 성립하려면 순서가 흔들리면 안 된다
+      //   (.in() 쿼리는 행 순서를 보장하지 않는다).
+      const groupCharIds = [...new Set(group.flatMap((s) => s.characters))].sort()
+      const groupRefs = groupCharIds
+        .map((id) => {
+          const c = charById.get(id)
+          const url = (((c?.view_main as string) ?? (c?.portrait as string)) || null) as
+            | string
+            | null
+          return url ? { characterId: id, name: ((c?.name as string) || id).trim() || id, url } : null
+        })
+        .filter((r): r is { characterId: string; name: string; url: string } => !!r)
+      const nameById = new Map(groupRefs.map((r) => [r.characterId, r.name]))
+      // 칸별 배정 — 레퍼런스가 없는 인물(이미지 미생성)은 배정문에서도 뺀다: 이름만 있고
+      //   그림이 없는 지시는 모델이 지어내게 만든다.
+      const columnCharacters = group.map((s) =>
+        s.characters.map((id) => nameById.get(id)).filter((n): n is string => !!n),
+      )
+
+      const sceneLighting = todByScene.get(group[0].scene_id) || null
+      // #anchor-wiring(2026-08-14 오너 확정): 앵커별 검증 절 + 서브룩 그레이드 권위 + watercolor
+      //   A안(preview 2번 스타일 레퍼런스). 전부 DB(style_anchors)가 진실.
+      const anchorTwoRef = !!(anchor?.usePreviewRef && anchor.previewUrl)
+      const prompt = buildRealGridPrompt(group.length, {
+        characterRefCount: groupRefs.length,
+        hasStyleRef: !!anchor,
+        characterRefs: groupRefs.map((r) => ({ name: r.name })),
+        columnCharacters,
+        sceneLighting,
+        styleClause: anchor?.styleClause ?? null,
+        anchorKeepsGrade: anchor?.anchorKind === 'sublook',
+        styleRefCount: anchorTwoRef ? 2 : 1,
+      })
+      const referenceImageUrls = [
+        refUrl,
+        ...groupRefs.map((r) => r.url),
+        ...(anchor ? [anchor.imageUrl] : []),
+        ...(anchorTwoRef ? [anchor!.previewUrl as string] : []),
+      ]
+
       const { request_id, model } = await falImageSubmit({
         model: 'openai/gpt-image-2/edit',
-        prompt: buildRealGridPrompt(group.length, {
-          characterRefCount: charRefs.length,
-          hasStyleRef: !!anchor,
-        }),
-        reference_image_urls: [refUrl, ...charRefs, ...(anchor ? [anchor.imageUrl] : [])],
+        prompt,
+        reference_image_urls: referenceImageUrls,
         image_size: '1536x1024', // 가로 시트 강제 — finalize 가드(세로=계약 위반 실패)와 짝
         webhookUrl,
       } as never)
@@ -119,10 +172,17 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         workspaceId: project.workspace_id as string,
         provider: 'fal',
+        // #B9(2026-08-12): 이 경로가 최종 프레임 전량을 만드는데도 프롬프트가 어디에도 안 남아
+        //   사고 역추적이 코드 재구성에 의존했다(실측: sh_04_18 조사). prompt/refs/칸 배정을
+        //   스냅샷에 남긴다 — 디버그 프롬프트 트레이스(PROMPT_TRACE_KINDS)도 이제 표시 가능.
         inputSnapshot: {
           shotIds: group.map((s) => s.shot_id),
           ref_grid_url: refUrl,
           style_anchor_key: anchor?.key ?? null,
+          prompt,
+          reference_image_urls: referenceImageUrls,
+          column_characters: columnCharacters,
+          scene_time_of_day: sceneLighting,
         },
         target: {
           workspaceId: project.workspace_id as string,

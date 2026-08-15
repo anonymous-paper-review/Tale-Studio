@@ -14,7 +14,11 @@ import { cn } from '@/lib/utils'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import { useActiveGenerationJobs, activeStartedAt } from '@/lib/generation-queue'
+import {
+  useActiveGenerationJobs,
+  activeShotIds,
+  activeStartedAt,
+} from '@/lib/generation-queue'
 import { isShotData, isShotImageData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
 
@@ -40,11 +44,22 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
   const projectId = useDirectorCanvasStore((s) => s.projectId)
   const activeJobs = useActiveGenerationJobs(projectId || null)
 
+  // 스토리보드 뷰와 같은 진행 동기화(#e6 2026-08-12) — 큐가 판정의 바닥.
+  const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
+
   if (!isShotImageData(data)) return null
 
   const hasImage = storyboardImage?.status === 'completed' && !!storyboardImage.url
-  const generating = parentGenerating || storyboardImage?.status === 'generating'
   const failed = storyboardImage?.status === 'failed'
+  const queuedImage =
+    !!parentWriterShotId &&
+    activeShotIds(activeJobs, ['shot_storyboard', 'storyboard_real_grid']).has(parentWriterShotId)
+  // 일괄 러너 순번 대기(큐에 아직 없음) — 문구만 '대기 중', 타이머 없음(#e4 와 동일 규칙).
+  const waitingOnly =
+    realBatchBusy && !hasImage && !failed && !queuedImage &&
+    storyboardImage?.status !== 'generating' && !parentGenerating
+  const generating =
+    parentGenerating || storyboardImage?.status === 'generating' || queuedImage || waitingOnly
 
   return (
     <div
@@ -141,7 +156,8 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
           )}
           <GeneratingOverlay
             active={!!generating}
-            label="이미지 생성 중"
+            label={waitingOnly ? '이미지 생성 대기 중' : '이미지 생성 중'}
+            showElapsed={!waitingOnly}
             beamColor="success"
             startedAt={
               parentWriterShotId

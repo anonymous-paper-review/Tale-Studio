@@ -34,7 +34,7 @@ import {
 } from '@/types/asset'
 import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
-import { applyStyleAnchor, resolveStyleAnchor } from '@/lib/style-anchor'
+import { applyStyleAnchor, resolveStyleAnchor, tokenUnlessMediaWord } from '@/lib/style-anchor'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
 
 export const runtime = 'nodejs'
@@ -147,15 +147,21 @@ export async function POST(req: Request) {
       appearance: character.appearance ?? character.name,
       role: character.role ?? undefined,
       costumes: character.costume ?? undefined,
-      // 앵커 존재 시 art_style 토큰 억제 (2026-07-14 실측, docs/style-anchor-art-style-authority.md §9-2):
-      //   art_style 값에 매체어가 실리면(예: dark_cinematic_realism) 앵커 이미지를 이겨 매체 전이가 깨진다
-      //   (d6208bba 거인 실사화 재현 2/2 → 토큰 제거로 카툰 복원 2/2). 앵커가 곧 art style authority 이므로
-      //   무조건 생략(값 검사 없이 단순·안전). 분위기는 palette·외모 텍스트가 유지. 앵커 없으면 기존 그대로(no-op).
-      artStyle: anchor ? undefined : dt.l1?.art_style,
-      shapeLanguage: dt.l1?.shape_language,
-      lineQuality: dt.l1?.line_quality,
-      texturePhilosophy: dt.l1?.texture_philosophy,
-      characterProportion: dt.l1?.character_proportion,
+      // 앵커 존재 시 매체어 토큰만 정밀 드롭(#F-004 B4 2026-08-12 — 2026-07-14 통짜 억제 결정의
+      //   **명시적 번복**): 옛 규칙은 art_style 을 무조건 생략했는데, 실측(dc531572)에서 억제된 것이
+      //   앵커에 부합하는 유일한 토큰(3d_animation)이고 정작 매체어(texture: photorealistic)는
+      //   살아남아 앵커를 이겼다 — 취지가 정확히 뒤집힌 배치. 새 규칙: 매체어를 품은 토큰만 드롭
+      //   (dark_cinematic_realism 류 — 2026-07-14 실측의 교훈은 그대로 보존), 무해한 토큰은 유지.
+      //   앵커 없으면 기존 그대로(no-op).
+      artStyle: anchor ? tokenUnlessMediaWord(dt.l1?.art_style) : dt.l1?.art_style,
+      shapeLanguage: anchor ? tokenUnlessMediaWord(dt.l1?.shape_language) : dt.l1?.shape_language,
+      lineQuality: anchor ? tokenUnlessMediaWord(dt.l1?.line_quality) : dt.l1?.line_quality,
+      texturePhilosophy: anchor
+        ? tokenUnlessMediaWord(dt.l1?.texture_philosophy)
+        : dt.l1?.texture_philosophy,
+      characterProportion: anchor
+        ? tokenUnlessMediaWord(dt.l1?.character_proportion)
+        : dt.l1?.character_proportion,
       palette,
       delta: typeof instruction === 'string' ? instruction : undefined,
       safeMode: effectiveSafeMode,
