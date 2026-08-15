@@ -85,7 +85,8 @@ describe('resolveStyleAnchor', () => {
 
     const anchor = await resolveStyleAnchor({ style_anchor_key: 'jp_anime' })
 
-    expect(anchor).toEqual({ key: 'jp_anime', imageUrl: 'https://cdn/jp.png' })
+    // 카탈로그 경로는 #anchor-wiring 확장 필드(medium·styleClause·preview·anchorKind)를 같이 싣는다 — 핵심만 대조.
+    expect(anchor).toMatchObject({ key: 'jp_anime', imageUrl: 'https://cdn/jp.png' })
     expect(mocks.from).toHaveBeenCalledWith('style_anchors')
   })
 
