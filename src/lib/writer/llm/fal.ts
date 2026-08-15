@@ -86,6 +86,9 @@ export interface FalImageOptions {
   model?: string;             // 기본: openai/gpt-image-2
   prompt: string;
   aspect_ratio?: string;
+  /** gpt-image 계열 edit 캔버스 지정('1024x1536' 등). 호출자가 명시하면 aspect_ratio 유도값보다 우선 —
+   *  타입에 없어 조용히 버려지고 'auto'가 전송되던 결함 수리(#tfix-fal-wiring 2026-08-11, AnchorableSubmit과 정렬). */
+  image_size?: string;
   reference_image_urls?: string[];
   negative_prompt?: string;
   /** 고정 시 diffusion 노이즈 초기값 고정 → 스타일 베이스라인 일관성 + 재생성 재현성 (flux 계열 지원). */
@@ -171,9 +174,9 @@ function buildFalImageInput(opts: FalImageOptions, model: string): Record<string
   if (typeof opts.seed === 'number') input.seed = opts.seed;
 
   if (isImageEditModel(model)) {
-    // edit 모델: image_urls 필수 + image_size preset
+    // edit 모델: image_urls 필수 + image_size(호출자 명시 우선, 없으면 aspect_ratio 유도 preset)
     input.image_urls = opts.reference_image_urls ?? [];
-    input.image_size = arToImageSize(opts.aspect_ratio);
+    input.image_size = opts.image_size ?? arToImageSize(opts.aspect_ratio);
   } else if (isFluxFamilyModel(model)) {
     // flux 계열: aspect_ratio 파라미터가 없고 image_size preset 사용 ('auto' 미지원 → 16:9 fallback)
     const size = arToImageSize(opts.aspect_ratio);

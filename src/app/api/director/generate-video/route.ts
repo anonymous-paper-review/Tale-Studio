@@ -154,8 +154,12 @@ function buildFalReferenceToVideoRequest(
   if (!spec.endpoint) throw new Error('FAL reference-to-video endpoint missing')
   const input: Record<string, unknown> = {
     prompt,
-    negative_prompt: 'blurry, low quality, distorted, deformed',
     [spec.refParam]: imageUrls,
+  }
+  // happy-horse는 negative_prompt 미지원(모델 스키마) — 헛송신 제거(#tfix-fal-wiring 2026-08-11).
+  //   고정 negative_prompt 계약 자체는 타 모델에서 유지(존폐는 별도 논의 — 카탈로그 B12).
+  if (modelKey !== 'happy-horse') {
+    input.negative_prompt = 'blurry, low quality, distorted, deformed'
   }
 
   // duration: flexible=정수(clamp), fixed(veo)='8s'

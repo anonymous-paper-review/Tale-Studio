@@ -262,8 +262,11 @@ export function buildRealStripPrompt(
     `- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.`,
     `- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.`,
     `- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.`,
-    `- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text.`,
-    `- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly.`,
+    // #tfix-repaint-prompt 2026-08-11: A1 실측 체계 결함 2건 보강 —
+    //   ④ 정지 샷(sh_02_10)에 없던 화살표가 3반복 모두 추가됨 → 원본에 없는 주석 발명 금지.
+    //   ③ 2동작 샷(sh_01_09)의 END 패널이 3반복 전부 실패 → 도착 상태 전건 완료 재현 명시.
+    `- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.`,
+    `- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.`,
     ...(characterRefCount > 0
       ? [
           `- Replace every wooden mannequin with the corresponding character(s) from ${charLocation} (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.`,
