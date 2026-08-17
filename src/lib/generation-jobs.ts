@@ -234,7 +234,7 @@ export type JobErrorClass =
   | 'moderation' // 명시 콘텐츠 정책 — 프롬프트 수정 필요 (fal content_policy_violation)
   | 'infra' // 우리 인프라 정리 — webhook 유실 좀비, superseded ("stale queued reaped")
   | 'provider' // 프로바이더 일시 장애 — 재시도 가치 (5xx/429/타임아웃/결과 결함)
-  | 'bad_request' // 불투명 400 — fal 이 본문을 버려 재시도성 미확정, 데이터 축적 중 (실측 14건)
+  | 'bad_request' // 불투명 400 + 422 스키마 거부 — 요청 자체가 틀림, 재시도 무가치 (#fal-canvas 실측 40건: image_size 'WxH' 문자열 거부가 unknown 으로 새던 구멍)
   | 'unknown'
 
 const JOB_ERROR_CLASS_RULES: Array<[JobErrorClass, RegExp]> = [
@@ -247,7 +247,8 @@ const JOB_ERROR_CLASS_RULES: Array<[JobErrorClass, RegExp]> = [
     'provider',
     /\b(429|500|502|503|504|529)\b|rate.?limit|timeout|timed out|overloaded|ECONN|no (image|video) url in webhook payload|invalid video url|unavailable/i,
   ],
-  ['bad_request', /^bad request$|status=400\b/i],
+  // 422 는 data_ref(참조 이미지 접근 불가도 422로 옴)가 먼저 매칭된 뒤의 잔여 = 스키마 거부.
+  ['bad_request', /^bad request$|status=4(00|22)\b|unprocessable entity/i],
 ]
 
 export function classifyJobError(message: string | null | undefined): JobErrorClass {

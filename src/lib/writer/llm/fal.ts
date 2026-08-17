@@ -86,8 +86,10 @@ export interface FalImageOptions {
   model?: string;             // 기본: openai/gpt-image-2
   prompt: string;
   aspect_ratio?: string;
-  /** gpt-image 계열 edit 캔버스 지정('1024x1536' 등). 호출자가 명시하면 aspect_ratio 유도값보다 우선 —
-   *  타입에 없어 조용히 버려지고 'auto'가 전송되던 결함 수리(#tfix-fal-wiring 2026-08-11, AnchorableSubmit과 정렬). */
+  /** 캔버스 지정 — 'WxH'('1024x1536' 등) 또는 fal preset('landscape_4_3' 등). 명시 시 aspect_ratio
+   *  유도값보다 우선(#tfix-fal-wiring). WxH 는 스키마가 요구하는 {width,height} 객체로 변환해 보낸다
+   *  (#fal-canvas 2026-08-17: 'WxH' 문자열 그대로는 422 — 실측 40/40 전멸. 객체는 4/4 수락 +
+   *  요청 치수 그대로 반환, 비네이티브 치수는 64배수 스냅: 1536x643→1536x640). */
   image_size?: string;
   reference_image_urls?: string[];
   negative_prompt?: string;
@@ -161,7 +163,18 @@ function resolveImageModel(opts: FalImageOptions): string {
   return hasRef ? DEFAULT_EDIT_IMAGE_MODEL : DEFAULT_IMAGE_MODEL;
 }
 
-function buildFalImageInput(opts: FalImageOptions, model: string): Record<string, unknown> {
+// 'WxH' → {width,height} (fal ImageSize 객체 — #fal-canvas 실측: 문자열은 422, 객체는 수락).
+//   preset 문자열('landscape_4_3' 등)은 그대로 통과.
+function normalizeImageSize(
+  size: string | undefined,
+): string | { width: number; height: number } | undefined {
+  if (!size) return undefined;
+  const m = /^(\d+)x(\d+)$/.exec(size.trim());
+  return m ? { width: Number(m[1]), height: Number(m[2]) } : size;
+}
+
+/** export 는 테스트 전용 — 순수 조립 함수라 네트워크 없이 스키마 계약을 검증할 수 있다. */
+export function buildFalImageInput(opts: FalImageOptions, model: string): Record<string, unknown> {
   // xai Grok Imagine(#arrow-layer 2026-08-09): aspect_ratio 기본 'auto'(입력 비율 유지)라 생략하고,
   //   image_size·negative_prompt·seed 는 스키마에 없다 — 알려진 키만 보낸다(422 방어).
   if (model.startsWith('xai/grok-imagine-image')) {
@@ -176,10 +189,10 @@ function buildFalImageInput(opts: FalImageOptions, model: string): Record<string
   if (isImageEditModel(model)) {
     // edit 모델: image_urls 필수 + image_size(호출자 명시 우선, 없으면 aspect_ratio 유도 preset)
     input.image_urls = opts.reference_image_urls ?? [];
-    input.image_size = opts.image_size ?? arToImageSize(opts.aspect_ratio);
+    input.image_size = normalizeImageSize(opts.image_size) ?? arToImageSize(opts.aspect_ratio);
   } else if (isFluxFamilyModel(model)) {
-    // flux 계열: aspect_ratio 파라미터가 없고 image_size preset 사용 ('auto' 미지원 → 16:9 fallback)
-    const size = arToImageSize(opts.aspect_ratio);
+    // flux 계열: aspect_ratio 파라미터가 없고 image_size 사용 ('auto' 미지원 → 16:9 fallback)
+    const size = normalizeImageSize(opts.image_size) ?? arToImageSize(opts.aspect_ratio);
     input.image_size = size === 'auto' ? 'landscape_16_9' : size;
     if (opts.reference_image_urls?.length) input.image_urls = opts.reference_image_urls;
   } else {

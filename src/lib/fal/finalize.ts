@@ -932,7 +932,7 @@ export async function finalizeShotStoryboardJob(
 
 /**
  * 실사 4샷 그리드(#real-grid 2026-08-06) 영속화 — 러프 그리드 경로의 실사판.
- *   시트 계약 위반(세로 반환) 시 명시 실패 — 해당 샷들은 단일 스트립 재생성으로 복구(이원화).
+ *   시트 계약 위반(요청 캔버스와 방향 불일치) 시 명시 실패 — 해당 샷들은 단일 스트립 재생성으로 복구(이원화).
  */
 async function finalizeRealGridJob(
   job: GenerationJob,
@@ -952,8 +952,19 @@ async function finalizeRealGridJob(
     throw new Error(`real grid too small (${gridBuf.length}b) — likely blank/moderated output`)
   }
   const meta = await sharp(gridBuf).metadata()
-  if ((meta.width ?? 0) <= (meta.height ?? 1)) {
-    throw new Error(`real grid 계약 위반(세로 ${meta.width}x${meta.height}) — 단일 스트립 재생성으로 복구하세요`)
+  // #fal-canvas(2026-08-17): 계약 방향 = 요청 캔버스 방향. 종전 "가로 아니면 위반"은 캔버스가
+  //   포맷 파생(vertical → 세로 시트)이 되면서 오판 — snapshot.image_size 로 요청 방향을 읽는다.
+  //   스냅샷에 없는 구 잡은 가로 계약 유지. 정방형 요청은 방향 판정 자체가 무의미라 통과.
+  const reqSize = /^(\d+)x(\d+)$/.exec(
+    String((job.input_snapshot as { image_size?: unknown } | null)?.image_size ?? ''),
+  )
+  const [reqW, reqH] = reqSize ? [Number(reqSize[1]), Number(reqSize[2])] : [1536, 1024]
+  const gotW = meta.width ?? 0
+  const gotH = meta.height ?? 1
+  if (reqW !== reqH && reqW > reqH !== gotW > gotH) {
+    throw new Error(
+      `real grid 계약 위반(요청 ${reqW}x${reqH}, 반환 ${gotW}x${gotH}) — 단일 스트립 재생성으로 복구하세요`,
+    )
   }
 
   const upload = async (path: string, buf: Buffer): Promise<string> => {

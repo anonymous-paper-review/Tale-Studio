@@ -19,8 +19,13 @@ import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { applyStyleAnchor, resolveStyleAnchor, type AnchorableSubmit } from '@/lib/style-anchor'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import { appendCheckConstraints } from '@/lib/writer/check-notes'
-import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
+import {
+  composeRoughReferenceStrip,
+  buildRealStripPrompt,
+  realSheetCanvas,
+} from '@/lib/director/storyboard-strip'
 import { storageKeySegment } from '@/lib/storage/key-segment'
+import { aspectRatioFromFormat, parseProjectFormat } from '@/types/project'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -55,7 +60,7 @@ export async function POST(req: Request) {
     const [{ data: project }, { data: shot }] = await Promise.all([
       supabaseAdmin
         .from('projects')
-        .select('workspace_id, style_anchor_key, custom_style_anchor')
+        .select('workspace_id, style_anchor_key, custom_style_anchor, settings')
         .eq('id', projectId)
         .maybeSingle(),
       supabaseAdmin
@@ -67,6 +72,11 @@ export async function POST(req: Request) {
     ])
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
     const anchor = await resolveStyleAnchor(project)
+    // #fal-canvas(2026-08-17): 프로듀서 포맷이 화면비의 진실 — 클라 aspectRatio 는 포맷 미상
+    //   구 프로젝트의 폴백일 뿐이다 (director-store 가 '16:9'를 하드코딩하던 결함의 교정).
+    const projectFormat = parseProjectFormat(
+      (project.settings as { format?: unknown } | null)?.format,
+    )
 
     const callerRefs = referenceImageUrls?.length ? referenceImageUrls : undefined
 
@@ -140,9 +150,11 @@ export async function POST(req: Request) {
           anchorKeepsGrade: anchor?.anchorKind === 'sublook',
           styleRefCount: anchor?.usePreviewRef && anchor.previewUrl ? 2 : 1,
         }),
-        // #real-strip-guard(2026-08-06): 'auto' 위임이 가로 단일컷 반환을 허용했다(실측 011fd4bd —
-        //   액자 테두리 단일컷을 고정 크롭이 액자째 3분할). 세로 캔버스를 강제해 시트 계약 준수를 유도.
-        image_size: '1024x1536',
+        // #real-strip-guard(2026-08-06)→#fal-canvas(2026-08-17): 세로 캔버스로 시트 계약 준수 유도.
+        //   ed5bd4a 전까지 이 값은 타입에 없어 조용히 버려지고 'auto'(첫 ref 비율 추종)가 전송되고
+        //   있었다 — WxH→{width,height} 변환 실측(4/4 수락) 후 진짜 배선. 스트립 캔버스는 3행 적층
+        //   레이아웃이 지배해 포맷 불문 세로(셀 ~2:1, 세로 프로젝트용 가로 3열 템플릿은 deferred).
+        image_size: realSheetCanvas(projectFormat, 'strip1'),
         reference_image_urls: [
           stripRefUrl,
           ...(callerRefs ?? []),
@@ -153,7 +165,8 @@ export async function POST(req: Request) {
     } else {
       const baseOpts: AnchorableSubmit = {
         prompt: guardedPrompt,
-        aspect_ratio: aspectRatio ?? '16:9',
+        aspect_ratio:
+          (projectFormat ? aspectRatioFromFormat(projectFormat) : null) ?? aspectRatio ?? '16:9',
         ...(callerRefs ? { reference_image_urls: callerRefs } : {}),
       }
       const mode = callerRefs ? 'multiref' : 'single'

@@ -29,6 +29,20 @@ export interface ProjectSettings {
   dialogueLanguage: string // BCP-47 short code: 'en', 'ko', 'ja', 'zh', ...
 }
 
+const PROJECT_FORMATS: readonly ProjectFormat[] = [
+  'horizontal_16:9',
+  'vertical_9:16',
+  'cinema_2.39:1',
+  'square_1:1',
+]
+
+/** settings JSONB 등 비신뢰 값 → ProjectFormat. 미상/구값은 null — 기본값은 소비처가 정한다. */
+export function parseProjectFormat(v: unknown): ProjectFormat | null {
+  return typeof v === 'string' && (PROJECT_FORMATS as readonly string[]).includes(v)
+    ? (v as ProjectFormat)
+    : null
+}
+
 // 비율 문자열은 저장하지 않고 format에서 파생한다 (architecture §0: 파생값 저장 금지).
 //   생성 경로(fal aspect_ratio)·표시 라벨이 이 함수를 호출한다.
 export function aspectRatioFromFormat(format: ProjectFormat): string {

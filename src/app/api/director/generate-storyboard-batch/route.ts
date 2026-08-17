@@ -12,7 +12,12 @@ import { createGenerationJob } from '@/lib/generation-jobs'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
-import { composeRoughReferenceGrid, buildRealGridPrompt } from '@/lib/director/storyboard-strip'
+import {
+  composeRoughReferenceGrid,
+  buildRealGridPrompt,
+  realSheetCanvas,
+} from '@/lib/director/storyboard-strip'
+import { parseProjectFormat } from '@/types/project'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -42,10 +47,16 @@ export async function POST(req: NextRequest) {
 
     const { data: project } = await supabaseAdmin
       .from('projects')
-      .select('workspace_id, style_anchor_key, custom_style_anchor')
+      .select('workspace_id, style_anchor_key, custom_style_anchor, settings')
       .eq('id', projectId)
       .maybeSingle()
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
+    // #fal-canvas(2026-08-17): 프로듀서 포맷 → 시트 캔버스. 캔버스 방향이 곧 셀 방향이라
+    //   이 한 줄이 "화면비를 fal 에 전달"의 본체다 (vertical 실측: 4×3 유지 + 세로 패널 재구도).
+    const sheetCanvas = realSheetCanvas(
+      parseProjectFormat((project.settings as { format?: unknown } | null)?.format),
+      'grid4',
+    )
 
     const { data: rows } = await supabaseAdmin
       .from('shots')
@@ -165,9 +176,11 @@ export async function POST(req: NextRequest) {
         model: 'openai/gpt-image-2/edit',
         prompt,
         reference_image_urls: referenceImageUrls,
-        image_size: '1536x1024', // 가로 시트 강제 — finalize 가드(세로=계약 위반 실패)와 짝
+        // 포맷 파생 캔버스 — finalize 방향 가드가 snapshot.image_size 로 같은 계약을 검사한다.
+        //   (ed5bd4a 전까지 이 필드는 타입에 없어 버려지고 'auto'가 전송되고 있었다 — #fal-canvas)
+        image_size: sheetCanvas,
         webhookUrl,
-      } as never)
+      })
 
       const job = await createGenerationJob({
         projectId,
@@ -188,6 +201,7 @@ export async function POST(req: NextRequest) {
           reference_image_urls: referenceImageUrls,
           column_characters: columnCharacters,
           scene_time_of_day: sceneLighting,
+          image_size: sheetCanvas, // finalize 방향 가드 + 사고 역추적용 (#fal-canvas)
         },
         target: {
           workspaceId: project.workspace_id as string,

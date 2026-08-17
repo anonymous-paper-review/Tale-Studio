@@ -11,8 +11,32 @@ import {
   STRIP_TEMPLATE_PATH,
   GRID_TEMPLATE_PATH,
   gridGeometry,
+  type RoughGridVariant,
 } from '@/lib/writer/rough-storyboard-grid'
 import { resolveWebhookBaseUrl } from '@/lib/fal/webhook-url'
+import type { ProjectFormat } from '@/types/project'
+
+/**
+ * 실사 시트 캔버스(WxH) — 프로듀서 포맷 파생 (#fal-canvas 2026-08-17, 실측 4/4 수락).
+ *   그리드는 캔버스 방향이 곧 셀 방향: vertical 은 세로 시트(셀 ~9:16 근접, 4×3 레이아웃 유지
+ *   실측), cinema 는 2.4:1(1536x643 요청 시 64배수 스냅 1536x640 실측). 스트립은 3행 적층
+ *   레이아웃이 지배해 포맷 불문 세로 고정(셀 ~2:1) — 세로 프로젝트용 가로 3열 스트립 템플릿은
+ *   미보유(deferred-vertical-strip-template). 러프 레퍼런스 시트는 가로 템플릿 그대로여도
+ *   모델이 패널을 캔버스 방향으로 재구도한다(실측 T2).
+ */
+export function realSheetCanvas(format: ProjectFormat | null, variant: RoughGridVariant): string {
+  if (variant === 'strip1') return '1024x1536'
+  switch (format) {
+    case 'vertical_9:16':
+      return '1024x1536'
+    case 'square_1:1':
+      return '1024x1024'
+    case 'cinema_2.39:1':
+      return '1536x640'
+    default:
+      return '1536x1024' // horizontal_16:9 · 포맷 미상(구 프로젝트)
+  }
+}
 
 /** 스트립 템플릿 바이트 로드 — 로컬 fs 우선(dev), 실패 시 배포 public URL(fal 그리드 경로와 동일 방식). */
 async function loadStripTemplate(): Promise<Buffer> {

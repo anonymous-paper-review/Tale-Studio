@@ -30,6 +30,12 @@ describe('classifyJobError — 실측 메시지 분류', () => {
     ],
     // webhook 이 [moderation] 접두를 붙여 기록하는 경로
     ['[moderation] NSFW content detected', 'moderation'],
+    // #fal-canvas(2026-08-17) 실측 40건 — image_size 'WxH' 문자열 스키마 거부. data_ref/moderation
+    // 이 앞서 매칭된 뒤의 잔여 422 = 요청 자체 결함(재시도 무가치)인데 unknown 으로 새고 있었다.
+    [
+      'status=422 | Unprocessable Entity | body={"detail":[{"type":"model_attributes_type","loc":["body","image_size","ImageSize"],"msg":"Input should be a valid dictionary or object to extract fields from","input":"1536x1024"}]}',
+      'bad_request',
+    ],
   ]
   it.each(CASES)('%s → %s', (msg, cls) => {
     expect(classifyJobError(msg)).toBe(cls)

@@ -2152,12 +2152,13 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             const res = await fetch('/api/director/generate-storyboard', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              // aspectRatio 미전송 — 서버가 프로듀서 포맷(projects.settings.format)에서 파생한다
+              //   (#fal-canvas: 클라 '16:9' 하드코딩이 세로 프로젝트의 화면비를 덮던 결함 제거).
               body: JSON.stringify({
                 projectId,
                 writerShotId,
                 prompt,
                 referenceImageUrls,
-                aspectRatio: '16:9',
               }),
             })
             if (!res.ok) {
