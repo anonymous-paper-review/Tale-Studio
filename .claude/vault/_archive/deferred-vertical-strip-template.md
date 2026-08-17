@@ -3,10 +3,15 @@ id: deferred-vertical-strip-template
 source: "#fal-canvas 2026-08-17 — research/experiments/fal-canvas-image-size/RESULTS.md 의 남은 것"
 kind: (조건이 차면 그때 정한다 — 템플릿 제작 + generation 실측)
 budget: { usd: 0, runs: 3, wall_min: 60 }
-blockers: [세로 프로젝트의 개별 샷 재생성 품질 불만이 실제로 관측될 것]
-status: waiting
+blockers: []
+status: done   # 2026-08-17 당일 해소 — 오너 지시(#sheet-formats: 포맷별 템플릿 신규 제작)로 해법 ① 구현
 priority: normal
 ```
+
+> **닫힘(2026-08-17)**: 해법 ① 그대로 — 가로 3열 세로 스트립 템플릿(`public/rough-storyboard-strip-vertical.png`,
+> 1536×1024, 셀 474×842 ≈9:16)을 시트 스펙에서 프로그램 생성(비례 좌표 재실측 불요 — 스펙이 곧 그림).
+> 합성·크롭·프롬프트가 프레임 축(frameAxis 'cols')을 인지하고, 리페인트는 프레임 AR 매칭으로 시트를
+> 골라 레거시 가로 프레임과 신규 세로 프레임이 공존한다. 실측: `research/experiments/sheet-formats/`.
 
 # 세로 프로젝트용 스트립 템플릿 — 개별 재생성 패널이 눕는 문제
 
