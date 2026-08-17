@@ -91,6 +91,17 @@ R3 square 1344×1024 · R4 cinema 1920×704 러프 전부 요청 치수 정확 �
 transposed 자동 선택 → 1536×896 리페인트 → 세로 프레임 크롭)도 신규 캔버스에서 재통과.
 비네이티브 신규 치수 6종(1728·1712·1344·1792·1920·1296·896)이 전부 스키마 문서대로 동작.
 
+## E2E (프로덕션, 오너 지시 — storage 업로드 + writer/director 확인)
+
+`tests/sheet-formats-e2e.manual.test.ts` (RUN_SHEET_E2E=1): 인증 2건만 모킹하고 실제 라우트
+핸들러 + reconcile/finalize 를 로컬에서 실행해 프로덕션 DB·스토리지·fal 전 체인 검증.
+① 템플릿 10장(신규 8 + 레거시 2) `templateAssetUrl` 로 storage 시드 — 해시 경로 public 200 확인
+② webtoon_test sc_02 3샷 러프 force 재생성 → vertical grid4 시트 → 세로 프레임(AR<0.8) 크롭·저장
+③ sh_02_04 director 개별 재생성 → compose 가 vertical(가로 3열) 시트 자동 선택(snapshot
+   sheet_format 어서션) → 1536×896 리페인트 → 세로 프레임 + 가로 시트 저장.
+발견·수리: vitest 셋업의 supabase.invalid 센티널이 라이브 env 를 가림 → loadEnv 무조건 덮어쓰기.
+Vercel 프로덕션 배포는 CLI 로 Ready 확인(e7d2d94).
+
 ## 운영 노트
 
 - **기존 세로 프로젝트(webtoon_test)의 러프는 가로 프레임 그대로다** — 실사만 세로로 나온다
