@@ -70,11 +70,11 @@
 한 번에 고정한다. 스냅샷 도구는 `_INBOX.md`를 수정하지 않고, 출력 JSON의 `snapshot_id`와
 `snapshot_fingerprint`를 이후 명령에 그대로 전달한다.
 
-실제 claim보다 먼저 `night-inbox-sync.py`가 `origin`의 최신 `main`을 가져온다. 친구가
-push한 `_INBOX.md`가 있으면 오너의 append와 함께 보존하고, 친구 push가 없으면 오너의
-현재 입력만으로 계속한다. 두 입력은 같은 우선순위다. 기존 줄을 수정·삭제한 충돌이나
-inbox 밖의 로컬 변경이 있으면 `merge-conflict`로 막고 추측하지 않는다. 동기화가 끝난
-뒤에만 provider claim과 snapshot을 만든다.
+`night-launchd.sh`는 claim 전에 `night-inbox-sync.py`를 실행한다. Orca가 이미 claim을
+만든 경로에서는 아래 계약 블록이 snapshot 직전에 같은 동기화를 한 번 더 확인한다.
+친구가 push한 `_INBOX.md`가 있으면 오너의 append와 함께 보존하고, 친구 push가 없으면
+오너의 현재 입력만으로 계속한다. 두 입력은 같은 우선순위다. 기존 줄을 수정·삭제한
+충돌이나 inbox 밖의 로컬 변경이 있으면 `merge-conflict`로 막고 추측하지 않는다.
 
 ```sh
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
@@ -107,6 +107,15 @@ fi
   echo "provider state has no valid owner" >&2
   exit 1
 }
+current_branch="$(git symbolic-ref --quiet --short HEAD)" || {
+  echo "현재 branch를 확인할 수 없어 inbox 동기화를 거부한다" >&2
+  exit 1
+}
+python3 "$PROJECT_ROOT/.claude/vault/backlog/night-inbox-sync.py" \
+  --project "$PROJECT_ROOT" --branch "$current_branch" || {
+    echo "inbox synchronization failed; snapshot을 만들지 않는다" >&2
+    exit 1
+  }
 run_id="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')"
 provider_run_id="$run_id"
 provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner_token"])')"
