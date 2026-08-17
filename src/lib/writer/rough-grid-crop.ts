@@ -275,13 +275,16 @@ export async function cropRoughGridFrames(
       for (let x = 0; x < ginfo.width; x++) if (gdata[base + x] < DARK_PIXEL_THRESHOLD) dark++
       rowProfile[y] = dark / ginfo.width
     }
-    /** fromY 부터 아래로 밝은 구간(거터)을 지나 처음 어두워지는 행 = 다음 행 시작. */
+    /** fromY 부터 3단계로 다음 행 시작을 찾는다: ① 현재 행 잔여 어두움(하단 보더·표 괘선)
+     *  통과 → ② 밝은 거터 통과 → ③ 처음 어두워지는 행 = 다음 행 시작.
+     *  1단계가 없으면 시작점이 이전 행의 하단 보더에 즉시 래치해 행이 ~20px 위로 밀린다
+     *  (실측: sh_03 end 상단에 캡션 표 침입 + sh_01 라벨 하단 잘림의 원인). */
     const scanNextRowTop = (fromY: number, fallbackGap: number): number => {
-      const limit = Math.min(ginfo.height - 1, fromY + 56)
-      for (let y = Math.max(0, fromY); y <= limit; y++) {
-        if (rowProfile[y] > 0.08) return y
-      }
-      return Math.min(ginfo.height - 1, fromY + fallbackGap)
+      const hardLimit = Math.min(ginfo.height - 1, fromY + 160)
+      let y = Math.max(0, fromY)
+      while (y <= hardLimit && rowProfile[y] > 0.08) y++
+      while (y <= hardLimit && rowProfile[y] <= 0.08) y++
+      return y > hardLimit ? Math.min(ginfo.height - 1, fromY + fallbackGap) : y
     }
     // 셀 크기는 축마다 한 번만 계산 — 셀별 경계 반올림 ±1px 가 프레임 크기를 흔들지 않게
     //   (스펙상 모든 셀의 비례 폭·높이는 동일하다). 균일성이 이 모드의 존재 이유다.
