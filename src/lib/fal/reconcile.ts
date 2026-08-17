@@ -11,7 +11,6 @@ import {
   failGenerationJob,
   getGenerationJobById,
   GenerationJobTerminalTransitionError,
-  GENERATION_JOB_COLUMNS,
   STALE_QUEUED_MS,
   type GenerationJob,
 } from '@/lib/generation-jobs'
@@ -85,7 +84,12 @@ function isPermanentProviderLookupFailure(error: unknown): boolean {
   const status = typeof statusValue === 'number'
     ? statusValue
     : typeof statusValue === 'string' ? Number(statusValue) : undefined
-  return typeof status === 'number' && Number.isFinite(status) && status >= 400 && status < 500 && status !== 408 && status !== 425 && status !== 429
+  // 401/403 은 "잡이 사라짐"이 아니라 우리 자격증명/권한 문제다 — FAL 키 회전·오설정의 순간에
+  //   지불이 끝난 회수 가능 잡들을 failed 로 굳히면 안 된다(#ghost-reconcile review S2).
+  //   transient 로 두면 queued 유지 → 키가 고쳐진 뒤 다음 폴/스윕이 회수한다.
+  return typeof status === 'number' && Number.isFinite(status) && status >= 400 && status < 500
+    && status !== 401 && status !== 403
+    && status !== 408 && status !== 425 && status !== 429
 }
 
 /** queued job을 persisted provider의 진실로 reconcile한다. Provider 조회 오류만 queued로 남긴다. */
@@ -142,9 +146,14 @@ export async function reconcileJobFromFal(job: GenerationJob): Promise<Generatio
 const GHOST_SWEEP_THROTTLE_MS = 60_000
 const GHOST_SWEEP_MAX_JOBS = 5
 const ghostSweepLastRun = new Map<string, number>()
+// 60s 를 넘기는 스윕(무거운 finalize 연쇄) 동안 다른 탭/폴러가 스로틀 창을 지나 재진입해
+//   같은 잡을 중복 스윕하는 것을 막는다 (#ghost-reconcile review S3). 프로세스 로컬이면 충분 —
+//   프로세스 간 경합은 finalize 의 CAS 가 최종 방어선이다.
+const ghostSweepInFlight = new Set<string>()
 
 export function _resetGhostSweepThrottleForTest(): void {
   ghostSweepLastRun.clear()
+  ghostSweepInFlight.clear()
 }
 
 /** 프로젝트의 유령 queued 잡을 fal 진실로 종결 시도. 실패는 삼키고 목록 조회를 막지 않는다. */
@@ -152,31 +161,41 @@ export async function reconcileGhostQueuedJobs(projectId: string): Promise<numbe
   const last = ghostSweepLastRun.get(projectId) ?? 0
   const now = Date.now()
   if (now - last < GHOST_SWEEP_THROTTLE_MS) return 0
+  if (ghostSweepInFlight.has(projectId)) return 0
+  ghostSweepInFlight.add(projectId)
   ghostSweepLastRun.set(projectId, now)
 
-  const { data, error } = await supabaseAdmin
-    .from('generation_jobs')
-    .select(GENERATION_JOB_COLUMNS)
-    .eq('project_id', projectId)
-    .eq('status', 'queued')
-    .lt('created_at', new Date(now - STALE_QUEUED_MS).toISOString())
-    .order('created_at', { ascending: false })
-    .limit(GHOST_SWEEP_MAX_JOBS)
-  if (error) {
-    console.error('[fal/reconcile] ghost sweep query failed:', error.message)
-    return 0
-  }
-
-  let settled = 0
-  for (const row of (data ?? []) as unknown as GenerationJob[]) {
-    try {
-      const after = await reconcileJobFromFal(row)
-      if (after.status !== 'queued') settled += 1
-    } catch (e) {
-      // 잡 하나의 회수 실패가 스윕 전체·목록 조회를 죽이면 안 된다. 다음 스윕이 재시도한다.
-      console.error('[fal/reconcile] ghost sweep job failed:', row.id, e instanceof Error ? e.message : e)
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('generation_jobs')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('status', 'queued')
+      .lt('created_at', new Date(now - STALE_QUEUED_MS).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(GHOST_SWEEP_MAX_JOBS)
+    if (error) {
+      console.error('[fal/reconcile] ghost sweep query failed:', error.message)
+      return 0
     }
+
+    let settled = 0
+    for (const { id } of (data ?? []) as Array<{ id: string }>) {
+      try {
+        // 목록 조회~회수 사이에 webhook/[id] 폴이 먼저 종결했을 수 있다 — 최신 행이 여전히
+        //   queued 일 때만 착수해 중복 finalize 시도를 줄인다 (review M11). CAS 는 그대로 최종 방어선.
+        const job = await getGenerationJobById(id)
+        if (!job || job.status !== 'queued') continue
+        const after = await reconcileJobFromFal(job)
+        if (after.status !== 'queued') settled += 1
+      } catch (e) {
+        // 잡 하나의 회수 실패가 스윕 전체·목록 조회를 죽이면 안 된다. 다음 스윕이 재시도한다.
+        console.error('[fal/reconcile] ghost sweep job failed:', id, e instanceof Error ? e.message : e)
+      }
+    }
+    if (settled > 0) console.log(`[fal/reconcile] ghost sweep settled ${settled} job(s) (project ${projectId})`)
+    return settled
+  } finally {
+    ghostSweepInFlight.delete(projectId)
   }
-  if (settled > 0) console.log(`[fal/reconcile] ghost sweep settled ${settled} job(s) (project ${projectId})`)
-  return settled
 }
