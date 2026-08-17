@@ -170,6 +170,7 @@ python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --run-id "$run_id" \
 - 티켓을 백지 subagent에게 줄 때는 티켓 경로만 전달한다. 실행자가 티켓만 읽고 닫을 수 있는지 확인하는 품질 검사이며, 머릿속 맥락을 덧붙이지 않는다.
 - 백지 실행자가 범위를 이해하지 못하면 해당 단위를 `blocked`로 기록하고, 내용을 대신 지어내어 실행하지 않는다.
 - 모든 결과에는 입력, 명령, 실행 시각, 실행 주체, worktree, 커밋, 산출물 경로를 연결한다.
+- **모델 금지: `fable`.** 모델 id나 별칭에 `fable`이 들어간 모델로는 어떤 실행도 하지 않는다 — 주 실행, 백지 subagent, 격리 worktree 안의 위임 실행 전부 해당한다. subagent를 띄울 때 모델을 지정할 수 있으면 fable이 아닌 모델을 명시하고, 환경이 fable을 강제하면 그 단위를 실행하지 말고 `blocked`(`tool-unavailable`)로 기록한다.
 
 ## 6. 작업 사본 격리와 기능 변경
 
@@ -378,6 +379,10 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
   - 변경 이유: 오너 요청 — backlog 루트에 티켓 104장이 평평하게 쌓여 구조가 안 보였고, 아침 리뷰 파일을 오너가 실제로 읽지 않았다.
   - 변경 내용: (1) 티켓·결과 카드를 `backlog/tickets/`로 이동하고 새 카드도 거기에만 만든다. (2) 아침 리뷰 파일을 `_archive/_MORNING.md`로 은퇴시키고, 오너 접점을 `_INBOX.md`(판정 쓰기)와 `reports/YYYY-MM-DD.html`(결과 읽기) 둘로 고정했다. 오너 판정은 다음 밤이 `_INBOX.md` 메모에서 해석해 결과 카드에 기록한다. (3) 비어 있던 `destination/` 디렉터리를 제거했다.
   - 영향받는 분해 기준: 없음 — 분해 규칙과 안전 경계는 그대로이고, 저장 경로와 아침 리뷰 통로만 바뀌었다.
+- 2026-08-17 (3차) · 이전 계약 해시 `5aa511ca68e792cba6f268970e6de338dbae93f11efc1adaa79b96163c7bf42b` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 지시 — fable 모델 사용 금지.
+  - 변경 내용: §5에 모델 금지 규칙 추가(주 실행·subagent·worktree 위임 전부). night-launchd.sh도 같은 가드를 셸 레벨에서 강제한다.
+  - 영향받는 분해 기준: 없음.
 - 2026-08-17 (2차) · 이전 계약 해시 `a00472f6c7bb59187f8640e950d04b07f0783d4a70f5b49d1c8c648afb151b03` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: Orca가 없는 개발자 머신에서도 같은 계약이 그대로 돌게 하기 위한 이식성 개정.
   - 변경 내용: (1) `PROJECT_ROOT`를 하드코딩 경로 대신 `git rev-parse --show-toplevel`로 구한다. (2) 잠금 게이트 호출을 Orca 설치 경로의 래퍼 대신 저장소 안의 `provider-gate.py` 직접 호출(`python3 "$GATE"`)로 바꿨다 — Orca 래퍼도 같은 파일을 exec할 뿐이라 상태 기계는 동일하다. (3) 스케줄러 중립 진입점 `night-launchd.sh`(run/dry-run)를 추가했다. Orca 머신은 기존대로 Orca precheck가 primary claim을 만들고, Orca 없는 머신은 launchd가 이 진입점을 부른다. 설치 절차는 `.claude/vault/night-runner-setup.md`가 정본이다.

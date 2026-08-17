@@ -156,6 +156,10 @@ launchctl bootout "gui/$(id -u)/com.tale-studio.night"
   - 읽기: `.claude/vault/backlog/reports/YYYY-MM-DD.html` — 날짜별 사람 보고서
 - 화면 스모크 테스트(`pnpm smoke`)는 Orca 런타임 전제가 없으면 실패 대신 skip으로
   빠진다. 브라우저 렌더 증거가 필요한 밤 작업은 오너 머신 쪽 실행이 담당한다.
+- 모델 규칙: `fable` 모델은 금지다 — 주 실행·subagent·worktree 위임 전부. 실행 스크립트가
+  환경변수(`NIGHT_CLAUDE_MODEL`, `ANTHROPIC_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL`)에서
+  fable을 발견하면 시작 자체를 거부한다. 다른 모델을 쓰려면 `NIGHT_CLAUDE_MODEL=<모델명>`을
+  plist의 EnvironmentVariables에 넣는다.
 - 안전 경계는 계약 그대로다: 비가역 행동과 예산 한도($50/일 생성 도구)만 hard-stop,
   그림·영상의 좋고 나쁨 판정은 사람만 한다.
 

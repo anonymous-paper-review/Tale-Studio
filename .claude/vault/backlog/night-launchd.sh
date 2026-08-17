@@ -15,6 +15,18 @@ GATE="$SCRIPT_DIR/provider-gate.py"
 CONTRACT="$SCRIPT_DIR/_NIGHT.md"
 MODE="${1:-run}"
 
+# 오너 지시: fable 모델 금지 — 주 실행·subagent 어느 쪽으로도 스며들지 못하게 한다.
+for v in "${NIGHT_CLAUDE_MODEL:-}" "${ANTHROPIC_MODEL:-}" "${CLAUDE_CODE_SUBAGENT_MODEL:-}"; do
+  case "$v" in
+  *fable*)
+    echo "금지 모델(fable)이 환경에 지정되어 있어 실행을 거부한다: $v" >&2
+    exit 1
+    ;;
+  esac
+done
+MODEL_ARGS=""
+[ -n "${NIGHT_CLAUDE_MODEL:-}" ] && MODEL_ARGS="--model ${NIGHT_CLAUDE_MODEL}"
+
 jget() { python3 -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"; }
 
 case "$MODE" in
@@ -33,8 +45,8 @@ run)
 
   # 2. 네이티브 Claude Code 헤드리스 실행 — 계약 문서가 정본이다.
   set +e
-  (cd "$PROJECT_ROOT" && claude --dangerously-skip-permissions -p \
-    ".claude/vault/backlog/_NIGHT.md 를 읽고 오늘 밤 실행을 계약 그대로 수행하라. 시작 블록의 claim 조회부터 종료 기록(complete)까지 계약 문서가 유일한 정본이다.")
+  (cd "$PROJECT_ROOT" && claude --dangerously-skip-permissions ${MODEL_ARGS:+$MODEL_ARGS} -p \
+    ".claude/vault/backlog/_NIGHT.md 를 읽고 오늘 밤 실행을 계약 그대로 수행하라. 시작 블록의 claim 조회부터 종료 기록(complete)까지 계약 문서가 유일한 정본이다. 모델 규칙: fable 모델은 주 실행·subagent 어디에도 쓰지 않는다.")
   claude_exit=$?
   set -e
 
