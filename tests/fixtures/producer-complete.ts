@@ -19,8 +19,7 @@
 // 실행:
 //   node tests/fixtures/producer-complete.ts            # TALE_SMOKE_EMAIL 계정의 첫 프로젝트
 //   node tests/fixtures/producer-complete.ts <projectId>
-import { createClient } from '@supabase/supabase-js'
-import dotenv from 'dotenv'
+import { makeDb, resolveProjectId, STAGES } from './_shared.ts'
 import { evaluateProducerGate, type BackgroundSource, type CastMember } from '../../src/lib/producer-gate.ts'
 import type { ProjectSettings, StageId } from '../../src/types/project.ts'
 
@@ -33,13 +32,6 @@ import type { ProjectSettings, StageId } from '../../src/types/project.ts'
  *     (lifecycle / producer-gate / producer-handoff-gate / handoff-intent / artist-lock-gate).
  *     여기서 얻는 건 "그 화면이 열리고 그려지는가"뿐이다.
  */
-const STAGES: readonly StageId[] = ['producer', 'writer', 'artist', 'director', 'editor']
-
-dotenv.config({ path: '.env.local', quiet: true })
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
-const SMOKE_EMAIL = process.env.TALE_SMOKE_EMAIL
 
 /** 프로듀서 완료 상태의 내용. 스모크가 화면을 열 수 있으면 되므로 최소한으로 채운다. */
 const STORY_TEXT =
@@ -74,18 +66,8 @@ const BACKGROUNDS: BackgroundSource[] = [
   },
 ]
 
-function must<T>(v: T | undefined | null, name: string): T {
-  if (v === undefined || v === null || v === '') {
-    console.error(`[불가] ${name} 가 없다. .env.local 을 확인할 것.`)
-    process.exit(2)
-  }
-  return v
-}
-
 async function main() {
-  const url = must(SUPABASE_URL, 'NEXT_PUBLIC_SUPABASE_URL')
-  const key = must(SERVICE_KEY, 'SUPABASE_SERVICE_ROLE_KEY')
-  const db = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+  const db = makeDb()
 
   // --- 쓰기 전에 제품 로직으로 검증한다. 여기서 막히면 프로듀서 완료 조건이 바뀐 것이다 ---
   //   styleAnchorKey 는 아래에서 카탈로그를 읽어 채우므로 검사도 그때 한 번 더 한다.
@@ -106,40 +88,15 @@ async function main() {
   const args = process.argv.slice(2)
   const stageArgIdx = args.indexOf('--stage')
   const stage = (stageArgIdx >= 0 ? args[stageArgIdx + 1] : 'writer') as StageId
-  if (!STAGES.includes(stage)) {
+  if (!(STAGES as readonly string[]).includes(stage)) {
     console.error(`[불가] --stage 는 ${STAGES.join('|')} 중 하나여야 한다 (받은 값: ${stage}).`)
     process.exit(2)
   }
 
-  // --- 대상 프로젝트 찾기: 테스트 계정 → workspace → project ---
-  let projectId = args.find((a) => !a.startsWith('--') && a !== stage)
-  if (!projectId) {
-    const email = must(SMOKE_EMAIL, 'TALE_SMOKE_EMAIL')
-    const { data: users, error: ue } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 })
-    if (ue) throw ue
-    const user = users.users.find((u) => u.email?.toLowerCase() === email.toLowerCase())
-    if (!user) {
-      console.error(`[불가] ${email} 계정을 찾을 수 없다.`)
-      process.exit(1)
-    }
-    const { data: ws } = await db.from('workspaces').select('id').eq('owner_id', user.id)
-    const wsIds = (ws ?? []).map((w) => w.id as string)
-    if (!wsIds.length) {
-      console.error('[불가] 그 계정이 소유한 workspace 가 없다. 앱에 한 번 로그인해 프로젝트를 만들 것.')
-      process.exit(1)
-    }
-    const { data: projects } = await db
-      .from('projects')
-      .select('id, title')
-      .in('workspace_id', wsIds)
-      .order('created_at', { ascending: true })
-      .limit(1)
-    if (!projects?.length) {
-      console.error('[불가] 그 계정에 프로젝트가 없다. /studio/producer 를 한 번 열면 자동 생성된다.')
-      process.exit(1)
-    }
-    projectId = projects[0].id as string
-  }
+  const projectId = await resolveProjectId(
+    db,
+    args.find((a) => !a.startsWith('--') && a !== stage),
+  )
 
   // --- 스타일 앵커는 카탈로그에서 실제 키를 가져온다(하드코딩하면 카탈로그가 바뀔 때 썩는다) ---
   const { data: anchors } = await db.from('style_anchors').select('key').limit(1)

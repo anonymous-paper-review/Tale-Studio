@@ -22,9 +22,14 @@ pnpm smoke / --click e4 --expect "이메일"     # 진입 후 클릭까지 따�
 ## 후반 스테이지를 열려면 — 픽스처 (계정당 1회)
 
 ```bash
-pnpm fixture:producer                      # 프로듀서 완료 + writer 잠금 해제
-pnpm fixture:producer --stage director     # director 까지 열기
+pnpm fixture:producer     # 프로듀서 완료 상태 (스토리·설정·캐스트·배경·스타일 앵커)
+pnpm fixture:writer       # 씬 1 / 샷 2 / 인물 1 / 배경 1 + editor 까지 잠금 해제
+pnpm fixture:writer --clean          # 이 픽스처가 만든 행만 삭제
+pnpm fixture:writer --stage artist   # 특정 스테이지까지만 열기
 ```
+
+둘을 순서대로 한 번씩 돌리면 5개 스테이지 화면(`producer|writer|artist|director|editor`)이
+전부 데이터가 있는 상태로 열린다. 재실행해도 같은 결과다(자기 행만 지우고 다시 넣는다).
 
 빈 프로젝트에서는 스테이지가 잠겨 `/studio/producer` 로 되돌아온다. 이 픽스처가 프로듀서 완료 상태를
 DB 에 써넣고 `projects.current_stage` 를 전진시켜 잠금을 푼다. **모델을 호출하지 않아 돈이 들지 않고,
