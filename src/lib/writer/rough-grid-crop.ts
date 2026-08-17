@@ -268,12 +268,18 @@ export async function cropRoughGridFrames(
       .greyscale()
       .raw()
       .toBuffer({ resolveWithObject: true })
+    // 행 프로파일은 **채워진 열 범위만**으로 — 전폭 기준이면 1샷 시트(4열 중 1열만 그림)의
+    //   잉크 비율이 최대 ~0.19 로 눌려 래치 임계(0.35)를 구조적으로 못 넘는다(배터리 실측).
+    const filledCols = framesAlongRows ? Math.min(shotCount, cols.length) : cols.length
+    const xFrom = Math.max(0, Math.round(cols[0][0] * ginfo.width) - 3)
+    const xTo = Math.min(ginfo.width, Math.round(cols[filledCols - 1][1] * ginfo.width) + 3)
+    const xSpan = Math.max(1, xTo - xFrom)
     const rowProfile = new Float32Array(ginfo.height)
     for (let y = 0; y < ginfo.height; y++) {
       let dark = 0
       const base = y * ginfo.width
-      for (let x = 0; x < ginfo.width; x++) if (gdata[base + x] < DARK_PIXEL_THRESHOLD) dark++
-      rowProfile[y] = dark / ginfo.width
+      for (let x = xFrom; x < xTo; x++) if (gdata[base + x] < DARK_PIXEL_THRESHOLD) dark++
+      rowProfile[y] = dark / xSpan
     }
     /** fromY 아래에서 다음 행 시작 찾기 — 판별 신호는 **잉크 밀도**다(실측 이중 모드:
      *  캡션 텍스트 줄 0.08~0.20 / 행 그림 0.67~0.90, 중간이 빈다). 두께 기준은 실패했다 —
@@ -308,15 +314,39 @@ export async function cropRoughGridFrames(
     const frameW = Math.max(1, Math.round((cols[0][1] - cols[0][0]) * W) + X_BLEED * 2)
     const frameH = Math.max(1, Math.round((rows[0][1] - rows[0][0]) * H))
 
-    // 행 시작 체인: 행1 = 스펙(상단 마진 안정 실측), 행 N+1 = scanNextRowTop 이 캡션의 얇은
-    //   블록들을 스스로 건너뛰고 다음 행의 두꺼운 그림 블록에 래치한다. 높이는 표준 고정.
+    // ── 패널 실측 박스 + 정규화(#detect-normalize, "빈공간의 명확한 해결") ──
+    // 빈 밴드의 근원 = 고정 크기 크롭이 모델이 실제 그린 패널 높이와 다른 것(짧게 그리면
+    //   하단에 거터 흰 띠, 길게 그리면 내용 절단). 해법은 검출·정규화의 분업 —
+    //   **정합은 검출이(실측 박스), 균일은 정규화가(표준 크기 스케일)** 보장한다.
+    /** 행의 실측 하단 — 패널 그림·보더가 끝나고 밝은 런(≥4행)이 시작되는 지점. 못 찾으면 스펙 높이. */
+    const panelBottom = (topY: number, capY: number): number => {
+      const from = topY + Math.floor(frameH * 0.7)
+      const to = Math.min(capY, topY + Math.ceil(frameH * 1.2), ginfo.height - 1)
+      let brightRun = 0
+      for (let y = from; y <= to; y++) {
+        if (rowProfile[y] <= 0.08) {
+          if (++brightRun >= 4) return y - brightRun + 1
+        } else brightRun = 0
+      }
+      return Math.min(topY + frameH, ginfo.height)
+    }
+
+    // 행 체인: 행1 상단도 잉크 래치(스펙 앵커 -24px 부터 — 배터리 실측: 1샷 시트에서 모델이
+    //   행1을 아래로 그려 상단 흰 밴드 26행) → 하단 실측 → 다음 행 상단 = 잉크 래치
+    //   (캡션의 얇은 블록은 scanNextRowTop 이 스스로 건너뛴다).
     const GUTTER_GAP = 20
-    const rowTops: number[] = [Math.round(rows[0][0] * H)]
-    for (let r = 1; r < rows.length; r++) {
-      const prevBottom = rowTops[r - 1] + frameH
-      rowTops.push(
-        Math.min(H - frameH, Math.max(prevBottom, scanNextRowTop(prevBottom + 2, GUTTER_GAP))),
-      )
+    const rowBoxes: Array<{ top: number; bottom: number }> = []
+    {
+      const specTop = Math.round(rows[0][0] * H)
+      let top = Math.min(Math.max(0, scanNextRowTop(Math.max(0, specTop - 24), 24)), H - frameH)
+      for (let r = 0; r < rows.length; r++) {
+        const capY = r < rows.length - 1 ? H - 14 : H - 14
+        const bottom = panelBottom(top, capY)
+        rowBoxes.push({ top, bottom })
+        if (r < rows.length - 1) {
+          top = Math.min(H - frameH, Math.max(bottom, scanNextRowTop(bottom + 2, GUTTER_GAP)))
+        }
+      }
     }
 
     // ── DIRECTION 하단 오버플로 — 상한 = 다음 행 시작(행 스캔과 한 진실이라 어긋날 수 없다) ──
@@ -337,30 +367,35 @@ export async function cropRoughGridFrames(
       return last < 0 ? 0 : Math.min(cap, last + 3)
     }
 
+    // 정규화 규칙: 실측 높이가 표준의 ±8% 안이면 fill(세로 미세 스케일 — 스케치에 비가시),
+    //   넘으면(캡션 포함 direction 등) contain + 종이색 패딩(왜곡 0).
+    const NORM_FILL_TOLERANCE = 0.08
     const out: RoughGridFrames[] = []
     for (let s = 0; s < shotCount; s++) {
       const frames: Buffer[] = []
       for (let f = 0; f < 3; f++) {
         const cx = framesAlongRows ? cols[s] : cols[f]
         const left = Math.max(0, Math.min(Math.round(cx[0] * W) - X_BLEED, W - frameW))
-        const top = Math.min(Math.max(0, rowTops[framesAlongRows ? f : s] ?? 0), H - frameH)
+        const box = rowBoxes[framesAlongRows ? f : s] ?? { top: 0, bottom: frameH }
+        const top = Math.min(Math.max(0, box.top), H - 8)
         const isDirection = f === 1
-        const nextRowTop = framesAlongRows ? rowTops[f + 1] ?? H - 14 : H - 14
-        const extend = isDirection ? overflowBelow(left, top + frameH, nextRowTop - 2) : 0
-        if (extend > 0) {
-          const tall = await sharp(grid)
-            .extract({ left, top, width: frameW, height: frameH + extend })
-            .png()
-            .toBuffer()
+        const nextRowTop = framesAlongRows ? rowBoxes[f + 1]?.top ?? H - 14 : H - 14
+        const extend = isDirection ? overflowBelow(left, box.bottom, nextRowTop - 2) : 0
+        const cropH = Math.max(8, Math.min(box.bottom + extend, H) - top)
+        const cut = await sharp(grid)
+          .extract({ left, top, width: frameW, height: cropH })
+          .png()
+          .toBuffer()
+        if (cropH === frameH) {
+          frames.push(cut)
+        } else if (Math.abs(cropH - frameH) / frameH <= NORM_FILL_TOLERANCE) {
+          frames.push(await sharp(cut).resize(frameW, frameH, { fit: 'fill' }).png().toBuffer())
+        } else {
           frames.push(
-            await sharp(tall)
+            await sharp(cut)
               .resize(frameW, frameH, { fit: 'contain', background: PAPER })
               .png()
               .toBuffer(),
-          )
-        } else {
-          frames.push(
-            await sharp(grid).extract({ left, top, width: frameW, height: frameH }).png().toBuffer(),
           )
         }
       }
