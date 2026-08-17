@@ -17,7 +17,7 @@ import {
 } from '@/lib/generation-jobs'
 import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
-import { type RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
+import { isRichStaticSpec, type RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
 // L4(shotDesign) state 로더 — 공용 lib(#motion-contract): 비디오 라우트와 공유.
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import {
@@ -332,7 +332,12 @@ export async function POST(req: Request) {
       //   라우트의 "shots.dynamic_spec 우선" 선례와 같은 원칙. 레거시/수동 샷은 컬럼이
       //   없으므로 기존 db_fallback 그대로.
       const colStatic = s.static_spec as RoughStoryboardSpec['staticSpec'] | null
-      if (colStatic) {
+      // rich 모양일 때만 채택 (#v2-rough-500 2026-08-17): static_spec 컬럼은 rich 부분상속
+      //   (#split-inherit) 외에 writer-v2 previz 스펙 등 다른 계약의 provenance 도 담긴다.
+      //   rich 소비자(translateRoughSpecsEn·시트 셀)는 framing.layers·character_blocking 을
+      //   가드 없이 역참조하므로, 모양이 다른 스펙을 채택하면 라우트가 500 으로 죽는다
+      //   (실측: writer-v2 프로젝트 러프 제출 전량 실패). 모양이 아니면 db_fallback 셀로.
+      if (colStatic && isRichStaticSpec(colStatic)) {
         resolvedSpecByShotId.set(sid, {
           staticSpec: colStatic,
           dynamicSpec:

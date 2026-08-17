@@ -124,6 +124,25 @@ export interface RoughStoryboardSpec {
   dynamicSpec?: ShotDynamicSpec
 }
 
+/**
+ * shots.static_spec 컬럼 값이 rich(ShotStaticSpec) 모양인지 판별 (#v2-rough-500).
+ * 컬럼엔 rich 부분상속(#split-inherit) 외에 writer-v2 previz 등 다른 계약의 스펙도 산다.
+ * rich 소비자가 가드 없이 역참조하는 두 필드(framing.layers 객체·character_blocking 배열)를
+ * 물리적으로 확인한다 — engine 마커 같은 선언이 아니라 실제 역참조 대상의 존재가 기준.
+ */
+export function isRichStaticSpec(value: unknown): value is ShotStaticSpec {
+  if (!value || typeof value !== 'object') return false
+  const spec = value as { framing?: unknown; character_blocking?: unknown }
+  const framing = spec.framing as { layers?: unknown } | undefined
+  return (
+    !!framing &&
+    typeof framing === 'object' &&
+    !!framing.layers &&
+    typeof framing.layers === 'object' &&
+    Array.isArray(spec.character_blocking)
+  )
+}
+
 export interface RoughStoryboardPromptInput {
   shotType: string
   actionDescription: string
