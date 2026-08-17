@@ -166,12 +166,12 @@ def _write_blob(project, content):
     return _decode(result.stdout).strip()
 
 
-def _commit_tree(project, branch, local_sha, parents, blob, message):
+def _commit_tree(project, branch, tree_revision, parents, blob, message):
     with tempfile.TemporaryDirectory(prefix="night-inbox-index-") as temporary:
         index_path = os.path.join(temporary, "index")
         env = os.environ.copy()
         env["GIT_INDEX_FILE"] = index_path
-        _git_checked(project, ["read-tree", local_sha], env=env)
+        _git_checked(project, ["read-tree", tree_revision], env=env)
         _git_checked(project, ["update-index", "--add", "--cacheinfo",
                               f"100644,{blob},{INBOX_REL}"], env=env)
         tree = _decode(_git_checked(project, ["write-tree"], env=env)).strip()
@@ -188,6 +188,10 @@ def _commit_tree(project, branch, local_sha, parents, blob, message):
 def _update_index(project, blob):
     _git_checked(project, ["update-index", "--add", "--cacheinfo",
                           f"100644,{blob},{INBOX_REL}"])
+
+
+def _checkout_tree(project, revision):
+    _git_checked(project, ["read-tree", "-u", "--reset", revision])
 
 
 def _update_ref(project, branch, new_sha, old_sha):
@@ -238,7 +242,10 @@ def synchronize(args):
         base_sha = _decode(_git_checked(project, ["merge-base", local_sha, remote_sha])).strip()
         local_names = _name_list(project, ["diff", "--name-only", "-z", base_sha, local_sha])
         remote_names = _name_list(project, ["diff", "--name-only", "-z", base_sha, remote_sha])
-        _ensure_only_inbox(project, local_names + remote_names)
+        # The owner may have local inbox-only commits while the friend's
+        # remote branch also contains ordinary code commits. Remote changes
+        # are the baseline we want; local non-inbox changes are unsafe.
+        _ensure_only_inbox(project, local_names)
         base_tree = _show_file(project, base_sha, INBOX_REL)
         remote_tree = _show_file(project, remote_sha, INBOX_REL)
         remote_inbox_commits = _inbox_commits(project, base_sha, remote_sha)
@@ -313,6 +320,7 @@ def synchronize(args):
     if local_is_ancestor and not content_changed:
         # A pure remote fast-forward needs no synthetic commit.
         _update_ref(project, branch, remote_sha, local_sha)
+        _checkout_tree(project, remote_sha)
         final_sha = remote_sha
         fast_forwarded = True
     elif remote_is_ancestor and not content_changed:
@@ -323,11 +331,13 @@ def synchronize(args):
         parents = [local_sha]
         if remote_available and remote_sha != local_sha:
             parents.append(remote_sha)
-        commit_sha = _commit_tree(project, branch, local_sha, parents, blob,
+        tree_revision = remote_sha if remote_available else local_sha
+        commit_sha = _commit_tree(project, branch, tree_revision, parents, blob,
                                   "chore(night): synchronize inbox append")
         _update_ref(project, branch, commit_sha, local_sha)
         final_sha = commit_sha
 
+    _checkout_tree(project, final_sha)
     _atomic_write(inbox_path, merged)
     _update_index(project, blob)
     if remote_available and final_sha != remote_sha:
