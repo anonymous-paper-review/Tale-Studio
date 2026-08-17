@@ -47,6 +47,19 @@ const SIZE_TOLERANCE_PX = 6 // 크기 클러스터 허용 오차
 //   통과(반쪽 14px 가 기각돼도 같은 거터의 온전한 쪽이 창 안에 남아 회복된다 — 시트2 실측).
 const MIN_GUTTER_RUN_PX = 15
 
+/** #label-invasion v3(실측 a219b9f3 sh_03): 트림으로 잘려나갈 구간이 "빈 종이"인지 판별.
+ *  어두운 행/열이 10% 미만이면 여백·얇은 보더 라인(1~2px 어두움)으로 보고 트림 허용,
+ *  라벨 텍스트 밴드처럼 내용이 있으면 트림하지 않는다 — 종전 "초과분=하단 여백" 가정이
+ *  DIRECTION 라벨 밴드를 잘라 "KEY:" 첫 줄만 남긴 사고의 수리. */
+function bandIsBlank(profile: Float32Array, from: number, to: number): boolean {
+  if (to < from) return true
+  let dark = 0
+  for (let i = Math.max(0, from); i <= Math.min(profile.length - 1, to); i++) {
+    if (profile[i] > GUTTER_RATIO) dark++
+  }
+  return dark / (to - from + 1) < 0.1
+}
+
 /** 크기 목록에서 기준 크기: ±tol 클러스터링 → (최다 멤버, 동수면 작은 쪽) 클러스터의 중앙값. */
 function referenceSize(sizes: number[]): number {
   const clusters: number[][] = []
@@ -181,7 +194,13 @@ function scanAxisBounds(
     if (b - a - ref <= SIZE_TOLERANCE_PX) return [a, b] as [number, number]
     const [e0, e1] = expected[i]
     // 기대에서 더 먼 경계가 마진을 문 쪽 — 가까운 경계 기준으로 기준 크기 복원.
-    return (Math.abs(a - e0) > Math.abs(b - e1) ? [b - ref, b] : [a, a + ref]) as [number, number]
+    const keepStart = !(Math.abs(a - e0) > Math.abs(b - e1))
+    const trimmed = (keepStart ? [a, a + ref] : [b - ref, b]) as [number, number]
+    // #label-invasion v3: 잘려나갈 밴드에 내용(라벨 텍스트)이 있으면 트림 포기 — 정보 보존 우선.
+    const blank = keepStart
+      ? bandIsBlank(profile, trimmed[1] + 1, b)
+      : bandIsBlank(profile, a, trimmed[0] - 1)
+    return blank ? trimmed : ([a, b] as [number, number])
   })
 }
 
@@ -193,12 +212,20 @@ function scanAxisBounds(
  *   #sheet-formats: 균일화 대상은 **프레임 축** — 레거시(frameAxis rows)는 행, 가로 스트립
  *   (frameAxis cols)은 열. 샷 축은 참 셀 유지가 정확해 균일화하지 않는다.
  */
-function uniformizeRows(rowsPx: Array<[number, number]>): Array<[number, number]> {
+function uniformizeRows(
+  rowsPx: Array<[number, number]>,
+  profile: Float32Array,
+): Array<[number, number]> {
   if (rowsPx.length < 2) return rowsPx
   const ref = referenceSize(rowsPx.map(([a, b]) => b - a))
-  return rowsPx.map(([a, b]) =>
-    b - a - ref > SIZE_TOLERANCE_PX ? ([a, a + ref] as [number, number]) : ([a, b] as [number, number]),
-  )
+  return rowsPx.map(([a, b]) => {
+    if (b - a - ref <= SIZE_TOLERANCE_PX) return [a, b] as [number, number]
+    // #label-invasion v3: 초과분이 빈 종이일 때만 top-anchor 트림 — DIRECTION 라벨 밴드처럼
+    //   내용이 있으면 프레임 높이 차이(순환 스케일 점프)를 감수하고 보존한다(오너 우선순위).
+    return bandIsBlank(profile, a + ref + 1, b)
+      ? ([a, a + ref] as [number, number])
+      : ([a, b] as [number, number])
+  })
 }
 
 /**
@@ -243,8 +270,8 @@ export async function cropRoughGridFrames(
   //   균일화는 **프레임 축**에만(순환 재생 스케일 점프 방지) — 축이 열이면 열 폭을 균일화한다.
   const colPx0 = globalAxisBounds(colProfile, cols.length, width) ?? scanAxisBounds(colProfile, cols, width)
   const rowPx0 = globalAxisBounds(rowProfile, rows.length, height) ?? scanAxisBounds(rowProfile, rows, height)
-  const colPx = framesAlongRows ? colPx0 : uniformizeRows(colPx0)
-  const rowPx = framesAlongRows ? uniformizeRows(rowPx0) : rowPx0
+  const colPx = framesAlongRows ? colPx0 : uniformizeRows(colPx0, colProfile)
+  const rowPx = framesAlongRows ? uniformizeRows(rowPx0, rowProfile) : rowPx0
   const shotBounds = framesAlongRows ? colPx : rowPx
   const frameBounds = framesAlongRows ? rowPx : colPx
 

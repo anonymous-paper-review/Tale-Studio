@@ -46,6 +46,40 @@ describe('cropRoughGridFrames — 라벨 파편 거터 내성', () => {
     }
   })
 
+  it('행2 하단 라벨 밴드는 잘라내지 않는다 — v3 내용 인지 트림 (실측 sh_03: "KEY:" 첫 줄만 남던 절단)', async () => {
+    // 실측 구조 재현: 스펙 거터 자리에 라벨 밴드(어두운 텍스트 줄들) + 그 아래 진짜 거터 +
+    //   행3 은 40px 하향. 경계 검출은 진짜 거터를 찾아 행2가 밴드를 포함하게 되고(486px),
+    //   과대 트림은 초과분에 내용이 있으므로 보존해야 한다.
+    const spec = sheetSpecOf('grid4', 'vertical_9:16')!
+    const { width, height } = spec.canvas
+    const cells: string[] = []
+    for (const [x0, x1] of spec.colBoxes) {
+      for (let r = 0; r < spec.rowBoxes.length; r++) {
+        const [y0, y1] = spec.rowBoxes[r]
+        const shift = r === 2 ? 40 : 0
+        const shrink = r === 2 ? 40 : 0
+        cells.push(
+          `<rect x="${x0}" y="${y0 + shift}" width="${x1 - x0}" height="${y1 - y0 - shrink}" fill="#777"/>`,
+        )
+      }
+    }
+    const bandTop = spec.rowBoxes[1][1] + 2
+    const bars = [0, 1, 2]
+      .map(
+        (i) =>
+          `<rect x="${spec.colBoxes[0][0]}" y="${bandTop + i * 13}" width="${spec.colBoxes[3][1] - spec.colBoxes[0][0]}" height="8" fill="#333"/>`,
+      )
+      .join('')
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="${width}" height="${height}" fill="#FAF8F2"/>${cells.join('')}${bars}</svg>`
+    const sheet = await sharp(Buffer.from(svg)).png().toBuffer()
+    const frames = await cropRoughGridFrames(sheet, 'grid4', 4, 'vertical_9:16')
+    const want = spec.rowBoxes[0][1] - spec.rowBoxes[0][0]
+    const md = await sharp(frames[0].direction).metadata()
+    expect(md.height ?? 0, `direction ${md.height} — 라벨 밴드 보존`).toBeGreaterThanOrEqual(want + 20)
+    const ms = await sharp(frames[0].start).metadata()
+    expect(Math.abs((ms.height ?? 0) - want), `start ${ms.height}`).toBeLessThanOrEqual(14)
+  })
+
   it('텍스트 조각 거터: 얇은 틈을 거터로 삼지 않고 세 행이 균일하게 잘린다', async () => {
     const sheet = await syntheticSheet(true)
     const frames = await cropRoughGridFrames(sheet, 'grid4', 4, 'vertical_9:16')
