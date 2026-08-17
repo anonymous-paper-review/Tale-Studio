@@ -21,6 +21,7 @@
 """
 import argparse
 import datetime as dt
+import fcntl
 import glob
 import hashlib
 import json
@@ -28,6 +29,7 @@ import math
 import os
 import re
 import sys
+import time
 import uuid
 
 HOME = os.path.expanduser("~")
@@ -218,6 +220,183 @@ def write_stamp(path, epoch):
     )
 
 
+def commit_stamp_monotonic(path, epoch, now, lease_until=None):
+    """한 lock 안에서 기존 도장을 읽고 비교한 뒤 원자 교체한다."""
+    lock_path = f"{path}.lock"
+    parent = os.path.dirname(path) or "."
+    os.makedirs(parent, exist_ok=True)
+    lock = open(lock_path, "a+", encoding="utf-8")
+    try:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        if lease_until is not None and time.time() >= lease_until:
+            raise ValueError("provider lease가 stamp lock 안에서 만료됐다")
+        if os.path.exists(path):
+            previous = read_stamp(path, now=now)
+            if previous > epoch:
+                return previous, False
+        if lease_until is not None and time.time() >= lease_until:
+            raise ValueError("provider lease가 stamp 쓰기 직전에 만료됐다")
+        write_stamp(path, epoch)
+        return epoch, True
+    finally:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+        lock.close()
+
+
+def _contract_file(project):
+    return os.path.join(project, ".claude", "vault", "backlog", "_NIGHT.md")
+
+
+def current_contract_hash(project):
+    """현재 밤 계약의 바이트 해시를 반환한다(계약 파일이 없으면 None)."""
+    path = _contract_file(project)
+    if not os.path.isfile(path):
+        return None
+    return _sha256(path)
+
+
+def resolve_contract_hash(project, supplied):
+    actual = current_contract_hash(project)
+    if supplied is not None:
+        if not isinstance(supplied, str) or not supplied or len(supplied) > 256:
+            raise ValueError("contract-hash가 비어 있거나 너무 길다")
+        if actual is not None and supplied.lower() != actual:
+            raise ValueError("contract-hash가 현재 _NIGHT.md와 다르다")
+        return supplied.lower()
+    if actual is not None:
+        return actual
+    return None
+
+
+def _snapshot_identity(snapshot_id=None, snapshot_fingerprint=None,
+                       snapshot_path=None, snapshot_start=None, snapshot_end=None):
+    values = {
+        "snapshot_id": snapshot_id,
+        "snapshot_fingerprint": snapshot_fingerprint,
+        "path": None,
+        "start": snapshot_start,
+        "end": snapshot_end,
+        "content_sha256": None,
+    }
+    if all(value is None for value in values.values()):
+        return None
+    if snapshot_id is not None and not isinstance(snapshot_id, str):
+        raise ValueError("snapshot-id가 문자열이 아니다")
+    if snapshot_fingerprint is not None and not re.fullmatch(
+            r"[0-9a-fA-F]{64}", str(snapshot_fingerprint)):
+        raise ValueError("snapshot-fingerprint는 SHA-256 64자리 hex여야 한다")
+    for key in ("start", "end"):
+        if values[key] is not None:
+            try:
+                values[key] = int(values[key])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"snapshot-{key}가 정수가 아니다") from exc
+            if values[key] < 0:
+                raise ValueError(f"snapshot-{key}가 음수다")
+    if snapshot_path is not None:
+        snapshot_record_path = os.path.realpath(
+            os.path.abspath(os.path.expanduser(snapshot_path))
+        )
+        try:
+            with open(snapshot_record_path, encoding="utf-8") as fh:
+                record = json.load(fh)
+        except (OSError, ValueError) as exc:
+            raise ValueError("snapshot 기록을 읽을 수 없다") from exc
+        if not isinstance(record, dict):
+            raise ValueError("snapshot 기록이 객체가 아니다")
+        for key in ("snapshot_id", "snapshot_fingerprint", "path", "start", "end",
+                    "content_sha256"):
+            record_value = record.get(key)
+            if key == "path" and record_value is not None:
+                record_value = os.path.realpath(os.path.abspath(os.path.expanduser(record_value)))
+            if key in {"start", "end"} and record_value is not None:
+                record_value = int(record_value)
+            if key != "path" and values.get(key) is not None and values[key] != record_value:
+                raise ValueError(f"snapshot 기록의 {key}가 요청과 다르다")
+            values[key] = record_value
+        if not values.get("snapshot_id") or not values.get("snapshot_fingerprint"):
+            raise ValueError("snapshot 기록의 식별자가 없다")
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", str(values["content_sha256"])):
+            raise ValueError("snapshot 기록의 content_sha256가 올바르지 않다")
+    return {key: value for key, value in values.items() if value is not None}
+
+
+def _bind_metadata(metadata, contract_hash, snapshot_identity):
+    bound = dict(metadata)
+    bound["contract_hash"] = contract_hash
+    if snapshot_identity is not None:
+        bound["inbox_snapshot"] = dict(snapshot_identity)
+        for key, value in snapshot_identity.items():
+            bound[key] = value
+    return bound
+
+
+def _load_snapshot_record(path, project, run_id, contract_hash):
+    """snapshot-inbox binding과 immutable content artifact를 검증한다."""
+    record_path = _project_identity(path)
+    if not os.path.isfile(record_path):
+        raise ValueError("snapshot binding 파일이 없다")
+    record = _read_json_file(record_path, "snapshot binding")
+    if record.get("run_id") != run_id:
+        raise ValueError("snapshot binding의 run_id가 현재 수확과 다르다")
+    if record.get("contract_hash") != contract_hash:
+        raise ValueError("snapshot binding의 contract_hash가 현재 계약과 다르다")
+    fingerprint = record.get("snapshot_fingerprint")
+    content_sha = record.get("content_sha256")
+    source = record.get("path")
+    byte_range = record.get("byte_range")
+    artifact = record.get("content_artifact")
+    if (not isinstance(fingerprint, str) or not isinstance(content_sha, str)
+            or not isinstance(source, str) or not isinstance(byte_range, dict)
+            or not isinstance(artifact, str)):
+        raise ValueError("snapshot binding 필드가 부족하다")
+    start, end = byte_range.get("start"), byte_range.get("end")
+    if not isinstance(start, int) or not isinstance(end, int) or start < 0 or end < start:
+        raise ValueError("snapshot binding 바이트 범위가 올바르지 않다")
+    artifact_path = _project_identity(os.path.join(os.path.dirname(record_path), artifact))
+    record_root = _project_identity(os.path.dirname(record_path))
+    if artifact_path != record_root and not artifact_path.startswith(record_root + os.sep):
+        raise ValueError("snapshot content artifact가 binding 디렉터리 밖이다")
+    try:
+        with open(artifact_path, "rb") as fh:
+            content = fh.read()
+    except OSError as exc:
+        raise ValueError("snapshot content artifact가 없다") from exc
+    if hashlib.sha256(content).hexdigest() != content_sha:
+        raise ValueError("snapshot content artifact hash가 다르다")
+    if end - start != len(content):
+        raise ValueError("snapshot content artifact 길이가 범위와 다르다")
+    identity = {
+        "snapshot_id": record.get("snapshot_id"),
+        "snapshot_fingerprint": fingerprint,
+        "path": _project_identity(source),
+        "start": start,
+        "end": end,
+        "content_sha256": content_sha,
+        "content_artifact": artifact,
+        "run_id": record.get("run_id"),
+        "contract_hash": record.get("contract_hash"),
+        "binding_path": record_path,
+    }
+    if not isinstance(identity["snapshot_id"], str):
+        raise ValueError("snapshot binding에 snapshot_id가 없다")
+    if identity["run_id"] != run_id or identity["contract_hash"] != contract_hash:
+        raise ValueError("snapshot binding owner/contract가 현재 실행과 다르다")
+    return identity
+
+
+def _assert_snapshot_args(identity, args):
+    requested = _snapshot_identity(
+        args.snapshot_id, args.snapshot_fingerprint, None,
+        args.snapshot_start, args.snapshot_end,
+    )
+    if requested is None:
+        return
+    for key, value in requested.items():
+        if identity.get(key) != value:
+            raise ValueError(f"snapshot {key}가 binding과 다르다")
+
+
 def discover(project, since_h, exclude_recent_min, now):
     """저장소별로 후보 세션을 모은다. 반환: dict 리스트."""
     win_start = now - since_h * 3600
@@ -265,7 +444,9 @@ def discover(project, since_h, exclude_recent_min, now):
                 rec["verdict"] = "TARGET"
         sessions.append(rec)
 
-    sessions.sort(key=lambda r: -r["mtime"])
+    sessions.sort(key=lambda r: (
+        -r["mtime"], r["store"], r["sid"], r["path"],
+    ))
     return sessions
 
 
@@ -465,7 +646,8 @@ def _identities_from_index(index_data):
     return identities
 
 
-def _validate_completed_run(run_dir, run_id, project, now):
+def _validate_completed_run(run_dir, run_id, project, now, contract_hash=None,
+                            snapshot_identity=None):
     marker_path = os.path.join(run_dir, ".run-complete.json")
     if not os.path.isfile(marker_path):
         raise ValueError("완료 표식이 없다 — committable=false")
@@ -476,10 +658,28 @@ def _validate_completed_run(run_dir, run_id, project, now):
         raise ValueError("완료 표식의 source가 현재 project와 다르다")
     if marker.get("committable") is not True:
         raise ValueError("완료 표식이 committable=true가 아니다")
+    if marker.get("contract_hash") != contract_hash:
+        raise ValueError("완료 표식의 contract_hash가 현재 계약과 다르다")
+    if marker.get("inbox_snapshot") != snapshot_identity:
+        if snapshot_identity is not None:
+            raise ValueError("완료 표식의 inbox snapshot identity가 요청과 다르다")
+        snapshot_identity = marker.get("inbox_snapshot")
+    if snapshot_identity is not None:
+        for key, value in snapshot_identity.items():
+            if marker.get(key) != value:
+                raise ValueError(f"완료 표식의 {key}가 snapshot identity와 다르다")
 
     index = _read_json_file(os.path.join(run_dir, "index.json"), "index.json")
     if index.get("run_id") != run_id or index.get("source") != project:
         raise ValueError("index.json의 run/source 식별자가 맞지 않는다")
+    if index.get("contract_hash") != contract_hash:
+        raise ValueError("index.json의 contract_hash가 현재 계약과 다르다")
+    if index.get("inbox_snapshot") != snapshot_identity:
+        raise ValueError("index.json의 inbox snapshot identity가 다르다")
+    if snapshot_identity is not None:
+        for key, value in snapshot_identity.items():
+            if index.get(key) != value:
+                raise ValueError(f"index.json의 {key}가 snapshot identity와 다르다")
     identities = _identities_from_index(index)
     if marker.get("sessions") != identities:
         raise ValueError("완료 표식의 session 식별자가 맞지 않는다")
@@ -488,6 +688,14 @@ def _validate_completed_run(run_dir, run_id, project, now):
     epoch, candidate = _read_candidate(candidate_path, now)
     if candidate.get("run_id") != run_id or candidate.get("source") != project:
         raise ValueError("도장 후보의 run/source 식별자가 맞지 않는다")
+    if candidate.get("contract_hash") != contract_hash:
+        raise ValueError("도장 후보의 contract_hash가 현재 계약과 다르다")
+    if candidate.get("inbox_snapshot") != snapshot_identity:
+        raise ValueError("도장 후보의 inbox snapshot identity가 다르다")
+    if snapshot_identity is not None:
+        for key, value in snapshot_identity.items():
+            if candidate.get(key) != value:
+                raise ValueError(f"도장 후보의 {key}가 snapshot identity와 다르다")
     if candidate.get("status") != "ready":
         raise ValueError("도장 후보가 ready 상태가 아니다")
     if candidate.get("sessions") != identities:
@@ -518,9 +726,25 @@ def main():
                     help="기준 시각 ISO 8601 (Z 또는 +00:00 필수, 드라이런 시뮬레이션용)")
     ap.add_argument("--run-id", default=None,
                     help="실행 식별자. 재개·commit-success 시 같은 값을 사용한다")
+    ap.add_argument("--contract-hash", default=None,
+                    help="현재 _NIGHT.md의 계약 해시")
+    ap.add_argument("--snapshot-id", default=None,
+                    help="snapshot-inbox가 발급한 snapshot_id")
+    ap.add_argument("--snapshot-fingerprint", default=None,
+                    help="snapshot-inbox가 발급한 snapshot_fingerprint")
+    ap.add_argument("--snapshot-path", default=None,
+                    help="스냅샷 원문 경로(선택)")
+    ap.add_argument("--snapshot-start", default=None, type=int,
+                    help="스냅샷 바이트 범위 시작(선택)")
+    ap.add_argument("--snapshot-end", default=None, type=int,
+                    help="스냅샷 바이트 범위 끝(선택)")
     ap.add_argument("--dry-run", action="store_true", help="표만 출력, 파일 안 씀")
     ap.add_argument("--commit-success", action="store_true",
                     help="완료된 run-id의 도장 후보를 실제 성공 도장으로 확정한다")
+    ap.add_argument("--validate-complete", action="store_true",
+                    help="완료된 run-id만 검증하고 성공 도장은 쓰지 않는다")
+    ap.add_argument("--lease-until", type=float, default=None,
+                    help="provider lease epoch. commit 직전에 만료 여부를 확인한다")
     a = ap.parse_args()
 
     try:
@@ -530,38 +754,121 @@ def main():
         return 2
 
     project = _project_identity(a.project)
+    try:
+        contract_hash = resolve_contract_hash(project, a.contract_hash)
+        snapshot_record_path = (
+            a.snapshot_path if a.snapshot_path and os.path.isfile(a.snapshot_path)
+            and a.snapshot_path.lower().endswith(".json") else None
+        )
+        snapshot_identity = _snapshot_identity(
+            a.snapshot_id, a.snapshot_fingerprint, a.snapshot_path,
+            a.snapshot_start, a.snapshot_end,
+        ) if snapshot_record_path is None else _snapshot_identity(
+            a.snapshot_id, a.snapshot_fingerprint, None,
+            a.snapshot_start, a.snapshot_end,
+        )
+    except ValueError as exc:
+        print(f"✗ 실행 메타데이터 오류: {exc}")
+        return 2
     existing_index = None
-    if not a.commit_success and a.run_id and not a.now:
+    if not a.commit_success and a.run_id:
         existing_index = _existing_index(project, a.out, a.run_id, now)
-        now = _resume_now(project, a.out, a.run_id, now)
+        if existing_index is not None:
+            if snapshot_record_path:
+                try:
+                    snapshot_identity = _load_snapshot_record(
+                        snapshot_record_path, project, a.run_id, contract_hash,
+                    )
+                    _assert_snapshot_args(snapshot_identity, a)
+                except (OSError, ValueError) as exc:
+                    print(f"✗ snapshot 검증 실패: {exc}")
+                    return 1
+            if existing_index.get("contract_hash") != contract_hash:
+                print("✗ 같은 run-id의 contract_hash가 바뀌었다. 새 run-id가 필요하다")
+                return 2
+            if existing_index.get("inbox_snapshot") != snapshot_identity:
+                print("✗ 같은 run-id의 inbox snapshot이 바뀌었다. 새 run-id가 필요하다")
+                return 2
+        if not a.now:
+            now = _resume_now(project, a.out, a.run_id, now)
     stamp = a.stamp_path or os.path.join(
         project, ".claude/vault/backlog/sweep", ".last-success"
     )
 
-    if a.commit_success:
+    if a.commit_success or a.validate_complete:
         if a.dry_run:
-            print("✗ --dry-run과 --commit-success를 함께 쓸 수 없다")
+            print("✗ --dry-run과 완료 검증을 함께 쓸 수 없다")
+            return 2
+        if a.commit_success and a.validate_complete:
+            print("✗ --commit-success와 --validate-complete를 함께 쓸 수 없다")
             return 2
         if not a.run_id:
-            print("✗ --commit-success에는 --run-id가 필요하다")
+            print("✗ 완료 검증에는 --run-id가 필요하다")
             return 2
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", a.run_id):
             print("✗ run-id 형식이 올바르지 않다")
             return 2
+        if snapshot_record_path:
+            try:
+                snapshot_identity = _load_snapshot_record(
+                    snapshot_record_path, project, a.run_id, contract_hash,
+                )
+                _assert_snapshot_args(snapshot_identity, a)
+            except (OSError, ValueError) as exc:
+                print(f"✗ snapshot 검증 실패: {exc}")
+                return 1
         run_dir = _locate_run_dir(project, a.out, a.run_id, now)
+        if a.stamp_path:
+            stamp_abs = os.path.realpath(os.path.abspath(os.path.expanduser(a.stamp_path)))
+            run_abs = os.path.realpath(os.path.abspath(run_dir))
+            if stamp_abs == run_abs or stamp_abs.startswith(run_abs + os.sep):
+                print("✗ --stamp-path는 실행 디렉터리/산출물 안에 둘 수 없다")
+                return 2
         try:
-            epoch = _validate_completed_run(run_dir, a.run_id, project, now)
+            epoch = _validate_completed_run(
+                run_dir, a.run_id, project, now, contract_hash, snapshot_identity,
+            )
         except (OSError, ValueError) as exc:
             print(f"✗ 완료된 수확이 아니다: {exc}")
             return 1
-        write_stamp(stamp, epoch)
-        print(f"✓ 성공 도장 확정 {dt.datetime.fromtimestamp(epoch, UTC):%Y-%m-%dT%H:%M:%SZ} → {stamp}")
+        if a.validate_complete:
+            print(f"✓ 완료 표식과 산출물 hash 검증 완료: {run_dir}")
+            return 0
+        if a.lease_until is not None and time.time() >= a.lease_until:
+            print("✗ provider lease가 commit 직전에 만료됐다")
+            return 1
+        stamp_abs = os.path.realpath(os.path.abspath(os.path.expanduser(stamp)))
+        run_abs = os.path.realpath(os.path.abspath(run_dir))
+        if stamp_abs == run_abs or stamp_abs.startswith(run_abs + os.sep):
+            print("✗ --stamp-path는 실행 디렉터리/산출물 안에 둘 수 없다")
+            return 2
+        try:
+            committed, changed = commit_stamp_monotonic(
+                stamp, epoch, now, lease_until=a.lease_until,
+            )
+        except (OSError, ValueError) as exc:
+            print(f"✗ 마지막 성공 시각을 읽을 수 없다: {exc}")
+            return 2
+        if not changed:
+            print(f"✓ 기존 성공 도장을 유지 {dt.datetime.fromtimestamp(committed, UTC):%Y-%m-%dT%H:%M:%SZ} "
+                  f"(오래된 run={dt.datetime.fromtimestamp(epoch, UTC):%Y-%m-%dT%H:%M:%SZ}) → {stamp}")
+            return 0
+        print(f"✓ 성공 도장 확정 {dt.datetime.fromtimestamp(committed, UTC):%Y-%m-%dT%H:%M:%SZ} → {stamp}")
         return 0
 
     if a.run_id and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", a.run_id):
         print("✗ run-id 형식이 올바르지 않다")
         return 2
     run_id = a.run_id or _new_run_id(now)
+    if snapshot_record_path:
+        try:
+            snapshot_identity = _load_snapshot_record(
+                snapshot_record_path, project, run_id, contract_hash,
+            )
+            _assert_snapshot_args(snapshot_identity, a)
+        except (OSError, ValueError) as exc:
+            print(f"✗ snapshot 검증 실패: {exc}")
+            return 1
 
     # Failsafe — 창을 "마지막 성공 이후"로 늘린다.
     # 고정 24시간이면 sweep 단계가 하루라도 못 뜬 날(맥북이 잠겼거나 실행이 죽었거나)
@@ -605,13 +912,18 @@ def main():
         by_store[s["store"]] = by_store.get(s["store"], 0) + 1
     print(f"\n대상 {len(targets)}개 / 스캔 {len(sessions)}개   {by_store}")
 
+    out = _output_root(project, a.out, now)
+    run_dir = _run_dir(out, run_id)
+    stamp_abs = os.path.realpath(os.path.abspath(os.path.expanduser(stamp)))
+    run_abs = os.path.realpath(os.path.abspath(run_dir))
+    if stamp_abs == run_abs or stamp_abs.startswith(run_abs + os.sep):
+        print("✗ --stamp-path는 실행 디렉터리/산출물 안에 둘 수 없다")
+        return 2
     if a.dry_run:
         print("\n(--dry-run: 파일 안 씀)")
         return 0
 
-    out = _output_root(project, a.out, now)
     date = dt.datetime.fromtimestamp(now, UTC).strftime("%Y-%m-%d")
-    run_dir = _run_dir(out, run_id)
     digest_dir = os.path.join(run_dir, "digest")
     os.makedirs(digest_dir, exist_ok=True)
     marker_path = os.path.join(run_dir, ".run-complete.json")
@@ -620,20 +932,32 @@ def main():
     except FileNotFoundError:
         pass
     index, rej_all = [], []
+    digest_names = {}
+    digest_name_for = {}
     for s in targets:
-        session_metadata = {
+        identity_hash = hashlib.sha256(
+            _json_text(_session_identity(s)).encode("utf-8")
+        ).hexdigest()
+        name = f"{s['store']}-{short_id(s['sid'])}-{identity_hash}.md"
+        if name in digest_names:
+            raise ValueError(f"다이제스트 경로 충돌: {name}")
+        digest_names[name] = _session_identity(s)
+        digest_name_for[id(s)] = name
+    for s in targets:
+        identity = _session_identity(s)
+        session_metadata = _bind_metadata({
             "run_id": run_id,
             "source": s["store"],
             "session_id": s["sid"],
             "session_path": s["path"],
-        }
+        }, contract_hash, snapshot_identity)
         body = digest(s, session_metadata)
-        name = f"{s['store']}-{short_id(s['sid'])}.md"
+        name = digest_name_for[id(s)]
         digest_path = os.path.join(digest_dir, name)
         _atomic_write(digest_path, body)
         rj = rejections(s)
         rej_all.append((s, rj))
-        index.append({
+        index.append(_bind_metadata({
             "run_id": run_id,
             "source": s["store"],
             "session_id": s["sid"],
@@ -645,15 +969,15 @@ def main():
             "oversized": len(body.encode()) > DIGEST_CAP,
             "rejections": len(rj),
             "first_user": s.get("first_user", ""),
-        })
+        }, contract_hash, snapshot_identity))
 
     # 기각 순간 모음 — 후보만 긁은 것이라 진짜 기각인지는 LLM이 판정한다
     identities = [_session_identity(s) for s in targets]
-    rejection_metadata = {
+    rejection_metadata = _bind_metadata({
         "run_id": run_id,
         "source": project,
         "sessions": identities,
-    }
+    }, contract_hash, snapshot_identity)
     lines = [f"<!-- harvest-metadata: {_json_text(rejection_metadata)} -->", "",
              "# 기각 순간 후보 — 사람이 제안을 되돌린 자리", "",
              "> 어휘로 넓게 긁은 **후보**다(재현율 우선). 진짜 기각인지, 그 안에 담긴 판단 기준이",
@@ -677,10 +1001,14 @@ def main():
         "project": project,
         "since_hours": since_h,
         "exclude_recent_min": exclude_recent_min,
+        "contract_hash": contract_hash,
+        "inbox_snapshot": snapshot_identity,
         "scanned": len(sessions),
         "targets": len(targets),
         "sessions": index,
     }
+    if snapshot_identity is not None:
+        index_data.update(snapshot_identity)
     _atomic_write(
         os.path.join(run_dir, "index.json"),
         json.dumps(index_data, ensure_ascii=False, indent=2) + "\n",
@@ -704,13 +1032,13 @@ def main():
     # 새 동작: 여기서는 **후보 시각만** 적어두고, 밤 루프가 리포트까지 다 낸 뒤
     # `--commit-success` 로 실제 도장을 찍는다. 후보 값은 `now` 가 아니라 **건너뛰기 경계**라,
     # 다음 밤 창이 이번에 건너뛴 지점에서 정확히 이어진다.
-    candidate_metadata = {
+    candidate_metadata = _bind_metadata({
         "run_id": run_id,
         "source": project,
         "sessions": identities,
         "candidate_epoch": cutoff,
         "status": "ready",
-    }
+    }, contract_hash, snapshot_identity)
     candidate_text = (
         f"{cutoff}  # {dt.datetime.fromtimestamp(cutoff, UTC):%Y-%m-%dT%H:%M:%SZ} "
         "= 이번 수확의 건너뛰기 경계. 완료 표식 검증 뒤 --commit-success 로 확정한다\n"
@@ -722,12 +1050,16 @@ def main():
     marker = {
         "run_id": run_id,
         "source": project,
+        "contract_hash": contract_hash,
+        "inbox_snapshot": snapshot_identity,
         "sessions": identities,
         "committable": True,
         "completed_at": dt.datetime.fromtimestamp(now, UTC).isoformat(timespec="seconds"),
         "artifacts": artifacts,
         "hashes": artifacts,
     }
+    if snapshot_identity is not None:
+        marker.update(snapshot_identity)
     _atomic_write(marker_path, json.dumps(marker, ensure_ascii=False, indent=2) + "\n")
     print(f"\n도장 후보 {dt.datetime.fromtimestamp(cutoff, UTC):%Y-%m-%dT%H:%M:%SZ} → "
           f"{run_dir}/.stamp-candidate")

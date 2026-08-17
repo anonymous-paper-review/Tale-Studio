@@ -19,12 +19,60 @@
 
 실행마다 다음 값을 먼저 만든다.
 
-- `run_id`: `night-YYYY-MM-DD` 형식의 날짜별 한 번 실행 식별자.
+- `run_id`: provider gate가 발급한 `night-YYYY-MM-DD-<uuid>` 실행 식별자.
 - `contract_id`, `contract_version`, 이 문서의 정규화된 해시.
 - 시작 시각과 기준 시각(UTC), 실행 주체(`claude` 또는 `codex`), 작업 루트.
 - 읽기 전용 입력 목록, 격리 작업 사본 목록, 결과 보고서 경로.
 
 이 값은 실행 기록과 모든 결과 카드에 이어 붙인다. 실행 중 계약 문서를 다시 읽어 규칙을 바꾸지 않는다. 계약 해시나 필수 입력이 서로 다르면 추측하지 말고 `contract-mismatch`로 진단·기록한 뒤 해당 실행을 시작하지 않는다.
+
+실행 시작 전에 Orca precheck가 반드시 `primary sweep` claim을 만든다. 이 claim이 없거나
+`state sweep`가 실패하면 실행을 시작하지 않는다. 계약 본문에서 `primary`를 다시 호출하지
+않아 이중 claim을 만들지 않는다. 실행 시작 시 계약 해시와 메모 스냅샷은 저장소 도구로
+한 번에 고정한다. 스냅샷 도구는 `_INBOX.md`를 수정하지 않고, 출력 JSON의 `snapshot_id`와
+`snapshot_fingerprint`를 이후 명령에 그대로 전달한다.
+
+```sh
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+cd "$PROJECT_ROOT"
+GATE="$PROJECT_ROOT/.claude/vault/backlog/provider-gate.py"
+# 스케줄러(Orca 또는 launchd 진입점 night-launchd.sh)가 이 계약 시작 전에
+# `primary sweep`을 정확히 한 번 만든다. 여기서 primary를 다시 부르지 않고
+# 필수 claim을 조회·검증만 한다.
+provider_state="$(python3 "$GATE" state sweep \
+  --contract-path "$PROJECT_ROOT/.claude/vault/backlog/_NIGHT.md")"
+provider_status="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')"
+provider="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["provider"])')"
+fallback_pending="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(str(json.load(sys.stdin).get("fallback_pending", False)).lower())')"
+if [ "$fallback_pending" = "true" ] || \
+   { [ "$provider" = "claude" ] && { [ "$provider_status" = "failed" ] || [ "$provider_status" = "timeout" ]; }; }; then
+  provider_state="$(python3 "$GATE" fallback sweep \
+    --run-id "$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')" \
+    --contract-path "$PROJECT_ROOT/.claude/vault/backlog/_NIGHT.md")" || {
+      echo "Codex fallback claim failed" >&2
+      exit 1
+    }
+  provider_status="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')"
+  provider="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["provider"])')"
+fi
+[ "$provider_status" = "claimed" ] || [ "$provider_status" = "running" ] || {
+  echo "provider primary claim is mandatory; state sweep is not active" >&2
+  exit 1
+}
+[ "$provider" = "claude" ] || [ "$provider" = "codex" ] || {
+  echo "provider state has no valid owner" >&2
+  exit 1
+}
+run_id="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')"
+provider_run_id="$run_id"
+provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner_token"])')"
+contract_hash="$(shasum -a 256 "$PROJECT_ROOT/.claude/vault/backlog/_NIGHT.md" | awk '{print $1}')"
+snapshot_json="$(python3 "$PROJECT_ROOT/.claude/vault/backlog/night-runtime.py" snapshot-inbox \
+  --run-id "$run_id" --contract-hash "$contract_hash")"
+snapshot_id="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["snapshot_id"])')"
+snapshot_fingerprint="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["snapshot_fingerprint"])')"
+snapshot_path="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["snapshot"])')"
+```
 
 ### 단일 실행 가정
 
@@ -39,7 +87,7 @@
 `_INBOX.md`는 사람이 쓰는 원문이다. 밤은 이 파일을 수정·삭제·정리하지 않는다.
 
 1. 시작할 때 UTF-8 원본 바이트의 범위 `[start, end)`와 읽은 시각, 범위의 내용 해시를 저장한다.
-2. `snapshot_fingerprint`는 경로·범위·내용 해시로 만들고, `snapshot_id`는 fingerprint와 읽은 시각으로 만든다. 같은 범위와 같은 내용은 같은 fingerprint로 알아본다.
+2. `snapshot_fingerprint`는 경로·범위·내용 해시로 만들고, `snapshot_id`는 fingerprint·run_id·contract_hash binding으로 만든다. 같은 범위와 같은 내용은 같은 fingerprint로 알아보되, 실행이나 계약이 달라지면 새 binding으로 취급한다.
 3. fingerprint별 상태를 `unclaimed → claimed → decomposed → executed → reported`로 기록한다. `failed`와 `blocked`는 안전한 종단 상태다.
 4. 분해 기록에는 원문 인용, 스냅샷 식별자, 해석, 실행 단위, 수용 기준을 함께 적는다. 이 기록이 메모의 소비 표식이다. 소비 표식이 있는 스냅샷은 다시 분해하지 않는다.
 5. 오너가 내용을 고치면 새 내용 해시와 새 snapshot으로 취급한다. 이전 스냅샷을 덮어쓰지 않는다.
@@ -53,8 +101,13 @@
 ### 4.1 정리되지 않은 세션 수확
 
 ```sh
-python3 .claude/vault/backlog/harvest.py --dry-run
-python3 .claude/vault/backlog/harvest.py --run-id "$run_id"
+python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --dry-run \
+  --project "$PROJECT_ROOT" --contract-hash "$contract_hash" \
+  --snapshot-id "$snapshot_id" --snapshot-fingerprint "$snapshot_fingerprint"
+python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --run-id "$run_id" \
+  --contract-hash "$contract_hash" --snapshot-id "$snapshot_id" \
+  --snapshot-fingerprint "$snapshot_fingerprint" \
+  --snapshot-path "$snapshot_path"
 ```
 
 - 먼저 드라이런 표를 보고, 쓰기 실행은 결과 산출을 끝낼 수 있을 때만 한다.
@@ -65,9 +118,16 @@ python3 .claude/vault/backlog/harvest.py --run-id "$run_id"
 - 50KB를 넘는 원문은 경로와 요약 위임 표식만 결과에 남긴다. 모델 원출력을 대화에 대량으로 붓지 않는다.
 - 기각 기록을 후보 목록보다 먼저 읽는다. 사람이 제안을 되돌린 이유가 무인 판단의 우선 기준이며, 단순 동의나 재질문은 판단 근거로 세지 않는다.
 - 수확 창이 중간에 끊기면 성공 표식을 남기지 않는다. 다음 실행은 마지막 성공 이후의 창을 다시 읽어 누락을 복구한다.
-- 모든 결과 카드·티켓·기계 보고서가 저장되고 `run_id`의 완료 표식이 검증된 뒤에만
-  `python3 .claude/vault/backlog/harvest.py --commit-success --run-id "$run_id"`를 실행한다.
-  완료 표식이 없거나 산출물 hash가 바뀌면 도장을 확정하지 않는다.
+- 모든 결과 카드·티켓·기계 보고서가 저장되고 `run_id`의 완료 표식을 미리 확인한 뒤에만
+  ```sh
+  python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --validate-complete --run-id "$run_id" \
+  --contract-hash "$contract_hash" --snapshot-id "$snapshot_id" \
+  --snapshot-fingerprint "$snapshot_fingerprint" \
+  --snapshot-path "$snapshot_path"
+  ```
+  완료 표식이 없거나 산출물 hash가 바뀌면 provider `complete success`를 호출하지 않는다.
+  실제 성공 도장 확정(`--commit-success`)은 provider gate가 현재 owner token·fencing·lease를
+  재확인한 뒤에만 수행한다.
 
 수확된 세션마다 다음을 짧게 기록한다.
 
@@ -197,7 +257,7 @@ git worktree add <isolated-path> -b night/<run-id>-<unit-id>
 
 ## 10. 아침 결과 리뷰 — budget, carryover, expiry
 
-아침은 사전 승인 창구가 아니라 밤 결과를 소비하는 리뷰 세션이다. 오너와 에이전트는 결과 카드를 보며 `merge`, `reject`, 또는 다음 실행에 반영할 `feedback`을 남긴다.
+아침은 사전 승인 창구가 아니라 밤 결과를 소비하는 리뷰 세션이다. 오너가 읽는 것은 결과 카드 원본이 아니라 **날짜 기준 사람 보고서 HTML**(`.claude/vault/backlog/reports/YYYY-MM-DD.html`)이다. 오너는 판정(`merge`, `reject`, 다음 실행에 반영할 `feedback`)과 이유를 별도 형식 없이 `_INBOX.md`에 적는다. 다음 밤 실행이 그 메모를 해석해 해당 결과 카드에 판정으로 기록한다. 오너가 카드 파일이나 원장을 직접 편집할 필요는 없다.
 
 ### 리뷰 예산
 
@@ -231,7 +291,7 @@ human_merge_reviewed = 위 카드 중 merge_mode가 human인 수
 
 ### 1단계 — 결과 카드에 판단을 붙인다
 
-아침 리뷰에서 오너의 `merge`·`reject`와 이유·피드백을 **그 결과 카드**에 직접 적는다. 카드에는 `judgment_key`, `judgment_version`, 메모 snapshot, 수용 기준 버전, 리뷰 시각과 머지 방식이 있어야 한다. 원본 대화를 새 파일로 복제하지 않는다.
+오너가 `_INBOX.md`에 남긴 판정 메모를 다음 밤 실행이 해석해, 오너의 `merge`·`reject`와 이유·피드백을 **그 결과 카드**에 기록한다. 어느 카드를 가리키는지 확실하지 않으면 추측하지 말고 확인 질문 카드를 아침 보고에 올린다. 카드에는 `judgment_key`, `judgment_version`, 메모 snapshot, 수용 기준 버전, 리뷰 시각과 머지 방식이 있어야 한다. 원본 대화를 새 파일로 복제하지 않는다.
 
 ### 2단계 — 반복된 판단만 계약 기준으로 올린다
 
@@ -252,6 +312,33 @@ G. 아침 결과 리뷰가 merge/reject/feedback을 카드에 붙인다.
 H. 독립 판정 두 번이 모이면 분해 기준 승격 후보를 만든다.
 ```
 
+자동화 provider 상태도 결과와 함께 닫는다. 모든 결과 카드·기계 보고서·수확
+완료 표식이 저장된 정상 종료에는 다음 명령을 실행한다.
+
+```sh
+# ... 결과 보고서와 harvest --validate-complete가 성공한 뒤 ...
+python3 "$GATE" complete sweep success \
+  --run-id "$provider_run_id" --token "$provider_token" --contract-hash "$contract_hash" \
+  --snapshot-id "$snapshot_id" --snapshot-fingerprint "$snapshot_fingerprint" \
+  --snapshot-path "$snapshot_path"
+```
+
+실행이 실패하거나 제한 시간에 끊기면 `success`를 호출하지 말고 `failed` 또는
+`timeout`을 기록한다(같은 `--run-id`와 `--token`을 전달한다). Claude 주 실행이
+`failed` 또는 `timeout`으로 닫힌 경우에만 다음처럼 Codex 대체 claim을 한 번 허용한다.
+
+```sh
+python3 "$GATE" fallback sweep \
+  --run-id "$provider_run_id" --contract-hash "$contract_hash"
+provider_state="$(python3 "$GATE" \
+  state sweep --contract-path "$PROJECT_ROOT/.claude/vault/backlog/_NIGHT.md")"
+provider_run_id="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')"
+provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner_token"])')"
+```
+
+상태 전이는 현재 provider claim과 원자적으로 결속되며,
+없는 claim·이미 닫힌 claim·알 수 없는 상태의 늦은 기록은 거부된다.
+
 실행을 끝내는 일반적인 경계는 다음뿐이다.
 
 - 연속으로 **3개** 단위가 결론 없이 끝나면 도구·입력 품질을 진단하고 그 밤의 새 단위 생성을 잠시 닫는다. 이미 실행 중인 단위는 안전하게 끝낸다.
@@ -264,6 +351,12 @@ H. 독립 판정 두 번이 모이면 분해 기준 승격 후보를 만든다.
 
 - 기계 보고서: 실행 상태, 단위별 한 줄 결과, 수용 기준, 지출 합계, 막힘·복구 사유, `reviewed_merge_rate`, 자가/사람 머지 수.
 - 사람 보고서: 맥락 → 해석 → 분해 → 수용 기준 → 결과 → 다음 질문 순서의 결과 카드. 상세 로그는 접고 경로만 연결한다.
+
+저장 위치는 고정한다.
+
+- 티켓·결과 카드: `.claude/vault/backlog/tickets/` — 새 티켓과 결과 카드는 이 디렉터리에만 만든다. backlog 루트에는 이 계약 문서와 실행 도구만 둔다.
+- 보고서: `.claude/vault/backlog/reports/` — 기계 보고서는 `YYYY-MM-DD.md`, 사람 보고서는 `YYYY-MM-DD.html`. 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
+- 오너 접점은 두 개뿐이다: 쓰는 곳 `_INBOX.md`, 읽는 곳 최신 `reports/YYYY-MM-DD.html`. 다른 파일을 오너가 읽어야만 진행되는 절차를 만들지 않는다.
 - 티켓 상태와 작업 사본 정보.
 - 메모 스냅샷 fingerprint·범위·내용 해시·소비 상태.
 - 필요한 실험 산출물과 결과표. raw 대화·모델 원출력은 소비 시점 없이 별도 보관하지 않는다.
@@ -278,3 +371,14 @@ H. 독립 판정 두 번이 모이면 분해 기준 승격 후보를 만든다.
 - 현재 결과와 역사 기록을 덮어쓰지 않는다. 새 판단은 새 버전과 연결된 결과 카드로 남긴다.
 
 이 문서를 고쳐야 할 때는 변경 이유, 영향받는 분해 기준, 이전 계약 해시, 새 계약 해시를 기록한다. 밤 실행은 항상 이 문서 하나를 정본으로 사용한다.
+
+## 15. 계약 개정 기록
+
+- 2026-08-17 · 이전 계약 해시 `a414257a45e1186012990e46fbfb68dcbdb80b2ce5c04d4a5ca5707e35bfdeea` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 요청 — backlog 루트에 티켓 104장이 평평하게 쌓여 구조가 안 보였고, 아침 리뷰 파일을 오너가 실제로 읽지 않았다.
+  - 변경 내용: (1) 티켓·결과 카드를 `backlog/tickets/`로 이동하고 새 카드도 거기에만 만든다. (2) 아침 리뷰 파일을 `_archive/_MORNING.md`로 은퇴시키고, 오너 접점을 `_INBOX.md`(판정 쓰기)와 `reports/YYYY-MM-DD.html`(결과 읽기) 둘로 고정했다. 오너 판정은 다음 밤이 `_INBOX.md` 메모에서 해석해 결과 카드에 기록한다. (3) 비어 있던 `destination/` 디렉터리를 제거했다.
+  - 영향받는 분해 기준: 없음 — 분해 규칙과 안전 경계는 그대로이고, 저장 경로와 아침 리뷰 통로만 바뀌었다.
+- 2026-08-17 (2차) · 이전 계약 해시 `a00472f6c7bb59187f8640e950d04b07f0783d4a70f5b49d1c8c648afb151b03` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: Orca가 없는 개발자 머신에서도 같은 계약이 그대로 돌게 하기 위한 이식성 개정.
+  - 변경 내용: (1) `PROJECT_ROOT`를 하드코딩 경로 대신 `git rev-parse --show-toplevel`로 구한다. (2) 잠금 게이트 호출을 Orca 설치 경로의 래퍼 대신 저장소 안의 `provider-gate.py` 직접 호출(`python3 "$GATE"`)로 바꿨다 — Orca 래퍼도 같은 파일을 exec할 뿐이라 상태 기계는 동일하다. (3) 스케줄러 중립 진입점 `night-launchd.sh`(run/dry-run)를 추가했다. Orca 머신은 기존대로 Orca precheck가 primary claim을 만들고, Orca 없는 머신은 launchd가 이 진입점을 부른다. 설치 절차는 `.claude/vault/night-runner-setup.md`가 정본이다.
+  - 영향받는 분해 기준: 없음 — 실행 절차·안전 경계·상태 기계는 동일하고 호출 경로만 이식 가능해졌다.

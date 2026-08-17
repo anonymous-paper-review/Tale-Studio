@@ -16,12 +16,14 @@
   않고 바이트 스냅샷으로 소비한다. 실행 순서나 승인 문서를 이 파일 대신 만들지 않는다.
 - `.claude/vault/backlog/_NIGHT.md` — **유일한 live 밤 계약**이다. 메모와 열린 티켓을 해석·분해하고,
   조사·실험·수리·기능 변경을 실행하며, 결과 카드를 남긴다. 사전 승인은 실행 조건이 아니다.
-- `.claude/vault/backlog/_MORNING.md` — 실행 전 분해를 승인하는 곳이 아니다. 밤이 만든 실제 결과와
-  근거를 읽고 오너가 각 카드에 `merge`·`reject`·`feedback`과 이유를 기록하는 아침 리뷰다.
-- `.claude/vault/backlog/` — 티켓과 실행 결과의 원장 (`ready`는 즉시 실행, `waiting`은 조건 확인,
-  `needs-owner`는 사람의 선택, `draft`는 닫힘 조건을 먼저 보완할 항목).
-- 목적지 문서(`destination/_NOW.md`)와 예전 수확 문서(`_SWEEP.md`)는 **역사 자료일 뿐 live 입력이나
-  실행 의존성이 아니다**. 새 절차는 이 경로들을 읽어야 진행되도록 쓰지 않는다.
+- `.claude/vault/backlog/reports/YYYY-MM-DD.html` — 오너가 아침에 읽는 날짜 기준 사람 보고서다.
+  오너 판정(`merge`·`reject`·`feedback`)은 `_INBOX.md`에 형식 없이 적고, 다음 밤이 해석해
+  결과 카드에 기록한다. 오너 접점은 `_INBOX.md`와 이 보고서 둘뿐이다.
+- `.claude/vault/backlog/tickets/` — 티켓과 실행 결과의 원장 (`ready`는 즉시 실행, `waiting`은 조건 확인,
+  `needs-owner`는 사람의 선택, `draft`는 닫힘 조건을 먼저 보완할 항목). backlog 루트에는
+  계약 문서(`_NIGHT.md`)와 실행 도구만 둔다.
+- 예전 아침 리뷰(`_archive/_MORNING.md`), 목적지 문서(`_archive/_NOW.md`), 예전 수확 문서(`_archive/_SWEEP.md`)는
+  **역사 자료일 뿐 live 입력이나 실행 의존성이 아니다**. 새 절차는 이 경로들을 읽어야 진행되도록 쓰지 않는다.
 - `.claude/vault/_archive/` — 닫힌 것과 폐지된 저장소의 원문이다. 과거 사고·결정의 근거를 보존하며,
   새 실행 입력으로 사용하지 않는다.
 
