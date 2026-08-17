@@ -26,7 +26,7 @@ when_to_use: 오너가 _INBOX.md 메모를 밤까지 기다리지 않고 지금 
 5. **백지 조사 위임**: Task 도구로 `night-investigator` 서브에이전트를 단위별 병렬 소환한다. **티켓 경로만 전달한다**(머릿속 맥락 덧붙이기 금지 — 백지 원칙). 모델은 작업자 정의에 고정되어 있으니 별도 지정하지 않는다.
 6. **교차 검증**: 결론을 좌우하는 주장은 메인이 원본 코드를 직접 다시 읽어 확인한다. 확인 못 한 주장은 보고서에 "유보/추정"으로 강도를 낮춘다.
 7. **기록**: 티켓에 결과를 갱신하고, 사람 보고서를 `.claude/vault/backlog/reports/YYYY-MM-DD-inbox-debug.html`로 만든다. 구조·CSS·어조는 같은 폴더의 `2026-08-17-inbox-debug.html`을 그대로 계승한다(4단 카드: 맥락→가설→확인→결과, 결론형 제목, 개발용어는 접기와 "남긴 것"에만, 멈춘 것 표, 정직 보고 접기, 지출 명시).
-8. **렌더와 기록**: `sh .claude/vault/backlog/night-launchd.sh open-report`로 브라우저에 띄우고, 티켓+보고서를 커밋한다. 실행이 `reported`까지 끝났으면 정식 밤은 `night-runtime.py archive-inbox --approval-state awaiting-owner-review`로 snapshot을 복사 보관한다. 이것은 아침 HTML 승인 전의 실행 보관일 뿐 최종 승인으로 세지 않는다. 절차 이탈이 있었으면 숨기지 말고 보고서 "정직 보고"에 기록한다.
+8. **렌더와 기록**: `sh .claude/vault/backlog/night-launchd.sh open-report`로 브라우저에 띄우고, 티켓+보고서를 커밋한다. 보고서 첫 화면은 짧은 브리프(결론·확인된 사실·막힘·아침 결정·지출)로 만들고, 각 섹션의 `details/summary` 안에 단계별 판단, 독단으로 둔 안전한 가정, 실제 출처(파일·세션·commit·줄), 서브 결과, 미확인 부분, 문제를 쪼갠 기준을 넣는다. 실행이 `reported`까지 끝났으면 정식 밤은 `night-runtime.py archive-inbox --approval-state awaiting-owner-review`로 snapshot을 복사 보관한다. 이것은 아침 HTML 승인 전의 실행 보관일 뿐 최종 승인으로 세지 않는다. 절차 이탈이 있었으면 숨기지 말고 보고서 "정직 보고"에 기록한다.
 
 ## 산출물 체크리스트
 
