@@ -25,7 +25,7 @@
 //   채택 조건(둘 다): 유도된 셀 개수 == 기대 개수, 셀 크기 균일(±max(6px, 2%)).
 //   불통과(밝은 콘텐츠 밴드로 인한 가짜 분할, 거터 소실 병합 등) 시 v4 앵커 스캔으로 폴백.
 import sharp from 'sharp'
-import { sheetGeometry, type RoughGridVariant } from '@/lib/writer/rough-storyboard-grid'
+import { sheetGeometry, sheetSpecOf, type RoughGridVariant } from '@/lib/writer/rough-storyboard-grid'
 import type { ProjectFormat } from '@/types/project'
 
 export interface RoughGridFrames {
@@ -247,6 +247,124 @@ export async function cropRoughGridFrames(
   if (shotCount < 1 || shotCount > shotAxisLen) {
     throw new Error(`rough grid crop: shotCount ${shotCount} out of range for ${variant}`)
   }
+
+  // ── #fixed-crop(2026-08-17, 오너 방향으로 2차 수정): 포맷 스펙 시트의 하이브리드 크롭 ──
+  // 실측 결론(a219b9f3 시트 6장): ① fal 은 요청 캔버스를 픽셀 정확히 반환하고 열(가로) 위치
+  // 드리프트는 수 px → **열 = 스펙 고정** ② 모델이 DIRECTION 캡션을 괘선 표로 부풀리며 행을
+  // 최대 ~100px 민다 → **행 위치 = 적응 검출**(스펙 앵커 ± 창, 두께 자격 밝은 런 — 순수 고정
+  // 불가라는 오너 판단이 맞았다) ③ 프레임 크기는 UI 순환·영상 레퍼런스의 전제 → **높이·너비
+  // = 스펙 표준으로 상시 균일**(검출된 행 시작 + 표준 높이) ④ DIRECTION 만 하단 오버플로
+  // (캡션 표)를 적응 포함 후 비율 유지 축소 + 종이색 패딩으로 정규화 — 라벨 무손실.
+  // 레거시(포맷 미상 null) 시트는 종전 적응형(v4/v5) 경로 그대로.
+  if (sheetSpecOf(variant, format)) {
+    const meta = await sharp(grid).metadata()
+    const W = meta.width ?? 0
+    const H = meta.height ?? 0
+    if (!W || !H) throw new Error('rough grid crop: metadata missing')
+
+    // 행 위치 적응 — 창 스캔이 아니라 **순차 체인**: 캡션 표가 행을 최대 ~110px 밀면 고정 창은
+    //   반드시 놓친다. 행 N+1 시작 = 행 N 끝(+DIRECTION 이면 오버플로 통과) 이후 첫 어두운 전환.
+    const { data: gdata, info: ginfo } = await sharp(grid)
+      .greyscale()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+    const rowProfile = new Float32Array(ginfo.height)
+    for (let y = 0; y < ginfo.height; y++) {
+      let dark = 0
+      const base = y * ginfo.width
+      for (let x = 0; x < ginfo.width; x++) if (gdata[base + x] < DARK_PIXEL_THRESHOLD) dark++
+      rowProfile[y] = dark / ginfo.width
+    }
+    /** fromY 부터 아래로 밝은 구간(거터)을 지나 처음 어두워지는 행 = 다음 행 시작. */
+    const scanNextRowTop = (fromY: number, fallbackGap: number): number => {
+      const limit = Math.min(ginfo.height - 1, fromY + 56)
+      for (let y = Math.max(0, fromY); y <= limit; y++) {
+        if (rowProfile[y] > 0.08) return y
+      }
+      return Math.min(ginfo.height - 1, fromY + fallbackGap)
+    }
+    // 셀 크기는 축마다 한 번만 계산 — 셀별 경계 반올림 ±1px 가 프레임 크기를 흔들지 않게
+    //   (스펙상 모든 셀의 비례 폭·높이는 동일하다). 균일성이 이 모드의 존재 이유다.
+    const frameW = Math.max(1, Math.round((cols[0][1] - cols[0][0]) * W))
+    const frameH = Math.max(1, Math.round((rows[0][1] - rows[0][0]) * H))
+
+    // ── DIRECTION 하단 오버플로 적응 확장 ──
+    // 모델이 캡션을 여러 칸 괘선 표로 부풀린다(실측 최대 ~110px, 표 안 괘선 틈 = 밝은 5~9행).
+    //   표 괘선 틈에서 조기 종료하지 않게 blank 종료 임계 12행, 최대 128px.
+    const OVERFLOW_MAX = 128
+    const OVERFLOW_BLANK_END = 12
+    const PAPER = { r: 250, g: 248, b: 242 }
+    const overflowBelow = (left: number, bottom: number): number => {
+      const cap = Math.min(OVERFLOW_MAX, H - 16 - bottom)
+      if (cap <= 4) return 0
+      const xEnd = Math.min(left + frameW, ginfo.width)
+      const rowsDark: boolean[] = []
+      for (let y = bottom; y < bottom + cap; y++) {
+        let dark = 0
+        const base = y * ginfo.width
+        for (let x = left; x < xEnd; x++) if (gdata[base + x] < DARK_PIXEL_THRESHOLD) dark++
+        rowsDark.push(dark / (xEnd - left) > 0.04)
+      }
+      let lastContent = -1
+      let blankRun = 0
+      for (let y = 0; y < rowsDark.length; y++) {
+        if (rowsDark[y]) {
+          lastContent = y
+          blankRun = 0
+        } else if (++blankRun >= OVERFLOW_BLANK_END && lastContent >= 0) break
+      }
+      return lastContent < 0 ? 0 : Math.min(cap, lastContent + 3)
+    }
+
+    // 행 시작 체인: 행1 = 스펙(상단 마진 안정 실측), 행 N+1 = 행 N 끝(+DIRECTION 뒤는 전 열
+    //   최대 오버플로 통과) 이후 첫 어두운 전환. 높이는 표준 고정이라 균일성은 불변.
+    const GUTTER_GAP = 20
+    const rowTops: number[] = [Math.round(rows[0][0] * H)]
+    for (let r = 1; r < rows.length; r++) {
+      const prevBottom = rowTops[r - 1] + frameH
+      let from = prevBottom + 2
+      if (framesAlongRows && r === 2) {
+        let maxExt = 0
+        for (let s = 0; s < shotCount; s++) {
+          const left = Math.min(Math.round(cols[s][0] * W), W - frameW)
+          maxExt = Math.max(maxExt, overflowBelow(left, rowTops[1] + frameH))
+        }
+        from = prevBottom + maxExt + 2
+      }
+      rowTops.push(Math.min(H - frameH, Math.max(prevBottom, scanNextRowTop(from, GUTTER_GAP))))
+    }
+
+    const out: RoughGridFrames[] = []
+    for (let s = 0; s < shotCount; s++) {
+      const frames: Buffer[] = []
+      for (let f = 0; f < 3; f++) {
+        const cx = framesAlongRows ? cols[s] : cols[f]
+        const left = Math.min(Math.round(cx[0] * W), W - frameW)
+        const top = Math.min(Math.max(0, rowTops[framesAlongRows ? f : s] ?? 0), H - frameH)
+        const isDirection = f === 1
+        const extend = isDirection ? overflowBelow(left, top + frameH) : 0
+        if (extend > 0) {
+          const tall = await sharp(grid)
+            .extract({ left, top, width: frameW, height: frameH + extend })
+            .png()
+            .toBuffer()
+          frames.push(
+            await sharp(tall)
+              .resize(frameW, frameH, { fit: 'contain', background: PAPER })
+              .png()
+              .toBuffer(),
+          )
+        } else {
+          frames.push(
+            await sharp(grid).extract({ left, top, width: frameW, height: frameH }).png().toBuffer(),
+          )
+        }
+      }
+      out.push({ start: frames[0], direction: frames[1], end: frames[2] })
+    }
+    return out
+  }
+
   const { data, info } = await sharp(grid).greyscale().raw().toBuffer({ resolveWithObject: true })
   const { width, height } = info
   if (!width || !height) throw new Error('rough grid crop: metadata missing')

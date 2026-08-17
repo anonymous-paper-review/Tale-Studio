@@ -53,6 +53,26 @@ const BodySchema = z.object({
   styleHints: z.array(z.string()).max(8).optional(),
 })
 
+/** 비-rich(writer-v2) static_spec 의 샷별 previz 연출 추출 (#v2-cell-dedup) — EN 파생 맵 우선. */
+function v2PrevizDirectionOf(
+  staticSpec: unknown,
+  shotId: string,
+  enByKey: Map<string, string>,
+): { composition: string | null; camera: string | null; blocking: string | null } | null {
+  const st = staticSpec as {
+    engine?: unknown
+    composition?: unknown
+    camera?: unknown
+    blocking?: unknown
+  } | null
+  if (st?.engine !== 'writer-v2') return null
+  const pick = (k: 'composition' | 'camera' | 'blocking'): string | null =>
+    enByKey.get(`${shotId}|${k}`) ??
+    (typeof st[k] === 'string' && (st[k] as string).trim() ? (st[k] as string) : null)
+  const direction = { composition: pick('composition'), camera: pick('camera'), blocking: pick('blocking') }
+  return direction.composition || direction.camera || direction.blocking ? direction : null
+}
+
 /**
  * rich 경로 shotDesign(state)의 자유서술(framing layers·focal·blocking 포즈·motion verb)을 영어 base 로 정규화.
  *   shotDesign 은 표시되지 않는 파이프라인 내부 상태라 native 보존 불요 — 생성용 EN 만 필요(language boundary S3c).
@@ -345,7 +365,7 @@ export async function POST(req: Request) {
         })
       }
     }
-    const [actionEnByShot, moodEnByScene, translatedSpecs, timeEnByScene, locEnByScene, nameEnById] =
+    const [actionEnByShot, moodEnByScene, translatedSpecs, timeEnByScene, locEnByScene, nameEnById, previzEnByKey] =
       await Promise.all([
         deriveEnBatch(
           targets.map((s) => ({ id: s.shot_id as string, native: (s.action_description as string) ?? '' })),
@@ -368,6 +388,23 @@ export async function POST(req: Request) {
         deriveEnBatch(
           targetChars.map((c) => ({ id: c.character_id as string, native: (c.name as string) ?? '' })),
           'character name (transliterate to Latin)',
+        ),
+        // 비-rich 엔진(writer-v2) 샷별 previz 연출 → EN (#v2-cell-dedup). rich 채택 샷은 제외.
+        deriveEnBatch(
+          targets.flatMap((s) => {
+            if (resolvedSpecByShotId.has(s.shot_id as string)) return []
+            const st = s.static_spec as {
+              engine?: unknown
+              composition?: unknown
+              camera?: unknown
+              blocking?: unknown
+            } | null
+            if (st?.engine !== 'writer-v2') return []
+            return (['composition', 'camera', 'blocking'] as const)
+              .filter((k) => typeof st[k] === 'string' && (st[k] as string).trim())
+              .map((k) => ({ id: `${s.shot_id as string}|${k}`, native: st[k] as string }))
+          }),
+          'writer-v2 previz direction',
         ),
       ])
     // 프롬프트용 EN 이름 맵 — DB 조회 키(scene.location / characters id)는 원문 유지, 라벨만 EN.
@@ -426,6 +463,11 @@ export async function POST(req: Request) {
             lightPosition: lighting.position ?? null,
             durationSeconds: (s.duration_seconds as number | null) ?? null,
             spec: translatedSpecs.get(shotId) ?? null,
+            previzDirection: v2PrevizDirectionOf(
+              translatedSpecs.has(shotId) ? null : s.static_spec,
+              shotId,
+              previzEnByKey,
+            ),
             styleHints,
           },
           shotId,

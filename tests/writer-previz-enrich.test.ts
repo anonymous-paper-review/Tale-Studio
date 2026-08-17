@@ -75,13 +75,13 @@ describe('previz 강화 ③ — 스케치에 빛·초점', () => {
 describe('previz 강화 ① — DIRECTION 기술 라벨', () => {
   it('KEY/카메라/FOCUS/색온도 라벨을 DIRECTION(motion)에 싣는다', () => {
     const cell = buildRoughGridCell(richInput(), 'sh_01_01')
-    // #label-invasion(2026-08-17): 라벨은 작게·패널 안 하단 가장자리 — 잠식·행 밀림 방지 계약.
-    expect(cell.motion).toContain('TINY handwriting')
-    expect(cell.motion).toContain('inside the panel')
+    // #fixed-crop(2026-08-17): 라벨은 템플릿이 내장한 캡션 스트립 안에만 — 고정 좌표 크롭과 한 몸.
+    expect(cell.motion).toContain('ruled caption strip')
+    expect(cell.motion).toContain('never write outside the panel')
     expect(cell.motion).toContain('"KEY: top right, soft"')
     expect(cell.motion).toContain('35mm')
     expect(cell.motion).toContain('shallow focus')
-    expect(cell.motion).toContain('"FOCUS: the girl straining against the shard"')
+    expect(cell.motion).toContain('"FOCUS: the girl straining again\u2026"') // 24자 클립 — 스트립 용량 계약(#fixed-crop)
     expect(cell.motion).toContain('"WARM 3500K"') // 색온도 — 흑백 previz 의 유일한 색 통로
   })
 

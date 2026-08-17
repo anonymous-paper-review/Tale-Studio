@@ -320,12 +320,26 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
     ? `lighting and focus (draw these into the sketch): ${drawParts.join('; ')}`
     : null
 
+  // 비-rich 엔진(writer-v2)의 샷별 연출 주입 (#v2-cell-dedup): rich spec 이 없으면 셀 입력이
+  //   유닛 공통값뿐이라 같은 유닛의 샷들이 문자 그대로 동일한 셀 서술이 되고, 모델은 같은
+  //   그림을 그린다. 구도·동선은 START 서술에, 카메라 무브는 MOTION 기본값에 반영한다.
+  const pvz = !s && input.previzDirection ? input.previzDirection : null
+  const pvzStartLine = pvz
+    ? [
+        pvz.composition ? `composition for THIS shot: ${stripColor(pvz.composition)}` : null,
+        pvz.blocking ? `staging: ${stripColor(pvz.blocking)}` : null,
+      ]
+        .filter(Boolean)
+        .join('; ') || null
+    : null
+
   const startParts = [
     `${size}, ${angle}, ${lens}mm, ${rule}`,
     figures || 'empty landscape, no figures',
     cuGuard,
     layerLine || (setting ? `setting: ${setting}` : null),
     input.actionDescription ? `moment: ${stripColor(input.actionDescription)}` : null,
+    pvzStartLine,
     figureGuard,
     `focal point: ${focal}`,
     drawLine,
@@ -344,7 +358,10 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   const gazeMoves = (dyn?.gaze_arc ?? [])
     .filter((g) => g.from !== g.to)
     .map((g) => `blank head turns ${words(g.from)} → ${words(g.to)}`)
-  const motionParts = [camMove, ...charMoves, ...gazeMoves].filter(Boolean) as string[]
+  // #v2-cell-dedup: rich dynamicSpec 이 없으면 previz 카메라 자유서술이 MOTION 재료 —
+  //   이게 없으면 V2 샷 전부가 'static hold' 로 균질화된다.
+  const pvzCam = !dyn && pvz?.camera ? `camera: ${stripColor(pvz.camera)}` : null
+  const motionParts = [camMove, pvzCam, ...charMoves, ...gazeMoves].filter(Boolean) as string[]
   // 샷 길이(초) 상속(#rough-grid duration, 2026-07-22): START↔END 변화량의 기준 —
   //   없으면 모델이 미세한 변화만 그리는 경향(실측). rich(intent) 우선, DB 폴백.
   const dur = input.spec?.intent?.duration_seconds ?? input.durationSeconds ?? null
@@ -355,22 +372,23 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
 
   // ① DIRECTION 여백의 손글씨 기술 라벨(#previz-enrich) — 조명 방향/질·카메라·초점·색온도.
   //   DIRECTION 은 텍스트 허용 유일 행이라 의도의 "확인 표면"이자 색의 유일한 운반 통로.
+  // #fixed-crop 라벨 다이어트: 스트립은 유한(셀 20%) — 좁은 셀에서 랩 줄 수가 넘치지 않게
+  //   각도어의 ' angle' 접미 제거 + FOCUS 24자 클립 (실측 sh_02_04: 5줄 랩이 스트립을 넘침).
   const labels: string[] = []
   if (L?.key_direction) labels.push(`KEY: ${words(L.key_direction)}${L.quality ? `, ${L.quality}` : ''}`)
-  const camLabel = [sizeCode, s?.lens_mm ? `${s.lens_mm}mm` : '', angle, dof ? `${dof} focus` : '']
+  const camLabel = [sizeCode, s?.lens_mm ? `${s.lens_mm}mm` : '', angle.replace(/ angle$/, ''), dof ? `${dof} focus` : '']
     .filter(Boolean)
     .join(' ')
   if (s && camLabel) labels.push(camLabel)
-  if (s?.framing?.focal_point) labels.push(`FOCUS: ${clipText(focal, 40)}`)
+  if (s?.framing?.focal_point) labels.push(`FOCUS: ${clipText(focal, 24)}`)
   const kelvin = L?.color_temp_kelvin
   const tempW = colorTempWord(kelvin)
   if (tempW) labels.push(`${tempW} ${kelvin}K`)
-  // #label-invasion(2026-08-17, 실측 a219b9f3 sh_01_01): 좁은 세로 셀에서 "margins" 지시가
-  //   두 갈래로 오작동 — 그림을 크게 덮거나(잠식), 패널 밖 행 사이에 텍스트 밴드를 만들어
-  //   시트 레이아웃을 밀었다(크롭 어긋남). 위치·크기·바깥 금지를 못박는다. 하단 가장자리
-  //   침범은 오너 허용 스타일(2026-08-17) — 행 시작 경계를 깨끗하게 유지하는 부수 효과도 있다.
+  // #label-invasion → #fixed-crop(2026-08-17): 자유 배치 라벨이 그림을 잠식하거나 패널 밖
+  //   밴드를 만들어 레이아웃을 밀었다(실측 a219b9f3). 템플릿이 DIRECTION 패널 하단에 캡션
+  //   스트립(괘선 칸)을 내장하므로 라벨은 그 안에만 — 고정 좌표 크롭과 한 몸의 계약.
   const motion = labels.length
-    ? `${motionBase}. In addition to the motion arrows, letter these technical labels in TINY handwriting tucked along the bottom edge of the DIRECTION frame, inside the panel (abbreviate freely; never cover the figures or the main subject; never write outside the panel borders or between panels): ${labels.map((l) => `"${l}"`).join(', ')}`
+    ? `${motionBase}. In addition to the motion arrows, letter these technical labels in small handwriting INSIDE the ruled caption strip at the bottom of the DIRECTION panel (the template already draws that strip — fill it, shrink the handwriting so EVERY label fits fully inside the strip, never write over the drawing above it, never write outside the panel): ${labels.map((l) => `"${l}"`).join(', ')}`
     : motionBase
 
   const endBase = motionParts.length
@@ -422,20 +440,20 @@ export function buildRoughGridPrompt(
 
 Each COLUMN is one shot of a film, read top to bottom as three frames:
 - Row 1 (top) = START: the composition at the beginning of the shot.
-- Row 2 (middle) = DIRECTION: an EXACT identical copy of Row 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Row 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Row 1 and Row 2 is the arrows and labels drawn on top. Row 2 is the ONLY place where text is allowed.
+- Row 2 (middle) = DIRECTION: an EXACT identical copy of Row 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Row 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Row 1 and Row 2 is the arrows and labels drawn on top. Row 2 is the ONLY place where text is allowed. The DIRECTION panels each have a thin ruled caption strip along their bottom edge — put every technical label inside that strip and keep the drawing above it.
 - Row 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Row 3 is the only frame where the motion has visibly progressed — and when a shot has movement, its END must differ clearly and unmistakably from its START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
       : stripRow
         ? `The reference image is a wide paper storyboard sheet with 3 empty panels side by side in a row. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels.
 
 The row is ONE shot of a film, read left to right as three frames:
 - Panel 1 (LEFT) = START: the composition at the beginning of the shot.
-- Panel 2 (MIDDLE) = DIRECTION: an EXACT identical copy of Panel 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Panel 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Panel 1 and Panel 2 is the arrows and labels drawn on top. Panel 2 is the ONLY place where text is allowed.
+- Panel 2 (MIDDLE) = DIRECTION: an EXACT identical copy of Panel 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Panel 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Panel 1 and Panel 2 is the arrows and labels drawn on top. Panel 2 is the ONLY place where text is allowed. The DIRECTION panels each have a thin ruled caption strip along their bottom edge — put every technical label inside that strip and keep the drawing above it.
 - Panel 3 (RIGHT) = END: the composition at the end of the shot, after the movement completes. Panel 3 is the only frame where the motion has visibly progressed — and when the shot has movement, END must differ clearly and unmistakably from START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
         : `The reference image is a paper storyboard strip with 3 empty panels stacked vertically. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels.
 
 The strip is ONE shot of a film, read top to bottom as three frames:
 - Panel 1 (top) = START: the composition at the beginning of the shot.
-- Panel 2 (middle) = DIRECTION: an EXACT identical copy of Panel 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Panel 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Panel 1 and Panel 2 is the arrows and labels drawn on top. Panel 2 is the ONLY place where text is allowed.
+- Panel 2 (middle) = DIRECTION: an EXACT identical copy of Panel 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Panel 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Panel 1 and Panel 2 is the arrows and labels drawn on top. Panel 2 is the ONLY place where text is allowed. The DIRECTION panels each have a thin ruled caption strip along their bottom edge — put every technical label inside that strip and keep the drawing above it.
 - Panel 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Panel 3 is the only frame where the motion has visibly progressed — and when the shot has movement, END must differ clearly and unmistakably from START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
 
   const body = cells

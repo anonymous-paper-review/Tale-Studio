@@ -168,6 +168,16 @@ export interface RoughStoryboardPromptInput {
   /** L4(shotDesign) 원본 — 있으면 rich 경로, 없으면 DB fallback */
   spec?: RoughStoryboardSpec | null
   /**
+   * 비-rich 스펙 엔진(writer-v2 previz 등)의 샷별 연출 자유서술 — db_fallback 셀 주입용
+   * (#v2-cell-dedup). rich spec 이 있으면 무시. 이게 없으면 유닛 내 샷들의 셀 입력이
+   * 유닛 공통값(action·인물·장소)만 남아 전부 같은 그림이 나온다(실측 090042eb).
+   */
+  previzDirection?: {
+    composition?: string | null
+    camera?: string | null
+    blocking?: string | null
+  } | null
+  /**
    * 콘텐츠 체커 우회 모드 — fal 입력 모더레이션(content_policy_violation, 토글 불가)에
    * 걸린 샷의 재시도용. 서사 동사·감정어(액션문/무드/모션/구도 레이어)를 빼고
    * 기계적 스테이징(샷 사이즈·blocking·포즈·소품·focal point)만 남긴다.

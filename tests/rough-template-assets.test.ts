@@ -66,15 +66,33 @@ async function paperBase(width: number, height: number): Promise<Buffer> {
   return sharp(full).extract({ left: 0, top: 0, width, height }).png().toBuffer()
 }
 
+/** DIRECTION 셀 캡션 스트립 높이 — 라벨 4~5줄 자리(셀 높이 20%, 40~96px).
+ *  1차 16%(72px)는 좁은 셀에서 라벨이 랩되며 넘쳤다(실측 sh_02_04: FOCUS 줄이 셀 밖으로). */
+export function captionStripHeight(cellH: number): number {
+  return Math.max(40, Math.min(96, Math.round(cellH * 0.2)))
+}
+
 async function renderTemplate(spec: SheetSpec): Promise<Buffer> {
   const { width, height } = spec.canvas
   const base = await paperBase(width, height)
   const cells: string[] = []
-  for (const [x0, x1] of spec.colBoxes) {
-    for (const [y0, y1] of spec.rowBoxes) {
+  for (let c = 0; c < spec.colBoxes.length; c++) {
+    for (let r = 0; r < spec.rowBoxes.length; r++) {
+      const [x0, x1] = spec.colBoxes[c]
+      const [y0, y1] = spec.rowBoxes[r]
       cells.push(
         `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="none" stroke="${BORDER}" stroke-width="2"/>`,
       )
+      // #fixed-crop(2026-08-17): DIRECTION 셀(프레임 축 index 1)에 캡션 스트립 내장 —
+      //   모델이 라벨 자리를 스스로 발명(패널 밖 밴드 → 레이아웃 밀림)하던 것을 템플릿이
+      //   공식화한다. 스트립은 셀 **안**이라 좌표·크롭·프레임 크기는 불변.
+      const isDirection = spec.frameAxis === 'rows' ? r === 1 : c === 1
+      if (isDirection) {
+        const stripH = captionStripHeight(y1 - y0)
+        cells.push(
+          `<line x1="${x0}" y1="${y1 - stripH}" x2="${x1}" y2="${y1 - stripH}" stroke="${BORDER}" stroke-width="2"/>`,
+        )
+      }
     }
   }
   const inset = Math.min(14, Math.round(Math.min(width, height) * 0.016))
