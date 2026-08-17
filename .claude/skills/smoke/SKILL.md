@@ -9,11 +9,15 @@ allowed-tools: Bash, Read
 인터페이스를 `pnpm test` 와 맞췄다. **전제가 없으면 알아서 skip 하므로 그냥 돌려도 안전하다.**
 
 ```bash
-pnpm smoke                                   # targets.json 전부 (훅·밤 러너가 부르는 형태)
+pnpm smoke                                   # 공개 화면 (targets.json) — 훅·밤 러너가 부르는 형태
+pnpm smoke --auth                            # 로그인 화면 (targets.auth.json) — 자동 로그인
 pnpm smoke /login --expect "로그인"           # 단건
+pnpm smoke /studio/writer --auth --tree       # 로그인 상태로 단건 + 접근성 트리 전체
 pnpm smoke / --click e4 --expect "이메일"     # 진입 후 클릭까지 따라가기
-pnpm smoke /studio --tree                     # 접근성 트리 전체 (--click 에 쓸 ref 찾기)
 ```
+
+**제품의 실제 화면은 전부 로그인 뒤에 있다** (`/studio/producer|writer|artist|director|editor`).
+공개 스위트만 돌리면 랜딩·요금·로그인폼만 확인된다 — UI 작업 확인이 목적이면 `--auth` 를 써야 한다.
 
 Skill 도구가 없는 서브에이전트(`frontend-designer` 등)와 다른 하네스(Codex·gjc)는 이렇게 부른다:
 `node .claude/skills/smoke/smoke.mjs /login --expect "로그인"`
@@ -47,18 +51,30 @@ dev 서버는 없으면 스스로 띄우고 끝나면 정리한다(`--no-serve` 
 `targets.json` 에 `{path, expect[], note}` 를 추가한다. `expect` 는 **지어내지 말고**
 `pnpm smoke <path> --tree` 로 실제 스냅샷을 떠서 거기 있는 문구를 그대로 붙인다.
 
-## 로그인이 필요한 화면
+## 로그인 (`--auth`)
 
 - `/`, `/pricing`, `/playground`, `/login`, `/share` 는 공개. 그 외는 `/login?next=...` 로 튕긴다.
   (`/docs` 는 미들웨어가 공개로 허용하지만 실제로는 404 라 targets 에서 제외했다.)
-- 읽기 전용 확인은 `?share=<64-hex>` 티켓으로 로그인 없이 `/studio` 진입이 가능하다 (`src/middleware.ts`).
-- 로그인 세션이 필요하면 **전용 프로파일에 사람이 1회 수동 로그인**한다:
-  `orca tab profile create --label tale-auth --scope isolated` → 그 탭에서 로그인 →
-  이후 `pnpm smoke /studio --profile tale-auth`.
-  `scripts/seed-test-accounts.mjs` 는 비밀번호를 랜덤 생성해 stdout 에 한 번 찍고 해시로만 저장하므로
-  사후 조회가 불가능하다. 자격증명을 파일에 적지 말고 세션을 프로파일에 남기는 방식만 쓴다.
-- 기본 프로파일 `tale-smoke` 는 isolated 다. Orca 의 `default` 프로파일에는 오너의 Comet 세션이
+- `--auth` 는 프로파일 `tale-auth` 를 쓰고, 세션이 없으면 **자동으로 로그인**한다.
+  자격증명은 `.env.local` 의 `TALE_SMOKE_EMAIL` / `TALE_SMOKE_PASSWORD` 를 읽는다.
+  `TALE_` 접두를 쓰는 이유: 표준 프로바이더 이름을 쓰면 다른 하네스가 오인 수집해 과금 사고가 난
+  전례가 있다. 계정은 `node scripts/seed-test-accounts.mjs 1` 로 만든 테스트 계정이며,
+  비밀번호는 생성 시 stdout 에 한 번만 찍히고 해시로만 저장돼 재조회가 불가능하다 — 잃어버리면 새로 만든다.
+- **세션 만료는 실패로 잡힌다.** `--auth` 인데 `/login` 에 도착하면 무조건 NOT-ok 다.
+  이걸 안 걸면 만료 시 "로그인 폼이 렌더됐다"로 통과해 아무것도 확인 못 한 채 초록불이 된다.
+- 자격증명이 틀리면 스위트를 돌리지 않고 exit 1 로 죽는다(조용한 통과 없음).
+- 읽기 전용 확인은 `?share=<64-hex>` 티켓으로 로그인 없이 `/studio` 진입도 가능하다 (`src/middleware.ts`).
+- 프로파일은 전부 isolated 다. Orca 의 `default` 프로파일에는 오너의 Comet 세션이
   임포트돼 있으니 **에이전트 실행에 default 를 쓰지 말 것.**
+
+### ⚠ 과금 경계
+
+로그인 화면은 실제 생성 기능에 붙어 있다. **생성 버튼을 누르는 타깃을 `targets.auth.json` 에 넣지 말 것** —
+fal·higgsfield 가 실제로 돌아 돈이 나간다. 목록에는 읽기 전용 진입만 두고,
+생성 흐름을 봐야 하면 사람이 판단해서 단건으로 돌린다.
+
+`admin@tale.studio` 계정으로 돌리면 작업 프로젝트 25개에 붙고 디버그 표면(`src/lib/admin.ts`)이 켜져
+일반 사용자와 다른 화면을 보게 된다 — 기본은 빈 테스트 계정을 쓴다.
 
 ## 알려진 한계 (실측 기준)
 

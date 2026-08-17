@@ -29,9 +29,9 @@
       "note": "공개 갤러리"
     },
     {
-      "path": "/studio",
+      "path": "/studio/producer",
       "expect": ["이메일", "비밀번호"],
-      "note": "미로그인 접근 → /login 으로 튕기는지. 소유권 가드(#access-audit)의 앞단"
+      "note": "미로그인 접근 → /login 으로 튕기는지. /studio 자체는 page.tsx 가 없어 실제 화면은 producer|writer|artist|director|editor 5개다"
     },
     {
       "path": "/projects",

@@ -1,0 +1,30 @@
+{
+  "_": [
+    "pnpm smoke --auth 로 도는 로그인 필요 화면 목록. 프로파일 tale-auth 에 세션이 남고,",
+    "자격증명은 .env.local 의 TALE_SMOKE_EMAIL / TALE_SMOKE_PASSWORD (seed-test-accounts.mjs 로 만든 테스트 계정).",
+    "",
+    "⚠ 생성 버튼을 누르는 타깃을 여기 넣지 말 것 — fal·higgsfield 가 실제로 돌아 과금된다.",
+    "  읽기 전용 진입만 둔다. 생성 흐름 확인이 필요하면 사람이 직접 판단해서 단건으로 돌린다.",
+    "",
+    "writer·artist·director·editor 를 넣지 않은 이유(2026-08-17 실측): 빈 프로젝트에서는 스테이지가",
+    "  잠겨 /studio/producer 로 되돌아온다. 프로젝트 진행도에 따라 도착지가 바뀌므로 목록에 넣으면",
+    "  계정 상태에 따라 흔들린다. 그 화면들은 단건으로 확인한다:",
+    "  pnpm smoke /studio/writer --auth --tree",
+    "",
+    "/studio/producer 는 프로젝트가 없으면 하나를 자동 생성하고 이후 같은 projectId 를 재사용한다",
+    "  (실행마다 쌓이지 않는 것을 실측 확인)."
+  ],
+  "base": "http://localhost:3000",
+  "targets": [
+    {
+      "path": "/projects",
+      "expect": ["새 프로젝트"],
+      "note": "로그인 후 프로젝트 목록. 빈 상태 문구는 계정 상태에 따라 바뀌므로 상시 존재하는 버튼으로 건다"
+    },
+    {
+      "path": "/studio/producer",
+      "expect": ["Meeting Room", "Producer"],
+      "note": "제품의 실제 진입 화면(스테이지 레일 + 기획 회의실)"
+    }
+  ]
+}

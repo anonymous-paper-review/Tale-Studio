@@ -48,10 +48,12 @@ export function parseArgs(argv) {
     json: false,
     tree: false,
     noServe: false,
+    auth: false,
   }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
-    if (a === '--keep') out.keep = true
+    if (a === '--auth') out.auth = true
+    else if (a === '--keep') out.keep = true
     else if (a === '--json') out.json = true
     else if (a === '--tree') out.tree = true
     else if (a === '--no-serve') out.noServe = true
@@ -142,6 +144,74 @@ async function ensureDevServer(base, { allowSpawn }) {
   return null
 }
 
+/** .env.local 을 의존성 없이 읽는다. 값은 절대 로그로 흘리지 않는다. */
+function loadEnvLocal() {
+  let raw
+  try {
+    raw = readFileSync(resolve(process.cwd(), '.env.local'), 'utf8')
+  } catch {
+    return {}
+  }
+  const env = {}
+  for (const line of raw.split('\n')) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/)
+    if (m) env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '')
+  }
+  return env
+}
+
+/** 스냅샷 텍스트에서 `textbox "이메일" [ref=e3]` 같은 줄의 ref 를 뽑는다. ref 번호는 고정이 아니다. */
+function findRef(snapshot, label) {
+  const m = snapshot.match(new RegExp(`"${label}"[^\\n]*\\[ref=(e\\d+)`))
+  return m?.[1] ?? null
+}
+
+/**
+ * 로그인 세션을 확보한다. 이미 로그인돼 있으면 아무것도 하지 않는다.
+ * 자격증명은 .env.local 의 TALE_SMOKE_EMAIL / TALE_SMOKE_PASSWORD 를 쓴다 —
+ *   표준 프로바이더 이름을 쓰면 다른 하네스가 오인 수집해 과금 사고가 난 전례가 있어 TALE_ 접두로 고정.
+ *   seed-test-accounts.mjs 로 만든 계정이며 비밀번호는 해시로만 저장돼 재조회가 불가능하다.
+ */
+async function ensureLoggedIn(base, profileId, wait) {
+  const env = loadEnvLocal()
+  const email = process.env.TALE_SMOKE_EMAIL || env.TALE_SMOKE_EMAIL
+  const password = process.env.TALE_SMOKE_PASSWORD || env.TALE_SMOKE_PASSWORD
+  if (!email || !password) {
+    return { ok: false, reason: '.env.local 에 TALE_SMOKE_EMAIL / TALE_SMOKE_PASSWORD 가 없다.' }
+  }
+
+  const { browserPageId: page } = orca(['tab', 'create', '--url', base + '/projects', '--profile', profileId, '--json'])
+  try {
+    await sleep(wait)
+    const where = () =>
+      JSON.parse(orca(['eval', '--page', page, '--expression', 'JSON.stringify(location.pathname)'], { raw: true }).trim())
+    if (!where().startsWith('/login')) return { ok: true, reason: '기존 세션 재사용' }
+
+    const snap = orca(['snapshot', '--page', page], { raw: true })
+    const emailRef = findRef(snap, '이메일')
+    const pwRef = findRef(snap, '비밀번호')
+    const btnRef = findRef(snap, '로그인')
+    if (!emailRef || !pwRef || !btnRef) {
+      return { ok: false, reason: `로그인 폼 요소를 못 찾았다 (이메일=${emailRef} 비번=${pwRef} 버튼=${btnRef}).` }
+    }
+    orca(['fill', '--page', page, '--element', emailRef, '--value', email], { raw: true })
+    orca(['fill', '--page', page, '--element', pwRef, '--value', password], { raw: true })
+    orca(['click', '--page', page, '--element', btnRef], { raw: true })
+    await sleep(wait * 2)
+
+    if (where().startsWith('/login')) {
+      return { ok: false, reason: '로그인 제출 후에도 /login 에 머물렀다 (자격증명 또는 폼 변경 확인).' }
+    }
+    return { ok: true, reason: '새로 로그인함' }
+  } finally {
+    try {
+      orca(['tab', 'close', '--page', page], { raw: true })
+    } catch {
+      /* noop */
+    }
+  }
+}
+
 /** 화면 하나를 확인한다. 판정하지 않고 사실만 담아 돌려준다. */
 async function checkOne(target, opt, profileId) {
   const { path, expect = [], click = [] } = target
@@ -207,7 +277,11 @@ async function checkOne(target, opt, profileId) {
     // Next dev 배지는 뷰포트를 가려 오너의 시각 판정을 방해한다. 찍기 직전에만 걷어낸다.
     orca(['eval', '--page', page, '--expression', "document.querySelector('nextjs-portal')?.remove();'ok'"], { raw: true })
     // 같은 진입 경로라도 클릭 체인이 다르면 도착 화면이 다르다 → 파일명에 클릭을 섞어 덮어쓰기를 막는다.
-    const shotPath = resolve(opt.shot || `.smoke/${[slug(path), ...click].join('-')}.png`)
+    // 파일명에 프로파일과 클릭 체인을 함께 넣는다 — 둘 다 도착 화면을 바꾼다.
+    //   실측 사고(2026-08-17): 공개 스위트와 --auth 스위트가 같은 /studio/producer 를 서로 다른
+    //   화면(로그인 폼 / Meeting Room)으로 찍는데 파일명이 같아 나중 실행이 앞 실행을 덮었다.
+    //   스냅샷은 Meeting Room 이라 보고하는데 오너가 여는 이미지는 로그인 폼이라 판정이 어긋난다.
+    const shotPath = resolve(opt.shot || `.smoke/${opt.profile}/${[slug(path), ...click].join('-')}.png`)
     mkdirSync(dirname(shotPath), { recursive: true })
     writeFileSync(shotPath, Buffer.from(orca(['screenshot', '--page', page, '--format', 'png', '--json']).data, 'base64'))
     result.screenshot = shotPath
@@ -221,8 +295,13 @@ async function checkOne(target, opt, profileId) {
     }
   }
 
+  // 세션 만료의 가짜 ok 방지: 로그인 모드인데 /login 에 있으면 무조건 실패다.
+  //   이걸 안 걸면 만료 시 "로그인 폼이 렌더됐다"로 통과해버려 아무것도 확인 못 한 채 초록불이 된다.
+  result.sessionExpired = Boolean(opt.auth) && String(result.finalUrl || '').startsWith('/login')
+
   // ok 는 "정상 응답이고, 렌더됐고, 기대 텍스트가 다 있고, 콘솔 에러가 없다"는 사실 진술일 뿐이다.
   result.ok =
+    !result.sessionExpired &&
     (result.httpStatus === null || result.httpStatus < 400) &&
     result.rendered &&
     result.expects.every((e) => e.found) &&
@@ -234,6 +313,7 @@ function report(r, opt) {
   console.log(
     `${r.ok ? 'ok    ' : 'NOT-ok'} ${r.path} → ${r.finalUrl}  HTTP ${r.httpStatus ?? '?'}  "${r.title}"  (${r.snapshotLines}줄)`,
   )
+  if (r.sessionExpired) console.log('         ⚠ 세션 만료 — /login 으로 튕겼다. 확인된 것이 없다.')
   for (const e of r.expects) console.log(`         기대 "${e.text}": ${e.found ? '있음' : '없음'}`)
   if (r.consoleErrors.length) {
     console.log(`         콘솔 에러 ${r.consoleErrors.length}건:`)
@@ -252,11 +332,13 @@ async function main() {
   const opt = parseArgs(process.argv.slice(2))
 
   // --- targets 모드: 인자 없이 부르면 등록된 화면 전부. `pnpm test` 와 같은 인터페이스 ---
+  if (opt.auth && opt.profile === DEFAULT_PROFILE) opt.profile = 'tale-auth'
+
   let targets
   if (opt.path) {
     targets = [{ path: opt.path, expect: opt.expect, click: opt.click }]
   } else {
-    const cfg = JSON.parse(readFileSync(resolve(HERE, 'targets.json'), 'utf8'))
+    const cfg = JSON.parse(readFileSync(resolve(HERE, opt.auth ? 'targets.auth.json' : 'targets.json'), 'utf8'))
     targets = cfg.targets
     opt.base = opt.base || cfg.base || DEFAULT_BASE
   }
@@ -285,6 +367,14 @@ async function main() {
   const results = []
   try {
     const profileId = ensureProfile(opt.profile)
+    if (opt.auth) {
+      const login = await ensureLoggedIn(opt.base, profileId, opt.wait)
+      if (!login.ok) {
+        console.error(`[로그인 실패] ${login.reason}`)
+        process.exit(1)
+      }
+      console.log(`(로그인: ${login.reason})`)
+    }
     for (const t of targets) results.push(await checkOne(t, opt, profileId))
   } finally {
     server.stop()
