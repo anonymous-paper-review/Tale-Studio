@@ -46,23 +46,23 @@ describe('buildFalImageInput — image_size 정규화', () => {
   })
 })
 
-describe('realSheetCanvas — 프로듀서 포맷 → 실사 시트 캔버스', () => {
-  it('그리드: 캔버스 방향 = 포맷 방향 (vertical 세로 시트 실측 T2, cinema 2.4:1 실측 T4)', () => {
-    expect(realSheetCanvas('horizontal_16:9', 'grid4')).toBe('1536x1024')
-    expect(realSheetCanvas('vertical_9:16', 'grid4')).toBe('1024x1536')
-    expect(realSheetCanvas('square_1:1', 'grid4')).toBe('1024x1024')
-    expect(realSheetCanvas('cinema_2.39:1', 'grid4')).toBe('1536x640')
+describe('realSheetCanvas — 프로듀서 포맷 → 실사 시트 캔버스 (#sheet-formats 2차: 4포맷 전부 스펙)', () => {
+  it('그리드: 셀 AR 정확·데드밴드 제거 캔버스 (horizontal 도 레거시에서 스펙 시트로 이동)', () => {
+    expect(realSheetCanvas('horizontal_16:9', 'grid4')).toBe('1728x768')
+    expect(realSheetCanvas('vertical_9:16', 'grid4')).toBe('1152x1536')
+    expect(realSheetCanvas('square_1:1', 'grid4')).toBe('1344x1024')
+    expect(realSheetCanvas('cinema_2.39:1', 'grid4')).toBe('1920x704')
   })
 
-  it('그리드: 포맷 미상(구 프로젝트 null)은 종전 가로 시트 유지 — 하위 호환', () => {
+  it('포맷 미상(구 프로젝트 null)만 레거시 캔버스 유지 — 하위 호환', () => {
     expect(realSheetCanvas(null, 'grid4')).toBe('1536x1024')
+    expect(realSheetCanvas(null, 'strip1')).toBe('1024x1536')
   })
 
-  it('스트립(#sheet-formats): 세로 포맷만 가로 3열 시트(1536x1024), 나머지는 적층 세로', () => {
-    expect(realSheetCanvas('horizontal_16:9', 'strip1')).toBe('1024x1536')
-    expect(realSheetCanvas(null, 'strip1')).toBe('1024x1536')
-    expect(realSheetCanvas('cinema_2.39:1', 'strip1')).toBe('1024x1536')
-    expect(realSheetCanvas('vertical_9:16', 'strip1')).toBe('1536x1024')
-    expect(realSheetCanvas('square_1:1', 'strip1')).toBe('768x1536')
+  it('스트립: 세로 포맷만 가로 3열(1536x896), 나머지는 적층', () => {
+    expect(realSheetCanvas('horizontal_16:9', 'strip1')).toBe('1024x1712')
+    expect(realSheetCanvas('cinema_2.39:1', 'strip1')).toBe('1024x1296')
+    expect(realSheetCanvas('vertical_9:16', 'strip1')).toBe('1536x896')
+    expect(realSheetCanvas('square_1:1', 'strip1')).toBe('640x1792')
   })
 })

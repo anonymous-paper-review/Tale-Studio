@@ -96,14 +96,15 @@ describe.runIf(LIVE)('sheet-formats 라이브 실측', () => {
         const buf = await readFile(path.join(repo, 'public', g.templatePath.replace(/^\//, '')))
         return { g, url: await uploadPng(buf, path.basename(g.templatePath)) }
       }
-      const [vGrid, vStrip, sGrid, cGrid] = await Promise.all([
+      const [vGrid, vStrip, sGrid, cGrid, hGrid] = await Promise.all([
         tpl('grid4', 'vertical_9:16'),
         tpl('strip1', 'vertical_9:16'),
         tpl('grid4', 'square_1:1'),
         tpl('grid4', 'cinema_2.39:1'),
+        tpl('grid4', 'horizontal_16:9'),
       ])
 
-      // R1~R4 동시 제출 (러프 생성 — 실제 라우트와 동일 조립: 프롬프트 빌더 + 명시 캔버스)
+      // R0~R4 동시 제출 (러프 생성 — 실제 라우트와 동일 조립: 프롬프트 빌더 + 명시 캔버스)
       const gridPrompt = buildRoughGridPrompt(cells, 'grid4')
       const stripPrompt = buildRoughGridPrompt([cells[0]], 'strip1', { frameAxis: vStrip.g.frameAxis })
       const reqs = await Promise.all([
@@ -111,12 +112,14 @@ describe.runIf(LIVE)('sheet-formats 라이브 실측', () => {
         submit(stripPrompt, [vStrip.url], vStrip.g.roughImageSize!),
         submit(gridPrompt, [sGrid.url], sGrid.g.roughImageSize!),
         submit(gridPrompt, [cGrid.url], cGrid.g.roughImageSize!),
+        submit(gridPrompt, [hGrid.url], hGrid.g.roughImageSize!),
       ])
-      const [r1, r2, r3, r4] = await Promise.all([
+      const [r1, r2, r3, r4, r0] = await Promise.all([
         await_(reqs[0], 'R1-vertical-grid'),
         await_(reqs[1], 'R2-vertical-strip'),
         await_(reqs[2], 'R3-square-grid'),
         await_(reqs[3], 'R4-cinema-grid'),
+        await_(reqs[4], 'R0-horizontal-grid'),
       ])
       const dims = async (b: Buffer) => {
         const m = await sharp(b).metadata()
@@ -126,20 +129,30 @@ describe.runIf(LIVE)('sheet-formats 라이브 실측', () => {
       await writeFile(path.join(outDir, 'R2-vertical-strip.png'), r2)
       await writeFile(path.join(outDir, 'R3-square-grid.png'), r3)
       await writeFile(path.join(outDir, 'R4-cinema-grid.png'), r4)
-      expect(await dims(r1)).toBe('1024x1536')
-      expect(await dims(r2)).toBe('1536x1024')
-      expect(await dims(r3)).toBe('1024x1024')
-      expect(await dims(r4)).toBe('1536x640')
+      await writeFile(path.join(outDir, 'R0-horizontal-grid.png'), r0)
+      // 치수는 스펙 동적 대조 — 스펙이 바뀌면 실측 기준도 같이 움직인다 (하드코딩 금지)
+      expect(await dims(r1)).toBe(vGrid.g.roughImageSize)
+      expect(await dims(r2)).toBe(vStrip.g.roughImageSize)
+      expect(await dims(r3)).toBe(sGrid.g.roughImageSize)
+      expect(await dims(r4)).toBe(cGrid.g.roughImageSize)
+      expect(await dims(r0)).toBe(hGrid.g.roughImageSize)
 
       // 실제 크롭 파스 — 포맷 좌표·프레임 축 그대로
       const c1 = await cropRoughGridFrames(r1, 'grid4', 3, 'vertical_9:16')
       const c2 = await cropRoughGridFrames(r2, 'strip1', 1, 'vertical_9:16')
       const c3 = await cropRoughGridFrames(r3, 'grid4', 3, 'square_1:1')
       const c4 = await cropRoughGridFrames(r4, 'grid4', 3, 'cinema_2.39:1')
+      const c0 = await cropRoughGridFrames(r0, 'grid4', 3, 'horizontal_16:9')
       expect(c1).toHaveLength(3)
       expect(c2).toHaveLength(1)
       expect(c3).toHaveLength(3)
       expect(c4).toHaveLength(3)
+      expect(c0).toHaveLength(3)
+      // 가로 프레임 검증 — 신규 16:9 셀이 실제 ~1.78 로 잘리는가 (레거시는 1.54 였다)
+      {
+        const m = await sharp(c0[0].start).metadata()
+        expect((m.width ?? 1) / (m.height ?? 1)).toBeGreaterThan(1.6)
+      }
       for (const [name, frames] of [
         ['R1s1', c1[0]],
         ['R2s1', c2[0]],
@@ -174,7 +187,7 @@ describe.runIf(LIVE)('sheet-formats 라이브 실측', () => {
       const r5req = await submit(repaintPrompt, [refUrl], composed.geometry.repaintCanvas)
       const r5 = await await_(r5req, 'R5-vertical-strip-repaint')
       await writeFile(path.join(outDir, 'R5-vertical-strip-repaint.png'), r5)
-      expect(await dims(r5)).toBe('1536x1024')
+      expect(await dims(r5)).toBe(composed.geometry.repaintCanvas)
       const c5 = await cropRoughGridFrames(r5, 'strip1', 1, 'vertical_9:16')
       const m5 = await sharp(c5[0].start).metadata()
       expect((m5.width ?? 1) / (m5.height ?? 1)).toBeLessThan(0.8)

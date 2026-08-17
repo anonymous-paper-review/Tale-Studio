@@ -53,18 +53,24 @@ export const GRID_MAX_SHOTS = GRID_COLS.length // 4
 export const GRID_TEMPLATE_PATH = '/rough-storyboard-grid.png'
 export const STRIP_TEMPLATE_PATH = '/rough-storyboard-strip.png'
 
-// ── 포맷별 시트 스펙 (#sheet-formats 2026-08-17) ─────────────────────────────
-// 프로듀서 포맷(vertical/square/cinema)마다 셀이 그 포맷의 종횡비를 갖는 전용 템플릿.
+// ── 포맷별 시트 스펙 (#sheet-formats 2026-08-17, 2차 개정: 오너 육안 피드백 반영) ──
+// 4포맷 전부(horizontal 포함) 셀이 포맷 종횡비를 **정확히** 갖는 전용 템플릿.
 // 신규 템플릿 PNG 는 이 스펙에서 **그려서 생성**한다(tests/rough-template-assets.test.ts 의
-// 게이트 생성기) — 좌표와 그림의 진실이 이 표 하나라서 "템플릿 교체 시 재실측" 함정이 없고,
-// 같은 테스트가 커밋된 PNG 치수를 스펙과 대조해 드리프트를 CI 에서 잡는다.
-// horizontal(16:9)·포맷 미상은 레거시 실측 좌표·기존 템플릿 그대로(검증 자산 불변).
+// 게이트 생성기 — 레거시 시트에서 추출한 종이 질감 + 스펙 좌표 보더) — 좌표와 그림의 진실이
+// 이 표 하나라서 "템플릿 교체 시 재실측" 함정이 없고, 같은 테스트가 커밋된 PNG 치수를 스펙과
+// 대조해 드리프트를 CI 에서 잡는다. 레거시 실측 좌표·구 템플릿은 포맷 미상(null) 구 프로젝트와
+// 구 잡 크롭 호환 전용으로 강등 — 파일은 유지한다.
 //
-// 세로(9:16) 스트립만 frameAxis 'cols' — 3단 적층으로 9:16 셀을 만들면 캔버스 좌우 여백이
-// 극단(≈370px)이라, 가로 3열(좌→우 = START/DIRECTION/END) 배치로 셀을 키운다(474×842).
+// 수치 원리(2차 실측·스키마 기반):
+//   ① 셀 AR = 포맷 정확값. 레거시 16:9 시트의 셀은 실측 1.544(-13.2%)로 처음부터 부정확했다 —
+//     4×3 셀을 시트 AR 에 욱여넣은 기하적 필연. 데드밴드 없는 캔버스 AR ≈ (열수/행수)×셀AR.
+//   ② gpt-image-2/edit 공식 스키마: 16배수 / 최대 변 3840 / AR ≤3:1 / 총 0.66~8.29MP.
+//     캔버스는 전부 이 안에서 현행 화소대(±20%)를 유지하며 셀 면적을 레거시 이상으로 보존.
+//   ③ 세로(9:16) 스트립만 frameAxis 'cols' — 적층이면 좌우 여백 극단(≈370px)이라 가로 3열
+//     (좌→우 = START/DIRECTION/END)로 셀을 키운다(474×842).
 
 export interface SheetSpec {
-  /** 템플릿 치수 = 생성 캔버스. 전부 64배수 — fal gpt-image 실측 스냅 규칙(#fal-canvas T4). */
+  /** 템플릿 치수 = 생성 캔버스. 전부 16배수 — gpt-image-2/edit 공식 스키마(최대 변 3840·AR≤3:1·0.66~8.29MP). */
   canvas: { width: number; height: number }
   /** 셀 박스 [x0,x1] px (2px 보더 포함). 비례 좌표·생성기가 모두 여기서 파생. */
   colBoxes: ReadonlyArray<readonly [number, number]>
@@ -77,48 +83,63 @@ export interface SheetSpec {
 const boxes = (start: number, size: number, n: number, gap = 20): Array<[number, number]> =>
   Array.from({ length: n }, (_, i) => [start + i * (size + gap), start + i * (size + gap) + size])
 
-const SHEET_SPECS: Partial<Record<`${Exclude<ProjectFormat, 'horizontal_16:9'>}:${RoughGridVariant}`, SheetSpec>> = {
-  // 세로 그리드: 1024×1536, 셀 223×396(9:16) — 실측 T2(세로 캔버스에서 4×3 유지) 기반
+const SHEET_SPECS: Partial<Record<`${ProjectFormat}:${RoughGridVariant}`, SheetSpec>> = {
+  // 16:9 — 셀 400×225(정확 1.778, 면적 90k ≈ 레거시 372×241 의 89.7k 보존)
+  'horizontal_16:9:grid4': {
+    canvas: { width: 1728, height: 768 },
+    colBoxes: boxes(34, 400, 4),
+    rowBoxes: boxes(26, 225, 3),
+    frameAxis: 'rows',
+    templatePath: '/rough-storyboard-grid-horizontal.png',
+  },
+  'horizontal_16:9:strip1': {
+    canvas: { width: 1024, height: 1712 },
+    colBoxes: boxes(36, 952, 1),
+    rowBoxes: boxes(32, 536, 3),
+    frameAxis: 'rows',
+    templatePath: '/rough-storyboard-strip-horizontal.png',
+  },
+  // 9:16 — 셀 255×453(정확 0.563). 캔버스 3:4 = 콘텐츠 AR 정합(1차 1024×1536 의 상하 154px
+  //   데드밴드가 오너 육안 지적의 절반이었다 — 나머지 절반은 9:16 이 원래 그만큼 길쭉하다는 것)
   'vertical_9:16:grid4': {
-    canvas: { width: 1024, height: 1536 },
-    colBoxes: boxes(36, 223, 4),
-    rowBoxes: boxes(154, 396, 3),
+    canvas: { width: 1152, height: 1536 },
+    colBoxes: boxes(36, 255, 4),
+    rowBoxes: boxes(68, 453, 3),
     frameAxis: 'rows',
     templatePath: '/rough-storyboard-grid-vertical.png',
   },
-  // 세로 스트립: 가로 3열 1536×1024, 셀 474×842(9:16) — 적층의 극단 여백 회피
   'vertical_9:16:strip1': {
-    canvas: { width: 1536, height: 1024 },
+    canvas: { width: 1536, height: 896 },
     colBoxes: boxes(37, 474, 3),
-    rowBoxes: boxes(91, 842, 1),
+    rowBoxes: boxes(27, 842, 1),
     frameAxis: 'cols',
     templatePath: '/rough-storyboard-strip-vertical.png',
   },
   'square_1:1:grid4': {
-    canvas: { width: 1024, height: 1024 },
-    colBoxes: boxes(36, 223, 4),
-    rowBoxes: boxes(157, 223, 3),
+    canvas: { width: 1344, height: 1024 },
+    colBoxes: boxes(36, 303, 4),
+    rowBoxes: boxes(37, 303, 3),
     frameAxis: 'rows',
     templatePath: '/rough-storyboard-grid-square.png',
   },
   'square_1:1:strip1': {
-    canvas: { width: 768, height: 1536 },
-    colBoxes: boxes(147, 474, 1),
-    rowBoxes: boxes(37, 474, 3),
+    canvas: { width: 640, height: 1792 },
+    colBoxes: boxes(36, 568, 1),
+    rowBoxes: boxes(24, 568, 3),
     frameAxis: 'rows',
     templatePath: '/rough-storyboard-strip-square.png',
   },
   'cinema_2.39:1:grid4': {
-    canvas: { width: 1536, height: 640 },
-    colBoxes: boxes(38, 350, 4),
-    rowBoxes: boxes(81, 146, 3),
+    canvas: { width: 1920, height: 704 },
+    colBoxes: boxes(36, 447, 4),
+    rowBoxes: boxes(51, 187, 3),
     frameAxis: 'rows',
     templatePath: '/rough-storyboard-grid-cinema.png',
   },
   'cinema_2.39:1:strip1': {
-    canvas: { width: 1024, height: 1536 },
+    canvas: { width: 1024, height: 1296 },
     colBoxes: boxes(36, 952, 1),
-    rowBoxes: boxes(151, 398, 3),
+    rowBoxes: boxes(31, 398, 3),
     frameAxis: 'rows',
     templatePath: '/rough-storyboard-strip-cinema.png',
   },
@@ -142,7 +163,8 @@ export function sheetSpecOf(
   variant: RoughGridVariant,
   format: ProjectFormat | null,
 ): SheetSpec | null {
-  if (!format || format === 'horizontal_16:9') return null
+  // null(포맷 미상 구 프로젝트)만 레거시 — horizontal 포함 4포맷 전부 스펙 시트를 쓴다(2차 개정).
+  if (!format) return null
   return SHEET_SPECS[`${format}:${variant}`] ?? null
 }
 
@@ -152,7 +174,8 @@ export function sheetGeometry(
 ): SheetGeometry {
   const spec = sheetSpecOf(variant, format)
   if (!spec) {
-    // 레거시(horizontal·미상): 실측 비례 좌표 + 기존 템플릿. 리페인트 캔버스는 #fal-canvas 확정값.
+    // 레거시(포맷 미상 null 전용 — 2차 개정으로 horizontal 도 스펙 시트로 이동):
+    //   실측 비례 좌표 + 기존 템플릿. 리페인트 캔버스는 #fal-canvas 확정값.
     return variant === 'grid4'
       ? {
           cols: GRID_COLS,
