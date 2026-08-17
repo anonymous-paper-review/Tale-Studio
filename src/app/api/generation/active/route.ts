@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { listActiveGenerationJobs, userOwnsProject } from '@/lib/generation-jobs'
+import { reconcileGhostQueuedJobs } from '@/lib/fal/reconcile'
 
 export const runtime = 'nodejs'
 
@@ -30,6 +31,10 @@ export async function GET(req: Request) {
       { status: 403 },
     )
   }
+
+  // 유령 queued 잡(STALE 초과·폴러 사망) 회수 — 숨기기 전에 fal 진실로 종결 시도(#ghost-reconcile).
+  //   프로젝트당 60s 스로틀 + 실패 무해라 4s 폴링 경로에 있어도 안전하다.
+  await reconcileGhostQueuedJobs(projectId)
 
   const jobs = await listActiveGenerationJobs(projectId)
   return NextResponse.json({ ok: true, data: { jobs } })

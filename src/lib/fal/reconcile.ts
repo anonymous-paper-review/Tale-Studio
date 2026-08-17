@@ -11,8 +11,11 @@ import {
   failGenerationJob,
   getGenerationJobById,
   GenerationJobTerminalTransitionError,
+  GENERATION_JOB_COLUMNS,
+  STALE_QUEUED_MS,
   type GenerationJob,
 } from '@/lib/generation-jobs'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
 import { falImageFetch, falVideoFetch } from '@/lib/writer/llm/fal'
 import {
@@ -124,4 +127,56 @@ export async function reconcileJobFromFal(job: GenerationJob): Promise<Generatio
       ? { media: 'video', url: result.url, payload: result.raw }
       : { media: 'image', url: result.url, payload: result.raw },
   )
+}
+
+// ── 유령 queued 잡 회수 (#ghost-reconcile 2026-08-17) ──
+//
+// STALE_QUEUED_MS 를 넘긴 queued 잡은 active 목록에서 숨겨지는데(listActiveGenerationJobs),
+// 숨기기만 하면 제출 탭의 폴링이 죽은 잡은 아무도 fal 진실을 회수하지 않는다 — 과금은 끝났고
+// 결과가 fal 큐에 있는데 화면은 영영 무반응(실측: rough 잡 5시간 queued 방치). webhook 없는
+// 로컬(resolveWebhookUrl()=undefined)에선 폴링이 유일한 완결 경로라 특히 잘 갇힌다.
+// active 라우트가 목록 조회 전에 이 스윕을 호출해, 유령을 fal 진실로 종결시킨다
+// (완료→finalize 회수, 실패→failed 배지, 진행 중→그대로). 자동 재생성이 아니라 이미 지불한
+// 결과의 회수이므로 과금 원칙(빈칸 자율 채움 금지 대상 아님)과 충돌하지 않는다.
+
+const GHOST_SWEEP_THROTTLE_MS = 60_000
+const GHOST_SWEEP_MAX_JOBS = 5
+const ghostSweepLastRun = new Map<string, number>()
+
+export function _resetGhostSweepThrottleForTest(): void {
+  ghostSweepLastRun.clear()
+}
+
+/** 프로젝트의 유령 queued 잡을 fal 진실로 종결 시도. 실패는 삼키고 목록 조회를 막지 않는다. */
+export async function reconcileGhostQueuedJobs(projectId: string): Promise<number> {
+  const last = ghostSweepLastRun.get(projectId) ?? 0
+  const now = Date.now()
+  if (now - last < GHOST_SWEEP_THROTTLE_MS) return 0
+  ghostSweepLastRun.set(projectId, now)
+
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select(GENERATION_JOB_COLUMNS)
+    .eq('project_id', projectId)
+    .eq('status', 'queued')
+    .lt('created_at', new Date(now - STALE_QUEUED_MS).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(GHOST_SWEEP_MAX_JOBS)
+  if (error) {
+    console.error('[fal/reconcile] ghost sweep query failed:', error.message)
+    return 0
+  }
+
+  let settled = 0
+  for (const row of (data ?? []) as unknown as GenerationJob[]) {
+    try {
+      const after = await reconcileJobFromFal(row)
+      if (after.status !== 'queued') settled += 1
+    } catch (e) {
+      // 잡 하나의 회수 실패가 스윕 전체·목록 조회를 죽이면 안 된다. 다음 스윕이 재시도한다.
+      console.error('[fal/reconcile] ghost sweep job failed:', row.id, e instanceof Error ? e.message : e)
+    }
+  }
+  if (settled > 0) console.log(`[fal/reconcile] ghost sweep settled ${settled} job(s) (project ${projectId})`)
+  return settled
 }

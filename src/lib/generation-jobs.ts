@@ -342,7 +342,8 @@ export interface ActiveGenerationJob {
  *
  * "생성 중"은 별도 플래그가 아니라 queued 잡의 존재로 도출한다(architecture §0). 컴포넌트 로컬
  *   상태(러프보드 panelJobs 등)는 탭을 떠나면 증발하므로, 돌아왔을 때 진행 애니메이션을 되살리는
- *   유일한 근거가 이 목록이다. STALE_QUEUED_MS 를 넘긴 잡은 웹훅이 유실된 유령이라 제외한다 —
+ *   유일한 근거가 이 목록이다. STALE_QUEUED_MS 를 넘긴 잡은 웹훅이 유실된 유령이라 제외한다
+ *   (회수는 active 라우트의 ghost sweep — fal/reconcile.reconcileGhostQueuedJobs — 이 맡는다) —
  *   그걸 세면 영원히 도는 스피너가 된다.
  */
 export async function listActiveGenerationJobs(
