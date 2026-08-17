@@ -58,9 +58,11 @@ describe('realSheetCanvas — 프로듀서 포맷 → 실사 시트 캔버스', 
     expect(realSheetCanvas(null, 'grid4')).toBe('1536x1024')
   })
 
-  it('스트립: 3행 적층 레이아웃이 지배 — 포맷 불문 세로 고정', () => {
+  it('스트립(#sheet-formats): 세로 포맷만 가로 3열 시트(1536x1024), 나머지는 적층 세로', () => {
     expect(realSheetCanvas('horizontal_16:9', 'strip1')).toBe('1024x1536')
-    expect(realSheetCanvas('vertical_9:16', 'strip1')).toBe('1024x1536')
     expect(realSheetCanvas(null, 'strip1')).toBe('1024x1536')
+    expect(realSheetCanvas('cinema_2.39:1', 'strip1')).toBe('1024x1536')
+    expect(realSheetCanvas('vertical_9:16', 'strip1')).toBe('1536x1024')
+    expect(realSheetCanvas('square_1:1', 'strip1')).toBe('768x1536')
   })
 })

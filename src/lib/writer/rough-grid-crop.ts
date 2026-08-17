@@ -25,7 +25,8 @@
 //   채택 조건(둘 다): 유도된 셀 개수 == 기대 개수, 셀 크기 균일(±max(6px, 2%)).
 //   불통과(밝은 콘텐츠 밴드로 인한 가짜 분할, 거터 소실 병합 등) 시 v4 앵커 스캔으로 폴백.
 import sharp from 'sharp'
-import { gridGeometry, type RoughGridVariant } from '@/lib/writer/rough-storyboard-grid'
+import { sheetGeometry, type RoughGridVariant } from '@/lib/writer/rough-storyboard-grid'
+import type { ProjectFormat } from '@/types/project'
 
 export interface RoughGridFrames {
   start: Buffer
@@ -162,7 +163,8 @@ function scanAxisBounds(
  *   나오므로 행 높이가 다르면 순환 재생 시 스케일 점프가 보인다(모델이 중간 행을 16px 크게
  *   그린 실측). 클러스터 기준 크기보다 큰 행만 top-anchor 로 축소 — 패널 콘텐츠는 상단부터
  *   그려지므로 초과분은 하단 여백/변형이다. 작은 행의 확장은 거터·이웃 침범 위험이라 유지.
- *   열은 대상 아님: 한 샷 = 한 열이라 열 폭 차이는 순환 점프를 만들지 않는다(참 셀 유지가 정확).
+ *   #sheet-formats: 균일화 대상은 **프레임 축** — 레거시(frameAxis rows)는 행, 가로 스트립
+ *   (frameAxis cols)은 열. 샷 축은 참 셀 유지가 정확해 균일화하지 않는다.
  */
 function uniformizeRows(rowsPx: Array<[number, number]>): Array<[number, number]> {
   if (rowsPx.length < 2) return rowsPx
@@ -173,17 +175,22 @@ function uniformizeRows(rowsPx: Array<[number, number]>): Array<[number, number]
 }
 
 /**
- * 그리드 버퍼에서 shotCount 개 열의 3프레임을 크롭.
- *   반환 배열 길이 = shotCount (열 순서 = 제출 시 writerShotIds 순서).
- *   shotCount 가 variant 열 수를 넘으면 throw (호출부 버그).
+ * 그리드 버퍼에서 shotCount 개 샷의 3프레임을 크롭.
+ *   반환 배열 길이 = shotCount (샷 순서 = 제출 시 writerShotIds 순서).
+ *   shotCount 가 시트의 샷 축 길이를 넘으면 throw (호출부 버그).
+ *   format(#sheet-formats): 포맷 전용 시트의 좌표·프레임 축 — 세로 스트립은 frameAxis 'cols'
+ *   (가로 3열: 샷 축이 행, 프레임 축이 열). 미지정/null = 레거시 horizontal 좌표.
  */
 export async function cropRoughGridFrames(
   grid: Buffer,
   variant: RoughGridVariant,
   shotCount: number,
+  format: ProjectFormat | null = null,
 ): Promise<RoughGridFrames[]> {
-  const { cols, rows } = gridGeometry(variant)
-  if (shotCount < 1 || shotCount > cols.length) {
+  const { cols, rows, frameAxis } = sheetGeometry(variant, format)
+  const framesAlongRows = frameAxis === 'rows'
+  const shotAxisLen = framesAlongRows ? cols.length : rows.length
+  if (shotCount < 1 || shotCount > shotAxisLen) {
     throw new Error(`rough grid crop: shotCount ${shotCount} out of range for ${variant}`)
   }
   const { data, info } = await sharp(grid).greyscale().raw().toBuffer({ resolveWithObject: true })
@@ -206,17 +213,21 @@ export async function cropRoughGridFrames(
   for (let y = 0; y < height; y++) rowProfile[y] /= width
 
   // v5: 전역 거터 검출 우선(재배치된 출력도 정합) → 검증 불통과 시 v4 앵커 스캔.
-  const colPx = globalAxisBounds(colProfile, cols.length, width) ?? scanAxisBounds(colProfile, cols, width)
-  const rowPx = uniformizeRows(
-    globalAxisBounds(rowProfile, rows.length, height) ?? scanAxisBounds(rowProfile, rows, height),
-  )
+  //   균일화는 **프레임 축**에만(순환 재생 스케일 점프 방지) — 축이 열이면 열 폭을 균일화한다.
+  const colPx0 = globalAxisBounds(colProfile, cols.length, width) ?? scanAxisBounds(colProfile, cols, width)
+  const rowPx0 = globalAxisBounds(rowProfile, rows.length, height) ?? scanAxisBounds(rowProfile, rows, height)
+  const colPx = framesAlongRows ? colPx0 : uniformizeRows(colPx0)
+  const rowPx = framesAlongRows ? uniformizeRows(rowPx0) : rowPx0
+  const shotBounds = framesAlongRows ? colPx : rowPx
+  const frameBounds = framesAlongRows ? rowPx : colPx
 
   const out: RoughGridFrames[] = []
-  for (let c = 0; c < shotCount; c++) {
-    const [left, right] = colPx[c]
+  for (let s = 0; s < shotCount; s++) {
     const frames: Buffer[] = []
-    for (let r = 0; r < rowPx.length; r++) {
-      const [top, bottom] = rowPx[r]
+    for (let f = 0; f < frameBounds.length; f++) {
+      // x 축은 항상 cols 계열, y 축은 rows 계열 — 축 배정만 frameAxis 를 따른다.
+      const [left, right] = framesAlongRows ? shotBounds[s] : frameBounds[f]
+      const [top, bottom] = framesAlongRows ? frameBounds[f] : shotBounds[s]
       const w = Math.max(1, right - left)
       const h = Math.max(1, bottom - top)
       // sharp 인스턴스는 extract 후 재사용 불가 → 셀마다 새로 연다(버퍼 소스라 비용 미미).

@@ -19,11 +19,7 @@ import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { applyStyleAnchor, resolveStyleAnchor, type AnchorableSubmit } from '@/lib/style-anchor'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import { appendCheckConstraints } from '@/lib/writer/check-notes'
-import {
-  composeRoughReferenceStrip,
-  buildRealStripPrompt,
-  realSheetCanvas,
-} from '@/lib/director/storyboard-strip'
+import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { aspectRatioFromFormat, parseProjectFormat } from '@/types/project'
 
@@ -117,6 +113,7 @@ export async function POST(req: Request) {
     let finalOpts: AnchorableSubmit
     let stripRefUrl: string | null = null
     let sceneLighting: string | null = null
+    let stripSheetFormat: ReturnType<typeof parseProjectFormat> = null
     if (stripFrames) {
       // #F-006: 씬 시간대를 스트립 리페인트에 배선 — 샷 산문의 시간대 단어는 확률적이라(실측
       //   1e166e55 sc_04: 7샷 중 4샷에만 존재) scenes.time_of_day 진실로 고정한다.
@@ -130,11 +127,14 @@ export async function POST(req: Request) {
         sceneLighting = (((scene?.time_of_day as string) ?? '').trim() || null)
       }
       // 합성 스트립 업로드 — 결정적 경로 upsert (재생성마다 교체, 잔재 누적 없음).
-      const stripBuf = await composeRoughReferenceStrip(stripFrames)
+      //   #sheet-formats: 시트는 프레임 AR 로 선택되고(레거시 가로 프레임 → 레거시 적층 시트),
+      //   반환 지오메트리가 캔버스·프롬프트 축·finalize 크롭의 공통 진실이 된다.
+      const composed = await composeRoughReferenceStrip(stripFrames, projectFormat)
+      stripSheetFormat = composed.sheetFormat
       const refPath = `${project.workspace_id}/${projectId}/shots/${storageKeySegment(writerShotId)}_storyboard_ref_strip.png`
       const { error: upErr } = await supabaseAdmin.storage
         .from('media')
-        .upload(refPath, stripBuf, { contentType: 'image/png', upsert: true })
+        .upload(refPath, composed.buffer, { contentType: 'image/png', upsert: true })
       if (upErr) throw upErr
       stripRefUrl = `${supabaseAdmin.storage.from('media').getPublicUrl(refPath).data.publicUrl}?v=${Date.now()}`
 
@@ -149,12 +149,13 @@ export async function POST(req: Request) {
           styleClause: anchor?.styleClause ?? null,
           anchorKeepsGrade: anchor?.anchorKind === 'sublook',
           styleRefCount: anchor?.usePreviewRef && anchor.previewUrl ? 2 : 1,
+          frameAxis: composed.geometry.frameAxis,
         }),
-        // #real-strip-guard(2026-08-06)→#fal-canvas(2026-08-17): 세로 캔버스로 시트 계약 준수 유도.
-        //   ed5bd4a 전까지 이 값은 타입에 없어 조용히 버려지고 'auto'(첫 ref 비율 추종)가 전송되고
-        //   있었다 — WxH→{width,height} 변환 실측(4/4 수락) 후 진짜 배선. 스트립 캔버스는 3행 적층
-        //   레이아웃이 지배해 포맷 불문 세로(셀 ~2:1, 세로 프로젝트용 가로 3열 템플릿은 deferred).
-        image_size: realSheetCanvas(projectFormat, 'strip1'),
+        // #real-strip-guard(2026-08-06)→#fal-canvas→#sheet-formats(2026-08-17): 캔버스는 합성이
+        //   고른 지오메트리를 따른다 — 레퍼런스·캔버스·프롬프트 축·크롭이 한 시트 계약으로 정합.
+        //   (ed5bd4a 전까지 image_size 는 타입에 없어 버려지고 'auto'가 전송되고 있었다 —
+        //   WxH→{width,height} 변환 실측 4/4 수락 후 진짜 배선.)
+        image_size: composed.geometry.repaintCanvas,
         reference_image_urls: [
           stripRefUrl,
           ...(callerRefs ?? []),
@@ -195,6 +196,8 @@ export async function POST(req: Request) {
         style_anchor_key: anchor?.key ?? null,
         scene_time_of_day: sceneLighting,
         ...(stripRefUrl ? { strip_ref_url: stripRefUrl } : {}),
+        // #sheet-formats: finalize 크롭·방향 가드가 이 값으로 같은 지오메트리를 복원한다.
+        sheet_format: stripSheetFormat,
         ...falCapture,
       },
       target: {

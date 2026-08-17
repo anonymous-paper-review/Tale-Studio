@@ -25,10 +25,10 @@ import {
   buildRoughGridPrompt,
   buildCellContinuityLine,
   GRID_MAX_SHOTS,
-  GRID_TEMPLATE_PATH,
-  STRIP_TEMPLATE_PATH,
+  sheetGeometry,
   type RoughGridVariant,
 } from '@/lib/writer/rough-storyboard-grid'
+import { parseProjectFormat } from '@/types/project'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
 import { parseCheckConstraints } from '@/lib/writer/check-notes'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
@@ -144,7 +144,7 @@ export async function POST(req: Request) {
 
     const { data: project } = await supabaseAdmin
       .from('projects')
-      .select('workspace_id')
+      .select('workspace_id, settings')
       .eq('id', projectId)
       .maybeSingle()
     if (!project)
@@ -380,8 +380,14 @@ export async function POST(req: Request) {
     //   불필요. give-up 게이트(반복 실패 자율 재생성 중단)는 위 선별에서 그대로 작동.
     // 템플릿은 앱 public URL(터널)이 아니라 스토리지에서 제공한다 — 터널이 죽으면 fal 이
     //   422 file_download_error 로 전량 실패하던 경로(2026-08-13). 자세한 이유는 template-asset.ts.
-    const templatePath = gridVariant === 'grid4' ? GRID_TEMPLATE_PATH : STRIP_TEMPLATE_PATH
-    const templateUrl = await templateAssetUrl(templatePath.replace(/^\//, ''))
+    // #sheet-formats(2026-08-17): 프로듀서 포맷 전용 시트 — 셀이 포맷 종횡비를 갖는 템플릿 +
+    //   명시 캔버스(실측 4/4 수락). 레거시(horizontal·포맷 미상)는 종전 템플릿 + 'auto'
+    //   (reference 비율 유지 — crop 좌표 정합의 핵심) 그대로: 검증된 동작 불변.
+    const projectFormat = parseProjectFormat(
+      (project.settings as { format?: unknown } | null)?.format,
+    )
+    const sheetGeom = sheetGeometry(gridVariant, projectFormat)
+    const templateUrl = await templateAssetUrl(sheetGeom.templatePath.replace(/^\//, ''))
     const webhookUrl = resolveWebhookUrl()
 
     for (const chunk of cappedChunks) {
@@ -431,7 +437,7 @@ export async function POST(req: Request) {
         return extra.length ? { ...cell, start: `${cell.start}. ${extra.join('. ')}` } : cell
       })
 
-      let prompt = buildRoughGridPrompt(cells, gridVariant)
+      let prompt = buildRoughGridPrompt(cells, gridVariant, { frameAxis: sheetGeom.frameAxis })
       if (styleHints?.length) prompt += `\n\nEmphasis for every panel: ${styleHints.join(', ')}.`
       if (!templateUrl) {
         prompt = `Create the storyboard sheet yourself on clean paper (no reference image available), matching the panel layout described below, then fill it.\n\n${prompt}`
@@ -443,13 +449,18 @@ export async function POST(req: Request) {
               model: DEFAULT_EDIT_IMAGE_MODEL, // gpt-image-2/edit — 템플릿 칸에 그려 넣기
               prompt,
               reference_image_urls: [templateUrl],
-              // aspect_ratio 미전달 → image_size 'auto' (reference 비율 유지 — crop 좌표 정합의 핵심)
+              // 포맷 시트는 캔버스 명시(=템플릿 치수, #sheet-formats) / 레거시는 미전달 →
+              //   image_size 'auto' (reference 비율 유지 — crop 좌표 정합의 핵심, 종전 그대로)
+              ...(sheetGeom.roughImageSize ? { image_size: sheetGeom.roughImageSize } : {}),
               webhookUrl,
             }
           : {
               model: DEFAULT_IMAGE_MODEL, // T2I 폴백 (dev)
               prompt,
-              aspect_ratio: gridVariant === 'grid4' ? '16:9' : '9:16',
+              aspect_ratio: (() => {
+                const [w, h] = sheetGeom.repaintCanvas.split('x').map(Number)
+                return w > h ? '16:9' : w < h ? '9:16' : '1:1'
+              })(),
               webhookUrl,
             },
       )
@@ -464,7 +475,14 @@ export async function POST(req: Request) {
           writerShotIds: chunkShotIds,
           gridVariant,
         },
-        inputSnapshot: { prompt, gridVariant, shotIds: chunkShotIds, templateUrl },
+        inputSnapshot: {
+          prompt,
+          gridVariant,
+          shotIds: chunkShotIds,
+          templateUrl,
+          // 포맷 시트를 썼을 때만 기록 — finalize 크롭이 같은 좌표·프레임 축을 복원 (#sheet-formats)
+          sheet_format: sheetGeom.roughImageSize ? projectFormat : null,
+        },
       })
       for (const s of chunk) {
         const shotId = s.shot_id as string

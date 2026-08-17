@@ -16,7 +16,15 @@ import {
 import { type CandidateView } from '@/lib/image-provenance'
 import { cropTurnaroundPortrait } from '@/lib/artist/portrait'
 import { cropRoughGridFrames } from '@/lib/writer/rough-grid-crop'
+import { sheetGeometry } from '@/lib/writer/rough-storyboard-grid'
+import { parseProjectFormat } from '@/types/project'
 import sharp from 'sharp'
+
+/** #sheet-formats: 제출측이 스냅샷에 남긴 시트 포맷 — 크롭·방향 가드가 같은 지오메트리를 복원한다.
+ *  없으면(구 잡·레거시) null = horizontal 좌표. */
+function sheetFormatOfJob(job: GenerationJob) {
+  return parseProjectFormat((job.input_snapshot as { sheet_format?: unknown } | null)?.sheet_format)
+}
 import { uploadThumbnail } from '@/lib/storage-thumb'
 import { completeDirectorVideoAttempt } from '@/lib/director-video-takes'
 import { buildFalResponseSnapshot } from '@/lib/fal/observability'
@@ -848,14 +856,19 @@ async function finalizeStoryboardStripJob(
   const base = `${workspaceId}/${job.project_id}/shots`
   const stripUrl = await upload(`${base}/${seg}_storyboard_strip.png`, stripBuf)
 
-  // #real-strip-guard: 모델이 시트 계약을 어기고 가로 단일컷을 반환하면(실측: 액자 테두리 단일컷)
+  // #real-strip-guard: 모델이 시트 계약을 어기고 단일컷을 반환하면(실측: 액자 테두리 단일컷)
   //   고정 크롭이 액자째 3분할하던 침묵 실패 대신 — 테두리 인셋 크롭한 단일컷을 3프레임에 복제.
+  //   #sheet-formats: 계약 방향은 시트 지오메트리를 따른다 — 레거시 적층은 세로가 정상(가로=위반),
+  //   세로 포맷 가로 3열(1536×1024)은 가로가 정상(세로=위반). 구 잡(sheet_format 없음)은 종전 그대로.
+  const sheetFmt = sheetFormatOfJob(job)
+  const [expW, expH] = sheetGeometry('strip1', sheetFmt).repaintCanvas.split('x').map(Number)
+  const wantLandscape = expW > expH
   const stripMeta = await sharp(stripBuf).metadata()
   const sw = stripMeta.width ?? 0
   const sh = stripMeta.height ?? 0
   let frames: { start: Buffer; direction: Buffer; end: Buffer }
-  if (sw > 0 && sh > 0 && sw >= sh) {
-    console.warn(`[finalize] real strip 계약 위반(가로 ${sw}x${sh}) — 단일컷 인셋 폴백`)
+  if (sw > 0 && sh > 0 && (wantLandscape ? sw <= sh : sw >= sh)) {
+    console.warn(`[finalize] real strip 계약 위반(요청 ${expW}x${expH}, 반환 ${sw}x${sh}) — 단일컷 인셋 폴백`)
     const ix = Math.round(sw * 0.04)
     const iy = Math.round(sh * 0.06)
     const inset = await sharp(stripBuf)
@@ -864,7 +877,7 @@ async function finalizeStoryboardStripJob(
       .toBuffer()
     frames = { start: inset, direction: inset, end: inset }
   } else {
-    ;[frames] = await cropRoughGridFrames(stripBuf, 'strip1', 1)
+    ;[frames] = await cropRoughGridFrames(stripBuf, 'strip1', 1, sheetFmt)
   }
   const [startUrl, directionUrl, endUrl] = await Promise.all([
     upload(`${base}/${seg}_storyboard_start.png`, frames.start),
@@ -978,7 +991,12 @@ async function finalizeRealGridJob(
   const base = `${workspaceId}/${job.project_id}/shots`
   const gridUrl = await upload(`${base}/real_grid_${job.id}.png`, gridBuf)
 
-  const perShot = await cropRoughGridFrames(gridBuf, gridVariant ?? 'grid4', writerShotIds.length)
+  const perShot = await cropRoughGridFrames(
+    gridBuf,
+    gridVariant ?? 'grid4',
+    writerShotIds.length,
+    sheetFormatOfJob(job),
+  )
   for (let i = 0; i < writerShotIds.length; i++) {
     const shotId = writerShotIds[i]
     const seg = storageKeySegment(shotId)
@@ -1046,7 +1064,12 @@ async function finalizeRoughGridJob(
   const base = `${workspaceId}/${job.project_id}/shots`
   const gridUrl = await upload(`${base}/rough_grid_${job.id}.png`, gridBuf)
 
-  const perShot = await cropRoughGridFrames(gridBuf, gridVariant ?? 'grid4', writerShotIds.length)
+  const perShot = await cropRoughGridFrames(
+    gridBuf,
+    gridVariant ?? 'grid4',
+    writerShotIds.length,
+    sheetFormatOfJob(job),
+  )
   for (let i = 0; i < writerShotIds.length; i++) {
     const shotId = writerShotIds[i]
     const seg = storageKeySegment(shotId)

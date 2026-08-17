@@ -431,6 +431,7 @@ describe('style-anchor route integration', () => {
       model: DEFAULT_EDIT_IMAGE_MODEL,
       style_anchor_key: ANCHOR_KEY,
       scene_time_of_day: null, // #F-006 — 스트립 아닌 폴백 경로는 씬 조명 미주입(null 기록)
+      sheet_format: null, // #sheet-formats — 스트립 모드에서만 채워진다
       fal_request: {},
       ignored_fields: [],
     })

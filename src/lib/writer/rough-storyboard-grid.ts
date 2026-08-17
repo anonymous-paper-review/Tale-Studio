@@ -14,6 +14,7 @@ import {
   angleWords,
   type RoughStoryboardPromptInput,
 } from '@/lib/writer/rough-storyboard'
+import type { ProjectFormat } from '@/types/project'
 
 // ── 셀 지오메트리 (finalize crop 이 소비) ─────────────────────────────────────
 // 템플릿 실측 비례 좌표(격자선 3px 인셋) — public/rough-storyboard-grid.png 1672×941 기준.
@@ -37,7 +38,7 @@ export const STRIP_COLS: ReadonlyArray<readonly [number, number]> = [[0.1189, 0.
 export const STRIP_ROWS = GRID_ROWS
 
 export type RoughGridVariant = 'grid4' | 'strip1'
-/** variant → (열 수, 셀 좌표). 그리드당 최대 샷 수 = 열 수. */
+/** variant → (열 수, 셀 좌표). 그리드당 최대 샷 수 = 열 수. 레거시(horizontal) 좌표 전용 별칭. */
 export function gridGeometry(variant: RoughGridVariant): {
   cols: ReadonlyArray<readonly [number, number]>
   rows: ReadonlyArray<readonly [number, number]>
@@ -48,9 +49,139 @@ export function gridGeometry(variant: RoughGridVariant): {
 }
 export const GRID_MAX_SHOTS = GRID_COLS.length // 4
 
-/** 템플릿 public 경로 (fal 이 fetch — resolveWebhookBaseUrl 과 조합). */
+/** 템플릿 public 경로 (fal 이 fetch — template-asset 이 스토리지로 승격). */
 export const GRID_TEMPLATE_PATH = '/rough-storyboard-grid.png'
 export const STRIP_TEMPLATE_PATH = '/rough-storyboard-strip.png'
+
+// ── 포맷별 시트 스펙 (#sheet-formats 2026-08-17) ─────────────────────────────
+// 프로듀서 포맷(vertical/square/cinema)마다 셀이 그 포맷의 종횡비를 갖는 전용 템플릿.
+// 신규 템플릿 PNG 는 이 스펙에서 **그려서 생성**한다(tests/rough-template-assets.test.ts 의
+// 게이트 생성기) — 좌표와 그림의 진실이 이 표 하나라서 "템플릿 교체 시 재실측" 함정이 없고,
+// 같은 테스트가 커밋된 PNG 치수를 스펙과 대조해 드리프트를 CI 에서 잡는다.
+// horizontal(16:9)·포맷 미상은 레거시 실측 좌표·기존 템플릿 그대로(검증 자산 불변).
+//
+// 세로(9:16) 스트립만 frameAxis 'cols' — 3단 적층으로 9:16 셀을 만들면 캔버스 좌우 여백이
+// 극단(≈370px)이라, 가로 3열(좌→우 = START/DIRECTION/END) 배치로 셀을 키운다(474×842).
+
+export interface SheetSpec {
+  /** 템플릿 치수 = 생성 캔버스. 전부 64배수 — fal gpt-image 실측 스냅 규칙(#fal-canvas T4). */
+  canvas: { width: number; height: number }
+  /** 셀 박스 [x0,x1] px (2px 보더 포함). 비례 좌표·생성기가 모두 여기서 파생. */
+  colBoxes: ReadonlyArray<readonly [number, number]>
+  rowBoxes: ReadonlyArray<readonly [number, number]>
+  /** START/DIRECTION/END 프레임이 놓이는 축 — 그리드·적층 스트립 'rows', 가로 스트립 'cols'. */
+  frameAxis: 'rows' | 'cols'
+  templatePath: string
+}
+
+const boxes = (start: number, size: number, n: number, gap = 20): Array<[number, number]> =>
+  Array.from({ length: n }, (_, i) => [start + i * (size + gap), start + i * (size + gap) + size])
+
+const SHEET_SPECS: Partial<Record<`${Exclude<ProjectFormat, 'horizontal_16:9'>}:${RoughGridVariant}`, SheetSpec>> = {
+  // 세로 그리드: 1024×1536, 셀 223×396(9:16) — 실측 T2(세로 캔버스에서 4×3 유지) 기반
+  'vertical_9:16:grid4': {
+    canvas: { width: 1024, height: 1536 },
+    colBoxes: boxes(36, 223, 4),
+    rowBoxes: boxes(154, 396, 3),
+    frameAxis: 'rows',
+    templatePath: '/rough-storyboard-grid-vertical.png',
+  },
+  // 세로 스트립: 가로 3열 1536×1024, 셀 474×842(9:16) — 적층의 극단 여백 회피
+  'vertical_9:16:strip1': {
+    canvas: { width: 1536, height: 1024 },
+    colBoxes: boxes(37, 474, 3),
+    rowBoxes: boxes(91, 842, 1),
+    frameAxis: 'cols',
+    templatePath: '/rough-storyboard-strip-vertical.png',
+  },
+  'square_1:1:grid4': {
+    canvas: { width: 1024, height: 1024 },
+    colBoxes: boxes(36, 223, 4),
+    rowBoxes: boxes(157, 223, 3),
+    frameAxis: 'rows',
+    templatePath: '/rough-storyboard-grid-square.png',
+  },
+  'square_1:1:strip1': {
+    canvas: { width: 768, height: 1536 },
+    colBoxes: boxes(147, 474, 1),
+    rowBoxes: boxes(37, 474, 3),
+    frameAxis: 'rows',
+    templatePath: '/rough-storyboard-strip-square.png',
+  },
+  'cinema_2.39:1:grid4': {
+    canvas: { width: 1536, height: 640 },
+    colBoxes: boxes(38, 350, 4),
+    rowBoxes: boxes(81, 146, 3),
+    frameAxis: 'rows',
+    templatePath: '/rough-storyboard-grid-cinema.png',
+  },
+  'cinema_2.39:1:strip1': {
+    canvas: { width: 1024, height: 1536 },
+    colBoxes: boxes(36, 952, 1),
+    rowBoxes: boxes(151, 398, 3),
+    frameAxis: 'rows',
+    templatePath: '/rough-storyboard-strip-cinema.png',
+  },
+}
+
+export interface SheetGeometry {
+  /** 비례 셀 좌표(보더 3px 인셋 — 레거시 관행과 동일). 크롭·레퍼런스 합성 공용. */
+  cols: ReadonlyArray<readonly [number, number]>
+  rows: ReadonlyArray<readonly [number, number]>
+  frameAxis: 'rows' | 'cols'
+  templatePath: string
+  /** 러프 생성 캔버스 'WxH'. null = 레거시 — 'auto'(템플릿 비율 추종, 검증된 종전 동작) 유지. */
+  roughImageSize: string | null
+  /** 실사 리페인트 캔버스 'WxH' (#fal-canvas — 레거시는 실측 확정값). */
+  repaintCanvas: string
+}
+
+const CELL_INSET_FRAC = 3 // 격자선 인셋 px — 레거시 실측 좌표와 같은 규약
+
+export function sheetSpecOf(
+  variant: RoughGridVariant,
+  format: ProjectFormat | null,
+): SheetSpec | null {
+  if (!format || format === 'horizontal_16:9') return null
+  return SHEET_SPECS[`${format}:${variant}`] ?? null
+}
+
+export function sheetGeometry(
+  variant: RoughGridVariant,
+  format: ProjectFormat | null,
+): SheetGeometry {
+  const spec = sheetSpecOf(variant, format)
+  if (!spec) {
+    // 레거시(horizontal·미상): 실측 비례 좌표 + 기존 템플릿. 리페인트 캔버스는 #fal-canvas 확정값.
+    return variant === 'grid4'
+      ? {
+          cols: GRID_COLS,
+          rows: GRID_ROWS,
+          frameAxis: 'rows',
+          templatePath: GRID_TEMPLATE_PATH,
+          roughImageSize: null,
+          repaintCanvas: '1536x1024',
+        }
+      : {
+          cols: STRIP_COLS,
+          rows: STRIP_ROWS,
+          frameAxis: 'rows',
+          templatePath: STRIP_TEMPLATE_PATH,
+          roughImageSize: null,
+          repaintCanvas: '1024x1536',
+        }
+  }
+  const { width, height } = spec.canvas
+  const canvasStr = `${width}x${height}`
+  return {
+    cols: spec.colBoxes.map(([a, b]) => [(a + CELL_INSET_FRAC) / width, (b - CELL_INSET_FRAC) / width] as const),
+    rows: spec.rowBoxes.map(([a, b]) => [(a + CELL_INSET_FRAC) / height, (b - CELL_INSET_FRAC) / height] as const),
+    frameAxis: spec.frameAxis,
+    templatePath: spec.templatePath,
+    roughImageSize: canvasStr,
+    repaintCanvas: canvasStr,
+  }
+}
 
 // ── 셀 서술 (샷 1개 → START/MOTION/END 3문단) ────────────────────────────────
 
@@ -249,9 +380,15 @@ Every human figure — in every panel, every column, every frame — is the same
 /**
  * 템플릿 12칸(또는 스트립 3칸)을 채우는 edit 지시문.
  *   cells.length ≤ 열 수. 남는 열은 빈 종이로 두라고 명시.
+ *   opts.frameAxis 'cols' = 가로 3열 스트립(#sheet-formats — 세로 포맷 전용): 위치어만 좌/중/우로.
  */
-export function buildRoughGridPrompt(cells: RoughGridCell[], variant: RoughGridVariant): string {
+export function buildRoughGridPrompt(
+  cells: RoughGridCell[],
+  variant: RoughGridVariant,
+  opts?: { frameAxis?: 'rows' | 'cols' },
+): string {
   const colCount = variant === 'grid4' ? GRID_COLS.length : 1
+  const stripRow = variant === 'strip1' && opts?.frameAxis === 'cols'
   const head =
     variant === 'grid4'
       ? `The reference image is a paper storyboard sheet with 12 empty panels in a 4-column × 3-row grid. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels, never across panel borders.
@@ -260,7 +397,14 @@ Each COLUMN is one shot of a film, read top to bottom as three frames:
 - Row 1 (top) = START: the composition at the beginning of the shot.
 - Row 2 (middle) = DIRECTION: an EXACT identical copy of Row 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Row 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Row 1 and Row 2 is the arrows and labels drawn on top. Row 2 is the ONLY place where text is allowed.
 - Row 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Row 3 is the only frame where the motion has visibly progressed — and when a shot has movement, its END must differ clearly and unmistakably from its START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
-      : `The reference image is a paper storyboard strip with 3 empty panels stacked vertically. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels.
+      : stripRow
+        ? `The reference image is a wide paper storyboard sheet with 3 empty panels side by side in a row. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels.
+
+The row is ONE shot of a film, read left to right as three frames:
+- Panel 1 (LEFT) = START: the composition at the beginning of the shot.
+- Panel 2 (MIDDLE) = DIRECTION: an EXACT identical copy of Panel 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Panel 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Panel 1 and Panel 2 is the arrows and labels drawn on top. Panel 2 is the ONLY place where text is allowed.
+- Panel 3 (RIGHT) = END: the composition at the end of the shot, after the movement completes. Panel 3 is the only frame where the motion has visibly progressed — and when the shot has movement, END must differ clearly and unmistakably from START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
+        : `The reference image is a paper storyboard strip with 3 empty panels stacked vertically. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels.
 
 The strip is ONE shot of a film, read top to bottom as three frames:
 - Panel 1 (top) = START: the composition at the beginning of the shot.

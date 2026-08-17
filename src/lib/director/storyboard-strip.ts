@@ -8,45 +8,33 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import sharp from 'sharp'
 import {
-  STRIP_TEMPLATE_PATH,
-  GRID_TEMPLATE_PATH,
-  gridGeometry,
+  sheetGeometry,
+  type SheetGeometry,
   type RoughGridVariant,
 } from '@/lib/writer/rough-storyboard-grid'
 import { resolveWebhookBaseUrl } from '@/lib/fal/webhook-url'
 import type { ProjectFormat } from '@/types/project'
 
 /**
- * 실사 시트 캔버스(WxH) — 프로듀서 포맷 파생 (#fal-canvas 2026-08-17, 실측 4/4 수락).
- *   그리드는 캔버스 방향이 곧 셀 방향: vertical 은 세로 시트(셀 ~9:16 근접, 4×3 레이아웃 유지
- *   실측), cinema 는 2.4:1(1536x643 요청 시 64배수 스냅 1536x640 실측). 스트립은 3행 적층
- *   레이아웃이 지배해 포맷 불문 세로 고정(셀 ~2:1) — 세로 프로젝트용 가로 3열 스트립 템플릿은
- *   미보유(deferred-vertical-strip-template). 러프 레퍼런스 시트는 가로 템플릿 그대로여도
- *   모델이 패널을 캔버스 방향으로 재구도한다(실측 T2).
+ * 실사 시트 캔버스(WxH) — 프로듀서 포맷 파생 (#fal-canvas 2026-08-17, 실측 4/4 수락 →
+ * #sheet-formats: 진실은 시트 스펙(sheetGeometry)으로 통합 — 템플릿·좌표·캔버스가 한 표).
+ *   그리드는 캔버스 방향이 곧 셀 방향(vertical 실측: 4×3 유지 + 패널 세로 재구도).
+ *   스트립 리페인트는 이 함수 대신 composeRoughReferenceStrip 이 고른 지오메트리의
+ *   repaintCanvas 를 써야 한다 — 레퍼런스·캔버스·프롬프트·크롭의 정합(아래 주석).
  */
 export function realSheetCanvas(format: ProjectFormat | null, variant: RoughGridVariant): string {
-  if (variant === 'strip1') return '1024x1536'
-  switch (format) {
-    case 'vertical_9:16':
-      return '1024x1536'
-    case 'square_1:1':
-      return '1024x1024'
-    case 'cinema_2.39:1':
-      return '1536x640'
-    default:
-      return '1536x1024' // horizontal_16:9 · 포맷 미상(구 프로젝트)
-  }
+  return sheetGeometry(variant, format).repaintCanvas
 }
 
-/** 스트립 템플릿 바이트 로드 — 로컬 fs 우선(dev), 실패 시 배포 public URL(fal 그리드 경로와 동일 방식). */
-async function loadStripTemplate(): Promise<Buffer> {
+/** 템플릿 바이트 로드 — 로컬 fs 우선(dev), 실패 시 배포 public URL(fal 그리드 경로와 동일 방식). */
+async function loadTemplate(templatePath: string): Promise<Buffer> {
   try {
-    return await readFile(path.join(process.cwd(), 'public', STRIP_TEMPLATE_PATH))
+    return await readFile(path.join(process.cwd(), 'public', templatePath.replace(/^\//, '')))
   } catch {
     const base = resolveWebhookBaseUrl()
-    if (!base) throw new Error('strip template unavailable: no fs asset and no public base URL')
-    const res = await fetch(`${base}${STRIP_TEMPLATE_PATH}`)
-    if (!res.ok) throw new Error(`strip template fetch failed: ${res.status}`)
+    if (!base) throw new Error(`template unavailable: no fs asset and no public base URL (${templatePath})`)
+    const res = await fetch(`${base}${templatePath}`)
+    if (!res.ok) throw new Error(`template fetch failed: ${res.status} (${templatePath})`)
     return Buffer.from(await res.arrayBuffer())
   }
 }
@@ -57,64 +45,113 @@ async function fetchImage(url: string): Promise<Buffer> {
   return Buffer.from(await res.arrayBuffer())
 }
 
+export interface ComposedReferenceSheet {
+  buffer: Buffer
+  /** 실제로 쓴 지오메트리 — 리페인트 캔버스·프롬프트 축·finalize 크롭이 전부 이걸 따라야 정합. */
+  geometry: SheetGeometry
+  /** 포맷 스펙 시트를 썼으면 그 포맷, 레거시 시트면 null — inputSnapshot.sheet_format 에 기록. */
+  sheetFormat: ProjectFormat | null
+}
+
 /**
- * 러프 3프레임을 스트립 템플릿의 3개 셀에 붙여 레퍼런스 스트립 PNG 를 만든다.
- *   행 순서 = START / DIRECTION / END (크롭과 동일한 GRID_ROWS 비례).
+ * 프레임 종횡비로 시트 지오메트리 선택(#sheet-formats 2026-08-17):
+ *   포맷 전용 시트와 레거시 시트 중 **첫 프레임의 실측 AR 에 가까운 셀**을 가진 쪽.
+ *   레거시(가로) 러프 프레임을 세로 셀에 fill 하면 스케치가 왜곡돼 리페인트 지침이 망가진다 —
+ *   그 경우 레거시 시트에 합성하고 재구도는 출력 캔버스에 맡긴다(T2 실측: 가로 레퍼런스 +
+ *   세로 캔버스에서 모델이 패널을 세로로 재프레이밍). 러프를 포맷 템플릿으로 재생성하면
+ *   프레임 AR 이 포맷 셀에 가까워져 자연히 포맷 시트로 넘어온다 — 자가 치유 경로.
  */
-export async function composeRoughReferenceStrip(frames: {
-  start: string
-  direction: string
-  end: string
-}): Promise<Buffer> {
-  const template = await loadStripTemplate()
+async function pickGeometryByFrameAr(
+  variant: RoughGridVariant,
+  format: ProjectFormat | null,
+  firstFrame: Buffer,
+): Promise<{ geometry: SheetGeometry; sheetFormat: ProjectFormat | null; template: Buffer }> {
+  const legacy = sheetGeometry(variant, null)
+  const formatGeom = sheetGeometry(variant, format)
+  if (formatGeom.templatePath === legacy.templatePath) {
+    return { geometry: legacy, sheetFormat: null, template: await loadTemplate(legacy.templatePath) }
+  }
+  const fm = await sharp(firstFrame).metadata()
+  const frameAr = fm.width && fm.height ? fm.width / fm.height : 1
+  const cellAr = async (g: SheetGeometry, template: Buffer) => {
+    const tm = await sharp(template).metadata()
+    const W = tm.width ?? 1
+    const H = tm.height ?? 1
+    return ((g.cols[0][1] - g.cols[0][0]) * W) / ((g.rows[0][1] - g.rows[0][0]) * H)
+  }
+  const [legacyTpl, formatTpl] = await Promise.all([
+    loadTemplate(legacy.templatePath),
+    loadTemplate(formatGeom.templatePath),
+  ])
+  const [legacyAr, formatAr] = [await cellAr(legacy, legacyTpl), await cellAr(formatGeom, formatTpl)]
+  const closerToFormat =
+    Math.abs(Math.log(frameAr / formatAr)) <= Math.abs(Math.log(frameAr / legacyAr))
+  return closerToFormat
+    ? { geometry: formatGeom, sheetFormat: format, template: formatTpl }
+    : { geometry: legacy, sheetFormat: null, template: legacyTpl }
+}
+
+/**
+ * 러프 3프레임을 스트립 시트의 3개 셀에 붙여 레퍼런스 스트립 PNG 를 만든다.
+ *   셀 순서 = START / DIRECTION / END — 프레임 축(frameAxis)이 rows 면 위→아래,
+ *   cols(세로 포맷 가로 3열)면 좌→우. 반환 지오메트리가 리페인트 계약의 진실이다.
+ */
+export async function composeRoughReferenceStrip(
+  frames: { start: string; direction: string; end: string },
+  format: ProjectFormat | null = null,
+): Promise<ComposedReferenceSheet> {
+  const bufs = [
+    await fetchImage(frames.start),
+    await fetchImage(frames.direction),
+    await fetchImage(frames.end),
+  ]
+  const { geometry, sheetFormat, template } = await pickGeometryByFrameAr('strip1', format, bufs[0])
   const meta = await sharp(template).metadata()
   const width = meta.width
   const height = meta.height
   if (!width || !height) throw new Error('strip template metadata missing')
 
-  const { cols, rows } = gridGeometry('strip1')
-  const [c0, c1] = cols[0]
-  const urls = [frames.start, frames.direction, frames.end]
+  const { cols, rows, frameAxis } = geometry
+  // 프레임 i 의 셀 좌표 — 축 배정만 frameAxis 를 따른다 (크롭과 동일 규약).
+  const cellOf = (i: number): { x: readonly [number, number]; y: readonly [number, number] } =>
+    frameAxis === 'rows' ? { x: cols[0], y: rows[i] } : { x: cols[i], y: rows[0] }
 
   const overlays: sharp.OverlayOptions[] = []
-  for (let r = 0; r < rows.length; r++) {
-    const [r0, r1] = rows[r]
-    const left = Math.round(c0 * width)
-    const top = Math.round(r0 * height)
-    const w = Math.max(1, Math.round((c1 - c0) * width))
-    const h = Math.max(1, Math.round((r1 - r0) * height))
-    const buf = await fetchImage(urls[r])
-    // 프레임은 같은 비례 셀에서 잘려 나온 것 — 종횡비가 이미 일치하므로 fill 왜곡은 미미.
-    const resized = await sharp(buf).resize(w, h, { fit: 'fill' }).png().toBuffer()
+  for (let i = 0; i < bufs.length; i++) {
+    const { x, y } = cellOf(i)
+    const left = Math.round(x[0] * width)
+    const top = Math.round(y[0] * height)
+    const w = Math.max(1, Math.round((x[1] - x[0]) * width))
+    const h = Math.max(1, Math.round((y[1] - y[0]) * height))
+    // 지오메트리를 프레임 AR 로 골랐으므로 fill 왜곡은 미미(레거시 주석의 전제를 선택으로 보존).
+    const resized = await sharp(bufs[i]).resize(w, h, { fit: 'fill' }).png().toBuffer()
     overlays.push({ input: resized, left, top })
   }
-  return sharp(template).composite(overlays).png().toBuffer()
+  return {
+    buffer: await sharp(template).composite(overlays).png().toBuffer(),
+    geometry,
+    sheetFormat,
+  }
 }
 
 /**
  * #real-grid(2026-08-06, 실험 검증: 011fd4bd 4샷 시트 1콜 리페인트 — 시트 계약·정체성·모션 전부 통과):
- *   같은 씬·같은 레퍼런스의 러프 3프레임 세트들을 grid4 템플릿(4열×3행)에 합성 — 일괄 리페인트 참조 시트.
+ *   같은 씬·같은 레퍼런스의 러프 3프레임 세트들을 grid4 시트(4열×3행)에 합성 — 일괄 리페인트 참조 시트.
+ *   #sheet-formats: 레퍼런스 시트는 프레임 AR 로 선택(왜곡 방지), 출력 캔버스·크롭은 호출부가
+ *   프로젝트 포맷 스펙으로 정한다 — 가로 레퍼런스+세로 캔버스 조합은 T2 실측으로 검증된 경로.
  */
 export async function composeRoughReferenceGrid(
   shotFrames: Array<{ start: string; direction: string; end: string }>,
+  format: ProjectFormat | null = null,
 ): Promise<Buffer> {
   if (!shotFrames.length || shotFrames.length > 4) throw new Error(`grid frames 1~4 필요 (${shotFrames.length})`)
-  const base = resolveWebhookBaseUrl()
-  const template = await (async () => {
-    try {
-      return await readFile(path.join(process.cwd(), 'public', GRID_TEMPLATE_PATH))
-    } catch {
-      if (!base) throw new Error('grid template unavailable')
-      const res = await fetch(`${base}${GRID_TEMPLATE_PATH}`)
-      if (!res.ok) throw new Error(`grid template fetch failed: ${res.status}`)
-      return Buffer.from(await res.arrayBuffer())
-    }
-  })()
+  const firstFrame = await fetchImage(shotFrames[0].start)
+  const { geometry, template } = await pickGeometryByFrameAr('grid4', format, firstFrame)
   const meta = await sharp(template).metadata()
   const W = meta.width
   const H = meta.height
   if (!W || !H) throw new Error('grid template metadata missing')
-  const { cols, rows } = gridGeometry('grid4')
+  const { cols, rows } = geometry
   const overlays: sharp.OverlayOptions[] = []
   for (let c = 0; c < shotFrames.length; c++) {
     const urls = [shotFrames[c].start, shotFrames[c].direction, shotFrames[c].end]
@@ -123,7 +160,7 @@ export async function composeRoughReferenceGrid(
       const [r0, r1] = rows[r]
       const w = Math.max(1, Math.round((c1 - c0) * W))
       const h = Math.max(1, Math.round((r1 - r0) * H))
-      const buf = await fetchImage(urls[r])
+      const buf = c === 0 && r === 0 ? firstFrame : await fetchImage(urls[r])
       overlays.push({
         input: await sharp(buf).resize(w, h, { fit: 'fill' }).png().toBuffer(),
         left: Math.round(c0 * W),
@@ -259,9 +296,22 @@ export function buildRealStripPrompt(
     styleClause?: string | null
     anchorKeepsGrade?: boolean
     styleRefCount?: 1 | 2
+    /** #sheet-formats: 레퍼런스 시트의 프레임 축 — composeRoughReferenceStrip 반환 지오메트리와
+     *  반드시 같은 값. 'cols' = 세로 포맷 가로 3열(좌→우 = START/DIRECTION/END). 생략 = 적층. */
+    frameAxis?: 'rows' | 'cols'
   },
 ): string {
   const { characterRefCount, hasStyleRef, cineLine } = opts
+  const rowLayout = opts.frameAxis === 'cols'
+  // 위치어 토큰 — 적층(위/중/아래) vs 가로 3열(왼/중/오른). 문안 구조는 동일하게 유지한다.
+  const p1 = rowLayout ? 'Left' : 'Top'
+  const p3 = rowLayout ? 'Right' : 'Bottom'
+  const sheetDesc = rowLayout
+    ? '3-panel horizontal storyboard row (three panels side by side on one wide sheet)'
+    : '3-panel vertical storyboard strip'
+  const layoutContract = rowLayout
+    ? 'the same single wide sheet with exactly three side-by-side panels'
+    : 'the same single vertical sheet with exactly three stacked panels'
   const sceneLine = (opts.sceneLighting ?? '').trim()
   const styleClause = (opts.styleClause ?? '').trim()
   const twoStyleRefs = opts.styleRefCount === 2
@@ -280,17 +330,17 @@ export function buildRealStripPrompt(
       : 'the reference images between the first and the last'
     : 'the remaining reference images'
   const lines = [
-    `The FIRST reference image is a 3-panel vertical storyboard strip of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. Top panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. Bottom panel = END frame, after that movement completes.`,
+    `The FIRST reference image is a ${sheetDesc} of ONE film shot, drawn as rough pencil previz with wooden mannequin stand-ins. ${p1} panel = START frame. Middle panel = DIRECTION frame — the same drawing as START plus hand-drawn direction arrows and text labels describing the camera and figure movement. ${p3} panel = END frame, after that movement completes.`,
     '',
     `Repaint this exact strip as ${target}:`,
-    `- The output MUST be the same single vertical sheet with exactly three stacked panels — never a single standalone picture, and never add any decorative frame or border outside the sheet.`,
+    `- The output MUST be ${layoutContract} — never a single standalone picture, and never add any decorative frame or border outside the sheet.`,
     `- Keep the sheet layout and the three panel borders exactly as they are; draw only inside the panels.`,
-    `- Top panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.`,
+    `- ${p1} panel: full-quality repaint of the START frame — same camera setup, framing, composition and poses as reference panel 1.`,
     // #tfix-repaint-prompt 2026-08-11: A1 실측 체계 결함 2건 보강 —
     //   ④ 정지 샷(sh_02_10)에 없던 화살표가 3반복 모두 추가됨 → 원본에 없는 주석 발명 금지.
     //   ③ 2동작 샷(sh_01_09)의 END 패널이 3반복 전부 실패 → 도착 상태 전건 완료 재현 명시.
-    `- Middle panel: the exact same image as the top panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.`,
-    `- Bottom panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the top panel's state.`,
+    `- Middle panel: the exact same image as the ${p1.toLowerCase()} panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.`,
+    `- ${p3} panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the ${p1.toLowerCase()} panel's state.`,
     ...(characterRefCount > 0
       ? [
           `- Replace every wooden mannequin with the corresponding character(s) from ${charLocation} (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.`,

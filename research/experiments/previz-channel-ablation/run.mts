@@ -130,8 +130,8 @@ async function stripFor(fx: Fixture): Promise<{ local: string; sha: string }> {
   mkdirSync(join(RUN, 'strips'), { recursive: true })
   const local = join(RUN, 'strips', `${fx.shot_id}_ref_strip.png`)
   if (!existsSync(local)) {
-    const buf = await P.composeRoughReferenceStrip(fx.roughFrames)
-    writeFileSync(local, buf)
+    const { buffer } = await P.composeRoughReferenceStrip(fx.roughFrames)
+    writeFileSync(local, buffer)
   }
   return { local, sha: sha(readFileSync(local)) }
 }

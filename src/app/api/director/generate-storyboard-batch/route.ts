@@ -53,10 +53,10 @@ export async function POST(req: NextRequest) {
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
     // #fal-canvas(2026-08-17): 프로듀서 포맷 → 시트 캔버스. 캔버스 방향이 곧 셀 방향이라
     //   이 한 줄이 "화면비를 fal 에 전달"의 본체다 (vertical 실측: 4×3 유지 + 세로 패널 재구도).
-    const sheetCanvas = realSheetCanvas(
-      parseProjectFormat((project.settings as { format?: unknown } | null)?.format),
-      'grid4',
+    const projectFormat = parseProjectFormat(
+      (project.settings as { format?: unknown } | null)?.format,
     )
+    const sheetCanvas = realSheetCanvas(projectFormat, 'grid4')
 
     const { data: rows } = await supabaseAdmin
       .from('shots')
@@ -123,7 +123,12 @@ export async function POST(req: NextRequest) {
     const webhookUrl = resolveWebhookUrl()
     const submitted: Array<{ jobId: string; shotIds: string[] }> = []
     for (const group of planned) {
-      const refGrid = await composeRoughReferenceGrid(group.map((s) => s.frames))
+      // #sheet-formats: 레퍼런스 시트는 프레임 AR 매칭(왜곡 방지 — 레거시 프레임이면 레거시 시트),
+      //   출력 캔버스·크롭은 포맷 스펙 — 가로 레퍼런스+세로 캔버스는 T2 실측 검증 경로.
+      const refGrid = await composeRoughReferenceGrid(
+        group.map((s) => s.frames),
+        projectFormat,
+      )
       const refPath = `${project.workspace_id}/${projectId}/shots/real_grid_ref_${Date.now()}_${group[0].shot_id}.png`
       const { error: upErr } = await supabaseAdmin.storage
         .from('media')
@@ -202,6 +207,7 @@ export async function POST(req: NextRequest) {
           column_characters: columnCharacters,
           scene_time_of_day: sceneLighting,
           image_size: sheetCanvas, // finalize 방향 가드 + 사고 역추적용 (#fal-canvas)
+          sheet_format: projectFormat, // finalize 크롭이 포맷 시트 좌표를 복원 (#sheet-formats)
         },
         target: {
           workspaceId: project.workspace_id as string,
