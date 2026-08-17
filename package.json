@@ -10,6 +10,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "smoke": "node .claude/skills/smoke/smoke.mjs",
     "seed:test-accounts": "node scripts/seed-test-accounts.mjs",
     "seed:producer:snapshot": "node scripts/producer-seed.mjs snapshot",
     "seed:producer:clone": "node scripts/producer-seed.mjs clone",

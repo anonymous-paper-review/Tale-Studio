@@ -88,6 +88,9 @@ docs/homepage_legacy/
 # experiment — 로컬 실험용, git/원격 미추적
 experiment/
 
+# 스모크 스크린샷 — 매 실행마다 덮어써지는 로컬 산출물 (판정 재료일 뿐 좌표가 아니다)
+.smoke/
+
 # logs
 logs/*
 # scratch artifacts — 로컬 테스트/디버그 산출물(로그·스크린샷·vitest json)

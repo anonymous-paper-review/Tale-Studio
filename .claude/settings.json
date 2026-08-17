@@ -19,6 +19,11 @@
             "type": "command",
             "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/typecheck-gate.sh",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/smoke-gate.sh",
+            "timeout": 15
           }
         ]
       }
