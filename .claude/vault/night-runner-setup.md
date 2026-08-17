@@ -38,7 +38,29 @@ sh .claude/vault/backlog/night-launchd.sh dry-run
 dry-run은 임시 디렉터리만 쓰므로 진짜 밤 상태와 절대 충돌하지 않는다.
 실패하면 그 단계의 메시지를 고치고 다시 돌린다. 통과 전에는 2단계로 가지 않는다.
 
+## 1.5 다른 개발자의 inbox 입력
+
+밤 실행은 오너 머신 하나만 담당한다. 다른 개발자는 새벽 실행 전에 자신의
+`_INBOX.md`에 메모를 append하고 commit/push만 한다. 오너의 `run`이 claim 전에
+`night-inbox-sync.py`로 원격 `main`을 가져와 양쪽 append를 합친다.
+
+- 친구 push가 없으면 오너의 현재 inbox만으로 계속한다.
+- 기존 줄을 고치거나 지운 충돌은 자동으로 선택하지 않고 `merge-conflict`로 멈춘다.
+- 실행 완료 archive는 원문 삭제가 아니라 snapshot 복사와 소비 manifest다.
+- archive 상태는 `awaiting-owner-review`이며, 아침 HTML의 `merge` 또는 `reject`가
+  최종 판정이다.
+
 ## 2. launchd 등록
+
+이 절은 **밤 coordinator인 오너 머신에만** 적용한다. 친구 머신은 이 `run` LaunchAgent를
+등록하지 않는다. 친구는 새벽에 아래처럼 inbox만 commit/push하거나 오너가 제공한 별도
+입력 publish 명령만 실행한다.
+
+```sh
+git add .claude/vault/_INBOX.md
+git commit -m "docs(inbox): publish nightly notes"
+git push origin main
+```
 
 Claude Code는 아래 절차를 실행하되, 자리표시자를 먼저 실제 값으로 치환한다.
 
@@ -148,9 +170,8 @@ launchctl bootout "gui/$(id -u)/com.tale-studio.night"
 
 - 매일 밤 01:30에 실행 잠금이 만들어지고, 네이티브 Claude Code가
   `_NIGHT.md` 계약대로 메모 해석 → 분해 → 실행 → 기록을 수행한다.
-- 같은 날짜에 실행은 하나만 돈다. 이 머신과 오너 머신이 **같은 상태 디렉터리를
-  공유하지 않으므로**, 두 머신이 같은 저장소 클론을 각자 밤에 돌리면 각자 돈다 —
-  같은 원격 브랜치를 두 밤이 동시에 만지지 않게 역할을 나눠라.
+- 이 머신은 inbox 입력을 publish하는 역할만 맡고 밤 실행은 하지 않는다. 오너 머신의
+  `night-launchd.sh run`이 원격 inbox를 먼저 동기화한 뒤 유일하게 밤을 실행한다.
 - 오너(사람) 접점은 두 개뿐이다:
   - 쓰기: `.claude/vault/_INBOX.md` — 형식 없는 메모와 아침 판정(merge/reject/feedback)
   - 읽기: `.claude/vault/backlog/reports/YYYY-MM-DD.html` — 날짜별 사람 보고서

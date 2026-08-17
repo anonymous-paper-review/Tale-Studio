@@ -6,6 +6,7 @@ import fcntl
 import hashlib
 import json
 import os
+import re
 import sys
 import uuid
 
@@ -25,6 +26,7 @@ TRANSITIONS = {
     "failed": set(),
     "blocked": set(),
 }
+ARCHIVE_APPROVAL_STATES = {"reported", "awaiting-owner-review"}
 
 
 def atomic_write(path, data):
@@ -247,6 +249,126 @@ def snapshot_status(args):
     return 0
 
 
+def _path_inside(root, candidate):
+    return candidate == root or candidate.startswith(root + os.sep)
+
+
+def _archive_json(path, expected):
+    if not os.path.exists(path):
+        return False
+    existing = _read_record(path)
+    if existing != expected:
+        raise ValueError("동일 archive/manifest 경로의 내용이 다르다")
+    return True
+
+
+def archive_inbox(args):
+    """Archive immutable snapshot bytes without touching the live inbox."""
+    binding = os.path.realpath(os.path.abspath(os.path.expanduser(args.snapshot_path)))
+    if not os.path.isfile(binding):
+        raise ValueError("snapshot binding 파일이 없다")
+    archive_root = os.path.realpath(os.path.abspath(os.path.expanduser(args.archive_root)))
+    os.makedirs(archive_root, exist_ok=True)
+    if args.approval_state not in ARCHIVE_APPROVAL_STATES:
+        raise ValueError("execution archive approval state가 올바르지 않다")
+
+    lock = _flock_path(binding)
+    try:
+        record = _read_record(binding)
+        if record.get("run_id") != args.run_id:
+            raise ValueError("snapshot binding의 run_id가 현재 실행과 다르다")
+        if record.get("status") != "reported":
+            raise ValueError("reported 상태인 snapshot만 archive할 수 있다")
+        snapshot_id = record.get("snapshot_id")
+        fingerprint = record.get("snapshot_fingerprint")
+        content_sha = record.get("content_sha256")
+        artifact = record.get("content_artifact")
+        if (not isinstance(snapshot_id, str)
+                or not re.fullmatch(r"[0-9a-fA-F]{64}", snapshot_id)
+                or not isinstance(fingerprint, str)
+                or not re.fullmatch(r"[0-9a-fA-F]{64}", fingerprint)
+                or not isinstance(content_sha, str)
+                or not re.fullmatch(r"[0-9a-fA-F]{64}", content_sha)
+                or not isinstance(artifact, str)):
+            raise ValueError("snapshot binding 식별자 또는 content hash가 올바르지 않다")
+        binding_root = os.path.realpath(os.path.dirname(binding))
+        artifact_path = os.path.realpath(os.path.join(binding_root, artifact))
+        if not _path_inside(binding_root, artifact_path):
+            raise ValueError("snapshot content artifact가 binding 디렉터리 밖이다")
+        try:
+            with open(artifact_path, "rb") as fh:
+                content = fh.read()
+        except OSError as exc:
+            raise ValueError("snapshot content artifact가 없다") from exc
+        if sha256_bytes(content) != content_sha:
+            raise ValueError("snapshot content artifact hash가 다르다")
+    finally:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+        lock.close()
+
+    key = f"{snapshot_id.lower()}-{content_sha.lower()}"
+    archive_path = os.path.join(archive_root, f"inbox-{key}.md")
+    metadata_path = os.path.join(archive_root, f"inbox-{key}.meta.json")
+    manifest_path = os.path.join(archive_root, f"consumption-{key}.json")
+    metadata = {
+        "schema": 1,
+        "kind": "inbox-execution-archive",
+        "run_id": args.run_id,
+        "snapshot_id": snapshot_id,
+        "snapshot_fingerprint": fingerprint,
+        "content_sha256": content_sha.lower(),
+        "approval_state": args.approval_state,
+        "source_snapshot": binding,
+        "source_content_artifact": artifact_path,
+        "archive_file": archive_path,
+    }
+    manifest = {
+        "schema": 1,
+        "kind": "inbox-consumption",
+        "key": f"{snapshot_id.lower()}:{content_sha.lower()}",
+        "run_id": args.run_id,
+        "snapshot_id": snapshot_id,
+        "snapshot_fingerprint": fingerprint,
+        "content_sha256": content_sha.lower(),
+        "approval_state": args.approval_state,
+        "archive_file": archive_path,
+        "metadata_file": metadata_path,
+    }
+    archive_lock = _flock_path(archive_path)
+    try:
+        if os.path.exists(archive_path):
+            with open(archive_path, "rb") as fh:
+                if fh.read() != content:
+                    raise ValueError("동일 archive 경로의 content가 다르다")
+            archive_existing = True
+        else:
+            atomic_write(archive_path, content)
+            archive_existing = False
+        metadata_existing = _archive_json(metadata_path, metadata)
+        manifest_existing = _archive_json(manifest_path, manifest)
+        if not metadata_existing:
+            atomic_write(metadata_path, json.dumps(
+                metadata, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+        if not manifest_existing:
+            atomic_write(manifest_path, json.dumps(
+                manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+    finally:
+        fcntl.flock(archive_lock.fileno(), fcntl.LOCK_UN)
+        archive_lock.close()
+    print(json.dumps({
+        "archive": archive_path,
+        "metadata": metadata_path,
+        "manifest": manifest_path,
+        "run_id": args.run_id,
+        "snapshot_id": snapshot_id,
+        "snapshot_fingerprint": fingerprint,
+        "content_sha256": content_sha.lower(),
+        "approval_state": args.approval_state,
+        "idempotent": archive_existing and metadata_existing and manifest_existing,
+    }, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
@@ -270,11 +392,18 @@ def main():
     status.add_argument("--read-time", default=None)
     status.add_argument("--out-dir", "--snapshot-dir", dest="out_dir", default=os.path.join(
         ROOT, ".claude", "vault", "backlog", "night-runtime", "snapshots"))
+    archive = sub.add_parser("archive-inbox")
+    archive.add_argument("--snapshot-path", "--snapshot-binding", dest="snapshot_path", required=True)
+    archive.add_argument("--run-id", required=True)
+    archive.add_argument("--archive-root", required=True)
+    archive.add_argument("--approval-state", "--status", dest="approval_state", required=True)
     args = parser.parse_args()
     try:
         if args.command == "snapshot-inbox":
             return snapshot_inbox(args)
-        return snapshot_status(args)
+        if args.command == "snapshot-status":
+            return snapshot_status(args)
+        return archive_inbox(args)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"✗ {exc}", file=sys.stderr)
         return 1

@@ -70,6 +70,12 @@
 한 번에 고정한다. 스냅샷 도구는 `_INBOX.md`를 수정하지 않고, 출력 JSON의 `snapshot_id`와
 `snapshot_fingerprint`를 이후 명령에 그대로 전달한다.
 
+실제 claim보다 먼저 `night-inbox-sync.py`가 `origin`의 최신 `main`을 가져온다. 친구가
+push한 `_INBOX.md`가 있으면 오너의 append와 함께 보존하고, 친구 push가 없으면 오너의
+현재 입력만으로 계속한다. 두 입력은 같은 우선순위다. 기존 줄을 수정·삭제한 충돌이나
+inbox 밖의 로컬 변경이 있으면 `merge-conflict`로 막고 추측하지 않는다. 동기화가 끝난
+뒤에만 provider claim과 snapshot을 만든다.
+
 ```sh
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 cd "$PROJECT_ROOT"
@@ -122,7 +128,10 @@ snapshot_path="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; pri
 
 ## 3. 메모 원문과 스냅샷 수명
 
-`_INBOX.md`는 사람이 쓰는 원문이다. 밤은 이 파일을 수정·삭제·정리하지 않는다.
+`_INBOX.md`는 사람이 쓰는 원문이다. 밤은 이 파일의 원문을 덮어쓰거나 삭제하지 않는다.
+실행 시작 전 append-only 동기화가 필요할 때만 양쪽 append를 보존한 동기화 commit을
+만들 수 있다. 실행 결과의 보관은 원문을 지우는 이동이 아니라 snapshot content를
+`_archive/inbox/`에 복사하고 소비 manifest를 쓰는 방식이다.
 
 1. 시작할 때 UTF-8 원본 바이트의 범위 `[start, end)`와 읽은 시각, 범위의 내용 해시를 저장한다.
 2. `snapshot_fingerprint`는 경로·범위·내용 해시로 만들고, `snapshot_id`는 fingerprint·run_id·contract_hash binding으로 만든다. 같은 범위와 같은 내용은 같은 fingerprint로 알아보되, 실행이나 계약이 달라지면 새 binding으로 취급한다.
@@ -131,6 +140,19 @@ snapshot_path="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; pri
 5. 오너가 내용을 고치면 새 내용 해시와 새 snapshot으로 취급한다. 이전 스냅샷을 덮어쓰지 않는다.
 6. 스냅샷 기록 중 실패하면 임시 파일에 쓰고 동기화한 뒤 원자적으로 이름을 바꾼다. 중간 표식이 없으면 소비 완료로 간주하지 않고 다음 실행이 안전하게 재청구한다.
 7. 메모의 바이트 범위가 겹치거나 경계가 불명확하면 전체 스냅샷의 결정론적 범위 목록을 먼저 만들고, 겹친 범위는 하나만 청구한다. 겹침을 조용히 합치지 않는다.
+8. 모든 실행 단위가 `reported`가 된 snapshot은 아래처럼 `night-runtime.py archive-inbox
+   --approval-state awaiting-owner-review`로 보관할 수 있다. `blocked`, `needs-owner`,
+   `waiting` 단위가 남아 있으면 전체 snapshot을 archive하지 않는다.
+   이것은 실행 완료 기록일 뿐 승인 완료가 아니다. 아침 HTML에서
+   오너가 `merge` 또는 `reject`를 남길 때까지 사람 승인 대기 상태로 둔다. `blocked`,
+   `needs-owner`, `waiting` 입력은 소비하지 않고 다음 실행에 남긴다.
+
+```sh
+python3 "$PROJECT_ROOT/.claude/vault/backlog/night-runtime.py" archive-inbox \
+  --snapshot-path "$snapshot_path" --run-id "$run_id" \
+  --archive-root "$PROJECT_ROOT/.claude/vault/_archive/inbox" \
+  --approval-state awaiting-owner-review
+```
 
 ## 4. 해석과 분해
 
@@ -183,6 +205,11 @@ python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --run-id "$run_id" \
 - 열린 것 후보를 `미결`(결론이 없음), `미착수`(결론은 있으나 실행하지 않음), `검증 대기`(실행했으나 확인하지 않음)로 구분.
 - 관련 티켓·실험·결정의 연결.
 - 코드·커밋으로 닫힌 것은 열린 후보로 다시 만들지 않는다.
+- 이 실행은 오너의 로컬 세션만 수확한다. 친구의 세션 수확은 공유하지 않으며, 친구
+  `_INBOX.md` 입력은 3. 메모 snapshot의 원문으로만 함께 소비한다.
+- 수확 후보는 `confirmed`, `candidate`, `needs-owner`, `duplicate`, `closed` 중 하나로
+  분류한다. 수확기가 모호함을 해결했다고 가정하지 않는다. `candidate`와 `needs-owner`는
+  HTML에 남기고, 레벨 1에서는 자동 실행하지 않는다.
 
 ### 4.2 실행 단위 만들기
 
@@ -307,7 +334,7 @@ git worktree add <isolated-path> -b night/<run-id>-<unit-id>
 
 ## 10. 아침 결과 리뷰 — budget, carryover, expiry
 
-아침은 사전 승인 창구가 아니라 밤 결과를 소비하는 리뷰 세션이다. 오너가 읽는 것은 결과 카드 원본이 아니라 **날짜 기준 사람 보고서 HTML**(`.claude/vault/backlog/reports/YYYY-MM-DD.html`)이다. 오너는 판정(`merge`, `reject`, 다음 실행에 반영할 `feedback`)과 이유를 별도 형식 없이 `_INBOX.md`에 적는다. 다음 밤 실행이 그 메모를 해석해 해당 결과 카드에 판정으로 기록한다. 오너가 카드 파일이나 원장을 직접 편집할 필요는 없다.
+아침은 사전 승인 창구가 아니라 밤 결과를 소비하는 리뷰 세션이다. 오너가 읽는 것은 결과 카드 원본이 아니라 **날짜 기준 사람 보고서 HTML**(`.claude/vault/backlog/reports/YYYY-MM-DD.html`)이다. 오너는 판정(`merge`, `reject`, 다음 실행에 반영할 `feedback`)과 이유를 별도 형식 없이 `_INBOX.md`에 적는다. 다음 밤 실행이 그 메모를 해석해 해당 결과 카드에 판정으로 기록한다. 오너가 카드 파일이나 원장을 직접 편집할 필요는 없다. 밤의 `reported`와 inbox archive는 오너 승인과 다른 상태다. HTML을 읽고 판정하기 전에는 결과를 최종 승인으로 세지 않는다.
 
 ### 리뷰 예산
 
@@ -352,14 +379,16 @@ human_merge_reviewed = 위 카드 중 merge_mode가 human인 수
 ## 12. 반복 루프와 종료
 
 ```text
-A. 실행 잠금과 입력 스냅샷을 만든다.
-B. 메모·최근 결과·세션·열린 티켓을 읽고 후보를 만든다.
-C. 사실 확인 → 해석 → 분해 → 수용 기준 선기입을 한다.
-D. 실행 단위를 백지 작업자·격리 worktree에 보내 조사·실험·기능 변경을 수행한다.
-E. 결과 카드와 비용·실패·산출물을 즉시 기록한다.
-F. 다음 실행 단위가 있으면 B로 돌아간다.
-G. 아침 결과 리뷰가 merge/reject/feedback을 카드에 붙인다.
-H. 독립 판정 두 번이 모이면 분해 기준 승격 후보를 만든다.
+A. 원격 inbox를 동기화하고 입력 스냅샷을 만든다.
+B. 실행 잠금을 만든다.
+C. 메모·최근 결과·세션·열린 티켓을 읽고 후보를 만든다.
+D. 사실 확인 → 해석 → 분해 → 수용 기준 선기입을 한다.
+E. 실행 단위를 백지 작업자·격리 worktree에 보내 조사·실험·기능 변경을 수행한다.
+F. 결과 카드와 비용·실패·산출물을 즉시 기록한다.
+G. `reported` 결과는 원문 삭제 없이 archive 복사와 소비 manifest를 남긴다.
+H. 다음 실행 단위가 있으면 C로 돌아간다.
+I. 아침 결과 리뷰가 merge/reject/feedback을 카드에 붙인다. 이것이 최종 승인이다.
+J. 독립 판정 두 번이 모이면 분해 기준 승격 후보를 만든다.
 ```
 
 자동화 provider 상태도 결과와 함께 닫는다. 모든 결과 카드·기계 보고서·수확
@@ -401,12 +430,15 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 
 - 기계 보고서: 실행 상태, 단위별 한 줄 결과, 수용 기준, 지출 합계, 막힘·복구 사유, `reviewed_merge_rate`, 자가/사람 머지 수.
 - 사람 보고서: 맥락 → 해석 → 분해 → 수용 기준 → 결과 → 다음 질문 순서의 결과 카드. 상세 로그는 접고 경로만 연결한다.
+- 사람 보고서의 각 카드에는 입력 출처(`owner inbox`, `friend inbox`, `owner harvest`), 동기화
+  commit SHA, snapshot ID·fingerprint, 관련 티켓·코드 파일:줄 또는 세션 ID를 표시한다.
+  친구 push가 없었던 실행은 그 사실도 적는다.
 
 저장 위치는 고정한다.
 
 - 티켓·결과 카드: `.claude/vault/backlog/tickets/` — 새 티켓과 결과 카드는 이 디렉터리에만 만든다. backlog 루트에는 이 계약 문서와 실행 도구만 둔다.
 - 보고서: `.claude/vault/backlog/reports/` — 기계 보고서는 `YYYY-MM-DD.md`, 사람 보고서는 `YYYY-MM-DD.html`. 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
-- 오너 접점은 두 개뿐이다: 쓰는 곳 `_INBOX.md`, 읽는 곳 최신 `reports/YYYY-MM-DD.html`. 다른 파일을 오너가 읽어야만 진행되는 절차를 만들지 않는다.
+- 오너 접점은 두 개뿐이다: 쓰는 곳 `_INBOX.md`, 읽는 곳 최신 `reports/YYYY-MM-DD.html`. 다른 파일을 오너가 읽어야만 진행되는 절차를 만들지 않는다. 친구의 입력도 같은 `_INBOX.md`에 append되어 동일 우선순위로 snapshot된다.
 - 티켓 상태와 작업 사본 정보.
 - 메모 스냅샷 fingerprint·범위·내용 해시·소비 상태.
 - 필요한 실험 산출물과 결과표. raw 대화·모델 원출력은 소비 시점 없이 별도 보관하지 않는다.
@@ -423,6 +455,11 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 이 문서를 고쳐야 할 때는 변경 이유, 영향받는 분해 기준, 이전 계약 해시, 새 계약 해시를 기록한다. 밤 실행은 항상 이 문서 하나를 정본으로 사용한다.
 
 ## 15. 계약 개정 기록
+
+- 2026-08-17 (6차) · 이전 계약 해시 `68d7e28ac5d41535605e234846d4af7d1203d958799e037b2c9bb6e2844b5d46` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — 친구는 실행하지 않고 새벽에 `_INBOX.md`를 push하며, 오너 실행기는 원격 입력을 먼저 받아 내 입력과 함께 처리한다. 두 inbox의 우선순위는 같고, 친구 push가 없으면 오너 입력만 사용한다. 실행 완료와 아침 승인도 분리한다.
+  - 변경 내용: claim 전 append-only inbox 동기화와 `merge-conflict` 경계 추가, 오너 harvest만 사용, `reported` snapshot의 archive 복사·소비 manifest·`awaiting-owner-review` 상태 추가.
+  - 영향받는 분해 기준: 메모 snapshot은 동기화된 `_INBOX.md` 전체를 기준으로 하며, archive는 승인 완료가 아니다.
 
 - 2026-08-17 (5차) · 이전 계약 해시 `bd39b56f8e836b81206122d33d1ca48b64379e22baac8f5fd7067d5da42cf741` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — "메모만 보고 알아서 해와라"의 범위가 과대했다. 판정 기준이 오너에게 있는 메모까지 자율 실행되던 것을 레벨 시스템으로 단계 해금한다.

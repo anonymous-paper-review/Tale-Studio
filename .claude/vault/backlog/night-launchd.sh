@@ -32,7 +32,16 @@ jget() { python3 -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' 
 case "$MODE" in
 run)
   sh "$SCRIPT_DIR/preflight.sh"
-  # 1. 실행 잠금 (같은 날짜에 주 실행 하나만 허용; claude 프로브 실패 시 fail-closed)
+  # 1. 친구가 push한 inbox와 오너의 append를 먼저 동기화한다.
+  #    dry-run은 별도 흐름이므로 여기서는 실제 run만 원격을 만진다.
+  if ! current_branch="$(git -C "$PROJECT_ROOT" symbolic-ref --quiet --short HEAD)"; then
+    echo "현재 branch를 확인할 수 없어 inbox 동기화를 거부한다" >&2
+    exit 1
+  fi
+  python3 "$SCRIPT_DIR/night-inbox-sync.py" \
+    --project "$PROJECT_ROOT" --branch "$current_branch"
+
+  # 2. 실행 잠금 (같은 날짜에 주 실행 하나만 허용; claude 프로브 실패 시 fail-closed)
   claim="$(python3 "$GATE" primary sweep --contract-path "$CONTRACT")"
   status="$(printf '%s' "$claim" | jget status)"
   provider="$(printf '%s' "$claim" | jget provider)"
@@ -43,14 +52,14 @@ run)
     exit 1
   fi
 
-  # 2. 네이티브 Claude Code 헤드리스 실행 — 계약 문서가 정본이다.
+  # 3. 네이티브 Claude Code 헤드리스 실행 — 계약 문서가 정본이다.
   set +e
   (cd "$PROJECT_ROOT" && claude --dangerously-skip-permissions ${MODEL_ARGS:+$MODEL_ARGS} -p \
     ".claude/vault/backlog/_NIGHT.md 를 읽고 오늘 밤 실행을 계약 그대로 수행하라. 시작 블록의 claim 조회부터 종료 기록(complete)까지 계약 문서가 유일한 정본이다. 모델 규칙: fable 모델은 주 실행·subagent 어디에도 쓰지 않는다.")
   claude_exit=$?
   set -e
 
-  # 3. 계약이 스스로 상태를 닫지 못했으면 failed로 기록한다 (성공 도장은 계약만 찍는다).
+  # 4. 계약이 스스로 상태를 닫지 못했으면 failed로 기록한다 (성공 도장은 계약만 찍는다).
   final="$(python3 "$GATE" state sweep --contract-path "$CONTRACT")"
   final_status="$(printf '%s' "$final" | jget status)"
   case "$final_status" in

@@ -145,3 +145,7 @@ research/experiments/_viewer.html
 # harvest.py 로 언제든 재생성된다(중간물은 로컬만 — 위 실험 미디어와 같은 규칙).
 # 큐레이션된 note-*.md 와 index.json 은 좌표라서 추적한다.
 .claude/vault/backlog/sweep/*/digest/
+
+# 밤 입력 snapshot은 로컬 검증용 immutable binding이다.
+# 사람용 archive와 consumption manifest는 `_archive/inbox/`에 따로 추적한다.
+.claude/vault/backlog/night-runtime/
