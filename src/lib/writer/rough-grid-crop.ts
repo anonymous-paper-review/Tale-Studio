@@ -275,66 +275,62 @@ export async function cropRoughGridFrames(
       for (let x = 0; x < ginfo.width; x++) if (gdata[base + x] < DARK_PIXEL_THRESHOLD) dark++
       rowProfile[y] = dark / ginfo.width
     }
-    /** fromY 부터 3단계로 다음 행 시작을 찾는다: ① 현재 행 잔여 어두움(하단 보더·표 괘선)
-     *  통과 → ② 밝은 거터 통과 → ③ 처음 어두워지는 행 = 다음 행 시작.
-     *  1단계가 없으면 시작점이 이전 행의 하단 보더에 즉시 래치해 행이 ~20px 위로 밀린다
-     *  (실측: sh_03 end 상단에 캡션 표 침입 + sh_01 라벨 하단 잘림의 원인). */
+    /** fromY 아래에서 다음 행 시작 찾기 — 판별 신호는 **잉크 밀도**다(실측 이중 모드:
+     *  캡션 텍스트 줄 0.08~0.20 / 행 그림 0.67~0.90, 중간이 빈다). 두께 기준은 실패했다 —
+     *  틈 두께(5~18px)는 진짜 거터와 겹치고, 붙은 캡션 2줄(17px 연속)은 그림으로 오인된다.
+     *  래치 = 진한 행(≥ROW_INK)이 ROW_INK_RUN 행 이상 연속(굵은 표 하단 괘선 1~3행 배제),
+     *  이후 블록의 진짜 시작(옅은 상단·보더, >0.08 연속)까지 거슬러 올라간다. */
+    const ROW_INK = 0.35
+    const ROW_INK_RUN = 6
     const scanNextRowTop = (fromY: number, fallbackGap: number): number => {
-      const hardLimit = Math.min(ginfo.height - 1, fromY + 160)
+      const hardLimit = Math.min(ginfo.height - 1, fromY + 220)
       let y = Math.max(0, fromY)
-      while (y <= hardLimit && rowProfile[y] > 0.08) y++
-      while (y <= hardLimit && rowProfile[y] <= 0.08) y++
-      return y > hardLimit ? Math.min(ginfo.height - 1, fromY + fallbackGap) : y
+      while (y <= hardLimit && rowProfile[y] > 0.08) y++ // 이전 행 잔여 어두움 통과
+      for (; y <= hardLimit; y++) {
+        if (rowProfile[y] < ROW_INK) continue
+        let b = y
+        while (b < ginfo.height && rowProfile[b] >= ROW_INK) b++
+        if (b - y >= ROW_INK_RUN) {
+          let t = y
+          while (t > fromY && rowProfile[t - 1] > 0.08) t--
+          return t
+        }
+        y = b
+      }
+      return Math.min(ginfo.height - 1, fromY + fallbackGap)
     }
     // 셀 크기는 축마다 한 번만 계산 — 셀별 경계 반올림 ±1px 가 프레임 크기를 흔들지 않게
     //   (스펙상 모든 셀의 비례 폭·높이는 동일하다). 균일성이 이 모드의 존재 이유다.
     const frameW = Math.max(1, Math.round((cols[0][1] - cols[0][0]) * W))
     const frameH = Math.max(1, Math.round((rows[0][1] - rows[0][0]) * H))
 
-    // ── DIRECTION 하단 오버플로 적응 확장 ──
-    // 모델이 캡션을 여러 칸 괘선 표로 부풀린다(실측 최대 ~110px, 표 안 괘선 틈 = 밝은 5~9행).
-    //   표 괘선 틈에서 조기 종료하지 않게 blank 종료 임계 12행, 최대 128px.
-    const OVERFLOW_MAX = 128
-    const OVERFLOW_BLANK_END = 12
-    const PAPER = { r: 250, g: 248, b: 242 }
-    const overflowBelow = (left: number, bottom: number): number => {
-      const cap = Math.min(OVERFLOW_MAX, H - 16 - bottom)
-      if (cap <= 4) return 0
-      const xEnd = Math.min(left + frameW, ginfo.width)
-      const rowsDark: boolean[] = []
-      for (let y = bottom; y < bottom + cap; y++) {
-        let dark = 0
-        const base = y * ginfo.width
-        for (let x = left; x < xEnd; x++) if (gdata[base + x] < DARK_PIXEL_THRESHOLD) dark++
-        rowsDark.push(dark / (xEnd - left) > 0.04)
-      }
-      let lastContent = -1
-      let blankRun = 0
-      for (let y = 0; y < rowsDark.length; y++) {
-        if (rowsDark[y]) {
-          lastContent = y
-          blankRun = 0
-        } else if (++blankRun >= OVERFLOW_BLANK_END && lastContent >= 0) break
-      }
-      return lastContent < 0 ? 0 : Math.min(cap, lastContent + 3)
-    }
-
-    // 행 시작 체인: 행1 = 스펙(상단 마진 안정 실측), 행 N+1 = 행 N 끝(+DIRECTION 뒤는 전 열
-    //   최대 오버플로 통과) 이후 첫 어두운 전환. 높이는 표준 고정이라 균일성은 불변.
+    // 행 시작 체인: 행1 = 스펙(상단 마진 안정 실측), 행 N+1 = scanNextRowTop 이 캡션의 얇은
+    //   블록들을 스스로 건너뛰고 다음 행의 두꺼운 그림 블록에 래치한다. 높이는 표준 고정.
     const GUTTER_GAP = 20
     const rowTops: number[] = [Math.round(rows[0][0] * H)]
     for (let r = 1; r < rows.length; r++) {
       const prevBottom = rowTops[r - 1] + frameH
-      let from = prevBottom + 2
-      if (framesAlongRows && r === 2) {
-        let maxExt = 0
-        for (let s = 0; s < shotCount; s++) {
-          const left = Math.min(Math.round(cols[s][0] * W), W - frameW)
-          maxExt = Math.max(maxExt, overflowBelow(left, rowTops[1] + frameH))
-        }
-        from = prevBottom + maxExt + 2
+      rowTops.push(
+        Math.min(H - frameH, Math.max(prevBottom, scanNextRowTop(prevBottom + 2, GUTTER_GAP))),
+      )
+    }
+
+    // ── DIRECTION 하단 오버플로 — 상한 = 다음 행 시작(행 스캔과 한 진실이라 어긋날 수 없다) ──
+    // 상한 안에서 열별 마지막 내용 행까지 포함(캡션 표 전체). 표 내부 틈 두께는 더는 판정에
+    //   안 쓴다 — 실측상 진짜 거터와 겹쳐 신뢰 불가.
+    const PAPER = { r: 250, g: 248, b: 242 }
+    const overflowBelow = (left: number, bottom: number, capTo: number): number => {
+      const cap = Math.max(0, Math.min(capTo, H - 16) - bottom)
+      if (cap <= 4) return 0
+      const xEnd = Math.min(left + frameW, ginfo.width)
+      let last = -1
+      for (let y = bottom; y < bottom + cap; y++) {
+        let dark = 0
+        const base = y * ginfo.width
+        for (let x = left; x < xEnd; x++) if (gdata[base + x] < DARK_PIXEL_THRESHOLD) dark++
+        if (dark / (xEnd - left) > 0.04) last = y - bottom
       }
-      rowTops.push(Math.min(H - frameH, Math.max(prevBottom, scanNextRowTop(from, GUTTER_GAP))))
+      return last < 0 ? 0 : Math.min(cap, last + 3)
     }
 
     const out: RoughGridFrames[] = []
@@ -345,7 +341,8 @@ export async function cropRoughGridFrames(
         const left = Math.min(Math.round(cx[0] * W), W - frameW)
         const top = Math.min(Math.max(0, rowTops[framesAlongRows ? f : s] ?? 0), H - frameH)
         const isDirection = f === 1
-        const extend = isDirection ? overflowBelow(left, top + frameH) : 0
+        const nextRowTop = framesAlongRows ? rowTops[f + 1] ?? H - 14 : H - 14
+        const extend = isDirection ? overflowBelow(left, top + frameH, nextRowTop - 2) : 0
         if (extend > 0) {
           const tall = await sharp(grid)
             .extract({ left, top, width: frameW, height: frameH + extend })

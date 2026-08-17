@@ -24,13 +24,19 @@ async function syntheticSheet(withTextBands: boolean): Promise<Buffer> {
       )
     }
   }
-  // 라벨 밴드 모사: 행2 아래 거터를 텍스트 줄들이 침범
+  // 라벨 밴드 모사: 행2 아래 거터를 텍스트 줄들이 침범 — 실측 잉크 밀도(전폭 0.08~0.20,
+  //   손글씨라 열 폭 일부만)를 재현: 열별 30% 폭 가는 줄. 전폭 채움 바는 그림 밀도(≥0.35)로
+  //   오인되므로 픽스처로서 거짓이다.
   const bandTop = spec.rowBoxes[1][1] + 2
   const bars = withTextBands
-    ? [0, 1, 2]
-        .map(
-          (i) =>
-            `<rect x="${spec.colBoxes[0][0]}" y="${bandTop + i * 13}" width="${spec.colBoxes[3][1] - spec.colBoxes[0][0]}" height="8" fill="#333"/>`,
+    ? spec.colBoxes
+        .map(([x0, x1]) =>
+          [0, 1, 2]
+            .map(
+              (i) =>
+                `<rect x="${x0 + 8}" y="${bandTop + i * 13}" width="${Math.round((x1 - x0) * 0.3)}" height="8" fill="#333"/>`,
+            )
+            .join(''),
         )
         .join('')
     : ''
