@@ -86,13 +86,8 @@ async function renderTemplate(spec: SheetSpec): Promise<Buffer> {
       // #fixed-crop(2026-08-17): DIRECTION 셀(프레임 축 index 1)에 캡션 스트립 내장 —
       //   모델이 라벨 자리를 스스로 발명(패널 밖 밴드 → 레이아웃 밀림)하던 것을 템플릿이
       //   공식화한다. 스트립은 셀 **안**이라 좌표·크롭·프레임 크기는 불변.
-      const isDirection = spec.frameAxis === 'rows' ? r === 1 : c === 1
-      if (isDirection) {
-        const stripH = captionStripHeight(y1 - y0)
-        cells.push(
-          `<line x1="${x0}" y1="${y1 - stripH}" x2="${x1}" y2="${y1 - stripH}" stroke="${BORDER}" stroke-width="2"/>`,
-        )
-      }
+      // 캡션 스트립 괘선은 오너 지시(2026-08-18)로 제거 — 라벨 위치 계약은 문안이 유지하고,
+      //   괘선 없는 열린 하단은 크롭의 실측 정규화가 흡수한다.
       // #corner-marks(2026-08-17, 오너 제안 — 초판 템플릿의 코너 마크 복원): 셀 내부 꼭지점에
       //   ㄱ/ㄴ 브래킷 — 생성기가 셀 지오메트리를 붙들 정박점. 프레임·리페인트에 전파되는
       //   트레이드는 오너 인지(거슬리면 보더 바깥 배치로 전환 가능하게 offset 로 분리).

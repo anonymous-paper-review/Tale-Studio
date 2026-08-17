@@ -76,7 +76,7 @@ describe('previz 강화 ① — DIRECTION 기술 라벨', () => {
   it('KEY/카메라/FOCUS/색온도 라벨을 DIRECTION(motion)에 싣는다', () => {
     const cell = buildRoughGridCell(richInput(), 'sh_01_01')
     // #fixed-crop(2026-08-17): 라벨은 템플릿이 내장한 캡션 스트립 안에만 — 고정 좌표 크롭과 한 몸.
-    expect(cell.motion).toContain('ruled caption strip')
+    expect(cell.motion).toContain('compact caption block')
     expect(cell.motion).toContain('never write outside the panel')
     expect(cell.motion).toContain('"KEY: top right, soft"')
     expect(cell.motion).toContain('35mm')
