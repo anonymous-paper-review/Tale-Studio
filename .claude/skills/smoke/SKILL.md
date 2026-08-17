@@ -19,6 +19,29 @@ pnpm smoke / --click e4 --expect "이메일"     # 진입 후 클릭까지 따�
 **제품의 실제 화면은 전부 로그인 뒤에 있다** (`/studio/producer|writer|artist|director|editor`).
 공개 스위트만 돌리면 랜딩·요금·로그인폼만 확인된다 — UI 작업 확인이 목적이면 `--auth` 를 써야 한다.
 
+## 후반 스테이지를 열려면 — 픽스처 (계정당 1회)
+
+```bash
+pnpm fixture:producer                      # 프로듀서 완료 + writer 잠금 해제
+pnpm fixture:producer --stage director     # director 까지 열기
+```
+
+빈 프로젝트에서는 스테이지가 잠겨 `/studio/producer` 로 되돌아온다. 이 픽스처가 프로듀서 완료 상태를
+DB 에 써넣고 `projects.current_stage` 를 전진시켜 잠금을 푼다. **모델을 호출하지 않아 돈이 들지 않고,
+여러 번 돌려도 같은 결과다.**
+
+`tests/fixtures/producer-complete.ts` 는 저장된 JSON 스냅샷이 아니라 **코드**다. 이유:
+writer 아키텍처가 자주 바뀌는 프로젝트라 산출물 모양을 JSON 으로 떠두면 **조용히** 낡아
+"옛날 모양"을 테스트하게 된다. 그래서 두 겹으로 시끄럽게 만들었다 —
+제품 타입을 직접 쓰므로 모양이 바뀌면 `pnpm typecheck` 가 깨지고,
+**실제 `evaluateProducerGate` 를 호출해 통과할 때만 DB 에 쓴다.**
+(그래서 그 파일은 반드시 `tests/` 아래여야 한다 — tsconfig 의 `**/*.ts` 는 `.claude/` 같은
+dot 디렉토리를 건너뛰어 거기 두면 타입체크가 조용히 안 돈다.)
+
+이 픽스처가 검증하지 **않는** 것: 핸드오프 동작. 그건 vitest 담당이다
+(`lifecycle` / `producer-gate` / `producer-handoff-gate` / `handoff-intent` / `artist-lock-gate`).
+여기서 얻는 건 "그 화면이 열리고 그려지는가"뿐이다.
+
 Skill 도구가 없는 서브에이전트(`frontend-designer` 등)와 다른 하네스(Codex·gjc)는 이렇게 부른다:
 `node .claude/skills/smoke/smoke.mjs /login --expect "로그인"`
 

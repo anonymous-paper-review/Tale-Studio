@@ -6,10 +6,14 @@
     "⚠ 생성 버튼을 누르는 타깃을 여기 넣지 말 것 — fal·higgsfield 가 실제로 돌아 과금된다.",
     "  읽기 전용 진입만 둔다. 생성 흐름 확인이 필요하면 사람이 직접 판단해서 단건으로 돌린다.",
     "",
-    "writer·artist·director·editor 를 넣지 않은 이유(2026-08-17 실측): 빈 프로젝트에서는 스테이지가",
-    "  잠겨 /studio/producer 로 되돌아온다. 프로젝트 진행도에 따라 도착지가 바뀌므로 목록에 넣으면",
-    "  계정 상태에 따라 흔들린다. 그 화면들은 단건으로 확인한다:",
-    "  pnpm smoke /studio/writer --auth --tree",
+    "⚠ 전제: /studio/writer 타깃은 `pnpm fixture:producer` 를 한 번 돌려둬야 통과한다.",
+    "  빈 프로젝트에서는 스테이지가 잠겨 /studio/producer 로 되돌아오기 때문이다.",
+    "  픽스처는 DB 에 남으므로 계정당 1회면 되고, 여러 번 돌려도 같은 결과다(멱등).",
+    "",
+    "artist·director·editor 를 아직 넣지 않은 이유: 그 화면들은 상류 산출물(씬·샷·캐릭터 시트 등)이",
+    "  있어야 의미가 있는데, 그 모양이 자주 바뀌어 픽스처가 썩는다. 필요해지면 tests/fixtures/ 에",
+    "  타입 기반 빌더를 추가한다(저장된 JSON 스냅샷으로 만들지 말 것 — 조용히 낡는다).",
+    "  단건 확인은 언제든: pnpm fixture:producer --stage director && pnpm smoke /studio/director --auth --tree",
     "",
     "/studio/producer 는 프로젝트가 없으면 하나를 자동 생성하고 이후 같은 projectId 를 재사용한다",
     "  (실행마다 쌓이지 않는 것을 실측 확인)."
@@ -25,6 +29,11 @@
       "path": "/studio/producer",
       "expect": ["Meeting Room", "Producer"],
       "note": "제품의 실제 진입 화면(스테이지 레일 + 기획 회의실)"
+    },
+    {
+      "path": "/studio/writer",
+      "expect": ["Writers' Room", "러프 스토리보드"],
+      "note": "pnpm fixture:producer 전제. 산출물이 없는 빈 상태로 열리는지 — 씬·샷 픽스처는 아직 없다"
     }
   ]
 }
