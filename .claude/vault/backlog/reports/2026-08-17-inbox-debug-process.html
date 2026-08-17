@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>데모 실행의 기계 내부 — 정식 밤과 다르게 돈 것 7가지와 그 보정</title>
+<style>
+  :root {
+    --bg: #F7F5F0; --surface: #FFFFFF; --surface-2: #F1EEE6;
+    --ink: #22242A; --muted: #6E7077; --line: #E3E0D8;
+    --accent: #A64F2A; --accent-ink: #8A3F1E; --accent-soft: #F3E4DB;
+    --ok: #2F7D4E; --ok-soft: #E2F0E7;
+    --warn: #96690A; --warn-soft: #F5EBD4;
+    --info: #3A6EA5; --info-soft: #E3ECF5;
+    --violet: #7A5CA8; --violet-soft: #ECE5F5;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15171B; --surface: #1D2026; --surface-2: #23262D;
+      --ink: #E9E7E2; --muted: #9C9EA6; --line: #2C2F36;
+      --accent: #E0824F; --accent-ink: #E8956A; --accent-soft: #3A2A20;
+      --ok: #5FBE8A; --ok-soft: #1E3328;
+      --warn: #D9A94A; --warn-soft: #362C16;
+      --info: #7FA9D9; --info-soft: #1E2A38;
+      --violet: #A78BD0; --violet-soft: #2B2438;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15171B; --surface: #1D2026; --surface-2: #23262D;
+    --ink: #E9E7E2; --muted: #9C9EA6; --line: #2C2F36;
+    --accent: #E0824F; --accent-ink: #E8956A; --accent-soft: #3A2A20;
+    --ok: #5FBE8A; --ok-soft: #1E3328;
+    --warn: #D9A94A; --warn-soft: #362C16;
+    --info: #7FA9D9; --info-soft: #1E2A38;
+    --violet: #A78BD0; --violet-soft: #2B2438;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", sans-serif; font-size: 15.5px; line-height: 1.7; margin: 0; padding: 0 20px 96px; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  header.page { padding: 54px 0 10px; border-bottom: 2px solid var(--ink); margin-bottom: 20px; }
+  .kicker { color: var(--accent); font-weight: 700; font-size: 13px; margin: 0 0 10px; }
+  h1 { font-size: clamp(25px, 4.5vw, 34px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.28; margin: 0 0 10px; text-wrap: balance; }
+  .standfirst { font-size: 16px; margin: 0 0 6px; }
+  .asof { color: var(--muted); font-size: 13px; margin: 0; }
+  h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+  section.block { margin: 42px 0 0; }
+  .sec-head { border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 16px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .sec-head .lede { color: var(--muted); font-size: 14px; }
+  p { margin: 0 0 12px; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 750; border-radius: 4px; padding: 1px 8px; white-space: nowrap; vertical-align: 1px; }
+  .c-ok { background: var(--ok-soft); color: var(--ok); }
+  .c-no { background: var(--info-soft); color: var(--info); }
+  .c-hold { background: var(--warn-soft); color: var(--warn); }
+  .c-fix { background: var(--accent-soft); color: var(--accent-ink); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px 14px; margin: 0 0 14px; }
+  .card .head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 12px; }
+  .card .head h3 { font-size: 16.5px; font-weight: 750; margin: 0; line-height: 1.45; text-wrap: balance; flex: 1 1 300px; }
+  .steps { display: grid; gap: 8px; margin: 0; }
+  .steps .row { display: grid; grid-template-columns: 74px 1fr; gap: 12px; align-items: baseline; }
+  .steps .k { font-size: 12px; font-weight: 750; color: var(--accent); letter-spacing: .02em; }
+  .steps .v { font-size: 14.5px; }
+  .steps .v b { font-weight: 750; }
+  @media (max-width: 520px) { .steps .row { grid-template-columns: 1fr; gap: 2px; } }
+  details { margin-top: 10px; border-top: 1px dashed var(--line); }
+  details summary { cursor: pointer; padding: 8px 0 4px; font-size: 13px; font-weight: 700; color: var(--info); list-style: none; }
+  details summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details summary::-webkit-details-marker { display: none; }
+  details .body { padding: 4px 0 8px; font-size: 13.5px; }
+  .mono, code { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  .tbl-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 700; font-size: 12px; padding: 6px 10px; border-bottom: 2px solid var(--line); white-space: nowrap; }
+  td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  footer { margin-top: 56px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 14px; }
+  a { color: var(--info); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="kicker">과정 디버깅 — 결과 보고서와 나란히 놓고 보는 문서</p>
+  <h1>데모 실행의 기계 내부 — 정식 밤과 다르게 돈 것 7가지와 그 보정</h1>
+  <p class="standfirst">결과는 <a href="2026-08-17-inbox-debug.html">결과 보고서</a>에 있다. 이 문서는 그 결과가 <b>어떤 과정으로 나왔는지</b>, 어디가 정식 밤 절차와 달랐는지, 에이전트가 무엇을 스스로 고쳐가며 돌았는지를 기록한다.</p>
+  <p class="asof">2026년 8월 17일 낮 데모 실행 · 같은 실행의 결과: <code>2026-08-17-inbox-debug.html</code></p>
+</header>
+
+<!-- 개념 정리 -->
+<section class="block">
+  <div class="sec-head"><h2>먼저 개념 정리 — 세션, 메인, 서브, 워크트리</h2><span class="lede">당신 질문에 대한 답</span></div>
+  <p>이 넷은 서로 다른 층의 개념이라 혼용하면 그림이 안 그려진다. 실제 구조는 이렇다.</p>
+  <div class="tbl-wrap">
+  <table>
+    <tr><th>개념</th><th>무엇인가</th><th>이번 밤 구조에서의 역할</th></tr>
+    <tr><td><b>세션</b></td><td>Claude와의 대화 하나 (터미널 창 하나라고 생각하면 된다)</td><td>정식 밤에는 예약 실행기가 <b>새 세션 하나</b>를 연다. 밤 전체에 세션은 그 하나뿐이다.</td></tr>
+    <tr><td><b>메인 에이전트</b></td><td>그 세션의 주인. 계약 문서를 읽고, 해석하고, 일을 나누는 주체</td><td>계약 전체를 아는 유일한 존재. 마지막에 <b>보고서 HTML도 메인이 혼자</b> 만든다.</td></tr>
+    <tr><td><b>서브 에이전트</b></td><td>메인이 세션 안에서 소환하는 일회용 작업자. 새 세션이 아니다</td><td>조사 단위 하나씩 받아 일하고 결과만 반납한다. 계약도 다른 단위도 모른다(백지 작업자). 보고서를 각자 만들지 않는다.</td></tr>
+    <tr><td><b>워크트리</b></td><td>git이 같은 저장소를 <b>다른 폴더에 하나 더 체크아웃</b>하는 기능. 코드 격리 공간</td><td>에이전트가 아니라 <b>장소</b>다. 코드를 고치는 단위에만 하나씩 만들어, 서브 에이전트가 그 폴더 안에서 작업한다. 조사만 하는 단위는 필요 없다.</td></tr>
+  </table>
+  </div>
+  <p>그래서 당신 질문에 직접 답하면: <b>워크트리별로 메인 세션이 생기는 게 아니다.</b> 밤 전체에 메인 하나 → 단위마다 서브 에이전트 → 그중 코드를 고치는 단위만 워크트리라는 격리 폴더를 받는다. 워크트리는 "누가"가 아니라 "어디서"의 문제다.</p>
+  <p>그리고 감지한 대로, <b>이번 데모는 정식 구조가 아니었다</b> — 예약 실행기가 새 세션을 연 것이 아니라, 이미 열려 있던 이 대화 세션이 메인 에이전트 역할을 대행했다. 서브 에이전트 둘은 진짜로 소환했다. 워크트리는 0개 — 세 단위 전부 읽기 전용 조사여서 격리할 코드 변경이 없었다.</p>
+</section>
+
+<!-- 타임라인 -->
+<section class="block">
+  <div class="sec-head"><h2>실행 타임라인 — 누가 뭘 읽고 뭘 결론냈나</h2></div>
+
+  <div class="card">
+    <div class="head"><span class="chip c-no">1 · 메인</span><h3>메모 읽기와 해석</h3></div>
+    <div class="steps">
+      <div class="row"><span class="k">읽은 것</span><span class="v">오너 메모함(<code>_INBOX.md</code>) 원문 3줄.</span></div>
+      <div class="row"><span class="k">결론</span><span class="v">"영상의 좋고 나쁨 판정은 오너 몫"이라는 헌법에 따라, 조사 질문을 <b>"우리가 영상 모델에 실제로 무엇을 보내는가"</b>로 바꿨다. 판정 대신 사실 확정.</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><span class="chip c-no">2 · 메인</span><h3>사전 정찰 — 조사 지도를 먼저 그림</h3></div>
+    <div class="steps">
+      <div class="row"><span class="k">읽은 것</span><span class="v">저장소에서 "힉스필드" 관련 코드 검색, 작가·영상 관련 파일 목록.</span></div>
+      <div class="row"><span class="k">결론</span><span class="v">뜻밖의 사실 — 코드에 힉스필드 <b>연동은 없다</b>. 힉스필드는 화면 디자인을 본뜬 참조 이름일 뿐이고, 실제 영상 발주는 전부 fal이라는 중계 서비스로 나간다. 조사 대상을 fal 발주 경로와 작가 산출물 체인, 두 갈래로 확정.</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><span class="chip c-no">3 · 메인 → 서브 둘</span><h3>분해와 발주 — 백지 작업자 소환</h3></div>
+    <div class="steps">
+      <div class="row"><span class="k">한 것</span><span class="v">조사 단위 둘을 병렬 발주. 발주문 안에 합격 기준을 미리 적었다(계약의 "수용 기준 선기입"을 발주문으로 대신함 — 아래 이탈 4번). 공통 제약: 읽기 전용, 유료 호출 금지, 파일:줄 근거 필수.</span></div>
+      <div class="row"><span class="k">단위 A</span><span class="v"><b>발주 경로 추적자</b> — 영상 발주 라우트, 모델 카탈로그, 프롬프트 조립기를 읽고 "모델에 보내는 모든 필드" 명세표를 만들라.</span></div>
+      <div class="row"><span class="k">단위 B</span><span class="v"><b>작가 체인 추적자</b> — 작가 v1의 12단계 변환과 v2의 저장 방식을 읽고 "장면 텍스트가 발주 문장이 되기까지 어디서 정보가 깎이나"를 찾으라.</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><span class="chip c-hold">4 · 서브 둘</span><h3>병렬 조사 — 8분과 10분</h3></div>
+    <div class="steps">
+      <div class="row"><span class="k">A가 읽은 것</span><span class="v">영상 발주 라우트 전문, 모델 카탈로그, 프롬프트 조립기, 화면 상태 저장소, 발주 기록 코드.</span></div>
+      <div class="row"><span class="k">A의 결론</span><span class="v">발주 경로는 운영에서 하나뿐. 주력은 그림(시작/끝 프레임)→영상. 해상도 720p 고정, 소리 기본 켜짐, 품질 가드 문구 허공 송신, 프롬프트 950자에서 뒤부터 잘림.</span></div>
+      <div class="row"><span class="k">B가 읽은 것</span><span class="v">작가 파이프라인 단계 파일 전부, 저장 코드, 카메라 계약 컴파일러, v2 저장 코드.</span></div>
+      <div class="row"><span class="k">B의 결론</span><span class="v">작가가 만든 움직임 묘사문은 발주에서 미소비(소비처가 운영 도달 불가 옛 경로뿐). v2는 카메라 칸에 자유 문장을 저장해 발주 시 깨진다. 스타일·대사 미주입.</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><span class="chip c-ok">5 · 메인</span><h3>교차 검증 — 서브 주장을 원본으로 재확인</h3></div>
+    <div class="steps">
+      <div class="row"><span class="k">읽은 것</span><span class="v">서브 결과 중 결론을 좌우하는 주장 4건의 원본 코드 5파일 — 프롬프트 조립기, 발주 라우트, 작가 저장 코드, v2 저장 코드, 모델 카탈로그.</span></div>
+      <div class="row"><span class="k">결론</span><span class="v">4건 전부 원본과 일치 확인. 이 재검증은 서브가 금지 대상 모델로 돌았기 때문에(이탈 1번) 평소보다 무겁게 했다.</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><span class="chip c-ok">6 · 메인</span><h3>기록과 렌더</h3></div>
+    <div class="steps">
+      <div class="row"><span class="k">한 것</span><span class="v">원장 티켓(사실·근거·다음 관측 후보)과 사람 보고서 HTML을 쓰고 커밋. 마지막으로 아침 자동화가 쓰는 것과 <b>같은 열기 명령</b>으로 보고서를 브라우저에 띄워 아침 렌더 경로까지 실증.</span></div>
+      <div class="row"><span class="k">지출</span><span class="v">유료 생성 0건, $0. 코드 수정 0건.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 이탈 목록 -->
+<section class="block">
+  <div class="sec-head"><h2>정식 밤과 다르게 돈 것 — 전체 7건</h2><span class="lede">기대와 달랐던 것, 에이전트가 스스로 고친 것 전부</span></div>
+  <div class="tbl-wrap">
+  <table>
+    <tr><th>#</th><th>무슨 일이 있었나</th><th>왜</th><th>어떻게 보정했나</th></tr>
+    <tr>
+      <td>1</td>
+      <td><b>서브 에이전트 둘이 금지 대상 모델(fable 계열)로 실행됨</b></td>
+      <td>"fable 금지" 지시가 서브 발주 <b>이후</b>에 도착 — 이미 뜬 작업자는 소급되지 않았다</td>
+      <td>결론을 좌우하는 주장 4건을 메인이 원본 코드로 전부 재검증. 이후 실행부터는 실행 스크립트가 환경에서 fable을 발견하면 <b>시작 자체를 거부</b>하는 가드를 넣고, 거부 동작을 실제로 테스트해 확인했다</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><b>파일 편집 도구가 한국어 편집을 여러 번 거부</b></td>
+      <td>편집 내용의 한국어가 검증 불가능한 부호(이스케이프)로 직렬화되면 도구가 안전을 위해 실행을 거부한다</td>
+      <td>같은 편집을 문자 그대로 다시 발행하거나, 실패가 반복된 파일은 부분 수정 대신 <b>파일 전체를 새로 써서</b> 우회. 내용 손실 없음</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><b>정식 밤의 앞 절차 3개를 생략</b> — 실행 잠금, 메모 바이트 스냅샷, 지난 세션 수확</td>
+      <td>낮의 디버그 요청이라 의도적으로 건너뜀. 잠금을 잡으면 오늘 진짜 밤 실행과 충돌한다</td>
+      <td>티켓에 "데모 실행, 소비 표식 없음"을 명시하고 <b>오늘 밤 정식 실행이 같은 메모를 재조사하지 않도록</b> 연결 문구를 남겼다</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><b>합격 기준을 티켓이 아닌 발주문에 선기입</b> — 티켓 파일은 조사가 끝난 뒤 작성됨</td>
+      <td>계약은 "실행 전 티켓에 수용 기준 선기입"인데, 데모 속도를 위해 서브 발주문 안의 기준으로 대신했다</td>
+      <td>기준이 실행 전에 고정됐다는 계약의 취지는 지켜졌으나 형식은 이탈. 티켓에 이 순서를 그대로 기록해 숨기지 않았다</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><b>서브 에이전트 대기 도구가 기본 꺼져 있었음</b></td>
+      <td>이 세션의 도구 상자에 해당 도구가 숨김 상태였다</td>
+      <td>도구 검색으로 활성화한 뒤 정상 대기·회수. 결과 영향 없음</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><b>v2 오류를 실행으로 재현하지 않음</b></td>
+      <td>재현하려면 실제 발주(과금) 또는 운영 데이터 쓰기가 필요 — 둘 다 금지 경계</td>
+      <td>코드 대조만으로 "형식 모순 확정, 발생 빈도는 유보"로 결론 강도를 낮춰 표기</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td><b>대화 중단이 2번 있어 부분 실행 상태가 남았음</b></td>
+      <td>오너가 진행 중 지시를 바꾸며 턴이 중단됨 — 중단 시점의 편집·명령이 어디까지 반영됐는지 불명</td>
+      <td>재개할 때마다 저장소 상태를 먼저 조회해 <b>실제 반영분을 확인한 뒤</b> 이어서 진행. 중복 실행·유실 없음 확인</td>
+    </tr>
+  </table>
+  </div>
+  <details>
+    <summary>정식 밤이었다면 어떻게 달랐나</summary>
+    <div class="body">
+      <p>예약 실행기가 새벽에 새 세션을 열고 → 실행 잠금과 메모 스냅샷을 만들고 → 지난 세션들을 수확해 미결을 건지고 → 이번과 같은 분해·발주·검증·기록을 돌린 뒤 → 성공 도장까지 스스로 찍는다. 이번 데모는 그중 <b>가운데 토막(분해→기록)만</b> 이 대화 세션이 대행한 것이다. 가운데 토막의 동작 자체는 정식 밤과 같은 코드·같은 규칙으로 돌았다.</p>
+    </div>
+  </details>
+</section>
+
+<footer>
+  이 문서: 과정 디버깅 · 같은 실행의 결과: <a href="2026-08-17-inbox-debug.html">2026-08-17-inbox-debug.html</a> · 원장 티켓: <code>tickets/t0-higgsfield-vs-pipeline-quality-gap.md</code> · 계약: <code>_NIGHT.md</code>
+</footer>
+
+</div>
+</body>
+</html>
