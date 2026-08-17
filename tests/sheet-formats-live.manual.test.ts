@@ -9,6 +9,7 @@ import {
 } from '@/lib/writer/rough-storyboard-grid'
 import { cropRoughGridFrames } from '@/lib/writer/rough-grid-crop'
 import { buildRealStripPrompt } from '@/lib/director/storyboard-strip'
+import type { ProjectFormat } from '@/types'
 
 // #sheet-formats 라이브 실측 (수동 게이트 — 실제 fal 결제 발생 ~$0.4, CI 는 항상 skip):
 //   RUN_SHEET_LIVE=1 SHEET_SHOTS=<shots.json> SHEET_OUT=<outdir> pnpm vitest run tests/sheet-formats-live.manual.test.ts
@@ -91,7 +92,7 @@ describe.runIf(LIVE)('sheet-formats 라이브 실측', () => {
       }
 
       // 템플릿 4장 → fal 스토리지
-      const tpl = async (variant: 'grid4' | 'strip1', format: 'vertical_9:16' | 'square_1:1' | 'cinema_2.39:1') => {
+      const tpl = async (variant: 'grid4' | 'strip1', format: ProjectFormat) => {
         const g = sheetGeometry(variant, format)
         const buf = await readFile(path.join(repo, 'public', g.templatePath.replace(/^\//, '')))
         return { g, url: await uploadPng(buf, path.basename(g.templatePath)) }
