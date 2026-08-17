@@ -436,20 +436,20 @@ export function buildRoughGridPrompt(
   const stripRow = variant === 'strip1' && opts?.frameAxis === 'cols'
   const head =
     variant === 'grid4'
-      ? `The reference image is a paper storyboard sheet with 12 empty panels in a 4-column × 3-row grid. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels, never across panel borders.
+      ? `The reference image is a paper storyboard sheet with 12 empty panels in a 4-column × 3-row grid. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels, never across panel borders. Each panel has small corner registration brackets just inside its border — redraw them exactly in place at all four corners, and keep every drawing inside them.
 
 Each COLUMN is one shot of a film, read top to bottom as three frames:
 - Row 1 (top) = START: the composition at the beginning of the shot.
 - Row 2 (middle) = DIRECTION: an EXACT identical copy of Row 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Row 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Row 1 and Row 2 is the arrows and labels drawn on top. Row 2 is the ONLY place where text is allowed. The DIRECTION panels each have a thin ruled caption strip along their bottom edge — put every technical label inside that strip and keep the drawing above it.
 - Row 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Row 3 is the only frame where the motion has visibly progressed — and when a shot has movement, its END must differ clearly and unmistakably from its START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
       : stripRow
-        ? `The reference image is a wide paper storyboard sheet with 3 empty panels side by side in a row. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels.
+        ? `The reference image is a wide paper storyboard sheet with 3 empty panels side by side in a row. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels. Each panel has small corner registration brackets just inside its border — redraw them exactly in place at all four corners, and keep every drawing inside them.
 
 The row is ONE shot of a film, read left to right as three frames:
 - Panel 1 (LEFT) = START: the composition at the beginning of the shot.
 - Panel 2 (MIDDLE) = DIRECTION: an EXACT identical copy of Panel 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Panel 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Panel 1 and Panel 2 is the arrows and labels drawn on top. Panel 2 is the ONLY place where text is allowed. The DIRECTION panels each have a thin ruled caption strip along their bottom edge — put every technical label inside that strip and keep the drawing above it.
 - Panel 3 (RIGHT) = END: the composition at the end of the shot, after the movement completes. Panel 3 is the only frame where the motion has visibly progressed — and when the shot has movement, END must differ clearly and unmistakably from START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
-        : `The reference image is a paper storyboard strip with 3 empty panels stacked vertically. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels.
+        : `The reference image is a paper storyboard strip with 3 empty panels stacked vertically. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels. Each panel has small corner registration brackets just inside its border — redraw them exactly in place at all four corners, and keep every drawing inside them.
 
 The strip is ONE shot of a film, read top to bottom as three frames:
 - Panel 1 (top) = START: the composition at the beginning of the shot.

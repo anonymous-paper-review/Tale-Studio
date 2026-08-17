@@ -93,6 +93,21 @@ async function renderTemplate(spec: SheetSpec): Promise<Buffer> {
           `<line x1="${x0}" y1="${y1 - stripH}" x2="${x1}" y2="${y1 - stripH}" stroke="${BORDER}" stroke-width="2"/>`,
         )
       }
+      // #corner-marks(2026-08-17, 오너 제안 — 초판 템플릿의 코너 마크 복원): 셀 내부 꼭지점에
+      //   ㄱ/ㄴ 브래킷 — 생성기가 셀 지오메트리를 붙들 정박점. 프레임·리페인트에 전파되는
+      //   트레이드는 오너 인지(거슬리면 보더 바깥 배치로 전환 가능하게 offset 로 분리).
+      const arm = 10
+      const off = 4
+      const bx0 = x0 + off
+      const bx1 = x1 - off
+      const by0 = y0 + off
+      const by1 = y1 - off
+      cells.push(
+        `<path d="M ${bx0} ${by0 + arm} V ${by0} H ${bx0 + arm}" fill="none" stroke="${BORDER}" stroke-width="2"/>`,
+        `<path d="M ${bx1 - arm} ${by0} H ${bx1} V ${by0 + arm}" fill="none" stroke="${BORDER}" stroke-width="2"/>`,
+        `<path d="M ${bx0} ${by1 - arm} V ${by1} H ${bx0 + arm}" fill="none" stroke="${BORDER}" stroke-width="2"/>`,
+        `<path d="M ${bx1 - arm} ${by1} H ${bx1} V ${by1 - arm}" fill="none" stroke="${BORDER}" stroke-width="2"/>`,
+      )
     }
   }
   const inset = Math.min(14, Math.round(Math.min(width, height) * 0.016))
