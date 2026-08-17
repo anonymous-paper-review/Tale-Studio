@@ -41,6 +41,11 @@ const SCAN_RANGE_FRAC = 0.03 // 기대 거터 중심에서 ±3% 탐색
 const OUTER_MARGIN_FRAC = 0.02 // 양끝(시트 마진) 거터 중심 = 셀 경계 바깥 2% 지점
 const CELL_INSET = 2 // 실측 경계에서 셀 안쪽 인셋(테두리선 두께 배제)
 const SIZE_TOLERANCE_PX = 6 // 크기 클러스터 허용 오차
+// #label-invasion(2026-08-17, 실측 a219b9f3 시트 3장): DIRECTION 라벨 텍스트가 거터 주변을
+//   밝은 조각으로 파편화해 밸리 선택이 텍스트 줄 사이 틈에 앉았다. 실측 분포 — 진짜 거터
+//   17~53px, 보더로 쪼개진 반쪽 14px, 라벨 줄 틈 4~13px. 임계 15: 틈 전부 기각, 진짜 거터
+//   통과(반쪽 14px 가 기각돼도 같은 거터의 온전한 쪽이 창 안에 남아 회복된다 — 시트2 실측).
+const MIN_GUTTER_RUN_PX = 15
 
 /** 크기 목록에서 기준 크기: ±tol 클러스터링 → (최다 멤버, 동수면 작은 쪽) 클러스터의 중앙값. */
 function referenceSize(sizes: number[]): number {
@@ -65,14 +70,16 @@ function globalAxisBounds(
   cellCount: number,
   total: number,
 ): Array<[number, number]> | null {
-  const MIN_RUN = 3 // 거터 최소 두께(px) — 노이즈 행/열 배제
+  // #label-invasion: 셀 분할 자격은 진짜 거터 두께(MIN_GUTTER_RUN_PX)부터 — 라벨 텍스트 줄
+  //   사이의 얇은 틈(4~11px 실측)이 분할선으로 오인되면 셀이 조각나 균일성 검증이 죽고,
+  //   반대로 자격을 높이면 보더로 반쪽 난 진짜 거터(≥14px)는 여전히 통과한다.
   const runs: Array<[number, number]> = []
   let runStart = -1
   for (let i = 0; i <= total; i++) {
     const bright = i < total && profile[i] <= GUTTER_RATIO
     if (bright && runStart < 0) runStart = i
     else if (!bright && runStart >= 0) {
-      if (i - runStart >= MIN_RUN) runs.push([runStart, i - 1])
+      if (i - runStart >= MIN_GUTTER_RUN_PX) runs.push([runStart, i - 1])
       runStart = -1
     }
   }
@@ -116,28 +123,48 @@ function scanAxisBounds(
   const starts = expected.map(([s]) => s)
   const ends = expected.map(([, e]) => e)
 
-  // 거터 골짜기 스캔: 중심 주변 최밝점 → 양방향으로 어두워지는 첫 지점 = 양쪽 셀 경계.
-  const scan = (gutterCenter: number): { left: number; right: number } | null => {
+  // 거터 골짜기 스캔(#label-invasion v2): 최밝점 하나가 아니라 **창 안의 자격 런들** 중
+  //   중심 최근접을 고른다 — 최밝점이 라벨 줄 틈(얇은 런)에 앉아도 옆의 진짜 거터로 회복된다.
+  //   자격 = 밝은 런 두께 ≥ MIN_GUTTER_RUN_PX (양끝 시트 마진은 축 경계에 잘릴 수 있어 예외).
+  const scan = (gutterCenter: number, isOuter: boolean): { left: number; right: number } | null => {
     const lo = Math.max(0, gutterCenter - range)
     const hi = Math.min(total - 1, gutterCenter + range)
     let g = lo
     for (let i = lo + 1; i <= hi; i++) if (profile[i] < profile[g]) g = i
     if (profile[g] > GUTTER_MISSING_RATIO) return null // 거터 소실(콘텐츠로 덮임) → 폴백
-    let L = g
-    while (L > 0 && profile[L - 1] <= GUTTER_RATIO) L--
-    let R = g
-    while (R < total - 1 && profile[R + 1] <= GUTTER_RATIO) R++
-    return { left: L - 1, right: R + 1 }
+    const runAt = (idx: number): { left: number; right: number } => {
+      let L = idx
+      while (L > 0 && profile[L - 1] <= GUTTER_RATIO) L--
+      let R = idx
+      while (R < total - 1 && profile[R + 1] <= GUTTER_RATIO) R++
+      return { left: L, right: R }
+    }
+    const candidates: Array<{ left: number; right: number }> = []
+    for (let i = lo; i <= hi; i++) {
+      if (profile[i] > GUTTER_RATIO) continue
+      const run = runAt(i)
+      candidates.push(run)
+      i = run.right // 같은 런 재방문 방지
+    }
+    const qualified = candidates.filter((r) => isOuter || r.right - r.left + 1 >= MIN_GUTTER_RUN_PX)
+    if (!qualified.length) return null
+    const best = qualified.reduce((a, b) => {
+      const da = Math.abs((a.left + a.right) / 2 - gutterCenter)
+      const db = Math.abs((b.left + b.right) / 2 - gutterCenter)
+      return db < da ? b : a
+    })
+    return { left: best.left - 1, right: best.right + 1 }
   }
 
   for (let i = 0; i <= n; i++) {
+    const isOuter = i === 0 || i === n
     const gutterCenter =
       i === 0
         ? Math.max(0, expected[0][0] - Math.round(total * OUTER_MARGIN_FRAC))
         : i === n
           ? Math.min(total - 1, expected[n - 1][1] + Math.round(total * OUTER_MARGIN_FRAC))
           : Math.floor((expected[i - 1][1] + expected[i][0]) / 2)
-    const hit = scan(gutterCenter)
+    const hit = scan(gutterCenter, isOuter)
     if (!hit) continue
     if (i > 0) ends[i - 1] = hit.left
     if (i < n) starts[i] = hit.right

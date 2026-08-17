@@ -16,10 +16,16 @@ import sharp from 'sharp'
 //   모킹은 인증 2건뿐(requireProjectAccess/demoWriteBlock — 세션 쿠키 없이 오너 자격 부여).
 
 const LIVE = process.env.RUN_SHEET_E2E === '1'
-const PROJECT = 'a003a8c6-82a1-4b6a-95d6-889a1f57ee08' // webtoon_test (vertical_9:16)
+// 대상은 env 로 오버라이드 가능 — 기본값은 최초 검증(webtoon_test) 좌표.
+const PROJECT = process.env.E2E_PROJECT ?? 'a003a8c6-82a1-4b6a-95d6-889a1f57ee08'
 const OWNER = 'd93f86e2-bbd6-4a23-b0c4-11a0a4c980ac'
-const ROUGH_SHOTS = ['sh_02_04', 'sh_02_05', 'sh_02_06'] // 같은 씬(sc_02) 3샷 → grid4 1시트
-const REPAINT_SHOT = 'sh_02_04'
+// 세미콜론 = 시트 그룹 구분(그룹별 force 1회 — 호출당 2시트 상한·완료분 재재생성 회피)
+const ROUGH_GROUPS = (process.env.E2E_ROUGH_SHOTS ?? 'sh_02_04,sh_02_05,sh_02_06')
+  .split(';')
+  .map((g) => g.split(',').filter(Boolean))
+const REPAINT_SHOT = process.env.E2E_REPAINT_SHOT ?? ROUGH_GROUPS[0][0]
+const SKIP_REPAINT = process.env.E2E_SKIP_REPAINT === '1'
+const SKIP_SEED = process.env.E2E_SKIP_SEED === '1'
 
 // 라우트 모듈 로드 전에 프로덕션 env 주입 (supabaseAdmin 은 모듈 로드 시 env 를 읽는다).
 //   vitest 셋업이 유닛테스트 보호용 센티널(supabase.invalid 등)을 미리 심으므로 **무조건 덮어쓴다**
@@ -59,7 +65,9 @@ describe.runIf(LIVE)('sheet-formats E2E — storage 시드 + writer/director 실
       const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
 
       // ── ① 오너 지시: 템플릿 전량 storage 업로드/업데이트 (제품 해시 경로 규약 그대로) ──
-      const formats = ['horizontal_16:9', 'vertical_9:16', 'square_1:1', 'cinema_2.39:1'] as const
+      const formats = SKIP_SEED
+        ? ([] as const)
+        : (['horizontal_16:9', 'vertical_9:16', 'square_1:1', 'cinema_2.39:1'] as const)
       const seeded: string[] = []
       for (const f of formats) {
         for (const v of ['grid4', 'strip1'] as const) {
@@ -72,7 +80,7 @@ describe.runIf(LIVE)('sheet-formats E2E — storage 시드 + writer/director 실
         }
       }
       // 레거시 2장도 최신 상태 보증 (null 포맷 구 프로젝트용)
-      for (const legacy of ['rough-storyboard-grid.png', 'rough-storyboard-strip.png']) {
+      for (const legacy of SKIP_SEED ? [] : ['rough-storyboard-grid.png', 'rough-storyboard-strip.png']) {
         const url = await templateAssetUrl(legacy)
         expect(url).toBeTruthy()
         seeded.push(url!)
@@ -107,31 +115,35 @@ describe.runIf(LIVE)('sheet-formats E2E — storage 시드 + writer/director 실
         return { buf, w: m.width ?? 0, h: m.height ?? 0 }
       }
 
-      // ── ② writer: 러프 force 재생성 — vertical grid4 시트 경로 ──
+      // ── ② writer: 러프 force 재생성 — 시트 그룹별 개별 force 호출(완료분 재재생성 회피) ──
       const { POST: roughPOST } = await import('@/app/api/writer/rough-storyboard/route')
-      const roughRes = await roughPOST(
-        post('/api/writer/rough-storyboard', {
-          projectId: PROJECT,
-          shotIds: ROUGH_SHOTS,
-          force: true,
-        }) as never,
-      )
-      const roughBody = (await roughRes.json()) as {
-        ok: boolean
-        data?: { submitted: Array<{ jobId: string; shotIds?: string[] }> }
-        error?: unknown
+      let totalJobs = 0
+      for (const group of ROUGH_GROUPS) {
+        const roughRes = await roughPOST(
+          post('/api/writer/rough-storyboard', {
+            projectId: PROJECT,
+            shotIds: group,
+            force: true,
+          }) as never,
+        )
+        const roughBody = (await roughRes.json()) as {
+          ok: boolean
+          data?: { submitted: Array<{ jobId: string; shotIds?: string[] }> }
+          error?: unknown
+        }
+        expect(roughBody.ok, `rough submit: ${JSON.stringify(roughBody.error ?? '')}`).toBe(true)
+        const ids = [...new Set(roughBody.data!.submitted.map((j) => j.jobId))]
+        totalJobs += ids.length
+        for (const id of ids) await settle(id, `rough ${id}`)
       }
-      expect(roughBody.ok, `rough submit: ${JSON.stringify(roughBody.error ?? '')}`).toBe(true)
-      const roughJobIds = [...new Set(roughBody.data!.submitted.map((j) => j.jobId))]
-      expect(roughJobIds.length).toBeGreaterThanOrEqual(1)
-      for (const id of roughJobIds) await settle(id, `rough ${id}`)
+      expect(totalJobs).toBeGreaterThanOrEqual(1)
 
       // 검증: 세로 프레임 (셀 9:16 — 레거시 가로 러프가 세로로 교체됐는가)
       const { data: roughShots } = await supabaseAdmin
         .from('shots')
         .select('shot_id, rough_storyboard')
         .eq('project_id', PROJECT)
-        .in('shot_id', ROUGH_SHOTS)
+        .in('shot_id', ROUGH_GROUPS.flat())
       for (const s of roughShots ?? []) {
         const frames = (s.rough_storyboard as { frames?: Record<string, string> } | null)?.frames
         expect(frames?.start, `${s.shot_id} rough frames`).toBeTruthy()
@@ -139,6 +151,8 @@ describe.runIf(LIVE)('sheet-formats E2E — storage 시드 + writer/director 실
         expect(w / h, `${s.shot_id} 세로 프레임 (${w}x${h})`).toBeLessThan(0.8)
         await writeFile(path.join(outDir, `rough-${s.shot_id}-start.png`), buf)
       }
+
+      if (SKIP_REPAINT) return
 
       // ── ③ director: 개별 샷 재생성 — 세로 러프 → 가로 3열 스트립 리페인트 경로 ──
       const { data: shotRow } = await supabaseAdmin

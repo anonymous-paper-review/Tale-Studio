@@ -365,8 +365,12 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   const kelvin = L?.color_temp_kelvin
   const tempW = colorTempWord(kelvin)
   if (tempW) labels.push(`${tempW} ${kelvin}K`)
+  // #label-invasion(2026-08-17, 실측 a219b9f3 sh_01_01): 좁은 세로 셀에서 "margins" 지시가
+  //   두 갈래로 오작동 — 그림을 크게 덮거나(잠식), 패널 밖 행 사이에 텍스트 밴드를 만들어
+  //   시트 레이아웃을 밀었다(크롭 어긋남). 위치·크기·바깥 금지를 못박는다. 하단 가장자리
+  //   침범은 오너 허용 스타일(2026-08-17) — 행 시작 경계를 깨끗하게 유지하는 부수 효과도 있다.
   const motion = labels.length
-    ? `${motionBase}. In addition to the motion arrows, letter these small handwritten technical labels in the DIRECTION frame's margins: ${labels.map((l) => `"${l}"`).join(', ')}`
+    ? `${motionBase}. In addition to the motion arrows, letter these technical labels in TINY handwriting tucked along the bottom edge of the DIRECTION frame, inside the panel (abbreviate freely; never cover the figures or the main subject; never write outside the panel borders or between panels): ${labels.map((l) => `"${l}"`).join(', ')}`
     : motionBase
 
   const endBase = motionParts.length

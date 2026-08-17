@@ -75,7 +75,9 @@ describe('previz 강화 ③ — 스케치에 빛·초점', () => {
 describe('previz 강화 ① — DIRECTION 기술 라벨', () => {
   it('KEY/카메라/FOCUS/색온도 라벨을 DIRECTION(motion)에 싣는다', () => {
     const cell = buildRoughGridCell(richInput(), 'sh_01_01')
-    expect(cell.motion).toContain('handwritten technical labels')
+    // #label-invasion(2026-08-17): 라벨은 작게·패널 안 하단 가장자리 — 잠식·행 밀림 방지 계약.
+    expect(cell.motion).toContain('TINY handwriting')
+    expect(cell.motion).toContain('inside the panel')
     expect(cell.motion).toContain('"KEY: top right, soft"')
     expect(cell.motion).toContain('35mm')
     expect(cell.motion).toContain('shallow focus')
