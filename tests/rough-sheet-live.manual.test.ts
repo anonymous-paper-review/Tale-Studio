@@ -19,6 +19,11 @@ import type { RoughStoryboardSpec, RoughStoryboardPromptInput } from '@/lib/writ
 
 const LIVE = process.env.RUN_SHEET_LIVE === '1'
 const FMT = (process.env.LIVE_FMT ?? 'cinema_2.39:1') as ProjectFormat
+// 실험 변수(HYPOTHESIS-geometry-prompt): 지오메트리 준수 계약을 프롬프트 끝에 추가 —
+//   direction 행 세로 신장(전 포맷 contain 패딩 10~13% 실측)의 문안 억제를 A/B 한다.
+const GEOM = process.env.LIVE_GEOM === '1'
+const GEOM_CONTRACT =
+  "Panel geometry is a hard contract: every panel's four borders stay EXACTLY where the template drew them — never move, stretch or redraw a border at a different position, and never let any panel grow taller or wider than its template box. This applies to the DIRECTION panel too: shrink the drawing and its caption block together so BOTH fit entirely inside the panel's original borders — the caption block replaces the bottom of the drawing, it never extends the panel."
 const OUT =
   process.env.LIVE_OUT ?? path.join(process.cwd(), 'research/experiments/sheet-formats', `out-live-${FMT.replace(/[^a-z0-9]/gi, '')}`)
 
@@ -218,7 +223,8 @@ describe.runIf(LIVE)('rough-sheet live — 포맷 시트 실생성 + 프로덕�
 
       // 프로덕션 라우트와 동일 조립: 셀 → 프롬프트 → edit 모델 + 명시 캔버스 (#sheet-formats)
       const cells = FIXTURE.map((f) => buildRoughGridCell(f.input, f.shotId))
-      const prompt = buildRoughGridPrompt(cells, 'grid4', { frameAxis: geom.frameAxis })
+      const basePrompt = buildRoughGridPrompt(cells, 'grid4', { frameAxis: geom.frameAxis })
+      const prompt = GEOM ? `${basePrompt}\n\n${GEOM_CONTRACT}` : basePrompt
 
       const submittedAt = new Date().toISOString()
       const { request_id, model } = await falImageSubmit({
@@ -271,10 +277,13 @@ describe.runIf(LIVE)('rough-sheet live — 포맷 시트 실생성 + 프로덕�
             request_id,
             image_size: geom.roughImageSize,
             templateUrl,
+            geometryContract: GEOM,
             submittedAt,
             completedAt: new Date().toISOString(),
             sheet: `${meta.width}x${meta.height}`,
             frame: want ? `${want.w}x${want.h}` : null,
+            // 스펙 좌표 동봉 — 오버레이 검증 스크립트가 제품 코드 밖에서 좌표를 재타이핑하지 않게
+            spec: { canvas: sheetSpec!.canvas, colBoxes: sheetSpec!.colBoxes, rowBoxes: sheetSpec!.rowBoxes },
             prompt,
           },
           null,
