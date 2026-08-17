@@ -1,0 +1,144 @@
+{
+  "probed_at": "2026-08-15T17:01:39.219Z",
+  "summary": {
+    "total_rows": 12,
+    "active_rows": 12,
+    "medium_null": 0,
+    "medium_live_action": 7,
+    "medium_non_live_action": 5,
+    "style_clause_present": 12,
+    "style_clause_absent": 0,
+    "use_preview_ref_true": 2,
+    "use_preview_ref_false_or_null": 10,
+    "anchor_kind_sublook": 6,
+    "anchor_kind_media_or_null": 6,
+    "mediums": [
+      "2d_anime",
+      "2d_cartoon",
+      "3d",
+      "live_action",
+      "stop_motion",
+      "watercolor"
+    ]
+  },
+  "rows": [
+    {
+      "key": "jp_anime",
+      "is_active": true,
+      "medium": "2d_anime",
+      "has_style_clause": true,
+      "use_preview_ref": false,
+      "has_preview_url": true,
+      "anchor_kind": "media"
+    },
+    {
+      "key": "real",
+      "is_active": true,
+      "medium": "live_action",
+      "has_style_clause": true,
+      "use_preview_ref": false,
+      "has_preview_url": true,
+      "anchor_kind": "media"
+    },
+    {
+      "key": "real_3d",
+      "is_active": true,
+      "medium": "3d",
+      "has_style_clause": true,
+      "use_preview_ref": false,
+      "has_preview_url": true,
+      "anchor_kind": "media"
+    },
+    {
+      "key": "real_desert_fantasy",
+      "is_active": true,
+      "medium": "live_action",
+      "has_style_clause": true,
+      "use_preview_ref": false,
+      "has_preview_url": true,
+      "anchor_kind": "sublook"
+    },
+    {
+      "key": "real_euro_period",
+      "is_active": true,
+      "medium": "live_action",
+      "has_style_clause": true,
+      "use_preview_ref": false,
+      "has_preview_url": true,
+      "anchor_kind": "sublook"
+    },
+    {
+      "key": "real_hitech_sf",
+      "is_active": true,
+      "medium": "live_action",
+      "has_style_clause": true,
+      "use_preview_ref": false,
+      "has_preview_url": true,
+      "anchor_kind": "sublook"
+    },
+    {
+      "key": "real_jp_melo",
+      "is_active": true,
+      "medium": "live_action",
+      "has_style_clause": true,
+      "use_preview_ref": false,
+      "has_preview_url": true,
+      "anchor_kind": "sublook"
+    },
+    {
+      "key": "real_psy_horror",
+      "is_active": true,
+      "medium": "live_action",
+      "has_style_clause": true,
+      "use_preview_ref": true,
+      "has_preview_url": true,
+      "anchor_kind": "sublook"
+    },
+    {
+      "key": "real_urban_hero",
+      "is_active": true,
+      "medium": "live_action",
+      "has_style_clause": true,
+      "use_preview_ref": false,
+      "has_preview_url": true,
+      "anchor_kind": "sublook"
+    },
+    {
+      "key": "stop_motion",
+      "is_active": true,
+      "medium": "stop_motion",
+      "has_style_clause": true,
+      "use_preview_ref": false,
+      "has_preview_url": true,
+      "anchor_kind": "media"
+    },
+    {
+      "key": "us_cartoon",
+      "is_active": true,
+      "medium": "2d_cartoon",
+      "has_style_clause": true,
+      "use_preview_ref": false,
+      "has_preview_url": true,
+      "anchor_kind": "media"
+    },
+    {
+      "key": "watercolor",
+      "is_active": true,
+      "medium": "watercolor",
+      "has_style_clause": true,
+      "use_preview_ref": true,
+      "has_preview_url": true,
+      "anchor_kind": "media"
+    }
+  ],
+  "customCheck": [
+    {
+      "id": "a003a8c6-82a1-4b6a-95d6-889a1f57ee08",
+      "title": "webtoon_test",
+      "style_anchor_key": "custom_be2890f1-cecc-4f50-8e79-562f3e68efd6",
+      "key_exists_in_catalog": false,
+      "custom_medium": "2d_anime",
+      "custom_label": "선명한 선화 셀 셰이딩 판타지"
+    }
+  ]
+}

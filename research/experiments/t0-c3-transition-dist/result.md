@@ -2,7 +2,7 @@
 
 - **날짜**: 2026-08-11 (밤 러너)
 - **판정**: **유보** — 사전 등록 유보 구간(80~95%) 적중. cut 합산 점유 93.3% (기각 조건 <80% 미발동, 참 조건 ≥95% 미달)
-- **출처 티켓**: `research/backlog/t0-c3-transition-dist.md` ← prompt-contract-audit §3 재검증① (카탈로그 C3❌)
+- **출처 티켓**: `.claude/vault/backlog/t0-c3-transition-dist.md` ← prompt-contract-audit §3 재검증① (카탈로그 C3❌)
 
 ## 가설과 결과
 

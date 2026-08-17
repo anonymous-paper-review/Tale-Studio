@@ -2,7 +2,7 @@
 
 - **날짜**: 2026-08-11 (밤 러너)
 - **판정**: **가설 참 — 복원 완료.** 배터리는 git과 백업 tar 양쪽에 실존했고, 이 디렉토리로 복원됨. 실행은 하지 않음(티켓 규정 — 배터리에 LLM 콜 있음).
-- **출처 티켓**: `research/backlog/t0-r1-battery-restore.md` ← prompt-contract-audit §3 (카탈로그 B2🕳)
+- **출처 티켓**: `.claude/vault/backlog/t0-r1-battery-restore.md` ← prompt-contract-audit §3 (카탈로그 B2🕳)
 
 ## 복원물과 출처
 

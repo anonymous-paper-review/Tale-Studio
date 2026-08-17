@@ -1,0 +1,333 @@
+{
+  "queriedAt": "2026-08-15T16:44:14.925Z",
+  "table": "generation_jobs",
+  "readOnly": true,
+  "headCountExact": 952,
+  "pagedRowCount": 952,
+  "uniqueIdCount": 952,
+  "countsMatch": true,
+  "createdAtRange": {
+    "first": "2026-07-14T13:34:29.239458+00:00",
+    "last": "2026-08-14T09:27:55.639756+00:00"
+  },
+  "statusCounts": {
+    "completed": 901,
+    "failed": 48,
+    "queued": 3
+  },
+  "attemptsDistributionAll": {
+    "1": 952
+  },
+  "attemptsDistributionFailed": {
+    "1": 48
+  },
+  "attemptsGte2Count": 0,
+  "attemptsGte2Rows": [],
+  "failedTotal": 48,
+  "failRatePct": 5.04,
+  "errorClassCounts": {
+    "bad_request": 14,
+    "infra": 13,
+    "moderation_soft": 9,
+    "data_ref": 5,
+    "billing": 4,
+    "provider": 2,
+    "moderation": 1
+  },
+  "errorClassFillRates": {
+    "error_class_filled": 48,
+    "last_error_filled": 35,
+    "error_filled": 48,
+    "failed_total": 48
+  },
+  "kindTable": [
+    {
+      "kind": "shot_rough_storyboard",
+      "total": 447,
+      "failed": 25,
+      "failRatePct": 5.59
+    },
+    {
+      "kind": "character_view",
+      "total": 83,
+      "failed": 9,
+      "failRatePct": 10.84
+    },
+    {
+      "kind": "world_shot",
+      "total": 88,
+      "failed": 7,
+      "failRatePct": 7.95
+    },
+    {
+      "kind": "shot_storyboard",
+      "total": 60,
+      "failed": 3,
+      "failRatePct": 5
+    },
+    {
+      "kind": "shot_video",
+      "total": 155,
+      "failed": 2,
+      "failRatePct": 1.29
+    },
+    {
+      "kind": "storyboard_real_grid",
+      "total": 115,
+      "failed": 2,
+      "failRatePct": 1.74
+    },
+    {
+      "kind": "shot_previz_video",
+      "total": 4,
+      "failed": 0,
+      "failRatePct": 0
+    }
+  ],
+  "kindByErrorClass": {
+    "shot_rough_storyboard": {
+      "infra": 6,
+      "moderation_soft": 9,
+      "bad_request": 10
+    },
+    "character_view": {
+      "data_ref": 5,
+      "billing": 4
+    },
+    "world_shot": {
+      "infra": 7
+    },
+    "shot_storyboard": {
+      "bad_request": 2,
+      "moderation": 1
+    },
+    "shot_video": {
+      "provider": 2
+    },
+    "storyboard_real_grid": {
+      "bad_request": 2
+    }
+  },
+  "actorCountsAll": {
+    "ui": 822,
+    "writer": 127,
+    "chat": 3
+  },
+  "actorCountsFailed": {
+    "ui": 37,
+    "writer": 11
+  },
+  "slotFollowUp": {
+    "note": "판정선 밖 보조 관측 — attempts 칸이 아니라 \"새 잡 행\"으로 다시 보내진 흔적이 있는지",
+    "slotsWithAtLeastOneFailure": 44,
+    "slotsWithAnotherJobAfterFailure": 31,
+    "slotsWithSuccessAfterFailure": 31,
+    "followUpJobActorCounts": {
+      "ui": 118,
+      "writer": 7
+    }
+  },
+  "codeAxis": {
+    "source": "src/lib/generation-jobs.ts (제품 코드 직접 import — 복붙 없음)",
+    "giveUpExemptClasses": [
+      "infra",
+      "provider"
+    ],
+    "autoGenerationGiveUpThreshold": 2,
+    "classifyJobErrorSelfTest": {
+      "fal 잔액 소진": "billing",
+      "image URL is not accessible": "data_ref",
+      "Bad Request": "bad_request",
+      "stale queued reaped": "infra",
+      "(빈 문자열)": "unknown"
+    }
+  },
+  "errorClassVsExemption": {
+    "note": "면제 목록은 \"give-up 게이트가 세지 않는 클래스\"다. 면제는 재시도를 일으키지 않고, 미래의 빈칸 채움을 막지 않을 뿐이다.",
+    "table": [
+      {
+        "errorClass": "bad_request",
+        "count": 14,
+        "autoRetryExempt": false
+      },
+      {
+        "errorClass": "infra",
+        "count": 13,
+        "autoRetryExempt": true
+      },
+      {
+        "errorClass": "moderation_soft",
+        "count": 9,
+        "autoRetryExempt": false
+      },
+      {
+        "errorClass": "data_ref",
+        "count": 5,
+        "autoRetryExempt": false
+      },
+      {
+        "errorClass": "billing",
+        "count": 4,
+        "autoRetryExempt": false
+      },
+      {
+        "errorClass": "provider",
+        "count": 2,
+        "autoRetryExempt": true
+      },
+      {
+        "errorClass": "moderation",
+        "count": 1,
+        "autoRetryExempt": false
+      }
+    ],
+    "exemptFailures": 15,
+    "nonExemptFailures": 33
+  },
+  "errorSamples": {
+    "infra": [
+      {
+        "id": "c5ddc5d1-8bb2-432a-b275-b73545944505",
+        "kind": "shot_rough_storyboard",
+        "attempts": 1,
+        "created_at": "2026-07-14T13:34:41.51145+00:00",
+        "error": "stale queued reaped — webhook 유실 좀비 정리 (quota 복구 2026-08-05)"
+      },
+      {
+        "id": "9ad02b22-c800-4035-9752-ab073fead837",
+        "kind": "shot_rough_storyboard",
+        "attempts": 1,
+        "created_at": "2026-07-14T13:34:41.51145+00:00",
+        "error": "stale queued reaped — webhook 유실 좀비 정리 (quota 복구 2026-08-05)"
+      }
+    ],
+    "moderation_soft": [
+      {
+        "id": "7e9756df-a520-4102-a189-94cd53dbfb8b",
+        "kind": "shot_rough_storyboard",
+        "attempts": 1,
+        "created_at": "2026-07-14T13:34:45.171829+00:00",
+        "error": "image too small (1795b < 20000) — likely blank/moderated output"
+      },
+      {
+        "id": "ba4859c2-4b0c-4913-822d-c5618620c2c6",
+        "kind": "shot_rough_storyboard",
+        "attempts": 1,
+        "created_at": "2026-07-14T13:34:45.171829+00:00",
+        "error": "image too small (1795b < 20000) — likely blank/moderated output"
+      }
+    ],
+    "data_ref": [
+      {
+        "id": "29f3dd68-9c48-4084-92df-de7daab118cc",
+        "kind": "character_view",
+        "attempts": 1,
+        "created_at": "2026-07-15T06:39:18.289367+00:00",
+        "error": "status=422 | body={\"detail\":[{\"loc\":[\"body\",\"input.image_urls\"],\"msg\":\"Failed to load the image. Please ensure the image file is not corrupted and is in a supported format.\",\"type\":\"image_load_error\","
+      },
+      {
+        "id": "57924e6c-f525-4d4c-8685-2e1f70cda5fc",
+        "kind": "character_view",
+        "attempts": 1,
+        "created_at": "2026-07-15T06:39:19.059677+00:00",
+        "error": "status=422 | body={\"detail\":[{\"loc\":[\"body\",\"input.image_urls\"],\"msg\":\"Failed to load the image. Please ensure the image file is not corrupted and is in a supported format.\",\"type\":\"image_load_error\","
+      }
+    ],
+    "billing": [
+      {
+        "id": "17f24214-7df7-40c6-a5d3-bfe3c1cec361",
+        "kind": "character_view",
+        "attempts": 1,
+        "created_at": "2026-07-15T10:33:16.284072+00:00",
+        "error": "fal 잔액 소진으로 미실행 — 수동 이미지 경로로 대체"
+      },
+      {
+        "id": "03497862-f7ed-46dc-814c-92019674b916",
+        "kind": "character_view",
+        "attempts": 1,
+        "created_at": "2026-07-15T10:33:16.870651+00:00",
+        "error": "fal 잔액 소진으로 미실행 — 수동 이미지 경로로 대체"
+      }
+    ],
+    "bad_request": [
+      {
+        "id": "ea99590c-8a19-42f0-8880-6071d091631c",
+        "kind": "shot_storyboard",
+        "attempts": 1,
+        "created_at": "2026-07-24T10:23:08.332618+00:00",
+        "error": "Bad Request"
+      },
+      {
+        "id": "430c9bed-dbb3-4a26-9621-9c7c81385bb5",
+        "kind": "shot_rough_storyboard",
+        "attempts": 1,
+        "created_at": "2026-08-05T07:11:29.080061+00:00",
+        "error": "Bad Request"
+      }
+    ],
+    "moderation": [
+      {
+        "id": "5d41afb9-09c7-433d-b852-769a67bb7dce",
+        "kind": "shot_storyboard",
+        "attempts": 1,
+        "created_at": "2026-07-26T01:09:47.740125+00:00",
+        "error": "status=422 | Unprocessable Entity | body={\"detail\":[{\"loc\":[\"body\",\"prompt\"],\"msg\":\"The content could not be processed because it contained material flagged by a content checker.\",\"type\":\"content_poli"
+      }
+    ],
+    "provider": [
+      {
+        "id": "b319d20d-92bf-4006-9409-bed13c589a58",
+        "kind": "shot_video",
+        "attempts": 1,
+        "created_at": "2026-07-31T14:47:49.830617+00:00",
+        "error": "invalid video url in provider result"
+      },
+      {
+        "id": "da4efc35-6d9e-4ccd-a507-180674bdd672",
+        "kind": "shot_video",
+        "attempts": 1,
+        "created_at": "2026-07-31T16:41:40.707545+00:00",
+        "error": "invalid video url in provider result"
+      }
+    ]
+  },
+  "attemptsWriteSites": [
+    {
+      "file": "src/lib/generation-jobs.ts",
+      "line": 167,
+      "code": "attempts: 1,",
+      "kind": "INSERT 시 상수 고정",
+      "increments": false
+    },
+    {
+      "file": "supabase/migrations/20260720043300_director_video_retakes_hardening.sql",
+      "line": 136,
+      "code": "update public.generation_jobs set request_id = ..., attempts = 1, ... where id = p_job_id and status = 'queued'",
+      "kind": "예약된 영상 잡 제출 시 1로 설정",
+      "increments": false
+    },
+    {
+      "file": "src/types/database.ts",
+      "line": 192,
+      "code": "attempts: number",
+      "kind": "타입 선언만",
+      "increments": false
+    }
+  ],
+  "attemptsIncrementSiteCount": 0,
+  "verdict": {
+    "line": "0건이고 시도 횟수를 늘리는 코드도 0곳이면 → \"재시도 장치는 존재하지 않는다\" 확정",
+    "which": 2,
+    "attemptsGte2": 0,
+    "incrementSites": 0,
+    "morningAction": "아침 목록에 목적지 갱신 초안"
+  },
+  "claimCrossCheck": {
+    "finding58Title": "그림 생성이 5건 중 1건꼴로 실패하는데 재시도가 단 한 번도 일어난 적이 없다",
+    "claimedFailRatePct": 20,
+    "measuredFailRatePct": 5.04,
+    "measuredFailed": 48,
+    "measuredTotal": 952,
+    "note": "실패율 주장은 어긋난다(20% 주장 vs 실측 5.04%). 티켓 규칙대로 이 어긋남은 판정을 바꾸지 않는다."
+  }
+}

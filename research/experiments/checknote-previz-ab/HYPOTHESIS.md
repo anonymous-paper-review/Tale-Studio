@@ -2,7 +2,7 @@
 
 > 작성 2026-08-11. 실행 전 사전 등록 — 결과를 본 뒤 이 문서를 소급 수정하지 않는다.
 > 심사 규칙 `.claude/rules/experiments.md` / 폼 `research/experiments/_HYPOTHESIS.md`.
-> 티켓: `research/backlog/t2-checknote-previz-ab.md` (T2 — 오너 승인 대기).
+> 티켓: `.claude/vault/backlog/t2-checknote-previz-ab.md` (T2 — 오너 승인 대기).
 
 ## 5줄
 

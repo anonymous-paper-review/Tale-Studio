@@ -1,6 +1,6 @@
 {
   "purpose": "참조 역할 계약 문단의 일반화 점검 — 3 시나리오(다른 이야기/다른 움직임/다른 연출) × ⓧ계약없음·ⓨ계약있음 × 1회. 관찰 전용, 판정·점수 없음",
-  "ticket": "research/backlog/t2-contract-generalize.md",
+  "ticket": ".claude/vault/backlog/t2-contract-generalize.md",
   "prior": "research/experiments/previz-video-reference-ab/qual4-grammar (동일 문단이 질주 샷 1개에서 최우수)",
   "model": "bytedance/seedance-2.0/reference-to-video",
   "model_note": "Seedance 2.0 고정 — 2.5 전환은 별건이라 통제",

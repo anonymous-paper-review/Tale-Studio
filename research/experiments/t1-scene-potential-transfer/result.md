@@ -3,7 +3,7 @@
 - **날짜**: 2026-08-11 (밤 러너)
 - **판정**: **가설 참** — blind 매칭 14/14 = 100% vs 우연율 33.3% (Δ+66.7%p ≥ 사전 등록 문턱 +20%p).
   scene_potential은 장식이 아니라 실제로 씬에 전이되는 재료다. (이항 p ≈ 2×10⁻⁷)
-- **출처 티켓**: `research/backlog/t1-scene-potential-transfer.md` ← dramaturgy-world-derivation §3
+- **출처 티켓**: `.claude/vault/backlog/t1-scene-potential-transfer.md` ← dramaturgy-world-derivation §3
 
 ## 설계 (사전 등록 준수)
 

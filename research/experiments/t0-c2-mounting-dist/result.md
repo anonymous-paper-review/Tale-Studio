@@ -2,7 +2,7 @@
 
 - **날짜**: 2026-08-11 (밤 러너)
 - **판정**: **가설 기각** — 기각 조건 발동 (handheld 계열 32% < 60%)
-- **출처 티켓**: `research/backlog/t0-c2-mounting-dist.md` ← prompt-contract-audit §3 재검증② (카탈로그 C2❌)
+- **출처 티켓**: `.claude/vault/backlog/t0-c2-mounting-dist.md` ← prompt-contract-audit §3 재검증② (카탈로그 C2❌)
 
 ## 가설과 결과
 

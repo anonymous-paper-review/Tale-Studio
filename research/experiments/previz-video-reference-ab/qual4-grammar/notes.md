@@ -3,7 +3,7 @@
 > 2026-08-11 수집. **판정·점수·승패 없음** — 프레임열 육안 관찰만 적는다. 승패는 오너 육안(낮 세션).
 > ⓔ는 같은 날 뒤에 추가된 **교정 조건**이다(오너 지적: ⓑⓒⓓ의 정면 구간에 카메라 운동 서술이 통째로
 > 빠져 있어, 전환이 앞당겨진 원인이 "초를 뺀 것"인지 "정면에 할 일이 없던 것"인지 구분되지 않았다).
-> 티켓: `research/backlog/t2-shot-grammar-rewrite.md` · 근거 조사: `../../_research/short-video-timing-and-rampup.md` 조치 1·2·4.
+> 티켓: `.claude/vault/backlog/t2-shot-grammar-rewrite.md` · 근거 조사: `../../_research/short-video-timing-and-rampup.md` 조치 1·2·4.
 > 발주 좌표·payload 전문: `manifest.json`. 팔별 프롬프트 전문: `inputs/prompt_{a_control,b,c,d}.txt`.
 > 시간 판독은 4fps 타일 기준이라 분해능 **±0.25초**. 그보다 짧은 전환·미세 워블은 사각.
 

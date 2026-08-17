@@ -1,0 +1,85 @@
+{
+  "generated_for": "2026-08-16",
+  "project": "/Users/xcape/projects/tale-studio",
+  "scanned": 58,
+  "targets": 7,
+  "sessions": [
+    {
+      "store": "gjc",
+      "sid": "2026-08-15T03-44-18-523Z_01a00385-3c5b-7000-8216-1b7b53d8decf",
+      "digest": "digest/gjc-01a00385.md",
+      "mtime": "2026-08-15T21:08",
+      "size_kb": 1376,
+      "digest_bytes": 18509,
+      "oversized": false,
+      "rejections": 0,
+      "first_user": "여러 터미널세션을 열어놓고 펼쳐놓은 작업들이 있는데\n다음과 같음 (각터미널에서 세션id 달라고했음)\n지금 main에 writer와 관련된 작업들이 대부분인데\n\n\n묶어서 정리한번 해줄래? 정리라는게 버그나 커밋컨플릭트나 충돌이나 의도간의 충돌이있으면\n정리해주고 내 의사가 필요하면 나에게 리스트업해서 축약어나 개발용어 최대한 배제하고 가볍게 리스트업\n\ncc9e"
+    },
+    {
+      "store": "claude",
+      "sid": "a2149b0f-f75d-456e-b98a-56f79e6f4437",
+      "digest": "digest/claude-a2149b0f.md",
+      "mtime": "2026-08-15T20:30",
+      "size_kb": 105,
+      "digest_bytes": 2683,
+      "oversized": false,
+      "rejections": 0,
+      "first_user": "맥북 덮어놔도 claudecode나 gjc같은 에이전트터미널 계속 배터리없어서꺼질떄까지 동작하게하려면 어떻게해야돼?"
+    },
+    {
+      "store": "claude",
+      "sid": "cc9e03b1-86a9-4cd2-bbfd-9ae9eda6d28d",
+      "digest": "digest/claude-cc9e03b1.md",
+      "mtime": "2026-08-15T12:45",
+      "size_kb": 1637,
+      "digest_bytes": 15334,
+      "oversized": false,
+      "rejections": 1,
+      "first_user": "지금 writer에서 우리가 발견하고 인지하고 잇는 문제들을 축약어 없고 개발용어는 최소한으로해서 리스트업해볼래?\n\n  vault라던가, .omc, .gjc의 세션들 그리고 클러드에서 html로 만든 아티팩트에 이런게 파편화되어잇는데 중복된것들은 그룹화해서 정리해주고 \n\n일단 초안으로 리스트업하고 어떤형태로 보여줄지 생각해보면좋을듯?\n\n너무 파편화가 많이되"
+    },
+    {
+      "store": "gjc",
+      "sid": "2026-08-13T14-09-47-348Z_019ffb75-2954-7000-af44-0490f5439c06",
+      "digest": "digest/gjc-019ffb75.md",
+      "mtime": "2026-08-15T12:43",
+      "size_kb": 178,
+      "digest_bytes": 3138,
+      "oversized": false,
+      "rejections": 0,
+      "first_user": "gjc update"
+    },
+    {
+      "store": "claude",
+      "sid": "5a3338db-acc5-49a0-b7e3-d6511b8c3e28",
+      "digest": "digest/claude-5a3338db.md",
+      "mtime": "2026-08-15T12:43",
+      "size_kb": 5568,
+      "digest_bytes": 51979,
+      "oversized": true,
+      "rejections": 7,
+      "first_user": "야 producer의 파일업로드에서 jpg,png업로드 지원하려고하는데 정책이랑 기능제안좀 해줘\n\n5mb정도면 되려나? 웹툰파일업로드 허용하고싶은데 어디까지 허용해줘야할까? \n\n그리고 txt계열(md,hwp,docs)랑 image계열(jpg,png,svg)를 구분하는 ui 만들어줘야할까?"
+    },
+    {
+      "store": "claude",
+      "sid": "52ae45f9-62e9-4bba-94db-b3c0869e7248",
+      "digest": "digest/claude-52ae45f9.md",
+      "mtime": "2026-08-15T12:13",
+      "size_kb": 3005,
+      "digest_bytes": 14551,
+      "oversized": false,
+      "rejections": 2,
+      "first_user": "https://claude.ai/code/artifact/a7a74acc-d3db-4bd4-9ae1-84463a4ea6ae 이거 보고 우리 writer 백엔드에서 visual축이랑 샷층(decoupage, shotdesin, shotcheck 부분) 새로 뽑아서 현행코드기준으로 \n다시 현황표 만들어줄수있음?\n\n연결여부랑 이런거 다 약간 노드형태로 연결하는 "
+    },
+    {
+      "store": "claude",
+      "sid": "0897af55-d557-4b5a-8928-990db6e6b599",
+      "digest": "digest/claude-0897af55.md",
+      "mtime": "2026-08-15T11:41",
+      "size_kb": 3914,
+      "digest_bytes": 47550,
+      "oversized": false,
+      "rejections": 3,
+      "first_user": "gajae\n Drafting detailed architecture summary\n\n Evaluating reliability improvements and workflow options\n                                                                                               "
+    }
+  ]
+}

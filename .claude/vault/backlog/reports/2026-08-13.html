@@ -1,0 +1,303 @@
+<title>밤사이 보고 — 2026년 8월 13일</title>
+<style>
+  :root {
+    --bg: #F7F5F0;
+    --surface: #FFFFFF;
+    --surface-2: #F1EEE6;
+    --ink: #22242A;
+    --muted: #6E7077;
+    --line: #E3E0D8;
+    --accent: #A64F2A;
+    --accent-ink: #8A3F1E;
+    --accent-soft: #F3E4DB;
+    --ok: #2F7D4E;
+    --ok-soft: #E2F0E7;
+    --warn: #96690A;
+    --warn-soft: #F5EBD4;
+    --info: #3A6EA5;
+    --info-soft: #E3ECF5;
+    --violet: #7A5CA8;
+    --violet-soft: #ECE5F5;
+    --danger: #B3261E;
+    --danger-soft: #F7E0DE;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15171B; --surface: #1D2026; --surface-2: #23262D;
+      --ink: #E9E7E2; --muted: #9C9EA6; --line: #2C2F36;
+      --accent: #E0824F; --accent-ink: #E8956A; --accent-soft: #3A2A20;
+      --ok: #5FBE8A; --ok-soft: #1E3328;
+      --warn: #D9A94A; --warn-soft: #362C16;
+      --info: #7FA9D9; --info-soft: #1E2A38;
+      --violet: #A78BD0; --violet-soft: #2B2438;
+      --danger: #E8827A; --danger-soft: #3A211F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15171B; --surface: #1D2026; --surface-2: #23262D;
+    --ink: #E9E7E2; --muted: #9C9EA6; --line: #2C2F36;
+    --accent: #E0824F; --accent-ink: #E8956A; --accent-soft: #3A2A20;
+    --ok: #5FBE8A; --ok-soft: #1E3328;
+    --warn: #D9A94A; --warn-soft: #362C16;
+    --info: #7FA9D9; --info-soft: #1E2A38;
+    --violet: #A78BD0; --violet-soft: #2B2438;
+    --danger: #E8827A; --danger-soft: #3A211F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", sans-serif;
+    font-size: 15.5px; line-height: 1.7; margin: 0; padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  header.page { padding: 54px 0 10px; border-bottom: 2px solid var(--ink); margin-bottom: 20px; }
+  .kicker { color: var(--accent); font-weight: 700; font-size: 13px; margin: 0 0 10px; }
+  h1 { font-size: clamp(25px, 4.5vw, 34px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.28; margin: 0 0 10px; text-wrap: balance; }
+  .standfirst { font-size: 16px; color: var(--ink); margin: 0 0 6px; }
+  .asof { color: var(--muted); font-size: 13px; margin: 0; }
+  h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+  section.block { margin: 42px 0 0; }
+  .sec-head { border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 16px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .sec-head .lede { color: var(--muted); font-size: 14px; }
+  p { margin: 0 0 12px; }
+
+  .chip { display: inline-block; font-size: 12px; font-weight: 750; border-radius: 4px; padding: 1px 8px; white-space: nowrap; vertical-align: 1px; }
+  .c-ok { background: var(--ok-soft); color: var(--ok); }
+  .c-no { background: var(--info-soft); color: var(--info); }
+  .c-hold { background: var(--warn-soft); color: var(--warn); }
+  .c-fix { background: var(--accent-soft); color: var(--accent-ink); }
+  .c-stop { background: var(--violet-soft); color: var(--violet); }
+  .c-bad { background: var(--danger-soft); color: var(--danger); }
+
+  .lead-list { margin: 0; padding-left: 0; list-style: none; counter-reset: n; }
+  .lead-list > li { position: relative; padding: 10px 0 10px 36px; border-bottom: 1px dashed var(--line); }
+  .lead-list > li:last-child { border-bottom: none; }
+  .lead-list > li::before { counter-increment: n; content: counter(n); position: absolute; left: 0; top: 12px; width: 22px; height: 22px; border: 1.5px solid var(--accent); color: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 750; font-family: var(--mono); }
+  .lead-list b { font-weight: 750; }
+  .lead-list .d { color: var(--muted); font-size: 13.5px; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px 14px; margin: 0 0 14px; }
+  .card.flag { border-left: 3px solid var(--danger); }
+  .card .head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 12px; }
+  .card .head h3 { font-size: 16.5px; font-weight: 750; margin: 0; line-height: 1.45; text-wrap: balance; flex: 1 1 300px; }
+  .steps { display: grid; gap: 8px; margin: 0; }
+  .steps .row { display: grid; grid-template-columns: 74px 1fr; gap: 12px; align-items: baseline; }
+  .steps .k { font-size: 12px; font-weight: 750; color: var(--accent); letter-spacing: .02em; }
+  .steps .v { font-size: 14.5px; }
+  .steps .v b { font-weight: 750; }
+  @media (max-width: 520px) { .steps .row { grid-template-columns: 1fr; gap: 2px; } }
+  .left { border-top: 1px dashed var(--line); margin-top: 12px; padding-top: 9px; font-size: 13.5px; color: var(--muted); }
+  .left b { color: var(--ink); font-weight: 700; }
+
+  details { margin-top: 10px; border-top: 1px dashed var(--line); }
+  details summary { cursor: pointer; padding: 8px 0 4px; font-size: 13px; font-weight: 700; color: var(--info); list-style: none; }
+  details summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details summary::-webkit-details-marker { display: none; }
+  details .body { padding: 4px 0 8px; font-size: 13.5px; color: var(--ink); }
+  details .body p { margin: 0 0 8px; }
+  .mono, code { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  pre { background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; overflow-x: auto; font-family: var(--mono); font-size: 12px; line-height: 1.6; margin: 8px 0; }
+  .quote { border-left: 3px solid var(--accent); padding: 1px 0 1px 12px; margin: 8px 0; font-size: 13.5px; }
+
+  .tbl-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 700; font-size: 12px; padding: 6px 10px; border-bottom: 2px solid var(--line); white-space: nowrap; }
+  td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  footer { margin-top: 56px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 14px; }
+  a { color: var(--info); text-decoration: none; }
+  a:hover, a:focus-visible { text-decoration: underline; }
+  a:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; border-radius: 2px; }
+</style>
+
+<div class="wrap">
+
+<header class="page">
+  <p class="kicker">밤사이 보고</p>
+  <h1>밤사이 돌릴 일이 한 건도 없었습니다 — 그리고 그 이유가 오늘의 수확입니다</h1>
+  <p class="standfirst">지출 <b>$0</b>. 대기 목록이 완전히 비어 있어서 실험은 하나도 안 돌았습니다. 대신 왜 비었는지를 좇다가 야간 자동화의 결함 두 개를 잡았고, <b>그중 하나는 기록을 조용히 영구 삭제하는 종류</b>라 그 자리에서 되돌려 놨습니다.</p>
+  <p class="asof">2026년 8월 13일 새벽 2시 실행 · 상세 원장: <code>.claude/vault/backlog/reports/2026-08-13.md</code></p>
+</header>
+
+<!-- ── 3분 요약 ── -->
+<section class="block">
+  <div class="sec-head"><h2>먼저 이것만 — 3분 요약</h2></div>
+  <ol class="lead-list">
+    <li><b>밤일꾼은 정상 기동했지만 시킬 일이 0건이었습니다.</b><br>
+      <span class="d">대기 목록 42장이 전부 닫혀 있었습니다 — 끝난 것 36, 당신 승인을 기다리며 멈춘 것 3, 다른 것에 흡수된 것 3. 새 일감을 채워 넣는 <b>앞 단계(새벽 1시 30분 그물)가 어젯밤 아무것도 남기지 않았습니다.</b> 켜져 있고 시각도 지났는데 산출물이 없습니다. 안 떴는지, 떠서 초반에 죽었는지는 실행 이력을 볼 수단이 없어 <b>가려내지 못했습니다</b>.</span></li>
+    <li><b>🔴 기록을 영구히 잃는 결함을 찾았고, 오늘 그 일이 실제로 벌어질 뻔했습니다.</b><br>
+      <span class="d">그물은 "여기까지 훑었다"는 도장을 남기는데, 이 도장이 <b>훑기가 끝나는 순간</b> 찍힙니다 — 정리·목록화가 하나도 안 끝난 시점입니다. 그래서 그물이 중간에 죽으면 그 사이 대화들은 <b>다음 밤 범위 밖으로 밀려 영영 안 걸립니다.</b> 문서에는 "산출이 다 끝난 뒤에만 찍는다"고 적혀 있는데 실제 동작이 다릅니다.</span></li>
+    <li><b>지금 구조로는 앞으로도 밤마다 0건입니다 — 당신 결정이 필요합니다.</b><br>
+      <span class="d">그물이 찾아낸 일감은 규칙상 전부 <b>"초안"</b>으로만 만들어지고, 밤일꾼은 <b>"승인됨"</b>만 집습니다. 즉 아침에 사람이 승격시키지 않으면 어떤 밤도 돌지 않습니다. 8월 12일 밤이 돌았던 건 그물이 스스로 승격시켰기 때문이고, 그 근거는 <b>어제 검토에서 지어낸 것으로 지적된 상태</b>입니다. 그 구멍을 막은 지금, 승격을 누가 어떻게 할지가 비어 있습니다.</span></li>
+  </ol>
+  <details><summary>오늘 결정하면 좋은 것 (우선순위순)</summary><div class="body">
+    <p><b>①</b> 밤에 돌릴 일감을 <b>누가 승격시킬지</b> 정하기 — 아침에 당신이 직접 고를지, 공짜·읽기전용에 한해 자동 승격을 정식 규칙으로 넣을지. 이걸 안 정하면 밤은 계속 0건입니다.<br>
+    <b>②</b> 위 2번 <b>도장 결함 수리</b> 승인 — 도장을 훑기 직후가 아니라 정리까지 끝난 뒤에 찍도록 옮기는 한 줄짜리 변경입니다.<br>
+    <b>③</b> 자동화 <b>실행 이력을 볼 방법</b> 마련 — 지금은 "안 떴다"와 "떠서 죽었다"를 구분할 수가 없어서, 무산출 밤의 원인 규명이 매번 미확인으로 끝납니다.<br>
+    <b>④</b> 멈춰 있는 3건의 관문 — 3D 도구 설치 / 정지 지시 준수 실측 비용 / 사라진 원본 데이터 위치. 상세는 <code>.claude/vault/backlog/_MORNING.md</code>.</p>
+  </div></details>
+</section>
+
+<!-- ── 설계 ↔ 검증 연결표 ── -->
+<section class="block">
+  <div class="sec-head"><h2>어제까지의 설계 논의와 오늘 밤의 관계</h2><span class="lede">밤은 설계를 못 고른다 — 오늘은 그 설계가 깔고 앉은 전제가 실제로 성립하는지가 드러났다</span></div>
+  <div class="card" style="padding: 6px 8px;">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>지난 설계 논의</th><th>그 발밑에 깔려 있던 사실 전제</th><th>오늘 밤이 드러낸 것</th></tr></thead>
+        <tbody>
+          <tr><td><b>낮에 흘린 논의를 밤에 자동으로 건져 실험으로 바꾼다</b></td><td>"그물 → 밤일꾼"이 실제로 이어져 돌아간다</td><td><b>안 이어져 있다.</b> 그물 산출은 전부 초안이고 밤일꾼은 승인된 것만 집는다 — 사람 손 없이는 연결이 끊긴 파이프라인</td></tr>
+          <tr><td><b>맥북이 잠겨 하루를 건너뛰어도 복구되게 한다</b></td><td>"성공 도장을 마지막에 찍으니 반쯤 죽은 밤은 성공으로 안 센다"</td><td><b>절반만 참이다.</b> 아예 안 뜬 밤은 복구되지만, <b>뜨다 죽은 밤은 도장이 이미 찍혀 그 대화들이 영구 이탈</b>한다</td></tr>
+          <tr><td><b>무인 실행이 사람 승인을 지어내지 못하게 잠근다</b></td><td>어제 그 잠금을 뚫은 사례가 하나 확인됨(그물의 자가 승격)</td><td>같은 유혹이 오늘 밤일꾼에게 그대로 왔다 — <b>일감을 스스로 만들어 스스로 승인하고 실행할 수 있었다.</b> 하지 않았고, 그 판단 근거를 아래에 남겼다</td></tr>
+          <tr><td><b>자동화가 무엇을 했는지 아침에 검증 가능해야 한다</b></td><td>실행 이력을 사후에 조회할 수 있다</td><td><b>조회 수단이 없다.</b> 오늘 원인 규명이 여기서 막혀 미확인으로 끝났다</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="asof">네 줄 모두 <b>설계 판단 자체는 실행하지 않았다</b> — 밤은 전제가 성립하는지만 확인했고, 방향 선택은 전부 아침 결정으로 넘겼다.</p>
+</section>
+
+<!-- ── 그룹 1: 왜 아무것도 안 돌았나 ── -->
+<section class="block">
+  <div class="sec-head"><h2>왜 아무것도 안 돌았나</h2><span class="lede">두 겹이다 — 앞 단계가 안 채웠고, 채웠어도 안 돌 구조였다</span></div>
+
+  <div class="card">
+    <div class="head"><h3>새벽 1시 30분 그물이 어젯밤 산출을 남겼는가</h3><span class="chip c-bad">안 남겼다</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">맥락</span><span class="v">밤 작업은 두 단계다. 먼저 새벽 1시 30분에 "그물"이 낮 동안 정리 없이 끝난 대화를 건져 일감 목록을 만들고, 2시에 "밤일꾼"이 그 목록을 실행한다. 오늘 2시에 밤일꾼이 떴는데 목록이 완전히 비어 있었다.</span></div>
+      <div class="row"><span class="k">가설</span><span class="v">앞 단계가 정상 동작했다면 어젯밤 몫의 산출물(오늘 날짜 폴더·훑은 지점 갱신)이 남아 있어야 한다.</span></div>
+      <div class="row"><span class="k">확인</span><span class="v">자동화 등록 상태, 오늘 날짜 산출 폴더의 존재 여부, "여기까지 훑었다" 표식의 시각 — 세 가지를 봤다.</span></div>
+      <div class="row"><span class="k">결과</span><span class="v"><b>등록은 정상(켜져 있고 매일 1시 30분), 산출물은 전무.</b> 표식도 <b>하루 전(8월 12일 새벽 2시 25분)에 멈춰</b> 있었다. 다만 <b>안 떴는지 떠서 죽었는지는 가려내지 못했다</b> — 실행 이력을 조회할 수단이 없다(아래 별도 항목).</span></div>
+    </div>
+    <div class="left">남긴 것: 원장의 관측 표 — <span class="mono">.claude/vault/backlog/reports/2026-08-13.md</span></div>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>그물이 정상이었다면 밤일꾼이 돌았을까</h3><span class="chip c-bad">아니다 — 그래도 0건</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">맥락</span><span class="v">앞 항목이 "앞 단계가 안 채웠다"로 끝나면 처방은 "그물을 고친다"가 된다. 그게 맞는지 한 겹 더 봤다.</span></div>
+      <div class="row"><span class="k">가설</span><span class="v">그물이 만든 일감을 밤일꾼이 집을 수 있다면, 그물만 고치면 밤은 돈다.</span></div>
+      <div class="row"><span class="k">확인</span><span class="v">두 규칙 문서의 조건을 맞대봤다 — 그물이 붙이는 딱지와 밤일꾼이 집는 딱지.</span></div>
+      <div class="row"><span class="k">결과</span><span class="v"><b>안 맞는다.</b> 그물은 자기가 만든 일감에 반드시 <b>"초안"</b>을 붙이게 돼 있고, 밤일꾼은 <b>"승인됨"</b>만 집는다. <b>사람이 아침에 승격시키지 않으면 어떤 밤도 안 돈다.</b> 8월 12일 밤이 돈 건 그물이 스스로 12건을 승격시켰기 때문이고, 그 근거는 어제 검토에서 <b>지어낸 것으로 지적</b>됐다. 즉 <b>그물을 고쳐도 밤은 0건이다</b> — 빠진 건 승격 경로다.</span></div>
+    </div>
+    <div class="left">남긴 것: 아침 결정 카드 ① (승격을 누가 어떻게 할지)</div>
+    <details><summary>정직 보고 — 어제의 "지어냈다" 판정에 러너가 붙이는 단서</summary><div class="body">
+      <p>어제 검토는 <b>"그런 허용은 없었습니다 … 조수의 제안을 오너의 결정으로 승격시킨 겁니다"</b>로 결론냈고, 규칙 문서와 대화를 근거로 들었다.</p>
+      <p>그런데 오늘 러너가 그물 자동화의 <b>발사 프롬프트 자체</b>를 열어보니 마지막 줄에 실제로 이 문장이 들어 있다: <span class="mono">"자동 ready는 T0 read-only만."</span> 어제 검토는 규칙 문서와 대화만 확인했고 <b>이 프롬프트는 안 봤다.</b></p>
+      <p>그래서 "창작"인지 "발사 프롬프트에 있던 지시를 출처만 잘못 댄 것"인지는 <b>당신만 판정할 수 있다</b>(그 프롬프트를 누가 썼는지는 러너가 모른다). 러너는 미확인으로 둔다. <b>어느 쪽이든 위 결론은 안 바뀐다</b> — 승격 경로를 명시적으로 정해야 한다는 것.</p>
+      <p class="mono">근거: orca automations show 7dfda6b6 · .claude/vault/backlog/_SWEEP.md §5</p>
+    </div></details>
+  </div>
+</section>
+
+<!-- ── 그룹 2: 발견한 결함 ── -->
+<section class="block">
+  <div class="sec-head"><h2>멈춰 있는 동안 발견한 결함 2건</h2><span class="lede">하나는 조용히 기록을 지운다 — 오늘 실제로 재현됐고 되돌렸다</span></div>
+
+  <div class="card flag">
+    <div class="head"><h3>"여기까지 훑었다" 도장이 너무 일찍 찍혀서, 중간에 죽으면 그 대화들이 영영 사라진다</h3><span class="chip c-bad">사실이었다</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">맥락</span><span class="v">그물은 훑은 지점을 표식으로 남기고, 다음 밤은 그 지점 이후만 본다. 맥북이 잠겨 하루를 건너뛰어도 다음 밤이 그 공백까지 넓혀 훑도록 만든 안전장치다. 규칙 문서에는 <b>"도장은 산출이 다 끝난 뒤에만 찍히므로, 도중에 죽은 밤은 성공으로 세지 않는다"</b>고 적혀 있다.</span></div>
+      <div class="row"><span class="k">가설</span><span class="v">문서 약속대로라면, 훑기만 하고 정리를 못 끝낸 실행은 도장을 남기지 않아야 한다.</span></div>
+      <div class="row"><span class="k">확인</span><span class="v">도장을 찍는 코드가 실제로 어느 시점에 실행되는지 봤다. 그리고 오늘 밤 원인 규명을 위해 훑기 도구를 읽기 전용으로 한 번 돌려, 표식이 어떻게 되는지 실물로 확인했다.</span></div>
+      <div class="row"><span class="k">결과</span><span class="v"><b>약속과 다르다.</b> 도장은 <b>훑기 도구가 끝나는 순간</b> 찍힌다 — 정리·목록화·보고서가 하나도 없는 시점이다. 오늘 러너가 진단 목적으로 훑기만 했는데 <b>표식이 8월 12일에서 8월 13일로 전진</b>했고, 그대로 뒀다면 어제 낮의 <b>대화 8개가 내일 그물의 범위 밖으로 영구 이탈</b>할 상태였다. <b>원래 값으로 복원해 놨다</b> — 내일 새벽 그물이 정상적으로 다시 훑는다.</span></div>
+    </div>
+    <div class="left">남긴 것: <b>복원 완료</b>(표식은 기동 전과 동일) + 진단 수확물에 붙인 경고문 — <span class="mono">.claude/vault/backlog/sweep/2026-08-13/README.md</span></div>
+    <details><summary>코드와 문서가 어긋난 지점 (원문 대조)</summary><div class="body">
+      <p><b>문서의 약속</b> — <code>.claude/vault/backlog/_SWEEP.md:48</code></p>
+      <p class="quote">성공 도장은 산출이 다 끝난 뒤에만 찍히므로, 도중에 죽은 밤은 성공으로 세지 않는다.</p>
+      <p><b>실제 코드</b> — <code>.claude/vault/backlog/harvest.py:319-323</code>. 주석은 의도를 정확히 적어놨는데, "맨 마지막"이 <b>스크립트의 끝</b>일 뿐 <b>스위프의 끝</b>이 아니다.</p>
+      <pre># 성공 도장은 맨 마지막에 찍는다 — 도중에 죽으면 안 찍히고, 다음 밤이 이번 창까지
+# 다시 훑는다(위 failsafe). 시뮬레이션(--now)은 찍지 않는다.
+if not a.now:
+    with open(stamp, "w", encoding="utf-8") as fh:
+        fh.write(str(now))</pre>
+      <p><b>오늘 실물 재현</b>: 표식 <span class="mono">1786469127.283189</span>(08-12 02:25) → <span class="mono">1786554234.418022</span>(08-13 02:03)로 전진 → <span class="mono">git checkout</span>으로 원복. 현재 값은 저장소 기준값과 동일하다.</p>
+      <p><b>처방(실행 안 함, 제안만)</b>: 도장 쓰기를 훑기 도구에서 떼어내, 그물이 보고서까지 낸 뒤 호출하는 별도 명령으로 분리. 밤에는 도구를 고치지 않는 규칙이라 제안까지만 남긴다.</p>
+    </div></details>
+  </div>
+
+  <div class="card flag">
+    <div class="head"><h3>자동화가 떴는지 안 떴는지를 사후에 확인할 방법이 있는가</h3><span class="chip c-bad">없다</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">맥락</span><span class="v">오늘 밤의 핵심 질문이 "앞 단계가 안 떴나, 떠서 죽었나"였다. 처방이 정반대로 갈리는 갈림길이다 — 전자면 스케줄 문제, 후자면 그물 내부 문제.</span></div>
+      <div class="row"><span class="k">가설</span><span class="v">무인 야간 파이프라인이면 실행 이력을 사후 조회할 수 있을 것이다.</span></div>
+      <div class="row"><span class="k">확인</span><span class="v">자동화 관리 도구에서 실행 이력 조회를 시도했다.</span></div>
+      <div class="row"><span class="k">결과</span><span class="v"><b>수단이 없다.</b> 상세 조회는 <b>다음 발사 예정 시각</b>만 주고, 지난 실행 목록을 부르는 명령은 존재하지 않는다("알 수 없는 명령"으로 거부). 그래서 오늘 원인은 <b>미확인으로 남긴다</b> — 추측으로 메우지 않는 규칙에 따라 둘 중 하나로 단정하지 않았다.</span></div>
+    </div>
+    <div class="left">남긴 것: 아침 결정 카드 ③ (실행 이력 조회 수단 마련) · 무산출 밤이 반복되면 매번 여기서 막힌다</div>
+  </div>
+</section>
+
+<!-- ── 그룹 3: 그물에 걸려 있는 것 ── -->
+<section class="block">
+  <div class="sec-head"><h2>지금 그물에 걸려 있는 것</h2><span class="lede">세어만 봤다 — 분류도 일감 변환도 하지 않았다</span></div>
+  <p>원인 규명 과정에서 훑기를 한 번 돌렸으므로, 무엇이 대기 중인지는 알게 됐다. <b>정리 없이 끝난 어제 대화가 8개</b>이고, 그중 <b>사람이 제안을 되돌린 순간이 24군데</b> 잡혔다(판단 기준이 압축돼 있는 자리다). 아래는 목록일 뿐이고, <b>내일 새벽 그물이 정식으로 처리한다.</b></p>
+  <div class="card" style="padding: 6px 8px;">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>크기</th><th>되돌린 순간</th><th>그 대화가 다룬 것</th></tr></thead>
+        <tbody>
+          <tr><td class="num">31MB</td><td class="num">18</td><td>밤사이 가설·실험을 자동으로 돌리는 구조 설계 — <b>지금 이 야간 체계를 만든 당사자 대화</b></td></tr>
+          <tr><td class="num">3.1MB</td><td class="num">1</td><td>밤 파이프라인 동작 설명과 밤일꾼 켜고 끄기</td></tr>
+          <tr><td class="num">2.4MB</td><td class="num">4</td><td>카메라 지시 6가지 경우를 격리해 돌린 실험 — <b>이미 쓴 $4.20이 판정 없이 대기 중</b></td></tr>
+          <tr><td class="num">1.2MB</td><td class="num">1</td><td>글쓰기 파이프라인 전면 재설계 (사람이 감당할 복잡도를 넘었다는 문제제기)</td></tr>
+          <tr><td class="num">803KB</td><td class="num">0</td><td>배포 환경과 로컬의 설정값 차이, 안 쓰는 기술 정리</td></tr>
+          <tr><td class="num">520KB</td><td class="num">0</td><td>영상 앞단에서 첫 장면 그림을 만드는 절차</td></tr>
+          <tr><td class="num">286KB</td><td class="num">0</td><td>대화 기록 색인이 깨진 오류</td></tr>
+          <tr><td class="num">29KB</td><td class="num">0</td><td>도구 업데이트</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="asof">가장 큰 31MB짜리는 규칙상 통째로 읽지 않고 위임해 요약만 받게 돼 있다. 오늘은 그 단계까지 가지 않았다.</p>
+</section>
+
+<!-- ── 그룹 4: 안 한 것과 멈춘 것 ── -->
+<section class="block">
+  <div class="sec-head"><h2>할 수 있었지만 하지 않은 것</h2><span class="lede">오늘 밤 가장 중요한 판단이라 따로 적는다</span></div>
+
+  <div class="card">
+    <div class="head"><h3>일감을 스스로 만들어 스스로 승인하고 실행할 수 있었다 — 하지 않았다</h3><span class="chip c-stop">권한 밖으로 판단</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">맥락</span><span class="v">대기 목록이 비어 있으니, 밤일꾼이 직접 일감을 만들어 채우면 오늘 밤이 채워진다. 실제로 재료(어제 대화 8개)는 이미 손에 있었고, 공짜·읽기 전용 조사라 돈도 안 든다.</span></div>
+      <div class="row"><span class="k">가설</span><span class="v">"공짜라서 위험이 없으니 해도 된다"가 성립하는가.</span></div>
+      <div class="row"><span class="k">확인</span><span class="v">어제 검토가 무엇을 가장 급한 문제로 짚었는지 다시 읽었다.</span></div>
+      <div class="row"><span class="k">결과</span><span class="v"><b>성립하지 않는다.</b> 어제의 <b>최우선 지적이 정확히 "무인 실행이 사람 승인을 지어냈다"</b>였다. 밤일꾼이 일감을 만들고·승인하고·실행하면 <b>같은 사고의 더 나쁜 판본</b>이 된다 — 생성부터 집행까지가 한 세션 안에서 닫히고 사람 관문이 0개가 된다. 위험은 돈이 아니라 <b>검증 안 된 판단이 통과되는 것</b>이라, 공짜라는 사실은 면제 사유가 아니다. 그래서 <b>재료를 세어 보고하는 데서 멈췄다.</b></span></div>
+    </div>
+    <div class="left">남긴 것: 이 판단의 근거와 경계 — <span class="mono">.claude/vault/backlog/sweep/2026-08-13/README.md</span></div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="sec-head"><h2>손대지 않고 멈춘 것 — 전부 당신 관문</h2></div>
+  <div class="card" style="padding: 6px 8px;">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>멈춘 것</th><th>막힌 지점</th><th>열리는 조건</th></tr></thead>
+        <tbody>
+          <tr><td><b>3D 도구로 장면 규격을 검사하기</b></td><td>도구를 이 맥북에 설치해야 한다 — 기계 상태를 바꾸는 일이라 밤이 못 한다</td><td>당신 승인</td></tr>
+          <tr><td><b>"정지" 지시를 정지 장면에서 실제로 지키는지 재보기</b></td><td>영상 9편 약 $7이 미승인</td><td>금액 승인</td></tr>
+          <tr><td><b>되짚기 박자 자동화</b></td><td>필요한 원본 데이터가 이 컴퓨터 어디에도 없다 — 예전 보고서 웹페이지 안에만 남아 있다</td><td>웹페이지에서 데이터를 다시 뽑는 것을 승인하거나, 원본 폴더 위치를 알려주기</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="asof">세 건 다 어제와 동일하다 — 밤 사이 변화 없음.</p>
+</section>
+
+<footer>
+  <p><b>집행 요약</b> — 실행한 일감 0건 / 지출 <b>$0.00</b>(영상·이미지 발주 0건, 실험용 모델 호출 0회) / 새로 만든 일감 0장 / 승격 0장.
+  제품 코드 수정 0건 · 데이터베이스 쓰기 0건 · 기록 보관소 수정 0건 · 커밋·푸시 0건 · 브랜치 전환 0건. 아침 체크아웃은 기동 전과 동일하다.</p>
+  <p><b>고친 것</b> — 진단 과정에서 전진한 "훑은 지점" 표식을 원래 값으로 복원(순변화 0).</p>
+  <p><b>정본 경로</b> — 원장 <code>.claude/vault/backlog/reports/2026-08-13.md</code> ·
+  진단 수확물 <code>.claude/vault/backlog/sweep/2026-08-13/</code> ·
+  아침 결정 <code>.claude/vault/backlog/_MORNING.md</code></p>
+</footer>
+
+</div>

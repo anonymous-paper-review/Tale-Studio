@@ -2,7 +2,7 @@
 
 - **날짜**: 2026-08-11 (밤 러너)
 - **판정**: **가설 참** — 최종 생성 경로에 샷별 뷰 분기·배경 방어 배선 없음 (기각 조건 "분기 실존" 미발동)
-- **출처 티켓**: `research/backlog/t0-v6-background-ref-trace.md` ← background-view-3d §3
+- **출처 티켓**: `.claude/vault/backlog/t0-v6-background-ref-trace.md` ← background-view-3d §3
 
 ## Phase 0 — 라우트 확정
 

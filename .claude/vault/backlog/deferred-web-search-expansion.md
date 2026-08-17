@@ -1,0 +1,26 @@
+```yaml
+id: web-search-전면-확대
+source: .claude/vault/_DEFERRED.md D-016 — 2026-08-15 한 원장으로 통합하며 옮겨옴
+kind: (조건이 차면 그때 정한다)
+budget: { usd: 0, runs: 1, wall_min: 30 }
+blockers: []
+status: waiting   # 원래 상태: 대기
+priority: normal
+```
+
+# web search 전면 확대
+
+
+- **무엇을**: 웹 검색 접지를 남은 LLM 호출로 넓힌다. 현재 켜진 곳은 producer 채팅과 스토리 축 s1/s3.
+- **왜 미뤘나**: 지연·비용을 측정하지 않아 단계적으로 가기로 했다("전면 확대는 지연·비용 측정 후 단계적으로").
+- **언제 꺼내나**: 켜진 구간의 지연·비용을 측정한 뒤.
+- **되살릴 좌표**: `dispatch.ts`(webSearch 옵션), `gemini.ts`(googleSearch), `claude.ts`, `openai.ts`(미배선).
+- 기록: 2026-08-11 (원 발화 2026-08-04/06)
+- ※ 2026-08-11 코드 대조 정정: 채굴 당시 "claude 는 webSearch 인자를 아예 안 받는다"고 적었으나
+  **현재 코드는 받는다** — `claude.ts:31,66` 이 옵션을 받아 web_search 툴을 붙이고 `:104-111` 에
+  접지 미발화 감시까지 있으며 `dispatch.ts:113,121` 이 전달한다. 미배선으로 남은 건 openai 뿐이다.
+
+---
+
+> 옮겨온 문서다. **"언제 꺼내나"가 이 항목의 판정선이다** — 밤 루프가 매일 그 조건이 찼는지 확인하고,
+> 찼으면 `종류` 를 정해 `ready` 로 올린다. 조건이 사람만 알 수 있는 것이면 `needs-owner` 로 바꾼다.

@@ -1,0 +1,194 @@
+{
+  "shot_rough_storyboard::-": {
+    "count": 3,
+    "anchored": 0,
+    "plain": 3,
+    "body_identical_across_anchored_and_plain": null,
+    "body_prefix_shared": null,
+    "rows": [
+      {
+        "created_at": "2026-08-13T07:39:03.469224+00:00",
+        "actor": "ui",
+        "anchored": false,
+        "bodyLen": 10600
+      },
+      {
+        "created_at": "2026-08-13T07:39:03.907237+00:00",
+        "actor": "ui",
+        "anchored": false,
+        "bodyLen": 10784
+      },
+      {
+        "created_at": "2026-08-13T07:41:27.124806+00:00",
+        "actor": "ui",
+        "anchored": false,
+        "bodyLen": 8044
+      }
+    ]
+  },
+  "character_view::goblin_horde": {
+    "count": 2,
+    "anchored": 1,
+    "plain": 1,
+    "body_identical_across_anchored_and_plain": false,
+    "body_prefix_shared": 0,
+    "rows": [
+      {
+        "created_at": "2026-08-13T07:43:31.335862+00:00",
+        "actor": "ui",
+        "anchored": false,
+        "bodyLen": 1212
+      },
+      {
+        "created_at": "2026-08-13T07:43:31.615707+00:00",
+        "actor": "ui",
+        "anchored": true,
+        "bodyLen": 1391
+      }
+    ]
+  },
+  "world_shot::location": {
+    "count": 3,
+    "anchored": 1,
+    "plain": 2,
+    "body_identical_across_anchored_and_plain": true,
+    "body_prefix_shared": 480,
+    "rows": [
+      {
+        "created_at": "2026-08-13T07:45:40.668376+00:00",
+        "actor": "ui",
+        "anchored": false,
+        "bodyLen": 480
+      },
+      {
+        "created_at": "2026-08-13T07:45:46.814147+00:00",
+        "actor": "ui",
+        "anchored": false,
+        "bodyLen": 480
+      },
+      {
+        "created_at": "2026-08-13T07:46:11.530127+00:00",
+        "actor": "ui",
+        "anchored": true,
+        "bodyLen": 480
+      }
+    ]
+  },
+  "world_shot::trap_choke_point": {
+    "count": 3,
+    "anchored": 1,
+    "plain": 2,
+    "body_identical_across_anchored_and_plain": true,
+    "body_prefix_shared": 377,
+    "rows": [
+      {
+        "created_at": "2026-08-13T07:49:00.645533+00:00",
+        "actor": "ui",
+        "anchored": true,
+        "bodyLen": 377
+      },
+      {
+        "created_at": "2026-08-13T07:49:12.874953+00:00",
+        "actor": "ui",
+        "anchored": false,
+        "bodyLen": 377
+      },
+      {
+        "created_at": "2026-08-13T07:49:15.829722+00:00",
+        "actor": "ui",
+        "anchored": false,
+        "bodyLen": 377
+      }
+    ]
+  },
+  "world_shot::location_2": {
+    "count": 3,
+    "anchored": 1,
+    "plain": 2,
+    "body_identical_across_anchored_and_plain": true,
+    "body_prefix_shared": 581,
+    "rows": [
+      {
+        "created_at": "2026-08-13T07:51:35.489866+00:00",
+        "actor": "ui",
+        "anchored": true,
+        "bodyLen": 581
+      },
+      {
+        "created_at": "2026-08-13T07:52:25.062147+00:00",
+        "actor": "ui",
+        "anchored": false,
+        "bodyLen": 581
+      },
+      {
+        "created_at": "2026-08-13T07:52:30.782239+00:00",
+        "actor": "ui",
+        "anchored": false,
+        "bodyLen": 581
+      }
+    ]
+  },
+  "character_view::char": {
+    "count": 1,
+    "anchored": 0,
+    "plain": 1,
+    "body_identical_across_anchored_and_plain": null,
+    "body_prefix_shared": null,
+    "rows": [
+      {
+        "created_at": "2026-08-14T09:27:50.819571+00:00",
+        "actor": "writer",
+        "anchored": false,
+        "bodyLen": 966
+      }
+    ]
+  },
+  "character_view::char_2": {
+    "count": 2,
+    "anchored": 0,
+    "plain": 2,
+    "body_identical_across_anchored_and_plain": null,
+    "body_prefix_shared": null,
+    "rows": [
+      {
+        "created_at": "2026-08-14T09:27:53.056063+00:00",
+        "actor": "writer",
+        "anchored": false,
+        "bodyLen": 962
+      },
+      {
+        "created_at": "2026-08-14T09:27:54.101357+00:00",
+        "actor": "writer",
+        "anchored": false,
+        "bodyLen": 962
+      }
+    ]
+  },
+  "character_view::char_3": {
+    "count": 3,
+    "anchored": 0,
+    "plain": 3,
+    "body_identical_across_anchored_and_plain": null,
+    "body_prefix_shared": null,
+    "rows": [
+      {
+        "created_at": "2026-08-14T09:27:55.066598+00:00",
+        "actor": "writer",
+        "anchored": false,
+        "bodyLen": 975
+      },
+      {
+        "created_at": "2026-08-14T09:27:55.201525+00:00",
+        "actor": "writer",
+        "anchored": false,
+        "bodyLen": 975
+      },
+      {
+        "created_at": "2026-08-14T09:27:55.639756+00:00",
+        "actor": "writer",
+        "anchored": false,
+        "bodyLen": 975
+      }
+    ]
+  }
+}

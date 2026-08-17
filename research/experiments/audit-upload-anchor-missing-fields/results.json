@@ -1,0 +1,87 @@
+{
+  "ticket": "audit-upload-anchor-missing-fields",
+  "run_at": "2026-08-16",
+  "mode": "code read + read-only db select (no generation, no model call)",
+  "spend_usd": 0,
+  "verdict": "성립",
+  "verdict_line_quoted": "\"다른 결과\"로 분류된 자리가 1곳 이상이면 가설 성립 — 그 목록이 산출이다. 0곳이면 기각.",
+  "counts": {
+    "resolved_anchor_fields_total": 7,
+    "filled_by_both_paths": 2,
+    "card_only_fields": 5,
+    "consumption_sites_total": 12,
+    "consumption_sites_in_ticket_presweep": 9,
+    "consumption_sites_newly_found": 3,
+    "different_outcome": 4,
+    "no_damage": 8,
+    "undecidable": 0
+  },
+  "field_table": [
+    { "field": "key", "card_path": "filled", "upload_path": "filled" },
+    { "field": "imageUrl", "card_path": "filled", "upload_path": "filled" },
+    { "field": "medium", "card_path": "filled (12/12 non-null)", "upload_path": "EMPTY (값은 projects.custom_style_anchor.medium 에 존재하나 resolveStyleAnchor 가 옮기지 않음)" },
+    { "field": "styleClause", "card_path": "filled (12/12 non-empty)", "upload_path": "EMPTY" },
+    { "field": "usePreviewRef", "card_path": "filled (true 2 / false 10)", "upload_path": "EMPTY" },
+    { "field": "previewUrl", "card_path": "filled", "upload_path": "EMPTY" },
+    { "field": "anchorKind", "card_path": "filled (media 6 / sublook 6)", "upload_path": "EMPTY" }
+  ],
+  "sites": [
+    { "n": 1, "file": "src/lib/style-anchor.ts", "line": 114, "reads": ["usePreviewRef", "previewUrl"], "empty_branch": "twoRef=false → 1-ref 모드", "class": "피해 없음", "why": "카드 12장 중 10장(use_preview_ref=false)이 같은 분기", "found_by": "이번 조사" },
+    { "n": 2, "file": "src/lib/style-anchor.ts", "line": 124, "reads": ["styleClause"], "empty_branch": "styleClauseLine='' → 프롬프트에서 문구 줄 제거", "class": "다른 결과", "why": "카드 12/12 가 문구 보유 — 빈 분기로 떨어지는 카드가 0장", "found_by": "이번 조사" },
+    { "n": 3, "file": "src/lib/style-anchor.ts", "line": 133, "reads": ["previewUrl"], "empty_branch": "참조 배열에 preview 미추가", "class": "피해 없음", "why": "1번과 같은 결정의 하류", "found_by": "이번 조사" },
+    { "n": 4, "file": "src/app/api/director/generate-storyboard/route.ts", "line": 139, "reads": ["styleClause"], "empty_branch": "storyboard-strip.ts:196 에서 `- <clause>` 항목 누락", "class": "다른 결과", "why": "카드 12/12 가 문구 보유", "found_by": "티켓 사전조사" },
+    { "n": 5, "file": "src/app/api/director/generate-storyboard/route.ts", "line": 140, "reads": ["anchorKind"], "empty_branch": "anchorKeepsGrade=false → 씬 조명절이 'and color grade' 포함", "class": "피해 없음", "why": "카드 12장 중 6장(media)이 같은 분기 + 카드 해석기 자신의 기본값이 'media'", "found_by": "티켓 사전조사" },
+    { "n": 6, "file": "src/app/api/director/generate-storyboard/route.ts", "line": 141, "reads": ["usePreviewRef", "previewUrl"], "empty_branch": "styleRefCount=1", "class": "피해 없음", "why": "카드 10/12 동일", "found_by": "티켓 사전조사" },
+    { "n": 7, "file": "src/app/api/director/generate-storyboard/route.ts", "line": 150, "reads": ["previewUrl"], "empty_branch": "참조 배열에 preview 미추가", "class": "피해 없음", "why": "카드 10/12 동일", "found_by": "티켓 사전조사" },
+    { "n": 8, "file": "src/app/api/director/generate-storyboard-batch/route.ts", "line": 146, "reads": ["usePreviewRef", "previewUrl"], "empty_branch": "anchorTwoRef=false", "class": "피해 없음", "why": "카드 10/12 동일", "found_by": "티켓 사전조사" },
+    { "n": 9, "file": "src/app/api/director/generate-storyboard-batch/route.ts", "line": 153, "reads": ["styleClause"], "empty_branch": "storyboard-strip.ts:284 에서 `- <clause>` 항목 누락", "class": "다른 결과", "why": "카드 12/12 가 문구 보유", "found_by": "티켓 사전조사" },
+    { "n": 10, "file": "src/app/api/director/generate-storyboard-batch/route.ts", "line": 154, "reads": ["anchorKind"], "empty_branch": "anchorKeepsGrade=false", "class": "피해 없음", "why": "카드 6/12 동일 + 해석기 기본값 'media'", "found_by": "티켓 사전조사" },
+    { "n": 11, "file": "src/app/api/director/generate-storyboard-batch/route.ts", "line": 161, "reads": ["previewUrl"], "empty_branch": "참조 배열에 preview 미추가", "class": "피해 없음", "why": "카드 10/12 동일", "found_by": "티켓 사전조사" },
+    { "n": 12, "file": "src/app/api/director/generate-video/route.ts", "line": 498, "reads": ["medium"], "empty_branch": "suppressGear=false → cameraPreset(실사 카메라 장비 문구)이 buildVideoPrompt 로 그대로 전달(:503)", "class": "다른 결과", "why": "medium 이 null 인 활성 카드는 0장. 이 프로젝트의 실제 매체는 2d_anime 이라 카드였다면 suppressGear=true", "found_by": "티켓 사전조사" }
+  ],
+  "video_path_double_break": {
+    "break_1": "src/app/api/director/generate-video/route.ts:411 — projects select 에 custom_style_anchor 없음",
+    "break_2": "src/app/api/director/generate-video/route.ts:495 — resolveStyleAnchorByKey (카탈로그 전용). 업로드 키 custom_be2890f1-… 는 style_anchors 에 행 없음(live 확인)",
+    "note": "둘 중 하나만 있어도 medium 은 도달 불가"
+  },
+  "checked_and_cleared": {
+    "site": "src/lib/writer/v2/persist.ts:156",
+    "reads": "input.styleAnchor?.medium ?? 'live_action'",
+    "object": "PipelineInput['styleAnchor'] (src/lib/writer/types/pipeline.ts:195) — ResolvedStyleAnchor 아님",
+    "filled_at": "src/app/api/writer/start/route.ts:206-216 — parseCustomStyleAnchor 로 custom label/medium 정상 주입",
+    "class": "피해 없음"
+  },
+  "excluded_display_sites": [
+    "src/features/producer/style-anchor-picker.tsx:44, 47, 63, 65",
+    "src/stores/producer-store.ts:157-158, 564, 581"
+  ],
+  "ticket_premise_correction": {
+    "premise": "카드 쪽에도 원래 비어 있는 값이 있다 (일부 그림체는 보정 문구가 의도적으로 비어 있다)",
+    "live_reality": "활성 12행 전부 style_clause 보유 (12/12). medium 도 null 0건.",
+    "stale_comment_in_code": "src/lib/style-anchor.ts:57-58 — '역사극·공포는 NULL' 이라는 주석이 현재 DB 와 불일치",
+    "effect_on_verdict": "이 전제가 참이었다면 보정 문구 3곳이 '피해 없음'으로 갔을 것. 거짓이므로 '다른 결과'."
+  },
+  "catalog_live": {
+    "total_rows": 12,
+    "active_rows": 12,
+    "medium_null": 0,
+    "medium_live_action": 7,
+    "medium_non_live_action": 5,
+    "style_clause_present": 12,
+    "style_clause_absent": 0,
+    "use_preview_ref_true": 2,
+    "use_preview_ref_false_or_null": 10,
+    "anchor_kind_sublook": 6,
+    "anchor_kind_media_or_null": 6,
+    "mediums": ["2d_anime", "2d_cartoon", "3d", "live_action", "stop_motion", "watercolor"]
+  },
+  "not_confirmed": [
+    "그림·영상 결과물의 품질 — 판정하지 않음 (사람이 본다)",
+    "실측 확인 — 코드 실행/생성 0건. 분기 판별은 코드 원문 독해에 근거"
+  ],
+  "morning_candidate": "올린 그림에 매체를 사용자에게 물을 것인가, 그림으로 추정할 것인가 — 단, 이 프로젝트는 이미 사용자에게 물어 2d_anime 를 받아 저장까지 해 뒀다. 실제 질문은 '이미 받아 둔 매체를 왜 해석기가 버리는가' 쪽에 가깝다. (밤은 결정하지 않는다)",
+  "coordinate_check": {
+    "all_frozen_coordinates_correct": true,
+    "presweep_site_count_wrong": "9곳이라 했으나 12곳 — 적용 함수 내부 3곳 누락"
+  }
+}

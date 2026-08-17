@@ -1,7 +1,7 @@
 # 관찰 노트 — 참조 역할 계약이 다른 시나리오에서도 재현되나 (3 시나리오 × ⓧ계약없음·ⓨ계약있음)
 
 > 2026-08-11 수집. **판정·점수·승패 없음** — 프레임열 육안 관찰만 적는다.
-> 티켓: `research/backlog/t2-contract-generalize.md` · 선례: `../qual4-grammar/`(같은 문단이 질주 샷 1개에서 최우수).
+> 티켓: `.claude/vault/backlog/t2-contract-generalize.md` · 선례: `../qual4-grammar/`(같은 문단이 질주 샷 1개에서 최우수).
 > 발주 좌표·payload 전문: `manifest.json` · 프롬프트 전문: `inputs/prompt_S{1,2,3}_{x,y}.txt` · 동결 좌표: `inputs/coords.json`.
 > 판독 자료: `frames/S{n}_{x,y}_tile.jpg`(1fps) · `frames/S{n}_{x,y}_f0.jpg` · `_last.jpg` ·
 > `frames/S{n}_firstframe_compare.jpg`(시작 그림 | ⓧ 첫 프레임 | ⓨ 첫 프레임 3연).

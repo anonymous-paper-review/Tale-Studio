@@ -1,6 +1,6 @@
 {
   "purpose": "블록아웃 격리 — 직전 3암은 전부 3D 블록아웃 영상을 함께 받았고 시간 언급 0인 CTL까지 주문 시각을 맞췄다. 타이밍을 나른 게 문장인지 3D인지 갈리지 않는다. 이번엔 video_urls만 빼고 같은 조건으로 재발주. 판정·점수 없음",
-  "ticket": "research/backlog/t2-25-blockout-isolation.md",
+  "ticket": ".claude/vault/backlog/t2-25-blockout-isolation.md",
   "model": "bytedance/seedance-2.5/reference-to-video",
   "shot_id": "sh_04_16",
   "variable_under_test": "video_urls (3D 블록아웃 영상 참조) 유무 — 그 외 모든 축 동일",

@@ -1,0 +1,22 @@
+```yaml
+id: 서버리스-합성-스텝-카나리아
+source: .claude/vault/backlog/_MORNING.md Q13 — 2026-08-15 한 원장으로 통합하며 옮겨옴
+kind: (해당 없음 — 사람이 답할 것)
+budget: { usd: 0, runs: 0, wall_min: 0 }
+blockers: []
+status: needs-owner
+priority: normal
+```
+
+# 서버리스 합성 스텝 카나리아 — 실행 시점
+
+
+
+- **원문** (writer-integrity-performance §3): "배포 후 STEP_BUDGET 낮춘 1런으로 partial 재개 실검증. A/B는 로컬 러너 경로였음."
+- **분해**: 배포 트리거 종속 + 프로덕션 런 1회(~$2) — 배포 일정을 오너가 정하면 그날 티켓화.
+- **밤 준비물**: [t0-serverless-path-parity](t0-serverless-path-parity.md) — **✅ 완료(8/12 밤)**: 이 카드가 필요한 이유가 코드로 확정됐다. 두 경로는 **스테이지 함수 13개가 완전 일치**하고 **동시성 3노브·전송 튜닝(instrumentation.ts:22, connections 64, NEXT_RUNTIME nodejs)도 서버리스에 그대로 적용**된다 — 즉 "튜닝이 로컬 전용"이라는 우려는 **반증**. 다만 **오케스트레이터가 갈라진다**(로컬 `runPipeline` vs 서버리스 `runWriterSteps`, 후자는 체크포인트·이어달리기 구조) → **총 벽시계 숫자는 이관 불가**, 카나리아가 재야 할 것은 정확히 그 이어붙이기 비용. 증거: `research/experiments/t0-serverless-path-parity/result.md`
+
+---
+
+> 옮겨온 문서다. **오너만 답할 수 있는 것**이라 밤 루프는 집지 않는다.
+> 답이 나오면 그 답에서 나오는 실행 단위를 새 티켓으로 만들고 이건 `done` 로 닫는다.

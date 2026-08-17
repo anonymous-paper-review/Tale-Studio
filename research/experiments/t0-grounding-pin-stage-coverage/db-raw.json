@@ -1,0 +1,73 @@
+{
+  "cutoff": "2026-08-12T06:08:59Z",
+  "queriedAt": "2026-08-15T16:36:34.550Z",
+  "totalRowsSinceCutoff": 108,
+  "byStage": {
+    "dramaturgy": {
+      "totalRows": 4,
+      "groundingCalls": 4,
+      "repairCalls": 0,
+      "groundingByModel": {
+        "gemini/gemini-3-flash-preview": {
+          "calls": 4,
+          "median_ms": 14050,
+          "min_ms": 11430,
+          "max_ms": 14694
+        }
+      },
+      "repairByModel": {},
+      "firstCalledAt": "2026-08-12T07:09:32.551+00:00",
+      "lastCalledAt": "2026-08-13T04:59:47.133+00:00",
+      "errorCount": 0
+    },
+    "narrativeStructure": {
+      "totalRows": 4,
+      "groundingCalls": 4,
+      "repairCalls": 0,
+      "groundingByModel": {
+        "gemini/gemini-3-flash-preview": {
+          "calls": 4,
+          "median_ms": 5407,
+          "min_ms": 5101,
+          "max_ms": 7974
+        }
+      },
+      "repairByModel": {},
+      "firstCalledAt": "2026-08-12T07:09:38.53+00:00",
+      "lastCalledAt": "2026-08-13T04:59:52.541+00:00",
+      "errorCount": 0
+    },
+    "scenes": {
+      "totalRows": 4,
+      "groundingCalls": 4,
+      "repairCalls": 0,
+      "groundingByModel": {
+        "gemini/gemini-3-flash-preview": {
+          "calls": 4,
+          "median_ms": 19739,
+          "min_ms": 12105,
+          "max_ms": 27772
+        }
+      },
+      "repairByModel": {},
+      "firstCalledAt": "2026-08-12T07:10:00.057+00:00",
+      "lastCalledAt": "2026-08-13T05:00:04.953+00:00",
+      "errorCount": 0
+    },
+    "structureScenesMerged": {
+      "totalRows": 0,
+      "groundingCalls": 0,
+      "repairCalls": 0,
+      "groundingByModel": {},
+      "repairByModel": {},
+      "firstCalledAt": null,
+      "lastCalledAt": null,
+      "errorCount": 0
+    }
+  },
+  "groundingModelRowsByStage": {
+    "dramaturgy": 4,
+    "narrativeStructure": 4,
+    "scenes": 4
+  }
+}

@@ -1,6 +1,6 @@
 {
   "purpose": "샷 문법 재작성 정성수집 — ⓐ 타임코드 대조군(재사용) ⓑ 순서형+무빙1개 ⓒ ⓑ+참조 역할 계약 ⓓ ⓒ+이동량 절반 ⓔ ⓒ+도입 정면 구간 카메라 운동 보강(교정 조건, 같은 날 추가). 관찰 전용, 판정 없음",
-  "hypothesis_source": "research/backlog/t2-shot-grammar-rewrite.md",
+  "hypothesis_source": ".claude/vault/backlog/t2-shot-grammar-rewrite.md",
   "research_source": "research/experiments/_research/short-video-timing-and-rampup.md §우리에게 적용 가능한 것 (조치 1·2·4)",
   "model": "bytedance/seedance-2.0/reference-to-video",
   "shot_id": "sh_04_16",

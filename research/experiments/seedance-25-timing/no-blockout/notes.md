@@ -2,7 +2,7 @@
 
 > 2026-08-11 수집. **판정·점수·승패 없음** — 측정된 시각과 눈에 보인 것, 그리고 티켓에 미리 적어둔
 > 기각 조건에 숫자를 대입한 결과까지만 적는다.
-> 티켓: `research/backlog/t2-25-blockout-isolation.md` · 발주 좌표·payload 전문: `manifest.json`
+> 티켓: `.claude/vault/backlog/t2-25-blockout-isolation.md` · 발주 좌표·payload 전문: `manifest.json`
 > 프롬프트 전문: `inputs/prompt_{tc,ctl}.txt` (부모 실험 파일과 SHA-256 동일, 발주 때마다 기계 검사)
 
 ## 왜 다시 돌렸나

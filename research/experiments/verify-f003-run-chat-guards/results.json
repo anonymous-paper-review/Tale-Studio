@@ -1,0 +1,302 @@
+{
+  "ticket": "verify-f003-run-chat-guards",
+  "shots_source_all_time": {
+    "pipeline": 1796
+  },
+  "writer_runs_since_fix": [
+    {
+      "id": "0cd24a9d-7c20-4a59-b6f7-e999c17170a6",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "status": "completed",
+      "current_stage": "persistShots",
+      "created_at": "2026-08-13T03:43:31.48522+00:00"
+    },
+    {
+      "id": "20b186e8-7c2b-4601-859d-6d8780b26106",
+      "project_id": "a003a8c6-82a1-4b6a-95d6-889a1f57ee08",
+      "status": "completed",
+      "current_stage": "persistShots",
+      "created_at": "2026-08-13T04:59:33.98895+00:00"
+    }
+  ],
+  "ran_at": "2026-08-15T16:39:14.191Z",
+  "fix_deploy_boundary": "2026-08-13T00:00:00Z",
+  "join_definition": "shots.characters[] 의 각 값이 같은 project_id 의 characters 행의 character_id / id / name 중 어느 것과도 안 맞으면 '테이블 밖'",
+  "counts": {
+    "roster_rows": 112,
+    "shots_total": 1796,
+    "shots_after_fix": 72,
+    "shots_before_fix": 1724,
+    "shots_after_fix_with_orphan_id": 0,
+    "orphan_id_occurrences_after_fix": 0,
+    "shots_before_fix_with_orphan_id": 16,
+    "orphan_id_occurrences_before_fix": 17
+  },
+  "distinct_orphan_ids_after_fix": {},
+  "distinct_orphan_ids_before_fix": {
+    "girl": 14,
+    "tracker": 3
+  },
+  "offending_rows_after_fix": [],
+  "offending_rows_before_fix_sample": [
+    {
+      "shot_row_id": "332b5537-1be9-4ef3-a799-2214e97fb058",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_05",
+      "shot_id": "sh_05_01",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:14:58.480843+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "bfc9c577-2612-4188-aaae-c1a9d0d2ed0c",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_05",
+      "shot_id": "sh_05_02",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:14:58.710787+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "0354d56a-79ea-4b0c-ae79-00af408d10c1",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_05",
+      "shot_id": "sh_05_03",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:14:58.976683+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "86c3f3f2-6cf2-44ff-a328-11e7b4cbc497",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_05",
+      "shot_id": "sh_05_04",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:14:59.122995+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "557220cd-9651-415c-bed0-062d4cf495ed",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_06",
+      "shot_id": "sh_06_01",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:14:59.46823+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "3e4ce4f9-9343-4fab-a70e-39d496fc2327",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_06",
+      "shot_id": "sh_06_02",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:14:59.604684+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "ca8c1c90-143e-4f94-847f-8d6a839477ac",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_06",
+      "shot_id": "sh_06_03",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:14:59.73668+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "01f02ed5-8c86-4541-a32e-53c679c1f552",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_06",
+      "shot_id": "sh_06_04",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:14:59.855887+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "128ff940-48fe-4692-a97e-99827bb46e04",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_07",
+      "shot_id": "sh_07_01",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:15:00.286451+00:00",
+      "characters": [
+        "tracker"
+      ],
+      "orphan_ids": [
+        "tracker"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "ed1d5ce7-1456-426b-bcc7-50c98ac51c15",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_07",
+      "shot_id": "sh_07_02",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:15:00.405851+00:00",
+      "characters": [
+        "tracker"
+      ],
+      "orphan_ids": [
+        "tracker"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "94526c98-8486-4942-91e2-958ba6710cd4",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_07",
+      "shot_id": "sh_07_03",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:15:00.529208+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "c4c6fafe-e6da-4558-b853-f7c8fe833dad",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_07",
+      "shot_id": "sh_07_04",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:15:00.796113+00:00",
+      "characters": [
+        "girl",
+        "tracker"
+      ],
+      "orphan_ids": [
+        "girl",
+        "tracker"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "2a311093-be99-4e69-92a2-d2f9e36946d0",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_08",
+      "shot_id": "sh_08_01",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:15:01.044354+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "ae180603-5ed0-4f70-93ab-0937ddcbcd59",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_08",
+      "shot_id": "sh_08_02",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:15:01.164195+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "efd467e6-b0dc-4520-b33e-ea6c5ef88a07",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_08",
+      "shot_id": "sh_08_03",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:15:01.296283+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    },
+    {
+      "shot_row_id": "e0633244-8063-4394-8cfe-8dbb6d07ab6a",
+      "project_id": "dc531572-50a4-4985-b343-d32e2b4490b0",
+      "scene_id": "sc_08",
+      "shot_id": "sh_08_04",
+      "source": "pipeline",
+      "created_at": "2026-08-12T07:15:01.418332+00:00",
+      "characters": [
+        "girl"
+      ],
+      "orphan_ids": [
+        "girl"
+      ],
+      "is_after_fix": false
+    }
+  ],
+  "projects_touched_after_fix": [
+    {
+      "id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "title": "writer_test_260813",
+      "current_stage": "director",
+      "created_at": "2026-08-13T03:38:07.862086+00:00"
+    },
+    {
+      "id": "a003a8c6-82a1-4b6a-95d6-889a1f57ee08",
+      "title": "webtoon_test",
+      "current_stage": "artist",
+      "created_at": "2026-08-13T01:48:34.923115+00:00"
+    }
+  ],
+  "source_breakdown_after_fix": {
+    "pipeline": 72
+  }
+}

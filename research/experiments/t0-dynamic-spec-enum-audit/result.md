@@ -2,7 +2,7 @@
 
 - **날짜**: 2026-08-11 (밤 러너)
 - **판정**: **가설 참** — enum 밖 값 ≥1건 조건을 압도적으로 충족 (672스펙 감사, 위반 982건, 7개 enum 필드 전부)
-- **출처 티켓**: `research/backlog/t0-dynamic-spec-enum-audit.md` ← prompt-contract-audit §3 잔가지
+- **출처 티켓**: `.claude/vault/backlog/t0-dynamic-spec-enum-audit.md` ← prompt-contract-audit §3 잔가지
 
 ## 실측 — 필드별 값 분포 (원문 값 그대로, ⚠=enum 밖)
 

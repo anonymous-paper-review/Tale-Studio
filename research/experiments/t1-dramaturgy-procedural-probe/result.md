@@ -4,7 +4,7 @@
 - **판정**: **가설 기각** — 법정물 3회 후보 수 3/3/3, 중앙값 3 ≤ 3 (사전 등록 기각 조건 발동).
   "유도 폭 = 전제 유형의 함수"는 성립하지 않음 — 유도 깊이 미결은 "전제 무관 수렴"으로 재프레임.
 - **부수 중대 발견**: 현행 기본 모델(3.6-flash)에서 s0.5 스테이지 **전면 불능** — 아래 §모델 전환.
-- **출처 티켓**: `research/backlog/t1-dramaturgy-procedural-probe.md` ← dramaturgy-world-derivation §3
+- **출처 티켓**: `.claude/vault/backlog/t1-dramaturgy-procedural-probe.md` ← dramaturgy-world-derivation §3
 
 ## 실측
 

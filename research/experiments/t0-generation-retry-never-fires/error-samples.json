@@ -1,0 +1,107 @@
+{
+  "infra": [
+    {
+      "id": "c5ddc5d1-8bb2-432a-b275-b73545944505",
+      "kind": "shot_rough_storyboard",
+      "attempts": 1,
+      "created_at": "2026-07-14T13:34:41.51145+00:00",
+      "error": "stale queued reaped — webhook 유실 좀비 정리 (quota 복구 2026-08-05)"
+    },
+    {
+      "id": "9ad02b22-c800-4035-9752-ab073fead837",
+      "kind": "shot_rough_storyboard",
+      "attempts": 1,
+      "created_at": "2026-07-14T13:34:41.51145+00:00",
+      "error": "stale queued reaped — webhook 유실 좀비 정리 (quota 복구 2026-08-05)"
+    }
+  ],
+  "moderation_soft": [
+    {
+      "id": "7e9756df-a520-4102-a189-94cd53dbfb8b",
+      "kind": "shot_rough_storyboard",
+      "attempts": 1,
+      "created_at": "2026-07-14T13:34:45.171829+00:00",
+      "error": "image too small (1795b < 20000) — likely blank/moderated output"
+    },
+    {
+      "id": "ba4859c2-4b0c-4913-822d-c5618620c2c6",
+      "kind": "shot_rough_storyboard",
+      "attempts": 1,
+      "created_at": "2026-07-14T13:34:45.171829+00:00",
+      "error": "image too small (1795b < 20000) — likely blank/moderated output"
+    }
+  ],
+  "data_ref": [
+    {
+      "id": "29f3dd68-9c48-4084-92df-de7daab118cc",
+      "kind": "character_view",
+      "attempts": 1,
+      "created_at": "2026-07-15T06:39:18.289367+00:00",
+      "error": "status=422 | body={\"detail\":[{\"loc\":[\"body\",\"input.image_urls\"],\"msg\":\"Failed to load the image. Please ensure the image file is not corrupted and is in a supported format.\",\"type\":\"image_load_error\","
+    },
+    {
+      "id": "57924e6c-f525-4d4c-8685-2e1f70cda5fc",
+      "kind": "character_view",
+      "attempts": 1,
+      "created_at": "2026-07-15T06:39:19.059677+00:00",
+      "error": "status=422 | body={\"detail\":[{\"loc\":[\"body\",\"input.image_urls\"],\"msg\":\"Failed to load the image. Please ensure the image file is not corrupted and is in a supported format.\",\"type\":\"image_load_error\","
+    }
+  ],
+  "billing": [
+    {
+      "id": "17f24214-7df7-40c6-a5d3-bfe3c1cec361",
+      "kind": "character_view",
+      "attempts": 1,
+      "created_at": "2026-07-15T10:33:16.284072+00:00",
+      "error": "fal 잔액 소진으로 미실행 — 수동 이미지 경로로 대체"
+    },
+    {
+      "id": "03497862-f7ed-46dc-814c-92019674b916",
+      "kind": "character_view",
+      "attempts": 1,
+      "created_at": "2026-07-15T10:33:16.870651+00:00",
+      "error": "fal 잔액 소진으로 미실행 — 수동 이미지 경로로 대체"
+    }
+  ],
+  "bad_request": [
+    {
+      "id": "ea99590c-8a19-42f0-8880-6071d091631c",
+      "kind": "shot_storyboard",
+      "attempts": 1,
+      "created_at": "2026-07-24T10:23:08.332618+00:00",
+      "error": "Bad Request"
+    },
+    {
+      "id": "430c9bed-dbb3-4a26-9621-9c7c81385bb5",
+      "kind": "shot_rough_storyboard",
+      "attempts": 1,
+      "created_at": "2026-08-05T07:11:29.080061+00:00",
+      "error": "Bad Request"
+    }
+  ],
+  "moderation": [
+    {
+      "id": "5d41afb9-09c7-433d-b852-769a67bb7dce",
+      "kind": "shot_storyboard",
+      "attempts": 1,
+      "created_at": "2026-07-26T01:09:47.740125+00:00",
+      "error": "status=422 | Unprocessable Entity | body={\"detail\":[{\"loc\":[\"body\",\"prompt\"],\"msg\":\"The content could not be processed because it contained material flagged by a content checker.\",\"type\":\"content_poli"
+    }
+  ],
+  "provider": [
+    {
+      "id": "b319d20d-92bf-4006-9409-bed13c589a58",
+      "kind": "shot_video",
+      "attempts": 1,
+      "created_at": "2026-07-31T14:47:49.830617+00:00",
+      "error": "invalid video url in provider result"
+    },
+    {
+      "id": "da4efc35-6d9e-4ccd-a507-180674bdd672",
+      "kind": "shot_video",
+      "attempts": 1,
+      "created_at": "2026-07-31T16:41:40.707545+00:00",
+      "error": "invalid video url in provider result"
+    }
+  ]
+}

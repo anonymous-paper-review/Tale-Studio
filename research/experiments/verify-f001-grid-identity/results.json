@@ -1,0 +1,1081 @@
+{
+  "ticket": "verify-f001-grid-identity",
+  "ran_at": "2026-08-15T16:35:50.856Z",
+  "query": {
+    "table": "generation_jobs",
+    "filters": {
+      "kind": "storyboard_real_grid",
+      "created_at_gte": "2026-08-12T11:13:00Z"
+    },
+    "scored_status": "completed"
+  },
+  "counts": {
+    "jobs_matching_kind_and_time": 21,
+    "by_status": {
+      "completed": 20,
+      "queued": 1
+    },
+    "scored": 20,
+    "pass": 20,
+    "fail": 0,
+    "prompt_missing": 0,
+    "mixed_cast_sheets": 5
+  },
+  "rows": [
+    {
+      "job_id": "6c8db38a-8390-4721-9156-4ed95fe5dee8",
+      "project_id": "1e166e55-6797-4b77-a7e4-12c22a4c865c",
+      "created_at": "2026-08-12T14:14:07.567939+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1475,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: 소녀",
+        "Column 3: 소녀",
+        "Column 4: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: 소녀\n    * Column 3: 소녀\n    * Column 4: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_01_01",
+          "sh_01_02",
+          "sh_01_03",
+          "sh_01_04"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/1e166e55-6797-4b77-a7e4-12c22a4c865c/shots/real_grid_6c8db38a-8390-4721-9156-4ed95fe5dee8.png?v=1786544177379"
+    },
+    {
+      "job_id": "7c9b63de-c6ea-4973-9aff-fdb33872902b",
+      "project_id": "1e166e55-6797-4b77-a7e4-12c22a4c865c",
+      "created_at": "2026-08-12T14:14:24.698463+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1532,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins. Only the first 2 column(s) contain shots — keep the remaining column(s) as empty blank panels.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_01_05",
+          "sh_01_06"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/1e166e55-6797-4b77-a7e4-12c22a4c865c/shots/real_grid_7c9b63de-c6ea-4973-9aff-fdb33872902b.png?v=1786544178673"
+    },
+    {
+      "job_id": "9f7aadd6-a02e-47f6-8ae4-021e9e6ae3b7",
+      "project_id": "1e166e55-6797-4b77-a7e4-12c22a4c865c",
+      "created_at": "2026-08-12T14:17:06.67008+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1475,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: 소녀",
+        "Column 3: 소녀",
+        "Column 4: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: 소녀\n    * Column 3: 소녀\n    * Column 4: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_02_07",
+          "sh_02_08",
+          "sh_02_09",
+          "sh_02_10"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/1e166e55-6797-4b77-a7e4-12c22a4c865c/shots/real_grid_9f7aadd6-a02e-47f6-8ae4-021e9e6ae3b7.png?v=1786544353624"
+    },
+    {
+      "job_id": "79276146-5862-419f-82d2-091d10f900d9",
+      "project_id": "1e166e55-6797-4b77-a7e4-12c22a4c865c",
+      "created_at": "2026-08-12T14:17:34.6168+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1595,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: no character — keep this column free of people",
+        "Column 3: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀",
+        "no character — keep this column free of people"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins. Only the first 3 column(s) contain shots — keep the remaining column(s) as empty blank panels.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: no character — keep this column free of people\n    * Column 3: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_02_11",
+          "sh_02_12",
+          "sh_02_13"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/1e166e55-6797-4b77-a7e4-12c22a4c865c/shots/real_grid_79276146-5862-419f-82d2-091d10f900d9.png?v=1786544380448"
+    },
+    {
+      "job_id": "49980c3c-59df-43e9-adc9-932b978ffc39",
+      "project_id": "1e166e55-6797-4b77-a7e4-12c22a4c865c",
+      "created_at": "2026-08-12T14:20:21.552172+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1519,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: no character — keep this column free of people",
+        "Column 3: 소녀",
+        "Column 4: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀",
+        "no character — keep this column free of people"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: no character — keep this column free of people\n    * Column 3: 소녀\n    * Column 4: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_03_14",
+          "sh_03_15",
+          "sh_03_16",
+          "sh_03_17"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/1e166e55-6797-4b77-a7e4-12c22a4c865c/shots/real_grid_49980c3c-59df-43e9-adc9-932b978ffc39.png?v=1786544538442"
+    },
+    {
+      "job_id": "47d6304e-7f7d-402d-a60b-e440ee5d08fe",
+      "project_id": "1e166e55-6797-4b77-a7e4-12c22a4c865c",
+      "created_at": "2026-08-12T14:20:45.175811+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1595,
+      "column_lines": [
+        "Column 1: no character — keep this column free of people",
+        "Column 2: 소녀",
+        "Column 3: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "no character — keep this column free of people",
+        "소녀"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins. Only the first 3 column(s) contain shots — keep the remaining column(s) as empty blank panels.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: no character — keep this column free of people\n    * Column 2: 소녀\n    * Column 3: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_03_18",
+          "sh_03_19",
+          "sh_03_20"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/1e166e55-6797-4b77-a7e4-12c22a4c865c/shots/real_grid_47d6304e-7f7d-402d-a60b-e440ee5d08fe.png?v=1786544591760"
+    },
+    {
+      "job_id": "80bd839a-3103-4a5f-b54a-036ecf30b081",
+      "project_id": "1e166e55-6797-4b77-a7e4-12c22a4c865c",
+      "created_at": "2026-08-12T14:24:01.586852+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1519,
+      "column_lines": [
+        "Column 1: no character — keep this column free of people",
+        "Column 2: 소녀",
+        "Column 3: 소녀",
+        "Column 4: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "no character — keep this column free of people",
+        "소녀"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: no character — keep this column free of people\n    * Column 2: 소녀\n    * Column 3: 소녀\n    * Column 4: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_04_21",
+          "sh_04_22",
+          "sh_04_23",
+          "sh_04_24"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/1e166e55-6797-4b77-a7e4-12c22a4c865c/shots/real_grid_80bd839a-3103-4a5f-b54a-036ecf30b081.png?v=1786544766690"
+    },
+    {
+      "job_id": "6948d8d3-3c1d-44f3-adda-387c237dd1a3",
+      "project_id": "1e166e55-6797-4b77-a7e4-12c22a4c865c",
+      "created_at": "2026-08-12T14:24:26.814814+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1587,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: 왕국의 추격자들",
+        "Column 3: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀",
+        "reference image 3 = 왕국의 추격자들"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀",
+        "왕국의 추격자들"
+      ],
+      "refimage_names": [
+        "소녀",
+        "왕국의 추격자들"
+      ],
+      "mixed_cast_sheet": true,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins. Only the first 3 column(s) contain shots — keep the remaining column(s) as empty blank panels.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀; reference image 3 = 왕국의 추격자들.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: 왕국의 추격자들\n    * Column 3: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, lighting mood and color grade. Do NOT reproduce its subject or objects.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_04_25",
+          "sh_04_26",
+          "sh_04_27"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/1e166e55-6797-4b77-a7e4-12c22a4c865c/shots/real_grid_6948d8d3-3c1d-44f3-adda-387c237dd1a3.png?v=1786544786637"
+    },
+    {
+      "job_id": "19389711-b905-4dfc-9ac9-8b6f98542aee",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "created_at": "2026-08-13T06:15:01.644935+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "scene_time_of_day",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1798,
+      "column_lines": [
+        "Column 1: no character — keep this column free of people",
+        "Column 2: 소녀",
+        "Column 3: 소녀",
+        "Column 4: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "no character — keep this column free of people",
+        "소녀"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: no character — keep this column free of people\n    * Column 2: 소녀\n    * Column 3: 소녀\n    * Column 4: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.\n- Scene lighting — the whole sheet is ONE scene, time of day: morning. Render that time of day's light and color grade in every panel, identical across all columns; never drift to a different time of day in any column.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_01_01",
+          "sh_01_02",
+          "sh_01_03",
+          "sh_01_04"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/shots/real_grid_19389711-b905-4dfc-9ac9-8b6f98542aee.png?v=1786601822330"
+    },
+    {
+      "job_id": "dd256bc2-563f-4ee2-8b82-232bbd40cee4",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "created_at": "2026-08-13T06:33:44.783559+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "scene_time_of_day",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1754,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: 소녀",
+        "Column 3: 소녀",
+        "Column 4: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: 소녀\n    * Column 3: 소녀\n    * Column 4: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.\n- Scene lighting — the whole sheet is ONE scene, time of day: morning. Render that time of day's light and color grade in every panel, identical across all columns; never drift to a different time of day in any column.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_01_05",
+          "sh_01_06",
+          "sh_01_07",
+          "sh_01_08"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/shots/real_grid_dd256bc2-563f-4ee2-8b82-232bbd40cee4.png?v=1786602959792"
+    },
+    {
+      "job_id": "16668a36-2fb3-4c62-893d-60ebce9eb78e",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "created_at": "2026-08-13T06:43:49.525061+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "scene_time_of_day",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1798,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: 소녀",
+        "Column 3: 소녀",
+        "Column 4: no character — keep this column free of people"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀",
+        "no character — keep this column free of people"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: 소녀\n    * Column 3: 소녀\n    * Column 4: no character — keep this column free of people\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.\n- Scene lighting — the whole sheet is ONE scene, time of day: morning. Render that time of day's light and color grade in every panel, identical across all columns; never drift to a different time of day in any column.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_02_09",
+          "sh_02_10",
+          "sh_02_11",
+          "sh_02_12"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/shots/real_grid_16668a36-2fb3-4c62-893d-60ebce9eb78e.png?v=1786603550351"
+    },
+    {
+      "job_id": "5daeb80e-eff3-4e5b-8ded-9cd9892e1148",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "created_at": "2026-08-13T06:44:02.135627+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "scene_time_of_day",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1798,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: 소녀",
+        "Column 3: 소녀",
+        "Column 4: no character — keep this column free of people"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀",
+        "no character — keep this column free of people"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: 소녀\n    * Column 3: 소녀\n    * Column 4: no character — keep this column free of people\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.\n- Scene lighting — the whole sheet is ONE scene, time of day: morning. Render that time of day's light and color grade in every panel, identical across all columns; never drift to a different time of day in any column.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_02_09",
+          "sh_02_10",
+          "sh_02_11",
+          "sh_02_12"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/shots/real_grid_5daeb80e-eff3-4e5b-8ded-9cd9892e1148.png?v=1786603564684"
+    },
+    {
+      "job_id": "543e6350-7b13-4db6-a4f2-bc5f1c552638",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "created_at": "2026-08-13T06:44:25.399451+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "scene_time_of_day",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1754,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: 소녀",
+        "Column 3: 소녀",
+        "Column 4: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: 소녀\n    * Column 3: 소녀\n    * Column 4: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.\n- Scene lighting — the whole sheet is ONE scene, time of day: morning. Render that time of day's light and color grade in every panel, identical across all columns; never drift to a different time of day in any column.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_02_13",
+          "sh_02_14",
+          "sh_02_15",
+          "sh_02_16"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/shots/real_grid_543e6350-7b13-4db6-a4f2-bc5f1c552638.png?v=1786603591141"
+    },
+    {
+      "job_id": "8995386f-3191-48ef-9402-54fb61b6c8c2",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "created_at": "2026-08-13T06:44:25.433146+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "scene_time_of_day",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1754,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: 소녀",
+        "Column 3: 소녀",
+        "Column 4: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀"
+      ],
+      "refimage_names": [
+        "소녀"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: 소녀\n    * Column 3: 소녀\n    * Column 4: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.\n- Scene lighting — the whole sheet is ONE scene, time of day: morning. Render that time of day's light and color grade in every panel, identical across all columns; never drift to a different time of day in any column.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_02_13",
+          "sh_02_14",
+          "sh_02_15",
+          "sh_02_16"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/shots/real_grid_8995386f-3191-48ef-9402-54fb61b6c8c2.png?v=1786603597434"
+    },
+    {
+      "job_id": "c89ed361-193e-4e88-8f3a-277cf90a4a04",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "created_at": "2026-08-13T06:47:14.475232+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "scene_time_of_day",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1777,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: 추적자",
+        "Column 3: 소녀",
+        "Column 4: 추적자"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀",
+        "reference image 3 = 추적자"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀",
+        "추적자"
+      ],
+      "refimage_names": [
+        "소녀",
+        "추적자"
+      ],
+      "mixed_cast_sheet": true,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀; reference image 3 = 추적자.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: 추적자\n    * Column 3: 소녀\n    * Column 4: 추적자\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.\n- Scene lighting — the whole sheet is ONE scene, time of day: day. Render that time of day's light and color grade in every panel, identical across all columns; never drift to a different time of day in any column.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_03_17",
+          "sh_03_18",
+          "sh_03_19",
+          "sh_03_20"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/shots/real_grid_c89ed361-193e-4e88-8f3a-277cf90a4a04.png?v=1786603775764"
+    },
+    {
+      "job_id": "ae85b4aa-829e-438d-9e3c-cb854db79da0",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "created_at": "2026-08-13T07:07:18.523791+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "scene_time_of_day",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1776,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: 추적자",
+        "Column 3: 소녀",
+        "Column 4: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀",
+        "reference image 3 = 추적자"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀",
+        "추적자"
+      ],
+      "refimage_names": [
+        "소녀",
+        "추적자"
+      ],
+      "mixed_cast_sheet": true,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀; reference image 3 = 추적자.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: 추적자\n    * Column 3: 소녀\n    * Column 4: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.\n- Scene lighting — the whole sheet is ONE scene, time of day: day. Render that time of day's light and color grade in every panel, identical across all columns; never drift to a different time of day in any column.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_03_21",
+          "sh_03_22",
+          "sh_03_23",
+          "sh_03_24"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/shots/real_grid_ae85b4aa-829e-438d-9e3c-cb854db79da0.png?v=1786604961577"
+    },
+    {
+      "job_id": "358718d8-5298-48e0-94d4-b4a51bc2e928",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "created_at": "2026-08-13T07:07:46.193259+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "scene_time_of_day",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1820,
+      "column_lines": [
+        "Column 1: no character — keep this column free of people",
+        "Column 2: 소녀",
+        "Column 3: 추적자",
+        "Column 4: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀",
+        "reference image 3 = 추적자"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "no character — keep this column free of people",
+        "소녀",
+        "추적자"
+      ],
+      "refimage_names": [
+        "소녀",
+        "추적자"
+      ],
+      "mixed_cast_sheet": true,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀; reference image 3 = 추적자.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: no character — keep this column free of people\n    * Column 2: 소녀\n    * Column 3: 추적자\n    * Column 4: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.\n- Scene lighting — the whole sheet is ONE scene, time of day: day. Render that time of day's light and color grade in every panel, identical across all columns; never drift to a different time of day in any column.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_04_25",
+          "sh_04_26",
+          "sh_04_27",
+          "sh_04_28"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/shots/real_grid_358718d8-5298-48e0-94d4-b4a51bc2e928.png?v=1786604990033"
+    },
+    {
+      "job_id": "033d837d-87f8-4f5f-bd56-6ed91656dae0",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "created_at": "2026-08-13T07:11:05.352639+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "scene_time_of_day",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 1776,
+      "column_lines": [
+        "Column 1: 소녀",
+        "Column 2: 소녀",
+        "Column 3: 추적자",
+        "Column 4: 소녀"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 소녀",
+        "reference image 3 = 추적자"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "소녀",
+        "추적자"
+      ],
+      "refimage_names": [
+        "소녀",
+        "추적자"
+      ],
+      "mixed_cast_sheet": true,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 소녀; reference image 3 = 추적자.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 소녀\n    * Column 2: 소녀\n    * Column 3: 추적자\n    * Column 4: 소녀\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework. Do NOT reproduce its subject or objects, and do NOT copy its time of day or lighting — the scene lighting line below governs those.\n- Scene lighting — the whole sheet is ONE scene, time of day: day. Render that time of day's light and color grade in every panel, identical across all columns; never drift to a different time of day in any column.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_04_29",
+          "sh_04_30",
+          "sh_04_31",
+          "sh_04_32"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/shots/real_grid_033d837d-87f8-4f5f-bd56-6ed91656dae0.png?v=1786605190365"
+    },
+    {
+      "job_id": "2939147d-5d82-4bab-801c-2cd6c873c1ed",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "created_at": "2026-08-14T03:29:49.225383+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "scene_time_of_day",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 2836,
+      "column_lines": [
+        "Column 1: 책사",
+        "Column 2: 책사",
+        "Column 3: no character — keep this column free of people",
+        "Column 4: 책사"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 책사"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "책사",
+        "no character — keep this column free of people"
+      ],
+      "refimage_names": [
+        "책사"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 책사.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 책사\n    * Column 2: 책사\n    * Column 3: no character — keep this column free of people\n    * Column 4: 책사\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, color grade and palette. Do NOT reproduce its subjects or objects. Take the time of day from the scene lighting line below, but KEEP the style reference's color grade and palette on top of it.\n- Render this as a finished example of that look applied to a whole shot - a sun-bleached desert grade: a low-saturation palette of sand, ochre, bone and pale dust-grey with no clean or vivid color anywhere in it; hard, low, raking key light that carves hot, heavy, sharp-edged shadows and bleaches its highlights; fine airborne dust hanging in every beam of light and a pale haze swallowing the far distance; gritty porous weathered stone, dust-filmed thick glass, pitted patinated brass and coarse rough-woven linen wherever such materials appear; monumental scale, heavy grain, a filmic grade, and a mood of solemn grandeur. This is a color, light and material treatment only - keep the scene exactly as described, with its own stated time of day and light source, and do not relocate it or add desert scenery. Expose it high-key and bright: the whole frame is light, pale and sun-washed, with a luminous pale haze, only a few small deep shadows, and no large dark areas anywhere in the frame.\n- Scene lighting — the whole sheet is ONE scene, time of day: day. Render that time of day's light in every panel, identical across all columns; never drift to a different time of day in any column.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_05_33",
+          "sh_05_34",
+          "sh_05_35",
+          "sh_05_36"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/shots/real_grid_2939147d-5d82-4bab-801c-2cd6c873c1ed.png?v=1786678308867"
+    },
+    {
+      "job_id": "b89800ef-dae1-4b76-aa72-a068c2d4b24e",
+      "project_id": "3036b333-28ae-41c9-a31b-072eb45484e0",
+      "created_at": "2026-08-14T03:30:15.560128+00:00",
+      "has_input_snapshot": true,
+      "input_snapshot_keys": [
+        "prompt",
+        "shotIds",
+        "ref_grid_url",
+        "style_anchor_key",
+        "column_characters",
+        "scene_time_of_day",
+        "reference_image_urls"
+      ],
+      "prompt_present": true,
+      "prompt_len": 2868,
+      "column_lines": [
+        "Column 1: 책사",
+        "Column 2: 책사",
+        "Column 3: 책사"
+      ],
+      "refimage_lines": [
+        "reference image 2 = 책사"
+      ],
+      "has_column": true,
+      "has_refimage": true,
+      "assigned_names": [
+        "책사"
+      ],
+      "refimage_names": [
+        "책사"
+      ],
+      "mixed_cast_sheet": false,
+      "verdict": "pass",
+      "prompt_full": "The FIRST reference image is a 4-column x 3-row storyboard sheet. Each COLUMN is ONE film shot, read top to bottom: row 1 = START frame, row 2 = DIRECTION frame (the same drawing as START plus hand-drawn arrows and labels), row 3 = END frame after the movement completes. The drawings are rough pencil previz with wooden mannequin stand-ins. Only the first 3 column(s) contain shots — keep the remaining column(s) as empty blank panels.\n\nRepaint this exact sheet as finished, final-quality film frames:\n- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.\n- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.\n- Character references, in order after the first image: reference image 2 = 책사.\n- Replace every wooden mannequin with the character assigned to ITS OWN column below — never carry a character into a column they are not assigned to:\n    * Column 1: 책사\n    * Column 2: 책사\n    * Column 3: 책사\n- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.\n- Match the exact visual style of the LAST reference image (style reference): art medium, rendering technique, linework, color grade and palette. Do NOT reproduce its subjects or objects. Take the time of day from the scene lighting line below, but KEEP the style reference's color grade and palette on top of it.\n- Render this as a finished example of that look applied to a whole shot - a sun-bleached desert grade: a low-saturation palette of sand, ochre, bone and pale dust-grey with no clean or vivid color anywhere in it; hard, low, raking key light that carves hot, heavy, sharp-edged shadows and bleaches its highlights; fine airborne dust hanging in every beam of light and a pale haze swallowing the far distance; gritty porous weathered stone, dust-filmed thick glass, pitted patinated brass and coarse rough-woven linen wherever such materials appear; monumental scale, heavy grain, a filmic grade, and a mood of solemn grandeur. This is a color, light and material treatment only - keep the scene exactly as described, with its own stated time of day and light source, and do not relocate it or add desert scenery. Expose it high-key and bright: the whole frame is light, pale and sun-washed, with a luminous pale haze, only a few small deep shadows, and no large dark areas anywhere in the frame.\n- Scene lighting — the whole sheet is ONE scene, time of day: day. Render that time of day's light in every panel, identical across all columns; never drift to a different time of day in any column.\n- No text anywhere except row 2's arrow labels.",
+      "model": "openai/gpt-image-2/edit",
+      "provider": "fal",
+      "target": {
+        "gridVariant": "grid4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "writerShotIds": [
+          "sh_05_37",
+          "sh_05_38",
+          "sh_05_39"
+        ]
+      },
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/shots/real_grid_b89800ef-dae1-4b76-aa72-a068c2d4b24e.png?v=1786678331705"
+    }
+  ],
+  "characters_by_project": {
+    "1e166e55-6797-4b77-a7e4-12c22a4c865c": [
+      {
+        "id": "73ea9ef6-fbd8-4569-9c4a-f94e0d7ef904",
+        "character_id": "char",
+        "name": "소녀",
+        "entity_type": "person",
+        "has_portrait": true,
+        "portrait": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/1e166e55-6797-4b77-a7e4-12c22a4c865c/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_portrait.png?v=1786542963152",
+        "view_main": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/1e166e55-6797-4b77-a7e4-12c22a4c865c/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786542960336"
+      },
+      {
+        "id": "655fc144-9287-4bcb-840c-d9b0cd87b8a5",
+        "character_id": "kingdom_pursuers",
+        "name": "왕국의 추격자들",
+        "entity_type": "person",
+        "has_portrait": true,
+        "portrait": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/1e166e55-6797-4b77-a7e4-12c22a4c865c/characters/v1-5fda21d19de01dfa5f0b6c79e1e3a7353a51431a12585447fd02cd536d0ff375_portrait.png?v=1786543867032",
+        "view_main": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/1e166e55-6797-4b77-a7e4-12c22a4c865c/characters/v1-5fda21d19de01dfa5f0b6c79e1e3a7353a51431a12585447fd02cd536d0ff375_view_main.png?v=1786543863889"
+      }
+    ],
+    "3036b333-28ae-41c9-a31b-072eb45484e0": [
+      {
+        "id": "a989fef1-bb81-4453-861a-c983277e6b92",
+        "character_id": "char",
+        "name": "소녀",
+        "entity_type": "person",
+        "has_portrait": true,
+        "portrait": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_portrait.png?v=1786592864492",
+        "view_main": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634_view_main.png?v=1786592861443"
+      },
+      {
+        "id": "3b6ecc70-8084-4623-9c96-6237b6c539ea",
+        "character_id": "char_2",
+        "name": "추적자",
+        "entity_type": "person",
+        "has_portrait": true,
+        "portrait": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/characters/v1-c50f938b516a0c463fd8f294753aa219811679c3267f33f227edd6bcf5abad2a_portrait.png?v=1786592886390",
+        "view_main": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/characters/v1-c50f938b516a0c463fd8f294753aa219811679c3267f33f227edd6bcf5abad2a_view_main.png?v=1786592883188"
+      },
+      {
+        "id": "6e959a28-27dc-4d7e-b5c2-ec6007c03a5a",
+        "character_id": "char_3",
+        "name": "책사",
+        "entity_type": "person",
+        "has_portrait": true,
+        "portrait": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/characters/v1-53045b217691e950565a213a4c9b3f2cd29284ab49a320fe55dc5dde6dda9436_portrait.png?v=1786592872777",
+        "view_main": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/3036b333-28ae-41c9-a31b-072eb45484e0/characters/v1-53045b217691e950565a213a4c9b3f2cd29284ab49a320fe55dc5dde6dda9436_view_main.png?v=1786592869638"
+      }
+    ]
+  }
+}
