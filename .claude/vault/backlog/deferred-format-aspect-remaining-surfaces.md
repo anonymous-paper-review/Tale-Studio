@@ -8,10 +8,12 @@ status: waiting
 priority: normal
 ```
 
-# 프로듀서 화면비 미배선 잔여 3표면 — 영상·수동 이미지·러프 previz
+# 프로듀서 화면비 미배선 잔여 2표면 — 영상·수동 이미지
 
 `#fal-canvas`(2026-08-17)로 실사 스토리보드 두 경로(일괄 그리드·개별 스트립)와 러프 없는 단일
-이미지는 프로듀서 포맷을 따르게 됐다. 같은 목표("producer 화면비 → fal")가 아직 안 닿은 표면:
+이미지는 프로듀서 포맷을 따르게 됐다. ③ 러프 previz 시트는 같은 날 `#sheet-formats`(오너 지시:
+포맷별 템플릿 신규 제작)로 해소 — 포맷 전용 템플릿 6장 + 시트 스펙 단일 진실원 + 축 인지
+크롭·합성. 남은 표면:
 
 - **① 영상 생성**: writer 는 샷마다 화면비를 포맷 파생으로 저장하지만(`v0_visual.ts` 가 강제,
   `v5_prompts.ts` 가 전파), director-store 의 영상 발주가 `aspectRatio: '16:9'` 를 하드코딩해
@@ -21,10 +23,7 @@ priority: normal
   kling 등 — kling-o3 는 미노출로 omit 중)도 모델별 확인 필요.
 - **② 수동 노드 이미지**: `/api/generate/image` 발주도 `'16:9'` 하드코딩(director-store).
   이 라우트는 projectId 를 안 받아 서버 파생이 불가 — 파라미터 추가 또는 클라 파생 필요.
-- **③ 러프 previz 시트**: 러프 그리드/스트립 생성은 가로 템플릿 고정(image_size 미지정 →
-  'auto' = 템플릿 비율 추종). 실사가 세로 재구도를 해주므로 급하지 않지만(실측 T2 — 가로
-  스케치를 세로 패널로 재프레이밍), previz 단계부터 세로 구도를 보고 싶다면 러프 캔버스도
-  포맷 파생으로. 이 경우 previz 검증기·화살표 편집기 등 러프 소비처 영향 확인 필요.
-- **좌표**: 이번 배선 원형 `realSheetCanvas`(storyboard-strip.ts) + `parseProjectFormat`
-  (types/project.ts) + 실측 `research/experiments/fal-canvas-image-size/RESULTS.md`.
-- 기록: 2026-08-17
+- **좌표**: 이번 배선 원형 `realSheetCanvas`·`sheetGeometry`(rough-storyboard-grid.ts) +
+  `parseProjectFormat`(types/project.ts) + 실측 `research/experiments/fal-canvas-image-size/` ·
+  `research/experiments/sheet-formats/`.
+- 기록: 2026-08-17 (③ 러프 previz 해소 반영 동일 날)
