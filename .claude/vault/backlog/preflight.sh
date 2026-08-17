@@ -28,6 +28,8 @@ fail() {
 [ -f "$SNAPSHOT_RUNTIME" ] || fail "snapshot runtime missing: $SNAPSHOT_RUNTIME"
 [ -f "$PROVIDER_GATE" ] || fail "provider gate helper missing: $PROVIDER_GATE"
 [ -f "$INBOX" ] || fail "owner inbox missing: $INBOX"
+[ -f "$PROJECT_ROOT/.claude/agents/night-investigator.md" ] || fail "night investigator agent missing"
+[ -f "$PROJECT_ROOT/.claude/skills/night-debug-run/SKILL.md" ] || fail "night debug-run skill missing"
 [ -d "$TICKETS_ROOT" ] || fail "tickets directory missing: $TICKETS_ROOT"
 [ -d "$REPORTS_ROOT" ] || fail "reports directory missing: $REPORTS_ROOT"
 [ ! -e "$OLD_SWEEP" ] || fail "obsolete live sweep contract still exists: $OLD_SWEEP"
