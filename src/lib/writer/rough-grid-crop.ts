@@ -301,7 +301,11 @@ export async function cropRoughGridFrames(
     }
     // 셀 크기는 축마다 한 번만 계산 — 셀별 경계 반올림 ±1px 가 프레임 크기를 흔들지 않게
     //   (스펙상 모든 셀의 비례 폭·높이는 동일하다). 균일성이 이 모드의 존재 이유다.
-    const frameW = Math.max(1, Math.round((cols[0][1] - cols[0][0]) * W))
+    // X_BLEED(#fixed-crop square 실측): 모델이 라벨을 셀 좌측 보더에 바짝 써서 3px 인테리어
+    //   인셋이 첫 글자 획을 자른다("KEY"→"EY") — 좌우만 보더 포함으로 되돌린다(세로 보더 라인이
+    //   프레임 가장자리에 보이는 트레이드, previz 라 무해). 상하는 오버플로·행 체인이 담당.
+    const X_BLEED = 3
+    const frameW = Math.max(1, Math.round((cols[0][1] - cols[0][0]) * W) + X_BLEED * 2)
     const frameH = Math.max(1, Math.round((rows[0][1] - rows[0][0]) * H))
 
     // 행 시작 체인: 행1 = 스펙(상단 마진 안정 실측), 행 N+1 = scanNextRowTop 이 캡션의 얇은
@@ -338,7 +342,7 @@ export async function cropRoughGridFrames(
       const frames: Buffer[] = []
       for (let f = 0; f < 3; f++) {
         const cx = framesAlongRows ? cols[s] : cols[f]
-        const left = Math.min(Math.round(cx[0] * W), W - frameW)
+        const left = Math.max(0, Math.min(Math.round(cx[0] * W) - X_BLEED, W - frameW))
         const top = Math.min(Math.max(0, rowTops[framesAlongRows ? f : s] ?? 0), H - frameH)
         const isDirection = f === 1
         const nextRowTop = framesAlongRows ? rowTops[f + 1] ?? H - 14 : H - 14

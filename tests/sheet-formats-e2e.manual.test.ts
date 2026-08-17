@@ -26,6 +26,9 @@ const ROUGH_GROUPS = (process.env.E2E_ROUGH_SHOTS ?? 'sh_02_04,sh_02_05,sh_02_06
 const REPAINT_SHOT = process.env.E2E_REPAINT_SHOT ?? ROUGH_GROUPS[0][0]
 const SKIP_REPAINT = process.env.E2E_SKIP_REPAINT === '1'
 const SKIP_SEED = process.env.E2E_SKIP_SEED === '1'
+// 프레임 AR 검증 범위 — 기본은 세로 프로젝트(AR<0.8). square 는 0.9~1.1 등으로 오버라이드.
+const FRAME_AR_MIN = Number(process.env.E2E_FRAME_AR_MIN ?? '0')
+const FRAME_AR_MAX = Number(process.env.E2E_FRAME_AR_MAX ?? '0.8')
 
 // 라우트 모듈 로드 전에 프로덕션 env 주입 (supabaseAdmin 은 모듈 로드 시 env 를 읽는다).
 //   vitest 셋업이 유닛테스트 보호용 센티널(supabase.invalid 등)을 미리 심으므로 **무조건 덮어쓴다**
@@ -148,7 +151,8 @@ describe.runIf(LIVE)('sheet-formats E2E — storage 시드 + writer/director 실
         const frames = (s.rough_storyboard as { frames?: Record<string, string> } | null)?.frames
         expect(frames?.start, `${s.shot_id} rough frames`).toBeTruthy()
         const { buf, w, h } = await frameDims(frames!.start!)
-        expect(w / h, `${s.shot_id} 세로 프레임 (${w}x${h})`).toBeLessThan(0.8)
+        expect(w / h, `${s.shot_id} 프레임 AR (${w}x${h})`).toBeGreaterThanOrEqual(FRAME_AR_MIN)
+        expect(w / h, `${s.shot_id} 프레임 AR (${w}x${h})`).toBeLessThanOrEqual(FRAME_AR_MAX)
         await writeFile(path.join(outDir, `rough-${s.shot_id}-start.png`), buf)
       }
 

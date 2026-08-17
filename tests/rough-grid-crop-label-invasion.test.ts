@@ -48,7 +48,7 @@ describe('cropRoughGridFrames — 포맷 시트 고정 좌표 (#fixed-crop)', ()
   it('드리프트·라벨 밴드가 있어도 프레임은 스펙 셀 내부 크기로 상시 균일', async () => {
     const g = sheetGeometry('grid4', 'vertical_9:16')
     const spec = sheetSpecOf('grid4', 'vertical_9:16')!
-    const wantW = Math.round(g.cols[0][1] * spec.canvas.width) - Math.round(g.cols[0][0] * spec.canvas.width)
+    const wantW = Math.round(g.cols[0][1] * spec.canvas.width) - Math.round(g.cols[0][0] * spec.canvas.width) + 6 // X_BLEED 3px×2 — 라벨 첫 글자 보호(#fixed-crop square 실측)
     const wantH = Math.round(g.rows[0][1] * spec.canvas.height) - Math.round(g.rows[0][0] * spec.canvas.height)
     for (const bands of [false, true]) {
       const frames = await cropRoughGridFrames(await syntheticSheet(bands), 'grid4', 4, 'vertical_9:16')
