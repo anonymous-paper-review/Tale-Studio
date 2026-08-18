@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synchronize append-only nightly inbox input without touching unrelated files."""
+"""Synchronize insertion-only nightly inbox input without touching unrelated files."""
 import argparse
 import json
 import os
@@ -116,23 +116,54 @@ def _ensure_only_inbox(project, paths):
         raise MergeConflict("merge-conflict: inbox 이외의 working tree 변경이 있다: " + ", ".join(unexpected))
 
 
+def _is_insert_only(base, candidate):
+    """Return true when candidate preserves every base line in order."""
+    base_lines = base.splitlines(keepends=True)
+    if not base_lines:
+        return True
+    cursor = 0
+    for line in candidate.splitlines(keepends=True):
+        if line == base_lines[cursor]:
+            cursor += 1
+            if cursor == len(base_lines):
+                return True
+    return False
+
+
 def _append_union(base, local, remote):
-    if not local.startswith(base) or not remote.startswith(base):
-        raise MergeConflict("merge-conflict: 공통 base가 rewrite 또는 delete 되었다")
-    local_tail = local[len(base):]
-    remote_tail = remote[len(base):]
-    if not local_tail:
-        return base + remote_tail, False
-    if not remote_tail:
-        return base + local_tail, False
-    if local_tail == remote_tail:
-        return base + local_tail, False
-    if local_tail.startswith(remote_tail):
-        return base + local_tail, True
-    if remote_tail.startswith(local_tail):
-        return base + remote_tail, True
-    separator = b"" if local_tail.endswith((b"\n", b"\r")) else b"\n"
-    return base + local_tail + separator + remote_tail, True
+    # The inbox is conceptually insertion-only, but people sometimes insert a
+    # heading or a pasted note above an older block. Preserve such insertions
+    # as long as no original line was rewritten or deleted.
+    if not _is_insert_only(base, local) or not _is_insert_only(base, remote):
+        raise MergeConflict("merge-conflict: 공통 base의 줄을 수정 또는 삭제했다")
+    if local == remote:
+        return local, False
+    if local == base:
+        return remote, False
+    if remote == base:
+        return local, False
+
+    with tempfile.TemporaryDirectory(prefix="night-inbox-merge-") as temporary:
+        local_path = os.path.join(temporary, "local")
+        base_path = os.path.join(temporary, "base")
+        remote_path = os.path.join(temporary, "remote")
+        for path, content in (
+            (local_path, local), (base_path, base), (remote_path, remote),
+        ):
+            with open(path, "wb") as handle:
+                handle.write(content)
+        merged = subprocess.run(
+            ["git", "merge-file", "--union", local_path, base_path, remote_path],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+        )
+        if merged.returncode > 1:
+            detail = merged.stderr.decode("utf-8", "replace").strip()
+            raise MergeConflict("merge-conflict: inbox 삽입 병합 실패" + (f": {detail}" if detail else ""))
+        with open(local_path, "rb") as handle:
+            content = handle.read()
+    if b"<<<<<<<" in content or b">>>>>>>" in content:
+        raise MergeConflict("merge-conflict: inbox 병합 표식이 남았다")
+    return content, True
 
 
 def _inbox_commits(project, base, revision):
@@ -249,14 +280,15 @@ def synchronize(args):
         base_tree = _show_file(project, base_sha, INBOX_REL)
         remote_tree = _show_file(project, remote_sha, INBOX_REL)
         remote_inbox_commits = _inbox_commits(project, base_sha, remote_sha)
-        if not local_tree.startswith(base_tree) or not remote_tree.startswith(base_tree) or not current.startswith(base_tree):
-            raise MergeConflict("merge-conflict: 공통 base가 rewrite 또는 delete 되었다")
+        if (not _is_insert_only(base_tree, local_tree)
+                or not _is_insert_only(base_tree, remote_tree)
+                or not _is_insert_only(base_tree, current)):
+            raise MergeConflict("merge-conflict: 공통 base의 줄을 수정 또는 삭제했다")
         friend_input = remote_tree != base_tree
         merged, unioned = _append_union(base_tree, current, remote_tree)
     else:
-        # Even without a remote, a local rewrite is not an append-only change.
-        if not current.startswith(local_tree):
-            raise MergeConflict("merge-conflict: local _INBOX.md가 append-only 규칙을 어겼다")
+        if not _is_insert_only(local_tree, current):
+            raise MergeConflict("merge-conflict: local _INBOX.md가 기존 줄을 수정 또는 삭제했다")
         merged = current
 
     content_changed = merged != local_tree

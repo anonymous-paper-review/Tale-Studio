@@ -41,8 +41,9 @@ dry-run은 임시 디렉터리만 쓰므로 진짜 밤 상태와 절대 충돌�
 ## 1.5 다른 개발자의 inbox 입력
 
 밤 실행은 오너 머신 하나만 담당한다. 다른 개발자는 새벽 실행 전에 자신의
-`_INBOX.md`에 메모를 append하고 commit/push만 한다. 오너의 `run`이 claim 전에
-`night-inbox-sync.py`로 원격 `main`을 가져와 양쪽 append를 합친다.
+`_INBOX.md`에 기존 줄을 지우거나 고치지 않고 메모를 추가한 뒤 commit/push만 한다.
+오너의 `run`이 claim 전에 `night-inbox-sync.py`로 원격 `main`을 가져와 양쪽 추가 내용을
+합친다.
 
 - 친구 push가 없으면 오너의 현재 inbox만으로 계속한다.
 - 기존 줄을 고치거나 지운 충돌은 자동으로 선택하지 않고 `merge-conflict`로 멈춘다.

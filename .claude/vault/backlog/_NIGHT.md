@@ -72,7 +72,7 @@
 
 `night-launchd.sh`는 claim 전에 `night-inbox-sync.py`를 실행한다. Orca가 이미 claim을
 만든 경로에서는 아래 계약 블록이 snapshot 직전에 같은 동기화를 한 번 더 확인한다.
-친구가 push한 `_INBOX.md`가 있으면 오너의 append와 함께 보존하고, 친구 push가 없으면
+친구가 push한 `_INBOX.md`가 있으면 오너의 추가 내용과 함께 보존하고, 친구 push가 없으면
 오너의 현재 입력만으로 계속한다. 두 입력은 같은 우선순위다. 기존 줄을 수정·삭제한
 충돌이나 inbox 밖의 로컬 변경이 있으면 `merge-conflict`로 막고 추측하지 않는다.
 
@@ -138,8 +138,8 @@ snapshot_path="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; pri
 ## 3. 메모 원문과 스냅샷 수명
 
 `_INBOX.md`는 사람이 쓰는 원문이다. 밤은 이 파일의 원문을 덮어쓰거나 삭제하지 않는다.
-실행 시작 전 append-only 동기화가 필요할 때만 양쪽 append를 보존한 동기화 commit을
-만들 수 있다. 실행 결과의 보관은 원문을 지우는 이동이 아니라 snapshot content를
+실행 시작 전 기존 줄을 보존하는 추가 전용 동기화가 필요할 때만 양쪽 추가 내용을
+보존한 동기화 commit을 만들 수 있다. 실행 결과의 보관은 원문을 지우는 이동이 아니라 snapshot content를
 `_archive/inbox/`에 복사하고 소비 manifest를 쓰는 방식이다.
 
 1. 시작할 때 UTF-8 원본 바이트의 범위 `[start, end)`와 읽은 시각, 범위의 내용 해시를 저장한다.
@@ -458,7 +458,7 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 
 - 티켓·결과 카드: `.claude/vault/backlog/tickets/` — 새 티켓과 결과 카드는 이 디렉터리에만 만든다. backlog 루트에는 이 계약 문서와 실행 도구만 둔다.
 - 보고서: `.claude/vault/backlog/reports/` — 기계 보고서는 `YYYY-MM-DD.md`, 사람 보고서는 `YYYY-MM-DD.html`. 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
-- 오너 접점은 두 개뿐이다: 쓰는 곳 `_INBOX.md`, 읽는 곳 최신 `reports/YYYY-MM-DD.html`. 다른 파일을 오너가 읽어야만 진행되는 절차를 만들지 않는다. 친구의 입력도 같은 `_INBOX.md`에 append되어 동일 우선순위로 snapshot된다.
+- 오너 접점은 두 개뿐이다: 쓰는 곳 `_INBOX.md`, 읽는 곳 최신 `reports/YYYY-MM-DD.html`. 다른 파일을 오너가 읽어야만 진행되는 절차를 만들지 않는다. 친구의 입력도 같은 `_INBOX.md`에 추가되어 동일 우선순위로 snapshot된다.
 - 티켓 상태와 작업 사본 정보.
 - 메모 스냅샷 fingerprint·범위·내용 해시·소비 상태.
 - 필요한 실험 산출물과 결과표. raw 대화·모델 원출력은 소비 시점 없이 별도 보관하지 않는다.
@@ -475,6 +475,11 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 이 문서를 고쳐야 할 때는 변경 이유, 영향받는 분해 기준, 이전 계약 해시, 새 계약 해시를 기록한다. 밤 실행은 항상 이 문서 하나를 정본으로 사용한다.
 
 ## 15. 계약 개정 기록
+
+- 2026-08-18 (8차) · 이전 계약 해시 `5be54f6111cd6464cb585de4fa882ce21bddd997063beffabd77950918b1aaed` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 02:00·02:30 실행이 `_INBOX.md` 앞부분에 추가된 메모를 기존 줄 수정으로 오인해 `merge-conflict`로 중단됐다.
+  - 변경 내용: 기존 줄을 순서대로 모두 보존하는 삽입 전용 병합을 허용하고, 실제 수정·삭제만 차단한다. 같은 상황에서 친구 push가 없어도 오너 입력만 계속 처리한다.
+  - 영향받는 분해 기준: inbox 동기화 경계만 넓어졌고, 원문 삭제·자동 의미 판단은 여전히 금지된다.
 
 - 2026-08-18 (7차) · 이전 계약 해시 `036ad05dd066ef2943315067d1819c9b5556f5f851a7d0520db846e12492a5cd` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 요청 — 최종 보고서를 어려운 원문 나열이 아니라 짧은 브리프로 먼저 읽고, 단계별 독단·참고 자료·쪼갠 기준은 필요할 때만 펼쳐 보게 한다.
