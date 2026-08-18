@@ -263,4 +263,6 @@ direction 라벨 잉크 존재. 첫 실행에서 1샷 시트 상단 밴드 26행
 - **기존 세로 프로젝트(webtoon_test)의 러프는 가로 프레임 그대로다** — 실사만 세로로 나온다
   (T2 경로). previz 부터 세로로 보려면 러프 재생성(force) 필요 — 과금이라 오너 결정.
 - 템플릿 PNG 는 `public/` 커밋 → template-asset 이 내용 해시로 스토리지 자동 승격(수동 단계 없음).
+  승격 시 같은 base 의 구판 해시 객체는 자동 삭제(#template-latest-only, 2026-08-18 오너 지시
+  "최신 버전만 관리") — queued 잡이 참조하는 객체는 보호, 수동 청소 스크립트 불요.
 - 영상·수동 노드 이미지의 포맷 배선은 별건 — `deferred-format-aspect-remaining-surfaces.md`.
