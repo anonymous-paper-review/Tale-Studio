@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { sanitizeNextPath } from '@/lib/session-restore'
@@ -16,6 +16,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [capsLockOn, setCapsLockOn] = useState(false)
+
+  const updateCapsLockState = (e: KeyboardEvent<HTMLInputElement>) => {
+    setCapsLockOn(e.getModifierState('CapsLock'))
+  }
 
   const handleEmailLogin = async (e: FormEvent) => {
     e.preventDefault()
@@ -85,8 +90,17 @@ export default function LoginPage() {
             placeholder="비밀번호"
             value={password}
             aria-invalid={!!errorMsg}
+            aria-describedby={capsLockOn ? 'caps-lock-hint' : undefined}
+            onBlur={() => setCapsLockOn(false)}
+            onKeyDown={updateCapsLockState}
+            onKeyUp={updateCapsLockState}
             onChange={(e) => { setPassword(e.target.value); if (errorMsg) setErrorMsg(null) }}
           />
+          {capsLockOn ? (
+            <p id="caps-lock-hint" role="status" className="text-sm text-muted-foreground">
+              Caps Lock이 켜져 있어요. 비밀번호를 입력할 때 대문자가 입력될 수 있어요.
+            </p>
+          ) : null}
           {errorMsg ? (
             <p className="text-sm text-destructive">{errorMsg}</p>
           ) : null}

@@ -5,7 +5,7 @@ import { Loader2, RefreshCw, AlertTriangle, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { ProducerReadinessBoard } from '@/features/producer/readiness-board'
-import { useProducerStore } from '@/stores/producer-store'
+import { useProducerStore, WRITER_RERUN_CONSENT_TEXT } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { evaluateProducerGate } from '@/lib/producer-gate'
@@ -136,11 +136,12 @@ export default function MeetingPage() {
       createPendingProposal({
         stage: 'producer',
         kind: 'producerWriterRerunRequest',
-        target: 'Writer rerun',
-        action: '현재 Producer source로 Writer를 다시 실행',
+        target: 'Writer 다시 실행',
+        action: WRITER_RERUN_CONSENT_TEXT,
         impact: [
-          'Writer 구현은 외부 계약을 호출합니다.',
-          'Writer 쪽 same-shot 보존이 보장되지 않았다면 downstream 산출물이 orphan/stale 될 수 있어요.',
+          '현재 Writer의 씬·샷 스토리와 채팅 내역을 새 Writer 입력에 담아요.',
+          '현재 Producer의 스토리·설정·캐스트·배경 결정도 함께 전달해요.',
+          '다시 실행하면 시간이 오래 걸릴 수 있어요. 승인 전에는 아무 생성도 시작하지 않아요.',
           '승인 전에는 아무 실행도 시작하지 않습니다.',
         ],
         payload: {},

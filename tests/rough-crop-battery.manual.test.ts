@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import sharp from 'sharp'
 import { cropRoughGridFrames } from '@/lib/writer/rough-grid-crop'
@@ -14,6 +14,8 @@ import type { ProjectFormat } from '@/types/project'
 //   ③ direction 잉크: 하단 절반에 내용 존재(라벨 소실 검출)
 
 const LIVE = process.env.BATTERY === '1'
+const CORPUS_DIR = path.join(process.cwd(), 'research/experiments/sheet-formats/corpus')
+const BATTERY_READY = LIVE && existsSync(CORPUS_DIR)
 const FMT: Record<string, ProjectFormat> = {
   vt: 'vertical_9:16',
   sq: 'square_1:1',
@@ -35,9 +37,9 @@ async function whiteBand(buf: Buffer, edge: 'top' | 'bottom'): Promise<number> {
   return best
 }
 
-describe.runIf(LIVE)('rough crop battery — 실측 시트 코퍼스', () => {
-  const dir = path.join(process.cwd(), 'research/experiments/sheet-formats/corpus')
-  const files = readdirSync(dir).filter((f) => f.endsWith('.png'))
+describe.runIf(BATTERY_READY)('rough crop battery — 실측 시트 코퍼스', () => {
+  const dir = CORPUS_DIR
+  const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.png')) : []
   it(`코퍼스 ${files.length}장: 균일·빈밴드·라벨 지표`, async () => {
     expect(files.length).toBeGreaterThan(0)
     for (const f of files) {

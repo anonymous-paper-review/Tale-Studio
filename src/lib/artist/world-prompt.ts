@@ -35,7 +35,13 @@ export function worldShotPrompt(
   boost: string | null,
   shot: WorldShotKey,
 ): string {
-  return `${buildWorldPrompt(visualDescription, timeOfDay, mood, boost)}, ${WORLD_SHOT_SUFFIX[shot]}`
+  return [
+    buildWorldPrompt(visualDescription, timeOfDay, mood, boost),
+    'no people or characters, empty environment',
+    WORLD_SHOT_SUFFIX[shot],
+  ]
+    .filter(Boolean)
+    .join(', ')
 }
 
 export function joinPromptParts(parts: Array<string | null | undefined>): string {

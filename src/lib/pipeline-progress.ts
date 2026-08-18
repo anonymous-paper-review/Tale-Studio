@@ -34,6 +34,89 @@ export interface PipelineWork {
 
 const EMPTY_IDS: ReadonlySet<string> = new Set<string>()
 
+type ProgressBatchKey = 'writer-rough' | 'director-storyboard' | 'director-video'
+
+interface ProgressBatch {
+  members: Set<string>
+  active: Set<string>
+  placeholders: Set<string>
+}
+
+// 완료된 산출물에는 다음 재생성 묶음의 숫자를 붙이지 않는다. 이 값은 화면 파생값만을
+// 위한 임시 기억이며, 저장소/DB에는 쓰지 않는다. 현재 묶음의 작업이 모두 끝나면 버린다.
+const progressBatches = new Map<ProgressBatchKey, ProgressBatch>()
+
+/**
+ * 옵티미스틱 상태를 쓰기 직전에 호출해, 상태 전이가 화면에 도착하기 전에도 묶음 경계를
+ * 명시한다. 이미 같은 종류의 작업이 돌고 있으면 기존 묶음에 항목을 추가한다.
+ */
+export function beginPipelineProgressBatch(
+  key: ProgressBatchKey,
+  itemId: string,
+  hasActiveWork: boolean,
+): void {
+  if (!itemId) return
+  const previous = progressBatches.get(key)
+  if (!previous || !hasActiveWork || previous.active.size === 0) {
+    progressBatches.set(key, {
+      members: new Set([itemId]),
+      active: new Set([itemId]),
+      placeholders: new Set(),
+    })
+    return
+  }
+  previous.members.add(itemId)
+  previous.active.add(itemId)
+}
+
+/** 프로젝트를 바꿀 때 화면 파생 묶음도 함께 버린다. */
+export function resetPipelineProgressBatches(): void {
+  progressBatches.clear()
+}
+
+function currentBatch(
+  key: ProgressBatchKey,
+  activeIds: ReadonlySet<string>,
+  activeCount = 0,
+): ProgressBatch | null {
+  const queueOnlyCount = Math.max(0, activeCount - activeIds.size)
+  if (activeIds.size === 0 && queueOnlyCount === 0) {
+    progressBatches.delete(key)
+    return null
+  }
+  const previous = progressBatches.get(key)
+  if (!previous || previous.active.size === 0) {
+    const placeholders = new Set(
+      Array.from({ length: queueOnlyCount }, (_, i) => `queue-${i}`),
+    )
+    const next = {
+      members: new Set([...activeIds, ...placeholders]),
+      active: new Set([...activeIds, ...placeholders]),
+      placeholders,
+    }
+    progressBatches.set(key, next)
+    return next
+  }
+  // 큐만 보이던 작업이 재수화되어 실제 노드로 나타나면 임시 자리표시자를 치환한다.
+  // 자리표시자를 묶음에 계속 남기면 실제 작업 하나가 2건으로 부풀려진다.
+  const replacements = Math.min(previous.placeholders.size, activeIds.size)
+  if (replacements > 0) {
+    const oldPlaceholders = [...previous.placeholders].slice(0, replacements)
+    for (const id of oldPlaceholders) {
+      previous.placeholders.delete(id)
+      previous.members.delete(id)
+    }
+  }
+  for (const id of activeIds) previous.members.add(id)
+  const placeholders = new Set(
+    Array.from({ length: queueOnlyCount }, (_, i) => `queue-${activeIds.size + i}`),
+  )
+  for (const id of placeholders) previous.members.add(id)
+  previous.placeholders = placeholders
+  previous.active = new Set([...activeIds, ...placeholders])
+  return previous
+}
+
 interface RoughShotLike {
   shotId?: string
   actionDescription?: string | null
@@ -49,19 +132,55 @@ export function writerRoughWork(
   activeIds: ReadonlySet<string> = EMPTY_IDS,
 ): PipelineWork | null {
   const eligible = shots.filter((s) => !!s.actionDescription?.trim())
-  const generating = eligible.filter(
+  const hasStableIds = eligible.every((s) => typeof s.shotId === 'string' && s.shotId.length > 0)
+  if (!hasStableIds) {
+    const generating = eligible.filter(
+      (s) =>
+        s.roughStoryboard?.status === 'generating' ||
+        (s.shotId ? activeIds.has(s.shotId) : false),
+    ).length
+    if (generating === 0) return null
+    const done = eligible.filter((s) => s.roughStoryboard?.status === 'completed').length
+    const failed = eligible.filter((s) => s.roughStoryboard?.status === 'failed').length
+    return {
+      key: 'writer-rough',
+      label: `${STAGE_AGENT_NAME.writer}가 러프 스토리보드를 그리고 있습니다`,
+      done,
+      total: eligible.length,
+      failed: failed || undefined,
+      stage: 'writer',
+    }
+  }
+  const active = new Set(
+    eligible
+      .filter(
+        (s) =>
+          s.roughStoryboard?.status === 'generating' ||
+          (s.shotId ? activeIds.has(s.shotId) : false),
+      )
+      .map((s) => s.shotId!),
+  )
+  const batch = currentBatch('writer-rough', active)
+  if (!batch) return null
+  const done = eligible.filter(
     (s) =>
-      s.roughStoryboard?.status === 'generating' ||
-      (s.shotId ? activeIds.has(s.shotId) : false),
+      s.shotId &&
+      batch.members.has(s.shotId) &&
+      s.roughStoryboard?.status === 'completed' &&
+      !activeIds.has(s.shotId),
   ).length
-  if (generating === 0) return null
-  const done = eligible.filter((s) => s.roughStoryboard?.status === 'completed').length
-  const failed = eligible.filter((s) => s.roughStoryboard?.status === 'failed').length
+  const failed = eligible.filter(
+    (s) =>
+      s.shotId &&
+      batch.members.has(s.shotId) &&
+      s.roughStoryboard?.status === 'failed' &&
+      !activeIds.has(s.shotId),
+  ).length
   return {
     key: 'writer-rough',
     label: `${STAGE_AGENT_NAME.writer}가 러프 스토리보드를 그리고 있습니다`,
     done,
-    total: eligible.length,
+    total: batch.members.size,
     failed: failed || undefined,
     stage: 'writer',
   }
@@ -112,20 +231,59 @@ export function directorShotImageWork(
   nodes: DirectorNode[],
   activeIds: ReadonlySet<string> = EMPTY_IDS,
 ): PipelineWork | null {
-  const shots = nodes.map((n) => n.data).filter(isShotData)
-  const generating = shots.filter(
-    (d) =>
-      d.storyboardImage?.status === 'generating' ||
-      (d.writerShotId ? activeIds.has(d.writerShotId) : false),
+  const shots = nodes
+    .map((node) => ({ id: node.id, data: node.data }))
+    .filter((entry): entry is { id: string; data: Extract<DirectorNode['data'], { kind: 'shot' }> } =>
+      isShotData(entry.data),
+    )
+  const hasStableIds = shots.every((entry) => !!entry.data.writerShotId || !!entry.id)
+  if (!hasStableIds) {
+    const generating = shots.filter(
+      (entry) =>
+        entry.data.storyboardImage?.status === 'generating' ||
+        (entry.data.writerShotId ? activeIds.has(entry.data.writerShotId) : false),
+    ).length
+    if (generating === 0) return null
+    const done = shots.filter((entry) => entry.data.storyboardImage?.status === 'completed').length
+    const failed = shots.filter((entry) => entry.data.storyboardImage?.status === 'failed').length
+    return {
+      key: 'director-storyboard',
+      label: `${STAGE_AGENT_NAME.director}가 촬영용 이미지를 생성하고 있습니다`,
+      done,
+      total: shots.length,
+      failed: failed || undefined,
+      stage: 'director',
+    }
+  }
+  const itemId = (entry: (typeof shots)[number]) => entry.data.writerShotId ?? entry.id
+  const active = new Set(
+    shots
+      .filter(
+        (entry) =>
+          entry.data.storyboardImage?.status === 'generating' ||
+          (entry.data.writerShotId ? activeIds.has(entry.data.writerShotId) : false),
+      )
+      .map(itemId),
+  )
+  const batch = currentBatch('director-storyboard', active)
+  if (!batch) return null
+  const done = shots.filter(
+    (entry) =>
+      batch.members.has(itemId(entry)) &&
+      entry.data.storyboardImage?.status === 'completed' &&
+      !activeIds.has(itemId(entry)),
   ).length
-  if (generating === 0) return null
-  const done = shots.filter((d) => d.storyboardImage?.status === 'completed').length
-  const failed = shots.filter((d) => d.storyboardImage?.status === 'failed').length
+  const failed = shots.filter(
+    (entry) =>
+      batch.members.has(itemId(entry)) &&
+      entry.data.storyboardImage?.status === 'failed' &&
+      !activeIds.has(itemId(entry)),
+  ).length
   return {
     key: 'director-storyboard',
     label: `${STAGE_AGENT_NAME.director}가 촬영용 이미지를 생성하고 있습니다`,
     done,
-    total: shots.length,
+    total: batch.members.size,
     failed: failed || undefined,
     stage: 'director',
   }
@@ -136,17 +294,59 @@ export function directorVideoWork(
   nodes: DirectorNode[],
   activeCount = 0,
 ): PipelineWork | null {
-  const videos = nodes.map((n) => n.data).filter(isVideoData)
-  const generating = videos.filter((d) => d.status === 'generating').length
-  if (generating === 0 && activeCount === 0) return null
-  const done = videos.filter((d) => d.status === 'completed').length
-  const failed = videos.filter((d) => d.status === 'failed').length
+  const videos = nodes
+    .map((node) => ({ id: node.id, data: node.data }))
+    .filter((entry): entry is { id: string; data: Extract<DirectorNode['data'], { kind: 'video' }> } =>
+      isVideoData(entry.data),
+    )
+  // 재생성 때 기존 성공 결과를 보존하는 영상도 lastAttemptStatus 로 낙관 상태를 표시한다.
+  const active = new Set(
+    videos
+      .filter(
+        (entry) =>
+          entry.data.status === 'generating' ||
+          entry.data.lastAttemptStatus === 'generating',
+      )
+      .map((entry) => entry.id),
+  )
+  const hasStableIds = videos.every((entry) => !!entry.id)
+  // 노드가 아직 재수화되지 않은 큐 작업은 기존처럼 큐 개수로 표시한다. 노드가 있으면
+  // 현재 묶음만 추적해 프로젝트 전체의 완료 take를 분모에 넣지 않는다.
+  if (!hasStableIds || videos.length === 0) {
+    const generating = videos.filter(
+      (entry) => entry.data.status === 'generating' || entry.data.lastAttemptStatus === 'generating',
+    ).length
+    if (generating === 0 && activeCount === 0) return null
+    const done = videos.filter((entry) => entry.data.status === 'completed').length
+    const failed = videos.filter((entry) => entry.data.status === 'failed').length
+    return {
+      key: 'director-video',
+      label: `${STAGE_AGENT_NAME.director}가 영상을 생성하고 있습니다`,
+      done,
+      total: videos.length > 0 ? videos.length : activeCount,
+      failed: failed || undefined,
+      stage: 'director',
+    }
+  }
+  const batch = currentBatch('director-video', active, activeCount)
+  if (!batch) return null
+  const done = videos.filter(
+    (entry) =>
+      batch.members.has(entry.id) &&
+      !batch.active.has(entry.id) &&
+      entry.data.status === 'completed',
+  ).length
+  const failed = videos.filter(
+    (entry) =>
+      batch.members.has(entry.id) &&
+      !batch.active.has(entry.id) &&
+      entry.data.status === 'failed',
+  ).length
   return {
     key: 'director-video',
     label: `${STAGE_AGENT_NAME.director}가 영상을 생성하고 있습니다`,
     done,
-    // 노드가 아직 안 만들어진 채 큐만 도는 순간(재수화 직후)엔 큐 수를 총량으로 쓴다.
-    total: videos.length > 0 ? videos.length : activeCount,
+    total: batch.members.size,
     failed: failed || undefined,
     stage: 'director',
   }

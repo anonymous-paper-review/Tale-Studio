@@ -217,6 +217,7 @@ describe.runIf(LIVE)('rough-sheet live — 포맷 시트 실생성 + 프로덕�
       const geom = sheetGeometry('grid4', FMT)
       const templateUrl = await templateAssetUrl(geom.templatePath.replace(/^\//, ''))
       expect(templateUrl, 'storage 템플릿 URL').toBeTruthy()
+      if (!templateUrl) throw new Error('storage 템플릿 URL이 없다')
 
       // 프로덕션 라우트와 동일 조립: 셀 → 프롬프트 → edit 모델 + 명시 캔버스 (#sheet-formats)
       const cells = FIXTURE.map((f) => buildRoughGridCell(f.input, f.shotId))
@@ -234,7 +235,7 @@ describe.runIf(LIVE)('rough-sheet live — 포맷 시트 실생성 + 프로덕�
       for (let i = 0; i < 90 && !url; i++) {
         await new Promise((r) => setTimeout(r, 5000))
         const res = await falImageFetch(model, request_id)
-        if (res.status === 'COMPLETED') url = res.url
+        if (res.status === 'COMPLETED' && res.url) url = res.url
         else if (res.status === 'FAILED') throw new Error(`fal failed: ${res.error}`)
       }
       expect(url, 'fal 완료').toBeTruthy()

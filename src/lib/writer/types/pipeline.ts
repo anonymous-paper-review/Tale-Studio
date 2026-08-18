@@ -194,12 +194,59 @@ export interface PipelineInput {
   //   소비 시점 art_style 억제(generate-sheet)는 "앵커를 나중에 바꾸는" 경우의 안전망으로 별도 유지.
   styleAnchor?: { key: string; label?: string; medium?: string };
   /**
+   * 완료된 Writer를 사용자의 동의로 다시 실행할 때 운반하는 원본 스냅샷.
+   * 파이프라인은 이 값을 새 run의 입력으로 보존하고, 각 stage는 story/producer 결정과
+   * 함께 필요한 이전 씬·샷·채팅 맥락을 읽을 수 있다.
+   */
+  rerunContext?: WriterRerunContext;
+  /**
    * Stage skip 플래그. 피드백이 다운스트림에 실질 반영되지 않는 stage를
    * 건너뛰어 LLM 호출/시간을 절약한다. 미지정 시 default = skip(true).
    *   - validation1: c_validation_1 (C 검증 ①) 통째 skip
    */
   skip?: {
     validation1?: boolean;
+  };
+}
+
+export interface WriterRerunContext {
+  previousRunId: string;
+  scenes: Array<{
+    sceneId: string;
+    story: string;
+    originalTextQuote: string | null;
+    location: string | null;
+    timeOfDay: string | null;
+    mood: string | null;
+    charactersPresent: string[];
+    estimatedDurationSeconds: number | null;
+  }>;
+  shots: Array<{
+    shotId: string;
+    sceneId: string;
+    story: string;
+    shotType: string;
+    characters: string[];
+    locationIds: string[];
+    durationSeconds: number | null;
+    dialogueLines: unknown;
+    cameraConfig: unknown;
+    lightingConfig: unknown;
+    prompt: string | null;
+  }>;
+  chatHistory: Array<{
+    stage: string;
+    role: string;
+    content: string;
+    createdAt: string | null;
+  }>;
+  producerDecisions: {
+    story: string;
+    settings: unknown;
+    genre: Genre | null;
+    cast: CastContract | null;
+    background: BackgroundContract | null;
+    styleAnchor: { key: string; label?: string; medium?: string } | null;
   };
 }
 

@@ -3,6 +3,9 @@ import {
   castMentions,
   backgroundMentions,
   activeMentionRefs,
+  mentionLabelForModifierClick,
+  sceneShotMentionRef,
+  sceneShotMentions,
   toggleMentionToken,
 } from '@/lib/card-mention'
 
@@ -86,5 +89,47 @@ describe('toggleMentionToken (script line click add/remove)', () => {
     expect(toggleMentionToken('@L51 고쳐', 'L5')).toBe('@L51 고쳐 @L5 ')
     // 둘 다 있을 때 L5 만 제거, L51 보존
     expect(toggleMentionToken('@L5 @L51 ', 'L5')).toBe('@L51')
+  })
+})
+
+describe('scene/shot mentions', () => {
+  it('keeps duplicate display names distinct with stable ids', () => {
+    const mentions = sceneShotMentions([
+      { kind: 'scene', id: 'sc_a', label: 'Scene 1' },
+      { kind: 'scene', id: 'sc_b', label: 'Scene 1' },
+      { kind: 'shot', id: 'sh_a', label: 'Shot 1' },
+    ])
+    expect(mentions.map((item) => item.label)).toEqual([
+      'Scene 1 · sc_a',
+      'Scene 1 · sc_b',
+      'Shot 1 · sh_a',
+    ])
+    expect(mentions.map((item) => item.ref)).toEqual([
+      sceneShotMentionRef('writer', 'scene', 'sc_a'),
+      sceneShotMentionRef('writer', 'scene', 'sc_b'),
+      sceneShotMentionRef('writer', 'shot', 'sh_a'),
+    ])
+    expect(
+      activeMentionRefs(`@${mentions[1].label}`, mentions),
+    ).toEqual([mentions[1].ref])
+    expect(activeMentionRefs('@Scene 9 · missing', mentions)).toEqual([])
+  })
+
+  it('keeps Director Previz and Real references separate', () => {
+    const targets = [{ kind: 'shot' as const, id: 'sh_1', label: 'Shot 1' }]
+    const previz = sceneShotMentions(targets, 'previz')[0]
+    const real = sceneShotMentions(targets, 'real')[0]
+    expect(previz.label).toContain('Previz')
+    expect(real.label).toContain('Real')
+    expect(previz.ref).not.toBe(real.ref)
+  })
+
+  it('only returns a label for a known modifier-click target', () => {
+    const target = { ref: 'writer:shot:sh_1', label: 'Shot Shot 1 · sh_1', hint: '샷' }
+    expect(mentionLabelForModifierClick({ ctrlKey: true, metaKey: false }, target)).toBe(
+      target.label,
+    )
+    expect(mentionLabelForModifierClick({ ctrlKey: false, metaKey: false }, target)).toBeNull()
+    expect(mentionLabelForModifierClick({ ctrlKey: true, metaKey: false }, null)).toBeNull()
   })
 })

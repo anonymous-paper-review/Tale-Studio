@@ -1,6 +1,10 @@
 // Writer 스크립트 라인맵 파생 모듈.
 // 뷰어 라인번호, @L 멘션 ref, 채팅 컨텍스트의 [L#] 주석을 같은 순수 함수에서 만든다.
-import type { CardMention } from '@/lib/card-mention'
+import {
+  sceneShotMentions,
+  type CardMention,
+  type SceneShotMentionTarget,
+} from '@/lib/card-mention'
 import type { DialogueLine, Scene, SceneManifest, Shot } from '@/types'
 
 export type ScriptLineKind = 'sceneHeading' | 'action' | 'dialogue'
@@ -150,6 +154,40 @@ export function scriptLineMentions(lines: ScriptLine[]): CardMention[] {
     label: `L${line.lineNo}`,
     hint: KIND_HINTS[line.kind],
   }))
+}
+
+/**
+ * Writer 채팅에서 라인 외에 직접 참조할 수 있는 씬·샷 목록.
+ * 순서와 stable id를 라벨에 함께 넣어 같은 장소/이름의 대상도 혼동하지 않는다.
+ */
+export function writerSceneShotMentions(
+  manifest: SceneManifest | null,
+  shots: readonly Shot[],
+): CardMention[] {
+  const scenes = manifest?.scenes ?? []
+  const targets: SceneShotMentionTarget[] = scenes.map((scene) => ({
+    kind: 'scene',
+    id: scene.sceneId,
+    label: `Scene ${scenes.indexOf(scene) + 1}`,
+  }))
+  const seenShots = new Set<string>()
+  for (const shot of shots) {
+    if (seenShots.has(shot.shotId)) continue
+    seenShots.add(shot.shotId)
+    const sceneIndex = scenes.findIndex((scene) => scene.sceneId === shot.sceneId)
+    const position =
+      sceneIndex >= 0
+        ? shots.filter((candidate) => candidate.sceneId === shot.sceneId).findIndex(
+            (candidate) => candidate.shotId === shot.shotId,
+          ) + 1
+        : 1
+    targets.push({
+      kind: 'shot',
+      id: shot.shotId,
+      label: `Shot ${sceneIndex >= 0 ? `${sceneIndex + 1}.` : ''}${position}`,
+    })
+  }
+  return sceneShotMentions(targets, 'writer')
 }
 
 function lineMap(lines: ScriptLine[]): Map<string, ScriptLine> {

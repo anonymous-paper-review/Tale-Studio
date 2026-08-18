@@ -8,6 +8,75 @@ export interface CardMention {
   hint: string // 종류 (인물/사물/배경)
 }
 
+export type SceneShotMentionMode = 'writer' | 'previz' | 'real'
+
+export interface SceneShotMentionTarget {
+  kind: 'scene' | 'shot'
+  id: string
+  /** 사람이 읽는 이름. 최종 라벨에는 항상 id도 포함해 중복 이름을 구분한다. */
+  label: string
+}
+
+/**
+ * 씬/샷 멘션의 안정 ref. Director는 같은 대상이라도 Previz와 Real 산출물이
+ * 다르므로 mode를 ref에 포함한다.
+ */
+export function sceneShotMentionRef(
+  mode: SceneShotMentionMode,
+  kind: SceneShotMentionTarget['kind'],
+  id: string,
+): string {
+  return `${mode}:${kind}:${id}`
+}
+
+/**
+ * Writer/Director가 공유하는 씬·샷 멘션 항목 생성기.
+ * 표시 이름이 겹쳐도 id를 라벨에 포함하므로 자동완성과 카드 하이라이트가 1:1로 유지된다.
+ */
+export function sceneShotMentions(
+  targets: readonly SceneShotMentionTarget[],
+  mode: SceneShotMentionMode = 'writer',
+): CardMention[] {
+  const modeLabel = mode === 'writer' ? '' : `${mode === 'previz' ? 'Previz' : 'Real'} `
+  const seen = new Set<string>()
+  return targets.flatMap((target) => {
+    const id = target.id.trim()
+    const name = target.label.trim()
+    if (!id || !name) return []
+    const ref = sceneShotMentionRef(mode, target.kind, id)
+    if (seen.has(ref)) return []
+    seen.add(ref)
+    const kindLabel = target.kind === 'scene' ? 'Scene' : 'Shot'
+    const displayName = name.replace(new RegExp(`^${kindLabel}\\s+`, 'i'), '').trim() || name
+    return [
+      {
+        ref,
+        label: `${modeLabel}${kindLabel} ${displayName} · ${id}`,
+        hint: `${mode === 'writer' ? '' : `${mode === 'previz' ? 'Previz' : 'Real'} `}${target.kind === 'scene' ? '씬' : '샷'}`,
+      },
+    ]
+  })
+}
+
+export function isMentionModifierClick(
+  event: Pick<MouseEvent, 'ctrlKey' | 'metaKey'>,
+): boolean {
+  return event.ctrlKey || event.metaKey
+}
+
+/**
+ * 카드가 실제 멘션 항목으로 확인된 경우에만 modifier-click 요청을 만든다.
+ * 알 수 없는/오염된 카드는 채팅 입력을 건드리지 않는다.
+ */
+export function mentionLabelForModifierClick(
+  event: Pick<MouseEvent, 'ctrlKey' | 'metaKey'>,
+  target: Pick<CardMention, 'label'> | null | undefined,
+): string | null {
+  if (!isMentionModifierClick(event)) return null
+  const label = target?.label.trim()
+  return label || null
+}
+
 interface CastLike {
   localId: string
   name?: string
