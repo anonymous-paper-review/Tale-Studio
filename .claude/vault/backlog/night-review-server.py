@@ -23,8 +23,11 @@ DECISIONS = {"merge", "reject", "feedback"}
 STATIC_PREFIXES = ("runs", "feedback")
 
 
-def utc_now():
-    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+KST = dt.timezone(dt.timedelta(hours=9))  # 날짜·시각 표기 기준 (2026-08-19 오너 결정)
+
+
+def kst_now():
+    return dt.datetime.now(KST).isoformat(timespec="seconds")
 
 
 def check_actor(value):
@@ -42,7 +45,8 @@ def check_run_id(value):
 def append_event(directory, event):
     """append-only: 새 파일만 만든다. 기존 파일은 절대 수정·삭제하지 않는다."""
     os.makedirs(directory, exist_ok=True)
-    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    # 파일명이라 %z(+0900)를 피한다 — HTTP 경로로도 서빙되는 이름이다.
+    stamp = dt.datetime.now(KST).strftime("%Y%m%dT%H%M%SKST")
     path = os.path.join(directory, f"{stamp}-{uuid.uuid4().hex[:8]}.json")
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     fd = os.open(path, flags, 0o644)
@@ -186,7 +190,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
             "card_id": payload.get("card_id"),
             "decision": decision,
             "note": payload.get("note"),
-            "created_at": utc_now(),
+            "created_at": kst_now(),
         }
         directory = os.path.join(self.project, "feedback", self.actor, run_id)
         path = append_event(directory, event)

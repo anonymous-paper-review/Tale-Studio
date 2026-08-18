@@ -34,6 +34,7 @@ import uuid
 
 HOME = os.path.expanduser("~")
 UTC = dt.timezone.utc
+KST = dt.timezone(dt.timedelta(hours=9))  # 날짜·시각 표기 기준 (2026-08-19 오너 결정)
 
 # 실제 Skill 호출만 인정한다. 느슨한 부분일치(`command-name>` 안에 warp/wrap)를
 # 쓰면 밤 계약 본문을 읽은 세션이 전부 "warp 완료"로 오탐된다 — 이 파일과
@@ -212,10 +213,10 @@ def read_stamp(path, now=None):
 def write_stamp(path, epoch):
     """도장을 쓴다. 숫자 뒤에 사람이 읽는 날짜를 주석으로 붙여
     '이게 무슨 파일인지 몰라서 날짜 글자로 덮어쓰는' 사고를 막는다."""
-    when = dt.datetime.fromtimestamp(epoch, UTC)
+    when = dt.datetime.fromtimestamp(epoch, KST)
     _atomic_write(
         path,
-        f"{epoch}  # {when:%Y-%m-%dT%H:%M:%SZ} — 첫 숫자만 읽는다. "
+        f"{epoch}  # {when:%Y-%m-%dT%H:%M:%S%z} — 첫 숫자만 읽는다. "
         f"손으로 고칠 때 숫자를 날짜 글자로 바꾸지 마라(2026-08-14 실사고)\n",
     )
 
@@ -459,7 +460,7 @@ def digest(rec, metadata=None):
         f"# 세션 다이제스트 — {rec['store']}:{short_id(rec['sid'])}",
         "",
         f"- 저장소: `{rec['path']}`",
-        f"- 최종 수정: {dt.datetime.fromtimestamp(rec['mtime'], UTC):%Y-%m-%dT%H:%MZ}  ({rec['size_kb']}KB)",
+        f"- 최종 수정: {dt.datetime.fromtimestamp(rec['mtime'], KST):%Y-%m-%dT%H:%M%z}  ({rec['size_kb']}KB)",
         "",
         "> user 발화는 전문, assistant는 500자 절단. thinking·tool_use·tool_result 제외.",
         "",
@@ -504,7 +505,8 @@ def _project_identity(path):
 
 
 def _new_run_id(now):
-    stamp = dt.datetime.fromtimestamp(now, UTC).strftime("%Y%m%dT%H%M%SZ")
+    # 식별자에는 %z(+0900)를 쓰지 않는다 — run_id 정규식이 '+'를 허용하지 않는다.
+    stamp = dt.datetime.fromtimestamp(now, KST).strftime("%Y%m%dT%H%M%SKST")
     return f"run-{stamp}-{uuid.uuid4()}"
 
 
@@ -590,7 +592,7 @@ def _output_root(project, explicit_out, now):
     return explicit_out or os.path.join(
         project,
         ".claude/vault/backlog/sweep",
-        dt.datetime.fromtimestamp(now, UTC).strftime("%Y-%m-%d"),
+        dt.datetime.fromtimestamp(now, KST).strftime("%Y-%m-%d"),
     )
 
 
@@ -850,10 +852,10 @@ def main():
             print(f"✗ 마지막 성공 시각을 읽을 수 없다: {exc}")
             return 2
         if not changed:
-            print(f"✓ 기존 성공 도장을 유지 {dt.datetime.fromtimestamp(committed, UTC):%Y-%m-%dT%H:%M:%SZ} "
-                  f"(오래된 run={dt.datetime.fromtimestamp(epoch, UTC):%Y-%m-%dT%H:%M:%SZ}) → {stamp}")
+            print(f"✓ 기존 성공 도장을 유지 {dt.datetime.fromtimestamp(committed, KST):%Y-%m-%dT%H:%M:%S%z} "
+                  f"(오래된 run={dt.datetime.fromtimestamp(epoch, KST):%Y-%m-%dT%H:%M:%S%z}) → {stamp}")
             return 0
-        print(f"✓ 성공 도장 확정 {dt.datetime.fromtimestamp(committed, UTC):%Y-%m-%dT%H:%M:%SZ} → {stamp}")
+        print(f"✓ 성공 도장 확정 {dt.datetime.fromtimestamp(committed, KST):%Y-%m-%dT%H:%M:%S%z} → {stamp}")
         return 0
 
     if a.run_id and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", a.run_id):
@@ -900,12 +902,12 @@ def main():
     sessions = discover(project, since_h, exclude_recent_min, now)
     targets = [s for s in sessions if s["verdict"] == "TARGET"]
 
-    print(f"기준시각 {dt.datetime.fromtimestamp(now, UTC):%Y-%m-%dT%H:%MZ} · "
+    print(f"기준시각 {dt.datetime.fromtimestamp(now, KST):%Y-%m-%dT%H:%M%z} · "
           f"창 {since_h:g}h · 최근 {exclude_recent_min:g}분 제외")
     print(f"{'store':7} {'sid':10} {'수정':12} {'크기':>8}  판정")
     for s in sessions:
         print(f"{s['store']:7} {short_id(s['sid']):10} "
-              f"{dt.datetime.fromtimestamp(s['mtime'], UTC):%m-%dT%H:%MZ}  "
+              f"{dt.datetime.fromtimestamp(s['mtime'], KST):%m-%dT%H:%M%z}  "
               f"{s['size_kb']:6d}KB  {s['verdict']}")
     by_store = {}
     for s in targets:
@@ -923,7 +925,7 @@ def main():
         print("\n(--dry-run: 파일 안 씀)")
         return 0
 
-    date = dt.datetime.fromtimestamp(now, UTC).strftime("%Y-%m-%d")
+    date = dt.datetime.fromtimestamp(now, KST).strftime("%Y-%m-%d")
     digest_dir = os.path.join(run_dir, "digest")
     os.makedirs(digest_dir, exist_ok=True)
     marker_path = os.path.join(run_dir, ".run-complete.json")
@@ -963,7 +965,7 @@ def main():
             "session_id": s["sid"],
             "session_path": s["path"],
             "store": s["store"], "sid": s["sid"], "digest": f"digest/{name}",
-            "mtime": dt.datetime.fromtimestamp(s["mtime"], UTC).isoformat(timespec="minutes"),
+            "mtime": dt.datetime.fromtimestamp(s["mtime"], KST).isoformat(timespec="minutes"),
             "size_kb": s["size_kb"], "digest_bytes": len(body.encode()),
             "digest_sha256": _sha256(digest_path),
             "oversized": len(body.encode()) > DIGEST_CAP,
@@ -996,7 +998,7 @@ def main():
         "run_id": run_id,
         "source": project,
         "generated_for": date,
-        "generated_at": dt.datetime.fromtimestamp(now, UTC).isoformat(timespec="seconds"),
+        "generated_at": dt.datetime.fromtimestamp(now, KST).isoformat(timespec="seconds"),
         "now_epoch": now,
         "project": project,
         "since_hours": since_h,
@@ -1040,7 +1042,7 @@ def main():
         "status": "ready",
     }, contract_hash, snapshot_identity)
     candidate_text = (
-        f"{cutoff}  # {dt.datetime.fromtimestamp(cutoff, UTC):%Y-%m-%dT%H:%M:%SZ} "
+        f"{cutoff}  # {dt.datetime.fromtimestamp(cutoff, KST):%Y-%m-%dT%H:%M:%S%z} "
         "= 이번 수확의 건너뛰기 경계. 완료 표식 검증 뒤 --commit-success 로 확정한다\n"
         f"# harvest-metadata: {_json_text(candidate_metadata)}\n"
     )
@@ -1054,14 +1056,14 @@ def main():
         "inbox_snapshot": snapshot_identity,
         "sessions": identities,
         "committable": True,
-        "completed_at": dt.datetime.fromtimestamp(now, UTC).isoformat(timespec="seconds"),
+        "completed_at": dt.datetime.fromtimestamp(now, KST).isoformat(timespec="seconds"),
         "artifacts": artifacts,
         "hashes": artifacts,
     }
     if snapshot_identity is not None:
         marker.update(snapshot_identity)
     _atomic_write(marker_path, json.dumps(marker, ensure_ascii=False, indent=2) + "\n")
-    print(f"\n도장 후보 {dt.datetime.fromtimestamp(cutoff, UTC):%Y-%m-%dT%H:%M:%SZ} → "
+    print(f"\n도장 후보 {dt.datetime.fromtimestamp(cutoff, KST):%Y-%m-%dT%H:%M:%S%z} → "
           f"{run_dir}/.stamp-candidate")
     print(f"완료 표식 {run_dir}/.run-complete.json (committable=true)")
     return 0
