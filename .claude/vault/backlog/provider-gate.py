@@ -290,7 +290,8 @@ def primary(args):
         if state is not None:
             if expire_if_stale(state):
                 atomic_json(state_file, state)
-            raise RuntimeError("primary claim이 이미 존재한다")
+            if state["status"] in ACTIVE:
+                raise RuntimeError("primary claim이 이미 존재한다")
         previous = locate_latest_state(args, match_identity=False)
         if previous is not None:
             previous_file, previous_state = previous
