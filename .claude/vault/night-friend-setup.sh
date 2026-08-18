@@ -28,8 +28,7 @@ command -v git >/dev/null 2>&1 || fail "git이 없다"
 command -v python3 >/dev/null 2>&1 || fail "python3이 없다"
 command -v claude >/dev/null 2>&1 || fail "native claude CLI가 없다"
 [ -f "$RUNNER" ] || fail "night-launchd.sh가 없다: $RUNNER"
-grep -q 'NIGHT_RUN_PROFILE' "$RUNNER" || fail "독립 실행 프로필이 아직 설치되지 않았다. migration prompt를 먼저 실행하라"
-grep -q 'NIGHT_ACTOR_ID' "$RUNNER" || fail "actor_id 지원이 아직 설치되지 않았다. migration prompt를 먼저 실행하라"
+grep -q 'NIGHT_ACTOR_ID' "$RUNNER" || fail "runner가 구버전이다. git pull로 최신을 받아라"
 
 case "$HOUR" in ''|*[!0-9]*) fail "NIGHT_HOUR가 숫자가 아니다";; esac
 case "$MINUTE" in ''|*[!0-9]*) fail "NIGHT_MINUTE가 숫자가 아니다";; esac
@@ -66,7 +65,6 @@ cat > "$PLIST" <<PLIST
   <dict>
     <key>PATH</key><string>$PATH_VALUE</string>
     <key>NIGHT_ACTOR_ID</key><string>$ACTOR_ID</string>
-    <key>NIGHT_RUN_PROFILE</key><string>independent</string>
     <key>NIGHT_GIT_BRANCH</key><string>$BRANCH</string>
     <key>NIGHT_REVIEW_PORT</key><string>$REVIEW_PORT</string>
   </dict>
@@ -119,7 +117,43 @@ plutil -lint "$REVIEW_PLIST" >/dev/null || fail "리뷰 서버 plist가 올바�
 launchctl bootout "gui/$(id -u)/$REVIEW_LABEL" >/dev/null 2>&1 || true
 launchctl bootstrap "gui/$(id -u)" "$REVIEW_PLIST"
 
-NIGHT_ACTOR_ID="$ACTOR_ID" NIGHT_RUN_PROFILE=independent NIGHT_GIT_BRANCH="$BRANCH" \
+# 아침 보고서 자동 열기 — 08:30에 최신 report를 기본 브라우저로 띄운다.
+MORNING_LABEL="com.tale-studio.night-morning-${ACTOR_ID}"
+MORNING_PLIST="$HOME/Library/LaunchAgents/${MORNING_LABEL}.plist"
+cat > "$MORNING_PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$MORNING_LABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>$RUNNER</string>
+    <string>open-report</string>
+  </array>
+  <key>WorkingDirectory</key><string>$PROJECT_ROOT</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>$PATH_VALUE</string>
+    <key>NIGHT_ACTOR_ID</key><string>$ACTOR_ID</string>
+    <key>NIGHT_REVIEW_PORT</key><string>$REVIEW_PORT</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>8</integer>
+    <key>Minute</key><integer>30</integer>
+  </dict>
+  <key>StandardOutPath</key><string>$LOG_DIR/morning.log</string>
+  <key>StandardErrorPath</key><string>$LOG_DIR/morning.err.log</string>
+</dict>
+</plist>
+PLIST
+plutil -lint "$MORNING_PLIST" >/dev/null || fail "아침 보고서 plist가 올바르지 않다"
+launchctl bootout "gui/$(id -u)/$MORNING_LABEL" >/dev/null 2>&1 || true
+launchctl bootstrap "gui/$(id -u)" "$MORNING_PLIST"
+
+NIGHT_ACTOR_ID="$ACTOR_ID" NIGHT_GIT_BRANCH="$BRANCH" \
   NIGHT_REVIEW_PORT="$REVIEW_PORT" sh "$RUNNER" dry-run
 
 echo "친구 독립 runner 설치 완료: $LABEL (리뷰 서버: http://127.0.0.1:$REVIEW_PORT/)"

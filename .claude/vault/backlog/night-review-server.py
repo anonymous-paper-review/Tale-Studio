@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-"""로컬 리뷰 서버 — 정적 report HTML의 merge/reject/feedback 버튼을 받아주는 127.0.0.1 전용 기록기.
+"""로컬 리뷰 서버 — report HTML의 merge/reject/feedback 버튼을 받아주는 127.0.0.1 전용 기록기.
 
-독립 실행 계약(§10):
-- 이 서버는 **자기 컴퓨터의 actor 하나**를 대표한다. 서버 시작 시 actor가 고정되고,
-  버튼 이벤트는 항상 `feedback/<자기 actor>/<run-id>/`에 append-only JSON으로 쌓인다.
-- 상대 actor의 report에 남기는 의견은 자동 작업 지시가 아니다.
-  `review/<자기 actor>/on-<상대 actor>/<run-id>/`에 별도 기록되고, 상대가 직접 읽고
-  자기 inbox에 가져가기로 결정할 때만 실행 입력이 된다.
-- 어떤 endpoint도 git commit/push를 하지 않는다. 사람이 확인 후 push한다.
-- 중앙 서버가 아니다. 바인딩은 127.0.0.1 고정이며 원격 노출을 지원하지 않는다.
+- 서버 시작 시 actor가 고정되고, 버튼 이벤트는 `feedback/<actor>/<run-id>/`에
+  append-only JSON으로만 쌓인다. 다음 밤 실행이 이 폴더를 읽는다.
+- git commit/push는 하지 않는다. 사람이 확인 후 push한다.
+- 127.0.0.1 고정. 원격 노출 없음.
 """
 import argparse
 import datetime as dt
@@ -24,16 +20,16 @@ ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."
 ACTOR_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,31}")
 RUN_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 DECISIONS = {"merge", "reject", "feedback"}
-STATIC_PREFIXES = ("runs", "feedback", "review")
+STATIC_PREFIXES = ("runs", "feedback")
 
 
 def utc_now():
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def check_actor(value, label="actor"):
+def check_actor(value):
     if not isinstance(value, str) or not ACTOR_RE.fullmatch(value):
-        raise ValueError(f"{label}가 올바르지 않다 (소문자·숫자·하이픈, 32자 이하)")
+        raise ValueError("actor가 올바르지 않다 (소문자·숫자·하이픈, 32자 이하)")
     return value
 
 
@@ -115,8 +111,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
         body = (
             "<!doctype html><meta charset=utf-8><title>밤 실행 리뷰</title>"
             f"<h1>밤 실행 리뷰 — 현재 actor: {self.actor}</h1>"
-            "<p>버튼 판정은 내 feedback 폴더에만 기록된다. 상대 report에 남긴 의견은 "
-            "review 폴더에 기록되고 상대가 직접 가져간다.</p>"
+            "<p>버튼 판정은 feedback 폴더에 기록되고 다음 밤 실행이 읽는다.</p>"
             f"<ul>{''.join(rows) or '<li>아직 report가 없다</li>'}</ul>"
         ).encode("utf-8")
         self.send_response(200)
@@ -168,8 +163,6 @@ class ReviewHandler(BaseHTTPRequestHandler):
         try:
             if self.path == "/api/feedback":
                 return self._post_feedback()
-            if self.path == "/api/review":
-                return self._post_review()
             return self._json(404, {"error": "not-found"})
         except ValueError as exc:
             return self._json(400, {"error": str(exc)})
@@ -184,9 +177,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
             raise ValueError("decision은 merge/reject/feedback 중 하나다")
         target_actor = payload.get("actor_id")
         if target_actor is not None and target_actor != self.actor:
-            # 상대 run에 대한 판정은 feedback이 아니라 review다 — 자동 소비를 막는다.
-            raise ValueError(
-                f"이 서버는 actor={self.actor} 전용이다. 상대 실행에는 /api/review를 사용하라")
+            raise ValueError(f"이 서버는 actor={self.actor}의 판정만 기록한다")
         event = {
             "schema": 1,
             "kind": "night-feedback",
@@ -202,30 +193,6 @@ class ReviewHandler(BaseHTTPRequestHandler):
         return self._json(201, {"ok": True, "path": os.path.relpath(path, self.project),
                                 "consumer": f"{self.actor}의 다음 밤 실행만 이 기록을 읽는다"})
 
-    def _post_review(self):
-        payload = self._read_body()
-        run_id = check_run_id(payload.get("run_id"))
-        target = check_actor(payload.get("target_actor"), "target_actor")
-        if target == self.actor:
-            raise ValueError("자기 실행에 대한 판정은 /api/feedback을 사용하라")
-        note = payload.get("note")
-        if not isinstance(note, str) or not note.strip():
-            raise ValueError("review에는 note가 필요하다")
-        event = {
-            "schema": 1,
-            "kind": "night-cross-review",
-            "actor_id": self.actor,
-            "target_actor": target,
-            "run_id": run_id,
-            "card_id": payload.get("card_id"),
-            "note": note,
-            "created_at": utc_now(),
-            "consumption": "자동 입력 아님 — 상대가 직접 읽고 자기 inbox에 옮길 때만 실행된다",
-        }
-        directory = os.path.join(self.project, "review", self.actor, f"on-{target}", run_id)
-        path = append_event(directory, event)
-        return self._json(201, {"ok": True, "path": os.path.relpath(path, self.project)})
-
 
 def serve(project, actor, port):
     handler = type("BoundHandler", (ReviewHandler,), {"project": project, "actor": actor})
@@ -234,9 +201,10 @@ def serve(project, actor, port):
 
 
 def self_test(project, actor):
-    """임시 프로젝트 루트에서 feedback/review 기록 경로를 검증한다. 네트워크는 loopback만."""
+    """임시 프로젝트 루트에서 feedback 기록 경로를 검증한다. 네트워크는 loopback만."""
     import urllib.request
 
+    ReviewHandler.log_message = lambda *a, **k: None  # 검증 출력에 요청 로그를 섞지 않는다
     server = serve(project, actor, 0)  # ephemeral port
     port = server.server_address[1]
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -265,22 +233,14 @@ def self_test(project, actor):
         assert os.path.isfile(feedback_path), feedback_path
         assert f"feedback{os.sep}{actor}{os.sep}{run_id}" in feedback_path
 
+        # 다른 actor의 run 판정은 거부되어야 한다 (자동 소비 금지 경계).
         other = "friend" if actor != "friend" else "owner"
-        status, body = post("/api/review", {"target_actor": other, "run_id": run_id,
-                                            "note": "cross review self-test"})
-        assert status == 201, (status, body)
-        review_path = os.path.join(project, body["path"])
-        assert os.path.isfile(review_path), review_path
-        assert f"review{os.sep}{actor}{os.sep}on-{other}{os.sep}{run_id}" in review_path
-
-        # 상대 run 판정을 feedback으로 보내면 거부되어야 한다 (자동 소비 금지 경계).
         status, body = post("/api/feedback", {"run_id": run_id, "decision": "merge",
                                               "actor_id": other})
         assert status == 400, (status, body)
 
         print(json.dumps({"self_test": "pass", "actor_id": actor,
-                          "feedback_event": os.path.relpath(feedback_path, project),
-                          "review_event": os.path.relpath(review_path, project)},
+                          "feedback_event": os.path.relpath(feedback_path, project)},
                          ensure_ascii=False))
         return 0
     finally:
