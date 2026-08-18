@@ -234,6 +234,30 @@ export async function falImageSubmit(
   }
 }
 
+/** 큐 콘솔 디버깅 (#queue-console 2026-08-18): fal 큐의 현재 상태 + 러너 로그 원문.
+ *  만료·비지원 요청은 throw — 호출부(콘솔 라우트)가 메시지로 표면화한다. 상태 조회는 무과금. */
+export async function falQueueStatusWithLogs(
+  model: string,
+  request_id: string,
+): Promise<{
+  status: string;
+  queuePosition: number | null;
+  logs: Array<{ timestamp?: string; level?: string; message?: string }>;
+}> {
+  if (!apiKey) throw new Error('FAL_KEY not set');
+  const status = await fal.queue.status(model, { requestId: request_id, logs: true });
+  const s = status as unknown as {
+    status?: string;
+    queue_position?: number;
+    logs?: Array<{ timestamp?: string; level?: string; message?: string }>;
+  };
+  return {
+    status: String(s.status ?? 'UNKNOWN'),
+    queuePosition: typeof s.queue_position === 'number' ? s.queue_position : null,
+    logs: Array.isArray(s.logs) ? s.logs : [],
+  };
+}
+
 /** fetch — fal queue status + result. 완료 시 url 포함, 미완료 시 pending */
 export async function falImageFetch(
   model: string,

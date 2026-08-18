@@ -728,6 +728,21 @@ export async function listQueueConsoleJobs(userId: string): Promise<{
   return { jobs, projectTitles }
 }
 
+/** 콘솔 상세 — 잡의 전체 흔적(스냅샷·타임라인·시도 이력·오류 클래스)까지 한 행으로. */
+export async function getQueueConsoleJobDetail(
+  id: string,
+): Promise<(GenerationJob & { created_at?: string; updated_at?: string; error_class?: string | null }) | null> {
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select(
+      `${GENERATION_JOB_COLUMNS}, error_class, actor, created_at, updated_at, submitted_at, completed_at, attempts, last_error`,
+    )
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw error
+  return (data as (GenerationJob & { created_at?: string; updated_at?: string; error_class?: string | null }) | null) ?? null
+}
+
 /** 콘솔 삭제 실행부 — 상태 가드(queued·failed 만)는 라우트가 잡 조회 후 판정한다. */
 export async function deleteGenerationJobById(id: string): Promise<void> {
   const { error } = await supabaseAdmin.from('generation_jobs').delete().eq('id', id)

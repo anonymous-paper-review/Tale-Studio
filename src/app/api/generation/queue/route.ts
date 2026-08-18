@@ -1,20 +1,23 @@
 // /api/generation/queue — 큐 콘솔 (#queue-console 2026-08-18).
 //
-// GET          오너 전 프로젝트 잡 목록 (queued·failed 전부 + 최근 completed 100).
-// GET ?id=     잡 1건 상세 — 콘솔 상세 패널용 input_snapshot·result 포함(목록엔 무거워 뺀다).
-// POST         queued reconcile: body.ids 지정분, 없으면 오너의 stale queued 전부(상한).
-//              reconcile 은 이미 지불한 fal 결과의 회수(무과금·멱등)다 — 재생성이 아니다.
+// GET              오너 전 프로젝트 잡 목록 (queued·failed 전부 + 최근 completed 100).
+// GET ?id=         잡 1건 상세 — input/response 스냅샷·타임라인·시도 이력(목록엔 무거워 뺀다).
+// GET ?falStatus=  잡의 fal 큐 상태+러너 로그 실시간 프록시(무과금 상태 조회) — 만료는 note 로.
+// POST             queued reconcile: body.ids 지정분, 없으면 오너의 stale queued 전부(상한).
+//                  reconcile 은 이미 지불한 fal 결과의 회수(무과금·멱등)다 — 재생성이 아니다.
 //
 // generation_jobs 는 RLS 로 클라 직접 접근 불가 → service-role 라우트만 창구(기존 규약).
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import {
   getGenerationJobById,
+  getQueueConsoleJobDetail,
   listQueueConsoleJobs,
   userOwnsProject,
   STALE_QUEUED_MS,
 } from '@/lib/generation-jobs'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
+import { falQueueStatusWithLogs } from '@/lib/writer/llm/fal'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -29,9 +32,10 @@ export async function GET(req: Request) {
   const user = await getUser()
   if (!user) return unauthorized()
 
-  const id = new URL(req.url).searchParams.get('id')
+  const params = new URL(req.url).searchParams
+  const id = params.get('id')
   if (id) {
-    const job = await getGenerationJobById(id)
+    const job = await getQueueConsoleJobDetail(id)
     if (!job) {
       return NextResponse.json(
         { ok: false, error: { code: 'not_found', message: 'job not found' } },
@@ -45,6 +49,38 @@ export async function GET(req: Request) {
       )
     }
     return NextResponse.json({ ok: true, data: { job } })
+  }
+
+  // fal 큐 실시간 상태+로그 — 디버깅 표면. 만료·비지원(provider 상이)은 실패가 아니라 정보다.
+  const falStatusId = params.get('falStatus')
+  if (falStatusId) {
+    const job = await getGenerationJobById(falStatusId)
+    if (!job) {
+      return NextResponse.json(
+        { ok: false, error: { code: 'not_found', message: 'job not found' } },
+        { status: 404 },
+      )
+    }
+    if (!(await userOwnsProject(job.project_id, user.id))) {
+      return NextResponse.json(
+        { ok: false, error: { code: 'forbidden', message: 'forbidden' } },
+        { status: 403 },
+      )
+    }
+    try {
+      const info = await falQueueStatusWithLogs(job.model, job.request_id)
+      return NextResponse.json({ ok: true, data: info })
+    } catch (e) {
+      return NextResponse.json({
+        ok: true,
+        data: {
+          status: 'UNAVAILABLE',
+          queuePosition: null,
+          logs: [],
+          note: e instanceof Error ? e.message : String(e),
+        },
+      })
+    }
   }
 
   const data = await listQueueConsoleJobs(user.id)

@@ -84,6 +84,27 @@ describe.runIf(LIVE)('queue console — 실 라우트 · 프로덕션 DB', () =>
         { params: Promise.resolve({ id: completed.id }) },
       )
       expect(res409.status).toBe(409)
+
+      // ⑤ 상세: 타임라인·스냅샷 필드 동봉 (#queue-console 디버깅 표면)
+      const detRes = await GET(new Request(`http://localhost/api/generation/queue?id=${completed.id}`))
+      const det = (await detRes.json()) as { ok: boolean; data: { job: Record<string, unknown> } }
+      expect(det.ok).toBe(true)
+      expect(det.data.job).toHaveProperty('created_at')
+      expect(det.data.job).toHaveProperty('input_snapshot')
+      expect(det.data.job).toHaveProperty('response_snapshot')
+      expect(det.data.job).toHaveProperty('submitted_at')
+
+      // ⑥ fal 큐 상태 프록시: 오래된 완료 잡도 실패 없이 응답(실상태 또는 UNAVAILABLE+note)
+      const falRes = await GET(
+        new Request(`http://localhost/api/generation/queue?falStatus=${completed.id}`),
+      )
+      const fal = (await falRes.json()) as {
+        ok: boolean
+        data: { status: string; logs: unknown[]; note?: string }
+      }
+      expect(fal.ok).toBe(true)
+      expect(typeof fal.data.status).toBe('string')
+      expect(Array.isArray(fal.data.logs)).toBe(true)
     }
   }, 120_000)
 })
