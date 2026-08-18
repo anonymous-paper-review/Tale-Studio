@@ -12,6 +12,20 @@ export function parseAppLocale(v: unknown): AppLocale | null {
   return v === 'en' || v === 'ko' ? v : null
 }
 
+/**
+ * writer/start 1.6 의 출력 언어 결정 (#i18n-s5) — 순수 로직 분리(유닛 검증 대상).
+ * 잠긴 프로젝트는 잠긴 값이 곧 출력 언어. 레거시(unlocked)는 스토리 감지값을 쓰고 잠근다 —
+ * 종전 "스토리 언어 추종" 산출과 동일해 행동이 보존된다.
+ */
+export function resolveOutputLocale(
+  row: { locale?: unknown; locale_locked?: boolean | null } | null | undefined,
+  story: string,
+): { outputLocale: AppLocale | undefined; lockTo: string | null } {
+  if (row?.locale_locked) return { outputLocale: parseAppLocale(row.locale) ?? undefined, lockTo: null }
+  const detected = detectLocaleFromText(story)
+  return { outputLocale: parseAppLocale(detected) ?? undefined, lockTo: detected }
+}
+
 /** 유저 입력 텍스트의 언어를 rule-base 로 감지. 한글 포함 → 'ko', 그 외 → 'en'. */
 export function detectLocaleFromText(text: string | null | undefined): string {
   if (text && /[가-힣]/.test(text)) return 'ko'

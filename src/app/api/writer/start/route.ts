@@ -16,7 +16,7 @@ import type { PipelineInput, Genre, CastContract } from '@/lib/writer/types/pipe
 import { isAdminOwnedProject } from '@/lib/admin';
 import { isWriterEngine, type WriterEngine } from '@/lib/writer/engine';
 import { applyProducerI18n } from '@/lib/writer/i18n/derive-en';
-import { detectLocaleFromText, parseAppLocale } from '@/lib/locale';
+import { resolveOutputLocale } from '@/lib/locale';
 import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
 import { parseCustomStyleAnchor } from '@/lib/style-anchor';
 
@@ -188,15 +188,13 @@ export async function POST(req: NextRequest) {
         .select('locale, locale_locked')
         .eq('id', projectId)
         .maybeSingle();
-      if (proj?.locale_locked) {
-        outputLocale = parseAppLocale(proj.locale) ?? undefined;
-      } else {
-        const detected = detectLocaleFromText(story);
+      const resolved = resolveOutputLocale(proj, story);
+      outputLocale = resolved.outputLocale;
+      if (resolved.lockTo) {
         await supabaseAdmin
           .from('projects')
-          .update({ locale: detected, locale_locked: true })
+          .update({ locale: resolved.lockTo, locale_locked: true })
           .eq('id', projectId);
-        outputLocale = parseAppLocale(detected) ?? undefined;
       }
     } catch (e) {
       console.error('[writer/start] locale resolve failed (proceeding):', e);
