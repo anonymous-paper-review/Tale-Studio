@@ -1,13 +1,13 @@
 # 밤 루프 계약 — 결과 우선 자율 실행
 
-> 이 문서가 밤 자동화의 유일한 live 계약이다. 자동화는 매일 새 실행을 시작할 때 이 문서와 `.claude/vault/_INBOX.md`를 읽는다.
+> 이 문서가 밤 자동화의 유일한 live 계약이다. 자동화는 매일 새 실행을 시작할 때 이 문서와 `.claude/vault/inbox/`의 메모 파일들을 읽는다.
 > 오너는 자고 있으므로 질문에 답하지 않는다. 밤은 해석하고, 쪼개고, 실행하고, 결과를 남긴다.
 
 ## 1. 목적과 원칙
 
 목표는 메모와 대화를 대기열로 쌓는 것이 아니라, 밤이 실제 결과를 만들어 아침에 사람이 판단할 수 있게 하는 것이다.
 
-- 오너는 `_INBOX.md`에 형식 없는 메모를 쓴다. 순서·길이·문장 완성 여부는 중요하지 않다.
+- 사람은 자기 메모 파일(`inbox/<자기 actor>.md`)에 형식 없는 메모를 쓴다. 순서·길이·문장 완성 여부는 중요하지 않다.
 - 밤은 메모를 읽고 뜻을 해석한 뒤, 가장 작고 검증 가능한 실행 단위로 나눈다.
 - 사전 승인은 실행 조건이 아니다. 해석이 갈리면 안전한 한 가지를 골라 실행하고, 틀린 실행도 결과와 학습 자료로 남긴다.
 - 조사, 모델 실험, 수리, 제품 기능 개발을 모두 실행 대상으로 삼는다. 제품 기능 변경도 격리와 검증을 거쳐 실행하며 실행 단위의 수에는 상한을 두지 않는다.
@@ -70,15 +70,23 @@
 실행 시작 전에 Orca precheck가 반드시 `primary sweep` claim을 만든다. 이 claim이 없거나
 `state sweep`가 실패하면 실행을 시작하지 않는다. 계약 본문에서 `primary`를 다시 호출하지
 않아 이중 claim을 만들지 않는다. 실행 시작 시 계약 해시와 메모 스냅샷은 저장소 도구로
-한 번에 고정한다. 스냅샷 도구는 `_INBOX.md`를 수정하지 않고, 출력 JSON의 `snapshot_id`와
+한 번에 고정한다. 스냅샷 도구는 inbox 파일을 수정하지 않고, 출력 JSON의 `snapshot_id`와
 `snapshot_fingerprint`를 이후 명령에 그대로 전달한다.
 
-owner와 friend는 각자 자기 컴퓨터에서 이 계약을 실행한다. 실행은 자기 checkout의
-`_INBOX.md`, 자기 로컬 Claude/gjc 세션 저장소, 자기 코드만 읽는다. 원격 동기화는 없다.
-입력도 결과도 판정도 전부 자기 디스크의 것이다 — 리포트·티켓·피드백은 자기 다음 실행과
-자기 아침만 소비하고 git에 올리지 않는다. 두 사람이 나누는 것은 **코드**뿐이다: 계약·도구
-같은 공용 코드와, 밤이 격리 worktree에 만든 수리 branch(`night/<actor>/<run_id>/<unit-id>`).
-branch 이름의 `NIGHT_ACTOR_ID`(기본 `owner`)는 어느 컴퓨터의 밤이 만든 수리인지 구분한다.
+owner와 friend는 각자 자기 컴퓨터에서 이 계약을 실행한다. 두 사람이 git으로 나누는 것은
+둘이다: **코드**(계약·도구와 밤이 만든 수리 branch `night/<actor>/<run_id>/<unit-id>`)와
+**메모**(`.claude/vault/inbox/` — 사람마다 자기 파일 `inbox/<actor>.md` 하나, 자기 파일에만
+쓴다. 파일이 갈라져 있어 git 충돌이 나지 않는다).
+
+실행 시작에 inbox 동기화를 한 번 시도한다: fetch → 상대 메모 ff 반영 → 내 메모 파일만
+커밋해 push (push 경합이면 rebase 재시도 1회 — 파일이 갈라져 있어 항상 깨끗하다).
+사람의 미푸시 커밋이 있으면 동기화 전체를 건너뛴다(남의 작업을 밤이 push하지 않는다).
+**어떤 실패도 밤을 막지 않는다** — 기록하고 로컬에 있는 내용으로 계속한다. 자기 전에
+손으로 보내려면 `sh night-launchd.sh push-inbox`. 소비 책임은 자기 메모 파일에만
+있고, 상대 메모는 읽기 전용 참고 입력이다(§4.0). 리포트·티켓·피드백·세션 수확은 자기
+디스크의 로컬 상태로 남아 git에 올라가지 않으며, 리포트는 자기 아침과 자기 다음 실행만
+소비한다. branch 이름의 `NIGHT_ACTOR_ID`(기본 `owner`)는 어느 컴퓨터의 밤이 만든 수리인지
+구분한다.
 
 ```sh
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
@@ -115,7 +123,8 @@ provider_run_id="$run_id"
 provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner_token"])')"
 contract_hash="$(shasum -a 256 "$PROJECT_ROOT/.claude/vault/backlog/_NIGHT.md" | awk '{print $1}')"
 snapshot_json="$(python3 "$PROJECT_ROOT/.claude/vault/backlog/night-runtime.py" snapshot-inbox \
-  --run-id "$run_id" --contract-hash "$contract_hash")"
+  --run-id "$run_id" --contract-hash "$contract_hash" \
+  --path "$PROJECT_ROOT/.claude/vault/inbox/$NIGHT_ACTOR.md")"
 snapshot_id="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["snapshot_id"])')"
 snapshot_fingerprint="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["snapshot_fingerprint"])')"
 snapshot_path="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["snapshot"])')"
@@ -131,7 +140,9 @@ snapshot_path="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; pri
 
 ## 3. 메모 원문과 스냅샷 수명
 
-`_INBOX.md`는 사람이 쓰는 원문이다. 밤은 이 파일의 원문을 덮어쓰거나 삭제하지 않는다.
+`inbox/`의 메모 파일은 사람이 쓰는 원문이다. 밤은 어느 파일도 덮어쓰거나 삭제하지 않는다.
+스냅샷·소비 표식·archive는 자기 actor의 파일에만 만든다. 상대 파일은 소비 관리 대상이
+아니다 — 상대의 밤이 자기 컴퓨터에서 직접 소비한다.
 실행 시작 전 기존 줄을 보존하는 추가 전용 동기화가 필요할 때만 양쪽 추가 내용을
 보존한 동기화 commit을 만들 수 있다. 실행 결과의 보관은 원문을 지우는 이동이 아니라 snapshot content를
 `_archive/inbox/`에 복사하고 소비 manifest를 쓰는 방식이다.
@@ -165,7 +176,10 @@ python3 "$PROJECT_ROOT/.claude/vault/backlog/night-runtime.py" archive-inbox \
 
 메모는 오너 머릿속 맥락이 잘린 채 도착한다. 분해 전에 메모의 핵심어로 다음을 검색해 "이 메모와 관련된 기존 흔적"을 먼저 수집한다. 검색은 읽기 전용이며 `.claude/agents/night-investigator.md` 백지 작업자에게 위임할 수 있다.
 
-1. 원장 — `tickets/`의 열린·닫힌 티켓, `reports/`의 과거 보고서, 오너 판정 기록.
+1. 원장 — `tickets/`의 열린·닫힌 티켓, 과거 run 보고서, 판정 기록.
+1.5 상대의 메모 — `inbox/`의 다른 actor 파일. 같은 주제를 상대가 어떻게 적었는지 읽기
+   전용으로 참고하고, 리포트 카드에 어느 파일에서 왔는지 출처를 표시한다. 소비 표식은
+   만들지 않는다.
 2. 실험 기록 — `research/experiments/`.
 3. 수확 다이제스트와 최근 세션 원문 — harvest가 보는 세션 저장소에서 메모 핵심어를 읽기 전용으로 검색한다. 오너가 낮 세션에서 같은 주제로 말한 대화가 바로 메모의 잘린 맥락이다.
 
@@ -357,7 +371,7 @@ save는 결과 카드가 아니다 — 결론이 없어도 쓴다. 같은 단위
 
 ## 10. 아침 결과 리뷰 — budget, carryover, expiry
 
-아침은 사전 승인 창구가 아니라 밤 결과를 소비하는 리뷰 세션이다. 각 사람이 읽는 것은 자기 컴퓨터가 만든 **run 단위 사람 보고서 HTML**(`runs/<actor>/<run_id>/report.html`)이다. 로컬 리뷰 서버(`sh night-launchd.sh review-server`, `http://127.0.0.1:<NIGHT_REVIEW_PORT>/`)로 열면 HTML의 `merge`·`reject`·`feedback` 버튼이 `feedback/<actor>/<run_id>/`에 append-only 이벤트를 남긴다. 버튼 결과는 로컬 기록이다 — git에 올리지 않고, 자기 다음 밤 실행만 읽는다. 형식 없는 판정 메모를 자기 `_INBOX.md`에 적는 통로도 그대로 유효하다.
+아침은 사전 승인 창구가 아니라 밤 결과를 소비하는 리뷰 세션이다. 각 사람이 읽는 것은 자기 컴퓨터가 만든 **run 단위 사람 보고서 HTML**(`runs/<actor>/<run_id>/report.html`)이다. 로컬 리뷰 서버(`sh night-launchd.sh review-server`, `http://127.0.0.1:<NIGHT_REVIEW_PORT>/`)로 열면 HTML의 `merge`·`reject`·`feedback` 버튼이 `feedback/<actor>/<run_id>/`에 append-only 이벤트를 남긴다. 버튼 결과는 로컬 기록이다 — git에 올리지 않고, 자기 다음 밤 실행만 읽는다. 형식 없는 판정 메모를 자기 메모 파일(`inbox/<자기 actor>.md`)에 적는 통로도 그대로 유효하다.
 
 판정 규칙은 두 줄이다:
 
@@ -420,7 +434,7 @@ human_merge_reviewed = 위 카드 중 merge_mode가 human인 수
 
 ### 1단계 — 결과 카드에 판단을 붙인다
 
-자기 `feedback/<actor>/`의 버튼 이벤트와 자기 `_INBOX.md`의 판정 메모를 다음 밤 실행이 해석해, `merge`·`reject`와 이유·피드백을 **그 결과 카드**에 기록한다. 상대 actor의 판정은 이 단계의 입력이 아니다. 어느 카드를 가리키는지 확실하지 않으면 추측하지 말고 확인 질문 카드를 아침 보고에 올린다. 카드에는 `judgment_key`, `judgment_version`, 메모 snapshot, 수용 기준 버전, 리뷰 시각과 머지 방식이 있어야 한다. 원본 대화를 새 파일로 복제하지 않는다.
+자기 `feedback/<actor>/`의 버튼 이벤트와 자기 메모 파일의 판정 메모를 다음 밤 실행이 해석해, `merge`·`reject`와 이유·피드백을 **그 결과 카드**에 기록한다. 상대 actor의 판정은 이 단계의 입력이 아니다. 어느 카드를 가리키는지 확실하지 않으면 추측하지 말고 확인 질문 카드를 아침 보고에 올린다. 카드에는 `judgment_key`, `judgment_version`, 메모 snapshot, 수용 기준 버전, 리뷰 시각과 머지 방식이 있어야 한다. 원본 대화를 새 파일로 복제하지 않는다.
 
 ### 2단계 — 반복된 판단만 계약 기준으로 올린다
 
@@ -482,7 +496,7 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 
 - 기계 보고서: 실행 상태, 단위별 한 줄 결과, 수용 기준, 지출 합계, 막힘·복구 사유, `reviewed_merge_rate`, 자가/사람 머지 수.
 - 사람 보고서: 맥락 → 해석 → 분해 → 수용 기준 → 결과 → 다음 질문 순서의 결과 카드. 상세 로그는 접고 경로만 연결한다.
-- 사람 보고서의 각 카드에는 입력 출처(자기 inbox, 자기 harvest, 자기 feedback),
+- 사람 보고서의 각 카드에는 입력 출처(어느 메모 파일인지 — `inbox/owner.md`/`inbox/friend.md` —, 자기 harvest, 자기 feedback),
   snapshot ID·fingerprint, 관련 티켓·코드 파일:줄 또는 세션 ID를 표시한다.
   로컬 절대경로와 세션 원문은 넣지 않는다 — 상대 컴퓨터에서도 열리는 상대 경로만.
 
@@ -502,8 +516,8 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 - 티켓·결과 카드: `.claude/vault/backlog/tickets/` — 새 티켓과 결과 카드는 이 디렉터리에만 만든다. backlog 루트에는 이 계약 문서와 실행 도구만 둔다.
 - 실행 산출물: `runs/<actor>/<run_id>/` — 사람 보고서 `report.html`, 기계 요약 `manifest.json`, 세션 요약 `sessions/*.md`, worktree 목록 `worktrees.json`, 중간 저장 `saves/*.md`(§8.4). actor와 run이 경로에 들어가므로 같은 날짜에 두 사람이 실행해도 서로 덮어쓰지 않는다. 날짜 하나를 덮어쓰는 `reports/YYYY-MM-DD.html` 경로는 더 쓰지 않는다 (기존 `.claude/vault/backlog/reports/`는 이력으로만 남긴다). 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
 - 판정 기록: `feedback/<actor>/<run_id>/*.json` — append-only, 자기 다음 밤 실행만 소비.
-- 각 사람의 접점은 두 개뿐이다: 쓰는 곳 자기 `_INBOX.md`, 읽는 곳 자기 최신 `runs/<actor>/<run_id>/report.html`. 다른 파일을 읽어야만 진행되는 절차를 만들지 않는다.
-- git 공유 경계: 계약·실행 도구·설치 문서, 그리고 밤이 만든 코드 수리 branch만 공유한다. `_INBOX.md`, `backlog/sweep/`, `_archive/`, `tickets/`, `runs/`, `feedback/`은 전부 이 컴퓨터의 로컬 상태다 — 입력도 결과도 판정도 각자의 것이고, 상대와 나누는 것은 코드뿐이다.
+- 각 사람의 접점은 두 개뿐이다: 쓰는 곳 자기 메모 파일 `inbox/<actor>.md`(commit·push하면 상대 밤에도 보인다), 읽는 곳 자기 최신 `runs/<actor>/<run_id>/report.html`. 다른 파일을 읽어야만 진행되는 절차를 만들지 않는다.
+- git 공유 경계: 계약·실행 도구·설치 문서, 공유 메모 `inbox/`(각자 자기 파일에만 쓴다), 밤이 만든 코드 수리 branch. `backlog/sweep/`, `_archive/`, `tickets/`, `runs/`, `feedback/`은 이 컴퓨터의 로컬 상태다 — 결과와 판정은 각자의 것이다.
 - 티켓 상태와 작업 사본 정보.
 - 메모 스냅샷 fingerprint·범위·내용 해시·소비 상태.
 - 필요한 실험 산출물과 결과표. raw 대화·모델 원출력은 소비 시점 없이 별도 보관하지 않는다.
@@ -520,6 +534,11 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 이 문서를 고쳐야 할 때는 변경 이유, 영향받는 분해 기준, 이전 계약 해시, 새 계약 해시를 기록한다. 밤 실행은 항상 이 문서 하나를 정본으로 사용한다.
 
 ## 15. 계약 개정 기록
+
+- 2026-08-18 (14차) · 이전 계약 해시 `084ae665d956edba5d5537bd86055a17ee8fb9de1cd967908c3afbc278340839` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — 메모만은 서로 보이게 한다. 단일 `_INBOX.md`를 섹션으로 나누는 방식은 8/18 새벽을 죽인 같은-파일 병합 충돌로 돌아가므로, 파일을 사람별로 갈라 충돌 자체를 없앤다.
+  - 변경 내용: (1) `_INBOX.md` → `.claude/vault/inbox/<actor>.md` — 사람마다 자기 파일 하나, 자기 파일에만 쓴다. git 추적으로 복귀해 push하면 상대 밤에도 보인다. (2) 실행 시작에 fetch·ff로 상대 메모를 받고 내 메모 파일만 커밋·push한다. 미푸시 사람 커밋이 있으면 건너뛰고, push 경합은 rebase 재시도 1회로 흡수하며, 어떤 실패도 기록 후 로컬 내용으로 계속한다(fail-open — 옛 inbox-sync의 fail-closed와 정반대). (3) 소비 책임은 자기 파일에만: 스냅샷·소비 표식·archive는 자기 메모만 만들고, 상대 메모는 §4.0의 읽기 전용 참고 입력으로 읽어 리포트에 출처를 표시한다. (4) 리포트·티켓·피드백·수확은 13차 그대로 로컬이다.
+  - 영향받는 분해 기준: §4.0 맥락 보강 입력에 상대 메모가 추가됐다. 같은 메모를 두 밤이 각자 실행할 수 있으나 소비 표식이 갈라져 있어 서로 간섭하지 않는다.
 
 - 2026-08-18 (13차) · 이전 계약 해시 `2e3faced1856a7de8463ea575a4cbfac03b0ce27969c60fa893c656bdc85a1ce` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — 독립 실행을 끝까지 밀어붙인다. 각자 자기 리포트만 보면 되고, 서로의 리포트·티켓·피드백을 git으로 나눌 이유가 없다. 12차가 남겨둔 "결과·원장 공유"는 inbox 독립과 모순이었다.

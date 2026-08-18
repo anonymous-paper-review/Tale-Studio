@@ -12,7 +12,7 @@ import uuid
 
 UTC = dt.timezone.utc
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-INBOX_DEFAULT = os.path.join(ROOT, ".claude", "vault", "_INBOX.md")
+INBOX_DEFAULT = os.path.join(ROOT, ".claude", "vault", "inbox", "owner.md")
 CONTRACT_DEFAULT = os.path.join(ROOT, ".claude", "vault", "backlog", "_NIGHT.md")
 VALID_STATUSES = {
     "unclaimed", "claimed", "decomposed", "executed", "reported", "failed", "blocked",

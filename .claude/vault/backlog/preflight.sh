@@ -19,7 +19,7 @@ warn() {
 [ -f "$BACKLOG_ROOT/night-runtime.py" ] || warn "snapshot runtime missing"
 [ -f "$BACKLOG_ROOT/provider-gate.py" ] || warn "provider gate helper missing"
 [ -f "$BACKLOG_ROOT/night-review-server.py" ] || warn "review server missing"
-[ -f "$PROJECT_ROOT/.claude/vault/_INBOX.md" ] || warn "inbox missing: .claude/vault/_INBOX.md"
+[ -d "$PROJECT_ROOT/.claude/vault/inbox" ] || warn "shared inbox directory missing: .claude/vault/inbox/"
 [ -f "$PROJECT_ROOT/.claude/agents/night-investigator.md" ] || warn "night investigator agent missing"
 [ -f "$PROJECT_ROOT/.claude/skills/night-debug-run/SKILL.md" ] || warn "night debug-run skill missing"
 [ -d "$BACKLOG_ROOT/tickets" ] || warn "tickets directory missing"
@@ -32,7 +32,7 @@ git -C "$PROJECT_ROOT" rev-parse --show-toplevel >/dev/null 2>&1 || warn "projec
 # 계약 정합 — 어긋나면 알리되 막지 않는다.
 if [ -f "$CONTRACT" ]; then
   grep -q '^# 밤 루프' "$CONTRACT" || warn "night contract header is invalid"
-  grep -q '_INBOX.md' "$CONTRACT" || warn "night contract does not consume _INBOX.md"
+  grep -q 'inbox/' "$CONTRACT" || warn "night contract does not consume shared inbox"
 fi
 # 티켓이 backlog 루트에 평평하게 쌓이면 정리 대상이다 (_NIGHT.md만 허용).
 stray_md="$(find "$BACKLOG_ROOT" -maxdepth 1 -name '*.md' ! -name '_NIGHT.md' 2>/dev/null | wc -l | tr -d ' ')"

@@ -46,15 +46,57 @@ MODEL_ARGS=""
 
 jget() { python3 -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"; }
 
-# inbox·티켓 원장은 git에 올라가지 않는 로컬 상태다. 새 checkout이면 빈 채로 시작한다.
-INBOX="$PROJECT_ROOT/.claude/vault/_INBOX.md"
-[ -f "$INBOX" ] || : > "$INBOX"
-mkdir -p "$SCRIPT_DIR/tickets"
+# inbox는 공유 디렉터리다 — 각자 자기 파일(inbox/<actor>.md)에만 쓴다.
+# 티켓 원장은 로컬 상태다. 새 checkout이면 빈 채로 시작한다.
+INBOX_DIR="$PROJECT_ROOT/.claude/vault/inbox"
+MY_INBOX="$INBOX_DIR/$ACTOR.md"
+mkdir -p "$INBOX_DIR" "$SCRIPT_DIR/tickets"
+[ -f "$MY_INBOX" ] || printf '# %s의 밤 메모\n' "$ACTOR" > "$MY_INBOX"
+
+# inbox 동기화 — 어떤 실패도 밤을 막지 않는다. 내 밤은 항상 로컬 내용으로 돈다.
+# 순서: fetch → (사람의 미푸시 커밋이 있으면 여기서 멈춤) → 상대 메모 ff 반영
+#       → [push 모드만] 내 메모 파일만 커밋 → push (경합 시 rebase 재시도 1회)
+sync_inbox() {
+  push_mode="${1:-fetch-only}"
+  if ! git -C "$PROJECT_ROOT" fetch origin main >/dev/null 2>&1; then
+    echo "[inbox] fetch 실패 — 로컬에 있는 내용으로 계속한다"
+    return 0
+  fi
+  # 사람의 미푸시 커밋이 있으면 밤이 건드리지 않는다 (남의 작업 자동 push 금지).
+  if [ "$(git -C "$PROJECT_ROOT" rev-list origin/main..main --count 2>/dev/null || echo 1)" != "0" ]; then
+    echo "[inbox] 미푸시 커밋이 있어 동기화를 건너뛴다 — 로컬 내용으로 계속한다"
+    return 0
+  fi
+  if git -C "$PROJECT_ROOT" merge --ff-only origin/main >/dev/null 2>&1; then
+    echo "[inbox] 상대 메모 수신 OK"
+  else
+    echo "[inbox] ff 반영 불가(작업 트리 충돌) — 로컬 내용으로 계속한다"
+  fi
+  [ "$push_mode" = "push" ] || return 0
+  # 내 메모 파일 하나만 커밋한다. 다른 변경은 건드리지 않는다.
+  if git -C "$PROJECT_ROOT" ls-files --error-unmatch "$MY_INBOX" >/dev/null 2>&1     && git -C "$PROJECT_ROOT" diff --quiet -- "$MY_INBOX" 2>/dev/null; then
+    echo "[inbox] 내 메모에 새 내용 없음"
+    return 0
+  fi
+  git -C "$PROJECT_ROOT" add -- "$MY_INBOX"
+  git -C "$PROJECT_ROOT" commit -q --only "$MY_INBOX" -m "inbox($ACTOR): 밤 메모" || return 0
+  if git -C "$PROJECT_ROOT" push -q origin main 2>/dev/null; then
+    echo "[inbox] 내 메모 push OK"
+    return 0
+  fi
+  # 경합: 상대가 그 사이 push했다. 파일이 갈라져 있어 rebase는 항상 깨끗하다.
+  if git -C "$PROJECT_ROOT" pull --rebase origin main >/dev/null 2>&1     && git -C "$PROJECT_ROOT" push -q origin main 2>/dev/null; then
+    echo "[inbox] 내 메모 push OK (경합 재시도)"
+  else
+    echo "[inbox] push 실패 — 메모는 로컬에 안전하고 다음 기회에 나간다"
+  fi
+}
 
 
 case "$MODE" in
 run)
   sh "$SCRIPT_DIR/preflight.sh"
+  sync_inbox push
 
   # 1. 실행 잠금 — 같은 날짜 이중 실행만 막는다. probe/preflight 경고는
   #    claim에 기록될 뿐 실행을 막지 않는다.
@@ -72,7 +114,7 @@ run)
   run_dir="runs/$ACTOR/$run_id"
   set +e
   (cd "$PROJECT_ROOT" && claude --dangerously-skip-permissions ${MODEL_ARGS:+$MODEL_ARGS} -p \
-    ".claude/vault/backlog/_NIGHT.md 를 읽고 오늘 밤 실행을 계약 그대로 수행하라. 시작 블록의 claim 조회부터 종료 기록(complete)까지 계약 문서가 유일한 정본이다. 이번 실행의 고정 값: actor_id=$ACTOR, run_id=$run_id, 결과 디렉터리=$run_dir/. 이 checkout의 _INBOX.md와 이 머신의 세션만 읽고, 이전 판정은 feedback/$ACTOR/ 만 소비한다. 모델 규칙: fable 모델은 주 실행·subagent 어디에도 쓰지 않는다.")
+    ".claude/vault/backlog/_NIGHT.md 를 읽고 오늘 밤 실행을 계약 그대로 수행하라. 시작 블록의 claim 조회부터 종료 기록(complete)까지 계약 문서가 유일한 정본이다. 이번 실행의 고정 값: actor_id=$ACTOR, run_id=$run_id, 결과 디렉터리=$run_dir/. 소비 책임은 내 메모(inbox/$ACTOR.md)에만 있고, 상대 메모(inbox/의 다른 파일)는 읽기 전용 참고 입력이며 리포트에 출처를 표시한다. 세션은 이 머신 것만 읽고, 이전 판정은 feedback/$ACTOR/ 만 소비한다. 모델 규칙: fable 모델은 주 실행·subagent 어디에도 쓰지 않는다.")
   claude_exit=$?
   set -e
 
@@ -91,9 +133,10 @@ run)
 
 dry-run)
   sh "$SCRIPT_DIR/preflight.sh"
+  sync_inbox fetch-only
   TMP="$(mktemp -d /tmp/night-dryrun.XXXXXX)"
   trap 'rm -rf "$TMP"' EXIT
-  echo "[1/6] preflight OK (actor=$ACTOR, inbox=$PROJECT_ROOT/.claude/vault/_INBOX.md)"
+  echo "[1/6] preflight OK (actor=$ACTOR, 내 inbox=$MY_INBOX)"
 
   claim="$(python3 "$GATE" primary sweep --state-dir "$TMP/gate" \
     --contract-path "$CONTRACT" --probe-timeout 30)"
@@ -111,7 +154,8 @@ dry-run)
 
   contract_hash="$(shasum -a 256 "$CONTRACT" | awk '{print $1}')"
   snapshot_json="$(python3 "$SCRIPT_DIR/night-runtime.py" snapshot-inbox \
-    --run-id "$run_id" --contract-hash "$contract_hash" --out-dir "$TMP/snapshots")"
+    --run-id "$run_id" --contract-hash "$contract_hash" --path "$MY_INBOX" \
+    --out-dir "$TMP/snapshots")"
   snapshot_id="$(printf '%s' "$snapshot_json" | jget snapshot_id)"
   snapshot_fingerprint="$(printf '%s' "$snapshot_json" | jget snapshot_fingerprint)"
   echo "[3/6] inbox snapshot OK (fingerprint=$snapshot_fingerprint)"
@@ -160,12 +204,17 @@ open-report)
   fi
   ;;
 
+push-inbox)
+  # 자기 전에 손으로: 내 메모를 커밋·push해서 상대 밤에도 보이게 한다.
+  sync_inbox push
+  ;;
+
 review-server)
   exec python3 "$REVIEW_SERVER" --project "$PROJECT_ROOT" --actor "$ACTOR" --port "$REVIEW_PORT"
   ;;
 
 *)
-  echo "usage: sh night-launchd.sh [run|dry-run|open-report|review-server]" >&2
+  echo "usage: sh night-launchd.sh [run|dry-run|open-report|review-server|push-inbox]" >&2
   exit 2
   ;;
 esac
