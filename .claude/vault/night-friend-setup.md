@@ -9,14 +9,14 @@
 ```sh
 git clone <Tale-Studio-원격주소>
 cd tale-studio
-git switch -c night/friend
+git switch -c night-runs/friend
 ```
 
 이미 clone이 있다면 작업 중인 변경을 먼저 보존하고:
 
 ```sh
 git fetch origin
-git switch night/friend
+git switch night-runs/friend
 ```
 
 친구는 자기 로컬 `.claude/vault/_INBOX.md`에만 메모를 쓴다. owner의 파일을 pull해서 합치지 않는다.
@@ -33,7 +33,7 @@ script가 확인하는 것:
 
 - `git`, `python3`, native `claude` CLI
 - 독립 실행 프로필 지원
-- 현재 branch가 `night/friend`
+- 현재 branch가 `night-runs/friend`
 - 작업 트리가 코드 변경으로 더럽혀져 있지 않은지
 - fable 모델 환경변수가 없는지
 
@@ -68,14 +68,16 @@ feedback/friend/<run-id>/
 
 ```sh
 git pull origin main
-git pull origin night/owner
+git pull origin night-runs/owner
 open runs/owner/<run-id>/report.html
 open runs/friend/<run-id>/report.html
 ```
 
-브라우저에서 친구 report와 owner report를 각각 확인한다. 독립 실행 프로필이 제공하는
-로컬 review server가 있으면 그 주소로 열고, 아직 없다면 HTML을 직접 열어 결과를 확인한다.
-버튼 피드백은 친구 namespace에 저장된다.
+브라우저에서 친구 report와 owner report를 각각 확인한다. setup이 등록한 로컬 리뷰
+서버(`http://127.0.0.1:8377/`)로 열면 `merge`·`reject`·`feedback` 버튼이 동작한다.
+버튼 피드백은 친구 namespace에 저장되고, **친구의 다음 밤 실행만** 읽는다.
+owner report에 남길 의견은 버튼이 `review/friend/on-owner/`에 따로 기록한다 — owner
+실행의 자동 입력이 아니고, owner가 직접 읽고 자기 inbox에 옮길 때만 반영된다.
 
 ```text
 feedback/friend/<run-id>/
@@ -86,7 +88,7 @@ feedback/friend/<run-id>/
 ```sh
 git add feedback/friend runs/friend
 git commit -m "feedback(friend): review night run"
-git push origin night/friend
+git push origin night-runs/friend
 ```
 
 ## 5. merge 규칙

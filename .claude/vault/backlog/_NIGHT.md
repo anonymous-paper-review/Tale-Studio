@@ -58,6 +58,9 @@
 실행마다 다음 값을 먼저 만든다.
 
 - `run_id`: provider gate가 발급한 `night-YYYY-MM-DD-<uuid>` 실행 식별자.
+- `actor_id`: `NIGHT_ACTOR_ID`가 정한 실행 주체(`owner`/`friend`). 결과 경로
+  `runs/<actor>/<run_id>/`, 판정 경로 `feedback/<actor>/<run_id>/`, worktree branch
+  `night/<actor>/<run_id>/<unit-id>`의 namespace다.
 - `contract_id`, `contract_version`, 이 문서의 정규화된 해시.
 - 시작 시각과 기준 시각(UTC), 실행 주체(`claude` 또는 `codex`), 작업 루트.
 - 읽기 전용 입력 목록, 격리 작업 사본 목록, 결과 보고서 경로.
@@ -70,16 +73,27 @@
 한 번에 고정한다. 스냅샷 도구는 `_INBOX.md`를 수정하지 않고, 출력 JSON의 `snapshot_id`와
 `snapshot_fingerprint`를 이후 명령에 그대로 전달한다.
 
-`night-launchd.sh`는 claim 전에 `night-inbox-sync.py`를 실행한다. Orca가 이미 claim을
-만든 경로에서는 아래 계약 블록이 snapshot 직전에 같은 동기화를 한 번 더 확인한다.
-친구가 push한 `_INBOX.md`가 있으면 오너의 추가 내용과 함께 보존하고, 친구 push가 없으면
-오너의 현재 입력만으로 계속한다. 두 입력은 같은 우선순위다. 기존 줄을 수정·삭제한
-충돌이나 inbox 밖의 로컬 변경이 있으면 `merge-conflict`로 막고 추측하지 않는다.
+실행 프로필은 `NIGHT_RUN_PROFILE`이 정하고, 기본은 `independent`다.
+
+- `independent` (기본, 독립 실행 계약): owner와 friend가 **각자 자기 컴퓨터에서** 이 계약을
+  실행한다. 각 실행은 자기 checkout의 `_INBOX.md`, 자기 로컬 Claude/gjc 세션 저장소, 자기
+  코드만 읽는다. 상대방 inbox를 pull해서 합치거나 덮어쓰지 않고 `night-inbox-sync.py`를
+  호출하지 않는다. 격리는 검증 대상이 아니라 전제다 — inbox·세션·provider state·snapshot은
+  전부 자기 디스크에만 있어서 상대 것을 읽을 방법 자체가 없다. 두 사람이 만나는 곳은 git뿐이므로,
+  공유 산출물 경로(`runs/<actor>/<run_id>/`, `feedback/<actor>/<run_id>/`)와 branch 이름에만
+  `NIGHT_ACTOR_ID`(기본 `owner`)가 들어가 서로 겹치지 않는다. 누가 만든 결과인지는 commit
+  author와 actor branch가 이미 답한다.
+- `shared-legacy` (명시했을 때만): 예전 owner-only 병합 흐름. claim 전에
+  `night-inbox-sync.py`로 원격 `_INBOX.md`의 추가 내용을 보존 병합한다. 기존 줄을 수정·삭제한
+  충돌이나 inbox 밖의 로컬 변경이 있으면 `merge-conflict`로 막고 추측하지 않는다. 이 프로필을
+  두 머신 독립 실행과 동시에 쓰지 않는다.
 
 ```sh
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 cd "$PROJECT_ROOT"
 GATE="$PROJECT_ROOT/.claude/vault/backlog/provider-gate.py"
+NIGHT_ACTOR="${NIGHT_ACTOR_ID:-owner}"
+NIGHT_PROFILE="${NIGHT_RUN_PROFILE:-independent}"
 # 스케줄러(Orca 또는 launchd 진입점 night-launchd.sh)가 이 계약 시작 전에
 # `primary sweep`을 정확히 한 번 만든다. 여기서 primary를 다시 부르지 않고
 # 필수 claim을 조회·검증만 한다.
@@ -107,15 +121,18 @@ fi
   echo "provider state has no valid owner" >&2
   exit 1
 }
-current_branch="$(git symbolic-ref --quiet --short HEAD)" || {
-  echo "현재 branch를 확인할 수 없어 inbox 동기화를 거부한다" >&2
-  exit 1
-}
-python3 "$PROJECT_ROOT/.claude/vault/backlog/night-inbox-sync.py" \
-  --project "$PROJECT_ROOT" --branch "$current_branch" || {
-    echo "inbox synchronization failed; snapshot을 만들지 않는다" >&2
+if [ "$NIGHT_PROFILE" = "shared-legacy" ]; then
+  # legacy 전용 — independent 프로필은 원격 inbox 동기화를 호출하지 않는다.
+  current_branch="$(git symbolic-ref --quiet --short HEAD)" || {
+    echo "현재 branch를 확인할 수 없어 inbox 동기화를 거부한다" >&2
     exit 1
   }
+  python3 "$PROJECT_ROOT/.claude/vault/backlog/night-inbox-sync.py" \
+    --project "$PROJECT_ROOT" --branch "$current_branch" || {
+      echo "inbox synchronization failed; snapshot을 만들지 않는다" >&2
+      exit 1
+    }
+fi
 run_id="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')"
 provider_run_id="$run_id"
 provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner_token"])')"
@@ -214,8 +231,9 @@ python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --run-id "$run_id" \
 - 열린 것 후보를 `미결`(결론이 없음), `미착수`(결론은 있으나 실행하지 않음), `검증 대기`(실행했으나 확인하지 않음)로 구분.
 - 관련 티켓·실험·결정의 연결.
 - 코드·커밋으로 닫힌 것은 열린 후보로 다시 만들지 않는다.
-- 이 실행은 오너의 로컬 세션만 수확한다. 친구의 세션 수확은 공유하지 않으며, 친구
-  `_INBOX.md` 입력은 3. 메모 snapshot의 원문으로만 함께 소비한다.
+- 이 실행은 이 머신의 로컬 세션만 수확한다. 상대 컴퓨터의 세션·harvest·inbox는 이
+  디스크에 없으므로 읽을 일 자체가 없다. 원본 세션 JSONL과 로컬 절대경로는 공유
+  산출물(`runs/<actor>/`)로 내보내지 않는다 — 파일:줄, session id, branch, commit, 요약만.
 - 수확 후보는 `confirmed`, `candidate`, `needs-owner`, `duplicate`, `closed` 중 하나로
   분류한다. 수확기가 모호함을 해결했다고 가정하지 않는다. `candidate`와 `needs-owner`는
   HTML에 남기고, 레벨 1에서는 자동 실행하지 않는다.
@@ -262,8 +280,13 @@ python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --run-id "$run_id" \
 기능 변경과 수리는 별도 작업 사본에서 한다. 메인 체크아웃에서 브랜치를 바꾸거나 오너의 커밋되지 않은 변경을 덮지 않는다.
 
 ```sh
-git worktree add <isolated-path> -b night/<run-id>-<unit-id>
+git worktree add <isolated-path> -b night/<actor>/<run-id>/<unit-id>
 ```
+
+worktree와 branch 이름에 actor가 들어가므로 두 actor가 같은 원격에 push해도 충돌하지
+않는다. 결과 보고·feedback을 쌓는 actor 전용 branch(`NIGHT_GIT_BRANCH`)는 worktree branch
+경로(`night/<actor>/…`)의 상위가 되지 않는 이름(예: `night-runs/<actor>`)을 쓴다 — 같은
+이름의 branch와 하위 경로 branch는 Git ref 구조상 공존할 수 없다.
 
 작업 사본마다 다음을 지킨다.
 
@@ -343,7 +366,15 @@ git worktree add <isolated-path> -b night/<run-id>-<unit-id>
 
 ## 10. 아침 결과 리뷰 — budget, carryover, expiry
 
-아침은 사전 승인 창구가 아니라 밤 결과를 소비하는 리뷰 세션이다. 오너가 읽는 것은 결과 카드 원본이 아니라 **날짜 기준 사람 보고서 HTML**(`.claude/vault/backlog/reports/YYYY-MM-DD.html`)이다. 오너는 판정(`merge`, `reject`, 다음 실행에 반영할 `feedback`)과 이유를 별도 형식 없이 `_INBOX.md`에 적는다. 다음 밤 실행이 그 메모를 해석해 해당 결과 카드에 판정으로 기록한다. 오너가 카드 파일이나 원장을 직접 편집할 필요는 없다. 밤의 `reported`와 inbox archive는 오너 승인과 다른 상태다. HTML을 읽고 판정하기 전에는 결과를 최종 승인으로 세지 않는다.
+아침은 사전 승인 창구가 아니라 밤 결과를 소비하는 리뷰 세션이다. 각 사람이 읽는 것은 자기 컴퓨터가 만든 **run 단위 사람 보고서 HTML**(`runs/<actor>/<run_id>/report.html`)이다. 로컬 리뷰 서버(`sh night-launchd.sh review-server`, `http://127.0.0.1:<NIGHT_REVIEW_PORT>/`)로 열면 HTML의 `merge`·`reject`·`feedback` 버튼이 `feedback/<actor>/<run_id>/`에 append-only 이벤트를 남긴다. 버튼 결과는 자동 commit하지 않고 사람이 확인 후 push한다. 형식 없는 판정 메모를 자기 `_INBOX.md`에 적는 통로도 그대로 유효하다.
+
+판정이 어떻게 흐르는지는 단순하다 — 각자 자기 것만:
+
+- 다음 밤 실행은 자기 컴퓨터의 `feedback/<자기 actor>/`만 읽어 이전 결과 카드에 판정을 기록한다. `git pull`로 받아진 상대 feedback·review 디렉터리는 읽지 않는다. 자동 입력이 아니다.
+- 상대 report와 commit은 pull해서 사람이 읽는 참고·코드 검토 자료다. 상대에게 전할 의견은 `review/<자기 actor>/on-<상대>/<run_id>/`에 남기고, 상대가 직접 읽고 자기 inbox에 옮겨 적을 때만 실행 입력이 된다.
+- 코드 branch·결과·report의 merge는 사람이 Git에서 한다. 밤 runner는 상대 branch나 상대 코드를 자동 merge하지 않는다.
+
+카드 파일이나 원장을 직접 편집할 필요는 없다. 밤의 `reported`와 inbox archive는 승인과 다른 상태다. HTML을 읽고 판정하기 전에는 결과를 최종 승인으로 세지 않는다.
 
 ### 리뷰 예산
 
@@ -377,7 +408,7 @@ human_merge_reviewed = 위 카드 중 merge_mode가 human인 수
 
 ### 1단계 — 결과 카드에 판단을 붙인다
 
-오너가 `_INBOX.md`에 남긴 판정 메모를 다음 밤 실행이 해석해, 오너의 `merge`·`reject`와 이유·피드백을 **그 결과 카드**에 기록한다. 어느 카드를 가리키는지 확실하지 않으면 추측하지 말고 확인 질문 카드를 아침 보고에 올린다. 카드에는 `judgment_key`, `judgment_version`, 메모 snapshot, 수용 기준 버전, 리뷰 시각과 머지 방식이 있어야 한다. 원본 대화를 새 파일로 복제하지 않는다.
+자기 `feedback/<actor>/`의 버튼 이벤트와 자기 `_INBOX.md`의 판정 메모를 다음 밤 실행이 해석해, `merge`·`reject`와 이유·피드백을 **그 결과 카드**에 기록한다. 상대 actor의 판정은 이 단계의 입력이 아니다. 어느 카드를 가리키는지 확실하지 않으면 추측하지 말고 확인 질문 카드를 아침 보고에 올린다. 카드에는 `judgment_key`, `judgment_version`, 메모 snapshot, 수용 기준 버전, 리뷰 시각과 머지 방식이 있어야 한다. 원본 대화를 새 파일로 복제하지 않는다.
 
 ### 2단계 — 반복된 판단만 계약 기준으로 올린다
 
@@ -388,7 +419,7 @@ human_merge_reviewed = 위 카드 중 merge_mode가 human인 수
 ## 12. 반복 루프와 종료
 
 ```text
-A. 원격 inbox를 동기화하고 입력 스냅샷을 만든다.
+A. 자기 inbox의 스냅샷을 만든다 (shared-legacy 프로필만 그 전에 원격 동기화를 한다).
 B. 실행 잠금을 만든다.
 C. 메모·최근 결과·세션·열린 티켓을 읽고 후보를 만든다.
 D. 사실 확인 → 해석 → 분해 → 수용 기준 선기입을 한다.
@@ -439,9 +470,9 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 
 - 기계 보고서: 실행 상태, 단위별 한 줄 결과, 수용 기준, 지출 합계, 막힘·복구 사유, `reviewed_merge_rate`, 자가/사람 머지 수.
 - 사람 보고서: 맥락 → 해석 → 분해 → 수용 기준 → 결과 → 다음 질문 순서의 결과 카드. 상세 로그는 접고 경로만 연결한다.
-- 사람 보고서의 각 카드에는 입력 출처(`owner inbox`, `friend inbox`, `owner harvest`), 동기화
-  commit SHA, snapshot ID·fingerprint, 관련 티켓·코드 파일:줄 또는 세션 ID를 표시한다.
-  친구 push가 없었던 실행은 그 사실도 적는다.
+- 사람 보고서의 각 카드에는 입력 출처(자기 inbox, 자기 harvest, 자기 feedback),
+  snapshot ID·fingerprint, 관련 티켓·코드 파일:줄 또는 세션 ID를 표시한다.
+  로컬 절대경로와 세션 원문은 넣지 않는다 — 상대 컴퓨터에서도 열리는 상대 경로만.
 
 ### 사람 보고서의 읽기 순서
 
@@ -457,8 +488,10 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 저장 위치는 고정한다.
 
 - 티켓·결과 카드: `.claude/vault/backlog/tickets/` — 새 티켓과 결과 카드는 이 디렉터리에만 만든다. backlog 루트에는 이 계약 문서와 실행 도구만 둔다.
-- 보고서: `.claude/vault/backlog/reports/` — 기계 보고서는 `YYYY-MM-DD.md`, 사람 보고서는 `YYYY-MM-DD.html`. 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
-- 오너 접점은 두 개뿐이다: 쓰는 곳 `_INBOX.md`, 읽는 곳 최신 `reports/YYYY-MM-DD.html`. 다른 파일을 오너가 읽어야만 진행되는 절차를 만들지 않는다. 친구의 입력도 같은 `_INBOX.md`에 추가되어 동일 우선순위로 snapshot된다.
+- 실행 산출물: `runs/<actor>/<run_id>/` — 사람 보고서 `report.html`, 기계 요약 `manifest.json`, 세션 요약 `sessions/*.md`, worktree 목록 `worktrees.json`. actor와 run이 경로에 들어가므로 같은 날짜에 두 사람이 실행해도 서로 덮어쓰지 않는다. 날짜 하나를 덮어쓰는 `reports/YYYY-MM-DD.html` 경로는 더 쓰지 않는다 (기존 `.claude/vault/backlog/reports/`는 이력으로만 남긴다). 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
+- 판정 기록: `feedback/<actor>/<run_id>/*.json` — append-only, 자기 다음 밤 실행만 소비.
+- 교차 검토: `review/<actor>/on-<상대>/<run_id>/*.json` — 자동 입력 아님.
+- 각 사람의 접점은 두 개뿐이다: 쓰는 곳 자기 `_INBOX.md`, 읽는 곳 자기 최신 `runs/<actor>/<run_id>/report.html`. 다른 파일을 읽어야만 진행되는 절차를 만들지 않는다. 상대 결과는 `git pull` 후 같은 방식으로 열어 참고한다.
 - 티켓 상태와 작업 사본 정보.
 - 메모 스냅샷 fingerprint·범위·내용 해시·소비 상태.
 - 필요한 실험 산출물과 결과표. raw 대화·모델 원출력은 소비 시점 없이 별도 보관하지 않는다.
@@ -475,6 +508,11 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 이 문서를 고쳐야 할 때는 변경 이유, 영향받는 분해 기준, 이전 계약 해시, 새 계약 해시를 기록한다. 밤 실행은 항상 이 문서 하나를 정본으로 사용한다.
 
 ## 15. 계약 개정 기록
+
+- 2026-08-18 (9차) · 이전 계약 해시 `86d3be3fdcb41ea622c18c53df1825a49574157723f122cd586a4c5d814f9b6c` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — 밤 러너를 owner-only inbox 병합 구조에서 두 개발자가 각자 자기 컴퓨터에서 독립 실행하는 구조로 전환한다.
+  - 변경 내용: (1) 실행 프로필 신설 — 기본 `independent`는 원격 inbox 동기화를 호출하지 않고 자기 checkout의 inbox·세션만 쓴다. 예전 병합 흐름은 명시적 `shared-legacy`로만 남는다. (2) 산출물 경로를 날짜 덮어쓰기(`reports/YYYY-MM-DD.html`)에서 run 단위 immutable 경로(`runs/<actor>/<run_id>/`)로 바꾸고, worktree branch에 actor를 넣는다(`night/<actor>/<run_id>/<unit-id>`). (3) 판정은 로컬 리뷰 서버가 `feedback/<actor>/<run_id>/`에 append-only로 기록하고 **자기 actor의 다음 실행만** 소비한다. 상대 report에 대한 의견은 `review/<actor>/on-<상대>/`에 별도 기록되며 자동 입력이 아니다. (4) 상대 branch·코드의 merge는 사람이 Git에서 한다.
+  - 영향받는 분해 기준: 소유권을 코드로 검증하는 레이어는 만들지 않았다. 격리는 "각자 자기 컴퓨터"라는 물리적 사실이 전제로 제공하고, 계약은 공유 지점(git에 push되는 경로·branch 이름)의 겹침 방지 규약만 정한다.
 
 - 2026-08-18 (8차) · 이전 계약 해시 `5be54f6111cd6464cb585de4fa882ce21bddd997063beffabd77950918b1aaed` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 02:00·02:30 실행이 `_INBOX.md` 앞부분에 추가된 메모를 기존 줄 수정으로 오인해 `merge-conflict`로 중단됐다.

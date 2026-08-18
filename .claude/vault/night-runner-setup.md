@@ -27,41 +27,39 @@ claude -p "ok만 출력하라" --max-turns 1   # 로그인·응답 확인 (응�
 sh .claude/vault/backlog/night-launchd.sh dry-run
 ```
 
-마지막 줄에 `DRY-RUN PASS`가 나와야 한다. 다섯 단계가 각각 검증하는 것:
+마지막 줄에 `DRY-RUN PASS`가 나와야 한다. 일곱 단계가 각각 검증하는 것:
 
 1. `preflight` — 계약·도구·디렉터리 구조가 온전한가
-2. `provider gate claim` — 실행 잠금이 만들어지고, **네이티브 Claude 헤드리스 프로브**가 응답하는가
-3. `inbox snapshot` — 오너 메모를 바이트 그대로 사진 찍을 수 있는가
-4. `harvest dry-run` — 세션 수확기가 읽기 전용으로 도는가
-5. `native claude contract read` — Claude Code가 계약 문서를 실제로 읽는가
+2. `inbox 격리` — independent 프로필에서 원격 inbox 동기화가 호출되지 않는가
+3. `provider gate claim` — 실행 잠금이 만들어지고, **네이티브 Claude 헤드리스 프로브**가 응답하는가
+4. `inbox snapshot` — 이 checkout의 메모를 바이트 그대로 사진 찍을 수 있는가
+5. `harvest dry-run` — 세션 수확기가 이 머신의 세션만 읽기 전용으로 도는가
+6. `결과 경로·리뷰 서버` — `runs/<actor>/<run_id>/` 경로가 비어 있고 feedback 기록이 동작하는가
+7. `native claude contract read` — Claude Code가 계약 문서를 실제로 읽는가
 
 dry-run은 임시 디렉터리만 쓰므로 진짜 밤 상태와 절대 충돌하지 않는다.
 실패하면 그 단계의 메시지를 고치고 다시 돌린다. 통과 전에는 2단계로 가지 않는다.
 
-## 1.5 다른 개발자의 inbox 입력
+## 1.5 두 개발자의 독립 실행
 
-밤 실행은 오너 머신 하나만 담당한다. 다른 개발자는 새벽 실행 전에 자신의
-`_INBOX.md`에 기존 줄을 지우거나 고치지 않고 메모를 추가한 뒤 commit/push만 한다.
-오너의 `run`이 claim 전에 `night-inbox-sync.py`로 원격 `main`을 가져와 양쪽 추가 내용을
-합친다.
+밤 실행은 owner와 friend가 **각자 자기 컴퓨터에서** 따로 돈다 (`NIGHT_RUN_PROFILE=independent`,
+기본값). 각자 자기 `_INBOX.md`에만 메모를 쓰고, 실행은 자기 inbox·자기 세션만 읽는다.
+상대 inbox를 pull해서 합치는 동작은 없다 — 예전 병합 흐름은 `NIGHT_RUN_PROFILE=shared-legacy`를
+명시했을 때만 동작한다.
 
-- 친구 push가 없으면 오너의 현재 inbox만으로 계속한다.
-- 기존 줄을 고치거나 지운 충돌은 자동으로 선택하지 않고 `merge-conflict`로 멈춘다.
+- 결과는 `runs/<actor>/<run_id>/`에 남고 actor 전용 branch로 push된다. 아침에 서로
+  `git pull` 후 상대 report를 열어볼 수 있다.
+- 아침 HTML의 `merge`·`reject`·`feedback` 버튼은 `feedback/<actor>/<run_id>/`에 기록되고
+  **자기 다음 밤 실행만** 읽는다. 상대 판정은 자동 입력이 아니다.
 - 실행 완료 archive는 원문 삭제가 아니라 snapshot 복사와 소비 manifest다.
-- archive 상태는 `awaiting-owner-review`이며, 아침 HTML의 `merge` 또는 `reject`가
-  최종 판정이다.
+- 코드·결과의 최종 merge는 사람이 Git에서 한다.
+
+친구 머신 설치는 `.claude/vault/night-friend-setup.md`가 정본이다.
 
 ## 2. launchd 등록
 
-이 절은 **밤 coordinator인 오너 머신에만** 적용한다. 친구 머신은 이 `run` LaunchAgent를
-등록하지 않는다. 친구는 새벽에 아래처럼 inbox만 commit/push하거나 오너가 제공한 별도
-입력 publish 명령만 실행한다.
-
-```sh
-git add .claude/vault/_INBOX.md
-git commit -m "docs(inbox): publish nightly notes"
-git push origin main
-```
+오너 머신 기준 절차다. 친구 머신은 같은 구조를 `.claude/vault/night-friend-setup.sh`가
+자동으로 등록하므로 이 절을 손으로 반복할 필요 없다.
 
 Claude Code는 아래 절차를 실행하되, 자리표시자를 먼저 실제 값으로 치환한다.
 
@@ -171,11 +169,11 @@ launchctl bootout "gui/$(id -u)/com.tale-studio.night"
 
 - 매일 밤 01:30에 실행 잠금이 만들어지고, 네이티브 Claude Code가
   `_NIGHT.md` 계약대로 메모 해석 → 분해 → 실행 → 기록을 수행한다.
-- 이 머신은 inbox 입력을 publish하는 역할만 맡고 밤 실행은 하지 않는다. 오너 머신의
-  `night-launchd.sh run`이 원격 inbox를 먼저 동기화한 뒤 유일하게 밤을 실행한다.
-- 오너(사람) 접점은 두 개뿐이다:
+- 이 머신은 자기 inbox·자기 세션만으로 독립 실행한다. 상대 inbox 병합은 없다.
+- 사람 접점은 두 개뿐이다:
   - 쓰기: `.claude/vault/_INBOX.md` — 형식 없는 메모와 아침 판정(merge/reject/feedback)
-  - 읽기: `.claude/vault/backlog/reports/YYYY-MM-DD.html` — 날짜별 사람 보고서
+  - 읽기: `runs/<actor>/<run_id>/report.html` — run 단위 사람 보고서
+    (`sh .claude/vault/backlog/night-launchd.sh open-report`가 최신 것을 연다)
 - 화면 스모크 테스트(`pnpm smoke`)는 Orca 런타임 전제가 없으면 실패 대신 skip으로
   빠진다. 브라우저 렌더 증거가 필요한 밤 작업은 오너 머신 쪽 실행이 담당한다.
 - 모델 규칙: `fable` 모델은 금지다 — 주 실행·subagent·worktree 위임 전부. 실행 스크립트가
