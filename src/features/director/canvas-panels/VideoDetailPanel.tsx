@@ -22,6 +22,7 @@ import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
 import { AngleControl } from '@/features/director/angle-control'
 import { KeyLight } from '@/features/director/key-light'
 import { CameraPresetControl } from '@/features/director/camera-preset-control'
+import { useT } from '@/lib/i18n'
 
 const MODEL_ORDER: VideoModelKey[] = [
   'happy-horse',
@@ -38,6 +39,7 @@ export function VideoDetailPanel({
   nodeId: string
   data: VideoNodeData
 }) {
+  const t = useT()
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
   const applyVideoOverride = useDirectorCanvasStore(
     (s) => s.applyVideoOverride,
@@ -115,7 +117,7 @@ export function VideoDetailPanel({
       <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
         <PanelSection title="Video">
           <p className="text-sm text-muted-foreground">
-            마더 Shot을 찾을 수 없습니다.
+            {t('Could not find the mother Shot.')}
           </p>
         </PanelSection>
       </div>
@@ -169,7 +171,7 @@ export function VideoDetailPanel({
           nodeId,
           intent,
           busy: false,
-          error: error instanceof Error ? error.message : 'Final 설정에 실패했습니다.',
+          error: error instanceof Error ? error.message : t('Failed to set Final.'),
         })
       }
     }
@@ -197,7 +199,7 @@ export function VideoDetailPanel({
       ) {
         setRegenerationState({
           nodeId,
-          error: error instanceof Error ? error.message : '영상 생성에 실패했습니다.',
+          error: error instanceof Error ? error.message : t('Failed to generate video.'),
         })
       }
     }
@@ -209,7 +211,7 @@ export function VideoDetailPanel({
 
   // effective(상속+override) 셋업을 프리셋으로 저장 (D-6, 결정 #46)
   const handleSavePreset = () => {
-    const name = window.prompt('프리셋 이름')?.trim()
+    const name = window.prompt(t('Preset name'))?.trim()
     if (!name) return
     void usePresetStorageStore.getState().savePreset({
       projectId,
@@ -236,7 +238,7 @@ export function VideoDetailPanel({
                 'w-full border-b border-transparent bg-transparent text-sm font-medium outline-none',
                 'focus:border-border',
               )}
-              placeholder="Video 라벨"
+              placeholder={t('Video label')}
             />
           </HoverBeam>
           <Badge variant="secondary" className="shrink-0 text-[10px]">
@@ -255,8 +257,8 @@ export function VideoDetailPanel({
             aria-label={data.final ? 'Unmark Final' : 'Mark Final'}
             title={
               data.final
-                ? '★ Final 해제'
-                : 'Editor 핸드오프 대상으로 마킹 (Shot당 1개 강제)'
+                ? t('★ Unmark Final')
+                : t('Mark as the Editor handoff target (only one per Shot)')
             }
           >
             <Star
@@ -273,7 +275,7 @@ export function VideoDetailPanel({
       <PanelSection
         title={
           <span className="flex items-center justify-between gap-2">
-            <span>영상 미리보기</span>
+            <span>{t('Video preview')}</span>
             <Badge variant="outline" className="text-[10px] uppercase">
               {data.status}
             </Badge>
@@ -292,19 +294,19 @@ export function VideoDetailPanel({
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
           ) : data.lastAttemptStatus === 'failed' || data.status === 'failed' ? (
             <span className="px-4 text-center text-xs text-destructive">
-              {data.lastAttemptError ?? data.errorMessage ?? '생성 실패'}
+              {data.lastAttemptError ?? data.errorMessage ?? t('Generation failed')}
             </span>
           ) : (
             <div className="flex flex-col items-center gap-1 text-muted-foreground">
               <Play className="size-5" />
-              <span className="text-xs">아직 생성되지 않음</span>
+              <span className="text-xs">{t('Not generated yet')}</span>
             </div>
           )}
         </div>
       </PanelSection>
       {isGenerating && (
         <p className="text-xs text-muted-foreground">
-          새 생성 시도를 진행 중입니다. 기존 영상은 계속 재생할 수 있습니다.
+          {t('A new generation attempt is in progress. You can keep playing the existing video.')}
         </p>
       )}
       {(data.lastAttemptStatus === 'failed' && data.lastAttemptError) || regenerationError ? (
@@ -337,11 +339,11 @@ export function VideoDetailPanel({
             }
             onBlur={commitPromptOverride}
             rows={3}
-            placeholder={motherPrompt || '마더 Shot의 prompt가 비어있음'}
+            placeholder={motherPrompt || t("Mother Shot's prompt is empty")}
           />
         </HoverBeam>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          비워두면 마더 Shot의 prompt가 그대로 사용됩니다.
+          {t("Leave blank to use the mother Shot's prompt as-is.")}
         </p>
       </PanelSection>
 
@@ -413,7 +415,7 @@ export function VideoDetailPanel({
           ) : (
             <>
               <RefreshCw className="size-3.5" />
-              {data.videoUrl ? '재생성' : '생성'}
+              {data.videoUrl ? t('Regenerate') : t('Generate')}
             </>
           )}
         </Button>
@@ -422,10 +424,10 @@ export function VideoDetailPanel({
           variant="outline"
           onClick={handleSavePreset}
           className="gap-1.5"
-          title="현재 카메라/조명/렌즈 셋업을 프리셋으로 저장"
+          title={t('Save the current camera/lighting/lens setup as a preset')}
         >
           <Bookmark className="size-3.5" />
-          프리셋 저장
+          {t('Save preset')}
         </Button>
         <div className="ml-auto" />
         <Button
@@ -435,7 +437,7 @@ export function VideoDetailPanel({
           className="gap-1.5 text-destructive hover:text-destructive"
         >
           <Trash2 className="size-3.5" />
-          삭제
+          {t('Delete')}
         </Button>
       </footer>
     </div>

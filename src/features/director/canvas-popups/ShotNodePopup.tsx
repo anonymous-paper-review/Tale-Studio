@@ -29,6 +29,7 @@ import { AngleControl } from '@/features/director/angle-control'
 import { KeyLight } from '@/features/director/key-light'
 import { CameraPresetControl } from '@/features/director/camera-preset-control'
 import { InventoryPickerDialog } from '@/features/director/canvas-popups/inventory-picker-dialog'
+import { useT } from '@/lib/i18n'
 
 type Props = {
   nodeId: string
@@ -44,6 +45,7 @@ const MODEL_ORDER: VideoModelKey[] = [
 ]
 
 export function ShotNodePopup({ nodeId, data }: Props) {
+  const t = useT()
   const closePopup = useDirectorCanvasStore((s) => s.closePopup)
   // #debug-prompts: 관리자 소유 프로젝트에서만 원본 생성 풀 프롬프트(shots.prompt) 노출.
   const debugProjectId = useDirectorCanvasStore((s) => s.projectId)
@@ -113,7 +115,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
 
   // 현재 카메라/조명/렌즈 셋업을 프리셋으로 저장 (D-6, 결정 #46)
   const handleSavePreset = () => {
-    const name = window.prompt('프리셋 이름')?.trim()
+    const name = window.prompt(t('Preset name'))?.trim()
     if (!name) return
     void usePresetStorageStore.getState().savePreset({
       projectId,
@@ -169,7 +171,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                   'border-b border-transparent bg-transparent text-sm font-medium outline-none',
                   'focus:border-border',
                 )}
-                placeholder="Shot 라벨"
+                placeholder={t('Shot label')}
               />
             </HoverBeam>
           </DialogTitle>
@@ -177,7 +179,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
 
         <div className="space-y-4">
           {/* Prompt */}
-          <Field label="프롬프트 (영상 생성용)">
+          <Field label={t('Prompt (for video generation)')}>
             <HoverBeam className="w-full">
               <Textarea
                 value={currentPrompt}
@@ -185,7 +187,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                   updateNodeData<'shot'>(nodeId, { promptOverride: e.target.value })
                 }
                 rows={3}
-                placeholder="이 샷에서 일어나는 액션, 분위기, 카메라 의도 등"
+                placeholder={t('Action, mood, camera intent, etc. happening in this shot')}
               />
             </HoverBeam>
           </Field>
@@ -194,7 +196,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
               위의 편집용 프롬프트(override)와 달리 파이프라인이 저장한 rich 프롬프트 원문이다
               (derivedPrompt = writer sync v2 파생, prompt = legacy 폴백). */}
           {debugPrompts && (data.derivedPrompt || data.prompt) ? (
-            <Field label="원본 생성 프롬프트 (debug)">
+            <Field label={t('Original generation prompt (debug)')}>
               <pre className="max-h-48 w-full select-text overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted p-3 font-mono text-[11px] leading-relaxed text-muted-foreground scrollbar-thin">
                 {data.derivedPrompt || data.prompt}
               </pre>
@@ -209,7 +211,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
           />
 
           {/* Reference images */}
-          <Field label={`참고 이미지 (${data.referenceImages.length}장)`}>
+          <Field label={t('Reference images ({count})', { count: data.referenceImages.length })}>
             <div className="flex flex-wrap items-center gap-2">
               {data.referenceImages.map((img) => (
                 <div
@@ -226,7 +228,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                     type="button"
                     onClick={() => handleRemoveRef(img.id)}
                     className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
-                    aria-label="참고 이미지 삭제"
+                    aria-label={t('Remove reference image')}
                   >
                     <X className="size-3 text-white" />
                   </button>
@@ -238,7 +240,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                   type="file"
                   accept="image/*"
                   className="sr-only"
-                  aria-label="참고 이미지 업로드"
+                  aria-label={t('Upload reference image')}
                   onChange={(e) => {
                     const file = e.target.files?.[0]
                     if (file) handleAddReferenceImage(file)
@@ -250,8 +252,8 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                 type="button"
                 onClick={() => setInventoryPickerOpen(true)}
                 className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-md border border-dashed border-border text-muted-foreground hover:bg-accent"
-                title="인벤토리에서 선택"
-                aria-label="인벤토리에서 참고 이미지 선택"
+                title={t('Choose from inventory')}
+                aria-label={t('Choose reference image from inventory')}
               >
                 <Images className="size-4" />
               </button>
@@ -263,11 +265,14 @@ export function ShotNodePopup({ nodeId, data }: Props) {
           {/* 등장 캐릭터 / 월드 — Artist 등록 Asset에서 선택 (스펙 §5.3).
               선택된 에셋의 대표 이미지가 스토리보드/영상 생성의 레퍼런스로 들어간다. */}
           <Field
-            label={`등장 캐릭터 (${data.characterAssetIds.length}/${projectCharacters.length})`}
+            label={t('Characters ({count}/{total})', {
+              count: data.characterAssetIds.length,
+              total: projectCharacters.length,
+            })}
           >
             {projectCharacters.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                Artist에서 캐릭터를 Register하면 여기에 나타납니다.
+                {t('Characters you Register in Artist will appear here.')}
               </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
@@ -293,11 +298,14 @@ export function ShotNodePopup({ nodeId, data }: Props) {
           </Field>
 
           <Field
-            label={`월드 / 장소 (${data.worldAssetIds.length}/${projectWorlds.length})`}
+            label={t('World / locations ({count}/{total})', {
+              count: data.worldAssetIds.length,
+              total: projectWorlds.length,
+            })}
           >
             {projectWorlds.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                Artist에서 장소를 Register하면 여기에 나타납니다.
+                {t('Locations you Register in Artist will appear here.')}
               </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
@@ -362,7 +370,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
 
           {/* 이미지 생성 모델(#e4 2026-07-15) — SHOT IMAGE는 GPT Image 2.0으로 생성된다.
               Midjourney 8.1은 도입 예정(비활성). 선택 상태는 표시 전용. */}
-          <Field label="이미지 생성 모델">
+          <Field label={t('Image generation model')}>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               <button
                 type="button"
@@ -370,7 +378,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
               >
                 <span className="block font-medium">GPT Image 2.0</span>
                 <span className="block font-mono text-[10px] text-muted-foreground">
-                  기본 · 16:9
+                  {t('Default · 16:9')}
                 </span>
               </button>
               <button
@@ -380,20 +388,20 @@ export function ShotNodePopup({ nodeId, data }: Props) {
               >
                 <span className="block font-medium">Midjourney 8.1</span>
                 <span className="block font-mono text-[10px] text-muted-foreground">
-                  준비 중
+                  {t('Coming soon')}
                 </span>
               </button>
             </div>
           </Field>
 
           {/* Provider (영상 생성 모델 — video-models 레지스트리) */}
-          <Field label="영상 생성 모델">
+          <Field label={t('Video generation model')}>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {MODEL_ORDER.map((p) => {
                 const spec = VIDEO_MODELS[p]
                 const durHint =
                   spec.duration.mode === 'fixed'
-                    ? '8s 고정'
+                    ? t('Fixed 8s')
                     : `${spec.duration.min}–${spec.duration.max}s`
                 return (
                   <button
@@ -445,7 +453,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
             ) : (
               <>
                 <Film className="size-3.5" />
-                새 Video 테이크 생성
+                {t('Generate new video take')}
               </>
             )}
           </Button>
@@ -454,20 +462,20 @@ export function ShotNodePopup({ nodeId, data }: Props) {
             variant="outline"
             onClick={handleAddTake}
             className="gap-1.5"
-            title="현재 설정으로 빈 Video 노드만 만들기 (실제 생성은 별도)"
+            title={t('Create just an empty Video node with the current settings (generation happens separately)')}
           >
             <GitBranch className="size-3.5" />
-            Branch (빈 테이크)
+            {t('Branch (empty take)')}
           </Button>
           <Button
             size="sm"
             variant="outline"
             onClick={handleSavePreset}
             className="gap-1.5"
-            title="현재 카메라/조명/렌즈 셋업을 프리셋으로 저장"
+            title={t('Save the current camera/lighting/lens setup as a preset')}
           >
             <Bookmark className="size-3.5" />
-            이 셋업 프리셋으로 저장
+            {t('Save this setup as a preset')}
           </Button>
           <div className="ml-auto" />
           <Button
@@ -477,7 +485,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
             className="gap-1.5 text-destructive hover:text-destructive"
           >
             <Trash2 className="size-3.5" />
-            삭제
+            {t('Delete')}
           </Button>
         </div>
       </DialogContent>

@@ -19,6 +19,7 @@ import { AngleControl } from '@/features/director/angle-control'
 import { KeyLight } from '@/features/director/key-light'
 import { CameraPresetControl } from '@/features/director/camera-preset-control'
 import { InventoryPickerDialog } from '@/features/director/canvas-popups/inventory-picker-dialog'
+import { useT } from '@/lib/i18n'
 
 type Props = {
   nodeId: string
@@ -34,6 +35,7 @@ const MODEL_ORDER: VideoModelKey[] = [
 ]
 
 export function ShotDetailPanel({ nodeId, data }: Props) {
+  const t = useT()
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
   const generateVideoForShot = useDirectorCanvasStore(
     (s) => s.generateVideoForShot,
@@ -77,7 +79,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
   }
 
   const handleSavePreset = () => {
-    const name = window.prompt('프리셋 이름')?.trim()
+    const name = window.prompt(t('Preset name'))?.trim()
     if (!name) return
     void usePresetStorageStore.getState().savePreset({
       projectId,
@@ -129,14 +131,14 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
                 updateNodeData<'shot'>(nodeId, { label: e.target.value })
               }
               className="h-8 border-transparent bg-transparent px-0 text-sm font-medium shadow-none focus-visible:border-border focus-visible:ring-0"
-              placeholder="Shot 라벨"
+              placeholder={t('Shot label')}
             />
           </HoverBeam>
         </div>
       </header>
 
       <Section title="Prompt">
-        <Field label="프롬프트 (영상 생성용)">
+        <Field label={t('Prompt (for video generation)')}>
           <HoverBeam>
             <Textarea
               value={effectivePrompt(data)}
@@ -144,20 +146,20 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
                 updateNodeData<'shot'>(nodeId, { promptOverride: e.target.value })
               }
               rows={4}
-              placeholder="이 샷에서 일어나는 액션, 분위기, 카메라 의도 등"
+              placeholder={t('Action, mood, camera intent, etc. happening in this shot')}
             />
           </HoverBeam>
         </Field>
       </Section>
 
       <Section title="Model">
-        <Field label="영상 생성 모델">
+        <Field label={t('Video generation model')}>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {MODEL_ORDER.map((p) => {
               const spec = VIDEO_MODELS[p]
               const durHint =
                 spec.duration.mode === 'fixed'
-                  ? '8s 고정'
+                  ? t('Fixed 8s')
                   : `${spec.duration.min}–${spec.duration.max}s`
               return (
                 <button
@@ -206,7 +208,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
       </Section>
 
       <Section title="References">
-        <Field label={`참고 이미지 (${data.referenceImages.length}장)`}>
+        <Field label={t('Reference images ({count})', { count: data.referenceImages.length })}>
           <div className="flex flex-wrap items-center gap-2">
             {data.referenceImages.map((img) => (
               <div
@@ -223,7 +225,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
                   type="button"
                   onClick={() => handleRemoveRef(img.id)}
                   className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
-                  aria-label="참고 이미지 삭제"
+                  aria-label={t('Remove reference image')}
                 >
                   <X className="size-3 text-white" />
                 </button>
@@ -235,7 +237,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
                 type="file"
                 accept="image/*"
                 className="sr-only"
-                aria-label="참고 이미지 업로드"
+                aria-label={t('Upload reference image')}
                 onChange={(e) => {
                   const file = e.target.files?.[0]
                   if (file) handleAddReferenceImage(file)
@@ -247,8 +249,8 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
               type="button"
               onClick={() => setInventoryPickerOpen(true)}
               className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-md border border-dashed border-border text-muted-foreground hover:bg-accent"
-              title="인벤토리에서 선택"
-              aria-label="인벤토리에서 참고 이미지 선택"
+              title={t('Choose from inventory')}
+              aria-label={t('Choose reference image from inventory')}
             >
               <Images className="size-4" />
             </button>
@@ -258,11 +260,14 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
 
       <Section title="Cast">
         <Field
-          label={`등장 캐릭터 (${data.characterAssetIds.length}/${projectCharacters.length})`}
+          label={t('Characters ({count}/{total})', {
+            count: data.characterAssetIds.length,
+            total: projectCharacters.length,
+          })}
         >
           {projectCharacters.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              Artist에서 캐릭터를 Register하면 여기에 나타납니다.
+              {t('Characters you Register in Artist will appear here.')}
             </p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
@@ -290,10 +295,15 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
       </Section>
 
       <Section title="World">
-        <Field label={`월드 / 장소 (${data.worldAssetIds.length}/${projectWorlds.length})`}>
+        <Field
+          label={t('World / locations ({count}/{total})', {
+            count: data.worldAssetIds.length,
+            total: projectWorlds.length,
+          })}
+        >
           {projectWorlds.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              Artist에서 장소를 Register하면 여기에 나타납니다.
+              {t('Locations you Register in Artist will appear here.')}
             </p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
@@ -373,7 +383,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
           ) : (
             <>
               <Film className="size-3.5" />
-              새 Video 테이크 생성
+              {t('Generate new video take')}
             </>
           )}
         </Button>
@@ -384,10 +394,10 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
             variant="outline"
             onClick={handleSavePreset}
             className="gap-1.5"
-            title="현재 카메라/조명/렌즈 셋업을 프리셋으로 저장"
+            title={t('Save the current camera/lighting/lens setup as a preset')}
           >
             <Bookmark className="size-3.5" />
-            프리셋 저장
+            {t('Save preset')}
           </Button>
           <Button
             type="button"
@@ -397,7 +407,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
             className="gap-1.5 text-destructive hover:text-destructive"
           >
             <Trash2 className="size-3.5" />
-            삭제
+            {t('Delete')}
           </Button>
         </div>
       </div>

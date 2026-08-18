@@ -13,6 +13,7 @@ import { ImageIcon, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isAssetData, type DirectorNode } from '@/types/director'
 import { ThumbImage } from '@/components/thumb-image'
+import { useT } from '@/lib/i18n'
 
 const KIND_STYLE = {
   character: { border: 'border-chart-1/70', dot: 'bg-chart-1', label: 'Character' },
@@ -20,6 +21,7 @@ const KIND_STYLE = {
 } as const
 
 function AssetNodeImpl({ data }: NodeProps<DirectorNode>) {
+  const t = useT()
   if (!isAssetData(data)) return null
   const style = KIND_STYLE[data.assetKind]
 
@@ -43,7 +45,7 @@ function AssetNodeImpl({ data }: NodeProps<DirectorNode>) {
         <span className="flex items-center gap-1.5 font-medium uppercase tracking-wide text-muted-foreground">
           <span className={cn('h-1.5 w-1.5 rounded-full', style.dot)} />
           {style.label}
-          {data.unused && <span className="normal-case text-muted-foreground/70">· 미사용</span>}
+          {data.unused && <span className="normal-case text-muted-foreground/70">· {t('Unused')}</span>}
         </span>
         <Lock className="size-3 text-muted-foreground" aria-label="locked" />
       </div>

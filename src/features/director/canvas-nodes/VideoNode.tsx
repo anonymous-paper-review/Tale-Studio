@@ -10,8 +10,10 @@ import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useActiveGenerationJobs, activeStartedAt } from '@/lib/generation-queue'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 
 function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
+  const t = useT()
   const setVideoFinal = useDirectorCanvasStore((s) => s.setVideoFinal)
   const playingNodeId = useDirectorCanvasStore((s) => s.playingNodeId)
   const setPlayingNode = useDirectorCanvasStore((s) => s.setPlayingNode)
@@ -115,7 +117,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           nodeId: id,
           intent,
           busy: false,
-          error: error instanceof Error ? error.message : 'Final 설정에 실패했습니다.',
+          error: error instanceof Error ? error.message : t('Failed to set Final.'),
         })
       }
     }
@@ -146,7 +148,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             }}
           >
             <RefreshCw className="size-3" />
-            영상 리테이크
+            {t('Retake video')}
           </Button>
         </div>
       </NodeToolbar>
@@ -183,7 +185,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       <div className="relative mt-1 flex h-24 w-full items-center justify-center overflow-hidden rounded-sm border border-border/40 bg-muted/40">
         {data.status === 'failed' && !data.videoUrl ? (
           <span className="px-2 text-center text-[10px] text-destructive">
-            {data.lastAttemptError ?? data.errorMessage ?? '실패'}
+            {data.lastAttemptError ?? data.errorMessage ?? t('Failed')}
           </span>
         ) : isPlaying && data.videoUrl ? (
           <>
@@ -199,7 +201,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             <button
               type="button"
               onClick={handleStop}
-              aria-label="정지"
+              aria-label={t('Stop')}
               className="nodrag absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white/90 transition-colors hover:bg-black/80"
             >
               <Square className="size-3" />
@@ -210,7 +212,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             type="button"
             onClick={handlePlay}
             disabled={!data.videoUrl}
-            aria-label="재생"
+            aria-label={t('Play')}
             className="nodrag group/play relative block h-full w-full"
           >
             <GeneratedImage
@@ -228,18 +230,18 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           <button
             type="button"
             onClick={handlePlay}
-            aria-label="재생"
+            aria-label={t('Play')}
             className="nodrag flex h-full w-full items-center justify-center transition-colors hover:bg-muted/60"
           >
             <Play className="size-6 fill-muted-foreground text-muted-foreground" />
           </button>
         ) : (
-          <span className="text-[10px] text-muted-foreground">대기 중</span>
+          <span className="text-[10px] text-muted-foreground">{t('Waiting')}</span>
         )}
 
         <GeneratingOverlay
           active={data.lastAttemptStatus === 'generating'}
-          label="영상 생성 중"
+          label={t('Generating video')}
           startedAt={
             parentWriterShotId
               ? activeStartedAt(activeVideoJobs, ['shot_video'], parentWriterShotId)
@@ -275,10 +277,10 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           title={[data.adherence.reason, data.adherence.observed].filter(Boolean).join(' / ')}
         >
           ⚠ {data.adherence.status === 'over_motion'
-            ? '정지 계약 위반 — 카메라가 움직였어요'
+            ? t('Static contract violated — the camera moved')
             : data.adherence.status === 'under_motion'
-              ? '변화 부족 — 설계된 큰 동작이 안 보여요'
-              : '방향 불일치 — 화살표와 다르게 움직였어요'}
+              ? t("Not enough motion — the designed big movement isn't visible")
+              : t('Direction mismatch — moved differently from the arrow')}
         </p>
       )}
       {finalError && <p className="mt-1 text-[10px] text-destructive">{finalError}</p>}

@@ -10,8 +10,10 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useDirectorCanvasStore } from '@/stores/director-store'
+import { useT } from '@/lib/i18n'
 
 export function DeleteConfirmModal() {
+  const t = useT()
   const info = useDirectorCanvasStore((s) => s.deleteConfirmInfo)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const closeDeleteConfirm = useDirectorCanvasStore(
@@ -34,19 +36,22 @@ export function DeleteConfirmModal() {
   if (kind === 'scene') {
     if (info.shotCount > 0) {
       cascadeLines.push(
-        `Shot ${info.shotCount}개 + Video ${info.videoCount}개가 함께 삭제됩니다.`,
+        t('This also deletes {shotCount} Shots + {videoCount} Videos.', {
+          shotCount: info.shotCount,
+          videoCount: info.videoCount,
+        }),
       )
     }
   } else if (kind === 'shot') {
     if (info.videoCount > 0) {
       cascadeLines.push(
-        `Video 테이크 ${info.videoCount}개가 함께 삭제됩니다.`,
+        t('This also deletes {count} Video takes.', { count: info.videoCount }),
       )
     }
   }
   if (info.finalAffected) {
     cascadeLines.push(
-      '⚠ ★ Final로 마킹된 테이크가 포함됩니다. Editor 핸드오프에 영향이 있을 수 있어요.',
+      t('⚠ Includes a take marked ★ Final. This may affect the Editor handoff.'),
     )
   }
 
@@ -63,9 +68,9 @@ export function DeleteConfirmModal() {
         }}
       >
         <DialogHeader>
-          <DialogTitle>노드 삭제</DialogTitle>
+          <DialogTitle>{t('Delete node')}</DialogTitle>
           <DialogDescription>
-            &quot;{label}&quot; ({kind}) 노드를 삭제할까요?
+            {t('Delete the "{label}" ({kind}) node?', { label, kind })}
           </DialogDescription>
         </DialogHeader>
 
@@ -88,10 +93,10 @@ export function DeleteConfirmModal() {
 
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={closeDeleteConfirm}>
-            취소
+            {t('Cancel')}
           </Button>
           <Button variant="destructive" size="sm" onClick={confirmDelete}>
-            삭제
+            {t('Delete')}
           </Button>
         </DialogFooter>
       </DialogContent>

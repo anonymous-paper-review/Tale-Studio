@@ -49,6 +49,8 @@ import { isDemoSession } from '@/lib/demo/context'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { notifyGenerationComplete, notifyGenerationFailure } from '@/lib/generation-notify'
 import { claimAction, releaseAction } from '@/lib/action-guard'
+import { translate } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 import { DEFAULT_VIDEO_MODEL, normalizeProvider } from '@/lib/video-models'
 
 // ============================================================================
@@ -946,9 +948,9 @@ export function getShotStage(
 }
 
 const SHOT_STAGE_LABEL: Record<ShotStage, string> = {
-  rough: '실사화',
-  live: '영상 생성',
-  video: '새 영상 테이크',
+  rough: 'Go live',
+  live: 'Generate video',
+  video: 'New video take',
 }
 
 /** 진행 버튼 라벨 = 현 단계에서 누르면 일어나는 '다음' 행동 */
@@ -2178,7 +2180,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             // 스트립 모드(#real-strip)의 frames{start,direction,end}는 잡 result_url(=start)에
             //   실리지 않는다 — DB 진실 재수화로 회수(로컬이 방금 쓴 완료값 그대로면 DB 값 채택).
             await get().hydrateFromDb(projectId).catch(() => {})
-            notifyGenerationComplete('director', '스토리보드') // 다른 stage에 있을 때만 알림
+            notifyGenerationComplete('director', translate(useLocaleStore.getState().locale, 'Storyboard')) // 다른 stage에 있을 때만 알림
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error'
             get().updateNodeData<'shot'>(shotNodeId, {
@@ -2192,7 +2194,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             // 실패한 시도가 1초 창을 붙잡고 있으면 즉시 재시도가 막힌다 — 창을 바로 연다.
             releaseAction(`director:storyboard:${shotNodeId}`)
             // 카드의 작은 빨간 글씨는 캔버스를 스크롤하면 사라진다 — 사유를 채팅에도 남긴다(#double-fire).
-            notifyGenerationFailure('director', '스토리보드 이미지', message)
+            notifyGenerationFailure('director', translate(useLocaleStore.getState().locale, 'Storyboard image'), message)
           }
           return
         }
@@ -2251,7 +2253,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           const message =
             err instanceof Error
               ? err.name === 'AbortError'
-                ? '시간 초과 (90s)'
+                ? translate(useLocaleStore.getState().locale, 'Timed out (90s)')
                 : err.message
               : 'Unknown error'
           get().updateNodeData<'shot'>(shotNodeId, {
@@ -2513,7 +2515,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               }
               if (!isCurrentAttempt()) return true
               if (status === 'completed') {
-                notifyGenerationComplete('director', '영상')
+                notifyGenerationComplete('director', translate(useLocaleStore.getState().locale, 'Video'))
                 // #adherence P2: 모션 계약 준수 검사(fire-and-forget) — 브라우저가 첫/끝 프레임을
                 //   캡처해 서버 판정 후 배지 반영. 실패는 조용히 무시(생성 결과에 영향 없음).
                 const doneNode = get().nodes.find((n) => n.id === videoNodeId)
@@ -2538,7 +2540,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             }
             await new Promise((resolve) => setTimeout(resolve, VIDEO_POLL_INTERVAL_MS))
           }
-          throw new Error('영상 생성 타임아웃 (5분)')
+          throw new Error(translate(useLocaleStore.getState().locale, 'Video generation timed out (5 min)'))
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Unknown error'
           if (message.startsWith('Canonical video-take hydration failed:')) throw err

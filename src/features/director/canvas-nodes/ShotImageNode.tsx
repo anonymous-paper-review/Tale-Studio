@@ -21,8 +21,10 @@ import {
 } from '@/lib/generation-queue'
 import { isShotData, isShotImageData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
+import { useT } from '@/lib/i18n'
 
 function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
+  const t = useT()
   const parentShotNodeId = isShotImageData(data) ? data.parentShotNodeId : null
   // 부모 Shot 스코프 구독 — storyboardImage 객체 참조는 노드 데이터 교체 시에만 바뀐다.
   const storyboardImage = useDirectorCanvasStore((s) => {
@@ -141,7 +143,7 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
             )
           ) : failed ? (
             <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 bg-destructive/10 p-1.5 text-center">
-              <span className="text-[10px] font-medium text-destructive">생성 실패</span>
+              <span className="text-[10px] font-medium text-destructive">{t('Generation failed')}</span>
               {storyboardImage?.errorMessage && (
                 <span className="line-clamp-2 break-all font-mono text-[9px] leading-tight text-destructive/80">
                   {storyboardImage.errorMessage}
@@ -151,12 +153,12 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
           ) : (
             <span className="flex h-full w-full flex-col items-center justify-center gap-1">
               <ImageIcon className="size-5 text-muted-foreground/40" />
-              <span className="text-[10px] text-muted-foreground/70">아직 이미지가 없어요</span>
+              <span className="text-[10px] text-muted-foreground/70">{t('No image yet')}</span>
             </span>
           )}
           <GeneratingOverlay
             active={!!generating}
-            label={waitingOnly ? '이미지 생성 대기 중' : '이미지 생성 중'}
+            label={waitingOnly ? t('Waiting to generate image') : t('Generating image')}
             showElapsed={!waitingOnly}
             beamColor="success"
             startedAt={
@@ -186,7 +188,7 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
           )}
         >
           <ImageIcon className="size-3" />
-          {hasImage ? '이미지 재생성' : '이미지 생성'}
+          {hasImage ? t('Regenerate image') : t('Generate image')}
         </button>
       </div>
     </div>

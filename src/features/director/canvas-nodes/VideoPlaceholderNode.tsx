@@ -11,8 +11,10 @@ import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { isVideoData, isVideoPlaceholderData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
+import { useT } from '@/lib/i18n'
 
 function VideoPlaceholderNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
+  const t = useT()
   const parentShotNodeId = isVideoPlaceholderData(data) ? data.parentShotNodeId : null
   const generateVideoForShot = useDirectorCanvasStore((s) => s.generateVideoForShot)
   // 형제 테이크가 생성 중이면 잠금 (VideoNode 의 parentGenerating 과 동일 판정)
@@ -68,7 +70,7 @@ function VideoPlaceholderNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
       <div className="p-2">
         <div className="flex h-24 w-full flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-border/60 bg-muted/20">
           <Play className="size-5 text-muted-foreground/40" />
-          <span className="text-[10px] text-muted-foreground/70">아직 영상이 없어요</span>
+          <span className="text-[10px] text-muted-foreground/70">{t('No video yet')}</span>
         </div>
 
         <button
@@ -84,7 +86,7 @@ function VideoPlaceholderNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
           )}
         >
           <Play className="size-3 fill-current" />
-          영상 생성
+          {t('Generate video')}
         </button>
       </div>
     </div>

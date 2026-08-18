@@ -4,6 +4,7 @@ import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { isPromptData, type DirectorNode } from '@/types/director'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 
 /**
  * Higgsfield식 분리 프롬프트 노드.
@@ -11,6 +12,7 @@ import { cn } from '@/lib/utils'
  * store.wirePromptToShot이 Shot.promptOverride를 이 노드 text로 동기한다.
  */
 function PromptNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
+  const t = useT()
   if (!isPromptData(data)) return null
 
   return (
@@ -45,7 +47,7 @@ function PromptNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
           {data.text || 'Describe what you want to create...'}
         </p>
         {data.targetShotNodeId && (
-          <p className="mt-2 text-[10px] text-muted-foreground">→ Shot에 연결됨</p>
+          <p className="mt-2 text-[10px] text-muted-foreground">→ {t('Connected to Shot')}</p>
         )}
       </div>
     </div>

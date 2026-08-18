@@ -37,6 +37,7 @@ import {
   type ShotNodeData,
 } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
+import { useT } from '@/lib/i18n'
 
 type SceneGroup = {
   key: string
@@ -60,14 +61,19 @@ type GridVideoTakeRecord = GridAttemptRecord & {
   last_attempt_at: string | null
   last_attempt_error: string | null
 }
-export function selectGridVideoAttemptState(takes: GridAttemptRecord[]) {
+// t 는 선택적(항등 폴백) — 기존 테스트의 1-인자 호출을 보존하고, 폴백 경로는 last_attempt_error
+//   가 이미 채워진 케이스라 실행상 t 를 타지 않는다 (#i18n-s5).
+export function selectGridVideoAttemptState(
+  takes: GridAttemptRecord[],
+  t: ReturnType<typeof useT> = (text) => text,
+) {
   const latestAttempt = selectLatestAttempt(takes)
   return {
     latestAttempt,
     generating: latestAttempt?.last_attempt_status === 'generating',
     failure:
       latestAttempt?.last_attempt_status === 'failed'
-        ? latestAttempt.last_attempt_error ?? '영상 생성 실패'
+        ? latestAttempt.last_attempt_error ?? t('Video generation failed')
         : null,
   }
 }
@@ -85,6 +91,7 @@ function isExpectedMediaPlayInterruption(error: unknown): boolean {
 /** 완료 영상 썸네일(#e1 2026-07-15) — 호버 시에만 재생, 클릭 = 일시정지 잠금(중앙 ⏸ 표시).
  *  다시 클릭하면 잠금 해제 + 재생 재개. 카드 더블클릭(팝업)은 dblclick 이벤트라 그대로 동작. */
 function HoverPlayVideo({ src, label }: { src: string; label: string }) {
+  const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
   const [pausedLock, setPausedLock] = useState(false)
   const [playbackError, setPlaybackError] = useState<string | null>(null)
@@ -93,7 +100,7 @@ function HoverPlayVideo({ src, label }: { src: string; label: string }) {
       () => setPlaybackError(null),
       (error: unknown) => {
         if (!isExpectedMediaPlayInterruption(error)) {
-          setPlaybackError(error instanceof Error ? error.message : '영상 재생에 실패했습니다.')
+          setPlaybackError(error instanceof Error ? error.message : t('Failed to play the video.'))
         }
       },
     )
@@ -101,7 +108,7 @@ function HoverPlayVideo({ src, label }: { src: string; label: string }) {
   return (
     <button
       type="button"
-      aria-label={pausedLock ? `${label} 재생 재개` : `${label} 일시정지`}
+      aria-label={pausedLock ? t('Resume playing {label}', { label }) : t('Pause {label}', { label })}
       onMouseEnter={() => {
         if (!pausedLock) play()
       }}
@@ -167,6 +174,7 @@ function ShotCell({
   /** 큐 원본 — 경과시간 durable 기준점(activeStartedAt) 계산용. */
   activeJobs: readonly ActiveJob[]
 }) {
+  const t = useT()
   const generateStoryboardImage = useDirectorCanvasStore(
     (s) => s.generateStoryboardImage,
   )
@@ -218,7 +226,7 @@ function ShotCell({
   const newestSuccessful = selectNewestSuccessfulTake(takeRecords)
   const completedVideoUrl = newestSuccessful?.url ?? null
   const { generating: childVideoGenerating, failure: childVideoFailure } =
-    selectGridVideoAttemptState(takeRecords)
+    selectGridVideoAttemptState(takeRecords, t)
 
   if (!isShotData(node.data)) return null
   const data: ShotNodeData = node.data
@@ -237,29 +245,29 @@ function ShotCell({
     mediaMode === 'previz'
       ? roughStartUrl
         ? { label: 'Previz', cls: 'border-sky-400/50 text-sky-300', video: false }
-        : { label: '러프 생성 필요', cls: 'border-warning/50 text-warning', video: false }
+        : { label: t('Rough needed'), cls: 'border-warning/50 text-warning', video: false }
       : completedVideoUrl
-        ? { label: '영상', cls: 'border-primary/50 text-primary', video: true }
+        ? { label: t('Video'), cls: 'border-primary/50 text-primary', video: true }
         : hasImage
-          ? { label: '이미지', cls: 'border-sky-400/50 text-sky-300', video: false }
-          : { label: '이미지 생성 필요', cls: 'border-warning/50 text-warning', video: false }
+          ? { label: t('Image'), cls: 'border-sky-400/50 text-sky-300', video: false }
+          : { label: t('Image needed'), cls: 'border-warning/50 text-warning', video: false }
 
   const runImage = async () => {
     if (realBatchBusy) {
-      setVideoError('실사 일괄 생성 중이에요 — 완료 후 다시 시도해 주세요.')
+      setVideoError(t('Batch live-action generation is running — try again after it finishes.'))
       return
     }
     try {
       await generateStoryboardImage(node.id)
     } catch (error) {
-      setVideoError(error instanceof Error ? error.message : '이미지 생성에 실패했습니다.')
+      setVideoError(error instanceof Error ? error.message : t('Failed to generate the image.'))
     }
   }
   // 영상 생성(#e12): 이미지가 없으면 먼저 생성하고, 성공했을 때만 영상으로 이어간다.
   const runVideo = async () => {
     if (videoBusy) return
     if (realBatchBusy) {
-      setVideoError('실사 일괄 생성 중이에요 — 완료 후 다시 시도해 주세요.')
+      setVideoError(t('Batch live-action generation is running — try again after it finishes.'))
       return
     }
     setVideoBusy(true)
@@ -278,7 +286,7 @@ function ShotCell({
       }
       await generateVideoForShot(node.id)
     } catch (error) {
-      setVideoError(error instanceof Error ? error.message : '영상 생성에 실패했습니다.')
+      setVideoError(error instanceof Error ? error.message : t('Failed to generate video.'))
     } finally {
       setVideoBusy(false)
     }
@@ -317,10 +325,10 @@ function ShotCell({
       ? [
           {
             key: 'previz',
-            label: 'Previz 재생성',
+            label: t('Regenerate previz'),
             title: writerShotId
-              ? '연출 화살표 편집기 — writer 탭 카드와 같은 팝업이에요'
-              : 'writer 샷과 연결되지 않은 노드예요',
+              ? t('Directing arrow editor — the same popup as the writer tab card')
+              : t("This node isn't linked to a writer shot"),
             primary: true,
             disabled: !writerShotId,
             onClick: () => setPrevizOpen(true),
@@ -329,13 +337,13 @@ function ShotCell({
       : [
           {
             key: 'image',
-            label: hasImage ? '이미지 재생성' : '이미지 생성',
+            label: hasImage ? t('Regenerate image') : t('Generate image'),
             title:
               status === 'failed' && img?.errorMessage
                 ? img.errorMessage
                 : hasImage
-                  ? '촬영용 이미지를 새로 만들어요 (기존 이미지 교체)'
-                  : '촬영용 이미지만 생성해요',
+                  ? t('Create a new shooting image (replaces the existing one)')
+                  : t('Only generates the shooting image'),
             primary: false,
             onClick: () => {
               if (hasImage) setConfirm('image')
@@ -344,8 +352,8 @@ function ShotCell({
           },
           {
             key: 'video',
-            label: completedVideoUrl ? '영상 재생성' : '영상 생성',
-            title: '영상 생성 — 촬영 이미지가 없으면 먼저 생성한 뒤 영상을 만들어요',
+            label: completedVideoUrl ? t('Regenerate video') : t('Generate video'),
+            title: t('Generate video — creates the shooting image first if missing, then the video'),
             primary: true,
             onClick: () => {
               if (completedVideoUrl) setConfirm('video')
@@ -405,7 +413,7 @@ function ShotCell({
           // 실패 시 이미지 자리에 로그 표시 (사용자 요청)
           <div className="flex size-full flex-col items-center justify-center gap-1 bg-destructive/10 p-2 text-center">
             <span className="text-[11px] font-medium text-destructive">
-              생성 실패
+              {t('Generation failed')}
             </span>
             {img?.errorMessage && (
               <span className="line-clamp-3 break-all font-mono text-[10px] leading-tight text-destructive/80">
@@ -481,7 +489,7 @@ function ShotCell({
         <GeneratingOverlay
           active={generating}
           label={
-            imageWaitingOnly ? '이미지 생성 대기 중' : imageGenerating ? '이미지 생성 중' : '영상 생성 중'
+            imageWaitingOnly ? t('Waiting to generate image') : imageGenerating ? t('Generating image') : t('Generating video')
           }
           showElapsed={!imageWaitingOnly}
           beamColor={imageGenerating ? 'success' : 'primary'}
@@ -502,7 +510,7 @@ function ShotCell({
             title={childVideoFailure}
             className="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded bg-destructive/90 px-1.5 py-0.5 text-[10px] text-destructive-foreground"
           >
-            최신 영상 시도 실패
+            {t('Latest video attempt failed')}
           </span>
         )}
         {videoError && (
@@ -520,18 +528,18 @@ function ShotCell({
         onOpenChange={(o) => {
           if (!o) setConfirm(null)
         }}
-        title={confirm === 'video' ? '영상을 다시 만들까요?' : '이미지를 다시 만들까요?'}
+        title={confirm === 'video' ? t('Regenerate the video?') : t('Regenerate the image?')}
         description={
           confirm === 'video'
-            ? '지금 촬영 이미지를 기준으로 새 테이크를 만들어요.'
-            : '이 샷의 촬영용 이미지를 새로 생성해요.'
+            ? t('Creates a new take based on the current shooting image.')
+            : t('Generates a new shooting image for this shot.')
         }
         impact={
           confirm === 'video'
-            ? ['영상 생성 비용이 발생합니다.', '새 테이크가 추가되고 카드에는 최신 성공본이 보입니다.']
-            : ['이미지 생성 비용이 발생합니다.', '기존 촬영용 이미지가 새 결과로 교체됩니다.']
+            ? [t('Costs money to generate the video.'), t('Adds a new take — the card shows the latest successful one.')]
+            : [t('Costs money to generate the image.'), t('Replaces the existing shooting image with the new result.')]
         }
-        confirmLabel="재생성"
+        confirmLabel={t('Regenerate')}
         onConfirm={() => {
           const which = confirm
           setConfirm(null)
@@ -568,6 +576,7 @@ function ShotCell({
 //   (2026-08-06 피드백) — 그 버튼이 runRealBatch(4샷 시트 일괄)를 호출한다.
 
 export function StoryboardGridView() {
+  const t = useT()
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const projectId = useDirectorCanvasStore((s) => s.projectId)
   // 미디어 모드: Previz(러프 3프레임 보드, 기본) | Real(실사) — 상단바(PaletteBar) 토글이 제어(2026-07-22).
@@ -625,7 +634,7 @@ export function StoryboardGridView() {
   if (orphanShots.length > 0) {
     groups.push({
       key: '__orphan__',
-      label: '(미배정)',
+      label: t('(Unassigned)'),
       location: '',
       timeOfDay: '',
       shots: orphanShots,
@@ -640,10 +649,10 @@ export function StoryboardGridView() {
         <div className="flex flex-col items-center gap-2 text-center">
           <ImageIcon className="size-12 text-muted-foreground opacity-50" />
           <p className="text-base font-medium text-foreground">
-            아직 Shot이 없어요
+            {t('No Shots yet')}
           </p>
           <p className="text-sm text-muted-foreground">
-            Node 뷰에서 Scene과 Shot을 먼저 만들어 보세요.
+            {t('Create a Scene and Shot first in the Node view.')}
           </p>
         </div>
       </div>
@@ -704,7 +713,7 @@ export function StoryboardGridView() {
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                이 Scene에는 Shot이 없어요.
+                {t('This Scene has no Shots.')}
               </p>
             )}
           </section>

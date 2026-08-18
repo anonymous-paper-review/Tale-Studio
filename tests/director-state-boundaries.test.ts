@@ -8,6 +8,10 @@ import {
   type VideoTakeSelectionRecord,
 } from '@/lib/director-video-take-selection'
 import { selectGridVideoAttemptState } from '@/features/director/canvas-views/StoryboardGridView'
+import { translate } from '@/lib/i18n'
+
+// 테스트는 useT() 훅을 못 쓴다(React 렌더 밖) — 고정 locale로 바인딩한 t 스텁을 넘긴다.
+const t = (text: string, params?: Record<string, string | number>) => translate('en', text, params)
 import {
   canRecoverGenerationAttempt,
   hydratedVideoStatus,
@@ -87,7 +91,7 @@ describe('director media state boundaries', () => {
     })
 
     expect(selectNewestSuccessfulTake([prior, failedReconciliation])?.url).toBe(prior.url)
-    expect(selectGridVideoAttemptState([prior, failedReconciliation]).failure).toContain(
+    expect(selectGridVideoAttemptState([prior, failedReconciliation], t).failure).toContain(
       'Canonical video-take hydration failed',
     )
   })

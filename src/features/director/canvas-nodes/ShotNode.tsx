@@ -16,9 +16,11 @@ import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { isShotData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
 import { ThumbImage } from '@/components/thumb-image'
+import { useT } from '@/lib/i18n'
 
 
 function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
+  const t = useT()
   const takeCount = useDirectorCanvasStore((s) => getChildVideos(s, id).length)
   const stage = useDirectorCanvasStore((s) => getShotStage(s, id))
   const isGenerating = useDirectorCanvasStore((s) => !!s.generatingNodeIds[id])
@@ -72,7 +74,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             }}
           >
             <ImageIcon className="size-3" />
-            {stage === 'rough' ? '이미지 생성' : '이미지 리터칭'}
+            {stage === 'rough' ? t('Generate image') : t('Retouch image')}
             <ChevronRight className="size-3" />
           </Button>
           {/* 이미지 생성 모델 표기(#e4 2026-07-15) — 영상 모델 칩 대신 이미지 모델 2종.
@@ -82,7 +84,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           </span>
           <span
             className="cursor-not-allowed rounded-sm border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground opacity-60"
-            title="준비 중"
+            title={t('Coming soon')}
           >
             Midjourney 8.1
           </span>
@@ -139,7 +141,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
               />
             )}
             <span className="pointer-events-none absolute left-1 top-1 rounded-sm bg-background/70 px-1 text-[9px] uppercase text-muted-foreground">
-              {isChainShot ? '목각' : stage === 'rough' ? '목각' : stage === 'live' ? '실사' : '영상'}
+              {isChainShot ? t('Previz') : stage === 'rough' ? t('Previz') : stage === 'live' ? t('Live-action') : t('Video')}
             </span>
           </div>
         )}
@@ -147,7 +149,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         {failed && (
           <div className="mt-2 flex aspect-video w-full flex-col items-center justify-center gap-0.5 rounded-sm border border-destructive/50 bg-destructive/10 p-1.5 text-center">
             <span className="text-[10px] font-medium text-destructive">
-              생성 실패
+              {t('Generation failed')}
             </span>
             {data.storyboardImage?.errorMessage && (
               <span className="line-clamp-2 break-all font-mono text-[9px] leading-tight text-destructive/80">
