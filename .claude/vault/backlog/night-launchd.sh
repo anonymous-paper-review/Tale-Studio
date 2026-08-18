@@ -47,6 +47,10 @@ MODEL_ARGS=""
 
 jget() { python3 -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"; }
 
+# inbox는 git에 올라가지 않는 로컬 파일이다. 새 checkout이면 빈 파일로 시작한다.
+INBOX="$PROJECT_ROOT/.claude/vault/_INBOX.md"
+[ -f "$INBOX" ] || : > "$INBOX"
+
 # NIGHT_GIT_BRANCH가 지정되면 현재 branch와 일치해야 한다 — 다른 branch 위에
 # 결과를 쓰는 사고를 막는다.
 require_branch() {

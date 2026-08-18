@@ -245,6 +245,7 @@ python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --run-id "$run_id" \
 실행 단위는 메모와 연결된 것, 목적에 가까운 것, 싼 것, 위험이 낮은 것 순으로 정렬한다. 목록을 비우는 것이 목표가 아니며, 목록이 비어도 아래 코드 신호를 점검한다.
 
 - 최근 자주 바뀐 파일, 코드에 남은 미완성 표시, 30일 넘은 판단 근거만 신호로 삼는다. 신호 없이 “더 나은 점”을 찾는 무한 탐색은 하지 않는다.
+- 코드 신호의 출처는 공유 git 히스토리라 두 actor가 같은 신호를 잡을 수 있다. 신호로 단위를 만들기 전에 pull되어 있는 티켓 원장 전체(상대 actor의 티켓 포함)와 대조하고, 같은 관측이 있으면 새 티켓 대신 연결만 기록한다. 같은 밤의 동시 중복은 막지 않는다 — 조사는 읽기 전용이라 잃는 것이 토큰뿐이고, 독립된 관측 두 개는 아침 비교 재료가 된다. 수리가 겹쳐도 worktree branch에 actor가 들어가 충돌하지 않으며, 어느 쪽을 살릴지는 사람이 merge에서 고른다.
 - 서로 다른 주제는 병렬로 실행할 수 있으나 같은 파일·같은 작업 사본을 두 실행이 동시에 쓰지 않는다.
 - 조사 백지 작업자는 `.claude/agents/night-investigator.md` 정의를 사용한다 — 도구는 읽기 전용, 모델은 정의 파일에 고정(fable 금지 집행 지점). 낮 디버그 실행 절차는 `.claude/skills/night-debug-run/SKILL.md`가 정본이다.
 - 티켓을 백지 subagent에게 줄 때는 티켓 경로만 전달한다. 실행자가 티켓만 읽고 닫을 수 있는지 확인하는 품질 검사이며, 머릿속 맥락을 덧붙이지 않는다.
@@ -502,6 +503,7 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 - 실행 산출물: `runs/<actor>/<run_id>/` — 사람 보고서 `report.html`, 기계 요약 `manifest.json`, 세션 요약 `sessions/*.md`, worktree 목록 `worktrees.json`, 중간 저장 `saves/*.md`(§8.4). actor와 run이 경로에 들어가므로 같은 날짜에 두 사람이 실행해도 서로 덮어쓰지 않는다. 날짜 하나를 덮어쓰는 `reports/YYYY-MM-DD.html` 경로는 더 쓰지 않는다 (기존 `.claude/vault/backlog/reports/`는 이력으로만 남긴다). 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
 - 판정 기록: `feedback/<actor>/<run_id>/*.json` — append-only, 자기 다음 밤 실행만 소비.
 - 각 사람의 접점은 두 개뿐이다: 쓰는 곳 자기 `_INBOX.md`, 읽는 곳 자기 최신 `runs/<actor>/<run_id>/report.html`. 다른 파일을 읽어야만 진행되는 절차를 만들지 않는다.
+- git 공유 경계: 계약·실행 도구·`tickets/` 원장·`runs/`·`feedback/`만 공유한다. `_INBOX.md`, `backlog/sweep/`(세션 수확), `_archive/`(inbox 보관)는 각 머신의 로컬 상태라 git에 올리지 않는다. 티켓 원장을 공유하는 이유는 하나 — 두 actor가 같은 코드 신호로 같은 조사를 반복하지 않게 대조 재료가 되는 것(§5).
 - 티켓 상태와 작업 사본 정보.
 - 메모 스냅샷 fingerprint·범위·내용 해시·소비 상태.
 - 필요한 실험 산출물과 결과표. raw 대화·모델 원출력은 소비 시점 없이 별도 보관하지 않는다.
@@ -518,6 +520,11 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 이 문서를 고쳐야 할 때는 변경 이유, 영향받는 분해 기준, 이전 계약 해시, 새 계약 해시를 기록한다. 밤 실행은 항상 이 문서 하나를 정본으로 사용한다.
 
 ## 15. 계약 개정 기록
+
+- 2026-08-18 (12차) · 이전 계약 해시 `b4e3bbba59ebf554f0b788e9260e7b5bbf6ea6d64a7d14ae713f81ba8db2c139` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — 독립 실행에서 vault의 git 공유 경계를 자르고, 두 actor가 공유 코드베이스에서 같은 코드 신호를 잡는 중복을 정의한다.
+  - 변경 내용: (1) `_INBOX.md`·`backlog/sweep/`·`_archive/`를 git 추적에서 빼 로컬 상태로 만들었다. 공유는 계약·도구·`tickets/`·`runs/`·`feedback/`만. 새 checkout에서 inbox가 없으면 실행 스크립트가 빈 파일로 시작한다. (2) §5에 코드 신호 중복 규칙 추가 — 단위를 만들기 전 티켓 원장 전체(상대 actor 포함)와 대조해 전날까지의 중복을 끊고, 같은 밤의 동시 중복은 허용한다(읽기 전용 조사, actor별 worktree branch, 사람 merge가 흡수).
+  - 영향받는 분해 기준: §4.2의 티켓 대조 범위가 "자기 티켓"에서 "pull된 원장 전체"로 넓어졌다.
 
 - 2026-08-18 (11차) · 이전 계약 해시 `e20c886348d10a1cc2abcedb4b1a3ca1ff65513c45d1d53481eb1e5e535eb18c` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — 실행 자체를 막는 보험을 없앤다. 8/18 새벽 실행이 inbox 병합 판정 하나로 두 번 전멸한 것이 계기다. 밤에서 보험의 비용은 "아침에 결과 없음"인데, 시작 관문형 보험이 막는 실패의 비용도 대부분 같아서 보험이 손해다.
