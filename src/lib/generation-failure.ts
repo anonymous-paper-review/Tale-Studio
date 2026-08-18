@@ -9,6 +9,12 @@
  * 이걸 그대로 채팅에 띄우면 "그래서 내가 뭘 하라고?"가 남는다. 분류해서 다음 행동을 준다.
  * 모르는 오류는 지어내지 말고 원문을 짧게 보여준 뒤 재시도를 권한다.
  */
+import { translate } from '@/lib/i18n'
+import type { AppLocale } from '@/lib/locale'
+
+// locale 을 안 넘기는 호출부(generation-notify.ts 등)가 조용히 안 깨지도록 기존 동작(항상
+//   한국어)을 기본값으로 보존한다 — producer-gate.ts/card-mention.ts 와 동일 취급.
+const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
 export interface FailureExplanation {
   /** 무슨 일이 있었나 (사용자 언어, 한 문장) */
@@ -24,7 +30,11 @@ function condense(raw: string): string {
   return source.replace(/\s+/g, ' ').trim().slice(0, 120)
 }
 
-export function explainGenerationFailure(raw: string): FailureExplanation {
+export function explainGenerationFailure(
+  raw: string,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+): FailureExplanation {
+  const t = (text: string, params?: Record<string, string | number>) => translate(locale, text, params)
   const text = (raw || '').toLowerCase()
 
   // 레퍼런스 이미지를 프로바이더가 못 가져옴 — 우리 스토리지/터널 도달 문제.
@@ -34,8 +44,8 @@ export function explainGenerationFailure(raw: string): FailureExplanation {
     text.includes('not accessible or has expired')
   ) {
     return {
-      what: '참고 이미지를 가져오지 못했어요.',
-      next: '잠시 후 다시 시도해 주세요. 계속 실패하면 올린 레퍼런스 이미지를 다시 올려 주세요.',
+      what: t("We couldn't fetch the reference image."),
+      next: t('Please try again in a moment. If it keeps failing, try re-uploading the reference image.'),
     }
   }
 
@@ -48,8 +58,10 @@ export function explainGenerationFailure(raw: string): FailureExplanation {
     text.includes('nsfw')
   ) {
     return {
-      what: '생성 정책에 걸려 이미지를 만들지 못했어요.',
-      next: '묘사에서 위험해 보이는 표현(피·상해·미성년 등)을 완화하거나, 카드의 안전 모드로 다시 시도해 주세요.',
+      what: t('The generation policy blocked this image.'),
+      next: t(
+        "Try softening risky wording in the description (blood, injury, minors, etc.), or retry using the card's safe mode.",
+      ),
     }
   }
 
@@ -61,8 +73,8 @@ export function explainGenerationFailure(raw: string): FailureExplanation {
     text.includes('status=429')
   ) {
     return {
-      what: '지금 생성 요청이 몰려 있어요.',
-      next: '잠시 후 다시 시도해 주세요.',
+      what: t('Generation requests are backed up right now.'),
+      next: t('Please try again in a moment.'),
     }
   }
 
@@ -75,28 +87,32 @@ export function explainGenerationFailure(raw: string): FailureExplanation {
     text.includes('fetch failed')
   ) {
     return {
-      what: '생성 서버와 연결이 끊겼어요.',
-      next: '다시 시도해 주세요. 반복되면 잠시 후에 시도해 주세요.',
+      what: t('Lost connection to the generation server.'),
+      next: t('Please try again. If it keeps happening, try again after a bit.'),
     }
   }
 
   // 인증/권한 — 사용자가 풀 수 없는 종류라 그렇게 말한다.
   if (text.includes('status=401') || text.includes('status=403') || text.includes('unauthorized')) {
     return {
-      what: '생성 서비스 인증에 문제가 있어요.',
-      next: '이건 설정 문제라 다시 시도해도 같아요. 관리자에게 알려 주세요.',
+      what: t("There's an authentication problem with the generation service."),
+      next: t("This is a configuration issue, so retrying won't help. Please let an admin know."),
     }
   }
 
   return {
-    what: `이미지 생성에 실패했어요 — ${condense(raw) || '알 수 없는 오류'}`,
-    next: '다시 시도해 주세요. 반복되면 묘사를 조금 바꿔 보세요.',
+    what: t('Image generation failed — {detail}', { detail: condense(raw) || t('unknown error') }),
+    next: t('Please try again. If it keeps happening, try tweaking the description a bit.'),
   }
 }
 
 /** 실패 알림 본문. `⚠` prefix 는 채팅이 상태 행으로 분류하는 마커다(chat-blocks). */
-export function generationFailureMessage(label: string, raw: string): string {
-  const { what, next } = explainGenerationFailure(raw)
+export function generationFailureMessage(
+  label: string,
+  raw: string,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+): string {
+  const { what, next } = explainGenerationFailure(raw, locale)
   return `⚠ ${label} — ${what} ${next}`
 }
 
@@ -107,9 +123,13 @@ export function generationFailureMessage(label: string, raw: string): string {
  * 안 알려준다**는 것 — 사용자에겐 그냥 아무 일도 안 일어난 화면이 남는다. 원인이 고쳐져도
  * 자동으로는 영영 안 돌아오므로, 사람이 눌러야 한다는 걸 반드시 말해야 한다.
  */
-export function generationGaveUpMessage(label: string): string {
-  return (
-    `⚠ ${label} 자동 생성을 멈췄어요 — 연속으로 실패해서 비용 보호를 위해 자동 재시도를 중단했어요. ` +
-    `카드에서 다시 생성을 눌러 주세요 (수동 요청은 이 제한을 받지 않아요).`
-  )
+export function generationGaveUpMessage(
+  label: string,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+): string {
+  return `⚠ ${translate(
+    locale,
+    "{label} auto-generation stopped — repeated failures triggered a cost-protection pause on automatic retries. Click generate again on the card (manual requests aren't limited).",
+    { label },
+  )}`
 }

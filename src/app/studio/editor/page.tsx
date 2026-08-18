@@ -27,10 +27,12 @@ import { useChatUiStore } from '@/stores/chat-ui-store'
 import { decodeAudioPeaks } from '@/lib/audio-waveform'
 import { downloadShotsZip } from '@/lib/editor-zip-export'
 import { toast } from 'sonner'
+import { useT } from '@/lib/i18n'
 
 const FRAME = 1 / 24
 
 export default function PostPage() {
+  const t = useT()
   const {
     shots,
     videoClips,
@@ -122,7 +124,7 @@ export default function PostPage() {
       const { durationSec, peaks } = await decodeAudioPeaks(src.url)
       if (!(durationSec > 0)) return
       st.addAudioClip({
-        name: `${shot?.shotType ?? '비디오'} 오디오`,
+        name: t('{type} audio', { type: shot?.shotType ?? t('Video') }),
         url: src.url,
         startSec: atSec,
         // 표시 길이는 영상 슬롯(shot.durationSeconds)에 맞춰 옆 클립과 안 겹치게.
@@ -136,7 +138,7 @@ export default function PostPage() {
     } catch {
       // 비디오에 오디오 트랙 없음 / 디코드 불가(CORS 등) → 비디오만 삽입
     }
-  }, [])
+  }, [t])
 
   // loadData(원본) → loadPersisted(저장된 편집 덮어쓰기) → 첫 진입 시 샷 오디오 자동 부착.
   useEffect(() => {
@@ -160,7 +162,7 @@ export default function PostPage() {
           if (!src?.url) continue
           const shot = st.shots.find((s) => s.shotId === item.shotId)
           const id = st.addAudioClip({
-            name: `${shot?.shotType ?? '비디오'} 오디오`,
+            name: t('{type} audio', { type: shot?.shotType ?? t('Video') }),
             url: src.url,
             startSec: item.startSec,
             durationSec: item.durationSec,
@@ -190,7 +192,7 @@ export default function PostPage() {
     return () => {
       cancelled = true
     }
-  }, [projectId, loadData, loadPersisted])
+  }, [projectId, loadData, loadPersisted, t])
 
   // Editor 진입 시 채팅 기본 접힘 (요청 6b). 떠날 때 이전 상태 복원
   useEffect(() => {
@@ -332,7 +334,7 @@ export default function PostPage() {
               variant={toolMode === 'select' ? 'default' : 'ghost'}
               className="size-6 hover-red-beam"
               onClick={() => setToolMode('select')}
-              title="선택 도구 (V)"
+              title={t('Select tool (V)')}
             >
               <MousePointer2 className="size-3" />
             </Button>
@@ -341,7 +343,7 @@ export default function PostPage() {
               variant={toolMode === 'cut' ? 'default' : 'ghost'}
               className="size-6 hover-red-beam"
               onClick={() => setToolMode('cut')}
-              title="자르기 도구 (C)"
+              title={t('Cut tool (C)')}
             >
               <Scissors className="size-3" />
             </Button>
@@ -357,11 +359,11 @@ export default function PostPage() {
               onPointerUp={stopFrameHold}
               onPointerLeave={stopFrameHold}
               onPointerCancel={stopFrameHold}
-              title="이전 프레임 (←) · 꾹 누르면 연속"
+              title={t('Previous frame (←) · hold for continuous')}
             >
               <ChevronLeft className="size-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="size-7 hover-red-beam" onClick={togglePlay} title="재생/정지 (Space)">
+            <Button size="icon" variant="ghost" className="size-7 hover-red-beam" onClick={togglePlay} title={t('Play/pause (Space)')}>
               {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
             </Button>
             <Button
@@ -372,7 +374,7 @@ export default function PostPage() {
               onPointerUp={stopFrameHold}
               onPointerLeave={stopFrameHold}
               onPointerCancel={stopFrameHold}
-              title="다음 프레임 (→) · 꾹 누르면 연속"
+              title={t('Next frame (→) · hold for continuous')}
             >
               <ChevronRight className="size-4" />
             </Button>
@@ -380,16 +382,16 @@ export default function PostPage() {
 
           {/* Undo / Redo */}
           <div className="flex items-center gap-0.5">
-            <Button size="icon" variant="ghost" className="size-7 hover-red-beam" onClick={undo} disabled={past.length === 0} title="실행취소 (Ctrl+Z)">
+            <Button size="icon" variant="ghost" className="size-7 hover-red-beam" onClick={undo} disabled={past.length === 0} title={t('Undo (Ctrl+Z)')}>
               <Undo2 className="size-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="size-7 hover-red-beam" onClick={redo} disabled={future.length === 0} title="다시실행 (Ctrl+Y)">
+            <Button size="icon" variant="ghost" className="size-7 hover-red-beam" onClick={redo} disabled={future.length === 0} title={t('Redo (Ctrl+Y)')}>
               <Redo2 className="size-4" />
             </Button>
           </div>
 
           <span className="text-[10px] text-muted-foreground">
-            클립 우클릭 → 속도·분할·삭제
+            {t('Right-click a clip → speed, split, delete')}
           </span>
 
           <div className="ml-auto flex items-center gap-2">
@@ -409,16 +411,20 @@ export default function PostPage() {
                     fileBaseName: 'draft_shots',
                   })
                   if (r.total === 0) {
-                    toast.info('다운로드할 샷 영상이 없습니다. (먼저 영상을 생성하세요)')
+                    toast.info(t('No shot videos to download. (Generate videos first)'))
                   } else if (r.failed > 0) {
                     toast.warning(
-                      `${r.downloaded}/${r.total}개 ZIP 완료 — ${r.failed}개 실패(zip 안 _failed.txt 참고).`,
+                      t('{downloaded}/{total} ZIP complete — {failed} failed (see _failed.txt inside the zip).', {
+                        downloaded: r.downloaded,
+                        total: r.total,
+                        failed: r.failed,
+                      }),
                     )
                   } else {
-                    toast.success(`샷 ${r.downloaded}개를 순서대로 ZIP 다운로드했습니다.`)
+                    toast.success(t('Downloaded {count} shots as a ZIP in order.', { count: r.downloaded }))
                   }
                 } catch (e) {
-                  toast.error('ZIP 생성 실패: ' + (e instanceof Error ? e.message : ''))
+                  toast.error(t('ZIP generation failed: {message}', { message: e instanceof Error ? e.message : '' }))
                 } finally {
                   setExportingZip(false)
                 }
@@ -429,7 +435,7 @@ export default function PostPage() {
               ) : (
                 <FileArchive className="size-3" />
               )}
-              {exportingZip ? '압축 중…' : '샷 ZIP'}
+              {exportingZip ? t('Zipping…') : t('Shot ZIP')}
             </Button>
             <Button size="sm" variant="outline" onClick={renderDraft} disabled={rendering} className="gap-1.5 hover-red-beam">
               {rendering ? <Loader2 className="size-3 animate-spin" /> : <Download className="size-3" />}

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 
 interface QueueJob {
   id: string
@@ -38,16 +39,17 @@ const POLL_MS = 10_000
 type Filter = 'all' | 'queued' | 'failed' | 'completed'
 
 // now 는 렌더에서 시계를 읽지 않도록(react-hooks/purity) 로드 사이클이 갱신해 내려준다.
-function age(iso: string, now: number): string {
+function age(iso: string, now: number, t: ReturnType<typeof useT>): string {
   const min = Math.floor((now - Date.parse(iso)) / 60000)
-  if (min < 1) return '방금'
-  if (min < 60) return `${min}분`
+  if (min < 1) return t('Just now')
+  if (min < 60) return t('{mins}m ago', { mins: min })
   const hr = Math.floor(min / 60)
-  if (hr < 24) return `${hr}시간`
-  return `${Math.floor(hr / 24)}일`
+  if (hr < 24) return t('{hours}h ago', { hours: hr })
+  return t('{days}d ago', { days: Math.floor(hr / 24) })
 }
 
 function StatusDot({ job, now }: { job: QueueJob; now: number }) {
+  const t = useT()
   const zombie = job.status === 'queued' && now - Date.parse(job.created_at) > STALE_MS
   return (
     <span className="flex items-center gap-2">
@@ -61,11 +63,11 @@ function StatusDot({ job, now }: { job: QueueJob; now: number }) {
         )}
       />
       <span className="text-sm text-gray-300">
-        {job.status === 'queued' ? '진행 중' : job.status === 'failed' ? '실패' : '완료'}
+        {job.status === 'queued' ? t('In progress') : job.status === 'failed' ? t('Failed') : t('Completed')}
       </span>
       {zombie && (
         <span className="rounded-full border border-amber-600/60 px-2 py-0.5 text-[11px] text-amber-500">
-          좀비 {age(job.created_at, now)}
+          {t('Zombie {age}', { age: age(job.created_at, now, t) })}
         </span>
       )}
     </span>
@@ -73,6 +75,7 @@ function StatusDot({ job, now }: { job: QueueJob; now: number }) {
 }
 
 export default function QueuePage() {
+  const t = useT()
   const [jobs, setJobs] = useState<QueueJob[]>([])
   const [titles, setTitles] = useState<Record<string, string>>({})
   const [filter, setFilter] = useState<Filter>('all')
@@ -120,10 +123,10 @@ export default function QueuePage() {
       await load()
     }
     void boot()
-    const t = setInterval(() => {
+    const pollId = setInterval(() => {
       if (document.visibilityState === 'visible') void load()
     }, POLL_MS)
-    return () => clearInterval(t)
+    return () => clearInterval(pollId)
   }, [load])
 
   const sweepStale = async () => {
@@ -137,8 +140,8 @@ export default function QueuePage() {
       const body = (await res.json()) as { data?: { checked: number; settled: number } }
       setNotice(
         body.data
-          ? `stale ${body.data.checked}건 확인, ${body.data.settled}건 종결`
-          : '회수 실패 — 잠시 후 다시 시도',
+          ? t('Checked {checked} stale, settled {settled}', { checked: body.data.checked, settled: body.data.settled })
+          : t('Recovery failed — try again shortly'),
       )
       await load()
     } finally {
@@ -207,10 +210,10 @@ export default function QueuePage() {
   const visible = filter === 'all' ? jobs : jobs.filter((j) => j.status === filter)
 
   const FILTERS: Array<{ key: Filter; label: string }> = [
-    { key: 'all', label: '전체' },
-    { key: 'queued', label: '진행 중' },
-    { key: 'failed', label: '실패' },
-    { key: 'completed', label: '완료' },
+    { key: 'all', label: t('All') },
+    { key: 'queued', label: t('In progress') },
+    { key: 'failed', label: t('Failed') },
+    { key: 'completed', label: t('Completed') },
   ]
 
   return (
@@ -243,12 +246,13 @@ export default function QueuePage() {
               className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-gray-200 transition-colors hover:bg-white/10 disabled:opacity-50"
             >
               {sweeping ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCw className="size-3.5" />}
-              stale 회수{zombieCount > 0 && ` (좀비 ${zombieCount})`}
+              {t('Sweep stale')}
+              {zombieCount > 0 && ` (${t('{count} zombie', { count: zombieCount })})`}
             </button>
             <button
               onClick={() => void load()}
               className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm text-gray-200 transition-colors hover:bg-white/10"
-              aria-label="새로고침"
+              aria-label={t('Refresh')}
             >
               <RefreshCw className="size-3.5" />
             </button>
@@ -257,23 +261,23 @@ export default function QueuePage() {
 
         {loading ? (
           <div className="flex items-center justify-center py-24 text-gray-400">
-            <Loader2 className="mr-2 size-4 animate-spin" /> 불러오는 중
+            <Loader2 className="mr-2 size-4 animate-spin" /> {t('Loading…')}
           </div>
         ) : visible.length === 0 ? (
           <div className="rounded-xl border border-white/10 bg-white/[0.03] py-24 text-center text-sm text-gray-500">
-            {filter === 'all' ? '잡이 없습니다' : '해당 상태의 잡이 없습니다'}
+            {filter === 'all' ? t('No jobs') : t('No jobs with this status')}
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-white/10">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/10 bg-white/[0.03] text-left text-[11px] uppercase tracking-wider text-gray-500">
-                  <th className="px-4 py-3 font-medium">상태</th>
-                  <th className="px-4 py-3 font-medium">종류</th>
-                  <th className="px-4 py-3 font-medium">프로젝트</th>
-                  <th className="px-4 py-3 font-medium">모델</th>
-                  <th className="px-4 py-3 font-medium">경과</th>
-                  <th className="px-4 py-3 font-medium">오류</th>
+                  <th className="px-4 py-3 font-medium">{t('Status')}</th>
+                  <th className="px-4 py-3 font-medium">{t('Kind')}</th>
+                  <th className="px-4 py-3 font-medium">{t('Project')}</th>
+                  <th className="px-4 py-3 font-medium">{t('Model')}</th>
+                  <th className="px-4 py-3 font-medium">{t('Elapsed')}</th>
+                  <th className="px-4 py-3 font-medium">{t('Error')}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -293,7 +297,7 @@ export default function QueuePage() {
                     <td className="max-w-40 truncate px-4 py-2.5 font-mono text-xs text-gray-500">
                       {job.model.split('/').slice(-2).join('/')}
                     </td>
-                    <td className="px-4 py-2.5 text-xs tabular-nums text-gray-400">{age(job.created_at, now)}</td>
+                    <td className="px-4 py-2.5 text-xs tabular-nums text-gray-400">{age(job.created_at, now, t)}</td>
                     <td className="max-w-56 px-4 py-2.5">
                       {job.error ? (
                         <span className="text-xs text-red-400/90">
@@ -318,7 +322,7 @@ export default function QueuePage() {
                               <button
                                 onClick={() => void reconcileOne(job.id)}
                                 className="rounded-md border border-white/15 px-2 py-1 text-[11px] text-gray-300 hover:bg-white/10"
-                                title="fal 상태를 즉시 동기화 (무과금)"
+                                title={t('Sync fal status instantly (no charge)')}
                               >
                                 reconcile
                               </button>
@@ -327,7 +331,7 @@ export default function QueuePage() {
                               onClick={() => void openDetail(job.id)}
                               className="rounded-md border border-white/15 px-2 py-1 text-[11px] text-gray-300 hover:bg-white/10"
                             >
-                              상세
+                              {t('Details')}
                             </button>
                             {job.status !== 'completed' &&
                               (deleteArm === job.id ? (
@@ -335,14 +339,14 @@ export default function QueuePage() {
                                   onClick={() => void deleteOne(job.id)}
                                   className="rounded-md bg-red-600 px-2 py-1 text-[11px] text-white hover:bg-red-500"
                                 >
-                                  정말 삭제
+                                  {t('Confirm delete')}
                                 </button>
                               ) : (
                                 <button
                                   onClick={() => setDeleteArm(job.id)}
                                   onBlur={() => setDeleteArm((v) => (v === job.id ? null : v))}
                                   className="rounded-md border border-white/15 px-1.5 py-1 text-gray-400 hover:border-red-500/40 hover:text-red-400"
-                                  aria-label="삭제"
+                                  aria-label={t('Delete')}
                                 >
                                   <Trash2 className="size-3" />
                                 </button>
@@ -359,9 +363,9 @@ export default function QueuePage() {
         )}
 
         <p className="mt-4 text-xs text-gray-600">
-          reconcile 은 이미 제출된 fal 요청의 결과를 회수합니다(재생성·추가 과금 없음). 10분 넘게
-          진행 중인 잡은 웹훅이 유실된 좀비로 표시되며, 매일 새벽 워치독이 자동 회수를 시도합니다.
-          완료된 잡은 이력으로 보존되어 삭제할 수 없습니다.
+          {t(
+            'reconcile recovers the result of an already-submitted fal request (no regeneration, no extra charge). Jobs in progress for more than 10 minutes are shown as zombies whose webhook was lost, and the nightly watchdog attempts automatic recovery each night. Completed jobs are preserved as history and cannot be deleted.',
+          )}
         </p>
       </main>
 
@@ -387,10 +391,10 @@ export default function QueuePage() {
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 rounded-md border border-white/10 bg-white/[0.03] p-3 text-xs sm:grid-cols-4">
             {(
               [
-                ['생성', detail?.created_at],
-                ['제출', detail?.submitted_at],
-                ['완료', detail?.completed_at],
-                ['갱신', detail?.updated_at],
+                [t('Created'), detail?.created_at],
+                [t('Submitted'), detail?.submitted_at],
+                [t('Completed'), detail?.completed_at],
+                [t('Updated'), detail?.updated_at],
               ] as Array<[string, unknown]>
             ).map(([label, v]) => (
               <div key={label}>
@@ -425,7 +429,7 @@ export default function QueuePage() {
               rel="noreferrer"
               className="flex items-center gap-1.5 text-xs text-sky-400 hover:underline"
             >
-              <ExternalLink className="size-3" /> 결과물 열기
+              <ExternalLink className="size-3" /> {t('Open result')}
             </a>
           )}
 
@@ -454,11 +458,13 @@ export default function QueuePage() {
                 className="flex items-center gap-1 rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-gray-400 hover:bg-white/10 disabled:opacity-50"
               >
                 {falLoading ? <Loader2 className="size-2.5 animate-spin" /> : <RefreshCw className="size-2.5" />}
-                조회
+                {t('Look up')}
               </button>
             </div>
             {falInfo?.note && (
-              <p className="mb-1 text-[11px] text-gray-500">fal 큐에서 조회 불가(만료·정리됨): {falInfo.note}</p>
+              <p className="mb-1 text-[11px] text-gray-500">
+                {t('Cannot look up in fal queue (expired or cleaned up): {note}', { note: falInfo.note })}
+              </p>
             )}
             {falInfo && falInfo.logs.length > 0 && (
               <div className="max-h-56 overflow-auto whitespace-pre-wrap rounded-md border border-white/10 bg-black p-3 font-mono text-[11px] leading-relaxed">
@@ -473,7 +479,9 @@ export default function QueuePage() {
               </div>
             )}
             {falInfo && falInfo.logs.length === 0 && !falInfo.note && (
-              <p className="text-[11px] text-gray-600">러너 로그 없음 (모델이 로그를 남기지 않았거나 이미 정리됨)</p>
+              <p className="text-[11px] text-gray-600">
+                {t('No runner logs (the model left none, or they were already cleaned up)')}
+              </p>
             )}
           </div>
 
@@ -485,15 +493,18 @@ export default function QueuePage() {
           </div>
           {detail?.response_snapshot != null && (
             <div>
-              <p className="mb-1 text-[11px] uppercase tracking-wider text-gray-500">response snapshot (fal 원 응답)</p>
+              <p className="mb-1 text-[11px] uppercase tracking-wider text-gray-500">
+                {t('response snapshot (fal original response)')}
+              </p>
               <pre className="max-h-72 overflow-auto rounded-md border border-white/10 bg-white/[0.03] p-3 text-[11px] leading-relaxed text-gray-300">
                 {JSON.stringify(detail.response_snapshot, null, 2)}
               </pre>
             </div>
           )}
           <p className="text-[11px] text-gray-600">
-            우리 서버(Vercel) 런타임 로그는 대시보드에서만 열람 가능하고 짧게 보존됩니다 — 잡의 영속
-            흔적은 위 스냅샷·오류·타임라인이 전부이며, fal queue 블록은 열 때마다 실시간 조회입니다.
+            {t(
+              "Our server (Vercel) runtime logs can only be viewed in the dashboard and are kept briefly — the job's permanent trace is only the snapshot/error/timeline above, and the fal queue block is a live lookup every time you open it.",
+            )}
           </p>
         </DialogContent>
       </Dialog>

@@ -789,6 +789,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       cast,
       backgrounds,
       styleAnchorKey: get().styleAnchorKey,
+      locale: useLocaleStore.getState().locale,
     })
     if (!gate.canHandoff) {
       // gate.hardMissing[].label 은 src/lib/producer-gate.ts(범위 밖)가 하드코딩한 한국어 —

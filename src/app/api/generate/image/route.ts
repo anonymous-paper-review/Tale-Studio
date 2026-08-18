@@ -83,7 +83,7 @@ async function generateViaGemini(
   const parts = response.candidates?.[0]?.content?.parts ?? []
   const imagePart = parts.find((p) => p.inlineData?.data)
   if (!imagePart?.inlineData?.data) {
-    throw new Error('Nano Banana 응답에 이미지가 없습니다')
+    throw new Error('Nano Banana response has no image')
   }
 
   const buffer = Buffer.from(imagePart.inlineData.data, 'base64')

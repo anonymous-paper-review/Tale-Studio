@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const finalPrompts = await logger.loadStage<RenderPromptsOutput>('14_v5_renderPrompts.json');
     if (!finalPrompts) {
       return NextResponse.json(
-        { error: '14_renderPrompts.json 없음. 파이프라인이 L5까지 완료되어야 함.' },
+        { error: '14_renderPrompts.json missing. Pipeline must complete through L5 first.' },
         { status: 400 },
       );
     }

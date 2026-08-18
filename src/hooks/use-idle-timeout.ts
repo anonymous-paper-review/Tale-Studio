@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { translate } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 
 const IDLE_TIMEOUT = 30 * 60 * 1000 // 30 minutes
 const WARNING_BEFORE = 5 * 60 * 1000 // warn 5 min before
@@ -31,8 +33,9 @@ export function useIdleTimeout() {
 
       warnTimer.current = setTimeout(() => {
         warned.current = true
-        toast.warning('세션이 곧 만료됩니다', {
-          description: '5분 내 활동이 없으면 자동 로그아웃됩니다.',
+        const locale = useLocaleStore.getState().locale
+        toast.warning(translate(locale, 'Your session is about to expire'), {
+          description: translate(locale, "You'll be automatically logged out after 5 minutes of inactivity."),
           duration: 10_000,
         })
       }, IDLE_TIMEOUT - WARNING_BEFORE)

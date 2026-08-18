@@ -65,14 +65,14 @@ export async function POST(req: Request) {
 
     const kind = kindOf(file.name)
     if (!kind) {
-      return NextResponse.json({ error: '지원하지 않는 형식이에요.' }, { status: 400 })
+      return NextResponse.json({ error: 'Unsupported file format.' }, { status: 400 })
     }
 
     if (kind === 'text') {
       const raw = await file.text()
       const { text, truncated } = clampTextBytes(normalizeExtractedText(raw))
       if (!text) {
-        return NextResponse.json({ error: `${file.name} 에서 읽을 내용이 없어요.` }, { status: 400 })
+        return NextResponse.json({ error: `No readable content in ${file.name}.` }, { status: 400 })
       }
       return NextResponse.json({ kind: 'text', name: file.name, text, truncated })
     }
@@ -84,14 +84,14 @@ export async function POST(req: Request) {
       } catch (error) {
         console.warn('[produce/ingest] docx parse failed', diagnostic(error))
         return NextResponse.json(
-          { error: `${file.name} 을(를) 읽지 못했어요. 파일이 손상되었을 수 있어요.` },
+          { error: `Couldn't read ${file.name} — the file may be corrupted.` },
           { status: 400 },
         )
       }
       const { text, truncated } = clampTextBytes(extracted)
       if (!text) {
         return NextResponse.json(
-          { error: `${file.name} 에 본문 텍스트가 없어요. 이미지로만 된 문서는 이미지로 올려 주세요.` },
+          { error: `No body text in ${file.name}. If it's an image-only document, upload it as an image instead.` },
           { status: 400 },
         )
       }
@@ -101,7 +101,7 @@ export async function POST(req: Request) {
     // ── 이미지 ──────────────────────────────────────────────────────────────
     const mimeType = file.type
     if (!isImageMimeType(mimeType)) {
-      return NextResponse.json({ error: `${file.name} 의 형식을 확인할 수 없어요.` }, { status: 400 })
+      return NextResponse.json({ error: `Couldn't determine the format of ${file.name}.` }, { status: 400 })
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
@@ -174,8 +174,8 @@ export async function POST(req: Request) {
       {
         error:
           process.env.NODE_ENV === 'production'
-            ? '파일을 처리하지 못했어요.'
-            : `처리 실패 (${stage}): ${detail}`,
+            ? 'Failed to process the file.'
+            : `Processing failed (${stage}): ${detail}`,
       },
       { status: 500 },
     )

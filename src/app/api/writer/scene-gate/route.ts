@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'projectId, action(confirm|revise) required' }, { status: 400 })
     }
     if (action === 'revise' && !feedback?.trim()) {
-      return NextResponse.json({ error: '수정 요청 내용을 입력해 주세요' }, { status: 400 })
+      return NextResponse.json({ error: 'feedback is required for a revision request' }, { status: 400 })
     }
 
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)

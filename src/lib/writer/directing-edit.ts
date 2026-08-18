@@ -9,6 +9,12 @@
 //      generatedAt 을 올려 캐시버스트(rough-frame-cycle.withCacheBust 가 새 프레임을 집는다).
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { falImageGenerate } from '@/lib/writer/llm/fal'
+import { translate } from '@/lib/i18n'
+import type { AppLocale } from '@/lib/locale'
+
+// locale 을 안 넘기는 호출부(rough-directing-edit/route.ts)가 조용히 안 깨지도록 기존 동작(항상
+//   한국어)을 기본값으로 보존한다 — producer-gate.ts/card-mention.ts 와 동일 취급.
+const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
 const GROK_EDIT_MODEL = 'xai/grok-imagine-image/edit'
 
@@ -38,11 +44,11 @@ async function loadRough(projectId: string, shotId: string): Promise<RoughJson |
 }
 
 /** media 버킷 public URL → 스토리지 경로 (?v= 캐시버스트 쿼리는 pathname 밖이라 자동 제외). */
-function storagePathFromPublicUrl(url: string): string {
+function storagePathFromPublicUrl(url: string, locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK): string {
   const marker = '/storage/v1/object/public/media/'
   const pathname = new URL(url).pathname
   const i = pathname.indexOf(marker)
-  if (i < 0) throw new Error(`media 버킷 URL 이 아님: ${url}`)
+  if (i < 0) throw new Error(translate(locale, 'Not a media bucket URL: {url}', { url }))
   return decodeURIComponent(pathname.slice(i + marker.length))
 }
 
@@ -62,10 +68,13 @@ async function uploadToMedia(path: string, buf: Buffer, contentType: string): Pr
 export async function separateArrowLayer(
   projectId: string,
   shotId: string,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
 ): Promise<{ cleanUrl: string; cached: boolean }> {
   const rb = await loadRough(projectId, shotId)
   if (rb?.status !== 'completed' || !rb.frames?.direction) {
-    throw new Error('DIRECTING 프레임이 없어요 — 3프레임 러프 세트가 먼저 필요해요')
+    throw new Error(
+      translate(locale, 'The DIRECTING frame is missing — you need the 3-frame rough set first'),
+    )
   }
   const genAt = rb.generatedAt ?? 0
   if (rb.cleanDirection?.url && rb.cleanDirection.for === genAt) {
@@ -78,15 +87,20 @@ export async function separateArrowLayer(
     reference_image_urls: [rb.frames.direction],
   })
   const res = await fetch(result.url)
-  if (!res.ok) throw new Error(`클린 플레이트 다운로드 실패: HTTP ${res.status}`)
+  if (!res.ok)
+    throw new Error(
+      translate(locale, 'Failed to download the clean plate: HTTP {status}', { status: res.status }),
+    )
   const buf = Buffer.from(await res.arrayBuffer())
   // 빈/모더레이션 출력 방어 (finalize 의 그리드 방어와 같은 취지, 단일 패널이라 문턱만 낮춤)
   if (buf.length < 10_000) {
-    throw new Error(`클린 플레이트가 비정상적으로 작아요 (${buf.length}b)`)
+    throw new Error(
+      translate(locale, 'The clean plate is abnormally small ({bytes}b)', { bytes: buf.length }),
+    )
   }
   const contentType = res.headers.get('content-type') ?? 'image/jpeg'
   const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
-  const dirPath = storagePathFromPublicUrl(rb.frames.direction)
+  const dirPath = storagePathFromPublicUrl(rb.frames.direction, locale)
   const cleanPath = `${dirPath.replace(/\.[a-z]+$/i, '')}_clean.${ext}`
   const cleanUrl = await uploadToMedia(cleanPath, buf, contentType)
 
@@ -123,10 +137,13 @@ const END_FROM_DIRECTION_PROMPT =
 export async function regenerateEndFrame(
   projectId: string,
   shotId: string,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
 ): Promise<{ url: string; generatedAt: number }> {
   const rb = await loadRough(projectId, shotId)
   if (rb?.status !== 'completed' || !rb.frames?.direction || !rb.frames?.end) {
-    throw new Error('3프레임 러프 세트가 있어야 END 를 다시 그릴 수 있어요')
+    throw new Error(
+      translate(locale, 'You need the 3-frame rough set to redraw the END frame'),
+    )
   }
 
   const result = await falImageGenerate({
@@ -135,21 +152,26 @@ export async function regenerateEndFrame(
     reference_image_urls: [rb.frames.direction],
   })
   const res = await fetch(result.url)
-  if (!res.ok) throw new Error(`END 프레임 다운로드 실패: HTTP ${res.status}`)
+  if (!res.ok)
+    throw new Error(
+      translate(locale, 'Failed to download the END frame: HTTP {status}', { status: res.status }),
+    )
   const buf = Buffer.from(await res.arrayBuffer())
   if (buf.length < 10_000) {
-    throw new Error(`END 프레임이 비정상적으로 작아요 (${buf.length}b)`)
+    throw new Error(
+      translate(locale, 'The END frame is abnormally small ({bytes}b)', { bytes: buf.length }),
+    )
   }
   const contentType = res.headers.get('content-type') ?? 'image/jpeg'
   const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
-  const endPath = `${storagePathFromPublicUrl(rb.frames.end).replace(/\.[a-z]+$/i, '')}.${ext}`
+  const endPath = `${storagePathFromPublicUrl(rb.frames.end, locale).replace(/\.[a-z]+$/i, '')}.${ext}`
   const newUrl = await uploadToMedia(endPath, buf, contentType)
 
   // 생성 중에 러프가 재생성됐으면(다른 generatedAt) 덮어쓰지 않는다 — 낡은 END 로 새 세트를
   //   오염시키는 것을 막는다(separateArrowLayer 와 같은 방어).
   const latest = await loadRough(projectId, shotId)
   if (!latest || (latest.generatedAt ?? 0) !== (rb.generatedAt ?? 0)) {
-    throw new Error('그 사이 러프가 재생성됐어요 — 다시 시도해 주세요')
+    throw new Error(translate(locale, 'The rough set was regenerated in the meantime — please try again'))
   }
   const now = Date.now()
   const { error } = await supabaseAdmin
@@ -174,18 +196,20 @@ export async function saveDirectingFrame(
   projectId: string,
   shotId: string,
   imageDataUrl: string,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
 ): Promise<{ url: string; generatedAt: number }> {
   const rb = await loadRough(projectId, shotId)
   if (rb?.status !== 'completed' || !rb.frames?.direction) {
-    throw new Error('DIRECTING 프레임이 없어요 — 저장할 대상이 없어요')
+    throw new Error(translate(locale, "The DIRECTING frame is missing — there's nothing to save"))
   }
   const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(imageDataUrl)
-  if (!m) throw new Error('PNG data URL 형식이 아니에요')
+  if (!m) throw new Error(translate(locale, "This isn't a PNG data URL"))
   const buf = Buffer.from(m[1], 'base64')
-  if (buf.length < 10_000) throw new Error('저장할 이미지가 비어 있어요')
-  if (buf.length > 15_000_000) throw new Error('이미지가 너무 커요 (15MB 초과)')
+  if (buf.length < 10_000) throw new Error(translate(locale, 'The image to save is empty'))
+  if (buf.length > 15_000_000)
+    throw new Error(translate(locale, 'The image is too large (over 15MB)'))
 
-  const dirPath = storagePathFromPublicUrl(rb.frames.direction)
+  const dirPath = storagePathFromPublicUrl(rb.frames.direction, locale)
   const newUrl = await uploadToMedia(dirPath, buf, 'image/png')
   const now = Date.now()
   // generatedAt 을 올려 3프레임 표시가 캐시버스트되게 한다. 클린 플레이트는 이 편집의 밑층

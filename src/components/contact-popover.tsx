@@ -5,6 +5,7 @@
 import { useState, type ReactNode } from 'react'
 import { Loader2, Send } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useT } from '@/lib/i18n'
 
 const CONTACT_EMAIL = 'talestudio24@gmail.com'
 
@@ -21,6 +22,7 @@ export function ContactPopover({
   /** 팝업 상단 안내 문구(예: 사이드바 Help의 응답/보상 안내). 없으면 미표시. */
   note?: ReactNode
 } = {}) {
+  const t = useT()
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -38,12 +40,12 @@ export function ContactPopover({
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error((data as { error?: string }).error ?? '전송 실패')
+        throw new Error((data as { error?: string }).error ?? t('Send failed'))
       }
       setMessage('')
       setSuccess(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '전송 실패')
+      setError(err instanceof Error ? err.message : t('Send failed'))
     } finally {
       setSending(false)
     }
@@ -75,7 +77,7 @@ export function ContactPopover({
           <textarea
             className="w-full resize-none rounded-md border border-input bg-transparent p-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             rows={4}
-            placeholder="메시지를 남겨주세요. 이메일로 전달됩니다."
+            placeholder={t('Leave a message. It will be sent by email.')}
             value={message}
             onChange={(e) => {
               setMessage(e.target.value)
@@ -84,7 +86,7 @@ export function ContactPopover({
             }}
           />
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
-          {success ? <p className="text-xs text-primary">전송되었습니다</p> : null}
+          {success ? <p className="text-xs text-primary">{t('Sent')}</p> : null}
           <button
             type="button"
             onClick={handleSend}
@@ -92,7 +94,7 @@ export function ContactPopover({
             className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground transition-opacity disabled:opacity-50"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            보내기
+            {t('Send')}
           </button>
         </div>
       </PopoverContent>

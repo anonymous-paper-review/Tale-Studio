@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     const file = await logger.loadStage<ShotImagesOutput>('15_v6_shotImages.json');
     if (!file) {
-      return NextResponse.json({ error: '15_shotImages.json 없음' }, { status: 400 });
+      return NextResponse.json({ error: '15_shotImages.json missing' }, { status: 400 });
     }
 
     const shots: ShotImageResult[] = file.shots.slice();

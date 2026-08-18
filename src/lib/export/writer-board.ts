@@ -8,6 +8,8 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { replaceSlugs, type SlugEntry } from '@/lib/script-lines'
+import { translate } from '@/lib/i18n'
+import { DEFAULT_LOCALE, type AppLocale } from '@/lib/locale'
 import { h1, h2 } from './md'
 import { sanitizeSegment } from './sanitize'
 import type { ArtifactFile } from './types'
@@ -92,16 +94,16 @@ function completedRoughUrl(shot: ShotRow): string | null {
 }
 
 // ── 1) treatment.md — 트리트먼트 탭 내용의 md 재현 ──────────────────────────
-function renderTreatmentMd(data: WriterBoardData): string {
+function renderTreatmentMd(data: WriterBoardData, locale: AppLocale): string {
   const { scenes, shotsByScene, roster } = data
   let body = h1('Treatment')
-  if (scenes.length === 0) return body + '씬 없음\n'
+  if (scenes.length === 0) return body + `${translate(locale, 'No scenes')}\n`
 
   scenes.forEach((scene, sceneIndex) => {
     const place = replaceSlugs(scene.location ?? '?', roster, '')
     const mood = scene.mood?.trim()
     body += h2(`Scene ${sceneIndex + 1} — ${place}${mood ? ` · ${mood}` : ''}`)
-    if (scene.time_of_day) body += `- 시간대: ${scene.time_of_day}\n`
+    if (scene.time_of_day) body += `- ${translate(locale, 'Time of day')}: ${scene.time_of_day}\n`
     if (scene.narrative_summary) body += `\n${replaceSlugs(scene.narrative_summary, roster)}\n`
     if (scene.original_text_quote) body += `\n> ${replaceSlugs(scene.original_text_quote, roster)}\n`
     body += '\n'
@@ -112,10 +114,10 @@ function renderTreatmentMd(data: WriterBoardData): string {
         .filter(Boolean)
         .join(' · ')
       body += `### Shot ${shotIndex + 1}${meta ? ` (${meta})` : ''}\n\n`
-      body += `${replaceSlugs(shot.action_description || '(설명 없음)', roster)}\n\n`
+      body += `${replaceSlugs(shot.action_description || translate(locale, '(No description)'), roster)}\n\n`
       for (const line of shot.dialogue_lines ?? []) {
         if (!line?.text) continue
-        const speaker = replaceSlugs(line.characterId ?? '인물', roster, '')
+        const speaker = replaceSlugs(line.characterId ?? translate(locale, 'Person'), roster, '')
         body += `- ${speaker}: "${replaceSlugs(line.text, roster)}"\n`
       }
       body += '\n'
@@ -160,7 +162,7 @@ function drawCover(
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h)
 }
 
-async function renderBoardSheet(data: WriterBoardData): Promise<Blob | null> {
+async function renderBoardSheet(data: WriterBoardData, locale: AppLocale): Promise<Blob | null> {
   if (typeof document === 'undefined') return null
   const { scenes, shotsByScene, roster } = data
 
@@ -235,7 +237,7 @@ async function renderBoardSheet(data: WriterBoardData): Promise<Blob | null> {
         ctx.fillRect(x, cy, CARD_W, CARD_H)
         ctx.fillStyle = '#9ca3af'
         ctx.font = '14px system-ui, sans-serif'
-        ctx.fillText('이미지 없음', x + CARD_W / 2 - 36, cy + CARD_H / 2 - 8)
+        ctx.fillText(translate(locale, 'No image'), x + CARD_W / 2 - 36, cy + CARD_H / 2 - 8)
       }
       ctx.strokeStyle = '#3f3f46'
       ctx.strokeRect(x + 0.5, cy + 0.5, CARD_W - 1, CARD_H - 1)
@@ -266,10 +268,13 @@ async function renderBoardSheet(data: WriterBoardData): Promise<Blob | null> {
 }
 
 // ── 수집기 ───────────────────────────────────────────────────────────────────
-export async function collectWriterBoardArtifacts(projectId: string): Promise<ArtifactFile[]> {
+export async function collectWriterBoardArtifacts(
+  projectId: string,
+  locale: AppLocale = DEFAULT_LOCALE,
+): Promise<ArtifactFile[]> {
   const data = await loadWriterBoardData(projectId)
   const files: ArtifactFile[] = [
-    { path: 'writer/treatment.md', kind: 'text', content: renderTreatmentMd(data) },
+    { path: 'writer/treatment.md', kind: 'text', content: renderTreatmentMd(data, locale) },
   ]
 
   // 샷별 러프 패널 원본 — scene/shot 순번으로 파일명 부여.
@@ -283,7 +288,7 @@ export async function collectWriterBoardArtifacts(projectId: string): Promise<Ar
     })
   })
 
-  const sheet = await renderBoardSheet(data)
+  const sheet = await renderBoardSheet(data, locale)
   if (sheet) {
     files.push({ path: 'writer/rough-storyboard-board.png', kind: 'media', blob: sheet })
   }

@@ -168,7 +168,7 @@ const fixtureData: DirectorExportData = {
 
 describe('collectDirectorArtifacts', () => {
   it('emits storyboard pngs only for completed storyboard_image rows with a url', () => {
-    const files = collectDirectorArtifacts(fixtureData)
+    const files = collectDirectorArtifacts(fixtureData, 'ko')
 
     expect(mediaFile(files, 'director/shots/sc_01-sh_01_01.png')?.url).toBe(
       'https://cdn.example.com/storyboards/sh_01_01.png',
@@ -184,7 +184,7 @@ describe('collectDirectorArtifacts', () => {
   })
 
   it('selects a successful live Final over newer takes, otherwise uses the newest successful take, and only uses shots.video_url without relational rows', () => {
-    const files = collectDirectorArtifacts(fixtureData)
+    const files = collectDirectorArtifacts(fixtureData, 'ko')
 
     expect(mediaFile(files, 'director/clips/sc_01-sh_01_01.mp4')?.url).toBe(
       'https://cdn.example.com/clips/final.mp4',
@@ -203,7 +203,7 @@ describe('collectDirectorArtifacts', () => {
   })
 
   it('renders a readable native-first shotlist without raw JSON bodies', () => {
-    const files = collectDirectorArtifacts(fixtureData)
+    const files = collectDirectorArtifacts(fixtureData, 'ko')
     const shotlist = textFile(files, 'director/shotlist.md')
 
     expect(shotlist).toContain('# Director Shotlist')

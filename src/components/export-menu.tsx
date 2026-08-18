@@ -17,6 +17,8 @@ import { useProjectStore } from '@/stores/project-store'
 import type { StageId } from '@/types'
 import { captureScreenJpeg } from '@/lib/export/screenshot'
 import { selectHandoffTake, type VideoTakeSelectionRecord } from '@/lib/director-video-take-selection'
+import { DEFAULT_LOCALE, parseAppLocale, type AppLocale } from '@/lib/locale'
+import { useT } from '@/lib/i18n'
 
 export type ExportFileKind = 'image' | 'video' | 'audio' | 'text' | 'other'
 export type ExportFileCountsByKind = Partial<Record<ExportFileKind, number>>
@@ -70,6 +72,7 @@ export function resolveExportStage(currentStage: StageId | string | null | undef
 }
 
 export function ExportMenu() {
+  const t = useT()
   const projectId = useProjectStore((s) => s.projectId)
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const currentStage = useProjectStore((s) => s.currentStage)
@@ -91,30 +94,33 @@ export function ExportMenu() {
 
     setBusyScope(scope)
     try {
+      // 콘텐츠 언어(#i18n-s5-batch6): export 산출물의 라벨/헤더는 UI locale(useT)이 아니라
+      //   프로젝트 자체의 locale 을 따른다 — 여기서 한 번 읽어 넘기기만 하고 저장은 안 한다.
+      const locale = await fetchProjectLocale(projectId)
       let result: ExportResult
 
       if (scope === 'stage') {
         if (!stage) {
-          toast.error('이 단계는 내보내기를 지원하지 않습니다.')
+          toast.error(t('This stage does not support export.'))
           return
         }
-        result = await exportStage(stage, project)
+        result = await exportStage(stage, project, undefined, locale)
       } else {
         const estimate = await estimateWholeProjectFileCounts(projectId)
         if (!estimate.known) {
-          if (!confirmUnknownExportSize()) return
+          if (!confirmUnknownExportSize(t)) return
         } else {
           const estimatedBytes = estimateExportBytes(estimate.counts)
-          if (shouldConfirmLargeExport(estimatedBytes) && !confirmLargeExport(estimatedBytes)) {
+          if (shouldConfirmLargeExport(estimatedBytes) && !confirmLargeExport(estimatedBytes, t)) {
             return
           }
         }
-        result = await exportProject(project)
+        result = await exportProject(project, undefined, locale)
       }
 
-      toast.success(exportSuccessMessage(result))
+      toast.success(exportSuccessMessage(result, t))
     } catch (error) {
-      toast.error(`내보내기 실패: ${errorMessage(error, '알 수 없는 오류')}`)
+      toast.error(t('Export failed: {error}', { error: errorMessage(error, t('Unknown error')) }))
     } finally {
       setBusyScope(null)
     }
@@ -124,7 +130,7 @@ export function ExportMenu() {
     if (!projectId || isBusy) return
     setBusyScope('screenshot')
     // 진행 상황 토스트(#c1) — 전체 보드 캡처는 이미지 임베드에 수 초 걸려 피드백이 필요하다.
-    const toastId = toast.loading('화면을 준비하고 있어요…')
+    const toastId = toast.loading(t('Preparing the screen…'))
     try {
       const base = projectTitle.trim() || 'tale-studio'
       const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
@@ -132,13 +138,13 @@ export function ExportMenu() {
       await new Promise((resolve) => setTimeout(resolve, 300))
       await captureScreenJpeg(`${base}-${stamp}.jpg`, (current, total) => {
         toast.loading(
-          total > 0 ? `화면 캡처 중… 이미지 ${current}/${total}` : '화면 캡처 중…',
+          total > 0 ? t('Capturing screen… image {current}/{total}', { current, total }) : t('Capturing screen…'),
           { id: toastId },
         )
       })
-      toast.success('화면을 JPEG로 저장했어요', { id: toastId })
+      toast.success(t('Saved the screen as JPEG'), { id: toastId })
     } catch (error) {
-      toast.error(`캡처 실패: ${errorMessage(error, '알 수 없는 오류')}`, { id: toastId })
+      toast.error(t('Capture failed: {error}', { error: errorMessage(error, t('Unknown error')) }), { id: toastId })
     } finally {
       setBusyScope(null)
     }
@@ -149,8 +155,8 @@ export function ExportMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label="내보내기 / Export"
-          title={projectId ? '내보내기 / Export' : '프로젝트를 먼저 열어주세요'}
+          aria-label={t('Export')}
+          title={projectId ? t('Export') : t('Open a project first.')}
           disabled={disabled}
           className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -167,7 +173,7 @@ export function ExportMenu() {
           onSelect={() => void runScreenshot()}
           className="cursor-pointer"
         >
-          화면 JPEG로 저장
+          {t('Save screen as JPEG')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -175,41 +181,41 @@ export function ExportMenu() {
           onSelect={() => void runExport('stage')}
           className="cursor-pointer"
         >
-          이 단계 ZIP
+          {t('This stage as ZIP')}
         </DropdownMenuItem>
         <DropdownMenuItem
           disabled={!projectId || isBusy}
           onSelect={() => void runExport('project')}
           className="cursor-pointer"
         >
-          전체 프로젝트 ZIP
+          {t('Entire project as ZIP')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
 
-function exportSuccessMessage(result: ExportResult): string {
-  const failed = result.failed ? `, ${result.failed}개 실패` : ''
-  return `내보내기 완료: ${result.downloaded}개 파일${failed}`
+function exportSuccessMessage(result: ExportResult, t: ReturnType<typeof useT>): string {
+  const failed = result.failed ? `, ${t('{count} failed', { count: result.failed })}` : ''
+  return `${t('Export complete: {count} files', { count: result.downloaded })}${failed}`
 }
 
-function confirmLargeExport(estimatedBytes: number): boolean {
+function confirmLargeExport(estimatedBytes: number, t: ReturnType<typeof useT>): boolean {
   if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
     return true
   }
 
   return window.confirm(
-    `예상 내보내기 크기가 ${formatBytes(estimatedBytes)}입니다. 계속 진행할까요?`,
+    t('Estimated export size is {size}. Continue?', { size: formatBytes(estimatedBytes) }),
   )
 }
 
-function confirmUnknownExportSize(): boolean {
+function confirmUnknownExportSize(t: ReturnType<typeof useT>): boolean {
   if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
     return true
   }
 
-  return window.confirm('크기 추정 불가 — 계속하시겠습니까?')
+  return window.confirm(t('Could not estimate size — continue anyway?'))
 }
 
 function formatBytes(bytes: number): string {
@@ -220,6 +226,24 @@ function formatBytes(bytes: number): string {
 }
 
 
+
+/** projects.locale 을 1회 조회한다 — export 콘텐츠 언어 소스(#i18n-s5-batch6). 실패 시 DEFAULT_LOCALE. */
+export async function fetchProjectLocale(projectId: string): Promise<AppLocale> {
+  try {
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('projects')
+      .select('locale')
+      .eq('id', projectId)
+      .single()
+
+    if (error || !data) return DEFAULT_LOCALE
+    return parseAppLocale((data as { locale?: unknown }).locale) ?? DEFAULT_LOCALE
+  } catch {
+    return DEFAULT_LOCALE
+  }
+}
 
 export async function estimateWholeProjectFileCounts(projectId: string): Promise<FileCountEstimate> {
   try {

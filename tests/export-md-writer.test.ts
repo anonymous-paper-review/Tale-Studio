@@ -117,7 +117,7 @@ const projection: WriterExportProjection = {
 
 describe('collectWriterArtifacts writer markdown', () => {
   it('renders the four writer markdown files with native-first prose and EN prompts', async () => {
-    const files = await collectWriterArtifacts('project-1', { fetchFn: fetchProjection(projection) })
+    const files = await collectWriterArtifacts('project-1', { fetchFn: fetchProjection(projection) }, 'ko')
 
     expect(files.map((file) => file.path).sort()).toEqual([
       'writer/prompts.md',
@@ -184,7 +184,7 @@ describe('collectWriterArtifacts writer markdown', () => {
           },
         ],
       }),
-    })
+    }, 'ko')
 
     for (const path of ['writer/story-bible.md', 'writer/scenes.md', 'writer/shots.md', 'writer/prompts.md']) {
       expect(content(files, path)).toContain('¶파이프라인 미완료')

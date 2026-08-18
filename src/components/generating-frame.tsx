@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 
 /**
  * 이미지/비디오 생성 중 카드·노드 표면에 얹는 "작업 중" 오버레이.
@@ -13,7 +14,7 @@ import { cn } from '@/lib/utils'
  */
 export function GeneratingOverlay({
   active,
-  label = '생성 중',
+  label,
   showElapsed = true,
   startedAt,
   beamColor = 'primary',
@@ -31,10 +32,11 @@ export function GeneratingOverlay({
   beamColor?: 'primary' | 'success'
   className?: string
 }) {
+  const t = useT()
   if (!active) return null
   return (
     <ActiveOverlay
-      label={label}
+      label={label ?? t('Generating')}
       showElapsed={showElapsed}
       startedAt={startedAt}
       beamColor={beamColor}

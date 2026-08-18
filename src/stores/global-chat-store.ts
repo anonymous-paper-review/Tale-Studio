@@ -25,6 +25,10 @@ import { parseAttachmentMarker, withAttachmentMarker } from '@/lib/chat-blocks'
 import { isDemoSession, getDemoSnapshot } from '@/lib/demo/context'
 import { cannedFor } from '@/lib/demo/canned'
 import { handoffMarker } from '@/lib/chat-blocks'
+// store 액션·순수 함수는 훅을 못 쓴다 — translate() + 현재 locale 직접 조회로 번역
+//   (writer 배치의 #i18n-s5-batch3 패턴).
+import { translate } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 import {
   STAGE_LABEL,
   CHAT_HISTORY_WINDOW,
@@ -140,10 +144,16 @@ function deletedDialoguePreview(current: DialogueLine[], next: DialogueLine[]): 
   const previewLines = (deleted.length > 0 ? deleted : current.slice(next.length))
     .slice(0, 3)
     .map((line) => `${line.characterId}: "${line.text.slice(0, 80)}${line.text.length > 80 ? '…' : ''}"`)
-  const suffix = deleted.length > 3 ? ` 외 ${deleted.length - 3}개` : ''
+  const locale = useLocaleStore.getState().locale
+  const suffix =
+    deleted.length > 3
+      ? ` ${translate(locale, 'and {count} more', { count: deleted.length - 3 })}`
+      : ''
   return previewLines.length > 0
-    ? `삭제되는 대사: ${previewLines.join(' / ')}${suffix}`
-    : `삭제되는 대사: ${Math.max(0, current.length - next.length)}개`
+    ? `${translate(locale, 'Dialogue to delete: {lines}', { lines: previewLines.join(' / ') })}${suffix}`
+    : translate(locale, 'Dialogue to delete: {count} lines', {
+        count: Math.max(0, current.length - next.length),
+      })
 }
 
 // 완료 알림 코얼레싱 — 같은 stage+label 완료를 짧은 윈도우로 모아 한 줄("N개 생성 완료")로 emit.
@@ -162,10 +172,19 @@ function flushCompletion(stage: StageId, label: string): void {
   if (!entry) return
   delete pendingCompletions[key]
   const projectId = useProjectStore.getState().projectId
+  // ✓ prefix 는 상태 행 판별(chat-blocks.classifyChatMessage)이 읽는 고정 마커다 — 번역 밖에 둔다.
+  const locale = useLocaleStore.getState().locale
   const content =
     entry.count > 1
-      ? `✓ ${label} ${entry.count}개 생성이 완료됐어요. ${STAGE_LABEL[stage]} 탭에서 확인하세요.`
-      : `✓ ${label} 생성이 완료됐어요. ${STAGE_LABEL[stage]} 탭에서 확인하세요.`
+      ? `✓ ${translate(locale, '{count} {label} generations finished. Check the {stage} tab.', {
+          count: entry.count,
+          label,
+          stage: STAGE_LABEL[stage],
+        })}`
+      : `✓ ${translate(locale, '{label} generation finished. Check the {stage} tab.', {
+          label,
+          stage: STAGE_LABEL[stage],
+        })}`
   useGlobalChatStore.setState((state) => ({
     messages: [...state.messages, { id: makeId(), stage, role: 'model', content }],
   }))
@@ -199,7 +218,10 @@ async function applyStyleAnchorIntent(
   const imageUrl = attachmentImageUrls[imageIndex]
   if (!imageUrl) {
     // 모델이 없는 인덱스를 짚었다. 조용히 넘기면 "화풍 잡았어요"만 남는다.
-    return '어떤 이미지를 말하는지 못 찾았어요. 다시 한 번 말씀해 주세요.'
+    return translate(
+      useLocaleStore.getState().locale,
+      "I couldn't tell which image you meant. Please tell me again.",
+    )
   }
 
   try {
@@ -219,7 +241,9 @@ async function applyStyleAnchorIntent(
     })
     return null
   } catch (error) {
-    return error instanceof Error ? error.message : '알 수 없는 오류'
+    return error instanceof Error
+      ? error.message
+      : translate(useLocaleStore.getState().locale, 'Unknown error')
   }
 }
 
@@ -232,6 +256,8 @@ function handoffBlockers(spec: HandoffSpec): string[] {
       cast: p.cast,
       backgrounds: p.backgrounds,
       styleAnchorKey: p.styleAnchorKey,
+      // label/detail 은 게이트가 완역해 돌려준다(#i18n-s5-batch4) — 여기서 다시 번역하지 않는다.
+      locale: useLocaleStore.getState().locale,
     })
     return gate.canHandoff
       ? []
@@ -348,9 +374,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
 
       const approved = await get().approvePendingProposal(pendingProposal.id)
+      const locale = useLocaleStore.getState().locale
       const content = approved
-        ? `승인했어요: ${pendingProposal.action}`
-        : '제안을 승인하지 못했어요. 잠시 후 다시 시도해 주세요.'
+        ? translate(locale, 'Approved: {action}', { action: pendingProposal.action })
+        : translate(locale, "Couldn't approve the proposal. Please try again in a moment.")
       set((state) => ({
         loading: false,
         messages: [
@@ -371,11 +398,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
 
       const blockers = handoffBlockers(handoffSpec)
+      const locale = useLocaleStore.getState().locale
       let reply: string
       let path: string | null = null
       if (blockers.length > 0) {
         reply =
-          `아직 ${STAGE_LABEL[handoffSpec.to]}로 넘어갈 수 없어요. 먼저 이것들을 채워 주세요:\n`
+          translate(locale, "Can't move to {stage} yet. Please fill these in first:", {
+            stage: STAGE_LABEL[handoffSpec.to],
+          })
+          + '\n'
           + blockers.map((b) => `· ${b}`).join('\n')
       } else {
         const result = await runHandoff(handoffSpec)
@@ -383,8 +414,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (result.ok) {
           reply =
             handoffSpec.from === 'producer'
-              ? `${STAGE_LABEL[handoffSpec.to]}에게 넘겼어요. 씬·샷 생성을 시작할게요 — 진행 상황은 ${STAGE_LABEL[handoffSpec.to]} 탭에서 볼 수 있어요.`
-              : `${STAGE_LABEL[handoffSpec.to]}로 넘어갈게요.`
+              ? translate(
+                  locale,
+                  'Handed over to {stage}. Starting scene and shot generation — you can follow the progress in the {stage} tab.',
+                  { stage: STAGE_LABEL[handoffSpec.to] },
+                )
+              : translate(locale, 'Moving on to {stage}.', {
+                  stage: STAGE_LABEL[handoffSpec.to],
+                })
         } else {
           // 실패 사유 표면화 (#handoff-visibility 2026-08-06) — saveAndHandoff 는 사유를
           //   producer-store.error 에만 남긴다. 채팅으로 요청한 사용자는 채팅에서 이유를
@@ -392,8 +429,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const detail =
             handoffSpec.from === 'producer' ? useProducerStore.getState().error : null
           reply = detail
-            ? `핸드오프에 실패했어요 — ${detail}`
-            : '핸드오프에 실패했어요. 잠시 후 다시 시도해 주세요.'
+            ? translate(locale, 'Handoff failed — {detail}', { detail })
+            : translate(locale, 'Handoff failed. Please try again in a moment.')
         }
       }
 
@@ -486,6 +523,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           cast: p.cast,
           backgrounds: p.backgrounds,
           styleAnchorKey: p.styleAnchorKey,
+          // 이 목록은 모델 컨텍스트로 들어가고 모델이 답변에서 그대로 되읊는다 — UI locale 로
+          //   맞춰야 en 사용자가 한국어 항목명을 듣지 않는다(ko 는 기존과 동일).
+          locale: useLocaleStore.getState().locale,
         })
         body = {
           message: trimmed,
@@ -643,7 +683,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         )
         if (anchorError) {
           // 모델은 이미 "이 화풍으로 잡았어요"라고 답했다. 저장이 실패했는데 조용하면 거짓말이 된다.
-          const failure = `화풍을 저장하지 못했어요 — ${anchorError}`
+          const failure = translate(
+            useLocaleStore.getState().locale,
+            "Couldn't save the art style — {reason}",
+            { reason: anchorError },
+          )
           set((state) => ({
             messages: [...state.messages, { id: makeId(), stage, role: 'model', content: failure }],
           }))
@@ -686,6 +730,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               ? artistState.worldAssets.find((w) => w.locationId === costUpdate.locationId)
                   ?.name || costUpdate.locationId
               : null
+          // createPendingProposal 의 렌더 지점은 아직 t() 를 안 태운다 — producer-store 와 같은
+          //   방식으로 여기서 미리 완역해 넘긴다(#i18n-s5-batch4, ko 출력은 기존과 동일).
+          const locale = useLocaleStore.getState().locale
           const proposal = costUpdate.type === 'regenerateCharacter'
             ? createPendingProposal({
                 stage: 'artist',
@@ -696,12 +743,17 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                     : 'artistRegenerateCharacterAllViews',
                 target: characterName ?? costUpdate.characterId,
                 action: costUpdate.views?.length
-                  ? `캐릭터 뷰 재생성: ${costUpdate.views.join(', ')}`
-                  : '캐릭터 전체 뷰 재생성',
+                  ? translate(locale, 'Regenerate character views: {views}', {
+                      views: costUpdate.views.join(', '),
+                    })
+                  : translate(locale, 'Regenerate all character views'),
                 impact: [
-                  '이미지 생성 비용이 발생합니다.',
-                  '기존 선택 이미지는 새 생성이 끝날 때까지 유지됩니다.',
-                  '승인 전에는 재생성이 시작되지 않습니다.',
+                  translate(locale, 'Costs money to generate the image.'),
+                  translate(
+                    locale,
+                    'The currently selected image stays until the new one is done.',
+                  ),
+                  translate(locale, 'Regeneration does not start until you approve.'),
                 ],
                 payload: {
                   characterId: costUpdate.characterId,
@@ -713,17 +765,26 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 stage: 'artist',
                 kind: 'artistRegenerateWorldAsset',
                 target: locationName ?? costUpdate.locationId,
-                action: '월드/배경 이미지 재생성',
+                action: translate(locale, 'Regenerate the world/background image'),
                 impact: [
-                  '이미지 생성 비용이 발생합니다.',
-                  'World 이미지는 MVP Director gate의 기본 hard blocker가 아닙니다.',
-                  '승인 전에는 재생성이 시작되지 않습니다.',
+                  translate(locale, 'Costs money to generate the image.'),
+                  translate(
+                    locale,
+                    'World images are not a default hard blocker for the MVP Director gate.',
+                  ),
+                  translate(locale, 'Regeneration does not start until you approve.'),
                 ],
                 payload: { locationId: costUpdate.locationId },
               })
 
           const accepted = get().offerPendingProposal(proposal)
-          if (!accepted) set({ error: '이미 대기 중인 제안이 있어 새 Artist 생성 제안을 보류했어요.' })
+          if (!accepted)
+            set({
+              error: translate(
+                locale,
+                'A proposal is already pending, so the new Artist generation proposal was held back.',
+              ),
+            })
         }
 
         if (immediateUpdates.length > 0) {
@@ -737,16 +798,22 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const apName =
             useArtistStore.getState().characterAssets.find((c) => c.characterId === ap.characterId)
               ?.name || ap.characterId
+          const apLocale = useLocaleStore.getState().locale
           get().offerPendingProposal(
             createPendingProposal({
               stage: 'artist',
               kind: 'artistSourceAppearancePatch',
               target: apName,
-              action: `캐릭터 기본 외형(원천) 변경: ${ap.appearance.slice(0, 60)}${ap.appearance.length > 60 ? '…' : ''}`,
+              action: translate(apLocale, 'Change the base character appearance (source): {appearance}', {
+                appearance: `${ap.appearance.slice(0, 60)}${ap.appearance.length > 60 ? '…' : ''}`,
+              }),
               impact: [
-                '캐릭터의 canonical 외형(원천)이 바뀝니다.',
-                '승인 후 그 캐릭터의 기존 이미지들이 낡음(stale)으로 표시돼요 — 자동 재생성은 하지 않아요.',
-                '승인 전에는 외형이 바뀌지 않습니다.',
+                translate(apLocale, "The character's canonical appearance (source) changes."),
+                translate(
+                  apLocale,
+                  'After approval the existing images of that character are marked stale — they are not regenerated automatically.',
+                ),
+                translate(apLocale, 'The appearance does not change until you approve.'),
               ],
               payload: { characterId: ap.characterId, appearance: ap.appearance },
             }),
@@ -765,7 +832,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               result.skipped,
             )
             // #p4-understand B: director 쪽도 침묵 스킵 제거.
-            toast.warning(`수정 ${result.skipped.length}건을 반영하지 못했어요`)
+            toast.warning(
+              translate(useLocaleStore.getState().locale, "Couldn't apply {count} changes", {
+                count: result.skipped.length,
+              }),
+            )
           }
         }
       }
@@ -792,22 +863,29 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           .getState()
           .applyChatUpdates(rawUpdates.filter((u) => u.type !== 'clarify'))
         // #p4-understand B: 침묵 no-op 제거 — 적용/건너뜀을 즉시 표면화.
+        const locale = useLocaleStore.getState().locale
         if (result.skipped.length > 0) {
           toast.warning(
-            `수정 ${result.skipped.length}건을 반영하지 못했어요 — ${result.skipped[0].reason}`,
+            translate(locale, "Couldn't apply {count} changes — {reason}", {
+              count: result.skipped.length,
+              reason: result.skipped[0].reason,
+            }),
           )
         } else if (result.applied > 0) {
-          toast.success(`수정 ${result.applied}건 반영 완료`)
+          toast.success(translate(locale, '{count} changes applied', { count: result.applied }))
         }
         for (const shrink of result.pendingDialogueShrinks) {
           const proposal = createPendingProposal({
             stage: 'writer',
             kind: 'writerShrinkDialogue',
             target: shrink.shotId,
-            action: `대사 ${shrink.currentDialogueLines.length}개 → ${shrink.dialogueLines.length}개로 줄이는 수정`,
+            action: translate(locale, 'Cut dialogue from {from} lines down to {to}', {
+              from: shrink.currentDialogueLines.length,
+              to: shrink.dialogueLines.length,
+            }),
             impact: [
               deletedDialoguePreview(shrink.currentDialogueLines, shrink.dialogueLines),
-              '승인 전에는 적용되지 않습니다.',
+              translate(locale, 'Nothing is applied until you approve.'),
             ],
             payload: {
               shotId: shrink.shotId,
@@ -816,7 +894,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           })
           const accepted = get().offerPendingProposal(proposal)
           if (!accepted) {
-            set({ error: '이미 대기 중인 제안이 있어 새 Writer 대사 축소 제안을 보류했어요.' })
+            set({
+              error: translate(
+                locale,
+                'A proposal is already pending, so the new Writer dialogue reduction proposal was held back.',
+              ),
+            })
             break
           }
         }
@@ -980,7 +1063,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       }
       return true
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : '제안 실행 실패' })
+      set({
+        error:
+          err instanceof Error
+            ? err.message
+            : translate(useLocaleStore.getState().locale, 'Failed to run the proposal'),
+      })
       return false
     }
   },
@@ -1019,7 +1107,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   //   채팅이 같은 줄로 도배되는 것을 피한다.
   notifyActionError: (stage, label, message) => {
     const trimmed = message.trim()
-    get().notifyIssue(stage, `⚠ ${label} 생성을 시작하지 못했어요 — ${trimmed || '알 수 없는 오류'}`)
+    // ⚠ prefix 는 상태 행 판별(chat-blocks.classifyChatMessage)이 읽는 고정 마커다 — 번역 밖에 둔다.
+    const locale = useLocaleStore.getState().locale
+    get().notifyIssue(
+      stage,
+      `⚠ ${translate(locale, "Couldn't start {label} generation — {message}", {
+        label,
+        message: trimmed || translate(locale, 'Unknown error'),
+      })}`,
+    )
   },
 
   notifyIssue: (stage, content) => {

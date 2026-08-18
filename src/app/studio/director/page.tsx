@@ -71,6 +71,7 @@ import {
   chainParentShotNodeId,
   connectRouteForTargetHandle,
 } from '@/features/director/canvas-interaction'
+import { useT } from '@/lib/i18n'
 
 const nodeTypes = {
   scene: SceneNode,
@@ -88,6 +89,7 @@ const nodeTypes = {
 //   (#d2 2026-07-18) 옛 "숨기기(X)→별도 재열기 버튼"은 재열기 버튼을 못 찾는 문제가 있어,
 //   X 대신 접기 토글로 바꾼다: 접으면 헤더 바만 남고 아주 투명해져(hover 시 또렷) 항상 다시 펼 수 있다.
 function MiniMapPanel() {
+  const t = useT()
   const [collapsed, setCollapsed] = useState(false)
   const [locked, setLocked] = useState(false)
   const [pos, setPos] = useState({ right: 16, bottom: 16 })
@@ -165,7 +167,7 @@ function MiniMapPanel() {
       {!collapsed && (
         <div
           onPointerDown={onResizePointerDown}
-          title="크기 조절 (드래그)"
+          title={t('Resize (drag)')}
           className="absolute left-0 top-0 z-30 size-3.5 cursor-nwse-resize rounded-tl-lg transition-colors hover:bg-primary/30"
           style={{ touchAction: 'none' }}
         />
@@ -180,14 +182,14 @@ function MiniMapPanel() {
       >
         <span className="flex items-center gap-1">
           <MapIcon className="size-3" />
-          미니맵
+          {t('Minimap')}
         </span>
         <div className="flex items-center gap-0.5">
           {!collapsed && (
             <button
               type="button"
               onClick={() => setLocked((v) => !v)}
-              title={locked ? '위치 잠금 해제' : '위치 잠금'}
+              title={locked ? t('Unlock position') : t('Lock position')}
               className="rounded p-0.5 hover:bg-accent hover:text-foreground hover-red-beam"
             >
               {locked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
@@ -196,7 +198,7 @@ function MiniMapPanel() {
           <button
             type="button"
             onClick={() => setCollapsed((v) => !v)}
-            title={collapsed ? '미니맵 펼치기' : '미니맵 접기'}
+            title={collapsed ? t('Expand minimap') : t('Collapse minimap')}
             className="rounded p-0.5 hover:bg-accent hover:text-foreground hover-red-beam"
           >
             {collapsed ? (
@@ -229,6 +231,7 @@ const edgeTypes = {
 // ────────────────────────────────────────────────────────────────────────────
 
 function CanvasInner() {
+  const t = useT()
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const edges = useDirectorCanvasStore((s) => s.edges)
   const deleteNode = useDirectorCanvasStore((s) => s.deleteNode)
@@ -288,22 +291,33 @@ function CanvasInner() {
   // 누락 감지 넛지 (chat-proactive-copilot Phase 4): 캔버스가 안정되면(2s) 채워두면 좋을
   //   항목(샷의 캐릭터·배경 참조 누락 / 스토리보드 미생성)을 1회 informational 제안. 생성 트리거 X.
   const gapNudgeRef = useRef<string | null>(null)
+  // gaps/content 는 렌더 본문에서 미리 계산 — effect 안에서 t() 를 직접 부르면 t 가 매 렌더
+  //   새 참조라 deps 에 넣을 때 2000ms 디바운스가 렌더마다 리셋된다(#i18n-s5-batch4).
+  //   summarizeGaps() 자체 산출물은 범위 밖(@/lib/completeness)이라 그대로 통과, 감싸는
+  //   문장만 번역한다.
+  const gaps = getDirectorGaps(nodes)
+  const gapNudgeContent =
+    gaps.length > 0
+      ? t('There are {count} things worth filling in:\n{summary}', {
+          count: gaps.length,
+          summary: summarizeGaps(gaps),
+        })
+      : null
   useEffect(() => {
     if (!directorProjectId || nodes.length === 0) return
     if (gapNudgeRef.current === directorProjectId) return
-    const gaps = getDirectorGaps(nodes)
-    if (gaps.length === 0) return
-    const t = setTimeout(() => {
+    if (!gapNudgeContent) return
+    const timer = setTimeout(() => {
       gapNudgeRef.current = directorProjectId
       offerSuggestion({
         id: `director-gaps-${directorProjectId}`,
         stage: 'director',
-        content: `채워두면 좋을 항목이 ${gaps.length}건 있어요:\n${summarizeGaps(gaps)}`,
+        content: gapNudgeContent,
         action: null,
       })
     }, 2000)
-    return () => clearTimeout(t)
-  }, [directorProjectId, nodes, offerSuggestion])
+    return () => clearTimeout(timer)
+  }, [directorProjectId, nodes, offerSuggestion, gapNudgeContent])
 
   // Editor 핸드오프(#handoff-to-chat 2026-07-31) — 탭 하단 'Head to Editor' 버튼을 걷어내고
   //   채팅 제안으로 옮겼다. 옛 버튼은 게이트 없이 항상 활성이었으므로 여기서도 막지 않는다.
@@ -323,10 +337,10 @@ function CanvasInner() {
     offerSuggestion({
       id: `handoff:director:${directorProjectId}`,
       stage: 'director',
-      content: '완성된 영상이 있어요. Editor로 넘어가 이어 붙여볼까요?',
-      action: { kind: 'handoff', utterance: spec.utterance, label: spec.label },
+      content: t('You have a finished video. Shall we move to Editor and start assembling it?'),
+      action: { kind: 'handoff', utterance: t(spec.utterance), label: t(spec.label) },
     })
-  }, [directorProjectId, hasRenderedVideo, offerSuggestion, reachedStageForNudge])
+  }, [directorProjectId, hasRenderedVideo, offerSuggestion, reachedStageForNudge, t])
 
   const {
     screenToFlowPosition,
@@ -574,9 +588,9 @@ function CanvasInner() {
       {nodes.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="text-center text-sm text-muted-foreground">
-            Writer에서 씬을 먼저 만들면 자동으로 들어와요.
+            {t('Scenes come in automatically once you create them in Writer.')}
             <div className="mt-1 text-xs opacity-70">
-              또는 캔버스를 더블클릭해서 직접 Scene을 만들 수 있어요.
+              {t('Or double-click the canvas to create a Scene directly.')}
             </div>
           </div>
         </div>
@@ -603,6 +617,7 @@ function CanvasInner() {
 const PRESET_DND_TYPE = 'application/preset-id'
 
 function PresetCard({ preset }: { preset: CameraLightPreset }) {
+  const t = useT()
   const deletePreset = usePresetStorageStore((s) => s.deletePreset)
 
   const handleDragStart = (e: React.DragEvent) => {
@@ -614,7 +629,7 @@ function PresetCard({ preset }: { preset: CameraLightPreset }) {
     <div
       draggable
       onDragStart={handleDragStart}
-      title="노드 위로 드래그해 카메라/조명/렌즈 셋업 적용"
+      title={t('Drag onto a node to apply the camera/lighting/lens setup')}
       className={cn(
         'group flex h-7 shrink-0 cursor-grab items-center gap-1 rounded-md border border-border px-2',
         'bg-card text-xs text-foreground active:cursor-grabbing',
@@ -625,7 +640,7 @@ function PresetCard({ preset }: { preset: CameraLightPreset }) {
       <button
         type="button"
         onClick={() => void deletePreset(preset.id)}
-        aria-label="프리셋 삭제"
+        aria-label={t('Delete preset')}
         className="rounded-sm p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 hover-red-beam"
       >
         <X className="size-3" />
@@ -635,6 +650,7 @@ function PresetCard({ preset }: { preset: CameraLightPreset }) {
 }
 
 function PresetStrip() {
+  const t = useT()
   const projectId = useDirectorCanvasStore((s) => s.projectId)
   const presets = usePresetStorageStore((s) => s.presets)
   const loadPresets = usePresetStorageStore((s) => s.loadPresets)
@@ -648,7 +664,7 @@ function PresetStrip() {
   return (
     <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
       <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
-        프리셋
+        {t('Presets')}
       </span>
       {presets.map((p) => (
         <PresetCard key={p.id} preset={p} />
@@ -664,6 +680,7 @@ const DIRECTOR_VIEW_CYCLE = ['node', 'previz', 'real'] as const
 type DirectorViewStep = (typeof DIRECTOR_VIEW_CYCLE)[number]
 
 function PaletteBar() {
+  const t = useT()
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
   const setViewMode = useDirectorCanvasStore((s) => s.setViewMode)
   const storyboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
@@ -738,7 +755,7 @@ function PaletteBar() {
         {/* 스토리보드 일괄 생성 */}
         <button
           type="button"
-          title="러프 스토리보드를 실제 촬영 이미지 스토리보드로 한번에 생성할 수 있어요"
+          title={t('Generate the rough storyboard into a real shooting-image storyboard in one go')}
           onClick={() => {
             // #2: 이미 모두 생성됐으면 재생성 대신 알림.
             const shots = nodes.filter((n) => isShotData(n.data))
@@ -748,8 +765,8 @@ function PaletteBar() {
                 n.data.storyboardImage?.status !== 'completed',
             )
             if (shots.length > 0 && pending.length === 0) {
-              toast.info('이미 모든 스토리보드가 생성되어 있습니다.', {
-                description: '개별 재생성은 샷을 더블클릭해서 진행하세요.',
+              toast.info(t('All storyboards have already been generated.'), {
+                description: t('To regenerate an individual shot, double-click it.'),
               })
               return
             }
@@ -775,7 +792,7 @@ function PaletteBar() {
           ) : (
             <ImageIcon className="size-4" />
           )}
-          <span>스토리보드 생성</span>
+          <span>{t('Generate storyboard')}</span>
           {totalShots > 0 && (
             <span className="font-mono tabular-nums text-muted-foreground">
               {completedShots}/{totalShots}
@@ -793,7 +810,7 @@ function PaletteBar() {
           <button
             type="button"
             onClick={() => toggleUnusedAssets()}
-            title="씬마다 해당 씬이 참조하지 않는 등록 에셋도 좌측 에셋 컬럼에 표시"
+            title={t('Show registered assets that this scene does not reference in the left asset column too')}
             className={cn(
               'flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-3 text-xs transition-colors duration-100',
               showUnusedAssets
@@ -803,18 +820,18 @@ function PaletteBar() {
             )}
           >
             <Boxes className="size-4" />
-            <span>{showUnusedAssets ? '미사용 에셋 숨기기' : '미사용 에셋 불러오기'}</span>
+            <span>{showUnusedAssets ? t('Hide unused assets') : t('Load unused assets')}</span>
           </button>
 
           {/* 노드 자동 정렬 — asset·scene·shot·video를 다이어그램 레이아웃으로 재배치 (DB 반영) */}
           <button
             type="button"
             onClick={() => relayoutCanvas()}
-            title="에셋·씬·샷·영상을 좌→우 레이아웃으로 정렬하고 간격을 확보 (DB 저장)"
+            title={t('Arrange assets, scenes, shots, and videos in a left-to-right layout with spacing (saved to DB)')}
             className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground hover-red-beam"
           >
             <LayoutGrid className="size-4" />
-            <span>자동 정렬</span>
+            <span>{t('Auto-arrange')}</span>
           </button>
 
           {/* 프롬프트 노드 추가 — Higgsfield식 분리 프롬프트(우측 핸들을 Shot T 입력에 연결) */}
@@ -823,11 +840,11 @@ function PaletteBar() {
             onClick={() =>
               addPromptNode({ x: 80, y: 120 + promptCount * 180 })
             }
-            title="분리된 프롬프트 노드를 추가합니다. 우측 핸들을 Shot의 T 입력에 연결하면 Shot 프롬프트가 동기됩니다."
+            title={t('Adds a standalone prompt node. Connect its right handle to a Shot\'s T input to sync the Shot prompt.')}
             className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground hover-red-beam"
           >
             <Type className="size-4" />
-            <span>프롬프트 노드</span>
+            <span>{t('Prompt node')}</span>
           </button>
         </div>
       )}
@@ -838,6 +855,7 @@ function PaletteBar() {
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function DirectorCanvasPage() {
+  const t = useT()
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
   const guideProjectId = useDirectorCanvasStore((s) => s.projectId)
   // Node↔Storyboard 전환 슬라이드(#e2 2026-08-03) — 두 뷰는 조건 렌더(원래 remount)라
@@ -917,16 +935,20 @@ export default function DirectorCanvasPage() {
       action: null,
       content:
         viewMode === 'storyboard'
-          ? '씬별 샷 이미지를 한눈에 보는 스토리보드예요.\n\n' +
-            '· "이미지 생성 필요" 카드는 아직 러프 상태예요\n' +
-            '· 카드의 "영상 생성"을 누르면 이미지부터 영상까지 이어서 만들어요\n' +
-            '· 카드를 더블클릭하면 상세 편집이 열려요'
-          : '여기는 The Set — 촬영장이에요. 씬 → 샷 → 영상이 노드로 이어져 있어요.\n\n' +
-            '· 카드를 더블클릭하면 상세 편집이 열려요\n' +
-            '· 샷 카드를 선택하면 위에 이미지 생성 버튼이 떠요\n' +
-            '· 상단 "스토리보드 생성"으로 모든 샷을 한 번에 실사화할 수 있어요',
+          ? t(
+              'This is the storyboard — see every shot image per scene at a glance.\n\n' +
+                '· A card marked "Image generation needed" is still in rough stage\n' +
+                '· Press "Generate video" on a card to go from image to video in one go\n' +
+                '· Double-click a card to open detailed editing',
+            )
+          : t(
+              'This is The Set — where scenes → shots → videos connect as nodes.\n\n' +
+                '· Double-click a card to open detailed editing\n' +
+                '· Select a shot card and an image-generation button appears above it\n' +
+                '· Use "Generate storyboard" at the top to turn every shot into a real image at once',
+            ),
     })
-  }, [guideProjectId, viewMode, stageReady, offerSuggestion])
+  }, [guideProjectId, viewMode, stageReady, offerSuggestion, t])
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -934,7 +956,11 @@ export default function DirectorCanvasPage() {
           설명문은 "?" 뱃지 호버로 이관(2026-08-06). */}
       <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-6 py-3">
         <h1 className="text-lg font-semibold">The Set</h1>
-        <StageHelpBadge text="러프 스토리보드와 등장인물, 월드를 바탕으로 실제 이미지/영상으로 촬영을 시작하세요." />
+        <StageHelpBadge
+          text={t(
+            'Start shooting real images/videos based on the rough storyboard, characters, and world.',
+          )}
+        />
       </div>
       <div className="flex flex-1 overflow-hidden">
         {/* Center: top Palette bar(#e1 — 하단→상단 이동) + Canvas (Node/Storyboard) */}

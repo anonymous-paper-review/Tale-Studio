@@ -1,4 +1,6 @@
 import type { StageId } from '@/types'
+import { translate } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 
 export type PendingProposalStage = Extract<StageId, 'producer' | 'writer' | 'artist'>
 
@@ -64,7 +66,7 @@ export function isApprovalUtterance(text: string | null | undefined): boolean {
 
 export function formatProposalImpact(impact: string[]): string {
   const items = impact.map((item) => item.trim()).filter(Boolean)
-  if (items.length === 0) return '영향 없음'
+  if (items.length === 0) return translate(useLocaleStore.getState().locale, 'No impact')
   return items.map((item) => `• ${item}`).join('\n')
 }
 

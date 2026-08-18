@@ -13,20 +13,23 @@ import { createPendingProposal } from '@/lib/pending-proposal'
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { useChatUiStore } from '@/stores/chat-ui-store'
+import { useLocale, useT } from '@/lib/i18n'
+
 
 // 첫 프로젝트 진입 시 프로듀서가 먼저 거는 인사·시작 넛지 — 유저가 바로 한 줄로 시작할 수 있게.
 //   2026-08-07: 프로듀서 소개·예시·업로드/스타일 진입점 안내의 친근한 장문으로 재작성
 //   (#feedback — 8/6 의 2문장 축약판 대체).
-const PRODUCER_WELCOME =
-  '안녕하세요! 저는 당신의 AI 프로듀서예요. 만들고 싶은 이야기를 편하게 한 줄로 들려주세요. \n'
-  + '장르, 주인공, 지금 떠오르는 한 장면, 무엇이든 좋아요! \n\n'
-  + '예를 들어 "비 오는 도시, 기억을 잃은 형사의 하룻밤"를 말씀해주시면 캐릭터, 장소, 구조는 제가 함께 정리해 드릴게요. \n\n'
-  + '미리 작성한 스토리 파일이 있으면 아래 업로드 버튼으로 저에게 공유해주세요. \n'
-  // #style-entry(#feedback 2026-08-07): 스타일 진입점 안내 — 버튼엔 첫 클릭 전까지 레이더 핑.
-  + '영상의 그림체는 아래 팔레트 버튼에서 언제든 고를 수 있어요.'
-
+// #style-entry(#feedback 2026-08-07): 스타일 진입점 안내 — 버튼엔 첫 클릭 전까지 레이더 핑.
+const PRODUCER_WELCOME_KEY =
+  "Hi! I'm your AI producer. Just tell me in one relaxed sentence the story you want to make. \n"
+  + 'Genre, protagonist, one scene that just came to mind — anything works! \n\n'
+  + 'For example, if you say "a rainy city, one night with a detective who\'s lost his memory," I\'ll help sort out the characters, setting, and structure together. \n\n'
+  + 'If you already have a story file written, share it with me using the upload button below. \n'
+  + 'You can pick the visual style anytime from the palette button below.'
 
 export default function MeetingPage() {
+  const t = useT()
+  const locale = useLocale()
   const projectId = useProjectStore((s) => s.projectId)
   const loadProject = useProducerStore((s) => s.loadProject)
   // saveAndHandoff 는 더 이상 이 페이지가 부르지 않는다 — 핸드오프는 채팅이 맡는다(#handoff-to-chat).
@@ -58,6 +61,7 @@ export default function MeetingPage() {
     cast,
     backgrounds,
     styleAnchorKey,
+    locale,
   })
   const canHandoff = gate.canHandoff
 
@@ -85,6 +89,13 @@ export default function MeetingPage() {
   const activeSuggestion = useGlobalChatStore((s) => s.suggestion)
   // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once) — 진실은 DB 의 reachedStage.
   const reachedStage = useProjectStore((s) => s.reachedStage)
+  // 아래 두 useEffect 의 offerSuggestion content/label 은 미리 t() 로 완역해 상수로 뽑는다 —
+  //   문자열 값이라 deps 에 넣어도 로케일이 안 바뀌면 재실행되지 않는다(#i18n-s5-batch4,
+  //   writer 배치의 scene-gate 패턴과 동일).
+  const handoffReadyContent = t(
+    'Everything needed is filled in. Calling Writer will start scene/shot design right away.',
+  )
+  const inviteWriterLabel = t('Invite Writer')
   useEffect(() => {
     if (!projectId || !canHandoff) return
     if (!shouldOfferHandoffNudge('producer', reachedStage)) return
@@ -94,16 +105,25 @@ export default function MeetingPage() {
       {
         id: `handoff:producer:${projectId}`,
         stage: 'producer',
-        content:
-          '필요한 항목이 모두 채워졌어요. Writer를 호출하면 씬·샷 설계가 바로 시작돼요.',
+        content: handoffReadyContent,
         // 라벨은 초대 프레임(#oiioii-handoff) — 실행하면 채팅에 ⇄ 초대 블록이 그려지고 넘어간다.
-        action: { kind: 'handoff', utterance: spec.utterance, label: 'Writer 호출하기' },
+        action: { kind: 'handoff', utterance: t(spec.utterance), label: inviteWriterLabel },
       },
       { preempt: true },
     )
     // activeSuggestion: 슬롯이 바뀔 때마다 재시도(선점이 막힌 경우 — 예: 내릴 수 없는 웰컴).
-  }, [projectId, canHandoff, activeSuggestion, offerSuggestion, reachedStage])
+  }, [
+    projectId,
+    canHandoff,
+    activeSuggestion,
+    offerSuggestion,
+    reachedStage,
+    handoffReadyContent,
+    inviteWriterLabel,
+    t,
+  ])
 
+  const producerWelcome = t(PRODUCER_WELCOME_KEY)
   // 첫 진입(스토리·프로듀서 채팅 모두 비어있음)에만 프로듀서가 먼저 인사 + 입력창 포커스(빔).
   //   offerSuggestion 은 dismiss/중복 가드 내장 → 한 번만, 세션 재진입 시 재노출 안 함.
   useEffect(() => {
@@ -114,12 +134,21 @@ export default function MeetingPage() {
     offerSuggestion({
       id: `producer-welcome:${projectId}`,
       stage: 'producer',
-      content: PRODUCER_WELCOME,
+      content: producerWelcome,
       action: null,
       dismissible: false,
     })
     requestChatFocus()
-  }, [projectId, producerLoaded, storyReady, storyText, messages, offerSuggestion, requestChatFocus])
+  }, [
+    projectId,
+    producerLoaded,
+    storyReady,
+    storyText,
+    messages,
+    offerSuggestion,
+    requestChatFocus,
+    producerWelcome,
+  ])
 
   // 배너 닫기 상태 — writer 재실행: 실제 문제 상태 기반 → 세션 한정, 문제 재발 시 재노출.
   //   (stale 경고 상주 배너는 2026-07-13 제거 — 문구 박스 정리.)
@@ -137,11 +166,13 @@ export default function MeetingPage() {
         stage: 'producer',
         kind: 'producerWriterRerunRequest',
         target: 'Writer rerun',
-        action: '현재 Producer source로 Writer를 다시 실행',
+        action: t('Re-run Writer with the current Producer source'),
         impact: [
-          'Writer 구현은 외부 계약을 호출합니다.',
-          'Writer 쪽 same-shot 보존이 보장되지 않았다면 downstream 산출물이 orphan/stale 될 수 있어요.',
-          '승인 전에는 아무 실행도 시작하지 않습니다.',
+          t('The Writer implementation calls an external contract.'),
+          t(
+            "If same-shot preservation on the Writer side isn't guaranteed, downstream output may become orphaned or stale.",
+          ),
+          t('Nothing runs until you approve.'),
         ],
         payload: {},
       }),
@@ -162,10 +193,12 @@ export default function MeetingPage() {
           <AlertTriangle className="size-4 shrink-0 text-warning" />
           <div className="flex-1">
             <p className="font-medium text-foreground">
-              이전 Writer 실행이 완료되지 않았어요 (씬/샷 없음)
+              {t("The previous Writer run didn't finish (no scenes/shots)")}
             </p>
             <p className="text-xs text-muted-foreground">
-              스토리·설정을 확인하고 다시 실행하면 씬·샷이 생성돼 Director/Editor 가 채워집니다.
+              {t(
+                'Check the story and settings, then re-run to generate scenes/shots and fill in Director/Editor.',
+              )}
             </p>
           </div>
           <Button
@@ -179,12 +212,12 @@ export default function MeetingPage() {
             ) : (
               <RefreshCw className="size-3.5" />
             )}
-            Writer 다시 실행 제안
+            {t('Suggest re-running Writer')}
           </Button>
           <button
             type="button"
             onClick={() => setRerunDismissed(true)}
-            aria-label="배너 닫기"
+            aria-label={t('Close banner')}
             className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-warning/20 hover:text-warning"
           >
             <X className="size-3.5" />

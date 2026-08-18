@@ -9,13 +9,7 @@ import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { useDebugPrompts } from '@/lib/use-debug-prompts'
 import type { PromptTraceItem, PromptTraceKind } from '@/lib/prompt-trace'
-
-const KIND_LABEL: Record<PromptTraceKind, string> = {
-  shot_video: '영상 최종 전송 프롬프트',
-  shot_storyboard: '실사 최종 전송 프롬프트 (개별)',
-  storyboard_real_grid: '실사 최종 전송 프롬프트 (일괄 그리드)',
-  shot_rough_storyboard: '러프 최종 전송 프롬프트 (그리드)',
-}
+import { useT } from '@/lib/i18n'
 
 export function DebugPromptTrace({
   projectId,
@@ -27,6 +21,13 @@ export function DebugPromptTrace({
   /** 이 팝업에서 보여줄 잡 종류 (예: 영상 팝업 = ['shot_video']) */
   kinds: PromptTraceKind[]
 }) {
+  const t = useT()
+  const KIND_LABEL: Record<PromptTraceKind, string> = {
+    shot_video: t('Final video prompt sent'),
+    shot_storyboard: t('Final live-action prompt sent (individual)'),
+    storyboard_real_grid: t('Final live-action prompt sent (batch grid)'),
+    shot_rough_storyboard: t('Final rough prompt sent (grid)'),
+  }
   const enabled = useDebugPrompts(projectId)
   const [items, setItems] = useState<PromptTraceItem[] | null>(null)
 
@@ -77,7 +78,7 @@ export function DebugPromptTrace({
           </pre>
           {item.sourcePrompt ? (
             <details className="text-xs text-muted-foreground">
-              <summary className="cursor-pointer">전송 시점 소스 프롬프트</summary>
+              <summary className="cursor-pointer">{t('Source prompt at send time')}</summary>
               <pre className="mt-1 max-h-40 select-text overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted p-2.5 font-mono text-[11px] leading-relaxed scrollbar-thin">
                 {item.sourcePrompt}
               </pre>

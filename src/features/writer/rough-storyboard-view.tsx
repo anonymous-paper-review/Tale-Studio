@@ -207,7 +207,7 @@ export function RoughStoryboardView() {
         locale,
         'The rough storyboard is all ready. Ready to move to Artist and work out character and background concepts?',
       ),
-      action: { kind: 'handoff', utterance: spec.utterance, label: spec.label },
+      action: { kind: 'handoff', utterance: translate(locale, spec.utterance), label: translate(locale, spec.label) },
     })
   }, [projectId, roughAllReady, offerSuggestion, reachedStage, locale])
 

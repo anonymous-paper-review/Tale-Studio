@@ -46,6 +46,16 @@ function walk(dir: string): string[] {
   return out
 }
 
+/** 마커 탐지용으로 문자열 리터럴 내용을 비운다 — accept="image/*" 류의 /* 를 블록 주석
+ *  시작으로 오인해 사각지대가 생기던 것 수정(director 배치 실측 발견). 이스케이프·여러 줄
+ *  템플릿까지는 다루지 않는 휴리스틱 — 남는 예외는 allowlist/프라그마가 흡수한다. */
+function stripStringLiterals(line: string): string {
+  return line
+    .replace(/'(?:[^'\\]|\\.)*'/g, "''")
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+    .replace(/`(?:[^`\\]|\\.)*`/g, '``')
+}
+
 /** 파일 단위 위반 라인 인덱스 — 여러 줄 블록 주석({/* … *\/}, /* … *\/)의 연속 줄을
  *  상태 추적으로 제외한다(마커 없는 이어짐 줄이 오탐되던 것 수정). */
 function violationLines(source: string): number[] {
@@ -55,12 +65,13 @@ function violationLines(source: string): number[] {
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i]
     const trimmed = raw.trim()
+    const markers = stripStringLiterals(raw)
     if (inBlock) {
-      if (raw.includes('*/')) inBlock = false
+      if (markers.includes('*/')) inBlock = false
       continue
     }
-    const opensBlock = /(\{\/\*|\/\*)/.test(raw)
-    if (opensBlock && !raw.slice(raw.search(/(\{\/\*|\/\*)/)).includes('*/')) inBlock = true
+    const opensBlock = /(\{\/\*|\/\*)/.test(markers)
+    if (opensBlock && !markers.slice(markers.search(/(\{\/\*|\/\*)/)).includes('*/')) inBlock = true
     if (!/[가-힣]/.test(raw)) continue
     if (raw.includes('// i18n-ok')) continue
     if (/^(\/\/|\*|\/\*|{\/\*)/.test(trimmed)) continue

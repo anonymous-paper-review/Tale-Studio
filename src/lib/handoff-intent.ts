@@ -19,30 +19,34 @@ export interface HandoffSpec {
   label: string
 }
 
+// label/utterance 값은 영어 원문 = i18n 키(#i18n-s5-batch4). 렌더 지점(global-chat.tsx 및 각
+//   stage page 의 handoff 넛지)이 t()/translate() 로 번역한다. utterance 는 번역된 문장 그대로
+//   채팅에 전송되므로, 번역 후에도 MOVE_WORDS(예: 'handover')·STAGE_WORDS 매칭 토큰을 포함해야
+//   matchHandoffIntent 가 여전히 인식한다 — "Please hand over to {Stage}" 형태로 고정.
 export const HANDOFFS: readonly HandoffSpec[] = [
   {
     from: 'producer',
     to: 'writer',
-    utterance: 'Writer로 넘겨주세요',
-    label: 'Writer로 넘기기',
+    utterance: 'Please hand over to Writer',
+    label: 'Hand over to Writer',
   },
   {
     from: 'writer',
     to: 'artist',
-    utterance: 'Artist로 넘겨주세요',
-    label: 'Artist로 넘기기',
+    utterance: 'Please hand over to Artist',
+    label: 'Hand over to Artist',
   },
   {
     from: 'artist',
     to: 'director',
-    utterance: 'Director로 넘겨주세요',
-    label: 'Director로 넘기기',
+    utterance: 'Please hand over to Director',
+    label: 'Hand over to Director',
   },
   {
     from: 'director',
     to: 'editor',
-    utterance: 'Editor로 넘겨주세요',
-    label: 'Editor로 넘기기',
+    utterance: 'Please hand over to Editor',
+    label: 'Hand over to Editor',
   },
 ] as const
 

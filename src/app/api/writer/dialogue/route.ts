@@ -48,14 +48,14 @@ export async function POST(req: Request) {
     const state = run?.state as WriterRunState | undefined
     if (!run || run.status === 'running')
       return NextResponse.json(
-        { ok: false, error: { code: 'run_active', message: 'writer가 아직 실행 중입니다. 완료 후 다시 시도하세요.' } },
+        { ok: false, error: { code: 'run_active', message: 'Writer is still running. Try again after it finishes.' } },
         { status: 409 },
       )
     if (!state?.scenes || !state.decoupage || !state.genre || !state.characters || !state.input?.story)
       return NextResponse.json(
         {
           ok: false,
-          error: { code: 'no_run_state', message: '완료된 writer 실행 기록이 없어 대사를 생성할 수 없습니다.' },
+          error: { code: 'no_run_state', message: "Can't generate dialogue — no completed writer run found." },
         },
         { status: 422 },
       )

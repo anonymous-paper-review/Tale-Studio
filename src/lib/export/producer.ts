@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/client'
 import { mergeDraftWithDb, parseProducerDraft, type ProducerBoardState } from '@/stores/producer-store'
 import type { ProjectSettings } from '@/types'
 import type { BackgroundSource, CastArc, CastMember, CastMotivation } from '@/lib/producer-gate'
+import { translate } from '@/lib/i18n'
+import { DEFAULT_LOCALE, type AppLocale } from '@/lib/locale'
 
 import { h1, isRecord, kvSection, labelPart, nativeText, textOrUnset } from './md'
 import type { ArtifactFile } from './types'
@@ -77,108 +79,119 @@ export async function loadProducerBoard(projectId: string): Promise<ProducerArti
   }
 }
 
-export function collectProducerArtifacts(board: ProducerArtifactBoard): ArtifactFile[] {
+export function collectProducerArtifacts(
+  board: ProducerArtifactBoard,
+  locale: AppLocale = DEFAULT_LOCALE,
+): ArtifactFile[] {
   const record = recordValue(board) ?? {}
   const cast = recordArray(record.cast)
   const backgrounds = recordArray(record.backgrounds)
 
   return [
-    { path: 'producer/story.md', kind: 'text', content: renderStory(record.storyText) },
-    { path: 'producer/settings.md', kind: 'text', content: renderSettings(record.projectSettings) },
-    { path: 'producer/cast.md', kind: 'text', content: renderCast(cast) },
-    { path: 'producer/backgrounds.md', kind: 'text', content: renderBackgrounds(backgrounds) },
+    { path: 'producer/story.md', kind: 'text', content: renderStory(record.storyText, locale) },
+    { path: 'producer/settings.md', kind: 'text', content: renderSettings(record.projectSettings, locale) },
+    { path: 'producer/cast.md', kind: 'text', content: renderCast(cast, locale) },
+    { path: 'producer/backgrounds.md', kind: 'text', content: renderBackgrounds(backgrounds, locale) },
   ]
 }
 
 
-function renderStory(storyText: unknown): string {
+function renderStory(storyText: unknown, locale: AppLocale): string {
   const story = stringValue(storyText)?.trim() ?? ''
-  return `${h1('스토리')}${story || '스토리 작성 전'}\n`
+  return `${h1(translate(locale, 'Story'))}${story || translate(locale, 'Story not written yet')}\n`
 }
 
-function renderSettings(settingsValue: unknown): string {
+function renderSettings(settingsValue: unknown, locale: AppLocale): string {
   const settings = recordValue(settingsValue) ?? {}
-  return `${h1('프로듀서 설정')}${kvSection('프로젝트 설정', [
-    ['장르', textOrUnset(settings.genre)],
-    ['세부 장르', textOrUnset(settings.subGenre)],
-    ['톤', listOrUnset(settings.tone)],
-    ['포맷', textOrUnset(settings.format)],
-    ['러닝타임', playtimeLabel(settings.playtime)],
-    ['대사 언어', textOrUnset(settings.dialogueLanguage)],
-    ['목표 감정', listOrUnset(settings.targetEmotion)],
+  return `${h1(translate(locale, 'Producer Settings'))}${kvSection(translate(locale, 'Project Settings'), [
+    [translate(locale, 'Genre'), textOrUnset(settings.genre, locale)],
+    [translate(locale, 'Sub-genre'), textOrUnset(settings.subGenre, locale)],
+    [translate(locale, 'Tone'), listOrUnset(settings.tone, locale)],
+    [translate(locale, 'Format'), textOrUnset(settings.format, locale)],
+    [translate(locale, 'Runtime'), playtimeLabel(settings.playtime, locale)],
+    [translate(locale, 'Dialogue language'), textOrUnset(settings.dialogueLanguage, locale)],
+    [translate(locale, 'Target emotion'), listOrUnset(settings.targetEmotion, locale)],
   ])}`
 }
 
-function renderCast(cast: Record<string, unknown>[]): string {
-  if (cast.length === 0) return `${h1('캐스트')}캐스트 없음\n`
+function renderCast(cast: Record<string, unknown>[], locale: AppLocale): string {
+  if (cast.length === 0) return `${h1(translate(locale, 'Cast'))}${translate(locale, 'No cast')}\n`
 
-  return `${h1('캐스트')}${cast
+  return `${h1(translate(locale, 'Cast'))}${cast
     .map((member, index) =>
-      kvSection(nativeText(member, 'name') || `이름 미정 캐스트 ${index + 1}`, [
-        ['이름', textOrUnset(nativeText(member, 'name'))],
-        ['역할', textOrUnset(nativeText(member, 'role'))],
-        ['유형', entityTypeLabel(member.entityType)],
-        ['외형', textOrUnset(nativeText(member, 'appearance'))],
-        ['아크', castArcLabel(member.arc)],
-        ['동기', castMotivationLabel(member.motivation)],
-      ]),
+      kvSection(
+        nativeText(member, 'name') || translate(locale, 'Unnamed cast {index}', { index: index + 1 }),
+        [
+          [translate(locale, 'Name'), textOrUnset(nativeText(member, 'name'), locale)],
+          [translate(locale, 'Role'), textOrUnset(nativeText(member, 'role'), locale)],
+          [translate(locale, 'Type'), entityTypeLabel(member.entityType, locale)],
+          [translate(locale, 'Appearance'), textOrUnset(nativeText(member, 'appearance'), locale)],
+          [translate(locale, 'Arc'), castArcLabel(member.arc, locale)],
+          [translate(locale, 'Motivation'), castMotivationLabel(member.motivation, locale)],
+        ],
+      ),
     )
     .join('')}`
 }
 
-function renderBackgrounds(backgrounds: Record<string, unknown>[]): string {
-  if (backgrounds.length === 0) return `${h1('배경')}배경 없음\n`
+function renderBackgrounds(backgrounds: Record<string, unknown>[], locale: AppLocale): string {
+  if (backgrounds.length === 0) return `${h1(translate(locale, 'Backgrounds'))}${translate(locale, 'No backgrounds')}\n`
 
-  return `${h1('배경')}${backgrounds
+  return `${h1(translate(locale, 'Backgrounds'))}${backgrounds
     .map((background, index) =>
-      kvSection(nativeText(background, 'name') || `이름 미정 배경 ${index + 1}`, [
-        ['이름', textOrUnset(nativeText(background, 'name'))],
-        ['목적', textOrUnset(nativeText(background, 'purpose'))],
-        ['시각 설명', textOrUnset(nativeText(background, 'visualDescription'))],
-      ]),
+      kvSection(
+        nativeText(background, 'name') || translate(locale, 'Unnamed background {index}', { index: index + 1 }),
+        [
+          [translate(locale, 'Name'), textOrUnset(nativeText(background, 'name'), locale)],
+          [translate(locale, 'Purpose'), textOrUnset(nativeText(background, 'purpose'), locale)],
+          [translate(locale, 'Visual description'), textOrUnset(nativeText(background, 'visualDescription'), locale)],
+        ],
+      ),
     )
     .join('')}`
 }
 
-function listOrUnset(value: unknown): string {
+function listOrUnset(value: unknown, locale: AppLocale): string {
   const items = Array.isArray(value)
     ? value.map((item) => stringValue(item)?.trim()).filter((item): item is string => Boolean(item))
     : []
-  return items.length ? items.join(', ') : '미설정'
+  return items.length ? items.join(', ') : translate(locale, 'Not set')
 }
 
-function playtimeLabel(seconds: unknown): string {
+function playtimeLabel(seconds: unknown, locale: AppLocale): string {
   return typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0
-    ? `${seconds}초`
-    : '미설정'
+    ? translate(locale, '{value}s', { value: seconds })
+    : translate(locale, 'Not set')
 }
 
-function entityTypeLabel(entityType: unknown): string {
-  return entityType === 'object' ? '사물 (object)' : '인물 (person)'
+function entityTypeLabel(entityType: unknown, locale: AppLocale): string {
+  return entityType === 'object'
+    ? `${translate(locale, 'Object')} (object)`
+    : `${translate(locale, 'Person')} (person)`
 }
 
-function castArcLabel(arcValue: unknown): string {
+function castArcLabel(arcValue: unknown, locale: AppLocale): string {
   const arc = recordValue(arcValue)
-  if (!arc) return '미설정'
+  if (!arc) return translate(locale, 'Not set')
 
   const parts = [
-    labelPart('시작', arc.start_state),
-    labelPart('끝', arc.end_state),
-    labelPart('유형', arc.arc_type),
+    labelPart(translate(locale, 'Start'), arc.start_state),
+    labelPart(translate(locale, 'End'), arc.end_state),
+    labelPart(translate(locale, 'Type'), arc.arc_type),
   ].filter(Boolean)
-  return parts.length ? parts.join(' / ') : '미설정'
+  return parts.length ? parts.join(' / ') : translate(locale, 'Not set')
 }
 
-function castMotivationLabel(motivationValue: unknown): string {
+function castMotivationLabel(motivationValue: unknown, locale: AppLocale): string {
   const motivation = recordValue(motivationValue)
-  if (!motivation) return '미설정'
+  if (!motivation) return translate(locale, 'Not set')
 
   const parts = [
-    labelPart('원함', motivation.want),
-    labelPart('필요', motivation.need),
-    labelPart('상처', motivation.wound),
+    labelPart(translate(locale, 'Want'), motivation.want),
+    labelPart(translate(locale, 'Need'), motivation.need),
+    labelPart(translate(locale, 'Wound'), motivation.wound),
   ].filter(Boolean)
-  return parts.length ? parts.join(' / ') : '미설정'
+  return parts.length ? parts.join(' / ') : translate(locale, 'Not set')
 }
 
 function normalizeSettingsFromProject(settings: unknown): ProjectSettings {

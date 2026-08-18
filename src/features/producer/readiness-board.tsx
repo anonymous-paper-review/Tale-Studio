@@ -46,7 +46,7 @@ import { AgentFace } from '@/components/agent-face'
 import { STAGE_FACE_COLOR } from '@/lib/constants'
 import { ProducerQuestJournal, StoryFoundationBadges } from './quest-journal'
 import { WriterEnginePicker } from '@/features/writer/writer-engine-picker'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
 
 // 카드 안 자동확장 textarea(외모/시각 설명)용 — 네이티브 스크롤바 대신 얇은 테마 스크롤바(#b5).
 //   max-h로 카드 폭주를 막고, 넘치면 얇은 썸만 보이게.
@@ -686,8 +686,10 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const objects = cast.filter((m) => m.entityType === 'object')
   const readyBackgrounds = backgrounds.filter(backgroundReady)
   // @멘션 라벨(ref 정렬) — cast/backgrounds 배열과 인덱스 일치. 카드에 라벨 전달(Cmd+클릭 삽입용).
-  const castMentionList = castMentions(cast)
-  const bgMentionList = backgroundMentions(backgrounds)
+  // hint(카테고리 배지)만 번역 — label 은 로케일 고정(card-mention.ts 헤더 코멘트, LLM @멘션 매칭 안정성).
+  const mentionLocale = useLocale()
+  const castMentionList = castMentions(cast, mentionLocale)
+  const bgMentionList = backgroundMentions(backgrounds, mentionLocale)
 
   const hardByField = useMemo(
     () => new Map(gate.hardMissing.map((issue) => [issue.field, issue])),

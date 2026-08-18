@@ -1,3 +1,6 @@
+import { translate } from '@/lib/i18n'
+import type { AppLocale } from '@/lib/locale'
+
 export function h1(s: string): string {
   return `# ${escapeMd(s)}\n\n`
 }
@@ -59,9 +62,9 @@ export function nativeText(source: Record<string, unknown>, field: string): stri
   )
 }
 
-export function textOrUnset(value: unknown): string {
+export function textOrUnset(value: unknown, locale: AppLocale): string {
   const text = stringValue(value)?.trim()
-  return text || '미설정'
+  return text || translate(locale, 'Not set')
 }
 
 export function labelPart(label: string, value: unknown): string {

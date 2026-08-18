@@ -1,5 +1,12 @@
 import type { StageId, ProjectSettings } from '@/types'
 import { computeImageSourceHash } from '@/lib/image-provenance'
+import { translate } from '@/lib/i18n'
+import type { AppLocale } from '@/lib/locale'
+
+// evaluateArtistGate/evaluateDirectorGate 호출부(studio/artist/page.tsx — 범위 밖)가 아직 locale 을
+//   안 넘긴다. 안 넘기는 호출부가 조용히 깨지지 않도록 기존 동작(항상 한국어)을 기본값으로
+//   보존한다(producer-gate.ts와 동일 취급 — 이 파일은 그 사촌 게이트 모듈).
+const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
 export type LifecycleEntityType = 'person' | 'object'
 
@@ -91,6 +98,8 @@ export interface ArtistGateInput {
   referencedCharacterIds?: string[] | null
   worlds?: LifecycleWorldAsset[] | null
   selectedDemoObjectIds?: string[] | null
+  /** GateIssue.label/detail 번역에 쓰는 로케일. 미지정이면 기존 동작(한국어) 유지. */
+  locale?: AppLocale
 }
 
 export interface ArtistGateResult {
@@ -127,8 +136,13 @@ export const UNKNOWN_WRITER_GATE_STATUS: WriterGateStatus = {
   blockers: [
     {
       field: 'writer:status',
-      label: 'Writer 상태를 아직 확인할 수 없음',
-      detail: 'Writer 개발자가 status/hash 계약을 제공하면 준비 여부를 계산합니다.',
+      // project-store.ts(범위 밖)가 이 상수를 초기값으로 직접 참조(함수 호출이 아니다) — locale 인자를
+      //   받을 수 없어 항상 UNSPECIFIED_LOCALE_FALLBACK 으로 완역한다(기존 동작과 byte-identical).
+      label: translate(UNSPECIFIED_LOCALE_FALLBACK, "Writer status can't be checked yet"),
+      detail: translate(
+        UNSPECIFIED_LOCALE_FALLBACK,
+        'Readiness will be computed once the Writer developer provides the status/hash contract.',
+      ),
     },
   ],
 }
@@ -345,6 +359,7 @@ export function evaluateArtistGate({
   referencedCharacterIds,
   worlds = [],
   selectedDemoObjectIds = [],
+  locale = UNSPECIFIED_LOCALE_FALLBACK,
 }: ArtistGateInput): ArtistGateResult {
   const byId = new Map(characters.map((character) => [character.characterId, character]))
   const referenceIds = [...new Set((referencedCharacterIds ?? []).filter(Boolean))]
@@ -364,7 +379,7 @@ export function evaluateArtistGate({
       blockers.push({
         field: `artist:${id}:missing`,
         characterId: id,
-        label: `필수 캐릭터 ${id} 없음`,
+        label: translate(locale, 'Required character {id} missing', { id }),
       })
       continue
     }
@@ -372,7 +387,7 @@ export function evaluateArtistGate({
       blockers.push({
         field: `artist:${id}:mainImage`,
         characterId: id,
-        label: `${character.name || id}: main 이미지 필요`,
+        label: translate(locale, '{who}: main image needed', { who: character.name || id }),
       })
     }
   }
@@ -384,8 +399,10 @@ export function evaluateArtistGate({
     warnings.push({
       field: `artist:${character.characterId}:objectImage`,
       characterId: character.characterId,
-      label: `${character.name || character.characterId}: object 이미지 없음`,
-      detail: selected ? '선택 demo shot이 참조하면 Director 품질/게이트에 영향을 줄 수 있습니다.' : 'MVP 기본 경로에서는 경고입니다.',
+      label: translate(locale, '{who}: no object image', { who: character.name || character.characterId }),
+      detail: selected
+        ? translate(locale, 'If a selected demo shot references this, it may affect Director quality/gates.')
+        : translate(locale, 'This is a warning on the MVP default path.'),
     })
   }
 
@@ -394,8 +411,8 @@ export function evaluateArtistGate({
     if (!normalizeText(world.wideShot)) {
       warnings.push({
         field: `artist:${world.locationId}:wideShot`,
-        label: `${world.name || world.locationId}: 배경 이미지 없음`,
-        detail: 'Director 보조 이미지이며 MVP 기본 경로에서는 경고입니다.',
+        label: translate(locale, '{who}: no background image', { who: world.name || world.locationId }),
+        detail: translate(locale, 'This is a supporting image for Director and is a warning on the MVP default path.'),
       })
     }
   }
@@ -411,9 +428,11 @@ export function evaluateArtistGate({
 export function evaluateDirectorGate({
   writer,
   artist,
+  locale = UNSPECIFIED_LOCALE_FALLBACK,
 }: {
   writer?: WriterGateStatus | null
   artist?: ArtistGateResult | null
+  locale?: AppLocale
 }): DirectorGateResult {
   const blockers: LifecycleGateIssue[] = []
   const warnings: LifecycleGateIssue[] = []
@@ -428,7 +447,7 @@ export function evaluateDirectorGate({
   }
 
   if (!artist) {
-    blockers.push({ field: 'artist:status', label: 'Artist 준비 상태를 아직 계산하지 않음' })
+    blockers.push({ field: 'artist:status', label: translate(locale, "Artist readiness hasn't been calculated yet") })
   } else {
     blockers.push(...artist.blockers)
     warnings.push(...artist.warnings)

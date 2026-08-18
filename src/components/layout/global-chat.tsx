@@ -212,7 +212,7 @@ function ThinkingIndicator({ stage }: { stage: StageId }) {
         key={idx}
         className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300 ease-out motion-reduce:animate-none"
       >
-        {phrases[idx % phrases.length] ?? t('Thinking')}
+        {t(phrases[idx % phrases.length] ?? 'Thinking')}
       </span>
       <span className="chat-thinking-dots" aria-hidden>
         <span />
@@ -1490,7 +1490,7 @@ export function GlobalChat() {
                       ? t('Type your changes — or press Enter as-is to confirm the scenes')
                       : canSendAttachments
                         ? t("Tell us how to use it — leave blank and we'll fold it into the story")
-                        : STAGE_PLACEHOLDER[currentStage]
+                        : t(STAGE_PLACEHOLDER[currentStage])
                 }
                 className={cn(
                   'max-h-[13.625rem] min-h-9 w-full resize-none border-0 bg-transparent px-2 py-2 leading-5 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
@@ -1552,10 +1552,10 @@ export function GlobalChat() {
                       <button
                         key={preset}
                         type="button"
-                        onClick={() => insertPreset(preset)}
+                        onClick={() => insertPreset(t(preset))}
                         className="w-full rounded-md px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-accent"
                       >
-                        {preset}
+                        {t(preset)}
                       </button>
                     ))}
                     {STAGE_PROMPT_PRESETS[currentStage].length === 0 && (
@@ -1571,10 +1571,10 @@ export function GlobalChat() {
                           <div className="mx-1 my-1 h-px bg-border" aria-hidden />
                           <button
                             type="button"
-                            onClick={() => insertPreset(handoff.utterance)}
+                            onClick={() => insertPreset(t(handoff.utterance))}
                             className="w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-accent"
                           >
-                            {handoff.label} →
+                            {t(handoff.label)} →
                           </button>
                         </>
                       )

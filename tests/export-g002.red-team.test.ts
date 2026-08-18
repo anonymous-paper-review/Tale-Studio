@@ -172,7 +172,7 @@ describe('G002 writer collector markdown robustness', () => {
 
     const files = await collectWriterArtifacts('project-malformed', {
       fetchFn: fetchProjection(malformedProjection),
-    })
+    }, 'ko')
 
     expect(files.map((file) => file.path).sort()).toEqual([
       'writer/prompts.md',
@@ -204,7 +204,7 @@ describe('G002 writer collector markdown robustness', () => {
         shotDesign: null,
         renderPrompts: null,
       }),
-    })
+    }, 'ko')
 
     const scenes = content(files, 'writer/scenes.md')
     expect(scenes).not.toMatch(/(^|\n)# Injected/m)
@@ -256,7 +256,7 @@ describe('G002 writer collector markdown robustness', () => {
 
     const files = await collectWriterArtifacts('project-native', {
       fetchFn: fetchProjection(nativeProjection),
-    })
+    }, 'ko')
     const allMarkdown = files.map((file) => file.content ?? '').join('\n')
 
     expect(allMarkdown).toContain('네이티브 장르')
@@ -305,7 +305,7 @@ describe('G002 producer collector robustness', () => {
 
     let files: ReturnType<typeof collectProducerArtifacts> = []
     expect(() => {
-      files = collectProducerArtifacts(malformedBoard)
+      files = collectProducerArtifacts(malformedBoard, 'ko')
     }).not.toThrow()
 
     expect(files.map((file) => file.path)).toEqual([

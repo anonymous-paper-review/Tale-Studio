@@ -74,7 +74,7 @@ export async function POST(req: Request) {
       ?.frames
     if (!frames?.start || !frames?.end) {
       return NextResponse.json(
-        { error: 'rough storyboard frames missing — writer 탭에서 러프 스토리보드를 먼저 생성하세요' },
+        { error: 'rough storyboard frames missing — generate the rough storyboard in the writer tab first' },
         { status: 422 },
       )
     }

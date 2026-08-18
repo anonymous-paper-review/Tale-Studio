@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     const file = await logger.loadStage<ShotVideosOutput>('16_v7_shotVideos.json');
     if (!file) {
-      return NextResponse.json({ error: '16_shotVideos.json 없음' }, { status: 400 });
+      return NextResponse.json({ error: '16_shotVideos.json missing' }, { status: 400 });
     }
 
     const shots: ShotVideoResult[] = file.shots.slice();

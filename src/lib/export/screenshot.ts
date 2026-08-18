@@ -6,6 +6,12 @@
 //   그대로 <main> 을 캡처하면 뷰포트 높이에서 잘려 "보이는 부분"만 나온다 → 캡처 동안
 //   스크롤 컨테이너의 높이 제약을 임시로 풀어(overflow:visible) 전체 콘텐츠를 펼친 뒤 담는다.
 import { domToJpeg } from 'modern-screenshot'
+import { translate } from '@/lib/i18n'
+import type { AppLocale } from '@/lib/locale'
+
+// locale 을 안 넘기는 호출부(export-menu.tsx)가 조용히 안 깨지도록 기존 동작(항상 한국어)을
+//   기본값으로 보존한다 — producer-gate.ts/card-mention.ts 와 동일 취급.
+const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
 function triggerDownload(dataUrl: string, fileName: string) {
   const a = document.createElement('a')
@@ -28,9 +34,10 @@ const nextFrame = () =>
 export async function captureScreenJpeg(
   fileName: string,
   onProgress?: (current: number, total: number) => void,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
 ): Promise<void> {
   const target = document.querySelector('main') as HTMLElement | null
-  if (!target) throw new Error('캡처할 화면을 찾지 못했어요')
+  if (!target) throw new Error(translate(locale, "Couldn't find the screen to capture"))
 
   // JPEG 는 투명도가 없어 배경색을 명시하지 않으면 검게 나온다 → 앱 배경색으로 채운다.
   const bg = getComputedStyle(document.body).backgroundColor || '#ffffff'
