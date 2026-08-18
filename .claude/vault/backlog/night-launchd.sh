@@ -64,7 +64,8 @@ run)
   sh "$SCRIPT_DIR/preflight.sh"
   require_branch
 
-  # 1. 실행 잠금 (claude 프로브 실패 시 fail-closed)
+  # 1. 실행 잠금 — 같은 날짜 이중 실행만 막는다. probe/preflight 경고는
+  #    claim에 기록될 뿐 실행을 막지 않는다.
   claim="$(python3 "$GATE" primary sweep --contract-path "$CONTRACT")"
   status="$(printf '%s' "$claim" | jget status)"
   provider="$(printf '%s' "$claim" | jget provider)"
@@ -113,7 +114,9 @@ dry-run)
     echo "FAIL: primary claim (status=$status provider=$provider) — claude CLI 로그인/설치를 확인하라" >&2
     exit 1
   fi
-  echo "[2/6] provider gate claim OK (claude 헤드리스 프로브 통과, run_id=$run_id)"
+  probe_warn="$(printf '%s' "$claim" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("probe_warning",""))')"
+  [ -n "$probe_warn" ] && echo "      warn: $probe_warn"
+  echo "[2/6] provider gate claim OK (run_id=$run_id)"
 
   contract_hash="$(shasum -a 256 "$CONTRACT" | awk '{print $1}')"
   snapshot_json="$(python3 "$SCRIPT_DIR/night-runtime.py" snapshot-inbox \

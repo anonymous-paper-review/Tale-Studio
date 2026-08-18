@@ -225,7 +225,8 @@ def state_view(state):
         "lease_until": state["lease_until"],
         "fencing": state["fencing"], "fencing_counter": state["fencing"],
         "contract_hash": state["contract_hash"], "claim_date": state["claim_date"],
-        "fallback_pending": bool(state.get("fallback_pending", False)),
+        **{key: state[key] for key in ("preflight_warning", "probe_warning")
+           if key in state},
     }
 
 
@@ -298,25 +299,15 @@ def primary(args):
             if (previous_file != state_file and previous_state["status"] in ACTIVE
                     and float(previous_state["lease_until"]) > now_epoch()):
                 raise RuntimeError("이전 KST 날짜의 provider claim이 아직 유효하다")
-        if not run_preflight(args):
-            state = new_claim(args.job, "claude", run_id, contract_hash, 1,
-                              lease_seconds(args), claim_date)
-            state["status"] = "failed"
-            atomic_json(state_file, state)
-            emit(state_view(state))
-            return 1
-        if not probe_claude(args):
-            # Probe failure is fail-closed: never launch an unverified Claude
-            # owner; select Codex directly with a fenced claim.
-            state = new_claim(args.job, "codex", run_id, contract_hash, 1,
-                              lease_seconds(args), claim_date)
-            state["failure_reason"] = "probe-failed"
-            state["fallback_pending"] = True
-            atomic_json(state_file, state)
-            emit(state_view(state))
-            return 1
+        # preflight와 probe는 관문이 아니라 점검 기록이다. 실패해도 밤을 막지
+        # 않는다 — 경고를 state에 남기고 claude 실행을 시도한다. 진짜 못 도는
+        # 환경이면 실행 단계가 실패하고 그 기록이 아침에 남는다.
         state = new_claim(args.job, "claude", run_id, contract_hash, 1,
                           lease_seconds(args), claim_date)
+        if not run_preflight(args):
+            state["preflight_warning"] = "preflight 점검 경고 — 기록하고 계속한다"
+        if not probe_claude(args):
+            state["probe_warning"] = "claude 헤드리스 프로브 무응답 — 기록하고 실행을 시도한다"
         atomic_json(state_file, state)
         emit(state_view(state))
         return 0
@@ -347,32 +338,19 @@ def fallback(args):
             atomic_json(state_file, state)
         if state["contract_hash"] != contract_hash:
             raise RuntimeError("상태의 contract_hash가 현재 계약과 다르다")
-        if (state["provider"] == "codex" and state["status"] in ACTIVE
-                and state.get("fallback_pending") is True):
-            if not run_preflight(args):
-                state["status"] = "failed"
-                state["fallback_pending"] = False
-                state["updated_at"] = iso_now()
-                atomic_json(state_file, state)
-                raise RuntimeError("fallback preflight가 실패했다")
-            state["fallback_pending"] = False
-            state["updated_at"] = iso_now()
-            atomic_json(state_file, state)
-            emit(state_view(state))
-            return 0
         if state["provider"] != "claude" or state["status"] not in {
                 "failed", "timeout", "claude:failed", "claude:timeout"}:
             raise RuntimeError("Codex fallback은 claude failed/timeout에서만 가능하다")
         run_id = args.run_id or state["run_id"]
         if args.run_id is not None and args.run_id != state["run_id"]:
             raise RuntimeError("fallback run-id가 primary와 다르다")
-        if not run_preflight(args):
-            raise RuntimeError("fallback preflight가 실패했다")
         # A failed/timeout primary is an explicit handoff; one fenced CAS under
         # this lock is the only place that can consume it.
         next_state = new_claim(args.job, "codex", run_id, contract_hash,
                                int(state["fencing"]) + 1, lease_seconds(args),
                                state["claim_date"])
+        if not run_preflight(args):
+            next_state["preflight_warning"] = "preflight 점검 경고 — 기록하고 계속한다"
         atomic_json(state_file, next_state)
         emit(state_view(next_state))
         return 0

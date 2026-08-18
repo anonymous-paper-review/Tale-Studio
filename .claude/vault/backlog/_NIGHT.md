@@ -92,9 +92,7 @@ provider_state="$(python3 "$GATE" state sweep \
   --contract-path "$PROJECT_ROOT/.claude/vault/backlog/_NIGHT.md")"
 provider_status="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')"
 provider="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["provider"])')"
-fallback_pending="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(str(json.load(sys.stdin).get("fallback_pending", False)).lower())')"
-if [ "$fallback_pending" = "true" ] || \
-   { [ "$provider" = "claude" ] && { [ "$provider_status" = "failed" ] || [ "$provider_status" = "timeout" ]; }; }; then
+if [ "$provider" = "claude" ] && { [ "$provider_status" = "failed" ] || [ "$provider_status" = "timeout" ]; }; then
   provider_state="$(python3 "$GATE" fallback sweep \
     --run-id "$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')" \
     --contract-path "$PROJECT_ROOT/.claude/vault/backlog/_NIGHT.md")" || {
@@ -316,7 +314,7 @@ worktree와 branch 이름에 actor가 들어가므로 두 actor가 같은 원격
 1. 같은 `operation_key`와 같은 입력을 재사용할 수 있는지 먼저 확인한다. 이미 성공 표식이 있으면 재실행하지 않고 그 결과를 연결한다.
 2. 임시 기록은 동기화 후 원자 교체한다. 표식이 없으면 완료로 추정하지 않는다.
 3. 표식이 `claimed`에서 끊겼고 lease가 만료되었다면 새 소유자가 그 단계부터 재개한다. `decomposed`, `executed`, `reported` 표식이 있으면 앞 단계를 반복하지 않는다.
-4. 외부 도구가 실패하면 짧은 재시도 한 번과 읽기 전용 대체 조사만 허용한다. 반복 실패는 `tool-unavailable`로 기록하고 다음 단위로 간다.
+4. 외부 도구가 실패해도 시도 자체를 막지 않는다. 재시도 횟수 상한은 없다 — 단 매 재시도는 무엇을 바꿨는지 save(§8.4)에 남기고, 같은 명령·같은 입력의 단순 반복은 하지 않는다. 바꿀 것이 더 없으면 `tool-unavailable`로 기록하고 다음 단위로 간다.
 5. 충돌, 테스트 실패, 입력 부족은 격리 사본을 보존하고 `awaiting-merge-review` 또는 아침 카드로 보낸다. 기준을 낮추거나 오류를 숨기지 않는다.
 6. primary의 상태가 `unknown`이면 fallback을 추측해서 띄우지 않는다. 운영자가 상태를 확인한 뒤 resume 기록을 남겨야 한다.
 7. 실행이 중단되면 그때까지의 decomposition, result, cost, artifact 경로를 먼저 기록한다. 수확 성공 표식과 아침 요약은 모든 산출이 저장된 뒤에만 쓴다.
@@ -333,6 +331,19 @@ worktree와 branch 이름에 actor가 들어가므로 두 actor가 같은 원격
 - 다음 조치와 사람이 봐야 할 질문.
 
 `inconclusive`는 실패를 성공으로 포장하지 않는 정상 결과다. 연결이 불확실하면 추측하지 말고 `확인 못 함`으로 남긴다.
+
+### 8.4 save — 중간 저장 지점
+
+밤은 지켜보는 사람이 없으므로, 막히거나 방향을 바꾸는 순간마다
+`runs/<actor>/<run_id>/saves/<unit-id>.md`에 저장 지점을 남긴다. 내용은 세 가지다.
+
+- **어디까지 갔나**: 확인한 사실, 실행한 명령, 마지막으로 참이었던 상태.
+- **왜 멈췄나**: 막힌 지점과 이유 (§8.1 진단 분류 코드).
+- **어디로 갔나**: 버린 길과 그 이유, 바꾼 접근. 종료라면 "여기서 종료"와 남은 질문.
+
+save는 결과 카드가 아니다 — 결론이 없어도 쓴다. 같은 단위를 다시 잡을 때(같은 밤이든
+다음 밤이든) 이전 save에서 이어가고, 같은 길을 처음부터 다시 걷지 않는다. save가 있는
+한 "결론 없음"은 손실이 아니라 다음 실행의 출발점이다.
 
 ## 9. 수용 기준, 측정, 판정선
 
@@ -460,9 +471,9 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 
 실행을 끝내는 일반적인 경계는 다음뿐이다.
 
-- 연속으로 **3개** 단위가 결론 없이 끝나면 도구·입력 품질을 진단하고 그 밤의 새 단위 생성을 잠시 닫는다. 이미 실행 중인 단위는 안전하게 끝낸다.
-- 오전 **8시**가 되면 새 단위를 잡지 않고 실행 중인 단위의 기록만 마친다.
-- 위 경계는 처리량 조절이며, 안전상 hard-stop인 비가역 행동·예산 초과와 혼동하지 않는다.
+- 단위가 결론 없이 끝나도 밤을 닫지 않는다. save(§8.4)를 남기고 접근을 바꿔 계속한다. 결론이 나올 때까지 도는 것이 기본이고, 금지는 "같은 접근의 단순 반복"뿐이다.
+- 오전 **8시**가 되면 새 단위를 잡지 않고, 실행 중인 단위의 기록과 save를 마친다.
+- 실행을 멈추는 안전상 hard-stop은 비가역 행동과 예산 초과 둘뿐이다(§7).
 
 ## 13. 산출물과 보존
 
@@ -488,7 +499,7 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 저장 위치는 고정한다.
 
 - 티켓·결과 카드: `.claude/vault/backlog/tickets/` — 새 티켓과 결과 카드는 이 디렉터리에만 만든다. backlog 루트에는 이 계약 문서와 실행 도구만 둔다.
-- 실행 산출물: `runs/<actor>/<run_id>/` — 사람 보고서 `report.html`, 기계 요약 `manifest.json`, 세션 요약 `sessions/*.md`, worktree 목록 `worktrees.json`. actor와 run이 경로에 들어가므로 같은 날짜에 두 사람이 실행해도 서로 덮어쓰지 않는다. 날짜 하나를 덮어쓰는 `reports/YYYY-MM-DD.html` 경로는 더 쓰지 않는다 (기존 `.claude/vault/backlog/reports/`는 이력으로만 남긴다). 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
+- 실행 산출물: `runs/<actor>/<run_id>/` — 사람 보고서 `report.html`, 기계 요약 `manifest.json`, 세션 요약 `sessions/*.md`, worktree 목록 `worktrees.json`, 중간 저장 `saves/*.md`(§8.4). actor와 run이 경로에 들어가므로 같은 날짜에 두 사람이 실행해도 서로 덮어쓰지 않는다. 날짜 하나를 덮어쓰는 `reports/YYYY-MM-DD.html` 경로는 더 쓰지 않는다 (기존 `.claude/vault/backlog/reports/`는 이력으로만 남긴다). 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
 - 판정 기록: `feedback/<actor>/<run_id>/*.json` — append-only, 자기 다음 밤 실행만 소비.
 - 각 사람의 접점은 두 개뿐이다: 쓰는 곳 자기 `_INBOX.md`, 읽는 곳 자기 최신 `runs/<actor>/<run_id>/report.html`. 다른 파일을 읽어야만 진행되는 절차를 만들지 않는다.
 - 티켓 상태와 작업 사본 정보.
@@ -507,6 +518,11 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 이 문서를 고쳐야 할 때는 변경 이유, 영향받는 분해 기준, 이전 계약 해시, 새 계약 해시를 기록한다. 밤 실행은 항상 이 문서 하나를 정본으로 사용한다.
 
 ## 15. 계약 개정 기록
+
+- 2026-08-18 (11차) · 이전 계약 해시 `e20c886348d10a1cc2abcedb4b1a3ca1ff65513c45d1d53481eb1e5e535eb18c` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — 실행 자체를 막는 보험을 없앤다. 8/18 새벽 실행이 inbox 병합 판정 하나로 두 번 전멸한 것이 계기다. 밤에서 보험의 비용은 "아침에 결과 없음"인데, 시작 관문형 보험이 막는 실패의 비용도 대부분 같아서 보험이 손해다.
+  - 변경 내용: (1) preflight와 claude 프로브를 관문에서 점검 기록으로 강등 — 실패해도 경고를 claim에 남기고 실행을 시도한다. probe 실패 시 즉시 Codex로 넘기던 fallback_pending 경로도 삭제하고, Codex 대체는 실제 실행이 failed/timeout으로 닫힌 뒤에만 남긴다. (2) 연속 3단위 결론 없음 중단을 삭제 — 결론이 나올 때까지 도는 것이 기본이다. (3) 외부 도구 재시도 1회 제한을 삭제 — 시도는 막지 않되 매 시도의 변경점을 기록한다. (4) §8.4 save 신설 — 막히거나 방향을 바꿀 때마다 어디까지 갔고, 왜 멈췄고, 어디로 갔는지를 `runs/<actor>/<run_id>/saves/`에 남기고, 다음 실행이 거기서 이어간다.
+  - 영향받는 분해 기준: hard-stop은 비가역 행동과 예산 초과 둘만 남는다. 동시성 잠금(같은 날짜 이중 실행 방지)과 거짓 성공 방지(완료 검증·fencing)는 실행을 만드는 장치라 그대로 둔다.
 
 - 2026-08-18 (10차) · 이전 계약 해시 `4ce259fb4b22aa9a473a9ff4d0c54fa550bde01aeccee09399c41d4ec512467f` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 지시 — 안 쓰는 것을 전부 뺀다. 상대 report에 대한 교차 검토 기록, shared-legacy 프로필, 원격 inbox 동기화 도구, 겹치는 설치 문서.

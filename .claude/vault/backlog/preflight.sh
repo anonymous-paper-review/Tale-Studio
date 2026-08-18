@@ -1,55 +1,42 @@
 #!/bin/sh
-# Orca precheck: 검증만 한다. 사용자 셸 설정이나 lock 파일을 수정하지 않는다.
-# 실패는 0으로 숨기지 않고 호출자에게 돌려보낸다.
-set -eu
+# 점검 보고 — 실행을 막지 않는다. 어긋난 것은 warn으로 남기고 밤이 스스로
+# 고치거나 기록한다. 항상 exit 0. (도구가 아예 없으면 어차피 실행 단계가
+# 실패하고 그 실패가 기록으로 남는다.)
+set -u
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 BACKLOG_ROOT="$PROJECT_ROOT/.claude/vault/backlog"
 CONTRACT="$BACKLOG_ROOT/_NIGHT.md"
-HARVEST="$BACKLOG_ROOT/harvest.py"
-SNAPSHOT_RUNTIME="$BACKLOG_ROOT/night-runtime.py"
-PROVIDER_GATE="$BACKLOG_ROOT/provider-gate.py"
-REVIEW_SERVER="$BACKLOG_ROOT/night-review-server.py"
-INBOX="$PROJECT_ROOT/.claude/vault/_INBOX.md"
-TICKETS_ROOT="$BACKLOG_ROOT/tickets"
-REPORTS_ROOT="$BACKLOG_ROOT/reports"
-OLD_SWEEP="$BACKLOG_ROOT/_SWEEP.md"
-OLD_NOW="$PROJECT_ROOT/.claude/vault/destination/_NOW.md"
-OLD_MORNING="$BACKLOG_ROOT/_MORNING.md"
+WARNINGS=0
 
-fail() {
-  echo "[preflight] FAIL: $*" >&2
-  exit 1
+warn() {
+  echo "[preflight] warn: $*" >&2
+  WARNINGS=$((WARNINGS + 1))
 }
 
-[ -d "$PROJECT_ROOT" ] || fail "project root missing: $PROJECT_ROOT"
-[ -d "$BACKLOG_ROOT" ] || fail "backlog root missing: $BACKLOG_ROOT"
-[ -f "$CONTRACT" ] || fail "night contract missing: $CONTRACT"
-[ -f "$HARVEST" ] || fail "harvest script missing: $HARVEST"
-[ -f "$SNAPSHOT_RUNTIME" ] || fail "snapshot runtime missing: $SNAPSHOT_RUNTIME"
-[ -f "$PROVIDER_GATE" ] || fail "provider gate helper missing: $PROVIDER_GATE"
-[ -f "$REVIEW_SERVER" ] || fail "review server missing: $REVIEW_SERVER"
-[ -f "$INBOX" ] || fail "owner inbox missing: $INBOX"
-[ -f "$PROJECT_ROOT/.claude/agents/night-investigator.md" ] || fail "night investigator agent missing"
-[ -f "$PROJECT_ROOT/.claude/skills/night-debug-run/SKILL.md" ] || fail "night debug-run skill missing"
-[ -d "$TICKETS_ROOT" ] || fail "tickets directory missing: $TICKETS_ROOT"
-[ -d "$REPORTS_ROOT" ] || fail "reports directory missing: $REPORTS_ROOT"
-[ ! -e "$OLD_SWEEP" ] || fail "obsolete live sweep contract still exists: $OLD_SWEEP"
-[ ! -e "$OLD_NOW" ] || fail "obsolete live destination still exists: $OLD_NOW"
-[ ! -e "$OLD_MORNING" ] || fail "obsolete live morning review still exists: $OLD_MORNING"
-# 티켓이 backlog 루트에 다시 평평하게 쌓이면 계약 위반이다 (_NIGHT.md만 허용).
-stray_md="$(find "$BACKLOG_ROOT" -maxdepth 1 -name '*.md' ! -name '_NIGHT.md' | wc -l | tr -d ' ')"
-[ "$stray_md" = "0" ] || fail "stray ticket markdown at backlog root; move into $TICKETS_ROOT"
+[ -f "$CONTRACT" ] || warn "night contract missing: $CONTRACT"
+[ -f "$BACKLOG_ROOT/harvest.py" ] || warn "harvest script missing"
+[ -f "$BACKLOG_ROOT/night-runtime.py" ] || warn "snapshot runtime missing"
+[ -f "$BACKLOG_ROOT/provider-gate.py" ] || warn "provider gate helper missing"
+[ -f "$BACKLOG_ROOT/night-review-server.py" ] || warn "review server missing"
+[ -f "$PROJECT_ROOT/.claude/vault/_INBOX.md" ] || warn "inbox missing: .claude/vault/_INBOX.md"
+[ -f "$PROJECT_ROOT/.claude/agents/night-investigator.md" ] || warn "night investigator agent missing"
+[ -f "$PROJECT_ROOT/.claude/skills/night-debug-run/SKILL.md" ] || warn "night debug-run skill missing"
+[ -d "$BACKLOG_ROOT/tickets" ] || warn "tickets directory missing"
 
-command -v python3 >/dev/null 2>&1 || fail "python3 is unavailable"
-command -v git >/dev/null 2>&1 || fail "git is unavailable"
-git -C "$PROJECT_ROOT" rev-parse --show-toplevel >/dev/null 2>&1 || fail "project is not a git worktree"
+command -v python3 >/dev/null 2>&1 || warn "python3 is unavailable"
+command -v git >/dev/null 2>&1 || warn "git is unavailable"
+command -v claude >/dev/null 2>&1 || warn "claude CLI is unavailable"
+git -C "$PROJECT_ROOT" rev-parse --show-toplevel >/dev/null 2>&1 || warn "project is not a git worktree"
 
-# The live runner reads this path. A stale or missing spec reference is a contract failure.
-grep -q '^# 밤 루프' "$CONTRACT" || fail "night contract header is invalid"
-grep -q '_INBOX.md' "$CONTRACT" || fail "night contract does not consume _INBOX.md"
-if grep -Eq '(^|[[:space:]`])(_SWEEP|destination/_NOW|\.omc/specs)' "$CONTRACT"; then
-  fail "night contract contains an obsolete live reference"
+# 계약 정합 — 어긋나면 알리되 막지 않는다.
+if [ -f "$CONTRACT" ]; then
+  grep -q '^# 밤 루프' "$CONTRACT" || warn "night contract header is invalid"
+  grep -q '_INBOX.md' "$CONTRACT" || warn "night contract does not consume _INBOX.md"
 fi
+# 티켓이 backlog 루트에 평평하게 쌓이면 정리 대상이다 (_NIGHT.md만 허용).
+stray_md="$(find "$BACKLOG_ROOT" -maxdepth 1 -name '*.md' ! -name '_NIGHT.md' 2>/dev/null | wc -l | tr -d ' ')"
+[ "$stray_md" = "0" ] || warn "stray markdown at backlog root ($stray_md) — move into tickets/"
 
+echo "[preflight] 점검 완료 — 경고 ${WARNINGS}건"
 exit 0
