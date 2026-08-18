@@ -15,24 +15,33 @@ import { Slider } from '@/components/ui/slider'
 import { withCacheBust } from '@/components/rough-frame-cycle'
 import { cn } from '@/lib/utils'
 import type { RoughStoryboardImage } from '@/types'
+import { translate, useT } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 
 const UNDO_LIMIT = 10
 // 지우개는 같은 슬라이더 값에서 펜보다 넓게 — 화살표 한 획을 몇 번에 걷어낼 수 있는 실용 배율.
 const ERASER_WIDTH_MULT = 3
+// 모듈 상수는 영어 키, 번역은 렌더 지점에서 t() (writer-progress.tsx 의 STAGE_LABELS 패턴).
 const PEN_COLORS = [
-  { label: '연필', value: '#333333' },
-  { label: '마킹', value: '#dc2626' },
+  { label: 'Pencil', value: '#333333' },
+  { label: 'Marker', value: '#dc2626' },
 ] as const
 
 type Tool = 'pen' | 'eraser'
 type Pt = { x: number; y: number }
 
+// 컴포넌트 밖 순수 함수라 훅을 못 쓴다 — translate() + 현재 locale 직접 조회로 번역(#i18n-s5-batch3).
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.crossOrigin = 'anonymous' // supabase storage 는 ACAO:* — 캔버스 오염 없이 픽셀 접근 가능
     img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error(`이미지 로드 실패: ${src}`))
+    img.onerror = () =>
+      reject(
+        new Error(
+          translate(useLocaleStore.getState().locale, 'Failed to load image: {src}', { src }),
+        ),
+      )
     img.src = src
   })
 }
@@ -48,6 +57,7 @@ export function DirectingArrowEditor({
   panel: RoughStoryboardImage
   onSaved: () => void
 }) {
+  const t = useT()
   const directionUrl = panel.frames?.direction
     ? withCacheBust(panel.frames.direction, panel.generatedAt)
     : null
@@ -76,6 +86,10 @@ export function DirectingArrowEditor({
   const [hoverPt, setHoverPt] = useState<Pt | null>(null)
   const [displayScale, setDisplayScale] = useState(1)
 
+  // effect 의 .catch() 안에서 쓸 문자열은 미리 번역해 둔다 — t 자체를 deps 에 넣으면 매 렌더
+  //   재실행되므로, 값(문자열)만 deps 에 넣어 로케일이 실제로 바뀔 때만 재실행되게 한다.
+  const failedToLoadFrameMsg = t('Could not load the DIRECTING frame')
+
   // 원본 DIRECTING 프레임 → 위층 캔버스. directionUrl 은 generatedAt 캐시버스트를 포함하므로
   //   저장 후(loadProject 로 generatedAt 갱신) 이 effect 가 저장본을 새 "원본"으로 다시 깐다.
   useEffect(() => {
@@ -94,12 +108,12 @@ export function DirectingArrowEditor({
         setDims({ w: img.naturalWidth, h: img.naturalHeight })
       })
       .catch(() => {
-        if (!cancelled) toast.error('DIRECTING 프레임을 불러오지 못했어요')
+        if (!cancelled) toast.error(failedToLoadFrameMsg)
       })
     return () => {
       cancelled = true
     }
-  }, [directionUrl])
+  }, [directionUrl, failedToLoadFrameMsg])
 
   const busy = separating || saving
   const ready = !!dims
@@ -210,7 +224,7 @@ export function DirectingArrowEditor({
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
     } catch {
-      toast.error('원본을 다시 불러오지 못했어요')
+      toast.error(t('Could not reload the original'))
     }
   }
 
@@ -228,11 +242,11 @@ export function DirectingArrowEditor({
       setTool('eraser') // 분리 직후 자연스러운 다음 동작 = 긁어보기
       toast.success(
         j.data.cached
-          ? '분리해 둔 레이어를 불러왔어요'
-          : '화살표 레이어를 분리했어요 — 지우개로 긁으면 밑층이 드러나요',
+          ? t('Loaded the previously separated layer')
+          : t('Separated the arrow layer — scrape with the eraser to reveal the layer underneath'),
       )
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '레이어 분리 실패')
+      toast.error(e instanceof Error ? e.message : t('Layer separation failed'))
     } finally {
       setSeparating(false)
     }
@@ -254,7 +268,7 @@ export function DirectingArrowEditor({
       out.width = top.width
       out.height = top.height
       const ctx = out.getContext('2d')
-      if (!ctx) throw new Error('캔버스 컨텍스트 생성 실패')
+      if (!ctx) throw new Error(t('Could not create a canvas context'))
       if (effectiveClean) {
         const base = await loadImage(effectiveClean)
         ctx.drawImage(base, 0, 0, out.width, out.height)
@@ -273,12 +287,12 @@ export function DirectingArrowEditor({
       const j = await res.json().catch(() => null)
       if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
       if (!regenerateEnd) {
-        toast.success('DIRECTING 프레임을 저장했어요')
+        toast.success(t('Saved the DIRECTING frame'))
         onSaved()
         return
       }
       // 저장이 끝난 뒤(= 서버가 새 DIRECTING 을 갖고 있는 상태) END 를 그 그림 기준으로 다시 그린다.
-      toast.info('END 프레임을 다시 그리는 중이에요 — 30초쯤 걸려요')
+      toast.info(t('Redrawing the END frame — about 30 seconds'))
       const endRes = await fetch('/api/writer/rough-directing-edit', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -286,10 +300,10 @@ export function DirectingArrowEditor({
       })
       const endJson = await endRes.json().catch(() => null)
       if (!endRes.ok) throw new Error(endJson?.error ?? `HTTP ${endRes.status}`)
-      toast.success('DIRECTING 저장 + END 프레임 재생성 완료')
+      toast.success(t('Saved DIRECTING and regenerated the END frame'))
       onSaved()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '저장 실패')
+      toast.error(e instanceof Error ? e.message : t('Save failed'))
     } finally {
       setSaving(false)
     }
@@ -298,7 +312,7 @@ export function DirectingArrowEditor({
   if (!directionUrl) {
     return (
       <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-        3프레임 러프 세트가 있어야 편집할 수 있어요. 패널을 먼저 생성해주세요.
+        {t('You need a 3-frame rough set to edit. Generate a panel first.')}
       </p>
     )
   }
@@ -315,7 +329,7 @@ export function DirectingArrowEditor({
           className="hover-red-beam"
         >
           {separating ? <Loader2 className="size-3.5 animate-spin" /> : <Layers className="size-3.5" />}
-          {effectiveClean ? '레이어 다시 분리' : '화살표 레이어 분리'}
+          {effectiveClean ? t('Re-separate layer') : t('Separate arrow layer')}
         </Button>
 
         <div className="ml-1 flex items-center gap-1">
@@ -323,7 +337,7 @@ export function DirectingArrowEditor({
             size="icon"
             variant={tool === 'pen' ? 'default' : 'ghost'}
             className="size-8"
-            aria-label="펜"
+            aria-label={t('Pen')}
             disabled={busy}
             onClick={() => setTool('pen')}
           >
@@ -333,8 +347,8 @@ export function DirectingArrowEditor({
             size="icon"
             variant={tool === 'eraser' ? 'default' : 'ghost'}
             className="size-8"
-            aria-label="지우개 (레이어 분리 후 사용 가능)"
-            title={effectiveClean ? '지우개' : '레이어 분리 후 사용할 수 있어요'}
+            aria-label={t('Eraser (available after separating layers)')}
+            title={effectiveClean ? t('Eraser') : t('Available after separating layers')}
             disabled={busy || !effectiveClean}
             onClick={() => setTool('eraser')}
           >
@@ -348,7 +362,7 @@ export function DirectingArrowEditor({
               <button
                 key={c.value}
                 type="button"
-                aria-label={`펜 색: ${c.label}`}
+                aria-label={t('Pen color: {color}', { color: t(c.label) })}
                 onClick={() => setPenColor(c.value)}
                 className={cn(
                   'size-5 rounded-full border-2 transition-transform',
@@ -367,7 +381,7 @@ export function DirectingArrowEditor({
           step={1}
           value={[penWidth]}
           onValueChange={([v]) => setPenWidth(v)}
-          aria-label="굵기"
+          aria-label={t('Thickness')}
         />
         {/* 실제 칠해지는 굵기 — 지우개는 배율이 붙으므로 슬라이더 값과 다르다. 그 값을 그대로 보여준다. */}
         <span className="w-10 shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
@@ -379,7 +393,7 @@ export function DirectingArrowEditor({
             size="icon"
             variant="ghost"
             className="size-8"
-            aria-label="되돌리기"
+            aria-label={t('Undo')}
             disabled={busy || undoCount === 0}
             onClick={handleUndo}
           >
@@ -389,8 +403,8 @@ export function DirectingArrowEditor({
             size="icon"
             variant="ghost"
             className="size-8"
-            aria-label="화살표 전부 지우기 (위층 비우기)"
-            title="화살표 전부 지우기"
+            aria-label={t('Erase all arrows (clear top layer)')}
+            title={t('Erase all arrows')}
             disabled={busy || !effectiveClean}
             onClick={handleClearLayer}
           >
@@ -400,8 +414,8 @@ export function DirectingArrowEditor({
             size="icon"
             variant="ghost"
             className="size-8"
-            aria-label="원본 복원"
-            title="원본 복원"
+            aria-label={t('Restore original')}
+            title={t('Restore original')}
             disabled={busy || !ready}
             onClick={() => void handleReset()}
           >
@@ -467,8 +481,10 @@ export function DirectingArrowEditor({
       <div className="flex items-center gap-3">
         <p className="min-w-0 flex-1 text-xs text-muted-foreground">
           {effectiveClean
-            ? '지우개로 위층을 긁으면 화살표 없는 밑층이 드러나요. 펜으로 새 화살표를 그려요.'
-            : '펜은 바로 쓸 수 있어요. 기존 화살표를 지우려면 먼저 레이어 분리를 눌러주세요.'}
+            ? t(
+                'Scrape the top layer with the eraser to reveal the arrow-free layer underneath. Draw new arrows with the pen.',
+              )
+            : t('The pen works right away. To erase existing arrows, separate the layers first.')}
         </p>
         <Button
           size="sm"
@@ -477,7 +493,7 @@ export function DirectingArrowEditor({
           onClick={() => void handleSave()}
         >
           {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-          저장
+          {t('Save')}
         </Button>
         {/* 화살표를 고쳤으면 END 도 그 화살표를 따라가야 한다(#end-from-direction). 이미지 생성이
             한 번 걸리므로 기본 저장과 갈라 두고, 누른 사람만 과금을 태운다. */}
@@ -485,14 +501,14 @@ export function DirectingArrowEditor({
           size="sm"
           disabled={busy || !ready}
           onClick={() => void handleSave(true)}
-          title="저장한 DIRECTING 프레임을 기준으로 END 프레임을 다시 그려요 (이미지 생성 1회)"
+          title={t('Redraw the END frame based on the saved DIRECTING frame (1 image generation)')}
         >
           {saving ? (
             <Loader2 className="size-3.5 animate-spin" />
           ) : (
             <Wand2 className="size-3.5" />
           )}
-          저장 후 END 재생성
+          {t('Save, then regenerate END')}
         </Button>
       </div>
     </div>

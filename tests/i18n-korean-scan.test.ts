@@ -19,6 +19,21 @@ const ALLOWLIST_PATH = path.join(process.cwd(), 'tests', 'i18n-korean-allowlist.
 const EXCLUDED = [
   path.join('src', 'lib', 'i18n', 'messages-ko.ts'),
   path.join('src', 'lib', 'writer', 'pipeline') + path.sep,
+  // 정찰 분류 C(2026-08-18, 구조적 영구 한국어 — 시스템 프롬프트/few-shot/서버 진단 로그/정규식):
+  //   few-shot 의 응답 언어 편향은 #20 에서 로케일 분기로 다루지만, 스캐너의 "UI 잔존" 지표와는
+  //   별개 축이라 제외한다. writer/chat/route.ts 는 B 1줄이 섞여 있어 래칫에 남긴다.
+  path.join('src', 'app', 'api', 'artist', 'chat') + path.sep,
+  path.join('src', 'app', 'api', 'director', 'chat') + path.sep,
+  path.join('src', 'app', 'api', 'produce', 'chat', 'system-prompt.ts'),
+  path.join('src', 'lib', 'writer', 'llm') + path.sep,
+  path.join('src', 'lib', 'writer', 'run-store.ts'),
+  path.join('src', 'app', 'api', 'writer', 'step') + path.sep,
+  path.join('src', 'app', 'api', 'writer', 'watchdog') + path.sep,
+  path.join('src', 'lib', 'writer', 'motion-vocabulary.ts'),
+  path.join('src', 'lib', 'chat-format.ts'),
+  path.join('src', 'lib', 'writer', 'chat-id-resolve.ts'),
+  path.join('src', 'lib', 'writer', 'content-safety-hint.ts'),
+  path.join('src', 'lib', 'writer', 'rough-storyboard.ts'),
 ]
 
 function walk(dir: string): string[] {

@@ -49,6 +49,8 @@ import { createWheelNotchStepper } from '@/lib/wheel-notch'
 import { cn } from '@/lib/utils'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import type { RoughStoryboardImage, Shot } from '@/types'
+import { translate, useT } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 
 type PanelJob = { status: 'generating' | 'failed'; error?: string }
 
@@ -68,6 +70,11 @@ function shotHasInfo(actionDescription?: string | null): boolean {
 }
 
 export function RoughStoryboardView() {
+  const t = useT()
+  // useCallback/useEffect 본문 안에서는 t() 대신 translate()+locale 을 쓴다(#i18n-s5-batch3) —
+  //   useT() 의 반환 함수는 매 렌더 새 참조라 deps 에 넣으면 메모이제이션이 무너진다. locale 은
+  //   원시값이라 실제로 로케일이 바뀔 때만 재계산을 트리거한다.
+  const locale = useLocaleStore((s) => s.locale)
   const projectId = useProjectStore((s) => s.projectId)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
@@ -139,14 +146,17 @@ export function RoughStoryboardView() {
       action: null,
       // #feedback 2026-08-07: "작업 완료"로 시작 + @멘션·Ctrl+클릭 조작법을 온보딩에 명시
       //   (진행도 핀이 풀린 직후 이 브리핑이 들어오는 흐름).
-      content:
-        '씬·샷 작업이 완료됐어요.\n\n' +
-        `· 씬 ${sceneCount}개, 샷 ${shots.length}개로 나눴어요\n` +
-        '· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n' +
-        '수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n' +
-        '"@"를 누르면 씬·샷을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
+      content: translate(
+        locale,
+        'Scene and shot work is done.\n\n' +
+          '· Split into {sceneCount} scenes, {shotCount} shots\n' +
+          '· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\n' +
+          "Let me know which scene or shot you'd like to revise or add.\n" +
+          'Press "@" to pick a scene or shot (Ctrl+click a card does the same).',
+        { sceneCount, shotCount: shots.length },
+      ),
     })
-  }, [projectId, sceneManifest, shots.length, chatMessages, offerSuggestion])
+  }, [projectId, sceneManifest, shots.length, chatMessages, offerSuggestion, locale])
 
   // Artist 핸드오프(#handoff-to-chat 2026-07-31) — 탭 하단 'Hand over to Concept Artist' 버튼을
   //   걷어내고 채팅 제안으로 옮겼다. 옛 버튼은 게이트 없이 항상 활성이었으므로 여기서도 막지 않고,
@@ -193,11 +203,13 @@ export function RoughStoryboardView() {
     offerSuggestion({
       id: `handoff:writer:${projectId}`,
       stage: 'writer',
-      content:
-        '러프 스토리보드가 모두 준비됐어요. Artist로 넘어가 캐릭터·배경 컨셉을 잡아볼까요?',
+      content: translate(
+        locale,
+        'The rough storyboard is all ready. Ready to move to Artist and work out character and background concepts?',
+      ),
       action: { kind: 'handoff', utterance: spec.utterance, label: spec.label },
     })
-  }, [projectId, roughAllReady, offerSuggestion, reachedStage])
+  }, [projectId, roughAllReady, offerSuggestion, reachedStage, locale])
 
   // 파이프라인이 이 화면을 보는 중에 완료되면 씬/샷을 1회 재로드.
   useEffect(() => {
@@ -254,7 +266,11 @@ export function RoughStoryboardView() {
           ).filter((x) => x.reason === 'gave_up')
           if (gaveUp.length) {
             toast.info(
-              `패널 ${gaveUp.length}개는 반복 실패로 자동 생성을 멈췄어요. 카드의 "다시 시도"로 재생성할 수 있어요.`,
+              translate(
+                locale,
+                '{count} panels stopped auto-generating after repeated failures. Use "Retry" on the card to regenerate them.',
+                { count: gaveUp.length },
+              ),
             )
           }
         }
@@ -356,7 +372,7 @@ export function RoughStoryboardView() {
               setPanelJobs((prev) => {
                 const next = { ...prev }
                 for (const id of jobShotIds) {
-                  if (!isDone(id)) next[id] = { status: 'failed', error: '생성 실패' }
+                  if (!isDone(id)) next[id] = { status: 'failed', error: translate(locale, 'Generation failed') }
                 }
                 return next
               })
@@ -390,11 +406,13 @@ export function RoughStoryboardView() {
             return next
           })
         }
-        toast.error(e instanceof Error ? e.message : '러프 스토리보드 생성 요청 실패')
+        toast.error(
+          e instanceof Error ? e.message : translate(locale, 'Rough storyboard generation request failed'),
+        )
         return null
       }
     },
-    [projectId, loadProject],
+    [projectId, loadProject, locale],
   )
 
   // 누락 패널 전체 생성 펌프(#c1·#c2·#c3 2026-07-15) — 서버가 호출당 6샷으로 캡하므로(504·쿼터
@@ -425,7 +443,12 @@ export function RoughStoryboardView() {
           if (r.quota) {
             if (!auto && !quotaToasted) {
               quotaToasted = true
-              toast.info('다른 생성 작업이 대기열을 쓰고 있어요. 자리가 나는 대로 이어서 생성할게요.')
+              toast.info(
+                translate(
+                  locale,
+                  "Another generation task is using the queue. We'll continue as soon as a slot opens up.",
+                ),
+              )
             }
             await sleep(8000)
             continue
@@ -439,7 +462,7 @@ export function RoughStoryboardView() {
         pumpRunningRef.current = false
       }
     },
-    [generate],
+    [generate, locale],
   )
 
   const running = !!(
@@ -465,8 +488,9 @@ export function RoughStoryboardView() {
   ).length
   // 제목 아래 설명문은 제거(#c2 2026-07-14) — 카드 사용법은 첫 진입 브리핑 채팅이 안내한다.
   // 트리트먼트·대사 탭과 같은 자리의 도움말(#c4 2026-08-03) — 헤더 아래 한 줄.
-  const headerDescription =
-    '러프 스토리보드 — 카드를 클릭하면 확인·수정·재생성, 씬 이름을 클릭하면 접을 수 있어요'
+  const headerDescription = t(
+    'Rough storyboard — click a card to review, edit, or regenerate; click a scene name to collapse it',
+  )
   const storyboardActions = hasShots ? (
     <>
       {/* 축척 — 가로 열 수 조절 (Ctrl+wheel 로도 가능) */}
@@ -475,7 +499,7 @@ export function RoughStoryboardView() {
           size="icon"
           variant="ghost"
           className="size-7 hover-red-beam"
-          aria-label="축소 (열 늘리기)"
+          aria-label={t('Zoom out (more columns)')}
           onClick={() => setZoomLevel((z) => Math.max(1, z - 1))}
         >
           <ZoomOut className="size-4" />
@@ -487,13 +511,13 @@ export function RoughStoryboardView() {
           step={1}
           value={[zoomLevel]}
           onValueChange={([v]) => setZoomLevel(v)}
-          aria-label="러프보드 축척"
+          aria-label={t('Rough board zoom')}
         />
         <Button
           size="icon"
           variant="ghost"
           className="size-7 hover-red-beam"
-          aria-label="확대 (열 줄이기)"
+          aria-label={t('Zoom in (fewer columns)')}
           onClick={() => setZoomLevel((z) => Math.min(6, z + 1))}
         >
           <ZoomIn className="size-4" />
@@ -502,7 +526,7 @@ export function RoughStoryboardView() {
       {generatingCount > 0 && (
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin" />
-          패널 {generatingCount}개 생성 중
+          {t('{count} panels generating', { count: generatingCount })}
         </span>
       )}
       {missingIds.length > 0 && generatingCount === 0 && (
@@ -513,7 +537,7 @@ export function RoughStoryboardView() {
           onClick={() => void generateAllMissing(false)}
         >
           <RefreshCw className="size-3.5" />
-          누락 패널 {missingIds.length}개 생성
+          {t('Generate {count} missing panels', { count: missingIds.length })}
         </Button>
       )}
       <Button
@@ -523,7 +547,7 @@ export function RoughStoryboardView() {
         onClick={() => setAddDialog({ mode: 'scene', contextSceneId: null })}
       >
         <Plus className="size-3.5" />
-        씬 추가
+        {t('Add scene')}
       </Button>
     </>
   ) : null
@@ -650,7 +674,7 @@ export function RoughStoryboardView() {
             <p className="text-sm text-muted-foreground">{formatRemaining(remainingMs)}</p>
           ) : null}
           <p className="text-xs text-muted-foreground">
-            샷 설계·검증 같은 복잡한 단계는 1~2분 걸릴 수 있어요.
+            {t('Complex stages like shot design and validation can take 1-2 minutes.')}
           </p>
         </div>
       </div>
@@ -664,17 +688,18 @@ export function RoughStoryboardView() {
         <WriterHeader description={headerDescription} />
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
           <ImageIcon className="size-12 text-muted-foreground" />
-          <p className="text-base font-medium">아직 생성된 씬·샷이 없어요</p>
+          <p className="text-base font-medium">{t('No scenes or shots generated yet')}</p>
           {status?.pipeline_failed ? (
             <>
               <p className="text-sm text-muted-foreground">
-                생성이 중단됐어요{status.error ? ` — ${status.error}` : ''}
+                {t('Generation stopped')}
+                {status.error ? ` — ${status.error}` : ''}
               </p>
               <WriterResumeButton projectId={projectId} onResumed={restart} />
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Producer에서 스토리를 핸드오프하면 씬·샷이 생성됩니다.
+              {t('Scenes and shots are generated once the story is handed off from Producer.')}
             </p>
           )}
         </div>
@@ -731,7 +756,7 @@ export function RoughStoryboardView() {
                     Scene {sceneIdx + 1}
                     {sceneCollapsed ? (
                       <span className="font-normal text-muted-foreground/70">
-                        · 샷 {sceneShots.length}개
+                        · {t('{count} shots', { count: sceneShots.length })}
                       </span>
                     ) : null}
                   </button>
@@ -745,7 +770,7 @@ export function RoughStoryboardView() {
                     }
                   >
                     <Plus className="size-3.5" />
-                    샷 추가
+                    {t('Add shot')}
                   </Button>
                 </div>
 
@@ -773,7 +798,7 @@ export function RoughStoryboardView() {
                       className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground transition-colors hover:bg-accent/40 hover-red-beam"
                     >
                       <Plus className="size-6" />
-                      <span className="text-sm">샷 추가</span>
+                      <span className="text-sm">{t('Add shot')}</span>
                     </button>
                   )}
                   {sceneShots.map((shot, shotIdx) => {
@@ -816,7 +841,7 @@ export function RoughStoryboardView() {
                             <div className="flex size-full flex-col items-center justify-center gap-2 p-4">
                               <AlertCircle className="size-5 text-destructive" />
                               <p className="line-clamp-2 text-center text-xs text-destructive">
-                                {job.error ?? '생성 실패'}
+                                {job.error ?? t('Generation failed')}
                               </p>
                               <Button
                                 size="sm"
@@ -826,7 +851,7 @@ export function RoughStoryboardView() {
                                   void generate([shot.shotId], true)
                                 }}
                               >
-                                다시 시도
+                                {t('Retry')}
                               </Button>
                             </div>
                           ) : (
@@ -844,11 +869,11 @@ export function RoughStoryboardView() {
                                     void generate([shot.shotId], true)
                                   }}
                                 >
-                                  패널 생성
+                                  {t('Generate panel')}
                                 </Button>
                               ) : (
                                 <p className="text-xs text-muted-foreground">
-                                  스토리(액션)를 입력하면 생성할 수 있어요
+                                  {t('Enter a story (action) to enable generation')}
                                 </p>
                               )}
                             </div>
@@ -869,7 +894,7 @@ export function RoughStoryboardView() {
                                   </Badge>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  {SHOT_TYPE_DESCRIPTIONS[shot.shotType] ?? shot.shotType}
+                                  {t(SHOT_TYPE_DESCRIPTIONS[shot.shotType] ?? shot.shotType)}
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
@@ -889,7 +914,7 @@ export function RoughStoryboardView() {
                               title={shot.roughStoryboard.adherence.reason ?? undefined}
                             >
                               <AlertCircle className="size-3.5 shrink-0" />
-                              설명과 다른 그림일 수 있어요 — 카드를 눌러 재생성해 보세요
+                              {t('The image may not match the description — click the card to try regenerating')}
                             </p>
                           ) : null}
                         </div>

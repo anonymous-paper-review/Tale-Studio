@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { HoverBeam } from '@/components/hover-beam'
 import { useWriterStore } from '@/stores/writer-store'
+import { useT } from '@/lib/i18n'
 
 interface SceneEditDialogProps {
   sceneId: string | null
@@ -25,6 +26,7 @@ interface SceneEditDialogProps {
 }
 
 export function SceneEditDialog({ sceneId, onOpenChange }: SceneEditDialogProps) {
+  const t = useT()
   const scene = useWriterStore((s) =>
     s.sceneManifest?.scenes.find((x) => x.sceneId === sceneId),
   )
@@ -36,7 +38,9 @@ export function SceneEditDialog({ sceneId, onOpenChange }: SceneEditDialogProps)
   const handleDelete = async () => {
     if (
       !window.confirm(
-        `${scene.sceneId} 씬과 그 안의 모든 샷을 삭제할까요? 되돌릴 수 없습니다.`,
+        t('Delete scene {id} and all its shots? This cannot be undone.', {
+          id: scene.sceneId,
+        }),
       )
     )
       return
@@ -50,48 +54,50 @@ export function SceneEditDialog({ sceneId, onOpenChange }: SceneEditDialogProps)
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="font-mono text-sm text-muted-foreground">{scene.sceneId}</span>
-            씬 상세
+            {t('Scene details')}
           </DialogTitle>
           <DialogDescription>
-            장소·시간·분위기·요약을 수정하면 자동 저장됩니다. 다음 패널 재생성부터 반영돼요.
+            {t(
+              'Location, time, mood, and summary save automatically. Changes apply from the next panel regeneration.',
+            )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">장소</label>
+              <label className="text-sm font-medium">{t('Location')}</label>
               <HoverBeam>
                 <Input
                   value={scene.location ?? ''}
                   onChange={(e) => updateScene(scene.sceneId, { location: e.target.value })}
-                  placeholder="예: 황량한 돌산"
+                  placeholder={t('e.g. a desolate rocky mountain')}
                 />
               </HoverBeam>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">시간대</label>
+              <label className="text-sm font-medium">{t('Time of day')}</label>
               <HoverBeam>
                 <Input
                   value={scene.timeOfDay ?? ''}
                   onChange={(e) => updateScene(scene.sceneId, { timeOfDay: e.target.value })}
-                  placeholder="예: Dusk"
+                  placeholder={t('e.g. Dusk')}
                 />
               </HoverBeam>
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">분위기</label>
+            <label className="text-sm font-medium">{t('Mood')}</label>
             <HoverBeam>
               <Input
                 value={scene.mood ?? ''}
                 onChange={(e) => updateScene(scene.sceneId, { mood: e.target.value })}
-                placeholder="예: 긴장된, 비장한"
+                placeholder={t('e.g. tense, grim')}
               />
             </HoverBeam>
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">서사 요약</label>
+            <label className="text-sm font-medium">{t('Narrative summary')}</label>
             <HoverBeam>
               <Textarea
                 value={scene.narrativeSummary ?? ''}
@@ -99,12 +105,12 @@ export function SceneEditDialog({ sceneId, onOpenChange }: SceneEditDialogProps)
                 onChange={(e) =>
                   updateScene(scene.sceneId, { narrativeSummary: e.target.value })
                 }
-                placeholder="이 씬에서 일어나는 일"
+                placeholder={t('What happens in this scene')}
               />
             </HoverBeam>
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">길이 (초) — 샷 합 자동</label>
+            <label className="text-sm font-medium">{t('Duration (sec) — auto from shots')}</label>
             <HoverBeam>
               <Input
                 type="number"
@@ -115,8 +121,9 @@ export function SceneEditDialog({ sceneId, onOpenChange }: SceneEditDialogProps)
               />
             </HoverBeam>
             <p className="text-xs text-muted-foreground">
-              씬 길이는 포함된 샷들의 duration 합으로 자동 계산됩니다 — 샷을 추가·삭제하거나 길이를
-              바꾸면 갱신돼요.
+              {t(
+                'Scene duration is calculated automatically from the total of its shots — it updates when you add, remove, or resize shots.',
+              )}
             </p>
           </div>
         </div>
@@ -128,10 +135,10 @@ export function SceneEditDialog({ sceneId, onOpenChange }: SceneEditDialogProps)
             onClick={() => void handleDelete()}
           >
             <Trash2 className="size-4" />
-            씬 삭제
+            {t('Delete scene')}
           </Button>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            닫기
+            {t('Close')}
           </Button>
         </DialogFooter>
       </DialogContent>

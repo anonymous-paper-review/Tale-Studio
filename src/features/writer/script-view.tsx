@@ -19,6 +19,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useWriterUiStore } from '@/stores/writer-ui-store'
+import { useT } from '@/lib/i18n'
 
 // 라벨 없는 헤딩 텍스트 컬럼과 정렬시키는 들여쓰기 (px-6 + w-16 라벨열 + gap-4).
 const TEXT_INDENT = 'pl-[6.5rem] pr-6'
@@ -28,6 +29,7 @@ const TEXT_INDENT = 'pl-[6.5rem] pr-6'
 type Roster = SlugEntry[]
 
 function ScriptLineText({ line, roster }: { line: ScriptLine; roster: Roster }) {
+  const t = useT()
   if (line.kind === 'sceneHeading') {
     return (
       <span className="font-semibold uppercase tracking-wide text-foreground">
@@ -39,7 +41,7 @@ function ScriptLineText({ line, roster }: { line: ScriptLine; roster: Roster }) 
     return (
       <span className="block">
         <span className="font-medium">
-          {replaceSlugs(line.characterName ?? '인물', roster, '')}
+          {replaceSlugs(line.characterName ?? t('Character'), roster, '')}
         </span>
         : &quot;{replaceSlugs(line.text, roster)}&quot;
       </span>
@@ -62,6 +64,7 @@ function ScriptLineButton({
   roster: Roster
   onToggle: (lineNo: number) => void
 }) {
+  const t = useT()
   return (
     <button
       type="button"
@@ -75,8 +78,10 @@ function ScriptLineButton({
         mentioned && 'mention-flash bg-sky-400/10 ring-1 ring-inset ring-sky-400/60 hover:bg-sky-400/15',
       )}
     >
+      {/* label 은 "Scene N"/"Shot N"(그대로 통과) 또는 displayLabels 가 심어둔 'Dialogue' 영어
+          키(#i18n-s5-batch3) — t() 는 사전에 없는 문자열은 그대로 반환하므로 안전하게 공용. */}
       <span className="w-16 shrink-0 pt-px font-mono text-xs tabular-nums tracking-wide text-muted-foreground">
-        {label}
+        {t(label)}
       </span>
       <span className="min-w-0 flex-1 break-words text-foreground">
         <ScriptLineText line={line} roster={roster} />
@@ -86,12 +91,13 @@ function ScriptLineButton({
 }
 
 function SceneBeats({ scene, roster }: { scene: Scene; roster: Roster }) {
+  const t = useT()
   const summary = scene.narrativeSummary?.trim()
   const quote = scene.originalTextQuote?.trim()
   if (!summary && !quote) {
     return (
       <p className={cn(TEXT_INDENT, 'pb-1 pt-0.5 text-sm italic text-muted-foreground/70')}>
-        스토리 텍스트 없음
+        {t('No story text')}
       </p>
     )
   }
@@ -124,6 +130,7 @@ function ShotSection({
   roster: Roster
   onToggle: (lineNo: number) => void
 }) {
+  const t = useT()
   const hasMentioned = lines.some((l) => mentionedRefs.includes(l.ref))
   // 기본 접힘. 사용자가 명시적으로 토글하면 그 값이 우선, 미조작 씬에 멘션이 걸리면 자동 펼침.
   const [override, setOverride] = useState<boolean | null>(null)
@@ -131,7 +138,7 @@ function ShotSection({
 
   if (lines.length === 0) {
     return (
-      <p className={cn(TEXT_INDENT, 'py-1 text-xs text-muted-foreground/70')}>샷 없음</p>
+      <p className={cn(TEXT_INDENT, 'py-1 text-xs text-muted-foreground/70')}>{t('No shots')}</p>
     )
   }
 
@@ -148,7 +155,7 @@ function ShotSection({
       >
         <ChevronRight className={cn('size-3.5 transition-transform', open && 'rotate-90')} />
         <span>
-          샷 {shotCount}개 {open ? '접기' : '보기'}
+          {t('{count} shots', { count: shotCount })} {open ? t('Hide') : t('Show')}
         </span>
       </button>
       {/* 펼침/접힘 애니메이션(#c3 2026-08-03) — 항상 마운트 + grid-rows 0fr↔1fr (인물 상세와
@@ -179,6 +186,7 @@ function ShotSection({
 }
 
 export function ScriptView() {
+  const t = useT()
   const projectId = useProjectStore((state) => state.projectId)
   const sceneManifest = useWriterStore((state) => state.sceneManifest)
   const shots = useWriterStore((state) => state.shots)
@@ -246,7 +254,8 @@ export function ScriptView() {
           map.set(line.ref, `Shot ${++orphanShotNo}`)
         }
       } else {
-        map.set(line.ref, '대사')
+        // 영어 키를 그대로 심는다 — 렌더 지점(ScriptLineButton)에서 t() 로 감싼다.
+        map.set(line.ref, 'Dialogue')
       }
     }
     return map
@@ -263,6 +272,14 @@ export function ScriptView() {
   //   첫 진입 브리핑과 제안 슬롯을 두고 경합해 이 안내가 덮여 사라진다.
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   const activeTab = useWriterUiStore((s) => s.activeTab)
+  // content 는 global-chat(범위 밖)이 t() 없이 그대로 렌더하므로 여기서 미리 번역해 넘긴다
+  //   (#i18n-s5-batch3, scene-gate 와 동일 패턴) — 문자열 값이라 로케일 불변 시 effect 재실행 없음.
+  const treatmentGuideContent = t(
+    'You can polish the story in this tab.\n\n' +
+      '· You can revise the story in the part you clicked\n' +
+      '· You can add story before or after the part you clicked\n\n' +
+      'You can also ask me to restructure the whole story based on your edits.',
+  )
   useEffect(() => {
     if (!projectId || lines.length === 0 || activeTab !== 'script') return
     const guardKey = `writer:treatmentGuide:${projectId}`
@@ -286,16 +303,16 @@ export function ScriptView() {
       stage: 'writer',
       dismissible: false,
       action: null,
-      content:
-        '이 탭에서는 스토리를 다듬을 수 있어요.\n\n' +
-        '· 클릭한 부분의 스토리를 수정할 수 있어요\n' +
-        '· 클릭한 부분의 앞뒤에 스토리를 추가할 수 있어요\n\n' +
-        '수정한 스토리를 기반으로 전체적인 스토리를 재구성해 달라고 저에게 요청할 수도 있어요.',
+      content: treatmentGuideContent,
     })
-  }, [projectId, lines.length, activeTab, offerSuggestion])
+  }, [projectId, lines.length, activeTab, offerSuggestion, treatmentGuideContent])
 
   const header = (
-    <WriterHeader description="트리트먼트 뷰어 — 라인을 클릭하면 채팅에서 바로 수정을 지시할 수 있어요 (다시 클릭하면 해제)" />
+    <WriterHeader
+      description={t(
+        'Treatment viewer — click a line to request an edit directly in chat (click again to release)',
+      )}
+    />
   )
 
   if (lines.length === 0) {
@@ -329,17 +346,18 @@ export function ScriptView() {
           ) : (
             <>
               <FileText className="size-12 text-muted-foreground" />
-              <p className="text-base font-medium">아직 대본이 없어요</p>
+              <p className="text-base font-medium">{t('No script yet')}</p>
               {status?.pipeline_failed ? (
                 <>
                   <p className="text-sm text-muted-foreground">
-                    생성이 중단됐어요{status.error ? ` — ${status.error}` : ''}
+                    {t('Generation stopped')}
+                    {status.error ? ` — ${status.error}` : ''}
                   </p>
                   <WriterResumeButton projectId={projectId} onResumed={restart} />
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Producer에서 스토리를 핸드오프하면 대본이 생성됩니다.
+                  {t('The script is generated once the story is handed off from Producer.')}
                 </p>
               )}
             </>
@@ -389,7 +407,7 @@ export function ScriptView() {
           {orphanLines.length > 0 ? (
             <section className="pb-3 pt-1">
               <p className={cn(TEXT_INDENT, 'py-1 text-xs font-medium uppercase tracking-wider text-muted-foreground')}>
-                씬 미배정 샷
+                {t('Shots not assigned to a scene')}
               </p>
               {orphanLines.map((line) => (
                 <ScriptLineButton

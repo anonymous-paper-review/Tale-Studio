@@ -12,20 +12,22 @@ import { ChevronRight, FileText } from 'lucide-react'
 import { replaceSlugs, type SlugEntry } from '@/lib/script-lines'
 import { cn } from '@/lib/utils'
 import type { PreviewScene, WriterPreview } from '@/lib/writer/use-writer-preview'
+import { useT } from '@/lib/i18n'
 
 const PARA_STAGGER_MS = 90
 
 /** 첫 서사가 도착하기 전 — "이야기를 쓰는 중" 문서 연출(은은). */
 function PreparingPlaceholder() {
+  const t = useT()
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
       <div className="relative">
         <div className="absolute inset-0 -z-10 animate-pulse rounded-full bg-primary/15 blur-2xl" />
         <FileText className="animate-writer-float size-12 text-primary/80" />
       </div>
-      <p className="text-base font-medium">이야기를 쓰고 있어요…</p>
+      <p className="text-base font-medium">{t('Writing the story…')}</p>
       <p className="max-w-xs text-sm text-muted-foreground">
-        완성되는 대로 이야기가 여기에 줄글로 이어집니다. 편하게 기다리며 읽어보세요.
+        {t("The story will appear here in prose as it's written. Sit back and read along.")}
       </p>
       <div className="mt-2 w-full max-w-md space-y-2">
         <div className="h-3 w-3/4 animate-pulse rounded bg-muted" />
@@ -39,6 +41,7 @@ function PreparingPlaceholder() {
 /** 문단 아래 접힌 샷 단위 이야기 — 기본 접힘, 클릭 시에만 펼침(읽기 방해 X). */
 function ShotStoryToggle({ lines, roster }: { lines: string[]; roster: SlugEntry[] }) {
   const [open, setOpen] = useState(false)
+  const t = useT()
   return (
     <div className="animate-in fade-in mt-1.5 duration-500">
       <button
@@ -49,7 +52,8 @@ function ShotStoryToggle({ lines, roster }: { lines: string[]; roster: SlugEntry
       >
         <ChevronRight className={cn('size-3.5 transition-transform', open && 'rotate-90')} />
         <span>
-          샷 단위 이야기 {lines.length}개 {open ? '접기' : '보기'}
+          {t('{count} per-shot stories', { count: lines.length })}{' '}
+          {open ? t('Hide') : t('Show')}
         </span>
       </button>
       {open ? (
@@ -88,6 +92,7 @@ function SceneParagraph({ scene, roster }: { scene: PreviewScene; roster: SlugEn
 }
 
 export function WriterStoryStream({ preview }: { preview: WriterPreview | null }) {
+  const t = useT()
   const scenes = (preview?.scenes ?? []).filter((s) => s.beats.length > 0)
   const roster: SlugEntry[] = preview?.roster ?? []
 
@@ -107,7 +112,7 @@ export function WriterStoryStream({ preview }: { preview: WriterPreview | null }
         ))}
       </article>
       <p className="pt-6 text-center text-xs text-muted-foreground/70">
-        이야기가 계속 생성되고 있어요 — 새 내용이 준비되면 자동으로 이어집니다.
+        {t("The story is still being written — new content will appear automatically as it's ready.")}
       </p>
     </div>
   )

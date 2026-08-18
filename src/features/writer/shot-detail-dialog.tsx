@@ -16,6 +16,7 @@ import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { RoughStoryboardImage } from '@/types'
+import { useT } from '@/lib/i18n'
 
 interface ShotDetailDialogProps {
   shotId: string | null
@@ -24,6 +25,7 @@ interface ShotDetailDialogProps {
 }
 
 export function ShotDetailDialog({ shotId, panel, onOpenChange }: ShotDetailDialogProps) {
+  const t = useT()
   const shot = useWriterStore((s) => s.shots.find((x) => x.shotId === shotId))
   const shots = useWriterStore((s) => s.shots)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
@@ -54,11 +56,12 @@ export function ShotDetailDialog({ shotId, panel, onOpenChange }: ShotDetailDial
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">{positionLabel}</span>
-            연출 화살표 편집
+            {t('Edit directing arrows')}
           </DialogTitle>
           <DialogDescription>
-            DIRECTING 프레임의 화살표를 레이어처럼 지우거나 새로 그려요. 저장하면 카드의 3프레임
-            순환에 바로 반영됩니다.
+            {t(
+              "Erase or draw new arrows on the DIRECTING frame like a layer. Saving applies immediately to the card's 3-frame cycle.",
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -72,7 +75,7 @@ export function ShotDetailDialog({ shotId, panel, onOpenChange }: ShotDetailDial
           />
         ) : (
           <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            러프 패널이 아직 없어요. 보드에서 패널을 먼저 생성해주세요.
+            {t('No rough panel yet. Generate a panel on the board first.')}
           </p>
         )}
       </DialogContent>

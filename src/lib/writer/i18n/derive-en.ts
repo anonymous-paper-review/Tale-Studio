@@ -29,7 +29,7 @@ Rules:
 
 // 이미 영어(라틴)면 LLM skip — 파이프라인 산출은 드리프트로 영어/한국어 혼재라 무변환 통과로 비용↓.
 //   CJK·Hangul·전각 문자가 있으면 번역 대상(보수적 필터, locale 감지 S4 와 별개).
-const NEEDS_TRANSLATION = /[　-鿿가-힯＀-￯]/
+const NEEDS_TRANSLATION = /[　-鿿가-힯＀-￯]/ // i18n-ok — 문자 클래스 경계값(문구 아님)
 
 /** native 배열 → Map<id, en>. 빈/공백 제외, 이미 영어면 무변환. LLM 실패 항목은 맵에 없음(호출부 native 폴백). */
 export async function deriveEnBatch(items: I18nItem[], kind: string): Promise<Map<string, string>> {
@@ -169,7 +169,7 @@ export function isTargetScript(text: string | null | undefined, locale: string):
 }
 
 const LOCALE_NAME: Record<string, string> = {
-  ko: 'Korean (한국어)',
+  ko: 'Korean (한국어)', // i18n-ok — 언어 고유 표기
   ja: 'Japanese (日本語)',
   zh: 'Chinese (中文)',
   en: 'English',

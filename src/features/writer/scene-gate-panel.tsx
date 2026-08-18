@@ -12,6 +12,8 @@ import { Check, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useProjectStore } from '@/stores/project-store'
+import { translate, useT } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 
 /** 씬 게이트 API 호출 — 채팅 입력창 가로채기(global-chat)와 확정 버튼이 공유하는 단일 경로. */
 export async function sendSceneGate(
@@ -28,17 +30,31 @@ export async function sendSceneGate(
     })
     const j = (await res.json().catch(() => null)) as { error?: string } | null
     if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
-    if (action === 'revise') toast.success('피드백을 반영해 씬 스토리를 다시 쓰는 중이에요')
-    else toast.success('씬 확정 — 인물·비주얼·샷 설계를 시작해요')
+    // sendSceneGate 는 컴포넌트 밖(global-chat 의 revise 경로 포함)에서도 호출되어 useT() 훅을
+    //   못 쓴다 — translate() + 현재 locale 직접 조회로 훅 없이 번역(#i18n-s5-batch3).
+    const locale = useLocaleStore.getState().locale
+    if (action === 'revise')
+      toast.success(translate(locale, 'Applying your feedback and rewriting the scene story…'))
+    else
+      toast.success(
+        translate(locale, 'Scenes confirmed — starting character, visual, and shot design'),
+      )
     return true
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : '요청에 실패했어요')
+    const locale = useLocaleStore.getState().locale
+    toast.error(e instanceof Error ? e.message : translate(locale, 'Request failed'))
     return false
   }
 }
 
 export function SceneGateControls() {
   const [busy, setBusy] = useState(false)
+  const t = useT()
+  // 캡션 중간에 <kbd> 엘리먼트가 끼어들어야 해서 {kbd} 토큰으로 번역문을 받은 뒤 직접 split
+  //   (sidebar.tsx 의 {credit} 스플릿과 동일 패턴).
+  const [kbdPre, kbdPost] = t('{kbd} to confirm · edits go in the input box below').split(
+    '{kbd}',
+  )
 
   return (
     <div className="mt-2 flex flex-col gap-1.5 px-1">
@@ -53,11 +69,12 @@ export function SceneGateControls() {
         }}
       >
         {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-        이대로 확정
+        {t('Confirm as-is')}
       </Button>
       <p className="text-center text-[10px] text-muted-foreground">
-        <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> 확정 · 수정할
-        내용은 아래 입력창에
+        {kbdPre}
+        <kbd className="rounded border border-border bg-muted px-1">Enter</kbd>
+        {kbdPost}
       </p>
     </div>
   )
