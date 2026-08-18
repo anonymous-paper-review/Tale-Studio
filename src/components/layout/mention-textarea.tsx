@@ -14,6 +14,7 @@ import {
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 
 export interface MentionItem {
   id: string
@@ -46,6 +47,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
   ) {
     const innerRef = useRef<HTMLTextAreaElement>(null)
     useImperativeHandle(ref, () => innerRef.current as HTMLTextAreaElement)
+    const t = useT()
 
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState('')
@@ -161,7 +163,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
         {showList && (
           <div className="absolute bottom-full left-0 z-popover mb-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md">
             <div className="px-2 py-1 text-[10px] text-muted-foreground">
-              카드/오브젝트 멘션 — ↑↓ 이동, Enter 선택
+              {t('Card/object mentions — ↑↓ to move, Enter to select')}
             </div>
             {filtered.map((it, i) => (
               <button
@@ -212,7 +214,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
         {scrollHint.up && (
           <button
             type="button"
-            aria-label="입력 위쪽 내용 보기"
+            aria-label={t('View content above')}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => scrollByLines(-1)}
             className="absolute left-1/2 top-1 z-10 -translate-x-1/2 rounded-full border border-border bg-card/90 p-0.5 text-muted-foreground shadow-sm transition-colors hover:text-foreground"
@@ -223,7 +225,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
         {scrollHint.down && (
           <button
             type="button"
-            aria-label="입력 아래쪽 내용 보기"
+            aria-label={t('View content below')}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => scrollByLines(1)}
             className="absolute bottom-1 left-1/2 z-10 -translate-x-1/2 rounded-full border border-border bg-card/90 p-0.5 text-muted-foreground shadow-sm transition-colors hover:text-foreground"

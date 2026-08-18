@@ -33,6 +33,7 @@ import { OwnerOnly } from '@/components/demo/owner-only'
 import { ShareButton } from '@/components/demo/share-button'
 import { FooterIconItem } from '@/components/layout/footer-icon-item'
 import { withDemoShare } from '@/lib/demo/context'
+import { useT } from '@/lib/i18n'
 
 const STAGE_ICONS: Record<StageId, React.ElementType> = {
   producer: Users,
@@ -45,6 +46,7 @@ const STAGE_ICONS: Record<StageId, React.ElementType> = {
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const t = useT()
   const canNavigateTo = useProjectStore((s) => s.canNavigateTo)
   const reachedStage = useProjectStore((s) => s.reachedStage)
   const artistImagesReady = useProjectStore((s) => s.artistImagesReady)
@@ -120,8 +122,11 @@ export function Sidebar() {
   const reachedStageIndex = STAGES.findIndex((stage) => stage.id === reachedStage)
   const artistImageLockCopy =
     artistImagesFailed || artistImagesStalled
-      ? '생성 실패·재시도'
-      : `이미지 생성 중 ${artistAssetProgress?.ready ?? 0}/${artistAssetProgress?.total ?? 0}`
+      ? t('Generation failed · retry')
+      : t('Generating images {ready}/{total}', {
+          ready: artistAssetProgress?.ready ?? 0,
+          total: artistAssetProgress?.total ?? 0,
+        })
 
   // Home HoverCard: 프로젝트명 인라인 편집. 편집 중에는 hover가 벗어나도 카드 유지(controlled open).
   const [homeOpen, setHomeOpen] = useState(false)
@@ -196,7 +201,7 @@ export function Sidebar() {
                 }
               }}
               onBlur={commitName}
-              placeholder="프로젝트 이름"
+              placeholder={t('Project name')}
               className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm font-medium outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
             />
           ) : (
@@ -210,8 +215,8 @@ export function Sidebar() {
                   setNameDraft(projectTitle)
                   setEditingName(true)
                 }}
-                title="이름 변경"
-                aria-label="프로젝트 이름 변경"
+                title={t('Rename')}
+                aria-label={t('Rename project')}
                 className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <Pencil className="h-3.5 w-3.5" />
@@ -219,7 +224,7 @@ export function Sidebar() {
             </div>
           )}
           <span className="text-xs text-muted-foreground">
-            {editingName ? 'Enter 저장 · Esc 취소' : 'Back to Projects'}
+            {editingName ? t('Enter to save · Esc to cancel') : 'Back to Projects'}
           </span>
         </HoverCardContent>
       </HoverCard>
@@ -317,12 +322,12 @@ export function Sidebar() {
       {/* 푸터 액션 — 공유·내보내기·문의·프로필: 버튼 크기·캡션 타이포·세로 간격을 FooterIconItem 로 통일 */}
       <div className="mt-2 flex shrink-0 flex-col items-center gap-2.5">
         <OwnerOnly>
-          <FooterIconItem label="공유">
+          <FooterIconItem label={t('Share')}>
             <ShareButton />
           </FooterIconItem>
         </OwnerOnly>
         <OwnerOnly>
-          <FooterIconItem label="내보내기">
+          <FooterIconItem label={t('Export')}>
             <ExportMenu />
           </FooterIconItem>
         </OwnerOnly>
@@ -331,18 +336,23 @@ export function Sidebar() {
           <ContactPopover
             side="right"
             align="end"
-            note={
-              <>
-                피드백은 항상 열려있습니다. 12시간 내로 답변 없을 시 시간당{' '}
-                <strong className="font-bold text-foreground">100 Credit</strong>을
-                제공해드립니다.
-              </>
-            }
+            note={(() => {
+              const [feedbackPre, feedbackPost] = t(
+                "Feedback is always open. If we don't reply within 12 hours, you'll get {credit} per hour.",
+              ).split('{credit}')
+              return (
+                <>
+                  {feedbackPre}
+                  <strong className="font-bold text-foreground">100 Credit</strong>
+                  {feedbackPost}
+                </>
+              )
+            })()}
             trigger={
               <button
                 type="button"
-                aria-label="문의 / Help"
-                title="문의 / Help"
+                aria-label={t('Contact / Help')}
+                title={t('Contact / Help')}
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <MessageCircle className="h-5 w-5" />
@@ -351,7 +361,7 @@ export function Sidebar() {
           />
         </FooterIconItem>
         <OwnerOnly>
-          <FooterIconItem label="프로필">
+          <FooterIconItem label={t('Profile')}>
             <UserMenu />
           </FooterIconItem>
         </OwnerOnly>

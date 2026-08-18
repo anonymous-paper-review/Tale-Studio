@@ -31,16 +31,29 @@ function walk(dir: string): string[] {
   return out
 }
 
-/** 라인이 "번역해야 할 한글"인가 — 주석·프라그마 제외 휴리스틱. */
-function isViolation(rawLine: string): boolean {
-  if (!/[가-힣]/.test(rawLine)) return false
-  if (rawLine.includes('// i18n-ok')) return false
-  const trimmed = rawLine.trim()
-  // 주석 라인(이 코드베이스 관례: //, JSDoc 의 *, 블록 시작, JSX 주석)
-  if (/^(\/\/|\*|\/\*|{\/\*)/.test(trimmed)) return false
-  // 코드 끝 후행 주석 제거(공백+// — URL 의 :// 는 공백이 없어 보존됨) 후 재검사
-  const withoutTrailing = rawLine.replace(/\s\/\/.*$/, '')
-  return /[가-힣]/.test(withoutTrailing)
+/** 파일 단위 위반 라인 인덱스 — 여러 줄 블록 주석({/* … *\/}, /* … *\/)의 연속 줄을
+ *  상태 추적으로 제외한다(마커 없는 이어짐 줄이 오탐되던 것 수정). */
+function violationLines(source: string): number[] {
+  const out: number[] = []
+  let inBlock = false
+  const lines = source.split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i]
+    const trimmed = raw.trim()
+    if (inBlock) {
+      if (raw.includes('*/')) inBlock = false
+      continue
+    }
+    const opensBlock = /(\{\/\*|\/\*)/.test(raw)
+    if (opensBlock && !raw.slice(raw.search(/(\{\/\*|\/\*)/)).includes('*/')) inBlock = true
+    if (!/[가-힣]/.test(raw)) continue
+    if (raw.includes('// i18n-ok')) continue
+    if (/^(\/\/|\*|\/\*|{\/\*)/.test(trimmed)) continue
+    // 코드 끝 후행 주석 제거(공백+// — URL 의 :// 는 공백이 없어 보존됨) 후 재검사
+    const withoutTrailing = raw.replace(/\s\/\/.*$/, '').replace(/\{\/\*.*$/, '').replace(/\/\*.*$/, '')
+    if (/[가-힣]/.test(withoutTrailing)) out.push(i)
+  }
+  return out
 }
 
 function scan(): Record<string, number> {
@@ -48,8 +61,7 @@ function scan(): Record<string, number> {
   for (const file of walk(SRC)) {
     const rel = path.relative(process.cwd(), file)
     if (EXCLUDED.some((ex) => rel === ex || rel.startsWith(ex))) continue
-    const lines = readFileSync(file, 'utf8').split('\n')
-    const n = lines.filter(isViolation).length
+    const n = violationLines(readFileSync(file, 'utf8')).length
     if (n > 0) counts[rel] = n
   }
   return counts
@@ -73,12 +85,11 @@ describe('i18n — 한글 잔존 게이트', () => {
     for (const [file, n] of Object.entries(counts)) {
       const cap = allowed[file] ?? 0
       if (n > cap) {
-        const lines = readFileSync(path.join(process.cwd(), file), 'utf8').split('\n')
-        const samples = lines
-          .map((l, i) => ({ l, i }))
-          .filter(({ l }) => isViolation(l))
+        const source = readFileSync(path.join(process.cwd(), file), 'utf8')
+        const lines = source.split('\n')
+        const samples = violationLines(source)
           .slice(0, 3)
-          .map(({ l, i }) => `    L${i + 1}: ${l.trim().slice(0, 80)}`)
+          .map((i) => `    L${i + 1}: ${lines[i].trim().slice(0, 80)}`)
         regressions.push(`${file}: ${n} > 허용 ${cap}\n${samples.join('\n')}`)
       }
     }

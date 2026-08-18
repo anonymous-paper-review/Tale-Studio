@@ -18,6 +18,7 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { useT } from '@/lib/i18n'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore } from '@/stores/artist-store'
@@ -48,6 +49,7 @@ function countKind(jobs: readonly ActiveJob[], kind: GenerationJobKind): number 
 
 /** 둥근 알림바 한 줄 — 에이전트 색을 배경으로 쓰고, 진행 분량만큼 스스로 차오른다. */
 function WorkPill({ work, fallbackStage }: { work: PipelineWork; fallbackStage: StageId }) {
+  const t = useT()
   const stage = work.stage ?? fallbackStage
   const color = STAGE_FACE_COLOR[stage]
   const pct =
@@ -86,8 +88,8 @@ function WorkPill({ work, fallbackStage }: { work: PipelineWork; fallbackStage: 
       <span className="relative min-w-0 flex-1 truncate text-foreground">{work.label}</span>
       {work.total != null && (
         <span className="relative shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
-          {work.done != null ? `${work.done}/${work.total}` : `${work.total}건`}
-          {work.failed ? <span className="text-destructive"> · 실패 {work.failed}</span> : null}
+          {work.done != null ? `${work.done}/${work.total}` : t('{count} items', { count: work.total })}
+          {work.failed ? <span className="text-destructive"> · {t('Failed {count}', { count: work.failed })}</span> : null}
         </span>
       )}
     </div>
