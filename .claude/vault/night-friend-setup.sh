@@ -8,9 +8,6 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
 }
 RUNNER="$PROJECT_ROOT/.claude/vault/backlog/night-launchd.sh"
 ACTOR_ID="${NIGHT_ACTOR_ID:-friend}"
-# 주의: worktree branch가 night/<actor>/<run-id>/<unit-id> 라서 결과 branch는
-# night/<actor> 를 쓸 수 없다 (같은 이름 branch와 하위 경로 branch는 공존 불가).
-BRANCH="${NIGHT_GIT_BRANCH:-night-runs/friend}"
 HOUR="${NIGHT_HOUR:-1}"
 MINUTE="${NIGHT_MINUTE:-30}"
 REVIEW_PORT="${NIGHT_REVIEW_PORT:-8377}"
@@ -36,16 +33,6 @@ case "$MINUTE" in ''|*[!0-9]*) fail "NIGHT_MINUTE가 숫자가 아니다";; esac
 [ "$MINUTE" -ge 0 ] && [ "$MINUTE" -le 59 ] || fail "NIGHT_MINUTE는 0~59이어야 한다"
 
 [ -z "$(git status --porcelain)" ] || fail "작업 트리가 더럽다. 변경을 먼저 commit하거나 보관하라"
-current_branch="$(git branch --show-current)"
-if [ "$current_branch" != "$BRANCH" ]; then
-  if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
-    git switch "$BRANCH"
-  elif git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
-    git switch --track -c "$BRANCH" "origin/$BRANCH"
-  else
-    git switch -c "$BRANCH"
-  fi
-fi
 
 mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
 cat > "$PLIST" <<PLIST
@@ -65,7 +52,6 @@ cat > "$PLIST" <<PLIST
   <dict>
     <key>PATH</key><string>$PATH_VALUE</string>
     <key>NIGHT_ACTOR_ID</key><string>$ACTOR_ID</string>
-    <key>NIGHT_GIT_BRANCH</key><string>$BRANCH</string>
     <key>NIGHT_REVIEW_PORT</key><string>$REVIEW_PORT</string>
   </dict>
   <key>StartCalendarInterval</key>
@@ -153,9 +139,8 @@ plutil -lint "$MORNING_PLIST" >/dev/null || fail "아침 보고서 plist가 올�
 launchctl bootout "gui/$(id -u)/$MORNING_LABEL" >/dev/null 2>&1 || true
 launchctl bootstrap "gui/$(id -u)" "$MORNING_PLIST"
 
-NIGHT_ACTOR_ID="$ACTOR_ID" NIGHT_GIT_BRANCH="$BRANCH" \
-  NIGHT_REVIEW_PORT="$REVIEW_PORT" sh "$RUNNER" dry-run
+NIGHT_ACTOR_ID="$ACTOR_ID" NIGHT_REVIEW_PORT="$REVIEW_PORT" sh "$RUNNER" dry-run
 
 echo "친구 독립 runner 설치 완료: $LABEL (리뷰 서버: http://127.0.0.1:$REVIEW_PORT/)"
-echo "branch=$BRANCH actor=$ACTOR_ID schedule=$(printf '%02d:%02d' "$HOUR" "$MINUTE")"
+echo "actor=$ACTOR_ID schedule=$(printf '%02d:%02d' "$HOUR" "$MINUTE")"
 echo "log=$LOG_DIR/night.log"

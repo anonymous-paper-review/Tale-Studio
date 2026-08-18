@@ -58,9 +58,9 @@
 실행마다 다음 값을 먼저 만든다.
 
 - `run_id`: provider gate가 발급한 `night-YYYY-MM-DD-<uuid>` 실행 식별자.
-- `actor_id`: `NIGHT_ACTOR_ID`가 정한 실행 주체(`owner`/`friend`). 결과 경로
-  `runs/<actor>/<run_id>/`, 판정 경로 `feedback/<actor>/<run_id>/`, worktree branch
-  `night/<actor>/<run_id>/<unit-id>`의 namespace다.
+- `actor_id`: `NIGHT_ACTOR_ID`가 정한 실행 주체(`owner`/`friend`). 로컬 결과 경로
+  `runs/<actor>/<run_id>/`·`feedback/<actor>/<run_id>/`와, 공유되는 유일한 이름인
+  수리 worktree branch `night/<actor>/<run_id>/<unit-id>`에 들어간다.
 - `contract_id`, `contract_version`, 이 문서의 정규화된 해시.
 - 시작 시각과 기준 시각(UTC), 실행 주체(`claude` 또는 `codex`), 작업 루트.
 - 읽기 전용 입력 목록, 격리 작업 사본 목록, 결과 보고서 경로.
@@ -75,10 +75,10 @@
 
 owner와 friend는 각자 자기 컴퓨터에서 이 계약을 실행한다. 실행은 자기 checkout의
 `_INBOX.md`, 자기 로컬 Claude/gjc 세션 저장소, 자기 코드만 읽는다. 원격 동기화는 없다.
-inbox·세션·provider state·snapshot은 전부 자기 디스크에만 있으므로 상대 것을 읽을 방법
-자체가 없다. 두 사람이 만나는 곳은 git뿐이고, git에 올라가는 경로(`runs/<actor>/<run_id>/`,
-`feedback/<actor>/<run_id>/`)와 branch 이름에만 `NIGHT_ACTOR_ID`(기본 `owner`)가 들어가
-서로 겹치지 않는다. 누가 만든 결과인지는 commit author와 actor branch가 답한다.
+입력도 결과도 판정도 전부 자기 디스크의 것이다 — 리포트·티켓·피드백은 자기 다음 실행과
+자기 아침만 소비하고 git에 올리지 않는다. 두 사람이 나누는 것은 **코드**뿐이다: 계약·도구
+같은 공용 코드와, 밤이 격리 worktree에 만든 수리 branch(`night/<actor>/<run_id>/<unit-id>`).
+branch 이름의 `NIGHT_ACTOR_ID`(기본 `owner`)는 어느 컴퓨터의 밤이 만든 수리인지 구분한다.
 
 ```sh
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
@@ -245,7 +245,7 @@ python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --run-id "$run_id" \
 실행 단위는 메모와 연결된 것, 목적에 가까운 것, 싼 것, 위험이 낮은 것 순으로 정렬한다. 목록을 비우는 것이 목표가 아니며, 목록이 비어도 아래 코드 신호를 점검한다.
 
 - 최근 자주 바뀐 파일, 코드에 남은 미완성 표시, 30일 넘은 판단 근거만 신호로 삼는다. 신호 없이 “더 나은 점”을 찾는 무한 탐색은 하지 않는다.
-- 코드 신호의 출처는 공유 git 히스토리라 두 actor가 같은 신호를 잡을 수 있다. 신호로 단위를 만들기 전에 pull되어 있는 티켓 원장 전체(상대 actor의 티켓 포함)와 대조하고, 같은 관측이 있으면 새 티켓 대신 연결만 기록한다. 같은 밤의 동시 중복은 막지 않는다 — 조사는 읽기 전용이라 잃는 것이 토큰뿐이고, 독립된 관측 두 개는 아침 비교 재료가 된다. 수리가 겹쳐도 worktree branch에 actor가 들어가 충돌하지 않으며, 어느 쪽을 살릴지는 사람이 merge에서 고른다.
+- 코드 신호의 출처는 공유 git 히스토리라 두 컴퓨터가 같은 신호를 잡을 수 있다. 대조는 자기 티켓 원장과만 한다 — 상대 티켓은 로컬이라 보이지 않고, 겹쳐도 막지 않는다. 조사는 읽기 전용이라 잃는 것이 토큰뿐이고, 수리가 겹치면 worktree branch에 actor가 들어가 충돌하지 않으며 어느 쪽을 살릴지 사람이 merge에서 고른다.
 - 서로 다른 주제는 병렬로 실행할 수 있으나 같은 파일·같은 작업 사본을 두 실행이 동시에 쓰지 않는다.
 - 조사 백지 작업자는 `.claude/agents/night-investigator.md` 정의를 사용한다 — 도구는 읽기 전용, 모델은 정의 파일에 고정(fable 금지 집행 지점). 낮 디버그 실행 절차는 `.claude/skills/night-debug-run/SKILL.md`가 정본이다.
 - 티켓을 백지 subagent에게 줄 때는 티켓 경로만 전달한다. 실행자가 티켓만 읽고 닫을 수 있는지 확인하는 품질 검사이며, 머릿속 맥락을 덧붙이지 않는다.
@@ -357,12 +357,12 @@ save는 결과 카드가 아니다 — 결론이 없어도 쓴다. 같은 단위
 
 ## 10. 아침 결과 리뷰 — budget, carryover, expiry
 
-아침은 사전 승인 창구가 아니라 밤 결과를 소비하는 리뷰 세션이다. 각 사람이 읽는 것은 자기 컴퓨터가 만든 **run 단위 사람 보고서 HTML**(`runs/<actor>/<run_id>/report.html`)이다. 로컬 리뷰 서버(`sh night-launchd.sh review-server`, `http://127.0.0.1:<NIGHT_REVIEW_PORT>/`)로 열면 HTML의 `merge`·`reject`·`feedback` 버튼이 `feedback/<actor>/<run_id>/`에 append-only 이벤트를 남긴다. 버튼 결과는 자동 commit하지 않고 사람이 확인 후 push한다. 형식 없는 판정 메모를 자기 `_INBOX.md`에 적는 통로도 그대로 유효하다.
+아침은 사전 승인 창구가 아니라 밤 결과를 소비하는 리뷰 세션이다. 각 사람이 읽는 것은 자기 컴퓨터가 만든 **run 단위 사람 보고서 HTML**(`runs/<actor>/<run_id>/report.html`)이다. 로컬 리뷰 서버(`sh night-launchd.sh review-server`, `http://127.0.0.1:<NIGHT_REVIEW_PORT>/`)로 열면 HTML의 `merge`·`reject`·`feedback` 버튼이 `feedback/<actor>/<run_id>/`에 append-only 이벤트를 남긴다. 버튼 결과는 로컬 기록이다 — git에 올리지 않고, 자기 다음 밤 실행만 읽는다. 형식 없는 판정 메모를 자기 `_INBOX.md`에 적는 통로도 그대로 유효하다.
 
 판정 규칙은 두 줄이다:
 
-- 다음 밤 실행은 자기 컴퓨터의 `feedback/<자기 actor>/`만 읽어 이전 결과 카드에 판정을 기록한다. `git pull`로 받아진 다른 폴더는 읽지 않는다.
-- branch와 코드의 merge는 사람이 Git에서 한다. 밤 runner는 다른 branch를 merge하지 않는다.
+- 다음 밤 실행은 자기 컴퓨터의 `feedback/<자기 actor>/`만 읽어 이전 결과 카드에 판정을 기록한다.
+- 코드 수리 branch의 merge는 사람이 Git에서 한다. 밤 runner는 어떤 branch도 merge하지 않는다.
 
 report.html의 버튼은 아래 형태를 그대로 쓴다. 포트는 생성 시점의 `NIGHT_REVIEW_PORT`
 값(기본 8377)을 박아 넣고, 새 문법을 지어내지 않는다:
@@ -503,7 +503,7 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 - 실행 산출물: `runs/<actor>/<run_id>/` — 사람 보고서 `report.html`, 기계 요약 `manifest.json`, 세션 요약 `sessions/*.md`, worktree 목록 `worktrees.json`, 중간 저장 `saves/*.md`(§8.4). actor와 run이 경로에 들어가므로 같은 날짜에 두 사람이 실행해도 서로 덮어쓰지 않는다. 날짜 하나를 덮어쓰는 `reports/YYYY-MM-DD.html` 경로는 더 쓰지 않는다 (기존 `.claude/vault/backlog/reports/`는 이력으로만 남긴다). 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
 - 판정 기록: `feedback/<actor>/<run_id>/*.json` — append-only, 자기 다음 밤 실행만 소비.
 - 각 사람의 접점은 두 개뿐이다: 쓰는 곳 자기 `_INBOX.md`, 읽는 곳 자기 최신 `runs/<actor>/<run_id>/report.html`. 다른 파일을 읽어야만 진행되는 절차를 만들지 않는다.
-- git 공유 경계: 계약·실행 도구·`tickets/` 원장·`runs/`·`feedback/`만 공유한다. `_INBOX.md`, `backlog/sweep/`(세션 수확), `_archive/`(inbox 보관)는 각 머신의 로컬 상태라 git에 올리지 않는다. 티켓 원장을 공유하는 이유는 하나 — 두 actor가 같은 코드 신호로 같은 조사를 반복하지 않게 대조 재료가 되는 것(§5).
+- git 공유 경계: 계약·실행 도구·설치 문서, 그리고 밤이 만든 코드 수리 branch만 공유한다. `_INBOX.md`, `backlog/sweep/`, `_archive/`, `tickets/`, `runs/`, `feedback/`은 전부 이 컴퓨터의 로컬 상태다 — 입력도 결과도 판정도 각자의 것이고, 상대와 나누는 것은 코드뿐이다.
 - 티켓 상태와 작업 사본 정보.
 - 메모 스냅샷 fingerprint·범위·내용 해시·소비 상태.
 - 필요한 실험 산출물과 결과표. raw 대화·모델 원출력은 소비 시점 없이 별도 보관하지 않는다.
@@ -520,6 +520,11 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 이 문서를 고쳐야 할 때는 변경 이유, 영향받는 분해 기준, 이전 계약 해시, 새 계약 해시를 기록한다. 밤 실행은 항상 이 문서 하나를 정본으로 사용한다.
 
 ## 15. 계약 개정 기록
+
+- 2026-08-18 (13차) · 이전 계약 해시 `2e3faced1856a7de8463ea575a4cbfac03b0ce27969c60fa893c656bdc85a1ce` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — 독립 실행을 끝까지 밀어붙인다. 각자 자기 리포트만 보면 되고, 서로의 리포트·티켓·피드백을 git으로 나눌 이유가 없다. 12차가 남겨둔 "결과·원장 공유"는 inbox 독립과 모순이었다.
+  - 변경 내용: (1) `tickets/`·`runs/`·`feedback/`·기존 `reports/`를 전부 로컬 상태로 강등(untrack+ignore). git으로 나누는 것은 코드(계약·도구·설치 문서)와 밤이 만든 수리 worktree branch 뿐이다. (2) 결과를 쌓는 actor 전용 branch(`NIGHT_GIT_BRANCH`) 개념 삭제 — 결과가 로컬이면 결과 branch는 존재 이유가 없다. 각 컴퓨터는 main에서 실행한다. (3) §5 코드 신호 대조 범위를 자기 티켓 원장으로 되돌림 — 두 컴퓨터의 조사가 겹쳐도 막지 않는다. (4) 아침 피드백의 commit/push 절차 삭제 — 판정은 로컬 기록이고 자기 다음 밤만 읽는다.
+  - 영향받는 분해 기준: §4.2 티켓 대조 범위가 자기 원장으로 돌아왔다. 사람 사이의 전달 통로는 코드 수리 branch 하나로 좁아졌다.
 
 - 2026-08-18 (12차) · 이전 계약 해시 `b4e3bbba59ebf554f0b788e9260e7b5bbf6ea6d64a7d14ae713f81ba8db2c139` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — 독립 실행에서 vault의 git 공유 경계를 자르고, 두 actor가 공유 코드베이스에서 같은 코드 신호를 잡는 중복을 정의한다.

@@ -3,11 +3,10 @@
 밤마다 launchd가 이 저장소의 `_NIGHT.md` 계약대로 자율 실행을 깨운다.
 Orca가 있는 오너 머신은 이 문서가 필요 없다. Orca가 같은 일을 이미 한다.
 
-각자 자기 컴퓨터에서 돈다. `_INBOX.md`는 git에 올라가지 않는 로컬 파일이다
-(없으면 실행 스크립트가 빈 파일로 만들어 준다). 실행은 자기 `_INBOX.md`와 자기 세션만 읽고,
-결과는 `runs/<actor>/<run_id>/`에 남아 자기 branch로 push된다.
-아침에 서로 `git pull` 하면 상대 report를 열어볼 수 있다.
-merge는 사람이 Git에서 한다.
+각자 자기 컴퓨터에서 돈다. 입력(`_INBOX.md`)도 결과(`runs/`)도 판정(`feedback/`)도
+전부 로컬이라 git에 올라가지 않는다 (inbox가 없으면 실행 스크립트가 빈 파일로 만든다).
+두 사람이 git으로 나누는 것은 코드뿐이다 — 밤이 코드를 고치면 수리 branch로 남고,
+그 merge는 사람이 한다.
 
 ## 1. 전제 확인
 
@@ -35,10 +34,10 @@ script가 하는 일:
 - LaunchAgent 3개 등록: 밤 실행(01:30), 리뷰 서버(상시), 아침 보고서 열기(08:30)
 - 마지막에 `dry-run`을 돌려 6단계 검증 — `DRY-RUN PASS`가 나와야 설치 완료
 
-기본 actor는 `friend`, 기본 branch는 `night-runs/friend`다. 다른 값이 필요하면:
+기본 actor는 `friend`다. 다른 값이 필요하면:
 
 ```sh
-NIGHT_ACTOR_ID=owner NIGHT_GIT_BRANCH=night-runs/owner NIGHT_HOUR=2 sh .claude/vault/night-friend-setup.sh
+NIGHT_ACTOR_ID=owner NIGHT_HOUR=2 sh .claude/vault/night-friend-setup.sh
 ```
 
 설치 없이 검증만 하려면:
@@ -51,13 +50,8 @@ sh .claude/vault/backlog/night-launchd.sh dry-run
 
 08:30에 최신 `runs/<actor>/<run_id>/report.html`이 브라우저에 뜬다.
 버튼(`merge`/`reject`/`feedback`)을 누르면 `feedback/<actor>/<run_id>/`에 기록되고,
-자기 다음 밤 실행만 그 기록을 읽는다. 확인이 끝나면:
-
-```sh
-git add runs feedback && git commit -m "review(<actor>): 밤 결과 판정" && git push
-```
-
-상대 결과를 보려면 `git pull` 후 상대 report를 연다. 상대에게 전할 말은 직접 한다.
+자기 다음 밤 실행만 그 기록을 읽는다. 전부 로컬 파일이라 commit할 것이 없다.
+밤이 만든 코드 수리 branch(`night/<actor>/…`)만 검토 후 merge·push 대상이다.
 
 ## 4. 운영 명령
 

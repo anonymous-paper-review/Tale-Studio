@@ -9,7 +9,6 @@
 #
 # 환경변수:
 #   NIGHT_ACTOR_ID     실행 주체 (기본 owner; 친구 머신은 friend)
-#   NIGHT_GIT_BRANCH   actor 전용 결과 branch. 지정하면 현재 branch와 일치해야 실행한다.
 #   NIGHT_REVIEW_PORT  리뷰 서버 포트 (기본 8377)
 #
 # 밤 실행은 이 checkout의 _INBOX.md와 이 머신의 세션만 읽는다. 원격 동기화는 없다.
@@ -47,26 +46,15 @@ MODEL_ARGS=""
 
 jget() { python3 -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"; }
 
-# inbox는 git에 올라가지 않는 로컬 파일이다. 새 checkout이면 빈 파일로 시작한다.
+# inbox·티켓 원장은 git에 올라가지 않는 로컬 상태다. 새 checkout이면 빈 채로 시작한다.
 INBOX="$PROJECT_ROOT/.claude/vault/_INBOX.md"
 [ -f "$INBOX" ] || : > "$INBOX"
+mkdir -p "$SCRIPT_DIR/tickets"
 
-# NIGHT_GIT_BRANCH가 지정되면 현재 branch와 일치해야 한다 — 다른 branch 위에
-# 결과를 쓰는 사고를 막는다.
-require_branch() {
-  if [ -n "${NIGHT_GIT_BRANCH:-}" ]; then
-    current="$(git -C "$PROJECT_ROOT" branch --show-current)"
-    if [ "$current" != "$NIGHT_GIT_BRANCH" ]; then
-      echo "현재 branch($current)가 NIGHT_GIT_BRANCH($NIGHT_GIT_BRANCH)와 다르다. 실행을 거부한다" >&2
-      exit 1
-    fi
-  fi
-}
 
 case "$MODE" in
 run)
   sh "$SCRIPT_DIR/preflight.sh"
-  require_branch
 
   # 1. 실행 잠금 — 같은 날짜 이중 실행만 막는다. probe/preflight 경고는
   #    claim에 기록될 뿐 실행을 막지 않는다.
@@ -103,7 +91,6 @@ run)
 
 dry-run)
   sh "$SCRIPT_DIR/preflight.sh"
-  require_branch
   TMP="$(mktemp -d /tmp/night-dryrun.XXXXXX)"
   trap 'rm -rf "$TMP"' EXIT
   echo "[1/6] preflight OK (actor=$ACTOR, inbox=$PROJECT_ROOT/.claude/vault/_INBOX.md)"
