@@ -540,6 +540,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             hardMissing: gate.hardMissing.map((i) => (i.detail ? `${i.label} (${i.detail})` : i.label)),
             softMissing: gate.softMissing.map((i) => (i.detail ? `${i.label} (${i.detail})` : i.label)),
           },
+          // 서버가 projects.locale 을 조회해 응답 언어를 강제할 수 있게 전달(#i18n-s5-batch6-chat).
+          projectId,
         }
         break
       }
@@ -587,6 +589,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           message: trimmed,
           history: historyPayload,
           canvasContext,
+          // 서버가 projects.locale 을 조회해 응답 언어를 강제할 수 있게 전달(#i18n-s5-batch6-chat).
+          projectId,
         }
         break
       }

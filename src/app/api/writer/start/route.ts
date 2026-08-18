@@ -16,7 +16,7 @@ import type { PipelineInput, Genre, CastContract } from '@/lib/writer/types/pipe
 import { isAdminOwnedProject } from '@/lib/admin';
 import { isWriterEngine, type WriterEngine } from '@/lib/writer/engine';
 import { applyProducerI18n } from '@/lib/writer/i18n/derive-en';
-import { detectLocaleFromText } from '@/lib/locale';
+import { detectLocaleFromText, parseAppLocale } from '@/lib/locale';
 import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
 import { parseCustomStyleAnchor } from '@/lib/style-anchor';
 
@@ -177,20 +177,26 @@ export async function POST(req: NextRequest) {
       console.log(`[writer/start] i18n EN base: chars=${n.characters} locs=${n.locations}`);
     }
 
-    // 1.6 언어 경계(S4): 표시 locale 확정 — 스토리(유저 입력) 언어를 rule-base 감지 → projects.locale.
-    //   기본 'en'(S0) → 첫 콘텐츠(handoff)에서 확정. locale_locked 면 보존(재핸드오프 덮어쓰기 방지). SSO 힌트는 후속.
-    //   소비자(표시 전환·UI i18n)는 S5 — 지금은 값만 기록. best-effort.
+    // 1.6 언어 경계(S4→S5): projects.locale 확정 + 파이프라인 출력 언어로 전달 (#i18n-s5).
+    //   신규 프로젝트는 생성 시 사용자 설정으로 잠겨 온다(project/new). 잠긴 값이 곧 출력 언어.
+    //   레거시(unlocked) 첫 핸드오프는 종전대로 스토리 감지로 잠그며, 감지값을 출력 언어로 쓰면
+    //   "스토리 언어 추종"이던 종전 산출과 동일하다 — 행동 보존. best-effort(실패 시 미주입 = 종전 관례).
+    let outputLocale: PipelineInput['outputLocale'];
     try {
       const { data: proj } = await supabaseAdmin
         .from('projects')
-        .select('locale_locked')
+        .select('locale, locale_locked')
         .eq('id', projectId)
         .maybeSingle();
-      if (!proj?.locale_locked) {
+      if (proj?.locale_locked) {
+        outputLocale = parseAppLocale(proj.locale) ?? undefined;
+      } else {
+        const detected = detectLocaleFromText(story);
         await supabaseAdmin
           .from('projects')
-          .update({ locale: detectLocaleFromText(story), locale_locked: true })
+          .update({ locale: detected, locale_locked: true })
           .eq('id', projectId);
+        outputLocale = parseAppLocale(detected) ?? undefined;
       }
     } catch (e) {
       console.error('[writer/start] locale resolve failed (proceeding):', e);
@@ -237,6 +243,7 @@ export async function POST(req: NextRequest) {
       runtimeSeconds,
       styleAnchor,
       models,
+      outputLocale,
       // #s3-gate: UI 핸드오프는 씬 스토리 확정 게이트를 켠다 — storyCheck 후 유저 검토·확정.
       // V2는 의미 단위 결과와 자체 검토 메타를 한 번에 만들므로 기존 씬 확인 게이트를
       // 중복 적용하지 않는다. V1은 기존 사용자 씬 검토 흐름을 그대로 유지한다.

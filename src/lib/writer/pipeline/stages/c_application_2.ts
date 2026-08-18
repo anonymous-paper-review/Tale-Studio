@@ -22,7 +22,9 @@ import type {
   DecoupagePlan,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
+import type { AppLocale } from '@/lib/locale';
 import { buildAssetRegistry, normalizeShotSequenceAssetRefs } from '@/lib/writer/pipeline/util/asset_refs';
+import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 
 interface ClaudeC2ValidationResponse {
   shots_to_split: Array<{ shot_id: string; reason: string; new_shots: ShotSequenceItem[] }>;
@@ -53,6 +55,8 @@ export async function runShotCheck(
   sceneBudgetIssues: ValidationIssue[],
   logger: PipelineLogger,
   cAxisConfig: LlmAxisConfig,   // C축: 의미/액션 검증 (현재 Claude)
+  // #i18n-s5: 미지정(레거시)이면 systemInstruction 절 미주입 — 종전 동작 그대로.
+  outputLocale?: AppLocale,
 ): Promise<{ shotSequence: ShotSequence; report: ShotCheckReport }> {
   await logger.markStage('shotCheck', 'started');
 
@@ -106,7 +110,7 @@ INFO: 미세 개선
 CRITICAL/WARNING 이슈는 실제 결함이면 찾되, visual 이슈에만 constraint를 붙인다. INFO는 constraint를 생략한다.
 
 split 권장 시 new_shots 배열로 분할안 제시 (각각 1 주요 액션). 각 new_shot 에는 S 블록을
-반드시 포함하고, S.character_action 에는 그 반쪽이 담는 구체 행동을 써라 (부모 문장 복사 금지).`;
+반드시 포함하고, S.character_action 에는 그 반쪽이 담는 구체 행동을 써라 (부모 문장 복사 금지).${outputLanguageClause(outputLocale)}`;
 // #output-diet 2026-08-10 (기각): new_shots 를 델타 전용으로 좁히는 실험을 했으나 벽시계 -2.2%
 //   (기준 ≥30%)로 기각했다. 근거 — 실측상 shots_to_split 은 출력의 23~24% 뿐이고(나머지 76%는
 //   semantic_issues), 모델은 이미 C/V/assets/continuity 를 안 내고 있었다(사실상 델타 상태).

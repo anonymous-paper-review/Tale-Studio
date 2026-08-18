@@ -91,18 +91,19 @@ interface Attachment {
 /**
  * 사용자가 아무 말 없이 첨부만 보냈을 때 대신 실어 보내는 문장.
  * 빈 메시지를 보내면 스레드에 "왜 이걸 했는지"가 남지 않는다 — 기록으로도 남을 문장을 만든다.
+ * 유저가 작성한 것처럼 전송되므로 UI locale 을 따른다(#i18n-s5-batch6-chat) — 호출부의 t 를 받는다.
  */
-function defaultUtterance(texts: Attachment[], images: Attachment[]): string {
+function defaultUtterance(texts: Attachment[], images: Attachment[], t: ReturnType<typeof useT>): string {
   const parts: string[] = []
   if (texts.length > 0) {
-    parts.push(`${texts.map((t) => t.name).join(', ')} 을(를) 스토리로 올렸어요.`)
+    const names = texts.map((file) => file.name).join(', ')
+    parts.push(t('Uploaded {names} as the story.', { names }))
   }
   if (images.length > 0) {
-    parts.push(
-      `${images.map((i) => i.name).join(', ')} 을(를) 올렸어요. 읽고 스토리로 정리해 주세요.`,
-    )
+    const names = images.map((file) => file.name).join(', ')
+    parts.push(t('Uploaded {names}. Please read them and put together a story.', { names }))
   }
-  return parts.join(' ') || '첨부한 파일을 확인해 주세요.'
+  return parts.join(' ') || t('Please check the attached files.')
 }
 
 // 이 세션에서 이미 타이핑 연출을 재생한 suggestion id — 재렌더/스테이지 왕복 시 재생 방지(#b1).
@@ -615,7 +616,7 @@ export function GlobalChat() {
     const imageUrls = images.flatMap((a) => a.sliceUrls ?? [])
     const thumbUrls = images.map((a) => a.thumbUrl).filter((u): u is string => !!u)
 
-    const msg = typed || defaultUtterance(texts, images)
+    const msg = typed || defaultUtterance(texts, images, t)
 
     setInput('')
     // 씬 게이트 중의 입력 = 수정 피드백 (#gate-main-input) — 일반 채팅이 아니라 revise 로 간다.

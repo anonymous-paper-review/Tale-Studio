@@ -10,6 +10,7 @@
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX } from '@/lib/writer/pipeline/physics';
 import { REPRESENTATIVE_DEPTHS, REPRESENTATIVE_SHOT_CAP } from '@/lib/writer/pipeline/budget';
+import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import type {
   DecoupagePlan,
   DecoupageShot,
@@ -22,6 +23,7 @@ import type {
   SceneDecoupage,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
+import type { AppLocale } from '@/lib/locale';
 
 // == 카메라 규율 == 계약 (#camera-contract-relax 2026-08-11).
 //
@@ -83,7 +85,7 @@ const CAMERA_CONTRACT_RELAXED_V3 = `== 카메라 규율 ==
   두 비트의 카메라 처리가 다르면 가능하면 split하라.
 - 동기가 있으면 크기도 그 동기에 맞춰라: 질주를 최소 움직임으로 축소하지 마라.`;
 
-export function buildSystemInstruction(): string {
+export function buildSystemInstruction(outputLocale?: AppLocale): string {
   const contract = process.env.WRITER_CAMERA_CONTRACT;
   // 기본 = relaxed-v3(채택본). 'legacy' 만 옛 문구로 되돌린다 — 되돌림 스위치는 남겨둔다
   //   (연출 방침 변경이라 관측이 나쁘면 즉시 원복할 수 있어야 한다).
@@ -125,7 +127,7 @@ ${cameraContract}
 
 == 시간 제약 (validator) ==
 - 각 샷 intended_duration_seconds는 ${SHOT_SECONDS_RANGE} (짧고 스냅있게). 1개 주요 액션이 들어맞는 길이. 긴 침묵 등 예외만 최대 ${SHOT_SECONDS_HARD_MAX}.
-- 한 샷에 액션을 몰아넣지 마라. 액션이 크거나 여러 개면 split으로 나눠라.`;
+- 한 샷에 액션을 몰아넣지 마라. 액션이 크거나 여러 개면 split으로 나눠라.${outputLanguageClause(outputLocale)}`;
 }
 
 // 씬 동시성 기본값(#concurrency-gap 2026-08-10). 종전엔 호출부가 `Number(env ?? '1') || 1` 로
@@ -266,11 +268,12 @@ async function decoupageForScene(
   shotBudgetHint: number | null,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
+  outputLocale?: AppLocale,
 ): Promise<SceneDecoupage> {
   const userPrompt = buildUserPrompt(scene, plan, genre, characters, worldVisual, shotBudgetHint);
 
   const raw = await generateJson<unknown>(userPrompt, axisConfig, {
-    systemInstruction: buildSystemInstruction(),
+    systemInstruction: buildSystemInstruction(outputLocale),
     temperature: 0.7, // 연출 창의성 (V4보다 약간 높게)
   });
 
@@ -335,10 +338,13 @@ export async function runDecoupage(
     /** 동시 처리 씬 수 (#scene-parallel 2026-08-09). 기본 1(순차). 씬들은 상호 독립이고
      *  전역 재인덱싱이 조립 단계라 순서 무관 — 단 한도(429)와 트레이드라 전역 방어 없이 크게 올리지 말 것. */
     concurrency?: number;
+    /** #i18n-s5: 미지정(레거시)이면 systemInstruction 끝 절 미주입 — 종전 동작 그대로. */
+    outputLocale?: AppLocale;
   },
 ): Promise<DecoupageRunResult> {
   const doneById = new Map((opts?.resume ?? []).map((sd) => [sd.scene_id, sd]));
   const softDeadlineMs = opts?.softDeadlineMs;
+  const outputLocale = opts?.outputLocale;
   await logger.markStage('decoupage', 'started', {
     scene_count: scenes.scenes.length,
     resumed_scenes: doneById.size,
@@ -380,7 +386,7 @@ export async function runDecoupage(
       const plan = sceneCinematographyPlans?.find((p) => p.scene_id === scene.scene_id) ?? null;
       const sceneStartedMs = Date.now();
       try {
-        const sceneDec = await decoupageForScene(scene, plan, genre, characters, worldVisual, shotBudgetHint, logger, axisConfig);
+        const sceneDec = await decoupageForScene(scene, plan, genre, characters, worldVisual, shotBudgetHint, logger, axisConfig, outputLocale);
         doneById.set(scene.scene_id, sceneDec);
         progressed += 1;
         estSceneMs = Math.max(estSceneMs, Math.round((Date.now() - sceneStartedMs) * 1.25));

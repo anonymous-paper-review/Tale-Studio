@@ -1,3 +1,33 @@
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { parseAppLocale, type AppLocale } from '@/lib/locale'
+
+// 챗 응답 언어 강제(#i18n-s5-batch6-chat) — 4개 챗 라우트(producer/writer/artist/director)가 공유.
+//   콘텐츠 언어(projects.locale)를 시스템 프롬프트 맨 끝(다른 가이드보다 뒤)에 주입해 최신 지시로
+//   우선순위를 준다. locale 을 모르면(프로젝트 미확인/미로그인 경로 등) 빈 문자열 — 종전 동작 유지.
+export function responseLanguageDirective(locale: AppLocale | null | undefined): string {
+  if (locale !== 'ko' && locale !== 'en') return ''
+  const lang = locale === 'ko' ? '한국어' : '영어(English)'
+  return `\n\n[응답 언어] 사용자에게 보내는 모든 응답 텍스트는 ${lang}로 작성한다.`
+}
+
+/**
+ * projects.locale 1회 조회 — 라우트가 이미 프로젝트 소유권을 확인했다면 그 뒤에 불러 중복 확인을
+ *   피한다. 실패/미상은 null(호출부가 responseLanguageDirective(null) → 무주입으로 폴백).
+ */
+export async function fetchProjectLocale(projectId: string): Promise<AppLocale | null> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('projects')
+      .select('locale')
+      .eq('id', projectId)
+      .maybeSingle()
+    if (error || !data) return null
+    return parseAppLocale((data as { locale?: unknown }).locale)
+  } catch {
+    return null
+  }
+}
+
 // 채팅 응답 공용 출력 형식 가이드 — 모든 stage 챗 라우트의 시스템 프롬프트 끝에 append 한다.
 //   목적: (1) 줄바꿈/문단 분리로 가독성 향상, (2) UI에서 제거되는 ** 별표 bold 사용 억제.
 //   렌더러(MarkdownText)는 whitespace-pre-wrap 이라 \n 이 그대로 줄바꿈으로 표시된다.

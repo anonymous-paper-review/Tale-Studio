@@ -66,9 +66,9 @@ describe('getShotStage (파생 단계: video > live > rough)', () => {
 
 describe('shotStageLabel (진행 버튼 라벨 = 다음 행동)', () => {
   it('단계별 라벨 매핑', () => {
-    expect(shotStageLabel('rough')).toBe('실사화')
-    expect(shotStageLabel('live')).toBe('영상 생성')
-    expect(shotStageLabel('video')).toBe('새 영상 테이크')
+    expect(shotStageLabel('rough')).toBe('Go live') // #i18n-s5: 함수는 영어 키 반환, 표시는 렌더의 t()
+    expect(shotStageLabel('live')).toBe('Generate video')
+    expect(shotStageLabel('video')).toBe('New video take')
   })
 })
 

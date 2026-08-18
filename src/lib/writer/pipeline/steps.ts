@@ -243,6 +243,7 @@ async function runLaneVisual(
       s.sceneBudgetIssues ?? [],
       logger,
       models.C,
+      s.input.outputLocale,
     );
     await logger.flushRawLlm('shotCheck');
     shotSequence = result.shotSequence;
@@ -279,7 +280,7 @@ async function runLaneDialogue(
     s.decoupage!,
     logger,
     models.S,
-    { resume: s.dialoguePartial ?? null, softDeadlineMs: deadlineMs },
+    { resume: s.dialoguePartial ?? null, softDeadlineMs: deadlineMs, outputLocale: s.input.outputLocale },
   );
   await logger.flushRawLlm('dialogue');
 
@@ -379,7 +380,7 @@ export const WRITER_STEPS: WriterStep[] = [
         await logger.markStage('storyCheck', 'completed', { skipped: true });
         return { storyCheck: emptyC1Report() };
       }
-      const storyCheck = await runStoryCheck(s.genre!, s.narrativeStructure!, s.characters!, s.scenes!, logger, models.C);
+      const storyCheck = await runStoryCheck(s.genre!, s.narrativeStructure!, s.characters!, s.scenes!, logger, models.C, s.input.outputLocale);
       await logger.flushRawLlm('storyCheck');
       return { storyCheck };
     },
@@ -426,6 +427,7 @@ export const WRITER_STEPS: WriterStep[] = [
         '',                                    // bridge seed 제거(E6 삭제 채택) — v2Design 시그니처 하위호환용 빈 값
         logger,
         models.V,
+        s.input.outputLocale,
       );
       await logger.flushRawLlm('v2Design');
 
@@ -473,6 +475,7 @@ export const WRITER_STEPS: WriterStep[] = [
         // E8 정식 배선(2026-08-10 act-arc-ablation 채택): v1 막별 아크를 v3 로 전달 —
         //   막 경계의 시각 대비를 살린다. 구 state resume 이면 null 폴백(배선 전과 동일).
         s.actVisualArc ?? null,
+        s.input.outputLocale,
       );
       await logger.flushRawLlm('sceneCinematography');
       return {
@@ -503,6 +506,7 @@ export const WRITER_STEPS: WriterStep[] = [
           softDeadlineMs: deadlineMs,
           // #concurrency-gap: 미지정이면 decoupage 자체 기본값(4). env 는 여전히 오버라이드.
           concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || undefined,
+          outputLocale: s.input.outputLocale,
         },
       );
       await logger.flushRawLlm('decoupage');

@@ -1122,4 +1122,11 @@ export const KO: Record<string, string> = {
   'not included': '미포함',
   '{value}s': '{value}초',
   '¶ Pipeline incomplete': '¶파이프라인 미완료',
+
+  // ── 스튜디오 공통: global-chat defaultUtterance(#i18n-s5-batch6-chat) ──
+  //   첨부만 보내고 말 없을 때 유저가 쓴 것처럼 대신 전송되는 문장 — UI locale 을 따른다.
+  'Uploaded {names} as the story.': '{names} 을(를) 스토리로 올렸어요.',
+  'Uploaded {names}. Please read them and put together a story.':
+    '{names} 을(를) 올렸어요. 읽고 스토리로 정리해 주세요.',
+  'Please check the attached files.': '첨부한 파일을 확인해 주세요.',
 }

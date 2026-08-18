@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
-import { PRODUCER_SYSTEM } from './system-prompt'
+import { buildProducerSystem } from './system-prompt'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 import { parseChatChoices } from '@/lib/chat-choices'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
-import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
+import { CHAT_OUTPUT_FORMAT_GUIDE, fetchProjectLocale, responseLanguageDirective } from '@/lib/chat-format'
 import { sanitizeAttachmentUrls } from '@/lib/upload/attachment'
 import { listStyleAnchorMediums } from '@/lib/style-anchor'
+import { userOwnsProject } from '@/lib/generation-jobs'
 
 interface ChatMessage {
   role: 'user' | 'model'
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
       storyText,
       gate,
       attachmentImageUrls,
+      projectId,
     } = await req.json()
 
     if (!message || typeof message !== 'string') {
@@ -64,6 +66,19 @@ export async function POST(req: Request) {
         { error: 'message is required' },
         { status: 400 },
       )
+    }
+
+    // 응답 언어 강제(#i18n-s5-batch6-chat) — projects.locale 조회. 소유 확인 실패/미상은
+    //   fetchProjectLocale 이 null 을 주고, responseLanguageDirective(null) 이 종전 동작(무주입)으로 폴백.
+    let projectLocale = null as Awaited<ReturnType<typeof fetchProjectLocale>>
+    if (typeof projectId === 'string' && projectId) {
+      try {
+        if (await userOwnsProject(projectId, user.id)) {
+          projectLocale = await fetchProjectLocale(projectId)
+        }
+      } catch (err) {
+        console.warn('[produce/chat] locale lookup skipped:', err instanceof Error ? err.message : err)
+      }
     }
 
     // #p1-attach: 첨부 이미지는 URL 로 넘어간다 — Anthropic 이 직접 가져가므로 화이트리스트
@@ -151,7 +166,7 @@ export async function POST(req: Request) {
       : ''
 
     const text = await llmChat(
-      PRODUCER_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE,
+      buildProducerSystem(projectLocale ?? 'ko') + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + responseLanguageDirective(projectLocale),
       normalizedHistory,
       `${contextPrefix}${message}`,
       0.7,

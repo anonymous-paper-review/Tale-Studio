@@ -104,14 +104,14 @@ describe('decodeImage', () => {
     // 확장자만 바꾼 파일이 통과하면 안 된다.
     const mismatch = await decodeImage(png, 'image/jpeg')
     expect(mismatch.ok).toBe(false)
-    expect(mismatch.ok === false && mismatch.reason).toMatch(/확장자와 실제 내용/)
+    expect(mismatch.ok === false && mismatch.reason).toMatch(/extension doesn't match the actual content/)
   })
 
   it('지원하지 않는 MIME 은 포맷을 알려주며 거부한다', async () => {
     const png = await solid(10, 10).png().toBuffer()
     const result = await decodeImage(png, 'image/svg+xml')
     expect(result.ok).toBe(false)
-    expect(result.ok === false && result.reason).toMatch(/JPG · PNG · WebP/)
+    expect(result.ok === false && result.reason).toMatch(/Only JPG, PNG, or WebP/)
   })
 
   it('스크롤 웹툰 높이를 받아준다 (2026-08-13 회귀)', async () => {

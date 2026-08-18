@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
-import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE } from '@/lib/chat-format'
+import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, fetchProjectLocale, responseLanguageDirective } from '@/lib/chat-format'
 import { parseFencedUpdates } from '@/lib/agentic-reply-guard'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildArtistActivityContext } from '@/lib/artist/chat-context'
@@ -157,10 +157,17 @@ export async function POST(req: Request) {
     //   UI/writer 가 트리거한 재생성도 채팅이 다음 턴에 인지한다 (chat-aware-regeneration).
     //   소유권 미확인 projectId 는 무시 (타 프로젝트 활동 로그 누설 방지). 실패는 비치명 — 채팅은 계속.
     let activityContext = ''
+    let projectLocale: Awaited<ReturnType<typeof fetchProjectLocale>> = null
     if (typeof projectId === 'string' && projectId) {
       try {
         if (await userOwnsProject(projectId, user.id)) {
-          activityContext = await buildArtistActivityContext(projectId)
+          // 활동 로그와 응답 언어(#i18n-s5-batch6-chat) 조회를 병렬로 — 추가 왕복 없음.
+          const [activity, locale] = await Promise.all([
+            buildArtistActivityContext(projectId),
+            fetchProjectLocale(projectId),
+          ])
+          activityContext = activity
+          projectLocale = locale
         }
       } catch (err) {
         console.warn(
@@ -183,7 +190,7 @@ export async function POST(req: Request) {
     const normalizedHistory = normalizeHistory(history)
 
     const text = await llmChat(
-      ARTIST_SYSTEM + CHAT_OUTPUT_FORMAT_GUIDE + CHAT_UPDATES_BATCH_GUIDE,
+      ARTIST_SYSTEM + CHAT_OUTPUT_FORMAT_GUIDE + CHAT_UPDATES_BATCH_GUIDE + responseLanguageDirective(projectLocale),
       normalizedHistory,
       `${contextPrefix}${message}`,
       0.7,
