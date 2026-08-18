@@ -120,8 +120,11 @@ def _is_insert_only(base, candidate):
     """Return true when candidate preserves every base line in order."""
     # A person may place a heading directly after a separator and remove an
     # empty spacer line. Treat whitespace-only lines as layout, not content.
+    def line_key(line):
+        return line.rstrip(b"\r\n")
+
     base_lines = [
-        line for line in base.splitlines(keepends=True) if line.strip()
+        line_key(line) for line in base.splitlines(keepends=True) if line.strip()
     ]
     if not base_lines:
         return True
@@ -129,7 +132,7 @@ def _is_insert_only(base, candidate):
     for line in candidate.splitlines(keepends=True):
         if not line.strip():
             continue
-        if line == base_lines[cursor]:
+        if line_key(line) == base_lines[cursor]:
             cursor += 1
             if cursor == len(base_lines):
                 return True
