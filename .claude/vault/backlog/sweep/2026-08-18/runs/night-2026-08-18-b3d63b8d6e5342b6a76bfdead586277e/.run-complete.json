@@ -1,0 +1,144 @@
+{
+  "run_id": "night-2026-08-18-b3d63b8d6e5342b6a76bfdead586277e",
+  "source": "/Users/xcape/projects/tale-studio",
+  "contract_hash": "86d3be3fdcb41ea622c18c53df1825a49574157723f122cd586a4c5d814f9b6c",
+  "inbox_snapshot": {
+    "snapshot_id": "751c326ecb3d456facf594118ca278688dd12e0f3dfce4d90c6466957327f6b5",
+    "snapshot_fingerprint": "12dec5aac06db4409dca28640ec3ad637b247093ee5b2e91063ef3858ad3d495",
+    "path": "/Users/xcape/projects/tale-studio/.claude/vault/_INBOX.md",
+    "start": 0,
+    "end": 9531,
+    "content_sha256": "7b17807fb8d5f044253f9e51c3e78aa1cfcc5fde45f74dc152d274c4583a1133",
+    "content_artifact": "content/7b17807fb8d5f044253f9e51c3e78aa1cfcc5fde45f74dc152d274c4583a1133.bin",
+    "run_id": "night-2026-08-18-b3d63b8d6e5342b6a76bfdead586277e",
+    "contract_hash": "86d3be3fdcb41ea622c18c53df1825a49574157723f122cd586a4c5d814f9b6c",
+    "binding_path": "/Users/xcape/projects/tale-studio/.claude/vault/backlog/night-runtime/snapshots/snapshot-12dec5aac06db4409dca28640ec3ad637b247093ee5b2e91063ef3858ad3d495-f2f5ec630e231877ea99ca6cb38f1c82541050d877c3cded825b43ad0ddaa3b4.json"
+  },
+  "sessions": [
+    {
+      "source": "gjc",
+      "session_id": "2026-08-17T15-03-41-884Z_01a0103f-f43c-7000-934a-19659569e149",
+      "session_path": "/Users/xcape/.gjc/agent/sessions/v2-mt6z7g7hs5rprsqo7md2kyzejj52dvtmidbcv5bz3hnqp3gtf2qa/2026-08-17T15-03-41-884Z_01a0103f-f43c-7000-934a-19659569e149.jsonl"
+    },
+    {
+      "source": "claude",
+      "session_id": "db75f040-7fcf-4812-a5c3-1c98f82e9054",
+      "session_path": "/Users/xcape/.claude/projects/-Users-xcape-projects-tale-studio/db75f040-7fcf-4812-a5c3-1c98f82e9054.jsonl"
+    },
+    {
+      "source": "claude",
+      "session_id": "40ab24a1-c8fa-4e9a-9439-b12ab1cbd8d5",
+      "session_path": "/Users/xcape/.claude/projects/-Users-xcape-projects-tale-studio/40ab24a1-c8fa-4e9a-9439-b12ab1cbd8d5.jsonl"
+    },
+    {
+      "source": "claude",
+      "session_id": "72e6f224-b1c1-4e6f-a5e3-83868f830084",
+      "session_path": "/Users/xcape/.claude/projects/-Users-xcape-projects-tale-studio/72e6f224-b1c1-4e6f-a5e3-83868f830084.jsonl"
+    },
+    {
+      "source": "claude",
+      "session_id": "1e781e5a-5578-43fc-a4d8-c2b3384b87dd",
+      "session_path": "/Users/xcape/.claude/projects/-Users-xcape-projects-tale-studio/1e781e5a-5578-43fc-a4d8-c2b3384b87dd.jsonl"
+    },
+    {
+      "source": "gjc",
+      "session_id": "2026-08-15T11-48-43-716Z_01a00540-bc44-7000-8360-a902bb6175fd",
+      "session_path": "/Users/xcape/.gjc/agent/sessions/v2-mt6z7g7hs5rprsqo7md2kyzejj52dvtmidbcv5bz3hnqp3gtf2qa/2026-08-15T11-48-43-716Z_01a00540-bc44-7000-8360-a902bb6175fd.jsonl"
+    },
+    {
+      "source": "claude",
+      "session_id": "38572b0c-4c0a-4912-8d11-214cff43c569",
+      "session_path": "/Users/xcape/.claude/projects/-Users-xcape-projects-tale-studio/38572b0c-4c0a-4912-8d11-214cff43c569.jsonl"
+    },
+    {
+      "source": "gjc",
+      "session_id": "2026-08-15T03-44-18-523Z_01a00385-3c5b-7000-8216-1b7b53d8decf",
+      "session_path": "/Users/xcape/.gjc/agent/sessions/v2-mt6z7g7hs5rprsqo7md2kyzejj52dvtmidbcv5bz3hnqp3gtf2qa/2026-08-15T03-44-18-523Z_01a00385-3c5b-7000-8216-1b7b53d8decf.jsonl"
+    },
+    {
+      "source": "claude",
+      "session_id": "d78f5448-cab3-47e5-b9a8-36074b1eeab4",
+      "session_path": "/Users/xcape/.claude/projects/-Users-xcape-projects-tale-studio/d78f5448-cab3-47e5-b9a8-36074b1eeab4.jsonl"
+    },
+    {
+      "source": "claude",
+      "session_id": "a2149b0f-f75d-456e-b98a-56f79e6f4437",
+      "session_path": "/Users/xcape/.claude/projects/-Users-xcape-projects-tale-studio/a2149b0f-f75d-456e-b98a-56f79e6f4437.jsonl"
+    },
+    {
+      "source": "claude",
+      "session_id": "cc9e03b1-86a9-4cd2-bbfd-9ae9eda6d28d",
+      "session_path": "/Users/xcape/.claude/projects/-Users-xcape-projects-tale-studio/cc9e03b1-86a9-4cd2-bbfd-9ae9eda6d28d.jsonl"
+    },
+    {
+      "source": "gjc",
+      "session_id": "2026-08-13T14-09-47-348Z_019ffb75-2954-7000-af44-0490f5439c06",
+      "session_path": "/Users/xcape/.gjc/agent/sessions/v2-mt6z7g7hs5rprsqo7md2kyzejj52dvtmidbcv5bz3hnqp3gtf2qa/2026-08-13T14-09-47-348Z_019ffb75-2954-7000-af44-0490f5439c06.jsonl"
+    },
+    {
+      "source": "claude",
+      "session_id": "5a3338db-acc5-49a0-b7e3-d6511b8c3e28",
+      "session_path": "/Users/xcape/.claude/projects/-Users-xcape-projects-tale-studio/5a3338db-acc5-49a0-b7e3-d6511b8c3e28.jsonl"
+    },
+    {
+      "source": "claude",
+      "session_id": "52ae45f9-62e9-4bba-94db-b3c0869e7248",
+      "session_path": "/Users/xcape/.claude/projects/-Users-xcape-projects-tale-studio/52ae45f9-62e9-4bba-94db-b3c0869e7248.jsonl"
+    },
+    {
+      "source": "claude",
+      "session_id": "0897af55-d557-4b5a-8928-990db6e6b599",
+      "session_path": "/Users/xcape/.claude/projects/-Users-xcape-projects-tale-studio/0897af55-d557-4b5a-8928-990db6e6b599.jsonl"
+    }
+  ],
+  "committable": true,
+  "completed_at": "2026-08-18T02:41:25+00:00",
+  "artifacts": {
+    ".stamp-candidate": "497b28cf11fbee5d6637a6ac704a0281b519cf76918b1a4652fa804758ed43fc",
+    "digest/claude-0897af55-b3977ad64632545ed2720dc773f9ae6942a9a8da31bb714edf86e738d3462684.md": "7acb30105ca985b87bc9abccc830d14250178429eff3a9d24d88246e821d935a",
+    "digest/claude-1e781e5a-cd869303da6aeba0a0f6049994524d70242bcfdf81686f053524858b96eedbe3.md": "a77751a7cdbe65f03507815b77e10010b0cef2811ebc85eee30b8cabea391575",
+    "digest/claude-38572b0c-456286a92a0103de6a7aaf9b7d5d561d28d5b6ec3828a7f378d6e5c243ea5933.md": "6256033b78ce034211bde74956e324d3698168cf6c92668342ee3f1762801726",
+    "digest/claude-40ab24a1-0a51a414941ef235230c67f1a1d3588c9fe9e6cde2c6c1da2f97862c46faaf9d.md": "46e5e0610cfd31ec060a74a0342f9261a5119f8f962eca0e8fb9c6aa6bf5b873",
+    "digest/claude-52ae45f9-82f316bdb792ad5f95b007b3f7dc68eec89da33196949878afecd55d09b85f9d.md": "f391233e11b6b63569928b9a8dbfc677fe0b6e394804756b2a1b05efb0732a8d",
+    "digest/claude-5a3338db-b07fa9940aea8c132a14767bee19d006d562b36a8d0004502c7ea600b568248a.md": "4e47d904121fc4593f39ebfabbb62fa17d78c12944b01dfdbcc45c8f42399a1b",
+    "digest/claude-72e6f224-950c8f2b6e7e1dcfc9b44612f571ae1383379a9dbaacf11a1c311a13e14381d6.md": "ae5a8e9cf37d65601633832ea787e64b8c556377e98c9f3a93e03b369d9ded75",
+    "digest/claude-a2149b0f-49335f429563e6510e75fa831222379d567ef8e65fedfc84d49b77264c0b5e0f.md": "c9ce0313e5ae3c6ff2911d90fb0d9e7fc212db9bb130703085dc31a4dc7bbfde",
+    "digest/claude-cc9e03b1-913b3ee804b5c788b3883a980744a13b5963d9a30b304fcbad5f8f90ab9961cc.md": "66d3e8bf06ac9ddb657619606033b990a79b71e404e0c8e56bbedf149537dadd",
+    "digest/claude-d78f5448-0821a9e77942f8e1ac7170234f80772af92371ca76fe278d676d6865a7aeef9a.md": "2b99eca4300dd717759e18c6cf760c96cc1518db79754768ec69402923daf159",
+    "digest/claude-db75f040-c9047b59142a15f376ad19db5d08491ee5c693447093a004235b7e1524c913f9.md": "c8b6acb55ea53a2fcc12df44854bd91b9990d510f1f7bfee759d528b66872fd0",
+    "digest/gjc-019ffb75-24cfb7e275858b8f4e3d22475fa30b17563ff9bb12a967502f924311810066b8.md": "81a936685a94fdab5a0f21c9b47d8bffba62282413700fe02c2d56e93ef81009",
+    "digest/gjc-01a00385-38e7c6f05b22d79756ebe438e7a27e9a8e8b330d0c891de1575612f114375481.md": "965fde0ba3c06fcfe1059f5302d76193f2bba00c7953cf1957ddc593d8f66b19",
+    "digest/gjc-01a00540-191352bbb08f3a1efbf2f074d95b55fed1b0e01f3be255f39b3135f4840d6d88.md": "e9c83d4794f55c3853feadfb488f6f2202380b60efa95a05b2e2deb80d35b701",
+    "digest/gjc-01a0103f-46a1b7db59f295dbcb0ef7df24dd5e10e17697a5f01293c30dd63ca3851d3714.md": "7366e195ab2c49aa4c67d280500052023243335df3680643a90151eaeda76e48",
+    "index.json": "d236909bcd66dcbc4f7be7c0a573de196601a069773786dddda4cf202fb5c433",
+    "rejections.md": "3ef64bb5be72d5427d646520349b2b939d94f496b9570572b5e170e0ad17fd0b"
+  },
+  "hashes": {
+    ".stamp-candidate": "497b28cf11fbee5d6637a6ac704a0281b519cf76918b1a4652fa804758ed43fc",
+    "digest/claude-0897af55-b3977ad64632545ed2720dc773f9ae6942a9a8da31bb714edf86e738d3462684.md": "7acb30105ca985b87bc9abccc830d14250178429eff3a9d24d88246e821d935a",
+    "digest/claude-1e781e5a-cd869303da6aeba0a0f6049994524d70242bcfdf81686f053524858b96eedbe3.md": "a77751a7cdbe65f03507815b77e10010b0cef2811ebc85eee30b8cabea391575",
+    "digest/claude-38572b0c-456286a92a0103de6a7aaf9b7d5d561d28d5b6ec3828a7f378d6e5c243ea5933.md": "6256033b78ce034211bde74956e324d3698168cf6c92668342ee3f1762801726",
+    "digest/claude-40ab24a1-0a51a414941ef235230c67f1a1d3588c9fe9e6cde2c6c1da2f97862c46faaf9d.md": "46e5e0610cfd31ec060a74a0342f9261a5119f8f962eca0e8fb9c6aa6bf5b873",
+    "digest/claude-52ae45f9-82f316bdb792ad5f95b007b3f7dc68eec89da33196949878afecd55d09b85f9d.md": "f391233e11b6b63569928b9a8dbfc677fe0b6e394804756b2a1b05efb0732a8d",
+    "digest/claude-5a3338db-b07fa9940aea8c132a14767bee19d006d562b36a8d0004502c7ea600b568248a.md": "4e47d904121fc4593f39ebfabbb62fa17d78c12944b01dfdbcc45c8f42399a1b",
+    "digest/claude-72e6f224-950c8f2b6e7e1dcfc9b44612f571ae1383379a9dbaacf11a1c311a13e14381d6.md": "ae5a8e9cf37d65601633832ea787e64b8c556377e98c9f3a93e03b369d9ded75",
+    "digest/claude-a2149b0f-49335f429563e6510e75fa831222379d567ef8e65fedfc84d49b77264c0b5e0f.md": "c9ce0313e5ae3c6ff2911d90fb0d9e7fc212db9bb130703085dc31a4dc7bbfde",
+    "digest/claude-cc9e03b1-913b3ee804b5c788b3883a980744a13b5963d9a30b304fcbad5f8f90ab9961cc.md": "66d3e8bf06ac9ddb657619606033b990a79b71e404e0c8e56bbedf149537dadd",
+    "digest/claude-d78f5448-0821a9e77942f8e1ac7170234f80772af92371ca76fe278d676d6865a7aeef9a.md": "2b99eca4300dd717759e18c6cf760c96cc1518db79754768ec69402923daf159",
+    "digest/claude-db75f040-c9047b59142a15f376ad19db5d08491ee5c693447093a004235b7e1524c913f9.md": "c8b6acb55ea53a2fcc12df44854bd91b9990d510f1f7bfee759d528b66872fd0",
+    "digest/gjc-019ffb75-24cfb7e275858b8f4e3d22475fa30b17563ff9bb12a967502f924311810066b8.md": "81a936685a94fdab5a0f21c9b47d8bffba62282413700fe02c2d56e93ef81009",
+    "digest/gjc-01a00385-38e7c6f05b22d79756ebe438e7a27e9a8e8b330d0c891de1575612f114375481.md": "965fde0ba3c06fcfe1059f5302d76193f2bba00c7953cf1957ddc593d8f66b19",
+    "digest/gjc-01a00540-191352bbb08f3a1efbf2f074d95b55fed1b0e01f3be255f39b3135f4840d6d88.md": "e9c83d4794f55c3853feadfb488f6f2202380b60efa95a05b2e2deb80d35b701",
+    "digest/gjc-01a0103f-46a1b7db59f295dbcb0ef7df24dd5e10e17697a5f01293c30dd63ca3851d3714.md": "7366e195ab2c49aa4c67d280500052023243335df3680643a90151eaeda76e48",
+    "index.json": "d236909bcd66dcbc4f7be7c0a573de196601a069773786dddda4cf202fb5c433",
+    "rejections.md": "3ef64bb5be72d5427d646520349b2b939d94f496b9570572b5e170e0ad17fd0b"
+  },
+  "snapshot_id": "751c326ecb3d456facf594118ca278688dd12e0f3dfce4d90c6466957327f6b5",
+  "snapshot_fingerprint": "12dec5aac06db4409dca28640ec3ad637b247093ee5b2e91063ef3858ad3d495",
+  "path": "/Users/xcape/projects/tale-studio/.claude/vault/_INBOX.md",
+  "start": 0,
+  "end": 9531,
+  "content_sha256": "7b17807fb8d5f044253f9e51c3e78aa1cfcc5fde45f74dc152d274c4583a1133",
+  "content_artifact": "content/7b17807fb8d5f044253f9e51c3e78aa1cfcc5fde45f74dc152d274c4583a1133.bin",
+  "binding_path": "/Users/xcape/projects/tale-studio/.claude/vault/backlog/night-runtime/snapshots/snapshot-12dec5aac06db4409dca28640ec3ad637b247093ee5b2e91063ef3858ad3d495-f2f5ec630e231877ea99ca6cb38f1c82541050d877c3cded825b43ad0ddaa3b4.json"
+}
