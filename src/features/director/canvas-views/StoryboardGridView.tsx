@@ -1,11 +1,19 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
+import {
+  GeneratedImage,
+  GeneratingOverlay,
+  StoryboardZoomControls,
+  applyStoryboardZoomShortcut,
+  storyboardColumns,
+  storyboardDescriptionFontSize,
+  useStoryboardZoom,
+} from '@/components/generating-frame'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import {
   selectLatestAttempt,
@@ -17,6 +25,7 @@ import {
   effectivePrompt,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
+import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import {
   useActiveGenerationJobs,
@@ -28,6 +37,14 @@ import { useRoughStoryboard, useShotActionDescription } from '@/features/directo
 import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { replaceSlugs, type SlugEntry } from '@/lib/script-lines'
+import {
+  isMentionModifierClick,
+  mentionLabelForModifierClick,
+  sceneShotMentionRef,
+  sceneShotMentions,
+  type CardMention,
+  type SceneShotMentionTarget,
+} from '@/lib/card-mention'
 import {
   isSceneData,
   isShotData,
@@ -162,6 +179,8 @@ function ShotCell({
   queuedImageShots,
   queuedVideoShots,
   activeJobs,
+  descriptionFontSize,
+  shotMention,
 }: {
   node: DirectorNode
   roster: SlugEntry[]
@@ -173,6 +192,8 @@ function ShotCell({
   queuedVideoShots: ReadonlySet<string>
   /** 큐 원본 — 경과시간 durable 기준점(activeStartedAt) 계산용. */
   activeJobs: readonly ActiveJob[]
+  descriptionFontSize: string
+  shotMention?: CardMention
 }) {
   const t = useT()
   const generateStoryboardImage = useDirectorCanvasStore(
@@ -182,6 +203,7 @@ function ShotCell({
     (s) => s.generateVideoForShot,
   )
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
+  const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
   // 실사 이미지가 없을 때 러프 스토리보드 폴백 표시(#e11) — writer-store 스코프 구독
   const writerShotId = isShotData(node.data) ? node.data.writerShotId : null
   const rough = useRoughStoryboard(writerShotId)
@@ -373,10 +395,28 @@ function ShotCell({
         ? img!
         : null
 
+  const mentionCardOnModifierClick = (
+    event: Pick<MouseEvent, 'ctrlKey' | 'metaKey'>,
+  ): boolean => {
+    const label = mentionLabelForModifierClick(event, shotMention)
+    if (!label) return false
+    requestMentionToggle(label)
+    return true
+  }
+
   return (
     <div
       className="group flex flex-col rounded-md border border-border bg-card p-2.5"
-      onDoubleClick={() => openPopup(node.id)}
+      onClickCapture={(event) => {
+        if (mentionCardOnModifierClick(event)) {
+          event.preventDefault()
+          event.stopPropagation()
+        }
+      }}
+      onDoubleClick={(event) => {
+        if (isMentionModifierClick(event)) return
+        openPopup(node.id)
+      }}
     >
       {/* 그림은 카드에 '담긴' 사각형(#card-inset 2026-08-11). 상자 높이는 **항상 16:9 고정**
           (#e2 2026-08-12) — 영상과 이미지 카드의 높이가 갈리면 아래 글줄이 어긋난다. 비율이
@@ -562,7 +602,10 @@ function ShotCell({
           {prettyNodeLabel(data.label)}
         </span>
         {(nativeDescription || prompt) && (
-          <p className="line-clamp-2 text-xs text-muted-foreground">
+          <p
+            className="line-clamp-2 text-muted-foreground"
+            style={{ fontSize: descriptionFontSize }}
+          >
             {/* writer 유저 언어 설명 우선(#e5) — 폴백은 프롬프트(슬러그 → @이름 치환, #e6) */}
             {nativeDescription || replaceSlugs(prompt, roster)}
           </p>
@@ -579,8 +622,11 @@ export function StoryboardGridView() {
   const t = useT()
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const projectId = useDirectorCanvasStore((s) => s.projectId)
+  const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
   // 미디어 모드: Previz(러프 3프레임 보드, 기본) | Real(실사) — 상단바(PaletteBar) 토글이 제어(2026-07-22).
   const mediaMode: StoryboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
+  const setStoryboardMediaMode = useDirectorCanvasStore((s) => s.setStoryboardMediaMode)
+  const [zoomLevel, setZoomLevel] = useStoryboardZoom('director:storyboard:zoomLevel')
 
   // 슬러그 → 실제 이름 로스터(#e6) — asset-storage(진입 시 DB hydrate)에서 인물·장소 이름.
   //   표시 전용: 노드 데이터·프롬프트 원문(구동)은 그대로 둔다.
@@ -597,6 +643,21 @@ export function StoryboardGridView() {
     ],
     [registeredCharacters, registeredWorlds, projectId],
   )
+  const sceneShotMentionItems = useMemo(() => {
+    const targets = nodes.flatMap((node): SceneShotMentionTarget[] => {
+      if (isSceneData(node.data)) {
+        return [{ kind: 'scene', id: node.id, label: prettyNodeLabel(node.data.label) }]
+      }
+      if (isShotData(node.data)) {
+        return [{ kind: 'shot', id: node.id, label: prettyNodeLabel(node.data.label) }]
+      }
+      return []
+    })
+    return [
+      ...sceneShotMentions(targets, 'previz'),
+      ...sceneShotMentions(targets, 'real'),
+    ]
+  }, [nodes])
 
   // 진행 중 잡 (#queue-restore) — 셀마다 훅을 걸면 폴링은 공유돼도 리렌더가 카드 수만큼 늘어난다.
   //   여기서 한 번 읽어 집합으로 내려보낸다.
@@ -609,6 +670,24 @@ export function StoryboardGridView() {
     () => activeShotIds(activeJobs, ['shot_video']),
     [activeJobs],
   )
+
+  // 진행 중인 산출물이 있으면 해당 Storyboard 화면을 우선 보여준다.
+  // 큐가 사라질 때 사용자가 고른 마지막 미디어 모드로 되돌리지 않는다(마지막 탭 기억은 store가 담당).
+  const hasQueuedRealWork = activeJobs.some(
+    (job) =>
+      job.kind === 'storyboard_real_grid' ||
+      job.kind === 'shot_storyboard' ||
+      job.kind === 'shot_video',
+  )
+  const hasQueuedPrevizWork = activeJobs.some(
+    (job) => job.kind === 'shot_rough_storyboard',
+  )
+  useEffect(() => {
+    if (hasQueuedRealWork && mediaMode !== 'real') setStoryboardMediaMode('real')
+    else if (!hasQueuedRealWork && hasQueuedPrevizWork && mediaMode !== 'previz') {
+      setStoryboardMediaMode('previz')
+    }
+  }, [hasQueuedPrevizWork, hasQueuedRealWork, mediaMode, setStoryboardMediaMode])
 
   // 완료 즉시 반영(#live-refresh) — 페이지 레벨 훅(use-queue-rehydrate)으로 승격돼 Node 뷰와
   //   공유한다(2026-08-12). 여기서 중복 구독하지 않는다.
@@ -641,6 +720,11 @@ export function StoryboardGridView() {
     })
   }
 
+  const mentionFor = (kind: 'scene' | 'shot', id: string, mode: StoryboardMediaMode) =>
+    sceneShotMentionItems.find(
+      (item) => item.ref === sceneShotMentionRef(mode, kind, id),
+    )
+
   const totalShots = nodes.filter((n) => isShotData(n.data)).length
 
   if (totalShots === 0) {
@@ -659,14 +743,40 @@ export function StoryboardGridView() {
     )
   }
 
+  const columns = storyboardColumns(zoomLevel)
+  const descriptionFontSize = storyboardDescriptionFontSize(columns)
+  const handleBoardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target
+    if (
+      target instanceof Element &&
+      target.closest('input, textarea, select, [contenteditable="true"]')
+    ) {
+      return
+    }
+    const next = applyStoryboardZoomShortcut(zoomLevel, event)
+    if (next === null) return
+    event.preventDefault()
+    setZoomLevel((current) => applyStoryboardZoomShortcut(current, event) ?? current)
+  }
+
   return (
     // Artist/Editor와 동일한 디자인 룰 — shadcn ScrollArea(스타일된 스크롤바).
     // 기존 raw overflow-auto(네이티브 스크롤바)를 교체. 부모 `min-h-0 flex-1`가 높이를 가둔다.
-    <ScrollArea className="size-full bg-background">
+    <div className="flex size-full min-h-0 flex-col bg-background">
+      <div className="flex shrink-0 items-center justify-end border-b border-border px-6 py-2">
+        <StoryboardZoomControls
+          zoomLevel={zoomLevel}
+          onZoomLevelChange={setZoomLevel}
+        />
+      </div>
+      <ScrollArea className="min-h-0 flex-1">
       {/* key=mediaMode: Previz↔Real 전환 시 remount 로 슬라이드 재생(#e2 2026-08-03).
           방향은 토글 순서(Previz 왼쪽·Real 오른쪽) — real 로 갈 땐 오른쪽에서, 되돌아오면 왼쪽에서. */}
       <div
         key={mediaMode}
+        tabIndex={0}
+        aria-label="Storyboard 보드"
+        onKeyDown={handleBoardKeyDown}
         className={cn(
           'flex flex-col gap-6 p-6',
           'animate-in fade-in-25 duration-500 ease-out motion-reduce:animate-none',
@@ -676,7 +786,23 @@ export function StoryboardGridView() {
         {groups.map((group) => (
           <section key={group.key} className="flex flex-col gap-4">
             <div className="flex items-baseline gap-3">
-              <h2 className="text-lg font-medium text-foreground">
+              <h2
+                className={cn(
+                  'text-lg font-medium text-foreground',
+                  group.key !== '__orphan__' && 'cursor-pointer',
+                )}
+                onClick={(event) => {
+                  if (group.key === '__orphan__' || !isMentionModifierClick(event)) return
+                  const label = mentionLabelForModifierClick(
+                    event,
+                    mentionFor('scene', group.key, mediaMode),
+                  )
+                  if (!label) return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  requestMentionToggle(label)
+                }}
+              >
                 {prettyNodeLabel(group.label)}
               </h2>
               <span className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -697,7 +823,10 @@ export function StoryboardGridView() {
             </div>
 
             {group.shots.length > 0 ? (
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
+              <div
+                className="grid gap-4 p-0.5"
+                style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+              >
                 {group.shots.map((shot) => (
                   <ShotCell
                     key={shot.id}
@@ -708,6 +837,8 @@ export function StoryboardGridView() {
                     queuedImageShots={queuedImageShots}
                     queuedVideoShots={queuedVideoShots}
                     activeJobs={activeJobs}
+                    descriptionFontSize={descriptionFontSize}
+                    shotMention={mentionFor('shot', shot.id, mediaMode)}
                   />
                 ))}
               </div>
@@ -719,6 +850,7 @@ export function StoryboardGridView() {
           </section>
         ))}
       </div>
-    </ScrollArea>
+      </ScrollArea>
+    </div>
   )
 }

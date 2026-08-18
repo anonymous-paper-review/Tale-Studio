@@ -52,6 +52,10 @@ import { claimAction, releaseAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { DEFAULT_VIDEO_MODEL, normalizeProvider } from '@/lib/video-models'
+import {
+  beginPipelineProgressBatch,
+  resetPipelineProgressBatches,
+} from '@/lib/pipeline-progress'
 
 // ============================================================================
 // Defaults
@@ -628,10 +632,12 @@ interface DirectorCanvasState {
   selectedNodeId: string | null
   selectedEdgeId: string | null
   viewport: { x: number; y: number; zoom: number }
-  // 뷰포트 최초 초기화 여부 (ephemeral, persist 제외). false → Node 뷰 최초 진입에서 fitView,
-  //   true → 마지막 뷰포트 복원. 탭 전환·스테이지 이동에 CanvasInner가 remount돼도 store(싱글턴)에
-  //   살아있어, 재진입 시 fitView로 위치가 초기화되던 문제를 막는다.
+  // 뷰포트 최초 초기화 여부. false → Node 뷰 최초 진입에서 fitView,
+  //   true → 마지막 뷰포트 복원. 프로젝트별 완료 표시는 persist해 새로고침 때도
+  //   Node 진입 애니메이션이 반복되지 않게 한다.
   viewportInitialized: boolean
+  /** 프로젝트별 Node 첫 진입 애니메이션 완료 여부. */
+  viewportInitializedProjects: Record<string, boolean>
   viewMode: 'node' | 'storyboard'
   /** Storyboard 뷰 미디어 모드(#previz-video) — Previz(목각, 기본) | Real(실사). 상단바 토글이 제어. */
   storyboardMediaMode: 'previz' | 'real'
@@ -1016,6 +1022,45 @@ function collectCascadeIds(
 const initialNodes: DirectorNode[] = []
 const initialEdges: DirectorEdge[] = []
 
+/** 진입 시 진행 중인 잡이 있으면 마지막 탭보다 생성 화면을 우선 복원한다. */
+async function restoreActiveGenerationView(projectId: string): Promise<void> {
+  if (typeof window === 'undefined' || !projectId || projectId === 'default') return
+  try {
+    const response = await fetch(
+      `/api/generation/active?projectId=${encodeURIComponent(projectId)}`,
+    )
+    if (!response.ok) return
+    const body: unknown = await response.json()
+    const rawJobs =
+      body && typeof body === 'object' && (body as { data?: unknown }).data
+        ? (body as { data: { jobs?: unknown } }).data.jobs
+        : null
+    if (!Array.isArray(rawJobs)) return
+    const kinds = new Set(
+      rawJobs
+        .filter(
+          (job): job is { kind: string } =>
+            !!job &&
+            typeof job === 'object' &&
+            typeof (job as { kind?: unknown }).kind === 'string',
+        )
+        .map((job) => job.kind),
+    )
+    const real =
+      kinds.has('storyboard_real_grid') ||
+      kinds.has('shot_storyboard') ||
+      kinds.has('shot_video')
+    const previz = kinds.has('shot_rough_storyboard')
+    if (!real && !previz) return
+    const current = useDirectorCanvasStore.getState()
+    if (current.projectId !== projectId) return
+    current.setViewMode('storyboard')
+    current.setStoryboardMediaMode(real ? 'real' : 'previz')
+  } catch {
+    // 진행 상태 조회 실패는 마지막 탭 복원을 방해하지 않는다.
+  }
+}
+
 export const useDirectorCanvasStore = create<DirectorCanvasState>()(
   persist(
     (set, get) => ({
@@ -1025,6 +1070,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       selectedEdgeId: null,
       viewport: { x: 0, y: 0, zoom: 1 },
       viewportInitialized: false,
+      viewportInitializedProjects: {},
       viewMode: 'node',
       storyboardMediaMode: 'previz',
       realBatchBusy: false,
@@ -1047,6 +1093,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         // localStorage 잔존 노드가 새 프로젝트로 새지 않도록 in-memory를 리셋하고,
         // 변경된 빈 상태가 곧바로 persist에 덮어써지게 한다.
         if (get().projectId !== projectId) {
+          resetPipelineProgressBatches()
+          const previous = get()
+          const viewportInitializedProjects = { ...previous.viewportInitializedProjects }
+          if (previous.projectId !== 'default' && previous.viewportInitialized) {
+            viewportInitializedProjects[previous.projectId] = true
+          }
           hydrationEpoch += 1
           set({
             projectId,
@@ -1054,7 +1106,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             edges: initialEdges,
             selectedNodeId: null,
             selectedEdgeId: null,
-            viewportInitialized: false,
+            viewportInitialized: viewportInitializedProjects[projectId] === true,
+            viewportInitializedProjects,
             popupNodeId: null,
             deleteConfirmInfo: null,
             relationModal: null,
@@ -1069,6 +1122,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         } else {
           set({ projectId })
         }
+        void restoreActiveGenerationView(projectId)
       },
       setViewport: (vp) => set({ viewport: vp }),
       setViewMode: (m) => set({ viewMode: m }),
@@ -2123,6 +2177,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           return
         }
         if (isDemoSession()) return
+        // 생성 중인 화면을 우선 보여준다. 마지막 탭 기억은 생성이 끝난 뒤에도 유지된다.
+        set({ viewMode: 'storyboard', storyboardMediaMode: 'real' })
         // 연타 방어(#double-fire) — 같은 샷의 생성 버튼은 캔버스 노드/그리드 카드/상세 패널에
         //   동시에 떠 있다. 버튼마다 잠가서는 서로를 못 막으므로 샷 키 하나로 창을 공유한다.
         if (!claimAction(`director:storyboard:${shotNodeId}`)) return
@@ -2132,6 +2188,16 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const data = node.data
         const prevUrl = data.storyboardImage?.url ?? ''
         const prompt = effectivePrompt(data) || data.label
+
+        const storyboardAlreadyGenerating = api.nodes.some(
+          (candidate) =>
+            isShotData(candidate.data) && candidate.data.storyboardImage?.status === 'generating',
+        )
+        beginPipelineProgressBatch(
+          'director-storyboard',
+          data.writerShotId ?? shotNodeId,
+          storyboardAlreadyGenerating,
+        )
 
         // status → generating (storyboardImage는 shotConfigKeys 아님 → stale 전파 없음)
         api.updateNodeData<'shot'>(shotNodeId, {
@@ -2306,6 +2372,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       //   잠그므로 더 강하다. 여기에 창을 덧대면 앞 시도가 *끝난 뒤*의 정당한 재시도까지 막힌다.
       generateVideoForShot: async (shotNodeId) => {
         if (isDemoSession()) return null
+        set({ viewMode: 'storyboard', storyboardMediaMode: 'real' })
         const api = get()
         const shotNode = api.nodes.find((n) => n.id === shotNodeId)
         if (!shotNode || !isShotData(shotNode.data)) return null
@@ -2357,6 +2424,13 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             ? shotNode.data.storyboardImage.frames
             : undefined
         const referenceImageUrls = sbFrames ? [sbFrames.start, sbFrames.end] : undefined
+        const videoAlreadyGenerating = get().nodes.some(
+          (candidate) =>
+            isVideoData(candidate.data) &&
+            (candidate.data.status === 'generating' ||
+              candidate.data.lastAttemptStatus === 'generating'),
+        )
+        beginPipelineProgressBatch('director-video', videoNodeId, videoAlreadyGenerating)
         get().updateNodeData<'video'>(videoNodeId, {
           lastAttemptStatus: 'generating',
           lastAttemptError: null,
@@ -3049,14 +3123,15 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         return result
       },
 
-      reset: () =>
+      reset: () => {
+        resetPipelineProgressBatches()
         set({
           nodes: initialNodes,
           edges: initialEdges,
           selectedNodeId: null,
           selectedEdgeId: null,
           viewport: { x: 0, y: 0, zoom: 1 },
-          viewportInitialized: false,
+          viewportInitialized: get().viewportInitializedProjects[get().projectId] === true,
           popupNodeId: null,
           deleteConfirmInfo: null,
           relationModal: null,
@@ -3067,7 +3142,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           historyPast: [],
           historyFuture: [],
           lastSavedAt: Date.now(),
-        }),
+        })
+      },
     }),
     {
       // Step 2 (unify-director-store-db): localStorage persist는 이제 오프라인 캐시.
@@ -3102,9 +3178,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           )
         })(),
         viewport: s.viewport,
-        // viewMode·storyboardMediaMode 는 영속하지 않는다(#node-first 2026-08-11) — director 는
-        //   항상 Node 뷰로 시작한다(오너 지정). 세션 안에서는 스토어 메모리가 유지하므로
-        //   탭을 오가는 동안엔 보던 뷰가 남고, 새로고침·재방문만 Node 로 돌아온다.
+        // writer 탭과 동일하게 마지막 뷰와 미디어 모드를 복원한다.
+        // Node 첫 진입 애니메이션 완료 표시는 프로젝트별로 저장해 새로고침 때 반복하지 않는다.
+        viewportInitialized: s.viewportInitialized,
+        viewportInitializedProjects: s.viewportInitializedProjects,
+        viewMode: s.viewMode,
+        storyboardMediaMode: s.storyboardMediaMode,
         projectId: s.projectId,
         lastSavedAt: s.lastSavedAt,
       }),

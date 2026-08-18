@@ -10,8 +10,8 @@
 // director 재생성 폭주 버그의 교훈: 판단은 DB 진실 fetch 후 + 서버 이중 가드).
 // 완료는 webhook → shots.rough_storyboard. 클라는 jobId 폴링으로 카드만 갱신.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertCircle, ChevronDown, ImageIcon, Loader2, Plus, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AlertCircle, ChevronDown, ImageIcon, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -22,7 +22,6 @@ import {
 } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Slider } from '@/components/ui/slider'
 import { fetchDebugPrompts } from '@/lib/use-debug-prompts'
 import { ADHERENCE_START_ENABLED } from '@/lib/adherence/core'
 import { handoffFrom } from '@/lib/handoff-intent'
@@ -34,7 +33,9 @@ import { WriterHeader } from '@/features/writer/writer-header'
 import { useProjectStore } from '@/stores/project-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useWriterStore } from '@/stores/writer-store'
+import { useWriterUiStore } from '@/stores/writer-ui-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
@@ -43,14 +44,28 @@ import { resolveEntityNames, manifestEntities } from '@/lib/writer/resolve-entit
 import {
   useActiveGenerationJobs,
   activeShotIds,
+  activeStartedAt,
   refreshGenerationQueue,
 } from '@/lib/generation-queue'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
 import { cn } from '@/lib/utils'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
+import {
+  GeneratingOverlay,
+  StoryboardZoomControls,
+  applyStoryboardZoomShortcut,
+  storyboardColumns,
+  storyboardDescriptionFontSize,
+  useStoryboardZoom,
+} from '@/components/generating-frame'
 import type { RoughStoryboardImage, Shot } from '@/types'
 import { translate, useT } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
+import {
+  mentionLabelForModifierClick,
+  sceneShotMentionRef,
+} from '@/lib/card-mention'
+import { writerSceneShotMentions } from '@/lib/script-lines'
 
 type PanelJob = { status: 'generating' | 'failed'; error?: string }
 
@@ -69,6 +84,20 @@ function shotHasInfo(actionDescription?: string | null): boolean {
   return !!actionDescription?.trim()
 }
 
+type RoughStoryboardZoomShortcutEvent = Pick<
+  KeyboardEvent,
+  'key' | 'ctrlKey' | 'metaKey'
+>
+
+// 키보드 축척 단위 조절 — 보드 밖에서는 이벤트 자체가 이 함수에 도달하지 않으며,
+//   입력 요소에서는 호출을 건너뛴다. null은 이 화면의 축척 단축키가 아님을 뜻한다.
+export function applyRoughStoryboardZoomShortcut(
+  zoomLevel: number,
+  event: RoughStoryboardZoomShortcutEvent,
+): number | null {
+  return applyStoryboardZoomShortcut(zoomLevel, event)
+}
+
 export function RoughStoryboardView() {
   const t = useT()
   // useCallback/useEffect 본문 안에서는 t() 대신 translate()+locale 을 쓴다(#i18n-s5-batch3) —
@@ -79,14 +108,26 @@ export function RoughStoryboardView() {
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
   const loadProject = useWriterStore((s) => s.loadProject)
+  const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
+  const sceneShotMentionItems = useMemo(
+    () => writerSceneShotMentions(sceneManifest, shots),
+    [sceneManifest, shots],
+  )
   const { status, restart } = useWriterStatus(projectId)
   // 진행 중 판정의 바닥 (#queue-restore 2026-08-11) — 아래 panelJobs 는 컴포넌트 로컬이라 탭을
   //   떠나면 증발하는데 잡은 fal 에서 계속 돈다. 돌아왔을 때 스피너를 되살리는 유일한 근거가 큐다.
   const activeJobs = useActiveGenerationJobs(projectId)
   const queuedRoughIds = activeShotIds(activeJobs, ['shot_rough_storyboard'])
+  const setActiveTab = useWriterUiStore((s) => s.setActiveTab)
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   const chatMessages = useGlobalChatStore((s) => s.messages)
   const briefedRef = useRef(false)
+
+  // 러프 생성이 진행 중이면 마지막 탭보다 진행 화면을 우선한다.
+  // WriterWorkspace가 각 탭 화면을 동시에 마운트하므로 백그라운드 잡도 놓치지 않는다.
+  useEffect(() => {
+    if (queuedRoughIds.size > 0) setActiveTab('storyboard')
+  }, [queuedRoughIds.size, setActiveTab])
 
   // 패널 단위 생성 상태(jobId 폴링) + 완료 즉시 반영용 로컬 오버라이드.
   // DB 진실은 shots.rough_storyboard — 오버라이드는 다음 loadProject 전까지의 캐시.
@@ -109,18 +150,8 @@ export function RoughStoryboardView() {
   } | null>(null)
   // 진행 중 단계 경과시간 라이브 표시(긴 단계에서 "멈춤" 오인 방지) — 1s 틱.
   const [nowMs, setNowMs] = useState(0)
-  // 보드 축척: zoomLevel 1(축소·6열)~6(확대·1열). 가로 열 수 cols = 7 - zoomLevel. 기본 4 → 3열(기존 동작).
-  //   탭 전환(리마운트)에도 유지 — localStorage 영속(#4, 2026-07-09).
-  const [zoomLevel, setZoomLevel] = useState(4)
-  useEffect(() => {
-    const saved = Number(localStorage.getItem('writer:zoomLevel'))
-    if (saved >= 1 && saved <= 6) setZoomLevel(saved)
-  }, [])
-  useEffect(() => {
-    try {
-      localStorage.setItem('writer:zoomLevel', String(zoomLevel))
-    } catch {}
-  }, [zoomLevel])
+  // Director Storyboard와 같은 축척 단계·저장 규칙을 사용한다.
+  const [zoomLevel, setZoomLevel] = useStoryboardZoom('writer:zoomLevel')
   const boardRef = useRef<HTMLDivElement>(null)
   const autoTriggeredRef = useRef(false)
   const reloadedAfterCompleteRef = useRef(false)
@@ -494,35 +525,10 @@ export function RoughStoryboardView() {
   const storyboardActions = hasShots ? (
     <>
       {/* 축척 — 가로 열 수 조절 (Ctrl+wheel 로도 가능) */}
-      <div className="flex items-center gap-1.5">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-7 hover-red-beam"
-          aria-label={t('Zoom out (more columns)')}
-          onClick={() => setZoomLevel((z) => Math.max(1, z - 1))}
-        >
-          <ZoomOut className="size-4" />
-        </Button>
-        <Slider
-          className="w-24"
-          min={1}
-          max={6}
-          step={1}
-          value={[zoomLevel]}
-          onValueChange={([v]) => setZoomLevel(v)}
-          aria-label={t('Rough board zoom')}
-        />
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-7 hover-red-beam"
-          aria-label={t('Zoom in (fewer columns)')}
-          onClick={() => setZoomLevel((z) => Math.min(6, z + 1))}
-        >
-          <ZoomIn className="size-4" />
-        </Button>
-      </div>
+      <StoryboardZoomControls
+        zoomLevel={zoomLevel}
+        onZoomLevelChange={setZoomLevel}
+      />
       {generatingCount > 0 && (
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin" />
@@ -580,7 +586,7 @@ export function RoughStoryboardView() {
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [hasShots])
+  }, [hasShots, setZoomLevel])
 
   // 진행 중일 때만 1초마다 현재 시각 갱신 → 현재 단계 경과시간 라이브 표시(shotCheck 등 100s+ 단계가 "멈춘" 듯 보이는 오인 방지).
   useEffect(() => {
@@ -626,9 +632,40 @@ export function RoughStoryboardView() {
     window.addEventListener('pointerup', up)
   }
 
+  // 보드에 포커스가 있을 때만 Ctrl/⌘ +/− 를 가로챈다. 이벤트를 보드에 직접
+  // 등록하므로 헤더·채팅 입력·다른 화면의 브라우저 페이지 축척은 건드리지 않는다.
+  const handleBoardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = e.target
+    if (
+      target instanceof Element &&
+      target.closest('input, textarea, select, [contenteditable="true"]')
+    ) {
+      return
+    }
+    const nextZoom = applyRoughStoryboardZoomShortcut(zoomLevel, e)
+    if (nextZoom === null) return
+    e.preventDefault()
+    // 빠르게 연속 입력해도 이전 렌더의 zoomLevel을 덮어쓰지 않도록 함수형 갱신.
+    setZoomLevel((current) => applyRoughStoryboardZoomShortcut(current, e) ?? current)
+  }
+
   const openDetail = (shotId: string) => {
     if (draggedRef.current) return
     setDetailShotId(shotId)
+  }
+
+  const mentionCardOnModifierClick = (
+    event: Pick<MouseEvent, 'ctrlKey' | 'metaKey'>,
+    kind: 'scene' | 'shot',
+    id: string,
+  ): boolean => {
+    const target = sceneShotMentionItems.find(
+      (item) => item.ref === sceneShotMentionRef('writer', kind, id),
+    )
+    const label = mentionLabelForModifierClick(event, target)
+    if (!label) return false
+    requestMentionToggle(label)
+    return true
   }
 
   // ── 파이프라인 진행 중 (샷이 아직 없음) ─────────────────────────────────
@@ -710,7 +747,7 @@ export function RoughStoryboardView() {
   // ── 보드 ────────────────────────────────────────────────────────────────
   const detailShot = detailShotId ? shots.find((s) => s.shotId === detailShotId) : undefined
   const detailPanel = detailShot ? panelOf(detailShot) : null
-  const cols = 7 - zoomLevel // zoomLevel 1~6 → 6~1열
+  const cols = storyboardColumns(zoomLevel)
   // 전역 샷 번호(#shot-global-no 2026-08-12) — 씬별 1부터 리셋하지 않고 씬 순서대로 이어 센다.
   //   샷 각각의 고유 호출 번호가 목적(오너). 위치 기준(불변 id 아님)은 기존 결정 유지.
   const globalShotNo = new Map<string, number>()
@@ -723,8 +760,7 @@ export function RoughStoryboardView() {
     }
   }
   // 설명문 폰트(#zoom-desc) — 열이 늘수록(축소) 글자도 줄여 전문이 들어가게. 클램프는 제거.
-  const DESC_FS: Record<number, string> = { 1: '14px', 2: '13px', 3: '12px', 4: '11px', 5: '10.5px', 6: '10px' }
-  const descFontSize = DESC_FS[cols] ?? '12px'
+  const descFontSize = storyboardDescriptionFontSize(cols)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -734,6 +770,9 @@ export function RoughStoryboardView() {
         <div
           ref={boardRef}
           className="cursor-grab space-y-8 p-6"
+          tabIndex={0}
+          aria-label="러프 스토리보드 보드"
+          onKeyDown={handleBoardKeyDown}
           onPointerDown={handleBoardPointerDown}
         >
           {(sceneManifest?.scenes ?? []).map((scene, sceneIdx) => {
@@ -746,7 +785,16 @@ export function RoughStoryboardView() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => toggleSceneCollapsed(scene.sceneId)}
+                    onClick={(event) => {
+                      if (
+                        mentionCardOnModifierClick(event, 'scene', scene.sceneId)
+                      ) {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        return
+                      }
+                      toggleSceneCollapsed(scene.sceneId)
+                    }}
                     aria-expanded={!sceneCollapsed}
                     className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
                   >
@@ -809,7 +857,18 @@ export function RoughStoryboardView() {
                         key={shot.shotId}
                         role="button"
                         tabIndex={0}
-                        onClick={() => openDetail(shot.shotId)}
+                        onClickCapture={(event) => {
+                          if (
+                            mentionCardOnModifierClick(event, 'shot', shot.shotId)
+                          ) {
+                            event.preventDefault()
+                            event.stopPropagation()
+                          }
+                        }}
+                        onClick={(event) => {
+                          if (event.ctrlKey || event.metaKey) return
+                          openDetail(shot.shotId)
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault()
@@ -878,6 +937,16 @@ export function RoughStoryboardView() {
                               )}
                             </div>
                           )}
+                          <GeneratingOverlay
+                            active={job?.status === 'generating'}
+                            label="러프 스토리보드 생성 중"
+                            beamColor="success"
+                            startedAt={activeStartedAt(
+                              activeJobs,
+                              ['shot_rough_storyboard'],
+                              shot.shotId,
+                            )}
+                          />
                         </div>
                         )}
 

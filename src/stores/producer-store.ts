@@ -7,7 +7,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { depthLevelFromRuntime } from '@/lib/depth'
 import { isDemoSession } from '@/lib/demo/context'
 import { assignCastSlugs, assignLocationSlugs } from '@/lib/cast-slug'
-import { claimAction } from '@/lib/action-guard'
+import { claimAction, releaseAction } from '@/lib/action-guard'
 import { computeProducerSourceHash } from '@/lib/lifecycle'
 import { createPendingProposal } from '@/lib/pending-proposal'
 import { evaluateProducerGate } from '@/lib/producer-gate'
@@ -23,6 +23,9 @@ import type {
   EntityType,
   BackgroundSource,
 } from '@/lib/producer-gate'
+
+export const WRITER_RERUN_CONSENT_TEXT =
+  '지금까지 채팅 내역을 바탕으로 다시 writer에게 스토리와 연출에 대한 구상을 요청할까요?? 변경 사항들을 자연스럽게 반영할 수 있지만 다시 오랜 시간이 걸릴 수 있어요.'
 
 // 채팅이 스토리에서 추출한 캐스트 후보 (제안일 뿐 — 사용자가 카드에서 확정/수정).
 export interface ExtractedCastMember {
@@ -220,7 +223,7 @@ interface ProducerState {
   addBackground: () => string
   updateBackground: (localId: string, patch: Partial<BackgroundSource>) => void
   removeBackground: (localId: string) => void
-  saveAndHandoff: () => Promise<boolean>
+  saveAndHandoff: (options?: { rerun?: boolean }) => Promise<boolean>
   loadProject: () => Promise<void>
   clearError: () => void
   reset: () => void
@@ -775,7 +778,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     scheduleDraftSave(() => boardOf(get()))
   },
 
-  saveAndHandoff: async () => {
+  saveAndHandoff: async (options) => {
     if (isDemoSession()) return false
     const { storyText, projectSettings, cast, backgrounds } = get()
     const projectId = useProjectStore.getState().projectId
@@ -808,7 +811,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     //   프로젝트에 실행이 겹친다. 버튼 disabled 와 별개인 최종 방어선.
     //   게이트 *뒤*에 둔다: 게이트 거절은 빠른 로컬 실패라, 앞에 두면 사용자가 빈 칸을 채우고
     //   바로 다시 눌렀을 때 아직 닫힌 창에 막힌다.
-    if (!claimAction(`producer:handoff:${projectId}`)) return false
+    const actionKey = `producer:handoff:${projectId}`
+    if (!claimAction(actionKey)) return false
 
     set({ syncing: true, error: null })
 
@@ -886,6 +890,20 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           body: JSON.stringify({
             projectId,
             story: storyText,
+            ...(options?.rerun === true ? { rerun: true } : {}),
+            ...(options?.rerun === true
+              ? {
+                  chatHistory: useGlobalChatStore
+                    .getState()
+                    .messages.slice(-200)
+                    .map((message) => ({
+                      stage: message.stage,
+                      role: message.role,
+                      content: message.content,
+                      created_at: null,
+                    })),
+                }
+              : {}),
             writerEngine: getWriterEnginePreference(projectId),
             runtimeSeconds,
             genre,
@@ -894,10 +912,38 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             backgrounds: backgroundContract,
           }),
         })
-        // 409 = 이미 writer run 이 진행 중. 실패가 아니라 "이미 돌고 있음" → throw 하지 않고
-        //   그대로 진행해 writer 탭으로 보낸다(중복 시작 방지 + 네비게이션 보장).
-        //   (이전엔 throw 해서 "이미 진행 중인데도 writer 로 못 넘어가는" CS 가 발생했다.)
-        if (!writerResponse.ok && writerResponse.status !== 409) {
+        if (writerResponse.status === 409) {
+          const body = await writerResponse.json().catch(() => ({}))
+          // 완료된 Writer 재실행은 반드시 별도 동의 후에만 허용한다. 첫 409에서
+          // 연타 방어 창을 즉시 열어 승인 버튼이 곧바로 새 요청을 보낼 수 있게 한다.
+          if (body?.code === 'writer_rerun_confirmation_required') {
+            releaseAction(actionKey)
+            useGlobalChatStore.getState().offerPendingProposal(
+              createPendingProposal({
+                stage: 'producer',
+                kind: 'producerWriterRerunRequest',
+                target: 'Writer 다시 실행',
+                action: WRITER_RERUN_CONSENT_TEXT,
+                impact: [
+                  '현재 Writer의 씬·샷 스토리와 채팅 내역을 새 Writer 입력에 담아요.',
+                  '현재 Producer의 스토리·설정·캐스트·배경 결정도 함께 전달해요.',
+                  '다시 실행하면 시간이 오래 걸릴 수 있어요. 승인 전에는 아무 생성도 시작하지 않아요.',
+                ],
+                payload: { rerun: true },
+              }),
+            )
+            set({ syncing: false, error: null })
+            return false
+          }
+          const status =
+            body?.code === 'writer_gate_pending'
+              ? '현재 씬 스토리 초안이 준비됐어요. Writer 화면에서 확정하거나 수정 요청으로 다시 실행할지 선택해 주세요.'
+              : body?.code === 'writer_run_active'
+                ? 'Writer가 이미 실행 중이에요. 현재 Writer 화면에서 진행 상황을 확인해 주세요.'
+                : `Writer 시작이 거부됐어요 (HTTP 409)`
+          throw new Error(status)
+        }
+        if (!writerResponse.ok) {
           let detail = writerResponse.statusText
           try {
             const body = await writerResponse.json()

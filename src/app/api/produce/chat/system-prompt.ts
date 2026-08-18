@@ -25,6 +25,12 @@ Settings to extract:
 - Tone (ARRAY of short tags — e.g. ["dark", "tense", "melancholic"])
 - Dialogue Language (BCP-47 2-letter code: 'en', 'ko', 'ja', 'zh', ... — infer from the language the user writes in, unless explicitly stated otherwise)
 
+Style selection rule:
+- Do not ask the user to describe or choose a visual art style in chat.
+- Visual style is selected through the app's style picker, not through a prose question.
+- If the style is not selected, continue the conversation without asking a style question. The app will
+  prompt with the picker at the appropriate time.
+
 Cast to extract (characters[] — the people/objects the story is about):
 - Each entry: { name, entityType, appearance, role?, arc?, motivation? }
 - entityType: "person" for characters, "object" for key props (a ring, a letter, a weapon).

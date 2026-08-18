@@ -1,12 +1,17 @@
-import { describe, it, expect } from 'vitest'
+import { beforeEach, describe, it, expect } from 'vitest'
 import {
   writerRoughWork,
   artistImageWork,
   directorShotImageWork,
   directorVideoWork,
   queueWorks,
+  resetPipelineProgressBatches,
 } from '@/lib/pipeline-progress'
 import type { DirectorNode } from '@/types/director'
+
+beforeEach(() => {
+  resetPipelineProgressBatches()
+})
 
 // #chat-progress-pin — 채팅 상단 고정 진행도의 파생 규칙.
 // 핵심 계약: "생성 중(generating)이 하나라도 있을 때만" 핀이 뜬다 — 완료/실패만 남으면 null
@@ -43,6 +48,158 @@ describe('writerRoughWork', () => {
   })
 })
 
+describe('재생성 묶음별 진행 수', () => {
+  it('writer 러프는 이전 완료 샷을 제외하고 진행 중 묶음에만 합산한다', () => {
+    const old = {
+      shotId: 'old',
+      actionDescription: '이미 끝남',
+      roughStoryboard: { status: 'completed' },
+    }
+    const first = {
+      shotId: 'first',
+      actionDescription: '첫 작업',
+      roughStoryboard: { status: 'generating' },
+    }
+    const second = {
+      shotId: 'second',
+      actionDescription: '두 번째 작업',
+      roughStoryboard: { status: 'generating' },
+    }
+
+    expect(writerRoughWork([old, first])).toMatchObject({ done: 0, total: 1 })
+    expect(writerRoughWork([old, first, second])).toMatchObject({ done: 0, total: 2 })
+    expect(
+      writerRoughWork([
+        old,
+        { ...first, roughStoryboard: { status: 'completed' } },
+        second,
+      ]),
+    ).toMatchObject({ done: 1, total: 2 })
+    expect(
+      writerRoughWork([
+        old,
+        { ...first, roughStoryboard: { status: 'completed' } },
+        { ...second, roughStoryboard: { status: 'completed' } },
+      ]),
+    ).toBeNull()
+    expect(
+      writerRoughWork([
+        old,
+        { ...first, roughStoryboard: { status: 'completed' } },
+        { ...second, roughStoryboard: { status: 'generating' } },
+      ]),
+    ).toMatchObject({ done: 0, total: 1 })
+  })
+
+  it('director 촬영용 그림도 같은 묶음 규칙을 쓴다', () => {
+    const old = node(
+      { kind: 'shot', writerShotId: 'old', storyboardImage: { status: 'completed' } },
+      'node-old',
+    )
+    const first = node(
+      { kind: 'shot', writerShotId: 'first', storyboardImage: { status: 'generating' } },
+      'node-first',
+    )
+    const second = node(
+      { kind: 'shot', writerShotId: 'second', storyboardImage: { status: 'generating' } },
+      'node-second',
+    )
+
+    expect(directorShotImageWork([old, first])).toMatchObject({ done: 0, total: 1 })
+    expect(directorShotImageWork([old, first, second])).toMatchObject({ done: 0, total: 2 })
+    expect(
+      directorShotImageWork([
+        old,
+        node(
+          { kind: 'shot', writerShotId: 'first', storyboardImage: { status: 'completed' } },
+          'node-first',
+        ),
+        second,
+      ]),
+    ).toMatchObject({ done: 1, total: 2 })
+    expect(
+      directorShotImageWork([
+        old,
+        node(
+          { kind: 'shot', writerShotId: 'first', storyboardImage: { status: 'completed' } },
+          'node-first',
+        ),
+        node(
+          { kind: 'shot', writerShotId: 'second', storyboardImage: { status: 'completed' } },
+          'node-second',
+        ),
+      ]),
+    ).toBeNull()
+    expect(
+      directorShotImageWork([
+        old,
+        node(
+          { kind: 'shot', writerShotId: 'first', storyboardImage: { status: 'completed' } },
+          'node-first',
+        ),
+        node(
+          { kind: 'shot', writerShotId: 'second', storyboardImage: { status: 'generating' } },
+          'node-second',
+        ),
+      ]),
+    ).toMatchObject({ done: 0, total: 1 })
+  })
+
+  it('director 영상도 기존 완료 take를 새 묶음에 섞지 않는다', () => {
+    const old = node(
+      { kind: 'video', status: 'completed', lastAttemptStatus: null },
+      'video-old',
+    )
+    const first = node(
+      { kind: 'video', status: 'generating', lastAttemptStatus: 'generating' },
+      'video-first',
+    )
+    const second = node(
+      { kind: 'video', status: 'generating', lastAttemptStatus: 'generating' },
+      'video-second',
+    )
+
+    expect(directorVideoWork([old, first])).toMatchObject({ done: 0, total: 1 })
+    expect(directorVideoWork([old, first, second])).toMatchObject({ done: 0, total: 2 })
+    expect(
+      directorVideoWork([
+        old,
+        node(
+          { kind: 'video', status: 'completed', lastAttemptStatus: 'completed' },
+          'video-first',
+        ),
+        second,
+      ]),
+    ).toMatchObject({ done: 1, total: 2 })
+    expect(
+      directorVideoWork([
+        old,
+        node(
+          { kind: 'video', status: 'completed', lastAttemptStatus: 'completed' },
+          'video-first',
+        ),
+        node(
+          { kind: 'video', status: 'completed', lastAttemptStatus: 'completed' },
+          'video-second',
+        ),
+      ]),
+    ).toBeNull()
+    expect(
+      directorVideoWork([
+        old,
+        node(
+          { kind: 'video', status: 'completed', lastAttemptStatus: 'completed' },
+          'video-first',
+        ),
+        node(
+          { kind: 'video', status: 'generating', lastAttemptStatus: 'generating' },
+          'video-second',
+        ),
+      ]),
+    ).toMatchObject({ done: 0, total: 1 })
+  })
+})
+
 describe('artistImageWork', () => {
   const base = {
     imagesReady: false,
@@ -71,7 +228,8 @@ describe('artistImageWork', () => {
 })
 
 // 노드 타입 가드는 data.kind 만 본다 — 테스트는 최소 형태로 구성.
-const node = (data: Record<string, unknown>) => ({ data }) as unknown as DirectorNode
+const node = (data: Record<string, unknown>, id?: string) =>
+  ({ ...(id ? { id } : {}), data }) as unknown as DirectorNode
 
 describe('directorShotImageWork', () => {
   it('생성 중 샷이 없으면 null', () => {
@@ -120,7 +278,7 @@ describe('큐 기반 진행 복원', () => {
     ]
     expect(writerRoughWork(shots)).toBeNull()
     const work = writerRoughWork(shots, new Set(['sh_01']))
-    expect(work).toMatchObject({ done: 0, total: 2 })
+    expect(work).toMatchObject({ done: 0, total: 1 })
   })
 
   it('러프: 큐가 비면 다시 null (완료 후 알림바가 스스로 사라진다)', () => {
@@ -136,7 +294,7 @@ describe('큐 기반 진행 복원', () => {
       node({ kind: 'shot', writerShotId: 'sh_02', storyboardImage: { status: 'completed' } }),
     ]
     expect(directorShotImageWork(nodes)).toBeNull()
-    expect(directorShotImageWork(nodes, new Set(['sh_01']))).toMatchObject({ done: 1, total: 2 })
+    expect(directorShotImageWork(nodes, new Set(['sh_01']))).toMatchObject({ done: 0, total: 1 })
   })
 
   it('director 영상: 노드가 아직 없어도 큐 개수만으로 알림바를 세운다', () => {

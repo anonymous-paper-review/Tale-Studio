@@ -12,7 +12,12 @@ import {
   WRITER_V2_TOTAL_UNITS,
   triggerWriterStep,
 } from '@/lib/writer/pipeline/steps';
-import type { PipelineInput, Genre, CastContract } from '@/lib/writer/types/pipeline';
+import type {
+  PipelineInput,
+  Genre,
+  CastContract,
+  WriterRerunContext,
+} from '@/lib/writer/types/pipeline';
 import { isAdminOwnedProject } from '@/lib/admin';
 import { isWriterEngine, type WriterEngine } from '@/lib/writer/engine';
 import { applyProducerI18n } from '@/lib/writer/i18n/derive-en';
@@ -35,6 +40,89 @@ interface ProducerBackgrounds {
 export const runtime = 'nodejs';
 // 시작만 응답하고 첫 step 은 after()로 트리거. 짧게.
 export const maxDuration = 60;
+
+export const WRITER_RERUN_CONSENT_TEXT =
+  '지금까지 채팅 내역을 바탕으로 다시 writer에게 스토리와 연출에 대한 구상을 요청할까요?? 변경 사항들을 자연스럽게 반영할 수 있지만 다시 오랜 시간이 걸릴 수 있어요.';
+
+interface RerunSceneRow {
+  scene_id: string;
+  narrative_summary: string | null;
+  original_text_quote: string | null;
+  location: string | null;
+  time_of_day: string | null;
+  mood: string | null;
+  characters_present: string[] | null;
+  estimated_duration_seconds: number | null;
+}
+
+interface RerunShotRow {
+  shot_id: string;
+  scene_id: string;
+  action_description: string | null;
+  shot_type: string;
+  characters: string[] | null;
+  location_ids: string[] | null;
+  duration_seconds: number | null;
+  dialogue_lines: unknown;
+  camera_config: unknown;
+  lighting_config: unknown;
+  prompt: string | null;
+}
+
+interface RerunMessageRow {
+  stage: string;
+  role: string;
+  content: string;
+  created_at: string | null;
+}
+
+export function buildRerunContext(
+  previousRunId: string,
+  scenes: RerunSceneRow[],
+  shots: RerunShotRow[],
+  messages: RerunMessageRow[],
+  producerDecisions: WriterRerunContext['producerDecisions'],
+): WriterRerunContext {
+  return {
+    previousRunId,
+    scenes: scenes.map((scene) => ({
+      sceneId: scene.scene_id,
+      story: scene.narrative_summary ?? '',
+      originalTextQuote: scene.original_text_quote,
+      location: scene.location,
+      timeOfDay: scene.time_of_day,
+      mood: scene.mood,
+      charactersPresent: Array.isArray(scene.characters_present)
+        ? scene.characters_present.filter((id): id is string => typeof id === 'string')
+        : [],
+      estimatedDurationSeconds: scene.estimated_duration_seconds,
+    })),
+    shots: shots.map((shot) => ({
+      shotId: shot.shot_id,
+      sceneId: shot.scene_id,
+      story: shot.action_description ?? '',
+      shotType: shot.shot_type,
+      characters: Array.isArray(shot.characters)
+        ? shot.characters.filter((id): id is string => typeof id === 'string')
+        : [],
+      locationIds: Array.isArray(shot.location_ids)
+        ? shot.location_ids.filter((id): id is string => typeof id === 'string')
+        : [],
+      durationSeconds: shot.duration_seconds,
+      dialogueLines: shot.dialogue_lines,
+      cameraConfig: shot.camera_config,
+      lightingConfig: shot.lighting_config,
+      prompt: shot.prompt,
+    })),
+    chatHistory: messages.map((message) => ({
+      stage: message.stage,
+      role: message.role,
+      content: message.content,
+      createdAt: message.created_at,
+    })),
+    producerDecisions,
+  };
+}
 
 function normRole(role?: string): 'protagonist' | 'antagonist' | 'supporting' {
   return role === 'protagonist' || role === 'antagonist' ? role : 'supporting';
@@ -107,12 +195,14 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       projectId: string;
       story: string;
+      rerun?: boolean;
       writerEngine?: unknown;
       runtimeSeconds?: number;
       models?: PipelineInput['models'];
       genre?: Genre;
       cast?: CastContract;
       backgrounds?: ProducerBackgrounds;
+      chatHistory?: RerunMessageRow[];
     };
     const { projectId, story, runtimeSeconds, models, genre, cast, backgrounds } = body;
 
@@ -154,8 +244,37 @@ export async function POST(req: NextRequest) {
 
     // 이미 실행 중이거나 씬 게이트 대기 중이면 거부 (중복 시작 방지 — 게이트는 확정/수정으로만 진행).
     const existing = await getActiveRun(projectId);
-    if (existing && (existing.status === 'running' || existing.status === 'awaiting_confirmation')) {
-      return NextResponse.json({ error: 'already running', projectId }, { status: 409 });
+    if (existing?.status === 'running') {
+      return NextResponse.json(
+        { error: 'already running', code: 'writer_run_active', projectId, status: existing.status },
+        { status: 409 },
+      );
+    }
+    if (existing?.status === 'awaiting_confirmation') {
+      return NextResponse.json(
+        {
+          error: 'writer scene gate is awaiting confirmation',
+          code: 'writer_gate_pending',
+          projectId,
+          status: existing.status,
+          message: '현재 씬 스토리 초안이 준비됐어요. Writer 화면에서 확정하거나 수정 요청으로 다시 실행할지 선택해 주세요.',
+        },
+        { status: 409 },
+      );
+    }
+    // 완료 run은 같은 입력으로 조용히 새 run을 만들지 않는다. 클라이언트가 이 409를
+    // 동의 제안으로 바꾼 뒤 `rerun: true`를 명시한 두 번째 요청만 허용한다.
+    if (existing?.status === 'completed' && body.rerun !== true) {
+      return NextResponse.json(
+        {
+          error: 'writer rerun confirmation required',
+          code: 'writer_rerun_confirmation_required',
+          projectId,
+          status: existing.status,
+          consentText: WRITER_RERUN_CONSENT_TEXT,
+        },
+        { status: 409 },
+      );
     }
 
     // 1. 캐스트 즉시 기록 (run 시작 전 — artist가 writer 완료를 안 기다리고 카드 작업 가능).
@@ -258,6 +377,83 @@ export async function POST(req: NextRequest) {
           }
         : undefined,
     };
+    if (existing?.status === 'completed' && body.rerun === true) {
+      const [sceneResult, shotResult, messageResult, projectResult] = await Promise.all([
+        supabaseAdmin
+          .from('scenes')
+          .select(
+            'scene_id,narrative_summary,original_text_quote,location,time_of_day,mood,characters_present,estimated_duration_seconds',
+          )
+          .eq('project_id', projectId)
+          .order('sort_order', { ascending: true }),
+        supabaseAdmin
+          .from('shots')
+          .select(
+            'shot_id,scene_id,action_description,shot_type,characters,location_ids,duration_seconds,dialogue_lines,camera_config,lighting_config,prompt',
+          )
+          .eq('project_id', projectId)
+          .order('sort_order', { ascending: true }),
+        supabaseAdmin
+          .from('messages')
+          .select('stage,role,content,created_at')
+          .eq('project_id', projectId)
+          .order('created_at', { ascending: true })
+          .limit(200),
+        supabaseAdmin.from('projects').select('settings').eq('id', projectId).maybeSingle(),
+      ]);
+      if (sceneResult.error) throw new Error(`rerun scenes load failed: ${sceneResult.error.message}`);
+      if (shotResult.error) throw new Error(`rerun shots load failed: ${shotResult.error.message}`);
+      if (messageResult.error) throw new Error(`rerun chat load failed: ${messageResult.error.message}`);
+      if (projectResult.error) throw new Error(`rerun producer decisions load failed: ${projectResult.error.message}`);
+
+      const previousInput = existing.state.input as PipelineInput;
+      input.genre = input.genre ?? previousInput.genre;
+      input.cast = input.cast ?? previousInput.cast;
+      input.background = input.background ?? previousInput.background;
+      input.styleAnchor = input.styleAnchor ?? previousInput.styleAnchor;
+      const requestedChatHistory = Array.isArray(body.chatHistory)
+        ? body.chatHistory.filter(
+            (message) =>
+              !!message &&
+              typeof message.stage === 'string' &&
+              typeof message.role === 'string' &&
+              typeof message.content === 'string',
+          )
+        : [];
+      input.rerunContext = buildRerunContext(
+        existing.id,
+        (sceneResult.data ?? []) as RerunSceneRow[],
+        (shotResult.data ?? []) as RerunShotRow[],
+        (requestedChatHistory.length ? requestedChatHistory : messageResult.data ?? []) as RerunMessageRow[],
+        {
+          story,
+          settings: projectResult.data?.settings ?? null,
+          genre: genre ?? previousInput.genre ?? null,
+          cast: cast ?? previousInput.cast ?? null,
+          background:
+            input.background ??
+            previousInput.background ??
+            null,
+          styleAnchor: styleAnchor ?? previousInput.styleAnchor ?? null,
+        },
+      );
+    }
+    // 동의 버튼의 중복 요청이 context 조회 중 끼어들어도, 최신 run이 기존 completed 행인지
+    // 다시 확인한다. 첫 요청이 먼저 새 run을 만들었으면 두 번째는 409로 양보한다.
+    if (existing?.status === 'completed' && body.rerun === true) {
+      const latest = await getActiveRun(projectId);
+      if (!latest || latest.id !== existing.id || latest.status !== 'completed') {
+        return NextResponse.json(
+          {
+            error: 'writer rerun already started',
+            code: 'writer_run_active',
+            projectId,
+            status: latest?.status ?? null,
+        },
+          { status: 409 },
+      );
+    }
+    }
     const run = await createRun(
       projectId,
       input,

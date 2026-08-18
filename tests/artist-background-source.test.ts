@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildWorldShotPromptForLocation } from '@/lib/artist/world-prompt'
+import { buildCharacterPrompt } from '@/lib/prompts'
 import { shouldMarkWorldGenerationUserEdited } from '@/stores/artist-store'
 
 describe('artist background source prompts', () => {
@@ -26,9 +27,19 @@ describe('artist background source prompts', () => {
     expect(prompt).toContain('story purpose: the chase starts here')
     expect(prompt).toContain('producer background purpose: the chase starts here')
     expect(prompt).toContain('lighting sources: pink sign, blue vending machine')
+    expect(prompt).toContain('no people or characters, empty environment')
     expect(prompt).toContain('wide shot, panoramic')
     expect(prompt).not.toContain('during ,')
     expect(prompt).not.toContain('during  ,')
+  })
+
+  it('keeps the person exclusion scoped to background prompts', () => {
+    const prompt = buildCharacterPrompt('a detective in a wool coat', 'front')
+
+    expect(prompt).toBe(
+      'a detective in a wool coat, front view, facing camera, full body, character reference sheet, white background, cinematic lighting',
+    )
+    expect(prompt).not.toContain('no people')
   })
 
   it('adds writer scene context when available for regeneration prompts', () => {

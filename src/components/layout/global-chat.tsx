@@ -32,17 +32,30 @@ import { useProducerStore } from '@/stores/producer-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useWriterStore } from '@/stores/writer-store'
+import { useDirectorCanvasStore } from '@/stores/director-store'
 import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
 import { HoverBeam } from '@/components/hover-beam'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
 import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
-import { castMentions, backgroundMentions, activeMentionRefs, toggleMentionToken, FOUNDATION_MENTIONS } from '@/lib/card-mention'
+import {
+  castMentions,
+  backgroundMentions,
+  activeMentionRefs,
+  sceneShotMentions,
+  toggleMentionToken,
+  FOUNDATION_MENTIONS,
+  type SceneShotMentionTarget,
+} from '@/lib/card-mention'
 import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
 import { SceneGateControls, sendSceneGate } from '@/features/writer/scene-gate-panel'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
-import { buildScriptLines, scriptLineMentions } from '@/lib/script-lines'
+import {
+  buildScriptLines,
+  scriptLineMentions,
+  writerSceneShotMentions,
+} from '@/lib/script-lines'
 import { handoffFrom } from '@/lib/handoff-intent'
 import {
   IMAGE_MAX_COUNT,
@@ -70,6 +83,8 @@ import {
 } from '@/lib/stage-transition'
 import { useT } from '@/lib/i18n'
 import type { StageId } from '@/types'
+import { isSceneData, isShotData } from '@/types/director'
+import { prettyNodeLabel } from '@/features/director/node-label'
 
 /** 입력창에 얹혀 있는 첨부 하나. 전송되면 비워진다(이번 턴 한정). */
 interface Attachment {
@@ -320,6 +335,7 @@ export function GlobalChat() {
   //   번역 결과(문자열, 값 비교 가능)만 미리 뽑아 deps에 넣는다.
   const characterHint = t('Character')
   const locationHint = t('Location')
+  const directorNodes = useDirectorCanvasStore((s) => s.nodes)
   const mentionItems = useMemo<MentionItem[]>(() => {
     if (currentStage === 'producer') {
       return [
@@ -339,11 +355,26 @@ export function GlobalChat() {
       ]
     }
     if (currentStage === 'writer') {
-      return scriptLineMentions(buildScriptLines(writerManifest, writerShots)).map((m) => ({
-        id: m.ref,
-        label: m.label,
-        hint: m.hint,
-      }))
+      return [
+        ...writerSceneShotMentions(writerManifest, writerShots),
+        ...scriptLineMentions(buildScriptLines(writerManifest, writerShots)),
+      ].map((m) => ({ id: m.ref, label: m.label, hint: m.hint }))
+    }
+    if (currentStage === 'director') {
+      const targets = directorNodes.flatMap(
+        (node): SceneShotMentionTarget[] => {
+          if (isSceneData(node.data)) {
+            return [{ kind: 'scene', id: node.id, label: prettyNodeLabel(node.data.label) }]
+          }
+          if (isShotData(node.data)) {
+            return [{ kind: 'shot', id: node.id, label: prettyNodeLabel(node.data.label) }]
+          }
+          return []
+        },
+      )
+      return [...sceneShotMentions(targets, 'previz'), ...sceneShotMentions(targets, 'real')].map(
+        (m) => ({ id: m.ref, label: m.label, hint: m.hint }),
+      )
     }
     return []
   }, [
@@ -356,6 +387,7 @@ export function GlobalChat() {
     writerShots,
     characterHint,
     locationHint,
+    directorNodes,
   ])
   const [input, setInput] = useState('')
   // 하나의 스레드를 stage 구간으로 쪼갠다 — 필터가 아니라 구분선용(전 메시지가 그대로 보인다).
@@ -492,15 +524,25 @@ export function GlobalChat() {
     return () => window.removeEventListener('keydown', handler)
   }, [collapsed, currentStage])
 
-  // #p4-choices v3 (#choices-freeform 2026-08-07): 선택지는 입력창 바로 위에 앵커하고, 떠 있는
-  //   동안 채팅 입력은 잠근다 — 답하는 곳이 두 군데면 눈이 갈린다. 자유 입력("기타" 답변)은
-  //   선택지 안의 "직접 입력" 행이 담당한다(Claude AskUserQuestion 의 Type my own answer 대응).
+  // #p4-choices v3 (#choices-freeform 2026-08-07): 활성 선택지는 입력창 바로 위에 앵커하고,
+  //   떠 있는 동안 채팅 입력은 잠근다 — 답하는 곳이 두 군데면 눈이 갈리기 때문이다.
+  //   새로고침으로 복원된 선택지는 display-only라 입력을 막지 않는다.
+  //   자유 입력("기타" 답변)은 선택지 안의 "직접 입력" 행이 담당한다(Claude AskUserQuestion 의 Type my own answer 대응).
   const choices =
-    suggestion && suggestion.stage === currentStage && suggestion.action?.kind === 'choices'
+    suggestion &&
+    suggestion.stage === currentStage &&
+    (suggestion.action?.kind === 'choices' || suggestion.restoredChoices)
       ? {
           stage: suggestion.stage,
           question: suggestion.content,
-          options: suggestion.action.options,
+          options:
+            suggestion.action?.kind === 'choices'
+              ? suggestion.action.options
+              : suggestion.restoredChoices?.options.map((label) => ({
+                  label,
+                  utterance: '',
+                })) ?? [],
+          displayOnly: !!suggestion.restoredChoices,
         }
       : null
 
@@ -508,9 +550,9 @@ export function GlobalChat() {
   // 타이핑 잠금과 전송 잠금을 가른다 (#type-while-thinking 2026-08-11).
   //   응답을 기다리는 동안 입력창까지 잠그면 "다음에 할 말"을 미리 적어둘 수 없다 — 생각은
   //   기다리는 동안 하는 것이라 그게 제일 자연스러운 타이밍이다. 그래서 loading 은 **제출만**
-  //   막는다. 선택지가 떠 있을 때(choices)는 여전히 타이핑도 잠근다 — 답하는 곳이 두 군데면
-  //   눈이 갈리기 때문(#choices-freeform 의 원래 판단). 미지원 단계(editor)도 그대로 잠금.
-  const inputLocked = !stageSupported || !!choices
+  //   막는다. 활성 선택지가 떠 있을 때는 타이핑도 잠근다 — 답하는 곳이 두 군데면 눈이
+  //   갈리기 때문이다(#choices-freeform). 복원된 display-only 선택지는 입력을 허용한다.
+  const inputLocked = !stageSupported || (!!choices && !choices.displayOnly)
   const sendDisabled = inputLocked || loading
   // (loading 중 disabled 해제 시 재포커스하던 #b3 effect 제거 — 이제 입력창이 잠기지 않아
   //  포커스를 잃을 일이 없다. 남겨두면 다른 곳으로 옮긴 포커스를 도로 뺏는다.)
@@ -571,6 +613,8 @@ export function GlobalChat() {
   //   전처리(docx 파싱·이미지 슬라이싱·스토리지 업로드)는 서버(api/produce/ingest)가 하고
   //   여기는 진행 상태만 들고 있는다.
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [fileDragActive, setFileDragActive] = useState(false)
+  const fileDragDepthRef = useRef(0)
   const uploading = attachments.some((a) => a.status === 'uploading')
   const readyAttachments = attachments.filter((a) => a.status === 'ready')
   const canSendAttachments = readyAttachments.length > 0 && !uploading
@@ -698,10 +742,8 @@ export function GlobalChat() {
     setAttachments((prev) => prev.filter((a) => a.id !== id))
   }
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const picked = Array.from(e.target.files ?? [])
+  const handleFiles = async (picked: File[]) => {
     // 같은 파일을 다시 고를 수 있게 즉시 비운다.
-    if (fileInputRef.current) fileInputRef.current.value = ''
     if (picked.length === 0) return
 
     const projectId = useProjectStore.getState().projectId
@@ -790,6 +832,40 @@ export function GlobalChat() {
     }
   }
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? [])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    await handleFiles(picked)
+  }
+
+  const handleFileDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    fileDragDepthRef.current += 1
+    setFileDragActive(true)
+  }
+
+  const handleFileDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  const handleFileDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    fileDragDepthRef.current = Math.max(0, fileDragDepthRef.current - 1)
+    if (fileDragDepthRef.current === 0) setFileDragActive(false)
+  }
+
+  const handleFileDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    fileDragDepthRef.current = 0
+    setFileDragActive(false)
+    await handleFiles(Array.from(e.dataTransfer.files))
+  }
+
   // 좌측 경계 드래그 → 폭 조절 (aside는 우측 고정이라 viewport 우측에서 역산)
   const handleResizePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -831,7 +907,7 @@ export function GlobalChat() {
     requestAnimationFrame(() => freeformInputRef.current?.focus())
   }
   const handleChoiceContinue = () => {
-    if (!choices || !selectedChoice) return
+    if (!choices || choices.displayOnly || !selectedChoice) return
     if (selectedChoice === FREEFORM) {
       openFreeform()
       return
@@ -853,7 +929,7 @@ export function GlobalChat() {
   //   #choices-freeform: 채팅 입력이 잠기므로 타이핑 우선 규칙은 폐기 — 대신 캡처 단계에서 듣되,
   //   다른 입력 요소(인라인 '직접 입력' 인풋·뱃지 popover 인풋 등)에 포커스가 있으면 양보한다.
   useEffect(() => {
-    if (!choices || freeformOpen) return
+    if (!choices || choices.displayOnly || freeformOpen) return
     const labels = [...choices.options.map((o) => o.label), FREEFORM]
     const handler = (e: KeyboardEvent) => {
       if (loading || e.isComposing) return
@@ -1314,6 +1390,17 @@ export function GlobalChat() {
                 </div>
               )}
               {choices.options.map((opt, oi) => {
+                if (choices.displayOnly) {
+                  return (
+                    <div
+                      key={opt.label}
+                      role="note"
+                      className="w-full rounded-xl border border-border-subtle bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground"
+                    >
+                      {opt.label}
+                    </div>
+                  )
+                }
                 const selected = selectedChoice === opt.label
                 return (
                   <button
@@ -1345,6 +1432,8 @@ export function GlobalChat() {
                   </button>
                 )
               })}
+              {!choices.displayOnly && (
+                <>
               {/* 직접 입력 (#choices-freeform) — 마지막 행. 클릭 즉시(키보드는 선택 후 Enter)
                   인라인 인풋으로 펼쳐진다. 잠긴 채팅 입력 대신 여기가 '기타' 답변 통로. */}
               {freeformOpen ? (
@@ -1424,10 +1513,23 @@ export function GlobalChat() {
                   <X className="size-3" />
                 </button>
               </div>
+                </>
+              )}
             </div>
           )}
-          <HoverBeam className="rounded-3xl">
-            <div className="rounded-3xl border border-border bg-background px-2 pb-1.5 pt-1">
+          <div
+            className={cn(
+              'relative rounded-3xl transition-colors',
+              fileDragActive && 'rounded-3xl ring-2 ring-primary/60',
+            )}
+            onDragEnter={handleFileDragEnter}
+            onDragOver={handleFileDragOver}
+            onDragLeave={handleFileDragLeave}
+            onDrop={handleFileDrop}
+            data-file-drop-zone
+          >
+            <HoverBeam className="rounded-3xl">
+              <div className="rounded-3xl border border-border bg-background px-2 pb-1.5 pt-1">
               {/* 첨부 칩 — 파일은 얹혀만 있고, 무엇으로 쓸지는 아래 입력창에 말로 적는다. */}
               {attachments.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 px-1 pb-1.5 pt-1">
@@ -1485,7 +1587,7 @@ export function GlobalChat() {
                 items={mentionItems}
                 disabled={inputLocked}
                 placeholder={
-                  choices
+                  choices && !choices.displayOnly
                     ? t('Answer using the choices above')
                     : sceneGateActive
                       ? t('Type your changes — or press Enter as-is to confirm the scenes')
@@ -1684,6 +1786,15 @@ export function GlobalChat() {
               </div>
             </div>
           </HoverBeam>
+            {fileDragActive && (
+              <div
+                className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-3xl border-2 border-dashed border-primary bg-primary/10 text-xs font-medium text-primary"
+                aria-hidden
+              >
+                파일을 놓으면 첨부돼요
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 

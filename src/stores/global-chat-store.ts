@@ -21,7 +21,13 @@ import {
 import { matchHandoffIntent, type HandoffSpec } from '@/lib/handoff-intent'
 import { handoffToStage } from '@/lib/stage-nav'
 import { saveChatMessage } from '@/lib/chat-persistence'
-import { parseAttachmentMarker, withAttachmentMarker } from '@/lib/chat-blocks'
+import {
+  choiceSuggestionMarker,
+  isPersistedChatMarker,
+  parseAttachmentMarker,
+  parseChoiceSuggestionMarker,
+  withAttachmentMarker,
+} from '@/lib/chat-blocks'
 import { isDemoSession, getDemoSnapshot } from '@/lib/demo/context'
 import { cannedFor } from '@/lib/demo/canned'
 import { handoffMarker } from '@/lib/chat-blocks'
@@ -68,6 +74,8 @@ export interface ChatSuggestion {
     // #p4-choices: 다중 선택지 — 클릭 = 그 문구를 채팅 입력(핸드오프 패턴, 직접 입력과 동일 경로)
     | { kind: 'choices'; options: Array<{ label: string; utterance: string }> }
     | null
+  /** 새로고침으로 복원한 선택지는 표시 전용이며 action을 복원하지 않는다. */
+  restoredChoices?: { options: string[] }
 }
 
 interface GlobalChatState {
@@ -165,6 +173,40 @@ const completionKey = (stage: StageId, label: string) => `${stage}::${label}`
 
 // 진행 중인 LLM 응답의 abort 컨트롤러 (#oiioii-chat) — 한 번에 한 요청만 뜨므로(loading 가드) 단일 슬롯.
 let activeGeneration: AbortController | null = null
+
+function projectChatStage(): { projectId: string | null; stage: StageId } {
+  const project = useProjectStore.getState()
+  return { projectId: project.projectId, stage: project.currentStage }
+}
+
+function saveChoiceStateMarker(suggestion: ChatSuggestion | null): void {
+  if (!suggestion || (!suggestion.restoredChoices && suggestion.action?.kind !== 'choices')) return
+  const { projectId } = projectChatStage()
+  if (!projectId) return
+  const marker = suggestion
+    ? suggestion.restoredChoices
+      ? choiceSuggestionMarker({
+          id: suggestion.id,
+          stage: suggestion.stage,
+          content: suggestion.content,
+          labels: suggestion.restoredChoices.options,
+        })
+      : choiceSuggestionMarker({
+          id: suggestion.id,
+          stage: suggestion.stage,
+          content: suggestion.content,
+          labels: suggestion.action?.kind === 'choices'
+            ? suggestion.action.options.map((option) => option.label)
+            : [],
+        })
+    : choiceSuggestionMarker(null)
+  saveChatMessage(projectId, suggestion.stage, 'model', marker)
+}
+
+function saveChoiceClearMarker(stage: StageId): void {
+  const { projectId } = projectChatStage()
+  if (projectId) saveChatMessage(projectId, stage, 'model', choiceSuggestionMarker(null))
+}
 
 function flushCompletion(stage: StageId, label: string): void {
   const key = completionKey(stage, label)
@@ -291,6 +333,52 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   pendingNavigatePath: null,
 
   loadMessages: async (projectId) => {
+    const hydrate = (
+      rows: Array<{
+        stage: string
+        role: 'user' | 'model'
+        content: string
+        created_at?: string
+      }>,
+    ) => {
+      let restoredChoice: ReturnType<typeof parseChoiceSuggestionMarker> = null
+      const visible: GlobalChatMessage[] = []
+      for (const row of rows) {
+        if (typeof row.content !== 'string') continue
+        const choiceMarker = parseChoiceSuggestionMarker(row.content)
+        if (choiceMarker) {
+          restoredChoice = choiceMarker
+          continue
+        }
+        // malformed/old 내부 마커는 렌더링하지 않는다.
+        if (isPersistedChatMarker(row.content)) continue
+        visible.push({
+          id: makeId(),
+          stage: row.stage as StageId,
+          role: row.role,
+          content: row.content,
+        })
+      }
+      const suggestion =
+        restoredChoice?.active &&
+        restoredChoice.stage &&
+        restoredChoice.content !== undefined &&
+        restoredChoice.labels
+          ? {
+              id: restoredChoice.id || `restored-choice:${makeId()}`,
+              stage: restoredChoice.stage,
+              content: restoredChoice.content,
+              dismissible: true,
+              action: null,
+              restoredChoices: { options: restoredChoice.labels },
+            }
+          : null
+      set({
+        messages: visible,
+        suggestion,
+      })
+    }
+
     // 데모(공유) 세션: /api/* 는 fetch-guard 로 중립화(빈 응답)되므로 스냅샷에서 직접 채팅 이력을 읽는다.
     if (isDemoSession()) {
       const rows = (getDemoSnapshot()?.tables?.messages ?? []) as Array<{
@@ -302,35 +390,24 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const ordered = [...rows].sort((a, b) =>
         (a.created_at ?? '').localeCompare(b.created_at ?? ''),
       )
-      set({
-        messages: ordered.map((m) => ({
-          id: makeId(),
-          stage: m.stage as StageId,
-          role: m.role,
-          content: m.content,
-        })),
-      })
+      hydrate(ordered)
       return
     }
     try {
       const res = await fetch(`/api/project/${projectId}/messages`)
       if (!res.ok) {
-        set({ messages: [] })
+        set({ messages: [], suggestion: null })
         return
       }
       const { messages } = await res.json()
-      const normalized: GlobalChatMessage[] = (messages ?? []).map(
-        (m: { stage: string; role: 'user' | 'model'; content: string }) => ({
-          id: makeId(),
-          stage: m.stage as StageId,
-          role: m.role,
-          content: m.content,
-        }),
-      )
-      set({ messages: normalized })
+      hydrate((messages ?? []) as Array<{
+        stage: string
+        role: 'user' | 'model'
+        content: string
+      }>)
     } catch (err) {
       console.error('[global-chat-store] loadMessages failed:', err)
-      set({ messages: [] })
+      set({ messages: [], suggestion: null })
     }
   },
 
@@ -958,21 +1035,33 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (!opts?.preempt) return
       // 내릴 수 없는 제안(웰컴 등)은 못 민다.
       if (current.dismissible === false) return
+      if (
+        (current.action?.kind === 'choices' || current.restoredChoices) &&
+        suggestion.action?.kind !== 'choices'
+      ) {
+        saveChoiceClearMarker(current.stage)
+      }
     }
     set({ suggestion })
+    if (suggestion.action?.kind === 'choices') saveChoiceStateMarker(suggestion)
   },
 
   // dismiss(또는 승인) — 제안을 내리고 id 를 기록해 같은 세션 재진입 시 재발사 막는다.
   //   implicit dismiss(유저가 다른 말을 해서 자동으로 내려간 것)는 기록하지 않는다 —
   //   명시적 거절("나중에"/선택 사용)만 재발사를 막을 자격이 있다(#handoff-suggestion-drop).
-  dismissSuggestion: (opts) =>
+  dismissSuggestion: (opts) => {
+    const current = get().suggestion
+    if (current?.action?.kind === 'choices' || current?.restoredChoices) {
+      saveChoiceClearMarker(current.stage)
+    }
     set((state) => ({
       suggestion: null,
       dismissedSuggestionIds:
         state.suggestion && !opts?.implicit
           ? [...state.dismissedSuggestionIds, state.suggestion.id]
           : state.dismissedSuggestionIds,
-    })),
+    }))
+  },
 
   offerPendingProposal: (proposal) => {
     const current = get().pendingProposal
@@ -1002,8 +1091,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           .getState()
           .applyProducerSourcePatch(proposal.payload.patch as ExtractedSettings)
       } else if (proposal.kind === 'producerWriterRerunRequest') {
-        const ok = await useProducerStore.getState().saveAndHandoff()
+        const ok = await useProducerStore.getState().saveAndHandoff({ rerun: true })
         if (!ok) return false
+        // 승인된 rerun도 최초 핸드오프와 같은 Writer 생성 화면으로 이동한다.
+        const path = await handoffToStage('writer')
+        if (path) set({ pendingNavigatePath: path })
       } else if (proposal.kind === 'artistRegenerateCharacterView') {
         const characterId = proposal.payload.characterId
         const view = proposal.payload.view
@@ -1158,7 +1250,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       loading: false,
       error: null,
       suggestion: null,
-      pendingProposal: null,
+          pendingProposal: null,
       dismissedSuggestionIds: [],
       stageBadges: {},
     })

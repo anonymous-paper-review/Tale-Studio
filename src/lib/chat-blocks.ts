@@ -35,6 +35,87 @@ export function handoffMarker(from: StageId, to: StageId): string {
 const ATTACHMENT_PREFIX = '📎'
 
 /**
+ * 입력창에 아직 보내지 않은 상태를 messages 행으로 저장할 때 쓰는 내부 마커.
+ * 일반 채팅 본문과 구분되는 접두사를 사용하고, JSON은 URL 인코딩해 한 줄로 보낸다.
+ * 이 행들은 loadMessages에서 걸러지므로 사용자에게는 보이지 않는다.
+ */
+const CHOICE_STATE_PREFIX = '⟦chat-choice:'
+const CHOICE_STATE_V1 = `${CHOICE_STATE_PREFIX}v1⟧`
+
+export interface PersistedChoiceSuggestion {
+  active: boolean
+  id?: string
+  stage?: StageId
+  content?: string
+  labels?: string[]
+}
+
+function encodeStateMarker(prefix: string, payload: unknown): string {
+  return `${prefix}${encodeURIComponent(JSON.stringify(payload))}`
+}
+
+function decodeStateMarker<T>(content: string, prefix: string): T | null {
+  if (!content.startsWith(prefix)) return null
+  try {
+    return JSON.parse(decodeURIComponent(content.slice(prefix.length))) as T
+  } catch {
+    return null
+  }
+}
+
+/** 선택지 제안의 표시 데이터만 저장한다. action/utterance는 저장하지 않는다. */
+export function choiceSuggestionMarker(
+  suggestion: {
+    id?: string
+    stage: StageId
+    content: string
+    labels: string[]
+  } | null,
+): string {
+  if (!suggestion) return encodeStateMarker(CHOICE_STATE_V1, { active: false })
+  return encodeStateMarker(CHOICE_STATE_V1, {
+    active: true,
+    id: suggestion.id,
+    stage: suggestion.stage,
+    content: suggestion.content,
+    labels: suggestion.labels,
+  })
+}
+
+/**
+ * 선택지 마커 파싱. malformed/구버전은 null로 돌려 호출자가 조용히 버리게 한다.
+ * active=false는 이전 제안이 명시적으로 지워졌다는 tombstone(삭제 표식)이다.
+ */
+export function parseChoiceSuggestionMarker(content: string): PersistedChoiceSuggestion | null {
+  const raw = decodeStateMarker<PersistedChoiceSuggestion>(content, CHOICE_STATE_V1)
+  if (!raw || typeof raw !== 'object' || typeof raw.active !== 'boolean') return null
+  if (!raw.active) return { active: false }
+  if (
+    typeof raw.stage !== 'string' ||
+    !STAGE_IDS.has(raw.stage) ||
+    typeof raw.content !== 'string' ||
+    !Array.isArray(raw.labels) ||
+    raw.labels.length < 2 ||
+    raw.labels.length > 4 ||
+    !raw.labels.every((label) => typeof label === 'string' && label.trim().length > 0)
+  ) {
+    return null
+  }
+  return {
+    active: true,
+    id: typeof raw.id === 'string' ? raw.id : undefined,
+    stage: raw.stage as StageId,
+    content: raw.content,
+    labels: raw.labels.map((label) => label.trim()),
+  }
+}
+
+/** malformed/old 내부 상태 마커도 렌더링하지 않도록 접두사만으로 먼저 가린다. */
+export function isPersistedChatMarker(content: string): boolean {
+  return content.startsWith(CHOICE_STATE_PREFIX)
+}
+
+/**
  * 첨부 이미지 마커 — 유저 메시지 본문 마지막 줄에 원본 이미지 URL 을 실어 영속화한다.
  *
  * messages 테이블에는 content(text) 하나뿐이라 별도 컬럼이 없다. 핸드오프 마커(⇄)와 같은

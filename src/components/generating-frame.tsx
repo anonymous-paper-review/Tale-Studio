@@ -1,8 +1,135 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { ZoomIn, ZoomOut } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
+
+/** Writer 러프/Director Storyboard가 공유하는 카드 축척 범위. */
+export const STORYBOARD_ZOOM_MIN = 1
+export const STORYBOARD_ZOOM_MAX = 6
+export const STORYBOARD_ZOOM_DEFAULT = 4
+
+/** 축척 단계(1=작은 카드·6열, 6=큰 카드·1열)를 카드 열 수로 변환한다. */
+export function storyboardColumns(zoomLevel: number): number {
+  const level = Math.min(
+    STORYBOARD_ZOOM_MAX,
+    Math.max(STORYBOARD_ZOOM_MIN, Math.round(zoomLevel)),
+  )
+  return STORYBOARD_ZOOM_MAX + 1 - level
+}
+
+/** 카드 폭에 맞춰 설명문도 같은 단계로 줄인다. */
+export function storyboardDescriptionFontSize(columns: number): string {
+  const sizes: Record<number, string> = {
+    1: '14px',
+    2: '13px',
+    3: '12px',
+    4: '11px',
+    5: '10.5px',
+    6: '10px',
+  }
+  return sizes[Math.round(columns)] ?? '12px'
+}
+
+export type StoryboardZoomShortcutEvent = Pick<
+  KeyboardEvent,
+  'key' | 'ctrlKey' | 'metaKey'
+>
+
+/** 보드에 포커스가 있을 때만 처리하는 공용 축척 단축키 판정. */
+export function applyStoryboardZoomShortcut(
+  zoomLevel: number,
+  event: StoryboardZoomShortcutEvent,
+): number | null {
+  if (!event.ctrlKey && !event.metaKey) return null
+  if (event.key === '+' || event.key === '=') {
+    return Math.min(STORYBOARD_ZOOM_MAX, zoomLevel + 1)
+  }
+  if (event.key === '-') return Math.max(STORYBOARD_ZOOM_MIN, zoomLevel - 1)
+  return null
+}
+
+function readStoryboardZoom(storageKey: string): number {
+  if (typeof window === 'undefined') return STORYBOARD_ZOOM_DEFAULT
+  try {
+    const saved = Number(window.localStorage.getItem(storageKey))
+    return saved >= STORYBOARD_ZOOM_MIN && saved <= STORYBOARD_ZOOM_MAX
+      ? saved
+      : STORYBOARD_ZOOM_DEFAULT
+  } catch {
+    return STORYBOARD_ZOOM_DEFAULT
+  }
+}
+
+/** 보드별 축척을 같은 저장·복원 규칙으로 관리한다. */
+export function useStoryboardZoom(
+  storageKey: string,
+): [number, Dispatch<SetStateAction<number>>] {
+  const [zoomLevel, setZoomLevel] = useState(() => readStoryboardZoom(storageKey))
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(storageKey, String(zoomLevel))
+    } catch {
+      // localStorage 접근이 막힌 환경에서도 화면 조작은 유지한다.
+    }
+  }, [storageKey, zoomLevel])
+
+  return [zoomLevel, setZoomLevel]
+}
+
+/** Writer/Director Storyboard가 공유하는 축척 조작 UI. */
+export function StoryboardZoomControls({
+  zoomLevel,
+  onZoomLevelChange,
+  className,
+}: {
+  zoomLevel: number
+  onZoomLevelChange: Dispatch<SetStateAction<number>>
+  className?: string
+}) {
+  const update = (next: number) =>
+    onZoomLevelChange(
+      Math.min(STORYBOARD_ZOOM_MAX, Math.max(STORYBOARD_ZOOM_MIN, next)),
+    )
+
+  return (
+    <div className={cn('flex items-center gap-1.5', className)}>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-7 hover-red-beam"
+        aria-label="축소 (열 늘리기)"
+        onClick={() => update(zoomLevel - 1)}
+      >
+        <ZoomOut className="size-4" />
+      </Button>
+      <Slider
+        className="w-24"
+        min={STORYBOARD_ZOOM_MIN}
+        max={STORYBOARD_ZOOM_MAX}
+        step={1}
+        value={[zoomLevel]}
+        onValueChange={([value]) => {
+          if (value != null) update(value)
+        }}
+        aria-label="스토리보드 축척"
+      />
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-7 hover-red-beam"
+        aria-label="확대 (열 줄이기)"
+        onClick={() => update(zoomLevel + 1)}
+      >
+        <ZoomIn className="size-4" />
+      </Button>
+    </div>
+  )
+}
 
 /**
  * 이미지/비디오 생성 중 카드·노드 표면에 얹는 "작업 중" 오버레이.
