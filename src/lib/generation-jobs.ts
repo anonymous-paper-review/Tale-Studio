@@ -659,6 +659,81 @@ export async function countQueuedJobsByUser(userId: string): Promise<number> {
   return count
 }
 
+// ── 큐 콘솔 (#queue-console 2026-08-18, 오너 지시 "Queue 를 시각적으로 보고 관리") ──
+
+export interface QueueConsoleJob {
+  id: string
+  project_id: string
+  kind: GenerationJobKind
+  status: GenerationJobStatus
+  model: string
+  error: string | null
+  error_class: string | null
+  request_id: string
+  created_at: string
+  completed_at: string | null
+}
+
+const QUEUE_CONSOLE_COLUMNS =
+  'id, project_id, kind, status, model, error, error_class, request_id, created_at, completed_at'
+
+/**
+ * 오너의 전 프로젝트 잡을 콘솔용으로 조회. 운영 관심사(queued·failed)는 시간 창 없이 전부
+ * (좀비는 본질적으로 오래된 행이라 "최근 N" 창에 밀려 안 보이면 콘솔의 존재 이유가 사라진다),
+ * completed 는 최근 100 개만 — 맥락용.
+ * 소유권 경계는 workspace.owner_id 체인(countQueuedJobsByUser 폴백 경로와 동일 규칙).
+ */
+export async function listQueueConsoleJobs(userId: string): Promise<{
+  jobs: QueueConsoleJob[]
+  projectTitles: Record<string, string>
+}> {
+  const { data: workspaces, error: wsError } = await supabaseAdmin
+    .from('workspaces')
+    .select('id')
+    .eq('owner_id', userId)
+  if (wsError) throw wsError
+  const wsIds = (workspaces ?? []).map((w) => w.id as string)
+  if (wsIds.length === 0) return { jobs: [], projectTitles: {} }
+
+  const { data: projects, error: prjError } = await supabaseAdmin
+    .from('projects')
+    .select('id, title')
+    .in('workspace_id', wsIds)
+  if (prjError) throw prjError
+  const projectTitles: Record<string, string> = {}
+  for (const p of projects ?? []) projectTitles[p.id as string] = ((p.title as string) || 'Untitled')
+  const projectIds = Object.keys(projectTitles)
+  if (projectIds.length === 0) return { jobs: [], projectTitles }
+
+  const [open, recent] = await Promise.all([
+    supabaseAdmin
+      .from('generation_jobs')
+      .select(QUEUE_CONSOLE_COLUMNS)
+      .in('project_id', projectIds)
+      .in('status', ['queued', 'failed'])
+      .order('created_at', { ascending: false })
+      .limit(200),
+    supabaseAdmin
+      .from('generation_jobs')
+      .select(QUEUE_CONSOLE_COLUMNS)
+      .in('project_id', projectIds)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(100),
+  ])
+  if (open.error) throw open.error
+  if (recent.error) throw recent.error
+  const jobs = [...(open.data ?? []), ...(recent.data ?? [])] as unknown as QueueConsoleJob[]
+  jobs.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+  return { jobs, projectTitles }
+}
+
+/** 콘솔 삭제 실행부 — 상태 가드(queued·failed 만)는 라우트가 잡 조회 후 판정한다. */
+export async function deleteGenerationJobById(id: string): Promise<void> {
+  const { error } = await supabaseAdmin.from('generation_jobs').delete().eq('id', id)
+  if (error) throw error
+}
+
 /** project → workspace.owner_id == userId 소유권 확인 (인증 polling 라우트에서 사용). */
 export async function userOwnsProject(
   projectId: string,

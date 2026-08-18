@@ -22,6 +22,8 @@ import { cn } from '@/lib/utils'
 const TABS = [
   { key: 'projects', label: '프로젝트', href: '/projects' },
   { key: 'playground', label: 'Playground', href: '/playground' },
+  // #queue-console: 전 프로젝트 생성 잡 운영 콘솔 — 좀비·실패를 보는 유일한 전역 창구.
+  { key: 'queue', label: 'Queue', href: '/queue' },
 ] as const
 
 export type DashboardTab = (typeof TABS)[number]['key']
