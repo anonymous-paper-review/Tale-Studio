@@ -118,11 +118,17 @@ def _ensure_only_inbox(project, paths):
 
 def _is_insert_only(base, candidate):
     """Return true when candidate preserves every base line in order."""
-    base_lines = base.splitlines(keepends=True)
+    # A person may place a heading directly after a separator and remove an
+    # empty spacer line. Treat whitespace-only lines as layout, not content.
+    base_lines = [
+        line for line in base.splitlines(keepends=True) if line.strip()
+    ]
     if not base_lines:
         return True
     cursor = 0
     for line in candidate.splitlines(keepends=True):
+        if not line.strip():
+            continue
         if line == base_lines[cursor]:
             cursor += 1
             if cursor == len(base_lines):
