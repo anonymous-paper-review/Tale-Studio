@@ -3,6 +3,7 @@
 import { ImageIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
+import { useT } from '@/lib/i18n'
 
 interface ImagePlaceholderProps {
   label: string
@@ -23,6 +24,7 @@ export function ImagePlaceholder({
   generatingStartedAt,
   className,
 }: ImagePlaceholderProps) {
+  const t = useT()
   return (
     <div
       className={cn(
@@ -46,7 +48,7 @@ export function ImagePlaceholder({
 
       <GeneratingOverlay
         active={generating}
-        label="생성 중"
+        label={t('Generating')}
         startedAt={generatingStartedAt}
       />
     </div>

@@ -24,15 +24,17 @@ import {
 
 import { cn } from '@/lib/utils'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
+import { useT } from '@/lib/i18n'
 
 // useSyncExternalStore 안정 스냅샷: selector 가 매 호출 새 [] 를 반환하면 무한루프(getServerSnapshot
 //   should be cached). 폴백은 모듈레벨 frozen 상수로 참조 고정한다.
 const EMPTY_REQUIRED_IDS: readonly string[] = Object.freeze([])
 
+// 라벨은 영어 원문 = i18n 사전 키 (#i18n-s5) — 렌더에서 t() 를 통과한다.
 const ROLE_TOGGLE: { value: CharacterRole; label: string }[] = [
-  { value: 'protagonist', label: '주인공' },
-  { value: 'antagonist', label: '적대자' },
-  { value: 'supporting', label: '조연' },
+  { value: 'protagonist', label: 'Protagonist' },
+  { value: 'antagonist', label: 'Antagonist' },
+  { value: 'supporting', label: 'Supporting' },
 ]
 
 // columns: 보드 축척(#d1) — 1(기존 세로 스택)~3열 그리드. 페이지 헤더의 슬라이더가 결정.
@@ -41,6 +43,7 @@ export function CharacterPanel({
   columns = 1,
   onZoomStep,
 }: { columns?: number; onZoomStep?: (dir: 1 | -1) => void } = {}) {
+  const t = useT()
   const {
     sceneManifest,
     characterAssets,
@@ -133,14 +136,14 @@ export function CharacterPanel({
               ) : null}
               {(char.appearanceNative || char.fixedPrompt) ? (
                 <p className="leading-snug text-background/70">
-                  <span className="text-background/50">외형 · </span>
+                  <span className="text-background/50">{t('Appearance')} · </span>
                   {char.appearanceNative || char.fixedPrompt}
                 </p>
               ) : null}
               {bgScenes.length > 0 ? (
                 <div className="space-y-0.5 border-t border-background/20 pt-1.5">
                   <p className="text-[10px] font-medium uppercase tracking-wide text-background/50">
-                    등장 씬 · 배경
+                    {t('Scenes appeared · background')}
                   </p>
                   {bgScenes.slice(0, 3).map((s) => (
                     <p
@@ -152,7 +155,7 @@ export function CharacterPanel({
                   ))}
                   {bgScenes.length > 3 ? (
                     <p className="text-background/50">
-                      +{bgScenes.length - 3}개 씬 더
+                      {t('+{count} more scenes', { count: bgScenes.length - 3 })}
                     </p>
                   ) : null}
                 </div>
@@ -160,7 +163,7 @@ export function CharacterPanel({
               {!char.description &&
               !char.fixedPrompt &&
               bgScenes.length === 0 ? (
-                <p className="text-background/60">아직 설정 정보가 없습니다.</p>
+                <p className="text-background/60">{t('No profile info yet.')}</p>
               ) : null}
             </>
           )
@@ -214,25 +217,25 @@ export function CharacterPanel({
                 <div className="flex items-center gap-2">
                   {/* 이름은 채팅으로만 변경 — 수동 편집 불가(#2). */}
                   <span className="min-w-0 flex-1 truncate text-base font-medium">
-                    {char.name || (isObject ? '사물' : '캐릭터')}
+                    {char.name || (isObject ? t('Object') : t('Character'))}
                   </span>
-                  {isObject ? <Badge variant="secondary">사물</Badge> : null}
+                  {isObject ? <Badge variant="secondary">{t('Object')}</Badge> : null}
                   {isRequired && (
                     <Badge variant={hasMainImage ? 'outline' : 'destructive'} className="text-[10px]">
-                      필수
+                      {t('Required')}
                     </Badge>
                   )}
                   {viewFailures[char.characterId] &&
                     Object.keys(viewFailures[char.characterId]).length > 0 && (
                       <Badge variant="destructive" className="text-[10px]">
-                        이미지 실패
+                        {t('Image failed')}
                       </Badge>
                     )}
                 </div>
                 {/* 역할은 채팅으로만 변경 — 수동 편집 불가(#3). 현재 역할만 읽기전용 배지로 표시. */}
                 {!isObject && (
                   <Badge variant="outline" className="w-fit text-xs font-normal">
-                    {ROLE_TOGGLE.find((r) => r.value === role)?.label ?? role}
+                    {t(ROLE_TOGGLE.find((r) => r.value === role)?.label ?? role)}
                   </Badge>
                 )}
               </div>
@@ -254,11 +257,11 @@ export function CharacterPanel({
                     {!isObject && char.views.main && !isViewGenerating('main') ? (
                       <TurnaroundRegionCycle
                         url={char.views.main}
-                        alt={`${char.name || '캐릭터'} 턴어라운드 시트`}
+                        alt={t('{name} turnaround sheet', { name: char.name || t('Character') })}
                       />
                     ) : (
                       <ImagePlaceholder
-                        label={isObject ? CHARACTER_VIEW_LABELS['main'] : '턴어라운드 (모든 뷰)'}
+                        label={isObject ? CHARACTER_VIEW_LABELS['main'] : t('Turnaround (all views)')}
                         aspectRatio={isObject ? 'square' : 'video'}
                         imageUrl={char.views.main ?? null}
                         generating={isViewGenerating('main')}
@@ -301,7 +304,7 @@ export function CharacterPanel({
                   ) : (
                     <>
                       <Sparkles className="size-3.5" />
-                      이미지 생성
+                      {t('Generate image')}
                     </>
                   )}
                 </Button>

@@ -16,6 +16,7 @@ import type { Shot, VideoClip, AudioSource } from '@/types'
 import { ingestAudioFile } from '@/lib/audio-waveform'
 import { startBinDrag, dropTargetSec } from '@/lib/pointer-drag'
 import { thumbUrl } from '@/lib/image-url'
+import { useT } from '@/lib/i18n'
 
 interface VideoSourcePanelProps {
   open: boolean
@@ -62,6 +63,7 @@ export function VideoSourcePanel({
   onBinDragEnd,
   onSetBinDropSec,
 }: VideoSourcePanelProps) {
+  const t = useT()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
 
@@ -82,7 +84,7 @@ export function VideoSourcePanel({
   if (!open) {
     return (
       <div className="flex w-9 shrink-0 flex-col items-center border-r border-border bg-card py-2">
-        <Button size="icon" variant="ghost" className="size-7" onClick={onToggle} title="소스 패널 펼치기">
+        <Button size="icon" variant="ghost" className="size-7" onClick={onToggle} title={t('Expand source panel')}>
           <PanelLeftOpen className="size-4" />
         </Button>
         <div className="mt-2 flex flex-1 items-center">
@@ -96,7 +98,7 @@ export function VideoSourcePanel({
     <aside className="flex h-full w-full min-w-0 shrink-0 flex-col border-r border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <span className="text-xs font-semibold">Source</span>
-        <Button size="icon" variant="ghost" className="size-6" onClick={onToggle} title="패널 접기">
+        <Button size="icon" variant="ghost" className="size-6" onClick={onToggle} title={t('Collapse panel')}>
           <PanelLeftClose className="size-3.5" />
         </Button>
       </div>
@@ -115,7 +117,7 @@ export function VideoSourcePanel({
 
         {/* ── Video 탭 ── */}
         <TabsContent value="video" className="mt-0 min-h-0 flex-1">
-          <p className="border-b border-border px-3 py-1 text-[9px] text-muted-foreground">클릭=미리보기 · 드래그/우클릭=타임라인 추가</p>
+          <p className="border-b border-border px-3 py-1 text-[9px] text-muted-foreground">{t('Click=preview · drag/right-click=add to timeline')}</p>
           <ScrollArea className="h-[calc(100%-22px)]">
             <div className="grid grid-cols-2 gap-2 p-2">
               {sourceShots.map((shot) => {
@@ -137,7 +139,7 @@ export function VideoSourcePanel({
                             onDrop: ({ target, clientX }) => onAddClip(shot.shotId, dropTargetSec(target, clientX)),
                           })
                         }
-                        title={`${shot.actionDescription}\n(클릭: 미리보기 / 드래그·우클릭: 타임라인 추가)`}
+                        title={`${shot.actionDescription}\n${t('(Click: preview / drag·right-click: add to timeline)')}`}
                         className="group flex cursor-grab flex-col rounded-md border border-border p-1.5 transition-all hover:bg-accent/50 active:cursor-grabbing"
                       >
                         <div className="flex aspect-video items-center justify-center overflow-hidden rounded bg-muted text-[9px] text-muted-foreground">
@@ -162,17 +164,17 @@ export function VideoSourcePanel({
                     </ContextMenuTrigger>
                     <ContextMenuContent className="w-40">
                       <ContextMenuItem className="text-xs" onSelect={() => onPreview(shot.shotId)}>
-                        <Eye className="size-3.5" /> 미리보기
+                        <Eye className="size-3.5" /> {t('Preview')}
                       </ContextMenuItem>
                       <ContextMenuItem className="text-xs" onSelect={() => onAddClipAtPlayhead(shot.shotId)}>
-                        <ListPlus className="size-3.5" /> 타임라인 추가
+                        <ListPlus className="size-3.5" /> {t('Add to timeline')}
                       </ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
                 )
               })}
               {sourceShots.length === 0 && (
-                <p className="col-span-2 py-8 text-center text-[10px] text-muted-foreground">생성된 클립이 없습니다</p>
+                <p className="col-span-2 py-8 text-center text-[10px] text-muted-foreground">{t('No clips generated yet')}</p>
               )}
             </div>
           </ScrollArea>
@@ -181,15 +183,15 @@ export function VideoSourcePanel({
         {/* ── Audio 탭 ── */}
         <TabsContent value="audio" className="mt-0 min-h-0 flex-1">
           <div className="flex items-center justify-between border-b border-border px-2 py-1">
-            <span className="text-[9px] text-muted-foreground">드래그 = 오디오 트랙에 추가</span>
+            <span className="text-[9px] text-muted-foreground">{t('Drag = add to audio track')}</span>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
-              title="오디오 업로드"
+              title={t('Upload audio')}
             >
-              {uploading ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />} 업로드
+              {uploading ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />} {t('Upload')}
             </button>
             <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleAudioFile(f); e.target.value = '' }} />
           </div>
@@ -210,7 +212,7 @@ export function VideoSourcePanel({
                             onAddAudioFromSource(src.id, dropTargetSec(target, clientX), (target as HTMLElement).dataset.trackId),
                         })
                       }
-                      title={`${src.name}\n(드래그: 오디오 트랙에 추가 / 우클릭: 메뉴)`}
+                      title={`${src.name}\n${t('(Drag: add to audio track / right-click: menu)')}`}
                       className="group flex cursor-grab items-center gap-2 rounded-md border border-border p-1.5 transition-all hover:bg-accent/50 active:cursor-grabbing"
                     >
                       <Music className="size-3.5 shrink-0 text-primary" />
@@ -223,7 +225,7 @@ export function VideoSourcePanel({
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={() => onRemoveAudioSource(src.id)}
                         className="hidden shrink-0 rounded p-0.5 text-destructive hover:bg-destructive/10 group-hover:block"
-                        title="소스 삭제"
+                        title={t('Remove source')}
                       >
                         <X className="size-3" />
                       </button>
@@ -231,16 +233,16 @@ export function VideoSourcePanel({
                   </ContextMenuTrigger>
                   <ContextMenuContent className="w-36">
                     <ContextMenuItem variant="destructive" className="text-xs" onSelect={() => onRemoveAudioSource(src.id)}>
-                      <X className="size-3.5" /> 삭제
+                      <X className="size-3.5" /> {t('Delete')}
                     </ContextMenuItem>
                   </ContextMenuContent>
                 </ContextMenu>
               ))}
               {audioSources.length === 0 && (
                 <p className="py-8 text-center text-[10px] text-muted-foreground">
-                  오디오 소스가 없습니다.
+                  {t('No audio sources.')}
                   <br />
-                  업로드 후 오디오 트랙으로 드래그하세요.
+                  {t('Upload one, then drag it to the audio track.')}
                 </p>
               )}
             </div>

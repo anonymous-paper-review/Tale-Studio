@@ -22,10 +22,12 @@ import { ThumbImage } from '@/components/thumb-image'
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
 import { WorldViewDialog } from '@/features/artist/world-view-dialog'
 import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
+import { useT } from '@/lib/i18n'
 
 const DROP_SELECTOR = '[data-shot-drop]'
 
 export function AssetShotBoard() {
+  const t = useT()
   const characterAssets = useArtistStore((s) => s.characterAssets)
   const worldAssets = useArtistStore((s) => s.worldAssets)
   // ⚠️ 셀렉터에서 `?.scenes ?? []` 금지 — null 매니페스트일 때 매 스냅샷 새 배열 → 무한 리렌더
@@ -143,22 +145,22 @@ export function AssetShotBoard() {
       {/* ── 상단: 에셋 스트립 — 평소엔 요약 한 줄, hover(또는 드래그 중)에 아래로 펼쳐져 그림 표시 ── */}
       <div className="group border-b border-border px-6 py-2">
         <div className="flex h-8 items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">에셋</span>
+          <span className="font-medium text-foreground">{t('Assets')}</span>
           <Badge variant="secondary" className="text-[10px]">
-            인물 {characterAssets.length}
+            {t('People')} {characterAssets.length}
           </Badge>
           <Badge variant="secondary" className="text-[10px]">
-            배경 {worldAssets.length}
+            {t('Backgrounds')} {worldAssets.length}
           </Badge>
           <span className="truncate">
-            — 마우스를 올리면 펼쳐집니다 · 드래그해 샷에 연결, 카드의 칩 클릭으로 해제
+            — {t('Hover to expand · drag to link to a shot, click a card chip to unlink')}
           </span>
           <div className="ml-auto flex shrink-0 items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
               className="size-7"
-              title="실행 취소 (Ctrl+Z)"
+              title={t('Undo (Ctrl+Z)')}
               disabled={!canUndo}
               onClick={() => void undo()}
             >
@@ -168,7 +170,7 @@ export function AssetShotBoard() {
               variant="ghost"
               size="icon"
               className="size-7"
-              title="다시 실행 (Ctrl+Shift+Z / Ctrl+Y)"
+              title={t('Redo (Ctrl+Shift+Z / Ctrl+Y)')}
               disabled={!canRedo}
               onClick={() => void redo()}
             >
@@ -186,7 +188,7 @@ export function AssetShotBoard() {
         >
           <div className="overflow-hidden">
             <div className="flex items-start gap-8 overflow-x-auto pb-2 pt-3 scrollbar-thin">
-              <AssetGroup label="인물">
+              <AssetGroup label={t('People')}>
                 {characterAssets.map((c) => (
                   <AssetCard
                     key={c.characterId}
@@ -196,9 +198,9 @@ export function AssetShotBoard() {
                     onPointerDown={(e) => dragChip(e, 'character', c.characterId, c.name)}
                   />
                 ))}
-                {characterAssets.length === 0 && <EmptyNote>인물 없음</EmptyNote>}
+                {characterAssets.length === 0 && <EmptyNote>{t('No people')}</EmptyNote>}
               </AssetGroup>
-              <AssetGroup label="배경">
+              <AssetGroup label={t('Backgrounds')}>
                 {worldAssets.map((w) => (
                   <AssetCard
                     key={w.locationId}
@@ -208,7 +210,7 @@ export function AssetShotBoard() {
                     onPointerDown={(e) => dragChip(e, 'world', w.locationId, w.name)}
                   />
                 ))}
-                {worldAssets.length === 0 && <EmptyNote>배경 없음</EmptyNote>}
+                {worldAssets.length === 0 && <EmptyNote>{t('No backgrounds')}</EmptyNote>}
               </AssetGroup>
             </div>
           </div>
@@ -224,8 +226,7 @@ export function AssetShotBoard() {
         )}
         {shots.length === 0 && !loading && (
           <p className="py-16 text-center text-sm text-muted-foreground">
-            아직 샷이 없어요 — Writer 파이프라인이 샷을 만들면 이곳에서 에셋을 연결할 수
-            있습니다.
+            {t('No shots yet — once the Writer pipeline creates shots, you can link assets to them here.')}
           </p>
         )}
         {groups.known.map(({ scene, shots: sceneShots }, si) => (
@@ -271,7 +272,7 @@ export function AssetShotBoard() {
         ))}
         {groups.orphan.length > 0 && (
           <section>
-            <h2 className="mb-3 text-sm font-semibold text-muted-foreground">(씬 미지정)</h2>
+            <h2 className="mb-3 text-sm font-semibold text-muted-foreground">{t('(Scene not assigned)')}</h2>
             <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(15rem,1fr))]">
               {groups.orphan.map((shot, ki) => (
                 <ShotCard
@@ -341,12 +342,13 @@ function AssetCard({
   aspect: 'portrait' | 'video'
   onPointerDown: (e: React.PointerEvent) => void
 }) {
+  const t = useT()
   return (
     <div
       role="button"
       tabIndex={0}
       onPointerDown={onPointerDown}
-      title={`${name} — 클릭: 상세 / 드래그: 샷에 연결`}
+      title={t('{name} — click: details / drag: link to shot', { name })}
       className={cn(
         'shrink-0 cursor-grab touch-none select-none active:cursor-grabbing',
         // 배경(landscape)은 한 단계 크게 — 와이드샷 디테일이 보이는 사이즈(#2).
@@ -396,6 +398,7 @@ function ShotCard({
   onRemoveCharacter: (id: string) => void
   onRemoveLocation: (id: string) => void
 }) {
+  const t = useT()
   const eff = effectiveLocationIds(shot, sceneLocation)
   return (
     <div
@@ -411,7 +414,7 @@ function ShotCard({
         <Badge
           variant="secondary"
           className="text-[10px]"
-          title={SHOT_TYPE_DESCRIPTIONS[shot.shotType] ?? shot.shotType}
+          title={t(SHOT_TYPE_DESCRIPTIONS[shot.shotType] ?? shot.shotType)}
         >
           {shot.shotType}
         </Badge>
@@ -421,11 +424,11 @@ function ShotCard({
       </div>
 
       <p className="mb-2.5 line-clamp-3 min-h-8 text-xs text-foreground/80" title={shot.description}>
-        {shot.description || '(설명 없음)'}
+        {shot.description || t('(No description)')}
       </p>
 
       {/* 인물 참조 */}
-      <RefRow label="인물">
+      <RefRow label={t('People')}>
         {shot.characters.map((id) => {
           const c = charById.get(id)
           return (
@@ -437,11 +440,11 @@ function ShotCard({
             />
           )
         })}
-        {shot.characters.length === 0 && <EmptyNote>없음</EmptyNote>}
+        {shot.characters.length === 0 && <EmptyNote>{t('None')}</EmptyNote>}
       </RefRow>
 
       {/* 배경 참조 — 상속(씬)분은 점선 표시 */}
-      <RefRow label="배경">
+      <RefRow label={t('Backgrounds')}>
         {eff.ids.map((id) => {
           const w = worldById.get(id)
           return (
@@ -454,7 +457,7 @@ function ShotCard({
             />
           )
         })}
-        {eff.ids.length === 0 && <EmptyNote>없음</EmptyNote>}
+        {eff.ids.length === 0 && <EmptyNote>{t('None')}</EmptyNote>}
       </RefRow>
     </div>
   )
@@ -480,11 +483,16 @@ function RefChip({
   inherited?: boolean
   onRemove: () => void
 }) {
+  const t = useT()
   return (
     <button
       type="button"
       onClick={onRemove}
-      title={inherited ? `${name} (씬에서 상속) — 클릭하면 참조 해제` : `${name} — 클릭하면 참조 해제`}
+      title={
+        inherited
+          ? t('{name} (inherited from the scene) — click to unlink', { name })
+          : t('{name} — click to unlink', { name })
+      }
       className={cn(
         'group flex items-center gap-1.5 rounded-full border bg-background py-0.5 pl-0.5 pr-2 text-xs transition-colors',
         inherited ? 'border-dashed border-border' : 'border-border',

@@ -12,6 +12,7 @@ import { useChatUiStore } from '@/stores/chat-ui-store'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { cn } from '@/lib/utils'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
+import { useT } from '@/lib/i18n'
 
 // columns: 보드 축척(#d1) — 1(기존 세로 스택)~3열 그리드. 페이지 헤더의 슬라이더가 결정.
 // onZoomStep: Ctrl+휠 축척(#a1 2026-07-15) — 캐릭터 탭과 동일한 굴림당 1단계.
@@ -19,6 +20,7 @@ export function WorldPanel({
   columns = 1,
   onZoomStep,
 }: { columns?: number; onZoomStep?: (dir: 1 | -1) => void } = {}) {
+  const t = useT()
   const {
     sceneManifest,
     worldAssets,
@@ -129,7 +131,7 @@ export function WorldPanel({
                 {/* 배경 = 이미지 1장(#6·#9): establishing 셀 제거, wide 1컷만. 클릭 → 프롬프트/재생성 Dialog. */}
                 <button
                   type="button"
-                  title="배경 — 클릭해서 프롬프트 보기/재생성"
+                  title={t('Background — click to view/regenerate the prompt')}
                   onClick={(e) => {
                     e.stopPropagation()
                     setViewDialog({ locationId: world.locationId, shot: 'wideShot' })
@@ -137,7 +139,7 @@ export function WorldPanel({
                   className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                 >
                   <ImagePlaceholder
-                    label="배경"
+                    label={t('Background')}
                     aspectRatio="video"
                     imageUrl={world.wideShot}
                     generating={isGenerating && !world.wideShot}
@@ -166,7 +168,7 @@ export function WorldPanel({
                     ) : (
                       <>
                         <Sparkles className="size-3.5" />
-                        이미지 생성
+                        {t('Generate image')}
                       </>
                     )}
                   </Button>

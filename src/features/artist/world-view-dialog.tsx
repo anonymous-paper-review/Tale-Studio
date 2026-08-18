@@ -19,6 +19,7 @@ import {
   WORLD_SHOT_LABELS,
   type WorldShotKey,
 } from '@/stores/artist-store'
+import { useT } from '@/lib/i18n'
 
 type Props = {
   locationId: string | null
@@ -32,6 +33,7 @@ type Props = {
  * 캐릭터 뷰 Dialog와 대칭 구조.
  */
 export function WorldViewDialog({ locationId, shot, onClose }: Props) {
+  const t = useT()
   const world = useArtistStore((s) =>
     s.worldAssets.find((w) => w.locationId === locationId),
   )
@@ -55,7 +57,7 @@ export function WorldViewDialog({ locationId, shot, onClose }: Props) {
   const generate = useGuardedAction({
     actionKey: `artist:world:${locationId}:${shot}`,
     stage: 'artist',
-    label: '배경 이미지',
+    label: t('Background image'),
     busy: isGenerating,
     action: async () => {
       if (!world || !shot) return
@@ -91,14 +93,14 @@ export function WorldViewDialog({ locationId, shot, onClose }: Props) {
           {/* 사용 프롬프트 (수정 가능) */}
           <div>
             <label className="mb-1.5 block text-xs text-muted-foreground">
-              프롬프트 (수정 후 생성)
+              {t('Prompt (edit, then generate)')}
             </label>
             <HoverBeam>
               <Textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={4}
-                placeholder="이 배경 이미지를 만들 프롬프트"
+                placeholder={t('Prompt to create this background image')}
               />
             </HoverBeam>
           </div>
@@ -112,12 +114,12 @@ export function WorldViewDialog({ locationId, shot, onClose }: Props) {
             {generate.locked ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                생성 중…
+                {t('Generating…')}
               </>
             ) : (
               <>
                 <Sparkles className="size-4" />
-                {imageUrl ? '재생성' : '생성'}
+                {imageUrl ? t('Regenerate') : t('Generate')}
               </>
             )}
           </Button>

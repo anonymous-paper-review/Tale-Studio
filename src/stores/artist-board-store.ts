@@ -8,6 +8,8 @@
 import { create } from 'zustand'
 import { createClient } from '@/lib/supabase/client'
 import { useProjectStore } from '@/stores/project-store'
+import { translate } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 
 export interface BoardShot {
   shotId: string
@@ -85,7 +87,12 @@ export const useArtistBoardStore = create<ArtistBoardState>((set, get) => {
       .eq('project_id', projectId)
       .eq('shot_id', shotId)
     if (error) {
-      set({ shots: prev, error: `참조 저장 실패: ${error.message}` })
+      set({
+        shots: prev,
+        error: translate(useLocaleStore.getState().locale, 'Failed to save the reference: {message}', {
+          message: error.message,
+        }),
+      })
       return false
     }
     return true
@@ -134,7 +141,12 @@ export const useArtistBoardStore = create<ArtistBoardState>((set, get) => {
     } catch (err) {
       set({
         loading: false,
-        error: err instanceof Error ? `샷 로드 실패: ${err.message}` : 'Shot load failed',
+        error:
+          err instanceof Error
+            ? translate(useLocaleStore.getState().locale, 'Failed to load shots: {message}', {
+                message: err.message,
+              })
+            : 'Shot load failed',
       })
     }
   },

@@ -19,6 +19,8 @@ import {
   notifyGenerationGaveUp,
 } from '@/lib/generation-notify'
 import { claimAction } from '@/lib/action-guard'
+import { translate } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
@@ -266,7 +268,7 @@ function scheduleCharacterPatch(
         useArtistStore.setState({
           error:
             err instanceof Error
-              ? `캐릭터 수정 저장 실패 (카드는 유지됨): ${err.message}`
+              ? `Failed to save character edits (card is kept): ${err.message}`
               : 'Character update failed',
         })
       })
@@ -733,7 +735,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         set({
           error:
             err instanceof Error
-              ? `캐릭터 저장 실패 (카드는 유지됨): ${err.message}`
+              ? `Failed to save character (card is kept): ${err.message}`
               : 'Character save failed',
         })
       }
@@ -832,7 +834,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       //   원인이 고쳐져도 자동으로는 복구되지 않아 사람이 눌러야 한다(2026-08-13 실사용에서 막힌 지점).
       if (body.skipped || !body.jobId) {
         alog(`[autogen] char ${key} — give-up 게이트로 자동 생성 skip`)
-        notifyGenerationGaveUp('artist', '캐릭터 이미지')
+        notifyGenerationGaveUp('artist', translate(useLocaleStore.getState().locale, 'Character image'))
         return
       }
       const jobId = body.jobId
@@ -860,7 +862,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       })
       const asset = get().characterAssets.find((a) => a.characterId === characterId)
       if (asset) registerCharacterCard(asset, projectId)
-      notifyGenerationComplete('artist', '캐릭터 이미지') // 다른 stage에 있을 때만 알림(store가 판단)
+      notifyGenerationComplete('artist', translate(useLocaleStore.getState().locale, 'Character image')) // 다른 stage에 있을 때만 알림(store가 판단)
     } catch (err) {
       console.warn(
         `[autogen] char ${key} ✗ failed in ${((Date.now() - t0) / 1000).toFixed(1)}s:`,
@@ -869,7 +871,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const raw = err instanceof Error ? err.message : String(err)
       set({ error: raw || 'Character view generation failed' })
       // 카드의 작은 배지는 스크롤하면 사라진다 — 채팅은 stage 를 옮겨도 남는 기록이다.
-      notifyGenerationFailed('artist', '캐릭터 이미지', raw)
+      notifyGenerationFailed('artist', translate(useLocaleStore.getState().locale, 'Character image'), raw)
     } finally {
       set((state) => ({
         generatingViews: state.generatingViews.filter((k) => k !== key),
@@ -978,11 +980,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           ),
         }))
       }
-      notifyGenerationComplete('artist', '배경 이미지') // 다른 stage에 있을 때만 알림(store가 판단)
+      notifyGenerationComplete('artist', translate(useLocaleStore.getState().locale, 'Background image')) // 다른 stage에 있을 때만 알림(store가 판단)
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err)
       set({ error: raw || 'World generation failed' })
-      notifyGenerationFailed('artist', '배경 이미지', raw)
+      notifyGenerationFailed('artist', translate(useLocaleStore.getState().locale, 'Background image'), raw)
     } finally {
       set((state) => ({
         generatingLocations: state.generatingLocations.filter(
@@ -1050,7 +1052,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       if (!url) {
         // 서버 give-up 게이트로 자동 생성 skip — 에러는 아니지만 사용자에게는 알려야 한다(캐릭터 경로와 동일 이유).
         alog(`[autogen] world ${locationId}:${shot} — give-up 게이트로 자동 생성 skip`)
-        notifyGenerationGaveUp('artist', '배경 이미지')
+        notifyGenerationGaveUp('artist', translate(useLocaleStore.getState().locale, 'Background image'))
         return
       }
       alog(`[autogen] world ${locationId}:${shot} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
@@ -1060,7 +1062,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           w.locationId === locationId ? { ...w, [shot]: url } : w,
         ),
       }))
-      notifyGenerationComplete('artist', '배경 이미지') // 다른 stage에 있을 때만 알림(store가 판단)
+      notifyGenerationComplete('artist', translate(useLocaleStore.getState().locale, 'Background image')) // 다른 stage에 있을 때만 알림(store가 판단)
     } catch (err) {
       console.warn(
         `[autogen] world ${locationId}:${shot} ✗ failed in ${((Date.now() - t0) / 1000).toFixed(1)}s:`,
@@ -1068,7 +1070,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       )
       const raw = err instanceof Error ? err.message : String(err)
       set({ error: raw || 'World generation failed' })
-      notifyGenerationFailed('artist', '배경 이미지', raw)
+      notifyGenerationFailed('artist', translate(useLocaleStore.getState().locale, 'Background image'), raw)
     } finally {
       // 같은 locationId 가 중복될 수 있으므로 한 건만 제거. startedAt 은 마지막 작업이 끝날 때만 정리.
       set((state) => {
