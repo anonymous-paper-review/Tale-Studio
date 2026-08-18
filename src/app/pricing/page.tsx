@@ -9,15 +9,15 @@ import { SiteFooter } from '@/components/marketing/site-footer'
 
 export const metadata: Metadata = {
   title: 'Pricing — Tale Studio',
-  description: '베타 기간 동안 Tale Studio 의 모든 기능을 무료로 사용할 수 있습니다.',
+  description: 'All Tale Studio features are free to use during the beta.',
 }
 
 const FREE_FEATURES = [
-  '5단계 AI 프로덕션 팀 전체 이용',
-  '러프 스토리보드·컨셉 이미지·실사 previz 생성',
-  '영상 생성 (샷당 테이크 관리)',
-  '읽기 전용 공유 링크 무제한',
-  'Playground 공개 게재',
+  'Full access to the 5-stage AI production team',
+  'Rough storyboards, concept art, and live-action previz generation',
+  'Video generation with per-shot take management',
+  'Unlimited read-only share links',
+  'Publish to the Playground',
 ]
 
 export default function PricingPage() {
@@ -28,7 +28,7 @@ export default function PricingPage() {
         <div className="mb-14 text-center">
           <h1 className="mb-3 text-4xl font-semibold tracking-tighter md:text-5xl">Pricing</h1>
           <p className="text-base font-light text-gray-400">
-            베타 기간에는 모든 기능이 무료입니다.
+            All features are free during the beta.
           </p>
         </div>
 
@@ -38,13 +38,13 @@ export default function PricingPage() {
             <div className="mb-1 flex items-center gap-2">
               <h2 className="text-xl font-semibold">Beta</h2>
               <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
-                현재 이용 가능
+                Currently available
               </span>
             </div>
-            <p className="mb-6 text-sm text-gray-400">지금 가입하는 모든 창작자에게</p>
+            <p className="mb-6 text-sm text-gray-400">For every creator signing up now</p>
             <p className="mb-8">
               <span className="text-5xl font-semibold tracking-tight">₩0</span>
-              <span className="ml-2 text-sm text-gray-500">/ 베타 기간</span>
+              <span className="ml-2 text-sm text-gray-500">/ during beta</span>
             </p>
             <ul className="mb-8 space-y-3 text-sm text-gray-300">
               {FREE_FEATURES.map((f) => (
@@ -58,7 +58,7 @@ export default function PricingPage() {
               href="/login"
               className="block rounded-full bg-primary py-3.5 text-center font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              무료로 시작하기
+              Start for free
             </Link>
           </div>
 
@@ -67,22 +67,22 @@ export default function PricingPage() {
             <div className="mb-1 flex items-center gap-2">
               <h2 className="text-xl font-semibold">Pro</h2>
               <span className="rounded-full border border-white/15 px-2.5 py-0.5 text-[11px] font-medium text-gray-400">
-                준비 중
+                Coming soon
               </span>
             </div>
-            <p className="mb-6 text-sm text-gray-400">더 많은 생성량이 필요한 팀에게</p>
+            <p className="mb-6 text-sm text-gray-400">For teams that need more generation volume</p>
             <p className="mb-8">
               <span className="text-5xl font-semibold tracking-tight text-gray-500">—</span>
             </p>
             <p className="text-sm leading-relaxed text-gray-500">
-              베타가 끝나면 생성량 기반 플랜을 공개할 예정입니다. 베타 참여자에게는
-              전환 혜택을 먼저 안내해 드려요.
+              Usage-based plans will launch when the beta ends. Beta participants
+              will be the first to hear about transition perks.
             </p>
           </div>
         </div>
 
         <p className="mt-10 text-center text-xs text-gray-600">
-          베타 기간 중 생성량에는 공정 사용 한도가 적용될 수 있습니다.
+          Fair-use limits may apply to generation volume during the beta.
         </p>
       </main>
       <SiteFooter />

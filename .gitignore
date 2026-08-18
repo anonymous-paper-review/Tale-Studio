@@ -59,7 +59,9 @@ BUGS.md
 # (루트 .worktrees/ 는 .git/info/exclude 가 이미 처리)
 .claude/worktrees/
 # docs/ 전체 로컬 전용(내부 노트) — 공개 repo 미추적. legacy는 로컬에서도 삭제함
-docs/
+#   루트 고정(/) 필수: 비고정 'docs/' 는 src/app/docs/(마케팅 /docs 라우트)까지 삼켜
+#   페이지가 배포에서 통째로 빠졌었다 (2026-08-18 발견 — i18n 배치 중 diff 부재로 발각).
+/docs/
 
 # supabase CLI 로컬 상태(project-ref·버전 등) — 추적 금지
 supabase/.temp/

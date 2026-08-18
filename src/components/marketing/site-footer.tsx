@@ -13,8 +13,8 @@ export function SiteFooter() {
             <span className="text-lg font-bold tracking-tight">Tale Studio</span>
           </div>
           <p className="max-w-md text-sm font-light leading-relaxed text-gray-400">
-            스토리 한 줄에서 Previz 영상까지 — AI 프로덕션 팀과 함께 만드는
-            프리프로덕션 스튜디오.
+            From a one-line story to a previz video — the pre-production
+            studio built with an AI production team.
           </p>
         </div>
         <div className="flex flex-col gap-3 text-sm text-gray-400">

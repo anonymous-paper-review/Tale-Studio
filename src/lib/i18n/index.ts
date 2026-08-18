@@ -7,13 +7,21 @@ import { useLocaleStore } from '@/stores/locale-store'
 import type { AppLocale } from '@/lib/locale'
 import { KO } from './messages-ko'
 
-export function translate(locale: AppLocale, text: string): string {
-  return locale === 'ko' ? (KO[text] ?? text) : text
+export function translate(
+  locale: AppLocale,
+  text: string,
+  params?: Record<string, string | number>,
+): string {
+  let out = locale === 'ko' ? (KO[text] ?? text) : text
+  if (params) {
+    for (const [k, v] of Object.entries(params)) out = out.replaceAll(`{${k}}`, String(v))
+  }
+  return out
 }
 
-export function useT(): (text: string) => string {
+export function useT(): (text: string, params?: Record<string, string | number>) => string {
   const locale = useLocaleStore((s) => s.locale)
-  return (text: string) => translate(locale, text)
+  return (text, params) => translate(locale, text, params)
 }
 
 export function useLocale(): AppLocale {

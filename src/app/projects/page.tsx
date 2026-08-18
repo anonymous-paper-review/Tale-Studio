@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dialog'
 import type { StageId } from '@/types'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
+import { useT } from '@/lib/i18n'
 import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
 
 interface ProjectItem {
@@ -64,6 +65,7 @@ function ProjectCard({
   onRenamed: (id: string, title: string) => void
   onDeleteRequest: (p: ProjectItem) => void
 }) {
+  const t = useT()
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(project.title || 'Untitled')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -135,8 +137,8 @@ function ProjectCard({
                   e.stopPropagation()
                   setEditing(true)
                 }}
-                title="이름 변경"
-                aria-label="프로젝트 이름 변경"
+                title={t('Rename')}
+                aria-label={t('Rename project')}
                 className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
               >
                 <Pencil className="size-3.5" />
@@ -146,8 +148,8 @@ function ProjectCard({
                   e.stopPropagation()
                   onDeleteRequest(project)
                 }}
-                title="프로젝트 삭제"
-                aria-label="프로젝트 삭제"
+                title={t('Delete project')}
+                aria-label={t('Delete project')}
                 className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
               >
                 <Trash2 className="size-3.5" />
@@ -174,6 +176,7 @@ function ProjectCard({
 
 export default function ProjectsPage() {
   const router = useRouter()
+  const t = useT()
   const switchProject = useProjectStore((s) => s.switchProject)
   const createNewProject = useProjectStore((s) => s.createNewProject)
 
@@ -229,7 +232,7 @@ export default function ProjectsPage() {
       if (readLastProjectId() === deleteTarget.id) clearLastProjectId()
       setDeleteTarget(null)
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : '삭제에 실패했어요')
+      setDeleteError(err instanceof Error ? err.message : t('Failed to delete'))
     } finally {
       setDeleting(false)
     }
@@ -245,7 +248,7 @@ export default function ProjectsPage() {
           className="flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90"
         >
           {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-          새 프로젝트
+          {t('New project')}
         </button>
       </DashboardHeader>
 
@@ -258,14 +261,14 @@ export default function ProjectsPage() {
         ) : projects.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 py-24">
             <Film className="size-10 text-gray-600" />
-            <p className="mt-4 text-sm text-gray-500">아직 프로젝트가 없어요</p>
+            <p className="mt-4 text-sm text-gray-500">{t('No projects yet')}</p>
             <button
               onClick={handleNew}
               disabled={creating}
               className="mt-6 flex items-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sm font-medium transition-all hover:border-primary hover:text-primary"
             >
               <Plus className="size-4" />
-              첫 프로젝트 만들기
+              {t('Create your first project')}
             </button>
           </div>
         ) : (
@@ -292,15 +295,15 @@ export default function ProjectsPage() {
       <Dialog open={nameOpen} onOpenChange={(o) => !creating && setNameOpen(o)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>새 프로젝트</DialogTitle>
+            <DialogTitle>{t('New project')}</DialogTitle>
             <DialogDescription>
-              프로젝트 이름을 지어 주세요. 나중에 언제든 바꿀 수 있어요.
+              {t('Name your project — you can rename it anytime.')}
             </DialogDescription>
           </DialogHeader>
           <Input
             value={nameValue}
             onChange={(e) => setNameValue(e.target.value)}
-            placeholder="예: 비 오는 도시의 하룻밤"
+            placeholder={t('e.g. One rainy night in the city')}
             autoFocus
             maxLength={120}
             onKeyDown={(e) => {
@@ -312,11 +315,11 @@ export default function ProjectsPage() {
           />
           <DialogFooter>
             <Button variant="outline" disabled={creating} onClick={() => setNameOpen(false)}>
-              취소
+              {t('Cancel')}
             </Button>
             <Button disabled={creating || !nameValue.trim()} onClick={() => void handleCreate()}>
               {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-              만들기
+              {t('Create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -326,19 +329,19 @@ export default function ProjectsPage() {
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>프로젝트 삭제</DialogTitle>
+            <DialogTitle>{t('Delete project')}</DialogTitle>
             <DialogDescription>
-              {`"${deleteTarget?.title || 'Untitled'}" 프로젝트와 모든 산출물(스토리·캐릭터·씬·샷·영상)이 삭제됩니다. 되돌릴 수 없어요.`}
+              {t('This deletes "{title}" and everything in it — story, characters, scenes, shots, videos. This cannot be undone.', { title: deleteTarget?.title || 'Untitled' })}
             </DialogDescription>
           </DialogHeader>
           {deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}
           <DialogFooter>
             <Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>
-              취소
+              {t('Cancel')}
             </Button>
             <Button variant="destructive" disabled={deleting} onClick={() => void handleDelete()}>
               {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-              삭제
+              {t('Delete')}
             </Button>
           </DialogFooter>
         </DialogContent>
