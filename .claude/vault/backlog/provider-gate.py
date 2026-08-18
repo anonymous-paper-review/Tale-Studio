@@ -176,7 +176,7 @@ def probe_claude(args):
         completed = subprocess.run(
             [command, "--print", "--max-turns", "1", "--output-format", "json",
              "Reply with exactly OK."],
-            cwd="/private/tmp", capture_output=True, text=True,
+            cwd="/tmp", capture_output=True, text=True,
             timeout=max(1.0, min(float(args.probe_timeout), 30.0)), check=False,
         )
     except (OSError, subprocess.TimeoutExpired):

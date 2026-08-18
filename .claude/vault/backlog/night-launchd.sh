@@ -176,7 +176,7 @@ dry-run)
 
   # 임시 cwd에서 절대경로로 읽는다 — 프로젝트 Stop 훅(typecheck-gate 등)이
   # headless 응답을 막으면 이 단계가 무관한 typecheck 상태에 인질로 잡힌다.
-  answer="$(cd /private/tmp && claude -p \
+  answer="$(cd /tmp && claude -p \
     "읽기 전용 확인: $CONTRACT 파일의 첫 줄 제목을 그대로 한 줄만 출력하라." \
     --allowedTools "Read" --max-turns 8)"
   echo "[6/6] native claude contract read OK → $answer"
