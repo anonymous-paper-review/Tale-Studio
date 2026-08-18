@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { parseAppLocale } from '@/lib/locale'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -35,10 +36,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Create new project
+    // Create new project.
+    //   locale (#i18n-s5): 생성 시점의 사용자 언어 설정(기본 en)을 콘텐츠 언어로 박아 잠근다 —
+    //   파이프라인 출력 강제·공유 뷰 표시가 이 값을 따른다. locked 라 writer/start 의
+    //   스토리 감지는 이 프로젝트에 손대지 않는다(감지는 설정 이전 레거시 전용 폴백).
+    const locale = parseAppLocale(user.user_metadata?.locale) ?? 'en'
     const { data: project, error } = await supabaseAdmin
       .from('projects')
-      .insert({ workspace_id: workspace.id, title })
+      .insert({ workspace_id: workspace.id, title, locale, locale_locked: true })
       .select()
       .single()
 
