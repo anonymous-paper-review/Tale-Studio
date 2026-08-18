@@ -129,10 +129,14 @@ const SHEET_SPECS: Partial<Record<`${ProjectFormat}:${RoughGridVariant}`, SheetS
     frameAxis: 'rows',
     templatePath: '/rough-storyboard-strip-square.png',
   },
+  // #cinema-row-pitch(2026-08-18, 오너 지시 "세로 간격 늘려줘"): 셀 187px 높이는 4포맷 중
+  //   유일하게 캡션 블록이 물리적으로 안 들어가 모델이 패널 밖 밴드로 회피했다(지오메트리
+  //   문안 A/B 실측 — HYPOTHESIS-geometry-prompt.md). 셀 AR 2.39 는 불변식이라 거터만 늘려선
+  //   해결이 안 되므로 캔버스·셀을 확대: 셀 높이 234(검증된 가로 225 이상) + 행 거터 20→28.
   'cinema_2.39:1:grid4': {
-    canvas: { width: 1920, height: 704 },
-    colBoxes: boxes(36, 447, 4),
-    rowBoxes: boxes(51, 187, 3),
+    canvas: { width: 2400, height: 880 },
+    colBoxes: boxes(52, 559, 4),
+    rowBoxes: boxes(61, 234, 3, 28),
     frameAxis: 'rows',
     templatePath: '/rough-storyboard-grid-cinema.png',
   },
@@ -471,11 +475,20 @@ The strip is ONE shot of a film, read top to bottom as three frames:
       ? `\n\nColumns ${cells.length + 1}–${colCount} have no shot: leave those panels completely empty blank paper.`
       : ''
 
+  // #geometry-contract(2026-08-18, A/B 실측 — HYPOTHESIS-geometry-prompt.md): direction 행이
+  //   캡션 블록 때문에 세로로 자라 전 포맷 정규화 contain 패딩 10~13%. 이 계약으로 가로/세로/
+  //   스퀘어 0%, 시네마는 확대 템플릿(#cinema-row-pitch)과 조합해 0~0.4% 실측. strip 은 실물
+  //   패딩 0%(셀이 충분히 큼)라 미적용 — 측정된 표면(grid4)에만, 측정된 위치(프롬프트 끝) 그대로.
+  const geometryContract =
+    variant === 'grid4'
+      ? `\n\nPanel geometry is a hard contract: every panel's four borders stay EXACTLY where the template drew them — never move, stretch or redraw a border at a different position, and never let any panel grow taller or wider than its template box. This applies to the DIRECTION panel too: shrink the drawing and its caption block together so BOTH fit entirely inside the panel's original borders — the caption block replaces the bottom of the drawing, it never extends the panel.`
+      : ''
+
   return `${head}
 
 ${GRID_STYLE}
 
 ${body}${empties}
 
-Within each column, the three frames depict the SAME camera setup, location, figures and props — continuity between START, DIRECTION and END must be obvious. START and DIRECTION are the same frozen instant (annotations are the only difference); motion progresses ONLY in END. Different columns are different shots and may differ. No text, captions or labels anywhere except the DIRECTION row's annotations (motion arrow labels and the small handwritten technical margin labels requested per column).`
+Within each column, the three frames depict the SAME camera setup, location, figures and props — continuity between START, DIRECTION and END must be obvious. START and DIRECTION are the same frozen instant (annotations are the only difference); motion progresses ONLY in END. Different columns are different shots and may differ. No text, captions or labels anywhere except the DIRECTION row's annotations (motion arrow labels and the small handwritten technical margin labels requested per column).${geometryContract}`
 }
