@@ -82,8 +82,8 @@ parallel_dev/
 !.claude/hooks/*.sh
 # 스킬 부속 스크립트도 추적 (SKILL.md가 참조하는 bin/*.sh 등이 *.sh 전역 규칙에 삼켜지지 않게)
 !.claude/skills/**/*.sh
-# 설치 스크립트만 추적한다. backlog/의 실행 도구(night-launchd.sh·preflight.sh)는
-# 각자 커스텀하는 로컬 워크플로우라 *.sh 전역 규칙에 그대로 둔다.
+# 야간 automation 부속도 추적 (orca --precheck 가 참조 — 사라지면 밤이 조용히 깨진다)
+!.claude/vault/backlog/*.sh
 !.claude/vault/night-*.sh
 docs/homepage_legacy/
 
@@ -144,23 +144,21 @@ lab/
 # 실험 뷰어 생성물 (viewer.mjs가 만드는 로컬 전용 인덱스)
 research/experiments/_viewer.html
 
-# 밤 러너 — git으로 나누는 것은 리포트(.claude/vault/backlog/reports/), 공유 inbox
-# (.claude/vault/inbox/<actor>.md — 각자 자기 파일에만 쓴다), 설치 문서, 그리고 밤이
-# 만든 수리 branch 뿐이다. 티켓·수확·판정은 여전히 그 컴퓨터의 것이다.
+# 밤 러너 — git으로 나누는 것은 계약·실행 도구·설치 문서, 공유 inbox
+# (.claude/vault/inbox/<actor>.md — 각자 자기 파일에만 쓴다), 사람 보고서
+# (runs/<actor>/<run_id>/report.html), 그리고 밤이 만든 수리 branch 뿐이다.
 .claude/vault/_INBOX.md
 .claude/vault/_archive/
 .claude/vault/backlog/sweep/
 .claude/vault/backlog/tickets/
-/runs/
 /feedback/
 
-# 로컬 워크플로우 — 계약과 실행 도구는 머신마다 따로 커스텀한다(2026-08-19 오너 결정).
-# 실행 도구 중 *.sh(night-launchd.sh·preflight.sh)는 위쪽 *.sh 전역 규칙이 맡는다.
-.claude/vault/backlog/_NIGHT.md
-.claude/vault/backlog/harvest.py
-.claude/vault/backlog/night-runtime.py
-.claude/vault/backlog/night-review-server.py
-.claude/vault/backlog/provider-gate.py
+# runs/ 는 사람 보고서 하나만 공유한다 (2026-08-19 오너 결정).
+# sessions/ 에는 harvest 가 긁은 사람 발화가 들어가고 saves/·manifest 는 기계 기록이라
+# 전부 로컬로 남긴다. 경로에 actor 와 run_id 가 들어가 merge 충돌은 나지 않는다.
+/runs/**
+!/runs/**/
+!/runs/*/*/report.html
 
 # 밤 입력 snapshot은 로컬 검증용 immutable binding이다.
 # 사람용 archive와 consumption manifest는 `_archive/inbox/`에 따로 추적한다.
