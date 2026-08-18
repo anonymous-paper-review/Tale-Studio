@@ -7,7 +7,7 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   exit 1
 }
 RUNNER="$PROJECT_ROOT/.claude/vault/backlog/night-launchd.sh"
-ACTOR_ID="${NIGHT_ACTOR_ID:-friend}"
+ACTOR_ID="${NIGHT_ACTOR_ID:-hs}"
 HOUR="${NIGHT_HOUR:-1}"
 MINUTE="${NIGHT_MINUTE:-30}"
 REVIEW_PORT="${NIGHT_REVIEW_PORT:-8377}"

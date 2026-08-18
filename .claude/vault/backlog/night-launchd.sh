@@ -8,10 +8,10 @@
 #   sh night-launchd.sh review-server  # 127.0.0.1 리뷰 서버 (HTML 버튼 → feedback 기록)
 #
 # 환경변수:
-#   NIGHT_ACTOR_ID     실행 주체 (기본 owner; 친구 머신은 friend)
+#   NIGHT_ACTOR_ID     실행 주체 (기본 jh; 친구 머신은 hs)
 #   NIGHT_REVIEW_PORT  리뷰 서버 포트 (기본 8377)
 #
-# 밤 실행은 이 checkout의 _INBOX.md와 이 머신의 세션만 읽는다. 원격 동기화는 없다.
+# 밤 실행은 공유 inbox의 메모와 이 머신의 세션을 읽는다. inbox 동기화 실패는 기록 후 계속한다.
 # dry-run은 임시 상태 디렉터리를 쓰므로 진짜 밤 claim과 충돌하지 않는다.
 set -eu
 
@@ -22,7 +22,7 @@ CONTRACT="$SCRIPT_DIR/_NIGHT.md"
 REVIEW_SERVER="$SCRIPT_DIR/night-review-server.py"
 MODE="${1:-run}"
 
-ACTOR="${NIGHT_ACTOR_ID:-owner}"
+ACTOR="${NIGHT_ACTOR_ID:-jh}"
 REVIEW_PORT="${NIGHT_REVIEW_PORT:-8377}"
 
 case "$ACTOR" in

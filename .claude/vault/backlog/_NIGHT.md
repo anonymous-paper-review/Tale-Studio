@@ -58,7 +58,7 @@
 실행마다 다음 값을 먼저 만든다.
 
 - `run_id`: provider gate가 발급한 `night-YYYY-MM-DD-<uuid>` 실행 식별자.
-- `actor_id`: `NIGHT_ACTOR_ID`가 정한 실행 주체(`owner`/`friend`). 로컬 결과 경로
+- `actor_id`: `NIGHT_ACTOR_ID`가 정한 실행 주체(`jh`/`hs`). 로컬 결과 경로
   `runs/<actor>/<run_id>/`·`feedback/<actor>/<run_id>/`와, 공유되는 유일한 이름인
   수리 worktree branch `night/<actor>/<run_id>/<unit-id>`에 들어간다.
 - `contract_id`, `contract_version`, 이 문서의 정규화된 해시.
@@ -73,7 +73,7 @@
 한 번에 고정한다. 스냅샷 도구는 inbox 파일을 수정하지 않고, 출력 JSON의 `snapshot_id`와
 `snapshot_fingerprint`를 이후 명령에 그대로 전달한다.
 
-owner와 friend는 각자 자기 컴퓨터에서 이 계약을 실행한다. 두 사람이 git으로 나누는 것은
+jh와 hs는 각자 자기 컴퓨터에서 이 계약을 실행한다. 두 사람이 git으로 나누는 것은
 둘이다: **코드**(계약·도구와 밤이 만든 수리 branch `night/<actor>/<run_id>/<unit-id>`)와
 **메모**(`.claude/vault/inbox/` — 사람마다 자기 파일 `inbox/<actor>.md` 하나, 자기 파일에만
 쓴다. 파일이 갈라져 있어 git 충돌이 나지 않는다).
@@ -85,14 +85,14 @@ owner와 friend는 각자 자기 컴퓨터에서 이 계약을 실행한다. 두
 손으로 보내려면 `sh night-launchd.sh push-inbox`. 소비 책임은 자기 메모 파일에만
 있고, 상대 메모는 읽기 전용 참고 입력이다(§4.0). 리포트·티켓·피드백·세션 수확은 자기
 디스크의 로컬 상태로 남아 git에 올라가지 않으며, 리포트는 자기 아침과 자기 다음 실행만
-소비한다. branch 이름의 `NIGHT_ACTOR_ID`(기본 `owner`)는 어느 컴퓨터의 밤이 만든 수리인지
+소비한다. branch 이름의 `NIGHT_ACTOR_ID`(기본 `jh`)는 어느 컴퓨터의 밤이 만든 수리인지
 구분한다.
 
 ```sh
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 cd "$PROJECT_ROOT"
 GATE="$PROJECT_ROOT/.claude/vault/backlog/provider-gate.py"
-NIGHT_ACTOR="${NIGHT_ACTOR_ID:-owner}"
+NIGHT_ACTOR="${NIGHT_ACTOR_ID:-jh}"
 # 스케줄러(Orca 또는 launchd 진입점 night-launchd.sh)가 이 계약 시작 전에
 # `primary sweep`을 정확히 한 번 만든다. 여기서 primary를 다시 부르지 않고
 # 필수 claim을 조회·검증만 한다.
@@ -496,7 +496,7 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 
 - 기계 보고서: 실행 상태, 단위별 한 줄 결과, 수용 기준, 지출 합계, 막힘·복구 사유, `reviewed_merge_rate`, 자가/사람 머지 수.
 - 사람 보고서: 맥락 → 해석 → 분해 → 수용 기준 → 결과 → 다음 질문 순서의 결과 카드. 상세 로그는 접고 경로만 연결한다.
-- 사람 보고서의 각 카드에는 입력 출처(어느 메모 파일인지 — `inbox/owner.md`/`inbox/friend.md` —, 자기 harvest, 자기 feedback),
+- 사람 보고서의 각 카드에는 입력 출처(어느 메모 파일인지 — `inbox/jh.md`/`inbox/hs.md` —, 자기 harvest, 자기 feedback),
   snapshot ID·fingerprint, 관련 티켓·코드 파일:줄 또는 세션 ID를 표시한다.
   로컬 절대경로와 세션 원문은 넣지 않는다 — 상대 컴퓨터에서도 열리는 상대 경로만.
 
@@ -534,6 +534,11 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 이 문서를 고쳐야 할 때는 변경 이유, 영향받는 분해 기준, 이전 계약 해시, 새 계약 해시를 기록한다. 밤 실행은 항상 이 문서 하나를 정본으로 사용한다.
 
 ## 15. 계약 개정 기록
+
+- 2026-08-18 (15차) · 이전 계약 해시 `35826e690c9646b4f0efc40d64f4d2c90ffc4152a78dce13796b631bcc4b43c0` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — actor 이름을 역할명(owner/friend) 대신 실제 사용자 이름(jh/hs)으로 쓴다.
+  - 변경 내용: 공유 inbox를 `inbox/jh.md`·`inbox/hs.md`로 이름 변경하고, 기본 actor를 오너 머신 `jh`, 친구 설치 `hs`로 맞췄다. 로컬 결과·feedback·수리 branch의 actor namespace도 같은 값을 쓴다.
+  - 영향받는 분해 기준: 없음 — 이름만 바뀌고 소비·공유·동기화 규칙은 같다.
 
 - 2026-08-18 (14차) · 이전 계약 해시 `084ae665d956edba5d5537bd86055a17ee8fb9de1cd967908c3afbc278340839` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — 메모만은 서로 보이게 한다. 단일 `_INBOX.md`를 섹션으로 나누는 방식은 8/18 새벽을 죽인 같은-파일 병합 충돌로 돌아가므로, 파일을 사람별로 갈라 충돌 자체를 없앤다.

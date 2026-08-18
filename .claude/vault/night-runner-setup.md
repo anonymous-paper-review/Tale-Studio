@@ -36,10 +36,10 @@ script가 하는 일:
 - LaunchAgent 3개 등록: 밤 실행(01:30), 리뷰 서버(상시), 아침 보고서 열기(08:30)
 - 마지막에 `dry-run`을 돌려 6단계 검증 — `DRY-RUN PASS`가 나와야 설치 완료
 
-기본 actor는 `friend`다. 다른 값이 필요하면:
+기본 actor는 `hs`다. 다른 값이 필요하면:
 
 ```sh
-NIGHT_ACTOR_ID=owner NIGHT_HOUR=2 sh .claude/vault/night-friend-setup.sh
+NIGHT_ACTOR_ID=jh NIGHT_HOUR=2 sh .claude/vault/night-friend-setup.sh
 ```
 
 설치 없이 검증만 하려면:
