@@ -49,7 +49,11 @@ feedback/<actor>/<run-id>/*.json
 
 - HTML의 `merge`, `reject`, `feedback` 버튼은 현재 actor의 `feedback/<actor>/<run-id>/`에 append-only 이벤트를 쓴다.
 - 버튼을 누른 결과는 자동 commit하지 말고 사용자가 확인 후 push한다.
-- 다음 밤 실행은 자기 feedback과 원격에서 pull한 상대 feedback을 읽는다.
+- 다음 밤 실행은 **자기 actor의 feedback만** 읽어 자기 report와 자기 작업을 이어간다.
+- 상대 actor의 report와 commit은 사람이 읽을 수 있는 참고 자료일 뿐 자동 입력이 아니다.
+  상대 report에 남긴 검토 의견도 상대 실행으로 자동 전달하지 않는다. 상대에게 보낼
+  의견은 상대 actor를 명시한 별도 review 기록으로 남기고, 상대가 직접 가져가기로
+  결정한 경우에만 그 actor의 inbox에 다시 적는다.
 - 중앙 서버는 만들지 않는다. 두 사람이 버튼 결과를 실시간으로 서로 봐야 한다는 요구가 생길 때만 별도 설계한다.
 
 ## 실행 프로필
