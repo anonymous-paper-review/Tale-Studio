@@ -11,6 +11,7 @@ import sys
 import uuid
 
 UTC = dt.timezone.utc
+KST = dt.timezone(dt.timedelta(hours=9))  # 날짜·시각 표기 기준 (2026-08-19 오너 결정)
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 INBOX_DEFAULT = os.path.join(ROOT, ".claude", "vault", "inbox", "jh.md")
 CONTRACT_DEFAULT = os.path.join(ROOT, ".claude", "vault", "backlog", "_NIGHT.md")
@@ -59,12 +60,14 @@ def contract_hash(path):
 
 def parse_read_time(value):
     if value is None:
-        return dt.datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        return dt.datetime.now(KST).isoformat(timespec="milliseconds")
     normalized = value.replace("Z", "+00:00")
     parsed = dt.datetime.fromisoformat(normalized)
     if parsed.tzinfo is None:
         raise ValueError("read-time에 시간대가 없다")
-    return parsed.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    # 입력이 Z(UTC)여도 기록은 KST 표기로 정규화한다. 같은 순간을 가리키는 값이라
+    # 시각 비교에는 영향이 없고, 사람이 읽는 기록만 KST 로 통일된다.
+    return parsed.astimezone(KST).isoformat(timespec="milliseconds")
 
 
 def snapshot_path(out_dir, fingerprint):

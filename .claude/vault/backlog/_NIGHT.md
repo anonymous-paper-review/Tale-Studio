@@ -62,7 +62,7 @@
   `runs/<actor>/<run_id>/`·`feedback/<actor>/<run_id>/`와, 공유되는 유일한 이름인
   수리 worktree branch `night/<actor>/<run_id>/<unit-id>`에 들어간다.
 - `contract_id`, `contract_version`, 이 문서의 정규화된 해시.
-- 시작 시각과 기준 시각(UTC), 실행 주체(`claude` 또는 `codex`), 작업 루트.
+- 시작 시각과 기준 시각(KST), 실행 주체(`claude` 또는 `codex`), 작업 루트.
 - 읽기 전용 입력 목록, 격리 작업 사본 목록, 결과 보고서 경로.
 
 이 값은 실행 기록과 모든 결과 카드에 이어 붙인다. 실행 중 계약 문서를 다시 읽어 규칙을 바꾸지 않는다. 계약 해시나 필수 입력이 서로 다르면 추측하지 말고 `contract-mismatch`로 진단·기록한 뒤 해당 실행을 시작하지 않는다.
@@ -534,6 +534,11 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 이 문서를 고쳐야 할 때는 변경 이유, 영향받는 분해 기준, 이전 계약 해시, 새 계약 해시를 기록한다. 밤 실행은 항상 이 문서 하나를 정본으로 사용한다.
 
 ## 15. 계약 개정 기록
+
+- 2026-08-19 (16차) · 이전 계약 해시 `68bcf07452deecf5c1bf1828c4e35b850e7b6e067854d2fbe03cdada76e236e5` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — 날짜·시각 기준을 KST 하나로 통일한다. 8/19 첫 실행에서 `run_id`가 UTC 날짜로 발급돼 01:30 KST 실행의 결과 디렉터리가 `night-2026-08-18-…`로 하루 밀린 것이 계기다(`claim_date`는 KST라 두 값이 어긋났다).
+  - 변경 내용: (1) §2의 기준 시각 표기를 UTC에서 KST로 고쳤다. (2) `provider-gate.py`의 `run_id` 날짜를 `current_claim_date()`(KST)로 바꿔 `claim_date`와 같은 기준을 쓰게 했고, `state_paths`의 중복 KST 리터럴도 같은 함수로 합쳤다. (3) `harvest.py`의 sweep 디렉터리 날짜(`_output_root`)·`generated_for`·`generated_at`·`completed_at`·도장 주석·드라이런 표를 KST 표기로 바꿨다. (4) `night-runtime.py`의 `read_time`과 `night-review-server.py`의 `created_at`을 KST 표기로 바꿨다.
+  - 영향받는 분해 기준: 없음. epoch 값(lease·도장·수확 창)은 타임존과 무관한 절대 시각이라 그대로 두었고, 비교·만료 계산은 바뀌지 않는다. 식별자와 파일명에는 `%z`(`+0900`)가 run_id 정규식을 깨므로 `KST` 리터럴을 쓴다.
 
 - 2026-08-18 (15차) · 이전 계약 해시 `35826e690c9646b4f0efc40d64f4d2c90ffc4152a78dce13796b631bcc4b43c0` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — actor 이름을 역할명(owner/friend) 대신 실제 사용자 이름(jh/hs)으로 쓴다.

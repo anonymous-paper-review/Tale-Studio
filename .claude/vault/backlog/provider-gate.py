@@ -33,7 +33,7 @@ def now_epoch():
 
 
 def iso_now(epoch=None):
-    return dt.datetime.fromtimestamp(now_epoch() if epoch is None else epoch, UTC).isoformat(timespec="seconds")
+    return dt.datetime.fromtimestamp(now_epoch() if epoch is None else epoch, KST).isoformat(timespec="seconds")
 
 
 def current_claim_date():
@@ -79,8 +79,7 @@ def state_paths(args, claim_date=None):
         args.state_dir or os.environ.get("ORCA_PROVIDER_GATE_STATE_DIR", os.path.join(
             os.path.expanduser("~"), "Library", "Application Support", "orca",
             "automation-provider-gate")))))
-    date = claim_date or dt.datetime.now(
-        dt.timezone(dt.timedelta(hours=9))).strftime("%Y-%m-%d")
+    date = claim_date or current_claim_date()
     state_file = os.path.join(state_dir, f"{args.job}-{date}.json")
     return state_dir, state_file, state_file + ".lock", os.path.join(
         state_dir, f"{args.job}.lock")
@@ -278,7 +277,9 @@ def new_claim(job, provider, run_id, contract_hash, fencing, seconds, claim_date
 
 def primary(args):
     contract_hash = requested_contract_hash(args)
-    run_id = args.run_id or f"night-{dt.datetime.now(UTC):%Y-%m-%d}-{uuid.uuid4().hex}"
+    # run_id 날짜는 claim_date 와 같은 KST 기준이어야 한다. UTC 를 쓰면 01:30 KST 실행이
+    # 전날 날짜로 발급돼 runs/<actor>/<run_id>/ 가 하루 밀린다 (2026-08-19 실측).
+    run_id = args.run_id or f"night-{current_claim_date()}-{uuid.uuid4().hex}"
     check_run_id(run_id)
     claim_date = current_claim_date()
     state_dir, state_file, lock_file, global_lock_file = state_paths(args, claim_date)
