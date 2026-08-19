@@ -1,0 +1,32 @@
+[
+  {
+    "created_at": "2026-08-19T07:14:42.918946Z",
+    "display_name": "GPT Image 2",
+    "id": "b672fda8-fe22-40f1-a3fc-a1f331715a7e",
+    "job_type": "gpt_image_2",
+    "min_result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260819_071442_b672fda8-fe22-40f1-a3fc-a1f331715a7e_min.webp",
+    "params": {
+      "aspect_ratio": "1:1",
+      "height": 1024,
+      "medias": [
+        {
+          "data": {
+            "id": "82fed9fe-d685-49c2-b80b-88edd95a4a84",
+            "type": "media_input",
+            "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/82fed9fe-d685-49c2-b80b-88edd95a4a84.png"
+          },
+          "role": "image"
+        }
+      ],
+      "model": "videotape-alpha",
+      "prompt": "Preserve the exact simple flat vector mascot design from the reference: white circular face, thin violet outline, two dark oval eyes with tiny white highlights, small curved smile, subtle violet cheek blush. Create a clean idle frame with a gentle smile and both eyes open. Transparent or plain white background, centered, no text, no 3D rendering.",
+      "quality": "medium",
+      "reference_elements": [],
+      "remove_bg": false,
+      "resolution": "1k",
+      "width": 1024
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260819_071442_b672fda8-fe22-40f1-a3fc-a1f331715a7e.png",
+    "status": "completed"
+  }
+]

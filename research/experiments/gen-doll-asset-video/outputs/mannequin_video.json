@@ -1,0 +1,41 @@
+[
+  {
+    "created_at": "2026-08-19T07:03:23.625963Z",
+    "display_name": "Seedance 2.5",
+    "id": "3bbf7ffb-125a-4dea-992a-a6c89a61a3ea",
+    "job_type": "seedance_2_5",
+    "min_result_url": null,
+    "params": {
+      "aspect_ratio": "16:9",
+      "bitrate_mode": "standard",
+      "duration": 5,
+      "extension_mode": null,
+      "generate_audio": false,
+      "genre": "auto",
+      "height": 720,
+      "medias": [
+        {
+          "data": {
+            "id": "638b83fb-adcd-4570-ac36-449fdbb63103",
+            "type": "media_input",
+            "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/638b83fb-adcd-4570-ac36-449fdbb63103_resize.jpg"
+          },
+          "role": "start_image"
+        }
+      ],
+      "model": "default",
+      "multi_prompt": [],
+      "multi_shot_mode": "custom",
+      "multi_shots": false,
+      "prompt": "A wooden artist mannequin makes one clear slow pose change: it raises its right arm and turns its blank head slightly toward camera. Keep the entire wooden mannequin, joints, blank featureless head, studio background, and lighting consistent. No face, no clothing, no extra objects. Locked camera.",
+      "prompt_language": "en",
+      "reference_elements": [],
+      "resolution": "720p",
+      "speedramp": "auto",
+      "width": 1280
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260819_070323_3bbf7ffb-125a-4dea-992a-a6c89a61a3ea.mp4",
+    "status": "completed",
+    "thumbnail_url": "https://cdn.higgsfield.ai/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260819_070323_3bbf7ffb-125a-4dea-992a-a6c89a61a3ea_thumbnail.webp"
+  }
+]
