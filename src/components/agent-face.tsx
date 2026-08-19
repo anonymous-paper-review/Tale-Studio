@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 
 type Expression = 'idle' | 'thinking' | 'talking' | 'happy'
 
@@ -11,6 +12,13 @@ interface AgentFaceProps {
   name?: string
   /** false면 깜빡임/말하기 애니메이션을 끄고 정적 얼굴로 렌더(리스트에 다수 렌더 시 성능/시각 안정). */
   animate?: boolean
+}
+
+const GENERATED_FACE_ASSET: Record<Expression, string> = {
+  idle: '/agent-face/idle.png',
+  thinking: '/agent-face/thinking.png',
+  talking: '/agent-face/working.png',
+  happy: '/agent-face/idle.png',
 }
 
 export function AgentFace({
@@ -89,11 +97,21 @@ export function AgentFace({
   return (
     <div className="flex flex-col items-center gap-1">
       <div className="relative" style={{ width: size, height: size }}>
+        <Image
+          src={GENERATED_FACE_ASSET[expression]}
+          alt=""
+          width={size}
+          height={size}
+          className={`h-full w-full rounded-full object-cover drop-shadow-md ${
+            animate ? 'agent-face-generated-motion' : ''
+          }`}
+        />
         <svg
           viewBox="0 0 48 48"
           width={size}
           height={size}
-          className="drop-shadow-md"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-0"
           style={{ color }}
         >
           {/* White face circle */}
