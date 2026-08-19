@@ -174,8 +174,7 @@ def state_paths(args, claim_date=None):
         args.state_dir or os.environ.get("ORCA_PROVIDER_GATE_STATE_DIR", os.path.join(
             os.path.expanduser("~"), "Library", "Application Support", "orca",
             "automation-provider-gate")))))
-    date = claim_date or dt.datetime.now(
-        dt.timezone(dt.timedelta(hours=9))).strftime("%Y-%m-%d")
+    date = claim_date or current_claim_date()
     state_file = os.path.join(state_dir, f"{args.job}-{date}.json")
     return state_dir, state_file, state_file + ".lock", os.path.join(
         state_dir, f"{args.job}.lock")
@@ -718,7 +717,7 @@ def primary(args):
     check_actor(args.actor)
     contract_hash = requested_contract_hash(args)
     project_root = canonical_directory(args.project_root, "project-root")
-    run_id = args.run_id or f"night-{dt.datetime.now(UTC):%Y-%m-%d}-{uuid.uuid4().hex}"
+    run_id = args.run_id or f"night-{current_claim_date()}-{uuid.uuid4().hex}"
     check_run_id(run_id)
     claim_date = current_claim_date()
     state_dir, state_file, lock_file, global_lock_file = state_paths(args, claim_date)

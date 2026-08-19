@@ -166,6 +166,32 @@ sys.exit(1 if n > 1 else 0)
     expect(result.stderr).toContain('같은 KST 날짜')
   })
 
+  it('자동 발급 run_id의 날짜가 claim_date와 같은 KST 기준이다', () => {
+    const project = realpathSync(mkdtempSync(join(tmpdir(), 'vault-provider-gate-')))
+    workspaces.push(project)
+    const state = join(project, 'state')
+    const contract = join(project, 'contract.md')
+    writeFileSync(contract, 'contract\n')
+    const claimed = run(project, ['primary', 'sweep', '--state-dir', state, '--contract-path', contract,
+      '--project-root', project, '--actor', 'jh', '--probe-command', 'false', '--preflight', 'false'])
+    expect(claimed.status).toBe(0)
+    const claim = JSON.parse(claimed.stdout) as { run_id: string, state_path: string }
+    const saved = JSON.parse(readFileSync(claim.state_path, 'utf8')) as { claim_date: string }
+    // run_id는 `night-<날짜>-<uuid>` 이고, 그 날짜는 claim_date 와 같은 KST 하루여야 한다.
+    // 예전 코드는 run_id 만 UTC 로 찍어 KST 00:00~09:00 실행에서 결과 디렉터리가 하루 밀렸다.
+    expect(claim.run_id.slice(0, 'night-YYYY-MM-DD'.length)).toBe(`night-${saved.claim_date}`)
+    expect(saved.claim_date).toBe(new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10))
+  })
+
+  it('날짜 도장에 UTC 시계를 쓰지 않는다', () => {
+    // 위 테스트는 KST 00:00~09:00 에만 UTC 회귀를 재현한다. 이 검사가 시각과 무관하게 막는다.
+    const source = readFileSync(gate, 'utf8')
+    expect(source).not.toMatch(/now\(UTC\)[^\n]*%Y-%m-%d/)
+    expect(source).not.toMatch(/utcnow\(\)[^\n]*%Y-%m-%d/)
+    // KST 날짜는 current_claim_date() 한 곳에서만 만든다 (중복 리터럴 금지).
+    expect(source.match(/timedelta\(hours=9\)/g) ?? []).toHaveLength(1)
+  })
+
   it('failed primary만 fallback으로 넘긴다', () => {
     const ctx = setup()
     const failed = run(ctx.project, ['complete', 'sweep', 'failed', '--state-dir', ctx.state,
