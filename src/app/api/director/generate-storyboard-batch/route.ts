@@ -19,6 +19,7 @@ import {
 } from '@/lib/director/storyboard-strip'
 import { parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
+import { storageKeySegment } from '@/lib/storage/key-segment'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -130,10 +131,20 @@ export async function POST(req: NextRequest) {
         group.map((s) => s.frames),
         projectFormat,
       )
-      const refPath = `${project.workspace_id}/${projectId}/shots/real_grid_ref_${Date.now()}_${group[0].shot_id}.png`
+      // 결정적 경로 — 같은 시트를 다시 만들면 덮어쓴다.
+      //   옛 키에는 `Date.now()` 가 박혀 있어 upsert 가 무의미했다: 호출마다 새 객체가 생기고
+      //   아무도 지우지 않아 295개 625MB 가 쌓였다(2026-08-19 실측, 버킷의 17.3%). 그중 한 시트는
+      //   38번 재생성돼 38벌이 남아 있었다. 이건 결과물이 아니라 외부 생성 서버에 넘기는
+      //   주문서 첨부물이므로 최신 한 벌만 있으면 된다.
+      //   식별자는 다른 경로와 같은 규약(해시 세그먼트)을 쓴다 — 원시 shot_id 를 그대로 키에
+      //   넣으면 안전한 식별자가 다른 식별자의 이스케이프 형태와 같아질 수 있다.
+      const refPath = `${project.workspace_id}/${projectId}/shots/real_grid_ref_${storageKeySegment(group[0].shot_id)}.png`
       const { error: upErr } = await mediaUpload(refPath, refGrid, { contentType: 'image/png', upsert: true })
       if (upErr) throw upErr
-      const refUrl = mediaPublicUrl(refPath)
+      // 캐시버스트는 **경로가 아니라 쿼리로** — 경로에 넣으면 객체가 늘고, 안 넣으면 덮어쓴
+      //   시트를 중계망이 옛 내용으로 돌려줘 외부 생성 서버가 지난 배치를 그린다.
+      //   단건 스토리보드 라우트가 쓰는 방식과 같다.
+      const refUrl = `${mediaPublicUrl(refPath)}?v=${Date.now()}`
 
       // #real-grid-identity: 이 시트에 실제로 나오는 인물만, 결정적 순서(sort)로 —
       //   "reference image N = 이름" 규약이 성립하려면 순서가 흔들리면 안 된다
