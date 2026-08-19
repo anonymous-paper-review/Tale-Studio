@@ -26,8 +26,10 @@ describe('cycleFrameUrls', () => {
   })
 
   it('frames가 없는 구버전 패널은 단일 주소로 떨어진다', () => {
-    const urls = cycleFrameUrls({ url: START, generatedAt: undefined, frames: undefined })
-    expect(urls).toEqual([START])
+    // generatedAt 은 RoughStoryboardImage 의 필수 필드다 — 없는 상태를 시험하면
+    // 일어날 수 없는 경우를 잠그게 된다. 구버전을 가르는 것은 frames 유무뿐이다.
+    const urls = cycleFrameUrls({ url: START, generatedAt: 1755000000000, frames: undefined })
+    expect(urls).toEqual([`${START}?v=1755000000000`])
   })
 
   it('세 프레임 전부 썸네일 주소가 되고 ?v= 쿼리가 보존된다 (ThumbImage 경유 계약)', () => {
