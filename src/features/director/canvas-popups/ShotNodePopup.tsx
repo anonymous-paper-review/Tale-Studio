@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { HoverBeam } from '@/components/hover-beam'
 import { Separator } from '@/components/ui/separator'
+import { ThumbImage } from '@/components/thumb-image'
 import { cn } from '@/lib/utils'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { DebugPromptTrace } from '@/components/debug-prompt-trace'
@@ -216,12 +217,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                   key={img.id}
                   className="group relative h-16 w-16 overflow-hidden rounded-md border border-border"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={img.url}
-                    alt="ref"
-                    className="h-full w-full object-cover"
-                  />
+                  <ThumbImage src={img.url} alt="ref" className="h-full w-full object-cover" />
                   <button
                     type="button"
                     onClick={() => handleRemoveRef(img.id)}

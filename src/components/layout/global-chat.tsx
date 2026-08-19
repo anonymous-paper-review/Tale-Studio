@@ -36,6 +36,7 @@ import { useDirectorCanvasStore } from '@/stores/director-store'
 import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
 import { HoverBeam } from '@/components/hover-beam'
+import { ThumbImage } from '@/components/thumb-image'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
 import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
@@ -1135,11 +1136,10 @@ export function GlobalChat() {
                           {urls.length > 0 && (
                             <div className="mb-1.5 flex flex-wrap justify-end gap-1">
                               {urls.map((url) => (
-                                <img
+                                <ThumbImage
                                   key={url}
                                   src={url}
                                   alt="첨부 이미지"
-                                  loading="lazy"
                                   // 세로로 긴 웹툰이 말풍선을 밀어내지 않도록 정사각 크롭.
                                   className="size-10 rounded-md border border-chat-user-bubble-foreground/15 object-cover"
                                 />

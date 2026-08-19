@@ -5,6 +5,7 @@ import { Bookmark, Film, Images, Loader2, Trash2, Upload, X } from 'lucide-react
 import { Button } from '@/components/ui/button'
 import { HoverBeam } from '@/components/hover-beam'
 import { Input } from '@/components/ui/input'
+import { ThumbImage } from '@/components/thumb-image'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
@@ -213,12 +214,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
                 key={img.id}
                 className="group relative h-16 w-16 overflow-hidden rounded-md border border-border"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={img.url}
-                  alt="ref"
-                  className="h-full w-full object-cover"
-                />
+                <ThumbImage src={img.url} alt="ref" className="h-full w-full object-cover" />
                 <button
                   type="button"
                   onClick={() => handleRemoveRef(img.id)}

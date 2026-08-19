@@ -4,6 +4,7 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
+import { ThumbImage } from '@/components/thumb-image'
 import { cn } from '@/lib/utils'
 
 /** Writer 러프/Director Storyboard가 공유하는 카드 축척 범위. */
@@ -221,7 +222,8 @@ function ActiveOverlay({
 /**
  * 생성 완료된 이미지의 blur-up reveal.
  * placeholder → 선명 이미지로 fade + 디블러 (Runway "frame breathes").
- * next/image 미사용 — 외부 storage URL 직접 렌더라 plain img 유지.
+ * 썸네일 치환은 ThumbImage 가 담당(썸네일 없으면 404 → 원본 폴백). 폴백 시 onLoad 가
+ * 두 번 불릴 수 있지만 loaded 는 한 방향으로만 바뀐다 — 흐림 해제가 유지되므로 무해.
  */
 export function GeneratedImage({
   src,
@@ -235,12 +237,9 @@ export function GeneratedImage({
   const [loaded, setLoaded] = useState(false)
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <ThumbImage
       src={src}
       alt={alt}
-      loading="lazy"
-      decoding="async"
       onLoad={() => setLoaded(true)}
       className={cn(
         'transition-[filter,opacity,transform] duration-500 ease-out',

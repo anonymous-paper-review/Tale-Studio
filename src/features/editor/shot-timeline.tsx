@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import type { Shot, VideoClip } from '@/types'
 import { cn } from '@/lib/utils'
 import { thumbUrl } from '@/lib/image-url'
+import { ThumbImage } from '@/components/thumb-image'
 
 interface ShotTimelineProps {
   orderedShotIds: string[]
@@ -123,7 +124,7 @@ export function ShotTimeline({
                   preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'}
                 />
               ) : shot.referenceImageUrl ? (
-                <img
+                <ThumbImage
                   src={shot.referenceImageUrl}
                   alt={shot.shotType}
                   className="h-full w-full rounded object-cover"

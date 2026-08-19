@@ -15,6 +15,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { ThumbImage } from '@/components/thumb-image'
 import type { PreviewCharacter, PreviewWorld } from '@/lib/writer/use-writer-preview'
 
 const ROLE_LABEL: Record<string, string> = {
@@ -52,8 +53,7 @@ function CharacterCard({
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-md bg-muted">
         {cardImage ? (
-          // eslint-disable-next-line @next/next/no-img-element -- 원격 초안 이미지, 최적화 불필요(프리뷰)
-          <img
+          <ThumbImage
             src={cardImage}
             alt={character.name}
             className="animate-in fade-in zoom-in-95 size-full object-cover duration-500"

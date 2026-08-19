@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import type { StyleAnchor } from '@/stores/producer-store'
 import { cn } from '@/lib/utils'
+import { ThumbImage } from '@/components/thumb-image'
 
 // medium 슬러그(2d_cartoon 등)를 표시용으로 정리 — 언더바 제거 + 단어별 대문자, 2d/3d는 통째 대문자.
 //   예) 2d_cartoon → "2D Cartoon", live_action → "Live Action", 3d → "3D".
@@ -42,11 +43,9 @@ function StyleAnchorCardBody({ anchor, active }: { anchor: StyleAnchor; active: 
           정사각 원본을 그대로 보여준다. 프리뷰 없으면 플레이스홀더 폴백. */}
       <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted">
         {anchor.previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <ThumbImage
             src={anchor.previewUrl}
             alt={anchor.label}
-            loading="lazy"
             className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (

@@ -872,12 +872,23 @@ async function finalizeStoryboardStripJob(
   } else {
     ;[frames] = await cropRoughGridFrames(stripBuf, 'strip1', 1, sheetFmt)
   }
+  // 경로를 변수로 뽑아 원본 업로드와 썸네일 생성이 **같은 문자열**을 쓴다 — 문자열을 두 번
+  //   쓰면 오타 하나로 짝이 어긋나고, 404 폴백 때문에 조용히 원본이 나간다(#thumb-pipeline).
+  const startPath = `${base}/${seg}_storyboard_start.png`
+  const directionPath = `${base}/${seg}_storyboard_direction.png`
+  const endPath = `${base}/${seg}_storyboard_end.png`
   const [startUrl, directionUrl, endUrl] = await Promise.all([
-    upload(`${base}/${seg}_storyboard_start.png`, frames.start),
-    upload(`${base}/${seg}_storyboard_direction.png`, frames.direction),
-    upload(`${base}/${seg}_storyboard_end.png`, frames.end),
+    upload(startPath, frames.start),
+    upload(directionPath, frames.direction),
+    upload(endPath, frames.end),
   ])
-  await uploadThumbnail(`${base}/${seg}_storyboard_start.png`, frames.start)
+  // 3프레임 모두 썸네일 — 화면(RoughFrameCycle)이 3장을 동시에 마운트한다. start 만 만들면
+  //   나머지 2장은 영원히 원본 폴백(2026-07-17~08-12 의 30% 생성률이 정확히 이 모양이었다).
+  await Promise.all([
+    uploadThumbnail(startPath, frames.start),
+    uploadThumbnail(directionPath, frames.direction),
+    uploadThumbnail(endPath, frames.end),
+  ])
 
   const { error } = await supabaseAdmin
     .from('shots')
@@ -992,12 +1003,20 @@ async function finalizeRealGridJob(
     const shotId = writerShotIds[i]
     const seg = storageKeySegment(shotId)
     const frames = perShot[i]
+    // 업로드·썸네일이 같은 경로 문자열을 공유 + 3프레임 전부 생성 (#thumb-pipeline — 위 strip 경로와 동일 규칙).
+    const startPath = `${base}/${seg}_storyboard_start.png`
+    const directionPath = `${base}/${seg}_storyboard_direction.png`
+    const endPath = `${base}/${seg}_storyboard_end.png`
     const [startUrl, directionUrl, endUrl] = await Promise.all([
-      upload(`${base}/${seg}_storyboard_start.png`, frames.start),
-      upload(`${base}/${seg}_storyboard_direction.png`, frames.direction),
-      upload(`${base}/${seg}_storyboard_end.png`, frames.end),
+      upload(startPath, frames.start),
+      upload(directionPath, frames.direction),
+      upload(endPath, frames.end),
     ])
-    await uploadThumbnail(`${base}/${seg}_storyboard_start.png`, frames.start)
+    await Promise.all([
+      uploadThumbnail(startPath, frames.start),
+      uploadThumbnail(directionPath, frames.direction),
+      uploadThumbnail(endPath, frames.end),
+    ])
 
     const { error } = await supabaseAdmin
       .from('shots')
@@ -1063,12 +1082,20 @@ async function finalizeRoughGridJob(
     const shotId = writerShotIds[i]
     const seg = storageKeySegment(shotId)
     const frames = perShot[i]
+    // 업로드·썸네일이 같은 경로 문자열을 공유 + 3프레임 전부 생성 (#thumb-pipeline — storyboard 경로와 동일 규칙).
+    const startPath = `${base}/${seg}_rough_start.png`
+    const directionPath = `${base}/${seg}_rough_direction.png`
+    const endPath = `${base}/${seg}_rough_end.png`
     const [startUrl, directionUrl, endUrl] = await Promise.all([
-      upload(`${base}/${seg}_rough_start.png`, frames.start),
-      upload(`${base}/${seg}_rough_direction.png`, frames.direction),
-      upload(`${base}/${seg}_rough_end.png`, frames.end),
+      upload(startPath, frames.start),
+      upload(directionPath, frames.direction),
+      upload(endPath, frames.end),
     ])
-    await uploadThumbnail(`${base}/${seg}_rough_start.png`, frames.start)
+    await Promise.all([
+      uploadThumbnail(startPath, frames.start),
+      uploadThumbnail(directionPath, frames.direction),
+      uploadThumbnail(endPath, frames.end),
+    ])
 
     const { error } = await supabaseAdmin
       .from('shots')

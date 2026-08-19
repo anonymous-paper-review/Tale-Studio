@@ -8,6 +8,11 @@
 
 import { mediaPathFromUrl } from '@/lib/storage/media-url'
 
+/** 이미 썸네일인 파일 — 우리가 만든 _thumb.webp, 영상 썸네일(_thumbnail.jpg 등).
+ *  scripts/backfill-thumbnails.mjs 의 isAlreadyThumb 와 같은 규칙. 여기서 치환하면
+ *  존재하지 않는 *_thumbnail_thumb.webp 를 매번 404 로 두드린다(영상 poster 류). */
+const ALREADY_THUMB = /(_thumb\.webp|_thumbnail\.(png|jpe?g|webp))$/i
+
 /**
  * 원본 public URL 의 확장자를 _thumb.webp 로 치환. 우리 media 버킷 주소가 아니면 원본 그대로.
  *
@@ -17,6 +22,7 @@ import { mediaPathFromUrl } from '@/lib/storage/media-url'
 export function toThumbUrl(url: string): string {
   const [base, query] = url.split('?')
   if (!mediaPathFromUrl(base)) return url
+  if (ALREADY_THUMB.test(base)) return url
   const slash = base.lastIndexOf('/')
   const dot = base.lastIndexOf('.')
   if (dot <= slash) return url // 파일명에 확장자 없음 → 그대로

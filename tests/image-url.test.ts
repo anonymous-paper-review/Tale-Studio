@@ -31,6 +31,17 @@ describe('toThumbUrl', () => {
     const u = mediaPublicUrl('proj/folder')
     expect(toThumbUrl(u)).toBe(u)
   })
+
+  it('이미 썸네일인 파일은 재치환하지 않는다 (_thumb.webp / 영상 _thumbnail.jpg)', () => {
+    // 영상 poster 류를 GeneratedImage(ThumbImage)로 그릴 때, 존재하지 않는
+    // *_thumbnail_thumb.webp 를 매번 404 로 두드리는 낭비를 막는다.
+    const already = mediaPublicUrl('proj/a_thumb.webp')
+    expect(toThumbUrl(already)).toBe(already)
+    const video = mediaPublicUrl('proj/clip_thumbnail.jpg')
+    expect(toThumbUrl(video)).toBe(video)
+    const videoQ = `${mediaPublicUrl('proj/clip_thumbnail.png')}?v=3`
+    expect(toThumbUrl(videoQ)).toBe(videoQ)
+  })
 })
 
 describe('thumbUrl', () => {

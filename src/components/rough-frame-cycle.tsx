@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { Pause } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { ThumbImage } from '@/components/thumb-image'
 import type { RoughStoryboardImage } from '@/types/shot'
 
 // 재생성 즉시 반영: 스토리지 url 은 같은 경로 덮어쓰기(upsert)라 URL 이 동일 → 브라우저/CDN 캐시 잔상이 남는다.
@@ -13,6 +14,18 @@ import type { RoughStoryboardImage } from '@/types/shot'
 export function withCacheBust(url: string, v?: number): string {
   if (!v) return url
   return `${url}${url.includes('?') ? '&' : '?'}v=${v}`
+}
+
+/** 순환에 쓸 프레임 원본 주소 목록 — frames 있으면 3장, 없으면(구버전 단일 패널) 1장.
+ *  캐시버스트 쿼리는 여기서 붙고, 썸네일 치환은 ThumbImage 내부(thumbUrl)가 담당한다
+ *  (toThumbUrl 이 쿼리를 분리해 확장자만 바꾸므로 ?v= 는 보존된다). 순수 함수 — 테스트 대상. */
+export function cycleFrameUrls(
+  panel: Pick<RoughStoryboardImage, 'url' | 'generatedAt' | 'frames'>,
+): string[] {
+  const f = panel.frames
+  return f
+    ? [f.start, f.direction, f.end].map((u) => withCacheBust(u, panel.generatedAt))
+    : [withCacheBust(panel.url, panel.generatedAt)]
 }
 
 // 3프레임 순환 라벨 — START → DIRECTING(연출 화살표/지시) → END (2026-07-22 라벨 영문 통일).
@@ -46,10 +59,7 @@ export function RoughFrameCycle({
    *  이 모드에선 루트가 in-flow(w-full) 이므로 부모의 absolute 배치 상자가 필요 없다. */
   sizeToImage?: boolean
 }) {
-  const f = panel.frames
-  const urls = f
-    ? [f.start, f.direction, f.end].map((u) => withCacheBust(u, panel.generatedAt))
-    : [withCacheBust(panel.url, panel.generatedAt)]
+  const urls = cycleFrameUrls(panel)
   const [idx, setIdx] = useState(0)
   const [hovering, setHovering] = useState(false)
   const [pinned, setPinned] = useState(false)
@@ -117,10 +127,13 @@ export function RoughFrameCycle({
         setPausedLock((v) => !v)
       }}
     >
-      {/* 프레임 전환 시 로딩 깜빡임 방지 — 3장을 모두 마운트하고 opacity 로 스위치 */}
+      {/* 프레임 전환 시 로딩 깜빡임 방지 — 3장을 모두 마운트하고 opacity 로 스위치.
+          썸네일이면 3장 합쳐 ~45KB 라 동시 마운트와 궁합이 좋다. 각 장이 개별 404 폴백
+          상태를 가져야 하므로 ThumbImage 인스턴스로 난다. sizeToImage 의 비율 측정은
+          썸네일도 원본과 같은 비율이라 값이 같고, 폴백으로 onLoad 가 두 번 불려도
+          같은 값 set 이라 무해. */}
       {urls.map((u, i) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <ThumbImage
           key={u}
           src={u}
           alt={i === current ? alt : ''}
@@ -141,7 +154,6 @@ export function RoughFrameCycle({
             fit === 'contain' && !sizeToImage ? 'object-contain' : 'object-cover',
             i === current ? 'opacity-100' : 'opacity-0',
           )}
-          loading="lazy"
           draggable={false}
         />
       ))}
