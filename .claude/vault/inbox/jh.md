@@ -23,30 +23,37 @@ Single unbroken handheld boyfriend vlog take throughout, 30 seconds total. A rea
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":456,"content_sha256":"dd506af2fac652e9fdd16791ff774ad2399e6f33e469cba178c9d912cc4d09a2","item_id":"6389b5fb1263b8775b3b48868af22d4d62f90f3950caf488cf2a9c762323d77a","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":3994,"start":3538},"state":"tracked","units":["n6-producer-input-rigidity-map"]}
+{"actor":"jh","byte_length":456,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/f2f6d298af5f6b797e1fb3d144a8d81c1a074dd3981a49c2ec6a3cb0f1d76ca8.json","close_proof_sha256":"f2f6d298af5f6b797e1fb3d144a8d81c1a074dd3981a49c2ec6a3cb0f1d76ca8","content_sha256":"dd506af2fac652e9fdd16791ff774ad2399e6f33e469cba178c9d912cc4d09a2","disposition":"completed","item_id":"6389b5fb1263b8775b3b48868af22d4d62f90f3950caf488cf2a9c762323d77a","receipt_id":"6389b5fb1263b877-7a221af8a914e76d","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":3994,"start":3538},"state":"closed","units":["n6-producer-input-rigidity-map"]}
 -->
+<del>
 입력창 좀 더 말랑하게 만들기 (DB나 백엔드가 딱딱하면 됐지 입력이 딱딱할 필요가 있는가?) ->입력은 뭘들어오든 채팅,다양한확장자 클러드가 배쉬 등 다양한 툴로 해석해서 입력받고 그걸 정보화해서 DB에 저장만 잘하고 재사용하면 되지않나? (producer기준으로?) 무조건 이런 입력이면 이렇게 처리해야해! 이런건 너무 딱딱하지 않은? 방식인듯?
+</del>
 <!-- vault-inbox-item:end -->
 
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":144,"content_sha256":"6b68afbdb37cf245bfe2c972f62b57be404743f66a8adc5394884ac7727c642e","item_id":"e9a560fe6451bd442b8d5f7cbd6d9791108b6bf1a8cdb19794d66906c35553db","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":4140,"start":3996},"state":"tracked","units":["n7-project-inheritance-map"]}
+{"actor":"jh","byte_length":144,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/0d4e17595ed6952d1c9de0b2f9c98bfd753658b79964284b96ee8ead5ebaf9fa.json","close_proof_sha256":"0d4e17595ed6952d1c9de0b2f9c98bfd753658b79964284b96ee8ead5ebaf9fa","content_sha256":"6b68afbdb37cf245bfe2c972f62b57be404743f66a8adc5394884ac7727c642e","disposition":"completed","item_id":"e9a560fe6451bd442b8d5f7cbd6d9791108b6bf1a8cdb19794d66906c35553db","receipt_id":"e9a560fe6451bd44-e63202996c86249a","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":4140,"start":3996},"state":"closed","units":["n7-project-inheritance-map"]}
 -->
+<del>
 연속 프로젝트 만들때 다른 프로젝트에서 이전 프로젝트 상속받기(캐릭터, 월드, 이어질 전 이야기(compacted))
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":346,"content_sha256":"b6dcd35944266391eac27661a735761153cf7ab1e354b91f8c6756b15c66b356","item_id":"807462fb58f602ab9698bcc040b0e9b40c934f74cdab21d8bf0a8c68bd0acc65","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":4487,"start":4141},"state":"tracked","units":["n6-producer-input-rigidity-map"]}
+{"actor":"jh","byte_length":346,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/4c6d4b5fd7e8fd49b26f7c768fa1e4523f9bdd28a46ec4b0f2a6ce9c799175cd.json","close_proof_sha256":"4c6d4b5fd7e8fd49b26f7c768fa1e4523f9bdd28a46ec4b0f2a6ce9c799175cd","content_sha256":"b6dcd35944266391eac27661a735761153cf7ab1e354b91f8c6756b15c66b356","disposition":"completed","item_id":"807462fb58f602ab9698bcc040b0e9b40c934f74cdab21d8bf0a8c68bd0acc65","receipt_id":"807462fb58f602ab-9e265d70d45783ad","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":4487,"start":4141},"state":"closed","units":["n6-producer-input-rigidity-map"]}
 -->
+<del>
 우리 시스템으로 뮤직비디오, 광고, 웹툰 실시화, 애니 실시화해보기
 - 가능하다면 외부조사로 뮤비,광고,웹툰에대한 입력 가져오고
 이거하려면 각 입력에대해서 스토리,연출,비주얼축을 각각 뽑는 해석(입력)기가 필요한데 그걸 claude 채팅하나가 해줄수있을까?
+</del>
 <!-- vault-inbox-item:end -->
 
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":1042,"content_sha256":"74af428bcc914db00cd4faf3ab87df3318342a5b56562395448424138175ea0d","item_id":"675b15c89e51df572956ac64c36938e24b43d5213dfc6d9a5c9bdfb5d3295da8","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":5531,"start":4489},"state":"tracked","units":["vault-inbox-lifecycle-2026-08-18"]}
+{"actor":"jh","byte_length":1042,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/c58a552f2a5d8435aef1cf632f88de59bff961936e09ed820388d23278af4823.json","close_proof_sha256":"c58a552f2a5d8435aef1cf632f88de59bff961936e09ed820388d23278af4823","content_sha256":"74af428bcc914db00cd4faf3ab87df3318342a5b56562395448424138175ea0d","disposition":"completed","item_id":"675b15c89e51df572956ac64c36938e24b43d5213dfc6d9a5c9bdfb5d3295da8","receipt_id":"675b15c89e51df57-b06c16a416950b51","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":5531,"start":4489},"state":"closed","units":["vault-inbox-lifecycle-2026-08-18"]}
 -->
+<del>
  원격저장소개념, 친구 harvest, 내 harvest, 내 inbox, 친구 inbox를 가장 적절한 형태로 상태관리하고 저장하는게 어떤걸까?
 - 각자의 로컬에 있어서 문제가되는건데
 - harvest는 어떻게든 .omc, .claude같은데서 긁어오는게 필요할거고 (push까지 원격저장소 혹은 노션 이런곳으로 빼내거나,,,) 결국 저장소의 개념이 필요할듯,, 일종의 맥락을 담고있는?
@@ -54,6 +61,7 @@ Single unbroken handheld boyfriend vlog take throughout, 30 seconds total. A rea
 night run의 목적: 둘이서 개발을 따로한다, 둘이 서로다른세션을쓴다 거기서 막히거나 열린논의가있다, 그런걸 밤러너가 닫거나 추가조사해주면 좋겠다.
 추가로 inbox에 사람이 기록해놓은 마일스톤이나 해야할일이 있다 그것도 해주면 좋다.
 그리고 그날 돌았던 기능개발, 없으면 기존의 커밋이 많이일어난 장소에대해 디버깅이나 QA, 버그발견등을 해주면좋다.
+</del>
 <!-- vault-inbox-item:end -->
 
 
@@ -78,9 +86,11 @@ END 프레임을 재생성해주되 실제 영상 생성에서 빼기 (대신 �
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":282,"content_sha256":"df44825eb3dd9517390c68fea69ee2deb7684e22185b07ccfaca0180dbb4bde7","item_id":"f661519154db64aada6dfe4d9fc79f9394b80c687fc0d93fc6c4a7de38403a10","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":6237,"start":5955},"state":"tracked","units":["audit-artist-background-space-deepdive"]}
+{"actor":"jh","byte_length":282,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/5688db66be04fde78b41c6db980b97777cdee69a260220a41745c4ad585e5f80.json","close_proof_sha256":"5688db66be04fde78b41c6db980b97777cdee69a260220a41745c4ad585e5f80","content_sha256":"df44825eb3dd9517390c68fea69ee2deb7684e22185b07ccfaca0180dbb4bde7","disposition":"completed","item_id":"f661519154db64aada6dfe4d9fc79f9394b80c687fc0d93fc6c4a7de38403a10","receipt_id":"f661519154db64aa-d5650806af742999","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":6237,"start":5955},"state":"closed","units":["audit-artist-background-space-deepdive"]}
 -->
+<del>
 artist 탭에서 배경이 한 장의 이미지로 관리되는게 문제다 -> 영화는 배경이 아닌 공간으로 활용을 하는데 그렇기에 같은 장소(공간)을 여러 방향으로 사용하면서 다양한 느낌을 주는데 AI 영상들은 그런게 잘 없다.
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
@@ -90,15 +100,19 @@ previz 이미지 다른 각도로 찍는 것처럼 돌려보기 (viz 이미지�
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":127,"content_sha256":"acf299519402caf1398935c73c77e2d01fd574c2f2ead69f1dc555cb2fc9e185","item_id":"d04dc28db5902b06dce44933b486c33e044cd13a45c470b89e744c2371b6b921","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":6755,"start":6628},"state":"tracked","units":["n4-direction-end-generation-timing","audit-direction-end-lineage"]}
+{"actor":"jh","byte_length":127,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/273da552077b3c4d3a861f7072a6b79bd061a8599bf1e2639f9ff76ed2cc2aff.json","close_proof_sha256":"273da552077b3c4d3a861f7072a6b79bd061a8599bf1e2639f9ff76ed2cc2aff","content_sha256":"acf299519402caf1398935c73c77e2d01fd574c2f2ead69f1dc555cb2fc9e185","disposition":"completed","item_id":"d04dc28db5902b06dce44933b486c33e044cd13a45c470b89e744c2371b6b921","receipt_id":"d04dc28db5902b06-b7cfa8728c37a75b","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":6755,"start":6628},"state":"closed","units":["n4-direction-end-generation-timing","audit-direction-end-lineage"]}
 -->
+<del>
 Direction, END 언제 생성되는지 확인 (현재 제대로 Direction이 생성되지도 않고 잘 작동하지도 않음)
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":45,"content_sha256":"3b24c2208008d608841d7ac9441c26c12a5808e08f04693c37176b97f3849a5d","item_id":"8f5b8592e66218fd25b6229572c40ea707b13ab056cac66b8f6f521f2826c070","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":6801,"start":6756},"state":"tracked","units":["r8-zoom-shortcut-keys"]}
+{"actor":"jh","byte_length":45,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/0941b28e937e69a5d568ba20b2fd0aef519112614492e535bd3e5f9bb9d09560.json","close_proof_sha256":"0941b28e937e69a5d568ba20b2fd0aef519112614492e535bd3e5f9bb9d09560","content_sha256":"3b24c2208008d608841d7ac9441c26c12a5808e08f04693c37176b97f3849a5d","disposition":"completed","item_id":"8f5b8592e66218fd25b6229572c40ea707b13ab056cac66b8f6f521f2826c070","receipt_id":"8f5b8592e66218fd-505b240adb9504e9","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":6801,"start":6756},"state":"closed","units":["r8-zoom-shortcut-keys"]}
 -->
+<del>
 축척 단축키 지정 (Ctrl/Command + +/-)
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
@@ -108,122 +122,157 @@ Direction, END 언제 생성되는지 확인 (현재 제대로 Direction이 생�
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":57,"content_sha256":"c79def2e02039401c3d09a294a2cb3217768fdbf767dba527bbf24d4b3bea3f9","item_id":"4d95e3b650e7d595e800683f8684b30f84ac9a53ab920b271c8dbf549d5efc02","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":6903,"start":6846},"state":"tracked","units":["n8-shot-cast-mislink-full-audit","audit-shot-cast-llm-failure-modes"]}
+{"actor":"jh","byte_length":57,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/66d6f19b5ce31f7c6b7c85b9028d360d66af4fb1ebcfa7d1c2cc9042234d79ef.json","close_proof_sha256":"66d6f19b5ce31f7c6b7c85b9028d360d66af4fb1ebcfa7d1c2cc9042234d79ef","content_sha256":"c79def2e02039401c3d09a294a2cb3217768fdbf767dba527bbf24d4b3bea3f9","disposition":"completed","item_id":"4d95e3b650e7d595e800683f8684b30f84ac9a53ab920b271c8dbf549d5efc02","receipt_id":"4d95e3b650e7d595-6bc7ea76ad798009","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":6903,"start":6846},"state":"closed","units":["n8-shot-cast-mislink-full-audit","audit-shot-cast-llm-failure-modes"]}
 -->
+<del>
 shot 중에 인물 asset 잘 못 연결된 부분 찾기
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":383,"content_sha256":"e080c3119450c5922ed52cd30691eac022b453b0f3e46d547001313a987b6d7c","item_id":"79e2c43df1033f24d1343c8ab3da9b5ff2a28e1bfdfe6baa2ef736ed286c23af","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":7287,"start":6904},"state":"tracked","units":["n1-progress-bar-carryover-count","r4-progress-batch-scoped-count"]}
+{"actor":"jh","byte_length":383,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/53e59244984a67c171576e2e62c1516eb433d4795ef3bf3356e0d5f2886392f4.json","close_proof_sha256":"53e59244984a67c171576e2e62c1516eb433d4795ef3bf3356e0d5f2886392f4","content_sha256":"e080c3119450c5922ed52cd30691eac022b453b0f3e46d547001313a987b6d7c","disposition":"completed","item_id":"79e2c43df1033f24d1343c8ab3da9b5ff2a28e1bfdfe6baa2ef736ed286c23af","receipt_id":"79e2c43df1033f24-ec867a83c2683413","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":7287,"start":6904},"state":"closed","units":["n1-progress-bar-carryover-count","r4-progress-batch-scoped-count"]}
 -->
+<del>
 재생성 로직돌때 상단바에 더 정보를 줄 수 있 수 있을 것 같다
  - 버그 : 작업 끝나고 다른 작업인 것 같은데 이전에 완료된 작업 수가 합산된다. (처음 시작이 6/8)
  - 호버링하면 현재 작업 중인 목록 보여주기?
  - 호버링하면 현재 진행 중인 작업 카드 하이라이트
  - 예상 종료 시간 보여주기
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":52,"content_sha256":"747502af7a2c2cd6f0592e669fba806039830d8b1eee5cb60b00d185d8272cc5","item_id":"a1ba0df0cbc8c67c98605a986ee867177686f03a2a7c68e8b32fe862a76e925e","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":7340,"start":7288},"state":"tracked","units":["r9-login-capslock-indicator"]}
+{"actor":"jh","byte_length":52,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/98de0f1d1fe870dc3c39f46cb10123ce507f6e6e02e0a840ded34b3cc996c7b5.json","close_proof_sha256":"98de0f1d1fe870dc3c39f46cb10123ce507f6e6e02e0a840ded34b3cc996c7b5","content_sha256":"747502af7a2c2cd6f0592e669fba806039830d8b1eee5cb60b00d185d8272cc5","disposition":"completed","item_id":"a1ba0df0cbc8c67c98605a986ee867177686f03a2a7c68e8b32fe862a76e925e","receipt_id":"a1ba0df0cbc8c67c-0c5af51b86b19ac0","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":7340,"start":7288},"state":"closed","units":["r9-login-capslock-indicator"]}
 -->
+<del>
 로그인 화면에서 capslock 켜졌으면 표기
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":80,"content_sha256":"64c49978c2e43ddbcabe45e1c5d84bbb90b5a1f071efa01d5b3ed4a9548c3b67","item_id":"ce39450c98b675961fcdb7fa918f28e83d30b3d49e75583bc16cf45bc2d37db1","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":7421,"start":7341},"state":"tracked","units":["r14-chat-file-drag-drop"]}
+{"actor":"jh","byte_length":80,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/fd10a3d698b6979f8412e78bf46f362a1060e225d3b19e59f4b9c49153796c1d.json","close_proof_sha256":"fd10a3d698b6979f8412e78bf46f362a1060e225d3b19e59f4b9c49153796c1d","content_sha256":"64c49978c2e43ddbcabe45e1c5d84bbb90b5a1f071efa01d5b3ed4a9548c3b67","disposition":"completed","item_id":"ce39450c98b675961fcdb7fa918f28e83d30b3d49e75583bc16cf45bc2d37db1","receipt_id":"ce39450c98b67596-7261cbffc08d582c","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":7421,"start":7341},"state":"closed","units":["r14-chat-file-drag-drop"]}
 -->
+<del>
 채팅창에서 외부 파일(이미지, 글감) 드래그 앤 드롭 활성화
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":157,"content_sha256":"9f69ecfacf04d5cd943911fc4667516ea3f4489b0e760f40781271571fbb6bc6","item_id":"9511ff17a6310889fc67fc0866d082cad64e66775a317569c8ebd15b549c88bc","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":7579,"start":7422},"state":"tracked","units":["n2-chat-choices-lost-on-reload","r6-chat-choices-attachments-persist"]}
+{"actor":"jh","byte_length":157,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/e3e71869a5301a51fc3528e7c56f75ab85d8a0689dd091e1a43d7396fd581484.json","close_proof_sha256":"e3e71869a5301a51fc3528e7c56f75ab85d8a0689dd091e1a43d7396fd581484","content_sha256":"9f69ecfacf04d5cd943911fc4667516ea3f4489b0e760f40781271571fbb6bc6","disposition":"completed","item_id":"9511ff17a6310889fc67fc0866d082cad64e66775a317569c8ebd15b549c88bc","receipt_id":"9511ff17a6310889-38a55031b2a88666","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":7579,"start":7422},"state":"closed","units":["n2-chat-choices-lost-on-reload","r6-chat-choices-attachments-persist"]}
 -->
+<del>
 선택지가 뜬 상태에서 새로고침이나 다른 탭 갔다오면 선택지가 안 뜸
 이미지 입력 후 새로고침하면 다 날아감 (버그)
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":212,"content_sha256":"015ce507906b6a4ff2cdfb28b796bac9236e6f884f910440daf3a327b276f791","item_id":"5bdb625ee27f212da32a218d2c0b539fcae5b646cfb1ea18825b4cf2ed973ce6","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":7792,"start":7580},"state":"tracked","units":["n2-chat-choices-lost-on-reload","r6-chat-choices-attachments-persist"]}
+{"actor":"jh","byte_length":212,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/fe51789f56124fcd9ac1a0d83e585912c48e93cd00685e602bc211aec1e50c78.json","close_proof_sha256":"fe51789f56124fcd9ac1a0d83e585912c48e93cd00685e602bc211aec1e50c78","content_sha256":"015ce507906b6a4ff2cdfb28b796bac9236e6f884f910440daf3a327b276f791","disposition":"completed","item_id":"5bdb625ee27f212da32a218d2c0b539fcae5b646cfb1ea18825b4cf2ed973ce6","receipt_id":"5bdb625ee27f212d-edf4ff296ee2b1f4","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":7792,"start":7580},"state":"closed","units":["n2-chat-choices-lost-on-reload","r6-chat-choices-attachments-persist"]}
 -->
+<del>
 채팅창 웰컴 멘트 날아가지 않게 수정
 다음 에이전트에게 넘기기 멘트도 날아가지 않게 수정 (대신 승낙, 취소 버튼은 지우기 -> 남겨두면 추후 에러뜰 수 있음)
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":286,"content_sha256":"18cfa6359d2ad25b37b49ef1bbfba79d3442f80c780b92b00cf8cbefc2fad67f","item_id":"6fa7dce9b960b0a2089f74a1f2017e91731572eccf7a7eddf07bd246a46b521a","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8079,"start":7793},"state":"tracked","units":["n5-writer-director-reload-parity","r7-writer-director-view-unify"]}
+{"actor":"jh","byte_length":286,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/ab8fabdf8f3137df25d1877456161d5a2c6e9a603194289c2a598d8aa0011c6c.json","close_proof_sha256":"ab8fabdf8f3137df25d1877456161d5a2c6e9a603194289c2a598d8aa0011c6c","content_sha256":"18cfa6359d2ad25b37b49ef1bbfba79d3442f80c780b92b00cf8cbefc2fad67f","disposition":"completed","item_id":"6fa7dce9b960b0a2089f74a1f2017e91731572eccf7a7eddf07bd246a46b521a","receipt_id":"6fa7dce9b960b0a2-5dc5481f4d8e7e7f","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8079,"start":7793},"state":"closed","units":["n5-writer-director-reload-parity","r7-writer-director-view-unify"]}
 -->
+<del>
 writer도 새로고침하면 안 보이는데 director로 동일한 로직 (DB에서 생성/대기 상태 및 시작 시간 확인 후 진행 시간 띄워주는 로직 + 기타 모든 로직) 적용하고 앞으로 writer, director의 경우 동일한 로직으로 적용되게 관리
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":49,"content_sha256":"a3c3e58fc9b8f5325f63a5dd69143ff835f480dc89dca9431656e080e33bd47f","item_id":"398e602bffdda07ea615c6a4250f6c747d09a558e7c60328aaa8d682185f0545","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8129,"start":8080},"state":"tracked","units":["n5-writer-director-reload-parity","r7-writer-director-view-unify"]}
+{"actor":"jh","byte_length":49,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/66052b41cd69e1b7b831ab66e85491fd91e1d780ff1add560606bd3e80daf2e0.json","close_proof_sha256":"66052b41cd69e1b7b831ab66e85491fd91e1d780ff1add560606bd3e80daf2e0","content_sha256":"a3c3e58fc9b8f5325f63a5dd69143ff835f480dc89dca9431656e080e33bd47f","disposition":"completed","item_id":"398e602bffdda07ea615c6a4250f6c747d09a558e7c60328aaa8d682185f0545","receipt_id":"398e602bffdda07e-70d5b21b958c6731","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8129,"start":8080},"state":"closed","units":["n5-writer-director-reload-parity","r7-writer-director-view-unify"]}
 -->
+<del>
 director의 뷰어 writer랑 동일하게 수정
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":254,"content_sha256":"2aa51c5a82432feb4e5f9e1684bc9005c506e943495e180b331db96fb677d926","item_id":"78c0863966904c830225d2781d38199bd78bb96d112b4330e21f3534c58fc989","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8384,"start":8130},"state":"tracked","units":["n5-writer-director-reload-parity","r7-writer-director-view-unify"]}
+{"actor":"jh","byte_length":254,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/8541444c5c16ebe34f650c5c0ec63a16a52bcbba8e3ac8f2278e973841559c3b.json","close_proof_sha256":"8541444c5c16ebe34f650c5c0ec63a16a52bcbba8e3ac8f2278e973841559c3b","content_sha256":"2aa51c5a82432feb4e5f9e1684bc9005c506e943495e180b331db96fb677d926","disposition":"completed","item_id":"78c0863966904c830225d2781d38199bd78bb96d112b4330e21f3534c58fc989","receipt_id":"78c0863966904c83-6974bb97ad901b7d","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8384,"start":8130},"state":"closed","units":["n5-writer-director-reload-parity","r7-writer-director-view-unify"]}
 -->
+<del>
 director도 마지막 보고 있던 탭 DB로 관래해서 새로고침 시 해당 탭이 바로 보이게 수정 (맨 처음 Node 애니메이션 보여주는거는 director 넘겨주세요 채팅 이후 프로젝트 당 최초 한 번만 보여주기)
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":38,"content_sha256":"08b49c742a1a278fb48d671867c34815765b7e552d31f1fbc4a3d86ec0b9d4ec","item_id":"e947d951e640c538f956b11d9fc2c7708fc87e69506771a1b7373185059e8235","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8423,"start":8385},"state":"tracked","units":["r10-background-no-person"]}
+{"actor":"jh","byte_length":38,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/2803a45ebf3f65691484ae66b8ccdf61442594c5c9e2223aae17bcd3f48dbe75.json","close_proof_sha256":"2803a45ebf3f65691484ae66b8ccdf61442594c5c9e2223aae17bcd3f48dbe75","content_sha256":"08b49c742a1a278fb48d671867c34815765b7e552d31f1fbc4a3d86ec0b9d4ec","disposition":"completed","item_id":"e947d951e640c538f956b11d9fc2c7708fc87e69506771a1b7373185059e8235","receipt_id":"e947d951e640c538-b847a7e677f0faeb","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8423,"start":8385},"state":"closed","units":["r10-background-no-person"]}
 -->
+<del>
 배경에 인물 안 나오게 수정
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":75,"content_sha256":"ddcf1fc6580606ebe34ac59cc9625ceb9356911b059974d4665ea5b7dfac6185","item_id":"7e03f21b66cc064d18e3f1ed4546d74c42f8b5f6b5ce956188c7aa556e479467","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8499,"start":8424},"state":"tracked","units":["audit-multitab-project-collision"]}
+{"actor":"jh","byte_length":75,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/2a600e25b1d4d1052920223c8e8e0c0584741561e19328d76e60fb3cbc0e1c4a.json","close_proof_sha256":"2a600e25b1d4d1052920223c8e8e0c0584741561e19328d76e60fb3cbc0e1c4a","content_sha256":"ddcf1fc6580606ebe34ac59cc9625ceb9356911b059974d4665ea5b7dfac6185","disposition":"completed","item_id":"7e03f21b66cc064d18e3f1ed4546d74c42f8b5f6b5ce956188c7aa556e479467","receipt_id":"7e03f21b66cc064d-2ce526dad1281ded","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8499,"start":8424},"state":"closed","units":["audit-multitab-project-collision"]}
 -->
+<del>
 여러 탭에 다른 프로젝트 띄워두고 작업할 수 있게 수정
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":69,"content_sha256":"66e6c17c942185fea5b151e25684b89d3234b2b9e1cb5a64d2aa10301a6f08ee","item_id":"50cfb6ac3f49f46472f2a67174152bcd6ca591c89dcbd909684180f8d3f4a84e","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8569,"start":8500},"state":"tracked","units":["r11-producer-no-style-text-question"]}
+{"actor":"jh","byte_length":69,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/11ff3f35b776743d624a7b13d118a21d8b892cc74f42c9f60379fe8f917e935f.json","close_proof_sha256":"11ff3f35b776743d624a7b13d118a21d8b892cc74f42c9f60379fe8f917e935f","content_sha256":"66e6c17c942185fea5b151e25684b89d3234b2b9e1cb5a64d2aa10301a6f08ee","disposition":"completed","item_id":"50cfb6ac3f49f46472f2a67174152bcd6ca591c89dcbd909684180f8d3f4a84e","receipt_id":"50cfb6ac3f49f464-e51194d46d1cebea","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8569,"start":8500},"state":"closed","units":["r11-producer-no-style-text-question"]}
 -->
+<del>
 producer가 스타일 글로 물어보는데 못 물어보게 수정
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":58,"content_sha256":"2fa0fd2ce212bfadd5a0682771beaf1aa593e2e56ae7c5d6763204e3822181a5","item_id":"d8432fe6efce77c36fb510f2e3a811dc393f9ebe28ca37db79055941f479724d","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8628,"start":8570},"state":"tracked","units":["n3-writer-rerun-deadlock","r5-writer-rerun-consent-flow"]}
+{"actor":"jh","byte_length":58,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/18dfa7744a8c772ea87cdc5afdda249bc7ebde84865048fe146fcc86e2b1c361.json","close_proof_sha256":"18dfa7744a8c772ea87cdc5afdda249bc7ebde84865048fe146fcc86e2b1c361","content_sha256":"2fa0fd2ce212bfadd5a0682771beaf1aa593e2e56ae7c5d6763204e3822181a5","disposition":"completed","item_id":"d8432fe6efce77c36fb510f2e3a811dc393f9ebe28ca37db79055941f479724d","receipt_id":"d8432fe6efce77c3-356b59c83bce9d72","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8628,"start":8570},"state":"closed","units":["n3-writer-rerun-deadlock","r5-writer-rerun-consent-flow"]}
 -->
+<del>
 writer 끝나고 다시 writer 다시 요청하면 갇힘
+</del>
 <!-- vault-inbox-item:end -->
 
 ## 오너 — 2026-08-18 아침 리포트(2026-08-18.html)에 대한 답 (세션 에이전트 대리 기록, 원문 그대로)
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":232,"content_sha256":"ce3c2338610764c4122b14dd141ad899ea90100edab0f4d9777c87d037667562","item_id":"8b6d2d2d9a28c9fb8895a1932330686e5becc48c451006f0c825298eeb5bc466","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8862,"start":8630},"state":"tracked","units":["n1-progress-bar-carryover-count","r4-progress-batch-scoped-count"]}
+{"actor":"jh","byte_length":232,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/fe5df8e6e1a1e0a432854a90a57192f8abfb6747de110c500bd98fba68c76e77.json","close_proof_sha256":"fe5df8e6e1a1e0a432854a90a57192f8abfb6747de110c500bd98fba68c76e77","content_sha256":"ce3c2338610764c4122b14dd141ad899ea90100edab0f4d9777c87d037667562","disposition":"completed","item_id":"8b6d2d2d9a28c9fb8895a1932330686e5becc48c451006f0c825298eeb5bc466","receipt_id":"8b6d2d2d9a28c9fb-5b8568e6c09cd2d5","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":8862,"start":8630},"state":"closed","units":["n1-progress-bar-carryover-count","r4-progress-batch-scoped-count"]}
 -->
+<del>
 1. 진행률이 이전에 끝난 작업까지 합쳐서 세는가
 -> (가) 방식으로 하되 현재 진행 중 작업이 있으면 묶음에 합산, 현재 진행 중 작업이 없으면 새로 카운팅으로 기능 수정하기
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":1036,"content_sha256":"764a2497783fda64620f4721d82c8b0e381647a989019b1182f26e0e397b1d55","item_id":"bd165a2b90083b2bedf35a79a2e6b2a61507d6b5d8922f5748333ecbd491c03c","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":9899,"start":8863},"state":"tracked","units":["n3-writer-rerun-deadlock","r5-writer-rerun-consent-flow"]}
+{"actor":"jh","byte_length":1036,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/d27fab4dae5826d614ba2c4eb6169e1cbb68f23763483ef3923ea5dbe1fe7a19.json","close_proof_sha256":"d27fab4dae5826d614ba2c4eb6169e1cbb68f23763483ef3923ea5dbe1fe7a19","content_sha256":"764a2497783fda64620f4721d82c8b0e381647a989019b1182f26e0e397b1d55","disposition":"completed","item_id":"bd165a2b90083b2bedf35a79a2e6b2a61507d6b5d8922f5748333ecbd491c03c","receipt_id":"bd165a2b90083b2b-4feeb2f8343cfc1e","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":9899,"start":8863},"state":"closed","units":["n3-writer-rerun-deadlock","r5-writer-rerun-consent-flow"]}
 -->
+<del>
 2. writer를 다시 요청하면 갇히는가
 -> 현재 상황 : writer가 끝나고 채팅창에 "writer에 넘겨주세요."라고 채팅을 치면 writer 생성 페이지가 다시 로딩된다. 물론 writer 파이프라인은 안 돌지만 완료 이벤트도 발생하지 않아서 writer 생성 페이지에서 유저가 갖혀버린다. 최초 writer 생성 이후 다시 writer에 넘겨달라는 요청이나 생성 요청 시 유저에게 "지금까지 채팅 내역을 바탕으로 다시 writer에게 스토리와 연출에 대한 구상을 요청할까요?? 변경 사항들을 자연스럽게 반영할 수 있지만 다시 오랜 시간이 걸릴 수 있어요."라는 문구를 출력해주고 동의나 취소를 받아줘. 동의할 경우 생성된 writer의 scene, shot 스토리에 채팅창 내역, producer탭에서의 결정 사항을 담아서 writer 파이프라인 다시 돌려주고 writer 생성 페이지로 유저를 보내서 최초 writer 생성 페이지와 동일한 입력받을 수 있게 해줘.
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":289,"content_sha256":"32714ad911851ddbafae769f054136e15e1fc27f90961a460e732e1afb30d1ec","item_id":"5e477bc9e6f15af8a3cabea48c6d7e443f8b6ea5e1705d581ad8b54dd5c05b43","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":10189,"start":9900},"state":"tracked","units":["n2-chat-choices-lost-on-reload","r6-chat-choices-attachments-persist"]}
+{"actor":"jh","byte_length":289,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/223a51f84fc20899d46792fd12348dda55a84c882a3ceb515d6da08e217502d8.json","close_proof_sha256":"223a51f84fc20899d46792fd12348dda55a84c882a3ceb515d6da08e217502d8","content_sha256":"32714ad911851ddbafae769f054136e15e1fc27f90961a460e732e1afb30d1ec","disposition":"completed","item_id":"5e477bc9e6f15af8a3cabea48c6d7e443f8b6ea5e1705d581ad8b54dd5c05b43","receipt_id":"5e477bc9e6f15af8-9e32af986c5ab4ca","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":10189,"start":9900},"state":"closed","units":["n2-chat-choices-lost-on-reload","r6-chat-choices-attachments-persist"]}
 -->
+<del>
 3. 새로고침하면 선택지와 붙인 이미지가 날아가는가
 -> DB에 Table을 만들거나 채팅 내역에 파싱 규칙 만들어서 저장해줘. 선택지와 이미지 모두 기억할 수 있게 해주고 다시 페이지를 들어와도 채팅창에 남아 있게 해줘.
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":388,"content_sha256":"a31df83a0e56496cdb7a19574f4c66d4f152437b6a5adcb2bc8888891bbecf00","item_id":"8ffdccd04ff7a786d9c2cccb75a42fe855306b104ab07b9f769e968242651547","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":10578,"start":10190},"state":"tracked","units":["n4-direction-end-generation-timing","audit-direction-end-lineage"]}
+{"actor":"jh","byte_length":388,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/5356bc8d347c3c3e982aacf8193523fce6f5dbd0ae56015a5bc4dfcbb49838c3.json","close_proof_sha256":"5356bc8d347c3c3e982aacf8193523fce6f5dbd0ae56015a5bc4dfcbb49838c3","content_sha256":"a31df83a0e56496cdb7a19574f4c66d4f152437b6a5adcb2bc8888891bbecf00","disposition":"completed","item_id":"8ffdccd04ff7a786d9c2cccb75a42fe855306b104ab07b9f769e968242651547","receipt_id":"8ffdccd04ff7a786-c9ba005f66e64d75","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":10578,"start":10190},"state":"closed","units":["n4-direction-end-generation-timing","audit-direction-end-lineage"]}
 -->
+<del>
 4. Direction과 끝 칸은 언제 만들어지고 왜 비는가
 -> 전수 조사해서 아티팩트 만들어줘. 어떤 인풋, 가이드를 받아서 어떻게 Direction이 만들어지는지 중간에 끊긴 길이 있는지 확인해서 알려줘. 그리고 END Frame이 어떤 인풋, 가이드를 받아서 만들어지는지 START Frame과 어떤 관계가 있는지 확인해줘.
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":764,"content_sha256":"0c3723dc681cee615ad2533199a7d884f8d5b72fea09618397f33251c2367297","item_id":"8d559cf18cbc68b2ff664825cd67cd593e68055c2a8609656de0ee2f9b06dd5c","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":11343,"start":10579},"state":"tracked","units":["n5-writer-director-reload-parity","r7-writer-director-view-unify"]}
+{"actor":"jh","byte_length":764,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/5fe454969aa11cefd64966068912c497c4a575d5f211de2f58083a7402f32fe0.json","close_proof_sha256":"5fe454969aa11cefd64966068912c497c4a575d5f211de2f58083a7402f32fe0","content_sha256":"0c3723dc681cee615ad2533199a7d884f8d5b72fea09618397f33251c2367297","disposition":"completed","item_id":"8d559cf18cbc68b2ff664825cd67cd593e68055c2a8609656de0ee2f9b06dd5c","receipt_id":"8d559cf18cbc68b2-5783c95e6dafa94b","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":11343,"start":10579},"state":"closed","units":["n5-writer-director-reload-parity","r7-writer-director-view-unify"]}
 -->
+<del>
 5. writer의 화면 복원 로직을 director에 옮길 수 있는가
 -> writer의 뷰어 화면, director의 이미지 생성 시간, 상태 확인 로직을 합쳐서 구현해주고 앞으로 두 개의 탭 (writer의 러프 스토리보드 뷰, director의 Storyboard뷰의 previz, real 둘 다) 모두 같은 로직과 UI로 관리해줘.
  - 진행·대기 상태 조회 : director 기준으로 변경
@@ -231,13 +280,16 @@ writer 끝나고 다시 writer 다시 요청하면 갇힘
  - 마지막 탭 기억 : writer 기준으로 변경 (프로젝트 최초 한 번만 node 뷰 보여주면 됨)
  - 진행 중 화면 자동 선택 : writer 기준으로 변경
  - 뷰어 화면 : 축척 기능 및 이미지 해상도에 따른 카드 크기 가변 조정 등 writer 기준으로 변경
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":192,"content_sha256":"2e84dcbdd687043f6337966da2f174a5166cf6f73a69c2fb46ed57afc188c2bb","item_id":"462c5df626a7ad40d38c29160dda7f474b1b21627be6dcd6c9a2fd2bb9ed7125","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":11536,"start":11344},"state":"tracked","units":["n8-shot-cast-mislink-full-audit","audit-shot-cast-llm-failure-modes"]}
+{"actor":"jh","byte_length":192,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/79064be838ec61490d66eeb4a5ff8cd7dbf5f00f8e7ffd9fe3ed174efa6c65d0.json","close_proof_sha256":"79064be838ec61490d66eeb4a5ff8cd7dbf5f00f8e7ffd9fe3ed174efa6c65d0","content_sha256":"2e84dcbdd687043f6337966da2f174a5166cf6f73a69c2fb46ed57afc188c2bb","disposition":"completed","item_id":"462c5df626a7ad40d38c29160dda7f474b1b21627be6dcd6c9a2fd2bb9ed7125","receipt_id":"462c5df626a7ad40-ba0059b461437b6c","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":11536,"start":11344},"state":"closed","units":["n8-shot-cast-mislink-full-audit","audit-shot-cast-llm-failure-modes"]}
 -->
+<del>
 6. 인물이 잘못 연결된 장면 찾기
 -> 지금은 그런 문제 없는데 LLM 파싱 오류나 발생 가능한 경우 찾아서 알려줘. 원인에 따른 대책 마련하려고 해.
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
