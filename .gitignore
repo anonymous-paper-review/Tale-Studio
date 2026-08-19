@@ -156,3 +156,4 @@ research/experiments/_viewer.html
 # 밤 입력 snapshot은 로컬 검증용 immutable binding이다.
 # 사람용 archive와 consumption manifest는 `_archive/inbox/`에 따로 추적한다.
 .claude/vault/backlog/night-runtime/
+.env*

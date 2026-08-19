@@ -1,7 +1,8 @@
-# 밤 러너 설치 — Orca 없는 macOS 머신
+# 밤 러너 설치 — 이 macOS 머신은 launchd 사용
 
-밤마다 launchd가 이 저장소의 `_NIGHT.md` 계약대로 자율 실행을 깨운다.
-Orca가 있는 오너 머신은 이 문서가 필요 없다. Orca가 같은 일을 이미 한다.
+이 머신은 Orca 자동화가 아니라 macOS `launchd`가 이 저장소의 `_NIGHT.md` 계약대로
+매일 밤 실행을 깨운다. 두 스케줄러를 동시에 켜면 같은 날 두 실행이 충돌하므로 Orca의
+밤 루프 자동화와 Codex 대체 자동화는 꺼둔다.
 
 각자 자기 컴퓨터에서 돈다. 메모는 `.claude/vault/inbox/<자기 이름>.md`에 쓴다 —
 사람마다 파일이 따로라 git 충돌이 없고, push되면 상대 밤도 참고로 읽는다.
@@ -22,46 +23,58 @@ claude -p "ok만 출력하라" --max-turns 1   # 로그인 확인
 저장소가 clone되어 있고 `pnpm install`이 끝나 있어야 한다.
 `.env.local`(과금 키)이 없어도 밤은 돌고, 유료 생성 단위만 `blocked`로 기록된다.
 
-## 2. 설치
+## 2. 현재 등록 상태
 
-저장소 루트에서 한 줄:
+현재 오너 머신의 등록은 다음과 같다.
 
-```sh
-sh .claude/vault/night-friend-setup.sh
-```
+- label: `com.tale-studio.night-jh`
+- 실행 시각: 매일 01:30 (`Asia/Seoul`)
+- 실행 파일: `/Users/xcape/Library/Application Support/tale-studio-night/run-night-jh.sh`
+- 로그: `~/Library/Logs/tale-studio-night/night-jh.log`
+- 실행 잠금: `~/Library/Logs/tale-studio-night/provider-state/`
+- actor: `jh`
 
-script가 하는 일:
-
-- git·python3·claude CLI·branch·깨끗한 작업 트리 확인
-- LaunchAgent 3개 등록: 밤 실행(01:30), 리뷰 서버(상시), 아침 보고서 열기(08:30)
-- 마지막에 `dry-run`을 돌려 6단계 검증 — `DRY-RUN PASS`가 나와야 설치 완료
-
-기본 actor는 `hs`다. 다른 값이 필요하면:
+등록 확인:
 
 ```sh
-NIGHT_ACTOR_ID=jh NIGHT_HOUR=2 sh .claude/vault/night-friend-setup.sh
+launchctl print "gui/$(id -u)/com.tale-studio.night-jh"
 ```
 
-설치 없이 검증만 하려면:
+실행 엔진만 안전하게 점검하려면 실제 run 대신 다음을 쓴다.
 
 ```sh
 sh .claude/vault/backlog/night-launchd.sh dry-run
 ```
 
-## 3. 아침
+## 3. 설치·재등록
+
+이 머신에는 이미 등록되어 있다. 다른 macOS 머신에 설치할 때는 같은 구조로
+`~/Library/LaunchAgents/com.tale-studio.night-<actor>.plist`와 실행 래퍼를 만들고,
+`launchctl bootstrap "gui/$(id -u)" <plist>`를 실행한다. actor는 그 머신의
+`jh` 또는 `hs`로 고정한다.
+
+등록 전에 반드시 다음을 실행한다.
+
+```sh
+sh .claude/vault/backlog/night-launchd.sh dry-run
+```
+
+`DRY-RUN PASS`가 나오지 않으면 LaunchAgent를 등록하지 않는다.
+
+## 4. 아침
 
 08:30에 최신 `runs/<actor>/<run_id>/report.html`이 브라우저에 뜬다.
 버튼(`merge`/`reject`/`feedback`)을 누르면 `feedback/<actor>/<run_id>/`에 기록되고,
 자기 다음 밤 실행만 그 기록을 읽는다. 전부 로컬 파일이라 commit할 것이 없다.
 밤이 만든 코드 수리 branch(`night/<actor>/…`)만 검토 후 merge·push 대상이다.
 
-## 4. 운영 명령
+## 5. 운영 명령
 
 ```sh
 sh .claude/vault/backlog/night-launchd.sh open-report        # 지금 보고서 열기
-tail -f ~/Library/Logs/tale-studio-night-<actor>/night.log   # 밤 로그
-launchctl kickstart -k "gui/$(id -u)/com.tale-studio.night-<actor>"   # 즉시 1회 실행 (과금 가능)
-launchctl bootout "gui/$(id -u)/com.tale-studio.night-<actor>"        # 해제
+tail -f ~/Library/Logs/tale-studio-night/night-jh.log        # 밤 로그
+launchctl kickstart -k "gui/$(id -u)/com.tale-studio.night-jh" # 즉시 1회 실행 (과금 가능)
+launchctl bootout "gui/$(id -u)/com.tale-studio.night-jh"      # 해제
 ```
 
 밤에 뚜껑을 덮어두는 노트북이면 잠든 Mac을 깨워야 한다:

@@ -55,9 +55,18 @@
 
 ## 2. 실행 시작 — 한 번만 읽고 고정하기
 
-실행마다 다음 값을 먼저 만든다.
+실행마다 다음 값을 **runner가 Claude를 시작하기 전에** 만들고 환경·headless prompt로 고정해
+전달한다. 계약 본문은 이를 검증·소비할 뿐 `primary`나 `snapshot-inbox`/`snapshot-inbox-set`을
+다시 호출하지 않는다.
 
 - `run_id`: provider gate가 발급한 `night-YYYY-MM-DD-<uuid>` 실행 식별자.
+- `provider_state`: primary claim JSON의 canonical `state_path`. runtime의 모든 쓰기는 이
+  파일의 같은 lock 아래에서 검증한다.
+- `provider_token`, `fencing`: primary claim JSON의 `owner_token`과 fencing 세대 번호.
+  `run_id`, `contract_hash`와 함께 한 세대의 owner proof를 이룬다.
+- Claude 환경에는 위 값을 각각 `NIGHT_PROVIDER_STATE`, `NIGHT_OWNER_TOKEN`,
+  `NIGHT_FENCING`으로도 전달한다. prompt에 적힌 값과 환경 값이 다르면
+  `contract-mismatch`로 기록하고 쓰지 않는다.
 - `actor_id`: `NIGHT_ACTOR_ID`가 정한 실행 주체(`jh`/`hs`). 로컬 결과 경로
   `runs/<actor>/<run_id>/`·`feedback/<actor>/<run_id>/`와, 공유되는 유일한 이름인
   수리 worktree branch `night/<actor>/<run_id>/<unit-id>`에 들어간다.
@@ -67,20 +76,44 @@
 
 이 값은 실행 기록과 모든 결과 카드에 이어 붙인다. 실행 중 계약 문서를 다시 읽어 규칙을 바꾸지 않는다. 계약 해시나 필수 입력이 서로 다르면 추측하지 말고 `contract-mismatch`로 진단·기록한 뒤 해당 실행을 시작하지 않는다.
 
-실행 시작 전에 Orca precheck가 반드시 `primary sweep` claim을 만든다. 이 claim이 없거나
+실행 시작 전에 launcher가 반드시 `primary sweep --contract-path "$CONTRACT" --actor "$actor_id"
+--project-root "$PROJECT_ROOT"` claim을 만든다. 이 claim이 없거나
 `state sweep`가 실패하면 실행을 시작하지 않는다. 계약 본문에서 `primary`를 다시 호출하지
-않아 이중 claim을 만들지 않는다. 실행 시작 시 계약 해시와 메모 스냅샷은 저장소 도구로
-한 번에 고정한다. 스냅샷 도구는 inbox 파일을 수정하지 않고, 출력 JSON의 `snapshot_id`와
-`snapshot_fingerprint`를 이후 명령에 그대로 전달한다.
+않아 이중 claim을 만들지 않는다. **실제 run**에서 claim 직후 launcher는 current actor의 exact
+`inbox/<actor>.md`와 canonical `.claude/vault/backlog/tickets/receipts`에 대해 정확히 한 번
+`reconcile-inbox`를 실행한다. `--provider-state`, `--provider-job sweep`, `--owner-token`,
+`--fencing`, `--run-id`, `--contract-hash`, `--actor`, `--path`, `--receipt-dir`는 모두 같은
+claim의 값이어야 한다. malformed receipt/marker와 `manual_review` 결과는 기록만 하고 자동
+close하지 않는다. authority 또는 canonical path 검증 실패는 Claude와 snapshot 전에 provider를
+`failed`로 닫고 실행을 중단한다. **dry-run은 actual inbox mutation이 금지되므로 reconcile을
+호출하지 않고 `receipt reconciliation skipped`를 명시한다.** 정산 뒤 launcher는 정확히 한 번
+`snapshot-inbox-set --provider-state "$provider_state" --owner-token="$provider_token"
+--fencing "$fencing" --run-id "$run_id" --contract-hash "$contract_hash" --actor "$NIGHT_ACTOR"
+--actors jh,hs`를 실행한다. set의 두 항목은 같은 `run_id`·계약 해시·read-time을 공유하며, current actor는 `actionable`, 상대 actor는
+`reference`다. set manifest 경로와 양쪽 snapshot path/id/fingerprint는 runner가 제공한
+값만 쓴다. 스냅샷 도구는 inbox 파일을 수정하지 않는다.
+
+snapshot set은 두 파일을 같은 generation으로 다시 검증한다. 둘 중 하나라도 generation
+재검증에 실패하면 set manifest를 만들지 않고 실행을 실패로 기록한다. 한 항목만 새
+snapshot으로 바꾸거나 이전 manifest를 성공 근거로 재사용하지 않는다.
+실제 run은 Claude를 시작하기 전에 provider `bind-snapshot`이 set 파일명·set ID,
+두 member, content artifact hash, fingerprint, snapshot ID와 binding digest를 다시 계산한다.
+검증된 set과 current actor의 actionable member identity는 provider state에 원자 저장된다.
+이 binding과 다른 standalone snapshot JSON이나 reference member는 success 근거가 아니다.
+dry-run의 state-root 임시 snapshot은 역할·hash·generation만 검사하고 bind하지 않으므로
+success proof가 아니다.
 
 jh와 hs는 각자 자기 컴퓨터에서 이 계약을 실행한다. 두 사람이 git으로 나누는 것은
 둘이다: **코드**(계약·도구와 밤이 만든 수리 branch `night/<actor>/<run_id>/<unit-id>`)와
 **메모**(`.claude/vault/inbox/` — 사람마다 자기 파일 `inbox/<actor>.md` 하나, 자기 파일에만
 쓴다. 파일이 갈라져 있어 git 충돌이 나지 않는다).
 
-실행 시작에 inbox 동기화를 한 번 시도한다: fetch → 상대 메모 ff 반영 → 내 메모 파일만
-커밋해 push (push 경합이면 rebase 재시도 1회 — 파일이 갈라져 있어 항상 깨끗하다).
-사람의 미푸시 커밋이 있으면 동기화 전체를 건너뛴다(남의 작업을 밤이 push하지 않는다).
+실행 시작에 inbox 동기화를 한 번 시도한다: fetch → 이전 자동화가 남긴 현재 actor inbox-only
+commit만 먼저 push/rebase 재시도 → 상대 메모 ff 반영 → 내 메모 파일만 커밋해 push (push
+경합이면 rebase 재시도 1회 — 파일이 갈라져 있어 항상 깨끗하다). 복구 대상은 commit 제목
+`inbox(<actor>): 밤 메모`이고 변경 파일이 정확히 `inbox/<actor>.md` 하나인 commit뿐이다.
+사람의 다른 미푸시 commit 또는 다른 파일이 하나라도 섞이면 동기화 전체를 건너뛴다(남의
+작업을 밤이 push하지 않는다).
 **어떤 실패도 밤을 막지 않는다** — 기록하고 로컬에 있는 내용으로 계속한다. 자기 전에
 손으로 보내려면 `sh night-launchd.sh push-inbox`. 소비 책임은 자기 메모 파일에만
 있고, 상대 메모는 읽기 전용 참고 입력이다(§4.0). 리포트·티켓·피드백·세션 수확은 자기
@@ -92,42 +125,27 @@ jh와 hs는 각자 자기 컴퓨터에서 이 계약을 실행한다. 두 사람
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 cd "$PROJECT_ROOT"
 GATE="$PROJECT_ROOT/.claude/vault/backlog/provider-gate.py"
-NIGHT_ACTOR="${NIGHT_ACTOR_ID:-jh}"
-# 스케줄러(Orca 또는 launchd 진입점 night-launchd.sh)가 이 계약 시작 전에
-# `primary sweep`을 정확히 한 번 만든다. 여기서 primary를 다시 부르지 않고
-# 필수 claim을 조회·검증만 한다.
-provider_state="$(python3 "$GATE" state sweep \
-  --contract-path "$PROJECT_ROOT/.claude/vault/backlog/_NIGHT.md")"
-provider_status="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')"
-provider="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["provider"])')"
-if [ "$provider" = "claude" ] && { [ "$provider_status" = "failed" ] || [ "$provider_status" = "timeout" ]; }; then
-  provider_state="$(python3 "$GATE" fallback sweep \
-    --run-id "$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')" \
-    --contract-path "$PROJECT_ROOT/.claude/vault/backlog/_NIGHT.md")" || {
-      echo "Codex fallback claim failed" >&2
-      exit 1
-    }
-  provider_status="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')"
-  provider="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["provider"])')"
-fi
-[ "$provider_status" = "claimed" ] || [ "$provider_status" = "running" ] || {
-  echo "provider primary claim is mandatory; state sweep is not active" >&2
-  exit 1
-}
-[ "$provider" = "claude" ] || [ "$provider" = "codex" ] || {
-  echo "provider state has no valid owner" >&2
-  exit 1
-}
-run_id="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')"
-provider_run_id="$run_id"
-provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner_token"])')"
-contract_hash="$(shasum -a 256 "$PROJECT_ROOT/.claude/vault/backlog/_NIGHT.md" | awk '{print $1}')"
-snapshot_json="$(python3 "$PROJECT_ROOT/.claude/vault/backlog/night-runtime.py" snapshot-inbox \
-  --run-id "$run_id" --contract-hash "$contract_hash" \
-  --path "$PROJECT_ROOT/.claude/vault/inbox/$NIGHT_ACTOR.md")"
-snapshot_id="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["snapshot_id"])')"
-snapshot_fingerprint="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["snapshot_fingerprint"])')"
-snapshot_path="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["snapshot"])')"
+# runner-provided: provider_state (canonical state_path only), provider_run_id, provider_token,
+# provider fencing, contract_hash, run_id, actor_id.
+# snapshot_set, snapshot_path/snapshot_id/snapshot_fingerprint (actionable),
+# reference_snapshot_path/reference_snapshot_id/reference_snapshot_fingerprint.
+# provider state JSON은 actor/state_path/state_root/project_root/run_id/owner_token/fencing/contract_hash가 고정된
+# 한 owner identity임을 설명한다. state sweep도 반드시
+# `state sweep --contract-path "$CONTRACT" --actor "$actor_id" --project-root "$PROJECT_ROOT"`로 읽는다.
+# `provider_state`에는 이 JSON 전체를 넣지 않고 canonical state_path만 둔다.
+# state_root의 mode 0600 `.authority-key`로 위 immutable identity의 `authority_hmac`을
+# 검증한다. key/HMAC 누락·변조·다른 root로 복사된 state는 authority가 아니다.
+state_json="$(python3 "$GATE" state sweep \
+  --contract-path "$PROJECT_ROOT/.claude/vault/backlog/_NIGHT.md" --actor "$actor_id" \
+  --project-root "$PROJECT_ROOT")"
+# state_json의 state_path/state_root/project_root/actor/run_id/owner_token/fencing/contract_hash가
+# runner-provided provider_state/PROJECT_ROOT/actor_id/run_id/provider_token/fencing/contract_hash와
+# 모두 같은지 확인한다.
+# state_json의 snapshot_set_path/set_id와 actionable snapshot path/id/fingerprint/content hash도
+# runner가 bind한 값과 같아야 한다.
+# set manifest을 읽어 actionable의 actor/role/id/fingerprint가 prompt 값과 일치하고
+# status가 reported인지 검증한다. reference를 actionable로 바꾸지 않으며,
+# 불일치하면 contract-mismatch로 기록하고 어떤 inbox도 수정하지 않는다.
 ```
 
 ### 단일 실행 가정
@@ -136,13 +154,32 @@ snapshot_path="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; pri
 - Claude 주 실행은 한 번만 시작한다. Codex는 주 실행이 명시적으로 `failed`이거나 시간 초과로 만료되었다는 기록이 있을 때만 같은 `run_id`의 대체 실행으로 한 번 시작한다.
 - 상태가 `running`, `unknown`, `reported` 또는 성공 기록 미완성인 경우 Codex는 대체 실행을 시작하지 않는다. 두 실행이 동시에 같은 메모·티켓·예산을 소비하지 않게 한다.
 - 실행 소유권은 만료 시각과 단조 증가하는 fencing token(오래된 실행의 늦은 쓰기를 거부하는 번호)으로 확인한다. 만료한 실행은 결과 카드·예산·보관 표식을 쓰지 못한다.
+- runtime의 mutating 명령(`reconcile-inbox`, `snapshot-inbox`, `snapshot-inbox-set`, `snapshot-status`,
+  `track-inbox`, `archive-inbox`)은 반드시 동일한 `--provider-state`,
+  `--provider-job`, `--owner-token`, `--fencing`, `--run-id`, `--contract-hash` proof를 준다. `scan-inbox`는
+  읽기 전용이므로 proof를 붙이지 않는다.
+- provider 상태가 `fallback`, terminal 또는 `expired`가 된 뒤에는 기존 runtime 호출을
+  재시도하거나 파일 직접 쓰기로 우회하지 않는다. proof 검증 오류는 `late-owner` 또는
+  `claim-conflict`로 기록하고, 다른 token을 추측하거나 새 owner 세대를 대신 사용하지 않는다.
+- runtime은 state의 `authority_hmac`을 state-root key로 검증한 뒤에만 root와 owner proof를
+  신뢰한다. state 파일과 root 문자열을 함께 복사해도 유효한 authority가 되지 않는다.
 - 주 실행이나 대체 실행이 실패해도 성공으로 도장을 찍지 않는다. 결과 보고와 확인 가능한 종료 표식이 모두 남은 뒤에만 성공으로 기록한다.
+- provider 상태가 `committing`이면 새 `primary`, `fallback`, `failed`로 덮지 않는다. 같은
+  owner proof와 동일한 actionable snapshot 및 run manifest로 `complete success`를 멱등
+  재호출해 journal을 끝낸다. 이 재호출도 `--actor "$actor_id"`와
+  `--fencing "$fencing"`을 포함하며, proof나 manifest/snapshot이 없으면 성공을 만들지
+  않고 복구 실패로 기록한다.
 
 ## 3. 메모 원문과 스냅샷 수명
 
-`inbox/`의 메모 파일은 사람이 쓰는 원문이다. 밤은 어느 파일도 덮어쓰거나 삭제하지 않는다.
-스냅샷·소비 표식·archive는 자기 actor의 파일에만 만든다. 상대 파일은 소비 관리 대상이
-아니다 — 상대의 밤이 자기 컴퓨터에서 직접 소비한다.
+`inbox/`의 사람 원문 바이트는 불변이다. night-runtime만 current actor 파일의
+`<!-- vault-inbox-item:start ... -->`/`<!-- vault-inbox-item:end -->` marker metadata와 closed
+표시를 CAS(기대 hash·byte range 비교), file lock, provider owner proof로 변경할 수 있다.
+모델과 일반 agent의 자유 편집·직접 파일 쓰기는 금지한다. marker 밖의 사람 원문은 추가·수정·삭제하지
+않으며 malformed 또는 drifted marker는 manual review로 보존한다.
+스냅샷 set의 actionable 항목만 소비 표식·상태 전이·archive·harvest·provider success의
+대상이다. reference 항목은 immutable read-only 맥락이며 인용 시 출처만 기록한다. 상대
+파일은 소비 관리 대상이 아니다 — 상대의 밤이 자기 컴퓨터에서 직접 소비한다.
 실행 시작 전 기존 줄을 보존하는 추가 전용 동기화가 필요할 때만 양쪽 추가 내용을
 보존한 동기화 commit을 만들 수 있다. 실행 결과의 보관은 원문을 지우는 이동이 아니라 snapshot content를
 `_archive/inbox/`에 복사하고 소비 manifest를 쓰는 방식이다.
@@ -163,10 +200,209 @@ snapshot_path="$(printf '%s' "$snapshot_json" | python3 -c 'import json,sys; pri
 
 ```sh
 python3 "$PROJECT_ROOT/.claude/vault/backlog/night-runtime.py" archive-inbox \
-  --snapshot-path "$snapshot_path" --run-id "$run_id" \
+  --provider-state "$provider_state" --owner-token="$provider_token" \
+  --fencing "$fencing" --run-id "$run_id" --contract-hash "$contract_hash" \
+  --snapshot-path "$snapshot_path" \
   --archive-root "$PROJECT_ROOT/.claude/vault/_archive/inbox" \
   --approval-state awaiting-owner-review
 ```
+
+### 3.1 actionable inbox ticket lifecycle
+
+현재 actor의 live 파일만 다음 CAS(비교 후 교체) helper로 다룬다. reference snapshot이나
+상대 inbox에는 `scan`·`track`·`close`·archive를 실행하지 않는다.
+
+1. `scan-inbox --actor "$actor_id" --path "$MY_INBOX"`로 읽는다. unmarked candidate의
+   `proposed_item_id`를 먼저 티켓의 `operation_key`로 저장하고, 같은 ID의 티켓을 검색해
+   없을 때만 만든다. 따라서 이전 `tracked`/`closed` 원문에서 새 티켓을 만들지 않는다.
+2. 티켓과 operation key가 저장된 뒤에만 `track-inbox --item-id ...`를 호출한다. marker를 한
+   번 쓸 때마다 즉시 다시 scan한다. `tracked` 항목은 기존 unit을 재개하고, 로컬 원장이
+   유실됐어도 marker의 같은 unit ID로 복구한다. `closed`는 후보에서 제외한다.
+3. 단순 Markdown 취소선은 제외 근거가 아니다. malformed·drifted marker는 fail-open으로
+   후보와 함께 보존하고 manual review로 올린다. 추측으로 닫거나 원문을 고치지 않는다.
+4. 실제 inbox 편집은 current actor 파일에 한정하고 `--expected-hash`, byte range,
+   `--item-id`와 동일 owner proof를 모두 전달하는 runtime CAS helper만 사용한다.
+
+`proposed_item_id`는 marker wrapper를 제거한 논리 원문의 raw byte range와 그 내용 hash로
+만드는 stable ID다. 파일 전체 hash는 CAS 비교 전용이며 item ID에 넣지 않는다. malformed 또는
+drifted marker는 `manual_review`로만 남기고 자동 ticket 후보로 만들지 않는다.
+
+```sh
+# 읽기 전용: provider proof를 붙이지 않는다.
+python3 "$PROJECT_ROOT/.claude/vault/backlog/night-runtime.py" scan-inbox \
+  --actor "$actor_id" --path "$MY_INBOX" --project-root "$PROJECT_ROOT"
+
+# 상태 조회와 marker 쓰기: 모두 runner-provided 동일 proof를 쓴다.
+python3 "$PROJECT_ROOT/.claude/vault/backlog/night-runtime.py" snapshot-status \
+  --provider-state "$provider_state" --owner-token="$provider_token" \
+  --fencing "$fencing" --run-id "$run_id" --contract-hash "$contract_hash" \
+  --snapshot-fingerprint "$snapshot_fingerprint" --snapshot-id "$snapshot_id" \
+  --status claimed
+python3 "$PROJECT_ROOT/.claude/vault/backlog/night-runtime.py" track-inbox \
+  --provider-state "$provider_state" --owner-token="$provider_token" \
+  --fencing "$fencing" --run-id "$run_id" --contract-hash "$contract_hash" \
+  --path "$MY_INBOX" --actor "$actor_id" --expected-hash "$expected_hash" \
+  --snapshot-id "$snapshot_id" --item-id "$item_id" --start "$start" --end "$end" \
+  --unit "$unit_id"
+python3 "$PROJECT_ROOT/.claude/vault/backlog/night-runtime.py" reconcile-inbox \
+  --provider-state "$provider_state" --owner-token="$provider_token" \
+  --fencing "$fencing" --run-id "$run_id" --contract-hash "$contract_hash" \
+  --actor "$actor_id" --path "$MY_INBOX" \
+  --receipt-dir "$PROJECT_ROOT/.claude/vault/backlog/tickets/receipts"
+```
+
+공개 direct close 명령은 없다. 닫힘은 canonical receipt를 검증하는 `reconcile-inbox`만
+만든다. `code`는 실제 target branch integration, `research`는 owner의
+accepted/rejected/no-action, `needs-owner`는 답변과 그 답변의 descendant 종료를 확인한
+receipt가 있어야 `closed`와 사람용 취소선 처리를 한다. 일부 unit만 끝났으면 `tracked`를
+유지한다. receipt 없는 종료와 취소선만으로는 close하지 않는다. closed marker에는 검증한
+receipt raw bytes의 `close_proof_sha256`과 content-addressed `close_proof_path`를 저장한다.
+최종 proof 경로는 `.claude/vault/backlog/tickets/receipts/.proofs/<sha256>.json`이다.
+동일 raw bytes는 같은 `.proofs/` directory fd의 임시 파일에 완전히
+write·chmod 0444·fsync한 뒤 hard-link로 `<sha256>.json` 이름을 create-only 원자 게시하고
+directory를 fsync한다. 중단돼 남은 임시 파일은 다음 정산을 막지 않는다. receipt와 evidence는 project/receipt
+directory fd를 고정한 openat 방식으로 모든 상위 경로의 symlink를 거부하고 같은 file
+descriptor에서 읽으며, inbox 교체 직전에 stat과 hash를 다시 검증한다.
+
+### 3.2 session·ticket·source·receipt 정산
+
+티켓을 만들고 저장을 확인한 즉시 source item은 `tracked`다. 같은 unit/ticket은 밤과 낮 session이 이어서 처리하며, 낮 session은 canonical
+`.claude/vault/backlog/tickets/receipts/<receipt_id>.json`에만 receipt를 남긴다. 다음 **실제**
+night run은 snapshot보다 먼저 `reconcile-inbox`로 그 receipt를 정산한다. `tracked`는 새 티켓 후보에서 제외되고 기존 unit을 재개하며, `closed`는 기본 입력에서 제외된다.
+
+linked unit 모두가 terminal receipt proof를 가진 경우에만 source item을 `closed`로 바꾼다.
+부분 receipt는 검증 결과를 `partial`로 남기지만 source item을 닫지 않으므로 `tracked`가 유지된다.
+`reconcile-inbox`는 부분 receipt를 검증한 뒤 닫지 않은 채 다음 unit과 다른 marker를 계속 처리한다.
+`awaiting-merge-review`는 해당 code unit만 보류하는 상태이며 다른 unit/marker의 실행·receipt
+정산·inbox 후보 처리를 막지 않는다. 사람 feedback이 기존 작업의 continuation이면 새 source item도 같은 ticket에 `tracked`로
+연결한다. 별도 요구일 때만 새 ticket을 만든다. manual_review,
+partial completion, receipt 없는 결과는 `tracked`를 유지하며 자동 close하지 않는다.
+
+receipt는 canonical directory의 정확히 `<receipt_id>.json` 파일이며 schema는 다음 필수 필드다.
+`{ "schema": 1, "receipt_id": "...", "actor": "...", "item_id": "...", "units": [...],
+"disposition": "...", "evidence": [...] }`. `actor`, `item_id`는 current tracked marker와 같아야
+하며, `units`는 비어 있지 않은 marker units의 중복 없는 부분집합이어야 한다. marker의 전체
+units와 정확히 같은 receipt만 terminal receipt로 source item을 닫는다. 각 evidence는
+`{kind,path,sha256}` 및 kind별 필수 필드를 가지며, `path`는
+canonical project-relative 실제 파일이고 SHA-256이 일치해야 한다.
+
+- `integrated`는 `kind: "origin-main"` evidence의 40자리 hex `commit`, ticket 또는 current actor
+  run manifest/result-card path, 그리고 `git merge-base --is-ancestor <commit> origin/main` 성공이
+  필요하다.
+- `accepted`, `rejected`, `no-action`, `cancelled`, `superseded`는 `kind: "owner-decision"` evidence와
+  `feedback/<actor>/` 아래 path가 필요하다.
+- `completed`, `failed`는 `kind: "result-card"` evidence와
+  `.claude/vault/backlog/tickets/` 아래 path가 필요하다.
+
+각 disposition에는 위 terminal evidence가 하나 이상 있어야 한다. 다른 actor receipt, 손상된
+schema/hash/path/evidence, marker와 맞지 않는 item/unit은 manual review 또는 skipped로 기록하며
+사람 원문과 marker를 자동으로 닫지 않는다.
+
+### 3.3 ticket runtime 인수 계약
+
+`ticket-runtime.py`의 상태는 ticket별 작업 소유권이고, provider lease는 밤 실행 자체의
+소유권일 뿐 ticket claim을 대신하지 않는다. link는 **완전 일치하는 session ID**만 인정한다.
+night session ID는 항상 `night-<run_id>`이다. launcher는 provider `bind-snapshot` 뒤 Claude를
+시작하기 전에 다음 읽기 전용 inventory를 `runs/<actor>/<run_id>/ticket-handoffs.json`에
+temp write·file fsync·replace·directory fsync 순서로 저장한다.
+
+```sh
+python3 "$PROJECT_ROOT/.claude/vault/backlog/ticket-runtime.py" list \
+  --project "$PROJECT_ROOT" --actor "$actor_id"
+```
+
+상태 분류와 처리 규칙은 다음으로 고정한다.
+
+- `active`: fresh day claim은 건드리거나 중복 실행하지 않는다. 다른 unit을 처리한 뒤 매 loop에서
+  live `list`를 다시 읽는다. day ticket이 밤중에 lease expiry 또는 `paused`가 되어
+  `takeover_ready`가 될 때만 그 시점에 인수할 수 있다.
+- `awaiting-merge-review`: 해당 code unit만 보류한다. 다른 unit/marker의 실행과 receipt 정산,
+  `reconcile-inbox`의 다음 inbox 후보 처리는 계속한다.
+- `takeover_ready`: valid checkpoint와 **정확히 같은 ticket worktree**가 있을 때만
+  `takeover --owner-kind night`를 쓴다. runtime이 fencing을 증가시킨 결과의 owner token/fencing으로
+  이후 동작한다. checkpoint 없는 stale claim과 checkpoint/worktree drift는 인수하지 않는다.
+- `reference_only`, `manual_review`: 수정·claim·takeover를 금지한다. session harvest의 읽기 전용
+  참고로만 쓴다. 특히 main에서 시작한 session은 ticket runtime에서
+  `claim --reference-only-main`으로 기록되며 night가 작업 대상으로 바꾸지 않는다.
+- `released`: 새 tracked ticket이면 ticket-owned worktree를 먼저 만들고 그 worktree에서
+  `claim --owner-kind night`한다. main worktree는 ticket 작업 사본이 아니다.
+
+```sh
+# launcher-provided fixed values; provider lease와 별개의 ticket lease다.
+lease_seconds="$NIGHT_TICKET_LEASE_SECONDS"          # 1800
+heartbeat_seconds="$NIGHT_TICKET_HEARTBEAT_SECONDS"  # 300
+
+# 각 unit 직전과 다른 unit 종료 뒤 loop마다 initial inventory가 아닌 live state를 다시 읽는다.
+live_inventory="$(python3 "$PROJECT_ROOT/.claude/vault/backlog/ticket-runtime.py" list \
+  --project "$PROJECT_ROOT" --actor "$actor_id")"
+# active는 즉시 skip한다. paused/expired ticket도 이 live list에서 takeover_ready로
+# 재분류된 경우에만 다음 takeover를 검토한다.
+
+# takeover는 live inventory의 ticket_id/worktree/checkpoint가 모두 정확히 일치할 때만 허용된다.
+takeover_json="$(python3 "$PROJECT_ROOT/.claude/vault/backlog/ticket-runtime.py" takeover \
+  --project "$PROJECT_ROOT" --ticket-id "$ticket_id" --actor "$actor_id" \
+  --session-id "night-$run_id" --owner-kind night --worktree "$ticket_worktree" \
+  --lease-seconds "$lease_seconds")"
+```
+
+`takeover` 출력 JSON에서 `owner_token`, `fencing`, `session_id`, `worktree`를 추출하고,
+모두 존재하며 session이 `night-$run_id`, worktree가 live inventory의 exact worktree와 같을
+때에만 subagent를 실행한다. provider owner token이나 provider lease를 ticket proof로
+대체하지 않는다.
+
+```sh
+ticket_owner_token="$(printf '%s' "$takeover_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner_token"])')"
+ticket_fencing="$(printf '%s' "$takeover_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["fencing"])')"
+ticket_session_id="$(printf '%s' "$takeover_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner_session_id"])')"
+ticket_worktree="$(printf '%s' "$takeover_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["worktree"])')"
+test -n "$ticket_owner_token" && test -n "$ticket_fencing" && \
+  test "$ticket_session_id" = "night-$run_id" && test -n "$ticket_worktree"
+
+# runtime state가 없는 tracked ticket은 등록된 격리 ticket worktree를 먼저 만든다.
+ticket_worktree="$PROJECT_ROOT/.claude/worktrees/$ticket_id"
+git -C "$PROJECT_ROOT" worktree add "$ticket_worktree" -b "night/$actor_id/$run_id/$ticket_id"
+claim_json="$(python3 "$PROJECT_ROOT/.claude/vault/backlog/ticket-runtime.py" claim \
+  --project "$PROJECT_ROOT" --ticket-id "$ticket_id" --actor "$actor_id" \
+  --session-id "night-$run_id" --owner-kind night --worktree "$ticket_worktree" \
+  --lease-seconds "$lease_seconds")"
+ticket_owner_token="$(printf '%s' "$claim_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner_token"])')"
+ticket_fencing="$(printf '%s' "$claim_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["fencing"])')"
+ticket_session_id="$(printf '%s' "$claim_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner_session_id"])')"
+claimed_worktree="$(printf '%s' "$claim_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["worktree"])')"
+# claim JSON의 owner_token/fencing/owner_session_id/worktree proof가 모두 검증되기 전에는 subagent를 실행하지 않는다.
+test -n "$ticket_owner_token" && test -n "$ticket_fencing" && \
+  test "$ticket_session_id" = "night-$run_id" && test "$claimed_worktree" = "$ticket_worktree"
+```
+
+night가 ticket proof를 얻은 뒤에만 subagent를 실행한다. mutation 뒤에는 최대
+`heartbeat_seconds` 이내에 heartbeat를 남기고, 시작·위임 전후·의미 있는 변경·결과 경계마다
+`checkpoint --status running`을 남긴다. terminal receipt 없이 실행을 끝낼 때는 반드시
+`checkpoint --status paused`를 먼저 남기고 멱등 `release --status paused`한다. release는
+inbox를 닫지 않으며, terminal canonical receipt를 다음 실제 run의 `reconcile-inbox`가
+정산할 때만 closed가 된다. `session_history`는 harvest linkage의 일부이므로 current owner와
+이전 owner history를 보존한다. ticket 상태와 checkpoint 없이 subagent에 실행을 위임하지 않는다.
+
+```sh
+python3 "$PROJECT_ROOT/.claude/vault/backlog/ticket-runtime.py" heartbeat \
+  --project "$PROJECT_ROOT" --ticket-id "$ticket_id" --session-id "$ticket_session_id" \
+  --owner-token "$ticket_owner_token" --fencing "$ticket_fencing" --lease-seconds "$lease_seconds"
+python3 "$PROJECT_ROOT/.claude/vault/backlog/ticket-runtime.py" checkpoint \
+  --project "$PROJECT_ROOT" --ticket-id "$ticket_id" --session-id "$ticket_session_id" \
+  --owner-token "$ticket_owner_token" --fencing "$ticket_fencing" --input "$checkpoint_input" \
+  --status running --lease-seconds "$lease_seconds"
+# terminal canonical receipt가 없을 때만 pause/release한다.
+python3 "$PROJECT_ROOT/.claude/vault/backlog/ticket-runtime.py" checkpoint \
+  --project "$PROJECT_ROOT" --ticket-id "$ticket_id" --session-id "$ticket_session_id" \
+  --owner-token "$ticket_owner_token" --fencing "$ticket_fencing" --input "$checkpoint_input" \
+  --status paused --lease-seconds "$lease_seconds"
+python3 "$PROJECT_ROOT/.claude/vault/backlog/ticket-runtime.py" release \
+  --project "$PROJECT_ROOT" --ticket-id "$ticket_id" --session-id "$ticket_session_id" \
+  --owner-token "$ticket_owner_token" --fencing "$ticket_fencing" --status paused
+```
+
+낮 session도 실제 session ID로 `claim`하고 ticket-owned worktree에서 작업한다. main에서
+시작된 기존 session은 `--reference-only-main`으로만 claim한다. 의미 있는 mutation마다
+checkpoint와 heartbeat를 남기며, 미완료 종료는 `paused` checkpoint로 끝낸다. 세션 원문은 보조 증거이고 재개 정본은 checkpoint다.
 
 ## 4. 해석과 분해
 
@@ -189,9 +425,11 @@ python3 "$PROJECT_ROOT/.claude/vault/backlog/night-runtime.py" archive-inbox \
 
 ```sh
 python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --dry-run \
-  --project "$PROJECT_ROOT" --contract-hash "$contract_hash" \
+  --project "$PROJECT_ROOT" --actor "$actor_id" --contract-hash "$contract_hash" \
   --snapshot-id "$snapshot_id" --snapshot-fingerprint "$snapshot_fingerprint"
 python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --run-id "$run_id" \
+  --project "$PROJECT_ROOT" --actor "$actor_id" \
+  --out "$PROJECT_ROOT/runs/$actor_id/$run_id/harvest" \
   --contract-hash "$contract_hash" --snapshot-id "$snapshot_id" \
   --snapshot-fingerprint "$snapshot_fingerprint" \
   --snapshot-path "$snapshot_path"
@@ -208,13 +446,17 @@ python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --run-id "$run_id" \
 - 모든 결과 카드·티켓·기계 보고서가 저장되고 `run_id`의 완료 표식을 미리 확인한 뒤에만
   ```sh
   python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --validate-complete --run-id "$run_id" \
+  --project "$PROJECT_ROOT" --actor "$actor_id" \
+  --out "$PROJECT_ROOT/runs/$actor_id/$run_id/harvest" \
   --contract-hash "$contract_hash" --snapshot-id "$snapshot_id" \
   --snapshot-fingerprint "$snapshot_fingerprint" \
   --snapshot-path "$snapshot_path"
   ```
-  완료 표식이 없거나 산출물 hash가 바뀌면 provider `complete success`를 호출하지 않는다.
-  실제 성공 도장 확정(`--commit-success`)은 provider gate가 현재 owner token·fencing·lease를
-  재확인한 뒤에만 수행한다.
+  완료 표식은 정확히 `runs/<actor>/<run>/harvest/.run-complete.json`이고, 완료 표식이 없거나
+  산출물 hash가 바뀌면 provider `complete success`를 호출하지 않는다.
+  harvest에는 공개 성공 도장 명령이 없다. 실제 도장은 provider `complete success`가 canonical
+  state lock 안에서 owner token·fencing·completion proof와 stamp candidate/run-complete hash를
+  다시 확인한 뒤 `.last-success`와 provider success를 함께 확정한다.
 
 수확된 세션마다 다음을 짧게 기록한다.
 
@@ -276,7 +518,9 @@ git worktree add <isolated-path> -b night/<actor>/<run-id>/<unit-id>
 ```
 
 worktree와 branch 이름에 actor가 들어가므로 두 actor가 같은 원격에 push해도 충돌하지
-않는다. 결과 보고·feedback을 쌓는 actor 전용 branch(`NIGHT_GIT_BRANCH`)는 worktree branch
+않는다. launcher는 새 primary·낮 실행 차단·inbox sync보다 먼저 기존 sweep state를 읽고,
+`committing`이면 state에 저장된 completion proof로 finalize한 뒤 exit 0한다. proof가
+불완전하거나 finalize가 실패하면 새 작업을 시작하지 않는다.
 경로(`night/<actor>/…`)의 상위가 되지 않는 이름(예: `night-runs/<actor>`)을 쓴다 — 같은
 이름의 branch와 하위 경로 branch는 Git ref 구조상 공존할 수 없다.
 
@@ -445,8 +689,8 @@ human_merge_reviewed = 위 카드 중 merge_mode가 human인 수
 ## 12. 반복 루프와 종료
 
 ```text
-A. 자기 inbox의 스냅샷을 만든다.
-B. 실행 잠금을 만든다.
+A. runner가 제공한 snapshot set을 검증·고정한다(재촬영하지 않는다).
+B. runner가 만든 실행 잠금을 확인한다.
 C. 메모·최근 결과·세션·열린 티켓을 읽고 후보를 만든다.
 D. 사실 확인 → 해석 → 분해 → 수용 기준 선기입을 한다.
 E. 실행 단위를 백지 작업자·격리 worktree에 보내 조사·실험·기능 변경을 수행한다.
@@ -458,28 +702,74 @@ J. 독립 판정 두 번이 모이면 분해 기준 승격 후보를 만든다.
 ```
 
 자동화 provider 상태도 결과와 함께 닫는다. 모든 결과 카드·기계 보고서·수확
-완료 표식이 저장된 정상 종료에는 다음 명령을 실행한다.
+완료 표식이 저장된 정상 종료에는 먼저 project-relative
+`runs/<actor>/<run_id>/manifest.json`을 만든다. schema는 `1`이고 `run_id`,
+`actor`, `contract_hash`, `status: "reported"`, exact report artifact
+`runs/<actor>/<run>/report.html` path/hash, exact harvest-complete artifact
+`runs/<actor>/<run>/harvest/.run-complete.json` path/hash, 모든 unit의 unique `id`와
+terminal status 및 result-card path/hash를 포함한다. result card는 반드시
+`.claude/vault/backlog/tickets/` 아래에 있어야 하며, report·harvest complete·이 result
+card 밖의 artifact만으로는 success를 만들 수 없다. 그 뒤에만 다음 명령을 실행한다.
+actionable snapshot은 앞에서 provider에 bind된 set member와 path/id/fingerprint/content hash가
+모두 같아야 한다. `--harvest-out`은 정확히 `runs/<actor>/<run-id>/harvest`, 성공 도장은
+정확히 `.claude/vault/backlog/sweep/.last-success`에 고정하며 두 경로도 committing
+`completion_proof`에 포함한다. journal 재호출에서 harvest/stamp 목적지를 바꾸지 않는다.
+harvest에는 공개 성공 도장 명령이 없다. provider가 state lock 안에서 owner proof와
+stamp candidate/run-complete hash를 다시 검증하고 도장과 success를 함께 확정한다.
 
 ```sh
 # ... 결과 보고서와 harvest --validate-complete가 성공한 뒤 ...
 python3 "$GATE" complete sweep success \
-  --run-id "$provider_run_id" --token "$provider_token" --contract-hash "$contract_hash" \
+  --run-id "$provider_run_id" --token="$provider_token" --contract-hash "$contract_hash" \
+  --fencing "$fencing" --actor "$actor_id" --harvest-project "$PROJECT_ROOT" \
+  --project-root "$PROJECT_ROOT" \
+  --harvest-out "$PROJECT_ROOT/runs/$actor_id/$run_id/harvest" \
   --snapshot-id "$snapshot_id" --snapshot-fingerprint "$snapshot_fingerprint" \
-  --snapshot-path "$snapshot_path"
+  --snapshot-path "$snapshot_path" \
+  --run-manifest "runs/$actor_id/$run_id/manifest.json"
 ```
 
 실행이 실패하거나 제한 시간에 끊기면 `success`를 호출하지 말고 `failed` 또는
-`timeout`을 기록한다(같은 `--run-id`와 `--token`을 전달한다). Claude 주 실행이
+`timeout`을 기록한다(같은 `--run-id`, `--token`, `--fencing`, `--actor "$actor_id"`를 전달한다). Claude 주 실행이
 `failed` 또는 `timeout`으로 닫힌 경우에만 다음처럼 Codex 대체 claim을 한 번 허용한다.
 
 ```sh
-python3 "$GATE" fallback sweep \
-  --run-id "$provider_run_id" --contract-hash "$contract_hash"
-provider_state="$(python3 "$GATE" \
-  state sweep --contract-path "$PROJECT_ROOT/.claude/vault/backlog/_NIGHT.md")"
-provider_run_id="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')"
-provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner_token"])')"
+# failure completion도 actor와 현재 fencing을 생략하지 않는다.
+python3 "$GATE" complete sweep failed \
+  --run-id "$provider_run_id" --token="$provider_token" \
+  --fencing "$fencing" --contract-hash "$contract_hash" --actor "$actor_id" \
+  --project-root "$PROJECT_ROOT"
+
+# fallback은 같은 state_path/run_id에서 새 owner_token과 증가한 fencing을 발급한다.
+previous_provider_state="$provider_state"
+previous_fencing="$fencing"
+fallback_claim="$(python3 "$GATE" fallback sweep \
+  --run-id "$provider_run_id" --contract-hash "$contract_hash" --actor "$actor_id" \
+  --project-root "$PROJECT_ROOT")"
+provider_state="$(printf '%s' "$fallback_claim" | python3 -c 'import json,sys; print(json.load(sys.stdin)["state_path"])')"
+provider_run_id="$(printf '%s' "$fallback_claim" | python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')"
+provider_token="$(printf '%s' "$fallback_claim" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner_token"])')"
+fencing="$(printf '%s' "$fallback_claim" | python3 -c 'import json,sys; print(json.load(sys.stdin)["fencing"])')"
+fallback_actor="$(printf '%s' "$fallback_claim" | python3 -c 'import json,sys; print(json.load(sys.stdin)["actor"])')"
+fallback_contract_hash="$(printf '%s' "$fallback_claim" | python3 -c 'import json,sys; print(json.load(sys.stdin)["contract_hash"])')"
+fallback_state_root="$(printf '%s' "$fallback_claim" | python3 -c 'import json,sys; print(json.load(sys.stdin)["state_root"])')"
+fallback_project_root="$(printf '%s' "$fallback_claim" | python3 -c 'import json,sys; print(json.load(sys.stdin)["project_root"])')"
+[ "$fallback_actor" = "$actor_id" ] &&
+[ "$fallback_contract_hash" = "$contract_hash" ] &&
+[ "$fallback_state_root" = "$(dirname "$provider_state")" ] &&
+[ "$fallback_project_root" = "$PROJECT_ROOT" ] &&
+[ "$provider_run_id" = "$run_id" ] &&
+[ "$provider_state" = "$previous_provider_state" ] &&
+[ "$fencing" -gt "$previous_fencing" ] ||
+  { echo "fallback owner proof mismatch" >&2; exit 1; }
+# 새 JSON에서 재추출한 provider_state/provider_token/fencing만 환경과 prompt proof로 교체한다.
+# 이전 token/fencing으로는 runtime을 재시도하지 않는다.
 ```
+
+`committing` recovery는 이 `complete success` 명령을 actor, token, fencing, actionable
+snapshot, `--harvest-project`, `--harvest-out`, canonical `--run-manifest`까지 **완전히
+같이** 다시 호출한다. 새 primary/fallback 또는 `complete failed`는 journal을 덮으므로
+호출하지 않는다.
 
 상태 전이는 현재 provider claim과 원자적으로 결속되며,
 없는 claim·이미 닫힌 claim·알 수 없는 상태의 늦은 기록은 거부된다.
@@ -535,10 +825,25 @@ provider_token="$(printf '%s' "$provider_state" | python3 -c 'import json,sys; p
 
 ## 15. 계약 개정 기록
 
+- 2026-08-18 (16차) · 이전 계약 해시 `68bcf07452deecf5c1bf1828c4e35b850e7b6e067854d2fbe03cdada76e236e5` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — actor별 canonical proof와 stable logical inbox ID를 실행 계약으로 고정하고, committing journal과 signal/day-run 경계를 성공 기록보다 앞에 둔다.
+  - 변경 내용: (1) 모든 provider 명령은 actor와 complete fencing을 같은 owner proof로 전달하며, state-root 0600 key의 HMAC으로 root identity를 검증한다. success는 provider가 bind한 reported actionable snapshot과 canonical manifest/report/harvest/result card만 인정한다. (2) fallback은 같은 state path/run에서 새 token·증가 fencing을 JSON으로 다시 추출하고 stale proof를 폐기한다. (3) marker wrapper를 뺀 logical raw byte range/content hash가 stable item ID이고 full-file hash는 CAS 전용이며 malformed/drifted는 `manual_review`다. (4) snapshot set은 두 파일 generation 재검증 실패 시 manifest 없이 실패하고, `committing`은 같은 completion proof와 canonical harvest/stamp 목적지의 idempotent success 재호출로만 복구한다. archive도 `.claude/vault/_archive/inbox`만 허용한다. (5) launcher는 lease·오전 8시와 `NIGHT_ALLOW_DAY_RUN=1` 기록 경계를 지키며, 코드 신호와 day-run은 별도 실행 경계다.
+  - 영향받는 분해 기준: §2의 actor/canonical 입력 고정, §3의 stable ID, §4의 harvest 경로, §8의 fallback·committing 복구, §12의 provider success 검증이 새 proof와 artifact 경계를 따른다. reference snapshot은 출처 맥락일 뿐 소비·표식·archive 대상이 아니다.
+
 - 2026-08-18 (15차) · 이전 계약 해시 `35826e690c9646b4f0efc40d64f4d2c90ffc4152a78dce13796b631bcc4b43c0` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — actor 이름을 역할명(owner/friend) 대신 실제 사용자 이름(jh/hs)으로 쓴다.
   - 변경 내용: 공유 inbox를 `inbox/jh.md`·`inbox/hs.md`로 이름 변경하고, 기본 actor를 오너 머신 `jh`, 친구 설치 `hs`로 맞췄다. 로컬 결과·feedback·수리 branch의 actor namespace도 같은 값을 쓴다.
   - 영향받는 분해 기준: 없음 — 이름만 바뀌고 소비·공유·동기화 규칙은 같다.
+
+- 2026-08-19 (15차) · 부분 완료 정산과 머지 검토를 전역 실행 관문에서 분리한다.
+  - 변경 이유: 한 source marker에 여러 unit이 묶였을 때 한 unit의 `awaiting-merge-review`가
+    다른 완료 unit의 receipt 기록과 다음 inbox 실행까지 막히는 것처럼 보였다.
+  - 변경 내용: marker 전체 unit의 terminal receipt가 모일 때만 `closed`로 바꾸되, 완료된
+    일부 unit의 부분 receipt는 먼저 검증해 `partial`로 남긴다. 겹치는 부분 receipt는
+    `manual_review`로 보낸다. `awaiting-merge-review`는 해당 code unit만 보류하고 다른
+    unit·marker는 계속 실행한다.
+  - 영향받는 분해 기준: 조사 완료, 코드 branch의 사람 머지, receipt 정산, source marker
+    close를 서로 다른 상태로 판정한다.
 
 - 2026-08-18 (14차) · 이전 계약 해시 `084ae665d956edba5d5537bd86055a17ee8fb9de1cd967908c3afbc278340839` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — 메모만은 서로 보이게 한다. 단일 `_INBOX.md`를 섹션으로 나누는 방식은 8/18 새벽을 죽인 같은-파일 병합 충돌로 돌아가므로, 파일을 사람별로 갈라 충돌 자체를 없앤다.

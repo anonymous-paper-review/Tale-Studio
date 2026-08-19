@@ -16,18 +16,18 @@
 `index.json`, `rejections.md`, 다이제스트의 메타데이터, `.stamp-candidate`에는
 실행(run), 원천(source), 세션(session) 식별자가 함께 들어간다. 마지막에
 `.run-complete.json`을 원자적으로 교체한 경우에만 실행을 완료한 것으로 본다.
-완료 표식의 해시·식별자가 맞을 때만 `--commit-success --run-id <id>`가
-성공 도장을 확정한다. 표식이 없거나 산출물이 바뀌면 `committable=false`다.
+완료 표식의 해시·식별자가 맞을 때만 `--validate-complete --run-id <id>`가
+산출물을 검증한다. 성공 도장은 provider gate만 쓴다.
 """
 import argparse
 import datetime as dt
-import fcntl
 import glob
 import hashlib
 import json
 import math
 import os
 import re
+import subprocess
 import sys
 import time
 import uuid
@@ -136,13 +136,23 @@ def short_id(sid):
     return (sid.rsplit("_", 1)[-1] if "_" in sid else sid)[:8]
 
 
-def _gjc_cwd(path, limit=300):
+def _gjc_metadata(path, limit=300):
+    cwd = session_id = None
     for i, o in enumerate(_iter_json(path)):
         if i > limit:
             break
-        if o.get("cwd"):
-            return o["cwd"]
-    return None
+        if cwd is None and isinstance(o.get("cwd"), str):
+            cwd = o["cwd"]
+        if (session_id is None and o.get("type") == "session"
+                and isinstance(o.get("id"), str) and o["id"]):
+            session_id = o["id"]
+        if cwd is not None and session_id is not None:
+            break
+    return cwd, session_id
+
+
+def _gjc_cwd(path, limit=300):
+    return _gjc_metadata(path, limit)[0]
 
 
 def parse_now(value):
@@ -207,40 +217,6 @@ def read_stamp(path, now=None):
     if now is not None and epoch > now:
         raise ValueError("도장이 기준 시각보다 미래다")
     return epoch
-
-
-def write_stamp(path, epoch):
-    """도장을 쓴다. 숫자 뒤에 사람이 읽는 날짜를 주석으로 붙여
-    '이게 무슨 파일인지 몰라서 날짜 글자로 덮어쓰는' 사고를 막는다."""
-    when = dt.datetime.fromtimestamp(epoch, UTC)
-    _atomic_write(
-        path,
-        f"{epoch}  # {when:%Y-%m-%dT%H:%M:%SZ} — 첫 숫자만 읽는다. "
-        f"손으로 고칠 때 숫자를 날짜 글자로 바꾸지 마라(2026-08-14 실사고)\n",
-    )
-
-
-def commit_stamp_monotonic(path, epoch, now, lease_until=None):
-    """한 lock 안에서 기존 도장을 읽고 비교한 뒤 원자 교체한다."""
-    lock_path = f"{path}.lock"
-    parent = os.path.dirname(path) or "."
-    os.makedirs(parent, exist_ok=True)
-    lock = open(lock_path, "a+", encoding="utf-8")
-    try:
-        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
-        if lease_until is not None and time.time() >= lease_until:
-            raise ValueError("provider lease가 stamp lock 안에서 만료됐다")
-        if os.path.exists(path):
-            previous = read_stamp(path, now=now)
-            if previous > epoch:
-                return previous, False
-        if lease_until is not None and time.time() >= lease_until:
-            raise ValueError("provider lease가 stamp 쓰기 직전에 만료됐다")
-        write_stamp(path, epoch)
-        return epoch, True
-    finally:
-        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
-        lock.close()
 
 
 def _contract_file(project):
@@ -413,8 +389,12 @@ def discover(project, since_h, exclude_recent_min, now):
     for p in glob.glob(f"{HOME}/.gjc/agent/sessions/*/*.jsonl"):
         if os.path.getmtime(p) < win_start:
             continue          # cwd 파싱 전에 싸게 거른다
-        if _gjc_cwd(p) == project:
-            out.append({"store": "gjc", "path": p, "turns": _turns_gjc})
+        cwd, session_id = _gjc_metadata(p)
+        if cwd == project:
+            out.append({
+                "store": "gjc", "path": p, "turns": _turns_gjc,
+                "sid": session_id or os.path.basename(p)[:-6],
+            })
 
     sessions = []
     for c in out:
@@ -422,7 +402,7 @@ def discover(project, since_h, exclude_recent_min, now):
         m = os.path.getmtime(p)
         rec = {
             "store": c["store"],
-            "sid": os.path.basename(p)[:-6],
+            "sid": c.get("sid", os.path.basename(p)[:-6]),
             "path": p,
             "mtime": m,
             "size_kb": os.path.getsize(p) // 1024,
@@ -448,6 +428,85 @@ def discover(project, since_h, exclude_recent_min, now):
         -r["mtime"], r["store"], r["sid"], r["path"],
     ))
     return sessions
+
+
+TICKET_CLASSIFICATIONS = {
+    "active", "takeover_ready", "reference_only", "manual_review", "released",
+}
+TICKET_HANDOFF_FIELDS = (
+    "ticket_id", "actor", "owner_kind", "owner_session_id", "fencing", "status",
+    "lease_until", "heartbeat_at", "project_root", "worktree", "workspace_mode",
+    "latest_checkpoint_path", "latest_checkpoint_hash", "latest_checkpoint_sequence",
+    "classification", "checkpoint_valid", "session_history",
+)
+
+
+def ticket_handoff_inventory(project, actor, now):
+    """검증된 ticket-runtime 목록을 읽고, owner token 없이 수확용 사본을 만든다."""
+    if not actor:
+        raise ValueError("ticket handoff inventory에는 --actor가 필요하다")
+    runtime = os.path.join(project, ".claude", "vault", "backlog", "ticket-runtime.py")
+    if not os.path.isfile(runtime):
+        raise ValueError("ticket-runtime.py가 없다")
+    try:
+        completed = subprocess.run(
+            [sys.executable, runtime, "list", "--project", project, "--actor", actor],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False,
+        )
+    except OSError as exc:
+        raise ValueError(f"ticket-runtime.py를 실행할 수 없다: {exc}") from exc
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip() or f"exit {completed.returncode}"
+        raise ValueError(f"ticket-runtime.py list 실패: {detail}")
+    try:
+        inventory = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError("ticket-runtime.py list 출력이 JSON이 아니다") from exc
+    if not isinstance(inventory, dict) or inventory.get("actor") != actor:
+        raise ValueError("ticket-runtime.py list inventory actor가 맞지 않는다")
+    tickets = inventory.get("tickets")
+    if not isinstance(tickets, list):
+        raise ValueError("ticket-runtime.py list inventory tickets가 목록이 아니다")
+
+    seen, cleaned = set(), []
+    for state in tickets:
+        if not isinstance(state, dict):
+            raise ValueError("ticket-runtime.py list ticket 항목이 객체가 아니다")
+        ticket_id = state.get("ticket_id")
+        classification = state.get("classification")
+        owner_session_id = state.get("owner_session_id")
+        if not isinstance(ticket_id, str) or not ticket_id:
+            raise ValueError("ticket-runtime.py list ticket_id가 없다")
+        if ticket_id in seen:
+            raise ValueError(f"ticket-runtime.py list에 중복 ticket_id가 있다: {ticket_id}")
+        if classification not in TICKET_CLASSIFICATIONS:
+            raise ValueError(f"ticket-runtime.py list classification이 올바르지 않다: {ticket_id}")
+        if owner_session_id is not None and not isinstance(owner_session_id, str):
+            raise ValueError(f"ticket-runtime.py list owner_session_id가 올바르지 않다: {ticket_id}")
+        session_history = state.get("session_history", [])
+        if not isinstance(session_history, list) or any(
+                not isinstance(session_id, str) or not session_id for session_id in session_history):
+            raise ValueError(f"ticket-runtime.py list session_history가 올바르지 않다: {ticket_id}")
+        seen.add(ticket_id)
+        cleaned.append({key: state.get(key) for key in TICKET_HANDOFF_FIELDS if key in state})
+    return {
+        "actor": actor,
+        "tickets": cleaned,
+        "queried_at": dt.datetime.fromtimestamp(now, UTC).isoformat(timespec="seconds"),
+    }
+
+
+def link_ticket_handoffs(sessions, inventory):
+    """현재 owner와 handoff history의 완전한 세션 ID만 ticket linkage로 인정한다."""
+    by_session = {}
+    for ticket in inventory["tickets"]:
+        session_ids = [ticket.get("owner_session_id"), *ticket.get("session_history", [])]
+        for sid in dict.fromkeys(sid for sid in session_ids if sid is not None):
+            by_session.setdefault(sid, []).append(ticket)
+    for session in sessions:
+        handoffs = list({ticket["ticket_id"]: ticket for ticket in by_session.get(session["sid"], [])}.values())
+        session["ticket_handoffs"] = handoffs
+        session["ticket_ids"] = [ticket["ticket_id"] for ticket in handoffs]
 
 
 def digest(rec, metadata=None):
@@ -586,31 +645,45 @@ def _read_candidate(path, now):
     return epoch, metadata
 
 
-def _output_root(project, explicit_out, now):
-    return explicit_out or os.path.join(
+def _output_root(project, explicit_out, now, run_id=None, actor=None):
+    """출력 루트: 명시 경로는 canonical harvest 디렉터리 자체다."""
+    if explicit_out:
+        if not run_id or not actor:
+            raise ValueError("--out에는 --run-id와 --actor가 필요하다")
+        supplied = _project_identity(explicit_out)
+        expected = os.path.join(project, "runs", actor, run_id, "harvest")
+        if supplied != expected:
+            raise ValueError(
+                "--out은 project 안의 runs/<actor>/<run-id>/harvest canonical 경로여야 한다"
+            )
+        return expected
+    return os.path.join(
         project,
         ".claude/vault/backlog/sweep",
         dt.datetime.fromtimestamp(now, UTC).strftime("%Y-%m-%d"),
     )
 
 
-def _run_dir(root, run_id):
-    return os.path.join(root, "runs", run_id)
+def _run_dir(root, run_id, actor=None):
+    """legacy sweep 출력 루트 아래의 실행 디렉터리를 만든다."""
+    return os.path.join(root, "runs", actor, run_id) if actor else os.path.join(root, "runs", run_id)
 
 
-def _locate_run_dir(project, explicit_out, run_id, now):
+def _locate_run_dir(project, explicit_out, run_id, now, actor=None):
     if explicit_out:
-        return _run_dir(explicit_out, run_id)
+        return _output_root(project, explicit_out, now, run_id, actor)
     sweep_root = os.path.join(project, ".claude/vault/backlog/sweep")
-    matches = glob.glob(os.path.join(sweep_root, "*", "runs", run_id))
+    pattern = os.path.join(sweep_root, "*", "runs", actor, run_id) if actor else os.path.join(
+        sweep_root, "*", "runs", run_id)
+    matches = glob.glob(pattern)
     matches = [p for p in matches if os.path.isdir(p)]
     if len(matches) == 1:
         return matches[0]
     return _run_dir(_output_root(project, None, now), run_id)
 
 
-def _existing_index(project, explicit_out, run_id, now):
-    run_dir = _locate_run_dir(project, explicit_out, run_id, now)
+def _existing_index(project, explicit_out, run_id, now, actor=None):
+    run_dir = _locate_run_dir(project, explicit_out, run_id, now, actor)
     try:
         data = _read_json_file(os.path.join(run_dir, "index.json"), "index.json")
     except (OSError, ValueError):
@@ -620,9 +693,9 @@ def _existing_index(project, explicit_out, run_id, now):
     return data
 
 
-def _resume_now(project, explicit_out, run_id, requested_now):
+def _resume_now(project, explicit_out, run_id, requested_now, actor=None):
     """같은 run-id를 재실행하면 최초 실행의 기준 시각을 유지한다."""
-    data = _existing_index(project, explicit_out, run_id, requested_now)
+    data = _existing_index(project, explicit_out, run_id, requested_now, actor)
     stored = data.get("now_epoch") if data else None
     if isinstance(stored, (int, float)) and math.isfinite(stored) and stored >= 0:
         return float(stored)
@@ -720,12 +793,12 @@ def main():
     ap.add_argument("--since-hours", type=float, default=24)
     ap.add_argument("--exclude-recent-min", type=float, default=60)
     ap.add_argument("--out", default=None, help="기본: .claude/vault/backlog/sweep/<오늘>")
-    ap.add_argument("--stamp-path", default=None,
-                    help="성공 도장 경로. 기본: <project>/.claude/vault/backlog/sweep/.last-success")
     ap.add_argument("--now", default=None,
                     help="기준 시각 ISO 8601 (Z 또는 +00:00 필수, 드라이런 시뮬레이션용)")
     ap.add_argument("--run-id", default=None,
-                    help="실행 식별자. 재개·commit-success 시 같은 값을 사용한다")
+                    help="실행 식별자. 재개·완료 검증 시 같은 값을 사용한다")
+    ap.add_argument("--actor", choices=("jh", "hs"), default=None,
+                    help="실행 actor. provider 완료 검증은 actor별 canonical run 경로를 사용한다")
     ap.add_argument("--contract-hash", default=None,
                     help="현재 _NIGHT.md의 계약 해시")
     ap.add_argument("--snapshot-id", default=None,
@@ -739,12 +812,8 @@ def main():
     ap.add_argument("--snapshot-end", default=None, type=int,
                     help="스냅샷 바이트 범위 끝(선택)")
     ap.add_argument("--dry-run", action="store_true", help="표만 출력, 파일 안 씀")
-    ap.add_argument("--commit-success", action="store_true",
-                    help="완료된 run-id의 도장 후보를 실제 성공 도장으로 확정한다")
     ap.add_argument("--validate-complete", action="store_true",
                     help="완료된 run-id만 검증하고 성공 도장은 쓰지 않는다")
-    ap.add_argument("--lease-until", type=float, default=None,
-                    help="provider lease epoch. commit 직전에 만료 여부를 확인한다")
     a = ap.parse_args()
 
     try:
@@ -770,9 +839,15 @@ def main():
     except ValueError as exc:
         print(f"✗ 실행 메타데이터 오류: {exc}")
         return 2
+    if a.out:
+        try:
+            _output_root(project, a.out, now, a.run_id, a.actor)
+        except ValueError as exc:
+            print(f"✗ 출력 경로 오류: {exc}")
+            return 2
     existing_index = None
-    if not a.commit_success and a.run_id:
-        existing_index = _existing_index(project, a.out, a.run_id, now)
+    if a.run_id:
+        existing_index = _existing_index(project, a.out, a.run_id, now, a.actor)
         if existing_index is not None:
             if snapshot_record_path:
                 try:
@@ -790,20 +865,20 @@ def main():
                 print("✗ 같은 run-id의 inbox snapshot이 바뀌었다. 새 run-id가 필요하다")
                 return 2
         if not a.now:
-            now = _resume_now(project, a.out, a.run_id, now)
-    stamp = a.stamp_path or os.path.join(
+            now = _resume_now(project, a.out, a.run_id, now, a.actor)
+    stamp = os.path.join(
         project, ".claude/vault/backlog/sweep", ".last-success"
     )
 
-    if a.commit_success or a.validate_complete:
+    if a.validate_complete:
         if a.dry_run:
             print("✗ --dry-run과 완료 검증을 함께 쓸 수 없다")
             return 2
-        if a.commit_success and a.validate_complete:
-            print("✗ --commit-success와 --validate-complete를 함께 쓸 수 없다")
-            return 2
         if not a.run_id:
             print("✗ 완료 검증에는 --run-id가 필요하다")
+            return 2
+        if not a.actor:
+            print("✗ 완료 검증에는 --actor가 필요하다")
             return 2
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", a.run_id):
             print("✗ run-id 형식이 올바르지 않다")
@@ -817,13 +892,7 @@ def main():
             except (OSError, ValueError) as exc:
                 print(f"✗ snapshot 검증 실패: {exc}")
                 return 1
-        run_dir = _locate_run_dir(project, a.out, a.run_id, now)
-        if a.stamp_path:
-            stamp_abs = os.path.realpath(os.path.abspath(os.path.expanduser(a.stamp_path)))
-            run_abs = os.path.realpath(os.path.abspath(run_dir))
-            if stamp_abs == run_abs or stamp_abs.startswith(run_abs + os.sep):
-                print("✗ --stamp-path는 실행 디렉터리/산출물 안에 둘 수 없다")
-                return 2
+        run_dir = _locate_run_dir(project, a.out, a.run_id, now, a.actor)
         try:
             epoch = _validate_completed_run(
                 run_dir, a.run_id, project, now, contract_hash, snapshot_identity,
@@ -831,29 +900,7 @@ def main():
         except (OSError, ValueError) as exc:
             print(f"✗ 완료된 수확이 아니다: {exc}")
             return 1
-        if a.validate_complete:
-            print(f"✓ 완료 표식과 산출물 hash 검증 완료: {run_dir}")
-            return 0
-        if a.lease_until is not None and time.time() >= a.lease_until:
-            print("✗ provider lease가 commit 직전에 만료됐다")
-            return 1
-        stamp_abs = os.path.realpath(os.path.abspath(os.path.expanduser(stamp)))
-        run_abs = os.path.realpath(os.path.abspath(run_dir))
-        if stamp_abs == run_abs or stamp_abs.startswith(run_abs + os.sep):
-            print("✗ --stamp-path는 실행 디렉터리/산출물 안에 둘 수 없다")
-            return 2
-        try:
-            committed, changed = commit_stamp_monotonic(
-                stamp, epoch, now, lease_until=a.lease_until,
-            )
-        except (OSError, ValueError) as exc:
-            print(f"✗ 마지막 성공 시각을 읽을 수 없다: {exc}")
-            return 2
-        if not changed:
-            print(f"✓ 기존 성공 도장을 유지 {dt.datetime.fromtimestamp(committed, UTC):%Y-%m-%dT%H:%M:%SZ} "
-                  f"(오래된 run={dt.datetime.fromtimestamp(epoch, UTC):%Y-%m-%dT%H:%M:%SZ}) → {stamp}")
-            return 0
-        print(f"✓ 성공 도장 확정 {dt.datetime.fromtimestamp(committed, UTC):%Y-%m-%dT%H:%M:%SZ} → {stamp}")
+        print(f"✓ 완료 표식과 산출물 hash 검증 완료: {run_dir}")
         return 0
 
     if a.run_id and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", a.run_id):
@@ -888,8 +935,11 @@ def main():
         try:
             last = read_stamp(stamp, now=now)
             gap_h = (now - last) / 3600
+            if gap_h > 24 * 14:
+                print(f"✗ 마지막 성공이 {gap_h:.1f}시간 전이다. 14일을 넘는 누락 창은 pagination 없이 처리할 수 없다")
+                return 2
             if gap_h > since_h:
-                since_h = min(gap_h + 1, 24 * 14)   # 상한 2주 — 그 이상은 사람이 볼 일
+                since_h = gap_h + 1
                 print(f"⚠ 마지막 성공이 {gap_h:.1f}시간 전 — 창을 {since_h:.1f}시간으로 넓힘 (건너뛴 날 복구)")
         except (OSError, ValueError) as exc:
             print(f"✗ 마지막 성공 시각을 읽을 수 없다: {exc}")
@@ -897,23 +947,33 @@ def main():
 
     # 건너뛰기 경계 — discover() 안의 것과 같은 값. 도장 후보로 쓴다(맨 아래 주석 참조).
     cutoff = now - exclude_recent_min * 60
+    try:
+        ticket_handoffs = ticket_handoff_inventory(project, a.actor, now)
+    except ValueError as exc:
+        print(f"✗ ticket handoff inventory 오류: {exc}")
+        return 1
     sessions = discover(project, since_h, exclude_recent_min, now)
+    link_ticket_handoffs(sessions, ticket_handoffs)
     targets = [s for s in sessions if s["verdict"] == "TARGET"]
 
     print(f"기준시각 {dt.datetime.fromtimestamp(now, UTC):%Y-%m-%dT%H:%MZ} · "
           f"창 {since_h:g}h · 최근 {exclude_recent_min:g}분 제외")
-    print(f"{'store':7} {'sid':10} {'수정':12} {'크기':>8}  판정")
+    print(f"{'store':7} {'sid':10} {'수정':12} {'크기':>8}  판정  ticket handoff")
     for s in sessions:
+        handoffs = ", ".join(
+            f"{ticket['ticket_id']}:{ticket['classification']}"
+            for ticket in s["ticket_handoffs"]
+        ) or "-"
         print(f"{s['store']:7} {short_id(s['sid']):10} "
               f"{dt.datetime.fromtimestamp(s['mtime'], UTC):%m-%dT%H:%MZ}  "
-              f"{s['size_kb']:6d}KB  {s['verdict']}")
+              f"{s['size_kb']:6d}KB  {s['verdict']}  {handoffs}")
     by_store = {}
     for s in targets:
         by_store[s["store"]] = by_store.get(s["store"], 0) + 1
     print(f"\n대상 {len(targets)}개 / 스캔 {len(sessions)}개   {by_store}")
 
-    out = _output_root(project, a.out, now)
-    run_dir = _run_dir(out, run_id)
+    out = _output_root(project, a.out, now, run_id, a.actor)
+    run_dir = out if a.out else _run_dir(out, run_id, a.actor)
     stamp_abs = os.path.realpath(os.path.abspath(os.path.expanduser(stamp)))
     run_abs = os.path.realpath(os.path.abspath(run_dir))
     if stamp_abs == run_abs or stamp_abs.startswith(run_abs + os.sep):
@@ -950,6 +1010,8 @@ def main():
             "source": s["store"],
             "session_id": s["sid"],
             "session_path": s["path"],
+            "ticket_ids": s["ticket_ids"],
+            "ticket_handoffs": s["ticket_handoffs"],
         }, contract_hash, snapshot_identity)
         body = digest(s, session_metadata)
         name = digest_name_for[id(s)]
@@ -969,6 +1031,8 @@ def main():
             "oversized": len(body.encode()) > DIGEST_CAP,
             "rejections": len(rj),
             "first_user": s.get("first_user", ""),
+            "ticket_ids": s["ticket_ids"],
+            "ticket_handoffs": s["ticket_handoffs"],
         }, contract_hash, snapshot_identity))
 
     # 기각 순간 모음 — 후보만 긁은 것이라 진짜 기각인지는 LLM이 판정한다
@@ -1006,6 +1070,7 @@ def main():
         "scanned": len(sessions),
         "targets": len(targets),
         "sessions": index,
+        "ticket_handoffs": ticket_handoffs,
     }
     if snapshot_identity is not None:
         index_data.update(snapshot_identity)
@@ -1029,11 +1094,12 @@ def main():
     #      생기고, 창을 넓히는 안전장치는 간격이 24시간을 못 넘어 영영 안 켜진다.
     #      2026-08-15 실사고 — 진짜 대화 5편(31MB)이 이 구멍에 빠질 뻔했다.
     #
-    # 새 동작: 여기서는 **후보 시각만** 적어두고, 밤 루프가 리포트까지 다 낸 뒤
-    # `--commit-success` 로 실제 도장을 찍는다. 후보 값은 `now` 가 아니라 **건너뛰기 경계**라,
+    # 새 동작: 여기서는 **후보 시각만** 적어두고, provider gate가 리포트까지 검증한 뒤
+    # 실제 도장을 찍는다. 후보 값은 `now` 가 아니라 **건너뛰기 경계**라,
     # 다음 밤 창이 이번에 건너뛴 지점에서 정확히 이어진다.
     candidate_metadata = _bind_metadata({
         "run_id": run_id,
+        "actor": a.actor,
         "source": project,
         "sessions": identities,
         "candidate_epoch": cutoff,
@@ -1041,7 +1107,7 @@ def main():
     }, contract_hash, snapshot_identity)
     candidate_text = (
         f"{cutoff}  # {dt.datetime.fromtimestamp(cutoff, UTC):%Y-%m-%dT%H:%M:%SZ} "
-        "= 이번 수확의 건너뛰기 경계. 완료 표식 검증 뒤 --commit-success 로 확정한다\n"
+        "= 이번 수확의 건너뛰기 경계. provider 완료 검증 뒤 확정한다\n"
         f"# harvest-metadata: {_json_text(candidate_metadata)}\n"
     )
     _atomic_write(os.path.join(run_dir, ".stamp-candidate"), candidate_text)
