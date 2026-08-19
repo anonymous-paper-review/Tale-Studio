@@ -29,8 +29,6 @@ export interface MediaVerdict {
 export interface ClassifyContext {
   /** 데이터베이스에 실제로 존재하는 프로젝트 id. */
   liveProjectIds: ReadonlySet<string>
-  /** 시험·샘플로 판정된 프로젝트 id — 살아 있지만 사람이 버릴지 정해야 한다. */
-  testProjectIds?: ReadonlySet<string>
 }
 
 /**
@@ -73,15 +71,14 @@ export function classifyMediaObject(objectPath: string, ctx: ClassifyContext): M
     return { disposition: 'skip-orphan', reason: '주인 프로젝트가 데이터베이스에 없음' }
   }
 
-  // 4) 시험·샘플 프로젝트는 양이 크지만(버킷의 86.6%) 살아 있는 데이터다. 자동으로 버리지 않는다.
-  if (ctx.testProjectIds?.has(projectId)) {
-    return { disposition: 'review', reason: '시험·샘플로 보이는 프로젝트 — 옮길지 사람이 정함' }
-  }
-
-  // 5) 잘라낸 조각이 따로 있는 업로드 원본. 원본이 화면 어디에 쓰이는지 확인 전까지 보류.
-  if (/(^|\/)uploads\/[^/]+\/original\.[^/]+$/.test(path)) {
-    return { disposition: 'review', reason: '업로드 원본 — 조각이 따로 있어 필요 여부 확인 필요' }
-  }
-
-  return { disposition: 'migrate', reason: '화면·생성에 쓰이는 결과물' }
+  // 4) 살아 있는 프로젝트의 파일은 전부 옮긴다.
+  //
+  //    시험·샘플 프로젝트(버킷의 68%)와 업로드 원본도 여기 포함된다. 옮기지 않고 남겨두는
+  //    쪽이 싸 보이지만 방향이 위험하다 — **옮겨두면 나중에 지울 수 있고, 안 옮기면
+  //    되돌리기 어렵다.** 무엇을 버릴지는 이전이 끝나 서비스가 정상으로 돌아온 뒤,
+  //    실제 사용량을 보고 사람이 정한다(2026-08-19 오너 판단).
+  //
+  //    양이 궁금하면 `scripts/media-migration-plan.mts` 가 옮기는 것 중 시험·샘플 몫을
+  //    따로 집계해 보여준다. 판정을 바꾸지 않고 크기만 알려주는 것이 목적이다.
+  return { disposition: 'migrate', reason: '살아 있는 프로젝트의 파일' }
 }

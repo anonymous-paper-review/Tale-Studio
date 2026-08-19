@@ -12,7 +12,6 @@ const TEST_PROJECT = 'a003a8c6-82a1-4b6a-95d6-889a1f57ee08'
 
 const ctx: ClassifyContext = {
   liveProjectIds: new Set([LIVE, TEST_PROJECT]),
-  testProjectIds: new Set([TEST_PROJECT]),
 }
 
 const verdict = (path: string) => classifyMediaObject(path, ctx).disposition
@@ -52,8 +51,8 @@ describe('classifyMediaObject', () => {
     expect(verdict(`${WS}/${LIVE}/shots/v1-abc_storyboard_ref_strip.png`)).toBe('skip-temp')
   })
 
-  it('임시물 판정이 시험 프로젝트 판정보다 먼저다', () => {
-    // 시험 프로젝트 안에 있어도 임시물은 사람에게 물을 필요가 없다.
+  it('임시물 판정이 프로젝트 판정보다 먼저다', () => {
+    // 살아 있는 프로젝트 안에 있어도 임시물은 다시 만들어지므로 옮기지 않는다.
     expect(verdict(`${WS}/${TEST_PROJECT}/shots/real_grid_ref_v1-x.png`)).toBe('skip-temp')
   })
 
@@ -61,12 +60,13 @@ describe('classifyMediaObject', () => {
     expect(verdict(`${WS}/${DEAD}/shots/v1-abc_rough_start.png`)).toBe('skip-orphan')
   })
 
-  it('시험·샘플 프로젝트는 사람이 정한다', () => {
-    expect(verdict(`${WS}/${TEST_PROJECT}/shots/v1-abc_rough_start.png`)).toBe('review')
+  it('시험·샘플 프로젝트도 옮긴다 — 버릴지는 이전 후에 정한다', () => {
+    // 옮겨두면 나중에 지울 수 있지만, 안 옮기면 되돌리기 어렵다.
+    expect(verdict(`${WS}/${TEST_PROJECT}/shots/v1-abc_rough_start.png`)).toBe('migrate')
   })
 
-  it('업로드 원본은 보류, 잘라낸 조각은 옮긴다', () => {
-    expect(verdict(`${WS}/${LIVE}/uploads/up-1/original.png`)).toBe('review')
+  it('업로드 원본도 조각도 옮긴다', () => {
+    expect(verdict(`${WS}/${LIVE}/uploads/up-1/original.png`)).toBe('migrate')
     expect(verdict(`${WS}/${LIVE}/uploads/up-1/s000.jpg`)).toBe('migrate')
   })
 
@@ -84,6 +84,7 @@ describe('classifyMediaObject', () => {
       `${WS}/${LIVE}/shots/real_grid_ref_x.png`,
       `${WS}/${DEAD}/shots/a.png`,
       `${WS}/${TEST_PROJECT}/shots/a.png`,
+      '',
     ]) {
       expect(classifyMediaObject(path, ctx).reason.length).toBeGreaterThan(0)
     }
