@@ -5,7 +5,11 @@
 // 견고성: 아직 queued면 FAL 큐를 직접 reconcile — webhook이 안 왔어도(로컬 터널 없음 등) 결과를 즉시 영속화.
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
-import { getGenerationJobById, userOwnsProject } from '@/lib/generation-jobs'
+import {
+  deleteGenerationJobById,
+  getGenerationJobById,
+  userOwnsProject,
+} from '@/lib/generation-jobs'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 
 export const runtime = 'nodejs'
@@ -51,4 +55,43 @@ export async function GET(
       videoClipId: job.video_clip_id,
     },
   })
+}
+
+// DELETE — 큐 콘솔의 좀비(queued)·실패 잡 정리 (#queue-console 2026-08-18).
+//   completed 는 활동 로그·산출 이력의 재료라 지우지 않는다(409). 소유권 가드는 GET 과 동일.
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getUser()
+  if (!user) {
+    return NextResponse.json(
+      { ok: false, error: { code: 'unauthorized', message: 'Unauthorized' } },
+      { status: 401 },
+    )
+  }
+
+  const { id } = await params
+  const job = await getGenerationJobById(id)
+  if (!job) {
+    return NextResponse.json(
+      { ok: false, error: { code: 'not_found', message: 'job not found' } },
+      { status: 404 },
+    )
+  }
+  if (!(await userOwnsProject(job.project_id, user.id))) {
+    return NextResponse.json(
+      { ok: false, error: { code: 'forbidden', message: 'forbidden' } },
+      { status: 403 },
+    )
+  }
+  if (job.status === 'completed') {
+    return NextResponse.json(
+      { ok: false, error: { code: 'completed_job', message: 'completed jobs are kept as history' } },
+      { status: 409 },
+    )
+  }
+
+  await deleteGenerationJobById(id)
+  return NextResponse.json({ ok: true, data: { deleted: id } })
 }

@@ -11,6 +11,7 @@ import {
 import { useInventoryStore } from '@/stores/inventory-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { InventoryItem } from '@/types/inventory'
+import { useT } from '@/lib/i18n'
 
 type Props = {
   open: boolean
@@ -19,6 +20,7 @@ type Props = {
 }
 
 export function InventoryPickerDialog({ open, onOpenChange, onPick }: Props) {
+  const t = useT()
   const workspaceId = useProjectStore((s) => s.workspaceId)
   const items = useInventoryStore((s) => s.items)
   const loading = useInventoryStore((s) => s.loading)
@@ -39,18 +41,18 @@ export function InventoryPickerDialog({ open, onOpenChange, onPick }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>인벤토리에서 선택</DialogTitle>
+          <DialogTitle>{t('Choose from inventory')}</DialogTitle>
         </DialogHeader>
 
         {loading && (
           <p className="py-4 text-center text-sm text-muted-foreground">
-            불러오는 중…
+            {t('Loading…')}
           </p>
         )}
 
         {!loading && items.length === 0 && (
           <p className="py-4 text-center text-sm text-muted-foreground">
-            인벤토리가 비어 있습니다.
+            {t('Inventory is empty.')}
           </p>
         )}
 

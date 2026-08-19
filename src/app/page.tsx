@@ -160,8 +160,8 @@ function ProjectCard({
                   e.stopPropagation()
                   setEditing(true)
                 }}
-                title="이름 변경"
-                aria-label="프로젝트 이름 변경"
+                title="Rename"
+                aria-label="Rename project"
                 className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
               >
                 <Pencil className="size-3.5" />
@@ -171,8 +171,8 @@ function ProjectCard({
                   e.stopPropagation()
                   onDeleteRequest(project)
                 }}
-                title="프로젝트 삭제"
-                aria-label="프로젝트 삭제"
+                title="Delete project"
+                aria-label="Delete project"
                 className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
               >
                 <Trash2 className="size-3.5" />
@@ -295,7 +295,7 @@ export default function HomePage() {
       if (readLastProjectId() === deleteTarget.id) clearLastProjectId()
       setDeleteTarget(null)
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : '삭제에 실패했어요')
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete the project')
     } finally {
       setDeleting(false)
     }
@@ -568,14 +568,14 @@ export default function HomePage() {
           ) : projects.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 py-20">
               <Film className="size-10 text-gray-600" />
-              <p className="mt-4 text-sm text-gray-500">아직 프로젝트가 없어요</p>
+              <p className="mt-4 text-sm text-gray-500">No projects yet</p>
               <button
                 onClick={handleNew}
                 disabled={creating}
                 className="mt-6 flex items-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white transition-all hover:border-primary hover:text-primary"
               >
                 <Plus className="size-4" />
-                첫 프로젝트 만들기
+                Create your first project
               </button>
             </div>
           ) : (
@@ -605,15 +605,15 @@ export default function HomePage() {
       <Dialog open={nameOpen} onOpenChange={(o) => !creating && setNameOpen(o)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>새 프로젝트</DialogTitle>
+            <DialogTitle>New project</DialogTitle>
             <DialogDescription>
-              프로젝트 이름을 지어 주세요. 나중에 언제든 바꿀 수 있어요.
+              Give your project a name. You can change it anytime.
             </DialogDescription>
           </DialogHeader>
           <Input
             value={nameValue}
             onChange={(e) => setNameValue(e.target.value)}
-            placeholder="예: 비 오는 도시의 하룻밤"
+            placeholder="e.g. a rainy night in the city"
             autoFocus
             maxLength={120}
             onKeyDown={(e) => {
@@ -629,14 +629,14 @@ export default function HomePage() {
               disabled={creating}
               onClick={() => setNameOpen(false)}
             >
-              취소
+              Cancel
             </Button>
             <Button
               disabled={creating || !nameValue.trim()}
               onClick={() => void handleCreate()}
             >
               {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-              만들기
+              Create
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -649,9 +649,9 @@ export default function HomePage() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>프로젝트 삭제</DialogTitle>
+            <DialogTitle>Delete project</DialogTitle>
             <DialogDescription>
-              {`"${deleteTarget?.title || 'Untitled'}" 프로젝트와 모든 산출물(스토리·캐릭터·씬·샷·영상)이 삭제됩니다. 되돌릴 수 없어요.`}
+              {`Deleting "${deleteTarget?.title || 'Untitled'}" will remove all its assets (story, characters, scenes, shots, videos). This can't be undone.`}
             </DialogDescription>
           </DialogHeader>
           {deleteError ? (
@@ -663,7 +663,7 @@ export default function HomePage() {
               disabled={deleting}
               onClick={() => setDeleteTarget(null)}
             >
-              취소
+              Cancel
             </Button>
             <Button
               variant="destructive"
@@ -671,7 +671,7 @@ export default function HomePage() {
               onClick={() => void handleDelete()}
             >
               {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-              삭제
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

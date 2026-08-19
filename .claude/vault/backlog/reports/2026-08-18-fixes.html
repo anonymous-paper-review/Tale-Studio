@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수리 성적표</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .standfirst{font-size:17.5px;color:var(--ink-2);margin:0 0 14px;max-width:60ch}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.fail{border-left:3px solid var(--fail)}
+  .card.pass{border-left:3px solid var(--pass)}
+  .card.note{border-left:3px solid var(--accent)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:16px}
+  .card-head h3{flex:1 1 240px;margin:0}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+
+  .mark{display:inline-block;font-weight:750;font-size:13px;border-radius:4px;
+    padding:2px 9px;margin-top:8px}
+  .m-yes{background:var(--pass-soft);color:var(--pass)}
+  .m-no{background:var(--fail-soft);color:var(--fail)}
+
+  blockquote{margin:14px 0;padding:14px 18px;background:var(--surface-2);
+    border-left:3px solid var(--line-2);border-radius:0 7px 7px 0;font-size:15px}
+  blockquote p{margin:0 0 8px}
+  blockquote p:last-child{margin:0}
+
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:12px 0;color:var(--ink-2);
+    white-space:pre-wrap;word-break:break-word}
+  pre b{color:var(--ink)}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:500px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .say{color:var(--muted);font-size:12.5px;display:block;margin-top:4px;line-height:1.55}
+  .num{font-variant-numeric:tabular-nums}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+
+  .banner{border:2px solid var(--ink);border-radius:10px;padding:22px 26px;margin:26px 0;
+    background:var(--surface)}
+  .banner h3{margin:0 0 10px;font-size:18px}
+  .banner p:last-child{margin-bottom:0}
+
+  details{margin:12px 0;border-top:1px dashed var(--line-2);padding-top:8px}
+  summary{cursor:pointer;font-size:13.5px;font-weight:700;color:var(--accent);list-style:none}
+  summary::before{content:"▸ "}
+  details[open] summary::before{content:"▾ "}
+  summary::-webkit-details-marker{display:none}
+  details .body{padding-top:10px;font-size:14px}
+
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  a{color:var(--accent)}
+</style>
+
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">아침 보고에 답한 수리 · 2026-08-18</p>
+  <h1>바로 고치라고 하신 것 열한 건을 전부 고쳤습니다. 한 건만 당신 손을 기다립니다</h1>
+  <p class="standfirst">아침 보고를 읽고 "이건 조사 말고 바로 고쳐라"라고 지정하신 항목들입니다. 열두 건 중 <b>열한 건이 끝났고</b>, 남은 하나는 제가 만들 수 없는 그림 파일이 있어야 시작됩니다. 조사만 하기로 한 네 건도 따로 끝냈습니다.</p>
+  <p class="asof">돈은 <b>한 푼도 쓰지 않았고</b>, 운영 데이터는 한 줄도 바꾸지 않았습니다. 아직 합치지 않았으니 판정은 당신 몫입니다.</p>
+</header>
+
+<!-- ═══ 0. 말 규칙 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">0</span><h2>이 문서의 말 규칙</h2></div>
+  <p><b>설명이 필요한 줄임말은 쓰레기입니다.</b> 읽는 사람이 "그게 뭐였더라" 하고 되짚어야 하는 순간, 그 단어는 정보를 전달한 게 아니라 숨긴 겁니다. 이 문서에는 그런 말을 쓰지 않습니다.</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:34%">쓰지 않는 말</th><th>대신 쓰는 말</th></tr></thead>
+      <tbody>
+        <tr><td><s>티켓 번호(r5, r12 …)</s></td><td>그 항목이 고치려던 것을 사람 말로 다시 씀</td></tr>
+        <tr><td><s>멘션</s></td><td>@로 콕 집어 부르기 — 채팅에서 특정 장면·컷을 지목하는 것</td></tr>
+        <tr><td><s>드래그 앤 드롭</s></td><td>파일을 끌어다 놓기</td></tr>
+        <tr><td><s>previz</s></td><td>러프 영상 / 밑그림 단계 그림</td></tr>
+        <tr><td><s>스모크</s></td><td>화면 확인 — 실제 브라우저로 열어서 떠는지 보는 것</td></tr>
+        <tr><td><s>타입 검사 / 린트</s></td><td>코드 문법·규칙 검사</td></tr>
+        <tr><td><s>파이프라인</s></td><td>자동으로 이어 도는 생성 작업</td></tr>
+        <tr><td><s>마커</s></td><td>대화 기록에 몰래 끼워 넣는 표식</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ 1. 무엇을 해달라고 하셨나 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>무엇을 해달라고 하셨나</h2></div>
+  <p class="sec-lede">아침 보고를 읽고 항목마다 "조사해라 / 바로 고쳐라"를 지정해 주셨습니다. 이 문서는 <b>"바로 고쳐라"라고 하신 것들</b>의 성적표입니다.</p>
+
+  <p>바로 고치라고 하신 것이 <b>열두 건</b>, 조사만 하라고 하신 것이 <b>네 건</b>이었습니다. 각각 무엇이었는지는 아래 두 절에 하나씩 있습니다.</p>
+
+  <div class="banner">
+    <h3>먼저 결과부터</h3>
+    <div class="tbl" style="margin-top:6px">
+      <table>
+        <thead><tr><th>구분</th><th class="num" style="width:90px">건수</th><th>상태</th></tr></thead>
+        <tbody>
+          <tr><td>바로 고치라고 하신 것</td><td class="num">12</td><td><b>11건 끝남</b> · 1건은 당신 손 대기</td></tr>
+          <tr><td>조사만 하라고 하신 것</td><td class="num">4</td><td><b>4건 전부 끝남</b> — 보고서 파일로 남김</td></tr>
+          <tr><td>돈을 쓴 작업</td><td class="num">0</td><td>그림·영상 발주 없음</td></tr>
+          <tr><td>운영 데이터 수정</td><td class="num">0</td><td>읽기만 함</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px"><b>대기 중인 하나는 "에이전트 얼굴 애니메이션"입니다.</b> 얼굴 그림 파일을 제가 만들 수 없어서, 당신이 파일을 내려받아 저장소에 넣어주셔야 시작됩니다. 그 파일만 있으면 바로 붙입니다.</p>
+  </div>
+</section>
+
+<!-- ═══ 2. 고친 것 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>고친 것 — 열한 건</h2></div>
+  <p class="sec-lede">각 항목마다 <b>무엇이 문제였고 · 어떻게 고쳤고 · 무엇으로 확인했는지</b>를 적었습니다. 큰 것 넷을 먼저 자세히, 나머지 일곱은 표로 묶었습니다.</p>
+
+  <div class="card pass">
+    <div class="card-head"><h3>글 작가에게 다시 시켜도 화면이 멈춰 있던 것</h3><span class="chip c-pass">고침</span></div>
+    <p><b>무엇이 문제였나</b> — 글 작가 단계가 끝난 뒤 채팅에 "작가에게 다시 넘겨주세요"라고 치면, 화면은 작업 페이지로 넘어가는데 <b>아무 일도 일어나지 않았습니다.</b> 서버는 "이미 끝난 작업이라 안 된다"고 거절하고 있었는데, 화면이 그 거절을 조용히 삼켜서 사용자에게 아무 말도 안 해줬습니다. 갇힌 게 아니라 <b>갇혔다고 말을 안 해준 것</b>입니다.</p>
+    <p><b>어떻게 고쳤나</b> — 이제 거절을 삼키지 않고 <b>동의를 묻는 카드</b>를 띄웁니다. 문구는 당신이 적어주신 그대로입니다:</p>
+    <blockquote><p>"지금까지 채팅 내역을 바탕으로 다시 writer에게 스토리와 연출에 대한 구상을 요청할까요?? 변경 사항들을 자연스럽게 반영할 수 있지만 다시 오랜 시간이 걸릴 수 있어요."</p></blockquote>
+    <p>버튼은 <b>[동의하고 Writer 다시 실행]</b>과 <b>[취소]</b> 둘입니다. 취소하면 아무것도 안 돌고, 동의하면 그때만 새로 시작합니다. 동의했을 때 새 작업에 <b>이전 장면·컷 이야기 + 채팅 내역 + 기획 단계에서 정한 것들</b>이 전부 실려 들어갑니다 — 맨땅에서 다시 시작하지 않습니다.</p>
+    <p><b>무엇으로 확인했나</b> — 동의 카드가 뜨는 조건, 동의했을 때 실려 가는 내용, 취소했을 때 아무것도 안 도는 것까지 자동 검사 <b>8개</b>로 확인했습니다.</p>
+  </div>
+
+  <div class="card pass">
+    <div class="card-head"><h3>새로고침하면 선택지와 올린 파일이 사라지던 것</h3><span class="chip c-pass">고침</span></div>
+    <p><b>무엇이 문제였나</b> — 에이전트가 "A로 갈까요, B로 갈까요?" 하고 선택지를 띄운 상태에서 새로고침하면 선택지가 통째로 사라졌습니다. 파일을 올려둔 것도 마찬가지로 날아갔습니다. 둘 다 화면 메모리에만 있고 저장이 안 되고 있었습니다.</p>
+    <p><b>어떻게 고쳤나</b> — <b>새 저장소를 만들지 않고</b> 이미 있는 대화 기록 저장 경로에 눈에 안 보이는 표식으로 얹었습니다. 새 테이블을 만들면 그만큼 관리할 것이 늘어나는데, 그럴 필요가 없는 크기였습니다.</p>
+    <p>여기서 <b>당신이 함께 지시하신 조건</b>이 중요합니다 — "승낙·취소 버튼은 지워라". 되살아난 선택지가 이미 지나간 제안의 버튼을 들고 있으면, 그걸 눌렀을 때 엉뚱한 일이 벌어집니다. 그래서 <b>글자만 되살리고 버튼은 되살리지 않습니다.</b> 키보드로도 못 고르고, 클릭할 수도 없습니다. 지난 대화가 이랬다는 기록으로만 남습니다.</p>
+    <p>올린 파일은 <b>실제로 보냈을 때</b>와 <b>사용자가 직접 지웠을 때</b>만 사라집니다. 중간에 다른 화면에 갔다 와도 그대로 있습니다.</p>
+    <p><b>무엇으로 확인했나</b> — 자동 검사 <b>4개</b>. 그중 하나는 <b>표식이 깨져 있을 때</b>를 일부러 만들어서, 깨진 표식이 화면에 그대로 튀어나오거나 오류를 내지 않고 조용히 무시되는지 봤습니다.</p>
+  </div>
+
+  <div class="card pass">
+    <div class="card-head"><h3>채팅에서 특정 장면·컷을 콕 집어 부를 수 없던 것</h3><span class="chip c-pass">고침</span></div>
+    <p><b>무엇이 문제였나</b> — 채팅에서 <code>@</code>를 치면 인물·배경 카드는 나왔지만 <b>장면과 컷은 목록에 없었습니다.</b> 그래서 "세 번째 장면 두 번째 컷 고쳐줘"처럼 말로 풀어 설명해야 했고, 에이전트가 다른 컷을 집는 일이 생겼습니다.</p>
+    <p><b>어떻게 고쳤나</b> — 두 가지를 붙였습니다.</p>
+    <ul class="plain">
+      <li><b>글 작가·감독 화면 채팅에서 <code>@</code>를 치면 장면과 컷이 목록에 나옵니다.</b></li>
+      <li><b>보드의 장면·컷 카드를 Ctrl(맥은 Command) 누른 채 클릭하면</b> 그 카드가 채팅 입력창에 바로 꽂힙니다. 그냥 클릭하면 원래대로 카드가 열립니다 — 기존 동작을 뺏지 않았습니다.</li>
+    </ul>
+    <p>감독 화면에서는 같은 컷이라도 <b>밑그림 단계</b>와 <b>실제 촬영 그림 단계</b> 둘이 따로 있습니다. 이 둘을 서로 다른 이름으로 구분해서 넣었습니다 — 안 그러면 "이 컷 고쳐줘"가 어느 쪽을 말하는지 알 수 없습니다.</p>
+    <p>이름이 겹치는 장면이 여럿일 때를 대비해 <b>이름 옆에 고유 번호를 함께</b> 보여줍니다. 그리고 알 수 없는 카드를 집으면 <b>아무 일도 안 합니다</b> — 엉뚱한 것이 입력창에 꽂히는 것보다 아무것도 안 꽂히는 게 낫습니다.</p>
+    <p><b>무엇으로 확인했나</b> — 자동 검사 <b>15개</b>. 이름이 겹칠 때 구분되는지, 밑그림과 촬영 그림이 안 섞이는지, 모르는 카드에서 아무 일도 안 일어나는지를 각각 따로 확인했습니다.</p>
+  </div>
+
+  <div class="card pass">
+    <div class="card-head"><h3>진행률이 예전에 끝난 작업까지 세던 것</h3><span class="chip c-pass">고침</span></div>
+    <p><b>무엇이 문제였나</b> — 아침 보고에서 "재생성 하나를 눌렀는데 진행률이 6/8로 시작한다"고 알려드린 그 항목입니다. 지금 도는 것만 세야 하는데 <b>그 프로젝트에서 예전에 끝난 것 전부</b>를 분자에 넣고 있었습니다.</p>
+    <p><b>어떻게 고쳤나</b> — "이번에 누른 묶음"이 무엇인지 기억하는 장치를 두고, 진행률을 세는 세 자리가 모두 <b>그 묶음만</b> 보게 했습니다. 이제 새로 누르면 <b>0/N으로 시작</b>합니다. 프로젝트를 옮기거나 화면을 초기화하면 이 기억도 함께 비워집니다 — 남아 있으면 다음 프로젝트의 숫자를 오염시킵니다.</p>
+    <p><b>무엇으로 확인했나</b> — 세 경로(밑그림·촬영 그림·영상)마다 <b>0에서 시작해 → 올라가고 → 끝난 뒤 다시 누르면 또 0에서 시작하는지</b>를 자동 검사로 확인했습니다.</p>
+  </div>
+
+  <h3>나머지 일곱 건</h3>
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:30%">무엇을</th><th>어떻게 고쳤나</th><th style="width:74px">확인</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>채팅창에 파일 끌어다 놓기</b></td>
+          <td>버튼을 눌러 고르는 것 말고 파일을 끌어다 놓아도 첨부됩니다. 끌고 있는 동안 "여기 놓으면 됩니다" 표시가 뜹니다.</td>
+          <td><span class="mark m-yes">화면</span></td>
+        </tr>
+        <tr>
+          <td><b>확대·축소 단축키</b></td>
+          <td>보드에 마우스를 올린 상태에서 Ctrl(맥은 Command) + <code>+</code> / <code>-</code>로 조절됩니다. 보드 밖에서는 브라우저 기본 확대가 그대로 동작합니다 — 뺏지 않았습니다.</td>
+          <td><span class="mark m-yes">검사 2</span></td>
+        </tr>
+        <tr>
+          <td><b>로그인 화면 대문자 잠금 표시</b></td>
+          <td>대문자 잠금이 켜진 채 비밀번호를 치면 안내가 뜹니다. 입력칸을 벗어나면 사라집니다.</td>
+          <td><span class="mark m-yes">검사 1</span></td>
+        </tr>
+        <tr>
+          <td><b>배경 그림에 사람이 나오던 것</b></td>
+          <td>배경을 그릴 때 "사람 없이, 빈 공간으로"를 지시문에 넣었습니다. 인물 그림 쪽 지시문은 건드리지 않았습니다.</td>
+          <td><span class="mark m-yes">검사 4</span></td>
+        </tr>
+        <tr>
+          <td><b>기획자가 그림체를 글로 묻던 것</b></td>
+          <td>그림체는 골라야 하는 것이지 글로 답할 것이 아닙니다. 글로 묻지 않게 하고, 고르는 팔레트로 안내합니다.</td>
+          <td><span class="mark m-yes">검사 1</span></td>
+        </tr>
+        <tr>
+          <td><b>작가·감독 화면의 진행 표시가 서로 다르던 것</b></td>
+          <td>경과 시간 표시·확대 조절·마지막 화면 기억을 양쪽이 같은 부품을 쓰도록 합쳤습니다. 작업이 도는 중에 들어가면 그 화면을 먼저 보여줍니다.</td>
+          <td><span class="mark m-yes">화면</span></td>
+        </tr>
+        <tr>
+          <td><b>글 작가 밑그림 저장 규격이 어긋나던 것</b></td>
+          <td>영화 비율(가로로 아주 긴 화면)에서 글씨 칸이 물리적으로 안 들어가 그림 밖으로 삐져나오던 것을, 칸을 키운 현재 규격에 맞춰 검사 기준을 바로잡았습니다.</td>
+          <td><span class="mark m-yes">검사</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ 3. 조사만 한 것 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>조사만 하라고 하신 것 — 네 건</h2></div>
+  <p class="sec-lede">이 넷은 <b>고치지 않았습니다.</b> 무엇이 사실인지만 확인해서 보고서로 남겼습니다. 어떻게 할지는 당신이 정할 일입니다.</p>
+
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:32%">무엇을 알아봤나</th><th>알아낸 것</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>배경을 "공간"으로 다루기</b><span class="say">같은 장소를 여러 방향에서 쓰려면 무엇이 필요한가</span></td>
+          <td>안에서 겪은 일(평면 그림으로 각도를 돌리면 무너짐, 같은 방인지 확인하는 문제)과 바깥 자료(3차원 밑틀을 세우는 방식, 카메라 경로를 지정하는 방식, 가격)를 모아 비교표로 정리했습니다. 다음에 해볼 실험 설계까지 적었습니다.</td>
+        </tr>
+        <tr>
+          <td><b>연출 칸과 끝 칸이 언제 만들어지나</b></td>
+          <td>실제 데이터 <b>1,893개</b>를 읽어 셌습니다. 세 칸이 온전한 것 865개, 아예 없는 것 852개, 칸 정보가 없는 것 176개, <b>일부만 있는 것은 0개</b>였습니다. 셋 다 있거나 셋 다 없다는 구조가 숫자로 확인됐습니다.</td>
+        </tr>
+        <tr>
+          <td><b>여러 탭에서 다른 프로젝트를 열면 섞이나</b></td>
+          <td>평소처럼 클릭해서 옮기면 <b>안 섞입니다.</b> 다만 프로젝트 번호가 주소에 없는 화면에서 브라우저를 새로 띄우면, 마지막에 열었던 프로젝트가 복원되는 경로가 있습니다. 그 순서를 그대로 적어뒀습니다.</td>
+        </tr>
+        <tr>
+          <td><b>인물이 잘못 연결되는 경로</b></td>
+          <td>인물 정보가 저장되는 길을 전부 훑어서, 어디서 검사가 빠지는지·실패했을 때 어떻게 되는지를 파일과 줄 번호까지 적었습니다.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--muted);font-size:14.5px">네 건 모두 <code>research/experiments/</code> 아래에 보고서 파일로 있습니다. <b>코드는 한 줄도 고치지 않았습니다.</b></p>
+</section>
+
+<!-- ═══ 4. 확인 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>무엇으로 확인했나</h2></div>
+  <p class="sec-lede">고쳤다는 말만으로는 부족하니, 실제로 돌린 것과 그 결과를 그대로 적습니다.</p>
+
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:30%">확인한 것</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td><b>코드 문법·타입 검사</b></td><td><span class="mark m-yes">오류 0건</span></td></tr>
+        <tr><td><b>자동 검사 전체</b></td><td><span class="mark m-yes">1,299개 통과</span> · 19개는 원래 건너뛰는 것<span class="say">고치기 전에 이미 깨져 있던 2건도 이번에 함께 정리했습니다 — 아래 접기 참조</span></td></tr>
+        <tr><td><b>코드 규칙 검사</b></td><td><span class="mark m-yes">오류 0건</span><span class="say">경고 2건은 원래 있던 것(그림 표시 방식 권고)이라 건드리지 않았습니다</span></td></tr>
+        <tr><td><b>실제 브라우저로 화면 열기</b></td><td><span class="mark m-yes">6개 화면 전부 정상</span><span class="say">로그인 뒤 화면 여섯 곳 — 전부 정상 응답, 화면 그려짐, 찾는 문구 있음, 콘솔 오류 0건</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card note">
+    <h3>화면 확인은 한 번 막혔다가 되살렸습니다 — 이 과정을 적어둡니다</h3>
+    <p>평소 쓰는 화면 확인 명령이 <b>중간에 오류로 멈췄습니다.</b> 화면을 사진으로 찍어 저장하는 단계에서 실패했습니다. 원인은 도구가 망가진 것이 아니라 <b>브라우저 창이 화면에 떠 있지 않아서</b>였습니다 — 사진을 찍으려면 그 창이 실제로 보이는 상태여야 하는데, 뒤에 가려져 있거나 최소화돼 있으면 시간 초과로 실패합니다.</p>
+    <p>그런데 그 명령이 하는 일의 순서를 뜯어보니, <b>사진 찍기는 맨 마지막 단계</b>였습니다. 화면이 떴는지·찾는 문구가 있는지·오류가 났는지는 <b>사진을 찍기 전에 이미 다 수집</b>하고 있었습니다. 그래서 사진 찍는 단계만 뺀 확인을 따로 돌렸고, <b>여섯 화면의 사실은 전부 얻었습니다.</b></p>
+    <pre>[ok] /projects        — HTTP 200 · 트리 20줄  · 콘솔에러 0
+[ok] /studio/producer — HTTP 200 · 트리 138줄 · 콘솔에러 0
+[ok] /studio/writer   — HTTP 200 · 트리 90줄  · 콘솔에러 0
+[ok] /studio/artist   — HTTP 200 · 트리 68줄  · 콘솔에러 0
+[ok] /studio/director — HTTP 200 · 트리 218줄 · 콘솔에러 0
+[ok] /studio/editor   — HTTP 200 · 트리 142줄 · 콘솔에러 0
+
+<b>6개 중 6개 ok.</b> (사진 저장 단계만 제외)</pre>
+    <p>덤으로 <b>파일을 끌어다 놓는 영역이 실제 브라우저에 붙어 있는지</b>도 직접 확인했습니다 — 붙어 있습니다. 자동 검사만으로는 알 수 없는 부분이라 눈으로 확인할 값어치가 있었습니다.</p>
+    <p style="color:var(--muted);font-size:14.5px"><b>다만 사진은 없습니다.</b> 브라우저 창을 앞으로 꺼낸 상태에서 다시 돌리면 사진까지 남습니다. 그림이 예쁜지·배치가 맞는지는 <b>당신이 직접 열어 보셔야</b> 합니다.</p>
+  </div>
+
+  <details>
+    <summary>고치기 전부터 깨져 있던 검사 2건을 어떻게 했는지</summary>
+    <div class="body">
+      <p>이번 작업과 무관하게 원래 실패하던 검사가 둘 있었습니다. 둘 다 정리했습니다.</p>
+      <ul class="plain">
+        <li><b>영화 비율 그림 규격 검사</b> — 검사가 기대하는 숫자가 낡아 있었습니다. 영화 비율에서 글씨 칸이 안 들어가는 문제 때문에 <b>규격을 키운 것이 의도된 변경</b>이었는데, 검사 쪽 숫자만 옛날 값으로 남아 있었습니다. 코드가 아니라 <b>검사 기준을 현재 규격에 맞췄습니다.</b></li>
+        <li><b>손으로 돌리는 그림 검사</b> — 이 검사는 저장소에 없는 그림 묶음이 있어야 도는 것인데, 그 폴더가 없으면 <b>검사를 건너뛰는 게 아니라 오류로 죽고</b> 있었습니다. 폴더가 없으면 조용히 건너뛰도록 고쳤습니다. 폴더가 있으면 예전처럼 그대로 돕니다.</li>
+      </ul>
+      <p>둘 다 <b>검사를 무력화한 게 아니라</b> 검사가 원래 하려던 일을 하도록 고친 것입니다. 통과시키려고 검사를 지우지 않았습니다.</p>
+    </div>
+  </details>
+</section>
+
+<!-- ═══ 5. 정직 분할 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>확실한 것과 모르는 것</h2></div>
+  <p class="sec-lede">여기서 제가 과장하면 안 되는 지점입니다.</p>
+
+  <div class="split">
+    <div class="yes">
+      <h4>이건 확실합니다</h4>
+      <ul>
+        <li>고친 코드가 <b>문법·타입 검사를 통과</b>하고 자동 검사 1,299개를 깨뜨리지 않았다</li>
+        <li>각 수리마다 <b>그 동작을 직접 확인하는 검사</b>를 새로 붙였다 (동의 카드 8개, 저장 4개, 콕 집어 부르기 15개 등)</li>
+        <li>로그인 뒤 여섯 화면이 <b>실제 브라우저에서 오류 없이 뜬다</b></li>
+        <li>파일을 끌어다 놓는 영역이 <b>실제로 화면에 붙어 있다</b></li>
+        <li>돈을 쓰지 않았고 운영 데이터를 바꾸지 않았다</li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>이건 모릅니다</h4>
+      <ul>
+        <li><b>화면이 보기 좋은지</b> — 사진을 못 찍었고, 애초에 이건 당신만 판정합니다</li>
+        <li>실제로 <b>파일을 끌어다 놓아본 적은 없습니다</b> — 영역이 붙어 있는 것까지만 확인했습니다</li>
+        <li>글 작가 다시 실행을 <b>끝까지 돌려본 적은 없습니다</b> — 돈이 나가는 작업이라 동의 카드가 뜨는 데까지만 확인했습니다</li>
+        <li>배경에서 사람이 <b>실제로 사라졌는지</b>는 그림을 뽑아봐야 압니다 — 지시문에 넣은 것까지만 했습니다</li>
+        <li>여러 사람이 동시에 쓸 때 어떻게 되는지</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="banner" style="border-color:var(--warn)">
+    <h3 style="color:var(--warn)">특히 이 셋은 돈이 나가야 확인됩니다</h3>
+    <p><b>배경에서 사람이 빠졌는지 · 글 작가 재실행이 끝까지 도는지 · 밑그림 규격이 실제로 잘 나오는지</b> — 이 셋은 그림이나 영상을 실제로 뽑아봐야 알 수 있습니다. 제 판단으로 돈을 쓰지 않았습니다. 예산과 범위를 정해주시면 그때 돌리겠습니다.</p>
+  </div>
+</section>
+
+<!-- ═══ 6. 당신이 하실 것 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">6</span><h2>당신이 하실 것</h2></div>
+
+  <div class="card gate" style="border-left:3px solid var(--gate)">
+    <div class="card-head"><h3>1. 고친 것을 합칠지 판정</h3><span class="chip c-gate">당신만 가능</span></div>
+    <p>고친 코드는 <b>아직 합치지 않았습니다.</b> 제가 스스로 합치지 않는 것이 규칙입니다. 화면을 직접 열어 보시고 판단해 주세요.</p>
+    <p style="color:var(--muted);font-size:14.5px">특히 <b>채팅에서 <code>@</code>로 장면·컷 부르기</b>와 <b>카드를 Ctrl 누르고 클릭하기</b>는 손에 붙는 느낌이 중요한 부분이라, 직접 써보시는 게 제일 빠릅니다.</p>
+  </div>
+
+  <div class="card gate" style="border-left:3px solid var(--gate)">
+    <div class="card-head"><h3>2. 얼굴 그림 파일 넣어주기</h3><span class="chip c-gate">이것만 있으면 바로 시작</span></div>
+    <p>남은 한 건(에이전트 얼굴 애니메이션)은 <b>얼굴 그림 파일이 있어야</b> 시작됩니다. 만들어두신 것을 파일로 내려받아 저장소에 넣어주시면 바로 붙이겠습니다.</p>
+    <p style="color:var(--muted);font-size:14.5px">제가 직접 받으려고 했지만 주소에서 파일이 아니라 빈 껍데기만 돌아왔습니다.</p>
+  </div>
+
+  <div class="card warn">
+    <div class="card-head"><h3>3. 화면 사진은 창이 보일 때만 찍힙니다</h3><span class="chip c-warn">알려드림</span></div>
+    <p>화면 사진 찍기가 실패한 원인은 <b>브라우저 창이 뒤에 가려져 있었기 때문</b>입니다. 도구가 망가진 게 아닙니다. 사실 수집은 우회해서 다 얻었지만 사진은 못 남겼습니다.</p>
+    <p style="color:var(--muted);font-size:14.5px">밤 작업은 사람이 없어 창을 앞으로 꺼낼 수 없습니다. 밤에도 사진을 남기려면 창이 보이지 않아도 찍히는 방식이 필요합니다 — 지금 구조로는 밤마다 이 자리가 빕니다.</p>
+  </div>
+</section>
+
+<!-- ═══ 7. 결론 ═══ -->
+<section>
+  <div class="sec-head"><span class="sec-num">7</span><h2>여기서 나오는 것</h2></div>
+
+  <div class="card note">
+    <h3>1. 바로 고치라고 하신 열두 건 중 열한 건이 끝났다.</h3>
+    <p>남은 하나는 제 능력 밖(그림 파일)이라 멈춘 것이지, 어려워서 미룬 게 아닙니다.</p>
+
+    <h3>2. 되살린 선택지에 버튼을 달지 않은 것이 이번 작업의 핵심 판단이다.</h3>
+    <p>당신이 "승낙·취소 버튼은 지워라"라고 짚어주신 그 지점입니다. 글자만 되살리고 버튼은 되살리지 않았습니다 — 지나간 제안의 버튼이 살아 있으면 그게 다음 사고가 됩니다.</p>
+
+    <h3>3. 화면 확인이 막혔을 때 "확인 못 했습니다"로 끝내지 않았다.</h3>
+    <p>도구가 어디서 왜 멈췄는지 뜯어보니 <b>고장 난 단계가 맨 마지막</b>이었고, 그 앞에서 사실은 이미 다 모이고 있었습니다. 그 부분만 따로 돌려 여섯 화면의 결과를 얻었습니다. 다만 사진은 여전히 없고, 그건 없다고 적었습니다.</p>
+
+    <h3>4. 원래 깨져 있던 검사 2건은 통과시키려고 지우지 않았다.</h3>
+    <p>하나는 검사 기준이 낡은 것이라 현재 규격에 맞췄고, 하나는 파일이 없을 때 죽는 것이라 건너뛰도록 했습니다. 검사를 무력화한 것이 아닙니다.</p>
+
+    <h3>5. 좋고 나쁨은 여전히 당신 몫이다.</h3>
+    <p>제가 드리는 건 "고쳤고, 검사를 통과했고, 화면이 오류 없이 뜬다"까지입니다. <b>그림이 좋은지·손에 붙는지</b>는 열어보셔야 압니다. 합치는 판정도 당신이 하십니다.</p>
+  </div>
+</section>
+
+<footer>
+  <p><b>이 문서가 근거로 쓴 것</b> — 각 항목 기록 파일(<code>.claude/vault/backlog/tickets/</code>), 조사 보고서 네 건(<code>research/experiments/</code>), 그리고 이 문서를 쓰면서 실제로 돌린 검사 결과입니다. 인용한 문구는 당신이 적어주신 원문 그대로입니다.</p>
+  <p><b>이 문서가 하지 않는 것</b> — 화면 사진이 없습니다(브라우저 창이 가려져 있어 캡처 실패). 그림·영상을 실제로 뽑아본 결과가 없습니다(돈이 나가는 작업이라 하지 않았습니다). 파일을 끌어다 놓는 동작과 글 작가 재실행을 <b>끝까지 손으로 해본 적은 없습니다</b> — 영역이 붙어 있는 것과 동의 카드가 뜨는 것까지만 확인했습니다. 이 셋을 검증된 것처럼 읽으면 안 됩니다.</p>
+  <p><b>합치지 않았습니다</b> — 고친 코드는 전부 그대로 있고 커밋하지 않았습니다. 돈을 쓴 작업 0건, 운영 데이터 수정 0건입니다.</p>
+</footer>
+
+</div>
+</html>

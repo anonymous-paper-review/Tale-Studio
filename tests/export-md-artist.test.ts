@@ -50,7 +50,7 @@ function fixtureData(): ArtistData {
 
 describe('collectArtistArtifacts', () => {
   it('emits present artist media with remapped filenames and deduped folders', () => {
-    const files = collectArtistArtifacts(fixtureData())
+    const files = collectArtistArtifacts(fixtureData(), 'ko')
 
     expect(mediaPaths(files)).toEqual([
       'artist/characters/윤서/front.png',
@@ -72,11 +72,11 @@ describe('collectArtistArtifacts', () => {
   })
 
   it('renders a readable assets.md index with native-first descriptions and remap notes', () => {
-    const files = collectArtistArtifacts(fixtureData())
+    const files = collectArtistArtifacts(fixtureData(), 'ko')
     const markdown = textFile(files, 'artist/assets.md')
 
     expect(markdown).toContain('# 아티스트 에셋')
-    expect(markdown).toContain('| 이름 | 타입 | 설명 | 파일 |')
+    expect(markdown).toContain('| 이름 | 유형 | 설명 | 파일 |')
     expect(markdown).not.toContain('{')
     expect(markdown).not.toContain('}')
 
@@ -99,7 +99,7 @@ describe('collectArtistArtifacts', () => {
   })
 
   it('renders an explicit Korean empty note when there are no artist assets', () => {
-    const files = collectArtistArtifacts({ characters: [], locations: [] })
+    const files = collectArtistArtifacts({ characters: [], locations: [] }, 'ko')
 
     expect(files).toHaveLength(1)
     expect(files[0]).toMatchObject({ path: 'artist/assets.md', kind: 'text' })
@@ -110,8 +110,8 @@ describe('collectArtistArtifacts', () => {
     const data = fixtureData()
     const before = JSON.parse(JSON.stringify(data))
 
-    const first = collectArtistArtifacts(data)
-    const second = collectArtistArtifacts(data)
+    const first = collectArtistArtifacts(data, 'ko')
+    const second = collectArtistArtifacts(data, 'ko')
 
     expect(second).toEqual(first)
     expect(data).toEqual(before)

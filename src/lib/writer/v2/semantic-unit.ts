@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { PipelineLogger } from '@/lib/writer/logger'
 import { generateJson, type LlmAxisConfig } from '@/lib/writer/llm/dispatch'
+import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language'
 import type { PipelineInput } from '@/lib/writer/types/pipeline'
 
 const DialogueLineSchema = z.object({
@@ -286,7 +287,7 @@ for downstream production, and downstream retains final authority.
 
 Producer/chat source context:
 ${JSON.stringify(source, null, 2)}
-${correctionBlock}`
+${correctionBlock}${outputLanguageClause(input.outputLocale)}`
 }
 
 async function invoke(

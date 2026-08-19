@@ -14,12 +14,14 @@ import {
   setWriterEnginePreference,
   type WriterEngine,
 } from '@/lib/writer/engine'
+import { useT } from '@/lib/i18n'
 
 interface WriterEnginePickerProps {
   projectId: string | null | undefined
 }
 
 export function WriterEnginePicker({ projectId }: WriterEnginePickerProps) {
+  const t = useT()
   const [authorizedProjectId, setAuthorizedProjectId] = useState<string | null>(null)
   const [engine, setEngine] = useState<WriterEngine>('v1')
 
@@ -51,7 +53,7 @@ export function WriterEnginePicker({ projectId }: WriterEnginePickerProps) {
       <Badge variant="outline" className="text-[10px] uppercase tracking-[0.08em]">
         Admin
       </Badge>
-      <span className="text-xs text-muted-foreground">Writer 엔진</span>
+      <span className="text-xs text-muted-foreground">{t('Writer engine')}</span>
       <Select
         value={engine}
         onValueChange={(value) => {
@@ -60,12 +62,12 @@ export function WriterEnginePicker({ projectId }: WriterEnginePickerProps) {
           setWriterEnginePreference(projectId, next)
         }}
       >
-        <SelectTrigger size="sm" aria-label="Writer 엔진 선택">
+        <SelectTrigger size="sm" aria-label={t('Select writer engine')}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="v1">V1 기존 파이프라인</SelectItem>
-          <SelectItem value="v2">V2 의미 단위 실험</SelectItem>
+          <SelectItem value="v1">{t('V1 — existing pipeline')}</SelectItem>
+          <SelectItem value="v2">{t('V2 — semantic unit experiment')}</SelectItem>
         </SelectContent>
       </Select>
     </div>

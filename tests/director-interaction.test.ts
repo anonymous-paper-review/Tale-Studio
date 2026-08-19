@@ -14,6 +14,10 @@ import {
 } from '@/features/director/canvas-interaction'
 
 import { selectGridVideoAttemptState } from '@/features/director/canvas-views/StoryboardGridView'
+import { translate } from '@/lib/i18n'
+
+// 테스트는 useT() 훅을 못 쓴다(React 렌더 밖) — 고정 locale로 바인딩한 t 스텁을 넘긴다.
+const t = (text: string, params?: Record<string, string | number>) => translate('en', text, params)
 describe('editActionForKind (BaseNode Edit 분기)', () => {
   // #e2 2026-07-14: shot/video도 Storyboard 뷰와 동일하게 모달로 통일 (좌측 패널 경로 폐기).
   it('scene/shot/video는 모달', () => {
@@ -140,7 +144,7 @@ describe('Director video-take selection contracts', () => {
       'provider rejected request',
     )
 
-    expect(selectGridVideoAttemptState([oldGenerating, latestFailure])).toMatchObject({
+    expect(selectGridVideoAttemptState([oldGenerating, latestFailure], t)).toMatchObject({
       latestAttempt: latestFailure,
       generating: false,
       failure: 'provider rejected request',

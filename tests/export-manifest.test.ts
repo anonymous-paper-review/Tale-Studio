@@ -51,7 +51,7 @@ describe('composeProjectArtifacts export manifest', () => {
       director: [textFile('director/shotlist.md'), mediaFile('director/clips/shot-1.mp4')],
     })
 
-    const files = await composeProjectArtifacts(PROJECT, deps)
+    const files = await composeProjectArtifacts(PROJECT, deps, 'ko')
     const readme = textContent(files, 'README.md')
 
     expect(paths(files)).toEqual([
@@ -80,7 +80,7 @@ describe('composeProjectArtifacts export manifest', () => {
       director: [textFile('director/shotlist.md')],
     })
 
-    const files = await composeProjectArtifacts(PROJECT, deps)
+    const files = await composeProjectArtifacts(PROJECT, deps, 'ko')
     const readme = textContent(files, 'README.md')
 
     expect(readme).toContain('| artist | 비어 있음 | 0 |  |')
@@ -101,7 +101,7 @@ describe('composeProjectArtifacts export manifest', () => {
       director: [textFile('director/shotlist.md')],
     })
 
-    const files = await composeProjectArtifacts(PROJECT, deps)
+    const files = await composeProjectArtifacts(PROJECT, deps, 'ko')
     const readme = textContent(files, 'README.md')
 
     expect(readme).toContain('| writer | 오류 | 0 | writer offline |')
@@ -121,7 +121,7 @@ describe('composeProjectArtifacts export manifest', () => {
       director: [],
     })
 
-    const files = await composeProjectArtifacts(PROJECT, deps)
+    const files = await composeProjectArtifacts(PROJECT, deps, 'ko')
     const readme = textContent(files, 'README.md')
 
     expect(readme).toContain('| writer | 오류 | 0 | writer \\| offline<br>retry later |')
@@ -172,7 +172,7 @@ describe('composeProjectArtifacts export manifest', () => {
     const { useProducerStore } = await import('@/stores/producer-store')
     useProducerStore.getState().reset()
 
-    const producerFiles = await createDefaultExportDeps().producer(PROJECT)
+    const producerFiles = await createDefaultExportDeps().producer(PROJECT, 'ko')
     const story = textContent(producerFiles, 'producer/story.md')
     const cast = textContent(producerFiles, 'producer/cast.md')
 
@@ -188,6 +188,7 @@ describe('composeProjectArtifacts export manifest', () => {
         artist: [],
         director: [],
       }),
+      'ko',
     )
     const bundledFiles = vi.mocked(bundleAndDownload).mock.calls.at(-1)?.[0] as ArtifactFile[]
     const readme = textContent(bundledFiles, 'README.md')
@@ -206,7 +207,7 @@ describe('export orchestrator download names', () => {
       director: [],
     })
 
-    await exportProject(project, deps)
+    await exportProject(project, deps, 'ko')
 
     expect(bundleAndDownload).toHaveBeenLastCalledWith(
       expect.any(Array),
@@ -215,7 +216,7 @@ describe('export orchestrator download names', () => {
 
     vi.clearAllMocks()
 
-    await exportStage('writer', project, deps)
+    await exportStage('writer', project, deps, 'ko')
 
     expect(bundleAndDownload).toHaveBeenLastCalledWith(
       [textFile('writer/scenes.md')],

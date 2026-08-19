@@ -1,11 +1,26 @@
 // 카드/오브젝트 @멘션 라벨 생성 (클라 드롭다운 + 서버 라우트 컨텍스트가 공유 — 라벨/ref 일치 보장).
 // 이름이 없는 "빈 깡통" 카드도 안정 ref(localId)로 멘션·지정 가능하게 한다.
 // 같은 종류의 이름 없는 카드가 여러 개면 번호를 붙여 라벨을 고유하게 만든다(이름 미정 인물, 이름 미정 인물 2 …).
+//
+// i18n(#i18n-s5-batch4): label 은 LLM @멘션 텍스트 매칭의 식별자를 겸한다(활성 멘션 판정 —
+//   activeMentionRefs/toggleMentionToken — 이 label 문자열 자체를 매칭 키로 쓴다) + 클라(드롭다운
+//   렌더)·서버(produce/chat/route.ts, LLM 컨텍스트에 "@{label}" 을 주입)가 이 값을 공유한다.
+//   따라서 label(이름 있는 카드는 그대로, 없는 카드의 "이름 미정 …" 폴백)은 로케일과 무관하게
+//   고정한다 — 클라·서버가 서로 다른 locale 해석으로 다른 문자열을 만들면 LLM 이 되돌려준
+//   @멘션이 클라의 멘션 목록과 매칭되지 않는 조용한 고장이 된다. hint(카테고리 배지, 순수 표시용 —
+//   매칭에 안 쓰이고 서버도 안 읽음, 실측 확인)만 locale 인자로 번역한다.
+import { translate } from '@/lib/i18n'
+import type { AppLocale } from '@/lib/locale'
+
+// locale 인자를 안 넘기는 기존 호출부(global-chat.tsx — 범위 밖, hint 를 그대로 렌더)가 조용히
+//   깨지지 않도록, 함수 도입 이전 동작(항상 한국어)을 기본값으로 보존한다. 앱 전역 DEFAULT_LOCALE
+//   ('en')과 다른 값을 의도적으로 쓴다 — 이건 "새 기능의 기본"이 아니라 "미갱신 호출부의 하위호환".
+const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
 export interface CardMention {
   ref: string // 카드 안정 핸들 (localId) — AI가 이름 없는 카드도 정확히 지정
-  label: string // 표시/삽입 라벨 (이름 또는 "이름 미정 …")
-  hint: string // 종류 (인물/사물/배경)
+  label: string // 표시/삽입 라벨 (이름 또는 "이름 미정 …") — 매칭 식별자 겸용, 로케일 고정
+  hint: string // 종류 (인물/사물/배경) — 순수 표시용, 번역 가능
 }
 
 export type SceneShotMentionMode = 'writer' | 'previz' | 'real'
@@ -87,23 +102,31 @@ interface BackgroundLike {
   name?: string
 }
 
-export function castMentions(cast: CastLike[]): CardMention[] {
+export function castMentions(
+  cast: CastLike[],
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+): CardMention[] {
   const unnamed: Record<string, number> = {}
   return cast.map((m) => {
-    const hint = m.entityType === 'object' ? '사물' : '인물'
+    // 매칭 키(label 폴백)는 로케일 고정(위 헤더 코멘트) — 표시용 hint 만 번역.
+    const kind = m.entityType === 'object' ? '사물' : '인물'
+    const hint = translate(locale, kind === '사물' ? 'Object' : 'Person')
     const named = m.name?.trim()
     let label: string
     if (named) {
       label = named
     } else {
-      unnamed[hint] = (unnamed[hint] ?? 0) + 1
-      label = `이름 미정 ${hint}${unnamed[hint] > 1 ? ` ${unnamed[hint]}` : ''}`
+      unnamed[kind] = (unnamed[kind] ?? 0) + 1
+      label = `이름 미정 ${kind}${unnamed[kind] > 1 ? ` ${unnamed[kind]}` : ''}`
     }
     return { ref: m.localId, label, hint }
   })
 }
 
-export function backgroundMentions(backgrounds: BackgroundLike[]): CardMention[] {
+export function backgroundMentions(
+  backgrounds: BackgroundLike[],
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+): CardMention[] {
   let unnamed = 0
   return backgrounds.map((b) => {
     const named = b.name?.trim()
@@ -114,7 +137,7 @@ export function backgroundMentions(backgrounds: BackgroundLike[]): CardMention[]
       unnamed += 1
       label = `이름 미정 배경${unnamed > 1 ? ` ${unnamed}` : ''}`
     }
-    return { ref: b.localId, label, hint: '배경' }
+    return { ref: b.localId, label, hint: translate(locale, 'Background') }
   })
 }
 

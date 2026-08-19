@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId } from '@/lib/session-restore'
 import { useProjectStore } from '@/stores/project-store'
+import { useT } from '@/lib/i18n'
 
 interface ProjectItem {
   id: string
@@ -21,22 +22,24 @@ interface ProjectItem {
   updated_at: string
 }
 
-function relativeTime(dateStr: string): string {
+// 포맷터는 컴포넌트가 아니라 훅을 쓸 수 없다 — t 를 인자로 받는다(#i18n-s5-batch2).
+function relativeTime(dateStr: string, t: ReturnType<typeof useT>): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return '방금'
-  if (mins < 60) return `${mins}분 전`
+  if (mins < 1) return t('Just now')
+  if (mins < 60) return t('{mins}m ago', { mins })
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}시간 전`
+  if (hours < 24) return t('{hours}h ago', { hours })
   const days = Math.floor(hours / 24)
-  if (days < 30) return `${days}일 전`
-  return `${Math.floor(days / 30)}달 전`
+  if (days < 30) return t('{days}d ago', { days })
+  return t('{months}mo ago', { months: Math.floor(days / 30) })
 }
 
 export function UserMenu() {
   const router = useRouter()
   const supabase = createClient()
   const { projectId, createNewProject, switchProject } = useProjectStore()
+  const t = useT()
 
   const [open, setOpen] = useState(false)
   const [avatar, setAvatar] = useState<string | null>(null)
@@ -92,7 +95,7 @@ export function UserMenu() {
   }
 
   const handleRename = async (p: ProjectItem) => {
-    const newTitle = window.prompt('프로젝트 이름', p.title)
+    const newTitle = window.prompt(t('Project name'), p.title)
     if (!newTitle?.trim() || newTitle === p.title) return
     const res = await fetch(`/api/project/${p.id}`, {
       method: 'PATCH',
@@ -109,7 +112,7 @@ export function UserMenu() {
   }
 
   const handleDelete = async (p: ProjectItem) => {
-    if (!window.confirm(`"${p.title}" 프로젝트를 삭제하시겠습니까?`)) return
+    if (!window.confirm(t('Delete project "{title}"?', { title: p.title }))) return
     const res = await fetch(`/api/project/${p.id}`, { method: 'DELETE' })
     if (!res.ok) return
     const remaining = projects.filter((x) => x.id !== p.id)
@@ -171,7 +174,7 @@ export function UserMenu() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate">{p.title}</div>
                   <div className="text-[11px] text-muted-foreground">
-                    {relativeTime(p.updated_at)}
+                    {relativeTime(p.updated_at, t)}
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-0.5 opacity-0 group-hover:opacity-100">

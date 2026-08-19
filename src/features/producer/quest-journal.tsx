@@ -24,6 +24,7 @@ import { useProjectStore } from '@/stores/project-store'
 import type { GateResult } from '@/lib/producer-gate'
 import type { ProjectFormat } from '@/types'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 
 const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [
   { value: 'horizontal_16:9', label: '16:9 Horizontal' },
@@ -32,8 +33,10 @@ const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [
   { value: 'square_1:1', label: '1:1 Square' },
 ]
 
+// 언어명은 각 언어의 자국어 표기(endonym) — 앱 UI 로케일과 무관하게 고정.
+//   copy-style.md 의 고유명사 예외와 동일 취급, 사전화 대상 아님.
 const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
-  { value: 'ko', label: '한국어' },
+  { value: 'ko', label: '한국어' }, // i18n-ok: 언어 자국어 표기(endonym), 번역 대상 아님
   { value: 'en', label: 'English' },
   { value: 'ja', label: '日本語' },
   { value: 'zh', label: '中文' },
@@ -48,10 +51,11 @@ const BADGE_EMPTY =
   'border-dashed border-border-strong text-muted-foreground hover:border-stage-producer/60 hover:text-foreground'
 
 function BadgeFace({ k, value }: { k: string; value: string | null }) {
+  const t = useT()
   return (
     <>
       <span className="shrink-0 text-[9px] uppercase tracking-wide opacity-60">{k}</span>
-      <span className="truncate">{value ?? '비어 있음'}</span>
+      <span className="truncate">{value ?? t('Empty')}</span>
     </>
   )
 }
@@ -115,6 +119,7 @@ function OptionList({
  * 빈 값 = 점선, 채워지면 producer 색 점등. 클릭 = popover 편집 (기본 동선은 채팅).
  */
 export function StoryFoundationBadges({ className }: { className?: string }) {
+  const t = useT()
   const settings = useProducerStore((s) => s.projectSettings)
   const updateSettings = useProducerStore((s) => s.updateSettings)
   const styleAnchors = useProducerStore((s) => s.styleAnchors)
@@ -134,25 +139,25 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
 
   return (
     <div className={cn('flex flex-wrap gap-1.5', className)}>
-      <SettingBadge k="러닝타임" value={settings.playtime ? `${settings.playtime}초` : null}>
+      <SettingBadge k={t('Runtime')} value={settings.playtime ? t('{sec}s', { sec: settings.playtime }) : null}>
         <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
-          러닝타임 (초)
+          {t('Runtime (sec)')}
         </label>
         <Input
           type="number"
           min={5}
           value={settings.playtime || ''}
-          placeholder="예: 120"
+          placeholder={t('e.g. 120')}
           onChange={(e) => updateSettings({ playtime: Number(e.target.value) || 0 })}
           className="number-spin h-8 font-mono tabular-nums"
         />
       </SettingBadge>
 
-      <SettingBadge k="장르" value={settings.genre || null}>
-        <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">장르</label>
+      <SettingBadge k={t('Genre')} value={settings.genre || null}>
+        <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">{t('Genre')}</label>
         <Input
           value={settings.genre}
-          placeholder="예: thriller"
+          placeholder={t('e.g. thriller')}
           onChange={(e) => updateSettings({ genre: e.target.value })}
           className="h-8"
         />
@@ -169,10 +174,10 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
             : 'border-dashed border-border-strong text-muted-foreground',
         )}
       >
-        <BadgeFace k="스타일" value={styleLabel} />
+        <BadgeFace k={t('Style')} value={styleLabel} />
       </span>
 
-      <SettingBadge k="포맷" value={formatLabel}>
+      <SettingBadge k={t('Format')} value={formatLabel}>
         <OptionList
           options={FORMAT_OPTIONS}
           value={settings.format}
@@ -180,18 +185,18 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
         />
       </SettingBadge>
 
-      <SettingBadge k="톤" value={settings.tone.length ? settings.tone.join(', ') : null}>
+      <SettingBadge k={t('Tone')} value={settings.tone.length ? settings.tone.join(', ') : null}>
         <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
-          톤 — 채우면 각본 퀄이 올라가요
+          {t('Tone — fill this in for a better script')}
         </label>
         <TagInput
           values={settings.tone}
           onChange={(tone) => updateSettings({ tone })}
-          placeholder="예: dark"
+          placeholder={t('e.g. dark')}
         />
       </SettingBadge>
 
-      <SettingBadge k="대사 언어" value={langLabel}>
+      <SettingBadge k={t('Dialogue language')} value={langLabel}>
         <OptionList
           options={LANGUAGE_OPTIONS}
           value={settings.dialogueLanguage || ''}
@@ -209,6 +214,7 @@ interface JourneyNode {
 }
 
 export function ProducerQuestJournal({ gate, className }: { gate: GateResult; className?: string }) {
+  const t = useT()
   const hard = new Set(gate.hardMissing.map((i) => i.field))
   const castIssues = gate.hardMissing.filter((i) => i.field.startsWith('cast'))
   const settingsDone = !['playtime', 'genre', 'format', 'dialogueLanguage'].some((f) => hard.has(f))
@@ -218,34 +224,34 @@ export function ProducerQuestJournal({ gate, className }: { gate: GateResult; cl
 
   const nodes: JourneyNode[] = [
     {
-      title: '이야기 씨앗',
-      desc: '장면 하나, 기분 하나면 충분해요 — 채팅에 던져 보세요.',
+      title: t('Story seed'),
+      desc: t('One scene, one feeling is enough — drop it in chat.'),
       done: storyDone,
     },
     {
-      title: '설정 확정',
-      desc: '이야기하다 보면 채워져요 — 러닝타임·장르·포맷·언어.',
+      title: t('Settings locked in'),
+      desc: t('These fill in as you talk — runtime, genre, format, language.'),
       done: settingsDone,
     },
     {
-      title: '주인공 등장',
+      title: t('Protagonist appears'),
       desc: castDone
-        ? '모습이 그려지는 인물이 준비됐어요.'
-        : `${castIssues.length}개 항목이 비어 있어요 — 인물을 묘사해 보세요.`,
+        ? t('A vividly-drawn character is ready.')
+        : t('{count} fields are empty — try describing a character.', { count: castIssues.length }),
       done: castDone,
     },
     {
-      title: '무대 완성',
+      title: t('Stage complete'),
       desc: stageDone
-        ? '이름·모습·용도가 있는 배경이 준비됐어요.'
-        : '이름·모습·용도가 있는 배경 1개가 필요해요.',
+        ? t('A background with a name, look, and purpose is ready.')
+        : t('You need at least one background with a name, look, and purpose.'),
       done: stageDone,
     },
     {
-      title: 'Writer 호출',
+      title: t('Call Writer'),
       desc: gate.canHandoff
-        ? '모든 재료가 준비됐어요 — 채팅에서 Writer를 호출해 보세요.'
-        : '마일스톤을 채우면 Writer를 호출할 수 있어요.',
+        ? t("Everything's ready — call Writer from the chat.")
+        : t('Complete the milestones to call Writer.'),
       done: false,
     },
   ]
@@ -253,7 +259,7 @@ export function ProducerQuestJournal({ gate, className }: { gate: GateResult; cl
 
   return (
     <aside className={cn('lg:sticky lg:top-0', className)}>
-      <h2 className="mb-4 text-sm font-semibold">제작 여정</h2>
+      <h2 className="mb-4 text-sm font-semibold">{t('Production journey')}</h2>
       {/* 세로 여정 레일 — 목업 저니맵 차용: 완료 = 초록 체크, 현재 = producer 색 링. */}
       <div className="relative pl-9">
         <span aria-hidden className="absolute bottom-3 left-[11px] top-2 w-0.5 bg-muted" />

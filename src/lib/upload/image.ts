@@ -40,13 +40,15 @@ function diagnostic(error: unknown): string {
  */
 export async function decodeImage(data: Buffer, mimeType: string): Promise<DecodeResult> {
   if (!isImageMimeType(mimeType)) {
-    return { ok: false, reason: 'JPG · PNG · WebP 만 올릴 수 있어요.' }
+    // server-only(호출부는 produce/ingest route 하나뿐, 범위 밖) — 유저 locale 을 알 방법이 없어
+    //   영어 리터럴로 고정한다(translate() 래퍼 없음 — #i18n-s5-batch, generation-quota.ts와 동일 취급).
+    return { ok: false, reason: 'Only JPG, PNG, or WebP can be uploaded.' }
   }
   if (data.length === 0) {
-    return { ok: false, reason: '파일이 비어 있어요.' }
+    return { ok: false, reason: 'The file is empty.' }
   }
   if (data.length > IMAGE_MAX_BYTES) {
-    return { ok: false, reason: `파일이 너무 커요 (최대 ${formatBytes(IMAGE_MAX_BYTES)}).` }
+    return { ok: false, reason: `The file is too large (max ${formatBytes(IMAGE_MAX_BYTES)}).` }
   }
 
   const expected = IMAGE_TYPES[mimeType]
@@ -55,27 +57,27 @@ export async function decodeImage(data: Buffer, mimeType: string): Promise<Decod
     const metadata = await image.metadata()
 
     if (!metadata.width || !metadata.height) {
-      return { ok: false, reason: '이미지 크기를 읽지 못했어요. 파일이 손상됐을 수 있어요.' }
+      return { ok: false, reason: "Couldn't read the image dimensions. The file may be corrupted." }
     }
     if (metadata.format !== expected.format) {
       return {
         ok: false,
-        reason: `확장자와 실제 내용이 달라요 (${expected.format} 이라고 했는데 ${metadata.format ?? '알 수 없음'} 이에요).`,
+        reason: `The extension doesn't match the actual content (expected ${expected.format}, got ${metadata.format ?? 'unknown'}).`,
       }
     }
     if (metadata.width > IMAGE_MAX_WIDTH) {
-      return { ok: false, reason: `가로가 너무 넓어요 (${metadata.width}px, 최대 ${IMAGE_MAX_WIDTH}px).` }
+      return { ok: false, reason: `The image is too wide (${metadata.width}px, max ${IMAGE_MAX_WIDTH}px).` }
     }
     if (metadata.height > IMAGE_MAX_HEIGHT) {
       return {
         ok: false,
-        reason: `세로가 너무 길어요 (${metadata.height}px, 최대 ${IMAGE_MAX_HEIGHT}px). 화를 나눠서 올려 주세요.`,
+        reason: `The image is too tall (${metadata.height}px, max ${IMAGE_MAX_HEIGHT}px). Please split it and upload in parts.`,
       }
     }
     if (metadata.width * metadata.height > IMAGE_MAX_PIXELS) {
       return {
         ok: false,
-        reason: `이미지가 너무 커요 (${Math.round((metadata.width * metadata.height) / 1_000_000)}메가픽셀, 최대 ${IMAGE_MAX_PIXELS / 1_000_000}). 화를 나눠서 올려 주세요.`,
+        reason: `The image is too large (${Math.round((metadata.width * metadata.height) / 1_000_000)} megapixels, max ${IMAGE_MAX_PIXELS / 1_000_000}). Please split it and upload in parts.`,
       }
     }
 
@@ -88,7 +90,7 @@ export async function decodeImage(data: Buffer, mimeType: string): Promise<Decod
     }
   } catch (error) {
     console.warn('[upload/image] decoder rejected input', diagnostic(error))
-    return { ok: false, reason: '이미지를 여는 데 실패했어요. 파일이 손상됐을 수 있어요.' }
+    return { ok: false, reason: 'Failed to open the image. The file may be corrupted.' }
   }
 }
 

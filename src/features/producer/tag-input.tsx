@@ -5,6 +5,7 @@ import { Plus, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 
 /**
  * 문자열 배열(tone[]) 칩 편집기.
@@ -22,6 +23,7 @@ export function TagInput({
   onChange: (next: string[]) => void
   placeholder?: string
 }) {
+  const t = useT()
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -46,7 +48,7 @@ export function TagInput({
           <button
             type="button"
             onClick={() => onChange(values.filter((x) => x !== v))}
-            aria-label={`${v} 제거`}
+            aria-label={t('Remove {value}', { value: v })}
             className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
           >
             <X className="size-3" />
@@ -72,15 +74,15 @@ export function TagInput({
             add()
             setEditing(false)
           }}
-          placeholder={placeholder ?? '추가…'}
+          placeholder={placeholder ?? t('Add…')}
           className="h-7 w-28 min-w-24 border-dashed text-xs"
         />
       ) : (
         <button
           type="button"
           onClick={() => setEditing(true)}
-          aria-label={placeholder ? `추가 (${placeholder})` : '추가'}
-          title="추가"
+          aria-label={placeholder ? t('Add ({placeholder})', { placeholder }) : t('Add')}
+          title={t('Add')}
           className={cn(
             'flex size-6 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100',
             // 상시 노출(2026-08-06) — hover 전 opacity-0 은 "톤을 어떻게 바꾸지?"로 읽혔다.

@@ -1,0 +1,392 @@
+<title>썸네일 파이프라인 수리</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.8;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(26px,5vw,38px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .standfirst{font-size:17px;color:var(--ink-2);margin:0 0 14px;max-width:62ch}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:0;line-height:1.7}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:56px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:22px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:64ch}
+  p{margin:0 0 14px;max-width:66ch}
+  h3{font-size:16.5px;font-weight:750;margin:26px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 14px;padding-left:22px;max-width:66ch}
+  ul.plain li{margin-bottom:7px}
+  ol.plain{margin:0 0 14px;padding-left:22px;max-width:66ch}
+  ol.plain li{margin-bottom:9px}
+  strong,b{font-weight:750}
+
+  .task{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:0;margin:0 0 20px;overflow:hidden}
+  .task > .th{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;
+    padding:16px 22px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+  .task > .th h3{margin:0;flex:1 1 260px;font-size:16.5px}
+  .task > .tb{padding:18px 22px 14px}
+  .task > .tb > :last-child{margin-bottom:0}
+  .task.t-a{border-left:3px solid var(--fail)}
+  .task.t-b{border-left:3px solid var(--warn)}
+  .task.t-c{border-left:3px solid var(--accent)}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:20px 24px 16px;margin:0 0 16px}
+  .card.fail{border-left:3px solid var(--fail)}
+  .card.note{border-left:3px solid var(--accent)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right;font-family:var(--mono);font-size:12.5px;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr.bad td{background:var(--fail-soft)}
+  tr.good td{background:var(--pass-soft)}
+  tr.hi td{background:var(--accent-soft)}
+  .say{color:var(--muted);font-size:12.5px;display:block;margin-top:3px;line-height:1.55}
+
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:13px 15px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.65;margin:10px 0 14px;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre.before{border-left-color:var(--fail)}
+  pre.after{border-left-color:var(--pass)}
+  pre b{color:var(--ink);font-weight:700}
+  .lbl{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted);margin:12px 0 0}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .path{font-family:var(--mono);font-size:12px;color:var(--muted)}
+
+  .banner{border:2px solid var(--ink);border-radius:10px;padding:20px 24px;margin:24px 0;
+    background:var(--surface)}
+  .banner h3{margin:0 0 10px;font-size:17px}
+  .banner p:last-child{margin-bottom:0}
+
+  footer{margin-top:62px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer ul{padding-left:20px;margin:8px 0 16px}
+  footer li{margin-bottom:6px}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+</style>
+
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">작업 명세 · 인수인계용 · 2026-08-19</p>
+  <h1>썸네일 파이프라인 수리 — 만드는 쪽과 쓰는 쪽을 동시에 고칩니다</h1>
+  <p class="standfirst">작은 그림이 세 프레임 중 한 장만 만들어지고, 만들어진 것조차 주요 화면이 쓰지 않고 있습니다. 어느 쪽 하나만 고치면 효과가 0이라 같이 고쳐야 합니다.</p>
+  <p class="asof">전제 — 파일 보관함이 요금 초과로 막혀 있어 <b>파일을 만들거나 지우는 작업은 지금 못 합니다.</b> 이 명세의 A·B·C는 전부 코드 변경이라 지금 가능하고, D(소급 생성·삭제)는 보관함이 열린 뒤입니다.</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>배경 — 왜 지금 손대나</h2></div>
+  <p>실측 결과 세 가지가 동시에 어긋나 있습니다.</p>
+  <ul class="plain">
+    <li><b>만드는 쪽</b> — 한 샷당 프레임 세 장을 올리는데 작은 그림은 시작 프레임만 만듭니다. 날짜별 생성 비율이 30% 안팎으로 코드 모양과 일치합니다.</li>
+    <li><b>쓰는 쪽</b> — 카드·그리드를 그리는 두 컴포넌트가 작은 그림을 아예 거치지 않고 원본을 직접 물고 있습니다. 그중 하나는 <b>세 장을 동시에 마운트</b>합니다.</li>
+    <li><b>소급 생성 도구</b> — 화면에 안 뜨는 생성용 임시 파일에도 작은 그림을 만들었습니다(141개).</li>
+  </ul>
+  <p>화면에 뜨는 그림 5,140장을 한 번씩 보면 지금은 <b>697메가</b>가 나갑니다. 전부 제대로 걸리면 <b>97메가</b>입니다. 저장은 35메가 늘어납니다.</p>
+  <div class="card fail">
+    <p><b>순서가 중요합니다.</b> 쓰는 쪽을 안 고친 채 소급 생성만 돌리면 저장·쓰기 비용만 늘고 효과는 0입니다. 2026년 7월 17일부터 8월 12일까지 26일 동안 정확히 그 상태였습니다 — 파일은 만들면서 화면 스위치는 꺼져 있었습니다. 같은 실수를 반복하지 않으려면 <b>A → B → C → D 순서</b>를 지켜야 합니다.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>A — 만드는 쪽: 세 프레임 모두 만들기</h2></div>
+
+  <div class="task t-a">
+    <div class="th"><h3>A-1 · 러프·스토리보드 프레임 세 장에 모두 작은 그림 생성</h3><span class="chip c-fail">필수 · 선행</span></div>
+    <div class="tb">
+      <p class="path">src/lib/fal/finalize.ts — 880행 · 1000행 · 1071행 (세 군데 모두 같은 형태)</p>
+      <p class="lbl">지금</p>
+      <pre class="before">const [startUrl, directionUrl, endUrl] = await Promise.all([
+  upload(`${base}/${seg}_rough_start.png`, frames.start),
+  upload(`${base}/${seg}_rough_direction.png`, frames.direction),
+  upload(`${base}/${seg}_rough_end.png`, frames.end),
+])
+<b>await uploadThumbnail(`${base}/${seg}_rough_start.png`, frames.start)</b></pre>
+      <p class="lbl">바꿀 것</p>
+      <pre class="after">const [startUrl, directionUrl, endUrl] = await Promise.all([
+  upload(`${base}/${seg}_rough_start.png`, frames.start),
+  upload(`${base}/${seg}_rough_direction.png`, frames.direction),
+  upload(`${base}/${seg}_rough_end.png`, frames.end),
+])
+<b>await Promise.all([
+  uploadThumbnail(`${base}/${seg}_rough_start.png`, frames.start),
+  uploadThumbnail(`${base}/${seg}_rough_direction.png`, frames.direction),
+  uploadThumbnail(`${base}/${seg}_rough_end.png`, frames.end),
+])</b></pre>
+      <p><b>경로 문자열을 다시 쓰지 말 것.</b> 위 예시는 원본과 나란히 두려고 반복했지만, 실제로는 경로를 변수로 뽑아 업로드와 작은 그림 생성이 <b>같은 문자열</b>을 쓰게 해야 합니다. 지금 형태는 오타 하나로 원본과 작은 그림의 짝이 어긋나고, 어긋나면 404 폴백 때문에 조용히 넘어갑니다.</p>
+      <p>1000행은 스토리보드 프레임(<code>_storyboard_start/direction/end</code>), 1071행은 러프 프레임입니다. 880행도 확인해서 같은 규칙을 적용합니다.</p>
+      <p><b>부작용:</b> 쓰기 요청이 샷당 1건에서 3건으로 늘어납니다. 8월 실적 기준 월 8,902건이 약 27,000건이 되는데, Cloudflare 무료 한도 100만 건의 2.7%라 문제가 되지 않습니다. 작은 그림 생성은 실패해도 던지지 않는 설계라 원본 저장을 막지 않습니다.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>B — 쓰는 쪽: 화면이 작은 그림을 쓰게 하기</h2></div>
+  <p class="sec-lede">소비처가 10곳입니다. 호출부마다 감싸지 말고 <b>공용 컴포넌트 안에서</b> 처리하는 것이 이 작업의 핵심 설계입니다.</p>
+
+  <div class="card note">
+    <h3>설계 원칙 — 한 곳만 알게 한다</h3>
+    <p>호출부 10곳에서 각자 <code>thumbUrl()</code>을 감싸면, 하나라도 빠뜨렸을 때 <b>조용히 원본이 나갑니다.</b> 지금 상태가 정확히 그렇게 만들어졌습니다. 게다가 404 폴백은 호출부에서 처리할 수 없습니다 — 상태가 필요합니다.</p>
+    <p>그래서 <span class="path">src/components/thumb-image.tsx</span>의 <code>ThumbImage</code>가 이미 갖고 있는 "작은 그림 우선 + 404 시 원본 폴백" 로직을 <b>유일한 통로로 삼고</b>, 나머지 컴포넌트가 그것을 쓰게 합니다.</p>
+    <p>필요한 준비: <code>ThumbImage</code>에 호출부들이 쓰는 속성을 받을 수 있게 넓힙니다 — <code>loading</code>, <code>onLoad</code>, <code>aria-hidden</code>, <code>style</code>, <code>key</code>는 부모가 붙입니다. 기본값은 지금과 같게 유지합니다(<code>loading="lazy"</code>, <code>decoding="async"</code>).</p>
+  </div>
+
+  <div class="task t-a">
+    <div class="th"><h3>B-1 · 3프레임 순환 컴포넌트</h3><span class="chip c-fail">가장 큼</span></div>
+    <div class="tb">
+      <p class="path">src/components/rough-frame-cycle.tsx — 122~148행 근처</p>
+      <p>이 컴포넌트는 <b>세 장을 동시에 마운트</b>하고 투명도로 전환합니다(전환 시 깜빡임 방지). 그래서 카드 하나가 화면에 들어오면 원본 3장, 약 735킬로바이트를 받습니다.</p>
+      <p class="lbl">지금</p>
+      <pre class="before">{urls.map((u, i) =&gt; (
+  // eslint-disable-next-line @next/next/no-img-element
+  <b>&lt;img
+    key={u}
+    src={u}</b>
+    alt={i === current ? alt : ''}
+    aria-hidden={i !== current}
+    onLoad={...}
+    className={...}
+    loading="lazy"
+    draggable={false}
+  /&gt;
+))}</pre>
+      <p class="lbl">바꿀 것 — 각 장이 개별 폴백 상태를 갖도록 컴포넌트 인스턴스로</p>
+      <pre class="after">{urls.map((u, i) =&gt; (
+  <b>&lt;ThumbImage
+    key={u}
+    src={u}</b>
+    alt={i === current ? alt : ''}
+    aria-hidden={i !== current}
+    onLoad={...}
+    className={...}
+    draggable={false}
+  /&gt;
+))}</pre>
+      <p><b>3장 동시 마운트는 그대로 둡니다.</b> 없애면 전환할 때 깜빡입니다. 작은 그림이면 세 장 합쳐 45킬로바이트라 오히려 이 설계와 궁합이 좋습니다.</p>
+      <p><b>깨뜨리면 안 되는 동작 넷:</b></p>
+      <ul class="plain">
+        <li>hover 순환 · 진입 시 1회 자동 순환(<code>introPlay</code>)</li>
+        <li>클릭으로 일시정지 잠금, 점 클릭으로 프레임 고정</li>
+        <li><code>sizeToImage</code> 모드에서 첫 장의 <code>onLoad</code>로 실제 비율을 재는 것 — <b>작은 그림도 원본과 같은 비율</b>이라 값은 같지만, <code>onLoad</code>가 첫 장에만 붙는 조건이 유지되어야 합니다</li>
+        <li><code>withCacheBust</code>가 붙인 <code>?v=</code> 쿼리 — <code>toThumbUrl</code>이 쿼리를 분리해 확장자만 바꾸므로 그대로 보존됩니다</li>
+      </ul>
+      <p><b>사용처 4곳:</b> <span class="path">StoryboardGridView.tsx</span>(418·436행), <span class="path">ShotImageNode.tsx</span>(134행), <span class="path">ShotNode.tsx</span>(133행), <span class="path">rough-storyboard-view.tsx</span>(861행). 앞 둘이 카드가 많이 깔리는 화면입니다.</p>
+    </div>
+  </div>
+
+  <div class="task t-a">
+    <div class="th"><h3>B-2 · 생성 완료 이미지 컴포넌트</h3><span class="chip c-fail">4개 화면 공유</span></div>
+    <div class="tb">
+      <p class="path">src/components/generating-frame.tsx — 226~245행, <code>GeneratedImage</code></p>
+      <p>흐릿한 상태에서 선명해지는 연출을 담당하는 공용 컴포넌트입니다. 내부에서 원본 <code>&lt;img&gt;</code>를 직접 씁니다.</p>
+      <pre class="before">export function GeneratedImage({ src, alt, className }) {
+  const [loaded, setLoaded] = useState(false)
+  return (
+    <b>&lt;img src={src}</b> alt={alt} loading="lazy" decoding="async"
+      onLoad={() =&gt; setLoaded(true)} ... /&gt;</pre>
+      <p><code>ThumbImage</code>로 교체하되 <code>onLoad</code>가 살아 있어야 합니다 — 그 값으로 흐림이 풀립니다. <b>404 폴백이 일어나면 <code>onLoad</code>가 두 번 불릴 수 있는데</b>, <code>loaded</code>는 한 방향으로만 바뀌므로 무해합니다. 그래도 의도한 동작인지 확인하고 넘어가세요.</p>
+      <p><b>사용처 5곳:</b> <span class="path">StoryboardGridView.tsx</span>(426·439행), <span class="path">VideoNode.tsx</span>(217행), <span class="path">ShotImageNode.tsx</span>(137행), <span class="path">image-placeholder.tsx</span>(36행).</p>
+    </div>
+  </div>
+
+  <div class="task t-b">
+    <div class="th"><h3>B-3 · 나머지 여덟 곳</h3><span class="chip c-warn">기계적</span></div>
+    <div class="tb">
+      <p>원본 <code>&lt;img&gt;</code>를 <code>ThumbImage</code>로 바꾸거나, 비디오 <code>poster</code>처럼 문자열만 필요한 자리는 <code>thumbUrl()</code>을 씌웁니다.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>위치</th><th class="num">표시 크기</th><th>메모</th></tr></thead>
+        <tbody>
+          <tr class="bad"><td><span class="path">ShotNodePopup.tsx:221</span></td><td class="num">64 × 64</td><td>참고 이미지 목록. 코드베이스에서 비율이 가장 나쁨</td></tr>
+          <tr class="bad"><td><span class="path">ShotDetailPanel.tsx:218</span></td><td class="num">64 × 64</td><td>같은 목록의 패널 버전</td></tr>
+          <tr><td><span class="path">global-chat.tsx:1140</span></td><td class="num">40 × 40</td><td>말풍선 첨부 이미지</td></tr>
+          <tr><td><span class="path">shot-timeline.tsx:127</span></td><td class="num">클립 칸</td><td><b>바로 위 <code>poster</code>엔 이미 <code>thumbUrl()</code>이 걸려 있습니다.</b> <code>&lt;img&gt;</code> 폴백만 빠졌습니다</td></tr>
+          <tr><td><span class="path">timeline.tsx:847</span></td><td class="num">최소 8px 폭</td><td>동일한 반쪽 적용</td></tr>
+          <tr><td><span class="path">video-source-panel.tsx:147</span></td><td class="num">소형 카드</td><td>동일한 반쪽 적용</td></tr>
+          <tr><td><span class="path">style-anchor-picker.tsx:47</span></td><td class="num">정사각 카드</td><td>작은 그림 25/26개가 이미 있습니다</td></tr>
+          <tr><td><span class="path">writer-character-panel.tsx:57</span></td><td class="num">정사각 카드</td><td>캐릭터 카드</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="banner">
+    <h3>손대면 안 되는 다섯 곳</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>위치</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td><span class="path">turnaround-region-cycle.tsx:85</span></td><td><b>확대해서 봅니다.</b> <code>regionStyle</code>이 <code>wFrac = Math.max(1/(x1-x0), …)</code>로 배율을 계산해 <code>max-w-none</code>으로 늘립니다. 512픽셀을 몇 배로 확대하면 뭉개집니다</td></tr>
+        <tr><td><span class="path">directing-arrow-editor.tsx:422</span></td><td>편집 캔버스. 화살표를 지우개로 긁는 작업이라 픽셀 정확도가 필요합니다</td></tr>
+        <tr><td><span class="path">writer-character-panel.tsx:162</span></td><td>대화상자 안 전폭 템플릿 시트. 크게 보는 것이 목적입니다</td></tr>
+        <tr><td><span class="path">user-menu.tsx:141</span><br><span class="path">dashboard-header.tsx:95</span></td><td>외부 로그인 제공자의 프로필 사진입니다(<code>referrerPolicy="no-referrer"</code>). 우리 보관함 파일이 아니라 해당 사항이 없습니다</td></tr>
+      </tbody>
+    </table></div>
+    <p><code>thumbUrl()</code>은 우리 보관함 주소가 아니면 원본을 그대로 돌려주므로 위 다섯 곳에 걸어도 <b>깨지지는 않습니다.</b> 다만 첫 두 곳은 화질이 실제로 나빠지므로 걸지 마세요.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>C — 소급 생성 도구에 대상 필터</h2></div>
+  <div class="task t-c">
+    <div class="th"><h3>C-1 · 화면에 안 뜨는 파일은 건너뛰기</h3><span class="chip c-acc">낭비 차단</span></div>
+    <div class="tb">
+      <p class="path">scripts/backfill-thumbnails.mjs</p>
+      <p>지금은 보관함의 모든 이미지를 훑어서, 외부 생성 서버만 가져가는 파일에도 작은 그림을 만들었습니다. 아무도 안 읽습니다.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>제외할 경로 패턴</th><th>무엇인가</th><th class="num">현재 잘못 만든 것</th></tr></thead>
+        <tbody>
+          <tr><td><code>real_grid_ref_</code></td><td>배치 스토리보드 생성용 참조 시트</td><td class="num" rowspan="2">141개</td></tr>
+          <tr><td><code>_storyboard_ref_strip</code></td><td>단건 스토리보드 생성용 참조 띠</td></tr>
+          <tr><td><code>templates/</code></td><td>생성 모델용 고정 템플릿 — 지금도 0개라 올바른 상태입니다</td><td class="num">0</td></tr>
+          <tr><td><code>uploads/</code></td><td>원본 업로드. 화면 어디에 뜨는지 확인 전까지 보류</td><td class="num">0</td></tr>
+        </tbody>
+      </table></div>
+      <p>필터는 <b>포함 목록이 아니라 제외 목록</b>으로 만드세요. 새 종류의 화면 이미지가 생겼을 때 자동으로 포함되어야 하고, 빠지면 지금과 같은 구멍이 다시 납니다.</p>
+      <p class="lbl">⚠ 먼저 확인할 것</p>
+      <p><b><span class="path">scripts/</span> 폴더 전체가 저장소에 추적되지 않습니다.</b> <span class="path">.gitignore</span> 68행에 <code>scripts/</code> 가 "실험·디버그 스크립트"라는 이유로 통째로 들어가 있습니다(2026-03-03 결정). 그래서 <b>소급 생성 도구는 저장소를 새로 받으면 존재하지 않습니다</b> — 원본 작업자의 로컬 컴퓨터에만 있습니다.</p>
+      <p>작업을 다른 곳에서 이어받는다면 먼저 그 파일을 받아야 합니다. 그 사이에 <span class="path">package.json</span> 의 <code>seed:producer:*</code>, <code>seed:test-accounts</code>, <code>media:plan</code> 명령도 같은 이유로 동작하지 않습니다. <b>이 폴더의 추적 여부를 정하는 것은 저장소 주인의 결정</b>이라 이 명세는 바꾸지 않았습니다.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>D — 보관함이 열린 뒤</h2></div>
+  <p class="sec-lede">파일 쓰기·삭제가 필요해 지금은 실행할 수 없습니다. 요금 문제가 풀린 뒤 A·B·C를 배포한 상태에서 돌립니다.</p>
+  <ol class="plain">
+    <li><b>소급 생성 991개</b> — <code>node scripts/backfill-thumbnails.mjs --dry-run</code>으로 대상을 먼저 확인하고 실행합니다. 저장이 약 35메가 늘어납니다. <b>이 파일이 저장소에 없다면 위 C-1 의 경고를 먼저 읽으세요.</b></li>
+    <li><b>잘못 만든 141개 삭제</b> — 생성용 임시 파일에 붙은 작은 그림입니다.</li>
+    <li><b>실제 전송량 측정</b> — 아래 6절 참조. 이걸 해야 이 명세의 숫자가 검증됩니다.</li>
+  </ol>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">6</span><h2>검증</h2></div>
+
+  <div class="card warn">
+    <h3>제약 하나를 먼저 알아야 합니다</h3>
+    <p>이 저장소에는 <b>화면을 렌더해서 검사하는 시험 장치가 없습니다.</b> 시험 실행 환경이 브라우저 없는 방식이고, 관련 라이브러리도 설치돼 있지 않습니다. 기존 156개 시험은 전부 순수 함수만 다룹니다.</p>
+    <p>그래서 <b>"작은 그림이 실제로 화면에 걸리는가"는 자동 시험으로 못 잡습니다.</b> 이 명세는 그 한계를 인정하고 두 갈래로 나눕니다.</p>
+  </div>
+
+  <h3>자동 시험으로 잡는 것</h3>
+  <p>이 저장소의 관행을 따릅니다 — 컴포넌트에서 <b>순수 함수를 뽑아내 그것을 시험</b>합니다(<code>storyboardColumns</code>, <code>applyStoryboardZoomShortcut</code>이 이미 그렇게 돼 있습니다).</p>
+  <div class="tbl"><table>
+    <thead><tr><th>뽑아낼 것</th><th>확인할 것</th></tr></thead>
+    <tbody>
+      <tr><td>3프레임 주소 목록 생성 함수<span class="say">rough-frame-cycle 에서 분리</span></td><td>세 프레임이 전부 작은 그림 주소가 되는가 · <code>?v=</code> 쿼리가 보존되는가 · 프레임이 없는 구버전 패널은 단일 주소로 떨어지는가</td></tr>
+      <tr><td><code>toThumbUrl</code> · <code>thumbUrl</code><span class="say">이미 시험 있음 — 보강</span></td><td>쿼리 붙은 주소 · 확장자 없는 경로 · 우리 보관함이 아닌 주소는 그대로</td></tr>
+      <tr><td>소급 생성 필터 함수<span class="say">backfill 에서 분리</span></td><td>제외 패턴 4종이 걸러지는가 · 정상 화면 이미지가 통과하는가</td></tr>
+      <tr><td>작은 그림 경로 계산<span class="say"><code>thumbObjectPath</code> — 이미 있음</span></td><td>원본 경로와 짝이 맞는가</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>A(만드는 쪽)는 기존 시험 방식으로 잡힙니다.</b> <span class="path">tests/</span>에 이미 보관함 호출을 흉내내는 시험들이 있으므로, 세 프레임 각각에 대해 작은 그림 생성이 호출되는지 확인하면 됩니다.</p>
+
+  <h3>사람이 확인해야 하는 것</h3>
+  <ul class="plain">
+    <li><b>순환·일시정지·프레임 고정이 그대로인가</b> — 자동으로 못 잡습니다</li>
+    <li><b>512픽셀 화질이 카드 크기에 충분한가</b> — 특히 <code>fit="contain"</code>으로 크게 담기는 러프 카드</li>
+    <li><b>실제 전송량</b> — 브라우저 개발자 도구 네트워크 탭에서 그리드 화면을 열고 총 전송량을 잽니다. <b>이 명세의 "697메가 → 97메가"는 파일 크기로 계산한 값이지 측정값이 아닙니다.</b> 실제로 재봐야 확정됩니다</li>
+  </ul>
+  <p>이 저장소에는 화면을 실제로 띄워 확인하는 절차가 따로 마련돼 있습니다(<code>/smoke</code>). 다만 <b>지금은 로그인이 막혀 있어 실행되지 않습니다</b> — 요금 문제가 풀린 뒤에 씁니다.</p>
+
+  <h3>배포 전 점검</h3>
+  <ul class="plain">
+    <li>타입 검사 통과 · 기존 시험 통과 (변경 전 기준선: <b>1건 실패</b> — <span class="path">tests/fal-image-size.test.ts</span>의 시트 캔버스 항목은 이 작업과 무관하게 원래 깨져 있습니다)</li>
+    <li>운영 서버의 <code>NEXT_PUBLIC_IMAGE_THUMBS</code>가 <code>1</code>인지 재확인 — 지금은 켜져 있습니다</li>
+    <li>원본을 유지해야 하는 다섯 곳에 실수로 <code>thumbUrl()</code>이 들어가지 않았는지</li>
+  </ul>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">7</span><h2>기대 효과</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>화면에 뜨는 그림 5,140장을 한 번씩 볼 때</th><th class="num">지금</th><th class="num">A·B·C·D 후</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td><b>나가는 데이터</b></td><td class="num">697 MB</td><td class="num"><b>97 MB</b></td></tr>
+      <tr><td>읽기 요청</td><td class="num">6,131</td><td class="num">5,140</td></tr>
+      <tr><td>저장 용량</td><td class="num">64 MB</td><td class="num">99 MB</td></tr>
+    </tbody>
+  </table></div>
+  <p>단, <b>B를 안 하면 위 숫자가 하나도 실현되지 않습니다.</b> 화면이 작은 그림을 요청하지 않으면 만들어 둔 파일은 아무 일도 하지 않습니다.</p>
+</section>
+
+<footer>
+  <p><b>이 명세의 근거</b></p>
+  <ul>
+    <li>파일 보관함 전수 집계 — 원본과 작은 그림을 짝지어 세었습니다 (2026-08-19)</li>
+    <li>코드 확인 — 인용한 파일과 행 번호는 2026-08-19 기준입니다. 작업 전에 현재 내용을 다시 확인하세요</li>
+    <li>표시 크기는 CSS 클래스로 판정했습니다 — 화면을 직접 열어본 것이 아닙니다</li>
+  </ul>
+  <p><b>이 명세가 하지 않는 것</b></p>
+  <ul>
+    <li><b>아무 코드도 고치지 않았습니다.</b> 전부 제안입니다</li>
+    <li><b>화면을 열어 확인하지 않았습니다.</b> 표시 크기 판정은 코드 기반이라, 실제로 다르게 보일 수 있습니다</li>
+    <li><b>"697메가 → 97메가"는 계산값입니다.</b> 실제 전송량을 잰 것이 아닙니다</li>
+    <li><b>uploads/ 80개의 처리를 정하지 않았습니다.</b> 화면 어디에 뜨는지 확인이 필요합니다</li>
+    <li><b>512픽셀이 적정 크기인지 검토하지 않았습니다.</b> 화질은 사람이 봐야 합니다</li>
+    <li><b><span class="path">scripts/</span> 의 추적 여부를 바꾸지 않았습니다.</b> 저장소 정책이라 주인이 정할 문제입니다</li>
+  </ul>
+</footer>
+
+</div>

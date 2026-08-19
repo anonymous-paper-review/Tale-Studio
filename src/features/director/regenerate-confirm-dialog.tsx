@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useT } from '@/lib/i18n'
 
 export function RegenerateConfirmDialog({
   open,
@@ -39,6 +40,7 @@ export function RegenerateConfirmDialog({
   busy?: boolean
   onConfirm: () => void
 }) {
+  const t = useT()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -55,7 +57,7 @@ export function RegenerateConfirmDialog({
         )}
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
-            취소
+            {t('Cancel')}
           </Button>
           <Button onClick={onConfirm} disabled={busy}>
             {busy && <Loader2 className="size-3.5 animate-spin" />}

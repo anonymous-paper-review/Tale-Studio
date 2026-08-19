@@ -13,6 +13,7 @@ import { WriterCharacterPanel } from '@/features/writer/writer-character-panel'
 import type { WriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
+import { useT } from '@/lib/i18n'
 
 // status 는 상위(WriterWorkspace)가 폴링해 내려준다 — 중복 status 폴링 방지.
 //   debug: admin 디버그 진입(#gen-debug) — 실행 중이 아닌데 강제 렌더된 상태 표시.
@@ -25,6 +26,7 @@ export function WriterGenerationView({
   status: WriterStatus | null
   debug?: boolean
 }) {
+  const t = useT()
   const { preview } = useWriterPreview(projectId)
 
   // 남은 시간 카운트다운용 1s 틱.
@@ -50,6 +52,12 @@ export function WriterGenerationView({
   //   화면 하단 바에도 같은 버튼을 두면 답할 곳이 둘로 갈린다. 다른 단계의 "다음으로 넘어갈까요"가
   //   전부 채팅에 있으므로 여기도 채팅으로 모았다(하단 바는 진행률 전용). 선점(preempt): 러프보드
   //   브리핑 등 다른 제안이 떠 있어도 게이트는 사용자를 기다리게 하는 결정이라 먼저 보여야 한다.
+  // content/label 은 global-chat(범위 밖)이 t() 없이 그대로 렌더하므로, 여기서 미리 t() 로
+  //   번역해 넘긴다(#i18n-s5-batch3) — 문자열 값 비교라 로케일이 안 바뀌면 effect 재실행 없음.
+  const sceneGateMessage = t(
+    "The scene story draft is ready. Please review it on the screen.\nIf there's anything you'd like to change, type it in the input box below — or press Enter with it empty to confirm and move to the next step.",
+  )
+  const confirmAsIsLabel = t('Confirm as-is')
   useEffect(() => {
     if (!awaiting || !projectId) return
     useGlobalChatStore.getState().offerSuggestion(
@@ -57,14 +65,12 @@ export function WriterGenerationView({
         id: `scene-gate:${projectId}`,
         stage: 'writer',
         dismissible: true,
-        content:
-          '씬 스토리 초안이 준비됐어요. 화면에서 검토해 주세요.\n' +
-          '고치고 싶은 부분이 있으면 아래 입력창에 적어 주시고, 없으시면 비어있는 상태로 Enter를 입력해주세요 — 바로 확정하고 다음 단계로 넘어갈게요.',
-        action: { kind: 'confirmScenes', label: '이대로 확정' },
+        content: sceneGateMessage,
+        action: { kind: 'confirmScenes', label: confirmAsIsLabel },
       },
       { preempt: true },
     )
-  }, [awaiting, projectId])
+  }, [awaiting, projectId, sceneGateMessage, confirmAsIsLabel])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -80,10 +86,12 @@ export function WriterGenerationView({
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
           {debug
-            ? '디버그 프리뷰 — 마지막 실행의 산출물로 생성 화면을 표시하고 있어요.'
+            ? t('Debug preview — showing the generation screen using output from the last run.')
             : awaiting
-              ? '씬 스토리 초안이 준비됐어요 — 검토 후 수정 요청하거나 확정하면 다음 단계를 진행해요.'
-              : '이야기를 생성하는 중이에요 — 완성되는 씬부터 아래에서 바로 읽어볼 수 있어요.'}
+              ? t(
+                  'The scene story draft is ready — review it, then request changes or confirm to move on.',
+                )
+              : t("Generating the story — read finished scenes below as they're ready.")}
         </p>
       </header>
 

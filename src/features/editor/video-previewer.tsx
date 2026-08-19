@@ -4,6 +4,7 @@ import { Play, Pause, Volume2, VolumeX } from 'lucide-react'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { useEditorStore, selectTimelineLayout } from '@/stores/editor-store'
+import { useT } from '@/lib/i18n'
 
 function formatTime(sec: number) {
   const t = Math.max(0, Number.isFinite(sec) ? sec : 0)
@@ -19,6 +20,7 @@ function formatTime(sec: number) {
  *   2) 소스 미리보기 모드(previewSourceShotId): 단일 클립을 원본 그대로 loop 재생.
  */
 export function VideoPreviewer() {
+  const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
   const fillRef = useRef<HTMLDivElement>(null)
   const timeRef = useRef<HTMLSpanElement>(null)
@@ -162,7 +164,7 @@ export function VideoPreviewer() {
         </div>
       ) : (
         // 영상 없는 구간 = 검은 화면. 타임라인이 비었을 때만 안내 문구.
-        !hasClips && <p className="text-sm text-muted-foreground">타임라인에 클립이 없습니다</p>
+        !hasClips && <p className="text-sm text-muted-foreground">{t('No clips in the timeline')}</p>
       )}
 
       {/* 재생 컨트롤 (항상 표시 — 검은 구간에서도 스크럽 가능) */}
@@ -192,7 +194,7 @@ export function VideoPreviewer() {
             type="button"
             onClick={() => setMasterVolume(masterVolume > 0 ? 0 : 1)}
             className="text-white/80 hover:text-white"
-            title={masterVolume > 0 ? '음소거' : '음소거 해제'}
+            title={masterVolume > 0 ? t('Mute') : t('Unmute')}
           >
             {masterVolume > 0 ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
           </button>
@@ -204,7 +206,7 @@ export function VideoPreviewer() {
             value={masterVolume}
             onChange={(e) => setMasterVolume(Number(e.target.value))}
             className="h-1 w-20 cursor-pointer accent-primary"
-            title={`전체 볼륨 ${Math.round(masterVolume * 100)}%`}
+            title={t('Overall volume {percent}%', { percent: Math.round(masterVolume * 100) })}
           />
         </div>
       </div>
@@ -212,7 +214,7 @@ export function VideoPreviewer() {
       {/* 모드 뱃지 + 길이 뱃지 (활성 클립 있을 때만) */}
       <div className="absolute right-3 top-3 flex items-center gap-1.5">
         {previewSourceShotId && (
-          <span className="rounded bg-primary/80 px-2 py-0.5 text-xs font-medium text-primary-foreground">소스 미리보기</span>
+          <span className="rounded bg-primary/80 px-2 py-0.5 text-xs font-medium text-primary-foreground">{t('Source preview')}</span>
         )}
         {activeShot && (
           <span className="rounded bg-black/60 px-2 py-0.5 text-xs text-white">

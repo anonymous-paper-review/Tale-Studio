@@ -8,6 +8,7 @@ import { Pause } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThumbImage } from '@/components/thumb-image'
 import type { RoughStoryboardImage } from '@/types/shot'
+import { useT } from '@/lib/i18n'
 
 // 재생성 즉시 반영: 스토리지 url 은 같은 경로 덮어쓰기(upsert)라 URL 이 동일 → 브라우저/CDN 캐시 잔상이 남는다.
 //   generatedAt 을 쿼리로 붙여 매 생성마다 src 가 바뀌게 해 새 이미지를 즉시 가져온다.
@@ -59,6 +60,7 @@ export function RoughFrameCycle({
    *  이 모드에선 루트가 in-flow(w-full) 이므로 부모의 absolute 배치 상자가 필요 없다. */
   sizeToImage?: boolean
 }) {
+  const t = useT()
   const urls = cycleFrameUrls(panel)
   const [idx, setIdx] = useState(0)
   const [hovering, setHovering] = useState(false)
@@ -169,7 +171,7 @@ export function RoughFrameCycle({
             <button
               key={i}
               type="button"
-              aria-label={`${FRAME_LABELS[i]} 프레임 고정`}
+              aria-label={t('Pin {label} frame', { label: FRAME_LABELS[i] })}
               onClick={(e) => {
                 e.stopPropagation()
                 setIdx(i)

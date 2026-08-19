@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils'
 
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
+import { useT } from '@/lib/i18n'
 
 type ArtistTab = 'characters' | 'world' | 'inventory'
 
@@ -36,6 +37,7 @@ type ArtistTab = 'characters' | 'world' | 'inventory'
 const ARTIST_TAB_ORDER: readonly ArtistTab[] = ['characters', 'world', 'inventory']
 
 export default function VisualPage() {
+  const t = useT()
   const {
     characterAssets,
     worldAssets,
@@ -139,16 +141,16 @@ export default function VisualPage() {
     : writerStatus?.pipeline_failed
       ? {
           state: 'failed',
-          blockers: [{ field: 'writer:failed', label: writerStatus.error ?? 'Writer 실행 실패' }],
+          blockers: [{ field: 'writer:failed', label: writerStatus.error ?? t('Writer run failed') }],
         }
       : writerStatus?.started
         ? {
             state: 'active',
-            blockers: [{ field: 'writer:active', label: 'Writer가 아직 실행 중입니다.' }],
+            blockers: [{ field: 'writer:active', label: t('Writer is still running.') }],
           }
         : {
             state: 'unknown',
-            blockers: [{ field: 'writer:status', label: 'Writer 상태를 아직 확인할 수 없음' }],
+            blockers: [{ field: 'writer:status', label: t('Writer status not yet available') }],
           }
 
   const artistGate = evaluateArtistGate({
@@ -273,29 +275,40 @@ export default function VisualPage() {
   const activeSuggestion = useGlobalChatStore((s) => s.suggestion)
   // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once) — 진실은 DB 의 reachedStage.
   const reachedStageForNudge = useProjectStore((s) => s.reachedStage)
+  // effect 안에서 t() 를 직접 부르지 않는다 — t 는 매 렌더 새 참조라 deps 에 넣으면 1500ms
+  //   디바운스가 렌더마다 리셋된다(#i18n-s5-batch4). 문자열 값으로 미리 뽑아 deps 에 넣는다.
+  const artistReadyContentWithWorlds = t(
+    '{count} characters and {worldCount} backgrounds are all ready. If you like them, shall we move to Director and start the storyboard?',
+    { count: characterAssets.length, worldCount: worldAssets.length },
+  )
+  const artistReadyContentNoWorlds = t(
+    '{count} characters are all ready. If you like them, shall we move to Director and start the storyboard?',
+    { count: characterAssets.length },
+  )
+  // handoffFrom() 은 정적 배열 .find() 라 렌더 본문에서 불러도 안전 — spec.utterance/label 도
+  //   여기서 미리 번역해 문자열 상수로 뽑는다. effect 안에서 t() 를 부르거나 t 자체를 deps 에
+  //   넣으면 1500ms 디바운스가 렌더마다 리셋된다(#i18n-s5-batch4, 위 content 상수와 동일 이유).
+  const artistHandoffSpec = handoffFrom('artist')
+  const artistHandoffUtterance = artistHandoffSpec ? t(artistHandoffSpec.utterance) : null
+  const artistHandoffLabel = artistHandoffSpec ? t(artistHandoffSpec.label) : null
   useEffect(() => {
     if (!projectId || !ready || !writerReady || !artistGate.ready) return
     if (!shouldOfferHandoffNudge('artist', reachedStageForNudge)) return
     if (nudgeOfferedRef.current === projectId) return
     if (characterAssets.length === 0 || generatingCount > 0) return
-    const t = setTimeout(() => {
-      // 월드 유무에 따라 주어+조사를 자연스럽게 (명+이 / 개+가).
-      const subject =
-        worldAssets.length > 0
-          ? `캐릭터 ${characterAssets.length}명·배경 ${worldAssets.length}개가`
-          : `캐릭터 ${characterAssets.length}명이`
+    const timer = setTimeout(() => {
       // 탭 하단의 'Approve & Direct' 버튼을 걷어내고 이 제안이 그 자리를 대신한다(#handoff-to-chat).
       //   버튼은 직접 이동하지 않고 문장을 채팅에 입력해 보낸다 — 직접 타이핑과 같은 경로.
-      const spec = handoffFrom('artist')
       const id = `artist-ready-${projectId}`
       offerSuggestion(
         {
           id,
           stage: 'artist',
-          content: `${subject} 모두 준비됐어요. 마음에 들면 Director로 넘어가 콘티를 짜볼까요?`,
-          action: spec
-            ? { kind: 'handoff', utterance: spec.utterance, label: spec.label }
-            : null,
+          content: worldAssets.length > 0 ? artistReadyContentWithWorlds : artistReadyContentNoWorlds,
+          action:
+            artistHandoffUtterance && artistHandoffLabel
+              ? { kind: 'handoff', utterance: artistHandoffUtterance, label: artistHandoffLabel }
+              : null,
         },
         { preempt: true },
       )
@@ -304,7 +317,7 @@ export default function VisualPage() {
         nudgeOfferedRef.current = projectId
       }
     }, 1500)
-    return () => clearTimeout(t)
+    return () => clearTimeout(timer)
   }, [
     projectId,
     ready,
@@ -317,11 +330,21 @@ export default function VisualPage() {
     artistGate.ready,
     activeSuggestion,
     reachedStageForNudge,
+    artistReadyContentWithWorlds,
+    artistReadyContentNoWorlds,
+    artistHandoffUtterance,
+    artistHandoffLabel,
   ])
 
   // 첫 진입 브리핑(2026-08-06 간소화) — "최종 룩으로 정리" 상태 온보딩 제안은 제거(피드백:
   //   긴 버블이 채팅을 점유하고, 초안이 남아 있는 동안 Director 핸드오프 제안을 가렸다).
   //   룩 미반영/실패는 카드 배지가 알리고, 일괄 정리는 채팅으로 요청할 수 있다.
+  const artistBriefContent = t(
+    'I have concepts ready for the characters and backgrounds — {count} characters · {worldCount} backgrounds.\n' +
+      "Let me know which character or background you'd like to revise or add.\n" +
+      'Press "@" to pick a character or background (Ctrl+click a card does the same).',
+    { count: characterAssets.length, worldCount: worldAssets.length },
+  )
   useEffect(() => {
     if (!projectId || !ready) return
     const hasArtistChat = useGlobalChatStore.getState().messages.some((m) => m.stage === 'artist')
@@ -334,10 +357,7 @@ export default function VisualPage() {
       stage: 'artist',
       // #feedback 2026-08-07: 온보딩 강화 — 무엇을 만들었는지 + @멘션·Ctrl+클릭 조작법 명시
       //   (8/6 간소화 유지 — 상태 분기 없이 첫 브리핑 한 종류만).
-      content:
-        `인물과 배경의 컨셉을 준비했어요 — 캐릭터 ${characterAssets.length}명 · 배경 ${worldAssets.length}곳.\n` +
-        '수정하거나 추가하고 싶은 인물이나 배경을 알려주세요.\n' +
-        '"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
+      content: artistBriefContent,
       action: null,
       // dismissible(2026-08-11): false → true. false 면 선점 불가라, 유저가 말을 안 걸고 에셋만
       //   보다가 준비가 끝나면 Director 핸드오프 제안이 이 브리핑에 막혀 영영 못 떴다(#handoff-starved).
@@ -347,7 +367,7 @@ export default function VisualPage() {
     if (dismissed || useGlobalChatStore.getState().suggestion?.id === id) {
       artistBriefedRef.current = projectId
     }
-  }, [projectId, ready, offerSuggestion, characterAssets.length, worldAssets.length])
+  }, [projectId, ready, offerSuggestion, characterAssets.length, worldAssets.length, artistBriefContent])
 
   // 진입 전 = 백그라운드 생성/ main 준비 진행 중 → progress bar 블로킹.
   //   단, 한 번이라도 진입한 프로젝트면(gateOpen) 탭 전환 후에도 다시 막지 않는다.
@@ -357,10 +377,10 @@ export default function VisualPage() {
         {writerStatus?.pipeline_failed ? (
           <div className="mx-auto w-full max-w-md space-y-4 text-center">
             <h1 className="text-xl font-bold text-destructive">
-              AI 자동 생성이 중단됐어요
+              {t('AI generation stopped')}
             </h1>
             <p className="text-sm text-muted-foreground">
-              {writerStatus.error ?? '백그라운드 생성이 중단됐습니다.'}
+              {writerStatus.error ?? t('Background generation stopped.')}
             </p>
             <WriterResumeButton projectId={projectId} onResumed={restartWriterStatus} />
           </div>
@@ -369,7 +389,7 @@ export default function VisualPage() {
             status={writerStatus}
             note={
               pipelineDone && !mainReady
-                ? '대표 이미지 생성 중… 잠시만요'
+                ? t('Generating the main image… just a moment')
                 : undefined
             }
           />
@@ -389,8 +409,8 @@ export default function VisualPage() {
         <StageHelpBadge
           text={
             newUi
-              ? '샷마다 어떤 인물·배경이 쓰이는지 연결합니다 — 에셋을 드래그해 참조를 구성하세요.'
-              : '캐릭터·월드의 컨셉 이미지를 만들고 다듬어 다음 단계로 넘깁니다.'
+              ? t('Connects which characters and backgrounds each shot uses — drag assets to build references.')
+              : t('Create and refine concept images for characters and worlds, then hand off to the next stage.')
           }
         />
       </div>
@@ -401,7 +421,7 @@ export default function VisualPage() {
         className="shrink-0"
       >
         <FlaskConical className="size-3.5" />
-        {newUi ? '기존 UI' : 'New UI'}
+        {newUi ? t('Old UI') : 'New UI'}
       </Button>
     </div>
   )
@@ -425,13 +445,13 @@ export default function VisualPage() {
               <AltArrowHint>
               <TabsList>
                 {/* 탭 한글화(#d3 2026-08-03) — writer 탭(러프 스토리보드…)과 표기 통일 */}
-                <TabsTrigger value="characters">인물</TabsTrigger>
-                <TabsTrigger value="world">배경</TabsTrigger>
+                <TabsTrigger value="characters">{t('Characters')}</TabsTrigger>
+                <TabsTrigger value="world">{t('Background')}</TabsTrigger>
                 {/* Inventory는 준비 중(#d4 2026-07-15) — writer 대사 탭과 동일한 비활성 패턴 */}
                 <TabsTrigger value="inventory" disabled>
-                  <span>인벤토리</span>
+                  <span>{t('Inventory')}</span>
                   <Badge variant="outline" className="ml-1 px-1.5 py-0 text-[10px]">
-                    준비 중
+                    {t('Coming soon')}
                   </Badge>
                 </TabsTrigger>
               </TabsList>
@@ -443,7 +463,7 @@ export default function VisualPage() {
                     size="icon"
                     variant="ghost"
                     className="size-7 hover-red-beam"
-                    aria-label="축소 (열 늘리기)"
+                    aria-label={t('Zoom out (more columns)')}
                     onClick={() => setZoom(tab, zoomByTab[tab] - 1)}
                   >
                     <ZoomOut className="size-4" />
@@ -455,13 +475,13 @@ export default function VisualPage() {
                     step={1}
                     value={[zoomByTab[tab]]}
                     onValueChange={([v]) => setZoom(tab, v)}
-                    aria-label="보드 축척"
+                    aria-label={t('Board zoom')}
                   />
                   <Button
                     size="icon"
                     variant="ghost"
                     className="size-7 hover-red-beam"
-                    aria-label="확대 (열 줄이기)"
+                    aria-label={t('Zoom in (fewer columns)')}
                     onClick={() => setZoom(tab, zoomByTab[tab] + 1)}
                   >
                     <ZoomIn className="size-4" />

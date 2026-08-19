@@ -6,6 +6,12 @@ import {
   type SceneShotMentionTarget,
 } from '@/lib/card-mention'
 import type { DialogueLine, Scene, SceneManifest, Shot } from '@/types'
+import { translate } from '@/lib/i18n'
+import type { AppLocale } from '@/lib/locale'
+
+// locale 을 안 넘기는 호출부(global-chat.tsx 의 scriptLineMentions 호출)가 조용히 안 깨지도록
+//   기존 동작(항상 한국어)을 기본값으로 보존한다 — producer-gate.ts/card-mention.ts 와 동일 취급.
+const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
 export type ScriptLineKind = 'sceneHeading' | 'action' | 'dialogue'
 
@@ -25,10 +31,11 @@ export interface LineRef {
   kind: ScriptLineKind
 }
 
+// 값은 영어 원문 = i18n 키(#i18n-s5-batch4). scriptLineMentions 가 translate() 로 번역해 반환한다.
 const KIND_HINTS: Record<ScriptLineKind, string> = {
-  sceneHeading: '씬',
-  action: '액션',
-  dialogue: '대사',
+  sceneHeading: 'Scene',
+  action: 'Action',
+  dialogue: 'Dialogue',
 }
 
 // 씬 헤딩 표시 텍스트 — sceneId(SC_01 등) 노출 제거(#c11 2026-07-14). 뷰어 표시 전용이며
@@ -148,11 +155,14 @@ export function replaceSlugs(
   return out
 }
 
-export function scriptLineMentions(lines: ScriptLine[]): CardMention[] {
+export function scriptLineMentions(
+  lines: ScriptLine[],
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+): CardMention[] {
   return lines.map((line) => ({
     ref: line.ref,
     label: `L${line.lineNo}`,
-    hint: KIND_HINTS[line.kind],
+    hint: translate(locale, KIND_HINTS[line.kind]),
   }))
 }
 

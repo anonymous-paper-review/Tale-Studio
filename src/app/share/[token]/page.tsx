@@ -9,10 +9,14 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { DEMO_SHARE_COOKIE, setDemoSnapshot, setDemoToken } from '@/lib/demo/context'
 import type { ProjectSnapshot } from '@/lib/demo/types'
+import { parseAppLocale } from '@/lib/locale'
+import { useLocaleStore } from '@/stores/locale-store'
+import { useT } from '@/lib/i18n'
 
 export default function SharePage() {
   const params = useParams<{ token: string }>()
   const router = useRouter()
+  const t = useT()
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -27,12 +31,18 @@ export default function SharePage() {
         setDemoToken(token)
         const res = await fetch(`/api/share/${token}`)
         if (!res.ok) {
-          if (!cancelled) setError('링크가 만료되었거나 유효하지 않아요.')
+          if (!cancelled) setError(t('This link has expired or is invalid.'))
           return
         }
         const snapshot = (await res.json()) as ProjectSnapshot
         if (cancelled) return
         setDemoSnapshot(snapshot)
+        // 공유 뷰는 프로젝트의 locale 로 표시 (#i18n-s5, 오너 결정) — 표시 전용 전환(저장 없음).
+        //   persist 캐시 덕에 스튜디오 새로고침(스냅샷 재fetch 경로)에도 유지된다.
+        const projectLocale = parseAppLocale(
+          (snapshot.project as { locale?: unknown } | null)?.locale,
+        )
+        if (projectLocale) useLocaleStore.getState().setLocaleForDisplay(projectLocale)
         const pid = snapshot?.projectId
         const ticket = `share=${encodeURIComponent(token)}`
         router.replace(
@@ -41,18 +51,20 @@ export default function SharePage() {
             : `/studio/producer?${ticket}`,
         )
       } catch {
-        if (!cancelled) setError('미리보기를 불러오지 못했어요.')
+        if (!cancelled) setError(t('Could not load the preview.'))
       }
     })()
 
     return () => {
       cancelled = true
     }
+    // t 는 locale 파생 순수 함수 — 의존성에 넣으면 locale 전환마다 재fetch 되므로 제외.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.token, router])
 
   return (
     <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-      {error ?? '미리보기 준비 중…'}
+      {error ?? t('Preparing preview…')}
     </div>
   )
 }

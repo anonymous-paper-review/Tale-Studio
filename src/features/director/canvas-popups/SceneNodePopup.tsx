@@ -19,6 +19,7 @@ import {
   useDirectorCanvasStore,
 } from '@/stores/director-store'
 import type { SceneNodeData } from '@/types/director'
+import { useT } from '@/lib/i18n'
 
 type Props = {
   nodeId: string
@@ -26,6 +27,7 @@ type Props = {
 }
 
 export function SceneNodePopup({ nodeId, data }: Props) {
+  const t = useT()
   const closePopup = useDirectorCanvasStore((s) => s.closePopup)
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
   const addShotNode = useDirectorCanvasStore((s) => s.addShotNode)
@@ -90,57 +92,57 @@ export function SceneNodePopup({ nodeId, data }: Props) {
                   'border-b border-transparent bg-transparent text-sm font-medium outline-none',
                   'focus:border-border',
                 )}
-                placeholder="Scene 라벨"
+                placeholder={t('Scene label')}
               />
             </HoverBeam>
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
-          <Field label="Location (장소)">
+          <Field label={t('Location')}>
             <HoverBeam className="w-full">
               <input
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 onBlur={commit}
-                placeholder="예: 다리 위, 폐허가 된 도시"
+                placeholder={t('e.g. on a bridge, a ruined city')}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
               />
             </HoverBeam>
           </Field>
 
-          <Field label="Time of Day (시간대)">
+          <Field label={t('Time of Day')}>
             <HoverBeam className="w-full">
               <input
                 value={timeOfDay}
                 onChange={(e) => setTimeOfDay(e.target.value)}
                 onBlur={commit}
-                placeholder="예: golden hour, midnight"
+                placeholder={t('e.g. golden hour, midnight')}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
               />
             </HoverBeam>
           </Field>
 
-          <Field label="Mood (분위기)">
+          <Field label={t('Mood')}>
             <HoverBeam className="w-full">
               <input
                 value={mood}
                 onChange={(e) => setMood(e.target.value)}
                 onBlur={commit}
-                placeholder="예: tense, melancholic, hopeful"
+                placeholder={t('e.g. tense, melancholic, hopeful')}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
               />
             </HoverBeam>
           </Field>
 
-          <Field label="Description (씬 설명)">
+          <Field label={t('Description')}>
             <HoverBeam className="w-full">
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 onBlur={commit}
                 rows={3}
-                placeholder="씬의 내러티브, 등장 인물, 사건 요약…"
+                placeholder={t('Narrative, characters, and event summary for the scene…')}
               />
             </HoverBeam>
           </Field>
@@ -151,7 +153,7 @@ export function SceneNodePopup({ nodeId, data }: Props) {
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={handleAddShot} className="gap-1.5">
             <Plus className="size-3.5" />
-            Shot 추가 ({childCount}개 보유)
+            {t('Add Shot ({count} so far)', { count: childCount })}
           </Button>
           <div className="ml-auto" />
           <Button
@@ -161,7 +163,7 @@ export function SceneNodePopup({ nodeId, data }: Props) {
             className="gap-1.5 text-destructive hover:text-destructive"
           >
             <Trash2 className="size-3.5" />
-            삭제
+            {t('Delete')}
           </Button>
         </div>
       </DialogContent>

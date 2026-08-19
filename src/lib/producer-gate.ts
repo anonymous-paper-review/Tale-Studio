@@ -5,6 +5,13 @@
 //   하드 게이트만 핸드오프를 차단하고, soft는 경고만(채팅 넛지로 의식적 선택 유도).
 import type { ProjectSettings } from '@/types'
 import { depthLevelFromRuntime } from '@/lib/depth'
+import { translate } from '@/lib/i18n'
+import type { AppLocale } from '@/lib/locale'
+
+// locale 을 안 넘기는 호출부(테스트 등)가 조용히 안 깨지도록 기존 동작(항상 한국어)을 기본값으로
+//   보존한다 — 앱 전역 DEFAULT_LOCALE('en')이 아니라 "미갱신 호출부의 하위호환" 목적의 로컬 상수
+//   (card-mention.ts 와 동일 취급).
+const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
 export type EntityType = 'person' | 'object'
 
@@ -48,7 +55,7 @@ export interface BackgroundSource {
 
 export interface GateIssue {
   field: string
-  label: string // 한국어 — UI 노출
+  label: string // 영어가 base, translate(locale) 로 UI 노출용 완역(#i18n-s5-batch4)
   detail?: string
 }
 
@@ -66,6 +73,8 @@ export interface GateInput {
   backgrounds: BackgroundSource[]
   /** 선택된 영상 스타일 앵커 키 — null/미지정이면 하드 게이트에 걸린다(#style-gate 2026-08-11). */
   styleAnchorKey?: string | null
+  /** GateIssue.label/detail 번역에 쓰는 로케일. 미지정이면 기존 동작(한국어) 유지. */
+  locale?: AppLocale
 }
 
 function isFilled(v: unknown): boolean {
@@ -87,21 +96,34 @@ function arcComplete(arc?: CastArc): boolean {
 function evaluatePersonFields(
   person: CastMember,
   depth: (typeof DEPTH_ORDER)[number],
+  locale: AppLocale,
 ): GateIssue[] {
   const issues: GateIssue[] = []
-  const who = person.name || '이름 미정 인물'
+  const who = person.name || translate(locale, 'Unnamed person')
   // 모든 depth: name + appearance 필수.
   if (!isFilled(person.name))
-    issues.push({ field: `cast:${person.localId}:name`, label: `${who}: 이름 필요` })
+    issues.push({
+      field: `cast:${person.localId}:name`,
+      label: translate(locale, '{who}: name needed', { who }),
+    })
   if (!isFilled(person.appearance))
-    issues.push({ field: `cast:${person.localId}:appearance`, label: `${who}: 외모(appearance) 필요` })
+    issues.push({
+      field: `cast:${person.localId}:appearance`,
+      label: translate(locale, '{who}: appearance needed', { who }),
+    })
 
   // D3+ : arc / motivation.want 추가 필수.
   if (depthAtLeast(depth, 'D3')) {
     if (!arcComplete(person.arc))
-      issues.push({ field: `cast:${person.localId}:arc`, label: `${who}: 아크(시작/끝/유형) 필요` })
+      issues.push({
+        field: `cast:${person.localId}:arc`,
+        label: translate(locale, '{who}: arc (start/end/type) needed', { who }),
+      })
     if (!isFilled(person.motivation?.want))
-      issues.push({ field: `cast:${person.localId}:want`, label: `${who}: 동기(want) 필요` })
+      issues.push({
+        field: `cast:${person.localId}:want`,
+        label: translate(locale, '{who}: motivation (want) needed', { who }),
+      })
   }
   return issues
 }
@@ -128,32 +150,42 @@ export function evaluateProducerGate({
   cast,
   backgrounds,
   styleAnchorKey,
+  locale = UNSPECIFIED_LOCALE_FALLBACK,
 }: GateInput): GateResult {
   const hardMissing: GateIssue[] = []
   const softMissing: GateIssue[] = []
+  const t = (text: string, params?: Record<string, string | number>) => translate(locale, text, params)
 
   // ── 게이트 A: Story Foundation ──────────────────────────────
   if (!isFilled(settings.genre))
-    hardMissing.push({ field: 'genre', label: '장르 필요' })
+    hardMissing.push({ field: 'genre', label: t('Genre needed') })
   // 영상 스타일(#style-gate 2026-08-11) — 앵커 없이 넘어가면 artist·director 의 모든 생성이
   //   스타일 없이 나간다. 실측 사고: 스타일이 비었는데 핸드오프 제안이 떠서 스타일 픽커와 Enter 를
   //   경합했다. 게이트에 넣으면 순서가 강제된다: 스타일을 골라야 핸드오프 제안이 뜬다.
   if (!isFilled(styleAnchorKey))
-    hardMissing.push({ field: 'styleAnchor', label: '영상 스타일 필요' })
+    hardMissing.push({ field: 'styleAnchor', label: t('Video style needed') })
   if (!(typeof settings.playtime === 'number' && settings.playtime >= 5 && settings.playtime <= 1800 + 600))
-    hardMissing.push({ field: 'playtime', label: '러닝타임 필요 (5초~30분+)' })
+    hardMissing.push({ field: 'playtime', label: t('Runtime needed (5 sec – 30 min+)') })
   if (!isFilled(settings.format))
-    hardMissing.push({ field: 'format', label: '포맷 필요' })
+    hardMissing.push({ field: 'format', label: t('Format needed') })
   if (!isFilled(settings.dialogueLanguage))
-    hardMissing.push({ field: 'dialogueLanguage', label: '대사 언어 필요' })
+    hardMissing.push({ field: 'dialogueLanguage', label: t('Dialogue language needed') })
   if (!storyReady)
-    hardMissing.push({ field: 'storyText', label: '스토리가 아직 준비되지 않음' })
+    hardMissing.push({ field: 'storyText', label: t("Story isn't ready yet") })
 
   // soft: subGenre / tone[]
   if (!isFilled(settings.subGenre))
-    softMissing.push({ field: 'subGenre', label: '세부 장르(subGenre)', detail: '비우면 writer에 빈 채로 전달' })
+    softMissing.push({
+      field: 'subGenre',
+      label: t('Sub-genre (subGenre)'),
+      detail: t('Leaves it blank when passed to writer'),
+    })
   if (!isFilled(settings.tone))
-    softMissing.push({ field: 'tone', label: '톤(tone)', detail: '채우면 각본 퀄이 올라가요' })
+    softMissing.push({
+      field: 'tone',
+      label: t('Tone (tone)'),
+      detail: t('Fill this in for a better script'),
+    })
 
   // ── 게이트 B: Cast (depth 연동) ─────────────────────────────
   const depth = depthLevelFromRuntime(
@@ -170,36 +202,39 @@ export function evaluateProducerGate({
   if (depthAtLeast(depth, 'D3') && persons.length < 1) {
     hardMissing.push({
       field: 'cast:minPerson',
-      label: '주인공 1명 이상 필요 (필수)',
-      detail: '러닝타임이 1분 이상이면 최소 1명의 인물이 필요합니다',
+      label: t('At least 1 protagonist needed (required)'),
+      detail: t('If runtime is 1 minute or more, at least 1 character is needed'),
     })
   }
   if (depthAtLeast(depth, 'D4') && persons.length < 2) {
     softMissing.push({
       field: 'cast:recommendPersons',
-      label: '인물 2명 이상 권장',
-      detail: '5분 이상 영상은 관계가 있는 다중 인물을 권장',
+      label: t('2 or more characters recommended'),
+      detail: t('For videos 5 minutes or longer, multiple related characters are recommended'),
     })
   }
 
   // 정의된 인물의 필수 필드 (object는 name+appearance만 — person 전용 필드 면제).
   for (const p of persons) {
-    hardMissing.push(...evaluatePersonFields(p, depth))
+    hardMissing.push(...evaluatePersonFields(p, depth, locale))
   }
   for (const o of producerCast.filter((c) => c.entityType === 'object')) {
-    const who = o.name || '이름 미정 사물'
+    const who = o.name || t('Unnamed object')
     if (!isFilled(o.name))
-      hardMissing.push({ field: `cast:${o.localId}:name`, label: `${who}: 이름 필요` })
+      hardMissing.push({ field: `cast:${o.localId}:name`, label: t('{who}: name needed', { who }) })
     if (!isFilled(o.appearance))
-      hardMissing.push({ field: `cast:${o.localId}:appearance`, label: `${who}: 외모(appearance) 필요` })
+      hardMissing.push({
+        field: `cast:${o.localId}:appearance`,
+        label: t('{who}: appearance needed', { who }),
+      })
   }
 
   // ── 게이트 C: Background source (producer-owned location pool) ───────
   if (!backgrounds.filter(isProducerOrigin).some(isProducerBackgroundComplete)) {
     hardMissing.push({
       field: 'background:minComplete',
-      label: '배경 1개 이상 필요',
-      detail: '이름, 시각 설명, 목적이 모두 있는 배경 카드가 필요합니다',
+      label: t('At least 1 background needed'),
+      detail: t('A background card with a name, visual description, and purpose is needed'),
     })
   }
 

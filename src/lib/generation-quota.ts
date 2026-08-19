@@ -30,7 +30,9 @@ export async function checkUserQuota(userId: string): Promise<QuotaCheck> {
 /** 429 응답 본문 표준 형태. */
 export function quotaExceededBody(check: QuotaCheck) {
   return {
-    error: `생성 대기열이 가득 찼어요 (${check.queued}/${check.limit}). 진행 중인 작업이 끝나면 다시 시도해주세요.`,
+    // server-only(호출부 8개 API 라우트, 전부 범위 밖) — 유저 locale 을 알 방법이 없어 영어 리터럴로
+    //   고정한다(translate() 래퍼 없음 — #i18n-s5-batch, upload/image.ts와 동일 취급).
+    error: `Generation queue is full (${check.queued}/${check.limit}). Please try again once the in-progress job finishes.`,
     code: 'quota_exceeded' as const,
     queued: check.queued,
     limit: check.limit,

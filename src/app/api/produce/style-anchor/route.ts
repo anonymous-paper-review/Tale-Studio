@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
     // 화이트리스트가 유일한 방어선 — 우리 media 버킷 경로만 앵커가 될 수 있다.
     if (!isOwnMediaUrl(imageUrl)) {
-      return NextResponse.json({ error: '이 프로젝트에 올린 이미지만 화풍으로 쓸 수 있어요.' }, { status: 400 })
+      return NextResponse.json({ error: 'Only images uploaded to this project can be used as a style anchor.' }, { status: 400 })
     }
 
     // medium 은 writer 파이프라인이 소비한다. 카탈로그에 없는 값을 넣으면 v0 가 매체를
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     const normalizedMedium = typeof medium === 'string' ? medium.trim() : ''
     if (allowedMediums.length > 0 && !allowedMediums.includes(normalizedMedium)) {
       return NextResponse.json(
-        { error: `지원하지 않는 매체예요 (${allowedMediums.join(', ')} 중 하나여야 해요).` },
+        { error: `Unsupported medium (must be one of ${allowedMediums.join(', ')}).` },
         { status: 400 },
       )
     }
@@ -85,6 +85,6 @@ export async function POST(req: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('[produce/style-anchor]', message.replace(/[\r\n\t]/g, ' ').slice(0, 200))
-    return NextResponse.json({ error: '화풍을 저장하지 못했어요.' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to save the style anchor.' }, { status: 500 })
   }
 }

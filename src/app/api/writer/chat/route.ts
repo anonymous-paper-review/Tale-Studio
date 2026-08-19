@@ -9,7 +9,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
-import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE } from '@/lib/chat-format'
+import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, fetchProjectLocale, responseLanguageDirective } from '@/lib/chat-format'
 import { sanitizeLineRefs, validateWriterUpdates } from '@/lib/writer-chat-updates'
 import { parseFencedUpdates } from '@/lib/agentic-reply-guard'
 
@@ -178,17 +178,20 @@ export async function POST(req: Request) {
     //   끊겼다(architecture §3 "모델 출력의 무검증 실행 금지" 위반). projectId 미전달(구 클라)이면
     //   무필터로 종전 동작.
     let allowedCharacterIds: ReadonlySet<string> | undefined
+    let projectLocale: Awaited<ReturnType<typeof fetchProjectLocale>> = null
     if (typeof projectId === 'string' && projectId) {
       if (!(await userOwnsProject(projectId, user.id))) {
         return NextResponse.json({ error: 'forbidden' }, { status: 403 })
       }
-      const { data: roster } = await supabaseAdmin
-        .from('characters')
-        .select('character_id')
-        .eq('project_id', projectId)
+      // 로스터(#F-003 R1)와 응답 언어(#i18n-s5-batch6-chat) 조회를 병렬로 — 추가 왕복 없음.
+      const [{ data: roster }, locale] = await Promise.all([
+        supabaseAdmin.from('characters').select('character_id').eq('project_id', projectId),
+        fetchProjectLocale(projectId),
+      ])
       allowedCharacterIds = new Set(
         (roster ?? []).map((r) => r.character_id as string).filter(Boolean),
       )
+      projectLocale = locale
     }
 
     const normalizedHistory = normalizeHistory(history)
@@ -202,7 +205,7 @@ export async function POST(req: Request) {
     const ctx = contextSections.length > 0 ? `${contextSections.join('\n\n')}\n\n---\n\n` : ''
 
     const text = await llmChat(
-      WRITER_CHAT_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + CHAT_UPDATES_BATCH_GUIDE,
+      WRITER_CHAT_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + CHAT_UPDATES_BATCH_GUIDE + responseLanguageDirective(projectLocale),
       normalizedHistory,
       `${ctx}${message}`,
       0.5,

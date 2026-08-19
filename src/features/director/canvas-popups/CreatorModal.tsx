@@ -18,6 +18,7 @@ import {
   nextShotPosition,
 } from '@/stores/director-store'
 import { isSceneData } from '@/types/director'
+import { useT } from '@/lib/i18n'
 
 type Props = {
   open: boolean
@@ -28,6 +29,7 @@ type Props = {
 type Kind = 'scene' | 'shot'
 
 export function CreatorModal({ open, position, onClose }: Props) {
+  const t = useT()
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const selectedNodeId = useDirectorCanvasStore((s) => s.selectedNodeId)
   const addSceneNode = useDirectorCanvasStore((s) => s.addSceneNode)
@@ -78,9 +80,9 @@ export function CreatorModal({ open, position, onClose }: Props) {
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>새 노드 만들기</DialogTitle>
+          <DialogTitle>{t('Create new node')}</DialogTitle>
           <DialogDescription>
-            어떤 종류의 노드를 만들까요?
+            {t('What kind of node do you want to create?')}
           </DialogDescription>
         </DialogHeader>
 
@@ -96,7 +98,7 @@ export function CreatorModal({ open, position, onClose }: Props) {
           >
             <Film className="size-5 text-chart-3" />
             <span className="text-sm font-medium">Scene</span>
-            <span className="text-xs text-muted-foreground">씬 컨테이너</span>
+            <span className="text-xs text-muted-foreground">{t('Scene container')}</span>
           </button>
           <button
             onClick={() => hasScene && setKind('shot')}
@@ -113,7 +115,7 @@ export function CreatorModal({ open, position, onClose }: Props) {
             <Clapperboard className="size-5 text-chart-4" />
             <span className="text-sm font-medium">Shot</span>
             <span className="text-xs text-muted-foreground">
-              {hasScene ? '영상 생성 단위' : 'Scene 먼저 필요'}
+              {hasScene ? t('Video generation unit') : t('Needs a Scene first')}
             </span>
           </button>
         </div>
@@ -121,7 +123,7 @@ export function CreatorModal({ open, position, onClose }: Props) {
         {kind === 'shot' && hasScene && (
           <div className="space-y-1.5">
             <label className="block text-xs text-muted-foreground">
-              어느 Scene 안에 만들까요?
+              {t('Which Scene should it go in?')}
             </label>
             <select
               value={parentSceneId ?? ''}
@@ -139,14 +141,14 @@ export function CreatorModal({ open, position, onClose }: Props) {
 
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={onClose}>
-            취소
+            {t('Cancel')}
           </Button>
           <Button
             size="sm"
             onClick={handleCreate}
             disabled={kind === 'shot' && !parentSceneId}
           >
-            만들기
+            {t('Create')}
           </Button>
         </DialogFooter>
       </DialogContent>

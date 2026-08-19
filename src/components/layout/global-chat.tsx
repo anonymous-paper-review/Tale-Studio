@@ -82,6 +82,7 @@ import {
   EPHEMERAL_SETTLE_MS,
   navigateWithStageSlide,
 } from '@/lib/stage-transition'
+import { useT } from '@/lib/i18n'
 import type { StageId } from '@/types'
 import { isSceneData, isShotData } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
@@ -106,18 +107,19 @@ interface Attachment {
 /**
  * 사용자가 아무 말 없이 첨부만 보냈을 때 대신 실어 보내는 문장.
  * 빈 메시지를 보내면 스레드에 "왜 이걸 했는지"가 남지 않는다 — 기록으로도 남을 문장을 만든다.
+ * 유저가 작성한 것처럼 전송되므로 UI locale 을 따른다(#i18n-s5-batch6-chat) — 호출부의 t 를 받는다.
  */
-function defaultUtterance(texts: Attachment[], images: Attachment[]): string {
+function defaultUtterance(texts: Attachment[], images: Attachment[], t: ReturnType<typeof useT>): string {
   const parts: string[] = []
   if (texts.length > 0) {
-    parts.push(`${texts.map((t) => t.name).join(', ')} 을(를) 스토리로 올렸어요.`)
+    const names = texts.map((file) => file.name).join(', ')
+    parts.push(t('Uploaded {names} as the story.', { names }))
   }
   if (images.length > 0) {
-    parts.push(
-      `${images.map((i) => i.name).join(', ')} 을(를) 올렸어요. 읽고 스토리로 정리해 주세요.`,
-    )
+    const names = images.map((file) => file.name).join(', ')
+    parts.push(t('Uploaded {names}. Please read them and put together a story.', { names }))
   }
-  return parts.join(' ') || '첨부한 파일을 확인해 주세요.'
+  return parts.join(' ') || t('Please check the attached files.')
 }
 
 // 이 세션에서 이미 타이핑 연출을 재생한 suggestion id — 재렌더/스테이지 왕복 시 재생 방지(#b1).
@@ -161,10 +163,11 @@ function TypewriterMarkdown({ id, text }: { id: string; text: string }) {
  * 탭마다 새 방이 열린 것처럼 보인다. "같은 방의 새 챕터"임을 보이는 표식.
  */
 function StageDivider({ stage, current }: { stage: StageId; current: boolean }) {
+  const t = useT()
   return (
     <div
       role="separator"
-      aria-label={`${STAGE_LABEL[stage]} 구간`}
+      aria-label={t('{stage} section', { stage: STAGE_LABEL[stage] })}
       className="flex items-center gap-2 py-1"
     >
       <span className="h-px flex-1 bg-border-subtle" />
@@ -175,7 +178,7 @@ function StageDivider({ stage, current }: { stage: StageId; current: boolean }) 
         )}
       >
         {STAGE_LABEL[stage]}
-        {current && <span className="opacity-70">· 지금</span>}
+        {current && <span className="opacity-70">· {t('Now')}</span>}
       </span>
       <span className="h-px flex-1 bg-border-subtle" />
     </div>
@@ -210,6 +213,7 @@ function RolePlate({ stage }: { stage: StageId }) {
  * 보여준다. 존재하지 않는 작업명(가짜 툴콜)은 constants 쪽 규칙으로 금지.
  */
 function ThinkingIndicator({ stage }: { stage: StageId }) {
+  const t = useT()
   const phrases = STAGE_THINKING_PHRASES[stage]
   const [idx, setIdx] = useState(0)
   useEffect(() => {
@@ -225,7 +229,7 @@ function ThinkingIndicator({ stage }: { stage: StageId }) {
         key={idx}
         className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300 ease-out motion-reduce:animate-none"
       >
-        {phrases[idx % phrases.length] ?? '생각 중'}
+        {t(phrases[idx % phrases.length] ?? 'Thinking')}
       </span>
       <span className="chat-thinking-dots" aria-hidden>
         <span />
@@ -238,6 +242,7 @@ function ThinkingIndicator({ stage }: { stage: StageId }) {
 
 /** 말풍선 우상단 호버 복사 버튼. 클립보드 복사 후 1.5초간 체크 표시. */
 function CopyButton({ text }: { text: string }) {
+  const t = useT()
   const [copied, setCopied] = useState(false)
   const handleCopy = async () => {
     try {
@@ -245,15 +250,15 @@ function CopyButton({ text }: { text: string }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      toast.error('복사에 실패했어요.')
+      toast.error(t('Copy failed.'))
     }
   }
   return (
     <button
       type="button"
       onClick={handleCopy}
-      title="메시지 복사"
-      aria-label="메시지 복사"
+      title={t('Copy message')}
+      aria-label={t('Copy message')}
       className="absolute right-1 top-1 rounded-md border border-border bg-card/80 p-1 text-muted-foreground opacity-0 backdrop-blur transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
     >
       {copied ? (
@@ -279,6 +284,7 @@ export function GlobalChat() {
   const pendingProposal = useGlobalChatStore((s) => s.pendingProposal)
   const approvePendingProposal = useGlobalChatStore((s) => s.approvePendingProposal)
   const dismissPendingProposal = useGlobalChatStore((s) => s.dismissPendingProposal)
+  const t = useT()
 
   const router = useRouter()
   // stage 는 URL 에서 직접 읽는다 (#chat-continuity 2026-07-31). store.currentStage 는
@@ -326,6 +332,10 @@ export function GlobalChat() {
   const artistWorlds = useArtistStore((s) => s.worldAssets)
   const writerManifest = useWriterStore((s) => s.sceneManifest)
   const writerShots = useWriterStore((s) => s.shots)
+  // t() 는 매 렌더 새 함수 참조라 memo deps에 그대로 넣으면 메모이제이션이 무력화된다 —
+  //   번역 결과(문자열, 값 비교 가능)만 미리 뽑아 deps에 넣는다.
+  const characterHint = t('Character')
+  const locationHint = t('Location')
   const directorNodes = useDirectorCanvasStore((s) => s.nodes)
   const mentionItems = useMemo<MentionItem[]>(() => {
     if (currentStage === 'producer') {
@@ -339,10 +349,10 @@ export function GlobalChat() {
       return [
         ...artistCharacters
           .filter((c) => c.name?.trim())
-          .map((c) => ({ id: c.characterId, label: c.name, hint: '캐릭터' })),
+          .map((c) => ({ id: c.characterId, label: c.name, hint: characterHint })),
         ...artistWorlds
           .filter((w) => w.name?.trim())
-          .map((w) => ({ id: w.locationId, label: w.name, hint: '장소' })),
+          .map((w) => ({ id: w.locationId, label: w.name, hint: locationHint })),
       ]
     }
     if (currentStage === 'writer') {
@@ -376,6 +386,8 @@ export function GlobalChat() {
     artistWorlds,
     writerManifest,
     writerShots,
+    characterHint,
+    locationHint,
     directorNodes,
   ])
   const [input, setInput] = useState('')
@@ -649,7 +661,7 @@ export function GlobalChat() {
     const imageUrls = images.flatMap((a) => a.sliceUrls ?? [])
     const thumbUrls = images.map((a) => a.thumbUrl).filter((u): u is string => !!u)
 
-    const msg = typed || defaultUtterance(texts, images)
+    const msg = typed || defaultUtterance(texts, images, t)
 
     setInput('')
     // 씬 게이트 중의 입력 = 수정 피드백 (#gate-main-input) — 일반 채팅이 아니라 revise 로 간다.
@@ -663,7 +675,9 @@ export function GlobalChat() {
       useGlobalChatStore.getState().appendLocalExchange(
         'writer',
         msg,
-        '지금은 씬·샷을 만드는 중이라 수정 요청을 접수할 수 없어요. 초안이 완성되면 다시 말씀해 주세요 — 그때 바로 반영할게요.',
+        t(
+          "I'm still building scenes and shots right now, so I can't take revision requests. Once the draft is ready, let me know — I'll apply it right away.",
+        ),
       )
       return
     }
@@ -702,9 +716,9 @@ export function GlobalChat() {
           body: JSON.stringify({ projectId: pid, action: 'confirm' }),
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        toast.success('씬 확정 — 인물·비주얼·샷 설계를 시작해요')
+        toast.success(t('Scenes confirmed — starting character, visual, and shot design'))
       } catch {
-        toast.error('확정에 실패했어요 — writer 화면의 게이트 패널에서 시도해 주세요')
+        toast.error(t('Confirmation failed — try again from the gate panel in the writer screen'))
       }
       return
     }
@@ -735,7 +749,7 @@ export function GlobalChat() {
 
     const projectId = useProjectStore.getState().projectId
     if (!projectId) {
-      toast.error('프로젝트를 먼저 열어 주세요.')
+      toast.error(t('Open a project first.'))
       return
     }
 
@@ -750,7 +764,7 @@ export function GlobalChat() {
       }
       if (kindOf(file.name) === 'image') {
         if (imageBudget <= 0) {
-          toast.error(`이미지는 한 번에 ${IMAGE_MAX_COUNT}장까지 올릴 수 있어요.`)
+          toast.error(t('You can upload up to {count} images at once.', { count: IMAGE_MAX_COUNT }))
           continue
         }
         imageBudget--
@@ -807,10 +821,10 @@ export function GlobalChat() {
           }),
         )
         if (data.truncated) {
-          toast.warning(`${file.name} 이(가) 상한을 넘어 뒷부분이 잘렸어요.`)
+          toast.warning(t('{name} exceeded the limit — the rest was cut off.', { name: file.name }))
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : '업로드에 실패했어요.'
+        const message = error instanceof Error ? error.message : t('Upload failed.')
         setAttachments((prev) =>
           prev.map((a) => (a.id === id ? { ...a, status: 'error' as const, error: message } : a)),
         )
@@ -1036,11 +1050,11 @@ export function GlobalChat() {
   /** 캡슐 버튼 옆 키 안내 — 있는 키만 적는다(없는 단축키를 광고하지 않는다). */
   const KeyHint = ({ dismissible }: { dismissible: boolean }) => (
     <span className="text-[10px] text-muted-foreground">
-      <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> 수락
+      <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> {t('Accept')}
       {dismissible && (
         <>
           {' · '}
-          <kbd className="rounded border border-border bg-muted px-1">Esc</kbd> 나중에
+          <kbd className="rounded border border-border bg-muted px-1">Esc</kbd> {t('Later')}
         </>
       )}
     </span>
@@ -1085,7 +1099,7 @@ export function GlobalChat() {
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">에이전트 채팅</span>
+              <span className="text-sm font-semibold text-foreground">{t('Agent chat')}</span>
               <span
                 className={cn(
                   'shrink-0 rounded-full border px-1.5 text-[10px] font-medium leading-4',
@@ -1096,15 +1110,15 @@ export function GlobalChat() {
               </span>
             </div>
             <span className="text-[11px] text-muted-foreground">
-              모든 단계가 이어지는 하나의 대화
+              {t('One conversation that continues across every stage')}
             </span>
           </div>
           <Button
             size="icon-sm"
             variant="ghost"
             onClick={toggleCollapsed}
-            title="채팅 접기"
-            aria-label="채팅 접기"
+            title={t('Collapse chat')}
+            aria-label={t('Collapse chat')}
           >
             <ChevronsRight className="size-4" />
           </Button>
@@ -1139,7 +1153,7 @@ export function GlobalChat() {
                                 <ThumbImage
                                   key={url}
                                   src={url}
-                                  alt="첨부 이미지"
+                                  alt={t('Attached image')}
                                   // 세로로 긴 웹툰이 말풍선을 밀어내지 않도록 정사각 크롭.
                                   className="size-10 rounded-md border border-chat-user-bubble-foreground/15 object-cover"
                                 />
@@ -1174,6 +1188,12 @@ export function GlobalChat() {
                     const invite = parseHandoffMarker(msg.content)
                     if (invite) {
                       // 핸드오프 초대 (#oiioii-handoff, ref spec §8) — 두 에이전트가 만나는 연출.
+                      //   이름마다 색이 달라 t() params 치환(플레인 텍스트만) 대신, 원문 템플릿을
+                      //   {from}/{to} 자리에서 직접 split 해 그 사이에 색상 span 을 끼워 넣는다.
+                      const [invitePre, inviteRest] = t('{from} invited {to} to the chat').split(
+                        '{from}',
+                      )
+                      const [inviteMid, invitePost] = inviteRest.split('{to}')
                       return (
                         <div
                           key={msg.id}
@@ -1190,14 +1210,15 @@ export function GlobalChat() {
                             <AgentFace color={STAGE_FACE_COLOR[invite.to]} size={34} />
                           </div>
                           <p className="text-[11px] text-muted-foreground">
+                            {invitePre}
                             <span className="font-semibold" style={{ color: STAGE_FACE_COLOR[invite.from] }}>
                               @{STAGE_LABEL[invite.from]}
                             </span>
-                            가{' '}
+                            {inviteMid}
                             <span className="font-semibold" style={{ color: STAGE_FACE_COLOR[invite.to] }}>
                               @{STAGE_LABEL[invite.to]}
                             </span>
-                            를 채팅에 초대했어요
+                            {invitePost}
                           </p>
                         </div>
                       )
@@ -1270,7 +1291,7 @@ export function GlobalChat() {
                     ) : null}
                     {suggestion.dismissible !== false && (
                       <Button size="sm" variant="ghost" className="rounded-full" onClick={() => dismissSuggestion()}>
-                        나중에
+                        {t('Later')}
                       </Button>
                     )}
                     {suggestionOpen && (
@@ -1296,7 +1317,7 @@ export function GlobalChat() {
                       STAGE_BADGE_CLASS[pendingProposal.stage],
                     )}
                   >
-                    제안
+                    {t('Suggestion')}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium"><MarkdownText text={pendingProposal.target} /></p>
@@ -1313,9 +1334,7 @@ export function GlobalChat() {
                 {/* CTA — oiioii form 카드의 캡슐 버튼 매핑(Confirm & Continue). 승인은 전폭 캡슐. */}
                 <div className="mt-3 flex flex-col gap-1.5">
                   <Button size="sm" className="w-full rounded-full" onClick={handlePendingProposalApprove}>
-                    {pendingProposal.kind === 'producerWriterRerunRequest'
-                      ? '동의하고 Writer 다시 실행'
-                      : '승인'}
+                    {t('Approve')}
                   </Button>
                   <Button
                     size="sm"
@@ -1323,7 +1342,7 @@ export function GlobalChat() {
                     className="w-full rounded-full"
                     onClick={() => dismissPendingProposal(pendingProposal.id)}
                   >
-                    {pendingProposal.kind === 'producerWriterRerunRequest' ? '취소' : '나중에'}
+                    {t('Later')}
                   </Button>
                   <div className="flex justify-center">
                     <KeyHint dismissible />
@@ -1435,8 +1454,8 @@ export function GlobalChat() {
                         setFreeformOpen(false)
                       }
                     }}
-                    placeholder="하고 싶은 말을 입력하고 Enter…"
-                    aria-label="직접 입력"
+                    placeholder={t('Type what you want to say, then press Enter…')}
+                    aria-label={t('Type my own answer')}
                     className="w-full border-0 bg-transparent text-xs leading-4 text-foreground outline-none placeholder:text-muted-foreground/60"
                   />
                 </div>
@@ -1463,7 +1482,7 @@ export function GlobalChat() {
                   >
                     {choices.options.length + 1}
                   </span>
-                  직접 입력…
+                  {t('Type my own answer…')}
                 </button>
               )}
               {/* 확정 CTA (#oiioii-chat v2) — 고르고 [계속하기]. '직접 입력' 행을 골랐으면 전송
@@ -1474,21 +1493,21 @@ export function GlobalChat() {
                 disabled={!selectedChoice || loading}
                 onClick={handleChoiceContinue}
               >
-                계속하기
+                {t('Continue')}
               </Button>
               <div className="flex items-center justify-center gap-1.5">
                 {/* 키 힌트(#choices-keys) — kbd 문법. 자유 입력은 '직접 입력' 행이 담당 */}
                 <p className="text-[10px] text-muted-foreground">
                   <kbd className="rounded border border-border bg-muted px-1">↑↓</kbd>·
-                  <kbd className="rounded border border-border bg-muted px-1">1-{Math.min(choices.options.length + 1, 9)}</kbd> 선택 (2회=확정) ·{' '}
-                  <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> 확정 ·{' '}
-                  <kbd className="rounded border border-border bg-muted px-1">Esc</kbd> 닫기
+                  <kbd className="rounded border border-border bg-muted px-1">1-{Math.min(choices.options.length + 1, 9)}</kbd> {t('Select (2× = confirm)')} ·{' '}
+                  <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> {t('Confirm')} ·{' '}
+                  <kbd className="rounded border border-border bg-muted px-1">Esc</kbd> {t('Close')}
                 </p>
                 <button
                   type="button"
                   onClick={() => dismissSuggestion()}
-                  title="선택지 닫기"
-                  aria-label="선택지 닫기"
+                  title={t('Close choices')}
+                  aria-label={t('Close choices')}
                   className="rounded-full bg-muted p-1 text-muted-foreground transition-colors duration-100 ease-out hover:bg-accent hover:text-foreground"
                 >
                   <X className="size-3" />
@@ -1543,15 +1562,15 @@ export function GlobalChat() {
                         a.kind === 'image' &&
                         (a.sliceUrls?.length ?? 0) > 1 && (
                           <span className="shrink-0 tabular-nums opacity-70">
-                            {a.sliceUrls?.length}조각
+                            {t('{count} slices', { count: a.sliceUrls?.length ?? 0 })}
                           </span>
                         )}
-                      {a.truncated && <span className="shrink-0 text-warning">잘림</span>}
+                      {a.truncated && <span className="shrink-0 text-warning">{t('Truncated')}</span>}
                       <button
                         type="button"
                         onClick={() => removeAttachment(a.id)}
-                        title="첨부 제거"
-                        aria-label={`${a.name} 첨부 제거`}
+                        title={t('Remove attachment')}
+                        aria-label={t('Remove {name}', { name: a.name })}
                         className="shrink-0 rounded p-0.5 transition-colors duration-100 ease-out hover:bg-accent hover:text-foreground"
                       >
                         <X className="size-3" />
@@ -1569,12 +1588,12 @@ export function GlobalChat() {
                 disabled={inputLocked}
                 placeholder={
                   choices && !choices.displayOnly
-                    ? '위 선택지에서 답해 주세요'
+                    ? t('Answer using the choices above')
                     : sceneGateActive
-                      ? '수정할 내용을 입력하세요 — 없으면 그대로 Enter (씬 확정)'
+                      ? t('Type your changes — or press Enter as-is to confirm the scenes')
                       : canSendAttachments
-                        ? '어떻게 쓸지 적어 주세요 — 비워 두면 스토리로 정리해요'
-                        : STAGE_PLACEHOLDER[currentStage]
+                        ? t("Tell us how to use it — leave blank and we'll fold it into the story")
+                        : t(STAGE_PLACEHOLDER[currentStage])
                 }
                 className={cn(
                   'max-h-[13.625rem] min-h-9 w-full resize-none border-0 bg-transparent px-2 py-2 leading-5 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
@@ -1600,8 +1619,8 @@ export function GlobalChat() {
                       className="rounded-full"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={loading || uploading}
-                      title="파일 첨부 — 원고(txt·md·docx)나 이미지(jpg·png·webp)"
-                      aria-label="파일 첨부"
+                      title={t('Attach a file — manuscript (txt·md·docx) or image (jpg·png·webp)')}
+                      aria-label={t('Attach file')}
                     >
                       <Plus className="size-4" />
                     </Button>
@@ -1613,7 +1632,7 @@ export function GlobalChat() {
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      title="빠른 요청"
+                      title={t('Quick requests')}
                       className={cn(
                         'flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-xs font-medium transition-colors',
                         STAGE_BADGE_CLASS[currentStage],
@@ -1630,21 +1649,21 @@ export function GlobalChat() {
                   </PopoverTrigger>
                   <PopoverContent align="start" side="top" sideOffset={8} className="w-64 p-1.5">
                     <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      빠른 요청
+                      {t('Quick requests')}
                     </div>
                     {STAGE_PROMPT_PRESETS[currentStage].map((preset) => (
                       <button
                         key={preset}
                         type="button"
-                        onClick={() => insertPreset(preset)}
+                        onClick={() => insertPreset(t(preset))}
                         className="w-full rounded-md px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-accent"
                       >
-                        {preset}
+                        {t(preset)}
                       </button>
                     ))}
                     {STAGE_PROMPT_PRESETS[currentStage].length === 0 && (
                       <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                        이 단계에서는 채팅을 지원하지 않아요.
+                        {t("Chat isn't supported at this stage.")}
                       </p>
                     )}
                     {(() => {
@@ -1655,10 +1674,10 @@ export function GlobalChat() {
                           <div className="mx-1 my-1 h-px bg-border" aria-hidden />
                           <button
                             type="button"
-                            onClick={() => insertPreset(handoff.utterance)}
+                            onClick={() => insertPreset(t(handoff.utterance))}
                             className="w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-accent"
                           >
-                            {handoff.label} →
+                            {t(handoff.label)} →
                           </button>
                         </>
                       )
@@ -1680,8 +1699,8 @@ export function GlobalChat() {
                       size="icon-sm"
                       variant="ghost"
                       className="hover-red-beam rounded-full"
-                      title="스타일 선택"
-                      aria-label="스타일 선택"
+                      title={t('Select style')}
+                      aria-label={t('Select style')}
                       onClick={() => setStylePressed(true)}
                     >
                       {/* 레이더 핑 — agent-face 의 ping 과 같은 문법, producer 색. 2s 주기로
@@ -1702,15 +1721,15 @@ export function GlobalChat() {
                       size="icon-sm"
                       variant="ghost"
                       className="rounded-full"
-                      title="에셋 멘션"
-                      aria-label="에셋 멘션"
+                      title={t('Asset mentions')}
+                      aria-label={t('Asset mentions')}
                     >
                       <LayoutGrid className="size-4" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent align="start" side="top" sideOffset={8} className="max-h-64 w-64 overflow-y-auto p-1.5">
                     <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      에셋 멘션
+                      {t('Asset mentions')}
                     </div>
                     {mentionItems.map((item) => {
                       const active = input.includes(`@${item.label}`)
@@ -1734,7 +1753,7 @@ export function GlobalChat() {
                     })}
                     {mentionItems.length === 0 && (
                       <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                        이 단계에서 멘션할 수 있는 항목이 없어요.
+                        {t("There's nothing to mention at this stage.")}
                       </p>
                     )}
                   </PopoverContent>
@@ -1747,8 +1766,8 @@ export function GlobalChat() {
                     size="icon-sm"
                     className="rounded-full"
                     onClick={stopGeneration}
-                    title="응답 생성 중단"
-                    aria-label="응답 생성 중단"
+                    title={t('Stop generating response')}
+                    aria-label={t('Stop generating response')}
                   >
                     <Square className="size-3 fill-current" />
                   </Button>
@@ -1758,8 +1777,8 @@ export function GlobalChat() {
                     className="rounded-full"
                     onClick={handleSend}
                     disabled={sendDisabled || uploading || (!input.trim() && !canSendAttachments)}
-                    title="보내기"
-                    aria-label="보내기"
+                    title={t('Send')}
+                    aria-label={t('Send')}
                   >
                     <ArrowUp className="size-4" />
                   </Button>
@@ -1791,8 +1810,8 @@ export function GlobalChat() {
             size="icon-sm"
             variant="ghost"
             onClick={toggleCollapsed}
-            title="채팅 열기"
-            aria-label="채팅 열기"
+            title={t('Open chat')}
+            aria-label={t('Open chat')}
           >
             <ChevronsLeft className="size-4" />
           </Button>

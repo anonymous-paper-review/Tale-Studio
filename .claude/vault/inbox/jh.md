@@ -8,18 +8,22 @@
 ---
 ## 오너
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":3411,"content_sha256":"60df8733b197105ac294baea5638974615bb6e7534396f6d2379e6ea35e2ddfe","item_id":"59a1ece2f291beff3442f350d4430c3a627a0860a4009784510eb2e5c4ec4dbd","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":3411,"start":0},"state":"tracked","units":["t0-higgsfield-vs-pipeline-quality-gap","r1-writer-v2-dynamic-spec-shape"]}
+{"actor":"jh","byte_length":3411,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/ef288b385e0a5cf848114eb1f31ae09a00a35f38d47643cebadcf9c8b2c2b567.json","close_proof_sha256":"ef288b385e0a5cf848114eb1f31ae09a00a35f38d47643cebadcf9c8b2c2b567","content_sha256":"60df8733b197105ac294baea5638974615bb6e7534396f6d2379e6ea35e2ddfe","disposition":"superseded","item_id":"59a1ece2f291beff3442f350d4430c3a627a0860a4009784510eb2e5c4ec4dbd","receipt_id":"59a1ece2f291beff-4085797e62b256d4","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":3411,"start":0},"state":"closed","units":["t0-higgsfield-vs-pipeline-quality-gap","r1-writer-v2-dynamic-spec-shape"]}
 -->
+<del>
 text to video로 힉스필드에서 돌릴떄랑 
 실행 프롬프트:
 Single unbroken handheld boyfriend vlog take throughout, 30 seconds total. A realistic personal travel vlog filmed by a boyfriend following his girlfriend during a normal day in Tokyo. Use the woman from the reference image as the main character. Maintain her exact facial identity, hairstyle, facial features, body proportions, and overall appearance throughout the entire video. She must remain the same person in every shot. The camera feels like a real boyfriend holding a small mirrorless camera or phone, not a professional production. Natural handheld movement, imperfect framing, occasional camera shake, spontaneous reactions, authentic everyday moments. The woman does not pose for the camera. She behaves naturally, sometimes forgetting the camera is there. 0-5s: Morning at a small Tokyo apartment. The camera starts recording as the boyfriend casually walks into the room. Soft morning sunlight enters through the window. The woman is sitting near the bed, fixing her hair and preparing for the day. She notices the camera, smiles naturally, laughs, and playfully tells him to stop filming. The camera stays close, slightly shaky, capturing a private everyday moment. 5-10s: Walking through Tokyo neighborhood streets. The boyfriend follows behind her as they leave the apartment. She walks through a quiet Tokyo street, carrying a small bag. Morning shops are opening, bicycles pass by, locals walk along the street. She stops at a convenience store. The camera follows her inside. She looks at different drinks and snacks, turns around and asks the person behind the camera which one she should choose. Natural interaction, casual conversation, realistic body language. 10-18s: Local food experience. The camera follows her through a small Tokyo alley to a cozy local restaurant. She sits down and tries a bowl of ramen or a local dish. The camera captures close handheld moments: her picking up chopsticks, tasting the food, reacting naturally, laughing when the food is hotter than expected. The boyfriend laughs behind the camera. The moment feels unplanned and authentic. 18-25s: Tokyo afternoon exploration. The couple walks through a lively neighborhood. She browses small shops, looks at interesting objects, takes photos, and occasionally looks back at the camera. The camera moves naturally between her face, her hands, the street atmosphere, and small details of daily life. Crowds pass naturally around them. The city feels alive and real. 25-30s: Tokyo night ending. Night falls. The camera follows her through illuminated Tokyo streets. She walks slightly ahead, then turns back and smiles at the camera. They ride a train home. She sits beside the window, watching city lights pass outside. The camera slowly moves closer as she rests quietly, ending like a real personal memory. Visual style: Authentic boyfriend travel vlog footage. Realistic handheld camera movement. Natural lighting. Casual documentary realism. Unplanned everyday moments. Real human expressions and interactions. Slight motion blur, natural exposure changes, realistic camera autofocus adjustments. No commercial advertisement style. No dramatic posing. No perfect cinematic composition. No text overlays. No logos. No face changes. No identity changes. No artificial transitions. No CGI feeling. Stable character consistency throughout.
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":125,"content_sha256":"8d24074738f6c5176fba41b56ffd8313ddb8393664aab51aa1ef18be2d519a57","item_id":"057f7ede47a2ef8d495db06af48d6e5ced1aa8136b51e4624c26c2b4d98261fe","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":3537,"start":3412},"state":"tracked","units":["t0-higgsfield-vs-pipeline-quality-gap","r1-writer-v2-dynamic-spec-shape"]}
+{"actor":"jh","byte_length":125,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/ccc4f4be5be68d953693ad1de1789fade4ea84f59177e215a9dffcbe4e480adb.json","close_proof_sha256":"ccc4f4be5be68d953693ad1de1789fade4ea84f59177e215a9dffcbe4e480adb","content_sha256":"8d24074738f6c5176fba41b56ffd8313ddb8393664aab51aa1ef18be2d519a57","disposition":"superseded","item_id":"057f7ede47a2ef8d495db06af48d6e5ced1aa8136b51e4624c26c2b4d98261fe","receipt_id":"057f7ede47a2ef8d-9f83eb40ae65d15c","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":3537,"start":3412},"state":"closed","units":["t0-higgsfield-vs-pipeline-quality-gap","r1-writer-v2-dynamic-spec-shape"]}
 -->
+<del>
 현재 v1,v2 writer 및 우리 워크플로우로 돌렸을때 퀄리티 차이가 존재하는데
 뭐가문제인지 모름
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
@@ -67,10 +71,12 @@ night run의 목적: 둘이서 개발을 따로한다, 둘이 서로다른세션
 
 ## 형석
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":154,"content_sha256":"f79f884789bcb23a8b9042d5ec8c7473fdb0d9a4c7bda94e4174488ec22ba936","item_id":"045ca78776ce13c7ffbb10af7d057e6fc340908f8313f7835df832b582120533","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":5687,"start":5533},"state":"tracked","units":["gen-doll-asset-video"]}
+{"actor":"jh","byte_length":154,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/3fa90dea960183945d3fa4cbd1d0f4aca1821243703379519507ccb2d5badaa0.json","close_proof_sha256":"3fa90dea960183945d3fa4cbd1d0f4aca1821243703379519507ccb2d5badaa0","content_sha256":"f79f884789bcb23a8b9042d5ec8c7473fdb0d9a4c7bda94e4174488ec22ba936","disposition":"completed","item_id":"045ca78776ce13c7ffbb10af7d057e6fc340908f8313f7835df832b582120533","receipt_id":"045ca78776ce13c7-066381431a148b21","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":5687,"start":5533},"state":"closed","units":["gen-doll-asset-video"]}
 -->
+<del>
 목각 인형 영상 + asset으로 영상 만들기 -> 성능 테스트
 목각 인형 사진 (Previz) + asset으로 영상 만들기  -> 성능 테스트
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
@@ -80,9 +86,11 @@ night run의 목적: 둘이서 개발을 따로한다, 둘이 서로다른세션
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":195,"content_sha256":"55f42e854a96e3cbc075ff42532c6ff885c234da81e0d573add9f2166b174871","item_id":"69f86a442594c61b89202ce4d2fb66d8c63f695bbac9057da980b81acc62ffa0","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":5954,"start":5759},"state":"tracked","units":["gen-endframe-excluded-video"]}
+{"actor":"jh","byte_length":195,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/42dfefa1a3eebda45995d9e764513ec2bab9a02a23f87f0f65f47e67a4f309f6.json","close_proof_sha256":"42dfefa1a3eebda45995d9e764513ec2bab9a02a23f87f0f65f47e67a4f309f6","content_sha256":"55f42e854a96e3cbc075ff42532c6ff885c234da81e0d573add9f2166b174871","disposition":"completed","item_id":"69f86a442594c61b89202ce4d2fb66d8c63f695bbac9057da980b81acc62ffa0","receipt_id":"69f86a442594c61b-0575a42dc971b55f","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":5954,"start":5759},"state":"closed","units":["gen-endframe-excluded-video"]}
 -->
+<del>
 END 프레임을 재생성해주되 실제 영상 생성에서 빼기 (대신 확인해야함 END 프레임처럼 영상이 안 나올 수 있어서) -> 영상 생성 및 실제 테스트 필요
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
@@ -94,9 +102,11 @@ artist 탭에서 배경이 한 장의 이미지로 관리되는게 문제다 -> 
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":389,"content_sha256":"e4b8c5c2d17bee6f1b8949a1ec376fb7dfd0e3ec0349eb2327b8435353cf61d3","item_id":"29dfcd20efa9d235757217a391ffa2da2e191a9ed85c841f4f57a1b0ae1534cc","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":6627,"start":6238},"state":"tracked","units":["gen-previz-angle-rotate"]}
+{"actor":"jh","byte_length":389,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/82307d2977a043d5651cca0319fd8323f6a5752bb65d6b980e6b6ce9e6c8a663.json","close_proof_sha256":"82307d2977a043d5651cca0319fd8323f6a5752bb65d6b980e6b6ce9e6c8a663","content_sha256":"e4b8c5c2d17bee6f1b8949a1ec376fb7dfd0e3ec0349eb2327b8435353cf61d3","disposition":"completed","item_id":"29dfcd20efa9d235757217a391ffa2da2e191a9ed85c841f4f57a1b0ae1534cc","receipt_id":"29dfcd20efa9d235-9ea4290d77fdb772","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":6627,"start":6238},"state":"closed","units":["gen-previz-angle-rotate"]}
 -->
+<del>
 previz 이미지 다른 각도로 찍는 것처럼 돌려보기 (viz 이미지는 이미지 생성 모델로 다른 각도 이미지 생성 요청 시 consistency가 깨져서 사용성이 없다. 하지만 previz에서 유저가 원하는 카메라 위치 변경을 요청했을 때 연출적 요소를 잘 만족할 경우 조금 consistency가 깨져도 사용할 수 있지 않을까)
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
@@ -116,9 +126,11 @@ Direction, END 언제 생성되는지 확인 (현재 제대로 Direction이 생�
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":43,"content_sha256":"37b66b8069d12429060f5db6e3460d05cd851821e135ac3e1f9f3fbde9980bf1","item_id":"9de9c3a06a4183c008c71873ff79d8cd125062097074b023c01a9841a4e093d4","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":6845,"start":6802},"state":"tracked","units":["r13-agent-face-animations"]}
+{"actor":"jh","byte_length":43,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/9dd37efe0569a30b6ecebb44ff611eb47561e50ce0604b026e845a1a2efe4537.json","close_proof_sha256":"9dd37efe0569a30b6ecebb44ff611eb47561e50ce0604b026e845a1a2efe4537","content_sha256":"37b66b8069d12429060f5db6e3460d05cd851821e135ac3e1f9f3fbde9980bf1","disposition":"completed","item_id":"9de9c3a06a4183c008c71873ff79d8cd125062097074b023c01a9841a4e093d4","receipt_id":"9de9c3a06a4183c0-820ed1b0a5225dfe","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":6845,"start":6802},"state":"closed","units":["r13-agent-face-animations"]}
 -->
+<del>
 에이전트 얼굴 변경 -> 만든걸로
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
@@ -293,15 +305,18 @@ writer 끝나고 다시 writer 다시 요청하면 갇힘
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":165,"content_sha256":"515ec20ff270f80b00daf3e480ff55dbf5fe044461081708fac7ea3bb2a8feca","item_id":"19df69629ef8bc160c09377eed3d65af2f7fe82d14effbeaa8045fce26f8899e","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":11702,"start":11537},"state":"tracked","units":["gen-doll-asset-video","gen-endframe-excluded-video","gen-previz-angle-rotate"]}
+{"actor":"jh","byte_length":165,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/fe6bd9299f05cdc0e8fea1a53da83d9b1f78dcbd4d3ebaa8870d5401e8fb82ba.json","close_proof_sha256":"fe6bd9299f05cdc0e8fea1a53da83d9b1f78dcbd4d3ebaa8870d5401e8fb82ba","content_sha256":"515ec20ff270f80b00daf3e480ff55dbf5fe044461081708fac7ea3bb2a8feca","disposition":"completed","item_id":"19df69629ef8bc160c09377eed3d65af2f7fe82d14effbeaa8045fce26f8899e","receipt_id":"19df69629ef8bc16-656bb43de3cc729a","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":11702,"start":11537},"state":"closed","units":["gen-doll-asset-video","gen-endframe-excluded-video","gen-previz-angle-rotate"]}
 -->
+<del>
 7. 돈이 드는 것 3건
 -> 3개 다 projectId=3187bb25-a117-4c62-b259-c20f4d856f5d 이 프로젝트로 테스트 진행해서 아티팩트로 결과 작성해줘.
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":1363,"content_sha256":"780e9c2e19bdcd8285246d30524014eb78c6ca7a112cd07d9721ad4b412b321e","item_id":"556fdafbfb5bde9f7d356a8a5ffeb622f646bc4e8688e5492d88fca2bfc3726e","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":13066,"start":11703},"state":"tracked","units":["r8-zoom-shortcut-keys","r9-login-capslock-indicator","r13-agent-face-animations","audit-multitab-project-collision","r10-background-no-person","audit-artist-background-space-deepdive","r11-producer-no-style-text-question","r12-chat-mention-scene-shot"]}
+{"actor":"jh","byte_length":1363,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/0a38732260bdf82770e7a2ecb0ee06c20b67e104acb36d63bc30f99229931b1c.json","close_proof_sha256":"0a38732260bdf82770e7a2ecb0ee06c20b67e104acb36d63bc30f99229931b1c","content_sha256":"780e9c2e19bdcd8285246d30524014eb78c6ca7a112cd07d9721ad4b412b321e","disposition":"completed","item_id":"556fdafbfb5bde9f7d356a8a5ffeb622f646bc4e8688e5492d88fca2bfc3726e","receipt_id":"556fdafbfb5bde9f-cdd688589e44a67d","schema":1,"snapshot_id":"inbox-bootstrap-2026-08-18","source_key":"inbox/jh.md","source_range":{"end":13066,"start":11703},"state":"closed","units":["r8-zoom-shortcut-keys","r9-login-capslock-indicator","r13-agent-face-animations","audit-multitab-project-collision","r10-background-no-person","audit-artist-background-space-deepdive","r11-producer-no-style-text-question","r12-chat-mention-scene-shot"]}
 -->
+<del>
 8. 다음밤 후보
  - 축척 단축키 : 바로 수정 진행
  - 로그인 화면 대문자 잠금 표시 : 바로 수정 진행
@@ -311,6 +326,7 @@ writer 끝나고 다시 writer 다시 요청하면 갇힘
  - artist 탭 배경을 공간으로 다루기 : 이미지 생성기로 불가능한게 실험적으로 밝혀짐 -> 딥다이브 진행해서 새로운 시도 방안 모색
  - producer가 스타일을 글로 묻지 않게 : 바로 수정 진행
  - (신규) writer, director 탭의 채팅창에서 @ 입력이나 ctrl/command + 클릭 가능하게 기능 수정 (현재 이전 기능이 구현되어 있어 현재 UI랑 안 맞음) -> scene, shot 모두 멘션 가능하게 하고 previz, real 구분 필요
+</del>
 <!-- vault-inbox-item:end -->
 
 ## 오너 — 2026-08-18 추가 확인

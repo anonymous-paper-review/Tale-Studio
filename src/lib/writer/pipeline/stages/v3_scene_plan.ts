@@ -7,6 +7,7 @@ import {
   validateSceneCinematography,
   buildCorrectionNote,
 } from '@/lib/writer/pipeline/validators/scene_cinematography';
+import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import type {
   VisualIdentity,
   WorldVisual,
@@ -18,6 +19,7 @@ import type {
   ValidationIssue,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
+import type { AppLocale } from '@/lib/locale';
 
 interface L3Result {
   scene_plans: SceneCinematography[];
@@ -46,6 +48,8 @@ export async function runSceneCinematography(
   //   steps.ts·index.ts 양 경로가 전달한다. 미전달(null)은 구 run resume 등 폴백 — 그때는
   //   프롬프트에서 아크 블록과 act 표기가 빠져 배선 전과 동일하게 동작한다.
   actVisualArc?: ActVisualArc | null,
+  // #i18n-s5: 미지정(레거시)이면 systemInstruction 절 미주입 — 종전 동작 그대로.
+  outputLocale?: AppLocale,
 ): Promise<L3Result> {
   await logger.markStage('sceneCinematography', 'started');
 
@@ -108,7 +112,7 @@ avg_shot_seconds 의 **허용 구간을 결정한다** — 아래 구간 밖의 
 - 저밀도/미니멀 (2d_cartoon 등 플랫 스타일): 화면이 즉시 읽힌다 — 여백은 곧 지루함
   → avg_shot_seconds **3.5~5s**, medium/rapid 캐던스, 동작·대화 중심의 촘촘한 진행.
 단, 대사 발화 시간은 매체와 무관한 물리량이다 — 캐던스 명목으로 대사 샷을 발화 시간
-밑으로 설계하지 마라 (긴 대사 샷은 구간을 초과해도 된다).`;
+밑으로 설계하지 마라 (긴 대사 샷은 구간을 초과해도 된다).${outputLanguageClause(outputLocale)}`;
 
   const userPrompt = `[genre]
 ${JSON.stringify(genre)}

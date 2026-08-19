@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useWriterUiStore, type WriterTab } from '@/stores/writer-ui-store'
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
+import { useT } from '@/lib/i18n'
 
 const TAB_ORDER: readonly WriterTab[] = ['storyboard', 'script', 'dialogue']
 // V2 run 프로젝트: 프리뷰 탭이 맨 앞 (#v2-tab — 진입 기본 탭이자 리뷰 표면).
@@ -15,6 +16,7 @@ export function WriterTabs() {
   const activeTab = useWriterUiStore((state) => state.activeTab)
   const setActiveTab = useWriterUiStore((state) => state.setActiveTab)
   const v2Available = useWriterUiStore((state) => state.v2Available)
+  const t = useT()
   const order = v2Available ? TAB_ORDER_V2 : TAB_ORDER
   // Alt+←/→ 로 러프 스토리보드 ↔ 트리트먼트 ↔ 대사 순환(#keyboard-only)
   useAltArrowCycle(order, activeTab, setActiveTab)
@@ -29,10 +31,10 @@ export function WriterTabs() {
         className="w-fit shrink-0"
       >
         <TabsList>
-          {v2Available ? <TabsTrigger value="v2">V2 유닛</TabsTrigger> : null}
-          <TabsTrigger value="storyboard">러프 스토리보드</TabsTrigger>
-          <TabsTrigger value="script">트리트먼트</TabsTrigger>
-          <TabsTrigger value="dialogue">대사</TabsTrigger>
+          {v2Available ? <TabsTrigger value="v2">{t('V2 units')}</TabsTrigger> : null}
+          <TabsTrigger value="storyboard">{t('Rough storyboard')}</TabsTrigger>
+          <TabsTrigger value="script">{t('Treatment')}</TabsTrigger>
+          <TabsTrigger value="dialogue">{t('Dialogue')}</TabsTrigger>
         </TabsList>
       </Tabs>
     </AltArrowHint>

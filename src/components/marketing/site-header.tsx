@@ -28,7 +28,7 @@ export function SiteHeader() {
             href="/login"
             className="rounded-full bg-white px-5 py-2 font-semibold text-black transition-colors hover:bg-primary hover:text-white"
           >
-            시작하기
+            Get started
           </Link>
         </nav>
       </div>

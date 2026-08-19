@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
 // user enumeration 방지: 성공/실패/빈입력 모두 동일한 단일 메시지(원본 supabase 에러 비노출).
-const GENERIC_LOGIN_ERROR = '이메일 또는 비밀번호가 올바르지 않아요'
+const GENERIC_LOGIN_ERROR = 'Incorrect email or password'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -79,7 +79,7 @@ export default function LoginPage() {
           <Input
             type="email"
             autoComplete="email"
-            placeholder="이메일"
+            placeholder="Email"
             value={email}
             aria-invalid={!!errorMsg}
             onChange={(e) => { setEmail(e.target.value); if (errorMsg) setErrorMsg(null) }}
@@ -87,7 +87,7 @@ export default function LoginPage() {
           <Input
             type="password"
             autoComplete="current-password"
-            placeholder="비밀번호"
+            placeholder="Password"
             value={password}
             aria-invalid={!!errorMsg}
             aria-describedby={capsLockOn ? 'caps-lock-hint' : undefined}
@@ -105,7 +105,7 @@ export default function LoginPage() {
             <p className="text-sm text-destructive">{errorMsg}</p>
           ) : null}
           <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? '로그인 중…' : '로그인'}
+            {submitting ? 'Logging in…' : 'Log in'}
           </Button>
         </form>
       </div>

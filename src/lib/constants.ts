@@ -100,45 +100,47 @@ export const STAGE_FACE_COLOR: Record<StageId, string> = {
   editor: 'var(--stage-editor)',
 }
 
+// 값은 영어 원문 = i18n 키(#i18n-s5-batch4). 렌더 지점(global-chat.tsx)이 t() 로 번역한다.
 export const STAGE_PLACEHOLDER: Record<StageId, string> = {
-  producer: '스토리에 대해 말해주세요…',
-  writer: '예: 씬2 샷3을 더 어둡게 바꿔줘',
-  artist: '예: 갈색 머리 Kai 캐릭터 만들어줘',
-  director: '러프 스토리보드를 실제 촬영 이미지로 생성해보세요.',
-  editor: '아직 이 단계에서는 채팅을 쓸 수 없어요.',
+  producer: 'Tell us about your story…',
+  writer: 'e.g. make scene 2 shot 3 darker',
+  artist: 'e.g. create a character named Kai with brown hair',
+  director: 'Try generating the rough storyboard into shooting-ready images.',
+  editor: "Chat isn't available at this stage yet.",
 }
 
 // ── GlobalChat: 응답 대기 사고 흐름 (#oiioii-chat v2 2026-08-06) ──
 // "생각 중…" 정지 문구 대신 순환시켜 에이전트가 뭔가 굴리고 있음을 보여주는 문구들.
 //   각 stage 채팅이 실제로 거치는 처리 단계(컨텍스트 직렬화·카드 대조·수정 범위 판정)에서
 //   따온 표현만 — 존재하지 않는 작업명(가짜 툴콜)은 넣지 않는다.
+// 값은 영어 원문 = i18n 키(#i18n-s5-batch4). 렌더 지점(global-chat.tsx ThinkingIndicator)이 t() 로 번역한다.
 export const STAGE_THINKING_PHRASES: Record<StageId, readonly string[]> = {
   producer: [
-    '이야기의 핵심을 짚어보는 중',
-    '설정에서 빈칸을 찾는 중',
-    '캐스트 카드를 살피는 중',
-    '장르와 톤을 저울질하는 중',
-    '다음 질문을 고르는 중',
+    'Pinpointing the heart of the story',
+    'Finding gaps in the settings',
+    'Looking over the cast cards',
+    'Weighing genre and tone',
+    'Choosing the next question',
   ],
   writer: [
-    '씬 구조를 되짚는 중',
-    '샷 리스트를 살피는 중',
-    '대사 리듬을 가늠하는 중',
-    '수정 범위를 정리하는 중',
+    'Retracing the scene structure',
+    'Looking over the shot list',
+    'Gauging the rhythm of the dialogue',
+    'Sorting out the scope of the edit',
   ],
   artist: [
-    '캐릭터 외형을 확인하는 중',
-    '비어 있는 뷰를 찾는 중',
-    '룩 일관성을 맞춰보는 중',
-    '생성 계획을 정리하는 중',
+    'Checking character appearances',
+    'Finding empty views',
+    'Matching up look consistency',
+    'Organizing the generation plan',
   ],
   director: [
-    '콘티 순서를 되짚는 중',
-    '카메라 동선을 그려보는 중',
-    '조명과 무드를 재는 중',
-    '샷 연결을 확인하는 중',
+    'Retracing the storyboard order',
+    'Mapping out camera movement',
+    'Gauging lighting and mood',
+    'Checking shot continuity',
   ],
-  editor: ['클립을 살피는 중'],
+  editor: ['Looking over the clips'],
 }
 
 // 핸드오프 초대 연출(⇄ 블록)이 보인 뒤 스테이지 슬라이드로 넘어가기까지의 지연 (#oiioii-handoff).
@@ -150,26 +152,27 @@ export const HANDOFF_INVITE_NAVIGATE_MS = 1600
 //   (자동 전송 금지 — 과금/전이가 걸린 발화를 원클릭으로 쏘지 않는다. 사용자가 다듬어 Enter).
 //   각 항목은 그 stage 채팅이 실제로 처리할 수 있는 능력 범위 안에서만 (모델에게 없는 일을
 //   시키는 프리셋은 실망 버튼이다). 핸드오프 문구는 handoff-intent.ts HANDOFFS 가 단일 source.
+// 값은 영어 원문 = i18n 키(#i18n-s5-batch4). 렌더 지점(global-chat.tsx 프리셋 popover)이 t() 로 번역한다.
 export const STAGE_PROMPT_PRESETS: Record<StageId, readonly string[]> = {
   producer: [
-    '장르와 톤을 먼저 정리해줘',
-    '주인공 캐릭터를 추가해줘',
-    '배경 장소를 추가해줘',
+    'Sort out the genre and tone first',
+    'Add a protagonist character',
+    'Add a background location',
   ],
   writer: [
-    '마지막 씬에 클로즈업 샷 추가해줘',
-    '대사를 더 간결하게 다듬어줘',
-    '전체 분위기를 더 어둡게 바꿔줘',
+    'Add a close-up shot to the last scene',
+    'Make the dialogue more concise',
+    'Make the overall mood darker',
   ],
   artist: [
-    '캐릭터를 만들어줘 — 이름과 외형을 알려줄게',
-    '비어 있는 캐릭터 뷰를 채워줘',
-    '배경 이미지를 다시 생성해줘',
+    "Create a character — I'll tell you the name and appearance",
+    'Fill in the empty character views',
+    'Regenerate the background image',
   ],
   director: [
-    '이 샷의 카메라를 로우앵글로 바꿔줘',
-    '조명을 더 극적으로 바꿔줘',
-    '샷 설명을 더 구체적으로 써줘',
+    "Change this shot's camera to a low angle",
+    'Make the lighting more dramatic',
+    'Write the shot description more specifically',
   ],
   editor: [],
 }

@@ -71,7 +71,7 @@
   `runs/<actor>/<run_id>/`·`feedback/<actor>/<run_id>/`와, 공유되는 유일한 이름인
   수리 worktree branch `night/<actor>/<run_id>/<unit-id>`에 들어간다.
 - `contract_id`, `contract_version`, 이 문서의 정규화된 해시.
-- 시작 시각과 기준 시각(UTC), 실행 주체(`claude` 또는 `codex`), 작업 루트.
+- 시작 시각과 기준 시각(KST), 실행 주체(`claude` 또는 `codex`), 작업 루트.
 - 읽기 전용 입력 목록, 격리 작업 사본 목록, 결과 보고서 경로.
 
 이 값은 실행 기록과 모든 결과 카드에 이어 붙인다. 실행 중 계약 문서를 다시 읽어 규칙을 바꾸지 않는다. 계약 해시나 필수 입력이 서로 다르면 추측하지 말고 `contract-mismatch`로 진단·기록한 뒤 해당 실행을 시작하지 않는다.
@@ -829,6 +829,10 @@ snapshot, `--harvest-project`, `--harvest-out`, canonical `--run-manifest`까지
   - 변경 이유: 오너 결정 — actor별 canonical proof와 stable logical inbox ID를 실행 계약으로 고정하고, committing journal과 signal/day-run 경계를 성공 기록보다 앞에 둔다.
   - 변경 내용: (1) 모든 provider 명령은 actor와 complete fencing을 같은 owner proof로 전달하며, state-root 0600 key의 HMAC으로 root identity를 검증한다. success는 provider가 bind한 reported actionable snapshot과 canonical manifest/report/harvest/result card만 인정한다. (2) fallback은 같은 state path/run에서 새 token·증가 fencing을 JSON으로 다시 추출하고 stale proof를 폐기한다. (3) marker wrapper를 뺀 logical raw byte range/content hash가 stable item ID이고 full-file hash는 CAS 전용이며 malformed/drifted는 `manual_review`다. (4) snapshot set은 두 파일 generation 재검증 실패 시 manifest 없이 실패하고, `committing`은 같은 completion proof와 canonical harvest/stamp 목적지의 idempotent success 재호출로만 복구한다. archive도 `.claude/vault/_archive/inbox`만 허용한다. (5) launcher는 lease·오전 8시와 `NIGHT_ALLOW_DAY_RUN=1` 기록 경계를 지키며, 코드 신호와 day-run은 별도 실행 경계다.
   - 영향받는 분해 기준: §2의 actor/canonical 입력 고정, §3의 stable ID, §4의 harvest 경로, §8의 fallback·committing 복구, §12의 provider success 검증이 새 proof와 artifact 경계를 따른다. reference snapshot은 출처 맥락일 뿐 소비·표식·archive 대상이 아니다.
+- 2026-08-19 (16차) · 이전 계약 해시 `68bcf07452deecf5c1bf1828c4e35b850e7b6e067854d2fbe03cdada76e236e5` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — 날짜·시각 기준을 KST 하나로 통일한다. 8/19 첫 실행에서 `run_id`가 UTC 날짜로 발급돼 01:30 KST 실행의 결과 디렉터리가 `night-2026-08-18-…`로 하루 밀린 것이 계기다(`claim_date`는 KST라 두 값이 어긋났다).
+  - 변경 내용: (1) §2의 기준 시각 표기를 UTC에서 KST로 고쳤다. (2) `provider-gate.py`의 `run_id` 날짜를 `current_claim_date()`(KST)로 바꿔 `claim_date`와 같은 기준을 쓰게 했고, `state_paths`의 중복 KST 리터럴도 같은 함수로 합쳤다. (3) `harvest.py`의 sweep 디렉터리 날짜(`_output_root`)·`generated_for`·`generated_at`·`completed_at`·도장 주석·드라이런 표를 KST 표기로 바꿨다. (4) `night-runtime.py`의 `read_time`과 `night-review-server.py`의 `created_at`을 KST 표기로 바꿨다.
+  - 영향받는 분해 기준: 없음. epoch 값(lease·도장·수확 창)은 타임존과 무관한 절대 시각이라 그대로 두었고, 비교·만료 계산은 바뀌지 않는다. 식별자와 파일명에는 `%z`(`+0900`)가 run_id 정규식을 깨므로 `KST` 리터럴을 쓴다.
 
 - 2026-08-18 (15차) · 이전 계약 해시 `35826e690c9646b4f0efc40d64f4d2c90ffc4152a78dce13796b631bcc4b43c0` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — actor 이름을 역할명(owner/friend) 대신 실제 사용자 이름(jh/hs)으로 쓴다.

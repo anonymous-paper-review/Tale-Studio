@@ -23,6 +23,7 @@
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { computeSceneBudget, renderBudgetBlock, validateSceneBudget, type SceneBudget } from '@/lib/writer/pipeline/budget';
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
+import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import { normalizeSceneLocations, uncoveredActs } from '@/lib/writer/pipeline/stages/s3_scenes';
 import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, BackgroundContract, StoryScene, NewCharacter } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
@@ -160,7 +161,7 @@ export async function runStructureScenesMerged(
 
   // 예산표: 막 수 미정 → computeSceneBudget(genre, 1)(주입·검증 공통). act 하한은 커버리지 규칙 대체(E13 동일).
   const budget = computeSceneBudget(genre, 1);
-  const system = buildSystem(genre, budget);
+  const system = buildSystem(genre, budget) + outputLanguageClause(input.outputLocale);
   const user = buildUser(input, genre, characters, world);
 
   // 병합 1콜 — 구조와 씬이 한 응답에 같이 나온다(접합부 위반이 구조적으로 소멸).

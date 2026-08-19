@@ -51,7 +51,7 @@ describe('realSheetCanvas — 프로듀서 포맷 → 실사 시트 캔버스 (#
     expect(realSheetCanvas('horizontal_16:9', 'grid4')).toBe('1728x768')
     expect(realSheetCanvas('vertical_9:16', 'grid4')).toBe('1152x1536')
     expect(realSheetCanvas('square_1:1', 'grid4')).toBe('1344x1024')
-    expect(realSheetCanvas('cinema_2.39:1', 'grid4')).toBe('1920x704')
+    expect(realSheetCanvas('cinema_2.39:1', 'grid4')).toBe('2400x880') // #cinema-row-pitch 확대 추종
   })
 
   it('포맷 미상(구 프로젝트 null)만 레거시 캔버스 유지 — 하위 호환', () => {

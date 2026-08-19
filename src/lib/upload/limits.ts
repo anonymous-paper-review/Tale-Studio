@@ -7,6 +7,13 @@
  *  - 이미지: Claude 비전의 장당/치수/장수 한도와 같은 값으로 맞춘다. 업로드는 통과했는데
  *    모델이 거부하는 상태를 만들지 않기 위해서다.
  */
+import { translate } from '@/lib/i18n'
+import type { AppLocale } from '@/lib/locale'
+
+// rejectReason 은 서버(produce/ingest route)·클라(global-chat.tsx) 양쪽에서 호출된다 — 서버에는
+//   useLocaleStore(브라우저 전용)가 없어 locale 을 인자로 받는다. 안 넘기는 두 호출부(범위 밖)가
+//   조용히 깨지지 않도록 기존 동작(항상 한국어)을 기본값으로 보존한다(producer-gate.ts/card-mention.ts와 동일 취급).
+const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
 /** 텍스트 상한. 한글 약 3.3만자(원고지 ~170매) — 시나리오 한 편이 넉넉히 들어간다. */
 export const TEXT_MAX_BYTES = 100 * 1024
@@ -72,13 +79,14 @@ const EXTENSION_KIND: Record<string, UploadKind> = {
  * 브라우저에서 렌더되면 스크립트 실행 벡터가 된다. GIF 는 Claude 는 받지만
  * 애니메이션의 첫 프레임만 쓰이고 슬라이싱 의미가 모호해 제외한다.
  */
+// 값은 완역된 문자열이 아니라 i18n 키(영어 원문) — rejectReason 이 locale 로 완역해 반환한다.
 export const REJECTED_EXTENSIONS: Record<string, string> = {
-  svg: 'SVG 는 읽을 수 없어요. PNG 나 JPG 로 내보내서 올려 주세요.',
-  hwp: 'HWP 는 아직 지원하지 않아요. TXT 나 DOCX 로 저장해서 올려 주세요.',
-  hwpx: 'HWPX 는 아직 지원하지 않아요. TXT 나 DOCX 로 저장해서 올려 주세요.',
-  doc: '옛 DOC 형식은 지원하지 않아요. DOCX 로 저장해서 올려 주세요.',
-  pdf: 'PDF 는 아직 지원하지 않아요. TXT 로 저장하거나 페이지를 이미지로 올려 주세요.',
-  gif: 'GIF 는 지원하지 않아요. PNG 나 JPG 로 올려 주세요.',
+  svg: "SVG can't be read. Please export as PNG or JPG and upload that.",
+  hwp: "HWP isn't supported yet. Please save as TXT or DOCX and upload that.",
+  hwpx: "HWPX isn't supported yet. Please save as TXT or DOCX and upload that.",
+  doc: "The old DOC format isn't supported. Please save as DOCX and upload that.",
+  pdf: "PDF isn't supported yet. Please save as TXT, or upload the pages as images.",
+  gif: "GIF isn't supported. Please upload as PNG or JPG.",
 }
 
 /** `<input accept>` 값 — 파일 다이얼로그가 1차 필터를 대신하게 한다. */
@@ -108,21 +116,25 @@ export function isImageMimeType(value: string): value is ImageMimeType {
 }
 
 /**
- * 한 파일이 정책을 통과하는지. 통과면 null, 아니면 사용자에게 보일 한국어 사유.
+ * 한 파일이 정책을 통과하는지. 통과면 null, 아니면 사용자에게 보일 사유(locale 로 완역).
  * 확장자와 크기만 본다 — 이미지 내용 검증은 decodeImage(image.ts)가 따로 한다.
  */
-export function rejectReason(filename: string, sizeBytes: number): string | null {
+export function rejectReason(
+  filename: string,
+  sizeBytes: number,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+): string | null {
   const ext = extensionOf(filename)
-  if (REJECTED_EXTENSIONS[ext]) return REJECTED_EXTENSIONS[ext]
+  if (REJECTED_EXTENSIONS[ext]) return translate(locale, REJECTED_EXTENSIONS[ext])
 
   const kind = EXTENSION_KIND[ext]
-  if (!kind) return `${filename} 은(는) 지원하지 않는 형식이에요.`
-  if (sizeBytes === 0) return `${filename} 이(가) 비어 있어요.`
+  if (!kind) return translate(locale, '{name} is an unsupported format.', { name: filename })
+  if (sizeBytes === 0) return translate(locale, '{name} is empty.', { name: filename })
 
   const limit =
     kind === 'text' ? TEXT_MAX_BYTES : kind === 'docx' ? DOCX_MAX_BYTES : IMAGE_MAX_BYTES
   if (sizeBytes > limit) {
-    return `${filename} 이(가) 너무 커요 (최대 ${formatBytes(limit)}).`
+    return translate(locale, '{name} is too large (max {max}).', { name: filename, max: formatBytes(limit) })
   }
   return null
 }

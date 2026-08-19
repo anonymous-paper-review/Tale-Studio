@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { ThumbImage } from '@/components/thumb-image'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 
 /** Writer 러프/Director Storyboard가 공유하는 카드 축척 범위. */
 export const STORYBOARD_ZOOM_MIN = 1
@@ -141,7 +142,7 @@ export function StoryboardZoomControls({
  */
 export function GeneratingOverlay({
   active,
-  label = '생성 중',
+  label,
   showElapsed = true,
   startedAt,
   beamColor = 'primary',
@@ -159,10 +160,11 @@ export function GeneratingOverlay({
   beamColor?: 'primary' | 'success'
   className?: string
 }) {
+  const t = useT()
   if (!active) return null
   return (
     <ActiveOverlay
-      label={label}
+      label={label ?? t('Generating')}
       showElapsed={showElapsed}
       startedAt={startedAt}
       beamColor={beamColor}

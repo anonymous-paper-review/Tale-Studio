@@ -18,6 +18,7 @@ import { classifyImageStale } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 
 type Props = {
   charId: string | null
@@ -30,6 +31,7 @@ type Props = {
  * main = 대표 포트레이트(T2I), 방향 뷰 = main 을 reference 로 한 i2i. 각 뷰를 개별 재생성한다.
  */
 export function CharacterViewDialog({ charId, view, onClose }: Props) {
+  const t = useT()
   const char = useArtistStore((s) =>
     s.characterAssets.find((c) => c.characterId === charId),
   )
@@ -51,7 +53,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
   const generate = useGuardedAction({
     actionKey: `artist:character:${charId}:${view}`,
     stage: 'artist',
-    label: '캐릭터 이미지',
+    label: t('Character image'),
     busy: isGenerating,
     action: async () => {
       if (!char || !view) return
@@ -67,7 +69,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
   const safeRetry = useGuardedAction({
     actionKey: `artist:character-safe:${charId}:${view}`,
     stage: 'artist',
-    label: '캐릭터 이미지(우회 재시도)',
+    label: t('Character image (bypass retry)'),
     busy: isGenerating,
     action: async () => {
       if (!char || !view) return
@@ -124,8 +126,8 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
             <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
               <RefreshCw className="size-3.5 shrink-0" />
               {staleClass === 'look-pending'
-                ? '최종 룩 반영 전 초안이에요 — 재생성하면 최종 그림체로 다시 만들어요'
-                : '외형이 수정됐어요 — 재생성하면 새 외형이 반영돼요'}
+                ? t('This is a draft from before the final look — regenerating remakes it in the final art style')
+                : t('The appearance changed — regenerating will apply the new appearance')}
             </div>
           )}
 
@@ -134,8 +136,8 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
               <AlertTriangle className="size-3.5 shrink-0" />
               <span>
                 {failure.moderation
-                  ? '콘텐츠 정책으로 생성이 거부됐어요. 아래 "우회(safe)로 다시 만들기"로 재시도할 수 있어요.'
-                  : '생성에 실패했어요. 다시 시도해 주세요.'}
+                  ? t('Generation was declined by content policy. You can retry below with "Redo with bypass (safe)."')
+                  : t('Generation failed. Please try again.')}
               </span>
             </div>
           )}
@@ -153,27 +155,27 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
           <p className="text-xs text-muted-foreground">
             {isObject
               ? imageUrl
-                ? '재생성하면 새 이미지를 만듭니다.'
-                : '이미지를 생성합니다.'
+                ? t('Regenerating creates a new image.')
+                : t('This generates the image.')
               : view === 'main'
-                ? '턴어라운드 시트입니다. 아래 외형 프롬프트를 수정하고 재생성하면 반영돼요.'
+                ? t('This is the turnaround sheet. Edit the appearance prompt below and regenerate to apply it.')
                 : needsMain
-                  ? '방향 뷰는 Main 을 기준으로 생성됩니다. 먼저 Main 을 생성하세요.'
-                  : '이 뷰는 Main 이미지를 기준으로 재생성됩니다.'}
+                  ? t('Directional views are generated from Main. Generate Main first.')
+                  : t('This view is regenerated based on the Main image.')}
           </p>
 
           {/* 외형 프롬프트(#4) — 월드 다이얼로그와 대칭. 수정하면 재생성 시 캐릭터 원천(appearance)에 반영. */}
           {view === 'main' && (
             <div>
               <label className="mb-1.5 block text-xs text-muted-foreground">
-                외형 프롬프트 (수정 후 재생성)
+                {t('Appearance prompt (edit, then regenerate)')}
               </label>
               <HoverBeam>
                 <Textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   rows={4}
-                  placeholder="이 캐릭터의 외형 묘사"
+                  placeholder={t("This character's appearance description")}
                 />
               </HoverBeam>
             </div>
@@ -185,12 +187,12 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
             {generate.locked ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                생성 중…
+                {t('Generating…')}
               </>
             ) : (
               <>
                 <Sparkles className="size-4" />
-                {imageUrl ? `${label} 재생성` : `${label} 생성`}
+                {imageUrl ? t('Regenerate {label}', { label }) : t('Generate {label}', { label })}
               </>
             )}
           </Button>
@@ -207,7 +209,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
               ) : (
                 <RefreshCw className="size-4" />
               )}
-              {capReached ? '우회 재시도 한도 도달' : '우회(safe)로 다시 만들기'}
+              {capReached ? t('Bypass retry limit reached') : t('Redo with bypass (safe)')}
             </Button>
           )}
         </div>

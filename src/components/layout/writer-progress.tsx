@@ -2,35 +2,37 @@
 
 import { Sparkles } from 'lucide-react'
 import type { WriterStatus } from '@/lib/writer/use-writer-status'
+import { useT } from '@/lib/i18n'
 
 /**
- * writer-pipeline 의 raw stage 키 → 위트있는 한글 진행 문구.
+ * writer-pipeline 의 raw stage 키 → 위트있는 진행 문구(영어 원문 = i18n 키, #i18n-s5-batch2).
  * 키는 /api/writer/status STAGE_FILES 의 `stage` 값 + PIPELINE/persist 마커.
- * 매핑에 없으면 raw 값을 그대로 노출(디버깅용).
+ * 매핑에 없으면 raw 값을 그대로 노출(디버깅용) — 이 함수는 훅을 쓸 수 없는 순수 함수라
+ * 반환값은 영어 키 문자열이고, 실제 번역은 렌더 지점(WriterProgress)에서 t() 로 한다.
  */
 const STAGE_LABELS: Record<string, string> = {
-  PIPELINE: '시동 거는 중…',
-  genre: '이야기의 결을 고르는 중…',
-  narrativeStructure: '기승전결을 짜는 중…',
-  characters: '캐릭터에 숨을 불어넣는 중…',
-  scenes: '장면을 나누는 중…',
-  storyCheck: '이야기에 구멍이 없나 살피는 중…',
-  renderFormat_artDirection: '화면의 톤앤매너를 잡는 중…',
-  productionDesign: '세트를 짓고 소품을 채우는 중…',
-  sceneCinematography: '카메라 자리를 잡는 중…',
-  shotDesign: '샷을 설계하는 중…',
-  shotCheck: '샷을 한 컷씩 검수하는 중…',
-  shotSequence: '샷 순서를 엮는 중…',
-  renderPrompts: '프롬프트를 빚는 중…',
-  assets: '소품을 챙기는 중…',
-  shotImages: '한 컷씩 그려내는 중…',
-  shotVideos: '카메라를 돌리는 중…',
-  persistAssets: '캐릭터·배경을 정리하는 중…',
-  persistShots: '콘티를 정리하는 중…',
+  PIPELINE: 'Warming up…',
+  genre: 'Choosing the tone of the story…',
+  narrativeStructure: 'Structuring the plot…',
+  characters: 'Breathing life into characters…',
+  scenes: 'Breaking the story into scenes…',
+  storyCheck: 'Checking the story for gaps…',
+  renderFormat_artDirection: 'Setting the visual tone…',
+  productionDesign: 'Building sets and props…',
+  sceneCinematography: 'Framing the camera…',
+  shotDesign: 'Designing shots…',
+  shotCheck: 'Reviewing shots one by one…',
+  shotSequence: 'Sequencing the shots…',
+  renderPrompts: 'Crafting prompts…',
+  assets: 'Gathering props…',
+  shotImages: 'Drawing each shot…',
+  shotVideos: 'Rolling camera…',
+  persistAssets: 'Finalizing characters and backgrounds…',
+  persistShots: 'Finalizing the storyboard…',
 }
 
 function stageLabel(stage: string | null | undefined): string {
-  if (!stage) return '막을 올리는 중…'
+  if (!stage) return 'Raising the curtain…'
   // "sceneCinematography (compact)" 같은 변형은 괄호 앞 키로 매핑
   const key = stage.split(' (')[0]
   return STAGE_LABELS[key] ?? stage
@@ -49,13 +51,14 @@ export function WriterProgress({
   /** 텍스트 파이프라인 완료 후 대표 이미지 생성 대기 등, 단계별 보조 안내 */
   note?: string
 }) {
+  const t = useT()
   return (
     <div className="mx-auto w-full max-w-md space-y-4 text-center">
       <Sparkles className="mx-auto size-8 animate-pulse text-primary" />
-      <h1 className="text-xl font-bold">AI 자동 생성 진행 중…</h1>
+      <h1 className="text-xl font-bold">{t('Generating with AI…')}</h1>
       <div className="text-sm text-muted-foreground">
         <div className="text-base font-medium text-foreground">
-          {note ?? stageLabel(status?.current_stage)}
+          {note ?? t(stageLabel(status?.current_stage))}
         </div>
         <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
           <div
@@ -64,12 +67,12 @@ export function WriterProgress({
           />
         </div>
         <div className="mt-1 text-xs font-mono">
-          {note ? '이미지 생성' : `${status?.progress_percent ?? 0}%`}
+          {note ? t('Generating images') : `${status?.progress_percent ?? 0}%`}
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
         {note ??
-          '스토리, 캐릭터, 씬, 샷, 프롬프트를 백그라운드에서 생성 중. 약 3-5분.'}
+          t('Generating story, characters, scenes, shots, and prompts in the background. About 3-5 minutes.')}
       </p>
     </div>
   )

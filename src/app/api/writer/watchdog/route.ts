@@ -5,8 +5,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { triggerWriterStep } from '@/lib/writer/pipeline/steps';
+import { getGenerationJobById, STALE_QUEUED_MS } from '@/lib/generation-jobs';
+import { reconcileJobFromFal } from '@/lib/fal/reconcile';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 // 이 시간보다 오래 갱신 없는 running run = 멈춘 것으로 간주.
 //   fan-out 단계가 100s+ 걸릴 수 있어 진행 중 단계를 오판하지 않도록 넉넉히 잡는다.
@@ -46,7 +49,37 @@ export async function GET(req: NextRequest) {
 
     await Promise.all(projectIds.map((pid) => triggerWriterStep(req.nextUrl.origin, pid)));
 
-    return NextResponse.json({ resumed: projectIds });
+    // #queue-console: 좀비 queued 일일 수거 — 웹훅 유실 잡을 fal 진실로 종결(무과금·멱등,
+    //   콘솔의 수동 reconcile 과 같은 경로). Hobby 크론이 하루 1회뿐이라도 fal 큐 TTL 안에
+    //   돌므로 "며칠 방치된 좀비"라는 종류가 구조적으로 사라진다. 상한은 함수 시간(60s) 안전폭 —
+    //   남으면 다음 날/콘솔이 잇는다. 실패는 삼킨다(워치독 본연의 writer 복구를 막지 않게).
+    let queueSettled = 0;
+    let queueChecked = 0;
+    try {
+      const staleCutoff = new Date(Date.now() - STALE_QUEUED_MS).toISOString();
+      const { data: staleJobs } = await supabaseAdmin
+        .from('generation_jobs')
+        .select('id')
+        .eq('status', 'queued')
+        .lt('created_at', staleCutoff)
+        .order('created_at', { ascending: true })
+        .limit(10);
+      for (const row of staleJobs ?? []) {
+        try {
+          const job = await getGenerationJobById(row.id as string);
+          if (!job || job.status !== 'queued') continue;
+          queueChecked += 1;
+          const after = await reconcileJobFromFal(job);
+          if (after.status !== 'queued') queueSettled += 1;
+        } catch (e) {
+          console.error('[writer/watchdog] queue sweep job failed:', row.id, e instanceof Error ? e.message : e);
+        }
+      }
+    } catch (e) {
+      console.error('[writer/watchdog] queue sweep failed:', e instanceof Error ? e.message : e);
+    }
+
+    return NextResponse.json({ resumed: projectIds, queueChecked, queueSettled });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[writer/watchdog]', msg);

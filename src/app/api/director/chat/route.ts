@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
-import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE } from '@/lib/chat-format'
+import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, fetchProjectLocale, responseLanguageDirective } from '@/lib/chat-format'
 import {
   NOTICE_PARTIAL,
   parseFencedJsonReply,
   parseFencedUpdates,
 } from '@/lib/agentic-reply-guard'
 import { normalizeProvider } from '@/lib/video-models'
+import { userOwnsProject } from '@/lib/generation-jobs'
 
 // ──────────────────────────────────────────────────────────────────────
 // Legacy system prompt — `director-store.ts` (구 P4) 사용 시
@@ -409,13 +410,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { message, history, shotContext, canvasContext } = await req.json()
+    const { message, history, shotContext, canvasContext, projectId } = await req.json()
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
         { error: 'message is required' },
         { status: 400 },
       )
+    }
+
+    // 응답 언어 강제(#i18n-s5-batch6-chat) — projects.locale 조회. 소유 확인 실패/미상은
+    //   fetchProjectLocale 이 null 을 주고, responseLanguageDirective(null) 이 종전 동작(무주입)으로 폴백.
+    let projectLocale: Awaited<ReturnType<typeof fetchProjectLocale>> = null
+    if (typeof projectId === 'string' && projectId) {
+      try {
+        if (await userOwnsProject(projectId, user.id)) {
+          projectLocale = await fetchProjectLocale(projectId)
+        }
+      } catch (err) {
+        console.warn('[director/chat] locale lookup skipped:', err instanceof Error ? err.message : err)
+      }
     }
 
     const normalizedHistory = normalizeHistory(history)
@@ -428,7 +442,7 @@ export async function POST(req: Request) {
     // 분기: canvasContext가 있으면 agentic 모드 (Director Canvas), 없으면 legacy 모드
     if (typeof canvasContext === 'string' && canvasContext.trim()) {
       const text = await llmChat(
-        DIRECTOR_CANVAS_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + CHAT_UPDATES_BATCH_GUIDE,
+        DIRECTOR_CANVAS_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + CHAT_UPDATES_BATCH_GUIDE + responseLanguageDirective(projectLocale),
         normalizedHistory,
         `${canvasContext}\n\n---\n\n${message}`,
         0.7,
@@ -442,7 +456,7 @@ export async function POST(req: Request) {
       ? `[Current Shot]\n${JSON.stringify(shotContext)}\n\n`
       : ''
     const text = await llmChat(
-      DIRECTOR_LEGACY_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE,
+      DIRECTOR_LEGACY_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + responseLanguageDirective(projectLocale),
       normalizedHistory,
       `${contextPrefix}${message}`,
       0.7,

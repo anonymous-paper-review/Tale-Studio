@@ -4,6 +4,7 @@ import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writ
 import { ScenesSchema } from '@/lib/writer/pipeline/schemas';
 import { computeSceneBudget, renderBudgetBlock, validateSceneBudget } from '@/lib/writer/pipeline/budget';
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
+import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, StoryCharacter, BackgroundContract, Dramaturgy, DramaturgyStageCandidate } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
@@ -131,6 +132,9 @@ export async function runScenes(
   //   씬 초만 부풀었다(M2 9~10배). honest/representative 모드는 budget.ts(정책) 참조.
   const budget = computeSceneBudget(genre, narrativeStructure.acts.length);
 
+  // #i18n-s5: 미지정(레거시)이면 종전 "스토리와 같은 언어" 관례 그대로 — 지정 시 [출력 언어] 절이 우선.
+  const langHint = input.outputLocale ? '[출력 언어] 절이 정한 언어' : '스토리와 같은 언어';
+
   const systemInstruction = `당신은 영상 제작의 S3(씬 브레이크다운) 디자이너이다.
 주어진 스토리·genre·내러티브 구조(S1)·캐스트/로케이션 위에서 씬 단위 분해를 한다.
 
@@ -171,16 +175,16 @@ scene_actions:
 - **스토리 전개상 꼭 필요한 새 인물만** new_characters에 추가하고, 그 새 slug를 등장 씬의
   characters_in_scene에도 쓴다. 새 slug는 기존 캐스트 slug와 절대 중복되지 않게 snake_case로 만든다.
 - 새 slug는 서술적으로 짓는다(예: masked_pursuer — char_1 같은 번호식 금지). name에는 slug가 아니라
-  **스토리와 같은 언어의 실제 표시 이름**을 채운다(예: "복면의 추적자". 화면에 그대로 노출된다).
+  **${langHint}의 실제 표시 이름**을 채운다(예: "복면의 추적자". 화면에 그대로 노출된다).
 - 카드(기존 캐스트)에 자리가 없는 인물을 억지로 등장시키지 말 것. 등장은 스토리가 결정한다.
 
 오픈 로케이션 규칙 (중요 — 캐스트와 동일 원칙):
 - 씬이 [기존 로케이션] 중 한 곳에서 벌어지면 scene.location에 **반드시 그 id를 글자 그대로** 쓴다
   (번역·의역·새 이름 금지. 같은 장소를 다른 이름으로 다시 만들면 배경 이미지가 이중 생성된다).
 - 기존 로케이션만으로 전개 가능하면 새 장소를 만들지 말 것.
-- 전개상 꼭 필요한 새 장소만 새 이름으로 쓰되, **스토리와 같은 언어**로 짧고 구체적인 장소명을 짓는다
-  (스토리가 한국어면 한국어 지명 — 임의로 영어 이름을 만들지 않는다).
-`;
+- 전개상 꼭 필요한 새 장소만 새 이름으로 쓰되, **${langHint}**로 짧고 구체적인 장소명을 짓는다
+  (${input.outputLocale ? '[출력 언어] 절이 정한 언어로 짓는다 — 임의로 다른 언어 이름을 만들지 않는다' : '스토리가 한국어면 한국어 지명 — 임의로 영어 이름을 만들지 않는다'}).
+${outputLanguageClause(input.outputLocale)}`;
 
   const revisionBlock = revisionNotes?.length
     ? `[유저 수정 요청 — 씬 게이트 피드백 (#s3-gate, 최우선 반영)]
@@ -234,7 +238,7 @@ ${
     ? world.locations
         .map((l) => `- ${l.id}${l.name && l.name !== l.id ? ` (${l.name})` : ''}${l.description ? `: ${l.description}` : ''}`)
         .join('\n')
-    : '(없음 — 씬 전개에 필요한 장소명을 스토리와 같은 언어로 새로 만든다)'
+    : `(없음 — 씬 전개에 필요한 장소명을 ${langHint}로 새로 만든다)`
 }
 
 [출력 형식 - JSON]

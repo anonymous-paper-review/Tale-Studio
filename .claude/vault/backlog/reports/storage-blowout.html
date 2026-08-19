@@ -1,0 +1,499 @@
+<title>저장소 한도 초과 해부</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .standfirst{font-size:17.5px;color:var(--ink-2);margin:0 0 14px;max-width:60ch}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:0;line-height:1.7}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  ol.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ol.plain li{margin-bottom:10px}
+  strong,b{font-weight:750}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.fail{border-left:3px solid var(--fail)}
+  .card.pass{border-left:3px solid var(--pass)}
+  .card.note{border-left:3px solid var(--accent)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:16px}
+  .card-head h3{flex:1 1 240px;margin:0}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+
+  .meters{display:flex;flex-direction:column;gap:18px;margin:18px 0 6px}
+  .meter .mlab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    font-size:14px;margin-bottom:7px;flex-wrap:wrap}
+  .meter .mlab b{font-weight:750}
+  .meter .mval{font-family:var(--mono);font-size:12.5px;color:var(--muted);
+    font-variant-numeric:tabular-nums}
+  .track{position:relative;height:12px;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .fill{position:absolute;left:0;top:0;bottom:0;background:var(--fail);border-radius:6px 0 0 6px}
+  .limit{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);opacity:.85}
+  .mnote{font-size:12.5px;color:var(--muted);margin:6px 0 0;line-height:1.6}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right;font-family:var(--mono);font-size:13px;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr.hi td{background:var(--fail-soft)}
+  .say{color:var(--muted);font-size:12.5px;display:block;margin-top:4px;line-height:1.55}
+
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:12px 0;color:var(--ink-2);
+    white-space:pre-wrap;word-break:break-word}
+  pre b{color:var(--ink)}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .path{font-family:var(--mono);font-size:12px;color:var(--muted)}
+
+  blockquote{margin:14px 0;padding:14px 18px;background:var(--surface-2);
+    border-left:3px solid var(--line-2);border-radius:0 7px 7px 0;font-size:15px}
+  blockquote p{margin:0 0 8px}
+  blockquote p:last-child{margin:0}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+
+  .banner{border:2px solid var(--ink);border-radius:10px;padding:22px 26px;margin:26px 0;
+    background:var(--surface)}
+  .banner h3{margin:0 0 10px;font-size:18px}
+  .banner p:last-child{margin-bottom:0}
+
+  .flow{display:flex;flex-direction:column;gap:0;margin:16px 0 22px;
+    border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+  .step{display:flex;gap:14px;padding:15px 18px;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:none}
+  .step .n{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 6px;height:fit-content;
+    line-height:1.7;flex:0 0 auto}
+  .step .body{flex:1;font-size:14.5px;line-height:1.7}
+  .step .body b{display:block;margin-bottom:2px}
+  .step.leak{background:var(--fail-soft)}
+  .step.leak .n{color:var(--fail);border-color:var(--fail)}
+
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer ul{padding-left:20px;margin:8px 0 16px}
+  footer li{margin-bottom:6px}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+</style>
+
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">서비스 정지 원인 조사 · 2026-08-19</p>
+  <h1>보관함이 왜 찼나 — 3.6기가를 파일 단위로 뜯어봤습니다</h1>
+  <p class="standfirst">Supabase가 요금 한도 초과로 서비스를 끊었습니다. 로그인·데이터·이미지가 전부 막혀 있습니다. 무엇이 얼마나 쌓였는지, 작업 한 건이 용량을 얼마나 먹는지, 어디서 새고 있는지를 실제 파일 목록에서 재봤습니다.</p>
+  <p class="asof">결론 먼저 — <b>실사용자가 몰려서 터진 게 아닙니다.</b> 테스트·샘플 프로젝트 37개가 전체의 86.6%를 먹었습니다. 이것만 지우면 무료 한도 안으로 돌아옵니다. 다만 <b>지금은 지울 수 없습니다.</b> 파일 삭제 요청도 같이 막혀 있어서, 요금 문제를 먼저 풀어야 청소를 시작할 수 있습니다.</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">0</span><h2>이 문서가 쓰는 말</h2></div>
+  <p class="sec-lede">읽다가 되짚어야 하는 단어를 만들지 않기 위해, 흔히 쓰는 줄임말을 여기서 전부 풀어 쓰고 본문에서는 오른쪽 말만 씁니다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>쓰지 않는 말</th><th>이 문서가 쓰는 말</th></tr></thead>
+    <tbody>
+      <tr><td>이그레스 / egress</td><td><b>나간 데이터량</b> — 우리 서버에서 바깥으로 흘러나간 총 바이트. 사람이 브라우저로 그림을 보면 그만큼 나간 것으로 셉니다</td></tr>
+      <tr><td>캐시드 이그레스</td><td><b>중계망을 거쳐 나간 데이터량</b> — 같은 파일을 여러 번 볼 때 중간 서버가 대신 내주는 몫. 별도로 계량되고 별도 한도가 있습니다</td></tr>
+      <tr><td>402 / Payment Required</td><td><b>요금 문제로 못 준다는 응답</b> — 서버가 일을 거부하고 돌려보내는 상태</td></tr>
+      <tr><td>버킷 / bucket</td><td><b>파일 보관함</b> — 이 서비스는 <span class="path">media</span> 한 곳만 씁니다</td></tr>
+      <tr><td>real_grid_ref</td><td><b>배치 참조 시트</b> — 여러 칸을 한 장에 합쳐 "이 배치대로 그려라"라고 외부 그림 서버에 넘기는 안내용 이미지</td></tr>
+      <tr><td>upsert</td><td><b>같은 이름이면 덮어쓰기</b></td></tr>
+      <tr><td>백필 / backfill</td><td><b>지난 것까지 소급해서 만들기</b></td></tr>
+      <tr><td>잡 / job</td><td><b>생성 요청 한 건</b> — 그림이나 영상 하나를 만들어 달라고 보낸 단위</td></tr>
+      <tr><td>fal</td><td><b>외부 그림·영상 생성 서버</b> — 우리가 재료를 넘기면 결과물을 만들어 돌려주는 바깥 회사</td></tr>
+      <tr><td>고아 파일</td><td><b>주인 없는 파일</b> — 프로젝트가 지워졌는데 파일만 남은 것</td></tr>
+    </tbody>
+  </table></div>
+  <p class="mnote">파일 경로와 코드 위치는 버리지 않고 회색 작은 글씨로 남깁니다 — 본문에서 빼되 추적은 되도록.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>무엇을 알고 싶었나</h2></div>
+  <p>서비스가 멈췄고 세 가지가 동시에 한도를 넘었다는 통보를 받았습니다. 알고 싶었던 건 세 가지입니다.</p>
+  <ol class="plain">
+    <li><b>실사용자 때문인가, 우리 때문인가.</b> 가입자가 늘어서 터진 거라면 요금제를 올리는 게 답이고, 개발하다 쌓인 거라면 청소가 답입니다. 대처가 정반대로 갈립니다.</li>
+    <li><b>작업 한 건이 용량을 얼마나 먹나.</b> 이걸 모르면 요금제를 올려도 언제 또 터질지 예측이 안 됩니다.</li>
+    <li><b>새는 곳이 있나.</b> 정상적으로 쌓인 것과 안 지워져서 남은 것을 갈라내야 합니다.</li>
+  </ol>
+  <div class="card note">
+    <p><b>확인 방법.</b> 서비스는 막혀 있지만, 데이터베이스에 직접 접속하는 통로는 살아 있었습니다. 요금 차단은 바깥쪽 관문에만 걸려 있고 데이터베이스 자체는 그대로 돌아가고 있습니다. 그래서 파일 목록 표를 직접 읽어 파일 하나하나의 크기·만든 시각·경로를 전부 집계했습니다. <b>아래 저장 용량 숫자는 추정이 아니라 실측입니다.</b></p>
+    <p>반대로 <b>나간 데이터량은 실측이 불가능했습니다.</b> 누가 언제 어떤 파일을 받아 갔는지는 데이터베이스에 안 남습니다. 요청 기록은 관리 화면의 별도 보관소에만 있고 무료 요금제는 보관 기간이 짧습니다. 그래서 이 문서는 <b>저장 용량은 실측, 나간 데이터량은 부분 실측 + 나머지는 미상</b>으로 갈라서 씁니다.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>얼마나 넘었나</h2></div>
+  <p class="sec-lede">무료 요금제 한도는 저장 1기가, 나간 데이터량은 중계망 5기가와 직접 5기가로 따로 셉니다. 세 칸 모두 넘겼습니다.</p>
+
+  <div class="meters">
+    <div class="meter">
+      <div class="mlab"><b>저장 용량</b><span class="mval">1.79 GB 표시 / 한도 1 GB · <b>179%</b></span></div>
+      <div class="track"><div class="fill" style="width:100%"></div><div class="limit" style="left:56%"></div></div>
+      <p class="mnote">검은 세로선이 한도입니다. 그런데 파일을 직접 세어 보니 <b>3.61기가</b>가 나왔습니다 — 관리 화면 표시의 두 배입니다. 이 차이는 아래 5절에서 따로 다룹니다.</p>
+    </div>
+    <div class="meter">
+      <div class="mlab"><b>중계망을 거쳐 나간 데이터량</b><span class="mval">8.89 GB / 한도 5 GB · <b>178%</b></span></div>
+      <div class="track"><div class="fill" style="width:100%"></div><div class="limit" style="left:56%"></div></div>
+    </div>
+    <div class="meter">
+      <div class="mlab"><b>직접 나간 데이터량</b><span class="mval">7.54 GB / 한도 5 GB · <b>151%</b></span></div>
+      <div class="track"><div class="fill" style="width:100%"></div><div class="limit" style="left:66%"></div></div>
+    </div>
+  </div>
+
+  <h3>지금 막혀 있는 것</h3>
+  <p>서비스 주소로 요청을 직접 넣어 어디까지 막혔는지 확인했습니다. 네 곳 모두 같은 거부 응답을 돌려줍니다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>기능</th><th>화면에서 벌어지는 일</th><th class="num">응답</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td><b>로그인</b><span class="say">홈페이지 로그인 창</span></td><td>비밀번호가 맞아도 실패합니다. 기존에 로그인돼 있던 사람도 매 요청마다 서버 확인을 거치므로 같이 튕겨 나갑니다</td><td class="num">거부</td></tr>
+      <tr><td><b>데이터 조회</b></td><td>프로젝트 목록·작업 내용이 전부 안 뜹니다</td><td class="num">거부</td></tr>
+      <tr><td><b>이미지·영상</b></td><td>그림이 하나도 안 보입니다</td><td class="num">거부</td></tr>
+      <tr><td>Supabase 관리 화면</td><td>정상 — 요금제 변경과 사용량 확인은 지금도 됩니다</td><td class="num">정상</td></tr>
+    </tbody>
+  </table></div>
+  <pre>Service for this project is restricted due to the following violations:
+exceed_cached_egress_quota, exceed_egress_quota, exceed_storage_size_quota.
+The project owner must upgrade their plan <b>or remove spend caps</b> to restore service.</pre>
+  <p>마지막 줄에 <b>"지출 상한을 풀어라"</b>가 같이 적혀 있습니다. 이미 유료 요금제인데 상한 설정 때문에 막힌 상태라면 상한만 해제해도 즉시 복구됩니다. 무료 요금제라면 요금제를 올리거나 결제 주기가 새로 시작되기를 기다려야 합니다. <b>둘 중 어느 상태인지는 관리 화면에서 먼저 봐야 합니다.</b></p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>누가 썼나 — 실사용자가 아니었습니다</h2></div>
+  <p>가입자는 <b>114명</b>입니다. 그런데 프로젝트를 실제로 만든 작업공간은 <b>4개뿐</b>이고, 그중 관리자 계정 하나가 전체의 90%를 차지합니다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>작업공간</th><th class="num">프로젝트</th><th class="num">파일</th><th class="num">용량</th><th class="num">비중</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td><b>관리자 계정</b><span class="say">admin@tale.studio</span></td><td class="num">47</td><td class="num">8,914</td><td class="num"><b>3,258 MB</b></td><td class="num"><b>90%</b></td></tr>
+      <tr><td>시험 계정 셋<span class="say">test-223bdf01 · test-eb2da004 · test-d8f28352</span></td><td class="num">5</td><td class="num">866</td><td class="num">283 MB</td><td class="num">8%</td></tr>
+      <tr><td>공용 자료<span class="say">스타일 기준 이미지 · 템플릿 · 조사 자료</span></td><td class="num">—</td><td class="num">68</td><td class="num">48 MB</td><td class="num">1%</td></tr>
+      <tr><td>나머지 가입자 110명</td><td class="num">0</td><td class="num">0</td><td class="num">0 MB</td><td class="num">0%</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="banner">
+    <h3>프로젝트 이름으로 한 번 더 갈라 봤습니다</h3>
+    <p>제목에 test·sample·viz·테스트가 들어간 프로젝트가 <b>37개, 3,124메가, 전체의 86.6%</b>입니다. 나머지 실제 작업물 4개는 <b>331메가, 9.2%</b>에 불과합니다.</p>
+    <p>즉 이번 초과는 <b>서비스가 성장해서 생긴 문제가 아니라, 개발하면서 만든 시험용 프로젝트를 한 번도 안 지운 결과</b>입니다.</p>
+  </div>
+
+  <h3>쌓인 속도</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>시점</th><th class="num">늘어난 파일</th><th class="num">늘어난 용량</th></tr></thead>
+    <tbody>
+      <tr><td>7월 한 달</td><td class="num">969</td><td class="num">589 MB</td></tr>
+      <tr class="hi"><td><b>8월 (19일까지)</b></td><td class="num"><b>8,902</b></td><td class="num"><b>3,017 MB</b></td></tr>
+      <tr><td>8월 11일 하루</td><td class="num">3,235</td><td class="num">316 MB</td></tr>
+      <tr><td>8월 16일 하루</td><td class="num">858</td><td class="num">665 MB</td></tr>
+    </tbody>
+  </table></div>
+  <p>8월 들어 속도가 <b>다섯 배</b>로 뛰었습니다. 이 속도가 유지되면 한 달에 3기가씩 늘어납니다. 유료 요금제의 100기가도 33개월이면 차고, 실사용자가 붙으면 훨씬 짧아집니다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>작업 한 건이 얼마나 먹나</h2></div>
+  <p class="sec-lede">파일 이름 규칙에서 단위를 세고 용량으로 나눈 실측 평균입니다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>만드는 것</th><th class="num">지금까지 건수</th><th class="num">총 용량</th><th class="num">한 건당</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td><b>샷 하나</b><span class="say">러프 3장 + 스토리보드 3장 + 미리보기 그림 3장</span></td><td class="num">894</td><td class="num">2,977 MB</td><td class="num"><b>3.41 MB</b></td></tr>
+      <tr><td>영상 클립 하나</td><td class="num">74</td><td class="num">217 MB</td><td class="num">3.00 MB</td></tr>
+      <tr><td>캐릭터 한 명</td><td class="num">74</td><td class="num">142 MB</td><td class="num">1.97 MB</td></tr>
+      <tr><td>장소 한 곳</td><td class="num">96</td><td class="num">115 MB</td><td class="num">1.23 MB</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="card note">
+    <p><b>역산하면 이렇습니다.</b></p>
+    <ul class="plain">
+      <li>무료 한도 <b>1기가 = 샷 약 300건</b></li>
+      <li>프로젝트 하나가 보통 20~50샷이므로 <b>프로젝트 6~10개면 무료 한도 소진</b></li>
+      <li>실제로 가장 큰 프로젝트 하나가 116샷 / 437메가였습니다</li>
+      <li>유료 100기가 = 샷 약 3만 건. 사용자 한 명이 프로젝트 10개를 만든다면 <b>약 60명</b>이 한계입니다</li>
+    </ul>
+  </div>
+  <p>샷 하나가 3.41메가인 내역은 이렇습니다. 러프 시작·끝·연출 각 217킬로바이트, 스토리보드 시작·끝·연출 각 245킬로바이트, 작게 줄인 미리보기 세 장 각 16킬로바이트, 여기에 아래에서 설명할 배치 참조 시트 몫이 얹힙니다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>새는 곳 셋</h2></div>
+  <p class="sec-lede">정상적으로 쌓인 것과 안 지워져서 남은 것을 갈랐습니다. 가장 큰 낭비부터 씁니다.</p>
+
+  <div class="card fail">
+    <div class="card-head">
+      <h3>새는 곳 하나 — 배치 참조 시트가 한 장도 안 지워집니다</h3>
+      <span class="chip c-fail">625 MB · 전체의 17.3%</span>
+    </div>
+
+    <h3>이게 뭐냐면</h3>
+    <p>스토리보드를 여러 칸 한꺼번에 만들 때, 우리 서버는 먼저 <b>러프 그림들을 한 장에 격자로 합칩니다.</b> 그리고 그 합친 이미지를 보관함에 올린 뒤, 그 주소를 외부 그림 생성 서버에 넘기면서 "이 배치대로, 각 칸에 이 인물을 넣어서 그려라"라고 지시합니다. 인물 참조 이미지도 함께 붙고, 프롬프트가 "참조 이미지 몇 번 = 누구"라는 규약으로 칸별 인물을 지정합니다.</p>
+    <p>그러니까 이건 <b>결과물이 아니라 주문서에 첨부하는 안내 그림</b>입니다. 주문이 끝나면 쓸모가 없습니다.</p>
+
+    <h3>어떻게 동작하고, 왜 안 지워지나</h3>
+    <div class="flow">
+      <div class="step"><span class="n">1</span><div class="body"><b>샷들을 시트 단위로 묶는다</b>씬 경계에서 끊어 한 시트에 씬 하나만 들어가게 합니다</div></div>
+      <div class="step"><span class="n">2</span><div class="body"><b>러프 그림을 한 장으로 합친다</b>화면 비율을 맞춰 격자로 붙입니다. 여러 칸이 한 장에 들어가니 크기가 큽니다 — <b>평균 2.17메가</b></div></div>
+      <div class="step leak"><span class="n">3</span><div class="body"><b>보관함에 올린다 — 여기가 새는 지점</b>파일 이름에 <b>만든 시각</b>이 들어갑니다. "같은 이름이면 덮어쓰기" 설정이 붙어 있지만 <b>이름이 매번 다르므로 아무 효과가 없습니다.</b> 호출할 때마다 새 파일이 생깁니다</div></div>
+      <div class="step"><span class="n">4</span><div class="body"><b>주소를 외부 서버에 넘긴다</b>외부 서버가 그 주소로 파일을 받아 갑니다 — <b>이때 나간 데이터량도 함께 발생합니다</b></div></div>
+      <div class="step leak"><span class="n">5</span><div class="body"><b>주문이 끝나도 아무도 안 지운다</b>삭제 코드가 없습니다. 영구 보관됩니다</div></div>
+    </div>
+    <p class="path">경로 형식: <span class="path">{작업공간}/{프로젝트}/shots/real_grid_ref_{만든시각}_{첫샷}.png</span><br>코드 위치: <span class="path">src/app/api/director/generate-storyboard-batch/route.ts:132</span></p>
+
+    <h3>실제로 어느 프로젝트에서 나왔나</h3>
+    <p>295장 전부가 관리자 계정의 시험용 프로젝트에서 나왔습니다. <b>실제 작업물 프로젝트에서 나온 건 하나도 없습니다.</b></p>
+    <div class="tbl"><table>
+      <thead><tr><th>프로젝트</th><th class="num">시트</th><th class="num">용량</th><th class="num">기간</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td><b>webtoon_test</b></td><td class="num">77</td><td class="num"><b>231 MB</b></td><td class="num">8/16 하루</td></tr>
+        <tr class="hi"><td><b>Sample1</b></td><td class="num">78</td><td class="num">113 MB</td><td class="num">8/5–8/11</td></tr>
+        <tr><td>writer_test_260813</td><td class="num">13</td><td class="num">41 MB</td><td class="num">8/12–8/13</td></tr>
+        <tr><td>writer_test_260812</td><td class="num">11</td><td class="num">32 MB</td><td class="num">8/11</td></tr>
+        <tr><td>writer_test_260810</td><td class="num">20</td><td class="num">31 MB</td><td class="num">8/10–8/11</td></tr>
+        <tr><td>writer_test_260817</td><td class="num">10</td><td class="num">30 MB</td><td class="num">8/16–8/17</td></tr>
+        <tr><td>writer_test_260805_6</td><td class="num">22</td><td class="num">28 MB</td><td class="num">8/4–8/11</td></tr>
+        <tr><td>나머지 5개 시험 프로젝트</td><td class="num">64</td><td class="num">119 MB</td><td class="num">8/6–8/16</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>webtoon_test 하나가 하루에 231메가를 만들었습니다.</b> 웹툰 형식이라 시트가 세로로 길어 장당 3메가입니다. 이 프로젝트 하나가 무료 저장 한도의 23%를 하루 만에 먹었습니다.</p>
+    <p class="mnote">덧붙여 같은 성격의 임시 파일이 하나 더 있습니다 — 단건 스토리보드용 참조 띠 117장, 52메가. 이쪽은 파일 이름이 고정이라 재생성하면 덮어써지므로 무한히 늘지는 않지만, 다 쓴 뒤에도 계속 남아 있는 건 같습니다.</p>
+  </div>
+
+  <div class="card warn">
+    <div class="card-head">
+      <h3>새는 곳 둘 — 작게 줄인 미리보기가 21% 빠져 있습니다</h3>
+      <span class="chip c-warn">1,011 MB가 원본으로 나감</span>
+    </div>
+    <p>목록 화면에서는 원본 대신 작게 줄인 그림을 보여주는 장치가 이미 있습니다. 켜고 끄는 스위치가 있는데, <b>운영 서버 설정을 직접 확인해 보니 7일 전부터 켜져 있었습니다.</b> 그러니 스위치는 문제가 아닙니다.</p>
+    <p>문제는 <b>줄인 그림 자체가 다 만들어져 있지 않다는 것</b>입니다. 샷 이미지 4,950장 중 3,889장(79%)만 줄인 그림이 있습니다. 나머지 <b>1,011메가는 스위치가 켜져 있어도 원본이 그대로 나갑니다.</b></p>
+    <p>프로젝트를 한 번 쭉 여는 데 드는 데이터량을 계산해 봤습니다.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>프로젝트</th><th class="num">이미지</th><th class="num">줄인 그림 없이</th><th class="num">줄인 그림으로</th><th class="num">차이</th></tr></thead>
+      <tbody>
+        <tr><td>Sample1</td><td class="num">768</td><td class="num">301 MB</td><td class="num">8.7 MB</td><td class="num"><b>35배</b></td></tr>
+        <tr><td>writer_test_260811</td><td class="num">249</td><td class="num">133 MB</td><td class="num">4.4 MB</td><td class="num"><b>30배</b></td></tr>
+        <tr class="hi"><td><b>writer_test_260813</b></td><td class="num">340</td><td class="num">158 MB</td><td class="num">137 MB</td><td class="num">1.2배</td></tr>
+        <tr class="hi"><td><b>writer_test_260812</b></td><td class="num">238</td><td class="num">106 MB</td><td class="num">91 MB</td><td class="num">1.2배</td></tr>
+      </tbody>
+    </table></div>
+    <p>위 둘은 줄인 그림이 깔려 있어 <b>35배</b> 차이가 납니다. 아래 붉은 두 개는 안 깔려 있어서 스위치를 켜도 거의 효과가 없습니다. <b>줄인 그림을 지난 것까지 소급해서 만드는 작업이 안 끝난 상태</b>입니다. 소급 생성 도구는 이미 있습니다 — <span class="path">scripts/backfill-thumbnails.mjs</span></p>
+  </div>
+
+  <div class="card warn">
+    <div class="card-head">
+      <h3>새는 곳 셋 — 외부 서버가 재료를 받아 가는 양</h3>
+      <span class="chip c-warn">8월에만 1,297 MB · 실측</span>
+    </div>
+    <p>그림을 만들 때마다 우리는 참조 이미지 주소들을 외부 생성 서버에 넘기고, 그 서버가 우리 보관함에서 파일을 받아 갑니다. <b>이것도 전부 나간 데이터량으로 계산됩니다.</b></p>
+    <p>생성 요청 기록에 어떤 주소를 넘겼는지가 남아 있어서, 그 주소를 파일 크기와 맞대어 정확히 계산했습니다.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>생성 종류</th><th class="num">받아 간 횟수</th><th class="num">나간 데이터량</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td><b>배치 스토리보드</b><span class="say">배치 참조 시트가 여기 포함됩니다</span></td><td class="num">508</td><td class="num"><b>909 MB</b></td></tr>
+        <tr><td>단건 스토리보드</td><td class="num">140</td><td class="num">139 MB</td></tr>
+        <tr><td>장소 이미지</td><td class="num">90</td><td class="num">137 MB</td></tr>
+        <tr><td>캐릭터 이미지</td><td class="num">67</td><td class="num">99 MB</td></tr>
+        <tr><td>영상</td><td class="num">56</td><td class="num">13 MB</td></tr>
+        <tr><td><b>합계</b></td><td class="num"><b>861</b></td><td class="num"><b>1,297 MB</b></td></tr>
+      </tbody>
+    </table></div>
+    <p>여기서도 <b>배치 참조 시트가 1등</b>입니다. 저장 용량으로 625메가를 먹고, 외부 서버가 받아 가면서 나간 데이터량으로 또 먹습니다. <b>한 파일이 두 칸을 동시에 채웁니다.</b></p>
+  </div>
+
+  <div class="card note">
+    <div class="card-head">
+      <h3>설명이 안 되는 부분 — 정직하게 적습니다</h3>
+      <span class="chip c-gate">미상 15 GB</span>
+    </div>
+    <p>나간 데이터량 합계는 16.4기가인데, 출처를 확정할 수 있었던 건 위의 <b>1.3기가뿐</b>입니다. 나머지 15기가는 브라우저로 화면을 열어 본 몫으로 <b>추정</b>되지만, 요청 기록이 안 남아 확인할 방법이 없습니다.</p>
+    <p>추정의 근거는 있습니다. 가장 큰 프로젝트를 줄인 그림 없이 한 번 열면 301메가가 나가므로, 그런 조회가 50번만 있어도 15기가입니다. 개발하면서 화면을 새로고침한 횟수를 생각하면 충분히 가능한 양입니다. <b>다만 이건 계산이 맞아떨어진다는 것이지 증명은 아닙니다.</b></p>
+    <p>같은 이유로 <b>관리 화면의 1.79기가와 실측 3.61기가가 왜 두 배 차이 나는지도 모릅니다.</b> 집계 시점 차이인지, 세는 방식이 다른지 확인할 방법이 없습니다. 확실한 건 <b>실제 파일은 3.61기가만큼 존재한다</b>는 것뿐입니다.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">6</span><h2>확실한 것과 모르는 것</h2></div>
+  <div class="split">
+    <div class="yes">
+      <h4>실측으로 확인한 것</h4>
+      <ul>
+        <li>파일 9,871개, 합계 3,606메가가 보관함에 실제로 있다</li>
+        <li>시험·샘플 프로젝트 37개가 그중 86.6%</li>
+        <li>샷 한 건 = 3.41메가, 영상 한 개 = 3.00메가</li>
+        <li>배치 참조 시트 295장 625메가가 전부 안 지워지고 남아 있다</li>
+        <li>줄인 그림이 21% 빠져 있고, 1,011메가가 원본으로 나간다</li>
+        <li>운영 서버의 줄인 그림 스위치는 7일 전부터 켜져 있다</li>
+        <li>외부 생성 서버가 8월에 1,297메가를 받아 갔다</li>
+        <li>로그인·데이터·이미지 네 곳 모두 거부 응답을 돌려준다</li>
+        <li>데이터베이스 직접 접속은 지금도 살아 있다</li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>모르는 것</h4>
+      <ul>
+        <li>나간 데이터량 16.4기가 중 <b>15기가의 출처</b> — 기록이 안 남아 확인 불가</li>
+        <li>관리 화면 1.79기가와 실측 3.61기가의 <b>두 배 차이 원인</b></li>
+        <li>현재 요금제가 무료인지, 유료인데 지출 상한에 걸린 건지 — <b>관리 화면에서 봐야 함</b></li>
+        <li>결제 주기가 언제 새로 시작되는지</li>
+        <li>관리 화면의 파일 탐색기로 삭제가 되는지 — <b>눌러 봐야 앎</b></li>
+        <li>줄인 그림 소급 생성이 왜 두 프로젝트에서 멈췄는지</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">7</span><h2>대처</h2></div>
+
+  <div class="banner">
+    <h3>먼저: 지금 하면 안 되는 것</h3>
+    <p>파일 삭제 요청이 막혀 있다고 해서, 살아 있는 데이터베이스 통로로 <b>파일 목록 표의 줄을 직접 지우면 안 됩니다.</b> 목록에서만 사라지고 실제 파일은 그대로 남습니다. 용량은 하나도 안 줄고 <b>추적조차 안 되는 주인 없는 파일만 늘어납니다.</b> 삭제는 반드시 차단이 풀린 뒤 정상 경로로 해야 합니다.</p>
+  </div>
+
+  <h3>1단계 — 지금 (차단 중에도 됨)</h3>
+  <ol class="plain">
+    <li><b>요금제 상태를 확인합니다.</b> 관리 화면에서 무료인지, 유료인데 지출 상한에 걸린 건지 봅니다. 후자면 상한 해제만으로 즉시 복구됩니다.</li>
+    <li><b>결제 주기 시작일을 확인합니다.</b> 기다리는 쪽을 택할 경우의 복구 시점입니다.</li>
+    <li><b>관리 화면 파일 탐색기에서 삭제가 되는지 눌러 봅니다.</b> 되면 아래 2단계 첫 항목을 지금 바로 할 수 있습니다.</li>
+  </ol>
+
+  <h3>2단계 — 차단이 풀리는 즉시</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>할 일</th><th class="num">회수되는 용량</th><th>위험</th></tr></thead>
+    <tbody>
+      <tr><td><b>배치 참조 시트 295장 삭제</b><span class="say">주문서 첨부용 임시 그림. 결과물이 아님</span></td><td class="num"><b>625 MB</b></td><td>없음</td></tr>
+      <tr><td><b>시험·샘플 프로젝트 37개 정리</b><span class="say">webtoon_test · Sample1 · writer_test_* 계열</span></td><td class="num"><b>3,124 MB</b></td><td>지울 목록을 눈으로 확인 후</td></tr>
+      <tr><td>단건 스토리보드 참조 띠 117장 삭제</td><td class="num">52 MB</td><td>없음</td></tr>
+      <tr><td>주인 없는 파일 220개 삭제</td><td class="num">102 MB</td><td>없음</td></tr>
+      <tr><td>슬라이스 후 남은 업로드 원본 7개</td><td class="num">10 MB</td><td>원본 보관 정책 확인 후</td></tr>
+      <tr><td><b>줄인 그림 소급 생성</b><span class="say">도구는 이미 있음</span></td><td class="num">—</td><td>나간 데이터량 대책</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>무료 한도로 돌아가려면 2,582메가(전체의 72%)를 지워야 합니다.</b> 위 목록 중 시험 프로젝트 정리 하나만 해도 3,124메가라 <b>무료 복귀가 실제로 가능합니다.</b> 정리 후 남는 건 482메가입니다.</p>
+
+  <h3>3단계 — 재발 차단 (코드 수정)</h3>
+  <ol class="plain">
+    <li><b>배치 참조 시트 이름에서 시각을 뺍니다.</b> 그러면 같은 시트를 다시 만들 때 덮어써집니다. 더 나아가 주문이 끝나면 지우는 게 맞습니다 — 이건 결과물이 아니라 주문서 첨부물입니다. <span class="path">generate-storyboard-batch/route.ts:132</span></li>
+    <li><b>영상은 클립당 최신 것만 남깁니다.</b> 지금은 재생성할 때마다 새 파일이 생기고 실패작·구버전이 전부 남습니다.</li>
+    <li><b>줄인 그림 생성을 업로드 시점에 강제합니다.</b> 지금은 만들다 만 상태가 21%나 됩니다.</li>
+    <li><b>보관 기간 규칙을 넣습니다.</b> 임시 파일은 하루, 시험 프로젝트는 한 달 같은 식으로.</li>
+  </ol>
+
+  <h3>4단계 — 구조 (검토 사항)</h3>
+  <p>지금 속도로는 유료 요금제로 올려도 시간을 버는 것뿐입니다. 영상·이미지를 이 보관함에 계속 둘지가 진짜 질문입니다. 선택지는 셋입니다.</p>
+  <ul class="plain">
+    <li><b>외부 생성 서버가 이미 갖고 있는 결과물 주소를 그대로 씁니다.</b> 지금은 받아서 다시 올리고 있습니다. 그 주소가 언제까지 유효한지만 확인하면 저장 자체를 줄일 수 있습니다.</li>
+    <li><b>나간 데이터량에 요금을 안 매기는 저장소로 옮깁니다.</b> 영상을 다루는 서비스에서는 이게 일반적인 선택입니다. 데이터베이스와 로그인만 지금 자리에 남깁니다.</li>
+    <li><b>지금 자리를 유지하고 보관 기간 규칙으로 버팁니다.</b> 가장 싸게 시작하지만 사용자가 늘면 다시 같은 문제가 옵니다.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">8</span><h2>결론</h2></div>
+  <ol class="plain">
+    <li><b>실사용자 때문이 아닙니다.</b> 가입자 114명 중 110명은 파일을 하나도 안 만들었습니다. 관리자 계정의 시험용 프로젝트 37개가 전체의 86.6%입니다.</li>
+    <li><b>샷 한 건이 3.41메가입니다.</b> 무료 한도 1기가는 샷 300건, 프로젝트 6~10개 분량입니다.</li>
+    <li><b>배치 참조 시트가 단일 최대 낭비입니다.</b> 295장 625메가가 저장 용량을 먹고, 외부 서버가 받아 가면서 나간 데이터량을 또 먹습니다. 파일 이름에 만든 시각이 들어가 덮어쓰기가 원천적으로 불가능한 구조입니다.</li>
+    <li><b>줄인 그림 스위치는 문제가 아니었습니다.</b> 운영 서버에서 7일 전부터 켜져 있었습니다. 문제는 줄인 그림이 21% 빠져 있다는 것입니다.</li>
+    <li><b>나간 데이터량 16.4기가 중 1.3기가만 출처를 확정했습니다.</b> 나머지는 기록이 없어 추정만 가능합니다.</li>
+    <li><b>시험 프로젝트 정리만으로 무료 한도 복귀가 가능합니다.</b> 3,124메가를 회수하면 482메가가 남습니다.</li>
+    <li><b>다만 지금은 아무것도 지울 수 없습니다.</b> 요금 문제를 먼저 풀어야 청소가 시작됩니다.</li>
+  </ol>
+</section>
+
+<footer>
+  <p><b>이 문서의 근거</b></p>
+  <ul>
+    <li>보관함 파일 목록 표 전수 집계 — 파일 9,871개의 크기·경로·생성시각. 데이터베이스 직접 접속으로 읽음 (2026-08-19)</li>
+    <li>생성 요청 기록 — 8월 716건의 종류와 넘긴 참조 주소</li>
+    <li>서비스 주소에 직접 요청을 넣어 확인한 거부 응답 4건</li>
+    <li>운영 서버 설정값 — 줄인 그림 스위치 상태와 설정 시점</li>
+    <li>코드 — <span class="path">generate-storyboard-batch/route.ts</span>, <span class="path">fal/finalize.ts</span>, <span class="path">lib/image-url.ts</span>, <span class="path">middleware.ts</span></li>
+  </ul>
+  <p><b>이 문서가 하지 않는 것</b></p>
+  <ul>
+    <li><b>나간 데이터량 16.4기가의 출처를 밝히지 못했습니다.</b> 1.3기가만 확정했고 나머지는 계산이 맞아떨어진다는 수준입니다</li>
+    <li><b>관리 화면 표시(1.79기가)와 실측(3.61기가)의 차이를 설명하지 못했습니다</b></li>
+    <li><b>아무것도 지우지 않았고 코드도 고치지 않았습니다.</b> 7절은 전부 제안이며 실행되지 않았습니다</li>
+    <li><b>요금제 상태를 확인하지 않았습니다.</b> 무료인지 유료+지출 상한인지는 사람이 관리 화면에서 봐야 합니다</li>
+    <li><b>4단계 저장소 이전은 비교만 적었고 비용 계산을 하지 않았습니다</b></li>
+  </ul>
+</footer>
+
+</div>

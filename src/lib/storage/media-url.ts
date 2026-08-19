@@ -72,7 +72,7 @@ export function mediaPublicPrefixes(): string[] {
  */
 export function mediaPublicUrl(objectPath: string): string {
   const prefix = mediaPublicPrefix()
-  if (!prefix) throw new Error('media public URL 접두사가 설정되지 않았어요')
+  if (!prefix) throw new Error('media public URL 접두사가 설정되지 않았어요') // i18n-ok
   return `${prefix}${objectPath.replace(/^\/+/, '')}`
 }
 

@@ -38,29 +38,31 @@ import { cn } from '@/lib/utils'
 import { useWriterStore } from '@/stores/writer-store'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import type { GenerationMethod, LightingConfig, ShotType } from '@/types'
+import { useT } from '@/lib/i18n'
 
+// 모듈 상수는 영어 키, 번역은 렌더 지점에서 t() (writer-progress.tsx 의 STAGE_LABELS 패턴).
 // 카메라 앵글 — writer 배지(shot.camera.pan) 규칙과 왕복 일치: pan>=3=low, <=-3=high, else eye.
 type CameraAngle = 'low' | 'eye' | 'high'
 const CAMERA_ANGLES: Array<{ value: CameraAngle; label: string; pan: number }> = [
-  { value: 'low', label: '로우앵글 (아래에서 위로)', pan: 5 },
-  { value: 'eye', label: '아이레벨 (눈높이)', pan: 0 },
-  { value: 'high', label: '하이앵글 (위에서 아래로)', pan: -5 },
+  { value: 'low', label: 'Low angle (looking up)', pan: 5 },
+  { value: 'eye', label: 'Eye level', pan: 0 },
+  { value: 'high', label: 'High angle (looking down)', pan: -5 },
 ]
 const LIGHT_POSITIONS: Array<{ value: LightingConfig['position']; label: string }> = [
-  { value: 'front', label: '정면' },
-  { value: 'left', label: '좌측' },
-  { value: 'right', label: '우측' },
-  { value: 'top', label: '상단' },
+  { value: 'front', label: 'Front' },
+  { value: 'left', label: 'Left' },
+  { value: 'right', label: 'Right' },
+  { value: 'top', label: 'Top' },
 ]
 const COLOR_TEMPS: Array<{ value: number; label: string }> = [
-  { value: 3200, label: '3200K · 따뜻 (백열등)' },
-  { value: 4500, label: '4500K · 중간' },
-  { value: 5600, label: '5600K · 주광 (기본)' },
-  { value: 6500, label: '6500K · 차가움 (흐림)' },
+  { value: 3200, label: '3200K · warm (incandescent)' },
+  { value: 4500, label: '4500K · neutral' },
+  { value: 5600, label: '5600K · daylight (default)' },
+  { value: 6500, label: '6500K · cool (overcast)' },
 ]
 const GEN_METHODS: Array<{ value: GenerationMethod; label: string }> = [
-  { value: 'T2V', label: 'T2V · 텍스트→영상' },
-  { value: 'I2V', label: 'I2V · 이미지→영상' },
+  { value: 'T2V', label: 'T2V · text-to-video' },
+  { value: 'I2V', label: 'I2V · image-to-video' },
 ]
 
 export type AddMode = 'shot' | 'scene'
@@ -114,6 +116,7 @@ function InsertionGap({
   onHover,
   onToggle,
 }: InsertionGapProps) {
+  const t = useT()
   const key = gapKey(gap)
   // 벌어짐 = 잠긴 갭(항상) OR (잠긴 게 없고 이 갭 호버 중). 초록 잠금이 있으면 회색 호버는 억제.
   const reveal = isLocked || (!anyLocked && isHovered)
@@ -121,7 +124,7 @@ function InsertionGap({
     <div
       role="button"
       tabIndex={0}
-      aria-label="이곳에 추가하기"
+      aria-label={t('Add here')}
       onMouseEnter={() => onHover(key)}
       onMouseLeave={() => onHover(null)}
       onClick={() => onToggle(gap)}
@@ -153,10 +156,10 @@ function InsertionGap({
           (isLocked ? (
             <>
               <Check className="size-3.5" />
-              <span>여기에 추가됩니다</span>
+              <span>{t('Will be added here')}</span>
             </>
           ) : (
-            <span>이곳에 추가하기</span>
+            <span>{t('Add here')}</span>
           ))}
       </div>
     </div>
@@ -177,6 +180,7 @@ export function AddItemDialog({
   contextSceneId,
   onOpenChange,
 }: AddItemDialogProps) {
+  const t = useT()
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
   const addShot = useWriterStore((s) => s.addShot)
@@ -286,7 +290,7 @@ export function AddItemDialog({
     }
   }
 
-  const title = mode === 'shot' ? '샷 추가' : '씬 추가'
+  const title = mode === 'shot' ? t('Add shot') : t('Add scene')
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -297,7 +301,9 @@ export function AddItemDialog({
             {title}
           </DialogTitle>
           <DialogDescription>
-            왼쪽에서 추가할 위치를 고르고(초록 표시), 오른쪽에서 내용을 설정하세요.
+            {t(
+              'Choose where to add it on the left (shown in green), then set its content on the right.',
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -307,7 +313,7 @@ export function AddItemDialog({
             <div className="h-[68vh] overflow-y-auto border-b scrollbar-thin md:border-b-0 md:border-r">
               <div className="px-4 py-3">
                 <p className="mb-2 px-1 text-xs uppercase tracking-wider text-muted-foreground">
-                  어디에 추가할까요
+                  {t('Where should it go?')}
                 </p>
 
                 {/* 씬 모드: 맨 앞 갭 */}
@@ -343,7 +349,7 @@ export function AddItemDialog({
                         </span>
                         <TruncatedStory
                           text={scene.narrativeSummary}
-                          placeholder="(요약 없음)"
+                          placeholder={t('(no summary)')}
                           className="min-w-0 flex-1 text-xs text-muted-foreground"
                         />
                       </div>
@@ -362,7 +368,7 @@ export function AddItemDialog({
                         )}
                         {sceneShots.length === 0 && (
                           <p className="px-1 py-1 text-xs italic text-muted-foreground/70">
-                            빈 씬
+                            {t('Empty scene')}
                           </p>
                         )}
                         {sceneShots.map((shot, ki) => {
@@ -384,7 +390,7 @@ export function AddItemDialog({
                                 </span>
                                 <TruncatedStory
                                   text={shot.actionDescription}
-                                  placeholder="(내용 없음)"
+                                  placeholder={t('(no content)')}
                                   className="min-w-0 flex-1 text-xs"
                                 />
                               </div>
@@ -420,7 +426,7 @@ export function AddItemDialog({
 
                 {scenes.length === 0 && (
                   <p className="px-1 py-4 text-center text-xs text-muted-foreground">
-                    아직 씬이 없어요.
+                    {t('No scenes yet.')}
                   </p>
                 )}
               </div>
@@ -430,14 +436,14 @@ export function AddItemDialog({
             <div className="h-[68vh] overflow-y-auto scrollbar-thin">
               <div className="space-y-4 px-6 py-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                  내용 설정
+                  {t('Set content')}
                 </p>
 
                 {mode === 'shot' ? (
                   <>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-sm font-medium">샷 타입 (카메라 초점)</label>
+                        <label className="text-sm font-medium">{t('Shot type (camera focus)')}</label>
                         <Select
                           value={shotType}
                           onValueChange={(v) => setShotType(v as ShotType)}
@@ -446,22 +452,23 @@ export function AddItemDialog({
                             <span>{shotType}</span>
                           </SelectTrigger>
                           <SelectContent position="popper">
-                            {SHOT_TYPES.map((t) => (
-                              <SelectItem key={t} value={t}>
-                                <span className="font-medium">{t}</span>
+                            {/* 루프 변수명 st — 바깥 스코프의 번역 함수 t 와 충돌 방지 */}
+                            {SHOT_TYPES.map((st) => (
+                              <SelectItem key={st} value={st}>
+                                <span className="font-medium">{st}</span>
                                 <span className="ml-1 text-xs text-muted-foreground">
-                                  · {SHOT_TYPE_DESCRIPTIONS[t]}
+                                  · {t(SHOT_TYPE_DESCRIPTIONS[st])}
                                 </span>
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground">
-                          {SHOT_TYPE_DESCRIPTIONS[shotType] ?? ''}
+                          {t(SHOT_TYPE_DESCRIPTIONS[shotType] ?? '')}
                         </p>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-sm font-medium">길이 (초)</label>
+                        <label className="text-sm font-medium">{t('Duration (sec)')}</label>
                         <HoverBeam>
                           <Input
                             type="number"
@@ -478,28 +485,30 @@ export function AddItemDialog({
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium">스토리 (액션)</label>
+                      <label className="text-sm font-medium">{t('Story (action)')}</label>
                       <HoverBeam>
                         <Textarea
                           value={actionText}
                           rows={4}
                           onChange={(e) => setActionText(e.target.value)}
-                          placeholder="이 샷에서 일어나는 일"
+                          placeholder={t('What happens in this shot')}
                         />
                       </HoverBeam>
                       <p className="text-xs text-muted-foreground">
-                        러프 패널·콘티·영상 생성 프롬프트의 원천이 되는 문장입니다.
+                        {t(
+                          'This becomes the source text for the rough panel, storyboard, and video generation prompts.',
+                        )}
                       </p>
                     </div>
 
                     {/* 연출 — 카메라 앵글·조명·생성 방식. 추가 후 카드 상세에서 미세 조정 가능. */}
                     <div className="space-y-3 rounded-lg border p-3">
                       <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                        연출
+                        {t('Direction')}
                       </p>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <label className="text-sm font-medium">카메라 앵글</label>
+                          <label className="text-sm font-medium">{t('Camera angle')}</label>
                           <Select
                             value={cameraAngle}
                             onValueChange={(v) => setCameraAngle(v as CameraAngle)}
@@ -510,14 +519,14 @@ export function AddItemDialog({
                             <SelectContent position="popper">
                               {CAMERA_ANGLES.map((a) => (
                                 <SelectItem key={a.value} value={a.value}>
-                                  {a.label}
+                                  {t(a.label)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
                         <div className="space-y-1.5">
-                          <label className="text-sm font-medium">생성 방식</label>
+                          <label className="text-sm font-medium">{t('Generation method')}</label>
                           <Select
                             value={genMethod}
                             onValueChange={(v) => setGenMethod(v as GenerationMethod)}
@@ -528,7 +537,7 @@ export function AddItemDialog({
                             <SelectContent position="popper">
                               {GEN_METHODS.map((m) => (
                                 <SelectItem key={m.value} value={m.value}>
-                                  {m.label}
+                                  {t(m.label)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -537,7 +546,7 @@ export function AddItemDialog({
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <label className="text-sm font-medium">조명 위치</label>
+                          <label className="text-sm font-medium">{t('Light position')}</label>
                           <Select
                             value={lightPosition}
                             onValueChange={(v) =>
@@ -550,14 +559,14 @@ export function AddItemDialog({
                             <SelectContent position="popper">
                               {LIGHT_POSITIONS.map((p) => (
                                 <SelectItem key={p.value} value={p.value}>
-                                  {p.label}
+                                  {t(p.label)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
                         <div className="space-y-1.5">
-                          <label className="text-sm font-medium">색온도</label>
+                          <label className="text-sm font-medium">{t('Color temperature')}</label>
                           <Select
                             value={String(colorTemp)}
                             onValueChange={(v) => setColorTemp(Number(v))}
@@ -568,7 +577,7 @@ export function AddItemDialog({
                             <SelectContent position="popper">
                               {COLOR_TEMPS.map((c) => (
                                 <SelectItem key={c.value} value={String(c.value)}>
-                                  {c.label}
+                                  {t(c.label)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -577,7 +586,7 @@ export function AddItemDialog({
                       </div>
                       <div className="space-y-1.5">
                         <label className="flex items-center justify-between text-sm font-medium">
-                          <span>밝기</span>
+                          <span>{t('Brightness')}</span>
                           <span className="font-mono text-xs tabular-nums text-muted-foreground">
                             {brightness}
                           </span>
@@ -588,17 +597,17 @@ export function AddItemDialog({
                           step={5}
                           value={[brightness]}
                           onValueChange={([v]) => setBrightness(v)}
-                          aria-label="밝기"
+                          aria-label={t('Brightness')}
                         />
                       </div>
                     </div>
 
                     {lockedShotSceneChars && (
                       <p className="text-xs text-muted-foreground">
-                        등장: {lockedShotSceneChars.join(', ') || '없음'}
+                        {t('Appearing:')} {lockedShotSceneChars.join(', ') || t('None')}
                         <span className="text-muted-foreground/70">
                           {' '}
-                          (씬에서 상속 — 추가 후 조정 가능)
+                          {t('(inherited from the scene — adjustable after adding)')}
                         </span>
                       </p>
                     )}
@@ -607,46 +616,46 @@ export function AddItemDialog({
                   <>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-sm font-medium">장소</label>
+                        <label className="text-sm font-medium">{t('Location')}</label>
                         <HoverBeam>
                           <Input
                             value={locationText}
                             onChange={(e) => setLocationText(e.target.value)}
-                            placeholder="예: 황량한 돌산"
+                            placeholder={t('e.g. a desolate rocky mountain')}
                           />
                         </HoverBeam>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-sm font-medium">시간대</label>
+                        <label className="text-sm font-medium">{t('Time of day')}</label>
                         <HoverBeam>
                           <Input
                             value={timeText}
                             onChange={(e) => setTimeText(e.target.value)}
-                            placeholder="예: 낮, 밤, 황혼"
+                            placeholder={t('e.g. day, night, dusk')}
                           />
                         </HoverBeam>
                       </div>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium">분위기</label>
+                      <label className="text-sm font-medium">{t('Mood')}</label>
                       <HoverBeam>
                         <Input
                           value={moodText}
                           onChange={(e) => setMoodText(e.target.value)}
-                          placeholder="예: 긴장된, 비장한"
+                          placeholder={t('e.g. tense, grim')}
                         />
                       </HoverBeam>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium">서사 요약</label>
+                      <label className="text-sm font-medium">{t('Narrative summary')}</label>
                       <HoverBeam>
                         <Textarea
                           value={summaryText}
                           rows={4}
                           onChange={(e) => setSummaryText(e.target.value)}
-                          placeholder="이 씬에서 일어나는 일"
+                          placeholder={t('What happens in this scene')}
                         />
                       </HoverBeam>
                     </div>
@@ -659,11 +668,11 @@ export function AddItemDialog({
         <DialogFooter className="items-center border-t px-6 py-4">
           <span className="mr-auto text-xs text-muted-foreground">
             {locked
-              ? '추가할 위치가 선택됐어요.'
-              : '왼쪽에서 추가할 위치를 골라주세요.'}
+              ? t('A location has been selected.')
+              : t('Choose where to add it on the left.')}
           </span>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            취소
+            {t('Cancel')}
           </Button>
           <Button onClick={() => void handleAdd()} disabled={!locked || submitting}>
             {submitting ? (

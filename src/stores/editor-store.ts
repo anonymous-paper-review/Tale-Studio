@@ -14,6 +14,8 @@ import {
   deleteAudioBlob,
   type PersistedEditor,
 } from '@/lib/editor-persistence'
+import { translate } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 
 const DEFAULT_CAMERA = {
   horizontal: 0,
@@ -1373,7 +1375,10 @@ export function scheduleServerSave(
         if (!fatalSaveNotified.has(projectId)) {
           fatalSaveNotified.add(projectId)
           toast.error(
-            '편집 내용을 서버에 저장할 수 없어요 — 프로젝트가 삭제됐거나 세션이 만료됐을 수 있어요. 새로고침하면 최근 프로젝트로 복원돼요.',
+            translate(
+              useLocaleStore.getState().locale,
+              "Couldn't save your edits to the server — the project may have been deleted or the session may have expired. Refresh to restore your most recent project.",
+            ),
           )
         }
         return

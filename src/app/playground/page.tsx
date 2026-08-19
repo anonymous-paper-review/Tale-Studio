@@ -71,7 +71,7 @@ export default function PlaygroundPage() {
         <div className="mb-10">
           <h1 className="mb-2 text-3xl font-semibold tracking-tighter md:text-4xl">Playground</h1>
           <p className="text-sm font-light text-gray-400">
-            창작자들이 공개한 작품들 — Tale Studio 로 만들어졌습니다.
+            Works shared by creators — made with Tale Studio.
           </p>
         </div>
 
@@ -82,9 +82,9 @@ export default function PlaygroundPage() {
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 py-32 text-center">
             <Clapperboard className="size-10 text-gray-600" />
-            <p className="mt-4 text-sm text-gray-500">아직 공개된 작품이 없어요</p>
+            <p className="mt-4 text-sm text-gray-500">No published works yet</p>
             <p className="mt-1 text-xs text-gray-600">
-              첫 번째로 작품을 공개할 창작자를 기다리고 있어요.
+              Waiting for the first creator to publish something.
             </p>
           </div>
         ) : (

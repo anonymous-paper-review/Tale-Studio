@@ -22,6 +22,7 @@ import {
 import { TimelineScrollbars } from '@/features/editor/timeline-scrollbars'
 import { thumbUrl } from '@/lib/image-url'
 import { ThumbImage } from '@/components/thumb-image'
+import { useT } from '@/lib/i18n'
 
 const CLIP_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4]
 const TRIM_MIN = 0.1 // 트림 최소 길이(초)
@@ -143,6 +144,7 @@ function AudioClipBlock({
   rowTrackId: string
   onPushHistory: () => void
 }) {
+  const t = useT()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const width = Math.max(clip.durationSec * pxPerSec, 12)
   const CLIP_H = 52
@@ -296,7 +298,7 @@ function AudioClipBlock({
         >
           <div className="flex items-center justify-between bg-card/80 px-1 py-px">
             <span className="truncate font-mono text-[8px] text-muted-foreground">{clip.name}</span>
-            <button type="button" data-no-seek onPointerDown={(e) => { e.stopPropagation(); onToggleMute() }} title={clip.muted ? '음소거 해제' : '음소거'}>
+            <button type="button" data-no-seek onPointerDown={(e) => { e.stopPropagation(); onToggleMute() }} title={clip.muted ? t('Unmute') : t('Mute')}>
               {clip.muted ? <VolumeX className="size-3 text-muted-foreground" /> : <Volume2 className="size-3 text-primary" />}
             </button>
           </div>
@@ -315,15 +317,15 @@ function AudioClipBlock({
             onPointerDown={handleGain}
             className="absolute inset-x-1.5 h-2.5 -translate-y-1/2 cursor-ns-resize"
             style={{ top: gainTop }}
-            title={`음량 ${Math.round(vol * 100)}% — 위/아래 드래그`}
+            title={t('Volume {percent}% — drag up/down', { percent: Math.round(vol * 100) })}
           />
 
           {/* 트림 핸들 (요청): 좌=시작점, 우=끝점 + hover 라벨 */}
           <div data-no-seek onPointerDown={handleTrim('l')} className="group/trim absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-primary/60">
-            <span className="pointer-events-none absolute -top-4 left-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">▕ 이 오디오 시작점</span>
+            <span className="pointer-events-none absolute -top-4 left-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">▕ {t('This audio start point')}</span>
           </div>
           <div data-no-seek onPointerDown={handleTrim('r')} className="group/trim absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-primary/60">
-            <span className="pointer-events-none absolute -top-4 right-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">이 오디오 끝점 ▏</span>
+            <span className="pointer-events-none absolute -top-4 right-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">{t('This audio end point')} ▏</span>
           </div>
         </div>
       </ContextMenuTrigger>
@@ -332,7 +334,7 @@ function AudioClipBlock({
         <ContextMenuSeparator />
         <div className="px-2 py-1.5" onPointerDown={(e) => e.stopPropagation()}>
           <div className="mb-1 flex items-center justify-between text-[10px] text-muted-foreground">
-            <span>음량 (draft 반영)</span>
+            <span>{t('Volume (applies to draft)')}</span>
             <span className="font-mono">{Math.round((clip.volume ?? 1) * 100)}%</span>
           </div>
           <input
@@ -348,10 +350,10 @@ function AudioClipBlock({
         <ContextMenuSeparator />
         <ContextMenuItem className="text-xs" onSelect={() => onToggleMute()}>
           {clip.muted ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
-          {clip.muted ? '음소거 해제' : '음소거'}
+          {clip.muted ? t('Unmute') : t('Mute')}
         </ContextMenuItem>
         <ContextMenuItem variant="destructive" className="text-xs" onSelect={() => onRemove()}>
-          <Trash2 className="size-3.5" /> 오디오 삭제
+          <Trash2 className="size-3.5" /> {t('Delete audio')}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
@@ -402,6 +404,7 @@ export function Timeline({
   onUpdateAudioClip,
   onPushHistory,
 }: TimelineProps) {
+  const t = useT()
   const trackRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const videoTrackRef = useRef<HTMLDivElement>(null)
@@ -459,11 +462,11 @@ export function Timeline({
       const thr = SNAP_PX / pxPerSec
       let best = candidateStart
       let bestD = thr
-      for (const t of targets) {
-        const dStart = Math.abs(candidateStart - t)
-        if (dStart < bestD) { bestD = dStart; best = t }
-        const dEnd = Math.abs(candidateStart + durationSec - t)
-        if (dEnd < bestD) { bestD = dEnd; best = t - durationSec }
+      for (const target of targets) {
+        const dStart = Math.abs(candidateStart - target)
+        if (dStart < bestD) { bestD = dStart; best = target }
+        const dEnd = Math.abs(candidateStart + durationSec - target)
+        if (dEnd < bestD) { bestD = dEnd; best = target - durationSec }
       }
       return Math.max(0, best)
     },
@@ -505,7 +508,7 @@ export function Timeline({
   const tickInterval = pickTickInterval(pxPerSec)
   const ticks = useMemo(() => {
     const arr: number[] = []
-    for (let t = 0; t <= totalSec; t += tickInterval) arr.push(t)
+    for (let sec = 0; sec <= totalSec; sec += tickInterval) arr.push(sec)
     return arr
   }, [totalSec, tickInterval])
 
@@ -602,7 +605,7 @@ export function Timeline({
         const y2 = Math.max(start.y, cur.y)
         const ids = audioClips
           .filter((a) => {
-            const ti = audioTracks.findIndex((t) => t.id === (a.trackId ?? firstId))
+            const ti = audioTracks.findIndex((track) => track.id === (a.trackId ?? firstId))
             if (ti < 0) return false
             const cx = a.startSec * pxPerSec
             const cw = Math.max(a.durationSec * pxPerSec, 12)
@@ -695,18 +698,18 @@ export function Timeline({
         <span className="font-mono text-xs tabular-nums text-foreground">{formatTimecode(currentTime)}</span>
         <div className="flex items-center gap-2">
           {selectedShotIds.length > 1 && (
-            <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">{selectedShotIds.length}개 선택</span>
+            <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">{t('{count} selected', { count: selectedShotIds.length })}</span>
           )}
           {selectedAudioIds.length > 1 && (
-            <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">오디오 {selectedAudioIds.length}개 선택</span>
+            <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">{t('{count} audio selected', { count: selectedAudioIds.length })}</span>
           )}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            title="외부 오디오 업로드 (플레이헤드 위치에 삽입)"
+            title={t('Upload external audio (inserts at the playhead)')}
           >
-            <Plus className="size-3" /> 오디오
+            <Plus className="size-3" /> {t('Audio')}
           </button>
           <span className="font-mono text-[10px] tabular-nums text-muted-foreground">{formatTimecode(totalSec)}</span>
         </div>
@@ -722,13 +725,13 @@ export function Timeline({
             <div className="flex h-24 items-center justify-center border-b border-border text-[10px] font-medium text-muted-foreground">
               Video
             </div>
-            {audioTracks.map((t, i) => (
-              <ContextMenu key={t.id}>
+            {audioTracks.map((track, i) => (
+              <ContextMenu key={track.id}>
                 <ContextMenuTrigger asChild>
                   <div
                     className={cn(
                       'flex h-16 items-center justify-center gap-1 border-b border-border text-[10px] font-medium text-muted-foreground hover:bg-accent/40',
-                      t.muted && 'opacity-60',
+                      track.muted && 'opacity-60',
                     )}
                   >
                     <span>Audio {i + 1}</span>
@@ -737,13 +740,13 @@ export function Timeline({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation()
-                        onToggleAudioTrackMute(t.id)
+                        onToggleAudioTrackMute(track.id)
                       }}
-                      title={t.muted ? '트랙 음소거 해제' : '트랙 전체 음소거'}
-                      aria-label={t.muted ? '트랙 음소거 해제' : '트랙 전체 음소거'}
+                      title={track.muted ? t('Unmute track') : t('Mute entire track')}
+                      aria-label={track.muted ? t('Unmute track') : t('Mute entire track')}
                       className="rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground"
                     >
-                      {t.muted ? (
+                      {track.muted ? (
                         <VolumeX className="size-3 text-muted-foreground" />
                       ) : (
                         <Volume2 className="size-3 text-primary" />
@@ -752,21 +755,21 @@ export function Timeline({
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-40">
-                  <ContextMenuItem className="text-xs" onSelect={() => onToggleAudioTrackMute(t.id)}>
-                    {t.muted ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
-                    {t.muted ? '트랙 음소거 해제' : '트랙 전체 음소거'}
+                  <ContextMenuItem className="text-xs" onSelect={() => onToggleAudioTrackMute(track.id)}>
+                    {track.muted ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
+                    {track.muted ? t('Unmute track') : t('Mute entire track')}
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem className="text-xs" onSelect={() => onAddAudioTrack()}>
-                    <Plus className="size-3.5" /> 오디오 트랙 추가
+                    <Plus className="size-3.5" /> {t('Add audio track')}
                   </ContextMenuItem>
                   <ContextMenuItem
                     variant="destructive"
                     className="text-xs"
                     disabled={audioTracks.length <= 1}
-                    onSelect={() => onRemoveAudioTrack(t.id)}
+                    onSelect={() => onRemoveAudioTrack(track.id)}
                   >
-                    <Trash2 className="size-3.5" /> 이 트랙 삭제
+                    <Trash2 className="size-3.5" /> {t('Delete this track')}
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
@@ -775,9 +778,9 @@ export function Timeline({
               type="button"
               onClick={() => onAddAudioTrack()}
               className="flex h-6 w-full items-center justify-center gap-1 text-[9px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              title="오디오 트랙 추가"
+              title={t('Add audio track')}
             >
-              <Plus className="size-3" /> 트랙
+              <Plus className="size-3" /> {t('Track')}
             </button>
           </div>
         </div>
@@ -800,10 +803,10 @@ export function Timeline({
           >
             {/* Ruler */}
             <div className="relative h-5 border-b border-border bg-muted/30" onPointerDown={handleSeekPointerDown}>
-              {ticks.map((t) => (
-                <div key={t} className="absolute top-0 flex h-full flex-col" style={{ left: t * pxPerSec }}>
+              {ticks.map((tickSec) => (
+                <div key={tickSec} className="absolute top-0 flex h-full flex-col" style={{ left: tickSec * pxPerSec }}>
                   <div className="h-2 w-px bg-border" />
-                  <span className="ml-0.5 font-mono text-[8px] leading-none text-muted-foreground">{formatTimecode(t)}</span>
+                  <span className="ml-0.5 font-mono text-[8px] leading-none text-muted-foreground">{formatTimecode(tickSec)}</span>
                 </div>
               ))}
             </div>
@@ -893,7 +896,7 @@ export function Timeline({
                           className="group/trim absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-primary/60"
                         >
                           <span className="pointer-events-none absolute -top-4 left-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">
-                            ▕ 이 클립 시작점
+                            ▕ {t('This clip start point')}
                           </span>
                         </div>
                         <div
@@ -932,7 +935,7 @@ export function Timeline({
                           className="group/trim absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-primary/60"
                         >
                           <span className="pointer-events-none absolute -top-4 right-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">
-                            이 클립 끝점 ▏
+                            {t('This clip end point')} ▏
                           </span>
                         </div>
 
@@ -941,7 +944,7 @@ export function Timeline({
                           data-no-seek
                           onPointerDown={(e) => { e.stopPropagation(); onDelete(item.shotId) }}
                           className="absolute right-0.5 top-0.5 z-20 hidden rounded bg-destructive/80 p-0.5 text-destructive-foreground hover:bg-destructive group-hover:block"
-                          title="클립 숨기기"
+                          title={t('Hide clip')}
                         >
                           <Trash2 className="size-3" />
                         </button>
@@ -949,11 +952,11 @@ export function Timeline({
                     </ContextMenuTrigger>
                     <ContextMenuContent className="w-44">
                       <ContextMenuLabel className="text-xs">
-                        {targets.length > 1 ? `${targets.length}개 클립` : `${shot.shotType} · ${item.durationSec.toFixed(1)}s`}
+                        {targets.length > 1 ? t('{count} clips', { count: targets.length }) : `${shot.shotType} · ${item.durationSec.toFixed(1)}s`}
                       </ContextMenuLabel>
                       <ContextMenuSeparator />
                       <ContextMenuSub>
-                        <ContextMenuSubTrigger className="text-xs"><Gauge className="size-3.5" /> 재생 속도</ContextMenuSubTrigger>
+                        <ContextMenuSubTrigger className="text-xs"><Gauge className="size-3.5" /> {t('Playback speed')}</ContextMenuSubTrigger>
                         <ContextMenuSubContent>
                           <ContextMenuRadioGroup value={String(clip?.speed ?? 1)} onValueChange={(v) => targets.forEach((id) => onSetSpeed(id, Number(v)))}>
                             {CLIP_SPEEDS.map((sp) => (
@@ -969,10 +972,10 @@ export function Timeline({
                           onSplitVideo(item.shotId, within ? currentTime : item.startSec + item.durationSec / 2)
                         }}
                       >
-                        <Scissors className="size-3.5" /> 여기서 분할
+                        <Scissors className="size-3.5" /> {t('Split here')}
                       </ContextMenuItem>
                       <ContextMenuItem variant="destructive" className="text-xs" onSelect={() => (targets.length > 1 ? onDeleteSelected() : onDelete(item.shotId))}>
-                        <Trash2 className="size-3.5" /> {targets.length > 1 ? `${targets.length}개 숨기기` : '클립 숨기기'}
+                        <Trash2 className="size-3.5" /> {targets.length > 1 ? t('Hide {count}', { count: targets.length }) : t('Hide clip')}
                       </ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
@@ -999,7 +1002,7 @@ export function Timeline({
               )}
               {layout.length === 0 && (
                 <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">
-                  Video Source에서 클립을 드래그하거나 우클릭→타임라인 추가
+                  {t('Drag a clip from Video Source, or right-click→Add to timeline')}
                 </p>
               )}
             </div>
@@ -1051,7 +1054,7 @@ export function Timeline({
 
             {audioClips.length === 0 && (
               <p className="pointer-events-none absolute left-2 z-10 text-[10px] text-muted-foreground" style={{ top: 20 + 96 + 4 }}>
-                Audio 소스를 드래그하거나 우상단 + 버튼으로 업로드
+                {t('Drag an Audio source, or upload with the + button in the top-right')}
               </p>
             )}
 

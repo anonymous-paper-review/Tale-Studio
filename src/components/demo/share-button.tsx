@@ -7,10 +7,12 @@ import { useState } from 'react'
 import { Loader2, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProjectStore } from '@/stores/project-store'
+import { useT } from '@/lib/i18n'
 
 export function ShareButton() {
   const projectId = useProjectStore((s) => s.projectId)
   const [loading, setLoading] = useState(false)
+  const t = useT()
 
   const createLink = async () => {
     if (!projectId || loading) return
@@ -25,9 +27,9 @@ export function ShareButton() {
       const { path } = (await res.json()) as { path: string }
       const url = `${window.location.origin}${path}`
       await navigator.clipboard.writeText(url).catch(() => {})
-      toast.success('공유 링크 복사됨 — 로그인 없이 열리는 읽기전용 미리보기')
+      toast.success(t('Share link copied — a read-only preview that opens without logging in'))
     } catch {
-      toast.error('공유 링크 생성에 실패했어요')
+      toast.error(t('Failed to create share link'))
     } finally {
       setLoading(false)
     }
@@ -38,8 +40,8 @@ export function ShareButton() {
       type="button"
       onClick={createLink}
       disabled={!projectId || loading}
-      aria-label="공유 링크 만들기"
-      title="공유 링크 만들기 (읽기전용 미리보기)"
+      aria-label={t('Create share link')}
+      title={t('Create share link (read-only preview)')}
       className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
     >
       {loading ? (

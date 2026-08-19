@@ -46,6 +46,7 @@ import { AgentFace } from '@/components/agent-face'
 import { STAGE_FACE_COLOR } from '@/lib/constants'
 import { ProducerQuestJournal, StoryFoundationBadges } from './quest-journal'
 import { WriterEnginePicker } from '@/features/writer/writer-engine-picker'
+import { useLocale, useT } from '@/lib/i18n'
 
 // 카드 안 자동확장 textarea(외모/시각 설명)용 — 네이티브 스크롤바 대신 얇은 테마 스크롤바(#b5).
 //   max-h로 카드 폭주를 막고, 넘치면 얇은 썸만 보이게.
@@ -58,16 +59,19 @@ const STORY_PEEK_VIEW_PX = 80
 const STORY_PEEK_SPEED_PX_PER_SEC = 26
 const STORY_PEEK_RETURN_MS = 240
 
+// 모듈 상수는 영어 키, 번역은 렌더 지점에서 t() (writer 배치의 STAGE_LABELS 패턴).
+//   writer-character-panel.tsx 의 ROLE_LABEL 과 같은 값·같은 사전 키를 공유(Protagonist/
+//   Antagonist/Supporting) — 재사용을 위해 여기도 영어로.
 const ROLE_LABEL: Record<string, string> = {
-  protagonist: '주인공',
-  antagonist: '적대자',
-  supporting: '조연',
+  protagonist: 'Protagonist',
+  antagonist: 'Antagonist',
+  supporting: 'Supporting',
 }
 
 const ROLE_TOGGLE: [string, string][] = [
-  ['protagonist', '주인공'],
-  ['antagonist', '적대자'],
-  ['supporting', '조연'],
+  ['protagonist', 'Protagonist'],
+  ['antagonist', 'Antagonist'],
+  ['supporting', 'Supporting'],
 ]
 
 // ── 줄(row) 레이아웃 공통 (#b-rows 2026-07-31) ───────────────────────────────
@@ -188,6 +192,7 @@ function MentionableCard({
   containerRef?: React.Ref<HTMLDivElement>
   children: ReactNode
 }) {
+  const t = useT()
   const mentioned = useChatUiStore((s) => s.mentionedRefs.includes(refId))
   // toggle 모드: 이미 멘션된 카드를 다시 Ctrl+클릭하면 입력창에서 @라벨 제거(언멘션, #b6).
   const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
@@ -226,7 +231,7 @@ function MentionableCard({
           armed && 'opacity-100',
         )}
       >
-        <AtSign className="size-3" /> {mentioned ? '⌘/Ctrl+클릭 멘션 해제' : '⌘/Ctrl+클릭 멘션'}
+        <AtSign className="size-3" /> {mentioned ? t('⌘/Ctrl+click to unmention') : t('⌘/Ctrl+click to mention')}
       </span>
       {children}
     </div>
@@ -237,15 +242,25 @@ function castIssuesFor(gate: GateResult, localId: string) {
   return gate.hardMissing.filter((i) => i.field.startsWith(`cast:${localId}:`))
 }
 
-function castDraftPrompt(member: CastMember, issue?: GateIssue) {
-  const label = member.name || (member.entityType === 'person' ? '이 인물' : '이 사물')
+// t 를 인자로 받는다 — 이 함수 자체는 컴포넌트가 아니라 훅을 못 쓴다(호출부는 전부 이 파일
+//   안의 컴포넌트라 t 전달이 안전하다, writer 배치의 relativeTime 패턴). issue.label 은
+//   src/lib/producer-gate.ts(이번 배치 범위 밖)가 하드코딩한 한국어라 그대로 통과시킨다.
+function castDraftPrompt(member: CastMember, t: ReturnType<typeof useT>, issue?: GateIssue) {
+  const label = member.name || (member.entityType === 'person' ? t('this character') : t('this object'))
   const current = [
-    member.name ? `이름: ${member.name}` : null,
-    member.appearance ? `외형: ${member.appearance}` : null,
-    member.role ? `역할: ${ROLE_LABEL[member.role] ?? member.role}` : null,
-  ].filter(Boolean).join(' / ')
-  const target = issue?.label ?? `${label}의 비어 있는 필드`
-  return `Producer, ${target}을 채울 수 있게 한 가지 질문을 해 주세요.${current ? ` 현재 정보: ${current}.` : ''}`
+    member.name ? t('Name: {value}', { value: member.name }) : null,
+    member.appearance ? t('Appearance: {value}', { value: member.appearance }) : null,
+    member.role
+      ? t('Role: {value}', { value: t(ROLE_LABEL[member.role] ?? member.role) })
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' / ')
+  const target = issue?.label ?? t("{label}'s empty field", { label })
+  return (
+    t('Producer, please ask one question to help fill in {target}.', { target }) +
+    (current ? t(' Current info: {current}.', { current }) : '')
+  )
 }
 
 // 캐스트 한 줄(#b-rows) — [삭제] [아이콘] [이름] [외모] [배지] [상태] [상세] [프로듀서 호출].
@@ -267,6 +282,7 @@ function CastRow({
   runtimeSeconds: number
   mentionLabel: string
 }) {
+  const t = useT()
   const isPerson = member.entityType === 'person'
   const ready = issues.length === 0
   const nameIssue = issues.find((i) => i.field.endsWith(':name'))
@@ -324,7 +340,7 @@ function CastRow({
         {/* 삭제는 줄 왼쪽 끝, 프로듀서 호출은 오른쪽 끝 (#b4) */}
         <RowIconButton
           icon={Trash2}
-          label="삭제"
+          label={t('Delete')}
           destructive
           onClick={() => onDelete(member.localId)}
         />
@@ -339,7 +355,7 @@ function CastRow({
                 ) : null}
               </span>
             </TooltipTrigger>
-            <TooltipContent side="top">상세 정보 (역할·아크·동기)</TooltipContent>
+            <TooltipContent side="top">{t('Details (role, arc, motivation)')}</TooltipContent>
           </Tooltip>
         ) : (
           <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
@@ -351,7 +367,7 @@ function CastRow({
           <HoverBeam>
             <Input
               value={member.name}
-              placeholder={isPerson ? '이름 (예: 지아)' : '이름 (예: 은빛 반지)'}
+              placeholder={isPerson ? t('Name (e.g. Jia)') : t('Name (e.g. Silver Ring)')}
               className={cn(QUIET_CONTROL, 'h-8')}
               onChange={(e) => onPatch(member.localId, { name: e.target.value })}
             />
@@ -363,7 +379,7 @@ function CastRow({
               value={member.appearance}
               rows={1}
               className={cn(CARD_TEXTAREA, QUIET_CONTROL, 'min-h-8 py-1.5')}
-              placeholder={isPerson ? '외모 — 복장, 나이, 특징' : '형태, 재질, 특징'}
+              placeholder={isPerson ? t('Appearance — clothing, age, features') : t('Shape, material, features')}
               onChange={(e) => onPatch(member.localId, { appearance: e.target.value })}
             />
           </HoverBeam>
@@ -372,7 +388,7 @@ function CastRow({
         <div className="flex shrink-0 items-center gap-1">
           {isPerson ? (
             <Badge variant="outline" className="text-[10px]">
-              {ROLE_LABEL[member.role ?? 'supporting'] ?? '조연'}
+              {t(ROLE_LABEL[member.role ?? 'supporting'] ?? 'Supporting')}
             </Badge>
           ) : null}
           {member.origin === 'writer' ? (
@@ -383,8 +399,9 @@ function CastRow({
         </div>
 
         {/* 상태 — 준비됐으면 체크 하나, 아니면 남은 개수(전체 사유는 호버 툴팁) */}
+        {/* issues[].label 은 src/lib/producer-gate.ts(범위 밖)가 하드코딩한 한국어 — 그대로 통과. */}
         {ready ? (
-          <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label="준비됨" />
+          <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label={t('Ready')} />
         ) : (
           <span
             title={issues.map((i) => i.label).join(' · ')}
@@ -397,8 +414,8 @@ function CastRow({
 
         <RowIconButton
           icon={Wand2}
-          label="프로듀서에게 채워달라"
-          onClick={() => onAskProducer(castDraftPrompt(member, issues[0]))}
+          label={t('Ask Producer to fill this in')}
+          onClick={() => onAskProducer(castDraftPrompt(member, t, issues[0]))}
         />
         {/* 상세 펼침/접힘 전용 버튼(2026-08-06) — 빈 공간 클릭 토글(#b3)은 줄이 입력창으로
             가득 차 닫을 자리가 거의 없었다. 명시적 chevron 이 항상 열고 닫는다. */}
@@ -409,7 +426,7 @@ function CastRow({
                 type="button"
                 onClick={() => setDetailsOpen((v) => !v)}
                 aria-expanded={detailsOpen}
-                aria-label={detailsOpen ? '상세 접기' : '상세 펼치기 (역할·아크·동기)'}
+                aria-label={detailsOpen ? t('Collapse details') : t('Expand details (role, arc, motivation)')}
                 className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <ChevronDown
@@ -417,7 +434,7 @@ function CastRow({
                 />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top">{detailsOpen ? '상세 접기' : '상세 펼치기'}</TooltipContent>
+            <TooltipContent side="top">{detailsOpen ? t('Collapse details') : t('Expand details')}</TooltipContent>
           </Tooltip>
         ) : null}
       </div>
@@ -434,7 +451,7 @@ function CastRow({
           {/* 줄의 이름 칸(삭제 버튼 + 아이콘 폭)에 맞춰 들여쓴다 — 어느 줄에 딸린 상세인지 보이게. */}
           <div className="min-h-0 overflow-hidden pl-[4.5rem] pr-2">
             <div className="mt-2 space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">역할</label>
+              <label className="text-xs font-medium text-muted-foreground">{t('Role')}</label>
               <div className="flex gap-2">
                 {ROLE_TOGGLE.map(([value, label]) => {
                   const active = (member.role ?? 'supporting') === value
@@ -450,7 +467,7 @@ function CastRow({
                           : `border-border text-muted-foreground ${HOVER_RED_BORDER}`
                       }`}
                     >
-                      {label}
+                      {t(label)}
                     </button>
                   )
                 })}
@@ -460,19 +477,20 @@ function CastRow({
             {deepPerson ? (
               <div className="mt-3 space-y-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">아크 (시작 / 끝 / 유형)</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t('Arc (start / end / type)')}</label>
                   <div className="grid grid-cols-3 gap-2">
-                    <HoverBeam><Input value={member.arc?.start_state ?? ''} placeholder="시작 상태" tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchArc({ start_state: e.target.value })} /></HoverBeam>
-                    <HoverBeam><Input value={member.arc?.end_state ?? ''} placeholder="끝 상태" tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchArc({ end_state: e.target.value })} /></HoverBeam>
-                    <HoverBeam><Input value={member.arc?.arc_type ?? ''} placeholder="유형" tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchArc({ arc_type: e.target.value })} /></HoverBeam>
+                    <HoverBeam><Input value={member.arc?.start_state ?? ''} placeholder={t('Start state')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchArc({ start_state: e.target.value })} /></HoverBeam>
+                    <HoverBeam><Input value={member.arc?.end_state ?? ''} placeholder={t('End state')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchArc({ end_state: e.target.value })} /></HoverBeam>
+                    <HoverBeam><Input value={member.arc?.arc_type ?? ''} placeholder={t('Type')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchArc({ arc_type: e.target.value })} /></HoverBeam>
                   </div>
+                  {/* arcIssue.label 은 producer-gate.ts(범위 밖) 하드코딩 한국어 — 그대로 통과. */}
                   {arcIssue ? <p className="text-xs text-destructive">{arcIssue.label}</p> : null}
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">동기 (want / need)</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t('Motivation (want / need)')}</label>
                   <div className="grid grid-cols-2 gap-2">
-                    <HoverBeam><Input value={member.motivation?.want ?? ''} placeholder="want (필수)" tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchMot({ want: e.target.value })} /></HoverBeam>
-                    <HoverBeam><Input value={member.motivation?.need ?? ''} placeholder="need (선택)" tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchMot({ need: e.target.value })} /></HoverBeam>
+                    <HoverBeam><Input value={member.motivation?.want ?? ''} placeholder={t('want (required)')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchMot({ want: e.target.value })} /></HoverBeam>
+                    <HoverBeam><Input value={member.motivation?.need ?? ''} placeholder={t('need (optional)')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchMot({ need: e.target.value })} /></HoverBeam>
                   </div>
                   {motivationIssue ? <p className="text-xs text-destructive">{motivationIssue.label}</p> : null}
                 </div>
@@ -490,15 +508,21 @@ function backgroundReady(background: BackgroundSource): boolean {
   return isProducerBackgroundComplete(background)
 }
 
-function backgroundDraftPrompt(background?: BackgroundSource) {
+function backgroundDraftPrompt(t: ReturnType<typeof useT>, background?: BackgroundSource) {
   const current = background
     ? [
-        background.name ? `이름: ${background.name}` : null,
-        background.visualDescription ? `시각 설명: ${background.visualDescription}` : null,
-        background.purpose ? `목적: ${background.purpose}` : null,
+        background.name ? t('Name: {value}', { value: background.name }) : null,
+        background.visualDescription
+          ? t('Visual description: {value}', { value: background.visualDescription })
+          : null,
+        background.purpose ? t('Purpose: {value}', { value: background.purpose }) : null,
       ].filter(Boolean).join(' / ')
     : ''
-  return `Producer, writer와 artist가 바로 쓸 수 있는 배경 카드 1개를 채워 주세요. 필수는 이름, 시각 설명, 이야기 속 목적입니다.${current ? ` 현재 정보: ${current}.` : ''}`
+  return (
+    t(
+      'Producer, please fill in one background card that writer and artist can use right away. It needs a name, visual description, and purpose in the story.',
+    ) + (current ? t(' Current info: {current}.', { current }) : '')
+  )
 }
 
 // 배경 한 줄(#b-rows) — [삭제] [아이콘] [이름] [시각 설명] [목적] [배지] [상태] [프로듀서 호출].
@@ -516,11 +540,13 @@ function BackgroundRow({
   onDelete: (localId: string) => void
   mentionLabel: string
 }) {
+  const t = useT()
   const ready = backgroundReady(background)
+  // 내부 식별은 영어 키로 고정(includes 비교용) — 표시는 t() 로 별도 감싼다.
   const missing = [
-    background.name?.trim() ? null : '이름',
-    background.visualDescription?.trim() ? null : '시각 설명',
-    background.purpose?.trim() ? null : '목적',
+    background.name?.trim() ? null : 'Name',
+    background.visualDescription?.trim() ? null : 'Visual description',
+    background.purpose?.trim() ? null : 'Purpose',
   ].filter(Boolean) as string[]
 
   return (
@@ -528,7 +554,7 @@ function BackgroundRow({
       <div className="flex items-center gap-2">
         <RowIconButton
           icon={Trash2}
-          label="삭제"
+          label={t('Delete')}
           destructive
           onClick={() => onDelete(background.localId)}
         />
@@ -536,25 +562,26 @@ function BackgroundRow({
           <Mountain className="size-4" />
         </span>
 
-        <FieldSlot needs={missing.includes('이름')} className="w-36 shrink-0">
+        <FieldSlot needs={missing.includes('Name')} className="w-36 shrink-0">
           <HoverBeam>
             <Input
               value={background.name}
-              placeholder="이름 (예: 네온 뒷골목)"
+              placeholder={t('Name (e.g. Neon back alley)')}
               className={cn(QUIET_CONTROL, 'h-8')}
               onChange={(e) => onPatch(background.localId, { name: e.target.value })}
             />
           </HoverBeam>
         </FieldSlot>
-        {/* 묘사는 줄에, 목적은 아래 줄로(#b4 2026-08-03) — 각 필드에 row head 를 붙인다. */}
-        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">묘사</span>
-        <FieldSlot needs={missing.includes('시각 설명')} className="flex-1">
+        {/* 묘사는 줄에, 목적은 아래 줄로(#b4 2026-08-03) — 각 필드에 row head 를 붙인다.
+            영어 키는 'Visual' — 'Description' 은 director 배치가 씬 설명 전용으로 선점(충돌 회피). */}
+        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{t('Visual')}</span>
+        <FieldSlot needs={missing.includes('Visual description')} className="flex-1">
           <HoverBeam>
             <Textarea
               value={background.visualDescription}
               rows={1}
               className={cn(CARD_TEXTAREA, QUIET_CONTROL, 'min-h-8 py-1.5')}
-              placeholder="색감, 구조, 소품, 분위기"
+              placeholder={t('Color palette, structure, props, mood')}
               onChange={(e) => onPatch(background.localId, { visualDescription: e.target.value })}
             />
           </HoverBeam>
@@ -570,10 +597,10 @@ function BackgroundRow({
         </div>
 
         {ready ? (
-          <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label="준비됨" />
+          <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label={t('Ready')} />
         ) : (
           <span
-            title={`${missing.join(' · ')} 필요`}
+            title={t('{fields} needed', { fields: missing.map((m) => t(m)).join(' · ') })}
             className="flex shrink-0 items-center gap-1 text-xs text-destructive"
           >
             <AlertCircle className="size-3.5" />
@@ -582,19 +609,19 @@ function BackgroundRow({
         )}
         <RowIconButton
           icon={Wand2}
-          label="프로듀서에게 채워달라"
-          onClick={() => onAskProducer(backgroundDraftPrompt(background))}
+          label={t('Ask Producer to fill this in')}
+          onClick={() => onAskProducer(backgroundDraftPrompt(t, background))}
         />
       </div>
       {/* 목적 — 둘째 줄. 들여쓰기는 첫 줄 "묘사" head 의 x 위치에 맞춘다(#b1 2026-08-03):
           삭제(28)+gap(8)+아이콘(28)+gap(8)+이름(144)+gap(8) = 224px = pl-56. */}
       <div className="mt-1.5 flex items-center gap-2 pl-56 pr-2">
-        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">목적</span>
-        <FieldSlot needs={missing.includes('목적')} className="max-w-md flex-1">
+        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{t('Purpose')}</span>
+        <FieldSlot needs={missing.includes('Purpose')} className="max-w-md flex-1">
           <HoverBeam>
             <Input
               value={background.purpose}
-              placeholder="예: 추격이 시작되는 공간"
+              placeholder={t('e.g. Where the chase begins')}
               className={cn(QUIET_CONTROL, 'h-8')}
               onChange={(e) => onPatch(background.localId, { purpose: e.target.value })}
             />
@@ -606,6 +633,7 @@ function BackgroundRow({
 }
 
 export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
+  const t = useT()
   const projectSettings = useProducerStore((s) => s.projectSettings)
   const storyText = useProducerStore((s) => s.storyText)
   const cast = useProducerStore((s) => s.cast)
@@ -658,8 +686,10 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const objects = cast.filter((m) => m.entityType === 'object')
   const readyBackgrounds = backgrounds.filter(backgroundReady)
   // @멘션 라벨(ref 정렬) — cast/backgrounds 배열과 인덱스 일치. 카드에 라벨 전달(Cmd+클릭 삽입용).
-  const castMentionList = castMentions(cast)
-  const bgMentionList = backgroundMentions(backgrounds)
+  // hint(카테고리 배지)만 번역 — label 은 로케일 고정(card-mention.ts 헤더 코멘트, LLM @멘션 매칭 안정성).
+  const mentionLocale = useLocale()
+  const castMentionList = castMentions(cast, mentionLocale)
+  const bgMentionList = backgroundMentions(backgrounds, mentionLocale)
 
   const hardByField = useMemo(
     () => new Map(gate.hardMissing.map((issue) => [issue.field, issue])),
@@ -691,7 +721,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const callProducerForStory = () => {
     useChatUiStore.getState().setCollapsed(false)
     askProducer(
-      'Producer, 이 이야기가 writer로 넘어갈 수 있게 캐릭터·장소·시작-갈등-결말 중 부족한 한 가지를 질문해 주세요.',
+      t(
+        'Producer, please ask about one missing piece — character, setting, or beginning-conflict-ending — so this story is ready to hand off to writer.',
+      ),
     )
     useChatUiStore.getState().requestChatFocus()
   }
@@ -711,16 +743,20 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold">Meeting Room</h1>
-            <StageHelpBadge text="스토리·설정·캐스트를 채우는 기획 회의실이에요. 프로듀서와 대화하면 보드가 함께 채워지고, 필수 항목이 모두 차면 Writer로 넘길 수 있어요." />
+            <StageHelpBadge
+              text={t(
+                'This is the planning room where you fill in story, settings, and cast. Talk with Producer and the board fills in together — once every required item is complete, you can hand off to Writer.',
+              )}
+            />
             {gate.canHandoff ? (
               <Badge variant="outline" className="gap-1 border-success/40 text-success">
-                <CheckCircle2 className="size-3" /> Writer 계약 준비 완료
+                <CheckCircle2 className="size-3" /> {t('Ready to hand off to Writer')}
               </Badge>
             ) : null}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {syncing ? <Badge variant="outline">저장 중</Badge> : null}
+          {syncing ? <Badge variant="outline">{t('Saving…')}</Badge> : null}
           <WriterEnginePicker projectId={projectId} />
           {/* Producer 호출 CTA(#b8) — 얼굴 + 이름 병기, 헤더 맨오른쪽.
               호버 시 얼굴이 활짝 웃으며 깜빡이고(#b1) 살짝 커진다 + 툴팁 안내. */}
@@ -747,10 +783,10 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                     animate={producerHover}
                   />
                 </span>
-                Producer와 스토리 만들기
+                {t('Build the story with Producer')}
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">도움이 필요하시면 저를 불러주세요</TooltipContent>
+            <TooltipContent side="bottom">{t('Need help? Call me')}</TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -776,7 +812,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 <button
                   type="button"
                   onClick={() => setTitleDraft(untitled ? '' : projectTitle)}
-                  title="제목 수정"
+                  title={t('Edit title')}
                   className="group/title mt-2 flex max-w-full items-center gap-2 text-left"
                 >
                   <h1
@@ -785,7 +821,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                       untitled && 'text-foreground/25',
                     )}
                   >
-                    {untitled ? '아직 제목이 없는 이야기' : projectTitle}
+                    {untitled ? t('A story without a title yet') : projectTitle}
                   </h1>
                   <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/title:opacity-60" />
                 </button>
@@ -793,7 +829,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 <input
                   autoFocus
                   value={titleDraft}
-                  placeholder="영화 제목"
+                  placeholder={t('Movie title')}
                   onChange={(e) => setTitleDraft(e.target.value)}
                   onBlur={(e) => {
                     if (titleCancelRef.current) {
@@ -855,7 +891,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                         onClick={() => setStoryExpanded((v) => !v)}
                         className="mt-2 flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
                       >
-                        {storyExpanded ? '접기' : '더 보기'}
+                        {storyExpanded ? t('Collapse') : t('See more')}
                         <ChevronDown
                           className={cn('size-3.5 transition-transform', storyExpanded && 'rotate-180')}
                         />
@@ -864,8 +900,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                   </>
                 ) : (
                   <p className="text-sm italic text-muted-foreground/70">
-                    채팅에 이야기를 던지면 Producer가 여기로 계속 정리해요 — 장면 하나,
-                    기분 하나면 충분해요.
+                    {t(
+                      'Drop your story into chat and Producer will keep organizing it here — one scene, one feeling is enough.',
+                    )}
                   </p>
                 )}
               </div>
@@ -881,23 +918,23 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold">Casting</h2>
                 <span className="text-xs text-muted-foreground">
-                  인물 {persons.length}
-                  {objects.length > 0 ? ` · 사물 ${objects.length}` : ''}
+                  {t('{count} people', { count: persons.length })}
+                  {objects.length > 0 ? t(' · {count} objects', { count: objects.length }) : ''}
                 </span>
               </div>
               {/* 사물 추가 제거(#feedback 2026-08-07 v3) — producer 는 인물/배경만.
                   기존 사물 카드(레거시/모델 추출)는 데이터 보존 차원에서 계속 표시된다. */}
               <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={addPerson}>
-                <Plus className="size-4" /> 인물
+                <Plus className="size-4" /> {t('Add person')}
               </Button>
             </div>
 
             {cast.length === 0 ? (
               <div className="flex min-h-56 flex-col items-center justify-center rounded-xl border border-dashed border-border p-8 text-center">
                 <User className="size-10 text-muted-foreground" />
-                <p className="mt-3 text-sm font-medium">아직 캐스트가 없어요</p>
+                <p className="mt-3 text-sm font-medium">{t('No cast yet')}</p>
                 <p className="mt-1 max-w-md text-xs text-muted-foreground">
-                  추가하고 싶은 인물과 사물에 대한 묘사를 AI Producer에게 알려주세요
+                  {t("Tell AI Producer about the people and objects you'd like to add")}
                 </p>
               </div>
             ) : (
@@ -923,10 +960,12 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold">Background</h2>
-                <span className="text-xs text-muted-foreground">준비됨 {readyBackgrounds.length} / 전체 {backgrounds.length}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t('{ready} / {total} ready', { ready: readyBackgrounds.length, total: backgrounds.length })}
+                </span>
               </div>
               <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={addBg}>
-                <Plus className="size-4" /> 배경
+                <Plus className="size-4" /> {t('Add background')}
               </Button>
             </div>
 
@@ -934,9 +973,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
             {backgrounds.length === 0 ? (
               <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-border p-8 text-center">
                 <Mountain className="size-10 text-muted-foreground" />
-                <p className="mt-3 text-sm font-medium">아직 배경 설정이 없어요</p>
+                <p className="mt-3 text-sm font-medium">{t('No backgrounds yet')}</p>
                 <p className="mt-1 max-w-md text-xs text-muted-foreground">
-                  추가하고 싶은 배경이나 세계관에 대한 묘사를 AI Producer에게 알려주세요
+                  {t("Tell AI Producer about the background or world you'd like to add")}
                 </p>
               </div>
             ) : (

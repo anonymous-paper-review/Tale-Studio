@@ -25,12 +25,12 @@ export async function POST(req: NextRequest) {
 
     const finalPrompts = await logger.loadStage<RenderPromptsOutput>('14_v5_renderPrompts.json');
     if (!finalPrompts) {
-      return NextResponse.json({ error: '14_renderPrompts.json 없음' }, { status: 400 });
+      return NextResponse.json({ error: '14_renderPrompts.json missing' }, { status: 400 });
     }
     const images = await logger.loadStage<ShotImagesOutput>('15_v6_shotImages.json');
     if (!images) {
       return NextResponse.json(
-        { error: '15_shotImages.json 없음. 이미지 생성 먼저 실행.' },
+        { error: '15_shotImages.json missing. Run image generation first.' },
         { status: 400 },
       );
     }

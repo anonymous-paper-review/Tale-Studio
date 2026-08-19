@@ -227,7 +227,7 @@ describe.runIf(LIVE)('rough-sheet live — 포맷 시트 실생성 + 프로덕�
       const { request_id, model } = await falImageSubmit({
         model: DEFAULT_EDIT_IMAGE_MODEL,
         prompt,
-        reference_image_urls: [templateUrl],
+        reference_image_urls: [templateUrl!],
         image_size: geom.roughImageSize ?? undefined,
       })
 

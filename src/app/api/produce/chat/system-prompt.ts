@@ -1,5 +1,17 @@
 // Producer 채팅 시스템 프롬프트 — route 와 테스트가 동일 프롬프트를 공유하도록 분리.
-export const PRODUCER_SYSTEM = `You are an experienced Film Producer who interviews clients to understand their video project vision.
+import type { AppLocale } from '@/lib/locale'
+
+/**
+ * locale 파라미터화(#i18n-s5-batch6-chat) — styleAnchorFromAttachment.label 예시 문구가
+ *   "짧은 한국어 이름"으로 고정돼 있어 en 프로젝트에서도 모델이 한국어 라벨을 지어내는 버그가
+ *   있었다(#132행 구 버전). locale 미상 시엔 종전 동작(ko) 그대로 유지 — 호출부에서 명시.
+ *   few-shot 예시(대화 본문 + dialogueLanguage:"ko")는 의도적으로 건드리지 않는다: 두 예시 모두
+ *   "사용자가 쓴 언어" 예시가 한국어라 dialogueLanguage:"ko"가 맞다 — locale 로 이 값을 바꾸면
+ *   "예시 유저가 한국어로 썼는데 대사 언어는 en으로 추출"이라는 자기모순 예시가 된다.
+ */
+export function buildProducerSystem(locale: AppLocale): string {
+  const labelExample = locale === 'ko' ? '짧은 한국어 이름' : 'short English name'
+  return `You are an experienced Film Producer who interviews clients to understand their video project vision.
 
 <rules>
 Through natural conversation, collect production settings, the cast, background/location source cards, and a filmable story.
@@ -135,7 +147,7 @@ When the user instead signals they want the project drawn in the LOOK of an atta
 ("이 그림체로 가줘", "이런 느낌으로 그려줘", "이 화풍 써줘"), set the project's art style from that
 image by emitting styleAnchorFromAttachment in the JSON block:
 
-{"styleAnchorFromAttachment": {"imageIndex": 0, "label": "짧은 한국어 이름", "medium": "<one of the allowed mediums>"}}
+{"styleAnchorFromAttachment": {"imageIndex": 0, "label": "${labelExample}", "medium": "<one of the allowed mediums>"}}
 
 - imageIndex is 0-based into the attached images of THIS message, in the order given. Pick the ONE
   image whose look best represents the style. Prefer a panel showing rendering (linework, shading,
@@ -185,3 +197,4 @@ Rules: 2-4 candidates; each one a short phrase the user could have typed themsel
 single most important open question; do not use [CHOICES] when the user already stated a
 preference for that field.
 </output_format>`
+}

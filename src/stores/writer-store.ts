@@ -14,6 +14,9 @@ import { classifyDialoguePatch } from '@/lib/writer-chat-updates'
 import { resolveChatShotId } from '@/lib/writer/chat-id-resolve'
 import { useProjectStore } from '@/stores/project-store'
 import { isDemoSession } from '@/lib/demo/context'
+// store 액션은 훅을 못 쓴다 — translate() + 현재 locale 직접 조회로 useT() 없이 번역(#i18n-s5-batch3).
+import { translate } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 
 
 const DEFAULT_CAMERA = {
@@ -587,8 +590,10 @@ export const useWriterStore = create<WriterState>((set, get) => ({
               skipped: [
                 {
                   type: 'all',
-                  reason:
-                    '초안 생성이 진행 중이에요 — 씬 확정과 생성이 끝난 뒤에 수정할 수 있어요',
+                  reason: translate(
+                    useLocaleStore.getState().locale,
+                    'Draft generation is in progress — you can edit once scene confirmation and generation finish',
+                  ),
                 },
               ],
               pendingDialogueShrinks: [],
@@ -630,7 +635,13 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         } else if (u.type === 'updateShot') {
           const shotId = resolveShot(u.id)
           if (!shotId) {
-            skipped.push({ type: u.type, id: u.id, reason: `샷 '${u.id}' 를 찾지 못했어요` })
+            skipped.push({
+              type: u.type,
+              id: u.id,
+              reason: translate(useLocaleStore.getState().locale, "Shot '{id}' not found", {
+                id: u.id,
+              }),
+            })
             continue
           }
           const nextDialogueLines = u.patch.dialogueLines
@@ -658,7 +669,13 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         } else if (u.type === 'deleteShot') {
           const delId = resolveShot(u.id)
           if (!delId) {
-            skipped.push({ type: u.type, id: u.id, reason: `샷 '${u.id}' 를 찾지 못했어요` })
+            skipped.push({
+              type: u.type,
+              id: u.id,
+              reason: translate(useLocaleStore.getState().locale, "Shot '{id}' not found", {
+                id: u.id,
+              }),
+            })
             continue
           }
           await get().deleteShot(delId)
@@ -872,9 +889,14 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         if (st === 'completed' || st === 'failed') return
         await new Promise((r) => setTimeout(r, 10_000))
       }
-      throw new Error('previz 영상이 제한 시간 안에 완료되지 않았습니다')
+      throw new Error(
+        translate(useLocaleStore.getState().locale, 'Previz video did not finish within the time limit'),
+      )
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'previz 영상 생성 실패'
+      const message =
+        err instanceof Error
+          ? err.message
+          : translate(useLocaleStore.getState().locale, 'Previz video generation failed')
       set((state) => ({
         shots: state.shots.map((sh) =>
           sh.shotId === shotId

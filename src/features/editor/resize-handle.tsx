@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 
 /**
  * 섹션 경계 드래그 핸들. axis='x' → 가로 너비 조절(세로 막대), axis='y' → 세로 높이 조절(가로 막대).
@@ -18,6 +19,7 @@ export function ResizeHandle({
   onChange: (value: number) => void
   onStart?: () => void
 }) {
+  const t = useT()
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault()
@@ -47,7 +49,7 @@ export function ResizeHandle({
         'group relative shrink-0 bg-border transition-colors hover:bg-primary/40',
         axis === 'x' ? 'w-1 cursor-col-resize' : 'h-1 cursor-row-resize',
       )}
-      title="드래그해서 크기 조절"
+      title={t('Drag to resize')}
     >
       {/* 히트 영역 확장 (얇은 막대라도 잡기 쉽게) */}
       <span

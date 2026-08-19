@@ -173,6 +173,9 @@ export interface ShotVideosOutput {
 
 export interface PipelineInput {
   story: string;          // 자유 텍스트 입력
+  /** #i18n-s5 출력 언어 강제: projects.locale(생성 시 잠금)을 writer/start 가 주입한다.
+   *  미지정(레거시 unlocked 프로젝트) = 종전 관례(스토리 언어 추종) 그대로 — 절 미주입. */
+  outputLocale?: 'en' | 'ko';
   /** 실행 시 고정되는 Writer 엔진. 누락된 구형 run은 V1로 해석한다. */
   writerEngine?: WriterEngine;
   presetId?: string;      // 선택적 장르 프리셋
@@ -270,7 +273,7 @@ export interface Genre {
 export interface DramaturgyStageCandidate {
   /** snake_case 슬러그 — s3 가 채택하면 scene.location 에 이 id 그대로 쓴다 */
   id: string;
-  /** 스토리와 같은 언어의 표시명 */
+  /** 표시명 — outputLocale 지정 시 그 언어, 미지정(레거시)이면 스토리와 같은 언어 (#i18n-s5) */
   name: string;
   description: string;
   /** 어느 메커니즘에서 유도됐나 — 유도 사슬의 증거 */

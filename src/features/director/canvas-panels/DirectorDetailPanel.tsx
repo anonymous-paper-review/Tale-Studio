@@ -5,6 +5,7 @@ import { useDirectorCanvasStore } from '@/stores/director-store'
 import { isShotData, isVideoData } from '@/types/director'
 import { ShotDetailPanel } from './ShotDetailPanel'
 import { VideoDetailPanel } from './VideoDetailPanel'
+import { useT } from '@/lib/i18n'
 
 /**
  * 노드 뷰 좌측 상세 패널 (Higgsfield 우측 패널을 좌측 미러 — 우측은 글로벌 챗 점유).
@@ -12,6 +13,7 @@ import { VideoDetailPanel } from './VideoDetailPanel'
  * 닫기는 selectNode(null) — page.tsx의 재클릭/더블클릭/빈공간 클릭과 동일 의미.
  */
 export function DirectorDetailPanel() {
+  const t = useT()
   const selectedNodeId = useDirectorCanvasStore((s) => s.selectedNodeId)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
   const node = useDirectorCanvasStore((s) =>
@@ -27,12 +29,12 @@ export function DirectorDetailPanel() {
     <aside className="absolute left-0 top-0 z-10 flex h-full w-80 flex-col border-r border-border bg-background/95 shadow-lg backdrop-blur">
       <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-3">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {showShot ? 'Shot' : 'Video'} 상세
+          {t('{kind} details', { kind: showShot ? 'Shot' : 'Video' })}
         </span>
         <button
           type="button"
           onClick={() => selectNode(null)}
-          aria-label="닫기"
+          aria-label={t('Close')}
           className="rounded p-1 text-muted-foreground hover:bg-accent"
         >
           <X className="size-4" />

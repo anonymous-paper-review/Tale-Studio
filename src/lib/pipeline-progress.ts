@@ -20,6 +20,12 @@ import type { GenerationJobKind } from '@/lib/generation-jobs'
 import type { DirectorNode } from '@/types/director'
 import { isShotData, isVideoData } from '@/types/director'
 import type { StageId } from '@/types'
+import { translate } from '@/lib/i18n'
+import type { AppLocale } from '@/lib/locale'
+
+// locale 을 안 넘기는 호출부(chat-progress-pin.tsx 등)가 조용히 안 깨지도록 기존 동작(항상
+//   한국어)을 기본값으로 보존한다 — producer-gate.ts/card-mention.ts 와 동일 취급.
+const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
 /** 알림바 한 줄 — done/total 이 있으면 분수 + 진행 바, 없으면 스피너 + 문구만. */
 export interface PipelineWork {
@@ -130,6 +136,7 @@ interface RoughShotLike {
 export function writerRoughWork(
   shots: RoughShotLike[],
   activeIds: ReadonlySet<string> = EMPTY_IDS,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
 ): PipelineWork | null {
   const eligible = shots.filter((s) => !!s.actionDescription?.trim())
   const hasStableIds = eligible.every((s) => typeof s.shotId === 'string' && s.shotId.length > 0)
@@ -178,7 +185,9 @@ export function writerRoughWork(
   ).length
   return {
     key: 'writer-rough',
-    label: `${STAGE_AGENT_NAME.writer}가 러프 스토리보드를 그리고 있습니다`,
+    label: translate(locale, '{agent} is drawing the rough storyboard', {
+      agent: STAGE_AGENT_NAME.writer,
+    }),
     done,
     total: batch.members.size,
     failed: failed || undefined,
@@ -200,12 +209,15 @@ export function artistImageWork(opts: {
   progress: { ready: number; total: number } | null
   generatingCount: number
   activeCount?: number
+  /** 알림바 label 번역에 쓰는 로케일. 미지정이면 기존 동작(한국어) 유지. */
+  locale?: AppLocale
 }): PipelineWork | null {
   const agent = STAGE_AGENT_NAME.artist
+  const locale = opts.locale ?? UNSPECIFIED_LOCALE_FALLBACK
   if (!opts.imagesReady && !opts.stalled && !opts.failed && opts.progress && opts.progress.total > 0) {
     return {
       key: 'artist-images',
-      label: `${agent}가 캐릭터·배경 이미지를 생성하고 있습니다`,
+      label: translate(locale, '{agent} is generating character and background images', { agent }),
       done: opts.progress.ready,
       total: opts.progress.total,
       stage: 'artist',
@@ -217,7 +229,7 @@ export function artistImageWork(opts: {
     //   이 배치의 완료 수는 추적하지 않으므로 done=0/total=남은 건수 (남은 작업 분모).
     return {
       key: 'artist-regen',
-      label: `${agent}가 이미지를 생성하고 있습니다`,
+      label: translate(locale, '{agent} is generating images', { agent }),
       done: 0,
       total: inFlight,
       stage: 'artist',
@@ -230,6 +242,7 @@ export function artistImageWork(opts: {
 export function directorShotImageWork(
   nodes: DirectorNode[],
   activeIds: ReadonlySet<string> = EMPTY_IDS,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
 ): PipelineWork | null {
   const shots = nodes
     .map((node) => ({ id: node.id, data: node.data }))
@@ -281,7 +294,9 @@ export function directorShotImageWork(
   ).length
   return {
     key: 'director-storyboard',
-    label: `${STAGE_AGENT_NAME.director}가 촬영용 이미지를 생성하고 있습니다`,
+    label: translate(locale, '{agent} is generating shooting-ready images', {
+      agent: STAGE_AGENT_NAME.director,
+    }),
     done,
     total: batch.members.size,
     failed: failed || undefined,
@@ -293,6 +308,7 @@ export function directorShotImageWork(
 export function directorVideoWork(
   nodes: DirectorNode[],
   activeCount = 0,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
 ): PipelineWork | null {
   const videos = nodes
     .map((node) => ({ id: node.id, data: node.data }))
@@ -344,7 +360,7 @@ export function directorVideoWork(
   ).length
   return {
     key: 'director-video',
-    label: `${STAGE_AGENT_NAME.director}가 영상을 생성하고 있습니다`,
+    label: translate(locale, '{agent} is generating video', { agent: STAGE_AGENT_NAME.director }),
     done,
     total: batch.members.size,
     failed: failed || undefined,
@@ -352,34 +368,42 @@ export function directorVideoWork(
   }
 }
 
-/** 잡 종류별 표시 문구 — 화면 상태 없이 큐만으로 알림바를 세울 때의 단일 source. */
-const KIND_WORK: Record<GenerationJobKind, { label: string; stage: StageId }> = {
+/** 잡 종류별 표시 문구 — 화면 상태 없이 큐만으로 알림바를 세울 때의 단일 source.
+ *  labelKey 는 영어 원문 = i18n 키, {agent} 를 translate() 가 치환한다. */
+const KIND_WORK: Record<GenerationJobKind, { labelKey: string; agent: string; stage: StageId }> = {
   character_view: {
-    label: `${STAGE_AGENT_NAME.artist}가 캐릭터 이미지를 생성하고 있습니다`,
+    labelKey: '{agent} is generating character images',
+    agent: STAGE_AGENT_NAME.artist,
     stage: 'artist',
   },
   world_shot: {
-    label: `${STAGE_AGENT_NAME.artist}가 배경 이미지를 생성하고 있습니다`,
+    labelKey: '{agent} is generating background images',
+    agent: STAGE_AGENT_NAME.artist,
     stage: 'artist',
   },
   shot_rough_storyboard: {
-    label: `${STAGE_AGENT_NAME.writer}가 러프 스토리보드를 그리고 있습니다`,
+    labelKey: '{agent} is drawing the rough storyboard',
+    agent: STAGE_AGENT_NAME.writer,
     stage: 'writer',
   },
   shot_storyboard: {
-    label: `${STAGE_AGENT_NAME.director}가 촬영용 이미지를 생성하고 있습니다`,
+    labelKey: '{agent} is generating shooting-ready images',
+    agent: STAGE_AGENT_NAME.director,
     stage: 'director',
   },
   storyboard_real_grid: {
-    label: `${STAGE_AGENT_NAME.director}가 촬영용 이미지를 일괄 생성하고 있습니다`,
+    labelKey: '{agent} is batch-generating shooting-ready images',
+    agent: STAGE_AGENT_NAME.director,
     stage: 'director',
   },
   shot_video: {
-    label: `${STAGE_AGENT_NAME.director}가 영상을 생성하고 있습니다`,
+    labelKey: '{agent} is generating video',
+    agent: STAGE_AGENT_NAME.director,
     stage: 'director',
   },
   shot_previz_video: {
-    label: `${STAGE_AGENT_NAME.director}가 프리비즈 영상을 만들고 있습니다`,
+    labelKey: '{agent} is making the previz video',
+    agent: STAGE_AGENT_NAME.director,
     stage: 'director',
   },
 }
@@ -390,6 +414,7 @@ const KIND_WORK: Record<GenerationJobKind, { label: string; stage: StageId }> = 
  */
 export function queueWorks(
   countByKind: Partial<Record<GenerationJobKind, number>>,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
 ): PipelineWork[] {
   const out: PipelineWork[] = []
   for (const [kind, count] of Object.entries(countByKind) as Array<
@@ -398,7 +423,8 @@ export function queueWorks(
     if (!count || count <= 0) continue
     const spec = KIND_WORK[kind]
     if (!spec) continue
-    out.push({ key: `queue-${kind}`, label: spec.label, total: count, stage: spec.stage })
+    const label = translate(locale, spec.labelKey, { agent: spec.agent })
+    out.push({ key: `queue-${kind}`, label, total: count, stage: spec.stage })
   }
   return out
 }

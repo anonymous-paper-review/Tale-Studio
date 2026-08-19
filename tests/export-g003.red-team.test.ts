@@ -45,7 +45,7 @@ describe('G003 artist collector red-team coverage', () => {
         },
       ],
       locations: [],
-    })
+    }, 'ko')
 
     expect(mediaPaths(files)).toEqual([
       'artist/characters/중복/front.png',
@@ -100,7 +100,7 @@ describe('G003 artist collector red-team coverage', () => {
           visual_description_native: '{"visual":"네이티브 월드","weather":"rain"}',
         },
       ],
-    })
+    }, 'ko')
 
     const markdown = textFile(files, 'artist/assets.md')
     expect(markdown).toContain('한국어 외형이 먼저')
@@ -143,9 +143,9 @@ describe('G003 artist collector red-team coverage', () => {
 
     let first: ArtifactFile[] = []
     expect(() => {
-      first = collectArtistArtifacts(data)
+      first = collectArtistArtifacts(data, 'ko')
     }).not.toThrow()
-    const second = collectArtistArtifacts(data)
+    const second = collectArtistArtifacts(data, 'ko')
 
     expect(second).toEqual(first)
     expect(data).toEqual(before)
@@ -199,7 +199,7 @@ describe('G003 director collector red-team coverage', () => {
         }),
       ],
       videoClips: [],
-    })
+    }, 'ko')
 
     expect(mediaPaths(files).filter((path) => path.startsWith('director/shots/'))).toEqual([
       'director/shots/sc_storyboard-sh_completed_url.png',
@@ -281,7 +281,7 @@ describe('G003 director collector red-team coverage', () => {
           created_at: '2026-07-11T17:00:00.000Z',
         }),
       ],
-    })
+    }, 'ko')
 
     expect(mediaFile(files, 'director/clips/sc_clip-sh_final.mp4')?.url).toBe(
       'https://cdn.test/clips/final-old.mp4',
@@ -333,7 +333,7 @@ describe('G003 director collector red-team coverage', () => {
         }),
       ],
       videoClips: [],
-    })
+    }, 'ko')
 
     const shotlist = textFile(files, 'director/shotlist.md')
     expect(shotlist).toContain('네이티브 장면 요약')
@@ -378,9 +378,9 @@ describe('G003 director collector red-team coverage', () => {
 
     let first: ArtifactFile[] = []
     expect(() => {
-      first = collectDirectorArtifacts(data)
+      first = collectDirectorArtifacts(data, 'ko')
     }).not.toThrow()
-    const second = collectDirectorArtifacts(data)
+    const second = collectDirectorArtifacts(data, 'ko')
 
     expect(second).toEqual(first)
     expect(data).toEqual(before)

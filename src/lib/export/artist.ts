@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
+import { translate } from '@/lib/i18n'
+import { DEFAULT_LOCALE, type AppLocale } from '@/lib/locale'
 
 import { bulletList, h1, h2, isRecord, pickNative, table } from './md'
 import { PathAllocator } from './sanitize'
@@ -71,7 +73,10 @@ export async function loadArtistData(projectId: string): Promise<ArtistData> {
   }
 }
 
-export function collectArtistArtifacts(data: ArtistData): ArtifactFile[] {
+export function collectArtistArtifacts(
+  data: ArtistData,
+  locale: AppLocale = DEFAULT_LOCALE,
+): ArtifactFile[] {
   const allocator = new PathAllocator()
   const mediaFiles: ArtifactFile[] = []
   const indexEntries: AssetIndexEntry[] = []
@@ -83,7 +88,7 @@ export function collectArtistArtifacts(data: ArtistData): ArtifactFile[] {
     : []
 
   characters.forEach((character, index) => {
-    const name = assetName(character.name, `이름 미정 캐릭터 ${index + 1}`)
+    const name = assetName(character.name, translate(locale, 'Unnamed character {index}', { index: index + 1 }))
     const folder = allocator.child('artist/characters', name)
     const paths: string[] = []
 
@@ -105,7 +110,7 @@ export function collectArtistArtifacts(data: ArtistData): ArtifactFile[] {
   })
 
   locations.forEach((location, index) => {
-    const name = assetName(location.name, `이름 미정 월드 ${index + 1}`)
+    const name = assetName(location.name, translate(locale, 'Unnamed world {index}', { index: index + 1 }))
     const folder = allocator.child('artist/worlds', name)
     const paths: string[] = []
 
@@ -126,7 +131,7 @@ export function collectArtistArtifacts(data: ArtistData): ArtifactFile[] {
     })
   })
 
-  return [{ path: 'artist/assets.md', kind: 'text', content: renderAssetsIndex(indexEntries) }, ...mediaFiles]
+  return [{ path: 'artist/assets.md', kind: 'text', content: renderAssetsIndex(indexEntries, locale) }, ...mediaFiles]
 }
 
 interface AssetIndexEntry {
@@ -136,25 +141,25 @@ interface AssetIndexEntry {
   paths: string[]
 }
 
-function renderAssetsIndex(entries: AssetIndexEntry[]): string {
-  let body = h1('아티스트 에셋')
+function renderAssetsIndex(entries: AssetIndexEntry[], locale: AppLocale): string {
+  let body = h1(translate(locale, 'Artist Assets'))
 
   if (entries.length === 0) {
-    body += '에셋 없음\n\n'
+    body += `${translate(locale, 'No assets')}\n\n`
   } else {
     body += table(
-      ['이름', '타입', '설명', '파일'],
+      [translate(locale, 'Name'), translate(locale, 'Type'), translate(locale, 'Asset description'), translate(locale, 'Files')],
       entries.map((entry) => [
         entry.name,
         entry.type,
-        entry.description || '미설정',
-        entry.paths.length ? entry.paths.join('<br>') : '미생성',
+        entry.description || translate(locale, 'Not set'),
+        entry.paths.length ? entry.paths.join('<br>') : translate(locale, 'Not generated'),
       ]),
     )
   }
 
-  body += h2('파일명 매핑 안내')
-  body += 'DB view key는 수신자가 바로 이해할 수 있는 파일명으로 remap됩니다 (view_main→front.png 등).\n\n'
+  body += h2(translate(locale, 'Filename mapping notes'))
+  body += `${translate(locale, 'DB view keys are remapped to filenames the recipient can immediately understand (view_main→front.png, etc.).')}\n\n`
   body += bulletList([
     'characters: view_main→front.png, view_back→back.png, view_side_left→side-left.png, view_side_right→side-right.png',
     'worlds: wide_shot→wide.png, establishing_shot→establishing.png',

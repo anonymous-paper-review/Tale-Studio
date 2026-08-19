@@ -24,7 +24,7 @@ import { STAGES } from '@/lib/constants'
 type Swatch = { token: string; role: string }
 
 const SURFACES: Swatch[] = [
-  { token: 'background', role: '앱 배경' },
+  { token: 'background', role: 'App background' },
   { token: 'card', role: 'elevated surface' },
   { token: 'popover', role: 'floating overlay' },
   { token: 'muted', role: 'subdued surface' },
@@ -34,26 +34,26 @@ const SURFACES: Swatch[] = [
 
 const BRAND: Swatch[] = [
   { token: 'primary', role: 'CTA / accent (Netflix Red)' },
-  { token: 'secondary', role: '보조 액션' },
-  { token: 'destructive', role: '위험' },
-  { token: 'success', role: '완료' },
-  { token: 'warning', role: '경고' },
-  { token: 'info', role: '도움말' },
+  { token: 'secondary', role: 'Secondary action' },
+  { token: 'destructive', role: 'Danger' },
+  { token: 'success', role: 'Done' },
+  { token: 'warning', role: 'Warning' },
+  { token: 'info', role: 'Help text' },
 ]
 
 const BORDERS: Swatch[] = [
-  { token: 'border-subtle', role: '비-interactive separator' },
-  { token: 'border', role: '기본 hairline' },
+  { token: 'border-subtle', role: 'Non-interactive separator' },
+  { token: 'border', role: 'Default hairline' },
   { token: 'border-strong', role: 'hovered border' },
   { token: 'ring', role: 'focus ring' },
 ]
 
 const CHART: Swatch[] = [
-  { token: 'chart-1', role: 'Actor 노드' },
-  { token: 'chart-2', role: 'World 노드' },
-  { token: 'chart-3', role: 'Scene 노드' },
-  { token: 'chart-4', role: 'Shot 노드' },
-  { token: 'chart-5', role: 'Video 노드' },
+  { token: 'chart-1', role: 'Actor node' },
+  { token: 'chart-2', role: 'World node' },
+  { token: 'chart-3', role: 'Scene node' },
+  { token: 'chart-4', role: 'Shot node' },
+  { token: 'chart-5', role: 'Video node' },
 ]
 
 const STAGE: Swatch[] = [
@@ -83,12 +83,12 @@ const BADGE_VARIANTS = [
 ] as const
 
 const TYPE_SCALE = [
-  { cls: 'text-2xl font-semibold', label: 'text-2xl / semibold — 페이지 타이틀' },
-  { cls: 'text-lg font-medium', label: 'text-lg / medium — 섹션 헤더' },
-  { cls: 'text-base', label: 'text-base — 본문' },
-  { cls: 'text-sm', label: 'text-sm — 기본 UI' },
-  { cls: 'text-xs text-muted-foreground', label: 'text-xs / muted — 캡션' },
-  { cls: 'font-mono text-sm', label: 'font-mono — camera 값 / render ID (-10 +10)' },
+  { cls: 'text-2xl font-semibold', label: 'text-2xl / semibold — Page title' },
+  { cls: 'text-lg font-medium', label: 'text-lg / medium — Section header' },
+  { cls: 'text-base', label: 'text-base — Body text' },
+  { cls: 'text-sm', label: 'text-sm — Default UI' },
+  { cls: 'text-xs text-muted-foreground', label: 'text-xs / muted — Caption' },
+  { cls: 'font-mono text-sm', label: 'font-mono — Camera value / render ID (-10 +10)' },
 ]
 
 const RADII = ['rounded-sm', 'rounded-md', 'rounded-lg', 'rounded-xl', 'rounded-full']
@@ -136,10 +136,10 @@ export default function DesignShowcasePage() {
   return (
     <div className="mx-auto max-w-5xl space-y-12 p-8">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">Design system 쇼케이스</h1>
+        <h1 className="text-2xl font-semibold">Design system showcase</h1>
         <p className="text-sm text-muted-foreground">
-          살아있는 토큰 + shadcn primitive 카탈로그. 값=
-          <span className="font-mono">globals.css</span>, 룰=
+          A living catalog of tokens + shadcn primitives. Values =
+          <span className="font-mono">globals.css</span>, rules =
           <span className="font-mono">specs/design.md</span>.
         </p>
       </header>
@@ -154,10 +154,10 @@ export default function DesignShowcasePage() {
       <Section title="Color — Borders" hint="design.md §2.4">
         <SwatchGrid items={BORDERS} />
       </Section>
-      <Section title="Color — Chart (엔티티 노드)" hint="design.md §2.2">
+      <Section title="Color — Chart (entity nodes)" hint="design.md §2.2">
         <SwatchGrid items={CHART} />
       </Section>
-      <Section title="Color — Stage (파이프라인 P1~P5)" hint="design.md §2.9">
+      <Section title="Color — Stage (pipeline P1–P5)" hint="design.md §2.9">
         <SwatchGrid items={STAGE} />
       </Section>
 
@@ -199,18 +199,18 @@ export default function DesignShowcasePage() {
       </Section>
 
       {/* ── Inputs ── */}
-      <Section title="Input — states" hint="design.md §6.2. footer 정렬 시 h-10">
+      <Section title="Input — states" hint="design.md §6.2. h-10 for footer alignment">
         <div className="grid max-w-md gap-4">
           <Input placeholder="default (h-9)" />
-          <Input className="h-10" placeholder="footer 정렬용 h-10" />
+          <Input className="h-10" placeholder="h-10 for footer alignment" />
           <Input placeholder="disabled" disabled />
           <Input placeholder="invalid (aria-invalid)" aria-invalid />
           <div className="rounded-md border border-border p-4">
             <p className="mb-2 text-xs text-muted-foreground">
-              패널 footer 패턴 (Input h-10 + icon-lg = 72px)
+              Panel footer pattern (Input h-10 + icon-lg = 72px)
             </p>
             <div className="flex gap-2">
-              <Input className="h-10" placeholder="메시지…" />
+              <Input className="h-10" placeholder="Message…" />
               <Button size="icon-lg" aria-label="send">
                 <Send className="size-4" />
               </Button>
@@ -275,7 +275,7 @@ export default function DesignShowcasePage() {
       </Section>
 
       {/* ── Agent faces ── */}
-      <Section title="AgentFace — stage 색 (badge와 동일)" hint="components/agent-face.tsx">
+      <Section title="AgentFace — stage color (same as badge)" hint="components/agent-face.tsx">
         <div className="flex flex-wrap gap-6">
           {STAGES.map((stage) => (
             <div key={stage.id} className="flex flex-col items-center gap-1">
@@ -318,7 +318,7 @@ export default function DesignShowcasePage() {
       </Section>
 
       {/* ── Motion ── */}
-      <Section title="Motion — duration tiers" hint="design.md §10.1 (hover로 확인)">
+      <Section title="Motion — duration tiers" hint="design.md §10.1 (hover to check)">
         <div className="flex flex-wrap gap-3">
           {(['duration-100', 'duration-150', 'duration-250', 'duration-350'] as const).map(
             (d) => (

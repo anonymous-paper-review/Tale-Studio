@@ -9,6 +9,7 @@
 // 대사는 향상 기능이지 크리티컬 패스가 아니다 — 씬 호출이 재시도 후에도 실패하면 그 씬만
 // 빈 대사로 흡수하고 파이프라인을 살린다 (오늘의 최악치 = 기존과 동일한 "대사 없음").
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import { outputLanguageClause, speechRateGuide } from '@/lib/writer/pipeline/util/output-language';
 import type {
   Genre,
   Characters,
@@ -23,6 +24,7 @@ import type {
   DialogueTrack,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
+import type { AppLocale } from '@/lib/locale';
 
 // 씬 실행 기본 모드(#dialogue-parallel 2026-08-11 오너 채택) — 병렬 + 사전유도 원장.
 //   실측(research/experiments/dialogue-parallel-ledger): 15씬 fixture 벽시계 169.8s → 52.3s(−69.2%),
@@ -51,13 +53,17 @@ const EMPTY_MEMORY: DialogueMemory = {
 // 보이스 프로파일 (스테이지 첫 호출 1회)
 // ---------------------------------------------------------------------
 
-const VOICE_SYSTEM = `당신은 캐릭터 보이스(어투) 디자이너이다.
+// #i18n-s5: example_lines 는 dialogueForScene 프롬프트에 그대로 인용돼 대사 톤의 참조가 된다 —
+//   voice profile 자체도 콘텐츠 스테이지로 취급해 절을 주입한다(dialogue 스테이지 소속).
+function buildVoiceSystem(outputLocale?: AppLocale): string {
+  return `당신은 캐릭터 보이스(어투) 디자이너이다.
 스토리와 인물 설정에서 각 인물의 *말하는 방식*을 설계한다 — 외모/서사가 아니라 오직 목소리.
 원칙:
 1. 인물 간 목소리가 서로 뚜렷이 구분되게 (formality/문장 길이/말버릇 중 최소 2축에서 대비).
 2. personality·motivation·역할에서 말투를 도출한다 (근거 없는 개성 부여 금지).
 3. example_lines는 그 인물이 이 스토리 속에서 실제로 할 법한 문장으로.
-4. 집단 인물(예: 병사들)은 집단의 발화 방식(구호/무전/침묵)으로 정의한다.`;
+4. 집단 인물(예: 병사들)은 집단의 발화 방식(구호/무전/침묵)으로 정의한다.${outputLanguageClause(outputLocale)}`;
+}
 
 export async function runVoiceProfiles(
   story: string,
@@ -65,6 +71,7 @@ export async function runVoiceProfiles(
   genre: Genre,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
+  outputLocale?: AppLocale,
 ): Promise<VoiceProfile[]> {
   const userPrompt = `[스토리]
 ${story}
@@ -93,7 +100,7 @@ ${JSON.stringify(characters.characters, null, 2)}
 }`;
 
   const raw = await generateJson<{ profiles?: VoiceProfile[] } | VoiceProfile[]>(userPrompt, axisConfig, {
-    systemInstruction: VOICE_SYSTEM,
+    systemInstruction: buildVoiceSystem(outputLocale),
     temperature: 0.7,
   });
   await logger.saveLlmCall('voice_profiles', {
@@ -113,14 +120,16 @@ ${JSON.stringify(characters.characters, null, 2)}
 // 씬 단위 대사 저작 (V4 규율 포함 단일 시스템 프롬프트)
 // ---------------------------------------------------------------------
 
-const DIALOGUE_SYSTEM = `당신은 영상 대본의 대사 작가이다. 이미 확정된 샷 분해 위에 샷 단위 대사를 쓴다.
+// #i18n-s5: 발화 속도 기준은 speechRateGuide(outputLocale) 로 위임 — 미지정은 한국어 기준(종전 동작).
+function buildDialogueSystem(outputLocale?: AppLocale): string {
+  return `당신은 영상 대본의 대사 작가이다. 이미 확정된 샷 분해 위에 샷 단위 대사를 쓴다.
 
 == 절대 규칙 ==
 1. dialogue.line은 인물이 *입으로 말하는 문장*만. 상황 설명·행동 지문·분위기 서술 금지
    ("소녀가 놀란다" ❌ / "이게... 뭐야?" ⭕). 지문은 delivery에 짧게.
 2. 모든 샷에 대사를 강요하지 마라 — 침묵이 옳은 샷은 dialogue를 빈 배열로 둔다.
    대사 없는 영상 구간은 정상이다. 샷의 이야기가 대사를 요구할 때만 쓴다.
-3. 분량 = 샷 길이: 한국어 발화 속도 초당 4~6음절 기준, 샷 duration 안에 실제로 말할 수 있는 분량만.
+3. 분량 = 샷 길이: ${speechRateGuide(outputLocale)}, 샷 duration 안에 실제로 말할 수 있는 분량만.
    (4초 샷에 두 문장 ❌)
 4. 대사는 씬을 *전진*시킨다: 정보를 주거나, 관계를 바꾸거나, 감정을 밀어올린다.
    있어 보이는 "명대사"를 위한 대사 금지 — 상황이 만든 말만.
@@ -136,7 +145,8 @@ B. 정보 공개 순서: 원 스토리에는 결말까지 다 적혀 있지만, 
    [전개 메모리]의 "확립된 사실"이 지금까지 공개된 것의 전부다 — 거기 없는 미래 정보를 인물이
    먼저 입에 올리게 하지 마라. 복선 대사도 인물의 현재 지식 범위 안에서만 가능하다.
 C. 명대사 제조 금지 강화: 주제를 요약·선언하는 문장("진실은 ~하지 않아", "이제 나는 ~다") 금지.
-   콜백은 [이미 나온 주요 대사]의 짧은 재사용만 허용 — 새로운 선언문을 만들지 마라.`;
+   콜백은 [이미 나온 주요 대사]의 짧은 재사용만 허용 — 새로운 선언문을 만들지 마라.${outputLanguageClause(outputLocale)}`;
+}
 
 function shotLine(s: DecoupageShot): string {
   return `  - ${s.shot_id} (${s.intended_duration_seconds}s, ${s.shot_size}, ${s.shot_function}): ${s.beat_summary_native ?? s.beat_summary}`;
@@ -270,6 +280,7 @@ export async function dialogueForScene(
   memory: DialogueMemory,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
+  outputLocale?: AppLocale,
 ): Promise<SceneDialogueResult> {
   const userPrompt = `[원 스토리]
 ${story}
@@ -320,7 +331,7 @@ ${JSON.stringify(
 }`;
 
   const raw = await generateJson<SceneDialogueResponse>(userPrompt, axisConfig, {
-    systemInstruction: DIALOGUE_SYSTEM,
+    systemInstruction: buildDialogueSystem(outputLocale),
     temperature: 0.7,
   });
   await logger.saveLlmCall(`dialogue_${scene.scene_id}`, {
@@ -385,11 +396,14 @@ export async function runDialogue(
     ledger?: boolean;
     /** parallel 전용: 씬 동시성. 미지정 시 DEFAULT_DIALOGUE_CONCURRENCY(env, 기본 5). */
     concurrency?: number;
+    /** #i18n-s5: 미지정(레거시)이면 발화 속도·systemInstruction 절 모두 종전 동작 그대로. */
+    outputLocale?: AppLocale;
   },
 ): Promise<RunDialogueResult> {
   const resume = opts?.resume ?? null;
   const mode = opts?.mode ?? DEFAULT_DIALOGUE_MODE;
   const useLedger = opts?.ledger !== false;
+  const outputLocale = opts?.outputLocale;
   const doneSceneIds = new Set(resume?.doneSceneIds ?? []);
   const out: SceneShotDialogue[] = [...(resume?.scenes ?? [])];
   let memory: DialogueMemory = resume?.memory ?? { ...EMPTY_MEMORY };
@@ -402,7 +416,7 @@ export async function runDialogue(
   // 프로파일은 스테이지 1회 — resume이 이미 갖고 있으면 재사용.
   //   (const 로 고정해야 아래 워커 클로저에서 타입이 좁혀진 채 잡힌다.)
   const profiles =
-    resume?.profiles ?? (await runVoiceProfiles(story, characters, genre, logger, axisConfig));
+    resume?.profiles ?? (await runVoiceProfiles(story, characters, genre, logger, axisConfig, outputLocale));
 
   const shotsOf = (scene: StoryScene): DecoupageShot[] =>
     decoupage.scenes.find((d) => d.scene_id === scene.scene_id)?.shots ?? [];
@@ -418,7 +432,7 @@ export async function runDialogue(
   ): Promise<SceneDialogueResult | null> => {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        return await dialogueForScene(story, scene, shots, characters, profiles, mem, logger, axisConfig);
+        return await dialogueForScene(story, scene, shots, characters, profiles, mem, logger, axisConfig, outputLocale);
       } catch (e) {
         console.warn(
           `[dialogue] ${scene.scene_id} 실패 (try ${attempt}/2):`,

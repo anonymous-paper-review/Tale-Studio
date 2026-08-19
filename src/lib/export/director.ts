@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { selectHandoffTake } from '@/lib/director-video-take-selection'
+import { translate } from '@/lib/i18n'
+import { DEFAULT_LOCALE, type AppLocale } from '@/lib/locale'
 
 import { bulletList, escapeMd, h1, h2, isRecord, kvSection, labelPart, nativeText, pickNative, table, textOrUnset } from './md'
 import { PathAllocator } from './sanitize'
@@ -66,8 +68,13 @@ export interface StoryboardImageValue extends Record<string, unknown> {
   generatedAt?: unknown
 }
 
-const IMAGE_OMITTED_SUFFIX = '— 미포함'
-const CLIP_OMITTED_NOTE = '생성 중/최종 없음 — 미포함'
+function imageOmittedSuffix(locale: AppLocale): string {
+  return `— ${translate(locale, 'not included')}`
+}
+
+function clipOmittedNote(locale: AppLocale): string {
+  return translate(locale, 'Generating/no final take — not included')
+}
 
 export const DIRECTOR_SCENES_SELECT =
   'id,project_id,scene_id,narrative_summary,narrative_summary_native,location,time_of_day,mood,mood_native,sort_order,created_at,updated_at'
@@ -76,7 +83,10 @@ export const DIRECTOR_SHOTS_SELECT =
 export const DIRECTOR_VIDEO_CLIPS_SELECT =
   'id,project_id,shot_id,url,status,created_at,updated_at,is_final,take_number,deleted_at,take_label'
 
-export function collectDirectorArtifacts(data: DirectorExportData): ArtifactFile[] {
+export function collectDirectorArtifacts(
+  data: DirectorExportData,
+  locale: AppLocale = DEFAULT_LOCALE,
+): ArtifactFile[] {
   const allocator = new PathAllocator()
   const scenes = sortedScenes(recordRows<SceneRow>(data.scenes))
   const shots = sortedShots(recordRows<ShotRow>(data.shots))
@@ -107,13 +117,13 @@ export function collectDirectorArtifacts(data: DirectorExportData): ArtifactFile
 
     shotRows.set(shot, [
       shotLabel(shot),
-      imagePath ?? storyboardStatusNote(storyboard),
-      clipPath ? clipCell(clipPath, clip) : CLIP_OMITTED_NOTE,
-      textOrUnset(nativeText(shot, 'action_description')),
-      textOrUnset(dialogueText(shot.dialogue_lines)),
-      textOrUnset(configText(shot.camera_config)),
-      textOrUnset(configText(shot.lighting_config)),
-      textOrUnset(textValue(shot.movement_preset)),
+      imagePath ?? storyboardStatusNote(storyboard, locale),
+      clipPath ? clipCell(clipPath, clip) : clipOmittedNote(locale),
+      textOrUnset(nativeText(shot, 'action_description'), locale),
+      textOrUnset(dialogueText(shot.dialogue_lines), locale),
+      textOrUnset(configText(shot.camera_config), locale),
+      textOrUnset(configText(shot.lighting_config), locale),
+      textOrUnset(textValue(shot.movement_preset), locale),
     ])
   }
 
@@ -121,7 +131,7 @@ export function collectDirectorArtifacts(data: DirectorExportData): ArtifactFile
     {
       path: 'director/shotlist.md',
       kind: 'text',
-      content: renderShotlist(scenes, shots, shotRows),
+      content: renderShotlist(scenes, shots, shotRows, locale),
     },
     ...mediaFiles,
   ]
@@ -166,23 +176,24 @@ function renderShotlist(
   scenes: SceneRow[],
   shots: ShotRow[],
   shotRows: Map<ShotRow, string[]>,
+  locale: AppLocale,
 ): string {
   let body = h1('Director Shotlist')
-  body += kvSection('요약', [
-    ['씬 수', String(scenes.length)],
-    ['샷 수', String(shots.length)],
+  body += kvSection(translate(locale, 'Summary'), [
+    [translate(locale, 'Scene count'), String(scenes.length)],
+    [translate(locale, 'Shot count'), String(shots.length)],
   ])
 
-  if (shots.length === 0) return `${body}${escapeMd('샷 없음')}\n`
+  if (shots.length === 0) return `${body}${escapeMd(translate(locale, 'No shots'))}\n`
 
   for (const group of sceneGroups(scenes, shots)) {
     body += h2(sceneHeading(group.sceneId, group.scene))
 
-    const details = sceneDetailItems(group.scene)
+    const details = sceneDetailItems(group.scene, locale)
     if (details.length > 0) body += bulletList(details)
 
     if (group.shots.length === 0) {
-      body += `${escapeMd('샷 없음')}\n\n`
+      body += `${escapeMd(translate(locale, 'No shots'))}\n\n`
       continue
     }
 
@@ -231,15 +242,15 @@ function sceneGroups(
   return groups
 }
 
-function sceneDetailItems(scene: SceneRow | null): string[] {
+function sceneDetailItems(scene: SceneRow | null, locale: AppLocale): string[] {
   if (!scene) return []
 
   return [
-    labelPart('장소', scene.location),
-    labelPart('시간', scene.time_of_day),
-    labelPart('무드', pickNative(textValue(scene.mood_native), textValue(scene.mood))),
+    labelPart(translate(locale, 'Location'), scene.location),
+    labelPart(translate(locale, 'Time'), scene.time_of_day),
+    labelPart(translate(locale, 'Scene mood'), pickNative(textValue(scene.mood_native), textValue(scene.mood))),
     labelPart(
-      '요약',
+      translate(locale, 'Summary'),
       pickNative(textValue(scene.narrative_summary_native), textValue(scene.narrative_summary)),
     ),
   ].filter((item): item is string => Boolean(item))
@@ -275,21 +286,22 @@ function completedStoryboardUrl(storyboard: StoryboardImageValue | null): string
   return mediaUrl(storyboard?.url)
 }
 
-function storyboardStatusNote(storyboard: StoryboardImageValue | null): string {
-  if (!storyboard) return `이미지 없음 ${IMAGE_OMITTED_SUFFIX}`
+function storyboardStatusNote(storyboard: StoryboardImageValue | null, locale: AppLocale): string {
+  const omitted = imageOmittedSuffix(locale)
+  if (!storyboard) return `${translate(locale, 'No image')} ${omitted}`
 
   const status = textValue(storyboard.status)?.toLowerCase() ?? 'unknown'
   const error = textValue(storyboard.errorMessage)
 
-  if (status === 'generating') return `생성 중 (generating) ${IMAGE_OMITTED_SUFFIX}`
+  if (status === 'generating') return `${translate(locale, 'Generating')} (generating) ${omitted}`
   if (status === 'failed') {
     return error
-      ? `실패 (failed): ${error} ${IMAGE_OMITTED_SUFFIX}`
-      : `실패 (failed) ${IMAGE_OMITTED_SUFFIX}`
+      ? `${translate(locale, 'Failed')} (failed): ${error} ${omitted}`
+      : `${translate(locale, 'Failed')} (failed) ${omitted}`
   }
-  if (status === 'completed') return `완료 (completed), URL 없음 ${IMAGE_OMITTED_SUFFIX}`
+  if (status === 'completed') return `${translate(locale, 'Completed')} (completed), ${translate(locale, 'No URL')} ${omitted}`
 
-  return `${status} ${IMAGE_OMITTED_SUFFIX}`
+  return `${status} ${omitted}`
 }
 
 function storyboardImageValue(value: unknown): StoryboardImageValue | null {

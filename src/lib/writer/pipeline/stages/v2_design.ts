@@ -1,5 +1,6 @@
 // V2: 비주얼 디자인 (인물/월드) — native 생성 [v0 스타일]+[v1 아크]+[s2 chars/world]+[seed.v2].
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import type {
   Characters,
   VisualIdentity,
@@ -9,6 +10,7 @@ import type {
   BackgroundContract,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
+import type { AppLocale } from '@/lib/locale';
 
 // ── native v2 (V축 재설계): CharacterVisual + WorldVisual 를 LLM 으로 직접 생성 ──
 //   읽음: v0 visualIdentity(전역 스타일 루트) + v1 actVisualArc(막별 아크, v-체인 상속)
@@ -24,6 +26,8 @@ export async function runV2Design(
   seedV2: string,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
+  // #i18n-s5: 미지정(레거시)이면 systemInstruction 절 미주입 — 종전 동작 그대로.
+  outputLocale?: AppLocale,
 ): Promise<{ characterVisual: CharacterVisual; worldVisual: WorldVisual }> {
   await logger.markStage('v2Design', 'started');
 
@@ -38,7 +42,7 @@ export async function runV2Design(
 - 전역 스타일(art_style/shape_language/line/proportion/texture)을 모든 디자인이 따른다.
 - 팔레트는 막별 아크의 palette_shift/lighting_mood 와 정합해야 한다(아크가 없으면 스타일+seed 로 자체 결정).
 - forbidden 색은 작품에서 절대 사용 안 할 색.
-- 주어진 로케이션 id 와 인물 character_id 를 **그대로** 사용한다(발명·변경 금지).`;
+- 주어진 로케이션 id 와 인물 character_id 를 **그대로** 사용한다(발명·변경 금지).${outputLanguageClause(outputLocale)}`;
 
   const userPrompt = `[v0 비주얼 아이덴티티 — 전역 고정 스타일]
 ${JSON.stringify(visualIdentity.style, null, 2)}

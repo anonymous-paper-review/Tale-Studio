@@ -1,6 +1,7 @@
 // S1: 내러티브 구조, POV, 주제, CDQ
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { NarrativeStructureSchema } from '@/lib/writer/pipeline/schemas';
+import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import type { Genre, NarrativeStructure, PipelineInput, Dramaturgy } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
@@ -39,7 +40,7 @@ CDQ (Central Dramatic Question):
 - D5: 표준 구조 + 서브플롯 1~2개
 - D6: 다층 구조 + 서브플롯 2~3개
 - D7: 다층 구조 + 서브플롯 다수 + 에피소드 연속성 가능
-`;
+${outputLanguageClause(input.outputLocale)}`;
 
   // 드라마투르그 진단 블록 — 강제가 아니라 재료. CDQ 는 여전히 s1 이 정한다(후보 채택·개선·기각 자유).
   const diag = dramaturgy?.dramatic_diagnosis;

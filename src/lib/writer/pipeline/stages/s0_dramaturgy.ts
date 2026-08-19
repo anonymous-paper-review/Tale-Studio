@@ -16,6 +16,7 @@
 //     (미채택 후보는 v2 디자인·배경 생성 비용을 태우지 않는다).
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { DramaturgySchema } from '@/lib/writer/pipeline/schemas';
+import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import type {
   Genre,
   Characters,
@@ -57,7 +58,10 @@ export async function runDramaturgy(
 - cdq_candidates: yes/no 로 답할 수 있는 중심 극적 질문 후보 2~3개.
 - ending_check: 스토리의 결말이 그 질문에 실제로 답하는가.
 
-진단은 제안이다 — 스토리를 고쳐 쓰지 마라. 원문은 불변이고, 판단 재료만 만든다.`;
+진단은 제안이다 — 스토리를 고쳐 쓰지 마라. 원문은 불변이고, 판단 재료만 만든다.${outputLanguageClause(input.outputLocale)}`;
+
+  // #i18n-s5: 미지정(레거시)이면 종전 "스토리와 같은 언어" 관례 그대로 — 지정 시 [출력 언어] 절이 우선.
+  const langHint = input.outputLocale ? '[출력 언어] 절이 정한 언어' : '스토리와 같은 언어';
 
   const userPrompt = `[스토리 — 원문 불변]
 ${input.story}
@@ -91,7 +95,7 @@ ${
   "world_inventory": [
     {
       "id": "snake_case_slug",
-      "name": "표시명 (스토리와 같은 언어)",
+      "name": "표시명 (${langHint})",
       "description": "이 무대의 시각적/기능적 한 줄",
       "derived_from": "엔진의 어느 메커니즘/단계에서 유도됐나",
       "scene_potential": ["이 무대에서 가능한 씬 상황 1~3개"]

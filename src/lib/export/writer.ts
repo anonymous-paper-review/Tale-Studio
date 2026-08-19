@@ -1,3 +1,6 @@
+import { translate } from '@/lib/i18n'
+import { DEFAULT_LOCALE, type AppLocale } from '@/lib/locale'
+
 import { h1, h2, isRecord, kvSection, labelPart, nativeText, table, textOrUnset } from './md'
 import type { ArtifactFile } from './types'
 
@@ -45,6 +48,7 @@ export interface CollectWriterArtifactsOptions {
 export async function collectWriterArtifacts(
   projectId: string,
   options: CollectWriterArtifactsOptions = {},
+  locale: AppLocale = DEFAULT_LOCALE,
 ): Promise<ArtifactFile[]> {
   const fetchFn = options.fetchFn ?? defaultFetch
   const response = await fetchFn(`/api/writer/export/${encodeURIComponent(projectId)}`, { method: 'GET' })
@@ -58,10 +62,10 @@ export async function collectWriterArtifacts(
     : {}
 
   return [
-    { path: 'writer/story-bible.md', kind: 'text', content: renderStoryBible(projection) },
-    { path: 'writer/scenes.md', kind: 'text', content: renderScenes(projection, fallback) },
-    { path: 'writer/shots.md', kind: 'text', content: renderShots(projection, fallback) },
-    { path: 'writer/prompts.md', kind: 'text', content: renderPrompts(projection, fallback) },
+    { path: 'writer/story-bible.md', kind: 'text', content: renderStoryBible(projection, locale) },
+    { path: 'writer/scenes.md', kind: 'text', content: renderScenes(projection, fallback, locale) },
+    { path: 'writer/shots.md', kind: 'text', content: renderShots(projection, fallback, locale) },
+    { path: 'writer/prompts.md', kind: 'text', content: renderPrompts(projection, fallback, locale) },
   ]
 }
 
@@ -106,46 +110,46 @@ function needsFallback(projection: WriterExportProjection): boolean {
   )
 }
 
-function renderStoryBible(projection: WriterExportProjection): string {
+function renderStoryBible(projection: WriterExportProjection, locale: AppLocale): string {
   const storyBible = projection.storyBible
   let body = h1('Writer Story Bible')
-  if (!storyBible) return body + incompleteSection('storyBible 산출물이 없습니다.')
+  if (!storyBible) return body + incompleteSection(translate(locale, 'The storyBible output is missing.'), locale)
 
   if (!storyBible.genre || !storyBible.narrativeStructure || !storyBible.characters) {
-    body += incompleteSection('storyBible 산출물이 일부 누락되었습니다.')
+    body += incompleteSection(translate(locale, 'Some of the storyBible output is missing.'), locale)
   }
 
-  body += renderGenre(storyBible.genre)
-  body += renderNarrativeStructure(storyBible.narrativeStructure)
-  body += renderCharacters(storyBible.characters)
+  body += renderGenre(storyBible.genre, locale)
+  body += renderNarrativeStructure(storyBible.narrativeStructure, locale)
+  body += renderCharacters(storyBible.characters, locale)
   return body
 }
 
-function renderGenre(value: unknown): string {
+function renderGenre(value: unknown, locale: AppLocale): string {
   const genre = isRecord(value) ? value : null
-  if (!genre) return `${h2('Genre')}미설정\n\n`
+  if (!genre) return `${h2('Genre')}${translate(locale, 'Not set')}\n\n`
 
   return kvSection('Genre', [
-    ['장르', nativeText(genre, 'genre')],
-    ['세부 장르', nativeText(genre, 'subGenre')],
-    ['톤', listText(genre.tone)],
-    ['목표 감정', listText(genre.targetEmotion)],
-    ['러닝타임', numberLabel(genre.runtime_seconds, '초')],
+    [translate(locale, 'Genre'), nativeText(genre, 'genre')],
+    [translate(locale, 'Sub-genre'), nativeText(genre, 'subGenre')],
+    [translate(locale, 'Tone'), listText(genre.tone)],
+    [translate(locale, 'Target emotion'), listText(genre.targetEmotion)],
+    [translate(locale, 'Runtime'), numberLabel(genre.runtime_seconds, 'seconds', locale)],
     ['Depth', textValue(genre.depth_level)],
-    ['포맷', textValue(genre.format)],
+    [translate(locale, 'Format'), textValue(genre.format)],
   ])
 }
 
-function renderNarrativeStructure(value: unknown): string {
+function renderNarrativeStructure(value: unknown, locale: AppLocale): string {
   const structure = isRecord(value) ? value : null
-  if (!structure) return `${h2('Narrative Structure')}미설정\n\n`
+  if (!structure) return `${h2('Narrative Structure')}${translate(locale, 'Not set')}\n\n`
 
   let body = kvSection('Narrative Structure', [
-    ['구조', nativeText(structure, 'structure_type')],
-    ['시점', nativeText(structure, 'pov')],
-    ['주제', nativeText(structure, 'theme')],
-    ['중심 극적 질문', nativeText(structure, 'central_dramatic_question')],
-    ['전환점 위치', numberLabel(structure.turning_point_position, '')],
+    [translate(locale, 'Structure'), nativeText(structure, 'structure_type')],
+    [translate(locale, 'POV'), nativeText(structure, 'pov')],
+    [translate(locale, 'Theme'), nativeText(structure, 'theme')],
+    [translate(locale, 'Central dramatic question'), nativeText(structure, 'central_dramatic_question')],
+    [translate(locale, 'Turning point position'), numberLabel(structure.turning_point_position, 'none')],
   ])
 
   const acts = Array.isArray(structure.acts) ? structure.acts.filter(isRecord) : []
@@ -153,9 +157,9 @@ function renderNarrativeStructure(value: unknown): string {
     body += table(
       ['Act', 'Purpose', 'Proportion'],
       acts.map((act) => [
-        textOrUnset(textValue(act.act_id)),
-        textOrUnset(nativeText(act, 'purpose')),
-        textOrUnset(numberLabel(act.proportion, '')),
+        textOrUnset(textValue(act.act_id), locale),
+        textOrUnset(nativeText(act, 'purpose'), locale),
+        textOrUnset(numberLabel(act.proportion, 'none'), locale),
       ]),
     )
   }
@@ -163,64 +167,64 @@ function renderNarrativeStructure(value: unknown): string {
   return body
 }
 
-function renderCharacters(value: unknown): string {
+function renderCharacters(value: unknown, locale: AppLocale): string {
   const characters = characterList(value)
-  if (characters.length === 0) return `${h2('Characters')}캐릭터 없음\n\n`
+  if (characters.length === 0) return `${h2('Characters')}${translate(locale, 'No characters')}\n\n`
 
   return `${h2('Characters')}${table(
     ['ID', 'Name', 'Role', 'Arc', 'Motivation', 'Appearance'],
     characters.map((character) => [
-      textOrUnset(textValue(character.id) || textValue(character.character_id)),
-      textOrUnset(nativeText(character, 'name')),
-      textOrUnset(nativeText(character, 'role')),
-      textOrUnset(arcText(character.arc)),
-      textOrUnset(motivationText(character.motivation)),
-      textOrUnset(nativeText(character, 'appearance_description') || nativeText(character, 'appearance')),
+      textOrUnset(textValue(character.id) || textValue(character.character_id), locale),
+      textOrUnset(nativeText(character, 'name'), locale),
+      textOrUnset(nativeText(character, 'role'), locale),
+      textOrUnset(arcText(character.arc, locale), locale),
+      textOrUnset(motivationText(character.motivation, locale), locale),
+      textOrUnset(nativeText(character, 'appearance_description') || nativeText(character, 'appearance'), locale),
     ]),
   )}`
 }
 
-function renderScenes(projection: WriterExportProjection, fallback: WriterDbFallback): string {
+function renderScenes(projection: WriterExportProjection, fallback: WriterDbFallback, locale: AppLocale): string {
   let body = h1('Writer Scenes')
   if (projection.scenes) {
-    body += sceneTable(projection.scenes)
+    body += sceneTable(projection.scenes, locale)
     return body
   }
 
-  body += incompleteSection('scenes 산출물이 없습니다.')
+  body += incompleteSection(translate(locale, 'The scenes output is missing.'), locale)
   const fallbackScenes = fallback.scenes ?? []
-  if (fallbackScenes.length) body += h2('DB Fallback Scenes') + sceneTable(fallbackScenes)
+  if (fallbackScenes.length) body += h2('DB Fallback Scenes') + sceneTable(fallbackScenes, locale)
   return body
 }
 
-function sceneTable(scenes: unknown[]): string {
+function sceneTable(scenes: unknown[], locale: AppLocale): string {
   const rows = scenes.filter(isRecord).map((scene) => [
-    textOrUnset(textValue(scene.scene_id) || textValue(scene.id)),
-    textOrUnset(scenePlaceText(scene)),
-    textOrUnset(sceneCharactersText(scene)),
-    textOrUnset(sceneSummaryText(scene)),
-    textOrUnset(sceneEmotionText(scene)),
-    textOrUnset(sceneDialogueText(scene)),
+    textOrUnset(textValue(scene.scene_id) || textValue(scene.id), locale),
+    textOrUnset(scenePlaceText(scene), locale),
+    textOrUnset(sceneCharactersText(scene), locale),
+    textOrUnset(sceneSummaryText(scene), locale),
+    textOrUnset(sceneEmotionText(scene), locale),
+    textOrUnset(sceneDialogueText(scene), locale),
   ])
 
-  if (!rows.length) return '씬 없음\n\n'
+  if (!rows.length) return `${translate(locale, 'No scenes')}\n\n`
   return table(['Scene', 'Location / Time', 'Characters', 'Summary', 'Emotional Beat', 'Dialogue / Actions'], rows)
 }
 
-function renderShots(projection: WriterExportProjection, fallback: WriterDbFallback): string {
+function renderShots(projection: WriterExportProjection, fallback: WriterDbFallback, locale: AppLocale): string {
   let body = h1('Writer Shots')
   if (projection.shotDesign) {
-    body += shotDesignTable(projection.shotDesign)
+    body += shotDesignTable(projection.shotDesign, locale)
     return body
   }
 
-  body += incompleteSection('shotDesign 산출물이 없습니다.')
+  body += incompleteSection(translate(locale, 'The shotDesign output is missing.'), locale)
   const fallbackShots = fallback.shots ?? []
-  if (fallbackShots.length) body += h2('DB Fallback Shots') + fallbackShotTable(fallbackShots)
+  if (fallbackShots.length) body += h2('DB Fallback Shots') + fallbackShotTable(fallbackShots, locale)
   return body
 }
 
-function shotDesignTable(shots: unknown[]): string {
+function shotDesignTable(shots: unknown[], locale: AppLocale): string {
   const rows = shots.filter(isRecord).map((shot) => {
     const intent = recordValue(shot.intent)
     const staticSpec = recordValue(shot.static_spec) || recordValue(shot.staticSpec)
@@ -229,79 +233,80 @@ function shotDesignTable(shots: unknown[]): string {
     return [
       textOrUnset(
         textValue(intent?.shot_id) || textValue(staticSpec?.shot_id) || textValue(dynamicSpec?.shot_id),
+        locale,
       ),
-      textOrUnset(textValue(intent?.scene_id)),
-      textOrUnset(intentText(intent)),
-      textOrUnset(staticSpecText(staticSpec)),
-      textOrUnset(dynamicSpecText(dynamicSpec)),
+      textOrUnset(textValue(intent?.scene_id), locale),
+      textOrUnset(intentText(intent, locale), locale),
+      textOrUnset(staticSpecText(staticSpec), locale),
+      textOrUnset(dynamicSpecText(dynamicSpec), locale),
     ]
   })
 
-  if (!rows.length) return '샷 없음\n\n'
+  if (!rows.length) return `${translate(locale, 'No shots')}\n\n`
   return table(['Shot', 'Scene', 'Intent', 'Static Spec', 'Dynamic Spec'], rows)
 }
 
-function fallbackShotTable(shots: unknown[]): string {
+function fallbackShotTable(shots: unknown[], locale: AppLocale): string {
   const rows = shots.filter(isRecord).map((shot) => [
-    textOrUnset(textValue(shot.shot_id) || textValue(shot.id)),
-    textOrUnset(textValue(shot.scene_id)),
-    textOrUnset(nativeText(shot, 'action_description')),
-    textOrUnset(textValue(shot.shot_type)),
-    textOrUnset(numberLabel(shot.duration_seconds ?? shot.duration, '초')),
-    textOrUnset(dialogueText(shot.dialogue_lines)),
+    textOrUnset(textValue(shot.shot_id) || textValue(shot.id), locale),
+    textOrUnset(textValue(shot.scene_id), locale),
+    textOrUnset(nativeText(shot, 'action_description'), locale),
+    textOrUnset(textValue(shot.shot_type), locale),
+    textOrUnset(numberLabel(shot.duration_seconds ?? shot.duration, 'seconds', locale), locale),
+    textOrUnset(dialogueText(shot.dialogue_lines), locale),
   ])
 
-  if (!rows.length) return '샷 없음\n\n'
+  if (!rows.length) return `${translate(locale, 'No shots')}\n\n`
   return table(['Shot', 'Scene', 'Action', 'Type', 'Duration', 'Dialogue'], rows)
 }
 
-function renderPrompts(projection: WriterExportProjection, fallback: WriterDbFallback): string {
+function renderPrompts(projection: WriterExportProjection, fallback: WriterDbFallback, locale: AppLocale): string {
   let body = h1('Writer Render Prompts')
   if (projection.renderPrompts) {
-    body += promptTable(projection.renderPrompts)
+    body += promptTable(projection.renderPrompts, locale)
     return body
   }
 
-  body += incompleteSection('renderPrompts 산출물이 없습니다.')
+  body += incompleteSection(translate(locale, 'The renderPrompts output is missing.'), locale)
   const fallbackShots = fallback.shots ?? []
-  if (fallbackShots.length) body += h2('DB Fallback Prompts') + fallbackPromptTable(fallbackShots)
+  if (fallbackShots.length) body += h2('DB Fallback Prompts') + fallbackPromptTable(fallbackShots, locale)
   return body
 }
 
-function promptTable(renderPrompts: Record<string, unknown>): string {
+function promptTable(renderPrompts: Record<string, unknown>, locale: AppLocale): string {
   const shots = Array.isArray(renderPrompts.shots) ? renderPrompts.shots.filter(isRecord) : []
   const rows = shots.map((shot) => {
     const t2i = recordValue(shot.t2i)
     const ti2v = recordValue(shot.ti2v)
     return [
-      textOrUnset(textValue(shot.shot_id)),
-      textOrUnset(textValue(shot.scene_id)),
-      textOrUnset(textValue(t2i?.prompt)),
-      textOrUnset(textValue(ti2v?.motion_prompt)),
-      textOrUnset(numberLabel(shot.duration_seconds ?? ti2v?.duration_seconds, '초')),
+      textOrUnset(textValue(shot.shot_id), locale),
+      textOrUnset(textValue(shot.scene_id), locale),
+      textOrUnset(textValue(t2i?.prompt), locale),
+      textOrUnset(textValue(ti2v?.motion_prompt), locale),
+      textOrUnset(numberLabel(shot.duration_seconds ?? ti2v?.duration_seconds, 'seconds', locale), locale),
     ]
   })
 
-  if (!rows.length) return '프롬프트 없음\n\n'
+  if (!rows.length) return `${translate(locale, 'No prompts')}\n\n`
   return table(['Shot', 'Scene', 'T2I Prompt (EN)', 'TI2V Motion Prompt (EN)', 'Duration'], rows)
 }
 
-function fallbackPromptTable(shots: unknown[]): string {
+function fallbackPromptTable(shots: unknown[], locale: AppLocale): string {
   const rows = shots
     .filter(isRecord)
     .filter((shot) => textValue(shot.prompt))
     .map((shot) => [
-      textOrUnset(textValue(shot.shot_id) || textValue(shot.id)),
-      textOrUnset(textValue(shot.scene_id)),
-      textOrUnset(textValue(shot.prompt)),
+      textOrUnset(textValue(shot.shot_id) || textValue(shot.id), locale),
+      textOrUnset(textValue(shot.scene_id), locale),
+      textOrUnset(textValue(shot.prompt), locale),
     ])
 
-  if (!rows.length) return '프롬프트 없음\n\n'
+  if (!rows.length) return `${translate(locale, 'No prompts')}\n\n`
   return table(['Shot', 'Scene', 'Prompt (EN)'], rows)
 }
 
-function incompleteSection(reason: string): string {
-  return `${h2('¶파이프라인 미완료')}${reason}\n\n`
+function incompleteSection(reason: string, locale: AppLocale): string {
+  return `${h2(translate(locale, '¶ Pipeline incomplete'))}${reason}\n\n`
 }
 
 function characterList(value: unknown): Record<string, unknown>[] {
@@ -350,13 +355,13 @@ function sceneDialogueText(scene: Record<string, unknown>): string {
   return nativeText(scene, 'dialogue_summary') || listText(scene.scene_actions)
 }
 
-function intentText(intent: Record<string, unknown> | null): string {
+function intentText(intent: Record<string, unknown> | null, locale: AppLocale): string {
   if (!intent) return ''
   return joinParts([
     labelPart('Purpose', nativeText(intent, 'dramatic_purpose')),
     labelPart('Focus', nativeText(intent, 'audience_focus')),
     labelPart('Position', textValue(intent.shot_position_in_scene)),
-    labelPart('Duration', numberLabel(intent.duration_seconds, '초')),
+    labelPart('Duration', numberLabel(intent.duration_seconds, 'seconds', locale)),
   ])
 }
 
@@ -401,23 +406,23 @@ function characterMotionText(value: unknown): string {
     .join('; ')
 }
 
-function arcText(value: unknown): string {
+function arcText(value: unknown, locale: AppLocale): string {
   const arc = recordValue(value)
   if (!arc) return ''
   return joinParts([
-    labelPart('시작', nativeText(arc, 'start_state')),
-    labelPart('끝', nativeText(arc, 'end_state')),
-    labelPart('유형', nativeText(arc, 'arc_type')),
+    labelPart(translate(locale, 'Start'), nativeText(arc, 'start_state')),
+    labelPart(translate(locale, 'End'), nativeText(arc, 'end_state')),
+    labelPart(translate(locale, 'Type'), nativeText(arc, 'arc_type')),
   ])
 }
 
-function motivationText(value: unknown): string {
+function motivationText(value: unknown, locale: AppLocale): string {
   const motivation = recordValue(value)
   if (!motivation) return ''
   return joinParts([
-    labelPart('원함', nativeText(motivation, 'want')),
-    labelPart('필요', nativeText(motivation, 'need')),
-    labelPart('상처', nativeText(motivation, 'wound')),
+    labelPart(translate(locale, 'Want'), nativeText(motivation, 'want')),
+    labelPart(translate(locale, 'Need'), nativeText(motivation, 'need')),
+    labelPart(translate(locale, 'Wound'), nativeText(motivation, 'wound')),
   ])
 }
 
@@ -460,8 +465,11 @@ function listItemText(value: unknown): string {
   )
 }
 
-function numberLabel(value: unknown, suffix: string): string {
-  return typeof value === 'number' && Number.isFinite(value) ? `${value}${suffix}` : ''
+function numberLabel(value: unknown, unit: 'seconds' | 'mm' | 'none', locale: AppLocale = DEFAULT_LOCALE): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return ''
+  if (unit === 'seconds') return translate(locale, '{value}s', { value })
+  if (unit === 'mm') return `${value}mm`
+  return String(value)
 }
 
 function textValue(value: unknown): string | undefined {

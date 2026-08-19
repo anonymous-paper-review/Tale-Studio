@@ -42,7 +42,7 @@ export function SectionNav({ sections }: { sections: readonly SectionNavItem[] }
     // 기본은 촘촘하고 작게(시야 방해 최소), 내비 영역에 마우스가 오면 간격·대시가 함께 커진다
     //   (#landing-v2d 2026-08-03 — dock 스타일). 개별 대시 hover 는 밝기 + 제목 pill 담당.
     <nav
-      aria-label="섹션 목차"
+      aria-label="Section navigation"
       className="group/nav fixed right-5 top-1/2 z-40 hidden -translate-y-1/2 flex-col items-end gap-1.5 transition-[gap] duration-300 hover:gap-4 md:flex"
     >
       {sections.map((s) => {
@@ -52,7 +52,7 @@ export function SectionNav({ sections }: { sections: readonly SectionNavItem[] }
             key={s.id}
             type="button"
             onClick={() => jump(s.id)}
-            aria-label={`${s.label} 섹션으로 이동`}
+            aria-label={`Jump to ${s.label} section`}
             aria-current={active ? 'true' : undefined}
             className="group flex items-center gap-3 py-1"
           >

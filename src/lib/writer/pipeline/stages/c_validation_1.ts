@@ -5,6 +5,7 @@
 //   클리셰 WARNING을 내고 광고 장르 관습(제품 매직 모먼트)을 데우스 엑스 마키나 CRITICAL로 오판했다.
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { analyzeCausalityChain } from '@/lib/writer/pipeline/validators/causality';
+import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import type {
   StoryCheckReport,
   Genre,
@@ -14,6 +15,7 @@ import type {
   ValidationIssue,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
+import type { AppLocale } from '@/lib/locale';
 
 interface LlmValidationResponse {
   cdq_present: boolean;
@@ -29,6 +31,8 @@ export async function runStoryCheck(
   scenes: Scenes,
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
+  // #i18n-s5: 미지정(레거시)이면 systemInstruction 절 미주입 — 종전 동작 그대로.
+  outputLocale?: AppLocale,
   retryCount = 0,
 ): Promise<StoryCheckReport> {
   await logger.markStage('storyCheck', 'started', { retry: retryCount });
@@ -67,7 +71,7 @@ CRITICAL: 인과·핍진성 붕괴, 차별점 실종 — 재생성이 필요한 
 WARNING: CDQ 약함, 인과 연결 약함, 주제 단절
 INFO: 미세 개선 제안
 
-cliche_count는 참고용 카운트로만 반환한다 — 클리셰를 이유로 llm_issues를 만들지 않는다.`;
+cliche_count는 참고용 카운트로만 반환한다 — 클리셰를 이유로 llm_issues를 만들지 않는다.${outputLanguageClause(outputLocale)}`;
 
   const user = `[genre]
 ${JSON.stringify(genre)}

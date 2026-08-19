@@ -49,12 +49,12 @@ export function projectIdOfPath(objectPath: string): string | null {
 
 export function classifyMediaObject(objectPath: string, ctx: ClassifyContext): MediaVerdict {
   const path = objectPath.replace(/^\/+/, '')
-  if (!path) return { disposition: 'review', reason: '경로가 비어 있음' }
+  if (!path) return { disposition: 'review', reason: '경로가 비어 있음' } // i18n-ok
 
   // 1) 임시물이 먼저다 — 주인 프로젝트가 살아 있어도 옮길 이유가 없다.
   for (const pattern of TEMP_PATTERNS) {
     if (path.includes(pattern)) {
-      return { disposition: 'skip-temp', reason: '생성용 임시 시트 — 다음 생성 때 다시 만들어짐' }
+      return { disposition: 'skip-temp', reason: '생성용 임시 시트 — 다음 생성 때 다시 만들어짐' } // i18n-ok
     }
   }
 
@@ -62,13 +62,13 @@ export function classifyMediaObject(objectPath: string, ctx: ClassifyContext): M
 
   // 2) 공용 자산(템플릿·스타일 앵커 등)은 프로젝트에 속하지 않는다. 그대로 옮긴다.
   if (projectId === null) {
-    return { disposition: 'migrate', reason: '프로젝트에 속하지 않는 공용 자산' }
+    return { disposition: 'migrate', reason: '프로젝트에 속하지 않는 공용 자산' } // i18n-ok
   }
 
   // 3) 주인이 없으면 옮기지 않는다. 지우는 게 아니라 **복사 대상에서 빼는** 것이라
   //    옛 보관함에 그대로 남는다 — 판단이 틀려도 되돌릴 수 있다.
   if (!ctx.liveProjectIds.has(projectId)) {
-    return { disposition: 'skip-orphan', reason: '주인 프로젝트가 데이터베이스에 없음' }
+    return { disposition: 'skip-orphan', reason: '주인 프로젝트가 데이터베이스에 없음' } // i18n-ok
   }
 
   // 4) 살아 있는 프로젝트의 파일은 전부 옮긴다.
@@ -80,5 +80,5 @@ export function classifyMediaObject(objectPath: string, ctx: ClassifyContext): M
   //
   //    양이 궁금하면 `scripts/media-migration-plan.mts` 가 옮기는 것 중 시험·샘플 몫을
   //    따로 집계해 보여준다. 판정을 바꾸지 않고 크기만 알려주는 것이 목적이다.
-  return { disposition: 'migrate', reason: '살아 있는 프로젝트의 파일' }
+  return { disposition: 'migrate', reason: '살아 있는 프로젝트의 파일' } // i18n-ok
 }

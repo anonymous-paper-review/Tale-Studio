@@ -5,6 +5,7 @@
 //   한 곳은 "Producer에서 다시"(전체 재실행)를 안내하는 사고가 재발한다.
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { useT } from '@/lib/i18n'
 
 export function WriterResumeButton({
   projectId,
@@ -15,6 +16,7 @@ export function WriterResumeButton({
   onResumed?: () => void
 }) {
   const [resuming, setResuming] = useState(false)
+  const t = useT()
   const resume = async () => {
     if (!projectId || resuming) return
     setResuming(true)
@@ -32,10 +34,10 @@ export function WriterResumeButton({
   return (
     <div className="flex flex-col items-center gap-2">
       <Button size="sm" onClick={resume} disabled={resuming}>
-        {resuming ? '재개하는 중…' : '이어서 재시도'}
+        {resuming ? t('Resuming…') : t('Resume')}
       </Button>
       <p className="text-xs text-muted-foreground">
-        중단된 단계부터 다시 시작해요 — 처음부터 다시 만들지 않아요.
+        {t("Picks up from where it stopped — it won't start over from scratch.")}
       </p>
     </div>
   )

@@ -67,7 +67,7 @@ const fixtureBoard: ProducerArtifactBoard = {
 
 describe('collectProducerArtifacts', () => {
   it('emits readable producer markdown artifacts for a populated board', () => {
-    const files = collectProducerArtifacts(fixtureBoard)
+    const files = collectProducerArtifacts(fixtureBoard, 'ko')
 
     expect(files.map((file) => file.path)).toEqual([
       'producer/story.md',
@@ -109,15 +109,29 @@ describe('collectProducerArtifacts', () => {
       storyText: '   ',
       cast: [],
       backgrounds: [],
-    })
+    }, 'ko')
 
     expect(textFile(files, 'producer/story.md')).toContain('스토리 작성 전')
     expect(textFile(files, 'producer/cast.md')).toContain('캐스트 없음')
     expect(textFile(files, 'producer/backgrounds.md')).toContain('배경 없음')
   })
 
+  it('falls back to English labels for the en locale (and the unset-key default)', () => {
+    const files = collectProducerArtifacts(
+      { ...fixtureBoard, storyText: '   ', cast: [], backgrounds: [] },
+      'en',
+    )
+
+    expect(textFile(files, 'producer/story.md')).toContain('Story not written yet')
+    expect(textFile(files, 'producer/cast.md')).toContain('No cast')
+    expect(textFile(files, 'producer/backgrounds.md')).toContain('No backgrounds')
+
+    const defaulted = collectProducerArtifacts({ ...fixtureBoard, projectSettings: { ...fixtureBoard.projectSettings, genre: '' } })
+    expect(textFile(defaulted, 'producer/settings.md')).toContain('Not set')
+  })
+
   it('does not emit producer background image files for today\'s BackgroundSource shape', () => {
-    const files = collectProducerArtifacts(fixtureBoard)
+    const files = collectProducerArtifacts(fixtureBoard, 'ko')
 
     expect(files.filter((file) => file.path.startsWith('producer/backgrounds/'))).toEqual([])
     expect(files.some((file) => file.kind === 'media')).toBe(false)

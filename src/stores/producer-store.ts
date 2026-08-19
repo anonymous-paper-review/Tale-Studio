@@ -12,6 +12,10 @@ import { computeProducerSourceHash } from '@/lib/lifecycle'
 import { createPendingProposal } from '@/lib/pending-proposal'
 import { evaluateProducerGate } from '@/lib/producer-gate'
 import { getWriterEnginePreference } from '@/lib/writer/engine'
+// store 액션·순수 함수는 훅을 못 쓴다 — translate() + 현재 locale 직접 조회로 번역
+//   (writer 배치의 #i18n-s5-batch3 패턴).
+import { translate } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 import type {
   CastMember,
   CastArc,
@@ -175,7 +179,10 @@ function parseCustomAnchorRow(
   if (typeof record.url !== 'string' || !record.url) return null
   return {
     url: record.url,
-    label: typeof record.label === 'string' && record.label ? record.label : '내 레퍼런스',
+    label:
+      typeof record.label === 'string' && record.label
+        ? record.label
+        : translate(useLocaleStore.getState().locale, 'My reference'),
     medium: typeof record.medium === 'string' ? record.medium : null,
   }
 }
@@ -612,7 +619,9 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       set({
         styleAnchorKey: prev,
         customStyleAnchor: prevCustom,
-        error: `스타일 저장 실패: ${error.message}`,
+        error: translate(useLocaleStore.getState().locale, 'Failed to save style: {message}', {
+          message: error.message,
+        }),
       })
     }
   },
@@ -642,24 +651,35 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       (afterHandoff && affected.length > 0) || protectedConflicts.length > 0
 
     if (needsApproval) {
+      // createPendingProposal/offerPendingProposal 은 범위 밖(global-chat-store.ts) — 그쪽
+      //   렌더 지점이 아직 t() 를 안 태우므로(artist 단계의 같은 패턴도 미번역 확인, 2026-08-18
+      //   실측), 여기서 미리 translate() 로 완역해 넘긴다(#i18n-s5-batch3, ko 사용자는 기존과
+      //   동일 출력 — locale 값이 안 바뀌면 회귀 없음).
+      const locale = useLocaleStore.getState().locale
       const impactFields = Array.from(new Set([...affected, ...protectedConflicts]))
       const accepted = useGlobalChatStore.getState().offerPendingProposal(
         createPendingProposal({
           stage: 'producer',
           kind: 'producerSourcePatch',
           target: 'Producer source',
-          action: '채팅이 제안한 story/settings/카드 변경 적용',
+          action: translate(locale, 'Apply story/settings/card changes suggested by chat'),
           impact: [
-            `변경 필드: ${impactFields.join(', ')}`,
+            translate(locale, 'Changed fields: {fields}', { fields: impactFields.join(', ') }),
             protectedConflicts.length > 0
-              ? '사용자가 직접 수정한 카드 값을 덮어쓰거나 삭제해요.'
-              : '기존 Writer/Artist 산출물이 낡을 수 있어요.',
-            '승인 전에는 현재 Producer 값이 유지됩니다.',
+              ? translate(locale, 'This overwrites or deletes card values you edited directly.')
+              : translate(locale, 'Existing Writer/Artist output may become stale.'),
+            translate(locale, 'Current Producer values stay in place until you approve.'),
           ],
           payload: { patch: extracted },
         }),
       )
-      if (!accepted) set({ error: '이미 대기 중인 제안이 있어 새 Producer 변경 제안을 보류했어요.' })
+      if (!accepted)
+        set({
+          error: translate(
+            locale,
+            'A proposal is already pending, so the new Producer change proposal was held back.',
+          ),
+        })
       return
     }
 
@@ -772,12 +792,17 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       cast,
       backgrounds,
       styleAnchorKey: get().styleAnchorKey,
+      locale: useLocaleStore.getState().locale,
     })
     if (!gate.canHandoff) {
+      // gate.hardMissing[].label 은 src/lib/producer-gate.ts(범위 밖)가 하드코딩한 한국어 —
+      //   래퍼 문장만 번역하고 목록 자체는 그대로 통과(ko 사용자는 회귀 없음, en 은 래퍼만 개선).
       set({
-        error: `핸드오프 전 필수 항목이 비어 있어요: ${gate.hardMissing
-          .map((i) => i.label)
-          .join(', ')}`,
+        error: translate(
+          useLocaleStore.getState().locale,
+          'Required items are empty before handoff: {fields}',
+          { fields: gate.hardMissing.map((i) => i.label).join(', ') },
+        ),
       })
       return false
     }

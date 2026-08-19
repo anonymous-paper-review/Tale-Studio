@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
 import type { DialogueLine, Shot } from '@/types'
+import { useT } from '@/lib/i18n'
 
 // 화자 칩/라인 색 — 등장 순서대로 순환 (chart 토큰과 무관한 대사 전용 4색).
 const SPEAKER_COLORS = [
@@ -36,6 +37,7 @@ function dialogueLinesOf(shot: Shot): DialogueLine[] {
 }
 
 export function DialogueView() {
+  const t = useT()
   const projectId = useProjectStore((state) => state.projectId)
   const sceneManifest = useWriterStore((state) => state.sceneManifest)
   const shots = useWriterStore((state) => state.shots)
@@ -102,11 +104,13 @@ export function DialogueView() {
       })
       const body = await res.json().catch(() => null)
       if (!res.ok || !body?.ok) {
-        throw new Error(body?.error?.message ?? `대사 생성 실패 (${res.status})`)
+        throw new Error(
+          body?.error?.message ?? t('Dialogue generation failed ({status})', { status: res.status }),
+        )
       }
       await loadProject()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '대사 생성에 실패했습니다.')
+      setError(e instanceof Error ? e.message : t('Dialogue generation failed.'))
       throw e // 훅이 받아 채팅에도 사유를 남긴다(#double-fire) — 여기 빨간 줄은 탭을 떠나면 사라진다.
     } finally {
       setGenerating(false)
@@ -117,7 +121,7 @@ export function DialogueView() {
   const generate = useGuardedAction({
     actionKey: `writer:dialogue:${projectId ?? 'none'}`,
     stage: 'writer',
-    label: '대사',
+    label: t('Dialogue'),
     busy: generating,
     action: runGenerate,
   })
@@ -133,7 +137,9 @@ export function DialogueView() {
 
   return (
     <div className="flex h-full flex-col">
-      <WriterHeader description="대사 뷰어 — 인물을 선택하면 그 인물의 대사만 강조돼요" />
+      <WriterHeader
+        description={t('Dialogue viewer — select a character to highlight only their lines')}
+      />
 
       {/* 인물 칩 + 생성 버튼 */}
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-2.5">
@@ -160,13 +166,15 @@ export function DialogueView() {
           )
         })}
         {speakers.length === 0 && (
-          <span className="text-xs text-muted-foreground">아직 대사가 없어요</span>
+          <span className="text-xs text-muted-foreground">{t('No dialogue yet')}</span>
         )}
 
         <div className="ml-auto flex items-center gap-2">
           {confirming && !generating && (
             <span className="text-[11px] text-muted-foreground">
-              기존 대사 {totalLines}개를 새로 씁니다 — 한 번 더 누르면 실행
+              {t('This rewrites the existing {count} dialogue lines — press again to run', {
+                count: totalLines,
+              })}
             </span>
           )}
           <button
@@ -184,10 +192,10 @@ export function DialogueView() {
               <RefreshCw className="size-3.5" />
             )}
             {generate.locked
-              ? '대사 쓰는 중… (1~2분)'
+              ? t('Writing dialogue… (1-2 min)')
               : totalLines > 0
-                ? '대사 재생성'
-                : '대사 생성'}
+                ? t('Regenerate dialogue')
+                : t('Generate dialogue')}
           </button>
         </div>
       </div>
@@ -201,7 +209,7 @@ export function DialogueView() {
         <div className="w-full max-w-3xl px-6 py-6">
           {scenes.length === 0 ? (
             <p className="py-16 text-center text-sm text-muted-foreground">
-              씬이 아직 없어요 — writer 생성이 끝나면 여기에 대본이 나타나요.
+              {t('No scenes yet — the script will appear here once writer generation finishes.')}
             </p>
           ) : (
             scenes.map((scene, sceneIdx) => {
@@ -281,7 +289,7 @@ export function DialogueView() {
                       )
                     })}
                     {sceneShots.length === 0 && (
-                      <p className="text-xs text-muted-foreground/60">(샷 없음)</p>
+                      <p className="text-xs text-muted-foreground/60">{t('(no shots)')}</p>
                     )}
                   </div>
                 </section>
@@ -292,8 +300,18 @@ export function DialogueView() {
             <div className="flex flex-col items-center gap-2 py-10 text-center">
               <MessageSquareText className="size-6 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">
-                아직 샷 대사가 없어요 — 위의 &ldquo;대사 생성&rdquo;을 누르면 인물 어투를 설계하고
-                <br />씬 흐름을 따라 샷 단위 대사를 써 드려요.
+                {(() => {
+                  const [l1, l2] = t(
+                    'No shot dialogue yet — press "Generate dialogue" above to design character voices{br}and write shot-by-shot dialogue that follows the scene.',
+                  ).split('{br}')
+                  return (
+                    <>
+                      {l1}
+                      <br />
+                      {l2}
+                    </>
+                  )
+                })()}
               </p>
             </div>
           )}

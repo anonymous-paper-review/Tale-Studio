@@ -25,6 +25,7 @@ import {
 import type { StyleAnchor } from '@/stores/producer-store'
 import { cn } from '@/lib/utils'
 import { ThumbImage } from '@/components/thumb-image'
+import { useT } from '@/lib/i18n'
 
 // medium 슬러그(2d_cartoon 등)를 표시용으로 정리 — 언더바 제거 + 단어별 대문자, 2d/3d는 통째 대문자.
 //   예) 2d_cartoon → "2D Cartoon", live_action → "Live Action", 3d → "3D".
@@ -88,6 +89,7 @@ export function StyleAnchorPicker({
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
+  const t = useT()
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const open = openProp ?? uncontrolledOpen
   const setOpen = (o: boolean) => {
@@ -163,16 +165,16 @@ export function StyleAnchorPicker({
         }}
       >
         <DialogHeader>
-          <DialogTitle>스타일 선택</DialogTitle>
+          <DialogTitle>{t('Choose style')}</DialogTitle>
           <DialogDescription>
-            영상 전체에 적용할 시각 스타일을 골라 주세요.
+            {t('Choose the visual style to apply to the whole video.')}
           </DialogDescription>
           {/* 뷰 전환 토글 — 우상단(닫기 X 왼쪽). grid ↔ sliding card. */}
           {anchors.length > 0 ? (
             <div className="absolute right-12 top-4 inline-flex items-center gap-0.5 rounded-md border border-border bg-muted/50 p-0.5">
               <button
                 type="button"
-                aria-label="그리드 보기"
+                aria-label={t('Grid view')}
                 aria-pressed={view === 'grid'}
                 onClick={() => setView('grid')}
                 className={cn(
@@ -184,7 +186,7 @@ export function StyleAnchorPicker({
               </button>
               <button
                 type="button"
-                aria-label="슬라이드 보기"
+                aria-label={t('Slide view')}
                 aria-pressed={view === 'slider'}
                 onClick={() => {
                   syncSlideToSelected()
@@ -208,7 +210,7 @@ export function StyleAnchorPicker({
         <div ref={bodyRef}>
         {anchors.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
-            아직 등록된 스타일이 없어요.
+            {t('No styles registered yet.')}
           </p>
         ) : view === 'grid' ? (
           // 그리드 진입 시 카드가 아래에서 살짝 확대되며 순차로 날아든다(#b1).
@@ -292,7 +294,7 @@ export function StyleAnchorPicker({
               {/* 좌우 이동 화살표 — 덱 위(z 최상단) */}
               <button
                 type="button"
-                aria-label="이전 스타일"
+                aria-label={t('Previous style')}
                 onClick={() => move(-1)}
                 className="absolute left-1 top-1/2 z-40 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background"
               >
@@ -300,7 +302,7 @@ export function StyleAnchorPicker({
               </button>
               <button
                 type="button"
-                aria-label="다음 스타일"
+                aria-label={t('Next style')}
                 onClick={() => move(1)}
                 className="absolute right-1 top-1/2 z-40 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background"
               >
@@ -313,7 +315,7 @@ export function StyleAnchorPicker({
                 <button
                   key={anchor.key}
                   type="button"
-                  aria-label={`${anchor.label}로 이동`}
+                  aria-label={t('Go to {label}', { label: anchor.label })}
                   onClick={() => setSlide(i)}
                   className={cn(
                     'h-1.5 rounded-full transition-all',
