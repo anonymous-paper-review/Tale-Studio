@@ -64,8 +64,13 @@ docs/
 # supabase CLI 로컬 상태(project-ref·버전 등) — 추적 금지
 supabase/.temp/
 
-# Experimental/debug scripts
-scripts/
+# Experimental/debug scripts (디렉토리째 막으면 하위 예외가 안 먹어 * 패턴)
+scripts/*
+# 썸네일 파이프라인 운영 도구는 추적 — tests/backfill-filter.test.ts 가 필터를 import 하므로
+# 빠지면 클린 클론에서 pnpm test 가 깨진다. 보관함 열린 뒤 D 실행도 이 세 파일이 전부다.
+!scripts/backfill-filter.mjs
+!scripts/backfill-thumbnails.mjs
+!scripts/cleanup-excluded-thumbs.mjs
 
 # OS
 .DS_Store
