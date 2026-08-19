@@ -639,3 +639,23 @@ html[data-stage-nav]::view-transition-new(chat-panel) {
 .animate-handoff-ring {
   animation: handoff-ring 1.1s ease-out 0.35s 3;
 }
+
+/* Higgsfield가 만든 얼굴 프레임을 상태별로 보여주되, 기존 SVG 얼굴과
+   같은 정도의 작은 움직임만 더한다. */
+@keyframes agent-face-generated-motion {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.025);
+  }
+}
+.agent-face-generated-motion {
+  animation: agent-face-generated-motion 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-face-generated-motion {
+    animation: none;
+  }
+}
