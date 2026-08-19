@@ -6,6 +6,7 @@ import { uploadThumbnail } from '@/lib/storage-thumb'
 import { uploadImmutableObject } from '@/lib/storage/immutable-object'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import sharp from 'sharp'
+import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const MAX_IMAGE_DIMENSION = 10_000
@@ -145,7 +146,7 @@ export async function POST(req: Request) {
 
       const storagePath = `${project.workspace_id}/${projectId}/videos/${clip.id}/${job.id}.jpg`
       await uploadImmutableObject(storagePath, buffer, mimeType)
-      const publicUrl = supabaseAdmin.storage.from('media').getPublicUrl(storagePath).data.publicUrl
+      const publicUrl = mediaPublicUrl(storagePath)
       const { data: updatedClip, error: updateError } = await supabaseAdmin
         .from('video_clips')
         .update({ thumbnail_url: publicUrl, thumbnail_path: storagePath })
@@ -187,12 +188,11 @@ export async function POST(req: Request) {
 
     const extension = imageType.extension
     const storagePath = `${project.workspace_id}/${projectId}/${type}s/${storageKeySegment(entityId)}_${field}.${extension}`
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('media').upload(storagePath, buffer, { contentType: mimeType, upsert: true })
+    const { error: uploadError } = await mediaUpload(storagePath, buffer, { contentType: mimeType, upsert: true })
     if (uploadError) throw uploadError
     await uploadThumbnail(storagePath, buffer)
 
-    const rawPublicUrl = supabaseAdmin.storage.from('media').getPublicUrl(storagePath).data.publicUrl
+    const rawPublicUrl = mediaPublicUrl(storagePath)
     const publicUrl = `${rawPublicUrl}?v=${Date.now()}`
     const value = field === 'storyboard_image'
       ? { url: publicUrl, status: 'completed', errorMessage: null, generatedAt: Date.now() }

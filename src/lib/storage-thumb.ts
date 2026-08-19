@@ -1,5 +1,5 @@
 import sharp from 'sharp'
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { mediaUpload } from '@/lib/storage/media'
 
 // 방법 B: 원본을 media 스토리지에 올릴 때 작은 WebP 썸네일을 원본 옆에 함께 만들어 둔다.
 // 그리드/노드는 thumbUrl() 로 이 _thumb.webp 를 읽는다(src/lib/image-url.ts).
@@ -25,12 +25,10 @@ export async function uploadThumbnail(path: string, original: Buffer): Promise<v
       .resize(THUMB_WIDTH, THUMB_WIDTH, { fit: 'inside', withoutEnlargement: true })
       .webp({ quality: THUMB_QUALITY })
       .toBuffer()
-    const { error } = await supabaseAdmin.storage
-      .from('media')
-      .upload(thumbObjectPath(path), thumb, {
-        contentType: 'image/webp',
-        upsert: true,
-      })
+    const { error } = await mediaUpload(thumbObjectPath(path), thumb, {
+      contentType: 'image/webp',
+      upsert: true,
+    })
     if (error) throw error
   } catch (err) {
     console.error(

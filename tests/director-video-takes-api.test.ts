@@ -25,6 +25,10 @@ import { GET } from '@/app/api/director/video-takes/route'
 import { PATCH, DELETE } from '@/app/api/director/video-takes/[clipId]/route'
 import { POST as uploadImage } from '@/app/api/assets/upload-image/route'
 import { storageKeySegment } from '@/lib/storage/key-segment'
+import { mediaPublicUrl } from '@/lib/storage/media-url'
+
+// 결과 주소는 보관함 경로에서 계산된다 — 고정 문자열로 두면 보관 위치를 옮겨도 통과한다.
+const THUMB_PUBLIC_URL = mediaPublicUrl('workspace-1/project-1/videos/clip-1/job-1.jpg')
 
 const USER = { id: 'user-1' }
 const PROJECT = 'project-1'
@@ -299,7 +303,6 @@ describe('non-video image upload boundary', () => {
     mocks.from.mockReturnValueOnce(projectQuery()).mockReturnValueOnce(targetQuery).mockReturnValueOnce(updateQuery)
     mocks.storageFrom.mockReturnValue({
       upload: vi.fn().mockResolvedValue({ error: null }),
-      getPublicUrl: vi.fn(() => ({ data: { publicUrl: 'https://media.example/image.png' } })),
     })
 
     const response = await uploadImage(imageRequest('character', 'character-1', 'portrait', new Blob([PNG_BYTES], { type: 'image/png' })))
@@ -394,19 +397,19 @@ describe('video thumbnail ancestry', () => {
     const upload = vi.fn().mockResolvedValue({ error: { status: 409 } })
     const info = vi.fn().mockResolvedValue({ data: { metadata: { size: JPEG_BYTES.byteLength, mimetype: 'image/jpeg' } }, error: null })
     const download = vi.fn().mockResolvedValue({ data: new Blob([JPEG_BYTES]), error: null })
-    mocks.storageFrom.mockReturnValue({ upload, info, download, getPublicUrl: vi.fn(() => ({ data: { publicUrl: 'https://media.example/thumb.jpg' } })) })
+    mocks.storageFrom.mockReturnValue({ upload, info, download })
 
     const response = await uploadImage(imageUploadRequest('job-1'))
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ publicUrl: 'https://media.example/thumb.jpg' })
+    await expect(response.json()).resolves.toEqual({ publicUrl: THUMB_PUBLIC_URL })
     expect(upload).toHaveBeenCalledWith(
       'workspace-1/project-1/videos/clip-1/job-1.jpg',
       expect.any(Buffer),
       { contentType: 'image/jpeg', upsert: false },
     )
     expect(updateQuery.update).toHaveBeenCalledWith({
-      thumbnail_url: 'https://media.example/thumb.jpg',
+      thumbnail_url: THUMB_PUBLIC_URL,
       thumbnail_path: 'workspace-1/project-1/videos/clip-1/job-1.jpg',
     })
     expect(jobQuery.eq).toHaveBeenCalledWith('id', 'job-1')
@@ -474,7 +477,7 @@ describe('video thumbnail ancestry', () => {
       .mockReturnValueOnce(thumbnailQuery({ id: 'job-1', video_clip_id: 'clip-1', status: 'completed' }))
       .mockReturnValueOnce(thumbnailQuery({ id: 'clip-1', storage_path: 'workspace-1/project-1/videos/clip-1/job-1.mp4' }))
       .mockReturnValueOnce(update)
-    mocks.storageFrom.mockReturnValue({ upload: vi.fn().mockResolvedValue({ error: null }), info: vi.fn(), getPublicUrl: vi.fn(() => ({ data: { publicUrl: 'https://media.example/thumb.jpg' } })) })
+    mocks.storageFrom.mockReturnValue({ upload: vi.fn().mockResolvedValue({ error: null }), info: vi.fn() })
     expect((await uploadImage(imageUploadRequest('job-1'))).status).toBe(409)
     expect(update.eq).toHaveBeenCalledWith('storage_path', 'workspace-1/project-1/videos/clip-1/job-1.mp4')
   })

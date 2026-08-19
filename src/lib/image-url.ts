@@ -1,4 +1,4 @@
-// 원본 Supabase Storage public URL → 사전 생성 썸네일(_thumb.webp) URL (방법 B).
+// 원본 media 버킷 public URL → 사전 생성 썸네일(_thumb.webp) URL (방법 B).
 //
 // 썸네일 파일은 업로드 시 src/lib/storage-thumb.ts 가 원본 옆(<path>_thumb.webp)에 만들어 둔다.
 // 기존 프로젝트는 scripts/backfill-thumbnails.mjs 로 일괄 생성한다.
@@ -6,12 +6,17 @@
 // 안전장치: 플래그 OFF(기본)면 원본을 그대로 반환한다. 플래그 ON 이어도 썸네일이 아직 없으면
 //   <img> 가 404 → ThumbImage 의 onError 가 원본으로 폴백한다. 즉 백필 전에도 화면이 안 깨진다.
 
-const PUBLIC_MARKER = '/storage/v1/object/public/'
+import { mediaPathFromUrl } from '@/lib/storage/media-url'
 
-/** 원본 public URL 의 확장자를 _thumb.webp 로 치환. Supabase public URL 이 아니면 원본 그대로. */
+/**
+ * 원본 public URL 의 확장자를 _thumb.webp 로 치환. 우리 media 버킷 주소가 아니면 원본 그대로.
+ *
+ * 접두사를 여기서 알지 않는다 — 보관함을 다른 회사로 옮겨도 `mediaPathFromUrl` 만 바뀌면
+ * 이 함수는 그대로 동작한다. 이전 기간에 옛 주소와 새 주소가 섞여 있어도 둘 다 인식한다.
+ */
 export function toThumbUrl(url: string): string {
   const [base, query] = url.split('?')
-  if (!base.includes(PUBLIC_MARKER)) return url
+  if (!mediaPathFromUrl(base)) return url
   const slash = base.lastIndexOf('/')
   const dot = base.lastIndexOf('.')
   if (dot <= slash) return url // 파일명에 확장자 없음 → 그대로

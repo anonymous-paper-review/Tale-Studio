@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getUser } from '@/lib/supabase/auth'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { assertWorkspaceAccess, toInventoryItem } from '@/lib/inventory'
+import { mediaRemove } from '@/lib/storage/media'
 
 const getQuerySchema = z.object({ workspaceId: z.uuid() })
 const deleteQuerySchema = z.object({ id: z.uuid() })
@@ -89,9 +90,7 @@ export async function DELETE(req: Request) {
 
     // storage 객체 제거 (실패 무시 — 멱등).
     try {
-      await supabaseAdmin.storage
-        .from('media')
-        .remove([row.storage_path as string])
+      await mediaRemove([row.storage_path as string])
     } catch (removeErr) {
       console.error(
         '[inventory DELETE] storage remove failed',

@@ -34,6 +34,7 @@ import {
   uploadImmutableObject,
 } from '@/lib/storage/immutable-object'
 import { storageKeySegment } from '@/lib/storage/key-segment'
+import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 
 // Natural IDs stay in the database; new storage objects use the shared versioned,
 // collision-resistant segment so every writer resolves the same namespace.
@@ -587,13 +588,11 @@ export async function finalizeCharacterViewJob(
   const buf = Buffer.from(await imgRes.arrayBuffer())
 
   const path = `${workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}_${column}.png`
-  const { error: upErr } = await supabaseAdmin.storage
-    .from('media')
-    .upload(path, buf, { contentType: 'image/png', upsert: true })
+  const { error: upErr } = await mediaUpload(path, buf, { contentType: 'image/png', upsert: true })
   if (upErr) throw upErr
   await uploadThumbnail(path, buf)
   const publicUrl = versionedUrl(
-    supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl,
+    mediaPublicUrl(path),
   )
 
   // 선택본 URL 은 기존대로 characters.view_* 에 미러(read 경로 무변경).
@@ -645,13 +644,11 @@ async function savePortraitFromMain(
     const cropped = await cropTurnaroundPortrait(sheetBuf)
     if (cropped) {
       const path = `${job.target.workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}_portrait.png`
-      const { error: upErr } = await supabaseAdmin.storage
-        .from('media')
-        .upload(path, cropped, { contentType: 'image/png', upsert: true })
+      const { error: upErr } = await mediaUpload(path, cropped, { contentType: 'image/png', upsert: true })
       if (upErr) throw upErr
       await uploadThumbnail(path, cropped)
       portraitUrl = versionedUrl(
-        supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl,
+        mediaPublicUrl(path),
       )
     }
   }
@@ -743,12 +740,10 @@ export async function uploadImageFromUrl(
       `image too small (${buf.length}b < ${opts.minBytes}) — likely blank/moderated output`,
     )
   }
-  const { error: upErr } = await supabaseAdmin.storage
-    .from('media')
-    .upload(path, buf, { contentType: 'image/png', upsert: true })
+  const { error: upErr } = await mediaUpload(path, buf, { contentType: 'image/png', upsert: true })
   if (upErr) throw upErr
   await uploadThumbnail(path, buf)
-  return versionedUrl(supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl)
+  return versionedUrl(mediaPublicUrl(path))
 }
 
 /**
@@ -845,11 +840,9 @@ async function finalizeStoryboardStripJob(
   }
 
   const upload = async (path: string, buf: Buffer): Promise<string> => {
-    const { error } = await supabaseAdmin.storage
-      .from('media')
-      .upload(path, buf, { contentType: 'image/png', upsert: true })
+    const { error } = await mediaUpload(path, buf, { contentType: 'image/png', upsert: true })
     if (error) throw error
-    return versionedUrl(supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl)
+    return versionedUrl(mediaPublicUrl(path))
   }
 
   const seg = storageKeySegment(writerShotId)
@@ -981,11 +974,9 @@ async function finalizeRealGridJob(
   }
 
   const upload = async (path: string, buf: Buffer): Promise<string> => {
-    const { error } = await supabaseAdmin.storage
-      .from('media')
-      .upload(path, buf, { contentType: 'image/png', upsert: true })
+    const { error } = await mediaUpload(path, buf, { contentType: 'image/png', upsert: true })
     if (error) throw error
-    return versionedUrl(supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl)
+    return versionedUrl(mediaPublicUrl(path))
   }
 
   const base = `${workspaceId}/${job.project_id}/shots`
@@ -1054,11 +1045,9 @@ async function finalizeRoughGridJob(
   }
 
   const upload = async (path: string, buf: Buffer): Promise<string> => {
-    const { error } = await supabaseAdmin.storage
-      .from('media')
-      .upload(path, buf, { contentType: 'image/png', upsert: true })
+    const { error } = await mediaUpload(path, buf, { contentType: 'image/png', upsert: true })
     if (error) throw error
-    return versionedUrl(supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl)
+    return versionedUrl(mediaPublicUrl(path))
   }
 
   const base = `${workspaceId}/${job.project_id}/shots`
@@ -1159,12 +1148,10 @@ export async function finalizeShotPrevizVideoJob(
   if (!res.ok) throw new Error(`previz video fetch failed: ${res.status}`)
   const bytes = Buffer.from(await res.arrayBuffer())
   const path = `${workspaceId}/${job.project_id}/shots/${storageKeySegment(writerShotId)}_previz.mp4`
-  const { error: upErr } = await supabaseAdmin.storage
-    .from('media')
-    .upload(path, bytes, { contentType: 'video/mp4', upsert: true })
+  const { error: upErr } = await mediaUpload(path, bytes, { contentType: 'video/mp4', upsert: true })
   if (upErr) throw upErr
   const publicUrl = versionedUrl(
-    supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl,
+    mediaPublicUrl(path),
   )
   const { error } = await supabaseAdmin
     .from('shots')
@@ -1206,7 +1193,7 @@ export async function finalizeShotVideoJob(
       if (terminalError) throw terminalError
       throw new DirectorVideoCompletionPersistenceError('storage_retryable', error)
     }
-    const publicUrl = supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl
+    const publicUrl = mediaPublicUrl(path)
     if (!publicUrl) throw new DirectorVideoTerminalError('database_state', `video public URL derivation failed: ${path}`)
     try {
       await completeDirectorVideoAttempt(job.project_id, job.id, job.video_clip_id, publicUrl, path)

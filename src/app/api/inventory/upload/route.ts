@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getUser } from '@/lib/supabase/auth'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { assertWorkspaceAccess, toInventoryItem } from '@/lib/inventory'
+import { mediaPublicUrl, mediaRemove, mediaUpload } from '@/lib/storage/media'
 
 export const runtime = 'nodejs'
 
@@ -79,13 +80,10 @@ export async function POST(req: Request) {
     const itemId = crypto.randomUUID()
     const path = `${workspaceId}/inventory/${itemId}.${ext}`
 
-    const { error: uploadErr } = await supabaseAdmin.storage
-      .from('media')
-      .upload(path, buffer, { contentType, upsert: true })
+    const { error: uploadErr } = await mediaUpload(path, buffer, { contentType, upsert: true })
     if (uploadErr) throw uploadErr
 
-    const imageUrl = supabaseAdmin.storage.from('media').getPublicUrl(path).data
-      .publicUrl
+    const imageUrl = mediaPublicUrl(path)
 
     try {
       const { data, error } = await supabaseAdmin
@@ -112,7 +110,7 @@ export async function POST(req: Request) {
     } catch (insertErr) {
       // 부분 실패 보상: 업로드한 storage 객체 제거.
       try {
-        await supabaseAdmin.storage.from('media').remove([path])
+        await mediaRemove([path])
       } catch {
         // 보상 실패 무해.
       }

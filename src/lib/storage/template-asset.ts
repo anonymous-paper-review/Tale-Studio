@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { mediaList, mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 
 /**
  * 생성 모델이 reference 로 가져가는 정적 템플릿 이미지의 public URL.
@@ -22,7 +22,6 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
  * 자동으로 새 객체가 올라간다 — 수동 재업로드 단계가 없다.
  */
 
-const BUCKET = 'media'
 const PREFIX = 'templates'
 
 /** 프로세스당 1회만 해시·업로드하도록 Promise 를 캐시한다. */
@@ -39,18 +38,14 @@ async function ensureUploaded(fileName: string): Promise<string | null> {
     const objectPath = `${PREFIX}/${base}-${hash}${ext}`
 
     // 이미 있으면 1.4MB 를 다시 올리지 않는다(콜드스타트마다 재업로드 방지).
-    const { data: existing } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .list(PREFIX, { search: `${base}-${hash}${ext}`, limit: 1 })
+    const { data: existing } = await mediaList(PREFIX, { search: `${base}-${hash}${ext}`, limit: 1 })
 
     if (!existing?.length) {
-      const { error } = await supabaseAdmin.storage
-        .from(BUCKET)
-        .upload(objectPath, bytes, { contentType: 'image/png', upsert: true })
+      const { error } = await mediaUpload(objectPath, bytes, { contentType: 'image/png', upsert: true })
       if (error) throw error
     }
 
-    return supabaseAdmin.storage.from(BUCKET).getPublicUrl(objectPath).data.publicUrl
+    return mediaPublicUrl(objectPath)
   } catch (error) {
     // 실패해도 던지지 않는다 — 호출부는 templateUrl 이 null 이면 T2I 폴백으로 내려간다.
     const message = error instanceof Error ? error.message : String(error)

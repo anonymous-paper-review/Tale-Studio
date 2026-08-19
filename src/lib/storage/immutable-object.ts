@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { mediaDownload, mediaInfo, mediaUpload } from './media'
 
 type StorageConflictError = {
   status?: unknown
@@ -66,12 +66,11 @@ export async function uploadImmutableObject(
   data: Buffer,
   contentType: string,
 ): Promise<void> {
-  const bucket = supabaseAdmin.storage.from('media')
-  const { error } = await bucket.upload(path, data, { contentType, upsert: false })
+  const { error } = await mediaUpload(path, data, { contentType, upsert: false })
   if (!error) return
   if (!isExactConflict(error)) throw error
 
-  const { data: existing, error: infoError } = await bucket.info(path)
+  const { data: existing, error: infoError } = await mediaInfo(path)
   if (infoError || !existing) {
     throw infoError ?? new Error(`immutable storage conflict without object: ${path}`)
   }
@@ -79,7 +78,7 @@ export async function uploadImmutableObject(
     throw new ImmutableObjectMismatchError(path, 'metadata')
   }
 
-  const { data: existingData, error: downloadError } = await bucket.download(path)
+  const { data: existingData, error: downloadError } = await mediaDownload(path)
   if (downloadError || !existingData) {
     throw downloadError ?? new Error(`immutable storage conflict without readable object: ${path}`)
   }

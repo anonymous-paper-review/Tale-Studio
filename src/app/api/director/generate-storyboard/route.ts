@@ -22,6 +22,7 @@ import { appendCheckConstraints } from '@/lib/writer/check-notes'
 import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { aspectRatioFromFormat, parseProjectFormat } from '@/types/project'
+import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -132,11 +133,9 @@ export async function POST(req: Request) {
       const composed = await composeRoughReferenceStrip(stripFrames, projectFormat)
       stripSheetFormat = composed.sheetFormat
       const refPath = `${project.workspace_id}/${projectId}/shots/${storageKeySegment(writerShotId)}_storyboard_ref_strip.png`
-      const { error: upErr } = await supabaseAdmin.storage
-        .from('media')
-        .upload(refPath, composed.buffer, { contentType: 'image/png', upsert: true })
+      const { error: upErr } = await mediaUpload(refPath, composed.buffer, { contentType: 'image/png', upsert: true })
       if (upErr) throw upErr
-      stripRefUrl = `${supabaseAdmin.storage.from('media').getPublicUrl(refPath).data.publicUrl}?v=${Date.now()}`
+      stripRefUrl = `${mediaPublicUrl(refPath)}?v=${Date.now()}`
 
       // 레퍼런스 계약(buildRealStripPrompt 와 합치): [스트립, ...캐릭터/월드, 앵커?].
       //   applyStyleAnchor 는 앵커를 1번에 놓아 스트립 프롬프트와 충돌 → 스트립 모드는 수동 조립.

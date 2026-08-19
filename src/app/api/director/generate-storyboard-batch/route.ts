@@ -18,6 +18,7 @@ import {
   realSheetCanvas,
 } from '@/lib/director/storyboard-strip'
 import { parseProjectFormat } from '@/types/project'
+import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -130,11 +131,9 @@ export async function POST(req: NextRequest) {
         projectFormat,
       )
       const refPath = `${project.workspace_id}/${projectId}/shots/real_grid_ref_${Date.now()}_${group[0].shot_id}.png`
-      const { error: upErr } = await supabaseAdmin.storage
-        .from('media')
-        .upload(refPath, refGrid, { contentType: 'image/png', upsert: true })
+      const { error: upErr } = await mediaUpload(refPath, refGrid, { contentType: 'image/png', upsert: true })
       if (upErr) throw upErr
-      const refUrl = supabaseAdmin.storage.from('media').getPublicUrl(refPath).data.publicUrl
+      const refUrl = mediaPublicUrl(refPath)
 
       // #real-grid-identity: 이 시트에 실제로 나오는 인물만, 결정적 순서(sort)로 —
       //   "reference image N = 이름" 규약이 성립하려면 순서가 흔들리면 안 된다

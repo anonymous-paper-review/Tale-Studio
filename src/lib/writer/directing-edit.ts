@@ -9,6 +9,7 @@
 //      generatedAt 을 올려 캐시버스트(rough-frame-cycle.withCacheBust 가 새 프레임을 집는다).
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { falImageGenerate } from '@/lib/writer/llm/fal'
+import { mediaPathFromUrl, mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 
 const GROK_EDIT_MODEL = 'xai/grok-imagine-image/edit'
 
@@ -37,21 +38,17 @@ async function loadRough(projectId: string, shotId: string): Promise<RoughJson |
   return (data?.rough_storyboard as RoughJson | null) ?? null
 }
 
-/** media 버킷 public URL → 스토리지 경로 (?v= 캐시버스트 쿼리는 pathname 밖이라 자동 제외). */
+/** media 버킷 public URL → 보관함 경로 (?v= 캐시버스트 쿼리는 pathname 밖이라 자동 제외). */
 function storagePathFromPublicUrl(url: string): string {
-  const marker = '/storage/v1/object/public/media/'
-  const pathname = new URL(url).pathname
-  const i = pathname.indexOf(marker)
-  if (i < 0) throw new Error(`media 버킷 URL 이 아님: ${url}`)
-  return decodeURIComponent(pathname.slice(i + marker.length))
+  const path = mediaPathFromUrl(url)
+  if (!path) throw new Error(`media 버킷 URL 이 아님: ${url}`)
+  return path
 }
 
 async function uploadToMedia(path: string, buf: Buffer, contentType: string): Promise<string> {
-  const { error } = await supabaseAdmin.storage
-    .from('media')
-    .upload(path, buf, { contentType, upsert: true })
+  const { error } = await mediaUpload(path, buf, { contentType, upsert: true })
   if (error) throw error
-  const publicUrl = supabaseAdmin.storage.from('media').getPublicUrl(path).data.publicUrl
+  const publicUrl = mediaPublicUrl(path)
   return `${publicUrl}?v=${Date.now()}`
 }
 

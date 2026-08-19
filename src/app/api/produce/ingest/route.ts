@@ -13,6 +13,7 @@ import {
 } from '@/lib/upload/limits'
 import { decodeImage, sliceForVision } from '@/lib/upload/image'
 import { extractDocxText, normalizeExtractedText } from '@/lib/upload/docx'
+import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 
 /**
  * 프로듀서 첨부 전처리 — 브라우저가 못 하는 일만 한다.
@@ -132,9 +133,7 @@ export async function POST(req: Request) {
 
     stage = 'upload-original'
     const originalPath = `${base}/original.${originalExt}`
-    const { error: originalError } = await supabaseAdmin.storage
-      .from('media')
-      .upload(originalPath, buffer, { contentType: mimeType, upsert: true })
+    const { error: originalError } = await mediaUpload(originalPath, buffer, { contentType: mimeType, upsert: true })
     if (originalError) throw originalError
 
     // 여기가 유일한 전체 디코드다 — 깨진 파일도 여기서 걸린다.
@@ -145,12 +144,10 @@ export async function POST(req: Request) {
     const sliceUrls: { url: string; width: number; height: number }[] = []
     for (const slice of slices) {
       const slicePath = `${base}/s${String(slice.index).padStart(3, '0')}.jpg`
-      const { error: sliceError } = await supabaseAdmin.storage
-        .from('media')
-        .upload(slicePath, slice.buffer, { contentType: 'image/jpeg', upsert: true })
+      const { error: sliceError } = await mediaUpload(slicePath, slice.buffer, { contentType: 'image/jpeg', upsert: true })
       if (sliceError) throw sliceError
       sliceUrls.push({
-        url: supabaseAdmin.storage.from('media').getPublicUrl(slicePath).data.publicUrl,
+        url: mediaPublicUrl(slicePath),
         width: slice.width,
         height: slice.height,
       })
@@ -159,7 +156,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       kind: 'image',
       name: file.name,
-      originalUrl: supabaseAdmin.storage.from('media').getPublicUrl(originalPath).data.publicUrl,
+      originalUrl: mediaPublicUrl(originalPath),
       width: decoded.image.width,
       height: decoded.image.height,
       slices: sliceUrls,

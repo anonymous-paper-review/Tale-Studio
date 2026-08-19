@@ -21,6 +21,12 @@ vi.mock('@/lib/writer/llm/fal', () => ({ falVideoFetch: mocks.falVideoFetch, fal
 
 import { finalizeShotVideoJob, readProviderVideoBytes } from '@/lib/fal/finalize'
 import { ImmutableObjectMismatchError } from '@/lib/storage/immutable-object'
+import { mediaPublicUrl } from '@/lib/storage/media-url'
+
+// 영상 결과 주소는 보관함 경로에서 계산된다. 하드코딩해 두면 보관 위치를 옮겼을 때
+// 테스트가 옛 주소를 계속 통과시켜 회귀를 놓친다.
+const LINKED_VIDEO_KEY = 'workspace-1/project-1/videos/clip-1/job-1.mp4'
+const LINKED_VIDEO_URL = mediaPublicUrl(LINKED_VIDEO_KEY)
 
 function box(type: string, ...payload: Buffer[]): Buffer {
   const body = Buffer.concat(payload)
@@ -111,22 +117,22 @@ afterEach(() => {
 })
 describe('linked director video finalization', () => {
   it('persists an immutable object and dispatches linked completion with the exact key', async () => {
-    await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4')).resolves.toBe('https://media.test/video.mp4')
-    const path = 'workspace-1/project-1/videos/clip-1/job-1.mp4'
+    await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4')).resolves.toBe(LINKED_VIDEO_URL)
+    const path = LINKED_VIDEO_KEY
     expect(mocks.uploadImmutableObject).toHaveBeenCalledWith(path, expect.any(Buffer), 'video/mp4')
-    expect(mocks.complete).toHaveBeenCalledWith('project-1', 'job-1', 'clip-1', 'https://media.test/video.mp4', path)
+    expect(mocks.complete).toHaveBeenCalledWith('project-1', 'job-1', 'clip-1', LINKED_VIDEO_URL, path)
   })
   it('accepts a new fal CDN subdomain (#fal-cdn-host) — 정적 목록에 없어도 도메인 소속이면 통과', async () => {
     // 2026-07-31 실패 재현: fal 이 v3b.fal.media 로 내보내자 정상 영상이 전부 죽었다.
     await expect(finalizeShotVideoJob(job, 'https://v3b.fal.media/files/b/0aa/x.mp4'))
-      .resolves.toBe('https://media.test/video.mp4')
+      .resolves.toBe(LINKED_VIDEO_URL)
   })
   it('still rejects a host that merely impersonates the fal domain', async () => {
     await expect(finalizeShotVideoJob(job, 'https://evilfal.media/video.mp4'))
       .rejects.toThrow('invalid video url in provider result')
   })
   it('propagates immutable storage conflicts and does not falsely complete the attempt', async () => {
-    mocks.uploadImmutableObject.mockRejectedValue(new ImmutableObjectMismatchError('workspace-1/project-1/videos/clip-1/job-1.mp4', 'content'))
+    mocks.uploadImmutableObject.mockRejectedValue(new ImmutableObjectMismatchError(LINKED_VIDEO_KEY, 'content'))
     await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4'))
       .rejects.toMatchObject({ code: 'storage_conflict' })
     expect(mocks.complete).not.toHaveBeenCalled()
@@ -152,7 +158,7 @@ describe('linked director video finalization', () => {
       responseBody(validMp4),
       { headers: { 'content-type': 'video/mp4' } },
     )))
-    await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4')).resolves.toBe('https://media.test/video.mp4')
+    await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4')).resolves.toBe(LINKED_VIDEO_URL)
     expect(mocks.uploadImmutableObject).toHaveBeenCalled()
   })
   it('rejects an ftyp-only MP4 before immutable upload', async () => {
@@ -246,11 +252,11 @@ describe('linked director video finalization', () => {
   })
   it('allows configured local and FAL media origins', async () => {
     const localJob = { ...(job as object), provider: 'local', request_id: 'http://local.test/api/tasks/1' } as never
-    await expect(finalizeShotVideoJob(localJob, 'http://local.test/api/tasks/1/output.mp4')).resolves.toBe('https://media.test/video.mp4')
-    await expect(finalizeShotVideoJob(job, 'https://v3.fal.media/video.mp4')).resolves.toBe('https://media.test/video.mp4')
+    await expect(finalizeShotVideoJob(localJob, 'http://local.test/api/tasks/1/output.mp4')).resolves.toBe(LINKED_VIDEO_URL)
+    await expect(finalizeShotVideoJob(job, 'https://v3.fal.media/video.mp4')).resolves.toBe(LINKED_VIDEO_URL)
 
     vi.stubEnv('FAL_MEDIA_ALLOWED_HOSTS', 'media.example.test')
-    await expect(finalizeShotVideoJob(job, 'https://media.example.test/video.mp4')).resolves.toBe('https://media.test/video.mp4')
+    await expect(finalizeShotVideoJob(job, 'https://media.example.test/video.mp4')).resolves.toBe(LINKED_VIDEO_URL)
   })
 
   it.each([
@@ -289,7 +295,7 @@ describe('linked director video finalization', () => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce(redirect)
       .mockResolvedValueOnce(new Response(responseBody(validMp4), { headers: { 'content-type': 'video/mp4' } })))
-    await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4')).resolves.toBe('https://media.test/video.mp4')
+    await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4')).resolves.toBe(LINKED_VIDEO_URL)
     expect(cancelled).toBe(true)
     expect(fetch).toHaveBeenCalledTimes(2)
   })
@@ -414,14 +420,14 @@ describe('linked reconcile boundaries', () => {
     const localJob = { ...(job as object), provider: 'local', request_id: 'http://local.test/api/output.mp4' } as never
     await expect(reconcileJobFromFal(localJob)).resolves.toMatchObject({
       status: 'completed',
-      result_url: 'https://media.test/video.mp4',
+      result_url: LINKED_VIDEO_URL,
     })
     expect(mocks.complete).toHaveBeenCalledWith(
       'project-1',
       'job-1',
       'clip-1',
-      'https://media.test/video.mp4',
-      'workspace-1/project-1/videos/clip-1/job-1.mp4',
+      LINKED_VIDEO_URL,
+      LINKED_VIDEO_KEY,
     )
   })
   it('reconciles an unlinked local result through the generic completion dispatcher', async () => {

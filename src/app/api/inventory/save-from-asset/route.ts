@@ -8,6 +8,7 @@ import {
   assertWorkspaceAccess,
   toInventoryItem,
 } from '@/lib/inventory'
+import { mediaRemove } from '@/lib/storage/media'
 
 export const runtime = 'nodejs'
 
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
     } catch (insertErr) {
       // 부분 실패 보상: 복사한 storage 객체 제거.
       try {
-        await supabaseAdmin.storage.from('media').remove([path])
+        await mediaRemove([path])
       } catch {
         // 보상 실패 무해.
       }
