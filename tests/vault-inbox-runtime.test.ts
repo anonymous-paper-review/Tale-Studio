@@ -359,3 +359,92 @@ describe('vault inbox lifecycle runtime', () => {
     expect(scan(path).markers[0].state).toBe('tracked')
   })
 })
+
+describe('vault inbox append-units', () => {
+  const appendUnits = (dir: string, path: string, itemId: string, units: string[], expected = sha(readFileSync(path))) => call([
+    'append-units', '--path', path, '--actor', 'jh', '--item-id', itemId,
+    '--expected-hash', expected, ...units.flatMap((unit) => ['--unit', unit]), ...proof(dir),
+  ])
+  const appendFails = (dir: string, path: string, itemId: string, units: string[], expected = sha(readFileSync(path))) => fail([
+    'append-units', '--path', path, '--actor', 'jh', '--item-id', itemId,
+    '--expected-hash', expected, ...units.flatMap((unit) => ['--unit', unit]), ...proof(dir),
+  ])
+  const tracked = (dir: string, body = '---\n작업 한 줄\n') => {
+    const path = inboxPath(dir)
+    writeFileSync(path, body)
+    const next = candidate(path)
+    const marker = track(dir, path, 'run', next.byte_range.start, next.byte_range.end, 'u1', next.proposed_item_id)
+    return { path, itemId: marker.item_id as string }
+  }
+
+  it('adds units to a tracked marker without changing its item id or the human bytes', () => {
+    const dir = make()
+    const { path, itemId } = tracked(dir)
+    const before = scan(path).markers[0]
+    const result = appendUnits(dir, path, itemId, ['u2', 'u3'])
+    expect(result.units).toEqual(['u1', 'u2', 'u3'])
+    expect(result.appended).toEqual(['u2', 'u3'])
+    expect(result.idempotent).toBe(false)
+    const after = scan(path).markers[0]
+    expect(after.item_id).toBe(itemId)
+    expect(after.state).toBe('tracked')
+    expect(after.content).toBe(before.content)
+    expect(after.payload.content_sha256).toBe(before.payload.content_sha256)
+    expect(after.payload.source_range).toEqual(before.payload.source_range)
+    expect(after.payload.units).toEqual(['u1', 'u2', 'u3'])
+  })
+
+  it('is a no-op when every unit is already listed and leaves the file byte identical', () => {
+    const dir = make()
+    const { path, itemId } = tracked(dir)
+    appendUnits(dir, path, itemId, ['u2'])
+    const bytes = readFileSync(path)
+    const repeat = appendUnits(dir, path, itemId, ['u1', 'u2'])
+    expect(repeat.idempotent).toBe(true)
+    expect(repeat.units).toEqual(['u1', 'u2'])
+    expect(readFileSync(path).equals(bytes)).toBe(true)
+  })
+
+  it('keeps the item id stable for a marker whose prose has no trailing newline', () => {
+    const dir = make()
+    const { path, itemId } = tracked(dir, '---\n마지막 줄에 개행이 없다')
+    appendUnits(dir, path, itemId, ['u2'])
+    const after = scan(path).markers[0]
+    expect(after.item_id).toBe(itemId)
+    expect(after.payload.units).toEqual(['u1', 'u2'])
+    expect(appendUnits(dir, path, itemId, ['u2']).idempotent).toBe(true)
+  })
+
+  it('refuses a stale full-file hash, an unknown item id, duplicate units and another actor file', () => {
+    const dir = make()
+    const { path, itemId } = tracked(dir)
+    const bytes = readFileSync(path)
+    expect(appendFails(dir, path, itemId, ['u2'], sha('stale')).status).toBe(1)
+    expect(appendFails(dir, path, '0'.repeat(64), ['u2']).status).toBe(1)
+    expect(appendFails(dir, path, itemId, ['u2', 'u2']).status).toBe(1)
+    expect(readFileSync(path).equals(bytes)).toBe(true)
+    const foreign = inboxPath(dir, 'hs')
+    writeFileSync(foreign, '---\n상대 메모\n')
+    expect(fail(['append-units', '--path', foreign, '--actor', 'jh', '--item-id', itemId,
+      '--expected-hash', sha(readFileSync(foreign)), '--unit', 'u2', ...proof(dir)]).status).toBe(1)
+  })
+
+  it('lets track-inbox stay idempotent when the same units arrive in a different order', () => {
+    const dir = make()
+    const path = inboxPath(dir)
+    writeFileSync(path, '---\n순서 무관 확인\n')
+    const next = candidate(path)
+    const first = call(['track-inbox', '--path', path, '--actor', 'jh', '--snapshot-id', 'run',
+      '--item-id', next.proposed_item_id, '--expected-hash', sha(readFileSync(path)),
+      '--start', String(next.byte_range.start), '--end', String(next.byte_range.end),
+      '--unit', 'alpha', '--unit', 'beta', ...proof(dir)])
+    expect(first.units).toEqual(['alpha', 'beta'])
+    const bytes = readFileSync(path)
+    const reversed = call(['track-inbox', '--path', path, '--actor', 'jh', '--snapshot-id', 'run',
+      '--item-id', first.item_id, '--expected-hash', sha(readFileSync(path)),
+      '--start', String(next.byte_range.start), '--end', String(next.byte_range.end),
+      '--unit', 'beta', '--unit', 'alpha', ...proof(dir)])
+    expect(reversed.idempotent).toBe(true)
+    expect(readFileSync(path).equals(bytes)).toBe(true)
+  })
+})
