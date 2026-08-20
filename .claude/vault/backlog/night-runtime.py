@@ -998,7 +998,7 @@ def _track_inbox(args, state):
         if existing:
             if args.item_id != existing["item_id"]:
                 raise ValueError("proposed item_id가 기존 tracked item과 다르다")
-            if existing["payload"].get("units") == units:
+            if sorted(existing["payload"].get("units", [])) == sorted(units):
                 print(json.dumps({"path": source, "item_id": existing["item_id"], "idempotent": True},
                                  ensure_ascii=False, sort_keys=True))
                 return 0
@@ -1027,6 +1027,62 @@ def _track_inbox(args, state):
     print(json.dumps({"path": source, "item_id": payload["item_id"], "state": "tracked",
                       "units": units, "idempotent": False}, ensure_ascii=False, sort_keys=True))
     return 0
+
+
+def _append_units(args, state):
+    source = _canonical_path(args.path)
+    if args.actor != state["actor"]:
+        raise ValueError("append-units actor는 provider state actor와 같아야 한다")
+    _validate_actor_source(source, args.actor, state["project_root"])
+    new_units = args.unit
+    if not new_units or len(set(new_units)) != len(new_units):
+        raise ValueError("중복 없는 unit ID가 하나 이상 필요하다")
+    lock = _flock_path(source)
+    try:
+        with open(source, "rb") as fh:
+            data = fh.read()
+        if sha256_bytes(data) != args.expected_hash.lower():
+            raise ValueError("expected full-file hash CAS가 실패했다")
+        items, _, _, _ = _scan_bytes(data, source)
+        existing = next((
+            item for item in items
+            if item.get("state") == "tracked"
+            and item["payload"].get("actor") == args.actor
+            and item.get("item_id") == args.item_id
+        ), None)
+        if not existing:
+            raise ValueError("해당 item_id의 tracked marker가 없다")
+        old_units = existing["payload"]["units"]
+        merged = list(dict.fromkeys(old_units + new_units))
+        if merged == old_units:
+            print(json.dumps({"path": source, "item_id": args.item_id,
+                              "units": old_units, "idempotent": True},
+                             ensure_ascii=False, sort_keys=True))
+            return 0
+        raw_start = existing["byte_range"]["start"]
+        raw_end = existing["byte_range"]["end"]
+        raw_bytes = data[raw_start:raw_end]
+        marker_start = existing["marker_range"]["start"]
+        marker_end = existing["marker_range"]["end"]
+        payload = _marker_payload(
+            existing["payload"]["actor"], existing["payload"]["snapshot_id"],
+            existing["payload"]["source_range"], raw_bytes, merged)
+        separator = b"" if raw_bytes.endswith(b"\n") else b"\n"
+        wrapped = _encode_start(payload) + b"\n" + raw_bytes + separator + MARKER_END + b"\n"
+        atomic_write(source, data[:marker_start] + wrapped + data[marker_end:],
+                     _mutation_check(args, state))
+    finally:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+        lock.close()
+    print(json.dumps({"path": source, "item_id": args.item_id, "units": merged,
+                      "appended": [u for u in new_units if u not in old_units],
+                      "idempotent": False}, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
+def append_units(args):
+    with _provider_owner_lock(args) as state:
+        return _append_units(args, state)
 
 
 def _directory_flags():
@@ -1509,6 +1565,13 @@ def main():
     track.add_argument("--start", required=True, type=int)
     track.add_argument("--end", required=True, type=int)
     track.add_argument("--unit", action="append", required=True)
+    append = sub.add_parser("append-units")
+    _add_owner_proof(append)
+    append.add_argument("--path", required=True)
+    append.add_argument("--actor", required=True)
+    append.add_argument("--item-id", required=True)
+    append.add_argument("--expected-hash", required=True)
+    append.add_argument("--unit", action="append", required=True)
     reconcile = sub.add_parser("reconcile-inbox")
     _add_owner_proof(reconcile)
     reconcile.add_argument("--actor", required=True)
@@ -1528,6 +1591,8 @@ def main():
             return scan_inbox(args)
         if args.command == "track-inbox":
             return track_inbox(args)
+        if args.command == "append-units":
+            return append_units(args)
         return reconcile_inbox(args)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"✗ {exc}", file=sys.stderr)
