@@ -73,6 +73,10 @@ scripts/*
 !scripts/backfill-filter.mjs
 !scripts/backfill-thumbnails.mjs
 !scripts/cleanup-excluded-thumbs.mjs
+# 같은 이유 — tests/seed-test-accounts.test.ts 가 이 스크립트를 import 한다.
+# 빠지면 클린 클론에서 pnpm typecheck 가 TS2307 로 깨진다. 하드코딩 비밀 없음
+# (service-role 키는 .env.local 에서 읽는다).
+!scripts/seed-test-accounts.mjs
 
 # OS
 .DS_Store
