@@ -16,6 +16,7 @@ import { getWriterEnginePreference } from '@/lib/writer/engine'
 //   (writer 배치의 #i18n-s5-batch3 패턴).
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
+import { contentLocale } from '@/lib/i18n/content'
 import type {
   CastMember,
   CastArc,
@@ -24,8 +25,10 @@ import type {
   BackgroundSource,
 } from '@/lib/producer-gate'
 
+// 영어 원문 = i18n 키(#i18n-s5) — 표시 지점에서 프로젝트 locale 로 완역(#i18n-content-voice).
+//   api/writer/start 의 동명 상수와 같은 문장(그쪽은 409 참고 필드, 여기는 제안 카드 본문).
 export const WRITER_RERUN_CONSENT_TEXT =
-  '지금까지 채팅 내역을 바탕으로 다시 writer에게 스토리와 연출에 대한 구상을 요청할까요?? 변경 사항들을 자연스럽게 반영할 수 있지만 다시 오랜 시간이 걸릴 수 있어요.'
+  'Shall I ask Writer again for a story and direction plan based on the chat so far? Your changes will be reflected naturally, but it may take a long time again.'
 
 // 채팅이 스토리에서 추출한 캐스트 후보 (제안일 뿐 — 사용자가 카드에서 확정/수정).
 export interface ExtractedCastMember {
@@ -653,9 +656,9 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     if (needsApproval) {
       // createPendingProposal/offerPendingProposal 은 범위 밖(global-chat-store.ts) — 그쪽
       //   렌더 지점이 아직 t() 를 안 태우므로(artist 단계의 같은 패턴도 미번역 확인, 2026-08-18
-      //   실측), 여기서 미리 translate() 로 완역해 넘긴다(#i18n-s5-batch3, ko 사용자는 기존과
-      //   동일 출력 — locale 값이 안 바뀌면 회귀 없음).
-      const locale = useLocaleStore.getState().locale
+      //   실측), 여기서 미리 translate() 로 완역해 넘긴다(#i18n-s5-batch3).
+      //   제안 카드는 챗 스트림 발화 → 콘텐츠 언어(#i18n-content-voice). error 배너는 크롬 → UI 언어.
+      const locale = contentLocale()
       const impactFields = Array.from(new Set([...affected, ...protectedConflicts]))
       const accepted = useGlobalChatStore.getState().offerPendingProposal(
         createPendingProposal({
@@ -676,7 +679,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       if (!accepted)
         set({
           error: translate(
-            locale,
+            useLocaleStore.getState().locale,
             'A proposal is already pending, so the new Producer change proposal was held back.',
           ),
         })
@@ -918,16 +921,18 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           // 연타 방어 창을 즉시 열어 승인 버튼이 곧바로 새 요청을 보낼 수 있게 한다.
           if (body?.code === 'writer_rerun_confirmation_required') {
             releaseAction(actionKey)
+            // 제안 카드는 챗 스트림 발화 → 프로젝트 콘텐츠 언어(#i18n-content-voice).
+            const voice = contentLocale()
             useGlobalChatStore.getState().offerPendingProposal(
               createPendingProposal({
                 stage: 'producer',
                 kind: 'producerWriterRerunRequest',
-                target: 'Writer 다시 실행',
-                action: WRITER_RERUN_CONSENT_TEXT,
+                target: 'Writer rerun',
+                action: translate(voice, WRITER_RERUN_CONSENT_TEXT),
                 impact: [
-                  '현재 Writer의 씬·샷 스토리와 채팅 내역을 새 Writer 입력에 담아요.',
-                  '현재 Producer의 스토리·설정·캐스트·배경 결정도 함께 전달해요.',
-                  '다시 실행하면 시간이 오래 걸릴 수 있어요. 승인 전에는 아무 생성도 시작하지 않아요.',
+                  translate(voice, "The current Writer scene/shot story and chat history go into the new Writer input."),
+                  translate(voice, 'The current Producer story, settings, cast, and background decisions are passed along too.'),
+                  translate(voice, 'Re-running can take a long time. Nothing generates until you approve.'),
                 ],
                 payload: { rerun: true },
               }),
@@ -935,12 +940,14 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             set({ syncing: false, error: null })
             return false
           }
+          // throw 는 error 배너(크롬)로 흐른다 → UI 언어.
+          const uiLocale = useLocaleStore.getState().locale
           const status =
             body?.code === 'writer_gate_pending'
-              ? '현재 씬 스토리 초안이 준비됐어요. Writer 화면에서 확정하거나 수정 요청으로 다시 실행할지 선택해 주세요.'
+              ? translate(uiLocale, 'The current scene story draft is ready. In the Writer tab, confirm it or request changes to run again.')
               : body?.code === 'writer_run_active'
-                ? 'Writer가 이미 실행 중이에요. 현재 Writer 화면에서 진행 상황을 확인해 주세요.'
-                : `Writer 시작이 거부됐어요 (HTTP 409)`
+                ? translate(uiLocale, 'Writer is already running. Check progress in the Writer tab.')
+                : translate(uiLocale, 'Writer start was rejected (HTTP 409)')
           throw new Error(status)
         }
         if (!writerResponse.ok) {
@@ -988,7 +995,12 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       const supabase = createClient()
       const { data: project } = await supabase
         .from('projects')
-        .select('story_text, settings, last_writer_run_id, producer_draft')
+        // style_anchor_key/custom_style_anchor (#style-anchor-load 2026-08-23): 키를 픽커 로드
+        //   (loadStyleAnchors)에만 실어 나르던 탓에, 프로젝트 전환(reset 이 키를 비움 + 전역
+        //   카탈로그는 유지) 직후 "카탈로그 있음·키 null·storyReady" 창이 생겨 #style-timing
+        //   자동 팝업이 저장된 스타일을 무시하고 재진입마다 다시 열렸다(webtoon_test 실측).
+        //   보드 진실을 싣는 이 로드가 키도 storyReady 와 같은 set 으로 싣는다 — 창 자체가 없어진다.
+        .select('story_text, settings, last_writer_run_id, producer_draft, style_anchor_key, custom_style_anchor')
         .eq('id', projectId)
         .single()
 
@@ -1053,6 +1065,11 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           projectSettings: restored.settings,
           cast: restored.cast,
           backgrounds: restored.backgrounds,
+          styleAnchorKey:
+            ((project as { style_anchor_key?: string | null }).style_anchor_key ?? '') || null,
+          customStyleAnchor: parseCustomAnchorRow(
+            (project as { custom_style_anchor?: unknown }).custom_style_anchor,
+          ),
         })
       }
     } catch (err) {

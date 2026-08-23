@@ -4,6 +4,7 @@ import { STAGES } from '@/lib/constants'
 import type { LifecycleStatus } from '@/lib/lifecycle'
 import { EMPTY_LIFECYCLE_STATUS } from '@/lib/lifecycle'
 import { createClient } from '@/lib/supabase/client'
+import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import {
   isDemoSession,
   getDemoSnapshot,
@@ -32,6 +33,9 @@ interface ProjectState {
   workspaceId: string | null
   projectId: string | null
   projectTitle: string
+  /** 콘텐츠 언어(projects.locale, 생성 시 잠금) — 채팅 발화·웰컴·게이트 라벨이 이 언어를 따른다
+   *  (#i18n-content-voice 2026-08-23). null = 아직 미조회(switchProject 직후 1쿼리 사이) → UI 언어 폴백. */
+  projectLocale: AppLocale | null
   initLoading: boolean
 
   // ── writer 산출물 게이트 (씬/샷 존재 여부 = "writer 완료"의 진실) ──
@@ -141,6 +145,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   workspaceId: null,
   projectId: null,
   projectTitle: 'Untitled',
+  projectLocale: null,
   initLoading: false,
   // 기본 true — 게이트 검증(verifyWriterGate) 전에는 잠그지 않는다(플래시 방지).
   writerComplete: true,
@@ -218,7 +223,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         }
       }
       const p = snap?.project as
-        | { title?: string; current_stage?: StageId }
+        | { title?: string; current_stage?: StageId; locale?: unknown }
         | null
         | undefined
       if (snap && p) {
@@ -226,6 +231,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           workspaceId: snap.workspaceId,
           projectId: snap.projectId,
           projectTitle: p.title ?? 'Untitled',
+          projectLocale: parseAppLocale(p.locale),
           initLoading: false,
           currentStage: p.current_stage ?? 'producer',
           reachedStage: p.current_stage ?? 'producer',
@@ -252,6 +258,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         workspaceId,
         projectId,
         projectTitle: project.title ?? 'Untitled',
+        projectLocale: parseAppLocale(project.locale),
         initLoading: false,
         currentStage: project.current_stage ?? 'producer',
         // DB current_stage = 지금까지 진행한 최고 단계 → 새로고침/복원 시 그만큼 열어둔다
@@ -278,11 +285,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         body: JSON.stringify({ title: trimmed }),
       })
       if (!res.ok) throw new Error('Failed to create project')
-      const { workspaceId, projectId } = await res.json()
+      const { workspaceId, projectId, project } = await res.json()
       set({
         workspaceId,
         projectId,
         projectTitle: trimmed,
+        projectLocale: parseAppLocale(project?.locale),
         initLoading: false,
         currentStage: 'producer',
         reachedStage: 'producer',
@@ -305,6 +313,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({
       projectId: id,
       projectTitle: title,
+      projectLocale: null, // 이전 프로젝트 언어 잔상 금지 — 아래 조회가 채울 때까지 UI 언어 폴백
       currentStage: stage ?? 'producer',
       reachedStage: stage ?? 'producer',
       // 새 프로젝트 진입 — 게이트 플래그 초기화 (verifyWriterGate 가 곧 재계산).
@@ -314,6 +323,22 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
       ...DEFAULT_ARTIST_ASSET_GATE,
     })
+    // 호출부(대시보드 카드·유저 메뉴)는 locale 을 안 들고 다닌다 — 여기서 1쿼리로 싣는다.
+    //   실패는 무해(null 유지 = UI 언어 폴백). 응답 도착 전에 또 전환됐으면 버린다.
+    void (async () => {
+      try {
+        const { data } = await createClient()
+          .from('projects')
+          .select('locale')
+          .eq('id', id)
+          .maybeSingle()
+        if (get().projectId === id) {
+          set({ projectLocale: parseAppLocale((data as { locale?: unknown } | null)?.locale) })
+        }
+      } catch {
+        /* 폴백: UI 언어 */
+      }
+    })()
     const { useDirectorCanvasStore } = require('@/stores/director-store')
     useDirectorCanvasStore.getState().setProjectId(id)
   },
@@ -396,6 +421,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       workspaceId: null,
       projectId: null,
       projectTitle: 'Untitled',
+      projectLocale: null,
       currentStage: 'producer',
       reachedStage: 'producer',
       initLoading: false,

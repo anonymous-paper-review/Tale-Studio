@@ -31,10 +31,12 @@ import {
 import { isDemoSession, getDemoSnapshot } from '@/lib/demo/context'
 import { cannedFor } from '@/lib/demo/canned'
 import { handoffMarker } from '@/lib/chat-blocks'
-// store 액션·순수 함수는 훅을 못 쓴다 — translate() + 현재 locale 직접 조회로 번역
-//   (writer 배치의 #i18n-s5-batch3 패턴).
+// store 액션·순수 함수는 훅을 못 쓴다 — translate() + locale 직접 조회로 번역.
+//   이 파일의 산출물은 전부 챗 스트림(발화·제안·알림)이라 UI 언어가 아니라 **프로젝트 콘텐츠
+//   언어**를 따른다(#i18n-content-voice 2026-08-23) — 챗 응답(서버가 프로젝트 locale 강제)과
+//   같은 대화창에서 언어가 섞이지 않게. 미조회 시 UI 언어 폴백은 contentLocale() 안에 있다.
 import { translate } from '@/lib/i18n'
-import { useLocaleStore } from '@/stores/locale-store'
+import { contentLocale } from '@/lib/i18n/content'
 import {
   STAGE_LABEL,
   CHAT_HISTORY_WINDOW,
@@ -89,6 +91,10 @@ interface GlobalChatState {
   stageBadges: Partial<Record<StageId, number>>
   /** 핸드오프 성공 후 이동할 경로 — 라우팅은 컴포넌트 몫이라 GlobalChat 이 소비하고 비운다. */
   pendingNavigatePath: string | null
+  /** loadMessages 가 이 프로젝트로 완료됨(성공·실패 불문) — hydrate 는 suggestion 슬롯을
+   *  통째로 덮어쓰므로, 로드 전에 띄운 프로액티브 제안(프로듀서 웰컴 등)은 소리 없이 지워진다.
+   *  제안을 띄우는 쪽은 이 마커를 기다려야 한다(#welcome-race 2026-08-23). */
+  messagesLoadedProjectId: string | null
 
   loadMessages: (projectId: string) => Promise<void>
   /**
@@ -152,7 +158,7 @@ function deletedDialoguePreview(current: DialogueLine[], next: DialogueLine[]): 
   const previewLines = (deleted.length > 0 ? deleted : current.slice(next.length))
     .slice(0, 3)
     .map((line) => `${line.characterId}: "${line.text.slice(0, 80)}${line.text.length > 80 ? '…' : ''}"`)
-  const locale = useLocaleStore.getState().locale
+  const locale = contentLocale()
   const suffix =
     deleted.length > 3
       ? ` ${translate(locale, 'and {count} more', { count: deleted.length - 3 })}`
@@ -215,7 +221,7 @@ function flushCompletion(stage: StageId, label: string): void {
   delete pendingCompletions[key]
   const projectId = useProjectStore.getState().projectId
   // ✓ prefix 는 상태 행 판별(chat-blocks.classifyChatMessage)이 읽는 고정 마커다 — 번역 밖에 둔다.
-  const locale = useLocaleStore.getState().locale
+  const locale = contentLocale()
   const content =
     entry.count > 1
       ? `✓ ${translate(locale, '{count} {label} generations finished. Check the {stage} tab.', {
@@ -261,7 +267,7 @@ async function applyStyleAnchorIntent(
   if (!imageUrl) {
     // 모델이 없는 인덱스를 짚었다. 조용히 넘기면 "화풍 잡았어요"만 남는다.
     return translate(
-      useLocaleStore.getState().locale,
+      contentLocale(),
       "I couldn't tell which image you meant. Please tell me again.",
     )
   }
@@ -285,7 +291,7 @@ async function applyStyleAnchorIntent(
   } catch (error) {
     return error instanceof Error
       ? error.message
-      : translate(useLocaleStore.getState().locale, 'Unknown error')
+      : translate(contentLocale(), 'Unknown error')
   }
 }
 
@@ -299,7 +305,7 @@ function handoffBlockers(spec: HandoffSpec): string[] {
       backgrounds: p.backgrounds,
       styleAnchorKey: p.styleAnchorKey,
       // label/detail 은 게이트가 완역해 돌려준다(#i18n-s5-batch4) — 여기서 다시 번역하지 않는다.
-      locale: useLocaleStore.getState().locale,
+      locale: contentLocale(),
     })
     return gate.canHandoff
       ? []
@@ -331,8 +337,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   pendingProposal: null,
   stageBadges: {},
   pendingNavigatePath: null,
+  messagesLoadedProjectId: null,
 
   loadMessages: async (projectId) => {
+    // #welcome-race: 아래 hydrate 의 set 은 suggestion 을 (복원 선택지 또는 null 로) 덮어쓴다.
+    //   완료 마커를 로드 전 비우고 모든 종료 경로에서 세워, 제안 발사측이 로드 뒤에만 쏘게 한다.
+    set({ messagesLoadedProjectId: null })
     const hydrate = (
       rows: Array<{
         stage: string
@@ -391,12 +401,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         (a.created_at ?? '').localeCompare(b.created_at ?? ''),
       )
       hydrate(ordered)
+      set({ messagesLoadedProjectId: projectId })
       return
     }
     try {
       const res = await fetch(`/api/project/${projectId}/messages`)
       if (!res.ok) {
-        set({ messages: [], suggestion: null })
+        set({ messages: [], suggestion: null, messagesLoadedProjectId: projectId })
         return
       }
       const { messages } = await res.json()
@@ -405,9 +416,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         role: 'user' | 'model'
         content: string
       }>)
+      set({ messagesLoadedProjectId: projectId })
     } catch (err) {
       console.error('[global-chat-store] loadMessages failed:', err)
-      set({ messages: [], suggestion: null })
+      // 실패도 "로드 종료"다 — 마커를 세워야 웰컴 등 제안이 영영 굶지 않는다(빈 이력으로 진행).
+      set({ messages: [], suggestion: null, messagesLoadedProjectId: projectId })
     }
   },
 
@@ -451,7 +464,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
 
       const approved = await get().approvePendingProposal(pendingProposal.id)
-      const locale = useLocaleStore.getState().locale
+      const locale = contentLocale()
       const content = approved
         ? translate(locale, 'Approved: {action}', { action: pendingProposal.action })
         : translate(locale, "Couldn't approve the proposal. Please try again in a moment.")
@@ -475,7 +488,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
 
       const blockers = handoffBlockers(handoffSpec)
-      const locale = useLocaleStore.getState().locale
+      const locale = contentLocale()
       let reply: string
       let path: string | null = null
       if (blockers.length > 0) {
@@ -600,9 +613,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           cast: p.cast,
           backgrounds: p.backgrounds,
           styleAnchorKey: p.styleAnchorKey,
-          // 이 목록은 모델 컨텍스트로 들어가고 모델이 답변에서 그대로 되읊는다 — UI locale 로
-          //   맞춰야 en 사용자가 한국어 항목명을 듣지 않는다(ko 는 기존과 동일).
-          locale: useLocaleStore.getState().locale,
+          // 이 목록은 모델 컨텍스트로 들어가고 모델이 답변에서 그대로 되읊는다 — 응답 언어
+          //   (= 프로젝트 locale, responseLanguageDirective)와 맞춘다(#i18n-content-voice).
+          locale: contentLocale(),
         })
         body = {
           message: trimmed,
@@ -765,7 +778,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (anchorError) {
           // 모델은 이미 "이 화풍으로 잡았어요"라고 답했다. 저장이 실패했는데 조용하면 거짓말이 된다.
           const failure = translate(
-            useLocaleStore.getState().locale,
+            contentLocale(),
             "Couldn't save the art style — {reason}",
             { reason: anchorError },
           )
@@ -813,7 +826,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               : null
           // createPendingProposal 의 렌더 지점은 아직 t() 를 안 태운다 — producer-store 와 같은
           //   방식으로 여기서 미리 완역해 넘긴다(#i18n-s5-batch4, ko 출력은 기존과 동일).
-          const locale = useLocaleStore.getState().locale
+          const locale = contentLocale()
           const proposal = costUpdate.type === 'regenerateCharacter'
             ? createPendingProposal({
                 stage: 'artist',
@@ -879,7 +892,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const apName =
             useArtistStore.getState().characterAssets.find((c) => c.characterId === ap.characterId)
               ?.name || ap.characterId
-          const apLocale = useLocaleStore.getState().locale
+          const apLocale = contentLocale()
           get().offerPendingProposal(
             createPendingProposal({
               stage: 'artist',
@@ -914,7 +927,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             )
             // #p4-understand B: director 쪽도 침묵 스킵 제거.
             toast.warning(
-              translate(useLocaleStore.getState().locale, "Couldn't apply {count} changes", {
+              translate(contentLocale(), "Couldn't apply {count} changes", {
                 count: result.skipped.length,
               }),
             )
@@ -944,7 +957,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           .getState()
           .applyChatUpdates(rawUpdates.filter((u) => u.type !== 'clarify'))
         // #p4-understand B: 침묵 no-op 제거 — 적용/건너뜀을 즉시 표면화.
-        const locale = useLocaleStore.getState().locale
+        const locale = contentLocale()
         if (result.skipped.length > 0) {
           toast.warning(
             translate(locale, "Couldn't apply {count} changes — {reason}", {
@@ -1163,7 +1176,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         error:
           err instanceof Error
             ? err.message
-            : translate(useLocaleStore.getState().locale, 'Failed to run the proposal'),
+            : translate(contentLocale(), 'Failed to run the proposal'),
       })
       return false
     }
@@ -1204,7 +1217,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   notifyActionError: (stage, label, message) => {
     const trimmed = message.trim()
     // ⚠ prefix 는 상태 행 판별(chat-blocks.classifyChatMessage)이 읽는 고정 마커다 — 번역 밖에 둔다.
-    const locale = useLocaleStore.getState().locale
+    const locale = contentLocale()
     get().notifyIssue(
       stage,
       `⚠ ${translate(locale, "Couldn't start {label} generation — {message}", {
@@ -1250,9 +1263,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       loading: false,
       error: null,
       suggestion: null,
-          pendingProposal: null,
+      pendingProposal: null,
       dismissedSuggestionIds: [],
       stageBadges: {},
+      messagesLoadedProjectId: null,
     })
   },
 }))

@@ -5,7 +5,7 @@ import { Loader2, RefreshCw, AlertTriangle, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { ProducerReadinessBoard } from '@/features/producer/readiness-board'
-import { useProducerStore, WRITER_RERUN_CONSENT_TEXT } from '@/stores/producer-store'
+import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { evaluateProducerGate } from '@/lib/producer-gate'
@@ -13,7 +13,8 @@ import { createPendingProposal } from '@/lib/pending-proposal'
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { useChatUiStore } from '@/stores/chat-ui-store'
-import { useLocale, useT } from '@/lib/i18n'
+import { translate, useLocale, useT } from '@/lib/i18n'
+import { useContentLocale } from '@/lib/i18n/content'
 
 
 // 첫 프로젝트 진입 시 프로듀서가 먼저 거는 인사·시작 넛지 — 유저가 바로 한 줄로 시작할 수 있게.
@@ -30,6 +31,10 @@ const PRODUCER_WELCOME_KEY =
 export default function MeetingPage() {
   const t = useT()
   const locale = useLocale()
+  // 챗 스트림에 실리는 발화(웰컴·핸드오프 넛지·제안 카드)는 프로젝트 콘텐츠 언어를 따른다
+  //   (#i18n-content-voice) — 챗 응답(서버가 프로젝트 locale 강제)과 같은 언어로 보이게.
+  //   보드·배너 등 크롬은 계속 t()(UI 언어).
+  const contentLoc = useContentLocale()
   const projectId = useProjectStore((s) => s.projectId)
   const loadProject = useProducerStore((s) => s.loadProject)
   // saveAndHandoff 는 더 이상 이 페이지가 부르지 않는다 — 핸드오프는 채팅이 맡는다(#handoff-to-chat).
@@ -89,13 +94,14 @@ export default function MeetingPage() {
   const activeSuggestion = useGlobalChatStore((s) => s.suggestion)
   // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once) — 진실은 DB 의 reachedStage.
   const reachedStage = useProjectStore((s) => s.reachedStage)
-  // 아래 두 useEffect 의 offerSuggestion content/label 은 미리 t() 로 완역해 상수로 뽑는다 —
+  // 아래 두 useEffect 의 offerSuggestion content/label 은 미리 완역해 상수로 뽑는다 —
   //   문자열 값이라 deps 에 넣어도 로케일이 안 바뀌면 재실행되지 않는다(#i18n-s5-batch4,
-  //   writer 배치의 scene-gate 패턴과 동일).
-  const handoffReadyContent = t(
+  //   writer 배치의 scene-gate 패턴과 동일). 발화라서 t() 가 아니라 콘텐츠 언어(#i18n-content-voice).
+  const handoffReadyContent = translate(
+    contentLoc,
     'Everything needed is filled in. Calling Writer will start scene/shot design right away.',
   )
-  const inviteWriterLabel = t('Invite Writer')
+  const inviteWriterLabel = translate(contentLoc, 'Invite Writer')
   useEffect(() => {
     if (!projectId || !canHandoff) return
     if (!shouldOfferHandoffNudge('producer', reachedStage)) return
@@ -107,7 +113,11 @@ export default function MeetingPage() {
         stage: 'producer',
         content: handoffReadyContent,
         // 라벨은 초대 프레임(#oiioii-handoff) — 실행하면 채팅에 ⇄ 초대 블록이 그려지고 넘어간다.
-        action: { kind: 'handoff', utterance: t(spec.utterance), label: inviteWriterLabel },
+        action: {
+          kind: 'handoff',
+          utterance: translate(contentLoc, spec.utterance),
+          label: inviteWriterLabel,
+        },
       },
       { preempt: true },
     )
@@ -120,14 +130,19 @@ export default function MeetingPage() {
     reachedStage,
     handoffReadyContent,
     inviteWriterLabel,
-    t,
+    contentLoc,
   ])
 
-  const producerWelcome = t(PRODUCER_WELCOME_KEY)
+  const producerWelcome = translate(contentLoc, PRODUCER_WELCOME_KEY)
   // 첫 진입(스토리·프로듀서 채팅 모두 비어있음)에만 프로듀서가 먼저 인사 + 입력창 포커스(빔).
   //   offerSuggestion 은 dismiss/중복 가드 내장 → 한 번만, 세션 재진입 시 재노출 안 함.
+  // #welcome-race(2026-08-23, "영어에서 웰컴이 안 나온다" 실체): loadMessages 의 hydrate 는
+  //   suggestion 슬롯을 통째로 덮어쓴다. 웰컴이 그보다 먼저 떴다가(producer 로드가 이기는 경합)
+  //   조용히 지워졌다 — 로케일 문제가 아니라 타이밍 복불복. 챗 이력 로드 완료 마커를 기다린다.
+  const messagesLoadedProjectId = useGlobalChatStore((s) => s.messagesLoadedProjectId)
+  const chatReady = messagesLoadedProjectId === projectId
   useEffect(() => {
-    if (!projectId || welcomeFiredRef.current || !producerLoaded) return
+    if (!projectId || welcomeFiredRef.current || !producerLoaded || !chatReady) return
     if (storyReady || storyText.trim()) return
     if (messages.some((m) => m.stage === 'producer')) return
     welcomeFiredRef.current = true
@@ -142,6 +157,7 @@ export default function MeetingPage() {
   }, [
     projectId,
     producerLoaded,
+    chatReady,
     storyReady,
     storyText,
     messages,
@@ -161,18 +177,20 @@ export default function MeetingPage() {
   }
 
   const handleWriterRerunProposal = () => {
+    // 제안 카드는 챗 스트림에 실린다 → 콘텐츠 언어(#i18n-content-voice).
     const accepted = offerPendingProposal(
       createPendingProposal({
         stage: 'producer',
         kind: 'producerWriterRerunRequest',
         target: 'Writer rerun',
-        action: t('Re-run Writer with the current Producer source'),
+        action: translate(contentLoc, 'Re-run Writer with the current Producer source'),
         impact: [
-          t('The Writer implementation calls an external contract.'),
-          t(
+          translate(contentLoc, 'The Writer implementation calls an external contract.'),
+          translate(
+            contentLoc,
             "If same-shot preservation on the Writer side isn't guaranteed, downstream output may become orphaned or stale.",
           ),
-          t('Nothing runs until you approve.'),
+          translate(contentLoc, 'Nothing runs until you approve.'),
         ],
         payload: {},
       }),
