@@ -5,6 +5,7 @@ import {
   Loader2,
   Download,
   FileArchive,
+  MonitorPlay,
   Play,
   Pause,
   ChevronLeft,
@@ -21,6 +22,7 @@ import { VideoSourcePanel } from '@/features/editor/video-source-panel'
 import { AudioMeter } from '@/features/editor/audio-meter'
 import { ResizeHandle } from '@/features/editor/resize-handle'
 import { useEditorPlayback } from '@/features/editor/use-editor-playback'
+import { prefetchVideos, resetVideoPrefetchFor } from '@/features/editor/video-prefetch'
 import { useEditorStore, selectTimelineLayout } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
@@ -113,6 +115,40 @@ export default function PostPage() {
   const projectId = useProjectStore((s) => s.projectId)
   const [exportingZip, setExportingZip] = useState(false)
 
+  // "전체 보기"(#watch-all) — 타임라인의 모든 클립을 먼저 받아(objectURL) 처음부터 끊김 없이
+  //   연속 재생한다. 진행 중에는 버튼이 n/m 을 보여준다. 일부 실패는 그 클립만 스트리밍.
+  const [prefetching, setPrefetching] = useState<{ done: number; total: number } | null>(null)
+  const handleWatchAll = useCallback(async () => {
+    const st = useEditorStore.getState()
+    const urls = selectTimelineLayout(st)
+      .map((item) => st.videoClips.find((c) => c.shotId === item.shotId)?.url)
+      .filter((u): u is string => !!u)
+    if (urls.length === 0) {
+      toast.info(t('No videos on the timeline yet — generate videos in Director first.'))
+      return
+    }
+    setPrefetching({ done: 0, total: urls.length })
+    try {
+      const r = await prefetchVideos(projectId ?? null, urls, (done, total) =>
+        setPrefetching({ done, total }),
+      )
+      if (r.failed > 0) {
+        toast.warning(
+          t('{failed} of {total} clips could not be preloaded — they will stream as before.', {
+            failed: r.failed,
+            total: r.total,
+          }),
+        )
+      }
+    } finally {
+      setPrefetching(null)
+    }
+    const ready = useEditorStore.getState()
+    ready.clearPreviewSource() // 소스 미리보기 모드였으면 타임라인 재생으로 복귀
+    ready.seek(0)
+    ready.setPlaying(true)
+  }, [projectId, t])
+
   // 비디오 소스에 오디오가 있으면 같은 위치 오디오 트랙에 함께 삽입.
   // 비디오 파일을 decodeAudioData 로 디코드 시도 → 성공 시 소리 있음. 실패(무음/CORS) 시 비디오만.
   const attachVideoAudio = useCallback(async (shotId: string, atSec: number) => {
@@ -143,6 +179,8 @@ export default function PostPage() {
   // loadData(원본) → loadPersisted(저장된 편집 덮어쓰기) → 첫 진입 시 샷 오디오 자동 부착.
   useEffect(() => {
     let cancelled = false
+    // 프로젝트가 바뀌면 이전 프로젝트의 "전체 보기" blob 캐시를 반환한다(같은 프로젝트 재진입은 유지).
+    resetVideoPrefetchFor(projectId ?? null)
     ;(async () => {
       await loadData()
       if (cancelled) return
@@ -395,6 +433,24 @@ export default function PostPage() {
           </span>
 
           <div className="ml-auto flex items-center gap-2">
+            {/* 전체 보기(#watch-all) — 전 클립 프리로드 후 처음부터 연속 재생 */}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!!prefetching}
+              className="gap-1.5 hover-red-beam"
+              onClick={() => void handleWatchAll()}
+              title={t('Preload every clip, then play the whole timeline from the start')}
+            >
+              {prefetching ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <MonitorPlay className="size-3" />
+              )}
+              {prefetching
+                ? t('Preparing {done}/{total}…', prefetching)
+                : t('Watch all')}
+            </Button>
             {/* 샷 영상 일괄 ZIP 다운로드 (타임라인 순서대로 NN_shotId.mp4) */}
             <Button
               size="sm"

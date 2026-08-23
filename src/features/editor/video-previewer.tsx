@@ -4,6 +4,7 @@ import { Play, Pause, Volume2, VolumeX } from 'lucide-react'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { useEditorStore, selectTimelineLayout } from '@/stores/editor-store'
+import { cachedVideoUrl } from '@/features/editor/video-prefetch'
 import { useT } from '@/lib/i18n'
 
 function formatTime(sec: number) {
@@ -141,7 +142,8 @@ export function VideoPreviewer() {
         <video
           key={activeShotId ?? 'none'}
           ref={videoRef}
-          src={activeClip.url}
+          // "전체 보기" 프리패치가 받아둔 blob 이 있으면 그걸로 — 클립 경계 전환이 즉시가 된다(#watch-all).
+          src={cachedVideoUrl(activeClip.url) ?? activeClip.url}
           muted
           playsInline
           preload="auto"
