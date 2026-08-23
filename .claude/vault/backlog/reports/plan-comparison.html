@@ -1,0 +1,699 @@
+<title>요금제 세 갈래</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.8;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(26px,5vw,38px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .standfirst{font-size:17px;color:var(--ink-2);margin:0 0 14px;max-width:62ch}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:0;line-height:1.7}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:56px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:22px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:64ch}
+  p{margin:0 0 14px;max-width:66ch}
+  h3{font-size:16.5px;font-weight:750;margin:26px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 14px;padding-left:22px;max-width:66ch}
+  ul.plain li{margin-bottom:7px}
+  ol.plain{margin:0 0 14px;padding-left:22px;max-width:66ch}
+  ol.plain li{margin-bottom:9px}
+  strong,b{font-weight:750}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:20px 24px 16px;margin:0 0 16px}
+  .card.fail{border-left:3px solid var(--fail)}
+  .card.pass{border-left:3px solid var(--pass)}
+  .card.note{border-left:3px solid var(--accent)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+
+  .lanes{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0 26px}
+  @media (max-width:720px){.lanes{grid-template-columns:1fr}}
+  .lane{border:1px solid var(--line);border-radius:10px;background:var(--surface);
+    padding:18px 20px 16px;display:flex;flex-direction:column;gap:4px}
+  .lane.now{border-left:3px solid var(--fail)}
+  .lane.pro{border-left:3px solid var(--accent)}
+  .lane.mix{border-left:3px solid var(--pass)}
+  .lane .tag{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted)}
+  .lane h3{margin:2px 0 6px;font-size:17px}
+  .lane .cost{font-family:var(--mono);font-size:22px;font-weight:800;
+    font-variant-numeric:tabular-nums;margin:2px 0 8px}
+  .lane.now .cost{color:var(--fail)}
+  .lane.pro .cost{color:var(--accent)}
+  .lane.mix .cost{color:var(--pass)}
+  .lane p{margin:0;font-size:13.5px;line-height:1.65;color:var(--ink-2);max-width:none}
+
+  figure{margin:22px 0 26px;padding:0}
+  figure svg{display:block;width:100%;max-width:100%;height:auto;
+    background:var(--surface);border:1px solid var(--line);border-radius:10px}
+  figcaption{font-size:13.5px;color:var(--muted);margin-top:10px;line-height:1.65;max-width:66ch}
+  .ax{stroke:currentColor;stroke-width:1.2;opacity:.3}
+  .axl{fill:currentColor;font-family:var(--mono);font-size:10.5px;opacity:.6}
+  .grp{fill:currentColor;font-family:var(--sans);font-size:13px;font-weight:750}
+  .bl{fill:currentColor;font-family:var(--sans);font-size:11.5px;opacity:.75}
+  .bv{font-family:var(--mono);font-size:12px;font-weight:750;font-variant-numeric:tabular-nums}
+  .b-now{fill:var(--fail-soft);stroke:var(--fail);stroke-width:1.4}
+  .b-pro{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4}
+  .b-mix{fill:var(--pass-soft);stroke:var(--pass);stroke-width:1.4}
+  .v-now{fill:var(--fail)}
+  .v-pro{fill:var(--accent)}
+  .v-mix{fill:var(--pass)}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:600px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right;font-family:var(--mono);font-size:13px;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr.bad td{background:var(--fail-soft)}
+  tr.good td{background:var(--pass-soft)}
+  tr.hi td{background:var(--accent-soft)}
+  .say{color:var(--muted);font-size:12.5px;display:block;margin-top:3px;line-height:1.55}
+  .x{color:var(--fail);font-weight:750}
+  .ok{color:var(--pass);font-weight:750}
+
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .path{font-family:var(--mono);font-size:12px;color:var(--muted)}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+
+  .banner{border:2px solid var(--ink);border-radius:10px;padding:20px 24px;margin:24px 0;
+    background:var(--surface)}
+  .banner h3{margin:0 0 10px;font-size:17px}
+  .banner p:last-child{margin-bottom:0}
+
+  footer{margin-top:62px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer ul{padding-left:20px;margin:8px 0 16px}
+  footer li{margin-bottom:6px}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+</style>
+
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">용량·비용 비교 · 2026-08-20</p>
+  <h1>같은 돈을 더 내는 것과, 파일만 딴 데 두는 것</h1>
+  <p class="standfirst">지금 쓰는 무료 요금제를 기준으로, 유료로 올렸을 때와 파일만 다른 회사로 옮겼을 때 각 한도가 몇 배가 되는지 실측 사용량을 대입해 계산했습니다.</p>
+  <p class="asof">한 줄 요약 — 사용자 한 명이 대본 100샷 + 연출 100샷짜리 프로젝트 하나를 쓴다고 보면 <b>1인당 약 272 MB</b>입니다. 지금 무료로는 <b>3명</b>, 유료로 올리면 <b>367명</b>, 파일만 딴 데로 옮기면 <b>36명</b>이 한계이고 — 셋 다 저장이 먼저 찹니다. <b>차이는 넘겼을 때 생깁니다.</b> 1,000명 규모에서 유료는 월 $29 이상, 파일만 옮긴 쪽은 월 $3.9 입니다.</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">0</span><h2>이 문서가 쓰는 말</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>흔히 쓰는 말</th><th>이 문서가 쓰는 말</th></tr></thead>
+    <tbody>
+      <tr><td>이그레스 / egress</td><td><b>나간 데이터량</b>. 두 종류를 갈라 씁니다 — <b>파일이 나간 양</b>과 <b>데이터·로그인이 나간 양</b></td></tr>
+      <tr><td>Supabase Pro</td><td><b>유료 요금제</b> — 월 $25</td></tr>
+      <tr><td>Cloudflare R2</td><td><b>다른 회사 파일 보관함</b> — 나가는 데이터에 요금을 안 매기는 곳</td></tr>
+      <tr><td>MAU</td><td><b>월간 접속 사용자 수</b></td></tr>
+      <tr><td>헤드룸 / headroom</td><td><b>여유</b> — 지금 쓰는 양의 몇 배까지 버티나</td></tr>
+      <tr><td>llm_calls / 트레이스</td><td><b>모델 호출 기록</b> — 모델에게 무엇을 보내고 무엇을 받았는지 남긴 것</td></tr>
+      <tr><td>리텐션 / retention</td><td><b>보존 기간</b> — 얼마나 오래 두고 언제 지우나</td></tr>
+      <tr><td>컴팩션 / compaction</td><td><b>압축 정리</b> — 통째로 지우는 대신 무거운 부분만 덜어내기</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>비교하는 세 갈래</h2></div>
+  <div class="lanes">
+    <div class="lane now">
+      <span class="tag">기준선 · 지금</span>
+      <h3>Supabase 무료만</h3>
+      <div class="cost">$0</div>
+      <p>세 항목이 한도를 넘어 <b>서비스가 멈춰 있습니다.</b> 이 상태로는 복구되지 않습니다.</p>
+    </div>
+    <div class="lane pro">
+      <span class="tag">갈래 A</span>
+      <h3>Supabase 유료만</h3>
+      <div class="cost">$25 / 월</div>
+      <p>구조는 그대로 두고 한도만 올립니다. 파일도 계속 Supabase 에 둡니다.</p>
+    </div>
+    <div class="lane mix">
+      <span class="tag">갈래 B</span>
+      <h3>무료 + 파일만 딴 데</h3>
+      <div class="cost">$0</div>
+      <p>데이터·로그인은 Supabase 무료, 파일은 Cloudflare 무료로 나눕니다.</p>
+    </div>
+  </div>
+  <p class="say" style="font-size:13.5px">세 갈래 모두 앱을 돌리는 Vercel 비용은 뺐습니다 — 어느 쪽을 골라도 같고, 사용량이 아니라 상업적 이용 조항 때문에 별도로 판단할 문제입니다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>지금 상태 — 무엇이 얼마나 넘었나</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>항목</th><th class="num">무료 한도</th><th class="num">실측 사용</th><th class="num">비율</th></tr></thead>
+    <tbody>
+      <tr class="good"><td>데이터베이스 용량</td><td class="num">500 MB</td><td class="num">60 MB</td><td class="num ok">12%</td></tr>
+      <tr class="bad"><td>파일 보관 용량</td><td class="num">1 GB</td><td class="num">3.61 GB</td><td class="num x">361%</td></tr>
+      <tr class="bad"><td>직접 나간 양</td><td class="num">5 GB</td><td class="num">7.54 GB</td><td class="num x">151%</td></tr>
+      <tr class="bad"><td>중계망 거쳐 나간 양</td><td class="num">5 GB</td><td class="num">8.89 GB</td><td class="num x">178%</td></tr>
+      <tr class="good"><td>월간 접속 사용자</td><td class="num">50,000</td><td class="num">114</td><td class="num ok">0.2%</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>넘은 셋은 전부 파일 쪽입니다.</b> 데이터베이스는 한도의 8분의 1만 쓰고 있고, 사용자 수는 사실상 비어 있습니다. 이 사실이 두 갈래의 우열을 정합니다.</p>
+  <div class="card note">
+    <p><b>비교의 기준점.</b> 아래 계산은 <b>정리 작업을 마친 뒤</b>를 가정합니다. 생성용 임시물 677MB 와 주인 없는 파일 17MB 는 옮기지도 남기지도 않기로 이미 정했으므로, 실제로 관리할 파일은 <b>2.8 GB</b>입니다.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>한도가 몇 배가 되나</h2></div>
+  <p class="sec-lede">무료 한도를 1배로 놓고, 두 갈래에서 각 한도가 몇 배가 되는지입니다.</p>
+
+  <figure>
+    <svg viewBox="0 0 840 430" role="img" aria-label="무료 한도를 1배로 놓았을 때, 유료 요금제는 파일 보관 100배·파일 전송 50배·데이터베이스 16배가 되고, 파일만 옮기는 쪽은 파일 보관 10배·파일 전송 무제한·데이터베이스는 1배 그대로가 된다.">
+      <line class="ax" x1="250" y1="52" x2="250" y2="368"/>
+      <text class="axl" x="250" y="386" text-anchor="middle">1배</text>
+      <line class="ax" x1="430" y1="52" x2="430" y2="368" stroke-dasharray="3 4"/>
+      <text class="axl" x="430" y="386" text-anchor="middle">10배</text>
+      <line class="ax" x1="610" y1="52" x2="610" y2="368" stroke-dasharray="3 4"/>
+      <text class="axl" x="610" y="386" text-anchor="middle">50배</text>
+      <line class="ax" x1="760" y1="52" x2="760" y2="368" stroke-dasharray="3 4"/>
+      <text class="axl" x="760" y="386" text-anchor="middle">100배</text>
+
+      <text class="grp" x="20" y="80">파일 보관</text>
+      <rect class="b-pro" x="250" y="62" width="510" height="26" rx="4"/>
+      <text class="bv v-pro" x="768" y="80">100배</text>
+      <text class="bl" x="20" y="98">유료 100 GB</text>
+      <rect class="b-mix" x="250" y="102" width="180" height="26" rx="4"/>
+      <text class="bv v-mix" x="440" y="120">10배</text>
+      <text class="bl" x="20" y="138">딴 데 10 GB</text>
+
+      <text class="grp" x="20" y="188">파일 전송</text>
+      <rect class="b-pro" x="250" y="170" width="360" height="26" rx="4"/>
+      <text class="bv v-pro" x="620" y="188">50배</text>
+      <text class="bl" x="20" y="206">유료 500 GB</text>
+      <rect class="b-mix" x="250" y="210" width="530" height="26" rx="4"/>
+      <text class="bv v-mix" x="516" y="228" text-anchor="middle">한도 없음</text>
+      <text class="bl" x="20" y="246">딴 데 · 요금 0</text>
+
+      <text class="grp" x="20" y="296">데이터베이스</text>
+      <rect class="b-pro" x="250" y="278" width="288" height="26" rx="4"/>
+      <text class="bv v-pro" x="548" y="296">16배</text>
+      <text class="bl" x="20" y="314">유료 8 GB</text>
+      <rect class="b-mix" x="250" y="318" width="4" height="26" rx="2"/>
+      <text class="bv v-mix" x="264" y="336">1배 — 그대로</text>
+      <text class="bl" x="20" y="354">무료 500 MB 유지</text>
+
+      <rect class="b-pro" x="20" y="404" width="16" height="12" rx="2"/>
+      <text class="bl" x="44" y="414">Supabase 유료만</text>
+      <rect class="b-mix" x="180" y="404" width="16" height="12" rx="2"/>
+      <text class="bl" x="204" y="414">무료 + 파일만 딴 데</text>
+    </svg>
+    <figcaption>가로축은 눈금 간격이 일정하지 않습니다(1·10·50·100배). 배수 차이가 커서 같은 간격으로 그리면 작은 값이 안 보입니다. <b>파일 전송에서 두 갈래의 성격이 갈립니다</b> — 유료는 바이트 한도를 50배로 올리는 것이고, 파일을 옮기는 쪽은 <b>바이트로 세는 것을 그만두고 요청 횟수로 셉니다.</b> 한도가 사라지는 게 아니라 자가 바뀌는 것이라, 다음 절에서 그 자로 다시 재봤습니다.</figcaption>
+  </figure>
+
+  <div class="tbl"><table>
+    <thead><tr><th>항목</th><th class="num">무료 (기준)</th><th class="num">유료만</th><th class="num">무료 + 딴 데</th></tr></thead>
+    <tbody>
+      <tr><td>파일 보관 용량</td><td class="num">1 GB</td><td class="num">100 GB <b>·100배</b></td><td class="num">10 GB <b>·10배</b></td></tr>
+      <tr class="hi"><td><b>파일이 나간 양</b><span class="say">바이트 기준</span></td><td class="num">10 GB</td><td class="num">500 GB <b>·50배</b></td><td class="num ok"><b>바이트 한도 없음</b><span class="say">대신 아래 요청 횟수로 셉니다</span></td></tr>
+      <tr><td>데이터베이스 용량</td><td class="num">500 MB</td><td class="num">8 GB <b>·16배</b></td><td class="num">500 MB ·1배</td></tr>
+      <tr><td>데이터·로그인이 나간 양</td><td class="num">10 GB</td><td class="num">500 GB <b>·50배</b></td><td class="num">10 GB ·1배</td></tr>
+      <tr class="hi"><td><b>파일 읽기 요청</b><span class="say">다른 회사만 세는 항목</span></td><td class="num">해당 없음</td><td class="num">해당 없음</td><td class="num"><b>1,000만 / 월</b></td></tr>
+      <tr><td><b>파일 쓰기 요청</b><span class="say">다른 회사만 세는 항목</span></td><td class="num">해당 없음</td><td class="num">해당 없음</td><td class="num"><b>100만 / 월</b></td></tr>
+      <tr><td>월간 접속 사용자</td><td class="num">50,000</td><td class="num">100,000 ·2배</td><td class="num">50,000 ·1배</td></tr>
+      <tr><td>활성 프로젝트</td><td class="num">2</td><td class="num">제한 없음</td><td class="num">2</td></tr>
+      <tr><td><b>월 비용</b></td><td class="num">$0</td><td class="num"><b>$25</b></td><td class="num ok"><b>$0</b></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>제품 규모로 바꾸면</h2></div>
+  <p class="sec-lede">추상적인 기가바이트 대신 "샷 몇 건까지"로 환산했습니다. 실측 평균 <b>샷 1건 = 3.41 MB</b> 기준입니다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th class="num">무료 (기준)</th><th class="num">유료만</th><th class="num">무료 + 딴 데</th></tr></thead>
+    <tbody>
+      <tr><td>담을 수 있는 샷</td><td class="num">약 290건</td><td class="num">약 29,300건</td><td class="num">약 2,900건</td></tr>
+      <tr class="hi"><td><b>지금(2.8 GB) 위에 더 담을 수 있는 샷</b></td><td class="num x">이미 초과</td><td class="num">약 28,500건</td><td class="num">약 2,100건</td></tr>
+      <tr><td>프로젝트 환산<span class="say">프로젝트당 20~50샷</span></td><td class="num x">—</td><td class="num">570~1,400개</td><td class="num">42~105개</td></tr>
+    </tbody>
+  </table></div>
+  <p>전송 쪽도 환산했습니다. 썸네일 수리를 마치면 <b>화면의 그림 5,140장을 한 번씩 전부 훑는 데 97 MB</b>가 나갑니다(수리 전에는 697 MB).</p>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th class="num">무료 (기준)</th><th class="num">유료만</th><th class="num">무료 + 딴 데</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td><b>전체 훑기 몇 회분</b><span class="say">바이트 기준</span></td><td class="num">약 100회</td><td class="num">약 5,100회</td><td class="num ok"><b>바이트로는 무제한</b><span class="say">횟수 기준은 다음 절</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="say" style="font-size:13.5px">실제로는 화면에 들어온 그림만 요청되고(<code>loading="lazy"</code>) 중계망 캐시가 상당량을 흡수하므로, 위 숫자는 <b>최악의 경우</b>입니다. 실제 여유는 이보다 큽니다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>다른 회사는 바이트가 아니라 횟수로 셉니다</h2></div>
+  <p class="sec-lede">"전송 한도가 없다"는 절반만 맞습니다. 나간 바이트에는 요금이 없지만, <b>파일을 주고받은 횟수</b>에 한도가 있습니다. 자가 다르니 그 자로 다시 재봐야 공정합니다.</p>
+
+  <div class="tbl"><table>
+    <thead><tr><th>세는 방식</th><th>Supabase</th><th>다른 회사</th></tr></thead>
+    <tbody>
+      <tr><td>파일을 내보낸 <b>바이트</b></td><td>과금 — 무료 10 GB / 유료 500 GB</td><td class="ok">요금 없음 · 한도 없음</td></tr>
+      <tr class="hi"><td>파일을 <b>읽은 횟수</b></td><td>세지 않음</td><td><b>무료 1,000만 건 / 월</b><span class="say">초과 100만 건당 $0.36</span></td></tr>
+      <tr><td>파일을 <b>쓴 횟수</b></td><td>세지 않음</td><td><b>무료 100만 건 / 월</b><span class="say">초과 100만 건당 $4.50</span></td></tr>
+      <tr class="good"><td><b>중계망 캐시에서 나간 것</b></td><td>과금 — 별도 한도 5 GB / 250 GB</td><td class="ok"><b>세지 않음</b> — 파일 보관함까지 안 갑니다</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="card note">
+    <p><b>마지막 줄이 이 비교의 핵심입니다.</b> 같은 그림을 두 번째로 보는 사람의 요청은 중계망이 대신 답합니다. Supabase 는 그것도 바이트로 세지만(더 싸긴 합니다), 다른 회사는 <b>파일 보관함까지 도달하지 않으므로 아예 세지 않습니다.</b> 조회가 반복될수록 격차가 벌어집니다.</p>
+  </div>
+
+  <h3>우리 사용량을 요청 횟수로 환산하면</h3>
+  <p>썸네일 수리를 마치면 화면의 그림 5,140장을 한 번씩 훑는 데 <b>요청 5,140건</b>이 듭니다. 무료 1,000만 건이면 <b>약 1,900회 훑기</b>입니다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>전체 훑기 몇 회분</th><th class="num">유료 (바이트 기준)</th><th class="num">다른 회사 (횟수 기준)</th></tr></thead>
+    <tbody>
+      <tr><td>중계망 캐시가 하나도 안 들을 때<span class="say">최악</span></td><td class="num">약 5,100회</td><td class="num">약 1,900회</td></tr>
+      <tr><td>절반이 캐시에서 나갈 때</td><td class="num">약 10,300회</td><td class="num">약 3,900회</td></tr>
+      <tr class="good"><td>열에 여덟이 캐시에서 나갈 때<span class="say">같은 화면을 여러 번 보는 실제 사용에 가까움</span></td><td class="num">약 25,700회</td><td class="num ok">약 9,700회</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="card warn">
+    <p><b>정직하게 적으면, 요청 횟수로 재면 유료 쪽이 더 넉넉합니다.</b> 바이트 한도가 없다는 것이 무제한을 뜻하지 않습니다. 우리 그림이 작아서(썸네일 15 kB) 바이트는 금방 안 차는데 <b>횟수는 그림 수만큼 정직하게 늘기</b> 때문입니다.</p>
+    <p>다만 세 가지를 같이 봐야 합니다. 첫째, 초과해도 <b>정지가 아니라 과금</b>입니다 — 1,000만 건을 넘겨도 100만 건당 $0.36 이라 두 배를 써도 월 $3.6 입니다. 둘째, <b>Supabase 는 초과하면 서비스가 멈춥니다</b>(무료 요금제에서 지금 겪은 것). 셋째, 유료 500 GB 를 넘기면 GB 당 $0.09 라 훨씬 비쌉니다.</p>
+  </div>
+
+  <h3>쓰기 횟수는 여유가 큽니다</h3>
+  <p>8월 한 달 업로드가 8,902건이었습니다. 썸네일을 세 프레임 모두 만들게 고쳤으므로 약 3배가 되어 <b>월 27,000건</b> 안팎이 됩니다. 무료 100만 건의 <b>2.7%</b>라 걱정할 자리가 아닙니다.</p>
+  <p>이전 작업 자체도 쓰기입니다 — 9,415개를 복사하니 9,415건. 이것도 한 번뿐이고 한도의 1% 미만입니다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">6</span><h2>프로젝트 하나에 실제로 뭐가 저장되나</h2></div>
+  <p class="sec-lede">저장되는 것은 두 종류입니다 — <b>글자</b>는 데이터베이스에, <b>그림과 영상</b>은 파일 보관함에 갑니다. 둘의 크기 차이가 이 문서의 모든 계산을 지배합니다.</p>
+
+  <figure>
+    <svg viewBox="0 0 840 190" role="img" aria-label="사용자 한 명이 쓰는 272.9메가 중 그림과 영상이 272메가로 거의 전부를 차지하고, 글자는 0.9메가로 전체의 0.3퍼센트에 불과해 막대에서 선 하나 굵기로만 보인다.">
+      <text class="grp" x="20" y="34">사용자 1명이 저장하는 272.9 MB</text>
+      <rect class="b-pro" x="20" y="52" width="797" height="44" rx="5"/>
+      <rect class="b-mix" x="20" y="52" width="3" height="44" rx="1.5"/>
+      <text class="bv v-pro" x="418" y="80" text-anchor="middle">그림·영상 272 MB</text>
+      <line class="ax" x1="23" y1="100" x2="23" y2="126"/>
+      <line class="ax" x1="23" y1="126" x2="120" y2="126"/>
+      <text class="bv v-mix" x="128" y="131">글자 0.9 MB</text>
+      <text class="bl" x="128" y="150">전체의 0.3% — 막대에서는 선 하나 굵기입니다</text>
+      <text class="bl" x="20" y="178">그림 한 장(215~245 kB)이 샷 한 건의 글자(3 kB) 약 80배입니다</text>
+    </svg>
+    <figcaption><b>글자는 사실상 공짜입니다.</b> 실측으로도 데이터베이스 전체가 27 MB 인데 파일 보관함은 3,606 MB 로 <b>133배</b> 차이입니다. 용량 걱정은 전부 그림 쪽 이야기입니다.</figcaption>
+  </figure>
+
+  <div class="card note">
+    <h3>먼저 알아야 할 것 — 샷 하나는 그림 한 장이 아닙니다</h3>
+    <p>샷 하나를 <b>시작 → 연출 → 끝</b> 세 프레임으로 만듭니다. 카드에 마우스를 올리면 이 셋이 순환 재생되어 샷의 움직임을 보여줍니다(가운데 프레임에 화살표와 지시문이 그려집니다).</p>
+    <p>그래서 <b>100샷 프로젝트의 프레임은 단계마다 300장</b>이고, 작은 그림까지 세면 600장입니다. 두 단계를 합치면 <b>샷 하나가 이미지 12장</b>이 됩니다.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>실측 검산</th><th class="num">샷</th><th class="num">프레임 파일</th><th class="num">확인</th></tr></thead>
+      <tbody>
+        <tr><td>대본(러프)</td><td class="num">894</td><td class="num">2,682</td><td class="num ok">894 × 3 ✓</td></tr>
+        <tr><td>연출(실사)</td><td class="num">434</td><td class="num">1,302</td><td class="num ok">434 × 3 ✓</td></tr>
+      </tbody>
+    </table></div>
+    <p style="margin-bottom:0">한 장도 어긋나지 않습니다. <b>이것이 이 제품이 파일에 무거운 이유의 절반입니다.</b></p>
+  </div>
+
+  <h3>단계별로 무엇이 남나</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>단계</th><th>글자 (데이터베이스)</th><th>그림·영상 (파일 보관함)</th><th class="num">1인당</th></tr></thead>
+    <tbody>
+      <tr><td><b>기획</b></td><td>스토리 원문, 설정, 채팅 기록<span class="say">projects 행 8.5 kB + messages 6.4 kB</span></td><td>없음</td><td class="num">0.02 MB</td></tr>
+      <tr class="hi"><td><b>대본</b></td><td>씬 14개, 샷 100개, 실행 스냅샷 1개<span class="say">샷 1건 = 3 kB · 스냅샷 89 kB</span></td><td><b>러프 프레임 300장</b> (100샷 × 3) + 작은 그림 300장 + 여러 샷을 묶은 격자 원본<span class="say">프레임 215 kB · 작은 그림 16 kB · 격자 1,748 kB</span></td><td class="num"><b>170 MB</b></td></tr>
+      <tr><td><b>미술</b></td><td>캐릭터 10명·장소 6곳 정보<span class="say">행당 1.3~1.4 kB</span></td><td>캐릭터·장소 이미지<span class="say">캐릭터 4.7 MB · 장소 3.5 MB</span></td><td class="num">8.2 MB</td></tr>
+      <tr class="hi"><td><b>연출</b></td><td>생성 요청 기록 약 60건<span class="say">건당 2.8 kB</span></td><td><b>실사 프레임 300장</b> (100샷 × 3) + 작은 그림 300장 + 스트립<span class="say">프레임 245 kB · 작은 그림 13 kB</span></td><td class="num"><b>94 MB</b></td></tr>
+      <tr><td>영상<span class="say">이번 계산에서는 제외</span></td><td>클립 정보</td><td>mp4</td><td class="num">+27 MB</td></tr>
+      <tr class="good"><td colspan="3"><b>연출까지 합계</b></td><td class="num"><b>272.9 MB</b></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>글자만 따로 보면</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>무엇</th><th class="num">1인당</th><th>메모</th></tr></thead>
+    <tbody>
+      <tr><td>샷 100건</td><td class="num">300 kB</td><td>샷 한 건이 3 kB. 그중 러프·실사 스토리보드 정보가 각 0.5 kB</td></tr>
+      <tr><td>생성 요청 기록 60건</td><td class="num">170 kB</td><td>무엇을 어떤 설정으로 만들었는지</td></tr>
+      <tr><td>대본 실행 스냅샷 1건</td><td class="num">89 kB</td><td>행 하나가 89 kB 로 가장 무거운 단일 행</td></tr>
+      <tr><td>모델 호출 기록</td><td class="num">0~259 kB</td><td>켜 둔 프로젝트에서만 쌓입니다</td></tr>
+      <tr><td>씬·캐릭터·장소·채팅</td><td class="num">약 40 kB</td><td></td></tr>
+      <tr class="hi"><td><b>합계</b></td><td class="num"><b>0.6 ~ 0.9 MB</b></td><td>모델 호출 기록을 켰는지에 따라</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="card pass">
+    <p><b>그래서 데이터베이스 한도는 어느 갈래에서도 병목이 아닙니다.</b> 1인당 0.9 MB 면 무료 500 MB 로 <b>약 555명</b>을 받습니다. 같은 무료 조건에서 파일은 3명이 한계입니다 — <b>185배 차이</b>입니다.</p>
+    <p>이것이 갈래 B(무료 + 파일만 딴 데)의 약점을 크게 줄여 줍니다. 데이터베이스를 무료로 두는 것이 인원 한계를 만들지 않습니다. 남는 걱정은 데이터베이스가 <b>내보내는 양</b>뿐인데, 그것도 글자라서 그림에 비하면 훨씬 작습니다.</p>
+  </div>
+
+  <div class="card warn">
+    <p><b>다만 글자에도 한 가지 함정이 있습니다.</b> 모델 호출 기록은 행 하나가 평균 10.8 kB 로 다른 표보다 훨씬 무겁고, 생성할 때마다 쌓입니다. 지금은 15개 프로젝트에서만 켜져 있어 문제가 안 되지만, 전체에 켜고 오래 쌓으면 <b>사용자 1,000명에서 두 달 만에 무료 한도를 채웁니다.</b> 다음 절에서 따로 다룹니다.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">7</span><h2>모델 호출 기록은 어떻게 보관해야 하나</h2></div>
+  <p class="sec-lede">글자 중에서 유일하게 위험한 항목입니다. 지금은 작지만 방치하면 사용자가 늘 때 가장 먼저 터집니다.</p>
+
+  <h3>이건 제품 기능이 아니라 조사용 기록입니다</h3>
+  <p>코드에서 누가 쓰고 누가 읽는지 확인했습니다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>어디서</th><th>성격</th></tr></thead>
+    <tbody>
+      <tr><td><b>쓰는 곳</b></td><td><span class="path">src/lib/writer/llm/archive-calls.ts</span> — 한 곳</td><td>대본 파이프라인이 모델을 부를 때마다 원문을 남깁니다</td></tr>
+      <tr class="good"><td><b>읽는 곳</b></td><td><span class="path">research/experiments/**</span> — 전부 조사용 스크립트</td><td><b>제품 화면이나 기능이 읽는 곳은 없습니다</b></td></tr>
+      <tr><td>사본</td><td><span class="path">logs/&lt;실행id&gt;/debug/llm_calls/*.json</span></td><td>같은 내용이 <b>파일로도 남습니다</b> — 데이터베이스 쪽은 2차 사본입니다</td></tr>
+    </tbody>
+  </table></div>
+  <p>이 둘이 보존 정책을 정해 줍니다. 제품이 안 읽고 원본이 파일로 남아 있으니, <b>공격적으로 줄여도 잃는 것이 없습니다.</b></p>
+
+  <h3>무게가 어디 있나</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>무엇</th><th class="num">행 하나당</th><th class="num">비중</th></tr></thead>
+    <tbody>
+      <tr><td>모델에게 보낸 글</td><td class="num">5,331 B</td><td class="num">49%</td></tr>
+      <tr><td>모델이 돌려준 글</td><td class="num">3,093 B</td><td class="num">29%</td></tr>
+      <tr><td>역할 설명문<span class="say">단계마다 거의 같은 내용이 반복됩니다</span></td><td class="num">2,224 B</td><td class="num">21%</td></tr>
+      <tr class="good"><td><b>숫자·메타 전부</b><span class="say">모델명·토큰 수·걸린 시간·종료 사유·단계</span></td><td class="num"><b>168 B</b></td><td class="num ok"><b>1.5%</b></td></tr>
+    </tbody>
+  </table></div>
+  <div class="card note">
+    <p><b>이 표가 처방을 정해 줍니다.</b> 분석에 쓰는 값(어느 단계가 느린가, 토큰이 얼마나 드나)은 <b>1.5%</b>뿐이고 나머지 98.5%는 원문 텍스트입니다. 통째로 지울 필요 없이 <b>원문만 덜어내면</b> 거의 전부가 사라집니다.</p>
+  </div>
+
+  <h3>다른 제품들은 어떻게 하나</h3>
+  <p>모델 호출을 기록해 주는 도구들의 보존 정책입니다. 2026년 8월 기준 공개 자료입니다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th class="num">무료</th><th class="num">유료</th></tr></thead>
+    <tbody>
+      <tr><td>Helicone</td><td class="num">7일</td><td class="num">1개월 / 3개월</td></tr>
+      <tr><td>LangSmith</td><td class="num">14일</td><td class="num">확장 400일</td></tr>
+      <tr><td>Langfuse</td><td class="num">30일</td><td class="num">90일 / 3년</td></tr>
+    </tbody>
+  </table></div>
+  <p>패턴이 뚜렷합니다 — <b>7~30일이 기본값이고, 오래 보관하는 것은 유료 기능</b>입니다. 무기한 보관을 기본으로 두는 곳이 없습니다.</p>
+  <p>Langfuse 는 여기에 <b>계층 이동</b>을 더합니다: 0~7일은 빠른 저장소, 8~90일은 느린 저장소로 옮기고, 91일이 지나면 아주 느린 보관소로 내보낸 뒤 원래 자리에서 지웁니다. 오래된 기록을 비싼 자리에 두지 않는다는 발상입니다.</p>
+
+  <h3>우리 처방 — 효과 순서대로</h3>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>무엇을</th><th class="num">효과</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td><b>1</b></td><td><b>30일 지나면 원문만 비웁니다.</b> 행은 남기고 보낸 글·받은 글·역할 설명문만 비웁니다. 모델명·토큰 수·걸린 시간은 그대로 두므로 통계 분석이 계속 됩니다. 원문이 필요하면 파일 로그에 있습니다</td><td class="num"><b>10.8 kB → 168 B</b><span class="say">98.5% 절감</span></td></tr>
+      <tr><td><b>2</b></td><td><b>역할 설명문의 중복을 없앱니다.</b> 단계는 14종인데 행이 368개라 같은 설명문이 계속 반복 저장됩니다. 내용 해시를 키로 별도 표에 두고 참조하면 됩니다</td><td class="num">799 kB → 수십 kB<span class="say">30일 이내 구간에도 효과</span></td></tr>
+      <tr><td><b>3</b></td><td><b>90일 지난 행은 지웁니다.</b> 1번을 하면 그때는 행당 168 B 라 사실상 무료지만, 행 수 자체에 상한은 필요합니다</td><td class="num">행 수 상한</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>규모를 대입하면</h3>
+  <p>지금 15개 프로젝트에서 한 달에 3.9 MB, 프로젝트 하나당 <b>259 kB/월</b>입니다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>사용자</th><th class="num">원문을 계속 보관하면</th><th class="num">1번을 적용하면</th></tr></thead>
+    <tbody>
+      <tr><td>100명</td><td class="num">월 26 MB — 19개월 뒤 한도</td><td class="num ok">월 0.4 MB — 사실상 무한</td></tr>
+      <tr class="bad"><td><b>1,000명</b></td><td class="num x">월 260 MB — <b>2개월 뒤 한도</b></td><td class="num ok">월 4 MB — 10년</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>1번을 안 하면 사용자 1,000명에서 두 달 만에 무료 데이터베이스 한도(500 MB)를 채웁니다.</b> 앞 절에서 "글자는 사실상 공짜"라고 한 결론이 이 항목 하나 때문에 뒤집힐 수 있습니다.</p>
+
+  <h3>어떻게 돌리나</h3>
+  <pre>-- 30일 지난 원문 비우기 (행과 숫자·메타는 그대로)
+update llm_calls
+   set prompt = null, response = null, system_instruction = null
+ where created_at &lt; now() - interval '30 days'
+   and prompt is not null;
+
+-- 90일 지난 행 삭제
+delete from llm_calls where created_at &lt; now() - interval '90 days';</pre>
+  <p>데이터베이스에 자체 스케줄러(<code>pg_cron</code>)가 있으면 거기 걸고, 없으면 이미 있는 <code>CRON_SECRET</code> 으로 주소 하나를 만들어 Vercel 스케줄러가 하루 한 번 부르게 하면 됩니다. 실행 전에 해당 컬럼들이 비어 있어도 되는지(NULL 허용)만 확인하면 됩니다.</p>
+
+  <div class="card pass">
+    <p><b>급하지는 않습니다.</b> 지금 쌓인 368건이 전부 30일 이내라 당장 비울 것도 없습니다. 파일 이전을 마친 뒤에 붙여도 늦지 않습니다. 다만 넣어 두면 나중에 터지지 않습니다.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">8</span><h2>그래서 몇 명까지 받나</h2></div>
+  <p class="sec-lede">사용자 한 명이 프로젝트 하나를 쓰고, 그 프로젝트가 <b>대본 100샷 + 연출 100샷</b>을 다 만든 상태를 기준으로 계산했습니다.</p>
+
+  <h3>먼저 샷 한 건의 원가를 단계별로 갈랐습니다</h3>
+  <p>지금까지 쓰던 "샷 1건 = 3.41 MB"는 두 단계가 섞인 값이라 이 계산에 못 씁니다. 파일 종류별로 다시 셌습니다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>단계</th><th>무엇이 만들어지나</th><th class="num">샷 1건당</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="2"><b>대본 단계</b><span class="say">러프 스토리보드</span></td><td>프레임 3장(시작·연출·끝) + 작은 그림 3장</td><td class="num">0.68 MB</td></tr>
+      <tr><td>여러 샷을 한 장에 그린 격자 원본의 몫</td><td class="num">1.02 MB</td></tr>
+      <tr class="hi"><td colspan="2"><b>대본 단계 소계</b></td><td class="num"><b>1.70 MB</b></td></tr>
+      <tr><td rowspan="2"><b>연출 단계</b><span class="say">실사 스토리보드</span></td><td>프레임 3장 + 작은 그림 3장</td><td class="num">0.77 MB</td></tr>
+      <tr><td>스트립·구버전 단일 이미지의 몫</td><td class="num">0.17 MB</td></tr>
+      <tr class="hi"><td colspan="2"><b>연출 단계 소계</b></td><td class="num"><b>0.94 MB</b></td></tr>
+      <tr class="good"><td colspan="2"><b>두 단계 합계</b></td><td class="num"><b>2.64 MB</b></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="card warn">
+    <p><b>이 값에는 재생성이 이미 들어 있습니다.</b> 실제로 쌓인 파일을 실제 샷 수로 나눈 값이라, 그동안 다시 만든 것이 평균에 섞여 있습니다. 특히 대본 단계의 격자 원본이 그렇습니다 — 894샷에 격자가 491장이면 4샷씩 묶었을 때 필요한 224장의 두 배가 넘습니다.</p>
+    <p>그래서 <b>이 숫자는 "한 번에 성공했을 때"보다 크고, 재생성을 많이 하면 더 커집니다.</b> 아래 인원 계산은 그만큼 보수적입니다.</p>
+  </div>
+
+  <h3>프로젝트 하나 = 사용자 한 명</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>구성</th><th class="num">용량</th></tr></thead>
+    <tbody>
+      <tr><td>대본 100샷</td><td class="num">170 MB</td></tr>
+      <tr><td>연출 100샷</td><td class="num">94 MB</td></tr>
+      <tr><td>캐릭터 (평균 10명)</td><td class="num">4.7 MB</td></tr>
+      <tr><td>장소 (평균 6곳)</td><td class="num">3.5 MB</td></tr>
+      <tr><td>글자 전부 (데이터베이스)</td><td class="num">0.9 MB</td></tr>
+      <tr class="hi"><td><b>사용자 1명당 합계</b></td><td class="num"><b>약 272 MB</b></td></tr>
+      <tr><td>영상까지 만들면<span class="say">연출 다음 단계 — 이 계산에서는 뺐습니다</span></td><td class="num">+27 MB</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>저장 용량으로 본 수용 인원</h3>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th class="num">한도</th><th class="num">받을 수 있는 사용자</th></tr></thead>
+    <tbody>
+      <tr class="bad"><td>Supabase 무료</td><td class="num">1 GB</td><td class="num x">3명</td></tr>
+      <tr><td>Supabase 유료</td><td class="num">100 GB</td><td class="num">약 <b>367명</b></td></tr>
+      <tr><td>파일만 딴 데 (무료)</td><td class="num">10 GB</td><td class="num">약 <b>36명</b></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>전송량으로 본 수용 인원</h3>
+  <p>작은 그림이 제대로 걸린 뒤, 프로젝트 하나를 처음부터 끝까지 한 번 훑으면 <b>약 9.1 MB</b>가 나갑니다 — 작은 그림 <b>616장</b>(러프 300 + 실사 300 + 캐릭터·장소 16)입니다. 원본으로 나가면 약 145 MB라 16배입니다.</p>
+  <p>사람마다 하루에 몇 번 여는지가 다르므로, 월 조회 횟수를 바꿔가며 계산했습니다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>사용자 1명이 월에 여는 횟수</th><th class="num">1명당 전송</th><th class="num">Supabase 무료<span class="say">10 GB</span></th><th class="num">Supabase 유료<span class="say">500 GB</span></th><th class="num">파일만 딴 데<span class="say">요청 1,000만</span></th></tr></thead>
+    <tbody>
+      <tr><td>30회 <span class="say">하루 한 번꼴</span></td><td class="num">273 MB</td><td class="num">37명</td><td class="num">1,830명</td><td class="num">540명</td></tr>
+      <tr class="hi"><td><b>100회</b> <span class="say">작업일마다 대여섯 번</span></td><td class="num">910 MB</td><td class="num x">11명</td><td class="num"><b>549명</b></td><td class="num"><b>162명</b></td></tr>
+      <tr><td>300회 <span class="say">집중 작업</span></td><td class="num">2.7 GB</td><td class="num x">3명</td><td class="num">183명</td><td class="num">54명</td></tr>
+    </tbody>
+  </table></div>
+  <p class="say" style="font-size:13.5px">딴 데 쪽은 바이트가 아니라 요청 횟수 기준이고, <b>중계망 캐시가 하나도 안 들을 때</b>의 최악값입니다. 열에 여덟이 캐시에서 나가면 인원이 다섯 배가 됩니다(100회 기준 약 810명).</p>
+
+  <div class="banner">
+    <h3>병목이 어디인지가 갈래마다 다릅니다</h3>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th class="num">저장 기준</th><th class="num">전송 기준<span class="say">월 100회</span></th><th>실제 한계</th></tr></thead>
+      <tbody>
+        <tr class="bad"><td>Supabase 무료</td><td class="num">3명</td><td class="num">11명</td><td><b>3명</b> — 저장이 먼저 막습니다</td></tr>
+        <tr><td>Supabase 유료</td><td class="num">367명</td><td class="num">549명</td><td><b>367명</b> — 저장이 먼저 막습니다</td></tr>
+        <tr class="good"><td>파일만 딴 데</td><td class="num">36명</td><td class="num">162명</td><td><b>36명</b> — 저장이 먼저 막습니다</td></tr>
+      </tbody>
+    </table></div>
+    <p style="margin-top:14px"><b>세 갈래 모두 저장이 먼저 찹니다.</b> 그런데 저장은 넘겼을 때의 값이 완전히 다릅니다.</p>
+  </div>
+
+  <h3>한도를 넘으면 얼마인가 — 여기서 갈립니다</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>사용자</th><th class="num">필요 저장</th><th class="num">Supabase 유료</th><th class="num">파일만 딴 데</th></tr></thead>
+    <tbody>
+      <tr><td>36명</td><td class="num">9.8 GB</td><td class="num">$25</td><td class="num ok">$0</td></tr>
+      <tr><td>100명</td><td class="num">27 GB</td><td class="num">$25</td><td class="num ok">약 $0.26</td></tr>
+      <tr><td>367명</td><td class="num">100 GB</td><td class="num">$25</td><td class="num ok">약 $1.35</td></tr>
+      <tr class="hi"><td><b>1,000명</b></td><td class="num">272 GB</td><td class="num">약 <b>$29</b> <span class="say">+ 전송 초과분 별도</span></td><td class="num ok">약 <b>$3.9</b></td></tr>
+    </tbody>
+  </table></div>
+  <p><b>딴 데 쪽은 넘겨도 싸고, 넘겨도 안 멈춥니다.</b> 저장이 기가당 $0.015 라 사용자가 열 배가 돼도 커피 한 잔 값입니다. 반면 Supabase 는 유료라도 전송이 500 GB 를 넘으면 기가당 $0.09 가 붙기 시작합니다 — 위 표에서 1,000명이면 전송만 월 910 GB 라 초과분이 저장보다 훨씬 큽니다.</p>
+  <p>그리고 <b>무료 요금제에서 넘기면 과금이 아니라 정지</b>입니다. 지금 겪고 있는 것이 그것입니다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">9</span><h2>갈래 B 의 유일한 약점</h2></div>
+  <p>파일을 옮기고 나면 Supabase 에는 <b>데이터베이스와 로그인만</b> 남습니다. 그 둘이 내보내는 양이 무료 한도 5 GB 안에 드는지가 이 갈래의 성패를 정합니다.</p>
+  <div class="card fail">
+    <p><b>그 숫자를 지금은 잴 수 없습니다.</b> 누가 언제 무엇을 받아 갔는지는 데이터베이스에 안 남고, 요청 기록은 무료 요금제에서 보관 기간이 짧습니다.</p>
+    <p>상한만 좁힐 수 있습니다 — 총 16.43 GB 중 파일 몫으로 <b>확정된 것이 10.19 GB</b>이므로, 데이터·로그인 몫은 <b>많아야 6.24 GB</b>입니다. 그런데 그 6.24 GB 안에도 파일이 중계망 캐시를 놓친 몫이 섞여 있어서, 실제 데이터·로그인 몫은 이보다 훨씬 작을 것입니다.</p>
+  </div>
+  <div class="card pass">
+    <p><b>작을 것이라고 보는 근거.</b> 데이터베이스 전체 크기가 <b>60 MB</b>입니다. 데이터·로그인이 6.24 GB 를 내보냈다면 데이터베이스 전체를 <b>100번 넘게</b> 밖으로 흘려보낸 셈인데, 사용자 114명 중 실제로 작업한 사람이 몇 명뿐인 상황에서는 나오기 어려운 양입니다.</p>
+  </div>
+  <p><b>그리고 이 미지수는 시간이 풀어 줍니다.</b> 이전을 마치고 한 달을 보내면, 그때 남아 있는 나간 양이 곧 데이터·로그인 몫입니다. 추정할 필요 없이 측정값이 생깁니다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">10</span><h2>어느 쪽이 무엇에 강한가</h2></div>
+  <div class="split">
+    <div class="yes">
+      <h4>파일만 옮기는 쪽이 이기는 곳</h4>
+      <ul>
+        <li><b>바이트 한도가 없어진다</b> — 큰 파일을 주고받아도 요금이 안 붙는다. 영상처럼 무거운 것에 특히 유리</li>
+        <li><b>중계망 캐시에서 나간 것은 아예 안 센다</b> — 같은 화면을 여러 번 볼수록 격차가 벌어진다</li>
+        <li>월 $0. 유료 구간에 들어가도 3.61 GB 기준 월 $0.05 수준</li>
+        <li><b>고장이 번지지 않는다</b> — 파일 한도를 넘겨도 로그인과 데이터는 산다. 이번에 겪은 전면 정지가 구조적으로 불가능해진다</li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>유료가 이기는 곳</h4>
+      <ul>
+        <li><b>데이터베이스 용량 16배</b> (500 MB → 8 GB)</li>
+        <li><b>데이터·로그인 전송 50배</b> — 갈래 B 의 유일한 약점을 정면으로 없앤다</li>
+        <li>활성 프로젝트 제한 없음 (무료는 2개)</li>
+        <li>7일 미사용 시 프로젝트 일시정지가 없다</li>
+        <li>회사가 하나라 정합성 관리가 단순하다</li>
+        <li><b>요청 횟수로 재면 여유가 더 크다</b> — 캐시가 안 들을 때 기준 약 5,100회 대 1,900회</li>
+        <li>초과 항목이 하나로 합쳐져 있어 예측이 단순하다</li>
+        <li><b>지금 당장 서비스를 살릴 수 있는 유일한 방법</b></li>
+      </ul>
+    </div>
+  </div>
+  <div class="banner">
+    <h3>둘은 대립하지 않습니다</h3>
+    <p>지금 막혀 있는 상태에서는 <b>유료 전환이 유일한 복구 수단</b>입니다. 무료로 내리는 것은 초과 상태에서 불가능합니다. 그리고 파일을 옮기려면 옛 보관함에서 파일을 읽어야 하는데, 그것도 지금은 막혀 있습니다.</p>
+    <p>그래서 실제 경로는 <b>유료로 복구 → 정리와 이전 → 한 달 관찰 → 무료 복귀 판단</b>입니다. 갈래 A 는 갈래 B 로 가는 통로이기도 합니다.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">11</span><h2>확실한 것과 모르는 것</h2></div>
+  <div class="split">
+    <div class="yes">
+      <h4>실측으로 확인한 것</h4>
+      <ul>
+        <li>넘은 세 항목이 전부 파일 쪽이다</li>
+        <li>데이터베이스는 60 MB — 무료 한도의 12%</li>
+        <li>사용자 114명 중 파일을 만든 계정은 4개</li>
+        <li>정리 후 관리할 파일은 2.8 GB</li>
+        <li>중계망 거쳐 나간 8.89 GB 는 100% 파일</li>
+        <li>파일 몫으로 확정된 것이 10.19 GB</li>
+        <li>샷 1건 = 3.41 MB</li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>모르는 것</h4>
+      <ul>
+        <li><b>데이터·로그인만의 나간 양</b> — 갈래 B 의 성패를 정하는 숫자인데 지금은 측정 수단이 없습니다</li>
+        <li><b>실제 조회 횟수와 중계망 캐시 적중률</b> — 다른 회사는 요청 횟수로 요금을 매기는데, 우리가 화면을 몇 번 여는지도 캐시가 얼마나 받아내는지도 기록이 없습니다. 5절의 세 줄은 가정을 바꿔가며 계산한 것이지 측정값이 아닙니다</li>
+        <li><b>요금표 숫자</b>는 2026년 8월 공개 자료입니다. 계약서가 아닙니다</li>
+        <li><b>이전 작업량</b>을 산정하지 않았습니다</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">12</span><h2>결론</h2></div>
+  <ol class="plain">
+    <li><b>파일 보관은 유료가 10배 넉넉합니다</b>(100 GB 대 10 GB). 다만 우리가 쓰는 양이 2.8 GB 라 둘 다 충분합니다 — 10 GB 도 지금의 3.6배입니다.</li>
+    <li><b>파일 전송에서 승부가 갈리는데, 자가 다릅니다.</b> 유료는 바이트 한도를 50배로 올리고, 파일을 옮기는 쪽은 바이트를 세는 대신 <b>주고받은 횟수</b>를 셉니다. 이번에 우리를 멈춰 세운 항목이 정확히 이것입니다.</li>
+    <li><b>횟수로 재면 오히려 유료가 넉넉합니다</b> — 캐시가 안 들을 때 약 5,100회 대 1,900회. 우리 그림이 작아서 바이트는 안 차는데 횟수는 그림 수만큼 정직하게 늘기 때문입니다. 다만 다른 회사는 <b>초과해도 정지가 아니라 과금</b>이고(두 배를 써도 월 $3.6), 캐시에서 나간 것은 아예 안 셉니다.</li>
+    <li><b>데이터베이스는 유료가 16배지만 지금은 의미가 없습니다.</b> 60 MB 를 쓰면서 500 MB 한도를 걱정할 이유가 없습니다.</li>
+    <li><b>갈래 B 의 약점은 하나뿐이고, 크기를 모릅니다.</b> 데이터·로그인 전송이 5 GB 안에 드는지. 데이터베이스가 60 MB 라는 사실이 유리한 신호지만 증명은 아닙니다.</li>
+    <li><b>갈래 B 는 고장을 격리합니다.</b> 파일 한도를 넘겨도 로그인과 데이터는 살아 있습니다. 이번처럼 서비스가 통째로 죽는 일이 구조적으로 안 생깁니다.</li>
+    <li><b>지금은 선택지가 아닙니다.</b> 초과 상태에서 무료 복구는 불가능하고, 이전하려면 옛 보관함을 읽어야 하는데 그것도 막혀 있습니다. <b>유료 전환이 두 갈래 모두의 출발점</b>입니다.</li>
+    <li><b>사용자 한 명은 약 272 MB 입니다</b>(대본 100샷 1.70 MB/샷 + 연출 100샷 0.94 MB/샷 + 캐릭터·장소 8 MB). 이 값에는 그동안의 재생성이 이미 섞여 있어 보수적인 편이고, 재생성을 많이 하면 더 커집니다.</li>
+    <li><b>세 갈래 모두 저장이 먼저 찹니다</b> — 무료 3명, 유료 367명, 파일만 딴 데 36명. 전송은 그보다 나중입니다.</li>
+    <li><b>그래서 진짜 차이는 "넘겼을 때"에 있습니다.</b> 딴 데는 기가당 $0.015 라 1,000명이 돼도 월 $3.9 이고 <b>안 멈춥니다.</b> 유료는 저장 초과보다 전송 초과(기가당 $0.09)가 먼저 아프고, 무료는 넘기는 순간 서비스가 정지합니다.</li>
+    <li><b>글자는 사실상 공짜입니다 — 딱 하나만 빼고.</b> 1인당 0.9 MB 라 무료 데이터베이스로 555명을 받지만, 모델 호출 기록은 원문을 계속 쌓아서 사용자 1,000명이면 두 달 만에 한도를 채웁니다. <b>30일 지난 원문만 비우면 98.5% 가 사라지고</b> 통계 분석은 그대로 됩니다. 업계도 7~30일이 기본값입니다.</li>
+    <li><b>한 달 뒤에는 추정이 필요 없습니다.</b> 파일이 빠진 상태로 한 주기를 보내면 남은 나간 양이 곧 답입니다.</li>
+  </ol>
+</section>
+
+<footer>
+  <p><b>이 문서의 근거</b></p>
+  <ul>
+    <li>파일 보관함 전수 집계와 데이터베이스 크기 측정 — 데이터베이스 직접 접속 (2026-08-19)</li>
+    <li>이전 대상 분류 — <span class="path">src/lib/storage/migration-plan.ts</span> 규칙을 실제 보관함에 적용한 결과</li>
+    <li>요금표와 모델 호출 기록 보존 정책은 2026년 8월 기준 각 회사 공개 자료</li>
+    <li>모델 호출 기록의 소비처는 코드 검색으로 확인 — 제품 코드에서 읽는 곳이 없고 조사용 스크립트만 읽습니다</li>
+    <li>앞선 문서 — 저장소 한도 초과 해부 · 나간 데이터량 회계 · 썸네일 실태 점검</li>
+  </ul>
+  <p><b>이 문서가 하지 않는 것</b></p>
+  <ul>
+    <li><b>데이터·로그인만의 나간 양을 재지 않았습니다.</b> 갈래 B 의 성패가 여기 걸려 있는데 지금은 측정 수단이 없습니다</li>
+    <li><b>Vercel 비용을 뺐습니다.</b> 어느 갈래를 골라도 같고, 사용량이 아니라 상업적 이용 조항 때문에 따로 판단할 문제입니다</li>
+    <li><b>이전 작업량과 위험을 산정하지 않았습니다.</b> 용량과 비용만 비교했습니다</li>
+    <li><b>사용자 1명 = 프로젝트 1개, 대본 100샷 + 연출 100샷은 가정입니다.</b> 실제 분포를 조사한 것이 아니라 오너가 제시한 기준으로 계산했습니다. 샷 수가 절반이면 인원은 두 배가 됩니다</li>
+    <li><b>월 조회 횟수와 캐시 적중률도 가정입니다.</b> 기록이 없어 30·100·300회를 놓고 계산했을 뿐, 실제 값은 모릅니다</li>
+    <li><b>영상 단계를 뺐습니다.</b> 연출까지만 계산했고, 영상까지 만들면 1인당 27 MB 가 더 붙습니다</li>
+    <li><b>요금표는 검색으로 얻은 값</b>이라 실제 계약과 다를 수 있습니다. 결정 전에 각 회사 요금 페이지에서 다시 확인해야 합니다</li>
+  </ul>
+</footer>
+
+</div>
