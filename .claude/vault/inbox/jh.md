@@ -342,7 +342,7 @@ writer 끝나고 다시 writer 다시 요청하면 갇힘
 
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":2342,"content_sha256":"65605c5d44bbe6ae8faa2b5633a6aa1f0efc11c1de140a2619b83ce27d39988c","item_id":"ff1079bf485d699c2743da914a23cc95d4be79da1a8bb3854193421a131561cf","schema":1,"snapshot_id":"inbox-track-2026-08-19","source_key":"inbox/jh.md","source_range":{"end":15988,"start":13646},"state":"tracked","units":["n6-producer-input-rigidity-map","n7-project-inheritance-map"]}
+{"actor":"jh","byte_length":2342,"content_sha256":"65605c5d44bbe6ae8faa2b5633a6aa1f0efc11c1de140a2619b83ce27d39988c","item_id":"ff1079bf485d699c2743da914a23cc95d4be79da1a8bb3854193421a131561cf","schema":1,"snapshot_id":"inbox-track-2026-08-19","source_key":"inbox/jh.md","source_range":{"end":15988,"start":13646},"state":"tracked","units":["n6-producer-input-rigidity-map","n7-project-inheritance-map","liveaction-experiment-prep","legacy-media-input-provider-map"]}
 -->
 1. 우리 시스템으로 뮤직비디오, 광고, 웹툰 실사화, 애니 실사화해보기
 - 입력은 그냥 유명한 뮤직비디오,광고,웹툰쓰면 될듯?
@@ -361,7 +361,7 @@ writer 끝나고 다시 writer 다시 요청하면 갇힘
 
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":983,"content_sha256":"56563b10b96dcd6e89ea05e68302a418e34a1dc50d5eac7b090a8aa071729dd4","item_id":"23f930a7086e51078b1a1fad47f90e1b39c2ef171fa3a5b807a01436ab875eb5","schema":1,"snapshot_id":"inbox-track-2026-08-19","source_key":"inbox/jh.md","source_range":{"end":16973,"start":15990},"state":"tracked","units":["vault-inbox-lifecycle-2026-08-18"]}
+{"actor":"jh","byte_length":983,"content_sha256":"56563b10b96dcd6e89ea05e68302a418e34a1dc50d5eac7b090a8aa071729dd4","item_id":"23f930a7086e51078b1a1fad47f90e1b39c2ef171fa3a5b807a01436ab875eb5","schema":1,"snapshot_id":"inbox-track-2026-08-19","source_key":"inbox/jh.md","source_range":{"end":16973,"start":15990},"state":"tracked","units":["vault-inbox-lifecycle-2026-08-18","night-approve-merge-slowness"]}
 -->
 열려있던 티켓에대해 승인 프롬프트만 쥐어주고 병합하고 inbox에서 표시남겨달라고햇는데
 엄청 오래걸림 (원인 파악 필요 아래가 프롬프트 원문)
