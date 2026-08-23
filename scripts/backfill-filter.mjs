@@ -3,11 +3,21 @@
 // **제외 목록**이다(포함 목록 아님) — 새 종류의 화면 이미지가 생기면 자동으로 백필 대상에
 // 포함되어야 한다. 포함 목록으로 만들면 새 화면이 생길 때마다 지금과 같은 구멍이 다시 난다.
 //
-// 생성용 임시 재료 패턴은 src/lib/storage/migration-plan.ts 의 TEMP_PATTERNS 와 같은 판단
-// (외부 생성 서버에 넘기는 주문서 첨부물 — 화면 어디에도 안 뜬다).
+// 생성용 임시 재료 패턴은 src/lib/storage/migration-plan.ts 의 TEMP_PATTERNS 와 겹치지만
+// **같지 않다.** 그쪽은 "새 보관함으로 옮길 것인가", 여기는 "축소본을 만들 것인가"를 정한다.
+// 격자 원본이 그 차이다 — 화면에 안 뜨니 축소본은 필요 없지만, shots.rough_storyboard.gridUrl
+// 이 가리키고 있으므로 안 옮기면 참조가 끊긴다. 두 판단을 한 규칙으로 묶으면 안 된다.
 export const EXCLUDE_PATTERNS = [
   // 배치 스토리보드 생성용 참조 시트 (<ws>/<proj>/shots/real_grid_ref_<seg>.png)
   /(^|\/)real_grid_ref_[^/]*$/i,
+  // 여러 샷을 한 장에 그린 격자 원본 (real_grid_<jobId>.png · rough_grid_<jobId>.png).
+  //   생성 모델이 돌려준 원본이고, 잘라낸 프레임이 따로 저장된다. 화면은 프레임만 읽는다 —
+  //   rough_storyboard 에서 UI 가 꺼내 쓰는 필드는 frames·status·url 뿐이고 gridUrl·stripUrl 을
+  //   렌더하는 곳이 없다("완료 시 result_url 은 그리드 원본(4샷 공용)이라 카드에 쓰면" —
+  //   rough-storyboard-view.tsx). 안 뜨는 그림의 축소본은 아무도 안 읽는다.
+  //   2026-08-23 확인: 이 규칙이 없어 격자 272장에 축소본이 이미 만들어져 있었다.
+  /(^|\/)real_grid_[^/]*$/i,
+  /(^|\/)rough_grid_[^/]*$/i,
   // 단건 스토리보드 생성용 참조 띠 (<seg>_storyboard_ref_strip.png)
   /_storyboard_ref_strip\.[^/.]+$/i,
   // 생성 모델용 고정 템플릿 — 화면에 안 뜬다

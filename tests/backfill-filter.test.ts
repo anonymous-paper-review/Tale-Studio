@@ -58,3 +58,29 @@ describe('shouldDeleteThumb — 잘못 만들어진 썸네일 삭제 판정 (cle
     expect(shouldDeleteThumb('ws/proj/uploads/u1/original.png')).toBe(false)
   })
 })
+
+describe('격자 원본 — 화면에 안 뜨므로 축소본을 만들지 않는다', () => {
+  const WS = 'ws-1/proj-1/shots'
+
+  it('배치 격자 원본을 제외한다', () => {
+    expect(shouldBackfill(`${WS}/real_grid_22a7791a-cea0-4216-9857-d130963727c1.png`)).toBe(false)
+    expect(shouldBackfill(`${WS}/rough_grid_b6654f02-6b3a-4c6e-ac44-663706f46b18.png`)).toBe(false)
+  })
+
+  it('참조 시트도 계속 제외한다 (real_grid_ 규칙이 삼키지 않는지 확인)', () => {
+    expect(shouldBackfill(`${WS}/real_grid_ref_v1-abc.png`)).toBe(false)
+  })
+
+  it('격자에 잘못 붙은 축소본은 삭제 대상이다', () => {
+    expect(shouldDeleteThumb(`${WS}/rough_grid_b6654f02_thumb.webp`)).toBe(true)
+    expect(shouldDeleteThumb(`${WS}/real_grid_22a7791a_thumb.webp`)).toBe(true)
+  })
+
+  it('샷 프레임은 격자 규칙에 걸리지 않는다', () => {
+    // `_rough_start` 같은 이름이 rough_grid_ 규칙에 잘못 잡히면 화면 그림이 통째로 빠진다.
+    expect(shouldBackfill(`${WS}/v1-abc_rough_start.png`)).toBe(true)
+    expect(shouldBackfill(`${WS}/v1-abc_rough_direction.png`)).toBe(true)
+    expect(shouldBackfill(`${WS}/v1-abc_storyboard_end.png`)).toBe(true)
+    expect(shouldDeleteThumb(`${WS}/v1-abc_rough_start_thumb.webp`)).toBe(false)
+  })
+})
