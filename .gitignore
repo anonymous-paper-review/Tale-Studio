@@ -154,20 +154,17 @@ lab/
 research/experiments/_viewer.html
 
 # 밤 러너 — git으로 나누는 것은 계약·실행 도구·설치 문서, 공유 inbox
-# (.claude/vault/inbox/<actor>.md — 각자 자기 파일에만 쓴다), 사람 보고서
-# (runs/<actor>/<run_id>/report.html), 그리고 밤이 만든 수리 branch 뿐이다.
+# (.claude/vault/inbox/<actor>.md — 각자 자기 파일에만 쓴다), 그리고 밤이 만든
+# 수리 branch 뿐이다. 결과물(runs/)은 전부 로컬이다.
 .claude/vault/_INBOX.md
 .claude/vault/_archive/
 .claude/vault/backlog/sweep/
 .claude/vault/backlog/tickets/
 /feedback/
 
-# runs/ 는 사람 보고서 하나만 공유한다 (2026-08-19 오너 결정).
-# sessions/ 에는 harvest 가 긁은 사람 발화가 들어가고 saves/·manifest 는 기계 기록이라
-# 전부 로컬로 남긴다. 경로에 actor 와 run_id 가 들어가 merge 충돌은 나지 않는다.
+# runs/ 는 전부 로컬이다 (2026-08-23 오너 결정 — 지금은 공유하지 않는다).
+# 사람 보고서·세션·기계 기록 모두 자기 컴퓨터에만 남는다.
 /runs/**
-!/runs/**/
-!/runs/*/*/report.html
 
 # 밤 입력 snapshot은 로컬 검증용 immutable binding이다.
 # 사람용 archive와 consumption manifest는 `_archive/inbox/`에 따로 추적한다.

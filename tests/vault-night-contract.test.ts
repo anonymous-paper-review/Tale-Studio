@@ -223,7 +223,7 @@ describe('night launcher/runtime contract', () => {
   })
 
   it('runtime requires owner proof for writes and keeps scan-inbox read-only', () => {
-    for (const command of ['reconcile-inbox', 'snapshot-inbox', 'snapshot-inbox-set', 'snapshot-status', 'archive-inbox', 'scan-inbox', 'track-inbox']) {
+    for (const command of ['reconcile-inbox', 'snapshot-inbox', 'snapshot-inbox-set', 'snapshot-status', 'archive-inbox', 'scan-inbox', 'track-inbox', 'append-units']) {
       const help = commandHelp(runtime, [command, '--help'])
       expect(help.status).toBe(0)
       if (command === 'scan-inbox') {
@@ -315,15 +315,23 @@ describe('night launcher/runtime contract', () => {
     }
   })
 
-  it('only retries automation commits that change exactly the current actor inbox', () => {
+  it('pushes only the current actor inbox even beside other unpushed commits', () => {
     const source = readFileSync(launcher, 'utf8')
-    const helper = source.slice(source.indexOf('inbox_only_ahead()'), source.indexOf('\nrecover_inbox_only_ahead()'))
-    expect(helper).toContain('show -s --format=%s')
-    expect(helper).toContain('[ "$subject" = "inbox($ACTOR): 밤 메모" ]')
-    expect(helper).toContain('diff-tree --root --no-commit-id --name-only -r "$commit"')
-    expect(helper).toContain('[ "$files" = ".claude/vault/inbox/$ACTOR.md" ]')
+    // 비-inbox 커밋이 섞이면 동기화 전체를 건너뛰던 게이트(inbox_only_ahead)는 제거됐다.
+    expect(source).not.toContain('inbox_only_ahead()')
+    expect(source).not.toContain('recover_inbox_only_ahead()')
     const sync = source.slice(source.indexOf('sync_inbox()'), source.indexOf('\nstart_claude_watchdog()'))
-    expect(sync).toMatch(/if inbox_only_ahead; then\s*recover_inbox_only_ahead \|\| return 0[\s\S]*else\s*echo "\[inbox\] 사람 또는 비-inbox 미푸시 커밋이 있어 동기화를 건너뛴다/)
+    // 내 메모 파일 하나만 커밋해 내보낸다.
+    expect(sync).toContain('commit -q --only "$MY_INBOX" -m "inbox($ACTOR): 밤 메모"')
+    // 옆에 다른 미푸시 커밋이 있어도 건너뛰지 않는다.
+    expect(sync).not.toContain('inbox_only_ahead')
+    expect(sync).not.toContain('동기화를 건너뛴다')
+    // 상대 메모를 강제로 당겨오는 ff 단계는 없다.
+    expect(sync).not.toContain('상대 메모 수신 OK')
+    expect(sync).not.toContain('merge --ff-only origin/main')
+    // 전체 스테이징 금지.
     expect(sync).not.toContain('git -C "$PROJECT_ROOT" add -A')
+    // 경합/뒤처짐은 rebase 재시도로 흡수한다.
+    expect(sync).toContain('pull --rebase origin main')
   })
 })

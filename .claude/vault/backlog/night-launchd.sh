@@ -111,56 +111,17 @@ require_inboxes() {
 }
 
 # inbox 동기화 — 어떤 실패도 밤을 막지 않는다. 내 밤은 항상 로컬 내용으로 돈다.
-# 순서: fetch → 자동화가 남긴 내 inbox-only 미푸시 commit만 복구 push/rebase →
-#       (그 밖의 사람 미푸시 commit은 여기서 멈춤) → 상대 메모 ff 반영 →
-#       [push 모드만] 내 메모 파일만 커밋 → push (경합 시 rebase 재시도 1회)
-inbox_only_ahead() {
-  commits="$(git -C "$PROJECT_ROOT" rev-list origin/main..main 2>/dev/null)" || return 1
-  [ -n "$commits" ] || return 1
-  for commit in $commits; do
-    subject="$(git -C "$PROJECT_ROOT" show -s --format=%s "$commit")" || return 1
-    [ "$subject" = "inbox($ACTOR): 밤 메모" ] || return 1
-    files="$(git -C "$PROJECT_ROOT" diff-tree --root --no-commit-id --name-only -r "$commit")" || return 1
-    [ "$files" = ".claude/vault/inbox/$ACTOR.md" ] || return 1
-  done
-}
-
-recover_inbox_only_ahead() {
-  if git -C "$PROJECT_ROOT" push -q origin main 2>/dev/null; then
-    echo "[inbox] 이전 자동 inbox commit push 복구 OK"
-    return 0
-  fi
-  if git -C "$PROJECT_ROOT" pull --rebase origin main >/dev/null 2>&1 \
-    && git -C "$PROJECT_ROOT" push -q origin main 2>/dev/null; then
-    echo "[inbox] 이전 자동 inbox commit push 복구 OK (경합 재시도)"
-    return 0
-  fi
-  git -C "$PROJECT_ROOT" rebase --abort >/dev/null 2>&1 || true
-  echo "[inbox] 이전 자동 inbox commit push 복구 실패 — 로컬 내용으로 계속한다"
-  return 1
-}
-
+# 순서: fetch → [push 모드만] 내 메모 파일만 커밋 → push (경합이면 rebase 재시도 1회).
+# 옆에 다른 미푸시 commit이 있어도 내 메모는 나간다 — 이 컴퓨터의 유일한 사람은
+# 자기 자신이라 push되는 것은 자기 작업뿐이다(2026-08-23 오너 결정). 상대 메모를
+# 받아오는 ff 단계는 두지 않는다 — 각자 로컬로 실행하고 메모를 서로 받지 않는다.
 sync_inbox() {
   push_mode="${1:-fetch-only}"
   if ! git -C "$PROJECT_ROOT" fetch origin main >/dev/null 2>&1; then
     echo "[inbox] fetch 실패 — 로컬에 있는 내용으로 계속한다"
     return 0
   fi
-  # 이전 실행의 자동 inbox-only commit은 다른 파일을 push하지 않는 범위에서만 복구한다.
-  # 그 밖의 미푸시 commit 하나라도 있으면 밤이 건드리지 않는다.
-  if [ "$(git -C "$PROJECT_ROOT" rev-list origin/main..main --count 2>/dev/null || echo 1)" != "0" ]; then
-    if inbox_only_ahead; then
-      recover_inbox_only_ahead || return 0
-    else
-      echo "[inbox] 사람 또는 비-inbox 미푸시 커밋이 있어 동기화를 건너뛴다 — 로컬 내용으로 계속한다"
-      return 0
-    fi
-  fi
-  if git -C "$PROJECT_ROOT" merge --ff-only origin/main >/dev/null 2>&1; then
-    echo "[inbox] 상대 메모 수신 OK"
-  else
-    echo "[inbox] ff 반영 불가(작업 트리 충돌) — 로컬 내용으로 계속한다"
-  fi
+  # 옆에 비-inbox 미푸시 커밋이 있어도 건너뛰지 않는다. 내 메모만 자동으로 내보낸다.
   [ "$push_mode" = "push" ] || return 0
   # 내 메모 파일 하나만 커밋한다. 다른 변경은 건드리지 않는다.
   if git -C "$PROJECT_ROOT" ls-files --error-unmatch "$MY_INBOX" >/dev/null 2>&1     && git -C "$PROJECT_ROOT" diff --quiet -- "$MY_INBOX" 2>/dev/null; then
