@@ -28,10 +28,31 @@ function bucket() {
   return supabaseAdmin.storage.from(MEDIA_BUCKET)
 }
 
+/**
+ * 브라우저 캐시 기간(초). **숫자로 시작하는 문자열만 넘길 것.**
+ *
+ * Supabase 가 이 값 앞에 `public, max-age=` 를 자동으로 붙여서 내보낸다. 그래서
+ * `'public, max-age=14400'` 처럼 통째로 넘기면 `public, max-age=public, max-age=14400` 이
+ * 되고, `max-age=public` 은 해석 불가라 브라우저가 캐시를 **아예 포기한다** — 안 넣느니만
+ * 못하다(2026-08-23 실측으로 확인). 기간을 늘리고 싶으면 숫자만 바꾼다.
+ *
+ * 값의 출처: 우리와 **같은 구조**로 서비스하는 Higgsfield 의 실측값이다
+ * (2026-08-23, `cdn.higgsfield.ai` 의 생성 이미지·영상 모두 `public, max-age=14400`).
+ * 같은 구조란 CDN 직결 + 추측 불가능한 주소를 뜻한다 — 한 번 나간 공개 주소를 나중에
+ * 서버가 끊을 수 없으므로, 자기 API 를 경유시켜 요청마다 권한을 다시 보는 곳들이 쓰는
+ * 훨씬 긴 값(TapNow 180일 등)을 그대로 가져오면 안 된다.
+ *
+ * 이 값이 정하는 것은 **브라우저 캐시뿐이다.** CDN 층은 무관하다 — Smart CDN 이 가능한
+ * 한 오래 잡고 있다가 파일이 수정·삭제되면 60초 안에 자동으로 무효화한다.
+ */
+export const MEDIA_CACHE_CONTROL = '14400'
+
 export interface MediaUploadOptions {
   contentType: string
   /** 같은 경로가 이미 있을 때 덮어쓸지. 생략하면 덮어쓰지 않고 409 를 돌려준다. */
   upsert?: boolean
+  /** 브라우저 캐시 기간. 생략하면 `MEDIA_CACHE_CONTROL`. 형식 제약은 그 주석을 볼 것. */
+  cacheControl?: string
 }
 
 /** 객체 하나를 올린다. 실패는 던지지 않고 `{ error }` 로 돌려준다. */
@@ -43,6 +64,7 @@ export function mediaUpload(
   return bucket().upload(path, data, {
     contentType: options.contentType,
     upsert: options.upsert ?? false,
+    cacheControl: options.cacheControl ?? MEDIA_CACHE_CONTROL,
   })
 }
 

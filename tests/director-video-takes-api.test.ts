@@ -26,6 +26,7 @@ import { PATCH, DELETE } from '@/app/api/director/video-takes/[clipId]/route'
 import { POST as uploadImage } from '@/app/api/assets/upload-image/route'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { mediaPublicUrl } from '@/lib/storage/media-url'
+import { MEDIA_CACHE_CONTROL } from '@/lib/storage/media'
 
 // 결과 주소는 보관함 경로에서 계산된다 — 고정 문자열로 두면 보관 위치를 옮겨도 통과한다.
 const THUMB_PUBLIC_URL = mediaPublicUrl('workspace-1/project-1/videos/clip-1/job-1.jpg')
@@ -406,7 +407,7 @@ describe('video thumbnail ancestry', () => {
     expect(upload).toHaveBeenCalledWith(
       'workspace-1/project-1/videos/clip-1/job-1.jpg',
       expect.any(Buffer),
-      { contentType: 'image/jpeg', upsert: false },
+      { contentType: 'image/jpeg', upsert: false, cacheControl: MEDIA_CACHE_CONTROL },
     )
     expect(updateQuery.update).toHaveBeenCalledWith({
       thumbnail_url: THUMB_PUBLIC_URL,
