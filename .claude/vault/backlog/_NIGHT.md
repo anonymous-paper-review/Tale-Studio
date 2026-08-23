@@ -827,7 +827,7 @@ snapshot, `--harvest-project`, `--harvest-out`, canonical `--run-manifest`까지
 - 티켓·결과 카드: `.claude/vault/backlog/tickets/` — 새 티켓과 결과 카드는 이 디렉터리에만 만든다. backlog 루트에는 이 계약 문서와 실행 도구만 둔다.
 - 실행 산출물: `runs/<actor>/<run_id>/` — 사람 보고서 `report.html`, 기계 요약 `manifest.json`, 세션 요약 `sessions/*.md`, worktree 목록 `worktrees.json`, 중간 저장 `saves/*.md`(§8.4). actor와 run이 경로에 들어가므로 같은 날짜에 두 사람이 실행해도 서로 덮어쓰지 않는다. 날짜 하나를 덮어쓰는 `reports/YYYY-MM-DD.html` 경로는 더 쓰지 않는다 (기존 `.claude/vault/backlog/reports/`는 이력으로만 남긴다). 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
 - 판정 기록: `feedback/<actor>/<run_id>/*.json` — append-only, 자기 다음 밤 실행만 소비.
-- 각 사람의 접점은 두 개뿐이다: 쓰는 곳 자기 메모 파일 `inbox/<actor>.md`(commit·push하면 상대 밤에도 보인다), 읽는 곳 자기 최신 `runs/<actor>/<run_id>/report.html`. 다른 파일을 읽어야만 진행되는 절차를 만들지 않는다.
+- 각 사람의 접점은 셋이다: 쓰는 곳 자기 메모 파일 `inbox/<actor>.md`(commit·push하면 상대 밤에도 보인다), 읽는 곳 자기 최신 `runs/<actor>/<run_id>/report.html`, 그리고 아침에 Orca 터미널로 이어받는 그날 밤 세션(`runs/<actor>/<run_id>/session-id.txt`의 id를 `claude --resume`으로 되살려 대화를 잇는다). 메모는 여전히 비동기로 쌓이고, 세션 이어받기는 결과를 읽고 후속 결정을 잇는 통로를 넓힌 것이지 메모 입력 방식을 바꾸지 않는다. 다른 파일을 읽어야만 진행되는 절차를 만들지 않는다.
 - git 공유 경계: 계약·실행 도구·설치 문서, 공유 메모 `inbox/`(각자 자기 파일에만 쓴다), 밤이 만든 코드 수리 branch. `backlog/sweep/`, `_archive/`, `tickets/`, `runs/`, `feedback/`은 이 컴퓨터의 로컬 상태다 — 결과와 판정은 각자의 것이다.
 - 티켓 상태와 작업 사본 정보.
 - 메모 스냅샷 fingerprint·범위·내용 해시·소비 상태.
@@ -854,6 +854,11 @@ snapshot, `--harvest-project`, `--harvest-out`, canonical `--run-manifest`까지
   - 변경 이유: 오너 결정 — 날짜·시각 기준을 KST 하나로 통일한다. 8/19 첫 실행에서 `run_id`가 UTC 날짜로 발급돼 01:30 KST 실행의 결과 디렉터리가 `night-2026-08-18-…`로 하루 밀린 것이 계기다(`claim_date`는 KST라 두 값이 어긋났다).
   - 변경 내용: (1) §2의 기준 시각 표기를 UTC에서 KST로 고쳤다. (2) `provider-gate.py`의 `run_id` 날짜를 `current_claim_date()`(KST)로 바꿔 `claim_date`와 같은 기준을 쓰게 했고, `state_paths`의 중복 KST 리터럴도 같은 함수로 합쳤다. (3) `harvest.py`의 sweep 디렉터리 날짜(`_output_root`)·`generated_for`·`generated_at`·`completed_at`·도장 주석·드라이런 표를 KST 표기로 바꿨다. (4) `night-runtime.py`의 `read_time`과 `night-review-server.py`의 `created_at`을 KST 표기로 바꿨다.
   - 영향받는 분해 기준: 없음. epoch 값(lease·도장·수확 창)은 타임존과 무관한 절대 시각이라 그대로 두었고, 비교·만료 계산은 바뀌지 않는다. 식별자와 파일명에는 `%z`(`+0900`)가 run_id 정규식을 깨므로 `KST` 리터럴을 쓴다.
+
+- 2026-08-23 (17차) · 이전 계약 해시 `8904d1936d9978b3ebdc52f754bcd12b7f90a760896f5b898254c457258d7668` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — 밤이 headless로 돌고 아침엔 리포트 html만 뜨는 비동기 구조에, 아침에 밤 세션을 이어받아 직접 논의하는 통로를 더한다. 메모 비동기성은 그대로 두고, 결과를 읽고 후속 결정하는 접점만 넓힌다.
+  - 변경 내용: (1) 밤 실행이 `claude -p`에 고정 `--session-id`를 붙이고 그 id를 `runs/<actor>/<run_id>/session-id.txt`에 기록한다. (2) 새 커맨드 `resume-session`이 최신 run의 세션 id를 읽어 `orca terminal create --command "claude --resume <id>"`로 Orca 새 터미널 탭에 밤 세션을 되살린다. (3) launchd 아침 진입점을 `open-report`에서 `morning`(리포트 html + 세션 탭 둘 다)으로 바꿨다. (4) §13 접점을 둘에서 셋으로 넓혔다.
+  - 영향받는 분해 기준: §13 오너 접점이 셋으로 넓어졌다. 메모 입력의 비동기성과 §1 결과 우선 원칙은 그대로다.
 
 - 2026-08-23 (16차) · 이전 계약 해시 `65ff971c6fb802f629538e2c12923fc8e0bd094d8f7f87969566ea9e7f9b943f` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — 밤이 오너의 머지만 기다리다 4일간 결과가 쌓이기만 한 병목을 푼다. 동작이 바뀌지 않는 기술 수리는 밤이 스스로 합치게 하고, 메모는 옆에 다른 커밋이 있어도 자동으로 내보내며, 결과물은 전부 로컬로 둔다.

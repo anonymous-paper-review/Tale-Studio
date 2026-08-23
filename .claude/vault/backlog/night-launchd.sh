@@ -5,6 +5,8 @@
 #   sh night-launchd.sh run            # 실제 밤 실행: claim → 네이티브 claude 실행 → 종료 기록
 #   sh night-launchd.sh dry-run        # 원장에 아무것도 쓰지 않고 파이프라인 전체를 검증
 #   sh night-launchd.sh open-report    # 이 actor의 가장 최신 밤 보고서를 연다 (아침용)
+#   sh night-launchd.sh resume-session # 최신 밤 실행 세션을 Orca 터미널로 이어받는다 (아침용)
+#   sh night-launchd.sh morning        # 리포트 html + 밤 세션 터미널 둘 다 (launchd 아침 진입점)
 #   sh night-launchd.sh review-server  # 127.0.0.1 리뷰 서버 (HTML 버튼 → feedback 기록)
 #
 # 환경변수:
@@ -146,7 +148,7 @@ sync_inbox() {
 start_claude_watchdog() {
   lease_until="$1"
   NIGHT_PROMPT="$2" NIGHT_PROJECT_ROOT="$PROJECT_ROOT" NIGHT_LEASE_UNTIL="$lease_until" \
-    NIGHT_MODEL="${NIGHT_CLAUDE_MODEL:-}" python3 - <<'PY' &
+    NIGHT_MODEL="${NIGHT_CLAUDE_MODEL:-}" NIGHT_SESSION_ID="${3:-}" python3 - <<'PY' &
 import datetime as dt
 import os
 import signal
@@ -162,6 +164,8 @@ if now >= morning:
     morning += dt.timedelta(days=1)
 deadline = min(lease_until, morning.timestamp())
 command = ["claude", "--dangerously-skip-permissions"]
+if os.environ.get("NIGHT_SESSION_ID"):
+    command.extend(["--session-id", os.environ["NIGHT_SESSION_ID"]])
 if os.environ["NIGHT_MODEL"]:
     command.extend(["--model", os.environ["NIGHT_MODEL"]])
 command.extend(["-p", os.environ["NIGHT_PROMPT"]])
@@ -512,9 +516,13 @@ assert s["actionable_snapshot_fingerprint"] == os.environ["SNAPSHOT_FINGERPRINT"
   prompt="${prompt}day_run_override=$day_run_override. day_run_override=1이면 보고서에 NIGHT_ALLOW_DAY_RUN=1 낮 실행 예외를 남겨라."
   lease_until="$(printf '%s' "$claim" | jget lease_until)"
   WATCHDOG_PID=""
+  # 아침에 Orca 터미널로 이어받을 수 있도록 밤 세션에 고정 id를 붙이고 기록한다.
+  mkdir -p "$run_dir"
+  night_session_id="$(uuidgen | tr 'A-Z' 'a-z')"
+  printf '%s' "$night_session_id" > "$run_dir/session-id.txt"
   trap 'stop_watchdog_on_signal' INT TERM
   set +e
-  start_claude_watchdog "$lease_until" "$prompt"
+  start_claude_watchdog "$lease_until" "$prompt" "$night_session_id"
   wait "$WATCHDOG_PID"
   claude_exit=$?
   set -e
@@ -653,6 +661,33 @@ open-report)
   fi
   ;;
 
+resume-session)
+  # 아침용: 최신 밤 실행의 세션을 Orca 새 터미널 탭으로 이어받는다.
+  latest="$(ls -td "$PROJECT_ROOT/runs/$ACTOR"/*/ 2>/dev/null | head -n 1 || true)"
+  sid_file="$latest/session-id.txt"
+  if [ -z "$latest" ] || [ ! -f "$sid_file" ]; then
+    echo "이어받을 밤 세션이 없다 (옛 실행이거나 session-id 미기록)" >&2
+    exit 0
+  fi
+  sid="$(cat "$sid_file")"
+  ORCA_BIN="$HOME/.local/bin/orca"
+  [ -x "$ORCA_BIN" ] || ORCA_BIN="orca"
+  "$ORCA_BIN" open >/dev/null 2>&1 || true
+  if "$ORCA_BIN" terminal create --worktree active \
+       --title "밤 세션 $(basename "$latest")" \
+       --command "claude --resume $sid" --focus; then
+    echo "밤 세션을 Orca 터미널로 열었다: $sid"
+  else
+    echo "Orca 터미널 열기 실패 — 수동으로: claude --resume $sid" >&2
+  fi
+  ;;
+
+morning)
+  # 아침용(launchd): 리포트 html을 열고 밤 세션을 Orca 터미널로 되살린다.
+  sh "$0" open-report || true
+  sh "$0" resume-session || true
+  ;;
+
 push-inbox)
   # 자기 전에 손으로: 내 메모를 커밋·push해서 상대 밤에도 보이게 한다.
   require_inboxes
@@ -664,7 +699,7 @@ review-server)
   ;;
 
 *)
-  echo "usage: sh night-launchd.sh [run|dry-run|open-report|review-server|push-inbox]" >&2
+  echo "usage: sh night-launchd.sh [run|dry-run|open-report|resume-session|morning|review-server|push-inbox]" >&2
   exit 2
   ;;
 esac
