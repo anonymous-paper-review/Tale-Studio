@@ -77,7 +77,11 @@ describe('provider owner fencing', () => {
       '--contract-path', contract, '--run-id', 'run-1', `--token=${fallback.owner_token}`,
       '--fencing', String(fallback.fencing), '--actor', 'jh', '--project-root', dir], { encoding: 'utf8' }))
     expect(complete.state_path).toBe(primary.state_path)
-  })
+    // primary 와 fallback 은 각각 provider-gate 의 preflight 를 돌고, 그 스크립트가
+    // 도구 확인용으로 --help 를 12번 따로 띄운다. 이 시험만 그 두 명령을 다 부르므로
+    // 고정 비용이 5.3초로 vitest 기본 예산 5초를 넘는다 (측정 3회: 5.75/5.55/5.84초).
+    // 같은 파일의 다음 느린 시험은 3.3초라 여유가 있다.
+  }, 30000)
 
   it('allows an active owner to snapshot, track, reconcile, and archive', () => {
     const dir = make()
