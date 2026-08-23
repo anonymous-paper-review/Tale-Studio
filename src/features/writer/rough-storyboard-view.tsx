@@ -771,7 +771,7 @@ export function RoughStoryboardView() {
           ref={boardRef}
           className="cursor-grab space-y-8 p-6"
           tabIndex={0}
-          aria-label="러프 스토리보드 보드"
+          aria-label={t('Rough storyboard board')}
           onKeyDown={handleBoardKeyDown}
           onPointerDown={handleBoardPointerDown}
         >
@@ -939,7 +939,7 @@ export function RoughStoryboardView() {
                           )}
                           <GeneratingOverlay
                             active={job?.status === 'generating'}
-                            label="러프 스토리보드 생성 중"
+                            label={t('Generating rough storyboard')}
                             beamColor="success"
                             startedAt={activeStartedAt(
                               activeJobs,

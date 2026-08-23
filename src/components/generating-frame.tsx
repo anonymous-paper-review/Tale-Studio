@@ -92,6 +92,7 @@ export function StoryboardZoomControls({
   onZoomLevelChange: Dispatch<SetStateAction<number>>
   className?: string
 }) {
+  const t = useT()
   const update = (next: number) =>
     onZoomLevelChange(
       Math.min(STORYBOARD_ZOOM_MAX, Math.max(STORYBOARD_ZOOM_MIN, next)),
@@ -103,7 +104,7 @@ export function StoryboardZoomControls({
         size="icon"
         variant="ghost"
         className="size-7 hover-red-beam"
-        aria-label="축소 (열 늘리기)"
+        aria-label={t('Zoom out (more columns)')}
         onClick={() => update(zoomLevel - 1)}
       >
         <ZoomOut className="size-4" />
@@ -117,13 +118,13 @@ export function StoryboardZoomControls({
         onValueChange={([value]) => {
           if (value != null) update(value)
         }}
-        aria-label="스토리보드 축척"
+        aria-label={t('Storyboard zoom')}
       />
       <Button
         size="icon"
         variant="ghost"
         className="size-7 hover-red-beam"
-        aria-label="확대 (열 줄이기)"
+        aria-label={t('Zoom in (fewer columns)')}
         onClick={() => update(zoomLevel + 1)}
       >
         <ZoomIn className="size-4" />

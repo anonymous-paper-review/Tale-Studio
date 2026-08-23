@@ -67,7 +67,7 @@ export function sceneShotMentions(
       {
         ref,
         label: `${modeLabel}${kindLabel} ${displayName} · ${id}`,
-        hint: `${mode === 'writer' ? '' : `${mode === 'previz' ? 'Previz' : 'Real'} `}${target.kind === 'scene' ? '씬' : '샷'}`,
+        hint: `${modeLabel}${kindLabel}`,
       },
     ]
   })

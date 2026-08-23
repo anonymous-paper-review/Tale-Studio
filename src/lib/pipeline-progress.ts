@@ -151,7 +151,9 @@ export function writerRoughWork(
     const failed = eligible.filter((s) => s.roughStoryboard?.status === 'failed').length
     return {
       key: 'writer-rough',
-      label: `${STAGE_AGENT_NAME.writer}가 러프 스토리보드를 그리고 있습니다`,
+      label: translate(locale, '{agent} is drawing the rough storyboard', {
+        agent: STAGE_AGENT_NAME.writer,
+      }),
       done,
       total: eligible.length,
       failed: failed || undefined,
@@ -261,7 +263,9 @@ export function directorShotImageWork(
     const failed = shots.filter((entry) => entry.data.storyboardImage?.status === 'failed').length
     return {
       key: 'director-storyboard',
-      label: `${STAGE_AGENT_NAME.director}가 촬영용 이미지를 생성하고 있습니다`,
+      label: translate(locale, '{agent} is generating shooting-ready images', {
+        agent: STAGE_AGENT_NAME.director,
+      }),
       done,
       total: shots.length,
       failed: failed || undefined,
@@ -337,7 +341,9 @@ export function directorVideoWork(
     const failed = videos.filter((entry) => entry.data.status === 'failed').length
     return {
       key: 'director-video',
-      label: `${STAGE_AGENT_NAME.director}가 영상을 생성하고 있습니다`,
+      label: translate(locale, '{agent} is generating video', {
+        agent: STAGE_AGENT_NAME.director,
+      }),
       done,
       total: videos.length > 0 ? videos.length : activeCount,
       failed: failed || undefined,

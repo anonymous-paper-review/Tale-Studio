@@ -98,7 +98,7 @@ export default function LoginPage() {
           />
           {capsLockOn ? (
             <p id="caps-lock-hint" role="status" className="text-sm text-muted-foreground">
-              Caps Lock이 켜져 있어요. 비밀번호를 입력할 때 대문자가 입력될 수 있어요.
+              Caps Lock is on — passwords are case-sensitive.
             </p>
           ) : null}
           {errorMsg ? (

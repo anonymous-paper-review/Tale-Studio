@@ -41,8 +41,10 @@ export const runtime = 'nodejs';
 // 시작만 응답하고 첫 step 은 after()로 트리거. 짧게.
 export const maxDuration = 60;
 
+// 영어 원문 = i18n 키(#i18n-s5) — 표시는 클라이언트(producer-store)가 프로젝트 locale 로 완역한다.
+//   409 body 의 consentText 는 현재 표시 소비자가 없는 참고 필드라 base 그대로 보낸다.
 export const WRITER_RERUN_CONSENT_TEXT =
-  '지금까지 채팅 내역을 바탕으로 다시 writer에게 스토리와 연출에 대한 구상을 요청할까요?? 변경 사항들을 자연스럽게 반영할 수 있지만 다시 오랜 시간이 걸릴 수 있어요.';
+  'Shall I ask Writer again for a story and direction plan based on the chat so far? Your changes will be reflected naturally, but it may take a long time again.';
 
 interface RerunSceneRow {
   scene_id: string;
@@ -233,9 +235,10 @@ export async function POST(req: NextRequest) {
       const hint = assessContentSafetyRisk(hintText);
       if (hint.risky) {
         console.warn(
-          `[writer/start] ⚠️ content-safety-hint(${projectId}): 미성년+위해 조합 감지 — Gemini 차단 위험. ` +
+          // 운영자(오너)용 서버 로그 — 유저 UI 가 아니라 한국어 유지. // i18n-ok
+          `[writer/start] ⚠️ content-safety-hint(${projectId}): 미성년+위해 조합 감지 — Gemini 차단 위험. ` + // i18n-ok
             `minor=[${hint.minorTerms.join(', ')}] harm=[${hint.harmTerms.join(', ')}]. ` +
-            `차단 시 해당 표현을 심볼릭(예: 피→검은 액체)으로 우회 권장.`,
+            `차단 시 해당 표현을 심볼릭(예: 피→검은 액체)으로 우회 권장.`, // i18n-ok
         );
       }
     } catch {

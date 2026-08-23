@@ -779,7 +779,7 @@ export function StoryboardGridView({
       <div
         key={mediaMode}
         tabIndex={0}
-        aria-label="Storyboard 보드"
+        aria-label={t('Storyboard board')}
         onKeyDown={handleBoardKeyDown}
         className={cn(
           'flex flex-col gap-6 p-6',
