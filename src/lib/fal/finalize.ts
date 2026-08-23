@@ -815,6 +815,38 @@ export async function finalizeWorldShotJob(
   return publicUrl
 }
 
+// ── 리페인트 레퍼런스 시트 정리 (#ref-sheet-ttl, 2026-08-19 오너 결정 B안) ──
+//   합성 레퍼런스 시트(real_grid_ref_*/_storyboard_ref_strip)는 fal 이 가져간 뒤 역할이 끝나는
+//   일회용인데 삭제 로직이 없어 무한 누적됐다(실측 267장 — storage 쿼터 초과 기여).
+//   finalize 성공 시 지운다. 실패는 무해(로그만) — 일괄 청소가 잇는다. 이름 패턴 가드로만
+//   지워 다른 자산 오삭제를 방어한다(templates 청소와 같은 원칙). 실패 잡의 ref 는 남지만
+//   드물고, 주기 청소 스크립트가 커버한다.
+
+const REF_SHEET_PATTERN = /\/shots\/(real_grid_ref_\d+_|[^/]*_storyboard_ref_strip\.png$)/
+
+/** ref 시트 public URL → storage 경로. ref 시트 패턴이 아니면 null (테스트 전용 export). */
+export function _refSheetStoragePath(url: unknown): string | null {
+  if (typeof url !== 'string') return null
+  const clean = url.split('?')[0]
+  const marker = '/storage/v1/object/public/media/'
+  const i = clean.indexOf(marker)
+  if (i === -1) return null
+  const path = clean.slice(i + marker.length)
+  return REF_SHEET_PATTERN.test(`/${path}`) ? path : null
+}
+
+async function cleanupRefSheet(job: GenerationJob): Promise<void> {
+  try {
+    const snap = job.input_snapshot as { ref_grid_url?: unknown; strip_ref_url?: unknown } | null
+    const path = _refSheetStoragePath(snap?.ref_grid_url) ?? _refSheetStoragePath(snap?.strip_ref_url)
+    if (!path) return
+    const { error } = await supabaseAdmin.storage.from('media').remove([path])
+    if (error) throw error
+  } catch (e) {
+    console.error('[finalize] ref sheet cleanup skipped:', job.id, e instanceof Error ? e.message : e)
+  }
+}
+
 /**
  * 실사 3프레임 스트립(#real-strip 2026-07-22) 영속화 — 스트립 원본 업로드 → strip1 크롭 →
  *   샷별 3프레임 업로드 → shots.storyboard_image 를 frames shape(url=start 하위호환)로 갱신.
@@ -907,6 +939,7 @@ async function finalizeStoryboardStripJob(
   if (error) throw error
 
   await completeGenerationJob(job.id, startUrl)
+  await cleanupRefSheet(job) // #ref-sheet-ttl — 일회용 합성 레퍼런스 회수(성공 후, 무해 실패)
   return startUrl
 }
 
@@ -1022,7 +1055,7 @@ async function finalizeRealGridJob(
       .from('shots')
       .update({
         storyboard_image: {
-          url: startUrl, // 하위 호환 대표 프레임 (Node 뷰 등 구 소비처는 url 만 읽음)
+          url: startUrl, // 하위 호환 대표 프레임 (Node 뷰 등 구 소비처는 url 만 읽음) [#real-grid-final]
           frames: { start: startUrl, direction: directionUrl, end: endUrl },
           stripUrl: gridUrl,
           status: 'completed',
@@ -1036,6 +1069,7 @@ async function finalizeRealGridJob(
   }
 
   await completeGenerationJob(job.id, gridUrl)
+  await cleanupRefSheet(job) // #ref-sheet-ttl — 일회용 합성 레퍼런스 회수(성공 후, 무해 실패)
   return gridUrl
 }
 

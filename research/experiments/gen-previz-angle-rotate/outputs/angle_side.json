@@ -1,0 +1,32 @@
+[
+  {
+    "created_at": "2026-08-19T06:54:51.921977Z",
+    "display_name": "GPT Image 2",
+    "id": "b322b90b-7bac-4bcf-bd89-56b795935b0e",
+    "job_type": "gpt_image_2",
+    "min_result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260819_065451_b322b90b-7bac-4bcf-bd89-56b795935b0e_min.webp",
+    "params": {
+      "aspect_ratio": "16:9",
+      "height": 1520,
+      "medias": [
+        {
+          "data": {
+            "id": "0c9a3da5-6575-4a2c-bac2-7b5fedca8fd4",
+            "type": "media_input",
+            "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/0c9a3da5-6575-4a2c-bac2-7b5fedca8fd4.png"
+          },
+          "role": "image"
+        }
+      ],
+      "model": "videotape-alpha",
+      "prompt": "Use the provided reference image as the same shot. Reframe the camera from a low side profile angle, looking across the action. Preserve the same characters, costume, props, location, lighting, and action moment. Do not add or remove people or objects. Cinematic storyboard frame, wide 16:9.",
+      "quality": "medium",
+      "reference_elements": [],
+      "remove_bg": false,
+      "resolution": "2k",
+      "width": 2688
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3B3kPb4uOlMHhJYP9E4FMtEIQZL/hf_20260819_065451_b322b90b-7bac-4bcf-bd89-56b795935b0e.png",
+    "status": "completed"
+  }
+]

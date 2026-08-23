@@ -8,11 +8,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   GeneratedImage,
   GeneratingOverlay,
-  StoryboardZoomControls,
   applyStoryboardZoomShortcut,
   storyboardColumns,
   storyboardDescriptionFontSize,
-  useStoryboardZoom,
 } from '@/components/generating-frame'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import {
@@ -406,7 +404,7 @@ function ShotCell({
 
   return (
     <div
-      className="group flex flex-col rounded-md border border-border bg-card p-2.5"
+      className="group flex cursor-pointer flex-col rounded-xl border border-border bg-card p-2.5 transition-colors duration-100 hover:bg-accent/40 hover-red-beam"
       onClickCapture={(event) => {
         if (mentionCardOnModifierClick(event)) {
           event.preventDefault()
@@ -418,15 +416,22 @@ function ShotCell({
         openPopup(node.id)
       }}
     >
-      {/* 그림은 카드에 '담긴' 사각형(#card-inset 2026-08-11). 상자 높이는 **항상 16:9 고정**
-          (#e2 2026-08-12) — 영상과 이미지 카드의 높이가 갈리면 아래 글줄이 어긋난다. 비율이
-          다른 3프레임은 투명 레터박스(contain) 로 담는다. */}
-      <div className="relative aspect-video overflow-hidden">
+      {/* 그림은 카드에 '담긴' 사각형(#card-inset 2026-08-11). writer 러프 카드와 동일 규칙
+          (#card-unify 2026-08-20 오너 지시, #fit-tight): 3프레임 순환은 sizeToImage — 상자가
+          그림 비율을 따라가 세로/스퀘어 포맷도 띠·크롭 없이 전부 보인다(같은 프로젝트는 프레임
+          비율이 균일해 행 정렬도 유지). 영상·단일 이미지·플레이스홀더·생성 중은 16:9 고정. */}
+      <div
+        className={cn(
+          'relative overflow-hidden',
+          !(framePanel && !generating) && 'aspect-video',
+        )}
+      >
         {framePanel && !generating ? (
           <RoughFrameCycle
             panel={framePanel}
             alt={mediaMode === 'previz' ? `${data.label} (previz)` : data.label}
-            fit="contain"
+            introPlay
+            sizeToImage
           />
         ) : mediaMode === 'previz' && roughStartUrl ? (
           // 구형 단일 패널 러프(3프레임 이전 데이터) → 대표 프레임 표시
@@ -618,7 +623,13 @@ function ShotCell({
 // #real-grid 일괄 생성 UI 는 별도 바 대신 상단 팔레트의 기존 "스토리보드 생성" 버튼으로 통합
 //   (2026-08-06 피드백) — 그 버튼이 runRealBatch(4샷 시트 일괄)를 호출한다.
 
-export function StoryboardGridView() {
+export function StoryboardGridView({
+  zoomLevel,
+  onZoomLevelChange,
+}: {
+  zoomLevel: number
+  onZoomLevelChange: React.Dispatch<React.SetStateAction<number>>
+}) {
   const t = useT()
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const projectId = useDirectorCanvasStore((s) => s.projectId)
@@ -626,7 +637,6 @@ export function StoryboardGridView() {
   // 미디어 모드: Previz(러프 3프레임 보드, 기본) | Real(실사) — 상단바(PaletteBar) 토글이 제어(2026-07-22).
   const mediaMode: StoryboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
   const setStoryboardMediaMode = useDirectorCanvasStore((s) => s.setStoryboardMediaMode)
-  const [zoomLevel, setZoomLevel] = useStoryboardZoom('director:storyboard:zoomLevel')
 
   // 슬러그 → 실제 이름 로스터(#e6) — asset-storage(진입 시 DB hydrate)에서 인물·장소 이름.
   //   표시 전용: 노드 데이터·프롬프트 원문(구동)은 그대로 둔다.
@@ -756,19 +766,13 @@ export function StoryboardGridView() {
     const next = applyStoryboardZoomShortcut(zoomLevel, event)
     if (next === null) return
     event.preventDefault()
-    setZoomLevel((current) => applyStoryboardZoomShortcut(current, event) ?? current)
+    onZoomLevelChange((current) => applyStoryboardZoomShortcut(current, event) ?? current)
   }
 
   return (
     // Artist/Editor와 동일한 디자인 룰 — shadcn ScrollArea(스타일된 스크롤바).
     // 기존 raw overflow-auto(네이티브 스크롤바)를 교체. 부모 `min-h-0 flex-1`가 높이를 가둔다.
     <div className="flex size-full min-h-0 flex-col bg-background">
-      <div className="flex shrink-0 items-center justify-end border-b border-border px-6 py-2">
-        <StoryboardZoomControls
-          zoomLevel={zoomLevel}
-          onZoomLevelChange={setZoomLevel}
-        />
-      </div>
       <ScrollArea className="min-h-0 flex-1">
       {/* key=mediaMode: Previz↔Real 전환 시 remount 로 슬라이드 재생(#e2 2026-08-03).
           방향은 토글 순서(Previz 왼쪽·Real 오른쪽) — real 로 갈 땐 오른쪽에서, 되돌아오면 왼쪽에서. */}

@@ -50,6 +50,7 @@ import {
   SNAP_GRID,
 } from '@/types/director'
 import { StoryboardGridView } from '@/features/director/canvas-views/StoryboardGridView'
+import { StoryboardZoomControls, useStoryboardZoom } from '@/components/generating-frame'
 import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
 import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
 
@@ -679,7 +680,13 @@ function PresetStrip() {
 const DIRECTOR_VIEW_CYCLE = ['node', 'previz', 'real'] as const
 type DirectorViewStep = (typeof DIRECTOR_VIEW_CYCLE)[number]
 
-function PaletteBar() {
+function PaletteBar({
+  storyboardZoom,
+  onStoryboardZoomChange,
+}: {
+  storyboardZoom: number
+  onStoryboardZoomChange: React.Dispatch<React.SetStateAction<number>>
+}) {
   const t = useT()
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
   const setViewMode = useDirectorCanvasStore((s) => s.setViewMode)
@@ -803,6 +810,17 @@ function PaletteBar() {
         <PresetStrip />
       </div>
 
+      {/* 축척 — Storyboard 뷰 전용, 우측 정렬(#e-zoom-merge 2026-08-20 오너 지시: 뷰 내부의
+          전용 바에 혼자 있던 것을 이 바로 합류). Ctrl+wheel 단축은 보드가 그대로 처리한다. */}
+      {viewMode === 'storyboard' && (
+        <div className="ml-auto flex shrink-0 items-center">
+          <StoryboardZoomControls
+            zoomLevel={storyboardZoom}
+            onZoomLevelChange={onStoryboardZoomChange}
+          />
+        </div>
+      )}
+
       {/* 캔버스 전용 액션 3종 — Node 탭에서만 표시, 오른쪽 정렬(#e2 2026-07-13) */}
       {viewMode === 'node' && (
         <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -857,6 +875,8 @@ function PaletteBar() {
 export default function DirectorCanvasPage() {
   const t = useT()
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
+  // 스토리보드 축척 — PaletteBar(컨트롤)와 StoryboardGridView(그리드·단축키)가 공유(#e-zoom-merge)
+  const [storyboardZoom, setStoryboardZoom] = useStoryboardZoom('director:storyboard:zoomLevel')
   const guideProjectId = useDirectorCanvasStore((s) => s.projectId)
   // Node↔Storyboard 전환 슬라이드(#e2 2026-08-03) — 두 뷰는 조건 렌더(원래 remount)라
   //   mount 애니메이션이 곧 전환 연출. 방향은 토글 순서(Node 왼쪽·Storyboard 오른쪽).
@@ -965,7 +985,10 @@ export default function DirectorCanvasPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Center: top Palette bar(#e1 — 하단→상단 이동) + Canvas (Node/Storyboard) */}
         <div className="relative flex flex-1 flex-col overflow-hidden">
-          <PaletteBar />
+          <PaletteBar
+            storyboardZoom={storyboardZoom}
+            onStoryboardZoomChange={setStoryboardZoom}
+          />
 
           {/* min-h-0: flex-1이 내용 높이만큼 커져 PaletteBar(토글)를
               밀어내고 StoryboardGridView의 overflow-auto가 안 걸리던 문제 수정.
@@ -975,7 +998,10 @@ export default function DirectorCanvasPage() {
                 렌더로 remount 되던 구조라 추가 비용 없음. */}
             <div key={viewMode} className={cn('flex h-full min-h-0 flex-col', viewSlideClass)}>
               {viewMode === 'storyboard' ? (
-                <StoryboardGridView />
+                <StoryboardGridView
+                  zoomLevel={storyboardZoom}
+                  onZoomLevelChange={setStoryboardZoom}
+                />
               ) : (
                 <ReactFlowProvider>
                   <CanvasInner />
