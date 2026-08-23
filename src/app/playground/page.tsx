@@ -13,6 +13,7 @@ import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { createClient } from '@/lib/supabase/client'
+import { ThumbImage } from '@/components/thumb-image'
 
 interface PlaygroundItem {
   id: string
@@ -98,8 +99,10 @@ export default function PlaygroundPage() {
                   {item.kind === 'video' ? (
                     <HoverVideo item={item} />
                   ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    // 카드는 가로 3열 격자라 원본 해상도가 필요 없다. ThumbImage 가 축소본으로
+                    //   바꿔 읽고, 축소본이 없으면(외부 큐레이션 주소 등) 원본으로 폴백한다.
+                    //   공개 표면이라 비로그인 방문자 트래픽이 그대로 요금이 된다.
+                    <ThumbImage
                       src={item.url}
                       alt={item.title}
                       loading="lazy"
