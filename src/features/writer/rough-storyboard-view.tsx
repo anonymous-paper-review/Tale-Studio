@@ -328,8 +328,8 @@ export function RoughStoryboardView() {
           })
         }
         // 잡 단위 dedupe(#rough-grid): 그리드 잡 1개가 샷 최대 4개를 커버 — 같은 jobId 를 샷 수만큼
-        //   중복 폴링하지 않는다. 완료 시 result_url 은 "그리드 원본"(4샷 공용)이라 카드에 쓰면
-        //   크롭 전 전체 그리드가 그대로 보인다(2026-07-22 실측) → URL 대신 크롭이 끝난 DB 진실
+        //   중복 폴링하지 않는다. 완료 시 result_url 은 대표 1장(#no-originals 이후 첫 샷 start,
+        //   이전엔 그리드 원본)이라 4샷 카드에 그대로 쓸 수 없다 → URL 대신 크롭이 끝난 DB 진실
         //   (shots.rough_storyboard.frames)을 리로드하고, stale override 를 지워 그 진실이 보이게 한다.
         const shotIdsByJob = new Map<string, string[]>()
         for (const { shotId, jobId } of submitted) {

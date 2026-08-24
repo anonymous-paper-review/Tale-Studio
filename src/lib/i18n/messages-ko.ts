@@ -840,6 +840,11 @@ export const KO: Record<string, string> = {
   'The current scene story draft is ready. In the Writer tab, confirm it or request changes to run again.': '현재 씬 스토리 초안이 준비됐어요. Writer 화면에서 확정하거나 수정 요청으로 다시 실행할지 선택해 주세요.',
   'Writer is already running. Check progress in the Writer tab.': 'Writer가 이미 실행 중이에요. 현재 Writer 화면에서 진행 상황을 확인해 주세요.',
   'Writer start was rejected (HTTP 409)': 'Writer 시작이 거부됐어요 (HTTP 409)',
+  // ── producer: 첨부 실맹 방지(#attach-loud-fail) ──
+  "Couldn't accept the attached images (unrecognized storage address). Please re-upload and send again.":
+    '첨부 이미지를 받아들이지 못했어요 (인식할 수 없는 저장소 주소). 다시 업로드해서 보내주세요.',
+  "Couldn't load the attached images from storage. Please try sending again in a moment.":
+    '저장소에서 첨부 이미지를 불러오지 못했어요. 잠시 후 다시 보내주세요.',
   'Hi! I\'m your AI producer. Just tell me in one relaxed sentence the story you want to make. \nGenre, protagonist, one scene that just came to mind — anything works! \n\nFor example, if you say "a rainy city, one night with a detective who\'s lost his memory," I\'ll help sort out the characters, setting, and structure together. \n\nIf you already have a story file written, share it with me using the upload button below. \nYou can pick the visual style anytime from the palette button below.': '안녕하세요! 저는 당신의 AI 프로듀서예요. 만들고 싶은 이야기를 편하게 한 줄로 들려주세요. \n장르, 주인공, 지금 떠오르는 한 장면, 무엇이든 좋아요! \n\n예를 들어 "비 오는 도시, 기억을 잃은 형사의 하룻밤"를 말씀해주시면 캐릭터, 장소, 구조는 제가 함께 정리해 드릴게요. \n\n미리 작성한 스토리 파일이 있으면 아래 업로드 버튼으로 저에게 공유해주세요. \n영상의 그림체는 아래 팔레트 버튼에서 언제든 고를 수 있어요.',
   'Re-run Writer with the current Producer source': '현재 Producer source로 Writer를 다시 실행',
   'The Writer implementation calls an external contract.': 'Writer 구현은 외부 계약을 호출합니다.',

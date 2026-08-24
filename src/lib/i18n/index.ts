@@ -5,19 +5,10 @@
 //   유저 콘텐츠·파이프라인 산출물은 여기를 타지 않는다(프로젝트 locale 이 지배).
 import { useLocaleStore } from '@/stores/locale-store'
 import type { AppLocale } from '@/lib/locale'
-import { KO } from './messages-ko'
+import { translate } from './translate'
 
-export function translate(
-  locale: AppLocale,
-  text: string,
-  params?: Record<string, string | number>,
-): string {
-  let out = locale === 'ko' ? (KO[text] ?? text) : text
-  if (params) {
-    for (const [k, v] of Object.entries(params)) out = out.replaceAll(`{${k}}`, String(v))
-  }
-  return out
-}
+// 순수 코어는 ./translate (지시자 없음 — 서버 라우트도 쓴다). 기존 소비처의 import 경로 보존.
+export { translate }
 
 export function useT(): (text: string, params?: Record<string, string | number>) => string {
   const locale = useLocaleStore((s) => s.locale)

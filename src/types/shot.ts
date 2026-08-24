@@ -60,7 +60,8 @@ export interface RoughStoryboardImage {
     direction: string
     end: string
   }
-  /** 이 세트가 잘려 나온 원본 그리드/스트립 이미지 (디버그·재현용). */
+  /** [레거시 기록] 이 세트가 잘려 나온 원본 그리드 — #no-originals(2026-08-24) 이후 미기록·
+   *  기존 행의 값도 스토리지에서 회수돼 404. 소비처 없음(제거 검증 완료). */
   gridUrl?: string
   /** 화살표 레이어 분리(#arrow-layer 실험 2026-08-09) — direction 프레임에서 화살표·지시문을
    *  i2i 로 지운 클린 플레이트 캐시. for = 파생 원본 generatedAt (재생성되면 stale → 재분리). */
