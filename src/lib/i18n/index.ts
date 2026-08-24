@@ -8,6 +8,7 @@
 //   producer 2턴부터 castMentions→translate() 호출이 "Attempted to call translate() from the
 //   server" 로 전사했다(웹툰 테스트 실측). 훅은 지시자 없이도 클라 컴포넌트에서 정상 동작하고,
 //   서버가 훅을 부르면 어차피 그 자리에서 죽는다 — 경계 지시자는 컴포넌트 파일의 몫이다.
+import { useCallback } from 'react'
 import { useLocaleStore } from '@/stores/locale-store'
 import type { AppLocale } from '@/lib/locale'
 import { translate } from './translate'
@@ -15,9 +16,16 @@ import { translate } from './translate'
 // 순수 코어는 ./translate — 서버 라우트가 직접 쓸 때는 그쪽을 import.
 export { translate }
 
+// useCallback 필수 (#editor-render-loop 2026-08-24 실사고): 렌더마다 새 함수를 돌려주면
+//   이 t 를 훅 deps 에 넣은 곳이 매 렌더 재실행된다. editor 의 마운트 로드 effect 가 그렇게 걸려
+//   loadData() → store set() → 리렌더 → effect 재실행 루프로 React #185(Maximum update depth)를
+//   프로덕션에서 4건 던졌다. locale 은 원시값이라 이 참조는 언어를 바꿀 때만 갱신된다.
 export function useT(): (text: string, params?: Record<string, string | number>) => string {
   const locale = useLocaleStore((s) => s.locale)
-  return (text, params) => translate(locale, text, params)
+  return useCallback(
+    (text: string, params?: Record<string, string | number>) => translate(locale, text, params),
+    [locale],
+  )
 }
 
 export function useLocale(): AppLocale {

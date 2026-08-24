@@ -177,6 +177,9 @@ export default function PostPage() {
   }, [t])
 
   // loadData(원본) → loadPersisted(저장된 편집 덮어쓰기) → 첫 진입 시 샷 오디오 자동 부착.
+  // deps 는 전부 안정 참조여야 한다 (#editor-render-loop 2026-08-24): 하나라도 매 렌더 새로
+  //   생기면 effect 재실행 → loadData() → store set() → 리렌더 로 무한 루프가 된다.
+  //   t 는 useT 가 useCallback 으로 고정해 준다 (src/lib/i18n/index.ts).
   useEffect(() => {
     let cancelled = false
     // 프로젝트가 바뀌면 이전 프로젝트의 "전체 보기" blob 캐시를 반환한다(같은 프로젝트 재진입은 유지).
