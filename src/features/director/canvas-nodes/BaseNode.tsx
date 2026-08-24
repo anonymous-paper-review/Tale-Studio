@@ -6,7 +6,7 @@ import { Copy, Edit, GitBranch, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import { usePresetStorageStore } from '@/stores/preset-storage-store'
+import { findPresetInCache } from '@/lib/director/preset-library'
 import { isShotData, isVideoData } from '@/types/director'
 import { editActionForKind } from '@/features/director/canvas-interaction'
 import { prettyNodeLabel } from '@/features/director/node-label'
@@ -121,9 +121,7 @@ function BaseNodeImpl({
     if (!presetId) return
     e.preventDefault()
     e.stopPropagation()
-    const preset = usePresetStorageStore
-      .getState()
-      .presets.find((p) => p.id === presetId)
+    const preset = findPresetInCache(presetId)
     if (!preset) return
     const node = useDirectorCanvasStore.getState().nodes.find((n) => n.id === id)
     if (!node) return

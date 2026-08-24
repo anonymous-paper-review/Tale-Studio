@@ -18,7 +18,7 @@ import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store
 import { DebugPromptTrace } from '@/components/debug-prompt-trace'
 import { useDebugPrompts } from '@/lib/use-debug-prompts'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
-import { usePresetStorageStore } from '@/stores/preset-storage-store'
+import { savePreset } from '@/lib/director/preset-library'
 import {
   newDirectorId,
   type ShotNodeData,
@@ -118,7 +118,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
   const handleSavePreset = () => {
     const name = window.prompt(t('Preset name'))?.trim()
     if (!name) return
-    void usePresetStorageStore.getState().savePreset({
+    void savePreset({
       projectId,
       name,
       camera: data.camera,

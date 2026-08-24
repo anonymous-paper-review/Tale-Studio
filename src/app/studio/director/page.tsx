@@ -41,9 +41,10 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { getDirectorGaps, summarizeGaps } from '@/lib/completeness'
 import {
-  usePresetStorageStore,
+  deletePreset,
+  usePresets,
   type CameraLightPreset,
-} from '@/stores/preset-storage-store'
+} from '@/lib/director/preset-library'
 import {
   isShotData,
   isSceneData,
@@ -619,7 +620,6 @@ const PRESET_DND_TYPE = 'application/preset-id'
 
 function PresetCard({ preset }: { preset: CameraLightPreset }) {
   const t = useT()
-  const deletePreset = usePresetStorageStore((s) => s.deletePreset)
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData(PRESET_DND_TYPE, preset.id)
@@ -653,12 +653,9 @@ function PresetCard({ preset }: { preset: CameraLightPreset }) {
 function PresetStrip() {
   const t = useT()
   const projectId = useDirectorCanvasStore((s) => s.projectId)
-  const presets = usePresetStorageStore((s) => s.presets)
-  const loadPresets = usePresetStorageStore((s) => s.loadPresets)
-
-  useEffect(() => {
-    if (projectId) void loadPresets(projectId)
-  }, [projectId, loadPresets])
+  // "언제 가져올지"는 캐시가 정한다 — 옛 useEffect 는 loadedProjectId 가드를
+  // 검사하지 않아 캔버스 진입마다 재요청했다(전환 동기, preset-library 머리말).
+  const { data: presets = [] } = usePresets(projectId)
 
   if (presets.length === 0) return null
 

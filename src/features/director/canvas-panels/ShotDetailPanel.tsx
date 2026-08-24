@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
-import { usePresetStorageStore } from '@/stores/preset-storage-store'
+import { savePreset } from '@/lib/director/preset-library'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
 import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
 import type { InventoryItem } from '@/types/inventory'
@@ -82,7 +82,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
   const handleSavePreset = () => {
     const name = window.prompt(t('Preset name'))?.trim()
     if (!name) return
-    void usePresetStorageStore.getState().savePreset({
+    void savePreset({
       projectId,
       name,
       camera: data.camera,

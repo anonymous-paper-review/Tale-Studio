@@ -12,7 +12,7 @@ import {
   effectivePrompt,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
-import { usePresetStorageStore } from '@/stores/preset-storage-store'
+import { savePreset } from '@/lib/director/preset-library'
 import {
   isShotData,
   type VideoNodeData,
@@ -213,7 +213,7 @@ export function VideoDetailPanel({
   const handleSavePreset = () => {
     const name = window.prompt(t('Preset name'))?.trim()
     if (!name) return
-    void usePresetStorageStore.getState().savePreset({
+    void savePreset({
       projectId,
       name,
       camera: effective.camera,
