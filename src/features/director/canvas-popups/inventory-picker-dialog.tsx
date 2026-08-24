@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect } from 'react'
 import { ImageIcon } from 'lucide-react'
 import {
   Dialog,
@@ -8,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useInventoryStore } from '@/stores/inventory-store'
+import { useInventory } from '@/lib/inventory-library'
 import { useProjectStore } from '@/stores/project-store'
 import type { InventoryItem } from '@/types/inventory'
 import { useT } from '@/lib/i18n'
@@ -22,15 +21,9 @@ type Props = {
 export function InventoryPickerDialog({ open, onOpenChange, onPick }: Props) {
   const t = useT()
   const workspaceId = useProjectStore((s) => s.workspaceId)
-  const items = useInventoryStore((s) => s.items)
-  const loading = useInventoryStore((s) => s.loading)
-  const load = useInventoryStore((s) => s.load)
-
-  useEffect(() => {
-    if (open && workspaceId) {
-      void load(workspaceId)
-    }
-  }, [open, workspaceId, load])
+  // 닫혀 있으면 null 로 꺼 둔다(옛 useEffect 의 open 가드와 같은 자리). 5분 안에
+  // 다시 열면 캐시가 즉답해 로딩 표시 없이 뜬다 — 옛 코드는 열 때마다 재요청했다.
+  const { data: items = [], isLoading: loading } = useInventory(open ? workspaceId : null)
 
   const handlePick = (item: InventoryItem) => {
     onPick(item)

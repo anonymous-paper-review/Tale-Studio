@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Loader2, Trash2, Upload } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
-import { useInventoryStore } from '@/stores/inventory-store'
+import { removeInventoryItem, uploadInventoryItem, useInventory } from '@/lib/inventory-library'
 import { useProjectStore } from '@/stores/project-store'
 import type { InventoryItem, InventoryKind } from '@/types/inventory'
 
@@ -27,14 +27,13 @@ const SECTION_TITLES: Record<InventoryKind, string> = {
 
 export function InventoryGrid() {
   const workspaceId = useProjectStore((s) => s.workspaceId)
-  const { items, loading, error, load, upload, remove } = useInventoryStore()
+  const { data: items = [], isLoading: loading, error: loadError } = useInventory(workspaceId)
 
   const [uploading, setUploading] = useState(false)
+  // 업로드·삭제 실패 안내 — 목록(useInventory)과 달리 변경 오류는 이 화면만의 일이라 지역 state.
+  const [actionError, setActionError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (workspaceId) void load(workspaceId)
-  }, [workspaceId, load])
+  const error = actionError ?? (loadError instanceof Error ? loadError.message : null)
 
   const groupedItems = SECTION_ORDER.reduce<Record<InventoryKind, InventoryItem[]>>(
     (acc, kind) => {
@@ -52,7 +51,14 @@ export function InventoryGrid() {
     // reset input so same file can be re-selected
     e.target.value = ''
     setUploading(true)
-    await upload(workspaceId, 'image', file.name.replace(/\.[^.]+$/, ''), file)
+    setActionError(null)
+    const { error: uploadError } = await uploadInventoryItem(
+      workspaceId,
+      'image',
+      file.name.replace(/\.[^.]+$/, ''),
+      file,
+    )
+    if (uploadError) setActionError(uploadError)
     setUploading(false)
   }
 
@@ -148,7 +154,15 @@ export function InventoryGrid() {
                     <button
                       type="button"
                       aria-label={`Delete ${item.name}`}
-                      onClick={() => void remove(item.id)}
+                      onClick={() => {
+                        if (!workspaceId) return
+                        setActionError(null)
+                        void removeInventoryItem(workspaceId, item.id).then(
+                          ({ error: removeError }) => {
+                            if (removeError) setActionError(removeError)
+                          },
+                        )
+                      }}
                       className="absolute right-1 top-1 hidden rounded-md bg-background/80 p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:flex group-hover:opacity-100"
                     >
                       <Trash2 className="size-3.5" />

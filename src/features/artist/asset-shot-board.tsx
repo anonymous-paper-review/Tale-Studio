@@ -13,10 +13,15 @@ import { cn } from '@/lib/utils'
 import { startBinDrag } from '@/lib/pointer-drag'
 import { useArtistStore } from '@/stores/artist-store'
 import {
-  useArtistBoardStore,
   effectiveLocationIds,
+  redoBoardEdit,
+  setShotCharacters as boardSetShotCharacters,
+  setShotLocationIds as boardSetShotLocationIds,
+  undoBoardEdit,
+  useBoardEditStore,
+  useBoardShots,
   type BoardShot,
-} from '@/stores/artist-board-store'
+} from '@/lib/artist/board-shots'
 import { useProjectStore } from '@/stores/project-store'
 import { ThumbImage } from '@/components/thumb-image'
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
@@ -36,27 +41,30 @@ export function AssetShotBoard() {
   const scenes = useMemo(() => sceneManifest?.scenes ?? [], [sceneManifest])
   const projectId = useProjectStore((s) => s.projectId)
 
-  const shots = useArtistBoardStore((s) => s.shots)
-  const loading = useArtistBoardStore((s) => s.loading)
-  const loadedProjectId = useArtistBoardStore((s) => s.loadedProjectId)
-  const boardError = useArtistBoardStore((s) => s.error)
-  const load = useArtistBoardStore((s) => s.load)
-  const setShotCharacters = useArtistBoardStore((s) => s.setShotCharacters)
-  const setShotLocationIds = useArtistBoardStore((s) => s.setShotLocationIds)
-  const undo = useArtistBoardStore((s) => s.undo)
-  const redo = useArtistBoardStore((s) => s.redo)
-  const canUndo = useArtistBoardStore((s) => s.past.length > 0)
-  const canRedo = useArtistBoardStore((s) => s.future.length > 0)
+  // "언제 가져올지"는 캐시가 정한다 — 옛 loadedProjectId 가드 useEffect 의 자리.
+  const { data: shots = [], isLoading: loading, error: loadError } = useBoardShots(projectId)
+  const editError = useBoardEditStore((s) => s.error)
+  const boardError =
+    editError ??
+    (loadError
+      ? t('Failed to load shots: {message}', {
+          message: loadError instanceof Error ? loadError.message : String(loadError),
+        })
+      : null)
+  // 편집 함수는 projectId 를 명시로 받는다(시험 가능·store 간 결합 제거) — 6곳의
+  // 호출부 시그니처는 이 래퍼가 유지한다.
+  const setShotCharacters = (shotId: string, next: string[]) =>
+    projectId ? boardSetShotCharacters(projectId, shotId, next) : Promise.resolve()
+  const setShotLocationIds = (shotId: string, next: string[]) =>
+    projectId ? boardSetShotLocationIds(projectId, shotId, next) : Promise.resolve()
+  const canUndo = useBoardEditStore((s) => s.past.length > 0)
+  const canRedo = useBoardEditStore((s) => s.future.length > 0)
 
   const [hoverShotId, setHoverShotId] = useState<string | null>(null)
   const [dlgCharId, setDlgCharId] = useState<string | null>(null)
   const [dlgWorldId, setDlgWorldId] = useState<string | null>(null)
   // 드래그 중엔 hover 가 벗어나도 스트립을 펼친 채 고정 — 접히면서 카드가 위로 밀리면 드롭 좌표가 어긋난다.
   const [dragActive, setDragActive] = useState(false)
-
-  useEffect(() => {
-    if (projectId && loadedProjectId !== projectId) void load()
-  }, [projectId, loadedProjectId, load])
 
   // undo/redo 키보드 오버로드 — Ctrl/Cmd+Z(취소) · Ctrl/Cmd+Shift+Z 또는 Ctrl/Cmd+Y(재실행).
   //   입력 필드(채팅 textarea 등) 포커스 중엔 네이티브 텍스트 undo 를 방해하지 않는다.
@@ -68,15 +76,15 @@ export function AssetShotBoard() {
       const k = e.key.toLowerCase()
       if (k === 'z' && !e.shiftKey) {
         e.preventDefault()
-        void undo()
+        void undoBoardEdit()
       } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
         e.preventDefault()
-        void redo()
+        void redoBoardEdit()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [undo, redo])
+  }, [])
 
   const charById = useMemo(
     () => new Map(characterAssets.map((c) => [c.characterId, c])),
@@ -162,7 +170,7 @@ export function AssetShotBoard() {
               className="size-7"
               title={t('Undo (Ctrl+Z)')}
               disabled={!canUndo}
-              onClick={() => void undo()}
+              onClick={() => void undoBoardEdit()}
             >
               <Undo2 className="size-3.5" />
             </Button>
@@ -172,7 +180,7 @@ export function AssetShotBoard() {
               className="size-7"
               title={t('Redo (Ctrl+Shift+Z / Ctrl+Y)')}
               disabled={!canRedo}
-              onClick={() => void redo()}
+              onClick={() => void redoBoardEdit()}
             >
               <Redo2 className="size-3.5" />
             </Button>
