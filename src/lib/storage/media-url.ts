@@ -14,8 +14,14 @@
 
 export const MEDIA_BUCKET = 'media'
 
-function trimTrailingSlash(value: string): string {
-  return value.replace(/\/+$/, '')
+// #env-newline(2026-08-24 실사고): Vercel env 값 끝에 개행이 붙어 들어왔다. SDK(getPublicUrl)는
+//   조용히 정규화해줬지만 이 모듈은 문자열을 그대로 이어붙여 "https://…co\n/storage/…" 를
+//   만들었고 — 판정(mediaPathFromUrl)은 new URL() 이 개행을 벗겨낸 값과 개행 든 접두사를
+//   비교하니 **자기가 만든 주소를 자기가 거부**했다(첨부 400 + 채팅 썸네일이 생 URL 로 표시).
+//   env 는 신뢰하지 않고 항상 공백·개행을 걷어낸다.
+function cleanBase(value: string | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed.replace(/\/+$/, '') : null
 }
 
 /**
@@ -25,9 +31,9 @@ function trimTrailingSlash(value: string): string {
  * 새 주소는 아래 `mediaPublicPrefix()` 가 만들고, 옛 주소는 계속 인식만 한다.
  */
 function supabasePublicPrefix(): string | null {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const base = cleanBase(process.env.NEXT_PUBLIC_SUPABASE_URL)
   if (!base) return null
-  return `${trimTrailingSlash(base)}/storage/v1/object/public/${MEDIA_BUCKET}/`
+  return `${base}/storage/v1/object/public/${MEDIA_BUCKET}/`
 }
 
 /**
@@ -39,9 +45,9 @@ function supabasePublicPrefix(): string | null {
  * 바꾸면 새로 올린 파일을 아무도 못 받는다.
  */
 function overridePublicPrefix(): string | null {
-  const base = process.env.NEXT_PUBLIC_MEDIA_PUBLIC_BASE_URL
+  const base = cleanBase(process.env.NEXT_PUBLIC_MEDIA_PUBLIC_BASE_URL)
   if (!base) return null
-  return `${trimTrailingSlash(base)}/`
+  return `${base}/`
 }
 
 /** 지금부터 만들 주소가 쓸 접두사. 설정이 없으면 Supabase 형태를 그대로 쓴다. */
