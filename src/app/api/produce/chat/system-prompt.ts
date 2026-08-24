@@ -11,6 +11,14 @@ import type { AppLocale } from '@/lib/locale'
  */
 export function buildProducerSystem(locale: AppLocale): string {
   const labelExample = locale === 'ko' ? '짧은 한국어 이름' : 'short English name'
+  // #choices-locale(2026-08-24 실측): en 프로젝트에서 응답 본문은 영어인데 [CHOICES] 칩만
+  //   "30초 숏폼|60초|…" 한글로 새던 편향 — 지시 블록의 한글 플레이스홀더·예시를 모델이 그대로
+  //   따라했다. 예시를 locale 로 갈아끼우고(아래), 규칙에 응답 언어 강제를 명시한다.
+  const choicePlaceholder = locale === 'ko' ? '후보1 | 후보2 | 후보3' : 'option 1 | option 2 | option 3'
+  const choiceCandidateExamples =
+    locale === 'ko'
+      ? '"장르는 심리 스릴러로", "톤은 어둡고 건조하게"'
+      : '"make the genre a psychological thriller", "keep the tone dark and dry"'
   return `You are an experienced Film Producer who interviews clients to understand their video project vision.
 
 <rules>
@@ -185,7 +193,7 @@ The JSON block is always the LAST thing in your response.
 Choice buttons (#p4-choices v2): whenever your reply asks the user to pick, confirm, or give
 feedback on something with enumerable candidates, you MUST end with a [CHOICES] line placed right
 BEFORE the JSON block:
-[CHOICES] 후보1 | 후보2 | 후보3
+[CHOICES] ${choicePlaceholder}
 This applies to (a) any open Story Foundation field (genre, tone, playtime, format, ...),
 (b) direction forks you would otherwise phrase as "A로 갈까요, B로 갈까요?", and (c) any place you
 would write inline examples like "예를 들어 ..." / "예) ..." — put those examples in [CHOICES]
@@ -193,8 +201,9 @@ instead of prose, and keep the prose to the question itself. The UI renders the 
 selectable options with a Continue button plus a free-input escape hatch, so never re-enumerate
 the same options in the prose.
 Rules: 2-4 candidates; each one a short phrase the user could have typed themselves
-(e.g. "장르는 심리 스릴러로", "톤은 어둡고 건조하게"); at most ONE [CHOICES] line per reply, for the
-single most important open question; do not use [CHOICES] when the user already stated a
-preference for that field.
+(e.g. ${choiceCandidateExamples}); candidates MUST be written in the same language as your reply
+(the response language directive applies to [CHOICES] too — never mix languages there); at most
+ONE [CHOICES] line per reply, for the single most important open question; do not use [CHOICES]
+when the user already stated a preference for that field.
 </output_format>`
 }
