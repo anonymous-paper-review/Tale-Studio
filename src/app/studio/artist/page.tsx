@@ -112,7 +112,6 @@ export default function VisualPage() {
   // 시간측정 로그 1회 가드 (프로젝트당)
   const timingLoggedRef = useRef<string | null>(null)
   // 프로액티브 넛지 1회 가드 (프로젝트당) — chat-proactive-copilot Phase 1
-  const nudgeOfferedRef = useRef<string | null>(null)
   // 첫 진입 브리핑(캐릭터·장소 요약) 1회 가드 — 프로젝트별.
   const artistBriefedRef = useRef<string | null>(null)
   // 진입 fallback: main 이 너무 오래 안 차도 일정 시간 뒤 진입 (이후 client 가 보강).
@@ -257,15 +256,14 @@ export default function VisualPage() {
   }, [setLifecycleStatus, writerGateStatus, artistGate, directorGate])
 
   // 프로액티브 넛지 (chat-proactive-copilot Phase 1): 자동생성이 모두 끝나고(생성 중 0 + main 준비)
-  //   1.5s 안정되면 채팅에 "Director로 넘어갈까요?" 다음-단계 제안을 1회 띄운다.
+  //   1.5s 안정되면 채팅에 "Director로 넘어갈까요?" 다음-단계 제안을 띄운다.
   //   debounce 로 생성 시작 전 조기발사 + 생성 중 깜빡임을 방지. 비용 지출 없는 넛지(자동생성은 별도 진행).
   const generatingCount = generatingViews.length + generatingLocations.length
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
-  // #handoff-starved(2026-08-11, producer 와 동일 계열): 옛 코드는 offer 를 부르기 **전에**
-  //   원샷 ref 를 세팅했다 — 제안 슬롯이 차 있으면(특히 dismissible:false 브리핑) offer 가
-  //   조용히 버려지는데 ref 는 이미 소모돼 영영 재시도되지 않았다. 그래서 Director 핸드오프가
-  //   안 떴다. 처방: ① preempt 로 브리핑을 밀어내고 ② 실제로 표면화된 것을 확인한 뒤에만
-  //   ref 를 고정하며 ③ 슬롯이 바뀔 때마다(activeSuggestion dep) 재시도한다.
+  // 재시도 이력(#handoff-starved 8/11 → #handoff-suggestion-drop 8/25): 원샷 래치는 두 번의
+  //   기아를 만들었다 — ① 슬롯 점유 중 offer 유실(8/11, ref 선소모), ② 유저 발화로 암묵
+  //   dismiss 된 뒤 재발사 불가(8/25). 래치를 걷어내고 슬롯이 바뀔 때마다(activeSuggestion dep)
+  //   재시도한다 — 중복·거절 방어는 offerSuggestion 의 id 가드가 전담한다.
   const activeSuggestion = useGlobalChatStore((s) => s.suggestion)
   // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once) — 진실은 DB 의 reachedStage.
   const reachedStageForNudge = useProjectStore((s) => s.reachedStage)
@@ -288,11 +286,16 @@ export default function VisualPage() {
   useEffect(() => {
     if (!projectId || !ready || !writerReady || !artistGate.ready) return
     if (!shouldOfferHandoffNudge('artist', reachedStageForNudge)) return
-    if (nudgeOfferedRef.current === projectId) return
     if (characterAssets.length === 0 || generatingCount > 0) return
     const timer = setTimeout(() => {
       // 탭 하단의 'Approve & Direct' 버튼을 걷어내고 이 제안이 그 자리를 대신한다(#handoff-to-chat).
       //   버튼은 직접 이동하지 않고 문장을 채팅에 입력해 보낸다 — 직접 타이핑과 같은 경로.
+      // #handoff-suggestion-drop(2026-08-25, producer 8/7 수리의 artist 판): 옛 원샷 래치
+      //   (nudgeOfferedRef)는 버그였다 — 유저가 아티스트 챗에 아무 말이나 하면 제안이 암묵
+      //   dismiss(id 미기록)되는데 래치는 이미 잠겨, 그 세션에선 준비 완료 멘트가 영영 다시
+      //   안 떴다(웹툰 테스트 실측). 슬롯이 빌 때마다(activeSuggestion dep) 재시도한다.
+      //   스팸 방지는 offerSuggestion 의 가드 몫 — 같은 id 표시 중이면 no-op, 명시적
+      //   "나중에"(dismissedSuggestionIds)면 재발사 안 함, 자동 내림 뒤에는 다시 뜬다.
       const id = `artist-ready-${projectId}`
       offerSuggestion(
         {
@@ -306,10 +309,6 @@ export default function VisualPage() {
         },
         { preempt: true },
       )
-      const chat = useGlobalChatStore.getState()
-      if (chat.suggestion?.id === id || chat.dismissedSuggestionIds.includes(id)) {
-        nudgeOfferedRef.current = projectId
-      }
     }, 1500)
     return () => clearTimeout(timer)
   }, [
