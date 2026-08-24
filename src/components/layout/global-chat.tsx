@@ -682,11 +682,18 @@ export function GlobalChat() {
       return
     }
     // 첨부 정리는 실제 전송 경로에서만 — 게이트/가드에 걸렸을 때 올린 파일이 사라지면 안 된다.
+    const msgCountBefore = useGlobalChatStore.getState().messages.length
     setAttachments([])
     await sendMessage(msg, {
       imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
       thumbUrls,
     })
+    // #attach-loud-fail(2026-08-24): 이미지 턴이 응답 없이 실패하면(모델 말풍선 미증가 + error)
+    //   첨부를 복원한다 — 슬라이스는 이미 스토리지에 있으니 파일부터 다시 올리게 하지 않는다.
+    const after = useGlobalChatStore.getState()
+    if (images.length > 0 && after.error && after.messages.length <= msgCountBefore + 1) {
+      setAttachments((prev) => (prev.length ? prev : images))
+    }
   }
 
   // 프로액티브 제안 승인 — 'navigate'(stage 이동) / 'artist-refresh-look'(초안 일괄 재생성, 유저 클릭).

@@ -7,6 +7,7 @@ import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 import { parseChatChoices } from '@/lib/chat-choices'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import { CHAT_OUTPUT_FORMAT_GUIDE, fetchProjectLocale, responseLanguageDirective } from '@/lib/chat-format'
+import { translate } from '@/lib/i18n/translate'
 import { sanitizeAttachmentUrls } from '@/lib/upload/attachment'
 import { listStyleAnchorMediums } from '@/lib/style-anchor'
 import { userOwnsProject } from '@/lib/generation-jobs'
@@ -84,6 +85,21 @@ export async function POST(req: Request) {
     // #p1-attach: 첨부 이미지는 URL 로 넘어간다 — Anthropic 이 직접 가져가므로 화이트리스트
     //   검증이 필수다(임의 주소를 대신 가져오게 시키는 걸 막는다).
     const attachments = sanitizeAttachmentUrls(attachmentImageUrls)
+    // #attach-loud-fail(2026-08-24): 첨부가 왔는데 통과분이 0이면 — 조용한 텍스트-온리 진행 금지.
+    //   8/17~18 쿼터 사태기에 모델이 첨부의 존재조차 모른 채 온보딩 응답을 하는 "조용한 실맹"으로
+    //   테스트 3프로젝트가 헛돌았다(실측: 📎 마커는 남고 이미지 블록은 0). 계층이 어디서 죽었든
+    //   사용자에게 실패를 말하는 게 먼저다 — 에러는 챗 에러 배너로 표면화된다.
+    if (Array.isArray(attachmentImageUrls) && attachmentImageUrls.length > 0 && attachments.urls.length === 0) {
+      return NextResponse.json(
+        {
+          error: translate(
+            projectLocale ?? 'en',
+            "Couldn't accept the attached images (unrecognized storage address). Please re-upload and send again.",
+          ),
+        },
+        { status: 400 },
+      )
+    }
 
     const contextParts: string[] = []
     if (storyText) {
@@ -165,15 +181,34 @@ export async function POST(req: Request) {
       ? `\n\nThe user is currently in the Producer (P1) stage. Prior messages from other stages are prefixed with [P1]/[P2]/[P3]/[P4]/[P5]. Reference them for continuity, but only emit extractedSettings valid for the Producer stage.`
       : ''
 
-    const text = await llmChat(
-      buildProducerSystem(projectLocale ?? 'ko') + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + responseLanguageDirective(projectLocale),
-      normalizedHistory,
-      `${contextPrefix}${message}`,
-      0.7,
-      'chat',
-      // #p4-websearch: producer 는 오마쥬/레퍼런스 요청의 진입점 — 실제 작품 검색으로 접지.
-      { webSearch: true, imageUrls: attachments.urls },
-    )
+    let text: string
+    try {
+      text = await llmChat(
+        buildProducerSystem(projectLocale ?? 'ko') + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + responseLanguageDirective(projectLocale),
+        normalizedHistory,
+        `${contextPrefix}${message}`,
+        0.7,
+        'chat',
+        // #p4-websearch: producer 는 오마쥬/레퍼런스 요청의 진입점 — 실제 작품 검색으로 접지.
+        { webSearch: true, imageUrls: attachments.urls },
+      )
+    } catch (err) {
+      // #attach-loud-fail: 이미지 턴에서 Anthropic 이 URL fetch 에 실패하면(스토리지 순단·쿼터)
+      //   일반 오류 대신 원인을 말한다 — 재업로드가 아니라 잠시 후 재전송이 맞는 대처라서.
+      const msg = err instanceof Error ? err.message : String(err)
+      if (attachments.urls.length > 0 && /image|fetch/i.test(msg)) {
+        return NextResponse.json(
+          {
+            error: translate(
+              projectLocale ?? 'en',
+              "Couldn't load the attached images from storage. Please try sending again in a moment.",
+            ),
+          },
+          { status: 502 },
+        )
+      }
+      throw err
+    }
 
     const { reply: replyRaw, extractedSettings } = parseExtractedSettings(text)
     // #p4-choices: Foundation 빈칸을 되묻기 대신 선택지 버튼으로 — [CHOICES] 라인 추출.
