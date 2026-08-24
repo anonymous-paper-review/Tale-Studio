@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Bookmark, Film, Loader2, Trash2, Upload, X } from 'lucide-react'
+import { Film, Loader2, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HoverBeam } from '@/components/hover-beam'
 import { Input } from '@/components/ui/input'
@@ -11,7 +11,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
-import { savePreset } from '@/lib/director/preset-library'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
 import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
 
@@ -74,18 +73,6 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
       ? data.worldAssetIds.filter((x) => x !== id)
       : [...data.worldAssetIds, id]
     updateNodeData<'shot'>(nodeId, { worldAssetIds: next })
-  }
-
-  const handleSavePreset = () => {
-    const name = window.prompt(t('Preset name'))?.trim()
-    if (!name) return
-    void savePreset({
-      projectId,
-      name,
-      camera: data.camera,
-      lighting: data.lighting,
-      cameraPreset: data.cameraPreset,
-    })
   }
 
   const handleAddReferenceImage = (file: File) => {
@@ -363,17 +350,6 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
           )}
         </Button>
         <div className="grid grid-cols-2 gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={handleSavePreset}
-            className="gap-1.5"
-            title={t('Save the current camera/lighting/lens setup as a preset')}
-          >
-            <Bookmark className="size-3.5" />
-            {t('Save preset')}
-          </Button>
           <Button
             type="button"
             size="sm"

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bookmark, Loader2, Play, RefreshCw, Star, Trash2 } from 'lucide-react'
+import { Loader2, Play, RefreshCw, Star, Trash2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,6 @@ import {
   effectivePrompt,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
-import { savePreset } from '@/lib/director/preset-library'
 import {
   isShotData,
   type VideoNodeData,
@@ -214,18 +213,6 @@ export function VideoNodePopup({ nodeId, data }: Props) {
   }
 
   // effective(상속+override) 셋업을 프리셋으로 저장 (D-6, 결정 #46)
-  const handleSavePreset = () => {
-    const name = window.prompt(t('Preset name'))?.trim()
-    if (!name) return
-    void savePreset({
-      projectId,
-      name,
-      camera: effective.camera,
-      lighting: effective.lighting,
-      cameraPreset: effective.cameraPreset,
-    })
-  }
-
   return (
     <Dialog open onOpenChange={(o) => !o && closePopup()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
@@ -416,16 +403,6 @@ export function VideoNodePopup({ nodeId, data }: Props) {
                 {data.videoUrl ? t('Regenerate') : t('Generate')}
               </>
             )}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleSavePreset}
-            className="gap-1.5"
-            title={t('Save the current camera/lighting/lens setup as a preset')}
-          >
-            <Bookmark className="size-3.5" />
-            {t('Save this setup as a preset')}
           </Button>
           <div className="ml-auto" />
           <Button

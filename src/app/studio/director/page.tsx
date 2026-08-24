@@ -41,11 +41,6 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { getDirectorGaps, summarizeGaps } from '@/lib/completeness'
 import {
-  deletePreset,
-  usePresets,
-  type CameraLightPreset,
-} from '@/lib/director/preset-library'
-import {
   isShotData,
   isSceneData,
   SNAP_GRID,
@@ -616,61 +611,6 @@ function CanvasInner() {
 
 // ────────────────────────────────────────────────────────────────────────────
 
-const PRESET_DND_TYPE = 'application/preset-id'
-
-function PresetCard({ preset }: { preset: CameraLightPreset }) {
-  const t = useT()
-
-  const handleDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData(PRESET_DND_TYPE, preset.id)
-    e.dataTransfer.effectAllowed = 'copy'
-  }
-
-  return (
-    <div
-      draggable
-      onDragStart={handleDragStart}
-      title={t('Drag onto a node to apply the camera/lighting/lens setup')}
-      className={cn(
-        'group flex h-7 shrink-0 cursor-grab items-center gap-1 rounded-md border border-border px-2',
-        'bg-card text-xs text-foreground active:cursor-grabbing',
-        'transition-colors duration-100 hover:bg-accent',
-      )}
-    >
-      <span className="max-w-[10rem] truncate">{preset.name}</span>
-      <button
-        type="button"
-        onClick={() => void deletePreset(preset.id)}
-        aria-label={t('Delete preset')}
-        className="rounded-sm p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 hover-red-beam"
-      >
-        <X className="size-3" />
-      </button>
-    </div>
-  )
-}
-
-function PresetStrip() {
-  const t = useT()
-  const projectId = useDirectorCanvasStore((s) => s.projectId)
-  // "언제 가져올지"는 캐시가 정한다 — 옛 useEffect 는 loadedProjectId 가드를
-  // 검사하지 않아 캔버스 진입마다 재요청했다(전환 동기, preset-library 머리말).
-  const { data: presets = [] } = usePresets(projectId)
-
-  if (presets.length === 0) return null
-
-  return (
-    <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
-      <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
-        {t('Presets')}
-      </span>
-      {presets.map((p) => (
-        <PresetCard key={p.id} preset={p} />
-      ))}
-    </div>
-  )
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 
 // Alt+←/→ 순환 뷰 시퀀스(#keyboard-only 2026-08-11) — Node → Storyboard(Previz) → Storyboard(Real).
@@ -804,7 +744,6 @@ function PaletteBar({
           )}
         </button>
 
-        <PresetStrip />
       </div>
 
       {/* 축척 — Storyboard 뷰 전용, 우측 정렬(#e-zoom-merge 2026-08-20 오너 지시: 뷰 내부의

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Bookmark, Film, GitBranch, Loader2, Trash2, Upload, X } from 'lucide-react'
+import { Film, GitBranch, Loader2, Trash2, Upload, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,6 @@ import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store
 import { DebugPromptTrace } from '@/components/debug-prompt-trace'
 import { useDebugPrompts } from '@/lib/use-debug-prompts'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
-import { savePreset } from '@/lib/director/preset-library'
 import {
   newDirectorId,
   type ShotNodeData,
@@ -112,18 +111,6 @@ export function ShotNodePopup({ nodeId, data }: Props) {
   }
 
   // 현재 카메라/조명/렌즈 셋업을 프리셋으로 저장 (D-6, 결정 #46)
-  const handleSavePreset = () => {
-    const name = window.prompt(t('Preset name'))?.trim()
-    if (!name) return
-    void savePreset({
-      projectId,
-      name,
-      camera: data.camera,
-      lighting: data.lighting,
-      cameraPreset: data.cameraPreset,
-    })
-  }
-
   const handleAddReferenceImage = (file: File) => {
     const reader = new FileReader()
     reader.onload = () => {
@@ -441,16 +428,6 @@ export function ShotNodePopup({ nodeId, data }: Props) {
           >
             <GitBranch className="size-3.5" />
             {t('Branch (empty take)')}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleSavePreset}
-            className="gap-1.5"
-            title={t('Save the current camera/lighting/lens setup as a preset')}
-          >
-            <Bookmark className="size-3.5" />
-            {t('Save this setup as a preset')}
           </Button>
           <div className="ml-auto" />
           <Button

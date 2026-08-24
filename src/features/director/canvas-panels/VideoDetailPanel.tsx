@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Bookmark, Loader2, Play, RefreshCw, Star, Trash2 } from 'lucide-react'
+import { Loader2, Play, RefreshCw, Star, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HoverBeam } from '@/components/hover-beam'
 import { Textarea } from '@/components/ui/textarea'
@@ -12,7 +12,6 @@ import {
   effectivePrompt,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
-import { savePreset } from '@/lib/director/preset-library'
 import {
   isShotData,
   type VideoNodeData,
@@ -210,18 +209,6 @@ export function VideoDetailPanel({
   }
 
   // effective(상속+override) 셋업을 프리셋으로 저장 (D-6, 결정 #46)
-  const handleSavePreset = () => {
-    const name = window.prompt(t('Preset name'))?.trim()
-    if (!name) return
-    void savePreset({
-      projectId,
-      name,
-      camera: effective.camera,
-      lighting: effective.lighting,
-      cameraPreset: effective.cameraPreset,
-    })
-  }
-
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
       <section className="rounded-lg border border-border bg-background p-3">
@@ -418,16 +405,6 @@ export function VideoDetailPanel({
               {data.videoUrl ? t('Regenerate') : t('Generate')}
             </>
           )}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleSavePreset}
-          className="gap-1.5"
-          title={t('Save the current camera/lighting/lens setup as a preset')}
-        >
-          <Bookmark className="size-3.5" />
-          {t('Save preset')}
         </Button>
         <div className="ml-auto" />
         <Button
