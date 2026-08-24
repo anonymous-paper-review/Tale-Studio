@@ -14,6 +14,14 @@
     "expect 는 화면의 **고정 문구**로만 건다. 개수가 들어간 문자열(예: 'Video 2', '스토리보드 생성 0/2')은",
     "  픽스처 규모가 바뀌면 깨지므로 쓰지 않는다.",
     "",
+    "⚠ expect 는 화면에 **실제로 렌더되는 언어**로 쓴다 (#smoke-auth-labels 2026-08-24).",
+    "  기본 locale 은 en 이다(src/stores/locale-store.ts). 한국어로 적어둔 4건이 i18n 배치 이후",
+    "  조용히 죽어 있었다: '새 프로젝트'→New project, '러프 스토리보드'→Rough storyboard,",
+    "  '인물'→Characters, '배경'→Background. 마지막 둘은 ko 사전 역매핑이 아니라 --tree 로 뜬 실측값이다 —",
+    "  사전에서 거꾸로 찾은 'Add person'/'Add background' 는 화면에 없었다. expect 는 지어내지 말고 --tree 로 떠서 붙인다.",
+    "  t() 를 타는 문구는 계정 locale 을 따르니, 번역을 안 타는 문구(스테이지 고유명 'Meeting Room'/'The Set',",
+    "  미번역 크롬 'Source')를 반드시 하나씩 함께 건다.",
+    "",
     "/studio/producer 는 프로젝트가 없으면 하나를 자동 생성하고 이후 같은 projectId 를 재사용한다",
     "  (실행마다 쌓이지 않는 것을 실측 확인)."
   ],
@@ -21,7 +29,7 @@
   "targets": [
     {
       "path": "/projects",
-      "expect": ["새 프로젝트"],
+      "expect": ["New project"],
       "note": "로그인 후 프로젝트 목록. 빈 상태 문구는 계정 상태에 따라 바뀌므로 상시 존재하는 버튼으로 건다"
     },
     {
@@ -31,12 +39,12 @@
     },
     {
       "path": "/studio/writer",
-      "expect": ["Writers' Room", "러프 스토리보드"],
+      "expect": ["Writers' Room", "Rough storyboard"],
       "note": "씬·샷 보드 + 트리트먼트/대사 탭"
     },
     {
       "path": "/studio/artist",
-      "expect": ["The Visual Studio", "인물", "배경"],
+      "expect": ["The Visual Studio", "Characters", "Background"],
       "note": "캐릭터·배경 시트 스튜디오"
     },
     {

@@ -160,10 +160,33 @@ function loadEnvLocal() {
   return env
 }
 
-/** 스냅샷 텍스트에서 `textbox "이메일" [ref=e3]` 같은 줄의 ref 를 뽑는다. ref 번호는 고정이 아니다. */
-function findRef(snapshot, label) {
-  const m = snapshot.match(new RegExp(`"${label}"[^\\n]*\\[ref=(e\\d+)`))
-  return m?.[1] ?? null
+/**
+ * 스냅샷에서 `- form` 하위 블록만 잘라낸다 (들여쓰기 기준). form 이 없으면 전체를 돌려준다.
+ *   폼 밖의 요소(토스트 region, "Open Next.js Dev Tools" 버튼 등)가 순서 가정을 깨는 걸 막는다 —
+ *   실측에서 dev tools 버튼이 로그인 버튼 뒤에 붙었다 안 붙었다 했다.
+ */
+function formBlock(snapshot) {
+  const lines = snapshot.split('\n')
+  const start = lines.findIndex((l) => /^\s*-\s+form\b/.test(l))
+  if (start === -1) return snapshot
+  const indent = lines[start].search(/\S/)
+  const out = [lines[start]]
+  for (let i = start + 1; i < lines.length; i++) {
+    if (lines[i].trim() && lines[i].search(/\S/) <= indent) break
+    out.push(lines[i])
+  }
+  return out.join('\n')
+}
+
+/**
+ * `- textbox "Email" [ref=e3]` 같은 줄에서 해당 role 의 ref 를 나온 순서대로 모은다.
+ *   문구가 아니라 역할로 찾는 이유 (#smoke-auth-labels 2026-08-24): 예전엔 라벨 문자열
+ *   ('이메일'/'비밀번호'/'로그인')로 찾았는데, 도입 다음 날 26cd18a(i18n 배치1)가 로그인 폼을
+ *   영어로 고정하면서 --auth 가 통째로 죽었고 6일간 아무도 못 돌렸다. 역할은 번역되지 않는다.
+ */
+function refsByRole(block, role) {
+  const re = new RegExp(`(?:^|\\n)\\s*-\\s+${role}\\b[^\\n]*\\[ref=(e\\d+)`, 'g')
+  return [...block.matchAll(re)].map((m) => m[1])
 }
 
 /**
@@ -188,12 +211,18 @@ async function ensureLoggedIn(base, profileId, wait) {
     if (!where().startsWith('/login')) return { ok: true, reason: '기존 세션 재사용' }
 
     const snap = orca(['snapshot', '--page', page], { raw: true })
-    const emailRef = findRef(snap, '이메일')
-    const pwRef = findRef(snap, '비밀번호')
-    const btnRef = findRef(snap, '로그인')
-    if (!emailRef || !pwRef || !btnRef) {
-      return { ok: false, reason: `로그인 폼 요소를 못 찾았다 (이메일=${emailRef} 비번=${pwRef} 버튼=${btnRef}).` }
+    // 라벨 문구가 아니라 폼 안의 역할·순서로 잡는다 (refsByRole 주석 참고).
+    const block = formBlock(snap)
+    const boxes = refsByRole(block, 'textbox')
+    const btns = refsByRole(block, 'button')
+    if (boxes.length !== 2 || btns.length < 1) {
+      return {
+        ok: false,
+        reason: `로그인 폼 모양이 바뀌었다 (textbox=${boxes.length} button=${btns.length}, 기대: 2/1+). smoke.mjs 의 폼 가정을 갱신해라.`,
+      }
     }
+    const [emailRef, pwRef] = boxes
+    const btnRef = btns[0]
     orca(['fill', '--page', page, '--element', emailRef, '--value', email], { raw: true })
     orca(['fill', '--page', page, '--element', pwRef, '--value', password], { raw: true })
     orca(['click', '--page', page, '--element', btnRef], { raw: true })
