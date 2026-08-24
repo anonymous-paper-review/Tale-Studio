@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { FlaskConical, ZoomIn, ZoomOut } from 'lucide-react'
+import { ZoomIn, ZoomOut } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,8 +11,6 @@ import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { CharacterPanel } from '@/features/artist/character-panel'
 import { WorldPanel } from '@/features/artist/world-panel'
-import { AssetShotBoard } from '@/features/artist/asset-shot-board'
-import { useArtistBoardStore } from '@/stores/artist-board-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -104,9 +102,6 @@ export default function VisualPage() {
   }
 
   // 실험 New UI(에셋·샷 보드) 토글 — 스토어 보관으로 탭 전환(remount)에도 유지.
-  const newUi = useArtistBoardStore((s) => s.boardMode)
-  const setBoardMode = useArtistBoardStore((s) => s.setBoardMode)
-  const toggleNewUi = () => setBoardMode(!newUi)
 
   // writer-pipeline 진행상황 (producer→artist 직행 시 백그라운드 생성 진행 표시용, decisions #37)
   const { status: writerStatus, restart: restartWriterStatus } = useWriterStatus(projectId)
@@ -406,34 +401,15 @@ export default function VisualPage() {
             설명문은 "?" 뱃지 호버로 이관(2026-08-06). */}
         <h1 className="text-lg font-semibold">The Visual Studio</h1>
         <StageHelpBadge
-          text={
-            newUi
-              ? t('Connects which characters and backgrounds each shot uses — drag assets to build references.')
-              : t('Create and refine concept images for characters and worlds, then hand off to the next stage.')
-          }
+          text={t('Create and refine concept images for characters and worlds, then hand off to the next stage.')}
         />
       </div>
-      <Button
-        size="sm"
-        variant={newUi ? 'secondary' : 'outline'}
-        onClick={toggleNewUi}
-        className="shrink-0"
-      >
-        <FlaskConical className="size-3.5" />
-        {newUi ? t('Old UI') : 'New UI'}
-      </Button>
     </div>
   )
 
   return (
     <>
-      {newUi ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="border-b border-border px-6 py-3">{headerRow}</div>
-          <AssetShotBoard />
-        </div>
-      ) : (
-        <Tabs
+      <Tabs
           value={tab}
           onValueChange={(v) => setTab(v as ArtistTab)}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
@@ -509,7 +485,6 @@ export default function VisualPage() {
             />
           </TabsContent>
         </Tabs>
-      )}
 
       {error && (
         <div className="border-t border-destructive/30 bg-destructive/10 px-6 py-2 text-sm text-destructive">
