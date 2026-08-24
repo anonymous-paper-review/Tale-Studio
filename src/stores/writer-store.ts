@@ -13,6 +13,7 @@ import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { classifyDialoguePatch } from '@/lib/writer-chat-updates'
 import { resolveChatShotId } from '@/lib/writer/chat-id-resolve'
 import { useProjectStore } from '@/stores/project-store'
+import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { isDemoSession } from '@/lib/demo/context'
 // store 액션은 훅을 못 쓴다 — translate() + 현재 locale 직접 조회로 useT() 없이 번역(#i18n-s5-batch3).
 import { translate } from '@/lib/i18n'
@@ -266,6 +267,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           })
           .eq('project_id', projectId)
           .eq('shot_id', id)
+        void invalidateShots(projectId) // 사물함 표시 — 다른 화면의 다음 읽기가 새로 받게
         shotSaveTimers.delete(id)
       }, 500),
     )
@@ -371,6 +373,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           ),
       )
     }
+    void invalidateShots(projectId)
     get().recomputeSceneDuration(sceneId)
     return shotId
   },
@@ -404,6 +407,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       set({ shots: prev, error: error.message })
       return
     }
+    void invalidateShots(projectId)
     get().recomputeSceneDuration(target.sceneId)
   },
 
@@ -553,7 +557,9 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         shots: prevShots,
         error: (shotErr ?? sceneErr)?.message ?? 'Delete failed',
       })
+      return
     }
+    void invalidateShots(projectId)
   },
 
   // 채팅(/api/writer/chat)이 낸 검증된 updates 를 기존 CRUD 로 실행한다.
@@ -787,6 +793,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         )
       }
 
+      void invalidateShots(projectId) // 씬 재생성 = delete+insert 완료 시점
       set((state) => ({
         regeneratingSceneId: null,
         shots: [
@@ -947,11 +954,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           .from('locations')
           .select('*')
           .eq('project_id', projectId),
-        supabase
-          .from('shots')
-          .select('*')
-          .eq('project_id', projectId)
-          .order('sort_order'),
+        loadShotsResult(projectId),
       ])
 
       // Always load story_text even if no scenes yet (P1 → P2 handoff)
@@ -1003,7 +1006,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         characters: s.characters ?? [],
         durationSeconds: s.duration_seconds ?? 5,
         generationMethod: (s.generation_method ?? 'T2V') as Shot['generationMethod'],
-        dialogueLines: (s.dialogue_lines as DialogueLine[]) ?? [],
+        dialogueLines: (s.dialogue_lines ?? []) as unknown as DialogueLine[],
         camera: {
           ...DEFAULT_CAMERA,
           ...(s.camera_config as Partial<Shot['camera']> ?? {}),

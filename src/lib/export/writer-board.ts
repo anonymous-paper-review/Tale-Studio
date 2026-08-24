@@ -13,6 +13,7 @@ import { DEFAULT_LOCALE, type AppLocale } from '@/lib/locale'
 import { h1, h2 } from './md'
 import { sanitizeSegment } from './sanitize'
 import type { ArtifactFile } from './types'
+import { loadShotsResult } from '@/lib/shots-cache'
 
 interface SceneRow {
   scene_id: string
@@ -54,11 +55,7 @@ async function loadWriterBoardData(projectId: string): Promise<WriterBoardData> 
       .select('scene_id, location, time_of_day, mood, narrative_summary, original_text_quote, sort_order')
       .eq('project_id', projectId)
       .order('sort_order'),
-    supabase
-      .from('shots')
-      .select('shot_id, scene_id, shot_type, action_description, duration_seconds, dialogue_lines, rough_storyboard, sort_order')
-      .eq('project_id', projectId)
-      .order('sort_order'),
+    loadShotsResult(projectId),
     supabase.from('characters').select('character_id, name').eq('project_id', projectId),
     supabase.from('locations').select('location_id, name').eq('project_id', projectId),
   ])

@@ -6,6 +6,7 @@ import { DEFAULT_LOCALE, type AppLocale } from '@/lib/locale'
 import { bulletList, escapeMd, h1, h2, isRecord, kvSection, labelPart, nativeText, pickNative, table, textOrUnset } from './md'
 import { PathAllocator } from './sanitize'
 import type { ArtifactFile } from './types'
+import { loadShotsResult } from '@/lib/shots-cache'
 
 export interface DirectorExportData {
   scenes: SceneRow[]
@@ -78,8 +79,6 @@ function clipOmittedNote(locale: AppLocale): string {
 
 export const DIRECTOR_SCENES_SELECT =
   'id,project_id,scene_id,narrative_summary,narrative_summary_native,location,time_of_day,mood,mood_native,sort_order,created_at,updated_at'
-export const DIRECTOR_SHOTS_SELECT =
-  'id,project_id,scene_id,shot_id,shot_type,action_description,action_description_native,dialogue_lines,camera_config,lighting_config,movement_preset,sort_order,created_at,updated_at,video_url,storyboard_image'
 export const DIRECTOR_VIDEO_CLIPS_SELECT =
   'id,project_id,shot_id,url,status,created_at,updated_at,is_final,take_number,deleted_at,take_label'
 
@@ -147,10 +146,7 @@ export async function loadDirectorData(projectId: string): Promise<DirectorExpor
       .from('scenes')
       .select(DIRECTOR_SCENES_SELECT)
       .eq('project_id', normalizedProjectId),
-    supabase
-      .from('shots')
-      .select(DIRECTOR_SHOTS_SELECT)
-      .eq('project_id', normalizedProjectId),
+    loadShotsResult(normalizedProjectId),
     supabase
       .from('video_clips')
       .select(DIRECTOR_VIDEO_CLIPS_SELECT)

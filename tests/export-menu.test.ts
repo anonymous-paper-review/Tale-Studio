@@ -10,6 +10,20 @@ vi.mock('@/lib/export', () => ({
   exportStage: vi.fn(),
 }))
 vi.mock('@/lib/supabase/client', () => ({ createClient: mocks.createClient }))
+// shots 읽기는 공유 사물함(@/lib/shots-cache)을 지난다 — 이 시험의 각본 client 를 그대로 태운다.
+// (사물함 자체는 tests/shots-cache.test.ts 가 잠근다.)
+vi.mock('@/lib/shots-cache', () => ({
+  invalidateShots: () => Promise.resolve(),
+  loadShotsResult: (projectId: string) => {
+    const client = mocks.createClient.mock.results.at(-1)?.value as {
+      from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => unknown } }
+    }
+    return Promise.resolve(client.from('shots').select('*').eq('project_id', projectId)).then(
+      (r) => r as { data: unknown[] | null; error: { message: string } | null },
+      (e) => ({ data: null, error: { message: String((e as { message?: string })?.message ?? e) } }),
+    )
+  },
+}))
 vi.mock('@/stores/asset-storage-store', () => ({
   useAssetStorageStore: { getState: () => ({
     listCharactersByProject: () => [],

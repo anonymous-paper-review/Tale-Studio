@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Download, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { loadShotsResult } from '@/lib/shots-cache'
 
 import {
   DropdownMenu,
@@ -258,10 +259,7 @@ export async function estimateWholeProjectFileCounts(projectId: string): Promise
         .from('locations')
         .select('wide_shot,establishing_shot')
         .eq('project_id', projectId),
-      supabase
-        .from('shots')
-        .select('shot_id,storyboard_image,video_url')
-        .eq('project_id', projectId),
+      loadShotsResult(projectId),
       supabase
         .from('video_clips')
         .select('id,shot_id,url,status,is_final,take_number,created_at,deleted_at')

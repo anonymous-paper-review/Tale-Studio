@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { collectArtistArtifacts, type ArtistData } from '@/lib/export/artist'
-import { DIRECTOR_SCENES_SELECT, DIRECTOR_SHOTS_SELECT, collectDirectorArtifacts, type DirectorExportData } from '@/lib/export/director'
+import { DIRECTOR_SCENES_SELECT, collectDirectorArtifacts, type DirectorExportData } from '@/lib/export/director'
 import type { ArtifactFile } from '@/lib/export/types'
 
 describe('G003 artist collector red-team coverage', () => {
@@ -159,9 +159,8 @@ describe('G003 director loader/collector contract guard', () => {
     expect(selectColumns(DIRECTOR_SCENES_SELECT)).toEqual(
       expect.arrayContaining(['narrative_summary', 'narrative_summary_native', 'mood', 'mood_native']),
     )
-    expect(selectColumns(DIRECTOR_SHOTS_SELECT)).toEqual(
-      expect.arrayContaining(['action_description', 'action_description_native']),
-    )
+    // shots 는 공유 사물함(@/lib/shots-cache)이 전체 행(select *)을 준다 — 부분 select
+    //   상수가 사라졌고, native 열 포함은 전체 행이라 구조적으로 충족된다(ShotRow 타입이 보증).
   })
 })
 

@@ -66,6 +66,7 @@ import {
   sceneShotMentionRef,
 } from '@/lib/card-mention'
 import { writerSceneShotMentions } from '@/lib/script-lines'
+import { invalidateShots } from '@/lib/shots-cache'
 
 type PanelJob = { status: 'generating' | 'failed'; error?: string }
 
@@ -246,9 +247,12 @@ export function RoughStoryboardView() {
   useEffect(() => {
     if (status?.pipeline_completed && !reloadedAfterCompleteRef.current) {
       reloadedAfterCompleteRef.current = true
+      // 파이프라인이 방금 shots 를 채웠다 — 사물함(30초 신선)을 낡음으로 표시해야
+      //   loadProject 가 캐시가 아니라 새 행을 받는다.
+      if (projectId) void invalidateShots(projectId)
       void loadProject()
     }
-  }, [status?.pipeline_completed, loadProject])
+  }, [status?.pipeline_completed, loadProject, projectId])
 
   const generate = useCallback(
     async (

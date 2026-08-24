@@ -2,6 +2,38 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const dbMocks = vi.hoisted(() => ({ createClient: vi.fn() }))
 vi.mock('@/lib/supabase/client', () => ({ createClient: dbMocks.createClient }))
+
+// shots 읽기는 이제 공유 사물함(@/lib/shots-cache)을 지난다. 이 시험은 하이드레이션
+// 경합의 각본(응답 시점 제어)이 핵심이라, 사물함을 얇은 다리로 바꿔 각 로드가 방금
+// 각본한 supabase client 를 그대로 타게 한다 — 시점 제어가 옛 다리 그대로 보존된다.
+// (사물함 자체의 합침·신선·무효화는 tests/shots-cache.test.ts 가 잠근다.)
+vi.mock('@/lib/shots-cache', () => ({
+  invalidateShots: () => Promise.resolve(),
+  loadShotsResult: (projectId: string) => {
+    const client = dbMocks.createClient.mock.results.at(-1)?.value as {
+      from: (t: string) => {
+        select: (c: string) => {
+          eq: (k: string, v: string) => unknown
+          order?: (c: string) => unknown
+        }
+      }
+    }
+    const chain = client.from('shots').select('*') as {
+      eq: (k: string, v: string) => { order?: (c: string) => unknown }
+      order?: (c: string) => unknown
+    }
+    const eq = chain.eq('project_id', projectId)
+    const final = typeof eq?.order === 'function' ? eq.order('sort_order') : eq
+    return Promise.resolve(final).then(
+      (r) => r as { data: unknown[] | null; error: { message: string } | null },
+      (e) => ({
+        data: null,
+        error: { message: String((e as { message?: string })?.message ?? e) },
+      }),
+    )
+  },
+}))
+
 import {
   selectLatestAttempt,
   selectNewestSuccessfulTake,

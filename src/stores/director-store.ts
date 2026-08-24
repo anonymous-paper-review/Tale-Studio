@@ -44,6 +44,7 @@ import {
   type RegisteredCharacter,
 } from '@/stores/asset-storage-store'
 import { createClient } from '@/lib/supabase/client'
+import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { runVideoAdherence } from '@/lib/director/video-adherence-client'
 import { isDemoSession } from '@/lib/demo/context'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
@@ -433,6 +434,7 @@ function debouncedShotSaveToDb(
           })
           .eq('project_id', projectId)
           .eq('shot_id', writerShotId)
+        void invalidateShots(projectId) // 사물함 표시 — writer/editor 의 다음 읽기가 새로 받게
       } catch (err) {
         console.error('[director-store] shot DB save failed:', err)
       }
@@ -481,6 +483,7 @@ function debouncedPositionSaveToDb(
             .update({ canvas_position: pos })
             .eq('project_id', projectId)
             .eq('shot_id', node.data.writerShotId)
+          void invalidateShots(projectId)
         } else if (isVideoData(node.data)) {
           if (!node.data.videoClipId) return
           const response = await fetch(
@@ -1193,10 +1196,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               .from('scenes')
               .select('scene_id, canvas_position')
               .eq('project_id', projectId),
-            supabase
-              .from('shots')
-              .select('shot_id, canvas_position, storyboard_image')
-              .eq('project_id', projectId),
+            loadShotsResult(projectId),
             fetch(`/api/director/video-takes?projectId=${encodeURIComponent(projectId)}`).then(
               async (response) => {
                 if (!response.ok) throw new Error(`video takes HTTP ${response.status}`)
@@ -1695,6 +1695,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               .eq('project_id', projectId)
               .in('shot_id', shotIdsToDelete)
             if (error) throw error
+            void invalidateShots(projectId)
           }
           if (projectId && sceneIdsToDelete.length > 0) {
             const { error } = await supabase

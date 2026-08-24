@@ -3,6 +3,7 @@ import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource } from 
 import { toast } from 'sonner'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
+import { loadShotsResult } from '@/lib/shots-cache'
 import {
   selectHandoffTake,
   selectLatestAttempt,
@@ -669,11 +670,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       try {
         const supabase = createClient()
         const [{ data: dbShots, error: shotsError }, { data: dbClips, error: clipsError }] = await Promise.all([
-          supabase
-            .from('shots')
-            .select('*')
-            .eq('project_id', projectId)
-            .order('sort_order'),
+          loadShotsResult(projectId),
           supabase
             .from('video_clips')
             .select('id, shot_id, url, status, is_final, take_number, created_at, deleted_at, thumbnail_url, last_attempt_status, last_attempt_at')
@@ -709,14 +706,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           const shots: Shot[] = dbShots.map((s) => ({
             shotId: s.shot_id,
             sceneId: s.scene_id,
-            shotType: s.shot_type,
+            shotType: s.shot_type as Shot['shotType'],
             actionDescription: s.action_description ?? '',
             characters: s.characters ?? [],
             durationSeconds: s.duration_seconds ?? 5,
-            generationMethod: s.generation_method ?? 'T2V',
-            dialogueLines: (s.dialogue_lines as DialogueLine[]) ?? [],
-            camera: { ...DEFAULT_CAMERA, ...(s.camera_config ?? {}) },
-            lighting: { ...DEFAULT_LIGHTING, ...(s.lighting_config ?? {}) },
+            generationMethod: (s.generation_method ?? 'T2V') as Shot['generationMethod'],
+            dialogueLines: (s.dialogue_lines ?? []) as unknown as DialogueLine[],
+            camera: { ...DEFAULT_CAMERA, ...((s.camera_config ?? {}) as object) },
+            lighting: { ...DEFAULT_LIGHTING, ...((s.lighting_config ?? {}) as object) },
             referenceImageUrl: s.reference_image ?? null,
           }))
 
