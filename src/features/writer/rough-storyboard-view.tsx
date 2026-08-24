@@ -689,7 +689,7 @@ export function RoughStoryboardView() {
         <WriterHeader description={headerDescription} />
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
           <Loader2 className="size-6 animate-spin text-muted-foreground" aria-busy="true" />
-          <p className="text-base font-medium">{friendlyStageLabel(status?.current_stage)}</p>
+          <p className="text-base font-medium">{friendlyStageLabel(status?.current_stage, locale)}</p>
 
           {/* 진행률 바(#c3) — 우측에 % 병기 */}
           <div className="flex w-full max-w-md items-center gap-3">
@@ -712,7 +712,7 @@ export function RoughStoryboardView() {
 
           {/* 남은 예상 시간 — 과거 실행 실측이 있을 때만(#c4, 기록 없으면 비움) */}
           {remainingMs != null ? (
-            <p className="text-sm text-muted-foreground">{formatRemaining(remainingMs)}</p>
+            <p className="text-sm text-muted-foreground">{formatRemaining(remainingMs, locale)}</p>
           ) : null}
           <p className="text-xs text-muted-foreground">
             {t('Complex stages like shot design and validation can take 1-2 minutes.')}

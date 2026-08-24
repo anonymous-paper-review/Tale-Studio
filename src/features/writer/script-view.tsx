@@ -19,7 +19,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useWriterUiStore } from '@/stores/writer-ui-store'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
 
 // 라벨 없는 헤딩 텍스트 컬럼과 정렬시키는 들여쓰기 (px-6 + w-16 라벨열 + gap-4).
 const TEXT_INDENT = 'pl-[6.5rem] pr-6'
@@ -187,6 +187,7 @@ function ShotSection({
 
 export function ScriptView() {
   const t = useT()
+  const locale = useLocale() // 단계 문구 UI 언어 (#c-locale)
   const projectId = useProjectStore((state) => state.projectId)
   const sceneManifest = useWriterStore((state) => state.sceneManifest)
   const shots = useWriterStore((state) => state.shots)
@@ -323,7 +324,7 @@ export function ScriptView() {
           {running ? (
             <>
               <Loader2 className="size-6 animate-spin text-muted-foreground" aria-busy="true" />
-              <p className="text-base font-medium">{friendlyStageLabel(status?.current_stage)}</p>
+              <p className="text-base font-medium">{friendlyStageLabel(status?.current_stage, locale)}</p>
               {/* 진행률 바(#c3) — 러프 보드 진행 화면과 동일 스타일 */}
               <div className="flex w-full max-w-md items-center gap-3">
                 <div

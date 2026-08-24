@@ -13,7 +13,7 @@ import { WriterCharacterPanel } from '@/features/writer/writer-character-panel'
 import type { WriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
 
 // status 는 상위(WriterWorkspace)가 폴링해 내려준다 — 중복 status 폴링 방지.
 //   debug: admin 디버그 진입(#gen-debug) — 실행 중이 아닌데 강제 렌더된 상태 표시.
@@ -37,6 +37,8 @@ export function WriterGenerationView({
   }, [])
 
   const pct = Math.max(0, Math.min(100, status?.progress_percent ?? 0))
+  // 단계 문구·ETA 는 UI 언어 (#c-locale — locale 미지정 시 ko 폴백이라 en UI 에서 한국어가 샜다)
+  const locale = useLocale()
   const startedAtMs = status?.timings?.pipeline_started_at
     ? Date.parse(status.timings.pipeline_started_at)
     : null
@@ -44,7 +46,7 @@ export function WriterGenerationView({
   const etaTotalMs = status?.eta_total_ms ?? null
   const remainingMs =
     etaTotalMs != null && elapsedMs != null ? etaTotalMs - elapsedMs : null
-  const phrase = friendlyStageLabel(status?.current_stage)
+  const phrase = friendlyStageLabel(status?.current_stage, locale)
   // #s3-gate: storyCheck 후 씬 확정 대기 — 진행 바 대신 게이트 패널.
   const awaiting = status?.current_status === 'awaiting_confirmation'
 
@@ -134,7 +136,7 @@ export function WriterGenerationView({
           </div>
           {remainingMs != null ? (
             <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
-              {formatRemaining(remainingMs)}
+              {formatRemaining(remainingMs, locale)}
             </span>
           ) : null}
         </div>
