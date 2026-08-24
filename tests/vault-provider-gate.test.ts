@@ -226,6 +226,24 @@ sys.exit(1 if n > 1 else 0)
       '--actor', 'jh']).status).toBe(1)
   })
 
+  it('계약 개정 후 완료된 옛 state는 없는 것으로 보아 새 실행을 막지 않는다 (밤 사망 방지)', () => {
+    const ctx = setup(); const snapshot = bind(ctx); artifacts(ctx, snapshot)
+    expect(run(ctx.project, completeArgs(ctx, snapshot)).status).toBe(0) // status=success (terminal)
+    writeFileSync(ctx.contract, 'contract v2 (개정)\n') // 계약 해시가 바뀐다
+    const r = run(ctx.project, ['state', 'sweep', '--state-dir', ctx.state, '--contract-path', ctx.contract, '--actor', 'jh'])
+    expect(r.status).toBe(1)
+    expect(r.stderr).toContain('provider 상태가 없다') // launcher가 정상 분기로 새 시작
+    expect(r.stderr).not.toContain('현재 계약과 다르다')
+  })
+
+  it('계약 개정 후에도 아직 살아있는 옛 state는 막아 사람 개입을 요구한다', () => {
+    const ctx = setup() // status=claimed (활성)
+    writeFileSync(ctx.contract, 'contract v2 (개정)\n')
+    const r = run(ctx.project, ['state', 'sweep', '--state-dir', ctx.state, '--contract-path', ctx.contract, '--actor', 'jh'])
+    expect(r.status).toBe(1)
+    expect(r.stderr).toContain('현재 계약과 다르다')
+  })
+
   it('report 없는 success manifest를 거부한다', () => {
     const ctx = setup(); const snapshot = bind(ctx); artifacts(ctx, snapshot)
     const manifest = join(ctx.project, 'runs/jh/run-1/manifest.json')

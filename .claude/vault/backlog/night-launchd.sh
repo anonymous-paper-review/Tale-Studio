@@ -26,6 +26,12 @@ REVIEW_SERVER="$SCRIPT_DIR/night-review-server.py"
 MODE="${1:-run}"
 
 ACTOR="${NIGHT_ACTOR_ID:-jh}"
+
+# 실제 밤 실행이 쓸 provider-state 위치. run-night 래퍼가 지정하면 그 값, 아니면 이 기본값.
+# run·dry-run이 같은 경로를 참조해 dry-run이 실제 상태를 검사할 수 있게 한다.
+: "${ORCA_PROVIDER_GATE_STATE_DIR:=$HOME/Library/Logs/tale-studio-night/provider-state}"
+export ORCA_PROVIDER_GATE_STATE_DIR
+REAL_STATE_DIR="$ORCA_PROVIDER_GATE_STATE_DIR"
 REVIEW_PORT="${NIGHT_REVIEW_PORT:-8377}"
 TICKET_LEASE_SECONDS=1800
 TICKET_HEARTBEAT_SECONDS=300
@@ -555,6 +561,18 @@ assert s["actionable_snapshot_fingerprint"] == os.environ["SNAPSHOT_FINGERPRINT"
 dry-run)
   sh "$SCRIPT_DIR/preflight.sh"
   require_inboxes
+  # [state-check] dry-run이 '실제' provider-state를 읽어, 계약 개정 뒤 다음 밤이 막힐지 미리 본다.
+  # (아래 파이프라인 시뮬레이션은 임시 폴더로 격리되지만, 이 검사만은 실제 상태를 본다.)
+  echo "[state-check] 실제 provider-state: $REAL_STATE_DIR"
+  real_state="$(python3 "$GATE" state sweep --contract-path "$CONTRACT" --actor "$ACTOR" --project-root "$PROJECT_ROOT" 2>&1 || true)"
+  case "$real_state" in
+    *"provider 상태가 없다"*)
+      echo "[state-check] OK — 깨끗하거나 옛 계약 완료분은 자동 무시된다(다음 밤이 새로 시작)" ;;
+    *"contract_hash가 현재 계약과 다르다"*)
+      echo "[state-check] ⚠ 실제 state에 '진행 중' 옛 계약 잔재 — 다음 실제 밤이 막힌다. 사람 개입 필요" >&2 ;;
+    *)
+      echo "[state-check] 실제 state에 활성/정상 claim 존재" ;;
+  esac
   TMP="$(mktemp -d /tmp/night-dryrun.XXXXXX)"
   trap 'rm -rf "$TMP"' EXIT
   PROVIDER_STATE_ROOT="$TMP/gate"

@@ -388,6 +388,12 @@ def show_state(args):
         check_state_location(state, state_file)
         check_project_root(state, args)
         if state["contract_hash"] != requested_contract_hash(args):
+            # 계약이 개정되면 예전 계약의 완료된(terminal) state는 잔재다. 없는 것으로
+            # 보아 새 실행이 새 claim을 만들게 한다 — 계약을 개정해도 밤이 죽지 않는다.
+            # 아직 살아있는(claimed/running/committing) state는 이중 실행·작업 유실 위험이
+            # 있으므로 막아 사람 개입을 요구한다.
+            if state["status"] in {"success", "failed", "timeout", "reported", "expired", "closed"}:
+                raise RuntimeError("provider 상태가 없다")
             raise RuntimeError("상태의 contract_hash가 현재 계약과 다르다")
         emit(state_view(state, state_file))
         return 0
