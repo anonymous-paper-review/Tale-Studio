@@ -879,7 +879,11 @@ async function finalizeStoryboardStripJob(
 
   const seg = storageKeySegment(writerShotId)
   const base = `${workspaceId}/${job.project_id}/shots`
-  const stripUrl = await upload(`${base}/${seg}_storyboard_strip.png`, stripBuf)
+  // #no-originals(2026-08-24 오너): 시트/스트립 원본은 저장하지 않는다 — 파싱(하이브리드 크롭)은
+  //   이 버퍼에서 1회 실행되고 저장본을 다시 읽는 경로가 없으며, 소비처(표시·영상 ref·재생성
+  //   ref 합성) 전부 크롭 프레임만 쓴다(DB 실측: url/frames 가 원본을 가리키는 행 0). 원본이
+  //   버킷의 ~42%(1.2GB) 를 차지했다. 디버그용 원본은 response_snapshot 의 fal CDN URL 로
+  //   ~60일간 조회 가능.
 
   // #real-strip-guard: 모델이 시트 계약을 어기고 단일컷을 반환하면(실측: 액자 테두리 단일컷)
   //   고정 크롭이 액자째 3분할하던 침묵 실패 대신 — 테두리 인셋 크롭한 단일컷을 3프레임에 복제.
@@ -928,7 +932,6 @@ async function finalizeStoryboardStripJob(
       storyboard_image: {
         url: startUrl, // 하위 호환 대표 프레임 (Node 뷰 등 구 소비처는 url 만 읽음)
         frames: { start: startUrl, direction: directionUrl, end: endUrl },
-        stripUrl,
         status: 'completed',
         errorMessage: null,
         generatedAt: Date.now(),
@@ -1024,7 +1027,10 @@ async function finalizeRealGridJob(
   }
 
   const base = `${workspaceId}/${job.project_id}/shots`
-  const gridUrl = await upload(`${base}/real_grid_${job.id}.png`, gridBuf)
+  // #no-originals(2026-08-24 오너): 그리드 원본은 저장하지 않는다 — 크롭은 버퍼에서 1회,
+  //   저장본을 다시 읽는 경로·소비처 없음(근거는 strip 경로의 같은 태그 주석).
+  //   잡 result_url 은 첫 샷 start 프레임(대표) — 소비처 3곳 모두 값 내용 비의존 실측
+  //   (director 재수화 / CAS 내부 비교 / rough 뷰는 의도적 미사용).
 
   const perShot = await cropRoughGridFrames(
     gridBuf,
@@ -1032,6 +1038,7 @@ async function finalizeRealGridJob(
     writerShotIds.length,
     sheetFormatOfJob(job),
   )
+  let representativeUrl = ''
   for (let i = 0; i < writerShotIds.length; i++) {
     const shotId = writerShotIds[i]
     const seg = storageKeySegment(shotId)
@@ -1045,6 +1052,7 @@ async function finalizeRealGridJob(
       upload(directionPath, frames.direction),
       upload(endPath, frames.end),
     ])
+    if (!representativeUrl) representativeUrl = startUrl
     await Promise.all([
       uploadThumbnail(startPath, frames.start),
       uploadThumbnail(directionPath, frames.direction),
@@ -1057,7 +1065,6 @@ async function finalizeRealGridJob(
         storyboard_image: {
           url: startUrl, // 하위 호환 대표 프레임 (Node 뷰 등 구 소비처는 url 만 읽음) [#real-grid-final]
           frames: { start: startUrl, direction: directionUrl, end: endUrl },
-          stripUrl: gridUrl,
           status: 'completed',
           errorMessage: null,
           generatedAt: Date.now(),
@@ -1068,15 +1075,16 @@ async function finalizeRealGridJob(
     if (error) throw error
   }
 
-  await completeGenerationJob(job.id, gridUrl)
+  await completeGenerationJob(job.id, representativeUrl)
   await cleanupRefSheet(job) // #ref-sheet-ttl — 일회용 합성 레퍼런스 회수(성공 후, 무해 실패)
-  return gridUrl
+  return representativeUrl
 }
 
 /**
  * 러프 그리드(#rough-grid 2026-07-22) 영속화 — 잡 1개 = 그리드 1장 = 샷 최대 4개.
- *   그리드 원본 업로드 → 셀 크롭(cropRoughGridFrames) → 샷별 3프레임 업로드 →
- *   shots.rough_storyboard 를 3프레임 shape(frames+gridUrl, url=start 하위호환)로 갱신.
+ *   셀 크롭(cropRoughGridFrames) → 샷별 3프레임 업로드 →
+ *   shots.rough_storyboard 를 3프레임 shape(url=start 하위호환)로 갱신.
+ *   그리드 원본은 저장하지 않는다(#no-originals — strip 경로의 같은 태그 주석 참조).
  */
 async function finalizeRoughGridJob(
   job: GenerationJob,
@@ -1104,7 +1112,6 @@ async function finalizeRoughGridJob(
   }
 
   const base = `${workspaceId}/${job.project_id}/shots`
-  const gridUrl = await upload(`${base}/rough_grid_${job.id}.png`, gridBuf)
 
   const perShot = await cropRoughGridFrames(
     gridBuf,
@@ -1112,6 +1119,7 @@ async function finalizeRoughGridJob(
     writerShotIds.length,
     sheetFormatOfJob(job),
   )
+  let representativeUrl = ''
   for (let i = 0; i < writerShotIds.length; i++) {
     const shotId = writerShotIds[i]
     const seg = storageKeySegment(shotId)
@@ -1125,6 +1133,7 @@ async function finalizeRoughGridJob(
       upload(directionPath, frames.direction),
       upload(endPath, frames.end),
     ])
+    if (!representativeUrl) representativeUrl = startUrl
     await Promise.all([
       uploadThumbnail(startPath, frames.start),
       uploadThumbnail(directionPath, frames.direction),
@@ -1137,7 +1146,6 @@ async function finalizeRoughGridJob(
         rough_storyboard: {
           url: startUrl, // 하위 호환 대표 프레임 (구 소비처는 url 만 읽음)
           frames: { start: startUrl, direction: directionUrl, end: endUrl },
-          gridUrl,
           status: 'completed',
           errorMessage: null,
           generatedAt: Date.now(),
@@ -1148,8 +1156,8 @@ async function finalizeRoughGridJob(
     if (error) throw error
   }
 
-  await completeGenerationJob(job.id, gridUrl)
-  return gridUrl
+  await completeGenerationJob(job.id, representativeUrl)
+  return representativeUrl
 }
 
 /** 러프 스토리보드 패널(writer 탭, mannequin previz) 영속화 → shots.rough_storyboard(JSONB) 갱신. */
