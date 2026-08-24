@@ -18,7 +18,7 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore } from '@/stores/artist-store'
@@ -107,6 +107,8 @@ const WORK_COVERS: Record<string, GenerationJobKind[]> = {
 
 function UnifiedPin({ projectId, stage }: { projectId: string; stage: StageId }) {
   const { status } = useWriterStatus(projectId)
+  // 알림바 문구는 UI 크롬 — 파이프라인 라벨·ETA 를 UI 언어로 (#c-locale, ko 폴백 방치 수리)
+  const locale = useLocale()
   const shots = useWriterStore((s) => s.shots)
   const imagesReady = useProjectStore((s) => s.artistImagesReady)
   const stalled = useProjectStore((s) => s.artistImagesStalled)
@@ -129,13 +131,13 @@ function UnifiedPin({ projectId, stage }: { projectId: string; stage: StageId })
     const total = status.total_units ?? 0
     works.push({
       key: 'writer-pipeline',
-      label: friendlyStageLabel(status.current_stage),
+      label: friendlyStageLabel(status.current_stage, locale),
       done: total > 0 ? status.completed_units ?? 0 : undefined,
       total: total > 0 ? total : undefined,
       stage: 'writer',
     })
   }
-  const rough = writerRoughWork(shots, activeShotIds(jobs, ['shot_rough_storyboard']))
+  const rough = writerRoughWork(shots, activeShotIds(jobs, ['shot_rough_storyboard']), locale)
   if (rough) works.push(rough)
 
   // ── artist: 초기 잠금 집계 + in-flight + 큐 바닥 ──
@@ -147,6 +149,7 @@ function UnifiedPin({ projectId, stage }: { projectId: string; stage: StageId })
     progress,
     generatingCount: generatingViews.length + generatingLocations.length,
     activeCount: activeAssets.characters.size + activeAssets.locations.size,
+    locale,
   })
   if (artist) works.push(artist)
 
@@ -154,9 +157,10 @@ function UnifiedPin({ projectId, stage }: { projectId: string; stage: StageId })
   const storyboard = directorShotImageWork(
     nodes,
     activeShotIds(jobs, ['shot_storyboard', 'storyboard_real_grid']),
+    locale,
   )
   if (storyboard) works.push(storyboard)
-  const video = directorVideoWork(nodes, countKind(jobs, 'shot_video'))
+  const video = directorVideoWork(nodes, countKind(jobs, 'shot_video'), locale)
   if (video) works.push(video)
 
   // ── 화면 상태가 못 받친 나머지는 큐만으로 세운다 (다른 탭이라 스토어가 빈 경우 포함) ──
@@ -173,7 +177,7 @@ function UnifiedPin({ projectId, stage }: { projectId: string; stage: StageId })
   for (const [kind, count] of kindCounts) {
     if (!covered.has(kind) && count > 0) remaining[kind] = count
   }
-  works.push(...queueWorks(remaining))
+  works.push(...queueWorks(remaining, locale))
 
   // 남은 예상 시간 — 과거 완료 run 실측이 있을 때만(#c4). rough-storyboard-view 와 동일 산식.
   //   렌더 순수성(react-hooks/purity) 때문에 벽시계는 1s 틱 상태로.
@@ -186,7 +190,7 @@ function UnifiedPin({ projectId, stage }: { projectId: string; stage: StageId })
   let footer: string | null = null
   if (running && nowMs > 0 && status?.eta_total_ms != null && status.timings?.pipeline_started_at) {
     const elapsed = nowMs - Date.parse(status.timings.pipeline_started_at)
-    if (!Number.isNaN(elapsed)) footer = formatRemaining(status.eta_total_ms - elapsed)
+    if (!Number.isNaN(elapsed)) footer = formatRemaining(status.eta_total_ms - elapsed, locale)
   }
 
   if (works.length === 0) return null

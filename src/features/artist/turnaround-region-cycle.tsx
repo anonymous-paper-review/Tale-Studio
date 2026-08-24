@@ -80,6 +80,9 @@ export function TurnaroundRegionCycle({ url, alt }: { url: string; alt: string }
     if (!el) return
     const onWheel = (e: WheelEvent) => {
       if (!hoveringRef.current) return
+      // 트랙패드 핀치는 ctrl+wheel 로 온다(#d1 오너 피드백 2026-08-24) — 브라우저 확대에 양보하고
+      //   확대경 배율은 건드리지 않는다. 두 배율이 동시에 움직이면 조작감이 무너진다.
+      if (e.ctrlKey || e.metaKey) return
       e.preventDefault() // 확대경 위의 휠은 페이지 스크롤이 아니라 배율 조절
       setZoom((z) =>
         Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z * (e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP))),
