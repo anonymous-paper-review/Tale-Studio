@@ -1,4 +1,4 @@
-<title>샷 사물함 통합</title>
+<title>샷 캐시 통합</title>
 <style>
   :root {
     --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
@@ -105,29 +105,11 @@
 <div class="wrap">
 
 <header class="page">
-  <p class="eyebrow">화면 데이터 사물함 전환 · 본체 · 2026-08-24</p>
-  <h1>샷 데이터를 여섯 곳이 각자 들던 것을, 사물함 한 칸으로 합쳤습니다</h1>
+  <p class="eyebrow">서버 데이터 캐시 전환 · 본체 · 2026-08-24</p>
+  <h1>샷 데이터를 여섯 곳이 각자 들던 것을, 캐시 한 칸으로 합쳤습니다</h1>
   <p class="standfirst">작가·감독·편집자 화면과 내보내기가 같은 프로젝트의 샷 목록을 <b>각자 서버에서 받아 각자 들고</b> 있었습니다. 화면을 오갈 때마다 같은 데이터를 다시 받았고, 한 화면의 편집을 다른 화면이 모르는 "사본 갈림"이 여기서 났습니다. 이번 작업으로 여섯 읽기가 한 칸을 공유합니다.</p>
-  <p class="asof">결론 먼저 — <b>여섯 읽기 전부 전환, 코드 시험 1,484건 전부 통과.</b> 덤으로 타입 장부가 실제 데이터베이스보다 8열 낡아 있던 것을 발견했습니다. 실제 브라우저 검증은 이번에 안 돌렸습니다(5절).</p>
+  <p class="asof">결론 먼저 — <b>여섯 읽기 전부 전환, 코드 시험 1,484건 전부 통과.</b> 덤으로 생성 타입 파일(database.ts)이 실제 데이터베이스보다 8열 낡아 있던 것을 발견했습니다. 실제 브라우저 검증은 이번에 안 돌렸습니다(5절).</p>
 </header>
-
-<!-- ═══ 0 ═══ -->
-<section>
-  <div class="sec-head"><span class="sec-num">0</span><h2>이 문서의 말 규칙</h2></div>
-  <div class="tbl">
-    <table>
-      <thead><tr><th style="width:40%">이 문서의 말</th><th>원래 용어 <span class="code-note">(추적용)</span></th></tr></thead>
-      <tbody>
-        <tr><td><b>사물함</b> — 받아온 데이터를 프로젝트 번호표로 담아두는 칸. 같은 번호면 같은 칸</td><td class="code-note">TanStack Query cache / ['shots', projectId]</td></tr>
-        <tr><td><b>신선 기간</b> — 이 시간(30초) 안에는 칸의 내용을 진실로 믿고 서버에 다시 묻지 않는다</td><td class="code-note">staleTime</td></tr>
-        <tr><td><b>낡음 표시</b> — "이 칸 못 믿겠다" 도장. 다음 읽기가 무조건 새로 받는다</td><td class="code-note">invalidateQueries</td></tr>
-        <tr><td><b>다리</b> — 옛 코드의 오류 처리 분기를 안 바꾸고 데이터 출처만 사물함으로 바꾸는 어댑터</td><td class="code-note">loadShotsResult ({data, error} 모양 보존)</td></tr>
-        <tr><td><b>타입 장부</b> — 데이터베이스 구조를 코드에 옮겨 적은 자동 생성 문서</td><td class="code-note">src/types/database.ts</td></tr>
-        <tr><td><b>각본 시험</b> — 서버 응답의 도착 순서를 손으로 조종하며 경합을 재현하는 시험</td><td class="code-note">deferred-promise race tests</td></tr>
-      </tbody>
-    </table>
-  </div>
-</section>
 
 <!-- ═══ 1 ═══ -->
 <section>
@@ -137,14 +119,14 @@
     <table>
       <thead><tr><th>분류</th><th>몇 곳</th><th>이번 작업에서</th></tr></thead>
       <tbody>
-        <tr><td><b>브라우저 읽기</b> — 화면이 목록을 받아오는 곳</td><td><b>6</b></td><td><b>전부 사물함으로</b> (작가·감독·편집자 화면 + 내보내기 3곳)</td></tr>
-        <tr><td>브라우저 쓰기 — 화면에서 고치는 곳</td><td>9</td><td>그대로 두고, 성공 지점에 <b>낡음 표시 한 줄</b>씩</td></tr>
-        <tr><td>서버 읽기·쓰기 — 생성 완료 처리·파이프라인</td><td>20</td><td>손대지 않음 — 사물함은 브라우저 메모리 층이라 무관</td></tr>
+        <tr><td><b>브라우저 읽기</b> — 화면이 목록을 받아오는 곳</td><td><b>6</b></td><td><b>전부 캐시로</b> (작가·감독·편집자 화면 + 내보내기 3곳)</td></tr>
+        <tr><td>브라우저 쓰기 — 화면에서 고치는 곳</td><td>9</td><td>그대로 두고, 성공 지점에 <b>무효화(invalidate) 한 줄</b>씩</td></tr>
+        <tr><td>서버 읽기·쓰기 — 생성 완료 처리·파이프라인</td><td>20</td><td>손대지 않음 — 캐시는 브라우저 메모리 층이라 무관</td></tr>
       </tbody>
     </table>
   </div>
   <figure>
-    <svg viewBox="0 0 760 260" role="img" aria-label="전: 작가·감독·편집자 화면이 각자 서버에 샷을 요청해 각자 사본을 든다. 후: 세 화면이 사물함 한 칸을 읽고, 칸 하나만 서버와 통신한다. 쓰기는 성공 시 칸에 낡음 표시를 남긴다.">
+    <svg viewBox="0 0 760 260" role="img" aria-label="전: 작가·감독·편집자 화면이 각자 서버에 샷을 요청해 각자 사본을 든다. 후: 세 화면이 캐시 한 칸을 읽고, 칸 하나만 서버와 통신한다. 쓰기는 성공 시 칸을 무효화한다.">
       <g fill="none" stroke="currentColor" stroke-width="1.3" font-family="ui-monospace,Menlo,monospace" font-size="12">
         <defs>
           <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
@@ -171,7 +153,7 @@
         <rect x="400" y="90" width="90" height="34" rx="6"/><text x="445" y="111" text-anchor="middle" fill="currentColor" stroke="none">감독</text>
         <rect x="400" y="140" width="90" height="34" rx="6"/><text x="445" y="161" text-anchor="middle" fill="currentColor" stroke="none">편집자</text>
         <rect x="540" y="83" width="104" height="50" rx="8" stroke-width="2" stroke="var(--accent)"/>
-        <text x="592" y="104" text-anchor="middle" fill="var(--accent)" stroke="none" font-weight="700">사물함</text>
+        <text x="592" y="104" text-anchor="middle" fill="var(--accent)" stroke="none" font-weight="700">캐시</text>
         <text x="592" y="121" text-anchor="middle" fill="var(--accent)" stroke="none" font-size="10">30초 신선</text>
         <rect x="672" y="88" width="70" height="40" rx="6"/><text x="707" y="112" text-anchor="middle" fill="currentColor" stroke="none">서버</text>
         <line x1="490" y1="57" x2="536" y2="95" marker-end="url(#arr)"/>
@@ -180,7 +162,7 @@
         <line x1="644" y1="108" x2="668" y2="108" marker-end="url(#arr)"/>
         <text x="656" y="98" text-anchor="middle" fill="currentColor" stroke="none" font-size="10.5">필요할 때만</text>
         <text x="516" y="200" text-anchor="middle" fill="currentColor" stroke="none" font-size="10.5">쓰기 9곳 · 생성 완료 →</text>
-        <text x="516" y="215" text-anchor="middle" fill="currentColor" stroke="none" font-size="10.5">칸에 "낡음 표시" 한 줄</text>
+        <text x="516" y="215" text-anchor="middle" fill="currentColor" stroke="none" font-size="10.5">칸 무효화 한 줄</text>
         <line x1="516" y1="184" x2="570" y2="138" marker-end="url(#arr)" stroke-dasharray="3 4"/>
       </g>
     </svg>
@@ -195,12 +177,12 @@
     <table>
       <thead><tr><th>#</th><th>조건</th><th style="width:14%">판정</th></tr></thead>
       <tbody>
-        <tr><td>a</td><td>브라우저 읽기 6곳 전부가 사물함을 지난다 — 직접 요청 잔존 0</td><td><span class="chip c-pass">통과</span></td></tr>
+        <tr><td>a</td><td>브라우저 읽기 6곳 전부가 캐시를 지난다 — 직접 요청 잔존 0</td><td><span class="chip c-pass">통과</span></td></tr>
         <tr><td>b</td><td>동시 호출 둘이 서버 요청 한 번으로 합쳐진다</td><td><span class="chip c-pass">통과</span></td></tr>
         <tr><td>c</td><td>신선 기간 안의 재호출은 네트워크 0건</td><td><span class="chip c-pass">통과</span></td></tr>
-        <tr><td>d</td><td>낡음 표시 뒤의 읽기는 신선 기간과 무관하게 새로 받는다</td><td><span class="chip c-pass">통과</span></td></tr>
-        <tr><td>e</td><td>옛 오류 처리 분기가 하나도 안 바뀐다 (다리가 모양 보존)</td><td><span class="chip c-pass">통과</span></td></tr>
-        <tr><td>f</td><td>기존 각본 시험(경합·계약)이 의미를 잃지 않고 전부 통과</td><td><span class="chip c-pass">통과</span></td></tr>
+        <tr><td>d</td><td>무효화 뒤의 읽기는 신선 기간과 무관하게 새로 받는다</td><td><span class="chip c-pass">통과</span></td></tr>
+        <tr><td>e</td><td>옛 오류 처리 분기가 하나도 안 바뀐다 (어댑터가 모양 보존)</td><td><span class="chip c-pass">통과</span></td></tr>
+        <tr><td>f</td><td>기존 경합·계약 시험이 의미를 잃지 않고 전부 통과</td><td><span class="chip c-pass">통과</span></td></tr>
         <tr><td>g</td><td>타입 검사 0 · 코드 시험 전체 통과 · 배포 빌드 통과</td><td><span class="chip c-pass">통과</span></td></tr>
       </tbody>
     </table>
@@ -214,17 +196,17 @@
 
   <div class="card fail">
     <div class="card-head"><h3>실수 ① — 일괄 수정 도구가 중간에 죽어 4파일이 빠졌는데, 검사는 통과였다</h3><span class="chip c-fail">자체 발견</span></div>
-    <p>여섯 다리를 한 번에 바꾸는 수정 도구가 중간 파일에서 멈췄는데, 이미 바뀐 파일들만으로도 타입 검사가 통과라 <b>빠진 4파일을 모르고 지나갈 뻔</b>했습니다. 코드 검사 도구가 "가져왔는데 안 쓰는 부품"을 경고해 준 것을 따라가 발견했고, 잔존 직접 요청을 다시 세어(<span class="code-note">grep from('shots')</span>) 0이 될 때까지 마저 바꿨습니다. 교훈: 일괄 수정 뒤에는 <b>남은 개수를 반드시 다시 센다.</b></p>
+    <p>여섯 호출부를 한 번에 바꾸는 수정 도구가 중간 파일에서 멈췄는데, 이미 바뀐 파일들만으로도 타입 검사가 통과라 <b>빠진 4파일을 모르고 지나갈 뻔</b>했습니다. 코드 검사 도구가 "가져왔는데 안 쓰는 부품"을 경고해 준 것을 따라가 발견했고, 잔존 직접 요청을 다시 세어(<span class="code-note">grep from('shots')</span>) 0이 될 때까지 마저 바꿨습니다. 교훈: 일괄 수정 뒤에는 <b>남은 개수를 반드시 다시 센다.</b></p>
   </div>
 
   <div class="card fail">
-    <div class="card-head"><h3>실수 ② — 오류를 "[object Object]" 로 바꿔치기하던 다리</h3><span class="chip c-fail">시험이 잡음</span></div>
-    <p>서버 오류는 표준 오류 객체가 아니라 <span class="code-note">{ message }</span> 모양의 일반 객체로 옵니다. 다리의 첫 판이 이를 문자열로 뭉개 "[object Object]" 라는 쓸모없는 메시지를 만들었습니다. 실패 경로 시험이 곧바로 잡았고, 두 모양을 다 받게 고쳤습니다.</p>
+    <div class="card-head"><h3>실수 ② — 오류를 "[object Object]" 로 바꿔치기하던 어댑터</h3><span class="chip c-fail">시험이 잡음</span></div>
+    <p>서버 오류는 표준 오류 객체가 아니라 <span class="code-note">{ message }</span> 모양의 일반 객체로 옵니다. 어댑터의 첫 판이 이를 문자열로 뭉개 "[object Object]" 라는 쓸모없는 메시지를 만들었습니다. 실패 경로 시험이 곧바로 잡았고, 두 모양을 다 받게 고쳤습니다.</p>
   </div>
 
   <div class="card warn">
-    <div class="card-head"><h3>발견 — 타입 장부가 실제 데이터베이스보다 8열 낡아 있었다</h3><span class="chip c-warn">숨어 있던 것</span></div>
-    <p>사물함에 정확한 타입을 붙이자, 화면이 실제로 읽는 열(러프 스토리보드·목각 영상 등 8개)이 <b>타입 장부에 없다</b>는 오류가 쏟아졌습니다. 옛 코드에서는 여러 요청을 한 다발로 받는 과정에서 타입이 "아무거나"로 뭉개져 <b>안 보였을 뿐, 전부터 낡아 있던 장부</b>입니다. 실제 데이터베이스 구조를 대조 실측해서 빠진 8열을 보강해 두었고, 장부 재생성은 별도 작업으로 남겼습니다.</p>
+    <div class="card-head"><h3>발견 — 생성 타입 파일(database.ts)이 실제 데이터베이스보다 8열 낡아 있었다</h3><span class="chip c-warn">숨어 있던 것</span></div>
+    <p>캐시에 정확한 타입을 붙이자, 화면이 실제로 읽는 열(러프 스토리보드·목각 영상 등 8개)이 <b>생성 타입에 없다</b>는 오류가 쏟아졌습니다. 옛 코드에서는 여러 요청을 한 다발로 받는 과정에서 타입이 "아무거나"로 뭉개져 <b>안 보였을 뿐, 전부터 낡아 있던 타입</b>입니다. 실제 데이터베이스 구조를 대조 실측해서 빠진 8열을 보강해 두었고, database.ts 재생성은 별도 작업으로 남겼습니다.</p>
   </div>
 </section>
 
@@ -233,8 +215,8 @@
   <div class="sec-head"><span class="sec-num">4</span><h2>무엇이 좋아지나 — 사용하는 사람 기준</h2></div>
   <ul class="plain">
     <li><b>화면을 오갈 때 같은 데이터를 다시 안 받는다.</b> 작가 → 감독으로 넘어가면, 30초 안이면 감독 화면이 작가가 받아둔 그 데이터를 그대로 쓴다. 167샷짜리 프로젝트 기준 화면 진입 한 번이 552KB였다 — 이제 신선 기간 안 왕복은 0KB다.</li>
-    <li><b>편집이 다른 화면에 전해질 길이 생겼다.</b> 샷을 고치면(쓰기 9곳) 칸에 낡음 표시가 남고, 다른 화면이 다음에 읽을 때 새 데이터를 받는다 — 예전에는 각 화면이 자기 사본을 쥔 채 서로의 변경을 알 방법 자체가 없었다.</li>
-    <li><b>생성 완료가 확실히 반영된다.</b> 파이프라인이 샷을 다 채운 순간, 재로드 전에 낡음 표시를 먼저 남긴다 — "완료됐는데 30초 전 캐시를 보여주는" 함정을 막았다.</li>
+    <li><b>편집이 다른 화면에 전해질 길이 생겼다.</b> 샷을 고치면(쓰기 9곳) 칸에 무효화가 남고, 다른 화면이 다음에 읽을 때 새 데이터를 받는다 — 예전에는 각 화면이 자기 사본을 쥔 채 서로의 변경을 알 방법 자체가 없었다.</li>
+    <li><b>생성 완료가 확실히 반영된다.</b> 파이프라인이 샷을 다 채운 순간, 재로드 전에 무효화를 먼저 남긴다 — "완료됐는데 30초 전 캐시를 보여주는" 함정을 막았다.</li>
     <li><b>타입이 진실에 가까워졌다.</b> 예전엔 "아무거나"로 받던 여섯 곳이 이제 실측 스키마 그대로의 타입을 받는다.</li>
   </ul>
 </section>
@@ -246,19 +228,19 @@
     <div class="yes">
       <h4>이 작업이 증명한 것</h4>
       <ul>
-        <li>여섯 읽기 전부 사물함 경유 — 직접 요청 잔존 0 (재계수)</li>
-        <li>동시 호출 합침·신선 즉답·칸 격리·낡음 표시 재조회 (신규 시험 7건)</li>
-        <li>옛 오류 분기·경합 각본·내보내기 계약 전부 보존 (기존 시험 1,477건)</li>
+        <li>여섯 읽기 전부 캐시 경유 — 직접 요청 잔존 0 (재계수)</li>
+        <li>동시 호출 합침·신선 즉답·칸 격리·무효화 재조회 (신규 시험 7건)</li>
+        <li>옛 오류 분기·경합 시험·내보내기 계약 전부 보존 (기존 시험 1,477건)</li>
         <li>배포 빌드 2회 연속 통과</li>
       </ul>
     </div>
     <div class="no">
       <h4>증명하지 않은 것</h4>
       <ul>
-        <li><b>실제 브라우저 검증은 이번에 안 돌렸다</b> — 코드 시험뿐이다. 이전 회차처럼 시험 계정+자동 조작으로 돌리려면 별도 실행이 필요하다</li>
-        <li>감독 화면의 생성 완료(영상 등)는 화면 내부 갱신에 의존한다 — 그 경로에는 아직 낡음 표시가 없다 (다음 조각)</li>
+        <li><b>실제 브라우저 검증은 이번에 안 돌렸다</b> — 코드 시험뿐이다. 이전 회차처럼 시험 계정 + Playwright으로 돌리려면 별도 실행이 필요하다</li>
+        <li>감독 화면의 생성 완료(영상 등)는 화면 내부 갱신에 의존한다 — 그 경로에는 아직 무효화가 없다 (다음 조각)</li>
         <li>30초 신선 기간이 체감상 맞는지 — 써 봐야 안다</li>
-        <li>타입 장부 재생성은 하지 않았다 — 8열 보강은 임시 보정이다</li>
+        <li>database.ts 재생성은 하지 않았다 — 8열 보강은 임시 보정이다</li>
       </ul>
     </div>
   </div>
@@ -268,9 +250,9 @@
 <section>
   <div class="sec-head"><span class="sec-num">6</span><h2>믿으려면 뭐가 더 필요한가</h2></div>
   <ul class="plain">
-    <li><b>실기기 확인 (10분, 0원)</b> — 작가 화면에서 샷 설명을 고치고 감독 화면으로 넘어가 30초 뒤 반영되는지. 시험 계정 + 브라우저 자동 조작으로 재현 가능(이전 성적표와 같은 방식).</li>
-    <li><b>감독 생성 완료 경로에 낡음 표시</b> — 영상·실사 완료를 화면이 알아챈 지점에 한 줄. 작은 조각이다.</li>
-    <li><b>타입 장부 재생성</b> — 실제 데이터베이스에서 다시 뽑기. 이번에 보강한 8열이 자연 소멸된다.</li>
+    <li><b>실기기 확인 (10분, 0원)</b> — 작가 화면에서 샷 설명을 고치고 감독 화면으로 넘어가 30초 뒤 반영되는지. 시험 계정 + Playwright 로 재현 가능(이전 성적표와 같은 방식).</li>
+    <li><b>감독 생성 완료 경로에 무효화</b> — 영상·실사 완료를 화면이 알아챈 지점에 한 줄. 작은 조각이다.</li>
+    <li><b>database.ts 재생성</b> — 실제 데이터베이스에서 다시 뽑기. 이번에 보강한 8열이 자연 소멸된다.</li>
   </ul>
 </section>
 
@@ -279,16 +261,16 @@
   <div class="sec-head"><span class="sec-num">7</span><h2>결론</h2></div>
   <div class="banner">
     <h3>사본 여섯 벌이 칸 하나가 됐다. 시험 1,484건이 그 위에서 전부 통과한다.</h3>
-    <p>1. 브라우저의 샷 읽기 여섯 곳이 전부 공유 사물함(프로젝트당 한 칸, 30초 신선)을 지난다. 화면 간 재요청과 사본 갈림이 구조적으로 사라졌다.</p>
-    <p>2. 쓰기 아홉 곳과 파이프라인 완료 지점에 낡음 표시를 심어, 변경이 다른 화면에 전해질 길을 만들었다.</p>
-    <p>3. 타입 장부가 실제 데이터베이스보다 8열 낡아 있던 것을 발견하고 실측으로 보강했다 — 재생성은 별도 작업.</p>
+    <p>1. 브라우저의 샷 읽기 여섯 곳이 전부 공유 캐시(프로젝트당 한 칸, 30초 신선)을 지난다. 화면 간 재요청과 사본 갈림이 구조적으로 사라졌다.</p>
+    <p>2. 쓰기 아홉 곳과 파이프라인 완료 지점에 무효화를 심어, 변경이 다른 화면에 전해질 길을 만들었다.</p>
+    <p>3. 생성 타입 파일(database.ts)이 실제 데이터베이스보다 8열 낡아 있던 것을 발견하고 실측으로 보강했다 — 재생성은 별도 작업.</p>
     <p>4. 실제 브라우저 검증은 이번 회차에 포함되지 않았다 — 코드 층 증명까지가 이 문서의 범위다.</p>
   </div>
 </section>
 
 <footer>
   <p><b>근거로 쓴 것</b> — 샷 접근 35곳 전수 분류(읽기/쓰기·브라우저/서버) · 신규 시험 7건 + 기존 1,477건 · 타입 검사 · 배포 빌드 2회 · 실제 데이터베이스 구조 대조(8열 실측). <span class="code-note">커밋: 2d9e85a · 모듈: src/lib/shots-cache.ts · 시험: tests/shots-cache.test.ts</span></p>
-  <p><b>이 문서가 하지 않는 것</b> — 실제 브라우저에서의 확인(5절), 감독 생성 완료 경로의 낡음 표시, 타입 장부 재생성, 속도 체감의 측정. "덜 묻는다"의 코드 층 증명까지만 담는다.</p>
+  <p><b>이 문서가 하지 않는 것</b> — 실제 브라우저에서의 확인(5절), 감독 생성 완료 경로의 무효화, database.ts 재생성, 속도 체감의 측정. "덜 묻는다"의 코드 층 증명까지만 담는다.</p>
 </footer>
 
 </div>
