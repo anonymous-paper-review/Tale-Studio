@@ -24,6 +24,7 @@ warn() {
 [ -f "$PROJECT_ROOT/.claude/vault/inbox/jh.md" ] || warn "required jh inbox missing: launcher run refuses to claim without both jh.md and hs.md"
 [ -f "$PROJECT_ROOT/.claude/vault/inbox/hs.md" ] || warn "required hs inbox missing: launcher run refuses to claim without both jh.md and hs.md"
 [ -f "$PROJECT_ROOT/.claude/agents/night-investigator.md" ] || warn "night investigator agent missing"
+[ -f "$PROJECT_ROOT/.claude/agents/night-fixer.md" ] || warn "night fixer agent missing"
 [ -f "$PROJECT_ROOT/.claude/skills/night-debug-run/SKILL.md" ] || warn "night debug-run skill missing"
 [ -d "$BACKLOG_ROOT/tickets" ] || warn "tickets directory missing"
 RECEIPT_DIR="$BACKLOG_ROOT/tickets/receipts"

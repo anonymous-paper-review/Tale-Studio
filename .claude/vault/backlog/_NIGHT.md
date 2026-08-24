@@ -503,7 +503,7 @@ python3 "$PROJECT_ROOT/.claude/vault/backlog/harvest.py" --run-id "$run_id" \
 - 최근 자주 바뀐 파일, 코드에 남은 미완성 표시, 30일 넘은 판단 근거만 신호로 삼는다. 신호 없이 “더 나은 점”을 찾는 무한 탐색은 하지 않는다.
 - 코드 신호의 출처는 공유 git 히스토리라 두 컴퓨터가 같은 신호를 잡을 수 있다. 대조는 자기 티켓 원장과만 한다 — 상대 티켓은 로컬이라 보이지 않고, 겹쳐도 막지 않는다. 조사는 읽기 전용이라 잃는 것이 토큰뿐이고, 수리가 겹치면 worktree branch에 actor가 들어가 충돌하지 않으며 어느 쪽을 살릴지 사람이 merge에서 고른다.
 - 서로 다른 주제는 병렬로 실행할 수 있으나 같은 파일·같은 작업 사본을 두 실행이 동시에 쓰지 않는다.
-- 조사 백지 작업자는 `.claude/agents/night-investigator.md` 정의를 사용한다 — 도구는 읽기 전용, 모델은 정의 파일에 고정(fable 금지 집행 지점). 낮 디버그 실행 절차는 `.claude/skills/night-debug-run/SKILL.md`가 정본이다.
+- 조사 백지 작업자는 `.claude/agents/night-investigator.md`(읽기 전용), 수리 백지 작업자는 `.claude/agents/night-fixer.md`(지정된 격리 worktree 안에서만 편집·검증, §6·§6a) 정의를 사용한다 — 둘 다 모델은 정의 파일에 고정(fable 금지 집행 지점). 티켓별 수리를 병렬 위임할 때 각 fixer는 자기 ticket worktree에서만 쓴다. 낮 디버그 실행 절차는 `.claude/skills/night-debug-run/SKILL.md`가 정본이다.
 - 티켓을 백지 subagent에게 줄 때는 티켓 경로만 전달한다. 실행자가 티켓만 읽고 닫을 수 있는지 확인하는 품질 검사이며, 머릿속 맥락을 덧붙이지 않는다.
 - 백지 실행자가 범위를 이해하지 못하면 해당 단위를 `blocked`로 기록하고, 내용을 대신 지어내어 실행하지 않는다.
 - 모든 결과에는 입력, 명령, 실행 시각, 실행 주체, worktree, 커밋, 산출물 경로를 연결한다.
@@ -854,6 +854,11 @@ snapshot, `--harvest-project`, `--harvest-out`, canonical `--run-manifest`까지
   - 변경 이유: 오너 결정 — 날짜·시각 기준을 KST 하나로 통일한다. 8/19 첫 실행에서 `run_id`가 UTC 날짜로 발급돼 01:30 KST 실행의 결과 디렉터리가 `night-2026-08-18-…`로 하루 밀린 것이 계기다(`claim_date`는 KST라 두 값이 어긋났다).
   - 변경 내용: (1) §2의 기준 시각 표기를 UTC에서 KST로 고쳤다. (2) `provider-gate.py`의 `run_id` 날짜를 `current_claim_date()`(KST)로 바꿔 `claim_date`와 같은 기준을 쓰게 했고, `state_paths`의 중복 KST 리터럴도 같은 함수로 합쳤다. (3) `harvest.py`의 sweep 디렉터리 날짜(`_output_root`)·`generated_for`·`generated_at`·`completed_at`·도장 주석·드라이런 표를 KST 표기로 바꿨다. (4) `night-runtime.py`의 `read_time`과 `night-review-server.py`의 `created_at`을 KST 표기로 바꿨다.
   - 영향받는 분해 기준: 없음. epoch 값(lease·도장·수확 창)은 타임존과 무관한 절대 시각이라 그대로 두었고, 비교·만료 계산은 바뀌지 않는다. 식별자와 파일명에는 `%z`(`+0900`)가 run_id 정규식을 깨므로 `KST` 리터럴을 쓴다.
+
+- 2026-08-24 (18차) · 이전 계약 해시 `83b570501d1c63d708033bdc09193ec9aefe360a85e31061307f0ae5dad4f32d` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — 안전 게이트를 풀지 않고 '죽기 전에 알리고 오래된 잔재는 자동 정리'하며, 조사만 위임되던 것을 티켓별 병렬 수리까지 연다.
+  - 변경 내용: (1) launcher가 committing인데 completion_proof 불완전 + lease 하루+ 만료면 죽은 밤으로 보고 state를 치우고 새로 시작한다(무한 블록 방지). (2) dry-run [state-check]가 실제 state의 committing을 감지해 미리 경고한다. (3) §5에 수리 백지 작업자 `night-fixer`(격리 worktree 안에서만 편집·검증, §6·§6a) 정의를 추가하고 preflight가 존재를 검증한다.
+  - 영향받는 분해 기준: §5 위임이 조사+수리 둘로 넓어졌다. hard-stop은 그대로(비가역·예산)이고, 자동 만료는 recover 실패 + 하루+ 만료라는 보수적 조건에서만 발동한다.
 
 - 2026-08-23 (17차) · 이전 계약 해시 `8904d1936d9978b3ebdc52f754bcd12b7f90a760896f5b898254c457258d7668` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — 밤이 headless로 돌고 아침엔 리포트 html만 뜨는 비동기 구조에, 아침에 밤 세션을 이어받아 직접 논의하는 통로를 더한다. 메모 비동기성은 그대로 두고, 결과를 읽고 후속 결정하는 접점만 넓힌다.

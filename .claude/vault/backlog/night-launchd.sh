@@ -371,8 +371,20 @@ run)
   if [ -n "$RECOVERY_STATE" ]; then
     recovery_status="$(printf '%s' "$RECOVERY_STATE" | jget status)"
     if [ "$recovery_status" = "committing" ]; then
-      recover_committing_sweep || exit 1
-      exit 0
+      if recover_committing_sweep; then
+        exit 0
+      fi
+      # recover 실패 = completion_proof 불완전(밤이 성공 직전 죽음). lease가 하루 넘게
+      # 만료됐으면 죽은 밤으로 보고 그 state를 치우고 새로 시작한다(무한 블록 방지).
+      # 최근이면 진짜 진행 중일 수 있으니 막아 사람 개입을 요구한다.
+      stale_lease="$(printf '%s' "$RECOVERY_STATE" | jget lease_until)"
+      stale_date="$(printf '%s' "$RECOVERY_STATE" | jget claim_date)"
+      if [ "$(date +%s)" -gt "$(( ${stale_lease%.*} + 86400 ))" ]; then
+        echo "committing이 하루 넘게 만료됨 — 죽은 밤으로 보고 state를 치우고 새로 시작한다" >&2
+        rm -f "$REAL_STATE_DIR/sweep-$stale_date.json" "$REAL_STATE_DIR/sweep-$stale_date.json.lock"
+      else
+        exit 1
+      fi
     fi
   fi
 
@@ -571,7 +583,14 @@ dry-run)
     *"contract_hash가 현재 계약과 다르다"*)
       echo "[state-check] ⚠ 실제 state에 '진행 중' 옛 계약 잔재 — 다음 실제 밤이 막힌다. 사람 개입 필요" >&2 ;;
     *)
-      echo "[state-check] 실제 state에 활성/정상 claim 존재" ;;
+      real_status="$(printf '%s' "$real_state" | python3 -c 'import json,sys
+try: print(json.load(sys.stdin).get("status",""))
+except Exception: print("")' 2>/dev/null)"
+      if [ "$real_status" = "committing" ]; then
+        echo "[state-check] ⚠ 실제 state가 committing — 다음 밤이 완료 복구를 시도한다. proof 불완전이고 하루+ 만료면 자동으로 치우고 새로 시작한다" >&2
+      else
+        echo "[state-check] 실제 state에 활성/정상 claim 존재 (status=$real_status)"
+      fi ;;
   esac
   TMP="$(mktemp -d /tmp/night-dryrun.XXXXXX)"
   trap 'rm -rf "$TMP"' EXIT
