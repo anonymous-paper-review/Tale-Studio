@@ -48,14 +48,6 @@ export async function buildProjectSnapshot(
     }),
   )
 
-  // 워크스페이스 스코프(인벤토리)는 project_id 가 없어 별도 캡처.
-  if (workspaceId) {
-    const { data } = await supabaseAdmin
-      .from('inventory_items')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-    tables['inventory_items'] = (data as SnapshotRow[] | null) ?? []
-  }
 
   return {
     version: 1,

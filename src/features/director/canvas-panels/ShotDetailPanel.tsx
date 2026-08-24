@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Bookmark, Film, Images, Loader2, Trash2, Upload, X } from 'lucide-react'
+import { Bookmark, Film, Loader2, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HoverBeam } from '@/components/hover-beam'
 import { Input } from '@/components/ui/input'
@@ -14,12 +14,10 @@ import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { savePreset } from '@/lib/director/preset-library'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
 import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
-import type { InventoryItem } from '@/types/inventory'
 
 import { AngleControl } from '@/features/director/angle-control'
 import { KeyLight } from '@/features/director/key-light'
 import { CameraPresetControl } from '@/features/director/camera-preset-control'
-import { InventoryPickerDialog } from '@/features/director/canvas-popups/inventory-picker-dialog'
 import { useT } from '@/lib/i18n'
 
 type Props = {
@@ -47,7 +45,6 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
   const projectId = useDirectorCanvasStore((s) => s.projectId)
   const characterRecords = useAssetStorageStore((s) => s.characters)
   const worldRecords = useAssetStorageStore((s) => s.worlds)
-  const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false)
 
   const projectCharacters = useMemo(
     () => Object.values(characterRecords).filter((c) => c.projectId === projectId),
@@ -103,15 +100,6 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
       })
     }
     reader.readAsDataURL(file)
-  }
-
-  const handlePickInventoryItem = (item: InventoryItem) => {
-    updateNodeData<'shot'>(nodeId, {
-      referenceImages: [
-        ...data.referenceImages,
-        { id: newDirectorId('dr'), url: item.imageUrl, uploadedAt: Date.now() },
-      ],
-    })
   }
 
   const handleRemoveRef = (id: string) => {
@@ -241,15 +229,6 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
                 }}
               />
             </label>
-            <button
-              type="button"
-              onClick={() => setInventoryPickerOpen(true)}
-              className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-md border border-dashed border-border text-muted-foreground hover:bg-accent"
-              title={t('Choose from inventory')}
-              aria-label={t('Choose reference image from inventory')}
-            >
-              <Images className="size-4" />
-            </button>
           </div>
         </Field>
       </Section>
@@ -407,12 +386,6 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
           </Button>
         </div>
       </div>
-
-      <InventoryPickerDialog
-        open={inventoryPickerOpen}
-        onOpenChange={setInventoryPickerOpen}
-        onPick={handlePickInventoryItem}
-      />
     </div>
   )
 }

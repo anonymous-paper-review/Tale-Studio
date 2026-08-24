@@ -11,7 +11,6 @@ import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { CharacterPanel } from '@/features/artist/character-panel'
 import { WorldPanel } from '@/features/artist/world-panel'
-import { InventoryGrid } from '@/features/artist/inventory-grid'
 import { AssetShotBoard } from '@/features/artist/asset-shot-board'
 import { useArtistBoardStore } from '@/stores/artist-board-store'
 import { useArtistStore } from '@/stores/artist-store'
@@ -31,10 +30,10 @@ import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
 import { useT } from '@/lib/i18n'
 
-type ArtistTab = 'characters' | 'world' | 'inventory'
+type ArtistTab = 'characters' | 'world'
 
 // 탭 순서 — 전환 슬라이드 방향의 기준 (#d3 2026-08-03, writer 탭과 동일 패턴).
-const ARTIST_TAB_ORDER: readonly ArtistTab[] = ['characters', 'world', 'inventory']
+const ARTIST_TAB_ORDER: readonly ArtistTab[] = ['characters', 'world']
 
 export default function VisualPage() {
   const t = useT()
@@ -52,7 +51,7 @@ export default function VisualPage() {
   const [tab, setTab] = useState<ArtistTab>('characters')
   // Alt+←/→ 로 인물 ↔ 배경 순환(#keyboard-only 2026-08-11) — 오너 지정 범위는 두 탭.
   //   인벤토리에 있다가 누르면 인물로 복귀한다(두 탭 순환에 합류).
-  useAltArrowCycle(['characters', 'world'] as const, tab === 'inventory' ? 'world' : tab, setTab)
+  useAltArrowCycle(['characters', 'world'] as const, tab, setTab)
   // 탭 전환 슬라이드(#d3) — 방향은 탭 순서 기준(왼→오른쪽 = forward). set-state-in-render 패턴.
   const [prevTab, setPrevTab] = useState<ArtistTab>(tab)
   const [tabSlide, setTabSlide] = useState<'forward' | 'back' | 'none'>('none')
@@ -447,13 +446,6 @@ export default function VisualPage() {
                 {/* 탭 한글화(#d3 2026-08-03) — writer 탭(러프 스토리보드…)과 표기 통일 */}
                 <TabsTrigger value="characters">{t('Characters')}</TabsTrigger>
                 <TabsTrigger value="world">{t('Background')}</TabsTrigger>
-                {/* Inventory는 준비 중(#d4 2026-07-15) — writer 대사 탭과 동일한 비활성 패턴 */}
-                <TabsTrigger value="inventory" disabled>
-                  <span>{t('Inventory')}</span>
-                  <Badge variant="outline" className="ml-1 px-1.5 py-0 text-[10px]">
-                    {t('Coming soon')}
-                  </Badge>
-                </TabsTrigger>
               </TabsList>
               </AltArrowHint>
               {/* 보드 축척(#d1) — writer 러프 보드와 동일 UI, 인물/배경 탭별 저장 */}
@@ -515,13 +507,6 @@ export default function VisualPage() {
               columns={4 - zoomByTab.world}
               onZoomStep={(dir) => stepZoom('world', dir)}
             />
-          </TabsContent>
-
-          <TabsContent
-            value="inventory"
-            className="flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
-          >
-            <InventoryGrid />
           </TabsContent>
         </Tabs>
       )}
