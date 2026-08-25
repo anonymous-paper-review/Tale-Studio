@@ -70,6 +70,46 @@ export default function MeetingPage() {
   })
   const canHandoff = gate.canHandoff
 
+  // #style-then-guide(2026-08-25 실사고 화개장터): 스타일을 고른 직후는 "다음이 뭐지?"의
+  //   순간인데, 게이트 미충족 사유는 보드에만 있고 채팅은 침묵했다 — 직전 모델 답변이
+  //   "스타일만 고르면 넘길 수 있어요"라고 낙관해 둔 경우 특히 길을 잃는다. 스타일 키가
+  //   실제로 바뀐 직후(로드 복원 제외), 하드 게이트가 남아 있으면 남은 항목을 발화로 안내한다.
+  const prevStyleKeyRef = useRef<string | null | undefined>(undefined)
+  useEffect(() => {
+    const prev = prevStyleKeyRef.current
+    prevStyleKeyRef.current = styleAnchorKey
+    if (!projectId || !producerLoaded || !styleAnchorKey) return
+    // undefined→값 = 마운트/로드 복원, 값→같은 값 = 무변화 — 사용자가 지금 고른 전이만.
+    if (prev === undefined || prev === styleAnchorKey) return
+    if (gate.canHandoff) return // 완비면 핸드오프 제안(아래 effect)이 담당한다
+    // 발화는 콘텐츠 언어 — 게이트 라벨도 같은 언어로 다시 평가해 뽑는다(순수 함수라 무비용).
+    const voiceGate = evaluateProducerGate({
+      settings: projectSettings,
+      storyReady,
+      cast,
+      backgrounds,
+      styleAnchorKey,
+      locale: contentLoc,
+    })
+    const items = voiceGate.hardMissing.map((i) => i.label).join(' · ')
+    if (!items) return
+    offerSuggestion(
+      {
+        id: `style-then-guide:${projectId}:${styleAnchorKey}`,
+        stage: 'producer',
+        content: translate(
+          contentLoc,
+          'Style locked in! A few things are still needed before handing to Writer: {items}. Tell me in chat and I will fill them in.',
+          { items },
+        ),
+        action: null,
+      },
+      { preempt: true },
+    )
+    // deps: styleAnchorKey 전이 감지가 목적 — gate 파생값들은 그 시점 스냅샷으로 충분하다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, producerLoaded, styleAnchorKey])
+
   // writer 산출물 게이트백 — 씬/샷이 없어 producer 로 되돌려진 프로젝트면 재실행 배너 노출.
   const writerNeedsRerun = useProjectStore((s) => s.writerNeedsRerun)
   const offerPendingProposal = useGlobalChatStore((s) => s.offerPendingProposal)
