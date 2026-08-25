@@ -355,6 +355,49 @@ describe('큐 기반 진행 복원', () => {
   })
 })
 
+// #batch-backlog 2026-08-25 — 일괄 실사 생성은 라운드제(서버가 몇 시트씩 fal 에 제출하고
+//   remaining 을 반환)라서, fal 에 앉은 잡만 세면 분모가 "현재 라운드"로 쪼그라든다(오너:
+//   "전체 갯수가 fal api queue 갯수만 보이는데"). 러너가 흘려주는 잔량(queuedBacklog)을
+//   분모에 합산하고, 라운드 사이(제출 잡 0개)에도 알림바가 사라지지 않아야 한다.
+describe('directorShotImageWork — 서버 대기 잔량(#batch-backlog)', () => {
+  const gen = (id: string) =>
+    node({ kind: 'shot', writerShotId: id, storyboardImage: { status: 'generating' } }, `n-${id}`)
+  const done = (id: string) =>
+    node({ kind: 'shot', writerShotId: id, storyboardImage: { status: 'completed' } }, `n-${id}`)
+
+  it('배치 전 구간에서 분모가 전체 작업량(제출분+잔량)으로 유지된다', () => {
+    const abcd = ['a', 'b', 'c', 'd']
+    const efgh = ['e', 'f', 'g', 'h']
+
+    // 1라운드: 4샷 제출 + 서버 잔량 10 → 4/14 가 아니라 0/14 에서 시작
+    expect(
+      directorShotImageWork(abcd.map(gen), new Set(abcd), 'ko', 10),
+    ).toMatchObject({ done: 0, total: 14 })
+
+    // 라운드 사이: 제출분 완료·fal 큐 텅 빔 — 잔량이 있으면 핀이 죽지 않는다
+    expect(
+      directorShotImageWork(abcd.map(done), new Set(), 'ko', 10),
+    ).toMatchObject({ done: 4, total: 14 })
+
+    // 2라운드: 다음 4샷 제출, 잔량 6 — 총량 불변
+    expect(
+      directorShotImageWork([...abcd.map(done), ...efgh.map(gen)], new Set(efgh), 'ko', 6),
+    ).toMatchObject({ done: 4, total: 14 })
+
+    // 종료: 잔량 0·큐 빔 → 핀 해제
+    expect(
+      directorShotImageWork([...abcd, ...efgh].map(done), new Set(), 'ko', 0),
+    ).toBeNull()
+  })
+
+  it('잔량 없이(단건 재생성 경로) 쓰면 종전 동작 그대로다', () => {
+    expect(directorShotImageWork([gen('x')], new Set(['x']), 'ko')).toMatchObject({
+      done: 0,
+      total: 1,
+    })
+  })
+})
+
 describe('queueWorks — 전용 화면이 없는 탭의 알림바', () => {
   it('0건인 종류는 줄을 만들지 않는다', () => {
     expect(queueWorks({ shot_video: 0, character_view: 0 })).toEqual([])

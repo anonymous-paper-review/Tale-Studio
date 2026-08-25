@@ -104,19 +104,14 @@ function currentBatch(
     progressBatches.set(key, next)
     return next
   }
-  // 큐만 보이던 작업이 재수화되어 실제 노드로 나타나면 임시 자리표시자를 치환한다.
-  // 자리표시자를 묶음에 계속 남기면 실제 작업 하나가 2건으로 부풀려진다.
-  const replacements = Math.min(previous.placeholders.size, activeIds.size)
-  if (replacements > 0) {
-    const oldPlaceholders = [...previous.placeholders].slice(0, replacements)
-    for (const id of oldPlaceholders) {
-      previous.placeholders.delete(id)
-      previous.members.delete(id)
-    }
-  }
+  // 큐만 보이던 작업이 실제 id 로 나타나면 자리표시자가 그만큼 줄어야 한다. 이전 구현은
+  //   "앞에서 activeIds.size 개"를 소비하는 근사라서, 이름이 흔들리면 미소비 자리표시자가
+  //   members 에 잔존해 분모가 부풀었다. 자리표시자는 기억이 아니라 **현재 잔량의 표현**이므로
+  //   매번 전부 걷어내고 이번 잔량만큼 다시 깐다 — 총량 기억은 실 id 멤버가 맡는다.
+  for (const id of previous.placeholders) previous.members.delete(id)
   for (const id of activeIds) previous.members.add(id)
   const placeholders = new Set(
-    Array.from({ length: queueOnlyCount }, (_, i) => `queue-${activeIds.size + i}`),
+    Array.from({ length: queueOnlyCount }, (_, i) => `queue-${i}`),
   )
   for (const id of placeholders) previous.members.add(id)
   previous.placeholders = placeholders
@@ -276,11 +271,15 @@ export function artistImageWork(opts: {
   return null
 }
 
-/** Director 촬영용(실사) 스토리보드 이미지 — 생성 중 샷이 있을 때만. */
+/** Director 촬영용(실사) 스토리보드 이미지 — 생성 중 샷이 있을 때만.
+ *  queuedBacklog(#batch-backlog 2026-08-25): 일괄 생성 러너가 아직 fal 에 제출하지 않은 잔여 샷 수
+ *  (director-store.realBatchRemaining). 분모에 포함해 "fal 큐 수"가 아니라 배치 전체 작업량을
+ *  보여주고, 라운드 사이(제출 잡 0개인 순간)에도 알림바가 깜빡 사라지지 않게 한다. */
 export function directorShotImageWork(
   nodes: DirectorNode[],
   activeIds: ReadonlySet<string> = EMPTY_IDS,
   locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+  queuedBacklog = 0,
 ): PipelineWork | null {
   const shots = nodes
     .map((node) => ({ id: node.id, data: node.data }))
@@ -318,7 +317,7 @@ export function directorShotImageWork(
       )
       .map(itemId),
   )
-  const batch = currentBatch('director-storyboard', active)
+  const batch = currentBatch('director-storyboard', active, active.size + queuedBacklog)
   if (!batch) return null
   const done = shots.filter(
     (entry) =>

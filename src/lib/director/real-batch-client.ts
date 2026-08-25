@@ -21,7 +21,7 @@ export async function runRealBatch(
 ): Promise<RealBatchResult> {
   const store = useDirectorCanvasStore
   if (store.getState().realBatchBusy) return { generated: 0, quotaBlocked: false }
-  store.setState({ realBatchBusy: true })
+  store.setState({ realBatchBusy: true, realBatchRemaining: null })
   let generated = 0
   let quotaBlocked = false
   try {
@@ -42,6 +42,9 @@ export async function runRealBatch(
       } | null
       if (!res.ok || !j?.data) throw new Error(j?.error ?? `HTTP ${res.status}`)
       const { submitted, remaining } = j.data
+      // #batch-backlog: 아직 제출 안 된 잔량을 알림바 분모에 태운다 — "fal 큐 수만 보인다"(오너
+      //   2026-08-25)의 수리. 라운드마다 갱신되고 러너 종료 시 finally 가 지운다.
+      store.setState({ realBatchRemaining: remaining })
       if (!submitted.length) break
       generated += submitted.reduce((n, s) => n + s.shotIds.length, 0)
       // 잡이 큐에 앉는 즉시 진행 표시(알림바·카드 스피너)가 켜지게 — 폴링 틱을 기다리지 않는다.
@@ -73,7 +76,7 @@ export async function runRealBatch(
     if (!opts?.silent) toast.error(e instanceof Error ? e.message : '일괄 생성에 실패했어요')
     else console.error('[real-batch] 자동 일괄 생성 실패:', e)
   } finally {
-    store.setState({ realBatchBusy: false })
+    store.setState({ realBatchBusy: false, realBatchRemaining: null })
   }
   return { generated, quotaBlocked }
 }

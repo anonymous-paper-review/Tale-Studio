@@ -645,6 +645,11 @@ interface DirectorCanvasState {
   storyboardMediaMode: 'previz' | 'real'
   // #real-grid-auto: 실사 일괄 생성 진행 중 — 개별 이미지 생성/재생성을 잠근다(시트 단위 작업과 충돌 방지).
   realBatchBusy: boolean
+  /** #batch-backlog(2026-08-25): 일괄 생성에서 아직 fal 에 제출되지 않고 우리 서버 라운드를
+   *  기다리는 샷 수 — 배치 라우트 응답의 remaining 을 러너가 흘려 넣는다. 진행 알림바가
+   *  "fal 에 들어간 것만"이 아니라 배치 전체 작업량을 분모로 보여주기 위한 화면 파생값
+   *  (DB 에 저장하지 않는다, architecture §0). null = 배치 비활성 또는 아직 1라운드 응답 전. */
+  realBatchRemaining: number | null
 
   // popup/modal
   popupNodeId: string | null
@@ -1059,6 +1064,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       viewMode: 'node',
       storyboardMediaMode: 'previz',
       realBatchBusy: false,
+      realBatchRemaining: null,
       popupNodeId: null,
       deleteConfirmInfo: null,
       relationModal: null,

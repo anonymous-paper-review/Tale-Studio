@@ -118,6 +118,9 @@ function UnifiedPin({ projectId, stage }: { projectId: string; stage: StageId })
   const generatingViews = useArtistStore((s) => s.generatingViews)
   const generatingLocations = useArtistStore((s) => s.generatingLocations)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
+  // #batch-backlog: 일괄 생성 러너가 아직 제출 못 한 잔여 샷 — fal 큐에 앉은 것만 세면
+  //   "전체 작업량"이 아니라는 오너 피드백(2026-08-25). 분모에 합산한다.
+  const realBatchRemaining = useDirectorCanvasStore((s) => s.realBatchRemaining)
   const jobs = useActiveGenerationJobs(projectId)
 
   const works: PipelineWork[] = []
@@ -154,6 +157,7 @@ function UnifiedPin({ projectId, stage }: { projectId: string; stage: StageId })
     nodes,
     activeShotIds(jobs, ['shot_storyboard', 'storyboard_real_grid']),
     locale,
+    realBatchRemaining ?? 0,
   )
   if (storyboard) works.push(storyboard)
   const video = directorVideoWork(nodes, countKind(jobs, 'shot_video'), locale)
