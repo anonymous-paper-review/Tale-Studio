@@ -16,13 +16,16 @@ type Filter =
   | { kind: 'match'; obj: Row }
 
 class DemoQuery implements PromiseLike<QueryResult> {
+  private readonly table: string
   private filters: Filter[] = []
   private orderBy: { col: string; asc: boolean } | null = null
   private limitN: number | null = null
   private wantSingle = false
   private isWrite = false
 
-  constructor(private readonly table: string) {}
+  constructor(table: string) {
+    this.table = table
+  }
 
   select(_cols?: string): this {
     return this

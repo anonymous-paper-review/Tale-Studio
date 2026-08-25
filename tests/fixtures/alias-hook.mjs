@@ -9,7 +9,7 @@
 import { existsSync, statSync } from 'node:fs'
 import { registerHooks } from 'node:module'
 import { resolve as pathResolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const SRC = pathResolve(process.cwd(), 'src')
 
@@ -22,11 +22,21 @@ function widen(base) {
   return null
 }
 
+// 제품 코드는 tsconfig moduleResolution:"bundler" 라 상대 경로도 확장자를 안 붙인다(예:
+// `./context`, `./translate`). Node 기본 리졸버는 확장자 없는 상대 경로를 못 찾는다
+// (ERR_MODULE_NOT_FOUND) — `@/` 별칭과 같은 widen() 을 상대 경로에도 적용해 같은 간극을 메운다.
 function resolve(specifier, context, next) {
-  if (!specifier.startsWith('@/')) return next(specifier, context)
-  const hit = widen(pathResolve(SRC, specifier.slice(2)))
-  if (!hit) return next(specifier, context) // 못 찾으면 원래 에러가 나게 둔다
-  return { url: pathToFileURL(hit).href, shortCircuit: true }
+  if (specifier.startsWith('@/')) {
+    const hit = widen(pathResolve(SRC, specifier.slice(2)))
+    if (!hit) return next(specifier, context) // 못 찾으면 원래 에러가 나게 둔다
+    return { url: pathToFileURL(hit).href, shortCircuit: true }
+  }
+  if ((specifier.startsWith('./') || specifier.startsWith('../')) && context.parentURL) {
+    const base = fileURLToPath(new URL(specifier, context.parentURL))
+    const hit = widen(base)
+    if (hit) return { url: pathToFileURL(hit).href, shortCircuit: true }
+  }
+  return next(specifier, context)
 }
 
 // registerHooks(동기·같은 스레드) — 구 module.register() 는 Node 26 에서 폐지 경고가 뜬다.
