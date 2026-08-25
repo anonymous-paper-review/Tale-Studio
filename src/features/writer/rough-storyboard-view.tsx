@@ -476,7 +476,11 @@ export function RoughStoryboardView() {
           const r = await generate(undefined, false, auto || round > 0)
           if (!r) return // 요청 실패 — generate 가 이미 토스트
           if (r.quota) {
-            if (!auto && !quotaToasted) {
+            // #silent-pump(2026-08-25 실사고): 진입 자동 모드가 429(다른 생성이 큐 점유 — 예:
+            //   러프 완주 직후의 artist 백필)를 무음으로 삼키며 재시도하다 무음으로 포기해,
+            //   사용자에겐 "러프 생성이 그냥 안 됨"으로 보였다. 자동 모드도 3라운드째(≈16s
+            //   점유 지속)면 한 번은 말한다 — 수동 모드는 종전대로 즉시 1회.
+            if (!quotaToasted && (!auto || round >= 2)) {
               quotaToasted = true
               toast.info(
                 translate(
