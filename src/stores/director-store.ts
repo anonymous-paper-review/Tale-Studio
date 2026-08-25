@@ -2244,6 +2244,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 generatedAt: Date.now(),
               },
             })
+            // 생성 완료 확정 — 사물함을 먼저 낡음으로 표시해야 바로 아래 hydrateFromDb 의 재수화도,
+            //   writer/editor 의 다음 읽기도 이 화면 완료를 반영한 새 행을 받는다(#shots-cache-invalidate).
+            void invalidateShots(projectId)
             // 스트립 모드(#real-strip)의 frames{start,direction,end}는 잡 result_url(=start)에
             //   실리지 않는다 — DB 진실 재수화로 회수(로컬이 방금 쓴 완료값 그대로면 DB 값 채택).
             await get().hydrateFromDb(projectId).catch(() => {})
@@ -2577,6 +2580,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               // reconciliation failure is a separate canonical-sync error and must
               // never rewrite that outcome.
               const acceptedJobId = jobId
+              if (status === 'completed') {
+                // 생성 완료 확정 — 사물함을 먼저 낡음으로 표시해야 바로 아래 hydrateFromDb 의 재수화도,
+                //   writer/editor 의 다음 읽기도 이 화면 완료를 반영한 새 행을 받는다(#shots-cache-invalidate).
+                void invalidateShots(projectId)
+              }
               try {
                 await get().hydrateFromDb(projectId)
               } catch (err) {

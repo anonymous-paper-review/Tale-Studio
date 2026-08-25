@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useActiveGenerationJobs, activeShotIds } from '@/lib/generation-queue'
+import { invalidateShots } from '@/lib/shots-cache'
 
 export function useQueueRehydrate(projectId: string | null): void {
   const hydrateFromDb = useDirectorCanvasStore((s) => s.hydrateFromDb)
@@ -28,6 +29,9 @@ export function useQueueRehydrate(projectId: string | null): void {
     if (!projectId) return
     for (const id of prev) {
       if (!watched.has(id)) {
+        // 잡이 큐에서 빠졌다 = 웹훅이 완료를 확정했다 — writer/editor 의 shots 사물함도
+        //   낡음으로 표시해야 다음 진입이 새 행을 받는다(#shots-cache-invalidate).
+        void invalidateShots(projectId)
         void hydrateFromDb(projectId).catch(() => {})
         return
       }
