@@ -176,6 +176,9 @@ export interface PipelineInput {
   /** #i18n-s5 출력 언어 강제: projects.locale(생성 시 잠금)을 writer/start 가 주입한다.
    *  미지정(레거시 unlocked 프로젝트) = 종전 관례(스토리 언어 추종) 그대로 — 절 미주입. */
   outputLocale?: 'en' | 'ko';
+  /** 대사(발화) 언어 — 프로듀서 Dialogue Language 설정(#dialogue-language).
+   *  출력 언어와 독립(예: en 트리트먼트 + ko 대사). 미지정(레거시)=출력 언어 추종. */
+  dialogueLanguage?: 'ko' | 'en' | 'ja' | 'zh';
   /** 실행 시 고정되는 Writer 엔진. 누락된 구형 run은 V1로 해석한다. */
   writerEngine?: WriterEngine;
   presetId?: string;      // 선택적 장르 프리셋

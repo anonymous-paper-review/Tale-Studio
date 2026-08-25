@@ -23,3 +23,43 @@ export function speechRateGuide(locale: AppLocale | undefined): string {
     ? '영어 발화 속도 초당 2~3단어(≈150 wpm) 기준'
     : '한국어 발화 속도 초당 4~6음절 기준';
 }
+
+// ── 대사(발화) 언어 (#dialogue-language 2026-08-25 오너 보고) ─────────────────
+// 프로듀서의 Dialogue Language 설정(게이트 필수 항목)은 지금까지 파이프라인에 전달되지 않는
+// 죽은 설정이었다 — 대사도 outputLocale(콘텐츠 언어)을 따라가, en 프로젝트에서 ko 대사 설정이
+// 무시됐다(실측). 대사는 "인물이 말하는 언어"라는 별도 축: 출력 언어(트리트먼트 산문)와
+// 독립적으로 ko/en/ja/zh 를 가진다. 미지정(레거시)이면 종전대로 출력 언어 추종.
+
+export type DialogueLanguage = 'ko' | 'en' | 'ja' | 'zh';
+
+const DIALOGUE_LANGUAGE_NAME: Record<DialogueLanguage, string> = {
+  ko: '한국어',
+  en: '영어(English)',
+  ja: '일본어(日本語)',
+  zh: '중국어(中文)',
+};
+
+export function parseDialogueLanguage(value: unknown): DialogueLanguage | undefined {
+  return value === 'ko' || value === 'en' || value === 'ja' || value === 'zh' ? value : undefined;
+}
+
+/** 발화 텍스트(line·narration)의 언어 계약 — outputLanguageClause **뒤에** 붙여 대사만 덮어쓴다. */
+export function dialogueLanguageClause(lang: DialogueLanguage | undefined): string {
+  if (!lang) return '';
+  const name = DIALOGUE_LANGUAGE_NAME[lang];
+  return `
+
+[대사 언어 — 설정 우선]
+인물이 입으로 말하는 텍스트(dialogue[].line, narration 보이스오버, 말버릇 예시 문장)는 위의 출력 언어 규칙과 무관하게 예외 없이 ${name}로 쓴다 — 프로듀서의 대사 언어 설정이다. 지문(delivery)·화자명 등 나머지 필드는 출력 언어 규칙을 그대로 따른다.`;
+}
+
+/** 발화 속도 기준 — 설정된 대사 언어가 있으면 그 언어 기준, 없으면 출력 언어 기준(종전). */
+export function speechRateGuideForDialogue(
+  lang: DialogueLanguage | undefined,
+  outputLocale: AppLocale | undefined,
+): string {
+  if (lang === 'ja') return '일본어 발화 속도 초당 7~8모라 기준';
+  if (lang === 'zh') return '중국어 발화 속도 초당 4~5자 기준';
+  if (lang === 'ko' || lang === 'en') return speechRateGuide(lang);
+  return speechRateGuide(outputLocale);
+}
