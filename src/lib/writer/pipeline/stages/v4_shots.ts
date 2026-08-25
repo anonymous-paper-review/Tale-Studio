@@ -429,6 +429,9 @@ V4는 3분할:
 - static_spec: framing.focal_point, framing.layers.foreground/midground/background,
   lighting.quality, lighting.key_direction, character_blocking[].pose/gaze/position_in_frame,
   prop_placement[].position_in_frame/significance, texture_notes, color_grading_intent, first_frame_prompt
+- character_blocking 은 **사람(person) 캐스트만** 넣는다. 사물(object) 캐스트·소품(들고 다니는
+  물건 포함)은 반드시 prop_placement 로 — blocking 에 넣으면 스토리보드가 그 사물을 목각
+  인형(사람)으로 그린다(실측: 가슴에 멘 엿판이 '안긴 아기'로 렌더된 사고).
 - dynamic_spec: character_motion[].verb, gaze_arc[].from/to, environmental_change[].type, motion_prompt
 (shot_type/camera_angle/depth_of_field/camera_motion.type/transition_in/out 등 고정 enum 필드는
  원래부터 영어 vocabulary라 이 지시의 대상이 아님 — 그대로 유지)

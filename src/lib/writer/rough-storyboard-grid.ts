@@ -256,9 +256,23 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   const rule = (FRAMING_RULE_WORDS[s?.framing?.rule ?? ''] ?? 'rule of thirds').replace(/^(an?|the) /, '')
 
   // 인물: 이름 없는 "mannequin figure N" (v1 의 L2 일관성 규칙 유지 — 이름은 모델이 매번 다르게 상상)
-  const blocking = s?.character_blocking ?? []
-  const figureCount = blocking.length || input.characterNames.length
-  const figures = blocking.length
+  // #object-not-figure(2026-08-25 실사고 화개장터 sh_04_20): shotDesign 이 사물 캐스트(엿판)를
+  //   character_blocking 에 넣자 여기서 "figure 2 …, blank head" 로 직렬화됐고, "가슴에 끈으로
+  //   고정된 얼굴 없는 인물" = 아기를 안은 그림이 됐다. 사물 id 는 figure 가 아니라 소품 문장으로
+  //   분기한다 — 이름을 명시해 무엇인지 못박고, 인형·사람 금지를 붙인다.
+  const objectIdSet = new Set(input.objectCharacterIds ?? [])
+  const allBlocking = s?.character_blocking ?? []
+  const blocking = allBlocking.filter((b) => !objectIdSet.has(b.character_id))
+  const objectBlocking = allBlocking.filter((b) => objectIdSet.has(b.character_id))
+  const objectProps = objectBlocking
+    .map((b) => {
+      const objName = input.characterNameById?.get(b.character_id) ?? b.character_id
+      return `carried prop (${stripColor(objName)}) at ${words(b.position_in_frame) || 'center'}, ${stripColor(words(b.pose)) || 'placed'} — this is an inanimate object: draw the object itself, NEVER a mannequin, person or head`
+    })
+    .join('; ')
+  const figureCount =
+    blocking.length || Math.max(0, input.characterNames.length - objectIdSet.size)
+  const personLine = blocking.length
     ? blocking
         .map(
           // 시선은 "머리(얼굴 없음)가 향하는 방향"으로 — gaze 단어는 눈/얼굴을 유발한다(목각 인형 캐논).
@@ -271,6 +285,8 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
       //   인물(추적자 등)이 스며들기 쉽다 — 인원수를 못박고 추가 인물을 명시적으로 금지.
       ? `exactly ${figureCount} figure${figureCount > 1 ? 's' : ''} placed naturally for the action — do not draw any other people in this panel`
       : ''
+  // 사물 소품 문장은 인물 유무와 무관하게 항상 살린다(사물 단독 인서트 컷 포함).
+  const figures = [personLine, objectProps].filter(Boolean).join('; ')
 
   const layers = s?.framing?.layers ?? {}
   const layerLine = [

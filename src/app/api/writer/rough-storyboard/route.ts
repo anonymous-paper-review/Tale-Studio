@@ -208,7 +208,7 @@ export async function POST(req: Request) {
           .eq('project_id', projectId),
         supabaseAdmin
           .from('characters')
-          .select('character_id, name')
+          .select('character_id, name, entity_type')
           .eq('project_id', projectId),
         supabaseAdmin
           .from('generation_jobs')
@@ -236,6 +236,12 @@ export async function POST(req: Request) {
     )
     const nameById = new Map(
       (chars ?? []).map((c) => [c.character_id as string, c.name as string]),
+    )
+    // 사물 캐스트(#object-not-figure) — blocking 직렬화가 figure 대신 소품 문장으로 분기할 근거.
+    const objectCharIds = new Set(
+      (chars ?? [])
+        .filter((c) => (c as { entity_type?: string }).entity_type === 'object')
+        .map((c) => c.character_id as string),
     )
     const inFlight = new Set(
       (queuedJobs ?? []).flatMap((j) => {
@@ -462,10 +468,14 @@ export async function POST(req: Request) {
             shotType: (s.shot_type as string) ?? 'MS',
             actionDescription:
               actionEnByShot.get(shotId) ?? (s.action_description as string) ?? '',
-            characterNames: ((s.characters as string[]) ?? []).map(
-              (id) => nameEnMap.get(id) ?? nameById.get(id) ?? id,
-            ),
+            // 인물 수 산정에 쓰이므로 사물은 뺀다 — 사물은 objectCharacterIds 로 별도 전달.
+            characterNames: ((s.characters as string[]) ?? [])
+              .filter((id) => !objectCharIds.has(id))
+              .map((id) => nameEnMap.get(id) ?? nameById.get(id) ?? id),
             characterNameById: nameEnMap,
+            objectCharacterIds: ((s.characters as string[]) ?? []).filter((id) =>
+              objectCharIds.has(id),
+            ),
             location:
               (scene ? locEnByScene.get(scene.scene_id as string) : undefined) ??
               (scene?.location as string | undefined),
