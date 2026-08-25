@@ -134,7 +134,8 @@ dev/db-backups/
 docs/test-accounts.md
 docs/test-accounts.csv
 
-# research: 재생성 가능한 중간 클립은 로컬만 (CONVENTIONS 규칙 7)
+# research: 실험 자료는 로컬만 보관하고 Git에서는 추적하지 않는다 (CONVENTIONS 규칙 7)
+research/
 research/experiments/**/assets/clips/
 # 같은 규칙: 실측 미디어 산출물·입력 스트립은 로컬만 (좌표는 provenance/HYPOTHESIS가 보유)
 research/experiments/previz-channel-ablation/run/

@@ -1,7 +1,0 @@
-A girl in tattered burlap wraps sprints straight at the lens, down a narrow drainage corridor of rusted mesh and cracked concrete. Low angle, chest height, wide lens.
-
-The shot is one move, held from the first frame to the last: the camera runs backwards down the corridor ahead of her, and it outruns her. She stays dead centre and head-on the whole way, at the same height and the same level horizon. The only thing that changes is how far away she is. She begins filling the frame, boots to hair, the doorway she has just cleared close behind her shoulders. Then she loses ground, steadily and without pause: her figure narrows, the doorway behind her shrinks to a small bright rectangle, and by the final frame she is a lone running silhouette far back down the corridor.
-
-What shows the speed is the corridor. The two rusted mesh panels in the near foreground rush past the bottom corners and are gone almost at once; after them wall sections, floor slabs, pipes and ceiling ribs keep arriving out of the frame edges and streaming outward past the lens, one after another, unbroken to the end. Her sprint never slows and her stride never breaks. The camera keeps to this one straight axis; it never swings around to her side.
-
-Reference roles: @Video1 controls only the camera movement and the framing; do not copy its colors, its shapes or its subjects. @Image1 defines the first frame, the character and the set dressing. Do not let the two references do the same job.
