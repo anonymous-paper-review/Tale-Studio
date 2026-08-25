@@ -19,25 +19,9 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { getQueryClient } from '@/lib/query-client'
-import type { Database, Json } from '@/types/database'
+import type { Database } from '@/types/database'
 
-type GeneratedShotRow = Database['public']['Tables']['shots']['Row']
-
-/** 생성된 database.ts 가 live 스키마보다 낡았다(8열 누락, 2026-08-24 실측:
- *  information_schema 대조). 재생성은 별도 작업이라 여기서 실측대로 보강한다 —
- *  이 보강이 없으면 소비처가 실제로 읽는 열(rough_storyboard 등)이 타입에서 사라진다. */
-type ShotRowDrift = {
-  rough_storyboard: Json | null
-  previz_video: Json | null
-  i18n_provenance: Json | null
-  static_spec: Json | null
-  dynamic_spec: Json | null
-  check_notes: Json | null
-  prompt_source_hash: string | null
-  design_ref: string | null
-}
-
-export type ShotRow = GeneratedShotRow & ShotRowDrift
+export type ShotRow = Database['public']['Tables']['shots']['Row']
 
 export const shotsKey = (projectId: string) => ['shots', projectId] as const
 
@@ -51,7 +35,6 @@ async function fetchShots(projectId: string): Promise<ShotRow[]> {
     .eq('project_id', projectId)
     .order('sort_order')
   if (error) throw error
-  // 생성 타입이 낡아 8열이 빠져 있다(ShotRowDrift 주석) — select('*') 는 실제로 전부 받아온다.
   return (data ?? []) as ShotRow[]
 }
 
