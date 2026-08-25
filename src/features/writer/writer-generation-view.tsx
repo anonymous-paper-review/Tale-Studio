@@ -85,7 +85,15 @@ export function WriterGenerationView({
       )
     offer()
     const iv = setInterval(offer, SCENE_GATE_REOFFER_MS)
-    return () => clearInterval(iv)
+    return () => {
+      clearInterval(iv)
+      // 확정 성공 후 상태 폴링이 이 컴포넌트를 내릴 때, 마지막으로 남은 게이트 제안도 함께 제거한다.
+      // 성공 응답과 다음 폴링이 거의 동시에 도착해 재등록된 경우까지 정리한다.
+      const current = useGlobalChatStore.getState().suggestion
+      if (current?.id === `scene-gate:${projectId}`) {
+        useGlobalChatStore.getState().dismissSuggestion({ implicit: true })
+      }
+    }
   }, [awaiting, projectId, sceneGateMessage, confirmAsIsLabel])
 
   return (

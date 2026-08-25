@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { translate, useT } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -65,7 +66,11 @@ export function SceneGateControls() {
         onClick={() => {
           if (busy) return
           setBusy(true)
-          void sendSceneGate('confirm').finally(() => setBusy(false))
+          void sendSceneGate('confirm')
+            .then((ok) => {
+              if (ok) useGlobalChatStore.getState().dismissSuggestion()
+            })
+            .finally(() => setBusy(false))
         }}
       >
         {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
