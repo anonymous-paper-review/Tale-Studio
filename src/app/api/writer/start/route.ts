@@ -22,6 +22,7 @@ import { isAdminOwnedProject } from '@/lib/admin';
 import { isWriterEngine, type WriterEngine } from '@/lib/writer/engine';
 import { applyProducerI18n } from '@/lib/writer/i18n/derive-en';
 import { resolveOutputLocale } from '@/lib/locale';
+import { parseDialogueLanguage } from '@/lib/writer/pipeline/util/output-language';
 import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
 import { parseCustomStyleAnchor } from '@/lib/style-anchor';
 
@@ -304,14 +305,21 @@ export async function POST(req: NextRequest) {
     //   레거시(unlocked) 첫 핸드오프는 종전대로 스토리 감지로 잠그며, 감지값을 출력 언어로 쓰면
     //   "스토리 언어 추종"이던 종전 산출과 동일하다 — 행동 보존. best-effort(실패 시 미주입 = 종전 관례).
     let outputLocale: PipelineInput['outputLocale'];
+    // 대사(발화) 언어 (#dialogue-language 2026-08-25): 프로듀서 게이트 필수 항목인데 여태
+    //   파이프라인에 전달되지 않아 대사가 outputLocale 을 따라갔다(en 프로젝트 ko 대사 설정
+    //   무시 실측). 진실은 DB projects.settings — 클라 전달값이 아니라 서버가 직접 읽는다.
+    let dialogueLanguage: PipelineInput['dialogueLanguage'];
     try {
       const { data: proj } = await supabaseAdmin
         .from('projects')
-        .select('locale, locale_locked')
+        .select('locale, locale_locked, settings')
         .eq('id', projectId)
         .maybeSingle();
       const resolved = resolveOutputLocale(proj, story);
       outputLocale = resolved.outputLocale;
+      dialogueLanguage = parseDialogueLanguage(
+        (proj?.settings as { dialogueLanguage?: unknown } | null)?.dialogueLanguage,
+      );
       if (resolved.lockTo) {
         await supabaseAdmin
           .from('projects')
@@ -364,6 +372,7 @@ export async function POST(req: NextRequest) {
       styleAnchor,
       models,
       outputLocale,
+      dialogueLanguage,
       // #s3-gate: UI 핸드오프는 씬 스토리 확정 게이트를 켠다 — storyCheck 후 유저 검토·확정.
       // V2는 의미 단위 결과와 자체 검토 메타를 한 번에 만들므로 기존 씬 확인 게이트를
       // 중복 적용하지 않는다. V1은 기존 사용자 씬 검토 흐름을 그대로 유지한다.

@@ -49,3 +49,32 @@ describe('resolveOutputLocale (writer/start 1.6)', () => {
     expect(resolveOutputLocale({ locale: 'jp', locale_locked: true }, 's').outputLocale).toBeUndefined()
   })
 })
+
+// #dialogue-language — 대사 언어는 출력 언어와 독립된 축 (프로듀서 설정이 line·narration 지배)
+import {
+  dialogueLanguageClause,
+  parseDialogueLanguage,
+  speechRateGuideForDialogue,
+} from '@/lib/writer/pipeline/util/output-language'
+
+describe('dialogueLanguage — 발화 언어 계약', () => {
+  it('파싱: 4개 값만 통과, 그 외·미지정은 undefined(레거시 = 출력 언어 추종)', () => {
+    expect(parseDialogueLanguage('ko')).toBe('ko')
+    expect(parseDialogueLanguage('ja')).toBe('ja')
+    expect(parseDialogueLanguage('fr')).toBeUndefined()
+    expect(parseDialogueLanguage(undefined)).toBeUndefined()
+  })
+  it('절: 설정 시에만 발화 필드 덮어쓰기 문구, 미지정은 빈 문자열(무주입)', () => {
+    expect(dialogueLanguageClause(undefined)).toBe('')
+    const ko = dialogueLanguageClause('ko')
+    expect(ko).toContain('한국어')
+    expect(ko).toContain('dialogue[].line')
+    expect(ko).toContain('출력 언어 규칙과 무관하게')
+  })
+  it('발화 속도: 대사 언어 우선, 미지정이면 출력 언어 기준(종전)', () => {
+    expect(speechRateGuideForDialogue('ko', 'en')).toContain('음절')
+    expect(speechRateGuideForDialogue('ja', 'en')).toContain('모라')
+    expect(speechRateGuideForDialogue(undefined, 'en')).toContain('wpm')
+    expect(speechRateGuideForDialogue(undefined, undefined)).toContain('음절')
+  })
+})
