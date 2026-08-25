@@ -9,12 +9,22 @@ Claude Code 외의 에이전트(Codex, gjc 라인 등)를 위한 진입점이다
 | 명령 | 무엇을 잠그나 |
 |---|---|
 | `pnpm typecheck` | 타입 |
-| `pnpm test` | 로직·API 라우트 계약 (vitest 130개) |
+| `pnpm test` | 제품 핵심 자동 회귀 테스트 (수동·실험·Vault 운영 테스트 제외) |
+| `pnpm test:all` | 수동·실험 테스트를 제외한 전체 자동 테스트 |
+| `pnpm test:writer` | Writer 파이프라인·러프 previz·샷 관련 테스트 |
+| `pnpm test:producer` | Producer 입력·게이트·핸드오프 테스트 |
+| `pnpm test:artist` | Artist 이미지·자산 생성 테스트 |
+| `pnpm test:director` | Director 캔버스·영상 생성 테스트 |
+| `pnpm test:security` | 권한·입력 경계·red-team 테스트 |
+| `pnpm test:manual` | 실제 API/Fal이 필요한 수동 테스트 (`RUN_LIVE_TESTS=1` 필요) |
 | `pnpm smoke` | **브라우저에서만 드러나는 것** — 렌더 여부·콘솔 에러·HTTP 상태·인증 리다이렉트 |
 | `pnpm smoke --auth` | 위와 같되 **로그인 뒤 화면** (제품의 실제 화면은 전부 여기 있다) |
 
 `pnpm test` 는 브라우저를 못 연다. 그래서 `src/app/**` 또는 `src/components/**` 를 고쳤으면
 `pnpm smoke` 를 함께 돌린다. 특정 화면만 볼 때는 `pnpm smoke /경로 --expect "그 화면에만 있는 문구"`.
+
+테스트 묶음과 파일 수는 `pnpm test:list`로 확인한다. 기본 테스트에서 빠지는 수동·실험 테스트는
+비용이 들거나 별도 환경이 필요한 경우에만 따로 실행한다.
 
 `/studio/producer|writer|artist|director|editor` 가 제품의 실제 화면이고 전부 로그인이 필요하다.
 공개 스위트만 돌리면 랜딩·요금·로그인폼만 확인되므로, UI 확인이 목적이면 `--auth` 를 쓴다.

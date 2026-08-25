@@ -77,6 +77,8 @@ scripts/*
 # 빠지면 클린 클론에서 pnpm typecheck 가 TS2307 로 깨진다. 하드코딩 비밀 없음
 # (service-role 키는 .env.local 에서 읽는다).
 !scripts/seed-test-accounts.mjs
+# 테스트 묶음 실행기는 개발자가 공통으로 쓰는 명령 인터페이스라 추적한다.
+!scripts/test-suites.mjs
 
 # OS
 .DS_Store
