@@ -421,8 +421,8 @@ export function useWriterDirectorSync() {
 
     // ── Pass 3: 스토리보드 자동생성 — 비활성화 (Higgsfield 노드 뷰 전환) ──
     // 목각(roughStoryboard)이 노드 뷰의 초기 상태로 남아야 하므로, 진입 시
-    // storyboardImage(실사)를 자동 생성하지 않는다. 실사화는 사용자가 진행 버튼
-    // (advanceShot → generateStoryboardImage)으로만 트리거한다. 재진입 시
+    // storyboardImage(실사)를 자동 생성하지 않는다. 실사화는 사용자의 명시적
+    // 생성 버튼(generateStoryboardImage)으로만 트리거한다. 재진입 시
     // 완료된 storyboardImage는 Pass 2.5 hydrate로 그대로 복원된다(멱등 보존).
     })().finally(() => {
       releaseHistorySuppression()

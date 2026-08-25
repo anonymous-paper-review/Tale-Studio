@@ -180,20 +180,18 @@ export const KO: Record<string, string> = {
   Show: '보기',
   Hide: '접기',
   "The story is still being written — new content will appear automatically as it's ready.": '이야기가 계속 생성되고 있어요 — 새 내용이 준비되면 자동으로 이어집니다.',
-  // ── writer 스테이지: scene-edit-dialog ──
-  'Delete scene {id} and all its shots? This cannot be undone.': '{id} 씬과 그 안의 모든 샷을 삭제할까요? 되돌릴 수 없습니다.',
-  'Scene details': '씬 상세',
-  'Location, time, mood, and summary save automatically. Changes apply from the next panel regeneration.': '장소·시간·분위기·요약을 수정하면 자동 저장됩니다. 다음 패널 재생성부터 반영돼요.',
+  // ── writer 스테이지: 씬 속성 공용 문구 (add-item-dialog 등) ──
   'e.g. a desolate rocky mountain': '예: 황량한 돌산',
   'Time of day': '시간대',
-  'e.g. Dusk': '예: Dusk',
   Mood: '분위기',
   'e.g. tense, grim': '예: 긴장된, 비장한',
   'Narrative summary': '서사 요약',
   'What happens in this scene': '이 씬에서 일어나는 일',
-  'Duration (sec) — auto from shots': '길이 (초) — 샷 합 자동',
-  'Scene duration is calculated automatically from the total of its shots — it updates when you add, remove, or resize shots.': '씬 길이는 포함된 샷들의 duration 합으로 자동 계산됩니다 — 샷을 추가·삭제하거나 길이를 바꾸면 갱신돼요.',
-  'Delete scene': '씬 삭제',
+  // ── writer store: 저장 실패 토스트 ──
+  "Couldn't add the shot — the change was rolled back.": '샷을 추가하지 못했어요 — 변경을 되돌렸습니다.',
+  "Couldn't delete the shot — it was restored.": '샷을 삭제하지 못했어요 — 원래대로 복구했습니다.',
+  "Couldn't add the scene — the change was rolled back.": '씬을 추가하지 못했어요 — 변경을 되돌렸습니다.',
+  "Couldn't delete the scene — it was restored.": '씬을 삭제하지 못했어요 — 원래대로 복구했습니다.',
   // ── writer 스테이지: writer-generation-view ──
   "The scene story draft is ready. Please review it on the screen.\nIf there's anything you'd like to change, type it in the input box below — or press Enter with it empty to confirm and move to the next step.": '씬 스토리 초안이 준비됐어요. 화면에서 검토해 주세요.\n고치고 싶은 부분이 있으면 아래 입력창에 적어 주시고, 없으시면 비어있는 상태로 Enter를 입력해주세요 — 바로 확정하고 다음 단계로 넘어갈게요.',
   'Debug preview — showing the generation screen using output from the last run.': '디버그 프리뷰 — 마지막 실행의 산출물로 생성 화면을 표시하고 있어요.',

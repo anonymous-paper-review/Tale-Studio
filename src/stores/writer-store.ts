@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { toast } from 'sonner'
 import type {
   Scene,
   SceneManifest,
@@ -109,24 +110,24 @@ function pickShotFields(u: WriterChatUpdate): Partial<Shot> {
   return out
 }
 
+// 저장 실패 표면화(2026-08-25 store 감사) — error 필드를 읽는 UI 가 없어
+// 토스트가 유일한 사용자 접점이다. 낙관 롤백과 함께 호출한다.
+function notifySaveError(message: string, detail?: string) {
+  toast.error(translate(useLocaleStore.getState().locale, message), {
+    description: detail,
+  })
+}
+
 interface WriterState {
-  storyText: string
-  expandedStory: string | null
   sceneManifest: SceneManifest | null
-  selectedSceneId: string | null
   shots: Shot[]
-  generatingShots: boolean
-  generating: boolean
-  regeneratingSceneId: string | null
   error: string | null
 
-  setStoryText: (text: string) => void
   loadProject: () => Promise<void>
   /** 목각 previz 영상 생성(#previz-video) — 러프 START+END refs. 완료 시 shots 리로드.
    *  ⚠️ 2026-07-27 UI 에서 진입점 제거(유저 부담 완화 — 영상 생성은 SHOT VIDEO 하나로 통일).
    *  현재 호출자 없음. 백엔드(API/webhook/DB 컬럼)와 함께 남겨둔 휴면 경로 — 되살릴 때 UI 만 붙이면 된다. */
   generatePrevizVideo: (shotId: string) => Promise<void>
-  selectScene: (id: string) => void
   updateScene: (id: string, changes: Partial<Scene>) => void
   updateShot: (id: string, changes: Partial<Shot>) => void
   // opts.afterShotId: undefined=씬 끝에 append(기존 동작), null=씬 맨 앞, shotId=그 샷 뒤에 삽입.
@@ -147,19 +148,9 @@ interface WriterState {
 }
 
 export const useWriterStore = create<WriterState>((set, get) => ({
-  storyText: '',
-  expandedStory: null,
   sceneManifest: null,
-  selectedSceneId: null,
   shots: [],
-  generatingShots: false,
-  generating: false,
-  regeneratingSceneId: null,
   error: null,
-
-  setStoryText: (text) => set({ storyText: text }),
-
-  selectScene: (id) => set({ selectedSceneId: id }),
 
   updateScene: (id, changes) => {
     if (isDemoSession()) return
@@ -335,6 +326,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
 
     if (error) {
       set({ shots: prevShots, error: error.message })
+      notifySaveError("Couldn't add the shot — the change was rolled back.", error.message)
       return null
     }
     // 자리 확보: 신규 order 이상이던 기존 샷들을 +1 로 밀어 DB 반영(순서 무결성). insert 성공 후 실행 —
@@ -378,6 +370,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
 
     if (error) {
       set({ shots: prev, error: error.message })
+      notifySaveError("Couldn't delete the shot — it was restored.", error.message)
       return
     }
     void invalidateShots(projectId)
@@ -471,6 +464,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           : state.sceneManifest,
         error: error.message,
       }))
+      notifySaveError("Couldn't add the scene — the change was rolled back.", error.message)
       return null
     }
     if (shift) {
@@ -506,8 +500,6 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           }
         : state.sceneManifest,
       shots: state.shots.filter((s) => s.sceneId !== sceneId),
-      selectedSceneId:
-        state.selectedSceneId === sceneId ? null : state.selectedSceneId,
     }))
 
     const supabase = createClient()
@@ -530,6 +522,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         shots: prevShots,
         error: (shotErr ?? sceneErr)?.message ?? 'Delete failed',
       })
+      notifySaveError("Couldn't delete the scene — it was restored.", (shotErr ?? sceneErr)?.message)
       return
     }
     void invalidateShots(projectId)
@@ -675,14 +668,8 @@ export const useWriterStore = create<WriterState>((set, get) => ({
 
   reset: () =>
     set({
-      storyText: '',
-      expandedStory: null,
       sceneManifest: null,
-      selectedSceneId: null,
       shots: [],
-      generatingShots: false,
-      generating: false,
-      regeneratingSceneId: null,
       error: null,
     }),
 
@@ -760,17 +747,11 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     try {
       const supabase = createClient()
       const [
-        { data: project },
         { data: scenes },
         { data: characters },
         { data: locations },
         { data: shotsData },
       ] = await Promise.all([
-        supabase
-          .from('projects')
-          .select('story_text, expanded_story')
-          .eq('id', projectId)
-          .single(),
         supabase
           .from('scenes')
           .select('*')
@@ -787,14 +768,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         loadShotsResult(projectId),
       ])
 
-      // Always load story_text even if no scenes yet (P1 → P2 handoff)
-      if (!scenes?.length) {
-        set({
-          storyText: project?.story_text ?? '',
-          expandedStory: project?.expanded_story ?? null,
-        })
-        return
-      }
+      if (!scenes?.length) return
 
       const manifest: SceneManifest = {
         scenes: scenes.map((s, i) => ({
@@ -851,12 +825,8 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         previzVideo: (s.previz_video as RoughStoryboardImage | null) ?? null,
       }))
 
-      const firstSceneId = manifest.scenes[0]?.sceneId ?? null
       set({
-        storyText: project?.story_text ?? '',
-        expandedStory: project?.expanded_story ?? null,
         sceneManifest: manifest,
-        selectedSceneId: firstSceneId,
         shots,
       })
     } catch (err) {

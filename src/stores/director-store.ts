@@ -754,10 +754,6 @@ interface DirectorCanvasState {
    *  반환 false = 생성 대기열(쿼터) 초과로 시작하지 못함(#e5) — 노드는 pending으로 되돌려짐. */
   regenerateVideo: (videoNodeId: string, heldLock?: GenerationLock) => Promise<boolean>
 
-  // stage progression (Higgsfield 진행 버튼)
-  /** 진행 버튼: 현 단계 기준 다음 산출물 생성 — rough→generateStoryboardImage(in-place 실사), live/video→generateVideoForShot(별도 Video 노드) */
-  advanceShot: (shotNodeId: string) => Promise<void>
-
   // prompt node (Higgsfield식 분리 프롬프트)
   /** Prompt 노드 추가 (캔버스 보조 노드). 생성된 노드 id 반환 */
   addPromptNode: (position?: XYPosition, text?: string) => string
@@ -951,17 +947,6 @@ export function getShotStage(
   if (getChildVideos(state, shotNodeId).length > 0) return 'video'
   if (shot.data.storyboardImage?.status === 'completed') return 'live'
   return 'rough'
-}
-
-const SHOT_STAGE_LABEL: Record<ShotStage, string> = {
-  rough: 'Go live',
-  live: 'Generate video',
-  video: 'New video take',
-}
-
-/** 진행 버튼 라벨 = 현 단계에서 누르면 일어나는 '다음' 행동 */
-export function shotStageLabel(stage: ShotStage): string {
-  return SHOT_STAGE_LABEL[stage]
 }
 
 /** 다음 take_vN 번호 계산 (Shot 자식 중 최대 + 1) */
@@ -1489,22 +1474,6 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         get().rebuildShotChainNodes()
 
         return id
-      },
-
-      // ─── stage progression (진행 버튼) ──────────────────────────────────
-      advanceShot: async (shotNodeId) => {
-        if (isDemoSession()) return
-        const api = get()
-        const node = api.nodes.find((n) => n.id === shotNodeId)
-        if (!node || !isShotData(node.data)) return
-        const stage = getShotStage(api, shotNodeId)
-        if (stage === 'rough') {
-          // 목각 → 실사: 같은 Shot 노드에서 storyboardImage 생성 (in-place)
-          await api.generateStoryboardImage(shotNodeId)
-        } else {
-          // 실사/영상 → 영상: 기존 수명주기 유지 (별도 Video 노드 생성, 결정 #40)
-          await api.generateVideoForShot(shotNodeId)
-        }
       },
 
       // ─── prompt node (Higgsfield식 분리 프롬프트) ───────────────────────

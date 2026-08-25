@@ -1,8 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   useDirectorCanvasStore,
   getShotStage,
-  shotStageLabel,
   effectivePrompt,
 } from '@/stores/director-store'
 import { selectRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
@@ -61,65 +60,6 @@ describe('getShotStage (파생 단계: video > live > rough)', () => {
 
   it('존재하지 않는 노드는 rough', () => {
     expect(getShotStage(api(), 'no_such_node')).toBe('rough')
-  })
-})
-
-describe('shotStageLabel (진행 버튼 라벨 = 다음 행동)', () => {
-  it('단계별 라벨 매핑', () => {
-    expect(shotStageLabel('rough')).toBe('Go live') // #i18n-s5: 함수는 영어 키 반환, 표시는 렌더의 t()
-    expect(shotStageLabel('live')).toBe('Generate video')
-    expect(shotStageLabel('video')).toBe('New video take')
-  })
-})
-
-describe('advanceShot 라우팅', () => {
-  it('rough → generateStoryboardImage 호출 (in-place 실사)', async () => {
-    const shotId = makeShot()
-    const gen = vi.fn().mockResolvedValue(undefined)
-    const vid = vi.fn().mockResolvedValue(null)
-    useDirectorCanvasStore.setState({ generateStoryboardImage: gen, generateVideoForShot: vid })
-
-    await api().advanceShot(shotId)
-
-    expect(gen).toHaveBeenCalledWith(shotId)
-    expect(vid).not.toHaveBeenCalled()
-  })
-
-  it('live → generateVideoForShot 호출 (재진입해도 실사 재생성 안 함)', async () => {
-    const shotId = makeShot()
-    api().updateNodeData<'shot'>(shotId, { storyboardImage: completedImage })
-    const gen = vi.fn().mockResolvedValue(undefined)
-    const vid = vi.fn().mockResolvedValue(null)
-    useDirectorCanvasStore.setState({ generateStoryboardImage: gen, generateVideoForShot: vid })
-
-    await api().advanceShot(shotId)
-
-    expect(vid).toHaveBeenCalledWith(shotId)
-    expect(gen).not.toHaveBeenCalled()
-  })
-
-  it('video → generateVideoForShot 호출 (새 테이크)', async () => {
-    const shotId = makeShot()
-    api().addVideoTake(shotId)
-    const gen = vi.fn().mockResolvedValue(undefined)
-    const vid = vi.fn().mockResolvedValue(null)
-    useDirectorCanvasStore.setState({ generateStoryboardImage: gen, generateVideoForShot: vid })
-
-    await api().advanceShot(shotId)
-
-    expect(vid).toHaveBeenCalledWith(shotId)
-    expect(gen).not.toHaveBeenCalled()
-  })
-
-  it('Shot이 아닌 id는 no-op', async () => {
-    const gen = vi.fn().mockResolvedValue(undefined)
-    const vid = vi.fn().mockResolvedValue(null)
-    useDirectorCanvasStore.setState({ generateStoryboardImage: gen, generateVideoForShot: vid })
-
-    await api().advanceShot('no_such_node')
-
-    expect(gen).not.toHaveBeenCalled()
-    expect(vid).not.toHaveBeenCalled()
   })
 })
 
