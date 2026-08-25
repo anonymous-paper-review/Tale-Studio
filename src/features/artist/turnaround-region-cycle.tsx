@@ -80,13 +80,19 @@ export function TurnaroundRegionCycle({ url, alt }: { url: string; alt: string }
     if (!el) return
     const onWheel = (e: WheelEvent) => {
       if (!hoveringRef.current) return
-      // 트랙패드 핀치는 ctrl+wheel 로 온다(#d1 오너 피드백 2026-08-24) — 브라우저 확대에 양보하고
-      //   확대경 배율은 건드리지 않는다. 두 배율이 동시에 움직이면 조작감이 무너진다.
-      if (e.ctrlKey || e.metaKey) return
-      e.preventDefault() // 확대경 위의 휠은 페이지 스크롤이 아니라 배율 조절
-      setZoom((z) =>
-        Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z * (e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP))),
-      )
+      // 트랙패드 핀치는 ctrl+wheel 로 온다. #d1(2026-08-24)에서 "두 배율 동시 동작"을 브라우저에
+      //   양보하는 쪽으로 풀었더니 핀치가 확대경에 아무 반응이 없어졌다(오너 피드백 2026-08-25).
+      //   의도는 반대: 확대경 위의 핀치는 **확대경 배율**이고, 페이지 확대를 preventDefault 로
+      //   막아야 동시 동작이 사라진다(#pinch-loupe). 핀치는 미세 delta 연속 이벤트라 휠 노치
+      //   (1.15×/칸)를 그대로 곱하면 튄다 — delta 비례 지수 배율로 잇는다.
+      e.preventDefault() // 확대경 위의 휠/핀치는 페이지 스크롤·페이지 확대가 아니라 배율 조절
+      const factor =
+        e.ctrlKey || e.metaKey
+          ? Math.exp(-e.deltaY * 0.01)
+          : e.deltaY < 0
+            ? ZOOM_STEP
+            : 1 / ZOOM_STEP
+      setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z * factor)))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
