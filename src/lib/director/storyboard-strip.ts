@@ -244,6 +244,12 @@ export function buildRealGridPrompt(
     `Repaint this exact sheet as ${target}:`,
     `- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.`,
     `- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.`,
+    // #end-fidelity(2026-08-25, 9d562ada 14샷 전수 감사): 스트립 프롬프트의 #tfix-repaint-prompt
+    //   END 강화절이 그리드에는 이식돼 있지 않았다 — 실사 END 가 러프 END 를 배신한 5건(카메라
+    //   반전 MCU 발명·push-in 2.3×·모션량 감쇠)이 전부 그리드 산이었다. 같은 계약을 행 단위로
+    //   못박고, 샷 사이즈 불변(재프레이밍 금지)을 명시한다.
+    `- Row 3 of each column = that shot's END: reproduce reference row 3's arrived state faithfully — every element the motion changed (a figure now moved or turned, an object now displaced) must be shown in its completed end state; if a column's motion has two or more movements, show ALL of them completed. Never repeat that column's row 1 state in row 3, and never invent a different composition for it.`,
+    `- Every panel keeps its reference panel's exact shot size and camera distance — never push in, pull out or reframe: an extreme close-up stays an extreme close-up, a full shot stays a full shot, and each figure's size within the frame stays the same as in the reference.`,
     ...identityBlock,
     ...(hasStyleRef
       ? [
@@ -341,6 +347,8 @@ export function buildRealStripPrompt(
     //   ③ 2동작 샷(sh_01_09)의 END 패널이 3반복 전부 실패 → 도착 상태 전건 완료 재현 명시.
     `- Middle panel: the exact same image as the ${p1.toLowerCase()} panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.`,
     `- ${p3} panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the ${p1.toLowerCase()} panel's state.`,
+    // #end-fidelity: 그리드 쪽과 동일 — 샷 사이즈 불변(재프레이밍 금지) 명시.
+    `- Every panel keeps its reference panel's exact shot size and camera distance — never push in, pull out or reframe: an extreme close-up stays an extreme close-up, a full shot stays a full shot, and each figure's size within the frame stays the same as in the reference.`,
     ...(characterRefCount > 0
       ? [
           `- Replace every wooden mannequin with the corresponding character(s) from ${charLocation} (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.`,
