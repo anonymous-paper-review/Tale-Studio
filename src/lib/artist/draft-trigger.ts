@@ -23,6 +23,7 @@ import {
   type LocationRowForWorldPrompt,
 } from '@/lib/artist/world-prompt'
 import { submitWorldShotJob } from '@/lib/artist/world-submit'
+import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 
 const DRAFT_MODEL = 'openai/gpt-image-2'
 
@@ -149,8 +150,27 @@ export async function triggerCharacterDrafts(
             : applyStyleAnchor(anchor, anchorable, 'single')
           submitOpts = { ...anchored, webhookUrl: wh }
         }
-        const { request_id, model } = await falImageSubmit(submitOpts)
-        await createGenerationJob({
+        await recordWriterObservabilityEvent(projectId, 'fal_submit_started', {
+          source: 'writer_v2_design',
+          kind: 'character_view',
+          characterId: c.character_id,
+          view: 'main',
+        })
+        let falResult: { request_id: string; model: string }
+        try {
+          falResult = await falImageSubmit(submitOpts)
+        } catch (error) {
+          await recordWriterObservabilityEvent(projectId, 'fal_submit_failed', {
+            source: 'writer_v2_design',
+            kind: 'character_view',
+            characterId: c.character_id,
+            view: 'main',
+            error: error instanceof Error ? error.message : String(error),
+          })
+          throw error
+        }
+        const { request_id, model } = falResult
+        const job = await createGenerationJob({
           projectId,
           requestId: request_id,
           model,
@@ -177,10 +197,30 @@ export async function triggerCharacterDrafts(
             column: CHARACTER_VIEW_COLUMNS.main,
           },
         })
+        await recordWriterObservabilityEvent(
+          projectId,
+          'fal_submit_accepted',
+          {
+            source: 'writer_v2_design',
+            kind: 'character_view',
+            characterId: c.character_id,
+            view: 'main',
+            model,
+            requestId: request_id,
+          },
+          { generationJobId: job.id },
+        )
         result.submitted++
       } catch (e) {
         // 실패 흡수(AC4) — 자동 재시도 루프 금지. 클라가 generation_jobs 에러를 카드 배지로 표시.
         result.failed++
+        await recordWriterObservabilityEvent(projectId, 'route_failed', {
+          source: 'writer_v2_design',
+          kind: 'character_view',
+          characterId: c.character_id,
+          view: 'main',
+          error: e instanceof Error ? e.message : String(e),
+        })
         console.error(
           `[draft-trigger] ${projectId}/${c.character_id}:main submit failed:`,
           e instanceof Error ? e.message : e,
@@ -245,20 +285,58 @@ export async function triggerWorldDrafts(
           null,
           'wideShot',
         )
-        await submitWorldShotJob({
-          projectId,
+        await recordWriterObservabilityEvent(projectId, 'fal_submit_started', {
+          source: 'writer_v2_design',
+          kind: 'world_shot',
           locationId: location.location_id,
-          column: 'wide_shot',
-          prompt: builtPrompt,
-          aspectRatio: '16:9',
-          sourceHash: computeWorldImageSourceHash(builtPrompt),
-          actor: 'writer',
-          workspaceId: project?.workspace_id ?? undefined,
-          anchor,
+          view: 'wide_shot',
         })
+        let job: Awaited<ReturnType<typeof submitWorldShotJob>>
+        try {
+          job = await submitWorldShotJob({
+            projectId,
+            locationId: location.location_id,
+            column: 'wide_shot',
+            prompt: builtPrompt,
+            aspectRatio: '16:9',
+            sourceHash: computeWorldImageSourceHash(builtPrompt),
+            actor: 'writer',
+            workspaceId: project?.workspace_id ?? undefined,
+            anchor,
+          })
+        } catch (error) {
+          await recordWriterObservabilityEvent(projectId, 'fal_submit_failed', {
+            source: 'writer_v2_design',
+            kind: 'world_shot',
+            locationId: location.location_id,
+            view: 'wide_shot',
+            error: error instanceof Error ? error.message : String(error),
+          })
+          throw error
+        }
+        await recordWriterObservabilityEvent(
+          projectId,
+          'fal_submit_accepted',
+          {
+            source: 'writer_v2_design',
+            kind: 'world_shot',
+            locationId: location.location_id,
+            view: 'wide_shot',
+            model: job.model,
+            requestId: job.request_id,
+          },
+          { generationJobId: job.id },
+        )
         result.submitted++
       } catch (e) {
         result.failed++
+        await recordWriterObservabilityEvent(projectId, 'route_failed', {
+          source: 'writer_v2_design',
+          kind: 'world_shot',
+          locationId: location.location_id,
+          view: 'wide_shot',
+          error: e instanceof Error ? e.message : String(e),
+        })
         console.error(
           `[draft-trigger] ${projectId}/${location.location_id}:wide_shot submit failed:`,
           e instanceof Error ? e.message : e,
@@ -285,6 +363,9 @@ export async function triggerAssetDrafts(
   projectId: string,
 ): Promise<AssetDraftTriggerResult> {
   const zero = () => zeroDraftResult()
+  await recordWriterObservabilityEvent(projectId, 'asset_trigger_started', {
+    source: 'writer_v2_design',
+  })
   try {
     const { data: project, error } = await supabaseAdmin
       .from('projects')
@@ -295,6 +376,10 @@ export async function triggerAssetDrafts(
     if (error) throw error
     if (project?.design_tokens == null) {
       console.warn('[v2design-trigger] design_tokens absent — skipping (stalled path)')
+      await recordWriterObservabilityEvent(projectId, 'asset_trigger_blocked', {
+        source: 'writer_v2_design',
+        reason: 'design_tokens_absent',
+      })
       return { skipped_no_look: true, characters: zero(), worlds: zero() }
     }
   } catch (e) {
@@ -302,6 +387,10 @@ export async function triggerAssetDrafts(
       '[v2design-trigger] design_tokens absent — skipping (stalled path)',
       e instanceof Error ? e.message : e,
     )
+    await recordWriterObservabilityEvent(projectId, 'asset_trigger_blocked', {
+      source: 'writer_v2_design',
+      reason: 'design_tokens_lookup_failed',
+    })
     return { skipped_no_look: true, characters: zero(), worlds: zero() }
   }
 
@@ -325,5 +414,10 @@ export async function triggerAssetDrafts(
   console.log(
     `[v2design-trigger] ${projectId} — chars ${characters.submitted}/${characters.skipped}/${characters.failed}, worlds ${worlds.submitted}/${worlds.skipped}/${worlds.failed}`,
   )
+  await recordWriterObservabilityEvent(projectId, 'asset_trigger_completed', {
+    source: 'writer_v2_design',
+    characters,
+    worlds,
+  })
   return { characters, worlds }
 }

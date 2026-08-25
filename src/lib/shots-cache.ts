@@ -19,6 +19,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { getQueryClient } from '@/lib/query-client'
+import { recordWriterObservabilityEventClient } from '@/lib/writer/debug-events-client'
 import type { Database } from '@/types/database'
 
 export type ShotRow = Database['public']['Tables']['shots']['Row']
@@ -27,6 +28,25 @@ export const shotsKey = (projectId: string) => ['shots', projectId] as const
 
 /** 샷은 편집 중 자주 바뀌는 층 — 캐릭터 시트(5분)보다 짧게. */
 const SHOTS_STALE_MS = 30_000
+const cacheDebugState = new Map<string, string>()
+const cacheDebugInvalidatedAt = new Map<string, number>()
+
+function recordCacheState(projectId: string): void {
+  const state = getQueryClient().getQueryState(shotsKey(projectId))
+  const ageMs = state?.dataUpdatedAt ? Math.max(0, Date.now() - state.dataUpdatedAt) : null
+  const cacheState = !state?.data
+    ? 'miss'
+    : ageMs != null && ageMs <= SHOTS_STALE_MS
+      ? 'fresh'
+      : 'stale'
+  if (cacheDebugState.get(projectId) === cacheState) return
+  cacheDebugState.set(projectId, cacheState)
+  recordWriterObservabilityEventClient(projectId, 'cache_read', {
+    cacheState,
+    ageMs,
+    staleTimeMs: SHOTS_STALE_MS,
+  })
+}
 
 async function fetchShots(projectId: string): Promise<ShotRow[]> {
   const { data, error } = await createClient()
@@ -47,6 +67,7 @@ async function fetchShots(projectId: string): Promise<ShotRow[]> {
  * "같은 진실의 사본"이 다시 생긴다 — 각자 필요한 열만 골라 쓰는 것은 소비처 몫.
  */
 export function loadShots(projectId: string): Promise<ShotRow[]> {
+  recordCacheState(projectId)
   return getQueryClient().fetchQuery({
     queryKey: shotsKey(projectId),
     queryFn: () => fetchShots(projectId),
@@ -59,6 +80,14 @@ export function loadShots(projectId: string): Promise<ShotRow[]> {
  * 다음 loadShots 가 신선 기간과 무관하게 다시 받는다.
  */
 export function invalidateShots(projectId: string): Promise<void> {
+  const now = Date.now()
+  const last = cacheDebugInvalidatedAt.get(projectId) ?? 0
+  if (now - last >= 10_000) {
+    cacheDebugInvalidatedAt.set(projectId, now)
+    recordWriterObservabilityEventClient(projectId, 'cache_invalidated', {
+      reason: 'explicit_invalidation',
+    })
+  }
   return getQueryClient().invalidateQueries({ queryKey: shotsKey(projectId) })
 }
 

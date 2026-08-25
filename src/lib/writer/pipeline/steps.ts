@@ -44,6 +44,7 @@ import {
   type WriterErrorDetail,
 } from '@/lib/writer/run-store';
 import { getPendingRawCalls, getUsageTotals } from '@/lib/writer/llm/raw_collector';
+import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events';
 import {
   classifyStageError,
   shouldAutoRetry,
@@ -688,6 +689,12 @@ export async function runWriterSteps(
         return { paused: true };
       }
       const message = `stage ${step.key} exceeded retry/time budget`;
+      void recordWriterObservabilityEvent(
+        projectId,
+        'stage_failed',
+        { stage: step.key, attempts: state._attempt?.count ?? 0, error: message },
+        { runId: run.id },
+      );
       await markFailed(run.id, message, captureErrorDetail(step.key, message));
       return { failed: true };
     }
@@ -712,6 +719,12 @@ export async function runWriterSteps(
 
     // 단계 실행 (단계별 소요시간 측정 — timing pipeline).
     const stageStartedMs = Date.now();
+    void recordWriterObservabilityEvent(
+      projectId,
+      'stage_started',
+      { stage: step.key, attempt: nextCount },
+      { runId: run.id },
+    );
     // 쿼터 회계(#llm-quota 2026-08-10): 스테이지 전후 델타로 콜/토큰을 잰다. 한 런의
     //   스테이지별 RPM·TPM 프로파일이 여기서 나오고, 그게 동시 실행 가능 수의 분모가 된다.
     const usageBefore = getUsageTotals();
@@ -720,6 +733,17 @@ export async function runWriterSteps(
       patch = await step.run(state, { logger, projectId, deadlineMs: opts.deadlineMs });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      void recordWriterObservabilityEvent(
+        projectId,
+        'stage_failed',
+        {
+          stage: step.key,
+          attempt: nextCount,
+          error: message,
+          errorClass: classifyStageError(e),
+        },
+        { runId: run.id },
+      );
       // #error-class(2026-08-13, 오너 정책 확장): network(프로바이더/우리 서버 일시 장애)는
       //   **예산 차감 없이** 백그라운드 재시도 — 진입 마킹으로 오른 attempt 를 원복하고 별도
       //   안전핀 카운터(_netRetry, 캡 소진 시 표면화)만 올린다. 지수 백오프로 429 폭주 완화.
@@ -848,8 +872,28 @@ export async function runWriterSteps(
       // CAS 패배는 실패가 아니다 — 다른 인보케이션이 run 을 이어받았으니 조용히 양보.
       if (saved === null) return { paused: true };
       version = saved;
+      void recordWriterObservabilityEvent(
+        projectId,
+        'stage_completed',
+        {
+          stage: step.key,
+          attempt: nextCount,
+          durationMs: stageMs,
+          calls: stageCalls,
+          inputTokens: stageInTok,
+          outputTokens: stageOutTok,
+          rateLimitHits: stage429,
+        },
+        { runId: run.id },
+      );
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      void recordWriterObservabilityEvent(
+        projectId,
+        'stage_failed',
+        { stage: step.key, attempt: nextCount, error: message, phase: 'checkpoint' },
+        { runId: run.id },
+      );
       await markFailed(run.id, message, captureErrorDetail(step.key, message));
       return { failed: true };
     }

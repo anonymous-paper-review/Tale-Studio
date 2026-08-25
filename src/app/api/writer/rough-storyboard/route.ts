@@ -32,6 +32,7 @@ import { parseProjectFormat } from '@/types/project'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
 import { parseCheckConstraints } from '@/lib/writer/check-notes'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
+import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 
 
 export const runtime = 'nodejs'
@@ -146,6 +147,7 @@ async function translateRoughSpecsEn(
 export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
+  let debugProjectId: string | null = null
   try {
     const parsed = BodySchema.safeParse(await req.json().catch(() => null))
     if (!parsed.success)
@@ -154,10 +156,14 @@ export async function POST(req: Request) {
         { status: 400 },
       )
     const { projectId, shotIds, force, styleHints } = parsed.data
+    debugProjectId = projectId
 
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
+    await recordWriterObservabilityEvent(projectId, 'route_entered', {
+      shotCount: shotIds?.length ?? 0,
+    })
 
     const quota = await checkUserQuota(access.userId!)
     if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
@@ -304,6 +310,16 @@ export async function POST(req: Request) {
     const cappedChunks = chunkPlan.slice(0, MAX_GRID_JOBS_PER_CALL)
     const plannedCount = cappedChunks.reduce((n, c) => n + c.length, 0)
     const remaining = eligible.length - plannedCount
+    const skippedByReason = skipped.reduce<Record<string, number>>((counts, item) => {
+      counts[item.reason] = (counts[item.reason] ?? 0) + 1
+      return counts
+    }, {})
+    await recordWriterObservabilityEvent(projectId, 'route_classified', {
+      wantedCount: wanted.length,
+      eligibleCount: eligible.length,
+      submittedCount: plannedCount,
+      skippedByReason,
+    })
 
     // 언어 경계(S3b): 주 컬럼이 native(수동/편집 샷)일 수 있어, 프롬프트 주입 전 action·mood 를 EN 으로 정규화.
     //   deriveEnBatch 가 이미 영어인 값은 LLM 호출 없이 통과(파이프라인 EN 산출은 무비용, native 만 번역).
@@ -490,27 +506,40 @@ export async function POST(req: Request) {
         prompt = `Create the storyboard sheet yourself on clean paper (no reference image available), matching the panel layout described below, then fill it.\n\n${prompt}`
       }
 
-      const { request_id, model } = await falImageSubmit(
-        templateUrl
-          ? {
-              model: DEFAULT_EDIT_IMAGE_MODEL, // gpt-image-2/edit — 템플릿 칸에 그려 넣기
-              prompt,
-              reference_image_urls: [templateUrl],
-              // 포맷 시트는 캔버스 명시(=템플릿 치수, #sheet-formats) / 레거시는 미전달 →
-              //   image_size 'auto' (reference 비율 유지 — crop 좌표 정합의 핵심, 종전 그대로)
-              ...(sheetGeom.roughImageSize ? { image_size: sheetGeom.roughImageSize } : {}),
-              webhookUrl,
-            }
-          : {
-              model: DEFAULT_IMAGE_MODEL, // T2I 폴백 (dev)
-              prompt,
-              aspect_ratio: (() => {
-                const [w, h] = sheetGeom.repaintCanvas.split('x').map(Number)
-                return w > h ? '16:9' : w < h ? '9:16' : '1:1'
-              })(),
-              webhookUrl,
-            },
-      )
+      await recordWriterObservabilityEvent(projectId, 'fal_submit_started', {
+        shotCount: chunk.length,
+      })
+      let falResult: { request_id: string; model: string }
+      try {
+        falResult = await falImageSubmit(
+          templateUrl
+            ? {
+                model: DEFAULT_EDIT_IMAGE_MODEL, // gpt-image-2/edit — 템플릿 칸에 그려 넣기
+                prompt,
+                reference_image_urls: [templateUrl],
+                // 포맷 시트는 캔버스 명시(=템플릿 치수, #sheet-formats) / 레거시는 미전달 →
+                //   image_size 'auto' (reference 비율 유지 — crop 좌표 정합의 핵심, 종전 그대로)
+                ...(sheetGeom.roughImageSize ? { image_size: sheetGeom.roughImageSize } : {}),
+                webhookUrl,
+              }
+            : {
+                model: DEFAULT_IMAGE_MODEL, // T2I 폴백 (dev)
+                prompt,
+                aspect_ratio: (() => {
+                  const [w, h] = sheetGeom.repaintCanvas.split('x').map(Number)
+                  return w > h ? '16:9' : w < h ? '9:16' : '1:1'
+                })(),
+                webhookUrl,
+              },
+        )
+      } catch (error) {
+        await recordWriterObservabilityEvent(projectId, 'fal_submit_failed', {
+          shotCount: chunk.length,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        throw error
+      }
+      const { request_id, model } = falResult
       const chunkShotIds = chunk.map((s) => s.shot_id as string)
       const job = await createGenerationJob({
         projectId,
@@ -531,6 +560,12 @@ export async function POST(req: Request) {
           sheet_format: sheetGeom.roughImageSize ? projectFormat : null,
         },
       })
+      await recordWriterObservabilityEvent(projectId, 'fal_submit_accepted', {
+        jobId: job.id,
+        requestId: request_id,
+        model,
+        shotCount: chunk.length,
+      })
       for (const s of chunk) {
         const shotId = s.shot_id as string
         submitted.push({
@@ -545,6 +580,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, data: { submitted, skipped, remaining } })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    if (debugProjectId) {
+      await recordWriterObservabilityEvent(debugProjectId, 'route_failed', {
+        error: msg.slice(0, 500),
+      })
+    }
     console.error('[writer/rough-storyboard]', msg)
     return NextResponse.json(
       { ok: false, error: { code: 'internal', message: msg } },

@@ -1358,6 +1358,58 @@ export type Database = {
         Relationships: [
         ]
       }
+      writer_observability_events: {
+        Row: {
+          id: string
+          project_id: string
+          run_id: string | null
+          generation_job_id: string | null
+          event: string
+          payload: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          run_id?: string | null
+          generation_job_id?: string | null
+          event: string
+          payload?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          run_id?: string | null
+          generation_job_id?: string | null
+          event?: string
+          payload?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "writer_observability_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "writer_observability_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "writer_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "writer_observability_events_generation_job_id_fkey"
+            columns: ["generation_job_id"]
+            isOneToOne: false
+            referencedRelation: "generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       writer_runs: {
         Row: {
           id: string

@@ -17,6 +17,7 @@ import {
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
 import { falImageFetch, falVideoFetch } from '@/lib/writer/llm/fal'
+import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 import {
   DirectorVideoCompletionPersistenceError,
   finalizeGenerationJob,
@@ -37,6 +38,14 @@ async function completeOrTerminalizeJob(
 ): Promise<GenerationJob> {
   try {
     const url = await finalizeGenerationJob(job, typeof result === 'function' ? result() : result)
+    if (job.kind === 'shot_rough_storyboard') {
+      void recordWriterObservabilityEvent(
+        job.project_id,
+        'finalize_completed',
+        { resultUrlPresent: Boolean(url), status: 'completed' },
+        { generationJobId: job.id },
+      )
+    }
     return { ...job, status: 'completed', result_url: url }
   } catch (error) {
     if (error instanceof GenerationJobTerminalTransitionError) {
@@ -53,6 +62,14 @@ async function completeOrTerminalizeJob(
       throw error
     }
     const message = error instanceof Error ? error.message : String(error)
+    if (job.kind === 'shot_rough_storyboard') {
+      void recordWriterObservabilityEvent(
+        job.project_id,
+        'finalize_failed',
+        { error: message },
+        { generationJobId: job.id },
+      )
+    }
     return terminalizeJob(job, message)
   }
 }

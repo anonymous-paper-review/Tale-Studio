@@ -67,6 +67,7 @@ import {
 } from '@/lib/card-mention'
 import { writerSceneShotMentions } from '@/lib/script-lines'
 import { invalidateShots } from '@/lib/shots-cache'
+import { recordWriterObservabilityEventClient } from '@/lib/writer/debug-events-client'
 
 type PanelJob = { status: 'generating' | 'failed'; error?: string }
 
@@ -155,6 +156,7 @@ export function RoughStoryboardView() {
   const [zoomLevel, setZoomLevel] = useStoryboardZoom('writer:zoomLevel')
   const boardRef = useRef<HTMLDivElement>(null)
   const autoTriggeredRef = useRef(false)
+  const autoCheckLoggedRef = useRef<string | null>(null)
   const reloadedAfterCompleteRef = useRef(false)
   // drag-to-scroll 직후의 click 이 카드 팝업을 여는 오발 방지
   const draggedRef = useRef(false)
@@ -275,8 +277,21 @@ export function RoughStoryboardView() {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ projectId, shotIds, force, styleHints }),
         })
+        const j = await res.json().catch(() => null)
         // 쿼터 초과(429)는 실패가 아니라 "큐가 빌 때까지 대기" 신호 — 펌프가 재시도한다(#c1).
         if (res.status === 429) {
+          if (auto) {
+            recordWriterObservabilityEventClient(projectId, 'auto_submit_response', {
+              auto: true,
+              httpStatus: 429,
+              submittedCount: 0,
+              remaining: 0,
+              quota: true,
+              queued: typeof j?.queued === 'number' ? j.queued : null,
+              limit: typeof j?.limit === 'number' ? j.limit : null,
+              code: typeof j?.code === 'string' ? j.code : null,
+            })
+          }
           if (shotIds?.length) {
             setPanelJobs((prev) => {
               const next = { ...prev }
@@ -286,7 +301,6 @@ export function RoughStoryboardView() {
           }
           return { submitted: 0, remaining: 0, quota: true, done: Promise.resolve() }
         }
-        const j = await res.json().catch(() => null)
         if (!res.ok || !j?.ok) {
           throw new Error(j?.error?.message ?? `HTTP ${res.status}`)
         }
@@ -294,6 +308,21 @@ export function RoughStoryboardView() {
           shotId: string
           jobId: string
         }>
+        if (auto) {
+          const skipped = (j.data?.skipped ?? []) as Array<{ reason?: unknown }>
+          const skippedByReason = skipped.reduce<Record<string, number>>((counts, item) => {
+            const reason = typeof item.reason === 'string' ? item.reason : 'unknown'
+            counts[reason] = (counts[reason] ?? 0) + 1
+            return counts
+          }, {})
+          recordWriterObservabilityEventClient(projectId, 'auto_submit_response', {
+            auto: true,
+            httpStatus: res.status,
+            submittedCount: submitted.length,
+            remaining: j.data?.remaining ?? 0,
+            skippedByReason,
+          })
+        }
         // give-up 게이트로 건너뛴 샷 안내 — 진입 자동 생성(auto)에는 매번 뜨지 않도록 억제.
         if (!auto) {
           const gaveUp = (
@@ -395,6 +424,9 @@ export function RoughStoryboardView() {
               .catch(() => false)
           }
           for (let i = 0; i < ROUGH_CONVERGE_MAX_RELOADS; i++) {
+            // 생성 완료 결과는 서버가 shots 를 갱신한 뒤 도착한다. 캐시 신선 기간을
+            // 기다리지 않고 매 수렴 확인마다 새 DB 행을 읽어야 한다.
+            await invalidateShots(projectId)
             await loadProject()
             const settled = jobShotIds.filter(isDone)
             clearShots(settled)
@@ -434,6 +466,12 @@ export function RoughStoryboardView() {
           done: Promise.allSettled(polls),
         }
       } catch (e) {
+        if (auto) {
+          recordWriterObservabilityEventClient(projectId, 'auto_submit_response', {
+            auto: true,
+            error: e instanceof Error ? e.message : String(e),
+          })
+        }
         if (shotIds?.length) {
           setPanelJobs((prev) => {
             const next = { ...prev }
@@ -562,15 +600,67 @@ export function RoughStoryboardView() {
     </>
   ) : null
 
+  // 자동 생성 판정은 한 프로젝트 진입당 한 번 영속화한다. 첫 null 상태는 로딩 중일 수
+  // 있으므로 status 가 도착한 뒤 기록해 "조건 미충족"과 "아직 데이터 없음"을 구분한다.
+  useEffect(() => {
+    if (!projectId || !status || autoCheckLoggedRef.current === projectId) return
+    if (!hasShots && !status.pipeline_completed && !status.pipeline_failed) return
+    autoCheckLoggedRef.current = projectId
+    const reason = !hasShots
+      ? 'no_shots'
+      : running
+        ? 'pipeline_running'
+        : missingIds.length === 0
+          ? 'no_missing_panels'
+          : 'eligible'
+    recordWriterObservabilityEventClient(projectId, 'auto_check', {
+      hasShots,
+      running,
+      pipelineStatus: status.current_status,
+      pipelineCompleted: status.pipeline_completed,
+      pipelineFailed: status.pipeline_failed,
+      shotCount: shots.length,
+      missingCount: missingIds.length,
+      queuedCount: queuedRoughIds.size,
+      autoTriggered: autoTriggeredRef.current,
+      reason,
+    })
+    if (reason !== 'eligible') {
+      recordWriterObservabilityEventClient(projectId, 'auto_submit_blocked', {
+        reason,
+        hasShots,
+        running,
+        shotCount: shots.length,
+        missingCount: missingIds.length,
+        queuedCount: queuedRoughIds.size,
+      })
+    }
+  }, [
+    projectId,
+    status,
+    hasShots,
+    running,
+    missingIds.length,
+    shots.length,
+    queuedRoughIds.size,
+  ])
+
   // 진입 자동 생성: 샷이 로드됐고 파이프라인이 돌고 있지 않을 때, 누락 패널 전체를 1회씩 —
   //   펌프가 6샷 라운드로 나눠 remaining 0 까지 이어간다(#c1). auto=true → give-up 토스트 억제.
   useEffect(() => {
+    if (!projectId) return
     if (autoTriggeredRef.current) return
     if (!hasShots || running) return
     if (missingIds.length === 0) return
     autoTriggeredRef.current = true
+    recordWriterObservabilityEventClient(projectId, 'auto_submit_started', {
+      shotCount: shots.length,
+      missingCount: missingIds.length,
+      queuedCount: queuedRoughIds.size,
+      source: 'writer_entry',
+    })
     void generateAllMissing(true)
-  }, [hasShots, running, missingIds.length, generateAllMissing])
+  }, [projectId, hasShots, running, missingIds.length, queuedRoughIds.size, shots.length, generateAllMissing])
 
   // Ctrl + wheel → 보드 축척(zoom). 브라우저 페이지 줌을 막아야 하므로 native wheel 리스너(passive:false)로
   //   붙인다(React onWheel 은 passive 라 preventDefault 가 안 먹을 수 있음). up=확대(열↓), down=축소(열↑).
