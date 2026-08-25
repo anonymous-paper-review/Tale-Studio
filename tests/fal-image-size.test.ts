@@ -48,7 +48,7 @@ describe('buildFalImageInput — image_size 정규화', () => {
 
 describe('realSheetCanvas — 프로듀서 포맷 → 실사 시트 캔버스 (#sheet-formats 2차: 4포맷 전부 스펙)', () => {
   it('그리드: 셀 AR 정확·데드밴드 제거 캔버스 (horizontal 도 레거시에서 스펙 시트로 이동)', () => {
-    expect(realSheetCanvas('horizontal_16:9', 'grid4')).toBe('1728x768')
+    expect(realSheetCanvas('horizontal_16:9', 'grid4')).toBe('2880x1280') // #hd-grid 상향(오너 ③D)
     expect(realSheetCanvas('vertical_9:16', 'grid4')).toBe('1152x1536')
     expect(realSheetCanvas('square_1:1', 'grid4')).toBe('1344x1024')
     expect(realSheetCanvas('cinema_2.39:1', 'grid4')).toBe('2400x880') // #cinema-row-pitch 확대 추종

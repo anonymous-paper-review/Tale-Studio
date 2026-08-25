@@ -84,11 +84,15 @@ const boxes = (start: number, size: number, n: number, gap = 20): Array<[number,
   Array.from({ length: n }, (_, i) => [start + i * (size + gap), start + i * (size + gap) + size])
 
 const SHEET_SPECS: Partial<Record<`${ProjectFormat}:${RoughGridVariant}`, SheetSpec>> = {
-  // 16:9 — 셀 400×225(정확 1.778, 면적 90k ≈ 레거시 372×241 의 89.7k 보존)
+  // 16:9 — 셀 672×378(정확 1.778). #hd-grid(2026-08-25 오너 ③D): 1차 400×225(90k, 레거시
+  //   화소대 보존)는 프레임 실효 해상도가 0.09MP 라 업스케일 소프트 + ECU 류에서 모델이 셀 안에
+  //   내용을 작게 그리는 붕괴 유인(9d562ada 14샷 전수 실측). 캔버스 1728×768→2880×1280(3.69MP,
+  //   스키마 상한 8.29MP 내), 셀 면적 2.82×. 생성 비용 증가는 오너 승인. 러프·리페인트가 같은
+  //   스펙을 읽으므로 previz 와 real 이 함께 오른다.
   'horizontal_16:9:grid4': {
-    canvas: { width: 1728, height: 768 },
-    colBoxes: boxes(34, 400, 4),
-    rowBoxes: boxes(26, 225, 3),
+    canvas: { width: 2880, height: 1280 },
+    colBoxes: boxes(66, 672, 4),
+    rowBoxes: boxes(53, 378, 3),
     frameAxis: 'rows',
     templatePath: '/rough-storyboard-grid-horizontal.png',
   },
@@ -459,20 +463,20 @@ export function buildRoughGridPrompt(
       ? `The reference image is a paper storyboard sheet with 12 empty panels in a 4-column × 3-row grid. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels, never across panel borders. Each panel has small corner registration brackets just inside its border — redraw them exactly in place at all four corners, and keep every drawing inside them.
 
 Each COLUMN is one shot of a film, read top to bottom as three frames:
-- Row 1 (top) = START: the composition at the beginning of the shot.
+- Row 1 (top) = START: the composition at the beginning of the shot — the instant just BEFORE the column's described movement begins. If the movement's end state would already be true here (a figure already kneeling before a "kneels down" motion, an object already set down before a "sets it down" motion), wind Row 1 back so the movement still has room to play out between Row 1 and Row 3.
 - Row 2 (middle) = DIRECTION: an EXACT identical copy of Row 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Row 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Row 1 and Row 2 is the arrows and labels drawn on top. Row 2 is the ONLY place where text is allowed. Letter every technical label as a compact block along the bottom edge INSIDE the DIRECTION panel — keep the drawing above the labels and never write between panels.
 - Row 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Row 3 is the only frame where the motion has visibly progressed — and when a shot has movement, its END must differ clearly and unmistakably from its START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
       : stripRow
         ? `The reference image is a wide paper storyboard sheet with 3 empty panels side by side in a row. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels. Each panel has small corner registration brackets just inside its border — redraw them exactly in place at all four corners, and keep every drawing inside them.
 
 The row is ONE shot of a film, read left to right as three frames:
-- Panel 1 (LEFT) = START: the composition at the beginning of the shot.
+- Panel 1 (LEFT) = START: the composition at the beginning of the shot — the instant just BEFORE the described movement begins; if the movement's end state would already be true here, wind Panel 1 back so the movement still has room to play out between Panel 1 and Panel 3.
 - Panel 2 (MIDDLE) = DIRECTION: an EXACT identical copy of Panel 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Panel 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Panel 1 and Panel 2 is the arrows and labels drawn on top. Panel 2 is the ONLY place where text is allowed. Letter every technical label as a compact block along the bottom edge INSIDE the DIRECTION panel — keep the drawing above the labels and never write between panels.
 - Panel 3 (RIGHT) = END: the composition at the end of the shot, after the movement completes. Panel 3 is the only frame where the motion has visibly progressed — and when the shot has movement, END must differ clearly and unmistakably from START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
         : `The reference image is a paper storyboard strip with 3 empty panels stacked vertically. Keep the sheet, panel borders and margins exactly as they are — draw only INSIDE the panels. Each panel has small corner registration brackets just inside its border — redraw them exactly in place at all four corners, and keep every drawing inside them.
 
 The strip is ONE shot of a film, read top to bottom as three frames:
-- Panel 1 (top) = START: the composition at the beginning of the shot.
+- Panel 1 (top) = START: the composition at the beginning of the shot — the instant just BEFORE the described movement begins; if the movement's end state would already be true here, wind Panel 1 back so the movement still has room to play out between Panel 1 and Panel 3.
 - Panel 2 (middle) = DIRECTION: an EXACT identical copy of Panel 1 — trace the very same drawing with the same poses, positions, framing and props, frozen at the same instant. Do NOT advance the motion; do NOT draw an in-between moment; nothing in the scene may change from Panel 1. Then overlay bold hand-drawn direction arrows for the camera and figure movement described below, with short handwritten English labels (e.g. "DOLLY IN", "PAN →", "TURNS"). The ONLY difference between Panel 1 and Panel 2 is the arrows and labels drawn on top. Panel 2 is the ONLY place where text is allowed. Letter every technical label as a compact block along the bottom edge INSIDE the DIRECTION panel — keep the drawing above the labels and never write between panels.
 - Panel 3 (bottom) = END: the composition at the end of the shot, after the movement completes. Panel 3 is the only frame where the motion has visibly progressed — and when the shot has movement, END must differ clearly and unmistakably from START (full extent of the motion over the shot's stated duration), never a barely-changed copy.`
 
