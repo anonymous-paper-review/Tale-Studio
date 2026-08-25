@@ -36,7 +36,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className="dark">
+      {/* suppressHydrationWarning: 비밀번호 관리자 등 브라우저 확장이 React 하이드레이션 전
+          body 태그에 속성(__processed_*__ 등)을 주입해 서버/클라이언트 불일치 경고가 뜬다.
+          우리 코드가 아닌 외부 주입이므로 body 속성 한 겹에 한해 경고만 억제한다(자식은 그대로 검사). */}
       <body
+        suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} ${pretendard.variable} antialiased`}
       >
         <QueryProvider>
