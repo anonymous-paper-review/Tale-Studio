@@ -206,6 +206,7 @@ export default function HomePage() {
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [plan, setPlan] = useState('free')
   const [slotLimit, setSlotLimit] = useState(1)
+  const [unlimitedProjects, setUnlimitedProjects] = useState(false)
   const [canUseReference, setCanUseReference] = useState(false)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -249,6 +250,7 @@ export default function HomePage() {
                   : 1,
               )
               setCanUseReference(data?.canUseReference === true)
+              setUnlimitedProjects(data?.unlimitedProjects === true)
             })
             .catch(() => {})
             .finally(() => setLoading(false))
@@ -677,7 +679,9 @@ export default function HomePage() {
                 aria-describedby="home-reference-project-help"
                 aria-label={
                   canUseReference
-                    ? `Reference project (${plan}, ${projects.length} of ${slotLimit} slots used)`
+                    ? `Reference project (${plan}, ${
+                        unlimitedProjects ? 'unlimited' : `${projects.length} of ${slotLimit}`
+                      } slots used)`
                     : `Reference project locked on the ${plan} plan`
                 }
                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm text-gray-900 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"

@@ -10,6 +10,7 @@ import {
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { parseAppLocale } from '@/lib/locale'
+import { isAdminWorkspaceOwner } from '@/lib/admin'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     // Find workspace for this user
     const { data: workspace } = await supabaseAdmin
       .from('workspaces')
-      .select('id, plan')
+      .select('id, plan, owner_id')
       .eq('owner_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -64,8 +65,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const isAdmin = isAdminWorkspaceOwner(user, workspace.owner_id)
     const limit = getPlanLimit(workspace.plan)
-    if (projectCount >= limit) {
+    if (!isAdmin && projectCount >= limit) {
       return NextResponse.json(
         { error: 'slot_limit', limit, plan: workspace.plan },
         { status: 403 },

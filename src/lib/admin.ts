@@ -19,6 +19,13 @@ export function isAdminEmail(email: string | null | undefined): boolean {
   return new Set([...DEFAULT_ADMIN_EMAILS, ...fromEnv]).has(email.trim().toLowerCase())
 }
 
+export function isAdminWorkspaceOwner(
+  user: { id: string; email?: string | null },
+  ownerId: string | null | undefined,
+): boolean {
+  return isAdminEmail(user.email) && ownerId === user.id
+}
+
 /**
  * "관리자 소유 프로젝트" 판별 — 관리자 이메일 && 프로젝트 워크스페이스 소유자가 본인.
  * 디버그 프롬프트(#debug-prompts)와 정합 검사(#adherence P2)가 같은 게이트를 공유한다.
@@ -40,5 +47,5 @@ export async function isAdminOwnedProject(
     .select('owner_id')
     .eq('id', project.workspace_id)
     .maybeSingle()
-  return ws?.owner_id === user.id
+  return isAdminWorkspaceOwner(user, ws?.owner_id)
 }

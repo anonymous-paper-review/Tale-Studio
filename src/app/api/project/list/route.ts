@@ -1,6 +1,7 @@
 import { canUseReference, getPlanLimit } from '@/lib/plan-limits'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { isAdminWorkspaceOwner } from '@/lib/admin'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
@@ -16,7 +17,7 @@ export async function GET() {
 
     const { data: workspace } = await supabaseAdmin
       .from('workspaces')
-      .select('id, plan')
+      .select('id, plan, owner_id')
       .eq('owner_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -32,7 +33,8 @@ export async function GET() {
     }
 
     const plan = workspace.plan || 'free'
-    const slotLimit = getPlanLimit(plan)
+    const isAdmin = isAdminWorkspaceOwner(user, workspace.owner_id)
+    const slotLimit = isAdmin ? null : getPlanLimit(plan)
     const referenceEnabled = canUseReference(plan)
 
     const { data: projects } = await supabaseAdmin
@@ -89,6 +91,7 @@ export async function GET() {
       })),
       plan,
       slotLimit,
+      unlimitedProjects: isAdmin,
       canUseReference: referenceEnabled,
     })
   } catch (err) {

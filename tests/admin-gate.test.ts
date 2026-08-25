@@ -2,7 +2,7 @@
 //   버그: 관리자 목록에 개인 계정만 있고 실제 작업 워크스페이스는 admin@tale.studio 소유라
 //   "관리자 이메일 && 워크스페이스 소유자" AND 조건이 배타가 돼 디버그가 영영 안 켜졌다.
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { isAdminEmail } from '@/lib/admin'
+import { isAdminEmail, isAdminWorkspaceOwner } from '@/lib/admin'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -34,5 +34,16 @@ describe('isAdminEmail', () => {
     expect(isAdminEmail('extra@tale.studio')).toBe(true)
     expect(isAdminEmail('other@x.com')).toBe(true)
     expect(isAdminEmail('nope@x.com')).toBe(false)
+  })
+})
+
+describe('isAdminWorkspaceOwner', () => {
+  it('관리자 이메일과 워크스페이스 소유자가 모두 일치할 때만 통과한다', () => {
+    const user = { id: 'admin-id', email: 'admin@tale.studio' }
+    expect(isAdminWorkspaceOwner(user, 'admin-id')).toBe(true)
+    expect(isAdminWorkspaceOwner(user, 'other-id')).toBe(false)
+    expect(isAdminWorkspaceOwner({ id: 'admin-id', email: 'user@example.com' }, 'admin-id')).toBe(
+      false,
+    )
   })
 })
