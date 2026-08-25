@@ -395,6 +395,10 @@ export function RoughStoryboardView() {
               .catch(() => false)
           }
           for (let i = 0; i < ROUGH_CONVERGE_MAX_RELOADS; i++) {
+            // #shots-cache-invalidate: 잡 완료를 안 순간의 리로드는 30초 신선 사물함을 그대로
+            //   믿으면 안 된다 — 무효화 없이 돌면 "리로드 1회 수렴" 설계가 캐시 도입 후 최대
+            //   30초 스피너로 늘어진다(오너 rerender 검증 요청에서 발견). 재시도마다 뚫는다.
+            if (projectId) await invalidateShots(projectId)
             await loadProject()
             const settled = jobShotIds.filter(isDone)
             clearShots(settled)
@@ -485,7 +489,7 @@ export function RoughStoryboardView() {
               toast.info(
                 translate(
                   locale,
-                  "Another generation task is using the queue. We'll continue as soon as a slot opens up.",
+                  "The server is busy, so this is taking longer than usual. We'll continue automatically as soon as a slot opens.",
                 ),
               )
             }

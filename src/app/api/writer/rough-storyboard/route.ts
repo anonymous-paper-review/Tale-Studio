@@ -15,7 +15,6 @@ import {
   AUTO_GENERATION_GIVE_UP_THRESHOLD,
   STALE_QUEUED_MS,
 } from '@/lib/generation-jobs'
-import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { isRichStaticSpec, type RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
 // L4(shotDesign) state 로더 — 공용 lib(#motion-contract): 비디오 라우트와 공유.
@@ -159,8 +158,12 @@ export async function POST(req: Request) {
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
 
-    const quota = await checkUserQuota(access.userId!)
-    if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
+    // #initial-rough-unblocked(2026-08-25 오너 지시 "처음에는 무조건 생성되게"): 러프 그리드는
+    //   파이프라인의 빈칸 자율 채움 — 첫 생성이 유저 쿼터(artist 백필 등 다른 잡의 점유)에 걸려
+    //   429 로 통째 막히면 "그냥 안 됨"으로 보인다. fal 은 초과분을 자기 큐에 대기시키므로(거부
+    //   아님) 우리 잡 등록은 막지 않는다 — 느려도 큐에는 들어간다. 쿼터 가드는 고가 작업
+    //   (실사 그리드·영상 라우트)에 그대로 남는다. 폭주 방어는 존치: 호출당 6샷 캡 + 샷 단위
+    //   dedupe + give-up 게이트.
 
     const { data: project } = await supabaseAdmin
       .from('projects')
