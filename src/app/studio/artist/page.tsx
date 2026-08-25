@@ -283,11 +283,37 @@ export default function VisualPage() {
   const artistHandoffSpec = handoffFrom('artist')
   const artistHandoffUtterance = artistHandoffSpec ? t(artistHandoffSpec.utterance) : null
   const artistHandoffLabel = artistHandoffSpec ? t(artistHandoffSpec.label) : null
+  // 게이트 차단 사유를 안정 문자열로 — deps 에 객체(artistGate, 매 렌더 새 참조)를 넣으면
+  //   1500ms 타이머가 렌더마다 리셋돼 멘트가 영영 못 뜬다. 문자열 값은 내용이 같으면 dep 안정.
+  const artistGateBlockSummary = artistGate.blockers.map((b) => b.field).join(',')
   useEffect(() => {
-    if (!projectId || !ready || !writerReady || !artistGate.ready) return
-    if (!shouldOfferHandoffNudge('artist', reachedStageForNudge)) return
-    if (characterAssets.length === 0 || generatingCount > 0) return
+    if (!projectId) return
     const timer = setTimeout(() => {
+      // #nudge-diagnosis(2026-08-26, 화개장터_3 실측): 서버 진실(런 완료·뷰 완비·stage=artist)이
+      //   전부 충족인데 멘트가 침묵 — 어느 클라 플래그가 막았는지 관측 수단이 없었다. 판정을
+      //   발사 시점으로 옮기고(휘발성 값은 스토어에서 라이브로 읽는다), 막히면 사유를 콘솔에
+      //   남긴다. 조건 충족을 기다리는 재시도는 종전대로 deps 재실행이 맡는다.
+      const artistLive = useArtistStore.getState()
+      const liveGenerating =
+        artistLive.generatingViews.length + artistLive.generatingLocations.length
+      const liveReached = useProjectStore.getState().reachedStage
+      const blocked = !ready
+        ? 'enter-not-ready'
+        : !writerReady
+          ? 'writer-not-ready'
+          : !artistGate.ready
+            ? `artist-gate:${artistGateBlockSummary}`
+            : characterAssets.length === 0
+              ? 'no-character-assets'
+              : liveGenerating > 0
+                ? `generating:${liveGenerating}`
+                : !shouldOfferHandoffNudge('artist', liveReached)
+                  ? `handoff-once:reached=${liveReached}`
+                  : null
+      if (blocked) {
+        console.info('[artist-ready-nudge] blocked:', blocked)
+        return
+      }
       // 탭 하단의 'Approve & Direct' 버튼을 걷어내고 이 제안이 그 자리를 대신한다(#handoff-to-chat).
       //   버튼은 직접 이동하지 않고 문장을 채팅에 입력해 보낸다 — 직접 타이핑과 같은 경로.
       // #handoff-suggestion-drop(2026-08-25, producer 8/7 수리의 artist 판): 옛 원샷 래치
@@ -321,6 +347,7 @@ export default function VisualPage() {
     offerSuggestion,
     writerReady,
     artistGate.ready,
+    artistGateBlockSummary,
     activeSuggestion,
     reachedStageForNudge,
     artistReadyContentWithWorlds,
