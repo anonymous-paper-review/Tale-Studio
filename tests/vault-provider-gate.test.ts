@@ -93,6 +93,11 @@ function completeArgs(ctx: ReturnType<typeof setup>, snapshot: ReturnType<typeof
 
 afterEach(() => workspaces.splice(0).forEach(path => rmSync(path, { recursive: true, force: true })))
 
+// 실측 기반 시간 예산 (티켓 vault-test-timeout-cost-map-2026-08-23):
+// 이 파일의 매 시험이 provider-gate.py 를 python3 자식 프로세스로 새로 띄운다.
+// 단독 실행 기준 파일당 약 23.5초, 최악 단일 시험(failed primary만 fallback으로 넘긴다)
+// 3252ms/5000ms(65%) — 로직이 아니라 파이썬 프로세스 기동 대기(246회 × 191ms)가 원인이라
+// 병렬 부하에서 수 배로 흔들린다.
 describe('provider-gate vault boundaries', () => {
   it('valid provider success alone writes the canonical stamp', () => {
     const ctx = setup(); const snapshot = bind(ctx); artifacts(ctx, snapshot)
@@ -399,4 +404,4 @@ sys.exit(0 if n == 0 else 1)
       '--contract-path', ctx.contract, '--run-id', 'run-1', '--actor', 'jh',
       '--fencing', String(ctx.claim.fencing + 1), `--token=${ctx.claim.token}`]).status).toBe(1)
   })
-})
+}, 30000)

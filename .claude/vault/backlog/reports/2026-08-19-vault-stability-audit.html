@@ -1,0 +1,294 @@
+<title>Vault 밤 워크플로우 안정성 현황 — 2026년 8월 19일</title>
+<style>
+  :root {
+    --bg: #F7F5F0; --surface: #FFFFFF; --surface-2: #F1EEE6;
+    --ink: #22242A; --muted: #6E7077; --line: #E3E0D8;
+    --accent: #A64F2A; --accent-ink: #8A3F1E; --accent-soft: #F3E4DB;
+    --ok: #2F7D4E; --ok-soft: #E2F0E7;
+    --warn: #96690A; --warn-soft: #F5EBD4;
+    --info: #3A6EA5; --info-soft: #E3ECF5;
+    --violet: #7A5CA8; --violet-soft: #ECE5F5;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15171B; --surface: #1D2026; --surface-2: #23262D;
+      --ink: #E9E7E2; --muted: #9C9EA6; --line: #2C2F36;
+      --accent: #E0824F; --accent-ink: #E8956A; --accent-soft: #3A2A20;
+      --ok: #5FBE8A; --ok-soft: #1E3328;
+      --warn: #D9A94A; --warn-soft: #362C16;
+      --info: #7FA9D9; --info-soft: #1E2A38;
+      --violet: #A78BD0; --violet-soft: #2B2438;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15171B; --surface: #1D2026; --surface-2: #23262D;
+    --ink: #E9E7E2; --muted: #9C9EA6; --line: #2C2F36;
+    --accent: #E0824F; --accent-ink: #E8956A; --accent-soft: #3A2A20;
+    --ok: #5FBE8A; --ok-soft: #1E3328;
+    --warn: #D9A94A; --warn-soft: #362C16;
+    --info: #7FA9D9; --info-soft: #1E2A38;
+    --violet: #A78BD0; --violet-soft: #2B2438;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", sans-serif; font-size: 15.5px; line-height: 1.7; margin: 0; padding: 0 20px 96px; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  header.page { padding: 54px 0 10px; border-bottom: 2px solid var(--ink); margin-bottom: 20px; }
+  .kicker { color: var(--accent); font-weight: 700; font-size: 13px; margin: 0 0 10px; }
+  h1 { font-size: clamp(25px, 4.5vw, 34px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.28; margin: 0 0 10px; text-wrap: balance; }
+  .standfirst { font-size: 16px; color: var(--ink); margin: 0 0 6px; }
+  .asof { color: var(--muted); font-size: 13px; margin: 0; }
+  h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+  section.block { margin: 42px 0 0; }
+  .sec-head { border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 16px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .sec-head .lede { color: var(--muted); font-size: 14px; }
+  p { margin: 0 0 12px; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 750; border-radius: 4px; padding: 1px 8px; white-space: nowrap; vertical-align: 1px; }
+  .c-ok { background: var(--ok-soft); color: var(--ok); }
+  .c-no { background: var(--info-soft); color: var(--info); }
+  .c-hold { background: var(--warn-soft); color: var(--warn); }
+  .c-fix { background: var(--accent-soft); color: var(--accent-ink); }
+  .c-stop { background: var(--violet-soft); color: var(--violet); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px 14px; margin: 0 0 14px; }
+  .card .head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 12px; }
+  .card .head h3 { font-size: 16.5px; font-weight: 750; margin: 0; line-height: 1.45; text-wrap: balance; flex: 1 1 300px; }
+  .steps { display: grid; gap: 8px; margin: 0; }
+  .steps .row { display: grid; grid-template-columns: 74px 1fr; gap: 12px; align-items: baseline; }
+  .steps .k { font-size: 12px; font-weight: 750; color: var(--accent); letter-spacing: .02em; }
+  .steps .v { font-size: 14.5px; }
+  .steps .v b { font-weight: 750; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 0 0 16px; }
+  th { text-align: left; font-weight: 750; border-bottom: 2px solid var(--ink); padding: 6px 8px; }
+  td { border-bottom: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
+  details { margin: 8px 0; }
+  summary { cursor: pointer; font-weight: 700; font-size: 14px; color: var(--accent); }
+  code, .mono { font-family: var(--mono); font-size: 13px; }
+  .lead-list { margin: 0; padding-left: 0; list-style: none; counter-reset: n; }
+  .lead-list > li { position: relative; padding: 10px 0 10px 36px; border-bottom: 1px dashed var(--line); }
+  .lead-list > li:last-child { border-bottom: none; }
+  .lead-list > li::before { counter-increment: n; content: counter(n); position: absolute; left: 0; top: 12px; width: 22px; height: 22px; border: 1.5px solid var(--accent); color: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 750; font-family: var(--mono); }
+  .lead-list b { font-weight: 750; }
+  .lead-list .d { color: var(--muted); font-size: 13.5px; }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+</style>
+<div class="wrap">
+<header class="page">
+  <p class="kicker">VAULT 안정성 감사</p>
+  <h1>밤 실행을 돌리기 전에 확인해야 할 7가지와 현재 상태</h1>
+  <p class="standfirst">8/18~19 사이 5개 세션이 vault 파일을 동시에 수정했다. 어디까지 적용됐고 어디서 막히는지 정리했다.</p>
+  <p class="asof">2026-08-19 23:00 KST 기준 · 이 세션(01a013a0) 작성</p>
+</header>
+
+<!-- ─── 3분 요약 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>한눈에 보기</h2></div>
+  <ol class="lead-list">
+    <li><b>밤 실행은 돌릴 수 있다</b> — dry-run 8단계 전부 통과, inbox hash 무변경. <span class="chip c-ok">통과</span>
+      <div class="d">provider claim → receipt 정산(건너뜀) → 두 inbox snapshot → provider binding → ticket inventory → claude 읽기 → provider 종료</div></li>
+    <li><b>중복 티켓은 안 만들어진다</b> — jh의 모든 원문(closed 34 + tracked 4 + 새 후보 2 방금 tracked)이 기존 티켓에 연결됨. unmarked 0. <span class="chip c-ok">안전</span></li>
+    <li><b>merge 충돌은 다른 세션이 해결했다</b> — unmerged 0, MERGE_HEAD 없음. 현재 main에서 깨끗하게 작업 가능. <span class="chip c-ok">해결됨</span></li>
+    <li><b>8/18 실제 밤 run은 돌지 않았다</b> — <code>runs/jh/</code>와 <code>runs/hs/</code>에 산출물 없음. <span class="chip c-hold">미수행</span></li>
+    <li><b>리허설 하네스는 아직 없다</b> — 실제 run 전체를 샌드박스에서 끝까지 검증하는 도구가 미완성. <span class="chip c-hold">미완성</span></li>
+    <li><b>partial receipt가 다른 세션에서 구현됐다</b> — 하나의 원문에 여러 unit이 있을 때 일부만 끝나도 기록 가능. <span class="chip c-ok">적용됨</span></li>
+    <li><b>ticket runtime handoff는 아직 실전 검증 전이다</b> — 코드와 테스트는 있지만 실제 밤→낮→밤 사이클을 겪지 않았음. <span class="chip c-hold">미검증</span></li>
+  </ol>
+</section>
+
+<!-- ─── 세션 계보 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>8/18~19에 vault를 건드린 세션들</h2><span class="lede">시간순</span></div>
+  <table>
+    <tr><th>세션</th><th>시각</th><th>한 일</th><th>현재</th></tr>
+    <tr>
+      <td><code>01a013a0</code><br><span class="d">이 세션 (GJC)</span></td>
+      <td>8/18 15:48 ~<br>8/19 23:00+</td>
+      <td>inbox 정책 설계, dual snapshot, HMAC authority, receipt/reconcile, ticket-runtime claim/checkpoint/takeover, harvest linkage, provider-owned stamp, inbox bootstrap 36→tracked, 새 후보 2 tracked</td>
+      <td><span class="chip c-hold">활성</span></td>
+    </tr>
+    <tr>
+      <td><code>01a01863</code><br><span class="d">GJC Update</span></td>
+      <td>8/19 04:59 ~ 16:35</td>
+      <td>origin/main merge, partial receipt 구현 (subagent 4개), receipt 28개 작성→reconcile→closed 34개, merge 충돌 해결, inbox(jh) commit</td>
+      <td><span class="chip c-ok">종료</span></td>
+    </tr>
+    <tr>
+      <td><code>80bfb6b8</code><br><span class="d">Claude Code</span></td>
+      <td>8/19 14:11 ~ 22:13</td>
+      <td>write-receipt 호출, 제품 코드 수정 (storage, thumbnail, i18n 등)</td>
+      <td><span class="chip c-ok">종료</span></td>
+    </tr>
+    <tr>
+      <td><code>e6e0764a</code><br><span class="d">Claude Code</span></td>
+      <td>8/19 ~ 22:37</td>
+      <td>제품 코드 작업 (vault 관련 동작 없음)</td>
+      <td><span class="chip c-no">무관</span></td>
+    </tr>
+    <tr>
+      <td><code>01a018c4</code><br><span class="d">계획서 검토 (GJC)</span></td>
+      <td>8/19 06:45 ~ 22:37</td>
+      <td>계획서 검토, vault 직접 수정 없음</td>
+      <td><span class="chip c-no">무관</span></td>
+    </tr>
+  </table>
+
+  <details>
+    <summary>merge 충돌이 생긴 원인</summary>
+    <p><code>01a01863</code> 세션이 <code>origin/main</code>을 merge하면서 이 세션(<code>01a013a0</code>)이 수정한 vault 파일과 원격의 제품 코드 변경이 충돌했다. 충돌 파일은 <code>_NIGHT.md</code>, <code>harvest.py</code>, <code>provider-gate.py</code>, <code>hs.md</code>였다. 해당 세션이 내용을 해결하고 <code>git add</code> + <code>git commit</code>까지 완료해 현재 unmerged는 0개다.</p>
+    <p><b>재발 조건:</b> 두 세션이 같은 vault 파일을 동시에 수정한 뒤 한쪽이 push하고 다른 쪽이 merge할 때. ticket-runtime의 worktree 격리가 이를 줄이지만, vault 인프라 파일 자체(<code>_NIGHT.md</code>, <code>harvest.py</code> 등)는 격리 대상이 아니라서 인프라를 고치는 세션이 동시에 두 개 이상 돌면 반복될 수 있다.</p>
+  </details>
+</section>
+
+<!-- ─── 기능별 적용 상태 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>기능별 적용 상태</h2><span class="lede">어디까지 되어 있고 어디가 안 되어 있는지</span></div>
+
+  <div class="card">
+    <div class="head"><h3>inbox 원문 보존과 marker 상태 관리</h3><span class="chip c-ok">적용됨</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">구현</span><span class="v">사람 원문 바이트 불변, <code>night-runtime.py</code>만 <code>tracked</code>/<code>closed</code> marker 변경, 일반 agent 자유 편집 금지</span></div>
+      <div class="row"><span class="k">검증</span><span class="v">jh 38개 marker 정상 (closed 34, tracked 4), hs unmarked 4개 (hs 밤이 처리), scan 경고 0</span></div>
+      <div class="row"><span class="k">남은 것</span><span class="v">없음 — 정책과 코드가 일치하고 실제 inbox에 적용됨</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>canonical receipt과 reconcile 정산</h3><span class="chip c-ok">적용됨</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">구현</span><span class="v">receipt JSON 검증 (actor/item_id/units exact match, disposition별 evidence hash, origin/main ancestry), 불변 proof 보존, pre-replace 재검증, symlink 차단</span></div>
+      <div class="row"><span class="k">검증</span><span class="v">receipt 28개로 34개 원문 closed, proof 파일 26개 생성됨. 다른 세션이 partial receipt도 구현해 일부 unit만 끝난 경우도 처리됨</span></div>
+      <div class="row"><span class="k">남은 것</span><span class="v"><code>write-receipt.py</code>가 partial receipt의 새 API를 아직 반영하지 않음 — 다른 세션이 <code>night-runtime.py</code>에 추가한 subset units 허용과 맞춰야 함</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>provider gate (HMAC, snapshot binding, committing recovery)</h3><span class="chip c-ok">적용됨</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">구현</span><span class="v">state-root 0600 key HMAC, bind-snapshot set/member/content 재계산, completion proof canonical path, 150초 finalize lease, provider-owned stamp (harvest에서 commit 경로 제거)</span></div>
+      <div class="row"><span class="k">검증</span><span class="v">provider gate 테스트 29개 통과, dry-run에서 claim→bind→close 정상</span></div>
+      <div class="row"><span class="k">남은 것</span><span class="v">다른 세션의 merge로 provider-gate.py가 수정됨 — 이 세션의 provider-owned stamp와 충돌 없이 합쳐졌는지 수동 검증 필요</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>ticket-runtime (낮→밤 이어받기)</h3><span class="chip c-hold">코드 있음, 실전 미검증</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">구현</span><span class="v">claim/heartbeat/checkpoint/takeover/release, HMAC, fencing, global worktree 예약, live drift 검증, session_history, finite lease 1..3600초</span></div>
+      <div class="row"><span class="k">검증</span><span class="v">테스트 12개 통과, 현재 세션이 reference_only paused checkpoint 기록, harvest에서 ticket linkage 확인</span></div>
+      <div class="row"><span class="k">남은 것</span><span class="v">실제 밤→낮→밤 사이클 미경험. night launcher가 실제로 <code>takeover</code> CLI를 호출하는 흐름은 계약 문서에만 있고 자동화된 적 없음</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>harvest session→ticket linkage</h3><span class="chip c-ok">적용됨</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">구현</span><span class="v">GJC session record의 exact ID로 ticket state 연결, dry-run 표에 classification 표시, index에 handoff metadata 저장</span></div>
+      <div class="row"><span class="k">검증</span><span class="v">이 세션 <code>01a013a0</code>이 <code>vault-ticket-handoff-2026-08-18:reference_only</code>로 연결되는 것을 실제 harvest dry-run에서 확인</span></div>
+      <div class="row"><span class="k">남은 것</span><span class="v">없음</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>launcher committing recovery</h3><span class="chip c-ok">적용됨</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">구현</span><span class="v">run 시작 시 기존 sweep state를 먼저 읽고, committing이면 저장된 completion proof로 finalize 후 exit 0. preflight/day guard/sync보다 선행</span></div>
+      <div class="row"><span class="k">검증</span><span class="v">launcher 구조 테스트 통과, dry-run 정상</span></div>
+      <div class="row"><span class="k">남은 것</span><span class="v">실제 crash→recovery 시나리오 미경험</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>밤 리허설 하네스</h3><span class="chip c-stop">미구현</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">구현</span><span class="v">없음. 운영 repo를 안 건드리고 샌드박스에서 전체 run을 끝까지 돌려 provider success를 확인하는 스크립트가 필요</span></div>
+      <div class="row"><span class="k">검증</span><span class="v">dry-run은 claude 실행과 산출물 생성을 건너뛰므로 "정책 게이트에 안 막힘"만 증명하고 "실제 산출물→success"까지는 못 봄</span></div>
+      <div class="row"><span class="k">남은 것</span><span class="v"><code>night-rehearsal.sh</code> 구현 (가짜 claude로 manifest/report/harvest/result-card 생성→provider success)</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>inbox 원격 동기화 (push/pull)</h3><span class="chip c-hold">조건부 작동</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">구현</span><span class="v"><code>sync_inbox push</code>가 자동 실행됨. inbox-only commit만 대상, 다른 미푸시 commit이 섞이면 전체 건너뜀. 실패해도 밤을 막지 않음</span></div>
+      <div class="row"><span class="k">검증</span><span class="v">dry-run에서 sync는 생략됨. 실제 push는 8/19 merge 세션에서 수행됨</span></div>
+      <div class="row"><span class="k">남은 것</span><span class="v">tracked/closed marker가 들어간 inbox를 push하면 상대 머신에서 marker가 그대로 보임 — 상대 밤이 같은 marker를 재해석하는 것은 정상이지만 두 머신이 같은 actor inbox를 동시에 수정하면 충돌 가능. 현재 "자기 파일에만 쓴다"가 유일한 방어선</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── inbox 현재 상태 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>inbox 현재 상태</h2></div>
+  <table>
+    <tr><th>actor</th><th>closed</th><th>tracked</th><th>unmarked</th><th>manual_review</th></tr>
+    <tr><td>jh</td><td>34</td><td>4</td><td>0</td><td>0</td></tr>
+    <tr><td>hs</td><td>0</td><td>0</td><td>4</td><td>0</td></tr>
+  </table>
+
+  <p><b>jh tracked 4건 상세:</b></p>
+  <table>
+    <tr><th>원문 앞부분</th><th>연결 티켓</th><th>상태</th></tr>
+    <tr><td>재생성 히스토리를 보여줄 수 있게 하기</td><td><code>deferred-regeneration-history</code></td><td>오너 보류</td></tr>
+    <tr><td>6/8 진행률 + 인물연결 + 드래그드롭</td><td><code>r4-progress-batch-scoped-count</code> 외 3개</td><td>일부 unit만 완료 (partial)</td></tr>
+    <tr><td>뮤비·광고·웹툰 실험 + 프로젝트 상속</td><td><code>n6-producer-input-rigidity-map</code>, <code>n7-project-inheritance-map</code></td><td>방금 tracked</td></tr>
+    <tr><td>승인 세션 느린 원인 파악</td><td><code>vault-inbox-lifecycle-2026-08-18</code></td><td>방금 tracked</td></tr>
+  </table>
+  <p><b>hs unmarked 4건:</b> 형석이 새로 쓴 메모. hs 밤 실행이 처리할 대상.</p>
+</section>
+
+<!-- ─── 8-18/19 run 상태 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>8월 18~19일 밤 실행 상태</h2></div>
+  <div class="card">
+    <div class="head"><h3>8-18 실제 밤 run</h3><span class="chip c-stop">수행 안 됨</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">증거</span><span class="v"><code>runs/jh/night-2026-08-18-*</code> 없음, <code>runs/hs/night-2026-08-18-*</code> 없음</span></div>
+      <div class="row"><span class="k">이유</span><span class="v">이 세션이 vault 인프라를 대폭 수정하느라 실제 run까지 안 갔음. worktree 3개는 이전 밤 시도의 흔적이지만 완료 산출물은 없음</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="head"><h3>8-19 밤 run</h3><span class="chip c-hold">대기 중</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">상태</span><span class="v">provider state 비어 있음 (활성 claim 없음). dry-run 통과. 돌리면 바로 시작 가능</span></div>
+      <div class="row"><span class="k">조건</span><span class="v">리허설 하네스 없이 실제 run을 돌리면 claude 실행 실패 시 provider failed로만 기록됨 — inbox는 안전하지만 시간 낭비 가능성</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── launchd 일정 제외 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>launchd 일정에서 뺄 것</h2><span class="lede">오너 요청: 안정성 확인 전까지 실제 run 금지</span></div>
+  <p>아래가 전부 해결되기 전까지 <code>night-launchd.sh run</code>의 자동 스케줄을 꺼둔다. <code>dry-run</code>은 언제든 가능.</p>
+  <table>
+    <tr><th>#</th><th>항목</th><th>현재</th><th>필요한 일</th></tr>
+    <tr><td>1</td><td>리허설 하네스로 provider success까지 확인</td><td><span class="chip c-stop">미구현</span></td><td><code>night-rehearsal.sh</code> 만들고 통과시킴</td></tr>
+    <tr><td>2</td><td>다른 세션의 partial receipt 코드와 이 세션의 write-receipt.py 정합</td><td><span class="chip c-hold">미확인</span></td><td>runtime의 subset units 허용을 write-receipt에 반영</td></tr>
+    <tr><td>3</td><td>다른 세션이 merge한 provider-gate.py와 이 세션의 stamp 변경 검증</td><td><span class="chip c-hold">미확인</span></td><td>provider gate 테스트 29개 재실행, stamp write 경로 확인</td></tr>
+    <tr><td>4</td><td>ticket-runtime takeover를 launcher가 실제로 호출하는 흐름 검증</td><td><span class="chip c-hold">계약만 있음</span></td><td>리허설 하네스에서 active→paused→takeover 시나리오 포함</td></tr>
+    <tr><td>5</td><td>8-18 worktree 3개 정리 또는 보존 결정</td><td><span class="chip c-hold">방치</span></td><td>작업 내용 확인 후 prune 또는 merge</td></tr>
+  </table>
+</section>
+
+<!-- ─── merge 충돌 재발 방지 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>merge 충돌 — 재발 가능성과 방지책</h2></div>
+  <div class="card">
+    <div class="head"><h3>8/19 충돌은 해결됐지만 구조적 원인은 남아 있다</h3><span class="chip c-hold">주의 필요</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">원인</span><span class="v">이 세션이 vault 인프라 파일을 대폭 수정하는 동안 다른 세션이 <code>origin/main</code>을 merge해서 같은 파일이 양쪽에서 바뀜</span></div>
+      <div class="row"><span class="k">현재</span><span class="v">unmerged 0, 충돌 마커 0, MERGE_HEAD 없음</span></div>
+      <div class="row"><span class="k">방지책</span><span class="v">vault 인프라 수정은 한 세션만 담당하고 끝낸 뒤 push. ticket 작업은 ticket-owned worktree에서 해서 main 충돌을 회피. 두 세션이 같은 vault 파일을 동시에 수정하면 여전히 충돌함</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 결론 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>결론</h2></div>
+  <p>중복 티켓 방지와 receipt 정산은 실제로 작동하고 있다. merge 충돌도 해결됐다. 밤 실행을 돌리는 데 정책적 차단은 없지만, 리허설 하네스로 실제 산출물→success 경로까지 확인하고, 다른 세션이 수정한 코드와의 정합을 검증한 뒤에 자동 스케줄을 다시 켜는 게 안전하다.</p>
+</section>
+
+<footer>
+  <p>이 리포트의 정본: <code>.claude/vault/backlog/reports/2026-08-19-vault-stability-audit.html</code></p>
+  <p>dry-run 마지막 결과: <code>DRY-RUN PASS — 이 머신에서 actor=jh 밤 실행이 동작한다.</code></p>
+</footer>
+</div>

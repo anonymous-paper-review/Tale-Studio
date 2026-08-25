@@ -363,6 +363,62 @@ stop_watchdog_on_signal() {
   exit 130
 }
 
+review_server_up() {
+  python3 - "$REVIEW_PORT" <<'PY' 2>/dev/null
+import sys, urllib.request
+try:
+    urllib.request.urlopen("http://127.0.0.1:%s/health" % sys.argv[1], timeout=1)
+except Exception:
+    sys.exit(1)
+PY
+}
+
+# 리뷰 서버가 꺼져 있으면 띄운다. report 버튼(merge/reject/feedback)이 죽는 원인은
+# 브라우저 종류도 file:// 도 아니고 이 서버가 없는 것뿐이다 (2026-08-24 실측:
+# Orca 브라우저의 file:// 페이지에서 127.0.0.1 fetch 통과). launchd 작업이 끝나도
+# 살아남도록 밤 claude 자식과 같은 분리 세션으로 띄운다.
+ensure_review_server() {
+  if review_server_up; then return 0; fi
+  review_log="$HOME/Library/Logs/tale-studio-night/review-server.log"
+  mkdir -p "$(dirname "$review_log")"
+  REVIEW_SERVER="$REVIEW_SERVER" REVIEW_PROJECT="$PROJECT_ROOT" REVIEW_ACTOR="$ACTOR" \
+  REVIEW_PORT="$REVIEW_PORT" REVIEW_LOG="$review_log" python3 - <<'PY'
+import os, subprocess
+log = open(os.environ["REVIEW_LOG"], "ab")
+subprocess.Popen(
+    ["python3", os.environ["REVIEW_SERVER"],
+     "--project", os.environ["REVIEW_PROJECT"],
+     "--actor", os.environ["REVIEW_ACTOR"],
+     "--port", os.environ["REVIEW_PORT"]],
+    stdout=log, stderr=log, stdin=subprocess.DEVNULL, start_new_session=True)
+PY
+  i=0
+  while [ "$i" -lt 20 ]; do
+    if review_server_up; then return 0; fi
+    sleep 0.5
+    i=$((i + 1))
+  done
+  return 1
+}
+
+orca_bin() {
+  if [ -x "$HOME/.local/bin/orca" ]; then
+    echo "$HOME/.local/bin/orca"
+  else
+    command -v orca || true
+  fi
+}
+
+# 보고서를 Orca 브라우저 탭으로 연다. launchd 는 cwd 가 프로젝트가 아니라
+# worktree 를 경로로 지목해야 한다. Orca 가 없거나 실패하면 기본 브라우저로 떨어진다.
+open_url_in_orca() {
+  ob="$(orca_bin)"
+  [ -n "$ob" ] || return 1
+  "$ob" open >/dev/null 2>&1 || true
+  "$ob" tab create --url "$1" --worktree "path:$PROJECT_ROOT" >/dev/null 2>&1 \
+    || "$ob" tab create --url "$1" >/dev/null 2>&1
+}
+
 case "$MODE" in
 run)
   if ! read_existing_sweep_state; then
@@ -688,13 +744,28 @@ open-report)
     exit 1
   fi
   run_name="$(basename "$latest")"
-  # 리뷰 서버가 떠 있으면 버튼이 동작하는 http 주소로 연다.
-  if python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:$REVIEW_PORT/health', timeout=1)" 2>/dev/null; then
-    open "http://127.0.0.1:$REVIEW_PORT/runs/$ACTOR/$run_name/report.html"
-    echo "opened: http://127.0.0.1:$REVIEW_PORT/runs/$ACTOR/$run_name/report.html"
+  # 어젯밤 것이 아니면 옛 보고서를 조용히 다시 열지 않는다 — 밤이 건너뛰었다는 신호다.
+  report_day="$(date -r "$latest/report.html" +%Y-%m-%d)"
+  if [ "$report_day" != "$(date +%Y-%m-%d)" ]; then
+    echo "⚠ 최신 보고서가 오늘 것이 아니다 (작성일=$report_day). 밤 실행이 건너뛰었는지 확인하라:" >&2
+    echo "  tail -5 $HOME/Library/Logs/tale-studio-night/night-$ACTOR.err.log" >&2
+  fi
+  url="http://127.0.0.1:$REVIEW_PORT/runs/$ACTOR/$run_name/report.html"
+  if ensure_review_server; then
+    if open_url_in_orca "$url"; then
+      echo "opened(orca): $url"
+    else
+      open "$url"
+      echo "opened(기본 브라우저): $url — Orca 를 못 써서 떨어졌지만 버튼은 동작한다"
+    fi
   else
-    open "$latest/report.html"
-    echo "opened: $latest/report.html (리뷰 서버가 꺼져 있어 버튼은 동작하지 않는다 — sh night-launchd.sh review-server)"
+    echo "리뷰 서버를 띄우지 못했다 — 버튼 없는 사본으로 연다 (로그: $HOME/Library/Logs/tale-studio-night/review-server.log)" >&2
+    if open_url_in_orca "file://$latest/report.html"; then
+      echo "opened(orca, 버튼 죽음): $latest/report.html"
+    else
+      open "$latest/report.html"
+      echo "opened(기본 브라우저, 버튼 죽음): $latest/report.html"
+    fi
   fi
   ;;
 
@@ -710,7 +781,8 @@ resume-session)
   ORCA_BIN="$HOME/.local/bin/orca"
   [ -x "$ORCA_BIN" ] || ORCA_BIN="orca"
   "$ORCA_BIN" open >/dev/null 2>&1 || true
-  if "$ORCA_BIN" terminal create --worktree active \
+  # launchd 는 cwd 가 / 라서 active worktree 해석이 안 된다 — 경로로 지목한다 (open-report 와 동일).
+  if "$ORCA_BIN" terminal create --worktree "path:$PROJECT_ROOT" \
        --title "밤 세션 $(basename "$latest")" \
        --command "claude --resume $sid" --focus; then
     echo "밤 세션을 Orca 터미널로 열었다: $sid"
@@ -723,6 +795,9 @@ morning)
   # 아침용(launchd): 리포트 html을 열고 밤 세션을 Orca 터미널로 되살린다.
   sh "$0" open-report || true
   sh "$0" resume-session || true
+  # 브라우저 회귀 최소안 (2026-08-25 오너 결정, 계약 §6a): 메인 체크아웃에서
+  # 로그인 후 화면들이 실제로 뜨는지만 확인하고 로그를 남긴다. 전제 없으면 skip(exit 0)이라 안전하다.
+  ( cd "$PROJECT_ROOT" && pnpm smoke --auth >> "$HOME/Library/Logs/tale-studio-night/morning-smoke.log" 2>&1 ) &
   ;;
 
 push-inbox)

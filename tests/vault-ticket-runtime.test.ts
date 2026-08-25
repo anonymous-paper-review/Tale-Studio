@@ -31,6 +31,11 @@ const checkpointInput = (changed_files: string[] = []) => JSON.stringify({ objec
 const addTicket = (root: string, id: string) => writeFileSync(join(root, '.claude', 'vault', 'backlog', 'tickets', `${id}.md`), `# ${id}`)
 afterEach(() => dirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })))
 
+// 실측 기반 시간 예산 (티켓 vault-test-timeout-cost-map-2026-08-23):
+// 이 파일의 매 시험이 ticket-runtime.py 를 python3 자식 프로세스로 새로 띄운다.
+// 단독 실행 기준 파일당 약 23.5초, 최악 단일 시험(rejects post-checkpoint HEAD and branch
+// drift before fencing takeover) 3137ms/5000ms(63%) — 로직이 아니라 파이썬 프로세스
+// 기동 대기(246회 × 191ms)가 원인이라 병렬 부하에서 수 배로 흔들린다.
 describe('vault ticket handoff runtime', () => {
   it('rejects duplicate and fresh takeover claims, but heartbeats the owner', () => {
     const { root, worktree } = make(); const first = claim(root, worktree)
@@ -155,4 +160,4 @@ describe('vault ticket handoff runtime', () => {
     expect(fail(['claim', '--project', root, '--ticket-id', 'four', '--actor', 'hs', '--session-id', 'main', '--owner-kind', 'day', '--worktree', root, '--lease-seconds', '50', '--reference-only-main']).status).toBe(1)
     expect(main.session_history).toEqual([])
   })
-})
+}, 30000)

@@ -56,6 +56,12 @@ const track = (dir: string, path: string, snapshot: string, start: number, end: 
 ])
 afterEach(() => dirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })))
 
+// 실측 기반 시간 예산 (티켓 vault-test-timeout-cost-map-2026-08-23):
+// 이 파일의 매 시험이 night-runtime.py 를 python3 자식 프로세스로 새로 띄운다.
+// 단독 실행 기준 파일당 약 23.5초, 최악 단일 시험(rejects direct close and closes only
+// through a verified receipt proof / reconciles sorted verified receipts / keeps IDs
+// stable across snapshot provenance ...) 2200~2300ms/5000ms(약 45%) — 로직이 아니라
+// 파이썬 프로세스 기동 대기(246회 × 191ms)가 원인이라 병렬 부하에서 수 배로 흔들린다.
 describe('vault inbox lifecycle runtime', () => {
   it('snapshots both actors with one run and splits actionable/reference roles', () => {
     const dir = make()
@@ -358,8 +364,9 @@ describe('vault inbox lifecycle runtime', () => {
     expect(proofLink.manual_review.map((entry: { receipt: string }) => entry.receipt)).toContain('proof-link.json')
     expect(scan(path).markers[0].state).toBe('tracked')
   })
-})
+}, 30000)
 
+// 실측 기반 시간 예산 (티켓 vault-test-timeout-cost-map-2026-08-23) — 위 describe와 동일 사유.
 describe('vault inbox append-units', () => {
   const appendUnits = (dir: string, path: string, itemId: string, units: string[], expected = sha(readFileSync(path))) => call([
     'append-units', '--path', path, '--actor', 'jh', '--item-id', itemId,
@@ -447,4 +454,4 @@ describe('vault inbox append-units', () => {
     expect(reversed.idempotent).toBe(true)
     expect(readFileSync(path).equals(bytes)).toBe(true)
   })
-})
+}, 30000)

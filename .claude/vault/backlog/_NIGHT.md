@@ -117,7 +117,7 @@ ff 단계는 두지 않는다 — 지금 두 사람은 각자 로컬로 실행�
 **어떤 실패도 밤을 막지 않는다** — 기록하고 로컬에 있는 내용으로 계속한다. 자기 전에
 손으로 보내려면 `sh night-launchd.sh push-inbox`. 소비 책임은 자기 메모 파일에만
 있고, 상대 메모는 읽기 전용 참고 입력이다(§4.0). 리포트·티켓·피드백·세션 수확은 자기
-디스크의 로컬 상태로 남아 git에 올라가지 않으며, 리포트는 자기 아침과 자기 다음 실행만
+디스크의 로컬 상태로 남아 git에 올라가지 않으며(단 사람 보고서 `runs/<actor>/<run_id>/report.html` 하나만 공유한다 — 2026-08-19 오너 결정), 리포트는 자기 아침과 자기 다음 실행만
 소비한다. branch 이름의 `NIGHT_ACTOR_ID`(기본 `jh`)는 어느 컴퓨터의 밤이 만든 수리인지
 구분한다.
 
@@ -285,6 +285,11 @@ receipt는 canonical directory의 정확히 `<receipt_id>.json` 파일이며 sch
 units와 정확히 같은 receipt만 terminal receipt로 source item을 닫는다. 각 evidence는
 `{kind,path,sha256}` 및 kind별 필수 필드를 가지며, `path`는
 canonical project-relative 실제 파일이고 SHA-256이 일치해야 한다.
+증서는 evidence 원문을 receipt 디렉터리 안 `.evidence/<sha256>.bin`(chmod 0444,
+content-addressed)으로 함께 얼려 둘 수 있다 (2026-08-25 오너 결정, 갈래 A). 얼린 사본이 있으면
+재검증은 살아 있는 원본이 아니라 그 사본과 SHA-256을 대조하므로, 근거 파일이 이후 편집돼도
+(예: 티켓에 오너 판정 절 추가) 지문이 썩지 않는다. 얼린 사본이 없는 receipt(레거시)는 기존과
+동일하게 살아 있는 원본과 직접 대조하며, 이후 원본이 편집되면 지문 불일치로 manual review로 밀린다.
 
 - `integrated`는 `kind: "origin-main"` evidence의 40자리 hex `commit`, ticket 또는 current actor
   run manifest/result-card path, 그리고 `git merge-base --is-ancestor <commit> origin/main` 성공이
@@ -407,6 +412,11 @@ checkpoint와 heartbeat를 남기며, 미완료 종료는 `paused` checkpoint로
 ## 4. 해석과 분해
 
 메모, 최근 결과, 열린 티켓, 정리되지 않은 세션, 코드의 실제 상태를 읽되 원문을 대화에 대량으로 복사하지 않는다. 세션 수확은 제공된 `harvest.py`를 거친다.
+
+<!-- 오너 인지 기록 (2026-08-25 낮, 오너 지시로 기입) — 아래 두 사실은 오너가 이미 알고 있다.
+새 티켓·결과 카드·아침 보고의 요약·강조 어디에도 문제로 다시 세우지 마라. 상태가 실제로 바뀐 날만 한 줄 보고한다.
+1. 입력 부재 — inbox/jh.md 새 메모 0건이 이어지는 것. 오너가 안다. 채우는 것은 오너 몫이다. asof 줄의 "새 메모 0건" 사실 표기는 유지하되 3분 요약·결정 목록에 올리지 마라.
+2. inbox 상호 공유 단절 — 8/19부터 상대(hs)와 메모가 오가지 않는 것. 오너가 안다. 원인 조사는 이미 끝났다(inbox-sync-silently-off-2026-08-23, done). 재조사·재보고·새 티켓 생성 금지. -->
 
 ### 4.0 메모 맥락 보강 — 분해보다 먼저
 
@@ -632,7 +642,7 @@ save는 결과 카드가 아니다 — 결론이 없어도 쓴다. 같은 단위
 - 모델은 지각·분류 자료를 만들 수 있지만 최종 판정은 정의된 채점 방법과 사람 검토에 둔다. 모델·코드·사람이 맡은 판단을 한 점수로 합치지 않는다.
 - 그림·영상의 결과에는 사람이 비교할 수 있는 원본, 입력, 시점, 설정, 채점표를 남긴다. 밤은 “좋다/나쁘다” 결론을 기록하지 않는다.
 - 기능 변경의 성공은 실행 가능한 검증 명령과 결과로 닫는다. 테스트 통과가 없으면 자가 머지하지 않는다.
-- 화면(`src/app/**`, `src/components/**`)을 고쳤으면 `pnpm smoke` 를 함께 돌린다. `pnpm test` 는 브라우저를 못 열어 렌더·콘솔 에러·인증 리다이렉트를 못 본다. 밤 루프는 Orca automation 으로 돌므로 전제가 이미 충족돼 있고, 전제가 없으면 실패가 아니라 skip 으로 빠지니 그냥 돌려도 안전하다. 스모크 통과는 완료가 아니라 오너가 볼 재료가 준비됐다는 뜻이므로, 결과 카드에 스크린샷 경로를 남기고 “좋다/나쁘다”는 쓰지 않는다.
+- 화면(`src/app/**`, `src/components/**`) 수리는 밤이 자가 머지하지 않는다 (2026-08-25 오너 결정). 밤의 격리 사본에는 접속 정보 파일이 없어 `pnpm smoke` 가 돌지 않는다는 것이 실측됐고(2026-08-25 밤), 사본에 접속 정보를 복제하지 않기로 했다. 따라서 화면 수리는 코드·시험 검증까지만 하고 사람 머지로 넘긴다. 브라우저 확인은 오너 쪽에서 돈다 — 아침 `morning` 진입점이 메인 체크아웃에서 `pnpm smoke --auth` 를 돌려 로그를 남긴다(브라우저 회귀 최소안, 2026-08-25 오너 결정). 스모크 통과는 완료가 아니라 오너가 볼 재료가 준비됐다는 뜻이므로, 결과 카드에 스크린샷 경로를 남기고 “좋다/나쁘다”는 쓰지 않는다.
 
 ## 10. 아침 결과 리뷰 — budget, carryover, expiry
 
@@ -828,7 +838,7 @@ snapshot, `--harvest-project`, `--harvest-out`, canonical `--run-manifest`까지
 - 실행 산출물: `runs/<actor>/<run_id>/` — 사람 보고서 `report.html`, 기계 요약 `manifest.json`, 세션 요약 `sessions/*.md`, worktree 목록 `worktrees.json`, 중간 저장 `saves/*.md`(§8.4). actor와 run이 경로에 들어가므로 같은 날짜에 두 사람이 실행해도 서로 덮어쓰지 않는다. 날짜 하나를 덮어쓰는 `reports/YYYY-MM-DD.html` 경로는 더 쓰지 않는다 (기존 `.claude/vault/backlog/reports/`는 이력으로만 남긴다). 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
 - 판정 기록: `feedback/<actor>/<run_id>/*.json` — append-only, 자기 다음 밤 실행만 소비.
 - 각 사람의 접점은 셋이다: 쓰는 곳 자기 메모 파일 `inbox/<actor>.md`(commit·push하면 상대 밤에도 보인다), 읽는 곳 자기 최신 `runs/<actor>/<run_id>/report.html`, 그리고 아침에 Orca 터미널로 이어받는 그날 밤 세션(`runs/<actor>/<run_id>/session-id.txt`의 id를 `claude --resume`으로 되살려 대화를 잇는다). 메모는 여전히 비동기로 쌓이고, 세션 이어받기는 결과를 읽고 후속 결정을 잇는 통로를 넓힌 것이지 메모 입력 방식을 바꾸지 않는다. 다른 파일을 읽어야만 진행되는 절차를 만들지 않는다.
-- git 공유 경계: 계약·실행 도구·설치 문서, 공유 메모 `inbox/`(각자 자기 파일에만 쓴다), 밤이 만든 코드 수리 branch. `backlog/sweep/`, `_archive/`, `tickets/`, `runs/`, `feedback/`은 이 컴퓨터의 로컬 상태다 — 결과와 판정은 각자의 것이다.
+- git 공유 경계: 계약·실행 도구·설치 문서, 공유 메모 `inbox/`(각자 자기 파일에만 쓴다), 밤이 만든 코드 수리 branch. `backlog/sweep/`, `_archive/`, `tickets/`, `feedback/`과 `runs/`는 이 컴퓨터의 로컬 상태다 — 단 사람 보고서 `runs/<actor>/<run_id>/report.html` 하나만 공유한다(2026-08-19 오너 결정). 결과와 판정은 각자의 것이다.
 - 티켓 상태와 작업 사본 정보.
 - 메모 스냅샷 fingerprint·범위·내용 해시·소비 상태.
 - 필요한 실험 산출물과 결과표. raw 대화·모델 원출력은 소비 시점 없이 별도 보관하지 않는다.
@@ -846,11 +856,20 @@ snapshot, `--harvest-project`, `--harvest-out`, canonical `--run-manifest`까지
 
 ## 15. 계약 개정 기록
 
-- 2026-08-18 (16차) · 이전 계약 해시 `68bcf07452deecf5c1bf1828c4e35b850e7b6e067854d2fbe03cdada76e236e5` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+<!-- 번호 정리 (2026-08-25 오너): 8/19 머지가 원격·로컬 개정문을 양쪽 보존하면서 15차·16차가 병존했다.
+역사 기록을 덮어쓰지 않기 위해 번호를 재부여하지 않고 가지 표시(-a/-b/-c)로 유일화했다. 내용 무변경.
+추적은 각 항목의 이전 계약 해시로 한다. -->
+
+- 2026-08-25 (19차) · 이전 계약 해시 `d7caab7c835d0a108edc60f7d6d4158283d163e17e54001b6de4f18dac62301f` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+  - 변경 이유: 오너 결정 — 낮 세션에서 밤 결과 검토 후 일괄 정리. 이미 인지한 사실의 재보고 중단, 화면 수리 경계의 정직화, runs/ 공유 예외의 계약 반영(2026-08-19 결정 소급), 개정 번호 병존 정리.
+  - 변경 내용: (1) §4.0 앞 오너 인지 주석 — 입력 부재·inbox 공유 단절은 문제로 재보고하지 않는다. (2) §6a 화면 수리 조항 — 격리 사본 smoke 불능 실측을 반영해 "밤은 화면 수리를 자가 머지하지 않는다"로 고치고, 아침 morning 진입점의 메인 체크아웃 smoke(--auth)를 브라우저 회귀 최소안으로 명시. (3) §2·§13 — 사람 보고서 `runs/<actor>/<run_id>/report.html` 하나만 공유 예외로 명시. (4) §15 병존 번호를 15차-a/-b·16차-a/-b/-c로 유일화(내용 무변경). (5) 작업자 정의(night-fixer·night-investigator)에 공유 저장소 stash 금지 규칙 추가 — 계약 밖 파일이라 각 파일에 기록. (6) §3.2 증서 근거 얼리기(갈래 A) — 생성 시 evidence 원문을 `.evidence/<sha256>.bin`으로 동결, 재검증은 동결 사본과 대조, 레거시 37장은 기존 동작 폴백(`night-runtime.py`·`write-receipt.py` 반영). (6) §3.2 증서 근거 얼리기(갈래 A) — 생성 시 evidence 원문을 `.evidence/<sha256>.bin`으로 동결, 재검증은 동결 사본과 대조, 레거시 37장은 기존 동작 폴백(`night-runtime.py`·`write-receipt.py` 반영).
+  - 영향받는 분해 기준: §6a 자가 머지 판정에서 화면 수리가 명시적으로 제외됐다. 나머지는 문서-실제 정합화라 실행 경계 무변경.
+
+- 2026-08-18 (16차-a) · 이전 계약 해시 `68bcf07452deecf5c1bf1828c4e35b850e7b6e067854d2fbe03cdada76e236e5` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — actor별 canonical proof와 stable logical inbox ID를 실행 계약으로 고정하고, committing journal과 signal/day-run 경계를 성공 기록보다 앞에 둔다.
   - 변경 내용: (1) 모든 provider 명령은 actor와 complete fencing을 같은 owner proof로 전달하며, state-root 0600 key의 HMAC으로 root identity를 검증한다. success는 provider가 bind한 reported actionable snapshot과 canonical manifest/report/harvest/result card만 인정한다. (2) fallback은 같은 state path/run에서 새 token·증가 fencing을 JSON으로 다시 추출하고 stale proof를 폐기한다. (3) marker wrapper를 뺀 logical raw byte range/content hash가 stable item ID이고 full-file hash는 CAS 전용이며 malformed/drifted는 `manual_review`다. (4) snapshot set은 두 파일 generation 재검증 실패 시 manifest 없이 실패하고, `committing`은 같은 completion proof와 canonical harvest/stamp 목적지의 idempotent success 재호출로만 복구한다. archive도 `.claude/vault/_archive/inbox`만 허용한다. (5) launcher는 lease·오전 8시와 `NIGHT_ALLOW_DAY_RUN=1` 기록 경계를 지키며, 코드 신호와 day-run은 별도 실행 경계다.
   - 영향받는 분해 기준: §2의 actor/canonical 입력 고정, §3의 stable ID, §4의 harvest 경로, §8의 fallback·committing 복구, §12의 provider success 검증이 새 proof와 artifact 경계를 따른다. reference snapshot은 출처 맥락일 뿐 소비·표식·archive 대상이 아니다.
-- 2026-08-19 (16차) · 이전 계약 해시 `68bcf07452deecf5c1bf1828c4e35b850e7b6e067854d2fbe03cdada76e236e5` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+- 2026-08-19 (16차-b) · 이전 계약 해시 `68bcf07452deecf5c1bf1828c4e35b850e7b6e067854d2fbe03cdada76e236e5` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — 날짜·시각 기준을 KST 하나로 통일한다. 8/19 첫 실행에서 `run_id`가 UTC 날짜로 발급돼 01:30 KST 실행의 결과 디렉터리가 `night-2026-08-18-…`로 하루 밀린 것이 계기다(`claim_date`는 KST라 두 값이 어긋났다).
   - 변경 내용: (1) §2의 기준 시각 표기를 UTC에서 KST로 고쳤다. (2) `provider-gate.py`의 `run_id` 날짜를 `current_claim_date()`(KST)로 바꿔 `claim_date`와 같은 기준을 쓰게 했고, `state_paths`의 중복 KST 리터럴도 같은 함수로 합쳤다. (3) `harvest.py`의 sweep 디렉터리 날짜(`_output_root`)·`generated_for`·`generated_at`·`completed_at`·도장 주석·드라이런 표를 KST 표기로 바꿨다. (4) `night-runtime.py`의 `read_time`과 `night-review-server.py`의 `created_at`을 KST 표기로 바꿨다.
   - 영향받는 분해 기준: 없음. epoch 값(lease·도장·수확 창)은 타임존과 무관한 절대 시각이라 그대로 두었고, 비교·만료 계산은 바뀌지 않는다. 식별자와 파일명에는 `%z`(`+0900`)가 run_id 정규식을 깨므로 `KST` 리터럴을 쓴다.
@@ -865,17 +884,17 @@ snapshot, `--harvest-project`, `--harvest-out`, canonical `--run-manifest`까지
   - 변경 내용: (1) 밤 실행이 `claude -p`에 고정 `--session-id`를 붙이고 그 id를 `runs/<actor>/<run_id>/session-id.txt`에 기록한다. (2) 새 커맨드 `resume-session`이 최신 run의 세션 id를 읽어 `orca terminal create --command "claude --resume <id>"`로 Orca 새 터미널 탭에 밤 세션을 되살린다. (3) launchd 아침 진입점을 `open-report`에서 `morning`(리포트 html + 세션 탭 둘 다)으로 바꿨다. (4) §13 접점을 둘에서 셋으로 넓혔다.
   - 영향받는 분해 기준: §13 오너 접점이 셋으로 넓어졌다. 메모 입력의 비동기성과 §1 결과 우선 원칙은 그대로다.
 
-- 2026-08-23 (16차) · 이전 계약 해시 `65ff971c6fb802f629538e2c12923fc8e0bd094d8f7f87969566ea9e7f9b943f` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+- 2026-08-23 (16차-c) · 이전 계약 해시 `65ff971c6fb802f629538e2c12923fc8e0bd094d8f7f87969566ea9e7f9b943f` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — 밤이 오너의 머지만 기다리다 4일간 결과가 쌓이기만 한 병목을 푼다. 동작이 바뀌지 않는 기술 수리는 밤이 스스로 합치게 하고, 메모는 옆에 다른 커밋이 있어도 자동으로 내보내며, 결과물은 전부 로컬로 둔다.
   - 변경 내용: (1) §1.5 레벨 1에 "동작 불변 자가 머지" 예외를 신설하고 §6a에 판정 조건을 정의했다 — 레벨을 올리지 않고(승급 게이트 우회) 되돌릴 위험이 없는 수리만 연다. 판정은 "기준 커밋 대비 새 시험 실패 0"이라 상대의 i18n 게이트가 상시 빨개도 막지 않는다. (2) §2 inbox 동기화를 "내 메모만 자동 push"로 바꿨다 — 옆에 비-inbox 미푸시 커밋이 있어도 건너뛰지 않는다(`inbox_only_ahead` 전체 skip 제거). 상대 메모 수신 ff 단계는 뺐다(각자 로컬 실행). (3) §2 mutating 명령 목록에 `append-units`를 넣었다(구현·시험은 이미 있음). (4) 결과물 `runs/`는 전부 로컬로 둔다 — `.gitignore`의 `report.html` 공유 예외를 제거해 계약(로컬)과 맞췄다.
   - 영향받는 분해 기준: §6 자가 머지가 레벨 1에서 좁게 열렸다. `night-launchd.sh`의 `sync_inbox`와 계약 시험(`vault-night-contract.test.ts`)이 새 동기화 로직으로 갱신됐다.
 
-- 2026-08-18 (15차) · 이전 계약 해시 `35826e690c9646b4f0efc40d64f4d2c90ffc4152a78dce13796b631bcc4b43c0` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
+- 2026-08-18 (15차-a) · 이전 계약 해시 `35826e690c9646b4f0efc40d64f4d2c90ffc4152a78dce13796b631bcc4b43c0` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — actor 이름을 역할명(owner/friend) 대신 실제 사용자 이름(jh/hs)으로 쓴다.
   - 변경 내용: 공유 inbox를 `inbox/jh.md`·`inbox/hs.md`로 이름 변경하고, 기본 actor를 오너 머신 `jh`, 친구 설치 `hs`로 맞췄다. 로컬 결과·feedback·수리 branch의 actor namespace도 같은 값을 쓴다.
   - 영향받는 분해 기준: 없음 — 이름만 바뀌고 소비·공유·동기화 규칙은 같다.
 
-- 2026-08-19 (15차) · 부분 완료 정산과 머지 검토를 전역 실행 관문에서 분리한다.
+- 2026-08-19 (15차-b) · 부분 완료 정산과 머지 검토를 전역 실행 관문에서 분리한다.
   - 변경 이유: 한 source marker에 여러 unit이 묶였을 때 한 unit의 `awaiting-merge-review`가
     다른 완료 unit의 receipt 기록과 다음 inbox 실행까지 막히는 것처럼 보였다.
   - 변경 내용: marker 전체 unit의 terminal receipt가 모일 때만 `closed`로 바꾸되, 완료된

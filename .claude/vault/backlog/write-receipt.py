@@ -21,6 +21,40 @@ def scan(project, actor):
         [sys.executable, runtime, "scan-inbox", "--actor", actor,
          "--path", inbox, "--project-root", project], text=True))
 
+def freeze_evidence(project, receipt_dir, evidence):
+    """근거 파일의 원문 바이트를 receipt 디렉터리 안 content-addressed 사본으로 얼려 둔다.
+    재검증(night-runtime.py의 reconcile-inbox)이 살아 있는 원본 대신 이 사본과 대조하므로
+    근거 파일이 이후 편집돼도(오너 판정 추가 등) 지문이 썩지 않는다."""
+    frozen_dir = os.path.join(receipt_dir, ".evidence")
+    os.makedirs(frozen_dir, 0o755, exist_ok=True)
+    for entry in evidence:
+        digest = entry["sha256"]
+        target = os.path.join(frozen_dir, f"{digest}.bin")
+        if os.path.exists(target):
+            continue
+        abs_path = os.path.join(project, entry["path"])
+        with open(abs_path, "rb") as f:
+            raw = f.read()
+        if hashlib.sha256(raw).hexdigest() != digest:
+            print(f"evidence 파일이 스캔 뒤 바뀌었다: {entry['path']}", file=sys.stderr)
+            sys.exit(1)
+        temp = os.path.join(frozen_dir, f".tmp-{digest}-{os.getpid()}-{secrets.token_hex(4)}")
+        fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(raw); f.flush(); os.fsync(f.fileno())
+            os.chmod(temp, 0o444)
+            try:
+                os.link(temp, target)
+            except FileExistsError:
+                pass
+        finally:
+            try:
+                os.unlink(temp)
+            except FileNotFoundError:
+                pass
+
+
 def main():
     p = argparse.ArgumentParser(description="canonical receipt 생성 (inbox 무변경)")
     p.add_argument("--project", default=os.getcwd())
@@ -110,6 +144,8 @@ def main():
     # 각 marker에 대해 receipt 생성
     receipt_dir = os.path.join(project, ".claude/vault/backlog/tickets/receipts")
     os.makedirs(receipt_dir, exist_ok=True)
+    if not a.dry_run:
+        freeze_evidence(project, receipt_dir, evidence)
     written = []
     skipped = []
     for m in targets:

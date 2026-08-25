@@ -1161,54 +1161,91 @@ def _same_file_proof(expected, actual):
     return expected == actual
 
 
-def _receipt_evidence(receipt, project_fd, project_root, actor):
+def _open_frozen_evidence_directory(receipt_fd):
+    # 얼린 evidence 사본 저장소. 이 receipt-dir 세대에서 한 번도 얼려 쓰지 않았으면
+    # (레거시 receipt만 있으면) 디렉터리 자체가 없을 수 있다 — 그건 오류가 아니다.
+    try:
+        return _open_directory_at(receipt_fd, ".evidence", "receipt evidence frozen 저장소")
+    except ValueError:
+        return None
+
+
+def _frozen_evidence_filename(digest):
+    return f"{digest}.bin"
+
+
+def _receipt_evidence(receipt, project_fd, project_root, actor, receipt_fd):
     evidence = receipt.get("evidence")
     if not isinstance(evidence, list) or not evidence:
         raise ValueError("receipt evidence가 비어 있거나 목록이 아니다")
     valid_terminal = False
     disposition = receipt["disposition"]
     proofs = []
-    for entry in evidence:
-        if not isinstance(entry, dict):
-            raise ValueError("receipt evidence 항목이 객체가 아니다")
-        kind, path, digest = entry.get("kind"), entry.get("path"), entry.get("sha256")
-        if (not isinstance(kind, str) or not isinstance(digest, str)
-                or re.fullmatch(r"[0-9a-f]{64}", digest) is None):
-            raise ValueError("receipt evidence 기본 필드가 올바르지 않다")
-        _, file_proof = _read_project_regular_file(project_fd, path, "receipt evidence")
-        if file_proof["sha256"] != digest:
-            raise ValueError("receipt evidence hash가 다르다")
-        proofs.append({"path": path, "proof": file_proof})
-        if disposition == "integrated" and kind == "origin-main":
-            commit = entry.get("commit")
-            if not isinstance(commit, str) or re.fullmatch(r"[0-9a-f]{40}", commit) is None:
-                raise ValueError("origin-main evidence commit이 올바르지 않다")
-            if not (path.startswith(".claude/vault/backlog/tickets/")
-                    or re.fullmatch(rf"runs/{re.escape(actor)}/[^/]+/(?:manifest|result-card[^/]*)\.json", path)):
-                raise ValueError("origin-main evidence path가 run manifest/result-card 또는 ticket이 아니다")
-            ancestor = subprocess.run(
-                ["git", "-C", project_root, "merge-base",
-                 "--is-ancestor", commit, "origin/main"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-            if ancestor.returncode != 0:
-                raise ValueError("origin-main evidence commit이 origin/main 조상이 아니다")
-            valid_terminal = True
-        elif disposition in {"accepted", "rejected", "no-action", "cancelled", "superseded"}:
-            if kind == "owner-decision":
-                if not path.startswith(f"feedback/{actor}/"):
-                    raise ValueError("owner-decision evidence path가 actor feedback 아래가 아니다")
+    frozen_fd = _open_frozen_evidence_directory(receipt_fd)
+    try:
+        for entry in evidence:
+            if not isinstance(entry, dict):
+                raise ValueError("receipt evidence 항목이 객체가 아니다")
+            kind, path, digest = entry.get("kind"), entry.get("path"), entry.get("sha256")
+            if (not isinstance(kind, str) or not isinstance(digest, str)
+                    or re.fullmatch(r"[0-9a-f]{64}", digest) is None):
+                raise ValueError("receipt evidence 기본 필드가 올바르지 않다")
+            frozen_proof = None
+            if frozen_fd is not None:
+                try:
+                    _, frozen_proof = _read_regular_file_at(
+                        frozen_fd, _frozen_evidence_filename(digest), "receipt evidence frozen 사본")
+                except ValueError:
+                    frozen_proof = None
+            if frozen_proof is not None:
+                # 갈래 A — 얼린 사본이 있으면 대조 대상은 살아 있는 원본이 아니라 이 불변 사본이다.
+                # 근거 파일이 이후 편집돼도(예: 티켓에 오너 판정 추가) 재검증이 썩지 않는다.
+                if (frozen_proof["sha256"] != digest
+                        or stat.S_IMODE(frozen_proof["st_mode"]) != 0o444):
+                    raise ValueError("receipt evidence 얼린 사본이 손상됐다")
+                file_proof = frozen_proof
+                frozen_digest = digest
+            else:
+                # 얼린 사본이 없는 receipt(레거시 37장 포함) — 기존과 동일하게 살아 있는
+                # 원본과 직접 대조한다. 원본이 이후 편집됐으면 여기서 그대로 사람 검토로 밀린다.
+                _, file_proof = _read_project_regular_file(project_fd, path, "receipt evidence")
+                if file_proof["sha256"] != digest:
+                    raise ValueError("receipt evidence hash가 다르다")
+                frozen_digest = None
+            proofs.append({"path": path, "proof": file_proof, "frozen_digest": frozen_digest})
+            if disposition == "integrated" and kind == "origin-main":
+                commit = entry.get("commit")
+                if not isinstance(commit, str) or re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+                    raise ValueError("origin-main evidence commit이 올바르지 않다")
+                if not (path.startswith(".claude/vault/backlog/tickets/")
+                        or re.fullmatch(rf"runs/{re.escape(actor)}/[^/]+/(?:manifest|result-card[^/]*)\.json", path)):
+                    raise ValueError("origin-main evidence path가 run manifest/result-card 또는 ticket이 아니다")
+                ancestor = subprocess.run(
+                    ["git", "-C", project_root, "merge-base",
+                     "--is-ancestor", commit, "origin/main"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                if ancestor.returncode != 0:
+                    raise ValueError("origin-main evidence commit이 origin/main 조상이 아니다")
                 valid_terminal = True
-        elif disposition in {"completed", "failed"}:
-            if kind == "result-card":
-                if not path.startswith(".claude/vault/backlog/tickets/"):
-                    raise ValueError("result-card evidence path가 tickets 아래가 아니다")
-                valid_terminal = True
+            elif disposition in {"accepted", "rejected", "no-action", "cancelled", "superseded"}:
+                if kind == "owner-decision":
+                    if not path.startswith(f"feedback/{actor}/"):
+                        raise ValueError("owner-decision evidence path가 actor feedback 아래가 아니다")
+                    valid_terminal = True
+            elif disposition in {"completed", "failed"}:
+                if kind == "result-card":
+                    if not path.startswith(".claude/vault/backlog/tickets/"):
+                        raise ValueError("result-card evidence path가 tickets 아래가 아니다")
+                    valid_terminal = True
+    finally:
+        if frozen_fd is not None:
+            os.close(frozen_fd)
     if not valid_terminal:
         raise ValueError("receipt disposition에 맞는 terminal evidence가 없다")
     return proofs
 
 
-def _receipt_valid(receipt, filename, project_fd, project_root, actor, item):
+def _receipt_valid(receipt, filename, project_fd, project_root, actor, item, receipt_fd):
     if not isinstance(receipt, dict) or receipt.get("schema") != 1:
         raise ValueError("receipt schema가 올바르지 않다")
     receipt_id = receipt.get("receipt_id")
@@ -1231,7 +1268,8 @@ def _receipt_valid(receipt, filename, project_fd, project_root, actor, item):
         raise ValueError("receipt units에 marker 밖 unit이 있다")
     if receipt.get("disposition") not in TERMINAL_DISPOSITIONS:
         raise ValueError("receipt disposition이 올바르지 않다")
-    return _receipt_evidence(receipt, project_fd, project_root, actor), units == marker_units
+    return (_receipt_evidence(receipt, project_fd, project_root, actor, receipt_fd),
+            units == marker_units)
 
 
 def _closed_replacement(item, receipt, receipt_proof, proof_path, raw):
@@ -1322,7 +1360,20 @@ def _revalidate_receipt_inputs(applications, receipt_fd, project_fd):
         if not _same_file_proof(application["receipt_proof"], proof):
             raise ValueError("receipt가 검증 뒤 변경됐다")
         for evidence in application["evidence"]:
-            _, proof = _read_project_regular_file(project_fd, evidence["path"], "receipt evidence")
+            if evidence.get("frozen_digest"):
+                # 얼린 사본으로 검증했던 evidence — 재확인도 같은 불변 사본을 다시 읽는다.
+                # 살아 있는 원본은 그 사이 편집돼도 무관하다.
+                frozen_fd = _open_frozen_evidence_directory(receipt_fd)
+                if frozen_fd is None:
+                    raise ValueError("receipt evidence 얼린 사본 저장소가 검증 뒤 사라졌다")
+                try:
+                    _, proof = _read_regular_file_at(
+                        frozen_fd, _frozen_evidence_filename(evidence["frozen_digest"]),
+                        "receipt evidence frozen 사본")
+                finally:
+                    os.close(frozen_fd)
+            else:
+                _, proof = _read_project_regular_file(project_fd, evidence["path"], "receipt evidence")
             if not _same_file_proof(evidence["proof"], proof):
                 raise ValueError("receipt evidence가 검증 뒤 변경됐다")
 
@@ -1370,7 +1421,7 @@ def _reconcile_inbox(args, state):
                 if item is None:
                     raise ValueError("receipt의 tracked item이 없다")
                 evidence, full = _receipt_valid(
-                    receipt, filename, project_fd, state["project_root"], args.actor, item)
+                    receipt, filename, project_fd, state["project_root"], args.actor, item, receipt_fd)
                 receipt_entries.append({
                     "filename": filename, "receipt": receipt, "bytes": receipt_bytes,
                     "proof": receipt_proof, "item": item, "item_id": item_id,

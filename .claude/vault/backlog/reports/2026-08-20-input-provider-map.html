@@ -1,0 +1,209 @@
+<title>입력 형식 세 벌 지도 — 말랑말랑하게 만들기 위해 먼저 봐야 할 것</title>
+<style>
+  :root {
+    --bg: #F7F5F0; --surface: #FFFFFF; --surface-2: #F1EEE6;
+    --ink: #22242A; --muted: #6E7077; --line: #E3E0D8;
+    --accent: #A64F2A; --accent-ink: #8A3F1E; --accent-soft: #F3E4DB;
+    --ok: #2F7D4E; --ok-soft: #E2F0E7;
+    --warn: #96690A; --warn-soft: #F5EBD4;
+    --info: #3A6EA5; --info-soft: #E3ECF5;
+    --violet: #7A5CA8; --violet-soft: #ECE5F5;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15171B; --surface: #1D2026; --surface-2: #23262D;
+      --ink: #E9E7E2; --muted: #9C9EA6; --line: #2C2F36;
+      --accent: #E0824F; --accent-ink: #E8956A; --accent-soft: #3A2A20;
+      --ok: #5FBE8A; --ok-soft: #1E3328; --warn: #D9A94A; --warn-soft: #362C16;
+      --info: #7FA9D9; --info-soft: #1E2A38; --violet: #A78BD0; --violet-soft: #2B2438;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15171B; --surface: #1D2026; --surface-2: #23262D;
+    --ink: #E9E7E2; --muted: #9C9EA6; --line: #2C2F36;
+    --accent: #E0824F; --accent-ink: #E8956A; --accent-soft: #3A2A20;
+    --ok: #5FBE8A; --ok-soft: #1E3328; --warn: #D9A94A; --warn-soft: #362C16;
+    --info: #7FA9D9; --info-soft: #1E2A38; --violet: #A78BD0; --violet-soft: #2B2438;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", sans-serif; font-size: 15.5px; line-height: 1.7; margin: 0; padding: 0 20px 96px; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  header.page { padding: 54px 0 10px; border-bottom: 2px solid var(--ink); margin-bottom: 20px; }
+  .kicker { color: var(--accent); font-weight: 700; font-size: 13px; margin: 0 0 10px; }
+  h1 { font-size: clamp(25px, 4.5vw, 34px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.28; margin: 0 0 10px; text-wrap: balance; }
+  .standfirst { font-size: 16px; margin: 0 0 6px; }
+  .asof { color: var(--muted); font-size: 13px; margin: 0; }
+  h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+  section.block { margin: 42px 0 0; }
+  .sec-head { border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 16px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .sec-head .lede { color: var(--muted); font-size: 14px; }
+  p { margin: 0 0 12px; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 750; border-radius: 4px; padding: 1px 8px; white-space: nowrap; vertical-align: 1px; }
+  .c-ok { background: var(--ok-soft); color: var(--ok); }
+  .c-no { background: var(--info-soft); color: var(--info); }
+  .c-hold { background: var(--warn-soft); color: var(--warn); }
+  .c-fix { background: var(--accent-soft); color: var(--accent-ink); }
+  .c-stop { background: var(--violet-soft); color: var(--violet); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px 14px; margin: 0 0 14px; }
+  .card .head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 12px; }
+  .card .head h3 { font-size: 16.5px; font-weight: 750; margin: 0; line-height: 1.45; text-wrap: balance; flex: 1 1 300px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 0 0 16px; }
+  th { text-align: left; font-weight: 750; border-bottom: 2px solid var(--ink); padding: 6px 8px; }
+  td { border-bottom: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
+  .tbl-wrap { overflow-x: auto; margin: 0 0 16px; }
+  code, .mono { font-family: var(--mono); font-size: 13px; background: var(--surface-2); padding: 1px 5px; border-radius: 3px; }
+  details { margin: 8px 0; }
+  summary { cursor: pointer; font-weight: 700; font-size: 14px; color: var(--accent); }
+  .steps { display: grid; gap: 8px; margin: 0; }
+  .steps .row { display: grid; grid-template-columns: 74px 1fr; gap: 12px; align-items: baseline; }
+  .steps .k { font-size: 12px; font-weight: 750; color: var(--accent); letter-spacing: .02em; }
+  .steps .v { font-size: 14.5px; }
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0; }
+  .flow .step { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; font-size: 14px; font-weight: 600; }
+  .flow .step.current { border-color: var(--accent); background: var(--accent-soft); }
+  .flow .arrow { color: var(--muted); font-size: 18px; }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+</style>
+<div class="wrap">
+<header class="page">
+  <p class="kicker">입력 형식 사실 지도</p>
+  <h1>파일을 받는 곳이 세 군데인데 허용 목록이 서로 다르다</h1>
+  <p class="standfirst">"입력을 말랑하게"를 만들려면 지금 얼마나 딱딱한지부터 봐야 한다. 밤이 코드를 전수 조사한 결과를 지도로 정리했다.</p>
+  <p class="asof">2026-08-20 기준 · 출처: 8-19 밤 run 조사 카드 <code>legacy-media-input-provider-map</code></p>
+</header>
+
+<!-- ─── 제안 순서 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>제안하는 진행 순서</h2></div>
+  <div class="flow">
+    <div class="step current">① 세 벌 지도 확인</div>
+    <div class="arrow">→</div>
+    <div class="step">② "말랑말랑"을 정의</div>
+    <div class="arrow">→</div>
+    <div class="step">③ 뮤비·광고·웹툰 실험</div>
+  </div>
+  <div class="card">
+    <div class="head"><h3>① 세 벌 지도 확인</h3><span class="chip c-ok">완료</span></div>
+    <p>아래에 정리됨. 파일을 받는 곳이 세 군데이고, 각각 허용하는 형식이 다르고, "provider"라는 이름의 입력 추상화는 코드에 존재하지 않음.</p>
+  </div>
+  <div class="card">
+    <div class="head"><h3>② "말랑말랑"을 정의</h3><span class="chip c-hold">오너 결정 필요</span></div>
+    <p>선택지:</p>
+    <table>
+      <tr><th>방향</th><th>하면 뭐가 좋은지</th><th>비용</th></tr>
+      <tr><td><b>세 벌을 한 벌로 합침</b></td><td>새 형식 추가가 한 자리 수정으로 끝남</td><td>파일 3개 리팩터링. DB 작업 없음</td></tr>
+      <tr><td><b>입력 provider 추상화 신설</b></td><td>"웹툰 provider", "광고 영상 provider"처럼 입력 종류별로 파서·검증·저장을 묶을 수 있음</td><td>새 모듈 설계. 기존 세 경로를 새 인터페이스로 마이그레이션</td></tr>
+      <tr><td><b>영상 입력 경로 추가</b></td><td>뮤비·광고 실험이 가능해짐</td><td>영상→장면·자막 변환 파이프라인 필요. 기능 개발</td></tr>
+    </table>
+    <p>세 벌 합치기가 선행이고, provider 추상화는 그 위에 올리는 것. 영상 입력은 뮤비·광고 실험의 전제 조건.</p>
+  </div>
+  <div class="card">
+    <div class="head"><h3>③ 뮤비·광고·웹툰 실험</h3><span class="chip c-hold">②에 의존</span></div>
+    <table>
+      <tr><th>갈래</th><th>지금 가능한가</th><th>필요한 것</th></tr>
+      <tr><td><b>웹툰 실사화</b></td><td><span class="chip c-ok">가능</span> 그림 여러 장으로 입력</td><td>웹툰 컷 이미지 (오너가 직접 준비)</td></tr>
+      <tr><td><b>뮤직비디오</b></td><td><span class="chip c-stop">불가</span> 영상 입력 경로 없음</td><td>영상 받는 길 먼저 만들어야 함</td></tr>
+      <tr><td><b>광고</b></td><td><span class="chip c-stop">불가</span> 영상 입력 경로 없음</td><td>위와 동일</td></tr>
+    </table>
+    <p>웹툰만 먼저 실험 가능. 가설과 채점표는 <code>research/experiments/liveaction-source-ingest/</code>에 준비돼 있음.</p>
+  </div>
+</section>
+
+<!-- ─── 세 벌 지도 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>세 벌 상세 지도</h2><span class="lede">파일이 어디서 들어와서 어디로 가는가</span></div>
+
+  <div class="card">
+    <div class="head"><h3>첫째 벌: 기획 단계 첨부</h3><span class="chip c-no">producer 채팅</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">경로</span><span class="v"><code>POST /api/produce/ingest</code></span></div>
+      <div class="row"><span class="k">검사 위치</span><span class="v"><code>src/lib/upload/limits.ts:66-75, :93, :106-110</code></span></div>
+      <div class="row"><span class="k">허용</span><span class="v">글 4종 (<code>txt md markdown docx</code>) + 그림 3종 (<code>jpg jpeg png webp</code>)</span></div>
+      <div class="row"><span class="k">거부</span><span class="v"><code>gif svg hwp hwpx doc pdf</code> 등 명시 거부 (<code>limits.ts:83-90</code>)</span></div>
+      <div class="row"><span class="k">검사 방식</span><span class="v">텍스트는 파일명 확장자만 봄. 이미지는 MIME + sharp 디코드 이중 대조</span></div>
+    </div>
+    <details><summary>들어온 뒤 어디로 가나</summary>
+      <table>
+        <tr><th>형식</th><th>파서</th><th>저장 위치</th></tr>
+        <tr><td>txt / md</td><td>브라우저 <code>file.text()</code> (서버 파서 없음)</td><td><code>projects.producer_draft.storyText</code></td></tr>
+        <tr><td>docx</td><td><code>extractDocxText</code> (mammoth) <code>src/lib/upload/docx.ts:9-12</code></td><td>위와 같음</td></tr>
+        <tr><td>jpg/png/webp</td><td><code>decodeImage</code> + <code>sliceForVision</code> <code>src/lib/upload/image.ts:41-95, 115-178</code></td><td>원본은 Storage + <code>messages.content</code> 마커</td></tr>
+      </table>
+      <p><b>주의:</b> 텍스트·docx <b>원본 바이트는 어디에도 저장되지 않음.</b> 글자만 뽑혀 초안에 들어가고 원본은 사라짐.</p>
+      <p>이미지에서 뽑은 슬라이스(잘라낸 조각)는 그 턴의 AI 호출에만 쓰이고 <b>DB가 참조하지 않음.</b></p>
+    </details>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>둘째 벌: 인물·장소·컷 이미지 교체</h3><span class="chip c-no">artist 에셋</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">경로</span><span class="v"><code>POST /api/assets/upload-image</code></span></div>
+      <div class="row"><span class="k">검사 위치</span><span class="v"><code>src/app/api/assets/upload-image/route.ts:14-19</code></span></div>
+      <div class="row"><span class="k">허용</span><span class="v">이미지 MIME 4종 (<code>jpeg png webp gif</code>) — <b>gif 포함</b></span></div>
+      <div class="row"><span class="k">차이</span><span class="v">첫째 벌에서 거부하는 gif를 여기서는 허용함</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head"><h3>셋째 벌: 소품 목록 이미지</h3><span class="chip c-no">inventory</span></div>
+    <div class="steps">
+      <div class="row"><span class="k">경로</span><span class="v"><code>POST /api/inventory/upload</code></span></div>
+      <div class="row"><span class="k">검사 위치</span><span class="v"><code>src/app/api/inventory/upload/route.ts:61-73</code></span></div>
+      <div class="row"><span class="k">허용</span><span class="v">매직바이트 3종 (PNG / JPEG / WEBP) — <b>확장자 검사 없음</b></span></div>
+      <div class="row"><span class="k">차이</span><span class="v">상수 테이블 없이 파일 앞머리 바이트로 직접 판별. gif, 확장자 검사 모두 없음</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 비교표 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>세 벌 비교 — 형식별로 어디서 되고 어디서 안 되나</h2></div>
+  <div class="tbl-wrap">
+  <table>
+    <tr><th>형식</th><th>기획 첨부</th><th>에셋 교체</th><th>소품 목록</th></tr>
+    <tr><td>txt / md / markdown</td><td>✅</td><td>❌</td><td>❌</td></tr>
+    <tr><td>docx</td><td>✅</td><td>❌</td><td>❌</td></tr>
+    <tr><td>jpg / jpeg</td><td>✅</td><td>✅</td><td>✅</td></tr>
+    <tr><td>png</td><td>✅</td><td>✅</td><td>✅</td></tr>
+    <tr><td>webp</td><td>✅</td><td>✅</td><td>✅</td></tr>
+    <tr><td>gif</td><td>❌</td><td><b>✅</b></td><td>❌</td></tr>
+    <tr><td>svg</td><td>❌</td><td>❌</td><td>❌</td></tr>
+    <tr><td>hwp / hwpx</td><td>❌</td><td>❌</td><td>❌</td></tr>
+    <tr><td>pdf</td><td>❌</td><td>❌</td><td>❌</td></tr>
+    <tr><td>영상 (mp4 등)</td><td>❌</td><td>❌</td><td>❌</td></tr>
+  </table>
+  </div>
+  <p>새 형식 하나를 <b>기획 첨부에만</b> 추가하려면 <code>limits.ts</code> 한 파일 안 3곳. <b>세 경로 전부에</b> 추가하려면 3개 파일을 고쳐야 함.</p>
+</section>
+
+<!-- ─── provider 현황 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>"provider"라는 이름은 코드에 있지만 전부 출력 쪽이다</h2></div>
+  <table>
+    <tr><th>이름</th><th>위치</th><th>하는 일</th></tr>
+    <tr><td><code>LlmProvider</code></td><td><code>src/lib/writer/llm/raw_collector.ts:4</code></td><td>어떤 언어 모델로 글을 쓸까</td></tr>
+    <tr><td><code>ImageProvider</code></td><td><code>src/stores/artist-store.ts:34</code></td><td>어떤 이미지 생성기로 그릴까</td></tr>
+    <tr><td><code>VideoProvider</code></td><td><code>src/app/api/director/generate-video/route.ts:41</code></td><td>어떤 영상 생성기로 만들까</td></tr>
+  </table>
+  <p>입력 쪽에는 "어떤 종류의 파일을 어떻게 해석할까"를 묶는 추상화가 <b>없음.</b> 메모에서 말한 "입력 provider"는 이름만 같은 <b>새 축</b>임.</p>
+</section>
+
+<!-- ─── 이미지 순서 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>이미지 순서는 보존되지만 "페이지 번호"는 아니다</h2></div>
+  <p>한 장 안의 세로 컷은 위→아래 순번으로, 여러 장은 고르거나 놓은 순서대로 배열에 들어감.</p>
+  <p>다만 이건 <b>배열 인덱스</b>이지 메타데이터가 아님. 순서를 검증하거나 다시 배열하는 화면은 없음. 웹툰처럼 순서가 곧 이야기인 입력에서는 이 차이가 중요할 수 있음.</p>
+</section>
+
+<!-- ─── 미확인 ─── -->
+<section class="block">
+  <div class="sec-head"><h2>미확인</h2></div>
+  <p>DB 자체에 형식 제약(CHECK 제약·트리거)이 걸려 있는지는 코드만으로 확인 불가. Supabase Pro 전환 뒤 확인 가능.</p>
+</section>
+
+<footer>
+  <p>출처: 8-19 밤 run 조사 카드 <code>.claude/vault/backlog/tickets/legacy-media-input-provider-map.md</code></p>
+  <p>코드 근거: <code>src/lib/upload/limits.ts</code>, <code>src/app/api/assets/upload-image/route.ts</code>, <code>src/app/api/inventory/upload/route.ts</code></p>
+</footer>
+</div>
