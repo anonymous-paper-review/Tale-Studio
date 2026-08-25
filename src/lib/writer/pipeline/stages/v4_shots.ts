@@ -432,6 +432,12 @@ V4는 3분할:
 - character_blocking 은 **사람(person) 캐스트만** 넣는다. 사물(object) 캐스트·소품(들고 다니는
   물건 포함)은 반드시 prop_placement 로 — blocking 에 넣으면 스토리보드가 그 사물을 목각
   인형(사람)으로 그린다(실측: 가슴에 멘 엿판이 '안긴 아기'로 렌더된 사고).
+- static_spec 은 **모션 시작 직전의 순간**이다. dynamic_spec 의 motion_prompt/character_motion 이
+  만들 도착 상태를 first_frame_prompt·framing·character_blocking[].pose 에 미리 쓰지 마라 —
+  액션이 "들어와 무릎 꿇는다"면 START 는 문간에 선 순간(무릎 꿇기 전)이고, "주걱을 내려놓는다"면
+  START 는 아직 주걱을 든 손이다. START 가 이미 도착해 있으면 모션이 놀 공간이 없어 START=END
+  정지 샷이 된다(실측 9d562ada: '들어와 무릎 꿇는' 샷의 START 가 이미 꿇은 자세 — 전수 감사
+  14샷 중 3샷이 이 결함으로 previz 에서 동작 소멸).
 - dynamic_spec: character_motion[].verb, gaze_arc[].from/to, environmental_change[].type, motion_prompt
 (shot_type/camera_angle/depth_of_field/camera_motion.type/transition_in/out 등 고정 enum 필드는
  원래부터 영어 vocabulary라 이 지시의 대상이 아님 — 그대로 유지)
