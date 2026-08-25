@@ -15,13 +15,13 @@
     },
     {
       "path": "/login",
-      "expect": ["이메일", "비밀번호"],
-      "note": "로그인 폼"
+      "expect": ["Email", "Password"],
+      "note": "로그인 폼. 2026-08-18 i18n 배치(26cd18a)로 한국어 고정 문구가 영어로 바뀌어 낡음 — src/app/login/page.tsx 의 placeholder 는 t() 를 안 타는 리터럴이라 로케일과 무관하게 항상 이 값이다 (#smoke-targets-rot 2026-08-25)"
     },
     {
       "path": "/pricing",
-      "expect": ["Pricing", "베타 기간에는 모든 기능이 무료입니다."],
-      "note": "요금"
+      "expect": ["Pricing", "All features are free during the beta."],
+      "note": "요금. src/app/pricing/page.tsx 의 부제도 t() 없는 리터럴 — 2026-08-18 i18n 배치로 낡았던 한국어 문구를 실제 텍스트로 교체 (#smoke-targets-rot 2026-08-25)"
     },
     {
       "path": "/playground",
@@ -30,13 +30,13 @@
     },
     {
       "path": "/studio/producer",
-      "expect": ["이메일", "비밀번호"],
-      "note": "미로그인 접근 → /login 으로 튕기는지. /studio 자체는 page.tsx 가 없어 실제 화면은 producer|writer|artist|director|editor 5개다"
+      "expect": ["Email", "Password"],
+      "note": "미로그인 접근 → /login 으로 튕기는지. /studio 자체는 page.tsx 가 없어 실제 화면은 producer|writer|artist|director|editor 5개다. expect 는 도착지 /login 문구 (#smoke-targets-rot 2026-08-25)"
     },
     {
       "path": "/projects",
-      "expect": ["이메일", "비밀번호"],
-      "note": "미로그인 접근 → /login 으로 튕기는지"
+      "expect": ["Email", "Password"],
+      "note": "미로그인 접근 → /login 으로 튕기는지. expect 는 도착지 /login 문구 (#smoke-targets-rot 2026-08-25)"
     }
   ]
 }
