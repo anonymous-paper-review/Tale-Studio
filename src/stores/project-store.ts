@@ -65,7 +65,6 @@ interface ProjectState {
   /** 진입 시 writer 산출물(씬) 검증 → 없으면 producer 로 게이트백 + writerNeedsRerun 표시 */
   verifyWriterGate: (projectId: string) => Promise<void>
   setLifecycleStatus: (status: LifecycleStatus) => void
-  clearLifecycleStatus: () => void
   setArtistAssetGate: (assets: WriterStatusAssets | null | undefined) => void
   /** 잠금 실패/stalled 시 재시도 — POST /api/artist/retry-drafts 후 실패·stalled 해제(폴링 재개). */
   retryArtistDrafts: () => Promise<void>
@@ -182,7 +181,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   setLifecycleStatus: (status) => set({ lifecycleStatus: status }),
-  clearLifecycleStatus: () => set({ lifecycleStatus: EMPTY_LIFECYCLE_STATUS }),
   setArtistAssetGate: (assets) => set(artistAssetGateFromAssets(assets)),
   retryArtistDrafts: async () => {
     const { projectId } = get()

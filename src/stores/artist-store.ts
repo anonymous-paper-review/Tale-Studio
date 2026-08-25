@@ -380,8 +380,6 @@ interface ArtistState {
   /** 온보딩 "진행" 단일 진입점 — look-pending 초안 + writer-추가 무이미지 캐릭터의 main 을 재생성(유저 클릭만). */
   refreshLookPendingDrafts: () => Promise<void>
   applyUpdates: (updates: ArtistUpdate[]) => Promise<void>
-  selectBoostPreset: (preset: string) => void
-  setImageProvider: (provider: ImageProvider) => void
   /** 진입 허용된 projectId 기록 (멱등). 페이지가 ready 도달 시 1회 호출. */
   markEntered: (projectId: string) => void
   /** 승인된 원천 외형 변경을 로컬 반영(C3 F6) — fixedPrompt 갱신 → 기존 파생 이미지가 stale 로 표시(자동 재생성 없음). */
@@ -1224,13 +1222,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       }
     }
   },
-
-  selectBoostPreset: (preset) =>
-    set((state) => ({
-      selectedBoostPreset: state.selectedBoostPreset === preset ? null : preset,
-    })),
-
-  setImageProvider: (provider) => set({ imageProvider: provider }),
 
   markEntered: (projectId) =>
     set((state) =>

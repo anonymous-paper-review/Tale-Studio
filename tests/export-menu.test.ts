@@ -26,8 +26,6 @@ vi.mock('@/lib/shots-cache', () => ({
 }))
 vi.mock('@/stores/asset-storage-store', () => ({
   useAssetStorageStore: { getState: () => ({
-    listCharactersByProject: () => [],
-    listWorldsByProject: () => [],
   }) },
 }))
 vi.mock('@/stores/writer-store', () => ({

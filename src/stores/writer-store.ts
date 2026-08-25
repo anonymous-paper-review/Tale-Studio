@@ -115,7 +115,6 @@ interface WriterState {
   sceneManifest: SceneManifest | null
   selectedSceneId: string | null
   shots: Shot[]
-  selectedShotId: string | null
   generatingShots: boolean
   generating: boolean
   regeneratingSceneId: string | null
@@ -129,7 +128,6 @@ interface WriterState {
   generatePrevizVideo: (shotId: string) => Promise<void>
   selectScene: (id: string) => void
   updateScene: (id: string, changes: Partial<Scene>) => void
-  selectShot: (id: string) => void
   updateShot: (id: string, changes: Partial<Shot>) => void
   // opts.afterShotId: undefined=씬 끝에 append(기존 동작), null=씬 맨 앞, shotId=그 샷 뒤에 삽입.
   addShot: (
@@ -143,15 +141,6 @@ interface WriterState {
     opts?: { afterSceneId?: string | null; fields?: Partial<Scene> },
   ) => Promise<string | null>
   deleteScene: (sceneId: string) => Promise<void>
-  reorderScenes: (orderedIds: string[]) => Promise<void>
-  regenerateScene: (sceneId: string) => Promise<void>
-  addDialogueLine: (shotId: string, line: DialogueLine) => void
-  removeDialogueLine: (shotId: string, index: number) => void
-  updateDialogueLine: (
-    shotId: string,
-    index: number,
-    changes: Partial<DialogueLine>,
-  ) => void
   applyChatUpdates: (updates: WriterChatUpdate[]) => Promise<WriterApplyChatUpdatesResult>
   clearError: () => void
   reset: () => void
@@ -163,7 +152,6 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   sceneManifest: null,
   selectedSceneId: null,
   shots: [],
-  selectedShotId: null,
   generatingShots: false,
   generating: false,
   regeneratingSceneId: null,
@@ -171,14 +159,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
 
   setStoryText: (text) => set({ storyText: text }),
 
-  selectScene: (id) => {
-    const { shots } = get()
-    const firstShot = shots.find((s) => s.sceneId === id)
-    set({
-      selectedSceneId: id,
-      selectedShotId: firstShot?.shotId ?? null,
-    })
-  },
+  selectScene: (id) => set({ selectedSceneId: id }),
 
   updateScene: (id, changes) => {
     if (isDemoSession()) return
@@ -226,8 +207,6 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       }, 500),
     )
   },
-
-  selectShot: (id) => set({ selectedShotId: id }),
 
   updateShot: (id, changes) => {
     if (isDemoSession()) return
@@ -333,7 +312,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     const nextShots = [...shifted, newShot].sort(
       (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
     )
-    set({ shots: nextShots, selectedShotId: shotId })
+    set({ shots: nextShots })
 
     const supabase = createClient()
     // 편집(추가 폼)은 유저 언어 → primary·_native 둘 다 native 로 기록(러프 라우트가 EN skip-or-derive). (S3b)
@@ -388,12 +367,6 @@ export const useWriterStore = create<WriterState>((set, get) => ({
 
     set((state) => ({
       shots: state.shots.filter((s) => s.shotId !== shotId),
-      selectedShotId:
-        state.selectedShotId === shotId
-          ? state.shots.find(
-              (s) => s.sceneId === target.sceneId && s.shotId !== shotId,
-            )?.shotId ?? null
-          : state.selectedShotId,
     }))
 
     const supabase = createClient()
@@ -698,148 +671,6 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     return { pendingDialogueShrinks, applied, skipped }
   },
 
-  reorderScenes: async (orderedIds) => {
-    if (isDemoSession()) return
-    const projectId = useProjectStore.getState().projectId
-    const manifest = get().sceneManifest
-    if (!projectId || !manifest) return
-
-    const byId = new Map(manifest.scenes.map((s) => [s.sceneId, s]))
-    const reordered = orderedIds
-      .map((id) => byId.get(id))
-      .filter((s): s is Scene => Boolean(s))
-
-    set((state) => ({
-      sceneManifest: state.sceneManifest
-        ? { ...state.sceneManifest, scenes: reordered }
-        : state.sceneManifest,
-    }))
-
-    const supabase = createClient()
-    await Promise.all(
-      orderedIds.map((sceneId, idx) =>
-        supabase
-          .from('scenes')
-          .update({ sort_order: idx })
-          .eq('project_id', projectId)
-          .eq('scene_id', sceneId),
-      ),
-    )
-  },
-
-  regenerateScene: async (sceneId) => {
-    if (isDemoSession()) return
-    const projectId = useProjectStore.getState().projectId
-    const manifest = get().sceneManifest
-    const scene = manifest?.scenes.find((s) => s.sceneId === sceneId)
-    if (!projectId || !scene || !manifest) return
-
-    set({ regeneratingSceneId: sceneId, error: null })
-
-    try {
-      const characterMap = Object.fromEntries(
-        manifest.characters.map((c) => [c.characterId, c.name]),
-      )
-      const res = await fetch('/api/director/generate-shots', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scene: {
-            sceneId: scene.sceneId,
-            narrativeSummary: scene.narrativeSummary,
-            location: scene.location,
-            timeOfDay: scene.timeOfDay,
-            mood: scene.mood,
-            characters: scene.charactersPresent.map(
-              (id) => characterMap[id] ?? id,
-            ),
-          },
-        }),
-      })
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error ?? `HTTP ${res.status}`)
-      }
-
-      const { shots: newShots } = (await res.json()) as { shots: Shot[] }
-
-      const supabase = createClient()
-      await supabase
-        .from('shots')
-        .delete()
-        .eq('project_id', projectId)
-        .eq('scene_id', sceneId)
-
-      if (newShots?.length) {
-        await supabase.from('shots').insert(
-          newShots.map((s, i) => ({
-            project_id: projectId,
-            scene_id: sceneId,
-            shot_id: s.shotId,
-            // #F-003 R3 — 씬 재생성은 사람이 지시한 그 씬의 교체이고 산출은 사람이 선별한 판본:
-            //   'manual'. 이후 전체 재런이 이 씬을 다시 만들면 충돌 스킵(수동 우선)으로 보존된다.
-            source: 'manual',
-            shot_type: s.shotType,
-            action_description: s.actionDescription,
-            characters: s.characters,
-            duration_seconds: s.durationSeconds,
-            generation_method: s.generationMethod,
-            dialogue_lines: s.dialogueLines,
-            camera_config: s.camera ?? DEFAULT_CAMERA,
-            lighting_config: s.lighting ?? DEFAULT_LIGHTING,
-            sort_order: i,
-          })),
-        )
-      }
-
-      void invalidateShots(projectId) // 씬 재생성 = delete+insert 완료 시점
-      set((state) => ({
-        regeneratingSceneId: null,
-        shots: [
-          ...state.shots.filter((s) => s.sceneId !== sceneId),
-          ...(newShots ?? []).map((s) => ({
-            ...s,
-            camera: s.camera ?? { ...DEFAULT_CAMERA },
-            lighting: s.lighting ?? { ...DEFAULT_LIGHTING },
-          })),
-        ],
-      }))
-    } catch (err) {
-      set({
-        regeneratingSceneId: null,
-        error:
-          err instanceof Error ? err.message : 'Scene regeneration failed',
-      })
-    }
-  },
-
-  addDialogueLine: (shotId, line) => {
-    const shot = get().shots.find((s) => s.shotId === shotId)
-    if (!shot) return
-    get().updateShot(shotId, {
-      dialogueLines: [...shot.dialogueLines, line],
-    })
-  },
-
-  removeDialogueLine: (shotId, index) => {
-    const shot = get().shots.find((s) => s.shotId === shotId)
-    if (!shot) return
-    get().updateShot(shotId, {
-      dialogueLines: shot.dialogueLines.filter((_, i) => i !== index),
-    })
-  },
-
-  updateDialogueLine: (shotId, index, changes) => {
-    const shot = get().shots.find((s) => s.shotId === shotId)
-    if (!shot) return
-    get().updateShot(shotId, {
-      dialogueLines: shot.dialogueLines.map((dl, i) =>
-        i === index ? { ...dl, ...changes } : dl,
-      ),
-    })
-  },
-
   clearError: () => set({ error: null }),
 
   reset: () =>
@@ -849,7 +680,6 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       sceneManifest: null,
       selectedSceneId: null,
       shots: [],
-      selectedShotId: null,
       generatingShots: false,
       generating: false,
       regeneratingSceneId: null,
@@ -1022,16 +852,12 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       }))
 
       const firstSceneId = manifest.scenes[0]?.sceneId ?? null
-      const firstShot =
-        shots.find((s) => s.sceneId === firstSceneId) ?? null
-
       set({
         storyText: project?.story_text ?? '',
         expandedStory: project?.expanded_story ?? null,
         sceneManifest: manifest,
         selectedSceneId: firstSceneId,
         shots,
-        selectedShotId: firstShot?.shotId ?? null,
       })
     } catch (err) {
       console.error('[writer-store] loadProject failed:', err)

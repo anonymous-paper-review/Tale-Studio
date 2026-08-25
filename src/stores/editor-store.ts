@@ -114,8 +114,6 @@ interface EditorState {
   setAudioSelection: (ids: string[]) => void           // 마퀴 드래그 선택
   clearAudioSelection: () => void
   deleteSelectedAudio: () => void                       // 선택된 오디오 일괄 삭제
-  reorderClips: (sceneId: string, fromIndex: number, toIndex: number) => void
-  setTrim: (shotId: string, trimStart: number, trimEnd: number) => void
   setSpeed: (shotId: string, speed: number) => void
   deleteClip: (shotId: string) => void
   deleteSelectedClips: () => void                       // 선택된 클립 일괄 삭제
@@ -139,7 +137,6 @@ interface EditorState {
   moveAudioClip: (id: string, startSec: number, trackId?: string) => void
   setAudioVolume: (id: string, volume: number) => void
   toggleAudioMute: (id: string) => void
-  setAudioPeaks: (id: string, peaks: number[]) => void
   removeAudioClip: (id: string) => void
   splitAudioClipAt: (id: string, atGlobalSec: number) => void   // cut(자르기) for audio
 
@@ -422,13 +419,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => ({
       audioClips: state.audioClips.map((a) =>
         a.id === id ? { ...a, muted: !a.muted } : a,
-      ),
-    })),
-
-  setAudioPeaks: (id, peaks) =>
-    set((state) => ({
-      audioClips: state.audioClips.map((a) =>
-        a.id === id ? { ...a, peaks } : a,
       ),
     })),
 
@@ -956,51 +946,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         future: [],
       }
     }),
-
-  reorderClips: (sceneId, fromIndex, toIndex) => {
-    set((state) => {
-      const order = [...(state.clipOrder[sceneId] ?? [])]
-      const [moved] = order.splice(fromIndex, 1)
-      order.splice(toIndex, 0, moved)
-      const newOrder = { ...state.clipOrder, [sceneId]: order }
-
-      // Persist to DB (fire-and-forget)
-      const reorderProjectId = useProjectStore.getState().projectId
-      if (reorderProjectId) {
-        fetch('/api/editor/reorder', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId: reorderProjectId, sceneId, clipOrder: order }),
-        }).catch((err) => console.error('[editor-store] reorder persist failed:', err))
-      }
-
-      return {
-        clipOrder: newOrder,
-        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
-        future: [],
-      }
-    })
-  },
-
-  setTrim: (shotId, trimStart, trimEnd) => {
-    set((state) => ({
-      videoClips: state.videoClips.map((c) =>
-        c.shotId === shotId ? { ...c, trimStart, trimEnd } : c,
-      ),
-      past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
-      future: [],
-    }))
-
-    // Persist to DB (fire-and-forget)
-    const trimProjectId = useProjectStore.getState().projectId
-    if (trimProjectId) {
-      fetch('/api/editor/trim', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: trimProjectId, shotId, trimStart, trimEnd }),
-      }).catch((err) => console.error('[editor-store] trim persist failed:', err))
-    }
-  },
 
   setSpeed: (shotId, speed) => {
     const clamped = Math.max(0.25, Math.min(4.0, speed))

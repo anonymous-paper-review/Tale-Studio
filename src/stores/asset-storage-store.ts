@@ -51,15 +51,8 @@ interface AssetStorageState {
     input: RegisterCharacterInput,
   ) => string
   registerWorld: (id: string, input: RegisterCharacterInput) => string
-  unregister: (id: string) => void
-  updateRegistration: (
-    id: string,
-    patch: Partial<RegisteredCharacter>,
-  ) => void
   getCharacter: (id: string) => RegisteredCharacter | undefined
   getWorld: (id: string) => RegisteredWorld | undefined
-  listCharactersByProject: (projectId: string) => RegisteredCharacter[]
-  listWorldsByProject: (projectId: string) => RegisteredWorld[]
 
   /**
    * DB(characters/locations)에서 직접 등록 — Artist 카드를 거치지 않은 진입(Director 직행,
@@ -102,38 +95,8 @@ export const useAssetStorageStore = create<AssetStorageState>()(
         return id
       },
 
-      unregister: (id) => {
-        set((s) => {
-          const characters = { ...s.characters }
-          const worlds = { ...s.worlds }
-          delete characters[id]
-          delete worlds[id]
-          return { characters, worlds }
-        })
-      },
-
-      updateRegistration: (id, patch) => {
-        set((s) => {
-          const existing = s.characters[id] ?? s.worlds[id]
-          if (!existing) return s
-          const updated = { ...existing, ...patch, updatedAt: Date.now() }
-          if (s.characters[id]) {
-            return { characters: { ...s.characters, [id]: updated } }
-          }
-          return { worlds: { ...s.worlds, [id]: updated } }
-        })
-      },
-
       getCharacter: (id) => get().characters[id],
       getWorld: (id) => get().worlds[id],
-
-      listCharactersByProject: (projectId) =>
-        Object.values(get().characters).filter(
-          (c) => c.projectId === projectId,
-        ),
-
-      listWorldsByProject: (projectId) =>
-        Object.values(get().worlds).filter((w) => w.projectId === projectId),
 
       hydrateFromDb: async (projectId) => {
         if (!projectId) return

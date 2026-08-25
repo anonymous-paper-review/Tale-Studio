@@ -37,9 +37,7 @@ import { POST as generateStoryboardPOST } from '@/app/api/director/generate-stor
 import { POST as generateStoryboardBatchPOST } from '@/app/api/director/generate-storyboard-batch/route'
 import { POST as generatePrevizVideoPOST } from '@/app/api/director/generate-previz-video/route'
 import { GET as editorStateGET, PUT as editorStatePUT } from '@/app/api/editor/state/route'
-import { PATCH as editorReorderPATCH } from '@/app/api/editor/reorder/route'
 import { PATCH as editorSpeedPATCH } from '@/app/api/editor/speed/route'
-import { PATCH as editorTrimPATCH } from '@/app/api/editor/trim/route'
 import { POST as editorRenderDraftPOST } from '@/app/api/editor/render-draft/route'
 import { POST as sceneGatePOST } from '@/app/api/writer/scene-gate/route'
 import { POST as dialoguePOST } from '@/app/api/writer/dialogue/route'
@@ -365,29 +363,9 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
     expect(mocks.from).not.toHaveBeenCalledWith('editor_states')
   })
 
-  it('PATCH /api/editor/reorder — 403', async () => {
-    const res = await editorReorderPATCH(
-      patchReq('/api/editor/reorder', {
-        projectId: PROJECT,
-        sceneId: 'sc_01',
-        clipOrder: ['sh_01_01'],
-      }),
-    )
-    expect(res.status).toBe(403)
-    expect(mocks.from).not.toHaveBeenCalledWith('shots')
-  })
-
   it('PATCH /api/editor/speed — 403', async () => {
     const res = await editorSpeedPATCH(
       patchReq('/api/editor/speed', { projectId: PROJECT, shotId: 'sh_01_01', speed: 1.5 }),
-    )
-    expect(res.status).toBe(403)
-    expect(mocks.from).not.toHaveBeenCalledWith('shots')
-  })
-
-  it('PATCH /api/editor/trim — 403', async () => {
-    const res = await editorTrimPATCH(
-      patchReq('/api/editor/trim', { projectId: PROJECT, shotId: 'sh_01_01', trimStart: 0, trimEnd: 1 }),
     )
     expect(res.status).toBe(403)
     expect(mocks.from).not.toHaveBeenCalledWith('shots')

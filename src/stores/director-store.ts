@@ -29,7 +29,6 @@ import {
   type DirectorNodeData,
   type DirectorNodeKind,
   type DirectorEdgeData,
-  type DirectorEdgeCategory,
   type SceneNodeData,
   type ShotNodeData,
   type VideoNodeData,
@@ -711,7 +710,6 @@ interface DirectorCanvasState {
     sourceHandle?: string | null,
     targetHandle?: string | null,
   ) => string | null
-  updateEdge: (id: string, patch: Partial<DirectorEdgeData>) => void
   deleteEdge: (id: string) => void
   /**
    * Artist 에셋(asset-storage) → 씬별 asset 노드 + shot 참조 엣지를 재생성한다 (멱등, 파생).
@@ -774,7 +772,6 @@ interface DirectorCanvasState {
 
   // propagation (Shot 설정 변경 → 자식 Video stale)
   propagateStaleFromShot: (shotNodeId: string) => void
-  clearStale: (id: string) => void
 
   // selection
   selectNode: (id: string | null) => void
@@ -1758,22 +1755,6 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         }
         set((s) => ({ edges: [...s.edges, edge], lastSavedAt: Date.now() }))
         return id
-      },
-
-      updateEdge: (id, patch) => {
-        if (isDemoSession()) return
-        set((s) => ({
-          edges: s.edges.map((e) =>
-            e.id === id
-              ? {
-                  ...e,
-                  data: { ...(e.data ?? {}), ...patch } as DirectorEdgeData,
-                  type: (patch.category ?? e.type) as DirectorEdgeCategory,
-                }
-              : e,
-          ),
-          lastSavedAt: Date.now(),
-        }))
       },
 
       rebuildAssetNodes: () => {
@@ -2795,19 +2776,6 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               ? ({ ...n, data: { ...n.data, stale: true } } as DirectorNode)
               : n,
           ),
-          lastSavedAt: Date.now(),
-        }))
-      },
-
-      clearStale: (id) => {
-        set((s) => ({
-          nodes: s.nodes.map((n) => {
-            if (n.id !== id) return n
-            if (isShotData(n.data) || isVideoData(n.data)) {
-              return { ...n, data: { ...n.data, stale: false } } as DirectorNode
-            }
-            return n
-          }),
           lastSavedAt: Date.now(),
         }))
       },
