@@ -708,6 +708,9 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       await pollGenerationJob(jobId).catch(() => {})
       // 진실 폴링: previz_video 가 terminal(completed/failed)로 보일 때까지 리로드.
       for (let i = 0; i < 30; i++) {
+        // #shots-cache-invalidate: 완료를 기다리는 리로드는 사물함(30초 신선)을 매 회 뚫는다 —
+        //   안 뚫으면 완료 반영이 캐시 만료까지(최대 30초) 늦는다.
+        void invalidateShots(projectId)
         await get().loadProject()
         const st = get().shots.find((sh) => sh.shotId === shotId)?.previzVideo?.status
         if (st === 'completed' || st === 'failed') return

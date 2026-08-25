@@ -366,7 +366,7 @@ export const KO: Record<string, string> = {
   '{count} panels stopped auto-generating after repeated failures. Use "Retry" on the card to regenerate them.': '패널 {count}개는 반복 실패로 자동 생성을 멈췄어요. 카드의 "다시 시도"로 재생성할 수 있어요.',
   'Generation failed': '생성 실패',
   'Rough storyboard generation request failed': '러프 스토리보드 생성 요청 실패',
-  "Another generation task is using the queue. We'll continue as soon as a slot opens up.": '다른 생성 작업이 대기열을 쓰고 있어요. 자리가 나는 대로 이어서 생성할게요.',
+  "The server is busy, so this is taking longer than usual. We'll continue automatically as soon as a slot opens.": '서버가 바빠서 시간이 오래 걸리고 있어요. 자리가 나는 대로 자동으로 이어서 진행할게요.',
   'Rough storyboard — click a card to review, edit, or regenerate; click a scene name to collapse it': '러프 스토리보드 — 카드를 클릭하면 확인·수정·재생성, 씬 이름을 클릭하면 접을 수 있어요',
   'Zoom out (more columns)': '축소 (열 늘리기)',
   'Rough board zoom': '러프보드 축척',
@@ -829,6 +829,8 @@ export const KO: Record<string, string> = {
   // ── misc: studio/producer/page.tsx (direct) ──
   'Everything needed is filled in. Calling Writer will start scene/shot design right away.': '필요한 항목이 모두 채워졌어요. Writer를 호출하면 씬·샷 설계가 바로 시작돼요.',
   'Invite Writer': 'Writer 호출하기',
+  'Style locked in! A few things are still needed before handing to Writer: {items}. Tell me in chat and I will fill them in.':
+    '스타일 확정! Writer로 넘기기 전에 아직 필요한 게 있어요: {items}. 채팅으로 말씀 주시면 채워드릴게요.',
   // ── producer: Writer 재실행 동의(#writer-rerun-consent — 밤 병합분 영어화) ──
   'Shall I ask Writer again for a story and direction plan based on the chat so far? Your changes will be reflected naturally, but it may take a long time again.':
     '지금까지 채팅 내역을 바탕으로 다시 writer에게 스토리와 연출에 대한 구상을 요청할까요?? 변경 사항들을 자연스럽게 반영할 수 있지만 다시 오랜 시간이 걸릴 수 있어요.',

@@ -424,9 +424,10 @@ export function RoughStoryboardView() {
               .catch(() => false)
           }
           for (let i = 0; i < ROUGH_CONVERGE_MAX_RELOADS; i++) {
-            // 생성 완료 결과는 서버가 shots 를 갱신한 뒤 도착한다. 캐시 신선 기간을
-            // 기다리지 않고 매 수렴 확인마다 새 DB 행을 읽어야 한다.
-            await invalidateShots(projectId)
+            // #shots-cache-invalidate: 잡 완료를 안 순간의 리로드는 30초 신선 사물함을 그대로
+            //   믿으면 안 된다 — 무효화 없이 돌면 "리로드 1회 수렴" 설계가 캐시 도입 후 최대
+            //   30초 스피너로 늘어진다(오너 rerender 검증 요청에서 발견). 재시도마다 뚫는다.
+            if (projectId) await invalidateShots(projectId)
             await loadProject()
             const settled = jobShotIds.filter(isDone)
             clearShots(settled)
@@ -514,12 +515,16 @@ export function RoughStoryboardView() {
           const r = await generate(undefined, false, auto || round > 0)
           if (!r) return // 요청 실패 — generate 가 이미 토스트
           if (r.quota) {
-            if (!auto && !quotaToasted) {
+            // #silent-pump(2026-08-25 실사고): 진입 자동 모드가 429(다른 생성이 큐 점유 — 예:
+            //   러프 완주 직후의 artist 백필)를 무음으로 삼키며 재시도하다 무음으로 포기해,
+            //   사용자에겐 "러프 생성이 그냥 안 됨"으로 보였다. 자동 모드도 3라운드째(≈16s
+            //   점유 지속)면 한 번은 말한다 — 수동 모드는 종전대로 즉시 1회.
+            if (!quotaToasted && (!auto || round >= 2)) {
               quotaToasted = true
               toast.info(
                 translate(
                   locale,
-                  "Another generation task is using the queue. We'll continue as soon as a slot opens up.",
+                  "The server is busy, so this is taking longer than usual. We'll continue automatically as soon as a slot opens.",
                 ),
               )
             }
