@@ -24,7 +24,7 @@ import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
-import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
+import { formatRemaining } from '@/lib/writer/stage-labels'
 import { STAGE_FACE_COLOR } from '@/lib/constants'
 import {
   useActiveGenerationJobs,
@@ -33,6 +33,7 @@ import {
   type ActiveJob,
 } from '@/lib/generation-queue'
 import {
+  writerPipelineWork,
   writerRoughWork,
   artistImageWork,
   directorShotImageWork,
@@ -122,21 +123,16 @@ function UnifiedPin({ projectId, stage }: { projectId: string; stage: StageId })
   const works: PipelineWork[] = []
 
   // ── writer: 텍스트 파이프라인(writer_runs 폴링) + 러프보드 ──
+  //   running 은 footer(남은 시간)·1s 틱 용도 — 확정 대기에도 "남은 시간 X분"은 거짓이므로 제외.
+  //   진행 핀 자체는 writerPipelineWork 셀렉터가 awaiting 을 걸러낸다(#fix-scene-gate-suggestion-resurface).
   const running = !!(
     status?.started &&
     !status.pipeline_completed &&
-    !status.pipeline_failed
+    !status.pipeline_failed &&
+    status.current_status !== 'awaiting_confirmation'
   )
-  if (running && status) {
-    const total = status.total_units ?? 0
-    works.push({
-      key: 'writer-pipeline',
-      label: friendlyStageLabel(status.current_stage, locale),
-      done: total > 0 ? status.completed_units ?? 0 : undefined,
-      total: total > 0 ? total : undefined,
-      stage: 'writer',
-    })
-  }
+  const writerPipeline = writerPipelineWork(status, locale)
+  if (writerPipeline) works.push(writerPipeline)
   const rough = writerRoughWork(shots, activeShotIds(jobs, ['shot_rough_storyboard']), locale)
   if (rough) works.push(rough)
 

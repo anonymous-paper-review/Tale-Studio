@@ -22,6 +22,7 @@ import { isShotData, isVideoData } from '@/types/director'
 import type { StageId } from '@/types'
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
+import { friendlyStageLabel } from '@/lib/writer/stage-labels'
 
 // locale 을 안 넘기는 호출부(chat-progress-pin.tsx 등)가 조용히 안 깨지도록 기존 동작(항상
 //   한국어)을 기본값으로 보존한다 — producer-gate.ts/card-mention.ts 와 동일 취급.
@@ -127,6 +128,41 @@ interface RoughShotLike {
   shotId?: string
   actionDescription?: string | null
   roughStoryboard?: { status: string } | null
+}
+
+// writer_runs 폴링 상태에서 진행 핀 판정에 필요한 최소 구조만 받는다(store 타입 직접 의존 X,
+//   RoughShotLike 등과 동일 패턴). WriterStatus 전체를 넘겨도 구조적으로 호환된다.
+interface WriterPipelineStatusLike {
+  started: boolean
+  pipeline_completed: boolean
+  pipeline_failed: boolean
+  current_status: string | null
+  current_stage: string | null
+  completed_units?: number
+  total_units?: number
+}
+
+/**
+ * Writer 텍스트 파이프라인 — writer_runs 폴링 상태에서 파생한 진행 알림바 한 줄.
+ * 확정 대기(awaiting_confirmation)는 "생성 중"이 아니라 사용자 확정을 기다리는 정지 상태다 —
+ *   핀을 세우지 않는다. 안 그러면 확정 대기 내내 "N/M 생성 중" 핀이 남아 파이프라인이 계속
+ *   도는 것처럼 보인다(오너가 15분 오해한 실측, #fix-scene-gate-suggestion-resurface 2026-08-25).
+ */
+export function writerPipelineWork(
+  status: WriterPipelineStatusLike | null | undefined,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+): PipelineWork | null {
+  if (!status) return null
+  if (!status.started || status.pipeline_completed || status.pipeline_failed) return null
+  if (status.current_status === 'awaiting_confirmation') return null
+  const total = status.total_units ?? 0
+  return {
+    key: 'writer-pipeline',
+    label: friendlyStageLabel(status.current_stage, locale),
+    done: total > 0 ? (status.completed_units ?? 0) : undefined,
+    total: total > 0 ? total : undefined,
+    stage: 'writer',
+  }
 }
 
 /**

@@ -1,5 +1,6 @@
 import { beforeEach, describe, it, expect } from 'vitest'
 import {
+  writerPipelineWork,
   writerRoughWork,
   artistImageWork,
   directorShotImageWork,
@@ -45,6 +46,45 @@ describe('writerRoughWork', () => {
       roughShot(null, '  '),
     ])
     expect(work).toMatchObject({ done: 0, total: 1 })
+  })
+})
+
+// #fix-scene-gate-suggestion-resurface (2026-08-25) — 확정 대기(awaiting_confirmation)는
+//   "생성 중"이 아니다. 이 상태에서 진행 핀이 남으면 오너가 생성이 계속되는 줄 오해한다.
+describe('writerPipelineWork', () => {
+  const base = {
+    started: true,
+    pipeline_completed: false,
+    pipeline_failed: false,
+    current_status: 'running',
+    current_stage: 'scenes',
+    completed_units: 4,
+    total_units: 14,
+  }
+
+  it('생성 중이면 done/total 을 담은 진행 핀을 세운다', () => {
+    const work = writerPipelineWork(base, 'ko')
+    expect(work).not.toBeNull()
+    expect(work?.key).toBe('writer-pipeline')
+    expect(work).toMatchObject({ done: 4, total: 14, stage: 'writer' })
+  })
+
+  it('확정 대기(awaiting_confirmation)면 핀을 안 세운다 — 정지 상태라 가짜 진행 문구 금지', () => {
+    expect(writerPipelineWork({ ...base, current_status: 'awaiting_confirmation' }, 'ko')).toBeNull()
+  })
+
+  it('완료·실패·미시작·null 은 핀이 없다', () => {
+    expect(writerPipelineWork({ ...base, pipeline_completed: true }, 'ko')).toBeNull()
+    expect(writerPipelineWork({ ...base, pipeline_failed: true }, 'ko')).toBeNull()
+    expect(writerPipelineWork({ ...base, started: false }, 'ko')).toBeNull()
+    expect(writerPipelineWork(null, 'ko')).toBeNull()
+  })
+
+  it('total_units 가 0 이면 분수를 숨긴다(스피너만)', () => {
+    const work = writerPipelineWork({ ...base, total_units: 0, completed_units: 0 }, 'ko')
+    expect(work).not.toBeNull()
+    expect(work?.done).toBeUndefined()
+    expect(work?.total).toBeUndefined()
   })
 })
 

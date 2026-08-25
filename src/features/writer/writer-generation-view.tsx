@@ -15,6 +15,11 @@ import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
 import { useLocale, useT } from '@/lib/i18n'
 
+// 확정 게이트 재등록 주기(#fix-scene-gate-suggestion-resurface 2026-08-25) — status 폴링(3s)과
+//   맞물려, 닫힘/선점/implicit dismiss 로 사라진 게이트를 한 틱 안에 되살린다. offerSuggestion 이
+//   idempotent(같은 id 가 떠 있으면 no-op)라 매 틱 호출해도 상태를 흔들지 않는다.
+const SCENE_GATE_REOFFER_MS = 3000
+
 // status 는 상위(WriterWorkspace)가 폴링해 내려준다 — 중복 status 폴링 방지.
 //   debug: admin 디버그 진입(#gen-debug) — 실행 중이 아닌데 강제 렌더된 상태 표시.
 export function WriterGenerationView({
@@ -60,18 +65,27 @@ export function WriterGenerationView({
     "The scene story draft is ready. Please review it on the screen.\nIf there's anything you'd like to change, type it in the input box below — or press Enter with it empty to confirm and move to the next step.",
   )
   const confirmAsIsLabel = t('Confirm as-is')
+  // 확정 게이트는 blocking 제안(dismissible:false) — 파이프라인이 멈춰 사용자 확정을 반드시
+  //   받아야 진행된다. 그래서 Esc·다른 제안 선점으로 닫히지 않고(store 가 dismissible:false 를
+  //   존중), 어떤 경로로 사라져도(수정 피드백 전송의 implicit dismiss·확정 실패) 서버가 awaiting
+  //   인 한 되살아나야 한다. useEffect 는 awaiting 전이 때 1회만 도므로, awaiting 동안 폴링 주기로
+  //   재등록해 self-heal 한다(#fix-scene-gate-suggestion-resurface 2026-08-25).
   useEffect(() => {
     if (!awaiting || !projectId) return
-    useGlobalChatStore.getState().offerSuggestion(
-      {
-        id: `scene-gate:${projectId}`,
-        stage: 'writer',
-        dismissible: true,
-        content: sceneGateMessage,
-        action: { kind: 'confirmScenes', label: confirmAsIsLabel },
-      },
-      { preempt: true },
-    )
+    const offer = () =>
+      useGlobalChatStore.getState().offerSuggestion(
+        {
+          id: `scene-gate:${projectId}`,
+          stage: 'writer',
+          dismissible: false,
+          content: sceneGateMessage,
+          action: { kind: 'confirmScenes', label: confirmAsIsLabel },
+        },
+        { preempt: true },
+      )
+    offer()
+    const iv = setInterval(offer, SCENE_GATE_REOFFER_MS)
+    return () => clearInterval(iv)
   }, [awaiting, projectId, sceneGateMessage, confirmAsIsLabel])
 
   return (

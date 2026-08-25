@@ -21,6 +21,15 @@ const choicesSuggestion: ChatSuggestion = {
   action: { kind: 'choices', options: [{ label: 'a', utterance: 'a' }, { label: 'b', utterance: 'b' }] },
 }
 
+// 씬 확정 게이트 — blocking 제안(dismissible:false). 파이프라인이 멈춰 사용자 확정을 반드시 받는다.
+const sceneGate: ChatSuggestion = {
+  id: 'scene-gate:p1',
+  stage: 'writer',
+  dismissible: false,
+  content: '씬 스토리 초안이 준비됐어요.',
+  action: { kind: 'confirmScenes', label: '이대로 확정' },
+}
+
 beforeEach(() => {
   useGlobalChatStore.getState().reset()
 })
@@ -108,5 +117,46 @@ describe('선점(preempt)', () => {
     useGlobalChatStore.getState().offerSuggestion(choicesSuggestion)
     useGlobalChatStore.getState().offerSuggestion(handoffSuggestion, { preempt: true })
     expect(useGlobalChatStore.getState().suggestion?.id).toBe('choices:abc')
+  })
+})
+
+// #fix-scene-gate-suggestion-resurface (2026-08-25) — 씬 확정 게이트는 blocking 제안이라
+//   닫힘/선점으로 사라지면 안 되고, 어떤 경로로 사라져도 서버가 awaiting 인 한 되살아나야 한다.
+//   핵심 계약: dismissible:false 제안은 dismissedSuggestionIds 래치에 갇히지 않는다.
+describe('blocking 게이트 재등록 (dismissible:false)', () => {
+  it('명시적 dismiss(확정 실패·수정 피드백) 후에도 blocking 게이트는 다시 뜬다', () => {
+    const s = useGlobalChatStore.getState()
+    s.offerSuggestion(sceneGate, { preempt: true })
+    expect(useGlobalChatStore.getState().suggestion?.id).toBe('scene-gate:p1')
+
+    useGlobalChatStore.getState().dismissSuggestion()
+    expect(useGlobalChatStore.getState().suggestion).toBeNull()
+
+    useGlobalChatStore.getState().offerSuggestion(sceneGate, { preempt: true })
+    expect(useGlobalChatStore.getState().suggestion?.id).toBe('scene-gate:p1')
+  })
+
+  it('일반(dismissible 미지정) 제안은 여전히 명시적 dismiss 후 재발사가 막힌다 (래치 회귀 방지)', () => {
+    const s = useGlobalChatStore.getState()
+    s.offerSuggestion(handoffSuggestion)
+    useGlobalChatStore.getState().dismissSuggestion()
+    useGlobalChatStore.getState().offerSuggestion(handoffSuggestion, { preempt: true })
+    expect(useGlobalChatStore.getState().suggestion).toBeNull()
+  })
+
+  it('떠 있는 blocking 게이트는 다른 제안이 선점(preempt)으로도 못 밀어난다', () => {
+    const s = useGlobalChatStore.getState()
+    s.offerSuggestion(sceneGate, { preempt: true })
+    s.offerSuggestion(handoffSuggestion, { preempt: true })
+    expect(useGlobalChatStore.getState().suggestion?.id).toBe('scene-gate:p1')
+  })
+
+  it('폴링 self-heal(반복 재등록)은 떠 있는 게이트를 흔들지 않는다', () => {
+    const s = useGlobalChatStore.getState()
+    s.offerSuggestion(sceneGate, { preempt: true })
+    const before = useGlobalChatStore.getState().suggestion
+    s.offerSuggestion(sceneGate, { preempt: true })
+    s.offerSuggestion(sceneGate, { preempt: true })
+    expect(useGlobalChatStore.getState().suggestion).toBe(before)
   })
 })

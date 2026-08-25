@@ -1037,7 +1037,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   // 프로액티브 제안 띄우기 — 한 번에 하나만(이미 떠 있으면 무시), 이미 dismiss/승인한 id 도 무시.
   offerSuggestion: (suggestion, opts) => {
     const { suggestion: current, dismissedSuggestionIds } = get()
-    if (dismissedSuggestionIds.includes(suggestion.id)) return
+    // blocking 게이트(dismissible:false)는 "닫을 수 없는" 제안이라 닫힘 기록에 갇히지 않는다 —
+    //   파이프라인이 멈춰 사용자 확정을 반드시 받아야 하므로, 어떤 경로로 사라졌든(implicit
+    //   dismiss·확정 실패) 서버 상태가 요구하는 한 항상 다시 세운다
+    //   (#fix-scene-gate-suggestion-resurface 2026-08-25).
+    if (suggestion.dismissible !== false && dismissedSuggestionIds.includes(suggestion.id)) return
     if (current) {
       if (current.id === suggestion.id) return // 이미 그 제안이 떠 있다
       // 선점 (#handoff-starved 2026-08-11) — 슬롯이 비기를 기다리기만 하면 영영 못 뜨는 제안이 있다.
