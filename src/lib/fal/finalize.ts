@@ -906,7 +906,8 @@ async function finalizeStoryboardStripJob(
       .toBuffer()
     frames = { start: inset, direction: inset, end: inset }
   } else {
-    ;[frames] = await cropRoughGridFrames(stripBuf, 'strip1', 1, sheetFmt)
+    // #repaint-crop: 실사 표면 — 연필 휴리스틱 대신 스펙 셀 고정+인셋 (rough-grid-crop 주석 참조)
+    ;[frames] = await cropRoughGridFrames(stripBuf, 'strip1', 1, sheetFmt, 'repaint')
   }
   // 경로를 변수로 뽑아 원본 업로드와 썸네일 생성이 **같은 문자열**을 쓴다 — 문자열을 두 번
   //   쓰면 오타 하나로 짝이 어긋나고, 404 폴백 때문에 조용히 원본이 나간다(#thumb-pipeline).
@@ -1037,6 +1038,7 @@ async function finalizeRealGridJob(
     gridVariant ?? 'grid4',
     writerShotIds.length,
     sheetFormatOfJob(job),
+    'repaint', // #repaint-crop: 실사 표면 — 스펙 셀 고정+인셋
   )
   let representativeUrl = ''
   for (let i = 0; i < writerShotIds.length; i++) {

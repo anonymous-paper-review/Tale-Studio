@@ -240,6 +240,9 @@ export async function cropRoughGridFrames(
   variant: RoughGridVariant,
   shotCount: number,
   format: ProjectFormat | null = null,
+  /** 시트 표면 종류(#repaint-crop 2026-08-25, 오너 ③C). 'pencil'(기본) = 종전 그대로.
+   *  'repaint' = 실사 리페인트 시트 — 연필 휴리스틱(잉크 래치·실측 하단·X_BLEED)을 타지 않는다. */
+  surface: 'pencil' | 'repaint' = 'pencil',
 ): Promise<RoughGridFrames[]> {
   const { cols, rows, frameAxis } = sheetGeometry(variant, format)
   const framesAlongRows = frameAxis === 'rows'
@@ -261,6 +264,37 @@ export async function cropRoughGridFrames(
     const W = meta.width ?? 0
     const H = meta.height ?? 0
     if (!W || !H) throw new Error('rough grid crop: metadata missing')
+
+    // ── #repaint-crop: 실사 시트 = 스펙 셀 고정 + 축 비례 3% 인셋 ──
+    // 근거 실측(9d562ada 14샷 전수 감사 2026-08-25): 실사 프레임 14/14 에서 3~7px 템플릿
+    //   띠·보더 라인·코너 브래킷 침입, 씬1 시트 2장은 severe.
+    //   ① 레퍼런스 시트는 스펙 좌표에 픽셀 정확히 합성되고(composeRoughReference*), 러프와 달리
+    //     캡션 표 밀림이 구조적으로 없다 — 연필 행 체인(래치 0.35/밝음 0.08)의 존재 이유가 없고,
+    //     오히려 사진 패널(어두운 씬·안개 밝은 행)에서 잉크 밀도를 오판해 하단 절단·리스케일을
+    //     만든다. ② X_BLEED(캡션 첫 글자 보호)는 실사에선 목적이 없고 보더만 프레임에 넣는다.
+    // 인셋 3%: 보더(2px)+AA+소폭 드리프트+코너 브래킷(셀 모서리 안쪽 4~14px)을 덮는 최소값.
+    //   셀 안에서 모델이 내용 자체를 작게 그린 경우(sh_01_06 실측)는 크롭으로 못 고친다 —
+    //   캔버스 상향(#hd-grid)과 프롬프트 계약(#end-fidelity)의 몫.
+    if (surface === 'repaint') {
+      const REPAINT_INSET_FRAC = 0.03
+      const insetX = Math.max(2, Math.round((cols[0][1] - cols[0][0]) * W * REPAINT_INSET_FRAC))
+      const insetY = Math.max(2, Math.round((rows[0][1] - rows[0][0]) * H * REPAINT_INSET_FRAC))
+      const out: RoughGridFrames[] = []
+      for (let s = 0; s < shotCount; s++) {
+        const frames: Buffer[] = []
+        for (let f = 0; f < 3; f++) {
+          const cx = framesAlongRows ? cols[s] : cols[f]
+          const cy = framesAlongRows ? rows[f] : rows[s]
+          const left = Math.max(0, Math.round(cx[0] * W) + insetX)
+          const top = Math.max(0, Math.round(cy[0] * H) + insetY)
+          const width = Math.min(Math.max(8, Math.round((cx[1] - cx[0]) * W) - insetX * 2), W - left)
+          const height = Math.min(Math.max(8, Math.round((cy[1] - cy[0]) * H) - insetY * 2), H - top)
+          frames.push(await sharp(grid).extract({ left, top, width, height }).png().toBuffer())
+        }
+        out.push({ start: frames[0], direction: frames[1], end: frames[2] })
+      }
+      return out
+    }
 
     // 행 위치 적응 — 창 스캔이 아니라 **순차 체인**: 캡션 표가 행을 최대 ~110px 밀면 고정 창은
     //   반드시 놓친다. 행 N+1 시작 = 행 N 끝(+DIRECTION 이면 오버플로 통과) 이후 첫 어두운 전환.
