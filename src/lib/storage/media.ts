@@ -90,3 +90,8 @@ export function mediaInfo(path: string) {
 export function mediaDownload(path: string) {
   return bucket().download(path)
 }
+
+/** 버킷 내부 객체를 서버에서 복제한다. 외부 URL을 읽지 않는 스냅샷 경계다. */
+export function mediaCopy(sourcePath: string, destinationPath: string) {
+  return bucket().copy(sourcePath, destinationPath)
+}

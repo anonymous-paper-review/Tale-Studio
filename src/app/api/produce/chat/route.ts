@@ -11,6 +11,7 @@ import { translate } from '@/lib/i18n/translate'
 import { sanitizeAttachmentUrls } from '@/lib/upload/attachment'
 import { listStyleAnchorMediums } from '@/lib/style-anchor'
 import { userOwnsProject } from '@/lib/generation-jobs'
+import { buildReferenceDigest, getProjectReferenceId } from '@/lib/reference-import'
 
 interface ChatMessage {
   role: 'user' | 'model'
@@ -72,9 +73,11 @@ export async function POST(req: Request) {
     // 응답 언어 강제(#i18n-s5-batch6-chat) — projects.locale 조회. 소유 확인 실패/미상은
     //   fetchProjectLocale 이 null 을 주고, responseLanguageDirective(null) 이 종전 동작(무주입)으로 폴백.
     let projectLocale = null as Awaited<ReturnType<typeof fetchProjectLocale>>
+    let ownsCurrentProject = false
     if (typeof projectId === 'string' && projectId) {
       try {
         if (await userOwnsProject(projectId, user.id)) {
+          ownsCurrentProject = true
           projectLocale = await fetchProjectLocale(projectId)
         }
       } catch (err) {
@@ -155,6 +158,20 @@ export async function POST(req: Request) {
         purpose: b.purpose,
       }))
       contextParts.push(`[Current Background Cards]\n${JSON.stringify(bgSummary)}`)
+    }
+    if (ownsCurrentProject && typeof projectId === 'string' && projectId) {
+      try {
+        const referenceProjectId = await getProjectReferenceId(projectId)
+        if (referenceProjectId) {
+          const referenceDigest = await buildReferenceDigest(referenceProjectId, user.id)
+          if (referenceDigest) contextParts.push(referenceDigest)
+        }
+      } catch (err) {
+        console.warn(
+          '[produce/chat] reference digest skipped:',
+          err instanceof Error ? err.message : err,
+        )
+      }
     }
     // 핸드오프 가부의 단일 판정자 = 코드 게이트. LLM 이 자기 기준으로 "준비 완료"를 선언하지 않도록
     //   실제 게이트 상태(남은 하드 항목)를 명시 주입한다.

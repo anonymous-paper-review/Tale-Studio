@@ -26,6 +26,23 @@ export interface WriterStatusAssets {
   images_ready: boolean
 }
 
+export interface CreateProjectOptions {
+  referenceProjectId?: string
+  includeLastShotFrame?: boolean
+}
+
+export interface ProjectCreationWarning {
+  code?: string
+  detail?: string
+}
+
+export interface ProjectCreationResult {
+  ok: boolean
+  projectId: string | null
+  warnings: ProjectCreationWarning[]
+  error?: string
+}
+
 interface ProjectState {
   currentStage: StageId
   /** 지금까지 도달한 최고 단계(순차 잠금 게이트 기준). 단조 증가 — 뒤로 가도 안 줄어든다. */
@@ -59,7 +76,10 @@ interface ProjectState {
   unlockThrough: (stage: StageId) => void
   canNavigateTo: (stage: StageId) => boolean
   initProject: (projectId?: string) => Promise<void>
-  createNewProject: (title?: string) => Promise<void>
+  createNewProject: (
+    title?: string,
+    options?: CreateProjectOptions,
+  ) => Promise<ProjectCreationResult>
   switchProject: (id: string, title: string, stage?: StageId) => void
   renameProject: (title: string) => Promise<void>
   /** 진입 시 writer 산출물(씬) 검증 → 없으면 producer 로 게이트백 + writerNeedsRerun 표시 */
@@ -85,15 +105,15 @@ function furtherStage(a: StageId, b: StageId): StageId {
   return getStageIndex(a) >= getStageIndex(b) ? a : b
 }
 
-function resetChildStores() {
+async function resetChildStores() {
   // Lazy imports to avoid circular dependencies
-  const { useProducerStore } = require('@/stores/producer-store')
-  const { useWriterStore } = require('@/stores/writer-store')
-  const { useArtistStore } = require('@/stores/artist-store')
-  const { useEditorStore } = require('@/stores/editor-store')
-  const { useGlobalChatStore } = require('@/stores/global-chat-store')
-  const { useAssetStorageStore } = require('@/stores/asset-storage-store')
-  const { useDirectorCanvasStore } = require('@/stores/director-store')
+  const { useProducerStore } = await import('@/stores/producer-store')
+  const { useWriterStore } = await import('@/stores/writer-store')
+  const { useArtistStore } = await import('@/stores/artist-store')
+  const { useEditorStore } = await import('@/stores/editor-store')
+  const { useGlobalChatStore } = await import('@/stores/global-chat-store')
+  const { useAssetStorageStore } = await import('@/stores/asset-storage-store')
+  const { useDirectorCanvasStore } = await import('@/stores/director-store')
 
   useProducerStore.getState().reset()
   useWriterStore.getState().reset()
@@ -264,7 +284,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
         ...DEFAULT_ARTIST_ASSET_GATE,
       })
-      const { useDirectorCanvasStore } = require('@/stores/director-store')
+      const { useDirectorCanvasStore } = await import('@/stores/director-store')
       useDirectorCanvasStore.getState().setProjectId(projectId)
     } catch (err) {
       console.error('[project-store] initProject failed:', err)
@@ -272,18 +292,34 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  createNewProject: async (title) => {
-    resetChildStores()
+  createNewProject: async (title, options) => {
+    await resetChildStores()
     set({ initLoading: true })
     try {
       const trimmed = title?.trim() || 'Untitled'
+      const referenceProjectId = options?.referenceProjectId?.trim()
+      const body = {
+        title: trimmed,
+        ...(referenceProjectId
+          ? {
+              referenceProjectId,
+              includeLastShotFrame: options?.includeLastShotFrame === true,
+            }
+          : {}),
+      }
       const res = await fetch('/api/project/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: trimmed }),
+        body: JSON.stringify(body),
       })
-      if (!res.ok) throw new Error('Failed to create project')
-      const { workspaceId, projectId, project } = await res.json()
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(
+          typeof body?.error === 'string' ? body.error : 'Failed to create project',
+        )
+      }
+      const response = await res.json()
+      const { workspaceId, projectId, project } = response
       set({
         workspaceId,
         projectId,
@@ -298,11 +334,22 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
         ...DEFAULT_ARTIST_ASSET_GATE,
       })
-      const { useDirectorCanvasStore } = require('@/stores/director-store')
+      const { useDirectorCanvasStore } = await import('@/stores/director-store')
       useDirectorCanvasStore.getState().setProjectId(projectId)
+      return {
+        ok: true,
+        projectId: typeof projectId === 'string' ? projectId : null,
+        warnings: Array.isArray(response.warnings) ? response.warnings : [],
+      }
     } catch (err) {
       console.error('[project-store] createNewProject failed:', err)
       set({ initLoading: false })
+      return {
+        ok: false,
+        projectId: null,
+        warnings: [],
+        error: err instanceof Error ? err.message : 'Failed to create project',
+      }
     }
   },
 

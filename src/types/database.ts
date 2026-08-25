@@ -900,6 +900,8 @@ export type Database = {
           locale_locked: boolean
           style_anchor_key: string | null
           custom_style_anchor: Json | null
+          reference_project_id: string | null
+          optional_reference_frame_url: string | null
         }
         Insert: {
           id?: string
@@ -918,6 +920,8 @@ export type Database = {
           locale_locked?: boolean
           style_anchor_key?: string | null
           custom_style_anchor?: Json | null
+          reference_project_id?: string | null
+          optional_reference_frame_url?: string | null
         }
         Update: {
           id?: string
@@ -936,6 +940,8 @@ export type Database = {
           locale_locked?: boolean
           style_anchor_key?: string | null
           custom_style_anchor?: Json | null
+          reference_project_id?: string | null
+          optional_reference_frame_url?: string | null
         }
         Relationships: [
           {
@@ -950,6 +956,13 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_reference_project_id_fkey"
+            columns: ["reference_project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -1338,6 +1351,7 @@ export type Database = {
           created_at: string | null
           updated_at: string | null
           owner_id: string | null
+          plan: string
         }
         Insert: {
           id?: string
@@ -1346,6 +1360,7 @@ export type Database = {
           created_at?: string | null
           updated_at?: string | null
           owner_id?: string | null
+          plan?: string
         }
         Update: {
           id?: string
@@ -1354,6 +1369,7 @@ export type Database = {
           created_at?: string | null
           updated_at?: string | null
           owner_id?: string | null
+          plan?: string
         }
         Relationships: [
         ]

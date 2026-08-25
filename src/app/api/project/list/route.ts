@@ -1,3 +1,4 @@
+import { canUseReference, getPlanLimit } from '@/lib/plan-limits'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
@@ -15,14 +16,24 @@ export async function GET() {
 
     const { data: workspace } = await supabaseAdmin
       .from('workspaces')
-      .select('id')
+      .select('id, plan')
       .eq('owner_id', user.id)
+      .order('created_at', { ascending: false })
       .limit(1)
       .single()
 
     if (!workspace) {
-      return NextResponse.json({ projects: [] })
+      return NextResponse.json({
+        projects: [],
+        plan: 'free',
+        slotLimit: getPlanLimit(null),
+        canUseReference: canUseReference(null),
+      })
     }
+
+    const plan = workspace.plan || 'free'
+    const slotLimit = getPlanLimit(plan)
+    const referenceEnabled = canUseReference(plan)
 
     const { data: projects } = await supabaseAdmin
       .from('projects')
@@ -76,6 +87,9 @@ export async function GET() {
         ...p,
         thumbnail_url: thumbnails.get(p.id) ?? null,
       })),
+      plan,
+      slotLimit,
+      canUseReference: referenceEnabled,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'

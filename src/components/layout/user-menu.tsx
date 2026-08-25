@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId } from '@/lib/session-restore'
 import { useProjectStore } from '@/stores/project-store'
 import { useT } from '@/lib/i18n'
+import { toast } from 'sonner'
 
 interface ProjectItem {
   id: string
@@ -79,11 +80,15 @@ export function UserMenu() {
   }
 
   const handleNewProject = async () => {
-    await createNewProject()
+    const result = await createNewProject()
+    if (!result.ok) {
+      toast.error(result.error ?? t('Failed to create project'))
+      return
+    }
     setOpen(false)
     // createNewProject가 set한 새 projectId를 URL 쿼리에 직접 실어 push.
     // (쿼리 없이 push하면 layout의 replaceState 보정이 push에 덮여 URL이 안 바뀜)
-    const newId = useProjectStore.getState().projectId
+    const newId = result.projectId ?? useProjectStore.getState().projectId
     router.push(newId ? `/studio/producer?projectId=${newId}` : '/studio/producer')
   }
 
@@ -122,7 +127,11 @@ export function UserMenu() {
       if (remaining.length > 0) {
         switchProject(remaining[0].id, remaining[0].title)
       } else {
-        await createNewProject()
+        const result = await createNewProject()
+        if (!result.ok) {
+          toast.error(result.error ?? t('Failed to create project'))
+          return
+        }
       }
       const nextId = useProjectStore.getState().projectId
       router.push(nextId ? `/studio/producer?projectId=${nextId}` : '/studio/producer')
