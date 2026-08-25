@@ -182,6 +182,17 @@ describe('rough template assets — 스펙↔PNG 정합', () => {
     }
   })
 
+  // #rough-canvas-regression(2026-08-26): 연필 크롭의 잉크 밀도 휴리스틱은 1728px 대역 실측
+  //   보정값 — 캔버스만 키우면 커진 캡션 글자가 행 래치(0.35)를 넘어 END 프레임에 캡션 띠가
+  //   침입한다(실측 c7871e04). 러프는 검증 대역에 남고 리페인트만 상향(#hd-grid)이 계약.
+  it('16:9 grid4: 러프 캔버스는 1728×768(검증 대역), 리페인트는 2880×1280(#hd-grid)', () => {
+    const g = sheetGeometry('grid4', 'horizontal_16:9')
+    expect(g.roughImageSize).toBe('1728x768')
+    expect(g.repaintCanvas).toBe('2880x1280')
+    expect(1728 % 16).toBe(0)
+    expect(768 % 16).toBe(0)
+  })
+
   it('세로 스트립만 frameAxis cols — 나머지는 rows', () => {
     expect(sheetGeometry('strip1', 'vertical_9:16').frameAxis).toBe('cols')
     expect(sheetGeometry('strip1', 'vertical_9:16').cols.length).toBe(3)

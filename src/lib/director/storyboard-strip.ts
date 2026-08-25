@@ -45,6 +45,27 @@ async function fetchImage(url: string): Promise<Buffer> {
   return Buffer.from(await res.arrayBuffer())
 }
 
+/** #ref-inset(2026-08-26, 오너 "previz drift 조치"): 러프 프레임 테두리 3% 인셋 후 합성.
+ *  러프 크롭은 X_BLEED 로 보더 라인을 일부러 물고 있고 코너 브래킷도 품는다(previz 표시용 트레이드).
+ *  이 잔재가 템플릿 셀(자체 보더·브래킷 보유)에 그대로 얹히면 이중 인쇄가 되고, 리페인트 모델이
+ *  둘 다 따라 그리며 어긋난 격자를 만든다 — 실사 크롭 띠(9d562ada 14/14)의 상류 원인. 셀 가구는
+ *  템플릿 것 하나만 남긴다. 3% = 브래킷(≤14px/400폭)을 대부분 걷되 DIRECTION 하단 캡션 글자는
+ *  보존하는 절충. */
+const REF_FRAME_INSET = 0.03
+async function insetFrame(buf: Buffer): Promise<Buffer> {
+  const m = await sharp(buf).metadata()
+  const w = m.width ?? 0
+  const h = m.height ?? 0
+  if (!w || !h) return buf
+  const ix = Math.round(w * REF_FRAME_INSET)
+  const iy = Math.round(h * REF_FRAME_INSET)
+  if (w - ix * 2 < 8 || h - iy * 2 < 8) return buf
+  return sharp(buf)
+    .extract({ left: ix, top: iy, width: w - ix * 2, height: h - iy * 2 })
+    .png()
+    .toBuffer()
+}
+
 export interface ComposedReferenceSheet {
   buffer: Buffer
   /** 실제로 쓴 지오메트리 — 리페인트 캔버스·프롬프트 축·finalize 크롭이 전부 이걸 따라야 정합. */
@@ -124,7 +145,7 @@ export async function composeRoughReferenceStrip(
     const w = Math.max(1, Math.round((x[1] - x[0]) * width))
     const h = Math.max(1, Math.round((y[1] - y[0]) * height))
     // 지오메트리를 프레임 AR 로 골랐으므로 fill 왜곡은 미미(레거시 주석의 전제를 선택으로 보존).
-    const resized = await sharp(bufs[i]).resize(w, h, { fit: 'fill' }).png().toBuffer()
+    const resized = await sharp(await insetFrame(bufs[i])).resize(w, h, { fit: 'fill' }).png().toBuffer()
     overlays.push({ input: resized, left, top })
   }
   return {
@@ -160,7 +181,7 @@ export async function composeRoughReferenceGrid(
       const [r0, r1] = rows[r]
       const w = Math.max(1, Math.round((c1 - c0) * W))
       const h = Math.max(1, Math.round((r1 - r0) * H))
-      const buf = c === 0 && r === 0 ? firstFrame : await fetchImage(urls[r])
+      const buf = await insetFrame(c === 0 && r === 0 ? firstFrame : await fetchImage(urls[r]))
       overlays.push({
         input: await sharp(buf).resize(w, h, { fit: 'fill' }).png().toBuffer(),
         left: Math.round(c0 * W),

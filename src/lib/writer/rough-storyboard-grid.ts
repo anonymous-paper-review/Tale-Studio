@@ -72,6 +72,12 @@ export const STRIP_TEMPLATE_PATH = '/rough-storyboard-strip.png'
 export interface SheetSpec {
   /** 템플릿 치수 = 생성 캔버스. 전부 16배수 — gpt-image-2/edit 공식 스키마(최대 변 3840·AR≤3:1·0.66~8.29MP). */
   canvas: { width: number; height: number }
+  /** 러프(연필) 생성 캔버스 오버라이드(#rough-canvas-regression 2026-08-26). 미지정 = canvas.
+   *  연필 크롭의 잉크 밀도 휴리스틱(캡션 0.08~0.20 / 그림 0.67~0.90 이중 모드, 래치 0.35)은
+   *  1728px 대역 실측으로 보정된 값이라, 캔버스만 키우면 커진 캡션 글자가 래치를 넘어 행 체인이
+   *  캡션을 다음 행 시작으로 오인한다(실측 c7871e04: END 프레임 상단에 KEY/WS/WARM 캡션 띠).
+   *  러프는 검증 대역에 남기고, 리페인트 캔버스만 상향한다(#hd-grid). */
+  roughCanvas?: { width: number; height: number }
   /** 셀 박스 [x0,x1] px (2px 보더 포함). 비례 좌표·생성기가 모두 여기서 파생. */
   colBoxes: ReadonlyArray<readonly [number, number]>
   rowBoxes: ReadonlyArray<readonly [number, number]>
@@ -91,6 +97,8 @@ const SHEET_SPECS: Partial<Record<`${ProjectFormat}:${RoughGridVariant}`, SheetS
   //   스펙을 읽으므로 previz 와 real 이 함께 오른다.
   'horizontal_16:9:grid4': {
     canvas: { width: 2880, height: 1280 },
+    // 러프는 1차 스펙(1728×768, 셀 400×225)으로 생성 — 비례 좌표가 같아 크롭·합성 왕복이 정합.
+    roughCanvas: { width: 1728, height: 768 },
     colBoxes: boxes(66, 672, 4),
     rowBoxes: boxes(53, 378, 3),
     frameAxis: 'rows',
@@ -209,7 +217,10 @@ export function sheetGeometry(
     rows: spec.rowBoxes.map(([a, b]) => [(a + CELL_INSET_FRAC) / height, (b - CELL_INSET_FRAC) / height] as const),
     frameAxis: spec.frameAxis,
     templatePath: spec.templatePath,
-    roughImageSize: canvasStr,
+    // #rough-canvas-regression: 러프는 오버라이드가 있으면 그쪽 — 연필 휴리스틱의 검증 대역 유지.
+    roughImageSize: spec.roughCanvas
+      ? `${spec.roughCanvas.width}x${spec.roughCanvas.height}`
+      : canvasStr,
     repaintCanvas: canvasStr,
   }
 }
