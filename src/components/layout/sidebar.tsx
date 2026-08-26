@@ -28,6 +28,7 @@ import { ContactPopover } from '@/components/contact-popover'
 import { ExportMenu } from '@/components/export-menu'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useVideoUsage } from '@/lib/generation-queue'
 import type { StageId } from '@/types'
 import { OwnerOnly } from '@/components/demo/owner-only'
 import { ShareButton } from '@/components/demo/share-button'
@@ -324,6 +325,7 @@ export function Sidebar() {
 
       {/* 푸터 액션 — 공유·내보내기·문의·프로필: 버튼 크기·캡션 타이포·세로 간격을 FooterIconItem 로 통일 */}
       <div className="mt-2 flex shrink-0 flex-col items-center gap-2.5">
+        <SidebarVideoUsage />
         <OwnerOnly>
           <FooterIconItem label={t('Share')}>
             <ShareButton />
@@ -370,5 +372,52 @@ export function Sidebar() {
         </OwnerOnly>
       </div>
     </aside>
+  )
+}
+
+
+// #f4(2026-08-27 오너): 프로젝트당 영상 생성 사용량 게이지 — active 잡 단일 폴러에 실려 와
+//   영상 생성 직후 다음 틱(≤4s)에 반영된다. 표시용 진실(하드 블록 아님).
+function SidebarVideoUsage() {
+  const t = useT()
+  const projectId = useProjectStore((s) => s.projectId)
+  const usage = useVideoUsage(projectId)
+  if (!projectId || !usage) return null
+  const ratio = usage.limit > 0 ? usage.used / usage.limit : 0
+  return (
+    <OwnerOnly>
+      <FooterIconItem label={t('Videos')}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className={cn(
+                'flex h-10 w-10 flex-col items-center justify-center rounded-full border bg-background/60',
+                ratio >= 1
+                  ? 'border-destructive/60 text-destructive'
+                  : ratio >= 0.9
+                    ? 'border-warning/60 text-warning'
+                    : 'border-border text-muted-foreground',
+              )}
+            >
+              <Film className="size-3.5" />
+              <span className="text-[9px] font-medium leading-none tabular-nums">
+                {usage.used}/{usage.limit}
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-52">
+            <span className="font-medium">
+              {t('Video generations in this project: {used} of {limit}', {
+                used: usage.used,
+                limit: usage.limit,
+              })}
+            </span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              {t('Every video generation (including previz and retakes) counts toward the limit.')}
+            </span>
+          </TooltipContent>
+        </Tooltip>
+      </FooterIconItem>
+    </OwnerOnly>
   )
 }

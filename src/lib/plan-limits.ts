@@ -26,3 +26,8 @@ export function getPlanLimit(plan: unknown): number {
 export function canUseReference(plan: unknown): boolean {
   return getPlanLimit(plan) >= 2
 }
+
+// #f4(2026-08-27 오너 확정): 프로젝트당 영상 생성 한도 — 전 요금제 공통 고정 100회.
+//   '생성 시도' 기준(영상 kind 잡 행 수) — 실패도 fal 과금이 발생할 수 있어 차감으로 센다.
+//   현재는 표시용 진실(사이드바 게이지)이며 하드 블록은 별도 결정 전까지 없다.
+export const PROJECT_VIDEO_GENERATION_LIMIT = 100

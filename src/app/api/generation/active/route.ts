@@ -6,6 +6,8 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { listActiveGenerationJobs, userOwnsProject } from '@/lib/generation-jobs'
+import { VIDEO_JOB_KINDS } from '@/lib/generation-quota'
+import { PROJECT_VIDEO_GENERATION_LIMIT } from '@/lib/plan-limits'
 import { reconcileGhostQueuedJobs } from '@/lib/fal/reconcile'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
@@ -39,11 +41,19 @@ export async function GET(req: Request) {
   await reconcileGhostQueuedJobs(projectId)
 
   const jobs = await listActiveGenerationJobs(projectId)
+  // #f4: 프로젝트당 영상 생성 사용량 — 이 라우트는 이미 모든 탭이 공유 폴링하므로(4s/15s),
+  //   여기 실어 보내면 사이드바 게이지가 추가 폴러 없이 실시간이 된다. count(head) 라 가볍다.
+  const { count: videoUsed } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('project_id', projectId)
+    .in('kind', VIDEO_JOB_KINDS as unknown as string[])
+  const videoUsage = { used: videoUsed ?? 0, limit: PROJECT_VIDEO_GENERATION_LIMIT }
   // 스테이지를 떠난 동안 완료된 잡은 클라의 prev active 목록에 한 번도 잡히지 않는다.
   // 복귀 마운트에서만 최근 완료·미반영 잡을 받아 DB 재수화 뒤 ui_reflected 를 찍는다.
   // 평상시 4초 active 폴링에는 쿼리 2개를 더하지 않도록 opt-in 이다(#a2-stage-away).
   if (new URL(req.url).searchParams.get('includeUnreflected') !== '1') {
-    return NextResponse.json({ ok: true, data: { jobs } })
+    return NextResponse.json({ ok: true, data: { jobs, videoUsage } })
   }
 
   const cutoff = new Date(Date.now() - RECENT_COMPLETED_MS).toISOString()
@@ -78,5 +88,5 @@ export async function GET(req: Request) {
       target: job.target,
       startedAt: Date.parse(job.created_at),
     }))
-  return NextResponse.json({ ok: true, data: { jobs, unreflected } })
+  return NextResponse.json({ ok: true, data: { jobs, unreflected, videoUsage } })
 }

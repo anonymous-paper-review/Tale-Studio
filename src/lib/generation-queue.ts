@@ -26,7 +26,14 @@ const POLL_IDLE_MS = 15_000
 
 const EMPTY: ActiveJob[] = []
 
+/** #f4(2026-08-27 오너): 프로젝트당 영상 생성 사용량 — active 폴링 응답에 실려 온다. */
+export interface VideoUsage {
+  used: number
+  limit: number
+}
+
 let jobs: ActiveJob[] = EMPTY
+let videoUsage: VideoUsage | null = null
 let signature = ''
 let projectId: string | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
@@ -53,12 +60,17 @@ async function fetchOnce(): Promise<void> {
       `/api/generation/active?projectId=${encodeURIComponent(projectId)}`,
     )
     if (!res.ok) return
-    const body = (await res.json()) as { data?: { jobs?: ActiveJob[] } }
+    const body = (await res.json()) as {
+      data?: { jobs?: ActiveJob[]; videoUsage?: VideoUsage }
+    }
     const next = body.data?.jobs ?? []
-    const sig = signatureOf(next)
+    const usage = body.data?.videoUsage ?? null
+    // 사용량 변화도 emit 대상 — 시그니처에 함께 태운다(잡 목록이 그대로여도 카운트는 오른다).
+    const sig = `${signatureOf(next)}|v:${usage ? `${usage.used}/${usage.limit}` : '-'}`
     if (sig === signature) return
     signature = sig
     jobs = next.length === 0 ? EMPTY : next
+    videoUsage = usage
     emit()
   } catch {
     // 네트워크 실패는 조용히 — 다음 틱이 재시도한다. 진행 표시가 사라지는 것보다 낫다.
@@ -83,6 +95,7 @@ function start(id: string) {
   if (projectId !== id) {
     projectId = id
     jobs = EMPTY
+    videoUsage = null
     signature = ''
   }
   void fetchOnce().finally(() => {
@@ -104,6 +117,10 @@ function getSnapshot(): ActiveJob[] {
   return jobs
 }
 
+function getVideoUsageSnapshot(): VideoUsage | null {
+  return videoUsage
+}
+
 function getServerSnapshot(): ActiveJob[] {
   return EMPTY
 }
@@ -123,6 +140,23 @@ export function useActiveGenerationJobs(projectId: string | null): ActiveJob[] {
     [projectId],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+}
+
+/** 프로젝트당 영상 생성 사용량(#f4) — 같은 단일 폴러를 공유한다. 없으면 null(첫 응답 전). */
+export function useVideoUsage(projectId: string | null): VideoUsage | null {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (!projectId) return () => {}
+      listeners.add(onChange)
+      if (listeners.size === 1) start(projectId)
+      return () => {
+        listeners.delete(onChange)
+        if (listeners.size === 0) stop()
+      }
+    },
+    [projectId],
+  )
+  return useSyncExternalStore(subscribe, getVideoUsageSnapshot, () => null)
 }
 
 // ── 순수 셀렉터 (테스트 대상) ────────────────────────────────────────────────

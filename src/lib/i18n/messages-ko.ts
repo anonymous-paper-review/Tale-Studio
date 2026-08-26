@@ -1216,4 +1216,11 @@ export const KO: Record<string, string> = {
     '기존 러프 프레임이 새 결과물로 교체돼요.',
   'Click to edit this shot': '클릭하면 이 샷을 수정할 수 있어요',
   'Drag to move': '끌어서 위치를 옮길 수 있어요',
+
+  // ── F4: 프로젝트당 영상 생성 게이지 ──
+  Videos: '영상',
+  'Video generations in this project: {used} of {limit}':
+    '이 프로젝트의 영상 생성: {limit}회 중 {used}회 사용',
+  'Every video generation (including previz and retakes) counts toward the limit.':
+    'previz·재생성을 포함한 모든 영상 생성이 한도에서 차감돼요.',
 }
