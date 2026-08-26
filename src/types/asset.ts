@@ -45,11 +45,13 @@ export const CHARACTER_VIEW_COLUMNS: Record<CharacterViewKey, string> = {
   sideRight: 'view_side_right',
 }
 
+// #f6(2026-08-26 오너): 'Main'만으로는 의미 불명 — 서술형 라벨. 값은 i18n 키(EN 원문)이며
+//   표시 지점에서 t()로 감싼다(messages-ko 에 번역).
 export const CHARACTER_VIEW_LABELS: Record<CharacterViewKey, string> = {
-  main: 'Main',
-  back: 'Back',
-  sideLeft: 'Side (L)',
-  sideRight: 'Side (R)',
+  main: 'Main sheet (turnaround)',
+  back: 'Back view',
+  sideLeft: 'Side view (left)',
+  sideRight: 'Side view (right)',
 }
 
 import type { CandidateImage } from '@/lib/image-provenance'

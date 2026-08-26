@@ -1150,10 +1150,6 @@ export function GlobalChat() {
           </Button>
         </div>
 
-        {/* 진행도 핀 (#chat-progress-pin) — 백그라운드 파이프라인이 도는 동안 헤더 아래 고정.
-            도는 게 없으면 스스로 사라진다. */}
-        <ChatProgressPin stage={currentStage} />
-
         {/* Messages */}
         <ScrollArea className="min-h-0 flex-1 px-4 py-3">
           <div className="space-y-2">
@@ -1543,6 +1539,9 @@ export function GlobalChat() {
               )}
             </div>
           )}
+          {/* 진행도 핀 (#chat-progress-pin → #f1 2026-08-26 오너: 헤더 아래→입력창 위로 이동.
+              시선이 머무는 입력창 쪽에서 진행이 보인다). 도는 게 없으면 스스로 사라진다. */}
+          <ChatProgressPin stage={currentStage} />
           <div
             className={cn(
               'relative rounded-3xl transition-colors',

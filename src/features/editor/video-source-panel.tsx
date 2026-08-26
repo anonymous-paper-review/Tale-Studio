@@ -118,7 +118,6 @@ export function VideoSourcePanel({
 
         {/* ── Video 탭 ── */}
         <TabsContent value="video" className="mt-0 min-h-0 flex-1">
-          <p className="border-b border-border px-3 py-1 text-[9px] text-muted-foreground">{t('Click=preview · drag/right-click=add to timeline')}</p>
           <ScrollArea className="h-[calc(100%-22px)]">
             <div className="grid grid-cols-2 gap-2 p-2">
               {sourceShots.map((shot) => {

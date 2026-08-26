@@ -81,7 +81,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
   if (!open || !char || !view) return null
 
   const imageUrl = char.views[view] ?? null
-  const label = CHARACTER_VIEW_LABELS[view]
+  const label = t(CHARACTER_VIEW_LABELS[view])
   const isObject = char.entityType === 'object'
   // object 캐릭터는 방향뷰 개념 없음 — isDirectional/needsMain 로직 미적용
   const isDirectional = !isObject && view !== 'main'

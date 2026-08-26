@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   GeneratedImage,
@@ -211,7 +212,32 @@ function ShotCell({
   const [videoBusy, setVideoBusy] = useState(false)
   const [videoError, setVideoError] = useState<string | null>(null)
   // 재생성 확인 팝업(#regen-confirm) / Previz 편집 팝업(#e6)
-  const [confirm, setConfirm] = useState<null | 'image' | 'video'>(null)
+  const [confirm, setConfirm] = useState<null | 'image' | 'video' | 'previz'>(null)
+  // #f10(2026-08-26 오너): previz 호버에 '진짜 재생성'이 없었다(연출 화살표 팝업뿐) — 카드에서
+  //   writer 러프 재생성을 직접 쏜다. 완료 반영은 writer finalize → 재수화 경로 그대로.
+  const cardProjectId = useDirectorCanvasStore((s) => s.projectId)
+  const [previzRegenBusy, setPrevizRegenBusy] = useState(false)
+  const runPrevizRegen = async () => {
+    if (!writerShotId || !cardProjectId || previzRegenBusy) return
+    setPrevizRegenBusy(true)
+    try {
+      const res = await fetch('/api/writer/rough-storyboard', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId: cardProjectId, shotIds: [writerShotId], force: true }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      toast.success(t('Previz regeneration started — this card updates when the new frames land.'))
+    } catch (e) {
+      toast.error(
+        t('Failed to start previz regeneration: {message}', {
+          message: e instanceof Error ? e.message : '',
+        }),
+      )
+    } finally {
+      setPrevizRegenBusy(false)
+    }
+  }
   const [previzOpen, setPrevizOpen] = useState(false)
   // Grid always projects the newest successful take; Final is an editor/export decision.
   const directorNodes = useDirectorCanvasStore((s) => s.nodes)
@@ -342,15 +368,29 @@ function ShotCell({
   }> =
     mediaMode === 'previz'
       ? [
+          // #f10: 옛 단일 액션은 라벨('재생성')과 실제 동작(화살표 편집 팝업)이 어긋났다 — 분리한다.
           {
-            key: 'previz',
-            label: t('Regenerate previz'),
+            key: 'previz-arrows',
+            label: t('Edit directing'),
             title: writerShotId
               ? t('Directing arrow editor — the same popup as the writer tab card')
               : t("This node isn't linked to a writer shot"),
-            primary: true,
+            primary: false,
             disabled: !writerShotId,
             onClick: () => setPrevizOpen(true),
+          },
+          {
+            key: 'previz-regen',
+            label: t('Regenerate previz'),
+            title: writerShotId
+              ? t('Redraws this shot\'s rough 3-frame set with the writer pipeline')
+              : t("This node isn't linked to a writer shot"),
+            primary: true,
+            disabled: !writerShotId || previzRegenBusy,
+            onClick: () => {
+              if (rough?.frames) setConfirm('previz')
+              else void runPrevizRegen()
+            },
           },
         ]
       : [
@@ -559,22 +599,33 @@ function ShotCell({
         onOpenChange={(o) => {
           if (!o) setConfirm(null)
         }}
-        title={confirm === 'video' ? t('Regenerate the video?') : t('Regenerate the image?')}
+        title={
+          confirm === 'video'
+            ? t('Regenerate the video?')
+            : confirm === 'previz'
+              ? t('Regenerate the previz?')
+              : t('Regenerate the image?')
+        }
         description={
           confirm === 'video'
             ? t('Creates a new take based on the current shooting image.')
-            : t('Generates a new shooting image for this shot.')
+            : confirm === 'previz'
+              ? t('Redraws this shot\'s rough 3-frame set (start/directing/end).')
+              : t('Generates a new shooting image for this shot.')
         }
         impact={
           confirm === 'video'
             ? [t('Costs money to generate the video.'), t('Adds a new take — the card shows the latest successful one.')]
-            : [t('Costs money to generate the image.'), t('Replaces the existing shooting image with the new result.')]
+            : confirm === 'previz'
+              ? [t('Costs money to generate the previz.'), t('Replaces the existing rough frames with the new result.')]
+              : [t('Costs money to generate the image.'), t('Replaces the existing shooting image with the new result.')]
         }
         confirmLabel={t('Regenerate')}
         onConfirm={() => {
           const which = confirm
           setConfirm(null)
           if (which === 'video') void runVideo()
+          else if (which === 'previz') void runPrevizRegen()
           else void runImage()
         }}
       />
@@ -587,7 +638,16 @@ function ShotCell({
         onOpenChange={setPrevizOpen}
       />
 
-      <div className="flex flex-col gap-1 px-1 pb-0.5 pt-2.5">
+      {/* #f9(2026-08-26 오너): 글자(캡션) 원클릭 = 편집 팝업 — 더블클릭을 몰라도 수정 진입. */}
+      <div
+        className="flex cursor-text flex-col gap-1 rounded-md px-1 pb-0.5 pt-2.5 transition-colors hover:bg-accent/60"
+        title={t('Click to edit this shot')}
+        onClick={(event) => {
+          if (isMentionModifierClick(event)) return
+          event.stopPropagation()
+          openPopup(node.id)
+        }}
+      >
         <span className="truncate text-sm font-medium text-foreground">
           {sceneLabel ? `${sceneLabel} · ` : ''}
           {prettyNodeLabel(data.label)}

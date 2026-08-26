@@ -120,7 +120,41 @@ export function WriterGenerationView({
       </header>
 
       {/* 메인 줄글 스토리 + 우측 캐릭터 사이드바 */}
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
+        {/* 진행 카드(#f2 2026-08-26 오너): 하단 바 대신 대시보드 중앙 — 시선 중심에서 진행을 말한다.
+            떠 있는 카드라 스트림은 주변으로 계속 보인다. 게이트 대기 중엔 채팅이 조작을 맡으므로 숨김. */}
+        {awaiting ? null : (
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 w-full max-w-md -translate-x-1/2 -translate-y-1/2 px-6">
+            <div className="pointer-events-auto rounded-2xl border border-border bg-background/95 px-5 py-4 shadow-lg backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-busy="true" />
+                <span className="truncate text-sm font-medium">{phrase}</span>
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <div
+                  role="progressbar"
+                  aria-valuenow={pct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  className="h-2 flex-1 overflow-hidden rounded-full bg-muted"
+                >
+                  <div
+                    className="h-full rounded-full bg-primary transition-[width] duration-500"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span className="w-10 shrink-0 text-right font-mono text-sm tabular-nums text-muted-foreground">
+                  {pct}%
+                </span>
+              </div>
+              {remainingMs != null ? (
+                <p className="mt-2 text-right text-xs text-muted-foreground">
+                  {formatRemaining(remainingMs, locale)}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        )}
         <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
           <WriterStoryStream preview={preview} />
         </div>
@@ -131,39 +165,6 @@ export function WriterGenerationView({
         />
       </div>
 
-      {/* 하단 바 — 진행률 전용. 게이트 대기 중엔 조작이 채팅에 있으므로(#gate-to-chat) 감춘다. */}
-      {awaiting ? null : (
-      <div className="shrink-0 border-t border-border bg-background/95 px-6 py-3 backdrop-blur-sm">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-4">
-          <div className="flex min-w-0 items-center gap-2">
-            <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-busy="true" />
-            <span className="truncate text-sm font-medium">{phrase}</span>
-          </div>
-          <div className="flex flex-1 items-center gap-3">
-            <div
-              role="progressbar"
-              aria-valuenow={pct}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              className="h-2 flex-1 overflow-hidden rounded-full bg-muted"
-            >
-              <div
-                className="h-full rounded-full bg-primary transition-[width] duration-500"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className="w-10 shrink-0 text-right font-mono text-sm tabular-nums text-muted-foreground">
-              {pct}%
-            </span>
-          </div>
-          {remainingMs != null ? (
-            <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
-              {formatRemaining(remainingMs, locale)}
-            </span>
-          ) : null}
-        </div>
-      </div>
-      )}
     </div>
   )
 }

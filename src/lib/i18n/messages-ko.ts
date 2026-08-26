@@ -1175,4 +1175,28 @@ export const KO: Record<string, string> = {
   'Draft render canceled.': '드래프트 렌더를 취소했어요.',
   'Draft render failed: {message}': '드래프트 렌더에 실패했어요: {message}',
   'No clips in the timeline to render.': '렌더할 클립이 타임라인에 없어요.',
+
+  // ── 그룹 F(#f5~#f10) — 라벨·툴팁·previz 재생성 ──
+  'Main sheet (turnaround)': '대표 시트(턴어라운드)',
+  'Back view': '뒷모습',
+  'Side view (left)': '측면(왼쪽)',
+  'Side view (right)': '측면(오른쪽)',
+  'Required for Director: this character appears in shots, and its main image is ready.':
+    'Director 진행에 필요한 캐릭터예요 — 샷에 등장하며, 대표 이미지가 준비됐어요.',
+  'Required for Director: this character appears in shots — red means its main image is still missing.':
+    'Director 진행에 필요한 캐릭터예요 — 샷에 등장하는데, 빨간색은 아직 대표 이미지가 없다는 뜻이에요.',
+  'Edit directing': '연출 편집',
+  "Redraws this shot's rough 3-frame set with the writer pipeline":
+    '이 샷의 러프 3프레임을 writer 파이프라인으로 다시 그려요',
+  'Previz regeneration started — this card updates when the new frames land.':
+    'Previz 재생성을 시작했어요 — 새 프레임이 도착하면 카드에 반영돼요.',
+  'Failed to start previz regeneration: {message}':
+    'Previz 재생성 시작에 실패했어요: {message}',
+  'Regenerate the previz?': 'Previz를 재생성할까요?',
+  "Redraws this shot's rough 3-frame set (start/directing/end).":
+    '이 샷의 러프 3프레임(시작/연출/끝)을 다시 그려요.',
+  'Costs money to generate the previz.': 'Previz 생성에는 비용이 들어요.',
+  'Replaces the existing rough frames with the new result.':
+    '기존 러프 프레임이 새 결과물로 교체돼요.',
+  'Click to edit this shot': '클릭하면 이 샷을 수정할 수 있어요',
 }

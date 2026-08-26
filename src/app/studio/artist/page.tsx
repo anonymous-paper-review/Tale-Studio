@@ -68,14 +68,16 @@ export default function VisualPage() {
 
   // 보드 축척(#d1 2026-07-14) — writer 러프 보드와 같은 슬라이더. 인물/배경 탭별로 저장.
   //   레벨 1(축소·3열) ~ 3(확대·1열, 기존 모습), cols = 4 - level. localStorage 탭별 키.
+  // 기본 레벨 2(#f5 2026-08-26 오너): 3(최대 확대)은 오너가 항상 최소로 줄여 썼다 — 중간이 기본.
+  //   저장값이 있으면 그것이 우선(아래 read).
   const [zoomByTab, setZoomByTab] = useState<{ characters: number; world: number }>({
-    characters: 3,
-    world: 3,
+    characters: 2,
+    world: 2,
   })
   useEffect(() => {
     const read = (key: string) => {
       const v = Number(localStorage.getItem(`artist:zoomLevel:${key}`))
-      return v >= 1 && v <= 3 ? v : 3
+      return v >= 1 && v <= 3 ? v : 2
     }
     // rAF 경유 — 하이드레이션 mismatch 없이 저장값 반영 + set-state-in-effect 린트 준수.
     const id = requestAnimationFrame(() =>

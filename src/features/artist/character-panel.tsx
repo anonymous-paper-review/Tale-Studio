@@ -220,7 +220,16 @@ export function CharacterPanel({
                   </span>
                   {isObject ? <Badge variant="secondary">{t('Object')}</Badge> : null}
                   {isRequired && (
-                    <Badge variant={hasMainImage ? 'outline' : 'destructive'} className="text-[10px]">
+                    <Badge
+                      variant={hasMainImage ? 'outline' : 'destructive'}
+                      className="text-[10px]"
+                      // #f7(2026-08-26 오너): '필수'의 색 의미가 불명이었다 — 뜻을 툴팁으로 말한다.
+                      title={
+                        hasMainImage
+                          ? t('Required for Director: this character appears in shots, and its main image is ready.')
+                          : t('Required for Director: this character appears in shots — red means its main image is still missing.')
+                      }
+                    >
                       {t('Required')}
                     </Badge>
                   )}
@@ -260,7 +269,7 @@ export function CharacterPanel({
                       />
                     ) : (
                       <ImagePlaceholder
-                        label={isObject ? CHARACTER_VIEW_LABELS['main'] : t('Turnaround (all views)')}
+                        label={isObject ? t(CHARACTER_VIEW_LABELS['main']) : t('Turnaround (all views)')}
                         aspectRatio={isObject ? 'square' : 'video'}
                         imageUrl={char.views.main ?? null}
                         generating={isViewGenerating('main')}
