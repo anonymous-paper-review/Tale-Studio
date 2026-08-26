@@ -34,6 +34,7 @@ describe('Director 스테이지 밖 완료 — 복귀 마운트에서 놓치지 
   it('복귀 시 DB 를 재수화하고 최근 완료·미반영 잡을 보고한다', () => {
     expect(queueRehydrate).toContain('fetchUnreflectedCompletedJobs(projectId)')
     expect(queueRehydrate).toContain('reflectedDirectorJobs(')
+    expect(queueRehydrate).toContain('hasWriterShotNodes')
     expect(queueRehydrate).toContain("'director-canvas-reentry'")
     expect(queueRehydrate).toContain('hydrateFromDb(projectId)')
   })

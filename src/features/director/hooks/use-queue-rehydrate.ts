@@ -74,6 +74,11 @@ export function reflectedDirectorJobs(
 
 export function useQueueRehydrate(projectId: string | null): void {
   const hydrateFromDb = useDirectorCanvasStore((s) => s.hydrateFromDb)
+  // Zustand persist 복원은 effect 마운트보다 늦을 수 있다. Shot 노드가 준비되기 전 복귀 효과를
+  // 1회 소진하면 DB 영상은 나중에 캐시에 들어와도 ui_reflected 를 영원히 놓친다.
+  const hasWriterShotNodes = useDirectorCanvasStore((s) =>
+    s.nodes.some((node) => isShotData(node.data) && !!node.data.writerShotId),
+  )
   const activeJobs = useActiveGenerationJobs(projectId)
   const watched = useMemo(
     () => activeJobs.filter((j) => WATCHED_KINDS.has(j.kind)),
@@ -84,7 +89,7 @@ export function useQueueRehydrate(projectId: string | null): void {
   // 스테이지 밖에서 완료된 잡은 prev active 목록에 없어서 아래 transition 감지로는 영원히 못 잡는다.
   // Director 복귀 마운트 때 DB 를 무조건 한 번 재수화하고, 최근 완료·미반영 잡을 좌표 ④로 보고한다.
   useEffect(() => {
-    if (!projectId) return
+    if (!projectId || !hasWriterShotNodes) return
     let cancelled = false
     const unreflectedPromise = fetchUnreflectedCompletedJobs(projectId)
     void invalidateShots(projectId)
@@ -103,7 +108,7 @@ export function useQueueRehydrate(projectId: string | null): void {
     return () => {
       cancelled = true
     }
-  }, [projectId, hydrateFromDb])
+  }, [projectId, hasWriterShotNodes, hydrateFromDb])
 
   useEffect(() => {
     const prev = prevRef.current
