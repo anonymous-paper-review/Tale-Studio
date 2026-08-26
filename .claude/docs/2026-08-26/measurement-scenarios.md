@@ -270,3 +270,40 @@ A2 중 **Writer 진행바가 서버 완료를 놓쳐 93%에 붙잡히는 경로*
 고정돼 동일하게 만들 수 없었다. 대신 더 강한 조건(상태 요청 강제 매달림)과 복귀 이벤트 경로를
 각각 검증했다. 배포본에서 오너 실제 사용 중 재발 여부를 계속 관찰한다.
 
+---
+
+# 실측 2회차 — Director 영상 stage-away (2026-08-26 23:55~08-27 00:22 KST)
+
+## 결과 요약
+
+| 항목 | 결과 | 판정 |
+|---|---|---|
+| 5초 I2V 제출 | 2건 모두 fal 완료·DB URL 저장 | 통과 |
+| 생성 직후 Director→Writer 10초 왕복 | 실제 화면 전환 확인 | 통과 |
+| Director 밖에서 영상 완료 | 첫 영상에서 화면 반영 누락 재현 | **버그 재현** |
+| 복귀 재수화 수리 | 최근 완료·미반영 조회 + DB hydrate | 통과 |
+| 실제 노드 판정 | 부모 Shot 없는 상태를 반영으로 오판하지 않음 | 통과 |
+| 초기화 레이스 | Shot 노드 복원 뒤 재수화 실행 | 통과 |
+| 최종 배포 화면 | `Shot video · Shot 1 · take 1 · completed`, 썸네일·URL 존재 | 통과 |
+| 최종 반영 좌표 | `director-canvas-reentry` 1건 | 통과 |
+
+상세 타임라인·원인·수리는 `group-a-state-loss.md`의 "A2 최종"에 기록했다.
+
+## 측정 주의
+
+- Director/Writer 단계 전환은 URL이 항상 바뀌지 않는다. URL 대신 화면 제목(`The Set` ↔
+  `Writers' Room`)으로 실제 언마운트를 확인했다.
+- Node 영상 카드는 완료 직후 `<video>`를 바로 올리지 않고 썸네일 `<img>`를 쓴다. 따라서
+  `<video> 0개`만으로 미반영 판정하면 안 된다. 최종 판정은 영상 노드 상태·URL·카드 DOM을 함께 봤다.
+- 자동화 중 같은 테스트 계정 탭이 둘 있어 `ui_reflected`가 중복된 회차는 증거에서 제외했다.
+  최종 판정은 Vercel 고유 배포 주소의 격리된 단일 탭에서 했다.
+- 첫 실사 그리드는 422 `content_policy_violation`으로 실패했고, 오류 사유 배선이 정상적으로
+  `moderation` 분류·본문을 남겼다. 영상 시작 프레임은 정책에 걸리지 않은 Shot으로 확보했다.
+
+## 캡처
+
+- `video-valid-01-submitted.png`
+- `video-valid-02-away-writer.png`
+- `video-valid-10-card-completed.png`
+- `video-final-01-reentry-completed.png`
+

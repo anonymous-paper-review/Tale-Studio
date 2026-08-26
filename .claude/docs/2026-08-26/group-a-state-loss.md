@@ -1,13 +1,13 @@
 # 그룹 A — 작업 날아감 (탭/스테이지 이동 시 상태 유실)
 
-2026-08-26 기준 상태: **A3 닫힘 · A2 배선 완료(데이터 수집 중) · A1 재현 대기**
+2026-08-27 기준 상태: **A3 닫힘 · A2 닫힘(Writer·Director 실측 완료) · A1 재현 대기**
 
 ## 이슈 원문
 
 | # | 화면 | 증상 | 상태 |
 |---|---|---|---|
 | A1 | Writer | Artist 다녀오니 생성 눌러놓은 게 초기화, 하나는 재생성 불가 | 열림 — 재현 대기 |
-| A2 | Director | Real창에서 다른 데 다녀오면 생성 중이던 게 다 죽음 | 열림 — 측정 배선 완료, 데이터 수집 중 |
+| A2 | Director | Real창에서 다른 데 다녀오면 생성 중이던 게 다 죽음 | **닫힘 — 영상 stage-away 재현·수리·배포 검증** |
 | A3 | Editor | 컷/편집 후 다른 탭 방문만 해도 원복 | **닫힘** |
 
 ---
@@ -34,7 +34,7 @@ Writer는 무관 — 어느 탭이든 Editor 언마운트→재진입이 트리�
 
 ---
 
-## A2 — 열림. 측정 배선 완료, 데이터 수집 중
+## A2 — 닫힘. Writer·Director 실제 조건 검증 완료
 
 ### 부검에서 확인한 것 (8/25 밤 오너 세션, 52잡 전수)
 
@@ -190,5 +190,55 @@ Writer는 무관 — 어느 탭이든 Editor 언마운트→재진입이 트리�
 - 통제 실측: 정상 조회 ≤3초, 매달린 조회 16.8초, 복귀 이벤트 1.3초에 완료 반영
 - 상세·캡처: `measurement-scenarios.md`의 "A2 통제 실측"
 
-Writer 진행바 경로는 닫는다. A2 전체는 Director 영상·화면 반영 측정이 남아 있어 열린 상태 유지.
+Writer 진행바 경로는 닫는다. Director 영상 경로는 아래 최종 실측에서 이어서 닫았다.
+
+## A2 최종 — Director 영상 stage-away 재현·수리·배포 검증 (2026-08-26 23:55~08-27 00:22 KST)
+
+### 첫 영상 — 버그 재현
+
+- 23:55:02: `sh_03_07` 5초 I2V 제출 (`shot_video`, fal)
+- 23:56:31: Director → Writer 실제 이탈 (URL은 유지되고 화면만 교체되는 구조)
+- 23:56:50: Director가 언마운트된 사이 영상 완료·DB URL 저장
+- 23:57:07: Director 복귀
+- 결과: 화면 영상 0, `ui_reflected` 없음 — **A2 영상 경로 재현 확정**
+
+원인: `useQueueRehydrate`의 `prevRef`가 복귀 마운트마다 `[]`로 시작했다. 밖에서 이미 완료돼
+active 큐에서 빠진 잡은 active→settled 전환을 한 번도 못 보므로 `hydrateFromDb` 자체를 건너뛰었다.
+
+### 수리
+
+1. Director 복귀 마운트에서 DB 1회 재수화
+2. `includeUnreflected=1` opt-in으로 최근 15분 완료·미반영 잡 조회
+   (평상시 4초 active 폴링에는 추가 쿼리 없음)
+3. 실제 완료 이미지/영상 노드가 생긴 잡만 `ui_reflected` 보고
+4. Zustand persist가 Shot 노드를 복원하기 전에 effect가 먼저 소진되는 초기화 레이스 수정 —
+   writer-backed Shot 노드가 준비된 뒤 재수화 시작
+
+### 두 번째 영상 — 유효 Shot에서 배포 검증
+
+- 00:07:50: 캔버스에 실제 부모 노드가 있는 `sh_01_01` 5초 I2V 제출
+- 00:08:10: Director → Writer 이탈
+- 00:08:20: 10초 뒤 Director 복귀
+- 00:09:40: 영상 완료
+- 00:09:44: 기존 화면 유지 경로의 `director-canvas` 반영 보고
+- 최종 격리 배포(`fbe6527`): 영상 노드 2개 모두 `completed + URL`,
+  `Shot video · Shot 1 · take 1 · completed` 카드가 실제 DOM에 표시됨
+- 초기화 레이스 수리 뒤 `director-canvas-reentry` 이벤트 정확히 1건 기록
+
+### 판정
+
+**A2 닫힘.** Writer 93% 붙잡힘과 Director 영상 stage-away 완료 누락 모두 실제 조건에서
+재현·수리·배포 검증했다. 운영 관측은 유지한다. 이후 `ui_reflected`가 있는데도 사용자가 빈 카드를
+본다면 현재 측정 경계 밖인 이미지/영상 로드·React 페인트 문제로 별도 재개한다.
+
+### 화면 증거
+
+`.claude/docs/2026-08-26/evidence/` (대용량이라 저장소 미포함)
+
+- `video-tab-02-submitted.png` — 첫 영상 제출
+- `video-tab-03-away-writer.png` — 첫 영상 완료 전 Writer 이탈
+- `video-valid-01-submitted.png` — 유효 Shot 두 번째 영상 제출
+- `video-valid-02-away-writer.png` — 두 번째 영상 Writer 이탈
+- `video-valid-10-card-completed.png` — 배포본 완료 영상 카드 확대
+- `video-final-01-reentry-completed.png` — 격리된 최신 배포에서 복귀 완료 상태
 
