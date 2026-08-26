@@ -1153,4 +1153,22 @@ export const KO: Record<string, string> = {
   'Uploaded {names}. Please read them and put together a story.':
     '{names} 을(를) 올렸어요. 읽고 스토리로 정리해 주세요.',
   'Please check the attached files.': '첨부한 파일을 확인해 주세요.',
+
+  // ── Editor: Draft Render(#draft-render) — 타임라인 이어붙여 파일 저장 ──
+  'Draft Render': '드래프트 렌더',
+  'Concatenate every clip in order and save as one video file':
+    '모든 클립을 순서대로 이어 붙여 영상 파일 하나로 저장해요',
+  'Click to cancel': '클릭하면 취소돼요',
+  'Preparing clips…': '클립 준비 중…',
+  'Preparing clips… {percent}%': '클립 준비 중… {percent}%',
+  'Rendering… {percent}%': '렌더링 중… {percent}%',
+  'Draft render records in real time — keep this tab visible until it finishes.':
+    '드래프트 렌더는 실시간으로 녹화돼요 — 끝날 때까지 이 탭을 화면에 켜 둬 주세요.',
+  'Draft video saved — {seconds}s, {size}MB.':
+    '드래프트 영상 저장 완료 — {seconds}초, {size}MB.',
+  '{count} clips have no video yet and were rendered as placeholders.':
+    '{count}개 클립은 아직 영상이 없어 자리표시 화면으로 들어갔어요.',
+  'Draft render canceled.': '드래프트 렌더를 취소했어요.',
+  'Draft render failed: {message}': '드래프트 렌더에 실패했어요: {message}',
+  'No clips in the timeline to render.': '렌더할 클립이 타임라인에 없어요.',
 }

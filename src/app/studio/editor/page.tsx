@@ -28,6 +28,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { decodeAudioPeaks } from '@/lib/audio-waveform'
 import { downloadShotsZip } from '@/lib/editor-zip-export'
+import { renderDraftTimeline } from '@/lib/editor-draft-render'
 import { toast } from 'sonner'
 import { useT } from '@/lib/i18n'
 
@@ -41,7 +42,6 @@ export default function PostPage() {
     clipOrder,
     selectedShotIds,
     selectedAudioIds,
-    rendering,
     error,
     sourcePanelOpen,
     currentTime,
@@ -86,7 +86,6 @@ export default function PostPage() {
     setBinDropSec,
     updateVideoClip,
     updateAudioClip,
-    renderDraft,
     toggleSourcePanel,
     seek,
     setPxPerSec,
@@ -113,7 +112,84 @@ export default function PostPage() {
   )
 
   const projectId = useProjectStore((s) => s.projectId)
+  const projectTitle = useProjectStore((s) => s.projectTitle)
   const [exportingZip, setExportingZip] = useState(false)
+
+  // Draft Render (#draft-render 2026-08-26): 타임라인 전체를 브라우저에서 이어 붙여 파일로 저장.
+  //   실시간 녹화라 진행 라벨을 버튼에 그대로 노출하고, 진행 중 재클릭 = 취소.
+  const [renderLabel, setRenderLabel] = useState<string | null>(null)
+  const renderAbortRef = useRef<AbortController | null>(null)
+  useEffect(() => () => renderAbortRef.current?.abort(), [])
+  const onDraftRender = useCallback(async () => {
+    if (renderAbortRef.current) {
+      renderAbortRef.current.abort()
+      return
+    }
+    const st = useEditorStore.getState()
+    const layout = selectTimelineLayout(st)
+    const totalSec = Math.max(
+      layout.reduce((sum, l) => sum + l.durationSec, 0),
+      st.audioClips.reduce((m, a) => Math.max(m, a.startSec + a.durationSec), 0),
+    )
+    if (!(totalSec > 0)) {
+      toast.info(t('No clips in the timeline to render.'))
+      return
+    }
+    st.setPlaying(false) // 프리뷰 재생과 녹화용 오디오가 겹치지 않게
+    const ctrl = new AbortController()
+    renderAbortRef.current = ctrl
+    setRenderLabel(t('Preparing clips…'))
+    toast.info(
+      t('Draft render records in real time — keep this tab visible until it finishes.'),
+    )
+    try {
+      const base = (projectTitle || 'draft').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60)
+      const stats = await renderDraftTimeline({
+        projectId,
+        fileBaseName: `${base}_draft`,
+        layout,
+        shots: st.shots,
+        videoClips: st.videoClips,
+        audioClips: st.audioClips,
+        audioTracks: st.audioTracks,
+        signal: ctrl.signal,
+        onPhase: (phase, frac) => {
+          const percent = Math.round(frac * 100)
+          setRenderLabel(
+            phase === 'prefetch'
+              ? t('Preparing clips… {percent}%', { percent })
+              : t('Rendering… {percent}%', { percent }),
+          )
+        },
+      })
+      toast.success(
+        t('Draft video saved — {seconds}s, {size}MB.', {
+          seconds: Math.round(stats.durationSec),
+          size: (stats.bytes / (1024 * 1024)).toFixed(1),
+        }),
+      )
+      if (stats.skippedClips > 0) {
+        toast.warning(
+          t('{count} clips have no video yet and were rendered as placeholders.', {
+            count: stats.skippedClips,
+          }),
+        )
+      }
+    } catch (e) {
+      if (ctrl.signal.aborted || (e instanceof DOMException && e.name === 'AbortError')) {
+        toast.info(t('Draft render canceled.'))
+      } else {
+        toast.error(
+          t('Draft render failed: {message}', {
+            message: e instanceof Error ? e.message : '',
+          }),
+        )
+      }
+    } finally {
+      renderAbortRef.current = null
+      setRenderLabel(null)
+    }
+  }, [projectId, projectTitle, t])
 
   // "전체 보기"(#watch-all) — 타임라인의 모든 클립을 먼저 받아(objectURL) 처음부터 끊김 없이
   //   연속 재생한다. 진행 중에는 버튼이 n/m 을 보여준다. 일부 실패는 그 클립만 스트리밍.
@@ -496,9 +572,23 @@ export default function PostPage() {
               )}
               {exportingZip ? t('Zipping…') : t('Shot ZIP')}
             </Button>
-            <Button size="sm" variant="outline" onClick={renderDraft} disabled={rendering} className="gap-1.5 hover-red-beam">
-              {rendering ? <Loader2 className="size-3 animate-spin" /> : <Download className="size-3" />}
-              {rendering ? 'Rendering…' : 'Draft Render'}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onDraftRender}
+              className="gap-1.5 hover-red-beam"
+              title={
+                renderLabel
+                  ? t('Click to cancel')
+                  : t('Concatenate every clip in order and save as one video file')
+              }
+            >
+              {renderLabel ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Download className="size-3" />
+              )}
+              {renderLabel ?? t('Draft Render')}
             </Button>
           </div>
         </div>

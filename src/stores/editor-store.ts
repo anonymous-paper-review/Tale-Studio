@@ -63,7 +63,6 @@ interface EditorState {
   selectedAudioId: string | null      // 다중 선택의 앵커/대표 (range 기준, Del 대상 구분)
   selectedAudioIds: string[]          // 다중 선택된 오디오 클립 (marquee/Ctrl/Shift)
   clipOrder: Record<string, string[]> // sceneId → shotId[]
-  rendering: boolean
   error: string | null
 
   // Video Source 패널 (프리미어2 좌상단 카드 그리드) — 토글로 접기
@@ -123,7 +122,6 @@ interface EditorState {
   splitVideoClipAt: (shotId: string, atGlobalSec: number) => void
   // Video Source → 타임라인 드래그-투-애드 (atSec 위치에 새 인스턴스 삽입)
   addClipInstanceAt: (sourceShotId: string, atGlobalSec: number) => void
-  renderDraft: () => Promise<void>
 
   // Video Source 패널 액션
   toggleSourcePanel: () => void
@@ -301,7 +299,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedAudioId: null,
   selectedAudioIds: [],
   clipOrder: {},
-  rendering: false,
   error: null,
   sourcePanelOpen: true,
   currentTime: 0,
@@ -650,7 +647,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       audioClips: [] as AudioTrackClip[],
       audioSources: [] as AudioSource[],
       audioTracks: [{ id: 'atrack_1' }],
-      rendering: false,
       binDragKind: null,
       binDropSec: null,
     }
@@ -796,7 +792,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedAudioId: null,
       selectedAudioIds: [],
       clipOrder: {},
-      rendering: false,
       error: null,
       currentTime: 0,
       pxPerSec: PX_PER_SEC_DEFAULT,
@@ -1181,41 +1176,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().addClipInstanceAt(sourceShotId, nearest)
   },
 
-  renderDraft: async () => {
-    set({ rendering: true, error: null })
-
-    try {
-      const { clipOrder, selectedSceneId, videoClips, audioClips, audioTracks } = get()
-      const projectId = useProjectStore.getState().projectId
-
-      const res = await fetch('/api/editor/render-draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          clipOrder,
-          sceneId: selectedSceneId,
-          // draft 에 트림/속도/오디오 음량 반영되도록 편집 데이터 동봉 (요청 1: 음량 draft 반영)
-          videoClips,
-          audioClips,
-          audioTracks,
-        }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Render failed')
-      }
-
-      // MVP: just marks render complete (actual video merge is post-MVP)
-      set({ rendering: false })
-    } catch (err) {
-      set({
-        rendering: false,
-        error: err instanceof Error ? err.message : 'Render failed',
-      })
-    }
-  },
 }))
 
 // ── 자동 저장 ─────────────────────────────────────────────────────────────────

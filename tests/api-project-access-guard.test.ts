@@ -38,7 +38,6 @@ import { POST as generateStoryboardBatchPOST } from '@/app/api/director/generate
 import { POST as generatePrevizVideoPOST } from '@/app/api/director/generate-previz-video/route'
 import { GET as editorStateGET, PUT as editorStatePUT } from '@/app/api/editor/state/route'
 import { PATCH as editorSpeedPATCH } from '@/app/api/editor/speed/route'
-import { POST as editorRenderDraftPOST } from '@/app/api/editor/render-draft/route'
 import { POST as sceneGatePOST } from '@/app/api/writer/scene-gate/route'
 import { POST as dialoguePOST } from '@/app/api/writer/dialogue/route'
 import { POST as shotConfigsPOST } from '@/app/api/writer/shot-configs/route'
@@ -369,13 +368,6 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
     )
     expect(res.status).toBe(403)
     expect(mocks.from).not.toHaveBeenCalledWith('shots')
-  })
-
-  it('POST /api/editor/render-draft — 403', async () => {
-    const res = await editorRenderDraftPOST(
-      postReq('/api/editor/render-draft', { projectId: PROJECT, clipOrder: ['sh_01_01'] }),
-    )
-    expect(res.status).toBe(403)
   })
 
   it('POST /api/writer/scene-gate — 403 (revise 의 scenes/storyCheck 삭제 전에 끊긴다)', async () => {
