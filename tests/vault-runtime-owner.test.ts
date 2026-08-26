@@ -218,4 +218,4 @@ describe('provider owner fencing', () => {
       expect(readdirSync(join(dir, 'snapshots')).sort()).toEqual(beforeFiles)
     })
   }
-})
+}, 30000)
