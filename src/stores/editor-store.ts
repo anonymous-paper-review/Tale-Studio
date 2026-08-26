@@ -47,6 +47,20 @@ let editorLoadEpoch = 0
 // Per-shot debounce timers for speed persist (300ms)
 const speedPersistTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
+// Per-shot debounce timers for trim persist (300ms) — speed 와 동일 패턴 (#a3-state-loss)
+const trimPersistTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+// 컷/드래그-투-애드가 만드는 로컬 전용 조각(shot_id 에 __c/__i 접미).
+//   DB shots 에 행이 없으므로 트림 write-through 대상에서 제외하고,
+//   loadPersisted 가 editor_states 스냅샷에서 복원한다 (#a3-state-loss).
+const SYNTHETIC_SHOT_RE = /__(?:c|i)[A-Za-z0-9-]+$/
+export function isSyntheticShotId(shotId: string): boolean {
+  return SYNTHETIC_SHOT_RE.test(shotId)
+}
+export function baseShotIdOf(shotId: string): string {
+  return shotId.replace(SYNTHETIC_SHOT_RE, '')
+}
+
 // 고유 id 생성. 모듈 카운터는 HMR/새로고침 후 리셋되어 영속화된 id 와 충돌(audio_1 중복 등)
 // → React key 중복 + 같은 id 클립 일괄 토글 버그 유발. crypto.randomUUID 로 충돌 원천 차단.
 function uid(): string {
@@ -164,6 +178,9 @@ interface EditorState {
   // 드래그 중 클립 필드 라이브 갱신 (history/persist 스팸 방지 — pushHistory는 드래그 시작 1회)
   updateVideoClip: (shotId: string, patch: Partial<VideoClip>) => void
   updateAudioClip: (id: string, patch: Partial<AudioTrackClip>) => void
+
+  // 트림 확정(핸들 드롭) — 로컬 갱신 + canonical 샷이면 DB write-through (#a3-state-loss)
+  setTrim: (shotId: string, trimStart: number, trimEnd: number) => void
 
   // 재생 / 도구 / Undo·Redo 액션
   togglePlay: () => void
@@ -595,8 +612,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const cur = get()
     const canonicalShotIds = new Set(cur.shots.map((shot) => shot.shotId))
+
+    // Synthetic piece restore (#a3-state-loss 2026-08-26): cut/drag-to-add pieces (__c/__i)
+    // exist only in the editor - loadData rebuilds from DB shots and dropped them, so a mere
+    // tab visit reverted every cut (reproduced: evidence/a3-0*.png). Restore a saved piece
+    // only when its base shot is still canonical: deleted media must not resurrect, and the
+    // piece replays the base clip's *current* url so regenerated takes flow through.
+    const savedClipByShot = new Map((saved.videoClips ?? []).map((c) => [c.shotId, c]))
+    const baseClipByShot = new Map(cur.videoClips.map((c) => [c.shotId, c]))
+    const baseShotById = new Map(cur.shots.map((s) => [s.shotId, s]))
+    const restoredShots: Shot[] = []
+    const restoredClips: VideoClip[] = []
+    for (const savedShot of saved.shots ?? []) {
+      if (!isSyntheticShotId(savedShot.shotId)) continue
+      if (canonicalShotIds.has(savedShot.shotId)) continue
+      const base = baseShotById.get(baseShotIdOf(savedShot.shotId))
+      if (!base) continue
+      restoredShots.push({ ...savedShot, sceneId: base.sceneId, durationSeconds: base.durationSeconds })
+      const savedClip = savedClipByShot.get(savedShot.shotId)
+      const baseClip = baseClipByShot.get(base.shotId)
+      restoredClips.push({
+        shotId: savedShot.shotId,
+        url: baseClip?.url ?? null,
+        status: baseClip?.status ?? 'pending',
+        thumbnailUrl: baseClip?.thumbnailUrl ?? null,
+        trimStart: savedClip?.trimStart,
+        trimEnd: savedClip?.trimEnd,
+        speed: savedClip?.speed ?? 1.0,
+      })
+      canonicalShotIds.add(savedShot.shotId)
+    }
+    const combinedShots = restoredShots.length ? [...cur.shots, ...restoredShots] : cur.shots
+    const combinedClips = restoredClips.length ? [...cur.videoClips, ...restoredClips] : cur.videoClips
+
     const canonicalOrder = new Map<string, string[]>()
-    for (const shot of cur.shots) {
+    for (const shot of combinedShots) {
       const order = canonicalOrder.get(shot.sceneId) ?? []
       order.push(shot.shotId)
       canonicalOrder.set(shot.sceneId, order)
@@ -610,8 +660,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       clipOrder[sceneId] = [...retained, ...canonicalIds.filter((id) => !retained.includes(id))]
     }
     set({
-      // shots/videoClips are loaded from the canonical DB by loadData; a local
+      // Canonical shots/videoClips come from loadData (DB truth). Only synthetic editor
+      // pieces whose base shot is still canonical are merged back in above - a local
       // snapshot must not resurrect deleted media when that DB snapshot is empty.
+      shots: combinedShots,
+      videoClips: combinedClips,
       clipOrder,
       audioClips: dedupAudioClips,
       audioSources: saved.audioSources ?? [],
@@ -966,6 +1019,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
     }, 300)
     speedPersistTimers.set(shotId, timer)
+  },
+
+  setTrim: (shotId, trimStart, trimEnd) => {
+    if (!Number.isFinite(trimStart) || !Number.isFinite(trimEnd)) return
+    const start = Math.max(0, trimStart)
+    if (trimEnd <= start) return
+
+    set((state) => ({
+      videoClips: state.videoClips.map((c) =>
+        c.shotId === shotId ? { ...c, trimStart: start, trimEnd } : c,
+      ),
+    }))
+
+    // synthetic pieces have no shots row - the editor_states snapshot restores them instead.
+    if (isSyntheticShotId(shotId)) return
+
+    // Debounced persist to DB (fire-and-forget), same pattern as setSpeed.
+    const existing = trimPersistTimers.get(shotId)
+    if (existing) clearTimeout(existing)
+    const timer = setTimeout(() => {
+      trimPersistTimers.delete(shotId)
+      const trimProjectId = useProjectStore.getState().projectId
+      if (trimProjectId) {
+        fetch('/api/editor/trim', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: trimProjectId, shotId, trimStart: start, trimEnd }),
+        }).catch((err) => console.error('[editor-store] trim persist failed:', err))
+      }
+    }, 300)
+    trimPersistTimers.set(shotId, timer)
   },
 
   // soft-delete: 타임라인(clipOrder)에서만 제거하고 videoClips 데이터는 보존.

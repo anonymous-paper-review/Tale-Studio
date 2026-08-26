@@ -7,7 +7,8 @@ import type { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
-import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
+import { checkGenerationCapacity } from '@/lib/generation-quota'
+import { quotaRejectionResponse } from '@/lib/api/quota'
 import { createGenerationJob } from '@/lib/generation-jobs'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
@@ -44,8 +45,8 @@ export async function POST(req: NextRequest) {
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
 
-    const quota = await checkUserQuota(access.userId!)
-    if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
+    const quota = await checkGenerationCapacity(access.userId!, 'image')
+    if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'storyboard_real_grid', userId: access.userId })
 
     const { data: project } = await supabaseAdmin
       .from('projects')

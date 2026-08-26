@@ -9,10 +9,8 @@ interface ImagePlaceholderProps {
   label: string
   aspectRatio?: 'square' | 'video'
   imageUrl?: string | null
-  /** 생성 중이면 border-beam + 경과시간 오버레이 표시 (이미지 유무와 무관) */
+  /** 생성 중이면 border-beam 오버레이 표시 (이미지 유무와 무관) */
   generating?: boolean
-  /** 생성 시작 시각(epoch ms) — 주면 탭 전환(remount)에도 경과시간 타이머가 안 리셋된다 */
-  generatingStartedAt?: number
   className?: string
 }
 
@@ -21,7 +19,6 @@ export function ImagePlaceholder({
   aspectRatio = 'square',
   imageUrl,
   generating = false,
-  generatingStartedAt,
   className,
 }: ImagePlaceholderProps) {
   const t = useT()
@@ -49,7 +46,6 @@ export function ImagePlaceholder({
       <GeneratingOverlay
         active={generating}
         label={t('Generating')}
-        startedAt={generatingStartedAt}
       />
     </div>
   )

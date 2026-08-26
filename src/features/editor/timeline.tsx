@@ -83,6 +83,8 @@ interface TimelineProps {
   onClearAudioSelection: () => void
   onUpdateVideoClip: (shotId: string, patch: Partial<VideoClip>) => void
   onUpdateAudioClip: (id: string, patch: Partial<AudioTrackClip>) => void
+  // trim commit on handle drop - persists via store (DB write-through / snapshot restore)
+  onSetTrim: (shotId: string, trimStart: number, trimEnd: number) => void
   onPushHistory: () => void
 }
 
@@ -402,6 +404,7 @@ export function Timeline({
   onClearAudioSelection,
   onUpdateVideoClip,
   onUpdateAudioClip,
+  onSetTrim,
   onPushHistory,
 }: TimelineProps) {
   const t = useT()
@@ -886,7 +889,7 @@ export function Timeline({
                               if (moved) {
                                 const lft = calc(ev.clientX)
                                 onPushHistory()
-                                onUpdateVideoClip(item.shotId, { trimStart: Math.max(0, t0 + (lft - startSec) * speed), trimEnd: t1 })
+                                onSetTrim(item.shotId, Math.max(0, t0 + (lft - startSec) * speed), t1)
                               }
                               setTrimPreview(null)
                             }
@@ -925,7 +928,7 @@ export function Timeline({
                               if (moved) {
                                 const rgt = calc(ev.clientX)
                                 onPushHistory()
-                                onUpdateVideoClip(item.shotId, { trimStart: t0, trimEnd: t0 + (rgt - startSec) * speed })
+                                onSetTrim(item.shotId, t0, t0 + (rgt - startSec) * speed)
                               }
                               setTrimPreview(null)
                             }

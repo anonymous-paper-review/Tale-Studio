@@ -144,19 +144,12 @@ export function StoryboardZoomControls({
 export function GeneratingOverlay({
   active,
   label,
-  showElapsed = true,
-  startedAt,
   beamColor = 'primary',
   className,
 }: {
   active: boolean
   /** pill 라벨 (예: "이미지 생성 중", "영상 생성 중") */
   label?: string
-  /** 경과시간 카운터 표시 여부 */
-  showElapsed?: boolean
-  /** 생성 시작 시각(epoch ms). 주면 이 시점부터 경과를 센다 → 탭 전환(remount)에도 타이머 안 리셋.
-   *  없으면(undefined) 기존처럼 mount 시점부터 센다. */
-  startedAt?: number
   /** 테두리 빛 색(#e13): 이미지 생성=success(초록), 영상 생성=primary(빨강). */
   beamColor?: 'primary' | 'success'
   className?: string
@@ -166,8 +159,6 @@ export function GeneratingOverlay({
   return (
     <ActiveOverlay
       label={label ?? t('Generating')}
-      showElapsed={showElapsed}
-      startedAt={startedAt}
       beamColor={beamColor}
       className={className}
     />
@@ -176,19 +167,13 @@ export function GeneratingOverlay({
 
 function ActiveOverlay({
   label,
-  showElapsed,
-  startedAt,
   beamColor,
   className,
 }: {
   label: string
-  showElapsed: boolean
-  startedAt?: number
   beamColor: 'primary' | 'success'
   className?: string
 }) {
-  const elapsed = useElapsedSeconds(startedAt)
-
   return (
     <div
       className={cn('pointer-events-none absolute inset-0 z-10', className)}
@@ -208,15 +193,12 @@ function ActiveOverlay({
         className="absolute inset-0 rounded-[inherit] bg-background/20"
         aria-hidden
       />
-      {/* 경과시간 pill */}
+      {/* 상태 pill — 경과 초는 표시하지 않는다(오너 결정 2026-08-26).
+          숫자가 올라가는 것은 진행의 근거가 아니고, 느린 샷에서 오히려 불안을 준다.
+          도는 빔 + pulse dot 이 "작업 중"을 말하고, 끝나면 결과 이미지/영상이 그 자리를 채운다. */}
       <span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full border border-border/60 bg-card/90 px-2 py-0.5 text-[10px] font-medium text-foreground">
         <span className="size-1.5 animate-pulse rounded-full bg-primary" />
         <span>{label}</span>
-        {showElapsed && (
-          <span className="font-mono tabular-nums text-muted-foreground">
-            {formatElapsed(elapsed)}
-          </span>
-        )}
       </span>
     </div>
   )
@@ -255,24 +237,4 @@ export function GeneratedImage({
   )
 }
 
-/** 흐른 초. startedAt 을 주면 그 시점부터(탭 전환 remount 에도 유지), 없으면 mount 시점부터.
- *  Date.now()/setState 모두 effect 안에서만 호출. */
-function useElapsedSeconds(startedAt?: number): number {
-  const [sec, setSec] = useState(0)
 
-  useEffect(() => {
-    const base = startedAt ?? Date.now()
-    const tick = () => setSec(Math.max(0, Math.floor((Date.now() - base) / 1000)))
-    tick() // 즉시 1회 — remount 직후에도 올바른 경과로 복원(0 으로 깜빡이지 않게)
-    const t = setInterval(tick, 1000)
-    return () => clearInterval(t)
-  }, [startedAt])
-
-  return sec
-}
-
-function formatElapsed(totalSec: number): string {
-  const m = Math.floor(totalSec / 60)
-  const s = totalSec % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
-}

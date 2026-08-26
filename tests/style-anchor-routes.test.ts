@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
-  checkUserQuota: vi.fn(),
+  checkGenerationCapacity: vi.fn(),
   quotaExceededBody: vi.fn(),
   createGenerationJob: vi.fn(),
   hasQueuedCharacterViewJob: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock('@/lib/api/guard', () => ({
   })),
 }))
 vi.mock('@/lib/generation-quota', () => ({
-  checkUserQuota: mocks.checkUserQuota,
+  checkGenerationCapacity: mocks.checkGenerationCapacity,
   quotaExceededBody: mocks.quotaExceededBody,
 }))
 vi.mock('@/lib/generation-jobs', () => ({
@@ -167,8 +167,8 @@ beforeEach(() => {
   mocks.getUser.mockReset()
   mocks.getUser.mockResolvedValue(USER)
 
-  mocks.checkUserQuota.mockReset()
-  mocks.checkUserQuota.mockResolvedValue({ ok: true, queued: 0, limit: 8 })
+  mocks.checkGenerationCapacity.mockReset()
+  mocks.checkGenerationCapacity.mockResolvedValue({ ok: true, queued: 0, limit: 8 })
   mocks.quotaExceededBody.mockReset()
   mocks.quotaExceededBody.mockImplementation((check: unknown) => check)
 

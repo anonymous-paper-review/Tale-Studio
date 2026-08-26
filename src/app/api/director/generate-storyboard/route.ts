@@ -14,7 +14,8 @@ import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { createGenerationJob } from '@/lib/generation-jobs'
-import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
+import { checkGenerationCapacity } from '@/lib/generation-quota'
+import { quotaRejectionResponse } from '@/lib/api/quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { applyStyleAnchor, resolveStyleAnchor, type AnchorableSubmit } from '@/lib/style-anchor'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
@@ -50,9 +51,9 @@ export async function POST(req: Request) {
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
 
-    // 멀티유저 쿼터 (Phase 3): 유저 in-flight 작업이 상한이면 429.
-    const quota = await checkUserQuota(access.userId!)
-    if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
+    // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
+    const quota = await checkGenerationCapacity(access.userId!, 'image')
+    if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'shot_storyboard', userId: access.userId })
 
     const [{ data: project }, { data: shot }] = await Promise.all([
       supabaseAdmin

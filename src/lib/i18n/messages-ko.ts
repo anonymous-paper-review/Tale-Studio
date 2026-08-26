@@ -772,6 +772,10 @@ export const KO: Record<string, string> = {
   'I have concepts ready for the characters and backgrounds — {count} characters · {worldCount} backgrounds.\nLet me know which character or background you\'d like to revise or add.\nPress "@" to pick a character or background (Ctrl+click a card does the same).': '인물과 배경의 컨셉을 준비했어요 — 캐릭터 {count}명 · 배경 {worldCount}곳.\n수정하거나 추가하고 싶은 인물이나 배경을 알려주세요.\n"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
   'AI generation stopped': 'AI 자동 생성이 중단됐어요',
   'Background generation stopped.': '백그라운드 생성이 중단됐습니다.',
+  // ── misc: generation-quota-toast.ts — 동시 생성 한도 안내 (영상/이미지 분리 풀, 2026-08-26) ──
+  'All generation slots are busy right now. It will start automatically in a moment — please try again shortly.': '지금 생성 자리가 모두 사용 중이에요. 잠시 뒤에 다시 시도해 주세요.',
+  'You can run up to {limit} video generations at once. Please retry after the current ones finish.': '영상은 동시에 {limit}개까지 생성할 수 있어요. 진행 중인 생성이 끝나면 다시 시도해 주세요.',
+  'You can run up to {limit} image generations at once. Please retry after the current ones finish.': '이미지는 동시에 {limit}개까지 생성할 수 있어요. 진행 중인 생성이 끝나면 다시 시도해 주세요.',
   'Generating the main image… just a moment': '대표 이미지 생성 중… 잠시만요',
   'Connects which characters and backgrounds each shot uses — drag assets to build references.': '샷마다 어떤 인물·배경이 쓰이는지 연결합니다 — 에셋을 드래그해 참조를 구성하세요.',
   'Create and refine concept images for characters and worlds, then hand off to the next stage.': '캐릭터·월드의 컨셉 이미지를 만들고 다듬어 다음 단계로 넘깁니다.',

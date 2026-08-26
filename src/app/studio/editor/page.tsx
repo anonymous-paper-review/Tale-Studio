@@ -73,6 +73,7 @@ export default function PostPage() {
     moveClipToIndex,
     addClipAtPlayhead,
     setSpeed,
+    setTrim,
     splitVideoClipAt,
     addClipInstanceAt,
     previewSource,
@@ -638,6 +639,7 @@ export default function PostPage() {
               onClearAudioSelection={clearAudioSelection}
               onUpdateVideoClip={updateVideoClip}
               onUpdateAudioClip={updateAudioClip}
+              onSetTrim={setTrim}
               onPushHistory={pushHistory}
             />
           </div>

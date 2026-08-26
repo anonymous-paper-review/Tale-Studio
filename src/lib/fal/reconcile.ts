@@ -14,6 +14,7 @@ import {
   STALE_QUEUED_MS,
   type GenerationJob,
 } from '@/lib/generation-jobs'
+import { describeFinalizeError, normalizeFailureEvidence } from '@/lib/fal/error-evidence'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
 import { falImageFetch, falVideoFetch } from '@/lib/writer/llm/fal'
@@ -24,12 +25,14 @@ import {
 } from '@/lib/fal/finalize'
 
 async function terminalizeJob(job: GenerationJob, message: string): Promise<GenerationJob> {
+  // Detail-less provider placeholders get wrapped with job context before they hit the ledger.
+  const evidence = normalizeFailureEvidence(message, job.kind)
   if (job.kind === 'shot_video' && job.video_clip_id) {
-    await markDirectorVideoAttemptFailed(job.project_id, job.id, message)
+    await markDirectorVideoAttemptFailed(job.project_id, job.id, evidence)
   } else {
-    await failGenerationJob(job.id, message)
+    await failGenerationJob(job.id, evidence)
   }
-  return { ...job, status: 'failed', error: message }
+  return { ...job, status: 'failed', error: evidence }
 }
 
 async function completeOrTerminalizeJob(
@@ -61,7 +64,7 @@ async function completeOrTerminalizeJob(
       console.error('[fal/reconcile] video persistence failed; retaining queued attempt:', error.message)
       throw error
     }
-    const message = error instanceof Error ? error.message : String(error)
+    const message = `[finalize] ${describeFinalizeError(error)}`
     if (job.kind === 'shot_rough_storyboard') {
       void recordWriterObservabilityEvent(
         job.project_id,

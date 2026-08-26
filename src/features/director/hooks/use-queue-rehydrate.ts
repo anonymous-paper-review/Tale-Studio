@@ -8,33 +8,39 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import { useActiveGenerationJobs, activeShotIds } from '@/lib/generation-queue'
+import { useActiveGenerationJobs, type ActiveJob } from '@/lib/generation-queue'
 import { invalidateShots } from '@/lib/shots-cache'
+import { computeSettledJobs, reportUiReflected } from '@/lib/generation-ui-reflected'
+
+const WATCHED_KINDS = new Set([
+  'shot_storyboard',
+  'storyboard_real_grid',
+  'shot_video',
+  'shot_previz_video',
+])
 
 export function useQueueRehydrate(projectId: string | null): void {
   const hydrateFromDb = useDirectorCanvasStore((s) => s.hydrateFromDb)
   const activeJobs = useActiveGenerationJobs(projectId)
   const watched = useMemo(
-    () =>
-      new Set([
-        ...activeShotIds(activeJobs, ['shot_storyboard', 'storyboard_real_grid']),
-        ...activeShotIds(activeJobs, ['shot_video', 'shot_previz_video']),
-      ]),
+    () => activeJobs.filter((j) => WATCHED_KINDS.has(j.kind)),
     [activeJobs],
   )
-  const prevRef = useRef<ReadonlySet<string>>(new Set())
+  const prevRef = useRef<readonly ActiveJob[]>([])
   useEffect(() => {
     const prev = prevRef.current
     prevRef.current = watched
     if (!projectId) return
-    for (const id of prev) {
-      if (!watched.has(id)) {
-        // 잡이 큐에서 빠졌다 = 웹훅이 완료를 확정했다 — writer/editor 의 shots 사물함도
-        //   낡음으로 표시해야 다음 진입이 새 행을 받는다(#shots-cache-invalidate).
-        void invalidateShots(projectId)
-        void hydrateFromDb(projectId).catch(() => {})
-        return
-      }
-    }
+    // 잡이 큐에서 빠졌다 = 웹훅이 완료를 확정했다 — writer/editor 의 shots 사물함도
+    //   낡음으로 표시해야 다음 진입이 새 행을 받는다(#shots-cache-invalidate).
+    const settled = computeSettledJobs(prev, watched)
+    if (settled.length === 0) return
+    void invalidateShots(projectId)
+    void hydrateFromDb(projectId)
+      .then(() => {
+        // 좌표 ④ (#a2-observability): 재수화까지 끝나 결과가 화면 상태에 반영된 시점 보고.
+        reportUiReflected(projectId, settled, 'director-canvas')
+      })
+      .catch(() => {})
   }, [watched, projectId, hydrateFromDb])
 }

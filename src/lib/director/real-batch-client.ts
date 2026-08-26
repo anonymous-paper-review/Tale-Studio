@@ -8,6 +8,9 @@
 import { toast } from 'sonner'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { refreshGenerationQueue } from '@/lib/generation-queue'
+import { notifyQuotaExceeded } from '@/lib/generation-quota-toast'
+import { translate } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 
 export interface RealBatchResult {
   generated: number
@@ -33,7 +36,11 @@ export async function runRealBatch(
       })
       if (res.status === 429) {
         quotaBlocked = true
-        if (!opts?.silent) toast.info('생성 대기열이 가득 찼어요 — 잠시 후 다시 시도해 주세요.')
+        // 한도 안내는 공용 헬퍼로 — 문구·중복억제·locale 을 7개 진입점이 공유한다(#quota-toast).
+        // silent(auto-fill) included - owner policy 2026-08-26: swallowing 429 silently was the
+        // prime suspect behind "everything died after a tab round-trip" (#a2-observability).
+        // Duplicate toasts are suppressed by the shared toast id inside notifyQuotaExceeded.
+        notifyQuotaExceeded(await res.json().catch(() => null))
         break
       }
       const j = (await res.json().catch(() => null)) as {
@@ -68,13 +75,27 @@ export async function runRealBatch(
     }
     if (generated > 0) {
       await store.getState().hydrateFromDb(projectId)
-      toast.success(`실사 스토리보드 ${generated}샷 일괄 생성 완료`)
+      toast.success(
+        translate(useLocaleStore.getState().locale, 'Generated {count} live-action storyboard shots', {
+          count: generated,
+        }),
+      )
     } else if (!opts?.silent && !quotaBlocked) {
-      toast.info('생성할 샷이 없어요 — 러프가 준비된 미생성 샷이 대상이에요.')
+      toast.info(
+        translate(
+          useLocaleStore.getState().locale,
+          'No shots to generate — only shots with a rough panel and no image yet are eligible.',
+        ),
+      )
     }
   } catch (e) {
-    if (!opts?.silent) toast.error(e instanceof Error ? e.message : '일괄 생성에 실패했어요')
-    else console.error('[real-batch] 자동 일괄 생성 실패:', e)
+    if (!opts?.silent) {
+      toast.error(
+        e instanceof Error
+          ? e.message
+          : translate(useLocaleStore.getState().locale, 'Batch generation failed'),
+      )
+    } else console.error('[real-batch] auto batch generation failed:', e)
   } finally {
     store.setState({ realBatchBusy: false, realBatchRemaining: null })
   }

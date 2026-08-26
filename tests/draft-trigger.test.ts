@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   countFailedJobsForTarget: vi.fn<(...a: unknown[]) => Promise<number>>(async () => 0),
   falImageSubmit: vi.fn<(...a: unknown[]) => Promise<{ request_id: string; model: string }>>(async () => ({ request_id: 'req-1', model: 'openai/gpt-image-2' })),
   getUser: vi.fn(),
-  checkUserQuota: vi.fn(),
+  checkGenerationCapacity: vi.fn(),
   quotaExceededBody: vi.fn(),
   from: vi.fn(),
 }))
@@ -24,7 +24,7 @@ vi.mock('@/lib/api/guard', () => ({
   })),
 }))
 vi.mock('@/lib/generation-quota', () => ({
-  checkUserQuota: mocks.checkUserQuota,
+  checkGenerationCapacity: mocks.checkGenerationCapacity,
   quotaExceededBody: mocks.quotaExceededBody,
 }))
 vi.mock('@/lib/writer/llm/fal', () => ({
@@ -137,8 +137,8 @@ beforeEach(() => {
   mocks.falImageSubmit.mockResolvedValue({ request_id: 'req-1', model: 'openai/gpt-image-2' })
   mocks.getUser.mockReset()
   mocks.getUser.mockResolvedValue({ id: 'user-1' })
-  mocks.checkUserQuota.mockReset()
-  mocks.checkUserQuota.mockResolvedValue({ ok: true, queued: 0, limit: 8 })
+  mocks.checkGenerationCapacity.mockReset()
+  mocks.checkGenerationCapacity.mockResolvedValue({ ok: true, queued: 0, limit: 8 })
   mocks.quotaExceededBody.mockReset()
   mocks.quotaExceededBody.mockImplementation((input: unknown) => input)
   mocks.from.mockReset()

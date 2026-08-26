@@ -49,7 +49,6 @@ export function CharacterPanel({
     characterAssets,
     selectedCharacterId,
     generatingViews,
-    generatingStartedAt,
     viewFailures,
     selectCharacter,
     generateCharacterAllViews,
@@ -265,7 +264,6 @@ export function CharacterPanel({
                         aspectRatio={isObject ? 'square' : 'video'}
                         imageUrl={char.views.main ?? null}
                         generating={isViewGenerating('main')}
-                        generatingStartedAt={generatingStartedAt[`${char.characterId}:main`]}
                       />
                     )}
                   </button>

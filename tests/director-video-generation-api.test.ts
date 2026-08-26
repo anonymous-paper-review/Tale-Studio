@@ -2,14 +2,14 @@ import { createHmac } from 'node:crypto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  getUser: vi.fn(), userOwnsProject: vi.fn(), checkUserQuota: vi.fn(),
+  getUser: vi.fn(), userOwnsProject: vi.fn(), checkGenerationCapacity: vi.fn(),
   reserveTake: vi.fn(), reserveRegeneration: vi.fn(), getJob: vi.fn(), attach: vi.fn(), fail: vi.fn(),
   from: vi.fn(), rpc: vi.fn(), submit: vi.fn(), finalize: vi.fn(), reconcile: vi.fn(),
 }))
 vi.mock('@/lib/supabase/auth', () => ({ getUser: mocks.getUser }))
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 vi.mock('@/lib/generation-jobs', () => ({ userOwnsProject: mocks.userOwnsProject, getGenerationJobById: mocks.getJob, getGenerationJobByRequestId: mocks.getJob }))
-vi.mock('@/lib/generation-quota', () => ({ checkUserQuota: mocks.checkUserQuota, quotaExceededBody: () => ({ error: 'quota' }) }))
+vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: mocks.checkGenerationCapacity, quotaExceededBody: () => ({ error: 'quota' }) }))
 vi.mock('@/lib/director-video-takes', () => ({ reserveDirectorVideoTake: mocks.reserveTake, reserveDirectorVideoRegeneration: mocks.reserveRegeneration, attachProviderRequestToReservedVideoJob: mocks.attach, markDirectorVideoAttemptFailed: mocks.fail }))
 vi.mock('@/lib/director/video-prompt', () => ({ buildVideoPrompt: () => ({ fullPrompt: 'prompt', prompt_parts: [] }) }))
 vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => 'https://webhook.test' }))
@@ -100,7 +100,7 @@ function reservedLocalJob(overrides: Record<string, unknown> = {}) {
 }
 beforeEach(() => {
   vi.resetAllMocks()
-  mocks.getUser.mockResolvedValue({ id: 'user-1' }); mocks.userOwnsProject.mockResolvedValue(true); mocks.checkUserQuota.mockResolvedValue({ ok: true })
+  mocks.getUser.mockResolvedValue({ id: 'user-1' }); mocks.userOwnsProject.mockResolvedValue(true); mocks.checkGenerationCapacity.mockResolvedValue({ ok: true })
   mocks.from.mockReturnValueOnce(query({ workspace_id: 'workspace-1' })).mockReturnValueOnce(query({ shot_id: 'shot-1' })).mockReturnValueOnce(query(null))
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
 })
@@ -127,7 +127,7 @@ describe('director video generation reservation', () => {
     expect(response.status).toBe(200)
     expect(mocks.reserveRegeneration).toHaveBeenCalledWith(expect.objectContaining({ videoClipId: 'clip-1', target: expect.objectContaining({ videoClipId: 'clip-1' }) }))
     expect(mocks.submit).not.toHaveBeenCalled()
-    expect(mocks.checkUserQuota).not.toHaveBeenCalled()
+    expect(mocks.checkGenerationCapacity).not.toHaveBeenCalled()
     await expect(response.json()).resolves.toMatchObject({ replayed: true, taskId: 'fal-existing', model: 'stored-model' })
   })
   it('validates regeneration ancestry before accepting a same-key recovery replay', async () => {
@@ -141,7 +141,7 @@ describe('director video generation reservation', () => {
     const response = await POST(request({ videoClipId: 'clip-2', recoveryReceipt: 'wrong.receipt' }))
 
     expect(response.status).toBe(400)
-    expect(mocks.checkUserQuota).not.toHaveBeenCalled()
+    expect(mocks.checkGenerationCapacity).not.toHaveBeenCalled()
     expect(mocks.reserveRegeneration).not.toHaveBeenCalled()
     expect(mocks.submit).not.toHaveBeenCalled()
   })
@@ -161,7 +161,8 @@ describe('director video generation reservation', () => {
 
     expect(response.status).toBe(200)
     expect(replayLookup.eq).toHaveBeenCalledWith('video_clip_id', 'clip-2')
-    expect(mocks.checkUserQuota).toHaveBeenCalledWith('user-1')
+    // split pools (2026-08-26): video routes check the video category
+    expect(mocks.checkGenerationCapacity).toHaveBeenCalledWith('user-1', 'video')
     expect(mocks.submit).toHaveBeenCalledTimes(1)
   })
   it('persists a submission failure and reports a failed attempt', async () => {
@@ -379,7 +380,7 @@ describe('reserved replay recovery', () => {
 
     expect(recovered.status).toBe(200)
     expect(mocks.submit).toHaveBeenCalledTimes(1)
-    expect(mocks.checkUserQuota).toHaveBeenCalledTimes(1)
+    expect(mocks.checkGenerationCapacity).toHaveBeenCalledTimes(1)
     expect(mocks.attach).toHaveBeenLastCalledWith('project-1', 'job-1', 'fal-live', expect.objectContaining({ provider: 'fal' }))
     await expect(recovered.json()).resolves.toMatchObject({ jobId: 'job-1', videoClipId: 'clip-1', status: 'generating' })
   })

@@ -28,7 +28,6 @@ import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import {
   useActiveGenerationJobs,
   activeShotIds,
-  activeStartedAt,
   type ActiveJob,
 } from '@/lib/generation-queue'
 import { useRoughStoryboard, useShotActionDescription } from '@/features/director/hooks/use-rough-storyboard'
@@ -527,28 +526,15 @@ function ShotCell({
           </div>
         )}
 
-        {/* 생성 중 — border beam + 경과시간 오버레이. 색 구분(#e13): 이미지=초록, 영상=빨강.
+        {/* 생성 중 — border beam 오버레이. 색 구분(#e13): 이미지=초록, 영상=빨강.
             동시 진행이면 라벨·빔 모두 이미지(선행 단계) 우선 — 표기 불일치 방지.
-            startedAt: 큐의 submitted_at(#elapsed-durable 2026-08-11) — 탭 왕복에도 타이머가
-            리셋되지 않는다(없으면 mount 시점 폴백). */}
+            경과 초는 표시하지 않는다(오너 결정 2026-08-26) — 스피너와 라벨만. */}
         <GeneratingOverlay
           active={generating}
           label={
             imageWaitingOnly ? t('Waiting to generate image') : imageGenerating ? t('Generating image') : t('Generating video')
           }
-          showElapsed={!imageWaitingOnly}
           beamColor={imageGenerating ? 'success' : 'primary'}
-          startedAt={
-            writerShotId
-              ? activeStartedAt(
-                  activeJobs,
-                  imageGenerating
-                    ? ['shot_storyboard', 'storyboard_real_grid']
-                    : ['shot_video'],
-                  writerShotId,
-                )
-              : undefined
-          }
         />
         {childVideoFailure && (
           <span

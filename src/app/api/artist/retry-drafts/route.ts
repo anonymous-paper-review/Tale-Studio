@@ -5,10 +5,10 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { triggerAssetDrafts } from '@/lib/artist/draft-trigger'
 import {
   STALE_QUEUED_MS,
-  countQueuedJobsByUser,
   userOwnsProject,
 } from '@/lib/generation-jobs'
-import { MAX_QUEUED_JOBS_PER_USER, quotaExceededBody } from '@/lib/generation-quota'
+import { checkGenerationCapacity } from '@/lib/generation-quota'
+import { quotaRejectionResponse } from '@/lib/api/quota'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -27,15 +27,6 @@ async function countFreshQueuedDraftJobs(projectId: string): Promise<number> {
 
   if (error) throw new Error(error.message ?? 'queued draft query failed')
   return count ?? 0
-}
-
-async function countQueuedJobsForQuota(userId: string): Promise<number> {
-  try {
-    return await countQueuedJobsByUser(userId)
-  } catch {
-    // Match checkUserQuota's fail-open convention: quota telemetry failure must not block recovery.
-    return 0
-  }
 }
 
 export async function POST(req: Request) {
@@ -63,12 +54,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const queuedForUser = await countQueuedJobsForQuota(user.id)
-    if (queuedForUser >= MAX_QUEUED_JOBS_PER_USER) {
-      return NextResponse.json(
-        quotaExceededBody({ ok: false, queued: queuedForUser, limit: MAX_QUEUED_JOBS_PER_USER }),
-        { status: 429 },
-      )
+    // 유저 상한 + 전역 fal 슬롯(#global-semaphore). 집계 실패 시 fail-open 은 게이트 안에 있다.
+    const quota = await checkGenerationCapacity(user.id, 'image')
+    if (!quota.ok) {
+      return quotaRejectionResponse(quota, { projectId, kind: 'artist_draft_retry', userId: user.id })
     }
 
     const queuedDrafts = await countFreshQueuedDraftJobs(projectId)

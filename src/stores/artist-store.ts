@@ -21,6 +21,7 @@ import {
 import { claimAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
+import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
@@ -161,6 +162,7 @@ async function generateAndPersistWorldShot(
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
+      if (notifyIfQuotaExceeded(res.status, body)) return null
       throw new Error(body.error ?? `HTTP ${res.status}`)
     }
     const body = (await res.json()) as { jobId?: string; skipped?: boolean }
@@ -276,24 +278,6 @@ function scheduleCharacterPatch(
   )
 }
 
-// generatingStartedAt 맵 헬퍼 — 생성 시작 시각을 store 에 들고 있어 GeneratingOverlay 가 mount 가
-//   아니라 이 시각 기준으로 경과를 센다(탭 전환=remount 에도 타이머 안 리셋). 시작시각은 호출자가 넘긴다.
-function withStartedAt(
-  map: Record<string, number>,
-  key: string,
-  now: number,
-): Record<string, number> {
-  return map[key] != null ? map : { ...map, [key]: now } // 이미 있으면 유지(최초 시작 시각)
-}
-function withoutStartedAt(
-  map: Record<string, number>,
-  key: string,
-): Record<string, number> {
-  if (map[key] == null) return map
-  const next = { ...map }
-  delete next[key]
-  return next
-}
 
 /** 작업 배열을 동시 N개 제한으로 실행 (캐릭터/월드 병렬 생성용). */
 async function runPool(
@@ -327,9 +311,6 @@ interface ArtistState {
   generatingViews: string[]
   /** 생성 중인 로케이션 id 들 (병렬 생성 추적) */
   generatingLocations: string[]
-  /** 생성 시작 시각 (key=`${characterId}:${view}` 또는 locationId → epoch ms).
-   *  GeneratingOverlay 가 이 시각 기준으로 경과를 세 탭 전환(remount)에도 타이머가 안 리셋된다. */
-  generatingStartedAt: Record<string, number>
   selectedBoostPreset: string | null
   imageProvider: ImageProvider
   error: string | null
@@ -397,7 +378,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectedLocationId: null,
   generatingViews: [],
   generatingLocations: [],
-  generatingStartedAt: {},
   selectedBoostPreset: null,
   imageProvider: 'fal' as ImageProvider,
   error: null,
@@ -805,7 +785,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
     set((state) => ({
       generatingViews: [...state.generatingViews, key],
-      generatingStartedAt: withStartedAt(state.generatingStartedAt, key, Date.now()),
       error: null,
     }))
     const t0 = Date.now()
@@ -818,6 +797,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
+        if (notifyIfQuotaExceeded(res.status, body)) return
         throw new Error(body.error ?? `HTTP ${res.status}`)
       }
       // 비동기: 라우트는 jobId만 반환 — 완료까지 polling (webhook이 서버사이드로 storage+DB 갱신).
@@ -873,7 +853,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     } finally {
       set((state) => ({
         generatingViews: state.generatingViews.filter((k) => k !== key),
-        generatingStartedAt: withoutStartedAt(state.generatingStartedAt, key),
       }))
       // 시도 후 실패 상태(viewFailures) 갱신 — 배지/우회버튼이 reload 없이 최신화. best-effort.
       void get().refreshViewFailures()
@@ -938,7 +917,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
     set((state) => ({
       generatingLocations: [...state.generatingLocations, locationId],
-      generatingStartedAt: withStartedAt(state.generatingStartedAt, locationId, Date.now()),
       error: null,
     }))
 
@@ -988,7 +966,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         generatingLocations: state.generatingLocations.filter(
           (id) => id !== locationId,
         ),
-        generatingStartedAt: withoutStartedAt(state.generatingStartedAt, locationId),
       }))
     }
   },
@@ -1011,7 +988,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     // location 단위 가드를 두지 않음 — 같은 로케이션의 wide/establishing 을 병렬 생성할 수 있어야 함.
     set((state) => ({
       generatingLocations: [...state.generatingLocations, locationId],
-      generatingStartedAt: withStartedAt(state.generatingStartedAt, locationId, Date.now()),
       error: null,
     }))
 
@@ -1076,10 +1052,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         if (idx === -1) return {}
         const next = state.generatingLocations.slice()
         next.splice(idx, 1)
-        const generatingStartedAt = next.includes(locationId)
-          ? state.generatingStartedAt
-          : withoutStartedAt(state.generatingStartedAt, locationId)
-        return { generatingLocations: next, generatingStartedAt }
+        return { generatingLocations: next }
       })
     }
   },
@@ -1133,7 +1106,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           }
           set((s) => ({
             generatingLocations: [...s.generatingLocations, locId],
-            generatingStartedAt: withStartedAt(s.generatingStartedAt, locId, Date.now()),
           }))
           const url = await waitForWorldWideShot(projectId, locId).catch(() => null)
           set((s) => {
@@ -1141,10 +1113,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             if (idx === -1) return {}
             const next = s.generatingLocations.slice()
             next.splice(idx, 1)
-            const generatingStartedAt = next.includes(locId)
-              ? s.generatingStartedAt
-              : withoutStartedAt(s.generatingStartedAt, locId)
-            return { generatingLocations: next, generatingStartedAt }
+            return { generatingLocations: next }
           })
           if (url) {
             alog(`[autogen] world ${locId}:wideShot ✓ server pre-gen 채움 (client skip)`)
@@ -1249,7 +1218,6 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       selectedLocationId: null,
       generatingViews: [],
       generatingLocations: [],
-      generatingStartedAt: {},
       selectedBoostPreset: null,
       imageProvider: 'fal' as ImageProvider,
       error: null,

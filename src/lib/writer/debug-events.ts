@@ -23,6 +23,15 @@ export const WRITER_OBSERVABILITY_EVENTS = [
   'stage_failed',
   'cache_read',
   'cache_invalidated',
+  // generation lifecycle coordinates (#a2-observability 2026-08-26) - a 429 rejection happens
+  // *before* a generation_jobs row exists, so without this event the refusal leaves no trace
+  // anywhere (owner autopsy 08-26: the "everything died" session had zero failed jobs in the
+  // ledger; the invisible losses were unrecorded quota rejections).
+  'generation_submit_rejected_quota',
+  // Coordinate (4) of the generation lifecycle: the client actually folded a settled job's
+  // result into visible UI state (store rehydrate after the job left the active queue).
+  // A completed job with no ui_reflected row = "finished but the screen never showed it".
+  'ui_reflected',
 ] as const
 
 export type WriterObservabilityEvent = (typeof WRITER_OBSERVABILITY_EVENTS)[number]

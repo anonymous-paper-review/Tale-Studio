@@ -26,7 +26,6 @@ export function WorldPanel({
     worldAssets,
     selectedLocationId,
     generatingLocations,
-    generatingStartedAt,
     selectLocation,
     generateWorldAsset,
   } = useArtistStore()
@@ -143,7 +142,6 @@ export function WorldPanel({
                     aspectRatio="video"
                     imageUrl={world.wideShot}
                     generating={isGenerating && !world.wideShot}
-                    generatingStartedAt={generatingStartedAt[world.locationId]}
                   />
                 </button>
 

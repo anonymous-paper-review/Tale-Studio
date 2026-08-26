@@ -44,8 +44,8 @@ import { resolveEntityNames, manifestEntities } from '@/lib/writer/resolve-entit
 import {
   useActiveGenerationJobs,
   activeShotIds,
-  activeStartedAt,
   refreshGenerationQueue,
+  type ActiveJob,
 } from '@/lib/generation-queue'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
 import { cn } from '@/lib/utils'
@@ -67,6 +67,7 @@ import {
 } from '@/lib/card-mention'
 import { writerSceneShotMentions } from '@/lib/script-lines'
 import { invalidateShots } from '@/lib/shots-cache'
+import { computeSettledJobs, reportUiReflected } from '@/lib/generation-ui-reflected'
 import { recordWriterObservabilityEventClient } from '@/lib/writer/debug-events-client'
 
 type PanelJob = { status: 'generating' | 'failed'; error?: string }
@@ -130,6 +131,31 @@ export function RoughStoryboardView() {
   useEffect(() => {
     if (queuedRoughIds.size > 0) setActiveTab('storyboard')
   }, [queuedRoughIds.size, setActiveTab])
+
+  // Coordinate (4) ui_reflected for Writer rough panels (#a2-observability 2026-08-26).
+  // Director canvas got this first; without the same wiring here every Writer job looks
+  // "completed but never shown" in the autopsy, which would drown the real signal.
+  // A job leaving the queue means the webhook settled it - reload, then report that the
+  // result actually landed in visible state.
+  // deps 는 원시값(잡 id 서명)만 쓴다 — 배열 참조를 deps 에 넣으면 매 렌더 재실행 위험이 있고
+  // 훅 deps 가드(tests/unstable-hook-deps.test.ts)가 이를 실패로 잡는다. 실제 잡 객체는 ref 로 나른다.
+  const roughJobs = activeJobs.filter((j) => j.kind === 'shot_rough_storyboard')
+  const roughSignature = roughJobs.map((j) => j.id).sort().join(',')
+  const roughJobsRef = useRef<readonly ActiveJob[]>([])
+  roughJobsRef.current = roughJobs
+  const prevRoughJobsRef = useRef<readonly ActiveJob[]>([])
+  useEffect(() => {
+    const prev = prevRoughJobsRef.current
+    const current = roughJobsRef.current
+    prevRoughJobsRef.current = current
+    if (!projectId) return
+    const settled = computeSettledJobs(prev, current)
+    if (settled.length === 0) return
+    void invalidateShots(projectId)
+    void loadProject()
+      .then(() => reportUiReflected(projectId, settled, 'writer-rough'))
+      .catch(() => {})
+  }, [roughSignature, projectId, loadProject])
 
   // 패널 단위 생성 상태(jobId 폴링) + 완료 즉시 반영용 로컬 오버라이드.
   // DB 진실은 shots.rough_storyboard — 오버라이드는 다음 loadProject 전까지의 캐시.
@@ -1040,11 +1066,6 @@ export function RoughStoryboardView() {
                             active={job?.status === 'generating'}
                             label={t('Generating rough storyboard')}
                             beamColor="success"
-                            startedAt={activeStartedAt(
-                              activeJobs,
-                              ['shot_rough_storyboard'],
-                              shot.shotId,
-                            )}
                           />
                         </div>
                         )}

@@ -8,7 +8,8 @@ import { buildVideoPrompt } from '@/lib/director/video-prompt'
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { getGenerationJobById, userOwnsProject } from '@/lib/generation-jobs'
-import { checkUserQuota, quotaExceededBody } from '@/lib/generation-quota'
+import { checkGenerationCapacity } from '@/lib/generation-quota'
+import { quotaRejectionResponse } from '@/lib/api/quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import {
@@ -451,8 +452,8 @@ export async function POST(req: Request) {
       )
     }
     if (!exactReplay) {
-      const quota = await checkUserQuota(user.id)
-      if (!quota.ok) return NextResponse.json(quotaExceededBody(quota), { status: 429 })
+      const quota = await checkGenerationCapacity(user.id, 'video')
+      if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'shot_video', userId: user.id })
     }
 
     const modelKey: VideoModelKey = model != null ? normalizeProvider(model) : provider === 'local' ? 'local' : normalizeProvider('')

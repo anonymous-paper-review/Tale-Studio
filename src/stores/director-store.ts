@@ -38,6 +38,7 @@ import {
   type DirectorVideoStatus,
   type DirectorVideoProvider,
 } from '@/types/director'
+import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import {
   useAssetStorageStore,
   type RegisteredCharacter,
@@ -2482,7 +2483,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               })
               await get().hydrateFromDb(projectId)
             }
-            if (res.status === 429 && body?.code === 'quota_exceeded') {
+            if (notifyIfQuotaExceeded(res.status, body)) {
               if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
               return false
             }

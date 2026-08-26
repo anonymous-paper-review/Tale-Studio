@@ -17,7 +17,6 @@ import { useDirectorCanvasStore } from '@/stores/director-store'
 import {
   useActiveGenerationJobs,
   activeShotIds,
-  activeStartedAt,
 } from '@/lib/generation-queue'
 import { isShotData, isShotImageData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
@@ -159,17 +158,7 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
           <GeneratingOverlay
             active={!!generating}
             label={waitingOnly ? t('Waiting to generate image') : t('Generating image')}
-            showElapsed={!waitingOnly}
             beamColor="success"
-            startedAt={
-              parentWriterShotId
-                ? activeStartedAt(
-                    activeJobs,
-                    ['shot_storyboard', 'storyboard_real_grid'],
-                    parentWriterShotId,
-                  )
-                : undefined
-            }
           />
         </div>
 

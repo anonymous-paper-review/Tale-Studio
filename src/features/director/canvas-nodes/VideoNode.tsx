@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import { BaseNode } from './BaseNode'
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import { useActiveGenerationJobs, activeStartedAt } from '@/lib/generation-queue'
+import { useActiveGenerationJobs } from '@/lib/generation-queue'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
@@ -242,11 +242,6 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         <GeneratingOverlay
           active={data.lastAttemptStatus === 'generating'}
           label={t('Generating video')}
-          startedAt={
-            parentWriterShotId
-              ? activeStartedAt(activeVideoJobs, ['shot_video'], parentWriterShotId)
-              : undefined
-          }
         />
       </div>
 

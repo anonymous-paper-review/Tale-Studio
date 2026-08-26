@@ -22,6 +22,7 @@ import {
   finalizeGenerationJob,
 } from '@/lib/fal/finalize'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
+import { describeFinalizeError } from '@/lib/fal/error-evidence'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -110,7 +111,7 @@ export async function POST(req: Request) {
     if (!result.url) throw new Error(`no ${result.media} url in webhook payload`)
     await finalizeGenerationJob(job, result)
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
+    const msg = `[finalize] ${describeFinalizeError(e)}`
     if (e instanceof GenerationJobTerminalTransitionError) {
       // 중복 finalize 경쟁(webhook ↔ 폴링 reconcile) — 다른 경로가 이미 종결한 잡.
       //   실패 아님: fail 마킹을 시도하면 같은 에러가 또 나서 500 이 됐다(2026-07-22 previz 실측).

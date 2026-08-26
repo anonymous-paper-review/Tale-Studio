@@ -3,6 +3,7 @@
 // 모든 접근은 service-role(supabaseAdmin)로만 — RLS ON + policy 없음이라 클라이언트 직접 접근 불가.
 // 프론트는 GET /api/generation-jobs/[id] (소유권 체크) 경유로만 상태를 읽는다.
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { normalizeFailureEvidence } from '@/lib/fal/error-evidence'
 import type { Json } from '@/types/database'
 
 export type GenerationJobKind =
@@ -528,7 +529,7 @@ export async function failGenerationJob(
   id: string,
   message: string,
 ): Promise<void> {
-  const errorMessage = message.trim().slice(0, 1000)
+  const errorMessage = normalizeFailureEvidence(message).slice(0, 1000)
   if (!errorMessage) throw new Error('generation job failure evidence must be nonblank')
   // CAS: queued일 때만 실패로 전이 — 이미 완료된 작업을 늦은 ERROR webhook이 덮어쓰지 못하게.
   const { data, error } = await supabaseAdmin
@@ -616,14 +617,19 @@ function isLegacyUserIdSchemaError(error: unknown): boolean {
 //   정상 fal 잡은 수 분 내 종결된다 — 이보다 훨씬 관대한 창 밖의 queued 는 죽은 것으로 간주.
 const QUOTA_COUNT_WINDOW_MIN = 30
 
-export async function countQueuedJobsByUser(userId: string): Promise<number> {
+export async function countQueuedJobsByUser(
+  userId: string,
+  kinds?: readonly GenerationJobKind[],
+): Promise<number> {
   const cutoffIso = new Date(Date.now() - QUOTA_COUNT_WINDOW_MIN * 60_000).toISOString()
-  const direct = await supabaseAdmin
+  let directQuery = supabaseAdmin
     .from('generation_jobs')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('status', 'queued')
     .gte('created_at', cutoffIso)
+  if (kinds?.length) directQuery = directQuery.in('kind', kinds as string[])
+  const direct = await directQuery
   if (!direct.error) {
     if (direct.count === null) throw new Error('generation job user quota count returned no count')
     return direct.count
@@ -648,14 +654,40 @@ export async function countQueuedJobsByUser(userId: string): Promise<number> {
   const projectIds = projects.map((p) => p.id as string)
   if (projectIds.length === 0) return 0
 
-  const { count, error: countError } = await supabaseAdmin
+  let fallbackQuery = supabaseAdmin
     .from('generation_jobs')
     .select('id', { count: 'exact', head: true })
     .in('project_id', projectIds)
     .eq('status', 'queued')
     .gte('created_at', cutoffIso) // 신선도 컷 — direct 경로와 동일 규칙(#quota-staleness)
+  if (kinds?.length) fallbackQuery = fallbackQuery.in('kind', kinds as string[])
+  const { count, error: countError } = await fallbackQuery
   if (countError) throw countError
   if (count === null) throw new Error('generation job fallback quota count returned no count')
+  return count
+}
+
+/**
+ * 전역 in-flight(queued) 작업 수 — 유저 구분 없이 전부 (#global-semaphore 2026-08-25).
+ *
+ * 유저 쿼터(countQueuedJobsByUser)가 막는 것은 "한 유저의 독점"뿐이라, 유저가 늘면 합계가
+ *   fal 계정 동시 실행 한도를 넘는다(유저당 6 × 5명 = 30 > 20). 넘긴 분은 거부가 아니라 fal
+ *   큐에서 대기하므로 터지진 않지만, 뒤에 온 유저의 첫 요청이 앞 유저의 잔여 큐 뒤에 서서
+ *   체감 대기가 분 단위로 늘어난다(head-of-line blocking). 그 합계를 세는 눈이 여기다.
+ *
+ * 신선도 컷은 유저 쿼터와 **같은 창**을 쓴다(QUOTA_COUNT_WINDOW_MIN). 전역 게이트에서 좀비의
+ *   대가는 유저 쿼터보다 크다 — 유저 쿼터의 좀비는 그 유저만 잠그지만, 여기 좀비는 전원을
+ *   잠근다(2026-08-05 실측: 12좀비 > 상한 8 → 러프 전면 불능. 그 사고의 전역판을 미리 막는다).
+ */
+export async function countQueuedJobsGlobal(): Promise<number> {
+  const cutoffIso = new Date(Date.now() - QUOTA_COUNT_WINDOW_MIN * 60_000).toISOString()
+  const { count, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'queued')
+    .gte('created_at', cutoffIso)
+  if (error) throw error
+  if (count === null) throw new Error('generation job global inflight count returned no count')
   return count
 }
 

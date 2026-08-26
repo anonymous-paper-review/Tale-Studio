@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   triggerAssetDrafts: vi.fn(),
   userOwnsProject: vi.fn(),
   countQueuedJobsByUser: vi.fn(),
+  countQueuedJobsGlobal: vi.fn(),
   from: vi.fn(),
   projectQueuedCount: 0,
 }))
@@ -16,7 +17,13 @@ vi.mock('@/lib/artist/draft-trigger', () => ({ triggerAssetDrafts: mocks.trigger
 vi.mock('@/lib/generation-jobs', () => ({
   STALE_QUEUED_MS,
   countQueuedJobsByUser: mocks.countQueuedJobsByUser,
+  countQueuedJobsGlobal: mocks.countQueuedJobsGlobal,
   userOwnsProject: mocks.userOwnsProject,
+}))
+// quota rejection observability (#a2-observability) writes via service-role - mock it out so
+// the "from was never called" assertions keep meaning "no project queued-draft lookup ran".
+vi.mock('@/lib/writer/debug-events', () => ({
+  recordWriterObservabilityEvent: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from } }))
 
@@ -35,6 +42,8 @@ describe('POST /api/artist/retry-drafts', () => {
     mocks.userOwnsProject.mockResolvedValue(true)
     mocks.countQueuedJobsByUser.mockReset()
     mocks.countQueuedJobsByUser.mockResolvedValue(0)
+    mocks.countQueuedJobsGlobal.mockReset()
+    mocks.countQueuedJobsGlobal.mockResolvedValue(0)
     mocks.projectQueuedCount = 0
     mocks.from.mockReset()
     mocks.from.mockImplementation(() => queuedCountQuery())
@@ -76,7 +85,8 @@ describe('POST /api/artist/retry-drafts', () => {
     const body = await response.json()
 
     expect(response.status).toBe(429)
-    expect(body).toMatchObject({ code: 'quota_exceeded', queued: 8, limit: 8 })
+    // limit 6 since 2026-08-25 (#global-semaphore: per-user cap 8 -> 6)
+    expect(body).toMatchObject({ code: 'quota_exceeded', queued: 8, limit: 6 })
     expect(mocks.from).not.toHaveBeenCalled()
     expect(mocks.triggerAssetDrafts).not.toHaveBeenCalled()
   })
@@ -103,7 +113,14 @@ describe('POST /api/artist/retry-drafts', () => {
     const body = await response.json()
 
     expect(response.status).toBe(200)
-    expect(mocks.countQueuedJobsByUser).toHaveBeenCalledWith(USER.id)
+    // split pools (2026-08-26): retry-drafts counts against the image pool kinds
+    expect(mocks.countQueuedJobsByUser).toHaveBeenCalledWith(USER.id, [
+      'character_view',
+      'world_shot',
+      'shot_storyboard',
+      'storyboard_real_grid',
+      'shot_rough_storyboard',
+    ])
     expect(mocks.triggerAssetDrafts).toHaveBeenCalledTimes(1)
     expect(mocks.triggerAssetDrafts).toHaveBeenCalledWith(PROJECT_ID)
     expect(body).toEqual(result)

@@ -86,7 +86,8 @@ describe('linked Director video webhook persistence', () => {
     expect(mocks.failLinked).toHaveBeenCalledWith(
       'project-1',
       'job-1',
-      'provider object unavailable',
+      // [finalize] prefix marks the failing stage (#a2-observability 2026-08-26)
+      '[finalize] provider object unavailable',
     )
     expect(mocks.failLegacy).not.toHaveBeenCalled()
   })

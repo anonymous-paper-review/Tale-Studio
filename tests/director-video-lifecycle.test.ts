@@ -455,7 +455,8 @@ describe('linked reconcile boundaries', () => {
       target: {},
     } as never
     await expect(reconcileJobFromFal(localJob)).resolves.toMatchObject({ status: 'failed' })
-    expect(mocks.failJob).toHaveBeenCalledWith('job-1', 'local video job has no valid result URL')
+    // [finalize] prefix marks the failing stage (#a2-observability 2026-08-26)
+    expect(mocks.failJob).toHaveBeenCalledWith('job-1', '[finalize] local video job has no valid result URL')
   })
   it.each([
     'https://evil.test/output.mp4',
@@ -471,7 +472,8 @@ describe('linked reconcile boundaries', () => {
       target: {},
     } as never
     await expect(reconcileJobFromFal(localJob)).resolves.toMatchObject({ status: 'failed' })
-    expect(mocks.failJob).toHaveBeenCalledWith('job-1', 'local video job has no valid result URL')
+    // [finalize] prefix marks the failing stage (#a2-observability 2026-08-26)
+    expect(mocks.failJob).toHaveBeenCalledWith('job-1', '[finalize] local video job has no valid result URL')
   })
   it('terminalizes a permanent linked provider lookup error through the attempt RPC', async () => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
