@@ -43,6 +43,8 @@ interface Options {
   stopWhenCompleted?: boolean  // 완료 시 폴링 중단 (기본 true)
 }
 
+export const WRITER_STATUS_REQUEST_TIMEOUT_MS = 15_000
+
 export function useWriterStatus(
   projectId: string | null | undefined,
   opts: Options = {},
@@ -63,6 +65,8 @@ export function useWriterStatus(
     if (!projectId) return
 
     let cancelled = false
+    let requestController: AbortController | null = null
+    let tickVersion = 0
 
     // 멈춘 run 자가복구: started && 미완료/미실패인데 last_timestamp 가 ~90s 이상 오래되면
     //   /api/writer/step 을 POST 해 끊긴 서버리스 체인을 재개한다 (fire-and-forget, cron 비의존).
@@ -91,10 +95,24 @@ export function useWriterStatus(
 
     const tick = async () => {
       if (cancelled) return
+      // 앞 요청이 네트워크에서 매달리면 다음 tick 이 영원히 예약되지 않는다. 화면을 계속 보고 있는
+      // 경우 focus/visibility 이벤트도 없으므로 F5 외엔 회복할 길이 없었다(#stale-gate).
+      // 새 tick 은 앞 요청을 끊고, 각 요청도 15초 안에 끝내 다음 폴링을 반드시 예약한다.
+      const version = ++tickVersion
+      requestController?.abort()
+      const controller = new AbortController()
+      requestController = controller
+      const requestTimeout = setTimeout(
+        () => controller.abort(),
+        WRITER_STATUS_REQUEST_TIMEOUT_MS,
+      )
       setLoading(true)
       let done = false
       try {
-        const r = await fetch(`/api/writer/status/${projectId}`)
+        const r = await fetch(`/api/writer/status/${projectId}`, {
+          signal: controller.signal,
+        })
+        if (version !== tickVersion) return
         if (!r.ok) {
           const j = await r.json().catch(() => ({}))
           setError(j.error ?? `status ${r.status}`)
@@ -106,12 +124,24 @@ export function useWriterStatus(
           maybeKeepalive(j)
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e))
+        if (version === tickVersion) {
+          setError(
+            e instanceof DOMException && e.name === 'AbortError'
+              ? 'Writer status request timed out'
+              : e instanceof Error
+                ? e.message
+                : String(e),
+          )
+        }
       } finally {
-        setLoading(false)
+        clearTimeout(requestTimeout)
+        if (version === tickVersion) {
+          requestController = null
+          setLoading(false)
+        }
       }
       // 완료/실패면 더 폴링 안 함
-      if (cancelled) return
+      if (cancelled || version !== tickVersion) return
       if (done && stopWhenCompleted) return
       timerRef.current = setTimeout(tick, interval)
     }
@@ -133,6 +163,9 @@ export function useWriterStatus(
 
     return () => {
       cancelled = true
+      tickVersion += 1
+      requestController?.abort()
+      requestController = null
       if (timerRef.current) clearTimeout(timerRef.current)
       document.removeEventListener('visibilitychange', onWake)
       window.removeEventListener('focus', onWake)

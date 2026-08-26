@@ -55,4 +55,11 @@ describe('복귀 시 자가복구 — 새로고침이 유일한 처방이면 안
     expect(writerStatus).toContain("addEventListener('visibilitychange'")
     expect(writerStatus).toContain("removeEventListener('focus'")
   })
+
+  it('화면을 계속 보고 있어도 매달린 요청을 끊고 다음 폴링을 예약한다', () => {
+    expect(lockPoll).toContain('ARTIST_LOCK_REQUEST_TIMEOUT_MS')
+    expect(lockPoll).toContain('requestController?.abort()')
+    expect(writerStatus).toContain('WRITER_STATUS_REQUEST_TIMEOUT_MS')
+    expect(writerStatus).toContain('requestController?.abort()')
+  })
 })

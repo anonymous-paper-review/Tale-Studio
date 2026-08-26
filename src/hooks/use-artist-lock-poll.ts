@@ -9,6 +9,7 @@ import { useProjectStore, type WriterStatusAssets } from '@/stores/project-store
 import type { StageId } from '@/types'
 
 export const ARTIST_LOCK_POLL_MS = 5_000
+export const ARTIST_LOCK_REQUEST_TIMEOUT_MS = 15_000
 
 const ARTIST_STAGE_INDEX = STAGES.findIndex((stage) => stage.id === 'artist')
 
@@ -77,6 +78,8 @@ export function useArtistLockPoll() {
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
     let stalledStreak = 0
+    let requestController: AbortController | null = null
+    let tickVersion = 0
 
     const schedule = () => {
       timer = setTimeout(tick, ARTIST_LOCK_POLL_MS)
@@ -84,9 +87,20 @@ export function useArtistLockPoll() {
 
     const tick = async () => {
       if (cancelled) return
+      const version = ++tickVersion
+      requestController?.abort()
+      const controller = new AbortController()
+      requestController = controller
+      const requestTimeout = setTimeout(
+        () => controller.abort(),
+        ARTIST_LOCK_REQUEST_TIMEOUT_MS,
+      )
 
       try {
-        const res = await fetch(`/api/writer/status/${projectId}?assets=1`)
+        const res = await fetch(`/api/writer/status/${projectId}?assets=1`, {
+          signal: controller.signal,
+        })
+        if (version !== tickVersion) return
         if (res.ok) {
           const status = (await res.json()) as { assets?: WriterStatusAssets }
           const assets = status.assets
@@ -119,10 +133,13 @@ export function useArtistLockPoll() {
         }
       } catch {
         // Transient status failures should not unlock or surface a false CTA; reset the streak and retry next tick.
-        stalledStreak = 0
+        if (version === tickVersion) stalledStreak = 0
+      } finally {
+        clearTimeout(requestTimeout)
+        if (version === tickVersion) requestController = null
       }
 
-      if (!cancelled) schedule()
+      if (!cancelled && version === tickVersion) schedule()
     }
 
     schedule()
@@ -144,6 +161,9 @@ export function useArtistLockPoll() {
 
     return () => {
       cancelled = true
+      tickVersion += 1
+      requestController?.abort()
+      requestController = null
       if (timer) clearTimeout(timer)
       document.removeEventListener('visibilitychange', onWake)
       window.removeEventListener('focus', onWake)
