@@ -77,10 +77,11 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
     // (전송 히스토리 ↑/↓ recall 은 제거 — 2026-08-07. 선택지(#choices-keys) 키보드 조작과
     //  충돌했고 실사용도 낮았다. ↑/↓ 는 이제 멘션 리스트/선택지 내비게이션 전용.)
 
+    // #mention-popup-cap(2026-08-26, 오너 E2 "@ 누르면 다 안 보임"): 옛 slice(0,8)이 후보를
+    //   8개에서 잘랐다 — writer 는 씬·샷·스크립트 라인 합쳐 수십 개라 뒷항목이 영영 안 보였다.
+    //   캡을 걷고 목록 스크롤(max-h + overflow)에 맡긴다. 타이핑 필터가 실질 축소를 담당.
     const filtered = open
-      ? items
-          .filter((it) => it.label.toLowerCase().includes(query.toLowerCase()))
-          .slice(0, 8)
+      ? items.filter((it) => it.label.toLowerCase().includes(query.toLowerCase()))
       : []
     const showList = open && filtered.length > 0
     useLayoutEffect(() => {
@@ -161,7 +162,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
     return (
       <div className="relative flex-1">
         {showList && (
-          <div className="absolute bottom-full left-0 z-popover mb-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md">
+          <div className="absolute bottom-full left-0 z-popover mb-1 max-h-72 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md">
             <div className="px-2 py-1 text-[10px] text-muted-foreground">
               {t('Card/object mentions — ↑↓ to move, Enter to select')}
             </div>
