@@ -5,18 +5,25 @@
 export interface ParsedChoices {
   reply: string
   choices: string[]
+  markerFound: boolean
 }
 
-const CHOICES_RE = /^\s*\[CHOICES\]\s*(.+)\s*$/im
+const CHOICES_RE = /^\s*\[CHOICES\]\s*(.*)\s*$/im
 
 export function parseChatChoices(text: string): ParsedChoices {
   const m = CHOICES_RE.exec(text)
-  if (!m) return { reply: text, choices: [] }
+  if (!m) return { reply: text, choices: [], markerFound: false }
   const choices = m[1]
-    .split('|')
+    // 모델이 지시의 "|" 대신 " / "를 쓰는 경우도 있어 공백이 있는 슬래시를
+    // 구분자로 허용한다. URL·비율·복합어의 슬래시는 그대로 둔다.
+    .split(/\s*\|\s*|\s+\/\s+/)
     .map((s) => s.trim())
     .filter(Boolean)
     .slice(0, 4)
   const reply = text.replace(CHOICES_RE, '').trimEnd()
-  return choices.length >= 2 ? { reply, choices } : { reply: text, choices: [] }
+  if (choices.length < 2) {
+    console.warn(`[chat-choices] marker found but only ${choices.length} candidate(s) parsed`)
+    return { reply, choices: [], markerFound: true }
+  }
+  return { reply, choices, markerFound: true }
 }

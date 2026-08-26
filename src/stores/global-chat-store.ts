@@ -31,6 +31,8 @@ import {
 import { isDemoSession, getDemoSnapshot } from '@/lib/demo/context'
 import { cannedFor } from '@/lib/demo/canned'
 import { handoffMarker } from '@/lib/chat-blocks'
+import { buildChatTrace, createChatTraceId, type ChatTrace } from '@/lib/chat-trace'
+import { stripLegacyStageMarkers } from '@/lib/display-names'
 // store 액션·순수 함수는 훅을 못 쓴다 — translate() + locale 직접 조회로 번역.
 //   이 파일의 산출물은 전부 챗 스트림(발화·제안·알림)이라 UI 언어가 아니라 **프로젝트 콘텐츠
 //   언어**를 따른다(#i18n-content-voice 2026-08-23) — 챗 응답(서버가 프로젝트 locale 강제)과
@@ -84,6 +86,8 @@ interface GlobalChatState {
   messages: GlobalChatMessage[]
   loading: boolean
   error: string | null
+  /** 마지막 채팅 요청의 입력·출력·적용 경계 계측. 화면 하단에 표시한다. */
+  lastTrace: ChatTrace | null
   suggestion: ChatSuggestion | null
   dismissedSuggestionIds: string[]
   pendingProposal: PendingProposal | null
@@ -332,6 +336,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   messages: [],
   loading: false,
   error: null,
+  lastTrace: null,
   suggestion: null,
   dismissedSuggestionIds: [],
   pendingProposal: null,
@@ -342,7 +347,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   loadMessages: async (projectId) => {
     // #welcome-race: 아래 hydrate 의 set 은 suggestion 을 (복원 선택지 또는 null 로) 덮어쓴다.
     //   완료 마커를 로드 전 비우고 모든 종료 경로에서 세워, 제안 발사측이 로드 뒤에만 쏘게 한다.
-    set({ messagesLoadedProjectId: null })
+    set({ messagesLoadedProjectId: null, lastTrace: null })
     const hydrate = (
       rows: Array<{
         stage: string
@@ -401,13 +406,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         (a.created_at ?? '').localeCompare(b.created_at ?? ''),
       )
       hydrate(ordered)
-      set({ messagesLoadedProjectId: projectId })
+      set({ messagesLoadedProjectId: projectId, lastTrace: null })
       return
     }
     try {
       const res = await fetch(`/api/project/${projectId}/messages`)
       if (!res.ok) {
-        set({ messages: [], suggestion: null, messagesLoadedProjectId: projectId })
+        set({ messages: [], suggestion: null, lastTrace: null, messagesLoadedProjectId: projectId })
         return
       }
       const { messages } = await res.json()
@@ -419,8 +424,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       set({ messagesLoadedProjectId: projectId })
     } catch (err) {
       console.error('[global-chat-store] loadMessages failed:', err)
-      // 실패도 "로드 종료"다 — 마커를 세워야 웰컴 등 제안이 영영 굶지 않는다(빈 이력으로 진행).
-      set({ messages: [], suggestion: null, messagesLoadedProjectId: projectId })
+      // 실패도 "로드 종료"다 — 마커를 세워야 웰컴 등 제안 발사측이 영영 굶지 않는다(빈 이력으로 진행).
+      set({ messages: [], suggestion: null, lastTrace: null, messagesLoadedProjectId: projectId })
     }
   },
 
@@ -570,7 +575,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       role: m.role,
       // 첨부 마커는 렌더링 전용이다 — URL 문자열을 모델에 다시 보내봐야 의미가 없고
       //   턴마다 히스토리 예산만 갉아먹는다.
-      content: m.role === 'user' ? parseAttachmentMarker(m.content).text : m.content,
+      content: stripLegacyStageMarkers(
+        m.role === 'user' ? parseAttachmentMarker(m.content).text : m.content,
+      ),
     }))
 
     // 데모(공유) 세션: 서버 LLM 호출 없이 canned 응답으로 "척"(typing 후 고정 답변).
@@ -711,6 +718,17 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         return
     }
 
+    const traceId = createChatTraceId()
+    body.traceId = traceId
+    const requestTrace = buildChatTrace({
+      traceId,
+      stage,
+      route: endpoint.replace(/^\/api\//, ''),
+      system: '',
+      history: historyPayload,
+      contextMessage: JSON.stringify(body),
+    })
+
     // 스레드에 남는 본문에는 첨부 마커를 붙이고, LLM 에는 아래에서 trimmed(순수 텍스트)만 보낸다.
     const displayContent = withAttachmentMarker(trimmed, thumbUrls)
     const userMsg: GlobalChatMessage = {
@@ -724,6 +742,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       messages: [...state.messages, userMsg],
       loading: true,
       error: null,
+      lastTrace: requestTrace,
     }))
 
     if (projectId) saveChatMessage(projectId, stage, 'user', displayContent)
@@ -732,6 +751,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     //   건다(핸드오프·승인 등 로컬 빠른 경로는 순식간이라 중단 대상이 아니다).
     const controller = new AbortController()
     activeGeneration = controller
+    let responseStatus: number | null = null
     try {
       const res = await fetch(endpoint, {
         signal: controller.signal,
@@ -739,16 +759,33 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      responseStatus = res.status
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}))
         throw new Error(errBody.error ?? `HTTP ${res.status}`)
       }
 
       const data = await res.json()
-      const reply: string = data.reply ?? data.message ?? ''
+      const replyValue = data.reply ?? data.message ?? ''
+      const reply = stripLegacyStageMarkers(
+        typeof replyValue === 'string' ? replyValue : String(replyValue),
+      )
+      const trace =
+        data.trace && typeof data.trace === 'object'
+          ? (data.trace as ChatTrace)
+          : null
+      const patchTrace = (patch: Partial<ChatTrace>) => {
+        if (!trace) return
+        set((state) =>
+          state.lastTrace?.traceId === trace.traceId
+            ? { lastTrace: { ...state.lastTrace, ...patch } }
+            : state,
+        )
+      }
 
       set((state) => ({
         loading: false,
+        lastTrace: trace,
         messages: [
           ...state.messages,
           {
@@ -766,6 +803,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         useProducerStore
           .getState()
           .applyExtractedSettings(data.extractedSettings)
+        patchTrace({
+          appliedCount:
+            data.extractedSettings &&
+            typeof data.extractedSettings === 'object' &&
+            Object.keys(data.extractedSettings).length > 0
+              ? 1
+              : 0,
+        })
 
         // #p1-attach: 채팅이 "이 그림체로" 의도를 읽었으면 앵커로 확정한다.
         //   모델은 인덱스만 주고 URL 은 우리가 이번 턴 첨부에서 꺼낸다 — 모델이 뱉은 URL 은
@@ -776,6 +821,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           projectId,
         )
         if (anchorError) {
+          patchTrace({ skippedCount: 1 })
           // 모델은 이미 "이 화풍으로 잡았어요"라고 답했다. 저장이 실패했는데 조용하면 거짓말이 된다.
           const failure = translate(
             contentLocale(),
@@ -808,6 +854,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           u.type === 'regenerateCharacter' || u.type === 'regenerateWorldAsset'
         )
         const immediateUpdates = updates.filter((u) => u.type === 'createCharacter')
+        let proposalShown = false
 
         if (costUpdate) {
           // 승인 카드의 target 은 사람이 읽는 제목 — id(char_2 등)가 아니라 이름으로(#d2 2026-08-11).
@@ -872,6 +919,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               })
 
           const accepted = get().offerPendingProposal(proposal)
+          proposalShown = accepted || !!get().pendingProposal
           if (!accepted)
             set({
               error: translate(
@@ -882,7 +930,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
 
         if (immediateUpdates.length > 0) {
-          void useArtistStore.getState().applyUpdates(immediateUpdates)
+          void useArtistStore
+            .getState()
+            .applyUpdates(immediateUpdates)
+            .then(() => patchTrace({ appliedCount: immediateUpdates.length }))
+            .catch(() => patchTrace({ skippedCount: 1 }))
         }
 
         // 원천(외형) 변경 제안(C3 F6) — 자동 실행 금지, pending-proposal 승인 게이트 전용.
@@ -893,7 +945,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             useArtistStore.getState().characterAssets.find((c) => c.characterId === ap.characterId)
               ?.name || ap.characterId
           const apLocale = contentLocale()
-          get().offerPendingProposal(
+          const accepted = get().offerPendingProposal(
             createPendingProposal({
               stage: 'artist',
               kind: 'artistSourceAppearancePatch',
@@ -912,7 +964,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               payload: { characterId: ap.characterId, appearance: ap.appearance },
             }),
           )
+          proposalShown = accepted || !!get().pendingProposal
         }
+        patchTrace({
+          appliedCount: immediateUpdates.length,
+          skippedCount: 0,
+          pendingProposal: proposalShown || !!get().pendingProposal,
+        })
       }
       if (stage === 'director') {
         // Agentic 응답 — DirectorCanvasUpdate[]
@@ -920,6 +978,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const result = useDirectorCanvasStore
             .getState()
             .applyUpdates(data.updates as DirectorCanvasUpdate[])
+          patchTrace({
+            appliedCount: result.applied,
+            skippedCount: result.skipped.length,
+            pendingProposal: false,
+          })
           if (result.skipped.length > 0) {
             console.warn(
               '[global-chat-store] director updates skipped:',
@@ -956,6 +1019,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const result = await useWriterStore
           .getState()
           .applyChatUpdates(rawUpdates.filter((u) => u.type !== 'clarify'))
+        patchTrace({
+          appliedCount: result.applied,
+          skippedCount: result.skipped.length,
+          pendingProposal: result.pendingDialogueShrinks.length > 0,
+        })
         // #p4-understand B: 침묵 no-op 제거 — 적용/건너뜀을 즉시 표면화.
         const locale = contentLocale()
         if (result.skipped.length > 0) {
@@ -997,16 +1065,38 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             break
           }
         }
+        patchTrace({
+          pendingProposal:
+            result.pendingDialogueShrinks.length > 0 && !!get().pendingProposal,
+        })
       }
     } catch (err) {
       // 사용자가 Stop 을 눌렀다 — 에러가 아니라 의도. 조용히 대기 상태만 푼다.
       if (err instanceof DOMException && err.name === 'AbortError') {
-        set({ loading: false })
+        set((state) =>
+          state.lastTrace?.traceId === traceId
+            ? {
+                loading: false,
+                lastTrace: {
+                  ...state.lastTrace,
+                  stopReason: 'aborted',
+                  error: null,
+                },
+              }
+            : { loading: false },
+        )
         return
       }
+      const error = err instanceof Error ? err.message : 'Chat failed'
       set({
         loading: false,
-        error: err instanceof Error ? err.message : 'Chat failed',
+        error,
+        lastTrace: {
+          ...requestTrace,
+          requestStatus: responseStatus,
+          error,
+          stopReason: null,
+        },
       })
     } finally {
       if (activeGeneration === controller) activeGeneration = null
@@ -1266,6 +1356,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       messages: [],
       loading: false,
       error: null,
+      lastTrace: null,
       suggestion: null,
       pendingProposal: null,
       dismissedSuggestionIds: [],

@@ -12,6 +12,11 @@ import { llmChat } from '@/lib/llm'
 import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, fetchProjectLocale, responseLanguageDirective } from '@/lib/chat-format'
 import { sanitizeLineRefs, validateWriterUpdates } from '@/lib/writer-chat-updates'
 import { parseFencedUpdates } from '@/lib/agentic-reply-guard'
+import {
+  buildChatTrace,
+  createChatTraceId,
+  type ChatLlmUsage,
+} from '@/lib/chat-trace'
 
 const WRITER_CHAT_SYSTEM = `You are the Writers' Room assistant in an AI video production pipeline called "The Set."
 The user is reviewing the rough storyboard (pre-concept previz) of a story already broken into Scenes and Shots.
@@ -120,15 +125,6 @@ interface ChatMessage {
 interface IncomingHistoryItem {
   role: 'user' | 'model'
   content: string
-  stage?: string
-}
-
-const STAGE_BADGE: Record<string, string> = {
-  producer: 'P1',
-  writer: 'P2',
-  artist: 'P3',
-  director: 'P4',
-  editor: 'P5',
 }
 
 function formatLineRefTable(rawLineRefs: unknown): string {
@@ -142,23 +138,38 @@ function formatLineRefTable(rawLineRefs: unknown): string {
 
 function normalizeHistory(history: unknown): ChatMessage[] {
   if (!Array.isArray(history)) return []
-  return (history as IncomingHistoryItem[]).map((m) => {
-    const badge = m.stage ? STAGE_BADGE[m.stage] : null
-    const prefix = badge ? `[${badge}] ` : ''
-    return { role: m.role, content: `${prefix}${m.content}` }
-  })
+  return (history as IncomingHistoryItem[]).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }))
 }
 
 function parseAgenticResponse(
   text: string,
   allowedCharacterIds?: ReadonlySet<string>,
-): { reply: string; updates: unknown[]; droppedCharacterIds: string[] } {
+): {
+  reply: string
+  updates: unknown[]
+  droppedCharacterIds: string[]
+  parseStatus: string
+  rawUpdateCount: number
+  validUpdateCount: number
+} {
   // 펜스 추출·복구·유출 방어·신호·부분 적용 안내는 공용 가드가 담당(#p4-json-guard).
   const dropped: string[] = []
-  const { reply, updates } = parseFencedUpdates(text, 'writer/chat', (raw) =>
-    validateWriterUpdates(raw, allowedCharacterIds, dropped),
+  const { reply, updates, raw, status } = parseFencedUpdates(
+    text,
+    'writer/chat',
+    (raw) => validateWriterUpdates(raw, allowedCharacterIds, dropped),
   )
-  return { reply, updates, droppedCharacterIds: dropped }
+  return {
+    reply,
+    updates,
+    droppedCharacterIds: dropped,
+    parseStatus: status,
+    rawUpdateCount: raw.length,
+    validUpdateCount: updates.length,
+  }
 }
 
 export async function POST(req: Request) {
@@ -168,7 +179,14 @@ export async function POST(req: Request) {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { message, history, writerContext, lineRefs, projectId } = await req.json()
+    const {
+      message,
+      history,
+      writerContext,
+      lineRefs,
+      projectId,
+      traceId: requestedTraceId,
+    } = await req.json()
     if (!message || typeof message !== 'string')
       return NextResponse.json({ error: 'message is required' }, { status: 400 })
 
@@ -195,22 +213,40 @@ export async function POST(req: Request) {
     }
 
     const normalizedHistory = normalizeHistory(history)
-    const crossStageNote = normalizedHistory.some((m) => /^\[P[1-5]\]/.test(m.content))
-      ? `\n\nNote: prior messages from other stages are prefixed with [P1]-[P5]. Reference for continuity.`
-      : ''
     const contextSections = [
       formatLineRefTable(lineRefs),
       typeof writerContext === 'string' && writerContext.trim() ? writerContext : '',
     ].filter(Boolean)
     const ctx = contextSections.length > 0 ? `${contextSections.join('\n\n')}\n\n---\n\n` : ''
+    const traceId = createChatTraceId(requestedTraceId)
+    let llmUsage: ChatLlmUsage | null = null
+    const systemPrompt =
+      WRITER_CHAT_SYSTEM +
+      CHAT_OUTPUT_FORMAT_GUIDE +
+      CHAT_UPDATES_BATCH_GUIDE +
+      responseLanguageDirective(projectLocale)
+    const userPrompt = `${ctx}${message}`
 
     const text = await llmChat(
-      WRITER_CHAT_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + CHAT_UPDATES_BATCH_GUIDE + responseLanguageDirective(projectLocale),
+      systemPrompt,
       normalizedHistory,
-      `${ctx}${message}`,
+      userPrompt,
       0.5,
+      `chat:${traceId}`,
+      {
+        onUsage: (usage) => {
+          llmUsage = usage
+        },
+      },
     )
-    const { reply, updates, droppedCharacterIds } = parseAgenticResponse(text, allowedCharacterIds)
+    const {
+      reply,
+      updates,
+      droppedCharacterIds,
+      parseStatus,
+      rawUpdateCount,
+      validUpdateCount,
+    } = parseAgenticResponse(text, allowedCharacterIds)
     // 드롭 표면화 — 침묵 드롭은 이 사고(무검증 저장)와 같은 함정을 반대 방향으로 판다.
     const dropped = [...new Set(droppedCharacterIds)]
     const replyOut = dropped.length
@@ -218,7 +254,22 @@ export async function POST(req: Request) {
 
 (등장인물 목록에 없는 인물 ${dropped.map((d) => `\`${d}\``).join(', ')} 은(는) 반영하지 않았어요 — 새 인물이 필요하면 Producer 단계에서 추가해 주세요.)`
       : reply
-    return NextResponse.json({ reply: replyOut, updates })
+    return NextResponse.json({
+      reply: replyOut,
+      updates,
+      trace: buildChatTrace({
+        traceId,
+        stage: 'writer',
+        route: 'writer/chat',
+        system: systemPrompt,
+        history: normalizedHistory,
+        contextMessage: userPrompt,
+        usage: llmUsage,
+        parseStatus,
+        rawUpdateCount,
+        validUpdateCount,
+      }),
+    })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[writer/chat]', errMsg)

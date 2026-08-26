@@ -18,6 +18,7 @@ import {
   extractAppearanceProposals,
   type AppearanceProposal,
 } from '@/lib/artist/chat-updates'
+import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
 
 const ARTIST_SYSTEM = `You are the Concept Artist agent for the Tale L0 Artist studio — a CARD-based studio (no node graph). Users define Characters and World locations as cards. Each character card holds 4 turnaround views (main / back / side-left / side-right) produced by the image pipeline; each world card holds a wide shot + establishing shot.
 
@@ -100,24 +101,14 @@ interface ChatMessage {
 interface IncomingHistoryItem {
   role: 'user' | 'model'
   content: string
-  stage?: string
-}
-
-const STAGE_BADGE: Record<string, string> = {
-  producer: 'P1',
-  writer: 'P2',
-  artist: 'P3',
-  director: 'P4',
-  editor: 'P5',
 }
 
 function normalizeHistory(history: unknown): ChatMessage[] {
   if (!Array.isArray(history)) return []
-  return (history as IncomingHistoryItem[]).map((m) => {
-    const badge = m.stage ? STAGE_BADGE[m.stage] : null
-    const prefix = badge ? `[${badge}] ` : ''
-    return { role: m.role, content: `${prefix}${m.content}` }
-  })
+  return (history as IncomingHistoryItem[]).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }))
 }
 
 // 카드 모델 update 검증(F6 화이트리스트)은 src/lib/artist/chat-updates.ts 로 분리(순수 단위 테스트 대상).
@@ -127,12 +118,26 @@ function parseUpdates(text: string): {
   reply: string
   updates: unknown[]
   proposals: AppearanceProposal[]
+  parseStatus: string
+  rawUpdateCount: number
+  validUpdateCount: number
 } {
   // #p4-json-guard: 종전엔 이 라우트만 방어가 없어 파싱 실패 시 raw JSON 을 채팅에 그대로
   //   노출하고 updates 를 조용히 폐기했다(writer/director 는 안내 문구가 있었다). 공용 가드로 정렬.
-  const { reply, updates, raw } = parseFencedUpdates(text, 'artist/chat', validateUpdates)
+  const { reply, updates, raw, status } = parseFencedUpdates(
+    text,
+    'artist/chat',
+    validateUpdates,
+  )
   // updates = 자동 실행(화이트리스트). proposals = 원천 외형 변경(승인 게이트 — F6, 원본 배열 기준).
-  return { reply, updates, proposals: extractAppearanceProposals(raw) }
+  return {
+    reply,
+    updates,
+    proposals: extractAppearanceProposals(raw),
+    parseStatus: status,
+    rawUpdateCount: raw.length,
+    validUpdateCount: updates.length,
+  }
 }
 
 export async function POST(req: Request) {
@@ -144,7 +149,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { message, history, canvasContext, projectId } = await req.json()
+    const { message, history, canvasContext, projectId, traceId: requestedTraceId } = await req.json()
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -188,17 +193,54 @@ export async function POST(req: Request) {
       : ''
 
     const normalizedHistory = normalizeHistory(history)
+    const traceId = createChatTraceId(requestedTraceId)
+    let llmUsage: ChatLlmUsage | null = null
+    const systemPrompt =
+      ARTIST_SYSTEM +
+      CHAT_OUTPUT_FORMAT_GUIDE +
+      CHAT_UPDATES_BATCH_GUIDE +
+      responseLanguageDirective(projectLocale)
+    const userPrompt = `${contextPrefix}${message}`
 
     const text = await llmChat(
-      ARTIST_SYSTEM + CHAT_OUTPUT_FORMAT_GUIDE + CHAT_UPDATES_BATCH_GUIDE + responseLanguageDirective(projectLocale),
+      systemPrompt,
       normalizedHistory,
-      `${contextPrefix}${message}`,
+      userPrompt,
       0.7,
+      `chat:${traceId}`,
+      {
+        onUsage: (usage) => {
+          llmUsage = usage
+        },
+      },
     )
 
-    const { reply, updates, proposals } = parseUpdates(text)
+    const {
+      reply,
+      updates,
+      proposals,
+      parseStatus,
+      rawUpdateCount,
+      validUpdateCount,
+    } = parseUpdates(text)
 
-    return NextResponse.json({ reply, updates, proposals })
+    return NextResponse.json({
+      reply,
+      updates,
+      proposals,
+      trace: buildChatTrace({
+        traceId,
+        stage: 'artist',
+        route: 'artist/chat',
+        system: systemPrompt,
+        history: normalizedHistory,
+        contextMessage: userPrompt,
+        usage: llmUsage,
+        parseStatus,
+        rawUpdateCount,
+        validUpdateCount,
+      }),
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[artist/chat]', message)

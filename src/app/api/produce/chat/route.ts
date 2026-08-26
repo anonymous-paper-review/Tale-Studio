@@ -12,6 +12,7 @@ import { sanitizeAttachmentUrls } from '@/lib/upload/attachment'
 import { listStyleAnchorMediums } from '@/lib/style-anchor'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildReferenceDigest, getProjectReferenceId } from '@/lib/reference-import'
+import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
 
 interface ChatMessage {
   role: 'user' | 'model'
@@ -21,24 +22,14 @@ interface ChatMessage {
 interface IncomingHistoryItem {
   role: 'user' | 'model'
   content: string
-  stage?: string
-}
-
-const STAGE_BADGE: Record<string, string> = {
-  producer: 'P1',
-  writer: 'P2',
-  artist: 'P3',
-  director: 'P4',
-  editor: 'P5',
 }
 
 function normalizeHistory(history: unknown): ChatMessage[] {
   if (!Array.isArray(history)) return []
-  return (history as IncomingHistoryItem[]).map((m) => {
-    const badge = m.stage && m.stage !== 'producer' ? STAGE_BADGE[m.stage] : null
-    const prefix = badge ? `[${badge}] ` : ''
-    return { role: m.role, content: `${prefix}${m.content}` }
-  })
+  return (history as IncomingHistoryItem[]).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }))
 }
 
 
@@ -61,6 +52,7 @@ export async function POST(req: Request) {
       gate,
       attachmentImageUrls,
       projectId,
+      traceId: requestedTraceId,
     } = await req.json()
 
     if (!message || typeof message !== 'string') {
@@ -192,22 +184,30 @@ export async function POST(req: Request) {
       : ''
 
     const normalizedHistory = normalizeHistory(history)
-    const crossStageNote = normalizedHistory.some((m) =>
-      /^\[P[1-5]\]/.test(m.content),
-    )
-      ? `\n\nThe user is currently in the Producer (P1) stage. Prior messages from other stages are prefixed with [P1]/[P2]/[P3]/[P4]/[P5]. Reference them for continuity, but only emit extractedSettings valid for the Producer stage.`
-      : ''
+    const traceId = createChatTraceId(requestedTraceId)
+    let llmUsage: ChatLlmUsage | null = null
+    const systemPrompt =
+      buildProducerSystem(projectLocale ?? 'ko') +
+      CHAT_OUTPUT_FORMAT_GUIDE +
+      responseLanguageDirective(projectLocale)
+    const userPrompt = `${contextPrefix}${message}`
 
     let text: string
     try {
       text = await llmChat(
-        buildProducerSystem(projectLocale ?? 'ko') + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + responseLanguageDirective(projectLocale),
+        systemPrompt,
         normalizedHistory,
-        `${contextPrefix}${message}`,
+        userPrompt,
         0.7,
-        'chat',
+        `chat:${traceId}`,
         // #p4-websearch: producer 는 오마쥬/레퍼런스 요청의 진입점 — 실제 작품 검색으로 접지.
-        { webSearch: true, imageUrls: attachments.urls },
+        {
+          webSearch: true,
+          imageUrls: attachments.urls,
+          onUsage: (usage) => {
+            llmUsage = usage
+          },
+        },
       )
     } catch (err) {
       // #attach-loud-fail: 이미지 턴에서 Anthropic 이 URL fetch 에 실패하면(스토리지 순단·쿼터)
@@ -229,11 +229,24 @@ export async function POST(req: Request) {
 
     const { reply: replyRaw, extractedSettings } = parseExtractedSettings(text)
     // #p4-choices: Foundation 빈칸을 되묻기 대신 선택지 버튼으로 — [CHOICES] 라인 추출.
-    const { reply, choices } = parseChatChoices(replyRaw)
-    // 방어: 모델이 히스토리의 [Pn] 접두어를 흉내내 답변 앞에 붙이는 경우 제거(사용자에게 stage 마커 노출 금지).
-    const cleanReply = reply.replace(/^\s*(?:\[P[1-5]\]\s*)+/, '')
+    const { reply, choices, markerFound } = parseChatChoices(replyRaw)
 
-    return NextResponse.json({ reply: cleanReply, extractedSettings, choices })
+    return NextResponse.json({
+      reply,
+      extractedSettings,
+      choices,
+      trace: buildChatTrace({
+        traceId,
+        stage: 'producer',
+        route: 'produce/chat',
+        system: systemPrompt,
+        history: normalizedHistory,
+        contextMessage: userPrompt,
+        usage: llmUsage,
+        choicesMarkerFound: markerFound ?? null,
+        choicesCount: choices.length,
+      }),
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[produce/chat]', message)

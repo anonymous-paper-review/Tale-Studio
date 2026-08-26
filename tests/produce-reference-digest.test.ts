@@ -67,6 +67,54 @@ beforeEach(() => {
 })
 
 describe('POST /api/produce/chat — reference digest context', () => {
+  it('returns prompt shape and provider usage without exposing the prompt', async () => {
+    mocks.llmChat.mockImplementationOnce(async (...args: unknown[]) => {
+      const options = args[5] as {
+        onUsage?: (usage: {
+          model: string
+          durationMs: number
+          inputTokens: number
+          outputTokens: number
+          cacheReadInputTokens: number
+          cacheCreationInputTokens: number
+          stopReason: string | null
+        }) => void
+      }
+      options.onUsage?.({
+        model: 'claude-sonnet-4-6',
+        durationMs: 42,
+        inputTokens: 100,
+        outputTokens: 12,
+        cacheReadInputTokens: 80,
+        cacheCreationInputTokens: 0,
+        stopReason: 'end_turn',
+      })
+      return 'plain reply'
+    })
+
+    const response = await POST(
+      request({
+        projectId: 'current',
+        message: 'Continue the story',
+        storyText: 'Current story',
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.trace).toMatchObject({
+      stage: 'producer',
+      route: 'produce/chat',
+      historyCount: 0,
+      contextChars: expect.any(Number),
+      inputTokens: 100,
+      outputTokens: 12,
+      cacheReadInputTokens: 80,
+      stopReason: 'end_turn',
+    })
+    expect(JSON.stringify(body.trace)).not.toContain('Current story')
+  })
+
   it('appends a read-only reference block after current project context', async () => {
     mocks.buildReferenceDigest.mockResolvedValue(
       `[Referenced Project: Episode One] (read-only background from a referenced project — not the current project's cards)\n\nCast:\n- Mina`,

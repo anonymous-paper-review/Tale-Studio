@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   AlertTriangle,
+  Activity,
   ArrowUp,
   Check,
   CheckCircle2,
@@ -84,6 +85,7 @@ import {
   navigateWithStageSlide,
 } from '@/lib/stage-transition'
 import { useT } from '@/lib/i18n'
+import { totalInputTokens, type ChatTrace } from '@/lib/chat-trace'
 import type { StageId } from '@/types'
 import { isSceneData, isShotData } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
@@ -271,10 +273,84 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
+function formatTraceNumber(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '—'
+  if (value < 1000) return String(Math.round(value))
+  return `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}k`
+}
+
+function ChatTraceFooter({
+  trace,
+  currentStage,
+}: {
+  trace: ChatTrace | null
+  currentStage: StageId
+}) {
+  const t = useT()
+  if (!trace) return null
+
+  const inputTotal = totalInputTokens(trace)
+  const stageLabel = STAGE_LABEL[trace.stage as StageId] ?? trace.stage
+  const traceStage = trace.stage as StageId
+  const traceColor = STAGE_FACE_COLOR[traceStage] ?? STAGE_FACE_COLOR[currentStage]
+  const actionSummary =
+    trace.rawUpdateCount != null || trace.validUpdateCount != null
+      ? t('Actions {raw} → {valid} → {applied}', {
+          raw: trace.rawUpdateCount ?? '—',
+          valid: trace.validUpdateCount ?? '—',
+          applied: trace.appliedCount ?? '—',
+        })
+      : null
+
+  return (
+    <details className="shrink-0 border-t border-border-subtle bg-muted/20 px-4 py-1.5 text-[10px] text-muted-foreground">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 outline-none [&::-webkit-details-marker]:hidden">
+        <Activity
+          className="size-3 shrink-0"
+          style={{ color: traceColor }}
+          aria-hidden
+        />
+        <span className="truncate">
+          {stageLabel} · {t('Context {tokens}', { tokens: formatTraceNumber(inputTotal) })} ·{' '}
+          {t('Output {tokens}', { tokens: formatTraceNumber(trace.outputTokens) })}
+        </span>
+      </summary>
+      <div className="mt-1.5 space-y-0.5 pl-[18px] leading-4">
+        <p>
+          {t('History {count} · {chars} chars', {
+            count: trace.historyCount,
+            chars: trace.historyChars.toLocaleString(),
+          })}{' '}
+          · {t('Request {chars} chars', { chars: trace.contextChars.toLocaleString() })} ·{' '}
+          {t('Prompt {chars} chars', { chars: trace.promptChars.toLocaleString() })}
+        </p>
+        <p>
+          {t('Input {tokens}', { tokens: formatTraceNumber(trace.inputTokens) })} ·{' '}
+          {t('Cache read {tokens} · cache write {created}', {
+            tokens: formatTraceNumber(trace.cacheReadInputTokens),
+            created: formatTraceNumber(trace.cacheCreationInputTokens),
+          })}{' '}
+          · {t('Response {ms} ms', { ms: Math.round(trace.durationMs) })}
+        </p>
+        {actionSummary && <p>{actionSummary}</p>}
+        {trace.choicesMarkerFound && (
+          <p>{t('Choices {count}', { count: trace.choicesCount ?? 0 })}</p>
+        )}
+        {trace.pendingProposal === true && <p>{t('Waiting for approval')}</p>}
+        {trace.requestStatus != null && trace.requestStatus >= 400 && (
+          <p>{t('Request status {status}', { status: trace.requestStatus })}</p>
+        )}
+        {trace.stopReason && <p>{t('Stop reason: {reason}', { reason: trace.stopReason })}</p>}
+      </div>
+    </details>
+  )
+}
+
 export function GlobalChat() {
   const messages = useGlobalChatStore((s) => s.messages)
   const loading = useGlobalChatStore((s) => s.loading)
   const error = useGlobalChatStore((s) => s.error)
+  const lastTrace = useGlobalChatStore((s) => s.lastTrace)
   const sendMessage = useGlobalChatStore((s) => s.sendMessage)
   const stopGeneration = useGlobalChatStore((s) => s.stopGeneration)
   const clearError = useGlobalChatStore((s) => s.clearError)
@@ -1339,15 +1415,15 @@ export function GlobalChat() {
                       STAGE_BADGE_CLASS[pendingProposal.stage],
                     )}
                   >
-                    {t('Suggestion')}
+                    Suggestion
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium"><MarkdownText text={pendingProposal.target} /></p>
-                    <p className="mt-0.5 text-muted-foreground"><MarkdownText text={pendingProposal.action} /></p>
+                    <p className="font-medium"><MarkdownText text={scrubProse(pendingProposal.target)} /></p>
+                    <p className="mt-0.5 text-muted-foreground"><MarkdownText text={scrubProse(pendingProposal.action)} /></p>
                     {pendingProposal.impact.length > 0 && (
                       <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
                         {pendingProposal.impact.map((item) => (
-                          <li key={item}><MarkdownText text={item} /></li>
+                          <li key={item}><MarkdownText text={scrubProse(item)} /></li>
                         ))}
                       </ul>
                     )}
@@ -1385,6 +1461,8 @@ export function GlobalChat() {
             {error}
           </button>
         )}
+
+        <ChatTraceFooter trace={lastTrace} currentStage={currentStage} />
 
         {/* Input footer (#oiioii-chat) — 둥근(r24) 입력 컨테이너 안에 편집기 + 하단 툴바.
             Textarea 는 입력 길이 따라 자동 확장 (max-h = 10줄 + padding). 내부 스크롤은

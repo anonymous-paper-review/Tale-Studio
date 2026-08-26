@@ -10,6 +10,11 @@ import {
 } from '@/lib/agentic-reply-guard'
 import { normalizeProvider } from '@/lib/video-models'
 import { userOwnsProject } from '@/lib/generation-jobs'
+import {
+  buildChatTrace,
+  createChatTraceId,
+  type ChatLlmUsage,
+} from '@/lib/chat-trace'
 
 // ──────────────────────────────────────────────────────────────────────
 // Legacy system prompt — `director-store.ts` (구 P4) 사용 시
@@ -146,24 +151,14 @@ interface ChatMessage {
 interface IncomingHistoryItem {
   role: 'user' | 'model'
   content: string
-  stage?: string
-}
-
-const STAGE_BADGE: Record<string, string> = {
-  producer: 'P1',
-  writer: 'P2',
-  artist: 'P3',
-  director: 'P4',
-  editor: 'P5',
 }
 
 function normalizeHistory(history: unknown): ChatMessage[] {
   if (!Array.isArray(history)) return []
-  return (history as IncomingHistoryItem[]).map((m) => {
-    const badge = m.stage ? STAGE_BADGE[m.stage] : null
-    const prefix = badge ? `[${badge}] ` : ''
-    return { role: m.role, content: `${prefix}${m.content}` }
-  })
+  return (history as IncomingHistoryItem[]).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }))
 }
 
 const VALID_UPDATE_TYPES = new Set([
@@ -376,10 +371,23 @@ function validateCanvasUpdates(raw: unknown[]): unknown[] {
 function parseAgenticResponse(text: string): {
   reply: string
   updates: unknown[]
+  parseStatus: string
+  rawUpdateCount: number
+  validUpdateCount: number
 } {
   // 펜스 추출·복구·유출 방어·신호·부분 적용 안내는 공용 가드가 담당(#p4-json-guard).
-  const { reply, updates } = parseFencedUpdates(text, 'director/chat', validateCanvasUpdates)
-  return { reply, updates }
+  const { reply, updates, raw, status } = parseFencedUpdates(
+    text,
+    'director/chat',
+    validateCanvasUpdates,
+  )
+  return {
+    reply,
+    updates,
+    parseStatus: status,
+    rawUpdateCount: raw.length,
+    validUpdateCount: updates.length,
+  }
 }
 
 function parseLegacyResponse(text: string): {
@@ -387,17 +395,19 @@ function parseLegacyResponse(text: string): {
   suggestedCamera?: Record<string, number>
   suggestedLighting?: Record<string, unknown>
   techniques?: string[]
+  parseStatus: string
 } {
   // agentic 경로와 같은 가드를 태운다 — 종전엔 실패 시 raw JSON 이 그대로 노출됐다(#p4-json-guard).
   //   이 경로의 산출은 배열이 아니라 제안 3종이라 "몇 건 적용" 을 셀 수 없다 — 일반 문구를 쓴다.
   const { reply: head, data, status } = parseFencedJsonReply(text, 'director/chat:legacy')
   const reply = status === 'recovered' ? (head ? `${head}\n\n${NOTICE_PARTIAL}` : NOTICE_PARTIAL) : head
-  if (!data) return { reply }
+  if (!data) return { reply, parseStatus: status }
   return {
     reply,
     suggestedCamera: data.suggestedCamera as Record<string, number> | undefined,
     suggestedLighting: data.suggestedLighting as Record<string, unknown> | undefined,
     techniques: data.techniques as string[] | undefined,
+    parseStatus: status,
   }
 }
 
@@ -410,7 +420,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { message, history, shotContext, canvasContext, projectId } = await req.json()
+    const {
+      message,
+      history,
+      shotContext,
+      canvasContext,
+      projectId,
+      traceId: requestedTraceId,
+    } = await req.json()
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -433,36 +450,91 @@ export async function POST(req: Request) {
     }
 
     const normalizedHistory = normalizeHistory(history)
-    const crossStageNote = normalizedHistory.some((m) =>
-      /^\[P[1-5]\]/.test(m.content),
-    )
-      ? `\n\nNote: prior messages from other stages are prefixed with [P1]-[P5]. Reference for continuity.`
-      : ''
+    const traceId = createChatTraceId(requestedTraceId)
 
     // 분기: canvasContext가 있으면 agentic 모드 (Director Canvas), 없으면 legacy 모드
     if (typeof canvasContext === 'string' && canvasContext.trim()) {
+      let llmUsage: ChatLlmUsage | null = null
+      const systemPrompt =
+        DIRECTOR_CANVAS_SYSTEM +
+        CHAT_OUTPUT_FORMAT_GUIDE +
+        CHAT_UPDATES_BATCH_GUIDE +
+        responseLanguageDirective(projectLocale)
+      const userPrompt = `${canvasContext}\n\n---\n\n${message}`
       const text = await llmChat(
-        DIRECTOR_CANVAS_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + CHAT_UPDATES_BATCH_GUIDE + responseLanguageDirective(projectLocale),
+        systemPrompt,
         normalizedHistory,
-        `${canvasContext}\n\n---\n\n${message}`,
+        userPrompt,
         0.7,
+        `chat:${traceId}`,
+        {
+          onUsage: (usage) => {
+            llmUsage = usage
+          },
+        },
       )
-      const { reply, updates } = parseAgenticResponse(text)
-      return NextResponse.json({ reply, updates })
+      const {
+        reply,
+        updates,
+        parseStatus,
+        rawUpdateCount,
+        validUpdateCount,
+      } = parseAgenticResponse(text)
+      return NextResponse.json({
+        reply,
+        updates,
+        trace: buildChatTrace({
+          traceId,
+          stage: 'director',
+          route: 'director/chat',
+          system: systemPrompt,
+          history: normalizedHistory,
+          contextMessage: userPrompt,
+          usage: llmUsage,
+          parseStatus,
+          rawUpdateCount,
+          validUpdateCount,
+        }),
+      })
     }
 
     // Legacy path — 기존 director-store 사용 시
     const contextPrefix = shotContext
       ? `[Current Shot]\n${JSON.stringify(shotContext)}\n\n`
       : ''
+    let llmUsage: ChatLlmUsage | null = null
+    const systemPrompt =
+      DIRECTOR_LEGACY_SYSTEM +
+      CHAT_OUTPUT_FORMAT_GUIDE +
+      responseLanguageDirective(projectLocale)
+    const userPrompt = `${contextPrefix}${message}`
     const text = await llmChat(
-      DIRECTOR_LEGACY_SYSTEM + crossStageNote + CHAT_OUTPUT_FORMAT_GUIDE + responseLanguageDirective(projectLocale),
+      systemPrompt,
       normalizedHistory,
-      `${contextPrefix}${message}`,
+      userPrompt,
       0.7,
+      `chat:${traceId}`,
+      {
+        onUsage: (usage) => {
+          llmUsage = usage
+        },
+      },
     )
     const result = parseLegacyResponse(text)
-    return NextResponse.json(result)
+    const { parseStatus, ...legacyResult } = result
+    return NextResponse.json({
+      ...legacyResult,
+      trace: buildChatTrace({
+        traceId,
+        stage: 'director',
+        route: 'director/chat',
+        system: systemPrompt,
+        history: normalizedHistory,
+        contextMessage: userPrompt,
+        usage: llmUsage,
+        parseStatus,
+      }),
+    })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[director/chat]', errMsg)

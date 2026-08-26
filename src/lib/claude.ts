@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { logTiming } from './timing'
 import { CHAT_COMPACTION_TRIGGER_TOKENS } from './constants'
+import type { ChatLlmUsage } from './chat-trace'
 
 const MODEL = 'claude-sonnet-4-6'
 
@@ -49,7 +50,11 @@ export async function claudeChat(
   // #p1-attach(2026-08-13): imageUrls — 프로듀서 첨부(웹툰·레퍼런스) 판독 경로.
   //   전처리(슬라이싱·스토리지 업로드)는 api/produce/ingest 가 끝내고 URL 만 넘어온다.
   //   "이미지 먼저, 텍스트 나중" 배치는 Anthropic 권장 순서다.
-  opts?: { webSearch?: boolean; imageUrls?: string[] },
+  opts?: {
+    webSearch?: boolean
+    imageUrls?: string[]
+    onUsage?: (usage: ChatLlmUsage) => void | PromiseLike<void>
+  },
 ): Promise<string> {
   const imageUrls = opts?.imageUrls ?? []
   const userContent: UserContent = imageUrls.length
@@ -109,9 +114,10 @@ export async function claudeChat(
     },
   })
   const u = response.usage
+  const durationMs = performance.now() - t0
   logTiming(
     'llm',
-    `${label} model=${MODEL} in=${u.input_tokens} out=${u.output_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0}${imageUrls.length ? ` img=${imageUrls.length}` : ''} ${(performance.now() - t0).toFixed(0)}ms`,
+    `${label} model=${MODEL} in=${u.input_tokens} out=${u.output_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} stop_reason=${response.stop_reason ?? 'null'}${imageUrls.length ? ` img=${imageUrls.length}` : ''} ${durationMs.toFixed(0)}ms`,
   )
 
   // compaction/웹서치가 켜지면 응답 content에 비텍스트 블록이 끼고, 검색 시엔 텍스트가
@@ -121,6 +127,23 @@ export async function claudeChat(
     .map((b) => b.text)
     .join('')
   if (!text) throw new Error('Unexpected response type')
+
+  const usage: ChatLlmUsage = {
+    model: response.model,
+    durationMs,
+    inputTokens: u.input_tokens,
+    outputTokens: u.output_tokens,
+    cacheReadInputTokens: u.cache_read_input_tokens ?? 0,
+    cacheCreationInputTokens: u.cache_creation_input_tokens ?? 0,
+    stopReason: response.stop_reason,
+  }
+  try {
+    const callbackResult = opts?.onUsage?.(usage)
+    if (callbackResult !== undefined) await Promise.resolve(callbackResult).catch(() => undefined)
+  } catch {
+    // Usage reporting must never turn a successful chat response into a failure.
+  }
+
   return text
 }
 

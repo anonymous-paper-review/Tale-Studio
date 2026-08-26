@@ -81,6 +81,7 @@ export const KO: Record<string, string> = {
   Send: '보내기',
   'Open chat': '채팅 열기',
   'Context {tokens}': '컨텍스트 {tokens}',
+  'Input {tokens}': '입력 {tokens}',
   'Output {tokens}': '출력 {tokens}',
   'History {count} · {chars} chars': '이력 {count}개 · {chars}자',
   'Request {chars} chars': '이번 요청 {chars}자',
@@ -88,7 +89,9 @@ export const KO: Record<string, string> = {
   'Cache read {tokens} · cache write {created}': '캐시 읽기 {tokens} · 캐시 쓰기 {created}',
   'Response {ms} ms': '응답 {ms}ms',
   'Actions {raw} → {valid} → {applied}': '액션 {raw}건 → 검증 {valid}건 → 적용 {applied}건',
+  'Choices {count}': '선택지 {count}개',
   'Waiting for approval': '승인 대기 중',
+  'Request status {status}': '요청 상태 {status}',
   'Stop reason: {reason}': '종료 사유: {reason}',
 
   // ── 스튜디오 공통: sidebar ──

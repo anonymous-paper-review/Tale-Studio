@@ -27,7 +27,7 @@ export function sceneIdDisplayName(sceneId: string): string | null {
  * 산문(챗 말풍선 등)에 새어 나온 내부 id 를 표시명으로 치환하고 내부 마커를 걷는다.
  *   - sh_XX_YY / sc_XX → 규칙 생성명
  *   - nameById 가 오면 char_../loc_.. 류 id 도 이름으로 (맵은 호출부의 스테이지 진실에서)
- *   - [p3] 같은 대괄호 문단 마커 제거([L3] 스크립트 라인 참조는 실제 기능이라 보존)
+ *   - 과거 스테이지 대괄호 마커 제거([L3] 스크립트 라인 참조는 실제 기능이라 보존)
  * 사용자 발화에는 적용하지 않는다 — 사용자가 직접 쓴 원문은 불가침.
  */
 export function scrubInternalIdsInProse(
@@ -36,8 +36,7 @@ export function scrubInternalIdsInProse(
 ): string {
   let out = text.replace(/\bsh[_-]\d+[_-]\d+\b/gi, (id) => shotIdDisplayName(id) ?? id)
   out = out.replace(/\bsc[_-]\d+\b/gi, (id) => sceneIdDisplayName(id) ?? id)
-  // [p3] 문단 마커 — 모델이 붙이는 내부 인용 표기. 붙은 공백 한 칸까지 함께 걷는다.
-  out = out.replace(/\[p\d+\]\s?/gi, '')
+  out = stripLegacyStageMarkers(out)
   if (nameById && nameById.size > 0) {
     for (const [id, name] of nameById) {
       const label = name.trim()
@@ -46,6 +45,11 @@ export function scrubInternalIdsInProse(
     }
   }
   return out
+}
+
+/** 과거 채팅에 저장된 스테이지 마커를 새 요청·표시에서 제거한다. */
+export function stripLegacyStageMarkers(text: string): string {
+  return text.replace(/\[p[1-5]\]\s?/gi, '')
 }
 
 function escapeRegExp(s: string): string {

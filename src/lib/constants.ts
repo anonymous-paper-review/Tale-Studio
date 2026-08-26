@@ -51,15 +51,7 @@ export const SHOTS_PER_SCENE = 6
 export const DEFAULT_SCENES_COUNT = 4
 export const DEFAULT_SHOT_DURATION = 8
 
-// ── GlobalChat: stage 표기 + 색 (design.md §2.9). 단일 source — 컴포넌트는 import만 ──
-
-export const STAGE_BADGE: Record<StageId, string> = {
-  producer: 'P1',
-  writer: 'P2',
-  artist: 'P3',
-  director: 'P4',
-  editor: 'P5',
-}
+// ── GlobalChat: stage 이름 + 색 (design.md §2.9). 단일 source — 컴포넌트는 import만 ──
 
 export const STAGE_LABEL: Record<StageId, string> = {
   producer: 'Producer',

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { shotIdDisplayName, sceneIdDisplayName, scrubInternalIdsInProse } from '@/lib/display-names'
+import {
+  shotIdDisplayName,
+  sceneIdDisplayName,
+  scrubInternalIdsInProse,
+  stripLegacyStageMarkers,
+} from '@/lib/display-names'
 import { renderInlineMarkdown } from '@/lib/inline-markdown'
 import { sceneShotMentions } from '@/lib/card-mention'
 
@@ -27,9 +32,15 @@ describe('산문 스크럽 — 챗 말풍선 최종 방어', () => {
     )
   })
 
-  it('[p3] 마커는 걷고 [L3] 스크립트 라인 참조는 보존한다', () => {
+  it('과거 스테이지 마커는 걷고 [L3] 스크립트 라인 참조는 보존한다', () => {
     expect(scrubInternalIdsInProse('[p3] 문단과 [L3] 라인을 참고했어요.')).toBe(
       '문단과 [L3] 라인을 참고했어요.',
+    )
+  })
+
+  it('과거 스테이지 마커는 새 요청 이력에서도 제거한다', () => {
+    expect(stripLegacyStageMarkers('[P1] 이전 답변\n[p3] 다음 답변')).toBe(
+      '이전 답변\n다음 답변',
     )
   })
 

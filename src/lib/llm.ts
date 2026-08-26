@@ -13,3 +13,4 @@
  */
 
 export { claudeChat as llmChat, claudeJSON as llmJSON } from './claude'
+export type { ChatLlmUsage, ChatTrace } from './chat-trace'

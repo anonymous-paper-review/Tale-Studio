@@ -8,6 +8,7 @@ describe('parseChatChoices', () => {
       '어떤 톤이 좋을까요?\n[CHOICES] 어둡고 건조하게 | 따뜻한 성장물 | 블랙 코미디\n',
     )
     expect(choices).toEqual(['어둡고 건조하게', '따뜻한 성장물', '블랙 코미디'])
+    expect(parseChatChoices('[CHOICES] 하나 / 둘').markerFound).toBe(true)
     expect(reply).not.toContain('[CHOICES]')
     expect(reply).toContain('어떤 톤이')
   })
@@ -16,12 +17,27 @@ describe('parseChatChoices', () => {
     const { reply, choices } = parseChatChoices('그냥 답변입니다.')
     expect(choices).toEqual([])
     expect(reply).toBe('그냥 답변입니다.')
+    expect(parseChatChoices('그냥 답변입니다.').markerFound).toBe(false)
+  })
+
+  it('공백으로 둘러싸인 슬래시도 선택지 구분자로 읽는다', () => {
+    const { reply, choices } = parseChatChoices(
+      '[CHOICES] 순수 액션 / 액션 + 드라마 (복수, 성장) / 액션 + 스릴러 (음모, 반전) / 액션 + 코미디',
+    )
+    expect(choices).toEqual([
+      '순수 액션',
+      '액션 + 드라마 (복수, 성장)',
+      '액션 + 스릴러 (음모, 반전)',
+      '액션 + 코미디',
+    ])
+    expect(reply).toBe('')
   })
 
   it('후보가 2개 미만이면 무시한다 (버튼 1개는 선택지가 아님)', () => {
     const { reply, choices } = parseChatChoices('본문\n[CHOICES] 하나뿐')
     expect(choices).toEqual([])
-    expect(reply).toContain('[CHOICES]')
+    expect(reply).not.toContain('[CHOICES]')
+    expect(reply).toContain('본문')
   })
 
   it('후보는 최대 4개로 자른다', () => {
