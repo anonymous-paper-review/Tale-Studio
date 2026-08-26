@@ -38,6 +38,7 @@ import { cn } from '@/lib/utils'
 import { HoverBeam } from '@/components/hover-beam'
 import { ThumbImage } from '@/components/thumb-image'
 import { MarkdownText } from '@/components/layout/markdown-text'
+import { scrubInternalIdsInProse } from '@/lib/display-names'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
 import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
 import {
@@ -82,7 +83,7 @@ import {
   EPHEMERAL_SETTLE_MS,
   navigateWithStageSlide,
 } from '@/lib/stage-transition'
-import { useT } from '@/lib/i18n'
+import { useT, useLocale } from '@/lib/i18n'
 import type { StageId } from '@/types'
 import { isSceneData, isShotData } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
@@ -390,6 +391,27 @@ export function GlobalChat() {
     locationHint,
     directorNodes,
   ])
+  // #internal-id-scrub(2026-08-26, 오너 E5): 에이전트 발화·제안에 새는 내부 id(sh_../char_..)와
+  //   [p3] 마커를 표시 직전에 걷는다 — 프롬프트 금지 규칙이 1차, 이 스크럽이 과거 메시지까지
+  //   덮는 최종 방어. 사용자 말풍선은 원문 불가침이라 통과시킨다.
+  const scrubLocale = useLocale()
+  const scrubNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    const put = (id: string | undefined | null, name: string | undefined | null) => {
+      const key = id?.trim()
+      const label = name?.trim()
+      if (key && label) map.set(key, label)
+    }
+    for (const c of producerCast) put(c.localId, c.name)
+    for (const c of artistCharacters) put(c.characterId, c.name)
+    for (const w of artistWorlds) put(w.locationId, w.name)
+    for (const c of writerManifest?.characters ?? []) put(c.characterId, c.name)
+    for (const l of writerManifest?.locations ?? []) put(l.locationId, l.name)
+    return map
+  }, [producerCast, artistCharacters, artistWorlds, writerManifest])
+  // useCallback 을 쓰지 않는 이유: useLocale() 결과를 deps 에 넣는 패턴은 훅 deps 게이트가
+  //   막는다(불안정 참조 감시 대상). 이 함수는 memo 소비자가 없어 평 함수로 충분하다.
+  const scrubProse = (text: string) => scrubInternalIdsInProse(text, scrubLocale, scrubNameById)
   const [input, setInput] = useState('')
   // 하나의 스레드를 stage 구간으로 쪼갠다 — 필터가 아니라 구분선용(전 메시지가 그대로 보인다).
   const sections = useMemo(
@@ -1186,7 +1208,7 @@ export function GlobalChat() {
                           <CheckCircle2 className="size-3.5 shrink-0 text-success" />
                         )}
                         <span className="min-w-0">
-                          <MarkdownText text={msg.content.trimStart().replace(/^[✓⚠]\s*/, '')} />
+                          <MarkdownText text={scrubProse(msg.content.trimStart().replace(/^[✓⚠]\s*/, ''))} />
                         </span>
                       </div>
                     )
@@ -1237,8 +1259,8 @@ export function GlobalChat() {
                     <div key={msg.id}>
                       {showRolePlate && <RolePlate stage={msg.stage} />}
                       <div className="group relative select-text whitespace-pre-wrap px-1 pr-8 text-xs leading-relaxed text-foreground">
-                        <MarkdownText text={msg.content} />
-                        <CopyButton text={msg.content} />
+                        <MarkdownText text={scrubProse(msg.content)} />
+                        <CopyButton text={scrubProse(msg.content)} />
                       </div>
                     </div>
                   )
@@ -1271,7 +1293,7 @@ export function GlobalChat() {
                   <TypewriterMarkdown
                     key={suggestion.id}
                     id={suggestion.id}
-                    text={suggestion.content}
+                    text={scrubProse(suggestion.content)}
                   />
                 </div>
                 {/* 씬 게이트(#gate-to-chat) — 확정 한 번으로 안 끝나는 결정이라 캡슐 버튼 대신

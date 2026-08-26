@@ -12,9 +12,19 @@ export function escapeHtml(input: string): string {
     .replace(/'/g, '&#39;')
 }
 
+// 구분선-전용 줄 제거 (#no-hr 2026-08-26, 오너 E1): 모델이 습관적으로 넣는 ---/ㅡㅡ/—— 같은
+//   구분선은 이 렌더러가 <hr> 을 만들지 않으므로 생 기호("ㅡ")로 노출됐다. 기호만으로 이뤄진
+//   줄을 통째로 걷고, 남은 이중 빈 줄을 한 칸으로 접는다. 프롬프트 금지 규칙이 1차 방어,
+//   이 스크럽이 과거 메시지까지 덮는 최종 방어다.
+function stripSeparatorLines(input: string): string {
+  return input
+    .replace(/^[ \t]*[-–—ㅡ―ー=_*·]{3,}[ \t]*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+}
+
 // escape된 안전한 문자열에 대해서만 inline 마크다운 변환을 적용한다.
 export function renderInlineMarkdown(input: string): string {
-  const escaped = escapeHtml(input ?? '')
+  const escaped = escapeHtml(stripSeparatorLines(input ?? ''))
   return (
     escaped
       // `code`

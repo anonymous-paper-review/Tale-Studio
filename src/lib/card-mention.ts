@@ -28,7 +28,7 @@ export type SceneShotMentionMode = 'writer' | 'previz' | 'real'
 export interface SceneShotMentionTarget {
   kind: 'scene' | 'shot'
   id: string
-  /** 사람이 읽는 이름. 최종 라벨에는 항상 id도 포함해 중복 이름을 구분한다. */
+  /** 사람이 읽는 이름. 내부 id 는 라벨에 넣지 않는다(#internal-id-scrub) — ref 가 식별을 전담. */
   label: string
 }
 
@@ -46,7 +46,11 @@ export function sceneShotMentionRef(
 
 /**
  * Writer/Director가 공유하는 씬·샷 멘션 항목 생성기.
- * 표시 이름이 겹쳐도 id를 라벨에 포함하므로 자동완성과 카드 하이라이트가 1:1로 유지된다.
+ * #internal-id-scrub(2026-08-26, 오너 E5 "내부 ID 전면 금지"): 옛 라벨은 `… · ${id}` 로 내부
+ *   id 를 그대로 노출했다("Real Shot 7 · sh_02_07" — 오너가 본 '변수'). 식별은 ref 가 전담하고
+ *   라벨은 사람 이름만 쓴다. 규칙 생성명(Scene N · Shot N.M)은 구조상 유일해 dedup 도 유지된다.
+ *   라벨은 여전히 로케일 고정(파일 헤더의 매칭 키 계약) — 한글 표기는 매칭에 안 쓰이는
+ *   표면(캔버스 라벨·챗 산문 스크럽, src/lib/display-names.ts)이 맡는다.
  */
 export function sceneShotMentions(
   targets: readonly SceneShotMentionTarget[],
@@ -66,7 +70,7 @@ export function sceneShotMentions(
     return [
       {
         ref,
-        label: `${modeLabel}${kindLabel} ${displayName} · ${id}`,
+        label: `${modeLabel}${kindLabel} ${displayName}`,
         hint: `${modeLabel}${kindLabel}`,
       },
     ]

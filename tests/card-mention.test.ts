@@ -93,26 +93,26 @@ describe('toggleMentionToken (script line click add/remove)', () => {
 })
 
 describe('scene/shot mentions', () => {
-  it('keeps duplicate display names distinct with stable ids', () => {
+  // #internal-id-scrub(2026-08-26, 오너 E5): 옛 계약("라벨에 id 포함으로 중복 구분")을 뒤집는다 —
+  //   내부 id 는 어떤 사용자 표면에도 안 보인다. 식별은 ref 가 전담하고, 규칙 생성명(Scene N ·
+  //   Shot N.M)은 구조상 유일해 실사용 중복이 없다(합성 중복 라벨은 라벨 충돌을 허용).
+  it('labels carry no internal ids — refs alone stay distinct', () => {
     const mentions = sceneShotMentions([
       { kind: 'scene', id: 'sc_a', label: 'Scene 1' },
       { kind: 'scene', id: 'sc_b', label: 'Scene 1' },
       { kind: 'shot', id: 'sh_a', label: 'Shot 1' },
     ])
-    expect(mentions.map((item) => item.label)).toEqual([
-      'Scene 1 · sc_a',
-      'Scene 1 · sc_b',
-      'Shot 1 · sh_a',
-    ])
+    expect(mentions.map((item) => item.label)).toEqual(['Scene 1', 'Scene 1', 'Shot 1'])
+    for (const item of mentions) {
+      expect(item.label).not.toMatch(/\b(sc|sh)_[a-z0-9]/i)
+    }
     expect(mentions.map((item) => item.ref)).toEqual([
       sceneShotMentionRef('writer', 'scene', 'sc_a'),
       sceneShotMentionRef('writer', 'scene', 'sc_b'),
       sceneShotMentionRef('writer', 'shot', 'sh_a'),
     ])
-    expect(
-      activeMentionRefs(`@${mentions[1].label}`, mentions),
-    ).toEqual([mentions[1].ref])
-    expect(activeMentionRefs('@Scene 9 · missing', mentions)).toEqual([])
+    expect(activeMentionRefs(`@${mentions[2].label}`, mentions)).toEqual([mentions[2].ref])
+    expect(activeMentionRefs('@Scene 9', mentions)).toEqual([])
   })
 
   it('keeps Director Previz and Real references separate', () => {

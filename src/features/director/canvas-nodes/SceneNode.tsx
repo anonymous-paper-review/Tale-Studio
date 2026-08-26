@@ -10,8 +10,10 @@ import {
 } from '@/stores/director-store'
 import { isSceneData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
+import { useLocale } from '@/lib/i18n'
 
 function SceneNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
+  const locale = useLocale()
   const childCount = useDirectorCanvasStore(
     (s) => getChildShots(s, id).length,
   )
@@ -29,7 +31,7 @@ function SceneNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     <BaseNode
       id={id}
       theme="scene"
-      title={prettyNodeLabel(data.label)}
+      title={prettyNodeLabel(data.label, locale)}
       selected={selected}
       width={280}
       canBranch

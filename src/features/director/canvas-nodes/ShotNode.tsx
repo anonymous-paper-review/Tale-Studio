@@ -16,11 +16,12 @@ import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { isShotData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
 import { ThumbImage } from '@/components/thumb-image'
-import { useT } from '@/lib/i18n'
+import { useT, useLocale } from '@/lib/i18n'
 
 
 function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const t = useT()
+  const locale = useLocale()
   const takeCount = useDirectorCanvasStore((s) => getChildVideos(s, id).length)
   const stage = useDirectorCanvasStore((s) => getShotStage(s, id))
   const isGenerating = useDirectorCanvasStore((s) => !!s.generatingNodeIds[id])
@@ -94,7 +95,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       <BaseNode
         id={id}
         theme="shot"
-        title={prettyNodeLabel(data.label)}
+        title={prettyNodeLabel(data.label, locale)}
         selected={selected}
         width={280}
         stale={data.stale}
