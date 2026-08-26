@@ -21,11 +21,10 @@ import {
 } from '@/lib/generation-queue'
 import { isShotData, isShotImageData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
-import { useT, useLocale } from '@/lib/i18n'
+import { useT } from '@/lib/i18n'
 
 function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
   const t = useT()
-  const locale = useLocale()
   const parentShotNodeId = isShotImageData(data) ? data.parentShotNodeId : null
   // 부모 Shot 스코프 구독 — storyboardImage 객체 참조는 노드 데이터 교체 시에만 바뀐다.
   const storyboardImage = useDirectorCanvasStore((s) => {
@@ -119,7 +118,7 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
           Shot image
         </span>
         <span className="max-w-24 truncate text-[10px] text-muted-foreground/70">
-          {prettyNodeLabel(data.label, locale)}
+          {prettyNodeLabel(data.label)}
         </span>
       </div>
 

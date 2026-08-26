@@ -11,11 +11,10 @@ import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { isVideoData, isVideoPlaceholderData, type DirectorNode } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
-import { useT, useLocale } from '@/lib/i18n'
+import { useT } from '@/lib/i18n'
 
 function VideoPlaceholderNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
   const t = useT()
-  const locale = useLocale()
   const parentShotNodeId = isVideoPlaceholderData(data) ? data.parentShotNodeId : null
   const generateVideoForShot = useDirectorCanvasStore((s) => s.generateVideoForShot)
   // 형제 테이크가 생성 중이면 잠금 (VideoNode 의 parentGenerating 과 동일 판정)
@@ -64,7 +63,7 @@ function VideoPlaceholderNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
           Shot video
         </span>
         <span className="max-w-24 truncate text-[10px] text-muted-foreground/60">
-          {prettyNodeLabel(data.label, locale)}
+          {prettyNodeLabel(data.label)}
         </span>
       </div>
 

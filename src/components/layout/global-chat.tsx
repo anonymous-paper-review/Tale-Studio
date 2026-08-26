@@ -83,7 +83,7 @@ import {
   EPHEMERAL_SETTLE_MS,
   navigateWithStageSlide,
 } from '@/lib/stage-transition'
-import { useT, useLocale } from '@/lib/i18n'
+import { useT } from '@/lib/i18n'
 import type { StageId } from '@/types'
 import { isSceneData, isShotData } from '@/types/director'
 import { prettyNodeLabel } from '@/features/director/node-label'
@@ -394,7 +394,6 @@ export function GlobalChat() {
   // #internal-id-scrub(2026-08-26, 오너 E5): 에이전트 발화·제안에 새는 내부 id(sh_../char_..)와
   //   [p3] 마커를 표시 직전에 걷는다 — 프롬프트 금지 규칙이 1차, 이 스크럽이 과거 메시지까지
   //   덮는 최종 방어. 사용자 말풍선은 원문 불가침이라 통과시킨다.
-  const scrubLocale = useLocale()
   const scrubNameById = useMemo(() => {
     const map = new Map<string, string>()
     const put = (id: string | undefined | null, name: string | undefined | null) => {
@@ -409,9 +408,7 @@ export function GlobalChat() {
     for (const l of writerManifest?.locations ?? []) put(l.locationId, l.name)
     return map
   }, [producerCast, artistCharacters, artistWorlds, writerManifest])
-  // useCallback 을 쓰지 않는 이유: useLocale() 결과를 deps 에 넣는 패턴은 훅 deps 게이트가
-  //   막는다(불안정 참조 감시 대상). 이 함수는 memo 소비자가 없어 평 함수로 충분하다.
-  const scrubProse = (text: string) => scrubInternalIdsInProse(text, scrubLocale, scrubNameById)
+  const scrubProse = (text: string) => scrubInternalIdsInProse(text, scrubNameById)
   const [input, setInput] = useState('')
   // 하나의 스레드를 stage 구간으로 쪼갠다 — 필터가 아니라 구분선용(전 메시지가 그대로 보인다).
   const sections = useMemo(
