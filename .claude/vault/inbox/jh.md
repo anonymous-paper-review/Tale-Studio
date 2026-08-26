@@ -361,7 +361,7 @@ writer 끝나고 다시 writer 다시 요청하면 갇힘
 
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":983,"content_sha256":"56563b10b96dcd6e89ea05e68302a418e34a1dc50d5eac7b090a8aa071729dd4","item_id":"23f930a7086e51078b1a1fad47f90e1b39c2ef171fa3a5b807a01436ab875eb5","schema":1,"snapshot_id":"inbox-track-2026-08-19","source_key":"inbox/jh.md","source_range":{"end":16973,"start":15990},"state":"tracked","units":["vault-inbox-lifecycle-2026-08-18","night-approve-merge-slowness"]}
+{"actor":"jh","byte_length":983,"content_sha256":"56563b10b96dcd6e89ea05e68302a418e34a1dc50d5eac7b090a8aa071729dd4","item_id":"23f930a7086e51078b1a1fad47f90e1b39c2ef171fa3a5b807a01436ab875eb5","schema":1,"snapshot_id":"inbox-track-2026-08-19","source_key":"inbox/jh.md","source_range":{"end":16973,"start":15990},"state":"tracked","units":["vault-inbox-lifecycle-2026-08-18","night-approve-merge-slowness","owner-judgment-record-2026-08-19"]}
 -->
 열려있던 티켓에대해 승인 프롬프트만 쥐어주고 병합하고 inbox에서 표시남겨달라고햇는데
 엄청 오래걸림 (원인 파악 필요 아래가 프롬프트 원문)
@@ -379,13 +379,37 @@ writer 끝나고 다시 writer 다시 요청하면 갇힘
 <!-- vault-inbox-item:end -->
 
 
+<!-- vault-inbox-item:start
+{"actor":"jh","byte_length":448,"content_sha256":"08e7b0beb580693cb67b27b923d8e749bd0382894169f49e2366f8be6279aa1c","item_id":"4115ec75d72afb77be0ef3848e197f19a6ee3c2ddf26cc708a29d01d92aaaa6b","schema":1,"snapshot_id":"ddcf8396927dbe36a2054466a3409135ef93af915f18162ebe19ddf08fad8023","source_key":"inbox/jh.md","source_range":{"end":17423,"start":16975},"state":"tracked","units":["owner-cognizance-ack-2026-08-25"]}
+-->
 26.08.25 (낮, 오너) — 아래 둘은 내가 이미 알고 있는 상태다. 다시 티켓으로 만들거나 아침 보고에 문제로 세우지 마라. 상태가 실제로 바뀐 날만 한 줄 보고.
 1. 새 메모(입력)가 비어 있는 것 — 알고 있음. 채우는 건 내 몫이다.
 2. 친구(hs) 쪽과 inbox 공유가 끊겨 있는 것 — 알고 있음. 원인 조사도 이미 끝났다(8/23 조사, done). 재조사 불필요.
+<!-- vault-inbox-item:end -->
 
+<!-- vault-inbox-item:start
+{"actor":"jh","byte_length":977,"content_sha256":"655d2dcf6ba24152573c1676601a0f630c48476adc7b977a45c691e0eabf069c","item_id":"e0a3a3fb36e330a04577835efddb92c34a0ec7cf9482ee05e66e0f70d7d16251","schema":1,"snapshot_id":"ddcf8396927dbe36a2054466a3409135ef93af915f18162ebe19ddf08fad8023","source_key":"inbox/jh.md","source_range":{"end":18401,"start":17424},"state":"tracked","units":["ledger-merge-reconcile-2026-08-26","vault-marker-unit-undercoverage","owner-decisions-applied-check-2026-08-26","ticket-runtime-worktree-drift-2026-08-26"]}
+-->
 26.08.25 (낮, 오너 위임 집행 기록) — 오늘 낮에 결정하고 바로 집행한 것들. 다음 밤은 원장 정합만 확인하면 된다.
 - 밤 수리 4건(감독 캐시·fixture 도구·smoke 타깃·DB 타입 재생성) 전부 main에 머지됨. fixture:producer 2회 연속 정상 종료 확인 — 그 티켓 판정선 닫힘.
 - 증서 썩음=갈래A(근거 얼리기, night-runtime.py 반영), stash=갈래A(night-fixer 규칙), 8/24 게이트=유지+순서 준수, smoke=사본에 접속정보 안 줌(계약 19차), 브라우저 회귀=(가) morning smoke, 리렌더 검사기=경고 모드 도입(tests/unstable-hook-deps.test.ts), 시험 타임아웃=갈래A(30000ms).
 - 표식 23f930a7에 owner-judgment-record-2026-08-19 를 append-units 로 이어라 (승인함, 티켓 vault-marker-unit-undercoverage 참조).
 - 유료 피드백 창구 티켓은 삭제했다 — 안 쓴다. 재생성 금지.
 - 8/18 사본 3개와 합쳐진 가지들 정리 완료.
+<!-- vault-inbox-item:end -->
+
+26.08.26 (낮, 오너 위임 집행 기록) — 밤 보고서의 결정 여섯 개를 그 자리에서 판정하고 집행했다. 다음 밤은 원장 정합만 확인하면 된다.
+- 밤 수리 3건 중 2건 머지: 씬 확정 화면 문구(fix-scene-gate-suggestion-resurface), 준비 도구 단계 되돌림(fixture-producer-undoes-writer-unlock). 격리 사본과 밤 가지는 제거했다. 커밋은 안 했다 — 내 미커밋 작업과 같은 트리라 묶음은 내가 나눈다.
+- vitest 전역 verbose는 반려. 통과 시험까지 전부 찍혀 출력이 길어지는 대가가 이득보다 크다. 대신 놓치면 안 되는 검사는 경고가 아니라 실패로 올리는 기존 길을 유지한다(리렌더 검사기가 선례). test-warnings 티켓은 원인 확정으로 done.
+- 기록 불일치 2건은 기록 쪽을 정정했다: 계약 19차 개정문 (5)항에 "실제 반영은 night-fixer 하나" 정정(+ 중복된 (6)항 하나 제거), needs-owner-browser-regression-layer 티켓에 "경고→실패 승격됨" 정정. 내 8/25 메모 원문은 안 고쳤다 — 어긋나면 파일이 답이다.
+- 죽은 사본 7줄은 갈래(나) 채택: ticket-runtime.py 분류가 사본 실재를 보게 고치고 회귀 시험 1건을 붙였다. 이제 사본이 없으면 manual_review로 떨어져 밤이 건너뛴다. 상태 파일은 안 건드렸다.
+- 8/19 stash는 지우기로 결정. drop 명령이 자동 실행에서 막혀 내 손으로 돌린다(복구용 해시 bdd3c3477e063ca6bd4a100eef47ddbae26f5caa 티켓에 기록).
+- 아직 안 닫힌 것 하나: fixture 판정선 실측 네 줄(fixture:producer → fixture:writer --stage editor → fixture:producer → smoke --auth). 운영 DB 쓰기라 자동 실행이 막혀 내가 돌린다. 그때까지 그 티켓은 waiting.
+- 대기열 안내 배선 2자리(project-store.ts:209, writer-store.ts:696)는 내 미커밋 작업 위라 그대로 둔다. 커밋한 뒤 밤이 잡으면 된다.
+- 낮 검증: npx tsc --noEmit exit 0 · npx vitest run 174파일 1543 통과 0 실패(8/25까지 반복되던 5000ms 타임아웃 흔들림이 사라졌다 — 타임아웃 상향 결정의 효과). 브라우저 확인은 smoke가 자동 실행에서 막혀 미실시, 위 네 줄의 마지막 명령으로 같이 닫는다.
+- 8/19 stash 지웠다(bdd3c34). 조사대로 잃은 것 0건.
+- 8/18 밤 가지 3개 정리 완료, 이제 night/* 가지는 0개다. r2(오디오 주석)는 결함이 8일째 살아 있어 머지. r1(v2 dynamic_spec)은 superseded 판정이 틀린 전제 위에 있었다 — 내가 다른 세션에서 고치기로 했는데 안 고쳤고 결함 세 자리가 그대로였다. 뒤집고 머지했다. r3(타입 게이트)은 main이 더 나아가 있어 합치면 오히려 되돌아간다 — 머지 없이 삭제. 복구용 해시는 각 티켓에.
+- 8/18 세 건 반영 뒤 검증: tsc exit 0, vitest 177파일 1557 통과 0 실패. v2 수리는 되돌린 상태에서 시험 2건이 실제로 깨지는 것까지 대조했다.
+- 포트 3000에 1일 8시간째 무응답이던 next-server(PID 44665)를 정리했다. 그 뒤 pnpm smoke 6/6 통과 — 아침 진입점이 쓰는 경로가 이제 실제로 작동한다. 비로그인 6화면 스크린샷은 .smoke/tale-smoke/ (22:58~23:0x).
+- 그러다 발견: 8/25에 켠 브라우저 회귀 확인이 로그를 한 줄도 안 남겼다. morning-smoke.log가 아예 없고 로그 디렉터리 mtime이 8/24 23:22라 8/25·8/26 두 아침 모두 새 파일이 안 생겼다. night-launchd.sh:800의 배경 서브셸(&)이 시작조차 못 한 것으로 보인다(가설, 확인 한 줄 있음). 티켓 morning-smoke-never-logged-2026-08-26 — 갈래 3개 중 선택 필요.
+- pnpm smoke --auth 는 분류기가 계속 막아서 못 돌렸다. 로그인 뒤 화면(내가 고친 작가 화면 포함)은 여전히 미확인.
