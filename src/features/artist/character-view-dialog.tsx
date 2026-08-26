@@ -117,7 +117,8 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
       >
         <DialogHeader>
           <DialogTitle className="text-sm">
-            {char.name} — {label}
+            {/* #f6(2026-08-27 오너): 'Main' 계열 문구 전삭제 — 대표 뷰는 이름만. */}
+            {view === 'main' ? char.name : `${char.name} — ${label}`}
           </DialogTitle>
         </DialogHeader>
 
@@ -145,7 +146,7 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
           {/* 사람 main = 시트 전체(16:9), 그 외 = 기존 1:1 프레임 */}
           <div className={cn('mx-auto w-full', !isSheet && 'max-w-sm')}>
             <ImagePlaceholder
-              label={label}
+              label={view === 'main' ? '' : label}
               aspectRatio={isSheet ? 'video' : 'square'}
               imageUrl={imageUrl}
               generating={isGenerating}
@@ -192,7 +193,13 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
             ) : (
               <>
                 <Sparkles className="size-4" />
-                {imageUrl ? t('Regenerate {label}', { label }) : t('Generate {label}', { label })}
+                {view === 'main'
+                  ? imageUrl
+                    ? t('Regenerate image')
+                    : t('Generate image')
+                  : imageUrl
+                    ? t('Regenerate {label}', { label })
+                    : t('Generate {label}', { label })}
               </>
             )}
           </Button>

@@ -269,7 +269,7 @@ export function CharacterPanel({
                       />
                     ) : (
                       <ImagePlaceholder
-                        label={isObject ? t(CHARACTER_VIEW_LABELS['main']) : t('Turnaround (all views)')}
+                        label={isObject ? '' : t('Turnaround (all views)')}
                         aspectRatio={isObject ? 'square' : 'video'}
                         imageUrl={char.views.main ?? null}
                         generating={isViewGenerating('main')}

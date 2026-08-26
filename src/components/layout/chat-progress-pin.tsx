@@ -195,7 +195,7 @@ function UnifiedPin({ projectId, stage }: { projectId: string; stage: StageId })
 
   if (works.length === 0) return null
   return (
-    <div className="shrink-0 space-y-1.5 px-3 pb-1 pt-2">
+    <div className="shrink-0 space-y-1.5 border-t border-border/60 px-3 pb-1 pt-2">
       {works.map((w) => (
         <WorkPill key={w.key} work={w} fallbackStage={stage} />
       ))}

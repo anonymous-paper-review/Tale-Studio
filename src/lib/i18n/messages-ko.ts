@@ -679,8 +679,8 @@ export const KO: Record<string, string> = {
   'This generates the image.': '이미지를 생성합니다.',
   'This is the turnaround sheet. Edit the appearance prompt below and regenerate to apply it.':
     '턴어라운드 시트입니다. 아래 외형 프롬프트를 수정하고 재생성하면 반영돼요.',
-  'Directional views are generated from Main. Generate Main first.': '방향 뷰는 Main 을 기준으로 생성됩니다. 먼저 Main 을 생성하세요.',
-  'This view is regenerated based on the Main image.': '이 뷰는 Main 이미지를 기준으로 재생성됩니다.',
+  'Directional views are generated from Main. Generate Main first.': '방향 뷰는 대표 이미지를 기준으로 생성됩니다. 먼저 대표 이미지를 생성하세요.',
+  'This view is regenerated based on the Main image.': '이 뷰는 대표 이미지를 기준으로 재생성됩니다.',
   'Appearance prompt (edit, then regenerate)': '외형 프롬프트 (수정 후 재생성)',
   "This character's appearance description": '이 캐릭터의 외형 묘사',
   'Regenerate {label}': '{label} 재생성',
@@ -1215,4 +1215,5 @@ export const KO: Record<string, string> = {
   'Replaces the existing rough frames with the new result.':
     '기존 러프 프레임이 새 결과물로 교체돼요.',
   'Click to edit this shot': '클릭하면 이 샷을 수정할 수 있어요',
+  'Drag to move': '끌어서 위치를 옮길 수 있어요',
 }

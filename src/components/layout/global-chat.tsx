@@ -542,6 +542,10 @@ export function GlobalChat() {
       if (stickRef.current) viewport.scrollTop = viewport.scrollHeight
     })
     ro.observe(content)
+    // #f1(2026-08-27 오너): 진행 핀이 입력창 위에 나타나면 뷰포트 높이가 줄어 마지막 메시지가
+    //   가려졌다 — 콘텐츠 성장뿐 아니라 뷰포트 축소도 관찰해, 하단에 붙어 있던 유저를 계속
+    //   하단에 붙여 둔다(위로 올려 읽는 중이면 안 끌어내리는 stick 규약 그대로).
+    ro.observe(viewport)
     viewport.addEventListener('scroll', onScroll, { passive: true })
     return () => {
       ro.disconnect()
