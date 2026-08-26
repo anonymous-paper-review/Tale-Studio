@@ -118,9 +118,24 @@ export function useWriterStatus(
 
     tick()
 
+    // Same wake-recovery as the artist gate (#stale-gate 2026-08-26): a backgrounded tab has
+    // its timers throttled, so the poll that would have flipped the bar to "done" can be
+    // delayed for minutes. Without this the progress bar sits at 93% until F5 - which is
+    // exactly what the owner hit (server finished 23:07:33, screen still showed 93%).
+    const onWake = () => {
+      if (cancelled) return
+      if (document.visibilityState !== 'visible') return
+      if (timerRef.current) clearTimeout(timerRef.current)
+      void tick()
+    }
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('focus', onWake)
+
     return () => {
       cancelled = true
       if (timerRef.current) clearTimeout(timerRef.current)
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('focus', onWake)
     }
   }, [projectId, interval, stopWhenCompleted, nonce])
 

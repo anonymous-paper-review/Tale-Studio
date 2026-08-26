@@ -1,7 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { toast } from 'sonner'
 import { STAGES } from '@/lib/constants'
+import { translate } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectStore, type WriterStatusAssets } from '@/stores/project-store'
 import type { StageId } from '@/types'
 
@@ -62,6 +65,12 @@ export function useArtistLockPoll() {
     !artistImagesFailed &&
     !artistImagesStalled
 
+  // 프로젝트당 1회만 알린다 - 폴러가 재개돼도 같은 상태로 반복해서 떠들지 않게.
+  const notifiedRef = useRef(false)
+  useEffect(() => {
+    notifiedRef.current = false
+  }, [projectId])
+
   useEffect(() => {
     if (!projectId || !imageLocked) return
 
@@ -86,6 +95,25 @@ export function useArtistLockPoll() {
             const decision = decideLockPoll(assets, stalledStreak)
             stalledStreak = decision.stalledStreak
             setArtistAssetGate(decision.gate)
+            // 실패·지연은 사이드바 뱃지로만 알리면 조용하다 (#stale-gate 2026-08-26, 오너 지적:
+            //   "실패는 실패라고 떠야 하는 거 아님?"). 판정이 서는 순간 한 번만 토스트로 말한다.
+            //   같은 id 로 중복 억제 - 폴러가 여러 번 서도 화면이 덮이지 않는다.
+            if (decision.stop && !notifiedRef.current) {
+              const locale = useLocaleStore.getState().locale
+              if (decision.gate.failed_count && decision.gate.failed_count > 0) {
+                notifiedRef.current = true
+                toast.error(
+                  translate(locale, 'Some image generations failed. Click the Artist tab to retry.'),
+                  { id: 'artist-gate-state' },
+                )
+              } else if (decision.gate.stalled) {
+                notifiedRef.current = true
+                toast.warning(
+                  translate(locale, 'Image generation is taking longer than usual. Click the Artist tab to retry.'),
+                  { id: 'artist-gate-state' },
+                )
+              }
+            }
             if (decision.stop) return
           }
         }
@@ -99,9 +127,26 @@ export function useArtistLockPoll() {
 
     schedule()
 
+    // Refresh must not be the only cure (#stale-gate 2026-08-26).
+    // Background tabs get their timers throttled to minutes, so the tick that would have
+    // seen "ready" may never land while the user is away - the gate then looks frozen and
+    // only F5 fixes it. Re-poll the moment the tab is visible/focused again.
+    // Owner-reported symptom: Writer stuck at 93% + Artist showing "failed" while the
+    // server had already completed (14/14, failed_count 0).
+    const onWake = () => {
+      if (cancelled) return
+      if (document.visibilityState !== 'visible') return
+      if (timer) clearTimeout(timer)
+      void tick()
+    }
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('focus', onWake)
+
     return () => {
       cancelled = true
       if (timer) clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('focus', onWake)
     }
   }, [imageLocked, projectId, setArtistAssetGate])
 }

@@ -120,9 +120,12 @@ export function Sidebar() {
   }, [goToStage])
 
   const reachedStageIndex = STAGES.findIndex((stage) => stage.id === reachedStage)
-  const artistImageLockCopy =
-    artistImagesFailed || artistImagesStalled
-      ? t('Generation failed · retry')
+  // stalled 는 실패가 아니라 "오래 대기 중"이다 (#stale-gate 2026-08-26). 한 문구로 뭉치면
+  //   실패 0건인데도 "생성 실패"가 떠서 사용자가 사고로 오인한다 - 오너 실측 신고 사례.
+  const artistImageLockCopy = artistImagesFailed
+    ? t('Generation failed · retry')
+    : artistImagesStalled
+      ? t('Taking longer than usual · retry')
       : t('Generating images {ready}/{total}', {
           ready: artistAssetProgress?.ready ?? 0,
           total: artistAssetProgress?.total ?? 0,
