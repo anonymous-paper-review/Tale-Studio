@@ -10,7 +10,16 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useActiveGenerationJobs, type ActiveJob } from '@/lib/generation-queue'
 import { invalidateShots } from '@/lib/shots-cache'
-import { computeSettledJobs, reportUiReflected } from '@/lib/generation-ui-reflected'
+import {
+  computeSettledJobs,
+  fetchUnreflectedCompletedJobs,
+  reportUiReflected,
+} from '@/lib/generation-ui-reflected'
+import {
+  isShotData,
+  isVideoData,
+  type DirectorNode,
+} from '@/types/director'
 
 const WATCHED_KINDS = new Set([
   'shot_storyboard',
@@ -18,6 +27,50 @@ const WATCHED_KINDS = new Set([
   'shot_video',
   'shot_previz_video',
 ])
+
+/** DB 재수화가 끝났어도 대상 노드가 없으면 "화면 반영"이 아니다. 실제 완료 미디어만 통과시킨다. */
+export function reflectedDirectorJobs(
+  jobs: readonly ActiveJob[],
+  nodes: readonly DirectorNode[],
+): ActiveJob[] {
+  const shotNodeByWriterId = new Map(
+    nodes
+      .filter((node) => isShotData(node.data) && !!node.data.writerShotId)
+      .map((node) => [node.data.writerShotId as string, node]),
+  )
+  const completedStoryboardShots = new Set(
+    [...shotNodeByWriterId]
+      .filter(([, node]) => {
+        const data = node.data
+        return isShotData(data) && data.storyboardImage?.status === 'completed'
+      })
+      .map(([writerShotId]) => writerShotId),
+  )
+  const completedVideoShots = new Set<string>()
+  for (const node of nodes) {
+    if (!isVideoData(node.data) || node.data.status !== 'completed' || !node.data.videoUrl) continue
+    const parent = nodes.find((candidate) => candidate.id === node.data.parentShotNodeId)
+    if (parent && isShotData(parent.data) && parent.data.writerShotId) {
+      completedVideoShots.add(parent.data.writerShotId)
+    }
+  }
+
+  return jobs.filter((job) => {
+    const targetIds = [
+      ...(job.target?.writerShotIds ?? []),
+      job.target?.writerShotId,
+      job.target?.shotId,
+    ].filter((id): id is string => !!id)
+    if (targetIds.length === 0) return false
+    if (job.kind === 'shot_storyboard' || job.kind === 'storyboard_real_grid') {
+      return targetIds.every((id) => completedStoryboardShots.has(id))
+    }
+    if (job.kind === 'shot_video') {
+      return targetIds.some((id) => completedVideoShots.has(id))
+    }
+    return false
+  })
+}
 
 export function useQueueRehydrate(projectId: string | null): void {
   const hydrateFromDb = useDirectorCanvasStore((s) => s.hydrateFromDb)
@@ -27,6 +80,31 @@ export function useQueueRehydrate(projectId: string | null): void {
     [activeJobs],
   )
   const prevRef = useRef<readonly ActiveJob[]>([])
+
+  // 스테이지 밖에서 완료된 잡은 prev active 목록에 없어서 아래 transition 감지로는 영원히 못 잡는다.
+  // Director 복귀 마운트 때 DB 를 무조건 한 번 재수화하고, 최근 완료·미반영 잡을 좌표 ④로 보고한다.
+  useEffect(() => {
+    if (!projectId) return
+    let cancelled = false
+    const unreflectedPromise = fetchUnreflectedCompletedJobs(projectId)
+    void invalidateShots(projectId)
+      .then(() => hydrateFromDb(projectId))
+      .then(async () => {
+        const unreflected = await unreflectedPromise
+        if (!cancelled) {
+          const reflected = reflectedDirectorJobs(
+            unreflected,
+            useDirectorCanvasStore.getState().nodes,
+          )
+          reportUiReflected(projectId, reflected, 'director-canvas-reentry')
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [projectId, hydrateFromDb])
+
   useEffect(() => {
     const prev = prevRef.current
     prevRef.current = watched

@@ -9,6 +9,8 @@ import { KO as koMessages } from '@/lib/i18n/messages-ko'
 const sidebar = readFileSync('src/components/layout/sidebar.tsx', 'utf8')
 const lockPoll = readFileSync('src/hooks/use-artist-lock-poll.ts', 'utf8')
 const writerStatus = readFileSync('src/lib/writer/use-writer-status.ts', 'utf8')
+const queueRehydrate = readFileSync('src/features/director/hooks/use-queue-rehydrate.ts', 'utf8')
+const activeRoute = readFileSync('src/app/api/generation/active/route.ts', 'utf8')
 
 describe('Artist 게이트 문구 — 대기와 실패는 다른 말이어야 한다', () => {
   it('stalled 와 failed 를 한 조건으로 묶어 같은 문구를 쓰지 않는다', () => {
@@ -25,6 +27,20 @@ describe('Artist 게이트 문구 — 대기와 실패는 다른 말이어야 �
 
   it('실패 문구는 그대로 실패라고 말한다', () => {
     expect(koMessages['Generation failed · retry']).toContain('실패')
+  })
+})
+
+describe('Director 스테이지 밖 완료 — 복귀 마운트에서 놓치지 않는다', () => {
+  it('복귀 시 DB 를 재수화하고 최근 완료·미반영 잡을 보고한다', () => {
+    expect(queueRehydrate).toContain('fetchUnreflectedCompletedJobs(projectId)')
+    expect(queueRehydrate).toContain('reflectedDirectorJobs(')
+    expect(queueRehydrate).toContain("'director-canvas-reentry'")
+    expect(queueRehydrate).toContain('hydrateFromDb(projectId)')
+  })
+
+  it('추가 완료 조회는 복귀 1회 opt-in 이고 4초 active 폴링에는 붙지 않는다', () => {
+    expect(activeRoute).toContain("get('includeUnreflected') !== '1'")
+    expect(activeRoute).toContain(".eq('event', 'ui_reflected')")
   })
 })
 

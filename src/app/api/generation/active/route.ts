@@ -7,8 +7,10 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { listActiveGenerationJobs, userOwnsProject } from '@/lib/generation-jobs'
 import { reconcileGhostQueuedJobs } from '@/lib/fal/reconcile'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
+const RECENT_COMPLETED_MS = 15 * 60_000
 
 export async function GET(req: Request) {
   const user = await getUser()
@@ -37,5 +39,44 @@ export async function GET(req: Request) {
   await reconcileGhostQueuedJobs(projectId)
 
   const jobs = await listActiveGenerationJobs(projectId)
-  return NextResponse.json({ ok: true, data: { jobs } })
+  // 스테이지를 떠난 동안 완료된 잡은 클라의 prev active 목록에 한 번도 잡히지 않는다.
+  // 복귀 마운트에서만 최근 완료·미반영 잡을 받아 DB 재수화 뒤 ui_reflected 를 찍는다.
+  // 평상시 4초 active 폴링에는 쿼리 2개를 더하지 않도록 opt-in 이다(#a2-stage-away).
+  if (new URL(req.url).searchParams.get('includeUnreflected') !== '1') {
+    return NextResponse.json({ ok: true, data: { jobs } })
+  }
+
+  const cutoff = new Date(Date.now() - RECENT_COMPLETED_MS).toISOString()
+  const { data: completed, error: completedError } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id, kind, target, created_at')
+    .eq('project_id', projectId)
+    .eq('status', 'completed')
+    .gte('updated_at', cutoff)
+  if (completedError) throw completedError
+
+  const completedIds = (completed ?? []).map((job) => job.id)
+  const reflectedIds = new Set<string>()
+  if (completedIds.length > 0) {
+    const { data: reflected, error: reflectedError } = await supabaseAdmin
+      .from('writer_observability_events')
+      .select('generation_job_id')
+      .eq('project_id', projectId)
+      .eq('event', 'ui_reflected')
+      .in('generation_job_id', completedIds)
+    if (reflectedError) throw reflectedError
+    for (const event of reflected ?? []) {
+      if (event.generation_job_id) reflectedIds.add(event.generation_job_id)
+    }
+  }
+
+  const unreflected = (completed ?? [])
+    .filter((job) => !reflectedIds.has(job.id))
+    .map((job) => ({
+      id: job.id,
+      kind: job.kind,
+      target: job.target,
+      startedAt: Date.parse(job.created_at),
+    }))
+  return NextResponse.json({ ok: true, data: { jobs, unreflected } })
 }

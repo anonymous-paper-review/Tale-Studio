@@ -13,6 +13,20 @@ import type { ActiveJob } from '@/lib/generation-queue'
 
 const reported = new Set<string>()
 
+/** 스테이지를 떠난 사이 완료돼 active→settled 전환을 못 본 잡. 복귀 마운트에서 1회만 조회한다. */
+export async function fetchUnreflectedCompletedJobs(projectId: string): Promise<ActiveJob[]> {
+  try {
+    const res = await fetch(
+      `/api/generation/active?projectId=${encodeURIComponent(projectId)}&includeUnreflected=1`,
+    )
+    if (!res.ok) return []
+    const body = (await res.json()) as { data?: { unreflected?: ActiveJob[] } }
+    return body.data?.unreflected ?? []
+  } catch {
+    return []
+  }
+}
+
 /** prev 에는 있었는데 next 에 없는 잡 — 이번 틱에 큐를 떠난(완료/실패 확정) 잡들. */
 export function computeSettledJobs(
   prev: readonly ActiveJob[],
