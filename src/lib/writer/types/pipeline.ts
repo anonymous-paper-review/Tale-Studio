@@ -313,6 +313,10 @@ export interface NarrativeStructure {
 export interface StoryCharacter {
   id: string;
   name: string;
+  /** person/object 구분 (#g4 2026-08-27). 없으면 person 으로 취급한다.
+   *  이 표식이 파이프라인 안에서 유실되면 사물이 character_blocking 에 섞여 들어가
+   *  "얼굴 없는 인물"로 그려진다(#object-not-figure, '엿판이 안긴 아기로' 실사고). */
+  entity_type?: 'person' | 'object';
   age?: string;
   role: string; // "protagonist" | "antagonist" | "supporting"
   personality: string[];
