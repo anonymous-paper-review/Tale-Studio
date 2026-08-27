@@ -202,7 +202,7 @@ function RolePlate({ stage }: { stage: StageId }) {
         background: `linear-gradient(90deg, color-mix(in oklab, ${STAGE_FACE_COLOR[stage]} 28%, transparent) 0%, transparent 100%)`,
       }}
     >
-      <AgentFace color={STAGE_FACE_COLOR[stage]} size={24} animate={false} />
+      <AgentFace stage={stage} size={24} />
       <span className="text-[13px] font-extrabold text-foreground">
         {STAGE_LABEL[stage]}
       </span>
@@ -226,7 +226,7 @@ function ThinkingIndicator({ stage }: { stage: StageId }) {
   }, [phrases])
   return (
     <div className="mr-6 flex items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3.5 py-2.5 text-xs text-muted-foreground">
-      <AgentFace color={STAGE_FACE_COLOR[stage]} size={20} expression="thinking" />
+      <AgentFace stage={stage} size={20} expression="thinking" />
       {/* key=idx: 문구가 바뀔 때마다 아래에서 스르륵 올라오는 재등장 */}
       <span
         key={idx}
@@ -1365,9 +1365,9 @@ export function GlobalChat() {
                             className="tale-beam-once pointer-events-none absolute inset-0 rounded-2xl"
                           />
                           <div className="flex items-center gap-3">
-                            <AgentFace color={STAGE_FACE_COLOR[invite.from]} size={26} animate={false} />
+                            <AgentFace stage={invite.from} size={26} />
                             <MoveRight className="size-4 text-muted-foreground" />
-                            <AgentFace color={STAGE_FACE_COLOR[invite.to]} size={34} />
+                            <AgentFace stage={invite.to} size={34} />
                           </div>
                           <p className="text-[11px] text-muted-foreground">
                             {invitePre}
@@ -1543,11 +1543,7 @@ export function GlobalChat() {
             >
               {choices.question && (
                 <div className="flex items-start gap-1.5">
-                  <AgentFace
-                    color={STAGE_FACE_COLOR[choices.stage]}
-                    size={16}
-                    animate={false}
-                  />
+                  <AgentFace stage={choices.stage} size={16} />
                   <p className="min-w-0 text-xs text-foreground">{choices.question}</p>
                 </div>
               )}
@@ -1803,11 +1799,7 @@ export function GlobalChat() {
                         STAGE_BADGE_CLASS[currentStage],
                       )}
                     >
-                      <AgentFace
-                        color={STAGE_FACE_COLOR[currentStage]}
-                        size={16}
-                        animate={false}
-                      />
+                      <AgentFace stage={currentStage} size={16} />
                       {STAGE_LABEL[currentStage]}
                       <ChevronDown className="size-3 opacity-60" />
                     </button>

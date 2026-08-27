@@ -1,207 +1,50 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import type { StageId } from '@/types/project'
 
-type Expression = 'idle' | 'thinking' | 'talking' | 'happy'
+// #agent-crew(2026-08-28 오너): 공용 원형 얼굴(색만 스테이지 구분) → 스테이지별 사물 마스코트
+//   GIF 로 교체 — producer=클립보드 · writer=노트 · artist=태블릿 · director=클래퍼 ·
+//   editor=모니터. 상태 애니메이션은 GIF 자체에 들어 있어 예전 SVG 깜빡임/입모양 장치와
+//   정적 PNG(agent-face/*.png)는 폐기했다. 에셋 2벌: full(512px)/preview(224px).
+type Expression = 'idle' | 'thinking' | 'talking' | 'working' | 'happy'
+
+const STATE_OF: Record<Expression, 'idle' | 'talking' | 'thinking' | 'working'> = {
+  idle: 'idle',
+  thinking: 'thinking',
+  talking: 'talking',
+  working: 'working',
+  happy: 'talking', // 인사/호응 전용 에셋은 없다 — 입이 움직이는 talking 이 가장 가깝다
+}
+
+export function agentFaceAsset(stage: StageId, expression: Expression, size: number): string {
+  // editor 는 idle 한 종뿐(채팅 에이전트가 아니라 상태 연기가 없다) — 전 상태 idle 폴백.
+  const state = stage === 'editor' ? 'idle' : STATE_OF[expression]
+  const variant = size > 64 ? 'full' : 'preview'
+  return `/agent-face/${variant}/${stage}_${state}.gif`
+}
 
 interface AgentFaceProps {
+  stage: StageId
   expression?: Expression
-  color?: string
   size?: number
   name?: string
-  /** false면 깜빡임/말하기 애니메이션을 끄고 정적 얼굴로 렌더(리스트에 다수 렌더 시 성능/시각 안정). */
-  animate?: boolean
 }
 
-const GENERATED_FACE_ASSET: Record<Expression, string> = {
-  idle: '/agent-face/idle.png',
-  thinking: '/agent-face/thinking.png',
-  talking: '/agent-face/working.png',
-  happy: '/agent-face/idle.png',
-}
-
-export function AgentFace({
-  expression = 'idle',
-  color = 'var(--primary)',
-  size = 48,
-  name,
-  animate = true,
-}: AgentFaceProps) {
-  const [blinking, setBlinking] = useState(false)
-  const [mouthFrame, setMouthFrame] = useState(0)
-
-  // Blink randomly — 첫 깜빡임은 짧게(호버로 animate가 켜진 직후에도 보이도록, #b1),
-  //   이후 1.8~4초 랜덤 간격. 꺼질 때 눈 감긴 채 멈추지 않게 cleanup에서 복원.
-  useEffect(() => {
-    if (!animate) return
-    let closeTimer: ReturnType<typeof setTimeout> | undefined
-    let nextTimer: ReturnType<typeof setTimeout> | undefined
-    const schedule = (delay: number) => {
-      nextTimer = setTimeout(() => {
-        setBlinking(true)
-        closeTimer = setTimeout(() => setBlinking(false), 150)
-        schedule(1800 + Math.random() * 2200)
-      }, delay)
-    }
-    schedule(350 + Math.random() * 400)
-    return () => {
-      clearTimeout(nextTimer)
-      clearTimeout(closeTimer)
-      setBlinking(false)
-    }
-  }, [animate])
-
-  // Mouth animation when talking
-  useEffect(() => {
-    if (!animate || expression !== 'talking') return
-    const interval = setInterval(() => {
-      setMouthFrame((f) => (f + 1) % 4)
-    }, 120)
-    return () => clearInterval(interval)
-  }, [animate, expression])
-
-  const eyeH = blinking ? 1 : 4.5
-  const eyeY = blinking ? 20 : 18
-
-  // Mouth shapes
-  const getMouth = () => {
-    if (expression === 'thinking') {
-      return <ellipse cx="24" cy="31" rx="2.5" ry="2" fill="#555" />
-    }
-    if (expression === 'happy') {
-      // 활짝 웃는 입(#b1) — idle의 잔잔한 미소보다 깊고 벌어진 스마일.
-      return <path d="M16.5 27.5 Q24 37.5 31.5 27.5 Q24 31.5 16.5 27.5" fill="#555" />
-    }
-    if (expression === 'talking') {
-      const shapes = [
-        <ellipse key="0" cx="24" cy="31" rx="4" ry="3.5" fill="#555" />,
-        <ellipse key="1" cx="24" cy="31" rx="3" ry="1.5" fill="#555" />,
-        <ellipse key="2" cx="24" cy="31" rx="5" ry="4" fill="#555" />,
-        <ellipse key="3" cx="24" cy="31" rx="3" ry="2" fill="#555" />,
-      ]
-      return shapes[expression === 'talking' ? mouthFrame : 0]
-    }
-    // Idle: gentle smile
-    return (
-      <path
-        d="M19 29 Q24 34 29 29"
-        fill="none"
-        stroke="#555"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    )
-  }
-
+export function AgentFace({ stage, expression = 'idle', size = 48, name }: AgentFaceProps) {
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="relative" style={{ width: size, height: size }}>
-        <Image
-          src={GENERATED_FACE_ASSET[expression]}
-          alt=""
-          width={size}
-          height={size}
-          className={`h-full w-full rounded-full object-cover drop-shadow-md ${
-            animate ? 'agent-face-generated-motion' : ''
-          }`}
-        />
-        <svg
-          viewBox="0 0 48 48"
-          width={size}
-          height={size}
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-0"
-          style={{ color }}
-        >
-          {/* White face circle */}
-          <circle cx="24" cy="24" r="21" fill="white" />
-          <circle
-            cx="24"
-            cy="24"
-            r="21"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          />
-
-          {/* Eyes */}
-          <ellipse cx="16" cy={eyeY} rx="3" ry={eyeH} fill="#333">
-            {expression === 'thinking' && (
-              <animateTransform
-                attributeName="transform"
-                type="translate"
-                values="0,0;-1.5,0;0,0;1.5,0;0,0"
-                dur="2s"
-                repeatCount="indefinite"
-              />
-            )}
-          </ellipse>
-          <ellipse cx="32" cy={eyeY} rx="3" ry={eyeH} fill="#333">
-            {expression === 'thinking' && (
-              <animateTransform
-                attributeName="transform"
-                type="translate"
-                values="0,0;-1.5,0;0,0;1.5,0;0,0"
-                dur="2s"
-                repeatCount="indefinite"
-              />
-            )}
-          </ellipse>
-
-          {/* Eye highlights */}
-          {!blinking && (
-            <>
-              <circle cx="17.5" cy="16.5" r="1.5" fill="white" />
-              <circle cx="33.5" cy="16.5" r="1.5" fill="white" />
-            </>
-          )}
-
-          {/* Eyebrows */}
-          <path
-            d={
-              expression === 'thinking'
-                ? 'M12 12 Q16 10 21 12'
-                : 'M12 13.5 Q16 12 21 13.5'
-            }
-            fill="none"
-            stroke="#333"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d={
-              expression === 'thinking'
-                ? 'M27 12 Q32 10 36 12'
-                : 'M27 13.5 Q32 12 36 13.5'
-            }
-            fill="none"
-            stroke="#333"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-
-          {/* Cheeks (blush) — happy일 땐 홍조 진하게(#b1) */}
-          <circle cx="10" cy="24" r="3" fill="currentColor" opacity={expression === 'happy' ? 0.3 : 0.15} />
-          <circle cx="38" cy="24" r="3" fill="currentColor" opacity={expression === 'happy' ? 0.3 : 0.15} />
-
-          {/* Mouth */}
-          {getMouth()}
-        </svg>
-
-        {/* Thinking pulse ring */}
-        {expression === 'thinking' && (
-          <div
-            className="absolute inset-0 animate-ping rounded-full opacity-20"
-            style={{ border: `2px solid ${color}` }}
-          />
-        )}
-      </div>
-
+      <Image
+        src={agentFaceAsset(stage, expression, size)}
+        alt=""
+        width={size}
+        height={size}
+        unoptimized // 애니메이션 GIF — 옵티마이저를 거치면 정지 프레임이 된다
+        className="shrink-0 object-contain drop-shadow-sm"
+        style={{ width: size, height: size }}
+      />
       {name && (
-        <span className="text-[10px] font-medium text-muted-foreground">
-          {name}
-        </span>
+        <span className="text-[10px] font-medium text-muted-foreground">{name}</span>
       )}
     </div>
   )

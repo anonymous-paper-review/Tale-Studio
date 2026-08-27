@@ -43,7 +43,6 @@ import { HoverBeam } from '@/components/hover-beam'
 import { cn } from '@/lib/utils'
 import { useModifierHeld } from '@/hooks/use-modifier-held'
 import { AgentFace } from '@/components/agent-face'
-import { STAGE_FACE_COLOR } from '@/lib/constants'
 import { ProducerQuestJournal, StoryFoundationBadges } from './quest-journal'
 import { WriterEnginePicker } from '@/features/writer/writer-engine-picker'
 import { useLocale, useT } from '@/lib/i18n'
@@ -777,10 +776,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                   )}
                 >
                   <AgentFace
-                    color={STAGE_FACE_COLOR.producer}
+                    stage="producer"
                     size={15}
                     expression={producerHover ? 'happy' : 'idle'}
-                    animate={producerHover}
                   />
                 </span>
                 {t('Build the story with Producer')}
