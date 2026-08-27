@@ -29,15 +29,50 @@ describe('스키마 게이트 — 결손을 잡는다 (Q6 계열 방어)', () =>
 
   it('Scenes: 씬에 scene_actions 가 없으면 거부한다', () => {
     const r = ScenesSchema.safeParse({
-      scenes: [{ scene_id: 'sc_1', location: 'loc' }],
+      scenes: [{ scene_id: 'sc_1', location: 'loc', narrative_time: 'present' }],
     })
     expect(r.success).toBe(false)
   })
 
+  it('Scenes: narrative_time 누락·임의 문자열을 거부한다', () => {
+    const missing = ScenesSchema.safeParse({
+      scenes: [{ scene_id: 'sc_1', location: 'loc', scene_actions: ['a'] }],
+    })
+    const invalid = ScenesSchema.safeParse({
+      scenes: [
+        {
+          scene_id: 'sc_1',
+          location: 'loc',
+          narrative_time: 'flashback',
+          scene_actions: ['a'],
+        },
+      ],
+    })
+    expect(missing.success).toBe(false)
+    expect(invalid.success).toBe(false)
+  })
+
+  it.each(['present', 'past', 'future'] as const)(
+    'Scenes: narrative_time=%s를 허용한다',
+    (narrative_time) => {
+      const r = ScenesSchema.safeParse({
+        scenes: [{ scene_id: 'sc_1', location: 'loc', narrative_time, scene_actions: ['a'] }],
+      })
+      expect(r.success).toBe(true)
+    },
+  )
+
   it('Scenes: 미지 필드는 거부하지 않는다(원본 반환 원칙과 합)', () => {
     const r = ScenesSchema.safeParse({
       scenes: [
-        { scene_id: 'sc_1', location: 'loc', scene_actions: ['a'], weather: 'rain', extra: 1 },
+        {
+          scene_id: 'sc_1',
+          location: 'loc',
+          narrative_time: 'present',
+          scene_actions: ['a'],
+          weather: 'rain',
+          extra: 1,
+        },
       ],
       total_estimated_seconds: 10,
       unknown_root_field: true,
@@ -55,6 +90,25 @@ describe('스키마 게이트 — 결손을 잡는다 (Q6 계열 방어)', () =>
       turning_point_position: 0.5,
     })
     expect(r.success).toBe(false)
+  })
+})
+
+describe('씬 생성 프롬프트 — 서사 시점 계약', () => {
+  const s3 = readFileSync(
+    path.resolve(process.cwd(), 'src/lib/writer/pipeline/stages/s3_scenes.ts'),
+    'utf8',
+  )
+  const merged = readFileSync(
+    path.resolve(process.cwd(), 'src/lib/writer/pipeline/stages/s1s3_merged.ts'),
+    'utf8',
+  )
+
+  it.each([
+    ['S3', s3],
+    ['S1+S3 병합', merged],
+  ])('%s 출력 형식이 narrative_time과 time_of_day를 분리한다', (_name, source) => {
+    expect(source).toContain('"narrative_time": "present | past | future"')
+    expect(source).toMatch(/time_of_day[\s\S]{0,80}조명/)
   })
 })
 
