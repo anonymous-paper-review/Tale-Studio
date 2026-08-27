@@ -4,7 +4,7 @@ import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { fal } from '@fal-ai/client'
-import { type DialogueLine, buildVideoPrompt } from '@/lib/director/video-prompt'
+import { type DialogueLine, type DialogueSpeaker, buildVideoPrompt } from '@/lib/director/video-prompt'
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { getGenerationJobById, userOwnsProject } from '@/lib/generation-jobs'
@@ -504,6 +504,29 @@ export async function POST(req: Request) {
       (project as { style_anchor_key?: string | null }).style_anchor_key ?? null,
     ).catch(() => null)
     const suppressGear = !!(videoAnchor?.medium && videoAnchor.medium !== 'live_action')
+    // #g7-speakers(2026-08-27 오너 확정): 대사 화자를 "이름 (외형 앵커)"로 접지 — 샷 프롬프트가
+    //   캐릭터를 이름 없이 외형으로만 묘사하므로 이름만으로는 화면 속 누구인지 알 수 없다.
+    //   대사에 characterId 가 실제로 있을 때만 조회(무대사 샷 비용 0·테스트 목 순서 불변),
+    //   실패는 fail-open — 화자 표기는 정확도 보조지 유료 생성의 성립 조건이 아니다.
+    const dialogueLines = Array.isArray(shot.dialogue_lines) ? (shot.dialogue_lines as DialogueLine[]) : null
+    let dialogueSpeakers: Record<string, DialogueSpeaker> | null = null
+    if (dialogueLines?.some((l) => (l?.text ?? '').trim() && (l?.characterId ?? '').trim())) {
+      try {
+        const { data: chars } = await supabaseAdmin
+          .from('characters')
+          .select('character_id, name, appearance')
+          .eq('project_id', projectId)
+        if (chars?.length) {
+          dialogueSpeakers = Object.fromEntries(
+            chars
+              .filter((c) => typeof c.character_id === 'string' && c.character_id && typeof c.name === 'string' && c.name)
+              .map((c) => [c.character_id, { name: c.name, appearance: c.appearance }]),
+          )
+        }
+      } catch (err) {
+        console.warn('[director/generate-video] speaker lookup skipped:', err instanceof Error ? err.message : err)
+      }
+    }
     const { fullPrompt, prompt_parts: promptParts } = buildVideoPrompt({
       prompt,
       camera,
@@ -516,9 +539,8 @@ export async function POST(req: Request) {
       dynamicSpec,
       // #g7 (2026-08-27 오너 확정: 음성은 영상 생성기에 맡긴다) — 대사를 프롬프트에 싣는다.
       //   DB 에 있는데 여태 아무도 읽지 않아 모델이 대사의 존재를 몰랐다.
-      dialogueLines: Array.isArray(shot.dialogue_lines)
-        ? (shot.dialogue_lines as DialogueLine[])
-        : null,
+      dialogueLines,
+      dialogueSpeakers, // #g7-speakers
     })
     const falSubmitRequest = isLocal
       ? null

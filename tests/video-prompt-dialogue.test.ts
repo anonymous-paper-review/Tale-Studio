@@ -23,7 +23,7 @@ describe('G7 — 대사가 영상 프롬프트에 실린다', () => {
   })
 
   it('립싱크를 명시적으로 요구한다 — 모델은 무성 클립 편향이 있다', () => {
-    const c = dialogueClause([{ text: '가자.' }])
+    const c = dialogueClause([{ text: '가자.', characterId: 'char' }])
     expect(c).toContain('lip-synced')
     expect(c).toContain("mouth moves in sync")
   })
@@ -77,7 +77,7 @@ describe('G7 — 기존 경로를 깨지 않는다', () => {
     const r = buildVideoPrompt({
       prompt: 'x'.repeat(600), generationMethod: 'I2V', modelKey: 'happy-horse' as never,
       durationSeconds: 10, dynamicSpec: spec,
-      dialogueLines: [{ text: long }],
+      dialogueLines: [{ text: long, characterId: 'char' }],
     })
     // 계약 → 대사 → 묘사 순이므로 묘사가 길어도 대사는 살아남는다
     expect(r.fullPrompt).toContain('Spoken dialogue')
@@ -91,5 +91,69 @@ describe('G7 — 기존 경로를 깨지 않는다', () => {
       dialogueLines: [{ text: '가자.' }],
     })
     expect(r.fullPrompt.indexOf('Motion contract')).toBeLessThan(r.fullPrompt.indexOf('Spoken dialogue'))
+  })
+})
+
+describe('G7-speakers — 화자를 이름+외형 앵커로 접지한다', () => {
+  const SPEAKERS = {
+    char: { name: '강이', appearance: 'A young man of twenty. Sun-darkened face, short black hair. White cotton trousers and jeogori, straw sandals.' },
+    char_3: { name: '연이', appearance: 'A young woman of eighteen. Long braided hair, pale pink jeogori jacket and jade-green skirt.' },
+  }
+
+  it('speakers 맵이 있으면 이름과 외형 앵커가 실린다', () => {
+    const c = dialogueClause([{ text: '가자.', characterId: 'char' }], SPEAKERS)
+    expect(c).toContain('강이 (')
+    expect(c).toContain('A young man of twenty')
+  })
+
+  it('외형 앵커는 문장 경계로 잘려 과도하게 길지 않다 (~120자)', () => {
+    const c = dialogueClause([{ text: '가자.', characterId: 'char' }], SPEAKERS)
+    const anchor = c.slice(c.indexOf('(') + 1, c.indexOf(')'))
+    expect(anchor.length).toBeLessThanOrEqual(130)
+    expect(anchor.endsWith('.')).toBe(false)
+  })
+
+  it('다중 화자 샷에서 각 줄이 제 화자에게 귀속된다', () => {
+    const c = dialogueClause(
+      [
+        { text: '구례로... 정녕 가시는 거요?', characterId: 'char' },
+        { text: '강이 오라버니, 나 이제 구례 길로 가요.', characterId: 'char_3' },
+      ],
+      SPEAKERS,
+    )
+    expect(c.indexOf('강이 (')).toBeLessThan(c.indexOf('연이 ('))
+    expect(c).toContain('line 1: 강이')
+    expect(c).toContain('line 2: 연이')
+    expect(c).toContain('spoken in the order given')
+  })
+
+  it('맵에 없는 characterId 는 종전 무명 표기로 폴백한다', () => {
+    const c = dialogueClause([{ text: '가자.', characterId: 'ghost' }], SPEAKERS)
+    expect(c).toContain('the speaking character says aloud')
+  })
+
+  it('characterId 없는 라인은 V.O. 내레이션 — 립싱크 대상에서 제외한다', () => {
+    const voOnly = dialogueClause([{ text: '봄이 오고 있었다.' }], SPEAKERS)
+    expect(voOnly).toContain('voice-over')
+    expect(voOnly).not.toContain('mouth moves in sync')
+    expect(voOnly).toContain('no on-screen character mouths them')
+
+    const mixed = dialogueClause(
+      [{ text: '가자.', characterId: 'char' }, { text: '봄이 오고 있었다.' }],
+      SPEAKERS,
+    )
+    expect(mixed).toContain('mouth moves in sync')
+    expect(mixed).toContain('The voice-over line is narration')
+  })
+
+  it('buildVideoPrompt 가 dialogueSpeakers 를 절까지 배선한다', () => {
+    const r = buildVideoPrompt({
+      prompt: 'A dim room.', generationMethod: 'I2V', modelKey: 'happy-horse' as never,
+      durationSeconds: 10, dynamicSpec: spec,
+      dialogueLines: [{ text: '가자.', characterId: 'char' }],
+      dialogueSpeakers: SPEAKERS,
+    })
+    expect(r.fullPrompt).toContain('강이 (')
+    expect(r.prompt_parts.dialogue).toContain('강이')
   })
 })
