@@ -793,6 +793,10 @@ resume-session)
 
 morning)
   # 아침용(launchd): 리포트 html을 열고 밤 세션을 Orca 터미널로 되살린다.
+  # launchd 기본 PATH(/usr/bin:/bin:/usr/sbin:/sbin)에는 pnpm이 없다 — 선례(run-night-jh.sh:8)와
+  # 같은 도구 경로를 앞에 붙이되, 호출자가 이미 준 PATH는 뒤에 그대로 보존한다.
+  PATH="$HOME/.local/bin:$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}"
+  export PATH
   sh "$0" open-report || true
   sh "$0" resume-session || true
   # 브라우저 회귀 최소안 (2026-08-25 오너 결정, 계약 §6a): 메인 체크아웃에서
