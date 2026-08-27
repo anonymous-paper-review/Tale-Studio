@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { triggerAssetDrafts } from '@/lib/artist/draft-trigger'
-import type { PipelineInput } from '@/lib/writer/types/pipeline'
+import { normalizeCameraMotion } from '@/lib/writer/motion-vocabulary'
+import type { PipelineInput, ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import type { WriterV2Package, WriterV2SemanticUnit } from '@/lib/writer/v2/semantic-unit'
 
 const UUID_RE =
@@ -83,6 +84,45 @@ function sceneRows(pkg: WriterV2Package) {
   })
 }
 
+/**
+ * writer-v2 의 자유 문장 연출을 `ShotDynamicSpec` 모양으로 세운다.
+ *
+ * v2 스키마는 camera/blocking 을 문장 하나로만 받는다(`semantic-unit.ts:18-19`). 그런데
+ * 하류(`compileMotionContract`)는 camera_motion 객체와 character_motion 배열을 기대한다.
+ * 예전에는 문장을 그대로 넣어 두 가지가 동시에 났다 — character_motion 문자열에 `.forEach`
+ * 가 걸려 TypeError, camera_motion 문자열은 `raw.type` 이 undefined 라 조용히 `static` 으로
+ * 접혀 "LOCKED tripod" 계약문이 나갔다. 문장은 버리지 않고 정본 어휘로 번역해 넘긴다.
+ */
+function v2DynamicSpec(
+  shotId: string,
+  shot: { camera: string; blocking: string; transition: string },
+  characters: string[],
+): ShotDynamicSpec {
+  const { motion } = normalizeCameraMotion(shot.camera)
+  const blocking = shot.blocking.trim()
+  return {
+    shot_id: shotId,
+    camera_motion: {
+      type: motion.type as ShotDynamicSpec['camera_motion']['type'],
+      direction: motion.direction,
+      speed: motion.speed,
+      magnitude: motion.magnitude,
+    },
+    // v2 는 인물별로 쪼개 주지 않는다. 문장 하나를 통째로 한 항목에 담되 인물 지목은
+    //   등장인물이 정확히 한 명일 때만 한다 — 여럿이면 누구의 동작인지 코드가 알 수 없다.
+    character_motion: blocking
+      ? [
+          {
+            character_id: characters.length === 1 ? characters[0] : '',
+            verb: blocking,
+            magnitude: 'medium',
+          },
+        ]
+      : [],
+    motion_prompt: blocking,
+  }
+}
+
 function shotRows(pkg: WriterV2Package) {
   return pkg.units.flatMap((unit, sceneIndex) => {
     const sceneId = canonicalSceneId(sceneIndex)
@@ -119,11 +159,11 @@ function shotRows(pkg: WriterV2Package) {
         blocking: shot.blocking,
         transition: shot.transition,
       },
-      dynamic_spec: {
-        camera_motion: shot.camera,
-        character_motion: shot.blocking,
-        transition: shot.transition,
-      },
+      dynamic_spec: v2DynamicSpec(
+        canonicalShotId(sceneIndex, shotIndex),
+        shot,
+        characters,
+      ),
       design_ref: `writer-v2:${pkg.revision_id}:${unit.unit_id}:${shot.shot_id}`,
       check_notes: [
         {

@@ -117,7 +117,7 @@ ff 단계는 두지 않는다 — 지금 두 사람은 각자 로컬로 실행�
 **어떤 실패도 밤을 막지 않는다** — 기록하고 로컬에 있는 내용으로 계속한다. 자기 전에
 손으로 보내려면 `sh night-launchd.sh push-inbox`. 소비 책임은 자기 메모 파일에만
 있고, 상대 메모는 읽기 전용 참고 입력이다(§4.0). 리포트·티켓·피드백·세션 수확은 자기
-디스크의 로컬 상태로 남아 git에 올라가지 않으며(단 사람 보고서 `runs/<actor>/<run_id>/report.html` 하나만 공유한다 — 2026-08-19 오너 결정), 리포트는 자기 아침과 자기 다음 실행만
+디스크의 로컬 상태로 남아 git에 올라가지 않으며, 리포트는 자기 아침과 자기 다음 실행만
 소비한다. branch 이름의 `NIGHT_ACTOR_ID`(기본 `jh`)는 어느 컴퓨터의 밤이 만든 수리인지
 구분한다.
 
@@ -838,7 +838,7 @@ snapshot, `--harvest-project`, `--harvest-out`, canonical `--run-manifest`까지
 - 실행 산출물: `runs/<actor>/<run_id>/` — 사람 보고서 `report.html`, 기계 요약 `manifest.json`, 세션 요약 `sessions/*.md`, worktree 목록 `worktrees.json`, 중간 저장 `saves/*.md`(§8.4). actor와 run이 경로에 들어가므로 같은 날짜에 두 사람이 실행해도 서로 덮어쓰지 않는다. 날짜 하나를 덮어쓰는 `reports/YYYY-MM-DD.html` 경로는 더 쓰지 않는다 (기존 `.claude/vault/backlog/reports/`는 이력으로만 남긴다). 사람 보고서 HTML은 readable-report 표준(`~/.claude/skills/readable-report/SKILL.md`)을 따르고 매 실행마다 반드시 만든다.
 - 판정 기록: `feedback/<actor>/<run_id>/*.json` — append-only, 자기 다음 밤 실행만 소비.
 - 각 사람의 접점은 셋이다: 쓰는 곳 자기 메모 파일 `inbox/<actor>.md`(commit·push하면 상대 밤에도 보인다), 읽는 곳 자기 최신 `runs/<actor>/<run_id>/report.html`, 그리고 아침에 Orca 터미널로 이어받는 그날 밤 세션(`runs/<actor>/<run_id>/session-id.txt`의 id를 `claude --resume`으로 되살려 대화를 잇는다). 메모는 여전히 비동기로 쌓이고, 세션 이어받기는 결과를 읽고 후속 결정을 잇는 통로를 넓힌 것이지 메모 입력 방식을 바꾸지 않는다. 다른 파일을 읽어야만 진행되는 절차를 만들지 않는다.
-- git 공유 경계: 계약·실행 도구·설치 문서, 공유 메모 `inbox/`(각자 자기 파일에만 쓴다), 밤이 만든 코드 수리 branch. `backlog/sweep/`, `_archive/`, `tickets/`, `feedback/`과 `runs/`는 이 컴퓨터의 로컬 상태다 — 단 사람 보고서 `runs/<actor>/<run_id>/report.html` 하나만 공유한다(2026-08-19 오너 결정). 결과와 판정은 각자의 것이다.
+- git 공유 경계: 계약·실행 도구·설치 문서, 공유 메모 `inbox/`(각자 자기 파일에만 쓴다), 밤이 만든 코드 수리 branch. `backlog/sweep/`, `_archive/`, `tickets/`, `feedback/`과 `runs/`는 이 컴퓨터의 로컬 상태다. 결과와 판정은 각자의 것이다.
 - 티켓 상태와 작업 사본 정보.
 - 메모 스냅샷 fingerprint·범위·내용 해시·소비 상태.
 - 필요한 실험 산출물과 결과표. raw 대화·모델 원출력은 소비 시점 없이 별도 보관하지 않는다.
@@ -862,7 +862,7 @@ snapshot, `--harvest-project`, `--harvest-out`, canonical `--run-manifest`까지
 
 - 2026-08-25 (19차) · 이전 계약 해시 `d7caab7c835d0a108edc60f7d6d4158283d163e17e54001b6de4f18dac62301f` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.
   - 변경 이유: 오너 결정 — 낮 세션에서 밤 결과 검토 후 일괄 정리. 이미 인지한 사실의 재보고 중단, 화면 수리 경계의 정직화, runs/ 공유 예외의 계약 반영(2026-08-19 결정 소급), 개정 번호 병존 정리.
-  - 변경 내용: (1) §4.0 앞 오너 인지 주석 — 입력 부재·inbox 공유 단절은 문제로 재보고하지 않는다. (2) §6a 화면 수리 조항 — 격리 사본 smoke 불능 실측을 반영해 "밤은 화면 수리를 자가 머지하지 않는다"로 고치고, 아침 morning 진입점의 메인 체크아웃 smoke(--auth)를 브라우저 회귀 최소안으로 명시. (3) §2·§13 — 사람 보고서 `runs/<actor>/<run_id>/report.html` 하나만 공유 예외로 명시. (4) §15 병존 번호를 15차-a/-b·16차-a/-b/-c로 유일화(내용 무변경). (5) 작업자 정의(night-fixer·night-investigator)에 공유 저장소 stash 금지 규칙 추가 — 계약 밖 파일이라 각 파일에 기록. (6) §3.2 증서 근거 얼리기(갈래 A) — 생성 시 evidence 원문을 `.evidence/<sha256>.bin`으로 동결, 재검증은 동결 사본과 대조, 레거시 37장은 기존 동작 폴백(`night-runtime.py`·`write-receipt.py` 반영). (6) §3.2 증서 근거 얼리기(갈래 A) — 생성 시 evidence 원문을 `.evidence/<sha256>.bin`으로 동결, 재검증은 동결 사본과 대조, 레거시 37장은 기존 동작 폴백(`night-runtime.py`·`write-receipt.py` 반영).
+  - 변경 내용: (1) §4.0 앞 오너 인지 주석 — 입력 부재·inbox 공유 단절은 문제로 재보고하지 않는다. (2) §6a 화면 수리 조항 — 격리 사본 smoke 불능 실측을 반영해 "밤은 화면 수리를 자가 머지하지 않는다"로 고치고, 아침 morning 진입점의 메인 체크아웃 smoke(--auth)를 브라우저 회귀 최소안으로 명시. (3) §2·§13 — 사람 보고서 `runs/<actor>/<run_id>/report.html` 하나만 공유 예외로 명시. (4) §15 병존 번호를 15차-a/-b·16차-a/-b/-c로 유일화(내용 무변경). (5) 작업자 정의에 공유 저장소 stash 금지 규칙 추가 — 계약 밖 파일이라 해당 파일에 기록. (정정 2026-08-26: 실제 반영은 `night-fixer` 하나다. `night-investigator`는 도구가 Read/Grep/Glob뿐이라 셸이 없어 애초에 대상이 아니다.) (6) §3.2 증서 근거 얼리기(갈래 A) — 생성 시 evidence 원문을 `.evidence/<sha256>.bin`으로 동결, 재검증은 동결 사본과 대조, 레거시 37장은 기존 동작 폴백(`night-runtime.py`·`write-receipt.py` 반영).
   - 영향받는 분해 기준: §6a 자가 머지 판정에서 화면 수리가 명시적으로 제외됐다. 나머지는 문서-실제 정합화라 실행 경계 무변경.
 
 - 2026-08-18 (16차-a) · 이전 계약 해시 `68bcf07452deecf5c1bf1828c4e35b850e7b6e067854d2fbe03cdada76e236e5` · 새 계약 해시는 이 개정을 담은 커밋의 파일 해시로 확인한다.

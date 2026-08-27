@@ -11,13 +11,12 @@ allowed-tools: Read, Edit, Write, Grep, Glob, Bash, AskUserQuestion
 
 ## 활성 계약
 
-- 오너가 쓰는 자유 메모의 원문은 `.claude/vault/_INBOX.md`다. `/warp`는 오너의 원문을 대신
+- 오너가 쓰는 자유 메모의 원문은 `.claude/vault/inbox/<actor>.md`다. `/warp`는 오너의 원문을 대신
   고치거나 승인 문서로 바꾸지 않는다.
 - 실행의 해석·분해·실행·결과 기록은 `.claude/vault/backlog/_NIGHT.md` 하나를 따른다.
-  목적지 문서나 별도 수확 절차를 live 입력으로 요구하지 않는다.
-- `.claude/vault/backlog/_MORNING.md`는 실행 전 제안 심사표가 아니다. 밤 결과를 읽은 뒤
-  `merge`·`reject`·`feedback`과 이유를 결과 카드에 남기는 리뷰 기록이다.
-- 소비자와 소비 시점이 없는 독립 날짜 문서는 만들지 않는다. 티켓·실험·결과 카드가 닫힐 때
+  현재 실행의 결과 보고는 `runs/<actor>/<run_id>/report.html`, 오너 피드백은
+  `feedback/<actor>/<run_id>/`에 남긴다.
+- 소비자와 소비 시점이 없는 독립 기록은 만들지 않는다. 티켓·실험·결과 카드가 닫힐 때
   관련 기록도 함께 닫는다.
 
 ## 라우팅 원칙

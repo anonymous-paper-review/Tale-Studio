@@ -208,13 +208,19 @@ def checkpoint_valid(state):
     try: checkpoint_data(state); return True
     except (OSError, ValueError, json.JSONDecodeError): return False
 
+def worktree_present(state):
+    # Checkpoints outlive the worktree they describe; without this the listing reports a takeover that always fails.
+    if state["workspace_mode"] != "ticket-worktree": return True
+    path = state.get("worktree")
+    return bool(path) and os.path.exists(os.path.join(path, ".git"))
+
 def classification(state):
     if state["status"] == "released": return "released"
     if state["status"] == "manual_review": return "manual_review"
     if state["workspace_mode"] == "reference-only-main": return "reference_only"
     fresh = state["lease_until"] > now()
     if state["status"] in {"claimed", "running"} and fresh: return "active"
-    if (state["status"] == "paused" or not fresh) and checkpoint_valid(state): return "takeover_ready"
+    if (state["status"] == "paused" or not fresh) and checkpoint_valid(state) and worktree_present(state): return "takeover_ready"
     return "manual_review"
 
 def ensure_owner(state, args):
@@ -230,7 +236,7 @@ def ensure_unique(root, state_dir, tid, worktree, reference, actor, session_id):
             fail("worktree is reserved by another ticket")
 
 def record(state):
-    return {key: state.get(key) for key in ("ticket_id", "actor", "owner_kind", "owner_session_id", "session_history", "fencing", "status", "lease_until", "heartbeat_at", "project_root", "worktree", "workspace_mode", "latest_checkpoint_path", "latest_checkpoint_hash", "latest_checkpoint_sequence")} | {"classification": classification(state), "checkpoint_valid": checkpoint_valid(state)}
+    return {key: state.get(key) for key in ("ticket_id", "actor", "owner_kind", "owner_session_id", "session_history", "fencing", "status", "lease_until", "heartbeat_at", "project_root", "worktree", "workspace_mode", "latest_checkpoint_path", "latest_checkpoint_hash", "latest_checkpoint_sequence")} | {"classification": classification(state), "checkpoint_valid": checkpoint_valid(state), "worktree_present": worktree_present(state)}
 
 def claim(args, takeover=False):
     root = project_root(args.project); ticket(root, args.ticket_id); state_dir, state_path, _ = paths(root, args.ticket_id)

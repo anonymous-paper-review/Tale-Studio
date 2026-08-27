@@ -55,3 +55,16 @@ export async function resolveProjectId(db: SupabaseClient, explicit?: string): P
 }
 
 export const STAGES = ['producer', 'writer', 'artist', 'director', 'editor'] as const
+
+/**
+ * 두 단계 중 더 앞선(진행된) 쪽을 반환한다. 제품 코드 `src/stores/project-store.ts` 의
+ * `furtherStage` 와 같은 판정(STAGES 배열 인덱스 비교) — reachedStage/current_stage 는
+ * 단조 증가해야 하므로, 준비 도구가 단계를 쓸 때도 이미 더 앞서 있으면 낮추지 않는다.
+ * (fixture-producer-undoes-writer-unlock-2026-08-25)
+ */
+export function furtherStage(
+  a: (typeof STAGES)[number],
+  b: (typeof STAGES)[number],
+): (typeof STAGES)[number] {
+  return STAGES.indexOf(a) >= STAGES.indexOf(b) ? a : b
+}

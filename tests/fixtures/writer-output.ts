@@ -20,7 +20,7 @@
 //   pnpm fixture:writer                     # editor 까지 잠금 해제(기본)
 //   pnpm fixture:writer --stage artist
 //   pnpm fixture:writer --clean             # 이 픽스처가 만든 행만 지우고 끝
-import { makeDb, resolveProjectId, STAGES } from './_shared.ts'
+import { furtherStage, makeDb, resolveProjectId, STAGES } from './_shared.ts'
 import type { Character, Location, Scene } from '../../src/types/scene.ts'
 import type { CameraConfig, DialogueLine, GenerationMethod, LightingConfig, ShotType } from '../../src/types/shot.ts'
 import type { StageId } from '../../src/types/project.ts'
@@ -217,13 +217,46 @@ async function main() {
     ).error,
   )
 
-  fail('current_stage update', (await db.from('projects').update({ current_stage: stage }).eq('id', projectId)).error)
+  // --- current_stage 는 단조 증가(furtherStage, fixture-producer-undoes-writer-unlock-2026-08-25) ---
+  //   이미 더 앞선 단계에 있으면 이 픽스처의 --stage 로 되돌리지 않는다(기획용이 뒤늦게 돌아
+  //   편집용이 풀어놓은 잠금을 도로 잠그는 사고 방지). 제품 코드 project-store.ts 의 furtherStage 와 같은 판정.
+  const { data: existingProject, error: existingProjectError } = await db
+    .from('projects')
+    .select('current_stage')
+    .eq('id', projectId)
+    .single()
+  if (existingProjectError) throw existingProjectError
+  const rawExistingStage = existingProject?.current_stage
+  if (typeof rawExistingStage !== 'string' || !(STAGES as readonly string[]).includes(rawExistingStage)) {
+    throw new Error(`[불가] projects.current_stage 조회 결과가 올바르지 않다: ${String(rawExistingStage)}`)
+  }
+  const existingStage = rawExistingStage as (typeof STAGES)[number]
+  const targetStage = existingStage ? furtherStage(existingStage, stage) : stage
+  if (existingStage && targetStage !== stage) {
+    console.log(`  ↳ current_stage 유지: ${existingStage} 가 ${stage} 보다 앞서 있어 낮추지 않음.`)
+  }
+
+  const currentStageUpdate = await db
+    .from('projects')
+    .update({ current_stage: targetStage })
+    .eq('id', projectId)
+    .eq('current_stage', existingStage)
+    .select('id')
+  fail(
+    'current_stage update',
+    currentStageUpdate.error,
+  )
+  if (!currentStageUpdate.data || currentStageUpdate.data.length !== 1) {
+    fail('current_stage update', {
+      message: `업데이트된 행이 1개가 아니다 (${currentStageUpdate.data?.length ?? 0}개)`,
+    })
+  }
 
   console.log('writer 산출물 최소 1세트를 써넣었다.')
   console.log(`  projectId : ${projectId}`)
   console.log(`  씬 1 / 샷 ${SHOTS.length} / 인물 1 / 배경 1`)
-  console.log(`  잠금 해제 : ${stage} 까지 (projects.current_stage)`)
-  console.log(`  확인      : pnpm smoke /studio/${stage} --auth --tree`)
+  console.log(`  잠금 해제 : ${targetStage} 까지 (projects.current_stage)`)
+  console.log(`  확인      : pnpm smoke /studio/${targetStage} --auth --tree`)
 }
 
 main().catch((err) => {

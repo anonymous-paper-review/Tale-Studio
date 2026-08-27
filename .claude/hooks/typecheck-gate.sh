@@ -8,13 +8,23 @@
 cd "${CLAUDE_PROJECT_DIR}" || exit 0
 
 if [ -f package.json ] && grep -q '"typecheck"' package.json; then
-  OUT=$(pnpm typecheck 2>&1)
+  CHECK=(pnpm typecheck)
 else
-  OUT=$(npx tsc --noEmit 2>&1)
+  CHECK=(npx tsc --noEmit)
 fi
 
-if echo "$OUT" | grep -qE 'error TS'; then
-  HEAD=$(echo "$OUT" | head -30)
+OUT=$("${CHECK[@]}" 2>&1)
+STATUS=$?
+
+if [ "$STATUS" -ne 0 ] || printf '%s\n' "$OUT" | grep -qE 'error TS'; then
+  HEAD=$(printf '%s\n' "$OUT" | head -30)
+  if [ "$STATUS" -eq 124 ] || [ "$STATUS" -eq 137 ] || [ "$STATUS" -eq 143 ]; then
+    HEAD="TypeScript 검사 명령이 timeout으로 종료됐습니다 (종료 코드: $STATUS).
+$HEAD"
+  elif [ "$STATUS" -ne 0 ]; then
+    HEAD="TypeScript 검사 명령이 실패했습니다 (종료 코드: $STATUS).
+$HEAD"
+  fi
   cat >&2 <<EOF
 TypeScript 에러가 있습니다:
 $HEAD
