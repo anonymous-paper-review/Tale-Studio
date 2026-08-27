@@ -52,8 +52,11 @@ describe('compileMotionContract', () => {
       8,
     )
     expect(c.text).toContain('over the full 8 seconds')
-    expect(c.text).toContain('8-second duration')
-    expect(c.text).toContain('fully completed')
+    // #g1 (2026-08-27): 긴 샷(>=7s)의 pace 문장이 바뀌었다 — "N초에 걸쳐 고르게"만 말하면
+    //   모델이 전체를 느리게 만들어 슬로우모션이 됐다(오너 실측). 지키려는 의도는 그대로다:
+    //   ① 샷 길이가 계약문에 실린다 ② 동작이 완결된다는 조항이 있다.
+    expect(c.text).toContain('8 seconds')
+    expect(c.text).toMatch(/fully completed|completes well before the end/)
     expect(c.text).toContain('"pulls the shard free"')
     expect(c.text).toContain('large, clearly visible movement')
   })
