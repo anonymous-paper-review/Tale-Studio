@@ -415,6 +415,9 @@ function SidebarVideoUsage() {
             <span className="mt-0.5 block text-xs text-muted-foreground">
               {t('Every video generation (including previz and retakes) counts toward the limit.')}
             </span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              {t('When the limit is reached, new video generations are blocked.')}
+            </span>
           </TooltipContent>
         </Tooltip>
       </FooterIconItem>

@@ -5,6 +5,7 @@ import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { refreshGenerationQueue } from '@/lib/generation-queue'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   GeneratedImage,
@@ -227,6 +228,7 @@ function ShotCell({
         body: JSON.stringify({ projectId: cardProjectId, shotIds: [writerShotId], force: true }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      refreshGenerationQueue() // 다음 폴링 틱을 기다리지 않고 카드 오버레이를 켠다(#f10)
       toast.success(t('Previz regeneration started — this card updates when the new frames land.'))
     } catch (e) {
       toast.error(
@@ -572,7 +574,13 @@ function ShotCell({
         <GeneratingOverlay
           active={generating}
           label={
-            imageWaitingOnly ? t('Waiting to generate image') : imageGenerating ? t('Generating image') : t('Generating video')
+            imageWaitingOnly
+              ? t('Waiting to generate image')
+              : imageGenerating
+                ? mediaMode === 'previz'
+                  ? t('Regenerating previz')
+                  : t('Generating image')
+                : t('Generating video')
           }
           beamColor={imageGenerating ? 'success' : 'primary'}
         />
@@ -718,9 +726,38 @@ export function StoryboardGridView({
   // 진행 중 잡 (#queue-restore) — 셀마다 훅을 걸면 폴링은 공유돼도 리렌더가 카드 수만큼 늘어난다.
   //   여기서 한 번 읽어 집합으로 내려보낸다.
   const activeJobs = useActiveGenerationJobs(projectId)
-  const queuedImageShots = useMemo(
-    () => activeShotIds(activeJobs, ['shot_storyboard', 'storyboard_real_grid']),
+  // #f10: 러프 재생성 잡이 활성 목록에서 빠지는 순간(=완료/실패) 캔버스를 재수화해 새 프레임을
+  //   바로 반영한다 — 종전엔 탭을 떠났다 와야 보였다. 마운트 첫 렌더(prev 빈 집합)는 발화 없음.
+  const activeRoughShots = useMemo(
+    () => activeShotIds(activeJobs, ['shot_rough_storyboard']),
     [activeJobs],
+  )
+  const prevRoughRef = useRef<ReadonlySet<string>>(new Set())
+  useEffect(() => {
+    const prev = prevRoughRef.current
+    prevRoughRef.current = activeRoughShots
+    let finished = false
+    for (const id of prev) {
+      if (!activeRoughShots.has(id)) {
+        finished = true
+        break
+      }
+    }
+    if (finished && projectId) {
+      void useDirectorCanvasStore.getState().hydrateFromDb(projectId).catch(() => {})
+    }
+  }, [activeRoughShots, projectId])
+  const queuedImageShots = useMemo(
+    // #f10(2026-08-27 오너): previz 모드에선 러프 재생성 잡도 "생성 중"의 근거다 — 큐 진실이라
+    //   탭을 떠났다 와도 오버레이가 복원되고, 문구가 없어 재생성을 또 누르던 문제가 사라진다.
+    () =>
+      activeShotIds(
+        activeJobs,
+        mediaMode === 'previz'
+          ? ['shot_storyboard', 'storyboard_real_grid', 'shot_rough_storyboard']
+          : ['shot_storyboard', 'storyboard_real_grid'],
+      ),
+    [activeJobs, mediaMode],
   )
   const queuedVideoShots = useMemo(
     () => activeShotIds(activeJobs, ['shot_video']),

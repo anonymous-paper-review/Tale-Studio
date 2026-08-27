@@ -1241,4 +1241,9 @@ export const KO: Record<string, string> = {
     '이 프로젝트의 영상 생성: {limit}회 중 {used}회 사용',
   'Every video generation (including previz and retakes) counts toward the limit.':
     'previz·재생성을 포함한 모든 영상 생성이 한도에서 차감돼요.',
+  'When the limit is reached, new video generations are blocked.':
+    '한도에 도달하면 새 영상 생성이 막혀요.',
+  'This project has reached its video generation limit ({limit}). New video generations are blocked.':
+    '이 프로젝트의 영상 생성 한도({limit}회)를 모두 사용했어요. 새 영상 생성이 제한돼요.',
+  'Regenerating previz': 'Previz 재생성 중',
 }
