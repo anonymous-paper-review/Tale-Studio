@@ -115,9 +115,33 @@ function cameraClause(
   }
 }
 
-function subjectClauses(dyn: ShotDynamicSpec): string[] {
+/**
+ * character_motion 을 배열로 세운다.
+ *   writer-v2 는 이 칸에 배열이 아니라 자유 문장 하나를 저장한다(실측: shots 8행,
+ *   design_ref `writer-v2:…`). 옛 코드는 문자열에 그대로 `.forEach` 를 불러 TypeError 로
+ *   죽었고, 그 예외가 영상 발주 경로를 통째로 끊었다. 문장은 동사 한 줄로 받아 살린다.
+ */
+function characterMotions(raw: ShotDynamicSpec['character_motion'] | string | null | undefined) {
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === 'string' && raw.trim()) {
+    return [{ character_id: '', verb: raw.trim(), magnitude: 'medium' as const }]
+  }
+  return []
+}
+
+// 긴 샷의 "펴짐"을 막는 기준 길이(#g1 2026-08-27 오너: "End 프레임 변화폭이 적음 → 슬로우모션").
+//   카메라 절은 durationSeconds 를 받아 "N초에 걸쳐"를 말했는데 피사체 절은 길이를 아예 안 봤다.
+//   그래서 10초 샷과 5초 샷이 똑같이 "a small, restrained movement" 로 나갔다(실측:
+//   sh_01_01 10s / sh_02_04 5s 둘 다 magnitude small). 같은 동작을 10초에 펴면 그게 슬로우모션이다.
+//   해법은 magnitude 를 조작하는 게 아니라 — 그건 연출 의도다 — "이 길이 안에서 무엇이
+//   완결돼야 하는가"를 덧붙이는 것이다. 짧은 샷은 한 동작을 또렷하게, 긴 샷은 그 동작이
+//   끝난 뒤에도 화면이 죽지 않게 후속 여파(무게 이동·호흡·옷자락)까지 이어가도록 요구한다.
+const LONG_SHOT_SECONDS = 7
+
+function subjectClauses(dyn: ShotDynamicSpec, durationSeconds: number): string[] {
   const out: string[] = []
-  ;(dyn.character_motion ?? []).forEach((m, i) => {
+  const isLong = durationSeconds >= LONG_SHOT_SECONDS
+  ;characterMotions(dyn.character_motion).forEach((m, i) => {
     if (!m?.verb?.trim()) return
     // 교정기 경유(#motion-vocab): 옛 코드는 어휘 밖 값을 else 로 흘려 최소값으로 떨궜다.
     //   그래서 인물 magnitude `moderate`(카메라 어휘와 혼동) 가 "micro" 로 뒤집혀 나갔다(실측).
@@ -131,7 +155,13 @@ function subjectClauses(dyn: ShotDynamicSpec): string[] {
           : mag === 'small'
             ? 'a small, restrained movement'
             : 'a barely-perceptible micro movement'
-    out.push(`subject ${i + 1}: "${w(m.verb)}" — ${scale}`)
+    // 긴 샷에서 작은 동작 하나만 지시하면 남는 시간이 정지 화면이 된다 — 그 시간을 채울
+    //   후속 여파를 함께 요구한다. 새 동작을 지어내라는 게 아니라 같은 동작의 뒤끝이다.
+    const tail =
+      isLong && (mag === 'small' || mag === 'micro')
+        ? ' — then let its aftermath carry the remaining time (weight settling, breath, cloth and hair still moving); never freeze after it lands'
+        : ''
+    out.push(`subject ${i + 1}: "${w(m.verb)}" — ${scale}${tail}`)
   })
   ;(dyn.gaze_arc ?? []).forEach((g) => {
     if (g && g.from !== g.to) out.push(`gaze turns from ${w(g.from)} to ${w(g.to)}`)
@@ -153,11 +183,16 @@ export function compileMotionContract(
   if (!dyn) return { text: '', cameraStatic: false }
   const { motion } = normalizeCameraMotion(dyn.camera_motion)
   const cam = cameraClause(motion, durationSeconds)
-  const subjects = subjectClauses(dyn)
+  const subjects = subjectClauses(dyn, durationSeconds)
   const subjectText = subjects.length
     ? `Subjects: ${subjects.join('; ')}.`
     : 'Subjects: no scripted action — only subtle natural life (breathing, cloth, hair, atmosphere), never frozen.'
-  const pace = `Pace the motion across the full ${durationSeconds}-second duration — by the final frame every scripted movement has fully completed.`
+  // 긴 샷은 "고르게 펴라"만 말하면 모델이 전체를 느리게 만든다(#g1). 완결 시점을 앞에 두고
+  //   남은 시간은 여파로 채우게 나눠 말한다 — 동작 자체는 제 속도로 일어나야 한다.
+  const pace =
+    durationSeconds >= LONG_SHOT_SECONDS
+      ? `Timing: perform each scripted movement at natural, lifelike speed — do NOT slow it down to fill ${durationSeconds} seconds. The main action completes well before the end; the remaining time is carried by its aftermath and ambient life, not by stretching the action.`
+      : `Pace the motion across the full ${durationSeconds}-second duration — by the final frame every scripted movement has fully completed.`
   // 금지절의 범위(#motion-vocab 2026-08-11): 옛 문구는 "beyond this contract" 로 끝나
   //   이 계약문을 프롬프트의 **유일한** 권위로 선언했다. 그런데 계약문 뒤에는 모델이 쓴 장면
   //   묘사문(motion_prompt)이 이어 붙고, 거기에만 있는 연출 정보가 있다 — 실측에서 계약문은
