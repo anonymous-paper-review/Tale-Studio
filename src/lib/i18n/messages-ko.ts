@@ -1192,6 +1192,9 @@ export const KO: Record<string, string> = {
     '{names} 을(를) 올렸어요. 읽고 스토리로 정리해 주세요.',
   'Please check the attached files.': '첨부한 파일을 확인해 주세요.',
 
+  // ── Director: real 빈 카드 안내(#real-empty-guidance) ──
+  'Generate a Real image.': 'Real 이미지를 생성해주세요.',
+
   // ── Editor: 빈 화면 3분리(#pps-empty-states) — 로딩/실패/정상 빈 구분 ──
   'Could not load your clips.': '클립을 불러오지 못했어요.',
   // 'Retry' 키는 위 아티스트 섹션에 이미 있다(공용).

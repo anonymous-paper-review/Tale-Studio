@@ -1103,6 +1103,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             selectedEdgeId: null,
             viewportInitialized: viewportInitializedProjects[projectId] === true,
             viewportInitializedProjects,
+            // #first-entry-node(2026-08-27 오너): 이 브라우저가 처음 보는 프로젝트는 Node 뷰
+            //   (+미디어 모드 기본 previz)에서 출발한다 — persist 키가 전역이라 직전 프로젝트의
+            //   storyboard 탭이 새 프로젝트 최초 진입을 덮던 것. 재진입은 종전대로 마지막 뷰 유지.
+            ...(viewportInitializedProjects[projectId] === true
+              ? {}
+              : { viewMode: 'node' as const, storyboardMediaMode: 'previz' as const }),
             popupNodeId: null,
             deleteConfirmInfo: null,
             relationModal: null,

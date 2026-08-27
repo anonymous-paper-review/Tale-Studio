@@ -27,11 +27,7 @@ import {
 } from '@/stores/director-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
-import {
-  useActiveGenerationJobs,
-  activeShotIds,
-  type ActiveJob,
-} from '@/lib/generation-queue'
+import { useActiveGenerationJobs, activeShotIds } from '@/lib/generation-queue'
 import { useRoughStoryboard, useShotActionDescription } from '@/features/director/hooks/use-rough-storyboard'
 import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
@@ -177,7 +173,6 @@ function ShotCell({
   sceneLabel,
   queuedImageShots,
   queuedVideoShots,
-  activeJobs,
   descriptionFontSize,
   shotMention,
 }: {
@@ -190,7 +185,6 @@ function ShotCell({
   queuedImageShots: ReadonlySet<string>
   queuedVideoShots: ReadonlySet<string>
   /** 큐 원본 — 경과시간 durable 기준점(activeStartedAt) 계산용. */
-  activeJobs: readonly ActiveJob[]
   descriptionFontSize: string
   shotMention?: CardMention
 }) {
@@ -508,14 +502,25 @@ function ShotCell({
             )}
           </div>
         ) : mediaMode === 'real' ? (
-          // 실사 미생성(#e3 2026-08-12) — previz 를 깔면(흐려도) "뭔가 나왔다/해야 한다"로
-          //   읽힌다. 진입 자동 생성이 곧 채울 자리이므로 검은 바탕 + 회전 링으로 "준비 중"만 말한다.
-          <div className="absolute inset-0 flex items-center justify-center bg-black">
-            <span
-              aria-hidden
-              className="size-8 animate-spin rounded-full border-2 border-white/15 border-t-white/70 motion-reduce:animate-none"
-            />
-          </div>
+          generating ? (
+            // 실사 생성 중(#e3 2026-08-12) — previz 를 깔면(흐려도) "뭔가 나왔다"로 읽히므로
+            //   검은 바탕 + 회전 링. 오버레이(bg-background/20)가 반투명이라 이 바닥이 비친다.
+            <div className="absolute inset-0 flex items-center justify-center bg-black">
+              <span
+                aria-hidden
+                className="size-8 animate-spin rounded-full border-2 border-white/15 border-t-white/70 motion-reduce:animate-none"
+              />
+            </div>
+          ) : (
+            // 실사 미생성(#real-empty-guidance 2026-08-27 오너): 진입 자동 생성이 꺼진 뒤로
+            //   스피너는 "곧 채워진다"는 거짓말이 됐다 — 사용자가 눌러야 생기니 안내 문구로.
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black p-3 text-center">
+              <ImageIcon className="size-6 text-white/30" />
+              <span className="text-[11px] font-medium text-white/70">
+                {t('Generate a Real image.')}
+              </span>
+            </div>
+          )
         ) : (
           <div className="flex size-full items-center justify-center bg-muted">
             <ImageIcon className="size-8 text-muted-foreground opacity-50" />
@@ -923,7 +928,6 @@ export function StoryboardGridView({
                     sceneLabel={group.key === '__orphan__' ? null : prettyNodeLabel(group.label)}
                     queuedImageShots={queuedImageShots}
                     queuedVideoShots={queuedVideoShots}
-                    activeJobs={activeJobs}
                     descriptionFontSize={descriptionFontSize}
                     shotMention={mentionFor('shot', shot.id, mediaMode)}
                   />
