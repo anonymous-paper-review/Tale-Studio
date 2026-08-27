@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { displayNameOf } from '@/lib/display-name'
-import type { SceneManifest, CharacterAsset, WorldAsset } from '@/types'
+import type { SceneManifest, CharacterAppearance, CharacterAsset, WorldAsset } from '@/types'
 import { type CharacterViewKey } from '@/types/asset'
 import { candidateViewToViewKey, classifyImageStale, computeLookFingerprint, computeWorldImageSourceHash, type CandidateImage, type LookTokens } from '@/lib/image-provenance'
 import {
@@ -396,6 +396,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           { data: dbLocs },
           { data: dbCandidates },
           { data: project },
+          { data: dbAppearances },
         ] = await Promise.all([
           supabase
             .from('scenes')
@@ -419,6 +420,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .select('design_tokens, style_anchor_key')
             .eq('id', projectId)
             .maybeSingle(),
+          // #g4(2026-08-27): 캐릭터의 모습(시점·의상 변형). 기본 모습이 항상 하나 있다.
+          supabase
+            .from('character_appearances')
+            .select('character_id, appearance_key, label, is_default, era, sheet_url, portrait_url, appearance')
+            .eq('project_id', projectId)
+            .order('is_default', { ascending: false }),
         ])
 
         // 후보 히스토리: character_id + viewKey 로 그룹핑, generated_at desc 정렬
@@ -488,9 +495,26 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             })),
             locations: dbLocations,
           }
+          // 캐릭터별 모습 묶음(#g4). 하나뿐이면 카드는 지금과 똑같이 보인다.
+          const appearancesByChar = new Map<string, CharacterAppearance[]>()
+          for (const a of dbAppearances ?? []) {
+            const list = appearancesByChar.get(a.character_id as string) ?? []
+            list.push({
+              appearanceKey: a.appearance_key as string,
+              label: a.label as string,
+              isDefault: !!a.is_default,
+              era: (a.era as string | null) ?? null,
+              sheetUrl: (a.sheet_url as string | null) ?? null,
+              portraitUrl: (a.portrait_url as string | null) ?? null,
+              appearance: (a.appearance as string | null) ?? null,
+            })
+            appearancesByChar.set(a.character_id as string, list)
+          }
+
           const characterAssets: CharacterAsset[] = (dbChars ?? []).map((c) => ({
             characterId: c.character_id,
             name: displayNameOf(c.name, c.character_id),
+            appearances: appearancesByChar.get(c.character_id as string) ?? [],
             views: {
               main: c.view_main ?? null,
               back: c.view_back ?? null,

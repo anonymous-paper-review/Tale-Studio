@@ -43,6 +43,17 @@ export function CharacterPanel({
   columns = 1,
   onZoomStep,
 }: { columns?: number; onZoomStep?: (dir: 1 | -1) => void } = {}) {
+  // #g4(2026-08-27): 카드 안에서 고른 모습. 캐릭터당 하나씩 기억한다.
+  //   모습이 하나뿐인 캐릭터는 탭 자체가 안 뜨므로 이 상태를 쓰지 않는다.
+  const [pickedAppearance, setPickedAppearance] = useState<Record<string, string>>({})
+
+  /** 카드에 보일 시트 URL. 고른 모습이 있으면 그것, 없으면 기존 view_main(#g4). */
+  const shownSheet = (c: { characterId: string; views: { main: string | null }; appearances?: Array<{ appearanceKey: string; isDefault: boolean; sheetUrl: string | null }> }) => {
+    const list = c.appearances ?? []
+    if (list.length <= 1) return c.views.main
+    const key = pickedAppearance[c.characterId] ?? list.find((a) => a.isDefault)?.appearanceKey
+    return list.find((a) => a.appearanceKey === key)?.sheetUrl ?? c.views.main
+  }
   const t = useT()
   const {
     sceneManifest,
@@ -248,6 +259,41 @@ export function CharacterPanel({
                 )}
               </div>
 
+              {/* 모습 탭(#g4 2026-08-27) — 옥화 ┬ 현재 └ 젊은 시절.
+                  모습이 하나뿐이면 그리지 않는다: 지금까지의 카드와 똑같이 보인다.
+                  카드를 늘리는 대신 여기서 갈아끼우는 이유는, 카드를 나누면
+                  "이 둘이 같은 사람"이라는 정보가 화면에서 사라지기 때문이다. */}
+              {(char.appearances?.length ?? 0) > 1 && (
+                <div className="mb-2 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+                  {char.appearances!.map((ap) => {
+                    const active =
+                      (pickedAppearance[char.characterId] ??
+                        char.appearances!.find((a) => a.isDefault)?.appearanceKey) ===
+                      ap.appearanceKey
+                    return (
+                      <button
+                        key={ap.appearanceKey}
+                        type="button"
+                        onClick={() =>
+                          setPickedAppearance((prev) => ({
+                            ...prev,
+                            [char.characterId]: ap.appearanceKey,
+                          }))
+                        }
+                        className={cn(
+                          'rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors',
+                          active
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border text-muted-foreground hover:bg-accent',
+                        )}
+                      >
+                        {ap.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
               {/* 캐릭터 = 턴어라운드 시트 1장(모든 뷰, 와이드 3:2) / 사물 = 단일 이미지(정사각). 둘 다 main 하나(#7).
                   셀 클릭 → 상세/재생성 Dialog. */}
               <Tooltip>
@@ -262,9 +308,9 @@ export function CharacterPanel({
                   >
                     {/* 사람 시트는 hover 리전 순환(#d2) — 컨셉→디테일→스케치→표정을 잘라 옮겨
                         다닌다. 생성 중·이미지 없음·사물은 기존 placeholder 경로 그대로. */}
-                    {!isObject && char.views.main && !isViewGenerating('main') ? (
+                    {!isObject && shownSheet(char) && !isViewGenerating('main') ? (
                       <TurnaroundRegionCycle
-                        url={char.views.main}
+                        url={shownSheet(char)!}
                         alt={t('{name} turnaround sheet', { name: char.name || t('Character') })}
                       />
                     ) : (
