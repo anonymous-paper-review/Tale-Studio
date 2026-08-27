@@ -9,8 +9,8 @@ import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
 import { falVideoSubmit } from '@/lib/writer/llm/fal'
 import { createGenerationJob, STALE_QUEUED_MS } from '@/lib/generation-jobs'
-import { checkGenerationCapacity } from '@/lib/generation-quota'
-import { quotaRejectionResponse } from '@/lib/api/quota'
+import { checkGenerationCapacity, checkProjectVideoBudget } from '@/lib/generation-quota'
+import { quotaRejectionResponse, videoBudgetRejectionResponse } from '@/lib/api/quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 
@@ -45,6 +45,8 @@ export async function POST(req: Request) {
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
 
+    const budget = await checkProjectVideoBudget(projectId, access.userId!) // #f4 총량 게이트
+    if (!budget.ok) return videoBudgetRejectionResponse(budget, { projectId, kind: 'shot_previz_video', userId: access.userId })
     const quota = await checkGenerationCapacity(access.userId!, 'video')
     if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'shot_previz_video', userId: access.userId })
 

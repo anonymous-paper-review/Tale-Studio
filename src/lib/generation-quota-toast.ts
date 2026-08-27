@@ -68,11 +68,45 @@ export function notifyQuotaExceeded(body: QuotaExceededBody | null | undefined):
   toast.info(message, { id: 'generation-quota-exceeded' })
 }
 
+/** #f4(2026-08-27): 프로젝트 영상 예산 소진 429 — code 'video_budget_exceeded'. */
+export interface VideoBudgetExceededBody {
+  code?: string
+  used?: number
+  limit?: number
+}
+
+export function isVideoBudgetExceeded(
+  status: number,
+  body: unknown,
+): body is VideoBudgetExceededBody {
+  return (
+    status === 429 &&
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { code?: unknown }).code === 'video_budget_exceeded'
+  )
+}
+
+export function notifyVideoBudgetExceeded(body: VideoBudgetExceededBody | null | undefined): void {
+  const locale = useLocaleStore.getState().locale
+  toast.error(
+    translate(locale, 'This project has reached its video generation limit ({limit}). New video generations are blocked.', {
+      limit: body?.limit ?? 100,
+    }),
+    { id: 'generation-quota-exceeded' },
+  )
+}
+
 /**
  * 429 면 안내하고 true. 호출부 관용구: `if (await notifyIfQuotaExceeded(res, body)) return`.
  * 429 가 아니면 아무 것도 하지 않고 false — 나머지 오류 처리는 호출부 몫이다.
+ * 동시성 한도와 프로젝트 영상 예산(#f4) 둘 다 여기서 갈라 안내한다 — 진입점들은 이 함수 하나만 안다.
  */
 export function notifyIfQuotaExceeded(status: number, body: unknown): boolean {
+  if (isVideoBudgetExceeded(status, body)) {
+    notifyVideoBudgetExceeded(body)
+    return true
+  }
   if (!isQuotaExceeded(status, body)) return false
   notifyQuotaExceeded(body)
   return true

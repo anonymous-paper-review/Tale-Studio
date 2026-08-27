@@ -7,7 +7,7 @@
 //
 // server-only: recordWriterObservabilityEvent 가 service-role 클라이언트를 쓴다.
 import { NextResponse } from 'next/server'
-import { quotaExceededBody, type QuotaCheck } from '@/lib/generation-quota'
+import { quotaExceededBody, videoBudgetExceededBody, type ProjectVideoBudget, type QuotaCheck } from '@/lib/generation-quota'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 
 export interface QuotaRejectionContext {
@@ -33,4 +33,18 @@ export function quotaRejectionResponse(
     userId: ctx.userId ?? null,
   })
   return NextResponse.json(quotaExceededBody(check), { status: 429 })
+}
+
+/** #f4: 프로젝트 영상 예산 소진 429 — 동시성 거절과 같은 관측 이벤트 규약. */
+export function videoBudgetRejectionResponse(
+  budget: ProjectVideoBudget,
+  ctx: QuotaRejectionContext,
+): NextResponse {
+  void recordWriterObservabilityEvent(ctx.projectId, 'generation_submit_rejected_video_budget', {
+    kind: ctx.kind,
+    used: budget.used,
+    limit: budget.limit,
+    userId: ctx.userId ?? null,
+  })
+  return NextResponse.json(videoBudgetExceededBody(budget), { status: 429 })
 }

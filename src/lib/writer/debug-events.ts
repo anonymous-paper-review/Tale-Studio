@@ -28,6 +28,9 @@ export const WRITER_OBSERVABILITY_EVENTS = [
   // anywhere (owner autopsy 08-26: the "everything died" session had zero failed jobs in the
   // ledger; the invisible losses were unrecorded quota rejections).
   'generation_submit_rejected_quota',
+  // #f4(2026-08-27): refusal because the project's total video budget (100) is spent — same
+  //   pre-ledger trace rationale as the quota rejection above.
+  'generation_submit_rejected_video_budget',
   // Coordinate (4) of the generation lifecycle: the client actually folded a settled job's
   // result into visible UI state (store rehydrate after the job left the active queue).
   // A completed job with no ui_reflected row = "finished but the screen never showed it".

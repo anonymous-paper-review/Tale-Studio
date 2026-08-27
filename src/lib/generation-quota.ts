@@ -25,6 +25,7 @@ import {
   type GenerationJobKind,
 } from '@/lib/generation-jobs'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { PROJECT_VIDEO_GENERATION_LIMIT } from '@/lib/plan-limits'
 import { isAdminEmail } from '@/lib/admin'
 
 /** 쿼터 카테고리 — Take 과금 축과 동일한 경계. 영상 kind 만 video, 나머지 전부 image. */
@@ -154,5 +155,43 @@ export function quotaExceededBody(check: QuotaCheck) {
     category: check.category,
     queued: check.queued,
     limit: check.limit,
+  }
+}
+
+// ── #f4 하드 블록(2026-08-27 오너 확정): 프로젝트당 영상 생성 총량 게이트 ──
+// 사이드바 게이지와 같은 집계(영상 kind 잡 행 수 — 실패 포함)를 진실로 쓴다. admin 은 면제
+//   (운영·QA), 집계 실패는 fail-open — 동시성 게이트와 같은 규약.
+export interface ProjectVideoBudget {
+  ok: boolean
+  used: number
+  limit: number
+}
+
+export async function checkProjectVideoBudget(
+  projectId: string,
+  userId: string,
+): Promise<ProjectVideoBudget> {
+  const limit = PROJECT_VIDEO_GENERATION_LIMIT
+  try {
+    if (await isAdminUserId(userId)) return { ok: true, used: 0, limit }
+    const { count } = await supabaseAdmin
+      .from('generation_jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+      .in('kind', VIDEO_JOB_KINDS as unknown as string[])
+    const used = count ?? 0
+    return { ok: used < limit, used, limit }
+  } catch {
+    return { ok: true, used: 0, limit }
+  }
+}
+
+/** 429 본문 — 클라(generation-quota-toast)가 code 로 문구를 고른다. 서버 문자열은 폴백. */
+export function videoBudgetExceededBody(budget: ProjectVideoBudget) {
+  return {
+    error: `This project has used all ${budget.limit} video generations (${budget.used}/${budget.limit}).`,
+    code: 'video_budget_exceeded' as const,
+    used: budget.used,
+    limit: budget.limit,
   }
 }

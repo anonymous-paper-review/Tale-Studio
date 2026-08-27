@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/supabase/auth', () => ({ getUser: mocks.getUser }))
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 vi.mock('@/lib/generation-jobs', () => ({ userOwnsProject: mocks.userOwnsProject, getGenerationJobById: mocks.getJob, getGenerationJobByRequestId: mocks.getJob }))
-vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: mocks.checkGenerationCapacity, quotaExceededBody: () => ({ error: 'quota' }) }))
+vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: mocks.checkGenerationCapacity, quotaExceededBody: () => ({ error: 'quota' }), checkProjectVideoBudget: async () => ({ ok: true, used: 0, limit: 100 }), videoBudgetExceededBody: () => ({ error: 'video budget' }) }))
 vi.mock('@/lib/director-video-takes', () => ({ reserveDirectorVideoTake: mocks.reserveTake, reserveDirectorVideoRegeneration: mocks.reserveRegeneration, attachProviderRequestToReservedVideoJob: mocks.attach, markDirectorVideoAttemptFailed: mocks.fail }))
 vi.mock('@/lib/director/video-prompt', () => ({ buildVideoPrompt: () => ({ fullPrompt: 'prompt', prompt_parts: [] }) }))
 vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => 'https://webhook.test' }))

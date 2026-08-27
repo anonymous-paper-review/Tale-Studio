@@ -12,8 +12,8 @@ import {
   linkGenerationJobToChatTrace,
   userOwnsProject,
 } from '@/lib/generation-jobs'
-import { checkGenerationCapacity } from '@/lib/generation-quota'
-import { quotaRejectionResponse } from '@/lib/api/quota'
+import { checkGenerationCapacity, checkProjectVideoBudget } from '@/lib/generation-quota'
+import { quotaRejectionResponse, videoBudgetRejectionResponse } from '@/lib/api/quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import {
@@ -466,6 +466,9 @@ export async function POST(req: Request) {
       )
     }
     if (!exactReplay) {
+      // #f4: 프로젝트 총량(100)이 동시성보다 먼저 — "지금 바빠서"가 아니라 "예산 소진"은 더 강한 no 다.
+      const budget = await checkProjectVideoBudget(projectId, user.id)
+      if (!budget.ok) return videoBudgetRejectionResponse(budget, { projectId, kind: 'shot_video', userId: user.id })
       const quota = await checkGenerationCapacity(user.id, 'video')
       if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'shot_video', userId: user.id })
     }
