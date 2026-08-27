@@ -1,0 +1,13 @@
+{
+  "model": "alibaba/happy-horse/reference-to-video",
+  "input": {
+    "prompt": "Motion contract: Camera: tracks slow with the subject toward deeper into the scene (background flows toward past the camera). The camera itself travels — this is not a rotation in place. Moderate amplitude, spread evenly over the full 5 seconds. Subjects: subject 1: \"walks forward\" — a clear movement that completes; gaze turns from downward to forward. Pace the motion across the full 5-second duration — by the final frame every scripted movement has fully completed. Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.. Kang-i walks steadily through an early morning 1940s Korean market alley carrying a wooden candy tray. Natural walking motion, subtle fabric movement, cinematic realism. The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.",
+    "duration": 5,
+    "image_urls": [
+      "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/f44a846b-1e9f-4c2a-b1a1-264ca193ff43/aa2aaf98-2a2a-4e36-9781-6be7ac56a71c/shots/v1-2765fb001202592289b4278a0364732d00745f392fedb03e8d6cf3f4ee3b1c3e_storyboard_start.png?v=1787754325326",
+      "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/f44a846b-1e9f-4c2a-b1a1-264ca193ff43/aa2aaf98-2a2a-4e36-9781-6be7ac56a71c/shots/v1-2765fb001202592289b4278a0364732d00745f392fedb03e8d6cf3f4ee3b1c3e_storyboard_end.png?v=1787754325827"
+    ],
+    "resolution": "720p",
+    "aspect_ratio": "16:9"
+  }
+}
