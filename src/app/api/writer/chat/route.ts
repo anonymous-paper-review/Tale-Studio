@@ -10,6 +10,7 @@ import { userOwnsProject } from '@/lib/generation-jobs'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, fetchProjectLocale, responseLanguageDirective } from '@/lib/chat-format'
+import { parseDialogueLanguage, type DialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
 import { sanitizeLineRefs, validateWriterUpdates } from '@/lib/writer-chat-updates'
 import { parseFencedUpdates } from '@/lib/agentic-reply-guard'
 import {
@@ -17,6 +18,22 @@ import {
   createChatTraceId,
   type ChatLlmUsage,
 } from '@/lib/chat-trace'
+
+// #dialogue-language-chat(2026-08-27 오너): 챗으로 대사를 새로 쓰거나 고칠 때도 파이프라인과
+//   같은 대사 언어를 따른다 — 단, 사용자가 그 메시지에서 명시적으로 다른 언어를 요구하면 요청이
+//   이긴다(파이프라인의 '예외 없이'와 다른 점). 설정이 없으면 무주입(종전 동작).
+const DIALOGUE_LANGUAGE_NAME: Record<DialogueLanguage, string> = {
+  ko: '한국어', // i18n-ok: LLM 프롬프트 상수
+  en: '영어(English)', // i18n-ok: LLM 프롬프트 상수
+  ja: '일본어(日本語)', // i18n-ok: LLM 프롬프트 상수
+  zh: '중국어(中文)', // i18n-ok: LLM 프롬프트 상수
+}
+
+function dialogueLanguageChatDirective(lang: DialogueLanguage | undefined): string {
+  if (!lang) return ''
+  const name = DIALOGUE_LANGUAGE_NAME[lang]
+  return `\n\n[대사 언어] 이 프로젝트의 대사 언어는 ${name}(${lang})다. updates 로 대사 텍스트(dialogueLines 의 대사, 내레이션 등)를 새로 쓰거나 고칠 때는 ${name}로 쓴다. 예외는 하나 — 사용자가 이 메시지에서 명시적으로 다른 언어로 써 달라고 요구한 경우에만 그 요청을 따른다. 응답 본문 언어([응답 언어])와 대사 언어는 별개다.` // i18n-ok: LLM 프롬프트 디렉티브
+}
 
 const WRITER_CHAT_SYSTEM = `You are the Writers' Room assistant in an AI video production pipeline called "The Set."
 The user is reviewing the rough storyboard (pre-concept previz) of a story already broken into Scenes and Shots.
@@ -197,19 +214,24 @@ export async function POST(req: Request) {
     //   무필터로 종전 동작.
     let allowedCharacterIds: ReadonlySet<string> | undefined
     let projectLocale: Awaited<ReturnType<typeof fetchProjectLocale>> = null
+    let dialogueLanguage: DialogueLanguage | undefined
     if (typeof projectId === 'string' && projectId) {
       if (!(await userOwnsProject(projectId, user.id))) {
         return NextResponse.json({ error: 'forbidden' }, { status: 403 })
       }
-      // 로스터(#F-003 R1)와 응답 언어(#i18n-s5-batch6-chat) 조회를 병렬로 — 추가 왕복 없음.
-      const [{ data: roster }, locale] = await Promise.all([
+      // 로스터(#F-003 R1)·응답 언어(#i18n-s5-batch6-chat)·대사 언어(#dialogue-language-chat) 병렬 조회.
+      const [{ data: roster }, locale, { data: projRow }] = await Promise.all([
         supabaseAdmin.from('characters').select('character_id').eq('project_id', projectId),
         fetchProjectLocale(projectId),
+        supabaseAdmin.from('projects').select('settings').eq('id', projectId).maybeSingle(),
       ])
       allowedCharacterIds = new Set(
         (roster ?? []).map((r) => r.character_id as string).filter(Boolean),
       )
       projectLocale = locale
+      dialogueLanguage = parseDialogueLanguage(
+        (projRow?.settings as { dialogueLanguage?: unknown } | null)?.dialogueLanguage,
+      )
     }
 
     const normalizedHistory = normalizeHistory(history)
@@ -224,7 +246,8 @@ export async function POST(req: Request) {
       WRITER_CHAT_SYSTEM +
       CHAT_OUTPUT_FORMAT_GUIDE +
       CHAT_UPDATES_BATCH_GUIDE +
-      responseLanguageDirective(projectLocale)
+      responseLanguageDirective(projectLocale) +
+      dialogueLanguageChatDirective(dialogueLanguage)
     const userPrompt = `${ctx}${message}`
 
     const text = await llmChat(
