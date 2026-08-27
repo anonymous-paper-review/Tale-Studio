@@ -850,6 +850,9 @@ export type DirectorCanvasUpdate =
       preset: Partial<CameraPreset>
     }
   | { type: 'generateVideo'; id: string }
+  // #c5 (2026-08-27): 진입 자동 실사 생성을 끄면서 채팅 경로를 열었다. id 를 주면 그 샷만,
+  //   생략하면 미생성 전체를 일괄로 — 버튼과 같은 경로(generateStoryboardImage / runRealBatch)를 탄다.
+  | { type: 'generateImage'; id?: string }
   | {
       type: 'connect'
       sourceId: string
@@ -2135,8 +2138,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           return
         }
         if (isDemoSession()) return
-        // 생성 중인 화면을 우선 보여준다. 마지막 탭 기억은 생성이 끝난 뒤에도 유지된다.
-        set({ viewMode: 'storyboard', storyboardMediaMode: 'real' })
+        // #c4 (2026-08-27): 예전엔 여기서 viewMode 를 storyboard 로 밀어 Node 뷰에서 생성을
+        //   누르면 화면이 통째로 튀었다. 사용자가 있는 화면을 뺏지 않는다 — 스토리보드 뷰에
+        //   있을 때만 실사 모드로 맞춰주고, Node 뷰면 그 자리에 머문다.
+        if (get().viewMode === 'storyboard') set({ storyboardMediaMode: 'real' })
         // 연타 방어(#double-fire) — 같은 샷의 생성 버튼은 캔버스 노드/그리드 카드/상세 패널에
         //   동시에 떠 있다. 버튼마다 잠가서는 서로를 못 막으므로 샷 키 하나로 창을 공유한다.
         if (!claimAction(`director:storyboard:${shotNodeId}`)) return
@@ -2333,7 +2338,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       //   잠그므로 더 강하다. 여기에 창을 덧대면 앞 시도가 *끝난 뒤*의 정당한 재시도까지 막힌다.
       generateVideoForShot: async (shotNodeId) => {
         if (isDemoSession()) return null
-        set({ viewMode: 'storyboard', storyboardMediaMode: 'real' })
+        // #c4 (2026-08-27): Node 뷰에서 영상 생성을 눌렀는데 Storyboard 로 튀던 것 — 화면을
+        //   빼앗지 않는다. 스토리보드 뷰일 때만 실사 모드로 맞춘다.
+        if (get().viewMode === 'storyboard') set({ storyboardMediaMode: 'real' })
         const api = get()
         const shotNode = api.nodes.find((n) => n.id === shotNodeId)
         if (!shotNode || !isShotData(shotNode.data)) return null
@@ -3001,6 +3008,29 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                     reason: 'cameraPreset only on Shot/Video',
                   })
                 }
+                break
+              }
+              case 'generateImage': {
+                // 개별: Shot 노드 지정 / 전체: id 없음 → 미생성 일괄(runRealBatch, 버튼과 동일 경로)
+                const pid = get().projectId
+                if (!u.id) {
+                  // real-batch-client 가 이 스토어를 import 하므로 정적 import 는 순환이 된다.
+                  //   전체 일괄은 드문 경로라 지연 로드로 끊는다.
+                  if (pid) {
+                    void import('@/lib/director/real-batch-client').then((m) => m.runRealBatch(pid))
+                  }
+                  break
+                }
+                const imgId = resolveId(u.id)
+                const imgNode = get().nodes.find((n) => n.id === imgId)
+                if (!imgNode || !isShotData(imgNode.data)) {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'generateImage target must be Shot node',
+                  })
+                  break
+                }
+                void get().generateStoryboardImage(imgId)
                 break
               }
               case 'generateVideo': {

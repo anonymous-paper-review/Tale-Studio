@@ -14,7 +14,6 @@ import {
   isDefaultCamera,
   isDefaultLighting,
 } from '@/lib/writer/shot-config-from-design'
-import { triggerRealBatchAutofill } from '@/lib/director/real-batch-client'
 import type { CameraConfig, LightingConfig } from '@/types/shot'
 
 type WriterPromptSource = {
@@ -413,11 +412,9 @@ export function useWriterDirectorSync() {
     useDirectorCanvasStore.getState().rebuildShotChainNodes()
     if (cancelled) return
 
-    // ── Pass 2.7: 실사 보드 자율 채움(#real-grid-auto 2026-08-06) ──────────
-    // Director 첫 진입 시 러프 완비·실사 미생성 샷을 4샷 시트로 일괄 생성 — 빈칸 자율 채움(멱등).
-    // 진행 중엔 realBatchBusy 플래그가 개별 생성/재생성을 잠근다. hydrate(Pass 2.5) 이후라
-    // "미생성" 판정이 DB 진실 기준. await 하지 않음 — 캔버스 진입을 막지 않는다.
-    if (projectId) triggerRealBatchAutofill(projectId)
+    // ── Pass 2.7: 실사 보드 자율 채움 — 제거됨 (#c5 2026-08-27 오너 지시) ──
+    // 진입만으로 실사 i2i 가 발사되던 경로. 사용자가 previz 를 확인·수정할 틈 없이 과금이
+    // 먼저 나서 껐다. 실사 생성은 전체 버튼·개별 버튼·채팅 셋 중 하나로만 시작한다.
 
     // ── Pass 3: 스토리보드 자동생성 — 비활성화 (Higgsfield 노드 뷰 전환) ──
     // 목각(roughStoryboard)이 노드 뷰의 초기 상태로 남아야 하므로, 진입 시

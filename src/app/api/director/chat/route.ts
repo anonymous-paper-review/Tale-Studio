@@ -80,6 +80,8 @@ Non-destructive (direct execution):
 7. {"type":"setLighting","id":"<shotOrVideoId>","lighting":{"position":"left|top|right|front","brightness":50,"colorTemp":5600}}
 8. {"type":"setCameraPreset","id":"<shotOrVideoId>","preset":{"brand":"arri","focalLength":35,"aperture":2.8,"whiteBalance":5600}}
 9. {"type":"generateVideo","id":"<videoId>"}
+9b. {"type":"generateImage","id":"<shotId>"}  — 그 샷의 실사 이미지 생성. id 를 빼면 미생성 샷 전체 일괄.
+    (실사는 자동 생성되지 않는다 — 사용자가 버튼을 누르거나 이 액션으로만 시작한다)
 10. {"type":"connect","sourceId":"<id>","targetId":"<id>","category":"relates-to","relationText":"..."}
 11. {"type":"selectNode","id":"<id>"}
 
@@ -171,6 +173,7 @@ const VALID_UPDATE_TYPES = new Set([
   'setLighting',
   'setCameraPreset',
   'generateVideo',
+  'generateImage',
   'connect',
   'requestDelete',
   'selectNode',
@@ -331,6 +334,11 @@ function validateCanvasUpdates(raw: unknown[]): unknown[] {
         if (asString(rec.id) && pr) {
           out.push({ type: 'setCameraPreset', id: rec.id, preset: pr })
         }
+        break
+      }
+      case 'generateImage': {
+        // id 는 선택 — 없으면 미생성 전체 일괄(#c5). 있으면 그 Shot 만.
+        out.push(asString(rec.id) ? { type: 'generateImage', id: rec.id } : { type: 'generateImage' })
         break
       }
       case 'generateVideo':

@@ -25,7 +25,7 @@ import {
 import { Loader2, ImageIcon, X, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
 
 import { toast } from 'sonner'
-import { runRealBatch, triggerRealBatchAutofill } from '@/lib/director/real-batch-client'
+import { runRealBatch } from '@/lib/director/real-batch-client'
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
 import { StageHelpBadge } from '@/components/stage-help-badge'
@@ -856,15 +856,12 @@ export default function DirectorCanvasPage() {
     }
   }, [setPlayingNodeForPause])
 
-  // 실사 보드 자율 채움을 진입 즉시 발사(#real-grid-auto 이관 2026-08-11) — 서버 라우트는 DB 만
-  //   읽으므로 캔버스 hydration 을 기다릴 이유가 없다. 옛 자리(sync 훅 Pass 2.7)는 안전망으로 유지.
-  //   가드(프로젝트당 1회)와 멱등(미생성만)이 이중이라 둘 다 불러도 1회만 나간다.
-  useEffect(() => {
-    if (guideProjectId && guideProjectId !== 'default' && stageReady) {
-      triggerRealBatchAutofill(guideProjectId)
-    }
-  }, [guideProjectId, stageReady])
-
+  // 진입 자동 실사 생성 제거 (#c5 2026-08-27 오너 지시). 예전엔 Director 로 넘어오는 것만으로
+  //   i2i 실사 일괄이 발사돼 사용자가 previz 를 손볼 틈이 없었고, 원치 않는 과금이 먼저 났다.
+  //   실사 생성 경로는 이제 셋 다 사람의 명시적 행동이다:
+  //     1) 상단 'Generate storyboard' 버튼 — 전체 일괄
+  //     2) 카드/노드의 개별 생성 버튼 — 샷 하나
+  //     3) 채팅 지시 — 위 둘과 같은 경로로 들어온다
   // 첫 진입 사용법 안내(#e3) — Node/Storyboard 탭 각각 프로젝트당 1회(localStorage 가드).
   //   제안 슬롯은 선점형: 갭 넛지가 점유 중이면 내리고 안내를 올리고, 그 외 제안이면 양보.
   useEffect(() => {

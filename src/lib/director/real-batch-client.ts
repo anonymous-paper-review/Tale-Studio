@@ -102,15 +102,7 @@ export async function runRealBatch(
   return { generated, quotaBlocked }
 }
 
-// 진입 자동 채움의 프로젝트당 1회 가드(#real-grid-auto) — 옛 자리는 sync 훅 Pass 2.7 로컬이었는데,
-//   hydration 패스들이 끝나야 발사돼 "탭에 들어왔는데 한동안 아무 일도 없는" 공백이 있었다.
-//   서버 라우트는 DB 만 읽으므로(캔버스 hydration 과 무관) director 진입 즉시 쏴도 안전하다.
-//   가드를 여기로 옮겨 페이지 mount 와 sync 훅 어느 쪽이 먼저 불러도 1회만 나간다.
-const autofillTriggered = new Set<string>()
-
-/** director 진입 시 실사 보드 자율 채움 — 프로젝트당 1회, 멱등(서버가 미생성만 채운다). */
-export function triggerRealBatchAutofill(projectId: string): void {
-  if (autofillTriggered.has(projectId)) return
-  autofillTriggered.add(projectId)
-  void runRealBatch(projectId, { silent: true })
-}
+// 진입 자동 채움(triggerRealBatchAutofill)은 제거됐다 (#c5 2026-08-27 오너 지시).
+//   Director 진입만으로 실사 i2i 가 발사돼 previz 를 손볼 틈 없이 과금이 먼저 났다.
+//   실사 생성은 사람의 명시적 행동 셋 중 하나로만 시작한다 — 전체 버튼 / 개별 버튼 / 채팅.
+//   셋 다 아래 runRealBatch(전체) 또는 generateStoryboardImage(개별)로 들어온다.
