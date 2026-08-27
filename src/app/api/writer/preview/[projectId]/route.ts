@@ -43,7 +43,7 @@ interface PreviewCharacter {
   description: string;
   /** 카드용 정면샷(portrait). 없으면 templateUrl 폴백은 클라 몫. */
   portraitUrl: string | null;
-  /** 클릭 팝업용 캐릭터 템플릿(턴어라운드 시트, view_main). */
+  /** 클릭 팝업용 캐릭터 템플릿(기본 모습 시트). */
   templateUrl: string | null;
 }
 
@@ -146,50 +146,60 @@ export async function GET(
       shotStories: [],
     }));
 
-    // 캐릭터 = state.characters(이름/역할, 이른 시점부터) + characters 테이블(네이티브 설명 + 초안 이미지).
-    //   카드=portrait(정면샷), 클릭 팝업=view_main(캐릭터 템플릿/턴어라운드 시트) — 2026-07-21 피드백.
-    const stateChars = state.characters?.characters ?? [];
-    const dbCharById = new Map<
-      string,
-      { description: string | null; portrait: string | null; view_main: string | null; name: string | null }
-    >();
-    try {
-      const { data } = await supabaseAdmin
+    // 캐릭터 정체성은 characters, 일반 표시 모습은 유일한 기본 character_appearances 행에서 읽는다.
+    const [charactersRes, appearancesRes] = await Promise.all([
+      supabaseAdmin
         .from('characters')
-        .select('character_id,name,description,portrait,view_main')
-        .eq('project_id', projectId);
-      for (const row of (data ?? []) as Array<{
-        character_id?: string;
-        name?: string;
-        description?: string;
-        portrait?: string;
-        view_main?: string;
-      }>) {
-        if (row.character_id) {
-          dbCharById.set(row.character_id, {
-            description: row.description ?? null,
-            portrait: row.portrait ?? null,
-            view_main: row.view_main ?? null,
-            name: row.name ?? null,
-          });
-        }
-      }
-    } catch {
-      // 캐릭터 테이블 조회 실패는 무시 — state.characters(이름/역할)만으로 사이드바를 채운다.
+        .select('character_id,name,role')
+        .eq('project_id', projectId),
+      supabaseAdmin
+        .from('character_appearances')
+        .select('character_id,appearance,portrait_url,sheet_url')
+        .eq('project_id', projectId)
+        .eq('is_default', true),
+    ]);
+    if (charactersRes.error) throw new Error(`writer preview characters load failed: ${charactersRes.error.message}`);
+    if (appearancesRes.error) throw new Error(`writer preview appearances load failed: ${appearancesRes.error.message}`);
+
+    const appearancesByCharacterId = new Map<string, Array<{
+      appearance?: string | null;
+      portrait_url?: string | null;
+      sheet_url?: string | null;
+    }>>();
+    for (const row of (appearancesRes.data ?? []) as Array<{
+      character_id?: string;
+      appearance?: string | null;
+      portrait_url?: string | null;
+      sheet_url?: string | null;
+    }>) {
+      if (!row.character_id) continue;
+      const appearances = appearancesByCharacterId.get(row.character_id) ?? [];
+      appearances.push(row);
+      appearancesByCharacterId.set(row.character_id, appearances);
     }
-    const characters: PreviewCharacter[] = stateChars
-      .filter((c): c is { id: string; name?: string; role?: string } => typeof c?.id === 'string' && !!c.id)
-      .map((c) => {
-        const db = dbCharById.get(c.id);
-        return {
-          id: c.id,
-          name: displayNameOf(c.name ?? db?.name, c.id),
-          role: c.role ?? '',
-          description: db?.description ?? '',
-          portraitUrl: db?.portrait ?? null,
-          templateUrl: db?.view_main ?? null,
-        };
-      });
+
+    const characters: PreviewCharacter[] = ((charactersRes.data ?? []) as Array<{
+      character_id?: string;
+      name?: string | null;
+      role?: string | null;
+    }>).map((character) => {
+      if (!character.character_id) throw new Error('writer preview character is missing character_id');
+      const appearances = appearancesByCharacterId.get(character.character_id) ?? [];
+      if (appearances.length !== 1) {
+        throw new Error(
+          `writer preview requires exactly one default appearance for character ${character.character_id}; found ${appearances.length}`,
+        );
+      }
+      const appearance = appearances[0];
+      return {
+        id: character.character_id,
+        name: displayNameOf(character.name, character.character_id),
+        role: character.role ?? '',
+        description: appearance.appearance ?? '',
+        portraitUrl: appearance.portrait_url ?? null,
+        templateUrl: appearance.sheet_url ?? null,
+      };
+    });
 
     // #p3b 쇼케이스: 배경(locations) 텍스트 카드 — writer 뒷단(v2)이 서술을 채우면 점진 노출.
     let worlds: Array<{ id: string; name: string; description: string }> = [];

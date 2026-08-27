@@ -56,3 +56,15 @@ describe('C3 — 막힐 때 이유를 말한다', () => {
     }
   })
 })
+
+describe('Director storyboard character appearance contract', () => {
+  it('uses each shot’s persisted appearance key and exact appearance sheet, never legacy character images', () => {
+    expect(route).toContain('character_appearance_keys')
+    expect(route).toContain("from('character_appearances')")
+    expect(route).toContain("select('character_id, appearance_key, sheet_url')")
+    expect(route).toContain('has no required sheet_url')
+    expect(route).toContain('a.characterId.localeCompare(b.characterId) || a.appearanceKey.localeCompare(b.appearanceKey)')
+    expect(route).not.toContain('view_main')
+    expect(route).not.toContain('portrait')
+  })
+})

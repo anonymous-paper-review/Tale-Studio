@@ -87,21 +87,51 @@ export async function applyProducerI18n(
     deriveEnBatch(locItems, 'location visual description'),
   ])
 
-  // i18n_provenance: S1a 는 테이블당 단일 필드라 객체 set. (S3 다필드 확장 시 jsonb merge `||` 로 전환.)
+  const castById = new Map((cast?.characters ?? []).map((character) => [character.character_id, character]))
   const charUpdates = charItems
-    .map((it) => ({ it, en: charEn.get(it.id) }))
-    .filter((x): x is { it: I18nItem; en: string } => !!x.en)
-    .map(({ it, en }) =>
-      supabaseAdmin
-        .from('characters')
+    .map((it) => ({ it, en: charEn.get(it.id), entityType: castById.get(it.id)?.entity_type }))
+    .filter((x): x is { it: I18nItem; en: string; entityType: 'person' | 'object' } => !!x.en && !!x.entityType)
+    .map(async ({ it, en, entityType }) => {
+      if (entityType === 'person') {
+        const { data, error: lookupError } = await supabaseAdmin
+          .from('character_appearances')
+          .select('character_id')
+          .eq('project_id', projectId)
+          .eq('character_id', it.id)
+          .eq('is_default', true)
+        if (lookupError) throw new Error(`i18n character appearance lookup failed: ${lookupError.message}`)
+        if ((data?.length ?? 0) !== 1) {
+          throw new Error(`i18n default appearance for ${it.id} must exist exactly once`)
+        }
+        return supabaseAdmin
+          .from('character_appearances')
+          .update({
+            appearance: en,
+            appearance_native: it.native,
+            i18n_provenance: { appearance: i18nHash(it.native) },
+          })
+          .eq('project_id', projectId)
+          .eq('character_id', it.id)
+          .eq('is_default', true)
+      }
+      const { data, error: lookupError } = await supabaseAdmin
+        .from('props')
+        .select('prop_id')
+        .eq('project_id', projectId)
+        .eq('prop_id', it.id)
+      if (lookupError) throw new Error(`i18n prop lookup failed: ${lookupError.message}`)
+      if (!(data?.length)) {
+        throw new Error(`i18n prop ${it.id} does not exist`)
+      }
+      return supabaseAdmin
+        .from('props')
         .update({
           appearance: en,
           appearance_native: it.native,
-          i18n_provenance: { appearance: i18nHash(it.native) },
         })
         .eq('project_id', projectId)
-        .eq('character_id', it.id),
-    )
+        .eq('prop_id', it.id)
+    })
   const locUpdates = locItems
     .map((it) => ({ it, en: locEn.get(it.id) }))
     .filter((x): x is { it: I18nItem; en: string } => !!x.en)

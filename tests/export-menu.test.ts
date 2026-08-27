@@ -107,11 +107,11 @@ describe('whole-project size estimation', () => {
       known: false,
     })
   })
-  it('counts only the selected handoff video when the database estimate is available', async () => {
+  it('counts the default appearance sheet and portrait, not legacy character views', async () => {
+    const appearanceQuery = query({ data: [{ sheet_url: 'sheet.png', portrait_url: 'portrait.png' }], error: null })
     mocks.createClient.mockReturnValue({
       from: vi.fn((table: string) => {
         const results: Record<string, unknown> = {
-          characters: { data: [{ view_main: 'main.png', view_back: 'back.png' }], error: null },
           locations: { data: [{ wide_shot: 'wide.png', establishing_shot: null }], error: null },
           shots: { data: [{ shot_id: 'shot-1', storyboard_image: { status: 'completed', url: 'board.png' }, video_url: 'legacy.mp4' }], error: null },
           video_clips: {
@@ -122,7 +122,7 @@ describe('whole-project size estimation', () => {
             error: null,
           },
         }
-        return query(results[table])
+        return table === 'character_appearances' ? appearanceQuery : query(results[table])
       }),
     })
 
@@ -130,5 +130,8 @@ describe('whole-project size estimation', () => {
       counts: { image: 4, video: 1, audio: 0, text: 0, other: 0 },
       known: true,
     })
+    expect(appearanceQuery.select).toHaveBeenCalledWith('sheet_url,portrait_url')
+    expect(appearanceQuery.eq).toHaveBeenCalledWith('project_id', 'project-1')
+    expect(appearanceQuery.eq).toHaveBeenCalledWith('is_default', true)
   })
 })

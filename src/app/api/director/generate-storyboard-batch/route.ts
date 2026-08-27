@@ -31,7 +31,21 @@ interface EligibleShot {
   shot_id: string
   scene_id: string
   characters: string[]
+  characterAppearanceKeys: Record<string, string>
   frames: { start: string; direction: string; end: string }
+}
+
+class CharacterAppearanceContractError extends Error {}
+
+function requireCharacterAppearanceKeys(value: unknown, shotId: string): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new CharacterAppearanceContractError(`Character appearance contract error: shot ${shotId} has no character_appearance_keys snapshot`)
+  }
+  const entries = Object.entries(value)
+  if (entries.some(([characterId, appearanceKey]) => !characterId || typeof appearanceKey !== 'string' || !appearanceKey.trim())) {
+    throw new CharacterAppearanceContractError(`Character appearance contract error: shot ${shotId} has a malformed character_appearance_keys snapshot`)
+  }
+  return Object.fromEntries(entries.map(([characterId, appearanceKey]) => [characterId, appearanceKey.trim()]))
 }
 
 export async function POST(req: NextRequest) {
@@ -64,7 +78,7 @@ export async function POST(req: NextRequest) {
 
     const { data: rows } = await supabaseAdmin
       .from('shots')
-      .select('shot_id, scene_id, characters, rough_storyboard, storyboard_image')
+      .select('shot_id, scene_id, characters, character_appearance_keys, rough_storyboard, storyboard_image')
       .eq('project_id', projectId)
       .order('sort_order')
 
@@ -75,10 +89,19 @@ export async function POST(req: NextRequest) {
       if (!force && s.storyboard_image) continue
       const f = (s.rough_storyboard as { frames?: Record<string, string> } | null)?.frames
       if (!f?.start || !f?.direction || !f?.end) continue
+      const characterAppearanceKeys = requireCharacterAppearanceKeys(s.character_appearance_keys, s.shot_id as string)
+      const characters = ((s.characters as string[]) ?? []).slice().sort()
+      if (
+        characters.some((characterId) => !characterAppearanceKeys[characterId]) ||
+        Object.keys(characterAppearanceKeys).some((characterId) => !characters.includes(characterId))
+      ) {
+        throw new CharacterAppearanceContractError(`Character appearance contract error: shot ${s.shot_id} character_appearance_keys does not match its characters`)
+      }
       eligible.push({
         shot_id: s.shot_id as string,
         scene_id: s.scene_id as string,
-        characters: ((s.characters as string[]) ?? []).slice().sort(),
+        characters,
+        characterAppearanceKeys,
         frames: { start: f.start, direction: f.direction, end: f.end },
       })
     }
@@ -116,15 +139,48 @@ export async function POST(req: NextRequest) {
     //   배열로 모든 시트에 실었다. 그 시트에 안 나오는 인물의 레퍼런스가 오염원으로 첨부되고,
     //   어느 URL 이 누구인지도 잃어버려 프롬프트가 대응을 지시할 수 없었다 — 실측 a5cb2cae
     //   sh_04_18: 추적자 단독 칸이 소녀로 바꿔치기된 시트가 그대로 저장됐다.
-    const allCharIds = [...new Set(planned.flatMap((g) => g.flatMap((s) => s.characters)))]
+    const appearancePairs = [...new Map(
+      planned
+        .flatMap((g) => g.flatMap((s) => s.characters.map((characterId) => ({
+          characterId,
+          appearanceKey: s.characterAppearanceKeys[characterId],
+        }))))
+        .map(({ characterId, appearanceKey }) => [`${characterId}\u0000${appearanceKey}`, { characterId, appearanceKey }]),
+    ).values()].sort((a, b) =>
+      a.characterId.localeCompare(b.characterId) || a.appearanceKey.localeCompare(b.appearanceKey),
+    )
+    const allCharIds = appearancePairs.map(({ characterId }) => characterId)
     const { data: chars } = allCharIds.length
       ? await supabaseAdmin
           .from('characters')
-          .select('character_id, name, portrait, view_main')
+          .select('character_id, name')
           .eq('project_id', projectId)
           .in('character_id', allCharIds)
       : { data: [] as Array<Record<string, unknown>> }
     const charById = new Map((chars ?? []).map((c) => [c.character_id as string, c]))
+    if (appearancePairs.some(({ characterId }) => !charById.has(characterId))) {
+      throw new CharacterAppearanceContractError('Character appearance contract error: a shot snapshot references a missing character identity')
+    }
+    const { data: appearanceRows } = appearancePairs.length
+      ? await supabaseAdmin
+          .from('character_appearances')
+          .select('character_id, appearance_key, sheet_url')
+          .eq('project_id', projectId)
+          .in('character_id', allCharIds)
+          .in('appearance_key', [...new Set(appearancePairs.map(({ appearanceKey }) => appearanceKey))])
+      : { data: [] as Array<Record<string, unknown>> }
+    const appearanceByPair = new Map(
+      (appearanceRows ?? []).map((appearance) => [
+        `${appearance.character_id as string}\u0000${appearance.appearance_key as string}`,
+        appearance,
+      ]),
+    )
+    for (const { characterId, appearanceKey } of appearancePairs) {
+      const sheetUrl = appearanceByPair.get(`${characterId}\u0000${appearanceKey}`)?.sheet_url
+      if (typeof sheetUrl !== 'string' || !sheetUrl.trim()) {
+        throw new CharacterAppearanceContractError(`Character appearance contract error: ${characterId}/${appearanceKey} has no required sheet_url`)
+      }
+    }
 
     const webhookUrl = resolveWebhookUrl()
     const submitted: Array<{ jobId: string; shotIds: string[] }> = []
@@ -153,19 +209,26 @@ export async function POST(req: NextRequest) {
       // #real-grid-identity: 이 시트에 실제로 나오는 인물만, 결정적 순서(sort)로 —
       //   "reference image N = 이름" 규약이 성립하려면 순서가 흔들리면 안 된다
       //   (.in() 쿼리는 행 순서를 보장하지 않는다).
-      const groupCharIds = [...new Set(group.flatMap((s) => s.characters))].sort()
-      const groupRefs = groupCharIds
-        .map((id) => {
-          const c = charById.get(id)
-          const url = (((c?.view_main as string) ?? (c?.portrait as string)) || null) as
-            | string
-            | null
-          return url ? { characterId: id, name: ((c?.name as string) || id).trim() || id, url } : null
+      const groupRefs = [...new Map(
+        group
+          .flatMap((s) => s.characters.map((characterId) => ({
+            characterId,
+            appearanceKey: s.characterAppearanceKeys[characterId],
+          })))
+          .map(({ characterId, appearanceKey }) => [`${characterId}\u0000${appearanceKey}`, { characterId, appearanceKey }]),
+      ).values()]
+        .sort((a, b) => a.characterId.localeCompare(b.characterId) || a.appearanceKey.localeCompare(b.appearanceKey))
+        .map(({ characterId, appearanceKey }) => {
+          const character = charById.get(characterId)!
+          const appearance = appearanceByPair.get(`${characterId}\u0000${appearanceKey}`)!
+          return {
+            characterId,
+            appearanceKey,
+            name: ((character.name as string) || characterId).trim() || characterId,
+            url: appearance.sheet_url as string,
+          }
         })
-        .filter((r): r is { characterId: string; name: string; url: string } => !!r)
       const nameById = new Map(groupRefs.map((r) => [r.characterId, r.name]))
-      // 칸별 배정 — 레퍼런스가 없는 인물(이미지 미생성)은 배정문에서도 뺀다: 이름만 있고
-      //   그림이 없는 지시는 모델이 지어내게 만든다.
       const columnCharacters = group.map((s) =>
         s.characters.map((id) => nameById.get(id)).filter((n): n is string => !!n),
       )
@@ -239,6 +302,6 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[director/generate-storyboard-batch]', msg)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json({ error: msg }, { status: e instanceof CharacterAppearanceContractError ? 409 : 500 })
   }
 }

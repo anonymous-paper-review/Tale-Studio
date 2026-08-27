@@ -41,6 +41,11 @@ import { PATCH as editorSpeedPATCH } from '@/app/api/editor/speed/route'
 import { POST as sceneGatePOST } from '@/app/api/writer/scene-gate/route'
 import { POST as dialoguePOST } from '@/app/api/writer/dialogue/route'
 import { POST as shotConfigsPOST } from '@/app/api/writer/shot-configs/route'
+import {
+  PATCH as artistCharacterPATCH,
+  POST as artistCharacterPOST,
+} from '@/app/api/artist/character/route'
+import { POST as artistAppearancePOST } from '@/app/api/artist/appearance/route'
 
 /** z.string().uuid() 스키마를 쓰는 라우트(rough-storyboard/previz-video/dialogue/shot-configs)용 — 형태 유효. */
 const ROUTE_PROJECT_ID = '11111111-1111-4111-8111-111111111111'
@@ -312,6 +317,46 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
       }),
     )
     expect(res.status).toBe(403)
+  })
+
+  it('POST /api/artist/character — 403 before any character or prop write', async () => {
+    const res = await artistCharacterPOST(
+      postReq('/api/artist/character', {
+        projectId: PROJECT,
+        characterId: 'char-1',
+        name: 'Not mine',
+        entity_type: 'person',
+      }),
+    )
+    expect(res.status).toBe(403)
+    expect(mocks.from).not.toHaveBeenCalledWith('characters')
+    expect(mocks.from).not.toHaveBeenCalledWith('props')
+  })
+
+  it('PATCH /api/artist/character — 403 before entity lookup or write', async () => {
+    const res = await artistCharacterPATCH(
+      patchReq('/api/artist/character', {
+        projectId: PROJECT,
+        characterId: 'char-1',
+        appearance: 'Not mine',
+      }),
+    )
+    expect(res.status).toBe(403)
+    expect(mocks.from).not.toHaveBeenCalledWith('characters')
+    expect(mocks.from).not.toHaveBeenCalledWith('props')
+  })
+
+  it('POST /api/artist/appearance — 403 before canonical appearance or prop write', async () => {
+    const res = await artistAppearancePOST(
+      postReq('/api/artist/appearance', {
+        projectId: PROJECT,
+        characterId: 'char-1',
+        appearance: 'Not mine',
+      }),
+    )
+    expect(res.status).toBe(403)
+    expect(mocks.from).not.toHaveBeenCalledWith('character_appearances')
+    expect(mocks.from).not.toHaveBeenCalledWith('props')
   })
 
   it('POST /api/writer/rough-storyboard — 403', async () => {

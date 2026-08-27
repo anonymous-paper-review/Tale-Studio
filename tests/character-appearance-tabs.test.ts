@@ -7,11 +7,14 @@ const routeMocks = vi.hoisted(() => ({
   demoWriteBlock: vi.fn(),
   requireProjectAccess: vi.fn(),
   from: vi.fn(),
+  rpc: vi.fn(),
 }))
 
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: routeMocks.demoWriteBlock }))
 vi.mock('@/lib/api/guard', () => ({ requireProjectAccess: routeMocks.requireProjectAccess }))
-vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: routeMocks.from } }))
+vi.mock('@/lib/supabase/admin', () => ({
+  supabaseAdmin: { from: routeMocks.from, rpc: routeMocks.rpc },
+}))
 
 const character: CharacterAsset = {
   characterId: 'char_3',
@@ -149,7 +152,13 @@ describe('PATCH /api/artist/character-appearance', () => {
 
     expect(response.status).toBe(200)
     expect(routeMocks.from).toHaveBeenCalledWith('character_appearances')
-    expect(update).toHaveBeenCalledWith({ appearance: 'young prompt revised' })
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appearance: 'young prompt revised',
+        appearance_native: 'young prompt revised',
+        i18n_provenance: expect.any(Object),
+      }),
+    )
     expect(projectId).toHaveBeenCalledWith('project_id', 'project-1')
     expect(characterId).toHaveBeenCalledWith('character_id', 'char_3')
     expect(appearanceKey).toHaveBeenCalledWith('appearance_key', 'young')
@@ -185,5 +194,79 @@ describe('PATCH /api/artist/character-appearance', () => {
       'project-1',
     )
     expect(routeMocks.from).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/artist/character canonical writes', () => {
+  beforeEach(() => {
+    routeMocks.demoWriteBlock.mockReset()
+    routeMocks.demoWriteBlock.mockReturnValue(null)
+    routeMocks.requireProjectAccess.mockReset()
+    routeMocks.requireProjectAccess.mockResolvedValue({ ok: true, userId: 'owner-1' })
+    routeMocks.from.mockReset()
+    routeMocks.rpc.mockReset()
+  })
+
+  it('creates a person and its current appearance atomically through the RPC', async () => {
+    routeMocks.rpc.mockResolvedValue({
+      data: { character_id: 'char_3', appearance_key: 'current' },
+      error: null,
+    })
+    const { POST } = await import('@/app/api/artist/character/route')
+
+    const response = await POST(
+      new Request('http://localhost/api/artist/character', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: 'project-1',
+          characterId: 'char_3',
+          name: 'Okhwa',
+          appearance: 'young prompt',
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(routeMocks.rpc).toHaveBeenCalledWith(
+      'create_person_with_default_appearance',
+      expect.objectContaining({
+        p_project_id: 'project-1',
+        p_person: expect.objectContaining({
+          character_id: 'char_3',
+          appearance: 'young prompt',
+          appearance_native: 'young prompt',
+          i18n_provenance: expect.any(Object),
+        }),
+      }),
+    )
+    expect(routeMocks.from).not.toHaveBeenCalledWith('characters')
+  })
+
+  it('creates an object only in props', async () => {
+    const single = vi.fn().mockResolvedValue({ data: { prop_id: 'prop_1' }, error: null })
+    const select = vi.fn().mockReturnValue({ single })
+    const insert = vi.fn().mockReturnValue({ select })
+    routeMocks.from.mockReturnValue({ insert })
+    const { POST } = await import('@/app/api/artist/character/route')
+
+    const response = await POST(
+      new Request('http://localhost/api/artist/character', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: 'project-1',
+          characterId: 'prop_1',
+          name: 'A ring',
+          entity_type: 'object',
+          appearance: 'silver ring',
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(routeMocks.from).toHaveBeenCalledWith('props')
+    expect(routeMocks.from).not.toHaveBeenCalledWith('characters')
+    expect(routeMocks.rpc).not.toHaveBeenCalled()
   })
 })

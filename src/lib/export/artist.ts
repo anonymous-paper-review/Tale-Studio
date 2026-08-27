@@ -2,22 +2,19 @@ import { createClient } from '@/lib/supabase/client'
 import { translate } from '@/lib/i18n'
 import { DEFAULT_LOCALE, type AppLocale } from '@/lib/locale'
 
-import { bulletList, h1, h2, isRecord, pickNative, table } from './md'
+import { h1, isRecord, pickNative, table } from './md'
 import { PathAllocator } from './sanitize'
 import type { ArtifactFile } from './types'
 
 export type CharacterRow = Record<string, unknown> & {
   character_id?: string | null
   name?: string | null
-  entity_type?: string | null
-  view_main?: string | null
-  view_back?: string | null
-  view_side_left?: string | null
-  view_side_right?: string | null
   description?: string | null
   appearance?: string | null
   appearanceNative?: string | null
   appearance_native?: string | null
+  sheet_url?: string | null
+  portrait_url?: string | null
 }
 
 export type LocationRow = Record<string, unknown> & {
@@ -37,17 +34,11 @@ export interface ArtistData {
   locations: LocationRow[]
 }
 
-const CHARACTER_SELECT =
-  'character_id,name,entity_type,view_main,view_back,view_side_left,view_side_right,description,appearance,appearance_native'
+const CHARACTER_SELECT = 'character_id,name,description'
+const CHARACTER_APPEARANCE_SELECT =
+  'character_id,appearance,appearance_native,sheet_url,portrait_url'
 const LOCATION_SELECT =
   'location_id,name,scene_id,wide_shot,establishing_shot,visual_description,visual_description_native'
-
-const CHARACTER_VIEW_FILES = [
-  ['view_main', 'front.png'],
-  ['view_back', 'back.png'],
-  ['view_side_left', 'side-left.png'],
-  ['view_side_right', 'side-right.png'],
-] as const
 
 const LOCATION_VIEW_FILES = [
   ['wide_shot', 'wide.png'],
@@ -59,16 +50,25 @@ export async function loadArtistData(projectId: string): Promise<ArtistData> {
   if (!normalizedProjectId) throw new Error('projectId is required')
 
   const supabase = createClient()
-  const [charactersRes, locationsRes] = await Promise.all([
+  const [charactersRes, appearancesRes, locationsRes] = await Promise.all([
     supabase.from('characters').select(CHARACTER_SELECT).eq('project_id', normalizedProjectId),
+    supabase
+      .from('character_appearances')
+      .select(CHARACTER_APPEARANCE_SELECT)
+      .eq('project_id', normalizedProjectId)
+      .eq('is_default', true),
     supabase.from('locations').select(LOCATION_SELECT).eq('project_id', normalizedProjectId),
   ])
 
   if (charactersRes.error) throw new Error(`artist characters load failed: ${charactersRes.error.message}`)
+  if (appearancesRes.error) throw new Error(`artist appearances load failed: ${appearancesRes.error.message}`)
   if (locationsRes.error) throw new Error(`artist locations load failed: ${locationsRes.error.message}`)
 
   return {
-    characters: ((charactersRes.data ?? []) as unknown[]).filter(isRecord) as CharacterRow[],
+    characters: mergeDefaultAppearances(
+      ((charactersRes.data ?? []) as unknown[]).filter(isRecord),
+      ((appearancesRes.data ?? []) as unknown[]).filter(isRecord),
+    ),
     locations: ((locationsRes.data ?? []) as unknown[]).filter(isRecord) as LocationRow[],
   }
 }
@@ -92,7 +92,10 @@ export function collectArtistArtifacts(
     const folder = allocator.child('artist/characters', name)
     const paths: string[] = []
 
-    for (const [column, fileName] of CHARACTER_VIEW_FILES) {
+    for (const [column, fileName] of [
+      ['sheet_url', 'sheet.png'],
+      ['portrait_url', 'portrait.png'],
+    ] as const) {
       const url = mediaUrl(character[column])
       if (!url) continue
 
@@ -158,24 +161,38 @@ function renderAssetsIndex(entries: AssetIndexEntry[], locale: AppLocale): strin
     )
   }
 
-  body += h2(translate(locale, 'Filename mapping notes'))
-  body += `${translate(locale, 'DB view keys are remapped to filenames the recipient can immediately understand (view_main→front.png, etc.).')}\n\n`
-  body += bulletList([
-    'characters: view_main→front.png, view_back→back.png, view_side_left→side-left.png, view_side_right→side-right.png',
-    'worlds: wide_shot→wide.png, establishing_shot→establishing.png',
-  ])
-
   return body
 }
 
+function mergeDefaultAppearances(
+  characterRows: Record<string, unknown>[],
+  appearanceRows: Record<string, unknown>[],
+): CharacterRow[] {
+  const appearancesByCharacterId = new Map<string, Record<string, unknown>[]>()
+  for (const appearance of appearanceRows) {
+    const characterId = stringValue(appearance.character_id)
+    if (!characterId) continue
+    const appearances = appearancesByCharacterId.get(characterId) ?? []
+    appearances.push(appearance)
+    appearancesByCharacterId.set(characterId, appearances)
+  }
+
+  return characterRows.map((character) => {
+    const characterId = stringValue(character.character_id)
+    if (!characterId) throw new Error('artist character is missing character_id')
+    const appearances = appearancesByCharacterId.get(characterId) ?? []
+    if (appearances.length !== 1) {
+      throw new Error(`artist export requires exactly one default appearance for character ${characterId}; found ${appearances.length}`)
+    }
+    return { ...character, ...appearances[0] } as CharacterRow
+  })
+}
+
 function characterDescription(character: CharacterRow): string {
-  const description =
-    pickNative(
-      firstPresentString(character.appearanceNative, character.appearance_native),
-      firstPresentString(character.appearance),
-    ) ||
-    stringValue(character.description)?.trim() ||
-    ''
+  const description = pickNative(
+    firstPresentString(character.appearanceNative, character.appearance_native),
+    firstPresentString(character.appearance),
+  )
 
   return readableText(description)
 }

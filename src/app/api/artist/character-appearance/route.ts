@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
 import { validateAppearancePatch } from '@/lib/artist/appearance-patch'
+import { appearanceI18nFields } from '@/lib/writer/i18n/derive-en'
 
 export const runtime = 'nodejs'
 
@@ -39,9 +40,14 @@ export async function PATCH(req: Request) {
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
 
+    const i18n = await appearanceI18nFields(characterId, appearance.appearance)
     const { data, error } = await supabaseAdmin
       .from('character_appearances')
-      .update({ appearance: appearance.appearance })
+      .update({
+        appearance: i18n.appearance,
+        appearance_native: i18n.appearance_native,
+        i18n_provenance: i18n.i18n_provenance,
+      })
       .eq('project_id', projectId)
       .eq('character_id', characterId)
       .eq('appearance_key', appearanceKey)
@@ -56,7 +62,8 @@ export async function PATCH(req: Request) {
       ok: true,
       characterId,
       appearanceKey,
-      appearance: appearance.appearance,
+      appearance: i18n.appearance,
+      appearanceNative: i18n.appearance_native,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

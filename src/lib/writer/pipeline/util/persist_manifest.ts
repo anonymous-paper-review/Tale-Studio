@@ -4,7 +4,7 @@
 // shot_sequence(ShotSequenceItem.S.dialogue)를 샷 소스로 쓴다.
 //
 // 매핑:
-//   characters ← S2.characters (appearance = appearance_description, costume = v2 CharacterVisual[id].costume)
+//   characters + character_appearances ← S2.characters (기본 모습 = appearance_description, costume = v2 CharacterVisual[id].costume)
 //   locations  ← v2 WorldVisual.locations
 //   scenes     ← S3.scenes
 //   shots      ← shot_sequence.shots (대사 포함)
@@ -323,24 +323,14 @@ export async function persistAssetsToDb(
     }
   }
 
-  // characters: additive (producer-story-gate §4 — 인물=입력). 기존 행(producer·writer-origin)은
-  //   보존하고, 새 slug 만 origin='writer' 로 insert + 기존 행은 비어 있는 보강 필드만 채운다.
-  //   producer 가 확정한 정체성(name/role/arc/motivation/이미지)은 절대 덮어쓰지 않는다.
-  // v2 CharacterVisual[].costume → { character_id: costume[] } (빈 의상 제외 — 옛 productionDesign.costumes 누락과 동일 취급)
+  // characters + 기본 모습: Writer가 추가한 인물도 RPC 하나로 identity와 기본 모습을 원자적으로 기록한다.
+  // v2 CharacterVisual[].costume → { character_id: costume[] }.
   const costumes: Record<string, string[]> = Object.fromEntries(
     characterVisual.characters
       .filter((cv) => cv.costume?.length)
       .map((cv) => [cv.character_id, cv.costume]),
   )
   if (characters.characters.length) {
-    const { data: existingRows } = await supabaseAdmin
-      .from('characters')
-      .select('character_id, appearance, costume')
-      .eq('project_id', projectId)
-    const existing = new Map(
-      (existingRows ?? []).map((r) => [r.character_id as string, r]),
-    )
-
     // 언어 경계: writer-신규 인물 외형도 EN base + _native 표기로 분리(생성=EN, 표시=유저 언어).
     //   빠뜨리면 appearance(생성 canonical)가 스토리 언어 그대로 들어간다(라이브 8건 확인, 2026-07-03).
     //   deriveEnBatch 는 이미 영어면 무비용 통과, deriveNativeBatch 는 locale=en 이면 no-op.
@@ -372,58 +362,25 @@ export async function persistAssetsToDb(
       return { appearance: en, appearance_native: native, i18n_provenance: prov }
     }
 
-    const toInsert: Record<string, unknown>[] = []
-    for (const c of characters.characters) {
-      const prev = existing.get(c.id)
-      if (!prev) {
-        // 새 인물 (writer 가 전개상 추가) — description 은 표시용 → native.
-        //   서사 속성(arc/motivation)도 기록(#opencast-arc 2026-07-21): s3 오픈캐스트가 산출한
-        //   값을 producer 캐릭터와 같은 JSONB shape 으로. 빈 껍데기면 null(UI 빈 표시 방지).
-        const af = appearFields(c.id)
-        const arc =
-          c.arc && (c.arc.start_state || c.arc.end_state || c.arc.arc_type) ? c.arc : null
-        const motivation =
-          c.motivation && (c.motivation.want || c.motivation.need) ? c.motivation : null
-        toInsert.push({
-          project_id: projectId,
-          character_id: c.id,
-          name: c.name,
-          role: normRole(c.role),
-          entity_type: 'person',
-          appearance: af.appearance,
-          appearance_native: af.appearance_native,
-          i18n_provenance: af.i18n_provenance,
-          description: af.appearance_native,
-          costume: costumes[c.id] ?? null,
-          arc,
-          motivation,
-          origin: 'writer',
-        })
-        continue
+    const people = characters.characters.map((c) => {
+      const af = appearFields(c.id)
+      return {
+        character_id: c.id,
+        name: c.name,
+        role: normRole(c.role),
+        description: null,
+        arc: c.arc && (c.arc.start_state || c.arc.end_state || c.arc.arc_type) ? c.arc : null,
+        motivation: c.motivation && (c.motivation.want || c.motivation.need) ? c.motivation : null,
+        origin: 'writer',
+        ...af,
+        costume: costumes[c.id] ?? null,
       }
-      // 기존 행: 빈 보강 필드만 채움 (덮어쓰기 금지).
-      const patch: Record<string, unknown> = {}
-      if (!prev.appearance && c.appearance_description) {
-        const af = appearFields(c.id)
-        patch.appearance = af.appearance
-        patch.appearance_native = af.appearance_native
-        patch.i18n_provenance = af.i18n_provenance
-        patch.description = af.appearance_native
-      }
-      if (prev.costume == null && costumes[c.id]) patch.costume = costumes[c.id]
-      if (Object.keys(patch).length) {
-        const { error: charPatchErr } = await supabaseAdmin
-          .from('characters')
-          .update(patch)
-          .eq('project_id', projectId)
-          .eq('character_id', c.id)
-        assertDbOk(`characters update(${c.id})`, charPatchErr)
-      }
-    }
-    if (toInsert.length) {
-      const { error: charInsertErr } = await supabaseAdmin.from('characters').insert(toInsert)
-      assertDbOk('characters insert', charInsertErr)
-    }
+    })
+    const { error } = await supabaseAdmin.rpc('upsert_people_with_default_appearances', {
+      p_project_id: projectId,
+      p_people: people,
+    })
+    assertDbOk('people with default appearances upsert', error)
   }
 }
 

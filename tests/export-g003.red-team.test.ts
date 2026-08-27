@@ -11,36 +11,28 @@ describe('G003 artist collector red-team coverage', () => {
         {
           character_id: 'dup-1',
           name: '중복',
-          view_main: 'https://cdn.test/dup-1/front.png',
-          view_back: null,
-          view_side_left: null,
-          view_side_right: null,
+          sheet_url: 'https://cdn.test/dup-1/sheet.png',
+          portrait_url: null,
           appearance: '첫 번째',
         },
         {
           character_id: 'dup-2',
           name: '중복',
-          view_main: null,
-          view_back: null,
-          view_side_left: null,
-          view_side_right: null,
+          sheet_url: null,
+          portrait_url: null,
         },
         {
           character_id: 'dup-3',
           name: '중복',
-          view_main: null,
-          view_back: null,
-          view_side_left: null,
-          view_side_right: 'https://cdn.test/dup-3/right.png',
+          sheet_url: null,
+          portrait_url: 'https://cdn.test/dup-3/portrait.png',
           appearance: '세 번째',
         },
         {
           character_id: 'hostile',
           name: '../x<>:"/\\|?* 한글',
-          view_main: 'https://cdn.test/hostile/front.png',
-          view_back: 123 as unknown as string,
-          view_side_left: '   ',
-          view_side_right: '\n\t',
+          sheet_url: 'https://cdn.test/hostile/sheet.png',
+          portrait_url: 123 as unknown as string,
           appearance: '위험한 이름',
         },
       ],
@@ -48,14 +40,12 @@ describe('G003 artist collector red-team coverage', () => {
     }, 'ko')
 
     expect(mediaPaths(files)).toEqual([
-      'artist/characters/중복/front.png',
-      'artist/characters/중복-3/side-right.png',
-      'artist/characters/x-한글/front.png',
+      'artist/characters/중복/sheet.png',
+      'artist/characters/중복-3/portrait.png',
+      'artist/characters/x-한글/sheet.png',
     ])
-    expect(mediaPaths(files)).not.toContain('artist/characters/중복-2/front.png')
-    expect(mediaPaths(files)).not.toContain('artist/characters/x-한글/back.png')
-    expect(mediaPaths(files)).not.toContain('artist/characters/x-한글/side-left.png')
-    expect(mediaPaths(files)).not.toContain('artist/characters/x-한글/side-right.png')
+    expect(mediaPaths(files)).not.toContain('artist/characters/중복-2/sheet.png')
+    expect(mediaPaths(files)).not.toContain('artist/characters/x-한글/portrait.png')
 
     for (const path of mediaPaths(files)) {
       expect(path).toMatch(/^artist\/characters\//)
@@ -73,21 +63,17 @@ describe('G003 artist collector red-team coverage', () => {
         {
           character_id: 'native',
           name: '네이티브',
-          view_main: null,
-          view_back: null,
-          view_side_left: null,
-          view_side_right: null,
+          sheet_url: null,
+          portrait_url: null,
           appearance: 'English appearance must not win',
           appearance_native: '한국어 외형이 먼저',
         },
         {
           character_id: 'json-desc',
           name: 'JSON 설명',
-          view_main: null,
-          view_back: null,
-          view_side_left: null,
-          view_side_right: null,
-          description: '{"raw":"object body should be readable","nested":{"tone":"calm"}}',
+          sheet_url: null,
+          portrait_url: null,
+          appearance: '{"raw":"object body should be readable","nested":{"tone":"calm"}}',
         },
       ],
       locations: [

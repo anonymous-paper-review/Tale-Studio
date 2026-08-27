@@ -265,29 +265,37 @@ function textContent(files: ArtifactFile[], path: string): string {
 function mockProducerSupabase({
   project,
   characters = [],
+  appearances = [],
   locations = [],
 }: {
   project: Record<string, unknown>
   characters?: Record<string, unknown>[]
+  appearances?: Record<string, unknown>[]
   locations?: Record<string, unknown>[]
 }) {
   const results: Record<string, { data: unknown; error: null }> = {
     projects: { data: project, error: null },
     characters: { data: characters, error: null },
+    character_appearances: { data: appearances, error: null },
     locations: { data: locations, error: null },
   }
 
   return {
     from: vi.fn((table: string) => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => {
-          const result = results[table]
-          if (!result) throw new Error(`unexpected table ${table}`)
-          return table === 'projects'
-            ? { single: vi.fn(async () => result) }
-            : Promise.resolve(result)
-        }),
-      })),
+      select: vi.fn(() => {
+        const result = results[table]
+        if (!result) throw new Error(`unexpected table ${table}`)
+        const query = {
+          eq: vi.fn(() =>
+            table === 'projects'
+              ? { single: vi.fn(async () => result) }
+              : query,
+          ),
+          then: (resolve: (value: typeof result) => unknown) =>
+            Promise.resolve(result).then(resolve),
+        }
+        return query
+      }),
     })),
   }
 }
