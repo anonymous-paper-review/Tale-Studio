@@ -7,11 +7,7 @@ import { fal } from '@fal-ai/client'
 import { type DialogueLine, buildVideoPrompt } from '@/lib/director/video-prompt'
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
-import {
-  getGenerationJobById,
-  linkGenerationJobToChatTrace,
-  userOwnsProject,
-} from '@/lib/generation-jobs'
+import { getGenerationJobById, userOwnsProject } from '@/lib/generation-jobs'
 import { checkGenerationCapacity, checkProjectVideoBudget } from '@/lib/generation-quota'
 import { quotaRejectionResponse, videoBudgetRejectionResponse } from '@/lib/api/quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
@@ -35,8 +31,6 @@ import {
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import type { Json } from '@/types/database'
 import type { CameraConfig, CameraPreset } from '@/types'
-import { isChatTraceId } from '@/lib/chat-trace'
-import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 
 fal.config({ credentials: () => process.env.FAL_KEY ?? '' })
 
@@ -393,12 +387,13 @@ export async function POST(req: Request) {
       model?: string; referenceImageUrl?: string; referenceImageUrls?: string[]; movementPreset?: string | null
       cameraPreset?: CameraPreset | null
       idempotencyKey?: string; videoClipId?: string; takeLabel?: string | null; override?: Json; canvasPosition?: Json | null
-      recoveryReceipt?: string; traceId?: string; actor?: string
+      recoveryReceipt?: string; actor?: string
     }
     const { prompt, camera, durationSeconds, aspectRatio, generationMethod = 'T2V', provider, model,
       referenceImageUrl, movementPreset, cameraPreset, idempotencyKey, videoClipId, takeLabel, override, canvasPosition,
       recoveryReceipt } = body
-    const traceId = body.traceId
+    // traceId(채팅 턴↔잡 연결)는 U16 티켓으로 분리 — trace 영속화 없이는 소속 검증이 불가능해
+    //   미구현 헬퍼 참조가 main 빌드를 깨고 있었다(2026-08-27 주간). actor 배선은 살아 있어 보존.
     const jobActor = body.actor === 'chat' ? 'chat' : 'ui'
     // V2 refs(#real-strip): [START, END] 등 다중 레퍼런스. referenceImageUrl(단일)과 병행 수신 —
     //   단일은 I2V 판별·스냅샷 하위호환 축, 배열은 실제 제출 레퍼런스로 우선.
@@ -414,13 +409,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'idempotencyKey must be a UUID' }, { status: 400 })
     }
     if (generationMethod === 'I2V' && !referenceImageUrl) return NextResponse.json({ error: 'referenceImageUrl is required for I2V' }, { status: 400 })
-    if (traceId !== undefined && !isChatTraceId(traceId)) {
-      return NextResponse.json({ error: 'traceId must be a UUID' }, { status: 400 })
-    }
     if (!(await userOwnsProject(projectId, user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
-      return NextResponse.json({ error: 'traceId does not belong to project' }, { status: 409 })
-    }
 
     const [{ data: project, error: projectError }, { data: shot, error: shotError }] = await Promise.all([
       supabaseAdmin.from('projects').select('workspace_id, style_anchor_key').eq('id', projectId).maybeSingle(),
@@ -567,15 +556,6 @@ export async function POST(req: Request) {
     reservation = videoClipId
       ? await reserveDirectorVideoRegeneration({ projectId, videoClipId, model: modelKey, target: { workspaceId: project.workspace_id, shotId: writerShotId, writerShotId, videoClipId, retakeMode: 'regeneration' }, idempotencyKey, inputSnapshot, userId: user.id, workspaceId: project.workspace_id, provider: isLocal ? 'local' : 'fal', actor: jobActor })
       : await reserveDirectorVideoTake({ projectId, shotId: writerShotId, model: modelKey, target: { workspaceId: project.workspace_id, shotId: writerShotId, writerShotId, retakeMode: 'new_take' }, idempotencyKey, inputSnapshot, userId: user.id, workspaceId: project.workspace_id, provider: isLocal ? 'local' : 'fal', actor: jobActor, takeLabel: normalizedNewTakeMetadata.take_label as string | null, override: normalizedNewTakeMetadata.override, canvasPosition: normalizedNewTakeMetadata.canvas_position })
-    if (traceId) {
-      try {
-        await linkGenerationJobToChatTrace(projectId, reservation.job_id, traceId)
-      } catch (error) {
-        // Trace 연결은 관측 기능이다. 영상 예약이 성공한 뒤 연결 실패가 생성 자체를
-        // 실패로 보이게 만들면 유료 잡이 고아가 되므로 best-effort로 남긴다.
-        console.error('[director/generate-video] trace link failed:', error)
-      }
-    }
     const reservedJob = await getGenerationJobById(reservation.job_id)
     if (!reservedJob) throw new Error('Reserved video job not found')
     const response = { shotId: writerShotId, jobId: reservation.job_id, videoClipId: reservation.video_clip_id, takeNumber: reservation.take_number, replayed: reservation.replayed, provider: reservedJob.provider ?? (isLocal ? 'local' : 'fal'), model: reservedJob.model, taskId: reservedJob.request_id.startsWith('reserved:') ? undefined : reservedJob.request_id }
