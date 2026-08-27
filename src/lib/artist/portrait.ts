@@ -4,18 +4,14 @@
 // 와이드 모델시트다. 좌상단 CHARACTER CONCEPT 박스 내부를 크롭해 카드/칩용 대표 포트레이트로 쓴다.
 // 시트가 템플릿 레이아웃을 유지하므로(I2I 프롬프트가 박스 고정 지시) 상대 좌표는 안정적이다.
 //
-// ⚠️ 템플릿을 교체하면 이 비율도 재실측할 것 — 좌표는 템플릿 v2(스타일 중립 마네킹판,
-//   2026-07-12) 원본 3840×2160 실측: 박스 테두리 x 41..1199 / y 41..896, 제목 텍스트 y 74..102
-//   → 내부(제목 아래) x 52..1188, y 132..886.
+// 좌표는 템플릿 v3 스펙(src/lib/artist/sheet-template.ts)에서 파생 — 실측이 아니라 단일 진실
+//   공유라 템플릿을 다시 그려도 어긋나지 않는다(정합은 tests/character-template-assets.test.ts).
+//   ⚠️ v2 시트(2026-08-27 이전 생성분)는 레이아웃이 달라 이 좌표로 재크롭하면 안 된다.
 import sharp from 'sharp'
+import { portraitRegionOfSpec } from '@/lib/artist/sheet-template'
 
-/** CHARACTER CONCEPT 박스 내부의 상대 좌표 (시트 W/H 에 대한 비율). */
-export const TURNAROUND_PORTRAIT_REGION = {
-  x0: 0.0135,
-  y0: 0.0611,
-  x1: 0.3094,
-  y1: 0.4102,
-} as const
+/** PORTRAIT 박스 내부의 상대 좌표 (시트 W/H 에 대한 비율) — v3 스펙 파생. */
+export const TURNAROUND_PORTRAIT_REGION = portraitRegionOfSpec()
 
 // ── #portrait-paper-trim(2026-08-26, 오너 실측 "카드에서 얼굴 자를 때 흰 바") ──
 // 시트 생성 모델이 CONCEPT 박스 안 그림을 박스보다 살짝 좁게 그리면, 고정 비율 크롭이

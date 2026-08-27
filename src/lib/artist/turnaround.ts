@@ -126,7 +126,7 @@ export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
 }
 
 /**
- * 턴어라운드 시트 프롬프트 — "한 장에 모든 뷰"(정면·3/4·측면·3/4 후면·후면) 모델시트.
+ * 턴어라운드 시트 프롬프트 — "한 장에 모든 뷰"(정면·3/4·측면·후면 + 표정·포즈·디테일) v3 모델시트.
  *   기본 경로는 캐릭터 템플릿(public/character-template.png)을 reference 로 넣은 I2I(edit) — 그 레이아웃에
  *   캐릭터를 채운다. 템플릿 URL 을 못 구하면 같은 프롬프트로 T2I 폴백. 동일 캐릭터/의상/비율을 뷰마다
  *   강하게 고정해 director 단계의 뷰 참조 일관성을 확보(#7). 개별 방향 뷰(i2i) 생성 대체 — 캐릭터당 1장(#9, 2026-07-11).
@@ -138,13 +138,19 @@ export function buildCharacterTurnaroundPrompt(input: CharacterPromptInput): str
     ...styleTokens(input),
     ...deltaClause(input),
     ...(input.safeMode ? [SAFE_TOKENS] : []),
-    'keep the template EXACTLY as-is — all of its section boxes, dividers, labels and headings stay in place (character concept, color palette, size guide, turnaround, detail notes, sketch style, face expression guide)',
-    // 템플릿 v2(스타일 중립 마네킹판): 마네킹은 "포즈 자리표시"임을 명시 — 마네킹 질감/형태를 계승하지 않게.
-    'the gray mannequin figures are pose placeholders ONLY — replace every one of them with the SAME character in that exact pose: the full-body turnaround row (front, three-quarter front, side profile, three-quarter back, and back), the concept portrait, the size-guide figure, the sketch-style row, the action pose, and the face-expression variations',
-    'identical character design, outfit, colors and proportions across every view, consistent art style',
+    // 템플릿 v3(#f8 2026-08-27): 마네킹·사이즈 가이드·스케치 열·노트 칸 제거 — 빈 정형 타일 +
+    //   최소 라벨. 칸별 내용은 이 절이 전담한다(시트-프롬프트 한 쌍, sheet-template.ts 참조).
+    'keep the template EXACTLY as-is — every tile border, divider and small label stays in place; draw only INSIDE the tiles and never add any extra text',
+    'PORTRAIT tile: waist-up front portrait of the character, facing camera',
+    'TURNAROUND tile: four full-body views of the same standing character in its labeled slots — FRONT, 3/4 FRONT, SIDE, BACK — same height and same neutral standing pose across all four',
+    'EXPRESSION tiles (JOY, SORROW, ANGER, SURPRISE): the same face as a close-up with that labeled expression, one per tile',
+    'POSE tiles: two different full-body personality poses that fit this character (a dynamic action and a characteristic idle)',
+    'DETAIL tiles: two close-up callouts of signature costume or prop details',
+    'PALETTE strip: fill the five swatches with the character\'s actual key colors, flat color only',
+    'identical character design, outfit, colors and proportions across every tile, consistent art style',
     // #B: 옛 "clean line art"(애니 토큰) 삭제 + 애니 디폴트 차단. "declared art style"을 따르라는 조건부
     //   표현이라 아트 스타일 자체가 애니인 프로젝트와는 충돌하지 않는다(디폴트 회귀만 금지).
-    'follow the declared art style exactly — never fall back to a generic anime, chibi or mascot look, and never inherit any art style from the template mannequins',
+    'follow the declared art style exactly — never fall back to a generic anime, chibi or mascot look',
   ]
     .filter(Boolean)
     .join('. ')

@@ -29,6 +29,8 @@ const projArgIdx = process.argv.indexOf('--project')
 const ONLY_PROJECT = projArgIdx >= 0 ? process.argv[projArgIdx + 1] : null
 
 // ── src/lib/artist/portrait.ts 와 동일 규약 ──
+// ⚠️ REGION 은 v2 템플릿 좌표다. 2026-08-27 v3 템플릿부터 레이아웃이 달라졌으므로 이 스크립트를
+//   v3 시트에 돌리면 엉뚱한 크롭이 된다 — v3 는 finalize 가 생성 시 스펙 파생 좌표로 크롭한다.
 const REGION = { x0: 0.0135, y0: 0.0611, x1: 0.3094, y1: 0.4102 }
 const PAPER_WHITE_MIN = 240
 const PAPER_FLAT_FRAC = 0.98
