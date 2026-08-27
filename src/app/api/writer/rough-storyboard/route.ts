@@ -14,8 +14,10 @@ import {
   createGenerationJob,
   AUTO_GENERATION_GIVE_UP_THRESHOLD,
   STALE_QUEUED_MS,
+  getGenerationJobById,
 } from '@/lib/generation-jobs'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
+import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 import { isRichStaticSpec, type RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
 // L4(shotDesign) state 로더 — 공용 lib(#motion-contract): 비디오 라우트와 공유.
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
@@ -42,6 +44,9 @@ export const maxDuration = 60
 //   maxDuration(60s) 안에 끝나므로, 이보다 한참 오래된 queued 는 버려진 것으로 보고 in_flight 에서 제외한다
 //   (2026-06-26, shot_9 가 stuck queued 로 재생성이 막혀 "검은 화면 그대로"이던 버그). 정상 중복 방지는 유지.
 //   TTL 값은 generation_jobs 상태/lock 집계와 공유한다(STALE_QUEUED_MS).
+
+// force 재생성 1회가 fal 에 물어볼 잡 수 상한 — 회수는 잡당 조회+finalize 라 무겁다(maxDuration 60s).
+const RECONCILE_ON_FORCE_CAP = 4
 
 const BodySchema = z.object({
   projectId: z.string().uuid(),
@@ -208,11 +213,11 @@ export async function POST(req: Request) {
           .eq('project_id', projectId),
         supabaseAdmin
           .from('characters')
-          .select('character_id, name, entity_type')
+          .select('character_id, name')
           .eq('project_id', projectId),
         supabaseAdmin
           .from('generation_jobs')
-          .select('target')
+          .select('id, target')
           .eq('project_id', projectId)
           .eq('kind', 'shot_rough_storyboard')
           .eq('status', 'queued')
@@ -237,19 +242,37 @@ export async function POST(req: Request) {
     const nameById = new Map(
       (chars ?? []).map((c) => [c.character_id as string, c.name as string]),
     )
-    // 사물 캐스트(#object-not-figure) — blocking 직렬화가 figure 대신 소품 문장으로 분기할 근거.
-    const objectCharIds = new Set(
-      (chars ?? [])
-        .filter((c) => (c as { entity_type?: string }).entity_type === 'object')
-        .map((c) => c.character_id as string),
-    )
-    const inFlight = new Set(
-      (queuedJobs ?? []).flatMap((j) => {
-        const t = j.target as { writerShotId?: string; writerShotIds?: string[] }
-        // 그리드 잡(writerShotIds, #rough-grid)과 구 단일 잡(writerShotId) 모두 중복 방지 대상.
-        return [...(t?.writerShotIds ?? []), ...(t?.writerShotId ? [t.writerShotId] : [])]
-      }),
-    )
+    // 샷 → 그 샷을 막고 있는 queued 잡 id. force 재생성일 때 이 잡을 fal 진실로 회수한다(#a1-inflight-block).
+    const inFlightJobByShot = new Map<string, string>()
+    for (const j of queuedJobs ?? []) {
+      const t = j.target as { writerShotId?: string; writerShotIds?: string[] }
+      // 그리드 잡(writerShotIds, #rough-grid)과 구 단일 잡(writerShotId) 모두 중복 방지 대상.
+      for (const id of [...(t?.writerShotIds ?? []), ...(t?.writerShotId ? [t.writerShotId] : [])]) {
+        if (!inFlightJobByShot.has(id)) inFlightJobByShot.set(id, j.id as string)
+      }
+    }
+    const inFlight = new Set(inFlightJobByShot.keys())
+
+    // 사람이 명시적으로 재생성을 눌렀는데(force) queued 잡이 막고 있으면, 그 잡이 살아 있는지
+    //   fal 에 물어 확정한다. 웹훅 유실로 좀비가 된 잡이면 여기서 종결돼 아래 가드를 통과한다.
+    //   STALE_QUEUED_MS(10분) 자동 제외만 믿으면 그 전까지는 사람이 눌러도 조용히 막혔다
+    //   (2026-08-27 A1 재현: force=true 가 ok:true·제출 0 으로 삼켜짐).
+    if (force && shotIds?.length) {
+      const blocking = [...new Set(shotIds.map((id) => inFlightJobByShot.get(id)).filter((v): v is string => !!v))]
+      for (const jobId of blocking.slice(0, RECONCILE_ON_FORCE_CAP)) {
+        try {
+          const job = await getGenerationJobById(jobId)
+          if (!job || job.status !== 'queued') continue
+          const after = await reconcileJobFromFal(job)
+          if (after.status !== 'queued') {
+            for (const [shotId, id] of inFlightJobByShot) if (id === jobId) inFlight.delete(shotId)
+          }
+        } catch (e) {
+          // 회수 실패는 무해 — 기존 가드가 그대로 막는다(중복 제출 방지 유지).
+          console.error('[rough-storyboard] force reconcile failed:', jobId, e instanceof Error ? e.message : e)
+        }
+      }
+    }
     // 실패 누적 횟수(샷별) — safeMode 파생 + give-up 게이트(임계값 이상이면 자율 재생성 멈춤).
     const failCountByShot = new Map<string, number>()
     for (const j of failedJobs ?? []) {
@@ -468,14 +491,10 @@ export async function POST(req: Request) {
             shotType: (s.shot_type as string) ?? 'MS',
             actionDescription:
               actionEnByShot.get(shotId) ?? (s.action_description as string) ?? '',
-            // 인물 수 산정에 쓰이므로 사물은 뺀다 — 사물은 objectCharacterIds 로 별도 전달.
-            characterNames: ((s.characters as string[]) ?? [])
-              .filter((id) => !objectCharIds.has(id))
-              .map((id) => nameEnMap.get(id) ?? nameById.get(id) ?? id),
-            characterNameById: nameEnMap,
-            objectCharacterIds: ((s.characters as string[]) ?? []).filter((id) =>
-              objectCharIds.has(id),
+            characterNames: ((s.characters as string[]) ?? []).map(
+              (id) => nameEnMap.get(id) ?? nameById.get(id) ?? id,
             ),
+            characterNameById: nameEnMap,
             location:
               (scene ? locEnByScene.get(scene.scene_id as string) : undefined) ??
               (scene?.location as string | undefined),

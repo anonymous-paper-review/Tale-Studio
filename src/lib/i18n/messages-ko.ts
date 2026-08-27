@@ -97,6 +97,7 @@ export const KO: Record<string, string> = {
   // ── 스튜디오 공통: sidebar ──
   'Generation failed · retry': '생성 실패·재시도',
   'Taking longer than usual · retry': '평소보다 오래 걸려요·다시 시도',
+  'Still finishing the previous generation for {count} panels — try again in a moment.': '패널 {count}개는 앞선 생성이 아직 끝나지 않았어요. 잠시 후 다시 눌러주세요.',
   'Some image generations failed. Click the Artist tab to retry.': '일부 이미지 생성에 실패했어요. Artist 탭을 눌러 다시 시도할 수 있어요.',
   'Image generation is taking longer than usual. Click the Artist tab to retry.': '이미지 생성이 평소보다 오래 걸리고 있어요. Artist 탭을 눌러 다시 시도할 수 있어요.',
   'Generating images {ready}/{total}': '이미지 생성 중 {ready}/{total}',

@@ -131,8 +131,11 @@ export async function reconcileJobFromFal(job: GenerationJob): Promise<Generatio
       : await falImageFetch(job.model, job.request_id)
   } catch (error) {
     if (isPermanentProviderLookupFailure(error)) {
-      const message = error instanceof Error ? error.message : String(error)
-      return terminalizeJob(job, message)
+      // fal ApiError 는 404(NOT_FOUND)에서 message 가 빈 문자열이다. 그대로 넘기면 terminalizeJob 의
+      //   "failure evidence must be nonblank" 가드에 걸려 종결이 실패하고, 그 잡은 영원히 queued 로
+      //   남아 그 샷의 재생성을 계속 막는다 (2026-08-27 A1 재현에서 확인).
+      //   name/status/cause 를 합성해 사유를 항상 채운다.
+      return terminalizeJob(job, describeFinalizeError(error))
     }
     console.error('[fal/reconcile] transient provider fetch failed:', error instanceof Error ? error.message : error)
     return job

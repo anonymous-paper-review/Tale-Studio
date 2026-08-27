@@ -386,6 +386,31 @@ export function RoughStoryboardView() {
             return next
           })
         }
+        // #a1-inflight-block (2026-08-27 재현): 사람이 누른 재생성이 in_flight 로 전부 막히면
+        //   서버는 ok:true·제출 0 을 준다. 예전엔 낙관적 스피너만 남고 아무 말이 없어 "눌러도
+        //   반응 없음 = 재생성 불가"로 보였다. 클릭 유래(force)일 때만 스피너를 풀고 이유를 말한다.
+        //   자동 경로(auto)는 원래 조용해야 하므로 제외 — 진짜 생성 중인 샷의 표시를 지우지 않는다.
+        if (force && !auto && submitted.length === 0) {
+          const blocked = (
+            (j.data?.skipped ?? []) as Array<{ shotId: string; reason: string }>
+          )
+            .filter((x) => x.reason === 'in_flight')
+            .map((x) => x.shotId)
+          if (blocked.length) {
+            setPanelJobs((prev) => {
+              const next = { ...prev }
+              for (const id of blocked) delete next[id]
+              return next
+            })
+            toast.info(
+              translate(
+                locale,
+                'Still finishing the previous generation for {count} panels — try again in a moment.',
+                { count: blocked.length },
+              ),
+            )
+          }
+        }
         // 잡 단위 dedupe(#rough-grid): 그리드 잡 1개가 샷 최대 4개를 커버 — 같은 jobId 를 샷 수만큼
         //   중복 폴링하지 않는다. 완료 시 result_url 은 대표 1장(#no-originals 이후 첫 샷 start,
         //   이전엔 그리드 원본)이라 4샷 카드에 그대로 쓸 수 없다 → URL 대신 크롭이 끝난 DB 진실

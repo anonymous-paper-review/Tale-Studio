@@ -478,8 +478,10 @@ describe('linked reconcile boundaries', () => {
   it('terminalizes a permanent linked provider lookup error through the attempt RPC', async () => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
     mocks.falVideoFetch.mockRejectedValue(Object.assign(new Error('provider request invalid'), { status: 400 }))
-    await expect(reconcileJobFromFal(job)).resolves.toMatchObject({ status: 'failed', error: 'provider request invalid' })
-    expect(mocks.fail).toHaveBeenCalledWith('project-1', 'job-1', 'provider request invalid')
+    // HTTP status 를 사유에 합성한다 (#a1-inflight-block 2026-08-27) — fal 404 는 message 가 비어
+    //   있어 원본만 넘기면 종결 가드("nonblank")에 걸리고, 그 잡이 샷의 재생성을 영구히 막았다.
+    await expect(reconcileJobFromFal(job)).resolves.toMatchObject({ status: 'failed', error: 'provider request invalid (status 400)' })
+    expect(mocks.fail).toHaveBeenCalledWith('project-1', 'job-1', 'provider request invalid (status 400)')
   })
 
   it('retains queued state for unclassified provider lookup errors', async () => {
