@@ -38,7 +38,8 @@ export async function POST(req: NextRequest) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId } = (await req.json()) as { projectId?: string }
+    // force: 이미 생성된 샷도 다시 만든다(#c3 2026-08-27 오너 — "전체 재생성"). 기본은 빈칸만.
+    const { projectId, force } = (await req.json()) as { projectId?: string; force?: boolean }
     if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 })
 
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
@@ -69,7 +70,9 @@ export async function POST(req: NextRequest) {
 
     const eligible: EligibleShot[] = []
     for (const s of rows ?? []) {
-      if (s.storyboard_image) continue // 빈칸만 — 교체는 개별 재생성(단일 스트립) 소관
+      // 기본은 빈칸만(교체는 개별 재생성 소관). force 면 이미 있는 것도 다시 만든다 —
+      //   오너가 "하나씩 하는 거 짜쳐서" 전체 재생성을 원한 경로(#c3).
+      if (!force && s.storyboard_image) continue
       const f = (s.rough_storyboard as { frames?: Record<string, string> } | null)?.frames
       if (!f?.start || !f?.direction || !f?.end) continue
       eligible.push({

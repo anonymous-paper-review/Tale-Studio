@@ -26,6 +26,7 @@ import { Loader2, ImageIcon, X, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map a
 
 import { toast } from 'sonner'
 import { runRealBatch } from '@/lib/director/real-batch-client'
+import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
 import { StageHelpBadge } from '@/components/stage-help-badge'
@@ -654,6 +655,8 @@ function PaletteBar({
   const completedShots = shots.filter(
     (n) => isShotData(n.data) && n.data.storyboardImage?.status === 'completed',
   ).length
+  // #c3: 전부 생성된 상태에서 '전체 재생성'을 누르면 확인을 거친다(과금이 크다).
+  const [confirmRegenAll, setConfirmRegenAll] = useState(false)
   const isGenerating = shots.some(
     (n) =>
       isShotData(n.data) && n.data.storyboardImage?.status === 'generating',
@@ -699,7 +702,11 @@ function PaletteBar({
         {/* 스토리보드 일괄 생성 */}
         <button
           type="button"
-          title={t('Generate the rough storyboard into a real shooting-image storyboard in one go')}
+          title={
+            isGenerating || realBatchBusy
+              ? t('Generation in progress — you can start again when it finishes.')
+              : t('Generate the rough storyboard into a real shooting-image storyboard in one go')
+          }
           onClick={() => {
             // #2: 이미 모두 생성됐으면 재생성 대신 알림.
             const shots = nodes.filter((n) => isShotData(n.data))
@@ -708,10 +715,11 @@ function PaletteBar({
                 isShotData(n.data) &&
                 n.data.storyboardImage?.status !== 'completed',
             )
+            // #c3 (2026-08-27 오너): "하나씩 하는 거 짜쳐서 전체 재생성 누르려는데 X표로 막힘".
+            //   전부 생성된 상태에서 안내만 띄우고 끝나 전체 재생성 경로가 아예 없었다.
+            //   과금이 큰 동작이라 바로 쏘지 않고 확인을 받는다.
             if (shots.length > 0 && pending.length === 0) {
-              toast.info(t('All storyboards have already been generated.'), {
-                description: t('To regenerate an individual shot, double-click it.'),
-              })
+              setConfirmRegenAll(true)
               return
             }
             // #real-grid: 샷별 단일 잡 루프(generateAllStoryboardImages) → 4샷 시트 일괄로 교체.
@@ -802,6 +810,24 @@ function PaletteBar({
           </button>
         </div>
       )}
+
+      {/* #c3: 전체 재생성 확인 — 이미 만든 걸 전부 갈아엎으므로 과금·교체를 명시하고 받는다. */}
+      <RegenerateConfirmDialog
+        open={confirmRegenAll}
+        onOpenChange={setConfirmRegenAll}
+        title={t('Regenerate every storyboard image?')}
+        description={t('Redraws the shooting image for all {count} shots.', { count: totalShots })}
+        impact={[
+          t('Costs money for every shot — {count} images.', { count: totalShots }),
+          t('Replaces the existing shooting images with the new results.'),
+        ]}
+        confirmLabel={t('Regenerate all')}
+        onConfirm={() => {
+          setConfirmRegenAll(false)
+          const pid = useDirectorCanvasStore.getState().projectId
+          if (pid) void runRealBatch(pid, { force: true })
+        }}
+      />
     </div>
   )
 }

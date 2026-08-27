@@ -20,7 +20,7 @@ export interface RealBatchResult {
 /** 라운드 반복 일괄 생성 — 완료 시 캔버스 rehydrate. 이미 진행 중이면 no-op. */
 export async function runRealBatch(
   projectId: string,
-  opts?: { silent?: boolean },
+  opts?: { silent?: boolean; force?: boolean },
 ): Promise<RealBatchResult> {
   const store = useDirectorCanvasStore
   if (store.getState().realBatchBusy) return { generated: 0, quotaBlocked: false }
@@ -32,7 +32,7 @@ export async function runRealBatch(
       const res = await fetch('/api/director/generate-storyboard-batch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify(opts?.force ? { projectId, force: true } : { projectId }),
       })
       if (res.status === 429) {
         quotaBlocked = true
