@@ -18,6 +18,7 @@ import {
   createChatTraceId,
   type ChatLlmUsage,
 } from '@/lib/chat-trace'
+import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 
 // #dialogue-language-chat(2026-08-27 오너): 챗으로 대사를 새로 쓰거나 고칠 때도 파이프라인과
 //   같은 대사 언어를 따른다 — 단, 사용자가 그 메시지에서 명시적으로 다른 언어를 요구하면 요청이
@@ -277,21 +278,24 @@ export async function POST(req: Request) {
 
 (등장인물 목록에 없는 인물 ${dropped.map((d) => `\`${d}\``).join(', ')} 은(는) 반영하지 않았어요 — 새 인물이 필요하면 Producer 단계에서 추가해 주세요.)`
       : reply
+    const trace = buildChatTrace({
+      traceId,
+      stage: 'writer',
+      route: 'writer/chat',
+      system: systemPrompt,
+      history: normalizedHistory,
+      contextMessage: userPrompt,
+      usage: llmUsage,
+      parseStatus,
+      rawUpdateCount,
+      validUpdateCount,
+    })
+    await persistChatTraceBestEffort(projectId, trace)
+
     return NextResponse.json({
       reply: replyOut,
       updates,
-      trace: buildChatTrace({
-        traceId,
-        stage: 'writer',
-        route: 'writer/chat',
-        system: systemPrompt,
-        history: normalizedHistory,
-        contextMessage: userPrompt,
-        usage: llmUsage,
-        parseStatus,
-        rawUpdateCount,
-        validUpdateCount,
-      }),
+      trace,
     })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'

@@ -301,6 +301,60 @@ function ChatTraceFooter({
           applied: trace.appliedCount ?? '—',
         })
       : null
+  const generationJobs = Array.isArray(trace.generationJobs) ? trace.generationJobs : []
+  const generationJobCount = generationJobs.length
+  const completedJobCount = generationJobs.filter((job) => job.status === 'completed').length
+  const failedJobCount = generationJobs.filter((job) => job.status === 'failed').length
+  const queuedJobCount = generationJobs.filter((job) => job.status === 'queued').length
+  const approvalPending =
+    trace.pendingProposal === true ||
+    (trace.generationStatus === 'awaiting_approval' && trace.pendingProposal !== false)
+  const displayGenerationStatus = (() => {
+    if (approvalPending) return 'awaiting_approval'
+    // Job receipts are the freshest source of truth. A queued job takes precedence
+    // over completed/failed jobs so a batch never looks finished while work remains.
+    if (generationJobCount > 0) {
+      if (queuedJobCount > 0) return 'queued'
+      if (completedJobCount === generationJobCount) return 'completed'
+      if (failedJobCount === generationJobCount) return 'failed'
+      if (completedJobCount > 0 && failedJobCount > 0) return 'partial'
+    }
+    // Approval clears before the first job receipt arrives. Keep that short gap
+    // understandable instead of continuing to show the approval state.
+    if (trace.generationStatus === 'awaiting_approval') return 'queued'
+    if (trace.generationStatus === 'deduped') return 'skipped'
+    if (trace.generationStatus === 'timed_out') return 'failed'
+    return trace.generationStatus
+  })()
+  const generationSummary = (() => {
+    switch (displayGenerationStatus) {
+      case 'queued':
+        return generationJobCount > 0
+          ? t('Generation queued · {count} jobs', { count: generationJobCount })
+          : t('Generation queued')
+      case 'completed':
+        return generationJobCount > 0
+          ? t('Generation completed · {count} jobs', { count: generationJobCount })
+          : t('Generation completed')
+      case 'partial':
+        return generationJobCount > 0
+          ? t('Generation partially completed · {completed} completed · {failed} failed', {
+              completed: completedJobCount,
+              failed: failedJobCount,
+            })
+          : t('Generation partially completed')
+      case 'failed':
+        return generationJobCount > 0
+          ? t('Generation failed · {count} jobs', { count: generationJobCount })
+          : t('Generation failed')
+      case 'skipped':
+        return generationJobCount > 0
+          ? t('Generation skipped · {count} jobs', { count: generationJobCount })
+          : t('Generation skipped')
+      default:
+        return null
+    }
+  })()
 
   return (
     <details className="shrink-0 border-t border-border-subtle bg-muted/20 px-4 py-1.5 text-[10px] text-muted-foreground">
@@ -336,7 +390,11 @@ function ChatTraceFooter({
         {trace.choicesMarkerFound && (
           <p>{t('Choices {count}', { count: trace.choicesCount ?? 0 })}</p>
         )}
-        {trace.pendingProposal === true && <p>{t('Waiting for approval')}</p>}
+        {approvalPending ? (
+          <p>{t('Waiting for approval')}</p>
+        ) : (
+          generationSummary && <p>{generationSummary}</p>
+        )}
         {trace.requestStatus != null && trace.requestStatus >= 400 && (
           <p>{t('Request status {status}', { status: trace.requestStatus })}</p>
         )}

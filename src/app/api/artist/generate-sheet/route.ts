@@ -37,6 +37,8 @@ import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-prov
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { applyStyleAnchor, resolveStyleAnchor, tokenUnlessMediaWord } from '@/lib/style-anchor'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
+import { isChatTraceId } from '@/lib/chat-trace'
+import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 
 export const runtime = 'nodejs'
 // submit만 하고 끝 — 실제 생성은 fal 큐에서 진행, 완료는 webhook(/poll reconcile)이 처리.
@@ -58,13 +60,14 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, characterId, view, actor, instruction, safeMode } = (await req.json()) as {
+    const { projectId, characterId, view, actor, instruction, safeMode, traceId } = (await req.json()) as {
       projectId?: string
       characterId?: string
       view?: CharacterViewKey
       actor?: string
       instruction?: string // 재생성 시 유저 델타(merge) — 룩 토대 위에 덮음(AC13).
       safeMode?: boolean // 모더레이션 우회 재시도(#A) — 직전 실패가 moderation-class 인 슬롯에만 적용.
+      traceId?: string
     }
     if (!projectId || !characterId || !view) {
       return NextResponse.json(
@@ -72,9 +75,15 @@ export async function POST(req: Request) {
         { status: 400 },
       )
     }
+    if (traceId !== undefined && !isChatTraceId(traceId)) {
+      return NextResponse.json({ error: 'traceId must be a UUID' }, { status: 400 })
+    }
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
+    if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
+      return NextResponse.json({ error: 'traceId does not belong to project' }, { status: 409 })
+    }
 
     // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
     const quota = await checkGenerationCapacity(access.userId!, 'image')
@@ -259,6 +268,7 @@ export async function POST(req: Request) {
       workspaceId: project.workspace_id,
       provider: 'fal',
       inputSnapshot,
+      chatTraceId: traceId ?? null,
       target: {
         workspaceId: project.workspace_id,
         characterId,

@@ -20,7 +20,12 @@ import {
 } from '@/lib/script-lines'
 import { matchHandoffIntent, type HandoffSpec } from '@/lib/handoff-intent'
 import { handoffToStage } from '@/lib/stage-nav'
-import { saveChatMessage } from '@/lib/chat-persistence'
+import {
+  loadLatestChatTrace,
+  saveChatMessage,
+  saveChatTrace,
+  saveChatTracePatch,
+} from '@/lib/chat-persistence'
 import {
   choiceSuggestionMarker,
   isPersistedChatMarker,
@@ -31,7 +36,16 @@ import {
 import { isDemoSession, getDemoSnapshot } from '@/lib/demo/context'
 import { cannedFor } from '@/lib/demo/canned'
 import { handoffMarker } from '@/lib/chat-blocks'
-import { buildChatTrace, createChatTraceId, type ChatTrace } from '@/lib/chat-trace'
+import {
+  buildChatTrace,
+  createChatTraceId,
+  type ChatGenerationJobTrace,
+  type ChatTrace,
+} from '@/lib/chat-trace'
+import {
+  type GenerationJobReceipt,
+  type GenerationJobObserver,
+} from '@/lib/generation-jobs-client'
 import { stripLegacyStageMarkers } from '@/lib/display-names'
 // store 액션·순수 함수는 훅을 못 쓴다 — translate() + locale 직접 조회로 번역.
 //   이 파일의 산출물은 전부 챗 스트림(발화·제안·알림)이라 UI 언어가 아니라 **프로젝트 콘텐츠
@@ -135,6 +149,17 @@ interface GlobalChatState {
 
 function makeId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function generationStatusOf(
+  status: GenerationJobReceipt['status'],
+): ChatTrace['generationStatus'] {
+  if (status === 'queued') return 'queued'
+  if (status === 'completed') return 'completed'
+  if (status === 'failed') return 'failed'
+  if (status === 'skipped') return 'skipped'
+  if (status === 'deduped') return 'deduped'
+  return 'timed_out'
 }
 
 function dialogueKey(line: DialogueLine): string {
@@ -415,13 +440,16 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         set({ messages: [], suggestion: null, lastTrace: null, messagesLoadedProjectId: projectId })
         return
       }
-      const { messages } = await res.json()
+      const [{ messages }, persistedTrace] = await Promise.all([
+        res.json() as Promise<{ messages?: unknown }>,
+        loadLatestChatTrace(projectId),
+      ])
       hydrate((messages ?? []) as Array<{
         stage: string
         role: 'user' | 'model'
         content: string
       }>)
-      set({ messagesLoadedProjectId: projectId })
+      set({ messagesLoadedProjectId: projectId, lastTrace: persistedTrace })
     } catch (err) {
       console.error('[global-chat-store] loadMessages failed:', err)
       // 실패도 "로드 종료"다 — 마커를 세워야 웰컴 등 제안 발사측이 영영 굶지 않는다(빈 이력으로 진행).
@@ -781,6 +809,35 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             ? { lastTrace: { ...state.lastTrace, ...patch } }
             : state,
         )
+        if (projectId) saveChatTracePatch(projectId, trace.traceId, patch)
+      }
+      const observeGeneration: GenerationJobObserver = (receipt) => {
+        const generationJobs = get().lastTrace?.generationJobs ?? []
+        const nextJobs = receipt.jobId
+          ? (() => {
+              const existing = generationJobs.find((job) => job.jobId === receipt.jobId)
+              const next: ChatGenerationJobTrace = {
+                jobId: receipt.jobId,
+                kind: existing?.kind ?? 'generation',
+                status:
+                  receipt.status === 'completed' || receipt.status === 'failed'
+                    ? receipt.status
+                    : 'queued',
+                resultReady: receipt.status === 'completed' && !!receipt.resultUrl,
+                error: receipt.error ?? null,
+              }
+              return existing
+                ? generationJobs.map((job) => (job.jobId === receipt.jobId ? next : job))
+                : [...generationJobs, next]
+            })()
+          : generationJobs
+        patchTrace({
+          generationStatus: generationStatusOf(receipt.status),
+          generationJobs: nextJobs,
+          ...(receipt.jobId ? { jobId: receipt.jobId } : {}),
+          ...(receipt.httpStatus != null ? { generationHttpStatus: receipt.httpStatus } : {}),
+          ...(receipt.error ? { error: receipt.error } : { error: null }),
+        })
       }
 
       set((state) => ({
@@ -854,7 +911,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           u.type === 'regenerateCharacter' || u.type === 'regenerateWorldAsset'
         )
         const immediateUpdates = updates.filter((u) => u.type === 'createCharacter')
-        let proposalShown = false
 
         if (costUpdate) {
           // 승인 카드의 target 은 사람이 읽는 제목 — id(char_2 등)가 아니라 이름으로(#d2 2026-08-11).
@@ -876,6 +932,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const locale = contentLocale()
           const proposal = costUpdate.type === 'regenerateCharacter'
             ? createPendingProposal({
+                traceId,
                 stage: 'artist',
                 kind: costUpdate.views?.length === 1
                   ? 'artistRegenerateCharacterView'
@@ -903,6 +960,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 },
               })
             : createPendingProposal({
+                traceId,
                 stage: 'artist',
                 kind: 'artistRegenerateWorldAsset',
                 target: locationName ?? costUpdate.locationId,
@@ -919,7 +977,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               })
 
           const accepted = get().offerPendingProposal(proposal)
-          proposalShown = accepted || !!get().pendingProposal
           if (!accepted)
             set({
               error: translate(
@@ -945,8 +1002,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             useArtistStore.getState().characterAssets.find((c) => c.characterId === ap.characterId)
               ?.name || ap.characterId
           const apLocale = contentLocale()
-          const accepted = get().offerPendingProposal(
+          get().offerPendingProposal(
             createPendingProposal({
+              traceId,
               stage: 'artist',
               kind: 'artistSourceAppearancePatch',
               target: apName,
@@ -964,12 +1022,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               payload: { characterId: ap.characterId, appearance: ap.appearance },
             }),
           )
-          proposalShown = accepted || !!get().pendingProposal
         }
         patchTrace({
           appliedCount: immediateUpdates.length,
           skippedCount: 0,
-          pendingProposal: proposalShown || !!get().pendingProposal,
+          pendingProposal: get().pendingProposal?.traceId === traceId,
+          generationStatus:
+            get().pendingProposal?.traceId === traceId ? 'awaiting_approval' : null,
         })
       }
       if (stage === 'director') {
@@ -977,11 +1036,18 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (Array.isArray(data.updates)) {
           const result = useDirectorCanvasStore
             .getState()
-            .applyUpdates(data.updates as DirectorCanvasUpdate[])
+            .applyUpdates(data.updates as DirectorCanvasUpdate[], {
+              traceId,
+              onJob: observeGeneration,
+            })
           patchTrace({
             appliedCount: result.applied,
             skippedCount: result.skipped.length,
             pendingProposal: false,
+            ...(data.updates.some((u: DirectorCanvasUpdate) => u.type === 'generateVideo') &&
+            result.skipped.length > 0
+              ? { generationStatus: 'skipped' }
+              : {}),
           })
           if (result.skipped.length > 0) {
             console.warn(
@@ -1038,6 +1104,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         for (const shrink of result.pendingDialogueShrinks) {
           const proposal = createPendingProposal({
+            traceId,
             stage: 'writer',
             kind: 'writerShrinkDialogue',
             target: shrink.shotId,
@@ -1098,6 +1165,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           stopReason: null,
         },
       })
+      if (projectId) {
+        saveChatTrace(projectId, {
+          ...requestTrace,
+          requestStatus: responseStatus,
+          error,
+          stopReason: null,
+        })
+      }
     } finally {
       if (activeGeneration === controller) activeGeneration = null
     }
@@ -1177,21 +1252,80 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     return true
   },
 
-  dismissPendingProposal: (id) =>
-    set((state) => {
-      if (id && state.pendingProposal?.id !== id) return state
-      return { pendingProposal: null }
-    }),
+  dismissPendingProposal: (id) => {
+    const proposal = get().pendingProposal
+    if (!proposal || (id && proposal.id !== id)) return
+    set({ pendingProposal: null })
+    const projectId = useProjectStore.getState().projectId
+    if (proposal.traceId && projectId) {
+      saveChatTracePatch(projectId, proposal.traceId, {
+        pendingProposal: false,
+        generationStatus: 'skipped',
+      })
+      set((state) => {
+        const current = state.lastTrace
+        if (!current || current.traceId !== proposal.traceId) return state
+        return {
+          lastTrace: {
+            ...current,
+            pendingProposal: false,
+            generationStatus: 'skipped',
+          },
+        }
+      })
+    }
+  },
 
   approvePendingProposal: async (id) => {
     const proposal = get().pendingProposal
     if (!proposal) return false
     if (id && proposal.id !== id) return false
+    const projectId = useProjectStore.getState().projectId
+    const traceId = proposal.traceId ?? null
+    const patchTrace = (patch: Partial<ChatTrace>) => {
+      if (!traceId) return
+      set((state) =>
+        state.lastTrace?.traceId === traceId
+          ? { lastTrace: { ...state.lastTrace, ...patch } }
+          : state,
+      )
+      if (projectId) saveChatTracePatch(projectId, traceId, patch)
+    }
+    const observeGeneration: GenerationJobObserver = (receipt) => {
+      const generationJobs = get().lastTrace?.generationJobs ?? []
+      const nextJobs = receipt.jobId
+        ? (() => {
+            const existing = generationJobs.find((job) => job.jobId === receipt.jobId)
+            const next: ChatGenerationJobTrace = {
+              jobId: receipt.jobId,
+              kind: existing?.kind ?? proposal.kind,
+              status:
+                receipt.status === 'completed' || receipt.status === 'failed'
+                  ? receipt.status
+                  : 'queued',
+              resultReady: receipt.status === 'completed' && !!receipt.resultUrl,
+              error: receipt.error ?? null,
+            }
+            return existing
+              ? generationJobs.map((job) => (job.jobId === receipt.jobId ? next : job))
+              : [...generationJobs, next]
+          })()
+        : generationJobs
+      patchTrace({
+        pendingProposal: false,
+        generationStatus: generationStatusOf(receipt.status),
+        generationJobs: nextJobs,
+        ...(receipt.jobId ? { jobId: receipt.jobId } : {}),
+        ...(receipt.httpStatus != null ? { generationHttpStatus: receipt.httpStatus } : {}),
+        ...(receipt.error ? { error: receipt.error } : { error: null }),
+      })
+    }
 
     // 카드는 승인 즉시 내린다(#d2 2026-08-11) — 옛 코드는 실행이 다 끝나야 지웠는데, 뷰 3개
     //   재생성이면 그게 수 분이라 "승인을 눌렀는데 안 사라진다"로 읽혔다. 진행은 상단 알림바가,
     //   실패는 error 배너가 보고한다.
     set({ pendingProposal: null })
+    patchTrace({ pendingProposal: false })
     try {
       if (proposal.kind === 'producerSourcePatch') {
         useProducerStore
@@ -1210,9 +1344,17 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (!['main', 'back', 'sideLeft', 'sideRight'].includes(String(view))) {
           throw new Error('view missing')
         }
-        await useArtistStore
+        const receipt = await useArtistStore
           .getState()
-          .generateCharacterView(characterId, view as 'main' | 'back' | 'sideLeft' | 'sideRight', 'chat')
+          .generateCharacterView(
+            characterId,
+            view as 'main' | 'back' | 'sideLeft' | 'sideRight',
+            'chat',
+            undefined,
+            undefined,
+            { traceId: traceId ?? undefined, onJob: observeGeneration },
+          )
+        if (receipt?.status === 'failed' || receipt?.status === 'timed_out') return false
       } else if (proposal.kind === 'artistRegenerateCharacterViews') {
         const characterId = proposal.payload.characterId
         const views = proposal.payload.views
@@ -1224,18 +1366,37 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           }
         }
         for (const view of views) {
-          await useArtistStore
+          const receipt = await useArtistStore
             .getState()
-            .generateCharacterView(characterId, view as 'main' | 'back' | 'sideLeft' | 'sideRight', 'chat')
+            .generateCharacterView(
+              characterId,
+              view as 'main' | 'back' | 'sideLeft' | 'sideRight',
+              'chat',
+              undefined,
+              undefined,
+              { traceId: traceId ?? undefined, onJob: observeGeneration },
+            )
+          if (receipt?.status === 'failed' || receipt?.status === 'timed_out') return false
         }
       } else if (proposal.kind === 'artistRegenerateCharacterAllViews') {
         const characterId = proposal.payload.characterId
         if (typeof characterId !== 'string') throw new Error('characterId missing')
-        await useArtistStore.getState().generateCharacterAllViews(characterId, 'chat')
+        const receipt = await useArtistStore
+          .getState()
+          .generateCharacterAllViews(characterId, 'chat', undefined, {
+            traceId: traceId ?? undefined,
+            onJob: observeGeneration,
+          })
+        if (receipt?.status === 'failed' || receipt?.status === 'timed_out') return false
       } else if (proposal.kind === 'artistRegenerateWorldAsset') {
         const locationId = proposal.payload.locationId
         if (typeof locationId !== 'string') throw new Error('locationId missing')
-        await useArtistStore.getState().generateWorldAsset(locationId, 'chat')
+        await useArtistStore
+          .getState()
+          .generateWorldAsset(locationId, 'chat', {
+            traceId: traceId ?? undefined,
+            onJob: observeGeneration,
+          })
       } else if (proposal.kind === 'artistSourceAppearancePatch') {
         const characterId = proposal.payload.characterId
         const appearance = proposal.payload.appearance
@@ -1266,6 +1427,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       }
       return true
     } catch (err) {
+      patchTrace({
+        pendingProposal: false,
+        generationStatus: 'failed',
+        error: err instanceof Error ? err.message : 'Failed to run the proposal',
+      })
       set({
         error:
           err instanceof Error

@@ -13,6 +13,7 @@ import { listStyleAnchorMediums } from '@/lib/style-anchor'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildReferenceDigest, getProjectReferenceId } from '@/lib/reference-import'
 import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
+import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 
 interface ChatMessage {
   role: 'user' | 'model'
@@ -230,22 +231,24 @@ export async function POST(req: Request) {
     const { reply: replyRaw, extractedSettings } = parseExtractedSettings(text)
     // #p4-choices: Foundation 빈칸을 되묻기 대신 선택지 버튼으로 — [CHOICES] 라인 추출.
     const { reply, choices, markerFound } = parseChatChoices(replyRaw)
+    const trace = buildChatTrace({
+      traceId,
+      stage: 'producer',
+      route: 'produce/chat',
+      system: systemPrompt,
+      history: normalizedHistory,
+      contextMessage: userPrompt,
+      usage: llmUsage,
+      choicesMarkerFound: markerFound ?? null,
+      choicesCount: choices.length,
+    })
+    await persistChatTraceBestEffort(projectId, trace)
 
     return NextResponse.json({
       reply,
       extractedSettings,
       choices,
-      trace: buildChatTrace({
-        traceId,
-        stage: 'producer',
-        route: 'produce/chat',
-        system: systemPrompt,
-        history: normalizedHistory,
-        contextMessage: userPrompt,
-        usage: llmUsage,
-        choicesMarkerFound: markerFound ?? null,
-        choicesCount: choices.length,
-      }),
+      trace,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'

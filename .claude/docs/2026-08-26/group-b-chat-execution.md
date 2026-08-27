@@ -128,5 +128,34 @@ SDK 전환 전에 한 턴을 하나의 `chatTraceId`로 묶어 다음 값만 기
 4. DB 대상 값과 화면 표시가 결과와 일치한다.
 
 스키마 변경은 `supabase/migrations/20260827120000_chat_trace_persistence.sql`에 기록했다.
-운영 반영 전에는 branch DB에서 migration을 적용하고, Artist·Director 승인 생성의
-`queued → completed/failed`를 다시 확인해야 한다.
+
+### 검증·반영·실측 (2026-08-27 후속 세션)
+
+다른 세션이 코드를 완성한 뒤 커밋·실측 전에 멈춘 지점을 이어받아 정적 검증을 다시 돌리고,
+오너 승인으로 migration 적용과 승인 생성 실측을 실행했다.
+
+**정적 검증.** `pnpm typecheck` 통과. `pnpm test`(제품 핵심) 1533개 통과·15개 skip.
+신규·수정 테스트 `chat-trace`·`chat-trace-api`·`generation-jobs-columns`·`generation-jobs-client`
+11개 통과. 배선 확인: `createGenerationJob`이 `chat_trace_id`를 넣고 trace를 `queued`로 갱신하고,
+영상 RPC는 `linkGenerationJobToChatTrace`로 사후 연결, `/api/chat/trace`는 `getUser`+`userOwnsProject`
+인증 뒤 service role로만 접근한다.
+
+**migration 적용.** 원격 스키마를 먼저 조회해 "이력 불일치"와 "진짜 미적용"을 갈랐다.
+`error_class`·lock_rls policy·`custom_style_anchor`는 스키마엔 이미 있고 이력만 빠진 상태였다
+(supabase 규칙의 "live schema 우선"과 일치). 반면 `chat_traces`와 `generation_jobs.chat_trace_id`는
+실제로 없었다. `supabase db push`로 미적용 11개를 몰지 않고 `20260827120000` 하나만 적용했다
+(이 SQL은 `create ... if not exists`라 멱등). 적용 뒤 테이블·컴럼·인덱스 2개·RLS(policy 0 =
+서버 전용 deny-all)를 확인하고 migration 이력에 `20260827120000 => applied`로 기록했다.
+
+**승인 생성 실측 (원격 DB, 과금 0).** 이번 변경이 여기 새로 엹은 건 fal 파이프라인이 아니라 `chat_trace_id`
+연결과 상태 집계다. `createGenerationJob`은 DB insert만 하고 fal submit은 별도라, 제품 코드
+(`createGenerationJob → completeGenerationJob/failGenerationJob → getChatTrace`)를 실제 원격 DB에
+태워 상태 기계를 검증했다. 각 케이스는 test row를 넣고 확인 뒤 즉시 지워 운영 데이터를 남기지 않았다.
+
+- 정상 경로: job 없음 → `awaiting_approval`(pending) → 생성 → `queued`(pending 해제, job 연결) → 완료 → `completed`(jobId 연결).
+- 일부 성공: completed 1 + failed 1 → `partial`.
+- 전부 실패: failed → `failed`.
+- 실행 후 잔여 job 0.
+
+이로써 최종 성공 판정 2·3·4를 실제 프로덕션 스키마에서 확인했다. fal이 실제로 이미지를 만드는지는
+이번 변경이 건드리지 않은 기존 경로이고 오너가 화면에서 판정하는 영역이라 여기 실측에서 분리한다.

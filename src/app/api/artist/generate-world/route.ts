@@ -16,6 +16,8 @@ import { checkGenerationCapacity } from '@/lib/generation-quota'
 import { quotaRejectionResponse } from '@/lib/api/quota'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
 import { submitWorldShotJob } from '@/lib/artist/world-submit'
+import { isChatTraceId } from '@/lib/chat-trace'
+import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -26,7 +28,7 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, locationId, column, prompt, aspectRatio, actor, sourceHash } =
+    const { projectId, locationId, column, prompt, aspectRatio, actor, sourceHash, traceId } =
       (await req.json()) as {
         projectId?: string
         locationId?: string
@@ -35,6 +37,7 @@ export async function POST(req: Request) {
         aspectRatio?: string
         actor?: string
         sourceHash?: string // F2: 호출자가 computeWorldImageSourceHash(prompt)로 계산해 동반 — 라우트는 DB 재조립 안 함.
+        traceId?: string
       }
 
     if (!projectId || !locationId || !column || !prompt) {
@@ -43,9 +46,15 @@ export async function POST(req: Request) {
         { status: 400 },
       )
     }
+    if (traceId !== undefined && !isChatTraceId(traceId)) {
+      return NextResponse.json({ error: 'traceId must be a UUID' }, { status: 400 })
+    }
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
+    if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
+      return NextResponse.json({ error: 'traceId does not belong to project' }, { status: 409 })
+    }
 
     // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
     const quota = await checkGenerationCapacity(access.userId!, 'image')
@@ -91,6 +100,7 @@ export async function POST(req: Request) {
       workspaceId: project.workspace_id,
       sourceHash: sourceHash ?? null,
       anchor,
+      chatTraceId: traceId ?? null,
     })
 
     return NextResponse.json({ ok: true, jobId: job.id, status: 'queued' })

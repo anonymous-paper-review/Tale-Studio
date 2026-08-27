@@ -18,6 +18,8 @@ export type PendingProposalKind =
 
 export interface PendingProposal {
   id: string
+  /** 이 제안을 만든 채팅 한 턴. 승인 뒤 생성 Job을 같은 trace에 연결한다. */
+  traceId?: string
   stage: PendingProposalStage
   kind: PendingProposalKind
   target: string

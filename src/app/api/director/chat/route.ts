@@ -15,6 +15,7 @@ import {
   createChatTraceId,
   type ChatLlmUsage,
 } from '@/lib/chat-trace'
+import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 
 // ──────────────────────────────────────────────────────────────────────
 // Legacy system prompt — `director-store.ts` (구 P4) 사용 시
@@ -488,21 +489,24 @@ export async function POST(req: Request) {
         rawUpdateCount,
         validUpdateCount,
       } = parseAgenticResponse(text)
+      const trace = buildChatTrace({
+        traceId,
+        stage: 'director',
+        route: 'director/chat',
+        system: systemPrompt,
+        history: normalizedHistory,
+        contextMessage: userPrompt,
+        usage: llmUsage,
+        parseStatus,
+        rawUpdateCount,
+        validUpdateCount,
+      })
+      await persistChatTraceBestEffort(projectId, trace)
+
       return NextResponse.json({
         reply,
         updates,
-        trace: buildChatTrace({
-          traceId,
-          stage: 'director',
-          route: 'director/chat',
-          system: systemPrompt,
-          history: normalizedHistory,
-          contextMessage: userPrompt,
-          usage: llmUsage,
-          parseStatus,
-          rawUpdateCount,
-          validUpdateCount,
-        }),
+        trace,
       })
     }
 
@@ -530,18 +534,21 @@ export async function POST(req: Request) {
     )
     const result = parseLegacyResponse(text)
     const { parseStatus, ...legacyResult } = result
+    const trace = buildChatTrace({
+      traceId,
+      stage: 'director',
+      route: 'director/chat',
+      system: systemPrompt,
+      history: normalizedHistory,
+      contextMessage: userPrompt,
+      usage: llmUsage,
+      parseStatus,
+    })
+    await persistChatTraceBestEffort(projectId, trace)
+
     return NextResponse.json({
       ...legacyResult,
-      trace: buildChatTrace({
-        traceId,
-        stage: 'director',
-        route: 'director/chat',
-        system: systemPrompt,
-        history: normalizedHistory,
-        contextMessage: userPrompt,
-        usage: llmUsage,
-        parseStatus,
-      }),
+      trace,
     })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'

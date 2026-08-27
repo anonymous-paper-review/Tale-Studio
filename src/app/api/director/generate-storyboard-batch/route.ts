@@ -21,6 +21,8 @@ import {
 import { parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { storageKeySegment } from '@/lib/storage/key-segment'
+import { isChatTraceId } from '@/lib/chat-trace'
+import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -39,12 +41,22 @@ export async function POST(req: NextRequest) {
   if (demoBlocked) return demoBlocked
   try {
     // force: 이미 생성된 샷도 다시 만든다(#c3 2026-08-27 오너 — "전체 재생성"). 기본은 빈칸만.
-    const { projectId, force } = (await req.json()) as { projectId?: string; force?: boolean }
+    const { projectId, force, traceId } = (await req.json()) as {
+      projectId?: string
+      force?: boolean
+      traceId?: string
+    }
     if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 })
 
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
+    if (traceId !== undefined && !isChatTraceId(traceId)) {
+      return NextResponse.json({ error: 'traceId must be a UUID' }, { status: 400 })
+    }
+    if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
+      return NextResponse.json({ error: 'traceId does not belong to project' }, { status: 409 })
+    }
 
     const quota = await checkGenerationCapacity(access.userId!, 'image')
     if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'storyboard_real_grid', userId: access.userId })
@@ -209,6 +221,7 @@ export async function POST(req: NextRequest) {
         userId: access.userId!,
         workspaceId: project.workspace_id as string,
         provider: 'fal',
+        chatTraceId: traceId ?? null,
         // #B9(2026-08-12): 이 경로가 최종 프레임 전량을 만드는데도 프롬프트가 어디에도 안 남아
         //   사고 역추적이 코드 재구성에 의존했다(실측: sh_04_18 조사). prompt/refs/칸 배정을
         //   스냅샷에 남긴다 — 디버그 프롬프트 트레이스(PROMPT_TRACE_KINDS)도 이제 표시 가능.
