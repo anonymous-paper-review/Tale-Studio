@@ -112,6 +112,7 @@ export const KO: Record<string, string> = {
   'Costs money for every shot — {count} images.': '샷마다 과금됩니다 — 이미지 {count}장.',
   'Replaces the existing shooting images with the new results.': '기존 촬영 이미지는 새 결과로 교체됩니다.',
   'Regenerate all': '전체 재생성',
+  '{done} of {total} shots have video. Shall we move to Editor and start assembling?': '샷 {total}개 중 {done}개에 영상이 있어요. Editor로 넘어가 편집을 시작할까요?',
   'Generation in progress — you can start again when it finishes.': '생성이 진행 중이에요. 끝나면 다시 시작할 수 있어요.',
   'Still finishing the previous generation for {count} panels — try again in a moment.': '패널 {count}개는 앞선 생성이 아직 끝나지 않았어요. 잠시 후 다시 눌러주세요.',
   'Some image generations failed. Click the Artist tab to retry.': '일부 이미지 생성에 실패했어요. Artist 탭을 눌러 다시 시도할 수 있어요.',

@@ -33,6 +33,10 @@ import { StageHelpBadge } from '@/components/stage-help-badge'
 
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
+
+// Editor 핸드오프를 권하는 최소 진행률(#d10 2026-08-27). 1개만 만들어도 권하던 것을 막는다.
+//   전부(1.0)를 요구하지 않는 이유: 마지막 한두 샷을 남겨두고 편집을 시작하는 흐름도 정상이다.
+const EDITOR_NUDGE_MIN_RATIO = 0.8
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
@@ -322,7 +326,18 @@ function CanvasInner() {
   //   다만 *버튼*은 편집할 영상이 하나라도 생겼을 때만 띄운다 — 빈 캔버스에서 권하면 의미가 없다.
   //   (채팅에 직접 "Editor로 넘겨줘"라고 쓰면 이 조건과 무관하게 언제든 넘어간다.)
   const editorNudgeRef = useRef<string | null>(null)
-  const hasRenderedVideo = nodes.some((n) => isVideoData(n.data) && !!n.data.videoUrl)
+  // #d10 (2026-08-27 오너): "다 안 했는데 Editor로 넘어가라고 함". 예전엔 영상이 하나만 있어도
+  //   "영상이 완성됐다"며 권했다 — 샷 14개 중 1개를 만든 사람에게도 떴다는 뜻이다.
+  //   샷 대비 영상 진행률로 판정한다. 전부는 아니어도 대다수가 끝났을 때만 권한다.
+  const shotsWithVideo = new Set(
+    nodes
+      .filter((n) => isVideoData(n.data) && !!n.data.videoUrl)
+      .map((n) => (isVideoData(n.data) ? n.data.parentShotNodeId : null))
+      .filter((v): v is string => !!v),
+  )
+  const shotCountForNudge = nodes.filter((n) => isShotData(n.data)).length
+  const videoReadyRatio = shotCountForNudge > 0 ? shotsWithVideo.size / shotCountForNudge : 0
+  const hasRenderedVideo = shotCountForNudge > 0 && videoReadyRatio >= EDITOR_NUDGE_MIN_RATIO
   // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once) — 진실은 DB 의 reachedStage.
   const reachedStageForNudge = useProjectStore((s) => s.reachedStage)
   useEffect(() => {
@@ -335,10 +350,13 @@ function CanvasInner() {
     offerSuggestion({
       id: `handoff:director:${directorProjectId}`,
       stage: 'director',
-      content: t('You have a finished video. Shall we move to Editor and start assembling it?'),
+      content: t('{done} of {total} shots have video. Shall we move to Editor and start assembling?', {
+        done: shotsWithVideo.size,
+        total: shotCountForNudge,
+      }),
       action: { kind: 'handoff', utterance: t(spec.utterance), label: t(spec.label) },
     })
-  }, [directorProjectId, hasRenderedVideo, offerSuggestion, reachedStageForNudge, t])
+  }, [directorProjectId, hasRenderedVideo, shotsWithVideo.size, shotCountForNudge, offerSuggestion, reachedStageForNudge, t])
 
   const {
     screenToFlowPosition,
