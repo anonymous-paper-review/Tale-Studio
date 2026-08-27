@@ -142,7 +142,6 @@ docs/*.html
 /reference-import-plan.html
 /reference-read-strategy.html
 
-*.gitignore
 # skill/harness 상태 (deep-interview 등) — .omc 와 동일 성격
 .gjc/
 
