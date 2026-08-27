@@ -12,7 +12,7 @@ begin;
 --   view_side_left/right/back 은 옮기지 않는다 — 최근 45행에서 0%인 잔재.
 insert into public.character_appearances (
   project_id, character_id, appearance_key, label, is_default,
-  appearance, appearance_native, costume, sheet_url, portrait_url, source_hash
+  appearance, appearance_native, costume, sheet_url, portrait_url
 )
 select
   c.project_id,
@@ -24,8 +24,7 @@ select
   c.appearance_native,
   c.costume,
   c.view_main,
-  c.portrait,
-  c.source_hash
+  c.portrait
 from public.characters c
 where c.entity_type <> 'object'
 on conflict (project_id, character_id, appearance_key) do nothing;
@@ -33,7 +32,7 @@ on conflict (project_id, character_id, appearance_key) do nothing;
 -- ── 2. 사물 → props ──
 -- 실측 6행(엿판 5, 옥비녀 1). 사람과 달리 시트가 없고 단일 포트레이트만 쓴다.
 insert into public.props (
-  project_id, prop_id, name, description, appearance, appearance_native, image_url, source_hash, origin
+  project_id, prop_id, name, description, appearance, appearance_native, image_url, origin
 )
 select
   c.project_id,
@@ -44,7 +43,6 @@ select
   c.appearance_native,
   -- 사물은 view_main 에 단일 포트레이트가 들어 있었다(#7 — 사물은 1:1 T2I).
   coalesce(c.view_main, c.portrait),
-  c.source_hash,
   case when c.origin in ('writer', 'producer') then c.origin else 'writer' end
 from public.characters c
 where c.entity_type = 'object'

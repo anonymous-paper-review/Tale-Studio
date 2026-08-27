@@ -8,8 +8,9 @@ import type { ShotStaticSpec } from '@/lib/writer/types/pipeline'
 //   모델이 지키지 않는 일이 반복됐다(실측: 화개장터 sh_04_20 엿판). 그 결과 그리드가
 //   "figure 2 …, blank head" 로 직렬화했고 '안긴 아기'가 그려졌다(#object-not-figure).
 //
-// 지시는 확률이고 이 변환은 결정론이다. 하류의 걸러내기(objectCharacterIds)는
-//   이 강제가 자리잡으면 지울 수 있다 — 그게 G4 완료 판정 기준이다.
+// 지시는 확률이고 이 변환은 결정론이다.
+//   2026-08-27: 이 강제가 자리잡아 하류 걸러내기(objectCharacterIds)를 실제로 지웠다 —
+//   G4 완료 판정 기준을 통과했다. 이제 이 시험이 그 사고를 막는 유일한 방어선이다.
 
 const spec = (over: Partial<ShotStaticSpec> = {}): ShotStaticSpec =>
   ({
