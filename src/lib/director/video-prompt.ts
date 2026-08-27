@@ -12,6 +12,8 @@ export type VideoPromptParts = {
   camera: string
   /** #motion-contract: dynamic_spec 컴파일 계약문 — 프롬프트 맨 앞에 실린다. */
   motionContract?: string
+  /** #g7: 대사 절(립싱크 지시 포함). 대사 없는 샷이면 미설정. */
+  dialogue?: string
   black?: string
   startEnd?: string
 }
@@ -29,22 +31,58 @@ export type BuildVideoPromptInput = {
   /** #motion-contract: v4 dynamic_spec — 있으면 모션 계약문을 컴파일해 맨 앞에 싣는다.
    *  미전달(레거시) = 기존 프롬프트와 동일(계약·분기 없음). */
   dynamicSpec?: ShotDynamicSpec | null
+  /** #g7 (2026-08-27 오너 확정: 음성은 영상 생성기에 맡긴다) — 이 샷의 대사.
+   *  DB(shots.dialogue_lines)에 텍스트·어조·화자가 다 있는데 영상 프롬프트가 참조하지
+   *  않아 모델이 대사의 존재를 몰랐다. 입이 안 움직이고 자막 싱크가 안 맞던 원인. */
+  dialogueLines?: DialogueLine[] | null
+}
+
+/** shots.dialogue_lines 한 줄. emotion/delivery 는 비어 있을 수 있다(파이프라인이 안 채운 경우). */
+export interface DialogueLine {
+  text?: string | null
+  emotion?: string | null
+  delivery?: string | null
+  characterId?: string | null
+}
+
+/**
+ * 대사 절(#g7). memo.md 의 중국 숏드라마 팀 구조를 따른다 —
+ *   "음색·성격은 캐릭터 고정 상수, 상태·어조는 컷별 변수"에서 지금 있는 건 컷별 변수쪽이다.
+ *   대사 텍스트는 원문 그대로 넣는다(번역하면 입모양이 어긋난다).
+ *   여러 줄이면 순서를 명시해 모델이 차례로 말하게 한다.
+ */
+export function dialogueClause(lines: DialogueLine[] | null | undefined): string {
+  const said = (lines ?? []).filter((l) => (l?.text ?? '').trim())
+  if (said.length === 0) return ''
+  const parts = said.map((l, i) => {
+    const tone = [l.emotion, l.delivery].map((x) => (x ?? '').trim()).filter(Boolean).join(', ')
+    const who = said.length > 1 ? `line ${i + 1}` : 'the speaking character'
+    return `${who} says aloud: "${(l.text ?? '').trim()}"${tone ? ` — delivery: ${tone}` : ''}`
+  })
+  // 립싱크를 명시적으로 요구한다. 모델은 기본적으로 무성 클립을 만들려는 편향이 있다.
+  return `Spoken dialogue (audible, lip-synced): ${parts.join('; ')}. The character's mouth moves in sync with these words${said.length > 1 ? ', spoken in the order given' : ''}; time the scripted action to the words.`
 }
 
 export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: string; prompt_parts: VideoPromptParts } {
-  const { prompt, camera, movementPreset, cameraPreset, generationMethod, modelKey, durationSeconds, startEndReference, dynamicSpec } = parts
+  const { prompt, camera, movementPreset, cameraPreset, generationMethod, modelKey, durationSeconds, startEndReference, dynamicSpec, dialogueLines } = parts
   const contract: MotionContract = compileMotionContract(dynamicSpec, durationSeconds)
+  const dialogue = dialogueClause(dialogueLines)
   const cameraText = camera ? cameraToText(camera) : ''
   const movementFragment = generationMethod === 'T2V' && movementPreset ? findCameraMovement(movementPreset)?.prompt_fragment ?? '' : ''
   const gearFragment = cameraPreset ? `shot on ${findCameraBrand(cameraPreset.brand)?.full_name ?? cameraPreset.brand}, ${cameraPreset.focalLength}mm, f/${cameraPreset.aperture}, white balance ${cameraPreset.whiteBalance}K` : ''
   const prompt_parts: VideoPromptParts = { prompt, movement: movementFragment, gear: gearFragment, camera: cameraText }
   if (contract.text) prompt_parts.motionContract = contract.text
+  if (dialogue) prompt_parts.dialogue = dialogue
   // 계약문이 맨 앞(모델이 앞 토큰을 강하게 가중) — 그 뒤 장면 묘사·수동 카메라·기어.
   //   계약 있는 경로는 캡을 950 으로: 계약(~400자)이 묘사문에 밀려 잘리지 않게. 레거시(계약 없음)는 500 유지.
-  let fullPrompt = [contract.text, prompt, movementFragment, gearFragment, cameraText]
+  // 대사는 계약 바로 뒤(#g7) — 앞 토큰 가중을 받되 모션 계약을 밀어내지 않는 자리.
+  //   대사가 있으면 캡을 늘린다: 계약(~400자) + 대사(~200자)가 장면 묘사에 밀려 잘리면
+  //   립싱크 지시가 통째로 사라진다.
+  const cap = contract.text ? (dialogue ? 1200 : 950) : dialogue ? 750 : 500
+  let fullPrompt = [contract.text, dialogue, prompt, movementFragment, gearFragment, cameraText]
     .filter(Boolean)
     .join('. ')
-    .slice(0, contract.text ? 950 : 500)
+    .slice(0, cap)
 
   // V2(previz 실측 검증: END 프레이밍 수렴) — 첫 레퍼런스=START, 마지막=END 로 시작·끝 구도를 고정.
   //   P0(#motion-contract): 옛 문구는 "one continuous camera and subject movement"를 무조건 전제해
@@ -54,7 +92,7 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
       ? `The first reference image is the shot's START frame and the last reference image is its END frame — hold this same composition throughout: no camera travel between them, only the contracted subject motion.`
       : `The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.`
     prompt_parts.startEnd = startEndInstruction
-    fullPrompt = `${fullPrompt} ${startEndInstruction}`.slice(0, contract.text ? 1200 : 800)
+    fullPrompt = `${fullPrompt} ${startEndInstruction}`.slice(0, cap + (contract.text ? 250 : 300))
   }
 
   if (modelKey === 'veo' && durationSeconds < 8) {
