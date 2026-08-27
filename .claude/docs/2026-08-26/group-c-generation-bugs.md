@@ -1,6 +1,6 @@
 # 그룹 C — 생성 파이프라인 버그 (생성이 깨지거나 막힘)
 
-2026-08-27 기준 상태: **진행 중 — 8건 중 5건 닫힘, 3건 남음**
+2026-08-27 기준 상태: **8건 중 7건 닫힘 — C3만 남음**
 
 ## 이슈
 
@@ -12,7 +12,7 @@
 | C4 | Director | Node에서 영상생성 버튼 누르면 Storyboard로 튐 | **닫힘** (08-27) |
 | C5 | Director | real 바로 생성 끄기 | **닫힘** (08-27) |
 | C6 | Director | Pre-viz에서 재생성 못 함 | **닫힘** — 다른 세션 F10 |
-| C7 | Artist | 정보가 생성 안 되는 부분 있음 | 열림 — 스크린샷 필요 |
+| C7 | Artist | 정보가 생성 안 되는 부분 있음 | **닫힘** — 시트 템플릿 v3(다른 세션 #f8) |
 | C8 | Editor | Draft Render 눌러도 변화 없음 | **닫힘** — 다른 세션 `#draft-render` |
 
 ## 관찰 메모
@@ -97,4 +97,52 @@
 
 회귀 잠금: `tests/director-no-auto-real.test.ts`(8) — 자동 발사 부활·화면 강제 전환·
 채팅 액션 누락을 각각 잡는다.
+
+## C7 — 닫힘. 시트의 빈 칸이 문제였다 (2026-08-27)
+
+### 오너 스크린샷으로 특정
+
+원문("정보가 생성 안 되는 부분 있음")만으로는 어느 필드인지 알 수 없었다. 오너 노트
+(Notion "8월 개발결과" 25번 항목)의 첨부 이미지를 받아 확인했다 —
+`evidence/owner-notes/c7-artist-missing-info.png`.
+
+캐릭터 시트 3장(성기·계연·옥화)을 나란히 놓으면 **같은 템플릿인데 칸마다 채워지는 게 다르다**:
+
+| 칸 | 성기(주인공) | 계연(조연) | 옥화(조연) |
+|---|---|---|---|
+| CHARACTER CONCEPT 설명글 | 없음 | 있음(영문) | 없음 |
+| DETAIL NOTES | 빈 칸 | 빈 칸 | 있음(한글) |
+| DETAIL POINT 3칸 | 이미지 | 이미지 | 빈 회색 칸 |
+
+즉 "정보가 생성 안 됨"의 실체는 **모델이 채울 수도 안 채울 수도 있는 텍스트 칸을 시트가
+들고 있던 것**이다. 채우면 가짜 글자, 안 채우면 빈 칸 — 어느 쪽도 쓸모가 없다.
+
+### 이미 고쳐져 있었다
+
+어젯밤 다른 세션의 시트 템플릿 v3(`f18daf8`, #f8)가 정확히 이 지점을 지목해 제거했다.
+커밋 사유에 그대로 적혀 있다 — "빈 노트 칸(가짜 글자 유발)".
+
+v3 스펙(`src/lib/artist/sheet-template.ts`)에 남은 칸: **PORTRAIT · PALETTE ·
+TURNAROUND · POSE · DETAIL**. 문제가 됐던 CHARACTER CONCEPT 설명글·DETAIL NOTES·
+SIZE GUIDE·SKETCH STYLE 은 전부 사라졌다.
+
+기존 v2 시트는 그대로 남고 **재생성부터 v3가 적용**된다.
+
+## 오너 원본 노트 증거 (2026-08-27 확보)
+
+Notion "8월 개발결과" 페이지에서 첨부 이미지 11장을 받아
+`evidence/owner-notes/` 에 보관했다. 그룹 C 밖의 항목도 함께 있으므로 해당 그룹에서 참조한다.
+
+| 파일 | 연결 항목 |
+|---|---|
+| `c7-artist-missing-info.png` | **C7** — 캐릭터 시트 빈 칸 |
+| `artist-required-color.png` | Artist "필수 색깔의 의미는?" (그룹 D) |
+| `e2-mention-popup-cut.png` | E2 @멘션 팝업 잘림 |
+| `e-white-clipped.png` | E "흰색으로 잘림" |
+| `e-popup-vs-dashboard.png` | E 팝업과 대시보드 구분 안 됨 |
+| `e-mention-shows-vars.png` | E 멘션에 변수 노출 |
+| `b2-director-no-action.png` | **B2** Director 채팅 지시 미실행 |
+| `b3-p4-video-take.png` | **B3** [p4] 등장·video take 오해 |
+| `g-no-reaction-regen.png` | G 재생성 반응 없음 |
+| `g-scene3-chaining.png` / `-2.png` | G Scene3 샷 체이닝 |
 
