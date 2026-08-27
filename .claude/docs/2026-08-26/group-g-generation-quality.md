@@ -537,3 +537,6 @@ memo.md 19줄에 같은 지적이 이미 있었다: "시작 프레임과 엔드 
 "원하는 방향인가"는 오너 판정 영역이다. 제자리 동작 장면은 아직 미측정.
 
 보고서: `g2-extreme-shot-report.html`
+
+**웹에서 바로 보기**: https://claude.ai/code/artifact/ebe54a0c-8c75-41a4-98e5-81f4b6eadd47?via=auto_preview
+(위 링크는 이 실험 보고서를 아티팩트로 올린 것 — 영상·이미지·번역이 그대로 들어 있다.)
