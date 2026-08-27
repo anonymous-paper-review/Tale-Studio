@@ -131,9 +131,21 @@ export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
  *   캐릭터를 채운다. 템플릿 URL 을 못 구하면 같은 프롬프트로 T2I 폴백. 동일 캐릭터/의상/비율을 뷰마다
  *   강하게 고정해 director 단계의 뷰 참조 일관성을 확보(#7). 개별 방향 뷰(i2i) 생성 대체 — 캐릭터당 1장(#9, 2026-07-11).
  */
-export function buildCharacterTurnaroundPrompt(input: CharacterPromptInput): string {
+export function buildCharacterTurnaroundPrompt(
+  input: CharacterPromptInput,
+  opts?: { hasBaseFace?: boolean },
+): string {
   return [
     `Fill in this character reference-sheet template with ${input.name}`,
+    // #g4(2026-08-27): 둘째 참조 이미지가 있으면 그건 "이 인물의 다른 시점 얼굴"이다.
+    //   memo.md 의 제작팀 방식 — 정체성 요소만 가져오고 그대로 복사하지는 않게 한다.
+    //   여기서 "복사하지 마라"를 빼면 젊은 시절이 현재 얼굴을 그대로 베껴 나이가 안 바뀐다.
+    ...(opts?.hasBaseFace
+      ? [
+          'the SECOND reference image is the same person at a different point in their life — carry over the identity markers (face structure, eye shape, nose bridge, distinguishing marks) so viewers recognise them as one person',
+          'do NOT copy that face verbatim: this sheet shows them at the age and condition described above, so skin, hairline, weight and bearing must match THIS description, not the reference',
+        ]
+      : []),
     ...describe(input),
     ...styleTokens(input),
     ...deltaClause(input),

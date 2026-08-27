@@ -58,14 +58,17 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, characterId, view, actor, instruction, safeMode } = (await req.json()) as {
-      projectId?: string
-      characterId?: string
-      view?: CharacterViewKey
-      actor?: string
-      instruction?: string // 재생성 시 유저 델타(merge) — 룩 토대 위에 덮음(AC13).
-      safeMode?: boolean // 모더레이션 우회 재시도(#A) — 직전 실패가 moderation-class 인 슬롯에만 적용.
-    }
+    const { projectId, characterId, view, actor, instruction, safeMode, baseCharacterId } =
+      (await req.json()) as {
+        projectId?: string
+        characterId?: string
+        view?: CharacterViewKey
+        actor?: string
+        instruction?: string // 재생성 시 유저 델타(merge) — 룩 토대 위에 덮음(AC13).
+        safeMode?: boolean // 모더레이션 우회 재시도(#A) — 직전 실패가 moderation-class 인 슬롯에만 적용.
+        /** #g4: 이 캐릭터가 누구의 다른 시점인가. 그 캐릭터의 얼굴을 참조로 넣어 연속성을 만든다. */
+        baseCharacterId?: string
+      }
     if (!projectId || !characterId || !view) {
       return NextResponse.json(
         { error: 'projectId, characterId, view required' },
@@ -171,6 +174,22 @@ export async function POST(req: Request) {
 
     // 2. 프롬프트 + 모델 결정
     //    main → 깨끗한 T2I. 방향 뷰 → view_main 을 reference 로 한 i2i(edit). main 없으면 T2I fallback.
+    // #g4(2026-08-27): 다른 캐릭터의 얼굴을 참조로 받는다 — "젊은 옥화"를 옥화 기반으로.
+    //   예전엔 참조할 수 있는 게 '자기 자신의 view_main' 뿐이라 시점 변형이 남남으로 나왔다
+    //   (실측: 옥화 char_3 / 젊은 옥화 char_new_9l6xq 의 얼굴 골격이 서로 다름).
+    //   시트 전체가 아니라 얼굴 크롭(portrait)을 쓴다 — 시트를 통째로 주면 레이아웃까지
+    //   따라와 템플릿과 충돌하고, 정체성만 전달하려는 목적에도 어긋난다.
+    let baseFaceUrl: string | null = null
+    if (typeof baseCharacterId === 'string' && baseCharacterId && baseCharacterId !== characterId) {
+      const { data: base } = await supabaseAdmin
+        .from('characters')
+        .select('portrait, view_main')
+        .eq('project_id', projectId)
+        .eq('character_id', baseCharacterId)
+        .maybeSingle()
+      baseFaceUrl = (base?.portrait as string | null) ?? (base?.view_main as string | null) ?? null
+    }
+
     const refMain = character.view_main as string | null
     const webhookUrl = resolveWebhookUrl()
     let submitOpts: FalImageOptions
@@ -186,8 +205,10 @@ export async function POST(req: Request) {
           styleAnchorMode = 'turnaround'
           submitOpts = {
             model: 'openai/gpt-image-2/edit',
-            prompt: buildCharacterTurnaroundPrompt(input),
-            reference_image_urls: [templateUrl],
+            prompt: buildCharacterTurnaroundPrompt(input, { hasBaseFace: !!baseFaceUrl }),
+            // 템플릿이 첫 장(레이아웃 기준), 기준 얼굴이 둘째 장(정체성).
+            //   순서가 뒤바뀌면 모델이 얼굴 이미지를 레이아웃으로 오인한다.
+            reference_image_urls: baseFaceUrl ? [templateUrl, baseFaceUrl] : [templateUrl],
             webhookUrl,
             // aspect_ratio 생략 → edit 모델이 템플릿 비율(≈16:9)을 따름
           }
