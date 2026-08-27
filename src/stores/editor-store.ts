@@ -78,6 +78,9 @@ interface EditorState {
   selectedAudioIds: string[]          // 다중 선택된 오디오 클립 (marquee/Ctrl/Shift)
   clipOrder: Record<string, string[]> // sceneId → shotId[]
   error: string | null
+  // #pps-empty-states(2026-08-27): shots=0 의 세 이유(로딩/실패/정상 빈)를 화면이 구분하게 하는
+  //   로드 상태. 'idle' 은 loadData 발화 전 첫 렌더 — 화면은 로딩과 동일하게 취급한다.
+  loadStatus: 'idle' | 'loading' | 'error' | 'ready'
 
   // Video Source 패널 (프리미어2 좌상단 카드 그리드) — 토글로 접기
   sourcePanelOpen: boolean
@@ -317,6 +320,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedAudioIds: [],
   clipOrder: {},
   error: null,
+  loadStatus: 'idle',
   sourcePanelOpen: true,
   currentTime: 0,
   pxPerSec: PX_PER_SEC_DEFAULT,
@@ -685,6 +689,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   loadData: async () => {
     const loadEpoch = ++editorLoadEpoch
     const projectId = useProjectStore.getState().projectId
+    set({ loadStatus: 'loading' })
     const emptyProjectData = {
       shots: [] as Shot[],
       videoClips: [] as VideoClip[],
@@ -809,10 +814,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             selectedSceneId: firstSceneId,
             selectedClipShotId: order[firstSceneId!]?.[0] ?? null,
             error: null,
+            loadStatus: 'ready',
           })
           return
         }
-        set({ ...emptyProjectData, error: null })
+        set({ ...emptyProjectData, error: null, loadStatus: 'ready' })
         return
       } catch (err) {
         console.error('[editor-store] DB load failed:', err)
@@ -822,6 +828,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         set({
           ...emptyProjectData,
           error: err instanceof Error ? err.message : 'Editor data load failed',
+          loadStatus: 'error',
         })
         return
       }
@@ -830,7 +837,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // 2) DB가 단일 진실 (unify-director-store-db Step 1) — 옛 director-store fallback 제거.
     //    Director 캔버스 편집은 Step 0 write-through로 DB shots에 반영되므로 위 (1) 경로가 캐넌.
 
-    set({ ...emptyProjectData, error: null })
+    set({ ...emptyProjectData, error: null, loadStatus: 'ready' })
   },
 
   reset: () => {
@@ -846,6 +853,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedAudioIds: [],
       clipOrder: {},
       error: null,
+      loadStatus: 'idle',
       currentTime: 0,
       pxPerSec: PX_PER_SEC_DEFAULT,
       isPlaying: false,

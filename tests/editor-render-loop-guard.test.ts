@@ -76,11 +76,13 @@ describe('무한 리렌더 방지 (React #185)', () => {
     const page = readFileSync(EDITOR_PAGE, 'utf8')
     // loadData/loadPersisted 를 부르는 effect 를 찾아 그 deps 를 검사한다.
     const deps = depArrays(page.slice(page.indexOf('await loadData()')))[0]
-    expect(deps).toEqual(['projectId', 'loadData', 'loadPersisted', 't'])
+    expect(deps).toEqual(['projectId', 'loadData', 'loadPersisted', 't', 'retryTick'])
     // 각 항목의 안정성 근거:
     //   projectId  — 스토어 원시값
     //   loadData / loadPersisted — zustand 액션(스토어 생성 시 1회)
     //   t          — useT 의 useCallback (위 첫 테스트가 잠금)
+    //   retryTick  — useState 숫자(#pps-empty-states '다시 시도' 재발화 신호) — 렌더 간 안정,
+    //                클릭에서만 증가하므로 재실행은 사용자 행동 1회당 1회다.
     expect(page).toMatch(/const projectId = useProjectStore\(\(s\) => s\.projectId\)/)
     expect(page).toMatch(/\n\s+loadData,\n\s+loadPersisted,\n/) // useEditorStore() 구조분해
   })

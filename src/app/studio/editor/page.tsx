@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useCallback, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Loader2,
   Download,
@@ -43,6 +44,7 @@ export default function PostPage() {
     selectedShotIds,
     selectedAudioIds,
     error,
+    loadStatus,
     sourcePanelOpen,
     currentTime,
     pxPerSec,
@@ -114,6 +116,10 @@ export default function PostPage() {
 
   const projectId = useProjectStore((s) => s.projectId)
   const projectTitle = useProjectStore((s) => s.projectTitle)
+  const router = useRouter()
+  // #pps-empty-states: 로드 실패 화면의 '다시 시도' — 로드 effect 를 통째로 재발화시켜
+  //   loadData→loadPersisted→오디오 자동 부착 순서를 그대로 다시 탄다.
+  const [retryTick, setRetryTick] = useState(0)
   const [exportingZip, setExportingZip] = useState(false)
 
   // Draft Render (#draft-render 2026-08-26): 타임라인 전체를 브라우저에서 이어 붙여 파일로 저장.
@@ -310,7 +316,7 @@ export default function PostPage() {
     return () => {
       cancelled = true
     }
-  }, [projectId, loadData, loadPersisted, t])
+  }, [projectId, loadData, loadPersisted, t, retryTick])
 
   // Editor 진입 시 채팅 기본 접힘 (요청 6b). 떠날 때 이전 상태 복원
   useEffect(() => {
@@ -363,14 +369,56 @@ export default function PostPage() {
     [addClipAtPlayhead, attachVideoAudio],
   )
 
+  // #pps-empty-states(2026-08-27 오너 확정): shots=0 의 세 이유(로딩/실패/정상 빈)를 한 화면으로
+  //   뭉개지 않는다 — 로딩 플래시가 "이전 단계를 완료하라"는 틀린 진단으로 보이던 것의 수리.
   if (shots.length === 0) {
+    if (loadStatus === 'error') {
+      return (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="max-w-sm text-center">
+            <h1 className="text-2xl font-bold">Post-Production Suite</h1>
+            <p className="mt-2 text-sm text-muted-foreground">{t('Could not load your clips.')}</p>
+            {error ? <p className="mt-1 text-xs text-muted-foreground/70">{error}</p> : null}
+            <Button variant="outline" className="mt-4" onClick={() => setRetryTick((n) => n + 1)}>
+              {t('Retry')}
+            </Button>
+          </div>
+        </div>
+      )
+    }
+    if (loadStatus === 'ready') {
+      return (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="max-w-sm text-center">
+            <h1 className="text-2xl font-bold">Post-Production Suite</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t('Complete previous steps first to load video clips.')}
+            </p>
+            <Button className="mt-4" onClick={() => router.push('/studio/director')}>
+              {t('Go to Director')}
+            </Button>
+          </div>
+        </div>
+      )
+    }
+    // 'loading'('idle' 포함 — 로드 effect 발화 전 첫 렌더): 문구 없는 레이아웃 스켈레톤.
+    //   소스 패널(좌) + 프리뷰(중) + 타임라인(하) 자리를 그대로 비쳐 화면 점프를 없앤다.
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">Post-Production Suite</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Complete previous steps first to load video clips.
-          </p>
+      <div className="flex flex-1 overflow-hidden" aria-busy>
+        <div className="w-64 shrink-0 border-r border-border/50 p-3">
+          <div className="grid grid-cols-2 gap-2">
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={i} className="aspect-video animate-pulse rounded-md bg-muted-foreground/10" />
+            ))}
+          </div>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="m-4 flex-1 animate-pulse rounded-md bg-muted-foreground/10" />
+          <div className="mx-4 mb-4 space-y-2">
+            <div className="h-3 w-full animate-pulse rounded bg-muted-foreground/10" />
+            <div className="h-9 w-3/4 animate-pulse rounded bg-muted-foreground/10" />
+            <div className="h-9 w-1/2 animate-pulse rounded bg-muted-foreground/10" />
+          </div>
         </div>
       </div>
     )

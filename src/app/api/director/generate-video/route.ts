@@ -170,7 +170,8 @@ function buildFalReferenceToVideoRequest(
     input.duration = clampDuration(spec, durationSeconds)
   }
 
-  // audio: 토글 있는 모델만, 기본 OFF
+  // audio: 토글 있는 모델만 — 현재 전 모델 audioDefault=true(91b83f6, 음성은 영상 생성기에
+  //   맡긴다는 방침의 전제). 대사 절(#g7)이 가청 대사를 요구하므로 여기가 꺼지면 반쪽이 된다.
   if (spec.audioParam) {
     input[spec.audioParam] = spec.audioDefault
   }
