@@ -577,9 +577,9 @@ export async function finalizeCharacterViewJob(
   falImageUrl: string,
   falPayload?: unknown,
 ): Promise<string> {
-  const { workspaceId, characterId, column, view } = job.target
-  if (!workspaceId || !characterId || !column) {
-    throw new Error('character_view job target missing workspaceId/characterId/column')
+  const { workspaceId, characterId, appearanceKey, view } = job.target
+  if (!workspaceId || !characterId || !appearanceKey || !view) {
+    throw new Error('character_view job target missing workspaceId/characterId/appearanceKey/view')
   }
   await recordFalResponseSnapshot(job, falPayload)
 
@@ -587,7 +587,7 @@ export async function finalizeCharacterViewJob(
   if (!imgRes.ok) throw new Error(`fal image fetch failed: ${imgRes.status}`)
   const buf = Buffer.from(await imgRes.arrayBuffer())
 
-  const path = `${workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}_${column}.png`
+  const path = `${workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}/${storageKeySegment(appearanceKey)}_${view}.png`
   const { error: upErr } = await mediaUpload(path, buf, { contentType: 'image/png', upsert: true })
   if (upErr) throw upErr
   await uploadThumbnail(path, buf)
@@ -595,25 +595,31 @@ export async function finalizeCharacterViewJob(
     mediaPublicUrl(path),
   )
 
-  // 선택본 URL 은 기존대로 characters.view_* 에 미러(read 경로 무변경).
-  const { error: updErr } = await supabaseAdmin
-    .from('characters')
-    .update({ [column]: publicUrl })
-    .eq('project_id', job.project_id)
-    .eq('character_id', characterId)
-  if (updErr) throw updErr
+  // 시트와 포트레이트는 character_appearances만 소유한다. 방향 뷰는 후보 이력만 갱신한다.
+  if (view === 'main') {
+    const { data: updatedAppearance, error: updErr } = await supabaseAdmin
+      .from('character_appearances')
+      .update({ sheet_url: publicUrl })
+      .eq('project_id', job.project_id)
+      .eq('character_id', characterId)
+      .eq('appearance_key', appearanceKey)
+      .select('appearance_key')
+      .maybeSingle()
+    if (updErr) throw updErr
+    if (!updatedAppearance) throw new Error('character appearance sheet update matched no row')
+  }
 
   // provenance(#57): 그 위에 character_image_candidates 행을 얹는다 — best-effort.
   //   지문이 어긋나 착지해도(생성 중 외모 변경) 폐기하지 않고 그대로 선택본으로 기록 →
   //   stale 판정(순수 함수)이 알아서 낡음으로 표시한다(architecture §5 — 착지 + 배지).
-  await recordCharacterImageCandidate(job, characterId, view, publicUrl).catch((e) => {
+  await recordCharacterImageCandidate(job, characterId, appearanceKey, view, publicUrl).catch((e) => {
     console.warn('[finalize] candidate record failed (image landed):', e instanceof Error ? e.message : e)
   })
 
   // 대표 포트레이트(New UI 에셋 칩) — 사람 main 은 시트 좌상단 CHARACTER CONCEPT 크롭,
   //   사물/비-시트는 main 그대로. best-effort(실패해도 시트 착지는 유지).
   if (view === 'main') {
-    await savePortraitFromMain(job, characterId, buf, publicUrl).catch((e) => {
+    await savePortraitFromMain(job, characterId, appearanceKey, buf, publicUrl).catch((e) => {
       console.warn('[finalize] portrait crop failed (sheet landed):', e instanceof Error ? e.message : e)
     })
   }
@@ -629,6 +635,7 @@ export async function finalizeCharacterViewJob(
 async function savePortraitFromMain(
   job: GenerationJob,
   characterId: string,
+  appearanceKey: string,
   sheetBuf: Buffer,
   mainUrl: string,
 ): Promise<void> {
@@ -643,7 +650,7 @@ async function savePortraitFromMain(
   if (ch?.entity_type !== 'object') {
     const cropped = await cropTurnaroundPortrait(sheetBuf)
     if (cropped) {
-      const path = `${job.target.workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}_portrait.png`
+      const path = `${job.target.workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}/${storageKeySegment(appearanceKey)}_portrait.png`
       const { error: upErr } = await mediaUpload(path, cropped, { contentType: 'image/png', upsert: true })
       if (upErr) throw upErr
       await uploadThumbnail(path, cropped)
@@ -653,12 +660,16 @@ async function savePortraitFromMain(
     }
   }
 
-  const { error } = await supabaseAdmin
-    .from('characters')
-    .update({ portrait: portraitUrl })
+  const { data: updatedAppearance, error } = await supabaseAdmin
+    .from('character_appearances')
+    .update({ portrait_url: portraitUrl })
     .eq('project_id', job.project_id)
     .eq('character_id', characterId)
+    .eq('appearance_key', appearanceKey)
+    .select('appearance_key')
+    .maybeSingle()
   if (error) throw error
+  if (!updatedAppearance) throw new Error('character appearance portrait update matched no row')
 }
 
 /**
@@ -670,6 +681,7 @@ async function savePortraitFromMain(
 async function recordCharacterImageCandidate(
   job: GenerationJob,
   characterId: string,
+  appearanceKey: string,
   viewKey: string | undefined,
   url: string,
 ): Promise<void> {
@@ -696,6 +708,7 @@ async function recordCharacterImageCandidate(
     .update({ is_selected: false })
     .eq('project_id', job.project_id)
     .eq('character_id', characterId)
+    .eq('appearance_key', appearanceKey)
     .eq('view', view)
     .eq('is_selected', true)
 
@@ -703,6 +716,7 @@ async function recordCharacterImageCandidate(
   const { error: insErr } = await supabaseAdmin.from('character_image_candidates').insert({
     project_id: job.project_id,
     character_id: characterId,
+    appearance_key: appearanceKey,
     view,
     url,
     source_hash: sourceHash,
@@ -719,6 +733,7 @@ async function recordCharacterImageCandidate(
     .delete()
     .eq('project_id', job.project_id)
     .eq('character_id', characterId)
+    .eq('appearance_key', appearanceKey)
     .eq('view', view)
     .eq('is_selected', false)
 }

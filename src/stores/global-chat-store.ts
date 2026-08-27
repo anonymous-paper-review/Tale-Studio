@@ -6,7 +6,11 @@ import { createPendingProposal, isApprovalUtterance } from '@/lib/pending-propos
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore, type ExtractedSettings } from '@/stores/producer-store'
 import { evaluateProducerGate } from '@/lib/producer-gate'
-import { useArtistStore, type ArtistUpdate } from '@/stores/artist-store'
+import {
+  requireDefaultAppearanceKey,
+  useArtistStore,
+  type ArtistUpdate,
+} from '@/stores/artist-store'
 import {
   useDirectorCanvasStore,
   serializeDirectorCanvasContext,
@@ -1210,9 +1214,18 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (!['main', 'back', 'sideLeft', 'sideRight'].includes(String(view))) {
           throw new Error('view missing')
         }
+        const character = useArtistStore
+          .getState()
+          .characterAssets.find((asset) => asset.characterId === characterId)
+        if (!character) throw new Error(`Character ${characterId} was not found`)
         await useArtistStore
           .getState()
-          .generateCharacterView(characterId, view as 'main' | 'back' | 'sideLeft' | 'sideRight', 'chat')
+          .generateCharacterView(
+            characterId,
+            requireDefaultAppearanceKey(character),
+            view as 'main' | 'back' | 'sideLeft' | 'sideRight',
+            'chat',
+          )
       } else if (proposal.kind === 'artistRegenerateCharacterViews') {
         const characterId = proposal.payload.characterId
         const views = proposal.payload.views
@@ -1223,15 +1236,31 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             throw new Error('view missing')
           }
         }
+        const character = useArtistStore
+          .getState()
+          .characterAssets.find((asset) => asset.characterId === characterId)
+        if (!character) throw new Error(`Character ${characterId} was not found`)
+        const appearanceKey = requireDefaultAppearanceKey(character)
         for (const view of views) {
           await useArtistStore
             .getState()
-            .generateCharacterView(characterId, view as 'main' | 'back' | 'sideLeft' | 'sideRight', 'chat')
+            .generateCharacterView(
+              characterId,
+              appearanceKey,
+              view as 'main' | 'back' | 'sideLeft' | 'sideRight',
+              'chat',
+            )
         }
       } else if (proposal.kind === 'artistRegenerateCharacterAllViews') {
         const characterId = proposal.payload.characterId
         if (typeof characterId !== 'string') throw new Error('characterId missing')
-        await useArtistStore.getState().generateCharacterAllViews(characterId, 'chat')
+        const character = useArtistStore
+          .getState()
+          .characterAssets.find((asset) => asset.characterId === characterId)
+        if (!character) throw new Error(`Character ${characterId} was not found`)
+        await useArtistStore
+          .getState()
+          .generateCharacterAllViews(characterId, requireDefaultAppearanceKey(character), 'chat')
       } else if (proposal.kind === 'artistRegenerateWorldAsset') {
         const locationId = proposal.payload.locationId
         if (typeof locationId !== 'string') throw new Error('locationId missing')

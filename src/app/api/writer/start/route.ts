@@ -17,6 +17,7 @@ import type {
   Genre,
   CastContract,
   WriterRerunContext,
+  NarrativeTime,
 } from '@/lib/writer/types/pipeline';
 import { isAdminOwnedProject } from '@/lib/admin';
 import { isWriterEngine, type WriterEngine } from '@/lib/writer/engine';
@@ -53,6 +54,8 @@ interface RerunSceneRow {
   original_text_quote: string | null;
   location: string | null;
   time_of_day: string | null;
+  narrative_time: NarrativeTime | null;
+  character_appearance_overrides: Record<string, string> | null;
   mood: string | null;
   characters_present: string[] | null;
   estimated_duration_seconds: number | null;
@@ -79,6 +82,19 @@ interface RerunMessageRow {
   created_at: string | null;
 }
 
+function requireRerunNarrativeTime(scene: RerunSceneRow): NarrativeTime {
+  if (
+    scene.narrative_time === 'present' ||
+    scene.narrative_time === 'past' ||
+    scene.narrative_time === 'future'
+  ) {
+    return scene.narrative_time;
+  }
+  throw new Error(
+    `rerun scene ${scene.scene_id} has no valid narrative_time; apply the narrative-time migration before rerunning Writer`,
+  );
+}
+
 export function buildRerunContext(
   previousRunId: string,
   scenes: RerunSceneRow[],
@@ -94,6 +110,8 @@ export function buildRerunContext(
       originalTextQuote: scene.original_text_quote,
       location: scene.location,
       timeOfDay: scene.time_of_day,
+      narrativeTime: requireRerunNarrativeTime(scene),
+      characterAppearanceOverrides: scene.character_appearance_overrides,
       mood: scene.mood,
       charactersPresent: Array.isArray(scene.characters_present)
         ? scene.characters_present.filter((id): id is string => typeof id === 'string')
@@ -390,11 +408,11 @@ export async function POST(req: NextRequest) {
         : undefined,
     };
     if (existing?.status === 'completed' && body.rerun === true) {
-      const [sceneResult, shotResult, messageResult, projectResult] = await Promise.all([
+      const [sceneResult, shotResult, messageResult, projectResult, overrideResult] = await Promise.all([
         supabaseAdmin
           .from('scenes')
           .select(
-            'scene_id,narrative_summary,original_text_quote,location,time_of_day,mood,characters_present,estimated_duration_seconds',
+            'scene_id,narrative_summary,original_text_quote,location,time_of_day,narrative_time,mood,characters_present,estimated_duration_seconds',
           )
           .eq('project_id', projectId)
           .order('sort_order', { ascending: true }),
@@ -412,11 +430,35 @@ export async function POST(req: NextRequest) {
           .order('created_at', { ascending: true })
           .limit(200),
         supabaseAdmin.from('projects').select('settings').eq('id', projectId).maybeSingle(),
+        supabaseAdmin
+          .from('scene_character_appearance_overrides')
+          .select('scene_id,character_id,appearance_key')
+          .eq('project_id', projectId),
       ]);
       if (sceneResult.error) throw new Error(`rerun scenes load failed: ${sceneResult.error.message}`);
       if (shotResult.error) throw new Error(`rerun shots load failed: ${shotResult.error.message}`);
       if (messageResult.error) throw new Error(`rerun chat load failed: ${messageResult.error.message}`);
       if (projectResult.error) throw new Error(`rerun producer decisions load failed: ${projectResult.error.message}`);
+      if (overrideResult.error) throw new Error(`rerun appearance overrides load failed: ${overrideResult.error.message}`);
+
+      const overridesByScene = new Map<string, Record<string, string>>();
+      for (const row of overrideResult.data ?? []) {
+        if (
+          typeof row.scene_id !== 'string' ||
+          typeof row.character_id !== 'string' ||
+          typeof row.appearance_key !== 'string' ||
+          !row.appearance_key.trim()
+        ) {
+          throw new Error('rerun appearance override row is invalid');
+        }
+        const overrides = overridesByScene.get(row.scene_id) ?? {};
+        overrides[row.character_id] = row.appearance_key;
+        overridesByScene.set(row.scene_id, overrides);
+      }
+      const rerunScenes = (sceneResult.data ?? []).map((scene) => ({
+        ...scene,
+        character_appearance_overrides: overridesByScene.get(scene.scene_id) ?? null,
+      }));
 
       const previousInput = existing.state.input as PipelineInput;
       input.genre = input.genre ?? previousInput.genre;
@@ -434,7 +476,7 @@ export async function POST(req: NextRequest) {
         : [];
       input.rerunContext = buildRerunContext(
         existing.id,
-        (sceneResult.data ?? []) as RerunSceneRow[],
+        rerunScenes as RerunSceneRow[],
         (shotResult.data ?? []) as RerunShotRow[],
         (requestedChatHistory.length ? requestedChatHistory : messageResult.data ?? []) as RerunMessageRow[],
         {

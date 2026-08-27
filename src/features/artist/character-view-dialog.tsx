@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { HoverBeam } from '@/components/hover-beam'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
-import { useArtistStore } from '@/stores/artist-store'
+import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { CHARACTER_VIEW_LABELS, type CharacterViewKey } from '@/types/asset'
 import { classifyImageStale } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
@@ -22,6 +22,7 @@ import { useT } from '@/lib/i18n'
 
 type Props = {
   charId: string | null
+  appearanceKey: string | null
   view: CharacterViewKey | null
   onClose: () => void
 }
@@ -30,17 +31,19 @@ type Props = {
  * 캐릭터 뷰 상세 — 선택 뷰 프리뷰 + 단일 뷰 재생성 (crop 폐기, 2026-06-05).
  * main = 대표 포트레이트(T2I), 방향 뷰 = main 을 reference 로 한 i2i. 각 뷰를 개별 재생성한다.
  */
-export function CharacterViewDialog({ charId, view, onClose }: Props) {
+export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Props) {
   const t = useT()
   const char = useArtistStore((s) =>
     s.characterAssets.find((c) => c.characterId === charId),
   )
   const generateCharacterView = useArtistStore((s) => s.generateCharacterView)
-  const updateCharacter = useArtistStore((s) => s.updateCharacter)
+  const updateCharacterAppearance = useArtistStore((s) => s.updateCharacterAppearance)
   const viewFailures = useArtistStore((s) => s.viewFailures)
   const retryCharacterViewSafe = useArtistStore((s) => s.retryCharacterViewSafe)
   const isGenerating = useArtistStore((s) =>
-    view ? s.generatingViews.includes(`${charId}:${view}`) : false,
+    appearanceKey && view
+      ? s.generatingViews.some((slot) => sameCharacterAppearanceSlot(slot, charId ?? '', appearanceKey, view))
+      : false,
   )
 
   // 외형 프롬프트(수정 후 재생성, 월드 다이얼로그와 대칭) — 대상(캐릭터×뷰) 전환 시 초기화.
@@ -51,60 +54,61 @@ export function CharacterViewDialog({ charId, view, onClose }: Props) {
   //   느린 서버에서 그 사이 버튼이 열려 있어 두 번째 클릭이 기존 중복 가드까지 통과했다.
   //   아래 훅은 store 상태를 기다리지 않고 클릭 순간 잠그고, busy 가 올라오면 잠금을 넘긴다.
   const generate = useGuardedAction({
-    actionKey: `artist:character:${charId}:${view}`,
+    actionKey: `artist:character:${charId}:${appearanceKey}:${view}`,
     stage: 'artist',
     label: t('Character image'),
     busy: isGenerating,
     action: async () => {
-      if (!char || !view) return
-      // 프롬프트가 편집됐으면 원천(appearance)에 먼저 반영 — 생성 직전 flush(#11)가 저장을 보장.
+      if (!char || !appearanceKey || !view || !appearance) return
+      // 프롬프트는 선택한 모습의 원천에만 저장한다.
       const next = prompt.trim()
-      const base = char.appearanceNative || char.fixedPrompt || ''
+      const base = appearance.appearanceNative || appearance.appearance || ''
       if (view === 'main' && next && next !== base) {
-        updateCharacter(char.characterId, { appearance: next })
+        await updateCharacterAppearance(char.characterId, appearanceKey, next)
       }
-      await generateCharacterView(char.characterId, view)
+      await generateCharacterView(char.characterId, appearanceKey, view)
     },
   })
   const safeRetry = useGuardedAction({
-    actionKey: `artist:character-safe:${charId}:${view}`,
+    actionKey: `artist:character-safe:${charId}:${appearanceKey}:${view}`,
     stage: 'artist',
     label: t('Character image (bypass retry)'),
     busy: isGenerating,
     action: async () => {
-      if (!char || !view) return
-      await retryCharacterViewSafe(char.characterId, view)
+      if (!char || !appearanceKey || !view) return
+      await retryCharacterViewSafe(char.characterId, appearanceKey, view)
     },
   })
 
-  const open = !!charId && !!view
-  if (!open || !char || !view) return null
+  const open = !!charId && !!appearanceKey && !!view
+  const appearance = char?.appearances.find((item) => item.appearanceKey === appearanceKey) ?? null
+  if (!open || !char || !appearance || !view) return null
 
-  const imageUrl = char.views[view] ?? null
+  const imageUrl = view === 'main' ? appearance.sheetUrl : null
   const label = t(CHARACTER_VIEW_LABELS[view])
   const isObject = char.entityType === 'object'
   // object 캐릭터는 방향뷰 개념 없음 — isDirectional/needsMain 로직 미적용
   const isDirectional = !isObject && view !== 'main'
-  const needsMain = isDirectional && !char.views.main
+  const needsMain = isDirectional && !appearance.sheetUrl
   // 사람 main = 와이드 턴어라운드 시트 → 넓은 다이얼로그 + 16:9 프레임으로 전체 표시(잘림 방지, #4).
   const isSheet = !isObject && view === 'main'
 
-  const initialPrompt = char.appearanceNative || char.fixedPrompt || ''
-  const key = `${charId}:${view}`
+  const initialPrompt = appearance.appearanceNative || appearance.appearance || ''
+  const key = `${charId}:${appearanceKey}:${view}`
   if (promptKey !== key) {
     setPromptKey(key)
     setPrompt(initialPrompt)
   }
 
   // stale 원인 분류(027): look-pending(룩만 도착) vs edited(외형 변경). dialog 포커스에서만 표시.
-  const candidates = char.viewCandidates[view] ?? []
+  const candidates = appearance.viewCandidates[view] ?? []
   const selectedCandidate = candidates.find((c) => c.isSelected)
-  const staleClass = classifyImageStale(char.fixedPrompt, char.lookFingerprint ?? null, {
+  const staleClass = classifyImageStale(appearance.appearance ?? '', char.lookFingerprint ?? null, {
     sourceHash: selectedCandidate?.sourceHash ?? null,
     appearanceHash: selectedCandidate?.appearanceHash ?? null,
   })
   // 생성 실패(reload-survivable) — moderation(콘텐츠정책) 이면 우회(safe) 재시도 버튼, cap 도달 시 비활성.
-  const failure = charId ? viewFailures[charId]?.[view] : undefined
+  const failure = charId && appearanceKey ? viewFailures[charId]?.[appearanceKey]?.[view] : undefined
   const capReached = (failure?.safeFailCount ?? 0) >= SAFE_RETRY_CAP
 
   return (

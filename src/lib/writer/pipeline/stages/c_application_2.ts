@@ -521,6 +521,8 @@ function buildShotSequenceItemFromDesign(
 
   const characters = (st.character_blocking ?? []).map((b) => ({
     id: b.character_id,
+    // DB appearance_key는 persistShotsToDb가 scene narrative_time에서 해소한다.
+    // 이 단계는 L4의 의상/상태 버전만 보존한다.
     asset_version: b.asset_version || 'v1',
     visible_parts: ['full'],
   }));

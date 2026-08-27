@@ -12,6 +12,7 @@ import type {
 import type { WriterEngine } from '@/lib/writer/engine';
 
 export type DepthLevel = 'D1' | 'D2' | 'D3' | 'D4' | 'D5' | 'D6' | 'D7';
+export type NarrativeTime = 'present' | 'past' | 'future';
 
 // Compact Mode 트리거: 어떤 depth도 V3를 스킵하지 않음 — 짧은 영상(D1~D3)도 풀 파이프라인.
 //   (이전엔 D1~D3가 V3를 스킵하고 V4가 디시플린을 자체 판단 → 씬 단위 연출 규율이 약했음.
@@ -223,6 +224,8 @@ export interface WriterRerunContext {
     originalTextQuote: string | null;
     location: string | null;
     timeOfDay: string | null;
+    narrativeTime: NarrativeTime;
+    characterAppearanceOverrides: Record<string, string> | null;
     mood: string | null;
     charactersPresent: string[];
     estimatedDurationSeconds: number | null;
@@ -368,6 +371,9 @@ export interface StoryScene {
   act_ref: string;
   location: string;
   time_of_day: string;
+  /** Relative to the fixed story present; independent from time_of_day. */
+  narrative_time: NarrativeTime;
+  character_appearance_overrides?: Record<string, string>;
   weather?: string;
   characters_in_scene: string[];
   purpose: string; // "exposition" | "conflict" | "decision" | "revelation" | "transformation" 등
@@ -802,7 +808,9 @@ export interface ShotSequenceItem {
 
   // 에셋 참조
   assets: {
-    characters: Array<{ id: string; asset_version: string; visible_parts?: string[] }>;
+    // appearance_key는 DB 저장 경계에서 scene narrative_time으로 해소된다.
+    // 그 전 단계는 L4 asset_version만 운반하며 DB 모습을 추측하지 않는다.
+    characters: Array<{ id: string; asset_version: string; appearance_key?: string; visible_parts?: string[] }>;
     locations: Array<{ id: string; asset_version: string }>;
     props?: Array<{ id: string; asset_version: string; first_appearance?: boolean }>;
   };

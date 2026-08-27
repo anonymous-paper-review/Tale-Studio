@@ -103,18 +103,32 @@ interface LocationRow {
 interface CandidateRow {
   project_id: string
   character_id: string
+  appearance_key: string
   view: string
   id: string
+}
+
+interface AppearanceRow {
+  project_id: string
+  character_id: string
+  appearance_key: 'current'
+  is_default: true
+  appearance: string | null
+  costume: string[] | string | null
+  sheet_url: string | null
+  portrait_url: string | null
 }
 
 const dbState: {
   projects: ProjectRow[]
   characters: CharacterRow[]
+  appearances: AppearanceRow[]
   locations: LocationRow[]
   candidates: CandidateRow[]
 } = {
   projects: [],
   characters: [],
+  appearances: [],
   locations: [],
   candidates: [],
 }
@@ -122,6 +136,7 @@ const dbState: {
 beforeEach(() => {
   dbState.projects = [projectFixture({ design_tokens: DESIGN_TOKENS })]
   dbState.characters = [characterFixture()]
+  dbState.appearances = [appearanceFixture()]
   dbState.locations = []
   dbState.candidates = []
 
@@ -194,6 +209,7 @@ describe('draft trigger relocation guards', () => {
       costume: ['blue raincoat'],
     })
     dbState.characters = [character]
+    dbState.appearances = [appearanceFixture({ appearance: character.appearance, costume: character.costume })]
 
     const result = await triggerAssetDrafts(PROJECT_ID)
 
@@ -202,11 +218,11 @@ describe('draft trigger relocation guards', () => {
     const arg = mocks.createGenerationJob.mock.calls[0][0] as {
       kind: string
       inputSnapshot: Record<string, unknown>
-      target: { workspaceId?: string; characterId?: string; view?: string; column?: string }
+      target: { workspaceId?: string; characterId?: string; appearanceKey?: string; view?: string; column?: string }
     }
     const lookFingerprint = computeLookFingerprint(DESIGN_TOKENS, character.costume, null)
     expect(arg.kind).toBe('character_view')
-    expect(arg.target).toMatchObject({ workspaceId: WORKSPACE_ID, characterId: character.character_id, view: 'main' })
+    expect(arg.target).toMatchObject({ workspaceId: WORKSPACE_ID, characterId: character.character_id, appearanceKey: 'current', view: 'main' })
     expect(arg.inputSnapshot.look_present).toBe(true)
     expect(arg.inputSnapshot.source_hash).toBe(computeImageSourceHash(character.appearance, lookFingerprint))
     expect(arg.inputSnapshot.source_hash).not.toBe(computeImageSourceHash(character.appearance, null))
@@ -216,6 +232,10 @@ describe('draft trigger relocation guards', () => {
     dbState.characters = [
       characterFixture({ character_id: 'char_producer', origin: 'producer' }),
       characterFixture({ character_id: 'char_writer', origin: 'writer' }),
+    ]
+    dbState.appearances = [
+      appearanceFixture({ character_id: 'char_producer' }),
+      appearanceFixture({ character_id: 'char_writer' }),
     ]
 
     const result = await triggerCharacterDrafts(PROJECT_ID)
@@ -320,6 +340,20 @@ function characterFixture(overrides: Partial<CharacterRow> = {}): CharacterRow {
   }
 }
 
+function appearanceFixture(overrides: Partial<AppearanceRow> = {}): AppearanceRow {
+  return {
+    project_id: PROJECT_ID,
+    character_id: 'char_hero',
+    appearance_key: 'current',
+    is_default: true,
+    appearance: '은발 검사',
+    costume: null,
+    sheet_url: null,
+    portrait_url: null,
+    ...overrides,
+  }
+}
+
 function locationFixture(overrides: Partial<LocationRow> = {}): LocationRow {
   return {
     project_id: PROJECT_ID,
@@ -376,6 +410,7 @@ function resolveRows(
 function rowsForTable(table: string): Array<Record<string, unknown>> {
   if (table === 'projects') return dbState.projects as unknown as Array<Record<string, unknown>>
   if (table === 'characters') return dbState.characters as unknown as Array<Record<string, unknown>>
+  if (table === 'character_appearances') return dbState.appearances as unknown as Array<Record<string, unknown>>
   if (table === 'locations') return dbState.locations as unknown as Array<Record<string, unknown>>
   if (table === 'character_image_candidates') return dbState.candidates as unknown as Array<Record<string, unknown>>
   return []

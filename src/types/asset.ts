@@ -65,18 +65,23 @@ export interface CharacterAppearance {
   label: string
   isDefault: boolean
   /** 서사 시점(past/present 등). 플래시백 씬이 자동 선택할 근거. 씬의 time_of_day(하루 중 시각)와 다른 축. */
-  era: string | null
+  narrativeTime: NarrativeTime | null
   sheetUrl: string | null
   portraitUrl: string | null
   appearance: string | null
+  appearanceNative: string | null
+  /** 모습별 뷰 후보 히스토리. 다른 모습 후보를 표시·stale 판정에 섞지 않는다. */
+  viewCandidates: Partial<Record<CharacterViewKey, CandidateImage[]>>
 }
+
+export type NarrativeTime = 'present' | 'past' | 'future'
 
 export interface CharacterAsset {
   characterId: string
   name: string
   views: CharacterView
   /** 이 캐릭터의 모습 목록(#g4). 기본 모습이 항상 하나 있다. */
-  appearances?: CharacterAppearance[]
+  appearances: CharacterAppearance[]
   entityType: 'person' | 'object'
   /** Writer 정의 계승 — asset-storage 등록 시 description/prompt로 전파 */
   description?: string

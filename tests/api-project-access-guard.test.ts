@@ -295,6 +295,7 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
       postReq('/api/artist/generate-sheet', {
         projectId: PROJECT,
         characterId: 'char-1',
+        appearanceKey: 'current',
         view: 'main',
       }),
     )

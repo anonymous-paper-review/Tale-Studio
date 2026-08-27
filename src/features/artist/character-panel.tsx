@@ -13,7 +13,7 @@ import {
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
 import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle'
-import { useArtistStore, type CharacterRole } from '@/stores/artist-store'
+import { sameCharacterAppearanceSlot, useArtistStore, type CharacterRole } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
@@ -47,12 +47,10 @@ export function CharacterPanel({
   //   모습이 하나뿐인 캐릭터는 탭 자체가 안 뜨므로 이 상태를 쓰지 않는다.
   const [pickedAppearance, setPickedAppearance] = useState<Record<string, string>>({})
 
-  /** 카드에 보일 시트 URL. 고른 모습이 있으면 그것, 없으면 기존 view_main(#g4). */
-  const shownSheet = (c: { characterId: string; views: { main: string | null }; appearances?: Array<{ appearanceKey: string; isDefault: boolean; sheetUrl: string | null }> }) => {
-    const list = c.appearances ?? []
-    if (list.length <= 1) return c.views.main
-    const key = pickedAppearance[c.characterId] ?? list.find((a) => a.isDefault)?.appearanceKey
-    return list.find((a) => a.appearanceKey === key)?.sheetUrl ?? c.views.main
+  /** 선택한 모습의 시트만 표시한다. 다른 모습이나 legacy view_main으로 대체하지 않는다. */
+  const selectedAppearance = (c: { characterId: string; appearances: Array<{ appearanceKey: string; isDefault: boolean; sheetUrl: string | null }> }) => {
+    const key = pickedAppearance[c.characterId] ?? c.appearances.find((appearance) => appearance.isDefault)?.appearanceKey
+    return c.appearances.find((appearance) => appearance.appearanceKey === key) ?? null
   }
   const t = useT()
   const {
@@ -76,6 +74,7 @@ export function CharacterPanel({
   )
   const [viewDialog, setViewDialog] = useState<{
     charId: string
+    appearanceKey: string
     view: CharacterViewKey
   } | null>(null)
 
@@ -115,16 +114,19 @@ export function CharacterPanel({
         )}
       >
         {characterAssets.map((char) => {
+          const appearance = selectedAppearance(char)
           const role = getRole(char.characterId)
           const isSelected = selectedCharacterId === char.characterId
-          const isGenerating = generatingViews.some((k) =>
-            k.startsWith(`${char.characterId}:`),
-          )
+          const isGenerating = appearance
+            ? generatingViews.some((slot) => sameCharacterAppearanceSlot(slot, char.characterId, appearance.appearanceKey, 'main'))
+            : false
           const isViewGenerating = (v: CharacterViewKey) =>
-            generatingViews.includes(`${char.characterId}:${v}`)
+            appearance
+              ? generatingViews.some((slot) => sameCharacterAppearanceSlot(slot, char.characterId, appearance.appearanceKey, v))
+              : false
           const isObject = char.entityType === 'object'
           // 캐릭터=턴어라운드 시트 1장, 사물=단일 이미지 — 둘 다 main 하나로 판정(#7).
-          const hasMainImage = Boolean(char.views.main)
+          const hasMainImage = Boolean(appearance?.sheetUrl)
           const isRequired = requiredCharacterIds.includes(char.characterId)
           const bgScenes = getBackgroundScenes(char.characterId)
 
@@ -207,7 +209,7 @@ export function CharacterPanel({
               }}
               // 더블 클릭 = 사진 클릭과 동일(#d5 2026-08-03) — 상세/재생성 팝업
               onDoubleClick={() =>
-                setViewDialog({ charId: char.characterId, view: 'main' })
+                appearance && setViewDialog({ charId: char.characterId, appearanceKey: appearance.appearanceKey, view: 'main' })
               }
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ')
@@ -302,22 +304,22 @@ export function CharacterPanel({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation()
-                      setViewDialog({ charId: char.characterId, view: 'main' })
+                      if (appearance) setViewDialog({ charId: char.characterId, appearanceKey: appearance.appearanceKey, view: 'main' })
                     }}
                     className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                   >
                     {/* 사람 시트는 hover 리전 순환(#d2) — 컨셉→디테일→스케치→표정을 잘라 옮겨
                         다닌다. 생성 중·이미지 없음·사물은 기존 placeholder 경로 그대로. */}
-                    {!isObject && shownSheet(char) && !isViewGenerating('main') ? (
+                    {!isObject && appearance?.sheetUrl && !isViewGenerating('main') ? (
                       <TurnaroundRegionCycle
-                        url={shownSheet(char)!}
+                        url={appearance.sheetUrl}
                         alt={t('{name} turnaround sheet', { name: char.name || t('Character') })}
                       />
                     ) : (
                       <ImagePlaceholder
                         label={isObject ? '' : t('Turnaround (all views)')}
                         aspectRatio={isObject ? 'square' : 'video'}
-                        imageUrl={char.views.main ?? null}
+                        imageUrl={appearance?.sheetUrl ?? null}
                         generating={isViewGenerating('main')}
                       />
                     )}
@@ -346,7 +348,7 @@ export function CharacterPanel({
                   disabled={isGenerating}
                   onClick={(e) => {
                     e.stopPropagation()
-                    generateCharacterAllViews(char.characterId)
+                    if (appearance) generateCharacterAllViews(char.characterId, appearance.appearanceKey)
                   }}
                 >
                   {isGenerating ? (
@@ -372,6 +374,7 @@ export function CharacterPanel({
 
       <CharacterViewDialog
         charId={viewDialog?.charId ?? null}
+        appearanceKey={viewDialog?.appearanceKey ?? null}
         view={viewDialog?.view ?? null}
         onClose={() => setViewDialog(null)}
       />
