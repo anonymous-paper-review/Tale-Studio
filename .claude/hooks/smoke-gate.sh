@@ -18,7 +18,8 @@ command -v orca >/dev/null 2>&1 || exit 0
 orca status --json 2>/dev/null | grep -q '"reachable": true' || exit 0
 
 # 작업 트리에서 바뀐 UI 파일 — 없으면 이 훅과 무관한 세션이다.
-CHANGED=$(git status --porcelain -- src/app src/components 2>/dev/null | awk '{print $NF}')
+# src/app/api/** 는 화면이 없는 서버 라우트라 스모크 확인 대상이 아니므로 제외한다.
+CHANGED=$(git status --porcelain -- src/app src/components ':!src/app/api' 2>/dev/null | awk '{print $NF}')
 [ -z "$CHANGED" ] && exit 0
 
 # 바뀐 UI 파일 중 가장 최근 것보다 새 스크린샷이 있으면 확인한 것으로 본다.
