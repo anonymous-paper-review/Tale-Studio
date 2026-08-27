@@ -81,6 +81,12 @@ scripts/*
 !scripts/seed-test-accounts.mjs
 # 테스트 묶음 실행기는 개발자가 공통으로 쓰는 명령 인터페이스라 추적한다.
 !scripts/test-suites.mjs
+# package.json이 직접 호출하는 운영·검증 도구도 clean checkout에 포함한다.
+!scripts/producer-seed.mjs
+!scripts/media-migration-plan.mts
+!scripts/generation-autopsy.mjs
+!scripts/fixtures/
+!scripts/fixtures/producer-seed.json
 
 # OS
 .DS_Store
@@ -162,6 +168,20 @@ research/experiments/ti2v-camera-cap-recheck/assets/
 research/experiments/checknote-previz-ab/assets/
 # 위 경로들을 실험마다 하나씩 추가해오다 일반화(2026-08-11):
 # 실험 산출물 미디어는 확장자로 일괄 로컬 전용. 좌표(HYPOTHESIS·manifest·provenance)만 추적한다.
+# package.json의 map:dev/map:build 진입점은 개발 도구이므로 예외로 추적한다.
+!research/
+research/*
+!research/tools/
+research/tools/*
+!research/tools/writer-map/
+research/tools/writer-map/*
+!research/tools/writer-map/README.md
+!research/tools/writer-map/serve.mjs
+!research/tools/writer-map/extract.mjs
+!research/tools/writer-map/data.mjs
+!research/tools/writer-map/build.mjs
+!research/tools/writer-map/render.mjs
+!research/tools/writer-map/findings.mjs
 # 이미 추적 중인 파일(rough-background-ref-holds-room/assets/*.png 6장)은 영향 없음.
 research/experiments/**/*.mp4
 research/experiments/**/*.mov
