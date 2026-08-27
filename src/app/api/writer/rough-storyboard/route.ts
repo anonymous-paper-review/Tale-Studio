@@ -213,7 +213,7 @@ export async function POST(req: Request) {
           .eq('project_id', projectId),
         supabaseAdmin
           .from('characters')
-          .select('character_id, name')
+          .select('character_id, name, entity_type')
           .eq('project_id', projectId),
         supabaseAdmin
           .from('generation_jobs')
@@ -462,6 +462,13 @@ export async function POST(req: Request) {
         nameEnById.get(c.character_id as string) ?? (c.name as string),
       ]),
     )
+    // 사물 캐스트(#object-not-figure) — blocking 직렬화가 figure 대신 소품 문장으로 분기할 근거.
+    //   2026-08-27 재복원: 내 A1 커밋(263a082)이 낡은 워킹트리 위에 얹히며 이 전달을 지웠다.
+    const objectCharIds = new Set(
+      targetChars
+        .filter((c) => (c as { entity_type?: string }).entity_type === 'object')
+        .map((c) => c.character_id as string),
+    )
 
     // 그리드 청크 제출(#rough-grid): targets 를 열 수(perGrid)씩 묶어 그리드/스트립 1장씩 submit.
     //   템플릿(public asset)을 gpt-image-2/edit reference 로 — base URL 없으면(로컬 무터널) T2I 폴백
@@ -491,8 +498,12 @@ export async function POST(req: Request) {
             shotType: (s.shot_type as string) ?? 'MS',
             actionDescription:
               actionEnByShot.get(shotId) ?? (s.action_description as string) ?? '',
-            characterNames: ((s.characters as string[]) ?? []).map(
-              (id) => nameEnMap.get(id) ?? nameById.get(id) ?? id,
+            // 인물 수 산정에 쓰이므로 사물은 뺀다 — 사물은 objectCharacterIds 로 별도 전달.
+            characterNames: ((s.characters as string[]) ?? [])
+              .filter((id) => !objectCharIds.has(id))
+              .map((id) => nameEnMap.get(id) ?? nameById.get(id) ?? id),
+            objectCharacterIds: ((s.characters as string[]) ?? []).filter((id) =>
+              objectCharIds.has(id),
             ),
             characterNameById: nameEnMap,
             location:
