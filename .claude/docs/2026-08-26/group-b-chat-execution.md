@@ -96,3 +96,37 @@ SDK 전환 전에 한 턴을 하나의 `chatTraceId`로 묶어 다음 값만 기
 
 - 챗에서 수정 요청 → 실행(또는 원클릭 실행 카드) → 진행 표시 → 완료 알림까지 전 스테이지에서 동작.
 - 실행 불가능한 요청에는 불가능하다고 답한다 (거짓 수락 금지).
+
+## 후속 구현 (2026-08-27)
+
+실측에서 가장 분명했던 단절은 Artist 승인 뒤였다. 실제 `generation_jobs`는 완료됐지만
+브라우저의 `lastTrace`는 계속 `pendingProposal`과 적용 0건으로 남았다. 이를 다음처럼 분리해
+연결했다.
+
+- `chat_traces`는 채팅 한 턴의 영수증으로 서버에 저장한다. 사용량·파싱·적용·승인 상태와
+  생성 상태만 남기며 원문 프롬프트·첨부·결과 URL은 저장하지 않는다.
+- `generation_jobs.chat_trace_id`는 비동기 생성 작업 티켓을 trace에 연결한다. 하나의 trace가
+  여러 Artist 뷰나 Director 스토리보드 Job을 만들 수 있다. Director 영상 예약 RPC는 예약 후
+  Job ID를 best-effort로 연결한다.
+- Artist 승인 전에는 `awaiting_approval`이고 Job은 0개다. 승인 뒤에는 `queued`가 되고,
+  각 Job의 `completed`·`failed` 결과를 조합해 `completed`·`partial`·`failed`로 계산한다.
+  거절·중복·자동 give-up은 `skipped`·`deduped`로 구분한다.
+- 채팅 하단 trace 요약은 Job ID·URL을 노출하지 않고 승인 대기·생성 대기·완료·일부 성공·
+  실패를 표시한다. 화면을 닫아도 다시 열 때 서버 trace와 Job 상태를 조회한다.
+- Director 채팅의 `generateImage`는 단일 샷과 실사 일괄 경로 모두 trace를 전달한다.
+  `generateVideo`는 실제 영상 Job 계약과 승인 경계가 없던 플레이스홀더를 제거하고,
+  지원하지 않는 액션으로 기록한다. 샷 체이닝도 같은 원칙으로 동의만 하고 실행하지 않는다.
+
+### 최종 성공 판정
+
+`appliedCount`나 `generation_jobs.status=completed`만으로 성공으로 보지 않는다. 다음 네 가지가
+모두 맞아야 한다.
+
+1. 요청 의도와 대상이 정확하다.
+2. 검증된 액션이 올바른 DB·캔버스 상태를 만든다.
+3. 비용이 걸린 경우 승인 뒤 올바른 Job이 생성되고 최종 상태가 `completed`다.
+4. DB 대상 값과 화면 표시가 결과와 일치한다.
+
+스키마 변경은 `supabase/migrations/20260827120000_chat_trace_persistence.sql`에 기록했다.
+운영 반영 전에는 branch DB에서 migration을 적용하고, Artist·Director 승인 생성의
+`queued → completed/failed`를 다시 확인해야 한다.
