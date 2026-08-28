@@ -68,7 +68,21 @@ describe('C5 — 채팅으로도 실사 생성이 가능하다', () => {
   })
 })
 
-describe('C4 — 생성 버튼이 보고 있던 화면을 뺏지 않는다', () => {
+describe('#영상거짓수락 — 채팅이 영상 생성 요청을 거짓 수락하지 않는다', () => {
+  it('프롬프트가 영상 요청에 generateVideo/addVideoTake 둘 다 내지 말라고 명시한다', () => {
+    expect(chatRoute).toContain('<video_request_rule>')
+    expect(chatRoute).toContain('do NOT emit generateVideo and do NOT emit addVideoTake')
+    expect(chatRoute).toContain("doesn't support video generation yet")
+  })
+
+  it('generateVideo skip 사유가 있으면 유저에게 정직한 문구를 모델 메시지로 남긴다 (클라 방어선)', () => {
+    expect(globalChatStore).toContain("result.skipped.some((s) => s.update.type === 'generateVideo')")
+    expect(globalChatStore).toContain("doesn't support video generation yet")
+    expect(globalChatStore).toContain('saveChatMessage(projectId, stage, \'model\', honestNotice)')
+  })
+})
+
+describe('C4 — 생성 버튼이 보고 있던 화면을 빼앗지 않는다', () => {
   it('생성 액션이 viewMode 를 강제로 바꾸지 않는다', () => {
     // 이 한 줄이 Node 뷰에서 누른 사람을 Storyboard 로 튕겨보내던 원인이다.
     expect(store).not.toContain("viewMode: 'storyboard', storyboardMediaMode: 'real'")

@@ -12,6 +12,7 @@ import {
   serializeDirectorCanvasContext,
   type DirectorCanvasUpdate,
 } from '@/stores/director-store'
+import { isShotData, isVideoData } from '@/types/director'
 import { useWriterStore, type WriterChatUpdate } from '@/stores/writer-store'
 import {
   buildScriptLines,
@@ -324,7 +325,15 @@ async function applyStyleAnchorIntent(
   }
 }
 
-function handoffBlockers(spec: HandoffSpec): string[] {
+interface HandoffBlockers {
+  /** 비워있으면 핸드오프를 차단한다 (기존 동작 불변). */
+  hard: string[]
+  /** 비워있어도 진행하되, 품질(퀴얼리티) 경고를 함께 보여준다(오너 확정 2026-08-28). */
+  soft: string[]
+}
+
+function handoffBlockers(spec: HandoffSpec): HandoffBlockers {
+  const locale = contentLocale()
   if (spec.from === 'producer') {
     const p = useProducerStore.getState()
     const gate = evaluateProducerGate({
@@ -334,18 +343,67 @@ function handoffBlockers(spec: HandoffSpec): string[] {
       backgrounds: p.backgrounds,
       styleAnchorKey: p.styleAnchorKey,
       // label/detail 은 게이트가 완역해 돌려준다(#i18n-s5-batch4) — 여기서 다시 번역하지 않는다.
-      locale: contentLocale(),
+      locale,
     })
-    return gate.canHandoff
-      ? []
-      : gate.hardMissing.map((i) => (i.detail ? `${i.label} (${i.detail})` : i.label))
+    return {
+      hard: gate.canHandoff
+        ? []
+        : gate.hardMissing.map((i) => (i.detail ? `${i.label} (${i.detail})` : i.label)),
+      soft: gate.softMissing.map((i) => (i.detail ? `${i.label} (${i.detail})` : i.label)),
+    }
+  }
+  if (spec.from === 'writer') {
+    // writer → artist: 씨 매니페스트/샷이 비어 있으면(0개) artist 도 그릴 거리가 없다 — 하드는 아니고(오너 확정) 경고로만.
+    const w = useWriterStore.getState()
+    const soft: string[] = []
+    if ((w.sceneManifest?.scenes.length ?? 0) === 0) {
+      soft.push(translate(locale, 'No scenes yet'))
+    }
+    if (w.shots.length === 0) {
+      soft.push(translate(locale, 'No shots yet'))
+    }
+    return { hard: [], soft }
   }
   if (spec.from === 'artist') {
     const gate = useProjectStore.getState().lifecycleStatus.director
-    return gate?.ready === false ? gate.blockers.map((b) => b.label) : []
+    const hard = gate?.ready === false ? gate.blockers.map((b) => b.label) : []
+    // artist → director soft: main 사진만 있고 back/side 가 없는 캐릭터 수 — 하드게이트(main 미생성)와 겹치지 않도록 main 있는 캐릭터만 셀다.
+    const missingTurnaroundCount = useArtistStore
+      .getState()
+      .characterAssets.filter(
+        (c) =>
+          c.entityType === 'person'
+          && c.views.main != null
+          && (c.views.back == null || c.views.sideLeft == null || c.views.sideRight == null),
+      ).length
+    const soft =
+      missingTurnaroundCount > 0
+        ? [
+            translate(locale, '{count} characters have only a main view — no back/side views yet', {
+              count: missingTurnaroundCount,
+            }),
+          ]
+        : []
+    return { hard, soft }
   }
-  // director → editor 는 게이트가 없다 (걷어낸 버튼도 항상 활성이었다).
-  return []
+  if (spec.from === 'director') {
+    // director → editor 는 하드 게이트가 없다 (걸어낸 버튼도 항상 활성이었다). soft: final 마킹 영상 없는 샷 수.
+    const nodes = useDirectorCanvasStore.getState().nodes
+    const shotNodeIds = nodes.filter((n) => isShotData(n.data)).map((n) => n.id)
+    const missingFinalCount = shotNodeIds.filter(
+      (id) => !nodes.some((n) => isVideoData(n.data) && n.data.parentShotNodeId === id && n.data.final),
+    ).length
+    const soft =
+      missingFinalCount > 0
+        ? [
+            translate(locale, '{count} shots have no video marked final', {
+              count: missingFinalCount,
+            }),
+          ]
+        : []
+    return { hard: [], soft }
+  }
+  return { hard: [], soft: [] }
 }
 
 /** 게이트 통과 후 실제 전이. producer 는 writer 파이프라인 발사까지 포함한다. */
@@ -520,17 +578,27 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       set((state) => ({ messages: [...state.messages, userMsg], loading: true, error: null }))
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
 
-      const blockers = handoffBlockers(handoffSpec)
+      const { hard, soft } = handoffBlockers(handoffSpec)
       const locale = contentLocale()
+      // hard 가 비어야만 진행한다 — soft 가 있어도 차단하지 않는다(오너 확정 2026-08-28). soft 경고 문구는
+      //   아래 각 분기점에서 reply 뒤에 붙인다.
+      const softWarning = (base: string): string =>
+        soft.length > 0
+          ? base
+              + '\n\n'
+              + translate(locale, 'But quality may suffer because these are empty:')
+              + '\n'
+              + soft.map((s) => `· ${s}`).join('\n')
+          : base
       let reply: string
       let path: string | null = null
-      if (blockers.length > 0) {
+      if (hard.length > 0) {
         reply =
           translate(locale, "Can't move to {stage} yet. Please fill these in first:", {
             stage: STAGE_LABEL[handoffSpec.to],
           })
           + '\n'
-          + blockers.map((b) => `· ${b}`).join('\n')
+          + hard.map((b) => `· ${b}`).join('\n')
       } else if (handoffSpec.from === 'producer' && handoffSpec.to === 'writer') {
         const accepted = get().offerPendingProposal(
           createPendingProposal({
@@ -538,12 +606,21 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             kind: 'producerWriterInitialHandoff',
             target: STAGE_LABEL.writer,
             action: translate(locale, 'Invite Writer'),
-            impact: [translate(locale, 'Nothing runs until you approve.')],
+            impact: [
+              translate(locale, 'Nothing runs until you approve.'),
+              ...(soft.length > 0
+                ? [
+                    translate(locale, 'Quality may suffer because these are empty: {items}', {
+                      items: soft.join(', '),
+                    }),
+                  ]
+                : []),
+            ],
             payload: {},
           }),
         )
         reply = accepted
-          ? translate(locale, 'Nothing runs until you approve.')
+          ? softWarning(translate(locale, 'Nothing runs until you approve.'))
           : translate(
               locale,
               'A proposal is already pending, so the new Producer change proposal was held back.',
@@ -552,7 +629,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const result = await runHandoff(handoffSpec)
         path = result.path
         if (result.ok) {
-          reply =
+          reply = softWarning(
             handoffSpec.from === 'producer'
               ? translate(
                   locale,
@@ -561,7 +638,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 )
               : translate(locale, 'Moving on to {stage}.', {
                   stage: STAGE_LABEL[handoffSpec.to],
-                })
+                }),
+          )
         } else {
           // 실패 사유 표면화 (#handoff-visibility 2026-08-06) — saveAndHandoff 는 사유를
           //   producer-store.error 에만 남긴다. 채팅으로 요청한 사용자는 채팅에서 이유를
@@ -1110,6 +1188,22 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 count: result.skipped.length,
               }),
             )
+          }
+          // 방어선(#영상거짓수락) — 프롬프트 규칙이 뚫려 모델이 그래도 generateVideo 를 냈을 때,
+          //   "생성할게요" 라고 이미 답한 채팅에 거절 흔적이 안 남는 사고를 막는다. skip 사유로
+          //   판별해 정직한 안내를 별도 모델 메시지로 영속화한다(원래 reply 는 건드리지 않는다).
+          if (result.skipped.some((s) => s.update.type === 'generateVideo')) {
+            const honestNotice = translate(
+              contentLocale(),
+              "Chat doesn't support video generation yet — please use the video generation button on the canvas.",
+            )
+            set((state) => ({
+              messages: [
+                ...state.messages,
+                { id: makeId(), stage, role: 'model' as const, content: honestNotice },
+              ],
+            }))
+            if (projectId) saveChatMessage(projectId, stage, 'model', honestNotice)
           }
         }
       }
