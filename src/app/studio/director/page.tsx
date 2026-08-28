@@ -232,9 +232,12 @@ const edgeTypes = {
   parent: CategoryEdge,
   'relates-to': CategoryEdge,
   references: CategoryEdge,
+  prompt: CategoryEdge,
   image: CategoryEdge,
   frame: CategoryEdge,
   'video-chain': CategoryEdge,
+  // 파생 previz 체인 — 등록 누락 시 React Flow가 fallback 경고를 렌더마다 찍는다(#011).
+  chain: CategoryEdge,
 } as const
 
 // ────────────────────────────────────────────────────────────────────────────
