@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>채팅 생성 승인 완주기</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .standfirst{font-size:17.5px;color:var(--ink-2);margin:0 0 14px;max-width:60ch}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.fail{border-left:3px solid var(--fail)}
+  .card.pass{border-left:3px solid var(--pass)}
+  .card.note{border-left:3px solid var(--accent)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:16px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+  .mark{display:inline-block;font-weight:750;font-size:13px;border-radius:4px;
+    padding:2px 9px;margin-top:8px}
+  .m-yes{background:var(--pass-soft);color:var(--pass)}
+  .m-no{background:var(--fail-soft);color:var(--fail)}
+  blockquote{margin:14px 0;padding:14px 18px;background:var(--surface-2);
+    border-left:3px solid var(--line-2);border-radius:0 7px 7px 0;font-size:15px}
+  blockquote p{margin:0 0 8px}
+  blockquote p:last-child{margin:0}
+  blockquote .orig{font-family:var(--mono);font-size:12.5px;color:var(--muted);
+    display:block;margin-top:6px;line-height:1.6}
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:12px 0;color:var(--ink-2);
+    white-space:pre-wrap;word-break:break-word}
+  pre b{color:var(--ink)}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:500px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .say{color:var(--muted);font-size:12.5px;display:block;margin-top:4px;line-height:1.55}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+  .banner{border:2px solid var(--ink);border-radius:10px;padding:22px 26px;margin:26px 0;
+    background:var(--surface)}
+  .banner h3{margin:0 0 10px;font-size:18px}
+  .banner p:last-child{margin-bottom:0}
+  details{margin:12px 0;border:1px solid var(--line);border-radius:8px;padding:0}
+  details summary{cursor:pointer;padding:12px 16px;font-weight:700;font-size:14px;color:var(--ink-2)}
+  details[open] summary{border-bottom:1px solid var(--line)}
+  details .inner{padding:14px 18px}
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+  .pathnote{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">그룹 B · 채팅 → 실행 연결 · 2026-08-27 ~ 08-28</p>
+  <h1>채팅으로 시킨 생성이 이제 승인 카드를 거쳐 끝까지 갑니다 — 실제 화면에서 한 번 완주했습니다</h1>
+  <p class="standfirst">"알겠다"고 답하고 아무것도 안 하던 채팅을 고치는 작업입니다. 사라졌던 완성본을 빌드 캐시에서 복구했고, 실제 화면에서 <b>재생성 요청 → 승인 카드 → 승인 → 진짜 이미지 생성 → 완료</b>를 한 번 완주했으며, 당신이 정한 규칙 세 개를 코드에 박았습니다. 전부 원격 main에 올라가 있습니다.</p>
+  <p class="asof">결론 먼저 — <b>Artist 화면은 실측까지 끝났고, Director 이미지·Writer 첫 실행은 코드는 막았으나 화면 실측이 남았습니다.</b> 이미지 생성 실비는 1건 썼습니다.</p>
+</header>
+
+<!-- 1 -->
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>무엇이 고장나 있었나</h2></div>
+  <p>화개장터 프로젝트의 실제 채팅 기록이 증거입니다. 사용자가 같은 요청을 여섯 번 반복하는 동안 채팅은 매번 "할게요"라고만 답했습니다.</p>
+  <blockquote>
+    <p>적용하라고 → "vertical 무빙만 적용하고 넘길게요" → dd → "적용할게요" → ㅇㅇ → "적용할게요" → <b>제발 적용해줘</b> → "알겠어요! 적용할게요" — 그리고 실행 없음.</p>
+  </blockquote>
+  <p>원인은 세 갈래였습니다. 채팅이 실제 생성 도구를 못 부르거나, 부를 수 있는데 안 부르거나, 불렀는데 그 결과가 화면과 연결되지 않는 것. 이 연결을 만들되, <b>돈이 나가는 생성은 반드시 당신 승인을 거치게</b> 하는 것이 이번 작업의 전부입니다.</p>
+</section>
+
+<!-- 2 -->
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>사라졌던 완성본부터 되찾았다</h2></div>
+  <p class="sec-lede">작업을 시작하려고 보니, 전날 다른 세션이 만들어둔 완성본이 폴더에서 사라져 있었습니다.</p>
+  <div class="card fail">
+    <div class="card-head"><h3>사고 경위</h3><span class="chip c-fail">작업 유실</span></div>
+    <p>여러 세션이 같은 폴더를 공유하는 상태에서, 한 세션이 <code>git reset --hard</code>로 폴더를 원격 기준으로 되돌렸습니다. 커밋하지 않고 파일로만 있던 완성본 수십 개가 그 순간 지워졌습니다.</p>
+  </div>
+  <div class="card pass">
+    <div class="card-head"><h3>복구 방법</h3><span class="chip c-pass">복구 성공</span></div>
+    <p>지워진 파일들의 원문이 <b>빌드 캐시 안에 통째로 남아</b> 있었습니다. 개발 서버가 화면을 만들 때 쓰는 중간 산출물(소스맵)에 원본 코드가 들어 있어서, 거기서 17개 파일을 꺼냈습니다.</p>
+    <p>덮어쓰지 않고 <b>3-way merge</b>(공통 조상·현재 파일·복구본 세 버전을 대조해 합치는 git 표준 방식)로 합쳤습니다. 그 사이 다른 개발 세션이 같은 파일에 넣어둔 수정 — 대사 언어 처리, 첫 진입 노드 처리 — 이 지워지면 안 되기 때문입니다. 합친 뒤 두 세션의 변경이 나란히 살아 있는 것을 파일마다 확인했고, 충돌은 0건이었습니다.</p>
+    <p>검증: 타입 검사 통과, 자동 시험 <b>1,537건 통과.</b> 복구본을 커밋해 원격에 올렸으므로 같은 사고로 다시 사라질 수 없습니다.</p>
+    <p class="pathnote">커밋 27ebaf3 · 재발 방지: 세션마다 폴더 분리(git worktree) + 자주 커밋 + reset --hard 금지</p>
+  </div>
+</section>
+
+<!-- 3 -->
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>배선이 진짜 데이터베이스에서 작동하는지 먼저 확인했다</h2></div>
+  <p class="sec-lede">화면을 열기 전에, 상태가 규칙대로 넘어가는지를 운영 데이터베이스에서 직접 확인했습니다. 이미지 생성 없이 기록만 넣었다 지우는 방식이라 비용은 0입니다.</p>
+  <p>구조는 이렇습니다. 채팅 한 턴마다 영수증(기록 한 줄)이 남고, 승인 후 생성 작업이 그 영수증에 연결되며, 작업 결과에 따라 영수증 상태가 바뀝니다.</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:34%">시나리오</th><th>기대한 상태 흐름</th><th style="width:18%">실측</th></tr></thead>
+      <tbody>
+        <tr><td><b>정상 경로</b></td><td>승인 대기 → (승인) → 생성 대기 → 완료</td><td><span class="mark m-yes">그대로 나옴</span></td></tr>
+        <tr><td><b>일부만 성공</b> (완료 1 + 실패 1)</td><td>"일부 성공"으로 집계</td><td><span class="mark m-yes">그대로 나옴</span></td></tr>
+        <tr><td><b>전부 실패</b></td><td>"실패"로 집계</td><td><span class="mark m-yes">그대로 나옴</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>확인용으로 넣은 기록은 확인 즉시 지워 운영 데이터에 잔여물 0건입니다. 이 확인에 필요한 테이블 추가(스키마 변경)도 운영 데이터베이스에 이때 적용했습니다 — 미적용 변경 11개를 한꺼번에 밀지 않고 이번 것 하나만 골라서.</p>
+  <p class="pathnote">테이블: chat_traces, generation_jobs.chat_trace_id · 적용: supabase migration 20260827120000</p>
+</section>
+
+<!-- 4 -->
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>실제 화면에서 완주 — 요청부터 완료까지</h2></div>
+  <p class="sec-lede">고장 사례가 실제로 났던 화개장터 프로젝트, 실제로 무반응이었던 그 요청으로 시험했습니다. 유일하게 실비가 나간 단계입니다(이미지 생성 1건).</p>
+  <p>Artist 채팅에 <b>"체장수 캐릭터 이미지를 다시 생성해줘"</b>를 입력했습니다. 예전엔 여기서 "그러겠다"고 답하고 끝이었습니다. 이번엔 승인 카드가 떴습니다:</p>
+  <blockquote>
+    <p><b>Artist: 체장수 4뷰 전체 재생성할게요.</b></p>
+    <p>[제안] 캐릭터 뷰 재생성: main, back, sideLeft, sideRight<br>
+    · 이미지 생성 비용이 발생합니다.<br>
+    · 기존 선택 이미지는 새 생성이 끝날 때까지 유지됩니다.<br>
+    · <b>승인 전에는 재생성이 시작되지 않습니다.</b><br>
+    [승인] [나중에]</p>
+  </blockquote>
+  <p>승인을 누르자 캐릭터 카드가 "생성 중"으로 바뀌고 진행 표시줄이 떴습니다. 그리고 데이터베이스에 이렇게 찍혔습니다:</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>시점</th><th>영수증 상태</th><th>생성 작업</th></tr></thead>
+      <tbody>
+        <tr><td>승인 직후</td><td>생성 대기(queued) · 승인 대기 해제</td><td>작업 생성됨 · <b>영수증에 연결됨</b></td></tr>
+        <tr><td>약 2분 뒤</td><td>조회 시 "완료"로 집계</td><td><b>완료 · 결과 이미지 주소 있음</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="banner" style="border-color:var(--pass)">
+    <h3 style="color:var(--pass)">이 문서에서 가장 중요한 한 줄</h3>
+    <p>채팅 요청 → 승인 카드 → 승인 → <b>실제 이미지 생성 서비스(fal)가 돌아 결과물이 나옴</b> → 영수증이 "완료"로 집계 — 이 사슬 전체가 운영 환경에서 한 번에 이어졌습니다. "알겠다"고만 하던 무반응이 이 화면에서는 끝났습니다.</p>
+  </div>
+  <details><summary>실측 원본 기록 (코드값 그대로)</summary><div class="inner">
+    <pre>chat_traces:      70ab8a3d | artist | queued | pending=false
+generation_jobs:  71238ba5 | character_view | <b>completed</b> | chat_trace_id=70ab8a3d | result_url 있음
+getChatTrace(70ab8a3d) → generationStatus: <b>'completed'</b>, resultReady: true</pre>
+    <p>영수증 테이블의 상태 칸은 queued로 남지만, 조회 함수가 연결된 작업들을 보고 최종 상태를 계산합니다(설계 의도대로 동작).</p>
+  </div></details>
+</section>
+
+<!-- 5 -->
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>당신이 정한 규칙 세 개, 그리고 그 규칙으로 찾아낸 구멍 두 개</h2></div>
+  <p class="sec-lede">실측 후 남은 설계 논의를 물었고, 당신이 답을 정했습니다. 그 규칙을 잣대로 코드 전체를 감사하니 규칙 위반 경로가 두 개 나왔습니다.</p>
+
+  <h3>확정된 규칙</h3>
+  <ul class="plain">
+    <li><b>"수정 얘기냐 생성 요청이냐"는 채팅이 추정하되</b> — 데이터만 고치는 수정(무료)은 즉시 적용하고, 이미지·영상을 만드는 생성(유료)은 반드시 확인 카드를 거친다. 추정이 틀려도 돈 나가기 전에 카드에서 멈춘다.</li>
+    <li><b>생성은 무조건 물어본다.</b> 화면 구분 없이 전부.</li>
+    <li><b>예상 비용 수치는 카드에 표시하지 않는다.</b></li>
+  </ul>
+
+  <h3>감사 결과 — 승인 없이 돈이 나가던 경로 두 개</h3>
+  <div class="card fail">
+    <div class="card-head"><h3>Director 채팅의 이미지 생성</h3><span class="chip c-fail">승인 없이 즉시 실행되던 것</span><span class="chip c-pass">막음</span></div>
+    <p>채팅이 이미지 생성 지시를 내리면 카드 없이 곧바로 생성이 시작됐습니다. Artist 화면은 카드를 거치는데 Director 화면만 예외였던 겁니다. 이제 같은 응답 안의 무료 수정은 즉시 반영하고, <b>이미지 생성(한 샷이든 일괄이든)만 카드 한 장으로 묶어</b> 승인 뒤에 기존 생성 경로를 태웁니다.</p>
+    <p>채팅 모델의 지시문에도 규칙을 박았습니다: 수정 요청에 생성을 멋대로 덧붙이지 말 것, 사용자가 명시적으로 생성을 요청했을 때만 생성 지시를 낼 것. "수정 얘기했는데 영상부터 만들려 든다"던 그 증상의 재발 방지입니다.</p>
+  </div>
+  <div class="card fail">
+    <div class="card-head"><h3>Producer→Writer 첫 넘김</h3><span class="chip c-fail">승인 없이 즉시 실행되던 것</span><span class="chip c-pass">막음</span></div>
+    <p>"Writer로 넘겨줘"라고 하면 씬·샷 생성(유료, 오래 걸림)이 곧바로 시작됐습니다. 재실행은 동의를 받으면서 정작 첫 실행은 안 받고 있었습니다. 이제 첫 실행도 카드를 거칩니다. 비용 없는 화면 이동(Artist→Director 등)은 예전처럼 바로 넘어갑니다.</p>
+  </div>
+  <div class="card note">
+    <div class="card-head"><h3>일부러 그대로 둔 것</h3><span class="chip c-acc">의도된 예외</span></div>
+    <p>대사 삭제, 캐릭터 기본 외형 덮어쓰기는 무료지만 <b>되돌리기 어려운 변경</b>이라 확인 절차를 유지했습니다. "무료 수정은 즉시"의 예외이며, 비용 방어가 아니라 실수 방어입니다.</p>
+  </div>
+  <p>검증: 타입 검사 통과, 승인 경계 시험 18건 통과, 제품 전체 자동 시험 <b>1,539건 통과.</b> 이 과정에서 시험 코드 자체의 결함 두 개(검사 범위가 과했던 것, 연타 방어 장치가 시험 간에 남던 것)도 고쳤습니다.</p>
+  <p class="pathnote">커밋 0c45689(구현) · 2142d47(기록) — 원격 main 반영 완료</p>
+</section>
+
+<!-- 6 -->
+<section>
+  <div class="sec-head"><span class="sec-num">6</span><h2>확실한 것과 아직 모르는 것</h2></div>
+  <div class="split">
+    <div class="yes">
+      <h4>이건 확실합니다</h4>
+      <ul>
+        <li>Artist 화면에서 요청→카드→승인→실제 생성→완료가 <b>운영 환경에서 한 번 완주</b>했다</li>
+        <li>상태 흐름 세 갈래(완료·일부 성공·실패)가 운영 데이터베이스에서 규칙대로 돈다</li>
+        <li>승인 없이 돈 나가던 두 경로가 코드에서 막혔고, 그 경계가 자동 시험으로 잠겼다</li>
+        <li>사라졌던 완성본이 복구·커밋됐고 다른 세션 작업은 하나도 안 지워졌다</li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>이건 아직 모릅니다</h4>
+      <ul>
+        <li>Director 이미지·Writer 첫 실행의 카드가 <b>실제 화면에서</b> 뜨고 완주하는지 — 코드와 시험으로만 확인했고 화면 실측은 한 번도 안 했다</li>
+        <li>수정/생성 의도 추정이 <b>실사용 문장에서 얼마나 자주 빗나가는지</b> — 빗나가도 카드에서 멈추는 구조지만, 빈도는 측정한 적 없다</li>
+        <li>영상 생성은 채팅에서 여전히 "지원 안 함"으로 정직하게 거절만 한다 — 승인 카드로 실행까지 이어주는 건 만들지 않았다</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section>
+  <div class="sec-head"><span class="sec-num">7</span><h2>결론</h2></div>
+  <div class="card note">
+    <h3>1. "알겠다"만 하던 무반응은 Artist 화면에서 끝났고, 실측으로 확인됐다.</h3>
+    <p>고장 사례가 났던 바로 그 프로젝트에서 완주했습니다.</p>
+    <h3>2. 채팅에서 돈 쓰는 일은 이제 전부 당신 승인 버튼 뒤에 있다.</h3>
+    <p>Artist 재생성, Director 이미지, Writer 첫 씬·샷 생성 — 코드가 강제하고 시험이 잠급니다.</p>
+    <h3>3. 다음에 확인할 것은 하나다.</h3>
+    <p>화개장터를 열고 Director 채팅에 "이 샷 이미지 생성해줘"를 한 번 던져보면, 새로 막은 두 경로 중 하나가 화면에서 검증됩니다. Writer 첫 실행은 새 프로젝트를 하나 만들어야 시험할 수 있습니다.</p>
+    <h3>4. 폴더 공유 사고의 재발 방지는 습관 문제로 남는다.</h3>
+    <p>세션마다 폴더 분리, 자주 커밋, reset --hard 금지. 이번 복구는 빌드 캐시가 우연히 남아 있어 가능했던 것이고, 다음에도 남아 있으리란 보장은 없습니다.</p>
+  </div>
+</section>
+
+<footer>
+  <p><b>이 문서가 근거로 쓴 것</b> — 화개장터 프로젝트의 실제 채팅 기록과 승인 카드 화면(2026-08-27 실측), 운영 데이터베이스의 영수증·생성 작업 기록 원문, 자동 시험 결과(1,537건/1,539건 통과), 원격 main 커밋 27ebaf3 · 0c45689 · 2142d47. 인용한 채팅과 데이터 행은 기록에 있는 그대로입니다.</p>
+  <p><b>이 문서가 하지 않는 것</b> — Director 이미지와 Writer 첫 실행의 화면 실측 결과는 여기 없습니다(아직 안 했습니다). 생성된 체장수 이미지가 <b>좋은지</b>는 판정하지 않습니다 — 그건 화면에서 당신이 봅니다. 의도 추정의 정확도 측정도 하지 않았습니다.</p>
+  <p style="margin-top:10px">정본 경로 — <code>.claude/docs/2026-08-28/group-b-approval-report.html</code> · 작업 원장 — <code>.claude/docs/2026-08-26/group-b-chat-execution.md</code></p>
+</footer>
+
+</div>
+</body>
+</html>
