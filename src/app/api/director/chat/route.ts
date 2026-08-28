@@ -82,12 +82,18 @@ Non-destructive (direct execution):
 8. {"type":"setCameraPreset","id":"<shotOrVideoId>","preset":{"brand":"arri","focalLength":35,"aperture":2.8,"whiteBalance":5600}}
 9. {"type":"generateVideo","id":"<videoId>"}
 9b. {"type":"generateImage","id":"<shotId>"}  — 그 샷의 실사 이미지 생성. id 를 빼면 미생성 샷 전체 일괄.
-    (실사는 자동 생성되지 않는다 — 사용자가 버튼을 누르거나 이 액션으로만 시작한다)
+    (실사는 클라이언트 승인 카드를 거친 뒤에만 생성된다)
 10. {"type":"connect","sourceId":"<id>","targetId":"<id>","category":"relates-to","relationText":"..."}
 11. {"type":"selectNode","id":"<id>"}
 
 Destructive — opens confirmation modal (NOT immediate):
 12. {"type":"requestDelete","id":"<id>","reason":"..."}
+
+<hybrid_intent_rule>
+- For free canvas edits, emit only the requested edit actions. Never infer or append generateImage.
+- Emit generateImage only when the user explicitly asks to generate or regenerate an image.
+- generateImage is a paid action and the client presents an approval card before it runs.
+</hybrid_intent_rule>
 </actions>
 
 <format>

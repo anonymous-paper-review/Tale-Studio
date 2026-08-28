@@ -16,6 +16,7 @@ import {
   WRITER_RERUN_CONSENT_TEXT,
 } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
+import { resetActionGuard } from '@/lib/action-guard'
 
 const settings: ProjectSettings = {
   playtime: 30,
@@ -39,6 +40,8 @@ const background: BackgroundSource = {
 }
 
 beforeEach(() => {
+  // saveAndHandoff 성공 경로는 연타 방어 잠금을 해제하지 않는다(의도된 동작) — 테스트 간에는 모듈 전역 창을 비운다.
+  resetActionGuard()
   useProducerStore.getState().reset()
   useGlobalChatStore.getState().reset()
   useProjectStore.getState().resetProject()
@@ -58,6 +61,37 @@ afterEach(() => {
 })
 
 describe('writer rerun consent', () => {
+  it('holds the initial Producer-to-Writer run behind a proposal until approval', async () => {
+    const saveAndHandoff = vi.spyOn(useProducerStore.getState(), 'saveAndHandoff')
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ runId: 'run-1' }), { status: 200 }))
+
+    await useGlobalChatStore.getState().sendMessage('Writer로 핸드오프해줘')
+
+    const proposal = useGlobalChatStore.getState().pendingProposal
+    expect(proposal?.kind).toBe('producerWriterInitialHandoff')
+    expect(proposal?.stage).toBe('producer')
+    expect(proposal?.target).toBe('Writer')
+    expect(saveAndHandoff).not.toHaveBeenCalled()
+    // 채팅 메시지 영속화는 fetch를 쓴다 — 승인 전 금지 대상은 Writer 시작 API뿐이다.
+    expect(
+      fetchSpy.mock.calls.filter(([url]) => url === '/api/writer/start'),
+    ).toHaveLength(0)
+
+    const approved = await useGlobalChatStore.getState().approvePendingProposal(proposal?.id)
+
+    expect(approved).toBe(true)
+    expect(saveAndHandoff).toHaveBeenCalledTimes(1)
+    expect(saveAndHandoff).toHaveBeenCalledWith()
+    expect(fetchSpy).toHaveBeenCalledWith(
+      '/api/writer/start',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(useProjectStore.getState().currentStage).toBe('writer')
+    expect(useGlobalChatStore.getState().pendingNavigatePath).toBe('/studio/writer')
+  })
+
   it('turns completed-run 409 into a consent proposal without rerunning', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')

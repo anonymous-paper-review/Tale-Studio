@@ -531,6 +531,23 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           })
           + '\n'
           + blockers.map((b) => `· ${b}`).join('\n')
+      } else if (handoffSpec.from === 'producer' && handoffSpec.to === 'writer') {
+        const accepted = get().offerPendingProposal(
+          createPendingProposal({
+            stage: 'producer',
+            kind: 'producerWriterInitialHandoff',
+            target: STAGE_LABEL.writer,
+            action: translate(locale, 'Invite Writer'),
+            impact: [translate(locale, 'Nothing runs until you approve.')],
+            payload: {},
+          }),
+        )
+        reply = accepted
+          ? translate(locale, 'Nothing runs until you approve.')
+          : translate(
+              locale,
+              'A proposal is already pending, so the new Producer change proposal was held back.',
+            )
       } else {
         const result = await runHandoff(handoffSpec)
         path = result.path
@@ -1034,18 +1051,51 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (stage === 'director') {
         // Agentic 응답 — DirectorCanvasUpdate[]
         if (Array.isArray(data.updates)) {
+          const updates = data.updates as DirectorCanvasUpdate[]
+          // 이미지는 과금 생성이므로 채팅 응답에서 바로 실행하지 않는다. 같은 응답의 무과금
+          // 수정은 즉시 반영하되, 이미지 생성은 하나의 승인 카드로만 묶는다.
+          const imageUpdates = updates.filter((update) => update.type === 'generateImage')
+          const immediateUpdates = updates.filter((update) => update.type !== 'generateImage')
+          let imageProposalAccepted = false
+          if (imageUpdates.length > 0) {
+            const locale = contentLocale()
+            imageProposalAccepted = get().offerPendingProposal(
+              createPendingProposal({
+                traceId,
+                stage: 'director',
+                kind: 'directorGenerateStoryboardImage',
+                target: translate(locale, 'Storyboard image'),
+                action: translate(locale, 'Generate image'),
+                impact: [
+                  translate(locale, 'Costs money to generate the image.'),
+                  translate(locale, 'Nothing runs until you approve.'),
+                ],
+                payload: { updates: imageUpdates },
+              }),
+            )
+            if (!imageProposalAccepted) {
+              set({
+                error: translate(
+                  locale,
+                  'A proposal is already pending, so the new Director image generation proposal was held back.',
+                ),
+              })
+            }
+          }
           const result = useDirectorCanvasStore
             .getState()
-            .applyUpdates(data.updates as DirectorCanvasUpdate[], {
+            .applyUpdates(immediateUpdates, {
               traceId,
               onJob: observeGeneration,
             })
           patchTrace({
             appliedCount: result.applied,
             skippedCount: result.skipped.length,
-            pendingProposal: false,
-            ...(data.updates.some((u: DirectorCanvasUpdate) => u.type === 'generateVideo') &&
-            result.skipped.length > 0
+            pendingProposal: imageProposalAccepted,
+            ...(imageProposalAccepted
+              ? { generationStatus: 'awaiting_approval' }
+              : immediateUpdates.some((u) => u.type === 'generateVideo') &&
+                  result.skipped.length > 0
               ? { generationStatus: 'skipped' }
               : {}),
           })
@@ -1331,6 +1381,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         useProducerStore
           .getState()
           .applyProducerSourcePatch(proposal.payload.patch as ExtractedSettings)
+      } else if (proposal.kind === 'producerWriterInitialHandoff') {
+        const ok = await useProducerStore.getState().saveAndHandoff()
+        if (!ok) return false
+        const path = await handoffToStage('writer')
+        if (path) set({ pendingNavigatePath: path })
       } else if (proposal.kind === 'producerWriterRerunRequest') {
         const ok = await useProducerStore.getState().saveAndHandoff({ rerun: true })
         if (!ok) return false
@@ -1415,6 +1470,34 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         // 로컬 외형 갱신 → 기존 파생 이미지가 즉시 stale 로 표시(자동 재생성 없음, #57). 이후 cc 가 재생성 제안.
         useArtistStore.getState().applyAppearancePatch(characterId, appearance)
+      } else if (proposal.kind === 'directorGenerateStoryboardImage') {
+        const payloadUpdates = proposal.payload.updates
+        if (!Array.isArray(payloadUpdates) || payloadUpdates.length === 0) {
+          throw new Error('storyboard image updates missing')
+        }
+        const updates: DirectorCanvasUpdate[] = payloadUpdates.map((update) => {
+          if (
+            !update ||
+            typeof update !== 'object' ||
+            Array.isArray(update) ||
+            (update as Record<string, unknown>).type !== 'generateImage' ||
+            !Object.keys(update).every((key) => key === 'type' || key === 'id') ||
+            ('id' in update &&
+              (typeof (update as Record<string, unknown>).id !== 'string' ||
+                !(update as Record<string, string>).id.trim()))
+          ) {
+            throw new Error('invalid storyboard image update')
+          }
+          const id = (update as Record<string, unknown>).id
+          return typeof id === 'string' ? { type: 'generateImage', id } : { type: 'generateImage' }
+        })
+        const result = useDirectorCanvasStore.getState().applyUpdates(updates, {
+          traceId: traceId ?? undefined,
+          onJob: observeGeneration,
+        })
+        if (result.applied === 0) {
+          throw new Error('no storyboard image updates could run')
+        }
       } else if (proposal.kind === 'writerShrinkDialogue') {
         const shotId = proposal.payload.shotId
         const dialogueLines = proposal.payload.dialogueLines

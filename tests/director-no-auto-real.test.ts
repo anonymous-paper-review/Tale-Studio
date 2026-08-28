@@ -12,6 +12,7 @@ const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
 const syncHook = readFileSync('src/features/director/hooks/use-writer-director-sync.ts', 'utf8')
 const batchClient = readFileSync('src/lib/director/real-batch-client.ts', 'utf8')
 const store = readFileSync('src/stores/director-store.ts', 'utf8')
+const globalChatStore = readFileSync('src/stores/global-chat-store.ts', 'utf8')
 const chatRoute = readFileSync('src/app/api/director/chat/route.ts', 'utf8')
 
 describe('C5 — Director 진입이 실사 생성을 발사하지 않는다', () => {
@@ -50,6 +51,20 @@ describe('C5 — 채팅으로도 실사 생성이 가능하다', () => {
 
   it('Shot 노드가 아니면 건너뛴다', () => {
     expect(store).toContain('generateImage target must be Shot node')
+  })
+
+  it('채팅 generateImage는 즉시 실행하지 않고 Director 승인 카드로 보낸다', () => {
+    expect(globalChatStore).toContain("update.type === 'generateImage'")
+    expect(globalChatStore).toContain("kind: 'directorGenerateStoryboardImage'")
+    expect(globalChatStore).toContain('payload: { updates: imageUpdates }')
+    expect(globalChatStore).toContain('.applyUpdates(immediateUpdates, {')
+  })
+
+  it('이미지 생성 의도는 사용자가 명시했을 때만 낸다', () => {
+    expect(chatRoute).toContain('<hybrid_intent_rule>')
+    expect(chatRoute).toContain('Never infer or append generateImage.')
+    expect(chatRoute).toContain('only when the user explicitly asks to generate or regenerate an image.')
+    expect(chatRoute).toContain('client presents an approval card before it runs.')
   })
 })
 
