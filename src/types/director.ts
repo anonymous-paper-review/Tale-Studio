@@ -25,7 +25,22 @@ export type DirectorEdgeCategory =
   | 'relates-to' // 사용자 정의 내러티브 관계
   | 'references' // Asset→Shot (Artist 에셋을 참조하는 샷, 파생 — DB 미영속)
   | 'prompt' // Prompt 노드 → Shot T 입력 (프롬프트 와이어, 영속)
+  | 'image' // image-capable source → Shot image-reference input (이미지 와이어, 파생)
+  | 'frame' // image-capable source → Video frame input (프레임 와이어, 영속)
+  | 'video-chain' // completed Video last-frame → Video START (사용자 체인)
   | 'chain' // Shot→ShotImage→Video (샷 체인, 파생 — DB 미영속)
+
+/** Shot image-reference input target handle. */
+export type DirectorImageTargetHandle = 'image-reference'
+
+/** Video frame input target handles. DIRECTION is intentionally not a Video input. */
+export type DirectorVideoFrameTargetHandle =
+  | 'frame-start'
+  | 'frame-end'
+  | 'frame-ref'
+
+/** Previous-video last-frame input target handle. */
+export type DirectorVideoChainTargetHandle = 'video-chain'
 
 export type DirectorVideoStatus =
   | 'pending'
@@ -100,6 +115,8 @@ export type ShotNodeData = {
   promptMigratedV2?: boolean
   /** 사용자 업로드 보조 참고 이미지 (생성물 아님 — storyboardImage와 구분, 결정 #37) */
   referenceImages: DirectorReferenceImage[]
+  /** Manual image-reference wiring source node IDs. URLs are resolved at generation time. */
+  imageInputs: string[]
   /** I2I 생성 샷 대표 이미지 (샷당 1장, I2V 기본 레퍼런스). null = 미생성 */
   storyboardImage: StoryboardImage | null
   /** Artist Asset Storage RegisteredCharacter.id 목록 (references 엣지는 논리적) */
@@ -148,6 +165,16 @@ export type VideoNodeData = {
   createdAt: string | null
   /** 마더 대비 변경된 필드 (없으면 마더 값 그대로 사용) */
   override: VideoOverride
+  /**
+   * Manual frame wiring source node IDs.
+   * `start` and `end` accept at most one source each; `refs` accepts multiple source IDs.
+   * DIRECTION is intentionally not a Video input.
+   */
+  frameInputs: { start: string | null; end: string | null; refs: string[] }
+  /** Previous completed Video node whose extracted last frame starts this take. */
+  videoChainInputId: string | null
+  /** Public image URL captured from the previous Video's last frame. */
+  videoChainFrameUrl: string | null
   /** 생성 결과 */
   videoUrl: string | null
   thumbnailUrl: string | null

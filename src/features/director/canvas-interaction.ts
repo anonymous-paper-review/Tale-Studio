@@ -67,10 +67,22 @@ export function clickToggleSelection(
 
 /**
  * onConnect 라우팅: Shot의 T 입력(targetHandle==='prompt')으로 들어오는 연결은
- * Prompt 노드 와이어링(wirePromptToShot)으로, 그 외는 기존 관계(RelationModal)로.
+ * Prompt 노드 와이어링(wirePromptToShot)으로, Shot 이미지 입력은 image 와이어링으로,
+ * Video 프레임 입력은 frame 와이어링으로, 이전 Video 입력은 video-chain으로,
+ * 그 외는 기존 관계(RelationModal)로.
  */
 export function connectRouteForTargetHandle(
   targetHandle: string | null | undefined,
-): 'prompt-wire' | 'relation' {
-  return targetHandle === 'prompt' ? 'prompt-wire' : 'relation'
+): 'prompt-wire' | 'image-wire' | 'frame-wire' | 'video-chain' | 'relation' {
+  if (targetHandle === 'prompt') return 'prompt-wire'
+  if (targetHandle === 'image-reference') return 'image-wire'
+  if (
+    targetHandle === 'frame-start' ||
+    targetHandle === 'frame-end' ||
+    targetHandle === 'frame-ref'
+  ) {
+    return 'frame-wire'
+  }
+  if (targetHandle === 'video-chain') return 'video-chain'
+  return 'relation'
 }

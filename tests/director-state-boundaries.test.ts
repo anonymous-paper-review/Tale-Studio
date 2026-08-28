@@ -518,6 +518,177 @@ describe('video generation orchestration boundaries', () => {
     })
   })
 
+  it('sends manually wired START/REF/END images with aligned roles', async () => {
+    vi.useFakeTimers()
+    const store = useDirectorCanvasStore.getState()
+    useDirectorCanvasStore.setState({
+      projectId: 'project-1',
+      hydrateFromDb: vi.fn().mockResolvedValue(undefined),
+    })
+    const sceneId = store.addSceneNode({ x: 0, y: 0 }, 'Scene')
+    const sourceShotId = store.addShotNode(sceneId, { x: 100, y: 0 }, 'Source')
+    const targetShotId = store.addShotNode(sceneId, { x: 100, y: 560 }, 'Target')
+    store.updateNodeData<'shot'>(sourceShotId, {
+      storyboardImage: {
+        url: 'https://media.example/source-default.png',
+        status: 'completed',
+        errorMessage: null,
+        generatedAt: 1,
+        frames: {
+          start: 'https://media.example/source-start.png',
+          direction: 'https://media.example/source-direction.png',
+          end: 'https://media.example/source-end.png',
+        },
+      },
+    })
+    const videoId = store.addVideoTake(targetShotId)!
+    store.wireFrameToVideo(sourceShotId, videoId, 'frame-start')
+    store.wireFrameToVideo(sourceShotId, videoId, 'frame-ref')
+    store.wireFrameToVideo(sourceShotId, videoId, 'frame-end')
+
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ jobId: 'job-1', status: 'queued' }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          data: { status: 'completed', resultUrl: 'https://media.example/video.mp4' },
+        }),
+      )
+    vi.stubGlobal('fetch', fetch)
+
+    const result = useDirectorCanvasStore.getState().regenerateVideo(videoId)
+    await Promise.resolve()
+    await vi.runAllTimersAsync()
+    await expect(result).resolves.toBe(true)
+
+    const body = JSON.parse((fetch.mock.calls[0]![1] as RequestInit).body as string)
+    expect(body).toMatchObject({
+      referenceImageUrl: 'https://media.example/source-start.png',
+      referenceImageUrls: [
+        'https://media.example/source-start.png',
+        'https://media.example/source-default.png',
+        'https://media.example/source-end.png',
+      ],
+      referenceImageRoles: ['start', 'ref', 'end'],
+      generationMethod: 'I2V',
+    })
+    expect(body.referenceImageUrls).not.toContain('https://media.example/source-direction.png')
+  })
+
+  it('uses a previous Video last frame as the target START image without sending video input', async () => {
+    vi.useFakeTimers()
+    const store = useDirectorCanvasStore.getState()
+    useDirectorCanvasStore.setState({
+      projectId: 'project-1',
+      hydrateFromDb: vi.fn().mockResolvedValue(undefined),
+    })
+    const sceneId = store.addSceneNode({ x: 0, y: 0 }, 'Scene')
+    const sourceShotId = store.addShotNode(sceneId, { x: 100, y: 0 }, 'Source')
+    const targetShotId = store.addShotNode(sceneId, { x: 100, y: 560 }, 'Target')
+    const sourceVideoId = store.addVideoTake(sourceShotId)!
+    const targetVideoId = store.addVideoTake(targetShotId)!
+    store.updateNodeData<'video'>(sourceVideoId, {
+      status: 'completed',
+      videoUrl: 'https://media.example/source.mp4',
+      videoClipId: 'clip-source',
+      generationJobId: 'job-source',
+    })
+    store.updateNodeData<'video'>(targetVideoId, {
+      videoChainInputId: sourceVideoId,
+      videoChainFrameUrl:
+        'https://media.example/videos/clip-source/job-source_chain-frame.jpg',
+    })
+
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ jobId: 'job-target', status: 'queued' }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          data: { status: 'completed', resultUrl: 'https://media.example/target.mp4' },
+        }),
+      )
+    vi.stubGlobal('fetch', fetch)
+
+    const result = useDirectorCanvasStore.getState().regenerateVideo(targetVideoId)
+    await Promise.resolve()
+    await vi.runAllTimersAsync()
+    await expect(result).resolves.toBe(true)
+
+    const body = JSON.parse((fetch.mock.calls[0]![1] as RequestInit).body as string)
+    expect(body).toMatchObject({
+      referenceImageUrl:
+        'https://media.example/videos/clip-source/job-source_chain-frame.jpg',
+      referenceImageUrls: [
+        'https://media.example/videos/clip-source/job-source_chain-frame.jpg',
+      ],
+      referenceImageRoles: ['start'],
+      generationMethod: 'I2V',
+    })
+    expect(body.videoUrl).toBeUndefined()
+    expect(JSON.stringify(body)).not.toContain(sourceVideoId)
+    vi.useRealTimers()
+  })
+
+  it('does not fall back to T2V when a configured video chain has no frame', async () => {
+    const store = useDirectorCanvasStore.getState()
+    const { videoId } = generationTestVideo()
+    store.updateNodeData<'video'>(videoId, {
+      videoChainInputId: 'source-video',
+      videoChainFrameUrl: null,
+    })
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+
+    await expect(store.regenerateVideo(videoId)).resolves.toBe(false)
+
+    expect(fetch).not.toHaveBeenCalled()
+    expect(useDirectorCanvasStore.getState().generationErrors[videoId]).toContain(
+      'chain frame',
+    )
+  })
+
+  it('sends wired Shot image references to storyboard I2I without leaking node IDs', async () => {
+    const store = useDirectorCanvasStore.getState()
+    useDirectorCanvasStore.setState({
+      projectId: 'project-1',
+      hydrateFromDb: vi.fn().mockResolvedValue(undefined),
+    })
+    const sceneId = store.addSceneNode({ x: 0, y: 0 }, 'Scene')
+    const sourceShotId = store.addShotNode(sceneId, { x: 100, y: 0 }, 'Source')
+    const targetShotId = store.addShotNode(sceneId, { x: 100, y: 560 }, 'Target')
+    store.updateNodeData<'shot'>(sourceShotId, {
+      writerShotId: 'writer-source',
+      storyboardImage: {
+        url: 'https://media.example/source.png',
+        status: 'completed',
+        errorMessage: null,
+        generatedAt: 1,
+      },
+    })
+    store.updateNodeData<'shot'>(targetShotId, {
+      writerShotId: 'writer-target',
+    })
+    store.wireImageToShot(sourceShotId, targetShotId, 'image-reference')
+
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ jobId: 'image-job' }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: { status: 'completed', resultUrl: 'https://media.example/target.png' },
+        }),
+      )
+    vi.stubGlobal('fetch', fetch)
+
+    await useDirectorCanvasStore.getState().generateStoryboardImage(targetShotId)
+
+    const body = JSON.parse((fetch.mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.referenceImageUrls).toEqual(['https://media.example/source.png'])
+    expect(body.referenceImageUrls).not.toContain(sourceShotId)
+  })
+
   it('stops signed recovery when the attempt is stale', async () => {
     vi.useFakeTimers()
     const { videoId } = generationTestVideo()

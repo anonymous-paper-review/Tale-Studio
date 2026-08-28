@@ -26,6 +26,10 @@ import { Loader2, ImageIcon, X, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map a
 
 import { toast } from 'sonner'
 import { runRealBatch } from '@/lib/director/real-batch-client'
+import {
+  eligibleVideoBatchShotIds,
+  runVideoBatch,
+} from '@/lib/director/video-batch-client'
 import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
@@ -228,6 +232,9 @@ const edgeTypes = {
   parent: CategoryEdge,
   'relates-to': CategoryEdge,
   references: CategoryEdge,
+  image: CategoryEdge,
+  frame: CategoryEdge,
+  'video-chain': CategoryEdge,
 } as const
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -242,6 +249,11 @@ function CanvasInner() {
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
   const openRelationModal = useDirectorCanvasStore((s) => s.openRelationModal)
   const wirePromptToShot = useDirectorCanvasStore((s) => s.wirePromptToShot)
+  const wireImageToShot = useDirectorCanvasStore((s) => s.wireImageToShot)
+  const wireFrameToVideo = useDirectorCanvasStore((s) => s.wireFrameToVideo)
+  const wireVideoChainToVideo = useDirectorCanvasStore(
+    (s) => s.wireVideoChainToVideo,
+  )
   const addShotNode = useDirectorCanvasStore((s) => s.addShotNode)
   const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
@@ -449,21 +461,54 @@ function CanvasInner() {
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      const next = applyEdgeChanges(changes, edges)
+      // Let the store observe removed frame/image edges before React Flow applies
+      // the edge list change so it can clear the corresponding source ID.
+      const removals = changes.filter((change) => change.type === 'remove')
+      removals.forEach((change) => deleteEdge(change.id))
+      const currentEdges = useDirectorCanvasStore.getState().edges
+      const nonRemovalChanges = changes.filter((change) => change.type !== 'remove')
+      const next = applyEdgeChanges(nonRemovalChanges, currentEdges)
       useDirectorCanvasStore.setState({ edges: next as typeof edges })
-      changes.forEach((c) => {
-        if (c.type === 'remove') deleteEdge(c.id)
-      })
     },
-    [edges, deleteEdge],
+    [deleteEdge],
   )
 
   const onConnect = useCallback(
     (params: Connection) => {
       if (!params.source || !params.target) return
+      if (params.targetHandle === 'video-chain') {
+        void wireVideoChainToVideo(
+          params.source,
+          params.target,
+          params.targetHandle,
+        ).then((connected) => {
+          if (!connected) toast.error(t('Video chain connection failed.'))
+        }).catch(() => {
+          toast.error(t('Video chain connection failed.'))
+        })
+        return
+      }
+      const route = connectRouteForTargetHandle(params.targetHandle)
       // Prompt 노드 출력(right) → Shot T 입력(prompt) 연결이면 와이어링 + prompt 동기
-      if (connectRouteForTargetHandle(params.targetHandle) === 'prompt-wire') {
+      if (route === 'prompt-wire') {
         wirePromptToShot(params.source, params.target)
+        return
+      }
+      if (route === 'image-wire') {
+        if (params.targetHandle === 'image-reference') {
+          wireImageToShot(params.source, params.target, params.targetHandle)
+        }
+        return
+      }
+      if (route === 'frame-wire') {
+        const targetHandle = params.targetHandle
+        if (
+          targetHandle === 'frame-start' ||
+          targetHandle === 'frame-end' ||
+          targetHandle === 'frame-ref'
+        ) {
+          wireFrameToVideo(params.source, params.target, targetHandle)
+        }
         return
       }
       openRelationModal(
@@ -473,7 +518,14 @@ function CanvasInner() {
         params.targetHandle,
       )
     },
-    [openRelationModal, wirePromptToShot],
+    [
+      openRelationModal,
+      wirePromptToShot,
+      wireImageToShot,
+      wireFrameToVideo,
+      wireVideoChainToVideo,
+      t,
+    ],
   )
 
   const dragFromRef = useRef<string | null>(null)
@@ -662,6 +714,8 @@ function PaletteBar({
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   // #real-grid: 일괄 생성은 4샷 시트 러너(runRealBatch)로 통합 — 진행 플래그는 스토어 공유.
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
+  const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
+  const videoBatchProgress = useDirectorCanvasStore((s) => s.videoBatchProgress)
   const relayoutCanvas = useDirectorCanvasStore((s) => s.relayoutCanvas)
   const showUnusedAssets = useDirectorCanvasStore((s) => s.showUnusedAssets)
   const toggleUnusedAssets = useDirectorCanvasStore((s) => s.toggleUnusedAssets)
@@ -679,6 +733,8 @@ function PaletteBar({
     (n) =>
       isShotData(n.data) && n.data.storyboardImage?.status === 'generating',
   )
+  const eligibleVideoCount = eligibleVideoBatchShotIds(nodes).length
+  const [confirmVideoBatch, setConfirmVideoBatch] = useState(false)
 
   // 상단 이동(#e1 2026-07-13): 하단 border-t 바 → 캔버스 위 border-b 바.
   //   Node/Storyboard 토글은 artist 탭(Characters/World/Inventory)과 동일한 TabsList 스타일.
@@ -770,6 +826,68 @@ function PaletteBar({
           )}
         </button>
 
+        {/* 명시적 전체 영상 생성 — 과금 동작은 확인 후에만 시작한다. */}
+        <button
+          type="button"
+          title={t('Generate videos for every eligible shot')}
+          onClick={() => {
+            if (videoBatchBusy) return
+            const eligible = eligibleVideoBatchShotIds(
+              useDirectorCanvasStore.getState().nodes,
+            )
+            if (eligible.length === 0) {
+              toast.info(t('No eligible shots for video generation.'))
+              return
+            }
+            setConfirmVideoBatch(true)
+          }}
+          disabled={videoBatchBusy}
+          aria-busy={videoBatchBusy}
+          className={cn(
+            'flex h-8 items-center gap-2 rounded-md border border-border px-3',
+            'text-xs font-medium text-foreground',
+            'transition-colors duration-100 hover:bg-accent',
+            videoBatchBusy && 'cursor-not-allowed opacity-70',
+            'hover-red-beam',
+          )}
+        >
+          {videoBatchBusy ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <ImageIcon className="size-4" />
+          )}
+          <span>{t('Generate videos')}</span>
+          {videoBatchBusy && videoBatchProgress && (
+            <>
+              <span className="font-mono tabular-nums text-muted-foreground">
+                {videoBatchProgress.done}/{videoBatchProgress.total}
+              </span>
+              {videoBatchProgress.failed > 0 && (
+                <span className="text-destructive">
+                  {t('{count} failed', { count: videoBatchProgress.failed })}
+                </span>
+              )}
+              <span
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={videoBatchProgress.total}
+                aria-valuenow={videoBatchProgress.done}
+                className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"
+              >
+                <span
+                  className="block h-full bg-primary transition-[width]"
+                  style={{
+                    width:
+                      videoBatchProgress.total > 0
+                        ? `${(videoBatchProgress.done / videoBatchProgress.total) * 100}%`
+                        : '0%',
+                  }}
+                />
+              </span>
+            </>
+          )}
+        </button>
+
       </div>
 
       {/* 축척 — Storyboard 뷰 전용, 우측 정렬(#e-zoom-merge 2026-08-20 오너 지시: 뷰 내부의
@@ -844,6 +962,27 @@ function PaletteBar({
           setConfirmRegenAll(false)
           const pid = useDirectorCanvasStore.getState().projectId
           if (pid) void runRealBatch(pid, { force: true })
+        }}
+      />
+      <RegenerateConfirmDialog
+        open={confirmVideoBatch}
+        onOpenChange={setConfirmVideoBatch}
+        title={t('Generate videos for eligible shots?')}
+        description={t('Generate videos for {count} eligible shots.', {
+          count: eligibleVideoCount,
+        })}
+        impact={[
+          t('Costs money for every generated video — {count} videos.', {
+            count: eligibleVideoCount,
+          }),
+          t('Only shots without a completed video or active generation will be included.'),
+        ]}
+        confirmLabel={t('Generate videos')}
+        busy={videoBatchBusy}
+        onConfirm={() => {
+          setConfirmVideoBatch(false)
+          const pid = useDirectorCanvasStore.getState().projectId
+          if (pid) void runVideoBatch(pid)
         }}
       />
     </div>

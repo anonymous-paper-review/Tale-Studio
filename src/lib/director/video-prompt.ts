@@ -16,7 +16,10 @@ export type VideoPromptParts = {
   dialogue?: string
   black?: string
   startEnd?: string
+  referenceRoles?: string
 }
+
+export type VideoReferenceImageRole = 'start' | 'end' | 'ref'
 
 export type BuildVideoPromptInput = {
   prompt: string
@@ -28,6 +31,8 @@ export type BuildVideoPromptInput = {
   durationSeconds: number
   /** V2 refs(#real-strip 2026-07-22): 레퍼런스가 [START, END] 2장일 때 수렴 지시 절 추가. */
   startEndReference?: boolean
+  /** 수동 프레임 와이어링으로 전달된 레퍼런스 배열의 역할(배열 순서와 정렬). */
+  referenceImageRoles?: VideoReferenceImageRole[]
   /** #motion-contract: v4 dynamic_spec — 있으면 모션 계약문을 컴파일해 맨 앞에 싣는다.
    *  미전달(레거시) = 기존 프롬프트와 동일(계약·분기 없음). */
   dynamicSpec?: ShotDynamicSpec | null
@@ -37,6 +42,26 @@ export type BuildVideoPromptInput = {
   dialogueLines?: DialogueLine[] | null
   /** #g7-speakers (2026-08-27 오너 확정): characterId → 화자. 없으면 종전 무명 표기. */
   dialogueSpeakers?: Record<string, DialogueSpeaker> | null
+}
+
+function referenceRolesClause(roles: VideoReferenceImageRole[]): string {
+  const order = roles
+    .map((role, index) => `image ${index + 1} = ${role.toUpperCase()}`)
+    .join(', ')
+  const refs = roles.includes('ref')
+    ? ' REF images are style/character references, not temporal keyframes.'
+    : ''
+  const hasStart = roles.includes('start')
+  const hasEnd = roles.includes('end')
+  const temporal =
+    hasStart && hasEnd
+      ? ' The START image is the beginning of the shot, and the END image is the completed composition.'
+      : hasStart
+        ? ' The START image is the beginning of the shot.'
+        : hasEnd
+          ? ' The END image is the completed composition.'
+          : ''
+  return `Reference image order: ${order}.${refs}${temporal}`
 }
 
 /** 대사 화자(characters 테이블에서 해석). appearance 는 시각 앵커 재료로 일부만 쓰인다. */
@@ -110,7 +135,7 @@ export function dialogueClause(
 }
 
 export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: string; prompt_parts: VideoPromptParts } {
-  const { prompt, camera, movementPreset, cameraPreset, generationMethod, modelKey, durationSeconds, startEndReference, dynamicSpec, dialogueLines, dialogueSpeakers } = parts
+  const { prompt, camera, movementPreset, cameraPreset, generationMethod, modelKey, durationSeconds, startEndReference, referenceImageRoles, dynamicSpec, dialogueLines, dialogueSpeakers } = parts
   const contract: MotionContract = compileMotionContract(dynamicSpec, durationSeconds)
   const dialogue = dialogueClause(dialogueLines, dialogueSpeakers)
   const cameraText = camera ? cameraToText(camera) : ''
@@ -130,10 +155,16 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
     .join('. ')
     .slice(0, cap)
 
+  if (referenceImageRoles?.length && generationMethod === 'I2V') {
+    const roleInstruction = referenceRolesClause(referenceImageRoles)
+    prompt_parts.referenceRoles = roleInstruction
+    fullPrompt = `${fullPrompt} ${roleInstruction}`.slice(0, cap + (contract.text ? 500 : 450))
+  }
+
   // V2(previz 실측 검증: END 프레이밍 수렴) — 첫 레퍼런스=START, 마지막=END 로 시작·끝 구도를 고정.
   //   P0(#motion-contract): 옛 문구는 "one continuous camera and subject movement"를 무조건 전제해
   //   정지 샷에도 이동을 지어내게 부추겼다 — 카메라 정지 계약이면 "구도 유지" 분기로.
-  if (startEndReference && generationMethod === 'I2V') {
+  if (!referenceImageRoles?.length && startEndReference && generationMethod === 'I2V') {
     const startEndInstruction = contract.text && contract.cameraStatic
       ? `The first reference image is the shot's START frame and the last reference image is its END frame — hold this same composition throughout: no camera travel between them, only the contracted subject motion.`
       : `The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.`

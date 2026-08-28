@@ -30,6 +30,9 @@ import { MEDIA_CACHE_CONTROL } from '@/lib/storage/media'
 
 // 결과 주소는 보관함 경로에서 계산된다 — 고정 문자열로 두면 보관 위치를 옮겨도 통과한다.
 const THUMB_PUBLIC_URL = mediaPublicUrl('workspace-1/project-1/videos/clip-1/job-1.jpg')
+const CHAIN_FRAME_PUBLIC_URL = mediaPublicUrl(
+  'workspace-1/project-1/videos/clip-1/job-1_chain-frame.jpg',
+)
 
 const USER = { id: 'user-1' }
 const PROJECT = 'project-1'
@@ -50,6 +53,16 @@ function imageUploadRequest(generationJobId: string) {
   form.set('field', 'thumbnail')
   form.set('generationJobId', generationJobId)
   form.set('file', new Blob([JPEG_BYTES], { type: 'image/jpeg' }), 'thumbnail.jpg')
+  return new Request('http://test/api/assets/upload-image', { method: 'POST', body: form })
+}
+function chainFrameUploadRequest(generationJobId: string) {
+  const form = new FormData()
+  form.set('projectId', PROJECT)
+  form.set('type', 'video')
+  form.set('entityId', 'clip-1')
+  form.set('field', 'chain_frame')
+  form.set('generationJobId', generationJobId)
+  form.set('file', new Blob([JPEG_BYTES], { type: 'image/jpeg' }), 'chain-frame.jpg')
   return new Request('http://test/api/assets/upload-image', { method: 'POST', body: form })
 }
 function imageRequest(type: string, entityId: string, field: string, file: Blob) {
@@ -423,6 +436,32 @@ describe('video thumbnail ancestry', () => {
     expect(updateQuery.eq).toHaveBeenCalledWith('project_id', PROJECT)
     expect(updateQuery.is).toHaveBeenCalledWith('deleted_at', null)
     expect(updateQuery.eq).toHaveBeenCalledWith('storage_path', 'workspace-1/project-1/videos/clip-1/job-1.mp4')
+  })
+  it('stores an extracted chain frame immutably without changing thumbnail metadata', async () => {
+    mocks.from
+      .mockReturnValueOnce(thumbnailQuery({ workspace_id: 'workspace-1' }))
+      .mockReturnValueOnce(
+        thumbnailQuery({ id: 'job-1', video_clip_id: 'clip-1', status: 'completed' }),
+      )
+      .mockReturnValueOnce(
+        thumbnailQuery({
+          id: 'clip-1',
+          storage_path: 'workspace-1/project-1/videos/clip-1/job-1.mp4',
+        }),
+      )
+    const upload = vi.fn().mockResolvedValue({ error: null })
+    mocks.storageFrom.mockReturnValue({ upload })
+
+    const response = await uploadImage(chainFrameUploadRequest('job-1'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ publicUrl: CHAIN_FRAME_PUBLIC_URL })
+    expect(upload).toHaveBeenCalledWith(
+      'workspace-1/project-1/videos/clip-1/job-1_chain-frame.jpg',
+      expect.any(Buffer),
+      { contentType: 'image/jpeg', upsert: false, cacheControl: MEDIA_CACHE_CONTROL },
+    )
+    expect(mocks.from).toHaveBeenCalledTimes(3)
   })
   it.each([
     ['wrong linked clip', { id: 'job-1', video_clip_id: 'other-clip', status: 'completed' }, 403],

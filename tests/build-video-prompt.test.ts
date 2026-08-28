@@ -77,6 +77,53 @@ describe('buildVideoPrompt', () => {
     expect(t2v.prompt_parts.startEnd).toBeUndefined()
   })
 
+  it('describes ordered START/REF/END roles without treating REF as a temporal keyframe', () => {
+    const result = buildVideoPrompt({
+      prompt: 'A duelist draws a rapier',
+      generationMethod: 'I2V',
+      modelKey: 'happy-horse',
+      durationSeconds: 5,
+      referenceImageRoles: ['start', 'ref', 'end'],
+    })
+
+    expect(result.fullPrompt).toContain('image 1 = START')
+    expect(result.fullPrompt).toContain('image 2 = REF')
+    expect(result.fullPrompt).toContain('image 3 = END')
+    expect(result.fullPrompt).toContain('REF images are style/character references, not temporal keyframes')
+    expect(result.fullPrompt).toContain('START image is the beginning')
+    expect(result.fullPrompt).toContain('END image is the completed composition')
+  })
+
+  it('does not claim an END frame when only REF images are supplied', () => {
+    const result = buildVideoPrompt({
+      prompt: 'A duelist studies the room',
+      generationMethod: 'I2V',
+      modelKey: 'happy-horse',
+      durationSeconds: 5,
+      referenceImageRoles: ['ref', 'ref'],
+    })
+
+    expect(result.fullPrompt).toContain('image 1 = REF')
+    expect(result.fullPrompt).toContain('REF images are style/character references, not temporal keyframes')
+    expect(result.fullPrompt).not.toContain('END image is')
+    expect(result.fullPrompt).not.toContain('START image is')
+    expect(result.fullPrompt).not.toContain('finish exactly at the END composition')
+  })
+
+  it('keeps legacy START/END convergence when roles are absent', () => {
+    const result = buildVideoPrompt({
+      prompt: 'A duelist draws a rapier',
+      generationMethod: 'I2V',
+      modelKey: 'happy-horse',
+      durationSeconds: 5,
+      startEndReference: true,
+    })
+
+    expect(result.fullPrompt).toContain('finish exactly at the END composition')
+    expect(result.prompt_parts.startEnd).toBeTruthy()
+    expect(result.prompt_parts.referenceRoles).toBeUndefined()
+  })
+
   it('snapshots the 500 character base prompt cap boundary', () => {
     const result = buildVideoPrompt({
       prompt: '0123456789'.repeat(52),

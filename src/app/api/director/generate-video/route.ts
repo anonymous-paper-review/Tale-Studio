@@ -4,7 +4,12 @@ import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { fal } from '@fal-ai/client'
-import { type DialogueLine, type DialogueSpeaker, buildVideoPrompt } from '@/lib/director/video-prompt'
+import {
+  type DialogueLine,
+  type DialogueSpeaker,
+  type VideoReferenceImageRole,
+  buildVideoPrompt,
+} from '@/lib/director/video-prompt'
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { getGenerationJobById, userOwnsProject } from '@/lib/generation-jobs'
@@ -80,6 +85,7 @@ function snapshotValueMatches(snapshot: Record<string, unknown>, candidate: Reco
   return [
     'prompt', 'full_prompt', 'camera', 'duration_seconds', 'aspect_ratio', 'generation_method',
     'provider', 'model', 'resolved_model_key', 'reference_image_url', 'reference_image_urls',
+    'reference_image_roles',
     'movement_preset', 'camera_preset', 'fal_request', 'new_take_metadata',
   ].every((key) => {
     const snapshotHasKey = Object.prototype.hasOwnProperty.call(snapshot, key)
@@ -385,7 +391,8 @@ export async function POST(req: Request) {
     const body = (await req.json()) as {
       shotId?: string; projectId?: string; writerShotId?: string | null; prompt?: string; camera?: CameraConfig
       durationSeconds?: number; aspectRatio?: string; generationMethod?: GenerationMethod; provider?: VideoProvider
-      model?: string; referenceImageUrl?: string; referenceImageUrls?: string[]; movementPreset?: string | null
+      model?: string; referenceImageUrl?: string; referenceImageUrls?: string[]
+      referenceImageRoles?: Array<'start' | 'end' | 'ref'>; movementPreset?: string | null
       cameraPreset?: CameraPreset | null
       idempotencyKey?: string; videoClipId?: string; takeLabel?: string | null; override?: Json; canvasPosition?: Json | null
       recoveryReceipt?: string; actor?: string
@@ -401,6 +408,20 @@ export async function POST(req: Request) {
     const referenceImageUrlsV2 = Array.isArray(body.referenceImageUrls)
       ? body.referenceImageUrls.filter((u): u is string => typeof u === 'string' && !!u).slice(0, 4)
       : undefined
+    const referenceImageRolesV2 = Array.isArray(body.referenceImageRoles)
+      ? body.referenceImageRoles.length <= 4 &&
+        body.referenceImageRoles.every(
+          (role): role is VideoReferenceImageRole =>
+            role === 'start' || role === 'end' || role === 'ref',
+        )
+        ? body.referenceImageRoles
+        : undefined
+      : undefined
+    const alignedReferenceImageRoles =
+      referenceImageUrlsV2?.length &&
+      referenceImageRolesV2?.length === referenceImageUrlsV2.length
+        ? referenceImageRolesV2
+        : undefined
     const writerShotId = body.writerShotId ?? body.shotId
     projectId = body.projectId ?? ''
     if (!projectId || !writerShotId || !prompt || !idempotencyKey) {
@@ -536,6 +557,7 @@ export async function POST(req: Request) {
       modelKey,
       durationSeconds: dur,
       startEndReference: (submitRefUrls?.length ?? 0) >= 2,
+      ...(alignedReferenceImageRoles ? { referenceImageRoles: alignedReferenceImageRoles } : {}),
       dynamicSpec,
       // #g7 (2026-08-27 오너 확정: 음성은 영상 생성기에 맡긴다) — 대사를 프롬프트에 싣는다.
       //   DB 에 있는데 여태 아무도 읽지 않아 모델이 대사의 존재를 몰랐다.
@@ -569,6 +591,7 @@ export async function POST(req: Request) {
       reference_image_url: referenceImageUrl ?? null,
       // 배열 키는 존재할 때만 — 구버전 예약 잡의 리플레이 비교(snapshotValueMatches)와 호환.
       ...(referenceImageUrlsV2?.length ? { reference_image_urls: referenceImageUrlsV2 } : {}),
+      ...(alignedReferenceImageRoles ? { reference_image_roles: alignedReferenceImageRoles } : {}),
       movement_preset: movementPreset ?? null,
       camera_preset: cameraPreset ?? null,
       ...(videoClipId ? {} : { new_take_metadata: normalizedNewTakeMetadata }),

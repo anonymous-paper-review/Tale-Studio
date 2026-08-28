@@ -119,6 +119,16 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
           style={{ top: 64 }}
         />
+        {/* Image-reference wiring input (left, separate from the prompt handle). */}
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="image-reference"
+          title={t('Image reference input')}
+          aria-label={t('Image reference input')}
+          className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
+          style={{ top: 88 }}
+        />
 
         {prompt && (
           <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">

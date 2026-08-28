@@ -76,6 +76,17 @@ describe('connectRouteForTargetHandle (onConnect 라우팅)', () => {
   it('targetHandle=prompt → 프롬프트 와이어링', () => {
     expect(connectRouteForTargetHandle('prompt')).toBe('prompt-wire')
   })
+  it('Shot 이미지 레퍼런스 핸들 → 이미지 와이어링', () => {
+    expect(connectRouteForTargetHandle('image-reference')).toBe('image-wire')
+  })
+  it('Video 프레임 입력 핸들 → 프레임 와이어링', () => {
+    expect(connectRouteForTargetHandle('frame-start')).toBe('frame-wire')
+    expect(connectRouteForTargetHandle('frame-end')).toBe('frame-wire')
+    expect(connectRouteForTargetHandle('frame-ref')).toBe('frame-wire')
+  })
+  it('이전 Video 마지막 프레임 핸들 → Video 체인 와이어링', () => {
+    expect(connectRouteForTargetHandle('video-chain')).toBe('video-chain')
+  })
   it('다른 핸들 → 관계 모달', () => {
     expect(connectRouteForTargetHandle('left')).toBe('relation')
     expect(connectRouteForTargetHandle(null)).toBe('relation')

@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useEffect, useRef, useState } from 'react'
-import { NodeToolbar, Position, type NodeProps } from '@xyflow/react'
+import { Handle, NodeToolbar, Position, type NodeProps } from '@xyflow/react'
 import { Play, RefreshCw, Square, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
@@ -180,6 +180,43 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         </Button>
       }
     >
+      {/* Manual frame wiring inputs — visible on hover alongside BaseNode's existing handles. */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="video-chain"
+        title={t('Previous-video last-frame input')}
+        aria-label={t('Previous-video last-frame input')}
+        className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
+        style={{ top: 34 }}
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="frame-start"
+        title={t('START frame input')}
+        aria-label={t('START frame input')}
+        className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
+        style={{ top: 54 }}
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="frame-end"
+        title={t('END frame input')}
+        aria-label={t('END frame input')}
+        className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
+        style={{ top: 74 }}
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="frame-ref"
+        title={t('REF frame input')}
+        aria-label={t('REF frame input')}
+        className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
+        style={{ top: 94 }}
+      />
       {/* 영상 재생 / 썸네일 / 상태 — single-play: playingNodeId===id 일 때만 <video> 마운트.
           nodrag·nopan: React Flow 가 영상/버튼 상호작용을 노드 드래그·팬으로 가로채지 않게. */}
       <div className="relative mt-1 flex h-24 w-full items-center justify-center overflow-hidden rounded-sm border border-border/40 bg-muted/40">
