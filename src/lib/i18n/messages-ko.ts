@@ -1256,4 +1256,22 @@ export const KO: Record<string, string> = {
   'This project has reached its video generation limit ({limit}). New video generations are blocked.':
     '이 프로젝트의 영상 생성 한도({limit}회)를 모두 사용했어요. 새 영상 생성이 제한돼요.',
   'Regenerating previz': 'Previz 재생성 중',
+
+  // ── 누락 보충(2026-08-28) — 사전에 없어 한국어 화면에 영어가 그대로 나오던 것들 ──
+  'Generate storyboard': '스토리보드 생성',
+  'Node': '노드',
+  'Create scene': '씬 만들기',
+  'Untitled': '제목 없음',
+  'Locked': '잠김',
+  'Failed to create project': '프로젝트를 만들지 못했어요',
+  'Include the last shot frame': '직전 샷의 마지막 프레임 넣기',
+  'Reference project': '참조 프로젝트',
+  'No reference project': '참조 프로젝트 없음',
+  'Reference project locked': '참조 프로젝트 잠김',
+  'Reference projects are available on P-10+ plans.': '참조 프로젝트는 P-10 이상 요금제에서 쓸 수 있어요.',
+  'Optionally copy assets from an existing project in this workspace.': '이 워크스페이스의 기존 프로젝트에서 에셋을 가져올 수 있어요. 선택 사항이에요.',
+  'Some reference assets could not be copied to the new project.': '일부 참조 에셋을 새 프로젝트로 가져오지 못했어요.',
+  'Batch generation failed': '일괄 생성에 실패했어요',
+  'Generated {count} live-action storyboard shots': '실사 스토리보드 {count}개를 만들었어요',
+  'No shots to generate — only shots with a rough panel and no image yet are eligible.': '생성할 샷이 없어요. 러프 그림이 있고 아직 이미지가 없는 샷만 대상이에요.',
 }
