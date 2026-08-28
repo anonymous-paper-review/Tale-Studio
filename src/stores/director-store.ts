@@ -2234,6 +2234,18 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 httpStatus: res.status,
                 error: body.error ?? `HTTP ${res.status}`,
               })
+              if (notifyIfQuotaExceeded(res.status, body)) {
+                get().updateNodeData<'shot'>(shotNodeId, {
+                  storyboardImage: {
+                    url: prevUrl,
+                    status: 'pending',
+                    errorMessage: null,
+                    generatedAt: data.storyboardImage?.generatedAt ?? 0,
+                  },
+                })
+                releaseAction(`director:storyboard:${shotNodeId}`)
+                return null
+              }
               throw new Error(body.error ?? `HTTP ${res.status}`)
             }
             const { jobId } = (await res.json()) as { jobId: string }

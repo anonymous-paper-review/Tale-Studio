@@ -6,6 +6,7 @@ import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { refreshGenerationQueue } from '@/lib/generation-queue'
+import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   GeneratedImage,
@@ -221,7 +222,11 @@ function ShotCell({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ projectId: cardProjectId, shotIds: [writerShotId], force: true }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        if (notifyIfQuotaExceeded(res.status, body)) return
+        throw new Error(`HTTP ${res.status}`)
+      }
       refreshGenerationQueue() // 다음 폴링 틱을 기다리지 않고 카드 오버레이를 켠다(#f10)
       toast.success(t('Previz regeneration started — this card updates when the new frames land.'))
     } catch (e) {
