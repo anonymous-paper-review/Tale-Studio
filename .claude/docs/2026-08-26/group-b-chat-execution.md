@@ -5,8 +5,14 @@
 > 갱신(2026-08-27): 계측·서버 저장(chat_traces)·job 연결(chat_trace_id)·승인 집계가 origin/main에
 > 착륙(27ebaf3), migration 원격 적용. **논의 #1·#2(자동실행경계·B3 의도분류) 결정 완료 +
 > Artist 실제 UI E2E 실측 완료(2026-08-27). 결정 구현 착륙(2026-08-28, 0c45689): Director 이미지·
-> Producer→Writer 최초 실행도 승인 카드 뒤로 + 프롬프트 hybrid_intent_rule. 남은 것: Director/Writer
-> 실제 UI 실측, 부수 요소(아래 표 참고).**
+> Producer→Writer 최초 실행도 승인 카드 뒤로 + 프롬프트 hybrid_intent_rule.**
+>
+> 갱신(2026-08-28 저녁, 배포 실측): **Director 이미지 카드 완주**(화개장터 Shot 1 → 카드 → 승인 →
+> shot_storyboard job completed+result) + **Writer 최초 실행 카드 완주**(가을 QC 프로젝트 → 카드 → 승인 →
+> 씬 스토리 초안 생성) + **빈 필수값 핸드오프 차단 실측**. 발견: 영상 요청에 "생성할게요" 후 침묵 skip
+> (계측은 정직, 대화 문구는 거짓) → 5f294cc로 수정(video_request_rule + 클라 방어선). 핸드오프
+> 최소 준비값(오너 결정)도 5f294cc: hard 차단 유지 + soft는 "퀄리티 떨어질 수 있음" 멘트와 함께 진행.
+> 남은 것: 의도 분류 빗나감 빈도 측정(새 프롬프트 배포 후 기준), 부수 요소(아래 표 참고).
 >
 > 발행 리포트: `.claude/docs/2026-08-28/group-b-approval-report.html` — 복구·실측·결정·구현 전체를 한 장으로.
 
