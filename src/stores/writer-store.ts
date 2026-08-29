@@ -16,6 +16,7 @@ import { resolveChatShotId } from '@/lib/writer/chat-id-resolve'
 import { useProjectStore } from '@/stores/project-store'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { isDemoSession } from '@/lib/demo/context'
+import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 // store 액션은 훅을 못 쓴다 — translate() + 현재 locale 직접 조회로 useT() 없이 번역(#i18n-s5-batch3).
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -700,6 +701,26 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
+        // 상한(429)이면 안내하고, 위에서 낙관적으로 걸어둔 generating 표시를 pending 으로 되돌린다.
+        //   안 되돌리면 생성이 시작되지도 않았는데 화면은 계속 도는 것처럼 보인다.
+        if (notifyIfQuotaExceeded(res.status, body)) {
+          set((state) => ({
+            shots: state.shots.map((sh) =>
+              sh.shotId === shotId
+                ? {
+                    ...sh,
+                    previzVideo: {
+                      url: sh.previzVideo?.url ?? '',
+                      status: 'pending',
+                      errorMessage: null,
+                      generatedAt: sh.previzVideo?.generatedAt ?? 0,
+                    },
+                  }
+                : sh,
+            ),
+          }))
+          return
+        }
         throw new Error(body.error ?? `HTTP ${res.status}`)
       }
       const { jobId } = (await res.json()) as { jobId: string }

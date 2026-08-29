@@ -11,6 +11,7 @@ import {
   setDemoSnapshot,
   readDemoToken,
 } from '@/lib/demo/context'
+import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 
 /* eslint-disable @typescript-eslint/no-require-imports -- Lazy store imports avoid circular Zustand dependencies. */
 export type ArtistAssetProgress = { ready: number; total: number }
@@ -214,7 +215,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       // 재시도 수락(200) 또는 이미 큐잉됨(409) → 실패·stalled 해제 → useArtistLockPoll 이 다시 폴링.
       if (res.ok || res.status === 409) {
         set({ artistImagesFailed: false, artistImagesStalled: false })
+        return
       }
+      // 상한(429)이면 안내한다 — 안 하면 재시도 버튼이 아무 말 없이 실패한다.
+      const body = await res.json().catch(() => ({}))
+      notifyIfQuotaExceeded(res.status, body)
     } catch {
       // 네트워크 실패 → 플래그 유지(CTA 유지, 재클릭 가능).
     }
