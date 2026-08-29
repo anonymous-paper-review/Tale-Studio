@@ -801,7 +801,11 @@ morning)
   sh "$0" resume-session || true
   # 브라우저 회귀 최소안 (2026-08-25 오너 결정, 계약 §6a): 메인 체크아웃에서
   # 로그인 후 화면들이 실제로 뜨는지만 확인하고 로그를 남긴다. 전제 없으면 skip(exit 0)이라 안전하다.
-  ( cd "$PROJECT_ROOT" && pnpm smoke --auth >> "$HOME/Library/Logs/tale-studio-night/morning-smoke.log" 2>&1 ) &
+  # 앞단에서 돈다 — 배경(&)으로 띄우면 이 스크립트가 곧바로 끝나면서 launchd 가 프로세스
+  # 그룹째 거두어 스모크가 시작하자마자 죽는다 (2026-08-30 밤 실측: 배경 3회 전부 3초 내 종료,
+  # 앞단·AbandonProcessGroup 대조 2건은 생존). 스모크는 전제 미충족이면 즉시 exit 0 이고
+  # dev 서버 대기 60초·페이지당 10초로 상한이 있어 아침 작업을 붙잡지 않는다.
+  ( cd "$PROJECT_ROOT" && pnpm smoke --auth >> "$HOME/Library/Logs/tale-studio-night/morning-smoke.log" 2>&1 )
   ;;
 
 push-inbox)

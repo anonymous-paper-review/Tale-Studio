@@ -101,6 +101,18 @@ describe('night launcher/runtime contract', () => {
     expect(source).toContain('deadline = min(lease_until, morning.timestamp())')
   })
 
+  it('runs the morning smoke in the foreground with a tool PATH so launchd cannot reap it', () => {
+    const source = readFileSync(launcher, 'utf8')
+    const morning = source.slice(source.indexOf('\nmorning)'), source.indexOf('\npush-inbox)'))
+    // launchd 는 스크립트가 끝나면 프로세스 그룹째 거둔다. 배경(&)으로 띄우면 스모크가
+    // 시작하자마자 죽어 브라우저 회귀 최소안(계약 §6a·§9)이 한 번도 돌지 않는다.
+    expect(morning).toContain('pnpm smoke --auth >> "$HOME/Library/Logs/tale-studio-night/morning-smoke.log" 2>&1 )\n')
+    expect(morning).not.toMatch(/pnpm smoke --auth[^\n]*\)\s*&/)
+    // PATH 보강이 스모크 호출보다 앞에 있어야 pnpm 을 찾는다.
+    expect(morning).toMatch(/PATH="\$HOME\/\.local\/bin[\s\S]*pnpm smoke --auth/)
+    expect(morning).toContain('export PATH')
+  })
+
   it('owns a background watchdog and preserves committing rather than overwriting it', () => {
     const source = readFileSync(launcher, 'utf8')
     expect(source).toContain("python3 - <<'PY' &")
