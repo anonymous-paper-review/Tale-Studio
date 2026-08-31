@@ -16,7 +16,9 @@ const mocks = vi.hoisted(() => ({
   templateAssetUrl: vi.fn(),
   from: vi.fn(),
   webhookBaseUrl: 'https://base.test' as string | null,
-  DEFAULT_IMAGE_MODEL: 'openai/gpt-image-2',
+  // #owner-default(2026-08-31): generate-sheet 는 image-models.ts 의 DEFAULT_IMAGE_MODEL(nano-banana) 를 쓁다.
+  //   generate-storyboard 는 여전히 @/lib/writer/llm/fal 의 DEFAULT_EDIT_IMAGE_MODEL(gpt-image-2/edit) 를 쓰므로 둘 다 유지.
+  DEFAULT_IMAGE_MODEL: 'fal-ai/nano-banana',
   DEFAULT_EDIT_IMAGE_MODEL: 'openai/gpt-image-2/edit',
 }))
 
@@ -236,14 +238,14 @@ describe('style-anchor route integration', () => {
     const expectedPrompt = `${STYLE_ANCHOR_CLAUSE}\n${STYLE_ANCHOR_TEMPLATE_CLAUSE}\n${buildCharacterTurnaroundPrompt(sheetPromptInput(character, designTokens))}`
     expect(response.status).toBe(200)
     expect(firstFalOpts()).toEqual({
-      model: DEFAULT_EDIT_IMAGE_MODEL,
+      model: 'fal-ai/nano-banana/edit',
       prompt: expectedPrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       webhookUrl: WEBHOOK_URL,
       aspect_ratio: '16:9',
     })
     expect(firstGenerationJobArg().inputSnapshot).toMatchObject({
-      model: DEFAULT_EDIT_IMAGE_MODEL,
+      model: 'fal-ai/nano-banana/edit',
       prompt: expectedPrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       aspect_ratio: '16:9',
@@ -354,7 +356,8 @@ describe('style-anchor route integration', () => {
 
     expect(response.status).toBe(200)
     expect(firstFalOpts()).toEqual({
-      model: DEFAULT_EDIT_IMAGE_MODEL,
+      // #owner-default(2026-08-31): 이 경로는 image-models.ts 의 resolveImageEndpoint 를 거치므로 DEFAULT_IMAGE_MODEL(nano-banana)의 edit 갈래.
+      model: 'fal-ai/nano-banana/edit',
       prompt: buildCharacterViewPrompt(sheetPromptInput(character, designTokens), 'back'),
       reference_image_urls: ['https://img/main.png'],
       webhookUrl: WEBHOOK_URL,
@@ -569,8 +572,10 @@ describe('style-anchor route integration', () => {
     })
     expect(falOptsAt(0)).not.toHaveProperty('aspect_ratio')
     expect(falOptsAt(0).prompt).not.toContain(STYLE_ANCHOR_CLAUSE)
+    // draft-trigger.ts 는 image-models.ts 레지스트리와 무관한 자체 DRAFT_MODEL(openai/gpt-image-2)
+    //   상수를 쓴다 (본 태스크 범위 밖 파일 — #owner-default 2026-08-31에서 미수정).
     expect(falOptsAt(1)).toEqual({
-      model: DEFAULT_IMAGE_MODEL,
+      model: 'openai/gpt-image-2',
       prompt: buildCharacterTurnaroundPrompt(draftPromptInput(fallbackPerson)),
       aspect_ratio: '3:2',
       webhookUrl: WEBHOOK_URL,

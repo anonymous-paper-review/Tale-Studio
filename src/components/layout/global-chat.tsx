@@ -1278,6 +1278,26 @@ export function GlobalChat() {
               {t('One conversation that continues across every stage')}
             </span>
           </div>
+          {/* 다음 단계 호출 칩(#owner-handoff-reentry 2026-08-31) — 제안 카드를 '나중에'로
+              내리면 다시 열 진입점이 사라진다는 오너 실측. 헤더에 상시 노출해 언제든 같은
+              수렴 경로(버튼=타이핑)로 재개할 수 있게 한다. */}
+          {(() => {
+            const handoff = handoffFrom(currentStage)
+            if (!handoff) return null
+            return (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() =>
+                  void sendMessage(t(handoff.utterance), undefined, { consentedHandoff: true })
+                }
+                title={t(handoff.label)}
+                className="shrink-0 rounded-full border border-border px-2 text-[10px] font-medium leading-5 text-foreground transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+              >
+                {t(handoff.label)}
+              </button>
+            )
+          })()}
           <Button
             size="icon-sm"
             variant="ghost"

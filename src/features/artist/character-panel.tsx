@@ -11,29 +11,14 @@ import {
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
 import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle'
-import { sameCharacterAppearanceSlot, useArtistStore, type CharacterRole } from '@/stores/artist-store'
-import { useProjectStore } from '@/stores/project-store'
+import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
-import {
-  CHARACTER_VIEW_LABELS,
-  type CharacterViewKey,
-} from '@/types/asset'
+import { type CharacterViewKey } from '@/types/asset'
 
 import { cn } from '@/lib/utils'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
 import { useT } from '@/lib/i18n'
-
-// useSyncExternalStore 안정 스냅샷: selector 가 매 호출 새 [] 를 반환하면 무한루프(getServerSnapshot
-//   should be cached). 폴백은 모듈레벨 frozen 상수로 참조 고정한다.
-const EMPTY_REQUIRED_IDS: readonly string[] = Object.freeze([])
-
-// 라벨은 영어 원문 = i18n 사전 키 (#i18n-s5) — 렌더에서 t() 를 통과한다.
-const ROLE_TOGGLE: { value: CharacterRole; label: string }[] = [
-  { value: 'protagonist', label: 'Protagonist' },
-  { value: 'antagonist', label: 'Antagonist' },
-  { value: 'supporting', label: 'Supporting' },
-]
 
 // columns: 보드 축척(#d1) — 1(기존 세로 스택)~3열 그리드. 페이지 헤더의 슬라이더가 결정.
 // onZoomStep: Ctrl+휠 축척(#d1 2026-07-15) — 이벤트 방향당 1단계(쿨다운), 브라우저 줌 차단.
@@ -60,7 +45,6 @@ export function CharacterPanel({
     selectCharacter,
   } = useArtistStore()
 
-  const requiredCharacterIds = useProjectStore((s) => s.lifecycleStatus.artist?.requiredCharacterIds ?? EMPTY_REQUIRED_IDS)
   // 입력창에 @멘션돼 있는 카드 하이라이트(#artist-mention) — producer 카드와 동일. artist 의
   //   mentionItems 는 이름을 라벨로 쓰므로(id 아님) 이름 기준으로 대조한다.
   const mentionedRefs = useChatUiStore((s) => s.mentionedRefs)
@@ -119,9 +103,6 @@ export function CharacterPanel({
               ? generatingViews.some((slot) => sameCharacterAppearanceSlot(slot, char.characterId, appearance.appearanceKey, v))
               : false
           const isObject = char.entityType === 'object'
-          // 캐릭터=턴어라운드 시트 1장, 사물=단일 이미지 — 둘 다 main 하나로 판정(#7).
-          const hasMainImage = Boolean(appearance?.sheetUrl)
-          const isRequired = requiredCharacterIds.includes(char.characterId)
           const bgScenes = getBackgroundScenes(char.characterId)
 
 
@@ -218,7 +199,11 @@ export function CharacterPanel({
                   'mention-flash ring-2 ring-sky-400/70 border-sky-400/50 bg-sky-400/10',
               )}
             >
-              {/* Header: 편집 가능한 이름 + 역할 토글 + 배지 (인라인 편집 — 팝업 없음) */}
+              {/* Header: 편집 가능한 이름만(#f8 2026-08-31 오너) — 역할·필수 배지는 카드 얼굴에서
+                  걷어냈다(과밀 신고). 역할은 원래도 카드에서 편집 불가(채팅 전용, #3)라 표시만
+                  사라지고 기능 손실은 없다. requiredCharacterIds 게이트 로직(lib/lifecycle.ts)는
+                  이 컴포넌트와 무관하게 그대로 유지된다 — 파생 표시용 변수(hasMainImage/isRequired)만
+                  카드에서 거뒀다. */}
               <div className="mb-3 space-y-2">
                 <div className="flex items-center gap-2">
                   {/* 이름은 채팅으로만 변경 — 수동 편집 불가(#2). */}
@@ -226,20 +211,6 @@ export function CharacterPanel({
                     {char.name || (isObject ? t('Object') : t('Character'))}
                   </span>
                   {isObject ? <Badge variant="secondary">{t('Object')}</Badge> : null}
-                  {isRequired && (
-                    <Badge
-                      variant={hasMainImage ? 'outline' : 'destructive'}
-                      className="text-[10px]"
-                      // #f7(2026-08-26 오너): '필수'의 색 의미가 불명이었다 — 뜻을 툴팁으로 말한다.
-                      title={
-                        hasMainImage
-                          ? t('Required for Director: this character appears in shots, and its main image is ready.')
-                          : t('Required for Director: this character appears in shots — red means its main image is still missing.')
-                      }
-                    >
-                      {t('Required')}
-                    </Badge>
-                  )}
                   {viewFailures[char.characterId] &&
                     Object.keys(viewFailures[char.characterId]).length > 0 && (
                       <Badge variant="destructive" className="text-[10px]">
@@ -247,12 +218,6 @@ export function CharacterPanel({
                       </Badge>
                     )}
                 </div>
-                {/* 역할은 채팅으로만 변경 — 수동 편집 불가(#3). 현재 역할만 읽기전용 배지로 표시. */}
-                {!isObject && (
-                  <Badge variant="outline" className="w-fit text-xs font-normal">
-                    {t(ROLE_TOGGLE.find((r) => r.value === role)?.label ?? role)}
-                  </Badge>
-                )}
               </div>
 
               {/* 모습 탭(#g4 2026-08-27) — 옥화 ┬ 현재 └ 젊은 시절.
@@ -315,6 +280,7 @@ export function CharacterPanel({
                         aspectRatio={isObject ? 'square' : 'video'}
                         imageUrl={appearance?.sheetUrl ?? null}
                         generating={isViewGenerating('main')}
+                        hideCaption
                       />
                     )}
                   </button>

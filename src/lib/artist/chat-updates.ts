@@ -12,12 +12,16 @@ import { isImageModelKey } from '@/lib/image-models'
 
 const VALID_ROLES = new Set(['protagonist', 'antagonist', 'supporting'])
 const VALID_VIEWS = new Set(['main', 'back', 'sideLeft', 'sideRight'])
+const VALID_NARRATIVE_TIMES = new Set(['present', 'past', 'future'])
 
 // 자동 실행(applyUpdates) 허용 type 화이트리스트. 외형(원천) 변경 type 은 의도적으로 제외(F6).
+//   createAppearance(#g4-chat 2026-08-31): 새 모습 "행"을 추가할 뿐 기존 모습을 덮지 않아 changeAppearance 와
+//   달리 원천 mutation 이 아니다 — 무과금(이미지 생성은 별도 요청)이라 자동 실행 화이트리스트에 넣는다.
 export const AUTO_APPLY_UPDATE_TYPES = new Set([
   'createCharacter',
   'regenerateCharacter',
   'regenerateWorldAsset',
+  'createAppearance',
 ])
 
 function asString(x: unknown): string | undefined {
@@ -73,6 +77,23 @@ export function validateUpdates(raw: unknown[]): unknown[] {
           out.push({ type: 'regenerateWorldAsset', locationId: rec.locationId })
         }
         break
+      case 'createAppearance': {
+        const characterId = asString(rec.characterId)?.trim()
+        const label = asString(rec.label)?.trim()
+        const appearance = asString(rec.appearance)?.trim()
+        if (characterId && label && appearance) {
+          out.push({
+            type: 'createAppearance',
+            characterId,
+            label,
+            appearance,
+            ...(typeof rec.narrativeTime === 'string' && VALID_NARRATIVE_TIMES.has(rec.narrativeTime)
+              ? { narrativeTime: rec.narrativeTime }
+              : {}),
+          })
+        }
+        break
+      }
     }
   }
   return out

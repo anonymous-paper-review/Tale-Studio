@@ -39,6 +39,8 @@ interface VideoClipLike {
 interface ShotLike {
   shotId: string
   shotType?: string | null
+  /** 타이틀 카드(#owner-title-card) — 있으면 검은 플레이스홀더 라벨을 카드 텍스트로 대체. */
+  titleCard?: { text: string; imageUrl: string | null } | null
 }
 
 const RECORD_FPS = 30
@@ -331,6 +333,14 @@ export async function renderDraftTimeline(opts: {
     for (let i = 0; i < layout.length; i++) {
       const item = layout[i]
       const shot = shots.find((s) => s.shotId === item.shotId)
+      // 타이틀 카드(#owner-title-card): FFmpeg drawtext 없이도 캔버스 placeholder 경로를 그대로
+      //   재사용해 검은 배경+텍스트를 그린다 — 이미지 합성(이미지 위에 텍스트 오버레이)은 범위 밖(MVP: 텍스트만).
+      if (shot?.titleCard) {
+        activeLabel = shot.titleCard.text || item.shotId
+        videoActive = false
+        await waitUntil(item.startSec + item.durationSec)
+        continue
+      }
       activeLabel = shot?.shotType ? `${item.shotId} · ${shot.shotType}` : item.shotId
       const ready = i === 0 ? firstReady : await prepareSegment(item)
       videoActive = ready

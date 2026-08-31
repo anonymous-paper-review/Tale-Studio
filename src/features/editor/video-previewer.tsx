@@ -3,7 +3,8 @@
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { useEditorStore, selectTimelineLayout } from '@/stores/editor-store'
+import { Textarea } from '@/components/ui/textarea'
+import { useEditorStore, selectTimelineLayout, isTitleCardShotId } from '@/stores/editor-store'
 import { cachedVideoUrl } from '@/features/editor/video-prefetch'
 import { useT } from '@/lib/i18n'
 
@@ -29,6 +30,8 @@ export function VideoPreviewer() {
 
   const [activeShotId, setActiveShotId] = useState<string | null>(null)
   const [actualDuration, setActualDuration] = useState<number | null>(null)
+  // 타이틀 카드 인라인 편집(#owner-title-card) — 프리뷰 더블클릭으로 열림. 저장은 blur/닫기 시.
+  const [editingTitleCard, setEditingTitleCard] = useState(false)
 
   const shots = useEditorStore((s) => s.shots)
   const videoClips = useEditorStore((s) => s.videoClips)
@@ -39,6 +42,8 @@ export function VideoPreviewer() {
   const togglePlay = useEditorStore((s) => s.togglePlay)
   const seek = useEditorStore((s) => s.seek)
   const setMasterVolume = useEditorStore((s) => s.setMasterVolume)
+  const updateTitleCard = useEditorStore((s) => s.updateTitleCard)
+  const pushHistory = useEditorStore((s) => s.pushHistory)
 
   // ── 동기화 루프 ──
   useEffect(() => {
@@ -85,6 +90,7 @@ export function VideoPreviewer() {
         activeIdRef.current = id
         setActiveShotId(id)
         setActualDuration(null)
+        setEditingTitleCard(false)
       }
 
       if (fillRef.current) fillRef.current.style.width = total > 0 ? `${Math.min(100, (t / total) * 100)}%` : '0%'
@@ -135,10 +141,49 @@ export function VideoPreviewer() {
 
   const activeShot = shots.find((s) => s.shotId === activeShotId)
   const activeClip = videoClips.find((c) => c.shotId === activeShotId)
+  // 타이틀 카드(#owner-title-card) 구간 — 영상 없이 검은 배경 + 중앙 텍스트(+선택 이미지)만 렌더.
+  const isTitleCard = !!activeShotId && isTitleCardShotId(activeShotId)
 
   return (
     <div className="relative flex h-full flex-col items-center justify-center bg-black">
-      {activeClip?.url ? (
+      {isTitleCard ? (
+        <div
+          className="flex max-h-full max-w-full flex-col items-center justify-center gap-4 p-8 text-center"
+          onDoubleClick={() => {
+            if (!editingTitleCard) pushHistory()
+            setEditingTitleCard(true)
+          }}
+        >
+          {activeShot?.titleCard?.imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={activeShot.titleCard.imageUrl}
+              alt=""
+              className="max-h-[60%] max-w-full rounded object-contain"
+            />
+          )}
+          {editingTitleCard && activeShotId ? (
+            <Textarea
+              autoFocus
+              value={activeShot?.titleCard?.text ?? ''}
+              onChange={(e) => updateTitleCard(activeShotId, { text: e.target.value })}
+              onBlur={() => setEditingTitleCard(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) {
+                  e.preventDefault()
+                  setEditingTitleCard(false)
+                }
+              }}
+              placeholder={t('Title text')}
+              className="max-w-[520px] resize-none border-white/30 bg-black/40 text-center text-2xl font-semibold text-white placeholder:text-white/40"
+            />
+          ) : (
+            <p className="max-w-[520px] cursor-text whitespace-pre-wrap text-2xl font-semibold text-white">
+              {activeShot?.titleCard?.text || t('(Empty title) — double-click to edit')}
+            </p>
+          )}
+        </div>
+      ) : activeClip?.url ? (
         <video
           key={activeShotId ?? 'none'}
           ref={videoRef}

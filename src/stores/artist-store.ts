@@ -97,6 +97,13 @@ export type ArtistUpdate =
     }
   | { type: 'regenerateWorldAsset'; locationId: string }
   | ({ type: 'createCharacter' } & NewCharacterInput)
+  | {
+      type: 'createAppearance'
+      characterId: string
+      label: string
+      appearance: string
+      narrativeTime?: NarrativeTime
+    }
 
 /** 생성 트리거 주체. `auto`는 Artist 자동 first-fill 내부 표식이며 서버 job actor 로는 ui 처리된다. */
 export type GenerationActor = 'ui' | 'chat' | 'auto'
@@ -441,6 +448,20 @@ interface ArtistState {
     characterId: string,
     appearanceKey: string,
     appearance: string,
+  ) => Promise<void>
+  /** 새 외형 타임라인 행 생성(#g4-chat 2026-08-31) — 무과금. 채팅 createAppearance / 향후 UI 공용. */
+  createAppearance: (
+    characterId: string,
+    label: string,
+    appearance: string,
+    narrativeTime?: NarrativeTime,
+  ) => Promise<void>
+  /** 후보 히스토리에서 이전 이미지를 선택본으로 되돌린다(#owner-keep-prev 2026-08-31). 무과금 — DB flip만. */
+  selectCandidate: (
+    characterId: string,
+    appearanceKey: string,
+    view: CharacterViewKey,
+    candidateId: string,
   ) => Promise<void>
   reset: () => void
 }
@@ -1370,6 +1391,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         }
       } else if (u.type === 'regenerateWorldAsset') {
         await get().generateWorldAsset(u.locationId, 'chat')
+      } else if (u.type === 'createAppearance') {
+        await get().createAppearance(u.characterId, u.label, u.appearance, u.narrativeTime)
       }
     }
   },
@@ -1414,6 +1437,92 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         a.characterId === characterId ? { ...a, fixedPrompt: appearance, appearanceNative: appearance } : a,
       ),
     })),
+
+  // 채팅 createAppearance(#g4-chat 2026-08-31) 배선 — 새 서사 시점 모습 "행"만 만든다. 이미지 생성은
+  //   트리거하지 않는다(무과금 원칙). 서버가 appearance_key(label 슬러그 + 중복 suffix)를 정해 반환.
+  createAppearance: async (characterId, label, appearance, narrativeTime) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) throw new Error('A project is required to create an appearance')
+    const res = await fetch('/api/artist/character-appearance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, characterId, label, appearance, narrativeTime }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    const created = (await res.json()) as {
+      appearanceKey: string
+      label: string
+      narrativeTime: NarrativeTime | null
+      appearance: string | null
+      appearanceNative: string | null
+    }
+    set((state) => ({
+      characterAssets: state.characterAssets.map((c) =>
+        c.characterId === characterId
+          ? {
+              ...c,
+              appearances: [
+                ...c.appearances,
+                {
+                  appearanceKey: created.appearanceKey,
+                  label: created.label,
+                  isDefault: false,
+                  narrativeTime: created.narrativeTime,
+                  sheetUrl: null,
+                  portraitUrl: null,
+                  appearance: created.appearance,
+                  appearanceNative: created.appearanceNative,
+                  viewCandidates: {},
+                },
+              ],
+            }
+          : c,
+      ),
+    }))
+  },
+
+  // 후보 히스토리에서 이전 이미지를 선택본으로 되돌린다(#owner-keep-prev 2026-08-31) —
+  //   finalize 는 슬롯당 최근 N장을 보관하므로(selectCandidatesToEvict) 이 액션이 그 보관분을 되살린다.
+  //   재생성 없이 DB flip만 하므로 fal 과금이 없다.
+  selectCandidate: async (characterId, appearanceKey, view, candidateId) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    const res = await fetch('/api/artist/select-candidate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, characterId, appearanceKey, view, candidateId }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      set({ error: body.error ?? `Candidate selection failed HTTP ${res.status}` })
+      return
+    }
+    const { url } = (await res.json()) as { url: string }
+    set((state) => ({
+      characterAssets: state.characterAssets.map((c) => {
+        if (c.characterId !== characterId) return c
+        return {
+          ...c,
+          appearances: c.appearances.map((a) => {
+            if (a.appearanceKey !== appearanceKey) return a
+            const prevCandidates = a.viewCandidates[view] ?? []
+            const nextCandidates = prevCandidates.map((cand) => ({
+              ...cand,
+              isSelected: cand.id === candidateId,
+            }))
+            return {
+              ...a,
+              sheetUrl: view === 'main' ? url : a.sheetUrl,
+              viewCandidates: { ...a.viewCandidates, [view]: nextCandidates },
+            }
+          }),
+        }
+      }),
+    }))
+  },
 
   reset: () =>
     set({

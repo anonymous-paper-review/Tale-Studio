@@ -14,6 +14,30 @@ describe('renderInlineMarkdown (C6 chat markdown)', () => {
     expect(renderInlineMarkdown('a _기울임_ b')).toContain('<em>기울임</em>')
   })
 
+  it('strips __bold__(밑줄 2개) markers to plain text (오너 실측: 밑줄 노출)', () => {
+    const out = renderInlineMarkdown('__A__')
+    expect(out).not.toContain('_')
+    expect(out).toBe('A')
+  })
+
+  it('strips __bold__ mixed with sentence, no leftover underscore or <strong>', () => {
+    const out = renderInlineMarkdown('이건 __굵게__ 입니다')
+    expect(out).toBe('이건 굵게 입니다')
+    expect(out).not.toContain('__')
+    expect(out).not.toContain('<strong>')
+  })
+
+  it('strips leading #/##/### heading markers but keeps the body text', () => {
+    expect(renderInlineMarkdown('## Title')).toBe('Title')
+    expect(renderInlineMarkdown('# 제목')).toBe('제목')
+    expect(renderInlineMarkdown('### 서브제목')).toBe('서브제목')
+    expect(renderInlineMarkdown('## Title')).not.toContain('#')
+  })
+
+  it('does not strip a mid-line # (only line-start heading markers)', () => {
+    expect(renderInlineMarkdown('use tag #hello here')).toContain('#hello')
+  })
+
   it('renders `code` as <code>', () => {
     expect(renderInlineMarkdown('use `npm run` here')).toContain('<code')
     expect(renderInlineMarkdown('use `npm run` here')).toContain('npm run</code>')

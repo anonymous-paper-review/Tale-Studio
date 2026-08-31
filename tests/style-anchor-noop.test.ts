@@ -71,8 +71,9 @@ const WRITER_SHOT_ID = 'writer-shot-1'
 const WEBHOOK_URL = 'https://hook.test/webhook'
 const BASE_URL = 'https://base.test'
 const TEMPLATE_URL = `${BASE_URL}/character-template.png`
-const DEFAULT_IMAGE_MODEL = 'openai/gpt-image-2'
-const DEFAULT_EDIT_IMAGE_MODEL = 'openai/gpt-image-2/edit'
+// #owner-default(2026-08-31): generate-sheet 는 image-models.ts 의 DEFAULT_IMAGE_MODEL(nano-banana) 로 엔드포인트를 고른다.
+const DEFAULT_IMAGE_MODEL = 'fal-ai/nano-banana'
+const DEFAULT_EDIT_IMAGE_MODEL = 'fal-ai/nano-banana/edit'
 
 interface DesignTokens {
   l1?: {
@@ -388,8 +389,10 @@ describe('style-anchor Phase 0 no-op characterization', () => {
 
     expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
     expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
+    // draft-trigger.ts 는 image-models.ts 레지스트리와 무관한 자체 하드코딩 모델(openai/gpt-image-2)을 쓴다
+    //   (#owner-default 2026-08-31에서 미수정 — 본 태스크 범위 밖).
     expect(falOptsAt(0)).toEqual({
-      model: DEFAULT_EDIT_IMAGE_MODEL,
+      model: 'openai/gpt-image-2/edit',
       prompt: buildCharacterTurnaroundPrompt(draftPromptInput(templatePerson)),
       reference_image_urls: [TEMPLATE_URL],
       webhookUrl: WEBHOOK_URL,
@@ -401,8 +404,9 @@ describe('style-anchor Phase 0 no-op characterization', () => {
       view: 'main',
     })
     expect(falOptsAt(0).prompt).not.toContain('STYLE REFERENCE')
+    // draft-trigger.ts DRAFT_MODEL 은 image-models.ts 와 무관한 자체 하드코딩(openai/gpt-image-2) — 미수정.
     expect(falOptsAt(1)).toEqual({
-      model: DEFAULT_IMAGE_MODEL,
+      model: 'openai/gpt-image-2',
       prompt: buildCharacterTurnaroundPrompt(draftPromptInput(fallbackPerson)),
       aspect_ratio: '3:2',
       webhookUrl: WEBHOOK_URL,

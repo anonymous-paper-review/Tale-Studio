@@ -568,6 +568,12 @@ export const KO: Record<string, string> = {
   'Tone — fill this in for a better script': '톤 — 채우면 각본 퀄이 올라가요',
   'e.g. dark': '예: dark',
   'Dialogue language': '대사 언어',
+  'Chat language': '채팅 언어',
+  'Chat replies and the generated story follow this language.':
+    '채팅 응답과 생성되는 이야기가 이 언어를 따라요.',
+  'It currently differs from your UI language.': '지금 화면 언어와 달라요.',
+  "Couldn't save your language setting — new projects may not follow it. Please try again.":
+    '언어 설정을 저장하지 못했어요 — 새 프로젝트가 이 언어를 따르지 않을 수 있어요. 다시 시도해 주세요.',
   'Production journey': '제작 여정',
   'Story seed': '이야기 씨앗',
   'One scene, one feeling is enough — drop it in chat.': '장면 하나, 기분 하나면 충분해요 — 채팅에 던져 보세요.',
@@ -699,6 +705,10 @@ export const KO: Record<string, string> = {
   'Generate {label}': '{label} 생성',
   'Bypass retry limit reached': '우회 재시도 한도 도달',
   'Redo with bypass (safe)': '우회(safe)로 다시 만들기',
+  'Candidate history': '후보 히스토리',
+  'Candidate image': '후보 이미지',
+  'Pre-look': '룩 이전',
+  'Pre-edit': '외형 이전',
   // 이미지 생성 모델 선택(image-models 레지스트리) — 'Image generation model' 키는 위에 이미 있어 재사용.
   'This model has no reference support — character identity may drift.':
     '이 모델은 참조 이미지를 지원하지 않아 캐릭터 얼굴이 흔들릴 수 있어요.',
@@ -1252,6 +1262,14 @@ export const KO: Record<string, string> = {
     '이전 단계를 먼저 완료하면 영상 클립이 여기에 나타나요.',
   'Go to Director': 'Director로 이동',
 
+  // ── Editor: 타이틀 카드(#owner-title-card) — 검은 배경 + 텍스트(+선택 이미지) synthetic 클립 ──
+  'Title Card': '타이틀 카드',
+  'Insert a black title card with text at the nearest clip boundary':
+    '가장 가까운 클립 경계에 검은 배경의 타이틀 카드를 넣어요',
+  'Title text': '타이틀 텍스트',
+  '(Empty title) — double-click to edit': '(빈 타이틀) — 더블클릭해서 입력하세요',
+  Title: '타이틀',
+
   // ── Editor: Draft Render(#draft-render) — 타임라인 이어붙여 파일 저장 ──
   'Draft Render': '드래프트 렌더',
   'Concatenate every clip in order and save as one video file':
@@ -1275,10 +1293,6 @@ export const KO: Record<string, string> = {
   'Back view': '뒷모습',
   'Side view (left)': '측면(왼쪽)',
   'Side view (right)': '측면(오른쪽)',
-  'Required for Director: this character appears in shots, and its main image is ready.':
-    'Director 진행에 필요한 캐릭터예요 — 샷에 등장하며, 대표 이미지가 준비됐어요.',
-  'Required for Director: this character appears in shots — red means its main image is still missing.':
-    'Director 진행에 필요한 캐릭터예요 — 샷에 등장하는데, 빨간색은 아직 대표 이미지가 없다는 뜻이에요.',
   'Edit directing': '연출 편집',
   "Redraws this shot's rough 3-frame set with the writer pipeline":
     '이 샷의 러프 3프레임을 writer 파이프라인으로 다시 그려요',

@@ -52,7 +52,8 @@ export interface ImageModelSpec {
   pricePerImage: number | null
 }
 
-export const DEFAULT_IMAGE_MODEL: ImageModelKey = 'gpt-image-2'
+// #owner-default(2026-08-31): Artist 기본 이미지 모델을 nano-banana 로 변경(오너 지시).
+export const DEFAULT_IMAGE_MODEL: ImageModelKey = 'nano-banana'
 
 export const IMAGE_MODELS: Record<ImageModelKey, ImageModelSpec> = {
   'gpt-image-2': {
@@ -105,8 +106,8 @@ export const IMAGE_MODELS: Record<ImageModelKey, ImageModelSpec> = {
 
 /** 팝업/채팅/패널에 노출하는 순서 (기본 모델 먼저). */
 export const IMAGE_MODEL_ORDER: ImageModelKey[] = [
-  'gpt-image-2',
   'nano-banana',
+  'gpt-image-2',
   'seedream-4',
   'flux-2-klein',
   'grok-imagine',

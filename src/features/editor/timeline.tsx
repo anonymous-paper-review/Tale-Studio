@@ -1,11 +1,11 @@
 'use client'
 
 import { useRef, useCallback, useMemo, useEffect, useState } from 'react'
-import { Trash2, Plus, Volume2, VolumeX, Scissors, Gauge } from 'lucide-react'
+import { Trash2, Plus, Volume2, VolumeX, Scissors, Gauge, Type } from 'lucide-react'
 import type { Shot, VideoClip, AudioTrackClip, AudioSource } from '@/types'
 import { cn } from '@/lib/utils'
 import { ingestAudioFile, drawWaveform } from '@/lib/audio-waveform'
-import { PX_PER_SEC_MIN, PX_PER_SEC_MAX } from '@/stores/editor-store'
+import { PX_PER_SEC_MIN, PX_PER_SEC_MAX, isTitleCardShotId } from '@/stores/editor-store'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -848,7 +848,14 @@ export function Timeline({
                         style={{ left, width: Math.max(width, 8) }}
                       >
                         <div className="pointer-events-none flex h-full w-full items-center justify-center bg-muted text-[8px] text-muted-foreground">
-                          {clip?.url ? (
+                          {isTitleCardShotId(item.shotId) ? (
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 bg-black px-1 text-center">
+                              <Type className="size-3 text-white/60" />
+                              <span className="line-clamp-2 text-[7px] leading-tight text-white/80">
+                                {shot.titleCard?.text || t('Title')}
+                              </span>
+                            </div>
+                          ) : clip?.url ? (
                             <video src={clip.url} poster={clip.thumbnailUrl ?? thumbUrl(shot.referenceImageUrl)} className="h-full w-full object-cover" muted preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'} draggable={false} />
                           ) : shot.referenceImageUrl ? (
                             <ThumbImage src={shot.referenceImageUrl} alt={shot.shotType} className="h-full w-full object-cover" draggable={false} />
@@ -857,7 +864,7 @@ export function Timeline({
                           )}
                         </div>
                         <span className="pointer-events-none absolute left-1 top-0.5 rounded bg-black/60 px-1 font-mono text-[8px] text-white">
-                          {shot.shotType}
+                          {isTitleCardShotId(item.shotId) ? t('Title') : shot.shotType}
                           {clip?.speed && clip.speed !== 1 && <span className="ml-1 text-primary">{clip.speed.toFixed(2)}×</span>}
                         </span>
                         {/* 트림 핸들 (요청): 점선 미리보기 → 드롭 시 적용. 원본 길이 초과 불가. */}

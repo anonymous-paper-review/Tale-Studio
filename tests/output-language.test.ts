@@ -11,6 +11,10 @@ describe('outputLanguageClause', () => {
     expect(c).toContain('영어(English)')
     expect(c).toContain('그 규칙이 우선한다')
   })
+  it('영문 대문자 시작 규칙 포함(오너 지시 2026-08-31)', () => {
+    const c = outputLanguageClause('en')
+    expect(c).toContain('대문자로 시작')
+  })
   it('ko: 한국어 강제 절', () => {
     expect(outputLanguageClause('ko')).toContain('한국어로 작성한다')
   })

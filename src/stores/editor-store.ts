@@ -50,15 +50,21 @@ const speedPersistTimers = new Map<string, ReturnType<typeof setTimeout>>()
 // Per-shot debounce timers for trim persist (300ms) — speed 와 동일 패턴 (#a3-state-loss)
 const trimPersistTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-// 컷/드래그-투-애드가 만드는 로컬 전용 조각(shot_id 에 __c/__i 접미).
+// 컷/드래그-투-애드/타이틀카드가 만드는 로컬 전용 조각(shot_id 에 __c/__i/__t 접미).
 //   DB shots 에 행이 없으므로 트림 write-through 대상에서 제외하고,
-//   loadPersisted 가 editor_states 스냅샷에서 복원한다 (#a3-state-loss).
-const SYNTHETIC_SHOT_RE = /__(?:c|i)[A-Za-z0-9-]+$/
+//   loadPersisted 가 editor_states 스냅샷에서 복원한다 (#a3-state-loss, #owner-title-card).
+const SYNTHETIC_SHOT_RE = /__(?:c|i|t)[A-Za-z0-9-]+$/
 export function isSyntheticShotId(shotId: string): boolean {
   return SYNTHETIC_SHOT_RE.test(shotId)
 }
 export function baseShotIdOf(shotId: string): string {
   return shotId.replace(SYNTHETIC_SHOT_RE, '')
+}
+
+// 타이틀 카드 판별(#owner-title-card) — __t 접미. baseShotIdOf 대상이 없다(독립 클립, 원본 shot 미연결).
+const TITLE_CARD_RE = /__t[A-Za-z0-9-]+$/
+export function isTitleCardShotId(shotId: string): boolean {
+  return TITLE_CARD_RE.test(shotId)
 }
 
 // 고유 id 생성. 모듈 카운터는 HMR/새로고침 후 리셋되어 영속화된 id 와 충돌(audio_1 중복 등)
@@ -139,6 +145,11 @@ interface EditorState {
   splitVideoClipAt: (shotId: string, atGlobalSec: number) => void
   // Video Source → 타임라인 드래그-투-애드 (atSec 위치에 새 인스턴스 삽입)
   addClipInstanceAt: (sourceShotId: string, atGlobalSec: number) => void
+  // 타이틀 카드(#owner-title-card) — 검은 배경+텍스트(+선택 이미지) synthetic 클립을 atGlobalSec
+  //   인접 경계에 삽입. 길이는 기존 트림 문법(setTrim)을 재사용.
+  addTitleCard: (atGlobalSec: number) => void
+  // 타이틀 카드 텍스트/이미지 갱신(인스펙터/더블클릭 편집). history 는 호출부가 관리.
+  updateTitleCard: (shotId: string, patch: Partial<{ text: string; imageUrl: string | null }>) => void
 
   // Video Source 패널 액션
   toggleSourcePanel: () => void
@@ -632,6 +643,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     for (const savedShot of saved.shots ?? []) {
       if (!isSyntheticShotId(savedShot.shotId)) continue
       if (canonicalShotIds.has(savedShot.shotId)) continue
+      // 타이틀 카드(#owner-title-card)는 원본 shot에 연결되지 않은 독립 클립 — base shot 검증을 건너뛰고
+      // 저장된 shot/clip을 그대로 복원한다 (텍스트/이미지/길이 모두 스냅샷에 있음).
+      if (isTitleCardShotId(savedShot.shotId)) {
+        restoredShots.push(savedShot)
+        const savedClip = savedClipByShot.get(savedShot.shotId)
+        restoredClips.push({
+          shotId: savedShot.shotId,
+          url: null,
+          status: 'completed',
+          thumbnailUrl: null,
+          trimStart: savedClip?.trimStart,
+          trimEnd: savedClip?.trimEnd,
+          speed: savedClip?.speed ?? 1.0,
+        })
+        canonicalShotIds.add(savedShot.shotId)
+        continue
+      }
       const base = baseShotById.get(baseShotIdOf(savedShot.shotId))
       if (!base) continue
       restoredShots.push({ ...savedShot, sceneId: base.sceneId, durationSeconds: base.durationSeconds })
@@ -1269,6 +1297,82 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     get().addClipInstanceAt(sourceShotId, nearest)
   },
+
+  // 타이틀 카드(#owner-title-card) — addClipInstanceAt 과 동일한 삽입 문법, 단 원본 shot 없이 독립 생성.
+  //   기본 5초 / 검은 배경 / 빈 텍스트 — 삽입 즉시 인스펙터에서 텍스트를 채운다.
+  addTitleCard: (atGlobalSec) =>
+    set((state) => {
+      const newId = `title__t${uid()}`
+      const sceneId = state.selectedSceneId ?? state.shots[0]?.sceneId ?? 'scene_1'
+      const DEFAULT_DURATION = 5
+      const newShot: Shot = {
+        shotId: newId,
+        sceneId,
+        shotType: 'WS',
+        actionDescription: '',
+        characters: [],
+        durationSeconds: DEFAULT_DURATION,
+        generationMethod: 'T2V',
+        dialogueLines: [],
+        camera: { ...DEFAULT_CAMERA },
+        lighting: { ...DEFAULT_LIGHTING },
+        referenceImageUrl: null,
+        titleCard: { text: '', imageUrl: null },
+      }
+      // 영상 없는 synthetic clip — 프리뷰에서 url 없음 → 검은 배경 렌더링 경로를 타려는 대신
+      // isTitleCardShotId 로 구별해 프리뷰어가 직접 텍스트 카드를 그린다.
+      const newClip: VideoClip = { shotId: newId, url: null, status: 'completed', thumbnailUrl: null }
+
+      const layout = selectTimelineLayout(state)
+      let g = layout.length
+      for (let i = 0; i < layout.length; i++) {
+        const it = layout[i]
+        if (atGlobalSec < it.startSec + it.durationSec / 2) {
+          g = i
+          break
+        }
+      }
+
+      const order = globalOrder(state)
+      let insertSceneId: string
+      let localIndex: number
+      if (order.length === 0) {
+        insertSceneId = sceneId
+        localIndex = 0
+      } else if (g >= order.length) {
+        insertSceneId = order[order.length - 1].sceneId
+        localIndex = (state.clipOrder[insertSceneId] ?? []).length
+      } else {
+        insertSceneId = order[g].sceneId
+        localIndex = (state.clipOrder[insertSceneId] ?? []).indexOf(order[g].shotId)
+        if (localIndex < 0) localIndex = (state.clipOrder[insertSceneId] ?? []).length
+      }
+
+      const sceneOrder = [...(state.clipOrder[insertSceneId] ?? [])]
+      sceneOrder.splice(localIndex, 0, newId)
+
+      return {
+        shots: [...state.shots, { ...newShot, sceneId: insertSceneId }],
+        videoClips: [...state.videoClips, newClip],
+        clipOrder: { ...state.clipOrder, [insertSceneId]: sceneOrder },
+        selectedClipShotId: newId,
+        selectedShotIds: [newId],
+        selectedAudioId: null,
+        selectedAudioIds: [],
+        previewSourceShotId: null,
+        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [],
+      }
+    }),
+
+  updateTitleCard: (shotId, patch) =>
+    set((state) => ({
+      shots: state.shots.map((s) =>
+        s.shotId === shotId
+          ? { ...s, titleCard: { text: s.titleCard?.text ?? '', imageUrl: s.titleCard?.imageUrl ?? null, ...patch } }
+          : s,
+      ),
+    })),
 
 }))
 

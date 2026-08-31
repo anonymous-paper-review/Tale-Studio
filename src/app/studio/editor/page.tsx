@@ -15,6 +15,7 @@ import {
   Scissors,
   Undo2,
   Redo2,
+  Type,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { VideoPreviewer } from '@/features/editor/video-previewer'
@@ -78,6 +79,7 @@ export default function PostPage() {
     setTrim,
     splitVideoClipAt,
     addClipInstanceAt,
+    addTitleCard,
     previewSource,
     addAudioSource,
     removeAudioSource,
@@ -394,6 +396,26 @@ export default function PostPage() {
     [addClipAtPlayhead, attachVideoAudio],
   )
 
+  // 타이틀 카드 삽입(#owner-title-card): 소스 클립 추가(addClipAtPlayhead)와 동일하게 플레이헤드에
+  //   가장 가까운 클립 경계에 삽입 — 검은 배경 + 텍스트(+선택 이미지) synthetic 클립.
+  const handleAddTitleCard = useCallback(() => {
+    const st = useEditorStore.getState()
+    const layout = selectTimelineLayout(st)
+    const boundaries = [0]
+    for (const it of layout) boundaries.push(it.startSec + it.durationSec)
+    const cur = st.currentTime
+    let nearest = 0
+    let best = Infinity
+    for (const b of boundaries) {
+      const d = Math.abs(b - cur)
+      if (d < best) {
+        best = d
+        nearest = b
+      }
+    }
+    addTitleCard(nearest)
+  }, [addTitleCard])
+
   // #pps-empty-states(2026-08-27 오너 확정): shots=0 의 세 이유(로딩/실패/정상 빈)를 한 화면으로
   //   뭉개지 않는다 — 로딩 플래시가 "이전 단계를 완료하라"는 틀린 진단으로 보이던 것의 수리.
   if (shots.length === 0) {
@@ -539,6 +561,18 @@ export default function PostPage() {
               <Scissors className="size-3" />
             </Button>
           </div>
+
+          {/* 타이틀 카드 삽입(#owner-title-card) — 지정 플레이헤드 인접 경계에 검은 배경/텍스트 카드 삽입 */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 hover-red-beam"
+            onClick={handleAddTitleCard}
+            title={t('Insert a black title card with text at the nearest clip boundary')}
+          >
+            <Type className="size-3" />
+            {t('Title Card')}
+          </Button>
 
           {/* 재생 컨트롤 (프레임 버튼은 꾹 누르면 연속) */}
           <div className="flex items-center gap-0.5">

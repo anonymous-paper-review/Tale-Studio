@@ -58,6 +58,7 @@ import { stripLegacyStageMarkers } from '@/lib/display-names'
 //   같은 대화창에서 언어가 섞이지 않게. 미조회 시 UI 언어 폴백은 contentLocale() 안에 있다.
 import { translate } from '@/lib/i18n'
 import { contentLocale } from '@/lib/i18n/content'
+import { parseAppLocale } from '@/lib/locale'
 import {
   STAGE_LABEL,
   CHAT_HISTORY_WINDOW,
@@ -801,11 +802,24 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         // summary in place of the former serializeCanvasContext output.
         const a = useArtistStore.getState()
         // 스냅샷에 이미지 보유 현황 포함 — 채팅이 "어떤 뷰가 비어있는지" 즉답 가능 (chat-aware-regeneration)
-        const charLines = a.characterAssets.map((c) => {
+        //   외형 타임라인(#g4-chat 2026-08-31): 4뷰 횟수만 알려서는 "늙은/젊은 버전" 요청을 changeAppearance(원천
+        //   교체)로 오인해 4뷰 레거시 어휘로만 답하던 오너 실측("천사의 old 버전")을 고친다 — 모습 목록을 노출해야
+        //   cc 가 createAppearance(신규 행)와 changeAppearance 를 구분할 근거가 생긴다.
+        const charLines = a.characterAssets.flatMap((c) => {
           const filled = (['main', 'back', 'sideLeft', 'sideRight'] as const)
             .filter((v) => c.views[v])
             .join(', ')
-          return `- ${c.name} (${c.characterId}) — views: ${filled || '(없음)'}`
+          const header = `- ${c.name} (${c.characterId}) — views: ${filled || '(없음)'}`
+          if (c.appearances.length <= 1) {
+            return [header, '  외형 타임라인: 기본 외형만 있음']
+          }
+          const appearanceLines = c.appearances.map((appearance) => {
+            const time = appearance.narrativeTime ?? '-'
+            const hasImage = appearance.sheetUrl || appearance.portraitUrl ? 'has image' : 'no image'
+            const dflt = appearance.isDefault ? ', default' : ''
+            return `  · ${appearance.appearanceKey} ("${appearance.label}", ${time}${dflt}, ${hasImage})`
+          })
+          return [header, '  외형 타임라인:', ...appearanceLines]
         })
         const worldLines = a.worldAssets.map((w) => {
           const shots = [w.wideShot ? 'wide' : null]
@@ -920,6 +934,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       }
 
       const data = await res.json()
+      // 발화 언어 추종 동기화(#chat-locale-follow 2026-08-31) — 서버가 이번 턴에 콘텐츠 언어를
+      //   바꿨으면(한글 발화 → ko 채택) 같은 턴의 코드 발화(contentLocale())부터 따라가야
+      //   한 대화창에 두 언어가 섞이지 않는다. reply 처리보다 먼저 반영한다.
+      const adoptedLocale = parseAppLocale((data as { contentLocale?: unknown }).contentLocale)
+      if (adoptedLocale) useProjectStore.getState().adoptProjectLocale(adoptedLocale)
       const replyValue = data.reply ?? data.message ?? ''
       const reply = stripLegacyStageMarkers(
         typeof replyValue === 'string' ? replyValue : String(replyValue),

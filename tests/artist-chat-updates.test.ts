@@ -9,8 +9,11 @@ type U = Record<string, unknown>
 const types = (out: unknown[]) => out.map((u) => (u as U).type)
 
 describe('validateUpdates — F6 화이트리스트 (원천 외형 변경 자동경로 금지)', () => {
-  it('자동 허용 type 화이트리스트 = createCharacter / regenerate* 만', () => {
+  // createAppearance(#g4-chat 2026-08-31): 새 서사 시점 외형 "행"만 만든다 — 무과금이고
+  //   기존 외형을 바꾸지 않으므로(F6의 보호 대상은 원천 교체) 자동 허용이 맞다.
+  it('자동 허용 type 화이트리스트 = createCharacter / createAppearance / regenerate* 만', () => {
     expect([...AUTO_APPLY_UPDATE_TYPES].sort()).toEqual([
+      'createAppearance',
       'createCharacter',
       'regenerateCharacter',
       'regenerateWorldAsset',

@@ -45,6 +45,7 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
   )
   const generateCharacterView = useArtistStore((s) => s.generateCharacterView)
   const updateCharacterAppearance = useArtistStore((s) => s.updateCharacterAppearance)
+  const selectCandidate = useArtistStore((s) => s.selectCandidate)
   const viewFailures = useArtistStore((s) => s.viewFailures)
   const retryCharacterViewSafe = useArtistStore((s) => s.retryCharacterViewSafe)
   const isGenerating = useArtistStore((s) =>
@@ -91,7 +92,7 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
 
   const open = !!charId && !!appearanceKey && !!view
   const appearance = char?.appearances.find((item) => item.appearanceKey === appearanceKey) ?? null
-  if (!open || !char || !appearance || !view) return null
+  if (!open || !char || !appearance || !view || !appearanceKey) return null
 
   const imageUrl = view === 'main' ? appearance.sheetUrl : null
   const label = t(CHARACTER_VIEW_LABELS[view])
@@ -195,7 +196,43 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
             </div>
           )}
 
-          {/* 후보 히스토리 스트립 제거(#5) — 이미지 1장 정책: 재생성은 누적 아닌 교체(finalize 가 최신 1장만 보관). */}
+          {/* 후보 히스토리 스트립(#owner-keep-prev 2026-08-31) — finalize 가 슬롯당 최근 N장을 보관하므로(
+              #5 단일 이미지 전량삭제 정책을 되돌림), 직전 이미지를 누르면 선택본으로 되돌릴 수 있다. 2장 이상일 때만 표시. */}
+          {candidates.length >= 2 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {t('Candidate history')}
+              </p>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {candidates.map((cand) => {
+                  const candClass = classifyImageStale(appearance.appearance ?? '', char.lookFingerprint ?? null, {
+                    sourceHash: cand.sourceHash,
+                    appearanceHash: cand.appearanceHash ?? null,
+                  })
+                  return (
+                    <button
+                      key={cand.id}
+                      type="button"
+                      onClick={() => selectCandidate(char.characterId, appearanceKey, view, cand.id)}
+                      className={cn(
+                        'relative shrink-0 overflow-hidden rounded-md border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        cand.isSelected ? 'border-primary' : 'border-transparent hover:border-border',
+                      )}
+                      style={{ width: 64, height: 64 }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={cand.url} alt={t('Candidate image')} className="size-full object-cover" />
+                      {candClass !== 'fresh' && (
+                        <span className="absolute bottom-0 left-0 right-0 bg-amber-500/80 px-0.5 py-px text-center text-[9px] leading-tight text-white">
+                          {candClass === 'look-pending' ? t('Pre-look') : t('Pre-edit')}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 이미지 생성 모델 선택(image-models 레지스트리) — 재생성창에서만 고른다. 채팅으로도 지정 가능. */}
           <div>

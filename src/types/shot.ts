@@ -98,6 +98,11 @@ export interface Shot {
   previzVideo?: RoughStoryboardImage | null
   /** DB shots.sort_order — 씬 내 순서. 위치 삽입(추가 팝업)에서 이웃 기준 계산에 사용. */
   sortOrder?: number
+  /**
+   * 타이틀 카드(#owner-title-card 2026-08-31) — 검은 배경 위에 텍스트(+선택 이미지)만 보여주는
+   * synthetic 클립(shotId 접미 __t) 전용 필드. DB shots 에 대응 행이 없다(editor_states 스냅샷 소관).
+   */
+  titleCard?: { text: string; imageUrl: string | null } | null
 }
 
 export interface VideoClip {

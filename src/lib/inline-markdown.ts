@@ -1,5 +1,5 @@
 // 경량 inline 마크다운 → HTML 렌더러 (C6).
-// 지원: **굵게**, *기울임* / _기울임_, `코드`. 그 외 마크다운은 원문 유지.
+// 지원: **굵게**, __굵게__, *기울임* / _기울임_, `코드`, #/##/### 헤딩(마커만 제거). 그 외 마크다운은 원문 유지.
 // XSS 방어: 입력을 먼저 HTML escape 한 뒤에만 우리가 만든 태그를 주입한다.
 //   따라서 사용자가 보낸 <script>, onerror= 등은 절대 실행되지 않는다(텍스트로 escape됨).
 
@@ -27,6 +27,9 @@ export function renderInlineMarkdown(input: string): string {
   const escaped = escapeHtml(stripSeparatorLines(input ?? ''))
   return (
     escaped
+      // 줄머리 #/##/### 헤딩 마커 제거(#heading-strip 2026-08-31, 오너 실측) — 이 렌더러는
+      //   <h1~3>을 만들지 않으므로 # 기호가 생 문자로 노출됐다. 마커만 걷고 본문은 유지.
+      .replace(/^#{1,3}[ \t]+/gm, '')
       // `code`
       .replace(
         /`([^`\n]+)`/g,
@@ -36,6 +39,9 @@ export function renderInlineMarkdown(input: string): string {
       .replace(/\*\*([^*\n]+)\*\*/g, '$1')
       // *italic* (앞에 *가 아닐 때만 — **bold**의 잔여 별표 오인 방지)
       .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
+      // __bold__(밑줄 2개) → **bold**와 동일하게 마커만 제거해 평문으로(#underline-bold 2026-08-31,
+      //   오너 실측: 밑줄이 화면에 그대로 노출됨). 단일 _italic_ 규칙보다 먼저 처리해 충돌 방지.
+      .replace(/__([^_\n]+)__/g, '$1')
       // _italic_
       .replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>')
       // @멘션(#a2 2026-07-15) — "@차미르", "@스토리" 같은 멘션 토큰을 하늘색으로.

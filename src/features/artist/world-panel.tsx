@@ -142,6 +142,7 @@ export function WorldPanel({
                     aspectRatio="video"
                     imageUrl={world.wideShot}
                     generating={isGenerating && !world.wideShot}
+                    hideCaption
                   />
                 </button>
 

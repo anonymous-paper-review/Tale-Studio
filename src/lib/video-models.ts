@@ -62,8 +62,8 @@ export const DEFAULT_VIDEO_MODEL: VideoModelKey = 'seedance'
  * 기존 provider='local' 노드는 normalizeProvider 가 계속 받아준다(기능 유지).
  */
 export const FAL_VIDEO_MODEL_ORDER: VideoModelKey[] = [
-  'happy-horse',
   'seedance',
+  'happy-horse',
   'kling-o3',
   'veo',
 ]

@@ -13,7 +13,7 @@ import {
   patchGenerationJobResponseSnapshotByRequestId,
   type GenerationJob,
 } from '@/lib/generation-jobs'
-import { type CandidateView } from '@/lib/image-provenance'
+import { selectCandidatesToEvict, type CandidateView } from '@/lib/image-provenance'
 import { cropTurnaroundPortrait } from '@/lib/artist/portrait'
 import { cropRoughGridFrames } from '@/lib/writer/rough-grid-crop'
 import { sheetGeometry } from '@/lib/writer/rough-storyboard-grid'
@@ -726,16 +726,28 @@ async function recordCharacterImageCandidate(
   })
   if (insErr) throw insErr
 
-  // 3) 단일 이미지 정책(#5, 2026-07-11): 이 슬롯의 비선택 후보를 전부 삭제 — 최신 선택본 1장만 유지(누적→교체).
-  //    (예전 "최근 N장 보관 + 후보 히스토리 스트립" 폐기. 월드도 동일 정책, #6.)
-  await supabaseAdmin
+  // 3) 보관 정리(#owner-keep-prev, 2026-08-31 오너 요청): 재생성해도 직전 이미지를 되돌릴 수 있어야 한다 —
+  //    #5(2026-07-11)의 "비선택 전량 삭제" 정책을 되돌리고, 슬롯당 최근 CANDIDATE_RETENTION(5)장만
+  //    남기는 예전 evict 정책(#57 원안)으로 복귀한다. 선택본은 항상 보존(evict 대상 아님).
+  const { data: unselected } = await supabaseAdmin
     .from('character_image_candidates')
-    .delete()
+    .select('id, generated_at')
     .eq('project_id', job.project_id)
     .eq('character_id', characterId)
     .eq('appearance_key', appearanceKey)
     .eq('view', view)
     .eq('is_selected', false)
+  const staleIds = selectCandidatesToEvict(
+    (unselected ?? []).map((r) => ({
+      id: r.id as string,
+      isSelected: false,
+      pinned: false,
+      generatedAt: r.generated_at as string,
+    })),
+  )
+  if (staleIds.length) {
+    await supabaseAdmin.from('character_image_candidates').delete().in('id', staleIds)
+  }
 }
 
 /** 공통: 원격 이미지 바이트 회수 → media 스토리지 업로드 → publicUrl. */
