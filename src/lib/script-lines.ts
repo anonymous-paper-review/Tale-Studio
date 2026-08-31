@@ -273,7 +273,14 @@ function pushShotContextLines(
   dialogueLinesOf(shot).forEach((dialogue, index) => {
     const line = byRef.get(`${shot.shotId}.dialogue[${index}]`)
     const speaker = characterRef(manifest, dialogue.characterId)
-    lines.push(`    ${lineLabel(line)}대사[${index}] ${speaker}: "${dialogue.text}"`)
+    // emotion·delivery·durationHint도 보여준다 — 모델은 보이는 필드만 재제출할 수 있고,
+    //   대사 수정은 전체 배열 재제출 계약이라 안 보이면 그대로 유실된다(2026-08-31 실측).
+    const extras: string[] = []
+    if (dialogue.emotion) extras.push(`emotion: ${dialogue.emotion}`)
+    if (dialogue.delivery) extras.push(`delivery: ${dialogue.delivery}`)
+    if (dialogue.durationHint) extras.push(`durationHint: ${dialogue.durationHint}`)
+    const extraNote = extras.length > 0 ? ` {${extras.join(' · ')}}` : ''
+    lines.push(`    ${lineLabel(line)}대사[${index}] ${speaker}: "${dialogue.text}"${extraNote}`)
   })
 }
 
