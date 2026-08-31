@@ -422,7 +422,6 @@ export const KO: Record<string, string> = {
   // ── director: canvas-nodes ──
   Unused: '미사용',
   'Connected to Shot': 'Shot에 연결됨',
-  'No image yet': '아직 이미지가 없어요',
   'Waiting to generate image': '이미지 생성 대기 중',
   'Generating image': '이미지 생성 중',
   'Regenerate image': '이미지 재생성',
@@ -442,7 +441,6 @@ export const KO: Record<string, string> = {
   'Static contract violated — the camera moved': '정지 계약 위반 — 카메라가 움직였어요',
   "Not enough motion — the designed big movement isn't visible": '변화 부족 — 설계된 큰 동작이 안 보여요',
   'Direction mismatch — moved differently from the arrow': '방향 불일치 — 화살표와 다르게 움직였어요',
-  'No video yet': '아직 영상이 없어요',
   'Generate video': '영상 생성',
 
   // ── director: canvas-panels ──
@@ -476,11 +474,6 @@ export const KO: Record<string, string> = {
   Generate: '생성',
 
   // ── director: canvas-popups ──
-  'Create new node': '새 노드 만들기',
-  'What kind of node do you want to create?': '어떤 종류의 노드를 만들까요?',
-  'Scene container': '씬 컨테이너',
-  'Video generation unit': '영상 생성 단위',
-  'Which Scene should it go in?': '어느 Scene 안에 만들까요?',
   'This also deletes {shotCount} Shots + {videoCount} Videos.': 'Shot {shotCount}개 + Video {videoCount}개가 함께 삭제됩니다.',
   'This also deletes {count} Video takes.': 'Video 테이크 {count}개가 함께 삭제됩니다.',
   '⚠ Includes a take marked ★ Final. This may affect the Editor handoff.':
@@ -836,7 +829,6 @@ export const KO: Record<string, string> = {
   'Add image node': '이미지 노드 추가',
   'Add video node': '영상 노드 추가',
   'Add prompt node': '프롬프트 노드 추가',
-  'Standalone (no scene)': '독립 (씬 없음)',
   'Previous video chain frame is unavailable.': '이전 영상의 마지막 프레임을 사용할 수 없습니다.',
   'Unable to capture the source video last frame.': '이전 영상의 마지막 프레임을 캡처하지 못했습니다.',
   'Unable to upload the source video last frame.': '이전 영상의 마지막 프레임을 업로드하지 못했습니다.',

@@ -145,7 +145,11 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             disabled={parentGenerating || data.lastAttemptStatus === 'generating' || !parentShotId}
             onClick={(e) => {
               e.stopPropagation()
-              if (parentShotId) void generateVideoForShot(parentShotId)
+              // #retake-inherit: 이 테이크의 체인·프레임 배선을 새 테이크가 물려받는다.
+              if (parentShotId)
+                void generateVideoForShot(parentShotId, {
+                  inheritFromVideoNodeId: id,
+                })
             }}
           >
             <RefreshCw className="size-3" />

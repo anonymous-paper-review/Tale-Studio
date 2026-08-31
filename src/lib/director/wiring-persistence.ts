@@ -15,7 +15,6 @@
 import {
   isAssetData,
   isShotData,
-  isShotImageData,
   isVideoData,
   type DirectorNode,
   type VideoNodeData,
@@ -49,12 +48,6 @@ export function serializeWiringRef(
   if (isShotData(data)) {
     return data.writerShotId ? { kind: 'shot', shotId: data.writerShotId } : null
   }
-  if (isShotImageData(data)) {
-    const parent = nodes.find((n) => n.id === data.parentShotNodeId)
-    return parent && isShotData(parent.data) && parent.data.writerShotId
-      ? { kind: 'shotImage', shotId: parent.data.writerShotId }
-      : null
-  }
   if (isVideoData(data)) {
     return data.videoClipId ? { kind: 'video', clipId: data.videoClipId } : null
   }
@@ -70,17 +63,12 @@ export function resolveWiringRef(
   ref: StableWiringRef,
 ): string | null {
   if (ref.kind === 'shot' || ref.kind === 'shotImage') {
+    // #node-merge: 파생 shotImage 카드는 제거 — 구 DB의 'shotImage' 참조도 부모 Shot
+    //   노드로 해석한다(이미지 해석 결과 동일 — 부모의 실사 이미지).
     const shot = nodes.find(
       (n) => isShotData(n.data) && n.data.writerShotId === ref.shotId,
     )
-    if (!shot) return null
-    if (ref.kind === 'shot') return shot.id
-    // 파생 shotImage 는 부모 Shot 기준으로 찾는다 (rebuild 가 만든 dn_simg_* 노드).
-    const shotImage = nodes.find(
-      (n) => isShotImageData(n.data) && n.data.parentShotNodeId === shot.id,
-    )
-    // 파생이 아직 없으면 부모 Shot 으로 폴백 — 이미지 해석 결과는 동일(부모의 실사 이미지).
-    return shotImage?.id ?? shot.id
+    return shot?.id ?? null
   }
   if (ref.kind === 'video') {
     const video = nodes.find(

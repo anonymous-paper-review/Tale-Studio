@@ -120,6 +120,23 @@ function isFluxFamilyModel(model: string): boolean {
   return /\bflux\b|\/flux/.test(model);
 }
 
+// nano-banana 계열(#nano-banana 2026-08-31): Google 이미지 모델의 fal 경로.
+//   T2I 는 prompt+aspect_ratio, /edit 는 prompt+image_urls 만 받는다 — image_size·
+//   negative_prompt·seed 는 스키마에 없어 보내면 422 (grok 과 같은 방어 규칙).
+function isNanoBananaModel(model: string): boolean {
+  return model.startsWith('fal-ai/nano-banana');
+}
+
+/**
+ * 명시 모델의 레퍼런스-자동 edit 전환 맵(#image-model-select).
+ * resolveImageModel 은 명시 모델을 그대로 쓰는데, T2I 변형을 고른 채로 레퍼런스를
+ * 붙이면 모델이 레퍼런스를 버리는 문제가 있다 — edit 변형이 있는 모델은 자동 전환.
+ */
+const EDIT_VARIANT_BY_MODEL: Record<string, string> = {
+  'openai/gpt-image-2': 'openai/gpt-image-2/edit',
+  'fal-ai/nano-banana': 'fal-ai/nano-banana/edit',
+};
+
 /** Consumed by src/lib/style-anchor.ts for Rule M model normalization. */
 export function isImageEditModel(model: string): boolean {
   return /\/edit$/.test(model) || /redux/.test(model) || /ip-adapter/.test(model);
@@ -158,6 +175,8 @@ function resolveImageModel(opts: FalImageOptions): string {
   if (explicit) {
     // 명시 모델이 edit인데 ref 없으면 ref 없이는 못 돌리니 → 순수 T2I로 강등
     if (isImageEditModel(explicit) && !hasRef) return DEFAULT_IMAGE_MODEL;
+    // 명시 T2I + 레퍼런스 → 같은 계열의 edit 변형으로 자동 전환(있을 때만).
+    if (hasRef && EDIT_VARIANT_BY_MODEL[explicit]) return EDIT_VARIANT_BY_MODEL[explicit];
     return explicit;
   }
   return hasRef ? DEFAULT_EDIT_IMAGE_MODEL : DEFAULT_IMAGE_MODEL;
@@ -181,6 +200,16 @@ export function buildFalImageInput(opts: FalImageOptions, model: string): Record
     const grokInput: Record<string, unknown> = { prompt: opts.prompt };
     if (opts.reference_image_urls?.length) grokInput.image_urls = opts.reference_image_urls;
     return grokInput;
+  }
+  // nano-banana(#nano-banana): T2I=prompt+aspect_ratio / edit=prompt+image_urls — 그 외 키 전송 금지.
+  if (isNanoBananaModel(model)) {
+    const bananaInput: Record<string, unknown> = { prompt: opts.prompt };
+    if (isImageEditModel(model)) {
+      bananaInput.image_urls = opts.reference_image_urls ?? [];
+    } else if (opts.aspect_ratio) {
+      bananaInput.aspect_ratio = opts.aspect_ratio.replace(/^(horizontal_|vertical_|cinema_)/, '');
+    }
+    return bananaInput;
   }
   const input: Record<string, unknown> = { prompt: opts.prompt };
   if (opts.negative_prompt) input.negative_prompt = opts.negative_prompt;

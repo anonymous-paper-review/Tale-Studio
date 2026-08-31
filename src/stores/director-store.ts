@@ -11,7 +11,6 @@ import {
   newDirectorId,
   SHOT_OFFSET_X,
   SHOT_OFFSET_Y,
-  SHOT_IMAGE_OFFSET_X,
   VIDEO_OFFSET_X,
   VIDEO_OFFSET_Y,
   ASSET_OFFSET_X,
@@ -105,6 +104,12 @@ export type DirectorGenerationRequestOptions = {
   onJob?: GenerationJobObserver
   /** Internal flag used exclusively by the explicit full-video batch runner. */
   batch?: boolean
+  /**
+   * 리테이크 상속(#retake-inherit 2026-08-31 오너): 이 Video 노드의 수동 배선
+   * (frameInputs·영상 체인·override)을 새 테이크에 복사한다. 8/31 실측에서
+   * '영상 리테이크'가 체인 없는 새 테이크를 만들던 함정의 교정.
+   */
+  inheritFromVideoNodeId?: string
 }
 
 function makeSceneData(label: string): SceneNodeData {
@@ -222,11 +227,8 @@ function normalizeImageInputs(value: unknown): string[] {
 }
 
 function isFrameSourceNode(node: DirectorNode): boolean {
-  return (
-    isShotData(node.data) ||
-    isShotImageData(node.data) ||
-    isAssetData(node.data)
-  )
+  // #node-merge: 파생 shotImage 카드 제거 — 이미지 출처는 Shot/Asset 노드뿐.
+  return isShotData(node.data) || isAssetData(node.data)
 }
 
 function isImageSourceNode(node: DirectorNode): boolean {
@@ -280,17 +282,8 @@ function resolveFrameInputImageUrl(
   const source = nodes.find((node) => node.id === sourceNodeId)
   if (!source || !isFrameSourceNode(source)) return null
   if (isAssetData(source.data)) return usableFrameImageUrl(source.data.imageUrl)
-  const shot =
-    isShotData(source.data)
-      ? source
-      : isShotImageData(source.data)
-        ? nodes.find(
-            (node) =>
-              node.id === source.data.parentShotNodeId && isShotData(node.data),
-          )
-        : undefined
-  return shot && isShotData(shot.data)
-    ? resolveShotFrameImageUrl(shot.data, slot)
+  return isShotData(source.data)
+    ? resolveShotFrameImageUrl(source.data, slot)
     : null
 }
 
@@ -310,17 +303,8 @@ function resolveImageInputImageUrl(
   const source = nodes.find((node) => node.id === sourceNodeId)
   if (!source || !isImageSourceNode(source)) return null
   if (isAssetData(source.data)) return usableFrameImageUrl(source.data.imageUrl)
-  const shot =
-    isShotData(source.data)
-      ? source
-      : isShotImageData(source.data)
-        ? nodes.find(
-            (node) =>
-              node.id === source.data.parentShotNodeId && isShotData(node.data),
-          )
-        : undefined
-  return shot && isShotData(shot.data)
-    ? resolveStoryboardImageUrl(shot.data)
+  return isShotData(source.data)
+    ? resolveStoryboardImageUrl(source.data)
     : null
 }
 
@@ -3075,20 +3059,21 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       rebuildShotChainNodes: () => {
+        // #node-merge(2026-08-31 오너 대공사): 파생 SHOT IMAGE/플레이스홀더 카드 제거 —
+        //   실사 이미지는 Shot(이미지 노드) 카드가 직접 표시하고, 체인은 Shot→Video 직결.
+        //   구 persist 쟔재(shotImage/videoPlaceholder 노드)는 여기서 멱등 정리된다.
         set((s) => {
-          // 1) 기존 파생물 제거 — 멱등 재생성
           const nodes = s.nodes.filter(
             (n) => !isShotImageData(n.data) && !isVideoPlaceholderData(n.data),
           )
           let edges = s.edges.filter((e) => e.data?.category !== 'chain')
 
-          // 체인 대상: writer 파이프라인 샷(writerShotId 有)만 — 수동 노드는 기존 직결 유지.
+          // 체인 대상: writer 파이프라인 샷(writerShotId 有)만 — 수동 노드는 기존 직결(parent) 유지.
           const chainShots = nodes.filter(
             (n) => isShotData(n.data) && !!n.data.writerShotId,
           )
           if (chainShots.length === 0) return { nodes, edges, lastSavedAt: Date.now() }
 
-          // 2) 체인 샷의 기존 Shot→Video parent 엣지는 previz 체인으로 대체(제거).
           const chainShotIds = new Set(chainShots.map((n) => n.id))
           const videoNodeIds = new Set(
             nodes.filter((n) => isVideoData(n.data)).map((n) => n.id),
@@ -3112,48 +3097,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             data: { category: 'chain', relationText: '' },
           })
 
-          // 체인: SHOT(previz 3프레임) → SHOT IMAGE(실사) → SHOT VIDEO — 2026-07-27 직선화.
-          //   (구 SHOT→PREVIZ VIDEO→VIDEO + SHOT IMAGE 하단 합류. previz 영상 제거로 단일 경로가 됐고,
-          //    실제 인과와도 일치한다: 러프 3프레임 → 실사 이미지 → 그 이미지 refs 로 영상.)
           for (const shot of chainShots) {
-            const sd = shot.data as ShotNodeData
-            const simgId = `dn_simg_${shot.id}`
-            nodes.push({
-              id: simgId,
-              type: 'shotImage',
-              position: {
-                x: shot.position.x + SHOT_IMAGE_OFFSET_X,
-                y: shot.position.y,
-              },
-              draggable: false,
-              selectable: true, // 클릭=선택 링, 더블클릭=부모 Shot 모달(2026-07-23 피드백)
-              connectable: true,
-              data: { kind: 'shotImage', label: sd.label, parentShotNodeId: shot.id },
-            })
-            edges.push(chainEdge(`de_chain_${shot.id}_simg`, shot.id, simgId))
-            let hasVideo = false
             for (const v of nodes) {
               if (!isVideoData(v.data) || v.data.parentShotNodeId !== shot.id) continue
-              hasVideo = true
-              edges.push(chainEdge(`de_chain_simg_${v.id}`, simgId, v.id))
-            }
-            // 테이크 0개 — 회색 SHOT VIDEO 플레이스홀더로 체인 종점을 안내(2026-07-22 피드백).
-            //   첫 테이크가 생기면 다음 rebuild 가 실제 Video 노드 배선으로 대체한다.
-            if (!hasVideo) {
-              const phId = `dn_vph_${shot.id}`
-              nodes.push({
-                id: phId,
-                type: 'videoPlaceholder',
-                position: {
-                  x: shot.position.x + VIDEO_OFFSET_X,
-                  y: shot.position.y,
-                },
-                draggable: false,
-                selectable: true,
-                connectable: false,
-                data: { kind: 'videoPlaceholder', label: sd.label, parentShotNodeId: shot.id },
-              })
-              edges.push(chainEdge(`de_chain_simg_${phId}`, simgId, phId))
+              edges.push(chainEdge(`de_chain_${shot.id}_${v.id}`, shot.id, v.id))
             }
           }
 
@@ -3730,6 +3677,30 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           // 새 Video take 생성 (마더 설정 상속, 결정 #13) → 그 노드를 생성
           const videoNodeId = api.addVideoTake(shotNodeId)
           if (!videoNodeId) return null
+
+          // #retake-inherit: 원본 테이크의 수동 배선(프레임 입력·영상 체인·override)을 상속.
+          if (options?.inheritFromVideoNodeId) {
+            const source = get().nodes.find(
+              (n) => n.id === options.inheritFromVideoNodeId,
+            )
+            if (source && isVideoData(source.data)) {
+              const src = source.data
+              get().updateNodeData<'video'>(videoNodeId, {
+                frameInputs: {
+                  start: src.frameInputs?.start ?? null,
+                  end: src.frameInputs?.end ?? null,
+                  refs: [...(src.frameInputs?.refs ?? [])],
+                },
+                videoChainInputId: src.videoChainInputId,
+                videoChainFrameUrl: src.videoChainFrameUrl,
+                override: { ...src.override },
+              })
+              // 상속된 배선을 엣지로 복원 + DB write-through.
+              get().rebuildFrameEdges()
+              get().rebuildVideoChainEdges()
+              scheduleWiringSweepToDb(get)
+            }
+          }
 
           const started = await get().regenerateVideo(videoNodeId, lock, options)
           if (!started) {
@@ -4905,31 +4876,7 @@ export function nextVideoPosition(
 
 /**
  * Previz 체인 파생 노드(드래그 불가)를 부모 Shot 위치에 상시 정합시킨다(#previz-chain).
- * 페이지 onNodesChange 가 드래그 적용 직후 호출 — Shot 을 끌면 체인이 함께 따라온다.
- * 변경이 없으면 입력 배열을 그대로 반환(참조 안정 — 불필요 재렌더 방지).
- */
-export function followChainNodePositions(nodes: DirectorNode[]): DirectorNode[] {
-  let shotById: Map<string, DirectorNode> | null = null
-  let changed = false
-  const out = nodes.map((n) => {
-    if (!isShotImageData(n.data) && !isVideoPlaceholderData(n.data)) return n
-    if (!shotById) {
-      shotById = new Map(nodes.filter((x) => isShotData(x.data)).map((x) => [x.id, x]))
-    }
-    const shot = shotById.get((n.data as { parentShotNodeId: string }).parentShotNodeId)
-    if (!shot) return n
-    const want = {
-      x:
-        shot.position.x +
-        (isVideoPlaceholderData(n.data) ? VIDEO_OFFSET_X : SHOT_IMAGE_OFFSET_X),
-      y: shot.position.y,
-    }
-    if (n.position.x === want.x && n.position.y === want.y) return n
-    changed = true
-    return { ...n, position: want }
-  })
-  return changed ? out : nodes
-}
+
 
 /**
  * 새 Scene 노드 자동 위치 — 가장 아래 Scene 아래로 stacking.

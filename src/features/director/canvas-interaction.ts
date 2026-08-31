@@ -3,7 +3,7 @@
 // React 컴포넌트(BaseNode/DirectorNodePopup/page.tsx)가 이 함수들을 소비한다.
 // 렌더링과 분리해 두어 node 환경 단위 테스트로 격리 검증한다.
 
-import type { DirectorNodeData, DirectorNodeKind } from '@/types/director'
+import type { DirectorNodeKind } from '@/types/director'
 
 export type DirectorViewMode = 'node' | 'storyboard'
 
@@ -49,17 +49,6 @@ export function doubleClickActionForKind(
 }
 
 /**
- * 샷 체인 파생 카드 더블클릭 위임 대상(#previz-chain 2026-07-23) — 파생 카드는 자체
- * 모달이 없고 진실이 부모 Shot 에 있으므로, 더블클릭을 부모 Shot 모달로 위임한다.
- * 파생 카드가 아니면 null.
- */
-export function chainParentShotNodeId(data: DirectorNodeData): string | null {
-  return data.kind === 'shotImage' || data.kind === 'videoPlaceholder'
-    ? (data as { parentShotNodeId: string }).parentShotNodeId
-    : null
-}
-
-/**
  * 단일클릭 토글 결정: 같은 노드를 다시 클릭하면 선택 해제(패널 닫기), 아니면 선택.
  * 반환값은 새 selectedNodeId.
  */
@@ -71,9 +60,9 @@ export function clickToggleSelection(
 }
 
 /**
- * 노드 우클릭 메뉴 항목 결정(#context-menu 2026-08-31) — 좌클릭=선택, 더블클릭=편집
- * 모달, 우클릭=이 메뉴로 인터랙션을 셋으로 가른다.
- * - edit: scene/shot/video 는 자기 모달, 파생(shotImage/videoPlaceholder)은 부모 Shot 모달
+ * 노드 우클릭 메뉴 항목 결정(#context-menu 2026-08-31) — 좌클릭=선택, 더블클릭=편집,
+ * 우클릭=이 메뉴로 인터랙션을 셋으로 가른다.
+ * #node-merge: 파생 카드(shotImage/videoPlaceholder)는 캔버스에서 제거돼 분기도 사라졌다.
  * - copy-image/download-image: 대표 이미지가 있을 때만 (판정은 호출부 nodePrimaryImageUrl)
  * - delete: asset(파생·읽기전용) 만 제외
  */
@@ -84,19 +73,13 @@ export function nodeContextMenuItems(
   hasImage: boolean,
 ): NodeMenuItem[] {
   const items: NodeMenuItem[] = []
-  if (
-    kind === 'scene' ||
-    kind === 'shot' ||
-    kind === 'video' ||
-    kind === 'shotImage' ||
-    kind === 'videoPlaceholder'
-  ) {
+  if (kind === 'scene' || kind === 'shot' || kind === 'video') {
     items.push('edit')
   }
   if (hasImage) {
     items.push('copy-image', 'download-image')
   }
-  if (kind !== 'asset' && kind !== 'shotImage' && kind !== 'videoPlaceholder') {
+  if (kind !== 'asset') {
     items.push('delete')
   }
   return items

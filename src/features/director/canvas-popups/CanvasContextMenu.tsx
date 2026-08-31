@@ -22,10 +22,7 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import {
-  chainParentShotNodeId,
-  nodeContextMenuItems,
-} from '@/features/director/canvas-interaction'
+import { nodeContextMenuItems } from '@/features/director/canvas-interaction'
 import {
   copyImageUrlToClipboard,
   downloadImageUrl,
@@ -157,11 +154,9 @@ export function CanvasContextMenu({ state, onClose }: Props) {
             icon={<Edit className="size-3.5" />}
             label={t('Edit')}
             onClick={() => {
-              // #panel-unify: shot/video(+파생은 부모 Shot)는 좌측 패널, scene만 모달.
-              const parentShotId = chainParentShotNodeId(node.data)
-              const targetId = parentShotId ?? state.nodeId
-              if (node.data.kind === 'scene') openPopup(targetId)
-              else selectNode(targetId)
+              // #panel-unify: shot/video는 좌측 패널, scene만 모달(그리드 뷰 경로).
+              if (node.data.kind === 'scene') openPopup(state.nodeId)
+              else selectNode(state.nodeId)
               onClose()
             }}
           />

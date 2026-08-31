@@ -6,7 +6,6 @@ import { Copy, Edit, GitBranch, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import { isShotData, isVideoData } from '@/types/director'
 import { editActionForKind } from '@/features/director/canvas-interaction'
 import { prettyNodeLabel } from '@/features/director/node-label'
 

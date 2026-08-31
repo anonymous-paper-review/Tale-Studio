@@ -20,9 +20,8 @@ import {
   type Connection,
   type OnConnectStart,
   type OnConnectEnd,
-  type XYPosition,
 } from '@xyflow/react'
-import { Loader2, ImageIcon, X, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
+import { Loader2, ImageIcon, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
 
 import { toast } from 'sonner'
 import { runRealBatch } from '@/lib/director/real-batch-client'
@@ -45,13 +44,12 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
 import { isVideoData } from '@/types/director'
-import { followChainNodePositions, useDirectorCanvasStore } from '@/stores/director-store'
+import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { getDirectorGaps, summarizeGaps } from '@/lib/completeness'
 import {
   isShotData,
-  isSceneData,
   SNAP_GRID,
 } from '@/types/director'
 import { StoryboardGridView } from '@/features/director/canvas-views/StoryboardGridView'
@@ -59,15 +57,11 @@ import { StoryboardZoomControls, useStoryboardZoom } from '@/components/generati
 import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
 import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
 
-import { SceneNode } from '@/features/director/canvas-nodes/SceneNode'
 import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
 import { VideoNode } from '@/features/director/canvas-nodes/VideoNode'
 import { AssetNode } from '@/features/director/canvas-nodes/AssetNode'
 import { PromptNode } from '@/features/director/canvas-nodes/PromptNode'
-import { ShotImageNode } from '@/features/director/canvas-nodes/ShotImageNode'
-import { VideoPlaceholderNode } from '@/features/director/canvas-nodes/VideoPlaceholderNode'
 import { CategoryEdge } from '@/features/director/canvas-edges/CategoryEdge'
-import { CreatorModal } from '@/features/director/canvas-popups/CreatorModal'
 import {
   CanvasContextMenu,
   type CanvasMenuState,
@@ -82,19 +76,17 @@ import { DirectorNodePopup } from '@/features/director/canvas-popups/DirectorNod
 import { DirectorDetailPanel } from '@/features/director/canvas-panels/DirectorDetailPanel'
 import {
   doubleClickActionForKind,
-  chainParentShotNodeId,
   connectRouteForTargetHandle,
 } from '@/features/director/canvas-interaction'
 import { useT } from '@/lib/i18n'
 
+// #scene-hide/#node-merge(2026-08-31 대공사): scene 노드는 캔버스에서 숨기고(데이터는
+// Writer 동기화·스토리보드 뷰가 계속 소비), 파생 shotImage/videoPlaceholder 카드는 제거.
 const nodeTypes = {
-  scene: SceneNode,
   shot: ShotNode,
   video: VideoNode,
   asset: AssetNode,
   prompt: PromptNode,
-  shotImage: ShotImageNode,
-  videoPlaceholder: VideoPlaceholderNode,
 } as const
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -265,7 +257,6 @@ function CanvasInner() {
   const wireVideoChainToVideo = useDirectorCanvasStore(
     (s) => s.wireVideoChainToVideo,
   )
-  const addShotNode = useDirectorCanvasStore((s) => s.addShotNode)
   const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
   const selectEdge = useDirectorCanvasStore((s) => s.selectEdge)
@@ -420,21 +411,21 @@ function CanvasInner() {
       void applyViewport(st.viewport)
       return
     }
-    // 최초 진입(#e9): 전체 fitView(정중앙)로 시작한 뒤 가장 왼쪽 Scene(Scene 1)으로
-    //   수평 팬 애니메이션. 종료 뷰포트를 store에 저장해 재진입 복원 기준점으로 삼는다.
+    // 최초 진입(#e9→#scene-hide): 전체 fitView 후 가장 왼쪽 이미지 노드로 수평 팬 애니메이션.
+    //   (씬 노드는 캔버스에서 숨겨져 기준이 될 수 없다 — 2026-08-31 대공사.)
     void (async () => {
       await fitView()
-      const scenes = useDirectorCanvasStore
+      const shots = useDirectorCanvasStore
         .getState()
-        .nodes.filter((n) => n.data.kind === 'scene')
-      if (scenes.length === 0) {
+        .nodes.filter((n) => n.data.kind === 'shot')
+      if (shots.length === 0) {
         useDirectorCanvasStore.setState({
           viewport: getViewport(),
           viewportInitialized: true,
         })
         return
       }
-      const first = scenes.reduce((a, b) =>
+      const first = shots.reduce((a, b) =>
         a.position.x <= b.position.x ? a : b,
       )
       const pane = document.querySelector('.react-flow')
@@ -454,21 +445,14 @@ function CanvasInner() {
     })()
   }, [nodesInitialized, applyViewport, getViewport, fitView])
 
-  const [creatorOpen, setCreatorOpen] = useState(false)
-  const [creatorPosition, setCreatorPosition] = useState<XYPosition | null>(
-    null,
-  )
-  // 우클릭 메뉴(#context-menu 2026-08-31) — 좌클릭=선택 · 더블클릭=편집 모달과 구분되는 세 번째 축.
+  // 우클릭 메뉴(#context-menu 2026-08-31) — 좌클릭=선택 · 더블클릭=편집과 구분되는 세 번째 축.
   const [contextMenu, setContextMenu] = useState<CanvasMenuState | null>(null)
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      // #previz-chain: Shot 드래그 시 파생 체인 노드(ShotImage/플레이스홀더)가 함께 따라온다.
-      const next = followChainNodePositions(
-        applyNodeChanges(
-          changes.filter((change) => change.type !== 'remove'),
-          nodes,
-        ) as typeof nodes,
+      const next = applyNodeChanges(
+        changes.filter((change) => change.type !== 'remove'),
+        nodes,
       )
       useDirectorCanvasStore.setState({ nodes: next as typeof nodes })
       changes.forEach((c) => {
@@ -584,18 +568,17 @@ function CanvasInner() {
         .nodes.find((n) => n.id === sourceId)
       if (!sourceNode) return
 
-      if (isSceneData(sourceNode.data)) {
-        const newId = addShotNode(sourceId, position)
-        if (newId) selectNode(newId)
-      } else if (isShotData(sourceNode.data)) {
+      if (isShotData(sourceNode.data)) {
         const newId = addVideoTake(sourceId, position)
         if (newId) selectNode(newId)
       }
       // Video는 자식 없음 — 빈 공간 drop은 무시
     },
-    [screenToFlowPosition, addShotNode, addVideoTake, selectNode],
+    [screenToFlowPosition, addVideoTake, selectNode],
   )
 
+  // 빈 캔버스 더블클릭 = 이미지 노드 생성(#scene-hide 2026-08-31) — 옛 Scene/Shot 선택 모달은
+  //   씬 노드 제거와 함께 폐기. 생성 종류는 우클릭 메뉴가 담당한다.
   const onPaneDoubleClick = useCallback(
     (event: MouseEvent) => {
       const target = event.target as HTMLElement | null
@@ -610,21 +593,38 @@ function CanvasInner() {
         x: event.clientX,
         y: event.clientY,
       })
-      setCreatorPosition(position)
-      setCreatorOpen(true)
+      const newId = useDirectorCanvasStore.getState().addShotNode(null, position)
+      if (newId) selectNode(newId)
     },
-    [screenToFlowPosition],
+    [screenToFlowPosition, selectNode],
+  )
+
+  // #scene-hide: 씬 노드와 씬 관련 엣지는 캔버스에 안 그린다 (데이터는 유지 —
+  //   Writer 동기화·스토리보드 뷰·챗 명령이 계속 쓴다). 구 persist의 파생 카드 쟔재도 함께 거른다.
+  const hiddenNodeIds = new Set(
+    nodes
+      .filter(
+        (n) =>
+          n.data.kind === 'scene' ||
+          n.data.kind === 'shotImage' ||
+          n.data.kind === 'videoPlaceholder',
+      )
+      .map((n) => n.id),
+  )
+  const visibleNodes = nodes.filter((n) => !hiddenNodeIds.has(n.id))
+  const visibleEdges = edges.filter(
+    (e) => !hiddenNodeIds.has(e.source) && !hiddenNodeIds.has(e.target),
   )
 
   return (
-    // B-D1 fix: wrapper div에 onDoubleClick 등록해 ReactFlow 내부 처리와 독립적으로 캡처
+    // B-D1 fix: wrapper div에 onDoubleClick 등록해 ReactFlow 내부 처리와 독립적으로 캐처
     <div
       className="relative h-full w-full"
       onDoubleClick={onPaneDoubleClick}
     >
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={visibleNodes}
+        edges={visibleEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
@@ -661,15 +661,9 @@ function CanvasInner() {
           })
         }}
         // 클릭=선택+좌측 패널(#panel-unify 2026-08-31) — 패널은 캔버스 조작을 안 막는다.
-        //   파생 카드(shotImage/videoPlaceholder)는 진실이 부모 Shot이라 부모를 선택한다.
         onNodeClick={(_event, node) => {
           const kind = node.data.kind
-          if (kind === 'shot' || kind === 'video') {
-            selectNode(node.id)
-            return
-          }
-          const parentShotId = chainParentShotNodeId(node.data)
-          if (parentShotId) selectNode(parentShotId)
+          if (kind === 'shot' || kind === 'video') selectNode(node.id)
         }}
         onEdgeClick={(_event, edge) => selectEdge(edge.id)}
         onNodeDoubleClick={(_event, node) => {
@@ -678,12 +672,7 @@ function CanvasInner() {
             openPopup(node.id)
             return
           }
-          if (action === 'select') {
-            selectNode(node.id)
-            return
-          }
-          const parentShotId = chainParentShotNodeId(node.data)
-          if (parentShotId) selectNode(parentShotId)
+          if (action === 'select') selectNode(node.id)
         }}
         onNodeDragStart={() => commitHistory()}
         onMove={(_, vp) => setViewport(vp)}
@@ -730,14 +719,6 @@ function CanvasInner() {
       <CanvasContextMenu
         state={contextMenu}
         onClose={() => setContextMenu(null)}
-      />
-      <CreatorModal
-        open={creatorOpen}
-        position={creatorPosition}
-        onClose={() => {
-          setCreatorOpen(false)
-          setCreatorPosition(null)
-        }}
       />
       <RelationModal />
       <DeleteConfirmModal />

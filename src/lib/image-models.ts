@@ -15,7 +15,11 @@
 // generate-storyboard 라우트를 거쳐 falImageSubmit({ model })로 전달된다.
 // ============================================================================
 
-export type ImageModelKey = 'gpt-image-2' | 'flux-2-klein' | 'grok-imagine'
+export type ImageModelKey =
+  | 'gpt-image-2'
+  | 'nano-banana'
+  | 'flux-2-klein'
+  | 'grok-imagine'
 
 export interface ImageModelSpec {
   key: ImageModelKey
@@ -36,6 +40,12 @@ export const IMAGE_MODELS: Record<ImageModelKey, ImageModelSpec> = {
     endpoint: 'openai/gpt-image-2',
     hint: 'Default',
   },
+  'nano-banana': {
+    key: 'nano-banana',
+    label: 'Nano Banana',
+    endpoint: 'fal-ai/nano-banana',
+    hint: 'Google',
+  },
   'flux-2-klein': {
     key: 'flux-2-klein',
     label: 'FLUX.2 Klein 9B',
@@ -52,6 +62,7 @@ export const IMAGE_MODELS: Record<ImageModelKey, ImageModelSpec> = {
 
 export const IMAGE_MODEL_ORDER: ImageModelKey[] = [
   'gpt-image-2',
+  'nano-banana',
   'flux-2-klein',
   'grok-imagine',
 ]

@@ -46,9 +46,9 @@ describe('nodeContextMenuItems (우클릭 메뉴 구성)', () => {
     ])
   })
 
-  it('파생 카드(shotImage/videoPlaceholder)는 편집(부모 위임)만 있고 삭제는 없다', () => {
-    expect(nodeContextMenuItems('shotImage', false)).toEqual(['edit'])
-    expect(nodeContextMenuItems('videoPlaceholder', false)).toEqual(['edit'])
+  it('파생 카드 kind(구 persist 쟔재)는 편집 없이 삭제만 남는다 (#node-merge)', () => {
+    expect(nodeContextMenuItems('shotImage', false)).toEqual(['delete'])
+    expect(nodeContextMenuItems('videoPlaceholder', false)).toEqual(['delete'])
   })
 
   it('prompt는 삭제만 있다', () => {
@@ -80,7 +80,7 @@ describe('nodePrimaryImageUrl (대표 이미지 해석)', () => {
     expect(nodePrimaryImageUrl(api().nodes, sceneId)).toBeNull()
   })
 
-  it('Video는 썸네일, 파생 ShotImage는 부모 Shot 이미지를 따라간다', () => {
+  it('Video는 썸네일을 준다', () => {
     const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
     const shotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Shot')
     api().updateNodeData<'shot'>(shotId, {
@@ -99,13 +99,9 @@ describe('nodePrimaryImageUrl (대표 이미지 해석)', () => {
     expect(nodePrimaryImageUrl(api().nodes, videoId)).toBe(
       'https://cdn.test/thumb.jpg',
     )
-
+    // #node-merge: 파생 shotImage 카드는 더 이상 생성되지 않는다
     api().rebuildShotChainNodes()
-    const shotImage = api().nodes.find((n) => n.data.kind === 'shotImage')
-    expect(shotImage).toBeTruthy()
-    expect(nodePrimaryImageUrl(api().nodes, shotImage!.id)).toBe(
-      'https://cdn.test/parent.png',
-    )
+    expect(api().nodes.some((n) => n.data.kind === 'shotImage')).toBe(false)
   })
 
   it('없는 노드는 null', () => {

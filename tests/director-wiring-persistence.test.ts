@@ -63,17 +63,14 @@ describe('serializeWiringRef / resolveWiringRef', () => {
     expect(serializeWiringRef(nodes, 'missing')).toBeNull()
   })
 
-  it('파생 shotImage는 부모 샷 키로 직렬화되고, 파생이 재생성된 캔버스에서 shotImage로 복원된다', () => {
+  it("구 DB의 'shotImage' 참조는 부모 Shot 노드로 해석된다 (#node-merge 하위호환)", () => {
     const { sourceShotId } = seedCanvas('b')
     api().rebuildShotChainNodes()
-    const nodes = api().nodes
-    const shotImage = nodes.find(
-      (n) => n.data.kind === 'shotImage' &&
-        (n.data as { parentShotNodeId: string }).parentShotNodeId === sourceShotId,
-    )!
-    const ref = serializeWiringRef(nodes, shotImage.id)
-    expect(ref).toEqual({ kind: 'shotImage', shotId: 'writer-src-b' })
-    expect(resolveWiringRef(nodes, ref!)).toBe(shotImage.id)
+    // 파생 카드는 더 이상 없지만, 구 버전이 저장한 shotImage 참조는 여전히 풀린다.
+    expect(api().nodes.some((n) => n.data.kind === 'shotImage')).toBe(false)
+    expect(
+      resolveWiringRef(api().nodes, { kind: 'shotImage', shotId: 'writer-src-b' }),
+    ).toBe(sourceShotId)
   })
 })
 

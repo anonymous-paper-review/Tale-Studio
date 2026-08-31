@@ -73,7 +73,7 @@ describe('Director Video frame wiring', () => {
     ).toHaveLength(1)
   })
 
-  it('파생 ShotImage가 재생성돼도 저장된 source ID에서 frame 엣지를 복원한다', () => {
+  it('writer 샷 본체에서 연결한 frame 엣지가 rebuild 후에도 복원된다 (#node-merge)', () => {
     const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
     const sourceShotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Source')
     api().updateNodeData<'shot'>(sourceShotId, { writerShotId: 'writer-source' })
@@ -81,18 +81,14 @@ describe('Director Video frame wiring', () => {
     const videoId = api().addVideoTake(targetShotId)!
     api().rebuildShotChainNodes()
 
-    const imageId = `dn_simg_${sourceShotId}`
-    expect(api().nodes.some((node) => node.id === imageId && isShotImageData(node.data))).toBe(true)
-    api().wireFrameToVideo(imageId, videoId, 'frame-ref')
-    expect(api().edges.some((edge) => edge.source === imageId && edge.target === videoId)).toBe(true)
-
+    api().wireFrameToVideo(sourceShotId, videoId, 'frame-ref')
     api().rebuildShotChainNodes()
 
     expect(
       api().edges.some(
         (edge) =>
           edge.data?.category === 'frame' &&
-          edge.source === imageId &&
+          edge.source === sourceShotId &&
           edge.target === videoId &&
           edge.targetHandle === 'frame-ref',
       ),
@@ -196,7 +192,7 @@ describe('Director Shot image-reference wiring', () => {
     ])
   })
 
-  it('파생 ShotImage가 재생성돼도 이미지 source ID에서 image 엣지를 복원한다', () => {
+  it('writer 샷 본체의 image 엣지가 rebuild 후에도 복원된다 (#node-merge)', () => {
     const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
     const sourceShotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Source')
     api().updateNodeData<'shot'>(sourceShotId, { writerShotId: 'writer-source' })
@@ -204,16 +200,11 @@ describe('Director Shot image-reference wiring', () => {
     api().wireImageToShot(sourceShotId, targetShotId, 'image-reference')
     api().rebuildShotChainNodes()
 
-    const imageId = `dn_simg_${sourceShotId}`
-    expect(api().nodes.some((node) => node.id === imageId && isShotImageData(node.data))).toBe(true)
-    api().wireImageToShot(imageId, targetShotId, 'image-reference')
-    api().rebuildShotChainNodes()
-
     expect(
       api().edges.some(
         (edge) =>
           edge.data?.category === 'image' &&
-          edge.source === imageId &&
+          edge.source === sourceShotId &&
           edge.target === targetShotId,
       ),
     ).toBe(true)

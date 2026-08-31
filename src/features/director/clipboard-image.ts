@@ -7,7 +7,6 @@
 import {
   isAssetData,
   isShotData,
-  isShotImageData,
   isVideoData,
   type DirectorNode,
 } from '@/types/director'
@@ -15,10 +14,9 @@ import {
 /**
  * 노드의 "복사 가능한 대표 이미지" URL. 없으면 null — 메뉴 항목 활성 판단에도 쓴다.
  * - shot: 완료된 실사 스토리보드 이미지
- * - shotImage(파생): 부모 Shot 의 실사 이미지
  * - video: 썸네일(첫 프레임)
  * - asset: Artist 에셋 이미지
- * - scene/prompt/videoPlaceholder: 이미지 없음
+ * - scene/prompt: 이미지 없음
  */
 export function nodePrimaryImageUrl(
   nodes: DirectorNode[],
@@ -31,9 +29,6 @@ export function nodePrimaryImageUrl(
     return data.storyboardImage?.status === 'completed'
       ? data.storyboardImage.url
       : null
-  }
-  if (isShotImageData(data)) {
-    return nodePrimaryImageUrl(nodes, data.parentShotNodeId)
   }
   if (isVideoData(data)) return data.thumbnailUrl
   if (isAssetData(data)) return data.imageUrl
