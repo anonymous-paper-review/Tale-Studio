@@ -19,7 +19,7 @@ import {
   resolveCharacterAppearance,
   type CharacterAppearanceCandidate,
 } from '@/lib/writer/appearance-selection'
-import { reallocateShotDurations } from '@/lib/writer/pipeline/util/duration_reallocation'
+import { reallocateShotDurations, speechSecondsForText } from '@/lib/writer/pipeline/util/duration_reallocation'
 import { buildShotDialogueMap } from '@/lib/writer/pipeline/util/dialogue_join'
 import { isFlagOn } from '@/lib/flags'
 import {
@@ -681,12 +681,12 @@ export async function persistShotsToDb(
   //   이후 전 샷의 대사가 밀린다. 형제는 첫 자식만 상속. (구 시퀀스는 직접 id 조인으로 폴백.)
   const dialogueByShotId = buildShotDialogueMap(shotSequence.shots, dialogue)
 
-  // 인지 부하 재배분(#p2-pacing): 대사가 확정된 유일한 시점이 여기다 — 발화·액션·신규 정보 기준
-  //   필요 시간에 못 미치는 샷만 증액한다(단축 금지). 씬 길이는 아래 scene 수렴이 합으로 갱신.
+  // 인지 부하 재배분(#p2-pacing → #duration-surgery 2026-08-31): 대사가 확정된 유일한 시점이
+  //   여기다 — 발화·액션·신규 정보 기준 needed 로 양방향 수렴(부족 증액 / 과대 감액, 롱테이크 면제).
   const realloc = reallocateShotDurations(shotSequence.shots, dialogueByShotId)
   if (realloc.changed.length) {
     console.log(
-      `[persistShotsToDb] 인지 부하 재배분: ${realloc.changed.length}샷 증액 — ` +
+      `[persistShotsToDb] 인지 부하 재배분: ${realloc.changed.length}샷 조정 — ` +
         realloc.changed.map((c) => `${c.shot_id} ${c.from}→${c.to}s(need ${c.needed})`).join(', '),
     )
   }
@@ -727,9 +727,16 @@ export async function persistShotsToDb(
         console.warn(`[persistShotsToDb] shot ${it.shot_id}: S.scene_id 누락 → 직전 씬(${sceneId})으로 귀속`)
       }
       lastSceneId = sceneId
-      const chars = (it.assets?.characters ?? [])
+      const blockingChars = (it.assets?.characters ?? [])
         .map((c) => c.id)
         .filter((id): id is string => typeof id === 'string')
+      // #w-a(2026-08-31 오너 확정): characters = blocking ∪ 대사 화자. v4 blocking 은 '연기 주체'만
+      //   나열하는 습성이 있어(감사 W2) 화자·원경 인물이 빠지면 캐릭터 시트 미동봉 → 익명 렌더.
+      //   전 프로젝트 실측: 화자인데 characters 에 없는 샷 151건 — 결정론 합집합이 최종 방어선.
+      const speakerChars = (dialogueByShotId.get(it.shot_id)?.dialogue ?? [])
+        .map((l) => l.character_id)
+        .filter((id): id is string => typeof id === 'string' && !!id)
+      const chars = [...new Set([...blockingChars, ...speakerChars])]
       const characterAppearanceKeys: Record<string, string> = {}
       const sceneMainId = writerSceneIdToMain(sceneId)
       const sceneAppearance = scenesById.get(sceneMainId)
@@ -852,10 +859,11 @@ export async function persistShotsToDb(
                   text: l.line,
                   emotion: '',
                   delivery: l.delivery ?? '',
-                  durationHint: 0,
+                  // #d6: 실발화 초(캘리브레이션 소스 SHOT_PACING) — 영상 프롬프트가 발화 길이를 알게 한다.
+                  durationHint: Math.round(speechSecondsForText(l.line) * 10) / 10,
                 })),
                 ...(r.shotDialogue.narration
-                  ? [{ characterId: null, text: r.shotDialogue.narration, emotion: '', delivery: 'V.O.', durationHint: 0 }]
+                  ? [{ characterId: null, text: r.shotDialogue.narration, emotion: '', delivery: 'V.O.', durationHint: Math.round(speechSecondsForText(r.shotDialogue.narration) * 10) / 10 }]
                   : []),
               ]
             : [],

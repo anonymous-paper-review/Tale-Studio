@@ -7,6 +7,7 @@
 // 얇은 라우트(architecture §2): 인증·zod 검증·소유 확인·위임. 생성 본체는 stages/dialogue.ts 공용.
 // 씬 순차(메모리 캐리)라 한 호출에서 전 씬을 돌고(3~8씬 ≈ 1~2분), 완료 후 일괄 UPDATE.
 import { NextResponse } from 'next/server'
+import { speechSecondsForText } from '@/lib/writer/pipeline/util/duration_reallocation'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { requireProjectAccess } from '@/lib/api/guard'
@@ -86,10 +87,10 @@ export async function POST(req: Request) {
             text: l.line,
             emotion: '',
             delivery: l.delivery ?? '',
-            durationHint: 0,
+            durationHint: Math.round(speechSecondsForText(l.line) * 10) / 10, // #d6
           })),
           ...(sh.narration
-            ? [{ characterId: null, text: sh.narration, emotion: '', delivery: 'V.O.', durationHint: 0 }]
+            ? [{ characterId: null, text: sh.narration, emotion: '', delivery: 'V.O.', durationHint: Math.round(speechSecondsForText(sh.narration) * 10) / 10 }]
             : []),
         ]
         lineCount += sh.dialogue.length

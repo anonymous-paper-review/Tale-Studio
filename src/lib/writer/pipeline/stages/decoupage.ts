@@ -4,11 +4,11 @@
 //   - 샷 개수는 연출적 결정 (shot_count_target은 힌트일 뿐)
 //   - ADD: 스토리에 없는 establishing/reaction/insert/cutaway 추가 = 연출의 핵심
 //   - 리듬 저작 (establish→develop→punctuate→breath) = "뇌 아픈 영상" 해독제
-//   - 시간 제약은 validator (각 샷 5~15초). action_budget이 후단에서 검증.
+//   - 시간 제약은 persist 직전 결정론 재배분(duration_reallocation, 2~10초 밴드)이 수렴시킨다.
 //
 // 출력 DecoupagePlan은 V4 입력으로 사용됨 (V4가 각 샷에 3분할 spec을 붙임).
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
-import { SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX } from '@/lib/writer/pipeline/physics';
+import { DURATION_RUBRIC, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX } from '@/lib/writer/pipeline/physics';
 import { REPRESENTATIVE_DEPTHS, REPRESENTATIVE_SHOT_CAP } from '@/lib/writer/pipeline/budget';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import type {
@@ -127,6 +127,7 @@ ${cameraContract}
 
 == 시간 제약 (validator) ==
 - 각 샷 intended_duration_seconds는 ${SHOT_SECONDS_RANGE} (짧고 스냅있게). 1개 주요 액션이 들어맞는 길이. 긴 침묵 등 예외만 최대 ${SHOT_SECONDS_HARD_MAX}.
+- ${DURATION_RUBRIC}
 - 한 샷에 액션을 몰아넣지 마라. 액션이 크거나 여러 개면 split으로 나눠라.${outputLanguageClause(outputLocale)}`;
 }
 
@@ -226,7 +227,7 @@ ${JSON.stringify(worldVisual.locations.filter((loc) => loc.id === scene.location
       "beat_summary": "이 샷이 담는 내용 (영어)",
       "beat_summary_native": "beat_summary와 같은 내용을 씬 텍스트(scene_actions)와 같은 언어로 — 연출 용어 없이 이야기 문장으로",
       "shot_size": "EWS" | "WS" | "FS" | "MFS" | "MS" | "MCU" | "CU" | "ECU" | "OTS" | "2S" | "POV",
-      "intended_duration_seconds": 6,
+      "intended_duration_seconds": 4,
       "rhythm_role": "establish" | "develop" | "punctuate" | "sustain" | "accelerate" | "breath",
       "camera_intent": "static" | "motivated_move",
       "camera_move_motivation": "motivated_move일 때만",

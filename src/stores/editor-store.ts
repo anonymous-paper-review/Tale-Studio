@@ -250,7 +250,9 @@ export function selectTimelineLayout(
     if (!shot) continue
     const base = shot.durationSeconds
     const trimStart = clip?.trimStart ?? 0
-    const trimEnd = clip?.trimEnd ?? base
+    // #d11: 수동 트림이 없으면 실측 파일 길이로 자동 트림 — 계획이 실제보다 길면(시간 인플레이션
+    //   +모델 최소 길이) 영상이 끝난 뒤 죽은 꼬리가 재생되던 것을 잘라낸다.
+    const trimEnd = clip?.trimEnd ?? Math.min(base, clip?.actualDurationSec ?? base)
     const speed = clip?.speed ?? 1.0
     const durationSec = Math.max(0.1, (trimEnd - trimStart) / speed)
     out.push({ shotId, startSec: cursor, durationSec })

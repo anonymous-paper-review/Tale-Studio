@@ -272,6 +272,31 @@ export default function PostPage() {
       if (cancelled) return
       await loadPersisted()
       if (cancelled) return
+      // #d11(2026-08-31 오너 확정): 실제 영상 파일 길이 측정 — 계획 duration 보다 짧은 파일
+      //   (시간 인플레이션·모델 최소 길이 산물)은 타임라인이 실측 길이로 자동 트림한다.
+      //   메타데이터만 로드하고 실패는 무시(측정 불가 시 종전 동작 그대로).
+      void Promise.all(
+        useEditorStore
+          .getState()
+          .videoClips.filter((c) => c.url && c.actualDurationSec == null)
+          .map(
+            (c) =>
+              new Promise<void>((resolve) => {
+                const v = document.createElement('video')
+                v.preload = 'metadata'
+                v.onloadedmetadata = () => {
+                  if (!cancelled && Number.isFinite(v.duration) && v.duration > 0) {
+                    useEditorStore.getState().updateVideoClip(c.shotId, {
+                      actualDurationSec: Math.round(v.duration * 10) / 10,
+                    })
+                  }
+                  resolve()
+                }
+                v.onerror = () => resolve()
+                v.src = c.url as string
+              }),
+          ),
+      )
       // Director→Editor 첫 진입: 저장된 오디오가 없으면 각 샷 오디오를 영상 카드처럼
       //   '즉시' 한 번에 트랙에 올린다(빈 파형) → 파형/실제 길이는 백그라운드 병렬 디코드로 채움.
       //   (영상은 음소거 재생 + 오디오는 별도 트랙 구조. 소리는 <audio>로 나므로 디코드 전에도 재생됨)

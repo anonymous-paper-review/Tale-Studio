@@ -108,6 +108,10 @@ export interface VideoClip {
   trimStart?: number  // seconds, client-only for P5 crop
   trimEnd?: number    // seconds, client-only for P5 crop
   speed?: number      // 0.25 ~ 4.0, default 1.0
+  // #d11(2026-08-31 오너 확정): 실제 영상 파일 길이(초) — 에디터가 로드 시 메타데이터로 측정.
+  //   파생값이라 DB 미저장(architecture §0). 계획(durationSeconds)보다 짧으면 타임라인이
+  //   이 길이로 자동 트림해 죽은 꼬리를 없앤다(모델 최소 길이 3~4s 파일이 긴 계획 슬롯에 앉는 사례).
+  actualDurationSec?: number
 }
 
 /**

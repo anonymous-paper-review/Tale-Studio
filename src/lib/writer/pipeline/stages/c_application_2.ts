@@ -571,9 +571,10 @@ function buildShotSequenceItemFromDesign(
       composition_prompt: st.first_frame_prompt,
     },
     video_generation: { motion_prompt: dyn.motion_prompt },
+    // #duration-surgery(2026-08-31): 보조 액션 1 캡 해제 — 계산기가 실제 수를 읽는다(감사 D2).
     action_budget: {
       primary_action_count: 1,
-      secondary_action_count: motionCount > 1 ? 1 : 0,
+      secondary_action_count: Math.max(0, motionCount - 1),
       camera_movement_complexity:
         cameraType === 'static' ? 'none' : dyn.camera_motion?.magnitude === 'large' ? 'complex' : 'simple',
       environmental_changes: (dyn.environmental_change ?? []).length,
@@ -585,5 +586,9 @@ function buildShotSequenceItemFromDesign(
       changes: [],
       is_scene_transition: design.intent.shot_position_in_scene === 'opening',
     },
+    // #duration-surgery: v4 의 "LONG TAKE — …" 선언을 재배분 감액 면제 태그로 매핑.
+    ...(/^\s*LONG TAKE/i.test(design.intent.duration_justification ?? '')
+      ? { pacing_intent: 'long_take' as const }
+      : {}),
   };
 }

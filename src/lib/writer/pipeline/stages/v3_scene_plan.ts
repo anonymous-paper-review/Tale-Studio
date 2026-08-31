@@ -161,7 +161,7 @@ ${sceneToShotHint}
       "spatial_axis_180": { "from_char": "id_a", "to_char": "id_b" },
       "rhythm_profile": "sustained",
       "cut_pace": "medium",
-      "avg_shot_seconds": 8,
+      "avg_shot_seconds": 5,
       "visual_intent": "한 줄로: 왜 이 씬을 이 패턴으로 찍는가"
     }
   ]

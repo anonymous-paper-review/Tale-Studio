@@ -6,7 +6,7 @@
 // 입력: V3 SceneVisualPlan으로 씬 디시플린이 잡혀 있어, 자유도가 제한됨.
 //        각 샷은 V3 vocabulary 안에서만 결정.
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
-import { SHOT_PHYSICS, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/writer/pipeline/physics';
+import { DURATION_RUBRIC, SHOT_PHYSICS, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX, MOTION_PROMPT_CHARS, FIRST_FRAME_CHARS } from '@/lib/writer/pipeline/physics';
 // 모션 어휘(#motion-vocab 2026-08-11) — 지시서의 낱말 목록은 여기서만 온다.
 //   손으로 다시 적으면 교정기와 갈라진다. 갈라짐이 실제 사고였다: 옛 지시서는 카메라 유형 9종 중
 //   3종만 보이고 `...` 로 끝나 있었고, 모델은 못 본 어휘를 지어냈다(`pan_right`).
@@ -469,7 +469,10 @@ V4는 3분할:
 - static_spec: framing.focal_point, framing.layers.foreground/midground/background,
   lighting.quality, lighting.key_direction, character_blocking[].pose/gaze/position_in_frame,
   prop_placement[].position_in_frame/significance, texture_notes, color_grading_intent, first_frame_prompt
-- character_blocking 은 **사람(person) 캐스트만** 넣는다. 사물(object) 캐스트·소품(들고 다니는
+- character_blocking 에는 **화면에 보이는 사람 캐스트 전원**을 넣는다 — 연기하지 않는 인물
+  (원경에서 발견당하는 사람, 지나가는 조연 등)도 포함하고 pose 를 정적으로 적어라(예: "standing
+  in the far background"). 이 목록이 곧 이미지 생성의 캐릭터 레퍼런스 명부다 — 여기서 빠지면
+  그 인물은 익명으로 그려진다(실측: 원경의 남주가 아무 여인으로 렌더). 단 **사람(person) 캐스트만** 넣는다. 사물(object) 캐스트·소품(들고 다니는
   물건 포함)은 반드시 prop_placement 로 — blocking 에 넣으면 스토리보드가 그 사물을 목각
   인형(사람)으로 그린다(실측: 가슴에 멘 엿판이 '안긴 아기'로 렌더된 사고).
 - static_spec 은 **모션 시작 직전의 순간**이다. dynamic_spec 의 motion_prompt/character_motion 이
@@ -488,7 +491,8 @@ ${disciplineSection}
 
 샷 분배 원칙:
 - 1 샷 = ${SHOT_SECONDS_RANGE} (짧고 스냅있게)${compactMode ? '' : ' (V3.avg_shot_seconds 기준 ±2)'}. 긴 침묵 등 예외만 최대 ${SHOT_SECONDS_HARD_MAX}.
-- duration은 story_beat의 무게에 따라 가변 (긴 침묵 = 길게, 빠른 액션 = 짧게)
+- ${DURATION_RUBRIC}
+- duration_justification 에는 위 규칙의 **산수를 그대로 적어라** (예: "base 1.2 + medium 2.0 = 3.2 → 4s"). 산수 없는 정성 서술 금지.
 
 V4c (Dynamic) 작성 규칙 (가장 중요):
 - character_motion.verb: 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개 이내, 순차 표현 금지
@@ -556,8 +560,8 @@ ${compactMode ? `씬 길이(${scene.estimated_seconds}초)와 액션 수에 따�
         "scene_id": "${scene.scene_id}",
         "story_beat_ref": 0,
         "dramatic_purpose": "...",
-        "duration_seconds": 8,
-        "duration_justification": "...",
+        "duration_seconds": 4,
+        "duration_justification": "base 1.2 + medium 2.0 + camera 0.5 = 3.7 → 4s",
         "audience_focus": "...",
         "shot_position_in_scene": "opening" | "developing" | "climax" | "resolution" | "transition"
       },

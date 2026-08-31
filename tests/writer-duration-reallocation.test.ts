@@ -1,11 +1,13 @@
-// 인지 부하 기반 시간 재배분(#p2-pacing 2026-08-04) 회귀 — 진단: lab/previz-quality/REPORT.md §7
+// 인지 부하 기반 시간 재배분(#p2-pacing 2026-08-04 → #duration-surgery 2026-08-31 개정) 회귀.
 //
-// 계약:
-//   1. 재배분은 **증액만** 한다 — 저부하 롱테이크를 줄이지 않는다 (연출 의도 보존).
-//   2. 대사 발화 시간(한글 ~4.5자/초, 라틴 ~13자/초 + 호흡)이 샷 길이에 반영된다 —
-//      "2초 샷에 대사 1줄" (실측 6/26) 재발 방지.
-//   3. 신규 인물 첫 등장·씬 오프닝은 리딩 타임을 가산받는다.
-//   4. 상한(10s)은 persist 클램프와 정합 — 초장문 대사도 상한을 넘기지 않는다.
+// 계약 (2026-08-31 오너 확정):
+//   1. **양방향 밴드** — 부족하면 ceil(needed)까지 증액, ceil(needed)+slack(2s) 초과분은 그
+//      경계까지 감액. pacing_intent='long_take' 는 감액 면제(증액은 적용).
+//   2. 대사 = 실발화 1배(한글 ~4.5자/초, 라틴 ~13자/초) + 고정 여백 0.5s — 종전 이중 여백
+//      (호흡 0.5 + 문맥 1.0 = 1.5s, 실측 1.9배 과대) 폐지.
+//   3. needed 는 dynamic_spec 의 동사별 magnitude 를 실제로 읽는다(micro 0.6/small 1.2/
+//      medium 2.0/large 3.0 + base 1.2). 스펙 미보유만 종전 근사 폴백.
+//   4. 신규 인물 첫 등장·씬 오프닝 가산, 바닥 2s(인서트), 상한 10s — persist 클램프 정합.
 //   5. 급전환 검출은 같은 씬 인접 3단계↑ 점프만 잡고, 인서트 복귀 문법은 면제한다.
 import { describe, it, expect } from 'vitest'
 import {
@@ -63,31 +65,55 @@ function dlg(shotId: string, line: string): [string, ShotDialogue] {
 }
 
 describe('reallocateShotDurations — 인지 부하 규칙', () => {
-  it('대사 있는 2초 샷은 발화 시간만큼 증액된다', () => {
-    // 한글 27자 → 27/4.5=6.0s + 호흡 0.5 + 문맥 1.0 ≈ 7.5 → ceil 8
+  it('대사 있는 2초 샷은 실발화+0.5s 로 증액된다 (이중 여백 폐지)', () => {
+    // 한글 23자 → 23/4.5≈5.1s + 여백 0.5 = 5.6 → ceil 6 (종전 이중 여백이면 7이었다)
     const line = '이 도면이 진짜라면 우리 마을의 가뭄은 전부 조작된 거야'
     const shots = [makeShot({ id: 'shot_1', dur: 2 })]
     const { shots: out, changed } = reallocateShotDurations(shots, new Map([dlg('shot_1', line)]))
-    expect(out[0].duration_seconds).toBeGreaterThanOrEqual(7)
+    expect(out[0].duration_seconds).toBe(6)
     expect(changed).toHaveLength(1)
   })
 
-  it('저부하 롱테이크는 줄이지 않는다 (증액 전용)', () => {
+  it('과대 배정은 ceil(needed)+slack 까지 감액된다 (양방향 밴드)', () => {
+    // 액션 2.0 + 오프닝 1.0 = 3.0 → ceil 3, slack 2 ⇒ 7s 배정은 5s 로 감액
     const shots = [makeShot({ id: 'shot_1', dur: 7 })]
     const { shots: out, changed } = reallocateShotDurations(shots, new Map())
-    expect(out[0].duration_seconds).toBe(7)
+    expect(out[0].duration_seconds).toBe(5)
+    expect(changed).toHaveLength(1)
+  })
+
+  it("pacing_intent='long_take' 는 감액을 면제받는다 (연출 의도 보존)", () => {
+    const shot = { ...makeShot({ id: 'shot_1', dur: 9 }), pacing_intent: 'long_take' as const }
+    const { shots: out, changed } = reallocateShotDurations([shot], new Map())
+    expect(out[0].duration_seconds).toBe(9)
     expect(changed).toHaveLength(0)
+  })
+
+  it('dynamic_spec 이 있으면 동사별 magnitude 를 실제로 읽는다', () => {
+    // base 1.2 + large 3.0 + medium 2.0 + 오프닝 1.0 = 7.2 → ceil 8
+    const shot = {
+      ...makeShot({ id: 'shot_1', dur: 3 }),
+      dynamic_spec: {
+        character_motion: [
+          { verb: 'bursts through the door', magnitude: 'large', character_id: 'c1' },
+          { verb: 'kneels', magnitude: 'medium', character_id: 'c1' },
+        ],
+        camera_motion: { type: 'static' },
+      },
+    } as never as import('@/lib/writer/types/pipeline').ShotSequenceItem
+    const { shots: out } = reallocateShotDurations([shot], new Map())
+    expect(out[0].duration_seconds).toBe(8)
   })
 
   it('신규 인물 첫 등장 샷은 가산받고, 재등장은 가산 없다', () => {
     const shots = [
       makeShot({ id: 'shot_1', dur: 5, chars: ['girl'] }),
       makeShot({ id: 'shot_2', dur: 2, chars: ['girl', 'hunter'] }), // hunter 첫 등장 → 2.0+1.0=3.0
-      makeShot({ id: 'shot_3', dur: 2, chars: ['hunter'] }), // 재등장 → 2.5 바닥
+      makeShot({ id: 'shot_3', dur: 2, chars: ['hunter'] }), // 재등장 → 바닥 2s
     ]
     const { shots: out } = reallocateShotDurations(shots, new Map())
     expect(out[1].duration_seconds).toBe(3)
-    expect(out[2].duration_seconds).toBe(3) // ceil(2.5)
+    expect(out[2].duration_seconds).toBe(2) // 바닥 2s (오너 루브릭: 인서트 = 2초)
   })
 
   it('초장문 대사도 상한(10s)을 넘지 않는다', () => {

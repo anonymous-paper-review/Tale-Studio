@@ -859,6 +859,9 @@ export interface ShotSequenceItem {
   dynamic_spec?: ShotDynamicSpec;
   // shotCheck 채널1: CRITICAL/WARNING 제약 — persist 가 shots.check_notes 로 운반, 생성 프롬프트에 첨부.
   check_notes?: ShotCheckNote[];
+  // #duration-surgery(2026-08-31): 의도적 롱테이크 태그 — 재배분 감액 면제. v4 가
+  //   duration_justification "LONG TAKE — …" 마커로 선언하면 c_application 이 매핑한다.
+  pacing_intent?: 'long_take';
 }
 
 export interface ShotSequence {
