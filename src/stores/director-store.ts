@@ -47,7 +47,21 @@ import {
   type RegisteredCharacter,
 } from '@/stores/asset-storage-store'
 import { createClient } from '@/lib/supabase/client'
+import type { Json } from '@/types/database'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
+import {
+  isEmptyStableFrameInputs,
+  parseStableFrameInputs,
+  parseStableImageInputs,
+  parseStableVideoChain,
+  resolveFrameInputs,
+  resolveImageInputs,
+  serializeFrameInputs,
+  serializeImageInputs,
+  type StableFrameInputs,
+  type StableVideoChain,
+  type StableWiringRef,
+} from '@/lib/director/wiring-persistence'
 import { runVideoAdherence } from '@/lib/director/video-adherence-client'
 import { isDemoSession } from '@/lib/demo/context'
 import {
@@ -152,6 +166,9 @@ type HydratedVideoTake = {
   latestAttemptAt: string | null
   /** #adherence P2: 모션 준수 판정(video_clips.adherence — select * 로 흘러옴). 구행/미검사 = 없음. */
   adherence?: VideoAdherence | null
+  /** #wiring-persistence: 수동 연결 안정 참조 (select * 로 흘러옴). 구행 = 없음. */
+  frame_inputs?: unknown
+  video_chain?: unknown
 }
 type VideoGenerationResponse = {
   error?: string
@@ -840,6 +857,87 @@ function debouncedPositionSaveToDb(
       }
     }, 500),
   )
+}
+
+// #wiring-persistence (2026-08-31): 수동 연결(imageInputs/frameInputs/videoChain)의 DB
+// write-through 스윅. 연결 편집은 진입점이 넓어(와이어링 3종·엣지 삭제·노드 삭제·해제)
+// 개별 추적 대신 debounce 후 전체를 직렬화해 "직전 저장값과 달라진 행만" 쓴다.
+// 노드 id 는 기기-로컬이라 안정 참조(wiring-persistence.ts)로 변환해 저장한다.
+let pendingWiringSweep: ReturnType<typeof setTimeout> | null = null
+const lastSavedWiringByKey = new Map<string, string>()
+
+function scheduleWiringSweepToDb(getState: () => DirectorCanvasState) {
+  if (pendingWiringSweep) clearTimeout(pendingWiringSweep)
+  pendingWiringSweep = setTimeout(async () => {
+    pendingWiringSweep = null
+    const state = getState()
+    const projectId = state.projectId
+    if (!projectId) return
+    const nodes = state.nodes
+    try {
+      const supabase = createClient()
+      for (const node of nodes) {
+        if (getState().projectId !== projectId) return
+        if (isShotData(node.data) && node.data.writerShotId) {
+          const stable = serializeImageInputs(
+            nodes,
+            normalizeImageInputs(node.data.imageInputs),
+          )
+          const key = `shot:${node.data.writerShotId}`
+          const json = JSON.stringify(stable)
+          if (lastSavedWiringByKey.get(key) === json) continue
+          const { error } = await supabase
+            .from('shots')
+            .update({ image_inputs: stable as unknown as Json })
+            .eq('project_id', projectId)
+            .eq('shot_id', node.data.writerShotId)
+          if (error) throw error
+          lastSavedWiringByKey.set(key, json)
+        } else if (isVideoData(node.data) && node.data.videoClipId) {
+          const stableFrames = serializeFrameInputs(
+            nodes,
+            normalizeFrameInputs(node.data.frameInputs),
+          )
+          const framePayload = isEmptyStableFrameInputs(stableFrames)
+            ? null
+            : stableFrames
+          const chainSource = node.data.videoChainInputId
+            ? nodes.find((n) => n.id === node.data.videoChainInputId)
+            : null
+          const chainClipId =
+            chainSource && isVideoData(chainSource.data)
+              ? chainSource.data.videoClipId
+              : null
+          const chainPayload: StableVideoChain | null = chainClipId
+            ? {
+                source_clip_id: chainClipId,
+                frame_url: node.data.videoChainFrameUrl,
+              }
+            : null
+          const key = `clip:${node.data.videoClipId}`
+          const json = JSON.stringify({ f: framePayload, c: chainPayload })
+          if (lastSavedWiringByKey.get(key) === json) continue
+          const response = await fetch(
+            `/api/director/video-takes/${encodeURIComponent(node.data.videoClipId)}`,
+            {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                projectId,
+                frame_inputs: framePayload,
+                video_chain: chainPayload,
+              }),
+            },
+          )
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
+          lastSavedWiringByKey.set(key, json)
+        }
+      }
+    } catch (err) {
+      // fire-and-forget 계약(Step 2와 동일): 실패는 다음 연결 편집/스윅이 재시도한다.
+      console.error('[director-store] wiring DB save failed:', err)
+    }
+  }, 500)
 }
 
 const pendingVideoClipSaves = new Map<string, ReturnType<typeof setTimeout>>()
@@ -1628,6 +1726,30 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               )
             }
           }
+          // #wiring-persistence: DB에 저장된 안정 참조 연결. 노드 재구성 후 resolve 해 복원한다.
+          const stableImageInputsByShotId = new Map<string, StableWiringRef[]>()
+          for (const r of shotsRes.data ?? []) {
+            if (r.shot_id) {
+              stableImageInputsByShotId.set(
+                r.shot_id,
+                parseStableImageInputs((r as { image_inputs?: unknown }).image_inputs),
+              )
+            }
+          }
+          const stableFrameByClipId = new Map<string, StableFrameInputs | null>()
+          const stableChainByClipId = new Map<string, StableVideoChain | null>()
+          for (const row of clipsRes.data ?? []) {
+            const clipId = row.id as string
+            if (!clipId) continue
+            stableFrameByClipId.set(
+              clipId,
+              parseStableFrameInputs((row as { frame_inputs?: unknown }).frame_inputs),
+            )
+            stableChainByClipId.set(
+              clipId,
+              parseStableVideoChain((row as { video_chain?: unknown }).video_chain),
+            )
+          }
           const liveSceneIds = new Set(
             (scenesRes.data ?? []).map((row) => row.scene_id as string).filter(Boolean),
           )
@@ -1796,6 +1918,88 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           })
           // hydrate 로 Video 노드 집합이 바뀌었을 수 있음 — previz 체인 엣지 재배선(멱등).
           get().rebuildShotChainNodes()
+          // #wiring-persistence: DB 안정 참조 → 현재 노드 id 복원. 파생 노드(rebuild)가 생긴 뒤에
+          //   resolve 해야 shotImage 참조가 맞는다. DB가 빈 값이면 로컬 유지(미저장 편집 보존 —
+          //   아래 스윅이 백필한다). DB 값이 있으면 DB가 진실(새 기기에서의 복원 경로).
+          set((s) => {
+            if (s.projectId !== projectId || hydrationEpoch !== hydrationToken) return {}
+            const allNodes = s.nodes
+            let changed = false
+            const nodes = allNodes.map((node) => {
+              if (isShotData(node.data) && node.data.writerShotId) {
+                const stable = stableImageInputsByShotId.get(node.data.writerShotId)
+                if (!stable || stable.length === 0) return node
+                const resolved = resolveImageInputs(allNodes, stable)
+                const local = normalizeImageInputs(node.data.imageInputs)
+                if (
+                  resolved.length === local.length &&
+                  resolved.every((v, i) => v === local[i])
+                ) {
+                  return node
+                }
+                changed = true
+                return {
+                  ...node,
+                  data: { ...node.data, imageInputs: resolved },
+                } as DirectorNode
+              }
+              if (isVideoData(node.data) && node.data.videoClipId) {
+                const stableF = stableFrameByClipId.get(node.data.videoClipId) ?? null
+                const stableC = stableChainByClipId.get(node.data.videoClipId) ?? null
+                let data = node.data
+                let touched = false
+                if (stableF) {
+                  const resolved = resolveFrameInputs(allNodes, stableF)
+                  const local = normalizeFrameInputs(data.frameInputs)
+                  if (
+                    resolved.start !== local.start ||
+                    resolved.end !== local.end ||
+                    resolved.refs.length !== local.refs.length ||
+                    resolved.refs.some((v, i) => v !== local.refs[i])
+                  ) {
+                    data = { ...data, frameInputs: resolved }
+                    touched = true
+                  }
+                }
+                if (stableC) {
+                  const sourceNode = allNodes.find(
+                    (n) =>
+                      isVideoData(n.data) &&
+                      n.data.videoClipId === stableC.source_clip_id,
+                  )
+                  if (
+                    sourceNode &&
+                    (data.videoChainInputId !== sourceNode.id ||
+                      data.videoChainFrameUrl !== stableC.frame_url)
+                  ) {
+                    data = {
+                      ...data,
+                      videoChainInputId: sourceNode.id,
+                      videoChainFrameUrl: stableC.frame_url,
+                    }
+                    touched = true
+                  }
+                }
+                if (!touched) return node
+                changed = true
+                return { ...node, data } as DirectorNode
+              }
+              return node
+            })
+            return changed ? { nodes, lastSavedAt: Date.now() } : {}
+          })
+          // 스윅 캐시 시드 — DB와 같은 값을 다시 쓰지 않게. 로컬 우위로 달라진 항목은
+          //   캐시 미스가 나 아래 스윅이 자연스럽게 백필한다.
+          for (const [shotId, stable] of stableImageInputsByShotId) {
+            lastSavedWiringByKey.set(`shot:${shotId}`, JSON.stringify(stable))
+          }
+          for (const [clipId, stableF] of stableFrameByClipId) {
+            lastSavedWiringByKey.set(
+              `clip:${clipId}`,
+              JSON.stringify({ f: stableF, c: stableChainByClipId.get(clipId) ?? null }),
+            )
+          }
+          scheduleWiringSweepToDb(get)
           // 파생 Shot Image 노드가 다시 만들어진 뒤 persisted frameInputs를 엣지로 복원한다.
           get().rebuildFrameEdges()
           // 파생 Image/Asset 노드가 다시 만들어진 뒤 persisted imageInputs를 엣지로 복원한다.
@@ -2024,6 +2228,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             lastSavedAt: Date.now(),
           }
         })
+        scheduleWiringSweepToDb(get)
       },
 
       wireFrameToVideo: (sourceNodeId, videoNodeId, targetHandle) => {
@@ -2127,6 +2332,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             lastSavedAt: Date.now(),
           }
         })
+        scheduleWiringSweepToDb(get)
       },
 
       wireVideoChainToVideo: async (sourceVideoNodeId, targetVideoNodeId, targetHandle) => {
@@ -2226,6 +2432,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             generationErrors: { ...s.generationErrors, [targetVideoNodeId]: message },
             lastSavedAt: Date.now(),
           }))
+          scheduleWiringSweepToDb(get)
           return false
         }
 
@@ -2285,6 +2492,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           ),
           lastSavedAt: Date.now(),
         }))
+        scheduleWiringSweepToDb(get)
         return true
       },
 
@@ -2511,6 +2719,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         get().rebuildShotChainNodes()
         // Source deletion can leave a target's persisted chain relation without an edge.
         get().rebuildVideoChainEdges()
+        // #wiring-persistence: 소스 삭제로 정리된 입력들을 DB에 반영한다.
+        scheduleWiringSweepToDb(get)
 
         try {
           await Promise.all(
@@ -3046,6 +3256,14 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           selectedEdgeId: s.selectedEdgeId === id ? null : s.selectedEdgeId,
           lastSavedAt: Date.now(),
         }))
+        // #wiring-persistence: frame/image/video-chain 해제도 DB에 반영한다.
+        if (
+          removedEdge?.data?.category === 'frame' ||
+          removedEdge?.data?.category === 'image' ||
+          removedEdge?.data?.category === 'video-chain'
+        ) {
+          scheduleWiringSweepToDb(get)
+        }
       },
 
       // ─── video ─────────────────────────────────────────────────────────

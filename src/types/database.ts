@@ -1080,6 +1080,7 @@ export type Database = {
           check_notes: Json | null
           dynamic_spec: Json | null
           source: string
+          image_inputs: Json
         }
         Insert: {
           id?: string
@@ -1122,6 +1123,7 @@ export type Database = {
           check_notes?: Json | null
           dynamic_spec?: Json | null
           source?: string
+          image_inputs?: Json
         }
         Update: {
           id?: string
@@ -1164,6 +1166,7 @@ export type Database = {
           check_notes?: Json | null
           dynamic_spec?: Json | null
           source?: string
+          image_inputs?: Json
         }
         Relationships: [
           {
@@ -1277,6 +1280,8 @@ export type Database = {
           last_attempt_at: string | null
           last_attempt_job_id: string | null
           adherence: Json | null
+          frame_inputs: Json | null
+          video_chain: Json | null
         }
         Insert: {
           id?: string
@@ -1301,6 +1306,8 @@ export type Database = {
           last_attempt_at?: string | null
           last_attempt_job_id?: string | null
           adherence?: Json | null
+          frame_inputs?: Json | null
+          video_chain?: Json | null
         }
         Update: {
           id?: string
@@ -1325,6 +1332,8 @@ export type Database = {
           last_attempt_at?: string | null
           last_attempt_job_id?: string | null
           adherence?: Json | null
+          frame_inputs?: Json | null
+          video_chain?: Json | null
         }
         Relationships: [
           {
