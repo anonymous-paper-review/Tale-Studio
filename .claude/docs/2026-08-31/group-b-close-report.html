@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>그룹 B를 닫습니다 — 남아 있던 실측을 완주했고, 대사 연기 지시가 지워지던 결함을 찾아 고쳤습니다</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .standfirst{font-size:17.5px;color:var(--ink-2);margin:0 0 14px;max-width:60ch}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.fail{border-left:3px solid var(--fail)}
+  .card.pass{border-left:3px solid var(--pass)}
+  .card.note{border-left:3px solid var(--accent)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:16px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+  .mark{display:inline-block;font-weight:750;font-size:13px;border-radius:4px;
+    padding:2px 9px;margin-top:8px}
+  .m-yes{background:var(--pass-soft);color:var(--pass)}
+  .m-no{background:var(--fail-soft);color:var(--fail)}
+  blockquote{margin:14px 0;padding:14px 18px;background:var(--surface-2);
+    border-left:3px solid var(--line-2);border-radius:0 7px 7px 0;font-size:15px}
+  blockquote p{margin:0 0 8px}
+  blockquote p:last-child{margin:0}
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:12px 0;color:var(--ink-2);
+    white-space:pre-wrap;word-break:break-word}
+  pre b{color:var(--ink)}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:500px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+  .banner{border:2px solid var(--ink);border-radius:10px;padding:22px 26px;margin:26px 0;
+    background:var(--surface)}
+  .banner h3{margin:0 0 10px;font-size:18px}
+  .banner p:last-child{margin-bottom:0}
+  details{margin:12px 0;border:1px solid var(--line);border-radius:8px;padding:0}
+  details summary{cursor:pointer;padding:12px 16px;font-weight:700;font-size:14px;color:var(--ink-2)}
+  details[open] summary{border-bottom:1px solid var(--line)}
+  details .inner{padding:14px 18px}
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  a{color:var(--accent)}
+  img.shot{max-width:100%;border:1px solid var(--line);border-radius:8px;margin:10px 0}
+  .pathnote{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">그룹 B · 채팅 → 실행 연결 · 마감 실측 · 2026-08-31</p>
+  <h1>그룹 B를 닫습니다 — 남아 있던 실측 네 갈래를 실제 화면에서 완주했고, 그 과정에서 대사 연기 지시가 지워지던 결함을 찾아 고쳤습니다</h1>
+  <p class="standfirst">지난 보고서(08-28)가 "아직 모른다"고 남겼던 것들 — 무료 수정이 즉시 되는지, 의도를 얼마나 빗나가는지, 각 화면의 승인 카드가 실제로 뜨는지 — 를 전부 실제 화면에서 확인했습니다. 확인 중에 <b>채팅으로 대사를 고치면 연기 지시(감정·전달 방식)가 통째로 지워지는 결함</b>을 발견해 원인 세 겹을 고치고 다시 확인했습니다. 전부 main에 커밋되어 있습니다.</p>
+  <p class="asof">지출 — <b>유료 이미지·영상 생성 0건.</b> 채팅 언어모델 호출 11회(소액). 테스트 계정의 확인용 프로젝트만 사용, 실제 작업 프로젝트는 건드리지 않음.</p>
+</header>
+
+<!-- 1 -->
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>3분 요약</h2></div>
+  <ul class="plain">
+    <li><b>채팅 명령 11번을 실제 화면에서 보냈고, 의도 분류가 11번 다 맞았습니다.</b> 무료 수정 7건은 즉시 적용, 돈 드는 생성 요청 2건은 승인 카드에서 정확히 멈췄고, 지원 안 하는 영상 요청 1건은 정직하게 거절했고, 막연한 피드백 1건은 멋대로 실행하는 대신 구체안을 제시하고 되물었습니다.</li>
+    <li><b>새로 찾은 결함 하나를 고쳤습니다.</b> 채팅으로 대사 문장만 바꿔도 그 대사에 붙어 있던 감정("경악")·전달 방식("숨을 삼키며 낮게")·길이 힌트가 조용히 지워지고 있었습니다. 이 값들은 나중에 영상의 립싱크·연기 지시로 들어가는 재료라, 지워진 채 영상을 만들면 연기가 밋밋해집니다. 원인 세 겹을 고치고 실제 화면에서 보존을 재확인했습니다.</li>
+    <li><b>영수증의 거짓말 하나도 고쳤습니다.</b> Producer 채팅이 승인 카드를 띄웠을 때, 내부 기록은 "이미 적용됨"으로 남고 있었습니다. 이제 "승인 대기 중"으로 정확히 남고, 승인·거절 결과가 같은 기록에 이어집니다.</li>
+  </ul>
+  <details><summary>이 보고서를 읽고 결정할 것</summary><div class="inner">
+    <p>없습니다. 그룹 B는 이 실측으로 닫힙니다. 다음 작업(그룹 D — 채팅 가이드·수다 9건)의 브랜치 전략 제안은 별도로 전달했습니다.</p>
+  </div></details>
+</section>
+
+<!-- 2 -->
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>설계 ↔ 검증 연결표</h2></div>
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:30%">상위 설계 논의</th><th style="width:35%">발밑에 깔려 있던 사실 전제</th><th>실제 한 일</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>무료 수정은 즉시, 유료 생성은 승인 카드 (08-27 확정 규칙)</td>
+          <td>규칙이 코드에 박혔지만 Director 무료 수정·Writer 수정은 화면 실측이 없었다</td>
+          <td>화면에서 무료 수정 7건 즉시 적용 확인, 생성 요청 2건 카드 정지 확인</td>
+        </tr>
+        <tr>
+          <td>의도 추정이 틀려도 돈 나가기 전에 멈춘다 (하이브리드 결정)</td>
+          <td>"얼마나 자주 빗나가는지" 측정한 적이 없었다</td>
+          <td>발화 11종 기준선 측정 — 11/11 정분류 (표본이 작아 기준선일 뿐)</td>
+        </tr>
+        <tr>
+          <td>실행 불가능한 요청엔 거짓 수락 금지 (08-28 수리)</td>
+          <td>영상 요청 거절 문구는 코드로만 확인된 상태였다</td>
+          <td>화면에서 "채팅에서는 영상 생성을 시작할 수 없습니다" + 대안 안내 확인</td>
+        </tr>
+        <tr>
+          <td>채팅 한 턴 = 영수증 하나 (계측 설계)</td>
+          <td>Producer의 승인 카드 경로만 영수증에 거짓("적용됨")으로 남고 있었다</td>
+          <td>배선 수리 후 화면 실측 — 승인 대기 → 거절 → 건너뜀이 그대로 찍힘</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="sec-lede">설계 판단 자체(규칙이 옳은가)는 실행하지 않았습니다 — 그건 이미 오너가 08-27에 정했습니다.</p>
+</section>
+
+<!-- 3 -->
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>확인 환경 — 무엇으로 재봤나</h2></div>
+  <p>테스트 계정의 확인용 프로젝트(씬 1개·샷 2개, "비 오는 골목의 배달원 도윤" 이야기)를 썼습니다. 이 프로젝트는 화면 확인용으로 만들어둔 것이라 실제 작업물이 아니고, 값을 바꿔도 잃는 것이 없습니다. 대화는 브라우저에서 실제 채팅창에 입력했고, 결과는 화면과 운영 데이터베이스 양쪽에서 대조했습니다.</p>
+  <p>중요한 전제 하나 — 개발 서버 포트 3000에는 <b>다른 작업 브랜치</b>(Director 노드 배선)가 떠 있었습니다. 거기서 재면 엉뚱한 코드를 재는 것이라, main 코드로 포트 3100에 서버를 따로 띄워 쟀습니다.</p>
+</section>
+
+<!-- 4 -->
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>실측 — 보낸 문장 11개와 일어난 일 전부</h2></div>
+  <p class="sec-lede">입력은 채팅창에 넣은 문장 그대로입니다. "적용"은 화면 반응과 데이터베이스 값 변화를 둘 다 확인한 것만 적었습니다.</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:8%">화면</th><th style="width:44%">보낸 문장 (원문 그대로)</th><th>일어난 일</th><th style="width:12%">판정</th></tr></thead>
+      <tbody>
+        <tr><td>Director</td><td>"Shot 2 (sh_01_02)의 카메라 vertical 값을 정확히 3으로 변경해줘. 영상이나 이미지 생성은 하지 마."</td><td>즉시 적용. DB의 카메라 수직값 0→3. 영수증: 적용 1건</td><td><span class="mark m-yes">즉시 적용</span></td></tr>
+        <tr><td>Director</td><td>"Shot 1 분위기가 너무 밝은 것 같아. 더 어둡고 무거운 느낌이었으면 좋겠어."</td><td>멋대로 실행하지 않고 조명 조정안(밝기·색온도·방향)을 제시한 뒤 되물음. "이미지 재생성은 하지 않고 값만 변경합니다" 명시</td><td><span class="mark m-yes">되물음</span></td></tr>
+        <tr><td>Director</td><td>"Shot 1 (sh_01_01) 영상을 생성해줘."</td><td>"현재 채팅에서는 영상 생성을 시작할 수 없습니다. Video take 버튼을 직접 클릭하시면…" — 거짓 수락 없음</td><td><span class="mark m-yes">정직 거절</span></td></tr>
+        <tr><td>Director</td><td>"Shot 1 (sh_01_01)의 스토리보드 이미지를 생성해줘."</td><td>승인 카드 표시("비용 발생·승인 전 실행 없음"). "나중에" 클릭 → 영수증이 건너뜀으로 마감. 생성 0건</td><td><span class="mark m-yes">카드 정지</span></td></tr>
+        <tr><td>Director</td><td>"Shot 2에서 도윤 손이 떨리는 게 보였으면 좋겠어. 그리고 마지막에 카메라가 살짝 흔들렸으면." <i>(과거 오분류 사고의 원문 유형)</i></td><td>영상을 만들려 들지 않고 무료 수정 2건 적용 — 카메라 흔들림값 DB 반영, 프롬프트 보강은 캔버스에 반영(아래 정직 보고 참조)</td><td><span class="mark m-yes">즉시 적용</span></td></tr>
+        <tr><td>Writer</td><td>"Scene 1 Shot 2의 대사를 정확히 "왜… 내 이름이 여기 있어."로 바꿔줘. 감정과 전달 방식은 유지하고, 이미지나 영상 생성은 하지 마."</td><td>대사 문장은 정확히 교체됐지만 <b>감정·전달 방식·길이 힌트가 지워짐</b> → 결함 발견 (5절)</td><td><span class="mark m-no">결함 발견</span></td></tr>
+        <tr><td>Producer</td><td>"장르를 액션 스릴러로 바꿔줘."</td><td>비어 있던 세부 장르 칸에 "action"을 채움 — 빈 칸 채우기는 즉시 반영 규칙대로 카드 없이 적용. 기존 장르는 유지</td><td><span class="mark m-yes">즉시 적용</span></td></tr>
+        <tr><td>Producer</td><td>"장르를 로맨스로 완전히 바꿔줘. 기존 스릴러는 버려."</td><td>기존 값 덮어쓰기 → 승인 카드 표시("승인 전에는 현재 값 유지"). "나중에" 클릭 → 기존 장르 그대로. 영수증: 승인 대기 → 건너뜀</td><td><span class="mark m-yes">카드 정지</span></td></tr>
+        <tr><td>Writer ×3</td><td>대사 교체 재시도 3회 (수리 단계별 재검증 — "이건… 내 이름이잖아." → "내 이름이… 왜 여기에." → "내 이름… 이게 왜 여기 적혀 있어.")</td><td>1·2차는 여전히 유실(수리가 아직 화면에 안 실린 상태), 3차(수리 완성 후)는 <b>문장 교체 + 감정·전달 방식·길이 힌트 전부 유지</b></td><td><span class="mark m-yes">수리 확인</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><b>의도 분류 기준선: 11/11 정분류.</b> 표본이 작으니 "이제 안 틀린다"가 아니라 "새 지시문 배포 후 첫 기준선"으로 읽어야 합니다.</p>
+  <img class="shot" src="media/b3c-director-image-card.png" alt="Director 채팅의 스토리보드 이미지 생성 승인 카드 — 비용 발생 고지와 승인/나중에 버튼">
+  <p class="pathnote">Director 이미지 생성 승인 카드 (승인하지 않고 닫음 — 과금 0)</p>
+  <img class="shot" src="media/producer-source-patch-card.png" alt="Producer 원천 변경 승인 카드 — 변경 필드 genre, 승인 전 현재 값 유지 고지">
+  <p class="pathnote">Producer 원천 변경 승인 카드 (장르 덮어쓰기가 카드에 걸린 장면)</p>
+</section>
+
+<!-- 5 -->
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>발견한 결함 — 대사를 고치면 연기 지시가 지워진다</h2></div>
+  <div class="card fail">
+    <div class="card-head"><h3>맥락 → 가설 → 확인 → 결과</h3><span class="chip c-fail">데이터 유실</span><span class="chip c-pass">수리·재확인</span></div>
+    <p><b>맥락.</b> Writer 수정 실측 중, 대사 문장만 바꿨는데 그 대사에 붙어 있던 감정("경악")·전달 방식("숨을 삼키며 낮게")·길이 힌트(2초)가 데이터베이스에서 사라졌습니다. 이 값들은 영상 생성 프롬프트의 대사 절(그룹 G에서 8-27에 배선한 립싱크·연기 지시)이 그대로 가져다 쓰는 재료입니다. 지워진 채 영상을 만들면 "어떻게 말하는지"를 모델이 모릅니다.</p>
+    <p><b>가설.</b> 원인 후보 세 겹 — ① 모델에게 보여주는 대본 요약이 대사 문장만 보여줘서 모델이 나머지 필드의 존재를 모른다, ② 지시문의 예시 자체가 "화자+문장" 2개 필드만 재제출하도록 가르친다, ③ 모델이 필드를 다 보내도 서버의 검증 단계가 화자+문장 외 전부를 버린다.</p>
+    <p><b>확인.</b> 단계별로 고치고 매번 같은 실측을 반복했습니다. ①만 고치면 → 여전히 유실. ②까지 고치면 → 여전히 유실. 코드를 읽어 ③을 확인하니 검증 함수가 실제로 화자+문장만 남기고 있었습니다. ③까지 고치고 화면을 새로고침(수정 전 화면 코드가 브라우저에 남아 있었음)한 뒤 → <b>문장 교체 + 세 필드 전부 유지.</b></p>
+    <p><b>결과.</b> 세 겹 전부 수리해 커밋했습니다. 유지 규칙은 자동 시험으로 잠갔습니다(정상 필드는 통과, 정체불명 필드·불량 값은 여전히 차단).</p>
+    <pre><b>수리 전</b> 대사 수정 후: {"text":"…","characterId":"char_doyun"}            ← 감정·전달·길이 증발
+<b>수리 후</b> 대사 수정 후: {"text":"…","emotion":"경악","delivery":"숨을 삼키며 낮게",
+                        "characterId":"char_doyun","durationHint":2}   ← 전부 유지</pre>
+    <p class="pathnote">커밋 4c8c1fb — 대본 요약 직렬화 · 채팅 지시문 예시 · 검증 함수 세 곳</p>
+  </div>
+  <div class="card note">
+    <div class="card-head"><h3>같은 원리의 영수증 거짓말 — Producer 승인 카드</h3><span class="chip c-pass">배선 수리·실측</span></div>
+    <p>Producer 채팅이 승인 카드를 띄우는 경우, 내부 영수증에는 무조건 "적용 1건"으로 적히고 있었습니다 — 승인 전인데도. 이제 실제 결과대로 적힙니다: 즉시 적용이면 "적용", 카드로 갔으면 "승인 대기", 카드 자리가 이미 차 있어 보류됐으면 "건너뜀". 위 4절의 "로맨스" 실측에서 승인 대기 → (거절) → 건너뜀이 데이터베이스에 그대로 찍히는 것까지 확인했습니다.</p>
+    <p class="pathnote">커밋 05c20f8 — 승인/거절이 같은 영수증에 이어지도록 제안에 영수증 번호를 실음</p>
+  </div>
+</section>
+
+<!-- 6 -->
+<section>
+  <div class="sec-head"><span class="sec-num">6</span><h2>확실한 것과 아직 모르는 것</h2></div>
+  <div class="split">
+    <div class="yes">
+      <h4>이건 확실합니다</h4>
+      <ul>
+        <li>다섯 화면(기획·대본·이미지·연출·편집 중 채팅이 있는 넷)의 <b>무료 수정 즉시 / 유료 생성 카드 / 미지원 정직 거절</b> 경계가 실제 화면에서 규칙대로 동작한다</li>
+        <li>채팅 한 턴마다 영수증이 남고, 적용·승인 대기·거절·건너뜀이 사실대로 찍힌다</li>
+        <li>대사 수정이 연기 지시를 더 이상 지우지 않는다 (실측 재확인 + 자동 시험 잠금)</li>
+        <li>이번 확인에서 유료 생성은 한 건도 실행되지 않았다</li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>이건 아직 모릅니다 (정직 보고)</h4>
+      <ul>
+        <li><b>의도 분류 기준선은 표본 11개다.</b> 실사용 문장은 더 다양하다 — 빗나가도 카드에서 멈추는 구조는 확인됐지만, 빈도는 계속 쌓아야 한다</li>
+        <li>Director 채팅이 프롬프트를 보강한 것은 <b>캔버스에만 반영되고 데이터베이스엔 저장되지 않는다</b> — 이건 이번 결함이 아니라 기존 설계의 예약석(연출 화면의 사람 편집은 별도 저장 체계 예정)이다. 화면을 완전히 닫았다 열면 사라질 수 있다</li>
+        <li>영상 생성을 채팅 승인 카드로 잇는 것은 만들지 않았다 — 의도된 미지원이며, Director 노드 배선 작업(별도 브랜치 진행 중)의 몫이다</li>
+        <li>확인용 프로젝트에는 이번 실측이 남긴 값 변화(카메라 수직 3·흔들림 2, 세부 장르 "action", 대사 문장)가 남아 있다 — 픽스처를 다시 돌리면 초기화된다</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section>
+  <div class="sec-head"><span class="sec-num">7</span><h2>결론 — 그룹 B 폐문</h2></div>
+  <div class="banner" style="border-color:var(--pass)">
+    <h3 style="color:var(--pass)">"알겠다"고 하고 실행하지 않던 채팅은 끝났습니다</h3>
+    <p>다섯 이슈 전부: 무반응(해소·실측) · 지정 행동 무시(해소·실측) · 의도 오해(해소·기준선 측정) · 거짓 수락(해소·실측) · 수정→반영 연계(전 화면 실측). 이 실측이 재현되지 않는 새 사례가 나오면 그때 새 이슈로 엽니다.</p>
+  </div>
+</section>
+
+<footer>
+  <p><b>이 문서가 근거로 쓴 것</b> — 확인용 프로젝트의 채팅 화면 실측(2026-08-31 오전, 문장 11개 원문 그대로 수록), 운영 데이터베이스의 영수증·샷 데이터 원문(영수증 번호 569db874·0195f006·68b905c6·b5bcc36b·2c55bd96·377c1fcf·a8977f78 외), 승인 카드 스크린샷 2장, 자동 시험(제품 핵심 1,546건 통과 — 다른 세션이 먼저 고쳐둔 내보내기 시험 4건 실패는 이 작업과 무관), main 커밋 05c20f8·4c8c1fb.</p>
+  <p><b>이 문서가 하지 않는 것</b> — 생성된 그림·영상의 품질 판정(오너 영역, 이번엔 생성 자체가 없음). 의도 분류의 장기 정확도 보증. 영상 생성 카드의 설계.</p>
+  <p style="margin-top:10px">정본 경로 — <code>.claude/docs/2026-08-31/group-b-close-report.html</code> · 작업 원장 — <code>.claude/docs/2026-08-26/group-b-chat-execution.md</code> · 이전 보고 — <code>.claude/docs/2026-08-28/group-b-approval-report.html</code></p>
+</footer>
+
+</div>
+</body>
+</html>
