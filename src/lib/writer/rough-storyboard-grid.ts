@@ -317,7 +317,11 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
       ? 'the numbered figure(s) above and any people described in the fg/mg/bg layers are the SAME subjects — draw each subject only once (no plain duplicate mannequin alongside them); anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them'
       : blocking.length
         ? 'anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them'
-        : null
+        : figureCount === 0
+          // #w4(2026-08-31, 감사 W4): 무인물 셀은 personLine 도 비어 "사람 없음"을 아무도
+          //   말하지 않았다 — moment 에 스친 인물을 모델이 그려 넣는 구멍.
+          ? 'this panel has NO people — anyone mentioned in the moment is OFF-SCREEN; draw the scene without any figure'
+          : null
   const setting = [stripColor(input.location), input.timeOfDay].filter(Boolean).join(', ')
   const focal =
     stripColor(s?.framing?.focal_point) ||
