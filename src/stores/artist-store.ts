@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { displayNameOf } from '@/lib/display-name'
-import type { SceneManifest, CharacterAsset, WorldAsset } from '@/types'
-import { type CharacterViewKey } from '@/types/asset'
+import type { SceneManifest, CharacterAppearance, CharacterAsset, WorldAsset } from '@/types'
+import { type CharacterViewKey, type NarrativeTime } from '@/types/asset'
+import type { ImageModelKey } from '@/lib/image-models'
 import { candidateViewToViewKey, classifyImageStale, computeLookFingerprint, computeWorldImageSourceHash, type CandidateImage, type LookTokens } from '@/lib/image-provenance'
 import {
   buildWorldShotPromptForLocation,
@@ -40,7 +41,22 @@ export type ImageProvider = 'fal' | 'gemini' | 'tailscale'
 
 export type CharacterRole = 'protagonist' | 'antagonist' | 'supporting'
 
-/** per-view 생성 실패(reload-survivable) — generation-status 엔드포인트로 채움. characterId → view → 실패정보. */
+export type CharacterAppearanceSlot = {
+  characterId: string
+  appearanceKey: string
+  view: CharacterViewKey
+}
+
+export function sameCharacterAppearanceSlot(
+  slot: CharacterAppearanceSlot,
+  characterId: string,
+  appearanceKey: string,
+  view: CharacterViewKey,
+): boolean {
+  return slot.characterId === characterId && slot.appearanceKey === appearanceKey && slot.view === view
+}
+
+/** per-appearance/per-view 생성 실패(reload-survivable). */
 export interface ViewFailure {
   error: string | null
   moderation: boolean
@@ -48,7 +64,15 @@ export interface ViewFailure {
   /** safe-mode(우회) 실패 수 — 우회 버튼 cap 기준(auto 실패와 분리). */
   safeFailCount: number
 }
-export type ViewFailures = Record<string, Record<string, ViewFailure>>
+export type ViewFailures = Record<string, Record<string, Record<string, ViewFailure>>>
+
+export function requireDefaultAppearanceKey(character: CharacterAsset): string {
+  const defaults = character.appearances.filter((appearance) => appearance.isDefault)
+  if (defaults.length !== 1) {
+    throw new Error(`Character ${character.characterId} requires exactly one default appearance`)
+  }
+  return defaults[0].appearanceKey
+}
 
 /** 새 캐릭터 생성 입력 (+버튼 Dialog / 채팅 createCharacter 공용) */
 export interface NewCharacterInput {
@@ -68,6 +92,8 @@ export type ArtistUpdate =
       views?: CharacterViewKey[]
       /** 재생성 시 유저 요청 델타(merge, AC13) — generate-sheet instruction 으로 전달. */
       instruction?: string
+      /** 이미지 생성 모델 선택(image-models 키). 미지정 = 기본 모델. */
+      model?: ImageModelKey
     }
   | { type: 'regenerateWorldAsset'; locationId: string }
   | ({ type: 'createCharacter' } & NewCharacterInput)
@@ -346,8 +372,8 @@ interface ArtistState {
   worldAssets: WorldAsset[]
   selectedCharacterId: string | null
   selectedLocationId: string | null
-  /** 생성 중인 캐릭터 뷰 키들 — `${characterId}:${view}` (병렬 생성 추적) */
-  generatingViews: string[]
+  /** 생성 중인 모습별 캐릭터 뷰 슬롯. */
+  generatingViews: CharacterAppearanceSlot[]
   /** 생성 중인 로케이션 id 들 (병렬 생성 추적) */
   generatingLocations: string[]
   selectedBoostPreset: string | null
@@ -371,21 +397,25 @@ interface ArtistState {
   /** 단일 뷰 생성 (main=T2I, 방향=main 기반 i2i). 서버가 view 컬럼만 갱신. */
   generateCharacterView: (
     characterId: string,
+    appearanceKey: string,
     view: CharacterViewKey,
     actor?: GenerationActor,
     instruction?: string,
     safeMode?: boolean,
+    model?: ImageModelKey,
     options?: GenerationRequestOptions,
   ) => Promise<GenerationJobReceipt | null>
   /** 모더레이션 우회(safe-mode) 재시도 — 유저 클릭 전용(#A). 서버가 자격/캡 판정, 일반 실패는 원본. */
-  retryCharacterViewSafe: (characterId: string, view: CharacterViewKey) => Promise<void>
+  retryCharacterViewSafe: (characterId: string, appearanceKey: string, view: CharacterViewKey, model?: ImageModelKey) => Promise<void>
   /** generation-status 엔드포인트로 viewFailures 재조회(배지/우회버튼 reload 없이 최신화). */
   refreshViewFailures: () => Promise<void>
   /** main → 4방향(i2i)을 순서대로 생성. 카드 "Generate All Views"용. */
   generateCharacterAllViews: (
     characterId: string,
+    appearanceKey: string,
     actor?: GenerationActor,
     instruction?: string,
+    model?: ImageModelKey,
     options?: GenerationRequestOptions,
   ) => Promise<GenerationJobReceipt | null>
   generateWorldAsset: (
@@ -407,6 +437,11 @@ interface ArtistState {
   markEntered: (projectId: string) => void
   /** 승인된 원천 외형 변경을 로컬 반영(C3 F6) — fixedPrompt 갱신 → 기존 파생 이미지가 stale 로 표시(자동 재생성 없음). */
   applyAppearancePatch: (characterId: string, appearance: string) => void
+  updateCharacterAppearance: (
+    characterId: string,
+    appearanceKey: string,
+    appearance: string,
+  ) => Promise<void>
   reset: () => void
 }
 
@@ -438,6 +473,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           { data: dbLocs },
           { data: dbCandidates },
           { data: project },
+          { data: dbAppearances },
         ] = await Promise.all([
           supabase
             .from('scenes')
@@ -454,20 +490,28 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .eq('project_id', projectId),
           supabase
             .from('character_image_candidates')
-            .select('id, character_id, view, url, source_hash, appearance_hash, is_selected, generated_at')
+            .select('id, character_id, appearance_key, view, url, source_hash, appearance_hash, is_selected, generated_at')
             .eq('project_id', projectId),
           supabase
             .from('projects')
             .select('design_tokens, style_anchor_key')
             .eq('id', projectId)
             .maybeSingle(),
+          // #g4(2026-08-27): 캐릭터의 모습(시점·의상 변형). 기본 모습이 항상 하나 있다.
+          supabase
+            .from('character_appearances')
+            .select('character_id, appearance_key, label, is_default, narrative_time, sheet_url, portrait_url, appearance, appearance_native')
+            .eq('project_id', projectId)
+            .order('is_default', { ascending: false }),
         ])
 
-        // 후보 히스토리: character_id + viewKey 로 그룹핑, generated_at desc 정렬
-        const candidatesByCharView: Record<string, Record<string, CandidateImage[]>> = {}
+        // 후보 히스토리: character_id + appearance_key + viewKey 로 그룹핑한다.
+        const candidatesByAppearanceView: Record<string, Record<string, Record<string, CandidateImage[]>>> = {}
         for (const row of dbCandidates ?? []) {
+          if (!row.appearance_key) continue
           const viewKey = candidateViewToViewKey(row.view)
-          const charMap = candidatesByCharView[row.character_id] ?? {}
+          const appearanceMap = candidatesByAppearanceView[row.character_id] ?? {}
+          const charMap = appearanceMap[row.appearance_key] ?? {}
           const list = charMap[viewKey] ?? []
           list.push({
             id: row.id,
@@ -478,12 +522,15 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             generatedAt: row.generated_at,
           })
           charMap[viewKey] = list
-          candidatesByCharView[row.character_id] = charMap
+          appearanceMap[row.appearance_key] = charMap
+          candidatesByAppearanceView[row.character_id] = appearanceMap
         }
         // generated_at desc 정렬
-        for (const charMap of Object.values(candidatesByCharView)) {
-          for (const key of Object.keys(charMap)) {
-            charMap[key].sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
+        for (const appearanceMap of Object.values(candidatesByAppearanceView)) {
+          for (const charMap of Object.values(appearanceMap)) {
+            for (const key of Object.keys(charMap)) {
+              charMap[key].sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
+            }
           }
         }
         const dbScenes = (scenes ?? []).map((s) => ({
@@ -530,9 +577,28 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             })),
             locations: dbLocations,
           }
+          // 캐릭터별 모습 묶음(#g4). 하나뿐이면 카드는 지금과 똑같이 보인다.
+          const appearancesByChar = new Map<string, CharacterAppearance[]>()
+          for (const a of dbAppearances ?? []) {
+            const list = appearancesByChar.get(a.character_id as string) ?? []
+            list.push({
+              appearanceKey: a.appearance_key as string,
+              label: a.label as string,
+              isDefault: !!a.is_default,
+              narrativeTime: (a.narrative_time as NarrativeTime | null) ?? null,
+              sheetUrl: (a.sheet_url as string | null) ?? null,
+              portraitUrl: (a.portrait_url as string | null) ?? null,
+              appearance: (a.appearance as string | null) ?? null,
+              appearanceNative: (a.appearance_native as string | null) ?? null,
+              viewCandidates: candidatesByAppearanceView[a.character_id as string]?.[a.appearance_key as string] ?? {},
+            })
+            appearancesByChar.set(a.character_id as string, list)
+          }
+
           const characterAssets: CharacterAsset[] = (dbChars ?? []).map((c) => ({
             characterId: c.character_id,
             name: displayNameOf(c.name, c.character_id),
+            appearances: appearancesByChar.get(c.character_id as string) ?? [],
             views: {
               main: c.view_main ?? null,
               back: c.view_back ?? null,
@@ -545,7 +611,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             // 생성·stale 은 fixedPrompt(영어 base), 표시는 appearance_native(유저 언어). 없으면 EN 폴백. (S2)
             appearanceNative: c.appearance_native ?? c.appearance ?? '',
             portrait: c.portrait ?? null,
-            viewCandidates: candidatesByCharView[c.character_id] ?? {},
+            viewCandidates: {},
             lookFingerprint: computeLookFingerprint(designTokens, c.costume, styleAnchorKey),
             origin: c.origin === 'writer' ? 'writer' : 'producer',
           }))
@@ -596,17 +662,19 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               const { failures, queuedMain } = (await res.json()) as {
                 failures: Array<{
                   characterId: string
+                  appearanceKey: string
                   view: string
                   error: string | null
                   failCount: number
                   safeFailCount: number
                   moderation: boolean
                 }>
-                queuedMain: Array<{ characterId: string; jobId: string }>
+                queuedMain: Array<{ characterId: string; appearanceKey: string; jobId: string }>
               }
               const vf: ViewFailures = {}
               for (const f of failures) {
-                ;(vf[f.characterId] ??= {})[f.view] = {
+                if (!f.appearanceKey) continue
+                ;((vf[f.characterId] ??= {})[f.appearanceKey] ??= {})[f.view] = {
                   error: f.error,
                   moderation: f.moderation,
                   failCount: f.failCount,
@@ -614,13 +682,20 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
                 }
               }
               set({ viewFailures: vf })
-              for (const { characterId, jobId } of queuedMain) {
+              for (const { characterId, appearanceKey, jobId } of queuedMain) {
                 void pollGenerationJob(jobId)
                   .then((url) => {
                     set((state) => ({
                       characterAssets: state.characterAssets.map((ca) =>
                         ca.characterId === characterId
-                          ? { ...ca, views: { ...ca.views, main: url } }
+                          ? {
+                              ...ca,
+                              appearances: ca.appearances.map((appearance) =>
+                                appearance.appearanceKey === appearanceKey
+                                  ? { ...appearance, sheetUrl: url }
+                                  : appearance,
+                              ),
+                            }
                           : ca,
                       ),
                     }))
@@ -654,6 +729,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           entityType: 'person' as const,
           description: c.description ?? '',
           fixedPrompt: c.fixedPrompt ?? '',
+          appearances: [],
           viewCandidates: {},
           origin: 'writer',
         }),
@@ -705,6 +781,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       entityType,
       description,
       fixedPrompt: appearance,
+      appearances: [],
       viewCandidates: {},
       origin: 'producer',
     }
@@ -807,12 +884,24 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectLocation: (id) => set({ selectedLocationId: id }),
 
   // 단일 뷰 생성 (crop 폐기, 2026-06-05). main=T2I, 방향=main 기반 i2i. 서버가 해당 뷰 컬럼만 갱신.
-  generateCharacterView: async (characterId, view, actor = 'ui', instruction, safeMode, options) => {
+  generateCharacterView: async (characterId, appearanceKey, view, actor = 'ui', instruction, safeMode, model, options) => {
     if (isDemoSession()) return null
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return null
-    const key = `${characterId}:${view}`
-    if (get().generatingViews.includes(key)) {
+    if (!appearanceKey) {
+      const error = `Appearance key is required for character ${characterId}`
+      set({ error })
+      throw new Error(error)
+    }
+    const character = get().characterAssets.find((asset) => asset.characterId === characterId)
+    if (!character?.appearances.some((appearance) => appearance.appearanceKey === appearanceKey)) {
+      const error = `Appearance ${appearanceKey} was not found for character ${characterId}`
+      set({ error })
+      throw new Error(error)
+    }
+    const slot = { characterId, appearanceKey, view }
+    const key = `${characterId}:${appearanceKey}:${view}`
+    if (get().generatingViews.some((active) => sameCharacterAppearanceSlot(active, characterId, appearanceKey, view))) {
       options?.onJob?.({ jobId: null, status: 'deduped' })
       return { jobId: null, status: 'deduped' }
     }
@@ -832,7 +921,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
 
     set((state) => ({
-      generatingViews: [...state.generatingViews, key],
+      generatingViews: [...state.generatingViews, slot],
       error: null,
     }))
     const t0 = Date.now()
@@ -845,10 +934,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         body: JSON.stringify({
           projectId,
           characterId,
+          appearanceKey,
           view,
           actor,
           instruction,
           safeMode,
+          model,
           ...(options?.traceId ? { traceId: options.traceId } : {}),
         }),
       })
@@ -889,15 +980,23 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         // 성공 → 해당 슬롯 실패 상태 낙관적 제거(거짓-실패 잔존 방지, P1). finally 의 refresh 가 서버 기준으로 재확인.
         const charFailures = state.viewFailures[characterId]
         let viewFailures = state.viewFailures
-        if (charFailures && charFailures[view]) {
-          const { [view]: _drop, ...rest } = charFailures
+        const appearanceFailures = charFailures?.[appearanceKey]
+        if (appearanceFailures && appearanceFailures[view]) {
+          const { [view]: _drop, ...rest } = appearanceFailures
           void _drop
-          viewFailures = { ...state.viewFailures, [characterId]: rest }
+          viewFailures = { ...state.viewFailures, [characterId]: { ...charFailures, [appearanceKey]: rest } }
         }
         return {
           characterAssets: state.characterAssets.map((a) =>
             a.characterId === characterId
-              ? { ...a, views: { ...a.views, [view]: url } }
+              ? {
+                  ...a,
+                  appearances: a.appearances.map((appearance) =>
+                    appearance.appearanceKey === appearanceKey
+                      ? { ...appearance, sheetUrl: view === 'main' ? url : appearance.sheetUrl }
+                      : appearance,
+                  ),
+                }
               : a,
           ),
           viewFailures,
@@ -919,15 +1018,17 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       return { jobId: activeJobId, status: 'failed', error: raw }
     } finally {
       set((state) => ({
-        generatingViews: state.generatingViews.filter((k) => k !== key),
+        generatingViews: state.generatingViews.filter(
+          (active) => !sameCharacterAppearanceSlot(active, characterId, appearanceKey, view),
+        ),
       }))
       // 시도 후 실패 상태(viewFailures) 갱신 — 배지/우회버튼이 reload 없이 최신화. best-effort.
       void get().refreshViewFailures()
     }
   },
 
-  retryCharacterViewSafe: async (characterId, view) => {
-    await get().generateCharacterView(characterId, view, 'ui', undefined, true)
+  retryCharacterViewSafe: async (characterId, appearanceKey, view, model) => {
+    await get().generateCharacterView(characterId, appearanceKey, view, 'ui', undefined, true, model)
   },
 
   refreshViewFailures: async () => {
@@ -941,6 +1042,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const { failures } = (await res.json()) as {
         failures: Array<{
           characterId: string
+          appearanceKey: string
           view: string
           error: string | null
           failCount: number
@@ -950,7 +1052,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       }
       const vf: ViewFailures = {}
       for (const f of failures) {
-        ;(vf[f.characterId] ??= {})[f.view] = {
+        if (!f.appearanceKey) continue
+        ;((vf[f.characterId] ??= {})[f.appearanceKey] ??= {})[f.view] = {
           error: f.error,
           moderation: f.moderation,
           failCount: f.failCount,
@@ -966,10 +1069,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   // main → 4방향 순서 생성. 방향 i2i 는 main 이 DB 에 있어야 하므로 main 을 먼저 await 한 뒤
   // 4방향을 제한된 풀로 병렬 생성. 카드 "Generate All Views" / 시트 재생성용.
   // object 캐릭터는 main 만 생성 — 방향뷰 불필요.
-  generateCharacterAllViews: async (characterId, actor = 'ui', instruction, options) => {
+  generateCharacterAllViews: async (characterId, appearanceKey, actor = 'ui', instruction, model, options) => {
     // 캐릭터 = 턴어라운드 시트 1장(모든 뷰 포함), 사물 = 단일 이미지 — 둘 다 main 하나만 생성(#7·#9 2026-07-11).
     //   방향뷰(개별 i2i) 생성 폐기: 라우트가 사람 main 을 와이드 턴어라운드로 그린다.
-    return await get().generateCharacterView(characterId, 'main', actor, instruction, undefined, options)
+    return await get().generateCharacterView(characterId, appearanceKey, 'main', actor, instruction, undefined, model, options)
   },
 
   generateWorldAsset: async (locationId, actor = 'ui', options) => {
@@ -1158,7 +1261,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       if (c.origin === 'writer') {
         queuedRest.push(`char ${c.characterId}:main (opencast 턴어라운드 자율)`)
         restTasks.push(async () => {
-          await get().generateCharacterView(c.characterId, 'main', 'auto')
+          await get().generateCharacterView(c.characterId, requireDefaultAppearanceKey(c), 'main', 'auto')
         })
       } else {
         skipped.push(`char ${c.characterId}:main (server 초안 대기)`)
@@ -1219,9 +1322,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   refreshLookPendingDrafts: async () => {
     const { characterAssets, viewFailures } = get()
     const targets = characterAssets.filter((c) => {
+      const appearanceKey = requireDefaultAppearanceKey(c)
       // 콘텐츠정책/일반 실패 슬롯은 일괄 비대상 — 카드별 우회(safe) 전용(버블 카피 계약과 정합).
-      if (viewFailures[c.characterId]?.main) return false
-      const selectedMain = (c.viewCandidates['main'] ?? []).find((cand) => cand.isSelected)
+      if (viewFailures[c.characterId]?.[appearanceKey]?.main) return false
+      const selectedMain = (c.appearances.find((appearance) => appearance.appearanceKey === appearanceKey)?.viewCandidates.main ?? []).find((cand) => cand.isSelected)
       // v2Design 이전에 만들어진 룩 부재 초안만 이 분기로 온다(legacy-only).
       const lookPending =
         classifyImageStale(c.fixedPrompt, c.lookFingerprint ?? null, {
@@ -1234,7 +1338,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     if (targets.length === 0) return
     await runPool(
       targets.map((c) => async () => {
-        await get().generateCharacterView(c.characterId, 'main', 'ui')
+        await get().generateCharacterView(c.characterId, requireDefaultAppearanceKey(c), 'main', 'ui')
       }),
       ARTIST_GENERATION_CONCURRENCY,
     )
@@ -1250,16 +1354,19 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           appearance: u.appearance,
         })
       } else if (u.type === 'regenerateCharacter') {
+        const character = get().characterAssets.find((asset) => asset.characterId === u.characterId)
+        if (!character) throw new Error(`Character ${u.characterId} was not found`)
+        const appearanceKey = requireDefaultAppearanceKey(character)
         // 채팅발 재생성 — generation_jobs.actor='chat' 귀속 (chat-aware-regeneration).
         if (u.views?.length) {
           await runPool(
             u.views.map((v) => async () => {
-              await get().generateCharacterView(u.characterId, v, 'chat', u.instruction)
+              await get().generateCharacterView(u.characterId, appearanceKey, v, 'chat', u.instruction, undefined, u.model)
             }),
             ARTIST_GENERATION_CONCURRENCY,
           )
         } else {
-          await get().generateCharacterAllViews(u.characterId, 'chat', u.instruction)
+          await get().generateCharacterAllViews(u.characterId, appearanceKey, 'chat', u.instruction, u.model)
         }
       } else if (u.type === 'regenerateWorldAsset') {
         await get().generateWorldAsset(u.locationId, 'chat')
@@ -1273,6 +1380,32 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         ? state
         : { enteredProjects: { ...state.enteredProjects, [projectId]: true } },
     ),
+
+  updateCharacterAppearance: async (characterId, appearanceKey, appearance) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) throw new Error('A project is required to update an appearance')
+    const res = await fetch('/api/artist/character-appearance', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, characterId, appearanceKey, appearance }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    set((state) => ({
+      characterAssets: state.characterAssets.map((character) =>
+        character.characterId === characterId
+          ? {
+              ...character,
+              appearances: character.appearances.map((item) =>
+                item.appearanceKey === appearanceKey ? { ...item, appearance } : item,
+              ),
+            }
+          : character,
+      ),
+    }))
+  },
 
   applyAppearancePatch: (characterId, appearance) =>
     set((state) => ({

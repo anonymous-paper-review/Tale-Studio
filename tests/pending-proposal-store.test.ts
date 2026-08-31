@@ -38,10 +38,15 @@ describe('producer chat extraction pending proposal guard', () => {
       cast: [],
     })
 
-    useProducerStore.getState().applyExtractedSettings({ genre: 'drama' })
+    const outcome = useProducerStore
+      .getState()
+      .applyExtractedSettings({ genre: 'drama' }, 'trace-producer')
 
+    expect(outcome).toBe('pending')
     expect(useProducerStore.getState().projectSettings.genre).toBe('thriller')
     expect(useGlobalChatStore.getState().pendingProposal?.kind).toBe('producerSourcePatch')
+    // 승인/거절이 같은 채팅 영수증(trace)으로 이어지려면 제안이 traceId를 들고 있어야 한다.
+    expect(useGlobalChatStore.getState().pendingProposal?.traceId).toBe('trace-producer')
 
     const approved = await useGlobalChatStore.getState().approvePendingProposal()
 
@@ -59,11 +64,33 @@ describe('producer chat extraction pending proposal guard', () => {
       cast: [],
     })
 
-    useProducerStore.getState().applyExtractedSettings({ genre: 'thriller', storyText: '새 스토리', storyReady: true })
+    const outcome = useProducerStore
+      .getState()
+      .applyExtractedSettings({ genre: 'thriller', storyText: '새 스토리', storyReady: true })
 
+    expect(outcome).toBe('applied')
     expect(useProducerStore.getState().projectSettings.genre).toBe('thriller')
     expect(useProducerStore.getState().storyText).toBe('새 스토리')
     expect(useGlobalChatStore.getState().pendingProposal).toBeNull()
+  })
+
+  it('reports rejected when the proposal slot is already occupied', () => {
+    useProjectStore.setState({ currentStage: 'producer', reachedStage: 'artist' })
+    useProducerStore.setState({
+      storyText: '기존 스토리',
+      storyReady: true,
+      projectSettings: settings,
+      cast: [],
+    })
+
+    expect(
+      useProducerStore.getState().applyExtractedSettings({ genre: 'drama' }, 'trace-1'),
+    ).toBe('pending')
+    // 카드 자리가 점유된 상태의 두 번째 추출은 보류된다 — 영수증엔 skipped로 적힐 재료.
+    expect(
+      useProducerStore.getState().applyExtractedSettings({ genre: 'romance' }, 'trace-2'),
+    ).toBe('rejected')
+    expect(useGlobalChatStore.getState().pendingProposal?.traceId).toBe('trace-1')
   })
 })
 

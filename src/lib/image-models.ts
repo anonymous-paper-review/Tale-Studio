@@ -1,75 +1,150 @@
 // ============================================================================
-// Image model registry — Director 이미지(스토리보드) 생성 모델 카탈로그.
+// Image model registry — 이미지 생성 모델 카탈로그 (Artist 캐릭터 시트 · Director 스토리보드 공용).
 //
-// 실제 생성 경로는 fal 큐(src/lib/writer/llm/fal.ts). 여기 등록된 모델은 전부
-// buildFalImageInput 이 입력 스키마를 아는 계열이다:
-//   - openai/gpt-image-2        : 기본. 레퍼런스 있으면 /edit 변형으로 자동 라우팅
-//   - fal-ai/flux-2/klein/9b    : flux 계열(image_size preset) — 러프 보드에서 실사용 중
-//   - xai/grok-imagine-image    : 전용 스키마(prompt+image_urls만) 처리 존재
-// 새 모델은 fal.ts 의 입력 분기가 그 스키마를 알 때만 추가한다 — 모르는 모델을
-// 나열하면 422로 죽는 가짜 선택지가 된다.
+// video-models.ts 와 대칭: 여기 spec 하나로 (1) 팝업/채팅이 고를 수 있는 목록,
+// (2) 라우트가 고를 fal 엔드포인트(T2I vs edit), (3) buildFalImageInput 이 넣을
+// canvas 파라미터(aspect_ratio vs image_size)를 모두 결정한다.
 //
-// #ui-cleanup(2026-08-31): 옛 "Midjourney 8.1 (Coming soon)" 더미 칩은 fal 카탈로그에
-// 없는 가짜 선택지라 제거 — 이 레지스트리가 표기의 단일 진실이다.
-// #image-model-select(2026-08-31): 표기 전용 → 실제 선택으로 승격. Shot.imageModel 이
-// generate-storyboard 라우트를 거쳐 falImageSubmit({ model })로 전달된다.
+// #registry-merge(2026-08-31): Artist(#g4)와 Director(#image-model-select)가 각자 만든 두
+//   레지스트리를 하나로 합쳤다. Director 쪽 spec 은 endpoint 하나뿐이라 reference 가 있는
+//   생성에서 edit 갈래로 못 갔다 — 아래 t2i/edit 분리 구조가 그 상위집합이라 이쪽으로 통일한다.
+//
+// reference(정체성/템플릿) 처리:
+//   캐릭터 턴어라운드·방향뷰·비기본 모습은 전부 reference 이미지를 넣는 image-to-image(edit)다.
+//   그래서 editEndpoint 가 있는 모델만 캐릭터 정체성을 이어받을 수 있다. editEndpoint 가 null 인
+//   모델(순수 T2I)은 reference 없이 프롬프트만으로 그린다 — 빠르고 싸지만 정체성이 약하다.
+//   앵커(스타일 레퍼런스)가 있을 때 style-anchor.ts 는 base.model 이 '/edit' 로 끝나지 않으면
+//   openai/gpt-image-2/edit 로 되돌린다 — 그래서 editEndpoint 는 반드시 '/edit' 로 끝나야 존중된다.
+//
+// canvas 파라미터(모델 스키마 실측, fal llms.txt 기준):
+//   - aspect_ratio 계열: nano-banana(t2i·edit), openai/gpt-image-2(레거시 — 실제로는 image_size지만
+//     기존 라우트가 aspect_ratio 를 넘겨도 무해히 무시되는 검증된 경로라 그대로 둔다).
+//   - image_size 계열: seedream v4(t2i·edit), flux-2 klein.
+//   - grok-imagine 은 fal.ts 가 prompt+image_urls 만 보내는 전용 분기라 canvas 값을 쓰지 않는다.
+//
+// 새 모델은 fal.ts 의 입력 분기가 그 스키마를 알고 model-schemas.ts 에 필드가 등록됐을 때만
+//   추가한다 — 모르는 모델을 나열하면 422 로 죽는 가짜 선택지가 된다(tests/image-models.test.ts 가 잠근다).
 // ============================================================================
 
 export type ImageModelKey =
   | 'gpt-image-2'
   | 'nano-banana'
+  | 'seedream-4'
   | 'flux-2-klein'
   | 'grok-imagine'
 
+/** canvas(캔버스 크기) 파라미터를 fal 에 어떻게 넘기는가 */
+export type ImageCanvasParam = 'aspect_ratio' | 'image_size'
+
 export interface ImageModelSpec {
   key: ImageModelKey
-  /** 사람이 읽는 라벨 (UI 표기) */
+  /** 사람이 읽는 라벨 (UI 표기, i18n base 키) */
   label: string
-  /** fal.ai 모델 id — falImageSubmit 이 실제 제출하는 경로와 일치 */
-  endpoint: string
-  /** UI 힌트 */
-  hint: string
+  /** 한 줄 강점 설명 (UI 표기, i18n base 키) */
+  description: string
+  /** reference 없을 때(순수 T2I) fal 엔드포인트 */
+  t2iEndpoint: string
+  /** reference 있을 때(edit/i2i) fal 엔드포인트. null = reference(정체성) 미지원 */
+  editEndpoint: string | null
+  /** canvas 크기 파라미터 방식 */
+  canvas: ImageCanvasParam
+  /** 대략 이미지당 가격(USD, UI 힌트). null = 가변/미표기(예: gpt-image-2 는 토큰 과금) */
+  pricePerImage: number | null
 }
 
-export const DEFAULT_IMAGE_MODEL_KEY: ImageModelKey = 'gpt-image-2'
+export const DEFAULT_IMAGE_MODEL: ImageModelKey = 'gpt-image-2'
 
 export const IMAGE_MODELS: Record<ImageModelKey, ImageModelSpec> = {
   'gpt-image-2': {
     key: 'gpt-image-2',
-    label: 'GPT Image 2.0',
-    endpoint: 'openai/gpt-image-2',
-    hint: 'Default',
+    label: 'GPT Image 2',
+    description: 'OpenAI · crisp typography, reliable identity',
+    t2iEndpoint: 'openai/gpt-image-2',
+    editEndpoint: 'openai/gpt-image-2/edit',
+    canvas: 'aspect_ratio',
+    pricePerImage: null,
   },
   'nano-banana': {
     key: 'nano-banana',
     label: 'Nano Banana',
-    endpoint: 'fal-ai/nano-banana',
-    hint: 'Google',
+    description: 'Google Gemini · strong character consistency',
+    t2iEndpoint: 'fal-ai/nano-banana',
+    editEndpoint: 'fal-ai/nano-banana/edit',
+    canvas: 'aspect_ratio',
+    pricePerImage: 0.039,
+  },
+  'seedream-4': {
+    key: 'seedream-4',
+    label: 'Seedream 4',
+    description: 'ByteDance · high-res, rich editing',
+    t2iEndpoint: 'fal-ai/bytedance/seedream/v4/text-to-image',
+    editEndpoint: 'fal-ai/bytedance/seedream/v4/edit',
+    canvas: 'image_size',
+    pricePerImage: 0.03,
   },
   'flux-2-klein': {
     key: 'flux-2-klein',
-    label: 'FLUX.2 Klein 9B',
-    endpoint: 'fal-ai/flux-2/klein/9b',
-    hint: 'Fast',
+    label: 'FLUX.2 Klein',
+    description: 'Black Forest Labs · fast & cheap, no reference',
+    t2iEndpoint: 'fal-ai/flux-2/klein/9b',
+    editEndpoint: null,
+    canvas: 'image_size',
+    pricePerImage: 0.012,
   },
   'grok-imagine': {
     key: 'grok-imagine',
     label: 'Grok Imagine',
-    endpoint: 'xai/grok-imagine-image',
-    hint: 'xAI',
+    description: 'xAI · keeps the input framing',
+    t2iEndpoint: 'xai/grok-imagine-image',
+    editEndpoint: 'xai/grok-imagine-image/edit',
+    // fal.ts 가 prompt+image_urls 만 보내는 전용 분기라 실제로는 안 쓰인다(표기상 기본값).
+    canvas: 'aspect_ratio',
+    pricePerImage: null,
   },
 }
 
+/** 팝업/채팅/패널에 노출하는 순서 (기본 모델 먼저). */
 export const IMAGE_MODEL_ORDER: ImageModelKey[] = [
   'gpt-image-2',
   'nano-banana',
+  'seedream-4',
   'flux-2-klein',
   'grok-imagine',
 ]
 
-/** 임의 문자열 → ImageModelKey 정규화 (구행/미지정은 기본 모델). */
-export function normalizeImageModel(value: unknown): ImageModelKey {
-  return typeof value === 'string' && value in IMAGE_MODELS
-    ? (value as ImageModelKey)
-    : DEFAULT_IMAGE_MODEL_KEY
+/** 문자열이 유효한 ImageModelKey 인지 (채팅 cc 입력 화이트리스트 검증용). */
+export function isImageModelKey(x: unknown): x is ImageModelKey {
+  return typeof x === 'string' && x in IMAGE_MODELS
+}
+
+/** 임의 문자열(레거시 endpoint·null·undefined) → ImageModelKey 정규화. 미상은 기본 모델. */
+export function normalizeImageModelKey(x: unknown): ImageModelKey {
+  if (isImageModelKey(x)) return x
+  // 레거시/직접 endpoint 문자열도 흡수한다 (예: 'openai/gpt-image-2/edit').
+  if (typeof x === 'string') {
+    for (const spec of Object.values(IMAGE_MODELS)) {
+      if (x === spec.t2iEndpoint || x === spec.editEndpoint) return spec.key
+    }
+  }
+  return DEFAULT_IMAGE_MODEL
+}
+
+/** 모델이 reference(캐릭터 정체성·템플릿)를 실을 수 있는가. */
+export function imageModelSupportsReference(key: ImageModelKey): boolean {
+  return IMAGE_MODELS[key].editEndpoint != null
+}
+
+/**
+ * 선택 모델 + reference 유무 → 실제 fal 엔드포인트 결정.
+ *   reference 가 필요한데 editEndpoint 가 없으면 순수 T2I 로 폴백한다(reference 는 라우트가 버린다).
+ */
+export function resolveImageEndpoint(
+  key: ImageModelKey,
+  hasReference: boolean,
+): { endpoint: string; isEdit: boolean } {
+  const spec = IMAGE_MODELS[key]
+  if (hasReference && spec.editEndpoint) {
+    return { endpoint: spec.editEndpoint, isEdit: true }
+  }
+  return { endpoint: spec.t2iEndpoint, isEdit: false }
 }

@@ -37,6 +37,7 @@ import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-prov
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { applyStyleAnchor, resolveStyleAnchor, tokenUnlessMediaWord } from '@/lib/style-anchor'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
+import { normalizeImageModelKey, resolveImageEndpoint } from '@/lib/image-models'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 
@@ -60,18 +61,23 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, characterId, view, actor, instruction, safeMode, traceId } = (await req.json()) as {
-      projectId?: string
-      characterId?: string
-      view?: CharacterViewKey
-      actor?: string
-      instruction?: string // 재생성 시 유저 델타(merge) — 룩 토대 위에 덮음(AC13).
-      safeMode?: boolean // 모더레이션 우회 재시도(#A) — 직전 실패가 moderation-class 인 슬롯에만 적용.
-      traceId?: string
-    }
-    if (!projectId || !characterId || !view) {
+    const { projectId, characterId, appearanceKey, view, actor, instruction, safeMode, traceId, model: modelInput } =
+      (await req.json()) as {
+        projectId?: string
+        characterId?: string
+        appearanceKey?: string
+        view?: CharacterViewKey
+        actor?: string
+        instruction?: string // 재생성 시 유저 델타(merge) — 룩 토대 위에 덮음(AC13).
+        safeMode?: boolean // 모더레이션 우회 재시도(#A) — 직전 실패가 moderation-class 인 슬롯에만 적용.
+        traceId?: string
+        model?: string // 이미지 생성 모델 선택(image-models 레지스트리 키). 미지정/미상은 기본 모델.
+      }
+    // 선택 모델 정규화 — 유효하지 않으면 기본(gpt-image-2). reference 유무에 따라 아래에서 t2i/edit 갈래를 고른다.
+    const modelKey = normalizeImageModelKey(modelInput)
+    if (!projectId || !characterId || !appearanceKey || !view) {
       return NextResponse.json(
-        { error: 'projectId, characterId, view required' },
+        { error: 'projectId, characterId, appearanceKey, view required' },
         { status: 400 },
       )
     }
@@ -81,6 +87,9 @@ export async function POST(req: Request) {
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
+    if (!CHARACTER_VIEW_KEYS.includes(view)) {
+      return NextResponse.json({ error: `invalid view: ${view}` }, { status: 400 })
+    }
     if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
       return NextResponse.json({ error: 'traceId does not belong to project' }, { status: 409 })
     }
@@ -91,8 +100,18 @@ export async function POST(req: Request) {
 
     // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
     const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
-    if (!CHARACTER_VIEW_KEYS.includes(view)) {
-      return NextResponse.json({ error: `invalid view: ${view}` }, { status: 400 })
+
+    // 존재 및 소유권은 비용·중복 게이트보다 먼저 확인한다. 잘못된 모습 키가 다른 슬롯 응답으로 숨으면 안 된다.
+    const { data: requestedAppearance, error: requestedAppearanceError } = await supabaseAdmin
+      .from('character_appearances')
+      .select('appearance_key')
+      .eq('project_id', projectId)
+      .eq('character_id', characterId)
+      .eq('appearance_key', appearanceKey)
+      .maybeSingle()
+    if (requestedAppearanceError) throw requestedAppearanceError
+    if (!requestedAppearance) {
+      return NextResponse.json({ error: 'appearance not found' }, { status: 404 })
     }
 
     // give-up 게이트: 자율 first-fill(actor='auto')은 같은 슬롯(캐릭터×뷰) 실패가 임계값 이상이면
@@ -100,6 +119,7 @@ export async function POST(req: Request) {
     if (actor === 'auto') {
       const failed = await countFailedJobsForTarget(projectId, 'character_view', {
         characterId,
+        appearanceKey,
         column: CHARACTER_VIEW_COLUMNS[view],
       })
       if (failed >= AUTO_GENERATION_GIVE_UP_THRESHOLD) {
@@ -113,8 +133,8 @@ export async function POST(req: Request) {
     // 중복 제출 가드(DB-authoritative): 같은 슬롯(캐릭터×뷰)에 이미 queued 잡이 있으면 새 fal 제출 생략.
     //   in-memory generatingViews 는 remount 에 소실되므로 서버 DB 가 진실. 온보딩 "진행" 재클릭/
     //   탭 복귀 시 in-flight 슬롯의 이중 과금을 막는다. 정당한 재생성(비-queued 슬롯)은 그대로 통과.
-    if (await hasQueuedCharacterViewJob(projectId, characterId, view)) {
-      return NextResponse.json({ ok: true, status: 'queued', deduped: true, view })
+    if (await hasQueuedCharacterViewJob(projectId, characterId, appearanceKey, view)) {
+      return NextResponse.json({ ok: true, status: 'queued', deduped: true, appearanceKey, view })
     }
 
     // safe-mode 자격/상한(#A): 요청 시 슬롯의 최근 실패를 본다 — moderation-class 실패에만 safe transform 적용,
@@ -122,7 +142,9 @@ export async function POST(req: Request) {
     let effectiveSafeMode = false
     if (safeMode === true) {
       const failures = await listFailedCharacterViewJobs(projectId)
-      const slot = failures.find((f) => f.characterId === characterId && f.view === view)
+      const slot = failures.find(
+        (f) => f.characterId === characterId && f.appearanceKey === appearanceKey && f.view === view,
+      )
       if (slot) {
         if ((jobActor === 'ui' || jobActor === 'chat') && slot.safeFailCount >= SAFE_RETRY_CAP) {
           return NextResponse.json({ ok: true, skipped: true, reason: 'capped', safeFailCount: slot.safeFailCount })
@@ -131,22 +153,47 @@ export async function POST(req: Request) {
       }
     }
 
-    // 1. 프로젝트(workspace + 디자인 토큰) + 캐릭터 로드 (view_main = i2i reference)
-    const [{ data: project }, { data: character }] = await Promise.all([
-      supabaseAdmin
-        .from('projects')
-        .select('workspace_id, design_tokens, style_anchor_key, custom_style_anchor')
-        .eq('id', projectId)
-        .single(),
-      supabaseAdmin
-        .from('characters')
-        .select('character_id, name, role, appearance, costume, view_main, entity_type')
-        .eq('project_id', projectId)
-        .eq('character_id', characterId)
-        .single(),
-    ])
+    // 1. 프로젝트, 캐릭터, 요청한 모습과 명시적 기본 모습을 로드한다.
+    const [{ data: project }, { data: character }, { data: appearance }, { data: defaultAppearance }] =
+      await Promise.all([
+        supabaseAdmin
+          .from('projects')
+          .select('workspace_id, design_tokens, style_anchor_key, custom_style_anchor')
+          .eq('id', projectId)
+          .single(),
+        supabaseAdmin
+          .from('characters')
+          .select('character_id, name, role, entity_type')
+          .eq('project_id', projectId)
+          .eq('character_id', characterId)
+          .single(),
+        supabaseAdmin
+          .from('character_appearances')
+          .select('appearance_key, is_default, appearance, costume, sheet_url, portrait_url')
+          .eq('project_id', projectId)
+          .eq('character_id', characterId)
+          .eq('appearance_key', appearanceKey)
+          .maybeSingle(),
+        supabaseAdmin
+          .from('character_appearances')
+          .select('appearance_key, is_default, appearance, costume, sheet_url, portrait_url')
+          .eq('project_id', projectId)
+          .eq('character_id', characterId)
+          .eq('is_default', true)
+          .maybeSingle(),
+      ])
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
     if (!character) return NextResponse.json({ error: 'character not found' }, { status: 404 })
+    if (!appearance) return NextResponse.json({ error: 'appearance not found' }, { status: 404 })
+    if (!defaultAppearance) {
+      return NextResponse.json({ error: 'default appearance not found' }, { status: 404 })
+    }
+    if (!appearance.is_default && !defaultAppearance.portrait_url) {
+      return NextResponse.json(
+        { error: 'default appearance portrait is required for non-default appearance generation' },
+        { status: 409 },
+      )
+    }
     const anchor = await resolveStyleAnchor(project)
 
     const dt = (project.design_tokens ?? {}) as DesignTokens
@@ -155,9 +202,9 @@ export async function POST(req: Request) {
     )
     const input: CharacterPromptInput = {
       name: character.name,
-      appearance: character.appearance ?? character.name,
+      appearance: appearance.appearance ?? character.name,
       role: character.role ?? undefined,
-      costumes: character.costume ?? undefined,
+      costumes: appearance.costume ?? undefined,
       // 앵커 존재 시 매체어 토큰만 정밀 드롭(#F-004 B4 2026-08-12 — 2026-07-14 통짜 억제 결정의
       //   **명시적 번복**): 옛 규칙은 art_style 을 무조건 생략했는데, 실측(dc531572)에서 억제된 것이
       //   앵커에 부합하는 유일한 토큰(3d_animation)이고 정작 매체어(texture: photorealistic)는
@@ -178,9 +225,9 @@ export async function POST(req: Request) {
       safeMode: effectiveSafeMode,
     }
 
-    // 2. 프롬프트 + 모델 결정
-    //    main → 깨끗한 T2I. 방향 뷰 → view_main 을 reference 로 한 i2i(edit). main 없으면 T2I fallback.
-    const refMain = character.view_main as string | null
+    // 2. 프롬프트 + 모델 결정. 비기본 모습은 같은 캐릭터의 기본 모습 portrait만 정체성 기준으로 쓴다.
+    const baseFaceUrl = appearance.is_default ? null : (defaultAppearance.portrait_url as string)
+    const refMain = appearance.sheet_url as string | null
     const webhookUrl = resolveWebhookUrl()
     let submitOpts: FalImageOptions
     let styleAnchorMode: 'turnaround' | 'single' | null = null
@@ -191,19 +238,44 @@ export async function POST(req: Request) {
         //   캐릭터를 채우는 I2I(edit). 템플릿은 스토리지에서 온다 — 앱 public URL(터널)에 걸면
         //   터널이 죽을 때 fal 이 못 받아 전량 실패한다(template-asset.ts). 업로드 실패 시만 T2I 폴백.
         const templateUrl = await templateAssetUrl('character-template.png')
-        if (templateUrl) {
+        // 선택 모델의 edit 갈래 — reference(템플릿·기준얼굴)를 실을 수 있는가. 미지원 모델은 isEdit=false.
+        const { endpoint, isEdit } = resolveImageEndpoint(modelKey, !!templateUrl)
+        if (templateUrl && isEdit) {
           styleAnchorMode = 'turnaround'
+          // 정체성 참조: 템플릿(레이아웃) 다음으로 얼굴을 빌려주는 이미지들을 붙인다.
+          //   - baseFaceUrl: 비기본 모습(젊은 시절 등)이 기본 모습 얼굴을 계승(#g4 연속성).
+          //   - refMain(#reref 2026-08-31): 재생성 시 이 모습의 직전 시트 — 얼굴이 매번 바뀌는 것을 막는다.
+          //     첫 생성(refMain 없음)은 템플릿만 — 기존 동작 그대로. 델타(instruction)가 우선이라 요청 변경은 반영된다.
+          const identityRefs = [
+            ...(baseFaceUrl ? [baseFaceUrl] : []),
+            ...(refMain ? [refMain] : []),
+          ]
           submitOpts = {
-            model: 'openai/gpt-image-2/edit',
-            prompt: buildCharacterTurnaroundPrompt(input),
-            reference_image_urls: [templateUrl],
+            model: endpoint,
+            prompt: buildCharacterTurnaroundPrompt(input, {
+              hasBaseFace: !!baseFaceUrl,
+              hasPriorRender: !!refMain,
+            }),
+            // 템플릿이 첫 장(레이아웃 기준), 그 뒤가 정체성 이미지(기준얼굴·직전 시트).
+            //   순서가 뒤바뀌면 모델이 얼굴 이미지를 레이아웃으로 오인한다.
+            reference_image_urls: [templateUrl, ...identityRefs],
             webhookUrl,
             // aspect_ratio 생략 → edit 모델이 템플릿 비율(≈16:9)을 따름
           }
         } else {
+          // 비기본 모습은 기준 얼굴 참조가 필수 — reference 미지원 모델을 골랐거나 템플릿이 없으면 막는다.
+          if (baseFaceUrl && !isEdit) {
+            return NextResponse.json(
+              { error: 'selected image model does not support the identity reference required for a non-default appearance' },
+              { status: 409 },
+            )
+          }
+          if (baseFaceUrl) {
+            throw new Error('character template is required for non-default appearance identity reference')
+          }
           styleAnchorMode = 'single'
           submitOpts = {
-            model: 'openai/gpt-image-2',
+            model: endpoint,
             prompt: buildCharacterTurnaroundPrompt(input),
             aspect_ratio: '3:2',
             webhookUrl,
@@ -211,9 +283,10 @@ export async function POST(req: Request) {
         }
       } else {
         styleAnchorMode = 'single'
-        // 사물 = 단일 대표 포트레이트(1:1).
+        // 사물 = 단일 대표 포트레이트(1:1). reference 없음 → 선택 모델의 T2I 갈래.
+        const { endpoint } = resolveImageEndpoint(modelKey, false)
         submitOpts = {
-          model: 'openai/gpt-image-2',
+          model: endpoint,
           prompt: buildCharacterMainPrompt(input),
           aspect_ratio: '1:1',
           webhookUrl,
@@ -221,14 +294,16 @@ export async function POST(req: Request) {
       }
     } else {
       const prompt = buildCharacterViewPrompt(input, view as DirectionalView)
-      submitOpts = refMain
+      const references = [refMain, baseFaceUrl].filter((url): url is string => !!url)
+      const { endpoint, isEdit } = resolveImageEndpoint(modelKey, references.length > 0)
+      submitOpts = isEdit
         ? {
-            model: 'openai/gpt-image-2/edit',
+            model: endpoint,
             prompt,
-            reference_image_urls: [refMain],
+            reference_image_urls: references,
             webhookUrl,
-          } // aspect_ratio 생략 → edit 모델이 reference 비율을 따름
-        : { model: 'openai/gpt-image-2', prompt, aspect_ratio: '1:1', webhookUrl }
+          } // aspect_ratio 생략 → edit 모델이 reference 비율을 따른다.
+        : { model: endpoint, prompt, aspect_ratio: '1:1', webhookUrl }
     }
     if (anchor && styleAnchorMode) {
       const { webhookUrl: wh, ...anchorable } = submitOpts
@@ -244,12 +319,13 @@ export async function POST(req: Request) {
     // provenance(#57): 생성 입력(외모) 지문을 submit 시점에 함께 계산해 input_snapshot 에 동봉.
     //   착지 시 finalize 가 이 지문으로 character_image_candidates 행을 남긴다(분리 금지 — architecture §5).
     // 룩(전역 토큰 + 의상) 지문 — 룩 부재 시 null(레거시 동일). 룩 도착 후 룩 미반영 초안이 stale로 판정(AC6/7).
-    const lookFingerprint = computeLookFingerprint(dt, character.costume, project.style_anchor_key)
+    const lookFingerprint = computeLookFingerprint(dt, appearance.costume, project.style_anchor_key)
     const inputSnapshot: Record<string, unknown> = {
       ...submitOpts,
-      source_hash: computeImageSourceHash(character.appearance, lookFingerprint),
+      appearance_key: appearanceKey,
+      source_hash: computeImageSourceHash(appearance.appearance, lookFingerprint),
       // 외형만의 지문(룩 무관) — look-pending vs edited 구분용(027). finalize 가 후보에 영속.
-      appearance_hash: computeImageSourceHash(character.appearance, null),
+      appearance_hash: computeImageSourceHash(appearance.appearance, null),
       look_present: lookFingerprint != null,
       safe_mode: effectiveSafeMode,
       style_anchor_key: anchor?.key ?? null,
@@ -272,12 +348,13 @@ export async function POST(req: Request) {
       target: {
         workspaceId: project.workspace_id,
         characterId,
+        appearanceKey,
         view,
         column,
       },
     })
 
-    return NextResponse.json({ ok: true, jobId: job.id, status: 'queued', view })
+    return NextResponse.json({ ok: true, jobId: job.id, status: 'queued', appearanceKey, view })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[artist/generate-sheet]', msg)

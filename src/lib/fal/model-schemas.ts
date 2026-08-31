@@ -104,6 +104,15 @@ const GPT_IMAGE_2_EDIT_FIELDS = [
   'mask_url',
 ] as const
 
+// xai/grok-imagine-image text-to-image schema. Same inputs as the edit variant minus image_urls.
+const GROK_IMAGINE_IMAGE_FIELDS = [
+  'prompt',
+  'aspect_ratio',
+  'resolution',
+  'output_format',
+  'num_images',
+] as const
+
 // xai/grok-imagine-image/edit i2i schema (#arrow-layer). aspect_ratio 'auto' preserves input ratio;
 //   no image_size/negative_prompt/seed inputs.
 const GROK_IMAGINE_IMAGE_EDIT_FIELDS = [
@@ -127,6 +136,56 @@ const FLUX_2_KLEIN_9B_FIELDS = [
   'output_format',
 ] as const
 
+// fal-ai/nano-banana (Google Gemini) text-to-image schema. Uses aspect_ratio, not image_size.
+const NANO_BANANA_FIELDS = [
+  'prompt',
+  'num_images',
+  'seed',
+  'aspect_ratio',
+  'output_format',
+  'safety_tolerance',
+  'sync_mode',
+  'limit_generations',
+] as const
+
+// fal-ai/nano-banana/edit image-to-image schema. References are image_urls; aspect_ratio adds 'auto'.
+const NANO_BANANA_EDIT_FIELDS = [
+  'prompt',
+  'image_urls',
+  'num_images',
+  'seed',
+  'aspect_ratio',
+  'output_format',
+  'safety_tolerance',
+  'sync_mode',
+  'limit_generations',
+] as const
+
+// fal-ai/bytedance/seedream/v4/text-to-image schema. Uses image_size (min 960², max 4096²).
+const SEEDREAM_V4_T2I_FIELDS = [
+  'prompt',
+  'image_size',
+  'num_images',
+  'max_images',
+  'seed',
+  'sync_mode',
+  'enable_safety_checker',
+  'enhance_prompt_mode',
+] as const
+
+// fal-ai/bytedance/seedream/v4/edit image-to-image schema. References are image_urls (up to 10).
+const SEEDREAM_V4_EDIT_FIELDS = [
+  'prompt',
+  'image_urls',
+  'image_size',
+  'num_images',
+  'max_images',
+  'seed',
+  'sync_mode',
+  'enable_safety_checker',
+  'enhance_prompt_mode',
+] as const
+
 export const FAL_INPUT_ALLOWLIST: Record<string, Set<string>> = {
   'happy-horse': fieldSet(HAPPY_HORSE_REFERENCE_TO_VIDEO_FIELDS),
   [FAL_VIDEO_MODEL_ENDPOINTS['happy-horse']]: fieldSet(HAPPY_HORSE_REFERENCE_TO_VIDEO_FIELDS),
@@ -145,8 +204,14 @@ export const FAL_INPUT_ALLOWLIST: Record<string, Set<string>> = {
 
   'openai/gpt-image-2': fieldSet(GPT_IMAGE_2_FIELDS),
   'openai/gpt-image-2/edit': fieldSet(GPT_IMAGE_2_EDIT_FIELDS),
+  'xai/grok-imagine-image': fieldSet(GROK_IMAGINE_IMAGE_FIELDS),
   'xai/grok-imagine-image/edit': fieldSet(GROK_IMAGINE_IMAGE_EDIT_FIELDS),
   'fal-ai/flux-2/klein/9b': fieldSet(FLUX_2_KLEIN_9B_FIELDS),
+
+  'fal-ai/nano-banana': fieldSet(NANO_BANANA_FIELDS),
+  'fal-ai/nano-banana/edit': fieldSet(NANO_BANANA_EDIT_FIELDS),
+  'fal-ai/bytedance/seedream/v4/text-to-image': fieldSet(SEEDREAM_V4_T2I_FIELDS),
+  'fal-ai/bytedance/seedream/v4/edit': fieldSet(SEEDREAM_V4_EDIT_FIELDS),
 }
 
 export function getAllowedFields(modelKey: string | null | undefined): Set<string> | undefined {

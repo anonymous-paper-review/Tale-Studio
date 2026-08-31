@@ -190,8 +190,6 @@ describe('loadProducerBoard', () => {
             id: 'db-cast-dupe',
             character_id: 'db-yunseo',
             name: '윤서',
-            entity_type: 'person',
-            appearance_native: 'DB 중복 외형',
             origin: 'producer',
           },
           {
@@ -199,12 +197,21 @@ describe('loadProducerBoard', () => {
             character_id: 'db-robot',
             name: 'R-7',
             role: '조력자',
-            entity_type: 'object',
-            appearance: 'metal body',
-            appearance_native: '금속 차체',
             arc: { start_state: '고장', end_state: '회복', arc_type: 'repair' },
             motivation: { want: '아이 찾기', need: '신뢰' },
             origin: 'writer',
+          },
+        ],
+        appearances: [
+          {
+            character_id: 'db-yunseo',
+            appearance: 'duplicate look',
+            appearance_native: 'DB 중복 외형',
+          },
+          {
+            character_id: 'db-robot',
+            appearance: 'metal body',
+            appearance_native: '금속 차체',
           },
         ],
         locations: [
@@ -255,7 +262,7 @@ describe('loadProducerBoard', () => {
       characterId: 'db-robot',
       name: 'R-7',
       role: '조력자',
-      entityType: 'object',
+      entityType: 'person',
       appearance: '금속 차체',
       arc: { start_state: '고장', end_state: '회복', arc_type: 'repair' },
       motivation: { want: '아이 찾기', need: '신뢰' },
@@ -291,30 +298,40 @@ function textFile(files: ArtifactFile[], path: string): string {
 function mockProducerSupabase({
   project,
   characters = [],
+  appearances = [],
   locations = [],
 }: {
   project: Record<string, unknown>
   characters?: Record<string, unknown>[]
+  appearances?: Record<string, unknown>[]
   locations?: Record<string, unknown>[]
 }) {
   const results: Record<string, { data: unknown; error: null }> = {
     projects: { data: project, error: null },
     characters: { data: characters, error: null },
+    character_appearances: { data: appearances, error: null },
     locations: { data: locations, error: null },
   }
 
   return {
     from: vi.fn((table: string) => ({
-      select: vi.fn(() => ({
-        eq: vi.fn((column: string, value: string) => {
-          expect(value).toBe('project-1')
-          const result = results[table]
-          if (!result) throw new Error(`unexpected table ${table}`)
-          return table === 'projects'
-            ? { single: vi.fn(async () => result) }
-            : Promise.resolve(result)
-        }),
-      })),
+      select: vi.fn(() => {
+        const result = results[table]
+        if (!result) throw new Error(`unexpected table ${table}`)
+        const query = {
+          eq: vi.fn((column: string, value: unknown) => {
+            if (column === 'project_id' || column === 'id') {
+              expect(value).toBe('project-1')
+            }
+            return table === 'projects'
+              ? { single: vi.fn(async () => result) }
+              : query
+          }),
+          then: (resolve: (value: typeof result) => unknown) =>
+            Promise.resolve(result).then(resolve),
+        }
+        return query
+      }),
     })),
   }
 }

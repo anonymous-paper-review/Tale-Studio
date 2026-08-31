@@ -4,14 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), userOwnsProject: vi.fn(), checkGenerationCapacity: vi.fn(),
   reserveTake: vi.fn(), reserveRegeneration: vi.fn(), getJob: vi.fn(), attach: vi.fn(), fail: vi.fn(),
-  from: vi.fn(), rpc: vi.fn(), submit: vi.fn(), finalize: vi.fn(), reconcile: vi.fn(),
+  from: vi.fn(), rpc: vi.fn(), submit: vi.fn(), finalize: vi.fn(), reconcile: vi.fn(), buildPrompt: vi.fn(),
 }))
 vi.mock('@/lib/supabase/auth', () => ({ getUser: mocks.getUser }))
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 vi.mock('@/lib/generation-jobs', () => ({ userOwnsProject: mocks.userOwnsProject, getGenerationJobById: mocks.getJob, getGenerationJobByRequestId: mocks.getJob }))
 vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: mocks.checkGenerationCapacity, quotaExceededBody: () => ({ error: 'quota' }), checkProjectVideoBudget: async () => ({ ok: true, used: 0, limit: 100 }), videoBudgetExceededBody: () => ({ error: 'video budget' }) }))
 vi.mock('@/lib/director-video-takes', () => ({ reserveDirectorVideoTake: mocks.reserveTake, reserveDirectorVideoRegeneration: mocks.reserveRegeneration, attachProviderRequestToReservedVideoJob: mocks.attach, markDirectorVideoAttemptFailed: mocks.fail }))
-vi.mock('@/lib/director/video-prompt', () => ({ buildVideoPrompt: () => ({ fullPrompt: 'prompt', prompt_parts: [] }) }))
+vi.mock('@/lib/director/video-prompt', () => ({ buildVideoPrompt: mocks.buildPrompt }))
 vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => 'https://webhook.test' }))
 vi.mock('@/lib/fal/observability', () => ({ buildBestEffortFalRequestCapturePatch: () => ({}) }))
 vi.mock('@/lib/fal/finalize', async (importOriginal) => ({
@@ -31,10 +31,17 @@ function request(extra: Record<string, unknown> = {}) {
 }
 function query(data: unknown) {
   // order/limit: #motion-contract state 폴백(writer_runs 조회)의 체인 지원 — await 시 data 없음 = 빈 결과.
-  const value = { select: vi.fn(), eq: vi.fn(), is: vi.fn(), contains: vi.fn(), maybeSingle: vi.fn(), order: vi.fn(), limit: vi.fn() }
-  value.select.mockReturnValue(value); value.eq.mockReturnValue(value); value.is.mockReturnValue(value); value.contains.mockReturnValue(value)
+  if (data && typeof data === 'object' && !Array.isArray(data) && 'shot_id' in data && !('character_appearance_keys' in data)) {
+    data = { ...data, character_appearance_keys: {} }
+  }
+  const result = { data, error: null }
+  const value = {
+    select: vi.fn(), eq: vi.fn(), in: vi.fn(), is: vi.fn(), contains: vi.fn(), maybeSingle: vi.fn(), order: vi.fn(), limit: vi.fn(),
+    then: (resolve: (resolved: typeof result) => unknown) => Promise.resolve(result).then(resolve),
+  }
+  value.select.mockReturnValue(value); value.eq.mockReturnValue(value); value.in.mockReturnValue(value); value.is.mockReturnValue(value); value.contains.mockReturnValue(value)
   value.order.mockReturnValue(value); value.limit.mockReturnValue(value)
-  value.maybeSingle.mockResolvedValue({ data, error: null })
+  value.maybeSingle.mockResolvedValue(result)
   return value
 }
 function reservedFalJob(overrides: Record<string, unknown> = {}) {
@@ -101,10 +108,79 @@ function reservedLocalJob(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.getUser.mockResolvedValue({ id: 'user-1' }); mocks.userOwnsProject.mockResolvedValue(true); mocks.checkGenerationCapacity.mockResolvedValue({ ok: true })
-  mocks.from.mockReturnValueOnce(query({ workspace_id: 'workspace-1' })).mockReturnValueOnce(query({ shot_id: 'shot-1' })).mockReturnValueOnce(query(null))
+  mocks.buildPrompt.mockReturnValue({ fullPrompt: 'prompt', prompt_parts: [] })
+  mocks.from.mockReturnValueOnce(query({ workspace_id: 'workspace-1' })).mockReturnValueOnce(query({ shot_id: 'shot-1', character_appearance_keys: {} })).mockReturnValueOnce(query(null))
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
 })
 describe('director video generation reservation', () => {
+  it('uses the dialogue speaker’s exact persisted appearance snapshot rather than the current character appearance', async () => {
+    mocks.from.mockReset()
+    mocks.from
+      .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
+      .mockReturnValueOnce(query({
+        shot_id: 'shot-1',
+        dynamic_spec: {},
+        dialogue_lines: [{ characterId: 'char-1', text: 'When I was young.' }],
+        character_appearance_keys: { 'char-1': 'young' },
+      }))
+      .mockReturnValueOnce(query(null))
+      .mockReturnValueOnce(query([{ character_id: 'char-1', name: 'Jiho' }]))
+      .mockReturnValueOnce(query([{ character_id: 'char-1', appearance_key: 'young', appearance: 'young face and school uniform' }]))
+    mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
+    mocks.getJob.mockResolvedValue(reservedFalJob())
+    mocks.submit.mockResolvedValue({ request_id: 'fal-1' })
+
+    await POST(request())
+
+    expect(mocks.buildPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      dialogueSpeakers: { 'char-1': { name: 'Jiho', appearance: 'young face and school uniform' } },
+    }))
+  })
+
+  it('rejects a missing exact dialogue appearance before reserving or submitting paid video work', async () => {
+    mocks.from.mockReset()
+    mocks.from
+      .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
+      .mockReturnValueOnce(query({
+        shot_id: 'shot-1',
+        dynamic_spec: {},
+        dialogue_lines: [{ characterId: 'char-1', text: 'When I was young.' }],
+        character_appearance_keys: { 'char-1': 'young' },
+      }))
+      .mockReturnValueOnce(query(null))
+      .mockReturnValueOnce(query([{ character_id: 'char-1', name: 'Jiho' }]))
+      .mockReturnValueOnce(query([]))
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({
+      error: 'Character appearance contract error: char-1/young has no required appearance',
+    })
+    expect(mocks.reserveTake).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
+  })
+
+  it('rejects a missing appearance snapshot before reserving or submitting paid video work', async () => {
+    mocks.from.mockReset()
+    mocks.from
+      .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
+      .mockReturnValueOnce(query({
+        shot_id: 'shot-1',
+        dynamic_spec: {},
+        character_appearance_keys: null,
+      }))
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({
+      error: 'Character appearance contract error: shot shot-1 has no character_appearance_keys snapshot',
+    })
+    expect(mocks.reserveTake).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
+  })
+
   it('reserves a new take and persists the provider-authoritative request', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 2, replayed: false })
     mocks.getJob.mockResolvedValueOnce(reservedFalJob())

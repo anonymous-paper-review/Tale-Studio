@@ -46,6 +46,48 @@ describe('buildFalImageInput — image_size 정규화', () => {
   })
 })
 
+describe('buildFalImageInput — 신규 fal 이미지 모델(nano-banana / seedream) 스키마 분기', () => {
+  const NANO = 'fal-ai/nano-banana'
+  const NANO_EDIT = 'fal-ai/nano-banana/edit'
+  const SEEDREAM = 'fal-ai/bytedance/seedream/v4/text-to-image'
+  const SEEDREAM_EDIT = 'fal-ai/bytedance/seedream/v4/edit'
+
+  it('nano t2i: aspect_ratio 를 그대로 싣고 image_urls/image_size 는 없다', () => {
+    const input = buildFalImageInput({ prompt: 'p', aspect_ratio: '1:1' }, NANO)
+    expect(input.aspect_ratio).toBe('1:1')
+    expect('image_urls' in input).toBe(false)
+    expect('image_size' in input).toBe(false)
+  })
+
+  it("nano edit: reference 를 image_urls 로, aspect_ratio 'auto' 는 생략(입력 비율 추종)", () => {
+    const input = buildFalImageInput(
+      { prompt: 'p', aspect_ratio: 'auto', reference_image_urls: ['a.png', 'b.png'] },
+      NANO_EDIT,
+    )
+    expect(input.image_urls).toEqual(['a.png', 'b.png'])
+    expect('aspect_ratio' in input).toBe(false)
+  })
+
+  it('seedream t2i: image_size 사용, aspect_ratio 는 preset 으로 유도(스키마에 aspect_ratio 없음)', () => {
+    const input = buildFalImageInput({ prompt: 'p', aspect_ratio: '16:9' }, SEEDREAM)
+    expect(input.image_size).toBe('landscape_16_9')
+    expect('aspect_ratio' in input).toBe(false)
+  })
+
+  it('seedream: canvas 미지정이면 image_size 를 생략한다(모델 기본 2048² 정사각)', () => {
+    expect('image_size' in buildFalImageInput({ prompt: 'p' }, SEEDREAM)).toBe(false)
+  })
+
+  it("seedream edit: reference 를 image_urls 로, 'WxH' 는 {width,height} 객체로", () => {
+    const input = buildFalImageInput(
+      { prompt: 'p', image_size: '1024x1536', reference_image_urls: ['t.png'] },
+      SEEDREAM_EDIT,
+    )
+    expect(input.image_urls).toEqual(['t.png'])
+    expect(input.image_size).toEqual({ width: 1024, height: 1536 })
+  })
+})
+
 describe('realSheetCanvas — 프로듀서 포맷 → 실사 시트 캔버스 (#sheet-formats 2차: 4포맷 전부 스펙)', () => {
   it('그리드: 셀 AR 정확·데드밴드 제거 캔버스 (horizontal 도 레거시에서 스펙 시트로 이동)', () => {
     expect(realSheetCanvas('horizontal_16:9', 'grid4')).toBe('2880x1280') // #hd-grid 상향(오너 ③D)

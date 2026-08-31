@@ -250,11 +250,12 @@ export async function estimateWholeProjectFileCounts(projectId: string): Promise
   try {
     const { createClient } = await import('@/lib/supabase/client')
     const supabase = createClient()
-    const [charactersRes, locationsRes, shotsRes, clipsRes] = await Promise.all([
+    const [appearancesRes, locationsRes, shotsRes, clipsRes] = await Promise.all([
       supabase
-        .from('characters')
-        .select('view_main,view_back,view_side_left,view_side_right')
-        .eq('project_id', projectId),
+        .from('character_appearances')
+        .select('sheet_url,portrait_url')
+        .eq('project_id', projectId)
+        .eq('is_default', true),
       supabase
         .from('locations')
         .select('wide_shot,establishing_shot')
@@ -266,20 +267,18 @@ export async function estimateWholeProjectFileCounts(projectId: string): Promise
         .eq('project_id', projectId),
     ])
 
-    if (charactersRes.error || locationsRes.error || shotsRes.error || clipsRes.error) {
+    if (appearancesRes.error || locationsRes.error || shotsRes.error || clipsRes.error) {
       const failure =
-        charactersRes.error ?? locationsRes.error ?? shotsRes.error ?? clipsRes.error
+        appearancesRes.error ?? locationsRes.error ?? shotsRes.error ?? clipsRes.error
       console.warn('[export-menu] DB size estimate failed; requiring unknown-size confirmation:', failure)
       return { counts: emptyCounts(), known: false }
     }
 
     const counts = emptyCounts()
 
-    for (const row of charactersRes.data ?? []) {
-      addUrlCount(counts, 'image', row.view_main)
-      addUrlCount(counts, 'image', row.view_back)
-      addUrlCount(counts, 'image', row.view_side_left)
-      addUrlCount(counts, 'image', row.view_side_right)
+    for (const row of appearancesRes.data ?? []) {
+      addUrlCount(counts, 'image', row.sheet_url)
+      addUrlCount(counts, 'image', row.portrait_url)
     }
 
     for (const row of locationsRes.data ?? []) {

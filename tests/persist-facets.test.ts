@@ -124,9 +124,43 @@ function projectQuery() {
   }
 }
 
+function characterAppearancesQuery() {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn(async () => ({
+        data: [
+          {
+            character_id: 'kai',
+            appearance_key: 'kai-current',
+            narrative_time: 'present',
+            is_default: true,
+          },
+        ],
+        error: null,
+      })),
+    })),
+  }
+}
+
 function sceneQuery() {
   const chain = { eq: vi.fn(() => chain) }
-  return { update: vi.fn(() => chain) }
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn(async () => ({
+        data: [{ scene_id: 'sc_01', narrative_time: 'present' }],
+        error: null,
+      })),
+    })),
+    update: vi.fn(() => chain),
+  }
+}
+
+function sceneCharacterAppearanceOverridesQuery() {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn(async () => ({ data: [], error: null })),
+    })),
+  }
 }
 
 beforeEach(() => {
@@ -137,7 +171,11 @@ beforeEach(() => {
   mocks.from.mockImplementation((table: string) => {
     if (table === 'shots') return shotQuery()
     if (table === 'projects') return projectQuery()
+    if (table === 'character_appearances') return characterAppearancesQuery()
     if (table === 'scenes') return sceneQuery()
+    if (table === 'scene_character_appearance_overrides') {
+      return sceneCharacterAppearanceOverridesQuery()
+    }
     throw new Error(`unexpected table ${table}`)
   })
   mocks.isFlagOn.mockReset()
@@ -174,6 +212,7 @@ describe('persistShotsToDb facet persistence', () => {
     expect(mocks.insertedShots).toHaveLength(1)
     expect(mocks.insertedShots[0].static_spec).toEqual(staticSpec)
     expect(mocks.insertedShots[0].prompt_source_hash).toBe('hash:shot_001')
+    expect(mocks.insertedShots[0].character_appearance_keys).toEqual({ kai: 'kai-current' })
   })
 
   it('keeps the legacy prompt path when FACET_RENDER is off', async () => {

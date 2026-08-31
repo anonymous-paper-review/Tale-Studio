@@ -1,9 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Tooltip,
@@ -13,7 +11,7 @@ import {
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
 import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle'
-import { useArtistStore, type CharacterRole } from '@/stores/artist-store'
+import { sameCharacterAppearanceSlot, useArtistStore, type CharacterRole } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
@@ -43,6 +41,15 @@ export function CharacterPanel({
   columns = 1,
   onZoomStep,
 }: { columns?: number; onZoomStep?: (dir: 1 | -1) => void } = {}) {
+  // #g4(2026-08-27): 카드 안에서 고른 모습. 캐릭터당 하나씩 기억한다.
+  //   모습이 하나뿐인 캐릭터는 탭 자체가 안 뜨므로 이 상태를 쓰지 않는다.
+  const [pickedAppearance, setPickedAppearance] = useState<Record<string, string>>({})
+
+  /** 선택한 모습의 시트만 표시한다. 다른 모습이나 legacy view_main으로 대체하지 않는다. */
+  const selectedAppearance = (c: { characterId: string; appearances: Array<{ appearanceKey: string; isDefault: boolean; sheetUrl: string | null }> }) => {
+    const key = pickedAppearance[c.characterId] ?? c.appearances.find((appearance) => appearance.isDefault)?.appearanceKey
+    return c.appearances.find((appearance) => appearance.appearanceKey === key) ?? null
+  }
   const t = useT()
   const {
     sceneManifest,
@@ -51,7 +58,6 @@ export function CharacterPanel({
     generatingViews,
     viewFailures,
     selectCharacter,
-    generateCharacterAllViews,
   } = useArtistStore()
 
   const requiredCharacterIds = useProjectStore((s) => s.lifecycleStatus.artist?.requiredCharacterIds ?? EMPTY_REQUIRED_IDS)
@@ -65,6 +71,7 @@ export function CharacterPanel({
   )
   const [viewDialog, setViewDialog] = useState<{
     charId: string
+    appearanceKey: string
     view: CharacterViewKey
   } | null>(null)
 
@@ -104,16 +111,16 @@ export function CharacterPanel({
         )}
       >
         {characterAssets.map((char) => {
+          const appearance = selectedAppearance(char)
           const role = getRole(char.characterId)
           const isSelected = selectedCharacterId === char.characterId
-          const isGenerating = generatingViews.some((k) =>
-            k.startsWith(`${char.characterId}:`),
-          )
           const isViewGenerating = (v: CharacterViewKey) =>
-            generatingViews.includes(`${char.characterId}:${v}`)
+            appearance
+              ? generatingViews.some((slot) => sameCharacterAppearanceSlot(slot, char.characterId, appearance.appearanceKey, v))
+              : false
           const isObject = char.entityType === 'object'
           // 캐릭터=턴어라운드 시트 1장, 사물=단일 이미지 — 둘 다 main 하나로 판정(#7).
-          const hasMainImage = Boolean(char.views.main)
+          const hasMainImage = Boolean(appearance?.sheetUrl)
           const isRequired = requiredCharacterIds.includes(char.characterId)
           const bgScenes = getBackgroundScenes(char.characterId)
 
@@ -196,7 +203,7 @@ export function CharacterPanel({
               }}
               // 더블 클릭 = 사진 클릭과 동일(#d5 2026-08-03) — 상세/재생성 팝업
               onDoubleClick={() =>
-                setViewDialog({ charId: char.characterId, view: 'main' })
+                appearance && setViewDialog({ charId: char.characterId, appearanceKey: appearance.appearanceKey, view: 'main' })
               }
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ')
@@ -248,6 +255,41 @@ export function CharacterPanel({
                 )}
               </div>
 
+              {/* 모습 탭(#g4 2026-08-27) — 옥화 ┬ 현재 └ 젊은 시절.
+                  모습이 하나뿐이면 그리지 않는다: 지금까지의 카드와 똑같이 보인다.
+                  카드를 늘리는 대신 여기서 갈아끼우는 이유는, 카드를 나누면
+                  "이 둘이 같은 사람"이라는 정보가 화면에서 사라지기 때문이다. */}
+              {(char.appearances?.length ?? 0) > 1 && (
+                <div className="mb-2 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+                  {char.appearances!.map((ap) => {
+                    const active =
+                      (pickedAppearance[char.characterId] ??
+                        char.appearances!.find((a) => a.isDefault)?.appearanceKey) ===
+                      ap.appearanceKey
+                    return (
+                      <button
+                        key={ap.appearanceKey}
+                        type="button"
+                        onClick={() =>
+                          setPickedAppearance((prev) => ({
+                            ...prev,
+                            [char.characterId]: ap.appearanceKey,
+                          }))
+                        }
+                        className={cn(
+                          'rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors',
+                          active
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border text-muted-foreground hover:bg-accent',
+                        )}
+                      >
+                        {ap.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
               {/* 캐릭터 = 턴어라운드 시트 1장(모든 뷰, 와이드 3:2) / 사물 = 단일 이미지(정사각). 둘 다 main 하나(#7).
                   셀 클릭 → 상세/재생성 Dialog. */}
               <Tooltip>
@@ -256,22 +298,22 @@ export function CharacterPanel({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation()
-                      setViewDialog({ charId: char.characterId, view: 'main' })
+                      if (appearance) setViewDialog({ charId: char.characterId, appearanceKey: appearance.appearanceKey, view: 'main' })
                     }}
                     className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                   >
                     {/* 사람 시트는 hover 리전 순환(#d2) — 컨셉→디테일→스케치→표정을 잘라 옮겨
                         다닌다. 생성 중·이미지 없음·사물은 기존 placeholder 경로 그대로. */}
-                    {!isObject && char.views.main && !isViewGenerating('main') ? (
+                    {!isObject && appearance?.sheetUrl && !isViewGenerating('main') ? (
                       <TurnaroundRegionCycle
-                        url={char.views.main}
+                        url={appearance.sheetUrl}
                         alt={t('{name} turnaround sheet', { name: char.name || t('Character') })}
                       />
                     ) : (
                       <ImagePlaceholder
                         label={isObject ? '' : t('Turnaround (all views)')}
                         aspectRatio={isObject ? 'square' : 'video'}
-                        imageUrl={char.views.main ?? null}
+                        imageUrl={appearance?.sheetUrl ?? null}
                         generating={isViewGenerating('main')}
                       />
                     )}
@@ -289,33 +331,9 @@ export function CharacterPanel({
               </Tooltip>
 
               {/* 카드 인라인 설정/외형 편집 제거(#d4 2026-08-03) — World 탭과 같은 이미지 중심
-                  카드로. 텍스트 수정은 상세 팝업(사진/더블 클릭)과 채팅 경로가 담당한다. */}
-              {/* Actions(#d3 2026-07-15) — Register(에셋은 진입 시 DB 하이드레이트로 자동 공급)·
-                  인벤토리 저장 버튼 제거, 생성 버튼 문구는 '이미지 생성'으로 통일. */}
-              <div className="mt-3 flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 hover-red-beam"
-                  disabled={isGenerating}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    generateCharacterAllViews(char.characterId)
-                  }}
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="size-3.5 animate-spin" />
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="size-3.5" />
-                      {t('Generate image')}
-                    </>
-                  )}
-                </Button>
-              </div>
+                  카드로. 텍스트 수정·이미지 재생성은 상세 팝업(사진/더블 클릭)과 채팅 경로가 담당한다. */}
+              {/* 카드 생성 버튼 제거(2026-08-31 오너) — 생성/재생성은 상세 팝업과 채팅으로만.
+                  카드에서 실수로 과금 생성이 눌리는 것을 막고, 이미지 모델 선택도 팝업/채팅에 둔다. */}
             </div>
           )
         })}
@@ -326,6 +344,7 @@ export function CharacterPanel({
 
       <CharacterViewDialog
         charId={viewDialog?.charId ?? null}
+        appearanceKey={viewDialog?.appearanceKey ?? null}
         view={viewDialog?.view ?? null}
         onClose={() => setViewDialog(null)}
       />

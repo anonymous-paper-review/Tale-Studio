@@ -319,7 +319,11 @@ export function buildSplitChildren(
         childIdx === 0
           ? { ...original.video_generation, ...(ns.video_generation ?? {}) }
           : { motion_prompt: ns.video_generation?.motion_prompt?.trim() ?? '' },
-      duration_seconds: ns.duration_seconds ?? original.duration_seconds,
+      // #d4(2026-08-31 오너 확정): 분할 자식의 액션은 부모의 1/N 인데 시간은 통짜 상속돼
+      //   액션↔시간 비가 반토막 났다(감사 D4, 실측 런 총합 +11.7~16.7%). 델타가 직접 주면
+      //   존중, 없으면 부모 시간을 자식 수로 안분(하한 2초 — physics 대역 하단).
+      duration_seconds:
+        ns.duration_seconds ?? Math.max(2, Math.round(original.duration_seconds / newShots.length)),
       continuity: ns.continuity ?? original.continuity,
       action_budget: ns.action_budget ?? original.action_budget,
       // provenance 는 시스템 소유 필드 — 모델이 new_shots 에 부모 값을 복사해 와도 무시한다
@@ -521,6 +525,8 @@ function buildShotSequenceItemFromDesign(
 
   const characters = (st.character_blocking ?? []).map((b) => ({
     id: b.character_id,
+    // DB appearance_key는 persistShotsToDb가 scene narrative_time에서 해소한다.
+    // 이 단계는 L4의 의상/상태 버전만 보존한다.
     asset_version: b.asset_version || 'v1',
     visible_parts: ['full'],
   }));

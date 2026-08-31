@@ -249,8 +249,16 @@ describe('artistImageWork', () => {
     generatingCount: 0,
   }
 
-  it('초기 잠금 구간: 서버 집계 ready/total 을 그대로 노출', () => {
-    expect(artistImageWork(base)).toMatchObject({ done: 2, total: 5 })
+  it('초기 잠금 구간: 활동 증거(큐 또는 in-flight)가 있을 때 서버 집계 ready/total 노출', () => {
+    expect(artistImageWork({ ...base, activeCount: 3 })).toMatchObject({ done: 2, total: 5 })
+    expect(artistImageWork({ ...base, generatingCount: 1 })).toMatchObject({ done: 2, total: 5 })
+  })
+
+  it('D13: 아무것도 안 돌면 미완성 프로젝트여도 "생성 중" 핀을 세우지 않는다 (0/N 상시 고착 수리)', () => {
+    // 2026-08-31 오너 실측: 생성이 끝났거나 시작된 적도 없는 프로젝트에서
+    //   "Concept Artist가 생성하고 있습니다 0/N"이 영원히 떠 있었다.
+    expect(artistImageWork(base)).toBeNull()
+    expect(artistImageWork({ ...base, progress: { ready: 0, total: 8 } })).toBeNull()
   })
 
   it('stalled/failed 로 큐가 멈추면 "진행 중"이 아니므로 null', () => {

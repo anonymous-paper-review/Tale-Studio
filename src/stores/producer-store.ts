@@ -65,6 +65,8 @@ export interface ExtractedSettings {
   storyReady?: boolean
   characters?: ExtractedCastMember[]
   backgrounds?: ExtractedBackground[]
+  /** D12: 이름/느낌으로 고른 카탈로그 앵커 키(style_anchors.key) — 첨부 기반은 styleAnchorFromAttachment. */
+  styleAnchorKey?: string
 }
 
 function newLocalId(prefix = 'cast'): string {
@@ -210,6 +212,9 @@ interface ProducerState {
   loadStyleAnchors: () => Promise<void>
   /** 스타일 앵커 선택 — 낙관적 반영 + projects.style_anchor_key 저장. */
   setStyleAnchor: (key: string | null) => Promise<void>
+  /** D12: 채팅이 이름/느낌으로 고른 카탈로그 앵커 키 적용 — 카탈로그 검증 후 setStyleAnchor.
+   *  모델이 발명한 키는 unknown_key로 되돌려 호출부가 정직하게 말하게 한다. */
+  applyStyleAnchorKeyFromChat: (key: string) => Promise<'applied' | 'unknown_key'>
   /** 채팅이 해석한 화풍 의도를 반영 — 저장은 서버(api/produce/style-anchor)가 검증 후 한다. */
   applyCustomStyleAnchor: (anchor: {
     key: string
@@ -218,7 +223,11 @@ interface ProducerState {
     medium: string | null
   }) => void
   updateSettings: (partial: Partial<ProjectSettings>) => void
-  applyExtractedSettings: (extracted: ExtractedSettings) => void
+  /** 반환값은 trace 영수증용 실제 결과 — applied·pending(승인 카드)·rejected(카드 자리 점유됨)·noop. */
+  applyExtractedSettings: (
+    extracted: ExtractedSettings,
+    traceId?: string | null,
+  ) => 'applied' | 'pending' | 'rejected' | 'noop'
   applyProducerSourcePatch: (patch: ExtractedSettings) => void
   addCastMember: (entityType: EntityType) => string
   updateCastMember: (localId: string, patch: Partial<CastMember>) => void
@@ -641,8 +650,17 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     scheduleDraftSave(() => boardOf(get()))
   },
 
-  applyExtractedSettings: (extracted) => {
-    if (!extracted) return
+  applyStyleAnchorKeyFromChat: async (key) => {
+    // 카탈로그가 아직 안 실렸으면(새로고침 직후 등) 먼저 불러서 검증 근거를 만든다.
+    if (get().styleAnchors.length === 0) await get().loadStyleAnchors()
+    const anchor = get().styleAnchors.find((a) => a.key === key)
+    if (!anchor) return 'unknown_key'
+    await get().setStyleAnchor(anchor.key)
+    return 'applied'
+  },
+
+  applyExtractedSettings: (extracted, traceId) => {
+    if (!extracted) return 'noop'
     const project = useProjectStore.getState()
     const current = get()
     const afterHandoff = project.reachedStage !== 'producer'
@@ -662,6 +680,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       const impactFields = Array.from(new Set([...affected, ...protectedConflicts]))
       const accepted = useGlobalChatStore.getState().offerPendingProposal(
         createPendingProposal({
+          traceId: traceId ?? undefined,
           stage: 'producer',
           kind: 'producerSourcePatch',
           target: 'Producer source',
@@ -676,17 +695,20 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           payload: { patch: extracted },
         }),
       )
-      if (!accepted)
+      if (!accepted) {
         set({
           error: translate(
             useLocaleStore.getState().locale,
             'A proposal is already pending, so the new Producer change proposal was held back.',
           ),
         })
-      return
+        return 'rejected'
+      }
+      return 'pending'
     }
 
     get().applyProducerSourcePatch(extracted)
+    return 'applied'
   },
 
   applyProducerSourcePatch: (patch) => {

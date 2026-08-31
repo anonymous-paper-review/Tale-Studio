@@ -271,22 +271,18 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   const rule = (FRAMING_RULE_WORDS[s?.framing?.rule ?? ''] ?? 'rule of thirds').replace(/^(an?|the) /, '')
 
   // 인물: 이름 없는 "mannequin figure N" (v1 의 L2 일관성 규칙 유지 — 이름은 모델이 매번 다르게 상상)
-  // #object-not-figure(2026-08-25 실사고 화개장터 sh_04_20): shotDesign 이 사물 캐스트(엿판)를
-  //   character_blocking 에 넣자 여기서 "figure 2 …, blank head" 로 직렬화됐고, "가슴에 끈으로
-  //   고정된 얼굴 없는 인물" = 아기를 안은 그림이 됐다. 사물 id 는 figure 가 아니라 소품 문장으로
-  //   분기한다 — 이름을 명시해 무엇인지 못박고, 인형·사람 금지를 붙인다.
-  const objectIdSet = new Set(input.objectCharacterIds ?? [])
-  const allBlocking = s?.character_blocking ?? []
-  const blocking = allBlocking.filter((b) => !objectIdSet.has(b.character_id))
-  const objectBlocking = allBlocking.filter((b) => objectIdSet.has(b.character_id))
-  const objectProps = objectBlocking
-    .map((b) => {
-      const objName = input.characterNameById?.get(b.character_id) ?? b.character_id
-      return `carried prop (${stripColor(objName)}) at ${words(b.position_in_frame) || 'center'}, ${stripColor(words(b.pose)) || 'placed'} — this is an inanimate object: draw the object itself, NEVER a mannequin, person or head`
+  // #g4(2026-08-27): 사물 걸러내기를 여기서 지웠다. 사물은 props 테이블에 살고
+  //   character_blocking 에는 v4_shots 의 moveObjectsToProps 가 못 들어오게 막는다.
+  //   즉 여기 오는 blocking 은 전부 사람이다 — 걸러낼 것이 없다.
+  //   (옛 방어는 '엿판이 안긴 아기로' 실사고의 응급처치였다. 이제 구조가 그 사고를 막는다.)
+  const blocking = s?.character_blocking ?? []
+  const objectProps = (s?.prop_placement ?? [])
+    .map((p) => {
+      const objName = input.characterNameById?.get(p.prop) ?? p.prop
+      return `carried prop (${stripColor(objName)}) at ${words(p.position_in_frame) || 'center'} — this is an inanimate object: draw the object itself, NEVER a mannequin, person or head`
     })
     .join('; ')
-  const figureCount =
-    blocking.length || Math.max(0, input.characterNames.length - objectIdSet.size)
+  const figureCount = blocking.length || input.characterNames.length
   const personLine = blocking.length
     ? blocking
         .map(
@@ -321,7 +317,11 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
       ? 'the numbered figure(s) above and any people described in the fg/mg/bg layers are the SAME subjects — draw each subject only once (no plain duplicate mannequin alongside them); anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them'
       : blocking.length
         ? 'anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them'
-        : null
+        : figureCount === 0
+          // #w4(2026-08-31, 감사 W4): 무인물 셀은 personLine 도 비어 "사람 없음"을 아무도
+          //   말하지 않았다 — moment 에 스친 인물을 모델이 그려 넣는 구멍.
+          ? 'this panel has NO people — anyone mentioned in the moment is OFF-SCREEN; draw the scene without any figure'
+          : null
   const setting = [stripColor(input.location), input.timeOfDay].filter(Boolean).join(', ')
   const focal =
     stripColor(s?.framing?.focal_point) ||

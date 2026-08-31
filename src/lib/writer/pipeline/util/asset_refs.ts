@@ -78,6 +78,7 @@ export function normalizeShotAssetRefs(
     .map((c) => {
       const res = resolveAssetRef(c.id, reg);
       if (res && res.kind === 'character') {
+        // asset_version은 L4의 의상/상태 메타다. DB appearance_key로 해석하지 않는다.
         return { ...c, id: res.id, asset_version: c.asset_version ?? res.strippedVersion ?? 'v1' };
       }
       issues.push({ shot_id: shot.shot_id, field: 'characters', dropped: c.id });

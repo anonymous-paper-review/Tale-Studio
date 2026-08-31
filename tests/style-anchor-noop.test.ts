@@ -57,7 +57,6 @@ import { POST as generateWorldPOST } from '@/app/api/artist/generate-world/route
 import { POST as generateStoryboardPOST } from '@/app/api/director/generate-storyboard/route'
 import { triggerCharacterDrafts } from '@/lib/artist/draft-trigger'
 import {
-  buildCharacterMainPrompt,
   buildCharacterTurnaroundPrompt,
   buildCharacterViewPrompt,
   type CharacterPromptInput,
@@ -100,13 +99,25 @@ interface CharacterRow {
   appearance: string | null
   costume: string[] | string | null
   view_main: string | null
-  entity_type: 'person' | 'object' | null
+  entity_type: 'person' | null
   origin: 'producer' | 'writer'
+}
+
+interface AppearanceRow {
+  project_id: string
+  character_id: string
+  appearance_key: string
+  is_default: boolean
+  appearance: string | null
+  costume: string[] | string | null
+  sheet_url: string | null
+  portrait_url: string | null
 }
 
 interface CandidateRow {
   project_id: string
   character_id: string
+  appearance_key: string
   view: string
   id: string
 }
@@ -137,16 +148,19 @@ const designTokens: DesignTokens = {
 const dbState: {
   projects: ProjectRow[]
   characters: CharacterRow[]
+  appearances: AppearanceRow[]
   candidates: CandidateRow[]
 } = {
   projects: [],
   characters: [],
+  appearances: [],
   candidates: [],
 }
 
 beforeEach(() => {
   dbState.projects = [projectFixture({ design_tokens: designTokens })]
   dbState.characters = []
+  dbState.appearances = []
   dbState.candidates = []
 
   mocks.getUser.mockReset()
@@ -194,12 +208,13 @@ beforeEach(() => {
 describe('style-anchor Phase 0 no-op characterization', () => {
   it('D.1 generate-sheet person main uses template edit opts with no aspect_ratio', async () => {
     const character = characterFixture({ view_main: null, entity_type: 'person' })
-    dbState.characters = [character]
+    setCharacters(character)
 
     const response = await generateSheetPOST(
       postRequest('/api/artist/generate-sheet', {
         projectId: PROJECT_ID,
         characterId: CHARACTER_ID,
+        appearanceKey: 'current',
         view: 'main',
       }),
     )
@@ -218,12 +233,13 @@ describe('style-anchor Phase 0 no-op characterization', () => {
   it('D.2 generate-sheet person main falls back to 3:2 T2I when no base URL exists', async () => {
     mocks.webhookBaseUrl = null
     const character = characterFixture({ view_main: null, entity_type: 'person' })
-    dbState.characters = [character]
+    setCharacters(character)
 
     const response = await generateSheetPOST(
       postRequest('/api/artist/generate-sheet', {
         projectId: PROJECT_ID,
         characterId: CHARACTER_ID,
+        appearanceKey: 'current',
         view: 'main',
       }),
     )
@@ -239,44 +255,15 @@ describe('style-anchor Phase 0 no-op characterization', () => {
     expect(firstFalOpts().prompt).not.toContain('STYLE REFERENCE')
   })
 
-  it('D.3 generate-sheet object main uses main portrait opts with 1:1 aspect ratio', async () => {
-    const character = characterFixture({
-      name: 'Chronometer',
-      role: 'mystery prop',
-      appearance: 'a brass clockwork compass with a cracked sapphire lens',
-      costume: [],
-      view_main: null,
-      entity_type: 'object',
-    })
-    dbState.characters = [character]
-
-    const response = await generateSheetPOST(
-      postRequest('/api/artist/generate-sheet', {
-        projectId: PROJECT_ID,
-        characterId: CHARACTER_ID,
-        view: 'main',
-      }),
-    )
-
-    expect(response.status).toBe(200)
-    expect(firstFalOpts()).toEqual({
-      model: DEFAULT_IMAGE_MODEL,
-      prompt: buildCharacterMainPrompt(sheetPromptInput(character, designTokens)),
-      aspect_ratio: '1:1',
-      webhookUrl: WEBHOOK_URL,
-    })
-    expect(firstFalOpts()).not.toHaveProperty('reference_image_urls')
-    expect(firstFalOpts().prompt).not.toContain('STYLE REFERENCE')
-  })
-
   it('D.4 generate-sheet directional view uses the main image as edit reference with no aspect_ratio', async () => {
     const character = characterFixture({ view_main: 'https://img/main.png', entity_type: 'person' })
-    dbState.characters = [character]
+    setCharacters(character)
 
     const response = await generateSheetPOST(
       postRequest('/api/artist/generate-sheet', {
         projectId: PROJECT_ID,
         characterId: CHARACTER_ID,
+        appearanceKey: 'current',
         view: 'back',
       }),
     )
@@ -299,15 +286,16 @@ describe('style-anchor Phase 0 no-op characterization', () => {
       view_main: null,
       entity_type: 'person',
     })
-    dbState.characters = [character]
+    setCharacters(character)
     mocks.listFailedCharacterViewJobs.mockResolvedValue([
-      { characterId: CHARACTER_ID, view: 'main', moderation: true, safeFailCount: 0 },
+      { characterId: CHARACTER_ID, appearanceKey: 'current', view: 'main', moderation: true, safeFailCount: 0 },
     ])
 
     const response = await generateSheetPOST(
       postRequest('/api/artist/generate-sheet', {
         projectId: PROJECT_ID,
         characterId: CHARACTER_ID,
+        appearanceKey: 'current',
         view: 'main',
         safeMode: true,
       }),
@@ -374,7 +362,7 @@ describe('style-anchor Phase 0 no-op characterization', () => {
     expect(firstFalOpts().prompt).not.toContain('STYLE REFERENCE')
   })
 
-  it('D.8 triggerCharacterDrafts submits current template, fallback, and object opts', async () => {
+  it('D.8 triggerCharacterDrafts submits current template and fallback opts', async () => {
     dbState.projects = [projectFixture({ design_tokens: designTokens })]
     const templatePerson = draftCharacter({
       character_id: 'draft-person-template',
@@ -390,24 +378,16 @@ describe('style-anchor Phase 0 no-op characterization', () => {
       appearance: 'masked violinist carrying a lantern',
       entity_type: 'person',
     })
-    const object = draftCharacter({
-      character_id: 'draft-object',
-      name: 'Signal Compass',
-      role: null,
-      appearance: 'a palm-sized compass with a glowing red needle',
-      entity_type: 'object',
-    })
-    dbState.characters = [templatePerson, fallbackPerson, object]
+    setCharacters(templatePerson, fallbackPerson)
     mocks.resolveWebhookBaseUrl.mockReset()
     mocks.resolveWebhookBaseUrl
       .mockReturnValueOnce(BASE_URL)
       .mockReturnValueOnce(null)
-      .mockReturnValueOnce(BASE_URL)
 
     const result = await triggerCharacterDrafts(PROJECT_ID)
 
-    expect(result).toEqual({ submitted: 3, skipped: 0, failed: 0 })
-    expect(mocks.falImageSubmit).toHaveBeenCalledTimes(3)
+    expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
+    expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
     expect(falOptsAt(0)).toEqual({
       model: DEFAULT_EDIT_IMAGE_MODEL,
       prompt: buildCharacterTurnaroundPrompt(draftPromptInput(templatePerson)),
@@ -415,6 +395,11 @@ describe('style-anchor Phase 0 no-op characterization', () => {
       webhookUrl: WEBHOOK_URL,
     })
     expect(falOptsAt(0)).not.toHaveProperty('aspect_ratio')
+    expect((mocks.createGenerationJob.mock.calls[0][0] as { target: unknown }).target).toMatchObject({
+      characterId: templatePerson.character_id,
+      appearanceKey: 'current',
+      view: 'main',
+    })
     expect(falOptsAt(0).prompt).not.toContain('STYLE REFERENCE')
     expect(falOptsAt(1)).toEqual({
       model: DEFAULT_IMAGE_MODEL,
@@ -424,14 +409,11 @@ describe('style-anchor Phase 0 no-op characterization', () => {
     })
     expect(falOptsAt(1)).not.toHaveProperty('reference_image_urls')
     expect(falOptsAt(1).prompt).not.toContain('STYLE REFERENCE')
-    expect(falOptsAt(2)).toEqual({
-      model: DEFAULT_IMAGE_MODEL,
-      prompt: buildCharacterMainPrompt(draftPromptInput(object)),
-      aspect_ratio: '1:1',
-      webhookUrl: WEBHOOK_URL,
+    expect((mocks.createGenerationJob.mock.calls[1][0] as { target: unknown }).target).toMatchObject({
+      characterId: fallbackPerson.character_id,
+      appearanceKey: 'current',
+      view: 'main',
     })
-    expect(falOptsAt(2)).not.toHaveProperty('reference_image_urls')
-    expect(falOptsAt(2).prompt).not.toContain('STYLE REFERENCE')
   })
 
   it('D.9 PREVIZ GUARD keeps rough storyboard source free of style-anchor wiring', () => {
@@ -485,6 +467,32 @@ function characterFixture(overrides: Partial<CharacterRow> = {}): CharacterRow {
     origin: 'producer',
     ...overrides,
   }
+}
+
+function appearanceFixture(overrides: Partial<AppearanceRow> = {}): AppearanceRow {
+  return {
+    project_id: PROJECT_ID,
+    character_id: CHARACTER_ID,
+    appearance_key: 'current',
+    is_default: true,
+    appearance: 'a focused explorer with copper goggles and wind-tossed black hair',
+    costume: ['navy flight coat', 'brass utility boots'],
+    sheet_url: null,
+    portrait_url: null,
+    ...overrides,
+  }
+}
+
+function setCharacters(...characters: CharacterRow[]) {
+  dbState.characters = characters
+  dbState.appearances = characters.map((character) =>
+    appearanceFixture({
+      character_id: character.character_id,
+      appearance: character.appearance,
+      costume: character.costume,
+      sheet_url: character.view_main,
+    }),
+  )
 }
 
 function draftCharacter(overrides: Partial<CharacterRow>): CharacterRow {
@@ -581,6 +589,7 @@ function resolveRows(
 function rowsForTable(table: string): Array<Record<string, unknown>> {
   if (table === 'projects') return dbState.projects as unknown as Array<Record<string, unknown>>
   if (table === 'characters') return dbState.characters as unknown as Array<Record<string, unknown>>
+  if (table === 'character_appearances') return dbState.appearances as unknown as Array<Record<string, unknown>>
   if (table === 'character_image_candidates') return dbState.candidates as unknown as Array<Record<string, unknown>>
   return []
 }

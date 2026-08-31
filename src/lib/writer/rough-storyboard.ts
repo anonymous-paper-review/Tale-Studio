@@ -150,9 +150,6 @@ export interface RoughStoryboardPromptInput {
   characterNames: string[]
   /** character_id → name (rich 경로의 blocking 치환용. 없으면 id 그대로 노출) */
   characterNameById?: Map<string, string>
-  /** 사물(entityType object) 캐스트의 character_id — blocking 에 사물이 섞이면 목각 figure 가
-   *  아니라 소품으로 그리게 분기한다(#object-not-figure 2026-08-25, '엿판이 아기로' 실사고). */
-  objectCharacterIds?: string[]
   location?: string | null
   /** 로케이션 visual_description (asset) — db_fallback 배경 묘사용. rich 경로는 framing.layers 사용(미사용). */
   locationDescription?: string | null

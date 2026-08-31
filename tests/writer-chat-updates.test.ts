@@ -18,15 +18,24 @@ const dialogue = (characterId: string, text: string): DialogueLine => ({
 })
 
 describe('writer chat update validation', () => {
-  it('passes dialogueLines entries with only characterId and text', () => {
+  it('keeps dialogue spec fields (emotion/delivery/durationHint) and drops unknown/invalid extras', () => {
+    // 예전 계약은 characterId+text 외 전부를 버려서, 챗 대사 수정마다 연기 지시가
+    //   유실됐다(2026-08-31 실측). 이제 스펙 필드는 통과시키고 미정의·불량 값만 건다.
     const out = validateWriterUpdates([
       {
         type: 'updateShot',
         id: 'sh_01_01',
         patch: {
           dialogueLines: [
-            { characterId: 'char_a', text: '안녕.', emotion: 'ignored' },
-            { characterId: 'char_b', text: '' },
+            {
+              characterId: 'char_a',
+              text: '안녕.',
+              emotion: '반가움',
+              delivery: '밝게 손을 흔들며',
+              durationHint: 2,
+              unknownField: 'dropped',
+            },
+            { characterId: 'char_b', text: '', emotion: 7, durationHint: -1 },
           ],
         },
       },
@@ -38,7 +47,13 @@ describe('writer chat update validation', () => {
         id: 'sh_01_01',
         patch: {
           dialogueLines: [
-            { characterId: 'char_a', text: '안녕.' },
+            {
+              characterId: 'char_a',
+              text: '안녕.',
+              emotion: '반가움',
+              delivery: '밝게 손을 흔들며',
+              durationHint: 2,
+            },
             { characterId: 'char_b', text: '' },
           ],
         },

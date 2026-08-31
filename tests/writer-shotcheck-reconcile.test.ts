@@ -9,6 +9,7 @@ function scene(id: string, location: string): StoryScene {
     act_ref: 'act_1',
     location,
     time_of_day: 'day',
+    narrative_time: 'present',
     characters_in_scene: ['char'],
     purpose: `purpose_${id}`,
     emotion_beat: { start: 'calm', end: 'tense' },

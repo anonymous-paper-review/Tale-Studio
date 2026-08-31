@@ -130,6 +130,20 @@ describe('handoff soft blockers warn but still proceed', () => {
           entityType: 'person',
           views: { main: 'https://x/main.png', back: null, sideLeft: null, sideRight: null },
           viewCandidates: {},
+          // #g4: 카드·게이트는 characters 가 아니라 기본 모습(character_appearances)의 sheetUrl 을 읽는다.
+          appearances: [
+            {
+              appearanceKey: 'current',
+              label: '현재',
+              isDefault: true,
+              narrativeTime: 'present',
+              sheetUrl: 'https://x/main.png',
+              portraitUrl: null,
+              appearance: null,
+              appearanceNative: null,
+              viewCandidates: {},
+            },
+          ],
         },
       ],
     })

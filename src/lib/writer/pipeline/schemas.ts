@@ -52,6 +52,7 @@ export const NarrativeStructureSchema = z.object({
 export const StorySceneLooseSchema = z.looseObject({
   scene_id: z.string(),
   location: z.string(),
+  narrative_time: z.enum(['present', 'past', 'future']),
   scene_actions: z.array(z.string()).min(1),
 });
 

@@ -25,7 +25,7 @@ import {
 import {
   IMAGE_MODELS,
   IMAGE_MODEL_ORDER,
-  normalizeImageModel,
+  normalizeImageModelKey,
 } from '@/lib/image-models'
 import { useT } from '@/lib/i18n'
 
@@ -285,7 +285,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {IMAGE_MODEL_ORDER.map((key) => {
                 const spec = IMAGE_MODELS[key]
-                const active = normalizeImageModel(data.imageModel) === key
+                const active = normalizeImageModelKey(data.imageModel) === key
                 return (
                   <button
                     key={key}
@@ -302,7 +302,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                   >
                     <span className="block font-medium">{spec.label}</span>
                     <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                      {spec.endpoint}
+                      {spec.t2iEndpoint}
                     </span>
                   </button>
                 )

@@ -566,6 +566,7 @@ export const KO: Record<string, string> = {
   'Protagonist appears': '주인공 등장',
   'A vividly-drawn character is ready.': '모습이 그려지는 인물이 준비됐어요.',
   '{count} fields are empty — try describing a character.': '{count}개 항목이 비어 있어요 — 인물을 묘사해 보세요.',
+  'No character yet — describe one in chat.': '아직 인물이 없어요 — 채팅에서 한 명 묘사해 보세요.',
   'Stage complete': '무대 완성',
   'A background with a name, look, and purpose is ready.': '이름·모습·용도가 있는 배경이 준비됐어요.',
   'You need at least one background with a name, look, and purpose.': '이름·모습·용도가 있는 배경 1개가 필요해요.',
@@ -688,6 +689,13 @@ export const KO: Record<string, string> = {
   'Generate {label}': '{label} 생성',
   'Bypass retry limit reached': '우회 재시도 한도 도달',
   'Redo with bypass (safe)': '우회(safe)로 다시 만들기',
+  // 이미지 생성 모델 선택(image-models 레지스트리) — 'Image generation model' 키는 위에 이미 있어 재사용.
+  'This model has no reference support — character identity may drift.':
+    '이 모델은 참조 이미지를 지원하지 않아 캐릭터 얼굴이 흔들릴 수 있어요.',
+  'OpenAI · crisp typography, reliable identity': 'OpenAI · 또렷한 글자, 안정적인 얼굴',
+  'Google Gemini · strong character consistency': 'Google Gemini · 캐릭터 일관성이 강함',
+  'ByteDance · high-res, rich editing': 'ByteDance · 고해상, 편집에 강함',
+  'Black Forest Labs · fast & cheap, no reference': 'Black Forest Labs · 빠르고 저렴, 참조 미지원',
   Assets: '에셋',
   People: '인물',
   'Hover to expand · drag to link to a shot, click a card chip to unlink':
@@ -902,6 +910,16 @@ export const KO: Record<string, string> = {
   'The Writer implementation calls an external contract.': 'Writer 구현은 외부 계약을 호출합니다.',
   "If same-shot preservation on the Writer side isn't guaranteed, downstream output may become orphaned or stale.": 'Writer 쪽 same-shot 보존이 보장되지 않았다면 downstream 산출물이 orphan/stale 될 수 있어요.',
   'Nothing runs until you approve.': '승인 전에는 아무 실행도 시작하지 않습니다.',
+  // D11 — 핸드오프 제안·승인 순간의 사람 말 발화 (2026-08-31 오너 실측)
+  "Everything's ready — approve the card below and I'll bring in the Writer right away.":
+    '재료가 다 모였어요 — 아래 카드에서 승인하면 바로 Writer를 불러올게요.',
+  'On it — handing your materials to the Writer! Scene and shot design starts now.':
+    '좋아요, Writer로 넘어갈게요! 재료를 넘기고 씌·샷 설계를 시작해요.',
+  'On it — re-running the Writer with your current source. This can take a while.':
+    '좋아요, 지금 원천 그대로 Writer를 다시 실행할게요! 시간이 좀 걸릴 수 있어요.',
+  // D12 — 채팅이 이름/느낌으로 스타일 앵커를 직접 반영 (2026-08-31 오너)
+  "Couldn't find that art style in the catalog — tell me the feel again or pick one in the style picker.":
+    '그 그림체는 목록에서 못 찾았어요 — 느낌을 다시 말해주거나 스타일 피커에서 골라주세요.',
   "The previous Writer run didn't finish (no scenes/shots)": '이전 Writer 실행이 완료되지 않았어요 (씬/샷 없음)',
   'Check the story and settings, then re-run to generate scenes/shots and fill in Director/Editor.': '스토리·설정을 확인하고 다시 실행하면 씬·샷이 생성돼 Director/Editor 가 채워집니다.',
   'Suggest re-running Writer': 'Writer 다시 실행 제안',
@@ -1106,6 +1124,7 @@ export const KO: Record<string, string> = {
   'Regenerate the world/background image': '월드/배경 이미지 재생성',
   'World images are not a default hard blocker for the MVP Director gate.': 'World 이미지는 MVP Director gate의 기본 hard blocker가 아닙니다.',
   'A proposal is already pending, so the new Artist generation proposal was held back.': '이미 대기 중인 제안이 있어 새 Artist 생성 제안을 보류했어요.',
+  'A proposal is already pending, so the new Director image generation proposal was held back.': '이미 대기 중인 제안이 있어 새 Director 이미지 생성 제안을 보류했어요.',
   'Change the base character appearance (source): {appearance}': '캐릭터 기본 외형(원천) 변경: {appearance}',
   "The character's canonical appearance (source) changes.": '캐릭터의 canonical 외형(원천)이 바뀝니다.',
   'After approval the existing images of that character are marked stale — they are not regenerated automatically.': '승인 후 그 캐릭터의 기존 이미지들이 낡음(stale)으로 표시돼요 — 자동 재생성은 하지 않아요.',
@@ -1277,4 +1296,22 @@ export const KO: Record<string, string> = {
   'This project has reached its video generation limit ({limit}). New video generations are blocked.':
     '이 프로젝트의 영상 생성 한도({limit}회)를 모두 사용했어요. 새 영상 생성이 제한돼요.',
   'Regenerating previz': 'Previz 재생성 중',
+
+  // ── 누락 보충(2026-08-28) — 사전에 없어 한국어 화면에 영어가 그대로 나오던 것들 ──
+  'Generate storyboard': '스토리보드 생성',
+  'Node': '노드',
+  'Create scene': '씬 만들기',
+  'Untitled': '제목 없음',
+  'Locked': '잠김',
+  'Failed to create project': '프로젝트를 만들지 못했어요',
+  'Include the last shot frame': '직전 샷의 마지막 프레임 넣기',
+  'Reference project': '참조 프로젝트',
+  'No reference project': '참조 프로젝트 없음',
+  'Reference project locked': '참조 프로젝트 잠김',
+  'Reference projects are available on P-10+ plans.': '참조 프로젝트는 P-10 이상 요금제에서 쓸 수 있어요.',
+  'Optionally copy assets from an existing project in this workspace.': '이 워크스페이스의 기존 프로젝트에서 에셋을 가져올 수 있어요. 선택 사항이에요.',
+  'Some reference assets could not be copied to the new project.': '일부 참조 에셋을 새 프로젝트로 가져오지 못했어요.',
+  'Batch generation failed': '일괄 생성에 실패했어요',
+  'Generated {count} live-action storyboard shots': '실사 스토리보드 {count}개를 만들었어요',
+  'No shots to generate — only shots with a rough panel and no image yet are eligible.': '생성할 샷이 없어요. 러프 그림이 있고 아직 이미지가 없는 샷만 대상이에요.',
 }

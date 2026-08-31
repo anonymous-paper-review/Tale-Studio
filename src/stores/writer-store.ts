@@ -322,6 +322,10 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       camera_config: newShot.camera,
       lighting_config: newShot.lighting,
       sort_order: newOrder,
+      // G4 스키마 계약: NOT NULL — 수동 샷도 전 등장인물→'current' 스냅샷을 기록한다.
+      character_appearance_keys: Object.fromEntries(
+        (newShot.characters ?? []).map((c) => [c, 'current']),
+      ),
     })
 
     if (error) {
@@ -455,6 +459,8 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       characters_present: newScene.charactersPresent,
       estimated_duration_seconds: newScene.estimatedDurationSeconds,
       sort_order: newOrder,
+      // G4 스키마 계약: NOT NULL — 수동 씌도 기본 서사 시점 'present' 로 기록한다.
+      narrative_time: 'present',
     })
 
     if (error) {

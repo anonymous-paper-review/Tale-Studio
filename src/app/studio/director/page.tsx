@@ -793,8 +793,8 @@ function PaletteBar({
         <AltArrowHint>
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'node' | 'storyboard')}>
             <TabsList>
-              <TabsTrigger value="node">Node</TabsTrigger>
-              <TabsTrigger value="storyboard">Storyboard</TabsTrigger>
+              <TabsTrigger value="node">{t('Node')}</TabsTrigger>
+              <TabsTrigger value="storyboard">{t('Storyboard')}</TabsTrigger>
             </TabsList>
           </Tabs>
         </AltArrowHint>

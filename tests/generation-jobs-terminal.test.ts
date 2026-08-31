@@ -60,7 +60,12 @@ describe('generation job terminal CAS helpers', () => {
       requestId: 'request-1',
       model: 'model-1',
       kind: 'character_view',
-      target: {},
+      target: {
+        workspaceId: 'workspace-1',
+        characterId: 'character-1',
+        appearanceKey: 'current',
+        view: 'main',
+      },
       workspaceId: 'workspace-1',
       userId: 'user-1',
     })

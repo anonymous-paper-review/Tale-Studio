@@ -1,23 +1,17 @@
-// 캐릭터 canonical 외형(원천) 변경 커밋 — C3 F6 승인 경로 전용(AC10/11).
-//
-// cc 자동경로(applyUpdates)로는 절대 진입하지 못한다(validateUpdates 화이트리스트 밖). 이 라우트는
-//   pending-proposal('artistSourceAppearancePatch') 사용자 승인 후에만 호출되어 characters.appearance 를 커밋한다.
-//   외형 변경 시 그 캐릭터의 모든 파생 이미지는 provenance(source_hash)상 자동 stale 이 된다 — 추가 무효화/재생성
-//   코드 없음(#57: 자동 무효화/자동 재생성 금지). 이후 cc 가 재생성을 *제안*(자동 실행 아님).
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { getUser } from '@/lib/supabase/auth'
-import { userOwnsProject } from '@/lib/generation-jobs'
+import { demoWriteBlock } from '@/lib/demo/guard-server'
+import { requireProjectAccess } from '@/lib/api/guard'
 import { validateAppearancePatch } from '@/lib/artist/appearance-patch'
 import { appearanceI18nFields } from '@/lib/writer/i18n/derive-en'
 
 export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
-  try {
-    const user = await getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
 
+  try {
     const body = (await req.json()) as {
       projectId?: string
       characterId?: string
@@ -28,28 +22,70 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'projectId, characterId required' }, { status: 400 })
     }
 
-    // 소유권: project → workspace → user.
-    const owns = await userOwnsProject(projectId, user.id)
-    if (!owns) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
 
-    // 필드 화이트리스트 + 길이 검증(순수 함수, 단위 검증).
     const result = validateAppearancePatch(body)
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
 
-    // 언어 경계(S2c): 패치는 유저 언어(native) → appearance_native 보존 + EN base 파생 → appearance.
-    //   description 은 표시 미러라 native 유지. 파생 실패 시 native 폴백(오염 아님).
+    const [personAppearances, person, prop] = await Promise.all([
+      supabaseAdmin
+        .from('character_appearances')
+        .select('appearance_key')
+        .eq('project_id', projectId)
+        .eq('character_id', characterId)
+        .eq('is_default', true),
+      supabaseAdmin
+        .from('characters')
+        .select('entity_type')
+        .eq('project_id', projectId)
+        .eq('character_id', characterId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('props')
+        .select('prop_id')
+        .eq('project_id', projectId)
+        .eq('prop_id', characterId)
+        .maybeSingle(),
+    ])
+    if (personAppearances.error) throw personAppearances.error
+    if (person.error) throw person.error
+    if (prop.error) throw prop.error
+    if (
+      personAppearances.data.length > 1 ||
+      (personAppearances.data.length === 1 &&
+        (!person.data || person.data.entity_type !== 'person' || prop.data))
+    ) {
+      return NextResponse.json({ error: 'ambiguous character entity' }, { status: 409 })
+    }
+    if (personAppearances.data.length === 0 && !prop.data) {
+      return NextResponse.json({ error: 'character not found' }, { status: 404 })
+    }
+
     const i18n = await appearanceI18nFields(characterId, result.appearance)
-    const { error } = await supabaseAdmin
-      .from('characters')
-      .update({
-        appearance: i18n.appearance,
-        appearance_native: i18n.appearance_native,
-        description: result.appearance,
-        i18n_provenance: i18n.i18n_provenance,
-      })
-      .eq('project_id', projectId)
-      .eq('character_id', characterId)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (personAppearances.data.length === 1) {
+      const { error } = await supabaseAdmin
+        .from('character_appearances')
+        .update({
+          appearance: i18n.appearance,
+          appearance_native: i18n.appearance_native,
+          i18n_provenance: i18n.i18n_provenance,
+        })
+        .eq('project_id', projectId)
+        .eq('character_id', characterId)
+        .eq('appearance_key', personAppearances.data[0].appearance_key)
+      if (error) throw error
+    } else {
+      const { error } = await supabaseAdmin
+        .from('props')
+        .update({
+          appearance: i18n.appearance,
+          appearance_native: i18n.appearance_native,
+        })
+        .eq('project_id', projectId)
+        .eq('prop_id', characterId)
+      if (error) throw error
+    }
 
     return NextResponse.json({
       ok: true,
