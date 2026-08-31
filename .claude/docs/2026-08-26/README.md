@@ -8,10 +8,10 @@
 | 순서 | 문서 | 그룹 | 성격 | 항목 수 |
 |---|---|---|---|---|
 | 1 | [group-a-state-loss.md](group-a-state-loss.md) | A. 작업 날아감 | 버그 (신뢰 파괴) | 3 |
-| 2 | [group-b-chat-execution.md](group-b-chat-execution.md) | B. 챗 명령→실행 끊김 | 버그 (신뢰 파괴) | 5 |
+| 2 | [Notion 이관](https://app.notion.com/p/B-3c93b513ca7e81de8023d2740477065f) | B. 챗 명령→실행 끓김 | 버그 (신뢰 파괴) | 5 |
 | 3 | [group-c-generation-bugs.md](group-c-generation-bugs.md) | C. 생성 파이프라인 버그 | 버그 | 8 |
 | 4 | [group-e-ui-breakage.md](group-e-ui-breakage.md) | E. UI 잘림/노출 버그 | 버그 (저비용) | 5 |
-| 5 | [group-d-chat-guidance.md](group-d-chat-guidance.md) | D. 챗 가이드/수다 | 에이전트 행동 설계 | 10 |
+| 5 | [Notion 이관](https://app.notion.com/p/D-3cd3b513ca7e81719fb8d537376dc82e) | D. 챗 가이드/수다 | 에이전트 행동 설계 | 10 |
 | 6 | [group-f-ui-ux.md](group-f-ui-ux.md) | F. UI/UX 개선 | 개선 | 12 |
 | 7 | [group-g-generation-quality.md](group-g-generation-quality.md) | G. 생성 품질/프롬프트 | 로직 개선 | 7 |
 | 8 | [group-h-new-features.md](group-h-new-features.md) | H. 신규 기능 | 기능 | 6 |
@@ -23,9 +23,9 @@
   A3 트림·컷 영속화 / A2 Writer 진행바·Director 영상 stage-away 재현·수리·배포 검증 / A1 좀비 잡이 재생성을 영구 차단하던 사슬 절단.
   부수 확정: 동시 생성 한도 영상 3 · 이미지 6 분리 풀, 전역 34(fal 실측 천장 40), admin 면제.
 
-- [x] **B — 닫힘 (2026-08-31)**. 계측 27ebaf3 → 승인 카드 표준 0c45689 → 거짓 수락 제거·soft 경고 5f294cc → 마감 실측 05c20f8·4c8c1fb(발화 11개 11/11 정분류 · B2·B3·B5 실측 · 대사 필드 유실 수리). 리포트: `../2026-08-31/group-b-close-report.html`
+- [x] **B — 닫힘 (2026-08-31) · 문서 Notion 이관**. 계측 27ebaf3 → 승인 카드 표준 0c45689 → 거짓 수락 제거·soft 경고 5f294cc → 마감 실측 05c20f8·4c8c1fb(발화 11개 11/11 정분류 · B2·B3·B5 실측 · 대사 필드 유실 수리). 리포트 HTML 원본도 [Notion](https://app.notion.com/p/B-HTML-3cd3b513ca7e8138a955ddf6e67025ec)에 있다
 - [x] **C — 완료 (8건 전부 닫힘)**. 오늘 연 것 4건(C3 전체 재생성 경로·C4 화면 튐·C5 진입 자동 생성·C7 특정), 이미 닫혀 있던 것 4건(C1 그룹 A / C6·C7·C8 다른 세션)
-- [~] D — **D10 닫힘, 나머지 9건 재개 가능** (B 착륙으로 채팅 파일 충돌 해소 — D1 4단계는 B의 trace 인프라 구독으로 구현)
+- [~] D — **D10~D13 닫힘(main 9e322ab), D1~D9 재개 가능 · 원장 Notion 이관** (D1 4단계는 B의 trace 인프라 구독으로 구현)
 - [→] E — **이관됨** (다른 개발자)
 - [→] F — **이관됨** (다른 개발자)
 - [~] G — **G1·G7 닫힘**. G2 3차 실험까지 완료(오너 판정 대기), G3 원인 확정(앵커 이름 오해 — UI 수리 방향 오너 판정), G4·G5 데이터 모델 결정 대기(오너), G6 재개 가능(파일 충돌 해소)

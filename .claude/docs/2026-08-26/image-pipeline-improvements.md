@@ -94,7 +94,7 @@ Artist i2i가 정리되면 그 참조가 Director 프레임 REF 포트로 자연
 
 ## 참조
 - `group-h-new-features.md` — H1(프레임 노드/포트)·H2(샷 체이닝)·H3(영상 전체 생성 + 진행바)
-- `group-b-chat-execution.md` — 챗 실행 경계, `generateVideo` 승인 계약
+- 그룹 B 원장([Notion 이관](https://app.notion.com/p/B-3c93b513ca7e81de8023d2740477065f)) — 챗 실행 경계, `generateVideo` 승인 계약
 - `group-g-generation-quality.md` — G3 스타일 앵커·G4 플래시백·G5 START/END 꼬임
 - 워크트리: `feat/director-node-wiring` (`.claude/worktrees/director-node-wiring`)
 - 코드: `stores/director-store.ts`(`applyUpdates`·`generateVideoForShot`)·`api/director/generate-video/route.ts`·
