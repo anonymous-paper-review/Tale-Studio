@@ -156,6 +156,24 @@ async function main() {
     ).error,
   )
 
+  // #g4(character_appearances): 카드는 characters 가 아니라 character_appearances(모습)를 읽는다.
+  //   기본 모습 1행이 없으면 artist 카드가 빈 채로 뜨고 상세 팝업(appearanceKey)이 안 열린다.
+  fail(
+    'character_appearances insert (기본 모습)',
+    (
+      await db.from('character_appearances').insert({
+        project_id: projectId,
+        character_id: CHARACTER.characterId,
+        appearance_key: 'current',
+        label: '현재',
+        is_default: true,
+        // #g4: 기본 모습은 narrative_time 필수(check 제약) — 현재 시점.
+        narrative_time: 'present',
+        appearance: CHARACTER.description,
+      })
+    ).error,
+  )
+
   fail(
     'locations insert',
     (
@@ -188,6 +206,8 @@ async function main() {
         characters_present: SCENE.charactersPresent,
         estimated_duration_seconds: SCENE.estimatedDurationSeconds,
         sort_order: SCENE.sortOrder,
+        // #g4(20260827200400_add_narrative_time): scenes.narrative_time 는 NOT NULL — 기본 시점은 현재.
+        narrative_time: 'present',
         source: 'manual',
       })
     ).error,
@@ -211,6 +231,9 @@ async function main() {
           camera_config: CAMERA,
           lighting_config: LIGHTING,
           sort_order: s.sortOrder,
+          // #g4(shots.character_appearance_keys): NOT NULL jsonb object {characterId: appearanceKey}.
+          //   샷 등장 캐릭터를 기본 모습('current')에 매핑. 빈 object 도 허용(제약은 typeof=object).
+          character_appearance_keys: Object.fromEntries((s.characters ?? []).map((cid: string) => [cid, 'current'])),
           source: 'manual',
         })),
       )
