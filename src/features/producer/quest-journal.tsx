@@ -213,13 +213,25 @@ interface JourneyNode {
   done: boolean
 }
 
-export function ProducerQuestJournal({ gate, className }: { gate: GateResult; className?: string }) {
+export function ProducerQuestJournal({
+  gate,
+  personCount,
+  className,
+}: {
+  gate: GateResult
+  /** 게이트가 평가한 producer 원천 인물 수. 0명이면 "주인공 등장"은 아직 미달성이다. */
+  personCount: number
+  className?: string
+}) {
   const t = useT()
   const hard = new Set(gate.hardMissing.map((i) => i.field))
   const castIssues = gate.hardMissing.filter((i) => i.field.startsWith('cast'))
   const settingsDone = !['playtime', 'genre', 'format', 'dialogueLanguage'].some((f) => hard.has(f))
   const storyDone = !hard.has('storyText')
-  const castDone = castIssues.length === 0
+  // 인물 수를 같이 봐야 한다 — 게이트는 D1·D2(러닝타임 60초 이하, 새 프로젝트의 playtime 0 포함)에서
+  //   인물 0명을 통과시켜 cast 이슈를 하나도 안 낸다. 이슈 없음만 보면 빈 프로젝트가 첫 화면부터
+  //   "주인공 등장" 체크로 뜬다.
+  const castDone = personCount > 0 && castIssues.length === 0
   const stageDone = !hard.has('background:minComplete')
 
   const nodes: JourneyNode[] = [
@@ -237,7 +249,9 @@ export function ProducerQuestJournal({ gate, className }: { gate: GateResult; cl
       title: t('Protagonist appears'),
       desc: castDone
         ? t('A vividly-drawn character is ready.')
-        : t('{count} fields are empty — try describing a character.', { count: castIssues.length }),
+        : personCount === 0
+          ? t('No character yet — describe one in chat.')
+          : t('{count} fields are empty — try describing a character.', { count: castIssues.length }),
       done: castDone,
     },
     {

@@ -213,7 +213,7 @@ export function WriterGenerationView({
           </div>
         )}
         <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
-          <WriterStoryStream preview={preview} />
+          <WriterStoryStream preview={preview} awaiting={awaiting} />
         </div>
         <WriterCharacterPanel
           characters={preview?.characters ?? []}

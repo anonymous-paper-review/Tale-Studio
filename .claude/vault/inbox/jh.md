@@ -361,8 +361,9 @@ writer 끝나고 다시 writer 다시 요청하면 갇힘
 
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":983,"content_sha256":"56563b10b96dcd6e89ea05e68302a418e34a1dc50d5eac7b090a8aa071729dd4","item_id":"23f930a7086e51078b1a1fad47f90e1b39c2ef171fa3a5b807a01436ab875eb5","schema":1,"snapshot_id":"inbox-track-2026-08-19","source_key":"inbox/jh.md","source_range":{"end":16973,"start":15990},"state":"tracked","units":["vault-inbox-lifecycle-2026-08-18","night-approve-merge-slowness","owner-judgment-record-2026-08-19"]}
+{"actor":"jh","byte_length":983,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/3e9b3de83be91126a98c0a81853c318fd2ae3889352c69afe21394e6ac02fcf1.json","close_proof_sha256":"3e9b3de83be91126a98c0a81853c318fd2ae3889352c69afe21394e6ac02fcf1","content_sha256":"56563b10b96dcd6e89ea05e68302a418e34a1dc50d5eac7b090a8aa071729dd4","disposition":"completed","item_id":"23f930a7086e51078b1a1fad47f90e1b39c2ef171fa3a5b807a01436ab875eb5","receipt_id":"23f930a7086e5107-17478f2649ddd9f5","schema":1,"snapshot_id":"inbox-track-2026-08-19","source_key":"inbox/jh.md","source_range":{"end":16973,"start":15990},"state":"closed","units":["vault-inbox-lifecycle-2026-08-18","night-approve-merge-slowness","owner-judgment-record-2026-08-19"]}
 -->
+<del>
 열려있던 티켓에대해 승인 프롬프트만 쥐어주고 병합하고 inbox에서 표시남겨달라고햇는데
 엄청 오래걸림 (원인 파악 필요 아래가 프롬프트 원문)
 글 작가에게 다시 시켜도 화면이 멈춰 있던 것 -> 승인
@@ -376,28 +377,36 @@ writer 끝나고 다시 writer 다시 요청하면 갇힘
  기획자가 그림체를 글로 묻던 것 -> 승인
  작가·감독 화면의 진행 표시가 서로 다르던 것 -> 승인
  글 작가 밑그림 저장 규격이 어긋나던 것 -> 다른 세션에서 수정함, 반영 유보 
+</del>
 <!-- vault-inbox-item:end -->
 
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":448,"content_sha256":"08e7b0beb580693cb67b27b923d8e749bd0382894169f49e2366f8be6279aa1c","item_id":"4115ec75d72afb77be0ef3848e197f19a6ee3c2ddf26cc708a29d01d92aaaa6b","schema":1,"snapshot_id":"ddcf8396927dbe36a2054466a3409135ef93af915f18162ebe19ddf08fad8023","source_key":"inbox/jh.md","source_range":{"end":17423,"start":16975},"state":"tracked","units":["owner-cognizance-ack-2026-08-25"]}
+{"actor":"jh","byte_length":448,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/93208381d0ff2e6c602ee57ebcd87553851ad7333cb2f9e8d225d4e3ff3707fc.json","close_proof_sha256":"93208381d0ff2e6c602ee57ebcd87553851ad7333cb2f9e8d225d4e3ff3707fc","content_sha256":"08e7b0beb580693cb67b27b923d8e749bd0382894169f49e2366f8be6279aa1c","disposition":"completed","item_id":"4115ec75d72afb77be0ef3848e197f19a6ee3c2ddf26cc708a29d01d92aaaa6b","receipt_id":"4115ec75d72afb77-a81fd87982157b95","schema":1,"snapshot_id":"ddcf8396927dbe36a2054466a3409135ef93af915f18162ebe19ddf08fad8023","source_key":"inbox/jh.md","source_range":{"end":17423,"start":16975},"state":"closed","units":["owner-cognizance-ack-2026-08-25"]}
 -->
+<del>
 26.08.25 (낮, 오너) — 아래 둘은 내가 이미 알고 있는 상태다. 다시 티켓으로 만들거나 아침 보고에 문제로 세우지 마라. 상태가 실제로 바뀐 날만 한 줄 보고.
 1. 새 메모(입력)가 비어 있는 것 — 알고 있음. 채우는 건 내 몫이다.
 2. 친구(hs) 쪽과 inbox 공유가 끊겨 있는 것 — 알고 있음. 원인 조사도 이미 끝났다(8/23 조사, done). 재조사 불필요.
+</del>
 <!-- vault-inbox-item:end -->
 
 <!-- vault-inbox-item:start
-{"actor":"jh","byte_length":977,"content_sha256":"655d2dcf6ba24152573c1676601a0f630c48476adc7b977a45c691e0eabf069c","item_id":"e0a3a3fb36e330a04577835efddb92c34a0ec7cf9482ee05e66e0f70d7d16251","schema":1,"snapshot_id":"ddcf8396927dbe36a2054466a3409135ef93af915f18162ebe19ddf08fad8023","source_key":"inbox/jh.md","source_range":{"end":18401,"start":17424},"state":"tracked","units":["ledger-merge-reconcile-2026-08-26","vault-marker-unit-undercoverage","owner-decisions-applied-check-2026-08-26","ticket-runtime-worktree-drift-2026-08-26"]}
+{"actor":"jh","byte_length":977,"close_proof_path":".claude/vault/backlog/tickets/receipts/.proofs/0ebfb34651d6746260ec3d1308aebf75bcd007fff6c081bf5e85fbb06379c522.json","close_proof_sha256":"0ebfb34651d6746260ec3d1308aebf75bcd007fff6c081bf5e85fbb06379c522","content_sha256":"655d2dcf6ba24152573c1676601a0f630c48476adc7b977a45c691e0eabf069c","disposition":"completed","item_id":"e0a3a3fb36e330a04577835efddb92c34a0ec7cf9482ee05e66e0f70d7d16251","receipt_id":"e0a3a3fb36e330a0-7d02ceab998c51df","schema":1,"snapshot_id":"ddcf8396927dbe36a2054466a3409135ef93af915f18162ebe19ddf08fad8023","source_key":"inbox/jh.md","source_range":{"end":18401,"start":17424},"state":"closed","units":["ledger-merge-reconcile-2026-08-26","vault-marker-unit-undercoverage","owner-decisions-applied-check-2026-08-26","ticket-runtime-worktree-drift-2026-08-26"]}
 -->
+<del>
 26.08.25 (낮, 오너 위임 집행 기록) — 오늘 낮에 결정하고 바로 집행한 것들. 다음 밤은 원장 정합만 확인하면 된다.
 - 밤 수리 4건(감독 캐시·fixture 도구·smoke 타깃·DB 타입 재생성) 전부 main에 머지됨. fixture:producer 2회 연속 정상 종료 확인 — 그 티켓 판정선 닫힘.
 - 증서 썩음=갈래A(근거 얼리기, night-runtime.py 반영), stash=갈래A(night-fixer 규칙), 8/24 게이트=유지+순서 준수, smoke=사본에 접속정보 안 줌(계약 19차), 브라우저 회귀=(가) morning smoke, 리렌더 검사기=경고 모드 도입(tests/unstable-hook-deps.test.ts), 시험 타임아웃=갈래A(30000ms).
 - 표식 23f930a7에 owner-judgment-record-2026-08-19 를 append-units 로 이어라 (승인함, 티켓 vault-marker-unit-undercoverage 참조).
 - 유료 피드백 창구 티켓은 삭제했다 — 안 쓴다. 재생성 금지.
 - 8/18 사본 3개와 합쳐진 가지들 정리 완료.
+</del>
 <!-- vault-inbox-item:end -->
 
+<!-- vault-inbox-item:start
+{"actor":"jh","byte_length":3883,"content_sha256":"3742c63a5048bc92d07308eb7e05fbab4be324e3268907c3916382a6bb8d6d08","item_id":"5e0656d66f337ed1c97693058d243cfa49d7d6165609169c4723a8918160837f","schema":1,"snapshot_id":"dea7a260104ffb3d82f54b26c0151594a6cb4710659746eb5e9790b4b76b8d50","source_key":"inbox/jh.md","source_range":{"end":22285,"start":18402},"state":"tracked","units":["U1-morning-smoke-launchd-probe","U2-ledger-reconcile-2026-08-27","U3-quota-toast-wiring"]}
+-->
 26.08.26 (낮, 오너 위임 집행 기록) — 밤 보고서의 결정 여섯 개를 그 자리에서 판정하고 집행했다. 다음 밤은 원장 정합만 확인하면 된다.
 - 밤 수리 3건 중 2건 머지: 씬 확정 화면 문구(fix-scene-gate-suggestion-resurface), 준비 도구 단계 되돌림(fixture-producer-undoes-writer-unlock). 격리 사본과 밤 가지는 제거했다. 커밋은 안 했다 — 내 미커밋 작업과 같은 트리라 묶음은 내가 나눈다.
 - vitest 전역 verbose는 반려. 통과 시험까지 전부 찍혀 출력이 길어지는 대가가 이득보다 크다. 대신 놓치면 안 되는 검사는 경고가 아니라 실패로 올리는 기존 길을 유지한다(리렌더 검사기가 선례). test-warnings 티켓은 원인 확정으로 done.
@@ -413,3 +422,4 @@ writer 끝나고 다시 writer 다시 요청하면 갇힘
 - 포트 3000에 1일 8시간째 무응답이던 next-server(PID 44665)를 정리했다. 그 뒤 pnpm smoke 6/6 통과 — 아침 진입점이 쓰는 경로가 이제 실제로 작동한다. 비로그인 6화면 스크린샷은 .smoke/tale-smoke/ (22:58~23:0x).
 - 그러다 발견: 8/25에 켠 브라우저 회귀 확인이 로그를 한 줄도 안 남겼다. morning-smoke.log가 아예 없고 로그 디렉터리 mtime이 8/24 23:22라 8/25·8/26 두 아침 모두 새 파일이 안 생겼다. night-launchd.sh:800의 배경 서브셸(&)이 시작조차 못 한 것으로 보인다(가설, 확인 한 줄 있음). 티켓 morning-smoke-never-logged-2026-08-26 — 갈래 3개 중 선택 필요.
 - pnpm smoke --auth 는 분류기가 계속 막아서 못 돌렸다. 로그인 뒤 화면(내가 고친 작가 화면 포함)은 여전히 미확인.
+<!-- vault-inbox-item:end -->

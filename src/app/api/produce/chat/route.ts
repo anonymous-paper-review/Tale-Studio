@@ -9,10 +9,11 @@ import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import { CHAT_OUTPUT_FORMAT_GUIDE, fetchProjectLocale, responseLanguageDirective } from '@/lib/chat-format'
 import { translate } from '@/lib/i18n/translate'
 import { sanitizeAttachmentUrls } from '@/lib/upload/attachment'
-import { listStyleAnchorMediums } from '@/lib/style-anchor'
+import { listStyleAnchorCatalog, listStyleAnchorMediums } from '@/lib/style-anchor'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildReferenceDigest, getProjectReferenceId } from '@/lib/reference-import'
 import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
+import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 
 interface ChatMessage {
   role: 'user' | 'model'
@@ -165,6 +166,20 @@ export async function POST(req: Request) {
         )
       }
     }
+    // D12(2026-08-31 오너): 유저가 이름/느낌으로 그림체를 말하면 모델이 여기서 키를 고른다 —
+    //   "피커에서 골라달라"고 되돌려보내지 않기 위한 재료. 캐시(TTL)라 턴마다 DB 왕복 아님.
+    const anchorCatalog = await listStyleAnchorCatalog()
+    if (anchorCatalog.length > 0) {
+      contextParts.push(
+        `[Style Anchor Catalog]\n${anchorCatalog
+          .map(
+            (a) =>
+              `${a.key} | ${a.label} | medium:${a.medium ?? '?'}${a.subtitle ? ` | ${a.subtitle}` : ''}`,
+          )
+          .join('\n')}`,
+      )
+    }
+
     // 핸드오프 가부의 단일 판정자 = 코드 게이트. LLM 이 자기 기준으로 "준비 완료"를 선언하지 않도록
     //   실제 게이트 상태(남은 하드 항목)를 명시 주입한다.
     if (gate && typeof gate === 'object') {
@@ -230,22 +245,24 @@ export async function POST(req: Request) {
     const { reply: replyRaw, extractedSettings } = parseExtractedSettings(text)
     // #p4-choices: Foundation 빈칸을 되묻기 대신 선택지 버튼으로 — [CHOICES] 라인 추출.
     const { reply, choices, markerFound } = parseChatChoices(replyRaw)
+    const trace = buildChatTrace({
+      traceId,
+      stage: 'producer',
+      route: 'produce/chat',
+      system: systemPrompt,
+      history: normalizedHistory,
+      contextMessage: userPrompt,
+      usage: llmUsage,
+      choicesMarkerFound: markerFound ?? null,
+      choicesCount: choices.length,
+    })
+    await persistChatTraceBestEffort(projectId, trace)
 
     return NextResponse.json({
       reply,
       extractedSettings,
       choices,
-      trace: buildChatTrace({
-        traceId,
-        stage: 'producer',
-        route: 'produce/chat',
-        system: systemPrompt,
-        history: normalizedHistory,
-        contextMessage: userPrompt,
-        usage: llmUsage,
-        choicesMarkerFound: markerFound ?? null,
-        choicesCount: choices.length,
-      }),
+      trace,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'

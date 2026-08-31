@@ -326,12 +326,19 @@ export function normalizeCharacterMagnitude(raw: unknown): CharacterMagnitude {
  *
  * @returns repairs — 사람이 읽을 교정 기록. 비어 있으면 어휘를 지킨 입력이다.
  */
-export function normalizeCameraMotion(raw: RawCameraMotion | null | undefined): {
+export function normalizeCameraMotion(
+  raw: RawCameraMotion | string | null | undefined,
+): {
   motion: NormalizedCameraMotion;
   repairs: string[];
 } {
   const repairs: string[] = [];
-  const rawType = raw?.type;
+  // writer-v2 는 camera_motion 을 객체가 아니라 자유 문장 하나로 저장한다(실측: shots 8행,
+  //   design_ref `writer-v2:…`). 문장을 type 자리로 돌려 토큰 판별을 그대로 태운다 —
+  //   "Dynamic handheld tracking shot." → tracking. 접지 않고 버리면 그 8행이 전부
+  //   static 으로 접혀 "LOCKED tripod" 계약문이 나간다(장면 묘사문과 정면 모순).
+  const spec: RawCameraMotion = typeof raw === 'string' ? { type: raw } : (raw ?? {});
+  const rawType = spec.type;
   const { type, mapped, directionFromType } = normalizeCameraMotionType(rawType);
   if (slug(rawType) && slug(rawType) !== slug(type)) {
     repairs.push(
@@ -344,18 +351,18 @@ export function normalizeCameraMotion(raw: RawCameraMotion | null | undefined): 
   }
 
   // 유형에 눌어붙어 있던 방향은 direction 이 비어 있을 때만 채운다 — 명시된 direction 이 우선.
-  const explicitDirection = normalizeDirection(raw?.direction);
+  const explicitDirection = normalizeDirection(spec.direction);
   const direction =
     explicitDirection === 'none' && directionFromType ? directionFromType : explicitDirection;
 
-  const speed = normalizeSpeed(raw?.speed);
-  if (slug(raw?.speed) && slug(raw?.speed) !== speed) {
-    repairs.push(`camera_motion.speed "${String(raw?.speed)}" → "${speed}"`);
+  const speed = normalizeSpeed(spec.speed);
+  if (slug(spec.speed) && slug(spec.speed) !== speed) {
+    repairs.push(`camera_motion.speed "${String(spec.speed)}" → "${speed}"`);
   }
 
-  const magnitude = normalizeCameraMagnitude(raw?.magnitude);
-  if (slug(raw?.magnitude) && slug(raw?.magnitude) !== magnitude) {
-    repairs.push(`camera_motion.magnitude "${String(raw?.magnitude)}" → "${magnitude}"`);
+  const magnitude = normalizeCameraMagnitude(spec.magnitude);
+  if (slug(spec.magnitude) && slug(spec.magnitude) !== magnitude) {
+    repairs.push(`camera_motion.magnitude "${String(spec.magnitude)}" → "${magnitude}"`);
   }
 
   return { motion: { type, mapped, direction, speed, magnitude }, repairs };

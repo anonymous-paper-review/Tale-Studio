@@ -91,7 +91,15 @@ function SceneParagraph({ scene, roster }: { scene: PreviewScene; roster: SlugEn
   )
 }
 
-export function WriterStoryStream({ preview }: { preview: WriterPreview | null }) {
+export function WriterStoryStream({
+  preview,
+  awaiting = false,
+}: {
+  preview: WriterPreview | null
+  /** 확정 대기(#fix-scene-gate-suggestion-resurface 2026-08-25) — 이 상태는 생성이 아니라 사용자
+   *  확정을 기다리는 것이라, 아래 "계속 쓰는 중" 꼬리말이 거짓 정보가 된다(오너 실측 사고). */
+  awaiting?: boolean
+}) {
   const t = useT()
   const scenes = (preview?.scenes ?? []).filter((s) => s.beats.length > 0)
   const roster: SlugEntry[] = preview?.roster ?? []
@@ -111,9 +119,11 @@ export function WriterStoryStream({ preview }: { preview: WriterPreview | null }
           <SceneParagraph key={scene.sceneId} scene={scene} roster={roster} />
         ))}
       </article>
-      <p className="pt-6 text-center text-xs text-muted-foreground/70">
-        {t("The story is still being written — new content will appear automatically as it's ready.")}
-      </p>
+      {awaiting ? null : (
+        <p className="pt-6 text-center text-xs text-muted-foreground/70">
+          {t("The story is still being written — new content will appear automatically as it's ready.")}
+        </p>
+      )}
     </div>
   )
 }

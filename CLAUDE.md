@@ -1,49 +1,28 @@
 # tale-studio — 문서 지도
 
-> 이 파일은 인덱스다. 내용을 여기 쓰지 말고 링크 대상 문서를 개정하라.
-> 규칙은 `.claude/rules/`(자동 로드), 디자인 가이드는 UI 작업 시 훅이 주입한다.
+> 이 파일은 현재 경로를 가리키는 짧은 인덱스다. 상세 규칙은 `.claude/rules/`,
+> 디자인 정본은 `specs/design.md`를 따른다.
 
 ## 진실원
 
-- 코드(`src/`)와 live Supabase DB가 진실원이다. 코드로 유도 가능한 내용은 문서로 만들지 않는다.
-- `specs/design.md` — 유일한 정본 문서 (디자인 판별 규칙. 토큰 값 자체는 `src/app/globals.css`가 진실)
-- 2026-08-05 대청소: 코드 유도 가능/레거시 문서 전량 삭제 (docs, specs 일부, research 레거시, databases).
-  복구는 git 히스토리 또는 `~/tale-studio-backup-2026-08-05.tar.gz`
+- 코드(`src/`)와 live Supabase DB가 진실원이다. 코드에서 유도되는 내용은 문서에 복제하지 않는다.
+- 디자인 판별 규칙은 `specs/design.md`, 토큰 값은 `src/app/globals.css`가 소유한다.
 
-## 활성 실행 계약 — 결과 우선
+## 활성 실행 계약
 
-- `.claude/vault/_INBOX.md` — **오너가 쓰는 형식 없는 메모 입력**이다. 밤은 원문을 고치거나 지우지
-  않고 바이트 스냅샷으로 소비한다. 실행 순서나 승인 문서를 이 파일 대신 만들지 않는다.
-- `.claude/vault/backlog/_NIGHT.md` — **유일한 live 밤 계약**이다. 메모와 열린 티켓을 해석·분해하고,
-  조사·실험·수리·기능 변경을 실행하며, 결과 카드를 남긴다. 사전 승인은 실행 조건이 아니다.
-- `.claude/vault/backlog/reports/YYYY-MM-DD.html` — 오너가 아침에 읽는 날짜 기준 사람 보고서다.
-  오너 판정(`merge`·`reject`·`feedback`)은 `_INBOX.md`에 형식 없이 적고, 다음 밤이 해석해
-  결과 카드에 기록한다. 오너 접점은 `_INBOX.md`와 이 보고서 둘뿐이다.
-- `.claude/vault/backlog/tickets/` — 티켓과 실행 결과의 원장 (`ready`는 즉시 실행, `waiting`은 조건 확인,
-  `needs-owner`는 사람의 선택, `draft`는 닫힘 조건을 먼저 보완할 항목). backlog 루트에는
-  계약 문서(`_NIGHT.md`)와 실행 도구만 둔다.
-- 예전 아침 리뷰(`_archive/_MORNING.md`), 목적지 문서(`_archive/_NOW.md`), 예전 수확 문서(`_archive/_SWEEP.md`)는
-  **역사 자료일 뿐 live 입력이나 실행 의존성이 아니다**. 새 절차는 이 경로들을 읽어야 진행되도록 쓰지 않는다.
-- `.claude/vault/_archive/` — 닫힌 것과 폐지된 저장소의 원문이다. 과거 사고·결정의 근거를 보존하며,
-  새 실행 입력으로 사용하지 않는다.
+- `.claude/vault/inbox/<actor>.md`는 오너의 형식 없는 메모 입력이다. 밤은 바이트 스냅샷으로 읽고
+  원문을 고치거나 지우지 않는다.
+- `.claude/vault/backlog/_NIGHT.md`는 유일한 live 밤 계약이다. 메모와 티켓을 해석해 조사·실험·수리·
+  기능 변경을 실행하고 결과를 기록한다.
+- `.claude/vault/backlog/tickets/`는 티켓과 결과 카드의 원장이다. `ready`는 실행, `waiting`은 조건 확인,
+  `needs-owner`는 사람의 선택, `draft`는 닫힘 조건 보완이 필요하다.
+- `runs/<actor>/<run_id>/report.html`은 아침에 읽는 실행 보고서다. 판정 이벤트는
+  `feedback/<actor>/<run_id>/`에 남고 다음 밤이 소비한다.
+- `.claude/vault/_archive/`는 닫힌 기록과 폐지된 원문의 보관소다. live 입력이나 실행 의존성으로 쓰지 않는다.
 
-## 판단 기록
+## 판단과 연구
 
-- **헌법: 산출물 판정은 오너만 한다.** 모델과 코드는 지각·측정 자료를 만들 수 있지만, 그림·영상에
-  대해 밤이 “좋다/나쁘다” 결론을 기록하지 않는다. 사람이 비교할 원본·입력·시점·설정·채점표를 남긴다.
-- 오너의 판단 기록은 버리는 메모가 아니라 재사용 가능한 **자산**이다. 같은 판단이 독립 결과에서
-  반복되면 근거 카드와 피드백을 묶어 규칙 후보로 증류하고, 오너 확인 뒤 정본 규칙으로 올린다.
-
-## 실험
-
-- 실험 시작 전 가설 폼: `research/experiments/_HYPOTHESIS.md` (5줄 — 가설/전제/예측/측정/기각 조건)
-- 실험 코드 규칙: `.claude/rules/experiments.md` — 복붙 금지·입력 고정·좌표 기록
-- 밤 실험 원장: `.claude/vault/backlog/` — 미결을 닫힘 조건이 있는 실행 티켓으로 만들고, 실행
-  결과를 카드로 남긴다. 밤 계약은 `_NIGHT.md`이며 `/warp`는 세션에서 생긴 미결·실측을 원장에 붙인다.
-
-## 세션 리추얼
-
-- 세션 종료 시 `/warp` — 코드로 귀결 안 된 것을 정산한다: 닫힘 조건이 있는 미결 → 실행 티켓,
-  오너 선택이 필요한 미결 → `needs-owner` 티켓, 실측·삽질 → 관련 실험/티켓 본문, 반복 참조 결정 →
-  rules/specs 승격. 소속 없으면 버린다. `/warp`는 오너의 `_INBOX.md` 원문을 대신 쓰지 않는다.
-- 세션 중 닫힌 티켓은 그 자리에서 status 갱신 + `_archive/`로 이동
+- 그림·영상의 최종 품질 판정은 오너만 한다. 밤은 원본·입력·시점·설정·비교 자료를 남긴다.
+- `research/`는 선택적인 로컬 실험 공간이다. 실험 규칙은 `.claude/rules/experiments.md`를 따르며,
+  `map:dev`·`map:build`가 사용하는 `research/tools/writer-map`은 유지한다.
+- 세션 미결과 실측은 `/warp`로 티켓 또는 실험 기록에 붙인다. `/warp`는 inbox 원문을 대신 쓰지 않는다.

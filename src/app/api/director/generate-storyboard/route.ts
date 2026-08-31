@@ -24,6 +24,8 @@ import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { aspectRatioFromFormat, parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
+import { isChatTraceId } from '@/lib/chat-trace'
+import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -32,13 +34,14 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio } =
+    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio, traceId } =
       (await req.json()) as {
         projectId?: string
         writerShotId?: string
         prompt?: string
         referenceImageUrls?: string[]
         aspectRatio?: string
+        traceId?: string
       }
 
     if (!projectId || !writerShotId || !prompt) {
@@ -47,9 +50,15 @@ export async function POST(req: Request) {
         { status: 400 },
       )
     }
+    if (traceId !== undefined && !isChatTraceId(traceId)) {
+      return NextResponse.json({ error: 'traceId must be a UUID' }, { status: 400 })
+    }
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
+    if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
+      return NextResponse.json({ error: 'traceId does not belong to project' }, { status: 409 })
+    }
 
     // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
     const quota = await checkGenerationCapacity(access.userId!, 'image')
@@ -188,6 +197,7 @@ export async function POST(req: Request) {
       userId: access.userId!,
       workspaceId: project.workspace_id,
       provider: 'fal',
+      chatTraceId: traceId ?? null,
       inputSnapshot: {
         prompt: finalOpts.prompt,
         aspect_ratio: finalOpts.aspect_ratio,

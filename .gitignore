@@ -81,6 +81,12 @@ scripts/*
 !scripts/seed-test-accounts.mjs
 # 테스트 묶음 실행기는 개발자가 공통으로 쓰는 명령 인터페이스라 추적한다.
 !scripts/test-suites.mjs
+# package.json이 직접 호출하는 운영·검증 도구도 clean checkout에 포함한다.
+!scripts/producer-seed.mjs
+!scripts/media-migration-plan.mts
+!scripts/generation-autopsy.mjs
+!scripts/fixtures/
+!scripts/fixtures/producer-seed.json
 
 # OS
 .DS_Store
@@ -111,6 +117,15 @@ experiment/
 logs/*
 # scratch artifacts — 로컬 테스트/디버그 산출물(로그·스크린샷·vitest json)
 artifacts/
+# Claude 보고서의 대용량 검수 미디어는 로컬 판정 재료로만 보관한다.
+.claude/docs/**/evidence/**/*.png
+.claude/docs/**/evidence/**/*.jpg
+.claude/docs/**/evidence/**/*.jpeg
+.claude/docs/**/evidence/**/*.webp
+.claude/docs/**/evidence/**/*.gif
+.claude/docs/**/evidence/**/*.mp4
+.claude/docs/**/evidence/**/*.mov
+.claude/docs/**/g2-media/**/*.mp4
 # Windows ADS metadata
 *:Zone.Identifier
 
@@ -119,8 +134,14 @@ memo.md
 
 docs/algorithm-experience-html-assets/*
 docs/*.html
+# 디자인·결정 비교용 임시 HTML snapshot은 로컬에서만 연다.
+/card-reference-gallery.html
+/card-unification-reference.html
+/owner-decisions-2026-08-25.html
+/poc-open-decisions.html
+/reference-import-plan.html
+/reference-read-strategy.html
 
-*.gitignore
 # skill/harness 상태 (deep-interview 등) — .omc 와 동일 성격
 .gjc/
 
@@ -136,7 +157,7 @@ dev/db-backups/
 docs/test-accounts.md
 docs/test-accounts.csv
 
-# research: 실험 자료는 로컬만 보관하고 Git에서는 추적하지 않는다 (CONVENTIONS 규칙 7)
+# research: 실험 자료는 로컬 전용이며 Git에서는 추적하지 않는다.
 research/
 research/experiments/**/assets/clips/
 # 같은 규칙: 실측 미디어 산출물·입력 스트립은 로컬만 (좌표는 provenance/HYPOTHESIS가 보유)
@@ -146,6 +167,20 @@ research/experiments/ti2v-camera-cap-recheck/assets/
 research/experiments/checknote-previz-ab/assets/
 # 위 경로들을 실험마다 하나씩 추가해오다 일반화(2026-08-11):
 # 실험 산출물 미디어는 확장자로 일괄 로컬 전용. 좌표(HYPOTHESIS·manifest·provenance)만 추적한다.
+# package.json의 map:dev/map:build 진입점은 개발 도구이므로 예외로 추적한다.
+!research/
+research/*
+!research/tools/
+research/tools/*
+!research/tools/writer-map/
+research/tools/writer-map/*
+!research/tools/writer-map/README.md
+!research/tools/writer-map/serve.mjs
+!research/tools/writer-map/extract.mjs
+!research/tools/writer-map/data.mjs
+!research/tools/writer-map/build.mjs
+!research/tools/writer-map/render.mjs
+!research/tools/writer-map/findings.mjs
 # 이미 추적 중인 파일(rough-background-ref-holds-room/assets/*.png 6장)은 영향 없음.
 research/experiments/**/*.mp4
 research/experiments/**/*.mov
@@ -161,7 +196,6 @@ research/experiments/_viewer.html
 # 밤 러너 — git으로 나누는 것은 계약·실행 도구·설치 문서, 공유 inbox
 # (.claude/vault/inbox/<actor>.md — 각자 자기 파일에만 쓴다), 그리고 밤이 만든
 # 수리 branch 뿐이다. 결과물(runs/)은 전부 로컬이다.
-.claude/vault/_INBOX.md
 .claude/vault/_archive/
 .claude/vault/backlog/sweep/
 .claude/vault/backlog/tickets/
@@ -174,4 +208,5 @@ research/experiments/_viewer.html
 # 밤 입력 snapshot은 로컬 검증용 immutable binding이다.
 # 사람용 archive와 consumption manifest는 `_archive/inbox/`에 따로 추적한다.
 .claude/vault/backlog/night-runtime/
+.claude/vault/inbox/*.lock
 .env*

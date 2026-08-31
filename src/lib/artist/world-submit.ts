@@ -14,6 +14,7 @@ export interface SubmitWorldShotJobInput {
   userId?: string | null
   workspaceId?: string | null
   anchor?: ResolvedStyleAnchor | null
+  chatTraceId?: string | null
 }
 
 export async function submitWorldShotJob(
@@ -47,6 +48,7 @@ export async function submitWorldShotJob(
       source_hash: input.sourceHash ?? null,
       style_anchor_key: input.anchor?.key ?? null,
     },
+    chatTraceId: input.chatTraceId ?? null,
     target: { workspaceId: input.workspaceId ?? undefined, locationId: input.locationId, column: input.column },
   })
 }

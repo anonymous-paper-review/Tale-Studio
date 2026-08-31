@@ -279,11 +279,7 @@ export default function DesignShowcasePage() {
         <div className="flex flex-wrap gap-6">
           {STAGES.map((stage) => (
             <div key={stage.id} className="flex flex-col items-center gap-1">
-              <AgentFace
-                color={`var(--stage-${stage.id})`}
-                size={48}
-                expression="idle"
-              />
+              <AgentFace stage={stage.id} size={48} expression="idle" />
               <span className="font-mono text-[11px] text-muted-foreground">
                 {stage.id}
               </span>

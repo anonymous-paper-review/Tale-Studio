@@ -36,7 +36,12 @@ export interface VideoModelSpec {
   refParam: 'image_urls'
   /** 오디오 토글 파라미터 이름. null = 토글 없음(네이티브) */
   audioParam: 'generate_audio' | 'audio' | null
-  /** 오디오 기본값 (전 모델 OFF) */
+  /**
+   * 오디오 기본값. **현재 전 모델 ON** — `91b83f6`(2026-06-06)이 넷 다 true 로 바꿨다.
+   *   (이 주석은 그 커밋 전의 "전 모델 OFF" 문구가 남아 있던 것을 코드에 맞춘 것이다.)
+   *   `audioParam` 이 null 인 모델(happy-horse)은 이 값이 전송되지 않는다 —
+   *   `generate-video/route.ts:173-174` 가 `audioParam` 이 있을 때만 실어 보낸다.
+   */
   audioDefault: boolean
   /** 지원 해상도 목록. 빈 배열 = 미노출 */
   resolutions: string[]

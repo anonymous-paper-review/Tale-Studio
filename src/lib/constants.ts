@@ -83,7 +83,7 @@ export const STAGE_BADGE_CLASS: Record<StageId, string> = {
   editor: 'bg-stage-editor/15 text-stage-editor border-stage-editor/30',
 }
 
-/** AgentFace SVG color — CSS var (badge와 동일 색). */
+/** 스테이지 색 CSS var (badge와 동일) — 플레이트 그라데이션·강조 텍스트용. */
 export const STAGE_FACE_COLOR: Record<StageId, string> = {
   producer: 'var(--stage-producer)',
   writer: 'var(--stage-writer)',

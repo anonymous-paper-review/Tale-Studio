@@ -2,6 +2,9 @@
 
 상태: 대기 · 우선순위: 8
 
+> 이미지 노드 연결(H1~H3)의 설계·조사 심화 — Higgsfield 노드 카피 관찰, 프레임 포트,
+> Artist i2i 연계: [image-pipeline-improvements.md](image-pipeline-improvements.md)
+
 ## 이슈
 
 | # | 화면 | 요청 원문 |

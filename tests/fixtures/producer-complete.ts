@@ -19,7 +19,7 @@
 // 실행:
 //   node tests/fixtures/producer-complete.ts            # TALE_SMOKE_EMAIL 계정의 첫 프로젝트
 //   node tests/fixtures/producer-complete.ts <projectId>
-import { makeDb, resolveProjectId, STAGES } from './_shared.ts'
+import { furtherStage, makeDb, resolveProjectId, STAGES } from './_shared.ts'
 import { evaluateProducerGate, type BackgroundSource, type CastMember } from '../../src/lib/producer-gate.ts'
 import type { ProjectSettings, StageId } from '../../src/types/project.ts'
 
@@ -119,13 +119,32 @@ async function main() {
     process.exit(1)
   }
 
-  const { error } = await db
+  // --- current_stage 는 단조 증가(furtherStage, fixture-producer-undoes-writer-unlock-2026-08-25) ---
+  //   이미 더 앞선 단계에 있으면 이 픽스처의 --stage 로 되돌리지 않는다(편집용 잠금 해제를
+  //   기획용이 뒤늦게 도로 잠그는 사고 방지). 제품 코드 project-store.ts 의 furtherStage 와 같은 판정.
+  const { data: existingProject, error: existingProjectError } = await db
+    .from('projects')
+    .select('current_stage')
+    .eq('id', projectId)
+    .single()
+  if (existingProjectError) throw existingProjectError
+  const rawExistingStage = existingProject?.current_stage
+  if (typeof rawExistingStage !== 'string' || !(STAGES as readonly string[]).includes(rawExistingStage)) {
+    throw new Error(`[불가] projects.current_stage 조회 결과가 올바르지 않다: ${String(rawExistingStage)}`)
+  }
+  const existingStage = rawExistingStage as (typeof STAGES)[number]
+  const targetStage = existingStage ? furtherStage(existingStage, stage) : stage
+  if (existingStage && targetStage !== stage) {
+    console.log(`  ↳ current_stage 유지: ${existingStage} 가 ${stage} 보다 앞서 있어 낮추지 않음.`)
+  }
+
+  const { data: updatedProjects, error } = await db
     .from('projects')
     .update({
       story_text: STORY_TEXT,
       settings: SETTINGS,
       style_anchor_key: styleAnchorKey,
-      current_stage: stage,
+      current_stage: targetStage,
       producer_draft: {
         savedAt: Date.now(),
         storyText: STORY_TEXT,
@@ -136,14 +155,19 @@ async function main() {
       },
     })
     .eq('id', projectId)
+    .eq('current_stage', existingStage)
+    .select('id')
   if (error) throw error
+  if (!updatedProjects || updatedProjects.length !== 1) {
+    throw new Error(`[불가] current_stage update 결과가 1개가 아니다: ${updatedProjects?.length ?? 0}`)
+  }
 
   console.log('프로듀서 완료 상태를 써넣었다.')
   console.log(`  projectId      : ${projectId}`)
   console.log(`  styleAnchorKey : ${styleAnchorKey}`)
   console.log(`  게이트         : canHandoff=${gate.canHandoff} (soft ${gate.softMissing.length}건 남음)`)
-  console.log(`  잠금 해제      : ${stage} 까지 (projects.current_stage)`)
-  console.log(`  확인           : pnpm smoke /studio/${stage} --auth --tree`)
+  console.log(`  잠금 해제      : ${targetStage} 까지 (projects.current_stage)`)
+  console.log(`  확인           : pnpm smoke /studio/${targetStage} --auth --tree`)
 }
 
 main().catch((err) => {

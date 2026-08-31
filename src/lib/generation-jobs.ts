@@ -5,6 +5,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { normalizeFailureEvidence } from '@/lib/fal/error-evidence'
 import type { Json } from '@/types/database'
+import { isChatTraceId } from '@/lib/chat-trace'
 
 export type GenerationJobKind =
   | 'character_view'
@@ -61,12 +62,13 @@ export interface GenerationJob {
   completed_at?: string | null
   attempts?: number
   last_error?: string | null
+  chat_trace_id?: string | null
 }
 
 // Read/finalize paths intentionally select only the fields they consume. Provider is authoritative for
 // local-vs-FAL reconciliation; actor/runtime metadata is selected only by activity/quota callsites.
 const COLUMNS =
-  'id, project_id, request_id, model, kind, status, target, video_clip_id, idempotency_key, provider, input_snapshot, response_snapshot, result_url, error'
+  'id, project_id, request_id, model, kind, status, target, video_clip_id, idempotency_key, provider, input_snapshot, response_snapshot, result_url, error, chat_trace_id'
 
 // 웹훅 finalize/폴링 경로가 의존하는 컬럼 집합(회귀 가드용 export). finalize 는 job.target.workspaceId 와
 //   job.input_snapshot.source_hash 를 읽으므로 둘 다 반드시 포함돼야 한다(누락 시 후보 source_hash=null → stale 무력화).
@@ -142,6 +144,8 @@ export async function createGenerationJob(input: {
   provider?: string
   /** provider submit 입력 스냅샷. webhook URL/secret 같은 runtime 값은 호출자가 제외한다. */
   inputSnapshot?: unknown
+  /** 채팅이 직접 시작한 생성이면 해당 채팅 trace와 연결한다. */
+  chatTraceId?: string | null
 }): Promise<GenerationJob> {
   if (input.kind === 'shot_video') {
     throw new Error('shot_video jobs must be created by a director video reservation')
@@ -151,6 +155,9 @@ export async function createGenerationJob(input: {
     (!input.target.workspaceId || !input.target.characterId || !input.target.appearanceKey || !input.target.view)
   ) {
     throw new Error('character_view job target requires workspaceId/characterId/appearanceKey/view')
+  }
+  if (input.chatTraceId && !isChatTraceId(input.chatTraceId)) {
+    throw new Error('chat trace ID must be a UUID')
   }
   const ownership = await resolveJobOwnership({
     projectId: input.projectId,
@@ -171,6 +178,7 @@ export async function createGenerationJob(input: {
       workspace_id: ownership.workspaceId,
       provider: input.provider ?? 'fal',
       input_snapshot: toJsonSnapshot(input.inputSnapshot === undefined ? {} : input.inputSnapshot),
+      chat_trace_id: input.chatTraceId ?? null,
       submitted_at: now,
       attempts: 1,
       status: 'queued',
@@ -178,7 +186,50 @@ export async function createGenerationJob(input: {
     .select(`${COLUMNS}, actor`)
     .single()
   if (error) throw error
+  if (input.chatTraceId) {
+    const { error: traceError } = await supabaseAdmin
+      .from('chat_traces')
+      .update({
+        pending_proposal: false,
+        generation_status: 'queued',
+        updated_at: now,
+      })
+      .eq('trace_id', input.chatTraceId)
+      .eq('project_id', input.projectId)
+    if (traceError) {
+      // Job 생성은 이미 성공했다. 관측 갱신 실패가 유료 작업을 실패로
+      // 보이게 만들지 않도록 로그만 남기고 상태 집계는 linked job으로 복구한다.
+      console.error('[generation-jobs] chat trace queue update failed:', traceError)
+    }
+  }
   return data as GenerationJob
+}
+
+/** RPC 예약으로 만들어진 영상 잡에 뒤늦게 채팅 trace를 연결한다. */
+export async function linkGenerationJobToChatTrace(
+  projectId: string,
+  jobId: string,
+  chatTraceId: string,
+): Promise<void> {
+  if (!isChatTraceId(chatTraceId)) throw new Error('chat trace ID must be a UUID')
+  const { error } = await supabaseAdmin
+    .from('generation_jobs')
+    .update({ chat_trace_id: chatTraceId, updated_at: new Date().toISOString() })
+    .eq('id', jobId)
+    .eq('project_id', projectId)
+  if (error) throw error
+  const { error: traceError } = await supabaseAdmin
+    .from('chat_traces')
+    .update({
+      pending_proposal: false,
+      generation_status: 'queued',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('trace_id', chatTraceId)
+    .eq('project_id', projectId)
+  if (traceError) {
+    console.error('[generation-jobs] chat trace queue update failed:', traceError)
+  }
 }
 
 /**

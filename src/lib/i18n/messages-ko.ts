@@ -583,6 +583,7 @@ export const KO: Record<string, string> = {
   'Protagonist appears': '주인공 등장',
   'A vividly-drawn character is ready.': '모습이 그려지는 인물이 준비됐어요.',
   '{count} fields are empty — try describing a character.': '{count}개 항목이 비어 있어요 — 인물을 묘사해 보세요.',
+  'No character yet — describe one in chat.': '아직 인물이 없어요 — 채팅에서 한 명 묘사해 보세요.',
   'Stage complete': '무대 완성',
   'A background with a name, look, and purpose is ready.': '이름·모습·용도가 있는 배경이 준비됐어요.',
   'You need at least one background with a name, look, and purpose.': '이름·모습·용도가 있는 배경 1개가 필요해요.',
@@ -895,6 +896,16 @@ export const KO: Record<string, string> = {
   'The Writer implementation calls an external contract.': 'Writer 구현은 외부 계약을 호출합니다.',
   "If same-shot preservation on the Writer side isn't guaranteed, downstream output may become orphaned or stale.": 'Writer 쪽 same-shot 보존이 보장되지 않았다면 downstream 산출물이 orphan/stale 될 수 있어요.',
   'Nothing runs until you approve.': '승인 전에는 아무 실행도 시작하지 않습니다.',
+  // D11 — 핸드오프 제안·승인 순간의 사람 말 발화 (2026-08-31 오너 실측)
+  "Everything's ready — approve the card below and I'll bring in the Writer right away.":
+    '재료가 다 모였어요 — 아래 카드에서 승인하면 바로 Writer를 불러올게요.',
+  'On it — handing your materials to the Writer! Scene and shot design starts now.':
+    '좋아요, Writer로 넘어갈게요! 재료를 넘기고 씌·샷 설계를 시작해요.',
+  'On it — re-running the Writer with your current source. This can take a while.':
+    '좋아요, 지금 원천 그대로 Writer를 다시 실행할게요! 시간이 좀 걸릴 수 있어요.',
+  // D12 — 채팅이 이름/느낌으로 스타일 앵커를 직접 반영 (2026-08-31 오너)
+  "Couldn't find that art style in the catalog — tell me the feel again or pick one in the style picker.":
+    '그 그림체는 목록에서 못 찾았어요 — 느낌을 다시 말해주거나 스타일 피커에서 골라주세요.',
   "The previous Writer run didn't finish (no scenes/shots)": '이전 Writer 실행이 완료되지 않았어요 (씬/샷 없음)',
   'Check the story and settings, then re-run to generate scenes/shots and fill in Director/Editor.': '스토리·설정을 확인하고 다시 실행하면 씬·샷이 생성돼 Director/Editor 가 채워집니다.',
   'Suggest re-running Writer': 'Writer 다시 실행 제안',
@@ -1082,6 +1093,12 @@ export const KO: Record<string, string> = {
   'Approved: {action}': '승인했어요: {action}',
   "Couldn't approve the proposal. Please try again in a moment.": '제안을 승인하지 못했어요. 잠시 후 다시 시도해 주세요.',
   "Can't move to {stage} yet. Please fill these in first:": '아직 {stage}로 넘어갈 수 없어요. 먼저 이것들을 채워 주세요:',
+  'But quality may suffer because these are empty:': '다만 이게 비어 있어 퀴올리티가 떨어질 수 있어요:',
+  'Quality may suffer because these are empty: {items}': '다음이 비어 있어 퀴올리티가 떨어질 수 있어요: {items}',
+  'No scenes yet': '아직 씨이 없어요',
+  'No shots yet': '아직 샷이 없어요',
+  '{count} characters have only a main view — no back/side views yet': '캐릭터 {count}명이 대표 이미지만 있고 뒷모습·측면이 없어요',
+  '{count} shots have no video marked final': '샷 {count}개에 final 마킹된 영상이 없어요',
   'Handed over to {stage}. Starting scene and shot generation — you can follow the progress in the {stage} tab.': '{stage}에게 넘겼어요. 씬·샷 생성을 시작할게요 — 진행 상황은 {stage} 탭에서 볼 수 있어요.',
   'Moving on to {stage}.': '{stage}로 넘어갈게요.',
   'Handoff failed — {detail}': '핸드오프에 실패했어요 — {detail}',
@@ -1093,12 +1110,14 @@ export const KO: Record<string, string> = {
   'Regenerate the world/background image': '월드/배경 이미지 재생성',
   'World images are not a default hard blocker for the MVP Director gate.': 'World 이미지는 MVP Director gate의 기본 hard blocker가 아닙니다.',
   'A proposal is already pending, so the new Artist generation proposal was held back.': '이미 대기 중인 제안이 있어 새 Artist 생성 제안을 보류했어요.',
+  'A proposal is already pending, so the new Director image generation proposal was held back.': '이미 대기 중인 제안이 있어 새 Director 이미지 생성 제안을 보류했어요.',
   'Change the base character appearance (source): {appearance}': '캐릭터 기본 외형(원천) 변경: {appearance}',
   "The character's canonical appearance (source) changes.": '캐릭터의 canonical 외형(원천)이 바뀝니다.',
   'After approval the existing images of that character are marked stale — they are not regenerated automatically.': '승인 후 그 캐릭터의 기존 이미지들이 낡음(stale)으로 표시돼요 — 자동 재생성은 하지 않아요.',
   'The appearance does not change until you approve.': '승인 전에는 외형이 바뀌지 않습니다.',
   "Couldn't apply {count} changes": '수정 {count}건을 반영하지 못했어요',
   "Couldn't apply {count} changes — {reason}": '수정 {count}건을 반영하지 못했어요 — {reason}',
+  "Chat doesn't support video generation yet — please use the video generation button on the canvas.": '채팅에서는 아직 영상 생성을 지원하지 않아요 — 캔버스의 영상 생성 버튼을 이용해 주세요.',
   '{count} changes applied': '수정 {count}건 반영 완료',
   'Cut dialogue from {from} lines down to {to}': '대사 {from}개 → {to}개로 줄이는 수정',
   'Nothing is applied until you approve.': '승인 전에는 적용되지 않습니다.',

@@ -13,7 +13,11 @@ import {
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
-import { pollGenerationJob } from '@/lib/generation-jobs-client'
+import {
+  pollGenerationJob,
+  type GenerationJobObserver,
+  type GenerationJobReceipt,
+} from '@/lib/generation-jobs-client'
 import {
   notifyGenerationComplete,
   notifyGenerationFailed,
@@ -96,6 +100,10 @@ export type ArtistUpdate =
 
 /** 생성 트리거 주체. `auto`는 Artist 자동 first-fill 내부 표식이며 서버 job actor 로는 ui 처리된다. */
 export type GenerationActor = 'ui' | 'chat' | 'auto'
+export type GenerationRequestOptions = {
+  traceId?: string
+  onJob?: GenerationJobObserver
+}
 
 // fal 계정 concurrent limit을 여러 유저가 공유하므로, dispatcher 전 단계에서는 화면별 submit 풀을
 // 보수적으로 유지한다. 계정 전역 공정성은 generation_jobs dispatcher 도입 시 중앙화한다.
@@ -179,29 +187,60 @@ async function generateAndPersistWorldShot(
   prompt: string,
   provider: ImageProvider,
   actor: GenerationActor = 'ui',
+  options?: GenerationRequestOptions,
 ): Promise<string | null> {
   if (provider === 'fal' && projectId) {
     const res = await fetch('/api/artist/generate-world', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, locationId, column, prompt, aspectRatio: '16:9', actor, sourceHash: computeWorldImageSourceHash(prompt) }),
+      body: JSON.stringify({
+        projectId,
+        locationId,
+        column,
+        prompt,
+        aspectRatio: '16:9',
+        actor,
+        sourceHash: computeWorldImageSourceHash(prompt),
+        ...(options?.traceId ? { traceId: options.traceId } : {}),
+      }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
+      options?.onJob?.({
+        jobId: null,
+        status: 'failed',
+        httpStatus: res.status,
+        error: body.error ?? `HTTP ${res.status}`,
+    })
       if (notifyIfQuotaExceeded(res.status, body)) return null
       throw new Error(body.error ?? `HTTP ${res.status}`)
     }
-    const body = (await res.json()) as { jobId?: string; skipped?: boolean }
+    const body = (await res.json()) as {
+      jobId?: string
+      skipped?: boolean
+      deduped?: boolean
+      status?: string
+    }
     // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음. 에러 아님: null 로 조용히 종료.
-    if (body.skipped || !body.jobId) return null
-    return await pollGenerationJob(body.jobId)
+    if (body.deduped) {
+      options?.onJob?.({ jobId: null, status: 'deduped' })
+      return null
+    }
+    if (body.skipped || !body.jobId) {
+      options?.onJob?.({ jobId: null, status: 'skipped' })
+      return null
+    }
+    options?.onJob?.({ jobId: body.jobId, status: 'queued', httpStatus: res.status })
+    return await pollGenerationJob(body.jobId, { onStatus: options?.onJob })
   }
-  // 비-fal provider 또는 projectId 없음 → 동기 경로
+  // 비-fal provider 또는 projectId 없음 → 기존 동기 blob + 클라 persist
   const blobUrl = await generateImage(prompt, '16:9', provider)
   if (projectId) {
     const persisted = await persistImage(projectId, 'location', locationId, column, blobUrl)
+    options?.onJob?.({ jobId: null, status: 'completed', resultUrl: persisted ?? blobUrl })
     return persisted ?? blobUrl
   }
+  options?.onJob?.({ jobId: null, status: 'completed', resultUrl: blobUrl })
   return blobUrl
 }
 
@@ -364,7 +403,8 @@ interface ArtistState {
     instruction?: string,
     safeMode?: boolean,
     model?: ImageModelKey,
-  ) => Promise<void>
+    options?: GenerationRequestOptions,
+  ) => Promise<GenerationJobReceipt | null>
   /** 모더레이션 우회(safe-mode) 재시도 — 유저 클릭 전용(#A). 서버가 자격/캡 판정, 일반 실패는 원본. */
   retryCharacterViewSafe: (characterId: string, appearanceKey: string, view: CharacterViewKey, model?: ImageModelKey) => Promise<void>
   /** generation-status 엔드포인트로 viewFailures 재조회(배지/우회버튼 reload 없이 최신화). */
@@ -376,10 +416,12 @@ interface ArtistState {
     actor?: GenerationActor,
     instruction?: string,
     model?: ImageModelKey,
-  ) => Promise<void>
+    options?: GenerationRequestOptions,
+  ) => Promise<GenerationJobReceipt | null>
   generateWorldAsset: (
     locationId: string,
     actor?: GenerationActor,
+    options?: GenerationRequestOptions,
   ) => Promise<void>
   generateWorldShot: (
     locationId: string,
@@ -842,10 +884,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectLocation: (id) => set({ selectedLocationId: id }),
 
   // 단일 뷰 생성 (crop 폐기, 2026-06-05). main=T2I, 방향=main 기반 i2i. 서버가 해당 뷰 컬럼만 갱신.
-  generateCharacterView: async (characterId, appearanceKey, view, actor = 'ui', instruction, safeMode, model) => {
-    if (isDemoSession()) return
+  generateCharacterView: async (characterId, appearanceKey, view, actor = 'ui', instruction, safeMode, model, options) => {
+    if (isDemoSession()) return null
     const projectId = useProjectStore.getState().projectId
-    if (!projectId) return
+    if (!projectId) return null
     if (!appearanceKey) {
       const error = `Appearance key is required for character ${characterId}`
       set({ error })
@@ -859,10 +901,16 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
     const slot = { characterId, appearanceKey, view }
     const key = `${characterId}:${appearanceKey}:${view}`
-    if (get().generatingViews.some((active) => sameCharacterAppearanceSlot(active, characterId, appearanceKey, view))) return
+    if (get().generatingViews.some((active) => sameCharacterAppearanceSlot(active, characterId, appearanceKey, view))) {
+      options?.onJob?.({ jobId: null, status: 'deduped' })
+      return { jobId: null, status: 'deduped' }
+    }
     // 연타 방어(#double-fire) — 사람이 누른 경로만. autogen 은 자체 흐름으로 중복을 관리하므로
     //   1초 창에 걸리면 정상 재시도가 조용히 사라진다.
-    if (actor === 'ui' && !claimAction(`artist:character:${key}`)) return
+    if (actor === 'ui' && !claimAction(`artist:character:${key}`)) {
+      options?.onJob?.({ jobId: null, status: 'deduped' })
+      return { jobId: null, status: 'deduped' }
+    }
 
     // 편집(디바운스 저장)이 서버에 닿기 전에 생성 라우트가 DB를 읽어 옛 프롬프트로 그리는 레이스 방지 —
     //   대기 중인 캐릭터 수정 PATCH 를 먼저 flush+await 한 뒤 제출한다(#11).
@@ -877,16 +925,31 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       error: null,
     }))
     const t0 = Date.now()
+    let activeJobId: string | null = null
     alog(`[autogen] char ${key} → submitting…`)
     try {
       const res = await fetch('/api/artist/generate-sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, characterId, appearanceKey, view, actor, instruction, safeMode, model }),
+        body: JSON.stringify({
+          projectId,
+          characterId,
+          appearanceKey,
+          view,
+          actor,
+          instruction,
+          safeMode,
+          model,
+          ...(options?.traceId ? { traceId: options.traceId } : {}),
+        }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        if (notifyIfQuotaExceeded(res.status, body)) return
+        const error = body.error ?? `HTTP ${res.status}`
+        options?.onJob?.({ jobId: null, status: 'failed', httpStatus: res.status, error })
+        if (notifyIfQuotaExceeded(res.status, body)) {
+          return { jobId: null, status: 'failed', httpStatus: res.status, error }
+        }
         throw new Error(body.error ?? `HTTP ${res.status}`)
       }
       // 비동기: 라우트는 jobId만 반환 — 완료까지 polling (webhook이 서버사이드로 storage+DB 갱신).
@@ -894,7 +957,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       // 서버 dedupe(이미 같은 슬롯에 queued 잡 존재) → 새 fal 제출 없이 종료. 에러/재시도 아님(중복 방지).
       if (body.deduped) {
         alog(`[autogen] char ${key} — 이미 큐에 있음(서버 dedupe), 제출 생략`)
-        return
+        options?.onJob?.({ jobId: null, status: 'deduped', httpStatus: res.status })
+        return { jobId: null, status: 'deduped', httpStatus: res.status }
       }
       // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음.
       //   에러는 아니지만 **조용히 끝내면 안 된다** — 화면상 아무 일도 안 일어난 것과 구분이 안 되고,
@@ -902,11 +966,14 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       if (body.skipped || !body.jobId) {
         alog(`[autogen] char ${key} — give-up 게이트로 자동 생성 skip`)
         notifyGenerationGaveUp('artist', translate(useLocaleStore.getState().locale, 'Character image'))
-        return
+        options?.onJob?.({ jobId: null, status: 'skipped', httpStatus: res.status })
+        return { jobId: null, status: 'skipped', httpStatus: res.status }
       }
       const jobId = body.jobId
+      activeJobId = jobId
       alog(`[autogen] char ${key} job ${jobId} queued, polling…`)
-      const url = await pollGenerationJob(jobId)
+      options?.onJob?.({ jobId, status: 'queued', httpStatus: res.status })
+      const url = await pollGenerationJob(jobId, { onStatus: options?.onJob })
       alog(`[autogen] char ${key} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
       atime(`char ${key}`, Date.now() - t0)
       set((state) => {
@@ -938,6 +1005,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const asset = get().characterAssets.find((a) => a.characterId === characterId)
       if (asset) registerCharacterCard(asset, projectId)
       notifyGenerationComplete('artist', translate(useLocaleStore.getState().locale, 'Character image')) // 다른 stage에 있을 때만 알림(store가 판단)
+      return { jobId, status: 'completed', resultUrl: url, httpStatus: res.status }
     } catch (err) {
       console.warn(
         `[autogen] char ${key} ✗ failed in ${((Date.now() - t0) / 1000).toFixed(1)}s:`,
@@ -947,6 +1015,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       set({ error: raw || 'Character view generation failed' })
       // 카드의 작은 배지는 스크롤하면 사라진다 — 채팅은 stage 를 옮겨도 남는 기록이다.
       notifyGenerationFailed('artist', translate(useLocaleStore.getState().locale, 'Character image'), raw)
+      return { jobId: activeJobId, status: 'failed', error: raw }
     } finally {
       set((state) => ({
         generatingViews: state.generatingViews.filter(
@@ -1000,13 +1069,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   // main → 4방향 순서 생성. 방향 i2i 는 main 이 DB 에 있어야 하므로 main 을 먼저 await 한 뒤
   // 4방향을 제한된 풀로 병렬 생성. 카드 "Generate All Views" / 시트 재생성용.
   // object 캐릭터는 main 만 생성 — 방향뷰 불필요.
-  generateCharacterAllViews: async (characterId, appearanceKey, actor = 'ui', instruction, model) => {
+  generateCharacterAllViews: async (characterId, appearanceKey, actor = 'ui', instruction, model, options) => {
     // 캐릭터 = 턴어라운드 시트 1장(모든 뷰 포함), 사물 = 단일 이미지 — 둘 다 main 하나만 생성(#7·#9 2026-07-11).
     //   방향뷰(개별 i2i) 생성 폐기: 라우트가 사람 main 을 와이드 턴어라운드로 그린다.
-    await get().generateCharacterView(characterId, appearanceKey, 'main', actor, instruction, undefined, model)
+    return await get().generateCharacterView(characterId, appearanceKey, 'main', actor, instruction, undefined, model, options)
   },
 
-  generateWorldAsset: async (locationId, actor = 'ui') => {
+  generateWorldAsset: async (locationId, actor = 'ui', options) => {
     if (isDemoSession()) return
     const { sceneManifest, selectedBoostPreset, imageProvider } = get()
     const location = sceneManifest?.locations.find(
@@ -1049,6 +1118,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         buildWorldShotPromptForLocation(location, scene, selectedBoostPreset, 'wideShot'),
         imageProvider,
         actor,
+        options,
       )
       if (wideShot) {
         set((state) => ({
@@ -1061,6 +1131,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err)
       set({ error: raw || 'World generation failed' })
+      options?.onJob?.({ jobId: null, status: 'failed', error: raw })
       notifyGenerationFailed('artist', translate(useLocaleStore.getState().locale, 'Background image'), raw)
     } finally {
       set((state) => ({
@@ -1189,7 +1260,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       //   producer 인물은 writer v2Design 서버 초안이 채우므로 대기. 멱등: generateCharacterView 가 generatingViews/서버 dedupe.
       if (c.origin === 'writer') {
         queuedRest.push(`char ${c.characterId}:main (opencast 턴어라운드 자율)`)
-        restTasks.push(() => get().generateCharacterView(c.characterId, requireDefaultAppearanceKey(c), 'main', 'auto'))
+        restTasks.push(async () => {
+          await get().generateCharacterView(c.characterId, requireDefaultAppearanceKey(c), 'main', 'auto')
+        })
       } else {
         skipped.push(`char ${c.characterId}:main (server 초안 대기)`)
       }
@@ -1264,7 +1337,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     })
     if (targets.length === 0) return
     await runPool(
-      targets.map((c) => () => get().generateCharacterView(c.characterId, requireDefaultAppearanceKey(c), 'main', 'ui')),
+      targets.map((c) => async () => {
+        await get().generateCharacterView(c.characterId, requireDefaultAppearanceKey(c), 'main', 'ui')
+      }),
       ARTIST_GENERATION_CONCURRENCY,
     )
   },
@@ -1285,7 +1360,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         // 채팅발 재생성 — generation_jobs.actor='chat' 귀속 (chat-aware-regeneration).
         if (u.views?.length) {
           await runPool(
-            u.views.map((v) => () => get().generateCharacterView(u.characterId, appearanceKey, v, 'chat', u.instruction, undefined, u.model)),
+            u.views.map((v) => async () => {
+              await get().generateCharacterView(u.characterId, appearanceKey, v, 'chat', u.instruction, undefined, u.model)
+            }),
             ARTIST_GENERATION_CONCURRENCY,
           )
         } else {

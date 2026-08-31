@@ -61,6 +61,19 @@ describe('vault ticket handoff runtime', () => {
     expect(call(['status', '--project', root, '--ticket-id', 'one'], '1051').classification).toBe('manual_review')
   })
 
+  // 저장 기록은 사본 밖(checkpoints/)에 있어 사본을 지워도 계속 읽힌다. 그래서 사본이 사라진
+  // 티켓이 "이어받을 수 있음"으로 계속 뜨던 거짓 초록 — 티켓 ticket-runtime-worktree-drift-2026-08-26.
+  it('stops calling a ticket takeover-ready once its worktree is gone', () => {
+    const { root, worktree } = make(); const first = claim(root, worktree)
+    call(['checkpoint', '--project', root, '--ticket-id', 'one', '--session-id', 'day', '--owner-token', first.owner_token, '--fencing', String(first.fencing), '--lease-seconds', '1', '--status', 'running', '--input', checkpointInput()])
+    expect(call(['status', '--project', root, '--ticket-id', 'one'], '1002')).toMatchObject({ classification: 'takeover_ready', worktree_present: true })
+    rmSync(worktree, { recursive: true, force: true })
+    expect(call(['status', '--project', root, '--ticket-id', 'one'], '1002')).toMatchObject({
+      classification: 'manual_review', checkpoint_valid: true, worktree_present: false,
+    })
+    expect(fail(['takeover', '--project', root, '--ticket-id', 'one', '--actor', 'jh', '--session-id', 'night', '--owner-kind', 'night', '--worktree', worktree, '--lease-seconds', '50'], '1002').status).toBe(1)
+  })
+
   it('takes expired work over only after a dirty checkpoint and preserves untracked content in patch', () => {
     const { root, worktree } = make(); const first = claim(root, worktree)
     writeFileSync(join(worktree, 'base.txt'), 'changed\n'); writeFileSync(join(worktree, 'new.txt'), 'untracked\n')

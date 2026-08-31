@@ -189,10 +189,14 @@ export function compileMotionContract(
     : 'Subjects: no scripted action — only subtle natural life (breathing, cloth, hair, atmosphere), never frozen.'
   // 긴 샷은 "고르게 펴라"만 말하면 모델이 전체를 느리게 만든다(#g1). 완결 시점을 앞에 두고
   //   남은 시간은 여파로 채우게 나눠 말한다 — 동작 자체는 제 속도로 일어나야 한다.
+  // #d3(2026-08-31 오너 확정): 짧은 샷의 옛 문장("전체 N초에 걸쳐 페이싱")이 남은 주 슬로모
+  //   경로였다 — 실측 126샷의 87.3%가 7초 미만이라 #g1 은 12.7%만 고친 상태였고, 5초 샷에
+  //   2초 동작이면 그 문장이 곧 2.5배 슬로모 지시가 된다. 짧은 샷도 자연 속도 원칙으로 통일하되,
+  //   짧은 샷의 원래 목적(마지막 프레임 전 완결 보장)은 유지한다.
   const pace =
     durationSeconds >= LONG_SHOT_SECONDS
       ? `Timing: perform each scripted movement at natural, lifelike speed — do NOT slow it down to fill ${durationSeconds} seconds. The main action completes well before the end; the remaining time is carried by its aftermath and ambient life, not by stretching the action.`
-      : `Pace the motion across the full ${durationSeconds}-second duration — by the final frame every scripted movement has fully completed.`
+      : `Timing: perform each scripted movement at natural, lifelike speed — do NOT stretch or slow it to fill ${durationSeconds} seconds. Every scripted movement completes by the final frame; leftover time is carried by natural follow-through and ambient life, never slow motion.`
   // 금지절의 범위(#motion-vocab 2026-08-11): 옛 문구는 "beyond this contract" 로 끝나
   //   이 계약문을 프롬프트의 **유일한** 권위로 선언했다. 그런데 계약문 뒤에는 모델이 쓴 장면
   //   묘사문(motion_prompt)이 이어 붙고, 거기에만 있는 연출 정보가 있다 — 실측에서 계약문은

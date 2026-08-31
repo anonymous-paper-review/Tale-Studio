@@ -19,6 +19,7 @@ import {
   type AppearanceProposal,
 } from '@/lib/artist/chat-updates'
 import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
+import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 
 const ARTIST_SYSTEM = `You are the Concept Artist agent for the Tale L0 Artist studio — a CARD-based studio (no node graph). Users define Characters and World locations as cards. Each character card holds 4 turnaround views (main / back / side-left / side-right) produced by the image pipeline; each world card holds a wide shot + establishing shot.
 
@@ -245,22 +246,25 @@ export async function POST(req: Request) {
       validUpdateCount,
     } = parseUpdates(text)
 
+    const trace = buildChatTrace({
+      traceId,
+      stage: 'artist',
+      route: 'artist/chat',
+      system: systemPrompt,
+      history: normalizedHistory,
+      contextMessage: userPrompt,
+      usage: llmUsage,
+      parseStatus,
+      rawUpdateCount,
+      validUpdateCount,
+    })
+    await persistChatTraceBestEffort(projectId, trace)
+
     return NextResponse.json({
       reply,
       updates,
       proposals,
-      trace: buildChatTrace({
-        traceId,
-        stage: 'artist',
-        route: 'artist/chat',
-        system: systemPrompt,
-        history: normalizedHistory,
-        contextMessage: userPrompt,
-        usage: llmUsage,
-        parseStatus,
-        rawUpdateCount,
-        validUpdateCount,
-      }),
+      trace,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'

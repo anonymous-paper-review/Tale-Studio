@@ -202,7 +202,7 @@ function RolePlate({ stage }: { stage: StageId }) {
         background: `linear-gradient(90deg, color-mix(in oklab, ${STAGE_FACE_COLOR[stage]} 28%, transparent) 0%, transparent 100%)`,
       }}
     >
-      <AgentFace color={STAGE_FACE_COLOR[stage]} size={24} animate={false} />
+      <AgentFace stage={stage} size={24} />
       <span className="text-[13px] font-extrabold text-foreground">
         {STAGE_LABEL[stage]}
       </span>
@@ -226,7 +226,7 @@ function ThinkingIndicator({ stage }: { stage: StageId }) {
   }, [phrases])
   return (
     <div className="mr-6 flex items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3.5 py-2.5 text-xs text-muted-foreground">
-      <AgentFace color={STAGE_FACE_COLOR[stage]} size={20} expression="thinking" />
+      <AgentFace stage={stage} size={20} expression="thinking" />
       {/* key=idx: 문구가 바뀔 때마다 아래에서 스르륵 올라오는 재등장 */}
       <span
         key={idx}
@@ -301,6 +301,60 @@ function ChatTraceFooter({
           applied: trace.appliedCount ?? '—',
         })
       : null
+  const generationJobs = Array.isArray(trace.generationJobs) ? trace.generationJobs : []
+  const generationJobCount = generationJobs.length
+  const completedJobCount = generationJobs.filter((job) => job.status === 'completed').length
+  const failedJobCount = generationJobs.filter((job) => job.status === 'failed').length
+  const queuedJobCount = generationJobs.filter((job) => job.status === 'queued').length
+  const approvalPending =
+    trace.pendingProposal === true ||
+    (trace.generationStatus === 'awaiting_approval' && trace.pendingProposal !== false)
+  const displayGenerationStatus = (() => {
+    if (approvalPending) return 'awaiting_approval'
+    // Job receipts are the freshest source of truth. A queued job takes precedence
+    // over completed/failed jobs so a batch never looks finished while work remains.
+    if (generationJobCount > 0) {
+      if (queuedJobCount > 0) return 'queued'
+      if (completedJobCount === generationJobCount) return 'completed'
+      if (failedJobCount === generationJobCount) return 'failed'
+      if (completedJobCount > 0 && failedJobCount > 0) return 'partial'
+    }
+    // Approval clears before the first job receipt arrives. Keep that short gap
+    // understandable instead of continuing to show the approval state.
+    if (trace.generationStatus === 'awaiting_approval') return 'queued'
+    if (trace.generationStatus === 'deduped') return 'skipped'
+    if (trace.generationStatus === 'timed_out') return 'failed'
+    return trace.generationStatus
+  })()
+  const generationSummary = (() => {
+    switch (displayGenerationStatus) {
+      case 'queued':
+        return generationJobCount > 0
+          ? t('Generation queued · {count} jobs', { count: generationJobCount })
+          : t('Generation queued')
+      case 'completed':
+        return generationJobCount > 0
+          ? t('Generation completed · {count} jobs', { count: generationJobCount })
+          : t('Generation completed')
+      case 'partial':
+        return generationJobCount > 0
+          ? t('Generation partially completed · {completed} completed · {failed} failed', {
+              completed: completedJobCount,
+              failed: failedJobCount,
+            })
+          : t('Generation partially completed')
+      case 'failed':
+        return generationJobCount > 0
+          ? t('Generation failed · {count} jobs', { count: generationJobCount })
+          : t('Generation failed')
+      case 'skipped':
+        return generationJobCount > 0
+          ? t('Generation skipped · {count} jobs', { count: generationJobCount })
+          : t('Generation skipped')
+      default:
+        return null
+    }
+  })()
 
   return (
     <details className="shrink-0 border-t border-border-subtle bg-muted/20 px-4 py-1.5 text-[10px] text-muted-foreground">
@@ -336,7 +390,11 @@ function ChatTraceFooter({
         {trace.choicesMarkerFound && (
           <p>{t('Choices {count}', { count: trace.choicesCount ?? 0 })}</p>
         )}
-        {trace.pendingProposal === true && <p>{t('Waiting for approval')}</p>}
+        {approvalPending ? (
+          <p>{t('Waiting for approval')}</p>
+        ) : (
+          generationSummary && <p>{generationSummary}</p>
+        )}
         {trace.requestStatus != null && trace.requestStatus >= 400 && (
           <p>{t('Request status {status}', { status: trace.requestStatus })}</p>
         )}
@@ -832,7 +890,8 @@ export function GlobalChat() {
     //   게이트 판정·전이·이동은 타이핑했을 때와 똑같이 sendMessage 안에서 일어난다.
     if (action.kind === 'handoff') {
       dismissSuggestion()
-      await sendMessage(action.utterance)
+      // D12(2026-08-31 오너): 명시 버튼("Writer 호출하기")이 곳 동의다 — 승인 카드를 또 띄우지 않는다.
+      await sendMessage(action.utterance, undefined, { consentedHandoff: true })
       return
     }
     const path = await handoffToStage(action.targetStage)
@@ -1307,9 +1366,9 @@ export function GlobalChat() {
                             className="tale-beam-once pointer-events-none absolute inset-0 rounded-2xl"
                           />
                           <div className="flex items-center gap-3">
-                            <AgentFace color={STAGE_FACE_COLOR[invite.from]} size={26} animate={false} />
+                            <AgentFace stage={invite.from} size={26} />
                             <MoveRight className="size-4 text-muted-foreground" />
-                            <AgentFace color={STAGE_FACE_COLOR[invite.to]} size={34} />
+                            <AgentFace stage={invite.to} size={34} />
                           </div>
                           <p className="text-[11px] text-muted-foreground">
                             {invitePre}
@@ -1485,11 +1544,7 @@ export function GlobalChat() {
             >
               {choices.question && (
                 <div className="flex items-start gap-1.5">
-                  <AgentFace
-                    color={STAGE_FACE_COLOR[choices.stage]}
-                    size={16}
-                    animate={false}
-                  />
+                  <AgentFace stage={choices.stage} size={16} />
                   <p className="min-w-0 text-xs text-foreground">{choices.question}</p>
                 </div>
               )}
@@ -1745,11 +1800,7 @@ export function GlobalChat() {
                         STAGE_BADGE_CLASS[currentStage],
                       )}
                     >
-                      <AgentFace
-                        color={STAGE_FACE_COLOR[currentStage]}
-                        size={16}
-                        animate={false}
-                      />
+                      <AgentFace stage={currentStage} size={16} />
                       {STAGE_LABEL[currentStage]}
                       <ChevronDown className="size-3 opacity-60" />
                     </button>

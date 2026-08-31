@@ -14,6 +14,28 @@ export type ChatLlmUsage = {
   stopReason: string | null
 }
 
+/** 생성 잡 하나의 영수증. 결과 URL 자체는 추적 기록에 저장하지 않는다. */
+export type ChatGenerationJobStatus = 'queued' | 'completed' | 'failed'
+
+export type ChatGenerationStatus =
+  | 'not_started'
+  | 'awaiting_approval'
+  | 'queued'
+  | 'completed'
+  | 'failed'
+  | 'partial'
+  | 'skipped'
+  | 'deduped'
+  | 'timed_out'
+
+export interface ChatGenerationJobTrace {
+  jobId: string
+  kind: string
+  status: ChatGenerationJobStatus
+  resultReady: boolean
+  error: string | null
+}
+
 /**
  * End-to-end metadata for one chat request.
  *
@@ -38,6 +60,8 @@ export interface ChatTrace extends ChatLlmUsage {
   choicesCount?: number | null
   generationHttpStatus?: number | null
   jobId?: string | null
+  generationStatus?: ChatGenerationStatus | null
+  generationJobs?: ChatGenerationJobTrace[]
   requestStatus?: number | null
   error?: string | null
 }
@@ -55,13 +79,19 @@ export interface ChatTraceInput {
   validUpdateCount?: number | null
   choicesMarkerFound?: boolean | null
   choicesCount?: number | null
+  generationStatus?: ChatGenerationStatus | null
+  generationJobs?: ChatGenerationJobTrace[]
+}
+
+export function isChatTraceId(candidate: unknown): candidate is string {
+  return (
+    typeof candidate === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate)
+  )
 }
 
 export function createChatTraceId(candidate?: unknown): string {
-  return typeof candidate === 'string' &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate)
-    ? candidate
-    : crypto.randomUUID()
+  return isChatTraceId(candidate) ? candidate : crypto.randomUUID()
 }
 
 /**
@@ -103,6 +133,8 @@ export function buildChatTrace(input: ChatTraceInput): ChatTrace {
     pendingProposal: null,
     generationHttpStatus: null,
     jobId: null,
+    generationStatus: input.generationStatus ?? null,
+    generationJobs: input.generationJobs ?? [],
     requestStatus: null,
     error: null,
   }

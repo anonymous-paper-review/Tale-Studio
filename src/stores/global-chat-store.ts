@@ -16,6 +16,7 @@ import {
   serializeDirectorCanvasContext,
   type DirectorCanvasUpdate,
 } from '@/stores/director-store'
+import { isShotData, isVideoData } from '@/types/director'
 import { useWriterStore, type WriterChatUpdate } from '@/stores/writer-store'
 import {
   buildScriptLines,
@@ -24,7 +25,12 @@ import {
 } from '@/lib/script-lines'
 import { matchHandoffIntent, type HandoffSpec } from '@/lib/handoff-intent'
 import { handoffToStage } from '@/lib/stage-nav'
-import { saveChatMessage } from '@/lib/chat-persistence'
+import {
+  loadLatestChatTrace,
+  saveChatMessage,
+  saveChatTrace,
+  saveChatTracePatch,
+} from '@/lib/chat-persistence'
 import {
   choiceSuggestionMarker,
   isPersistedChatMarker,
@@ -35,7 +41,16 @@ import {
 import { isDemoSession, getDemoSnapshot } from '@/lib/demo/context'
 import { cannedFor } from '@/lib/demo/canned'
 import { handoffMarker } from '@/lib/chat-blocks'
-import { buildChatTrace, createChatTraceId, type ChatTrace } from '@/lib/chat-trace'
+import {
+  buildChatTrace,
+  createChatTraceId,
+  type ChatGenerationJobTrace,
+  type ChatTrace,
+} from '@/lib/chat-trace'
+import {
+  type GenerationJobReceipt,
+  type GenerationJobObserver,
+} from '@/lib/generation-jobs-client'
 import { stripLegacyStageMarkers } from '@/lib/display-names'
 // store 액션·순수 함수는 훅을 못 쓴다 — translate() + locale 직접 조회로 번역.
 //   이 파일의 산출물은 전부 챗 스트림(발화·제안·알림)이라 UI 언어가 아니라 **프로젝트 콘텐츠
@@ -114,6 +129,9 @@ interface GlobalChatState {
   sendMessage: (
     content: string,
     attachments?: { imageUrls?: string[]; thumbUrls?: string[] },
+    /** consentedHandoff: 명시적 핸드오프 버튼("Writer 호출하기")에서 온 호출 — 버튼이 곳 동의라
+     *  승인 카드를 다시 띄우지 않고 바로 실행한다(D12, 2026-08-31 오너). */
+    opts?: { consentedHandoff?: boolean },
   ) => Promise<void>
   /** 진행 중인 LLM 응답 중단 (#oiioii-chat) — Stop 버튼. 대기 중이 아니면 no-op. */
   stopGeneration: () => void
@@ -139,6 +157,17 @@ interface GlobalChatState {
 
 function makeId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function generationStatusOf(
+  status: GenerationJobReceipt['status'],
+): ChatTrace['generationStatus'] {
+  if (status === 'queued') return 'queued'
+  if (status === 'completed') return 'completed'
+  if (status === 'failed') return 'failed'
+  if (status === 'skipped') return 'skipped'
+  if (status === 'deduped') return 'deduped'
+  return 'timed_out'
 }
 
 function dialogueKey(line: DialogueLine): string {
@@ -303,7 +332,15 @@ async function applyStyleAnchorIntent(
   }
 }
 
-function handoffBlockers(spec: HandoffSpec): string[] {
+interface HandoffBlockers {
+  /** 비워있으면 핸드오프를 차단한다 (기존 동작 불변). */
+  hard: string[]
+  /** 비워있어도 진행하되, 품질(퀴얼리티) 경고를 함께 보여준다(오너 확정 2026-08-28). */
+  soft: string[]
+}
+
+function handoffBlockers(spec: HandoffSpec): HandoffBlockers {
+  const locale = contentLocale()
   if (spec.from === 'producer') {
     const p = useProducerStore.getState()
     const gate = evaluateProducerGate({
@@ -313,18 +350,67 @@ function handoffBlockers(spec: HandoffSpec): string[] {
       backgrounds: p.backgrounds,
       styleAnchorKey: p.styleAnchorKey,
       // label/detail 은 게이트가 완역해 돌려준다(#i18n-s5-batch4) — 여기서 다시 번역하지 않는다.
-      locale: contentLocale(),
+      locale,
     })
-    return gate.canHandoff
-      ? []
-      : gate.hardMissing.map((i) => (i.detail ? `${i.label} (${i.detail})` : i.label))
+    return {
+      hard: gate.canHandoff
+        ? []
+        : gate.hardMissing.map((i) => (i.detail ? `${i.label} (${i.detail})` : i.label)),
+      soft: gate.softMissing.map((i) => (i.detail ? `${i.label} (${i.detail})` : i.label)),
+    }
+  }
+  if (spec.from === 'writer') {
+    // writer → artist: 씨 매니페스트/샷이 비어 있으면(0개) artist 도 그릴 거리가 없다 — 하드는 아니고(오너 확정) 경고로만.
+    const w = useWriterStore.getState()
+    const soft: string[] = []
+    if ((w.sceneManifest?.scenes.length ?? 0) === 0) {
+      soft.push(translate(locale, 'No scenes yet'))
+    }
+    if (w.shots.length === 0) {
+      soft.push(translate(locale, 'No shots yet'))
+    }
+    return { hard: [], soft }
   }
   if (spec.from === 'artist') {
     const gate = useProjectStore.getState().lifecycleStatus.director
-    return gate?.ready === false ? gate.blockers.map((b) => b.label) : []
+    const hard = gate?.ready === false ? gate.blockers.map((b) => b.label) : []
+    // artist → director soft: main 사진만 있고 back/side 가 없는 캐릭터 수 — 하드게이트(main 미생성)와 겹치지 않도록 main 있는 캐릭터만 셀다.
+    const missingTurnaroundCount = useArtistStore
+      .getState()
+      .characterAssets.filter(
+        (c) =>
+          c.entityType === 'person'
+          && c.views.main != null
+          && (c.views.back == null || c.views.sideLeft == null || c.views.sideRight == null),
+      ).length
+    const soft =
+      missingTurnaroundCount > 0
+        ? [
+            translate(locale, '{count} characters have only a main view — no back/side views yet', {
+              count: missingTurnaroundCount,
+            }),
+          ]
+        : []
+    return { hard, soft }
   }
-  // director → editor 는 게이트가 없다 (걷어낸 버튼도 항상 활성이었다).
-  return []
+  if (spec.from === 'director') {
+    // director → editor 는 하드 게이트가 없다 (걸어낸 버튼도 항상 활성이었다). soft: final 마킹 영상 없는 샷 수.
+    const nodes = useDirectorCanvasStore.getState().nodes
+    const shotNodeIds = nodes.filter((n) => isShotData(n.data)).map((n) => n.id)
+    const missingFinalCount = shotNodeIds.filter(
+      (id) => !nodes.some((n) => isVideoData(n.data) && n.data.parentShotNodeId === id && n.data.final),
+    ).length
+    const soft =
+      missingFinalCount > 0
+        ? [
+            translate(locale, '{count} shots have no video marked final', {
+              count: missingFinalCount,
+            }),
+          ]
+        : []
+    return { hard: [], soft }
+  }
+  return { hard: [], soft: [] }
 }
 
 /** 게이트 통과 후 실제 전이. producer 는 writer 파이프라인 발사까지 포함한다. */
@@ -419,13 +505,16 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         set({ messages: [], suggestion: null, lastTrace: null, messagesLoadedProjectId: projectId })
         return
       }
-      const { messages } = await res.json()
+      const [{ messages }, persistedTrace] = await Promise.all([
+        res.json() as Promise<{ messages?: unknown }>,
+        loadLatestChatTrace(projectId),
+      ])
       hydrate((messages ?? []) as Array<{
         stage: string
         role: 'user' | 'model'
         content: string
       }>)
-      set({ messagesLoadedProjectId: projectId })
+      set({ messagesLoadedProjectId: projectId, lastTrace: persistedTrace })
     } catch (err) {
       console.error('[global-chat-store] loadMessages failed:', err)
       // 실패도 "로드 종료"다 — 마커를 세워야 웰컴 등 제안 발사측이 영영 굶지 않는다(빈 이력으로 진행).
@@ -433,7 +522,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (content, attachments) => {
+  sendMessage: async (content, attachments, opts) => {
     const trimmed = content.trim()
     if (!trimmed || get().loading) return
     const attachmentImageUrls = attachments?.imageUrls
@@ -496,22 +585,82 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       set((state) => ({ messages: [...state.messages, userMsg], loading: true, error: null }))
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
 
-      const blockers = handoffBlockers(handoffSpec)
+      const { hard, soft } = handoffBlockers(handoffSpec)
       const locale = contentLocale()
+      // hard 가 비어야만 진행한다 — soft 가 있어도 차단하지 않는다(오너 확정 2026-08-28). soft 경고 문구는
+      //   아래 각 분기점에서 reply 뒤에 붙인다.
+      const softWarning = (base: string): string =>
+        soft.length > 0
+          ? base
+              + '\n\n'
+              + translate(locale, 'But quality may suffer because these are empty:')
+              + '\n'
+              + soft.map((s) => `· ${s}`).join('\n')
+          : base
       let reply: string
       let path: string | null = null
-      if (blockers.length > 0) {
+      if (hard.length > 0) {
         reply =
           translate(locale, "Can't move to {stage} yet. Please fill these in first:", {
             stage: STAGE_LABEL[handoffSpec.to],
           })
           + '\n'
-          + blockers.map((b) => `· ${b}`).join('\n')
+          + hard.map((b) => `· ${b}`).join('\n')
+      } else if (handoffSpec.from === 'producer' && handoffSpec.to === 'writer' && !opts?.consentedHandoff) {
+        const accepted = get().offerPendingProposal(
+          createPendingProposal({
+            stage: 'producer',
+            kind: 'producerWriterInitialHandoff',
+            target: STAGE_LABEL.writer,
+            action: translate(locale, 'Invite Writer'),
+            impact: [
+              translate(locale, 'Nothing runs until you approve.'),
+              ...(soft.length > 0
+                ? [
+                    translate(locale, 'Quality may suffer because these are empty: {items}', {
+                      items: soft.join(', '),
+                    }),
+                  ]
+                : []),
+            ],
+            payload: {},
+          }),
+        )
+        // D11: 제안 순간의 발화는 사람 말이어야 한다 — "승인 전에는 아무 실행도 시작하지
+        //   않습니다."만 덩그러니 남던 것(2026-08-31 오너 실측)을 교체. 실행 경계 고지는
+        //   카드 impact가 이미 말한다.
+        reply = accepted
+          ? softWarning(
+              translate(
+                locale,
+                "Everything's ready — approve the card below and I'll bring in the Writer right away.",
+              ),
+            )
+          : translate(
+              locale,
+              'A proposal is already pending, so the new Producer change proposal was held back.',
+            )
       } else {
+        // 명시 버튼(consentedHandoff)의 producer→writer 또는 비-producer 전이 — 카드 없이 직접 실행.
+        //   D12(2026-08-31 오너): "Writer 호출하기를 늈는데 승인 카드가 또 뜨는 게 이상함".
+        if (handoffSpec.from === 'producer') {
+          // 느린 saveAndHandoff(수 초) 동안 무반응 공백을 즉시 반응 발화로 메운다(D11).
+          const reaction = translate(
+            locale,
+            'On it — handing your materials to the Writer! Scene and shot design starts now.',
+          )
+          set((state) => ({
+            messages: [
+              ...state.messages,
+              { id: makeId(), stage, role: 'model' as const, content: reaction },
+            ],
+          }))
+          if (projectId) saveChatMessage(projectId, stage, 'model', reaction)
+        }
         const result = await runHandoff(handoffSpec)
         path = result.path
         if (result.ok) {
-          reply =
+          reply = softWarning(
             handoffSpec.from === 'producer'
               ? translate(
                   locale,
@@ -520,7 +669,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 )
               : translate(locale, 'Moving on to {stage}.', {
                   stage: STAGE_LABEL[handoffSpec.to],
-                })
+                }),
+          )
         } else {
           // 실패 사유 표면화 (#handoff-visibility 2026-08-06) — saveAndHandoff 는 사유를
           //   producer-store.error 에만 남긴다. 채팅으로 요청한 사용자는 채팅에서 이유를
@@ -785,6 +935,35 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             ? { lastTrace: { ...state.lastTrace, ...patch } }
             : state,
         )
+        if (projectId) saveChatTracePatch(projectId, trace.traceId, patch)
+      }
+      const observeGeneration: GenerationJobObserver = (receipt) => {
+        const generationJobs = get().lastTrace?.generationJobs ?? []
+        const nextJobs = receipt.jobId
+          ? (() => {
+              const existing = generationJobs.find((job) => job.jobId === receipt.jobId)
+              const next: ChatGenerationJobTrace = {
+                jobId: receipt.jobId,
+                kind: existing?.kind ?? 'generation',
+                status:
+                  receipt.status === 'completed' || receipt.status === 'failed'
+                    ? receipt.status
+                    : 'queued',
+                resultReady: receipt.status === 'completed' && !!receipt.resultUrl,
+                error: receipt.error ?? null,
+              }
+              return existing
+                ? generationJobs.map((job) => (job.jobId === receipt.jobId ? next : job))
+                : [...generationJobs, next]
+            })()
+          : generationJobs
+        patchTrace({
+          generationStatus: generationStatusOf(receipt.status),
+          generationJobs: nextJobs,
+          ...(receipt.jobId ? { jobId: receipt.jobId } : {}),
+          ...(receipt.httpStatus != null ? { generationHttpStatus: receipt.httpStatus } : {}),
+          ...(receipt.error ? { error: receipt.error } : { error: null }),
+        })
       }
 
       set((state) => ({
@@ -804,17 +983,18 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (projectId) saveChatMessage(projectId, stage, 'model', reply)
 
       if (stage === 'producer' && data.extractedSettings) {
-        useProducerStore
+        // 영수증은 실제 결과를 기록한다 — 승인 카드로 간 것을 applied로 적으면 거짓 영수증이 된다.
+        //   제안에 traceId를 실어 승인/거절이 같은 trace로 이어지게 한다.
+        const extractOutcome = useProducerStore
           .getState()
-          .applyExtractedSettings(data.extractedSettings)
-        patchTrace({
-          appliedCount:
-            data.extractedSettings &&
-            typeof data.extractedSettings === 'object' &&
-            Object.keys(data.extractedSettings).length > 0
-              ? 1
-              : 0,
-        })
+          .applyExtractedSettings(data.extractedSettings, trace?.traceId ?? null)
+        patchTrace(
+          extractOutcome === 'pending'
+            ? { pendingProposal: true }
+            : extractOutcome === 'rejected'
+              ? { skippedCount: 1 }
+              : { appliedCount: extractOutcome === 'applied' ? 1 : 0 },
+        )
 
         // #p1-attach: 채팅이 "이 그림체로" 의도를 읽었으면 앵커로 확정한다.
         //   모델은 인덱스만 주고 URL 은 우리가 이번 턴 첨부에서 꺼낸다 — 모델이 뱉은 URL 은
@@ -837,6 +1017,30 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           }))
           if (projectId) saveChatMessage(projectId, stage, 'model', failure)
         }
+
+        // D12(2026-08-31 오너): 이름/느낌("일본 애니 그림체")으로 고른 카탈로그 앵커 키 —
+        //   무과금 데이터 수정이라 즉시 반영하고, 피커의 선택 표시가 UI 확인을 겸한다.
+        //   "앱 화면에서 선택해 주세요"라고 떠넘기던 것을 없앤다.
+        const requestedAnchorKey = data.extractedSettings.styleAnchorKey
+        if (typeof requestedAnchorKey === 'string' && requestedAnchorKey) {
+          const anchorOutcome = await useProducerStore
+            .getState()
+            .applyStyleAnchorKeyFromChat(requestedAnchorKey)
+          if (anchorOutcome === 'applied') {
+            patchTrace({ appliedCount: 1 })
+          } else {
+            // 모델이 카탈로그에 없는 키를 발명 — 조용히 묵살하면 "반영했다"가 거짓말이 된다.
+            patchTrace({ skippedCount: 1 })
+            const failure = translate(
+              contentLocale(),
+              "Couldn't find that art style in the catalog — tell me the feel again or pick one in the style picker.",
+            )
+            set((state) => ({
+              messages: [...state.messages, { id: makeId(), stage, role: 'model', content: failure }],
+            }))
+            if (projectId) saveChatMessage(projectId, stage, 'model', failure)
+          }
+        }
       }
       // #p4-choices: 에이전트가 낸 선택지를 버튼 제안으로 — 클릭 = 채팅 입력.
       if (stage === 'producer' && Array.isArray(data.choices) && data.choices.length >= 2) {
@@ -858,7 +1062,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           u.type === 'regenerateCharacter' || u.type === 'regenerateWorldAsset'
         )
         const immediateUpdates = updates.filter((u) => u.type === 'createCharacter')
-        let proposalShown = false
 
         if (costUpdate) {
           // 승인 카드의 target 은 사람이 읽는 제목 — id(char_2 등)가 아니라 이름으로(#d2 2026-08-11).
@@ -880,6 +1083,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const locale = contentLocale()
           const proposal = costUpdate.type === 'regenerateCharacter'
             ? createPendingProposal({
+                traceId,
                 stage: 'artist',
                 kind: costUpdate.views?.length === 1
                   ? 'artistRegenerateCharacterView'
@@ -907,6 +1111,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 },
               })
             : createPendingProposal({
+                traceId,
                 stage: 'artist',
                 kind: 'artistRegenerateWorldAsset',
                 target: locationName ?? costUpdate.locationId,
@@ -923,7 +1128,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               })
 
           const accepted = get().offerPendingProposal(proposal)
-          proposalShown = accepted || !!get().pendingProposal
           if (!accepted)
             set({
               error: translate(
@@ -949,8 +1153,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             useArtistStore.getState().characterAssets.find((c) => c.characterId === ap.characterId)
               ?.name || ap.characterId
           const apLocale = contentLocale()
-          const accepted = get().offerPendingProposal(
+          get().offerPendingProposal(
             createPendingProposal({
+              traceId,
               stage: 'artist',
               kind: 'artistSourceAppearancePatch',
               target: apName,
@@ -968,24 +1173,65 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               payload: { characterId: ap.characterId, appearance: ap.appearance },
             }),
           )
-          proposalShown = accepted || !!get().pendingProposal
         }
         patchTrace({
           appliedCount: immediateUpdates.length,
           skippedCount: 0,
-          pendingProposal: proposalShown || !!get().pendingProposal,
+          pendingProposal: get().pendingProposal?.traceId === traceId,
+          generationStatus:
+            get().pendingProposal?.traceId === traceId ? 'awaiting_approval' : null,
         })
       }
       if (stage === 'director') {
         // Agentic 응답 — DirectorCanvasUpdate[]
         if (Array.isArray(data.updates)) {
+          const updates = data.updates as DirectorCanvasUpdate[]
+          // 이미지는 과금 생성이므로 채팅 응답에서 바로 실행하지 않는다. 같은 응답의 무과금
+          // 수정은 즉시 반영하되, 이미지 생성은 하나의 승인 카드로만 묶는다.
+          const imageUpdates = updates.filter((update) => update.type === 'generateImage')
+          const immediateUpdates = updates.filter((update) => update.type !== 'generateImage')
+          let imageProposalAccepted = false
+          if (imageUpdates.length > 0) {
+            const locale = contentLocale()
+            imageProposalAccepted = get().offerPendingProposal(
+              createPendingProposal({
+                traceId,
+                stage: 'director',
+                kind: 'directorGenerateStoryboardImage',
+                target: translate(locale, 'Storyboard image'),
+                action: translate(locale, 'Generate image'),
+                impact: [
+                  translate(locale, 'Costs money to generate the image.'),
+                  translate(locale, 'Nothing runs until you approve.'),
+                ],
+                payload: { updates: imageUpdates },
+              }),
+            )
+            if (!imageProposalAccepted) {
+              set({
+                error: translate(
+                  locale,
+                  'A proposal is already pending, so the new Director image generation proposal was held back.',
+                ),
+              })
+            }
+          }
           const result = useDirectorCanvasStore
             .getState()
-            .applyUpdates(data.updates as DirectorCanvasUpdate[])
+            .applyUpdates(immediateUpdates, {
+              traceId,
+              onJob: observeGeneration,
+            })
           patchTrace({
             appliedCount: result.applied,
             skippedCount: result.skipped.length,
-            pendingProposal: false,
+            pendingProposal: imageProposalAccepted,
+            ...(imageProposalAccepted
+              ? { generationStatus: 'awaiting_approval' }
+              : immediateUpdates.some((u) => u.type === 'generateVideo') &&
+                  result.skipped.length > 0
+              ? { generationStatus: 'skipped' }
+              : {}),
           })
           if (result.skipped.length > 0) {
             console.warn(
@@ -998,6 +1244,22 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 count: result.skipped.length,
               }),
             )
+          }
+          // 방어선(#영상거짓수락) — 프롬프트 규칙이 뚫려 모델이 그래도 generateVideo 를 냈을 때,
+          //   "생성할게요" 라고 이미 답한 채팅에 거절 흔적이 안 남는 사고를 막는다. skip 사유로
+          //   판별해 정직한 안내를 별도 모델 메시지로 영속화한다(원래 reply 는 건드리지 않는다).
+          if (result.skipped.some((s) => s.update.type === 'generateVideo')) {
+            const honestNotice = translate(
+              contentLocale(),
+              "Chat doesn't support video generation yet — please use the video generation button on the canvas.",
+            )
+            set((state) => ({
+              messages: [
+                ...state.messages,
+                { id: makeId(), stage, role: 'model' as const, content: honestNotice },
+              ],
+            }))
+            if (projectId) saveChatMessage(projectId, stage, 'model', honestNotice)
           }
         }
       }
@@ -1042,6 +1304,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         for (const shrink of result.pendingDialogueShrinks) {
           const proposal = createPendingProposal({
+            traceId,
             stage: 'writer',
             kind: 'writerShrinkDialogue',
             target: shrink.shotId,
@@ -1102,6 +1365,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           stopReason: null,
         },
       })
+      if (projectId) {
+        saveChatTrace(projectId, {
+          ...requestTrace,
+          requestStatus: responseStatus,
+          error,
+          stopReason: null,
+        })
+      }
     } finally {
       if (activeGeneration === controller) activeGeneration = null
     }
@@ -1181,32 +1452,150 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     return true
   },
 
-  dismissPendingProposal: (id) =>
-    set((state) => {
-      if (id && state.pendingProposal?.id !== id) return state
-      return { pendingProposal: null }
-    }),
+  dismissPendingProposal: (id) => {
+    const proposal = get().pendingProposal
+    if (!proposal || (id && proposal.id !== id)) return
+    set({ pendingProposal: null })
+    const projectId = useProjectStore.getState().projectId
+    if (proposal.traceId && projectId) {
+      saveChatTracePatch(projectId, proposal.traceId, {
+        pendingProposal: false,
+        generationStatus: 'skipped',
+      })
+      set((state) => {
+        const current = state.lastTrace
+        if (!current || current.traceId !== proposal.traceId) return state
+        return {
+          lastTrace: {
+            ...current,
+            pendingProposal: false,
+            generationStatus: 'skipped',
+          },
+        }
+      })
+    }
+  },
 
   approvePendingProposal: async (id) => {
     const proposal = get().pendingProposal
     if (!proposal) return false
     if (id && proposal.id !== id) return false
+    const projectId = useProjectStore.getState().projectId
+    const traceId = proposal.traceId ?? null
+    const patchTrace = (patch: Partial<ChatTrace>) => {
+      if (!traceId) return
+      set((state) =>
+        state.lastTrace?.traceId === traceId
+          ? { lastTrace: { ...state.lastTrace, ...patch } }
+          : state,
+      )
+      if (projectId) saveChatTracePatch(projectId, traceId, patch)
+    }
+    const observeGeneration: GenerationJobObserver = (receipt) => {
+      const generationJobs = get().lastTrace?.generationJobs ?? []
+      const nextJobs = receipt.jobId
+        ? (() => {
+            const existing = generationJobs.find((job) => job.jobId === receipt.jobId)
+            const next: ChatGenerationJobTrace = {
+              jobId: receipt.jobId,
+              kind: existing?.kind ?? proposal.kind,
+              status:
+                receipt.status === 'completed' || receipt.status === 'failed'
+                  ? receipt.status
+                  : 'queued',
+              resultReady: receipt.status === 'completed' && !!receipt.resultUrl,
+              error: receipt.error ?? null,
+            }
+            return existing
+              ? generationJobs.map((job) => (job.jobId === receipt.jobId ? next : job))
+              : [...generationJobs, next]
+          })()
+        : generationJobs
+      patchTrace({
+        pendingProposal: false,
+        generationStatus: generationStatusOf(receipt.status),
+        generationJobs: nextJobs,
+        ...(receipt.jobId ? { jobId: receipt.jobId } : {}),
+        ...(receipt.httpStatus != null ? { generationHttpStatus: receipt.httpStatus } : {}),
+        ...(receipt.error ? { error: receipt.error } : { error: null }),
+      })
+    }
 
     // 카드는 승인 즉시 내린다(#d2 2026-08-11) — 옛 코드는 실행이 다 끝나야 지웠는데, 뷰 3개
     //   재생성이면 그게 수 분이라 "승인을 눌렀는데 안 사라진다"로 읽혔다. 진행은 상단 알림바가,
     //   실패는 error 배너가 보고한다.
     set({ pendingProposal: null })
+    patchTrace({ pendingProposal: false })
+    // D11(2026-08-31 오너 실측): 승인 버튼을 눌러도 채팅이 조용하다가 수 초 뒤 화면만 넘어갔다.
+    //   승인 반응 발화를 즐시 스레드에 남기는 헬퍼 — 채팅 발화는 콘텐츠 언어(#i18n-content-voice).
+    const speak = (content: string) => {
+      set((state) => ({
+        messages: [
+          ...state.messages,
+          { id: makeId(), stage: proposal.stage, role: 'model' as const, content },
+        ],
+      }))
+      if (projectId) saveChatMessage(projectId, proposal.stage, 'model', content)
+    }
     try {
       if (proposal.kind === 'producerSourcePatch') {
         useProducerStore
           .getState()
           .applyProducerSourcePatch(proposal.payload.patch as ExtractedSettings)
+        // 승인 후에야 실제 적용 — 이 시점에 applied로 집계한다(생성 Job 없는 무과금 패치).
+        patchTrace({ appliedCount: 1 })
+      } else if (proposal.kind === 'producerWriterInitialHandoff') {
+        // 승인 즉시 반응 — saveAndHandoff(수 초)가 끝나기 전 무반응 공백을 없앨다.
+        const voice = contentLocale()
+        speak(
+          translate(
+            voice,
+            "On it — handing your materials to the Writer! Scene and shot design starts now.",
+          ),
+        )
+        const ok = await useProducerStore.getState().saveAndHandoff()
+        if (!ok) {
+          // "넘어갈게요" 해놓고 침묵하면 거짓말이 된다 — 실패도 스레드에 남긴다.
+          const detail = useProducerStore.getState().error
+          speak(
+            detail
+              ? translate(voice, 'Handoff failed — {detail}', { detail })
+              : translate(voice, 'Handoff failed. Please try again in a moment.'),
+          )
+          return false
+        }
+        const path = await handoffToStage('writer')
+        // ⇄ 초대 연출(#oiioii-handoff)을 승인 경로에도 — 멈칫 대신 전이 애니메이션이 보인다(D11).
+        speak(handoffMarker('producer', 'writer'))
+        if (path) {
+          const target = path
+          setTimeout(() => set({ pendingNavigatePath: target }), HANDOFF_INVITE_NAVIGATE_MS)
+        }
       } else if (proposal.kind === 'producerWriterRerunRequest') {
+        const voice = contentLocale()
+        speak(
+          translate(
+            voice,
+            'On it — re-running the Writer with your current source. This can take a while.',
+          ),
+        )
         const ok = await useProducerStore.getState().saveAndHandoff({ rerun: true })
-        if (!ok) return false
+        if (!ok) {
+          const detail = useProducerStore.getState().error
+          speak(
+            detail
+              ? translate(voice, 'Handoff failed — {detail}', { detail })
+              : translate(voice, 'Handoff failed. Please try again in a moment.'),
+          )
+          return false
+        }
         // 승인된 rerun도 최초 핸드오프와 같은 Writer 생성 화면으로 이동한다.
         const path = await handoffToStage('writer')
-        if (path) set({ pendingNavigatePath: path })
+        speak(handoffMarker('producer', 'writer'))
+        if (path) {
+          const target = path
+          setTimeout(() => set({ pendingNavigatePath: target }), HANDOFF_INVITE_NAVIGATE_MS)
+        }
       } else if (proposal.kind === 'artistRegenerateCharacterView') {
         const characterId = proposal.payload.characterId
         const view = proposal.payload.view
@@ -1218,14 +1607,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           .getState()
           .characterAssets.find((asset) => asset.characterId === characterId)
         if (!character) throw new Error(`Character ${characterId} was not found`)
-        await useArtistStore
+        const receipt = await useArtistStore
           .getState()
           .generateCharacterView(
             characterId,
             requireDefaultAppearanceKey(character),
             view as 'main' | 'back' | 'sideLeft' | 'sideRight',
             'chat',
+            undefined,
+            undefined,
+            undefined,
+            { traceId: traceId ?? undefined, onJob: observeGeneration },
           )
+        if (receipt?.status === 'failed' || receipt?.status === 'timed_out') return false
       } else if (proposal.kind === 'artistRegenerateCharacterViews') {
         const characterId = proposal.payload.characterId
         const views = proposal.payload.views
@@ -1242,14 +1636,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (!character) throw new Error(`Character ${characterId} was not found`)
         const appearanceKey = requireDefaultAppearanceKey(character)
         for (const view of views) {
-          await useArtistStore
+          const receipt = await useArtistStore
             .getState()
             .generateCharacterView(
               characterId,
               appearanceKey,
               view as 'main' | 'back' | 'sideLeft' | 'sideRight',
               'chat',
+              undefined,
+              undefined,
+              undefined,
+              { traceId: traceId ?? undefined, onJob: observeGeneration },
             )
+          if (receipt?.status === 'failed' || receipt?.status === 'timed_out') return false
         }
       } else if (proposal.kind === 'artistRegenerateCharacterAllViews') {
         const characterId = proposal.payload.characterId
@@ -1258,13 +1657,22 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           .getState()
           .characterAssets.find((asset) => asset.characterId === characterId)
         if (!character) throw new Error(`Character ${characterId} was not found`)
-        await useArtistStore
+        const receipt = await useArtistStore
           .getState()
-          .generateCharacterAllViews(characterId, requireDefaultAppearanceKey(character), 'chat')
+          .generateCharacterAllViews(characterId, requireDefaultAppearanceKey(character), 'chat', undefined, undefined, {
+            traceId: traceId ?? undefined,
+            onJob: observeGeneration,
+          })
+        if (receipt?.status === 'failed' || receipt?.status === 'timed_out') return false
       } else if (proposal.kind === 'artistRegenerateWorldAsset') {
         const locationId = proposal.payload.locationId
         if (typeof locationId !== 'string') throw new Error('locationId missing')
-        await useArtistStore.getState().generateWorldAsset(locationId, 'chat')
+        await useArtistStore
+          .getState()
+          .generateWorldAsset(locationId, 'chat', {
+            traceId: traceId ?? undefined,
+            onJob: observeGeneration,
+          })
       } else if (proposal.kind === 'artistSourceAppearancePatch') {
         const characterId = proposal.payload.characterId
         const appearance = proposal.payload.appearance
@@ -1283,6 +1691,34 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         // 로컬 외형 갱신 → 기존 파생 이미지가 즉시 stale 로 표시(자동 재생성 없음, #57). 이후 cc 가 재생성 제안.
         useArtistStore.getState().applyAppearancePatch(characterId, appearance)
+      } else if (proposal.kind === 'directorGenerateStoryboardImage') {
+        const payloadUpdates = proposal.payload.updates
+        if (!Array.isArray(payloadUpdates) || payloadUpdates.length === 0) {
+          throw new Error('storyboard image updates missing')
+        }
+        const updates: DirectorCanvasUpdate[] = payloadUpdates.map((update) => {
+          if (
+            !update ||
+            typeof update !== 'object' ||
+            Array.isArray(update) ||
+            (update as Record<string, unknown>).type !== 'generateImage' ||
+            !Object.keys(update).every((key) => key === 'type' || key === 'id') ||
+            ('id' in update &&
+              (typeof (update as Record<string, unknown>).id !== 'string' ||
+                !(update as Record<string, string>).id.trim()))
+          ) {
+            throw new Error('invalid storyboard image update')
+          }
+          const id = (update as Record<string, unknown>).id
+          return typeof id === 'string' ? { type: 'generateImage', id } : { type: 'generateImage' }
+        })
+        const result = useDirectorCanvasStore.getState().applyUpdates(updates, {
+          traceId: traceId ?? undefined,
+          onJob: observeGeneration,
+        })
+        if (result.applied === 0) {
+          throw new Error('no storyboard image updates could run')
+        }
       } else if (proposal.kind === 'writerShrinkDialogue') {
         const shotId = proposal.payload.shotId
         const dialogueLines = proposal.payload.dialogueLines
@@ -1295,6 +1731,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       }
       return true
     } catch (err) {
+      patchTrace({
+        pendingProposal: false,
+        generationStatus: 'failed',
+        error: err instanceof Error ? err.message : 'Failed to run the proposal',
+      })
       set({
         error:
           err instanceof Error

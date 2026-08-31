@@ -15,6 +15,7 @@ import {
   createChatTraceId,
   type ChatLlmUsage,
 } from '@/lib/chat-trace'
+import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 
 // ──────────────────────────────────────────────────────────────────────
 // Legacy system prompt — `director-store.ts` (구 P4) 사용 시
@@ -81,12 +82,25 @@ Non-destructive (direct execution):
 8. {"type":"setCameraPreset","id":"<shotOrVideoId>","preset":{"brand":"arri","focalLength":35,"aperture":2.8,"whiteBalance":5600}}
 9. {"type":"generateVideo","id":"<videoId>"}
 9b. {"type":"generateImage","id":"<shotId>"}  — 그 샷의 실사 이미지 생성. id 를 빼면 미생성 샷 전체 일괄.
-    (실사는 자동 생성되지 않는다 — 사용자가 버튼을 누르거나 이 액션으로만 시작한다)
+    (실사는 클라이언트 승인 카드를 거친 뒤에만 생성된다)
 10. {"type":"connect","sourceId":"<id>","targetId":"<id>","category":"relates-to","relationText":"..."}
 11. {"type":"selectNode","id":"<id>"}
 
 Destructive — opens confirmation modal (NOT immediate):
 12. {"type":"requestDelete","id":"<id>","reason":"..."}
+
+<hybrid_intent_rule>
+- For free canvas edits, emit only the requested edit actions. Never infer or append generateImage.
+- Emit generateImage only when the user explicitly asks to generate or regenerate an image.
+- generateImage is a paid action and the client presents an approval card before it runs.
+</hybrid_intent_rule>
+
+<video_request_rule>
+- Chat cannot start video generation yet — there is no approval-card contract for it (unlike generateImage).
+- When the user asks to generate/create/render a video (or a video take), do NOT emit generateVideo and do NOT emit addVideoTake for that request. Emitting addVideoTake alone creates an empty take placeholder while implying a video was queued — that is misleading, so skip both actions entirely.
+- Reply honestly that chat doesn't support video generation yet and point them to the canvas video-generation button (per-shot or the Video take button on the Shot node) instead of saying you will generate it.
+- Never reply as if a video generation started, is queued, or will be ready soon.
+</video_request_rule>
 </actions>
 
 <format>
@@ -488,21 +502,24 @@ export async function POST(req: Request) {
         rawUpdateCount,
         validUpdateCount,
       } = parseAgenticResponse(text)
+      const trace = buildChatTrace({
+        traceId,
+        stage: 'director',
+        route: 'director/chat',
+        system: systemPrompt,
+        history: normalizedHistory,
+        contextMessage: userPrompt,
+        usage: llmUsage,
+        parseStatus,
+        rawUpdateCount,
+        validUpdateCount,
+      })
+      await persistChatTraceBestEffort(projectId, trace)
+
       return NextResponse.json({
         reply,
         updates,
-        trace: buildChatTrace({
-          traceId,
-          stage: 'director',
-          route: 'director/chat',
-          system: systemPrompt,
-          history: normalizedHistory,
-          contextMessage: userPrompt,
-          usage: llmUsage,
-          parseStatus,
-          rawUpdateCount,
-          validUpdateCount,
-        }),
+        trace,
       })
     }
 
@@ -530,18 +547,21 @@ export async function POST(req: Request) {
     )
     const result = parseLegacyResponse(text)
     const { parseStatus, ...legacyResult } = result
+    const trace = buildChatTrace({
+      traceId,
+      stage: 'director',
+      route: 'director/chat',
+      system: systemPrompt,
+      history: normalizedHistory,
+      contextMessage: userPrompt,
+      usage: llmUsage,
+      parseStatus,
+    })
+    await persistChatTraceBestEffort(projectId, trace)
+
     return NextResponse.json({
       ...legacyResult,
-      trace: buildChatTrace({
-        traceId,
-        stage: 'director',
-        route: 'director/chat',
-        system: systemPrompt,
-        history: normalizedHistory,
-        contextMessage: userPrompt,
-        usage: llmUsage,
-        parseStatus,
-      }),
+      trace,
     })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'
