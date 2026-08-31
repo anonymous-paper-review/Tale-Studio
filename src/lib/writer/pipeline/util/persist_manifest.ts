@@ -294,6 +294,10 @@ export async function persistAssetsToDb(
           characters_present: r.chars,
           estimated_duration_seconds: r.seconds,
           sort_order: r.i,
+          // G4 스키마 계약(20260827200400): scenes.narrative_time 은 NOT NULL — 서사 시점 미분류
+          //   파이프라인은 g4 백필과 같은 'present' 로 기록한다. 이 값이 빠지면 insert 가
+          //   통째로 죽어 "완료띄웠는데 씌·샷 0개"가 된다(2026-08-31 실측 fc7ec6d4).
+          narrative_time: 'present',
         }
       }),
     )
@@ -708,6 +712,9 @@ export async function persistShotsToDb(
           scene_id: r.sceneMainId,
           shot_id: r.shotMainId,
           source: 'pipeline', // #F-003 R3 — 이 행은 재런 시 파이프라인이 갈아엎는다
+          // G4 스키마 계약(20260827200400): shots.character_appearance_keys 는 NOT NULL —
+          //   모습 미분화 파이프라인은 g4 백필과 같이 전 등장인물→'current' 스냅샷을 기록한다.
+          character_appearance_keys: Object.fromEntries(r.chars.map((c) => [c, 'current'])),
           shot_type: r.shotType,
           action_description: actionEn.get(r.shotMainId) ?? r.actionNative,
           action_description_native: actionKo.get(r.shotMainId) ?? r.actionNative,

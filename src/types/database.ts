@@ -1101,6 +1101,7 @@ export type Database = {
           mood_native: string | null
           i18n_provenance: Json
           source: string
+          narrative_time: string
         }
         Insert: {
           id?: string
@@ -1121,6 +1122,7 @@ export type Database = {
           mood_native?: string | null
           i18n_provenance?: Json
           source?: string
+          narrative_time: string
         }
         Update: {
           id?: string
@@ -1141,6 +1143,7 @@ export type Database = {
           mood_native?: string | null
           i18n_provenance?: Json
           source?: string
+          narrative_time?: string
         }
         Relationships: [
           {
@@ -1194,6 +1197,7 @@ export type Database = {
           check_notes: Json | null
           dynamic_spec: Json | null
           source: string
+          character_appearance_keys: Json
         }
         Insert: {
           id?: string
@@ -1236,6 +1240,7 @@ export type Database = {
           check_notes?: Json | null
           dynamic_spec?: Json | null
           source?: string
+          character_appearance_keys: Json
         }
         Update: {
           id?: string
@@ -1278,6 +1283,7 @@ export type Database = {
           check_notes?: Json | null
           dynamic_spec?: Json | null
           source?: string
+          character_appearance_keys?: Json
         }
         Relationships: [
           {
