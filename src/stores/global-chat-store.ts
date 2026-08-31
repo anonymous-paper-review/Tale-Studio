@@ -952,17 +952,18 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (projectId) saveChatMessage(projectId, stage, 'model', reply)
 
       if (stage === 'producer' && data.extractedSettings) {
-        useProducerStore
+        // 영수증은 실제 결과를 기록한다 — 승인 카드로 간 것을 applied로 적으면 거짓 영수증이 된다.
+        //   제안에 traceId를 실어 승인/거절이 같은 trace로 이어지게 한다.
+        const extractOutcome = useProducerStore
           .getState()
-          .applyExtractedSettings(data.extractedSettings)
-        patchTrace({
-          appliedCount:
-            data.extractedSettings &&
-            typeof data.extractedSettings === 'object' &&
-            Object.keys(data.extractedSettings).length > 0
-              ? 1
-              : 0,
-        })
+          .applyExtractedSettings(data.extractedSettings, trace?.traceId ?? null)
+        patchTrace(
+          extractOutcome === 'pending'
+            ? { pendingProposal: true }
+            : extractOutcome === 'rejected'
+              ? { skippedCount: 1 }
+              : { appliedCount: extractOutcome === 'applied' ? 1 : 0 },
+        )
 
         // #p1-attach: 채팅이 "이 그림체로" 의도를 읽었으면 앵커로 확정한다.
         //   모델은 인덱스만 주고 URL 은 우리가 이번 턴 첨부에서 꺼낸다 — 모델이 뱉은 URL 은
@@ -1475,6 +1476,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         useProducerStore
           .getState()
           .applyProducerSourcePatch(proposal.payload.patch as ExtractedSettings)
+        // 승인 후에야 실제 적용 — 이 시점에 applied로 집계한다(생성 Job 없는 무과금 패치).
+        patchTrace({ appliedCount: 1 })
       } else if (proposal.kind === 'producerWriterInitialHandoff') {
         const ok = await useProducerStore.getState().saveAndHandoff()
         if (!ok) return false

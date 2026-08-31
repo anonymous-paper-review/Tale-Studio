@@ -218,7 +218,11 @@ interface ProducerState {
     medium: string | null
   }) => void
   updateSettings: (partial: Partial<ProjectSettings>) => void
-  applyExtractedSettings: (extracted: ExtractedSettings) => void
+  /** 반환값은 trace 영수증용 실제 결과 — applied·pending(승인 카드)·rejected(카드 자리 점유됨)·noop. */
+  applyExtractedSettings: (
+    extracted: ExtractedSettings,
+    traceId?: string | null,
+  ) => 'applied' | 'pending' | 'rejected' | 'noop'
   applyProducerSourcePatch: (patch: ExtractedSettings) => void
   addCastMember: (entityType: EntityType) => string
   updateCastMember: (localId: string, patch: Partial<CastMember>) => void
@@ -641,8 +645,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     scheduleDraftSave(() => boardOf(get()))
   },
 
-  applyExtractedSettings: (extracted) => {
-    if (!extracted) return
+  applyExtractedSettings: (extracted, traceId) => {
+    if (!extracted) return 'noop'
     const project = useProjectStore.getState()
     const current = get()
     const afterHandoff = project.reachedStage !== 'producer'
@@ -662,6 +666,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       const impactFields = Array.from(new Set([...affected, ...protectedConflicts]))
       const accepted = useGlobalChatStore.getState().offerPendingProposal(
         createPendingProposal({
+          traceId: traceId ?? undefined,
           stage: 'producer',
           kind: 'producerSourcePatch',
           target: 'Producer source',
@@ -676,17 +681,20 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           payload: { patch: extracted },
         }),
       )
-      if (!accepted)
+      if (!accepted) {
         set({
           error: translate(
             useLocaleStore.getState().locale,
             'A proposal is already pending, so the new Producer change proposal was held back.',
           ),
         })
-      return
+        return 'rejected'
+      }
+      return 'pending'
     }
 
     get().applyProducerSourcePatch(extracted)
+    return 'applied'
   },
 
   applyProducerSourcePatch: (patch) => {
