@@ -133,7 +133,7 @@ export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
  */
 export function buildCharacterTurnaroundPrompt(
   input: CharacterPromptInput,
-  opts?: { hasBaseFace?: boolean },
+  opts?: { hasBaseFace?: boolean; hasPriorRender?: boolean },
 ): string {
   return [
     `Fill in this character reference-sheet template with ${input.name}`,
@@ -144,6 +144,14 @@ export function buildCharacterTurnaroundPrompt(
       ? [
           'the SECOND reference image is the same person at a different point in their life — carry over the identity markers (face structure, eye shape, nose bridge, distinguishing marks) so viewers recognise them as one person',
           'do NOT copy that face verbatim: this sheet shows them at the age and condition described above, so skin, hairline, weight and bearing must match THIS description, not the reference',
+        ]
+      : []),
+    // #reref(2026-08-31): 재생성 — 직전 시트를 정체성 참조로 넣어 얼굴이 매번 바뀌지 않게 한다.
+    //   위치 무관 표현 — 앵커/기준얼굴로 순서가 밀려도 안전. 델타(위 설명)가 우선이라
+    //   요청한 변경은 반영되고 얼굴만 유지된다.
+    ...(opts?.hasPriorRender
+      ? [
+          'one of the reference images is the PREVIOUS render of this exact character — keep the same face, identity, design and proportions so it stays recognisably the same person; apply ONLY the adjustments described above and never drift into a different face',
         ]
       : []),
     ...describe(input),

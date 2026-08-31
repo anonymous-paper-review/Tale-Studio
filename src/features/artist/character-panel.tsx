@@ -1,9 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Tooltip,
@@ -60,7 +58,6 @@ export function CharacterPanel({
     generatingViews,
     viewFailures,
     selectCharacter,
-    generateCharacterAllViews,
   } = useArtistStore()
 
   const requiredCharacterIds = useProjectStore((s) => s.lifecycleStatus.artist?.requiredCharacterIds ?? EMPTY_REQUIRED_IDS)
@@ -117,9 +114,6 @@ export function CharacterPanel({
           const appearance = selectedAppearance(char)
           const role = getRole(char.characterId)
           const isSelected = selectedCharacterId === char.characterId
-          const isGenerating = appearance
-            ? generatingViews.some((slot) => sameCharacterAppearanceSlot(slot, char.characterId, appearance.appearanceKey, 'main'))
-            : false
           const isViewGenerating = (v: CharacterViewKey) =>
             appearance
               ? generatingViews.some((slot) => sameCharacterAppearanceSlot(slot, char.characterId, appearance.appearanceKey, v))
@@ -337,33 +331,9 @@ export function CharacterPanel({
               </Tooltip>
 
               {/* 카드 인라인 설정/외형 편집 제거(#d4 2026-08-03) — World 탭과 같은 이미지 중심
-                  카드로. 텍스트 수정은 상세 팝업(사진/더블 클릭)과 채팅 경로가 담당한다. */}
-              {/* Actions(#d3 2026-07-15) — Register(에셋은 진입 시 DB 하이드레이트로 자동 공급)·
-                  인벤토리 저장 버튼 제거, 생성 버튼 문구는 '이미지 생성'으로 통일. */}
-              <div className="mt-3 flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 hover-red-beam"
-                  disabled={isGenerating}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (appearance) generateCharacterAllViews(char.characterId, appearance.appearanceKey)
-                  }}
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="size-3.5 animate-spin" />
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="size-3.5" />
-                      {t('Generate image')}
-                    </>
-                  )}
-                </Button>
-              </div>
+                  카드로. 텍스트 수정·이미지 재생성은 상세 팝업(사진/더블 클릭)과 채팅 경로가 담당한다. */}
+              {/* 카드 생성 버튼 제거(2026-08-31 오너) — 생성/재생성은 상세 팝업과 채팅으로만.
+                  카드에서 실수로 과금 생성이 눌리는 것을 막고, 이미지 모델 선택도 팝업/채팅에 둔다. */}
             </div>
           )
         })}

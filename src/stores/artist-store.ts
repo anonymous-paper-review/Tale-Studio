@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { displayNameOf } from '@/lib/display-name'
 import type { SceneManifest, CharacterAppearance, CharacterAsset, WorldAsset } from '@/types'
 import { type CharacterViewKey, type NarrativeTime } from '@/types/asset'
+import type { ImageModelKey } from '@/lib/image-models'
 import { candidateViewToViewKey, classifyImageStale, computeLookFingerprint, computeWorldImageSourceHash, type CandidateImage, type LookTokens } from '@/lib/image-provenance'
 import {
   buildWorldShotPromptForLocation,
@@ -87,6 +88,8 @@ export type ArtistUpdate =
       views?: CharacterViewKey[]
       /** 재생성 시 유저 요청 델타(merge, AC13) — generate-sheet instruction 으로 전달. */
       instruction?: string
+      /** 이미지 생성 모델 선택(image-models 키). 미지정 = 기본 모델. */
+      model?: ImageModelKey
     }
   | { type: 'regenerateWorldAsset'; locationId: string }
   | ({ type: 'createCharacter' } & NewCharacterInput)
@@ -360,9 +363,10 @@ interface ArtistState {
     actor?: GenerationActor,
     instruction?: string,
     safeMode?: boolean,
+    model?: ImageModelKey,
   ) => Promise<void>
   /** 모더레이션 우회(safe-mode) 재시도 — 유저 클릭 전용(#A). 서버가 자격/캡 판정, 일반 실패는 원본. */
-  retryCharacterViewSafe: (characterId: string, appearanceKey: string, view: CharacterViewKey) => Promise<void>
+  retryCharacterViewSafe: (characterId: string, appearanceKey: string, view: CharacterViewKey, model?: ImageModelKey) => Promise<void>
   /** generation-status 엔드포인트로 viewFailures 재조회(배지/우회버튼 reload 없이 최신화). */
   refreshViewFailures: () => Promise<void>
   /** main → 4방향(i2i)을 순서대로 생성. 카드 "Generate All Views"용. */
@@ -371,6 +375,7 @@ interface ArtistState {
     appearanceKey: string,
     actor?: GenerationActor,
     instruction?: string,
+    model?: ImageModelKey,
   ) => Promise<void>
   generateWorldAsset: (
     locationId: string,
@@ -837,7 +842,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectLocation: (id) => set({ selectedLocationId: id }),
 
   // 단일 뷰 생성 (crop 폐기, 2026-06-05). main=T2I, 방향=main 기반 i2i. 서버가 해당 뷰 컬럼만 갱신.
-  generateCharacterView: async (characterId, appearanceKey, view, actor = 'ui', instruction, safeMode) => {
+  generateCharacterView: async (characterId, appearanceKey, view, actor = 'ui', instruction, safeMode, model) => {
     if (isDemoSession()) return
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
@@ -877,7 +882,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const res = await fetch('/api/artist/generate-sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, characterId, appearanceKey, view, actor, instruction, safeMode }),
+        body: JSON.stringify({ projectId, characterId, appearanceKey, view, actor, instruction, safeMode, model }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -953,8 +958,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
   },
 
-  retryCharacterViewSafe: async (characterId, appearanceKey, view) => {
-    await get().generateCharacterView(characterId, appearanceKey, view, 'ui', undefined, true)
+  retryCharacterViewSafe: async (characterId, appearanceKey, view, model) => {
+    await get().generateCharacterView(characterId, appearanceKey, view, 'ui', undefined, true, model)
   },
 
   refreshViewFailures: async () => {
@@ -995,10 +1000,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   // main → 4방향 순서 생성. 방향 i2i 는 main 이 DB 에 있어야 하므로 main 을 먼저 await 한 뒤
   // 4방향을 제한된 풀로 병렬 생성. 카드 "Generate All Views" / 시트 재생성용.
   // object 캐릭터는 main 만 생성 — 방향뷰 불필요.
-  generateCharacterAllViews: async (characterId, appearanceKey, actor = 'ui', instruction) => {
+  generateCharacterAllViews: async (characterId, appearanceKey, actor = 'ui', instruction, model) => {
     // 캐릭터 = 턴어라운드 시트 1장(모든 뷰 포함), 사물 = 단일 이미지 — 둘 다 main 하나만 생성(#7·#9 2026-07-11).
     //   방향뷰(개별 i2i) 생성 폐기: 라우트가 사람 main 을 와이드 턴어라운드로 그린다.
-    await get().generateCharacterView(characterId, appearanceKey, 'main', actor, instruction)
+    await get().generateCharacterView(characterId, appearanceKey, 'main', actor, instruction, undefined, model)
   },
 
   generateWorldAsset: async (locationId, actor = 'ui') => {
@@ -1280,11 +1285,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         // 채팅발 재생성 — generation_jobs.actor='chat' 귀속 (chat-aware-regeneration).
         if (u.views?.length) {
           await runPool(
-            u.views.map((v) => () => get().generateCharacterView(u.characterId, appearanceKey, v, 'chat', u.instruction)),
+            u.views.map((v) => () => get().generateCharacterView(u.characterId, appearanceKey, v, 'chat', u.instruction, undefined, u.model)),
             ARTIST_GENERATION_CONCURRENCY,
           )
         } else {
-          await get().generateCharacterAllViews(u.characterId, appearanceKey, 'chat', u.instruction)
+          await get().generateCharacterAllViews(u.characterId, appearanceKey, 'chat', u.instruction, u.model)
         }
       } else if (u.type === 'regenerateWorldAsset') {
         await get().generateWorldAsset(u.locationId, 'chat')

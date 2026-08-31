@@ -8,6 +8,8 @@
 //
 // route 와 분리해 순수 단위 테스트가 가능하게 한다(F6 회귀 가드).
 
+import { isImageModelKey } from '@/lib/image-models'
+
 const VALID_ROLES = new Set(['protagonist', 'antagonist', 'supporting'])
 const VALID_VIEWS = new Set(['main', 'back', 'sideLeft', 'sideRight'])
 
@@ -61,6 +63,8 @@ export function validateUpdates(raw: unknown[]): unknown[] {
             characterId: rec.characterId,
             ...(views.length ? { views } : {}),
             ...(asString(rec.instruction) ? { instruction: rec.instruction } : {}),
+            // 이미지 모델 지정(선택) — 유효한 image-models 키만 통과, 미지정은 라우트 기본 모델.
+            ...(isImageModelKey(rec.model) ? { model: rec.model } : {}),
           })
         }
         break

@@ -186,7 +186,18 @@ export function buildFalImageInput(opts: FalImageOptions, model: string): Record
   if (opts.negative_prompt) input.negative_prompt = opts.negative_prompt;
   if (typeof opts.seed === 'number') input.seed = opts.seed;
 
-  if (isImageEditModel(model)) {
+  if (model.includes('nano-banana')) {
+    // nano-banana(t2i·edit, Google Gemini): aspect_ratio 사용. 'auto'(edit 기본)는 생략해
+    //   입력 reference 비율을 따르게 둔다. reference 는 image_urls 로 싣는다.
+    if (opts.aspect_ratio && opts.aspect_ratio !== 'auto') input.aspect_ratio = opts.aspect_ratio;
+    if (opts.reference_image_urls?.length) input.image_urls = opts.reference_image_urls;
+  } else if (model.includes('seedream')) {
+    // seedream v4(t2i·edit, ByteDance): image_size 사용(aspect_ratio 스키마에 없음). preset 으로 유도하되
+    //   'auto'는 미지원이라 생략(기본 2048²). reference 는 image_urls 로 싣는다.
+    const size = normalizeImageSize(opts.image_size) ?? arToImageSize(opts.aspect_ratio);
+    if (size && size !== 'auto') input.image_size = size;
+    if (opts.reference_image_urls?.length) input.image_urls = opts.reference_image_urls;
+  } else if (isImageEditModel(model)) {
     // edit 모델: image_urls 필수 + image_size(호출자 명시 우선, 없으면 aspect_ratio 유도 preset)
     input.image_urls = opts.reference_image_urls ?? [];
     input.image_size = normalizeImageSize(opts.image_size) ?? arToImageSize(opts.aspect_ratio);

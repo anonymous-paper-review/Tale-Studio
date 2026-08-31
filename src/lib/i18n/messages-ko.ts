@@ -705,6 +705,13 @@ export const KO: Record<string, string> = {
   'Generate {label}': '{label} 생성',
   'Bypass retry limit reached': '우회 재시도 한도 도달',
   'Redo with bypass (safe)': '우회(safe)로 다시 만들기',
+  // 이미지 생성 모델 선택(image-models 레지스트리) — 'Image generation model' 키는 위에 이미 있어 재사용.
+  'This model has no reference support — character identity may drift.':
+    '이 모델은 참조 이미지를 지원하지 않아 캐릭터 얼굴이 흔들릴 수 있어요.',
+  'OpenAI · crisp typography, reliable identity': 'OpenAI · 또렷한 글자, 안정적인 얼굴',
+  'Google Gemini · strong character consistency': 'Google Gemini · 캐릭터 일관성이 강함',
+  'ByteDance · high-res, rich editing': 'ByteDance · 고해상, 편집에 강함',
+  'Black Forest Labs · fast & cheap, no reference': 'Black Forest Labs · 빠르고 저렴, 참조 미지원',
   Assets: '에셋',
   People: '인물',
   'Hover to expand · drag to link to a shot, click a card chip to unlink':

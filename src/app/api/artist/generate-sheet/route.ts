@@ -37,6 +37,7 @@ import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-prov
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { applyStyleAnchor, resolveStyleAnchor, tokenUnlessMediaWord } from '@/lib/style-anchor'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
+import { normalizeImageModelKey, resolveImageEndpoint } from '@/lib/image-models'
 
 export const runtime = 'nodejs'
 // submit만 하고 끝 — 실제 생성은 fal 큐에서 진행, 완료는 webhook(/poll reconcile)이 처리.
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, characterId, appearanceKey, view, actor, instruction, safeMode } =
+    const { projectId, characterId, appearanceKey, view, actor, instruction, safeMode, model: modelInput } =
       (await req.json()) as {
         projectId?: string
         characterId?: string
@@ -67,7 +68,10 @@ export async function POST(req: Request) {
         actor?: string
         instruction?: string // 재생성 시 유저 델타(merge) — 룩 토대 위에 덮음(AC13).
         safeMode?: boolean // 모더레이션 우회 재시도(#A) — 직전 실패가 moderation-class 인 슬롯에만 적용.
+        model?: string // 이미지 생성 모델 선택(image-models 레지스트리 키). 미지정/미상은 기본 모델.
       }
+    // 선택 모델 정규화 — 유효하지 않으면 기본(gpt-image-2). reference 유무에 따라 아래에서 t2i/edit 갈래를 고른다.
+    const modelKey = normalizeImageModelKey(modelInput)
     if (!projectId) {
       return NextResponse.json({ error: 'projectId required' }, { status: 400 })
     }
@@ -228,24 +232,44 @@ export async function POST(req: Request) {
         //   캐릭터를 채우는 I2I(edit). 템플릿은 스토리지에서 온다 — 앱 public URL(터널)에 걸면
         //   터널이 죽을 때 fal 이 못 받아 전량 실패한다(template-asset.ts). 업로드 실패 시만 T2I 폴백.
         const templateUrl = await templateAssetUrl('character-template.png')
-        if (templateUrl) {
+        // 선택 모델의 edit 갈래 — reference(템플릿·기준얼굴)를 실을 수 있는가. 미지원 모델은 isEdit=false.
+        const { endpoint, isEdit } = resolveImageEndpoint(modelKey, !!templateUrl)
+        if (templateUrl && isEdit) {
           styleAnchorMode = 'turnaround'
+          // 정체성 참조: 템플릿(레이아웃) 다음으로 얼굴을 빌려주는 이미지들을 붙인다.
+          //   - baseFaceUrl: 비기본 모습(젊은 시절 등)이 기본 모습 얼굴을 계승(#g4 연속성).
+          //   - refMain(#reref 2026-08-31): 재생성 시 이 모습의 직전 시트 — 얼굴이 매번 바뀌는 것을 막는다.
+          //     첫 생성(refMain 없음)은 템플릿만 — 기존 동작 그대로. 델타(instruction)가 우선이라 요청 변경은 반영된다.
+          const identityRefs = [
+            ...(baseFaceUrl ? [baseFaceUrl] : []),
+            ...(refMain ? [refMain] : []),
+          ]
           submitOpts = {
-            model: 'openai/gpt-image-2/edit',
-            prompt: buildCharacterTurnaroundPrompt(input, { hasBaseFace: !!baseFaceUrl }),
-            // 템플릿이 첫 장(레이아웃 기준), 기준 얼굴이 둘째 장(정체성).
+            model: endpoint,
+            prompt: buildCharacterTurnaroundPrompt(input, {
+              hasBaseFace: !!baseFaceUrl,
+              hasPriorRender: !!refMain,
+            }),
+            // 템플릿이 첫 장(레이아웃 기준), 그 뒤가 정체성 이미지(기준얼굴·직전 시트).
             //   순서가 뒤바뀌면 모델이 얼굴 이미지를 레이아웃으로 오인한다.
-            reference_image_urls: baseFaceUrl ? [templateUrl, baseFaceUrl] : [templateUrl],
+            reference_image_urls: [templateUrl, ...identityRefs],
             webhookUrl,
             // aspect_ratio 생략 → edit 모델이 템플릿 비율(≈16:9)을 따름
           }
         } else {
+          // 비기본 모습은 기준 얼굴 참조가 필수 — reference 미지원 모델을 골랐거나 템플릿이 없으면 막는다.
+          if (baseFaceUrl && !isEdit) {
+            return NextResponse.json(
+              { error: 'selected image model does not support the identity reference required for a non-default appearance' },
+              { status: 409 },
+            )
+          }
           if (baseFaceUrl) {
             throw new Error('character template is required for non-default appearance identity reference')
           }
           styleAnchorMode = 'single'
           submitOpts = {
-            model: 'openai/gpt-image-2',
+            model: endpoint,
             prompt: buildCharacterTurnaroundPrompt(input),
             aspect_ratio: '3:2',
             webhookUrl,
@@ -253,9 +277,10 @@ export async function POST(req: Request) {
         }
       } else {
         styleAnchorMode = 'single'
-        // 사물 = 단일 대표 포트레이트(1:1).
+        // 사물 = 단일 대표 포트레이트(1:1). reference 없음 → 선택 모델의 T2I 갈래.
+        const { endpoint } = resolveImageEndpoint(modelKey, false)
         submitOpts = {
-          model: 'openai/gpt-image-2',
+          model: endpoint,
           prompt: buildCharacterMainPrompt(input),
           aspect_ratio: '1:1',
           webhookUrl,
@@ -264,14 +289,15 @@ export async function POST(req: Request) {
     } else {
       const prompt = buildCharacterViewPrompt(input, view as DirectionalView)
       const references = [refMain, baseFaceUrl].filter((url): url is string => !!url)
-      submitOpts = references.length
+      const { endpoint, isEdit } = resolveImageEndpoint(modelKey, references.length > 0)
+      submitOpts = isEdit
         ? {
-            model: 'openai/gpt-image-2/edit',
+            model: endpoint,
             prompt,
             reference_image_urls: references,
             webhookUrl,
           } // aspect_ratio 생략 → edit 모델이 reference 비율을 따른다.
-        : { model: 'openai/gpt-image-2', prompt, aspect_ratio: '1:1', webhookUrl }
+        : { model: endpoint, prompt, aspect_ratio: '1:1', webhookUrl }
     }
     if (anchor && styleAnchorMode) {
       const { webhookUrl: wh, ...anchorable } = submitOpts

@@ -14,6 +14,13 @@ import { HoverBeam } from '@/components/hover-beam'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { CHARACTER_VIEW_LABELS, type CharacterViewKey } from '@/types/asset'
+import {
+  DEFAULT_IMAGE_MODEL,
+  IMAGE_MODELS,
+  IMAGE_MODEL_ORDER,
+  imageModelSupportsReference,
+  type ImageModelKey,
+} from '@/lib/image-models'
 import { classifyImageStale } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { useGuardedAction } from '@/hooks/use-guarded-action'
@@ -49,6 +56,8 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
   // 외형 프롬프트(수정 후 재생성, 월드 다이얼로그와 대칭) — 대상(캐릭터×뷰) 전환 시 초기화.
   const [prompt, setPrompt] = useState('')
   const [promptKey, setPromptKey] = useState<string | null>(null)
+  // 이미지 생성 모델 선택 — 다이얼로그가 열려 있는 동안 유지(마지막 선택 기억). 기본은 gpt-image-2.
+  const [imageModel, setImageModel] = useState<ImageModelKey>(DEFAULT_IMAGE_MODEL)
 
   // 클릭 즉시 잠금(#double-fire) — generatingViews 는 sendCharacterPatchNow 왕복 *뒤에* 세워지므로,
   //   느린 서버에서 그 사이 버튼이 열려 있어 두 번째 클릭이 기존 중복 가드까지 통과했다.
@@ -66,7 +75,7 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
       if (view === 'main' && next && next !== base) {
         await updateCharacterAppearance(char.characterId, appearanceKey, next)
       }
-      await generateCharacterView(char.characterId, appearanceKey, view)
+      await generateCharacterView(char.characterId, appearanceKey, view, 'ui', undefined, undefined, imageModel)
     },
   })
   const safeRetry = useGuardedAction({
@@ -76,7 +85,7 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
     busy: isGenerating,
     action: async () => {
       if (!char || !appearanceKey || !view) return
-      await retryCharacterViewSafe(char.characterId, appearanceKey, view)
+      await retryCharacterViewSafe(char.characterId, appearanceKey, view, imageModel)
     },
   })
 
@@ -187,6 +196,41 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
           )}
 
           {/* 후보 히스토리 스트립 제거(#5) — 이미지 1장 정책: 재생성은 누적 아닌 교체(finalize 가 최신 1장만 보관). */}
+
+          {/* 이미지 생성 모델 선택(image-models 레지스트리) — 재생성창에서만 고른다. 채팅으로도 지정 가능. */}
+          <div>
+            <label className="mb-1.5 block text-xs text-muted-foreground">
+              {t('Image generation model')}
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {IMAGE_MODEL_ORDER.map((key) => {
+                const spec = IMAGE_MODELS[key]
+                const active = imageModel === key
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setImageModel(key)}
+                    className={cn(
+                      'rounded-md border px-3 py-1.5 text-left text-xs transition-colors',
+                      active ? 'border-primary bg-primary/10' : 'border-border hover:bg-accent',
+                    )}
+                  >
+                    <span className="block font-medium">{spec.label}</span>
+                    <span className="block text-[10px] text-muted-foreground">
+                      {t(spec.description)}
+                      {spec.pricePerImage != null ? ` · $${spec.pricePerImage}` : ''}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            {!isObject && !imageModelSupportsReference(imageModel) && (
+              <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400">
+                {t('This model has no reference support — character identity may drift.')}
+              </p>
+            )}
+          </div>
 
           <Button className="w-full" disabled={generate.locked || needsMain} onClick={generate.run}>
             {generate.locked ? (
