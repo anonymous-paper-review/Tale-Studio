@@ -66,6 +66,38 @@ export function clickToggleSelection(
 }
 
 /**
+ * 노드 우클릭 메뉴 항목 결정(#context-menu 2026-08-31) — 좌클릭=선택, 더블클릭=편집
+ * 모달, 우클릭=이 메뉴로 인터랙션을 셋으로 가른다.
+ * - edit: scene/shot/video 는 자기 모달, 파생(shotImage/videoPlaceholder)은 부모 Shot 모달
+ * - copy-image/download-image: 대표 이미지가 있을 때만 (판정은 호출부 nodePrimaryImageUrl)
+ * - delete: asset(파생·읽기전용) 만 제외
+ */
+export type NodeMenuItem = 'edit' | 'copy-image' | 'download-image' | 'delete'
+
+export function nodeContextMenuItems(
+  kind: DirectorNodeKind,
+  hasImage: boolean,
+): NodeMenuItem[] {
+  const items: NodeMenuItem[] = []
+  if (
+    kind === 'scene' ||
+    kind === 'shot' ||
+    kind === 'video' ||
+    kind === 'shotImage' ||
+    kind === 'videoPlaceholder'
+  ) {
+    items.push('edit')
+  }
+  if (hasImage) {
+    items.push('copy-image', 'download-image')
+  }
+  if (kind !== 'asset' && kind !== 'shotImage' && kind !== 'videoPlaceholder') {
+    items.push('delete')
+  }
+  return items
+}
+
+/**
  * onConnect 라우팅: Shot의 T 입력(targetHandle==='prompt')으로 들어오는 연결은
  * Prompt 노드 와이어링(wirePromptToShot)으로, Shot 이미지 입력은 image 와이어링으로,
  * Video 프레임 입력은 frame 와이어링으로, 이전 Video 입력은 video-chain으로,

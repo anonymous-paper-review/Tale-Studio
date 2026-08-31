@@ -1,0 +1,133 @@
+// 우클릭 컨텍스트 메뉴 결정 로직 + 노드 대표 이미지 해석(#context-menu 2026-08-31).
+//
+// 인터랙션 계약: 좌클릭=선택(RF 기본), 더블클릭=편집 모달, 우클릭=메뉴.
+// 메뉴 구성은 순수 함수(nodeContextMenuItems)로 격리했고, 이미지 복사/다운로드 활성 여부는
+// nodePrimaryImageUrl 이 판정한다 — 여기서 그 두 계약을 잠근다.
+
+import { beforeEach, describe, expect, it } from 'vitest'
+import { nodeContextMenuItems } from '@/features/director/canvas-interaction'
+import { nodePrimaryImageUrl } from '@/features/director/clipboard-image'
+import { useDirectorCanvasStore } from '@/stores/director-store'
+import { isShotData, isVideoData } from '@/types/director'
+
+beforeEach(() => {
+  useDirectorCanvasStore.getState().reset()
+})
+
+function api() {
+  return useDirectorCanvasStore.getState()
+}
+
+describe('nodeContextMenuItems (우클릭 메뉴 구성)', () => {
+  it('scene/shot/video는 편집과 삭제를 가진다', () => {
+    for (const kind of ['scene', 'shot', 'video'] as const) {
+      const items = nodeContextMenuItems(kind, false)
+      expect(items).toContain('edit')
+      expect(items).toContain('delete')
+    }
+  })
+
+  it('이미지가 있으면 복사·다운로드가 추가된다', () => {
+    const items = nodeContextMenuItems('shot', true)
+    expect(items).toContain('copy-image')
+    expect(items).toContain('download-image')
+  })
+
+  it('이미지가 없으면 복사·다운로드가 빠진다', () => {
+    const items = nodeContextMenuItems('shot', false)
+    expect(items).not.toContain('copy-image')
+    expect(items).not.toContain('download-image')
+  })
+
+  it('asset(읽기전용)은 삭제·편집이 없고 이미지 복사만 가능하다', () => {
+    expect(nodeContextMenuItems('asset', true)).toEqual([
+      'copy-image',
+      'download-image',
+    ])
+  })
+
+  it('파생 카드(shotImage/videoPlaceholder)는 편집(부모 위임)만 있고 삭제는 없다', () => {
+    expect(nodeContextMenuItems('shotImage', false)).toEqual(['edit'])
+    expect(nodeContextMenuItems('videoPlaceholder', false)).toEqual(['edit'])
+  })
+
+  it('prompt는 삭제만 있다', () => {
+    expect(nodeContextMenuItems('prompt', false)).toEqual(['delete'])
+  })
+})
+
+describe('nodePrimaryImageUrl (대표 이미지 해석)', () => {
+  it('Shot은 완료된 스토리보드 이미지 URL을 준다', () => {
+    const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
+    const shotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Shot')
+    api().updateNodeData<'shot'>(shotId, {
+      storyboardImage: {
+        url: 'https://cdn.test/shot.png',
+        status: 'completed',
+        errorMessage: null,
+        generatedAt: Date.now(),
+      },
+    })
+    expect(nodePrimaryImageUrl(api().nodes, shotId)).toBe(
+      'https://cdn.test/shot.png',
+    )
+  })
+
+  it('생성 전/실패 Shot과 Scene은 null', () => {
+    const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
+    const shotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Shot')
+    expect(nodePrimaryImageUrl(api().nodes, shotId)).toBeNull()
+    expect(nodePrimaryImageUrl(api().nodes, sceneId)).toBeNull()
+  })
+
+  it('Video는 썸네일, 파생 ShotImage는 부모 Shot 이미지를 따라간다', () => {
+    const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
+    const shotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Shot')
+    api().updateNodeData<'shot'>(shotId, {
+      writerShotId: 'writer-1',
+      storyboardImage: {
+        url: 'https://cdn.test/parent.png',
+        status: 'completed',
+        errorMessage: null,
+        generatedAt: Date.now(),
+      },
+    })
+    const videoId = api().addVideoTake(shotId)!
+    api().updateNodeData<'video'>(videoId, {
+      thumbnailUrl: 'https://cdn.test/thumb.jpg',
+    })
+    expect(nodePrimaryImageUrl(api().nodes, videoId)).toBe(
+      'https://cdn.test/thumb.jpg',
+    )
+
+    api().rebuildShotChainNodes()
+    const shotImage = api().nodes.find((n) => n.data.kind === 'shotImage')
+    expect(shotImage).toBeTruthy()
+    expect(nodePrimaryImageUrl(api().nodes, shotImage!.id)).toBe(
+      'https://cdn.test/parent.png',
+    )
+  })
+
+  it('없는 노드는 null', () => {
+    expect(nodePrimaryImageUrl(api().nodes, 'missing')).toBeNull()
+  })
+})
+
+describe('addShotNode standalone (Higgsfield식 독립 이미지 노드)', () => {
+  it('부모 Scene 없이 생성되고 parent 엣지가 없다', () => {
+    const shotId = api().addShotNode(null, { x: 100, y: 100 }, 'Standalone')
+    const node = api().nodes.find((n) => n.id === shotId)
+    expect(node && isShotData(node.data)).toBe(true)
+    expect(
+      api().edges.filter((e) => e.target === shotId && e.type === 'parent'),
+    ).toHaveLength(0)
+  })
+
+  it('독립 Shot에서도 Video Branch가 가능하다', () => {
+    const shotId = api().addShotNode(null, { x: 100, y: 100 }, 'Standalone')
+    const videoId = api().addVideoTake(shotId)
+    expect(videoId).toBeTruthy()
+    const video = api().nodes.find((n) => n.id === videoId)
+    expect(video && isVideoData(video.data)).toBe(true)
+  })
+})

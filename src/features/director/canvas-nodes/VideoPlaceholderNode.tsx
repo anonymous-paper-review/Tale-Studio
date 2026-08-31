@@ -50,11 +50,12 @@ function VideoPlaceholderNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
         selected && 'border-2 ring-4 ring-muted-foreground/30 opacity-100',
       )}
     >
+      {/* #handle-visibility: 체인 종점 입력 홈들 항상 표시. */}
       <Handle
         type="target"
         position={Position.Left}
         id="left"
-        className="!h-2 !w-2 !border-0 bg-muted-foreground/60 opacity-0 group-hover:opacity-100"
+        className="!h-3 !w-3 !rounded-full !border-2 !border-background bg-muted-foreground/60"
       />
 
       <div className="flex h-7 items-center justify-between border-b border-dashed border-border/60 px-3 text-xs">

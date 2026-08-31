@@ -68,6 +68,14 @@ import { ShotImageNode } from '@/features/director/canvas-nodes/ShotImageNode'
 import { VideoPlaceholderNode } from '@/features/director/canvas-nodes/VideoPlaceholderNode'
 import { CategoryEdge } from '@/features/director/canvas-edges/CategoryEdge'
 import { CreatorModal } from '@/features/director/canvas-popups/CreatorModal'
+import {
+  CanvasContextMenu,
+  type CanvasMenuState,
+} from '@/features/director/canvas-popups/CanvasContextMenu'
+import {
+  copyImageUrlToClipboard,
+  nodePrimaryImageUrl,
+} from '@/features/director/clipboard-image'
 import { RelationModal } from '@/features/director/canvas-popups/RelationModal'
 import { DeleteConfirmModal } from '@/features/director/canvas-popups/DeleteConfirmModal'
 import { DirectorNodePopup } from '@/features/director/canvas-popups/DirectorNodePopup'
@@ -299,11 +307,25 @@ function CanvasInner() {
       } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
         e.preventDefault()
         redo()
+      } else if (k === 'c') {
+        // Cmd/Ctrl+C = 선택 노드의 대표 이미지 복사(#node-copy-image).
+        //   페이지 텍스트를 드래그해 복사하는 중이면 브라우저 기본 동작이 우선.
+        const sel = window.getSelection()
+        if (sel && !sel.isCollapsed) return
+        const st = useDirectorCanvasStore.getState()
+        const target = st.nodes.find((n) => n.selected)
+        if (!target) return
+        const url = nodePrimaryImageUrl(st.nodes, target.id)
+        if (!url) return
+        e.preventDefault()
+        void copyImageUrlToClipboard(url)
+          .then(() => toast.success(t('Image copied to clipboard.')))
+          .catch(() => toast.error(t('Failed to copy image.')))
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [undo, redo])
+  }, [undo, redo, t])
 
   // 누락 감지 넛지 (chat-proactive-copilot Phase 4): 캔버스가 안정되면(2s) 채워두면 좋을
   //   항목(샷의 캐릭터·배경 참조 누락 / 스토리보드 미생성)을 1회 informational 제안. 생성 트리거 X.
@@ -436,6 +458,8 @@ function CanvasInner() {
   const [creatorPosition, setCreatorPosition] = useState<XYPosition | null>(
     null,
   )
+  // 우클릭 메뉴(#context-menu 2026-08-31) — 좌클릭=선택 · 더블클릭=편집 모달과 구분되는 세 번째 축.
+  const [contextMenu, setContextMenu] = useState<CanvasMenuState | null>(null)
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -611,6 +635,30 @@ function CanvasInner() {
         onPaneClick={() => {
           selectNode(null)
           selectEdge(null)
+          setContextMenu(null)
+        }}
+        // 우클릭(#context-menu): 노드=편집/복사/삭제 메뉴, 빈 캔버스=노드 생성 메뉴.
+        onNodeContextMenu={(event, node) => {
+          event.preventDefault()
+          setContextMenu({
+            type: 'node',
+            nodeId: node.id,
+            x: event.clientX,
+            y: event.clientY,
+          })
+        }}
+        onPaneContextMenu={(event) => {
+          event.preventDefault()
+          const native = event as unknown as { clientX: number; clientY: number }
+          setContextMenu({
+            type: 'pane',
+            x: native.clientX,
+            y: native.clientY,
+            flowPosition: screenToFlowPosition({
+              x: native.clientX,
+              y: native.clientY,
+            }),
+          })
         }}
         // 단일클릭 커스텀 액션(onNodeClick) 제거(#e2) — RF 기본 선택(하이라이트·툴바)만 유지
         onEdgeClick={(_event, edge) => selectEdge(edge.id)}
@@ -667,6 +715,10 @@ function CanvasInner() {
         </div>
       )}
 
+      <CanvasContextMenu
+        state={contextMenu}
+        onClose={() => setContextMenu(null)}
+      />
       <CreatorModal
         open={creatorOpen}
         position={creatorPosition}

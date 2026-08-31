@@ -77,12 +77,14 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
             : 'border-2 ring-4 ring-muted-foreground/30 opacity-100'),
       )}
     >
+      {/* #handle-visibility: 체인 입출력 홈들 항상 표시 — 이 카드가 프레임 와이어링의
+          주 이미지 출처라 출력 구멍이 보여야 드래그가 시작된다. */}
       <Handle
         type="target"
         position={Position.Left}
         id="left"
         className={cn(
-          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
+          '!h-3 !w-3 !rounded-full !border-2 !border-background',
           hasImage ? 'bg-chart-4' : 'bg-muted-foreground/60',
         )}
       />
@@ -90,8 +92,9 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
         type="source"
         position={Position.Right}
         id="right"
+        title="Output"
         className={cn(
-          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
+          '!h-3.5 !w-3.5 !rounded-full !border-2 !border-background transition-transform hover:!scale-125',
           hasImage ? 'bg-chart-4' : 'bg-muted-foreground/60',
         )}
       />

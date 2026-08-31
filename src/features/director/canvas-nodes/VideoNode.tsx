@@ -1,11 +1,12 @@
 'use client'
 
 import { memo, useEffect, useRef, useState } from 'react'
-import { Handle, NodeToolbar, Position, type NodeProps } from '@xyflow/react'
+import { NodeToolbar, Position, type NodeProps } from '@xyflow/react'
 import { Play, RefreshCw, Square, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import { BaseNode } from './BaseNode'
+import { LabeledTargetHandle } from './LabeledHandle'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useActiveGenerationJobs } from '@/lib/generation-queue'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
@@ -180,42 +181,31 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         </Button>
       }
     >
-      {/* Manual frame wiring inputs — visible on hover alongside BaseNode's existing handles. */}
-      <Handle
-        type="target"
-        position={Position.Left}
+      {/* Manual frame wiring inputs(#handle-visibility) — 항상 보이는 라벨 홈들.
+          hover-only 8px 점은 "구멍이 안 보인다"는 오너 피드백의 원인이었다. */}
+      <LabeledTargetHandle
         id="video-chain"
+        label="PREV"
+        top={36}
         title={t('Previous-video last-frame input')}
-        aria-label={t('Previous-video last-frame input')}
-        className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
-        style={{ top: 34 }}
       />
-      <Handle
-        type="target"
-        position={Position.Left}
+      <LabeledTargetHandle
         id="frame-start"
+        label="START"
+        top={62}
         title={t('START frame input')}
-        aria-label={t('START frame input')}
-        className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
-        style={{ top: 54 }}
       />
-      <Handle
-        type="target"
-        position={Position.Left}
+      <LabeledTargetHandle
         id="frame-end"
+        label="END"
+        top={88}
         title={t('END frame input')}
-        aria-label={t('END frame input')}
-        className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
-        style={{ top: 74 }}
       />
-      <Handle
-        type="target"
-        position={Position.Left}
+      <LabeledTargetHandle
         id="frame-ref"
+        label="REF"
+        top={114}
         title={t('REF frame input')}
-        aria-label={t('REF frame input')}
-        className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
-        style={{ top: 94 }}
       />
       {/* 영상 재생 / 썸네일 / 상태 — single-play: playingNodeId===id 일 때만 <video> 마운트.
           nodrag·nopan: React Flow 가 영상/버튼 상호작용을 노드 드래그·팬으로 가로채지 않게. */}

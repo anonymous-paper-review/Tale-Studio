@@ -142,11 +142,13 @@ function BaseNodeImpl({
         />
       )}
 
+      {/* 출력 핸들(#handle-visibility 2026-08-31) — 주 출력(우측)은 Higgsfield 처럼
+          항상 보이게. top/bottom/left 는 자유 배선용 보조 포트라 hover 시만. */}
       <Handle
         type="source"
         position={Position.Top}
         className={cn(
-          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
+          '!h-2.5 !w-2.5 !border-0 opacity-0 group-hover:opacity-100',
           palette.dot,
         )}
         id="top"
@@ -154,8 +156,9 @@ function BaseNodeImpl({
       <Handle
         type="source"
         position={Position.Right}
+        title="Output"
         className={cn(
-          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
+          '!h-3.5 !w-3.5 !rounded-full !border-2 !border-background transition-transform hover:!scale-125',
           palette.dot,
         )}
         id="right"
@@ -164,7 +167,7 @@ function BaseNodeImpl({
         type="source"
         position={Position.Bottom}
         className={cn(
-          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
+          '!h-2.5 !w-2.5 !border-0 opacity-0 group-hover:opacity-100',
           palette.dot,
         )}
         id="bottom"
@@ -173,7 +176,7 @@ function BaseNodeImpl({
         type="source"
         position={Position.Left}
         className={cn(
-          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
+          '!h-2.5 !w-2.5 !border-0 opacity-0 group-hover:opacity-100',
           palette.dot,
         )}
         id="left"

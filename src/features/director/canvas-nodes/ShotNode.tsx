@@ -1,10 +1,11 @@
 'use client'
 
 import { memo } from 'react'
-import { Handle, NodeToolbar, Position, type NodeProps } from '@xyflow/react'
+import { NodeToolbar, Position, type NodeProps } from '@xyflow/react'
 import { Camera, Lightbulb, ImageIcon, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BaseNode } from './BaseNode'
+import { LabeledTargetHandle } from './LabeledHandle'
 import {
   getChildVideos,
   getShotStage,
@@ -111,23 +112,18 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           void generateVideoForShot(id)
         }}
       >
-        {/* Prompt 노드 와이어링용 T 입력 핸들 (좌측) */}
-        <Handle
-          type="target"
-          position={Position.Left}
+        {/* 입력 핸들(#handle-visibility) — 항상 보이는 라벨 홈들로 교체. */}
+        <LabeledTargetHandle
           id="prompt"
-          className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
-          style={{ top: 64 }}
+          label="PROMPT"
+          top={64}
+          title={t('Prompt input')}
         />
-        {/* Image-reference wiring input (left, separate from the prompt handle). */}
-        <Handle
-          type="target"
-          position={Position.Left}
+        <LabeledTargetHandle
           id="image-reference"
+          label="IMAGE"
+          top={90}
           title={t('Image reference input')}
-          aria-label={t('Image reference input')}
-          className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
-          style={{ top: 88 }}
         />
 
         {prompt && (

@@ -47,7 +47,9 @@ export function CreatorModal({ open, position, onClose }: Props) {
     return scenes[0]?.id ?? null
   })()
 
-  const [kind, setKind] = useState<Kind>(hasScene ? 'shot' : 'scene')
+  // #context-menu 2026-08-31: Shot 은 Scene 없이도 만든다(Higgsfield 식 독립 이미지 노드).
+  //   기본 종류도 shot — 캔버스의 주인공은 이미지다.
+  const [kind, setKind] = useState<Kind>('shot')
   const [parentSceneId, setParentSceneId] = useState<string | null>(
     defaultParentScene,
   )
@@ -56,7 +58,7 @@ export function CreatorModal({ open, position, onClose }: Props) {
   const [wasOpen, setWasOpen] = useState(open)
   if (open && !wasOpen) {
     setWasOpen(true)
-    setKind(hasScene ? 'shot' : 'scene')
+    setKind('shot')
     setParentSceneId(defaultParentScene)
   } else if (!open && wasOpen) {
     setWasOpen(false)
@@ -67,11 +69,8 @@ export function CreatorModal({ open, position, onClose }: Props) {
     if (kind === 'scene') {
       addSceneNode(position)
     } else {
-      // Shot: parent Scene 필수
-      const parent = parentSceneId ?? scenes[0]?.id ?? null
-      if (!parent) return
-      // 자동 배치 (#18) 대신 사용자가 클릭한 위치 사용
-      addShotNode(parent, position)
+      // Shot: Scene 은 선택 — null 이면 부모 엣지 없는 독립 이미지 노드.
+      addShotNode(parentSceneId, position)
     }
     onClose()
   }
@@ -101,21 +100,18 @@ export function CreatorModal({ open, position, onClose }: Props) {
             <span className="text-xs text-muted-foreground">{t('Scene container')}</span>
           </button>
           <button
-            onClick={() => hasScene && setKind('shot')}
-            disabled={!hasScene}
+            onClick={() => setKind('shot')}
             className={cn(
               'group flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors',
               kind === 'shot'
                 ? 'border-chart-4 bg-chart-4/10'
-                : hasScene
-                  ? 'border-chart-4/40 bg-card hover:bg-accent'
-                  : 'cursor-not-allowed border-border bg-card opacity-40',
+                : 'border-chart-4/40 bg-card hover:bg-accent',
             )}
           >
             <Clapperboard className="size-5 text-chart-4" />
             <span className="text-sm font-medium">Shot</span>
             <span className="text-xs text-muted-foreground">
-              {hasScene ? t('Video generation unit') : t('Needs a Scene first')}
+              {t('Video generation unit')}
             </span>
           </button>
         </div>
@@ -127,9 +123,10 @@ export function CreatorModal({ open, position, onClose }: Props) {
             </label>
             <select
               value={parentSceneId ?? ''}
-              onChange={(e) => setParentSceneId(e.target.value)}
+              onChange={(e) => setParentSceneId(e.target.value || null)}
               className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm"
             >
+              <option value="">{t('Standalone (no scene)')}</option>
               {scenes.map((s) => (
                 <option key={s.id} value={s.id}>
                   {isSceneData(s.data) ? s.data.label : s.id}
@@ -143,11 +140,7 @@ export function CreatorModal({ open, position, onClose }: Props) {
           <Button variant="ghost" size="sm" onClick={onClose}>
             {t('Cancel')}
           </Button>
-          <Button
-            size="sm"
-            onClick={handleCreate}
-            disabled={kind === 'shot' && !parentSceneId}
-          >
+          <Button size="sm" onClick={handleCreate}>
             {t('Create')}
           </Button>
         </DialogFooter>
