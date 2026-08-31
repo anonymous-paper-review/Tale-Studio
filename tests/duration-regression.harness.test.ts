@@ -60,6 +60,10 @@ describe('duration/characters 프롬프트 개정 회귀 (env 게이트)', () =>
       const arithRe = /=\s*[\d.]+\s*(→|->)\s*\d+/
       const report = {
         scenes: sceneIds,
+        decoupage_shots: dec.scenes.flatMap((s) =>
+          s.shots.map((sh: { shot_id: string; operation: string; shot_function: string; intended_duration_seconds: number }) =>
+            `${sh.shot_id} [${sh.operation}/${sh.shot_function}] ${sh.intended_duration_seconds}s`),
+        ),
         decoupage_durations: { old: stat(oldDec.map((s) => s.intended_duration_seconds)), new: stat(decShots.map((s) => s.intended_duration_seconds)) },
         v4_durations: { old: stat(oldDesign.map((d) => d.intent.duration_seconds)), new: stat(newDesignShots.map((d) => d.intent.duration_seconds)) },
         justification_arithmetic: {

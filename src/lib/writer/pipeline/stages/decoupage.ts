@@ -128,7 +128,14 @@ ${cameraContract}
 == 시간 제약 (validator) ==
 - 각 샷 intended_duration_seconds는 ${SHOT_SECONDS_RANGE} (짧고 스냅있게). 1개 주요 액션이 들어맞는 길이. 긴 침묵 등 예외만 최대 ${SHOT_SECONDS_HARD_MAX}.
 - ${DURATION_RUBRIC}
-- 한 샷에 액션을 몰아넣지 마라. 액션이 크거나 여러 개면 split으로 나눠라.${outputLanguageClause(outputLocale)}`;
+- 한 샷에 액션을 몰아넣지 마라. 액션이 크거나 여러 개면 split으로 나눠라.
+
+== 사건 접지 (#story-1 2026-08-31 오너 확정) ==
+주요 사건(첫 만남·충돌·발견·죽음 같은 전환점)을 아무 맥락 없이 터뜨리지 마라 — 그 직전에
+평상 상태를 보여주는 설정 비트(인파의 흐름, 공간의 표정, 인물의 일상 동작) 샷 1개를 선행시켜
+사건이 "어디서 무엇을 깨고 일어나는지" 접지하라. 씬 첫 비트가 곧 사건이면 operation='added' 로
+설정 샷을 삽입하고 added_rationale 에 사유를 적어라.
+(실측 결함: 인파 소개 없이 두 주인공이 부딪히는 샷부터 시작해 만남이 뜬금없이 읽혔다.)${outputLanguageClause(outputLocale)}`;
 }
 
 // 씬 동시성 기본값(#concurrency-gap 2026-08-10). 종전엔 호출부가 `Number(env ?? '1') || 1` 로
