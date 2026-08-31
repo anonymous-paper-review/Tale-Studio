@@ -16,6 +16,8 @@ export type VideoPromptParts = {
   dialogue?: string
   black?: string
   startEnd?: string
+  /** #u17-3: 레퍼런스 권위 절 — I2V 에서 텍스트↔레퍼런스 상충 시 레퍼런스가 이긴다. */
+  referenceAuthority?: string
   referenceRoles?: string
 }
 
@@ -155,10 +157,16 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
     .join('. ')
     .slice(0, cap)
 
+  // #u17-3(2026-08-31 오너 확정, 실측 sh_02_04): 장면 묘사문(shots.prompt)은 writer 가 상상한
+  //   프레임 묘사라 실제 생성된 레퍼런스와 조명·배경·질감이 어긋날 수 있다 — 이미지 경로는
+  //   "이 그림을 다시 그려라"(레퍼런스 권위)인데 영상만 텍스트 권위였던 배선 비대칭의 교정.
+  const referenceAuthority = `The reference images are the visual ground truth — match their lighting, color temperature, wardrobe, set dressing and framing exactly; wherever this text description differs from the reference images, follow the references.`
+
   if (referenceImageRoles?.length && generationMethod === 'I2V') {
     const roleInstruction = referenceRolesClause(referenceImageRoles)
     prompt_parts.referenceRoles = roleInstruction
-    fullPrompt = `${fullPrompt} ${roleInstruction}`.slice(0, cap + (contract.text ? 500 : 450))
+    prompt_parts.referenceAuthority = referenceAuthority
+    fullPrompt = `${fullPrompt} ${roleInstruction} ${referenceAuthority}`.slice(0, cap + (contract.text ? 700 : 650))
   }
 
   // V2(previz 실측 검증: END 프레이밍 수렴) — 첫 레퍼런스=START, 마지막=END 로 시작·끝 구도를 고정.
@@ -169,7 +177,8 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
       ? `The first reference image is the shot's START frame and the last reference image is its END frame — hold this same composition throughout: no camera travel between them, only the contracted subject motion.`
       : `The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.`
     prompt_parts.startEnd = startEndInstruction
-    fullPrompt = `${fullPrompt} ${startEndInstruction}`.slice(0, cap + (contract.text ? 250 : 300))
+    prompt_parts.referenceAuthority = referenceAuthority
+    fullPrompt = `${fullPrompt} ${startEndInstruction} ${referenceAuthority}`.slice(0, cap + (contract.text ? 500 : 550))
   }
 
   if (modelKey === 'veo' && durationSeconds < 8) {

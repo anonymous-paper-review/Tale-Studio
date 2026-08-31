@@ -24,6 +24,7 @@ import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { aspectRatioFromFormat, parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
+import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { isImageModelKey, normalizeImageModelKey, resolveImageEndpoint } from '@/lib/image-models'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
@@ -95,6 +96,17 @@ export async function POST(req: Request) {
 
     const callerRefs = referenceImageUrls?.length ? referenceImageUrls : undefined
 
+    // #u17-2(2026-08-31 오너 지시): 수동 샷(shots.prompt=NULL)의 한국어 액션 원문 유출 방어 —
+    //   영상 라우트(#w-c)와 동일하게 서버 최종 방어로 EN 파생. 이미 영어면 LLM 없이 통과,
+    //   실패 항목은 맵에 없어 원문 폴백. 배치 그리드 라우트는 산문을 싣지 않아 해당 없음.
+    let promptEn = prompt
+    try {
+      const en = (await deriveEnBatch([{ id: 'p', native: prompt }], 'director storyboard prompt')).get('p')
+      if (en) promptEn = en
+    } catch (err) {
+      console.warn('[director/generate-storyboard] EN derive skipped:', err instanceof Error ? err.message : err)
+    }
+
     // 스트립 모드 판별 — 러프 3프레임 완비 시에만 (하나라도 없으면 기존 단일 경로).
     const roughFrames = (
       shot?.rough_storyboard as {
@@ -133,7 +145,7 @@ export async function POST(req: Request) {
       Array.isArray((shot as { characters?: unknown } | null)?.characters) &&
       ((shot as { characters: unknown[] }).characters.length === 0)
     const guardedPrompt =
-      appendCheckConstraints(prompt, (shot as { check_notes?: unknown } | null)?.check_notes) +
+      appendCheckConstraints(promptEn, (shot as { check_notes?: unknown } | null)?.check_notes) +
       continuityLine +
       (noPeopleShot
         ? ' This shot contains NO people — do not draw any person or figure; anyone implied by the text is off-screen.'

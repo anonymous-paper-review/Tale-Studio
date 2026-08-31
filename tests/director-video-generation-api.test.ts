@@ -61,7 +61,7 @@ function reservedFalJob(overrides: Record<string, unknown> = {}) {
       generation_method: 'T2V',
       provider: null,
       model: null,
-      resolved_model_key: 'happy-horse',
+      resolved_model_key: 'seedance', // 2026-08-31 오너 확정: 기본 생성기 전환
       reference_image_url: null,
       movement_preset: null,
       camera_preset: null,
@@ -112,6 +112,16 @@ beforeEach(() => {
   mocks.from.mockReturnValueOnce(query({ workspace_id: 'workspace-1' })).mockReturnValueOnce(query({ shot_id: 'shot-1', character_appearance_keys: {} })).mockReturnValueOnce(query(null))
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
 })
+describe('U16 — chat trace 배선 (2026-08-31 복원)', () => {
+  it('형식이 UUID 가 아닌 traceId 는 400 으로 거절한다', async () => {
+    mocks.getUser.mockResolvedValue({ id: 'user-1' })
+    const res = await POST(request({ traceId: 'not-a-uuid' }))
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toContain('traceId')
+  })
+})
+
 describe('director video generation reservation', () => {
   it('uses a standalone clip’s persisted config without loading a Shot', async () => {
     const standaloneKey =

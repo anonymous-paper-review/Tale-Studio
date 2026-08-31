@@ -51,7 +51,10 @@ export interface VideoModelSpec {
   pricePerSecNoAudio: number
 }
 
-export const DEFAULT_VIDEO_MODEL: VideoModelKey = 'happy-horse'
+// 2026-08-31 오너 확정: 기본 생성기를 Seedance 2.0 으로 전환 (종전 happy-horse).
+//   주의: min 4s — 계획 4초 미만 샷은 제출 시 4초로 클램프되고, 에디터 #d11 자동 트림이
+//   초과분(죽은 꼬리)을 실측 길이 기준으로 잘라낸다.
+export const DEFAULT_VIDEO_MODEL: VideoModelKey = 'seedance'
 
 /**
  * UI 모델 선택지 순서(#ui-cleanup 2026-08-31) — fal.ai 카탈로그 모델만.
