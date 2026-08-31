@@ -583,6 +583,7 @@ export const KO: Record<string, string> = {
   'Protagonist appears': '주인공 등장',
   'A vividly-drawn character is ready.': '모습이 그려지는 인물이 준비됐어요.',
   '{count} fields are empty — try describing a character.': '{count}개 항목이 비어 있어요 — 인물을 묘사해 보세요.',
+  'No character yet — describe one in chat.': '아직 인물이 없어요 — 채팅에서 한 명 묘사해 보세요.',
   'Stage complete': '무대 완성',
   'A background with a name, look, and purpose is ready.': '이름·모습·용도가 있는 배경이 준비됐어요.',
   'You need at least one background with a name, look, and purpose.': '이름·모습·용도가 있는 배경 1개가 필요해요.',
