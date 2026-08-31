@@ -275,7 +275,56 @@ export async function listStyleAnchorMediums(): Promise<string[]> {
   }
 }
 
+export interface StyleAnchorCatalogEntry {
+  key: string
+  label: string
+  medium: string | null
+  subtitle: string | null
+}
+
+let catalogCache: { values: StyleAnchorCatalogEntry[]; expires: number } | null = null
+
+/**
+ * 활성 앵커 카탈로그(키·라벨·매체·부제) — 채팅 프롬프트 주입용(D12).
+ *
+ * 유저가 이름/느낌("일본 애니 그림체")으로 말하면 모델이 여기서 키를 고른다.
+ * medium을 같이 주는 이유: 라벨만 보면 "일본 멜로"(실사 서브룩)를 일본 애니로
+ * 오인한다(G3 실측 — 이름이 오해를 부른다).
+ */
+export async function listStyleAnchorCatalog(): Promise<StyleAnchorCatalogEntry[]> {
+  const now = Date.now()
+  if (catalogCache && catalogCache.expires > now) return catalogCache.values
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('style_anchors')
+      .select('key, label, medium, subtitle, is_active')
+      .eq('is_active', true)
+    if (error) throw error
+
+    const values = (data ?? [])
+      .map((row) => {
+        const r = row as { key?: unknown; label?: unknown; medium?: unknown; subtitle?: unknown }
+        if (typeof r.key !== 'string' || r.key.length === 0) return null
+        return {
+          key: r.key,
+          label: typeof r.label === 'string' ? r.label : r.key,
+          medium: typeof r.medium === 'string' ? r.medium : null,
+          subtitle: typeof r.subtitle === 'string' ? r.subtitle : null,
+        }
+      })
+      .filter((v): v is StyleAnchorCatalogEntry => v !== null)
+
+    catalogCache = { values, expires: now + STYLE_ANCHOR_CACHE_TTL_MS }
+    return values
+  } catch (error) {
+    console.warn('[style-anchor] catalog list failed', error)
+    return []
+  }
+}
+
 export function _clearStyleAnchorCacheForTest(): void {
   styleAnchorCache.clear()
   mediumsCache = null
+  catalogCache = null
 }

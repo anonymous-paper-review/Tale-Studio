@@ -53,6 +53,18 @@ export interface VideoModelSpec {
 
 export const DEFAULT_VIDEO_MODEL: VideoModelKey = 'happy-horse'
 
+/**
+ * UI 모델 선택지 순서(#ui-cleanup 2026-08-31) — fal.ai 카탈로그 모델만.
+ * 'local'(Self-hosted)은 fal 밖 실험 경로라 선택 UI에서 제외한다 —
+ * 기존 provider='local' 노드는 normalizeProvider 가 계속 받아준다(기능 유지).
+ */
+export const FAL_VIDEO_MODEL_ORDER: VideoModelKey[] = [
+  'happy-horse',
+  'seedance',
+  'kling-o3',
+  'veo',
+]
+
 export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
   'happy-horse': {
     key: 'happy-horse',

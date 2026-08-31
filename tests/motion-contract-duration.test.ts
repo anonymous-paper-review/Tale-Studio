@@ -27,11 +27,17 @@ describe('G1 — 긴 샷이 동작을 늘여 슬로우모션이 되지 않는다
     expect(long).toContain('aftermath')
   })
 
-  it('짧은 샷은 기존 문장 그대로 — 문제가 없던 경로를 건드리지 않는다', () => {
+  it('짧은 샷도 자연 속도 원칙 — 스트레치 지시가 주 슬로모 경로였다 (#d3 오너 실측)', () => {
+    // 2026-08-31 개정: 옛 전제("짧은 샷은 문제가 없던 경로")가 실측으로 반박됐다 —
+    //   실제 분포의 87.3%가 7초 미만이라 "전체 N초에 걸쳐 페이싱" 문장이 남은 주 슬로모
+    //   원인이었다(5초 샷 + 2초 동작 = 2.5배 슬로모). 짧은 샷 고유 목적(마지막 프레임 전
+    //   완결)은 유지된 채 자연 속도 지시가 들어가야 한다.
     const short = compileMotionContract(spec('small'), 5).text
-    expect(short).toContain('Pace the motion across the full 5-second duration')
-    expect(short).not.toContain('do NOT slow it down')
-    expect(short).not.toContain('aftermath')
+    expect(short).toContain('natural, lifelike speed')
+    expect(short).toContain('do NOT stretch or slow it')
+    expect(short).toContain('completes by the final frame')
+    expect(short).toContain('never slow motion')
+    expect(short).not.toContain('Pace the motion across')
   })
 
   it('같은 spec 이라도 길이가 다르면 계약문이 달라진다', () => {

@@ -168,6 +168,11 @@ scene_actions:
 - 한 액션 = 한 샷(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초)에 들어가도록 분리해서 작성
 - 씬당 액션 수는 위 시간 예산을 따른다
 
+서사 시점 (필수, time_of_day와 다른 축):
+- narrative_time은 프로젝트의 고정된 "이야기 현재" 기준으로만 present | past | future 중 하나를 쓴다.
+- 회상 속에서 더 과거로 들어가도 직전 씬이 아니라 이야기 현재와 비교한다.
+- time_of_day는 낮·밤·새벽 같은 조명 정보다. narrative_time을 여기에 섞지 않는다.
+
 오픈 캐스트 규칙 (중요):
 - 위 [기존 캐스트]는 producer가 이미 확정한 인물/사물이다. 등장시킬 때 **반드시 주어진 slug 그대로**
   characters_in_scene에 쓴다 (새 slug를 만들거나 이름을 바꾸지 않는다).
@@ -249,6 +254,7 @@ ${
       "act_ref": "act_id (S1.acts 중 하나)",
       "location": "string",
       "time_of_day": "string",
+      "narrative_time": "present | past | future",
       "weather": "string (optional)",
       "characters_in_scene": ["char_id", ...],
       "purpose": "string (씬 목적 분류 중)",

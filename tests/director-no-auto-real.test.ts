@@ -95,3 +95,33 @@ describe('C4 — 생성 버튼이 보고 있던 화면을 빼앗지 않는다', 
     expect(guarded?.length).toBe(2)
   })
 })
+
+describe('Director chat — semantic Video frame wiring', () => {
+  it('connectFrame is documented and whitelisted with the three target handles', () => {
+    expect(chatRoute).toContain('"type":"connectFrame"')
+    expect(chatRoute).toContain("'connectFrame'")
+    expect(chatRoute).toContain("'frame-start'")
+    expect(chatRoute).toContain("'frame-end'")
+    expect(chatRoute).toContain("'frame-ref'")
+    expect(chatRoute).toContain('VALID_FRAME_TARGET_HANDLES')
+  })
+
+  it('store applies connectFrame through the existing frame wiring path', () => {
+    expect(store).toContain("case 'connectFrame'")
+    expect(store).toContain('wireFrameToVideo')
+  })
+})
+
+describe('Director chat — semantic Shot image-reference wiring', () => {
+  it('connectImage is documented and restricted to image-reference', () => {
+    expect(chatRoute).toContain('"type":"connectImage"')
+    expect(chatRoute).toContain("'connectImage'")
+    expect(chatRoute).toContain("'image-reference'")
+    expect(chatRoute).toContain('VALID_IMAGE_TARGET_HANDLES')
+  })
+
+  it('store applies connectImage through the existing image wiring path', () => {
+    expect(store).toContain("case 'connectImage'")
+    expect(store).toContain('wireImageToShot')
+  })
+})

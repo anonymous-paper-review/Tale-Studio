@@ -7,7 +7,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
 import { createGenerationJob, hasQueuedCharacterViewJob, hasQueuedWorldShotJob } from '@/lib/generation-jobs'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
-import { buildCharacterMainPrompt, buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
+import { buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
 import { CHARACTER_VIEW_COLUMNS } from '@/types/asset'
 import {
   computeImageSourceHash,
@@ -31,10 +31,15 @@ interface DraftCharacterRow {
   character_id: string
   name: string
   role: string | null
-  appearance: string | null
   costume: string | string[] | null
-  view_main: string | null
   entity_type: string | null
+}
+
+interface DraftAppearanceRow {
+  character_id: string
+  appearance_key: string
+  appearance: string | null
+  sheet_url: string | null
 }
 
 interface DraftLocationRow extends LocationRowForWorldPrompt {
@@ -65,9 +70,9 @@ export interface AssetDraftTriggerResult {
 /**
  * 프로젝트 프로듀서 캐릭터들의 대표 main 초안을 서버에서 생성(빈칸만, 멱등). v2Design 직후 1회.
  *   멱등 3조건 — 하나라도 참이면 skip:
- *     (a) characters.view_main 이미 존재(차 있음 — 교체는 사람만),
- *     (b) main 슬롯 character_image_candidates 이미 존재,
- *     (c) main 슬롯에 status=queued character_view 잡 존재(submit~finalize 윈도우 재핸드오프 중복 차단).
+ *     (a) 기본 모습의 sheet_url 이미 존재(차 있음 — 교체는 사람만),
+ *     (b) 기본 모습 main 슬롯 character_image_candidates 이미 존재,
+ *     (c) 기본 모습 main 슬롯에 status=queued character_view 잡 존재(submit~finalize 윈도우 재핸드오프 중복 차단).
  *   각 캐릭터 submit 실패는 흡수(throw 금지) — 자동 재시도 루프 없음, 클라가 generation_jobs 에러를 배지로 표시(AC4).
  */
 export async function triggerCharacterDrafts(
@@ -75,18 +80,24 @@ export async function triggerCharacterDrafts(
 ): Promise<DraftTriggerResult> {
   const result: DraftTriggerResult = { submitted: 0, skipped: 0, failed: 0 }
   try {
-    const [{ data: chars }, { data: project }] = await Promise.all([
+    const [{ data: chars }, { data: appearances, error: appearancesError }, { data: project }] = await Promise.all([
       supabaseAdmin
         .from('characters')
-        .select('character_id, name, role, appearance, costume, view_main, entity_type')
+        .select('character_id, name, role, costume, entity_type')
         .eq('project_id', projectId)
         .eq('origin', 'producer'),
+      supabaseAdmin
+        .from('character_appearances')
+        .select('character_id, appearance_key, appearance, sheet_url')
+        .eq('project_id', projectId)
+        .eq('is_default', true),
       supabaseAdmin
         .from('projects')
         .select('design_tokens, workspace_id, style_anchor_key, custom_style_anchor')
         .eq('id', projectId)
         .maybeSingle(),
     ])
+    if (appearancesError) throw appearancesError
     if (!chars?.length) return result
 
     // v2Design trigger path is gated by triggerAssetDrafts, so design_tokens should be present here.
@@ -100,10 +111,28 @@ export async function triggerCharacterDrafts(
     }
     const webhookUrl = resolveWebhookUrl()
     const anchor = await resolveStyleAnchor(project)
+    const defaultAppearances = new Map<string, DraftAppearanceRow>()
+    for (const appearance of appearances ?? []) {
+      const row = appearance as DraftAppearanceRow
+      if (defaultAppearances.has(row.character_id)) {
+        throw new Error(`Character ${row.character_id} has multiple default appearances`)
+      }
+      defaultAppearances.set(row.character_id, row)
+    }
 
     for (const c of chars as DraftCharacterRow[]) {
+      if (c.entity_type === 'object') {
+        result.skipped++
+        continue
+      }
+      const defaultAppearance = defaultAppearances.get(c.character_id)
+      if (!defaultAppearance) {
+        result.failed++
+        console.error(`[draft-trigger] ${projectId}/${c.character_id}: default appearance missing`)
+        continue
+      }
       // (a) 대표 이미지 이미 있음
-      if (c.view_main) {
+      if (defaultAppearance.sheet_url) {
         result.skipped++
         continue
       }
@@ -113,6 +142,7 @@ export async function triggerCharacterDrafts(
         .select('id')
         .eq('project_id', projectId)
         .eq('character_id', c.character_id)
+        .eq('appearance_key', defaultAppearance.appearance_key)
         .eq('view', 'main')
         .limit(1)
       if (existingCandidate && existingCandidate.length > 0) {
@@ -120,29 +150,26 @@ export async function triggerCharacterDrafts(
         continue
       }
       // (c) main 슬롯 queued 잡 존재
-      if (await hasQueuedCharacterViewJob(projectId, c.character_id, 'main')) {
+      if (await hasQueuedCharacterViewJob(projectId, c.character_id, defaultAppearance.appearance_key, 'main')) {
         result.skipped++
         continue
       }
 
       try {
         const lookFingerprint = computeLookFingerprint(designTokens, c.costume, project?.style_anchor_key ?? null)
-        // 사람 = 턴어라운드 시트: 캐릭터 템플릿(public asset)을 reference 로 넣은 I2I(edit) — 버튼 경로(generate-sheet)와 정합.
-        //   base URL 없으면 동일 프롬프트 T2I(3:2) 폴백. 사물 = 단일 포트레이트(1:1). (#7)
-        const isPerson = c.entity_type !== 'object'
+        // 턴어라운드 시트: 캐릭터 템플릿(public asset)을 reference 로 넣은 I2I(edit) — 버튼 경로(generate-sheet)와 정합.
+        // base URL 없으면 동일 프롬프트 T2I(3:2) 폴백.
         const promptInput = {
           name: c.name,
-          appearance: c.appearance ?? c.name,
+          appearance: defaultAppearance.appearance ?? c.name,
           role: c.role ?? undefined,
         }
-        const prompt = isPerson
-          ? buildCharacterTurnaroundPrompt(promptInput)
-          : buildCharacterMainPrompt(promptInput)
+        const prompt = buildCharacterTurnaroundPrompt(promptInput)
         // 템플릿은 스토리지에서 (template-asset.ts 주석 참고).
-        const templateUrl = isPerson ? await templateAssetUrl('character-template.png') : null
+        const templateUrl = await templateAssetUrl('character-template.png')
         let submitOpts: FalImageOptions = templateUrl
           ? { model: 'openai/gpt-image-2/edit', prompt, reference_image_urls: [templateUrl], webhookUrl }
-          : { model: DRAFT_MODEL, prompt, aspect_ratio: isPerson ? '3:2' : '1:1', webhookUrl }
+          : { model: DRAFT_MODEL, prompt, aspect_ratio: '3:2', webhookUrl }
         if (anchor) {
           const { webhookUrl: wh, ...anchorable } = submitOpts
           const anchored = templateUrl
@@ -184,15 +211,16 @@ export async function triggerCharacterDrafts(
               ? { reference_image_urls: submitOpts.reference_image_urls }
               : {}),
             ...(submitOpts.aspect_ratio ? { aspect_ratio: submitOpts.aspect_ratio } : {}),
-            source_hash: computeImageSourceHash(c.appearance, lookFingerprint),
+            source_hash: computeImageSourceHash(defaultAppearance.appearance, lookFingerprint),
             // 외형만의 지문(룩 무관) — look-pending vs edited 구분용(027).
-            appearance_hash: computeImageSourceHash(c.appearance, null),
+            appearance_hash: computeImageSourceHash(defaultAppearance.appearance, null),
             look_present: lookFingerprint != null,
             style_anchor_key: anchor?.key ?? null,
           },
           target: {
             workspaceId: project?.workspace_id ?? undefined,
             characterId: c.character_id,
+            appearanceKey: defaultAppearance.appearance_key,
             view: 'main',
             column: CHARACTER_VIEW_COLUMNS.main,
           },

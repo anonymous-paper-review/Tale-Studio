@@ -108,7 +108,10 @@ export async function softDeleteDirectorVideoTake(projectId: string, videoClipId
 export async function updateDirectorVideoTakeMetadata(
   projectId: string,
   videoClipId: string,
-  metadata: Pick<Partial<DirectorVideoTake>, 'take_label' | 'override' | 'canvas_position'>,
+  metadata: Pick<
+    Partial<DirectorVideoTake>,
+    'take_label' | 'override' | 'canvas_position' | 'frame_inputs' | 'video_chain'
+  >,
 ): Promise<DirectorVideoTake> {
   const { data, error } = await supabaseAdmin
     .from('video_clips')
@@ -116,6 +119,9 @@ export async function updateDirectorVideoTakeMetadata(
       ...(metadata.take_label !== undefined ? { take_label: metadata.take_label } : {}),
       ...(metadata.override !== undefined ? { override: metadata.override } : {}),
       ...(metadata.canvas_position !== undefined ? { canvas_position: metadata.canvas_position } : {}),
+      // #wiring-persistence: 수동 연결의 안정 참조 직렬화 결과 write-through.
+      ...(metadata.frame_inputs !== undefined ? { frame_inputs: metadata.frame_inputs } : {}),
+      ...(metadata.video_chain !== undefined ? { video_chain: metadata.video_chain } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('id', videoClipId)

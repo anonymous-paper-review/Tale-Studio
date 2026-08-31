@@ -4,12 +4,18 @@ import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { fal } from '@fal-ai/client'
-import { type DialogueLine, type DialogueSpeaker, buildVideoPrompt } from '@/lib/director/video-prompt'
+import {
+  type DialogueLine,
+  type DialogueSpeaker,
+  type VideoReferenceImageRole,
+  buildVideoPrompt,
+} from '@/lib/director/video-prompt'
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { getGenerationJobById, userOwnsProject } from '@/lib/generation-jobs'
 import { checkGenerationCapacity, checkProjectVideoBudget } from '@/lib/generation-quota'
 import { quotaRejectionResponse, videoBudgetRejectionResponse } from '@/lib/api/quota'
+import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import {
@@ -52,6 +58,19 @@ type VideoSubmission = {
   model: string
 }
 
+class CharacterAppearanceContractError extends Error {}
+
+function requireCharacterAppearanceKeys(value: unknown, shotId: string): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new CharacterAppearanceContractError(`Character appearance contract error: shot ${shotId} has no character_appearance_keys snapshot`)
+  }
+  const entries = Object.entries(value)
+  if (entries.some(([characterId, appearanceKey]) => !characterId || typeof appearanceKey !== 'string' || !appearanceKey.trim())) {
+    throw new CharacterAppearanceContractError(`Character appearance contract error: shot ${shotId} has a malformed character_appearance_keys snapshot`)
+  }
+  return Object.fromEntries(entries.map(([characterId, appearanceKey]) => [characterId, appearanceKey.trim()]))
+}
+
 function isJsonValue(value: unknown): value is Json {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true
   if (typeof value === 'number') return Number.isFinite(value)
@@ -80,6 +99,7 @@ function snapshotValueMatches(snapshot: Record<string, unknown>, candidate: Reco
   return [
     'prompt', 'full_prompt', 'camera', 'duration_seconds', 'aspect_ratio', 'generation_method',
     'provider', 'model', 'resolved_model_key', 'reference_image_url', 'reference_image_urls',
+    'reference_image_roles',
     'movement_preset', 'camera_preset', 'fal_request', 'new_take_metadata',
   ].every((key) => {
     const snapshotHasKey = Object.prototype.hasOwnProperty.call(snapshot, key)
@@ -385,7 +405,8 @@ export async function POST(req: Request) {
     const body = (await req.json()) as {
       shotId?: string; projectId?: string; writerShotId?: string | null; prompt?: string; camera?: CameraConfig
       durationSeconds?: number; aspectRatio?: string; generationMethod?: GenerationMethod; provider?: VideoProvider
-      model?: string; referenceImageUrl?: string; referenceImageUrls?: string[]; movementPreset?: string | null
+      model?: string; referenceImageUrl?: string; referenceImageUrls?: string[]
+      referenceImageRoles?: Array<'start' | 'end' | 'ref'>; movementPreset?: string | null
       cameraPreset?: CameraPreset | null
       idempotencyKey?: string; videoClipId?: string; takeLabel?: string | null; override?: Json; canvasPosition?: Json | null
       recoveryReceipt?: string; actor?: string
@@ -401,6 +422,20 @@ export async function POST(req: Request) {
     const referenceImageUrlsV2 = Array.isArray(body.referenceImageUrls)
       ? body.referenceImageUrls.filter((u): u is string => typeof u === 'string' && !!u).slice(0, 4)
       : undefined
+    const referenceImageRolesV2 = Array.isArray(body.referenceImageRoles)
+      ? body.referenceImageRoles.length <= 4 &&
+        body.referenceImageRoles.every(
+          (role): role is VideoReferenceImageRole =>
+            role === 'start' || role === 'end' || role === 'ref',
+        )
+        ? body.referenceImageRoles
+        : undefined
+      : undefined
+    const alignedReferenceImageRoles =
+      referenceImageUrlsV2?.length &&
+      referenceImageRolesV2?.length === referenceImageUrlsV2.length
+        ? referenceImageRolesV2
+        : undefined
     const writerShotId = body.writerShotId ?? body.shotId
     projectId = body.projectId ?? ''
     if (!projectId || !writerShotId || !prompt || !idempotencyKey) {
@@ -415,12 +450,13 @@ export async function POST(req: Request) {
     const [{ data: project, error: projectError }, { data: shot, error: shotError }] = await Promise.all([
       supabaseAdmin.from('projects').select('workspace_id, style_anchor_key').eq('id', projectId).maybeSingle(),
       // #motion-contract: dynamic_spec(모션 계약 소스) + design_ref(구버전 state 폴백 조인 키) 동봉.
-      supabaseAdmin.from('shots').select('shot_id, dynamic_spec, design_ref, dialogue_lines').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
+      supabaseAdmin.from('shots').select('shot_id, dynamic_spec, design_ref, dialogue_lines, character_appearance_keys').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
     ])
     if (projectError) throw projectError
     if (shotError) throw shotError
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
     if (!shot) return NextResponse.json({ error: 'writerShotId does not belong to project' }, { status: 400 })
+    const characterAppearanceKeys = requireCharacterAppearanceKeys(shot.character_appearance_keys, writerShotId)
     const replayQuery = supabaseAdmin
       .from('generation_jobs')
       .select('id, video_clip_id, target')
@@ -504,31 +540,61 @@ export async function POST(req: Request) {
       (project as { style_anchor_key?: string | null }).style_anchor_key ?? null,
     ).catch(() => null)
     const suppressGear = !!(videoAnchor?.medium && videoAnchor.medium !== 'live_action')
+    // #w-c(2026-08-31 오너 확정, 실측 sh_02_09): 수동 샷(shots.prompt=NULL)은 한국어 액션
+    //   원문이 그대로 영상 프롬프트로 흘러온다 — EN 파생은 previz 라우트에만 있었다(감사 W3).
+    //   서버 최종 방어로 여기서 파생한다: 이미 영어면 deriveEnBatch 가 LLM 없이 통과라 파이프라인
+    //   샷은 비용 0, 실패 항목은 맵에 없어 원문 폴백. 대사 원문은 dialogueClause 가 따로 싣는다.
+    let promptEn = prompt
+    try {
+      const en = (await deriveEnBatch([{ id: 'p', native: prompt }], 'director video prompt')).get('p')
+      if (en) promptEn = en
+    } catch (err) {
+      console.warn('[director/generate-video] EN derive skipped:', err instanceof Error ? err.message : err)
+    }
     // #g7-speakers(2026-08-27 오너 확정): 대사 화자를 "이름 (외형 앵커)"로 접지 — 샷 프롬프트가
     //   캐릭터를 이름 없이 외형으로만 묘사하므로 이름만으로는 화면 속 누구인지 알 수 없다.
     //   대사에 characterId 가 실제로 있을 때만 조회(무대사 샷 비용 0·테스트 목 순서 불변),
     //   실패는 fail-open — 화자 표기는 정확도 보조지 유료 생성의 성립 조건이 아니다.
     const dialogueLines = Array.isArray(shot.dialogue_lines) ? (shot.dialogue_lines as DialogueLine[]) : null
     let dialogueSpeakers: Record<string, DialogueSpeaker> | null = null
-    if (dialogueLines?.some((l) => (l?.text ?? '').trim() && (l?.characterId ?? '').trim())) {
-      try {
-        const { data: chars } = await supabaseAdmin
-          .from('characters')
-          .select('character_id, name, appearance')
-          .eq('project_id', projectId)
-        if (chars?.length) {
-          dialogueSpeakers = Object.fromEntries(
-            chars
-              .filter((c) => typeof c.character_id === 'string' && c.character_id && typeof c.name === 'string' && c.name)
-              .map((c) => [c.character_id, { name: c.name, appearance: c.appearance }]),
-          )
+    const speakerIds = [...new Set(
+      (dialogueLines ?? [])
+        .filter((line) => (line?.text ?? '').trim() && (line?.characterId ?? '').trim())
+        .map((line) => line.characterId!.trim()),
+    )].sort()
+    if (speakerIds.length) {
+      const speakerPairs = speakerIds.map((characterId) => {
+        const appearanceKey = characterAppearanceKeys[characterId]
+        if (!appearanceKey) {
+          throw new CharacterAppearanceContractError(`Character appearance contract error: dialogue speaker ${characterId} has no appearance snapshot`)
         }
-      } catch (err) {
-        console.warn('[director/generate-video] speaker lookup skipped:', err instanceof Error ? err.message : err)
-      }
+        return { characterId, appearanceKey }
+      })
+      const [{ data: chars, error: charsError }, { data: appearanceRows, error: appearancesError }] = await Promise.all([
+        supabaseAdmin.from('characters').select('character_id, name').eq('project_id', projectId).in('character_id', speakerIds),
+        supabaseAdmin.from('character_appearances').select('character_id, appearance_key, appearance').eq('project_id', projectId).in('character_id', speakerIds).in('appearance_key', [...new Set(speakerPairs.map(({ appearanceKey }) => appearanceKey))]),
+      ])
+      if (charsError) throw charsError
+      if (appearancesError) throw appearancesError
+      const charsById = new Map((chars ?? []).map((character) => [character.character_id as string, character]))
+      const appearancesByPair = new Map((appearanceRows ?? []).map((appearance) => [
+        `${appearance.character_id as string}\u0000${appearance.appearance_key as string}`,
+        appearance,
+      ]))
+      dialogueSpeakers = Object.fromEntries(speakerPairs.map(({ characterId, appearanceKey }) => {
+        const character = charsById.get(characterId)
+        const appearance = appearancesByPair.get(`${characterId}\u0000${appearanceKey}`)
+        if (!character || typeof character.name !== 'string' || !character.name.trim()) {
+          throw new CharacterAppearanceContractError(`Character appearance contract error: dialogue speaker ${characterId} has no character identity`)
+        }
+        if (!appearance || typeof appearance.appearance !== 'string' || !appearance.appearance.trim()) {
+          throw new CharacterAppearanceContractError(`Character appearance contract error: ${characterId}/${appearanceKey} has no required appearance`)
+        }
+        return [characterId, { name: character.name, appearance: appearance.appearance }] as const
+      }))
     }
     const { fullPrompt, prompt_parts: promptParts } = buildVideoPrompt({
-      prompt,
+      prompt: promptEn,
       camera,
       movementPreset,
       cameraPreset: suppressGear ? null : cameraPreset,
@@ -536,6 +602,7 @@ export async function POST(req: Request) {
       modelKey,
       durationSeconds: dur,
       startEndReference: (submitRefUrls?.length ?? 0) >= 2,
+      ...(alignedReferenceImageRoles ? { referenceImageRoles: alignedReferenceImageRoles } : {}),
       dynamicSpec,
       // #g7 (2026-08-27 오너 확정: 음성은 영상 생성기에 맡긴다) — 대사를 프롬프트에 싣는다.
       //   DB 에 있는데 여태 아무도 읽지 않아 모델이 대사의 존재를 몰랐다.
@@ -569,6 +636,7 @@ export async function POST(req: Request) {
       reference_image_url: referenceImageUrl ?? null,
       // 배열 키는 존재할 때만 — 구버전 예약 잡의 리플레이 비교(snapshotValueMatches)와 호환.
       ...(referenceImageUrlsV2?.length ? { reference_image_urls: referenceImageUrlsV2 } : {}),
+      ...(alignedReferenceImageRoles ? { reference_image_roles: alignedReferenceImageRoles } : {}),
       movement_preset: movementPreset ?? null,
       camera_preset: cameraPreset ?? null,
       ...(videoClipId ? {} : { new_take_metadata: normalizedNewTakeMetadata }),
@@ -738,6 +806,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ...response, taskId: result.taskId, provider: result.provider, model: result.model, status: 'generating' })
   } catch (err) {
     if (err instanceof RecoveryInputError) return NextResponse.json({ error: err.message }, { status: err.status })
+    if (err instanceof CharacterAppearanceContractError) return NextResponse.json({ error: err.message }, { status: 409 })
     const errMsg = err instanceof Error ? err.message : String(err)
     if (err instanceof DirectorVideoCompletionPersistenceError && reservation && projectId) {
       console.error('[director/generate-video] completion persistence failed:', errMsg)

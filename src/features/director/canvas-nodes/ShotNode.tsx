@@ -1,10 +1,11 @@
 'use client'
 
 import { memo } from 'react'
-import { Handle, NodeToolbar, Position, type NodeProps } from '@xyflow/react'
+import { NodeToolbar, Position, type NodeProps } from '@xyflow/react'
 import { Camera, Lightbulb, ImageIcon, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BaseNode } from './BaseNode'
+import { LabeledTargetHandle } from './LabeledHandle'
 import {
   getChildVideos,
   getShotStage,
@@ -14,6 +15,7 @@ import {
 import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { isShotData, type DirectorNode } from '@/types/director'
+import { IMAGE_MODELS, normalizeImageModelKey } from '@/lib/image-models'
 import { prettyNodeLabel } from '@/features/director/node-label'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
@@ -43,18 +45,15 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     ['horizontal', 'vertical', 'pan', 'tilt', 'roll', 'zoom'] as const
   ).filter((k) => data.camera[k] !== 0).length
 
-  // #previz-chain: writer 샷 카드는 항상 목각(previz) 이미지 — 실사는 SHOT IMAGE 파생 노드가 표시.
-  //   수동 노드(writerShotId 없음, 체인 미생성)만 기존 단계별 표시(rough→실사) 유지.
-  const isChainShot = !!data.writerShotId
+  // #node-merge(2026-08-31): 파생 SHOT IMAGE 카드 제거 — 이 카드가 실사 이미지를 직접
+  //   표시한다. 실사(storyboardImage 완료) 우선, 없으면 previz(rough) 폴백.
   const roughUrl =
     rough?.status === 'completed' ? (rough.frames?.start ?? rough.url) : null
-  const stageImageUrl = isChainShot
-    ? roughUrl
-    : stage === 'rough'
-      ? roughUrl
-      : (data.storyboardImage?.url ?? null)
+  const realImage =
+    data.storyboardImage?.status === 'completed' ? data.storyboardImage : null
+  const stageImageUrl = realImage?.url ?? roughUrl
 
-  const failed = !isChainShot && data.storyboardImage?.status === 'failed'
+  const failed = data.storyboardImage?.status === 'failed'
   const prompt = effectivePrompt(data)
 
   return (
@@ -77,16 +76,12 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             {stage === 'rough' ? t('Generate image') : t('Retouch image')}
             <ChevronRight className="size-3" />
           </Button>
-          {/* 이미지 생성 모델 표기(#e4 2026-07-15) — 영상 모델 칩 대신 이미지 모델 2종.
-              GPT Image 2.0 = 현재 사용 모델, Midjourney 8.1 = 준비 중(비활성). */}
-          <span className="rounded-sm border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
-            GPT Image 2.0
-          </span>
+          {/* 선택된 이미지 모델 칩(#image-model-select) — 변경은 편집 패널/팝업에서. */}
           <span
-            className="cursor-not-allowed rounded-sm border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground opacity-60"
-            title={t('Coming soon')}
+            className="rounded-sm border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground"
+            title={IMAGE_MODELS[normalizeImageModelKey(data.imageModel)].t2iEndpoint}
           >
-            Midjourney 8.1
+            {IMAGE_MODELS[normalizeImageModelKey(data.imageModel)].label}
           </span>
         </div>
       </NodeToolbar>
@@ -101,8 +96,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         // 빔은 로컬 플래그(즉시 반응) + DB status(재진입/웹훅 경로) 둘 다에서 켜진다.
         //   #previz-chain: 체인 샷의 실사 생성 빔은 SHOT IMAGE 파생 노드가 담당.
         beam={
-          isGenerating ||
-          (!isChainShot && data.storyboardImage?.status === 'generating')
+          isGenerating || data.storyboardImage?.status === 'generating'
             ? 'success'
             : null
         }
@@ -111,13 +105,18 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           void generateVideoForShot(id)
         }}
       >
-        {/* Prompt 노드 와이어링용 T 입력 핸들 (좌측) */}
-        <Handle
-          type="target"
-          position={Position.Left}
+        {/* 입력 핸들(#handle-visibility) — 항상 보이는 라벨 홈들로 교체. */}
+        <LabeledTargetHandle
           id="prompt"
-          className="!h-2 !w-2 !border-0 bg-foreground/50 opacity-0 group-hover:opacity-100"
-          style={{ top: 64 }}
+          label="PROMPT"
+          top={64}
+          title={t('Prompt input')}
+        />
+        <LabeledTargetHandle
+          id="image-reference"
+          label="IMAGE"
+          top={90}
+          title={t('Image reference input')}
         />
 
         {prompt && (
@@ -131,17 +130,27 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             카드 본문·팝업에서 이미 보인다. 3프레임 없는 이미지(구버전/수동 노드)는 정적 표시. */}
         {stageImageUrl && (
           <div className="relative mt-2 aspect-video w-full overflow-hidden rounded-sm border border-border/40">
-            {rough?.status === 'completed' && rough.frames ? (
+            {realImage ? (
+              realImage.frames ? (
+                <RoughFrameCycle panel={realImage} alt={`${data.label} storyboard`} />
+              ) : (
+                <ThumbImage
+                  src={realImage.url}
+                  alt="storyboard"
+                  className="h-full w-full object-cover"
+                />
+              )
+            ) : rough?.status === 'completed' && rough.frames ? (
               <RoughFrameCycle panel={rough} alt={`${data.label} (previz)`} />
             ) : (
               <ThumbImage
                 src={stageImageUrl}
-                alt={stage === 'rough' ? 'rough storyboard' : 'storyboard'}
+                alt="rough storyboard"
                 className="h-full w-full object-cover"
               />
             )}
             <span className="pointer-events-none absolute left-1 top-1 rounded-sm bg-background/70 px-1 text-[9px] uppercase text-muted-foreground">
-              {isChainShot ? t('Previz') : stage === 'rough' ? t('Previz') : stage === 'live' ? t('Live-action') : t('Video')}
+              {realImage ? t('Live-action') : t('Previz')}
             </span>
           </div>
         )}

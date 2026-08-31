@@ -1,8 +1,7 @@
-// 새 캐릭터 영속 — Artist 카드 (+버튼) / 채팅 createCharacter 에서 만든 캐릭터를
-// characters 테이블에 insert. 이미지(view_*)는 비워둠 — 이후 generate-sheet 가 채운다.
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { getUser } from '@/lib/supabase/auth'
+import { demoWriteBlock } from '@/lib/demo/guard-server'
+import { requireProjectAccess } from '@/lib/api/guard'
 import { appearanceI18nFields } from '@/lib/writer/i18n/derive-en'
 
 export const runtime = 'nodejs'
@@ -10,31 +9,23 @@ export const runtime = 'nodejs'
 const VALID_ROLES = new Set(['protagonist', 'antagonist', 'supporting'])
 const VALID_ENTITY_TYPES = new Set(['person', 'object'])
 
+type CharacterBody = {
+  projectId?: string
+  characterId?: string
+  name?: string
+  role?: string
+  entity_type?: string
+  description?: string
+  appearance?: string
+}
+
 export async function POST(req: Request) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
+
   try {
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const {
-      projectId,
-      characterId,
-      name,
-      role,
-      entity_type,
-      description,
-      appearance,
-    } = (await req.json()) as {
-      projectId?: string
-      characterId?: string
-      name?: string
-      role?: string
-      entity_type?: string
-      description?: string
-      appearance?: string
-    }
-
+    const body = (await req.json()) as CharacterBody
+    const { projectId, characterId, name, role, entity_type, description, appearance } = body
     if (!projectId || !characterId || !name?.trim()) {
       return NextResponse.json(
         { error: 'projectId, characterId, name required' },
@@ -42,60 +33,69 @@ export async function POST(req: Request) {
       )
     }
 
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
+
     const safeRole = role && VALID_ROLES.has(role) ? role : 'supporting'
     const safeEntityType =
       entity_type && VALID_ENTITY_TYPES.has(entity_type) ? entity_type : 'person'
-
-    // 언어 경계(S2c): 입력 외형(native) → appearance_native 보존 + EN base 파생 → appearance. description 은 별개(유저 입력).
     const i18n = await appearanceI18nFields(characterId, appearance)
-    const { data, error } = await supabaseAdmin
-      .from('characters')
-      .insert({
-        project_id: projectId,
-        character_id: characterId,
-        name: name.trim(),
-        role: safeRole,
-        entity_type: safeEntityType,
-        description: description?.trim() || null,
-        appearance: i18n.appearance,
-        appearance_native: i18n.appearance_native,
-        i18n_provenance: i18n.i18n_provenance,
-      })
-      .select('character_id')
-      .single()
 
-    if (error) {
-      console.error('[artist/character] insert failed:', error.message)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (safeEntityType === 'object') {
+      const { data, error } = await supabaseAdmin
+        .from('props')
+        .insert({
+          project_id: projectId,
+          prop_id: characterId,
+          name: name.trim(),
+          description: description?.trim() || null,
+          appearance: i18n.appearance,
+          appearance_native: i18n.appearance_native,
+          image_url: null,
+          origin: 'user',
+        })
+        .select('prop_id')
+        .single()
+      if (error) throw error
+      return NextResponse.json({ characterId: data.prop_id })
     }
 
-    return NextResponse.json({ characterId: data.character_id })
+    const { data, error } = await supabaseAdmin.rpc(
+      'create_person_with_default_appearance',
+      {
+        p_project_id: projectId,
+        p_person: {
+          character_id: characterId,
+          name: name.trim(),
+          role: safeRole,
+          description: description?.trim() || null,
+          arc: null,
+          motivation: null,
+          origin: 'user',
+          appearance: i18n.appearance,
+          appearance_native: i18n.appearance_native,
+          costume: null,
+          i18n_provenance: i18n.i18n_provenance,
+        },
+      },
+    )
+    if (error) throw error
+
+    return NextResponse.json({ characterId: data?.character_id ?? characterId })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    console.error('[artist/character]', message)
+    console.error('[artist/character POST]', message)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
-// 기존 캐릭터 메타 수정 — 카드 인라인 편집(이름/역할/설정/외형)에서 호출.
-// 전달된 필드만 부분 갱신. 외형은 언어 경계(S2c) i18n 파생을 거친다.
 export async function PATCH(req: Request) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
+
   try {
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { projectId, characterId, name, role, description, appearance } =
-      (await req.json()) as {
-        projectId?: string
-        characterId?: string
-        name?: string
-        role?: string
-        description?: string
-        appearance?: string
-      }
-
+    const body = (await req.json()) as CharacterBody
+    const { projectId, characterId, name, role, description, appearance } = body
     if (!projectId || !characterId) {
       return NextResponse.json(
         { error: 'projectId, characterId required' },
@@ -103,35 +103,83 @@ export async function PATCH(req: Request) {
       )
     }
 
-    const patch: Record<string, unknown> = {}
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
+
+    const [personResult, propResult] = await Promise.all([
+      supabaseAdmin
+        .from('characters')
+        .select('character_id, entity_type')
+        .eq('project_id', projectId)
+        .eq('character_id', characterId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('props')
+        .select('prop_id')
+        .eq('project_id', projectId)
+        .eq('prop_id', characterId)
+        .maybeSingle(),
+    ])
+    if (personResult.error) throw personResult.error
+    if (propResult.error) throw propResult.error
+    if (!personResult.data && !propResult.data) {
+      return NextResponse.json({ error: 'character not found' }, { status: 404 })
+    }
+    if (
+      (personResult.data && personResult.data.entity_type !== 'person') ||
+      (personResult.data && propResult.data)
+    ) {
+      return NextResponse.json({ error: 'ambiguous character entity' }, { status: 409 })
+    }
+
+    const identityPatch: Record<string, unknown> = {}
     if (name !== undefined) {
       if (!name.trim()) {
         return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 })
       }
-      patch.name = name.trim()
+      identityPatch.name = name.trim()
     }
-    if (role !== undefined && VALID_ROLES.has(role)) patch.role = role
-    if (description !== undefined) patch.description = description.trim() || null
-    if (appearance !== undefined) {
-      const i18n = await appearanceI18nFields(characterId, appearance)
-      patch.appearance = i18n.appearance
-      patch.appearance_native = i18n.appearance_native
-      patch.i18n_provenance = i18n.i18n_provenance
-    }
+    if (role !== undefined && VALID_ROLES.has(role)) identityPatch.role = role
+    if (description !== undefined) identityPatch.description = description.trim() || null
 
-    if (Object.keys(patch).length === 0) {
+    const i18n = appearance === undefined
+      ? null
+      : await appearanceI18nFields(characterId, appearance)
+    const appearancePatch = i18n
+      ? {
+          appearance: i18n.appearance,
+          appearance_native: i18n.appearance_native,
+          i18n_provenance: i18n.i18n_provenance,
+        }
+      : {}
+
+    if (Object.keys(identityPatch).length === 0 && Object.keys(appearancePatch).length === 0) {
       return NextResponse.json({ ok: true })
     }
 
-    const { error } = await supabaseAdmin
-      .from('characters')
-      .update(patch)
-      .eq('project_id', projectId)
-      .eq('character_id', characterId)
-
-    if (error) {
-      console.error('[artist/character PATCH] update failed:', error.message)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (personResult.data) {
+      const { error } = await supabaseAdmin.rpc(
+        'update_person_with_default_appearance',
+        {
+          p_project_id: projectId,
+          p_character_id: characterId,
+          p_identity_patch: identityPatch,
+          p_appearance_patch: appearancePatch,
+        },
+      )
+      if (error) throw error
+    } else {
+      const patch: Record<string, unknown> = { ...identityPatch, ...appearancePatch }
+      delete patch.role
+      if (Object.keys(patch).length === 0) {
+        return NextResponse.json({ ok: true })
+      }
+      const { error } = await supabaseAdmin
+        .from('props')
+        .update(patch)
+        .eq('project_id', projectId)
+        .eq('prop_id', characterId)
+      if (error) throw error
     }
 
     return NextResponse.json({ ok: true })

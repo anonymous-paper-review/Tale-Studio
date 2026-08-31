@@ -114,8 +114,8 @@ export async function POST(req: Request) {
     }
 
     if (type === 'video') {
-      if (field !== 'thumbnail') {
-        return NextResponse.json({ error: 'Only thumbnail uploads are allowed for video takes' }, { status: 400 })
+      if (field !== 'thumbnail' && field !== 'chain_frame') {
+        return NextResponse.json({ error: 'Only thumbnail or chain-frame uploads are allowed for video takes' }, { status: 400 })
       }
       if (!generationJobId || !isCanonicalSegment(generationJobId)) return NextResponse.json({ error: 'generationJobId is required for video thumbnails' }, { status: 400 })
       if (file.size === 0 || file.size > MAX_IMAGE_BYTES) {
@@ -142,6 +142,12 @@ export async function POST(req: Request) {
       if (!clip) return NextResponse.json({ error: 'Video take not found' }, { status: 404 })
       if (clip.storage_path !== expectedVideoPath) {
         return NextResponse.json({ error: 'Generation job is no longer the current video take' }, { status: 409 })
+      }
+
+      if (field === 'chain_frame') {
+        const storagePath = `${project.workspace_id}/${projectId}/videos/${clip.id}/${job.id}_chain-frame.jpg`
+        await uploadImmutableObject(storagePath, buffer, mimeType)
+        return NextResponse.json({ publicUrl: mediaPublicUrl(storagePath) })
       }
 
       const storagePath = `${project.workspace_id}/${projectId}/videos/${clip.id}/${job.id}.jpg`

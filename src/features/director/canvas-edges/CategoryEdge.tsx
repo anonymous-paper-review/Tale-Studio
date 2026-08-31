@@ -15,6 +15,9 @@ const STYLE_BY_CATEGORY: Record<
   'relates-to': { strokeWidth: 1.5 },
   references: { strokeWidth: 1.5, strokeDasharray: '4 4' }, // Asset→Shot, 점선
   prompt: { strokeWidth: 1.5, strokeDasharray: '2 3' }, // Prompt→Shot T 입력
+  image: { strokeWidth: 1.5, strokeDasharray: '3 3' }, // Image→Shot reference input
+  frame: { strokeWidth: 1.5, strokeDasharray: '2 3' }, // Video frame 입력
+  'video-chain': { strokeWidth: 2, strokeDasharray: '6 3' }, // Video last-frame → Video START
   chain: { strokeWidth: 2 }, // previz 체인(파생) — parent 와 동일한 실선 계층 표현
 }
 

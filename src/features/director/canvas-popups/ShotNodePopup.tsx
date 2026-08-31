@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Film, GitBranch, Loader2, Trash2, Upload, X } from 'lucide-react'
+import { useMemo } from 'react'
+import { ImageIcon, Loader2, Trash2, Upload, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -22,25 +22,17 @@ import {
   newDirectorId,
   type ShotNodeData,
 } from '@/types/director'
-import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
-
-import { AngleControl } from '@/features/director/angle-control'
-import { KeyLight } from '@/features/director/key-light'
-import { CameraPresetControl } from '@/features/director/camera-preset-control'
+import {
+  IMAGE_MODELS,
+  IMAGE_MODEL_ORDER,
+  normalizeImageModelKey,
+} from '@/lib/image-models'
 import { useT } from '@/lib/i18n'
 
 type Props = {
   nodeId: string
   data: ShotNodeData
 }
-
-const MODEL_ORDER: VideoModelKey[] = [
-  'happy-horse',
-  'seedance',
-  'kling-o3',
-  'veo',
-  'local',
-]
 
 export function ShotNodePopup({ nodeId, data }: Props) {
   const t = useT()
@@ -49,9 +41,8 @@ export function ShotNodePopup({ nodeId, data }: Props) {
   const debugProjectId = useDirectorCanvasStore((s) => s.projectId)
   const debugPrompts = useDebugPrompts(debugProjectId)
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
-  const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
-  const generateVideoForShot = useDirectorCanvasStore(
-    (s) => s.generateVideoForShot,
+  const generateStoryboardImage = useDirectorCanvasStore(
+    (s) => s.generateStoryboardImage,
   )
   const openDeleteConfirm = useDirectorCanvasStore(
     (s) => s.openDeleteConfirm,
@@ -91,18 +82,12 @@ export function ShotNodePopup({ nodeId, data }: Props) {
   }
 
   const currentPrompt = effectivePrompt(data)
+  const hasImage = data.storyboardImage?.status === 'completed'
 
-  // 새 Video 테이크 생성 + 실제 영상 생성 (D-5). storyboardImage 있으면 I2V.
-  const handleGenerateTake = () => {
-    void generateVideoForShot(nodeId).then((newId) => {
-      if (newId) useDirectorCanvasStore.getState().openPopup(newId)
-    })
-  }
-
-  // Branch = 빈 Video 노드만 생성 (생성은 별도, 결정 #13)
-  const handleAddTake = () => {
-    const newId = addVideoTake(nodeId)
-    if (newId) useDirectorCanvasStore.getState().openPopup(newId)
+  // #ui-cleanup: 이미지 노드의 주 액션은 이미지 생성/재생성 — 영상 테이크 버튼은
+  //   Video 노드(캔버스 Branch·우클릭)가 담당한다.
+  const handleGenerateImage = () => {
+    void generateStoryboardImage(nodeId)
   }
 
   const handleDelete = () => {
@@ -294,96 +279,30 @@ export function ShotNodePopup({ nodeId, data }: Props) {
 
           <Separator />
 
-          {/* Camera preset (브랜드/렌즈/조리개/색온도) */}
-          <CameraPresetControl
-            preset={data.cameraPreset}
-            onUpdate={(changes) =>
-              updateNodeData<'shot'>(nodeId, {
-                cameraPreset: { ...data.cameraPreset, ...changes },
-              })
-            }
-          />
-
-          <Separator />
-
-          {/* Camera 6축 */}
-          <AngleControl
-            camera={data.camera}
-            onUpdate={(changes) =>
-              updateNodeData<'shot'>(nodeId, {
-                camera: { ...data.camera, ...changes },
-              })
-            }
-          />
-
-          <Separator />
-
-          {/* Key Light */}
-          <KeyLight
-            lighting={data.lighting}
-            onUpdate={(changes) =>
-              updateNodeData<'shot'>(nodeId, {
-                lighting: { ...data.lighting, ...changes },
-              })
-            }
-          />
-
-          <Separator />
-
-          {/* 이미지 생성 모델(#e4 2026-07-15) — SHOT IMAGE는 GPT Image 2.0으로 생성된다.
-              Midjourney 8.1은 도입 예정(비활성). 선택 상태는 표시 전용. */}
+          {/* 이미지 생성 모델(#image-model-select 2026-08-31) — fal.ai 카탈로그 기준 실제 선택.
+              이미지 노드에는 이미지 모델만 뜸다 — 영상 모델 선택은 Video 노드 소관. */}
           <Field label={t('Image generation model')}>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <button
-                type="button"
-                className="rounded-md border border-primary bg-primary/10 px-3 py-1.5 text-left text-xs"
-              >
-                <span className="block font-medium">GPT Image 2.0</span>
-                <span className="block font-mono text-[10px] text-muted-foreground">
-                  {t('Default · 16:9')}
-                </span>
-              </button>
-              <button
-                type="button"
-                disabled
-                className="cursor-not-allowed rounded-md border border-border px-3 py-1.5 text-left text-xs opacity-60"
-              >
-                <span className="block font-medium">Midjourney 8.1</span>
-                <span className="block font-mono text-[10px] text-muted-foreground">
-                  {t('Coming soon')}
-                </span>
-              </button>
-            </div>
-          </Field>
-
-          {/* Provider (영상 생성 모델 — video-models 레지스트리) */}
-          <Field label={t('Video generation model')}>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {MODEL_ORDER.map((p) => {
-                const spec = VIDEO_MODELS[p]
-                const durHint =
-                  spec.duration.mode === 'fixed'
-                    ? t('Fixed 8s')
-                    : `${spec.duration.min}–${spec.duration.max}s`
+              {IMAGE_MODEL_ORDER.map((key) => {
+                const spec = IMAGE_MODELS[key]
+                const active = normalizeImageModelKey(data.imageModel) === key
                 return (
                   <button
-                    key={p}
+                    key={key}
+                    type="button"
                     onClick={() =>
-                      updateNodeData<'shot'>(nodeId, { provider: p })
+                      updateNodeData<'shot'>(nodeId, { imageModel: key })
                     }
                     className={cn(
                       'rounded-md border px-3 py-1.5 text-left text-xs transition-colors',
-                      data.provider === p
+                      active
                         ? 'border-primary bg-primary/10'
                         : 'border-border hover:bg-accent',
                     )}
                   >
                     <span className="block font-medium">{spec.label}</span>
-                    <span className="block font-mono text-[10px] text-muted-foreground">
-                      {durHint}
-                      {spec.pricePerSecNoAudio > 0
-                        ? ` · $${spec.pricePerSecNoAudio}/s`
-                        : ''}
+                    <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                      {spec.t2iEndpoint}
                     </span>
                   </button>
                 )
@@ -403,7 +322,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
-            onClick={handleGenerateTake}
+            onClick={handleGenerateImage}
             className="gap-1.5"
             disabled={isGenerating}
           >
@@ -414,20 +333,10 @@ export function ShotNodePopup({ nodeId, data }: Props) {
               </>
             ) : (
               <>
-                <Film className="size-3.5" />
-                {t('Generate new video take')}
+                <ImageIcon className="size-3.5" />
+                {hasImage ? t('Regenerate image') : t('Generate image')}
               </>
             )}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleAddTake}
-            className="gap-1.5"
-            title={t('Create just an empty Video node with the current settings (generation happens separately)')}
-          >
-            <GitBranch className="size-3.5" />
-            {t('Branch (empty take)')}
           </Button>
           <div className="ml-auto" />
           <Button

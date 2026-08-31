@@ -11,11 +11,26 @@ const lookV1 = computeLookFingerprint({ l1: { art_style: 'dark_gothic' } }, null
 const apptA = computeImageSourceHash(A, null) // 외형-only (= 핸드오프 초안 source/appearance hash)
 
 function mkChar(over: Partial<CharacterAsset> & { characterId: string }): CharacterAsset {
+  const views = over.views ?? { main: null, back: null, sideLeft: null, sideRight: null }
+  const viewCandidates = over.viewCandidates ?? {}
   return {
     name: over.characterId,
-    views: { main: null, back: null, sideLeft: null, sideRight: null },
+    views,
+    appearances: [
+      {
+        appearanceKey: 'current',
+        label: 'Current',
+        isDefault: true,
+        narrativeTime: 'present',
+        sheetUrl: views.main,
+        portraitUrl: null,
+        appearance: over.fixedPrompt ?? A,
+        appearanceNative: null,
+        viewCandidates,
+      },
+    ],
     entityType: 'person',
-    viewCandidates: {},
+    viewCandidates,
     fixedPrompt: A,
     ...over,
   } as CharacterAsset
@@ -27,11 +42,11 @@ describe('refreshLookPendingDrafts', () => {
   })
 
   it('look-pending 초안 + writer-무이미지만 main 재생성, fresh/producer-무이미지 제외', async () => {
-    const calls: Array<[string, string]> = []
+    const calls: Array<[string, string, string]> = []
     // generateCharacterView 스텁 — 실제 fetch 대신 호출 기록.
     useArtistStore.setState({
-      generateCharacterView: (async (id: string, view: string) => {
-        calls.push([id, view])
+      generateCharacterView: (async (id: string, appearanceKey: string, view: string) => {
+        calls.push([id, appearanceKey, view])
       }) as never,
       characterAssets: [
         // look-pending: 룩 도착 전 초안(source=appearance-only), 현재 룩 lookV1 → stale=look-pending
@@ -59,7 +74,7 @@ describe('refreshLookPendingDrafts', () => {
 
     const ids = calls.map((c) => c[0]).sort()
     expect(ids).toEqual(['lookpending', 'writernew'])
-    expect(calls.every((c) => c[1] === 'main')).toBe(true)
+    expect(calls.every((c) => c[1] === 'current' && c[2] === 'main')).toBe(true)
   })
 
   it('대상 없으면 아무 것도 호출 안 함', async () => {

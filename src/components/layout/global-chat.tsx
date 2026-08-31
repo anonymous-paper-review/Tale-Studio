@@ -890,7 +890,8 @@ export function GlobalChat() {
     //   게이트 판정·전이·이동은 타이핑했을 때와 똑같이 sendMessage 안에서 일어난다.
     if (action.kind === 'handoff') {
       dismissSuggestion()
-      await sendMessage(action.utterance)
+      // D12(2026-08-31 오너): 명시 버튼("Writer 호출하기")이 곳 동의다 — 승인 카드를 또 띄우지 않는다.
+      await sendMessage(action.utterance, undefined, { consentedHandoff: true })
       return
     }
     const path = await handoffToStage(action.targetStage)

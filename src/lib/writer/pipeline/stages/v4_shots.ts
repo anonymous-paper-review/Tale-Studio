@@ -20,7 +20,7 @@ import {
   normalizeCameraMotion,
   normalizeCharacterMagnitude,
 } from '@/lib/writer/motion-vocabulary';
-import type {
+import type { ShotStaticSpec,
   DecoupagePlan,
   DecoupageShot,
   VisualIdentity,
@@ -221,6 +221,46 @@ export async function runShotDesign(
 }
 
 /** 샷 객체 판별 — 3분할 스펙의 핵심 키(intent) 보유 여부. */
+/**
+ * 사물 캐스트가 character_blocking 에 들어와 있으면 prop_placement 로 옮긴다 (#g4).
+ *
+ * 왜 코드로 강제하나: v4 프롬프트가 "character_blocking 은 사람만, 사물은 prop_placement 로"를
+ *   명시하는데도 모델이 사물을 blocking 에 넣는 일이 반복됐다(실측: 화개장터 sh_04_20 엿판).
+ *   그 결과 그리드 직렬화가 "figure 2 …, blank head" 로 찍었고 아기를 안은 그림이 나왔다.
+ *   지시는 확률이고 이 변환은 결정론이다 — 확률에 안전을 맡기지 않는다.
+ *
+ * 순수 함수(테스트 대상). 사물이 없으면 원본을 그대로 돌려준다.
+ */
+export function moveObjectsToProps(
+  spec: ShotStaticSpec,
+  objectIds: ReadonlySet<string>,
+): ShotStaticSpec {
+  if (objectIds.size === 0) return spec;
+  const blocking = spec.character_blocking;
+  if (!Array.isArray(blocking) || blocking.length === 0) return spec;
+
+  const moved = blocking.filter((b) => objectIds.has(b?.character_id ?? ''));
+  if (moved.length === 0) return spec;
+
+  const stays = blocking.filter((b) => !objectIds.has(b?.character_id ?? ''));
+  const existing = Array.isArray(spec.prop_placement) ? spec.prop_placement : [];
+  // 이미 prop_placement 에 있는 사물은 중복해 넣지 않는다(모델이 양쪽에 쓴 경우).
+  const already = new Set(existing.map((p) => p?.prop ?? ''));
+  const added = moved
+    .filter((b) => !already.has(b.character_id ?? ''))
+    .map((b) => ({
+      prop: b.character_id ?? '',
+      position_in_frame: b.position_in_frame ?? 'center',
+      significance: 'carried',
+    }));
+
+  return {
+    ...spec,
+    character_blocking: stays,
+    prop_placement: [...existing, ...added],
+  };
+}
+
 function isShotLike(v: unknown): v is ShotDesign {
   return !!v && typeof v === 'object' && 'intent' in (v as object);
 }
@@ -686,6 +726,14 @@ ${compactMode ? `씬 길이(${scene.estimated_seconds}초)와 액션 수에 따�
   }
 
   // shot_id 표준화. 데쿠파주 구동 시 감독이 정한 shot_id를 index로 정렬해 보존.
+  // #g4(2026-08-27): 사물이 character_blocking 에 섞이면 스토리보드가 "얼굴 없는 인물"로
+  //   그린다('엿판이 안긴 아기로' 실사고). 프롬프트로 "사물은 prop_placement 로"라고 지시하지만
+  //   모델이 지키지 않는다 — 실측에서 반복 관측됐다. 지시에 의존하지 말고 여기서 바로잡는다.
+  //   하류(러프 그리드)의 걸러내기는 이 강제가 자리잡으면 지울 수 있다.
+  const objectIds = new Set(
+    characters.characters.filter((c) => c.entity_type === 'object').map((c) => c.id),
+  );
+
   return normalized.map((shot, i) => {
     const dec = decoupageDriven && sceneDec![i] ? sceneDec![i] : null;
     const sid = dec
@@ -704,7 +752,7 @@ ${compactMode ? `씬 길이(${scene.estimated_seconds}초)와 액션 수에 따�
           rhythm_role: dec.rhythm_role,
         }),
       },
-      static_spec: { ...shot.static_spec, shot_id: sid },
+      static_spec: { ...moveObjectsToProps(shot.static_spec, objectIds), shot_id: sid },
       dynamic_spec: { ...shot.dynamic_spec, shot_id: sid },
     };
   });

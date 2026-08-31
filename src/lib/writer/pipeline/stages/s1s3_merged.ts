@@ -106,6 +106,11 @@ scene_actions:
 - 씬에서 일어나는 주요 액션을 텍스트로. 한 액션 = 한 샷(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초)에 들어가도록 분리해서 작성.
 - 씬당 액션 수는 위 시간 예산을 따른다.
 
+서사 시점 (필수, time_of_day와 다른 축):
+- narrative_time은 프로젝트의 고정된 "이야기 현재" 기준 present | past | future 중 하나다.
+- 중첩 회상도 직전 씬이 아니라 이야기 현재와 비교한다.
+- time_of_day는 낮·밤·새벽 같은 조명 정보로만 쓴다.
+
 오픈 캐스트 규칙 (중요):
 - [기존 캐스트]는 producer가 이미 확정한 인물이다. 등장시킬 때 **반드시 주어진 slug 그대로** characters_in_scene에 쓴다.
 - 기존 캐스트만으로 전개 가능하면 새 인물을 만들지 말 것 — new_characters는 빈 배열.
@@ -140,6 +145,7 @@ ${world?.locations.length ? world.locations.map((l) => `- ${l.id}${l.name && l.n
   },
   "scenes": [
     {"scene_id": "scene_1", "act_ref": "act_id", "location": "string", "time_of_day": "string",
+     "narrative_time": "present | past | future",
      "characters_in_scene": ["char_id"], "purpose": "string", "emotion_beat": {"start": "string", "end": "string"},
      "dialogue_summary": "string", "key_dialogue": [], "info_asymmetry": "string",
      "estimated_seconds": number, "scene_actions": ["action 1", ...]}

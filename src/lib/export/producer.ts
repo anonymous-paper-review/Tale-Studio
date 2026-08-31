@@ -25,7 +25,8 @@ const DEFAULT_PRODUCER_SETTINGS: ProjectSettings = {
 
 const PRODUCER_PROJECT_SELECT = 'story_text,settings,last_writer_run_id,producer_draft'
 const PRODUCER_CHARACTER_SELECT =
-  'id,character_id,name,role,entity_type,appearance,appearance_native,arc,motivation,origin'
+  'id,character_id,name,role,arc,motivation,origin'
+const PRODUCER_CHARACTER_APPEARANCE_SELECT = 'character_id,appearance,appearance_native'
 const PRODUCER_LOCATION_SELECT =
   'id,location_id,name,visual_description,visual_description_native,style_description,purpose,origin,user_edited,last_writer_run_id'
 
@@ -35,7 +36,7 @@ export async function loadProducerBoard(projectId: string): Promise<ProducerArti
   if (!normalizedProjectId) throw new Error('projectId is required')
 
   const supabase = createClient()
-  const [projectRes, charactersRes, locationsRes] = await Promise.all([
+  const [projectRes, charactersRes, appearancesRes, locationsRes] = await Promise.all([
     supabase
       .from('projects')
       .select(PRODUCER_PROJECT_SELECT)
@@ -46,6 +47,11 @@ export async function loadProducerBoard(projectId: string): Promise<ProducerArti
       .select(PRODUCER_CHARACTER_SELECT)
       .eq('project_id', normalizedProjectId),
     supabase
+      .from('character_appearances')
+      .select(PRODUCER_CHARACTER_APPEARANCE_SELECT)
+      .eq('project_id', normalizedProjectId)
+      .eq('is_default', true),
+    supabase
       .from('locations')
       .select(PRODUCER_LOCATION_SELECT)
       .eq('project_id', normalizedProjectId),
@@ -53,6 +59,7 @@ export async function loadProducerBoard(projectId: string): Promise<ProducerArti
 
   if (projectRes.error) throw new Error(`producer project load failed: ${projectRes.error.message}`)
   if (charactersRes.error) throw new Error(`producer characters load failed: ${charactersRes.error.message}`)
+  if (appearancesRes.error) throw new Error(`producer appearances load failed: ${appearancesRes.error.message}`)
   if (locationsRes.error) throw new Error(`producer locations load failed: ${locationsRes.error.message}`)
 
   const project = recordValue(projectRes.data)
@@ -64,7 +71,7 @@ export async function loadProducerBoard(projectId: string): Promise<ProducerArti
     storyText,
     storyReady: storyText.trim().length > 0,
     settings: normalizeSettingsFromProject(project.settings),
-    cast: recordArray(charactersRes.data).map(mapCharacterRow),
+    cast: mergeDefaultAppearances(recordArray(charactersRes.data), recordArray(appearancesRes.data)).map(mapCharacterRow),
     backgrounds: recordArray(locationsRes.data).map((location, index) =>
       mapBackgroundRow(location, index, project.last_writer_run_id),
     ),
@@ -212,7 +219,7 @@ function mapCharacterRow(row: Record<string, unknown>, index: number): CastMembe
     localId: stringValue(row.id) ?? stringValue(row.character_id) ?? `character-${index + 1}`,
     characterId: stringValue(row.character_id),
     name: stringValue(row.name) ?? '',
-    entityType: row.entity_type === 'object' ? 'object' : 'person',
+    entityType: 'person',
     appearance: stringValue(row.appearance_native) ?? stringValue(row.appearance) ?? '',
     role: stringValue(row.role),
     arc: (recordValue(row.arc) as CastArc | null) ?? undefined,
@@ -220,6 +227,30 @@ function mapCharacterRow(row: Record<string, unknown>, index: number): CastMembe
     origin: row.origin === 'writer' ? 'writer' : 'producer',
     userEdited: false,
   }
+}
+
+function mergeDefaultAppearances(
+  characterRows: Record<string, unknown>[],
+  appearanceRows: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const appearancesByCharacterId = new Map<string, Record<string, unknown>[]>()
+  for (const appearance of appearanceRows) {
+    const characterId = stringValue(appearance.character_id)
+    if (!characterId) continue
+    const appearances = appearancesByCharacterId.get(characterId) ?? []
+    appearances.push(appearance)
+    appearancesByCharacterId.set(characterId, appearances)
+  }
+
+  return characterRows.map((character) => {
+    const characterId = stringValue(character.character_id)
+    if (!characterId) throw new Error('producer character is missing character_id')
+    const appearances = appearancesByCharacterId.get(characterId) ?? []
+    if (appearances.length !== 1) {
+      throw new Error(`producer export requires exactly one default appearance for character ${characterId}; found ${appearances.length}`)
+    }
+    return { ...character, ...appearances[0] }
+  })
 }
 
 function mapBackgroundRow(

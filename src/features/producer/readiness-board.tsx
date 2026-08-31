@@ -683,6 +683,8 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   }, [])
   const persons = cast.filter((m) => m.entityType === 'person')
   const objects = cast.filter((m) => m.entityType === 'object')
+  // 저널의 "주인공 등장" 판정에 쓰는 인물 수 — 게이트와 같은 범위(producer 원천)로 센다.
+  const gatedPersonCount = persons.filter((m) => m.origin !== 'writer').length
   const readyBackgrounds = backgrounds.filter(backgroundReady)
   // @멘션 라벨(ref 정렬) — cast/backgrounds 배열과 인덱스 일치. 카드에 라벨 전달(Cmd+클릭 삽입용).
   // hint(카테고리 배지)만 번역 — label 은 로케일 고정(card-mention.ts 헤더 코멘트, LLM @멘션 매칭 안정성).
@@ -793,7 +795,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
         {/* 좌 퀘스트 저널(제작 여정, 순수 뷰어) / 우 기존 리스트 (#quest-journal 2026-08-07).
             옛 Story Foundation 폼 섹션은 Brief Story 아래 뱃지로 흡수 — 기본 동선은 채팅. */}
         <div className="mx-auto grid max-w-6xl items-start gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
-          <ProducerQuestJournal gate={gate} />
+          <ProducerQuestJournal gate={gate} personCount={gatedPersonCount} />
           <div className="min-w-0 space-y-5">
           {/* Brief Story 히어로(#feedback 2026-08-07 v2) — 목업 타이틀 페이지 형태 차용
               (research/ui-references/producer-viewer-mock.html .hero, 그라데이션만 제외):

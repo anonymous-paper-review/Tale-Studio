@@ -1,22 +1,21 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Film, Loader2, Trash2, Upload, X } from 'lucide-react'
+import { useMemo } from 'react'
+import { ImageIcon, Loader2, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HoverBeam } from '@/components/hover-beam'
 import { Input } from '@/components/ui/input'
 import { ThumbImage } from '@/components/thumb-image'
-import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
-import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
-
-import { AngleControl } from '@/features/director/angle-control'
-import { KeyLight } from '@/features/director/key-light'
-import { CameraPresetControl } from '@/features/director/camera-preset-control'
+import {
+  IMAGE_MODELS,
+  IMAGE_MODEL_ORDER,
+  normalizeImageModelKey,
+} from '@/lib/image-models'
 import { useT } from '@/lib/i18n'
 
 type Props = {
@@ -24,19 +23,11 @@ type Props = {
   data: ShotNodeData
 }
 
-const MODEL_ORDER: VideoModelKey[] = [
-  'happy-horse',
-  'seedance',
-  'kling-o3',
-  'veo',
-  'local',
-]
-
 export function ShotDetailPanel({ nodeId, data }: Props) {
   const t = useT()
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
-  const generateVideoForShot = useDirectorCanvasStore(
-    (s) => s.generateVideoForShot,
+  const generateStoryboardImage = useDirectorCanvasStore(
+    (s) => s.generateStoryboardImage,
   )
   const openDeleteConfirm = useDirectorCanvasStore(
     (s) => s.openDeleteConfirm,
@@ -129,32 +120,27 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
       </Section>
 
       <Section title="Model">
-        <Field label={t('Video generation model')}>
+        {/* #image-model-select 2026-08-31: fal.ai 카탈로그 기준 실제 선택. */}
+        <Field label={t('Image generation model')}>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {MODEL_ORDER.map((p) => {
-              const spec = VIDEO_MODELS[p]
-              const durHint =
-                spec.duration.mode === 'fixed'
-                  ? t('Fixed 8s')
-                  : `${spec.duration.min}–${spec.duration.max}s`
+            {IMAGE_MODEL_ORDER.map((key) => {
+              const spec = IMAGE_MODELS[key]
+              const active = normalizeImageModelKey(data.imageModel) === key
               return (
                 <button
-                  key={p}
+                  key={key}
                   type="button"
-                  onClick={() => updateNodeData<'shot'>(nodeId, { provider: p })}
+                  onClick={() => updateNodeData<'shot'>(nodeId, { imageModel: key })}
                   className={cn(
                     'rounded-md border px-3 py-2 text-left text-xs transition-colors',
-                    data.provider === p
+                    active
                       ? 'border-primary bg-primary/10'
                       : 'border-border hover:bg-accent',
                   )}
                 >
                   <span className="block font-medium">{spec.label}</span>
-                  <span className="block font-mono text-[10px] text-muted-foreground">
-                    {durHint}
-                    {spec.pricePerSecNoAudio > 0
-                      ? ` · $${spec.pricePerSecNoAudio}/s`
-                      : ''}
+                  <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                    {spec.t2iEndpoint}
                   </span>
                 </button>
               )
@@ -292,37 +278,6 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
         </Field>
       </Section>
 
-      <Section title="Camera / Lens">
-        <CameraPresetControl
-          preset={data.cameraPreset}
-          onUpdate={(changes) =>
-            updateNodeData<'shot'>(nodeId, {
-              cameraPreset: { ...data.cameraPreset, ...changes },
-            })
-          }
-        />
-        <Separator />
-        <AngleControl
-          camera={data.camera}
-          onUpdate={(changes) =>
-            updateNodeData<'shot'>(nodeId, {
-              camera: { ...data.camera, ...changes },
-            })
-          }
-        />
-      </Section>
-
-      <Section title="Lighting">
-        <KeyLight
-          lighting={data.lighting}
-          onUpdate={(changes) =>
-            updateNodeData<'shot'>(nodeId, {
-              lighting: { ...data.lighting, ...changes },
-            })
-          }
-        />
-      </Section>
-
       {generationError && (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {generationError}
@@ -333,7 +288,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
         <Button
           type="button"
           size="sm"
-          onClick={() => void generateVideoForShot(nodeId)}
+          onClick={() => void generateStoryboardImage(nodeId)}
           disabled={isGenerating}
           className="w-full gap-1.5"
         >
@@ -344,8 +299,10 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
             </>
           ) : (
             <>
-              <Film className="size-3.5" />
-              {t('Generate new video take')}
+              <ImageIcon className="size-3.5" />
+              {data.storyboardImage?.status === 'completed'
+                ? t('Regenerate image')
+                : t('Generate image')}
             </>
           )}
         </Button>

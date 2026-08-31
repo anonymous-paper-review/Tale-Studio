@@ -324,6 +324,110 @@ export type Database = {
           },
         ]
       }
+      chat_traces: {
+        Row: {
+          trace_id: string
+          project_id: string
+          stage: string
+          route: string
+          model: string
+          duration_ms: number
+          input_tokens: number
+          output_tokens: number
+          cache_read_input_tokens: number
+          cache_creation_input_tokens: number
+          stop_reason: string | null
+          history_count: number
+          history_chars: number
+          context_chars: number
+          prompt_chars: number
+          parse_status: string | null
+          raw_update_count: number | null
+          valid_update_count: number | null
+          applied_count: number | null
+          skipped_count: number | null
+          pending_proposal: boolean | null
+          choices_marker_found: boolean | null
+          choices_count: number | null
+          generation_http_status: number | null
+          generation_status: string | null
+          request_status: number | null
+          error: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          trace_id: string
+          project_id: string
+          stage: string
+          route: string
+          model?: string
+          duration_ms?: number
+          input_tokens?: number
+          output_tokens?: number
+          cache_read_input_tokens?: number
+          cache_creation_input_tokens?: number
+          stop_reason?: string | null
+          history_count?: number
+          history_chars?: number
+          context_chars?: number
+          prompt_chars?: number
+          parse_status?: string | null
+          raw_update_count?: number | null
+          valid_update_count?: number | null
+          applied_count?: number | null
+          skipped_count?: number | null
+          pending_proposal?: boolean | null
+          choices_marker_found?: boolean | null
+          choices_count?: number | null
+          generation_http_status?: number | null
+          generation_status?: string | null
+          request_status?: number | null
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          trace_id?: string
+          project_id?: string
+          stage?: string
+          route?: string
+          model?: string
+          duration_ms?: number
+          input_tokens?: number
+          output_tokens?: number
+          cache_read_input_tokens?: number
+          cache_creation_input_tokens?: number
+          stop_reason?: string | null
+          history_count?: number
+          history_chars?: number
+          context_chars?: number
+          prompt_chars?: number
+          parse_status?: string | null
+          raw_update_count?: number | null
+          valid_update_count?: number | null
+          applied_count?: number | null
+          skipped_count?: number | null
+          pending_proposal?: boolean | null
+          choices_marker_found?: boolean | null
+          choices_count?: number | null
+          generation_http_status?: number | null
+          generation_status?: string | null
+          request_status?: number | null
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_traces_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       editor_states: {
         Row: {
           project_id: string
@@ -401,6 +505,7 @@ export type Database = {
           idempotency_key: string | null
           response_snapshot: Json | null
           error_class: string | null
+          chat_trace_id: string | null
         }
         Insert: {
           id?: string
@@ -427,6 +532,7 @@ export type Database = {
           idempotency_key?: string | null
           response_snapshot?: Json | null
           error_class?: string | null
+          chat_trace_id?: string | null
         }
         Update: {
           id?: string
@@ -453,8 +559,16 @@ export type Database = {
           idempotency_key?: string | null
           response_snapshot?: Json | null
           error_class?: string | null
+          chat_trace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "generation_jobs_chat_trace_id_fkey"
+            columns: ["chat_trace_id"]
+            isOneToOne: false
+            referencedRelation: "chat_traces"
+            referencedColumns: ["trace_id"]
+          },
           {
             foreignKeyName: "generation_jobs_project_id_fkey"
             columns: ["project_id"]
@@ -987,6 +1101,7 @@ export type Database = {
           mood_native: string | null
           i18n_provenance: Json
           source: string
+          narrative_time: string
         }
         Insert: {
           id?: string
@@ -1007,6 +1122,7 @@ export type Database = {
           mood_native?: string | null
           i18n_provenance?: Json
           source?: string
+          narrative_time: string
         }
         Update: {
           id?: string
@@ -1027,6 +1143,7 @@ export type Database = {
           mood_native?: string | null
           i18n_provenance?: Json
           source?: string
+          narrative_time?: string
         }
         Relationships: [
           {
@@ -1080,6 +1197,8 @@ export type Database = {
           check_notes: Json | null
           dynamic_spec: Json | null
           source: string
+          image_inputs: Json
+          character_appearance_keys: Json
         }
         Insert: {
           id?: string
@@ -1122,6 +1241,8 @@ export type Database = {
           check_notes?: Json | null
           dynamic_spec?: Json | null
           source?: string
+          image_inputs?: Json
+          character_appearance_keys: Json
         }
         Update: {
           id?: string
@@ -1164,6 +1285,8 @@ export type Database = {
           check_notes?: Json | null
           dynamic_spec?: Json | null
           source?: string
+          image_inputs?: Json
+          character_appearance_keys?: Json
         }
         Relationships: [
           {
@@ -1277,6 +1400,8 @@ export type Database = {
           last_attempt_at: string | null
           last_attempt_job_id: string | null
           adherence: Json | null
+          frame_inputs: Json | null
+          video_chain: Json | null
         }
         Insert: {
           id?: string
@@ -1301,6 +1426,8 @@ export type Database = {
           last_attempt_at?: string | null
           last_attempt_job_id?: string | null
           adherence?: Json | null
+          frame_inputs?: Json | null
+          video_chain?: Json | null
         }
         Update: {
           id?: string
@@ -1325,6 +1452,8 @@ export type Database = {
           last_attempt_at?: string | null
           last_attempt_job_id?: string | null
           adherence?: Json | null
+          frame_inputs?: Json | null
+          video_chain?: Json | null
         }
         Relationships: [
           {

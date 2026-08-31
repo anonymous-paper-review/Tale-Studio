@@ -25,6 +25,7 @@ import { storageKeySegment } from '@/lib/storage/key-segment'
 import { aspectRatioFromFormat, parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { isChatTraceId } from '@/lib/chat-trace'
+import { isImageModelKey, normalizeImageModelKey, resolveImageEndpoint } from '@/lib/image-models'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 
 export const runtime = 'nodejs'
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio, traceId } =
+    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio, traceId, imageModel } =
       (await req.json()) as {
         projectId?: string
         writerShotId?: string
@@ -42,7 +43,14 @@ export async function POST(req: Request) {
         referenceImageUrls?: string[]
         aspectRatio?: string
         traceId?: string
+        imageModel?: string
       }
+    // #image-model-select: 화이트리스트 밖 모델명은 400 — 임의 fal 경로 주입 방지.
+    //   실제 엔드포인트는 reference 유무가 정해지는 submit 시점에 고른다(#registry-merge).
+    if (imageModel !== undefined && !isImageModelKey(imageModel)) {
+      return NextResponse.json({ error: 'unknown imageModel' }, { status: 400 })
+    }
+    const requestedModelKey = imageModel !== undefined ? normalizeImageModelKey(imageModel) : null
 
     if (!projectId || !writerShotId || !prompt) {
       return NextResponse.json(
@@ -72,7 +80,7 @@ export async function POST(req: Request) {
         .maybeSingle(),
       supabaseAdmin
         .from('shots')
-        .select('shot_id, scene_id, sort_order, rough_storyboard, check_notes')
+        .select('shot_id, scene_id, sort_order, rough_storyboard, check_notes, characters')
         .eq('project_id', projectId)
         .eq('shot_id', writerShotId)
         .maybeSingle(),
@@ -117,9 +125,19 @@ export async function POST(req: Request) {
 
     // shotCheck 채널1(#p2-wiring): 검증이 남긴 연속성 제약을 서버에서 최종 첨부 —
     //   클라가 어떤 프롬프트를 보내든(derivedPrompt/promptOverride) 시각적 사실은 지켜지게.
+    // #w-b2(2026-08-31, 감사 W1 보강): shots.characters 가 명시적 빈 배열이면 프롬프트에도
+    //   무인물을 못박는다 — 그리드 경로의 'no character — keep free of people' 방어의 스트립판.
+    //   (characters 미정의/비어있지 않음은 종전 그대로 — 레퍼런스 없는 레거시 호출을 오판하지 않게
+    //   서버 진실(shots.characters)로만 판정한다.)
+    const noPeopleShot =
+      Array.isArray((shot as { characters?: unknown } | null)?.characters) &&
+      ((shot as { characters: unknown[] }).characters.length === 0)
     const guardedPrompt =
       appendCheckConstraints(prompt, (shot as { check_notes?: unknown } | null)?.check_notes) +
-      continuityLine
+      continuityLine +
+      (noPeopleShot
+        ? ' This shot contains NO people — do not draw any person or figure; anyone implied by the text is off-screen.'
+        : '')
 
     let finalOpts: AnchorableSubmit
     let stripRefUrl: string | null = null
@@ -183,8 +201,15 @@ export async function POST(req: Request) {
       finalOpts = anchor ? applyStyleAnchor(anchor, baseOpts, mode) : baseOpts
     }
 
+    // 명시 모델이 있으면 reference 유무로 t2i/edit 갈래를 고른다(#registry-merge).
+    //   예전엔 t2i 엔드포인트를 그대로 넘겼는데, resolveImageModel 은 명시 모델을 그대로
+    //   존중하므로 레퍼런스가 있어도 edit 갈래로 안 가 참조가 무시됐다.
+    const requestedImageModel = requestedModelKey
+      ? resolveImageEndpoint(requestedModelKey, !!finalOpts.reference_image_urls?.length).endpoint
+      : null
     const { request_id, model, fal_request } = await falImageSubmit({
       ...finalOpts,
+      ...(requestedImageModel ? { model: requestedImageModel } : {}),
       webhookUrl: resolveWebhookUrl(),
     })
     const falCapture = buildBestEffortFalRequestCapturePatch(fal_request, model)

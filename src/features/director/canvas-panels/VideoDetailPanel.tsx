@@ -16,20 +16,8 @@ import {
   isShotData,
   type VideoNodeData,
 } from '@/types/director'
-import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
-
-import { AngleControl } from '@/features/director/angle-control'
-import { KeyLight } from '@/features/director/key-light'
-import { CameraPresetControl } from '@/features/director/camera-preset-control'
+import { FAL_VIDEO_MODEL_ORDER, VIDEO_MODELS } from '@/lib/video-models'
 import { useT } from '@/lib/i18n'
-
-const MODEL_ORDER: VideoModelKey[] = [
-  'happy-horse',
-  'seedance',
-  'kling-o3',
-  'veo',
-  'local',
-]
 
 export function VideoDetailPanel({
   nodeId,
@@ -66,7 +54,6 @@ export function VideoDetailPanel({
       node.data.parentShotNodeId === data.parentShotNodeId &&
       node.data.lastAttemptStatus === 'generating',
   )
-  const projectId = useDirectorCanvasStore((s) => s.projectId)
   const [regenerationState, setRegenerationState] = useState<{
     nodeId: string
     error: string | null
@@ -334,56 +321,30 @@ export function VideoDetailPanel({
         </p>
       </PanelSection>
 
-      <PanelSection>
-        <CameraPresetControl
-          preset={effective.cameraPreset}
-          onUpdate={(changes) =>
-            applyVideoOverride(nodeId, {
-              cameraPreset: { ...effective.cameraPreset, ...changes },
-            })
-          }
-        />
-      </PanelSection>
-
-      <PanelSection>
-        <AngleControl
-          camera={effective.camera}
-          onUpdate={(changes) =>
-            applyVideoOverride(nodeId, {
-              camera: { ...effective.camera, ...changes },
-            })
-          }
-        />
-      </PanelSection>
-
-      <PanelSection>
-        <KeyLight
-          lighting={effective.lighting}
-          onUpdate={(changes) =>
-            applyVideoOverride(nodeId, {
-              lighting: { ...effective.lighting, ...changes },
-            })
-          }
-        />
-      </PanelSection>
-
-      <PanelSection title="Provider">
+      {/* #ui-cleanup 2026-08-31: 카메라/조명 UI 제거 — 영상 노드엔 fal 영상 모델만. */}
+      <PanelSection title={t('Video generation model')}>
         <div className="grid grid-cols-2 gap-2">
-          {MODEL_ORDER.map((p) => (
-            <button
-              type="button"
-              key={p}
-              onClick={() => applyVideoOverride(nodeId, { provider: p })}
-              className={cn(
-                'rounded-md border px-3 py-1.5 text-xs transition-colors',
-                effective.provider === p
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border hover:bg-accent',
-              )}
-            >
-              {VIDEO_MODELS[p].label}
-            </button>
-          ))}
+          {FAL_VIDEO_MODEL_ORDER.map((p) => {
+            const spec = VIDEO_MODELS[p]
+            return (
+              <button
+                type="button"
+                key={p}
+                onClick={() => applyVideoOverride(nodeId, { provider: p })}
+                className={cn(
+                  'rounded-md border px-3 py-1.5 text-left text-xs transition-colors',
+                  effective.provider === p
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:bg-accent',
+                )}
+              >
+                <span className="block font-medium">{spec.label}</span>
+                <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                  {spec.endpoint}
+                </span>
+              </button>
+            )
+          })}
         </div>
       </PanelSection>
 
@@ -402,7 +363,7 @@ export function VideoDetailPanel({
           ) : (
             <>
               <RefreshCw className="size-3.5" />
-              {data.videoUrl ? t('Regenerate') : t('Generate')}
+              {data.videoUrl ? t('Regenerate video') : t('Generate video')}
             </>
           )}
         </Button>

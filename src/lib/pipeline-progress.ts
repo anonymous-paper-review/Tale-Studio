@@ -247,7 +247,19 @@ export function artistImageWork(opts: {
 }): PipelineWork | null {
   const agent = STAGE_AGENT_NAME.artist
   const locale = opts.locale ?? UNSPECIFIED_LOCALE_FALLBACK
-  if (!opts.imagesReady && !opts.stalled && !opts.failed && opts.progress && opts.progress.total > 0) {
+  const inFlight = Math.max(opts.generatingCount, opts.activeCount ?? 0)
+  // D13(2026-08-31 오너 실측): "생성하고 있습니다 0/N"이 아무것도 안 도는 프로젝트에서
+  //   상시 고착 — 이 분기가 활동 증거 없이 "미완성 = 생성 중"으로 민 탓이다.
+  //   #queue-restore 원칙 그대로 큰가 판정의 바닥: 진행 문구는 실제로 도는 것
+  //   (store in-flight 또는 queued 잡)이 있을 때만 세운다.
+  if (
+    !opts.imagesReady &&
+    !opts.stalled &&
+    !opts.failed &&
+    inFlight > 0 &&
+    opts.progress &&
+    opts.progress.total > 0
+  ) {
     return {
       key: 'artist-images',
       label: translate(locale, '{agent} is generating character and background images', { agent }),
@@ -256,7 +268,6 @@ export function artistImageWork(opts: {
       stage: 'artist',
     }
   }
-  const inFlight = Math.max(opts.generatingCount, opts.activeCount ?? 0)
   if (inFlight > 0) {
     // 문구 형식 통일(#feedback 2026-08-12) — 다른 에이전트 줄과 같은 "…하고 있습니다 n/N" 꼴.
     //   이 배치의 완료 수는 추적하지 않으므로 done=0/total=남은 건수 (남은 작업 분모).

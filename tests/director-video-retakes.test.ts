@@ -41,7 +41,7 @@ function take(overrides: Partial<DirectorVideoTake>): DirectorVideoTake {
     thumbnail_path: null, thumbnail_url: null, status: 'completed', duration: null, created_at: '2026-07-20T00:00:00Z',
     updated_at: null, canvas_position: null, is_final: false, take_label: null, override: null, take_number: 1,
     deleted_at: null, last_attempt_status: 'completed', last_attempt_error: null, last_attempt_at: null,
-    last_attempt_job_id: null, adherence: null,
+    last_attempt_job_id: null, adherence: null, frame_inputs: null, video_chain: null,
     ...overrides,
   }
 }

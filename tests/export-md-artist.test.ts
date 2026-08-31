@@ -12,11 +12,8 @@ function fixtureData(): ArtistData {
       {
         character_id: 'char-1',
         name: '윤서',
-        entity_type: 'person',
-        view_main: '  https://cdn.test/yun/front.png  ',
-        view_back: 'https://cdn.test/yun/back.png',
-        view_side_left: 'https://cdn.test/yun/side-left.png',
-        view_side_right: null,
+        sheet_url: '  https://cdn.test/yun/sheet.png  ',
+        portrait_url: 'https://cdn.test/yun/portrait.png',
         description: 'English character card description',
         appearance: 'English trench coat',
         appearance_native: '젖은 트렌치코트',
@@ -24,11 +21,8 @@ function fixtureData(): ArtistData {
       {
         character_id: 'char-2',
         name: '윤서',
-        entity_type: 'person',
-        view_main: 'https://cdn.test/yun-duplicate/front.png',
-        view_back: '',
-        view_side_left: null,
-        view_side_right: 'https://cdn.test/yun-duplicate/side-right.png',
+        sheet_url: 'https://cdn.test/yun-duplicate/sheet.png',
+        portrait_url: 'https://cdn.test/yun-duplicate/portrait.png',
         description: 'English duplicate description',
         appearance: 'English silver coat',
         appearanceNative: '은색 코트',
@@ -53,21 +47,19 @@ describe('collectArtistArtifacts', () => {
     const files = collectArtistArtifacts(fixtureData(), 'ko')
 
     expect(mediaPaths(files)).toEqual([
-      'artist/characters/윤서/front.png',
-      'artist/characters/윤서/back.png',
-      'artist/characters/윤서/side-left.png',
-      'artist/characters/윤서-2/front.png',
-      'artist/characters/윤서-2/side-right.png',
+      'artist/characters/윤서/sheet.png',
+      'artist/characters/윤서/portrait.png',
+      'artist/characters/윤서-2/sheet.png',
+      'artist/characters/윤서-2/portrait.png',
       'artist/worlds/네온-골목/establishing.png',
     ])
 
-    expect(mediaFile(files, 'artist/characters/윤서/front.png')?.url).toBe(
-      'https://cdn.test/yun/front.png',
+    expect(mediaFile(files, 'artist/characters/윤서/sheet.png')?.url).toBe(
+      'https://cdn.test/yun/sheet.png',
     )
-    expect(mediaFile(files, 'artist/characters/윤서-2/front.png')?.url).toBe(
-      'https://cdn.test/yun-duplicate/front.png',
+    expect(mediaFile(files, 'artist/characters/윤서-2/sheet.png')?.url).toBe(
+      'https://cdn.test/yun-duplicate/sheet.png',
     )
-    expect(mediaPaths(files)).not.toContain('artist/characters/윤서/side-right.png')
     expect(mediaPaths(files)).not.toContain('artist/worlds/네온-골목/wide.png')
   })
 
@@ -87,11 +79,10 @@ describe('collectArtistArtifacts', () => {
     expect(markdown).not.toContain('English silver coat')
     expect(markdown).not.toContain('English wet alley')
 
-    expect(markdown).toContain('view_main→front.png')
-    expect(markdown).toContain('view\\_back→back.png')
-    expect(markdown).toContain('view\\_side\\_left→side-left.png')
-    expect(markdown).toContain('wide\\_shot→wide.png')
-    expect(markdown).toContain('establishing\\_shot→establishing.png')
+    expect(markdown).toContain('artist/characters/윤서/sheet.png')
+    expect(markdown).toContain('artist/characters/윤서/portrait.png')
+    expect(markdown).not.toContain('view_main')
+    expect(markdown).not.toContain('view_back')
 
     for (const path of mediaPaths(files)) {
       expect(markdown).toContain(path)

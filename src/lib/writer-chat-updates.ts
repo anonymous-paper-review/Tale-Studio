@@ -87,11 +87,11 @@ function pickDialogueLines(
   src: unknown,
   allowedCharacterIds?: ReadonlySet<string>,
   droppedCharacterIds?: string[],
-): Array<Pick<DialogueLine, 'characterId' | 'text'>> | undefined {
+): Array<Partial<DialogueLine> & Pick<DialogueLine, 'characterId' | 'text'>> | undefined {
   if (!Array.isArray(src)) return undefined
   const entries = src
     .filter(
-      (line): line is { characterId: string; text: string } =>
+      (line): line is Record<string, unknown> & { characterId: string; text: string } =>
         line !== null &&
         typeof line === 'object' &&
         typeof (line as { characterId?: unknown }).characterId === 'string' &&
@@ -104,7 +104,17 @@ function pickDialogueLines(
       droppedCharacterIds?.push(line.characterId)
       return false
     })
-    .map((line) => ({ characterId: line.characterId, text: line.text }))
+    // emotion·delivery·durationHint는 보존한다 — 여기서 버리면 모델이 재제출해도
+    //   대사 수정마다 연기 지시가 유실된다(2026-08-31 실측 — G7 영상 대사 절의 재료다).
+    .map((line) => ({
+      characterId: line.characterId,
+      text: line.text,
+      ...(typeof line.emotion === 'string' && line.emotion ? { emotion: line.emotion } : {}),
+      ...(typeof line.delivery === 'string' && line.delivery ? { delivery: line.delivery } : {}),
+      ...(typeof line.durationHint === 'number' && line.durationHint > 0
+        ? { durationHint: line.durationHint }
+        : {}),
+    }))
   // 전량 불량 배열이 빈 patch 로 통과하면 "대사 전체 삭제"로 위장한다 —
   // 명시적 [] 만 빈 배열로 인정하고, 불량 엔트리만 있던 배열은 필드 자체를 drop.
   if (src.length > 0 && entries.length === 0) return undefined

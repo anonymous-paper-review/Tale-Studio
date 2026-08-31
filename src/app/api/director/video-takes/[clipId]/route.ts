@@ -74,9 +74,9 @@ export async function PATCH(req: Request, { params }: Context) {
   const authorized = await authorize(body.projectId)
   if ('error' in authorized) return authorized.error
   const { clipId } = await params
-  const allowed = new Set(['projectId', 'take_label', 'override', 'canvas_position', 'is_final'])
+  const allowed = new Set(['projectId', 'take_label', 'override', 'canvas_position', 'is_final', 'frame_inputs', 'video_chain'])
   if (Object.keys(body).some(key => !allowed.has(key))) {
-    return NextResponse.json({ error: 'Only take_label, override, canvas_position, and is_final may be changed' }, { status: 400 })
+    return NextResponse.json({ error: 'Only take_label, override, canvas_position, is_final, frame_inputs, and video_chain may be changed' }, { status: 400 })
   }
   if (!Object.keys(body).some(key => key !== 'projectId')) {
     return NextResponse.json({ error: 'No mutable fields supplied' }, { status: 400 })
@@ -90,6 +90,9 @@ export async function PATCH(req: Request, { params }: Context) {
     ...(Object.prototype.hasOwnProperty.call(body, 'take_label') ? { take_label: body.take_label as string | null } : {}),
     ...(Object.prototype.hasOwnProperty.call(body, 'override') ? { override: body.override as never } : {}),
     ...(Object.prototype.hasOwnProperty.call(body, 'canvas_position') ? { canvas_position: body.canvas_position as never } : {}),
+    // #wiring-persistence: 수동 연결(프레임 입력·영상 체인)의 안정 참조 직렬화 결과.
+    ...(Object.prototype.hasOwnProperty.call(body, 'frame_inputs') ? { frame_inputs: body.frame_inputs as never } : {}),
+    ...(Object.prototype.hasOwnProperty.call(body, 'video_chain') ? { video_chain: body.video_chain as never } : {}),
   }
   if ('is_final' in body && Object.keys(metadata).length) {
     return NextResponse.json({ error: 'is_final cannot be changed with take metadata' }, { status: 400 })
@@ -102,6 +105,12 @@ export async function PATCH(req: Request, { params }: Context) {
   }
   if ('canvas_position' in metadata && metadata.canvas_position !== null && !isCanvasPosition(metadata.canvas_position)) {
     return NextResponse.json({ error: 'canvas_position must be null or a finite {x,y} object' }, { status: 400 })
+  }
+  if ('frame_inputs' in metadata && metadata.frame_inputs !== null && !isPlainJsonObject(metadata.frame_inputs)) {
+    return NextResponse.json({ error: 'frame_inputs must be a plain JSON object or null' }, { status: 400 })
+  }
+  if ('video_chain' in metadata && metadata.video_chain !== null && !isPlainJsonObject(metadata.video_chain)) {
+    return NextResponse.json({ error: 'video_chain must be a plain JSON object or null' }, { status: 400 })
   }
 
   try {

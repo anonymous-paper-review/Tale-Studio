@@ -1,7 +1,18 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { GeneratedImage, CharacterAsset, WorldAsset } from '@/types/asset'
+import type {
+  GeneratedImage,
+  CharacterAsset,
+  CharacterAppearance,
+  CharacterViewKey,
+  WorldAsset,
+} from '@/types/asset'
 import { createClient } from '@/lib/supabase/client'
+import {
+  candidateViewToViewKey,
+  type CandidateImage,
+  type CandidateView,
+} from '@/lib/image-provenance'
 
 // ============================================================================
 // Types — see specs/data/asset_storage.md
@@ -102,11 +113,11 @@ export const useAssetStorageStore = create<AssetStorageState>()(
         if (!projectId) return
         try {
           const supabase = createClient()
-          const [charsRes, locsRes] = await Promise.all([
+          const [charsRes, locsRes, appearancesRes, candidatesRes] = await Promise.all([
             supabase
               .from('characters')
               .select(
-                'character_id, name, entity_type, view_main, view_back, view_side_left, view_side_right, description, appearance',
+                'character_id, name, entity_type, description, appearance',
               )
               .eq('project_id', projectId),
             supabase
@@ -115,9 +126,67 @@ export const useAssetStorageStore = create<AssetStorageState>()(
                 'location_id, name, scene_id, wide_shot, visual_description',
               )
               .eq('project_id', projectId),
+            supabase
+              .from('character_appearances')
+              .select('character_id, appearance_key, label, is_default, narrative_time, sheet_url, portrait_url, appearance, appearance_native')
+              .eq('project_id', projectId)
+              .order('is_default', { ascending: false }),
+            supabase
+              .from('character_image_candidates')
+              .select('id, character_id, appearance_key, view, url, source_hash, appearance_hash, is_selected, generated_at')
+              .eq('project_id', projectId),
           ])
           if (charsRes.error) throw charsRes.error
           if (locsRes.error) throw locsRes.error
+          if (appearancesRes.error) throw appearancesRes.error
+          if (candidatesRes.error) throw candidatesRes.error
+
+          const candidatesByAppearance = new Map<
+            string,
+            Partial<Record<CharacterViewKey, CandidateImage[]>>
+          >()
+          for (const candidate of candidatesRes.data ?? []) {
+            if (!candidate.appearance_key) continue
+            const key = `${candidate.character_id}\u0000${candidate.appearance_key}`
+            const views = candidatesByAppearance.get(key) ?? {}
+            const view = candidateViewToViewKey(candidate.view as CandidateView)
+            const list = views[view] ?? []
+            list.push({
+              id: candidate.id,
+              url: candidate.url,
+              sourceHash: candidate.source_hash ?? null,
+              appearanceHash: candidate.appearance_hash ?? null,
+              isSelected: candidate.is_selected ?? false,
+              generatedAt: candidate.generated_at,
+            })
+            views[view] = list
+            candidatesByAppearance.set(key, views)
+          }
+          for (const views of candidatesByAppearance.values()) {
+            for (const candidates of Object.values(views)) {
+              candidates?.sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
+            }
+          }
+
+          const appearancesByCharacter = new Map<string, CharacterAppearance[]>()
+          for (const appearance of appearancesRes.data ?? []) {
+            const list = appearancesByCharacter.get(appearance.character_id) ?? []
+            list.push({
+              appearanceKey: appearance.appearance_key,
+              label: appearance.label,
+              isDefault: appearance.is_default ?? false,
+              narrativeTime: appearance.narrative_time,
+              sheetUrl: appearance.sheet_url,
+              portraitUrl: appearance.portrait_url,
+              appearance: appearance.appearance,
+              appearanceNative: appearance.appearance_native,
+              viewCandidates:
+                candidatesByAppearance.get(
+                  `${appearance.character_id}\u0000${appearance.appearance_key}`,
+                ) ?? {},
+            })
+            appearancesByCharacter.set(appearance.character_id, list)
+          }
 
           // DB row → CharacterAsset/WorldAsset (artist-store.loadData와 동일 매핑)
           // → 카드 어댑터로 RegisteredCharacter/World 등록.
@@ -125,11 +194,12 @@ export const useAssetStorageStore = create<AssetStorageState>()(
             const asset: CharacterAsset = {
               characterId: c.character_id,
               name: c.name,
+              appearances: appearancesByCharacter.get(c.character_id) ?? [],
               views: {
-                main: c.view_main ?? null,
-                back: c.view_back ?? null,
-                sideLeft: c.view_side_left ?? null,
-                sideRight: c.view_side_right ?? null,
+                main: null,
+                back: null,
+                sideLeft: null,
+                sideRight: null,
               },
               entityType: c.entity_type === 'object' ? 'object' : 'person',
               description: c.description ?? '',
@@ -210,19 +280,13 @@ export function characterAssetToRegisterInput(
   projectId: string,
 ): RegisterCharacterInput {
   // main(정면 대표)이 front 역할을 겸한다 (별도 front 뷰 폐기, 2026-06-05).
-  // 다운스트림 GeneratedImage.view='front' 계약은 유지하고 소스만 main 으로.
-  const main = asset.views.main
+  // 다운스트림 GeneratedImage.view='front' 계약은 유지하고, 권위는 기본 모습의 sheet_url이다.
+  const defaults = asset.appearances.filter((appearance) => appearance.isDefault)
+  if (asset.entityType === 'person' && defaults.length !== 1) {
+    throw new Error(`Character ${asset.characterId} requires exactly one default appearance`)
+  }
+  const main = defaults[0]?.sheetUrl ?? null
   const single = main ? [viewToGeneratedImage(main, 'front')] : []
-  const fiveView: GeneratedImage[] = (
-    [
-      ['front', asset.views.main],
-      ['left', asset.views.sideLeft],
-      ['right', asset.views.sideRight],
-      ['back', asset.views.back],
-    ] as const
-  )
-    .filter(([, u]) => u)
-    .map(([v, u]) => viewToGeneratedImage(u as string, v))
 
   return {
     projectId,
@@ -233,7 +297,7 @@ export function characterAssetToRegisterInput(
     description: asset.description ?? '',
     prompt: asset.fixedPrompt ?? '',
     referenceImages: main ? [main] : [],
-    views: { single, fiveView, sixteenAngle: [] },
+    views: { single, fiveView: [], sixteenAngle: [] },
     statusVariants: [],
   }
 }

@@ -238,40 +238,43 @@ async function persistArtistSources(
   const cast = input.cast?.characters ?? []
   const locations = input.background?.locations ?? []
 
-  const [{ data: existingCharacters, error: characterLookupError }, { data: existingLocations, error: locationLookupError }] =
+  const [{ data: existingLocations, error: locationLookupError }] =
     await Promise.all([
-      supabaseAdmin
-        .from('characters')
-        .select('character_id')
-        .eq('project_id', projectId),
       supabaseAdmin
         .from('locations')
         .select('location_id')
         .eq('project_id', projectId),
     ])
-  assertDbOk('character source lookup', characterLookupError)
   assertDbOk('location source lookup', locationLookupError)
 
-  const characterIds = new Set(
-    (existingCharacters ?? []).map((row) => row.character_id as string),
-  )
   const locationIds = new Set(
     (existingLocations ?? []).map((row) => row.location_id as string),
   )
 
-  const characterRows = cast
-    .filter((character) => !characterIds.has(character.character_id))
+  const people = cast
+    .filter((character) => character.entity_type === 'person')
     .map((character) => ({
-      project_id: projectId,
       character_id: character.character_id,
       name: character.name,
       role: character.role ?? 'supporting',
-      entity_type: character.entity_type,
       appearance: character.appearance,
       appearance_native: character.appearance,
-      description: character.appearance,
+      description: null,
       arc: character.arc ?? null,
       motivation: character.motivation ?? null,
+      origin: 'producer',
+      costume: null,
+      i18n_provenance: {},
+    }))
+  const props = cast
+    .filter((character) => character.entity_type === 'object')
+    .map((character) => ({
+      project_id: projectId,
+      prop_id: character.character_id,
+      name: character.name,
+      description: null,
+      appearance: character.appearance,
+      appearance_native: character.appearance,
       origin: 'producer',
     }))
 
@@ -288,9 +291,18 @@ async function persistArtistSources(
       user_edited: false,
     }))
 
-  if (characterRows.length) {
-    const { error } = await supabaseAdmin.from('characters').insert(characterRows)
-    assertDbOk('character source persist', error)
+  if (people.length) {
+    const { error } = await supabaseAdmin.rpc('upsert_people_with_default_appearances', {
+      p_project_id: projectId,
+      p_people: people,
+    })
+    assertDbOk('people source persist', error)
+  }
+  if (props.length) {
+    const { error } = await supabaseAdmin
+      .from('props')
+      .upsert(props, { onConflict: 'project_id,prop_id' })
+    assertDbOk('prop source persist', error)
   }
   if (locationRows.length) {
     const { error } = await supabaseAdmin.from('locations').insert(locationRows)

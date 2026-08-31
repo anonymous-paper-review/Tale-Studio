@@ -33,12 +33,17 @@ function AssetNodeImpl({ data }: NodeProps<DirectorNode>) {
         data.unused && 'border-dashed opacity-60',
       )}
     >
-      {/* 샷으로 향하는 출력 포트만 (우측). asset은 입력을 안 받음 */}
+      {/* 샷으로 향하는 출력 포트만 (우측). asset은 입력을 안 받음.
+          #handle-visibility: 항상 표시 — 에셋을 샷/프레임에 연결하는 드래그 시작점. */}
       <Handle
         type="source"
         position={Position.Right}
         id="right"
-        className={cn('!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100', style.dot)}
+        title="Output"
+        className={cn(
+          '!h-3.5 !w-3.5 !rounded-full !border-2 !border-background transition-transform hover:!scale-125',
+          style.dot,
+        )}
       />
 
       <div className="flex h-7 items-center justify-between border-b border-border/60 px-3 text-xs">

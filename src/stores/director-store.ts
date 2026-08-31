@@ -11,7 +11,6 @@ import {
   newDirectorId,
   SHOT_OFFSET_X,
   SHOT_OFFSET_Y,
-  SHOT_IMAGE_OFFSET_X,
   VIDEO_OFFSET_X,
   VIDEO_OFFSET_Y,
   ASSET_OFFSET_X,
@@ -32,6 +31,9 @@ import {
   type SceneNodeData,
   type ShotNodeData,
   type VideoNodeData,
+  type DirectorImageTargetHandle,
+  type DirectorVideoFrameTargetHandle,
+  type DirectorVideoChainTargetHandle,
   type PromptNodeData,
   type VideoOverride,
   type VideoAdherence,
@@ -44,7 +46,21 @@ import {
   type RegisteredCharacter,
 } from '@/stores/asset-storage-store'
 import { createClient } from '@/lib/supabase/client'
+import type { Json } from '@/types/database'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
+import {
+  isEmptyStableFrameInputs,
+  parseStableFrameInputs,
+  parseStableImageInputs,
+  parseStableVideoChain,
+  resolveFrameInputs,
+  resolveImageInputs,
+  serializeFrameInputs,
+  serializeImageInputs,
+  type StableFrameInputs,
+  type StableVideoChain,
+  type StableWiringRef,
+} from '@/lib/director/wiring-persistence'
 import { runVideoAdherence } from '@/lib/director/video-adherence-client'
 import { isDemoSession } from '@/lib/demo/context'
 import {
@@ -86,6 +102,14 @@ const DEFAULT_PROVIDER: DirectorVideoProvider = DEFAULT_VIDEO_MODEL
 export type DirectorGenerationRequestOptions = {
   traceId?: string
   onJob?: GenerationJobObserver
+  /** Internal flag used exclusively by the explicit full-video batch runner. */
+  batch?: boolean
+  /**
+   * 리테이크 상속(#retake-inherit 2026-08-31 오너): 이 Video 노드의 수동 배선
+   * (frameInputs·영상 체인·override)을 새 테이크에 복사한다. 8/31 실측에서
+   * '영상 리테이크'가 체인 없는 새 테이크를 만들던 함정의 교정.
+   */
+  inheritFromVideoNodeId?: string
 }
 
 function makeSceneData(label: string): SceneNodeData {
@@ -111,6 +135,7 @@ function makeShotData(label: string, parentSceneNodeId: string | null): ShotNode
     promptOverride: undefined,
     promptMigratedV2: true,
     referenceImages: [],
+    imageInputs: [],
     storyboardImage: null,
     characterAssetIds: [],
     worldAssetIds: [],
@@ -118,6 +143,7 @@ function makeShotData(label: string, parentSceneNodeId: string | null): ShotNode
     lighting: { ...DEFAULT_LIGHTING },
     cameraPreset: { ...DEFAULT_CAMERA_PRESET },
     provider: DEFAULT_PROVIDER,
+    imageModel: undefined,
     durationSeconds: 5,
     generationMethod: 'T2V',
     stale: false,
@@ -146,6 +172,9 @@ type HydratedVideoTake = {
   latestAttemptAt: string | null
   /** #adherence P2: 모션 준수 판정(video_clips.adherence — select * 로 흘러옴). 구행/미검사 = 없음. */
   adherence?: VideoAdherence | null
+  /** #wiring-persistence: 수동 연결 안정 참조 (select * 로 흘러옴). 구행 = 없음. */
+  frame_inputs?: unknown
+  video_chain?: unknown
 }
 type VideoGenerationResponse = {
   error?: string
@@ -156,6 +185,219 @@ type VideoGenerationResponse = {
   status?: DirectorVideoStatus | 'queued'
   retryable?: boolean
   recoveryReceipt?: string
+}
+
+const EMPTY_FRAME_INPUTS = (): VideoNodeData['frameInputs'] => ({
+  start: null,
+  end: null,
+  refs: [],
+})
+
+/**
+ * Persisted Director snapshots can predate frame wiring. Normalize that payload
+ * at every rebuild boundary so old cached Video nodes remain usable.
+ */
+function normalizeFrameInputs(value: unknown): VideoNodeData['frameInputs'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return EMPTY_FRAME_INPUTS()
+  }
+  const row = value as Record<string, unknown>
+  const refs = Array.isArray(row.refs)
+    ? row.refs.filter(
+        (id): id is string => typeof id === 'string' && id.length > 0,
+      )
+    : []
+  return {
+    start: typeof row.start === 'string' && row.start.length > 0 ? row.start : null,
+    end: typeof row.end === 'string' && row.end.length > 0 ? row.end : null,
+    refs: [...new Set(refs)],
+  }
+}
+
+/** Persisted Shot image-reference IDs may be absent or malformed in old caches. */
+function normalizeImageInputs(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return [
+    ...new Set(
+      value.filter(
+        (id): id is string => typeof id === 'string' && id.length > 0,
+      ),
+    ),
+  ]
+}
+
+function isFrameSourceNode(node: DirectorNode): boolean {
+  // #node-merge: 파생 shotImage 카드 제거 — 이미지 출처는 Shot/Asset 노드뿐.
+  return isShotData(node.data) || isAssetData(node.data)
+}
+
+function isImageSourceNode(node: DirectorNode): boolean {
+  return isFrameSourceNode(node)
+}
+
+type FrameInputSlot = 'start' | 'end' | 'ref'
+
+function usableFrameImageUrl(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null
+}
+
+function firstUploadedReferenceImageUrl(value: unknown): string | null {
+  if (!Array.isArray(value)) return null
+  for (const image of value) {
+    if (!image || typeof image !== 'object' || Array.isArray(image)) continue
+    const url = usableFrameImageUrl((image as { url?: unknown }).url)
+    if (url) return url
+  }
+  return null
+}
+
+function resolveShotFrameImageUrl(
+  data: ShotNodeData,
+  slot: FrameInputSlot,
+): string | null {
+  const storyboard = data.storyboardImage
+  if (storyboard?.status === 'completed') {
+    const frame =
+      slot === 'start'
+        ? storyboard.frames?.start
+        : slot === 'end'
+          ? storyboard.frames?.end
+          : undefined
+    const storyboardUrl = usableFrameImageUrl(frame) ?? usableFrameImageUrl(storyboard.url)
+    if (storyboardUrl) return storyboardUrl
+  }
+  return firstUploadedReferenceImageUrl(data.referenceImages)
+}
+
+/**
+ * Resolve a persisted frame-input source node ID to an image URL. Frame inputs
+ * intentionally store Director IDs, so unsupported or not-yet-generated nodes
+ * must resolve to null rather than leaking an ID into the generation request.
+ */
+function resolveFrameInputImageUrl(
+  nodes: DirectorNode[],
+  sourceNodeId: string,
+  slot: FrameInputSlot,
+): string | null {
+  const source = nodes.find((node) => node.id === sourceNodeId)
+  if (!source || !isFrameSourceNode(source)) return null
+  if (isAssetData(source.data)) return usableFrameImageUrl(source.data.imageUrl)
+  return isShotData(source.data)
+    ? resolveShotFrameImageUrl(source.data, slot)
+    : null
+}
+
+function resolveStoryboardImageUrl(data: ShotNodeData): string | null {
+  const storyboard = data.storyboardImage
+  if (!storyboard || storyboard.status !== 'completed') return null
+  return (
+    usableFrameImageUrl(storyboard.url) ??
+    usableFrameImageUrl(storyboard.frames?.start)
+  )
+}
+
+function resolveImageInputImageUrl(
+  nodes: DirectorNode[],
+  sourceNodeId: string,
+): string | null {
+  const source = nodes.find((node) => node.id === sourceNodeId)
+  if (!source || !isImageSourceNode(source)) return null
+  if (isAssetData(source.data)) return usableFrameImageUrl(source.data.imageUrl)
+  return isShotData(source.data)
+    ? resolveStoryboardImageUrl(source.data)
+    : null
+}
+
+function frameEdgeId(
+  sourceNodeId: string,
+  videoNodeId: string,
+  targetHandle: DirectorVideoFrameTargetHandle,
+): string {
+  return `de_frame_${sourceNodeId}_${videoNodeId}_${targetHandle}`
+}
+
+function imageEdgeId(sourceNodeId: string, shotNodeId: string): string {
+  return `de_image_${sourceNodeId}_${shotNodeId}`
+}
+
+function makeImageEdge(sourceNodeId: string, shotNodeId: string): DirectorEdge {
+  return {
+    id: imageEdgeId(sourceNodeId, shotNodeId),
+    source: sourceNodeId,
+    target: shotNodeId,
+    sourceHandle: 'right',
+    targetHandle: 'image-reference',
+    type: 'image',
+    data: { category: 'image', relationText: '' },
+  }
+}
+
+function makeFrameEdge(
+  sourceNodeId: string,
+  videoNodeId: string,
+  targetHandle: DirectorVideoFrameTargetHandle,
+): DirectorEdge {
+  return {
+    id: frameEdgeId(sourceNodeId, videoNodeId, targetHandle),
+    source: sourceNodeId,
+    target: videoNodeId,
+    sourceHandle: 'right',
+    targetHandle,
+    type: 'frame',
+    data: { category: 'frame', relationText: '' },
+  }
+}
+
+function videoChainEdgeId(sourceVideoNodeId: string, targetVideoNodeId: string): string {
+  return `de_video_chain_${sourceVideoNodeId}_${targetVideoNodeId}`
+}
+
+function makeVideoChainEdge(
+  sourceVideoNodeId: string,
+  targetVideoNodeId: string,
+): DirectorEdge {
+  return {
+    id: videoChainEdgeId(sourceVideoNodeId, targetVideoNodeId),
+    source: sourceVideoNodeId,
+    target: targetVideoNodeId,
+    sourceHandle: 'right',
+    targetHandle: 'video-chain',
+    type: 'video-chain',
+    data: { category: 'video-chain', relationText: '' },
+  }
+}
+
+function videoChainWouldCycle(
+  nodes: DirectorNode[],
+  sourceVideoNodeId: string,
+  targetVideoNodeId: string,
+): boolean {
+  const byId = new Map(nodes.map((node) => [node.id, node]))
+  const seen = new Set<string>()
+  let currentId: string | null = sourceVideoNodeId
+  while (currentId) {
+    if (currentId === targetVideoNodeId) return true
+    if (seen.has(currentId)) return true
+    seen.add(currentId)
+    const current = byId.get(currentId)
+    if (!current || !isVideoData(current.data)) return false
+    currentId = current.data.videoChainInputId
+  }
+  return false
+}
+
+function chainFrameMatchesSource(
+  frameUrl: string | null,
+  source: VideoNodeData,
+): boolean {
+  const frame = usableFrameImageUrl(frameUrl)
+  if (!frame || !source.videoClipId || !source.generationJobId) {
+    return false
+  }
+  return (
+    frame.includes(source.videoClipId) &&
+    frame.includes(source.generationJobId)
+  )
 }
 
 function isHydratedVideoTake(value: unknown): value is HydratedVideoTake {
@@ -241,6 +483,9 @@ function makeVideoData(
     lastAttemptAt: null,
     createdAt: new Date().toISOString(),
     override: {},
+    frameInputs: EMPTY_FRAME_INPUTS(),
+    videoChainInputId: null,
+    videoChainFrameUrl: null,
     videoUrl: null,
     thumbnailUrl: null,
     status: 'pending',
@@ -273,6 +518,18 @@ function resolveShotAssetImages(data: ShotNodeData): string[] {
   for (const id of data.worldAssetIds) {
     const u = pickAssetImageUrl(store.getWorld(id))
     if (u) urls.push(u)
+  }
+  return urls
+}
+
+function resolveShotImageInputs(
+  nodes: DirectorNode[],
+  imageInputs: unknown,
+): string[] {
+  const urls: string[] = []
+  for (const sourceNodeId of normalizeImageInputs(imageInputs)) {
+    const url = resolveImageInputImageUrl(nodes, sourceNodeId)
+    if (url) urls.push(url)
   }
   return urls
 }
@@ -345,8 +602,13 @@ function toRouteProvider(p: DirectorVideoProvider): 'fal' | 'local' {
 /** 같은 노드 썸네일 중복 캡처 방지 (in-flight 가드). */
 const thumbnailInFlight = new Set<string>()
 
-/** 영상 URL 첫 프레임을 JPEG Blob 으로 캡처. 실패(CORS/네트워크/디코드/타임아웃) 시 null. */
-async function captureVideoThumbnail(videoUrl: string): Promise<Blob | null> {
+type VideoCapturePosition = 'start' | 'end'
+
+/** 영상 URL의 시작/끝 프레임을 JPEG Blob으로 캡처한다. 실패 시 null. */
+async function captureVideoFrame(
+  videoUrl: string,
+  position: VideoCapturePosition,
+): Promise<Blob | null> {
   if (typeof document === 'undefined') return null
   return new Promise<Blob | null>((resolve) => {
     const video = document.createElement('video')
@@ -360,8 +622,8 @@ async function captureVideoThumbnail(videoUrl: string): Promise<Blob | null> {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      video.removeAttribute('src')
       try {
+        video.removeAttribute('src')
         video.load()
       } catch {
         /* noop */
@@ -369,6 +631,33 @@ async function captureVideoThumbnail(videoUrl: string): Promise<Blob | null> {
       resolve(blob)
     }
     const timer = setTimeout(() => finish(null), 15_000)
+    let metadataLoaded = false
+    let seekStarted = false
+
+    const seekToPosition = () => {
+      if (seekStarted) return
+      const duration = Number.isFinite(video.duration) ? video.duration : 0
+      // A last-frame capture must never guess a position when metadata did not
+      // provide a usable duration.
+      if (position === 'end' && duration <= 0) {
+        if (metadataLoaded) finish(null)
+        return
+      }
+      const target =
+        position === 'end'
+          ? Math.max(0, duration - 0.15)
+          : Math.min(0.1, (duration || 1) / 2)
+      seekStarted = true
+      if (target === 0) {
+        grab()
+        return
+      }
+      try {
+        video.currentTime = target
+      } catch {
+        grab()
+      }
+    }
 
     const grab = () => {
       try {
@@ -387,18 +676,54 @@ async function captureVideoThumbnail(videoUrl: string): Promise<Blob | null> {
       }
     }
 
+    video.onloadedmetadata = () => {
+      metadataLoaded = true
+      seekToPosition()
+    }
     video.onloadeddata = () => {
       // 일부 코덱은 currentTime=0 프레임이 비어있어 살짝 seek 후 캡처.
-      try {
-        video.currentTime = Math.min(0.1, (video.duration || 1) / 2)
-      } catch {
-        grab()
-      }
+      seekToPosition()
     }
     video.onseeked = grab
     video.onerror = () => finish(null)
     video.src = videoUrl
   })
+}
+
+/** 영상 카드용 기존 썸네일은 시작 프레임 동작을 유지한다. */
+async function captureVideoThumbnail(videoUrl: string): Promise<Blob | null> {
+  return captureVideoFrame(videoUrl, 'start')
+}
+
+async function captureVideoEndFrame(videoUrl: string): Promise<Blob | null> {
+  return captureVideoFrame(videoUrl, 'end')
+}
+
+async function uploadVideoChainFrame(
+  projectId: string,
+  sourceVideoClipId: string,
+  sourceGenerationJobId: string,
+  blob: Blob,
+): Promise<string | null> {
+  if (!projectId || !sourceVideoClipId || !sourceGenerationJobId) return null
+  try {
+    const form = new FormData()
+    form.append('projectId', projectId)
+    form.append('type', 'video')
+    form.append('entityId', sourceVideoClipId)
+    form.append('field', 'chain_frame')
+    form.append('generationJobId', sourceGenerationJobId)
+    form.append('file', blob, `${sourceVideoClipId}_chain-frame.jpg`)
+    const response = await fetch('/api/assets/upload-image', {
+      method: 'POST',
+      body: form,
+    })
+    if (!response.ok) return null
+    const body = (await response.json().catch(() => ({}))) as { publicUrl?: unknown }
+    return usableFrameImageUrl(body.publicUrl)
+  } catch {
+    return null
+  }
 }
 
 // ============================================================================
@@ -517,6 +842,87 @@ function debouncedPositionSaveToDb(
       }
     }, 500),
   )
+}
+
+// #wiring-persistence (2026-08-31): 수동 연결(imageInputs/frameInputs/videoChain)의 DB
+// write-through 스윅. 연결 편집은 진입점이 넓어(와이어링 3종·엣지 삭제·노드 삭제·해제)
+// 개별 추적 대신 debounce 후 전체를 직렬화해 "직전 저장값과 달라진 행만" 쓴다.
+// 노드 id 는 기기-로컬이라 안정 참조(wiring-persistence.ts)로 변환해 저장한다.
+let pendingWiringSweep: ReturnType<typeof setTimeout> | null = null
+const lastSavedWiringByKey = new Map<string, string>()
+
+function scheduleWiringSweepToDb(getState: () => DirectorCanvasState) {
+  if (pendingWiringSweep) clearTimeout(pendingWiringSweep)
+  pendingWiringSweep = setTimeout(async () => {
+    pendingWiringSweep = null
+    const state = getState()
+    const projectId = state.projectId
+    if (!projectId) return
+    const nodes = state.nodes
+    try {
+      const supabase = createClient()
+      for (const node of nodes) {
+        if (getState().projectId !== projectId) return
+        if (isShotData(node.data) && node.data.writerShotId) {
+          const stable = serializeImageInputs(
+            nodes,
+            normalizeImageInputs(node.data.imageInputs),
+          )
+          const key = `shot:${node.data.writerShotId}`
+          const json = JSON.stringify(stable)
+          if (lastSavedWiringByKey.get(key) === json) continue
+          const { error } = await supabase
+            .from('shots')
+            .update({ image_inputs: stable as unknown as Json })
+            .eq('project_id', projectId)
+            .eq('shot_id', node.data.writerShotId)
+          if (error) throw error
+          lastSavedWiringByKey.set(key, json)
+        } else if (isVideoData(node.data) && node.data.videoClipId) {
+          const stableFrames = serializeFrameInputs(
+            nodes,
+            normalizeFrameInputs(node.data.frameInputs),
+          )
+          const framePayload = isEmptyStableFrameInputs(stableFrames)
+            ? null
+            : stableFrames
+          const chainSource = node.data.videoChainInputId
+            ? nodes.find((n) => n.id === node.data.videoChainInputId)
+            : null
+          const chainClipId =
+            chainSource && isVideoData(chainSource.data)
+              ? chainSource.data.videoClipId
+              : null
+          const chainPayload: StableVideoChain | null = chainClipId
+            ? {
+                source_clip_id: chainClipId,
+                frame_url: node.data.videoChainFrameUrl,
+              }
+            : null
+          const key = `clip:${node.data.videoClipId}`
+          const json = JSON.stringify({ f: framePayload, c: chainPayload })
+          if (lastSavedWiringByKey.get(key) === json) continue
+          const response = await fetch(
+            `/api/director/video-takes/${encodeURIComponent(node.data.videoClipId)}`,
+            {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                projectId,
+                frame_inputs: framePayload,
+                video_chain: chainPayload,
+              }),
+            },
+          )
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
+          lastSavedWiringByKey.set(key, json)
+        }
+      }
+    } catch (err) {
+      // fire-and-forget 계약(Step 2와 동일): 실패는 다음 연결 편집/스윅이 재시도한다.
+      console.error('[director-store] wiring DB save failed:', err)
+    }
+  }, 500)
 }
 
 const pendingVideoClipSaves = new Map<string, ReturnType<typeof setTimeout>>()
@@ -660,6 +1066,9 @@ interface DirectorCanvasState {
    *  "fal 에 들어간 것만"이 아니라 배치 전체 작업량을 분모로 보여주기 위한 화면 파생값
    *  (DB 에 저장하지 않는다, architecture §0). null = 배치 비활성 또는 아직 1라운드 응답 전. */
   realBatchRemaining: number | null
+  /** Explicit full-video batch progress. Ephemeral UI state; never persisted. */
+  videoBatchBusy: boolean
+  videoBatchProgress: { done: number; total: number; failed: number } | null
 
   // popup/modal
   popupNodeId: string | null
@@ -732,6 +1141,12 @@ interface DirectorCanvasState {
    * shot에 references 엣지를 잇는다. asset과 겹치는 shot은 우측으로 밀어 정렬.
    */
   rebuildAssetNodes: () => void
+  /** Persisted Shot imageInputs에서 유효한 image 엣지를 멱등 재생성한다. */
+  rebuildImageEdges: () => void
+  /** Persisted Video frameInputs에서 유효한 frame 엣지를 멱등 재생성한다. */
+  rebuildFrameEdges: () => void
+  /** Persisted Video chain inputs에서 last-frame chain 엣지를 멱등 재생성한다. */
+  rebuildVideoChainEdges: () => void
   /**
    * Shot 체인 파생 노드/엣지 재생성(#previz-chain 2026-07-22, 멱등) —
    * writerShotId 있는 Shot 마다 SHOT IMAGE(우측) 노드를 만들고
@@ -784,6 +1199,24 @@ interface DirectorCanvasState {
   addPromptNode: (position?: XYPosition, text?: string) => string
   /** Prompt 노드를 Shot T 입력에 와이어링 — prompt 엣지 추가 + 대상 Shot.promptOverride 동기 */
   wirePromptToShot: (promptNodeId: string, shotNodeId: string) => void
+  /** 이미지 소스를 Shot image-reference 입력에 수동 와이어링한다. */
+  wireImageToShot: (
+    sourceNodeId: string,
+    shotNodeId: string,
+    targetHandle: DirectorImageTargetHandle,
+  ) => void
+  /** 이미지 소스를 Video START/END/REF 입력에 수동 와이어링한다. */
+  wireFrameToVideo: (
+    sourceNodeId: string,
+    videoNodeId: string,
+    targetHandle: DirectorVideoFrameTargetHandle,
+  ) => void
+  /** Completed Video의 마지막 프레임을 다음 Video START 이미지로 연결한다. */
+  wireVideoChainToVideo: (
+    sourceVideoNodeId: string,
+    targetVideoNodeId: string,
+    targetHandle: DirectorVideoChainTargetHandle,
+  ) => Promise<boolean>
 
   // playback + thumbnail (ST-4 후속 — Node 탭 영상 재생)
   /** single-play 토글 — 이 노드만 재생, 나머지 Video 는 자동 정지. id=null 이면 전부 정지 */
@@ -881,6 +1314,24 @@ export type DirectorCanvasUpdate =
       targetId: string
       category: 'relates-to'
       relationText?: string
+    }
+  | {
+      type: 'connectFrame'
+      sourceId: string
+      targetId: string
+      targetHandle: DirectorVideoFrameTargetHandle
+    }
+  | {
+      type: 'connectVideo'
+      sourceId: string
+      targetId: string
+      targetHandle: DirectorVideoChainTargetHandle
+    }
+  | {
+      type: 'connectImage'
+      sourceId: string
+      targetId: string
+      targetHandle: DirectorImageTargetHandle
     }
   // 파괴/등록 — request만, 사용자 확인 모달 경유
   | { type: 'requestDelete'; id: string; reason?: string }
@@ -1091,6 +1542,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       storyboardMediaMode: 'previz',
       realBatchBusy: false,
       realBatchRemaining: null,
+      videoBatchBusy: false,
+      videoBatchProgress: null,
       popupNodeId: null,
       deleteConfirmInfo: null,
       relationModal: null,
@@ -1134,6 +1587,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             popupNodeId: null,
             deleteConfirmInfo: null,
             relationModal: null,
+            videoBatchBusy: false,
+            videoBatchProgress: null,
             generatingNodeIds: {},
             generationErrors: {},
             playingNodeId: null,
@@ -1256,6 +1711,30 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               )
             }
           }
+          // #wiring-persistence: DB에 저장된 안정 참조 연결. 노드 재구성 후 resolve 해 복원한다.
+          const stableImageInputsByShotId = new Map<string, StableWiringRef[]>()
+          for (const r of shotsRes.data ?? []) {
+            if (r.shot_id) {
+              stableImageInputsByShotId.set(
+                r.shot_id,
+                parseStableImageInputs((r as { image_inputs?: unknown }).image_inputs),
+              )
+            }
+          }
+          const stableFrameByClipId = new Map<string, StableFrameInputs | null>()
+          const stableChainByClipId = new Map<string, StableVideoChain | null>()
+          for (const row of clipsRes.data ?? []) {
+            const clipId = row.id as string
+            if (!clipId) continue
+            stableFrameByClipId.set(
+              clipId,
+              parseStableFrameInputs((row as { frame_inputs?: unknown }).frame_inputs),
+            )
+            stableChainByClipId.set(
+              clipId,
+              parseStableVideoChain((row as { video_chain?: unknown }).video_chain),
+            )
+          }
           const liveSceneIds = new Set(
             (scenesRes.data ?? []).map((row) => row.scene_id as string).filter(Boolean),
           )
@@ -1300,6 +1779,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                         : n.position,
                     data: {
                       ...n.data,
+                      imageInputs: normalizeImageInputs(n.data.imageInputs),
                       storyboardImage: shotStoryboardMatchesHydrationSnapshot(
                         n,
                         localSnapshot.get(n.id),
@@ -1423,6 +1903,112 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           })
           // hydrate 로 Video 노드 집합이 바뀌었을 수 있음 — previz 체인 엣지 재배선(멱등).
           get().rebuildShotChainNodes()
+          // #wiring-persistence: DB 안정 참조 → 현재 노드 id 복원. 파생 노드(rebuild)가 생긴 뒤에
+          //   resolve 해야 shotImage 참조가 맞는다. DB가 빈 값이면 로컬 유지(미저장 편집 보존 —
+          //   아래 스윅이 백필한다). DB 값이 있으면 DB가 진실(새 기기에서의 복원 경로).
+          set((s) => {
+            if (s.projectId !== projectId || hydrationEpoch !== hydrationToken) return {}
+            const allNodes = s.nodes
+            let changed = false
+            const nodes = allNodes.map((node) => {
+              if (isShotData(node.data) && node.data.writerShotId) {
+                const stable = stableImageInputsByShotId.get(node.data.writerShotId)
+                if (!stable || stable.length === 0) return node
+                const resolved = resolveImageInputs(allNodes, stable)
+                const local = normalizeImageInputs(node.data.imageInputs)
+                if (
+                  resolved.length === local.length &&
+                  resolved.every((v, i) => v === local[i])
+                ) {
+                  return node
+                }
+                changed = true
+                return {
+                  ...node,
+                  data: { ...node.data, imageInputs: resolved },
+                } as DirectorNode
+              }
+              if (isVideoData(node.data) && node.data.videoClipId) {
+                const stableF = stableFrameByClipId.get(node.data.videoClipId) ?? null
+                const stableC = stableChainByClipId.get(node.data.videoClipId) ?? null
+                let data = node.data
+                let touched = false
+                if (stableF) {
+                  const resolved = resolveFrameInputs(allNodes, stableF)
+                  const local = normalizeFrameInputs(data.frameInputs)
+                  if (
+                    resolved.start !== local.start ||
+                    resolved.end !== local.end ||
+                    resolved.refs.length !== local.refs.length ||
+                    resolved.refs.some((v, i) => v !== local.refs[i])
+                  ) {
+                    data = { ...data, frameInputs: resolved }
+                    touched = true
+                  }
+                }
+                if (stableC) {
+                  const sourceNode = allNodes.find(
+                    (n) =>
+                      isVideoData(n.data) &&
+                      n.data.videoClipId === stableC.source_clip_id,
+                  )
+                  if (
+                    sourceNode &&
+                    (data.videoChainInputId !== sourceNode.id ||
+                      data.videoChainFrameUrl !== stableC.frame_url)
+                  ) {
+                    data = {
+                      ...data,
+                      videoChainInputId: sourceNode.id,
+                      videoChainFrameUrl: stableC.frame_url,
+                    }
+                    touched = true
+                  }
+                }
+                if (!touched) return node
+                changed = true
+                return { ...node, data } as DirectorNode
+              }
+              return node
+            })
+            return changed ? { nodes, lastSavedAt: Date.now() } : {}
+          })
+          // 스윅 캐시 시드 — DB와 같은 값을 다시 쓰지 않게. 로컬 우위로 달라진 항목은
+          //   캐시 미스가 나 아래 스윅이 자연스럽게 백필한다.
+          for (const [shotId, stable] of stableImageInputsByShotId) {
+            lastSavedWiringByKey.set(`shot:${shotId}`, JSON.stringify(stable))
+          }
+          for (const [clipId, stableF] of stableFrameByClipId) {
+            lastSavedWiringByKey.set(
+              `clip:${clipId}`,
+              JSON.stringify({ f: stableF, c: stableChainByClipId.get(clipId) ?? null }),
+            )
+          }
+          scheduleWiringSweepToDb(get)
+          // 파생 Shot Image 노드가 다시 만들어진 뒤 persisted frameInputs를 엣지로 복원한다.
+          get().rebuildFrameEdges()
+          // 파생 Image/Asset 노드가 다시 만들어진 뒤 persisted imageInputs를 엣지로 복원한다.
+          get().rebuildImageEdges()
+          // Video data is canonical for previous-video links; restore their edges last.
+          get().rebuildVideoChainEdges()
+          set((s) => {
+            const sourceById = new Map(
+              s.nodes
+                .filter((node) => isVideoData(node.data))
+                .map((node) => [node.id, node.data as VideoNodeData]),
+            )
+            return {
+              nodes: s.nodes.map((node) => {
+                if (!isVideoData(node.data) || !node.data.videoChainInputId) return node
+                const source = sourceById.get(node.data.videoChainInputId)
+                return source &&
+                  chainFrameMatchesSource(node.data.videoChainFrameUrl, source)
+                  ? node
+                  : ({ ...node, data: { ...node.data, stale: true } } as DirectorNode)
+              }),
+              lastSavedAt: Date.now(),
+            }
+          })
         } catch (err) {
           console.error('[director-store] hydrateFromDb failed:', err)
           throw err
@@ -1563,6 +2149,338 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         api.updateNodeData<'shot'>(shotNodeId, { promptOverride: text })
       },
 
+      wireImageToShot: (sourceNodeId, shotNodeId, targetHandle) => {
+        if (isDemoSession()) return
+        if (targetHandle !== 'image-reference') return
+        const state = get()
+        const sourceNode = state.nodes.find((node) => node.id === sourceNodeId)
+        const shotNode = state.nodes.find((node) => node.id === shotNodeId)
+        if (
+          !sourceNode ||
+          !shotNode ||
+          sourceNodeId === shotNodeId ||
+          !isImageSourceNode(sourceNode) ||
+          !isShotData(shotNode.data)
+        ) {
+          return
+        }
+
+        const currentInputs = normalizeImageInputs(shotNode.data.imageInputs)
+        const hasInput = currentInputs.includes(sourceNodeId)
+        const expectedEdgeId = imageEdgeId(sourceNodeId, shotNodeId)
+        const hasExpectedEdge = state.edges.some(
+          (edge) =>
+            edge.id === expectedEdgeId &&
+            edge.data?.category === 'image' &&
+            edge.source === sourceNodeId &&
+            edge.target === shotNodeId &&
+            edge.targetHandle === targetHandle,
+        )
+        if (hasInput && hasExpectedEdge) return
+
+        get().commitHistory()
+        set((s) => {
+          const edges = [
+            ...s.edges.filter(
+              (edge) =>
+                !(
+                  edge.data?.category === 'image' &&
+                  edge.source === sourceNodeId &&
+                  edge.target === shotNodeId
+                ),
+            ),
+            makeImageEdge(sourceNodeId, shotNodeId),
+          ]
+          return {
+            nodes: s.nodes.map((node) =>
+              node.id === shotNodeId && isShotData(node.data)
+                ? ({
+                    ...node,
+                    data: {
+                      ...node.data,
+                      imageInputs: currentInputs.includes(sourceNodeId)
+                        ? currentInputs
+                        : [...currentInputs, sourceNodeId],
+                      stale:
+                        node.data.storyboardImage?.status === 'completed'
+                          ? true
+                          : node.data.stale,
+                    },
+                  } as DirectorNode)
+                : node,
+            ),
+            edges,
+            lastSavedAt: Date.now(),
+          }
+        })
+        scheduleWiringSweepToDb(get)
+      },
+
+      wireFrameToVideo: (sourceNodeId, videoNodeId, targetHandle) => {
+        if (isDemoSession()) return
+        if (
+          targetHandle !== 'frame-start' &&
+          targetHandle !== 'frame-end' &&
+          targetHandle !== 'frame-ref'
+        ) {
+          return
+        }
+        const state = get()
+        const sourceNode = state.nodes.find((node) => node.id === sourceNodeId)
+        const videoNode = state.nodes.find((node) => node.id === videoNodeId)
+        if (
+          !sourceNode ||
+          !videoNode ||
+          sourceNodeId === videoNodeId ||
+          !isFrameSourceNode(sourceNode) ||
+          !isVideoData(videoNode.data)
+        ) {
+          return
+        }
+
+        const currentInputs = normalizeFrameInputs(videoNode.data.frameInputs)
+        const existingEdge = state.edges.find(
+          (edge) =>
+            edge.data?.category === 'frame' &&
+            edge.source === sourceNodeId &&
+            edge.target === videoNodeId &&
+            edge.targetHandle === targetHandle,
+        )
+        const slot = targetHandle === 'frame-start'
+          ? 'start'
+          : targetHandle === 'frame-end'
+            ? 'end'
+            : 'refs'
+        const alreadyWired =
+          existingEdge &&
+          (slot === 'refs'
+            ? currentInputs.refs.includes(sourceNodeId)
+            : currentInputs[slot] === sourceNodeId)
+        if (alreadyWired) return
+
+        get().commitHistory()
+        set((s) => {
+          const currentVideo = s.nodes.find((node) => node.id === videoNodeId)
+          const frameInputs = normalizeFrameInputs(
+            currentVideo && isVideoData(currentVideo.data)
+              ? currentVideo.data.frameInputs
+              : currentInputs,
+          )
+          const nextInputs: VideoNodeData['frameInputs'] = {
+            ...frameInputs,
+            ...(slot === 'start' ? { start: sourceNodeId } : {}),
+            ...(slot === 'end' ? { end: sourceNodeId } : {}),
+            ...(slot === 'refs' && !frameInputs.refs.includes(sourceNodeId)
+              ? { refs: [...frameInputs.refs, sourceNodeId] }
+              : {}),
+          }
+          const edges = s.edges.filter((edge) => {
+            if (edge.data?.category !== 'frame' || edge.target !== videoNodeId) {
+              return true
+            }
+            if (slot === 'refs') {
+              return !(
+                edge.targetHandle === targetHandle &&
+                edge.source === sourceNodeId
+              )
+            }
+            return edge.targetHandle !== targetHandle
+          })
+          const hasTargetEdge = edges.some(
+            (edge) =>
+              edge.data?.category === 'frame' &&
+              edge.source === sourceNodeId &&
+              edge.target === videoNodeId &&
+              edge.targetHandle === targetHandle,
+          )
+          if (!hasTargetEdge) {
+            edges.push(makeFrameEdge(sourceNodeId, videoNodeId, targetHandle))
+          }
+
+          return {
+            nodes: s.nodes.map((node) =>
+              node.id === videoNodeId && isVideoData(node.data)
+                ? ({
+                    ...node,
+                    data: {
+                      ...node.data,
+                      frameInputs: nextInputs,
+                      stale:
+                        node.data.status === 'completed' || node.data.videoUrl
+                          ? true
+                          : node.data.stale,
+                    },
+                  } as DirectorNode)
+                : node,
+            ),
+            edges,
+            lastSavedAt: Date.now(),
+          }
+        })
+        scheduleWiringSweepToDb(get)
+      },
+
+      wireVideoChainToVideo: async (sourceVideoNodeId, targetVideoNodeId, targetHandle) => {
+        if (isDemoSession() || targetHandle !== 'video-chain') return false
+        const initial = get()
+        const sourceNode = initial.nodes.find((node) => node.id === sourceVideoNodeId)
+        const targetNode = initial.nodes.find((node) => node.id === targetVideoNodeId)
+        const sourceClipId =
+          sourceNode && isVideoData(sourceNode.data)
+            ? usableFrameImageUrl(sourceNode.data.videoClipId)
+            : null
+        const sourceJobId =
+          sourceNode && isVideoData(sourceNode.data)
+            ? usableFrameImageUrl(sourceNode.data.generationJobId)
+            : null
+        const sourceVideoUrl =
+          sourceNode && isVideoData(sourceNode.data)
+            ? usableFrameImageUrl(sourceNode.data.videoUrl)
+            : null
+        if (
+          !sourceNode ||
+          !targetNode ||
+          sourceVideoNodeId === targetVideoNodeId ||
+          !isVideoData(sourceNode.data) ||
+          !isVideoData(targetNode.data) ||
+          sourceNode.data.status !== 'completed' ||
+          !sourceVideoUrl ||
+          !sourceClipId ||
+          !sourceJobId ||
+          videoChainWouldCycle(initial.nodes, sourceVideoNodeId, targetVideoNodeId)
+        ) {
+          return false
+        }
+        get().commitHistory()
+        set((s) => ({
+          nodes: s.nodes.map((node) =>
+            node.id === targetVideoNodeId && isVideoData(node.data)
+              ? ({
+                  ...node,
+                  data: {
+                    ...node.data,
+                    videoChainInputId: sourceVideoNodeId,
+                    videoChainFrameUrl: null,
+                    stale: true,
+                    errorMessage: null,
+                    lastAttemptError: null,
+                  },
+                } as DirectorNode)
+              : node,
+          ),
+          edges: [
+            ...s.edges.filter(
+              (edge) =>
+                edge.data?.category !== 'video-chain' ||
+                edge.target !== targetVideoNodeId,
+            ),
+            makeVideoChainEdge(sourceVideoNodeId, targetVideoNodeId),
+          ],
+          generationErrors: { ...s.generationErrors, [targetVideoNodeId]: '' },
+          lastSavedAt: Date.now(),
+        }))
+
+        const projectId = get().projectId
+        const failure = (message: string): false => {
+          const current = get()
+          if (current.projectId !== projectId) return false
+          const target = current.nodes.find((node) => node.id === targetVideoNodeId)
+          if (
+            !target ||
+            !isVideoData(target.data) ||
+            target.data.videoChainInputId !== sourceVideoNodeId
+          ) {
+            return false
+          }
+          set((s) => ({
+            nodes: s.nodes.map((node) =>
+              node.id === targetVideoNodeId && isVideoData(node.data)
+                ? ({
+                    ...node,
+                    data: {
+                      ...node.data,
+                      videoChainInputId: null,
+                      videoChainFrameUrl: null,
+                      lastAttemptError: message,
+                      errorMessage: message,
+                    },
+                  } as DirectorNode)
+                : node,
+            ),
+            edges: s.edges.filter(
+              (edge) =>
+                !(
+                  edge.data?.category === 'video-chain' &&
+                  edge.target === targetVideoNodeId
+                ),
+            ),
+            generationErrors: { ...s.generationErrors, [targetVideoNodeId]: message },
+            lastSavedAt: Date.now(),
+          }))
+          scheduleWiringSweepToDb(get)
+          return false
+        }
+
+        let blob: Blob | null
+        try {
+          blob = await captureVideoEndFrame(sourceVideoUrl)
+        } catch {
+          blob = null
+        }
+        if (!blob) {
+          return failure(
+            translate(
+              useLocaleStore.getState().locale,
+              'Unable to capture the source video last frame.',
+            ),
+          )
+        }
+        const publicUrl = await uploadVideoChainFrame(projectId, sourceClipId, sourceJobId, blob)
+        if (!publicUrl) {
+          return failure(
+            translate(
+              useLocaleStore.getState().locale,
+              'Unable to upload the source video last frame.',
+            ),
+          )
+        }
+
+        const latestSource = get().nodes.find((node) => node.id === sourceVideoNodeId)
+        const latestTarget = get().nodes.find((node) => node.id === targetVideoNodeId)
+        if (
+          get().projectId !== projectId ||
+          !latestSource ||
+          !latestTarget ||
+          !isVideoData(latestSource.data) ||
+          !isVideoData(latestTarget.data) ||
+          latestSource.data.videoClipId !== sourceClipId ||
+          latestSource.data.generationJobId !== sourceJobId ||
+          latestSource.data.videoUrl !== sourceVideoUrl ||
+          latestSource.data.status !== 'completed' ||
+          latestTarget.data.videoChainInputId !== sourceVideoNodeId
+        ) {
+          return failure(
+            translate(
+              useLocaleStore.getState().locale,
+              'The source video changed while its last frame was captured.',
+            ),
+          )
+        }
+        set((s) => ({
+          nodes: s.nodes.map((node) =>
+            node.id === targetVideoNodeId && isVideoData(node.data)
+              ? ({
+                  ...node,
+                  data: { ...node.data, videoChainFrameUrl: publicUrl },
+                } as DirectorNode)
+              : node,
+          ),
+          lastSavedAt: Date.now(),
+        }))
+        scheduleWiringSweepToDb(get)
+        return true
+      },
+
       updateNodeData: (id, patch) => {
         if (isDemoSession()) return
         const prev = get().nodes.find((n) => n.id === id)
@@ -1602,6 +2520,43 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           ),
           lastSavedAt: Date.now(),
         }))
+
+        const previousVideoData = isVideoData(prev.data) ? prev.data : null
+        const videoPatch = patch as Partial<VideoNodeData>
+        const sourceAttemptChanged =
+          !!previousVideoData &&
+          (('generationJobId' in patch &&
+            videoPatch.generationJobId !== previousVideoData.generationJobId) ||
+            ('videoUrl' in patch && videoPatch.videoUrl !== previousVideoData.videoUrl) ||
+            ('status' in patch && videoPatch.status !== previousVideoData.status))
+        if (sourceAttemptChanged) {
+          const source = get().nodes.find((node) => node.id === id)
+          if (source && isVideoData(source.data)) {
+            const sourceData = source.data
+            set((s) => ({
+              nodes: s.nodes.map((node) =>
+                isVideoData(node.data) &&
+                node.data.videoChainInputId === id &&
+                (!chainFrameMatchesSource(node.data.videoChainFrameUrl, sourceData) ||
+                  sourceAttemptChanged)
+                  ? ({
+                      ...node,
+                      data: {
+                        ...node.data,
+                        stale: true,
+                        videoChainFrameUrl: null,
+                        errorMessage: translate(
+                          useLocaleStore.getState().locale,
+                          'Previous video chain frame is unavailable.',
+                        ),
+                      },
+                    } as DirectorNode)
+                  : node,
+              ),
+              lastSavedAt: Date.now(),
+            }))
+          }
+        }
 
         if (isShotConfigChange) {
           get().propagateStaleFromShot(id)
@@ -1658,6 +2613,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const removedEdges = get().edges.filter(
           (edge) => ids.has(edge.source) || ids.has(edge.target),
         )
+        const removedFrameEdges = removedEdges.filter(
+          (edge) => edge.data?.category === 'frame',
+        )
         const clipIdsToDelete = removedNodes.flatMap((node) =>
           isVideoData(node.data) && node.data.videoClipId ? [node.data.videoClipId] : [],
         )
@@ -1669,13 +2627,85 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         )
 
         set((s) => ({
-          nodes: s.nodes.filter((node) => !ids.has(node.id)),
+          nodes: s.nodes
+            .filter((node) => !ids.has(node.id))
+            .map((node) => {
+              if (isShotData(node.data)) {
+                const imageInputs = normalizeImageInputs(node.data.imageInputs)
+                const nextImageInputs = imageInputs.filter(
+                  (sourceId) => !ids.has(sourceId),
+                )
+                if (nextImageInputs.length !== imageInputs.length) {
+                  return {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      imageInputs: nextImageInputs,
+                      stale:
+                        node.data.storyboardImage?.status === 'completed'
+                          ? true
+                          : node.data.stale,
+                    },
+                  } as DirectorNode
+                }
+              }
+              if (!isVideoData(node.data)) return node
+              const chainCleared =
+                node.data.videoChainInputId &&
+                ids.has(node.data.videoChainInputId)
+              const incomingRemoved = removedFrameEdges.filter(
+                (edge) => edge.target === node.id,
+              )
+              if (incomingRemoved.length === 0 && !chainCleared) return node
+              const frameInputs = normalizeFrameInputs(node.data.frameInputs)
+              const nextInputs = incomingRemoved.reduce(
+                (inputs, edge) => {
+                  if (edge.targetHandle === 'frame-start' && inputs.start === edge.source) {
+                    return { ...inputs, start: null }
+                  }
+                  if (edge.targetHandle === 'frame-end' && inputs.end === edge.source) {
+                    return { ...inputs, end: null }
+                  }
+                  if (edge.targetHandle === 'frame-ref') {
+                    return {
+                      ...inputs,
+                      refs: inputs.refs.filter((sourceId) => sourceId !== edge.source),
+                    }
+                  }
+                  return inputs
+                },
+                frameInputs,
+              )
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  frameInputs: nextInputs,
+                  ...(chainCleared
+                    ? {
+                        videoChainInputId: null,
+                        videoChainFrameUrl: null,
+                      }
+                    : {}),
+                  stale:
+                    chainCleared ||
+                    node.data.status === 'completed' ||
+                    node.data.videoUrl
+                      ? true
+                      : node.data.stale,
+                },
+              } as DirectorNode
+            }),
           edges: s.edges.filter((edge) => !ids.has(edge.source) && !ids.has(edge.target)),
           selectedNodeId: s.selectedNodeId && ids.has(s.selectedNodeId) ? null : s.selectedNodeId,
           lastSavedAt: Date.now(),
         }))
         // 삭제된 샷의 previz 체인 파생 노드 정리 (부모 없는 파생은 rebuild 가 재생성 안 함)
         get().rebuildShotChainNodes()
+        // Source deletion can leave a target's persisted chain relation without an edge.
+        get().rebuildVideoChainEdges()
+        // #wiring-persistence: 소스 삭제로 정리된 입력들을 DB에 반영한다.
+        scheduleWiringSweepToDb(get)
 
         try {
           await Promise.all(
@@ -1762,6 +2792,150 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         }
         set((s) => ({ edges: [...s.edges, edge], lastSavedAt: Date.now() }))
         return id
+      },
+
+      rebuildImageEdges: () => {
+        set((s) => {
+          const nodeById = new Map(s.nodes.map((node) => [node.id, node]))
+          const imageEdges: DirectorEdge[] = []
+          const seen = new Set<string>()
+
+          const nodes = s.nodes.map((node) => {
+            if (!isShotData(node.data)) return node
+            const imageInputs = normalizeImageInputs(node.data.imageInputs)
+            for (const sourceNodeId of imageInputs) {
+              if (sourceNodeId === node.id) continue
+              const sourceNode = nodeById.get(sourceNodeId)
+              if (!sourceNode || !isImageSourceNode(sourceNode)) continue
+              const key = `${sourceNodeId}:${node.id}`
+              if (seen.has(key)) continue
+              seen.add(key)
+              imageEdges.push(makeImageEdge(sourceNodeId, node.id))
+            }
+            return {
+              ...node,
+              data: { ...node.data, imageInputs },
+            } as DirectorNode
+          })
+
+          return {
+            nodes,
+            edges: [
+              ...s.edges.filter((edge) => edge.data?.category !== 'image'),
+              ...imageEdges,
+            ],
+            lastSavedAt: Date.now(),
+          }
+        })
+      },
+
+      rebuildFrameEdges: () => {
+        set((s) => {
+          const nodeById = new Map(s.nodes.map((node) => [node.id, node]))
+          const frameEdges: DirectorEdge[] = []
+          const seen = new Set<string>()
+
+          const nodes = s.nodes.map((node) => {
+            if (!isVideoData(node.data)) return node
+            const frameInputs = normalizeFrameInputs(node.data.frameInputs)
+            const addFrameEdge = (
+              sourceNodeId: string | null,
+              targetHandle: DirectorVideoFrameTargetHandle,
+            ) => {
+              if (!sourceNodeId || sourceNodeId === node.id) return
+              const sourceNode = nodeById.get(sourceNodeId)
+              if (!sourceNode || !isFrameSourceNode(sourceNode)) return
+              const key = `${sourceNodeId}:${node.id}:${targetHandle}`
+              if (seen.has(key)) return
+              seen.add(key)
+              frameEdges.push(makeFrameEdge(sourceNodeId, node.id, targetHandle))
+            }
+
+            addFrameEdge(frameInputs.start, 'frame-start')
+            addFrameEdge(frameInputs.end, 'frame-end')
+            for (const sourceNodeId of frameInputs.refs) {
+              addFrameEdge(sourceNodeId, 'frame-ref')
+            }
+
+            return {
+              ...node,
+              data: { ...node.data, frameInputs },
+            } as DirectorNode
+          })
+
+          return {
+            nodes,
+            edges: [
+              ...s.edges.filter((edge) => edge.data?.category !== 'frame'),
+              ...frameEdges,
+            ],
+            lastSavedAt: Date.now(),
+          }
+        })
+      },
+
+      rebuildVideoChainEdges: () => {
+        set((s) => {
+          const nodeById = new Map(s.nodes.map((node) => [node.id, node]))
+          const chainEdges: DirectorEdge[] = []
+          const nodes = s.nodes.map((node) => {
+            if (!isVideoData(node.data)) return node
+            const sourceId = node.data.videoChainInputId
+            if (!sourceId || sourceId === node.id) {
+              return sourceId || node.data.videoChainFrameUrl
+                ? ({
+                    ...node,
+                    data: {
+                      ...node.data,
+                      videoChainInputId: null,
+                      videoChainFrameUrl: null,
+                      stale: true,
+                    },
+                  } as DirectorNode)
+                : node
+            }
+            const source = nodeById.get(sourceId)
+            if (
+              !source ||
+              !isVideoData(source.data) ||
+              videoChainWouldCycle(s.nodes, sourceId, node.id)
+            ) {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  videoChainInputId: null,
+                  videoChainFrameUrl: null,
+                  stale: true,
+                },
+              } as DirectorNode
+            }
+            chainEdges.push(makeVideoChainEdge(sourceId, node.id))
+            const frameValid = chainFrameMatchesSource(
+              node.data.videoChainFrameUrl,
+              source.data,
+            )
+            return frameValid
+              ? node
+              : ({
+                  ...node,
+                  data: {
+                    ...node.data,
+                    videoChainFrameUrl: null,
+                    stale: true,
+                  },
+                } as DirectorNode)
+          })
+
+          return {
+            nodes,
+            edges: [
+              ...s.edges.filter((edge) => edge.data?.category !== 'video-chain'),
+              ...chainEdges,
+            ],
+            lastSavedAt: Date.now(),
+          }
+        })
       },
 
       rebuildAssetNodes: () => {
@@ -1879,23 +3053,27 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
           return { nodes, edges, lastSavedAt: Date.now() }
         })
+        get().rebuildFrameEdges()
+        get().rebuildImageEdges()
+        get().rebuildVideoChainEdges()
       },
 
       rebuildShotChainNodes: () => {
+        // #node-merge(2026-08-31 오너 대공사): 파생 SHOT IMAGE/플레이스홀더 카드 제거 —
+        //   실사 이미지는 Shot(이미지 노드) 카드가 직접 표시하고, 체인은 Shot→Video 직결.
+        //   구 persist 쟔재(shotImage/videoPlaceholder 노드)는 여기서 멱등 정리된다.
         set((s) => {
-          // 1) 기존 파생물 제거 — 멱등 재생성
           const nodes = s.nodes.filter(
             (n) => !isShotImageData(n.data) && !isVideoPlaceholderData(n.data),
           )
           let edges = s.edges.filter((e) => e.data?.category !== 'chain')
 
-          // 체인 대상: writer 파이프라인 샷(writerShotId 有)만 — 수동 노드는 기존 직결 유지.
+          // 체인 대상: writer 파이프라인 샷(writerShotId 有)만 — 수동 노드는 기존 직결(parent) 유지.
           const chainShots = nodes.filter(
             (n) => isShotData(n.data) && !!n.data.writerShotId,
           )
           if (chainShots.length === 0) return { nodes, edges, lastSavedAt: Date.now() }
 
-          // 2) 체인 샷의 기존 Shot→Video parent 엣지는 previz 체인으로 대체(제거).
           const chainShotIds = new Set(chainShots.map((n) => n.id))
           const videoNodeIds = new Set(
             nodes.filter((n) => isVideoData(n.data)).map((n) => n.id),
@@ -1919,62 +3097,121 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             data: { category: 'chain', relationText: '' },
           })
 
-          // 체인: SHOT(previz 3프레임) → SHOT IMAGE(실사) → SHOT VIDEO — 2026-07-27 직선화.
-          //   (구 SHOT→PREVIZ VIDEO→VIDEO + SHOT IMAGE 하단 합류. previz 영상 제거로 단일 경로가 됐고,
-          //    실제 인과와도 일치한다: 러프 3프레임 → 실사 이미지 → 그 이미지 refs 로 영상.)
           for (const shot of chainShots) {
-            const sd = shot.data as ShotNodeData
-            const simgId = `dn_simg_${shot.id}`
-            nodes.push({
-              id: simgId,
-              type: 'shotImage',
-              position: {
-                x: shot.position.x + SHOT_IMAGE_OFFSET_X,
-                y: shot.position.y,
-              },
-              draggable: false,
-              selectable: true, // 클릭=선택 링, 더블클릭=부모 Shot 모달(2026-07-23 피드백)
-              connectable: false,
-              data: { kind: 'shotImage', label: sd.label, parentShotNodeId: shot.id },
-            })
-            edges.push(chainEdge(`de_chain_${shot.id}_simg`, shot.id, simgId))
-            let hasVideo = false
             for (const v of nodes) {
               if (!isVideoData(v.data) || v.data.parentShotNodeId !== shot.id) continue
-              hasVideo = true
-              edges.push(chainEdge(`de_chain_simg_${v.id}`, simgId, v.id))
-            }
-            // 테이크 0개 — 회색 SHOT VIDEO 플레이스홀더로 체인 종점을 안내(2026-07-22 피드백).
-            //   첫 테이크가 생기면 다음 rebuild 가 실제 Video 노드 배선으로 대체한다.
-            if (!hasVideo) {
-              const phId = `dn_vph_${shot.id}`
-              nodes.push({
-                id: phId,
-                type: 'videoPlaceholder',
-                position: {
-                  x: shot.position.x + VIDEO_OFFSET_X,
-                  y: shot.position.y,
-                },
-                draggable: false,
-                selectable: true,
-                connectable: false,
-                data: { kind: 'videoPlaceholder', label: sd.label, parentShotNodeId: shot.id },
-              })
-              edges.push(chainEdge(`de_chain_simg_${phId}`, simgId, phId))
+              edges.push(chainEdge(`de_chain_${shot.id}_${v.id}`, shot.id, v.id))
             }
           }
 
           return { nodes, edges, lastSavedAt: Date.now() }
         })
+        get().rebuildFrameEdges()
+        get().rebuildImageEdges()
+        get().rebuildVideoChainEdges()
       },
 
       deleteEdge: (id) => {
         if (isDemoSession()) return
+        const removedEdge = get().edges.find((edge) => edge.id === id)
         set((s) => ({
+          nodes:
+            removedEdge?.data?.category === 'video-chain'
+              ? s.nodes.map((node) => {
+                  if (
+                    node.id !== removedEdge.target ||
+                    !isVideoData(node.data) ||
+                    node.data.videoChainInputId !== removedEdge.source
+                  ) {
+                    return node
+                  }
+                  return {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      videoChainInputId: null,
+                      videoChainFrameUrl: null,
+                      stale: true,
+                    },
+                  } as DirectorNode
+                })
+              : removedEdge?.data?.category === 'frame'
+              ? s.nodes.map((node) => {
+                  if (
+                    node.id !== removedEdge.target ||
+                    !isVideoData(node.data)
+                  ) {
+                    return node
+                  }
+                  const frameInputs = normalizeFrameInputs(node.data.frameInputs)
+                  const nextInputs: VideoNodeData['frameInputs'] =
+                    removedEdge.targetHandle === 'frame-start'
+                      ? {
+                          ...frameInputs,
+                          start:
+                            frameInputs.start === removedEdge.source
+                              ? null
+                              : frameInputs.start,
+                        }
+                      : removedEdge.targetHandle === 'frame-end'
+                        ? {
+                            ...frameInputs,
+                            end:
+                              frameInputs.end === removedEdge.source
+                                ? null
+                                : frameInputs.end,
+                          }
+                        : removedEdge.targetHandle === 'frame-ref'
+                          ? {
+                              ...frameInputs,
+                              refs: frameInputs.refs.filter(
+                                (sourceId) => sourceId !== removedEdge.source,
+                              ),
+                            }
+                          : frameInputs
+                  return {
+                    ...node,
+                    data: { ...node.data, frameInputs: nextInputs },
+                  } as DirectorNode
+                })
+              : removedEdge?.data?.category === 'image'
+                ? s.nodes.map((node) => {
+                    if (
+                      node.id !== removedEdge.target ||
+                      !isShotData(node.data) ||
+                      removedEdge.targetHandle !== 'image-reference'
+                    ) {
+                      return node
+                    }
+                    const imageInputs = normalizeImageInputs(node.data.imageInputs)
+                    if (!imageInputs.includes(removedEdge.source)) return node
+                    return {
+                      ...node,
+                      data: {
+                        ...node.data,
+                        imageInputs: imageInputs.filter(
+                          (sourceId) => sourceId !== removedEdge.source,
+                        ),
+                        stale:
+                          node.data.storyboardImage?.status === 'completed'
+                            ? true
+                            : node.data.stale,
+                      },
+                    } as DirectorNode
+                  })
+              : s.nodes,
           edges: s.edges.filter((e) => e.id !== id),
           selectedEdgeId: s.selectedEdgeId === id ? null : s.selectedEdgeId,
           lastSavedAt: Date.now(),
         }))
+        // #wiring-persistence: frame/image/video-chain 해제도 DB에 반영한다.
+        if (
+          removedEdge?.data?.category === 'frame' ||
+          removedEdge?.data?.category === 'image' ||
+          removedEdge?.data?.category === 'video-chain'
+        ) {
+          scheduleWiringSweepToDb(get)
+        }
       },
 
       // ─── video ─────────────────────────────────────────────────────────
@@ -2095,6 +3332,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       setVideoStatus: (videoNodeId, status, payload) => {
+        const previousSource = get().nodes.find((node) => node.id === videoNodeId)
+        const sourceVideoChanged =
+          !!previousSource &&
+          isVideoData(previousSource.data) &&
+          payload?.url !== undefined &&
+          payload.url !== previousSource.data.videoUrl
         set((s) => ({
           nodes: s.nodes.map((n) => {
             if (n.id !== videoNodeId || !isVideoData(n.data)) return n
@@ -2120,6 +3363,33 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           lastSavedAt: Date.now(),
         }))
 
+        const source = get().nodes.find((node) => node.id === videoNodeId)
+        if (source && isVideoData(source.data)) {
+          const sourceData = source.data
+          set((s) => ({
+            nodes: s.nodes.map((node) =>
+              isVideoData(node.data) &&
+              node.data.videoChainInputId === videoNodeId &&
+              (status !== 'completed' ||
+                sourceVideoChanged ||
+                !chainFrameMatchesSource(node.data.videoChainFrameUrl, sourceData))
+                ? ({
+                      ...node,
+                      data: {
+                        ...node.data,
+                        stale: true,
+                        videoChainFrameUrl: null,
+                        errorMessage: translate(
+                          useLocaleStore.getState().locale,
+                          'Previous video chain frame is unavailable.',
+                        ),
+                      },
+                    } as DirectorNode)
+                : node,
+            ),
+            lastSavedAt: Date.now(),
+          }))
+        }
         if (status === 'completed') {
           void get().ensureVideoThumbnail(videoNodeId)
         }
@@ -2204,7 +3474,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           },
         })
 
-        const referenceImageUrls = resolveShotAssetImages(data)
+        const referenceImageUrls = [
+          ...new Set([
+            ...resolveShotAssetImages(data),
+            ...resolveShotImageInputs(api.nodes, data.imageInputs),
+          ]),
+        ]
 
         // DB 샷(writerShotId=shots.shot_id 있음) → webhook job 경로.
         // 서버가 fal submit + storage 업로드 + shots.storyboard_image 갱신을 처리(탭 닫혀도 보존).
@@ -2223,6 +3498,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 writerShotId,
                 prompt,
                 referenceImageUrls,
+                // #image-model-select: 샷이 고른 fal 이미지 모델 (미지정 = 서버 기본)
+                ...(data.imageModel ? { imageModel: data.imageModel } : {}),
                 ...(options?.traceId ? { traceId: options.traceId } : {}),
               }),
             })
@@ -2398,6 +3675,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       // 연타 방어는 아래 acquireGenerationLock 이 이미 담당한다 — 1초 창이 아니라 생성 전 구간을
       //   잠그므로 더 강하다. 여기에 창을 덧대면 앞 시도가 *끝난 뒤*의 정당한 재시도까지 막힌다.
       generateVideoForShot: async (shotNodeId, options) => {
+        if (get().videoBatchBusy && options?.batch !== true) return null
         if (isDemoSession()) return null
         // #c4 (2026-08-27): Node 뷰에서 영상 생성을 눌렀는데 Storyboard 로 튀던 것 — 화면을
         //   빼앗지 않는다. 스토리보드 뷰일 때만 실사 모드로 맞춘다.
@@ -2411,6 +3689,30 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           // 새 Video take 생성 (마더 설정 상속, 결정 #13) → 그 노드를 생성
           const videoNodeId = api.addVideoTake(shotNodeId)
           if (!videoNodeId) return null
+
+          // #retake-inherit: 원본 테이크의 수동 배선(프레임 입력·영상 체인·override)을 상속.
+          if (options?.inheritFromVideoNodeId) {
+            const source = get().nodes.find(
+              (n) => n.id === options.inheritFromVideoNodeId,
+            )
+            if (source && isVideoData(source.data)) {
+              const src = source.data
+              get().updateNodeData<'video'>(videoNodeId, {
+                frameInputs: {
+                  start: src.frameInputs?.start ?? null,
+                  end: src.frameInputs?.end ?? null,
+                  refs: [...(src.frameInputs?.refs ?? [])],
+                },
+                videoChainInputId: src.videoChainInputId,
+                videoChainFrameUrl: src.videoChainFrameUrl,
+                override: { ...src.override },
+              })
+              // 상속된 배선을 엣지로 복원 + DB write-through.
+              get().rebuildFrameEdges()
+              get().rebuildVideoChainEdges()
+              scheduleWiringSweepToDb(get)
+            }
+          }
 
           const started = await get().regenerateVideo(videoNodeId, lock, options)
           if (!started) {
@@ -2437,22 +3739,105 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         if (!shotNode || !isShotData(shotNode.data)) return true
         const eff = getEffectiveShotConfig(get(), videoNodeId)
         if (!eff) return true
+        const chainInputId = videoNode.data.videoChainInputId
+        const chainFrameUrl = usableFrameImageUrl(videoNode.data.videoChainFrameUrl)
+        const chainSource = chainInputId
+          ? get().nodes.find((node) => node.id === chainInputId)
+          : null
+        const chainReady =
+          !!chainInputId &&
+          !!chainSource &&
+          isVideoData(chainSource.data) &&
+          chainSource.data.status === 'completed' &&
+          chainFrameMatchesSource(chainFrameUrl, chainSource.data)
+        if (chainInputId && !chainReady) {
+          const message = translate(
+            useLocaleStore.getState().locale,
+            'Previous video chain frame is unavailable.',
+          )
+          set((s) => ({
+            nodes: s.nodes.map((node) =>
+              node.id === videoNodeId && isVideoData(node.data)
+                ? ({
+                    ...node,
+                    data: {
+                      ...node.data,
+                      lastAttemptError: message,
+                      errorMessage: message,
+                    },
+                  } as DirectorNode)
+                : node,
+            ),
+            generationErrors: { ...s.generationErrors, [videoNodeId]: message },
+            lastSavedAt: Date.now(),
+          }))
+          return false
+        }
         const projectId = get().projectId
         const lockIsHeld = !!heldLock && generationLocks.get(heldLock.key) === heldLock.token
         const lock = lockIsHeld ? null : acquireGenerationLock(projectId, shotNode.id)
         if (!lockIsHeld && !lock) return true
         const idempotencyKey = crypto.randomUUID()
         const preserveSuccess = !!videoNode.data.videoUrl
-        const referenceImageUrl =
-          shotNode.data.storyboardImage?.status === 'completed'
-            ? shotNode.data.storyboardImage.url
-            : shotNode.data.referenceImages[0]?.url ?? null
+        const frameInputs = normalizeFrameInputs(videoNode.data.frameInputs)
+        const hasManualFrameInputs =
+          !!frameInputs.start || !!frameInputs.end || frameInputs.refs.length > 0
+        const storyboard = shotNode.data.storyboardImage
         // V2 refs(#real-strip): 실사 3프레임이 있으면 [START, END] 2장 — 시작·끝 구도 고정.
-        const sbFrames =
-          shotNode.data.storyboardImage?.status === 'completed'
-            ? shotNode.data.storyboardImage.frames
-            : undefined
-        const referenceImageUrls = sbFrames ? [sbFrames.start, sbFrames.end] : undefined
+        const sbFrames = storyboard?.status === 'completed' ? storyboard.frames : undefined
+        const automaticStart = resolveShotFrameImageUrl(shotNode.data, 'start')
+        const automaticEnd = sbFrames
+          ? resolveShotFrameImageUrl(shotNode.data, 'end')
+          : null
+        const automaticReferenceImageUrl =
+          (storyboard?.status === 'completed'
+            ? usableFrameImageUrl(storyboard.url)
+            : null) ??
+          resolveShotFrameImageUrl(shotNode.data, 'ref')
+        let referenceImageUrls: string[] | undefined
+        let referenceImageRoles: Array<'start' | 'end' | 'ref'> | undefined
+        if (chainFrameUrl || hasManualFrameInputs || sbFrames) {
+          // Unresolvable manual slots deliberately fall back to the corresponding
+          // automatic image so a stale source node cannot remove a valid frame.
+          const start =
+            chainFrameUrl ??
+            (frameInputs.start
+              ? resolveFrameInputImageUrl(get().nodes, frameInputs.start, 'start')
+              : null) ??
+            automaticStart
+          const refs = frameInputs.refs
+            .map((sourceNodeId) =>
+              resolveFrameInputImageUrl(get().nodes, sourceNodeId, 'ref'),
+            )
+            .filter((url): url is string => !!url)
+          const end =
+            (frameInputs.end
+              ? resolveFrameInputImageUrl(get().nodes, frameInputs.end, 'end')
+              : null) ?? automaticEnd
+          const urls: string[] = []
+          const roles: Array<'start' | 'end' | 'ref'> = []
+          if (start) {
+            urls.push(start)
+            roles.push('start')
+          }
+          for (const url of refs) {
+            urls.push(url)
+            roles.push('ref')
+          }
+          if (end) {
+            urls.push(end)
+            roles.push('end')
+          }
+          if (urls.length > 0) {
+            referenceImageUrls = urls
+            referenceImageRoles = roles
+          }
+        }
+        const referenceImageUrl =
+          referenceImageUrls?.find((url) => !!usableFrameImageUrl(url)) ??
+          automaticReferenceImageUrl ??
+          automaticStart ??
+          null
         const videoAlreadyGenerating = get().nodes.some(
           (candidate) =>
             isVideoData(candidate.data) &&
@@ -2486,6 +3871,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           durationSeconds: shotNode.data.durationSeconds ?? 5,
           referenceImageUrl,
           ...(referenceImageUrls ? { referenceImageUrls } : {}),
+          ...(referenceImageUrls && referenceImageRoles ? { referenceImageRoles } : {}),
           ...(options?.traceId ? { traceId: options.traceId, actor: 'chat' } : {}),
         }
         const postGeneration = (recoveryReceipt?: string) =>
@@ -2714,7 +4100,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const snap = {
           nodes: s.nodes.filter((n) => !isDerivedNodeData(n.data)),
           edges: s.edges.filter(
-            (e) => e.data?.category !== 'references' && e.data?.category !== 'chain',
+            (e) =>
+              e.data?.category !== 'references' &&
+              e.data?.category !== 'chain' &&
+              e.data?.category !== 'video-chain' &&
+              e.data?.category !== 'image',
           ),
         }
         // past 최대 50개 유지, 새 변경이 생기면 redo 가지(future)는 버린다
@@ -2727,7 +4117,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const cur = {
           nodes: s.nodes.filter((n) => !isDerivedNodeData(n.data)),
           edges: s.edges.filter(
-            (e) => e.data?.category !== 'references' && e.data?.category !== 'chain',
+            (e) =>
+              e.data?.category !== 'references' &&
+              e.data?.category !== 'chain' &&
+              e.data?.category !== 'video-chain' &&
+              e.data?.category !== 'image',
           ),
         }
         set({
@@ -2747,7 +4141,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const cur = {
           nodes: s.nodes.filter((n) => !isDerivedNodeData(n.data)),
           edges: s.edges.filter(
-            (e) => e.data?.category !== 'references' && e.data?.category !== 'chain',
+            (e) =>
+              e.data?.category !== 'references' &&
+              e.data?.category !== 'chain' &&
+              e.data?.category !== 'video-chain' &&
+              e.data?.category !== 'image',
           ),
         }
         set({
@@ -3165,6 +4563,186 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   })
                 break
               }
+              case 'connectFrame': {
+                const s = resolveId(u.sourceId)
+                const t = resolveId(u.targetId)
+                if (
+                  u.targetHandle !== 'frame-start' &&
+                  u.targetHandle !== 'frame-end' &&
+                  u.targetHandle !== 'frame-ref'
+                ) {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'invalid frame target handle',
+                  })
+                  break
+                }
+                const source = get().nodes.find((node) => node.id === s)
+                const target = get().nodes.find((node) => node.id === t)
+                if (!source || !target) {
+                  result.skipped.push({ update: u, reason: 'unknown id' })
+                  break
+                }
+                if (!isVideoData(target.data)) {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'targetId must be Video node',
+                  })
+                  break
+                }
+                if (!isFrameSourceNode(source)) {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'sourceId is not frame-capable',
+                  })
+                  break
+                }
+
+                api.wireFrameToVideo(s, t, u.targetHandle)
+                const wiredVideo = get().nodes.find((node) => node.id === t)
+                const wiredInputs =
+                  wiredVideo && isVideoData(wiredVideo.data)
+                    ? normalizeFrameInputs(wiredVideo.data.frameInputs)
+                    : null
+                const inputMatches =
+                  wiredInputs !== null &&
+                  (u.targetHandle === 'frame-start'
+                    ? wiredInputs.start === s
+                    : u.targetHandle === 'frame-end'
+                      ? wiredInputs.end === s
+                      : wiredInputs.refs.includes(s))
+                const edgeMatches = get().edges.some(
+                  (edge) =>
+                    edge.data?.category === 'frame' &&
+                    edge.source === s &&
+                    edge.target === t &&
+                    edge.targetHandle === u.targetHandle,
+                )
+                if (inputMatches && edgeMatches) {
+                  result.applied += 1
+                } else {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'frame wiring not reflected',
+                  })
+                }
+                break
+              }
+              case 'connectVideo': {
+                const s = resolveId(u.sourceId)
+                const t = resolveId(u.targetId)
+                if (u.targetHandle !== 'video-chain') {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'invalid video-chain target handle',
+                  })
+                  break
+                }
+                const source = get().nodes.find((node) => node.id === s)
+                const target = get().nodes.find((node) => node.id === t)
+                if (
+                  !source ||
+                  !target ||
+                  !isVideoData(source.data) ||
+                  !isVideoData(target.data)
+                ) {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'sourceId and targetId must be Video nodes',
+                  })
+                  break
+                }
+                if (
+                  source.data.status !== 'completed' ||
+                  !usableFrameImageUrl(source.data.videoUrl) ||
+                  !source.data.videoClipId ||
+                  !source.data.generationJobId ||
+                  videoChainWouldCycle(get().nodes, s, t)
+                ) {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'source Video must be completed and chainable',
+                  })
+                  break
+                }
+                void api.wireVideoChainToVideo(s, t, u.targetHandle)
+                const wiredVideo = get().nodes.find((node) => node.id === t)
+                const inputMatches =
+                  wiredVideo &&
+                  isVideoData(wiredVideo.data) &&
+                  wiredVideo.data.videoChainInputId === s
+                const edgeMatches = get().edges.some(
+                  (edge) =>
+                    edge.data?.category === 'video-chain' &&
+                    edge.source === s &&
+                    edge.target === t &&
+                    edge.targetHandle === u.targetHandle,
+                )
+                if (inputMatches && edgeMatches) {
+                  result.applied += 1
+                } else {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'video chain wiring not reflected',
+                  })
+                }
+                break
+              }
+              case 'connectImage': {
+                const s = resolveId(u.sourceId)
+                const t = resolveId(u.targetId)
+                if (u.targetHandle !== 'image-reference') {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'invalid image target handle',
+                  })
+                  break
+                }
+                const source = get().nodes.find((node) => node.id === s)
+                const target = get().nodes.find((node) => node.id === t)
+                if (!source || !target) {
+                  result.skipped.push({ update: u, reason: 'unknown id' })
+                  break
+                }
+                if (!isShotData(target.data)) {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'targetId must be Shot node',
+                  })
+                  break
+                }
+                if (!isImageSourceNode(source)) {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'sourceId is not image-capable',
+                  })
+                  break
+                }
+
+                api.wireImageToShot(s, t, u.targetHandle)
+                const wiredShot = get().nodes.find((node) => node.id === t)
+                const wiredInputs =
+                  wiredShot && isShotData(wiredShot.data)
+                    ? normalizeImageInputs(wiredShot.data.imageInputs)
+                    : null
+                const inputMatches = wiredInputs?.includes(s) ?? false
+                const edgeMatches = get().edges.some(
+                  (edge) =>
+                    edge.data?.category === 'image' &&
+                    edge.source === s &&
+                    edge.target === t &&
+                    edge.targetHandle === u.targetHandle,
+                )
+                if (inputMatches && edgeMatches) {
+                  result.applied += 1
+                } else {
+                  result.skipped.push({
+                    update: u,
+                    reason: 'image wiring not reflected',
+                  })
+                }
+                break
+              }
               case 'requestDelete': {
                 const id = resolveId(u.id)
                 if (!findNodeOrSkip(id, u)) break
@@ -3209,6 +4787,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           popupNodeId: null,
           deleteConfirmInfo: null,
           relationModal: null,
+          videoBatchBusy: false,
+          videoBatchProgress: null,
           generatingNodeIds: {},
           generationErrors: {},
           playingNodeId: null,
@@ -3227,7 +4807,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
         // 파생물(asset/previz 체인 노드, references/chain 엣지)은 persist 제외.
-        // 매 진입 시 sync가 rebuild* 로 재생성하므로 캐시에 남기면 stale 위험.
+        // frame 엣지는 양 끝이 persisted 노드일 때만 아래 필터를 통과한다.
+        // 매 진입 시 sync가 rebuild* 로 재생성하므로 파생물 캐시에 남기면 stale 위험.
         nodes: s.nodes.filter(
           (n) =>
             !isDerivedNodeData(n.data) &&
@@ -3247,6 +4828,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             (e) =>
               e.data?.category !== 'references' &&
               e.data?.category !== 'chain' &&
+              e.data?.category !== 'video-chain' &&
+              e.data?.category !== 'image' &&
               persistedNodeIds.has(e.source) &&
               persistedNodeIds.has(e.target),
           )
@@ -3305,31 +4888,7 @@ export function nextVideoPosition(
 
 /**
  * Previz 체인 파생 노드(드래그 불가)를 부모 Shot 위치에 상시 정합시킨다(#previz-chain).
- * 페이지 onNodesChange 가 드래그 적용 직후 호출 — Shot 을 끌면 체인이 함께 따라온다.
- * 변경이 없으면 입력 배열을 그대로 반환(참조 안정 — 불필요 재렌더 방지).
- */
-export function followChainNodePositions(nodes: DirectorNode[]): DirectorNode[] {
-  let shotById: Map<string, DirectorNode> | null = null
-  let changed = false
-  const out = nodes.map((n) => {
-    if (!isShotImageData(n.data) && !isVideoPlaceholderData(n.data)) return n
-    if (!shotById) {
-      shotById = new Map(nodes.filter((x) => isShotData(x.data)).map((x) => [x.id, x]))
-    }
-    const shot = shotById.get((n.data as { parentShotNodeId: string }).parentShotNodeId)
-    if (!shot) return n
-    const want = {
-      x:
-        shot.position.x +
-        (isVideoPlaceholderData(n.data) ? VIDEO_OFFSET_X : SHOT_IMAGE_OFFSET_X),
-      y: shot.position.y,
-    }
-    if (n.position.x === want.x && n.position.y === want.y) return n
-    changed = true
-    return { ...n, position: want }
-  })
-  return changed ? out : nodes
-}
+
 
 /**
  * 새 Scene 노드 자동 위치 — 가장 아래 Scene 아래로 stacking.
@@ -3402,8 +4961,13 @@ export function serializeDirectorCanvasContext(
         const camActive = (
           ['horizontal', 'vertical', 'pan', 'tilt', 'roll', 'zoom'] as const
         ).filter((k) => shData.camera[k] !== 0).length
+        const imageInputs = normalizeImageInputs(shData.imageInputs)
+        const imageSuffix =
+          imageInputs.length > 0
+            ? `, image refs: ${imageInputs.join(',')}`
+            : ''
         lines.push(
-          `  - [${sh.id}] Shot "${shData.label}" (camera ${camActive}/6 active, light ${shData.lighting.position}, ${shData.provider})${shData.stale ? ' [stale]' : ''}: ${promptSnippet || '(빈 prompt)'}`,
+          `  - [${sh.id}] Shot "${shData.label}" (camera ${camActive}/6 active, light ${shData.lighting.position}, ${shData.provider}${imageSuffix})${shData.stale ? ' [stale]' : ''}: ${promptSnippet || '(빈 prompt)'}`,
         )
         const childVideos = nodes.filter(
           (n) => isVideoData(n.data) && n.data.parentShotNodeId === sh.id,
@@ -3412,8 +4976,21 @@ export function serializeDirectorCanvasContext(
           if (!isVideoData(v.data)) return
           const vData = v.data
           const ovKeys = Object.keys(vData.override).join(',') || '-'
+          const frameInputs = normalizeFrameInputs(vData.frameInputs)
+          const frameSlots = [
+            frameInputs.start ? `START=${frameInputs.start}` : null,
+            frameInputs.end ? `END=${frameInputs.end}` : null,
+            frameInputs.refs.length > 0
+              ? `REF=${frameInputs.refs.join(',')}`
+              : null,
+          ].filter((value): value is string => value !== null)
+          const frameSuffix =
+            frameSlots.length > 0 ? `, frames: ${frameSlots.join('; ')}` : ''
+          const videoChainSuffix = vData.videoChainInputId
+            ? `, previous-video: ${vData.videoChainInputId}${vData.videoChainFrameUrl ? ' (last frame ready)' : ' (last frame pending)'}`
+            : ''
           lines.push(
-            `      - [${v.id}] Video "${vData.label}" (${vData.status}${vData.final ? ', ★FINAL' : ''}${vData.stale ? ', stale' : ''}, override: ${ovKeys})`,
+            `      - [${v.id}] Video "${vData.label}" (${vData.status}${vData.final ? ', ★FINAL' : ''}${vData.stale ? ', stale' : ''}, override: ${ovKeys}${frameSuffix}${videoChainSuffix})`,
           )
         })
       })
@@ -3427,7 +5004,12 @@ export function serializeDirectorCanvasContext(
       lines.push('- (orphan Shots — Scene 미연결)')
       orphanShots.forEach((sh) => {
         if (!isShotData(sh.data)) return
-        lines.push(`  - [${sh.id}] Shot "${sh.data.label}"`)
+        const imageInputs = normalizeImageInputs(sh.data.imageInputs)
+        const imageSuffix =
+          imageInputs.length > 0
+            ? ` (image refs: ${imageInputs.join(',')})`
+            : ''
+        lines.push(`  - [${sh.id}] Shot "${sh.data.label}"${imageSuffix}`)
       })
     }
     lines.push('')
@@ -3460,11 +5042,20 @@ export function serializeDirectorCanvasContext(
         lines.push(`- lighting: ${JSON.stringify(sel.data.lighting)}`)
         lines.push(`- cameraPreset: ${JSON.stringify(sel.data.cameraPreset)}`)
         lines.push(`- provider: ${sel.data.provider}`)
+        lines.push(
+          `- image-reference inputs: ${normalizeImageInputs(sel.data.imageInputs).join(', ') || '(none)'}`,
+        )
       } else if (isVideoData(sel.data)) {
         lines.push(`- parent Shot: ${sel.data.parentShotNodeId}`)
         lines.push(`- override: ${JSON.stringify(sel.data.override)}`)
         lines.push(`- status: ${sel.data.status}`)
         lines.push(`- final: ${sel.data.final}`)
+        lines.push(
+          `- previous-video input: ${sel.data.videoChainInputId ?? '(none)'}`,
+        )
+        lines.push(
+          `- previous-video last frame: ${sel.data.videoChainFrameUrl ? 'ready' : '(none)'}`,
+        )
       } else if (isSceneData(sel.data)) {
         lines.push(`- description: ${sel.data.description || '(빈)'}`)
       }

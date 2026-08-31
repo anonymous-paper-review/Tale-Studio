@@ -62,7 +62,6 @@ import { POST as generateWorldPOST } from '@/app/api/artist/generate-world/route
 import { POST as generateStoryboardPOST } from '@/app/api/director/generate-storyboard/route'
 import { triggerCharacterDrafts } from '@/lib/artist/draft-trigger'
 import {
-  buildCharacterMainPrompt,
   buildCharacterTurnaroundPrompt,
   buildCharacterViewPrompt,
   type CharacterPromptInput,
@@ -115,8 +114,19 @@ interface CharacterRow {
   appearance: string | null
   costume: string[] | string | null
   view_main: string | null
-  entity_type: 'person' | 'object' | null
+  entity_type: 'person' | null
   origin: 'producer' | 'writer'
+}
+
+interface AppearanceRow {
+  project_id: string
+  character_id: string
+  appearance_key: string
+  is_default: boolean
+  appearance: string | null
+  costume: string[] | string | null
+  sheet_url: string | null
+  portrait_url: string | null
 }
 
 interface StyleAnchorRow {
@@ -151,10 +161,12 @@ const designTokens: DesignTokens = {
 const dbState: {
   projects: ProjectRow[]
   characters: CharacterRow[]
+  appearances: AppearanceRow[]
   styleAnchors: StyleAnchorRow[]
 } = {
   projects: [],
   characters: [],
+  appearances: [],
   styleAnchors: [],
 }
 
@@ -162,6 +174,7 @@ beforeEach(() => {
   _clearStyleAnchorCacheForTest()
   dbState.projects = [projectFixture({ design_tokens: designTokens, style_anchor_key: ANCHOR_KEY })]
   dbState.characters = []
+  dbState.appearances = []
   dbState.styleAnchors = [styleAnchorFixture()]
 
   mocks.getUser.mockReset()
@@ -209,12 +222,13 @@ beforeEach(() => {
 describe('style-anchor route integration', () => {
   it('AC1 generate-sheet person/template injects anchor before the layout template', async () => {
     const character = characterFixture({ view_main: null, entity_type: 'person' })
-    dbState.characters = [character]
+    setCharacters(character)
 
     const response = await generateSheetPOST(
       postRequest('/api/artist/generate-sheet', {
         projectId: PROJECT_ID,
         characterId: CHARACTER_ID,
+        appearanceKey: 'current',
         view: 'main',
       }),
     )
@@ -235,6 +249,11 @@ describe('style-anchor route integration', () => {
       aspect_ratio: '16:9',
       style_anchor_key: ANCHOR_KEY,
     })
+    expect((mocks.createGenerationJob.mock.calls[0][0] as { target: unknown }).target).toMatchObject({
+      characterId: CHARACTER_ID,
+      appearanceKey: 'current',
+      view: 'main',
+    })
   })
 
   // Q3b/exp4 판정 잠금 (2026-07-14, docs/style-anchor-art-style-authority.md §9):
@@ -246,12 +265,13 @@ describe('style-anchor route integration', () => {
     //   지우고 매체어(texture: photorealistic)를 살리는, 취지가 뒤집힌 배치였다. 새 계약:
     //   매체어를 품은 토큰만 드롭(2026-07-14 의 dark_cinematic_realism 교훈은 보존), 무해 토큰 유지.
     const character = characterFixture({ view_main: null, entity_type: 'person' })
-    dbState.characters = [character]
+    setCharacters(character)
 
     const response = await generateSheetPOST(
       postRequest('/api/artist/generate-sheet', {
         projectId: PROJECT_ID,
         characterId: CHARACTER_ID,
+        appearanceKey: 'current',
         view: 'main',
       }),
     )
@@ -270,11 +290,12 @@ describe('style-anchor route integration', () => {
 
   it('AC10 Q5 generate-sheet folds the anchor key into source_hash (false-stale guard)', async () => {
     const character = characterFixture({ view_main: null, entity_type: 'person' })
-    dbState.characters = [character]
+    setCharacters(character)
     await generateSheetPOST(
       postRequest('/api/artist/generate-sheet', {
         projectId: PROJECT_ID,
         characterId: CHARACTER_ID,
+        appearanceKey: 'current',
         view: 'main',
       }),
     )
@@ -297,12 +318,13 @@ describe('style-anchor route integration', () => {
   it('AC2 generate-sheet person/T2I fallback injects anchor and normalizes to the edit model', async () => {
     mocks.webhookBaseUrl = null
     const character = characterFixture({ view_main: null, entity_type: 'person' })
-    dbState.characters = [character]
+    setCharacters(character)
 
     const response = await generateSheetPOST(
       postRequest('/api/artist/generate-sheet', {
         projectId: PROJECT_ID,
         characterId: CHARACTER_ID,
+        appearanceKey: 'current',
         view: 'main',
       }),
     )
@@ -317,43 +339,15 @@ describe('style-anchor route integration', () => {
     })
   })
 
-  it('AC3 generate-sheet object main injects anchor and preserves the square aspect ratio', async () => {
-    const character = characterFixture({
-      name: 'Chronometer',
-      role: 'mystery prop',
-      appearance: 'a brass clockwork compass with a cracked sapphire lens',
-      costume: [],
-      view_main: null,
-      entity_type: 'object',
-    })
-    dbState.characters = [character]
-
-    const response = await generateSheetPOST(
-      postRequest('/api/artist/generate-sheet', {
-        projectId: PROJECT_ID,
-        characterId: CHARACTER_ID,
-        view: 'main',
-      }),
-    )
-
-    expect(response.status).toBe(200)
-    expect(firstFalOpts()).toEqual({
-      model: DEFAULT_EDIT_IMAGE_MODEL,
-      prompt: `${STYLE_ANCHOR_CLAUSE}\n${buildCharacterMainPrompt(sheetPromptInput(character, designTokens))}`,
-      aspect_ratio: '1:1',
-      reference_image_urls: [ANCHOR_URL],
-      webhookUrl: WEBHOOK_URL,
-    })
-  })
-
   it('AC4 generate-sheet directional views stay anchor-free even when the project has an anchor key', async () => {
     const character = characterFixture({ view_main: 'https://img/main.png', entity_type: 'person' })
-    dbState.characters = [character]
+    setCharacters(character)
 
     const response = await generateSheetPOST(
       postRequest('/api/artist/generate-sheet', {
         projectId: PROJECT_ID,
         characterId: CHARACTER_ID,
+        appearanceKey: 'current',
         view: 'back',
       }),
     )
@@ -459,7 +453,7 @@ describe('style-anchor route integration', () => {
     })
   })
 
-  it('AC7 triggerCharacterDrafts injects anchor for character main template, fallback, and object drafts', async () => {
+  it('AC7 triggerCharacterDrafts injects anchor for character main template and fallback drafts', async () => {
     dbState.projects = [projectFixture({ design_tokens: designTokens, style_anchor_key: ANCHOR_KEY })]
     const templatePerson = draftCharacter({
       character_id: 'draft-person-template',
@@ -475,28 +469,19 @@ describe('style-anchor route integration', () => {
       appearance: 'masked violinist carrying a lantern',
       entity_type: 'person',
     })
-    const object = draftCharacter({
-      character_id: 'draft-object',
-      name: 'Signal Compass',
-      role: null,
-      appearance: 'a palm-sized compass with a glowing red needle',
-      entity_type: 'object',
-    })
-    dbState.characters = [templatePerson, fallbackPerson, object]
+    setCharacters(templatePerson, fallbackPerson)
     mocks.resolveWebhookBaseUrl.mockReset()
     mocks.resolveWebhookBaseUrl
       .mockReturnValueOnce(BASE_URL)
       .mockReturnValueOnce(null)
-      .mockReturnValueOnce(BASE_URL)
 
     const result = await triggerCharacterDrafts(PROJECT_ID)
 
     const expectedTemplatePrompt = `${STYLE_ANCHOR_CLAUSE}\n${STYLE_ANCHOR_TEMPLATE_CLAUSE}\n${buildCharacterTurnaroundPrompt(draftPromptInput(templatePerson))}`
     const expectedFallbackPrompt = `${STYLE_ANCHOR_CLAUSE}\n${buildCharacterTurnaroundPrompt(draftPromptInput(fallbackPerson))}`
-    const expectedObjectPrompt = `${STYLE_ANCHOR_CLAUSE}\n${buildCharacterMainPrompt(draftPromptInput(object))}`
-    expect(result).toEqual({ submitted: 3, skipped: 0, failed: 0 })
-    expect(mocks.falImageSubmit).toHaveBeenCalledTimes(3)
-    expect(mocks.createGenerationJob).toHaveBeenCalledTimes(3)
+    expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
+    expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
+    expect(mocks.createGenerationJob).toHaveBeenCalledTimes(2)
     expect(falOptsAt(0)).toEqual({
       model: DEFAULT_EDIT_IMAGE_MODEL,
       prompt: expectedTemplatePrompt,
@@ -510,6 +495,16 @@ describe('style-anchor route integration', () => {
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       aspect_ratio: '16:9',
       style_anchor_key: ANCHOR_KEY,
+    })
+    expect((mocks.createGenerationJob.mock.calls[0][0] as { target: unknown }).target).toMatchObject({
+      characterId: templatePerson.character_id,
+      appearanceKey: 'current',
+      view: 'main',
+    })
+    expect((mocks.createGenerationJob.mock.calls[1][0] as { target: unknown }).target).toMatchObject({
+      characterId: fallbackPerson.character_id,
+      appearanceKey: 'current',
+      view: 'main',
     })
     expect(generationJobArgAt(0).inputSnapshot.source_hash).toBe(
       computeImageSourceHash(
@@ -537,20 +532,6 @@ describe('style-anchor route integration', () => {
       aspect_ratio: '3:2',
       style_anchor_key: ANCHOR_KEY,
     })
-    expect(falOptsAt(2)).toEqual({
-      model: DEFAULT_EDIT_IMAGE_MODEL,
-      prompt: expectedObjectPrompt,
-      reference_image_urls: [ANCHOR_URL],
-      aspect_ratio: '1:1',
-      webhookUrl: WEBHOOK_URL,
-    })
-    expect(generationJobArgAt(2).inputSnapshot).toMatchObject({
-      model: DEFAULT_EDIT_IMAGE_MODEL,
-      prompt: expectedObjectPrompt,
-      reference_image_urls: [ANCHOR_URL],
-      aspect_ratio: '1:1',
-      style_anchor_key: ANCHOR_KEY,
-    })
   })
 
   it('AC7 triggerCharacterDrafts treats an inactive anchor as a fail-soft no-op for draft opts', async () => {
@@ -570,24 +551,16 @@ describe('style-anchor route integration', () => {
       appearance: 'masked violinist carrying a lantern',
       entity_type: 'person',
     })
-    const object = draftCharacter({
-      character_id: 'draft-object',
-      name: 'Signal Compass',
-      role: null,
-      appearance: 'a palm-sized compass with a glowing red needle',
-      entity_type: 'object',
-    })
-    dbState.characters = [templatePerson, fallbackPerson, object]
+    setCharacters(templatePerson, fallbackPerson)
     mocks.resolveWebhookBaseUrl.mockReset()
     mocks.resolveWebhookBaseUrl
       .mockReturnValueOnce(BASE_URL)
       .mockReturnValueOnce(null)
-      .mockReturnValueOnce(BASE_URL)
 
     const result = await triggerCharacterDrafts(PROJECT_ID)
 
-    expect(result).toEqual({ submitted: 3, skipped: 0, failed: 0 })
-    expect(mocks.falImageSubmit).toHaveBeenCalledTimes(3)
+    expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
+    expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
     expect(falOptsAt(0)).toEqual({
       model: DEFAULT_EDIT_IMAGE_MODEL,
       prompt: buildCharacterTurnaroundPrompt(draftPromptInput(templatePerson)),
@@ -604,17 +577,8 @@ describe('style-anchor route integration', () => {
     })
     expect(falOptsAt(1)).not.toHaveProperty('reference_image_urls')
     expect(falOptsAt(1).prompt).not.toContain(STYLE_ANCHOR_CLAUSE)
-    expect(falOptsAt(2)).toEqual({
-      model: DEFAULT_IMAGE_MODEL,
-      prompt: buildCharacterMainPrompt(draftPromptInput(object)),
-      aspect_ratio: '1:1',
-      webhookUrl: WEBHOOK_URL,
-    })
-    expect(falOptsAt(2)).not.toHaveProperty('reference_image_urls')
-    expect(falOptsAt(2).prompt).not.toContain(STYLE_ANCHOR_CLAUSE)
     expect(generationJobArgAt(0).inputSnapshot.style_anchor_key).toBeNull()
     expect(generationJobArgAt(1).inputSnapshot.style_anchor_key).toBeNull()
-    expect(generationJobArgAt(2).inputSnapshot.style_anchor_key).toBeNull()
   })
 
   it('AC9 treats an inactive anchor row as a fail-soft no-op for fal submit opts', async () => {
@@ -688,6 +652,32 @@ function draftCharacter(overrides: Partial<CharacterRow>): CharacterRow {
   })
 }
 
+
+function appearanceFixture(overrides: Partial<AppearanceRow> = {}): AppearanceRow {
+  return {
+    project_id: PROJECT_ID,
+    character_id: CHARACTER_ID,
+    appearance_key: 'current',
+    is_default: true,
+    appearance: 'a focused explorer with copper goggles and wind-tossed black hair',
+    costume: ['navy flight coat', 'brass utility boots'],
+    sheet_url: null,
+    portrait_url: null,
+    ...overrides,
+  }
+}
+
+function setCharacters(...characters: CharacterRow[]) {
+  dbState.characters = characters
+  dbState.appearances = characters.map((character) =>
+    appearanceFixture({
+      character_id: character.character_id,
+      appearance: character.appearance,
+      costume: character.costume,
+      sheet_url: character.view_main,
+    }),
+  )
+}
 
 function styleAnchorFixture(overrides: Partial<StyleAnchorRow> = {}): StyleAnchorRow {
   return {
@@ -778,6 +768,7 @@ function resolveRows(
 function rowsForTable(table: string): Array<Record<string, unknown>> {
   if (table === 'projects') return dbState.projects as unknown as Array<Record<string, unknown>>
   if (table === 'characters') return dbState.characters as unknown as Array<Record<string, unknown>>
+  if (table === 'character_appearances') return dbState.appearances as unknown as Array<Record<string, unknown>>
   if (table === 'style_anchors') return dbState.styleAnchors as unknown as Array<Record<string, unknown>>
   return []
 }

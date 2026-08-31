@@ -17,10 +17,11 @@ import type {
   Genre,
   CastContract,
   WriterRerunContext,
+  NarrativeTime,
 } from '@/lib/writer/types/pipeline';
 import { isAdminOwnedProject } from '@/lib/admin';
 import { isWriterEngine, type WriterEngine } from '@/lib/writer/engine';
-import { applyProducerI18n } from '@/lib/writer/i18n/derive-en';
+import { appearanceI18nFields, applyProducerI18n } from '@/lib/writer/i18n/derive-en';
 import { resolveOutputLocale } from '@/lib/locale';
 import { parseDialogueLanguage } from '@/lib/writer/pipeline/util/output-language';
 import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
@@ -53,6 +54,8 @@ interface RerunSceneRow {
   original_text_quote: string | null;
   location: string | null;
   time_of_day: string | null;
+  narrative_time: NarrativeTime | null;
+  character_appearance_overrides: Record<string, string> | null;
   mood: string | null;
   characters_present: string[] | null;
   estimated_duration_seconds: number | null;
@@ -79,6 +82,19 @@ interface RerunMessageRow {
   created_at: string | null;
 }
 
+function requireRerunNarrativeTime(scene: RerunSceneRow): NarrativeTime {
+  if (
+    scene.narrative_time === 'present' ||
+    scene.narrative_time === 'past' ||
+    scene.narrative_time === 'future'
+  ) {
+    return scene.narrative_time;
+  }
+  throw new Error(
+    `rerun scene ${scene.scene_id} has no valid narrative_time; apply the narrative-time migration before rerunning Writer`,
+  );
+}
+
 export function buildRerunContext(
   previousRunId: string,
   scenes: RerunSceneRow[],
@@ -94,6 +110,8 @@ export function buildRerunContext(
       originalTextQuote: scene.original_text_quote,
       location: scene.location,
       timeOfDay: scene.time_of_day,
+      narrativeTime: requireRerunNarrativeTime(scene),
+      characterAppearanceOverrides: scene.character_appearance_overrides,
       mood: scene.mood,
       charactersPresent: Array.isArray(scene.characters_present)
         ? scene.characters_present.filter((id): id is string => typeof id === 'string')
@@ -131,26 +149,52 @@ function normRole(role?: string): 'protagonist' | 'antagonist' | 'supporting' {
   return role === 'protagonist' || role === 'antagonist' ? role : 'supporting';
 }
 
-// producer-story-gate §3 step 1: 핸드오프 캐스트를 characters 테이블에 즉시 기록(origin='producer').
-//   slug 기준 upsert — 미지정 컬럼(view_main 등 이미지)은 보존, writer-origin 행은 건드리지 않음.
+// producer-story-gate §3 step 1: 사람은 identity + 기본 모습을 원자적으로 기록하고, 소품은 props에 기록한다.
 async function upsertProducerCast(projectId: string, cast: CastContract): Promise<void> {
   if (!cast.characters.length) return;
-  const rows = cast.characters.map((c) => ({
-    project_id: projectId,
-    character_id: c.character_id,
-    name: c.name,
-    role: normRole(c.role),
-    entity_type: c.entity_type === 'object' ? 'object' : 'person',
-    appearance: c.appearance,
-    description: c.appearance, // 레거시 미러
-    arc: c.arc ?? null,
-    motivation: c.motivation ?? null,
-    origin: 'producer',
-  }));
-  const { error } = await supabaseAdmin
-    .from('characters')
-    .upsert(rows, { onConflict: 'project_id,character_id' });
-  if (error) throw new Error(`cast upsert failed: ${error.message}`);
+  const prepared = await Promise.all(
+    cast.characters.map(async (character) => ({
+      character,
+      fields: await appearanceI18nFields(character.character_id, character.appearance),
+    })),
+  );
+  const people = prepared
+    .filter(({ character }) => character.entity_type === 'person')
+    .map(({ character, fields }) => ({
+      character_id: character.character_id,
+      name: character.name,
+      role: normRole(character.role),
+      description: null,
+      arc: character.arc ?? null,
+      motivation: character.motivation ?? null,
+      origin: 'producer',
+      ...fields,
+      costume: null,
+    }));
+  const props = prepared
+    .filter(({ character }) => character.entity_type === 'object')
+    .map(({ character, fields }) => ({
+      project_id: projectId,
+      prop_id: character.character_id,
+      name: character.name,
+      description: null,
+      appearance: fields.appearance,
+      appearance_native: fields.appearance_native,
+      origin: 'producer',
+    }));
+  if (people.length) {
+    const { error } = await supabaseAdmin.rpc('upsert_people_with_default_appearances', {
+      p_project_id: projectId,
+      p_people: people,
+    });
+    if (error) throw new Error(`people upsert failed: ${error.message}`);
+  }
+  if (props.length) {
+    const { error } = await supabaseAdmin
+      .from('props')
+      .upsert(props, { onConflict: 'project_id,prop_id' });
+    if (error) throw new Error(`props upsert failed: ${error.message}`);
+  }
 }
 
 async function upsertProducerBackgrounds(projectId: string, backgrounds: ProducerBackgrounds): Promise<void> {
@@ -287,17 +331,9 @@ export async function POST(req: NextRequest) {
     }
     if (backgrounds?.locations?.length) {
       await upsertProducerBackgrounds(projectId, backgrounds);
-    }
-
-    // 1.5 언어 경계(S1a): producer native 자유서술(외형·배경)을 영어 base 로 파생 → DB 주 컬럼(EN) + `_native` 보존.
-    //   동기 실행(Hobby `after()` 죽음 회피) + best-effort(실패해도 핸드오프 진행, 주 컬럼=native 유지).
-    //   drafts/step 트리거보다 먼저 await → 캐릭터 초안 이미지가 EN appearance 를 사용. (표시→`_native` 재배선은 S2)
-    if (cast?.characters?.length || backgrounds?.locations?.length) {
-      const n = await applyProducerI18n(projectId, cast, backgrounds).catch((e) => {
-        console.error('[writer/start] i18n derive failed (proceeding):', e);
-        return { characters: 0, locations: 0 };
+      await applyProducerI18n(projectId, undefined, backgrounds).catch((e) => {
+        console.error('[writer/start] location i18n derive failed (proceeding):', e);
       });
-      console.log(`[writer/start] i18n EN base: chars=${n.characters} locs=${n.locations}`);
     }
 
     // 1.6 언어 경계(S4→S5): projects.locale 확정 + 파이프라인 출력 언어로 전달 (#i18n-s5).
@@ -390,11 +426,11 @@ export async function POST(req: NextRequest) {
         : undefined,
     };
     if (existing?.status === 'completed' && body.rerun === true) {
-      const [sceneResult, shotResult, messageResult, projectResult] = await Promise.all([
+      const [sceneResult, shotResult, messageResult, projectResult, overrideResult] = await Promise.all([
         supabaseAdmin
           .from('scenes')
           .select(
-            'scene_id,narrative_summary,original_text_quote,location,time_of_day,mood,characters_present,estimated_duration_seconds',
+            'scene_id,narrative_summary,original_text_quote,location,time_of_day,narrative_time,mood,characters_present,estimated_duration_seconds',
           )
           .eq('project_id', projectId)
           .order('sort_order', { ascending: true }),
@@ -412,11 +448,35 @@ export async function POST(req: NextRequest) {
           .order('created_at', { ascending: true })
           .limit(200),
         supabaseAdmin.from('projects').select('settings').eq('id', projectId).maybeSingle(),
+        supabaseAdmin
+          .from('scene_character_appearance_overrides')
+          .select('scene_id,character_id,appearance_key')
+          .eq('project_id', projectId),
       ]);
       if (sceneResult.error) throw new Error(`rerun scenes load failed: ${sceneResult.error.message}`);
       if (shotResult.error) throw new Error(`rerun shots load failed: ${shotResult.error.message}`);
       if (messageResult.error) throw new Error(`rerun chat load failed: ${messageResult.error.message}`);
       if (projectResult.error) throw new Error(`rerun producer decisions load failed: ${projectResult.error.message}`);
+      if (overrideResult.error) throw new Error(`rerun appearance overrides load failed: ${overrideResult.error.message}`);
+
+      const overridesByScene = new Map<string, Record<string, string>>();
+      for (const row of overrideResult.data ?? []) {
+        if (
+          typeof row.scene_id !== 'string' ||
+          typeof row.character_id !== 'string' ||
+          typeof row.appearance_key !== 'string' ||
+          !row.appearance_key.trim()
+        ) {
+          throw new Error('rerun appearance override row is invalid');
+        }
+        const overrides = overridesByScene.get(row.scene_id) ?? {};
+        overrides[row.character_id] = row.appearance_key;
+        overridesByScene.set(row.scene_id, overrides);
+      }
+      const rerunScenes = (sceneResult.data ?? []).map((scene) => ({
+        ...scene,
+        character_appearance_overrides: overridesByScene.get(scene.scene_id) ?? null,
+      }));
 
       const previousInput = existing.state.input as PipelineInput;
       input.genre = input.genre ?? previousInput.genre;
@@ -434,7 +494,7 @@ export async function POST(req: NextRequest) {
         : [];
       input.rerunContext = buildRerunContext(
         existing.id,
-        (sceneResult.data ?? []) as RerunSceneRow[],
+        rerunScenes as RerunSceneRow[],
         (shotResult.data ?? []) as RerunShotRow[],
         (requestedChatHistory.length ? requestedChatHistory : messageResult.data ?? []) as RerunMessageRow[],
         {

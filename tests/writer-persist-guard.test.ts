@@ -69,7 +69,7 @@ function seq(): ShotSequence {
         S: { scene_id: 'scene_1', scene_purpose: 'p', emotion_beat: { start: '', end: '' }, character_action: 'act' },
         C: { causal_link: { from: null, to: null }, info_disclosure: '' },
         V: { camera: { type: 'MS' } },
-        assets: { characters: [] },
+        assets: { characters: [{ id: 'kai', asset_version: 'v1' }] },
       } as unknown as ShotSequence['shots'][number],
     ],
   }
@@ -80,6 +80,22 @@ beforeEach(() => {
   calls.length = 0
   eqArgs.length = 0
   insertPayloads.length = 0
+  responses.set('character_appearances.select', {
+    data: [
+      {
+        character_id: 'kai',
+        appearance_key: 'kai-current',
+        narrative_time: 'present',
+        is_default: true,
+      },
+    ],
+    error: null,
+  })
+  responses.set('scenes.select', {
+    data: [{ scene_id: 'sc_01', narrative_time: 'present' }],
+    error: null,
+  })
+  responses.set('scene_character_appearance_overrides.select', { data: [], error: null })
 })
 
 describe('persistShotsToDb — DB 쓰기 가드', () => {
@@ -124,7 +140,10 @@ describe('persistShotsToDb — 소유권 경계 (#F-003 R3)', () => {
       Record<string, unknown>
     >
     expect(payload.length).toBeGreaterThan(0)
-    for (const row of payload) expect(row.source).toBe('pipeline')
+    for (const row of payload) {
+      expect(row.source).toBe('pipeline')
+      expect(row.character_appearance_keys).toEqual({ kai: 'kai-current' })
+    }
   })
 
   it('생존 수동 샷과 shot_id 충돌 시 수동이 이긴다 — 파이프라인 행 스킵 + 경고 표면화', async () => {

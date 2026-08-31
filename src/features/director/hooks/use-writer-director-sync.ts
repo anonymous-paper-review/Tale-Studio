@@ -301,12 +301,14 @@ export function useWriterDirectorSync() {
     }
 
     // ── Pass 2: Shot 노드 (프롬프트 + 에셋 바인딩) ──────────────────────
-    // 등장 캐릭터: Shot.characters 우선, 없으면 Scene.charactersPresent.
+    // 등장 캐릭터: Shot.characters 우선. 씬 캐스트 폴백은 **미정의(null/undefined)일 때만** —
+    // #w-b(2026-08-31 오너 확정, 실측 sh_03_09): 빈 배열([])은 "이 샷에 인물 없음"이라는 명시적
+    //   사실인데 옛 코드는 length 로 판정해 씬 캐스트로 폴백했다 → 순수 풍경 샷에 주연 시트가
+    //   동봉돼 모델이 빈 풍경에 인물을 그려 넣었다.
     // 등록(asset-storage, Pass 0 hydrate)된 것만 바인딩 — 어댑터가 id === characterId/locationId로 등록.
     const resolveAssetIds = (shot: (typeof shots)[number]) => {
       const scene = manifest.scenes.find((s) => s.sceneId === shot.sceneId)
-      const sourceCharIds =
-        shot.characters?.length ? shot.characters : scene?.charactersPresent ?? []
+      const sourceCharIds = shot.characters ?? scene?.charactersPresent ?? []
       return {
         characterAssetIds: sourceCharIds.filter((cid) => assets.getCharacter(cid)),
         worldAssetIds:

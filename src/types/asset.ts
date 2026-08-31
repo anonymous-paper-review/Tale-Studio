@@ -56,10 +56,32 @@ export const CHARACTER_VIEW_LABELS: Record<CharacterViewKey, string> = {
 
 import type { CandidateImage } from '@/lib/image-provenance'
 
+/** 캐릭터의 한 "모습" — 시점·의상 변형 (#g4 2026-08-27).
+ *  옥화 ─┬ 현재(기본)
+ *        └ 젊은 시절  ← 옥화 얼굴을 참조해 생성 = 연속성
+ *  모습이 하나뿐이면 카드는 지금과 똑같이 보인다(탭 없음). */
+export interface CharacterAppearance {
+  appearanceKey: string
+  label: string
+  isDefault: boolean
+  /** 서사 시점(past/present 등). 플래시백 씬이 자동 선택할 근거. 씬의 time_of_day(하루 중 시각)와 다른 축. */
+  narrativeTime: NarrativeTime | null
+  sheetUrl: string | null
+  portraitUrl: string | null
+  appearance: string | null
+  appearanceNative: string | null
+  /** 모습별 뷰 후보 히스토리. 다른 모습 후보를 표시·stale 판정에 섞지 않는다. */
+  viewCandidates: Partial<Record<CharacterViewKey, CandidateImage[]>>
+}
+
+export type NarrativeTime = 'present' | 'past' | 'future'
+
 export interface CharacterAsset {
   characterId: string
   name: string
   views: CharacterView
+  /** 이 캐릭터의 모습 목록(#g4). 기본 모습이 항상 하나 있다. */
+  appearances: CharacterAppearance[]
   entityType: 'person' | 'object'
   /** Writer 정의 계승 — asset-storage 등록 시 description/prompt로 전파 */
   description?: string

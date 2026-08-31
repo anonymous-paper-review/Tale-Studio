@@ -9,6 +9,11 @@ import {
   parseFencedUpdates,
 } from '@/lib/agentic-reply-guard'
 import { normalizeProvider } from '@/lib/video-models'
+import type {
+  DirectorImageTargetHandle,
+  DirectorVideoFrameTargetHandle,
+  DirectorVideoChainTargetHandle,
+} from '@/types/director'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import {
   buildChatTrace,
@@ -63,6 +68,9 @@ For pure discussion, omit the JSON block.
 - Edges:
   - 'parent' Scene→Shot, Shot→Video (자동, 사용자 수동 안 함)
   - 'relates-to' 사용자 정의 내러티브 관계
+  - 'image' 이미지 source→Shot image-reference (image-reference 입력은 여러 source 허용)
+  - 'frame' 이미지 source→Video START/END/REF (START·END는 하나, REF는 여러 개)
+  - 'video-chain' 완료된 Video의 마지막 프레임→다음 Video START (공개 이미지로 추출)
 - 6-axis camera: horizontal/vertical (좌우/상하 슬라이드), pan (피치 상하 회전), tilt (요 좌우 회전), roll (롤), zoom (화각). Kling 매핑.
 - Lighting position: left|top|right|front, brightness 0-100, colorTemp 2000-10000K (낮을수록 따뜻)
 - Camera preset brand: arri (warm filmic) | panavision (anamorphic) | red (sharp) | cooke (vintage) | zeiss (clean)
@@ -84,10 +92,16 @@ Non-destructive (direct execution):
 9b. {"type":"generateImage","id":"<shotId>"}  — 그 샷의 실사 이미지 생성. id 를 빼면 미생성 샷 전체 일괄.
     (실사는 클라이언트 승인 카드를 거친 뒤에만 생성된다)
 10. {"type":"connect","sourceId":"<id>","targetId":"<id>","category":"relates-to","relationText":"..."}
-11. {"type":"selectNode","id":"<id>"}
+11. {"type":"connectFrame","sourceId":"<sourceId|tempId>","targetId":"<videoId|tempId>","targetHandle":"frame-start"|"frame-end"|"frame-ref"}
+    (semantic frame wiring only; targetHandle must be exactly frame-start, frame-end, or frame-ref)
+12. {"type":"connectImage","sourceId":"<sourceId|tempId>","targetId":"<shotId|tempId>","targetHandle":"image-reference"}
+    (image reference wiring only; targetHandle must be exactly image-reference)
+13. {"type":"connectVideo","sourceId":"<sourceId|tempId>","targetId":"<videoId|tempId>","targetHandle":"video-chain"}
+    (completed source Video's last frame becomes the target START image; never send a video URL)
+14. {"type":"selectNode","id":"<id>"}
 
 Destructive — opens confirmation modal (NOT immediate):
-12. {"type":"requestDelete","id":"<id>","reason":"..."}
+15. {"type":"requestDelete","id":"<id>","reason":"..."}
 
 <hybrid_intent_rule>
 - For free canvas edits, emit only the requested edit actions. Never infer or append generateImage.
@@ -189,6 +203,9 @@ const VALID_UPDATE_TYPES = new Set([
   'generateVideo',
   'generateImage',
   'connect',
+  'connectFrame',
+  'connectImage',
+  'connectVideo',
   'requestDelete',
   'selectNode',
 ])
@@ -202,9 +219,25 @@ const VALID_PROVIDERS = new Set([
   'kling', // legacy → normalizeProvider가 'kling-o3'로
 ])
 const VALID_LIGHT_POSITIONS = new Set(['left', 'top', 'right', 'front'])
+const VALID_FRAME_TARGET_HANDLES = new Set<DirectorVideoFrameTargetHandle>([
+  'frame-start',
+  'frame-end',
+  'frame-ref',
+])
+const VALID_IMAGE_TARGET_HANDLES = new Set<DirectorImageTargetHandle>([
+  'image-reference',
+])
+const VALID_VIDEO_CHAIN_TARGET_HANDLES = new Set<DirectorVideoChainTargetHandle>([
+  'video-chain',
+])
 
 function asString(x: unknown): string | undefined {
   return typeof x === 'string' ? x : undefined
+}
+function asNonEmptyString(x: unknown): string | undefined {
+  if (typeof x !== 'string') return undefined
+  const value = x.trim()
+  return value ? value : undefined
 }
 function asObj(x: unknown): Record<string, unknown> | null {
   return x && typeof x === 'object' ? (x as Record<string, unknown>) : null
@@ -385,6 +418,65 @@ function validateCanvasUpdates(raw: unknown[]): unknown[] {
           })
         }
         break
+      case 'connectFrame': {
+        const sourceId = asNonEmptyString(rec.sourceId)
+        const targetId = asNonEmptyString(rec.targetId)
+        const targetHandle = rec.targetHandle
+        if (
+          sourceId &&
+          targetId &&
+          typeof targetHandle === 'string' &&
+          VALID_FRAME_TARGET_HANDLES.has(targetHandle as DirectorVideoFrameTargetHandle)
+        ) {
+          out.push({
+            type: 'connectFrame',
+            sourceId,
+            targetId,
+            targetHandle,
+          })
+        }
+        break
+      }
+      case 'connectImage': {
+        const sourceId = asNonEmptyString(rec.sourceId)
+        const targetId = asNonEmptyString(rec.targetId)
+        const targetHandle = rec.targetHandle
+        if (
+          sourceId &&
+          targetId &&
+          typeof targetHandle === 'string' &&
+          VALID_IMAGE_TARGET_HANDLES.has(targetHandle as DirectorImageTargetHandle)
+        ) {
+          out.push({
+            type: 'connectImage',
+            sourceId,
+            targetId,
+            targetHandle,
+          })
+        }
+        break
+      }
+      case 'connectVideo': {
+        const sourceId = asNonEmptyString(rec.sourceId)
+        const targetId = asNonEmptyString(rec.targetId)
+        const targetHandle = rec.targetHandle
+        if (
+          sourceId &&
+          targetId &&
+          typeof targetHandle === 'string' &&
+          VALID_VIDEO_CHAIN_TARGET_HANDLES.has(
+            targetHandle as DirectorVideoChainTargetHandle,
+          )
+        ) {
+          out.push({
+            type: 'connectVideo',
+            sourceId,
+            targetId,
+            targetHandle,
+          })
+        }
+        break
+      }
     }
   }
   return out

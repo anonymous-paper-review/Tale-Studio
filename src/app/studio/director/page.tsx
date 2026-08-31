@@ -20,12 +20,15 @@ import {
   type Connection,
   type OnConnectStart,
   type OnConnectEnd,
-  type XYPosition,
 } from '@xyflow/react'
-import { Loader2, ImageIcon, X, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
+import { Loader2, ImageIcon, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
 
 import { toast } from 'sonner'
 import { runRealBatch } from '@/lib/director/real-batch-client'
+import {
+  eligibleVideoBatchShotIds,
+  runVideoBatch,
+} from '@/lib/director/video-batch-client'
 import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
@@ -41,13 +44,12 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
 import { isVideoData } from '@/types/director'
-import { followChainNodePositions, useDirectorCanvasStore } from '@/stores/director-store'
+import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { getDirectorGaps, summarizeGaps } from '@/lib/completeness'
 import {
   isShotData,
-  isSceneData,
   SNAP_GRID,
 } from '@/types/director'
 import { StoryboardGridView } from '@/features/director/canvas-views/StoryboardGridView'
@@ -55,34 +57,36 @@ import { StoryboardZoomControls, useStoryboardZoom } from '@/components/generati
 import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
 import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
 
-import { SceneNode } from '@/features/director/canvas-nodes/SceneNode'
 import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
 import { VideoNode } from '@/features/director/canvas-nodes/VideoNode'
 import { AssetNode } from '@/features/director/canvas-nodes/AssetNode'
 import { PromptNode } from '@/features/director/canvas-nodes/PromptNode'
-import { ShotImageNode } from '@/features/director/canvas-nodes/ShotImageNode'
-import { VideoPlaceholderNode } from '@/features/director/canvas-nodes/VideoPlaceholderNode'
 import { CategoryEdge } from '@/features/director/canvas-edges/CategoryEdge'
-import { CreatorModal } from '@/features/director/canvas-popups/CreatorModal'
+import {
+  CanvasContextMenu,
+  type CanvasMenuState,
+} from '@/features/director/canvas-popups/CanvasContextMenu'
+import {
+  copyImageUrlToClipboard,
+  nodePrimaryImageUrl,
+} from '@/features/director/clipboard-image'
 import { RelationModal } from '@/features/director/canvas-popups/RelationModal'
 import { DeleteConfirmModal } from '@/features/director/canvas-popups/DeleteConfirmModal'
 import { DirectorNodePopup } from '@/features/director/canvas-popups/DirectorNodePopup'
 import { DirectorDetailPanel } from '@/features/director/canvas-panels/DirectorDetailPanel'
 import {
   doubleClickActionForKind,
-  chainParentShotNodeId,
   connectRouteForTargetHandle,
 } from '@/features/director/canvas-interaction'
 import { useT } from '@/lib/i18n'
 
+// #scene-hide/#node-merge(2026-08-31 대공사): scene 노드는 캔버스에서 숨기고(데이터는
+// Writer 동기화·스토리보드 뷰가 계속 소비), 파생 shotImage/videoPlaceholder 카드는 제거.
 const nodeTypes = {
-  scene: SceneNode,
   shot: ShotNode,
   video: VideoNode,
   asset: AssetNode,
   prompt: PromptNode,
-  shotImage: ShotImageNode,
-  videoPlaceholder: VideoPlaceholderNode,
 } as const
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -228,6 +232,12 @@ const edgeTypes = {
   parent: CategoryEdge,
   'relates-to': CategoryEdge,
   references: CategoryEdge,
+  prompt: CategoryEdge,
+  image: CategoryEdge,
+  frame: CategoryEdge,
+  'video-chain': CategoryEdge,
+  // 파생 previz 체인 — 등록 누락 시 React Flow가 fallback 경고를 렌더마다 찍는다(#011).
+  chain: CategoryEdge,
 } as const
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -242,7 +252,11 @@ function CanvasInner() {
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
   const openRelationModal = useDirectorCanvasStore((s) => s.openRelationModal)
   const wirePromptToShot = useDirectorCanvasStore((s) => s.wirePromptToShot)
-  const addShotNode = useDirectorCanvasStore((s) => s.addShotNode)
+  const wireImageToShot = useDirectorCanvasStore((s) => s.wireImageToShot)
+  const wireFrameToVideo = useDirectorCanvasStore((s) => s.wireFrameToVideo)
+  const wireVideoChainToVideo = useDirectorCanvasStore(
+    (s) => s.wireVideoChainToVideo,
+  )
   const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
   const selectEdge = useDirectorCanvasStore((s) => s.selectEdge)
@@ -284,11 +298,25 @@ function CanvasInner() {
       } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
         e.preventDefault()
         redo()
+      } else if (k === 'c') {
+        // Cmd/Ctrl+C = 선택 노드의 대표 이미지 복사(#node-copy-image).
+        //   페이지 텍스트를 드래그해 복사하는 중이면 브라우저 기본 동작이 우선.
+        const sel = window.getSelection()
+        if (sel && !sel.isCollapsed) return
+        const st = useDirectorCanvasStore.getState()
+        const target = st.nodes.find((n) => n.selected)
+        if (!target) return
+        const url = nodePrimaryImageUrl(st.nodes, target.id)
+        if (!url) return
+        e.preventDefault()
+        void copyImageUrlToClipboard(url)
+          .then(() => toast.success(t('Image copied to clipboard.')))
+          .catch(() => toast.error(t('Failed to copy image.')))
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [undo, redo])
+  }, [undo, redo, t])
 
   // 누락 감지 넛지 (chat-proactive-copilot Phase 4): 캔버스가 안정되면(2s) 채워두면 좋을
   //   항목(샷의 캐릭터·배경 참조 누락 / 스토리보드 미생성)을 1회 informational 제안. 생성 트리거 X.
@@ -383,21 +411,21 @@ function CanvasInner() {
       void applyViewport(st.viewport)
       return
     }
-    // 최초 진입(#e9): 전체 fitView(정중앙)로 시작한 뒤 가장 왼쪽 Scene(Scene 1)으로
-    //   수평 팬 애니메이션. 종료 뷰포트를 store에 저장해 재진입 복원 기준점으로 삼는다.
+    // 최초 진입(#e9→#scene-hide): 전체 fitView 후 가장 왼쪽 이미지 노드로 수평 팬 애니메이션.
+    //   (씬 노드는 캔버스에서 숨겨져 기준이 될 수 없다 — 2026-08-31 대공사.)
     void (async () => {
       await fitView()
-      const scenes = useDirectorCanvasStore
+      const shots = useDirectorCanvasStore
         .getState()
-        .nodes.filter((n) => n.data.kind === 'scene')
-      if (scenes.length === 0) {
+        .nodes.filter((n) => n.data.kind === 'shot')
+      if (shots.length === 0) {
         useDirectorCanvasStore.setState({
           viewport: getViewport(),
           viewportInitialized: true,
         })
         return
       }
-      const first = scenes.reduce((a, b) =>
+      const first = shots.reduce((a, b) =>
         a.position.x <= b.position.x ? a : b,
       )
       const pane = document.querySelector('.react-flow')
@@ -417,19 +445,14 @@ function CanvasInner() {
     })()
   }, [nodesInitialized, applyViewport, getViewport, fitView])
 
-  const [creatorOpen, setCreatorOpen] = useState(false)
-  const [creatorPosition, setCreatorPosition] = useState<XYPosition | null>(
-    null,
-  )
+  // 우클릭 메뉴(#context-menu 2026-08-31) — 좌클릭=선택 · 더블클릭=편집과 구분되는 세 번째 축.
+  const [contextMenu, setContextMenu] = useState<CanvasMenuState | null>(null)
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      // #previz-chain: Shot 드래그 시 파생 체인 노드(ShotImage/플레이스홀더)가 함께 따라온다.
-      const next = followChainNodePositions(
-        applyNodeChanges(
-          changes.filter((change) => change.type !== 'remove'),
-          nodes,
-        ) as typeof nodes,
+      const next = applyNodeChanges(
+        changes.filter((change) => change.type !== 'remove'),
+        nodes,
       )
       useDirectorCanvasStore.setState({ nodes: next as typeof nodes })
       changes.forEach((c) => {
@@ -449,21 +472,54 @@ function CanvasInner() {
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      const next = applyEdgeChanges(changes, edges)
+      // Let the store observe removed frame/image edges before React Flow applies
+      // the edge list change so it can clear the corresponding source ID.
+      const removals = changes.filter((change) => change.type === 'remove')
+      removals.forEach((change) => deleteEdge(change.id))
+      const currentEdges = useDirectorCanvasStore.getState().edges
+      const nonRemovalChanges = changes.filter((change) => change.type !== 'remove')
+      const next = applyEdgeChanges(nonRemovalChanges, currentEdges)
       useDirectorCanvasStore.setState({ edges: next as typeof edges })
-      changes.forEach((c) => {
-        if (c.type === 'remove') deleteEdge(c.id)
-      })
     },
-    [edges, deleteEdge],
+    [deleteEdge],
   )
 
   const onConnect = useCallback(
     (params: Connection) => {
       if (!params.source || !params.target) return
+      if (params.targetHandle === 'video-chain') {
+        void wireVideoChainToVideo(
+          params.source,
+          params.target,
+          params.targetHandle,
+        ).then((connected) => {
+          if (!connected) toast.error(t('Video chain connection failed.'))
+        }).catch(() => {
+          toast.error(t('Video chain connection failed.'))
+        })
+        return
+      }
+      const route = connectRouteForTargetHandle(params.targetHandle)
       // Prompt 노드 출력(right) → Shot T 입력(prompt) 연결이면 와이어링 + prompt 동기
-      if (connectRouteForTargetHandle(params.targetHandle) === 'prompt-wire') {
+      if (route === 'prompt-wire') {
         wirePromptToShot(params.source, params.target)
+        return
+      }
+      if (route === 'image-wire') {
+        if (params.targetHandle === 'image-reference') {
+          wireImageToShot(params.source, params.target, params.targetHandle)
+        }
+        return
+      }
+      if (route === 'frame-wire') {
+        const targetHandle = params.targetHandle
+        if (
+          targetHandle === 'frame-start' ||
+          targetHandle === 'frame-end' ||
+          targetHandle === 'frame-ref'
+        ) {
+          wireFrameToVideo(params.source, params.target, targetHandle)
+        }
         return
       }
       openRelationModal(
@@ -473,7 +529,14 @@ function CanvasInner() {
         params.targetHandle,
       )
     },
-    [openRelationModal, wirePromptToShot],
+    [
+      openRelationModal,
+      wirePromptToShot,
+      wireImageToShot,
+      wireFrameToVideo,
+      wireVideoChainToVideo,
+      t,
+    ],
   )
 
   const dragFromRef = useRef<string | null>(null)
@@ -505,18 +568,17 @@ function CanvasInner() {
         .nodes.find((n) => n.id === sourceId)
       if (!sourceNode) return
 
-      if (isSceneData(sourceNode.data)) {
-        const newId = addShotNode(sourceId, position)
-        if (newId) selectNode(newId)
-      } else if (isShotData(sourceNode.data)) {
+      if (isShotData(sourceNode.data)) {
         const newId = addVideoTake(sourceId, position)
         if (newId) selectNode(newId)
       }
       // Video는 자식 없음 — 빈 공간 drop은 무시
     },
-    [screenToFlowPosition, addShotNode, addVideoTake, selectNode],
+    [screenToFlowPosition, addVideoTake, selectNode],
   )
 
+  // 빈 캔버스 더블클릭 = 이미지 노드 생성(#scene-hide 2026-08-31) — 옛 Scene/Shot 선택 모달은
+  //   씬 노드 제거와 함께 폐기. 생성 종류는 우클릭 메뉴가 담당한다.
   const onPaneDoubleClick = useCallback(
     (event: MouseEvent) => {
       const target = event.target as HTMLElement | null
@@ -531,21 +593,38 @@ function CanvasInner() {
         x: event.clientX,
         y: event.clientY,
       })
-      setCreatorPosition(position)
-      setCreatorOpen(true)
+      const newId = useDirectorCanvasStore.getState().addShotNode(null, position)
+      if (newId) selectNode(newId)
     },
-    [screenToFlowPosition],
+    [screenToFlowPosition, selectNode],
+  )
+
+  // #scene-hide: 씬 노드와 씬 관련 엣지는 캔버스에 안 그린다 (데이터는 유지 —
+  //   Writer 동기화·스토리보드 뷰·챗 명령이 계속 쓴다). 구 persist의 파생 카드 쟔재도 함께 거른다.
+  const hiddenNodeIds = new Set(
+    nodes
+      .filter(
+        (n) =>
+          n.data.kind === 'scene' ||
+          n.data.kind === 'shotImage' ||
+          n.data.kind === 'videoPlaceholder',
+      )
+      .map((n) => n.id),
+  )
+  const visibleNodes = nodes.filter((n) => !hiddenNodeIds.has(n.id))
+  const visibleEdges = edges.filter(
+    (e) => !hiddenNodeIds.has(e.source) && !hiddenNodeIds.has(e.target),
   )
 
   return (
-    // B-D1 fix: wrapper div에 onDoubleClick 등록해 ReactFlow 내부 처리와 독립적으로 캡처
+    // B-D1 fix: wrapper div에 onDoubleClick 등록해 ReactFlow 내부 처리와 독립적으로 캐처
     <div
       className="relative h-full w-full"
       onDoubleClick={onPaneDoubleClick}
     >
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={visibleNodes}
+        edges={visibleEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
@@ -556,19 +635,44 @@ function CanvasInner() {
         onPaneClick={() => {
           selectNode(null)
           selectEdge(null)
+          setContextMenu(null)
         }}
-        // 단일클릭 커스텀 액션(onNodeClick) 제거(#e2) — RF 기본 선택(하이라이트·툴바)만 유지
+        // 우클릭(#context-menu): 노드=편집/복사/삭제 메뉴, 빈 캔버스=노드 생성 메뉴.
+        onNodeContextMenu={(event, node) => {
+          event.preventDefault()
+          setContextMenu({
+            type: 'node',
+            nodeId: node.id,
+            x: event.clientX,
+            y: event.clientY,
+          })
+        }}
+        onPaneContextMenu={(event) => {
+          event.preventDefault()
+          const native = event as unknown as { clientX: number; clientY: number }
+          setContextMenu({
+            type: 'pane',
+            x: native.clientX,
+            y: native.clientY,
+            flowPosition: screenToFlowPosition({
+              x: native.clientX,
+              y: native.clientY,
+            }),
+          })
+        }}
+        // 클릭=선택+좌측 패널(#panel-unify 2026-08-31) — 패널은 캔버스 조작을 안 막는다.
+        onNodeClick={(_event, node) => {
+          const kind = node.data.kind
+          if (kind === 'shot' || kind === 'video') selectNode(node.id)
+        }}
         onEdgeClick={(_event, edge) => selectEdge(edge.id)}
         onNodeDoubleClick={(_event, node) => {
-          // Storyboard 뷰 더블클릭과 동일(#e2): scene/shot/video 모두 모달 열기
           const action = doubleClickActionForKind(node.data.kind)
           if (action === 'popup') {
             openPopup(node.id)
             return
           }
-          // previz 체인 파생 카드(#previz-chain) — 부모 Shot 모달로 위임
-          const parentShotId = chainParentShotNodeId(node.data)
-          if (parentShotId) openPopup(parentShotId)
+          if (action === 'select') selectNode(node.id)
         }}
         onNodeDragStart={() => commitHistory()}
         onMove={(_, vp) => setViewport(vp)}
@@ -612,13 +716,9 @@ function CanvasInner() {
         </div>
       )}
 
-      <CreatorModal
-        open={creatorOpen}
-        position={creatorPosition}
-        onClose={() => {
-          setCreatorOpen(false)
-          setCreatorPosition(null)
-        }}
+      <CanvasContextMenu
+        state={contextMenu}
+        onClose={() => setContextMenu(null)}
       />
       <RelationModal />
       <DeleteConfirmModal />
@@ -662,6 +762,8 @@ function PaletteBar({
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   // #real-grid: 일괄 생성은 4샷 시트 러너(runRealBatch)로 통합 — 진행 플래그는 스토어 공유.
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
+  const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
+  const videoBatchProgress = useDirectorCanvasStore((s) => s.videoBatchProgress)
   const relayoutCanvas = useDirectorCanvasStore((s) => s.relayoutCanvas)
   const showUnusedAssets = useDirectorCanvasStore((s) => s.showUnusedAssets)
   const toggleUnusedAssets = useDirectorCanvasStore((s) => s.toggleUnusedAssets)
@@ -679,6 +781,8 @@ function PaletteBar({
     (n) =>
       isShotData(n.data) && n.data.storyboardImage?.status === 'generating',
   )
+  const eligibleVideoCount = eligibleVideoBatchShotIds(nodes).length
+  const [confirmVideoBatch, setConfirmVideoBatch] = useState(false)
 
   // 상단 이동(#e1 2026-07-13): 하단 border-t 바 → 캔버스 위 border-b 바.
   //   Node/Storyboard 토글은 artist 탭(Characters/World/Inventory)과 동일한 TabsList 스타일.
@@ -689,8 +793,8 @@ function PaletteBar({
         <AltArrowHint>
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'node' | 'storyboard')}>
             <TabsList>
-              <TabsTrigger value="node">Node</TabsTrigger>
-              <TabsTrigger value="storyboard">Storyboard</TabsTrigger>
+              <TabsTrigger value="node">{t('Node')}</TabsTrigger>
+              <TabsTrigger value="storyboard">{t('Storyboard')}</TabsTrigger>
             </TabsList>
           </Tabs>
         </AltArrowHint>
@@ -770,6 +874,68 @@ function PaletteBar({
           )}
         </button>
 
+        {/* 명시적 전체 영상 생성 — 과금 동작은 확인 후에만 시작한다. */}
+        <button
+          type="button"
+          title={t('Generate videos for every eligible shot')}
+          onClick={() => {
+            if (videoBatchBusy) return
+            const eligible = eligibleVideoBatchShotIds(
+              useDirectorCanvasStore.getState().nodes,
+            )
+            if (eligible.length === 0) {
+              toast.info(t('No eligible shots for video generation.'))
+              return
+            }
+            setConfirmVideoBatch(true)
+          }}
+          disabled={videoBatchBusy}
+          aria-busy={videoBatchBusy}
+          className={cn(
+            'flex h-8 items-center gap-2 rounded-md border border-border px-3',
+            'text-xs font-medium text-foreground',
+            'transition-colors duration-100 hover:bg-accent',
+            videoBatchBusy && 'cursor-not-allowed opacity-70',
+            'hover-red-beam',
+          )}
+        >
+          {videoBatchBusy ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <ImageIcon className="size-4" />
+          )}
+          <span>{t('Generate videos')}</span>
+          {videoBatchBusy && videoBatchProgress && (
+            <>
+              <span className="font-mono tabular-nums text-muted-foreground">
+                {videoBatchProgress.done}/{videoBatchProgress.total}
+              </span>
+              {videoBatchProgress.failed > 0 && (
+                <span className="text-destructive">
+                  {t('{count} failed', { count: videoBatchProgress.failed })}
+                </span>
+              )}
+              <span
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={videoBatchProgress.total}
+                aria-valuenow={videoBatchProgress.done}
+                className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"
+              >
+                <span
+                  className="block h-full bg-primary transition-[width]"
+                  style={{
+                    width:
+                      videoBatchProgress.total > 0
+                        ? `${(videoBatchProgress.done / videoBatchProgress.total) * 100}%`
+                        : '0%',
+                  }}
+                />
+              </span>
+            </>
+          )}
+        </button>
+
       </div>
 
       {/* 축척 — Storyboard 뷰 전용, 우측 정렬(#e-zoom-merge 2026-08-20 오너 지시: 뷰 내부의
@@ -844,6 +1010,27 @@ function PaletteBar({
           setConfirmRegenAll(false)
           const pid = useDirectorCanvasStore.getState().projectId
           if (pid) void runRealBatch(pid, { force: true })
+        }}
+      />
+      <RegenerateConfirmDialog
+        open={confirmVideoBatch}
+        onOpenChange={setConfirmVideoBatch}
+        title={t('Generate videos for eligible shots?')}
+        description={t('Generate videos for {count} eligible shots.', {
+          count: eligibleVideoCount,
+        })}
+        impact={[
+          t('Costs money for every generated video — {count} videos.', {
+            count: eligibleVideoCount,
+          }),
+          t('Only shots without a completed video or active generation will be included.'),
+        ]}
+        confirmLabel={t('Generate videos')}
+        busy={videoBatchBusy}
+        onConfirm={() => {
+          setConfirmVideoBatch(false)
+          const pid = useDirectorCanvasStore.getState().projectId
+          if (pid) void runVideoBatch(pid)
         }}
       />
     </div>

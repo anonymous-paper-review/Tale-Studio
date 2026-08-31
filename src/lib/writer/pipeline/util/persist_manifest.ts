@@ -4,7 +4,7 @@
 // shot_sequence(ShotSequenceItem.S.dialogue)를 샷 소스로 쓴다.
 //
 // 매핑:
-//   characters ← S2.characters (appearance = appearance_description, costume = v2 CharacterVisual[id].costume)
+//   characters + character_appearances ← S2.characters (기본 모습 = appearance_description, costume = v2 CharacterVisual[id].costume)
 //   locations  ← v2 WorldVisual.locations
 //   scenes     ← S3.scenes
 //   shots      ← shot_sequence.shots (대사 포함)
@@ -14,6 +14,11 @@
 import { humanizeSlug } from '@/lib/display-name'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { writerSceneIdToMain, writerShotIdToMain } from '@/lib/writer/adapters'
+import {
+  AppearanceSelectionError,
+  resolveCharacterAppearance,
+  type CharacterAppearanceCandidate,
+} from '@/lib/writer/appearance-selection'
 import { reallocateShotDurations } from '@/lib/writer/pipeline/util/duration_reallocation'
 import { buildShotDialogueMap } from '@/lib/writer/pipeline/util/dialogue_join'
 import { isFlagOn } from '@/lib/flags'
@@ -41,6 +46,7 @@ import type {
   ShotCheckNote,
   DialogueTrack,
   ShotDialogue,
+  NarrativeTime,
 } from '@/lib/writer/types/pipeline'
 
 const UUID_RE =
@@ -235,6 +241,8 @@ export async function persistAssetsToDb(
       quote: (sc.scene_actions ?? []).join(' '),
       location: sc.location ?? '',
       timeOfDay: sc.time_of_day ?? '',
+      narrativeTime: sc.narrative_time,
+      characterAppearanceOverrides: sc.character_appearance_overrides ?? {},
       chars: sc.characters_in_scene ?? [],
       seconds: sc.estimated_seconds ?? 0,
       i,
@@ -282,6 +290,7 @@ export async function persistAssetsToDb(
           original_text_quote: r.quote,
           location: r.location,
           time_of_day: r.timeOfDay,
+          narrative_time: r.narrativeTime,
           mood: moodEn.get(r.id) ?? r.moodNative,
           mood_native: moodKo.get(r.id) ?? r.moodNative,
           i18n_provenance: {
@@ -298,26 +307,30 @@ export async function persistAssetsToDb(
       }),
     )
     assertDbOk('scenes insert', sceneInsertErr)
+    const overrideRows = sRows.flatMap((scene) =>
+      Object.entries(scene.characterAppearanceOverrides).map(([characterId, appearanceKey]) => ({
+        project_id: projectId,
+        scene_id: scene.id,
+        character_id: characterId,
+        appearance_key: appearanceKey,
+      })),
+    )
+    if (overrideRows.length) {
+      const { error: overrideInsertErr } = await supabaseAdmin
+        .from('scene_character_appearance_overrides')
+        .insert(overrideRows)
+      assertDbOk('scene appearance overrides insert', overrideInsertErr)
+    }
   }
 
-  // characters: additive (producer-story-gate §4 — 인물=입력). 기존 행(producer·writer-origin)은
-  //   보존하고, 새 slug 만 origin='writer' 로 insert + 기존 행은 비어 있는 보강 필드만 채운다.
-  //   producer 가 확정한 정체성(name/role/arc/motivation/이미지)은 절대 덮어쓰지 않는다.
-  // v2 CharacterVisual[].costume → { character_id: costume[] } (빈 의상 제외 — 옛 productionDesign.costumes 누락과 동일 취급)
+  // characters + 기본 모습: Writer가 추가한 인물도 RPC 하나로 identity와 기본 모습을 원자적으로 기록한다.
+  // v2 CharacterVisual[].costume → { character_id: costume[] }.
   const costumes: Record<string, string[]> = Object.fromEntries(
     characterVisual.characters
       .filter((cv) => cv.costume?.length)
       .map((cv) => [cv.character_id, cv.costume]),
   )
   if (characters.characters.length) {
-    const { data: existingRows } = await supabaseAdmin
-      .from('characters')
-      .select('character_id, appearance, costume')
-      .eq('project_id', projectId)
-    const existing = new Map(
-      (existingRows ?? []).map((r) => [r.character_id as string, r]),
-    )
-
     // 언어 경계: writer-신규 인물 외형도 EN base + _native 표기로 분리(생성=EN, 표시=유저 언어).
     //   빠뜨리면 appearance(생성 canonical)가 스토리 언어 그대로 들어간다(라이브 8건 확인, 2026-07-03).
     //   deriveEnBatch 는 이미 영어면 무비용 통과, deriveNativeBatch 는 locale=en 이면 no-op.
@@ -349,58 +362,25 @@ export async function persistAssetsToDb(
       return { appearance: en, appearance_native: native, i18n_provenance: prov }
     }
 
-    const toInsert: Record<string, unknown>[] = []
-    for (const c of characters.characters) {
-      const prev = existing.get(c.id)
-      if (!prev) {
-        // 새 인물 (writer 가 전개상 추가) — description 은 표시용 → native.
-        //   서사 속성(arc/motivation)도 기록(#opencast-arc 2026-07-21): s3 오픈캐스트가 산출한
-        //   값을 producer 캐릭터와 같은 JSONB shape 으로. 빈 껍데기면 null(UI 빈 표시 방지).
-        const af = appearFields(c.id)
-        const arc =
-          c.arc && (c.arc.start_state || c.arc.end_state || c.arc.arc_type) ? c.arc : null
-        const motivation =
-          c.motivation && (c.motivation.want || c.motivation.need) ? c.motivation : null
-        toInsert.push({
-          project_id: projectId,
-          character_id: c.id,
-          name: c.name,
-          role: normRole(c.role),
-          entity_type: 'person',
-          appearance: af.appearance,
-          appearance_native: af.appearance_native,
-          i18n_provenance: af.i18n_provenance,
-          description: af.appearance_native,
-          costume: costumes[c.id] ?? null,
-          arc,
-          motivation,
-          origin: 'writer',
-        })
-        continue
+    const people = characters.characters.map((c) => {
+      const af = appearFields(c.id)
+      return {
+        character_id: c.id,
+        name: c.name,
+        role: normRole(c.role),
+        description: null,
+        arc: c.arc && (c.arc.start_state || c.arc.end_state || c.arc.arc_type) ? c.arc : null,
+        motivation: c.motivation && (c.motivation.want || c.motivation.need) ? c.motivation : null,
+        origin: 'writer',
+        ...af,
+        costume: costumes[c.id] ?? null,
       }
-      // 기존 행: 빈 보강 필드만 채움 (덮어쓰기 금지).
-      const patch: Record<string, unknown> = {}
-      if (!prev.appearance && c.appearance_description) {
-        const af = appearFields(c.id)
-        patch.appearance = af.appearance
-        patch.appearance_native = af.appearance_native
-        patch.i18n_provenance = af.i18n_provenance
-        patch.description = af.appearance_native
-      }
-      if (prev.costume == null && costumes[c.id]) patch.costume = costumes[c.id]
-      if (Object.keys(patch).length) {
-        const { error: charPatchErr } = await supabaseAdmin
-          .from('characters')
-          .update(patch)
-          .eq('project_id', projectId)
-          .eq('character_id', c.id)
-        assertDbOk(`characters update(${c.id})`, charPatchErr)
-      }
-    }
-    if (toInsert.length) {
-      const { error: charInsertErr } = await supabaseAdmin.from('characters').insert(toInsert)
-      assertDbOk('characters insert', charInsertErr)
-    }
+    })
+    const { error } = await supabaseAdmin.rpc('upsert_people_with_default_appearances', {
+      p_project_id: projectId,
+      p_people: people,
+    })
+    assertDbOk('people with default appearances upsert', error)
   }
 }
 
@@ -435,12 +415,121 @@ type PersistShotDraft = {
   dynamicSpec: ShotDynamicSpec | null
   promptSourceHash: string | null
   chars: string[]
+  characterAppearanceKeys: Record<string, string>
   shotDialogue: ShotDialogue | null
   duration: number
   i: number
   // #p2-wiring: v4 설계 provenance(분할 자식은 부모 id) + shotCheck 채널1 제약.
   designRef: string | null
   checkNotes: ShotCheckNote[] | null
+}
+
+type SceneAppearanceResolution = {
+  narrativeTime: NarrativeTime
+  overrides: Record<string, string>
+}
+
+function requireNarrativeTime(value: unknown, sceneId: string): NarrativeTime {
+  if (value === 'present' || value === 'past' || value === 'future') return value
+  throw new Error(
+    `[persistShotsToDb] scene ${sceneId} has no valid narrative_time; apply the narrative-time migration before persisting shots`,
+  )
+}
+
+function requireAppearanceOverrides(value: unknown, sceneId: string): Record<string, string> {
+  if (value == null) return {}
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new AppearanceSelectionError(
+      'INVALID_APPEARANCE_OVERRIDE',
+      `Scene ${sceneId} has invalid character appearance overrides`,
+    )
+  }
+  const overrides: Record<string, string> = {}
+  for (const [characterId, appearanceKey] of Object.entries(value)) {
+    if (typeof appearanceKey !== 'string' || !appearanceKey.trim()) {
+      throw new AppearanceSelectionError(
+        'INVALID_APPEARANCE_OVERRIDE',
+        `Scene ${sceneId} has an invalid appearance override for character "${characterId}"`,
+      )
+    }
+    overrides[characterId] = appearanceKey
+  }
+  return overrides
+}
+
+async function loadShotAppearanceResolutionData(
+  projectId: string,
+): Promise<{
+  appearancesByCharacter: Map<string, CharacterAppearanceCandidate[]>
+  scenesById: Map<string, SceneAppearanceResolution>
+}> {
+  const [appearanceResult, sceneResult, overrideResult] = await Promise.all([
+    supabaseAdmin
+      .from('character_appearances')
+      .select('character_id,appearance_key,narrative_time,is_default')
+      .eq('project_id', projectId),
+    supabaseAdmin
+      .from('scenes')
+      .select('scene_id,narrative_time')
+      .eq('project_id', projectId),
+    supabaseAdmin
+      .from('scene_character_appearance_overrides')
+      .select('scene_id,character_id,appearance_key')
+      .eq('project_id', projectId),
+  ])
+  assertDbOk('character appearances load', appearanceResult.error)
+  assertDbOk('scene appearance settings load', sceneResult.error)
+  assertDbOk('scene appearance overrides load', overrideResult.error)
+
+  const appearancesByCharacter = new Map<string, CharacterAppearanceCandidate[]>()
+  for (const row of appearanceResult.data ?? []) {
+    if (typeof row.character_id !== 'string' || typeof row.appearance_key !== 'string' || !row.appearance_key.trim()) {
+      continue
+    }
+    if (
+      row.narrative_time !== null &&
+      row.narrative_time !== 'present' &&
+      row.narrative_time !== 'past' &&
+      row.narrative_time !== 'future'
+    ) {
+      throw new Error(
+        `[persistShotsToDb] character ${row.character_id} appearance ${row.appearance_key} has invalid narrative_time`,
+      )
+    }
+    const appearances = appearancesByCharacter.get(row.character_id) ?? []
+    appearances.push({
+      appearanceKey: row.appearance_key,
+      narrativeTime: row.narrative_time,
+      isDefault: row.is_default === true,
+    })
+    appearancesByCharacter.set(row.character_id, appearances)
+  }
+
+  const overridesByScene = new Map<string, Record<string, string>>()
+  for (const row of overrideResult.data ?? []) {
+    if (typeof row.scene_id !== 'string' || typeof row.character_id !== 'string') {
+      throw new AppearanceSelectionError(
+        'INVALID_APPEARANCE_OVERRIDE',
+        'A scene appearance override has no valid scene or character identifier',
+      )
+    }
+    const overrides = overridesByScene.get(row.scene_id) ?? {}
+    overrides[row.character_id] = requireAppearanceOverrides(
+      { [row.character_id]: row.appearance_key },
+      row.scene_id,
+    )[row.character_id]
+    overridesByScene.set(row.scene_id, overrides)
+  }
+
+  const scenesById = new Map<string, SceneAppearanceResolution>()
+  for (const row of sceneResult.data ?? []) {
+    if (typeof row.scene_id !== 'string') continue
+    scenesById.set(row.scene_id, {
+      narrativeTime: requireNarrativeTime(row.narrative_time, row.scene_id),
+      overrides: overridesByScene.get(row.scene_id) ?? {},
+    })
+  }
+  return { appearancesByCharacter, scenesById }
 }
 
 function warnShotPersistFallback(scope: string, error: unknown) {
@@ -603,6 +692,10 @@ export async function persistShotsToDb(
   }
   const seqShots = realloc.shots
 
+  // appearance_key는 L4/C2가 알 수 없는 DB 이미지 슬롯이다. 샷을 행으로 매핑하기 전에
+  // 씬의 서사 시점과 override, 해당 캐릭터의 DB appearance만으로 결정론적으로 해소한다.
+  const { appearancesByCharacter, scenesById } = await loadShotAppearanceResolutionData(projectId)
+
   // 자신이 채우는 테이블만 정리 (shots). characters/locations/scenes 는 Tier 1 소관.
   // #F-003 R3(2026-08-13): DELETE 를 파이프라인 소유 행으로 좁힌다 — 채팅/수동 샷(source='manual')은
   //   재런에서 살아남는다. 사고(dc531572)에선 persist(07:14:33)가 채팅(07:14:58)보다 먼저라 16샷이
@@ -637,6 +730,27 @@ export async function persistShotsToDb(
       const chars = (it.assets?.characters ?? [])
         .map((c) => c.id)
         .filter((id): id is string => typeof id === 'string')
+      const characterAppearanceKeys: Record<string, string> = {}
+      const sceneMainId = writerSceneIdToMain(sceneId)
+      const sceneAppearance = scenesById.get(sceneMainId)
+      if (!sceneAppearance) {
+        throw new Error(
+          `[persistShotsToDb] shot ${it.shot_id} references scene ${sceneMainId} without persisted narrative_time`,
+        )
+      }
+      for (const characterId of new Set(chars)) {
+        const character = it.assets.characters.find((asset) => asset.id === characterId)
+        const explicitAppearanceKey =
+          typeof character?.appearance_key === 'string' && character.appearance_key.trim()
+            ? character.appearance_key
+            : undefined
+        const appearanceOverride = explicitAppearanceKey ?? sceneAppearance.overrides[characterId]
+        characterAppearanceKeys[characterId] = resolveCharacterAppearance(
+          sceneAppearance.narrativeTime,
+          appearancesByCharacter.get(characterId) ?? [],
+          appearanceOverride,
+        )
+      }
       // rich 생성 프롬프트(구도/의상/인물 명시) — 스토리보드·영상 생성이 쓰는 shots.prompt 로 저장.
       //   추상 연출의도(character_action)가 아니라 이 값이 이미지/영상 모델에 들어가야 정체성/의상이 고정된다.
       const rich = it as typeof it & {
@@ -660,6 +774,7 @@ export async function persistShotsToDb(
         dynamicSpec: rich.dynamic_spec ?? null,
         promptSourceHash: safeFacetsHash(staticSpec),
         chars: Array.from(new Set(chars)),
+        characterAppearanceKeys,
         // #dialogue-v4: 대사 트랙(화자 명시)에서 조회 — it.shot_id는 decoupage 표준화 id 그대로.
         shotDialogue: dialogueByShotId.get(it.shot_id) ?? null,
         duration: clampShotSeconds(it.duration_seconds), // #9 페이싱 상한
@@ -716,6 +831,7 @@ export async function persistShotsToDb(
             ...(actTx ? { action_description_native: i18nHash(actionEn.get(r.shotMainId) ?? r.actionNative) } : {}),
           },
           characters: r.chars,
+          character_appearance_keys: r.characterAppearanceKeys,
           // 생성 프롬프트: flag off 는 rich composition → action, flag on 은 static_spec facet 렌더(캐시 가능).
           prompt: promptValue,
           static_spec: r.staticSpec ?? null,

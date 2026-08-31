@@ -24,25 +24,13 @@ import {
   isShotData,
   type VideoNodeData,
 } from '@/types/director'
-import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
-
-import { AngleControl } from '@/features/director/angle-control'
-import { KeyLight } from '@/features/director/key-light'
-import { CameraPresetControl } from '@/features/director/camera-preset-control'
+import { FAL_VIDEO_MODEL_ORDER, VIDEO_MODELS } from '@/lib/video-models'
 import { useT } from '@/lib/i18n'
 
 type Props = {
   nodeId: string
   data: VideoNodeData
 }
-
-const MODEL_ORDER: VideoModelKey[] = [
-  'happy-horse',
-  'seedance',
-  'kling-o3',
-  'veo',
-  'local',
-]
 
 export function VideoNodePopup({ nodeId, data }: Props) {
   const t = useT()
@@ -330,55 +318,30 @@ export function VideoNodePopup({ nodeId, data }: Props) {
 
           <Separator />
 
-          <CameraPresetControl
-            preset={effective.cameraPreset}
-            onUpdate={(changes) =>
-              applyVideoOverride(nodeId, {
-                cameraPreset: { ...effective.cameraPreset, ...changes },
-              })
-            }
-          />
-
-          <Separator />
-
-          <AngleControl
-            camera={effective.camera}
-            onUpdate={(changes) =>
-              applyVideoOverride(nodeId, {
-                camera: { ...effective.camera, ...changes },
-              })
-            }
-          />
-
-          <Separator />
-
-          <KeyLight
-            lighting={effective.lighting}
-            onUpdate={(changes) =>
-              applyVideoOverride(nodeId, {
-                lighting: { ...effective.lighting, ...changes },
-              })
-            }
-          />
-
-          <Separator />
-
-          <Field label="Provider">
+          {/* 영상 생성 모델(#ui-cleanup 2026-08-31) — fal.ai 카탈로그 모델만.
+              카메라/조명 UI는 오너 피드백으로 제거 — 데이터와 프롬프트 반영은 유지. */}
+          <Field label={t('Video generation model')}>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {MODEL_ORDER.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => applyVideoOverride(nodeId, { provider: p })}
-                  className={cn(
-                    'rounded-md border px-3 py-1.5 text-xs transition-colors',
-                    effective.provider === p
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:bg-accent',
-                  )}
-                >
-                  {VIDEO_MODELS[p].label}
-                </button>
-              ))}
+              {FAL_VIDEO_MODEL_ORDER.map((p) => {
+                const spec = VIDEO_MODELS[p]
+                return (
+                  <button
+                    key={p}
+                    onClick={() => applyVideoOverride(nodeId, { provider: p })}
+                    className={cn(
+                      'rounded-md border px-3 py-1.5 text-left text-xs transition-colors',
+                      effective.provider === p
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:bg-accent',
+                    )}
+                  >
+                    <span className="block font-medium">{spec.label}</span>
+                    <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                      {spec.endpoint}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </Field>
         </div>
@@ -400,7 +363,7 @@ export function VideoNodePopup({ nodeId, data }: Props) {
             ) : (
               <>
                 <RefreshCw className="size-3.5" />
-                {data.videoUrl ? t('Regenerate') : t('Generate')}
+                {data.videoUrl ? t('Regenerate video') : t('Generate video')}
               </>
             )}
           </Button>

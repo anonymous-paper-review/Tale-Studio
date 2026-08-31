@@ -21,8 +21,9 @@ export type GenerationJobActor = 'ui' | 'chat' | 'writer'
 
 export interface GenerationJobTarget {
   workspaceId?: string
-  // character_view: characters[column] 갱신
+  // character_view: character_appearances의 정확한 모습 슬롯 갱신
   characterId?: string
+  appearanceKey?: string
   view?: string
   column?: string // character_view: view_* / world_shot: wide_shot|establishing_shot
   // world_shot: locations[column] 갱신
@@ -149,6 +150,12 @@ export async function createGenerationJob(input: {
   if (input.kind === 'shot_video') {
     throw new Error('shot_video jobs must be created by a director video reservation')
   }
+  if (
+    input.kind === 'character_view' &&
+    (!input.target.workspaceId || !input.target.characterId || !input.target.appearanceKey || !input.target.view)
+  ) {
+    throw new Error('character_view job target requires workspaceId/characterId/appearanceKey/view')
+  }
   if (input.chatTraceId && !isChatTraceId(input.chatTraceId)) {
     throw new Error('chat trace ID must be a UUID')
   }
@@ -226,14 +233,16 @@ export async function linkGenerationJobToChatTrace(
 }
 
 /**
- * 멱등 가드(C1): 해당 슬롯(project+character+view)에 status=queued character_view 잡이 이미 있는가.
+ * 멱등 가드(C1): 해당 슬롯(project+character+appearance+view)에 status=queued character_view 잡이 이미 있는가.
  *   핸드오프 초안 submit~finalize 윈도우의 재핸드오프 중복 제출을 차단한다.
  */
 export async function hasQueuedCharacterViewJob(
   projectId: string,
   characterId: string,
+  appearanceKey: string,
   view: string,
 ): Promise<boolean> {
+  if (!appearanceKey) throw new Error('character_view queued lookup requires appearanceKey')
   const { data, error } = await supabaseAdmin
     .from('generation_jobs')
     .select('id, target')
@@ -244,7 +253,7 @@ export async function hasQueuedCharacterViewJob(
   if (!data) throw new Error('generation job queued-character query returned no data')
   return data.some((row) => {
     const t = (row.target ?? {}) as GenerationJobTarget
-    return t.characterId === characterId && t.view === view
+    return t.characterId === characterId && t.appearanceKey === appearanceKey && t.view === view
   })
 }
 
@@ -316,6 +325,7 @@ export function classifyFalFailure(message: string | null | undefined): 'moderat
 
 export interface CharacterViewFailure {
   characterId: string
+  appearanceKey: string
   view: string
   error: string | null
   /** 슬롯의 24h 누적 실패 수(표시용). */
@@ -326,7 +336,7 @@ export interface CharacterViewFailure {
 }
 
 /**
- * 최근 24h 기준, **현재 실패 상태인** character_view 슬롯 목록(슬롯=characterId+view).
+ * 최근 24h 기준, **현재 실패 상태인** character_view 슬롯 목록(슬롯=characterId+appearanceKey+view).
  *   슬롯의 최신 잡이 'failed' 일 때만 포함 → 성공 회복(완료/큐) 후엔 빠진다(거짓-실패 방지, P1).
  *   safeFailCount = input_snapshot.safe_mode=true 인 실패 수(우회 재시도 cap 기준, auto 실패와 분리, P2).
  *   owner 확인은 호출 라우트가 한다(service-role 직접 조회). reload-survivable 실패 노출용.
@@ -351,13 +361,16 @@ export async function listFailedCharacterViewJobs(projectId: string): Promise<Ch
   const bySlot = new Map<string, CharacterViewFailure & { _latestSeen: boolean }>()
   for (const row of data as Row[]) {
     const t = row.target ?? {}
-    if (!t.characterId || !t.view) continue
-    const key = `${t.characterId}\u0000${t.view}`
+    if (!t.characterId || !t.appearanceKey || !t.view) {
+      throw new Error('character_view failure row missing characterId/appearanceKey/view')
+    }
+    const key = `${t.characterId}\u0000${t.appearanceKey}\u0000${t.view}`
     let slot = bySlot.get(key)
     if (!slot) {
       // 첫 행 = 최신. 최신이 failed 가 아니면(완료/큐) 이 슬롯은 현재 실패 아님 → 비실패로 표시(집계 제외).
       slot = {
         characterId: t.characterId,
+        appearanceKey: t.appearanceKey,
         view: t.view,
         error: row.error,
         failCount: 0,
@@ -435,7 +448,10 @@ export async function listQueuedMainJobs(
   const out: Array<{ characterId: string; jobId: string }> = []
   for (const row of data as Array<{ id: string; target: GenerationJobTarget | null }>) {
     const t = row.target ?? {}
-    if (t.view === 'main' && t.characterId) out.push({ characterId: t.characterId, jobId: row.id as string })
+    if (t.view === 'main' && t.characterId) {
+      if (!t.appearanceKey) throw new Error('queued character_view main job missing appearanceKey')
+      out.push({ characterId: t.characterId, jobId: row.id as string })
+    }
   }
   return out
 }

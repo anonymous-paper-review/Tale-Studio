@@ -6,7 +6,6 @@ import { Copy, Edit, GitBranch, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import { isShotData, isVideoData } from '@/types/director'
 import { editActionForKind } from '@/features/director/canvas-interaction'
 import { prettyNodeLabel } from '@/features/director/node-label'
 
@@ -37,12 +36,13 @@ const THEME_CLASS: Record<
   },
 }
 
-// shot/video 카드 종류 라벨(#e5 2026-07-13): 산출물 기준 명명 — CSS uppercase 표기.
-//   #previz-chain: Shot 카드는 목각(previz) 이미지 담당 — 실사는 별도 SHOT IMAGE 파생 노드.
+// 카드 종류 라벨(#ui-cleanup 2026-08-31): 생성 노드 기준 단순 명명 — 오너 피드백
+//   "previz가 뭐임?": 파이프라인 내부 용어(previz/shot)를 카드 이름에서 전부 걷어냈다.
+//   Shot 카드 = 이미지 생성 노드(Image), Video 카드 = 영상 생성 노드(Video).
 const LABEL_BY_THEME: Record<Theme, string> = {
   scene: 'Scene',
-  shot: 'Previz shot image',
-  video: 'Shot video',
+  shot: 'Image',
+  video: 'Video',
 }
 
 type BaseNodeProps = {
@@ -111,12 +111,14 @@ function BaseNodeImpl({
   return (
     <div
       className={cn(
-        'group relative rounded-lg bg-node-bg-default transition-[border-width] duration-100',
+        // #producer-tone 2026-08-31: 카드 톤을 Producer 화면과 맞춤 — 둔한 라운드,
+        //   과한 링 대신 부드러운 선택 표시.
+        'group relative rounded-xl bg-node-bg-default transition-[border-color,box-shadow] duration-100',
         'border',
         palette.border,
         selected
-          ? cn('border-2 ring-4', palette.ring)
-          : cn('hover:border-2 hover:ring-4', palette.hoverRing),
+          ? cn('border-2 ring-2', palette.ring)
+          : cn('hover:ring-2', palette.hoverRing),
         strongStale && 'border-2 border-destructive',
       )}
       style={width ? { width: `${width}px` } : undefined}
@@ -142,46 +144,31 @@ function BaseNodeImpl({
         />
       )}
 
-      <Handle
-        type="source"
-        position={Position.Top}
-        className={cn(
-          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
-          palette.dot,
-        )}
-        id="top"
-      />
+      {/* 핸들(#handle-simplify 2026-08-31 오너): 좌→우 흐름만 — top/bottom 입구는 쓰임이
+          없어 제거. 우측=출력(항상 표시), 좌측=입력(parent 엣지의 targetHandle='left' 입구). */}
       <Handle
         type="source"
         position={Position.Right}
+        title="Output"
         className={cn(
-          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
+          '!h-3.5 !w-3.5 !rounded-full !border-2 !border-background transition-transform hover:!scale-125',
           palette.dot,
         )}
         id="right"
       />
       <Handle
-        type="source"
-        position={Position.Bottom}
-        className={cn(
-          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
-          palette.dot,
-        )}
-        id="bottom"
-      />
-      <Handle
-        type="source"
+        type="target"
         position={Position.Left}
         className={cn(
-          '!h-2 !w-2 !border-0 opacity-0 group-hover:opacity-100',
+          '!h-2.5 !w-2.5 !border-0 opacity-0 group-hover:opacity-100',
           palette.dot,
         )}
         id="left"
       />
 
-      {/* Header */}
-      <div className="flex h-7 items-center justify-between border-b border-border/60 px-3 text-xs">
-        <span className="flex items-center gap-1.5 font-medium uppercase tracking-wide text-muted-foreground">
+      {/* Header — #producer-tone: uppercase 대신 차분한 라벨. */}
+      <div className="flex h-8 items-center justify-between border-b border-border/40 px-3 text-xs">
+        <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
           <span className={cn('h-1.5 w-1.5 rounded-full', palette.dot)} />
           {LABEL_BY_THEME[theme]}
         </span>
@@ -233,7 +220,7 @@ function BaseNodeImpl({
 
       {/* Body */}
       <div className="p-3">
-        <div className="text-sm font-medium">{prettyNodeLabel(title) || '(untitled)'}</div>
+        <div className="text-sm font-semibold">{prettyNodeLabel(title) || '(untitled)'}</div>
         {children}
       </div>
     </div>

@@ -19,11 +19,13 @@ import { translate } from '@/lib/i18n'
 // 테스트는 useT() 훅을 못 쓴다(React 렌더 밖) — 고정 locale로 바인딩한 t 스텁을 넘긴다.
 const t = (text: string, params?: Record<string, string | number>) => translate('en', text, params)
 describe('editActionForKind (BaseNode Edit 분기)', () => {
-  // #e2 2026-07-14: shot/video도 Storyboard 뷰와 동일하게 모달로 통일 (좌측 패널 경로 폐기).
-  it('scene/shot/video는 모달', () => {
+  // #panel-unify 2026-08-31: 노드 뷰의 shot/video 편집은 좌측 패널 — 모달은 캔버스를 가린다.
+  it('shot/video는 좌측 패널 선택', () => {
+    expect(editActionForKind('shot')).toBe('select')
+    expect(editActionForKind('video')).toBe('select')
+  })
+  it('scene은 모달(패널 미지원)', () => {
     expect(editActionForKind('scene')).toBe('popup')
-    expect(editActionForKind('shot')).toBe('popup')
-    expect(editActionForKind('video')).toBe('popup')
   })
   it('asset/prompt는 액션 없음', () => {
     expect(editActionForKind('asset')).toBe('none')
@@ -37,10 +39,10 @@ describe('popupVisibleInView (DirectorNodePopup 가드)', () => {
     expect(popupVisibleInView('storyboard', 'video')).toBe(true)
     expect(popupVisibleInView('storyboard', 'scene')).toBe(true)
   })
-  it('노드 뷰도 scene/shot/video 모달 허용 (#e2)', () => {
+  it('노드 뷰는 scene만 모달 — shot/video는 좌측 패널 (#panel-unify)', () => {
     expect(popupVisibleInView('node', 'scene')).toBe(true)
-    expect(popupVisibleInView('node', 'shot')).toBe(true)
-    expect(popupVisibleInView('node', 'video')).toBe(true)
+    expect(popupVisibleInView('node', 'shot')).toBe(false)
+    expect(popupVisibleInView('node', 'video')).toBe(false)
   })
   it('asset/prompt는 모달 없음', () => {
     expect(popupVisibleInView('node', 'asset')).toBe(false)
@@ -49,10 +51,10 @@ describe('popupVisibleInView (DirectorNodePopup 가드)', () => {
 })
 
 describe('doubleClickActionForKind (노드 뷰 더블클릭)', () => {
-  it('scene/shot/video는 모달 열기 (#e2 — Storyboard 더블클릭과 동일)', () => {
+  it('scene은 모달, shot/video는 좌측 패널 (#panel-unify)', () => {
     expect(doubleClickActionForKind('scene')).toBe('popup')
-    expect(doubleClickActionForKind('shot')).toBe('popup')
-    expect(doubleClickActionForKind('video')).toBe('popup')
+    expect(doubleClickActionForKind('shot')).toBe('select')
+    expect(doubleClickActionForKind('video')).toBe('select')
   })
   it('그 외는 no-op', () => {
     expect(doubleClickActionForKind('asset')).toBe('none')
@@ -75,6 +77,17 @@ describe('clickToggleSelection (재클릭 토글)', () => {
 describe('connectRouteForTargetHandle (onConnect 라우팅)', () => {
   it('targetHandle=prompt → 프롬프트 와이어링', () => {
     expect(connectRouteForTargetHandle('prompt')).toBe('prompt-wire')
+  })
+  it('Shot 이미지 레퍼런스 핸들 → 이미지 와이어링', () => {
+    expect(connectRouteForTargetHandle('image-reference')).toBe('image-wire')
+  })
+  it('Video 프레임 입력 핸들 → 프레임 와이어링', () => {
+    expect(connectRouteForTargetHandle('frame-start')).toBe('frame-wire')
+    expect(connectRouteForTargetHandle('frame-end')).toBe('frame-wire')
+    expect(connectRouteForTargetHandle('frame-ref')).toBe('frame-wire')
+  })
+  it('이전 Video 마지막 프레임 핸들 → Video 체인 와이어링', () => {
+    expect(connectRouteForTargetHandle('video-chain')).toBe('video-chain')
   })
   it('다른 핸들 → 관계 모달', () => {
     expect(connectRouteForTargetHandle('left')).toBe('relation')

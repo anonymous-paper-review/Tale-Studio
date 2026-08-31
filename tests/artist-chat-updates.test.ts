@@ -82,6 +82,24 @@ describe('validateUpdates — F6 화이트리스트 (원천 외형 변경 자동
   })
 })
 
+describe('validateUpdates — 이미지 모델 지정(image-models 키 화이트리스트)', () => {
+  it('유효한 model 키는 통과한다', () => {
+    const out = validateUpdates([{ type: 'regenerateCharacter', characterId: 'c1', model: 'nano-banana' }])
+    expect(out[0]).toMatchObject({ type: 'regenerateCharacter', characterId: 'c1', model: 'nano-banana' })
+  })
+
+  it('무효한 model 값은 드롭한다(오타·임의 endpoint 주입 차단)', () => {
+    const out = validateUpdates([{ type: 'regenerateCharacter', characterId: 'c1', model: 'evil-model' }])
+    expect(out).toHaveLength(1)
+    expect((out[0] as U).model).toBeUndefined()
+  })
+
+  it('model 없으면 필드 자체가 없다(라우트 기본 모델 사용)', () => {
+    const out = validateUpdates([{ type: 'regenerateCharacter', characterId: 'c1' }])
+    expect('model' in (out[0] as U)).toBe(false)
+  })
+})
+
 describe('extractAppearanceProposals — C3 원천 외형 변경 제안 채널 (F6)', () => {
   it('changeAppearance → 제안으로 추출 (자동경로 아님)', () => {
     const out = extractAppearanceProposals([
