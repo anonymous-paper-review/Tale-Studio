@@ -121,6 +121,20 @@ const RUNS = [
 const fixture = (run: string, file: string) => path.resolve(process.cwd(), 'logs', run, file)
 const load = (p: string) => JSON.parse(readFileSync(p, 'utf8'))
 
+// #g4(narrative_time 계약, 2026-08-27): 씨 산출에 narrative_time 이 필수가 됐다.
+//   그 전에 캡처된 로그는 이 칸이 없어 지금 스키마를 못 통과한다 — 이건 오탐이 아니라
+//   계약 이전 샘플이다. 이 묶음의 목적은 "지금 산출을 스키마가 잘못 죽이는가"라 제외한다.
+//   (새 산출은 s3_scenes/s1s3_merged 프롬프트가 이 값을 반드시 출력하게 한다 — 위 계약 테스트가 잠그는 지점.)
+const hasNarrativeTime = (p: string): boolean => {
+  if (!existsSync(p)) return false
+  try {
+    const scenes = load(p)?.scenes
+    return Array.isArray(scenes) && scenes.every((s: { narrative_time?: unknown }) => s?.narrative_time != null)
+  } catch {
+    return false
+  }
+}
+
 describe('픽스처 회귀 — 실산출 오탐 0', () => {
   for (const run of RUNS) {
     const s0 = fixture(run, '01_s0_dramaturgy.json')
@@ -136,13 +150,13 @@ describe('픽스처 회귀 — 실산출 오탐 0', () => {
     })
 
     const s3 = fixture(run, '05_s3_scenes.json')
-    it.skipIf(!existsSync(s3))(`s3 씬 실산출 통과 (${run.slice(0, 8)})`, () => {
+    it.skipIf(!existsSync(s3) || !hasNarrativeTime(s3))(`s3 씨 실산출 통과 (${run.slice(0, 8)})`, () => {
       const r = ScenesSchema.safeParse(load(s3))
       expect(r.success, JSON.stringify(!r.success && r.error.issues.slice(0, 3))).toBe(true)
     })
 
     // merged 산출은 s1+s3 결합 형태 — 실런 파일 둘을 합성해 동형 검산
-    it.skipIf(!existsSync(s1) || !existsSync(s3))(`s1s3 병합 동형 통과 (${run.slice(0, 8)})`, () => {
+    it.skipIf(!existsSync(s1) || !existsSync(s3) || !hasNarrativeTime(s3))(`s1s3 병합 동형 통과 (${run.slice(0, 8)})`, () => {
       const scenes = load(s3)
       const r = MergedRawSchema.safeParse({
         narrative_structure: load(s1),
