@@ -125,6 +125,9 @@ interface GlobalChatState {
   sendMessage: (
     content: string,
     attachments?: { imageUrls?: string[]; thumbUrls?: string[] },
+    /** consentedHandoff: 명시적 핸드오프 버튼("Writer 호출하기")에서 온 호출 — 버튼이 곳 동의라
+     *  승인 카드를 다시 띄우지 않고 바로 실행한다(D12, 2026-08-31 오너). */
+    opts?: { consentedHandoff?: boolean },
   ) => Promise<void>
   /** 진행 중인 LLM 응답 중단 (#oiioii-chat) — Stop 버튼. 대기 중이 아니면 no-op. */
   stopGeneration: () => void
@@ -515,7 +518,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (content, attachments) => {
+  sendMessage: async (content, attachments, opts) => {
     const trimmed = content.trim()
     if (!trimmed || get().loading) return
     const attachmentImageUrls = attachments?.imageUrls
@@ -599,7 +602,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           })
           + '\n'
           + hard.map((b) => `· ${b}`).join('\n')
-      } else if (handoffSpec.from === 'producer' && handoffSpec.to === 'writer') {
+      } else if (handoffSpec.from === 'producer' && handoffSpec.to === 'writer' && !opts?.consentedHandoff) {
         const accepted = get().offerPendingProposal(
           createPendingProposal({
             stage: 'producer',
@@ -634,6 +637,22 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               'A proposal is already pending, so the new Producer change proposal was held back.',
             )
       } else {
+        // 명시 버튼(consentedHandoff)의 producer→writer 또는 비-producer 전이 — 카드 없이 직접 실행.
+        //   D12(2026-08-31 오너): "Writer 호출하기를 늈는데 승인 카드가 또 뜨는 게 이상함".
+        if (handoffSpec.from === 'producer') {
+          // 느린 saveAndHandoff(수 초) 동안 무반응 공백을 즉시 반응 발화로 메운다(D11).
+          const reaction = translate(
+            locale,
+            'On it — handing your materials to the Writer! Scene and shot design starts now.',
+          )
+          set((state) => ({
+            messages: [
+              ...state.messages,
+              { id: makeId(), stage, role: 'model' as const, content: reaction },
+            ],
+          }))
+          if (projectId) saveChatMessage(projectId, stage, 'model', reaction)
+        }
         const result = await runHandoff(handoffSpec)
         path = result.path
         if (result.ok) {
@@ -993,6 +1012,30 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             messages: [...state.messages, { id: makeId(), stage, role: 'model', content: failure }],
           }))
           if (projectId) saveChatMessage(projectId, stage, 'model', failure)
+        }
+
+        // D12(2026-08-31 오너): 이름/느낌("일본 애니 그림체")으로 고른 카탈로그 앵커 키 —
+        //   무과금 데이터 수정이라 즉시 반영하고, 피커의 선택 표시가 UI 확인을 겸한다.
+        //   "앱 화면에서 선택해 주세요"라고 떠넘기던 것을 없앤다.
+        const requestedAnchorKey = data.extractedSettings.styleAnchorKey
+        if (typeof requestedAnchorKey === 'string' && requestedAnchorKey) {
+          const anchorOutcome = await useProducerStore
+            .getState()
+            .applyStyleAnchorKeyFromChat(requestedAnchorKey)
+          if (anchorOutcome === 'applied') {
+            patchTrace({ appliedCount: 1 })
+          } else {
+            // 모델이 카탈로그에 없는 키를 발명 — 조용히 묵살하면 "반영했다"가 거짓말이 된다.
+            patchTrace({ skippedCount: 1 })
+            const failure = translate(
+              contentLocale(),
+              "Couldn't find that art style in the catalog — tell me the feel again or pick one in the style picker.",
+            )
+            set((state) => ({
+              messages: [...state.messages, { id: makeId(), stage, role: 'model', content: failure }],
+            }))
+            if (projectId) saveChatMessage(projectId, stage, 'model', failure)
+          }
         }
       }
       // #p4-choices: 에이전트가 낸 선택지를 버튼 제안으로 — 클릭 = 채팅 입력.
@@ -1518,7 +1561,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           return false
         }
         const path = await handoffToStage('writer')
-        if (path) set({ pendingNavigatePath: path })
+        // ⇄ 초대 연출(#oiioii-handoff)을 승인 경로에도 — 멈칫 대신 전이 애니메이션이 보인다(D11).
+        speak(handoffMarker('producer', 'writer'))
+        if (path) {
+          const target = path
+          setTimeout(() => set({ pendingNavigatePath: target }), HANDOFF_INVITE_NAVIGATE_MS)
+        }
       } else if (proposal.kind === 'producerWriterRerunRequest') {
         const voice = contentLocale()
         speak(
@@ -1539,7 +1587,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         // 승인된 rerun도 최초 핸드오프와 같은 Writer 생성 화면으로 이동한다.
         const path = await handoffToStage('writer')
-        if (path) set({ pendingNavigatePath: path })
+        speak(handoffMarker('producer', 'writer'))
+        if (path) {
+          const target = path
+          setTimeout(() => set({ pendingNavigatePath: target }), HANDOFF_INVITE_NAVIGATE_MS)
+        }
       } else if (proposal.kind === 'artistRegenerateCharacterView') {
         const characterId = proposal.payload.characterId
         const view = proposal.payload.view

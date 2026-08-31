@@ -17,6 +17,7 @@ import {
 } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { resetActionGuard } from '@/lib/action-guard'
+import { handoffMarker } from '@/lib/chat-blocks'
 
 const settings: ProjectSettings = {
   playtime: 30,
@@ -62,7 +63,16 @@ afterEach(() => {
 
 describe('writer rerun consent', () => {
   it('holds the initial Producer-to-Writer run behind a proposal until approval', async () => {
-    const saveAndHandoff = vi.spyOn(useProducerStore.getState(), 'saveAndHandoff')
+    // vi.spyOn 금지(zustand): set()이 상태를 스프레드 복사해 스파이가 다음 테스트까지 살아남고,
+    //   같은 프로퍼티를 다시 spyOn하면 기존 목이 카운트째 재사용된다 — 카운터 교체+복원 패턴을 쓴다.
+    const originalSaveAndHandoff = useProducerStore.getState().saveAndHandoff
+    const handoffCalls: unknown[][] = []
+    useProducerStore.setState({
+      saveAndHandoff: async (...args) => {
+        handoffCalls.push(args)
+        return originalSaveAndHandoff(...args)
+      },
+    })
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response(JSON.stringify({ runId: 'run-1' }), { status: 200 }))
@@ -73,7 +83,7 @@ describe('writer rerun consent', () => {
     expect(proposal?.kind).toBe('producerWriterInitialHandoff')
     expect(proposal?.stage).toBe('producer')
     expect(proposal?.target).toBe('Writer')
-    expect(saveAndHandoff).not.toHaveBeenCalled()
+    expect(handoffCalls).toHaveLength(0)
     // D11: 제안 순간 발화는 안내 문장 — "승인 전에는 실행 없음"만 덩그러니 남지 않는다.
     const proposalReply = useGlobalChatStore.getState().messages.at(-1)
     expect(proposalReply?.role).toBe('model')
@@ -86,19 +96,60 @@ describe('writer rerun consent', () => {
     const approved = await useGlobalChatStore.getState().approvePendingProposal(proposal?.id)
 
     expect(approved).toBe(true)
-    expect(saveAndHandoff).toHaveBeenCalledTimes(1)
-    expect(saveAndHandoff).toHaveBeenCalledWith()
+    expect(handoffCalls).toEqual([[]])
     expect(fetchSpy).toHaveBeenCalledWith(
       '/api/writer/start',
       expect.objectContaining({ method: 'POST' }),
     )
     expect(useProjectStore.getState().currentStage).toBe('writer')
-    expect(useGlobalChatStore.getState().pendingNavigatePath).toBe('/studio/writer')
+    // D11: ⇄ 연출이 보일 시간을 준 뒤 이동 — 네비는 HANDOFF_INVITE_NAVIGATE_MS 뒤에 설정된다.
+    await vi.waitFor(
+      () => expect(useGlobalChatStore.getState().pendingNavigatePath).toBe('/studio/writer'),
+      { timeout: 2500 },
+    )
+    useProducerStore.setState({ saveAndHandoff: originalSaveAndHandoff })
     // D11: 승인 즉시 반응 발화가 스레드에 남는다 — 무반응 공백 제거.
     const reaction = useGlobalChatStore
       .getState()
       .messages.find((m) => m.role === 'model' && m.content.includes('handing your materials to the Writer'))
     expect(reaction).toBeTruthy()
+    // D11: ⇄ 초대 연출 마커가 승인 경로에도 남는다 — 멈칫 대신 전이 애니메이션.
+    expect(
+      useGlobalChatStore
+        .getState()
+        .messages.some((m) => m.content === handoffMarker('producer', 'writer')),
+    ).toBe(true)
+  })
+
+  it('runs the handoff directly without a second approval card when the explicit button consents', async () => {
+    // D12(2026-08-31 오너): "Writer 호출하기를 늈는데 승인 카드가 또 뜨는 게 이상함" —
+    //   명시 버튼이 곳 동의다. 카드 없이 바로 실행하고, 즉시 반응 발화 + ⇄ 연출이 남는다.
+    const originalSaveAndHandoff = useProducerStore.getState().saveAndHandoff
+    const handoffCalls: unknown[][] = []
+    useProducerStore.setState({
+      saveAndHandoff: async (...args) => {
+        handoffCalls.push(args)
+        return originalSaveAndHandoff(...args)
+      },
+    })
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ runId: 'run-1' }), { status: 200 }))
+
+    await useGlobalChatStore
+      .getState()
+      .sendMessage('Writer로 핸드오프해줘', undefined, { consentedHandoff: true })
+
+    expect(useGlobalChatStore.getState().pendingProposal).toBeNull()
+    expect(handoffCalls).toHaveLength(1)
+    expect(
+      fetchSpy.mock.calls.filter(([url]) => url === '/api/writer/start'),
+    ).toHaveLength(1)
+    const contents = useGlobalChatStore.getState().messages.map((m) => m.content)
+    expect(contents.some((c) => c.includes('handing your materials to the Writer'))).toBe(true)
+    expect(contents.some((c) => c === handoffMarker('producer', 'writer'))).toBe(true)
+    expect(useProjectStore.getState().currentStage).toBe('writer')
+    useProducerStore.setState({ saveAndHandoff: originalSaveAndHandoff })
   })
 
   it('speaks an honest failure message when the approved handoff fails', async () => {
@@ -192,6 +243,9 @@ describe('writer rerun consent', () => {
       (rerunBody.chatHistory as Array<{ role: string }>).every((m) => m.role === 'model'),
     ).toBe(true)
     expect(useGlobalChatStore.getState().pendingProposal).toBeNull()
-    expect(useGlobalChatStore.getState().pendingNavigatePath).toBe('/studio/writer')
+    await vi.waitFor(
+      () => expect(useGlobalChatStore.getState().pendingNavigatePath).toBe('/studio/writer'),
+      { timeout: 2500 },
+    )
   })
 })
