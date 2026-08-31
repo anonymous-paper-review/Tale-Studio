@@ -61,7 +61,7 @@ function VideoPlaceholderNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
       <div className="flex h-7 items-center justify-between border-b border-dashed border-border/60 px-3 text-xs">
         <span className="flex items-center gap-1.5 font-medium uppercase tracking-wide text-muted-foreground/70">
           <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
-          Shot video
+          Video
         </span>
         <span className="max-w-24 truncate text-[10px] text-muted-foreground/60">
           {prettyNodeLabel(data.label)}

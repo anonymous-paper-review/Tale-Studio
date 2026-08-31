@@ -37,12 +37,13 @@ const THEME_CLASS: Record<
   },
 }
 
-// shot/video 카드 종류 라벨(#e5 2026-07-13): 산출물 기준 명명 — CSS uppercase 표기.
-//   #previz-chain: Shot 카드는 목각(previz) 이미지 담당 — 실사는 별도 SHOT IMAGE 파생 노드.
+// 카드 종류 라벨(#ui-cleanup 2026-08-31): 생성 노드 기준 단순 명명 — 오너 피드백
+//   "previz가 뭐임?": 파이프라인 내부 용어(previz/shot)를 카드 이름에서 전부 걷어냈다.
+//   Shot 카드 = 이미지 생성 노드(Image), Video 카드 = 영상 생성 노드(Video).
 const LABEL_BY_THEME: Record<Theme, string> = {
   scene: 'Scene',
-  shot: 'Previz shot image',
-  video: 'Shot video',
+  shot: 'Image',
+  video: 'Video',
 }
 
 type BaseNodeProps = {

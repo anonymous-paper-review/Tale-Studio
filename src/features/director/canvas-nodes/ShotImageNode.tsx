@@ -117,7 +117,7 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
               hasImage ? 'bg-chart-4' : 'bg-muted-foreground/50',
             )}
           />
-          Shot image
+          Final image
         </span>
         <span className="max-w-24 truncate text-[10px] text-muted-foreground/70">
           {prettyNodeLabel(data.label)}

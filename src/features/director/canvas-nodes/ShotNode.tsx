@@ -15,6 +15,7 @@ import {
 import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { isShotData, type DirectorNode } from '@/types/director'
+import { DEFAULT_IMAGE_MODEL_KEY, IMAGE_MODELS } from '@/lib/image-models'
 import { prettyNodeLabel } from '@/features/director/node-label'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
@@ -78,16 +79,13 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             {stage === 'rough' ? t('Generate image') : t('Retouch image')}
             <ChevronRight className="size-3" />
           </Button>
-          {/* 이미지 생성 모델 표기(#e4 2026-07-15) — 영상 모델 칩 대신 이미지 모델 2종.
-              GPT Image 2.0 = 현재 사용 모델, Midjourney 8.1 = 준비 중(비활성). */}
-          <span className="rounded-sm border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
-            GPT Image 2.0
-          </span>
+          {/* 이미지 생성 모델 칩(#ui-cleanup 2026-08-31) — fal.ai 카탈로그 기준 단일 진실
+              (image-models 레지스트리). 예전 Midjourney 더미 칩은 fal에 없는 가짜 선택지라 제거. */}
           <span
-            className="cursor-not-allowed rounded-sm border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground opacity-60"
-            title={t('Coming soon')}
+            className="rounded-sm border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground"
+            title={IMAGE_MODELS[DEFAULT_IMAGE_MODEL_KEY].endpoint}
           >
-            Midjourney 8.1
+            {IMAGE_MODELS[DEFAULT_IMAGE_MODEL_KEY].label}
           </span>
         </div>
       </NodeToolbar>
