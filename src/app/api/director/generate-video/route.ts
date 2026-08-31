@@ -10,6 +10,7 @@ import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { getGenerationJobById, userOwnsProject } from '@/lib/generation-jobs'
 import { checkGenerationCapacity, checkProjectVideoBudget } from '@/lib/generation-quota'
 import { quotaRejectionResponse, videoBudgetRejectionResponse } from '@/lib/api/quota'
+import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import {
@@ -504,6 +505,17 @@ export async function POST(req: Request) {
       (project as { style_anchor_key?: string | null }).style_anchor_key ?? null,
     ).catch(() => null)
     const suppressGear = !!(videoAnchor?.medium && videoAnchor.medium !== 'live_action')
+    // #w-c(2026-08-31 오너 확정, 실측 sh_02_09): 수동 샷(shots.prompt=NULL)은 한국어 액션
+    //   원문이 그대로 영상 프롬프트로 흘러온다 — EN 파생은 previz 라우트에만 있었다(감사 W3).
+    //   서버 최종 방어로 여기서 파생한다: 이미 영어면 deriveEnBatch 가 LLM 없이 통과라 파이프라인
+    //   샷은 비용 0, 실패 항목은 맵에 없어 원문 폴백. 대사 원문은 dialogueClause 가 따로 싣는다.
+    let promptEn = prompt
+    try {
+      const en = (await deriveEnBatch([{ id: 'p', native: prompt }], 'director video prompt')).get('p')
+      if (en) promptEn = en
+    } catch (err) {
+      console.warn('[director/generate-video] EN derive skipped:', err instanceof Error ? err.message : err)
+    }
     // #g7-speakers(2026-08-27 오너 확정): 대사 화자를 "이름 (외형 앵커)"로 접지 — 샷 프롬프트가
     //   캐릭터를 이름 없이 외형으로만 묘사하므로 이름만으로는 화면 속 누구인지 알 수 없다.
     //   대사에 characterId 가 실제로 있을 때만 조회(무대사 샷 비용 0·테스트 목 순서 불변),
@@ -528,7 +540,7 @@ export async function POST(req: Request) {
       }
     }
     const { fullPrompt, prompt_parts: promptParts } = buildVideoPrompt({
-      prompt,
+      prompt: promptEn,
       camera,
       movementPreset,
       cameraPreset: suppressGear ? null : cameraPreset,

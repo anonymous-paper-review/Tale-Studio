@@ -72,7 +72,7 @@ export async function POST(req: Request) {
         .maybeSingle(),
       supabaseAdmin
         .from('shots')
-        .select('shot_id, scene_id, sort_order, rough_storyboard, check_notes')
+        .select('shot_id, scene_id, sort_order, rough_storyboard, check_notes, characters')
         .eq('project_id', projectId)
         .eq('shot_id', writerShotId)
         .maybeSingle(),
@@ -117,9 +117,19 @@ export async function POST(req: Request) {
 
     // shotCheck 채널1(#p2-wiring): 검증이 남긴 연속성 제약을 서버에서 최종 첨부 —
     //   클라가 어떤 프롬프트를 보내든(derivedPrompt/promptOverride) 시각적 사실은 지켜지게.
+    // #w-b2(2026-08-31, 감사 W1 보강): shots.characters 가 명시적 빈 배열이면 프롬프트에도
+    //   무인물을 못박는다 — 그리드 경로의 'no character — keep free of people' 방어의 스트립판.
+    //   (characters 미정의/비어있지 않음은 종전 그대로 — 레퍼런스 없는 레거시 호출을 오판하지 않게
+    //   서버 진실(shots.characters)로만 판정한다.)
+    const noPeopleShot =
+      Array.isArray((shot as { characters?: unknown } | null)?.characters) &&
+      ((shot as { characters: unknown[] }).characters.length === 0)
     const guardedPrompt =
       appendCheckConstraints(prompt, (shot as { check_notes?: unknown } | null)?.check_notes) +
-      continuityLine
+      continuityLine +
+      (noPeopleShot
+        ? ' This shot contains NO people — do not draw any person or figure; anyone implied by the text is off-screen.'
+        : '')
 
     let finalOpts: AnchorableSubmit
     let stripRefUrl: string | null = null
