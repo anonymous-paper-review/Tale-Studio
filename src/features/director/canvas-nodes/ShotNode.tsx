@@ -15,7 +15,7 @@ import {
 import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { isShotData, type DirectorNode } from '@/types/director'
-import { DEFAULT_IMAGE_MODEL_KEY, IMAGE_MODELS } from '@/lib/image-models'
+import { IMAGE_MODELS, normalizeImageModel } from '@/lib/image-models'
 import { prettyNodeLabel } from '@/features/director/node-label'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
@@ -79,13 +79,12 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             {stage === 'rough' ? t('Generate image') : t('Retouch image')}
             <ChevronRight className="size-3" />
           </Button>
-          {/* 이미지 생성 모델 칩(#ui-cleanup 2026-08-31) — fal.ai 카탈로그 기준 단일 진실
-              (image-models 레지스트리). 예전 Midjourney 더미 칩은 fal에 없는 가짜 선택지라 제거. */}
+          {/* 선택된 이미지 모델 칩(#image-model-select) — 변경은 편집 패널/팝업에서. */}
           <span
             className="rounded-sm border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground"
-            title={IMAGE_MODELS[DEFAULT_IMAGE_MODEL_KEY].endpoint}
+            title={IMAGE_MODELS[normalizeImageModel(data.imageModel)].endpoint}
           >
-            {IMAGE_MODELS[DEFAULT_IMAGE_MODEL_KEY].label}
+            {IMAGE_MODELS[normalizeImageModel(data.imageModel)].label}
           </span>
         </div>
       </NodeToolbar>

@@ -25,6 +25,7 @@ import { storageKeySegment } from '@/lib/storage/key-segment'
 import { aspectRatioFromFormat, parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { isChatTraceId } from '@/lib/chat-trace'
+import { IMAGE_MODELS, normalizeImageModel } from '@/lib/image-models'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 
 export const runtime = 'nodejs'
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio, traceId } =
+    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio, traceId, imageModel } =
       (await req.json()) as {
         projectId?: string
         writerShotId?: string
@@ -42,7 +43,16 @@ export async function POST(req: Request) {
         referenceImageUrls?: string[]
         aspectRatio?: string
         traceId?: string
+        imageModel?: string
       }
+    // #image-model-select: 화이트리스트 밖 모델명은 기본 모델로 정규화 — 임의 fal 경로 주입 방지.
+    const requestedImageModel =
+      imageModel !== undefined && normalizeImageModel(imageModel) === imageModel
+        ? IMAGE_MODELS[normalizeImageModel(imageModel)].endpoint
+        : null
+    if (imageModel !== undefined && !requestedImageModel) {
+      return NextResponse.json({ error: 'unknown imageModel' }, { status: 400 })
+    }
 
     if (!projectId || !writerShotId || !prompt) {
       return NextResponse.json(
@@ -185,6 +195,8 @@ export async function POST(req: Request) {
 
     const { request_id, model, fal_request } = await falImageSubmit({
       ...finalOpts,
+      // 명시 모델이 있으면 그것으로 (레퍼런스 유무 기반 자동 라우팅은 resolveImageModel 소관).
+      ...(requestedImageModel ? { model: requestedImageModel } : {}),
       webhookUrl: resolveWebhookUrl(),
     })
     const falCapture = buildBestEffortFalRequestCapturePatch(fal_request, model)

@@ -660,18 +660,30 @@ function CanvasInner() {
             }),
           })
         }}
-        // 단일클릭 커스텀 액션(onNodeClick) 제거(#e2) — RF 기본 선택(하이라이트·툴바)만 유지
+        // 클릭=선택+좌측 패널(#panel-unify 2026-08-31) — 패널은 캔버스 조작을 안 막는다.
+        //   파생 카드(shotImage/videoPlaceholder)는 진실이 부모 Shot이라 부모를 선택한다.
+        onNodeClick={(_event, node) => {
+          const kind = node.data.kind
+          if (kind === 'shot' || kind === 'video') {
+            selectNode(node.id)
+            return
+          }
+          const parentShotId = chainParentShotNodeId(node.data)
+          if (parentShotId) selectNode(parentShotId)
+        }}
         onEdgeClick={(_event, edge) => selectEdge(edge.id)}
         onNodeDoubleClick={(_event, node) => {
-          // Storyboard 뷰 더블클릭과 동일(#e2): scene/shot/video 모두 모달 열기
           const action = doubleClickActionForKind(node.data.kind)
           if (action === 'popup') {
             openPopup(node.id)
             return
           }
-          // previz 체인 파생 카드(#previz-chain) — 부모 Shot 모달로 위임
+          if (action === 'select') {
+            selectNode(node.id)
+            return
+          }
           const parentShotId = chainParentShotNodeId(node.data)
-          if (parentShotId) openPopup(parentShotId)
+          if (parentShotId) selectNode(parentShotId)
         }}
         onNodeDragStart={() => commitHistory()}
         onMove={(_, vp) => setViewport(vp)}

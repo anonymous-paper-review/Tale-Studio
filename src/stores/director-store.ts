@@ -138,6 +138,7 @@ function makeShotData(label: string, parentSceneNodeId: string | null): ShotNode
     lighting: { ...DEFAULT_LIGHTING },
     cameraPreset: { ...DEFAULT_CAMERA_PRESET },
     provider: DEFAULT_PROVIDER,
+    imageModel: undefined,
     durationSeconds: 5,
     generationMethod: 'T2V',
     stale: false,
@@ -3550,6 +3551,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 writerShotId,
                 prompt,
                 referenceImageUrls,
+                // #image-model-select: 샷이 고른 fal 이미지 모델 (미지정 = 서버 기본)
+                ...(data.imageModel ? { imageModel: data.imageModel } : {}),
                 ...(options?.traceId ? { traceId: options.traceId } : {}),
               }),
             })

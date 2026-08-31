@@ -39,7 +39,7 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
   const parentGenerating = useDirectorCanvasStore(
     (s) => !!parentShotNodeId && !!s.generatingNodeIds[parentShotNodeId],
   )
-  const openPopup = useDirectorCanvasStore((s) => s.openPopup)
+  const selectNode = useDirectorCanvasStore((s) => s.selectNode)
   // 경과시간 durable 기준점(#elapsed-durable 2026-08-12) — 그리드와 동일: 큐의 submitted_at.
   //   탭을 떠났다 와도(remount) 타이머가 0으로 돌아가지 않는다.
   const projectId = useDirectorCanvasStore((s) => s.projectId)
@@ -107,7 +107,7 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
       >
         <span
           className={cn(
-            'flex items-center gap-1.5 font-medium uppercase tracking-wide',
+            'flex items-center gap-1.5 font-medium',
             hasImage ? 'text-muted-foreground' : 'text-muted-foreground/70',
           )}
         >
@@ -171,7 +171,8 @@ function ShotImageNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
           type="button"
           onClick={(e) => {
             e.stopPropagation()
-            if (parentShotNodeId) openPopup(parentShotNodeId)
+            // #panel-unify: 노드 뷰의 편집 통로는 좌측 패널 — 부모 Shot을 선택한다.
+            if (parentShotNodeId) selectNode(parentShotNodeId)
           }}
           disabled={!parentShotNodeId || !!generating}
           className={cn(

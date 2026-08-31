@@ -11,7 +11,11 @@ import { cn } from '@/lib/utils'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
-import { IMAGE_MODELS, IMAGE_MODEL_ORDER } from '@/lib/image-models'
+import {
+  IMAGE_MODELS,
+  IMAGE_MODEL_ORDER,
+  normalizeImageModel,
+} from '@/lib/image-models'
 import { useT } from '@/lib/i18n'
 
 type Props = {
@@ -116,20 +120,27 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
       </Section>
 
       <Section title="Model">
-        {/* #ui-cleanup 2026-08-31: 이미지 노드에는 이미지 모델만 — fal.ai 카탈로그 기준. */}
+        {/* #image-model-select 2026-08-31: fal.ai 카탈로그 기준 실제 선택. */}
         <Field label={t('Image generation model')}>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {IMAGE_MODEL_ORDER.map((key) => {
               const spec = IMAGE_MODELS[key]
+              const active = normalizeImageModel(data.imageModel) === key
               return (
                 <button
                   key={key}
                   type="button"
-                  className="rounded-md border border-primary bg-primary/10 px-3 py-2 text-left text-xs"
+                  onClick={() => updateNodeData<'shot'>(nodeId, { imageModel: key })}
+                  className={cn(
+                    'rounded-md border px-3 py-2 text-left text-xs transition-colors',
+                    active
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:bg-accent',
+                  )}
                 >
                   <span className="block font-medium">{spec.label}</span>
-                  <span className="block font-mono text-[10px] text-muted-foreground">
-                    {spec.endpoint} · {spec.hint}
+                  <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                    {spec.endpoint}
                   </span>
                 </button>
               )

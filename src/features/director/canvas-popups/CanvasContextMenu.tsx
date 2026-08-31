@@ -3,18 +3,19 @@
 // 캔버스 우클릭 메뉴(#context-menu 2026-08-31) — 인터랙션 구분의 한 축.
 //   좌클릭 = 선택(RF 기본) · 더블클릭 = 편집 모달 · 우클릭 = 이 메뉴.
 // 노드 위: 편집 / 이미지 복사 / 이미지 다운로드 / 삭제.
-// 빈 캔버스: Scene / 독립 이미지 노드 / Prompt 노드 생성 (Higgsfield 의 빈 생성 노드 대응).
-//   영상 노드는 부모 Shot(프롬프트·설정의 진실) 없이는 생성 계약이 없어 메뉴에 없다 —
-//   이미지 노드에서 Branch 로 만든다.
+// 빈 캔버스(#menu-simplify 2026-08-31 오너): 이미지 / 영상 / 프롬프트 노드만 —
+//   Scene/Shot 생성 항목은 제거 (씬은 Writer 동기화 소관, 캔버스의 주인공은 생성 노드).
+//   영상 노드: 생성 설정(프롬프트·모델)의 진실이 아직 Shot 행에 있어 독립 이미지
+//   노드 + 빈 영상 테이크 세트로 만든다 (이미지→영상 체인이 Higgsfield 흐름과 동일).
 
 import { useEffect, useRef } from 'react'
 import type { XYPosition } from '@xyflow/react'
 import {
-  Clapperboard,
   Copy,
   Download,
   Edit,
   Film,
+  ImageIcon,
   Trash2,
   Type,
 } from 'lucide-react'
@@ -74,8 +75,8 @@ export function CanvasContextMenu({ state, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
   const openDeleteConfirm = useDirectorCanvasStore((s) => s.openDeleteConfirm)
-  const addSceneNode = useDirectorCanvasStore((s) => s.addSceneNode)
   const addShotNode = useDirectorCanvasStore((s) => s.addShotNode)
+  const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
   const addPromptNode = useDirectorCanvasStore((s) => s.addPromptNode)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
 
@@ -103,21 +104,27 @@ export function CanvasContextMenu({ state, onClose }: Props) {
       return (
         <>
           <MenuButton
-            icon={<Film className="size-3.5 text-chart-3" />}
-            label={t('Add Scene')}
-            onClick={() => {
-              const id = addSceneNode(state.flowPosition)
-              if (id) selectNode(id)
-              onClose()
-            }}
-          />
-          <MenuButton
-            icon={<Clapperboard className="size-3.5 text-chart-4" />}
+            icon={<ImageIcon className="size-3.5 text-chart-4" />}
             label={t('Add image node')}
             onClick={() => {
               // Higgsfield 식 빈 생성 노드 — Scene 없이 독립 생성(부모 엣지 없음).
               const id = addShotNode(null, state.flowPosition)
               if (id) selectNode(id)
+              onClose()
+            }}
+          />
+          <MenuButton
+            icon={<Film className="size-3.5 text-chart-5" />}
+            label={t('Add video node')}
+            onClick={() => {
+              // 독립 이미지 노드 + 빈 영상 테이크 세트 — 영상 생성 설정의 진실이 Shot에 있다.
+              const shotId = addShotNode(null, state.flowPosition)
+              if (!shotId) return onClose()
+              const videoId = addVideoTake(shotId, {
+                x: state.flowPosition.x + 320,
+                y: state.flowPosition.y,
+              })
+              selectNode(videoId ?? shotId)
               onClose()
             }}
           />
@@ -150,9 +157,11 @@ export function CanvasContextMenu({ state, onClose }: Props) {
             icon={<Edit className="size-3.5" />}
             label={t('Edit')}
             onClick={() => {
-              // 파생 카드는 진실이 부모 Shot 에 있어 부모 모달로 위임(더블클릭과 동일).
+              // #panel-unify: shot/video(+파생은 부모 Shot)는 좌측 패널, scene만 모달.
               const parentShotId = chainParentShotNodeId(node.data)
-              openPopup(parentShotId ?? state.nodeId)
+              const targetId = parentShotId ?? state.nodeId
+              if (node.data.kind === 'scene') openPopup(targetId)
+              else selectNode(targetId)
               onClose()
             }}
           />

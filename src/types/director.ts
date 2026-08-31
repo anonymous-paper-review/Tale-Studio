@@ -127,6 +127,8 @@ export type ShotNodeData = {
   lighting: LightingConfig
   cameraPreset: CameraPreset
   provider: DirectorVideoProvider
+  /** 이미지 생성 모델 키(#image-model-select 2026-08-31 — image-models 레지스트리). 미지정 = 기본 모델 */
+  imageModel?: string
   /** Writer가 설계한 샷 길이(초). flexible 모델 duration + Veo 트림 기준 (#4) */
   durationSeconds: number
   /** 영상 생성 방식. storyboardImage/레퍼런스 있으면 I2V, 없으면 T2V (결정 #36) */
