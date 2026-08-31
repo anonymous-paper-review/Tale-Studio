@@ -619,8 +619,16 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             payload: {},
           }),
         )
+        // D11: 제안 순간의 발화는 사람 말이어야 한다 — "승인 전에는 아무 실행도 시작하지
+        //   않습니다."만 덩그러니 남던 것(2026-08-31 오너 실측)을 교체. 실행 경계 고지는
+        //   카드 impact가 이미 말한다.
         reply = accepted
-          ? softWarning(translate(locale, 'Nothing runs until you approve.'))
+          ? softWarning(
+              translate(
+                locale,
+                "Everything's ready — approve the card below and I'll bring in the Writer right away.",
+              ),
+            )
           : translate(
               locale,
               'A proposal is already pending, so the new Producer change proposal was held back.',
@@ -1471,6 +1479,17 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     //   실패는 error 배너가 보고한다.
     set({ pendingProposal: null })
     patchTrace({ pendingProposal: false })
+    // D11(2026-08-31 오너 실측): 승인 버튼을 눌러도 채팅이 조용하다가 수 초 뒤 화면만 넘어갔다.
+    //   승인 반응 발화를 즐시 스레드에 남기는 헬퍼 — 채팅 발화는 콘텐츠 언어(#i18n-content-voice).
+    const speak = (content: string) => {
+      set((state) => ({
+        messages: [
+          ...state.messages,
+          { id: makeId(), stage: proposal.stage, role: 'model' as const, content },
+        ],
+      }))
+      if (projectId) saveChatMessage(projectId, proposal.stage, 'model', content)
+    }
     try {
       if (proposal.kind === 'producerSourcePatch') {
         useProducerStore
@@ -1479,13 +1498,45 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         // 승인 후에야 실제 적용 — 이 시점에 applied로 집계한다(생성 Job 없는 무과금 패치).
         patchTrace({ appliedCount: 1 })
       } else if (proposal.kind === 'producerWriterInitialHandoff') {
+        // 승인 즉시 반응 — saveAndHandoff(수 초)가 끝나기 전 무반응 공백을 없앨다.
+        const voice = contentLocale()
+        speak(
+          translate(
+            voice,
+            "On it — handing your materials to the Writer! Scene and shot design starts now.",
+          ),
+        )
         const ok = await useProducerStore.getState().saveAndHandoff()
-        if (!ok) return false
+        if (!ok) {
+          // "넘어갈게요" 해놓고 침묵하면 거짓말이 된다 — 실패도 스레드에 남긴다.
+          const detail = useProducerStore.getState().error
+          speak(
+            detail
+              ? translate(voice, 'Handoff failed — {detail}', { detail })
+              : translate(voice, 'Handoff failed. Please try again in a moment.'),
+          )
+          return false
+        }
         const path = await handoffToStage('writer')
         if (path) set({ pendingNavigatePath: path })
       } else if (proposal.kind === 'producerWriterRerunRequest') {
+        const voice = contentLocale()
+        speak(
+          translate(
+            voice,
+            'On it — re-running the Writer with your current source. This can take a while.',
+          ),
+        )
         const ok = await useProducerStore.getState().saveAndHandoff({ rerun: true })
-        if (!ok) return false
+        if (!ok) {
+          const detail = useProducerStore.getState().error
+          speak(
+            detail
+              ? translate(voice, 'Handoff failed — {detail}', { detail })
+              : translate(voice, 'Handoff failed. Please try again in a moment.'),
+          )
+          return false
+        }
         // 승인된 rerun도 최초 핸드오프와 같은 Writer 생성 화면으로 이동한다.
         const path = await handoffToStage('writer')
         if (path) set({ pendingNavigatePath: path })

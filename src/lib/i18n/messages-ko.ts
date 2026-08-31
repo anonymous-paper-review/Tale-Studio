@@ -888,6 +888,13 @@ export const KO: Record<string, string> = {
   'The Writer implementation calls an external contract.': 'Writer 구현은 외부 계약을 호출합니다.',
   "If same-shot preservation on the Writer side isn't guaranteed, downstream output may become orphaned or stale.": 'Writer 쪽 same-shot 보존이 보장되지 않았다면 downstream 산출물이 orphan/stale 될 수 있어요.',
   'Nothing runs until you approve.': '승인 전에는 아무 실행도 시작하지 않습니다.',
+  // D11 — 핸드오프 제안·승인 순간의 사람 말 발화 (2026-08-31 오너 실측)
+  "Everything's ready — approve the card below and I'll bring in the Writer right away.":
+    '재료가 다 모였어요 — 아래 카드에서 승인하면 바로 Writer를 불러올게요.',
+  'On it — handing your materials to the Writer! Scene and shot design starts now.':
+    '좋아요, Writer로 넘어갈게요! 재료를 넘기고 씌·샷 설계를 시작해요.',
+  'On it — re-running the Writer with your current source. This can take a while.':
+    '좋아요, 지금 원천 그대로 Writer를 다시 실행할게요! 시간이 좀 걸릴 수 있어요.',
   "The previous Writer run didn't finish (no scenes/shots)": '이전 Writer 실행이 완료되지 않았어요 (씬/샷 없음)',
   'Check the story and settings, then re-run to generate scenes/shots and fill in Director/Editor.': '스토리·설정을 확인하고 다시 실행하면 씬·샷이 생성돼 Director/Editor 가 채워집니다.',
   'Suggest re-running Writer': 'Writer 다시 실행 제안',
