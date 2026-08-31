@@ -65,6 +65,8 @@ export interface ExtractedSettings {
   storyReady?: boolean
   characters?: ExtractedCastMember[]
   backgrounds?: ExtractedBackground[]
+  /** D12: 이름/느낌으로 고른 카탈로그 앵커 키(style_anchors.key) — 첨부 기반은 styleAnchorFromAttachment. */
+  styleAnchorKey?: string
 }
 
 function newLocalId(prefix = 'cast'): string {
@@ -210,6 +212,9 @@ interface ProducerState {
   loadStyleAnchors: () => Promise<void>
   /** 스타일 앵커 선택 — 낙관적 반영 + projects.style_anchor_key 저장. */
   setStyleAnchor: (key: string | null) => Promise<void>
+  /** D12: 채팅이 이름/느낌으로 고른 카탈로그 앵커 키 적용 — 카탈로그 검증 후 setStyleAnchor.
+   *  모델이 발명한 키는 unknown_key로 되돌려 호출부가 정직하게 말하게 한다. */
+  applyStyleAnchorKeyFromChat: (key: string) => Promise<'applied' | 'unknown_key'>
   /** 채팅이 해석한 화풍 의도를 반영 — 저장은 서버(api/produce/style-anchor)가 검증 후 한다. */
   applyCustomStyleAnchor: (anchor: {
     key: string
@@ -643,6 +648,15 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       projectSettings: { ...state.projectSettings, ...partial },
     }))
     scheduleDraftSave(() => boardOf(get()))
+  },
+
+  applyStyleAnchorKeyFromChat: async (key) => {
+    // 카탈로그가 아직 안 실렸으면(새로고침 직후 등) 먼저 불러서 검증 근거를 만든다.
+    if (get().styleAnchors.length === 0) await get().loadStyleAnchors()
+    const anchor = get().styleAnchors.find((a) => a.key === key)
+    if (!anchor) return 'unknown_key'
+    await get().setStyleAnchor(anchor.key)
+    return 'applied'
   },
 
   applyExtractedSettings: (extracted, traceId) => {

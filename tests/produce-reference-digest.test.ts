@@ -36,6 +36,8 @@ vi.mock('@/lib/upload/attachment', () => ({
 }))
 vi.mock('@/lib/style-anchor', () => ({
   listStyleAnchorMediums: mocks.listStyleAnchorMediums,
+  // D12: 카탈로그 블록은 이 테스트 관심사 밖 — 빈 목록이면 컨텍스트에 안 실린다.
+  listStyleAnchorCatalog: async () => [],
 }))
 vi.mock('@/lib/i18n/translate', () => ({ translate: (_locale: string, text: string) => text }))
 vi.mock('@/lib/reference-import', () => ({
