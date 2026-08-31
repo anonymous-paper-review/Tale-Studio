@@ -6,7 +6,13 @@ import { buildProducerSystem } from './system-prompt'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 import { parseChatChoices } from '@/lib/chat-choices'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
-import { CHAT_OUTPUT_FORMAT_GUIDE, fetchProjectLocale, responseLanguageDirective } from '@/lib/chat-format'
+import {
+  CHAT_OUTPUT_FORMAT_GUIDE,
+  fetchProjectLocaleState,
+  responseLanguageDirective,
+  updateProjectLocale,
+} from '@/lib/chat-format'
+import { detectLocaleFromText, type AppLocale } from '@/lib/locale'
 import { translate } from '@/lib/i18n/translate'
 import { sanitizeAttachmentUrls } from '@/lib/upload/attachment'
 import { listStyleAnchorCatalog, listStyleAnchorMediums } from '@/lib/style-anchor'
@@ -64,14 +70,28 @@ export async function POST(req: Request) {
     }
 
     // 응답 언어 강제(#i18n-s5-batch6-chat) — projects.locale 조회. 소유 확인 실패/미상은
-    //   fetchProjectLocale 이 null 을 주고, responseLanguageDirective(null) 이 종전 동작(무주입)으로 폴백.
-    let projectLocale = null as Awaited<ReturnType<typeof fetchProjectLocale>>
+    //   null 로 남고, responseLanguageDirective(null) 이 종전 동작(무주입)으로 폴백.
+    let projectLocale: AppLocale | null = null
     let ownsCurrentProject = false
     if (typeof projectId === 'string' && projectId) {
       try {
         if (await userOwnsProject(projectId, user.id)) {
           ownsCurrentProject = true
-          projectLocale = await fetchProjectLocale(projectId)
+          const localeState = await fetchProjectLocaleState(projectId)
+          projectLocale = localeState?.locale ?? null
+          // 발화 언어 추종(#chat-locale-follow 2026-08-31): 사용자가 한국어로 말하는데 프로젝트가
+          //   ko 가 아니면 — 계정 기본값(en)이 사용자의 실제 언어를 이기지 못하게 그 턴부터 ko 로
+          //   확정한다. 비대칭(en 으로는 자동 전환 안 함)인 이유: en 은 detectLocaleFromText 의
+          //   디폴트 폴백이라 약한 신호고, 한글 포함은 강한 신호다. 명시 전환은 보드의 채팅 언어
+          //   배지가 담당. writer 산출물이 이미 있으면 기존 콘텐츠와 섞이므로 건드리지 않는다.
+          if (
+            localeState &&
+            !localeState.writerRan &&
+            projectLocale !== 'ko' &&
+            detectLocaleFromText(message) === 'ko'
+          ) {
+            if (await updateProjectLocale(projectId, 'ko')) projectLocale = 'ko'
+          }
         }
       } catch (err) {
         console.warn('[produce/chat] locale lookup skipped:', err instanceof Error ? err.message : err)
@@ -263,6 +283,9 @@ export async function POST(req: Request) {
       extractedSettings,
       choices,
       trace,
+      // 클라이언트 동기화(#chat-locale-follow) — 서버가 이번 턴에 채택한 콘텐츠 언어.
+      //   project-store.projectLocale 이 이 값으로 갱신돼야 코드 발화(contentLocale())도 같은 턴부터 따라온다.
+      contentLocale: projectLocale,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'

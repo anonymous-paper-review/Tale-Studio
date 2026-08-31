@@ -83,6 +83,10 @@ interface ProjectState {
   ) => Promise<ProjectCreationResult>
   switchProject: (id: string, title: string, stage?: StageId) => void
   renameProject: (title: string) => Promise<void>
+  /** 서버가 채택한 콘텐츠 언어를 반영(#chat-locale-follow) — 저장 없이 상태만 동기화. */
+  adoptProjectLocale: (locale: AppLocale) => void
+  /** 명시 전환(보드 배지) — PATCH /api/project/[id] 로 저장 + 잠금. 실패 시 이전 값 복원. */
+  setContentLocale: (locale: AppLocale) => Promise<boolean>
   /** 진입 시 writer 산출물(씬) 검증 → 없으면 producer 로 게이트백 + writerNeedsRerun 표시 */
   verifyWriterGate: (projectId: string) => Promise<void>
   setLifecycleStatus: (status: LifecycleStatus) => void
@@ -405,6 +409,31 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       })
     } catch (err) {
       console.error('[project-store] rename failed:', err)
+    }
+  },
+
+  adoptProjectLocale: (locale) => {
+    if (get().projectLocale === locale) return
+    set({ projectLocale: locale })
+  },
+
+  setContentLocale: async (locale) => {
+    const { projectId, projectLocale: prev } = get()
+    if (!projectId) return false
+    set({ projectLocale: locale })
+    try {
+      const res = await fetch(`/api/project/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locale }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return true
+    } catch (err) {
+      // 무음 실패 금지 — 표시만 바뀌고 서버는 예전 언어면 다음 응답에서 또 어긋난다. 되돌린다.
+      console.error('[project-store] locale save failed:', err)
+      set({ projectLocale: prev })
+      return false
     }
   },
 

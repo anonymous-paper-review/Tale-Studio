@@ -24,7 +24,8 @@ import { useProjectStore } from '@/stores/project-store'
 import type { GateResult } from '@/lib/producer-gate'
 import type { ProjectFormat } from '@/types'
 import { cn } from '@/lib/utils'
-import { useT } from '@/lib/i18n'
+import { useT, useLocale } from '@/lib/i18n'
+import { parseAppLocale, type AppLocale } from '@/lib/locale'
 
 const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [
   { value: 'horizontal_16:9', label: '16:9 Horizontal' },
@@ -40,6 +41,12 @@ const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
   { value: 'en', label: 'English' },
   { value: 'ja', label: '日本語' },
   { value: 'zh', label: '中文' },
+]
+
+// 콘텐츠(채팅) 언어 — projects.locale. 대사 언어(영상 속 대사)와 별개다(#chat-locale-follow).
+const CONTENT_LOCALE_OPTIONS: { value: AppLocale; label: string }[] = [
+  { value: 'ko', label: '한국어' }, // i18n-ok: 언어 자국어 표기(endonym), 번역 대상 아님
+  { value: 'en', label: 'English' },
 ]
 
 // 설정 뱃지 — 빈 상태(점선)와 점등 상태를 오간다. 값이 바뀌면 key 재마운트로 pop 연출.
@@ -136,6 +143,12 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
     styleAnchors.find((a) => a.key === styleAnchorKey)?.label ?? customStyleAnchor?.label ?? null
   const formatLabel = FORMAT_OPTIONS.find((o) => o.value === settings.format)?.label ?? null
   const langLabel = LANGUAGE_OPTIONS.find((o) => o.value === settings.dialogueLanguage)?.label ?? null
+  const projectLocale = useProjectStore((s) => s.projectLocale)
+  const setContentLocale = useProjectStore((s) => s.setContentLocale)
+  const uiLocale = useLocale()
+  const contentLocaleLabel =
+    CONTENT_LOCALE_OPTIONS.find((o) => o.value === projectLocale)?.label ?? null
+  const localeMismatch = projectLocale !== null && projectLocale !== uiLocale
 
   return (
     <div className={cn('flex flex-wrap gap-1.5', className)}>
@@ -201,6 +214,23 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
           options={LANGUAGE_OPTIONS}
           value={settings.dialogueLanguage || ''}
           onSelect={(v) => updateSettings({ dialogueLanguage: v })}
+        />
+      </SettingBadge>
+
+      {/* 채팅 언어 배지 (#chat-locale-follow 2026-08-31) — 숨은 상태(projects.locale)가 화면 언어와
+          몰래 갈렸던 게 사고의 뿌리였다. 보이게 하고, 명시 전환 입구를 준다. */}
+      <SettingBadge k={t('Chat language')} value={contentLocaleLabel}>
+        <p className="mb-1.5 text-[11px] leading-relaxed text-muted-foreground">
+          {t('Chat replies and the generated story follow this language.')}
+          {localeMismatch ? ` ${t('It currently differs from your UI language.')}` : ''}
+        </p>
+        <OptionList
+          options={CONTENT_LOCALE_OPTIONS}
+          value={projectLocale ?? ''}
+          onSelect={(v) => {
+            const next = parseAppLocale(v)
+            if (next) void setContentLocale(next)
+          }}
         />
       </SettingBadge>
     </div>

@@ -126,6 +126,26 @@ describe('POST /api/project/new — v4 slot and reference contract', () => {
     expect(response.status).toBe(200)
     expect(mocks.inserted).toMatchObject({ title: 'Untitled' })
   })
+
+  // #chat-locale-follow 2026-08-31: 계정에 언어 설정이 없는 en 은 폴백이지 선택이 아니다 —
+  //   잠그면 한국어 사용자의 채팅이 영어로 고착된다(실사고). 발화 추종·스토리 감지가 후정하게 연다.
+  it('locks the locale only when the account actually stored one', async () => {
+    const response = await POST(request({ title: 'Defaulted' }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.inserted).toMatchObject({ locale: 'en', locale_locked: false })
+  })
+
+  it('locks the locale when user_metadata carries a real setting', async () => {
+    mocks.getUser.mockResolvedValue({
+      data: { user: { id: 'user-1', user_metadata: { locale: 'ko' } } },
+    })
+
+    const response = await POST(request({ title: 'Chosen' }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.inserted).toMatchObject({ locale: 'ko', locale_locked: true })
+  })
 })
 
 function request(body: unknown): NextRequest {

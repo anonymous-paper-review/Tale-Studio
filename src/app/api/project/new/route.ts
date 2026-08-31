@@ -99,10 +99,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Create new project.
-    //   locale (#i18n-s5): 생성 시점의 사용자 언어 설정(기본 en)을 콘텐츠 언어로 박아 잠근다 —
-    //   파이프라인 출력 강제·공유 뷰 표시가 이 값을 따른다. locked 라 writer/start 의
-    //   스토리 감지는 이 프로젝트에 손대지 않는다(감지는 설정 이전 레거시 전용 폴백).
-    const locale = parseAppLocale(user.user_metadata?.locale) ?? 'en'
+    //   locale (#i18n-s5): 생성 시점의 사용자 언어 설정을 콘텐츠 언어로 박는다 —
+    //   파이프라인 출력 강제·공유 뷰 표시가 이 값을 따른다.
+    //   잠금(#chat-locale-follow 2026-08-31): 계정에 설정이 있을 때만 잠근다. 설정 없는 계정의
+    //   'en' 은 선택이 아니라 폴백이다 — 이걸 잠그면 한국어로 말 거는 사용자의 채팅이 영어로
+    //   고착된다(실사고). unlocked 로 두면 producer 채팅의 발화 언어 추종과 writer/start 의
+    //   스토리 감지가 사용자 실제 언어로 확정한다.
+    const userLocale = parseAppLocale(user.user_metadata?.locale)
+    const locale = userLocale ?? 'en'
     // G004 integration seam: ownership validation and source copying intentionally
     // remain outside this slice; these are only persisted as canonical strings.
     const projectInsert = {
@@ -110,7 +114,7 @@ export async function POST(req: NextRequest) {
       workspace_id: workspace.id,
       title,
       locale,
-      locale_locked: true,
+      locale_locked: userLocale !== null,
       ...(referenceProjectId ? { reference_project_id: referenceProjectId } : {}),
     }
     const { data: project, error } = await supabaseAdmin

@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { parseAppLocale } from '@/lib/locale'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // 이 프로젝트가 요청 유저 소유(workspace owner)인지 확인. 아니면 4xx 응답 반환.
@@ -40,14 +41,27 @@ export async function PATCH(
     const forbidden = await assertOwnership(id, user.id)
     if (forbidden) return forbidden
 
-    const { title } = await req.json()
-    if (!title?.trim()) {
-      return NextResponse.json({ error: 'Title required' }, { status: 400 })
+    const { title, locale } = await req.json()
+    // locale (#chat-locale-follow 2026-08-31) — 보드의 채팅 언어 배지가 명시 전환으로 쓴다.
+    //   명시 선택이므로 잠근다(발화 추종·스토리 감지가 더는 안 건드린다).
+    const parsedLocale = locale === undefined ? null : parseAppLocale(locale)
+    if (locale !== undefined && !parsedLocale) {
+      return NextResponse.json({ error: 'Invalid locale' }, { status: 400 })
+    }
+    if (!title?.trim() && !parsedLocale) {
+      return NextResponse.json({ error: 'Title or locale required' }, { status: 400 })
+    }
+
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+    if (title?.trim()) patch.title = title.trim()
+    if (parsedLocale) {
+      patch.locale = parsedLocale
+      patch.locale_locked = true
     }
 
     const { data, error } = await supabaseAdmin
       .from('projects')
-      .update({ title: title.trim(), updated_at: new Date().toISOString() })
+      .update(patch)
       .eq('id', id)
       .select()
       .single()

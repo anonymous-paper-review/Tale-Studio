@@ -7,7 +7,8 @@ const mocks = vi.hoisted(() => ({
   buildProducerSystem: vi.fn(),
   parseExtractedSettings: vi.fn(),
   parseChatChoices: vi.fn(),
-  fetchProjectLocale: vi.fn(),
+  fetchProjectLocaleState: vi.fn(),
+  updateProjectLocale: vi.fn(),
   responseLanguageDirective: vi.fn(),
   sanitizeAttachmentUrls: vi.fn(),
   listStyleAnchorMediums: vi.fn(),
@@ -27,7 +28,8 @@ vi.mock('@/lib/parse-extracted-settings', () => ({
 }))
 vi.mock('@/lib/chat-choices', () => ({ parseChatChoices: mocks.parseChatChoices }))
 vi.mock('@/lib/chat-format', () => ({
-  fetchProjectLocale: mocks.fetchProjectLocale,
+  fetchProjectLocaleState: mocks.fetchProjectLocaleState,
+  updateProjectLocale: mocks.updateProjectLocale,
   responseLanguageDirective: mocks.responseLanguageDirective,
   CHAT_OUTPUT_FORMAT_GUIDE: '',
 }))
@@ -58,7 +60,8 @@ beforeEach(() => {
     extractedSettings: null,
   })
   mocks.parseChatChoices.mockReturnValue({ reply: 'plain reply', choices: [] })
-  mocks.fetchProjectLocale.mockResolvedValue('en')
+  mocks.fetchProjectLocaleState.mockResolvedValue({ locale: 'en', writerRan: false })
+  mocks.updateProjectLocale.mockResolvedValue(true)
   mocks.responseLanguageDirective.mockReturnValue('')
   mocks.sanitizeAttachmentUrls.mockReturnValue({
     urls: [],

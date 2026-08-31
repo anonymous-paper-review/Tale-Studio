@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { isDemoSession } from '@/lib/demo/context'
+import { translate } from '@/lib/i18n/translate'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 
 /**
@@ -42,11 +45,22 @@ export const useLocaleStore = create<LocaleState>()(
       setLocaleForDisplay: (l) => set({ locale: l, hydrated: true }),
       setLocale: async (l) => {
         set({ locale: l })
+        // 데모(공유) 세션: updateUser 없음 — 표시 전환만, 경고 없이.
+        if (isDemoSession()) return
         try {
           const supabase = createClient()
-          await supabase.auth.updateUser({ data: { locale: l } })
-        } catch {
-          // 데모 shim 등 저장 불가 환경 — 표시 전환만 유지.
+          const { error } = await supabase.auth.updateUser({ data: { locale: l } })
+          if (error) throw error
+        } catch (err) {
+          // 무음 실패 금지(#chat-locale-follow 2026-08-31 실사고): 저장 실패를 삼키면 표시(ko)와
+          //   계정 진실(미설정→en 폴백)이 영구히 갈려 신규 프로젝트가 계속 영어로 생성된다.
+          console.error('[locale-store] locale save failed:', err)
+          toast.error(
+            translate(
+              l,
+              "Couldn't save your language setting — new projects may not follow it. Please try again.",
+            ),
+          )
         }
       },
     }),
