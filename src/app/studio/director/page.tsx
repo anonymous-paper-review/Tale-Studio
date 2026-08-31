@@ -663,7 +663,9 @@ function CanvasInner() {
         // 클릭=선택+좌측 패널(#panel-unify 2026-08-31) — 패널은 캔버스 조작을 안 막는다.
         onNodeClick={(_event, node) => {
           const kind = node.data.kind
-          if (kind === 'shot' || kind === 'video') selectNode(node.id)
+          if (kind === 'shot' || kind === 'video' || kind === 'asset') {
+            selectNode(node.id)
+          }
         }}
         onEdgeClick={(_event, edge) => selectEdge(edge.id)}
         onNodeDoubleClick={(_event, node) => {

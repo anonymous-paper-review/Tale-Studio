@@ -16,7 +16,7 @@ import { DebugPromptTrace } from '@/components/debug-prompt-trace'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
-  getEffectiveShotConfig,
+  getEffectiveVideoConfig,
   effectivePrompt,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
@@ -65,12 +65,12 @@ export function VideoNodePopup({ nodeId, data }: Props) {
   const openDeleteConfirm = useDirectorCanvasStore(
     (s) => s.openDeleteConfirm,
   )
-  // getEffectiveShotConfig는 매 호출마다 새 객체를 반환하므로 셀렉터에서 직접
+  // getEffectiveVideoConfig는 매 호출마다 새 객체를 반환하므로 셀렉터에서 직접
   // 호출하면 useSyncExternalStore가 무한 변화로 인식("getSnapshot should be
   // cached" 에러). nodes만 구독하고 useMemo로 캐싱한다.
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const effective = useMemo(
-    () => getEffectiveShotConfig({ nodes }, nodeId),
+    () => getEffectiveVideoConfig({ nodes }, nodeId),
     [nodes, nodeId],
   )
   const motherNode = useMemo(
@@ -327,6 +327,7 @@ export function VideoNodePopup({ nodeId, data }: Props) {
                 return (
                   <button
                     key={p}
+                    type="button"
                     onClick={() => applyVideoOverride(nodeId, { provider: p })}
                     className={cn(
                       'rounded-md border px-3 py-1.5 text-left text-xs transition-colors',
@@ -334,11 +335,9 @@ export function VideoNodePopup({ nodeId, data }: Props) {
                         ? 'border-primary bg-primary/10'
                         : 'border-border hover:bg-accent',
                     )}
+                    aria-pressed={effective.provider === p}
                   >
                     <span className="block font-medium">{spec.label}</span>
-                    <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                      {spec.endpoint}
-                    </span>
                   </button>
                 )
               })}

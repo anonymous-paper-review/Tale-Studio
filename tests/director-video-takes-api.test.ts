@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
   userOwnsProject: vi.fn(),
   listLiveDirectorVideoTakes: vi.fn(),
+  createStandaloneDirectorVideoTake: vi.fn(),
   updateDirectorVideoTakeMetadata: vi.fn(),
   setDirectorVideoFinal: vi.fn(),
   softDeleteDirectorVideoTake: vi.fn(),
@@ -15,13 +16,17 @@ vi.mock('@/lib/supabase/auth', () => ({ getUser: mocks.getUser }))
 vi.mock('@/lib/generation-jobs', () => ({ userOwnsProject: mocks.userOwnsProject }))
 vi.mock('@/lib/director-video-takes', () => ({
   listLiveDirectorVideoTakes: mocks.listLiveDirectorVideoTakes,
+  createStandaloneDirectorVideoTake: mocks.createStandaloneDirectorVideoTake,
   updateDirectorVideoTakeMetadata: mocks.updateDirectorVideoTakeMetadata,
   setDirectorVideoFinal: mocks.setDirectorVideoFinal,
   softDeleteDirectorVideoTake: mocks.softDeleteDirectorVideoTake,
 }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from, storage: { from: mocks.storageFrom } } }))
 
-import { GET } from '@/app/api/director/video-takes/route'
+import {
+  GET,
+  POST as createStandaloneVideo,
+} from '@/app/api/director/video-takes/route'
 import { PATCH, DELETE } from '@/app/api/director/video-takes/[clipId]/route'
 import { POST as uploadImage } from '@/app/api/assets/upload-image/route'
 import { storageKeySegment } from '@/lib/storage/key-segment'
@@ -118,6 +123,65 @@ describe('director video takes API', () => {
     mocks.getUser.mockResolvedValue(null)
     expect(requireResponse(await GET(request(`http://test/api/director/video-takes?projectId=${PROJECT}`, undefined, 'GET'))).status).toBe(401)
     expect(mocks.userOwnsProject).not.toHaveBeenCalled()
+  })
+
+  it('creates one persisted standalone Video without a Shot row', async () => {
+    const take = {
+      ...clip,
+      id: 'standalone-clip',
+      shot_id: 'standalone:123e4567-e89b-42d3-a456-426614174000',
+      take_label: 'Video',
+      override: {
+        prompt: '',
+        camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 },
+        lighting: { position: 'front', brightness: 50, colorTemp: 5600 },
+        cameraPreset: {
+          brand: 'arri',
+          focalLength: 35,
+          aperture: 2.8,
+          whiteBalance: 5600,
+        },
+        provider: 'kling-2.1',
+        durationSeconds: 5,
+      },
+      canvas_position: { x: 120, y: 240 },
+      status: 'pending',
+      last_attempt_status: null,
+      is_final: false,
+    }
+    mocks.createStandaloneDirectorVideoTake.mockResolvedValue(take)
+
+    const response = await createStandaloneVideo(
+      request(
+        'http://test/api/director/video-takes',
+        { projectId: PROJECT, canvasPosition: { x: 120, y: 240 } },
+        'POST',
+      ),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.createStandaloneDirectorVideoTake).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: PROJECT,
+        ownerKey: expect.stringMatching(
+          /^standalone:[0-9a-f-]{36}$/i,
+        ),
+        canvasPosition: { x: 120, y: 240 },
+      }),
+    )
+    await expect(response.json()).resolves.toEqual({ take })
+  })
+
+  it('rejects malformed standalone positions before writing', async () => {
+    const response = await createStandaloneVideo(
+      request(
+        'http://test/api/director/video-takes',
+        { projectId: PROJECT, canvasPosition: { x: 1 } },
+        'POST',
+      ),
+    )
+    expect(response.status).toBe(400)
+    expect(mocks.createStandaloneDirectorVideoTake).not.toHaveBeenCalled()
   })
 
   it('rejects projects the user does not own', async () => {
@@ -310,6 +374,34 @@ describe('non-video image upload boundary', () => {
     expect((await uploadImage(imageRequest('location', '서울 광장', 'wide_shot', png))).status).toBe(404)
     expect(targetQuery.eq).toHaveBeenCalledWith('location_id', '서울 광장')
     expect(mocks.storageFrom).not.toHaveBeenCalled()
+  })
+  it('stores a Director derivative without overwriting its Character source row', async () => {
+    const targetQuery = thumbnailQuery({ character_id: 'character-1' })
+    mocks.from.mockReturnValueOnce(projectQuery()).mockReturnValueOnce(targetQuery)
+    const upload = vi.fn().mockResolvedValue({ error: null })
+    mocks.storageFrom.mockReturnValue({ upload })
+
+    const response = await uploadImage(
+      imageRequest(
+        'director-asset',
+        'character-1',
+        'character',
+        new Blob([PNG_BYTES], { type: 'image/png' }),
+      ),
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      publicUrl: expect.stringMatching(
+        /director-assets\/character\/v1-[a-f0-9]{64}\.png\?v=\d+$/,
+      ),
+    })
+    expect(targetQuery.eq).toHaveBeenCalledWith(
+      'character_id',
+      'character-1',
+    )
+    expect(upload).toHaveBeenCalled()
+    expect(targetQuery).not.toHaveProperty('update')
   })
   it('rejects a vanished target after storage succeeds instead of reporting an orphaned upload', async () => {
     const targetQuery = thumbnailQuery({ character_id: 'character-1' })

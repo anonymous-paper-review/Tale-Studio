@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
-  getEffectiveShotConfig,
+  getEffectiveVideoConfig,
   effectivePrompt,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
@@ -36,23 +36,24 @@ export function VideoDetailPanel({
     (s) => s.openDeleteConfirm,
   )
   const regenerateVideo = useDirectorCanvasStore((s) => s.regenerateVideo)
-  // getEffectiveShotConfig는 매 호출마다 새 객체를 반환하므로 셀렉터에서 직접
+  // getEffectiveVideoConfig는 매 호출마다 새 객체를 반환하므로 셀렉터에서 직접
   // 호출하면 useSyncExternalStore가 무한 변화로 인식("getSnapshot should be
   // cached" 에러). nodes만 구독하고 useMemo로 캐싱한다.
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const effective = useMemo(
-    () => getEffectiveShotConfig({ nodes }, nodeId),
+    () => getEffectiveVideoConfig({ nodes }, nodeId),
     [nodes, nodeId],
   )
   const motherNode = useMemo(
     () => nodes.find((n) => n.id === data.parentShotNodeId),
     [nodes, data.parentShotNodeId],
   )
-  const isGenerating = nodes.some(
-    (node) =>
-      node.data.kind === 'video' &&
-      node.data.parentShotNodeId === data.parentShotNodeId &&
-      node.data.lastAttemptStatus === 'generating',
+  const ownerKey = data.parentShotNodeId ?? data.standaloneVideoKey
+  const isStandalone = data.parentShotNodeId === null
+  const isGenerating = nodes.some((node) =>
+    node.data.kind === 'video' &&
+    (node.data.parentShotNodeId ?? node.data.standaloneVideoKey) === ownerKey &&
+    node.data.lastAttemptStatus === 'generating',
   )
   const [regenerationState, setRegenerationState] = useState<{
     nodeId: string
@@ -68,7 +69,8 @@ export function VideoDetailPanel({
   const regenerationOperationRef = useRef(0)
   const activeNodeIdRef = useRef(nodeId)
   const nodeSessionRef = useRef(0)
-  const canMarkFinal = !!data.videoUrl && data.status === 'completed'
+  const canMarkFinal =
+    !isStandalone && !!data.videoUrl && data.status === 'completed'
   const finalBusy = finalState?.nodeId === nodeId ? finalState.busy : false
   const finalError =
     finalState?.nodeId === nodeId && finalState.intent !== data.final
@@ -92,13 +94,18 @@ export function VideoDetailPanel({
     promptDraft.nodeId === nodeId && promptDraft.dirty
       ? promptDraft.value
       : data.override.prompt ?? ''
+  const standalonePromptMissing =
+    isStandalone && overridePrompt.trim().length === 0
 
   useEffect(() => {
     activeNodeIdRef.current = nodeId
     nodeSessionRef.current += 1
   }, [nodeId])
 
-  if (!effective || !motherNode || !isShotData(motherNode.data)) {
+  if (
+    !effective ||
+    (!isStandalone && (!motherNode || !isShotData(motherNode.data)))
+  ) {
     return (
       <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
         <PanelSection title="Video">
@@ -110,8 +117,10 @@ export function VideoDetailPanel({
     )
   }
 
-  const mother = motherNode.data
-  const motherPrompt = effectivePrompt(mother)
+  const mother = !isStandalone && motherNode && isShotData(motherNode.data)
+    ? motherNode.data
+    : null
+  const motherPrompt = mother ? effectivePrompt(mother) : null
 
   const commitLabel = () => {
     setLabelDraft({ nodeId, value: label, dirty: false })
@@ -121,7 +130,11 @@ export function VideoDetailPanel({
   const commitPromptOverride = () => {
     setPromptDraft({ nodeId, value: overridePrompt, dirty: false })
     const trimmed = overridePrompt.trim()
-    if (trimmed === '') {
+    if (isStandalone) {
+      updateNodeData<'video'>(nodeId, {
+        override: { ...effective, prompt: trimmed },
+      })
+    } else if (trimmed === '') {
       const next = { ...data.override }
       delete next.prompt
       updateNodeData<'video'>(nodeId, { override: next })
@@ -165,6 +178,13 @@ export function VideoDetailPanel({
 
   const handleRegenerate = async () => {
     if (isGenerating) return
+    if (standalonePromptMissing) {
+      setRegenerationState({
+        nodeId,
+        error: t('Enter a prompt before generating the video.'),
+      })
+      return
+    }
     const operation = ++regenerationOperationRef.current
     const session = nodeSessionRef.current
     setRegenerationState({ nodeId, error: null })
@@ -215,10 +235,12 @@ export function VideoDetailPanel({
               placeholder={t('Video label')}
             />
           </HoverBeam>
-          <Badge variant="secondary" className="shrink-0 text-[10px]">
-            from {mother.label}
-          </Badge>
-          <button
+          {mother && (
+            <Badge variant="secondary" className="shrink-0 text-[10px]">
+              from {mother.label}
+            </Badge>
+          )}
+          {!isStandalone && <button
             type="button"
             onClick={() => void handleFinalToggle()}
             disabled={!canMarkFinal || finalBusy}
@@ -242,7 +264,7 @@ export function VideoDetailPanel({
               )}
             />
             Final
-          </button>
+          </button>}
         </div>
       </section>
 
@@ -293,8 +315,8 @@ export function VideoDetailPanel({
       <PanelSection
         title={
           <span className="flex items-center gap-1.5">
-            Override Prompt
-            {overrideKeys.includes('prompt') && (
+            {isStandalone ? t('Prompt') : t('Override Prompt')}
+            {!isStandalone && overrideKeys.includes('prompt') && (
               <Badge
                 variant="outline"
                 className="border-warning/50 bg-warning/10 text-[9px] uppercase text-warning"
@@ -313,12 +335,23 @@ export function VideoDetailPanel({
             }
             onBlur={commitPromptOverride}
             rows={3}
-            placeholder={motherPrompt || t("Mother Shot's prompt is empty")}
+            placeholder={
+              isStandalone
+                ? t('Describe the video to generate')
+                : motherPrompt || t("Mother Shot's prompt is empty")
+            }
           />
         </HoverBeam>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          {t("Leave blank to use the mother Shot's prompt as-is.")}
+          {isStandalone
+            ? t('Set the prompt for this video directly.')
+            : t("Leave blank to use the mother Shot's prompt as-is.")}
         </p>
+        {standalonePromptMissing && (
+          <p className="mt-1 text-xs text-destructive">
+            {t('Enter a prompt before generating the video.')}
+          </p>
+        )}
       </PanelSection>
 
       {/* #ui-cleanup 2026-08-31: 카메라/조명 UI 제거 — 영상 노드엔 fal 영상 모델만. */}
@@ -330,18 +363,24 @@ export function VideoDetailPanel({
               <button
                 type="button"
                 key={p}
-                onClick={() => applyVideoOverride(nodeId, { provider: p })}
+                onClick={() => {
+                  if (isStandalone) {
+                    updateNodeData<'video'>(nodeId, {
+                      override: { ...effective, provider: p },
+                    })
+                  } else {
+                    applyVideoOverride(nodeId, { provider: p })
+                  }
+                }}
                 className={cn(
                   'rounded-md border px-3 py-1.5 text-left text-xs transition-colors',
                   effective.provider === p
                     ? 'border-primary bg-primary/10'
                     : 'border-border hover:bg-accent',
                 )}
+                aria-pressed={effective.provider === p}
               >
                 <span className="block font-medium">{spec.label}</span>
-                <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                  {spec.endpoint}
-                </span>
               </button>
             )
           })}
@@ -352,7 +391,7 @@ export function VideoDetailPanel({
         <Button
           size="sm"
           onClick={() => void handleRegenerate()}
-          disabled={isGenerating}
+          disabled={isGenerating || standalonePromptMissing}
           className="gap-1.5"
         >
           {isGenerating ? (

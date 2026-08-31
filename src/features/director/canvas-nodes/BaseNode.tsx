@@ -58,6 +58,8 @@ type BaseNodeProps = {
   headerExtra?: ReactNode
   /** Branch 액션 활성 여부 (Scene/Shot만 true) */
   canBranch?: boolean
+  /** 삭제 액션 노출 여부. upstream asset Image처럼 직접 삭제할 수 없는 노드는 false. */
+  canDelete?: boolean
   /** Branch 클릭 시 호출 */
   onBranch?: () => void
   /** stale 표시 */
@@ -77,6 +79,7 @@ function BaseNodeImpl({
   children,
   headerExtra,
   canBranch,
+  canDelete = true,
   onBranch,
   stale,
   strongStale,
@@ -205,15 +208,17 @@ function BaseNodeImpl({
             >
               <Copy className="size-3 opacity-30" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={handleDelete}
-              aria-label="Delete"
-              className="text-destructive hover-red-beam"
-            >
-              <Trash2 className="size-3" />
-            </Button>
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={handleDelete}
+                aria-label="Delete"
+                className="text-destructive hover-red-beam"
+              >
+                <Trash2 className="size-3" />
+              </Button>
+            )}
           </div>
         </div>
       </div>

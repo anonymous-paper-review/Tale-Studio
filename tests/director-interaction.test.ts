@@ -19,16 +19,16 @@ import { translate } from '@/lib/i18n'
 // 테스트는 useT() 훅을 못 쓴다(React 렌더 밖) — 고정 locale로 바인딩한 t 스텁을 넘긴다.
 const t = (text: string, params?: Record<string, string | number>) => translate('en', text, params)
 describe('editActionForKind (BaseNode Edit 분기)', () => {
-  // #panel-unify 2026-08-31: 노드 뷰의 shot/video 편집은 좌측 패널 — 모달은 캔버스를 가린다.
-  it('shot/video는 좌측 패널 선택', () => {
+  // #panel-unify 2026-08-31: 생성 이미지/영상 편집은 좌측 패널 — 모달은 캔버스를 가린다.
+  it('shot/video/asset Image는 좌측 패널 선택', () => {
     expect(editActionForKind('shot')).toBe('select')
     expect(editActionForKind('video')).toBe('select')
+    expect(editActionForKind('asset')).toBe('select')
   })
   it('scene은 모달(패널 미지원)', () => {
     expect(editActionForKind('scene')).toBe('popup')
   })
-  it('asset/prompt는 액션 없음', () => {
-    expect(editActionForKind('asset')).toBe('none')
+  it('prompt는 액션 없음', () => {
     expect(editActionForKind('prompt')).toBe('none')
   })
 })
@@ -51,13 +51,13 @@ describe('popupVisibleInView (DirectorNodePopup 가드)', () => {
 })
 
 describe('doubleClickActionForKind (노드 뷰 더블클릭)', () => {
-  it('scene은 모달, shot/video는 좌측 패널 (#panel-unify)', () => {
+  it('scene은 모달, shot/video/asset은 좌측 패널 (#panel-unify)', () => {
     expect(doubleClickActionForKind('scene')).toBe('popup')
     expect(doubleClickActionForKind('shot')).toBe('select')
     expect(doubleClickActionForKind('video')).toBe('select')
+    expect(doubleClickActionForKind('asset')).toBe('select')
   })
-  it('그 외는 no-op', () => {
-    expect(doubleClickActionForKind('asset')).toBe('none')
+  it('prompt는 no-op', () => {
     expect(doubleClickActionForKind('prompt')).toBe('none')
   })
 })

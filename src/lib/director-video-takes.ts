@@ -147,6 +147,31 @@ export async function listLiveDirectorVideoTakes(projectId: string): Promise<Dir
   return (data ?? []) as DirectorVideoTake[]
 }
 
+export async function createStandaloneDirectorVideoTake(input: {
+  projectId: string
+  ownerKey: string
+  override: Json
+  canvasPosition: Json
+}): Promise<DirectorVideoTake> {
+  const { data, error } = await supabaseAdmin
+    .from('video_clips')
+    .insert({
+      project_id: input.projectId,
+      shot_id: input.ownerKey,
+      take_number: 1,
+      take_label: 'Video',
+      override: input.override,
+      canvas_position: input.canvasPosition,
+      status: 'pending',
+      last_attempt_status: null,
+      is_final: false,
+    })
+    .select('*')
+    .single()
+  if (error) throw error
+  return data as DirectorVideoTake
+}
+
 export async function attachProviderRequestToReservedVideoJob(
   projectId: string,
   jobId: string,

@@ -10,15 +10,15 @@ export type DirectorViewMode = 'node' | 'storyboard'
 /**
  * BaseNode Edit 버튼 동작 분기(#panel-unify 2026-08-31 오너 결정).
  * 노드 뷰의 편집 통로는 좌측 패널로 통일 — 모달은 캔버스를 가려 노드 이동을 막는다.
- * - shot/video: 좌측 패널 선택(selectNode)
+ * - shot/video/asset Image: 좌측 패널 선택(selectNode)
  * - scene: 모달(패널 미지원 — 씬 노드 자체가 정리 대상)
- * - 그 외(asset/prompt): 액션 없음
+ * - prompt: 액션 없음
  */
 export function editActionForKind(
   kind: DirectorNodeKind,
 ): 'popup' | 'select' | 'none' {
   if (kind === 'scene') return 'popup'
-  if (kind === 'shot' || kind === 'video') return 'select'
+  if (kind === 'shot' || kind === 'video' || kind === 'asset') return 'select'
   return 'none'
 }
 
@@ -37,14 +37,14 @@ export function popupVisibleInView(
 
 /**
  * 노드 뷰 더블클릭 동작 분기(#panel-unify 2026-08-31).
- * - scene: 모달 / shot/video: 좌측 패널(클릭과 동일 — 클릭이 이미 열어 사실상 멱등)
+ * - scene: 모달 / shot/video/asset: 좌측 패널(클릭과 동일)
  * - 그 외: no-op
  */
 export function doubleClickActionForKind(
   kind: DirectorNodeKind,
 ): 'popup' | 'select' | 'none' {
   if (kind === 'scene') return 'popup'
-  if (kind === 'shot' || kind === 'video') return 'select'
+  if (kind === 'shot' || kind === 'video' || kind === 'asset') return 'select'
   return 'none'
 }
 
@@ -64,7 +64,7 @@ export function clickToggleSelection(
  * 우클릭=이 메뉴로 인터랙션을 셋으로 가른다.
  * #node-merge: 파생 카드(shotImage/videoPlaceholder)는 캔버스에서 제거돼 분기도 사라졌다.
  * - copy-image/download-image: 대표 이미지가 있을 때만 (판정은 호출부 nodePrimaryImageUrl)
- * - delete: asset(파생·읽기전용) 만 제외
+ * - delete: upstream 원본과 연결된 asset Image만 제외
  */
 export type NodeMenuItem = 'edit' | 'copy-image' | 'download-image' | 'delete'
 
@@ -73,7 +73,12 @@ export function nodeContextMenuItems(
   hasImage: boolean,
 ): NodeMenuItem[] {
   const items: NodeMenuItem[] = []
-  if (kind === 'scene' || kind === 'shot' || kind === 'video') {
+  if (
+    kind === 'scene' ||
+    kind === 'shot' ||
+    kind === 'video' ||
+    kind === 'asset'
+  ) {
     items.push('edit')
   }
   if (hasImage) {

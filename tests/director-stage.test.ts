@@ -6,10 +6,87 @@ import {
 } from '@/stores/director-store'
 import { selectRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
 import type { ShotNodeData, PromptNodeData } from '@/types/director'
+import { isAssetData } from '@/types/director'
 import type { Shot, RoughStoryboardImage } from '@/types'
+import { useAssetStorageStore } from '@/stores/asset-storage-store'
 
 beforeEach(() => {
   useDirectorCanvasStore.getState().reset()
+  useAssetStorageStore.getState().reset()
+})
+
+describe('asset-backed Image template', () => {
+  it('캐릭터 원본을 editable Image로 만들고 rebuild 뒤 편집값을 보존한다', () => {
+    api().setProjectId('project-1')
+    const sceneId = api().addSceneNode({ x: 400, y: 0 }, 'S1')
+    const shotId = api().addShotNode(sceneId, { x: 700, y: 0 }, 'Shot1')
+    api().updateNodeData<'shot'>(shotId, {
+      characterAssetIds: ['char-1'],
+    })
+    const secondSceneId = api().addSceneNode({ x: 1200, y: 0 }, 'S2')
+    const secondShotId = api().addShotNode(
+      secondSceneId,
+      { x: 1500, y: 0 },
+      'Shot2',
+    )
+    api().updateNodeData<'shot'>(secondShotId, {
+      characterAssetIds: ['char-1'],
+    })
+    useAssetStorageStore.getState().registerCharacter('char-1', {
+      projectId: 'project-1',
+      sourceCanvasNodeId: 'artist-char-1',
+      name: '주인공',
+      alias: '',
+      background: '',
+      description: '검은 코트를 입은 탐정',
+      prompt: 'detective in a black coat',
+      referenceImages: [],
+      views: {
+        single: [
+          {
+            id: 'image-1',
+            url: 'https://example.com/character.png',
+            prompt: 'detective',
+            modelId: 'imagen',
+            createdAt: 1,
+          },
+        ],
+        fiveView: [],
+        sixteenAngle: [],
+      },
+      statusVariants: [],
+    })
+
+    api().rebuildAssetNodes()
+    const assetNodes = api().nodes.filter((node) => isAssetData(node.data))
+    expect(assetNodes).toHaveLength(1)
+    const asset = assetNodes[0]
+    expect(asset?.selectable).toBe(true)
+    expect(asset && isAssetData(asset.data) ? asset.data : null).toMatchObject({
+      assetKind: 'character',
+      sourceImageUrl: 'https://example.com/character.png',
+      imageUrl: 'https://example.com/character.png',
+      prompt: 'detective in a black coat',
+      locked: false,
+    })
+    if (!asset || !isAssetData(asset.data)) throw new Error('Asset Image missing')
+    expect(
+      api().edges.filter(
+        (edge) =>
+          edge.source === asset.id && edge.data?.category === 'references',
+      ),
+    ).toHaveLength(2)
+    api().updateNodeData<'asset'>(asset.id, {
+      prompt: 'edited in Director',
+      imageModel: 'nano-banana',
+    })
+    api().rebuildAssetNodes()
+    const rebuilt = api().nodes.find((node) => node.id === asset.id)
+    expect(rebuilt && isAssetData(rebuilt.data) ? rebuilt.data : null).toMatchObject({
+      prompt: 'edited in Director',
+      imageModel: 'nano-banana',
+    })
+  })
 })
 
 function api() {

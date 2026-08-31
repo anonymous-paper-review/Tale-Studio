@@ -407,8 +407,8 @@ export function useWriterDirectorSync() {
 
     // ── Pass 2.6: Artist 에셋 노드 재생성 (파생, 멱등) ──────────────────
     // hydrate로 shot 위치가 확정된 뒤 실행 — Scene 우측에 character/world 에셋을
-    // 세로 컬럼으로 표시하고 참조 shot에 references 엣지를 잇는다. asset-storage가
-    // 진실(Pass 0에서 hydrate 완료)이므로 매번 재생성해도 멱등. DB 미영속(persist 제외).
+    // 프로젝트당 한 장씩 세로 컬럼으로 표시하고 참조 shot에 references 엣지를 잇는다. Artist 원본과 연결은
+    // 다시 계산하되 Director에서 편집한 Image 설정·파생 결과는 로컬 캐시에서 보존한다.
     useDirectorCanvasStore.getState().rebuildAssetNodes()
     // Previz 체인 파생 노드(#previz-chain) — Shot 우측 PREVIZ VIDEO / SHOT IMAGE 재생성(멱등).
     useDirectorCanvasStore.getState().rebuildShotChainNodes()

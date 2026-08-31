@@ -167,6 +167,67 @@ export async function POST(req: Request) {
       return NextResponse.json({ publicUrl })
     }
 
+    if (type === 'director-asset') {
+      const source =
+        field === 'character'
+          ? { table: 'characters' as const, idColumn: 'character_id' as const }
+          : field === 'world'
+            ? { table: 'locations' as const, idColumn: 'location_id' as const }
+            : null
+      if (!source) {
+        return NextResponse.json(
+          { error: 'Unsupported Director asset image target' },
+          { status: 400 },
+        )
+      }
+      if (file.size === 0 || file.size > MAX_IMAGE_BYTES) {
+        return NextResponse.json(
+          { error: 'Image must be no larger than 10 MB' },
+          { status: 400 },
+        )
+      }
+      const mimeType = file.type
+      const buffer = Buffer.from(await file.arrayBuffer())
+      const imageType = IMAGE_TYPES[mimeType as keyof typeof IMAGE_TYPES]
+      if (
+        buffer.length === 0 ||
+        buffer.length > MAX_IMAGE_BYTES ||
+        !imageType ||
+        !(await validImage(mimeType, buffer))
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Image MIME type does not match fully decoded supported image content',
+          },
+          { status: 400 },
+        )
+      }
+      const { data: sourceRow, error: sourceError } = await supabaseAdmin
+        .from(source.table)
+        .select(source.idColumn)
+        .eq('project_id', projectId)
+        .eq(source.idColumn, entityId)
+        .maybeSingle()
+      if (sourceError) throw sourceError
+      if (!sourceRow) {
+        return NextResponse.json(
+          { error: 'Director asset source not found' },
+          { status: 404 },
+        )
+      }
+      const storagePath = `${project.workspace_id}/${projectId}/director-assets/${field}/${storageKeySegment(entityId)}.${imageType.extension}`
+      const { error: uploadError } = await mediaUpload(storagePath, buffer, {
+        contentType: mimeType,
+        upsert: true,
+      })
+      if (uploadError) throw uploadError
+      await uploadThumbnail(storagePath, buffer)
+      return NextResponse.json({
+        publicUrl: `${mediaPublicUrl(storagePath)}?v=${Date.now()}`,
+      })
+    }
+
     const target = IMAGE_TARGETS[type as keyof typeof IMAGE_TARGETS]
     if (!target || !target.fields.includes(field)) {
       return NextResponse.json({ error: 'Unsupported image upload target' }, { status: 400 })

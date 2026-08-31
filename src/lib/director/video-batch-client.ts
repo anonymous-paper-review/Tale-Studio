@@ -17,7 +17,7 @@ const EMPTY_RESULT = { total: 0, started: 0, failed: 0 }
 export function eligibleVideoBatchShotIds(nodes: DirectorNode[]): string[] {
   const videosByShot = new Map<string, DirectorNode[]>()
   for (const node of nodes) {
-    if (!isVideoData(node.data)) continue
+    if (!isVideoData(node.data) || node.data.parentShotNodeId === null) continue
     const videos = videosByShot.get(node.data.parentShotNodeId) ?? []
     videos.push(node)
     videosByShot.set(node.data.parentShotNodeId, videos)

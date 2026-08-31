@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { BaseNode } from './BaseNode'
 import { LabeledTargetHandle } from './LabeledHandle'
 import {
-  getChildVideos,
   getShotStage,
   effectivePrompt,
   useDirectorCanvasStore,
@@ -23,7 +22,6 @@ import { useT } from '@/lib/i18n'
 
 function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const t = useT()
-  const takeCount = useDirectorCanvasStore((s) => getChildVideos(s, id).length)
   const stage = useDirectorCanvasStore((s) => getShotStage(s, id))
   const isGenerating = useDirectorCanvasStore((s) => !!s.generatingNodeIds[id])
   const generateStoryboardImage = useDirectorCanvasStore(
@@ -76,11 +74,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             {stage === 'rough' ? t('Generate image') : t('Retouch image')}
             <ChevronRight className="size-3" />
           </Button>
-          {/* 선택된 이미지 모델 칩(#image-model-select) — 변경은 편집 패널/팝업에서. */}
-          <span
-            className="rounded-sm border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground"
-            title={IMAGE_MODELS[normalizeImageModelKey(data.imageModel)].t2iEndpoint}
-          >
+          {/* 선택된 이미지 모델명 — 변경은 편집 패널/팝업에서. */}
+          <span className="rounded-sm border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
             {IMAGE_MODELS[normalizeImageModelKey(data.imageModel)].label}
           </span>
         </div>
@@ -186,7 +181,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           </div>
         )}
 
-        <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+        <div className="mt-2 text-[10px] text-muted-foreground">
           <span className="flex items-center gap-2">
             <span className="flex items-center gap-0.5">
               <Camera className="size-2.5" />
@@ -197,7 +192,6 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
               {data.lighting.position}
             </span>
           </span>
-          <span className="font-mono">{takeCount} take</span>
         </div>
       </BaseNode>
     </>

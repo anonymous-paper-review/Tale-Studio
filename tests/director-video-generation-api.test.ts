@@ -4,13 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), userOwnsProject: vi.fn(), checkGenerationCapacity: vi.fn(),
   reserveTake: vi.fn(), reserveRegeneration: vi.fn(), getJob: vi.fn(), attach: vi.fn(), fail: vi.fn(),
-  from: vi.fn(), rpc: vi.fn(), submit: vi.fn(), finalize: vi.fn(), reconcile: vi.fn(), buildPrompt: vi.fn(),
+  updateMetadata: vi.fn(), from: vi.fn(), rpc: vi.fn(), submit: vi.fn(), finalize: vi.fn(), reconcile: vi.fn(), buildPrompt: vi.fn(),
 }))
 vi.mock('@/lib/supabase/auth', () => ({ getUser: mocks.getUser }))
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 vi.mock('@/lib/generation-jobs', () => ({ userOwnsProject: mocks.userOwnsProject, getGenerationJobById: mocks.getJob, getGenerationJobByRequestId: mocks.getJob }))
 vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: mocks.checkGenerationCapacity, quotaExceededBody: () => ({ error: 'quota' }), checkProjectVideoBudget: async () => ({ ok: true, used: 0, limit: 100 }), videoBudgetExceededBody: () => ({ error: 'video budget' }) }))
-vi.mock('@/lib/director-video-takes', () => ({ reserveDirectorVideoTake: mocks.reserveTake, reserveDirectorVideoRegeneration: mocks.reserveRegeneration, attachProviderRequestToReservedVideoJob: mocks.attach, markDirectorVideoAttemptFailed: mocks.fail }))
+vi.mock('@/lib/director-video-takes', () => ({ reserveDirectorVideoTake: mocks.reserveTake, reserveDirectorVideoRegeneration: mocks.reserveRegeneration, updateDirectorVideoTakeMetadata: mocks.updateMetadata, attachProviderRequestToReservedVideoJob: mocks.attach, markDirectorVideoAttemptFailed: mocks.fail }))
 vi.mock('@/lib/director/video-prompt', () => ({ buildVideoPrompt: mocks.buildPrompt }))
 vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => 'https://webhook.test' }))
 vi.mock('@/lib/fal/observability', () => ({ buildBestEffortFalRequestCapturePatch: () => ({}) }))
@@ -113,6 +113,97 @@ beforeEach(() => {
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
 })
 describe('director video generation reservation', () => {
+  it('uses a standalone clip’s persisted config without loading a Shot', async () => {
+    const standaloneKey =
+      'standalone:123e4567-e89b-42d3-a456-426614174000'
+    const persistedConfig = {
+      prompt: 'Stored standalone motion',
+      camera: {
+        horizontal: 0,
+        vertical: 0,
+        pan: 1,
+        tilt: 0,
+        roll: 0,
+        zoom: 0,
+      },
+      lighting: { position: 'front', brightness: 50, colorTemp: 5600 },
+      cameraPreset: {
+        brand: 'arri',
+        focalLength: 35,
+        aperture: 2.8,
+        whiteBalance: 5600,
+      },
+      provider: 'happy-horse',
+      durationSeconds: 7,
+    }
+    mocks.from.mockReset()
+    mocks.from
+      .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
+      .mockReturnValueOnce(
+        query({
+          id: 'clip-standalone',
+          shot_id: standaloneKey,
+          override: persistedConfig,
+        }),
+      )
+      .mockReturnValueOnce(query(null))
+    mocks.reserveRegeneration.mockImplementation(
+      async (args: { inputSnapshot: unknown; model: string }) => {
+        mocks.getJob.mockResolvedValueOnce({
+          id: 'job-standalone',
+          request_id: 'reserved:job-standalone',
+          provider: 'fal',
+          model: args.model,
+          status: 'queued',
+          input_snapshot: args.inputSnapshot,
+        })
+        return {
+          video_clip_id: 'clip-standalone',
+          job_id: 'job-standalone',
+          take_number: 1,
+          replayed: false,
+        }
+      },
+    )
+    mocks.submit.mockRejectedValue(new Error('stop after metadata save'))
+
+    const response = await POST(
+      request({
+        standaloneVideoKey: standaloneKey,
+        standaloneConfig: persistedConfig,
+        videoClipId: 'clip-standalone',
+        prompt: 'Client spoof',
+        model: 'local',
+      }),
+    )
+
+    expect(response.status).toBe(500)
+    expect(mocks.buildPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'Stored standalone motion',
+        camera: persistedConfig.camera,
+        cameraPreset: persistedConfig.cameraPreset,
+        durationSeconds: 7,
+      }),
+    )
+    expect(mocks.reserveRegeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: 'project-1',
+        videoClipId: 'clip-standalone',
+        target: expect.objectContaining({
+          writerShotId: standaloneKey,
+          retakeMode: 'regeneration',
+        }),
+      }),
+    )
+    expect(mocks.updateMetadata).toHaveBeenCalledWith(
+      'project-1',
+      'clip-standalone',
+      { override: persistedConfig },
+    )
+    expect(mocks.reserveTake).not.toHaveBeenCalled()
+  })
+
   it('uses the dialogue speaker’s exact persisted appearance snapshot rather than the current character appearance', async () => {
     mocks.from.mockReset()
     mocks.from

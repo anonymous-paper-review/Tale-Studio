@@ -4,13 +4,15 @@
 // 메뉴 구성은 순수 함수(nodeContextMenuItems)로 격리했고, 이미지 복사/다운로드 활성 여부는
 // nodePrimaryImageUrl 이 판정한다 — 여기서 그 두 계약을 잠근다.
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nodeContextMenuItems } from '@/features/director/canvas-interaction'
 import { nodePrimaryImageUrl } from '@/features/director/clipboard-image'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { isShotData, isVideoData } from '@/types/director'
+import { createDefaultStandaloneVideoConfig } from '@/lib/director/standalone-video'
 
 beforeEach(() => {
+  vi.unstubAllGlobals()
   useDirectorCanvasStore.getState().reset()
 })
 
@@ -39,8 +41,9 @@ describe('nodeContextMenuItems (우클릭 메뉴 구성)', () => {
     expect(items).not.toContain('download-image')
   })
 
-  it('asset(읽기전용)은 삭제·편집이 없고 이미지 복사만 가능하다', () => {
+  it('asset Image는 편집·복사가 가능하지만 upstream 연결 때문에 직접 삭제하지 않는다', () => {
     expect(nodeContextMenuItems('asset', true)).toEqual([
+      'edit',
       'copy-image',
       'download-image',
     ])
@@ -125,5 +128,119 @@ describe('addShotNode standalone (Higgsfield식 독립 이미지 노드)', () =>
     expect(videoId).toBeTruthy()
     const video = api().nodes.find((n) => n.id === videoId)
     expect(video && isVideoData(video.data)).toBe(true)
+  })
+})
+
+describe('addStandaloneVideo (독립 영상 노드)', () => {
+  it('영속 clip을 받은 뒤 Video 하나만 만들고 Shot·parent 엣지를 만들지 않는다', async () => {
+    api().setProjectId('project-1')
+    const before = api()
+    const ownerKey = 'standalone:123e4567-e89b-42d3-a456-426614174000'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            take: {
+              id: 'clip-standalone',
+              shot_id: ownerKey,
+              take_number: 1,
+              take_label: 'Video',
+              override: createDefaultStandaloneVideoConfig(),
+              created_at: '2026-08-31T00:00:00.000Z',
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    )
+
+    const videoId = await before.addStandaloneVideo({ x: 100, y: 200 })
+    expect(videoId).toBeTruthy()
+    const state = api()
+    expect(state.nodes).toHaveLength(before.nodes.length + 1)
+    const video = state.nodes.find((node) => node.id === videoId)
+    expect(video && isVideoData(video.data)).toBe(true)
+    if (!video || !isVideoData(video.data)) throw new Error('Video missing')
+    expect(video.data).toMatchObject({
+      parentShotNodeId: null,
+      standaloneVideoKey: ownerKey,
+      videoClipId: 'clip-standalone',
+    })
+    expect(state.nodes.filter((node) => isShotData(node.data))).toHaveLength(
+      before.nodes.filter((node) => isShotData(node.data)).length,
+    )
+    expect(
+      state.edges.some(
+        (edge) =>
+          edge.target === videoId && edge.data?.category === 'parent',
+      ),
+    ).toBe(false)
+  })
+
+  it('최신 자체 설정을 같은 clip의 생성 snapshot으로 보낸다', async () => {
+    api().setProjectId('project-1')
+    const ownerKey = 'standalone:123e4567-e89b-42d3-a456-426614174000'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            take: {
+              id: 'clip-standalone',
+              shot_id: ownerKey,
+              take_number: 1,
+              take_label: 'Video',
+              override: createDefaultStandaloneVideoConfig(),
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    )
+    const videoId = await api().addStandaloneVideo({ x: 10, y: 20 })
+    if (!videoId) throw new Error('Video missing')
+    const config = {
+      ...createDefaultStandaloneVideoConfig(),
+      prompt: 'A paper boat crosses a dark puddle',
+    }
+    api().updateNodeData<'video'>(videoId, { override: config })
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: 'job-1',
+            videoClipId: 'clip-standalone',
+            status: 'queued',
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ ok: true, data: { status: 'completed' } }),
+          { status: 200 },
+        ),
+      )
+    vi.stubGlobal('fetch', fetch)
+    useDirectorCanvasStore.setState({
+      hydrateFromDb: vi.fn().mockResolvedValue(undefined),
+    })
+
+    const first = api().regenerateVideo(videoId)
+    const duplicate = api().regenerateVideo(videoId)
+    await expect(duplicate).resolves.toBe(true)
+    await expect(first).resolves.toBe(true)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch.mock.calls[0]?.[0]).toBe('/api/director/generate-video')
+    expect(
+      JSON.parse((fetch.mock.calls[0]?.[1] as RequestInit).body as string),
+    ).toMatchObject({
+      standaloneVideoKey: ownerKey,
+      standaloneConfig: config,
+      videoClipId: 'clip-standalone',
+      prompt: config.prompt,
+    })
   })
 })

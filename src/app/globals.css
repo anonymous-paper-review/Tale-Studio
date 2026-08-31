@@ -127,15 +127,16 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 
-  /* Canvas extension tokens (design.md §17.11). alias only — values follow base tokens at use site so cascade applies dark overrides automatically. */
+  /* Canvas extension tokens (design.md §17.11). Edge colors are mode-specific
+     sources of truth; the remaining aliases follow their base tokens. */
   --canvas-bg: var(--background);
   --canvas-dot: var(--muted-foreground);
   --node-bg-default: var(--card);
   --node-bg-selected: var(--accent);
   --node-border-default: var(--border);
   --node-border-selected: var(--ring);
-  --edge-default: var(--border);
-  --edge-selected: var(--ring);
+  --edge-default: oklch(0.52 0.06 250);
+  --edge-selected: oklch(0.5 0.07 300);
 
   /* Border tiers (design.md §2.4). light: Radix gray-7 / gray-5. */
   --border-strong: oklch(0.85 0 0);
@@ -213,6 +214,9 @@
   --input: oklch(0.278 0 0);
   /* Ring: #E50914 */
   --ring: oklch(0.537 0.234 29.23);
+  /* Canvas edge sources of truth: muted blue by default, muted purple when selected. */
+  --edge-default: oklch(0.7 0.06 250);
+  --edge-selected: oklch(0.72 0.07 300);
 
   --chart-1: oklch(0.537 0.234 29.23);
   --chart-2: oklch(0.614 0.189 254.8);

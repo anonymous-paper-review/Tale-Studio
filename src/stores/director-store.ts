@@ -36,6 +36,7 @@ import {
   type DirectorVideoChainTargetHandle,
   type PromptNodeData,
   type VideoOverride,
+  type StandaloneVideoConfig,
   type VideoAdherence,
   type DirectorVideoStatus,
   type DirectorVideoProvider,
@@ -73,6 +74,10 @@ import { claimAction, releaseAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { DEFAULT_VIDEO_MODEL, normalizeProvider } from '@/lib/video-models'
+import {
+  isStandaloneVideoOwnerKey,
+  normalizeStandaloneVideoConfig,
+} from '@/lib/director/standalone-video'
 import {
   beginPipelineProgressBatch,
   resetPipelineProgressBatches,
@@ -438,7 +443,9 @@ function isHydratedVideoTake(value: unknown): value is HydratedVideoTake {
     nullableString(row.last_attempt_error) &&
     nullableString(row.last_attempt_at) &&
     nullableString(row.created_at) &&
-    nullableString(row.updated_at)
+    nullableString(row.updated_at) &&
+    (!isStandaloneVideoOwnerKey(row.shot_id) ||
+      normalizeStandaloneVideoConfig(row.override) !== null)
   )
 }
 /**
@@ -475,6 +482,7 @@ function makeVideoData(
     kind: 'video',
     label: `take_v${takeIndex}`,
     parentShotNodeId,
+    standaloneVideoKey: null,
     videoClipId: null,
     takeNumber: takeIndex,
     generationJobId: null,
@@ -483,6 +491,37 @@ function makeVideoData(
     lastAttemptAt: null,
     createdAt: new Date().toISOString(),
     override: {},
+    frameInputs: EMPTY_FRAME_INPUTS(),
+    videoChainInputId: null,
+    videoChainFrameUrl: null,
+    videoUrl: null,
+    thumbnailUrl: null,
+    status: 'pending',
+    errorMessage: null,
+    final: false,
+    stale: false,
+    adherence: null,
+  }
+}
+
+function makeStandaloneVideoData(
+  standaloneVideoKey: string,
+  config: StandaloneVideoConfig,
+  takeIndex = 1,
+): VideoNodeData {
+  return {
+    kind: 'video',
+    label: 'Video',
+    parentShotNodeId: null,
+    standaloneVideoKey,
+    videoClipId: null,
+    takeNumber: takeIndex,
+    generationJobId: null,
+    lastAttemptStatus: null,
+    lastAttemptError: null,
+    lastAttemptAt: null,
+    createdAt: new Date().toISOString(),
+    override: config,
     frameInputs: EMPTY_FRAME_INPUTS(),
     videoChainInputId: null,
     videoChainFrameUrl: null,
@@ -556,6 +595,33 @@ async function persistStoryboardImage(
     if (!res.ok) return null
     const { publicUrl } = await res.json()
     return publicUrl ?? null
+  } catch {
+    return null
+  }
+}
+
+async function persistDirectorAssetImage(
+  projectId: string,
+  assetKind: 'character' | 'world',
+  assetId: string,
+  blobUrl: string,
+): Promise<string | null> {
+  try {
+    const response = await fetch(blobUrl)
+    const blob = await response.blob()
+    const form = new FormData()
+    form.append('projectId', projectId)
+    form.append('type', 'director-asset')
+    form.append('entityId', assetId)
+    form.append('field', assetKind)
+    form.append('file', blob, `${assetKind}-image.png`)
+    const upload = await fetch('/api/assets/upload-image', {
+      method: 'POST',
+      body: form,
+    })
+    if (!upload.ok) return null
+    const body = (await upload.json()) as { publicUrl?: unknown }
+    return typeof body.publicUrl === 'string' ? body.publicUrl : null
   } catch {
     return null
   }
@@ -926,6 +992,7 @@ function scheduleWiringSweepToDb(getState: () => DirectorCanvasState) {
 }
 
 const pendingVideoClipSaves = new Map<string, ReturnType<typeof setTimeout>>()
+const inFlightVideoClipSaves = new Map<string, Promise<void>>()
 const pendingVideoFinalWrites = new Map<string, Promise<void>>()
 const latestVideoFinalIntent = new Map<string, number>()
 const latestVideoDeleteIntent = new Map<string, number>()
@@ -1000,25 +1067,45 @@ function debouncedVideoClipSaveToDb(
   if (existing) clearTimeout(existing)
   pendingVideoClipSaves.set(
     videoClipId,
-    setTimeout(async () => {
+    setTimeout(() => {
       pendingVideoClipSaves.delete(videoClipId)
-      const patch = getPatch()
-      if (!patch) return
-      try {
-        const response = await fetch(`/api/director/video-takes/${encodeURIComponent(videoClipId)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, ...patch }),
+      const previous =
+        inFlightVideoClipSaves.get(videoClipId) ?? Promise.resolve()
+      const operation = previous
+        .catch(() => undefined)
+        .then(async () => {
+          const patch = getPatch()
+          if (!patch) return
+          const response = await fetch(
+            `/api/director/video-takes/${encodeURIComponent(videoClipId)}`,
+            {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ projectId, ...patch }),
+            },
+          )
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
         })
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      } catch (err) {
-        console.error('[director-store] video take save failed:', err)
-        try {
-          await onFailure()
-        } catch (hydrateErr) {
-          console.error('[director-store] video take rollback hydration failed:', hydrateErr)
+        .catch(async (err) => {
+          console.error('[director-store] video take save failed:', err)
+          if (inFlightVideoClipSaves.get(videoClipId) === operation) {
+            inFlightVideoClipSaves.delete(videoClipId)
+          }
+          try {
+            await onFailure()
+          } catch (hydrateErr) {
+            console.error(
+              '[director-store] video take rollback hydration failed:',
+              hydrateErr,
+            )
+          }
+        })
+      inFlightVideoClipSaves.set(videoClipId, operation)
+      void operation.finally(() => {
+        if (inFlightVideoClipSaves.get(videoClipId) === operation) {
+          inFlightVideoClipSaves.delete(videoClipId)
         }
-      }
+      })
     }, 500),
   )
 }
@@ -1085,8 +1172,8 @@ interface DirectorCanvasState {
   // 미사용 에셋(어떤 shot도 참조 안 함) 좌상단 표시 토글. 비영속(UI ephemeral).
   showUnusedAssets: boolean
 
-  // undo/redo 히스토리 (런타임, 비영속). asset/references 파생은 스냅샷에서 제외 —
-  // 복원 후 rebuildAssetNodes가 재생성. sync 셋업 중에는 _historySuppressed로 기록 차단.
+  // undo/redo 히스토리 (런타임, 비영속). references/legacy 체인만 재구성하며
+  // editable asset Image 설정은 일반 노드처럼 스냅샷에 포함한다.
   historyPast: { nodes: DirectorNode[]; edges: DirectorEdge[] }[]
   historyFuture: { nodes: DirectorNode[]; edges: DirectorEdge[] }[]
   _historySuppressed: boolean
@@ -1119,6 +1206,8 @@ interface DirectorCanvasState {
   ) => string
   /** Shot → Video Branch. 마더 설정 상속, override 빈 객체로 시작 (결정 #13) */
   addVideoTake: (parentShotNodeId: string, position?: XYPosition) => string | null
+  /** 부모 Shot 없이 자체 설정과 영속 clip을 소유하는 Video 노드 생성. */
+  addStandaloneVideo: (position: XYPosition) => Promise<string | null>
 
   updateNodeData: <K extends DirectorNodeKind>(
     id: string,
@@ -1136,9 +1225,8 @@ interface DirectorCanvasState {
   ) => string | null
   deleteEdge: (id: string) => void
   /**
-   * Artist 에셋(asset-storage) → 씬별 asset 노드 + shot 참조 엣지를 재생성한다 (멱등, 파생).
-   * 각 Scene 우측에 character(위)→world(아래) 세로 컬럼을 만들고, 그 에셋을 참조하는
-   * shot에 references 엣지를 잇는다. asset과 겹치는 shot은 우측으로 밀어 정렬.
+   * Artist 에셋(asset-storage) → 프로젝트당 하나의 editable Image와 참조 엣지를 재조정한다.
+   * Character/Background는 같은 Image 카드 외형을 쓰고 역할 라벨만 다르다.
    */
   rebuildAssetNodes: () => void
   /** Persisted Shot imageInputs에서 유효한 image 엣지를 멱등 재생성한다. */
@@ -1177,6 +1265,8 @@ interface DirectorCanvasState {
     shotNodeId: string,
     options?: DirectorGenerationRequestOptions,
   ) => Promise<GenerationJobReceipt | null>
+  /** Artist 원본을 reference로 쓰는 editable Image 템플릿을 생성/재생성한다. */
+  generateAssetImage: (assetNodeId: string) => Promise<boolean>
   /** 모든 Shot의 storyboardImage 일괄 생성 (씬 순서대로). 영상 생성은 포함 안 함 (결정 #40) */
   generateAllStoryboardImages: () => Promise<void>
 
@@ -1385,8 +1475,8 @@ export function effectivePrompt(
   return data.promptOverride ?? data.derivedPrompt ?? data.prompt ?? ''
 }
 
-/** Video 노드의 effective 설정 (마더 Shot 상속 + override) */
-export function getEffectiveShotConfig(
+/** Video 노드의 최종 생성 설정. Shot-backed는 상속, standalone은 자체 설정을 쓴다. */
+export function getEffectiveVideoConfig(
   state: Pick<DirectorCanvasState, 'nodes'>,
   videoNodeId: string,
 ): {
@@ -1395,9 +1485,13 @@ export function getEffectiveShotConfig(
   lighting: LightingConfig
   cameraPreset: CameraPreset
   provider: DirectorVideoProvider
+  durationSeconds: number
 } | null {
   const video = state.nodes.find((n) => n.id === videoNodeId)
   if (!video || !isVideoData(video.data)) return null
+  if (video.data.parentShotNodeId === null) {
+    return normalizeStandaloneVideoConfig(video.data.override)
+  }
   const mother = state.nodes.find((n) => n.id === video.data.parentShotNodeId)
   if (!mother || !isShotData(mother.data)) return null
   const m = mother.data
@@ -1408,7 +1502,12 @@ export function getEffectiveShotConfig(
     lighting: o.lighting ?? m.lighting,
     cameraPreset: o.cameraPreset ?? m.cameraPreset,
     provider: o.provider ?? m.provider,
+    durationSeconds: m.durationSeconds,
   }
+}
+
+function videoOwnerKey(data: VideoNodeData): string {
+  return data.parentShotNodeId ?? data.standaloneVideoKey
 }
 
 /**
@@ -1791,6 +1890,13 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 }
                 return n
               })
+            const seenClipIds = new Set<string>()
+            nodes = nodes.filter((node) => {
+              if (!isVideoData(node.data) || !node.data.videoClipId) return true
+              if (seenClipIds.has(node.data.videoClipId)) return false
+              seenClipIds.add(node.data.videoClipId)
+              return true
+            })
             const retainedNodeIds = new Set(nodes.map((node) => node.id))
             let edges = s.edges.filter(
               (edge) => retainedNodeIds.has(edge.source) && retainedNodeIds.has(edge.target),
@@ -1799,6 +1905,16 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             for (const row of clipsRes.data ?? []) {
               const clipId = row.id as string
               if (!clipId) continue
+              const standaloneConfig = isStandaloneVideoOwnerKey(row.shot_id)
+                ? normalizeStandaloneVideoConfig(row.override)
+                : null
+              const parentShot = standaloneConfig
+                ? null
+                : nodes.find(
+                    (n) =>
+                      isShotData(n.data) &&
+                      n.data.writerShotId === row.shot_id,
+                  ) ?? null
               const existingIndex = nodes.findIndex(
                 (n) => isVideoData(n.data) && n.data.videoClipId === clipId,
               )
@@ -1816,7 +1932,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   isStrictlyNewerAttempt(existingNode.data.lastAttemptAt, canonicalAttemptAt)
                 const preserveLocalFinal =
                   !videoFieldMatchesHydrationSnapshot(existingNode, snapshot, 'final') ||
-                  pendingVideoFinalWrites.has(`${projectId}:${existingNode.data.parentShotNodeId}`)
+                  pendingVideoFinalWrites.has(
+                    `${projectId}:${videoOwnerKey(existingNode.data)}`,
+                  )
+                const preserveLocalOverride =
+                  pendingVideoClipSaves.has(clipId) ||
+                  inFlightVideoClipSaves.has(clipId) ||
+                  !videoFieldMatchesHydrationSnapshot(
+                    existingNode,
+                    snapshot,
+                    'override',
+                  )
                 nodes[existingIndex] = {
                   ...existingNode,
                   position:
@@ -1829,9 +1955,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                       ? (row.take_label as string) ?? `take_v${row.take_number}`
                       : existingNode.data.label,
                     takeNumber: (row.take_number as number) ?? existingNode.data.takeNumber,
-                    override: videoFieldMatchesHydrationSnapshot(existingNode, snapshot, 'override')
-                      ? (row.override as VideoOverride) ?? {}
-                      : existingNode.data.override,
+                    override: preserveLocalOverride
+                      ? existingNode.data.override
+                      : standaloneConfig ?? (row.override as VideoOverride) ?? {},
+                    parentShotNodeId: standaloneConfig
+                      ? null
+                      : parentShot?.id ?? existingNode.data.parentShotNodeId,
+                    standaloneVideoKey: standaloneConfig
+                      ? row.shot_id
+                      : parentShot
+                        ? null
+                        : existingNode.data.standaloneVideoKey,
                     final: preserveLocalFinal
                       ? existingNode.data.final
                       : (row.is_final as boolean) ?? false,
@@ -1858,15 +1992,24 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                     adherence: (row.adherence as VideoAdherence | null) ?? existingNode.data.adherence ?? null,
                   },
                 } as DirectorNode
+                if (standaloneConfig) {
+                  edges = edges.filter(
+                    (edge) =>
+                      edge.target !== existingNode.id ||
+                      (edge.data?.category !== 'parent' &&
+                        edge.data?.category !== 'chain'),
+                  )
+                }
                 continue
               }
 
-              const parentShot = nodes.find(
-                (n) => isShotData(n.data) && n.data.writerShotId === row.shot_id,
-              )
-              if (!parentShot) continue
-              const takeIndex = (row.take_number as number) ?? nextTakeIndex({ ...s, nodes }, parentShot.id)
-              const data = makeVideoData(parentShot.id, takeIndex)
+              if (!standaloneConfig && !parentShot) continue
+              const takeIndex =
+                (row.take_number as number) ??
+                (parentShot ? nextTakeIndex({ ...s, nodes }, parentShot.id) : 1)
+              const data = standaloneConfig
+                ? makeStandaloneVideoData(row.shot_id, standaloneConfig, takeIndex)
+                : makeVideoData(parentShot!.id, takeIndex)
               data.videoClipId = clipId
               data.label = (row.take_label as string) ?? data.label
               data.takeNumber = takeIndex
@@ -1875,7 +2018,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               data.lastAttemptError = row.latestJobError ?? row.last_attempt_error ?? null
               data.lastAttemptAt = row.latestAttemptAt ?? row.last_attempt_at ?? row.updated_at ?? null
               data.createdAt = row.created_at ?? data.createdAt
-              data.override = (row.override as VideoOverride) ?? {}
+              data.override = standaloneConfig ?? (row.override as VideoOverride) ?? {}
               data.final = (row.is_final as boolean) ?? false
               data.videoUrl = (row.url as string) ?? null
               data.thumbnailUrl = (row.thumbnail_url as string) ?? null
@@ -1885,18 +2028,24 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               nodes = [...nodes, {
                 id,
                 type: 'video',
-                position: dbPos ? { x: dbPos.x, y: dbPos.y } : nextVideoPosition({ ...s, nodes }, parentShot.id),
+                position: dbPos
+                  ? { x: dbPos.x, y: dbPos.y }
+                  : standaloneConfig
+                    ? { x: 80, y: 80 }
+                    : nextVideoPosition({ ...s, nodes }, parentShot!.id),
                 data,
               }]
-              edges = [...edges, {
-                id: newDirectorId('de'),
-                source: parentShot.id,
-                target: id,
-                sourceHandle: 'right',
-                targetHandle: 'left',
-                type: 'parent',
-                data: { category: 'parent', relationText: '' },
-              }]
+              if (parentShot) {
+                edges = [...edges, {
+                  id: newDirectorId('de'),
+                  source: parentShot.id,
+                  target: id,
+                  sourceHandle: 'right',
+                  targetHandle: 'left',
+                  type: 'parent',
+                  data: { category: 'parent', relationText: '' },
+                }]
+              }
             }
 
             return { nodes, edges, lastSavedAt: Date.now() }
@@ -2098,6 +2247,76 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         get().rebuildShotChainNodes()
 
         return id
+      },
+
+      addStandaloneVideo: async (position) => {
+        if (isDemoSession()) return null
+        const projectId = get().projectId
+        if (!projectId) return null
+        const response = await fetch('/api/director/video-takes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, canvasPosition: position }),
+        })
+        const body = (await response.json().catch(() => ({}))) as {
+          error?: string
+          take?: Record<string, unknown>
+        }
+        if (!response.ok) {
+          throw new Error(body.error ?? `HTTP ${response.status}`)
+        }
+        if (get().projectId !== projectId) return null
+        const take = body.take
+        const clipId = take?.id
+        const ownerKey = take?.shot_id
+        const config = normalizeStandaloneVideoConfig(take?.override)
+        if (
+          typeof clipId !== 'string' ||
+          !isStandaloneVideoOwnerKey(ownerKey) ||
+          !config
+        ) {
+          throw new Error('Invalid standalone video take response')
+        }
+        const existing = get().nodes.find(
+          (node) =>
+            isVideoData(node.data) && node.data.videoClipId === clipId,
+        )
+        if (existing) {
+          set({
+            selectedNodeId: existing.id,
+            selectedEdgeId: null,
+            historyPast: [],
+            historyFuture: [],
+          })
+          return existing.id
+        }
+        const takeNumber =
+          typeof take?.take_number === 'number' && take.take_number > 0
+            ? take.take_number
+            : 1
+        const data = makeStandaloneVideoData(ownerKey, config, takeNumber)
+        data.videoClipId = clipId
+        data.label =
+          typeof take?.take_label === 'string' && take.take_label.trim()
+            ? take.take_label
+            : 'Video'
+        data.createdAt =
+          typeof take?.created_at === 'string' ? take.created_at : data.createdAt
+        const node: DirectorNode = {
+          id: newDirectorId('dn'),
+          type: 'video',
+          position,
+          data,
+        }
+        set((s) => ({
+          nodes: [...s.nodes, node],
+          selectedNodeId: node.id,
+          selectedEdgeId: null,
+          historyPast: [],
+          historyFuture: [],
+          lastSavedAt: Date.now(),
+        }))
+        return node.id
       },
 
       // ─── prompt node (Higgsfield식 분리 프롬프트) ───────────────────────
@@ -2485,6 +2704,23 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         if (isDemoSession()) return
         const prev = get().nodes.find((n) => n.id === id)
         if (!prev) return
+        if (isVideoData(prev.data)) {
+          if (
+            'parentShotNodeId' in patch ||
+            'standaloneVideoKey' in patch
+          ) {
+            return
+          }
+          if (
+            prev.data.parentShotNodeId === null &&
+            'override' in patch &&
+            normalizeStandaloneVideoConfig(
+              (patch as Partial<VideoNodeData>).override,
+            ) === null
+          ) {
+            return
+          }
+        }
         // 노드 데이터 수정은 undo 대상에서 제외 — generateStoryboardImage 등 생성 결과도
         // 이 경로로 들어와 history를 오염시키기 때문. undo는 드래그/추가/삭제/연결/정렬만.
 
@@ -2941,11 +3177,21 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       rebuildAssetNodes: () => {
         const assetStore = useAssetStorageStore.getState()
         set((s) => {
-          // 1) 기존 파생물(asset 노드 + references 엣지) 제거 — 멱등 재생성
+          // 1) upstream 연결은 다시 계산하되 Director에서 편집한 이미지 설정/결과는 보존한다.
+          const existingAssets = new Map<string, DirectorNode>()
+          for (const node of s.nodes) {
+            if (!isAssetData(node.data)) continue
+            const key = `${node.data.assetKind}:${node.data.assetId}`
+            const current = existingAssets.get(key)
+            const hasDirectorResult =
+              node.data.imageUrl !==
+              (node.data.sourceImageUrl ?? node.data.imageUrl)
+            if (!current || hasDirectorResult) existingAssets.set(key, node)
+          }
           const nodes = s.nodes.filter((n) => !isAssetData(n.data))
           const edges = s.edges.filter((e) => e.data?.category !== 'references')
 
-          // 토글 ON: 이 프로젝트에 등록된 전체 에셋(미사용 후보). 씬별로 안 쓰는 것도 표시한다.
+          // 토글 ON: 이 프로젝트에 등록된 전체 에셋(미사용 후보)도 표시한다.
           //   asset-storage는 localStorage 영속이라 타 프로젝트 잔재 혼입 방지 위해 projectId 필터.
           const allCharIds = s.showUnusedAssets
             ? Object.keys(assetStore.characters).filter(
@@ -2958,96 +3204,120 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               )
             : []
 
-          const sceneNodes = nodes.filter((n) => isSceneData(n.data))
-          for (const scene of sceneNodes) {
-            const childShots = nodes.filter(
-              (n) =>
-                isShotData(n.data) && n.data.parentSceneNodeId === scene.id,
-            )
-            if (childShots.length === 0) continue
-
-            // 2) 이 씬 shot들이 참조하는 character/world 에셋 수집 (등록된 것만, 순서 보존 dedup)
-            const charIds: string[] = []
-            const worldIds: string[] = []
-            for (const sn of childShots) {
-              const sd = sn.data as ShotNodeData
-              for (const cid of sd.characterAssetIds)
-                if (!charIds.includes(cid) && assetStore.getCharacter(cid))
-                  charIds.push(cid)
-              for (const wid of sd.worldAssetIds)
-                if (!worldIds.includes(wid) && assetStore.getWorld(wid))
-                  worldIds.push(wid)
-            }
-            // 2.5) 토글 ON: 이 씬이 안 쓰는 등록 에셋 = per-scene 미사용. 엣지 없이 표시만.
-            const unusedCharIds = allCharIds.filter((id) => !charIds.includes(id))
-            const unusedWorldIds = allWorldIds.filter(
-              (id) => !worldIds.includes(id),
-            )
-
-            if (
-              charIds.length === 0 &&
-              worldIds.length === 0 &&
-              unusedCharIds.length === 0 &&
-              unusedWorldIds.length === 0
-            )
-              continue
-
-            // 3) asset 노드 생성 — Scene 좌측 컬럼, character(위)→world(아래), 사용→미사용 순.
-            const baseX = scene.position.x - ASSET_OFFSET_X
-            let y = scene.position.y
-            const assetNodeIdByAssetId = new Map<string, string>()
-            const make = (
-              assetId: string,
-              kind: 'character' | 'world',
-              unused: boolean,
-            ) => {
-              const reg =
-                kind === 'character'
-                  ? assetStore.getCharacter(assetId)
-                  : assetStore.getWorld(assetId)
-              const id = `dn_asset_${scene.id}_${kind}_${assetId}`
-              nodes.push({
-                id,
-                type: 'asset',
-                position: { x: baseX, y },
-                draggable: false,
-                selectable: false,
-                data: {
-                  kind: 'asset',
-                  assetKind: kind,
-                  assetId,
-                  label: reg?.name ?? assetId,
-                  imageUrl: pickAssetImageUrl(reg),
-                  locked: true,
-                  ...(unused ? { unused: true } : {}),
-                },
-              })
-              // 미사용 노드는 ref 엣지를 안 만드므로 매핑에서 제외(사용분만 등록).
-              if (!unused) assetNodeIdByAssetId.set(assetId, id)
-              y += ASSET_OFFSET_Y
-            }
-            for (const cid of charIds) make(cid, 'character', false)
-            for (const cid of unusedCharIds) make(cid, 'character', true)
-            for (const wid of worldIds) make(wid, 'world', false)
-            for (const wid of unusedWorldIds) make(wid, 'world', true)
-
-            // 4) shot → 참조 asset references 엣지 (asset 우측 포트 → shot 좌측 포트)
-            //    asset이 Scene 좌측에 있으므로 shot 위치는 건드리지 않는다(기존 흐름 보존).
-            for (const sn of childShots) {
-              const sd = sn.data as ShotNodeData
-              for (const aid of [...sd.characterAssetIds, ...sd.worldAssetIds]) {
-                const assetNodeId = assetNodeIdByAssetId.get(aid)
-                if (!assetNodeId) continue
-                edges.push({
-                  id: `de_ref_${assetNodeId}_${sn.id}`,
-                  source: assetNodeId,
-                  target: sn.id,
-                  sourceHandle: 'right',
-                  targetHandle: 'left',
-                  type: 'references',
-                  data: { category: 'references', relationText: '' },
-                })
+          // 2) 프로젝트 전체 Shot에서 쓰는 에셋을 dedup한다. 한 에셋은 Image 한 장만 가진다.
+          const shots = nodes.filter(
+            (node): node is DirectorNode =>
+              isShotData(node.data),
+          )
+          const charIds: string[] = []
+          const worldIds: string[] = []
+          for (const shot of shots) {
+            if (!isShotData(shot.data)) continue
+            for (const id of shot.data.characterAssetIds) {
+              if (!charIds.includes(id) && assetStore.getCharacter(id)) {
+                charIds.push(id)
               }
+            }
+            for (const id of shot.data.worldAssetIds) {
+              if (!worldIds.includes(id) && assetStore.getWorld(id)) {
+                worldIds.push(id)
+              }
+            }
+          }
+          const unusedCharIds = allCharIds.filter((id) => !charIds.includes(id))
+          const unusedWorldIds = allWorldIds.filter(
+            (id) => !worldIds.includes(id),
+          )
+
+          const anchors = [...shots, ...nodes.filter((node) => isSceneData(node.data))]
+          const baseX =
+            (anchors.length > 0
+              ? Math.min(...anchors.map((node) => node.position.x))
+              : 400) - ASSET_OFFSET_X
+          let y =
+            anchors.length > 0
+              ? Math.min(...anchors.map((node) => node.position.y))
+              : 80
+          const assetNodeIdByKey = new Map<string, string>()
+          const make = (
+            assetId: string,
+            kind: 'character' | 'world',
+            unused: boolean,
+          ) => {
+            const key = `${kind}:${assetId}`
+            const reg =
+              kind === 'character'
+                ? assetStore.getCharacter(assetId)
+                : assetStore.getWorld(assetId)
+            const existing = existingAssets.get(key)
+            const previousData =
+              existing && isAssetData(existing.data) ? existing.data : null
+            const sourceImageUrl = pickAssetImageUrl(reg)
+            const previousSource =
+              previousData?.sourceImageUrl ?? previousData?.imageUrl ?? null
+            const imageUrl =
+              previousData && previousData.imageUrl !== previousSource
+                ? previousData.imageUrl
+                : sourceImageUrl
+            const id = `dn_asset_${kind}_${assetId}`
+            nodes.push({
+              id,
+              type: 'asset',
+              position: existing?.position ?? { x: baseX, y },
+              draggable: false,
+              selectable: true,
+              data: {
+                kind: 'asset',
+                assetKind: kind,
+                assetId,
+                label: previousData?.label ?? reg?.name ?? assetId,
+                sourceImageUrl,
+                imageUrl,
+                prompt:
+                  previousData?.prompt ??
+                  reg?.prompt ??
+                  reg?.description ??
+                  '',
+                referenceImages: previousData?.referenceImages ?? [],
+                imageModel: previousData?.imageModel,
+                generationStatus:
+                  previousData?.generationStatus === 'generating'
+                    ? 'pending'
+                    : previousData?.generationStatus ?? 'pending',
+                generationError: previousData?.generationError ?? null,
+                locked: false,
+                ...(unused ? { unused: true } : {}),
+              },
+            })
+            if (!unused) assetNodeIdByKey.set(key, id)
+            y += ASSET_OFFSET_Y
+          }
+          for (const id of charIds) make(id, 'character', false)
+          for (const id of unusedCharIds) make(id, 'character', true)
+          for (const id of worldIds) make(id, 'world', false)
+          for (const id of unusedWorldIds) make(id, 'world', true)
+
+          // 3) 공통 Image 출력에서 참조하는 모든 Shot으로 edge를 잇는다.
+          for (const shot of shots) {
+            if (!isShotData(shot.data)) continue
+            const refs = [
+              ...shot.data.characterAssetIds.map(
+                (id) => `character:${id}`,
+              ),
+              ...shot.data.worldAssetIds.map((id) => `world:${id}`),
+            ]
+            for (const key of refs) {
+              const assetNodeId = assetNodeIdByKey.get(key)
+              if (!assetNodeId) continue
+              edges.push({
+                id: `de_ref_${assetNodeId}_${shot.id}`,
+                source: assetNodeId,
+                target: shot.id,
+                sourceHandle: 'right',
+                targetHandle: 'left',
+                type: 'references',
+                data: { category: 'references', relationText: '' },
+              })
             }
           }
 
@@ -3230,7 +3500,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         if (!clipId || !projectId) {
           return Promise.reject(new Error('Video take is not persisted'))
         }
-        const queueKey = `${projectId}:${video.data.parentShotNodeId}`
+        const ownerKey = videoOwnerKey(video.data)
+        const queueKey = `${projectId}:${ownerKey}`
         const intent = (latestVideoFinalIntent.get(queueKey) ?? 0) + 1
         latestVideoFinalIntent.set(queueKey, intent)
         const previousFinalFlags = new Map(
@@ -3238,14 +3509,14 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             .filter(
               (node): node is DirectorNode =>
                 isVideoData(node.data) &&
-                node.data.parentShotNodeId === video.data.parentShotNodeId,
+                videoOwnerKey(node.data) === ownerKey,
             )
             .map((node) => [node.id, node.data.final]),
         )
 
         set((s) => ({
           nodes: s.nodes.map((node) => {
-            if (!isVideoData(node.data) || node.data.parentShotNodeId !== video.data.parentShotNodeId) {
+            if (!isVideoData(node.data) || videoOwnerKey(node.data) !== ownerKey) {
               return node
             }
             return {
@@ -3423,6 +3694,97 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             },
             () => get().hydrateFromDb(get().projectId),
           )
+        }
+      },
+
+      generateAssetImage: async (assetNodeId) => {
+        if (isDemoSession()) return false
+        const node = get().nodes.find((candidate) => candidate.id === assetNodeId)
+        if (!node || !isAssetData(node.data)) return false
+        if (node.data.generationStatus === 'generating') return false
+        const prompt = node.data.prompt.trim() || node.data.label.trim()
+        if (!prompt) {
+          get().updateNodeData<'asset'>(assetNodeId, {
+            generationStatus: 'failed',
+            generationError: 'Image prompt is required',
+          })
+          return false
+        }
+        const referenceImageUrls = [
+          ...new Set(
+            [
+              node.data.sourceImageUrl,
+              ...node.data.referenceImages.map((image) => image.url),
+            ].filter((url): url is string => !!url),
+          ),
+        ]
+        get().updateNodeData<'asset'>(assetNodeId, {
+          generationStatus: 'generating',
+          generationError: null,
+        })
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 90_000)
+        let blobUrl: string | null = null
+        try {
+          const response = await fetch('/api/generate/image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt,
+              aspectRatio:
+                node.data.assetKind === 'character' ? '1:1' : '16:9',
+              referenceImageUrls,
+              ...(node.data.imageModel
+                ? { imageModel: node.data.imageModel }
+                : {}),
+            }),
+            signal: controller.signal,
+          })
+          if (!response.ok) {
+            const body = (await response.json().catch(() => ({}))) as {
+              error?: string
+            }
+            throw new Error(body.error ?? `HTTP ${response.status}`)
+          }
+          blobUrl = URL.createObjectURL(await response.blob())
+          const persistedUrl = await persistDirectorAssetImage(
+            get().projectId,
+            node.data.assetKind,
+            node.data.assetId,
+            blobUrl,
+          )
+          if (!persistedUrl) {
+            URL.revokeObjectURL(blobUrl)
+            get().updateNodeData<'asset'>(assetNodeId, {
+              generationStatus: 'failed',
+              generationError: translate(
+                useLocaleStore.getState().locale,
+                'The image was generated but could not be saved.',
+              ),
+            })
+            return false
+          }
+          URL.revokeObjectURL(blobUrl)
+          get().updateNodeData<'asset'>(assetNodeId, {
+            imageUrl: persistedUrl,
+            generationStatus: 'completed',
+            generationError: null,
+          })
+          return true
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.name === 'AbortError'
+                ? translate(useLocaleStore.getState().locale, 'Timed out (90s)')
+                : error.message
+              : 'Unknown error'
+          get().updateNodeData<'asset'>(assetNodeId, {
+            generationStatus: 'failed',
+            generationError: message,
+          })
+          return false
+        } finally {
+          clearTimeout(timer)
         }
       },
 
@@ -3733,14 +4095,96 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       // generateVideoForShot 과 같은 이유로 창을 두지 않는다 — 아래 lock 이 전 구간을 덮는다.
       regenerateVideo: async (videoNodeId, heldLock, options) => {
         if (isDemoSession()) return true
-        const videoNode = get().nodes.find((n) => n.id === videoNodeId)
-        if (!videoNode || !isVideoData(videoNode.data)) return true
-        const shotNode = get().nodes.find((n) => n.id === videoNode.data.parentShotNodeId)
-        if (!shotNode || !isShotData(shotNode.data)) return true
-        const eff = getEffectiveShotConfig(get(), videoNodeId)
-        if (!eff) return true
+        const initialVideoNode = get().nodes.find((n) => n.id === videoNodeId)
+        if (!initialVideoNode || !isVideoData(initialVideoNode.data)) return true
+        let videoNode = initialVideoNode as DirectorNode & {
+          data: VideoNodeData
+        }
+        const shotNode =
+          videoNode.data.parentShotNodeId === null
+            ? null
+            : get().nodes.find(
+                (n) =>
+                  n.id === videoNode.data.parentShotNodeId &&
+                  isShotData(n.data),
+              ) ?? null
+        if (videoNode.data.parentShotNodeId !== null && !shotNode) return false
+        if (shotNode && !isShotData(shotNode.data)) return false
+        const eff = getEffectiveVideoConfig(get(), videoNodeId)
+        if (!eff) return false
+        const standaloneConfigIntent =
+          videoNode.data.parentShotNodeId === null
+            ? normalizeStandaloneVideoConfig(videoNode.data.override)
+            : null
+        if (
+          videoNode.data.parentShotNodeId === null &&
+          !eff.prompt.trim()
+        ) {
+          const message = 'Video prompt is required'
+          set((s) => ({
+            generationErrors: { ...s.generationErrors, [videoNodeId]: message },
+            nodes: s.nodes.map((node) =>
+              node.id === videoNodeId && isVideoData(node.data)
+                ? ({
+                    ...node,
+                    data: {
+                      ...node.data,
+                      lastAttemptError: message,
+                      errorMessage: message,
+                    },
+                  } as DirectorNode)
+                : node,
+            ),
+          }))
+          return false
+        }
+        if (
+          videoNode.data.parentShotNodeId === null &&
+          (!standaloneConfigIntent ||
+            !videoNode.data.videoClipId ||
+            !isStandaloneVideoOwnerKey(videoNode.data.standaloneVideoKey))
+        ) {
+          return false
+        }
+        const projectId = get().projectId
+        const lockIsHeld = !!heldLock && generationLocks.get(heldLock.key) === heldLock.token
+        const lock = lockIsHeld
+          ? null
+          : acquireGenerationLock(projectId, videoOwnerKey(videoNode.data))
+        if (!lockIsHeld && !lock) return true
+        if (
+          videoNode.data.parentShotNodeId === null &&
+          videoNode.data.videoClipId
+        ) {
+          const pendingSave = pendingVideoClipSaves.get(
+            videoNode.data.videoClipId,
+          )
+          if (pendingSave) {
+            clearTimeout(pendingSave)
+            pendingVideoClipSaves.delete(videoNode.data.videoClipId)
+          }
+          await inFlightVideoClipSaves.get(videoNode.data.videoClipId)
+          const current = get()
+          const refreshed = current.nodes.find(
+            (node) => node.id === videoNodeId,
+          )
+          if (
+            current.projectId !== projectId ||
+            !refreshed ||
+            !isVideoData(refreshed.data) ||
+            refreshed.data.videoClipId !== videoNode.data.videoClipId ||
+            refreshed.data.standaloneVideoKey !==
+              videoNode.data.standaloneVideoKey
+          ) {
+            releaseGenerationLock(lock)
+            return false
+          }
+          videoNode = refreshed as DirectorNode & { data: VideoNodeData }
+        }
         const chainInputId = videoNode.data.videoChainInputId
-        const chainFrameUrl = usableFrameImageUrl(videoNode.data.videoChainFrameUrl)
+        const chainFrameUrl = usableFrameImageUrl(
+          videoNode.data.videoChainFrameUrl,
+        )
         const chainSource = chainInputId
           ? get().nodes.find((node) => node.id === chainInputId)
           : null
@@ -3771,29 +4215,36 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             generationErrors: { ...s.generationErrors, [videoNodeId]: message },
             lastSavedAt: Date.now(),
           }))
+          releaseGenerationLock(lock)
           return false
         }
-        const projectId = get().projectId
-        const lockIsHeld = !!heldLock && generationLocks.get(heldLock.key) === heldLock.token
-        const lock = lockIsHeld ? null : acquireGenerationLock(projectId, shotNode.id)
-        if (!lockIsHeld && !lock) return true
         const idempotencyKey = crypto.randomUUID()
         const preserveSuccess = !!videoNode.data.videoUrl
         const frameInputs = normalizeFrameInputs(videoNode.data.frameInputs)
         const hasManualFrameInputs =
           !!frameInputs.start || !!frameInputs.end || frameInputs.refs.length > 0
-        const storyboard = shotNode.data.storyboardImage
+        const storyboard =
+          shotNode && isShotData(shotNode.data)
+            ? shotNode.data.storyboardImage
+            : null
         // V2 refs(#real-strip): 실사 3프레임이 있으면 [START, END] 2장 — 시작·끝 구도 고정.
         const sbFrames = storyboard?.status === 'completed' ? storyboard.frames : undefined
-        const automaticStart = resolveShotFrameImageUrl(shotNode.data, 'start')
+        const automaticStart =
+          shotNode && isShotData(shotNode.data)
+            ? resolveShotFrameImageUrl(shotNode.data, 'start')
+            : null
         const automaticEnd = sbFrames
-          ? resolveShotFrameImageUrl(shotNode.data, 'end')
+          ? shotNode && isShotData(shotNode.data)
+            ? resolveShotFrameImageUrl(shotNode.data, 'end')
+            : null
           : null
         const automaticReferenceImageUrl =
-          (storyboard?.status === 'completed'
-            ? usableFrameImageUrl(storyboard.url)
-            : null) ??
-          resolveShotFrameImageUrl(shotNode.data, 'ref')
+          shotNode && isShotData(shotNode.data)
+            ? (storyboard?.status === 'completed'
+                ? usableFrameImageUrl(storyboard.url)
+                : null) ??
+              resolveShotFrameImageUrl(shotNode.data, 'ref')
+            : null
         let referenceImageUrls: string[] | undefined
         let referenceImageRoles: Array<'start' | 'end' | 'ref'> | undefined
         if (chainFrameUrl || hasManualFrameInputs || sbFrames) {
@@ -3854,8 +4305,15 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         })
         const requestPayload = {
           projectId,
-          shotId: shotNode.id,
-          writerShotId: shotNode.data.writerShotId,
+          ...(shotNode && isShotData(shotNode.data)
+            ? {
+                shotId: shotNode.id,
+                writerShotId: shotNode.data.writerShotId,
+              }
+            : {
+                standaloneVideoKey: videoNode.data.standaloneVideoKey,
+                standaloneConfig: standaloneConfigIntent,
+              }),
           videoClipId: videoNode.data.videoClipId,
           takeNumber: videoNode.data.takeNumber,
           takeLabel: videoNode.data.label,
@@ -3868,7 +4326,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           generationMethod: referenceImageUrl ? 'I2V' : 'T2V',
           model: normalizeProvider(eff.provider),
           provider: toRouteProvider(eff.provider),
-          durationSeconds: shotNode.data.durationSeconds ?? 5,
+          durationSeconds: eff.durationSeconds,
           referenceImageUrl,
           ...(referenceImageUrls ? { referenceImageUrls } : {}),
           ...(referenceImageUrls && referenceImageRoles ? { referenceImageRoles } : {}),
@@ -4093,7 +4551,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       // ─── undo/redo ─────────────────────────────────────────────────────
-      // 스냅샷은 파생물(asset/previz 체인) 제외 — 복원 후 rebuild* 가 재생성.
+      // 스냅샷은 legacy previz 체인만 제외 — editable asset Image는 보존한다.
       commitHistory: () => {
         if (get()._historySuppressed) return
         const s = get()
@@ -4262,8 +4720,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       openDeleteConfirm: (id) => {
         const node = get().nodes.find((n) => n.id === id)
         if (!node) return
-        // 파생 노드(asset/previz 체인)는 삭제 대상이 아니다 — 진실이 따로 있고 rebuild 가 재생성.
-        if (isDerivedNodeData(node.data)) return
+        // upstream asset Image와 legacy 파생 카드는 삭제 대상이 아니다.
+        if (isAssetData(node.data) || isDerivedNodeData(node.data)) return
         const info: DeleteCascadeInfo = {
           nodeId: id,
           shotCount: 0,
@@ -4424,7 +4882,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   })
                   result.applied += 1
                 } else if (isVideoData(node.data)) {
-                  const eff = getEffectiveShotConfig(get(), id)
+                  const eff = getEffectiveVideoConfig(get(), id)
                   if (eff) {
                     api.applyVideoOverride(id, {
                       camera: { ...eff.camera, ...u.camera },
@@ -4450,7 +4908,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   })
                   result.applied += 1
                 } else if (isVideoData(node.data)) {
-                  const eff = getEffectiveShotConfig(get(), id)
+                  const eff = getEffectiveVideoConfig(get(), id)
                   if (eff) {
                     api.applyVideoOverride(id, {
                       lighting: { ...eff.lighting, ...u.lighting },
@@ -4479,7 +4937,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   })
                   result.applied += 1
                 } else if (isVideoData(node.data)) {
-                  const eff = getEffectiveShotConfig(get(), id)
+                  const eff = getEffectiveVideoConfig(get(), id)
                   if (eff) {
                     api.applyVideoOverride(id, {
                       cameraPreset: { ...eff.cameraPreset, ...u.preset },
@@ -4806,7 +5264,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       name: 'tale-director-v1-default',
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
-        // 파생물(asset/previz 체인 노드, references/chain 엣지)은 persist 제외.
+        // legacy previz 체인 노드와 재구성 가능한 references/chain 엣지만 persist 제외.
         // frame 엣지는 양 끝이 persisted 노드일 때만 아래 필터를 통과한다.
         // 매 진입 시 sync가 rebuild* 로 재생성하므로 파생물 캐시에 남기면 stale 위험.
         nodes: s.nodes.filter(
@@ -5012,6 +5470,23 @@ export function serializeDirectorCanvasContext(
         lines.push(`  - [${sh.id}] Shot "${sh.data.label}"${imageSuffix}`)
       })
     }
+    const standaloneVideos = videos.filter(
+      (node) =>
+        isVideoData(node.data) && node.data.parentShotNodeId === null,
+    )
+    if (standaloneVideos.length > 0) {
+      lines.push('- (standalone Videos)')
+      standaloneVideos.forEach((video) => {
+        if (!isVideoData(video.data) || video.data.parentShotNodeId !== null) return
+        const config = normalizeStandaloneVideoConfig(video.data.override)
+        const prompt = config?.prompt ?? ''
+        const promptSnippet =
+          prompt.length > 60 ? `${prompt.slice(0, 60)}…` : prompt
+        lines.push(
+          `  - [${video.id}] Video "${video.data.label}" (${video.data.status}, ${config?.provider ?? 'invalid config'}, ${config?.durationSeconds ?? '?'}s): ${promptSnippet || '(empty prompt)'}`,
+        )
+      })
+    }
     lines.push('')
   }
 
@@ -5046,7 +5521,11 @@ export function serializeDirectorCanvasContext(
           `- image-reference inputs: ${normalizeImageInputs(sel.data.imageInputs).join(', ') || '(none)'}`,
         )
       } else if (isVideoData(sel.data)) {
-        lines.push(`- parent Shot: ${sel.data.parentShotNodeId}`)
+        lines.push(
+          sel.data.parentShotNodeId === null
+            ? `- standalone owner: ${sel.data.standaloneVideoKey}`
+            : `- parent Shot: ${sel.data.parentShotNodeId}`,
+        )
         lines.push(`- override: ${JSON.stringify(sel.data.override)}`)
         lines.push(`- status: ${sel.data.status}`)
         lines.push(`- final: ${sel.data.final}`)

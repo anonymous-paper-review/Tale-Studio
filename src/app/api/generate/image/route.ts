@@ -3,6 +3,11 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { falImageGenerate } from '@/lib/writer/llm/fal'
+import {
+  isImageModelKey,
+  resolveImageEndpoint,
+  type ImageModelKey,
+} from '@/lib/image-models'
 
 function getApiKey(): string {
   const keys = process.env.GOOGLE_API_KEYS ?? ''
@@ -106,8 +111,13 @@ async function generateViaFal(
   prompt: string,
   aspectRatio: string,
   referenceImageUrls?: string[],
+  imageModel?: ImageModelKey,
 ): Promise<Response> {
+  const resolvedModel = imageModel
+    ? resolveImageEndpoint(imageModel, !!referenceImageUrls?.length).endpoint
+    : undefined
   const { url } = await falImageGenerate({
+    ...(resolvedModel ? { model: resolvedModel } : {}),
     prompt,
     aspect_ratio: aspectRatio,
     reference_image_urls: referenceImageUrls?.length
@@ -145,11 +155,18 @@ export async function POST(req: Request) {
       aspectRatio = '1:1',
       provider,
       referenceImageUrls,
+      imageModel,
     } = await req.json()
 
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json(
         { error: 'prompt is required' },
+        { status: 400 },
+      )
+    }
+    if (imageModel !== undefined && !isImageModelKey(imageModel)) {
+      return NextResponse.json(
+        { error: 'imageModel is invalid' },
         { status: 400 },
       )
     }
@@ -167,7 +184,12 @@ export async function POST(req: Request) {
     if (providerUsed === 'gemini') {
       return await generateViaGemini(prompt, aspectRatio)
     }
-    return await generateViaFal(prompt, aspectRatio, referenceImageUrls)
+    return await generateViaFal(
+      prompt,
+      aspectRatio,
+      referenceImageUrls,
+      imageModel,
+    )
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[generate/image]', {

@@ -29,7 +29,12 @@ import {
   markDirectorVideoAttemptFailed,
   reserveDirectorVideoRegeneration,
   reserveDirectorVideoTake,
+  updateDirectorVideoTakeMetadata,
 } from '@/lib/director-video-takes'
+import {
+  isStandaloneVideoOwnerKey,
+  normalizeStandaloneVideoConfig,
+} from '@/lib/director/standalone-video'
 import {
   DirectorVideoCompletionPersistenceError,
   finalizeShotVideoJob,
@@ -37,6 +42,7 @@ import {
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import type { Json } from '@/types/database'
 import type { CameraConfig, CameraPreset } from '@/types'
+import type { StandaloneVideoConfig } from '@/types/director'
 
 fal.config({ credentials: () => process.env.FAL_KEY ?? '' })
 
@@ -409,11 +415,31 @@ export async function POST(req: Request) {
       referenceImageRoles?: Array<'start' | 'end' | 'ref'>; movementPreset?: string | null
       cameraPreset?: CameraPreset | null
       idempotencyKey?: string; videoClipId?: string; takeLabel?: string | null; override?: Json; canvasPosition?: Json | null
-      recoveryReceipt?: string; actor?: string
+      recoveryReceipt?: string; actor?: string; standaloneVideoKey?: string
+      standaloneConfig?: unknown
     }
-    const { prompt, camera, durationSeconds, aspectRatio, generationMethod = 'T2V', provider, model,
-      referenceImageUrl, movementPreset, cameraPreset, idempotencyKey, videoClipId, takeLabel, override, canvasPosition,
-      recoveryReceipt } = body
+    let {
+      prompt,
+      camera,
+      durationSeconds,
+      provider,
+      model,
+      cameraPreset,
+    } = body
+    const {
+      aspectRatio,
+      generationMethod = 'T2V',
+      referenceImageUrl,
+      movementPreset,
+      idempotencyKey,
+      videoClipId,
+      takeLabel,
+      override,
+      canvasPosition,
+      recoveryReceipt,
+    } = body
+    const standaloneVideoKey = body.standaloneVideoKey
+    const standalone = standaloneVideoKey !== undefined
     // traceId(채팅 턴↔잡 연결)는 U16 티켓으로 분리 — trace 영속화 없이는 소속 검증이 불가능해
     //   미구현 헬퍼 참조가 main 빌드를 깨고 있었다(2026-08-27 주간). actor 배선은 살아 있어 보존.
     const jobActor = body.actor === 'chat' ? 'chat' : 'ui'
@@ -436,9 +462,15 @@ export async function POST(req: Request) {
       referenceImageRolesV2?.length === referenceImageUrlsV2.length
         ? referenceImageRolesV2
         : undefined
-    const writerShotId = body.writerShotId ?? body.shotId
+    let writerShotId = body.writerShotId ?? body.shotId
     projectId = body.projectId ?? ''
-    if (!projectId || !writerShotId || !prompt || !idempotencyKey) {
+    if (
+      !projectId
+      || !idempotencyKey
+      || (standalone
+        ? !videoClipId || !isStandaloneVideoOwnerKey(standaloneVideoKey)
+        : !writerShotId || !prompt)
+    ) {
       return NextResponse.json({ error: 'projectId, shotId, prompt, and idempotencyKey are required' }, { status: 400 })
     }
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey)) {
@@ -450,13 +482,51 @@ export async function POST(req: Request) {
     const [{ data: project, error: projectError }, { data: shot, error: shotError }] = await Promise.all([
       supabaseAdmin.from('projects').select('workspace_id, style_anchor_key').eq('id', projectId).maybeSingle(),
       // #motion-contract: dynamic_spec(모션 계약 소스) + design_ref(구버전 state 폴백 조인 키) 동봉.
-      supabaseAdmin.from('shots').select('shot_id, dynamic_spec, design_ref, dialogue_lines, character_appearance_keys').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
+      standalone
+        ? Promise.resolve({ data: null, error: null })
+        : supabaseAdmin.from('shots').select('shot_id, dynamic_spec, design_ref, dialogue_lines, character_appearance_keys').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
     ])
     if (projectError) throw projectError
     if (shotError) throw shotError
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
-    if (!shot) return NextResponse.json({ error: 'writerShotId does not belong to project' }, { status: 400 })
-    const characterAppearanceKeys = requireCharacterAppearanceKeys(shot.character_appearance_keys, writerShotId)
+    if (!standalone && !shot) return NextResponse.json({ error: 'writerShotId does not belong to project' }, { status: 400 })
+    let standaloneConfig: StandaloneVideoConfig | null = null
+    if (standalone) {
+      const { data: clip, error } = await supabaseAdmin
+        .from('video_clips')
+        .select('id, shot_id')
+        .eq('id', videoClipId)
+        .eq('project_id', projectId)
+        .is('deleted_at', null)
+        .maybeSingle()
+      if (error) throw error
+      if (!clip || clip.shot_id !== standaloneVideoKey) {
+        return NextResponse.json({ error: 'videoClipId does not belong to standaloneVideoKey' }, { status: 400 })
+      }
+      standaloneConfig = normalizeStandaloneVideoConfig(body.standaloneConfig)
+      if (!standaloneConfig) {
+        return NextResponse.json({ error: 'Standalone video configuration is invalid' }, { status: 400 })
+      }
+      if (!standaloneConfig.prompt) {
+        return NextResponse.json(
+          { error: 'Standalone video prompt is required' },
+          { status: 400 },
+        )
+      }
+      writerShotId = standaloneVideoKey!
+      prompt = standaloneConfig.prompt
+      camera = standaloneConfig.camera
+      durationSeconds = standaloneConfig.durationSeconds
+      provider = standaloneConfig.provider === 'local' ? 'local' : 'fal'
+      model = standaloneConfig.provider
+      cameraPreset = standaloneConfig.cameraPreset
+    }
+    if (!writerShotId || prompt === undefined) {
+      return NextResponse.json({ error: 'Video generation input is incomplete' }, { status: 400 })
+    }
+    const characterAppearanceKeys = standalone
+      ? {}
+      : requireCharacterAppearanceKeys(shot!.character_appearance_keys, writerShotId)
     const replayQuery = supabaseAdmin
       .from('generation_jobs')
       .select('id, video_clip_id, target')
@@ -467,7 +537,7 @@ export async function POST(req: Request) {
       ? await replayQuery.eq('video_clip_id', videoClipId).maybeSingle()
       : await replayQuery.contains('target', { retakeMode: 'new_take' }).maybeSingle()
     if (replayError) throw replayError
-    if (videoClipId) {
+    if (videoClipId && !standalone) {
       const { data: clip, error } = await supabaseAdmin.from('video_clips').select('id, shot_id').eq('id', videoClipId).eq('project_id', projectId).is('deleted_at', null).maybeSingle()
       if (error) throw error
       if (!clip || clip.shot_id !== writerShotId) return NextResponse.json({ error: 'videoClipId does not belong to writerShotId' }, { status: 400 })
@@ -507,12 +577,12 @@ export async function POST(req: Request) {
     //   구버전 프로젝트는 writer_runs.state.shotDesign 을 design_ref 로 조인(러프보드와 동일 패턴).
     //   둘 다 없으면 null → 계약 없는 레거시 프롬프트(기존 동작 그대로).
     //   replay/recovery(exactReplay)는 스냅샷 프롬프트를 재사용하므로 state 폴백을 건너뛴다.
-    let dynamicSpec = (shot.dynamic_spec as ShotDynamicSpec | null) ?? null
-    if (!dynamicSpec && !exactReplay) {
+    let dynamicSpec = standalone ? null : (shot!.dynamic_spec as ShotDynamicSpec | null) ?? null
+    if (!standalone && !dynamicSpec && !exactReplay) {
       try {
         // #split-spec: ref 체계 프로젝트에서 ref 없는 샷(분할 자식)은 main-id 폴백 금지 —
         //   옆 샷 설계의 모션 계약이 잘못 붙는다. 그런 샷은 계약 없는 레거시 프롬프트로.
-        const designRef = (shot.design_ref as string | null) ?? null
+        const designRef = (shot!.design_ref as string | null) ?? null
         const { count } = await supabaseAdmin
           .from('shots')
           .select('shot_id', { count: 'exact', head: true })
@@ -555,7 +625,7 @@ export async function POST(req: Request) {
     //   캐릭터를 이름 없이 외형으로만 묘사하므로 이름만으로는 화면 속 누구인지 알 수 없다.
     //   대사에 characterId 가 실제로 있을 때만 조회(무대사 샷 비용 0·테스트 목 순서 불변),
     //   실패는 fail-open — 화자 표기는 정확도 보조지 유료 생성의 성립 조건이 아니다.
-    const dialogueLines = Array.isArray(shot.dialogue_lines) ? (shot.dialogue_lines as DialogueLine[]) : null
+    const dialogueLines = !standalone && Array.isArray(shot!.dialogue_lines) ? (shot!.dialogue_lines as DialogueLine[]) : null
     let dialogueSpeakers: Record<string, DialogueSpeaker> | null = null
     const speakerIds = [...new Set(
       (dialogueLines ?? [])
@@ -666,6 +736,11 @@ export async function POST(req: Request) {
       : reservedSubmission.input
     if (!snapshotValueMatches(storedSnapshot, inputSnapshot as unknown as Record<string, unknown>)) {
       return NextResponse.json({ error: 'idempotencyKey replay does not match the reserved video input' }, { status: 409 })
+    }
+    if (standaloneConfig && videoClipId) {
+      await updateDirectorVideoTakeMetadata(projectId, videoClipId, {
+        override: standaloneConfig as unknown as Json,
+      })
     }
     let result: VideoSubmission
     if (recoveryReceipt) {

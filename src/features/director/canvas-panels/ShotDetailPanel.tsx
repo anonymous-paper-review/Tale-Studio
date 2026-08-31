@@ -120,7 +120,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
       </Section>
 
       <Section title="Model">
-        {/* #image-model-select 2026-08-31: fal.ai 카탈로그 기준 실제 선택. */}
+        {/* #image-model-select 2026-08-31: 이미지 모델을 이름으로 선택한다. */}
         <Field label={t('Image generation model')}>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {IMAGE_MODEL_ORDER.map((key) => {
@@ -137,11 +137,9 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
                       ? 'border-primary bg-primary/10'
                       : 'border-border hover:bg-accent',
                   )}
+                  aria-pressed={active}
                 >
                   <span className="block font-medium">{spec.label}</span>
-                  <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                    {spec.t2iEndpoint}
-                  </span>
                 </button>
               )
             })}

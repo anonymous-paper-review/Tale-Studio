@@ -5,8 +5,7 @@
 // 노드 위: 편집 / 이미지 복사 / 이미지 다운로드 / 삭제.
 // 빈 캔버스(#menu-simplify 2026-08-31 오너): 이미지 / 영상 / 프롬프트 노드만 —
 //   Scene/Shot 생성 항목은 제거 (씬은 Writer 동기화 소관, 캔버스의 주인공은 생성 노드).
-//   영상 노드: 생성 설정(프롬프트·모델)의 진실이 아직 Shot 행에 있어 독립 이미지
-//   노드 + 빈 영상 테이크 세트로 만든다 (이미지→영상 체인이 Higgsfield 흐름과 동일).
+//   영상 노드는 자체 설정과 영속 clip을 소유하며 부모 이미지 없이 한 장만 만든다.
 
 import { useEffect, useRef } from 'react'
 import type { XYPosition } from '@xyflow/react'
@@ -54,6 +53,7 @@ function MenuButton({
   return (
     <button
       type="button"
+      role="menuitem"
       onClick={onClick}
       className={cn(
         'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs',
@@ -70,27 +70,65 @@ function MenuButton({
 export function CanvasContextMenu({ state, onClose }: Props) {
   const t = useT()
   const ref = useRef<HTMLDivElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
   const openDeleteConfirm = useDirectorCanvasStore((s) => s.openDeleteConfirm)
   const addShotNode = useDirectorCanvasStore((s) => s.addShotNode)
-  const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
+  const addStandaloneVideo = useDirectorCanvasStore((s) => s.addStandaloneVideo)
   const addPromptNode = useDirectorCanvasStore((s) => s.addPromptNode)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
 
   // 바깥 클릭·Esc 로 닫기 — mousedown 캡처라 메뉴 안 클릭은 stopPropagation 불필요
   useEffect(() => {
     if (!state) return
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    const focusFrame = requestAnimationFrame(() => {
+      ref.current
+        ?.querySelector<HTMLElement>('[role="menuitem"]')
+        ?.focus()
+    })
     const onPointerDown = (e: PointerEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose()
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return
+      const items = Array.from(
+        ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+      )
+      if (items.length === 0) return
+      e.preventDefault()
+      const current = items.indexOf(document.activeElement as HTMLElement)
+      const next =
+        e.key === 'Home'
+          ? 0
+          : e.key === 'End'
+            ? items.length - 1
+            : e.key === 'ArrowDown'
+              ? (current + 1 + items.length) % items.length
+              : (current - 1 + items.length) % items.length
+      items[next]?.focus()
     }
     window.addEventListener('pointerdown', onPointerDown, true)
     window.addEventListener('keydown', onKey)
     return () => {
+      cancelAnimationFrame(focusFrame)
       window.removeEventListener('pointerdown', onPointerDown, true)
       window.removeEventListener('keydown', onKey)
+      const previous = previousFocusRef.current
+      requestAnimationFrame(() => {
+        if (previous?.isConnected && previous !== document.body) {
+          previous.focus()
+          return
+        }
+        document.querySelector<HTMLElement>('.react-flow')?.focus()
+      })
     }
   }, [state, onClose])
 
@@ -114,15 +152,13 @@ export function CanvasContextMenu({ state, onClose }: Props) {
             icon={<Film className="size-3.5 text-chart-5" />}
             label={t('Add video node')}
             onClick={() => {
-              // 독립 이미지 노드 + 빈 영상 테이크 세트 — 영상 생성 설정의 진실이 Shot에 있다.
-              const shotId = addShotNode(null, state.flowPosition)
-              if (!shotId) return onClose()
-              const videoId = addVideoTake(shotId, {
-                x: state.flowPosition.x + 320,
-                y: state.flowPosition.y,
-              })
-              selectNode(videoId ?? shotId)
               onClose()
+              void addStandaloneVideo(state.flowPosition)
+                .then((videoId) => {
+                  if (videoId) selectNode(videoId)
+                  else toast.error(t('Failed to add video node.'))
+                })
+                .catch(() => toast.error(t('Failed to add video node.')))
             }}
           />
           <MenuButton

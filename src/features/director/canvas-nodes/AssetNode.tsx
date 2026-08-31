@@ -1,83 +1,70 @@
 'use client'
 
-// Asset 노드 — Artist에서 생성된 캐릭터/월드 에셋의 read-only 시각화.
-//
-// BaseNode를 쓰지 않는다: BaseNode 헤더는 항상 Edit/Branch/Delete 액션을 노출하는데
-// asset은 locked(편집 불가)이므로 자물쇠만 표시하는 경량 노드로 별도 구성.
-// 색: character = chart-1(Actor), world = chart-2(World) (design.md §2.2 엔티티 매핑).
-// DB 미영속 파생 노드 — node.draggable=false로 위치 고정(sync가 매번 배치).
+// Artist 원본을 reference로 쓰는 editable Image 템플릿.
+// Character/World 색과 별도 카드 구조를 없애고 일반 Image 노드와 같은 외형·편집 통로를 쓴다.
 
 import { memo } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { ImageIcon, Lock } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { type NodeProps } from '@xyflow/react'
+import { ImageIcon } from 'lucide-react'
 import { isAssetData, type DirectorNode } from '@/types/director'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
+import { BaseNode } from './BaseNode'
+import { GeneratingOverlay } from '@/components/generating-frame'
+import { IMAGE_MODELS, normalizeImageModelKey } from '@/lib/image-models'
 
-const KIND_STYLE = {
-  character: { border: 'border-chart-1/70', dot: 'bg-chart-1', label: 'Character' },
-  world: { border: 'border-chart-2/70', dot: 'bg-chart-2', label: 'World' },
-} as const
-
-function AssetNodeImpl({ data }: NodeProps<DirectorNode>) {
+function AssetNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const t = useT()
   if (!isAssetData(data)) return null
-  const style = KIND_STYLE[data.assetKind]
+  const role = data.assetKind === 'character' ? t('Character') : t('Background')
+  const model = IMAGE_MODELS[normalizeImageModelKey(data.imageModel)]
 
   return (
-    <div
-      className={cn(
-        'group relative w-[200px] overflow-hidden rounded-lg border bg-node-bg-default',
-        style.border,
-        data.unused && 'border-dashed opacity-60',
-      )}
+    <BaseNode
+      id={id}
+      theme="shot"
+      title={data.label}
+      selected={selected}
+      width={240}
+      canDelete={false}
+      beam={data.generationStatus === 'generating' ? 'success' : null}
     >
-      {/* 샷으로 향하는 출력 포트만 (우측). asset은 입력을 안 받음.
-          #handle-visibility: 항상 표시 — 에셋을 샷/프레임에 연결하는 드래그 시작점. */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="right"
-        title="Output"
-        className={cn(
-          '!h-3.5 !w-3.5 !rounded-full !border-2 !border-background transition-transform hover:!scale-125',
-          style.dot,
-        )}
-      />
-
-      <div className="flex h-7 items-center justify-between border-b border-border/60 px-3 text-xs">
-        <span className="flex items-center gap-1.5 font-medium uppercase tracking-wide text-muted-foreground">
-          <span className={cn('h-1.5 w-1.5 rounded-full', style.dot)} />
-          {style.label}
-          {data.unused && <span className="normal-case text-muted-foreground/70">· {t('Unused')}</span>}
+      <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+        <span className="rounded-sm border border-border px-1.5 py-0.5">
+          {role}
         </span>
-        <Lock className="size-3 text-muted-foreground" aria-label="locked" />
+        {data.unused && <span>· {t('Unused')}</span>}
       </div>
 
-      <div className="flex items-center gap-2 p-2">
-        <div className="size-12 shrink-0 overflow-hidden rounded bg-muted">
+      <div className="relative mt-2 flex aspect-video w-full items-center justify-center overflow-hidden rounded-sm border border-border/40 bg-muted">
           {data.imageUrl ? (
             <ThumbImage
               src={data.imageUrl}
               alt={data.label}
-              className="size-full object-cover"
+              className="h-full w-full object-cover"
               draggable={false}
             />
           ) : (
-            <div className="flex size-full items-center justify-center">
+          <div className="flex h-full w-full items-center justify-center">
               <ImageIcon className="size-4 text-muted-foreground" />
             </div>
           )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{data.label || '(unnamed)'}</div>
-          <div className="truncate font-mono text-[10px] text-muted-foreground">
-            {data.assetId}
-          </div>
-        </div>
+        <GeneratingOverlay
+          active={data.generationStatus === 'generating'}
+          label={t('Generating image')}
+        />
       </div>
-    </div>
+
+      <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+        <span className="truncate">{model.label}</span>
+        <span>{role}</span>
+      </div>
+      {data.generationError && (
+        <p className="mt-1 line-clamp-2 text-[10px] text-destructive">
+          {data.generationError}
+        </p>
+      )}
+    </BaseNode>
   )
 }
 

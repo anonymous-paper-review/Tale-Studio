@@ -8,7 +8,6 @@ import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame
 import { BaseNode } from './BaseNode'
 import { LabeledTargetHandle } from './LabeledHandle'
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import { useActiveGenerationJobs } from '@/lib/generation-queue'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
@@ -24,25 +23,22 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const generateVideoForShot = useDirectorCanvasStore(
     (s) => s.generateVideoForShot,
   )
-  // Any generating sibling locks retakes for this shot.
+  const regenerateVideo = useDirectorCanvasStore((s) => s.regenerateVideo)
   const parentShotId = isVideoData(data) ? data.parentShotNodeId : null
-  // 경과시간 durable 기준점(#elapsed-durable 2026-08-12) — 큐의 submitted_at. 부모 Shot 의
-  //   writerShotId 로 이 노드 몫의 영상 잡을 찾는다(탭 왕복에도 타이머 유지).
-  const parentWriterShotId = useDirectorCanvasStore((s) => {
-    if (!parentShotId) return null
-    const n = s.nodes.find((x) => x.id === parentShotId)
-    return n && isShotData(n.data) ? n.data.writerShotId : null
-  })
-  const videoProjectId = useDirectorCanvasStore((s) => s.projectId)
-  const activeVideoJobs = useActiveGenerationJobs(videoProjectId || null)
-  const parentGenerating = useDirectorCanvasStore((s) =>
-    !!parentShotId &&
-    s.nodes.some(
-      (node) =>
-        isVideoData(node.data) &&
-        node.data.parentShotNodeId === parentShotId &&
-        node.data.lastAttemptStatus === 'generating',
-    ),
+  const videoOwnerKey =
+    isVideoData(data)
+      ? data.parentShotNodeId ?? data.standaloneVideoKey
+      : null
+  const ownerGenerating = useDirectorCanvasStore(
+    (s) =>
+      !!videoOwnerKey &&
+      s.nodes.some(
+        (node) =>
+          isVideoData(node.data) &&
+          (node.data.parentShotNodeId ?? node.data.standaloneVideoKey) ===
+            videoOwnerKey &&
+          node.data.lastAttemptStatus === 'generating',
+      ),
   )
   // 카드 제목 = 연결된 부모 샷 번호(#e3 2026-07-15): take_v1 대신 'Shot 14'처럼 표기.
   //   selector는 라벨 문자열만 반환(참조 안정). 부모가 없으면 자체 라벨(take 패턴 변환) 폴백.
@@ -86,10 +82,14 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   if (!isVideoData(data)) return null
 
   const isPlaying = playingNodeId === id
-  const overrideKeys = Object.keys(data.override) as (keyof typeof data.override)[]
+  const overrideKeys =
+    data.parentShotNodeId === null
+      ? []
+      : (Object.keys(data.override) as (keyof typeof data.override)[])
 
   const isStrongStale = data.stale
-  const canMarkFinal = !!data.videoUrl && data.status === 'completed'
+  const canMarkFinal =
+    !!parentShotId && !!data.videoUrl && data.status === 'completed'
 
 
   const handleFinalToggle = async (e: React.MouseEvent) => {
@@ -142,7 +142,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           <Button
             size="sm"
             className="h-7 gap-1 px-2 text-xs"
-            disabled={parentGenerating || data.lastAttemptStatus === 'generating' || !parentShotId}
+            disabled={ownerGenerating || data.lastAttemptStatus === 'generating'}
             onClick={(e) => {
               e.stopPropagation()
               // #retake-inherit: 이 테이크의 체인·프레임 배선을 새 테이크가 물려받는다.
@@ -150,6 +150,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
                 void generateVideoForShot(parentShotId, {
                   inheritFromVideoNodeId: id,
                 })
+              else void regenerateVideo(id)
             }}
           >
             <RefreshCw className="size-3" />
@@ -166,7 +167,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       stale={data.stale}
       strongStale={isStrongStale}
       beam={data.lastAttemptStatus === 'generating' ? 'primary' : null}
-      headerExtra={
+      headerExtra={parentShotId ? (
         <Button
           variant="ghost"
           size="icon-xs"
@@ -183,7 +184,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             )}
           />
         </Button>
-      }
+      ) : undefined}
     >
       {/* Manual frame wiring inputs(#handle-visibility) — 항상 보이는 라벨 홈들.
           hover-only 8px 점은 "구멍이 안 보인다"는 오너 피드백의 원인이었다. */}

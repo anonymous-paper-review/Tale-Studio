@@ -149,11 +149,19 @@ export type VideoOverride = Partial<{
   provider: DirectorVideoProvider
 }>
 
-export type VideoNodeData = {
+/** 부모 Shot 없이 독립 생성한 Video가 직접 소유하는 완전한 생성 설정. */
+export type StandaloneVideoConfig = {
+  prompt: string
+  camera: CameraConfig
+  lighting: LightingConfig
+  cameraPreset: CameraPreset
+  provider: DirectorVideoProvider
+  durationSeconds: number
+}
+
+type VideoNodeCommonData = {
   kind: 'video'
   label: string
-  /** 마더 Shot Canvas 노드 ID (반드시 존재) */
-  parentShotNodeId: string
   /** 연결된 `video_clips.id` (uuid). null = 아직 서버에 영속 안 됨 */
   videoClipId: string | null
   /** DB가 부여한 logical take 순서 */
@@ -165,8 +173,6 @@ export type VideoNodeData = {
   lastAttemptAt: string | null
   /** Logical take creation time for deterministic projection ordering. */
   createdAt: string | null
-  /** 마더 대비 변경된 필드 (없으면 마더 값 그대로 사용) */
-  override: VideoOverride
   /**
    * Manual frame wiring source node IDs.
    * `start` and `end` accept at most one source each; `refs` accepts multiple source IDs.
@@ -191,6 +197,23 @@ export type VideoNodeData = {
   [key: string]: unknown
 }
 
+export type VideoNodeData =
+  | (VideoNodeCommonData & {
+      /** 설정과 take 그룹을 소유하는 마더 Shot Canvas 노드 ID. */
+      parentShotNodeId: string
+      standaloneVideoKey: null
+      /** 마더 Shot 대비 변경된 필드 (없으면 마더 값 그대로 사용). */
+      override: VideoOverride
+    })
+  | (VideoNodeCommonData & {
+      /** 독립 Video에는 마더 Shot이 없다. */
+      parentShotNodeId: null
+      /** `video_clips.shot_id`에 저장된 독립 Video owner key. */
+      standaloneVideoKey: string
+      /** 독립 Video가 직접 소유하는 완전한 생성 설정. */
+      override: StandaloneVideoConfig
+    })
+
 /** 영상 모션 준수 판정(video_clips.adherence 와 동형). */
 export interface VideoAdherence {
   status: 'ok' | 'over_motion' | 'under_motion' | 'direction_mismatch' | 'skipped'
@@ -201,13 +224,12 @@ export interface VideoAdherence {
   checkedAt?: string
 }
 
-// ─── Asset Node (파생 — Artist Asset Storage 시각화) ─────────────────────────
+// ─── Asset-backed Image Node ────────────────────────────────────────────────
 
 /**
- * Artist에서 생성된 캐릭터/월드 에셋을 Director 캔버스에 표시하는 read-only 노드.
- * DB에 영속하지 않는 파생 노드 — asset-storage(characters/locations)가 진실이고,
- * 매 진입 시 sync가 재생성한다(persist partialize에서 제외). Director에서 편집 불가(locked).
- * 같은 에셋이 여러 씬에 등장하면 씬별 인스턴스로 표시된다(scene 우측 컬럼).
+ * Artist 에셋을 입력으로 삼는 Director의 editable Image 템플릿.
+ * 원본은 asset-storage가 소유하고, Director에서는 prompt/model/reference와 파생 이미지만
+ * 로컬 캔버스 상태로 편집한다. 프로젝트 안에서 같은 에셋은 Image 한 장으로 dedup한다.
  */
 export type AssetNodeData = {
   kind: 'asset'
@@ -215,9 +237,16 @@ export type AssetNodeData = {
   assetKind: 'character' | 'world'
   /** asset-storage RegisteredCharacter/World.id (= DB character_id / location_id) */
   assetId: string
+  /** Artist가 소유하는 원본. Director 편집으로 덮어쓰지 않는다. */
+  sourceImageUrl: string | null
+  /** 현재 카드가 출력하는 이미지. 초기값은 원본이며 생성 후 Director 파생본으로 바뀐다. */
   imageUrl: string | null
-  /** 항상 true — Artist가 진실, Director는 표시만 */
-  locked: true
+  prompt: string
+  referenceImages: DirectorReferenceImage[]
+  imageModel?: string
+  generationStatus: DirectorVideoStatus
+  generationError: string | null
+  locked: false
   /** 어떤 shot도 참조하지 않는 미사용 에셋 (불러오기 토글로 좌상단에 표시) */
   unused?: boolean
   [key: string]: unknown
@@ -353,11 +382,7 @@ export function isVideoPlaceholderData(
   return d.kind === 'videoPlaceholder'
 }
 
-/** DB 미영속 파생 노드(재생성 대상) 판별 — persist/undo 스냅샷 제외용. */
+/** 재구성 때 제거하는 legacy 파생 노드 판별 — editable asset Image는 포함하지 않는다. */
 export function isDerivedNodeData(d: DirectorNodeData): boolean {
-  return (
-    d.kind === 'asset' ||
-    d.kind === 'shotImage' ||
-    d.kind === 'videoPlaceholder'
-  )
+  return d.kind === 'shotImage' || d.kind === 'videoPlaceholder'
 }
