@@ -68,6 +68,19 @@ FAL_KEYS=[{"id":"paid-1","key":"...","pool":"paid","maxInflight":34},
 - 키별 in-flight·일일 생성 수를 `fal_key_id` 집계로. 원가 대시보드(readiness 6장)의 집계 축.
 - fal 계정마다 지출 알림(billing alert) 설정 — phase-1 1-7의 완료 증거에 포함.
 
+## 할당 확정 (2026-09-01)
+
+새 키(새 계정 · $2000 충전)가 생기면서 풀 격리의 첫 실행이 가능해졌다:
+
+| 키 | 역할 | 등록 위치 |
+|---|---|---|
+| 새 키 ($2000) | **Production 전용** — 실서비스, 향후 paid 풀의 시작점 | Vercel Production `FAL_KEY` (교체 대기 — phase-1 1-7) |
+| 기존 키 | 개발·실험 — 향후 ops/free 풀의 시작점 | `.env.local` `FAL_KEY`(local) + Vercel Preview/Development `FAL_KEY` (✅ 2026-09-01 배선됨) |
+
+이렇게 하면 밤 루프·스모크·개발 실험이 새 계정의 잔액과 동시 슬롯을 전혀 안 먹는다.
+⚠ 교체 타이밍: fal 잡 status는 제출 키로만 조회되므로, Production 키 교체는 진행 중(queued) 잡이 없는 시점에 한다.
+⚠ 한도 재산정: `MAX_GLOBAL_INFLIGHT_JOBS = 34`는 옛 계정 실측 40 기준. 새 계정($2000)은 대시보드 표기 확인 → 필요 시 probe 실측(과금) → 상수 재산정.
+
 ## 단계별 도입 — 언제 뭘 하나
 
 | 단계 | 트리거 | 작업 |

@@ -19,7 +19,7 @@ MoR(해외 결제 대행) 방식으로 결제를 붙이기 위한 3단계 워크
 
 ## 진행 상태
 
-- [~] **1 — 환경 분리**: ✅ dev 브랜치 fast-forward · ✅ CI 워크플로(로컬 1702 passed 검증) · 🔴 오너: 개발 Supabase(`supabase login`) · Vercel env 스코프 · PITR · FAL 계정
+- [~] **1 — 환경 분리**: ✅ dev 브랜치 · ✅ CI(GitHub 런 초록) · ✅ tale-dev DB(live 스키마 복제·패리티 검증·시드) · ✅ Vercel env 재배치(Preview/Development→tale-dev) · 🔴 남음: PITR(오너) · 롤백 연습 · FAL 새 키 Production 교체(값 대기) · WEBHOOK_BASE_URL preview
 - [ ] **2 — 권한**: v4 과금 축 4개 + Account 게이트 · Take 원장 · 생성 전 소모량 표시
 - [ ] **3 — 결제**: 벤더 선정 · 샌드박스 전 구간 · 심사 · 라이브 전환
 - [ ] **기획 안건**: `specs/payments-planner-agenda.html` 다섯 안건 논의 (병렬 진행)

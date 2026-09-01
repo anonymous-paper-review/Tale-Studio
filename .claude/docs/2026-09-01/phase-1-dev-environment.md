@@ -20,12 +20,12 @@
 | # | 항목 | 상태 | 내용 |
 |---|---|---|---|
 | 1-1 | dev 브랜치 + Vercel 매핑 | 🟡 절반 | ✅ `origin/dev`를 main(`853d849`)으로 fast-forward (기존 dev는 main의 조상이라 유실 없음). 오너: Vercel에서 dev Preview 고정 도메인 확인 |
-| 1-2 | 개발 Supabase 프로젝트 | 🔴 토큰 대기 | 오너: supabase.com/dashboard/account/tokens에서 개인 액세스 토큰(sbp_) 발급 → `.env.local`에 `SUPABASE_ACCESS_TOKEN=` 추가. 그 뒤는 에이전트가 CLI로 생성 → 마이그레이션 → `pnpm seed:test-accounts`까지 진행 (리전은 live와 동일하게) |
-| 1-3 | Vercel env 스코프 재정리 | 🔴 토큰 대기 | ⚠ 2026-09-01 실측: `~/.vercel/auth.json` 로그인과 `.env.local`의 `VERCEL_TOKEN` 둘 다 죽음(API 404). 오너: vercel.com/account/tokens에서 새 토큰 발급 → `VERCEL_TOKEN` 교체. 그 뒤는 에이전트가 env 전수 점검·스코프 재배치 진행 (프로젝트 링크는 살아있음 — `.vercel/project.json` = `tale`) |
+| 1-2 | 개발 Supabase 프로젝트 | ✅ 완료 | **tale-dev** (`pbiumddivadgbzxuymak` · 싱가포르 · PG 17.6). 관리 토큰은 브라우저로 발급(gjc-tale-dev-setup · 90일 · `.env.local`의 `SUPABASE_ACCESS_TOKEN`). 마이그레이션 파일은 대시보드 시대 기반 위 증분이라 from-scratch 재생 불가(실측: 2번째 파일에서 실패) → **live 스키마 전체를 pg_dump/psql로 복제** (supabase.md 규칙 "live schema 우선"과 정합). 패리티 검증: 테이블 27·정책 41·RLS 27·함수 19·knowledge 30행·이력 21행 — live와 동일. 테스트 계정 3개 시드(`.env.local`에 기록). 접속정보는 `.env.local`의 `SUPABASE_DEV_*` |
+| 1-3 | Vercel env 스코프 재정리 | ✅ 완료 | 토큰 브라우저 발급(tale 프로젝트 스코프 · ~11/30 · `VERCEL_TOKEN` 교체). 전수 감사 실측: **Preview 스코프에 Supabase 변수 0개**(dev Preview는 DB 없이 뜸) + development 스코프는 live를 바라봄. 조치: preview/development에 tale-dev 3종(NEXT_PUBLIC_SUPABASE_URL/ANON_KEY, SUPABASE_SERVICE_ROLE_KEY) + FAL_KEY(기존 키) 배선, production 무변경. 남음: `WEBHOOK_BASE_URL` preview 값(dev 도메인 확정 후) |
 | 1-4 | live 백업 | 🔴 오너 | PITR(특정 시점 복원) 활성화 + 복원 리허설 1회 — 유료 플랜 비용 승인 포함 |
 | 1-5 | CI | 🟡 절반 | ✅ `.github/workflows/ci.yml` 생성 (typecheck+test, main·dev push+PR). 로컬 검증: 1702 passed · 시크릿 불필요(vitest.setup.ts 스텁). ⚠ 이 워크플로는 신호등이지 방팭이 아님 — 아래 메모 |
 | 1-6 | 롤백 연습 | 🔴 오너 | Vercel instant rollback 1회 실행, 소요 시간 기록 |
-| 1-7 | FAL 계정 정리 (I1 흡수) | 🔴 오너 | 현재 fal 호출이 어느 계정/키로 나가는지 확인 → 계정·결제수단·등급 확정 → 지출 알림(billing alert) 설정. `2026-08-26/group-i-ops.md` 원장 닫기. 다중 키 정책은 [fal-key-pool.md](fal-key-pool.md) |
+| 1-7 | FAL 계정 정리 (I1 흡수) | 🟡 진행 | 새 키 발급 + $2000 충전 완료(2026-09-01 오너). **할당 확정: 새 키 = Production 전용 / 기존 키 = local·Preview·Development(개발·실험)** — 풀 격리 정책의 첫 실행([fal-key-pool.md](fal-key-pool.md)). 남은 순서: ① 새 키 값을 `.env.local`에 `FAL_KEY_PROD=`로 저장 → 에이전트가 Vercel Production 교체(진행 중 잡 없는 시점에 — fal 잡은 제출 키로만 조회 가능) ② 새 계정 대시보드에서 동시 한도 표기 확인($1000=40이었음) → `MAX_GLOBAL_INFLIGHT_JOBS`(34) 재산정 ③ 지출 알림 설정 |
 | 1-8 | fal 키 풀 단계 0 | ⚪ 대기 | `generation_jobs.fal_key_id` + 키 레지스트리 추상화 — 키 1개인 지금 넣으면 나중 마이그레이션이 공짜. 설계는 [fal-key-pool.md](fal-key-pool.md) |
 
 ## 메모
