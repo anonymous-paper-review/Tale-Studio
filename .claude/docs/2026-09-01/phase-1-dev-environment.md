@@ -26,12 +26,17 @@
 | 1-5 | CI | 🟡 절반 | ✅ `.github/workflows/ci.yml` 생성 (typecheck+test, main·dev push+PR). 로컬 검증: 1702 passed · 시크릿 불필요(vitest.setup.ts 스텁). ⚠ 이 워크플로는 신호등이지 방팭이 아님 — 아래 메모 |
 | 1-6 | 롤백 연습 | 🔴 오너 | Vercel instant rollback 1회 실행, 소요 시간 기록 |
 | 1-7 | FAL 계정 정리 (I1 흡수) | 🟡 거의 완료 | ✅ 새 키($2000) 발급 · ✅ Vercel Production `FAL_KEY` 교체(2026-09-01, 다음 배포부터 적용) · ✅ 할당 확정: **Production 40+40**(둘 다 production 풀, 개발 전용 계정 없음 — 밤 루프 폐지) — [fal-key-pool.md](fal-key-pool.md). 남음: 새 계정 대시보드 동시 한도 표기 확인 + 두 계정 지출 알림 설정(오너) |
-| 1-8 | fal 키 풀 단계 0 | ⚪ 대기 | `generation_jobs.fal_key_id` + 키 레지스트리 추상화 — 키 1개인 지금 넣으면 나중 마이그레이션이 공짜. 설계는 [fal-key-pool.md](fal-key-pool.md) |
+| 1-8 | fal 키 풀 단계 0+1 | ✅ 완료 | 다중 키 레지스트리 구현·배포(main `86ceadb`) — 합산 상한 68 가동 중. [fal-key-pool.md](fal-key-pool.md) 실측 절 참조 |
 
 ## 메모
 
 - 마이그레이션 규율은 이 시점부터: 대시보드 직접 스키마 수정 금지, 파일로만. 개발 DB 먼저 → live 순서.
 - 개발 DB 공유의 대가는 local·dev 테스트 데이터 섞임 — `seed:test-accounts` 규율로 충분.
+- ✅ **local 전환 완료 (2026-09-01 밤)**: `.env.local`의 앱 키(NEXT_PUBLIC_SUPABASE_* · SUPABASE_SERVICE_ROLE_KEY 등)를
+  tale-dev로 교체, 스모크 계정도 dev 시드 계정으로. live 접속정보는 `SUPABASE_LIVE_*`로 보존
+  (`SUPABASE_DB_PASSWORD`는 live 전용 유지 — 하우스 마이그레이션 툴 `.claude/cache/db/_apply_migration.mjs`가 사용).
+  검증: `pnpm smoke` 6/6 ok · `pnpm smoke --auth` 5/6 ok — NOT-ok 1건은 새 DB의 신선한 프로젝트가
+  스테이지 게이트로 Editor 잠김(정상 동작 — 진행 안 된 프로젝트는 Editor 버튼 disabled). 스크린샷 `.smoke/tale-auth/`.
 - **CI가 main 직푸시를 물리적으로 막지는 못한다**: Vercel은 Actions 결과를 기다리지 않고 push 즉시 배포한다.
   진짜 차단은 둘 중 하나 (오너 결정): (a) GitHub branch protection으로 main 직푸시 금지 + dev→main PR에
   required check — 결제 코드 경로만이라도 이 규율 권장. (b) 현재 직푸시 관습 유지 + CI는 사후 신호등.
