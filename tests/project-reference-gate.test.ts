@@ -5,19 +5,22 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   getUser: vi.fn(),
   from: vi.fn(),
+  rpc: vi.fn(),
   prepareReferenceImport: vi.fn(),
   copyReferenceAssets: vi.fn(),
   workspace: {
     id: 'workspace-1',
     plan: 'free',
   } as { id: string; plan: string },
-  projectCount: 0 as number | null,
-  countError: null as { message: string } | null,
+  rpcResult: null as Record<string, unknown> | null,
+  rpcError: null as { message: string } | null,
   inserted: null as Record<string, unknown> | null,
 }))
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
-vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from } }))
+vi.mock('@/lib/supabase/admin', () => ({
+  supabaseAdmin: { from: mocks.from, rpc: mocks.rpc },
+}))
 vi.mock('@/lib/reference-import', () => ({
   prepareReferenceImport: mocks.prepareReferenceImport,
   copyReferenceAssets: mocks.copyReferenceAssets,
@@ -29,8 +32,8 @@ import { POST } from '@/app/api/project/new/route'
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.workspace = { id: 'workspace-1', plan: 'free' }
-  mocks.projectCount = 0
-  mocks.countError = null
+  mocks.rpcResult = null
+  mocks.rpcError = null
   mocks.inserted = null
   mocks.createClient.mockResolvedValue({
     auth: { getUser: mocks.getUser },
@@ -52,8 +55,25 @@ beforeEach(() => {
   mocks.copyReferenceAssets.mockResolvedValue({ warnings: [] })
   mocks.from.mockImplementation((table: string) => {
     if (table === 'workspaces') return workspaceQuery()
-    if (table === 'projects') return projectQuery()
     throw new Error(`unexpected table: ${table}`)
+  })
+  // #project-lifecycle-rpc: 슬롯 카운트+삽입은 create_project_slotted RPC 하나가 담당한다.
+  mocks.rpc.mockImplementation(async (name: string, args: Record<string, unknown>) => {
+    if (name !== 'create_project_slotted') throw new Error(`unexpected rpc: ${name}`)
+    if (mocks.rpcError) return { data: null, error: mocks.rpcError }
+    if (mocks.rpcResult) return { data: mocks.rpcResult, error: null }
+    mocks.inserted = {
+      id: args.p_project_id,
+      workspace_id: args.p_workspace_id,
+      title: args.p_title,
+      locale: args.p_locale,
+      locale_locked: args.p_locale_locked,
+      reference_project_id: args.p_reference_project_id,
+    }
+    return {
+      data: { status: 'ok', project: mocks.inserted },
+      error: null,
+    }
   })
 })
 
@@ -65,10 +85,11 @@ describe('POST /api/project/new — v4 slot and reference contract', () => {
 
     expect(response.status).toBe(401)
     expect(mocks.from).not.toHaveBeenCalled()
+    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
-  it('fails closed when the project count query fails', async () => {
-    mocks.countError = { message: 'count unavailable' }
+  it('fails closed when the slot RPC fails', async () => {
+    mocks.rpcError = { message: 'count unavailable' }
 
     const response = await POST(request({ title: 'New project' }))
     const body = await response.json()
@@ -79,13 +100,28 @@ describe('POST /api/project/new — v4 slot and reference contract', () => {
   })
 
   it('blocks a free workspace at its one-project limit', async () => {
-    mocks.projectCount = 1
+    mocks.rpcResult = { status: 'slot_limit', count: 1 }
 
     const response = await POST(request({ title: 'Second project' }))
     const body = await response.json()
 
     expect(response.status).toBe(403)
     expect(body).toEqual({ error: 'slot_limit', limit: 1, plan: 'free' })
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      'create_project_slotted',
+      expect.objectContaining({ p_slot_limit: 1 }),
+    )
+    expect(mocks.inserted).toBeNull()
+  })
+
+  it('fails closed on an unexpected RPC status without leaking a project', async () => {
+    mocks.rpcResult = { status: 'workspace_not_found' }
+
+    const response = await POST(request({ title: 'Orphan project' }))
+    const body = await response.json()
+
+    expect(response.status).toBe(500)
+    expect(body).toEqual({ error: 'Failed to create project (workspace_not_found)' })
     expect(mocks.inserted).toBeNull()
   })
 
@@ -168,37 +204,6 @@ function workspaceQuery() {
     limit: vi.fn(() => query),
     maybeSingle: vi.fn(async () => ({ data: mocks.workspace, error: null })),
     single: vi.fn(async () => ({ data: mocks.workspace, error: null })),
-  }
-  return query
-}
-
-function projectQuery() {
-  const insertQuery = {
-    select: vi.fn(() => insertQuery),
-    single: vi.fn(async () => ({
-      data: {
-        id: 'created-project',
-        ...mocks.inserted,
-      },
-      error: null,
-    })),
-  }
-  const query = {
-    select: vi.fn(() => query),
-    eq: vi.fn(() => query),
-    maybeSingle: vi.fn(async () => ({ data: null, error: null })),
-    then: (
-      resolve: (value: { count: number | null; error: { message: string } | null }) => unknown,
-      reject?: (reason: unknown) => unknown,
-    ) =>
-      Promise.resolve({
-        count: mocks.projectCount,
-        error: mocks.countError,
-      }).then(resolve, reject),
-    insert: vi.fn((payload: Record<string, unknown>) => {
-      mocks.inserted = payload
-      return insertQuery
-    }),
   }
   return query
 }

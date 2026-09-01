@@ -92,55 +92,32 @@ export async function DELETE(
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const forbidden = await assertOwnership(id, user.id)
-    if (forbidden) return forbidden
 
-    // FK-safe 전체 삭제 (CASCADE 없음) — scripts/reset-to-producer.mjs 의 wipe 순서를
-    // 프로젝트 전체 삭제로 확장한 것. 순서 근거:
-    //   projects.last_writer_run_id → writer_runs FK 를 먼저 끊고, leaf 자식부터 지운 뒤
-    //   locations(→writer_runs FK) 다음에 writer_runs, 마지막에 projects.
-    //   Storage 파일(버킷 이미지/영상)은 남는다 — 경로가 projectId 기반이라 재사용 충돌 없음.
-    await supabaseAdmin
-      .from('projects')
-      .update({ last_writer_run_id: null })
-      .eq('id', id)
-
-    const childTables = [
-      'character_image_candidates',
-      'location_image_candidates',
-      'editor_states',
-      'video_clips',
-      'subtext_notes',
-      'generation_jobs',
-      'camera_light_presets',
-      'shots',
-      'scenes',
-      'locations',
-      'character_relationships',
-      'characters',
-      'writer_runs',
-      'messages',
-    ]
-    for (const table of childTables) {
-      const { error: childErr } = await supabaseAdmin
-        .from(table)
-        .delete()
-        .eq('project_id', id)
-      if (childErr) {
-        return NextResponse.json(
-          { error: `${table}: ${childErr.message}` },
-          { status: 500 },
-        )
-      }
-    }
-
-    const { error } = await supabaseAdmin
-      .from('projects')
-      .delete()
-      .eq('id', id)
+    // 삭제 전체(소유권 확인 + FK-safe 순서의 자식 14테이블 + 본체)를 DB 함수 하나로
+    // (#project-lifecycle-rpc 2026-09-01). 왕복 18회→1회, 함수가 단일 트랜잭션이라
+    // 중간 실패 시 부분 삭제도 안 남는다. 삭제 순서·cascade 근거는
+    // supabase/migrations/20260901113500_project_lifecycle_rpcs.sql 에 있다.
+    // Storage 파일(버킷 이미지/영상)은 기존과 동일하게 남는다 — 경로가 projectId 기반이라
+    // 재사용 충돌 없음.
+    const { data: status, error } = await supabaseAdmin.rpc('delete_project_deep', {
+      p_project_id: id,
+      p_user_id: user.id,
+    })
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    if (status === 'not_found') {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+    if (status === 'forbidden') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    if (status !== 'ok') {
+      return NextResponse.json(
+        { error: `Unexpected delete status: ${String(status)}` },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ ok: true })

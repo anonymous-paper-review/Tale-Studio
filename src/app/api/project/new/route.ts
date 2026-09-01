@@ -51,28 +51,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { count: projectCount, error: countError } = await supabaseAdmin
-      .from('projects')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspace.id)
-
-    // A missing count is as unsafe as a failed count: never let a query failure
-    // bypass the slot gate.
-    if (countError || projectCount === null || projectCount === undefined) {
-      return NextResponse.json(
-        { error: countError?.message ?? 'Failed to count projects' },
-        { status: 500 },
-      )
-    }
-
     const isAdmin = isAdminWorkspaceOwner(user, workspace.owner_id)
     const limit = getPlanLimit(workspace.plan)
-    if (!isAdmin && projectCount >= limit) {
-      return NextResponse.json(
-        { error: 'slot_limit', limit, plan: workspace.plan },
-        { status: 403 },
-      )
-    }
 
     if (includeLastShotFrame && !referenceProjectId) {
       return NextResponse.json(
@@ -107,25 +87,42 @@ export async function POST(req: NextRequest) {
     //   스토리 감지가 사용자 실제 언어로 확정한다.
     const userLocale = parseAppLocale(user.user_metadata?.locale)
     const locale = userLocale ?? 'en'
-    // G004 integration seam: ownership validation and source copying intentionally
-    // remain outside this slice; these are only persisted as canonical strings.
-    const projectInsert = {
-      id: projectId,
-      workspace_id: workspace.id,
-      title,
-      locale,
-      locale_locked: userLocale !== null,
-      ...(referenceProjectId ? { reference_project_id: referenceProjectId } : {}),
-    }
-    const { data: project, error } = await supabaseAdmin
-      .from('projects')
-      .insert(projectInsert)
-      .select()
-      .single()
+    // 슬롯 카운트+삽입을 DB 함수 하나로 원자화(#project-lifecycle-rpc 2026-09-01) —
+    // 왕복 1회 제거 + 동시 생성이 카운트 게이트를 우회하는 경쟁 봉쇄(워크스페이스 행 잠금).
+    // 요금제→한도 매핑은 plan-limits.ts 가 진실원이라 여기서 계산해 넘긴다(null=무제한).
+    // RPC 실패·빈 응답은 기존 count 실패와 동일하게 fail-closed.
+    const { data: creationData, error } = await supabaseAdmin.rpc(
+      'create_project_slotted',
+      {
+        p_project_id: projectId,
+        p_workspace_id: workspace.id,
+        p_title: title,
+        p_locale: locale,
+        p_locale_locked: userLocale !== null,
+        p_reference_project_id: referenceProjectId || null,
+        p_slot_limit: isAdmin ? null : limit,
+      },
+    )
+    const creation = creationData as
+      | { status?: string; project?: Record<string, unknown> }
+      | null
 
-    if (error || !project) {
+    if (error || !creation || typeof creation !== 'object') {
       return NextResponse.json(
         { error: error?.message ?? 'Failed to create project' },
+        { status: 500 },
+      )
+    }
+    if (creation.status === 'slot_limit') {
+      return NextResponse.json(
+        { error: 'slot_limit', limit, plan: workspace.plan },
+        { status: 403 },
+      )
+    }
+    const project = creation.status === 'ok' ? creation.project : null
+    if (!project) {
+      return NextResponse.json(
+        { error: `Failed to create project (${String(creation.status)})` },
         { status: 500 },
       )
     }
@@ -134,7 +131,7 @@ export async function POST(req: NextRequest) {
     if (referenceSource) {
       const copied = await copyReferenceAssets({
         source: referenceSource,
-        destinationProjectId: project.id,
+        destinationProjectId: projectId,
         destinationWorkspaceId: workspace.id,
         includeLastShotFrame,
       })
@@ -143,7 +140,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       workspaceId: workspace.id,
-      projectId: project.id,
+      projectId,
       project,
       warnings,
     })

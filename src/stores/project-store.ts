@@ -302,7 +302,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   createNewProject: async (title, options) => {
-    await resetChildStores()
+    // 서버 생성 요청과 동시에 진행(#project-lifecycle-rpc 2026-09-01) — 7개 스토어의
+    // 동적 import+reset 을 요청 앞에서 기다리면 첫 생성이 그만큼 느려진다.
+    // 새 프로젝트 상태를 set 하기 전에만 완료되면 된다.
+    const resetDone = resetChildStores().catch((err) => {
+      console.error('[project-store] resetChildStores failed:', err)
+    })
     set({ initLoading: true })
     try {
       const trimmed = title?.trim() || 'Untitled'
@@ -329,6 +334,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
       const response = await res.json()
       const { workspaceId, projectId, project } = response
+      await resetDone
       set({
         workspaceId,
         projectId,
