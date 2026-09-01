@@ -23,8 +23,8 @@
 
 ## 활성 실행 계약
 
-> 밤 루프(Orca automation)는 2026-09-01부로 당분간 중단 — 밤 계약(`_NIGHT.md` · inbox 스냅샷 ·
-> `runs/` 아침 보고 · `feedback/` 소비)은 휴면 상태다. 파일은 보존하되 새 실행 의존성을 만들지 않는다.
+> 밤 루프(Orca automation)는 2026-09-01부로 **폐지** — 밤 계약(inbox 스냅샷 · `runs/` 아침 보고 ·
+> `feedback/` 소비)은 없다. `_NIGHT.md`는 `_archive/`로 이관했고, 어떤 새 작업도 밤 계약을 전제하지 않는다.
 
 - `.claude/vault/backlog/tickets/`는 티켓과 결과 카드의 원장이다. `ready`는 실행, `waiting`은 조건 확인,
   `needs-owner`는 사람의 선택, `draft`는 닫힘 조건 보완이 필요하다.

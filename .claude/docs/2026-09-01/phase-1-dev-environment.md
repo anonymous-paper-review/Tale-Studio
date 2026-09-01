@@ -25,7 +25,7 @@
 | 1-4 | live 백업 | 🟡 결정 대기 | 실측(2026-09-01, 관리 API): PITR 꺼져 있음 · **일일 백업 7개 보유 중**(Pro) · PITR 가격 7일 $100/월 · 14일 $200 · 28일 $400. 권고: 지금은 일일 백업으로 충분(최악 하루치 유실 수용), **PITR은 결제 라이브 전환 직전에 pitr_7 켜기** — 승인만 주면 에이전트가 API로 즉시 적용. 복원 리허설은 tale-dev에 복원해보는 것으로 대체 가능 |
 | 1-5 | CI | 🟡 절반 | ✅ `.github/workflows/ci.yml` 생성 (typecheck+test, main·dev push+PR). 로컬 검증: 1702 passed · 시크릿 불필요(vitest.setup.ts 스텁). ⚠ 이 워크플로는 신호등이지 방팭이 아님 — 아래 메모 |
 | 1-6 | 롤백 연습 | 🔴 오너 | Vercel instant rollback 1회 실행, 소요 시간 기록 |
-| 1-7 | FAL 계정 정리 (I1 흡수) | 🟡 거의 완료 | ✅ 새 키($2000) 발급 · ✅ Vercel Production `FAL_KEY` 교체(2026-09-01, 다음 배포부터 적용) · ✅ 할당 확정: **Production 40+40**(둘 다 production 풀, 개발 전용 계정 없음 — 밤 루프 중단) — [fal-key-pool.md](fal-key-pool.md). 남음: 새 계정 대시보드 동시 한도 표기 확인 + 두 계정 지출 알림 설정(오너) |
+| 1-7 | FAL 계정 정리 (I1 흡수) | 🟡 거의 완료 | ✅ 새 키($2000) 발급 · ✅ Vercel Production `FAL_KEY` 교체(2026-09-01, 다음 배포부터 적용) · ✅ 할당 확정: **Production 40+40**(둘 다 production 풀, 개발 전용 계정 없음 — 밤 루프 폐지) — [fal-key-pool.md](fal-key-pool.md). 남음: 새 계정 대시보드 동시 한도 표기 확인 + 두 계정 지출 알림 설정(오너) |
 | 1-8 | fal 키 풀 단계 0 | ⚪ 대기 | `generation_jobs.fal_key_id` + 키 레지스트리 추상화 — 키 1개인 지금 넣으면 나중 마이그레이션이 공짜. 설계는 [fal-key-pool.md](fal-key-pool.md) |
 
 ## 메모
