@@ -21,7 +21,7 @@ v4 요금제를 코드로 번역하는 단계. 결제는 이 시스템의 스위
 | 2-1 | 스키마 | `take_ledger`(적립/차감/hold/반환 행 + reason·ref_id), `billing_events`(웹훅 원본·멱등성 키 — 3단계용 자리), `subscriptions`, `billing_customers`. 잔액은 UPDATE가 아니라 행 합산 |
 | 2-2 | plan-limits 확장 | v4 사다리(무료~P-30)를 `plan-limits.ts`에 반영 — 축 4개+Account. 진실원 유지 |
 | 2-3 | 게이트 배선 | 프로젝트 생성(연결 슬롯 — `create_project_slotted` RPC 기존), 생성 분량, Export, Account 수 |
-| 2-4 | Take hold/확정/반환 | 생성 잡 시작 시 hold → 성공 확정 → 실패 반환. `generation_jobs` 경로에 관문. 동시 요청 경쟁 봉쇄(행 잠금 — 기존 워크스페이스 잠금 패턴 재사용) |
+| 2-4 | Take hold/확정/반환 | 생성 잡 시작 시 hold → 성공 확정 → 실패 반환. `generation_jobs` 경로에 관문. 동시 요청 경쟁 봉쇄(행 잠금 — 기존 워크스페이스 잠금 패턴 재사용). ⚠ 이때 티켓 `gen-quota-atomic-gate`(쿼터 count-then-submit 경쟁 — 2026-09-01 실측 오버슗 11/1슬롯)를 같은 RPC로 함께 닫는다 |
 | 2-5 | 생성 전 소모량 표시 | 모델·해상도별 Take 계수 × 개수. UI + API 응답 |
 | 2-6 | 소멸 잡 | 월말 플랜분 소멸, 충전분 12개월, 소멸 임박 알림 30/7/1일 전 (알림 채널은 최소 이메일) |
 | 2-7 | 관리자 수동 부여 | 플랜 변경·Take 수동 적립을 관리자 경로로 + 감사 로그(ledger의 reason으로) |
