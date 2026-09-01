@@ -8,6 +8,19 @@
 - 코드(`src/`)와 live Supabase DB가 진실원이다. 코드에서 유도되는 내용은 문서에 복제하지 않는다.
 - 디자인 판별 규칙은 `specs/design.md`, 토큰 값은 `src/app/globals.css`가 소유한다.
 
+## 개발환경 (2026-09-01 확정 — 결제 준비 phase-1)
+
+- 브랜치 = 환경: `main` → Vercel Production(live) / `dev` → Preview(개발).
+  local·dev는 개발 Supabase 프로젝트를 공유하고 live는 main 전용 — live DB를 dev가 바라보게 하지 않는다.
+- 스키마는 `supabase/migrations/` 파일로만 바꾼다. 대시보드 직접 수정 금지, 개발 DB 먼저 → live 순서.
+- 키 스코프: 개발·샌드박스 키 = Vercel Preview/Development, 라이브 키 = Production에만.
+  결제(MoR) 웹훅도 같은 매핑 — 샌드박스 → dev 도메인 / 라이브 → production 도메인.
+- CI: `.github/workflows/ci.yml`이 main·dev push와 PR에서 `pnpm typecheck && pnpm test`를 돈다
+  (시크릿 불필요 — vitest.setup.ts 스텁). 신호등이지 방벽이 아니다 — Vercel은 CI를 기다리지 않고 배포한다.
+  결제 코드 경로(`/api/billing/**`·웹훅)는 테스트 없이 main 금지.
+- 결제 워크스트림 원장: `.claude/docs/2026-09-01/` (phase-1~3 + fal 키 풀) · 전체 지도: `specs/payments-readiness.md`
+  · 기획 안건: `specs/payments-planner-agenda.html`
+
 ## 활성 실행 계약
 
 - `.claude/vault/inbox/<actor>.md`는 오너의 형식 없는 메모 입력이다. 밤은 바이트 스냅샷으로 읽고

@@ -20,8 +20,8 @@
 | # | 항목 | 상태 | 내용 |
 |---|---|---|---|
 | 1-1 | dev 브랜치 + Vercel 매핑 | 🟡 절반 | ✅ `origin/dev`를 main(`853d849`)으로 fast-forward (기존 dev는 main의 조상이라 유실 없음). 오너: Vercel에서 dev Preview 고정 도메인 확인 |
-| 1-2 | 개발 Supabase 프로젝트 | 🔴 오너 | CLI 미인증 확인됨(`supabase login` 필요). 생성 → `supabase/migrations/` 전체 적용 → `pnpm seed:test-accounts`. 리전은 live와 동일하게 |
-| 1-3 | Vercel env 스코프 재정리 | 🔴 오너 | Production=live DB+라이브 키만 / Preview·Development=개발 DB+샌드박스 키만. 현재 등록된 변수 전수 점검 (vercel CLI 미설치 — 대시보드서) |
+| 1-2 | 개발 Supabase 프로젝트 | 🔴 토큰 대기 | 오너: supabase.com/dashboard/account/tokens에서 개인 액세스 토큰(sbp_) 발급 → `.env.local`에 `SUPABASE_ACCESS_TOKEN=` 추가. 그 뒤는 에이전트가 CLI로 생성 → 마이그레이션 → `pnpm seed:test-accounts`까지 진행 (리전은 live와 동일하게) |
+| 1-3 | Vercel env 스코프 재정리 | 🔴 토큰 대기 | ⚠ 2026-09-01 실측: `~/.vercel/auth.json` 로그인과 `.env.local`의 `VERCEL_TOKEN` 둘 다 죽음(API 404). 오너: vercel.com/account/tokens에서 새 토큰 발급 → `VERCEL_TOKEN` 교체. 그 뒤는 에이전트가 env 전수 점검·스코프 재배치 진행 (프로젝트 링크는 살아있음 — `.vercel/project.json` = `tale`) |
 | 1-4 | live 백업 | 🔴 오너 | PITR(특정 시점 복원) 활성화 + 복원 리허설 1회 — 유료 플랜 비용 승인 포함 |
 | 1-5 | CI | 🟡 절반 | ✅ `.github/workflows/ci.yml` 생성 (typecheck+test, main·dev push+PR). 로컬 검증: 1702 passed · 시크릿 불필요(vitest.setup.ts 스텁). ⚠ 이 워크플로는 신호등이지 방팭이 아님 — 아래 메모 |
 | 1-6 | 롤백 연습 | 🔴 오너 | Vercel instant rollback 1회 실행, 소요 시간 기록 |
