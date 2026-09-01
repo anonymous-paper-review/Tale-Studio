@@ -101,6 +101,7 @@ const job = {
   video_clip_id: 'clip-1',
   target: { workspaceId: 'workspace-1' },
   input_snapshot: {},
+  fal_key_id: 'prod-2000',
 } as never
 beforeEach(() => {
   vi.stubEnv('TAILSCALE_VIDEO_API_URL', 'http://local.test/api')

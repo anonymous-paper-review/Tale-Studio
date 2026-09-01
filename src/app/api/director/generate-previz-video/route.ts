@@ -90,7 +90,7 @@ export async function POST(req: Request) {
       : ''
     const duration = Math.max(3, Math.min(15, Math.round((shot.duration_seconds as number) || 5)))
 
-    const { request_id, model } = await falVideoSubmit({
+    const { request_id, model, fal_key_id } = await falVideoSubmit({
       prompt: buildPrevizVideoPrompt(actionEn, duration),
       image_url: frames.start,
       image_urls: [frames.start, frames.end],
@@ -102,6 +102,7 @@ export async function POST(req: Request) {
       projectId,
       requestId: request_id,
       model,
+      falKeyId: fal_key_id,
       kind: 'shot_previz_video',
       target: { workspaceId: project.workspace_id as string, writerShotId },
       inputSnapshot: {

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
-import { fal } from '@fal-ai/client'
+import { pickFalKey } from '@/lib/fal/keys'
 import {
   type DialogueLine,
   type DialogueSpeaker,
@@ -46,8 +46,6 @@ import type { Json } from '@/types/database'
 import type { CameraConfig, CameraPreset } from '@/types'
 import type { StandaloneVideoConfig } from '@/types/director'
 
-fal.config({ credentials: () => process.env.FAL_KEY ?? '' })
-
 // reference-to-video는 레퍼런스 이미지가 필수. 레퍼런스 없는 T2V는 이 Kling 엔드포인트로 폴백.
 const FAL_T2V_FALLBACK_MODEL = 'fal-ai/kling-video/v2.1/master/text-to-video'
 
@@ -64,6 +62,8 @@ type VideoSubmission = {
   taskId: string
   provider: VideoProvider
   model: string
+  /** fal 제출에만 존재(#fal-key-pool) — local 제출은 키 개념이 없다. */
+  falKeyId?: string
 }
 
 class CharacterAppearanceContractError extends Error {}
@@ -221,7 +221,8 @@ async function submitFalReferenceToVideo(
   request: FalVideoSubmitRequest,
   webhookUrl?: string,
 ) {
-  const { request_id } = await fal.queue.submit(
+  const k = await pickFalKey()
+  const { request_id } = await k.client.queue.submit(
     request.model,
     webhookUrl ? { input: request.input, webhookUrl } : { input: request.input },
   )
@@ -229,6 +230,7 @@ async function submitFalReferenceToVideo(
     taskId: request_id,
     provider: 'fal' as const,
     model: request.model,
+    falKeyId: k.id,
   }
 }
 
@@ -866,7 +868,7 @@ export async function POST(req: Request) {
       }
     }
     try {
-      await attachProviderRequestToReservedVideoJob(projectId, reservation.job_id, result.taskId, { provider: result.provider, model: result.model })
+      await attachProviderRequestToReservedVideoJob(projectId, reservation.job_id, result.taskId, { provider: result.provider, model: result.model, falKeyId: result.falKeyId })
     } catch (attachmentError) {
       const error = attachmentError instanceof Error ? attachmentError.message : String(attachmentError)
       console.error('[director/generate-video] provider request attachment failed:', error)

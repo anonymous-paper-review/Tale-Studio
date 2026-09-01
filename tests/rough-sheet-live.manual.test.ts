@@ -224,7 +224,7 @@ describe.runIf(LIVE)('rough-sheet live — 포맷 시트 실생성 + 프로덕�
       const prompt = buildRoughGridPrompt(cells, 'grid4', { frameAxis: geom.frameAxis })
 
       const submittedAt = new Date().toISOString()
-      const { request_id, model } = await falImageSubmit({
+      const { request_id, model, fal_key_id } = await falImageSubmit({
         model: DEFAULT_EDIT_IMAGE_MODEL,
         prompt,
         reference_image_urls: [templateUrl!],
@@ -234,7 +234,7 @@ describe.runIf(LIVE)('rough-sheet live — 포맷 시트 실생성 + 프로덕�
       let url: string | null = null
       for (let i = 0; i < 90 && !url; i++) {
         await new Promise((r) => setTimeout(r, 5000))
-        const res = await falImageFetch(model, request_id)
+        const res = await falImageFetch(model, request_id, fal_key_id)
         if (res.status === 'COMPLETED' && res.url) url = res.url
         else if (res.status === 'FAILED') throw new Error(`fal failed: ${res.error}`)
       }

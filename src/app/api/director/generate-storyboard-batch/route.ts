@@ -268,7 +268,7 @@ export async function POST(req: NextRequest) {
       ]
 
       // 이 배치 경로는 모델 선택 UI 가 없다 — 기본 모델의 edit 갈래로 고정(#owner-default 2026-08-31).
-      const { request_id, model } = await falImageSubmit({
+      const { request_id, model, fal_key_id } = await falImageSubmit({
         // #sheet-model-guard: 그리드는 시트 계약 경로 — 기본 모델이 무엇이든 시트 가능 모델로 강제.
         model: resolveImageEndpoint(resolveSheetImageModel(null), true).endpoint,
         prompt,
@@ -283,6 +283,7 @@ export async function POST(req: NextRequest) {
         projectId,
         requestId: request_id,
         model,
+        falKeyId: fal_key_id,
         kind: 'storyboard_real_grid',
         userId: access.userId!,
         workspaceId: project.workspace_id as string,

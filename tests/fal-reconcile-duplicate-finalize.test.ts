@@ -57,6 +57,7 @@ const QUEUED_SNAPSHOT = {
   provider: 'fal',
   result_url: null,
   error: null,
+  fal_key_id: 'prod-2000',
 } as unknown as GenerationJob
 
 const WINNER_URL = 'https://cdn.example/media/shot_1_storyboard_start.png?v=1785489691388'

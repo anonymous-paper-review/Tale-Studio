@@ -194,7 +194,7 @@ export async function POST(req: Request) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[generate/image]', {
       provider: providerUsed,
-      hasFalKey: !!process.env.FAL_KEY,
+      hasFalKeys: !!process.env.FAL_KEYS,
       hasGoogleKey: !!process.env.GOOGLE_API_KEYS,
       hasTailscaleUrl: !!process.env.TAILSCALE_IMAGE_API_URL,
       message,

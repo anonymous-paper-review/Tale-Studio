@@ -29,7 +29,18 @@ export async function POST(req: NextRequest) {
       ...characters.map((a, i) => ({ a, i, group: 'c' as const })),
       ...locations.map((a, i) => ({ a, i, group: 'l' as const })),
     ];
-    const pending = all.filter((x) => x.a.status === 'pending' && x.a.request_id);
+    // request_id 는 있지만 fal_key_id 가 없는 항목은 다중키 이전에 제출된 오래된 pending —
+    //   어느 키로 제출됐는지 알 수 없어 재시도 없이 즉시 failed 처리(#fal-key-pool).
+    for (const { a, i, group } of all) {
+      if (a.status === 'pending' && a.request_id && !a.fal_key_id) {
+        const failed = { ...a, status: 'failed' as const, error: 'fal key unknown (pre-multikey entry)' };
+        if (group === 'c') characters[i] = failed;
+        else locations[i] = failed;
+      }
+    }
+    const pending = all
+      .map(({ i, group }) => ({ a: group === 'c' ? characters[i] : locations[i], i, group }))
+      .filter((x) => x.a.status === 'pending' && x.a.request_id);
 
     if (pending.length === 0) {
       return NextResponse.json({ ...file, resumed: 0, still_pending: 0 });
@@ -54,7 +65,7 @@ export async function POST(req: NextRequest) {
         const tooOld = !(ageMs < TIMEOUT_MS); // NaN/Infinity도 timeout으로 간주
 
         try {
-          const r = await falImageFetch(model, a.request_id!);
+          const r = await falImageFetch(model, a.request_id!, a.fal_key_id!);
           if (r.status === 'COMPLETED') {
             setItem({ ...a, image_url: r.url, width: r.width, height: r.height, status: 'success' });
           } else if (r.status === 'FAILED') {

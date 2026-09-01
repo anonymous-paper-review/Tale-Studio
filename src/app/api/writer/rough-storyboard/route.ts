@@ -543,7 +543,7 @@ export async function POST(req: Request) {
       await recordWriterObservabilityEvent(projectId, 'fal_submit_started', {
         shotCount: chunk.length,
       })
-      let falResult: { request_id: string; model: string }
+      let falResult: { request_id: string; model: string; fal_key_id: string }
       try {
         falResult = await falImageSubmit(
           templateUrl
@@ -573,12 +573,13 @@ export async function POST(req: Request) {
         })
         throw error
       }
-      const { request_id, model } = falResult
+      const { request_id, model, fal_key_id } = falResult
       const chunkShotIds = chunk.map((s) => s.shot_id as string)
       const job = await createGenerationJob({
         projectId,
         requestId: request_id,
         model,
+        falKeyId: fal_key_id,
         kind: 'shot_rough_storyboard',
         target: {
           workspaceId: project.workspace_id,

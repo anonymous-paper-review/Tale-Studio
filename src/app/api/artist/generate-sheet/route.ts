@@ -316,7 +316,7 @@ export async function POST(req: Request) {
     }
 
     // 3. fal 큐에 submit (비동기). 완료는 webhook(/poll reconcile)이 storage 업로드 + DB 갱신.
-    const { request_id, model } = await falImageSubmit(submitOpts)
+    const { request_id, model, fal_key_id } = await falImageSubmit(submitOpts)
     // provenance(#57): 생성 입력(외모) 지문을 submit 시점에 함께 계산해 input_snapshot 에 동봉.
     //   착지 시 finalize 가 이 지문으로 character_image_candidates 행을 남긴다(분리 금지 — architecture §5).
     // 룩(전역 토큰 + 의상) 지문 — 룩 부재 시 null(레거시 동일). 룩 도착 후 룩 미반영 초안이 stale로 판정(AC6/7).
@@ -339,6 +339,7 @@ export async function POST(req: Request) {
       projectId,
       requestId: request_id,
       model,
+      falKeyId: fal_key_id,
       kind: 'character_view',
       actor: jobActor,
       userId: access.userId!,

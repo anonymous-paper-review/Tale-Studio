@@ -52,6 +52,13 @@ export async function runShotVideos(
       .filter((s) => s.status === 'success' && s.video_url)
       .map((s) => [s.shot_id, s]),
   );
+  // fal_key_id 없는 pending 항목(#fal-key-pool 전환 이전 제출)은 어느 키로 나갔는지 몰라 조회
+  //   불가 — 재시도 없이 즉시 failed 로 마킹한다.
+  const stalePendingFromCache = new Map<string, ShotVideoResult>(
+    (cachedFile?.shots ?? [])
+      .filter((s) => s.status === 'pending' && s.request_id && !s.fal_key_id)
+      .map((s) => [s.shot_id, { ...s, status: 'failed' as const, error: 'fal key unknown (pre-multikey entry)' }]),
+  );
 
   await logger.markStage('shotVideos', 'started', {
     total: finalPrompts.shots.length,
@@ -69,6 +76,9 @@ export async function runShotVideos(
   const resultByShot = new Map<string, ShotVideoResult>();
   for (const cached of cachedSuccess.values()) {
     resultByShot.set(cached.shot_id, cached);
+  }
+  for (const stale of stalePendingFromCache.values()) {
+    resultByShot.set(stale.shot_id, stale);
   }
 
   let writeLock: Promise<void> = Promise.resolve();
@@ -95,7 +105,9 @@ export async function runShotVideos(
   };
 
   // ── Phase 1: submit ────────────────────────────────────────────────
-  const submitQueue = finalPrompts.shots.filter((s) => !cachedSuccess.has(s.shot_id));
+  const submitQueue = finalPrompts.shots.filter(
+    (s) => !cachedSuccess.has(s.shot_id) && !stalePendingFromCache.has(s.shot_id),
+  );
   const pendingShots: Array<{ shot_id: string; request_id: string }> = [];
 
   async function submitWorker() {
@@ -119,7 +131,7 @@ export async function runShotVideos(
         continue;
       }
       try {
-        const { request_id } = await falVideoSubmit({
+        const { request_id, fal_key_id } = await falVideoSubmit({
           model: opts.model,
           prompt: shot.ti2v.motion_prompt,
           image_url: img.image_url,
@@ -137,6 +149,7 @@ export async function runShotVideos(
           model: modelLabel,
           status: 'pending',
           request_id,
+          fal_key_id,
           submitted_at: new Date().toISOString(),
         });
         pendingShots.push({ shot_id: shot.shot_id, request_id });
@@ -174,7 +187,7 @@ export async function runShotVideos(
         const cur = resultByShot.get(shot_id);
         if (!cur) return;
         try {
-          const r = await falVideoFetch(modelLabel, request_id);
+          const r = await falVideoFetch(modelLabel, request_id, cur.fal_key_id!);
           if (r.status === 'COMPLETED') {
             resultByShot.set(shot_id, {
               ...cur,

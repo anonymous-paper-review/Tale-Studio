@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   hasQueuedCharacterViewJob: vi.fn<(...a: unknown[]) => Promise<boolean>>(async () => false),
   hasQueuedWorldShotJob: vi.fn<(...a: unknown[]) => Promise<boolean>>(async () => false),
   countFailedJobsForTarget: vi.fn<(...a: unknown[]) => Promise<number>>(async () => 0),
-  falImageSubmit: vi.fn<(...a: unknown[]) => Promise<{ request_id: string; model: string }>>(async () => ({ request_id: 'req-1', model: 'openai/gpt-image-2' })),
+  falImageSubmit: vi.fn<(...a: unknown[]) => Promise<{ request_id: string; model: string; fal_key_id: string }>>(async () => ({ request_id: 'req-1', model: 'openai/gpt-image-2', fal_key_id: 'prod-2000' })),
   getUser: vi.fn(),
   checkGenerationCapacity: vi.fn(),
   quotaExceededBody: vi.fn(),
@@ -149,7 +149,7 @@ beforeEach(() => {
   mocks.countFailedJobsForTarget.mockReset()
   mocks.countFailedJobsForTarget.mockResolvedValue(0)
   mocks.falImageSubmit.mockReset()
-  mocks.falImageSubmit.mockResolvedValue({ request_id: 'req-1', model: 'openai/gpt-image-2' })
+  mocks.falImageSubmit.mockResolvedValue({ request_id: 'req-1', model: 'openai/gpt-image-2', fal_key_id: 'prod-2000' })
   mocks.getUser.mockReset()
   mocks.getUser.mockResolvedValue({ id: 'user-1' })
   mocks.checkGenerationCapacity.mockReset()

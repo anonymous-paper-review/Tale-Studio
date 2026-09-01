@@ -223,7 +223,7 @@ export async function POST(req: Request) {
     const requestedImageModel = effectiveModelKey
       ? resolveImageEndpoint(effectiveModelKey, !!finalOpts.reference_image_urls?.length).endpoint
       : null
-    const { request_id, model, fal_request } = await falImageSubmit({
+    const { request_id, model, fal_request, fal_key_id } = await falImageSubmit({
       ...finalOpts,
       ...(requestedImageModel ? { model: requestedImageModel } : {}),
       webhookUrl: resolveWebhookUrl(),
@@ -234,6 +234,7 @@ export async function POST(req: Request) {
       projectId,
       requestId: request_id,
       model,
+      falKeyId: fal_key_id,
       kind: 'shot_storyboard',
       userId: access.userId!,
       workspaceId: project.workspace_id,

@@ -4,12 +4,9 @@
 //   1. submit/fetch 분리 — Next.js maxDuration timeout 회피용. submit으로 request_id만 받고
 //      별도 fetch 호출로 결과 수집. 끊겨도 fal 큐 작업은 살아있음.
 //   2. *Generate (legacy wrapper) — submit + 짧은 polling을 묶은 thin wrapper. 빠른 작업용.
-import { fal } from '@fal-ai/client';
 import { recordRawCall } from './raw_collector';
 import { withLlmRetry } from './retry';
-
-const apiKey = process.env.FAL_KEY;
-fal.config({ credentials: () => apiKey ?? '' });
+import { pickFalKey, falKeyById, FalUnknownKeyError } from '@/lib/fal/keys';
 
 let imageCallCount = 0;
 let videoCallCount = 0;
@@ -55,6 +52,8 @@ export interface FalSubmitReceipt {
   request_id: string;
   model: string;
   fal_request: Record<string, unknown>;
+  /** 제출에 사용된 fal 키 id(#fal-key-pool) — 조회 계열은 이 id 로 falKeyById 를 경유해야 한다. */
+  fal_key_id: string;
 }
 
 /**
@@ -256,16 +255,16 @@ function extractImageUrlFromData(raw: unknown): { url: string; width?: number; h
 export async function falImageSubmit(
   opts: FalImageOptions,
 ): Promise<FalSubmitReceipt> {
-  if (!apiKey) throw new Error('FAL_KEY not set');
   const model = resolveImageModel(opts);
   const input = buildFalImageInput(opts, model);
+  const k = await pickFalKey();
   try {
     const { request_id } = await withLlmRetry(
       () =>
-        fal.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
+        k.client.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
       'fal-image-submit',
     );
-    return { request_id, model, fal_request: input };
+    return { request_id, model, fal_request: input, fal_key_id: k.id };
   } catch (e) {
     // fal 실패 상세를 표면화 — 라우트(500 body.error)→client(✗ failed)까지 진짜 이유가 전파된다.
     const detail = falErrorDetail(e);
@@ -279,13 +278,15 @@ export async function falImageSubmit(
 export async function falQueueStatusWithLogs(
   model: string,
   request_id: string,
+  falKeyId: string,
 ): Promise<{
   status: string;
   queuePosition: number | null;
   logs: Array<{ timestamp?: string; level?: string; message?: string }>;
 }> {
-  if (!apiKey) throw new Error('FAL_KEY not set');
-  const status = await fal.queue.status(model, { requestId: request_id, logs: true });
+  const k = falKeyById(falKeyId);
+  if (!k) throw new FalUnknownKeyError(falKeyId);
+  const status = await k.client.queue.status(model, { requestId: request_id, logs: true });
   const s = status as unknown as {
     status?: string;
     queue_position?: number;
@@ -302,14 +303,16 @@ export async function falQueueStatusWithLogs(
 export async function falImageFetch(
   model: string,
   request_id: string,
+  falKeyId: string,
 ): Promise<FalImageFetchResult> {
-  if (!apiKey) throw new Error('FAL_KEY not set');
-  const status = await fal.queue.status(model, { requestId: request_id, logs: false });
+  const k = falKeyById(falKeyId);
+  if (!k) throw new FalUnknownKeyError(falKeyId);
+  const status = await k.client.queue.status(model, { requestId: request_id, logs: false });
   const s = (status.status as string).toUpperCase();
   if (s === 'COMPLETED') {
     let result;
     try {
-      result = await fal.queue.result(model, { requestId: request_id });
+      result = await k.client.queue.result(model, { requestId: request_id });
     } catch (e) {
       // fal 큐는 처리 중 실패한 요청도 status=COMPLETED 로 두고, result 조회가 422 로 실패 상세를 돌려준다.
       //   422 = 터미널 실패(예: reference 이미지 fetch 불가) → FAILED 매핑. 이를 transient 로 취급해
@@ -327,9 +330,8 @@ export async function falImageFetch(
   return { status: s === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'IN_QUEUE' };
 }
 
-/** legacy — submit + 폴링 합쳐 결과까지 await. 짧은 작업용. */
+/** legacy — submit + 폴링 합쳐 결과까지 await. 짧은 작업용. 키는 한 번만 골라 subscribe 전체에 사용. */
 export async function falImageGenerate(opts: FalImageOptions): Promise<FalImageResult> {
-  if (!apiKey) throw new Error('FAL_KEY not set');
   imageCallCount++;
   const model = resolveImageModel(opts);
   const started = Date.now();
@@ -339,8 +341,9 @@ export async function falImageGenerate(opts: FalImageOptions): Promise<FalImageR
 
   try {
     const input = buildFalImageInput(opts, model);
+    const k = await pickFalKey();
     const result = await withLlmRetry(
-      () => fal.subscribe(model, { input, logs: false }),
+      () => k.client.subscribe(model, { input, logs: false }),
       'fal-image',
     );
     raw = result.data;
@@ -452,29 +455,31 @@ function extractVideoUrlFromData(raw: unknown): { url: string; duration?: number
 export async function falVideoSubmit(
   opts: FalVideoOptions,
 ): Promise<FalSubmitReceipt> {
-  if (!apiKey) throw new Error('FAL_KEY not set');
   const model = opts.model ?? DEFAULT_VIDEO_MODEL;
   const input = buildFalVideoInput(opts, model);
+  const k = await pickFalKey();
   const { request_id } = await withLlmRetry(
     () =>
-      fal.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
+      k.client.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
     'fal-video-submit',
   );
-  return { request_id, model, fal_request: input };
+  return { request_id, model, fal_request: input, fal_key_id: k.id };
 }
 
 /** fetch — fal queue status + result. */
 export async function falVideoFetch(
   model: string,
   request_id: string,
+  falKeyId: string,
 ): Promise<FalVideoFetchResult> {
-  if (!apiKey) throw new Error('FAL_KEY not set');
-  const status = await fal.queue.status(model, { requestId: request_id, logs: false });
+  const k = falKeyById(falKeyId);
+  if (!k) throw new FalUnknownKeyError(falKeyId);
+  const status = await k.client.queue.status(model, { requestId: request_id, logs: false });
   const s = (status.status as string).toUpperCase();
   if (s === 'COMPLETED') {
     let result;
     try {
-      result = await fal.queue.result(model, { requestId: request_id });
+      result = await k.client.queue.result(model, { requestId: request_id });
     } catch (e) {
       // falImageFetch 와 동일: result 422 = 터미널 실패 → FAILED 매핑 (queued 고착 방지, 2026-07-12).
       if ((e as { status?: number })?.status === 422)
@@ -489,9 +494,8 @@ export async function falVideoFetch(
   return { status: s === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'IN_QUEUE' };
 }
 
-/** legacy — submit + 폴링 합쳐 결과까지 await. 짧은 작업용. */
+/** legacy — submit + 폴링 합쳐 결과까지 await. 짧은 작업용. 키는 한 번만 골라 subscribe 전체에 사용. */
 export async function falVideoGenerate(opts: FalVideoOptions): Promise<FalVideoResult> {
-  if (!apiKey) throw new Error('FAL_KEY not set');
   videoCallCount++;
   const model = opts.model ?? DEFAULT_VIDEO_MODEL;
   const started = Date.now();
@@ -501,8 +505,9 @@ export async function falVideoGenerate(opts: FalVideoOptions): Promise<FalVideoR
 
   try {
     const input = buildFalVideoInput(opts, model);
+    const k = await pickFalKey();
     const result = await withLlmRetry(
-      () => fal.subscribe(model, { input, logs: false }),
+      () => k.client.subscribe(model, { input, logs: false }),
       'fal-video',
     );
     raw = result.data;

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   countGlobal: vi.fn(),
   getUserById: vi.fn(),
   isAdminEmail: vi.fn(),
+  totalMaxInflight: vi.fn(),
 }))
 
 vi.mock('@/lib/generation-jobs', () => ({
@@ -19,16 +20,19 @@ vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: { auth: { admin: { getUserById: mocks.getUserById } } },
 }))
 vi.mock('@/lib/admin', () => ({ isAdminEmail: mocks.isAdminEmail }))
+// #fal-key-pool: 전역 상한은 이제 키 레지스트리 합산(totalMaxInflight)이다 — 단일 상수 대신 mock 값 사용.
+vi.mock('@/lib/fal/keys', () => ({ totalMaxInflight: mocks.totalMaxInflight }))
 
 import {
   checkGenerationCapacity,
   quotaExceededBody,
   MAX_QUEUED_VIDEO_JOBS_PER_USER,
   MAX_QUEUED_IMAGE_JOBS_PER_USER,
-  MAX_GLOBAL_INFLIGHT_JOBS,
   VIDEO_JOB_KINDS,
   IMAGE_JOB_KINDS,
 } from '@/lib/generation-quota'
+
+const MAX_GLOBAL_INFLIGHT_JOBS = 34
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -36,6 +40,7 @@ beforeEach(() => {
   mocks.countGlobal.mockResolvedValue(0)
   mocks.getUserById.mockResolvedValue({ data: { user: { email: 'user@x.test' } }, error: null })
   mocks.isAdminEmail.mockReturnValue(false)
+  mocks.totalMaxInflight.mockReturnValue(MAX_GLOBAL_INFLIGHT_JOBS)
 })
 
 describe('checkGenerationCapacity — 분리 풀', () => {

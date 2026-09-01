@@ -26,7 +26,7 @@ export async function submitWorldShotJob(
   }
   const finalOpts = input.anchor ? applyStyleAnchor(input.anchor, baseOpts, 'single') : baseOpts
 
-  const { request_id, model } = await falImageSubmit({
+  const { request_id, model, fal_key_id } = await falImageSubmit({
     ...finalOpts,
     webhookUrl: resolveWebhookUrl(),
   })
@@ -35,6 +35,7 @@ export async function submitWorldShotJob(
     projectId: input.projectId,
     requestId: request_id,
     model,
+    falKeyId: fal_key_id,
     kind: 'world_shot',
     actor: input.actor,
     userId: input.userId,

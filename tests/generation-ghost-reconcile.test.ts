@@ -49,6 +49,7 @@ function ghostRow(id: string, overrides: Record<string, unknown> = {}) {
     provider: 'fal',
     result_url: null,
     error: null,
+    fal_key_id: 'prod-2000',
     ...overrides,
   }
 }
@@ -121,7 +122,7 @@ describe('reconcileGhostQueuedJobs', () => {
     const settled = await reconcileGhostQueuedJobs('project-1')
 
     expect(settled).toBe(1)
-    expect(mocks.falImageFetch).toHaveBeenCalledWith('openai/gpt-image-2/edit', 'fal-req-job-1')
+    expect(mocks.falImageFetch).toHaveBeenCalledWith('openai/gpt-image-2/edit', 'fal-req-job-1', 'prod-2000')
     expect(mocks.finalizeGenerationJob).toHaveBeenCalledTimes(1)
     // S5 — 목록 체인 인자 검증: 뒤집히면(.lt→.gte 등) 유령 대신 활성 잡을 쓸어버린다.
     const list = recorded.listChains[0]

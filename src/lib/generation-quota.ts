@@ -1,11 +1,12 @@
 // 생성 작업 동시성 정책 (멀티유저) — 2단 게이트 + 영상/이미지 분리 풀.
 //
-// 희소 자원은 단 하나다: 단일 FAL_KEY 계정의 **동시 실행 슬롯 20개**를 전 유저가 공유한다.
+// 희소 자원은 fal 키 풀(#fal-key-pool, FAL_KEYS env)의 동시 실행 슬롯 합계다 — 예전 단일
+// FAL_KEY 계정의 슬롯 한도였던 것이 이제 키별 maxInflight 의 합산으로 대체됐다.
 // fal 은 초과분을 거부하지 않고 큐에 태우므로 "터진다"가 아니라 "뒤에 온 사람이 앞사람 잔여 큐
 // 뒤에서 기다린다"(head-of-line blocking)가 실제 증상이다. 이 파일은 그 대기를 통제한다.
 //
 //   레벨 0 — 유저당 상한: 한 유저의 독점을 막는다. 영상/이미지 **별도 풀** (2026-08-26 오너 결정).
-//   레벨 1 — 전역 세마포어(MAX_GLOBAL_INFLIGHT_JOBS): 전 유저 합계가 fal 슬롯을 넘지 않게 막는다.
+//   레벨 1 — 전역 세마포어(totalMaxInflight, #fal-key-pool): 전 유저 합계가 fal 키 풀 슬롯을 넘지 않게 막는다.
 //
 // 영상/이미지를 왜 나누나 (2026-08-26, 오너 세션 실측 C1): 합산 상한에서는 영상 배치가 슬롯을
 //   다 먹어 이미지 한 장도 못 뽑았다. 과금 축과도 정합 — 요금제(tale_pricing v4)에서 Take 는
@@ -13,7 +14,7 @@
 //   통제하고, 이미지는 처리량을 유지한다.
 //
 // admin 면제 (2026-08-26 오너 결정): 관리자 계정(운영·QA)은 유저당 상한을 받지 않는다.
-//   전역 세마포어는 admin 도 받는다 — fal 슬롯 20 은 물리 한도라 면제 대상이 아니다.
+//   전역 세마포어는 admin 도 받는다 — fal 키 풀 슬롯은 물리 한도라 면제 대상이 아니다.
 //
 // 공정성(유저 라운드로빈 디스패치)은 여기 없다 — 전역 상한에 닿으면 먼저 온 요청이 슬롯을 먹는다.
 //   5명 규모에서는 이 러프함이 실무상 문제가 아니고, 진짜 fair-queue 는 잡을 pending 으로 재웠다가
@@ -24,6 +25,7 @@ import {
   countQueuedJobsGlobal,
   type GenerationJobKind,
 } from '@/lib/generation-jobs'
+import { totalMaxInflight } from '@/lib/fal/keys'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { PROJECT_VIDEO_GENERATION_LIMIT } from '@/lib/plan-limits'
 import { isAdminEmail } from '@/lib/admin'
@@ -43,23 +45,16 @@ export const IMAGE_JOB_KINDS: readonly GenerationJobKind[] = [
 // 유저 1명이 동시에 큐에 올릴 수 있는 최대 생성 작업 수 (레벨 0) — 카테고리별.
 // 영상 3: Take(과금) 소진 속도 통제 + 5초 클립은 수 분 내 순환하므로 배치도 밀리지 않는다.
 // 이미지 6: 무과금·다량(러프/실사 보드 12샷 × 샷당 6장) — 기존 합산 상한 수준의 처리량 유지.
-// 합산 최악 9 라도 3명까지는 전역 상한(34) 안이고, 그 이상은 전역 세마포어가 받는다.
+// 합산 최악 9 라도 소수 유저까지는 전역 상한(totalMaxInflight) 안이고, 그 이상은 전역 세마포어가 받는다.
 export const MAX_QUEUED_VIDEO_JOBS_PER_USER = 3
 export const MAX_QUEUED_IMAGE_JOBS_PER_USER = 6
 
-// 전 유저 합계 in-flight 상한 (레벨 1). fal 계정 동시 실행 한도에서 안전 마진을 뺀 값.
-//
-// 실측 근거 (2026-08-26, scripts/fal-slot-probe.mjs): 24건·40건 동시 제출은 전원 대기 0으로 즉시
-//   실행됐고, 60건에서 처음으로 41건 실행 + 19건 대기가 관측됐다 — 계정 동시 한도 = 40.
-//   오너 대시보드 표기($1000 충전 = 40건 동시)와 일치한다. 옛 주석의 "슬롯 20" 은 근거 없는
-//   과소 가정이었고 그 위에 세운 18은 산 슬롯의 절반 이상을 놀리고 있었다.
-//
-// 마진 6인 이유: (a) count-then-submit 경쟁의 오버슛, (b) webhook 지연으로 이미 끝났는데 아직
-//   queued 로 세는 잡, (c) 이 40이 충전액 연동 티어라 잔액이 줄면 한도가 내려갈 수 있다.
-//   (c) 때문에 마진을 옛 2보다 크게 잡는다 — 티어가 30으로 내려가도 34는 fal 큐로 조금 새는 정도지만
-//   40에 딱 붙은 값이면 대기가 즉시 길어진다.
-//   ⚠️ fal 충전액/플랜을 바꾸면 이 값도 재검토할 것. 재측정은 위 스크립트로 (과금 발생).
-export const MAX_GLOBAL_INFLIGHT_JOBS = 34
+// 전 유저 합계 in-flight 상한 (레벨 1). 키별 maxInflight 의 합산이다(#fal-key-pool) — 다중 키
+//   레지스트리(FAL_KEYS env)로 전환하며 단일 상수 34(계정당 40 − 마진 6)를 폐기했다. 키별 값과
+//   마진 근거는 fal-key-pool.md 를 참고: 실측·마진 산정은 그대로(계정당 실측 − 마진 6), 값만 키마다
+//   env 로 설정한다. ⚠️ 키 추가/충전액 변경 시 FAL_KEYS.maxInflight 를 재검토할 것(재측정은
+//   scripts/fal-slot-probe.mjs, 과금 발생).
+
 
 /** 한도에 걸린 축 — 유저 본인의 상한인지, 전 유저 공유 슬롯인지. 안내 문구가 갈린다. */
 export type QuotaScope = 'user' | 'global'
@@ -127,8 +122,9 @@ export async function checkGenerationCapacity(
     if (!admin && userQueued >= limit) {
       return { ok: false, queued: userQueued, limit, scope: 'user', category }
     }
-    if (globalQueued >= MAX_GLOBAL_INFLIGHT_JOBS) {
-      return { ok: false, queued: globalQueued, limit: MAX_GLOBAL_INFLIGHT_JOBS, scope: 'global', category }
+    const globalLimit = totalMaxInflight()
+    if (globalQueued >= globalLimit) {
+      return { ok: false, queued: globalQueued, limit: globalLimit, scope: 'global', category }
     }
     return { ok: true, queued: userQueued, limit, scope: 'user', category }
   } catch {

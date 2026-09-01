@@ -20,7 +20,9 @@ vi.mock('@/lib/fal/finalize', async (importOriginal) => ({
 }))
 vi.mock('@/lib/fal/reconcile', () => ({ reconcileJobFromFal: mocks.reconcile }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from, rpc: mocks.rpc } }))
-vi.mock('@fal-ai/client', () => ({ fal: { config: vi.fn(), queue: { submit: mocks.submit } } }))
+vi.mock('@/lib/fal/keys', () => ({
+  pickFalKey: vi.fn(async () => ({ id: 'prod-2000', maxInflight: 40, client: { queue: { submit: mocks.submit } } })),
+}))
 
 import { POST } from '@/app/api/director/generate-video/route'
 import { GET as pollVideo } from '@/app/api/director/generate-video/[taskId]/route'

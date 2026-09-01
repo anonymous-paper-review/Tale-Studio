@@ -189,6 +189,7 @@ beforeEach(() => {
   mocks.falImageSubmit.mockImplementation(async (opts: FalImageOpts) => ({
     request_id: 'req-1',
     model: opts.model ?? (opts.reference_image_urls?.length ? DEFAULT_EDIT_IMAGE_MODEL : DEFAULT_IMAGE_MODEL),
+    fal_key_id: 'prod-2000',
   }))
 
   mocks.webhookBaseUrl = BASE_URL

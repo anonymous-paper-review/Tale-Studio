@@ -18,6 +18,7 @@ import {
 } from '@/lib/generation-jobs'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 import { falQueueStatusWithLogs } from '@/lib/writer/llm/fal'
+import { FalUnknownKeyError } from '@/lib/fal/keys'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -68,7 +69,8 @@ export async function GET(req: Request) {
       )
     }
     try {
-      const info = await falQueueStatusWithLogs(job.model, job.request_id)
+      if (!job.fal_key_id) throw new FalUnknownKeyError(job.fal_key_id)
+      const info = await falQueueStatusWithLogs(job.model, job.request_id, job.fal_key_id)
       return NextResponse.json({ ok: true, data: info })
     } catch (e) {
       return NextResponse.json({

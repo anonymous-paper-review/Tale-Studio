@@ -176,7 +176,7 @@ export async function attachProviderRequestToReservedVideoJob(
   projectId: string,
   jobId: string,
   providerRequestId: string,
-  options: { provider?: string; model?: string } = {},
+  options: { provider?: string; model?: string; falKeyId?: string } = {},
 ): Promise<void> {
   const { error } = await supabaseAdmin.rpc('attach_director_video_provider_request', {
     p_project_id: projectId,
@@ -186,6 +186,17 @@ export async function attachProviderRequestToReservedVideoJob(
     p_model: options.model ?? null,
   })
   if (error) throw error
+  // #fal-key-pool: attach RPC 시그니처에 fal_key_id 가 없어 별도 업데이트로 기록한다(fal 제출일에만 해당,
+  //   local 제출은 falKeyId 미지정 — 조용히 no-op). 실패는 치명적이지 않다 — 조회가 안 되면
+  //   reconcile 이 FalUnknownKeyError 로 터미널 처리해 잡을 영원히 queued 로 남기지 않는다.
+  if (options.falKeyId) {
+    const { error: keyError } = await supabaseAdmin
+      .from('generation_jobs')
+      .update({ fal_key_id: options.falKeyId })
+      .eq('id', jobId)
+      .eq('project_id', projectId)
+    if (keyError) console.error('[director-video-takes] fal_key_id attach failed:', keyError.message)
+  }
 }
 
 export async function completeDirectorVideoAttempt(

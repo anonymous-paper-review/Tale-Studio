@@ -103,6 +103,8 @@ export interface AssetItem {
   error?: string;
   request_id?: string;
   submitted_at?: string;
+  /** 제출에 사용된 fal 키 id(#fal-key-pool) — resume 조회가 이 id 의 client 를 쓴다. */
+  fal_key_id?: string;
 }
 
 export interface AssetsManifest {
@@ -133,6 +135,8 @@ export interface ShotImageResult {
   error?: string;
   request_id?: string;       // fal queue id (pending 상태 회수에 필요)
   submitted_at?: string;     // ISO. resume timeout 판단용
+  /** 제출에 사용된 fal 키 id(#fal-key-pool) — resume 조회가 이 id 의 client 를 쓴다. */
+  fal_key_id?: string;
 }
 
 export interface ShotImagesOutput {
@@ -160,6 +164,8 @@ export interface ShotVideoResult {
   error?: string;
   request_id?: string;
   submitted_at?: string;
+  /** 제출에 사용된 fal 키 id(#fal-key-pool) — resume 조회가 이 id 의 client 를 쓴다. */
+  fal_key_id?: string;
 }
 
 export interface ShotVideosOutput {

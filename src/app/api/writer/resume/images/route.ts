@@ -37,6 +37,14 @@ export async function POST(req: NextRequest) {
     }
 
     const shots: ShotImageResult[] = file.shots.slice();
+    // request_id 는 있지만 fal_key_id 가 없는 항목은 다중키 이전에 제출된 오래된 pending —
+    //   어느 키로 제출됐는지 알 수 없어 재시도 없이 즉시 failed 처리(#fal-key-pool).
+    for (const s of shots) {
+      if (s.status === 'pending' && s.request_id && !s.fal_key_id) {
+        s.status = 'failed';
+        s.error = 'fal key unknown (pre-multikey entry)';
+      }
+    }
     const pendingIdx = shots
       .map((s, i) => ({ s, i }))
       .filter(({ s }) => s.status === 'pending' && s.request_id);
@@ -54,7 +62,7 @@ export async function POST(req: NextRequest) {
     await Promise.all(
       pendingIdx.map(async ({ s, i }) => {
         try {
-          const r = await falImageFetch(model, s.request_id!);
+          const r = await falImageFetch(model, s.request_id!, s.fal_key_id!);
           if (r.status === 'COMPLETED') {
             shots[i] = { ...s, image_url: r.url, width: r.width, height: r.height, status: 'success' };
             resumed++;

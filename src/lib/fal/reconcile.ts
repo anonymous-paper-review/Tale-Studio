@@ -18,6 +18,7 @@ import { describeFinalizeError, normalizeFailureEvidence } from '@/lib/fal/error
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
 import { falImageFetch, falVideoFetch } from '@/lib/writer/llm/fal'
+import { FalUnknownKeyError } from '@/lib/fal/keys'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 import {
   DirectorVideoCompletionPersistenceError,
@@ -124,13 +125,16 @@ export async function reconcileJobFromFal(job: GenerationJob): Promise<Generatio
     }))
   }
 
+  // 키 미지정(null) 또는 레지스트리에 없는 id 는 조회 불가능한 영구 상태다(#fal-key-pool) — 404 분기와
+  //   동일하게 터미널 처리한다(재시도해도 어느 키로 조회할지 모른다).
   let result: Awaited<ReturnType<typeof falImageFetch | typeof falVideoFetch>>
   try {
+    if (!job.fal_key_id) throw new FalUnknownKeyError(job.fal_key_id)
     result = job.kind === 'shot_video' || job.kind === 'shot_previz_video'
-      ? await falVideoFetch(job.model, job.request_id)
-      : await falImageFetch(job.model, job.request_id)
+      ? await falVideoFetch(job.model, job.request_id, job.fal_key_id)
+      : await falImageFetch(job.model, job.request_id, job.fal_key_id)
   } catch (error) {
-    if (isPermanentProviderLookupFailure(error)) {
+    if (error instanceof FalUnknownKeyError || isPermanentProviderLookupFailure(error)) {
       // fal ApiError 는 404(NOT_FOUND)에서 message 가 빈 문자열이다. 그대로 넘기면 terminalizeJob 의
       //   "failure evidence must be nonblank" 가드에 걸려 종결이 실패하고, 그 잡은 영원히 queued 로
       //   남아 그 샷의 재생성을 계속 막는다 (2026-08-27 A1 재현에서 확인).

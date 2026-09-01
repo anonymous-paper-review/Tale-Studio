@@ -183,7 +183,7 @@ export async function triggerCharacterDrafts(
           characterId: c.character_id,
           view: 'main',
         })
-        let falResult: { request_id: string; model: string }
+        let falResult: { request_id: string; model: string; fal_key_id: string }
         try {
           falResult = await falImageSubmit(submitOpts)
         } catch (error) {
@@ -196,11 +196,12 @@ export async function triggerCharacterDrafts(
           })
           throw error
         }
-        const { request_id, model } = falResult
+        const { request_id, model, fal_key_id } = falResult
         const job = await createGenerationJob({
           projectId,
           requestId: request_id,
           model,
+          falKeyId: fal_key_id,
           kind: 'character_view',
           actor: 'writer',
           provider: 'fal',

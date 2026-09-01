@@ -60,6 +60,13 @@ export async function runShotImages(
       .filter((s) => s.status === 'success' && s.image_url)
       .map((s) => [s.shot_id, s]),
   );
+  // fal_key_id 없는 pending 항목(#fal-key-pool 전환 이전 제출)은 어느 키로 나갔는지 몰라 조회
+  //   불가 — 재시도 없이 즉시 failed 로 마킹한다.
+  const stalePendingFromCache = new Map<string, ShotImageResult>(
+    (cachedFile?.shots ?? [])
+      .filter((s) => s.status === 'pending' && s.request_id && !s.fal_key_id)
+      .map((s) => [s.shot_id, { ...s, status: 'failed' as const, error: 'fal key unknown (pre-multikey entry)' }]),
+  );
 
   await logger.markStage('shotImages', 'started', {
     total: finalPrompts.shots.length,
@@ -77,6 +84,9 @@ export async function runShotImages(
   const resultByShot = new Map<string, ShotImageResult>();
   for (const cached of cachedSuccess.values()) {
     resultByShot.set(cached.shot_id, cached);
+  }
+  for (const stale of stalePendingFromCache.values()) {
+    resultByShot.set(stale.shot_id, stale);
   }
 
   let writeLock: Promise<void> = Promise.resolve();
@@ -102,7 +112,9 @@ export async function runShotImages(
   };
 
   // ── Phase 1: 모든 샷을 fal queue에 submit ─────────────────────────────
-  const submitQueue = finalPrompts.shots.filter((s) => !cachedSuccess.has(s.shot_id));
+  const submitQueue = finalPrompts.shots.filter(
+    (s) => !cachedSuccess.has(s.shot_id) && !stalePendingFromCache.has(s.shot_id),
+  );
   const pendingShots: Array<{ shot_id: string; request_id: string }> = [];
 
   async function submitWorker() {
@@ -114,7 +126,7 @@ export async function runShotImages(
         .map((id) => assetUrlById.get(id))
         .filter((u): u is string => !!u);
       try {
-        const { request_id } = await falImageSubmit({
+        const { request_id, fal_key_id } = await falImageSubmit({
           model: opts.model,
           prompt: shot.t2i.prompt,
           aspect_ratio: shot.t2i.aspect_ratio,
@@ -129,6 +141,7 @@ export async function runShotImages(
           model: modelLabel,
           status: 'pending',
           request_id,
+          fal_key_id,
           submitted_at: new Date().toISOString(),
         };
         resultByShot.set(shot.shot_id, pending);
@@ -165,7 +178,7 @@ export async function runShotImages(
         const cur = resultByShot.get(shot_id);
         if (!cur) return;
         try {
-          const r = await falImageFetch(modelLabel, request_id);
+          const r = await falImageFetch(modelLabel, request_id, cur.fal_key_id!);
           if (r.status === 'COMPLETED') {
             resultByShot.set(shot_id, {
               ...cur,

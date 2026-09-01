@@ -68,10 +68,12 @@ describe('generation job terminal CAS helpers', () => {
       },
       workspaceId: 'workspace-1',
       userId: 'user-1',
+      falKeyId: 'prod-2000',
     })
 
     expect(creation.insert).toHaveBeenCalledWith(expect.objectContaining({
       input_snapshot: {},
+      fal_key_id: 'prod-2000',
     }))
   })
 

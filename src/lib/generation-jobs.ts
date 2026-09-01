@@ -63,12 +63,14 @@ export interface GenerationJob {
   attempts?: number
   last_error?: string | null
   chat_trace_id?: string | null
+  /** 제출에 사용된 fal 키 id(#fal-key-pool) — 조회 계열이 같은 키의 client 로만 fal 잡을 볼 수 있어 필수. */
+  fal_key_id: string
 }
 
 // Read/finalize paths intentionally select only the fields they consume. Provider is authoritative for
 // local-vs-FAL reconciliation; actor/runtime metadata is selected only by activity/quota callsites.
 const COLUMNS =
-  'id, project_id, request_id, model, kind, status, target, video_clip_id, idempotency_key, provider, input_snapshot, response_snapshot, result_url, error, chat_trace_id'
+  'id, project_id, request_id, model, kind, status, target, video_clip_id, idempotency_key, provider, input_snapshot, response_snapshot, result_url, error, chat_trace_id, fal_key_id'
 
 // 웹훅 finalize/폴링 경로가 의존하는 컬럼 집합(회귀 가드용 export). finalize 는 job.target.workspaceId 와
 //   job.input_snapshot.source_hash 를 읽으므로 둘 다 반드시 포함돼야 한다(누락 시 후보 source_hash=null → stale 무력화).
@@ -146,6 +148,8 @@ export async function createGenerationJob(input: {
   inputSnapshot?: unknown
   /** 채팅이 직접 시작한 생성이면 해당 채팅 trace와 연결한다. */
   chatTraceId?: string | null
+  /** submit 시 pickFalKey() 가 고른 키 id(#fal-key-pool) — 조회 경로가 이 값의 client 를 쓴다. */
+  falKeyId: string
 }): Promise<GenerationJob> {
   if (input.kind === 'shot_video') {
     throw new Error('shot_video jobs must be created by a director video reservation')
@@ -179,6 +183,7 @@ export async function createGenerationJob(input: {
       provider: input.provider ?? 'fal',
       input_snapshot: toJsonSnapshot(input.inputSnapshot === undefined ? {} : input.inputSnapshot),
       chat_trace_id: input.chatTraceId ?? null,
+      fal_key_id: input.falKeyId,
       submitted_at: now,
       attempts: 1,
       status: 'queued',
@@ -755,6 +760,24 @@ export async function countQueuedJobsGlobal(): Promise<number> {
     .gte('created_at', cutoffIso)
   if (error) throw error
   if (count === null) throw new Error('generation job global inflight count returned no count')
+  return count
+}
+
+/**
+ * 키별 in-flight(queued) 수 (#fal-key-pool) — pickFalKey 의 least-loaded 배분 기준.
+ *   countQueuedJobsGlobal 과 같은 비종결 status 집합 + 신선도 컷(QUOTA_COUNT_WINDOW_MIN)을 쓴다 —
+ *   좋비(webhook 유실)가 키의 여유를 영구히 0으로 보이게 만들어 그 키만 계속 쓰이는 쓰림을 막는다.
+ */
+export async function countQueuedJobsByKey(falKeyId: string): Promise<number> {
+  const cutoffIso = new Date(Date.now() - QUOTA_COUNT_WINDOW_MIN * 60_000).toISOString()
+  const { count, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'queued')
+    .eq('fal_key_id', falKeyId)
+    .gte('created_at', cutoffIso)
+  if (error) throw error
+  if (count === null) throw new Error('generation job key inflight count returned no count')
   return count
 }
 
